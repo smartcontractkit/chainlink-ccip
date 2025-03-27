@@ -1,0 +1,68 @@
+name: Solana publish build
+
+env:
+    AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+    AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_hash:
+        type: string
+        description: 'Commit hash'
+        required: true
+      cluster:
+        type: choice
+        description: 'Cluster'
+        required: true
+        options:
+          - localnet
+defaults:
+  run:
+    working-directory: ./chains/solana
+
+jobs:
+  set_s3_values:
+    runs-on: ubuntu-latest
+    needs: build_solana_artifacts
+    steps:
+      - name: Set S3 reference values
+        run: |
+          BUCKET_NAME=your-bucket-name >> $GITHUB_ENV
+          FOLDER_NAME=${{github.event.inputs.cluster}}/${{ github.event.inputs.commit_hash }}/" >> $GITHUB_ENV
+
+  build_solana_artifacts:
+    uses: ./.github/workflows/solana.yml
+    with:
+      commit_hash: ${{ github.event.inputs.commit_hash }}
+    secrets: inherit
+    
+  publish_artifacts_to_s3:
+    runs-on: ubuntu-latest
+    needs: build_solana_artifacts
+    steps:
+      - name: Prepare S3 folder
+        run: |
+          if aws s3 ls "s3://$BUCKET_NAME/$FOLDER_NAME" 2>&1 | grep -q 'NoSuchKey'; then
+              echo "Folder does not exist."
+          else
+              echo "Folder exists, deleting it."
+              aws s3 rm "s3://$BUCKET_NAME/$FOLDER_NAME" --recursive
+          fi
+
+          aws s3api put-object --bucket $BUCKET_NAME --key $FOLDER_NAME
+
+      - name: Publish contracts
+        run: |
+          echo "Publishing contracts"
+          aws s3 cp chains/solana/contracts/target/deploy/ s3://$BUCKET_NAME/$FOLDER_NAME --recursive --exclude "*" --include "*.so"
+
+      - name: Publish keypairs
+        run: |
+          echo "Publishing keypairs"
+          aws s3 cp chains/solana/contracts/target/deploy/ s3://$BUCKET_NAME/$FOLDER_NAME --recursive --exclude "*" --include "*.json"
+
+      - name: Publish go bindings
+        run: |
+          echo "Publishing go bindings"
+          aws s3 cp chains/solana/contracts/target/deploy/ s3://$BUCKET_NAME/$FOLDER_NAME --recursive --exclude "*" --include "*.go"
