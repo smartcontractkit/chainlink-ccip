@@ -28,11 +28,11 @@ func validateCommitReportsReadingEligibility(
 	supportedChains mapset.Set[cciptypes.ChainSelector],
 	observedData exectypes.CommitObservations,
 ) error {
-	for chainSel := range observedData {
+	for chainSel, observedDataOfChain := range observedData {
 		if !supportedChains.Contains(chainSel) {
 			return fmt.Errorf("observer not allowed to read from chain %d", chainSel)
 		}
-		for _, data := range observedData[chainSel] {
+		for _, data := range observedDataOfChain {
 			if data.SourceChain != chainSel {
 				return fmt.Errorf("invalid observed data, key=%d but data chain=%d",
 					chainSel, data.SourceChain)
@@ -140,12 +140,12 @@ func validateMessagesConformToCommitReports(
 
 	msgsCount := 0
 	for chain, report := range observedData {
-		for _, data := range report {
-			msgsMap, ok := observedMsgs[chain]
-			if !ok {
-				return fmt.Errorf("no messages observed for chain %d, while report was observed", chain)
-			}
+		msgsMap, ok := observedMsgs[chain]
+		if !ok {
+			return fmt.Errorf("no messages observed for chain %d, while report was observed", chain)
+		}
 
+		for _, data := range report {
 			for seqNum := data.SequenceNumberRange.Start(); seqNum <= data.SequenceNumberRange.End(); seqNum++ {
 				_, ok = msgsMap[seqNum]
 				if !ok {
