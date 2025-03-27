@@ -3,6 +3,7 @@ package v1
 import (
 	"encoding/json"
 	"fmt"
+	"sync"
 
 	"google.golang.org/protobuf/proto"
 
@@ -50,8 +51,8 @@ func (e *ExecCodecProto) EncodeObservation(observation exectypes.Observation) ([
 		},
 		FChain: e.tr.fChainToProto(observation.FChain),
 	}
-
-	return proto.Marshal(pbObs)
+	encoded, err := proto.Marshal(pbObs)
+	return encoded, err
 }
 
 func (e *ExecCodecProto) DecodeObservation(data []byte) (exectypes.Observation, error) {
@@ -63,8 +64,7 @@ func (e *ExecCodecProto) DecodeObservation(data []byte) (exectypes.Observation, 
 	if err := proto.Unmarshal(data, pbObs); err != nil {
 		return exectypes.Observation{}, fmt.Errorf("proto unmarshal ExecObservation: %w", err)
 	}
-
-	return exectypes.Observation{
+	decoded := exectypes.Observation{
 		CommitReports: e.tr.commitReportsFromProto(pbObs.CommitReports),
 		Messages:      e.tr.messageObservationsFromProto(pbObs.SeqNumsToMsgs),
 		Hashes:        e.tr.messageHashesFromProto(pbObs.MsgHashes),
@@ -75,7 +75,8 @@ func (e *ExecCodecProto) DecodeObservation(data []byte) (exectypes.Observation, 
 			Addresses: e.tr.discoveryAddressesFromProto(pbObs.Contracts.ContractNames.Addresses),
 		},
 		FChain: e.tr.fChainFromProto(pbObs.FChain),
-	}, nil
+	}
+	return decoded, nil
 }
 
 func (e *ExecCodecProto) EncodeOutcome(outcome exectypes.Outcome) ([]byte, error) {
@@ -88,8 +89,9 @@ func (e *ExecCodecProto) EncodeOutcome(outcome exectypes.Outcome) ([]byte, error
 			ChainReports: e.tr.chainReportsToProto(outcome.Report.ChainReports),
 		},
 	}
+	encoded, err := proto.MarshalOptions{Deterministic: true}.Marshal(pbObs)
 
-	return proto.MarshalOptions{Deterministic: true}.Marshal(pbObs)
+	return encoded, err
 }
 
 func (e *ExecCodecProto) DecodeOutcome(data []byte) (exectypes.Outcome, error) {
@@ -109,42 +111,56 @@ func (e *ExecCodecProto) DecodeOutcome(data []byte) (exectypes.Outcome, error) {
 			ChainReports: e.tr.chainReportsFromProto(pbOutc.ExecutePluginReport.ChainReports),
 		},
 	}
-
 	return outc, nil
 }
 
 // ExecCodecJSON is an implementation of ExecCodec that uses JSON.
 // DEPRECATED: Use ExecCodecProto instead.
-type ExecCodecJSON struct{}
+type ExecCodecJSON struct {
+	mu sync.Mutex
+}
 
+// NewExecCodecJSON Used in tests only so far
 // DEPRECATED
 func NewExecCodecJSON() *ExecCodecJSON {
-	return &ExecCodecJSON{}
+	return &ExecCodecJSON{
+		mu: sync.Mutex{},
+	}
 }
 
-func (*ExecCodecJSON) EncodeObservation(observation exectypes.Observation) ([]byte, error) {
-	return json.Marshal(observation)
+func (e *ExecCodecJSON) EncodeObservation(observation exectypes.Observation) ([]byte, error) {
+	e.mu.Lock()
+	encoded, err := json.Marshal(observation)
+	e.mu.Unlock()
+	return encoded, err
 }
 
-func (*ExecCodecJSON) DecodeObservation(data []byte) (exectypes.Observation, error) {
+func (e *ExecCodecJSON) DecodeObservation(data []byte) (exectypes.Observation, error) {
 	if len(data) == 0 {
 		return exectypes.Observation{}, nil
 	}
 	obs := exectypes.Observation{}
+	e.mu.Lock()
 	err := json.Unmarshal(data, &obs)
+	e.mu.Unlock()
 	return obs, err
 }
 
-func (*ExecCodecJSON) EncodeOutcome(outcome exectypes.Outcome) ([]byte, error) {
+func (e *ExecCodecJSON) EncodeOutcome(outcome exectypes.Outcome) ([]byte, error) {
 	// We sort again here in case construction is not via the constructor.
-	return json.Marshal(exectypes.NewSortedOutcome(outcome.State, outcome.CommitReports, outcome.Report))
+	e.mu.Lock()
+	encoded, err := json.Marshal(exectypes.NewSortedOutcome(outcome.State, outcome.CommitReports, outcome.Report))
+	e.mu.Unlock()
+	return encoded, err
 }
 
-func (*ExecCodecJSON) DecodeOutcome(data []byte) (exectypes.Outcome, error) {
+func (e *ExecCodecJSON) DecodeOutcome(data []byte) (exectypes.Outcome, error) {
 	if len(data) == 0 {
 		return exectypes.Outcome{}, nil
 	}
 	o := exectypes.Outcome{}
+	e.mu.Lock()
 	err := json.Unmarshal(data, &o)
+	e.mu.Unlock()
 	return o, err
 }
