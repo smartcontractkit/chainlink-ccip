@@ -2,7 +2,8 @@ use anchor_lang::prelude::*;
 use ethnum::U256;
 
 use crate::extra_args::{
-    GenericExtraArgsV2, SVMExtraArgsV1, GENERIC_EXTRA_ARGS_V2_TAG, SVM_EXTRA_ARGS_V1_TAG,
+    GenericExtraArgsV2, SVMExtraArgsV1, GENERIC_EXTRA_ARGS_V2_TAG, SVM_EXTRA_ARGS_MAX_ACCOUNTS,
+    SVM_EXTRA_ARGS_V1_TAG,
 };
 use crate::messages::{
     ProcessedExtraArgs, SVM2AnyMessage, CHAIN_FAMILY_SELECTOR_EVM, CHAIN_FAMILY_SELECTOR_SVM,
@@ -169,7 +170,17 @@ fn parse_and_validate_svm_extra_args(
             let args = if data.is_empty() {
                 SVMExtraArgsV1::default_config(cfg)
             } else {
-                SVMExtraArgsV1::deserialize(data)?
+                let args = SVMExtraArgsV1::deserialize(data)?;
+                require_gte!(
+                    SVM_EXTRA_ARGS_MAX_ACCOUNTS,
+                    args.accounts.len(),
+                    FeeQuoterError::InvalidExtraArgsAccounts
+                );
+                require!(
+                    args.account_is_writable_bitmap >> args.accounts.len() == 0,
+                    FeeQuoterError::InvalidExtraArgsWritabilityBitmap
+                );
+                args
             };
 
             // token_receiver != 0 when tokens are present
