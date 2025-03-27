@@ -41,8 +41,6 @@ use instructions::*;
 /// All operations enforce state transitions, size limits, and role-based access.
 pub mod timelock {
     #![warn(missing_docs)]
-    use bytemuck::Zeroable;
-
     use super::*;
 
     /// Initialize the timelock configuration.
@@ -489,8 +487,8 @@ pub mod timelock {
         _timelock_id: [u8; TIMELOCK_ID_PADDED],
     ) -> Result<()> {
         let mut config = ctx.accounts.config.load_mut()?;
+        // NOTE: take() resets proposed_owner to default
         config.owner = std::mem::take(&mut config.proposed_owner);
-        config.proposed_owner = Pubkey::zeroed();
         Ok(())
     }
 }
