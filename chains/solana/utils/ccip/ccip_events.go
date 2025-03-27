@@ -72,6 +72,20 @@ type UsdPerUnitGasUpdated struct {
 	Timestamp     int64
 }
 
+type EventUsdPerTokenUpdated struct {
+	Discriminator [8]byte
+	Token         solana.PublicKey
+	Value         [28]byte
+	Timestamp     int64
+}
+
+type EventUsdPerUnitGasUpdated struct {
+	Discriminator [8]byte
+	DestChain     uint64
+	Value         [28]byte
+	Timestamp     int64
+}
+
 type OwnershipTransferRequested struct {
 	Discriminator [8]byte
 	From          solana.PublicKey

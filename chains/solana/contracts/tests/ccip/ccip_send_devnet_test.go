@@ -40,6 +40,25 @@ func TestDevnet(t *testing.T) {
 	require.NoError(t, err)
 
 	var referenceAddresses ccip_offramp.ReferenceAddresses
+
+	t.Run("Read event", func(t *testing.T) {
+		txsig, err := solana.SignatureFromBase58("dTWzQJ2FELaREGAQ4dMeuDTfXYwY42LSczTfUSRyqTqi3WvG4TBuxLCdZtcZnYtqWKheP5evXdQFrJgYVSG8SQi")
+		require.NoError(t, err)
+
+		v := uint64(0)
+		tx, err := client.GetTransaction(ctx, txsig, &rpc.GetTransactionOpts{
+			Commitment:                     rpc.CommitmentConfirmed,
+			MaxSupportedTransactionVersion: &v,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, tx)
+
+		var event ccip.EventUsdPerTokenUpdated
+		require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "UsdPerTokenUpdated", &event, true))
+
+		t.FailNow()
+	})
+
 	t.Run("Read Reference Addresses", func(t *testing.T) {
 		require.NoError(t, common.GetAccountDataBorshInto(ctx, client, offrampPDAs.referenceAddresses, rpc.CommitmentConfirmed, &referenceAddresses))
 		fmt.Printf("Reference Addresses: %+v\n", referenceAddresses)
@@ -99,22 +118,6 @@ func TestDevnet(t *testing.T) {
 	// 	require.NoError(t, common.GetAccountDataBorshInto(ctx, client, solana.MustPublicKeyFromBase58("6WwuJ4Z2RCkzZs2XY5TRhhGVGeBwSzC74sSBzoddfBPd"), rpc.CommitmentConfirmed, &loggedDestChainState))
 	// 	fmt.Printf("(Logged) DestChainState: %+v\n", loggedDestChainState)
 	// })
-
-	t.Run("Read event", func(t *testing.T) {
-		txsig, err := solana.SignatureFromBase58("61qFfCUu5wsoLZSt9B9MjAiokFFxSHywboZk1rFtE57ndF2GhYmQkJDqgJ4xC14iizsaX2prQXtfrmmN4pmMJwtx")
-		require.NoError(t, err)
-
-		v := uint64(0)
-		tx, err := client.GetTransaction(ctx, txsig, &rpc.GetTransactionOpts{
-			Commitment:                     rpc.CommitmentConfirmed,
-			MaxSupportedTransactionVersion: &v,
-		})
-		require.NoError(t, err)
-		require.NotNil(t, tx)
-
-		var event ccip.EventConfigSet
-		require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "ConfigSet", &event, true))
-	})
 
 	t.Run("Offramp: Commit prices only", func(t *testing.T) {
 		report := ccip_offramp.CommitInput{
