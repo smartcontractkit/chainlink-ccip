@@ -252,14 +252,29 @@ func TestCCIPRouter(t *testing.T) {
 		t.Run("token-pool", func(t *testing.T) {
 			token0.AdditionalAccounts = append(token0.AdditionalAccounts, solana.MemoProgramID) // add test additional accounts in pool interactions
 
+			type ProgramData struct {
+				DataType uint32
+				Address  solana.PublicKey
+			}
+			// get program data account
+			data, err := solanaGoClient.GetAccountInfoWithOpts(ctx, config.CcipTokenPoolProgram, &rpc.GetAccountInfoOpts{
+				Commitment: config.DefaultCommitment,
+			})
+			require.NoError(t, err)
+			// Decode program data
+			var programData ProgramData
+			require.NoError(t, bin.UnmarshalBorsh(&programData, data.Bytes()))
+
 			ixInit0, err := test_token_pool.NewInitializeInstruction(
 				test_token_pool.BurnAndMint_PoolType,
 				config.CcipRouterProgram,
 				config.RMNRemoteProgram,
 				token0.PoolConfig,
 				token0.Mint,
-				token0PoolAdmin.PublicKey(),
+				legacyAdmin.PublicKey(),
 				solana.SystemProgramID,
+				config.CcipTokenPoolProgram,
+				programData.Address,
 			).ValidateAndBuild()
 			require.NoError(t, err)
 
@@ -269,8 +284,10 @@ func TestCCIPRouter(t *testing.T) {
 				config.RMNRemoteProgram,
 				token1.PoolConfig,
 				token1.Mint,
-				token1PoolAdmin.PublicKey(),
+				legacyAdmin.PublicKey(),
 				solana.SystemProgramID,
+				config.CcipTokenPoolProgram,
+				programData.Address,
 			).ValidateAndBuild()
 			require.NoError(t, err)
 
@@ -280,8 +297,54 @@ func TestCCIPRouter(t *testing.T) {
 				config.RMNRemoteProgram,
 				token2.PoolConfig,
 				token2.Mint,
-				token2PoolAdmin.PublicKey(),
+				legacyAdmin.PublicKey(),
 				solana.SystemProgramID,
+				config.CcipTokenPoolProgram,
+				programData.Address,
+			).ValidateAndBuild()
+			require.NoError(t, err)
+
+			// The pools are nitially owned by the CCIP admin. For the purposes of this test, they're now transferred to the individual
+			// token admins. In practice, these token pools would've been original instantiated under separate token pool programs
+			// owned by each individual admin instead.
+			ixTransfer0, err := test_token_pool.NewTransferOwnershipInstruction(
+				token0PoolAdmin.PublicKey(),
+				token0.PoolConfig,
+				token0.Mint,
+				legacyAdmin.PublicKey(),
+			).ValidateAndBuild()
+			require.NoError(t, err)
+			ixTransfer1, err := test_token_pool.NewTransferOwnershipInstruction(
+				token1PoolAdmin.PublicKey(),
+				token1.PoolConfig,
+				token1.Mint,
+				legacyAdmin.PublicKey(),
+			).ValidateAndBuild()
+			require.NoError(t, err)
+			ixTransfer2, err := test_token_pool.NewTransferOwnershipInstruction(
+				token2PoolAdmin.PublicKey(),
+				token2.PoolConfig,
+				token2.Mint,
+				legacyAdmin.PublicKey(),
+			).ValidateAndBuild()
+			require.NoError(t, err)
+
+			ixAccept0, err := test_token_pool.NewAcceptOwnershipInstruction(
+				token0.PoolConfig,
+				token0.Mint,
+				token0PoolAdmin.PublicKey(),
+			).ValidateAndBuild()
+			require.NoError(t, err)
+			ixAccept1, err := test_token_pool.NewAcceptOwnershipInstruction(
+				token1.PoolConfig,
+				token1.Mint,
+				token1PoolAdmin.PublicKey(),
+			).ValidateAndBuild()
+			require.NoError(t, err)
+			ixAccept2, err := test_token_pool.NewAcceptOwnershipInstruction(
+				token2.PoolConfig,
+				token2.Mint,
+				token2PoolAdmin.PublicKey(),
 			).ValidateAndBuild()
 			require.NoError(t, err)
 
@@ -301,7 +364,9 @@ func TestCCIPRouter(t *testing.T) {
 			ixAuth, err := tokens.SetTokenMintAuthority(token0.Program, token0.PoolSigner, token0.Mint, token0PoolAdmin.PublicKey())
 			require.NoError(t, err)
 
-			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ixInit0, ixInit1, ixAta0, ixAta1, ixAuth, ixInit2, ixAta2}, token0PoolAdmin, config.DefaultCommitment, common.AddSigners(token1PoolAdmin, token2PoolAdmin))
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ixInit0, ixInit1, ixInit2}, legacyAdmin, config.DefaultCommitment)
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ixTransfer0, ixTransfer1, ixTransfer2, ixAccept0, ixAccept1, ixAccept2}, legacyAdmin, config.DefaultCommitment, common.AddSigners(token0PoolAdmin, token1PoolAdmin, token2PoolAdmin))
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ixAta0, ixAta1, ixAuth, ixAta2}, token0PoolAdmin, config.DefaultCommitment, common.AddSigners(token1PoolAdmin, token2PoolAdmin))
 
 			// Lookup Table for Tokens
 			require.NoError(t, token0.SetupLookupTable(ctx, solanaGoClient, token0PoolAdmin))
