@@ -79,6 +79,7 @@ pipelines:
 
   cluster-services:
     run: |-
+      run_dependency_pipelines prometheus
       run_dependency_pipelines tempo
       run_dependency_pipelines beholder-gateway
       run_dependency_pipelines minio-operator
@@ -143,6 +144,20 @@ profiles:
               TEMPO_RETENTION: 720h # 30d
             profiles: [enable-persistence]
 
+  - name: cluster-services-prometheus
+    patches:
+      - op: add
+        path: dependencies
+        value:
+          prometheus:
+            path: ${DEPENDENCIES_DIR}/daas/cluster-services-prometheus.yaml
+            overwriteVars: true
+            namespace: prometheus
+            pipeline: deploy
+            vars:
+              NAMESPACE: prometheus
+            profiles: []
+
   - name: cluster-services-beholder-gateway
     patches:
       - op: add
@@ -192,6 +207,7 @@ profiles:
   - name: cluster-services
     parents:
       - profile: cluster-services-tempo
+      - profile: cluster-services-prometheus
       - profile: cluster-services-beholder-gateway
       - profile: cluster-services-minio-operator
       - profile: cluster-services-minio-tenant

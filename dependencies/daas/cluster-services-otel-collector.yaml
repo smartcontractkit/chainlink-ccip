@@ -113,6 +113,12 @@ deployments:
               endpoint: tempo.prometheus.svc.cluster.local:4317
               tls:
                 insecure: true
+            prometheusremotewrite:
+              endpoint: "http://prometheus-push-gateway.prometheus.svc.cluster.local:9091/metrics/job/beholder_gateway"
+              headers:
+                Content-Type: "text/plain"
+              tls:
+                insecure: true
           extensions:
             # The health_check extension is mandatory for this chart.
             # Without the health_check extension the collector will fail the readiness and liveliness probes.
@@ -161,6 +167,7 @@ deployments:
               metrics:
                 exporters:
                   - debug
+                  - prometheusremotewrite
                 processors:
                   - memory_limiter
                   - batch
