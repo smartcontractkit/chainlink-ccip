@@ -114,9 +114,7 @@ deployments:
               tls:
                 insecure: true
             prometheusremotewrite:
-              endpoint: "http://prometheus-push-gateway.prometheus.svc.cluster.local:9091/metrics/job/beholder_gateway"
-              headers:
-                Content-Type: "text/plain"
+              endpoint: "http://prometheus-prometheus.prometheus.svc.cluster.local:9090/api/v1/write"
               tls:
                 insecure: true
           extensions:

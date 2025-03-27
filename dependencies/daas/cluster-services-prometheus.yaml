@@ -21,18 +21,14 @@ vars:
   PROMETHEUS_NAME:
     source: env
     default: prometheus
-  PROMETHEUS_PUSH_GATEWAY_NAME:
-    source: env
-    default: prometheus-push-gateway
+
 pipelines:
   deploy:
     run: |-
       create_deployments prometheus
-      create_deployments prometheus-push-gateway
   purge:
     run: |-
       purge_deployments prometheus
-      purge_deployments prometheus-push-gateway
 
 deployments:
   prometheus:
@@ -49,20 +45,6 @@ deployments:
         fullnameOverride: ${PROMETHEUS_NAME}
       valuesFiles:
         - ${LOCAL_VALUES_DIR}/prometheus/prometheus-default.yaml
-  prometheus-push-gateway:
-    updateImageTags: false
-    namespace: ${NAMESPACE}
-    helm:
-      displayOutput: true
-      releaseName: ${PROMETHEUS_PUSH_GATEWAY_NAME}
-      chart:
-        name: prometheus-pushgateway
-        repo: https://prometheus-community.github.io/helm-charts
-        version: 3.0.0
-      values:
-        fullnameOverride: ${PROMETHEUS_PUSH_GATEWAY_NAME}
-      valuesFiles:
-        - ${LOCAL_VALUES_DIR}/prometheus/prometheus-push-gateway.yaml
 
 hooks:
   - wait:

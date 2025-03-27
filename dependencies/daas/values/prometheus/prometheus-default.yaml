@@ -59,6 +59,8 @@ additionalPrometheusRulesMap:
 ## - alertmanager
 ## - thanosRuler (disabled)
 prometheus:
+  extraArgs:
+    - --web.enable-remote-write-receiver
   enabled: true
   service:
     type: NodePort
@@ -97,6 +99,9 @@ prometheus:
     serviceMonitorSelectorNilUsesHelmValues: false
     priorityClassName: system-node-critical
     retention: 14d
+    ## enable --web.enable-remote-write-receiver flag on prometheus-server
+    ##
+    enableRemoteWriteReceiver: true
 prometheusOperator:
   enabled: true
   admissionWebhooks:
