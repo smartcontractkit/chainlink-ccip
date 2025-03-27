@@ -151,16 +151,17 @@ type CommitOffchainConfig struct {
 	// MaxRootsPerReport is the maximum number of roots to include in a single report.
 	// Set this to 1 for destination chains that cannot process more than one commit root per report (e.g, Solana)
 	// Disable by setting to 0.
-	// Warning: if MaxRootsPerReport is non-zero, MultipleReportsEnabled should be set to true. In the future
-	// it may become an error to use MaxMerkleRootsPerReport without also using MultipleReportsEnabled. For now
-	// it is allowed for testing purposes.
-	// NOTE: this can only be used if RMNEnabled == false.
+	// NOTE:
+	//  * this can only be used if RMNEnabled == false.
+	//  * if MaxMerkleRootsPerReport is non-zero, MultipleReportsEnabled should be set to true.
 	MaxMerkleRootsPerReport uint64 `json:"maxRootsPerReport"`
 
-	// MaxPricesPerReport is the maximum number of prices to include in a single report. When this option is set,
-	// the commit plugin will split the prices across multiple reports if there are more than this number of prices.
-	// It will also split prices and merkle roots into separate reports.
-	// NOTE: this can only be used if RMNEnabled == false.
+	// MaxPricesPerReport is the maximum number of token and/or gas prices that may be included in a single report.
+	// Price data will not be included with MerkleRoots when this value is set.
+	// Disable by setting to 0.
+	// NOTE:
+	//  * this can only be used if RMNEnabled == false.
+	//  * if MaxPricesPerReport is non-zero, MultipleReportsEnabled should be set to true.
 	MaxPricesPerReport uint64 `json:"maxPricesPerReport"`
 
 	// MultipleReportsEnabled is a flag to enable/disable multiple reports per round.

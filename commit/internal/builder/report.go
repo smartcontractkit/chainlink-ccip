@@ -356,11 +356,15 @@ func buildMultiplePriceReports(
 				priceUpdates,
 			)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("buildingMultiplePriceReports: priceUpdates(%+v): %w", priceUpdates, err)
 			}
-			if report != nil {
-				reports = append(reports, *report)
+			if report == nil {
+				return nil,
+					fmt.Errorf("buildingMultiplePriceReports: unexpected empty report for updates(%+v): %w",
+						priceUpdates, err)
 			}
+
+			reports = append(reports, *report)
 
 			// reset accumulators for next report.
 			numUpdates = 0
@@ -385,11 +389,15 @@ func buildMultiplePriceReports(
 			priceUpdates,
 		)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("buildingMultiplePriceReports: priceUpdates(%+v): %w", priceUpdates, err)
 		}
-		if report != nil {
-			reports = append(reports, *report)
+		if report == nil {
+			return nil,
+				fmt.Errorf("buildingMultiplePriceReports: unexpected empty report for updates(%+v): %w",
+					priceUpdates, err)
 		}
+
+		reports = append(reports, *report)
 	}
 
 	return reports, nil
