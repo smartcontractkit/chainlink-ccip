@@ -1,6 +1,8 @@
 # https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack
 
+
 defaultRules:
+
   create: true
   rules:
     alertmanager: true
@@ -102,6 +104,25 @@ prometheus:
     ## enable --web.enable-remote-write-receiver flag on prometheus-server
     ##
     enableRemoteWriteReceiver: true
+    scrapeClasses:
+      - default: true
+        name: cluster-relabeling
+        relabelings:
+          - sourceLabels: [ __name__ ]
+            regex: (.*)
+            targetLabel: cluster
+            replacement: main-fwog
+            action: replace
+          - sourceLabels: [ __name__ ]
+            regex: (.*)
+            targetLabel: env
+            replacement: sandbox
+            action: replace
+          - sourceLabels: [ __name__ ]
+            regex: (.*)
+            targetLabel: team
+            replacement: cl-orchestration
+            action: replace
 prometheusOperator:
   enabled: true
   admissionWebhooks:
@@ -112,6 +133,8 @@ prometheusOperator:
     requests:
       cpu: 100m
       memory: 128Mi
+  kubeletService:
+    enabled: false
 nodeExporter:
   enabled: true
 alertmanager:
