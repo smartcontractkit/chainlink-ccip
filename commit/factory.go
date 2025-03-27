@@ -60,8 +60,8 @@ const (
 	// check factory_test for the calculation
 	maxReportLength = 128_2933
 
-	// maxReportCount is set to 1 because the commit plugin only generates one report per round.
-	maxReportCount = 1
+	// maxReportCount is set very high because some chains may require many reports per round.
+	maxReportCount = 1000
 )
 
 type PluginFactory struct {
