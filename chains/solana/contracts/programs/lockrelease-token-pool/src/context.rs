@@ -68,6 +68,24 @@ pub struct AddToAllowList<'info> {
 }
 
 #[derive(Accounts)]
+#[instruction(remove: Vec<Pubkey>)]
+pub struct RemoveFromAllowlist<'info> {
+    #[account(
+        mut,
+        seeds = [POOL_STATE_SEED, mint.key().as_ref()],
+        bump,
+        realloc = ANCHOR_DISCRIMINATOR + State::INIT_SPACE + 32 * (state.config.allow_list.len().saturating_sub(remove.len())),
+        realloc::payer = authority,
+        realloc::zero = false
+    )]
+    pub state: Account<'info, State>,
+    pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
+    #[account(mut, address = state.config.owner @ CcipTokenPoolError::Unauthorized)]
+    pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
 pub struct AcceptOwnership<'info> {
     #[account(
         mut,
