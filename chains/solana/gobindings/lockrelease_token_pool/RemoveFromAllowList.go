@@ -18,14 +18,16 @@ type RemoveFromAllowList struct {
 	//
 	// [1] = [] mint
 	//
-	// [2] = [SIGNER] authority
+	// [2] = [WRITE, SIGNER] authority
+	//
+	// [3] = [] systemProgram
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewRemoveFromAllowListInstructionBuilder creates a new `RemoveFromAllowList` instruction builder.
 func NewRemoveFromAllowListInstructionBuilder() *RemoveFromAllowList {
 	nd := &RemoveFromAllowList{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 3),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 4),
 	}
 	return nd
 }
@@ -60,13 +62,24 @@ func (inst *RemoveFromAllowList) GetMintAccount() *ag_solanago.AccountMeta {
 
 // SetAuthorityAccount sets the "authority" account.
 func (inst *RemoveFromAllowList) SetAuthorityAccount(authority ag_solanago.PublicKey) *RemoveFromAllowList {
-	inst.AccountMetaSlice[2] = ag_solanago.Meta(authority).SIGNER()
+	inst.AccountMetaSlice[2] = ag_solanago.Meta(authority).WRITE().SIGNER()
 	return inst
 }
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *RemoveFromAllowList) GetAuthorityAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[2]
+}
+
+// SetSystemProgramAccount sets the "systemProgram" account.
+func (inst *RemoveFromAllowList) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *RemoveFromAllowList {
+	inst.AccountMetaSlice[3] = ag_solanago.Meta(systemProgram)
+	return inst
+}
+
+// GetSystemProgramAccount gets the "systemProgram" account.
+func (inst *RemoveFromAllowList) GetSystemProgramAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[3]
 }
 
 func (inst RemoveFromAllowList) Build() *Instruction {
@@ -105,6 +118,9 @@ func (inst *RemoveFromAllowList) Validate() error {
 		if inst.AccountMetaSlice[2] == nil {
 			return errors.New("accounts.Authority is not set")
 		}
+		if inst.AccountMetaSlice[3] == nil {
+			return errors.New("accounts.SystemProgram is not set")
+		}
 	}
 	return nil
 }
@@ -123,10 +139,11 @@ func (inst *RemoveFromAllowList) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("    state", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("     mint", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice[2]))
+					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+						accountsBranch.Child(ag_format.Meta("        state", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("         mint", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("    authority", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[3]))
 					})
 				})
 		})
@@ -156,10 +173,12 @@ func NewRemoveFromAllowListInstruction(
 	// Accounts:
 	state ag_solanago.PublicKey,
 	mint ag_solanago.PublicKey,
-	authority ag_solanago.PublicKey) *RemoveFromAllowList {
+	authority ag_solanago.PublicKey,
+	systemProgram ag_solanago.PublicKey) *RemoveFromAllowList {
 	return NewRemoveFromAllowListInstructionBuilder().
 		SetRemove(remove).
 		SetStateAccount(state).
 		SetMintAccount(mint).
-		SetAuthorityAccount(authority)
+		SetAuthorityAccount(authority).
+		SetSystemProgramAccount(systemProgram)
 }
