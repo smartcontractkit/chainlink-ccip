@@ -1,7 +1,6 @@
 package commit
 
 import (
-	"fmt"
 	unsaferand "math/rand"
 	"testing"
 
@@ -402,7 +401,7 @@ func Test_encodeReports(t *testing.T) {
 	for _, tt := range testcases {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := encodeReports(ctx, lggr, tt.args.reports, transmissionSchedule, tt.args.reportCodec())
-			if !tt.wantErr(t, err, fmt.Sprintf("encodeReports(...)")) {
+			if !tt.wantErr(t, err, "encodeReports(...)") {
 				return
 			}
 			assert.Equal(t, tt.numReports, len(got))
