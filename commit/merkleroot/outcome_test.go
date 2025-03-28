@@ -486,6 +486,10 @@ func Test_Processor_Outcome(t *testing.T) {
 					{ChainSel: chainA, SeqNum: 10},
 					{ChainSel: chainB, SeqNum: 20},
 				},
+				RootsToReport: []cciptypes.MerkleRootChain{
+					{ChainSel: chainA},
+					{ChainSel: chainB},
+				},
 				ReportTransmissionCheckAttempts: 0x1,
 			},
 			expErr: false,
@@ -577,6 +581,10 @@ func Test_Processor_Outcome(t *testing.T) {
 				OffRampNextSeqNums: []plugintypes.SeqNumChain{
 					{ChainSel: chainA, SeqNum: 10},
 					{ChainSel: chainB, SeqNum: 20},
+				},
+				RootsToReport: []cciptypes.MerkleRootChain{
+					{ChainSel: chainA},
+					{ChainSel: chainB},
 				},
 				ReportTransmissionCheckAttempts: 0x1,
 			},
@@ -781,6 +789,170 @@ func Test_reportRangesOutcome(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			outcome := reportRangesOutcome(Query{}, lggr, tc.consensusObservation, tc.merkleTreeSizeLimit, destChain)
 			require.Equal(t, tc.expectedOutcome, outcome)
+		})
+	}
+}
+
+func TestCheckForReportTransmission(t *testing.T) {
+	source1, source2 := cciptypes.ChainSelector(1), cciptypes.ChainSelector(2)
+	tests := []struct {
+		name                          string
+		maxReportTransmissionAttempts uint
+		multipleReports               bool
+		previousOutcome               Outcome
+		consensusObservation          consensusObservation
+		expectedOutcome               Outcome
+	}{
+		{
+			name:                          "Report transmitted, multiReports disabled",
+			maxReportTransmissionAttempts: 3,
+			multipleReports:               false,
+			previousOutcome: Outcome{
+				ReportTransmissionCheckAttempts: 1,
+				RootsToReport: []cciptypes.MerkleRootChain{
+					{ChainSel: source1, SeqNumsRange: cciptypes.NewSeqNumRange(10, 10)},
+					{ChainSel: source2, SeqNumsRange: cciptypes.NewSeqNumRange(20, 20)},
+				},
+				OffRampNextSeqNums: []plugintypes.SeqNumChain{
+					{ChainSel: source1, SeqNum: 10},
+					{ChainSel: source2, SeqNum: 20},
+				},
+			},
+			consensusObservation: consensusObservation{
+				OffRampNextSeqNums: map[cciptypes.ChainSelector]cciptypes.SeqNum{
+					source1: 11,
+					source2: 21,
+				},
+			},
+			expectedOutcome: Outcome{
+				OutcomeType: ReportTransmitted,
+			},
+		},
+		{
+			name:                          "Report transmitted, multiReports enabled",
+			maxReportTransmissionAttempts: 3,
+			multipleReports:               true,
+			previousOutcome: Outcome{
+				RootsToReport: []cciptypes.MerkleRootChain{
+					{ChainSel: source1, SeqNumsRange: cciptypes.NewSeqNumRange(10, 10)},
+					{ChainSel: source2, SeqNumsRange: cciptypes.NewSeqNumRange(20, 20)},
+				},
+				OffRampNextSeqNums: []plugintypes.SeqNumChain{
+					{ChainSel: source1, SeqNum: 10},
+					{ChainSel: source2, SeqNum: 20},
+				},
+			},
+			consensusObservation: consensusObservation{
+				OffRampNextSeqNums: map[cciptypes.ChainSelector]cciptypes.SeqNum{
+					source1: 11,
+					source2: 21,
+				},
+			},
+			expectedOutcome: Outcome{
+				OutcomeType: ReportTransmitted,
+			},
+		},
+		{
+			name:                          "Report in flight",
+			maxReportTransmissionAttempts: 3,
+			multipleReports:               true,
+			previousOutcome: Outcome{
+				RootsToReport: []cciptypes.MerkleRootChain{
+					{ChainSel: source1, SeqNumsRange: cciptypes.NewSeqNumRange(10, 10)},
+					{ChainSel: source2, SeqNumsRange: cciptypes.NewSeqNumRange(20, 20)},
+				},
+				OffRampNextSeqNums: []plugintypes.SeqNumChain{
+					{ChainSel: source1, SeqNum: 10},
+					{ChainSel: source2, SeqNum: 20},
+				},
+				ReportTransmissionCheckAttempts: 1,
+			},
+			consensusObservation: consensusObservation{
+				OffRampNextSeqNums: map[cciptypes.ChainSelector]cciptypes.SeqNum{
+					source1: 10,
+					source2: 20,
+				},
+			},
+			expectedOutcome: Outcome{
+				OutcomeType: ReportInFlight,
+				OffRampNextSeqNums: []plugintypes.SeqNumChain{
+					{ChainSel: source1, SeqNum: 10},
+					{ChainSel: source2, SeqNum: 20},
+				},
+				ReportTransmissionCheckAttempts: 2, // previous + 1
+				// same as before, still in-flight.
+				RootsToReport: []cciptypes.MerkleRootChain{
+					{ChainSel: source1, SeqNumsRange: cciptypes.NewSeqNumRange(10, 10)},
+					{ChainSel: source2, SeqNumsRange: cciptypes.NewSeqNumRange(20, 20)},
+				},
+			},
+		},
+		{
+			name:                          "Report transmission failed",
+			maxReportTransmissionAttempts: 2,
+			multipleReports:               true,
+			previousOutcome: Outcome{
+				RootsToReport: []cciptypes.MerkleRootChain{
+					{ChainSel: source1, SeqNumsRange: cciptypes.NewSeqNumRange(10, 10)},
+					{ChainSel: source2, SeqNumsRange: cciptypes.NewSeqNumRange(20, 20)},
+				},
+				OffRampNextSeqNums: []plugintypes.SeqNumChain{
+					{ChainSel: source1, SeqNum: 10},
+					{ChainSel: source2, SeqNum: 20},
+				},
+				ReportTransmissionCheckAttempts: 2,
+			},
+			consensusObservation: consensusObservation{
+				OffRampNextSeqNums: map[cciptypes.ChainSelector]cciptypes.SeqNum{
+					source1: 10,
+					source2: 20,
+				},
+			},
+			expectedOutcome: Outcome{
+				OutcomeType: ReportTransmissionFailed,
+			},
+		},
+		{
+			name:                          "Impossible state",
+			maxReportTransmissionAttempts: 3,
+			multipleReports:               false,
+			previousOutcome: Outcome{
+				RootsToReport: []cciptypes.MerkleRootChain{
+					{ChainSel: source1, SeqNumsRange: cciptypes.NewSeqNumRange(15, 15)},
+				},
+				OffRampNextSeqNums: []plugintypes.SeqNumChain{
+					{ChainSel: source1, SeqNum: 15},
+				},
+			},
+			consensusObservation: consensusObservation{
+				OffRampNextSeqNums: map[cciptypes.ChainSelector]cciptypes.SeqNum{
+					source1: 10,
+				},
+			},
+			expectedOutcome: Outcome{
+				OutcomeType: ReportInFlight,
+				OffRampNextSeqNums: []plugintypes.SeqNumChain{
+					{ChainSel: source1, SeqNum: 15},
+				},
+				RootsToReport: []cciptypes.MerkleRootChain{
+					{ChainSel: source1, SeqNumsRange: cciptypes.NewSeqNumRange(15, 15)},
+				},
+				ReportTransmissionCheckAttempts: 1,
+			}, // The function logs an error but continues execution.
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lggr := logger.Test(t)
+			outcome := checkForReportTransmission(
+				lggr,
+				tt.maxReportTransmissionAttempts,
+				tt.multipleReports,
+				tt.previousOutcome,
+				tt.consensusObservation,
+			)
+			require.Equal(t, tt.expectedOutcome, outcome)
 		})
 	}
 }

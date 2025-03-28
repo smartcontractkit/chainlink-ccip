@@ -18,6 +18,9 @@ pub const GENERIC_EXTRA_ARGS_V2_TAG: u32 = 0x181dcf10;
 /// bytes4(keccak256("CCIP SVMExtraArgsV1"));
 pub const SVM_EXTRA_ARGS_V1_TAG: u32 = 0x1f3b3aba;
 
+/// The maximum number of accounts that can be passed in SVMExtraArgs.
+pub const SVM_EXTRA_ARGS_MAX_ACCOUNTS: usize = 64;
+
 #[derive(Clone, AnchorSerialize, AnchorDeserialize, Default)]
 pub struct GenericExtraArgsV2 {
     pub gas_limit: u128,                    // message gas limit
