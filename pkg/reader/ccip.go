@@ -196,7 +196,7 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 		"ts", ts,
 		"limit", limit*2)
 
-	reports := r.processCommitReports(iter, ts, limit)
+	reports := r.processCommitReports(lggr, iter, ts, limit)
 
 	lggr.Debugw("decoded commit reports", "reports", reports)
 
@@ -234,9 +234,8 @@ func (r *ccipChainReader) queryCommitReports(
 // processCommitReports decodes the commit reports from the query results
 // and returns the ones that can be properly parsed and validated.
 func (r *ccipChainReader) processCommitReports(
-	iter []types.Sequence, ts time.Time, limit int,
+	lggr logger.Logger, iter []types.Sequence, ts time.Time, limit int,
 ) []plugintypes2.CommitPluginReportWithMeta {
-	lggr := r.lggr
 	reports := make([]plugintypes2.CommitPluginReportWithMeta, 0)
 	for _, item := range iter {
 		ev, err := validateCommitReportAcceptedEvent(item, ts)
@@ -355,14 +354,25 @@ func (r *ccipChainReader) ExecutedMessages(
 	rangesPerChain map[cciptypes.ChainSelector][]cciptypes.SeqNumRange,
 	confidence primitives.ConfidenceLevel,
 ) (map[cciptypes.ChainSelector][]cciptypes.SeqNum, error) {
+	lggr := logutil.WithContextValues(ctx, r.lggr)
+
 	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
 		return nil, err
 	}
 
+	// trim empty ranges from rangesPerChain
+	// otherwise we may get SQL errors from the chainreader.
+	nonEmptyRangesPerChain := make(map[cciptypes.ChainSelector][]cciptypes.SeqNumRange)
+	for chain, ranges := range rangesPerChain {
+		if len(ranges) > 0 {
+			nonEmptyRangesPerChain[chain] = ranges
+		}
+	}
+
 	dataTyp := ExecutionStateChangedEvent{}
-	keyFilter, countSqNrs := createExecutedMessagesKeyFilter(rangesPerChain, confidence)
+	keyFilter, countSqNrs := createExecutedMessagesKeyFilter(nonEmptyRangesPerChain, confidence)
 	if countSqNrs == 0 {
-		r.lggr.Debugw("no sequence numbers to query", "rangesPerChain", rangesPerChain)
+		lggr.Debugw("no sequence numbers to query", "nonEmptyRangesPerChain", nonEmptyRangesPerChain)
 		return nil, nil
 	}
 	iter, err := r.contractReaders[r.destChain].ExtendedQueryKey(
@@ -388,8 +398,8 @@ func (r *ccipChainReader) ExecutedMessages(
 			return nil, fmt.Errorf("failed to cast %T to ExecutionStateChangedEvent", item.Data)
 		}
 
-		if err := validateExecutionStateChangedEvent(stateChange, rangesPerChain); err != nil {
-			r.lggr.Errorw("validate execution state changed event",
+		if err := validateExecutionStateChangedEvent(stateChange, nonEmptyRangesPerChain); err != nil {
+			lggr.Errorw("validate execution state changed event",
 				"err", err, "stateChange", stateChange)
 			continue
 		}
