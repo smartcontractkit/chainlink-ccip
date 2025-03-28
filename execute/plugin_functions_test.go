@@ -1611,7 +1611,7 @@ func Test_validateCommitReportsReadingEligibility(t *testing.T) {
 
 func Test_computeNoncesConsensus(t *testing.T) {
 	lggr := logger.Test(t)
-	
+
 	testCases := []struct {
 		name                 string
 		allNonceObservations []exectypes.NonceObservations
