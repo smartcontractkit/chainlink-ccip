@@ -144,6 +144,11 @@ pipelines:
       DEVSPACE_NAMESPACE=${DEVSPACE_NAMESPACE} \
       go run ${DEPENDENCIES_DIR}/donut/scripts/urls/main.go -chain -chain-variant=besu -chain-type=evm -chain-name=${CHAIN_NAME} -target-dir=${CONFIG_OVERRIDES_DIR}
 
+  copy-to-pods:
+    run: |-
+      SCRIPTS_DIR=${SCRIPTS_DIR} \
+      pushd ${SCRIPTS_DIR}/copy && go run main.go -p "${POD_NAME_PATTERN}" -s "${SOURCE}" -d "${DESTINATION}" && popd
+
 profiles:
   - name: mockserver
     patches:
@@ -256,13 +261,17 @@ commands:
     appendArgs: true
   beholder:
     command: devspace run-pipeline beholder -p beholder
-    description: Run the Beholder pipeline.
+    description: Run the Beholder pipeline
     appendArgs: true
   beholder-kind:
     command: devspace run-pipeline beholder -p beholder-kind
-    description: Run the Beholder pipeline for Kind.
+    description: Run the Beholder pipeline for Kind
     appendArgs: true
   gen-besu-chain-urls:
     command: devspace run-pipeline besu-chain-urls
     description: Generate chain url json only
+    appendArgs: true
+  copy-to-pods:
+    command: devspace run-pipeline copy-to-pods
+    description: Copy files to pods
     appendArgs: true

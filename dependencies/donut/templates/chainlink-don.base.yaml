@@ -10,7 +10,7 @@ in: |
         {{- else }}
           - ${LOCAL_VALUES_DIR}/chainlink-cluster/type.base.yaml
         {{- end }}
-        {{- if eq (getenv "DON_TYPE") "workflow" }}
+        {{- if and (eq $.Env.PROVIDER "aws") (eq $.Env.DON_TYPE "workflow") }}
           - ${LOCAL_VALUES_DIR}/chainlink-cluster/resources.workflow.yaml
         {{- else }}
           - ${LOCAL_VALUES_DIR}/chainlink-cluster/resources.base.yaml
@@ -87,7 +87,7 @@ in: |
           {{- else if and (eq $.Env.PROVIDER "aws") (eq $.Env.ENV "sandbox") }}
           - ${LOCAL_VALUES_DIR}/postgresql/env.crib-sandbox.yaml
           {{- end }}
-          {{- if eq $.Env.DON_TYPE "workflow" }}
+          {{- if and (eq $.Env.PROVIDER "aws") (eq $.Env.DON_TYPE "workflow") }}
           - ${LOCAL_VALUES_DIR}/postgresql/type.workflow.yaml
           {{- end }}
         values:
@@ -114,7 +114,7 @@ in: |
           {{- else if and (eq $.Env.PROVIDER "aws") (eq $.Env.ENV "sandbox") }}
           - ${LOCAL_VALUES_DIR}/postgresql/env.crib-sandbox.yaml
           {{- end }}
-          {{- if eq $.Env.DON_TYPE "workflow" }}
+          {{- if and (eq $.Env.PROVIDER "aws") (eq $.Env.DON_TYPE "workflow") }}
           - ${LOCAL_VALUES_DIR}/postgresql/type.workflow.yaml
           {{- end }}
         values:
