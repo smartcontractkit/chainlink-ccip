@@ -1,7 +1,8 @@
 package commit
 
 import (
-	rand2 "math/rand"
+	"fmt"
+	unsaferand "math/rand"
 	"testing"
 
 	"github.com/smartcontractkit/libocr/commontypes"
@@ -12,6 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/mocks/internal_/plugincommon"
 	ocrtypecodec "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -22,7 +24,9 @@ import (
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
+	ccipocr3mocks "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 func TestPluginReports(t *testing.T) {
@@ -278,8 +282,8 @@ func Test_Plugin_isStaleReport(t *testing.T) {
 	}{
 		{
 			name:           "report is not stale when merkle roots exist no matter the seq nums",
-			onChainSeqNum:  rand2.Uint64(),
-			reportSeqNum:   rand2.Uint64(),
+			onChainSeqNum:  unsaferand.Uint64(),
+			reportSeqNum:   unsaferand.Uint64(),
 			lenMerkleRoots: 1,
 			shouldBeStale:  false,
 		},
@@ -449,4 +453,199 @@ func TestMultiReportBuilders(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_buildOneReport(t *testing.T) {
+	ctx := t.Context()
+	lggr := logger.Test(t)
+
+	transmissionSchedule := &ocr3types.TransmissionSchedule{}
+
+	blessedMerkleRoots := []cciptypes.MerkleRootChain{
+		{ChainSel: 1, MerkleRoot: mustMakeBytes("0x0102030405060708090102030405060708090102030405060708090102030405")},
+	}
+	unblessedMerkleRoots := []cciptypes.MerkleRootChain{
+		{ChainSel: 2, MerkleRoot: mustMakeBytes("0x0202030405060708090102030405060708090102030405060708090102030405")},
+	}
+	rmnSignatures := []cciptypes.RMNECDSASignature{
+		{
+			R: [32]byte{0x01},
+			S: [32]byte{0x02},
+		},
+		{
+			R: [32]byte{0x02},
+			S: [32]byte{0x03},
+		},
+	}
+	priceUpdates := cciptypes.PriceUpdates{
+		TokenPriceUpdates: []cciptypes.TokenPrice{
+			{TokenID: "ETH", Price: cciptypes.NewBigIntFromInt64(1234)},
+		},
+		GasPriceUpdates: []cciptypes.GasPriceChain{
+			{ChainSel: 1, GasPrice: cciptypes.NewBigIntFromInt64(4567)},
+		},
+	}
+
+	tests := []struct {
+		name              string
+		merkleOutcomeType merkleroot.OutcomeType
+		blessedRoots      []cciptypes.MerkleRootChain
+		unblessedRoots    []cciptypes.MerkleRootChain
+		rmnSignatures     []cciptypes.RMNECDSASignature
+		rmnRemoteFSign    uint64
+		priceUpdates      cciptypes.PriceUpdates
+		mockCodecFn       func() *ccipocr3mocks.MockCommitPluginCodec
+		wantErr           bool
+		reportNil         bool
+	}{
+		{
+			name:              "empty merkle root outcome, no prices either",
+			merkleOutcomeType: merkleroot.ReportEmpty,
+			mockCodecFn: func() *ccipocr3mocks.MockCommitPluginCodec {
+				// no calls
+				return ccipocr3mocks.NewMockCommitPluginCodec(t)
+			},
+			wantErr:   false,
+			reportNil: true,
+		},
+		{
+			name:              "empty merkle root outcome, with prices",
+			merkleOutcomeType: merkleroot.ReportEmpty,
+			priceUpdates:      priceUpdates,
+			mockCodecFn: func() *ccipocr3mocks.MockCommitPluginCodec {
+				m := ccipocr3mocks.NewMockCommitPluginCodec(t)
+				m.EXPECT().Encode(mock.Anything, mock.MatchedBy(func(r ccipocr3.CommitPluginReport) bool {
+					return len(r.PriceUpdates.TokenPriceUpdates) == 1 && len(r.PriceUpdates.GasPriceUpdates) == 1
+				})).Once().Return([]byte("report"), nil)
+				return m
+			},
+			wantErr:   false,
+			reportNil: false,
+		},
+		{
+			name:              "merkle outcome with blessed and unblessed roots, no price updates",
+			merkleOutcomeType: merkleroot.ReportGenerated,
+			blessedRoots:      blessedMerkleRoots,
+			unblessedRoots:    unblessedMerkleRoots,
+			rmnRemoteFSign:    1,
+			rmnSignatures:     rmnSignatures,
+			mockCodecFn: func() *ccipocr3mocks.MockCommitPluginCodec {
+				m := ccipocr3mocks.NewMockCommitPluginCodec(t)
+				m.EXPECT().Encode(mock.Anything, mock.MatchedBy(func(r ccipocr3.CommitPluginReport) bool {
+					return len(r.BlessedMerkleRoots) == 1 && len(r.UnblessedMerkleRoots) == 1
+				})).Once().Return([]byte("report"), nil)
+				return m
+			},
+			wantErr:   false,
+			reportNil: false,
+		},
+		{
+			name:              "merkle outcome with blessed and unblessed roots, with price updates",
+			merkleOutcomeType: merkleroot.ReportGenerated,
+			blessedRoots:      blessedMerkleRoots,
+			unblessedRoots:    unblessedMerkleRoots,
+			priceUpdates:      priceUpdates,
+			mockCodecFn: func() *ccipocr3mocks.MockCommitPluginCodec {
+				m := ccipocr3mocks.NewMockCommitPluginCodec(t)
+				m.EXPECT().Encode(mock.Anything, mock.MatchedBy(func(r ccipocr3.CommitPluginReport) bool {
+					return len(r.BlessedMerkleRoots) == 1 && len(r.UnblessedMerkleRoots) == 1 &&
+						len(r.PriceUpdates.TokenPriceUpdates) == 1 && len(r.PriceUpdates.GasPriceUpdates) == 1
+				})).Once().Return([]byte("report"), nil)
+				return m
+			},
+			wantErr:   false,
+			reportNil: false,
+		},
+		{
+			name:              "merkle outcome ReportInFlight, no price updates",
+			merkleOutcomeType: merkleroot.ReportInFlight,
+
+			// notice that blessed and unblessed roots are still set since they're
+			// set in the merkle outcome.
+			// However, they wouldn't be included in the report.
+			blessedRoots:   blessedMerkleRoots,
+			unblessedRoots: unblessedMerkleRoots,
+			rmnRemoteFSign: 1,
+			rmnSignatures:  rmnSignatures,
+			mockCodecFn: func() *ccipocr3mocks.MockCommitPluginCodec {
+				// no calls
+				return ccipocr3mocks.NewMockCommitPluginCodec(t)
+			},
+			wantErr:   false,
+			reportNil: true,
+		},
+		{
+			name:              "merkle outcome ReportInFlight, with price updates",
+			merkleOutcomeType: merkleroot.ReportInFlight,
+
+			// notice that blessed and unblessed roots are still set since they're
+			// set in the merkle outcome.
+			// However, they wouldn't be included in the report.
+			blessedRoots:   blessedMerkleRoots,
+			unblessedRoots: unblessedMerkleRoots,
+			rmnRemoteFSign: 1,
+			rmnSignatures:  rmnSignatures,
+			priceUpdates:   priceUpdates,
+			mockCodecFn: func() *ccipocr3mocks.MockCommitPluginCodec {
+				m := ccipocr3mocks.NewMockCommitPluginCodec(t)
+				m.EXPECT().Encode(mock.Anything, mock.MatchedBy(func(r ccipocr3.CommitPluginReport) bool {
+					return len(r.PriceUpdates.TokenPriceUpdates) == 1 && len(r.PriceUpdates.GasPriceUpdates) == 1
+				})).Once().Return([]byte("report"), nil)
+				return m
+			},
+			wantErr:   false,
+			reportNil: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			report, err := buildOneReport(
+				ctx,
+				lggr,
+				tt.mockCodecFn(),
+				transmissionSchedule,
+				tt.merkleOutcomeType,
+				tt.blessedRoots,
+				tt.unblessedRoots,
+				tt.rmnSignatures,
+				tt.rmnRemoteFSign,
+				tt.priceUpdates,
+			)
+
+			if tt.wantErr {
+				require.Error(t, err)
+				require.Nil(t, report)
+			} else {
+				require.NoError(t, err)
+
+				if tt.reportNil {
+					require.Nil(t, report)
+				} else {
+					require.NotNil(t, report)
+				}
+			}
+		})
+	}
+}
+
+// mustMakeBytes parses a given string into a byte array, any error causes a panic. Pass in an empty string for a
+// random byte array.
+func mustMakeBytes(byteStr string) cciptypes.Bytes32 {
+	if byteStr == "" {
+		var randomBytes cciptypes.Bytes32
+		n, err := unsaferand.New(unsaferand.NewSource(0)).Read(randomBytes[:])
+		if n != 32 {
+			panic(fmt.Sprintf("Unexpected number of bytes read for placeholder id: want 32, got %d", n))
+		}
+		if err != nil {
+			panic(fmt.Sprintf("Error reading random bytes: %v", err))
+		}
+		return randomBytes
+	}
+	b, err := cciptypes.NewBytes32FromString(byteStr)
+	if err != nil {
+		panic(err)
+	}
+	return b
 }

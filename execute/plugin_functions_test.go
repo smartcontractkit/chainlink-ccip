@@ -435,9 +435,10 @@ func Test_computeRanges(t *testing.T) {
 	}
 }
 
-func Test_groupByChainSelector(t *testing.T) {
+func Test_groupByChainSelectorWithFilter(t *testing.T) {
 	type args struct {
-		reports []plugintypes2.CommitPluginReportWithMeta
+		reports            []plugintypes2.CommitPluginReportWithMeta
+		cursedSourceChains map[cciptypes.ChainSelector]bool
 	}
 	tests := []struct {
 		name string
@@ -446,17 +447,23 @@ func Test_groupByChainSelector(t *testing.T) {
 	}{
 		{
 			name: "empty",
-			args: args{reports: []plugintypes2.CommitPluginReportWithMeta{}},
+			args: args{
+				reports:            []plugintypes2.CommitPluginReportWithMeta{},
+				cursedSourceChains: nil,
+			},
 			want: exectypes.CommitObservations{},
 		},
 		{
-			name: "reports",
-			args: args{reports: []plugintypes2.CommitPluginReportWithMeta{{
-				Report: cciptypes.CommitPluginReport{
-					BlessedMerkleRoots: []cciptypes.MerkleRootChain{
-						{ChainSel: 1, SeqNumsRange: cciptypes.NewSeqNumRange(10, 20), MerkleRoot: cciptypes.Bytes32{1}},
-						{ChainSel: 2, SeqNumsRange: cciptypes.NewSeqNumRange(30, 40), MerkleRoot: cciptypes.Bytes32{2}},
-					}}}}},
+			name: "reports with no cursed chains",
+			args: args{
+				reports: []plugintypes2.CommitPluginReportWithMeta{{
+					Report: cciptypes.CommitPluginReport{
+						BlessedMerkleRoots: []cciptypes.MerkleRootChain{
+							{ChainSel: 1, SeqNumsRange: cciptypes.NewSeqNumRange(10, 20), MerkleRoot: cciptypes.Bytes32{1}},
+							{ChainSel: 2, SeqNumsRange: cciptypes.NewSeqNumRange(30, 40), MerkleRoot: cciptypes.Bytes32{2}},
+						}}}},
+				cursedSourceChains: map[cciptypes.ChainSelector]bool{},
+			},
 			want: exectypes.CommitObservations{
 				1: {
 					{
@@ -474,11 +481,110 @@ func Test_groupByChainSelector(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "reports with cursed chain 1",
+			args: args{
+				reports: []plugintypes2.CommitPluginReportWithMeta{{
+					Report: cciptypes.CommitPluginReport{
+						BlessedMerkleRoots: []cciptypes.MerkleRootChain{
+							{ChainSel: 1, SeqNumsRange: cciptypes.NewSeqNumRange(10, 20), MerkleRoot: cciptypes.Bytes32{1}},
+							{ChainSel: 2, SeqNumsRange: cciptypes.NewSeqNumRange(30, 40), MerkleRoot: cciptypes.Bytes32{2}},
+						}}}},
+				cursedSourceChains: map[cciptypes.ChainSelector]bool{1: true},
+			},
+			want: exectypes.CommitObservations{
+				2: {
+					{
+						SourceChain:         2,
+						MerkleRoot:          cciptypes.Bytes32{2},
+						SequenceNumberRange: cciptypes.NewSeqNumRange(30, 40),
+					},
+				},
+			},
+		},
+		{
+			name: "reports with all chains cursed",
+			args: args{
+				reports: []plugintypes2.CommitPluginReportWithMeta{{
+					Report: cciptypes.CommitPluginReport{
+						BlessedMerkleRoots: []cciptypes.MerkleRootChain{
+							{ChainSel: 1, SeqNumsRange: cciptypes.NewSeqNumRange(10, 20), MerkleRoot: cciptypes.Bytes32{1}},
+							{ChainSel: 2, SeqNumsRange: cciptypes.NewSeqNumRange(30, 40), MerkleRoot: cciptypes.Bytes32{2}},
+						}}}},
+				cursedSourceChains: map[cciptypes.ChainSelector]bool{1: true, 2: true},
+			},
+			want: exectypes.CommitObservations{},
+		},
+		{
+			name: "reports with blessed and unblessed merkle roots",
+			args: args{
+				reports: []plugintypes2.CommitPluginReportWithMeta{{
+					Report: cciptypes.CommitPluginReport{
+						BlessedMerkleRoots: []cciptypes.MerkleRootChain{
+							{ChainSel: 1, SeqNumsRange: cciptypes.NewSeqNumRange(10, 20), MerkleRoot: cciptypes.Bytes32{1}},
+						},
+						UnblessedMerkleRoots: []cciptypes.MerkleRootChain{
+							{ChainSel: 2, SeqNumsRange: cciptypes.NewSeqNumRange(30, 40), MerkleRoot: cciptypes.Bytes32{2}},
+						}}}},
+				cursedSourceChains: map[cciptypes.ChainSelector]bool{1: true},
+			},
+			want: exectypes.CommitObservations{
+				2: {
+					{
+						SourceChain:         2,
+						MerkleRoot:          cciptypes.Bytes32{2},
+						SequenceNumberRange: cciptypes.NewSeqNumRange(30, 40),
+					},
+				},
+			},
+		},
+		{
+			name: "multiple reports with some cursed chains",
+			args: args{
+				reports: []plugintypes2.CommitPluginReportWithMeta{
+					{
+						Report: cciptypes.CommitPluginReport{
+							BlessedMerkleRoots: []cciptypes.MerkleRootChain{
+								{ChainSel: 1, SeqNumsRange: cciptypes.NewSeqNumRange(10, 20), MerkleRoot: cciptypes.Bytes32{1}},
+							},
+						},
+					},
+					{
+						Report: cciptypes.CommitPluginReport{
+							BlessedMerkleRoots: []cciptypes.MerkleRootChain{
+								{ChainSel: 2, SeqNumsRange: cciptypes.NewSeqNumRange(30, 40), MerkleRoot: cciptypes.Bytes32{2}},
+								{ChainSel: 3, SeqNumsRange: cciptypes.NewSeqNumRange(50, 60), MerkleRoot: cciptypes.Bytes32{3}},
+							},
+						},
+					},
+				},
+				cursedSourceChains: map[cciptypes.ChainSelector]bool{2: true},
+			},
+			want: exectypes.CommitObservations{
+				1: {
+					{
+						SourceChain:         1,
+						MerkleRoot:          cciptypes.Bytes32{1},
+						SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20),
+					},
+				},
+				3: {
+					{
+						SourceChain:         3,
+						MerkleRoot:          cciptypes.Bytes32{3},
+						SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60),
+					},
+				},
+			},
+		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			assert.Equalf(t, tt.want, groupByChainSelector(tt.args.reports), "groupByChainSelector(%v)", tt.args.reports)
+			lggr := logger.Test(t)
+			assert.Equalf(t, tt.want, groupByChainSelectorWithFilter(lggr, tt.args.reports, tt.args.cursedSourceChains),
+				"groupByChainSelectorWithFilter(%v, %v)", tt.args.reports, tt.args.cursedSourceChains)
 		})
 	}
 }
@@ -851,7 +957,7 @@ func Test_getConsensusObservation(t *testing.T) {
 					},
 				},
 			},
-			want:    exectypes.Observation{},
+			want:    exectypes.Observation{Nonces: exectypes.NonceObservations{}},
 			wantErr: assert.NoError,
 		},
 		{
@@ -870,7 +976,7 @@ func Test_getConsensusObservation(t *testing.T) {
 						}},
 				},
 			},
-			want:    exectypes.Observation{},
+			want:    exectypes.Observation{Nonces: exectypes.NonceObservations{}},
 			wantErr: assert.NoError,
 		},
 		{
@@ -964,7 +1070,7 @@ func Test_getConsensusObservation(t *testing.T) {
 					},
 				},
 			},
-			want:    exectypes.Observation{},
+			want:    exectypes.Observation{Nonces: exectypes.NonceObservations{}},
 			wantErr: assert.NoError,
 		},
 	}
@@ -1499,6 +1605,149 @@ func Test_validateCommitReportsReadingEligibility(t *testing.T) {
 				return
 			}
 			assert.NoError(t, err)
+		})
+	}
+}
+
+func Test_computeNoncesConsensus(t *testing.T) {
+	lggr := logger.Test(t)
+
+	testCases := []struct {
+		name                 string
+		allNonceObservations []exectypes.NonceObservations
+		fChain               int
+		expNonceConsensus    exectypes.NonceObservations
+	}{
+		{
+			name:                 "empty",
+			allNonceObservations: []exectypes.NonceObservations{},
+			fChain:               1,
+			expNonceConsensus:    exectypes.NonceObservations{},
+		},
+		{
+			name: "one observation does not reach threshold",
+			allNonceObservations: []exectypes.NonceObservations{
+				{1: {"0x1": 100}},
+			},
+			fChain:            1,
+			expNonceConsensus: exectypes.NonceObservations{},
+		},
+		{
+			name: "two observations reach threshold",
+			allNonceObservations: []exectypes.NonceObservations{
+				{1: {"0x1": 100}},
+				{1: {"0x1": 100}},
+			},
+			fChain: 1,
+			expNonceConsensus: exectypes.NonceObservations{
+				1: {"0x1": 100},
+			},
+		},
+		{
+			name: "two observations reach threshold but different values",
+			allNonceObservations: []exectypes.NonceObservations{
+				{1: {"0x1": 100}},
+				{1: {"0x1": 101}},
+			},
+			fChain: 1,
+			expNonceConsensus: exectypes.NonceObservations{
+				1: {"0x1": 101},
+			},
+		},
+		{
+			name: "multiple observations with different values unordered",
+			allNonceObservations: []exectypes.NonceObservations{
+				{1: {"0x1": 108}},
+				{1: {"0x1": 100}},
+				{1: {"0x1": 102}},
+				{1: {"0x1": 103}},
+				{1: {"0x1": 109}},
+				{1: {"0x1": 104}},
+				{1: {"0x1": 105}},
+				{1: {"0x1": 106}},
+				{1: {"0x1": 107}},
+				{1: {"0x1": 101}},
+			},
+			fChain: 5,
+			expNonceConsensus: exectypes.NonceObservations{
+				1: {"0x1": 105},
+			},
+		},
+		{
+			name: "multiple observations deviating on two values",
+			allNonceObservations: []exectypes.NonceObservations{
+				{1: {"0x1": 100}},
+				{1: {"0x1": 100}},
+				{1: {"0x1": 100}},
+				{1: {"0x1": 100}},
+				{1: {"0x1": 100}},
+				{1: {"0x1": 100}},
+				{1: {"0x1": 101}},
+				{1: {"0x1": 101}},
+				{1: {"0x1": 101}},
+				{1: {"0x1": 101}},
+			},
+			fChain: 5,
+			expNonceConsensus: exectypes.NonceObservations{
+				1: {"0x1": 100},
+			},
+		},
+		{
+			name: "multiple observations deviating on two values",
+			allNonceObservations: []exectypes.NonceObservations{
+				{1: {"0x1": 100}},
+				{1: {"0x1": 100}},
+				{1: {"0x1": 100}},
+				{1: {"0x1": 100}},
+				{1: {"0x1": 100}},
+				{1: {"0x1": 100}},
+				{1: {"0x1": 101}},
+				{1: {"0x1": 101}},
+				{1: {"0x1": 101}},
+				{1: {"0x1": 101}},
+			},
+			fChain: 5,
+			expNonceConsensus: exectypes.NonceObservations{
+				1: {"0x1": 100},
+			},
+		},
+		{
+			name: "12 oracles, 15 observations, 5 f",
+			allNonceObservations: []exectypes.NonceObservations{
+				{1: {"0x1": 134}},
+				{1: {"0x1": 134}},
+				{1: {"0x1": 134}},
+				{1: {"0x1": 134}},
+				{1: {"0x1": 134}},
+				{1: {"0x1": 134}},
+				{1: {"0x1": 134}},
+				{1: {"0x1": 134}},
+				{1: {"0x1": 134}},
+				{1: {"0x1": 133}},
+				{1: {"0x1": 133}},
+				{1: {"0x1": 133}},
+				{1: {"0x1": 133}},
+				{1: {"0x1": 133}},
+				{1: {"0x1": 133}},
+			},
+			fChain: 5,
+			expNonceConsensus: exectypes.NonceObservations{
+				1: {"0x1": 133},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			observations := make([]plugincommon.AttributedObservation[exectypes.Observation], len(tc.allNonceObservations))
+			for i, obs := range tc.allNonceObservations {
+				observations[i] = plugincommon.AttributedObservation[exectypes.Observation]{
+					Observation: exectypes.Observation{Nonces: obs},
+					OracleID:    commontypes.OracleID(i),
+				}
+			}
+			obs := computeNoncesConsensus(lggr, observations, tc.fChain)
+			assert.Equal(t, tc.expNonceConsensus, obs)
 		})
 	}
 }

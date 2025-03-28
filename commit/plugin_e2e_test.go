@@ -189,6 +189,14 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 						{ChainSel: sourceChain1, SeqNum: 10},
 						{ChainSel: sourceChain2, SeqNum: 20},
 					},
+					RootsToReport: []ccipocr3.MerkleRootChain{
+						{
+							ChainSel:      sourceChain1,
+							SeqNumsRange:  ccipocr3.NewSeqNumRange(0xa, 0xa),
+							OnRampAddress: ccipocr3.UnknownAddress{1},
+							MerkleRoot:    merkleRoot1,
+						},
+					},
 				},
 			},
 		},
