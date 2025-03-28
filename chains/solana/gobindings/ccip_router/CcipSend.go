@@ -24,6 +24,7 @@ import (
 // * `ctx` - The context containing the accounts required for sending the message.
 // * `dest_chain_selector` - The chain selector for the destination chain.
 // * `message` - The message to be sent. The size limit of data is 256 bytes.
+// * `token_indexes` - Indices into the remaining accounts vector where the subslice for a token begins.
 type CcipSend struct {
 	DestChainSelector *uint64
 	Message           *SVM2AnyMessage

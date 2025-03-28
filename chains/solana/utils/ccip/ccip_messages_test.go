@@ -8,6 +8,7 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/fee_quoter"
@@ -51,22 +52,23 @@ func TestMessageHashing(t *testing.T) {
 				},
 			},
 		},
+			config.OnRampAddress,
 			[]solana.PublicKey{
 				solana.MustPublicKeyFromBase58("C8WSPj3yyus1YN3yNB6YA5zStYtbjQWtpmKadmvyUXq8"),
 				solana.MustPublicKeyFromBase58("CtEVnHsQzhTNWav8skikiV2oF6Xx7r7uGGa8eCDQtTjH"),
 			})
 
 		require.NoError(t, err)
-		require.Equal(t, "7c1572c33e52696603008269d3dfb2936811891af29c263bfb83e38ae6b36321", hex.EncodeToString(h))
+		require.Equal(t, "bd8025f7b32386d93be284b6b4eb6f36c7b46ea157c0228f00ccba38fe7a448e", hex.EncodeToString(h))
 	})
 
 	t.Run("SVMToAny", func(t *testing.T) {
 		t.Parallel()
 
-		extraArgs, err := SerializeExtraArgs(fee_quoter.EVMExtraArgsV2{
+		extraArgs, err := SerializeExtraArgs(fee_quoter.GenericExtraArgsV2{
 			GasLimit:                 bin.Uint128{Lo: 1},
 			AllowOutOfOrderExecution: true,
-		}, EVMExtraArgsV2Tag)
+		}, GenericExtraArgsV2Tag)
 		require.NoError(t, err)
 
 		h, err := HashSVMToAnyMessage(ccip_router.SVM2AnyRampMessage{
@@ -95,6 +97,6 @@ func TestMessageHashing(t *testing.T) {
 			},
 		})
 		require.NoError(t, err)
-		require.Equal(t, "2335e7898faa4e7e8816a6b1e0cf47ea2a18bb66bca205d0cb3ae4a8ce5c72f7", hex.EncodeToString(h))
+		require.Equal(t, "ab7f57fbf9979573a9fa1bcf1ad816449223c343ea8b938db9e917f2ca138a84", hex.EncodeToString(h))
 	})
 }

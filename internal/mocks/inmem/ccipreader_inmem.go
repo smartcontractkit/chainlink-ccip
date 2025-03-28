@@ -63,45 +63,59 @@ func (r InMemoryCCIPReader) CommitReportsGTETimestamp(
 }
 
 func (r InMemoryCCIPReader) ExecutedMessages(
-	ctx context.Context, source cciptypes.ChainSelector, seqNumRange cciptypes.SeqNumRange, _ primitives.ConfidenceLevel,
-) ([]cciptypes.SeqNum, error) {
-	msgs, ok := r.Messages[source]
-	// no messages for chain
-	if !ok {
-		return nil, nil
-	}
-	filtered := slicelib.Filter(msgs, func(msg MessagesWithMetadata) bool {
-		return seqNumRange.Contains(msg.Header.SequenceNumber) && msg.Destination == r.Dest && msg.Executed
-	})
-
-	// Build executed ranges
-	var ranges []cciptypes.SeqNumRange
-	var currentRange *cciptypes.SeqNumRange
-	for _, msg := range filtered {
-		if currentRange != nil && currentRange.End()+1 == msg.Header.SequenceNumber {
-			// expand current range
-			currentRange.SetEnd(msg.Header.SequenceNumber)
-		} else {
-			if currentRange != nil {
-				ranges = append(ranges, *currentRange)
-			}
-			// initialize new range and add it to the list
-			newRange := cciptypes.NewSeqNumRange(msg.Header.SequenceNumber, msg.Header.SequenceNumber)
-			currentRange = &newRange
+	ctx context.Context,
+	rangesByChain map[cciptypes.ChainSelector][]cciptypes.SeqNumRange,
+	_ primitives.ConfidenceLevel,
+) (map[cciptypes.ChainSelector][]cciptypes.SeqNum, error) {
+	var ret = make(map[cciptypes.ChainSelector][]cciptypes.SeqNum)
+	for source, seqNumRanges := range rangesByChain {
+		msgs, ok := r.Messages[source]
+		// no messages for chain
+		if !ok {
+			return nil, nil
 		}
-	}
-	if currentRange != nil {
-		ranges = append(ranges, *currentRange)
-	}
+		filtered := slicelib.Filter(msgs, func(msg MessagesWithMetadata) bool {
+			if msg.Destination != r.Dest || !msg.Executed {
+				return false
+			}
+			for _, r := range seqNumRanges {
+				if r.Contains(msg.Header.SequenceNumber) {
+					return true
+				}
+			}
+			return false
+		})
 
-	seqNums := make([]cciptypes.SeqNum, 0, len(ranges))
-	for _, r := range ranges {
-		seqNums = append(seqNums, r.ToSlice()...)
-	}
+		// Build executed ranges
+		var ranges []cciptypes.SeqNumRange
+		var currentRange *cciptypes.SeqNumRange
+		for _, msg := range filtered {
+			if currentRange != nil && currentRange.End()+1 == msg.Header.SequenceNumber {
+				// expand current range
+				currentRange.SetEnd(msg.Header.SequenceNumber)
+			} else {
+				if currentRange != nil {
+					ranges = append(ranges, *currentRange)
+				}
+				// initialize new range and add it to the list
+				newRange := cciptypes.NewSeqNumRange(msg.Header.SequenceNumber, msg.Header.SequenceNumber)
+				currentRange = &newRange
+			}
+		}
+		if currentRange != nil {
+			ranges = append(ranges, *currentRange)
+		}
 
-	unqSeqNums := mapset.NewSet(seqNums...).ToSlice()
-	sort.Slice(unqSeqNums, func(i, j int) bool { return unqSeqNums[i] < unqSeqNums[j] })
-	return unqSeqNums, nil
+		seqNums := make([]cciptypes.SeqNum, 0, len(ranges))
+		for _, r := range ranges {
+			seqNums = append(seqNums, r.ToSlice()...)
+		}
+
+		unqSeqNums := mapset.NewSet(seqNums...).ToSlice()
+		sort.Slice(unqSeqNums, func(i, j int) bool { return unqSeqNums[i] < unqSeqNums[j] })
+		ret[source] = unqSeqNums
+	}
+	return ret, nil
 }
 
 func (r InMemoryCCIPReader) MsgsBetweenSeqNums(
@@ -197,12 +211,6 @@ func (r InMemoryCCIPReader) Sync(_ context.Context, _ reader.ContractAddresses) 
 	return nil
 }
 
-func (r InMemoryCCIPReader) GetMedianDataAvailabilityGasConfig(
-	ctx context.Context,
-) (cciptypes.DataAvailabilityGasConfig, error) {
-	return cciptypes.DataAvailabilityGasConfig{}, nil
-}
-
 func (r InMemoryCCIPReader) GetLatestPriceSeqNr(ctx context.Context) (uint64, error) {
 	return 0, nil
 }
@@ -212,8 +220,15 @@ func (r InMemoryCCIPReader) GetOffRampConfigDigest(ctx context.Context, pluginTy
 }
 
 func (r InMemoryCCIPReader) GetOffRampSourceChainsConfig(ctx context.Context, chains []cciptypes.ChainSelector,
-) (map[cciptypes.ChainSelector]reader.SourceChainConfig, error) {
+) (map[cciptypes.ChainSelector]reader.StaticSourceChainConfig, error) {
 	return nil, nil
+}
+
+// Close implements the reader.CCIPReader interface
+func (r InMemoryCCIPReader) Close() error {
+	// Since this is an in-memory implementation with no persistent connections
+	// or resources to clean up, we can simply return nil
+	return nil
 }
 
 // Interface compatibility check.

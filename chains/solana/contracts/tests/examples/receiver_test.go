@@ -189,7 +189,7 @@ func TestCcipReceiver(t *testing.T) {
 						receiverState,
 					).ValidateAndBuild()
 					require.NoError(t, err)
-					testutils.SendAndFailWith(ctx, t, solClient, []solana.Instruction{ix}, transmitter, rpc.CommitmentConfirmed, []string{"ConstraintSeeds"})
+					testutils.SendAndFailWith(ctx, t, solClient, []solana.Instruction{ix}, transmitter, rpc.CommitmentConfirmed, []string{"Error Code: " + common.ConstraintSeeds_AnchorError.String()})
 				})
 			}
 		})
@@ -210,7 +210,7 @@ func TestCcipReceiver(t *testing.T) {
 				receiverState,
 			).ValidateAndBuild()
 			require.NoError(t, err)
-			testutils.SendAndFailWith(ctx, t, solClient, []solana.Instruction{ix}, transmitter, rpc.CommitmentConfirmed, []string{"AccountNotInitialized"})
+			testutils.SendAndFailWith(ctx, t, solClient, []solana.Instruction{ix}, transmitter, rpc.CommitmentConfirmed, []string{"Error Code: " + common.AccountNotInitialized_AnchorError.String()})
 		})
 
 		t.Run("invalid sender", func(t *testing.T) {
@@ -228,7 +228,7 @@ func TestCcipReceiver(t *testing.T) {
 				receiverState,
 			).ValidateAndBuild()
 			require.NoError(t, err)
-			testutils.SendAndFailWith(ctx, t, solClient, []solana.Instruction{ix}, transmitter, rpc.CommitmentConfirmed, []string{"AccountNotInitialized"})
+			testutils.SendAndFailWith(ctx, t, solClient, []solana.Instruction{ix}, transmitter, rpc.CommitmentConfirmed, []string{"Error Code: " + common.AccountNotInitialized_AnchorError.String()})
 		})
 	})
 
@@ -236,21 +236,21 @@ func TestCcipReceiver(t *testing.T) {
 		// use token pool for address derivation & state management
 		mint := solana.MustPrivateKeyFromBase58("4dD1x6rv1uLHKWCrYBY9WYa781YgNQGocVpqrS1EzfDQAq9TK4Vdyju6eLXicoSmjiGU9uZ9ExJHmC5GzwGoQUWD")
 		require.NoError(t, err)
-		token, err := tokens.NewTokenPool(solana.TokenProgramID, config.CcipTokenPoolProgram, mint)
+		token, err := tokens.NewTokenPool(solana.TokenProgramID, config.CcipTokenPoolProgram, mint.PublicKey())
 		require.NoError(t, err)
 
-		ixs, ixErr := tokens.CreateToken(ctx, token.Program, token.Mint.PublicKey(), ccipAdmin.PublicKey(), 0, solClient, rpc.CommitmentConfirmed)
+		ixs, ixErr := tokens.CreateToken(ctx, token.Program, token.Mint, ccipAdmin.PublicKey(), 0, solClient, rpc.CommitmentConfirmed)
 		require.NoError(t, ixErr)
 
-		ixAta, tokenAdminATA, err := tokens.CreateAssociatedTokenAccount(token.Program, token.Mint.PublicKey(), tokenAdmin, ccipAdmin.PublicKey())
+		ixAta, tokenAdminATA, err := tokens.CreateAssociatedTokenAccount(token.Program, token.Mint, tokenAdmin, ccipAdmin.PublicKey())
 		require.NoError(t, err)
-		ixAtaOwner, ccipAdminATA, err := tokens.CreateAssociatedTokenAccount(token.Program, token.Mint.PublicKey(), ccipAdmin.PublicKey(), ccipAdmin.PublicKey())
+		ixAtaOwner, ccipAdminATA, err := tokens.CreateAssociatedTokenAccount(token.Program, token.Mint, ccipAdmin.PublicKey(), ccipAdmin.PublicKey())
 		require.NoError(t, err)
 
-		ixMintTo, mintErr := tokens.MintTo(123, token.Program, token.Mint.PublicKey(), tokenAdminATA, ccipAdmin.PublicKey())
+		ixMintTo, mintErr := tokens.MintTo(123, token.Program, token.Mint, tokenAdminATA, ccipAdmin.PublicKey())
 		require.NoError(t, mintErr)
 
-		testutils.SendAndConfirm(ctx, t, solClient, append(ixs, ixAta, ixAtaOwner, ixMintTo), ccipAdmin, rpc.CommitmentConfirmed, common.AddSigners(token.Mint))
+		testutils.SendAndConfirm(ctx, t, solClient, append(ixs, ixAta, ixAtaOwner, ixMintTo), ccipAdmin, rpc.CommitmentConfirmed, common.AddSigners(mint))
 
 		// withdraw
 		_, initBal, err := tokens.TokenBalance(ctx, solClient, tokenAdminATA, rpc.CommitmentConfirmed)
@@ -260,7 +260,7 @@ func TestCcipReceiver(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 0, initBalOwner)
 
-		ix, err := ccip_receiver.NewWithdrawTokensInstruction(123, 0, receiverState, tokenAdminATA, ccipAdminATA, token.Mint.PublicKey(), token.Program, tokenAdmin, user.PublicKey()).ValidateAndBuild()
+		ix, err := ccip_receiver.NewWithdrawTokensInstruction(123, 0, receiverState, tokenAdminATA, ccipAdminATA, token.Mint, token.Program, tokenAdmin, user.PublicKey()).ValidateAndBuild()
 		require.NoError(t, err)
 		testutils.SendAndConfirm(ctx, t, solClient, []solana.Instruction{ix}, user, rpc.CommitmentConfirmed)
 

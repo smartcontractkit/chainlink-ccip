@@ -24,6 +24,16 @@ export type TestTokenPool = {
           "name": "systemProgram",
           "isMut": false,
           "isSigner": false
+        },
+        {
+          "name": "program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": [
@@ -52,6 +62,11 @@ export type TestTokenPool = {
           "isSigner": false
         },
         {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "authority",
           "isMut": false,
           "isSigner": true
@@ -73,6 +88,11 @@ export type TestTokenPool = {
           "isSigner": false
         },
         {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "authority",
           "isMut": false,
           "isSigner": true
@@ -86,6 +106,11 @@ export type TestTokenPool = {
         {
           "name": "state",
           "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -547,6 +572,16 @@ export const IDL: TestTokenPool = {
           "name": "systemProgram",
           "isMut": false,
           "isSigner": false
+        },
+        {
+          "name": "program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": [
@@ -575,6 +610,11 @@ export const IDL: TestTokenPool = {
           "isSigner": false
         },
         {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "authority",
           "isMut": false,
           "isSigner": true
@@ -596,6 +636,11 @@ export const IDL: TestTokenPool = {
           "isSigner": false
         },
         {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "authority",
           "isMut": false,
           "isSigner": true
@@ -609,6 +654,11 @@ export const IDL: TestTokenPool = {
         {
           "name": "state",
           "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
           "isSigner": false
         },
         {

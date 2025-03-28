@@ -1,4 +1,6 @@
 use anchor_lang::prelude::*;
+use bytemuck::{Pod, Zeroable};
+use ccip_common::seed;
 use solana_program::sysvar::instructions;
 
 use crate::messages::ExecutionReportSingleChain;
@@ -24,28 +26,6 @@ pub const fn valid_version(v: u8, max_version: u8) -> bool {
 
 pub const fn uninitialized(v: u8) -> bool {
     v == 0
-}
-
-/// Fixed seeds for PDA derivation: different context must use different seeds.
-pub mod seed {
-    pub const SOURCE_CHAIN: &[u8] = b"source_chain_state";
-    pub const COMMIT_REPORT: &[u8] = b"commit_report";
-    pub const CONFIG: &[u8] = b"config";
-    pub const REFERENCE_ADDRESSES: &[u8] = b"reference_addresses";
-    pub const STATE: &[u8] = b"state";
-
-    // arbitrary messaging signer
-    pub const EXTERNAL_EXECUTION_CONFIG: &[u8] = b"external_execution_config";
-    // token pool interaction signer
-    pub const EXTERNAL_TOKEN_POOL: &[u8] = b"external_token_pools_signer";
-    // signer for billing fee token transfer
-    pub const FEE_BILLING_SIGNER: &[u8] = b"fee_billing_signer";
-
-    // token specific
-    pub const TOKEN_ADMIN_REGISTRY: &[u8] = b"token_admin_registry";
-    pub const CCIP_TOKENPOOL_CONFIG: &[u8] = b"ccip_tokenpool_config";
-    pub const CCIP_TOKENPOOL_SIGNER: &[u8] = b"ccip_tokenpool_signer";
-    pub const TOKEN_POOL_CONFIG: &[u8] = b"ccip_tokenpool_chainconfig";
 }
 
 #[derive(Accounts)]
@@ -381,7 +361,7 @@ pub struct CommitReportContext<'info> {
     /// CHECK: fee quoter allowed price updater account, used to invoke fee quoter with price updates
     /// so that it can authorize the call made by this offramp
     #[account(
-        seeds = [fee_quoter::context::seed::ALLOWED_PRICE_UPDATER, fee_billing_signer.key().as_ref()],
+        seeds = [seed::ALLOWED_PRICE_UPDATER, fee_billing_signer.key().as_ref()],
         bump,
         seeds::program = fee_quoter.key(),
     )]
@@ -389,7 +369,7 @@ pub struct CommitReportContext<'info> {
 
     /// CHECK: fee quoter config account, used to invoke fee quoter with price updates
     #[account(
-        seeds = [fee_quoter::context::seed::CONFIG],
+        seeds = [seed::CONFIG],
         bump,
         seeds::program = reference_addresses.load()?.fee_quoter,
     )]
@@ -406,7 +386,7 @@ pub struct CommitReportContext<'info> {
 
     /// CHECK: This account is just used in the CPI to the RMN Remote program
     #[account(
-        seeds = [rmn_remote::context::seed::CURSES],
+        seeds = [seed::CURSES],
         bump,
         seeds::program = reference_addresses.load()?.rmn_remote,
     )]
@@ -414,7 +394,7 @@ pub struct CommitReportContext<'info> {
 
     /// CHECK: This account is just used in the CPI to the RMN Remote program
     #[account(
-        seeds = [rmn_remote::context::seed::CONFIG],
+        seeds = [seed::CONFIG],
         bump,
         seeds::program = reference_addresses.load()?.rmn_remote,
     )]
@@ -465,7 +445,7 @@ pub struct PriceOnlyCommitReportContext<'info> {
     /// CHECK: fee quoter allowed price updater account, used to invoke fee quoter with price updates
     /// so that it can authorize the call made by this offramp
     #[account(
-        seeds = [fee_quoter::context::seed::ALLOWED_PRICE_UPDATER, fee_billing_signer.key().as_ref()],
+        seeds = [seed::ALLOWED_PRICE_UPDATER, fee_billing_signer.key().as_ref()],
         bump,
         seeds::program = fee_quoter.key(),
     )]
@@ -473,7 +453,7 @@ pub struct PriceOnlyCommitReportContext<'info> {
 
     /// CHECK: fee quoter config account, used to invoke fee quoter with price updates
     #[account(
-        seeds = [fee_quoter::context::seed::CONFIG],
+        seeds = [seed::CONFIG],
         bump,
         seeds::program = reference_addresses.load()?.fee_quoter,
     )]
@@ -490,7 +470,7 @@ pub struct PriceOnlyCommitReportContext<'info> {
 
     /// CHECK: This account is just used in the CPI to the RMN Remote program
     #[account(
-        seeds = [rmn_remote::context::seed::CURSES],
+        seeds = [seed::CURSES],
         bump,
         seeds::program = reference_addresses.load()?.rmn_remote,
     )]
@@ -498,7 +478,7 @@ pub struct PriceOnlyCommitReportContext<'info> {
 
     /// CHECK: This account is just used in the CPI to the RMN Remote program
     #[account(
-        seeds = [rmn_remote::context::seed::CONFIG],
+        seeds = [seed::CONFIG],
         bump,
         seeds::program = reference_addresses.load()?.rmn_remote,
     )]
@@ -583,7 +563,7 @@ pub struct ExecuteReportContext<'info> {
 
     /// CHECK: This account is just used in the CPI to the RMN Remote program
     #[account(
-        seeds = [rmn_remote::context::seed::CURSES],
+        seeds = [seed::CURSES],
         bump,
         seeds::program = reference_addresses.load()?.rmn_remote,
     )]
@@ -591,7 +571,7 @@ pub struct ExecuteReportContext<'info> {
 
     /// CHECK: This account is just used in the CPI to the RMN Remote program
     #[account(
-        seeds = [rmn_remote::context::seed::CONFIG],
+        seeds = [seed::CONFIG],
         bump,
         seeds::program = reference_addresses.load()?.rmn_remote,
     )]
@@ -615,7 +595,37 @@ pub struct ExecuteReportContext<'info> {
     // ] x N tokens
 }
 
-#[derive(Copy, Clone, AnchorSerialize, AnchorDeserialize)]
+/// It's not possible to store enums in zero_copy accounts, so we wrap the discriminant
+/// in a struct to store in config.
+#[derive(
+    Copy, Clone, AnchorSerialize, AnchorDeserialize, PartialEq, Eq, InitSpace, Pod, Zeroable,
+)]
+#[repr(C)]
+pub struct ConfigOcrPluginType {
+    discriminant: u8,
+}
+
+impl From<OcrPluginType> for ConfigOcrPluginType {
+    fn from(value: OcrPluginType) -> Self {
+        Self {
+            discriminant: value as u8,
+        }
+    }
+}
+
+impl TryFrom<ConfigOcrPluginType> for OcrPluginType {
+    type Error = CcipOfframpError;
+
+    fn try_from(value: ConfigOcrPluginType) -> std::result::Result<Self, Self::Error> {
+        match value.discriminant {
+            0 => Ok(Self::Commit),
+            1 => Ok(Self::Execution),
+            _ => Err(CcipOfframpError::InvalidPluginType),
+        }
+    }
+}
+
+#[derive(Copy, Clone, AnchorSerialize, AnchorDeserialize, PartialEq, Eq)]
 pub enum OcrPluginType {
     Commit,
     Execution,

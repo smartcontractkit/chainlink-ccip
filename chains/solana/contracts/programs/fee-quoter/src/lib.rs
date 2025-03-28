@@ -1,7 +1,7 @@
 use anchor_lang::error_code;
 use anchor_lang::prelude::*;
 
-declare_id!("FeeVB9Q77QvyaENRL1i77BjW6cTkaWwNLjNbZg9JHqpw");
+declare_id!("FeeQPGkKDeRV1MgoYfMH6L8o3KeuYjwUZrgn4LRKfjHi");
 
 pub mod context;
 use context::*;
@@ -19,6 +19,9 @@ pub mod extra_args;
 
 mod instructions;
 use instructions::router;
+
+// 1e18 Juels = 1 LINK natively (in EVM.) In SVM, the LINK mint likely has different decimals.
+pub const LINK_JUEL_DECIMALS: u8 = 18;
 
 #[program]
 pub mod fee_quoter {
@@ -38,23 +41,29 @@ pub mod fee_quoter {
     #[allow(clippy::too_many_arguments)]
     pub fn initialize(
         ctx: Context<Initialize>,
-        link_token_mint: Pubkey,
         max_fee_juels_per_msg: u128,
         onramp: Pubkey,
     ) -> Result<()> {
+        require!(
+            ctx.accounts.link_token_mint.decimals <= LINK_JUEL_DECIMALS,
+            FeeQuoterError::InvalidInputsMint
+        );
+
         ctx.accounts.config.set_inner(Config {
             version: 1,
             owner: ctx.accounts.authority.key(),
             proposed_owner: Pubkey::default(),
             max_fee_juels_per_msg,
-            link_token_mint,
+            link_token_mint: ctx.accounts.link_token_mint.key(),
+            link_token_local_decimals: ctx.accounts.link_token_mint.decimals,
             onramp,
             default_code_version: CodeVersion::V1,
         });
 
         emit!(ConfigSet {
             max_fee_juels_per_msg,
-            link_token_mint,
+            link_token_mint: ctx.accounts.link_token_mint.key(),
+            link_token_local_decimals: ctx.accounts.link_token_mint.decimals,
             onramp,
             default_code_version: CodeVersion::V1,
         });
@@ -383,6 +392,10 @@ pub enum FeeQuoterError {
     ExtraArgOutOfOrderExecutionMustBeTrue,
     #[msg("Invalid extra args tag")]
     InvalidExtraArgsTag,
+    #[msg("Invalid amount of accounts in extra args")]
+    InvalidExtraArgsAccounts,
+    #[msg("Invalid writability bitmap in extra args")]
+    InvalidExtraArgsWritabilityBitmap,
     #[msg("Invalid chain family selector")]
     InvalidChainFamilySelector,
     #[msg("Invalid token receiver")]
@@ -391,6 +404,8 @@ pub enum FeeQuoterError {
     InvalidSVMAddress,
     #[msg("The caller is not an authorized price updater")]
     UnauthorizedPriceUpdater,
+    #[msg("The LINK mint uses an unsupported number of decimals")]
+    InvalidLinkDecimals,
     #[msg("Invalid code version")]
     InvalidCodeVersion,
 }

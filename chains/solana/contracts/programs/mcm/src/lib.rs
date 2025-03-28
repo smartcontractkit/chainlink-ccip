@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-declare_id!("6UmMZr5MEqiKWD5jqTJd1WCR5kT8oZuFYBLJFi1o6GQX");
+declare_id!("5vNJx78mz7KVMjhuipyr9jKBKcMrKYGdjGkgE4LUmjKk");
 
 use program::Mcm;
 
@@ -97,7 +97,10 @@ pub mod mcm {
         proposed_owner: Pubkey,
     ) -> Result<()> {
         let config = &mut ctx.accounts.config;
-        require!(proposed_owner != config.owner, McmError::InvalidInputs);
+        require!(
+            proposed_owner != config.owner && proposed_owner != Pubkey::default(),
+            McmError::InvalidInputs
+        );
         config.proposed_owner = proposed_owner;
         Ok(())
     }
@@ -114,8 +117,8 @@ pub mod mcm {
         ctx: Context<AcceptOwnership>,
         _multisig_id: [u8; MULTISIG_ID_PADDED],
     ) -> Result<()> {
+        // NOTE: take() resets proposed_owner to default
         ctx.accounts.config.owner = std::mem::take(&mut ctx.accounts.config.proposed_owner);
-        ctx.accounts.config.proposed_owner = Pubkey::new_from_array([0; 32]);
         Ok(())
     }
 

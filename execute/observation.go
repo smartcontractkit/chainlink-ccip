@@ -118,7 +118,7 @@ func (p *Plugin) Observation(
 		"duration", time.Since(tStart),
 		"state", state,
 		"numCommitReports", len(observation.CommitReports),
-		"numMessages", len(observation.Messages))
+		"numMessages", observation.Messages.Count())
 
 	return p.ocrTypeCodec.EncodeObservation(observation)
 }
@@ -203,6 +203,7 @@ func (p *Plugin) getCommitReportsObservation(
 		p.ccipReader,
 		p.commitRootsCache.CanExecute,
 		fetchFrom,
+		ci.CursedSourceChains,
 		lggr,
 	)
 	if err != nil {
@@ -221,17 +222,6 @@ func (p *Plugin) getCommitReportsObservation(
 	// This cache will be re-initialized on each plugin restart.
 	for _, fullyExecutedCommit := range fullyExecutedUnfinalized {
 		p.commitRootsCache.Snooze(fullyExecutedCommit.SourceChain, fullyExecutedCommit.MerkleRoot)
-	}
-
-	// Remove and snooze commit reports from cursed chains.
-	for chainSelector, isCursed := range ci.CursedSourceChains {
-		if isCursed {
-			// Snooze everything on a cursed chain.
-			for _, commit := range groupedCommits[chainSelector] {
-				p.commitRootsCache.Snooze(chainSelector, commit.MerkleRoot)
-			}
-			delete(groupedCommits, chainSelector)
-		}
 	}
 
 	// Update the earliest unexecuted root based on remaining reports
@@ -428,7 +418,7 @@ func (p *Plugin) getFilterObservation(
 	// Read args from chain.
 	nonceObservations := make(exectypes.NonceObservations)
 	for srcChain, addrSet := range nonceRequestArgs {
-		// TODO: check if srcSelector is supported.
+		// TODO: check if srcSelectors is supported.
 		addrs := maps.Keys(addrSet)
 		nonces, err := p.ccipReader.Nonces(ctx, srcChain, addrs)
 		if err != nil {

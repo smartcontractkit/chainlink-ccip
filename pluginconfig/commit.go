@@ -22,7 +22,6 @@ const (
 	defaultNewMsgScanBatchSize                = merklemulti.MaxNumberTreeLeaves
 	defaultEvmDefaultMaxMerkleTreeSize        = merklemulti.MaxNumberTreeLeaves
 	defaultMaxReportTransmissionCheckAttempts = 5
-	defaultRMNEnabled                         = false
 	defaultRemoteGasPriceBatchWriteFrequency  = 1 * time.Minute
 	defaultSignObservationPrefix              = "chainlink ccip 1.6 rmn observation"
 	defaultTransmissionDelayMultiplier        = 30 * time.Second
@@ -30,11 +29,6 @@ const (
 	defaultAsyncObserverSyncFreq              = 5 * time.Second
 	defaultAsyncObserverSyncTimeout           = 10 * time.Second
 )
-
-type FeeInfo struct {
-	ExecDeviationPPB             cciptypes.BigInt `json:"execDeviationPPB"`
-	DataAvailabilityDeviationPPB cciptypes.BigInt `json:"dataAvailabilityDeviationPPB"`
-}
 
 type TokenInfo struct {
 	// AggregatorAddress is the address of the price feed TOKEN/USD aggregator on the feed chain.
@@ -83,8 +77,6 @@ type CommitOffchainConfig struct {
 	// should write gas prices to the remote chain.
 	//TODO: Rename to something with ChainFee
 	RemoteGasPriceBatchWriteFrequency commonconfig.Duration `json:"remoteGasPriceBatchWriteFrequency"`
-
-	FeeInfo map[cciptypes.ChainSelector]FeeInfo `json:"feeInfo"`
 
 	// TokenPriceBatchWriteFrequency is the frequency at which the commit plugin should
 	// write token prices to the remote chain.

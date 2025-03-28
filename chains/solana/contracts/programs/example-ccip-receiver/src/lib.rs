@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{Mint, TokenAccount};
 
-declare_id!("CcipReceiver1111111111111111111111111111111");
+declare_id!("48LGpn6tPn5SjTtK2wL9uUx48JUWZdZBv11sboy2orCc");
 
 pub const EXTERNAL_EXECUTION_CONFIG_SEED: &[u8] = b"external_execution_config";
 pub const APPROVED_SENDER_SEED: &[u8] = b"approved_ccip_sender";
@@ -325,6 +325,10 @@ impl BaseState {
     }
 
     pub fn transfer_ownership(&mut self, owner: Pubkey, proposed_owner: Pubkey) -> Result<()> {
+        require!(
+            proposed_owner != self.owner && proposed_owner != Pubkey::default(),
+            CcipReceiverError::InvalidProposedOwner
+        );
         require_eq!(self.owner, owner, CcipReceiverError::OnlyOwner);
         self.proposed_owner = proposed_owner;
         Ok(())
@@ -336,8 +340,8 @@ impl BaseState {
             proposed_owner,
             CcipReceiverError::OnlyProposedOwner
         );
-        self.proposed_owner = Pubkey::default();
-        self.owner = proposed_owner;
+        // NOTE: take() resets proposed_owner to default
+        self.owner = std::mem::take(&mut self.proposed_owner);
         Ok(())
     }
 
@@ -386,6 +390,8 @@ pub enum CcipReceiverError {
     OnlyProposedOwner,
     #[msg("Caller is not allowed")]
     InvalidCaller,
+    #[msg("Proposed owner is invalid")]
+    InvalidProposedOwner,
 }
 
 #[event]

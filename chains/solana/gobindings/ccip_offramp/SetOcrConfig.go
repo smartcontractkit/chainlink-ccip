@@ -21,7 +21,7 @@ import (
 // * `signers` - The list of signers.
 // * `transmitters` - The list of transmitters.
 type SetOcrConfig struct {
-	PluginType   *uint8
+	PluginType   *OcrPluginType
 	ConfigInfo   *Ocr3ConfigInfo
 	Signers      *[][20]uint8
 	Transmitters *[]ag_solanago.PublicKey
@@ -43,7 +43,7 @@ func NewSetOcrConfigInstructionBuilder() *SetOcrConfig {
 }
 
 // SetPluginType sets the "pluginType" parameter.
-func (inst *SetOcrConfig) SetPluginType(pluginType uint8) *SetOcrConfig {
+func (inst *SetOcrConfig) SetPluginType(pluginType OcrPluginType) *SetOcrConfig {
 	inst.PluginType = &pluginType
 	return inst
 }
@@ -224,7 +224,7 @@ func (obj *SetOcrConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err e
 // NewSetOcrConfigInstruction declares a new SetOcrConfig instruction with the provided parameters and accounts.
 func NewSetOcrConfigInstruction(
 	// Parameters:
-	pluginType uint8,
+	pluginType OcrPluginType,
 	configInfo Ocr3ConfigInfo,
 	signers [][20]uint8,
 	transmitters []ag_solanago.PublicKey,

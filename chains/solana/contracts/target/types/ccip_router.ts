@@ -700,7 +700,7 @@ export type CcipRouter = {
         },
         {
           "name": "tokenAdminRegistry",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         },
         {
@@ -927,7 +927,8 @@ export type CcipRouter = {
         "",
         "* `ctx` - The context containing the accounts required for sending the message.",
         "* `dest_chain_selector` - The chain selector for the destination chain.",
-        "* `message` - The message to be sent. The size limit of data is 256 bytes."
+        "* `message` - The message to be sent. The size limit of data is 256 bytes.",
+        "* `token_indexes` - Indices into the remaining accounts vector where the subslice for a token begins."
       ],
       "accounts": [
         {
@@ -1054,6 +1055,73 @@ export type CcipRouter = {
           32
         ]
       }
+    },
+    {
+      "name": "getFee",
+      "docs": [
+        "Queries the onramp for the fee required to send a message.",
+        "",
+        "This call is permissionless. Note it does not verify whether there's a curse active",
+        "in order to avoid the RMN CPI overhead.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for obtaining the message fee.",
+        "* `dest_chain_selector` - The chain selector for the destination chain.",
+        "* `message` - The message to be sent. The size limit of data is 256 bytes."
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "destChainState",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feeQuoter",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feeQuoterConfig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feeQuoterDestChain",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feeQuoterBillingTokenConfig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feeQuoterLinkTokenConfig",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "destChainSelector",
+          "type": "u64"
+        },
+        {
+          "name": "message",
+          "type": {
+            "defined": "SVM2AnyMessage"
+          }
+        }
+      ],
+      "returns": {
+        "defined": "GetFeeResult"
+      }
     }
   ],
   "accounts": [
@@ -1159,43 +1227,6 @@ export type CcipRouter = {
       "type": {
         "kind": "struct",
         "fields": []
-      }
-    },
-    {
-      "name": "tokenAdminRegistry",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "version",
-            "type": "u8"
-          },
-          {
-            "name": "administrator",
-            "type": "publicKey"
-          },
-          {
-            "name": "pendingAdministrator",
-            "type": "publicKey"
-          },
-          {
-            "name": "lookupTable",
-            "type": "publicKey"
-          },
-          {
-            "name": "writableIndexes",
-            "type": {
-              "array": [
-                "u128",
-                2
-              ]
-            }
-          },
-          {
-            "name": "mint",
-            "type": "publicKey"
-          }
-        ]
       }
     }
   ],
@@ -1378,6 +1409,26 @@ export type CcipRouter = {
                 32
               ]
             }
+          }
+        ]
+      }
+    },
+    {
+      "name": "GetFeeResult",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "juels",
+            "type": "u128"
+          },
+          {
+            "name": "token",
+            "type": "publicKey"
           }
         ]
       }
@@ -1801,86 +1852,81 @@ export type CcipRouter = {
     },
     {
       "code": 7010,
-      "name": "InvalidInputsConfigAccounts",
-      "msg": "Invalid config account"
-    },
-    {
-      "code": 7011,
       "name": "InvalidInputsTokenAdminRegistryAccounts",
       "msg": "Invalid Token Admin Registry account"
     },
     {
-      "code": 7012,
+      "code": 7011,
       "name": "InvalidInputsLookupTableAccounts",
       "msg": "Invalid LookupTable account"
     },
     {
-      "code": 7013,
+      "code": 7012,
       "name": "InvalidInputsLookupTableAccountWritable",
       "msg": "Invalid LookupTable account writable access"
     },
     {
-      "code": 7014,
+      "code": 7013,
       "name": "InvalidInputsTokenAmount",
       "msg": "Cannot send zero tokens"
     },
     {
-      "code": 7015,
+      "code": 7014,
       "name": "InvalidInputsTransferAllAmount",
       "msg": "Must specify zero amount to send alongside transfer_all"
     },
     {
-      "code": 7016,
+      "code": 7015,
       "name": "InvalidInputsAtaAddress",
       "msg": "Invalid Associated Token Account address"
     },
     {
-      "code": 7017,
+      "code": 7016,
       "name": "InvalidInputsAtaWritable",
       "msg": "Invalid Associated Token Account writable flag"
     },
     {
-      "code": 7018,
+      "code": 7017,
       "name": "InvalidInputsChainSelector",
       "msg": "Chain selector is invalid"
     },
     {
-      "code": 7019,
+      "code": 7018,
       "name": "InsufficientLamports",
       "msg": "Insufficient lamports"
     },
     {
-      "code": 7020,
+      "code": 7019,
       "name": "InsufficientFunds",
       "msg": "Insufficient funds"
     },
     {
-      "code": 7021,
+      "code": 7020,
       "name": "SourceTokenDataTooLarge",
       "msg": "Source token data is too large"
     },
     {
-      "code": 7022,
+      "code": 7021,
       "name": "InvalidTokenAdminRegistryInputsZeroAddress",
       "msg": "New Admin can not be zero address"
     },
     {
-      "code": 7023,
+      "code": 7022,
       "name": "InvalidTokenAdminRegistryProposedAdmin",
       "msg": "An already owned registry can not be proposed"
     },
     {
-      "code": 7024,
+      "code": 7023,
       "name": "SenderNotAllowed",
       "msg": "Sender not allowed for that destination chain"
     },
     {
-      "code": 7025,
+      "code": 7024,
       "name": "InvalidCodeVersion",
       "msg": "Invalid code version"
     },
     {
-      "code": 7026,
+      "code": 7025,
       "name": "InvalidCcipVersionRollback",
       "msg": "Invalid rollback attempt on the CCIP version of the onramp to the destination chain"
     }
@@ -2589,7 +2635,7 @@ export const IDL: CcipRouter = {
         },
         {
           "name": "tokenAdminRegistry",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         },
         {
@@ -2816,7 +2862,8 @@ export const IDL: CcipRouter = {
         "",
         "* `ctx` - The context containing the accounts required for sending the message.",
         "* `dest_chain_selector` - The chain selector for the destination chain.",
-        "* `message` - The message to be sent. The size limit of data is 256 bytes."
+        "* `message` - The message to be sent. The size limit of data is 256 bytes.",
+        "* `token_indexes` - Indices into the remaining accounts vector where the subslice for a token begins."
       ],
       "accounts": [
         {
@@ -2943,6 +2990,73 @@ export const IDL: CcipRouter = {
           32
         ]
       }
+    },
+    {
+      "name": "getFee",
+      "docs": [
+        "Queries the onramp for the fee required to send a message.",
+        "",
+        "This call is permissionless. Note it does not verify whether there's a curse active",
+        "in order to avoid the RMN CPI overhead.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for obtaining the message fee.",
+        "* `dest_chain_selector` - The chain selector for the destination chain.",
+        "* `message` - The message to be sent. The size limit of data is 256 bytes."
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "destChainState",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feeQuoter",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feeQuoterConfig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feeQuoterDestChain",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feeQuoterBillingTokenConfig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feeQuoterLinkTokenConfig",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "destChainSelector",
+          "type": "u64"
+        },
+        {
+          "name": "message",
+          "type": {
+            "defined": "SVM2AnyMessage"
+          }
+        }
+      ],
+      "returns": {
+        "defined": "GetFeeResult"
+      }
     }
   ],
   "accounts": [
@@ -3048,43 +3162,6 @@ export const IDL: CcipRouter = {
       "type": {
         "kind": "struct",
         "fields": []
-      }
-    },
-    {
-      "name": "tokenAdminRegistry",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "version",
-            "type": "u8"
-          },
-          {
-            "name": "administrator",
-            "type": "publicKey"
-          },
-          {
-            "name": "pendingAdministrator",
-            "type": "publicKey"
-          },
-          {
-            "name": "lookupTable",
-            "type": "publicKey"
-          },
-          {
-            "name": "writableIndexes",
-            "type": {
-              "array": [
-                "u128",
-                2
-              ]
-            }
-          },
-          {
-            "name": "mint",
-            "type": "publicKey"
-          }
-        ]
       }
     }
   ],
@@ -3267,6 +3344,26 @@ export const IDL: CcipRouter = {
                 32
               ]
             }
+          }
+        ]
+      }
+    },
+    {
+      "name": "GetFeeResult",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "juels",
+            "type": "u128"
+          },
+          {
+            "name": "token",
+            "type": "publicKey"
           }
         ]
       }
@@ -3690,86 +3787,81 @@ export const IDL: CcipRouter = {
     },
     {
       "code": 7010,
-      "name": "InvalidInputsConfigAccounts",
-      "msg": "Invalid config account"
-    },
-    {
-      "code": 7011,
       "name": "InvalidInputsTokenAdminRegistryAccounts",
       "msg": "Invalid Token Admin Registry account"
     },
     {
-      "code": 7012,
+      "code": 7011,
       "name": "InvalidInputsLookupTableAccounts",
       "msg": "Invalid LookupTable account"
     },
     {
-      "code": 7013,
+      "code": 7012,
       "name": "InvalidInputsLookupTableAccountWritable",
       "msg": "Invalid LookupTable account writable access"
     },
     {
-      "code": 7014,
+      "code": 7013,
       "name": "InvalidInputsTokenAmount",
       "msg": "Cannot send zero tokens"
     },
     {
-      "code": 7015,
+      "code": 7014,
       "name": "InvalidInputsTransferAllAmount",
       "msg": "Must specify zero amount to send alongside transfer_all"
     },
     {
-      "code": 7016,
+      "code": 7015,
       "name": "InvalidInputsAtaAddress",
       "msg": "Invalid Associated Token Account address"
     },
     {
-      "code": 7017,
+      "code": 7016,
       "name": "InvalidInputsAtaWritable",
       "msg": "Invalid Associated Token Account writable flag"
     },
     {
-      "code": 7018,
+      "code": 7017,
       "name": "InvalidInputsChainSelector",
       "msg": "Chain selector is invalid"
     },
     {
-      "code": 7019,
+      "code": 7018,
       "name": "InsufficientLamports",
       "msg": "Insufficient lamports"
     },
     {
-      "code": 7020,
+      "code": 7019,
       "name": "InsufficientFunds",
       "msg": "Insufficient funds"
     },
     {
-      "code": 7021,
+      "code": 7020,
       "name": "SourceTokenDataTooLarge",
       "msg": "Source token data is too large"
     },
     {
-      "code": 7022,
+      "code": 7021,
       "name": "InvalidTokenAdminRegistryInputsZeroAddress",
       "msg": "New Admin can not be zero address"
     },
     {
-      "code": 7023,
+      "code": 7022,
       "name": "InvalidTokenAdminRegistryProposedAdmin",
       "msg": "An already owned registry can not be proposed"
     },
     {
-      "code": 7024,
+      "code": 7023,
       "name": "SenderNotAllowed",
       "msg": "Sender not allowed for that destination chain"
     },
     {
-      "code": 7025,
+      "code": 7024,
       "name": "InvalidCodeVersion",
       "msg": "Invalid code version"
     },
     {
-      "code": 7026,
+      "code": 7025,
       "name": "InvalidCcipVersionRollback",
       "msg": "Invalid rollback attempt on the CCIP version of the onramp to the destination chain"
     }

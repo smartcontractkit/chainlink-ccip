@@ -1,18 +1,17 @@
 use crate::{
     events::token_admin_registry as events,
     instructions::interfaces::TokenAdminRegistry,
+    token_admin_registry_writable,
     token_context::{
         OverridePendingTokenAdminRegistryByCCIPAdmin, OverridePendingTokenAdminRegistryByOwner,
     },
 };
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::get_associated_token_address_with_program_id;
+use ccip_common::seed;
 use solana_program::{address_lookup_table::state::AddressLookupTable, log::sol_log};
 
-use super::pools::token_admin_registry_writable;
-
 use crate::{
-    seed,
     token_context::{RegisterTokenAdminRegistryByCCIPAdmin, RegisterTokenAdminRegistryByOwner},
     AcceptAdminRoleTokenAdminRegistry, CcipRouterError, ModifyTokenAdminRegistry,
     SetPoolTokenAdminRegistry,
@@ -138,7 +137,7 @@ impl TokenAdminRegistry for Impl {
     ) -> Result<()> {
         let token_mint = ctx.accounts.mint.key().to_owned();
 
-        // Enable to overwrite the lookup table pool with 0 to deslist from CCIP
+        // Enable to overwrite the lookup table pool with 0 to delist from CCIP
         let token_admin_registry = &mut ctx.accounts.token_admin_registry;
         let previous_pool = token_admin_registry.lookup_table;
         let new_pool = ctx.accounts.pool_lookuptable.key();
@@ -182,10 +181,7 @@ impl TokenAdminRegistry for Impl {
                 &pool_program,
             );
             let (fee_billing_config, _) = Pubkey::find_program_address(
-                &[
-                    fee_quoter::context::seed::FEE_BILLING_TOKEN_CONFIG,
-                    token_mint.as_ref(),
-                ],
+                &[seed::FEE_BILLING_TOKEN_CONFIG, token_mint.as_ref()],
                 &ctx.accounts.config.fee_quoter,
             );
 
@@ -231,7 +227,7 @@ impl TokenAdminRegistry for Impl {
 }
 
 fn init_with_pending_administrator(
-    token_admin_registry: &mut Account<'_, crate::TokenAdminRegistry>,
+    token_admin_registry: &mut Account<'_, ccip_common::router_accounts::TokenAdminRegistry>,
     token_mint: Pubkey,
     new_admin: Pubkey,
 ) -> Result<()> {

@@ -1,7 +1,7 @@
 use anchor_lang::error_code;
 use anchor_lang::prelude::*;
 
-declare_id!("offRPDpDxT5MGFNmMh99QKTZfPWTkqYUrStEriAS1H5");
+declare_id!("offqSMQWgQud6WJz694LRzkeN5kMYpCHTpXQr3Rkcjm");
 
 mod event;
 mod messages;
@@ -79,8 +79,8 @@ pub mod ccip_offramp {
         config.enable_manual_execution_after = enable_execution_after;
         config.owner = ctx.accounts.authority.key();
         config.ocr3 = [
-            Ocr3Config::new(OcrPluginType::Commit as u8),
-            Ocr3Config::new(OcrPluginType::Execution as u8),
+            Ocr3Config::new(OcrPluginType::Commit),
+            Ocr3Config::new(OcrPluginType::Execution),
         ];
 
         emit!(ConfigSet {
@@ -327,7 +327,7 @@ pub mod ccip_offramp {
     /// * `transmitters` - The list of transmitters.
     pub fn set_ocr_config(
         ctx: Context<SetOcrConfig>,
-        plugin_type: u8, // OcrPluginType, u8 used because anchor tests did not work with an enum
+        plugin_type: OcrPluginType,
         config_info: Ocr3ConfigInfo,
         signers: Vec<[u8; 20]>,
         transmitters: Vec<Pubkey>,
@@ -585,8 +585,6 @@ pub enum CcipOfframpError {
     InvalidInputsFeeQuoterAccount,
     #[msg("Invalid offramp authorization account")]
     InvalidInputsAllowedOfframpAccount,
-    #[msg("Invalid config account")]
-    InvalidInputsConfigAccounts,
     #[msg("Invalid Token Admin Registry account")]
     InvalidInputsTokenAdminRegistryAccounts,
     #[msg("Invalid LookupTable account")]

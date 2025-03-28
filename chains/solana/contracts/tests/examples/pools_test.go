@@ -12,7 +12,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/testutils"
-	tokenpool "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/example_lockrelease_token_pool"
+	tokenpool "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/lockrelease_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/rmn_remote"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_ccip_invalid_receiver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
@@ -111,9 +111,9 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 			for _, poolProgram := range []solana.PublicKey{config.CcipBasePoolBurnMint} {
 				mintPriv, err := solana.NewRandomPrivateKey()
 				require.NoError(t, err)
-				p, err := tokens.NewTokenPool(v.tokenProgram, poolProgram, mintPriv)
+				p, err := tokens.NewTokenPool(v.tokenProgram, poolProgram, mintPriv.PublicKey())
 				require.NoError(t, err)
-				mint := p.Mint.PublicKey()
+				mint := p.Mint
 
 				t.Run("setup:token", func(t *testing.T) {
 					// create token
@@ -130,7 +130,7 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 					require.NoError(t, err)
 
 					instructions = append(instructions, createI, mintToI)
-					testutils.SendAndConfirm(ctx, t, solanaGoClient, instructions, admin, config.DefaultCommitment, common.AddSigners(p.Mint))
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, instructions, admin, config.DefaultCommitment, common.AddSigners(mintPriv))
 
 					// validate
 					outDec, outVal, err := tokens.TokenBalance(ctx, solanaGoClient, p.User[admin.PublicKey()], config.DefaultCommitment)
@@ -148,7 +148,20 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 					require.NoError(t, err)
 
 					t.Run("setup", func(t *testing.T) {
-						poolInitI, err := tokenpool.NewInitializeInstruction(dumbRamp, config.RMNRemoteProgram, poolConfig, mint, admin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+						type ProgramData struct {
+							DataType uint32
+							Address  solana.PublicKey
+						}
+						// get program data account
+						data, err := solanaGoClient.GetAccountInfoWithOpts(ctx, poolProgram, &rpc.GetAccountInfoOpts{
+							Commitment: config.DefaultCommitment,
+						})
+						require.NoError(t, err)
+						// Decode program data
+						var programData ProgramData
+						require.NoError(t, bin.UnmarshalBorsh(&programData, data.Bytes()))
+
+						poolInitI, err := tokenpool.NewInitializeInstruction(dumbRamp, config.RMNRemoteProgram, poolConfig, mint, admin.PublicKey(), solana.SystemProgramID, poolProgram, programData.Address).ValidateAndBuild()
 						require.NoError(t, err)
 
 						// make pool mint_authority for token (required for burn/mint)
@@ -158,7 +171,7 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 						// set pool config
 						ixConfigure, err := tokenpool.NewInitChainRemoteConfigInstruction(
 							config.EvmChainSelector,
-							p.Mint.PublicKey(),
+							p.Mint,
 							tokenpool.RemoteConfig{
 								TokenAddress: remoteToken,
 								Decimals:     9,
@@ -171,7 +184,7 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 						require.NoError(t, err)
 
 						ixAppend, err := tokenpool.NewAppendRemotePoolAddressesInstruction(
-							config.EvmChainSelector, p.Mint.PublicKey(), []tokenpool.RemoteAddress{remotePool}, poolConfig, p.Chain[config.EvmChainSelector], admin.PublicKey(), solana.SystemProgramID,
+							config.EvmChainSelector, p.Mint, []tokenpool.RemoteAddress{remotePool}, poolConfig, p.Chain[config.EvmChainSelector], admin.PublicKey(), solana.SystemProgramID,
 						).ValidateAndBuild()
 						require.NoError(t, err)
 
@@ -182,6 +195,25 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 							&tokens.TokenInstruction{Instruction: ixConfigure, Program: poolProgram},
 							&tokens.TokenInstruction{Instruction: ixAppend, Program: poolProgram},
 						}, admin, config.DefaultCommitment)
+
+						// Test growing and shrinking allowlist (realloc test)
+						a, _ := solana.NewRandomPrivateKey()
+						b, _ := solana.NewRandomPrivateKey()
+
+						ixGrowWithDuplicates, err := tokenpool.NewConfigureAllowListInstruction([]solana.PublicKey{a.PublicKey(), b.PublicKey(), b.PublicKey()}, false, poolConfig, mint, admin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+						require.NoError(t, err)
+						testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{&tokens.TokenInstruction{Instruction: ixGrowWithDuplicates, Program: poolProgram}}, admin, rpc.CommitmentConfirmed, []string{"Key already existed in the allowlist"})
+
+						ixGrow, err := tokenpool.NewConfigureAllowListInstruction([]solana.PublicKey{a.PublicKey(), b.PublicKey()}, false, poolConfig, mint, admin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+						require.NoError(t, err)
+						testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{&tokens.TokenInstruction{Instruction: ixGrow, Program: poolProgram}}, admin, rpc.CommitmentConfirmed)
+
+						ixShrink, err := tokenpool.NewRemoveFromAllowListInstruction([]solana.PublicKey{a.PublicKey(), b.PublicKey()}, poolConfig, mint, admin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+						require.NoError(t, err)
+						testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{&tokens.TokenInstruction{Instruction: ixShrink, Program: poolProgram}}, admin, rpc.CommitmentConfirmed)
+
+						// Shrinking fails now as the entries do not exist anymore
+						testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{&tokens.TokenInstruction{Instruction: ixShrink, Program: poolProgram}}, admin, rpc.CommitmentConfirmed, []string{"Key did not exist in the allowlist"})
 					})
 
 					t.Run("lockOrBurn", func(t *testing.T) {
@@ -267,13 +299,13 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 						require.Equal(t, fmt.Sprintf("%d", amount), getBalance(p.User[admin.PublicKey()]))
 						require.Equal(t, "0", getBalance(poolTokenAccount))
 
-						approveIx, err := tokens.TokenApproveChecked(amount, decimals, v.tokenProgram, p.User[admin.PublicKey()], p.Mint.PublicKey(), poolSigner, admin.PublicKey(), solana.PublicKeySlice{})
+						approveIx, err := tokens.TokenApproveChecked(amount, decimals, v.tokenProgram, p.User[admin.PublicKey()], p.Mint, poolSigner, admin.PublicKey(), solana.PublicKeySlice{})
 						require.NoError(t, err)
 
-						acceptIx, err := tokenpool.NewSetCanAcceptLiquidityInstruction(true, poolConfig, admin.PublicKey()).ValidateAndBuild()
+						acceptIx, err := tokenpool.NewSetCanAcceptLiquidityInstruction(true, poolConfig, mint, admin.PublicKey()).ValidateAndBuild()
 						require.NoError(t, err)
 
-						provideIx, err := tokenpool.NewProvideLiquidityInstruction(amount, poolConfig, v.tokenProgram, p.Mint.PublicKey(), poolSigner, poolTokenAccount, p.User[admin.PublicKey()], admin.PublicKey()).ValidateAndBuild()
+						provideIx, err := tokenpool.NewProvideLiquidityInstruction(amount, poolConfig, v.tokenProgram, p.Mint, poolSigner, poolTokenAccount, p.User[admin.PublicKey()], admin.PublicKey()).ValidateAndBuild()
 						require.NoError(t, err)
 
 						testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{
@@ -290,7 +322,7 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 						require.Equal(t, "0", getBalance(p.User[admin.PublicKey()]))
 						require.Equal(t, fmt.Sprintf("%d", amount), getBalance(poolTokenAccount))
 
-						withdrawIx, err := tokenpool.NewWithdrawLiquidityInstruction(amount, poolConfig, v.tokenProgram, p.Mint.PublicKey(), poolSigner, poolTokenAccount, p.User[admin.PublicKey()], admin.PublicKey()).ValidateAndBuild()
+						withdrawIx, err := tokenpool.NewWithdrawLiquidityInstruction(amount, poolConfig, v.tokenProgram, p.Mint, poolSigner, poolTokenAccount, p.User[admin.PublicKey()], admin.PublicKey()).ValidateAndBuild()
 						require.NoError(t, err)
 
 						testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{

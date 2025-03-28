@@ -5,185 +5,24 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
-	"time"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/urfave/cli/v3"
 
+	"github.com/smartcontractkit/chainlink-ccip/cmd/carpenter/internal/filter"
 	"github.com/smartcontractkit/chainlink-ccip/cmd/carpenter/internal/parse"
+	"github.com/smartcontractkit/chainlink-ccip/cmd/carpenter/internal/render"
 	"github.com/smartcontractkit/chainlink-ccip/cmd/carpenter/internal/stream"
 )
 
 type arguments struct {
-	files          []string
-	logType        string
-	disableFilters bool
-}
+	files        []string
+	logType      parse.LogType
+	rendererName string
 
-// renderData
-/*
-
-2024-12-04T20:15:35Z | 1.1.1 |       Commit(MerkleRoot) | <processor details>
-                       | | |           |     |-- processor
-                       | | |           |-- OCR Plugin
-                       | | |-- sequence number
-                       | |-- DON ID
-                       -- oracleID
-
-*/
-func renderData(data *parse.Data) {
-	// simple color selection algorithm
-	withColor := func(in interface{}, i int) string {
-		color := fmt.Sprintf("%d", i%7+1)
-		str := fmt.Sprintf("%v", in)
-
-		return lipgloss.NewStyle().Foreground(lipgloss.Color(color)).Render(str)
-	}
-
-	var timeStyle = lipgloss.NewStyle().Width(10).Height(1).MaxHeight(1).
-		Align(lipgloss.Center)
-	var uidStyle = lipgloss.NewStyle().Width(25).Height(1).MaxHeight(1).
-		Align(lipgloss.Left).PaddingLeft(1).Bold(true)
-	var levelStyle = lipgloss.NewStyle().Width(4).Height(1).MaxHeight(1).
-		Align(lipgloss.Left).PaddingLeft(1).Italic(true)
-	var messageStyle = lipgloss.NewStyle().Width(60).Height(1).MaxHeight(1).
-		Align(lipgloss.Left).PaddingLeft(1)
-	var fieldsStyle = lipgloss.NewStyle().Width(100).Height(1).MaxHeight(1).
-		Align(lipgloss.Left).PaddingLeft(1)
-
-	uid := fmt.Sprintf("%s.%s.%s.%s.%s",
-		withColor(data.OracleID, data.OracleID),
-		withColor(data.DONID, data.DONID),
-		withColor(data.SequenceNumber, data.SequenceNumber),
-		withColor(data.Component, 0),
-		withColor(data.OCRPhase, ocrPhaseToColor(data.OCRPhase)),
-	)
-
-	fmt.Printf("%s|%s|%s|%s|%s\n",
-		timeStyle.Render(data.Timestamp.Format(time.TimeOnly)),
-		uidStyle.Render(uid),
-		levelStyle.Render(truncateLevel(data.Level)),
-		messageStyle.Render(data.Message),
-		fieldsStyle.Render(getRelevantFieldsForMessage(data)),
-	)
-}
-
-func ocrPhaseToColor(phase string) int {
-	switch phase {
-	case "qry":
-		return 1
-	case "obs":
-		return 2
-	case "otcm":
-		return 3
-	case "rprt":
-		return 4
-	case "sacc":
-		return 5
-	case "strn":
-		return 6
-	default:
-		return 0
-	}
-}
-
-func truncateLevel(level string) string {
-	switch lv := strings.ToLower(level); lv {
-	case "info":
-		return "ifo"
-	case "debug":
-		return "dbg"
-	case "warn":
-		return "wrn"
-	case "error":
-		return "err"
-	case "critical":
-		return "crt"
-	default:
-		return "unk"
-	}
-}
-
-func getRelevantFieldsForMessage(data *parse.Data) string {
-	var fields string
-
-	if strings.ToLower(data.Level) == "error" {
-		fields = fmt.Sprintf("err=%v", data.RawLoggerFields["err"])
-	}
-
-	if strings.HasPrefix(data.Message, "failed to get token prices outcome") {
-		return fmt.Sprintf("err=%v", data.RawLoggerFields["err"])
-	}
-
-	if strings.HasPrefix(data.Message, "Get consensus observation failed, empty outcome") {
-		return fmt.Sprintf("err=%v", data.RawLoggerFields["err"])
-	}
-
-	if strings.HasPrefix(data.Message, "Sending Outcome") {
-		return fmt.Sprintf("nextState=%v outcome=%v",
-			data.RawLoggerFields["nextState"], data.RawLoggerFields["outcome"])
-	}
-
-	if strings.HasPrefix(data.Message, "sending merkle root processor observation") {
-		return fmt.Sprintf("observation=%v", data.RawLoggerFields["observation"])
-	}
-
-	if strings.HasPrefix(data.Message, "call to MsgsBetweenSeqNums returned unexpected") {
-		return fmt.Sprintf(
-			"%s expected=%v actual=%v chain=%v",
-			fields,
-			data.RawLoggerFields["expected"],
-			data.RawLoggerFields["actual"],
-			data.RawLoggerFields["chain"],
-		)
-	}
-	if strings.HasPrefix(data.Message, "queried messages between sequence numbers") {
-		return fmt.Sprintf("%s numMsgs=%v sourceChain=%v seqNumRange=%v",
-			fields,
-			data.RawLoggerFields["numMsgs"],
-			data.RawLoggerFields["sourceChainSelector"],
-			data.RawLoggerFields["seqNumRange"],
-		)
-	}
-	if strings.HasPrefix(data.Message, "decoded messages between sequence numbers") {
-		return fmt.Sprintf("%s sourceChain=%v seqNumRange=%v",
-			fields, data.RawLoggerFields["sourceChainSelector"], data.RawLoggerFields["seqNumRange"])
-	}
-
-	return ""
-}
-
-func run(args arguments) error {
-	var io stream.InputOptions
-
-	// If no files are provided the stream will read from stdin.
-	if len(args.files) != 0 {
-		io.Filenames = args.files
-	}
-
-	inputStream, err := stream.InitializeInputStream(io)
-	if err != nil {
-		return fmt.Errorf("failed to initialize input stream: %w", err)
-	}
-
-	scanner := bufio.NewScanner(inputStream)
-	for scanner.Scan() {
-		line := scanner.Text()
-		data, err := parse.Filter(line, args.logType, args.disableFilters)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Unable to get data: %s\n", err)
-			return err
-		}
-		if data == nil {
-			// no data to display.
-			continue
-		}
-
-		renderData(data)
-		//fmt.Println(data)
-	}
-	return nil
+	filter.CompiledFilterFields
+	filterOP filter.FilterOP
 }
 
 func makeCommand() *cli.Command {
@@ -198,31 +37,115 @@ func makeCommand() *cli.Command {
 				Destination: &args.files,
 			},
 			&cli.StringFlag{
-				Name:        "logType",
-				Usage:       "Specify the type of log to parse, valid options: json, mixed, ci",
-				Destination: &args.logType,
-				Required:    true,
+				Name:  "logType",
+				Usage: "Specify the type of log to parse, valid options: json, mixed, ci",
+				Value: "json",
 				Validator: func(s string) error {
-					if !parse.IsValidLogType(s) {
-						return fmt.Errorf("invalid log type: %s, expected either %s or %s or %s",
-							s,
-							parse.LogTypeJSON,
-							parse.LogTypeMixed,
-							parse.LogTypeMixedGoTestJSON,
-						)
+					var err error
+					args.logType, err = parse.ParseLogType(s)
+					if err != nil {
+						return fmt.Errorf("expected one of [%s]",
+							strings.Join(parse.LogTypeNames(), ", "))
 					}
 					return nil
 				},
 			},
-			&cli.BoolFlag{
-				Name:        "disableFilters",
-				Usage:       "Set to disable filter application on the logs. Defaults to false.",
-				Destination: &args.disableFilters,
-				Required:    false,
+			&cli.StringFlag{
+				OnlyOnce:    true,
+				Name:        "renderer",
+				Usage:       fmt.Sprintf("Select which rendering algorithm to use: [%s]", strings.Join(render.GetRenderers(), ", ")),
+				Value:       "basic",
+				Destination: &args.rendererName,
+				Validator: func(s string) error {
+					choices := render.GetRenderers()
+					if !slices.Contains(choices, s) {
+						return fmt.Errorf("expected one of [%s]",
+							s, strings.Join(choices, ", "))
+					}
+					return nil
+				},
+			},
+			&cli.StringSliceFlag{
+				Name: "filter",
+				Usage: fmt.Sprintf(
+					"Line selection filters. Format as 'FieldName:Regexp', valid fields: [%s]",
+					strings.Join(filter.FieldNames(), ", ")),
+				//Destination: &args.FilterFields.Filters,
+				Category: "filters",
+				Validator: func(fields []string) error {
+					var err error
+					args.CompiledFilterFields, err = filter.NewFilterFields(fields)
+					if err != nil {
+						return err
+					}
+					return nil
+				},
+			},
+			&cli.StringFlag{
+				Name: "filter-op",
+				Usage: fmt.Sprintf(
+					"Operation to use when combining filters. Valid options: [%s]",
+					strings.Join(filter.FilterOPNames(), ", ")),
+				Category: "filters",
+				Value:    string(filter.FilterOPAND),
+				Validator: func(s string) error {
+					var err error
+					args.filterOP, err = filter.ParseFilterOP(s)
+					if err != nil {
+						return fmt.Errorf("expected one of %s", err,
+							strings.Join(filter.FilterOPNames(), ", "))
+					}
+					return nil
+				},
 			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			return run(args)
 		},
 	}
+}
+
+func run(args arguments) error {
+	var io stream.InputOptions
+
+	// If no files are provided the stream will read from stdin.
+	if len(args.files) != 0 {
+		io.Filenames = args.files
+	}
+
+	renderer, err := render.GetRenderer(args.rendererName, render.Options{})
+	if err != nil {
+		return fmt.Errorf("failed to get renderer: %w", err)
+	}
+
+	inputStream, err := stream.InitializeInputStream(io)
+	if err != nil {
+		return fmt.Errorf("failed to initialize input stream: %w", err)
+	}
+
+	scanner := bufio.NewScanner(inputStream)
+	for scanner.Scan() {
+		line := scanner.Text()
+		data, err := parse.ParseLine(line, args.logType)
+		if err != nil {
+			return fmt.Errorf("ParseLine: %w", err)
+		}
+
+		include, err := filter.Filter(data, args.CompiledFilterFields, args.filterOP)
+		if err != nil {
+			msg := fmt.Sprintf("Unable to get data: %s\n", err)
+			_, err2 := fmt.Fprintf(os.Stderr, msg)
+			if err2 != nil {
+				panic(msg)
+			}
+			return err
+		}
+		if !include {
+			// no data to display.
+			continue
+		}
+
+		renderer(data)
+	}
+	return nil
 }

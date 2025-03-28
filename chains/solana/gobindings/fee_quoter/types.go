@@ -73,12 +73,12 @@ func (obj *GasPriceUpdate) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err
 	return nil
 }
 
-type EVMExtraArgsV2 struct {
+type GenericExtraArgsV2 struct {
 	GasLimit                 ag_binary.Uint128
 	AllowOutOfOrderExecution bool
 }
 
-func (obj EVMExtraArgsV2) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj GenericExtraArgsV2) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `GasLimit` param:
 	err = encoder.Encode(obj.GasLimit)
 	if err != nil {
@@ -92,7 +92,7 @@ func (obj EVMExtraArgsV2) MarshalWithEncoder(encoder *ag_binary.Encoder) (err er
 	return nil
 }
 
-func (obj *EVMExtraArgsV2) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *GenericExtraArgsV2) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `GasLimit`:
 	err = decoder.Decode(&obj.GasLimit)
 	if err != nil {
@@ -307,7 +307,7 @@ func (obj *TokenTransferAdditionalData) UnmarshalWithDecoder(decoder *ag_binary.
 type GetFeeResult struct {
 	Token                       ag_solanago.PublicKey
 	Amount                      uint64
-	Juels                       uint64
+	Juels                       ag_binary.Uint128
 	TokenTransferAdditionalData []TokenTransferAdditionalData
 	ProcessedExtraArgs          ProcessedExtraArgs
 }

@@ -266,7 +266,20 @@ var (
 	// * `ctx` - The context containing the accounts required for sending the message.
 	// * `dest_chain_selector` - The chain selector for the destination chain.
 	// * `message` - The message to be sent. The size limit of data is 256 bytes.
+	// * `token_indexes` - Indices into the remaining accounts vector where the subslice for a token begins.
 	Instruction_CcipSend = ag_binary.TypeID([8]byte{108, 216, 134, 191, 249, 234, 33, 84})
+
+	// Queries the onramp for the fee required to send a message.
+	//
+	// This call is permissionless. Note it does not verify whether there's a curse active
+	// in order to avoid the RMN CPI overhead.
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for obtaining the message fee.
+	// * `dest_chain_selector` - The chain selector for the destination chain.
+	// * `message` - The message to be sent. The size limit of data is 256 bytes.
+	Instruction_GetFee = ag_binary.TypeID([8]byte{115, 195, 235, 161, 25, 219, 60, 29})
 )
 
 // InstructionIDToName returns the name of the instruction given its ID.
@@ -316,6 +329,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "WithdrawBilledFunds"
 	case Instruction_CcipSend:
 		return "CcipSend"
+	case Instruction_GetFee:
+		return "GetFee"
 	default:
 		return ""
 	}
@@ -401,6 +416,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"ccip_send", (*CcipSend)(nil),
+		},
+		{
+			"get_fee", (*GetFee)(nil),
 		},
 	},
 )

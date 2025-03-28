@@ -24,6 +24,11 @@ export type FeeQuoter = {
           "isSigner": false
         },
         {
+          "name": "linkTokenMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "authority",
           "isMut": true,
           "isSigner": true
@@ -45,10 +50,6 @@ export type FeeQuoter = {
         }
       ],
       "args": [
-        {
-          "name": "linkTokenMint",
-          "type": "publicKey"
-        },
         {
           "name": "maxFeeJuelsPerMsg",
           "type": "u128"
@@ -674,6 +675,10 @@ export type FeeQuoter = {
             "type": "publicKey"
           },
           {
+            "name": "linkTokenLocalDecimals",
+            "type": "u8"
+          },
+          {
             "name": "onramp",
             "type": "publicKey"
           },
@@ -813,7 +818,7 @@ export type FeeQuoter = {
       }
     },
     {
-      "name": "EVMExtraArgsV2",
+      "name": "GenericExtraArgsV2",
       "type": {
         "kind": "struct",
         "fields": [
@@ -947,7 +952,7 @@ export type FeeQuoter = {
           },
           {
             "name": "juels",
-            "type": "u64"
+            "type": "u128"
           },
           {
             "name": "tokenTransferAdditionalData",
@@ -1201,6 +1206,11 @@ export type FeeQuoter = {
         {
           "name": "linkTokenMint",
           "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "linkTokenLocalDecimals",
+          "type": "u8",
           "index": false
         },
         {
@@ -1617,26 +1627,41 @@ export type FeeQuoter = {
     },
     {
       "code": 8032,
+      "name": "InvalidExtraArgsAccounts",
+      "msg": "Invalid amount of accounts in extra args"
+    },
+    {
+      "code": 8033,
+      "name": "InvalidExtraArgsWritabilityBitmap",
+      "msg": "Invalid writability bitmap in extra args"
+    },
+    {
+      "code": 8034,
       "name": "InvalidChainFamilySelector",
       "msg": "Invalid chain family selector"
     },
     {
-      "code": 8033,
+      "code": 8035,
       "name": "InvalidTokenReceiver",
       "msg": "Invalid token receiver"
     },
     {
-      "code": 8034,
+      "code": 8036,
       "name": "InvalidSVMAddress",
       "msg": "Invalid SVM address"
     },
     {
-      "code": 8035,
+      "code": 8037,
       "name": "UnauthorizedPriceUpdater",
       "msg": "The caller is not an authorized price updater"
     },
     {
-      "code": 8036,
+      "code": 8038,
+      "name": "InvalidLinkDecimals",
+      "msg": "The LINK mint uses an unsupported number of decimals"
+    },
+    {
+      "code": 8039,
       "name": "InvalidCodeVersion",
       "msg": "Invalid code version"
     }
@@ -1669,6 +1694,11 @@ export const IDL: FeeQuoter = {
           "isSigner": false
         },
         {
+          "name": "linkTokenMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "authority",
           "isMut": true,
           "isSigner": true
@@ -1690,10 +1720,6 @@ export const IDL: FeeQuoter = {
         }
       ],
       "args": [
-        {
-          "name": "linkTokenMint",
-          "type": "publicKey"
-        },
         {
           "name": "maxFeeJuelsPerMsg",
           "type": "u128"
@@ -2319,6 +2345,10 @@ export const IDL: FeeQuoter = {
             "type": "publicKey"
           },
           {
+            "name": "linkTokenLocalDecimals",
+            "type": "u8"
+          },
+          {
             "name": "onramp",
             "type": "publicKey"
           },
@@ -2458,7 +2488,7 @@ export const IDL: FeeQuoter = {
       }
     },
     {
-      "name": "EVMExtraArgsV2",
+      "name": "GenericExtraArgsV2",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2592,7 +2622,7 @@ export const IDL: FeeQuoter = {
           },
           {
             "name": "juels",
-            "type": "u64"
+            "type": "u128"
           },
           {
             "name": "tokenTransferAdditionalData",
@@ -2846,6 +2876,11 @@ export const IDL: FeeQuoter = {
         {
           "name": "linkTokenMint",
           "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "linkTokenLocalDecimals",
+          "type": "u8",
           "index": false
         },
         {
@@ -3262,26 +3297,41 @@ export const IDL: FeeQuoter = {
     },
     {
       "code": 8032,
+      "name": "InvalidExtraArgsAccounts",
+      "msg": "Invalid amount of accounts in extra args"
+    },
+    {
+      "code": 8033,
+      "name": "InvalidExtraArgsWritabilityBitmap",
+      "msg": "Invalid writability bitmap in extra args"
+    },
+    {
+      "code": 8034,
       "name": "InvalidChainFamilySelector",
       "msg": "Invalid chain family selector"
     },
     {
-      "code": 8033,
+      "code": 8035,
       "name": "InvalidTokenReceiver",
       "msg": "Invalid token receiver"
     },
     {
-      "code": 8034,
+      "code": 8036,
       "name": "InvalidSVMAddress",
       "msg": "Invalid SVM address"
     },
     {
-      "code": 8035,
+      "code": 8037,
       "name": "UnauthorizedPriceUpdater",
       "msg": "The caller is not an authorized price updater"
     },
     {
-      "code": 8036,
+      "code": 8038,
+      "name": "InvalidLinkDecimals",
+      "msg": "The LINK mint uses an unsupported number of decimals"
+    },
+    {
+      "code": 8039,
       "name": "InvalidCodeVersion",
       "msg": "Invalid code version"
     }

@@ -1,6 +1,9 @@
 use crate::events::on_ramp as events;
+use crate::messages::GetFeeResult;
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface;
+use ccip_common::seed;
+use ccip_common::v1::{validate_and_parse_token_accounts, TokenAccounts};
 use fee_quoter::messages::TokenTransferAdditionalData;
 
 use super::super::interfaces::OnRamp;
@@ -8,10 +11,10 @@ use super::fees::{get_fee_cpi, transfer_and_wrap_native_sol, transfer_fee};
 use super::messages::pools::{LockOrBurnInV1, LockOrBurnOutV1};
 use super::pools::{
     calculate_token_pool_account_indices, interact_with_pool, transfer_token,
-    validate_and_parse_token_accounts, TokenAccounts, CCIP_LOCK_OR_BURN_V1_RET_BYTES,
+    CCIP_LOCK_OR_BURN_V1_RET_BYTES,
 };
 
-use crate::seed;
+use crate::GetFee;
 use crate::{
     CcipRouterError, CcipSend, Nonce, RampMessageHeader, SVM2AnyMessage, SVM2AnyRampMessage,
     SVM2AnyTokenTransfer, SVMTokenAmount,
@@ -65,11 +68,29 @@ impl OnRamp for Impl {
             accounts_per_sent_token.push(current_token_accounts);
         }
 
+        let billing_token_config_accs: Vec<AccountInfo<'info>> = accounts_per_sent_token
+            .iter()
+            .map(|a| a.fee_token_config.to_account_info())
+            .collect();
+        let per_chain_per_token_config_accs: Vec<AccountInfo<'info>> = accounts_per_sent_token
+            .iter()
+            .map(|a| a.token_billing_config.to_account_info())
+            .collect();
+
+        let mut get_fee_remaining_accounts = billing_token_config_accs;
+        get_fee_remaining_accounts.extend(per_chain_per_token_config_accs);
+
         let get_fee_result = get_fee_cpi(
-            &ctx,
+            ctx.accounts.fee_quoter.to_account_info(),
+            ctx.accounts.fee_quoter_config.to_account_info(),
+            ctx.accounts.fee_quoter_dest_chain.to_account_info(),
+            ctx.accounts
+                .fee_quoter_billing_token_config
+                .to_account_info(),
+            ctx.accounts.fee_quoter_link_token_config.to_account_info(),
             dest_chain_selector,
             &message,
-            &accounts_per_sent_token,
+            get_fee_remaining_accounts,
         )?;
 
         let is_paying_with_native_sol = message.fee_token == Pubkey::default();
@@ -223,6 +244,33 @@ impl OnRamp for Impl {
 
         Ok(*message_id)
     }
+
+    fn get_fee<'info>(
+        &self,
+        ctx: Context<'_, '_, 'info, 'info, GetFee<'info>>,
+        dest_chain_selector: u64,
+        message: SVM2AnyMessage,
+    ) -> Result<GetFeeResult> {
+        let fq_result = get_fee_cpi(
+            ctx.accounts.fee_quoter.to_account_info(),
+            ctx.accounts.fee_quoter_config.to_account_info(),
+            ctx.accounts.fee_quoter_dest_chain.to_account_info(),
+            ctx.accounts
+                .fee_quoter_billing_token_config
+                .to_account_info(),
+            ctx.accounts.fee_quoter_link_token_config.to_account_info(),
+            dest_chain_selector,
+            &message,
+            ctx.remaining_accounts.to_vec(),
+        )?;
+
+        // not all fields that fee quoter returns are relevant for the user, so just pick the important ones
+        Ok(GetFeeResult {
+            amount: fq_result.amount,
+            juels: fq_result.juels,
+            token: fq_result.token,
+        })
+    }
 }
 
 mod helpers {
@@ -265,12 +313,7 @@ mod helpers {
             CcipRouterError::SourceTokenDataTooLarge
         );
 
-        // TODO: Revisit when/if non-EVM destinations from SVM become supported.
-        // for an EVM destination, exec data it consists of the amount of gas available for the releaseOrMint
-        // and transfer calls made by the offRamp
-        let dest_exec_data = ethnum::U256::new(dest_gas_amount.into()) // TODO remove dependency on ethnum
-            .to_be_bytes()
-            .to_vec();
+        let dest_exec_data = dest_gas_amount.to_be_bytes().to_vec();
 
         Ok(SVM2AnyTokenTransfer {
             source_pool_address,
@@ -371,7 +414,7 @@ mod helpers {
                     0, 0, 0, 0, 0, 0,
                 ]
                 .to_vec(),
-                extra_args: fee_quoter::extra_args::EVMExtraArgsV2 {
+                extra_args: fee_quoter::extra_args::GenericExtraArgsV2 {
                     gas_limit: 1,
                     allow_out_of_order_execution: true,
                 }
@@ -396,7 +439,7 @@ mod helpers {
             let hash_result = hash(&message);
 
             assert_eq!(
-                "2335e7898faa4e7e8816a6b1e0cf47ea2a18bb66bca205d0cb3ae4a8ce5c72f7",
+                "46abd733e950b0b0e05b1b4b040cf2df6c38899af71aad058ff08bfa96d4b532",
                 hex::encode(hash_result)
             );
         }
@@ -426,9 +469,9 @@ mod helpers {
             )
             .unwrap();
 
-            let expected_exec_data =
-                ethnum::U256::new(additional_token_transfer_data.dest_gas_overhead.into())
-                    .to_be_bytes();
+            let expected_exec_data = additional_token_transfer_data
+                .dest_gas_overhead
+                .to_be_bytes();
 
             assert!(transfer.extra_data.is_empty());
             assert_eq!(transfer.dest_exec_data, expected_exec_data);

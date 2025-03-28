@@ -217,9 +217,15 @@ func (p *processor) getGasPricesToUpdate(
 	obsTimestamp time.Time,
 ) []cciptypes.GasPriceChain {
 	var gasPrices []cciptypes.GasPriceChain
-	feeInfo := p.cfg.FeeInfo
 
 	for chain, currentChainFee := range currentChainUSDFees {
+		chainCfg, err := p.homeChain.GetChainConfig(chain)
+
+		feeConfig := chainCfg.Config
+		if err != nil {
+			lggr.Errorw("error getting chain config", "chain", chain, "err", err)
+			continue
+		}
 		packedFee := cciptypes.NewBigInt(FeeComponentsToPackedFee(currentChainFee))
 		lastUpdate, exists := latestUpdates[chain]
 		// If the chain is not in the fee quoter updates or is stale, then we should update it
@@ -240,25 +246,27 @@ func (p *processor) getGasPricesToUpdate(
 			continue
 		}
 
-		if feeInfo == nil {
+		if feeConfig.ChainFeeDeviationDisabled {
+			lggr.Debugw("chain fee deviation disabled", "chain", chain)
 			continue
 		}
-		ci, ok := feeInfo[chain]
-		if !ok {
-			lggr.Warnf("could not find fee info for chain %d", chain)
+
+		// Validating later as chain can be updated even if the config is invalid when write frequency is reached
+		if feeConfig.Validate() != nil {
+			lggr.Errorw("invalid chain config", "chain", chain, "err", err)
 			continue
 		}
 
 		executionFeeDeviates := mathslib.Deviates(
 			currentChainFee.ExecutionFeePriceUSD,
 			lastUpdate.ChainFee.ExecutionFeePriceUSD,
-			ci.ExecDeviationPPB.Int64(),
+			feeConfig.GasPriceDeviationPPB.Int64(),
 		)
 
 		dataAvFeeDeviates := mathslib.Deviates(
 			currentChainFee.DataAvFeePriceUSD,
 			lastUpdate.ChainFee.DataAvFeePriceUSD,
-			ci.DataAvailabilityDeviationPPB.Int64(),
+			feeConfig.DAGasPriceDeviationPPB.Int64(),
 		)
 
 		if executionFeeDeviates || dataAvFeeDeviates {

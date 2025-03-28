@@ -178,9 +178,7 @@ export type BaseTokenPool = {
           },
           {
             "name": "destPoolData",
-            "type": {
-              "defined": "RemoteAddress"
-            }
+            "type": "bytes"
           }
         ]
       }
@@ -591,31 +589,41 @@ export type BaseTokenPool = {
     },
     {
       "code": 6009,
+      "name": "AllowlistKeyAlreadyExisted",
+      "msg": "Key already existed in the allowlist"
+    },
+    {
+      "code": 6010,
+      "name": "AllowlistKeyDidNotExist",
+      "msg": "Key did not exist in the allowlist"
+    },
+    {
+      "code": 6011,
       "name": "RLBucketOverfilled",
       "msg": "RateLimit: bucket overfilled"
     },
     {
-      "code": 6010,
+      "code": 6012,
       "name": "RLMaxCapacityExceeded",
       "msg": "RateLimit: max capacity exceeded"
     },
     {
-      "code": 6011,
+      "code": 6013,
       "name": "RLRateLimitReached",
       "msg": "RateLimit: rate limit reached"
     },
     {
-      "code": 6012,
+      "code": 6014,
       "name": "RLInvalidRateLimitRate",
       "msg": "RateLimit: invalid rate limit rate"
     },
     {
-      "code": 6013,
+      "code": 6015,
       "name": "RLDisabledNonZeroRateLimit",
       "msg": "RateLimit: disabled non-zero rate limit"
     },
     {
-      "code": 6014,
+      "code": 6016,
       "name": "LiquidityNotAccepted",
       "msg": "Liquidity not accepted"
     }
@@ -802,9 +810,7 @@ export const IDL: BaseTokenPool = {
           },
           {
             "name": "destPoolData",
-            "type": {
-              "defined": "RemoteAddress"
-            }
+            "type": "bytes"
           }
         ]
       }
@@ -1215,31 +1221,41 @@ export const IDL: BaseTokenPool = {
     },
     {
       "code": 6009,
+      "name": "AllowlistKeyAlreadyExisted",
+      "msg": "Key already existed in the allowlist"
+    },
+    {
+      "code": 6010,
+      "name": "AllowlistKeyDidNotExist",
+      "msg": "Key did not exist in the allowlist"
+    },
+    {
+      "code": 6011,
       "name": "RLBucketOverfilled",
       "msg": "RateLimit: bucket overfilled"
     },
     {
-      "code": 6010,
+      "code": 6012,
       "name": "RLMaxCapacityExceeded",
       "msg": "RateLimit: max capacity exceeded"
     },
     {
-      "code": 6011,
+      "code": 6013,
       "name": "RLRateLimitReached",
       "msg": "RateLimit: rate limit reached"
     },
     {
-      "code": 6012,
+      "code": 6014,
       "name": "RLInvalidRateLimitRate",
       "msg": "RateLimit: invalid rate limit rate"
     },
     {
-      "code": 6013,
+      "code": 6015,
       "name": "RLDisabledNonZeroRateLimit",
       "msg": "RateLimit: disabled non-zero rate limit"
     },
     {
-      "code": 6014,
+      "code": 6016,
       "name": "LiquidityNotAccepted",
       "msg": "Liquidity not accepted"
     }

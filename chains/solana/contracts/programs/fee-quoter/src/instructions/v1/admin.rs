@@ -39,8 +39,8 @@ impl Admin for Impl {
             from: config.owner,
             to: config.proposed_owner,
         });
-        ctx.accounts.config.owner = ctx.accounts.config.proposed_owner;
-        ctx.accounts.config.proposed_owner = Pubkey::default();
+        // NOTE: take() resets proposed_owner to default
+        ctx.accounts.config.owner = std::mem::take(&mut ctx.accounts.config.proposed_owner);
         Ok(())
     }
 
@@ -60,6 +60,7 @@ impl Admin for Impl {
         emit!(ConfigSet {
             max_fee_juels_per_msg: config.max_fee_juels_per_msg,
             link_token_mint: config.link_token_mint,
+            link_token_local_decimals: config.link_token_local_decimals,
             onramp: config.onramp,
             default_code_version: config.default_code_version
         });

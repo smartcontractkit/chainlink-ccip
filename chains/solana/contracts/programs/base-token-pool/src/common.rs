@@ -6,7 +6,7 @@ use rmn_remote::state::CurseSubject;
 use spl_math::uint::U256;
 use std::ops::Deref;
 
-use crate::rate_limiter::{validate_token_bucket_config, RateLimitConfig, RateLimitTokenBucket};
+use crate::rate_limiter::{RateLimitConfig, RateLimitTokenBucket};
 
 pub const ANCHOR_DISCRIMINATOR: usize = 8; // 8-byte anchor discriminator length
 pub const POOL_CHAINCONFIG_SEED: &[u8] = b"ccip_tokenpool_chainconfig"; // seed used by CCIP to provide correct chain config to pool
@@ -101,8 +101,8 @@ impl BaseConfig {
 
     pub fn accept_ownership(&mut self) -> Result<()> {
         let old_owner = self.owner;
+        // NOTE: take() resets proposed_owner to default
         self.owner = std::mem::take(&mut self.proposed_owner);
-        self.proposed_owner = Pubkey::default();
 
         emit!(OwnershipTransferred {
             from: old_owner,
@@ -122,36 +122,11 @@ impl BaseConfig {
         let old_router = self.router;
         self.router = new_router;
         (self.router_onramp_authority, _) =
-            Pubkey::find_program_address(&[POOL_SIGNER_SEED], &new_router);
+            Pubkey::find_program_address(&[EXTERNAL_TOKENPOOL_SIGNER], &new_router);
         emit!(RouterUpdated {
             old_router,
             new_router,
         });
-        Ok(())
-    }
-
-    pub fn update_allow_list(
-        &mut self,
-        enabled: Option<bool>,
-        add: Vec<Pubkey>,
-        remove: Vec<Pubkey>,
-    ) -> Result<()> {
-        if let Some(enabled_val) = enabled {
-            self.list_enabled = enabled_val;
-        };
-
-        for k in remove {
-            if let Ok(v) = self.allow_list.binary_search(&k) {
-                self.allow_list.remove(v);
-            }
-        }
-
-        for k in add {
-            if let Err(v) = self.allow_list.binary_search(&k) {
-                self.allow_list.insert(v, k);
-            }
-        }
-
         Ok(())
     }
 
@@ -213,11 +188,10 @@ impl BaseChain {
         inbound: RateLimitConfig,
         outbound: RateLimitConfig,
     ) -> Result<()> {
-        validate_token_bucket_config(&inbound)?;
-        validate_token_bucket_config(&outbound)?;
-
-        self.inbound_rate_limit.cfg = inbound.clone();
-        self.outbound_rate_limit.cfg = outbound.clone();
+        self.inbound_rate_limit
+            .set_token_bucket_config(inbound.clone())?;
+        self.outbound_rate_limit
+            .set_token_bucket_config(outbound.clone())?;
 
         emit!(RateLimitConfigured {
             chain_selector: remote_chain_selector,
@@ -285,7 +259,8 @@ pub struct LockOrBurnInV1 {
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
 pub struct LockOrBurnOutV1 {
     pub dest_token_address: RemoteAddress,
-    pub dest_pool_data: RemoteAddress,
+    // Currently encodes the local decimals as there's a chance they differ.
+    pub dest_pool_data: Vec<u8>,
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
@@ -404,6 +379,10 @@ pub enum CcipTokenPoolError {
     InvalidToken,
     #[msg("Invalid token amount conversion")]
     InvalidTokenAmountConversion,
+    #[msg("Key already existed in the allowlist")]
+    AllowlistKeyAlreadyExisted,
+    #[msg("Key did not exist in the allowlist")]
+    AllowlistKeyDidNotExist,
 
     // Rate limit errors
     #[msg("RateLimit: bucket overfilled")]
@@ -456,7 +435,7 @@ pub fn validate_lock_or_burn<'info>(
         lock_or_burn_in.remote_chain_selector,
     )?;
 
-    outbound_rate_limit.consume(lock_or_burn_in.amount)
+    outbound_rate_limit.consume::<Clock>(lock_or_burn_in.amount)
 }
 
 // validate_lock_or_burn checks for correctness on inputs
@@ -494,7 +473,7 @@ pub fn validate_release_or_mint<'info>(
         release_or_mint_in.remote_chain_selector,
     )?;
 
-    inbound_rate_limit.consume(parsed_amount)
+    inbound_rate_limit.consume::<Clock>(parsed_amount)
 }
 
 pub fn verify_uncursed_cpi<'info>(

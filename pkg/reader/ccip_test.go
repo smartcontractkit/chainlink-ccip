@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"reflect"
 	"testing"
 	"time"
 
@@ -14,12 +15,12 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
-	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
@@ -35,7 +36,272 @@ var (
 	chainA = cciptypes.ChainSelector(1)
 	chainB = cciptypes.ChainSelector(2)
 	chainC = cciptypes.ChainSelector(3)
+	chainD = cciptypes.ChainSelector(4)
 )
+
+func TestCCIPChainReader_CreateExecutedMessagesKeyFilter(t *testing.T) {
+	var (
+		range1 = cciptypes.NewSeqNumRange(1, 2)
+		range2 = cciptypes.NewSeqNumRange(5, 7)
+		range3 = cciptypes.NewSeqNumRange(10, 15)
+	)
+	testCases := []struct {
+		name               string
+		seqNrRangesByChain map[cciptypes.ChainSelector][]cciptypes.SeqNumRange
+		confidence         primitives.ConfidenceLevel
+		expectedCount      uint64
+		expected           query.KeyFilter
+	}{
+		{
+			name: "simple example",
+			seqNrRangesByChain: map[cciptypes.ChainSelector][]cciptypes.SeqNumRange{
+				chainA: {range1},
+			},
+			confidence:    primitives.Finalized,
+			expectedCount: 2,
+			expected: query.KeyFilter{
+				Key: consts.EventNameExecutionStateChanged,
+				Expressions: []query.Expression{
+					{
+						BoolExpression: query.BoolExpression{
+							BoolOperator: query.AND,
+							Expressions: []query.Expression{
+								{
+									Primitive: &primitives.Comparator{
+										Name: consts.EventAttributeSequenceNumber,
+										ValueComparators: []primitives.ValueComparator{
+											{Value: range1.Start(), Operator: primitives.Gte},
+											{Value: range1.End(), Operator: primitives.Lte},
+										},
+									},
+								},
+								{
+									Primitive: &primitives.Comparator{
+										Name: consts.EventAttributeSourceChain,
+										ValueComparators: []primitives.ValueComparator{
+											{Value: chainA, Operator: primitives.Eq},
+										},
+									},
+								},
+							},
+						},
+					},
+					{
+						Primitive: &primitives.Comparator{
+							Name:             consts.EventAttributeState,
+							ValueComparators: []primitives.ValueComparator{{Value: 0, Operator: primitives.Gt}},
+						},
+					},
+					{Primitive: &primitives.Confidence{ConfidenceLevel: primitives.Finalized}},
+				},
+			},
+		},
+		{
+			name: "multiChain simple example",
+			seqNrRangesByChain: map[cciptypes.ChainSelector][]cciptypes.SeqNumRange{
+				chainA: {range1},
+				chainB: {range2},
+			},
+			confidence:    primitives.Finalized,
+			expectedCount: 5,
+			expected: query.KeyFilter{
+				Key: consts.EventNameExecutionStateChanged,
+				Expressions: []query.Expression{
+					{
+						BoolExpression: query.BoolExpression{
+							BoolOperator: query.OR,
+							Expressions: []query.Expression{
+								{
+									BoolExpression: query.BoolExpression{
+										BoolOperator: query.AND,
+										Expressions: []query.Expression{
+											{
+												Primitive: &primitives.Comparator{
+													Name: consts.EventAttributeSequenceNumber,
+													ValueComparators: []primitives.ValueComparator{
+														{Value: range1.Start(), Operator: primitives.Gte},
+														{Value: range1.End(), Operator: primitives.Lte},
+													},
+												},
+											},
+											{
+												Primitive: &primitives.Comparator{
+													Name: consts.EventAttributeSourceChain,
+													ValueComparators: []primitives.ValueComparator{
+														{Value: chainA, Operator: primitives.Eq},
+													},
+												},
+											},
+										},
+									},
+								},
+								{
+									BoolExpression: query.BoolExpression{
+										BoolOperator: query.AND,
+										Expressions: []query.Expression{
+											{
+												Primitive: &primitives.Comparator{
+													Name: consts.EventAttributeSequenceNumber,
+													ValueComparators: []primitives.ValueComparator{
+														{Value: range2.Start(), Operator: primitives.Gte},
+														{Value: range2.End(), Operator: primitives.Lte},
+													},
+												},
+											},
+											{
+												Primitive: &primitives.Comparator{
+													Name: consts.EventAttributeSourceChain,
+													ValueComparators: []primitives.ValueComparator{
+														{Value: chainB, Operator: primitives.Eq},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					{
+						Primitive: &primitives.Comparator{
+							Name:             consts.EventAttributeState,
+							ValueComparators: []primitives.ValueComparator{{Value: 0, Operator: primitives.Gt}},
+						},
+					},
+					{Primitive: &primitives.Confidence{ConfidenceLevel: primitives.Finalized}},
+				},
+			},
+		},
+		{
+			name: "multichain multi range example",
+			seqNrRangesByChain: map[cciptypes.ChainSelector][]cciptypes.SeqNumRange{
+				chainA: {range1, range2, range3},
+				chainB: {range2, range3},
+			},
+			confidence:    primitives.Finalized,
+			expectedCount: 20,
+			expected: query.KeyFilter{
+				Key: consts.EventNameExecutionStateChanged,
+				Expressions: []query.Expression{
+					{
+						BoolExpression: query.BoolExpression{
+							BoolOperator: query.OR,
+							Expressions: []query.Expression{
+								{
+									BoolExpression: query.BoolExpression{
+										BoolOperator: query.AND,
+										Expressions: []query.Expression{
+											{
+												BoolExpression: query.BoolExpression{
+													BoolOperator: query.OR,
+													Expressions: []query.Expression{
+														{
+															Primitive: &primitives.Comparator{
+																Name: consts.EventAttributeSequenceNumber,
+																ValueComparators: []primitives.ValueComparator{
+																	{Value: range1.Start(), Operator: primitives.Gte},
+																	{Value: range1.End(), Operator: primitives.Lte},
+																},
+															},
+														},
+														{
+															Primitive: &primitives.Comparator{
+																Name: consts.EventAttributeSequenceNumber,
+																ValueComparators: []primitives.ValueComparator{
+																	{Value: range2.Start(), Operator: primitives.Gte},
+																	{Value: range2.End(), Operator: primitives.Lte},
+																},
+															},
+														},
+														{
+															Primitive: &primitives.Comparator{
+																Name: consts.EventAttributeSequenceNumber,
+																ValueComparators: []primitives.ValueComparator{
+																	{Value: range3.Start(), Operator: primitives.Gte},
+																	{Value: range3.End(), Operator: primitives.Lte},
+																},
+															},
+														},
+													},
+												},
+											},
+											{
+												Primitive: &primitives.Comparator{
+													Name: consts.EventAttributeSourceChain,
+													ValueComparators: []primitives.ValueComparator{
+														{Value: chainA, Operator: primitives.Eq},
+													},
+												},
+											},
+										},
+									},
+								},
+								{
+									BoolExpression: query.BoolExpression{
+										BoolOperator: query.AND,
+										Expressions: []query.Expression{
+											{
+												BoolExpression: query.BoolExpression{
+													BoolOperator: query.OR,
+													Expressions: []query.Expression{
+														{
+															Primitive: &primitives.Comparator{
+																Name: consts.EventAttributeSequenceNumber,
+																ValueComparators: []primitives.ValueComparator{
+																	{Value: range2.Start(), Operator: primitives.Gte},
+																	{Value: range2.End(), Operator: primitives.Lte},
+																},
+															},
+														},
+														{
+															Primitive: &primitives.Comparator{
+																Name: consts.EventAttributeSequenceNumber,
+																ValueComparators: []primitives.ValueComparator{
+																	{Value: range3.Start(), Operator: primitives.Gte},
+																	{Value: range3.End(), Operator: primitives.Lte},
+																},
+															},
+														},
+													},
+												},
+											},
+											{
+												Primitive: &primitives.Comparator{
+													Name: consts.EventAttributeSourceChain,
+													ValueComparators: []primitives.ValueComparator{
+														{Value: chainB, Operator: primitives.Eq},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					{
+						Primitive: &primitives.Comparator{
+							Name:             consts.EventAttributeState,
+							ValueComparators: []primitives.ValueComparator{{Value: 0, Operator: primitives.Gt}},
+						},
+					},
+					{Primitive: &primitives.Confidence{ConfidenceLevel: primitives.Finalized}},
+				},
+			},
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			output, count := createExecutedMessagesKeyFilter(tt.seqNrRangesByChain, tt.confidence)
+			//assert.ElementsMatch(t, tt.expected, output, "unequal values")
+			if !reflect.DeepEqual(tt.expected, output) {
+				t.Errorf("createExecutedMessagesKeyFilter() got = %+v, want %+v", output, tt.expected)
+			}
+			assert.Equal(t, tt.expectedCount, count)
+		})
+	}
+}
 
 func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 	sourceCRs := make(map[cciptypes.ChainSelector]*reader_mocks.MockContractReaderFacade)
@@ -89,6 +355,14 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 			chainC: destCR,
 		}, nil, chainC, offrampAddress, mockAddrCodec,
 	)
+
+	// Add cleanup to ensure resources are released
+	t.Cleanup(func() {
+		err := ccipReader.Close()
+		if err != nil {
+			t.Logf("Error closing ccipReader: %v", err)
+		}
+	})
 
 	addrStr, err := mockAddrCodec.AddressBytesToString(offrampAddress, 111_111)
 	require.NoError(t, err)
@@ -444,14 +718,12 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round1(t *testing.T) {
 	destRMNRemote := []byte{0x4}
 	destFeeQuoter := []byte{0x5}
 	destRouter := []byte{0x6}
-	srcRouters := [][]byte{{0x7}, {0x8}}
 
-	sourceChainConfigs := make(map[cciptypes.ChainSelector]SourceChainConfig, len(sourceChain))
+	sourceChainConfigs := make(map[cciptypes.ChainSelector]StaticSourceChainConfig, len(sourceChain))
 	for i, chain := range sourceChain {
-		sourceChainConfigs[chain] = SourceChainConfig{
-			Router:    srcRouters[i],
+		sourceChainConfigs[chain] = StaticSourceChainConfig{
+			Router:    destRouter,
 			IsEnabled: true,
-			MinSeqNr:  0,
 			OnRamp:    onramps[i],
 		}
 	}
@@ -484,29 +756,17 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round1(t *testing.T) {
 			},
 		},
 	}
-	mockReaders[destChain].EXPECT().ExtendedBatchGetLatestValues(
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-	).RunAndReturn(withBatchGetLatestValuesRetValues(t,
-		"0x1234567890123456789012345678901234567890",
-		[]any{&SourceChainConfig{
-			OnRamp:    onramps[0],
-			Router:    destRouter,
-			IsEnabled: true,
-		}, &SourceChainConfig{
-			OnRamp:    onramps[1],
-			Router:    destRouter,
-			IsEnabled: true,
-		}},
-	))
-
 	// Set up cache expectations for destination chain and source chains
 	mockCache.On("GetChainConfig", mock.Anything, destChain).Return(destChainConfig, nil).Once()
 	mockCache.On("GetChainConfig", mock.Anything, sourceChain[0]).Return(
 		ChainConfigSnapshot{}, contractreader.ErrNoBindings).Maybe()
 	mockCache.On("GetChainConfig", mock.Anything, sourceChain[1]).Return(
 		ChainConfigSnapshot{}, contractreader.ErrNoBindings).Maybe()
+	mockCache.On(
+		"GetOfframpSourceChainConfigs",
+		mock.Anything,
+		destChain,
+		sourceChain[:]).Return(sourceChainConfigs, nil).Once()
 
 	castToExtended := make(map[cciptypes.ChainSelector]contractreader.Extended)
 	for sel, v := range mockReaders {
@@ -561,6 +821,15 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round2(t *testing.T) {
 	srcFeeQuoters := [2][]byte{{0x7}, {0x8}}
 	srcRouters := [2][]byte{{0x9}, {0x10}}
 
+	sourceChainConfigs := make(map[cciptypes.ChainSelector]StaticSourceChainConfig, len(sourceChain))
+	for i, chain := range sourceChain {
+		sourceChainConfigs[chain] = StaticSourceChainConfig{
+			Router:    destRouter[i], // Using the corresponding router from destRouter array
+			IsEnabled: true,
+			OnRamp:    onramps[i],
+		}
+	}
+
 	// Build expected addresses.
 	var expectedContractAddresses ContractAddresses
 	for i := range onramps {
@@ -599,6 +868,11 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round2(t *testing.T) {
 	}
 	// Set up destination chain expectation
 	mockCache.On("GetChainConfig", mock.Anything, destChain).Return(destChainConfig, nil).Once()
+	mockCache.On(
+		"GetOfframpSourceChainConfigs",
+		mock.Anything,
+		destChain,
+		sourceChain[:]).Return(sourceChainConfigs, nil).Once()
 
 	// Set up source chain expectations with proper OnRamp configs
 	for i, chain := range sourceChain {
@@ -619,24 +893,6 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round2(t *testing.T) {
 		}
 		mockCache.On("GetChainConfig", mock.Anything, chain).Return(srcChainConfig, nil).Once()
 	}
-
-	mockReaders[destChain].EXPECT().ExtendedBatchGetLatestValues(
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-	).RunAndReturn(withBatchGetLatestValuesRetValues(t,
-		"0x1234567890123456789012345678901234567890",
-		[]any{&SourceChainConfig{
-			OnRamp:    onramps[0],
-			Router:    destRouter[0],
-			IsEnabled: true,
-		},
-			&SourceChainConfig{
-				OnRamp:    onramps[1],
-				Router:    destRouter[1],
-				IsEnabled: true,
-			},
-		}))
 
 	castToExtended := make(map[cciptypes.ChainSelector]contractreader.Extended)
 	for sel, v := range mockReaders {
@@ -677,11 +933,9 @@ func TestCCIPChainReader_DiscoverContracts_GetAllSourceChainConfig_Errors(t *tes
 	// Setup mock cache to return an error
 	destExtended := reader_mocks.NewMockExtended(t)
 	getLatestValueErr := errors.New("some error")
-	destExtended.EXPECT().ExtendedBatchGetLatestValues(
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-	).Return(nil, nil, getLatestValueErr)
+	mockCache.On("GetOfframpSourceChainConfigs", mock.Anything, destChain,
+		[]cciptypes.ChainSelector{sourceChain1, sourceChain2}).
+		Return(map[cciptypes.ChainSelector]StaticSourceChainConfig{}, getLatestValueErr).Once()
 
 	// create the reader with cache
 	ccipChainReader := &ccipChainReader{
@@ -752,42 +1006,6 @@ func withReturnValueOverridden(mapper func(returnVal interface{})) func(ctx cont
 		params,
 		returnVal interface{}) {
 		mapper(returnVal)
-	}
-}
-
-// withBatchGetLatestValuesRetValues returns a mock ExtendedBatchGetLatestValues() method
-// which can be passed to RunAndReturn(), given a set of return values and an address as input
-// Only supports a single contract
-func withBatchGetLatestValuesRetValues(
-	t testing.TB,
-	address string,
-	retVals []any) func(
-	context.Context,
-	contractreader.ExtendedBatchGetLatestValuesRequest,
-	bool) (types.BatchGetLatestValuesResult, []string, error) {
-	return func(
-		ctx context.Context, req contractreader.ExtendedBatchGetLatestValuesRequest, graceful bool,
-	) (types.BatchGetLatestValuesResult, []string, error) {
-		require.GreaterOrEqual(t, len(retVals), 1)
-		_, ok := retVals[0].(*SourceChainConfig)
-		require.True(t, ok)
-		require.Len(t, req, 1)
-		contract := maps.Keys(req)[0]
-		batchRequest := maps.Values(req)[0]
-		require.Equal(t, len(retVals), len(batchRequest))
-
-		results := make(types.ContractBatchResults, 0, len(retVals))
-		for i, retVal := range retVals {
-			res := types.BatchReadResult{ReadName: batchRequest[i].ReadName}
-			res.SetResult(retVal, nil)
-			results = append(results, res)
-		}
-		boundContract := types.BoundContract{
-			Address: address,
-			Name:    contract,
-		}
-
-		return types.BatchGetLatestValuesResult{boundContract: results}, nil, nil
 	}
 }
 
@@ -870,6 +1088,14 @@ func TestCCIPChainReader_getFeeQuoterTokenPriceUSD(t *testing.T) {
 		}, nil, chainC, offrampAddress, mockAddrCodec,
 	)
 
+	// Add cleanup to properly shut down the background polling
+	t.Cleanup(func() {
+		err := ccipReader.Close()
+		if err != nil {
+			t.Logf("Error closing ccipReader: %v", err)
+		}
+	})
+
 	feeQuoterAddressStr, err := mockAddrCodec.AddressBytesToString(feeQuoterAddress, 111_111)
 	require.NoError(t, err)
 	require.NoError(t, ccipReader.contractReaders[chainC].Bind(
@@ -906,6 +1132,14 @@ func TestCCIPFeeComponents_HappyPath(t *testing.T) {
 		internal.NewMockAddressCodecHex(t),
 	)
 
+	// Add cleanup to ensure resources are released
+	t.Cleanup(func() {
+		err := ccipReader.Close()
+		if err != nil {
+			t.Logf("Error closing ccipReader: %v", err)
+		}
+	})
+
 	ctx := context.Background()
 	feeComponents := ccipReader.GetChainsFeeComponents(ctx, []cciptypes.ChainSelector{chainA, chainB, chainC})
 	assert.Len(t, feeComponents, 2)
@@ -934,6 +1168,14 @@ func TestCCIPFeeComponents_NotFoundErrors(t *testing.T) {
 		[]byte{0x3},
 		internal.NewMockAddressCodecHex(t),
 	)
+
+	// Add cleanup to ensure resources are released
+	t.Cleanup(func() {
+		err := ccipReader.Close()
+		if err != nil {
+			t.Logf("Error closing ccipReader: %v", err)
+		}
+	})
 
 	ctx := context.Background()
 	_, err := ccipReader.GetDestChainFeeComponents(ctx)
@@ -995,147 +1237,6 @@ func TestCCIPChainReader_LinkPriceUSD(t *testing.T) {
 	mockCache.AssertExpectations(t)
 }
 
-func TestCCIPChainReader_GetMedianDataAvailabilityGasConfig(t *testing.T) {
-	type mockValue struct {
-		overhead   uint32
-		perByte    uint16
-		multiplier uint16
-		enabled    bool
-	}
-
-	setupConfigMocks := func(
-		readers map[cciptypes.ChainSelector]*reader_mocks.MockExtended,
-		chains []cciptypes.ChainSelector,
-		values []mockValue) {
-		for i, chain := range chains {
-			readers[chain].EXPECT().
-				ExtendedGetLatestValue(
-					mock.Anything,
-					consts.ContractNameFeeQuoter,
-					consts.MethodNameGetDestChainConfig,
-					primitives.Unconfirmed,
-					mock.Anything,
-					mock.Anything,
-				).
-				Return(nil).
-				Run(withReturnValueOverridden(func(returnVal interface{}) {
-					cfg := returnVal.(*cciptypes.FeeQuoterDestChainConfig)
-					cfg.DestDataAvailabilityOverheadGas = values[i].overhead
-					cfg.DestGasPerDataAvailabilityByte = values[i].perByte
-					cfg.DestDataAvailabilityMultiplierBps = values[i].multiplier
-					cfg.IsEnabled = values[i].enabled
-				})).Once()
-		}
-	}
-
-	tests := []struct {
-		name           string
-		expectedConfig cciptypes.DataAvailabilityGasConfig
-		expectError    bool
-		chains         []cciptypes.ChainSelector
-		setupMocks     func(readers map[cciptypes.ChainSelector]*reader_mocks.MockExtended)
-	}{
-		{
-			name: "success - returns median values from multiple configs",
-			expectedConfig: cciptypes.DataAvailabilityGasConfig{
-				DestDataAvailabilityOverheadGas:   200,
-				DestGasPerDataAvailabilityByte:    20,
-				DestDataAvailabilityMultiplierBps: 2000,
-			},
-			chains: []cciptypes.ChainSelector{chainA, chainB, chainC},
-			setupMocks: func(readers map[cciptypes.ChainSelector]*reader_mocks.MockExtended) {
-				values := []mockValue{
-					{100, 10, 1000, true},
-					{200, 20, 2000, true},
-					{300, 30, 3000, true},
-				}
-				setupConfigMocks(readers, []cciptypes.ChainSelector{chainA, chainB, chainC}, values)
-			},
-		},
-		{
-			name: "success - skips disabled configs",
-			expectedConfig: cciptypes.DataAvailabilityGasConfig{
-				DestDataAvailabilityOverheadGas:   300,
-				DestGasPerDataAvailabilityByte:    30,
-				DestDataAvailabilityMultiplierBps: 3000,
-			},
-			chains: []cciptypes.ChainSelector{chainA, chainB, chainC},
-			setupMocks: func(readers map[cciptypes.ChainSelector]*reader_mocks.MockExtended) {
-				values := []mockValue{
-					{100, 10, 1000, true},
-					{200, 20, 2000, false},
-					{300, 30, 3000, true},
-				}
-				setupConfigMocks(readers, []cciptypes.ChainSelector{chainA, chainB, chainC}, values)
-			},
-		},
-		{
-			name: "no valid configs found due to empty DA params",
-			expectedConfig: cciptypes.DataAvailabilityGasConfig{
-				DestDataAvailabilityOverheadGas:   0,
-				DestGasPerDataAvailabilityByte:    0,
-				DestDataAvailabilityMultiplierBps: 0,
-			},
-			expectError: false,
-			chains:      []cciptypes.ChainSelector{chainA, chainB, chainC},
-			setupMocks: func(readers map[cciptypes.ChainSelector]*reader_mocks.MockExtended) {
-				values := []mockValue{
-					{0, 0, 0, true}, // Empty DA params
-					{0, 0, 0, true}, // Empty DA params
-					{0, 0, 0, true}, // Empty DA params
-				}
-				setupConfigMocks(readers, []cciptypes.ChainSelector{chainA, chainB, chainC}, values)
-			},
-		},
-		{
-			name:        "all configs disabled",
-			expectError: false,
-			expectedConfig: cciptypes.DataAvailabilityGasConfig{
-				DestDataAvailabilityOverheadGas:   0,
-				DestGasPerDataAvailabilityByte:    0,
-				DestDataAvailabilityMultiplierBps: 0,
-			},
-			chains: []cciptypes.ChainSelector{chainA, chainB},
-			setupMocks: func(readers map[cciptypes.ChainSelector]*reader_mocks.MockExtended) {
-				values := []mockValue{
-					{100, 10, 1000, false},
-					{200, 20, 2000, false},
-				}
-				setupConfigMocks(readers, []cciptypes.ChainSelector{chainA, chainB}, values)
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			mockReaders := make(map[cciptypes.ChainSelector]*reader_mocks.MockExtended)
-			contractReaders := make(map[cciptypes.ChainSelector]contractreader.Extended)
-
-			// Initialize mocks
-			for _, chain := range tt.chains {
-				mockReaders[chain] = reader_mocks.NewMockExtended(t)
-				contractReaders[chain] = mockReaders[chain]
-			}
-
-			tt.setupMocks(mockReaders)
-
-			reader := &ccipChainReader{
-				lggr:            logger.Test(t),
-				contractReaders: contractReaders,
-				destChain:       chainC,
-			}
-			config, err := reader.GetMedianDataAvailabilityGasConfig(context.Background())
-
-			if tt.expectError {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-				assert.Equal(t, tt.expectedConfig, config)
-			}
-		})
-	}
-}
-
 func Test_getCurseInfoFromCursedSubjects(t *testing.T) {
 	testCases := []struct {
 		name              string
@@ -1155,7 +1256,7 @@ func Test_getCurseInfoFromCursedSubjects(t *testing.T) {
 		},
 		{
 			name: "everything cursed",
-			cursedSubjectsSet: mapset.NewSet[[16]byte](
+			cursedSubjectsSet: mapset.NewSet(
 				chainSelectorToBytes16(chainB),
 				chainSelectorToBytes16(chainC),
 				chainSelectorToBytes16(chainA), // dest
@@ -1173,7 +1274,7 @@ func Test_getCurseInfoFromCursedSubjects(t *testing.T) {
 		},
 		{
 			name: "no global curse",
-			cursedSubjectsSet: mapset.NewSet[[16]byte](
+			cursedSubjectsSet: mapset.NewSet(
 				chainSelectorToBytes16(chainB),
 				chainSelectorToBytes16(chainC),
 				chainSelectorToBytes16(chainA), // dest
@@ -1190,7 +1291,7 @@ func Test_getCurseInfoFromCursedSubjects(t *testing.T) {
 		},
 		{
 			name: "dest cursed due to global curse",
-			cursedSubjectsSet: mapset.NewSet[[16]byte](
+			cursedSubjectsSet: mapset.NewSet(
 				chainSelectorToBytes16(chainB),
 				chainSelectorToBytes16(chainC),
 				GlobalCurseSubject,
@@ -1207,7 +1308,7 @@ func Test_getCurseInfoFromCursedSubjects(t *testing.T) {
 		},
 		{
 			name: "dest not cursed",
-			cursedSubjectsSet: mapset.NewSet[[16]byte](
+			cursedSubjectsSet: mapset.NewSet(
 				chainSelectorToBytes16(chainB),
 				chainSelectorToBytes16(chainC),
 			),
@@ -1223,7 +1324,7 @@ func Test_getCurseInfoFromCursedSubjects(t *testing.T) {
 		},
 		{
 			name: "source chain B not cursed",
-			cursedSubjectsSet: mapset.NewSet[[16]byte](
+			cursedSubjectsSet: mapset.NewSet(
 				chainSelectorToBytes16(chainC),
 				chainSelectorToBytes16(chainA), // dest
 				GlobalCurseSubject,
@@ -1342,10 +1443,19 @@ func TestCCIPChainReader_DiscoverContracts_Parallel(t *testing.T) {
 		},
 	}
 
+	sourceChainConfigs := make(map[cciptypes.ChainSelector]StaticSourceChainConfig, len(sourceChains))
+	for i, chain := range sourceChains {
+		sourceChainConfigs[chain] = StaticSourceChainConfig{
+			Router:    []byte{0x6}, // Same router for all source chains
+			IsEnabled: true,
+			OnRamp:    []byte{byte(i + 1)}, // 0x1, 0x2, 0x3 as in the batch response
+		}
+	}
+
 	// Set up destination chain expectation with delay
 	mockCache.On("GetChainConfig", mock.Anything, destChain).
 		Run(func(args mock.Arguments) {
-			time.Sleep(100 * time.Millisecond) // Simulate network delay
+			time.Sleep(75 * time.Millisecond) // Simulate network delay
 		}).
 		Return(destChainConfig, nil).Once()
 
@@ -1365,7 +1475,7 @@ func TestCCIPChainReader_DiscoverContracts_Parallel(t *testing.T) {
 		}
 		mockCache.On("GetChainConfig", mock.Anything, chain).
 			Run(func(args mock.Arguments) {
-				time.Sleep(100 * time.Millisecond) // Simulate network delay
+				time.Sleep(75 * time.Millisecond) // Simulate network delay
 			}).
 			Return(srcChainConfig, nil).Once()
 	}
@@ -1385,30 +1495,11 @@ func TestCCIPChainReader_DiscoverContracts_Parallel(t *testing.T) {
 	}
 
 	// Setup dest chain batch get values expectation
-	mockReaders[destChain].EXPECT().ExtendedBatchGetLatestValues(
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-	).RunAndReturn(withBatchGetLatestValuesRetValues(t,
-		"0x1234567890123456789012345678901234567890",
-		[]any{
-			&SourceChainConfig{
-				OnRamp:    []byte{0x1},
-				Router:    []byte{0x6},
-				IsEnabled: true,
-			},
-			&SourceChainConfig{
-				OnRamp:    []byte{0x2},
-				Router:    []byte{0x6},
-				IsEnabled: true,
-			},
-			&SourceChainConfig{
-				OnRamp:    []byte{0x3},
-				Router:    []byte{0x6},
-				IsEnabled: true,
-			},
-		},
-	))
+	mockCache.On("GetOfframpSourceChainConfigs", mock.Anything, destChain, sourceChains).
+		Run(func(args mock.Arguments) {
+			time.Sleep(100 * time.Millisecond) // Simulate network delay
+		}).
+		Return(sourceChainConfigs, nil).Once()
 
 	ccipReader := &ccipChainReader{
 		destChain:       destChain,
@@ -1728,11 +1819,6 @@ func TestCCIPChainReader_prepareBatchConfigRequests(t *testing.T) {
 	})
 }
 
-// MockConfigCache is an autogenerated mock type for the ConfigCache type
-type MockConfigCache struct {
-	mock.Mock
-}
-
 type mockConfigCache struct {
 	mock.Mock
 }
@@ -1744,9 +1830,34 @@ func (m *mockConfigCache) GetChainConfig(
 	return args.Get(0).(ChainConfigSnapshot), args.Error(1)
 }
 
-func (m *mockConfigCache) RefreshChainConfig(
+func (m *mockConfigCache) GetOfframpSourceChainConfigs(
 	ctx context.Context,
-	chainSel cciptypes.ChainSelector) (ChainConfigSnapshot, error) {
-	args := m.Called(ctx, chainSel)
-	return args.Get(0).(ChainConfigSnapshot), args.Error(1)
+	destChain cciptypes.ChainSelector,
+	sourceChains []cciptypes.ChainSelector) (map[cciptypes.ChainSelector]StaticSourceChainConfig, error) {
+	args := m.Called(ctx, destChain, sourceChains)
+	return args.Get(0).(map[cciptypes.ChainSelector]StaticSourceChainConfig), args.Error(1)
+}
+
+// Update Start method to accept context parameter
+func (m *mockConfigCache) Start(ctx context.Context) error {
+	return m.Called(ctx).Error(0)
+}
+
+func (m *mockConfigCache) Close() error {
+	return m.Called().Error(0)
+}
+
+// Implement HealthReport method for services.Service interface
+func (m *mockConfigCache) HealthReport() map[string]error {
+	args := m.Called()
+	return args.Get(0).(map[string]error)
+}
+
+// Implement Name method for the Service interface
+func (m *mockConfigCache) Name() string {
+	return m.Called().String(0)
+}
+
+func (m *mockConfigCache) Ready() error {
+	return m.Called().Error(0)
 }

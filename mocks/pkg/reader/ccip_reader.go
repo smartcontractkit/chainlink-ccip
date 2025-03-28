@@ -37,6 +37,51 @@ func (_m *MockCCIPReader) EXPECT() *MockCCIPReader_Expecter {
 	return &MockCCIPReader_Expecter{mock: &_m.Mock}
 }
 
+// Close provides a mock function with no fields
+func (_m *MockCCIPReader) Close() error {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for Close")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func() error); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockCCIPReader_Close_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Close'
+type MockCCIPReader_Close_Call struct {
+	*mock.Call
+}
+
+// Close is a helper method to define mock.On call
+func (_e *MockCCIPReader_Expecter) Close() *MockCCIPReader_Close_Call {
+	return &MockCCIPReader_Close_Call{Call: _e.mock.On("Close")}
+}
+
+func (_c *MockCCIPReader_Close_Call) Run(run func()) *MockCCIPReader_Close_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockCCIPReader_Close_Call) Return(_a0 error) *MockCCIPReader_Close_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockCCIPReader_Close_Call) RunAndReturn(run func() error) *MockCCIPReader_Close_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CommitReportsGTETimestamp provides a mock function with given fields: ctx, ts, limit
 func (_m *MockCCIPReader) CommitReportsGTETimestamp(ctx context.Context, ts time.Time, limit int) ([]plugintypes.CommitPluginReportWithMeta, error) {
 	ret := _m.Called(ctx, ts, limit)
@@ -156,29 +201,29 @@ func (_c *MockCCIPReader_DiscoverContracts_Call) RunAndReturn(run func(context.C
 	return _c
 }
 
-// ExecutedMessages provides a mock function with given fields: ctx, source, seqNumRange, confidence
-func (_m *MockCCIPReader) ExecutedMessages(ctx context.Context, source ccipocr3.ChainSelector, seqNumRange ccipocr3.SeqNumRange, confidence primitives.ConfidenceLevel) ([]ccipocr3.SeqNum, error) {
-	ret := _m.Called(ctx, source, seqNumRange, confidence)
+// ExecutedMessages provides a mock function with given fields: ctx, rangesPerChain, confidence
+func (_m *MockCCIPReader) ExecutedMessages(ctx context.Context, rangesPerChain map[ccipocr3.ChainSelector][]ccipocr3.SeqNumRange, confidence primitives.ConfidenceLevel) (map[ccipocr3.ChainSelector][]ccipocr3.SeqNum, error) {
+	ret := _m.Called(ctx, rangesPerChain, confidence)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ExecutedMessages")
 	}
 
-	var r0 []ccipocr3.SeqNum
+	var r0 map[ccipocr3.ChainSelector][]ccipocr3.SeqNum
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, ccipocr3.ChainSelector, ccipocr3.SeqNumRange, primitives.ConfidenceLevel) ([]ccipocr3.SeqNum, error)); ok {
-		return rf(ctx, source, seqNumRange, confidence)
+	if rf, ok := ret.Get(0).(func(context.Context, map[ccipocr3.ChainSelector][]ccipocr3.SeqNumRange, primitives.ConfidenceLevel) (map[ccipocr3.ChainSelector][]ccipocr3.SeqNum, error)); ok {
+		return rf(ctx, rangesPerChain, confidence)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, ccipocr3.ChainSelector, ccipocr3.SeqNumRange, primitives.ConfidenceLevel) []ccipocr3.SeqNum); ok {
-		r0 = rf(ctx, source, seqNumRange, confidence)
+	if rf, ok := ret.Get(0).(func(context.Context, map[ccipocr3.ChainSelector][]ccipocr3.SeqNumRange, primitives.ConfidenceLevel) map[ccipocr3.ChainSelector][]ccipocr3.SeqNum); ok {
+		r0 = rf(ctx, rangesPerChain, confidence)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]ccipocr3.SeqNum)
+			r0 = ret.Get(0).(map[ccipocr3.ChainSelector][]ccipocr3.SeqNum)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, ccipocr3.ChainSelector, ccipocr3.SeqNumRange, primitives.ConfidenceLevel) error); ok {
-		r1 = rf(ctx, source, seqNumRange, confidence)
+	if rf, ok := ret.Get(1).(func(context.Context, map[ccipocr3.ChainSelector][]ccipocr3.SeqNumRange, primitives.ConfidenceLevel) error); ok {
+		r1 = rf(ctx, rangesPerChain, confidence)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -193,26 +238,25 @@ type MockCCIPReader_ExecutedMessages_Call struct {
 
 // ExecutedMessages is a helper method to define mock.On call
 //   - ctx context.Context
-//   - source ccipocr3.ChainSelector
-//   - seqNumRange ccipocr3.SeqNumRange
+//   - rangesPerChain map[ccipocr3.ChainSelector][]ccipocr3.SeqNumRange
 //   - confidence primitives.ConfidenceLevel
-func (_e *MockCCIPReader_Expecter) ExecutedMessages(ctx interface{}, source interface{}, seqNumRange interface{}, confidence interface{}) *MockCCIPReader_ExecutedMessages_Call {
-	return &MockCCIPReader_ExecutedMessages_Call{Call: _e.mock.On("ExecutedMessages", ctx, source, seqNumRange, confidence)}
+func (_e *MockCCIPReader_Expecter) ExecutedMessages(ctx interface{}, rangesPerChain interface{}, confidence interface{}) *MockCCIPReader_ExecutedMessages_Call {
+	return &MockCCIPReader_ExecutedMessages_Call{Call: _e.mock.On("ExecutedMessages", ctx, rangesPerChain, confidence)}
 }
 
-func (_c *MockCCIPReader_ExecutedMessages_Call) Run(run func(ctx context.Context, source ccipocr3.ChainSelector, seqNumRange ccipocr3.SeqNumRange, confidence primitives.ConfidenceLevel)) *MockCCIPReader_ExecutedMessages_Call {
+func (_c *MockCCIPReader_ExecutedMessages_Call) Run(run func(ctx context.Context, rangesPerChain map[ccipocr3.ChainSelector][]ccipocr3.SeqNumRange, confidence primitives.ConfidenceLevel)) *MockCCIPReader_ExecutedMessages_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(ccipocr3.ChainSelector), args[2].(ccipocr3.SeqNumRange), args[3].(primitives.ConfidenceLevel))
+		run(args[0].(context.Context), args[1].(map[ccipocr3.ChainSelector][]ccipocr3.SeqNumRange), args[2].(primitives.ConfidenceLevel))
 	})
 	return _c
 }
 
-func (_c *MockCCIPReader_ExecutedMessages_Call) Return(_a0 []ccipocr3.SeqNum, _a1 error) *MockCCIPReader_ExecutedMessages_Call {
+func (_c *MockCCIPReader_ExecutedMessages_Call) Return(_a0 map[ccipocr3.ChainSelector][]ccipocr3.SeqNum, _a1 error) *MockCCIPReader_ExecutedMessages_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockCCIPReader_ExecutedMessages_Call) RunAndReturn(run func(context.Context, ccipocr3.ChainSelector, ccipocr3.SeqNumRange, primitives.ConfidenceLevel) ([]ccipocr3.SeqNum, error)) *MockCCIPReader_ExecutedMessages_Call {
+func (_c *MockCCIPReader_ExecutedMessages_Call) RunAndReturn(run func(context.Context, map[ccipocr3.ChainSelector][]ccipocr3.SeqNumRange, primitives.ConfidenceLevel) (map[ccipocr3.ChainSelector][]ccipocr3.SeqNum, error)) *MockCCIPReader_ExecutedMessages_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -543,62 +587,6 @@ func (_c *MockCCIPReader_GetLatestPriceSeqNr_Call) RunAndReturn(run func(context
 	return _c
 }
 
-// GetMedianDataAvailabilityGasConfig provides a mock function with given fields: ctx
-func (_m *MockCCIPReader) GetMedianDataAvailabilityGasConfig(ctx context.Context) (ccipocr3.DataAvailabilityGasConfig, error) {
-	ret := _m.Called(ctx)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetMedianDataAvailabilityGasConfig")
-	}
-
-	var r0 ccipocr3.DataAvailabilityGasConfig
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context) (ccipocr3.DataAvailabilityGasConfig, error)); ok {
-		return rf(ctx)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context) ccipocr3.DataAvailabilityGasConfig); ok {
-		r0 = rf(ctx)
-	} else {
-		r0 = ret.Get(0).(ccipocr3.DataAvailabilityGasConfig)
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
-		r1 = rf(ctx)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockCCIPReader_GetMedianDataAvailabilityGasConfig_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetMedianDataAvailabilityGasConfig'
-type MockCCIPReader_GetMedianDataAvailabilityGasConfig_Call struct {
-	*mock.Call
-}
-
-// GetMedianDataAvailabilityGasConfig is a helper method to define mock.On call
-//   - ctx context.Context
-func (_e *MockCCIPReader_Expecter) GetMedianDataAvailabilityGasConfig(ctx interface{}) *MockCCIPReader_GetMedianDataAvailabilityGasConfig_Call {
-	return &MockCCIPReader_GetMedianDataAvailabilityGasConfig_Call{Call: _e.mock.On("GetMedianDataAvailabilityGasConfig", ctx)}
-}
-
-func (_c *MockCCIPReader_GetMedianDataAvailabilityGasConfig_Call) Run(run func(ctx context.Context)) *MockCCIPReader_GetMedianDataAvailabilityGasConfig_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context))
-	})
-	return _c
-}
-
-func (_c *MockCCIPReader_GetMedianDataAvailabilityGasConfig_Call) Return(_a0 ccipocr3.DataAvailabilityGasConfig, _a1 error) *MockCCIPReader_GetMedianDataAvailabilityGasConfig_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockCCIPReader_GetMedianDataAvailabilityGasConfig_Call) RunAndReturn(run func(context.Context) (ccipocr3.DataAvailabilityGasConfig, error)) *MockCCIPReader_GetMedianDataAvailabilityGasConfig_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // GetOffRampConfigDigest provides a mock function with given fields: ctx, pluginType
 func (_m *MockCCIPReader) GetOffRampConfigDigest(ctx context.Context, pluginType uint8) ([32]byte, error) {
 	ret := _m.Called(ctx, pluginType)
@@ -659,23 +647,23 @@ func (_c *MockCCIPReader_GetOffRampConfigDigest_Call) RunAndReturn(run func(cont
 }
 
 // GetOffRampSourceChainsConfig provides a mock function with given fields: ctx, sourceChains
-func (_m *MockCCIPReader) GetOffRampSourceChainsConfig(ctx context.Context, sourceChains []ccipocr3.ChainSelector) (map[ccipocr3.ChainSelector]reader.SourceChainConfig, error) {
+func (_m *MockCCIPReader) GetOffRampSourceChainsConfig(ctx context.Context, sourceChains []ccipocr3.ChainSelector) (map[ccipocr3.ChainSelector]reader.StaticSourceChainConfig, error) {
 	ret := _m.Called(ctx, sourceChains)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetOffRampSourceChainsConfig")
 	}
 
-	var r0 map[ccipocr3.ChainSelector]reader.SourceChainConfig
+	var r0 map[ccipocr3.ChainSelector]reader.StaticSourceChainConfig
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, []ccipocr3.ChainSelector) (map[ccipocr3.ChainSelector]reader.SourceChainConfig, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, []ccipocr3.ChainSelector) (map[ccipocr3.ChainSelector]reader.StaticSourceChainConfig, error)); ok {
 		return rf(ctx, sourceChains)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, []ccipocr3.ChainSelector) map[ccipocr3.ChainSelector]reader.SourceChainConfig); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, []ccipocr3.ChainSelector) map[ccipocr3.ChainSelector]reader.StaticSourceChainConfig); ok {
 		r0 = rf(ctx, sourceChains)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(map[ccipocr3.ChainSelector]reader.SourceChainConfig)
+			r0 = ret.Get(0).(map[ccipocr3.ChainSelector]reader.StaticSourceChainConfig)
 		}
 	}
 
@@ -707,12 +695,12 @@ func (_c *MockCCIPReader_GetOffRampSourceChainsConfig_Call) Run(run func(ctx con
 	return _c
 }
 
-func (_c *MockCCIPReader_GetOffRampSourceChainsConfig_Call) Return(_a0 map[ccipocr3.ChainSelector]reader.SourceChainConfig, _a1 error) *MockCCIPReader_GetOffRampSourceChainsConfig_Call {
+func (_c *MockCCIPReader_GetOffRampSourceChainsConfig_Call) Return(_a0 map[ccipocr3.ChainSelector]reader.StaticSourceChainConfig, _a1 error) *MockCCIPReader_GetOffRampSourceChainsConfig_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockCCIPReader_GetOffRampSourceChainsConfig_Call) RunAndReturn(run func(context.Context, []ccipocr3.ChainSelector) (map[ccipocr3.ChainSelector]reader.SourceChainConfig, error)) *MockCCIPReader_GetOffRampSourceChainsConfig_Call {
+func (_c *MockCCIPReader_GetOffRampSourceChainsConfig_Call) RunAndReturn(run func(context.Context, []ccipocr3.ChainSelector) (map[ccipocr3.ChainSelector]reader.StaticSourceChainConfig, error)) *MockCCIPReader_GetOffRampSourceChainsConfig_Call {
 	_c.Call.Return(run)
 	return _c
 }

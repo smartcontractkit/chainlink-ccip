@@ -122,9 +122,9 @@ func TestTokenPool(t *testing.T) {
 			for _, poolType := range []test_token_pool.PoolType{test_token_pool.LockAndRelease_PoolType, test_token_pool.BurnAndMint_PoolType} {
 				mintPriv, err := solana.NewRandomPrivateKey()
 				require.NoError(t, err)
-				p, err := tokens.NewTokenPool(v.tokenProgram, config.CcipTokenPoolProgram, mintPriv)
+				p, err := tokens.NewTokenPool(v.tokenProgram, config.CcipTokenPoolProgram, mintPriv.PublicKey())
 				require.NoError(t, err)
-				mint := p.Mint.PublicKey()
+				mint := p.Mint
 
 				t.Run("setup:token", func(t *testing.T) {
 					// create token
@@ -141,7 +141,7 @@ func TestTokenPool(t *testing.T) {
 					require.NoError(t, err)
 
 					instructions = append(instructions, createI, mintToI)
-					testutils.SendAndConfirm(ctx, t, solanaGoClient, instructions, admin, config.DefaultCommitment, common.AddSigners(p.Mint))
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, instructions, admin, config.DefaultCommitment, common.AddSigners(mintPriv))
 
 					// validate
 					outDec, outVal, err := tokens.TokenBalance(ctx, solanaGoClient, p.User[admin.PublicKey()], config.DefaultCommitment)
@@ -166,6 +166,19 @@ func TestTokenPool(t *testing.T) {
 					releaseOrMint := poolMethodName[1]
 
 					t.Run("setup", func(t *testing.T) {
+						type ProgramData struct {
+							DataType uint32
+							Address  solana.PublicKey
+						}
+						// get program data account
+						data, err := solanaGoClient.GetAccountInfoWithOpts(ctx, config.CcipTokenPoolProgram, &rpc.GetAccountInfoOpts{
+							Commitment: config.DefaultCommitment,
+						})
+						require.NoError(t, err)
+						// Decode program data
+						var programData ProgramData
+						require.NoError(t, bin.UnmarshalBorsh(&programData, data.Bytes()))
+
 						poolInitI, err := test_token_pool.NewInitializeInstruction(
 							poolType,
 							dumbRamp,
@@ -173,7 +186,11 @@ func TestTokenPool(t *testing.T) {
 							poolConfig,
 							mint,
 							admin.PublicKey(),
-							solana.SystemProgramID).ValidateAndBuild()
+							solana.SystemProgramID,
+							config.CcipTokenPoolProgram,
+							programData.Address,
+						).ValidateAndBuild()
+
 						require.NoError(t, err)
 
 						// make pool mint_authority for token (required for burn/mint)
@@ -181,7 +198,7 @@ func TestTokenPool(t *testing.T) {
 						require.NoError(t, err)
 
 						// set rate limit
-						ixRates, err := test_token_pool.NewSetChainRateLimitInstruction(config.EvmChainSelector, p.Mint.PublicKey(), test_token_pool.RateLimitConfig{
+						ixRates, err := test_token_pool.NewSetChainRateLimitInstruction(config.EvmChainSelector, p.Mint, test_token_pool.RateLimitConfig{
 							Enabled:  true,
 							Capacity: amount,
 							Rate:     1, // slow refill
@@ -193,14 +210,14 @@ func TestTokenPool(t *testing.T) {
 						require.NoError(t, err)
 
 						// set pool config
-						ixConfigure, err := test_token_pool.NewInitChainRemoteConfigInstruction(config.EvmChainSelector, p.Mint.PublicKey(), test_token_pool.RemoteConfig{
+						ixConfigure, err := test_token_pool.NewInitChainRemoteConfigInstruction(config.EvmChainSelector, p.Mint, test_token_pool.RemoteConfig{
 							TokenAddress: remoteToken,
 							Decimals:     9,
 						}, poolConfig, p.Chain[config.EvmChainSelector], admin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 						require.NoError(t, err)
 
 						ixAppend, err := test_token_pool.NewAppendRemotePoolAddressesInstruction(
-							config.EvmChainSelector, p.Mint.PublicKey(), []test_token_pool.RemoteAddress{remotePool}, poolConfig, p.Chain[config.EvmChainSelector], admin.PublicKey(), solana.SystemProgramID,
+							config.EvmChainSelector, p.Mint, []test_token_pool.RemoteAddress{remotePool}, poolConfig, p.Chain[config.EvmChainSelector], admin.PublicKey(), solana.SystemProgramID,
 						).ValidateAndBuild()
 						require.NoError(t, err)
 
@@ -241,6 +258,7 @@ func TestTokenPool(t *testing.T) {
 						instruction, err := test_token_pool.NewTransferOwnershipInstruction(
 							anotherAdmin.PublicKey(),
 							poolConfig,
+							mint,
 							admin.PublicKey(),
 						).ValidateAndBuild()
 						require.NoError(t, err)
@@ -251,6 +269,7 @@ func TestTokenPool(t *testing.T) {
 						// anotherAdmin becomes owner for remaining tests
 						instruction, err = test_token_pool.NewAcceptOwnershipInstruction(
 							poolConfig,
+							mint,
 							anotherAdmin.PublicKey(),
 						).ValidateAndBuild()
 						require.NoError(t, err)
@@ -395,7 +414,7 @@ func TestTokenPool(t *testing.T) {
 								t.Run(cfg.name, func(t *testing.T) {
 									t.Parallel()
 
-									ixRates, err := test_token_pool.NewSetChainRateLimitInstruction(config.EvmChainSelector, p.Mint.PublicKey(), cfg.c, test_token_pool.RateLimitConfig{}, poolConfig, p.Chain[config.EvmChainSelector], anotherAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+									ixRates, err := test_token_pool.NewSetChainRateLimitInstruction(config.EvmChainSelector, p.Mint, cfg.c, test_token_pool.RateLimitConfig{}, poolConfig, p.Chain[config.EvmChainSelector], anotherAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 									require.NoError(t, err)
 
 									testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ixRates}, anotherAdmin, config.DefaultCommitment, []string{cfg.errStr})
@@ -408,7 +427,7 @@ func TestTokenPool(t *testing.T) {
 								Value: [16]uint8{0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01},
 							}
 
-							ix, err := rmn_remote.NewCurseInstruction(
+							curseI, err := rmn_remote.NewCurseInstruction(
 								globalCurse,
 								config.RMNRemoteConfigPDA,
 								admin.PublicKey(),
@@ -416,8 +435,10 @@ func TestTokenPool(t *testing.T) {
 								solana.SystemProgramID,
 							).ValidateAndBuild()
 							require.NoError(t, err)
-							result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
-							require.NotNil(t, result)
+
+							// Do not alter global state, so don't just submit the curse instruction in a tx that succeeds,
+							// as that may break parallel tests. Instead, submit the curse ix together with the pool ix
+							// that fails, which reverts the entire tx and does not affect other tests.
 
 							lbI, err := test_ccip_invalid_receiver.NewPoolProxyLockOrBurnInstruction(
 								test_ccip_invalid_receiver.LockOrBurnInV1{
@@ -439,7 +460,7 @@ func TestTokenPool(t *testing.T) {
 							).ValidateAndBuild()
 							require.NoError(t, err)
 
-							testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{lbI}, admin, config.DefaultCommitment, []string{"Error Code: GloballyCursed"})
+							testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{curseI, lbI}, admin, config.DefaultCommitment, []string{"Error Code: GloballyCursed"})
 
 							rmI, err := test_ccip_invalid_receiver.NewPoolProxyReleaseOrMintInstruction(
 								test_ccip_invalid_receiver.ReleaseOrMintInV1{
@@ -467,25 +488,14 @@ func TestTokenPool(t *testing.T) {
 
 							require.NoError(t, err)
 
-							testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{rmI}, admin, config.DefaultCommitment, []string{"Error Code: GloballyCursed"})
-
-							ix, err = rmn_remote.NewUncurseInstruction(
-								globalCurse,
-								config.RMNRemoteConfigPDA,
-								admin.PublicKey(),
-								config.RMNRemoteCursesPDA,
-								solana.SystemProgramID,
-							).ValidateAndBuild()
-							require.NoError(t, err)
-							result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
-							require.NotNil(t, result)
+							testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{curseI, rmI}, admin, config.DefaultCommitment, []string{"Error Code: GloballyCursed"})
 						})
 
 						t.Run("subject cursed", func(t *testing.T) {
 							evmCurse := rmn_remote.CurseSubject{}
 							binary.LittleEndian.PutUint64(evmCurse.Value[:], config.EvmChainSelector)
 
-							ix, err := rmn_remote.NewCurseInstruction(
+							curseI, err := rmn_remote.NewCurseInstruction(
 								evmCurse,
 								config.RMNRemoteConfigPDA,
 								admin.PublicKey(),
@@ -493,8 +503,10 @@ func TestTokenPool(t *testing.T) {
 								solana.SystemProgramID,
 							).ValidateAndBuild()
 							require.NoError(t, err)
-							result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
-							require.NotNil(t, result)
+
+							// Do not alter global state, so don't just submit the curse instruction in a tx that succeeds,
+							// as that may break parallel tests. Instead, submit the curse ix together with the pool ix
+							// that fails, which reverts the entire tx and does not affect other tests.
 
 							lbI, err := test_ccip_invalid_receiver.NewPoolProxyLockOrBurnInstruction(
 								test_ccip_invalid_receiver.LockOrBurnInV1{
@@ -516,7 +528,7 @@ func TestTokenPool(t *testing.T) {
 							).ValidateAndBuild()
 							require.NoError(t, err)
 
-							testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{lbI}, admin, config.DefaultCommitment, []string{"Error Code: SubjectCursed"})
+							testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{curseI, lbI}, admin, config.DefaultCommitment, []string{"Error Code: SubjectCursed"})
 
 							rmI, err := test_ccip_invalid_receiver.NewPoolProxyReleaseOrMintInstruction(
 								test_ccip_invalid_receiver.ReleaseOrMintInV1{
@@ -544,19 +556,9 @@ func TestTokenPool(t *testing.T) {
 
 							require.NoError(t, err)
 
-							testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{rmI}, admin, config.DefaultCommitment, []string{"Error Code: SubjectCursed"})
-
-							ix, err = rmn_remote.NewUncurseInstruction(
-								evmCurse,
-								config.RMNRemoteConfigPDA,
-								admin.PublicKey(),
-								config.RMNRemoteCursesPDA,
-								solana.SystemProgramID,
-							).ValidateAndBuild()
-							require.NoError(t, err)
-							result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
-							require.NotNil(t, result)
+							testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{curseI, rmI}, admin, config.DefaultCommitment, []string{"Error Code: SubjectCursed"})
 						})
+
 						t.Run("exceed-rate-limit", func(t *testing.T) {
 							t.Parallel()
 
@@ -662,7 +664,7 @@ func TestTokenPool(t *testing.T) {
 						ixDelete, err := test_token_pool.NewDeleteChainConfigInstruction(config.EvmChainSelector, mint, poolConfig, p.Chain[config.EvmChainSelector], anotherAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 						require.NoError(t, err)
 
-						ixRouterChange, err := test_token_pool.NewSetRouterInstruction(config.CcipRouterProgram, poolConfig, anotherAdmin.PublicKey()).ValidateAndBuild()
+						ixRouterChange, err := test_token_pool.NewSetRouterInstruction(config.CcipRouterProgram, poolConfig, mint, anotherAdmin.PublicKey()).ValidateAndBuild()
 						require.NoError(t, err)
 
 						res := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ixDelete, ixRouterChange}, anotherAdmin, config.DefaultCommitment)
@@ -686,9 +688,9 @@ func TestTokenPool(t *testing.T) {
 	t.Run("Wrapped", func(t *testing.T) {
 		t.Parallel()
 		mintPriv := solana.MustPrivateKeyFromBase58("5PMQ49JibQPVBFneTzixstoS2z888CoUgej1PoYgvmKXZcKw4b3Zd8vhCjKQcUDSjLnR9M1tUrzCCXLrPBZoqjJm")
-		p, err := tokens.NewTokenPool(solana.TokenProgramID, config.CcipTokenPoolProgram, mintPriv)
+		p, err := tokens.NewTokenPool(solana.TokenProgramID, config.CcipTokenPoolProgram, mintPriv.PublicKey())
 		require.NoError(t, err)
-		mint := p.Mint.PublicKey()
+		mint := p.Mint
 
 		t.Run("setup:pool", func(t *testing.T) {
 			var err error
@@ -701,6 +703,19 @@ func TestTokenPool(t *testing.T) {
 			instructions, err := tokens.CreateToken(ctx, solana.TokenProgramID, mint, admin.PublicKey(), 0, solanaGoClient, config.DefaultCommitment)
 			require.NoError(t, err)
 
+			type ProgramData struct {
+				DataType uint32
+				Address  solana.PublicKey
+			}
+			// get program data account
+			data, err := solanaGoClient.GetAccountInfoWithOpts(ctx, config.CcipTokenPoolProgram, &rpc.GetAccountInfoOpts{
+				Commitment: config.DefaultCommitment,
+			})
+			require.NoError(t, err)
+			// Decode program data
+			var programData ProgramData
+			require.NoError(t, bin.UnmarshalBorsh(&programData, data.Bytes()))
+
 			// create pool
 			poolInitI, err := test_token_pool.NewInitializeInstruction(
 				test_token_pool.Wrapped_PoolType,
@@ -710,6 +725,8 @@ func TestTokenPool(t *testing.T) {
 				mint,
 				admin.PublicKey(),
 				solana.SystemProgramID,
+				config.CcipTokenPoolProgram,
+				programData.Address,
 			).ValidateAndBuild()
 			require.NoError(t, err)
 
@@ -724,18 +741,18 @@ func TestTokenPool(t *testing.T) {
 			require.NoError(t, err)
 
 			// initialize pool config
-			configureI, err := test_token_pool.NewInitChainRemoteConfigInstruction(config.EvmChainSelector, p.Mint.PublicKey(), test_token_pool.RemoteConfig{
+			configureI, err := test_token_pool.NewInitChainRemoteConfigInstruction(config.EvmChainSelector, p.Mint, test_token_pool.RemoteConfig{
 				TokenAddress: remoteToken,
 			}, p.PoolConfig, p.Chain[config.EvmChainSelector], admin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 			require.NoError(t, err)
 
 			// append remote pools
 			appendI, err := test_token_pool.NewAppendRemotePoolAddressesInstruction(
-				config.EvmChainSelector, p.Mint.PublicKey(), []test_token_pool.RemoteAddress{remotePool}, p.PoolConfig, p.Chain[config.EvmChainSelector], admin.PublicKey(), solana.SystemProgramID,
+				config.EvmChainSelector, p.Mint, []test_token_pool.RemoteAddress{remotePool}, p.PoolConfig, p.Chain[config.EvmChainSelector], admin.PublicKey(), solana.SystemProgramID,
 			).ValidateAndBuild()
 			require.NoError(t, err)
 
-			res := testutils.SendAndConfirm(ctx, t, solanaGoClient, append(instructions, poolInitI, createR, createP, configureI, appendI), admin, config.DefaultCommitment, common.AddSigners(p.Mint))
+			res := testutils.SendAndConfirm(ctx, t, solanaGoClient, append(instructions, poolInitI, createR, createP, configureI, appendI), admin, config.DefaultCommitment, common.AddSigners(mintPriv))
 			require.NotNil(t, res)
 		})
 
