@@ -260,6 +260,7 @@ pub struct ReceiverProxyExecute<'info> {
     pub allowed_offramp: UncheckedAccount<'info>,
     //
     /*
+    Remaining Accounts:
         Example-receiver specific PDAs
             pub approved_sender: UncheckedAccount<'info>,
             pub state: UncheckedAccount<'info>,
