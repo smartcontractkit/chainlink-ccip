@@ -579,6 +579,7 @@ func initResultsAndValidators(
 // computeNoncesConsensus computes the consensus on the observed nonces.
 // For each (chain, sender) pair we sort the observed nonces ascending and select the f-th observation.
 func computeNoncesConsensus(
+	lggr logger.Logger,
 	observations []plugincommon.AttributedObservation[exectypes.Observation],
 	fChainDest int,
 ) exectypes.NonceObservations {
@@ -597,9 +598,14 @@ func computeNoncesConsensus(
 		}
 	}
 
+	lggr.Debugw("computing nonces consensus",
+		"observedNonces", observedNonces, "fChainDest", fChainDest)
+
 	consensusNonces := make(exectypes.NonceObservations, len(observedNonces))
 	for pair, nonces := range observedNonces {
 		if len(nonces) == 0 || fChainDest >= len(nonces) {
+			lggr.Debugw("no consensus on chain/sender pair",
+				"chain", pair.chain, "sender", pair.sender, "nonces", nonces)
 			continue
 		}
 
@@ -656,7 +662,7 @@ func getConsensusObservation(
 	mergedHashes := mergeMessageHashes(lggr, aos, fChain)
 	lggr.Debugw("merged message hashes", "mergedHashes", mergedHashes)
 
-	agreedNoncesAmongOracles := computeNoncesConsensus(aos, fChain[destChainSelector])
+	agreedNoncesAmongOracles := computeNoncesConsensus(lggr, aos, fChain[destChainSelector])
 	lggr.Debugw("agreed nonces among oracles", "agreedNoncesAmongOracles", agreedNoncesAmongOracles)
 
 	observation := exectypes.NewObservation(
