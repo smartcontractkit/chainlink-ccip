@@ -7,30 +7,31 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/smartcontractkit/chainlink-ccip/cmd/carpenter/internal/format"
 	"github.com/smartcontractkit/chainlink-ccip/cmd/carpenter/internal/parse"
-	"github.com/smartcontractkit/chainlink-ccip/cmd/carpenter/internal/render"
 )
 
 func init() {
-	render.Register("fancy", basicRendererFactory)
+	format.Register("fancy", basicFormatterFactory, "Print formatted and colorized logs to the console.")
 }
 
-func basicRendererFactory(options render.Options) render.Renderer {
-	return basicRenderer
+func basicFormatterFactory(options format.Options) format.Formatter {
+	return format.NewWrappedFormat(fancyFormatter)
 }
 
 // renderData
 /*
 
-2024-12-04T20:15:35Z | 1.1.1 |       Commit(MerkleRoot) | <processor details>
-                       | | |           |     |-- processor
-                       | | |           |-- OCR Plugin
+2024-12-04T20:15:35Z | 1.1.1 | inf | Commit(MerkleRoot) | <processor details>
+                       | | |    |     |     |-- processor
+                       | | |    |     |-- OCR Plugin
+                       | | |    |-- log level
                        | | |-- sequence number
-                       | |-- DON ID
-                       -- oracleID
+                       | |-- Oracle ID
+                       -- DON ID
 
 */
-func basicRenderer(data *parse.Data) {
+func fancyFormatter(data *parse.Data) {
 	// simple color selection algorithm
 	withColor := func(in interface{}, i int) string {
 		color := fmt.Sprintf("%d", i%7+1)
@@ -41,30 +42,36 @@ func basicRenderer(data *parse.Data) {
 
 	var timeStyle = lipgloss.NewStyle().Width(10).Height(1).MaxHeight(1).
 		Align(lipgloss.Center)
-	var uidStyle = lipgloss.NewStyle().Width(25).Height(1).MaxHeight(1).
-		Align(lipgloss.Left).PaddingLeft(1).Bold(true)
-	var levelStyle = lipgloss.NewStyle().Width(4).Height(1).MaxHeight(1).
-		Align(lipgloss.Left).PaddingLeft(1).Italic(true)
+	var uidStyle = lipgloss.NewStyle().Height(1).MaxHeight(1).Width(10).
+		Align(lipgloss.Left).Padding(0, 1).Bold(true)
+	var levelStyle = lipgloss.NewStyle().Width(5).Height(1).MaxHeight(1).
+		Align(lipgloss.Left).Padding(0, 1).Italic(true)
 	var messageStyle = lipgloss.NewStyle().Width(60).Height(1).MaxHeight(1).
 		Align(lipgloss.Left).PaddingLeft(1)
 	var fieldsStyle = lipgloss.NewStyle().Width(100).Height(1).MaxHeight(1).
 		Align(lipgloss.Left).PaddingLeft(1)
 
-	uid := fmt.Sprintf("%s.%s.%s.%s.%s",
-		withColor(data.OracleID, data.OracleID),
+	uid := fmt.Sprintf("%s.%s.%s",
 		withColor(data.DONID, data.DONID),
+		withColor(data.OracleID, data.OracleID),
 		withColor(data.SequenceNumber, data.SequenceNumber),
-		withColor(data.Component, 0),
-		withColor(data.OCRPhase, ocrPhaseToColor(data.OCRPhase)),
+		//withColor(data.Component, 0),
+		//withColor(data.OCRPhase, ocrPhaseToColor(data.OCRPhase)),
 	)
 
-	fmt.Printf("%s|%s|%s|%s|%s\n",
+	var pluginPrefix string
+	if data.Plugin != "" {
+		pluginPrefix = fmt.Sprintf("%s(%s): ", data.Plugin, data.Component)
+	}
+
+	line := fmt.Sprintf("%s|%s|%s|%s|%s",
 		timeStyle.Render(data.GetTimestamp().Format(time.TimeOnly)),
 		uidStyle.Render(uid),
 		levelStyle.Render(truncateLevel(data.GetLevel())),
-		messageStyle.Render(data.GetMessage()),
+		messageStyle.Render(pluginPrefix+data.GetMessage()),
 		fieldsStyle.Render(getRelevantFieldsForMessage(data)),
 	)
+	fmt.Println(line)
 }
 
 func ocrPhaseToColor(phase string) int {

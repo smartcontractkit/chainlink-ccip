@@ -23,6 +23,8 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
+const SendingOutcome = "Sending Outcome"
+
 // Outcome depending on the current state, either:
 // - chooses the seq num ranges for the next round
 // - builds a report
@@ -43,7 +45,7 @@ func (p *Processor) Outcome(
 		return Outcome{}, err
 	}
 
-	lggr.Infow("Sending Outcome",
+	lggr.Infow(SendingOutcome,
 		"outcome", outcome, "nextState", nextState, "outcomeDuration", time.Since(tStart))
 	return outcome, nil
 }

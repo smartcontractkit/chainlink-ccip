@@ -1,4 +1,4 @@
-// Package basic is a simple renderer that prints the data message to the
+// Package basic is a simple formatter that prints the data message to the
 // console. Long lines are truncated when printing to a terminal.
 package basic
 
@@ -7,12 +7,13 @@ import (
 
 	"golang.org/x/term"
 
+	"github.com/smartcontractkit/chainlink-ccip/cmd/carpenter/internal/format"
 	"github.com/smartcontractkit/chainlink-ccip/cmd/carpenter/internal/parse"
-	"github.com/smartcontractkit/chainlink-ccip/cmd/carpenter/internal/render"
 )
 
 func init() {
-	render.Register("basic", basicRendererFactory)
+	// Register the basic formatter by name.
+	format.Register("basic", basicFormatterFactory, "Print logs to the console with minimal processing.")
 
 	tryUpdateTermWidth()
 }
@@ -32,11 +33,13 @@ func tryUpdateTermWidth() {
 	termWidth = width
 }
 
-func basicRendererFactory(options render.Options) render.Renderer {
-	return basicRenderer
+func basicFormatterFactory(options format.Options) format.Formatter {
+	// This simple formatter is a pure function, more advanced formats
+	// can implement the Formatter interface.
+	return format.NewWrappedFormat(basicFormatter)
 }
 
-func basicRenderer(data *parse.Data) {
+func basicFormatter(data *parse.Data) {
 	tryUpdateTermWidth()
 
 	var line string
