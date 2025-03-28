@@ -1,0 +1,408 @@
+# https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack
+
+defaultRules:
+  create: true
+  rules:
+    alertmanager: true
+    etcd: true
+    configReloaders: true
+    general: true
+    k8sContainerCpuUsageSecondsTotal: true
+    k8sContainerMemoryCache: true
+    k8sContainerMemoryRss: true
+    k8sContainerMemorySwap: true
+    k8sContainerResource: true
+    k8sContainerMemoryWorkingSetBytes: true
+    k8sPodOwner: true
+    kubeApiserverAvailability: true
+    kubeApiserverBurnrate: true
+    kubeApiserverHistogram: true
+    kubeApiserverSlos: true
+    kubeControllerManager: false
+    kubelet: true
+    kubeProxy: true
+    kubePrometheusGeneral: true
+    kubePrometheusNodeRecording: true
+    kubernetesApps: true
+    kubernetesResources: true
+    kubernetesStorage: true
+    kubernetesSystem: true
+    kubeSchedulerAlerting: false
+    kubeSchedulerRecording: false
+    kubeStateMetrics: true
+    network: true
+    node: true
+    nodeExporterAlerting: true
+    nodeExporterRecording: true
+    prometheus: true
+    prometheusOperator: true
+    windows: true
+
+additionalPrometheusRulesMap:
+  custom-rules:
+    groups:
+      - name: Blockchain alerts
+        rules:
+          - alert: BlockHeightStuck
+            expr: changes(brpc_block_height[1m]) == 0
+            for: 1m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Block height has not changed"
+              description: "The brpc_block_height gauge has not changed in the last minute, indicating a possible issue."
+
+## Components
+## - prometheus
+## - prometheusOperator
+## - nodeExporter
+## - alertmanager
+## - thanosRuler (disabled)
+prometheus:
+  extraArgs:
+    - --web.enable-remote-write-receiver
+  enabled: true
+  service:
+    type: NodePort
+  ingress:
+    enabled: true
+    ingressClassName: alb
+    annotations:
+      alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-west-2:273354650086:certificate/cff3fbc7-e14c-4d79-af82-dc66d747ebf0
+      alb.ingress.kubernetes.io/group.name: sandbox
+      alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}, {"HTTP":80}]'
+      alb.ingress.kubernetes.io/ssl-redirect: "443"
+    hosts:
+      - prometheus.fwog.sandbox.enterprise.chain.link
+    paths:
+      - /*
+    pathType: ImplementationSpecific
+  prometheusSpec:
+    probeSelector:
+      matchLabels:
+        prometheus: ops
+    resources:
+      limits:
+        cpu: 4000m
+        memory: 8Gi
+      requests:
+        cpu: 2000m
+        memory: 4Gi
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: gp3
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 50Gi
+    serviceMonitorSelectorNilUsesHelmValues: false
+    priorityClassName: system-node-critical
+    retention: 14d
+    ## enable --web.enable-remote-write-receiver flag on prometheus-server
+    ##
+    enableRemoteWriteReceiver: true
+    scrapeClasses:
+      - default: true
+        name: cluster-relabeling
+        relabelings:
+          - sourceLabels: [__name__]
+            regex: (.*)
+            targetLabel: cluster
+            replacement: main-fwog
+            action: replace
+          - sourceLabels: [__name__]
+            regex: (.*)
+            targetLabel: env
+            replacement: sandbox
+            action: replace
+          - sourceLabels: [__name__]
+            regex: (.*)
+            targetLabel: team
+            replacement: cl-orchestration
+            action: replace
+prometheusOperator:
+  enabled: true
+  admissionWebhooks:
+    enabled: true
+  resources:
+    limits:
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  kubeletService:
+    enabled: false
+nodeExporter:
+  enabled: true
+alertmanager:
+  enabled: true
+  service:
+    type: NodePort
+  ingress:
+    enabled: true
+    ingressClassName: alb
+    annotations:
+      alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-west-2:273354650086:certificate/cff3fbc7-e14c-4d79-af82-dc66d747ebf0
+      alb.ingress.kubernetes.io/group.name: sandbox
+      alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}, {"HTTP":80}]'
+      alb.ingress.kubernetes.io/ssl-redirect: "443"
+    hosts:
+      - alertmanager.fwog.sandbox.enterprise.chain.link
+    paths: ["/*"]
+    pathType: ImplementationSpecific
+  alertmanagerSpec:
+    resources:
+      limits:
+        memory: 400Mi
+      requests:
+        cpu: 50m
+        memory: 200Mi
+
+thanosRuler:
+  enabled: false
+
+## Component Subcharts
+## - crds
+## - kube-state-metrics
+## - prometheus-node-exporter
+## - grafana (disabled)
+crds:
+  enabled: true
+kube-state-metrics:
+  enabled: true
+  resources:
+    limits:
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  prometheus:
+    monitor:
+      enabled: true
+      metricRelabelings:
+        # Dropped due to no usage in Grafana Cloud.
+        # These are used in the alerts shipped by kube-state-metrics so if we
+        # were to add those alerts we should look into keeping these metrics.
+        # Monthly Cost: ~$1310/month
+        - action: drop
+          regex: kube_.*_(annotations|metadata_generation|status_observed_generation)
+          sourceLabels: [__name__]
+prometheus-node-exporter:
+  enabled: true
+  resources:
+    limits:
+      memory: 60Mi
+    requests:
+      cpu: 100m
+      memory: 30Mi
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: eks.amazonaws.com/compute-type
+                operator: NotIn
+                values: ["fargate"]
+  prometheus:
+    monitor:
+      enabled: true
+      metricRelabelings:
+        # Dropped due to cost vs value.
+        # While node network metrics are nice, they are not worth the cost.
+        # Monthly Cost: ~$5,314/month
+        - action: drop
+          regex: node_network.*
+          sourceLabels: [__name__]
+grafana:
+  enabled: true
+  adminPassword: derpderpderp
+  image:
+    respository: grafana/grafana
+  service:
+    type: NodePort
+  ingress:
+    enabled: true
+    ingressClassName: alb
+    annotations:
+      alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-west-2:273354650086:certificate/cff3fbc7-e14c-4d79-af82-dc66d747ebf0
+      alb.ingress.kubernetes.io/group.name: sandbox
+      alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}, {"HTTP":80}]'
+      alb.ingress.kubernetes.io/ssl-redirect: "443"
+    hosts:
+      - grafana.fwog.sandbox.enterprise.chain.link
+    path: /*
+    pathType: ImplementationSpecific
+  resources:
+    limits:
+      memory: 500Mi
+    requests:
+      cpu: 100m
+      memory: 250Mi
+  sidecar:
+    dashboards:
+      enabled: false
+      label: grafana_dashboard
+      folderAnnotation: grafana_folder
+      folder: /tmp/dashboards/
+      annotations:
+        grafana_folder: /tmp/dashboards/Kubernetes
+      provider:
+        allowUiUpdates: true
+        disableDelete: false
+        foldersFromFilesStructure: true
+  additionalDataSources:
+    - name: Loki
+      type: loki
+      access: proxy
+      url: "http://loki.prometheus:3100"
+      version: 1
+      isDefault: false
+      jsonData: {}
+prometheus-windows-exporter:
+  enabled: false
+
+## Component Scrapers
+## - kubeControllerManager
+## - coreDns
+## - kubeDns
+## - kubeEtcd
+## - kubeScheduler
+## - kubeProxy
+## - kubeStateMetrics
+## - kubelet
+## - kubeApiServer
+kubeControllerManager:
+  enabled: true
+coreDns:
+  enabled: true
+kubeDns:
+  enabled: true
+kubeEtcd:
+  enabled: true
+kubeScheduler:
+  enabled: true
+kubeStateMetrics:
+  enabled: true
+kubeProxy:
+  enabled: true
+kubelet:
+  enabled: true
+  serviceMonitor:
+    metricRelabelings:
+      # Drop apiserver metrics due to high cardinality.
+      # These are used in default dashboards/recording rules in this chart
+      # but we do not consume them in Grafana Cloud.
+      # This is only done here to ensure that all apiserver_.* metrics are
+      # dropped as to avoid confusion with the apiserver metrics comfing from
+      # the kube-apiserver job. The rest of the metrics can be found in the
+      # kubeApiServer metricsRelabelings section.
+      # Monthly Cost: ~$187/month
+      - action: drop
+        regex: apiserver_.*
+        sourceLabels:
+          - __name__
+      # Dropped due to high cardinality with no usage save for in a default
+      # dashboard shipped with this chart (not present in Grafana Cloud).
+      # Monthly Cost: ~$935/month
+      - action: drop
+        regex: storage_operation_duration_seconds_.*
+        sourceLabels:
+          - __name__
+      # Dropped due to high cardinality with no usage.
+      # Monthly Cost: ~$1,360/month
+      - action: drop
+        regex: kubelet_(pod_worker|runtime_operations|http_requests|docker_operations|cgroup_manager)_duration.*
+        sourceLabels:
+          - __name__
+    cAdvisorMetricRelabelings:
+      # Dropped due to high cardinality.
+      # Allegedly this metric is "used" according to Grafana Cloud. Best
+      # guess is it is a default dashboard somewhere. Feel free to remove
+      # this block if you need this metric despite the high cost.
+      # Monthly Cost: ~$2,109/month
+      - action: drop
+        regex: container_memory_failures_total
+        sourceLabels:
+          - __name__
+      # Dropped due to high cardinality with no usage in Grafana Cloud.
+      # Monthly Cost: ~$1,546/month
+      - action: drop
+        regex: container_blkio_device_usage_total
+        sourceLabels:
+          - __name__
+      # Dropped due to no usage.
+      # Monthly Cost: ~$3,324/month
+      - action: drop
+        regex: container_(last_seen|processes|sockets|threads|start_time_seconds|gpu_allocation|ulimits_soft|clientset_k8s_request_total)
+        sourceLabels:
+          - __name__
+      # Dropped due to not being unused in Grafana Cloud.
+      # These are used in default dashboards and recording rules by this
+      # chart. If we decide to use those we should look into keeping these.
+      # Monthly Cost: ~$635/month
+      - action: drop
+        regex: container_memory_(cache|failcnt)
+        sourceLabels:
+          - __name__
+      # Dropped due to not being unused in Grafana Cloud.
+      # It should be noted that dropping (receive|transmit)_bytes_total as
+      # well would save an additional ~$2,150/month.
+      # Monthly Cost: ~$6,450/month
+      - action: drop
+        regex: container_network_(receive|transmit)_(errors|packets|packets_dropped)_total
+        sourceLabels:
+          - __name__
+      # Drop less useful container CPU metrics.
+      # (This was copied from upstream chart)
+      - sourceLabels: [__name__]
+        action: drop
+        regex: "container_cpu_(cfs_throttled_seconds_total|load_average_10s|system_seconds_total|user_seconds_total)"
+      # Drop less useful container / always zero filesystem metrics.
+      # (This was copied from upstream chart)
+      - sourceLabels: [__name__]
+        action: drop
+        regex: "container_fs_(io_current|io_time_seconds_total|io_time_weighted_seconds_total|reads_merged_total|sector_reads_total|sector_writes_total|writes_merged_total)"
+      # Drop less useful / always zero container memory metrics.
+      # (This was copied from upstream chart)
+      - sourceLabels: [__name__]
+        action: drop
+        regex: "container_memory_(mapped_file|swap)"
+      # Drop less useful container process metrics.
+      # (This was copied from upstream chart)
+      - sourceLabels: [__name__]
+        action: drop
+        regex: "container_(file_descriptors|tasks_state|threads_max)"
+      # Drop container spec metrics that overlap with kube-state-metrics.
+      # (This was copied from upstream chart)
+      - sourceLabels: [__name__]
+        action: drop
+        regex: "container_spec.*"
+      # Drop cgroup metrics with no pod.
+      # (This was copied from upstream chart)
+      - sourceLabels: [id, pod]
+        action: drop
+        regex: ".+;"
+kubeApiServer:
+  enabled: true
+  serviceMonitor:
+    metricRelabelings:
+      # Drop apiserver metrics due to high cardinality.
+      # These are used in default dashboards/recording rules in this chart
+      # but we do not consume them in Grafana Cloud.
+      # Monthly Cost: ~$4,885/month
+      - action: drop
+        regex: apiserver_.*
+        sourceLabels:
+          - __name__
+
+      # Drop etcd metrics since we don't manage the control plane.
+      # Monthly Cost: ~$865/month
+      - action: drop
+        regex: etcd_.*
+        sourceLabels:
+          - __name__
+
+## Misc
+cleanPrometheusOperatorObjectNames: false
+extraManifests: []

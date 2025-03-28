@@ -1,0 +1,58 @@
+---
+# charts: https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack
+version: v2beta1
+name: cluster-services-prometheus
+
+require:
+  devspace: ">= 6.0"
+
+vars:
+  # default
+  DEVSPACE_ENV_FILE:
+    source: env
+    default: .env
+  NAMESPACE:
+    source: env
+    default: ${DEVSPACE_NAMESPACE}
+  LOCAL_VALUES_DIR:
+    source: env
+    default: ./values
+  # specific
+  PROMETHEUS_NAME:
+    source: env
+    default: prometheus
+
+pipelines:
+  deploy:
+    run: |-
+      create_deployments prometheus
+  purge:
+    run: |-
+      purge_deployments prometheus
+
+deployments:
+  prometheus:
+    updateImageTags: false
+    namespace: ${NAMESPACE}
+    helm:
+      displayOutput: true
+      releaseName: ${PROMETHEUS_NAME}
+      chart:
+        name: kube-prometheus-stack
+        repo: https://prometheus-community.github.io/helm-charts
+        version: 70.3.0
+      values:
+        fullnameOverride: ${PROMETHEUS_NAME}
+      valuesFiles:
+        - ${LOCAL_VALUES_DIR}/prometheus/prometheus-default.yaml
+
+hooks:
+  - wait:
+      running: true
+      terminatedWithCode: 0
+      timeout: 600
+    container:
+      labelSelector:
+        app.kubernetes.io/instance: ${PROMETHEUS_NAME}
+        release: ${PROMETHEUS_NAME}
+    events: ["after:deploy:prometheus"]
