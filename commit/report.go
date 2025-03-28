@@ -114,6 +114,7 @@ func (p *Plugin) Reports(
 				"gasPriceUpdates", outcome.ChainFeeOutcome.GasPrices,
 				"rmnSignatures", outcome.MerkleRootOutcome.RMNReportSignatures,
 			)
+			return nil, fmt.Errorf("no reports generated despite having data")
 		}
 	}
 
