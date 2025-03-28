@@ -1610,6 +1610,8 @@ func Test_validateCommitReportsReadingEligibility(t *testing.T) {
 }
 
 func Test_computeNoncesConsensus(t *testing.T) {
+	lggr := logger.Test(t)
+	
 	testCases := []struct {
 		name                 string
 		allNonceObservations []exectypes.NonceObservations
@@ -1744,7 +1746,7 @@ func Test_computeNoncesConsensus(t *testing.T) {
 					OracleID:    commontypes.OracleID(i),
 				}
 			}
-			obs := computeNoncesConsensus(observations, tc.fChain)
+			obs := computeNoncesConsensus(lggr, observations, tc.fChain)
 			assert.Equal(t, tc.expNonceConsensus, obs)
 		})
 	}
