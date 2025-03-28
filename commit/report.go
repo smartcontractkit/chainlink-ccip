@@ -51,16 +51,62 @@ func (p *Plugin) Reports(
 	lggr.Debugw("transmission schedule override",
 		"transmissionSchedule", transmissionSchedule, "oracleIDToP2PID", p.oracleIDToP2PID)
 
-	reports, err := p.reportBuilder(ctx, lggr, p.reportCodec, transmissionSchedule, outcome, p.offchainCfg)
+	// Build reports for outcome
+	reports, err := p.reportBuilder(ctx, lggr, outcome, p.offchainCfg)
 
-	if err != nil {
-		return nil, fmt.Errorf("error while building reports: %w", err)
+	// If no report was generated, check if there should have been one
+	if len(reports) == 0 {
+		dataPoints := len(outcome.MerkleRootOutcome.RootsToReport)
+		dataPoints += len(outcome.TokenPriceOutcome.TokenPrices)
+		dataPoints += len(outcome.ChainFeeOutcome.GasPrices)
+		dataPoints += len(outcome.MerkleRootOutcome.RMNReportSignatures)
+		if dataPoints > 0 {
+			lggr.Errorw("no reports generated despite having data",
+				"roots", outcome.MerkleRootOutcome.RootsToReport,
+				"tokenPriceUpdates", outcome.TokenPriceOutcome.TokenPrices,
+				"gasPriceUpdates", outcome.ChainFeeOutcome.GasPrices,
+				"rmnSignatures", outcome.MerkleRootOutcome.RMNReportSignatures,
+			)
+		}
 	}
-	if len(reports) != 0 {
+
+	var encodedReports []ocr3types.ReportPlus[[]byte]
+	// Encode the reports and report info
+	for _, report := range reports {
+		if report.Report.IsEmpty() {
+			p.lggr.Errorw("an empty report was generated",
+				"numReports", len(reports),
+				"outcome", outcome)
+		}
+
+		lggr.Infow("encoding report and report info",
+			"report", report.Report,
+			"reportInfo", report.ReportInfo)
+
+		encodedReport, err := p.reportCodec.Encode(ctx, report.Report)
+		if err != nil {
+			return nil, fmt.Errorf("encode commit plugin report: %w", err)
+		}
+
+		encodedInfo, err := report.ReportInfo.Encode()
+		if err != nil {
+			return nil, fmt.Errorf("encode commit plugin report info: %w", err)
+		}
+
+		encodedReports = append(encodedReports, ocr3types.ReportPlus[[]byte]{
+			ReportWithInfo: ocr3types.ReportWithInfo[[]byte]{
+				Report: encodedReport,
+				Info:   encodedInfo,
+			},
+			TransmissionScheduleOverride: transmissionSchedule,
+		})
+	}
+
+	if len(encodedReports) != 0 {
 		lggr.Infof("built %d reports", len(reports))
 	}
 
-	return reports, nil
+	return encodedReports, nil
 }
 
 // validateReport validates various aspects of the report.

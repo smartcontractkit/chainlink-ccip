@@ -5,24 +5,25 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
-
 	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 )
+
+type Report struct {
+	Report     cciptypes.CommitPluginReport
+	ReportInfo cciptypes.CommitReportInfo
+}
 
 // ReportBuilderFunc is used to inject different algorithms for building commit reports.
 type ReportBuilderFunc func(
 	ctx context.Context,
 	lggr logger.Logger,
-	reportCodec cciptypes.CommitPluginCodec,
-	transmissionSchedule *ocr3types.TransmissionSchedule,
 	outcome committypes.Outcome,
 	config pluginconfig.CommitOffchainConfig,
-) ([]ocr3types.ReportPlus[[]byte], error)
+) ([]Report, error)
 
 // NewReportBuilder returns a ReportBuilderFunc based on the provided config.
 func NewReportBuilder(RMNEnabled bool, MaxMerkleRootsPerReport, MaxPricesPerReport uint64) (ReportBuilderFunc, error) {
@@ -55,15 +56,13 @@ func NewReportBuilder(RMNEnabled bool, MaxMerkleRootsPerReport, MaxPricesPerRepo
 func buildOneReport(
 	ctx context.Context,
 	lggr logger.Logger,
-	reportCodec cciptypes.CommitPluginCodec,
-	transmissionSchedule *ocr3types.TransmissionSchedule,
 	merkleOutcomeType merkleroot.OutcomeType,
 	blessedMerkleRoots []cciptypes.MerkleRootChain,
 	unblessedMerkleRoots []cciptypes.MerkleRootChain,
 	rmnSignatures []cciptypes.RMNECDSASignature,
 	rmnRemoteFSign uint64,
 	priceUpdates cciptypes.PriceUpdates,
-) (*ocr3types.ReportPlus[[]byte], error) {
+) (Report, error) {
 	var (
 		rep     cciptypes.CommitPluginReport
 		repInfo cciptypes.CommitReportInfo
@@ -97,39 +96,28 @@ func buildOneReport(
 	repInfo.PriceUpdates = rep.PriceUpdates
 
 	if rep.IsEmpty() {
-		lggr.Infow("empty report", "report", rep)
-		return nil, nil
+		lggr.Errorw("buildOneReport: generated an empty report",
+			"blessedMerkleRoots", blessedMerkleRoots,
+			"unblessedMerkleRoots", unblessedMerkleRoots,
+			"priceUpdates", priceUpdates,
+		)
+
+		return Report{}, nil
 	}
 
-	encodedReport, err := reportCodec.Encode(ctx, rep)
-	if err != nil {
-		return nil, fmt.Errorf("encode commit plugin report: %w", err)
-	}
-
-	encodedInfo, err := repInfo.Encode()
-	if err != nil {
-		return nil, fmt.Errorf("encode commit plugin report info: %w", err)
-	}
-
-	lggr.Infow("commit plugin generated reports", "report", rep, "reportInfo", repInfo)
-
-	return &ocr3types.ReportPlus[[]byte]{
-		ReportWithInfo: ocr3types.ReportWithInfo[[]byte]{
-			Report: encodedReport,
-			Info:   encodedInfo,
-		},
-		TransmissionScheduleOverride: transmissionSchedule,
+	return Report{
+		Report:     rep,
+		ReportInfo: repInfo,
 	}, nil
 }
 
+// buildStandardReport builds a one report with all the merkle roots and price updates.
 func buildStandardReport(
 	ctx context.Context,
 	lggr logger.Logger,
-	reportCodec cciptypes.CommitPluginCodec,
-	transmission *ocr3types.TransmissionSchedule,
 	outcome committypes.Outcome,
 	_ pluginconfig.CommitOffchainConfig,
-) ([]ocr3types.ReportPlus[[]byte], error) {
+) ([]Report, error) {
 	blessedMerkleRoots := make([]cciptypes.MerkleRootChain, 0)
 	unblessedMerkleRoots := make([]cciptypes.MerkleRootChain, 0)
 
@@ -149,8 +137,6 @@ func buildStandardReport(
 	report, err := buildOneReport(
 		ctx,
 		lggr,
-		reportCodec,
-		transmission,
 		outcome.MerkleRootOutcome.OutcomeType,
 		blessedMerkleRoots,
 		unblessedMerkleRoots,
@@ -159,26 +145,25 @@ func buildStandardReport(
 		priceUpdates,
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("buildStandardReport err: %w", err)
 	}
-	if report != nil {
-		return []ocr3types.ReportPlus[[]byte]{*report}, nil
+	// Do not return an empty report.
+	if report.Report.IsEmpty() {
+		return nil, nil
 	}
-	return nil, nil
+	return []Report{report}, nil
 }
 
 // buildMultiplePriceReports builds many reports of with at most maxMerkleRootsPerReport roots.
 func buildMultiplePriceAndMerkleRootReports(
 	ctx context.Context,
 	lggr logger.Logger,
-	reportCodec cciptypes.CommitPluginCodec,
-	transmissionSchedule *ocr3types.TransmissionSchedule,
 	outcome committypes.Outcome,
 	config pluginconfig.CommitOffchainConfig,
-) ([]ocr3types.ReportPlus[[]byte], error) {
+) ([]Report, error) {
 	// 1. Build price reports.
 	maxPrices := config.MaxPricesPerReport
-	reports, err := buildMultiplePriceReports(ctx, lggr, reportCodec, transmissionSchedule, outcome, maxPrices)
+	reports, err := buildMultiplePriceReports(ctx, lggr, outcome, maxPrices)
 	if err != nil {
 		return nil, fmt.Errorf("problem building price reports: %w", err)
 	}
@@ -194,7 +179,7 @@ func buildMultiplePriceAndMerkleRootReports(
 		rootReportBuilder = buildMultipleMerkleRootReports
 	}
 
-	rootReports, err := rootReportBuilder(ctx, lggr, reportCodec, transmissionSchedule, outcome, config)
+	rootReports, err := rootReportBuilder(ctx, lggr, outcome, config)
 	if err != nil {
 		return nil, fmt.Errorf("problem building merkle root reports: %w", err)
 	}
@@ -209,12 +194,10 @@ func buildMultiplePriceAndMerkleRootReports(
 func buildMultipleMerkleRootReports(
 	ctx context.Context,
 	lggr logger.Logger,
-	reportCodec cciptypes.CommitPluginCodec,
-	transmissionSchedule *ocr3types.TransmissionSchedule,
 	outcome committypes.Outcome,
 	config pluginconfig.CommitOffchainConfig,
-) ([]ocr3types.ReportPlus[[]byte], error) {
-	var reports []ocr3types.ReportPlus[[]byte]
+) ([]Report, error) {
+	var reports []Report
 
 	numRoots := uint64(0)
 	blessedMerkleRoots := make([]cciptypes.MerkleRootChain, 0)
@@ -242,8 +225,6 @@ func buildMultipleMerkleRootReports(
 			report, err := buildOneReport(
 				ctx,
 				lggr,
-				reportCodec,
-				transmissionSchedule,
 				outcome.MerkleRootOutcome.OutcomeType,
 				blessedMerkleRoots,
 				unblessedMerkleRoots,
@@ -252,11 +233,9 @@ func buildMultipleMerkleRootReports(
 				priceUpdates,
 			)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("buildMultipleMerkleRootReports err: %w", err)
 			}
-			if report != nil {
-				reports = append(reports, *report)
-			}
+			reports = append(reports, report)
 
 			// reset accumulators for next report.
 			numRoots = 0
@@ -273,8 +252,6 @@ func buildMultipleMerkleRootReports(
 		report, err := buildOneReport(
 			ctx,
 			lggr,
-			reportCodec,
-			transmissionSchedule,
 			outcome.MerkleRootOutcome.OutcomeType,
 			blessedMerkleRoots,
 			unblessedMerkleRoots,
@@ -283,11 +260,10 @@ func buildMultipleMerkleRootReports(
 			priceUpdates,
 		)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("buildMultipleMerkleRootReports err: %w", err)
 		}
-		if report != nil {
-			reports = append(reports, *report)
-		}
+
+		reports = append(reports, report)
 	}
 
 	return reports, nil
@@ -299,11 +275,9 @@ func buildMultipleMerkleRootReports(
 func buildMultiplePriceReports(
 	ctx context.Context,
 	lggr logger.Logger,
-	reportCodec cciptypes.CommitPluginCodec,
-	transmissionSchedule *ocr3types.TransmissionSchedule,
 	outcome committypes.Outcome,
 	maxPricesPerReport uint64, // passed in directly to avoid implementing ReportBuilderFunc
-) ([]ocr3types.ReportPlus[[]byte], error) {
+) ([]Report, error) {
 	// update is a union of the different types of price updates. This is done so that one loop can
 	// create all the reports.
 	type update struct {
@@ -323,7 +297,7 @@ func buildMultiplePriceReports(
 	}
 
 	// Build reports
-	var reports []ocr3types.ReportPlus[[]byte]
+	var reports []Report
 	numUpdates := uint64(0)
 	priceUpdates := cciptypes.PriceUpdates{}
 	for _, u := range updates {
@@ -341,8 +315,6 @@ func buildMultiplePriceReports(
 			report, err := buildOneReport(
 				ctx,
 				lggr,
-				reportCodec,
-				transmissionSchedule,
 				outcome.MerkleRootOutcome.OutcomeType,
 				nil,
 				nil,
@@ -351,15 +323,9 @@ func buildMultiplePriceReports(
 				priceUpdates,
 			)
 			if err != nil {
-				return nil, fmt.Errorf("buildingMultiplePriceReports: priceUpdates(%+v): %w", priceUpdates, err)
+				return nil, fmt.Errorf("buildMultiplePriceReports err: %w", err)
 			}
-			if report == nil {
-				return nil,
-					fmt.Errorf("buildingMultiplePriceReports: unexpected empty report for updates(%+v): %w",
-						priceUpdates, err)
-			}
-
-			reports = append(reports, *report)
+			reports = append(reports, report)
 
 			// reset accumulators for next report.
 			numUpdates = 0
@@ -374,8 +340,6 @@ func buildMultiplePriceReports(
 		report, err := buildOneReport(
 			ctx,
 			lggr,
-			reportCodec,
-			transmissionSchedule,
 			outcome.MerkleRootOutcome.OutcomeType,
 			nil,
 			nil,
@@ -384,15 +348,9 @@ func buildMultiplePriceReports(
 			priceUpdates,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("buildingMultiplePriceReports: priceUpdates(%+v): %w", priceUpdates, err)
+			return nil, fmt.Errorf("buildMultiplePriceReports err: %w", err)
 		}
-		if report == nil {
-			return nil,
-				fmt.Errorf("buildingMultiplePriceReports: unexpected empty report for updates(%+v): %w",
-					priceUpdates, err)
-		}
-
-		reports = append(reports, *report)
+		reports = append(reports, report)
 	}
 
 	return reports, nil
