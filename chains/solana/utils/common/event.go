@@ -19,6 +19,10 @@ func IsEvent(event string, data []byte) bool {
 	return bytes.Equal(d, data[:8])
 }
 
+func NewEventNotFoundError(event string) error {
+	return fmt.Errorf("%s: event not found", event)
+}
+
 // Note: This will not work for any events containing `Option`. This will be fixed when the version
 // of anchor-go is updated to support events. In the meantime, events containing `Option` require
 // bespoke parsing (see ParseEventCommitReportAccepted)
@@ -42,7 +46,7 @@ func ParseEvent(logs []string, event string, obj interface{}, shouldPrint ...boo
 			}
 		}
 	}
-	return fmt.Errorf("%s: event not found", event)
+	return NewEventNotFoundError(event)
 }
 
 func ParseMultipleEvents[T any](logs []string, event string, shouldPrint bool) ([]T, error) {
@@ -69,7 +73,7 @@ func ParseMultipleEvents[T any](logs []string, event string, shouldPrint bool) (
 		}
 	}
 	if len(results) == 0 {
-		return nil, fmt.Errorf("%s: event not found", event)
+		return nil, NewEventNotFoundError(event)
 	}
 
 	return results, nil
@@ -123,5 +127,5 @@ func ParseEventCommitReportAccepted(logs []string, event string, obj *EventCommi
 			}
 		}
 	}
-	return fmt.Errorf("%s: event not found", event)
+	return NewEventNotFoundError(event)
 }
