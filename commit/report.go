@@ -13,6 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 
+	"github.com/smartcontractkit/chainlink-ccip/commit/internal/builder"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
@@ -21,6 +22,46 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
+
+func encodeReports(
+	ctx context.Context,
+	lggr logger.Logger,
+	reports []builder.Report,
+	transmissionSchedule *ocr3types.TransmissionSchedule,
+	reportCodec cciptypes.CommitPluginCodec,
+) ([]ocr3types.ReportPlus[[]byte], error) {
+	var encodedReports []ocr3types.ReportPlus[[]byte]
+	// Encode the reports and report info
+	for _, report := range reports {
+		// the report builder should not include empty reports.
+		if report.Report.IsEmpty() {
+			return nil, fmt.Errorf("found empty report")
+		}
+
+		lggr.Infow("encoding report and report info",
+			"report", report.Report,
+			"reportInfo", report.ReportInfo)
+
+		encodedReport, err := reportCodec.Encode(ctx, report.Report)
+		if err != nil {
+			return nil, fmt.Errorf("encode commit plugin report: %w", err)
+		}
+
+		encodedInfo, err := report.ReportInfo.Encode()
+		if err != nil {
+			return nil, fmt.Errorf("encode commit plugin report info: %w", err)
+		}
+
+		encodedReports = append(encodedReports, ocr3types.ReportPlus[[]byte]{
+			ReportWithInfo: ocr3types.ReportWithInfo[[]byte]{
+				Report: encodedReport,
+				Info:   encodedInfo,
+			},
+			TransmissionScheduleOverride: transmissionSchedule,
+		})
+	}
+	return encodedReports, nil
+}
 
 func (p *Plugin) Reports(
 	ctx context.Context, seqNr uint64, outcomeBytes ocr3types.Outcome,
@@ -52,7 +93,13 @@ func (p *Plugin) Reports(
 		"transmissionSchedule", transmissionSchedule, "oracleIDToP2PID", p.oracleIDToP2PID)
 
 	// Build reports for outcome
-	reports, err := p.reportBuilder(ctx, lggr, outcome, p.offchainCfg)
+	reports, err := p.reportBuilder(lggr, outcome, p.offchainCfg)
+	if err != nil {
+		lggr.Errorw("failed to build reports",
+			"outcome", outcome,
+			"err", err)
+		return nil, fmt.Errorf("Reports err: %w", err)
+	}
 
 	// If no report was generated, check if there should have been one
 	if len(reports) == 0 {
@@ -70,36 +117,12 @@ func (p *Plugin) Reports(
 		}
 	}
 
-	var encodedReports []ocr3types.ReportPlus[[]byte]
-	// Encode the reports and report info
-	for _, report := range reports {
-		if report.Report.IsEmpty() {
-			p.lggr.Errorw("an empty report was generated",
-				"numReports", len(reports),
-				"outcome", outcome)
-		}
-
-		lggr.Infow("encoding report and report info",
-			"report", report.Report,
-			"reportInfo", report.ReportInfo)
-
-		encodedReport, err := p.reportCodec.Encode(ctx, report.Report)
-		if err != nil {
-			return nil, fmt.Errorf("encode commit plugin report: %w", err)
-		}
-
-		encodedInfo, err := report.ReportInfo.Encode()
-		if err != nil {
-			return nil, fmt.Errorf("encode commit plugin report info: %w", err)
-		}
-
-		encodedReports = append(encodedReports, ocr3types.ReportPlus[[]byte]{
-			ReportWithInfo: ocr3types.ReportWithInfo[[]byte]{
-				Report: encodedReport,
-				Info:   encodedInfo,
-			},
-			TransmissionScheduleOverride: transmissionSchedule,
-		})
+	encodedReports, err := encodeReports(ctx, lggr, reports, transmissionSchedule, p.reportCodec)
+	if err != nil {
+		lggr.Errorw("unable to encode reports",
+			"reports", reports,
+			"outcome", outcome,
+			"err", err)
 	}
 
 	if len(encodedReports) != 0 {

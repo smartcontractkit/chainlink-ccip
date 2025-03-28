@@ -910,7 +910,7 @@ func setupNode(params SetupNodeParams) nodeSetup {
 	cfg := pluginconfig.CommitOffchainConfig{}
 	err := cfg.ApplyDefaultsAndValidate()
 	require.NoError(params.t, err)
-	reportBuilder, err := builder.NewReportBuilder(cfg)
+	reportBuilder, err := builder.NewReportBuilder(cfg.RMNEnabled, cfg.MaxMerkleRootsPerReport, cfg.MaxPricesPerReport)
 	require.NoError(params.t, err)
 
 	mockAddrCodec := internal.NewMockAddressCodecHex(params.t)

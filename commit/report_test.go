@@ -222,7 +222,7 @@ func TestPluginReports(t *testing.T) {
 	cfg := pluginconfig.CommitOffchainConfig{}
 	err := cfg.ApplyDefaultsAndValidate()
 	require.NoError(t, err)
-	reportBuilder, err := builder.NewReportBuilder(cfg)
+	reportBuilder, err := builder.NewReportBuilder(cfg.RMNEnabled, cfg.MaxMerkleRootsPerReport, cfg.MaxPricesPerReport)
 	require.NoError(t, err)
 
 	for _, tc := range testCases {

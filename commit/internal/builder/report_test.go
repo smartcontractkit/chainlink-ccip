@@ -7,20 +7,15 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
 	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
-	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
-	ccipocr3mocks "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
@@ -153,37 +148,27 @@ func TestReportBuilders(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			ctx := tests.Context(t)
 			lggr := logger.Test(t)
-			reportCodec := mocks.NewCommitPluginJSONReportCodec()
-			ts := &ocr3types.TransmissionSchedule{
-				Transmitters:       nil,
-				TransmissionDelays: nil,
-			}
 
 			cfg := pluginconfig.CommitOffchainConfig{}
 			require.NoError(t, cfg.ApplyDefaultsAndValidate())
 			cfg.MaxMerkleRootsPerReport = tc.maxRoots
 			cfg.MaxPricesPerReport = tc.maxPrices
 			cfg.MultipleReportsEnabled = true
-			reports, err := tc.reportBuilder(ctx, lggr, reportCodec, ts, outcome, cfg)
+			reports, err := tc.reportBuilder(lggr, outcome, cfg)
 			require.NoError(t, err)
 			require.Len(t, reports, tc.expectedReports)
 
 			for i, report := range reports {
-				r, err := reportCodec.Decode(ctx, report.ReportWithInfo.Report)
 				require.NoError(t, err)
-				tc.checkReport(t, i, r)
+				tc.checkReport(t, i, report.Report)
 			}
 		})
 	}
 }
 
 func Test_buildOneReport(t *testing.T) {
-	ctx := t.Context()
 	lggr := logger.Test(t)
-
-	transmissionSchedule := &ocr3types.TransmissionSchedule{}
 
 	blessedMerkleRoots := []ccipocr3.MerkleRootChain{
 		{ChainSel: 1, MerkleRoot: mustMakeBytes("0x0102030405060708090102030405060708090102030405060708090102030405")},
@@ -210,7 +195,7 @@ func Test_buildOneReport(t *testing.T) {
 		},
 	}
 
-	tests := []struct {
+	testcases := []struct {
 		name              string
 		merkleOutcomeType merkleroot.OutcomeType
 		blessedRoots      []ccipocr3.MerkleRootChain
@@ -218,33 +203,18 @@ func Test_buildOneReport(t *testing.T) {
 		rmnSignatures     []ccipocr3.RMNECDSASignature
 		rmnRemoteFSign    uint64
 		priceUpdates      ccipocr3.PriceUpdates
-		mockCodecFn       func() *ccipocr3mocks.MockCommitPluginCodec
-		wantErr           bool
-		reportNil         bool
+		reportEmpty       bool
 	}{
 		{
 			name:              "empty merkle root outcome, no prices either",
 			merkleOutcomeType: merkleroot.ReportEmpty,
-			mockCodecFn: func() *ccipocr3mocks.MockCommitPluginCodec {
-				// no calls
-				return ccipocr3mocks.NewMockCommitPluginCodec(t)
-			},
-			wantErr:   false,
-			reportNil: true,
+			reportEmpty:       true,
 		},
 		{
 			name:              "empty merkle root outcome, with prices",
 			merkleOutcomeType: merkleroot.ReportEmpty,
 			priceUpdates:      priceUpdates,
-			mockCodecFn: func() *ccipocr3mocks.MockCommitPluginCodec {
-				m := ccipocr3mocks.NewMockCommitPluginCodec(t)
-				m.EXPECT().Encode(mock.Anything, mock.MatchedBy(func(r ccipocr3.CommitPluginReport) bool {
-					return len(r.PriceUpdates.TokenPriceUpdates) == 1 && len(r.PriceUpdates.GasPriceUpdates) == 1
-				})).Once().Return([]byte("report"), nil)
-				return m
-			},
-			wantErr:   false,
-			reportNil: false,
+			reportEmpty:       false,
 		},
 		{
 			name:              "merkle outcome with blessed and unblessed roots, no price updates",
@@ -253,15 +223,7 @@ func Test_buildOneReport(t *testing.T) {
 			unblessedRoots:    unblessedMerkleRoots,
 			rmnRemoteFSign:    1,
 			rmnSignatures:     rmnSignatures,
-			mockCodecFn: func() *ccipocr3mocks.MockCommitPluginCodec {
-				m := ccipocr3mocks.NewMockCommitPluginCodec(t)
-				m.EXPECT().Encode(mock.Anything, mock.MatchedBy(func(r ccipocr3.CommitPluginReport) bool {
-					return len(r.BlessedMerkleRoots) == 1 && len(r.UnblessedMerkleRoots) == 1
-				})).Once().Return([]byte("report"), nil)
-				return m
-			},
-			wantErr:   false,
-			reportNil: false,
+			reportEmpty:       false,
 		},
 		{
 			name:              "merkle outcome with blessed and unblessed roots, with price updates",
@@ -269,16 +231,7 @@ func Test_buildOneReport(t *testing.T) {
 			blessedRoots:      blessedMerkleRoots,
 			unblessedRoots:    unblessedMerkleRoots,
 			priceUpdates:      priceUpdates,
-			mockCodecFn: func() *ccipocr3mocks.MockCommitPluginCodec {
-				m := ccipocr3mocks.NewMockCommitPluginCodec(t)
-				m.EXPECT().Encode(mock.Anything, mock.MatchedBy(func(r ccipocr3.CommitPluginReport) bool {
-					return len(r.BlessedMerkleRoots) == 1 && len(r.UnblessedMerkleRoots) == 1 &&
-						len(r.PriceUpdates.TokenPriceUpdates) == 1 && len(r.PriceUpdates.GasPriceUpdates) == 1
-				})).Once().Return([]byte("report"), nil)
-				return m
-			},
-			wantErr:   false,
-			reportNil: false,
+			reportEmpty:       false,
 		},
 		{
 			name:              "merkle outcome ReportInFlight, no price updates",
@@ -291,12 +244,7 @@ func Test_buildOneReport(t *testing.T) {
 			unblessedRoots: unblessedMerkleRoots,
 			rmnRemoteFSign: 1,
 			rmnSignatures:  rmnSignatures,
-			mockCodecFn: func() *ccipocr3mocks.MockCommitPluginCodec {
-				// no calls
-				return ccipocr3mocks.NewMockCommitPluginCodec(t)
-			},
-			wantErr:   false,
-			reportNil: true,
+			reportEmpty:    true,
 		},
 		{
 			name:              "merkle outcome ReportInFlight, with price updates",
@@ -310,25 +258,14 @@ func Test_buildOneReport(t *testing.T) {
 			rmnRemoteFSign: 1,
 			rmnSignatures:  rmnSignatures,
 			priceUpdates:   priceUpdates,
-			mockCodecFn: func() *ccipocr3mocks.MockCommitPluginCodec {
-				m := ccipocr3mocks.NewMockCommitPluginCodec(t)
-				m.EXPECT().Encode(mock.Anything, mock.MatchedBy(func(r ccipocr3.CommitPluginReport) bool {
-					return len(r.PriceUpdates.TokenPriceUpdates) == 1 && len(r.PriceUpdates.GasPriceUpdates) == 1
-				})).Once().Return([]byte("report"), nil)
-				return m
-			},
-			wantErr:   false,
-			reportNil: false,
+			reportEmpty:    false,
 		},
 	}
 
-	for _, tt := range tests {
+	for _, tt := range testcases {
 		t.Run(tt.name, func(t *testing.T) {
-			report, err := buildOneReport(
-				ctx,
+			report := buildOneReport(
 				lggr,
-				tt.mockCodecFn(),
-				transmissionSchedule,
 				tt.merkleOutcomeType,
 				tt.blessedRoots,
 				tt.unblessedRoots,
@@ -337,17 +274,10 @@ func Test_buildOneReport(t *testing.T) {
 				tt.priceUpdates,
 			)
 
-			if tt.wantErr {
-				require.Error(t, err)
-				require.Nil(t, report)
+			if tt.reportEmpty {
+				require.True(t, report.Report.IsEmpty())
 			} else {
-				require.NoError(t, err)
-
-				if tt.reportNil {
-					require.Nil(t, report)
-				} else {
-					require.NotNil(t, report)
-				}
+				require.NotNil(t, report)
 			}
 		})
 	}
@@ -460,12 +390,14 @@ func TestNewReportBuilder(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := NewReportBuilder(tt.args.RMNEnabled, tt.args.MaxMerkleRootsPerReport, tt.args.MaxPricesPerReport)
-			if !tt.wantErr(t, err, fmt.Sprintf("NewReportBuilder(%v, %v, %v)", tt.args.RMNEnabled, tt.args.MaxMerkleRootsPerReport, tt.args.MaxPricesPerReport)) {
+			if !tt.wantErr(t, err, fmt.Sprintf("NewReportBuilder(%v, %v, %v)",
+				tt.args.RMNEnabled, tt.args.MaxMerkleRootsPerReport, tt.args.MaxPricesPerReport)) {
 				return
 			}
 			wantFunc := reflect.ValueOf(tt.want).Pointer()
 			gotFunc := reflect.ValueOf(got).Pointer()
-			assert.Equalf(t, wantFunc, gotFunc, "NewReportBuilder(%v, %v, %v)", tt.args.RMNEnabled, tt.args.MaxPricesPerReport, tt.args.MaxMerkleRootsPerReport)
+			assert.Equalf(t, wantFunc, gotFunc, "NewReportBuilder(%v, %v, %v)",
+				tt.args.RMNEnabled, tt.args.MaxPricesPerReport, tt.args.MaxMerkleRootsPerReport)
 		})
 	}
 }
