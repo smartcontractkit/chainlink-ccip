@@ -15,6 +15,7 @@ func TestExecuteOffchainConfig_Validate(t *testing.T) {
 		RootSnoozeTime            commonconfig.Duration
 		MessageVisibilityInterval commonconfig.Duration
 		BatchingStrategyID        uint32
+		ConfigPollerSyncFreq      commonconfig.Duration
 	}
 	tests := []struct {
 		name    string
@@ -29,6 +30,7 @@ func TestExecuteOffchainConfig_Validate(t *testing.T) {
 				RootSnoozeTime:            *commonconfig.MustNewDuration(1),
 				MessageVisibilityInterval: *commonconfig.MustNewDuration(1),
 				BatchingStrategyID:        0,
+				ConfigPollerSyncFreq:      *commonconfig.MustNewDuration(defaultConfigPollerSyncFreq),
 			},
 			false,
 		},
@@ -40,6 +42,7 @@ func TestExecuteOffchainConfig_Validate(t *testing.T) {
 				RootSnoozeTime:            *commonconfig.MustNewDuration(1),
 				MessageVisibilityInterval: *commonconfig.MustNewDuration(1),
 				BatchingStrategyID:        0,
+				ConfigPollerSyncFreq:      *commonconfig.MustNewDuration(defaultConfigPollerSyncFreq),
 			},
 			true,
 		},
@@ -51,6 +54,7 @@ func TestExecuteOffchainConfig_Validate(t *testing.T) {
 				RootSnoozeTime:            *commonconfig.MustNewDuration(1),
 				MessageVisibilityInterval: *commonconfig.MustNewDuration(1),
 				BatchingStrategyID:        0,
+				ConfigPollerSyncFreq:      *commonconfig.MustNewDuration(defaultConfigPollerSyncFreq),
 			},
 			true,
 		},
@@ -73,6 +77,19 @@ func TestExecuteOffchainConfig_Validate(t *testing.T) {
 				RootSnoozeTime:            *commonconfig.MustNewDuration(1),
 				MessageVisibilityInterval: *commonconfig.MustNewDuration(0),
 				BatchingStrategyID:        0,
+				ConfigPollerSyncFreq:      *commonconfig.MustNewDuration(defaultConfigPollerSyncFreq),
+			},
+			true,
+		},
+		{
+			"invalid, ConfigPollerSyncFreq not set",
+			fields{
+				BatchGasLimit:             1,
+				InflightCacheExpiry:       *commonconfig.MustNewDuration(1),
+				RootSnoozeTime:            *commonconfig.MustNewDuration(1),
+				MessageVisibilityInterval: *commonconfig.MustNewDuration(1),
+				BatchingStrategyID:        0,
+				ConfigPollerSyncFreq:      *commonconfig.MustNewDuration(0),
 			},
 			true,
 		},
@@ -85,6 +102,7 @@ func TestExecuteOffchainConfig_Validate(t *testing.T) {
 				RootSnoozeTime:            tt.fields.RootSnoozeTime,
 				MessageVisibilityInterval: tt.fields.MessageVisibilityInterval,
 				BatchingStrategyID:        tt.fields.BatchingStrategyID,
+				ConfigPollerSyncFreq:      tt.fields.ConfigPollerSyncFreq,
 			}
 			if err := e.Validate(); (err != nil) != tt.wantErr {
 				t.Errorf("ExecuteOffchainConfig.Validate() error = %v, wantErr %v", err, tt.wantErr)
@@ -101,6 +119,7 @@ func TestExecuteOffchainConfig_EncodeDecode(t *testing.T) {
 		MessageVisibilityInterval commonconfig.Duration
 		BatchingStrategyID        uint32
 		TokenDataObserver         []TokenDataObserverConfig
+		ConfigPollerSyncFreq      commonconfig.Duration
 	}
 	tests := []struct {
 		name   string
@@ -136,6 +155,7 @@ func TestExecuteOffchainConfig_EncodeDecode(t *testing.T) {
 				MessageVisibilityInterval: tt.fields.MessageVisibilityInterval,
 				BatchingStrategyID:        tt.fields.BatchingStrategyID,
 				TokenDataObservers:        tt.fields.TokenDataObserver,
+				ConfigPollerSyncFreq:      tt.fields.ConfigPollerSyncFreq,
 			}
 			encoded, err := EncodeExecuteOffchainConfig(e)
 			require.NoError(t, err)

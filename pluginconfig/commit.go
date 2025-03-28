@@ -28,6 +28,7 @@ const (
 	defaultInflightPriceCheckRetries          = 5
 	defaultAsyncObserverSyncFreq              = 5 * time.Second
 	defaultAsyncObserverSyncTimeout           = 10 * time.Second
+	defaultConfigPollerSyncFreq               = 30 * time.Second
 )
 
 type TokenInfo struct {
@@ -162,6 +163,9 @@ type CommitOffchainConfig struct {
 	// in order to avoid delays when there are reports from multiple sources.
 	// NOTE: this can only be used if RMNEnabled == false.
 	MultipleReportsEnabled bool `json:"multipleReports"`
+
+	// ConfigPollerSyncFreq is the frequency at which the config poller should sync.
+	ConfigPollerSyncFreq commonconfig.Duration `json:"configPollerSyncFreq"`
 }
 
 //nolint:gocyclo // it is considered ok since we don't have complicated logic here
@@ -225,6 +229,10 @@ func (c *CommitOffchainConfig) applyDefaults() {
 			c.TokenPriceAsyncObserverSyncTimeout = *commonconfig.MustNewDuration(defaultAsyncObserverSyncTimeout)
 		}
 	}
+
+	if c.ConfigPollerSyncFreq.Duration() == 0 {
+		c.ConfigPollerSyncFreq = *commonconfig.MustNewDuration(defaultConfigPollerSyncFreq)
+	}
 }
 
 //nolint:gocyclo // it is considered ok since we don't have complicated logic here
@@ -279,6 +287,10 @@ func (c *CommitOffchainConfig) Validate() error {
 		(c.ChainFeeAsyncObserverSyncFreq == 0 || c.ChainFeeAsyncObserverSyncTimeout == 0) {
 		return fmt.Errorf("chain fee async observer sync freq (%s) or sync timeout (%s) not set",
 			c.ChainFeeAsyncObserverSyncFreq, c.ChainFeeAsyncObserverSyncTimeout)
+	}
+
+	if c.ConfigPollerSyncFreq.Duration() == 0 {
+		return errors.New("ConfigPollerSyncFreq not set")
 	}
 
 	// Options for multiple reports. These settings were added so that Solana can be configured

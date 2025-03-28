@@ -134,6 +134,7 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 		TokenPriceAsyncObservedDisabled    bool
 		TokenPriceAsyncObserverSyncFreq    commonconfig.Duration
 		TokenPriceAsyncObserverSyncTimeout commonconfig.Duration
+		ConfigPollerSyncFreq               commonconfig.Duration
 	}
 	remoteTokenAddress := rand.RandomAddress()
 	aggregatorAddress := rand.RandomAddress()
@@ -165,6 +166,7 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 				ChainFeeAsyncObserverSyncTimeout:   defaultAsyncObserverSyncTimeout,
 				TokenPriceAsyncObserverSyncFreq:    *commonconfig.MustNewDuration(defaultAsyncObserverSyncFreq),
 				TokenPriceAsyncObserverSyncTimeout: *commonconfig.MustNewDuration(defaultAsyncObserverSyncTimeout),
+				ConfigPollerSyncFreq:               *commonconfig.MustNewDuration(defaultConfigPollerSyncFreq),
 			},
 			false,
 		},
@@ -184,6 +186,7 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 				ChainFeeAsyncObserverSyncTimeout:   defaultAsyncObserverSyncTimeout,
 				TokenPriceAsyncObserverSyncFreq:    *commonconfig.MustNewDuration(defaultAsyncObserverSyncFreq),
 				TokenPriceAsyncObserverSyncTimeout: *commonconfig.MustNewDuration(defaultAsyncObserverSyncTimeout),
+				ConfigPollerSyncFreq:               *commonconfig.MustNewDuration(defaultConfigPollerSyncFreq),
 			},
 			false,
 		},
@@ -304,6 +307,7 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 				ChainFeeAsyncObserverDisabled:      tt.fields.ChainFeeAsyncObserverDisabled,
 				ChainFeeAsyncObserverSyncFreq:      tt.fields.ChainFeeAsyncObserverSyncFreq,
 				ChainFeeAsyncObserverSyncTimeout:   tt.fields.ChainFeeAsyncObserverSyncTimeout,
+				ConfigPollerSyncFreq:               tt.fields.ConfigPollerSyncFreq,
 			}
 			err := c.Validate()
 			if tt.wantErr {
@@ -398,6 +402,7 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				ChainFeeAsyncObserverSyncTimeout:   defaultAsyncObserverSyncTimeout,
 				TokenPriceAsyncObserverSyncFreq:    *commonconfig.MustNewDuration(defaultAsyncObserverSyncFreq),
 				TokenPriceAsyncObserverSyncTimeout: *commonconfig.MustNewDuration(defaultAsyncObserverSyncTimeout),
+				ConfigPollerSyncFreq:               *commonconfig.MustNewDuration(defaultConfigPollerSyncFreq),
 			},
 		},
 		{
@@ -421,6 +426,7 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				MerkleRootAsyncObserverDisabled:    true,
 				ChainFeeAsyncObserverDisabled:      true,
 				TokenPriceAsyncObserverDisabled:    true,
+				ConfigPollerSyncFreq:               *commonconfig.MustNewDuration(defaultConfigPollerSyncFreq),
 			},
 		},
 		{
@@ -436,6 +442,7 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				ChainFeeAsyncObserverSyncFreq:      12 * time.Minute,
 				TokenPriceAsyncObserverSyncFreq:    *commonconfig.MustNewDuration(10 * time.Minute),
 				TokenPriceAsyncObserverSyncTimeout: *commonconfig.MustNewDuration(10 * time.Second),
+				ConfigPollerSyncFreq:               *commonconfig.MustNewDuration(10 * time.Minute),
 			},
 			expected: CommitOffchainConfig{
 				RMNEnabled:                         true,
@@ -453,6 +460,7 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				ChainFeeAsyncObserverSyncTimeout:   defaultAsyncObserverSyncTimeout,
 				TokenPriceAsyncObserverSyncFreq:    *commonconfig.MustNewDuration(10 * time.Minute),
 				TokenPriceAsyncObserverSyncTimeout: *commonconfig.MustNewDuration(10 * time.Second),
+				ConfigPollerSyncFreq:               *commonconfig.MustNewDuration(10 * time.Minute),
 			},
 		},
 		{
@@ -480,6 +488,7 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				ChainFeeAsyncObserverSyncTimeout:   defaultAsyncObserverSyncTimeout,
 				TokenPriceAsyncObserverSyncFreq:    *commonconfig.MustNewDuration(defaultAsyncObserverSyncFreq),
 				TokenPriceAsyncObserverSyncTimeout: *commonconfig.MustNewDuration(defaultAsyncObserverSyncTimeout),
+				ConfigPollerSyncFreq:               *commonconfig.MustNewDuration(defaultConfigPollerSyncFreq),
 			},
 		},
 	}

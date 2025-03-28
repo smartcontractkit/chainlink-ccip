@@ -7,6 +7,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
+
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
@@ -41,7 +43,7 @@ type configPoller struct {
 
 	sync.RWMutex
 	chainCaches   map[cciptypes.ChainSelector]*chainCache
-	refreshPeriod time.Duration
+	refreshPeriod commonconfig.Duration
 	reader        ccipReaderInternal
 	lggr          logger.Logger
 
@@ -75,7 +77,7 @@ type chainCache struct {
 func newConfigPoller(
 	lggr logger.Logger,
 	reader ccipReaderInternal,
-	refreshPeriod time.Duration,
+	refreshPeriod commonconfig.Duration,
 ) *configPoller {
 	return &configPoller{
 		chainCaches:       make(map[cciptypes.ChainSelector]*chainCache),
@@ -92,7 +94,7 @@ func (c *configPoller) startBackgroundPolling() {
 	c.wg.Add(1)
 	go func() {
 		defer c.wg.Done()
-		ticker := time.NewTicker(c.refreshPeriod)
+		ticker := time.NewTicker(c.refreshPeriod.Duration())
 		defer ticker.Stop()
 
 		for {
