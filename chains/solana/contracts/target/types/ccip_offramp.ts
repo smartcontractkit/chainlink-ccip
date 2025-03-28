@@ -1962,6 +1962,26 @@ export type CcipOfframp = {
       ]
     },
     {
+      "name": "CommitReportPDAClosed",
+      "fields": [
+        {
+          "name": "sourceChainSelector",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "merkleRoot",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          },
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "SkippedAlreadyExecutedMessage",
       "fields": [
         {
@@ -4329,6 +4349,26 @@ export const IDL: CcipOfframp = {
           "name": "priceUpdates",
           "type": {
             "defined": "PriceUpdates"
+          },
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "CommitReportPDAClosed",
+      "fields": [
+        {
+          "name": "sourceChainSelector",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "merkleRoot",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
           },
           "index": false
         }

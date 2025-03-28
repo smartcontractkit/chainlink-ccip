@@ -6764,6 +6764,25 @@ func TestCCIPRouter(t *testing.T) {
 				require.Equal(t, bin.Uint128{Lo: 2, Hi: 0}, rootAccount.ExecutionStates)
 				require.Equal(t, sequenceNumber, rootAccount.MinMsgNr)
 				require.Equal(t, sequenceNumber, rootAccount.MaxMsgNr)
+
+				closeCommitPDAInstruction, err := ccip_offramp.NewCloseCommitReportAccountInstruction(
+					commitReport.MerkleRoot.SourceChainSelector,
+					commitReport.MerkleRoot.MerkleRoot[:],
+					config.OfframpConfigPDA,
+					rootPDA,
+					config.OfframpReferenceAddressesPDA,
+					wsol.mint,
+					wsol.billingATA,
+					config.BillingSignerPDA,
+					wsol.program,
+				).ValidateAndBuild()
+				require.NoError(t, err)
+				tx = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{closeCommitPDAInstruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT)) // signature verification compute unit amounts can vary depending on sorting
+
+				commitPDACloseEvent := ccip.EventCommitReportPDAClosed{}
+				require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportPDAClosed", &commitPDACloseEvent, config.PrintEvents))
+				require.Equal(t, commitReport.MerkleRoot.SourceChainSelector, commitPDACloseEvent.SourceChainSelector)
+				require.Equal(t, hex.EncodeToString(root[:]), hex.EncodeToString(commitPDACloseEvent.MerkleRoot[:]))
 			})
 
 			t.Run("When executing a report with not matching source chain selector in message, it fails", func(t *testing.T) {

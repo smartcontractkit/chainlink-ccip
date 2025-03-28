@@ -402,12 +402,12 @@ mod tests {
         };
         assert!(
             !all_messages_executed(&report),
-            "Message should still be paneding"
+            "Message should still be pending"
         );
         report.execution_states = 3;
         assert!(
             !all_messages_executed(&report),
-            "Failed message does not acount as executed"
+            "Failed message does not count as executed"
         );
         report.execution_states = 2;
         assert!(all_messages_executed(&report), "Single successful message");

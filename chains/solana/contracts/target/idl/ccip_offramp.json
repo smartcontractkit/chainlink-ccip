@@ -1962,6 +1962,26 @@
       ]
     },
     {
+      "name": "CommitReportPDAClosed",
+      "fields": [
+        {
+          "name": "sourceChainSelector",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "merkleRoot",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          },
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "SkippedAlreadyExecutedMessage",
       "fields": [
         {
