@@ -1,12 +1,16 @@
 package commit
 
 import (
+	"fmt"
 	unsaferand "math/rand"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/libocr/commontypes"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -20,6 +24,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/mocks/internal_/plugincommon"
+	ccipocr3mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
 	ocrtypecodec "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -322,6 +327,85 @@ func Test_Plugin_isStaleReport(t *testing.T) {
 			}
 			stale := p.isStaleReport(p.lggr, tc.reportSeqNum, tc.onChainSeqNum, report)
 			require.Equal(t, tc.shouldBeStale, stale)
+		})
+	}
+}
+
+func Test_encodeReports(t *testing.T) {
+	ctx := tests.Context(t)
+	lggr := logger.Test(t)
+	var transmissionSchedule *ocr3types.TransmissionSchedule
+
+	var emptyReport builder.Report
+
+	nonEmptyReport := builder.Report{
+		Report: ccipocr3.CommitPluginReport{
+			PriceUpdates: ccipocr3.PriceUpdates{
+				GasPriceUpdates: []ccipocr3.GasPriceChain{
+					{
+						GasPrice: ccipocr3.NewBigIntFromInt64(3),
+						ChainSel: 123,
+					},
+				},
+			},
+		},
+	}
+
+	type args struct {
+		reports     []builder.Report
+		reportCodec func() ccipocr3.CommitPluginCodec
+	}
+	testcases := []struct {
+		name       string
+		args       args
+		numReports int
+		wantErr    assert.ErrorAssertionFunc
+	}{
+		{
+			name: "Happy path:one report with no errors",
+			args: args{
+				reports: []builder.Report{nonEmptyReport},
+				reportCodec: func() ccipocr3.CommitPluginCodec {
+					codec := ccipocr3mock.NewMockCommitPluginCodec(t)
+					codec.EXPECT().Encode(mock.Anything, mock.Anything).Return([]byte{0x1}, nil)
+					return codec
+				},
+			},
+			numReports: 1,
+			wantErr:    assert.NoError,
+		},
+		{
+			name: "Happy path:multiple report with no errors",
+			args: args{
+				reports: []builder.Report{nonEmptyReport, nonEmptyReport},
+				reportCodec: func() ccipocr3.CommitPluginCodec {
+					codec := ccipocr3mock.NewMockCommitPluginCodec(t)
+					codec.EXPECT().Encode(mock.Anything, mock.Anything).Return([]byte{0x1}, nil)
+					return codec
+				},
+			},
+			numReports: 2,
+			wantErr:    assert.NoError,
+		},
+		{
+			name: "Empty report error",
+			args: args{
+				reports: []builder.Report{emptyReport},
+				reportCodec: func() ccipocr3.CommitPluginCodec {
+					return ccipocr3mock.NewMockCommitPluginCodec(t)
+				},
+			},
+			numReports: 0,
+			wantErr:    assert.Error,
+		},
+	}
+	for _, tt := range testcases {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := encodeReports(ctx, lggr, tt.args.reports, transmissionSchedule, tt.args.reportCodec())
+			if !tt.wantErr(t, err, fmt.Sprintf("encodeReports(...)")) {
+				return
+			}
+			assert.Equal(t, tt.numReports, len(got))
 		})
 	}
 }
