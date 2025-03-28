@@ -1,14 +1,15 @@
 use anchor_lang::prelude::*;
+use anchor_spl::token::{sync_native, Token, TokenAccount};
 use ccip_common::seed;
 
 use super::ocr3base::{ocr3_transmit, ReportContext, Signatures};
 use super::ocr3impl::Ocr3ReportForCommit;
 
-use crate::context::{CommitInput, CommitReportContext, OcrPluginType};
-use crate::event::CommitReportAccepted;
+use crate::context::{CloseCommitReportAccount, CommitInput, CommitReportContext, OcrPluginType};
+use crate::event::{CommitReportAccepted, CommitReportPDAClosed};
 use crate::instructions::interfaces::Commit;
 use crate::instructions::v1::rmn::verify_uncursed_cpi;
-use crate::state::GlobalState;
+use crate::state::{CommitReport, GlobalState};
 use crate::{CcipOfframpError, PriceOnlyCommitReportContext};
 
 pub struct Impl;
@@ -230,6 +231,74 @@ impl Commit for Impl {
 
         Ok(())
     }
+
+    fn close_commit_report_account(
+        &self,
+        ctx: Context<CloseCommitReportAccount>,
+        _source_chain_selector: u64,
+        _root: Vec<u8>,
+    ) -> Result<()> {
+        let commit_report = &ctx.accounts.commit_report;
+
+        // Check if all messages have been executed (must be Success)
+        require!(
+            all_messages_executed(commit_report),
+            CcipOfframpError::CommitReportHasPendingMessages
+        );
+
+        // Close the account and convert rent to wrapped SOL
+        transfer_and_wrap_native_sol(
+            &ctx.accounts.token_program,
+            ctx.accounts.commit_report.to_account_info(),
+            &ctx.accounts.fee_token_receiver,
+        )?;
+
+        let merkle_root_array: [u8; 32] = _root
+            .try_into()
+            .map_err(|_| CcipOfframpError::InvalidProof)?;
+
+        emit!(CommitReportPDAClosed {
+            source_chain_selector: _source_chain_selector,
+            merkle_root: merkle_root_array,
+        });
+
+        Ok(())
+    }
+}
+
+// Helper function to check if all messages have been executed
+fn all_messages_executed(report: &CommitReport) -> bool {
+    let num_messages = report.max_msg_nr.saturating_sub(report.min_msg_nr) + 1;
+
+    // execution_states follow geometric series 2^1 + 2^3 + 2^5 + ... + 2 * 2^(2 * (num_messages - 1))
+    // it can be converted to 2 * (4^0 + 4^1 + 4^2 + ... + 4^(num_messages - 1))
+    // sum is calculated as 2 * (4^num_messages - 1) / 3
+    let fully_executed = (4u128.pow(num_messages as u32) - 1) * 2 / 3;
+    report.execution_states == fully_executed
+}
+
+// Helper function to convert the SOL from the closed account to wrapped SOL
+fn transfer_and_wrap_native_sol<'info>(
+    token_program: &Program<'info, Token>,
+    commit_report: AccountInfo<'info>,
+    fee_token_receiver: &Account<'info, TokenAccount>,
+) -> Result<()> {
+    // Get lamports before closing
+    let lamports = commit_report.lamports();
+
+    // Close the account by setting its data length to 0
+    **commit_report.try_borrow_mut_lamports()? = 0;
+
+    // Transfer wSOL to OnRamp fee_token_receiver
+    **fee_token_receiver
+        .to_account_info()
+        .try_borrow_mut_lamports()? += lamports;
+
+    let account = fee_token_receiver.to_account_info();
+    let sync: anchor_spl::token::SyncNative = anchor_spl::token::SyncNative { account };
+
+    let cpi_ctx = CpiContext::new(token_program.to_account_info(), sync);
+    sync_native(cpi_ctx)
 }
 
 mod helpers {
@@ -313,5 +382,44 @@ mod helpers {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn commit_report_has_pending_messages() {
+        let mut report = CommitReport {
+            version: 1,
+            chain_selector: 0,
+            merkle_root: [0; 32],
+            timestamp: 0,
+            min_msg_nr: 42,
+            max_msg_nr: 42,
+            execution_states: 0,
+        };
+        assert!(
+            !all_messages_executed(&report),
+            "Message should still be pending"
+        );
+        report.execution_states = 3;
+        assert!(
+            !all_messages_executed(&report),
+            "Failed message does not count as executed"
+        );
+        report.execution_states = 2;
+        assert!(all_messages_executed(&report), "Single successful message");
+
+        // Add 2 more messages
+        report.max_msg_nr += 2;
+        report.execution_states = 0b100011;
+        assert!(
+            !all_messages_executed(&report),
+            "Mix - failed, untouched, failed"
+        );
+        report.execution_states = 0b101010;
+        assert!(all_messages_executed(&report), "All messages executed");
     }
 }
