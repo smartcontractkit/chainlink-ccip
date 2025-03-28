@@ -1748,6 +1748,4 @@ func Test_computeNoncesConsensus(t *testing.T) {
 			assert.Equal(t, tc.expNonceConsensus, obs)
 		})
 	}
-
-	return
 }
