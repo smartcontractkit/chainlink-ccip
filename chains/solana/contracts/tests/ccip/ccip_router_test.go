@@ -4472,7 +4472,7 @@ func TestCCIPRouter(t *testing.T) {
 				ixApprove1, err := tokens.TokenApproveChecked(2, token1Decimals, token1.Program, userTokenAccount1, token1.Mint, config.ExternalTokenPoolsSignerPDA, user.PublicKey(), nil)
 				require.NoError(t, err)
 
-				result := testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{ixApprove0, ixApprove1, ix}, user, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(400_000))
+				result := testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{ixApprove0, ixApprove1, ix}, user, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(800_000))
 				require.NotNil(t, result)
 
 				// check balances
@@ -5050,7 +5050,9 @@ func TestCCIPRouter(t *testing.T) {
 							config.ExternalTokenPoolsSignerPDA,
 						).ValidateAndBuild()
 						require.NoError(t, err)
-						testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
+						result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
+						require.NotNil(t, result)
+						fmt.Printf("Logs: %s\n", result.Meta.LogMessages)
 					})
 				}
 

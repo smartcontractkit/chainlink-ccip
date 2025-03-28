@@ -24,6 +24,7 @@ var (
 	FeeQuoterProgram           = GetProgramID("fee_quoter")
 	CcipOfframpProgram         = GetProgramID("ccip_offramp")
 	RMNRemoteProgram           = GetProgramID("rmn_remote")
+	PingPongProgram            = GetProgramID("ping_pong_demo")
 
 	// test values
 	OnRampAddress                   = []byte{1, 2, 3}
