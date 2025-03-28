@@ -3,16 +3,15 @@
   "name": "ping_pong_demo",
   "instructions": [
     {
-      "name": "initializeConfig",
+      "name": "initialize",
+      "docs": [
+        "Initialize the global config account.",
+        "Call this just once."
+      ],
       "accounts": [
         {
-          "name": "config",
+          "name": "globalConfig",
           "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "feeTokenMint",
-          "isMut": false,
           "isSigner": false
         },
         {
@@ -40,7 +39,43 @@
         {
           "name": "router",
           "type": "publicKey"
+        }
+      ]
+    },
+    {
+      "name": "initializeChain",
+      "docs": [
+        "Initialize the chain's config account.",
+        "Call this once for each chain you want to ping-pong with."
+      ],
+      "accounts": [
+        {
+          "name": "globalConfig",
+          "isMut": false,
+          "isSigner": false
         },
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "feeTokenMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
         {
           "name": "counterpartChainSelector",
           "type": "u64"
@@ -60,16 +95,20 @@
       ]
     },
     {
-      "name": "initialize",
+      "name": "initializeFeeToken",
+      "docs": [
+        "Initializes the ATA for the fee token and approve the Router for transferring from it.",
+        "Call this once for each token you want to pay CCIP fees with."
+      ],
       "accounts": [
         {
-          "name": "config",
+          "name": "globalConfig",
           "isMut": false,
           "isSigner": false
         },
         {
-          "name": "nameVersion",
-          "isMut": true,
+          "name": "config",
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -119,11 +158,21 @@
           "isSigner": false
         }
       ],
-      "args": []
+      "args": [
+        {
+          "name": "counterpartChainSelector",
+          "type": "u64"
+        }
+      ]
     },
     {
       "name": "setCounterpart",
       "accounts": [
+        {
+          "name": "globalConfig",
+          "isMut": false,
+          "isSigner": false
+        },
         {
           "name": "config",
           "isMut": true,
@@ -150,6 +199,11 @@
       "name": "setPaused",
       "accounts": [
         {
+          "name": "globalConfig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "config",
           "isMut": true,
           "isSigner": false
@@ -162,6 +216,10 @@
       ],
       "args": [
         {
+          "name": "counterpartChainSelector",
+          "type": "u64"
+        },
+        {
           "name": "pause",
           "type": "bool"
         }
@@ -170,6 +228,11 @@
     {
       "name": "setExtraArgs",
       "accounts": [
+        {
+          "name": "globalConfig",
+          "isMut": false,
+          "isSigner": false
+        },
         {
           "name": "config",
           "isMut": true,
@@ -188,6 +251,10 @@
       ],
       "args": [
         {
+          "name": "counterpartChainSelector",
+          "type": "u64"
+        },
+        {
           "name": "extraArgs",
           "type": "bytes"
         }
@@ -196,6 +263,11 @@
     {
       "name": "startPingPong",
       "accounts": [
+        {
+          "name": "globalConfig",
+          "isMut": false,
+          "isSigner": false
+        },
         {
           "name": "config",
           "isMut": true,
@@ -355,7 +427,12 @@
           "isSigner": false
         }
       ],
-      "args": []
+      "args": [
+        {
+          "name": "counterpartChainSelector",
+          "type": "u64"
+        }
+      ]
     },
     {
       "name": "ccipReceive",
@@ -382,6 +459,11 @@
             "CHECK PDA of the router program verifying the signer is an allowed offramp.",
             "If PDA does not exist, the router doesn't allow this offramp"
           ]
+        },
+        {
+          "name": "globalConfig",
+          "isMut": false,
+          "isSigner": false
         },
         {
           "name": "config",
@@ -549,7 +631,7 @@
   ],
   "accounts": [
     {
-      "name": "Config",
+      "name": "GlobalConfig",
       "type": {
         "kind": "struct",
         "fields": [
@@ -560,7 +642,15 @@
           {
             "name": "router",
             "type": "publicKey"
-          },
+          }
+        ]
+      }
+    },
+    {
+      "name": "Config",
+      "type": {
+        "kind": "struct",
+        "fields": [
           {
             "name": "counterpartChainSelector",
             "type": "u64"
@@ -582,22 +672,6 @@
           {
             "name": "extraArgs",
             "type": "bytes"
-          }
-        ]
-      }
-    },
-    {
-      "name": "NameVersion",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "name",
-            "type": "string"
-          },
-          {
-            "name": "version",
-            "type": "string"
           }
         ]
       }

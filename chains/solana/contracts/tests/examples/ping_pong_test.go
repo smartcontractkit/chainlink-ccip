@@ -28,6 +28,7 @@ import (
 
 type ReusableAccounts struct {
 	// Ping Pong accounts
+	GlobalConfig   solana.PublicKey
 	Config         solana.PublicKey
 	NameVersion    solana.PublicKey
 	FeeTokenATA    solana.PublicKey
@@ -45,7 +46,9 @@ type ReusableAccounts struct {
 }
 
 func getReusableAccounts(t *testing.T, linkMint solana.PublicKey) ReusableAccounts {
-	ppConfig, _, err := solana.FindProgramAddress([][]byte{[]byte("config")}, config.PingPongProgram)
+	ppGlobalConfig, _, err := solana.FindProgramAddress([][]byte{[]byte("global_config")}, config.PingPongProgram)
+	require.NoError(t, err)
+	ppConfig, _, err := solana.FindProgramAddress([][]byte{[]byte("config"), common.Uint64ToLE(config.SvmChainSelector)}, config.PingPongProgram)
 	require.NoError(t, err)
 	ppNameVersion, _, _ := solana.FindProgramAddress([][]byte{[]byte("name_version")}, config.PingPongProgram)
 	require.NoError(t, err)
@@ -68,6 +71,7 @@ func getReusableAccounts(t *testing.T, linkMint solana.PublicKey) ReusableAccoun
 	require.NoError(t, err)
 
 	return ReusableAccounts{
+		GlobalConfig:          ppGlobalConfig,
 		FeeTokenATA:           ppLinkAta,
 		Config:                ppConfig,
 		NameVersion:           ppNameVersion,
@@ -314,41 +318,7 @@ func TestPingPong(t *testing.T) {
 	})
 
 	t.Run("Configure PingPong", func(t *testing.T) {
-		t.Run("Initialize Config", func(t *testing.T) {
-			extraArgs := testutils.MustSerializeExtraArgs(
-				t,
-				fee_quoter.SVMExtraArgsV1{
-					ComputeUnits:             400_000,
-					AccountIsWritableBitmap:  ccip.GenerateBitMapForIndexes([]int{1, 4, 7, 8, 9, 19}),
-					AllowOutOfOrderExecution: true,
-					TokenReceiver:            [32]uint8{}, // none, no token transfer
-					Accounts: [][32]uint8{
-						reusableAccounts.Config,
-						reusableAccounts.CcipSendSigner, // 1
-						config.Token2022Program,
-						linkMint,
-						reusableAccounts.FeeTokenATA, // 4
-						config.CcipRouterProgram,
-						config.RouterConfigPDA,
-						config.SvmDestChainStatePDA,            // 7
-						reusableAccounts.nonce,                 // 8
-						reusableAccounts.routerBillingReceiver, // 9
-						config.BillingSignerPDA,
-						config.FeeQuoterProgram,
-						config.FqConfigPDA,
-						config.FqSvmDestChainPDA,
-						reusableAccounts.fqBillingConfig,
-						reusableAccounts.fqBillingConfig,
-						config.RMNRemoteProgram,
-						config.RMNRemoteCursesPDA,
-						config.RMNRemoteConfigPDA,
-						config.ExternalTokenPoolsSignerPDA, // 19
-						solana.SystemProgramID,
-					},
-				},
-				ccip.SVMExtraArgsV1Tag, // msg has SVM as destination
-			)
-
+		t.Run("Initialize", func(t *testing.T) {
 			type ProgramData struct {
 				DataType uint32
 				Address  solana.PublicKey
@@ -363,28 +333,75 @@ func TestPingPong(t *testing.T) {
 			var programData ProgramData
 			require.NoError(t, bin.UnmarshalBorsh(&programData, data.Bytes()))
 
-			ix, err := ping_pong_demo.NewInitializeConfigInstruction(
+			ix, err := ping_pong_demo.NewInitializeInstruction(
 				config.CcipRouterProgram,
-				config.SvmChainSelector,
-				config.PingPongProgram[:],
-				true, // isPaused
-				extraArgs,
-				reusableAccounts.Config,
-				linkMint,
+				reusableAccounts.GlobalConfig,
 				admin.PublicKey(),
 				solana.SystemProgramID,
 				config.PingPongProgram,
 				programData.Address,
 			).ValidateAndBuild()
 			require.NoError(t, err)
-			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin,
-				config.DefaultCommitment)
+
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 		})
 
-		t.Run("Initialize", func(t *testing.T) {
-			ix, err := ping_pong_demo.NewInitializeInstruction(
+		t.Run("Initialize Chain", func(t *testing.T) {
+			extraArgs := testutils.MustSerializeExtraArgs(
+				t,
+				fee_quoter.SVMExtraArgsV1{
+					ComputeUnits:             400_000,
+					AccountIsWritableBitmap:  ccip.GenerateBitMapForIndexes([]int{2, 5, 8, 9, 10, 20}),
+					AllowOutOfOrderExecution: true,
+					TokenReceiver:            [32]uint8{}, // none, no token transfer
+					Accounts: [][32]uint8{
+						reusableAccounts.GlobalConfig,
+						reusableAccounts.Config,
+						reusableAccounts.CcipSendSigner, // 2
+						config.Token2022Program,
+						linkMint,
+						reusableAccounts.FeeTokenATA, // 5
+						config.CcipRouterProgram,
+						config.RouterConfigPDA,
+						config.SvmDestChainStatePDA,            // 8
+						reusableAccounts.nonce,                 // 9
+						reusableAccounts.routerBillingReceiver, // 10
+						config.BillingSignerPDA,
+						config.FeeQuoterProgram,
+						config.FqConfigPDA,
+						config.FqSvmDestChainPDA,
+						reusableAccounts.fqBillingConfig,
+						reusableAccounts.fqBillingConfig,
+						config.RMNRemoteProgram,
+						config.RMNRemoteCursesPDA,
+						config.RMNRemoteConfigPDA,
+						config.ExternalTokenPoolsSignerPDA, // 20
+						solana.SystemProgramID,
+					},
+				},
+				ccip.SVMExtraArgsV1Tag, // msg has SVM as destination
+			)
+
+			ix, err := ping_pong_demo.NewInitializeChainInstruction(
+				config.SvmChainSelector,
+				config.PingPongProgram[:],
+				true, // isPaused
+				extraArgs,
+				reusableAccounts.GlobalConfig,
 				reusableAccounts.Config,
-				reusableAccounts.NameVersion,
+				linkMint,
+				admin.PublicKey(),
+				solana.SystemProgramID,
+			).ValidateAndBuild()
+			require.NoError(t, err)
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+		})
+
+		t.Run("Initialize Fee Token", func(t *testing.T) {
+			ix, err := ping_pong_demo.NewInitializeFeeTokenInstruction(
+				config.SvmChainSelector,
+				reusableAccounts.GlobalConfig,
+				reusableAccounts.Config,
 				config.BillingSignerPDA,
 				config.Token2022Program,
 				linkMint,
@@ -446,6 +463,8 @@ func TestPingPong(t *testing.T) {
 
 		t.Run("Start", func(t *testing.T) {
 			ix, err := ping_pong_demo.NewStartPingPongInstruction(
+				config.SvmChainSelector,
+				reusableAccounts.GlobalConfig,
 				reusableAccounts.Config,
 				admin.PublicKey(),
 				reusableAccounts.CcipSendSigner,
@@ -520,7 +539,9 @@ func TestPingPong(t *testing.T) {
 
 		t.Run("Pause", func(t *testing.T) {
 			pauseIx, err := ping_pong_demo.NewSetPausedInstruction(
+				config.SvmChainSelector,
 				true,
+				reusableAccounts.GlobalConfig,
 				reusableAccounts.Config,
 				admin.PublicKey(),
 			).ValidateAndBuild()
@@ -538,7 +559,9 @@ func TestPingPong(t *testing.T) {
 
 		t.Run("Resume", func(t *testing.T) {
 			resumeIx, err := ping_pong_demo.NewSetPausedInstruction(
+				config.SvmChainSelector,
 				false,
+				reusableAccounts.GlobalConfig,
 				reusableAccounts.Config,
 				admin.PublicKey(),
 			).ValidateAndBuild()

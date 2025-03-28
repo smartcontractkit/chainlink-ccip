@@ -10,153 +10,90 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// Initialize is the `initialize` instruction.
+// Initialize the global config account.
+// Call this just once.
 type Initialize struct {
+	Router *ag_solanago.PublicKey
 
-	// [0] = [] config
+	// [0] = [WRITE] globalConfig
 	//
-	// [1] = [WRITE] nameVersion
+	// [1] = [WRITE, SIGNER] authority
 	//
-	// [2] = [] routerFeeBillingSigner
-	// ··········· CHECK
+	// [2] = [] systemProgram
 	//
-	// [3] = [] feeTokenProgram
+	// [3] = [] program
 	//
-	// [4] = [] feeTokenMint
-	//
-	// [5] = [WRITE] feeTokenAta
-	//
-	// [6] = [] ccipSendSigner
-	// ··········· CHECK
-	//
-	// [7] = [WRITE, SIGNER] authority
-	//
-	// [8] = [] associatedTokenProgram
-	//
-	// [9] = [] systemProgram
+	// [4] = [] programData
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewInitializeInstructionBuilder creates a new `Initialize` instruction builder.
 func NewInitializeInstructionBuilder() *Initialize {
 	nd := &Initialize{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 10),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 5),
 	}
 	return nd
 }
 
-// SetConfigAccount sets the "config" account.
-func (inst *Initialize) SetConfigAccount(config ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[0] = ag_solanago.Meta(config)
+// SetRouter sets the "router" parameter.
+func (inst *Initialize) SetRouter(router ag_solanago.PublicKey) *Initialize {
+	inst.Router = &router
 	return inst
 }
 
-// GetConfigAccount gets the "config" account.
-func (inst *Initialize) GetConfigAccount() *ag_solanago.AccountMeta {
+// SetGlobalConfigAccount sets the "globalConfig" account.
+func (inst *Initialize) SetGlobalConfigAccount(globalConfig ag_solanago.PublicKey) *Initialize {
+	inst.AccountMetaSlice[0] = ag_solanago.Meta(globalConfig).WRITE()
+	return inst
+}
+
+// GetGlobalConfigAccount gets the "globalConfig" account.
+func (inst *Initialize) GetGlobalConfigAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
-}
-
-// SetNameVersionAccount sets the "nameVersion" account.
-func (inst *Initialize) SetNameVersionAccount(nameVersion ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[1] = ag_solanago.Meta(nameVersion).WRITE()
-	return inst
-}
-
-// GetNameVersionAccount gets the "nameVersion" account.
-func (inst *Initialize) GetNameVersionAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
-}
-
-// SetRouterFeeBillingSignerAccount sets the "routerFeeBillingSigner" account.
-// CHECK
-func (inst *Initialize) SetRouterFeeBillingSignerAccount(routerFeeBillingSigner ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[2] = ag_solanago.Meta(routerFeeBillingSigner)
-	return inst
-}
-
-// GetRouterFeeBillingSignerAccount gets the "routerFeeBillingSigner" account.
-// CHECK
-func (inst *Initialize) GetRouterFeeBillingSignerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
-}
-
-// SetFeeTokenProgramAccount sets the "feeTokenProgram" account.
-func (inst *Initialize) SetFeeTokenProgramAccount(feeTokenProgram ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[3] = ag_solanago.Meta(feeTokenProgram)
-	return inst
-}
-
-// GetFeeTokenProgramAccount gets the "feeTokenProgram" account.
-func (inst *Initialize) GetFeeTokenProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
-}
-
-// SetFeeTokenMintAccount sets the "feeTokenMint" account.
-func (inst *Initialize) SetFeeTokenMintAccount(feeTokenMint ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[4] = ag_solanago.Meta(feeTokenMint)
-	return inst
-}
-
-// GetFeeTokenMintAccount gets the "feeTokenMint" account.
-func (inst *Initialize) GetFeeTokenMintAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[4]
-}
-
-// SetFeeTokenAtaAccount sets the "feeTokenAta" account.
-func (inst *Initialize) SetFeeTokenAtaAccount(feeTokenAta ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[5] = ag_solanago.Meta(feeTokenAta).WRITE()
-	return inst
-}
-
-// GetFeeTokenAtaAccount gets the "feeTokenAta" account.
-func (inst *Initialize) GetFeeTokenAtaAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[5]
-}
-
-// SetCcipSendSignerAccount sets the "ccipSendSigner" account.
-// CHECK
-func (inst *Initialize) SetCcipSendSignerAccount(ccipSendSigner ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[6] = ag_solanago.Meta(ccipSendSigner)
-	return inst
-}
-
-// GetCcipSendSignerAccount gets the "ccipSendSigner" account.
-// CHECK
-func (inst *Initialize) GetCcipSendSignerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[6]
 }
 
 // SetAuthorityAccount sets the "authority" account.
 func (inst *Initialize) SetAuthorityAccount(authority ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[7] = ag_solanago.Meta(authority).WRITE().SIGNER()
+	inst.AccountMetaSlice[1] = ag_solanago.Meta(authority).WRITE().SIGNER()
 	return inst
 }
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *Initialize) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[7]
-}
-
-// SetAssociatedTokenProgramAccount sets the "associatedTokenProgram" account.
-func (inst *Initialize) SetAssociatedTokenProgramAccount(associatedTokenProgram ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[8] = ag_solanago.Meta(associatedTokenProgram)
-	return inst
-}
-
-// GetAssociatedTokenProgramAccount gets the "associatedTokenProgram" account.
-func (inst *Initialize) GetAssociatedTokenProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[8]
+	return inst.AccountMetaSlice[1]
 }
 
 // SetSystemProgramAccount sets the "systemProgram" account.
 func (inst *Initialize) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[9] = ag_solanago.Meta(systemProgram)
+	inst.AccountMetaSlice[2] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
 // GetSystemProgramAccount gets the "systemProgram" account.
 func (inst *Initialize) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[9]
+	return inst.AccountMetaSlice[2]
+}
+
+// SetProgramAccount sets the "program" account.
+func (inst *Initialize) SetProgramAccount(program ag_solanago.PublicKey) *Initialize {
+	inst.AccountMetaSlice[3] = ag_solanago.Meta(program)
+	return inst
+}
+
+// GetProgramAccount gets the "program" account.
+func (inst *Initialize) GetProgramAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[3]
+}
+
+// SetProgramDataAccount sets the "programData" account.
+func (inst *Initialize) SetProgramDataAccount(programData ag_solanago.PublicKey) *Initialize {
+	inst.AccountMetaSlice[4] = ag_solanago.Meta(programData)
+	return inst
+}
+
+// GetProgramDataAccount gets the "programData" account.
+func (inst *Initialize) GetProgramDataAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[4]
 }
 
 func (inst Initialize) Build() *Instruction {
@@ -177,37 +114,29 @@ func (inst Initialize) ValidateAndBuild() (*Instruction, error) {
 }
 
 func (inst *Initialize) Validate() error {
+	// Check whether all (required) parameters are set:
+	{
+		if inst.Router == nil {
+			return errors.New("Router parameter is not set")
+		}
+	}
+
 	// Check whether all (required) accounts are set:
 	{
 		if inst.AccountMetaSlice[0] == nil {
-			return errors.New("accounts.Config is not set")
+			return errors.New("accounts.GlobalConfig is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
-			return errors.New("accounts.NameVersion is not set")
-		}
-		if inst.AccountMetaSlice[2] == nil {
-			return errors.New("accounts.RouterFeeBillingSigner is not set")
-		}
-		if inst.AccountMetaSlice[3] == nil {
-			return errors.New("accounts.FeeTokenProgram is not set")
-		}
-		if inst.AccountMetaSlice[4] == nil {
-			return errors.New("accounts.FeeTokenMint is not set")
-		}
-		if inst.AccountMetaSlice[5] == nil {
-			return errors.New("accounts.FeeTokenAta is not set")
-		}
-		if inst.AccountMetaSlice[6] == nil {
-			return errors.New("accounts.CcipSendSigner is not set")
-		}
-		if inst.AccountMetaSlice[7] == nil {
 			return errors.New("accounts.Authority is not set")
 		}
-		if inst.AccountMetaSlice[8] == nil {
-			return errors.New("accounts.AssociatedTokenProgram is not set")
-		}
-		if inst.AccountMetaSlice[9] == nil {
+		if inst.AccountMetaSlice[2] == nil {
 			return errors.New("accounts.SystemProgram is not set")
+		}
+		if inst.AccountMetaSlice[3] == nil {
+			return errors.New("accounts.Program is not set")
+		}
+		if inst.AccountMetaSlice[4] == nil {
+			return errors.New("accounts.ProgramData is not set")
 		}
 	}
 	return nil
@@ -222,54 +151,54 @@ func (inst *Initialize) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=0]").ParentFunc(func(paramsBranch ag_treeout.Branches) {})
+					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+						paramsBranch.Child(ag_format.Param("Router", *inst.Router))
+					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=10]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("                config", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("           nameVersion", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("routerFeeBillingSigner", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("       feeTokenProgram", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("          feeTokenMint", inst.AccountMetaSlice[4]))
-						accountsBranch.Child(ag_format.Meta("           feeTokenAta", inst.AccountMetaSlice[5]))
-						accountsBranch.Child(ag_format.Meta("        ccipSendSigner", inst.AccountMetaSlice[6]))
-						accountsBranch.Child(ag_format.Meta("             authority", inst.AccountMetaSlice[7]))
-						accountsBranch.Child(ag_format.Meta("associatedTokenProgram", inst.AccountMetaSlice[8]))
-						accountsBranch.Child(ag_format.Meta("         systemProgram", inst.AccountMetaSlice[9]))
+					instructionBranch.Child("Accounts[len=5]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+						accountsBranch.Child(ag_format.Meta(" globalConfig", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("    authority", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("      program", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("  programData", inst.AccountMetaSlice[4]))
 					})
 				})
 		})
 }
 
 func (obj Initialize) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Router` param:
+	err = encoder.Encode(obj.Router)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 func (obj *Initialize) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Router`:
+	err = decoder.Decode(&obj.Router)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
 // NewInitializeInstruction declares a new Initialize instruction with the provided parameters and accounts.
 func NewInitializeInstruction(
+	// Parameters:
+	router ag_solanago.PublicKey,
 	// Accounts:
-	config ag_solanago.PublicKey,
-	nameVersion ag_solanago.PublicKey,
-	routerFeeBillingSigner ag_solanago.PublicKey,
-	feeTokenProgram ag_solanago.PublicKey,
-	feeTokenMint ag_solanago.PublicKey,
-	feeTokenAta ag_solanago.PublicKey,
-	ccipSendSigner ag_solanago.PublicKey,
+	globalConfig ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
-	associatedTokenProgram ag_solanago.PublicKey,
-	systemProgram ag_solanago.PublicKey) *Initialize {
+	systemProgram ag_solanago.PublicKey,
+	program ag_solanago.PublicKey,
+	programData ag_solanago.PublicKey) *Initialize {
 	return NewInitializeInstructionBuilder().
-		SetConfigAccount(config).
-		SetNameVersionAccount(nameVersion).
-		SetRouterFeeBillingSignerAccount(routerFeeBillingSigner).
-		SetFeeTokenProgramAccount(feeTokenProgram).
-		SetFeeTokenMintAccount(feeTokenMint).
-		SetFeeTokenAtaAccount(feeTokenAta).
-		SetCcipSendSignerAccount(ccipSendSigner).
+		SetRouter(router).
+		SetGlobalConfigAccount(globalConfig).
 		SetAuthorityAccount(authority).
-		SetAssociatedTokenProgramAccount(associatedTokenProgram).
-		SetSystemProgramAccount(systemProgram)
+		SetSystemProgramAccount(systemProgram).
+		SetProgramAccount(program).
+		SetProgramDataAccount(programData)
 }

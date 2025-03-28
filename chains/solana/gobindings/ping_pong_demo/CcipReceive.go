@@ -24,70 +24,72 @@ type CcipReceive struct {
 	// ··········· CHECK PDA of the router program verifying the signer is an allowed offramp.
 	// ··········· If PDA does not exist, the router doesn't allow this offramp
 	//
-	// [3] = [] config
+	// [3] = [] globalConfig
 	//
-	// [4] = [WRITE] ccipSendSigner
+	// [4] = [] config
+	//
+	// [5] = [WRITE] ccipSendSigner
 	// ··········· CHECK
 	//
-	// [5] = [] feeTokenProgram
+	// [6] = [] feeTokenProgram
 	//
-	// [6] = [] feeTokenMint
+	// [7] = [] feeTokenMint
 	//
-	// [7] = [WRITE] feeTokenAta
+	// [8] = [WRITE] feeTokenAta
 	//
-	// [8] = [] ccipRouterProgram
+	// [9] = [] ccipRouterProgram
 	// ··········· CHECK
 	//
-	// [9] = [] ccipRouterConfig
+	// [10] = [] ccipRouterConfig
 	// ··········· CHECK
 	//
-	// [10] = [WRITE] ccipRouterDestChainState
+	// [11] = [WRITE] ccipRouterDestChainState
 	// ··········· CHECK
 	//
-	// [11] = [WRITE] ccipRouterNonce
+	// [12] = [WRITE] ccipRouterNonce
 	// ··········· CHECK
 	//
-	// [12] = [WRITE] ccipRouterFeeReceiver
+	// [13] = [WRITE] ccipRouterFeeReceiver
 	// ··········· CHECK
 	//
-	// [13] = [] ccipRouterFeeBillingSigner
+	// [14] = [] ccipRouterFeeBillingSigner
 	// ··········· CHECK
 	//
-	// [14] = [] feeQuoter
+	// [15] = [] feeQuoter
 	// ··········· CHECK
 	//
-	// [15] = [] feeQuoterConfig
+	// [16] = [] feeQuoterConfig
 	// ··········· CHECK
 	//
-	// [16] = [] feeQuoterDestChain
+	// [17] = [] feeQuoterDestChain
 	// ··········· CHECK
 	//
-	// [17] = [] feeQuoterBillingTokenConfig
+	// [18] = [] feeQuoterBillingTokenConfig
 	// ··········· CHECK
 	//
-	// [18] = [] feeQuoterLinkTokenConfig
+	// [19] = [] feeQuoterLinkTokenConfig
 	// ··········· CHECK
 	//
-	// [19] = [] rmnRemote
+	// [20] = [] rmnRemote
 	// ··········· CHECK
 	//
-	// [20] = [] rmnRemoteCurses
+	// [21] = [] rmnRemoteCurses
 	// ··········· CHECK
 	//
-	// [21] = [] rmnRemoteConfig
+	// [22] = [] rmnRemoteConfig
 	// ··········· CHECK
 	//
-	// [22] = [WRITE] tokenPoolsSigner
+	// [23] = [WRITE] tokenPoolsSigner
 	// ··········· CHECK
 	//
-	// [23] = [] systemProgram
+	// [24] = [] systemProgram
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewCcipReceiveInstructionBuilder creates a new `CcipReceive` instruction builder.
 func NewCcipReceiveInstructionBuilder() *CcipReceive {
 	nd := &CcipReceive{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 24),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 25),
 	}
 	return nd
 }
@@ -139,267 +141,278 @@ func (inst *CcipReceive) GetAllowedOfframpAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[2]
 }
 
+// SetGlobalConfigAccount sets the "globalConfig" account.
+func (inst *CcipReceive) SetGlobalConfigAccount(globalConfig ag_solanago.PublicKey) *CcipReceive {
+	inst.AccountMetaSlice[3] = ag_solanago.Meta(globalConfig)
+	return inst
+}
+
+// GetGlobalConfigAccount gets the "globalConfig" account.
+func (inst *CcipReceive) GetGlobalConfigAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[3]
+}
+
 // SetConfigAccount sets the "config" account.
 func (inst *CcipReceive) SetConfigAccount(config ag_solanago.PublicKey) *CcipReceive {
-	inst.AccountMetaSlice[3] = ag_solanago.Meta(config)
+	inst.AccountMetaSlice[4] = ag_solanago.Meta(config)
 	return inst
 }
 
 // GetConfigAccount gets the "config" account.
 func (inst *CcipReceive) GetConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice[4]
 }
 
 // SetCcipSendSignerAccount sets the "ccipSendSigner" account.
 // CHECK
 func (inst *CcipReceive) SetCcipSendSignerAccount(ccipSendSigner ag_solanago.PublicKey) *CcipReceive {
-	inst.AccountMetaSlice[4] = ag_solanago.Meta(ccipSendSigner).WRITE()
+	inst.AccountMetaSlice[5] = ag_solanago.Meta(ccipSendSigner).WRITE()
 	return inst
 }
 
 // GetCcipSendSignerAccount gets the "ccipSendSigner" account.
 // CHECK
 func (inst *CcipReceive) GetCcipSendSignerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[4]
+	return inst.AccountMetaSlice[5]
 }
 
 // SetFeeTokenProgramAccount sets the "feeTokenProgram" account.
 func (inst *CcipReceive) SetFeeTokenProgramAccount(feeTokenProgram ag_solanago.PublicKey) *CcipReceive {
-	inst.AccountMetaSlice[5] = ag_solanago.Meta(feeTokenProgram)
+	inst.AccountMetaSlice[6] = ag_solanago.Meta(feeTokenProgram)
 	return inst
 }
 
 // GetFeeTokenProgramAccount gets the "feeTokenProgram" account.
 func (inst *CcipReceive) GetFeeTokenProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[5]
+	return inst.AccountMetaSlice[6]
 }
 
 // SetFeeTokenMintAccount sets the "feeTokenMint" account.
 func (inst *CcipReceive) SetFeeTokenMintAccount(feeTokenMint ag_solanago.PublicKey) *CcipReceive {
-	inst.AccountMetaSlice[6] = ag_solanago.Meta(feeTokenMint)
+	inst.AccountMetaSlice[7] = ag_solanago.Meta(feeTokenMint)
 	return inst
 }
 
 // GetFeeTokenMintAccount gets the "feeTokenMint" account.
 func (inst *CcipReceive) GetFeeTokenMintAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[6]
+	return inst.AccountMetaSlice[7]
 }
 
 // SetFeeTokenAtaAccount sets the "feeTokenAta" account.
 func (inst *CcipReceive) SetFeeTokenAtaAccount(feeTokenAta ag_solanago.PublicKey) *CcipReceive {
-	inst.AccountMetaSlice[7] = ag_solanago.Meta(feeTokenAta).WRITE()
+	inst.AccountMetaSlice[8] = ag_solanago.Meta(feeTokenAta).WRITE()
 	return inst
 }
 
 // GetFeeTokenAtaAccount gets the "feeTokenAta" account.
 func (inst *CcipReceive) GetFeeTokenAtaAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[7]
+	return inst.AccountMetaSlice[8]
 }
 
 // SetCcipRouterProgramAccount sets the "ccipRouterProgram" account.
 // CHECK
 func (inst *CcipReceive) SetCcipRouterProgramAccount(ccipRouterProgram ag_solanago.PublicKey) *CcipReceive {
-	inst.AccountMetaSlice[8] = ag_solanago.Meta(ccipRouterProgram)
+	inst.AccountMetaSlice[9] = ag_solanago.Meta(ccipRouterProgram)
 	return inst
 }
 
 // GetCcipRouterProgramAccount gets the "ccipRouterProgram" account.
 // CHECK
 func (inst *CcipReceive) GetCcipRouterProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[8]
+	return inst.AccountMetaSlice[9]
 }
 
 // SetCcipRouterConfigAccount sets the "ccipRouterConfig" account.
 // CHECK
 func (inst *CcipReceive) SetCcipRouterConfigAccount(ccipRouterConfig ag_solanago.PublicKey) *CcipReceive {
-	inst.AccountMetaSlice[9] = ag_solanago.Meta(ccipRouterConfig)
+	inst.AccountMetaSlice[10] = ag_solanago.Meta(ccipRouterConfig)
 	return inst
 }
 
 // GetCcipRouterConfigAccount gets the "ccipRouterConfig" account.
 // CHECK
 func (inst *CcipReceive) GetCcipRouterConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[9]
+	return inst.AccountMetaSlice[10]
 }
 
 // SetCcipRouterDestChainStateAccount sets the "ccipRouterDestChainState" account.
 // CHECK
 func (inst *CcipReceive) SetCcipRouterDestChainStateAccount(ccipRouterDestChainState ag_solanago.PublicKey) *CcipReceive {
-	inst.AccountMetaSlice[10] = ag_solanago.Meta(ccipRouterDestChainState).WRITE()
+	inst.AccountMetaSlice[11] = ag_solanago.Meta(ccipRouterDestChainState).WRITE()
 	return inst
 }
 
 // GetCcipRouterDestChainStateAccount gets the "ccipRouterDestChainState" account.
 // CHECK
 func (inst *CcipReceive) GetCcipRouterDestChainStateAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[10]
+	return inst.AccountMetaSlice[11]
 }
 
 // SetCcipRouterNonceAccount sets the "ccipRouterNonce" account.
 // CHECK
 func (inst *CcipReceive) SetCcipRouterNonceAccount(ccipRouterNonce ag_solanago.PublicKey) *CcipReceive {
-	inst.AccountMetaSlice[11] = ag_solanago.Meta(ccipRouterNonce).WRITE()
+	inst.AccountMetaSlice[12] = ag_solanago.Meta(ccipRouterNonce).WRITE()
 	return inst
 }
 
 // GetCcipRouterNonceAccount gets the "ccipRouterNonce" account.
 // CHECK
 func (inst *CcipReceive) GetCcipRouterNonceAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[11]
+	return inst.AccountMetaSlice[12]
 }
 
 // SetCcipRouterFeeReceiverAccount sets the "ccipRouterFeeReceiver" account.
 // CHECK
 func (inst *CcipReceive) SetCcipRouterFeeReceiverAccount(ccipRouterFeeReceiver ag_solanago.PublicKey) *CcipReceive {
-	inst.AccountMetaSlice[12] = ag_solanago.Meta(ccipRouterFeeReceiver).WRITE()
+	inst.AccountMetaSlice[13] = ag_solanago.Meta(ccipRouterFeeReceiver).WRITE()
 	return inst
 }
 
 // GetCcipRouterFeeReceiverAccount gets the "ccipRouterFeeReceiver" account.
 // CHECK
 func (inst *CcipReceive) GetCcipRouterFeeReceiverAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[12]
+	return inst.AccountMetaSlice[13]
 }
 
 // SetCcipRouterFeeBillingSignerAccount sets the "ccipRouterFeeBillingSigner" account.
 // CHECK
 func (inst *CcipReceive) SetCcipRouterFeeBillingSignerAccount(ccipRouterFeeBillingSigner ag_solanago.PublicKey) *CcipReceive {
-	inst.AccountMetaSlice[13] = ag_solanago.Meta(ccipRouterFeeBillingSigner)
+	inst.AccountMetaSlice[14] = ag_solanago.Meta(ccipRouterFeeBillingSigner)
 	return inst
 }
 
 // GetCcipRouterFeeBillingSignerAccount gets the "ccipRouterFeeBillingSigner" account.
 // CHECK
 func (inst *CcipReceive) GetCcipRouterFeeBillingSignerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[13]
+	return inst.AccountMetaSlice[14]
 }
 
 // SetFeeQuoterAccount sets the "feeQuoter" account.
 // CHECK
 func (inst *CcipReceive) SetFeeQuoterAccount(feeQuoter ag_solanago.PublicKey) *CcipReceive {
-	inst.AccountMetaSlice[14] = ag_solanago.Meta(feeQuoter)
+	inst.AccountMetaSlice[15] = ag_solanago.Meta(feeQuoter)
 	return inst
 }
 
 // GetFeeQuoterAccount gets the "feeQuoter" account.
 // CHECK
 func (inst *CcipReceive) GetFeeQuoterAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[14]
+	return inst.AccountMetaSlice[15]
 }
 
 // SetFeeQuoterConfigAccount sets the "feeQuoterConfig" account.
 // CHECK
 func (inst *CcipReceive) SetFeeQuoterConfigAccount(feeQuoterConfig ag_solanago.PublicKey) *CcipReceive {
-	inst.AccountMetaSlice[15] = ag_solanago.Meta(feeQuoterConfig)
+	inst.AccountMetaSlice[16] = ag_solanago.Meta(feeQuoterConfig)
 	return inst
 }
 
 // GetFeeQuoterConfigAccount gets the "feeQuoterConfig" account.
 // CHECK
 func (inst *CcipReceive) GetFeeQuoterConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[15]
+	return inst.AccountMetaSlice[16]
 }
 
 // SetFeeQuoterDestChainAccount sets the "feeQuoterDestChain" account.
 // CHECK
 func (inst *CcipReceive) SetFeeQuoterDestChainAccount(feeQuoterDestChain ag_solanago.PublicKey) *CcipReceive {
-	inst.AccountMetaSlice[16] = ag_solanago.Meta(feeQuoterDestChain)
+	inst.AccountMetaSlice[17] = ag_solanago.Meta(feeQuoterDestChain)
 	return inst
 }
 
 // GetFeeQuoterDestChainAccount gets the "feeQuoterDestChain" account.
 // CHECK
 func (inst *CcipReceive) GetFeeQuoterDestChainAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[16]
+	return inst.AccountMetaSlice[17]
 }
 
 // SetFeeQuoterBillingTokenConfigAccount sets the "feeQuoterBillingTokenConfig" account.
 // CHECK
 func (inst *CcipReceive) SetFeeQuoterBillingTokenConfigAccount(feeQuoterBillingTokenConfig ag_solanago.PublicKey) *CcipReceive {
-	inst.AccountMetaSlice[17] = ag_solanago.Meta(feeQuoterBillingTokenConfig)
+	inst.AccountMetaSlice[18] = ag_solanago.Meta(feeQuoterBillingTokenConfig)
 	return inst
 }
 
 // GetFeeQuoterBillingTokenConfigAccount gets the "feeQuoterBillingTokenConfig" account.
 // CHECK
 func (inst *CcipReceive) GetFeeQuoterBillingTokenConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[17]
+	return inst.AccountMetaSlice[18]
 }
 
 // SetFeeQuoterLinkTokenConfigAccount sets the "feeQuoterLinkTokenConfig" account.
 // CHECK
 func (inst *CcipReceive) SetFeeQuoterLinkTokenConfigAccount(feeQuoterLinkTokenConfig ag_solanago.PublicKey) *CcipReceive {
-	inst.AccountMetaSlice[18] = ag_solanago.Meta(feeQuoterLinkTokenConfig)
+	inst.AccountMetaSlice[19] = ag_solanago.Meta(feeQuoterLinkTokenConfig)
 	return inst
 }
 
 // GetFeeQuoterLinkTokenConfigAccount gets the "feeQuoterLinkTokenConfig" account.
 // CHECK
 func (inst *CcipReceive) GetFeeQuoterLinkTokenConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[18]
+	return inst.AccountMetaSlice[19]
 }
 
 // SetRmnRemoteAccount sets the "rmnRemote" account.
 // CHECK
 func (inst *CcipReceive) SetRmnRemoteAccount(rmnRemote ag_solanago.PublicKey) *CcipReceive {
-	inst.AccountMetaSlice[19] = ag_solanago.Meta(rmnRemote)
+	inst.AccountMetaSlice[20] = ag_solanago.Meta(rmnRemote)
 	return inst
 }
 
 // GetRmnRemoteAccount gets the "rmnRemote" account.
 // CHECK
 func (inst *CcipReceive) GetRmnRemoteAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[19]
+	return inst.AccountMetaSlice[20]
 }
 
 // SetRmnRemoteCursesAccount sets the "rmnRemoteCurses" account.
 // CHECK
 func (inst *CcipReceive) SetRmnRemoteCursesAccount(rmnRemoteCurses ag_solanago.PublicKey) *CcipReceive {
-	inst.AccountMetaSlice[20] = ag_solanago.Meta(rmnRemoteCurses)
+	inst.AccountMetaSlice[21] = ag_solanago.Meta(rmnRemoteCurses)
 	return inst
 }
 
 // GetRmnRemoteCursesAccount gets the "rmnRemoteCurses" account.
 // CHECK
 func (inst *CcipReceive) GetRmnRemoteCursesAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[20]
+	return inst.AccountMetaSlice[21]
 }
 
 // SetRmnRemoteConfigAccount sets the "rmnRemoteConfig" account.
 // CHECK
 func (inst *CcipReceive) SetRmnRemoteConfigAccount(rmnRemoteConfig ag_solanago.PublicKey) *CcipReceive {
-	inst.AccountMetaSlice[21] = ag_solanago.Meta(rmnRemoteConfig)
+	inst.AccountMetaSlice[22] = ag_solanago.Meta(rmnRemoteConfig)
 	return inst
 }
 
 // GetRmnRemoteConfigAccount gets the "rmnRemoteConfig" account.
 // CHECK
 func (inst *CcipReceive) GetRmnRemoteConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[21]
+	return inst.AccountMetaSlice[22]
 }
 
 // SetTokenPoolsSignerAccount sets the "tokenPoolsSigner" account.
 // CHECK
 func (inst *CcipReceive) SetTokenPoolsSignerAccount(tokenPoolsSigner ag_solanago.PublicKey) *CcipReceive {
-	inst.AccountMetaSlice[22] = ag_solanago.Meta(tokenPoolsSigner).WRITE()
+	inst.AccountMetaSlice[23] = ag_solanago.Meta(tokenPoolsSigner).WRITE()
 	return inst
 }
 
 // GetTokenPoolsSignerAccount gets the "tokenPoolsSigner" account.
 // CHECK
 func (inst *CcipReceive) GetTokenPoolsSignerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[22]
+	return inst.AccountMetaSlice[23]
 }
 
 // SetSystemProgramAccount sets the "systemProgram" account.
 func (inst *CcipReceive) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *CcipReceive {
-	inst.AccountMetaSlice[23] = ag_solanago.Meta(systemProgram)
+	inst.AccountMetaSlice[24] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
 // GetSystemProgramAccount gets the "systemProgram" account.
 func (inst *CcipReceive) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[23]
+	return inst.AccountMetaSlice[24]
 }
 
 func (inst CcipReceive) Build() *Instruction {
@@ -439,66 +452,69 @@ func (inst *CcipReceive) Validate() error {
 			return errors.New("accounts.AllowedOfframp is not set")
 		}
 		if inst.AccountMetaSlice[3] == nil {
-			return errors.New("accounts.Config is not set")
+			return errors.New("accounts.GlobalConfig is not set")
 		}
 		if inst.AccountMetaSlice[4] == nil {
-			return errors.New("accounts.CcipSendSigner is not set")
+			return errors.New("accounts.Config is not set")
 		}
 		if inst.AccountMetaSlice[5] == nil {
-			return errors.New("accounts.FeeTokenProgram is not set")
+			return errors.New("accounts.CcipSendSigner is not set")
 		}
 		if inst.AccountMetaSlice[6] == nil {
-			return errors.New("accounts.FeeTokenMint is not set")
+			return errors.New("accounts.FeeTokenProgram is not set")
 		}
 		if inst.AccountMetaSlice[7] == nil {
-			return errors.New("accounts.FeeTokenAta is not set")
+			return errors.New("accounts.FeeTokenMint is not set")
 		}
 		if inst.AccountMetaSlice[8] == nil {
-			return errors.New("accounts.CcipRouterProgram is not set")
+			return errors.New("accounts.FeeTokenAta is not set")
 		}
 		if inst.AccountMetaSlice[9] == nil {
-			return errors.New("accounts.CcipRouterConfig is not set")
+			return errors.New("accounts.CcipRouterProgram is not set")
 		}
 		if inst.AccountMetaSlice[10] == nil {
-			return errors.New("accounts.CcipRouterDestChainState is not set")
+			return errors.New("accounts.CcipRouterConfig is not set")
 		}
 		if inst.AccountMetaSlice[11] == nil {
-			return errors.New("accounts.CcipRouterNonce is not set")
+			return errors.New("accounts.CcipRouterDestChainState is not set")
 		}
 		if inst.AccountMetaSlice[12] == nil {
-			return errors.New("accounts.CcipRouterFeeReceiver is not set")
+			return errors.New("accounts.CcipRouterNonce is not set")
 		}
 		if inst.AccountMetaSlice[13] == nil {
-			return errors.New("accounts.CcipRouterFeeBillingSigner is not set")
+			return errors.New("accounts.CcipRouterFeeReceiver is not set")
 		}
 		if inst.AccountMetaSlice[14] == nil {
-			return errors.New("accounts.FeeQuoter is not set")
+			return errors.New("accounts.CcipRouterFeeBillingSigner is not set")
 		}
 		if inst.AccountMetaSlice[15] == nil {
-			return errors.New("accounts.FeeQuoterConfig is not set")
+			return errors.New("accounts.FeeQuoter is not set")
 		}
 		if inst.AccountMetaSlice[16] == nil {
-			return errors.New("accounts.FeeQuoterDestChain is not set")
+			return errors.New("accounts.FeeQuoterConfig is not set")
 		}
 		if inst.AccountMetaSlice[17] == nil {
-			return errors.New("accounts.FeeQuoterBillingTokenConfig is not set")
+			return errors.New("accounts.FeeQuoterDestChain is not set")
 		}
 		if inst.AccountMetaSlice[18] == nil {
-			return errors.New("accounts.FeeQuoterLinkTokenConfig is not set")
+			return errors.New("accounts.FeeQuoterBillingTokenConfig is not set")
 		}
 		if inst.AccountMetaSlice[19] == nil {
-			return errors.New("accounts.RmnRemote is not set")
+			return errors.New("accounts.FeeQuoterLinkTokenConfig is not set")
 		}
 		if inst.AccountMetaSlice[20] == nil {
-			return errors.New("accounts.RmnRemoteCurses is not set")
+			return errors.New("accounts.RmnRemote is not set")
 		}
 		if inst.AccountMetaSlice[21] == nil {
-			return errors.New("accounts.RmnRemoteConfig is not set")
+			return errors.New("accounts.RmnRemoteCurses is not set")
 		}
 		if inst.AccountMetaSlice[22] == nil {
-			return errors.New("accounts.TokenPoolsSigner is not set")
+			return errors.New("accounts.RmnRemoteConfig is not set")
 		}
 		if inst.AccountMetaSlice[23] == nil {
+			return errors.New("accounts.TokenPoolsSigner is not set")
+		}
+		if inst.AccountMetaSlice[24] == nil {
 			return errors.New("accounts.SystemProgram is not set")
 		}
 	}
@@ -519,31 +535,32 @@ func (inst *CcipReceive) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=24]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Accounts[len=25]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("                  authority", inst.AccountMetaSlice[0]))
 						accountsBranch.Child(ag_format.Meta("             offrampProgram", inst.AccountMetaSlice[1]))
 						accountsBranch.Child(ag_format.Meta("             allowedOfframp", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("                     config", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("             ccipSendSigner", inst.AccountMetaSlice[4]))
-						accountsBranch.Child(ag_format.Meta("            feeTokenProgram", inst.AccountMetaSlice[5]))
-						accountsBranch.Child(ag_format.Meta("               feeTokenMint", inst.AccountMetaSlice[6]))
-						accountsBranch.Child(ag_format.Meta("                feeTokenAta", inst.AccountMetaSlice[7]))
-						accountsBranch.Child(ag_format.Meta("          ccipRouterProgram", inst.AccountMetaSlice[8]))
-						accountsBranch.Child(ag_format.Meta("           ccipRouterConfig", inst.AccountMetaSlice[9]))
-						accountsBranch.Child(ag_format.Meta("   ccipRouterDestChainState", inst.AccountMetaSlice[10]))
-						accountsBranch.Child(ag_format.Meta("            ccipRouterNonce", inst.AccountMetaSlice[11]))
-						accountsBranch.Child(ag_format.Meta("      ccipRouterFeeReceiver", inst.AccountMetaSlice[12]))
-						accountsBranch.Child(ag_format.Meta(" ccipRouterFeeBillingSigner", inst.AccountMetaSlice[13]))
-						accountsBranch.Child(ag_format.Meta("                  feeQuoter", inst.AccountMetaSlice[14]))
-						accountsBranch.Child(ag_format.Meta("            feeQuoterConfig", inst.AccountMetaSlice[15]))
-						accountsBranch.Child(ag_format.Meta("         feeQuoterDestChain", inst.AccountMetaSlice[16]))
-						accountsBranch.Child(ag_format.Meta("feeQuoterBillingTokenConfig", inst.AccountMetaSlice[17]))
-						accountsBranch.Child(ag_format.Meta("   feeQuoterLinkTokenConfig", inst.AccountMetaSlice[18]))
-						accountsBranch.Child(ag_format.Meta("                  rmnRemote", inst.AccountMetaSlice[19]))
-						accountsBranch.Child(ag_format.Meta("            rmnRemoteCurses", inst.AccountMetaSlice[20]))
-						accountsBranch.Child(ag_format.Meta("            rmnRemoteConfig", inst.AccountMetaSlice[21]))
-						accountsBranch.Child(ag_format.Meta("           tokenPoolsSigner", inst.AccountMetaSlice[22]))
-						accountsBranch.Child(ag_format.Meta("              systemProgram", inst.AccountMetaSlice[23]))
+						accountsBranch.Child(ag_format.Meta("               globalConfig", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("                     config", inst.AccountMetaSlice[4]))
+						accountsBranch.Child(ag_format.Meta("             ccipSendSigner", inst.AccountMetaSlice[5]))
+						accountsBranch.Child(ag_format.Meta("            feeTokenProgram", inst.AccountMetaSlice[6]))
+						accountsBranch.Child(ag_format.Meta("               feeTokenMint", inst.AccountMetaSlice[7]))
+						accountsBranch.Child(ag_format.Meta("                feeTokenAta", inst.AccountMetaSlice[8]))
+						accountsBranch.Child(ag_format.Meta("          ccipRouterProgram", inst.AccountMetaSlice[9]))
+						accountsBranch.Child(ag_format.Meta("           ccipRouterConfig", inst.AccountMetaSlice[10]))
+						accountsBranch.Child(ag_format.Meta("   ccipRouterDestChainState", inst.AccountMetaSlice[11]))
+						accountsBranch.Child(ag_format.Meta("            ccipRouterNonce", inst.AccountMetaSlice[12]))
+						accountsBranch.Child(ag_format.Meta("      ccipRouterFeeReceiver", inst.AccountMetaSlice[13]))
+						accountsBranch.Child(ag_format.Meta(" ccipRouterFeeBillingSigner", inst.AccountMetaSlice[14]))
+						accountsBranch.Child(ag_format.Meta("                  feeQuoter", inst.AccountMetaSlice[15]))
+						accountsBranch.Child(ag_format.Meta("            feeQuoterConfig", inst.AccountMetaSlice[16]))
+						accountsBranch.Child(ag_format.Meta("         feeQuoterDestChain", inst.AccountMetaSlice[17]))
+						accountsBranch.Child(ag_format.Meta("feeQuoterBillingTokenConfig", inst.AccountMetaSlice[18]))
+						accountsBranch.Child(ag_format.Meta("   feeQuoterLinkTokenConfig", inst.AccountMetaSlice[19]))
+						accountsBranch.Child(ag_format.Meta("                  rmnRemote", inst.AccountMetaSlice[20]))
+						accountsBranch.Child(ag_format.Meta("            rmnRemoteCurses", inst.AccountMetaSlice[21]))
+						accountsBranch.Child(ag_format.Meta("            rmnRemoteConfig", inst.AccountMetaSlice[22]))
+						accountsBranch.Child(ag_format.Meta("           tokenPoolsSigner", inst.AccountMetaSlice[23]))
+						accountsBranch.Child(ag_format.Meta("              systemProgram", inst.AccountMetaSlice[24]))
 					})
 				})
 		})
@@ -574,6 +591,7 @@ func NewCcipReceiveInstruction(
 	authority ag_solanago.PublicKey,
 	offrampProgram ag_solanago.PublicKey,
 	allowedOfframp ag_solanago.PublicKey,
+	globalConfig ag_solanago.PublicKey,
 	config ag_solanago.PublicKey,
 	ccipSendSigner ag_solanago.PublicKey,
 	feeTokenProgram ag_solanago.PublicKey,
@@ -600,6 +618,7 @@ func NewCcipReceiveInstruction(
 		SetAuthorityAccount(authority).
 		SetOfframpProgramAccount(offrampProgram).
 		SetAllowedOfframpAccount(allowedOfframp).
+		SetGlobalConfigAccount(globalConfig).
 		SetConfigAccount(config).
 		SetCcipSendSignerAccount(ccipSendSigner).
 		SetFeeTokenProgramAccount(feeTokenProgram).

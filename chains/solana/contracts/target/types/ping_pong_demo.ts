@@ -3,16 +3,15 @@ export type PingPongDemo = {
   "name": "ping_pong_demo",
   "instructions": [
     {
-      "name": "initializeConfig",
+      "name": "initialize",
+      "docs": [
+        "Initialize the global config account.",
+        "Call this just once."
+      ],
       "accounts": [
         {
-          "name": "config",
+          "name": "globalConfig",
           "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "feeTokenMint",
-          "isMut": false,
           "isSigner": false
         },
         {
@@ -40,7 +39,43 @@ export type PingPongDemo = {
         {
           "name": "router",
           "type": "publicKey"
+        }
+      ]
+    },
+    {
+      "name": "initializeChain",
+      "docs": [
+        "Initialize the chain's config account.",
+        "Call this once for each chain you want to ping-pong with."
+      ],
+      "accounts": [
+        {
+          "name": "globalConfig",
+          "isMut": false,
+          "isSigner": false
         },
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "feeTokenMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
         {
           "name": "counterpartChainSelector",
           "type": "u64"
@@ -60,16 +95,20 @@ export type PingPongDemo = {
       ]
     },
     {
-      "name": "initialize",
+      "name": "initializeFeeToken",
+      "docs": [
+        "Initializes the ATA for the fee token and approve the Router for transferring from it.",
+        "Call this once for each token you want to pay CCIP fees with."
+      ],
       "accounts": [
         {
-          "name": "config",
+          "name": "globalConfig",
           "isMut": false,
           "isSigner": false
         },
         {
-          "name": "nameVersion",
-          "isMut": true,
+          "name": "config",
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -119,11 +158,21 @@ export type PingPongDemo = {
           "isSigner": false
         }
       ],
-      "args": []
+      "args": [
+        {
+          "name": "counterpartChainSelector",
+          "type": "u64"
+        }
+      ]
     },
     {
       "name": "setCounterpart",
       "accounts": [
+        {
+          "name": "globalConfig",
+          "isMut": false,
+          "isSigner": false
+        },
         {
           "name": "config",
           "isMut": true,
@@ -150,6 +199,11 @@ export type PingPongDemo = {
       "name": "setPaused",
       "accounts": [
         {
+          "name": "globalConfig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "config",
           "isMut": true,
           "isSigner": false
@@ -162,6 +216,10 @@ export type PingPongDemo = {
       ],
       "args": [
         {
+          "name": "counterpartChainSelector",
+          "type": "u64"
+        },
+        {
           "name": "pause",
           "type": "bool"
         }
@@ -170,6 +228,11 @@ export type PingPongDemo = {
     {
       "name": "setExtraArgs",
       "accounts": [
+        {
+          "name": "globalConfig",
+          "isMut": false,
+          "isSigner": false
+        },
         {
           "name": "config",
           "isMut": true,
@@ -188,6 +251,10 @@ export type PingPongDemo = {
       ],
       "args": [
         {
+          "name": "counterpartChainSelector",
+          "type": "u64"
+        },
+        {
           "name": "extraArgs",
           "type": "bytes"
         }
@@ -196,6 +263,11 @@ export type PingPongDemo = {
     {
       "name": "startPingPong",
       "accounts": [
+        {
+          "name": "globalConfig",
+          "isMut": false,
+          "isSigner": false
+        },
         {
           "name": "config",
           "isMut": true,
@@ -355,7 +427,12 @@ export type PingPongDemo = {
           "isSigner": false
         }
       ],
-      "args": []
+      "args": [
+        {
+          "name": "counterpartChainSelector",
+          "type": "u64"
+        }
+      ]
     },
     {
       "name": "ccipReceive",
@@ -382,6 +459,11 @@ export type PingPongDemo = {
             "CHECK PDA of the router program verifying the signer is an allowed offramp.",
             "If PDA does not exist, the router doesn't allow this offramp"
           ]
+        },
+        {
+          "name": "globalConfig",
+          "isMut": false,
+          "isSigner": false
         },
         {
           "name": "config",
@@ -549,7 +631,7 @@ export type PingPongDemo = {
   ],
   "accounts": [
     {
-      "name": "config",
+      "name": "globalConfig",
       "type": {
         "kind": "struct",
         "fields": [
@@ -560,7 +642,15 @@ export type PingPongDemo = {
           {
             "name": "router",
             "type": "publicKey"
-          },
+          }
+        ]
+      }
+    },
+    {
+      "name": "config",
+      "type": {
+        "kind": "struct",
+        "fields": [
           {
             "name": "counterpartChainSelector",
             "type": "u64"
@@ -582,22 +672,6 @@ export type PingPongDemo = {
           {
             "name": "extraArgs",
             "type": "bytes"
-          }
-        ]
-      }
-    },
-    {
-      "name": "nameVersion",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "name",
-            "type": "string"
-          },
-          {
-            "name": "version",
-            "type": "string"
           }
         ]
       }
@@ -650,16 +724,15 @@ export const IDL: PingPongDemo = {
   "name": "ping_pong_demo",
   "instructions": [
     {
-      "name": "initializeConfig",
+      "name": "initialize",
+      "docs": [
+        "Initialize the global config account.",
+        "Call this just once."
+      ],
       "accounts": [
         {
-          "name": "config",
+          "name": "globalConfig",
           "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "feeTokenMint",
-          "isMut": false,
           "isSigner": false
         },
         {
@@ -687,7 +760,43 @@ export const IDL: PingPongDemo = {
         {
           "name": "router",
           "type": "publicKey"
+        }
+      ]
+    },
+    {
+      "name": "initializeChain",
+      "docs": [
+        "Initialize the chain's config account.",
+        "Call this once for each chain you want to ping-pong with."
+      ],
+      "accounts": [
+        {
+          "name": "globalConfig",
+          "isMut": false,
+          "isSigner": false
         },
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "feeTokenMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
         {
           "name": "counterpartChainSelector",
           "type": "u64"
@@ -707,16 +816,20 @@ export const IDL: PingPongDemo = {
       ]
     },
     {
-      "name": "initialize",
+      "name": "initializeFeeToken",
+      "docs": [
+        "Initializes the ATA for the fee token and approve the Router for transferring from it.",
+        "Call this once for each token you want to pay CCIP fees with."
+      ],
       "accounts": [
         {
-          "name": "config",
+          "name": "globalConfig",
           "isMut": false,
           "isSigner": false
         },
         {
-          "name": "nameVersion",
-          "isMut": true,
+          "name": "config",
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -766,11 +879,21 @@ export const IDL: PingPongDemo = {
           "isSigner": false
         }
       ],
-      "args": []
+      "args": [
+        {
+          "name": "counterpartChainSelector",
+          "type": "u64"
+        }
+      ]
     },
     {
       "name": "setCounterpart",
       "accounts": [
+        {
+          "name": "globalConfig",
+          "isMut": false,
+          "isSigner": false
+        },
         {
           "name": "config",
           "isMut": true,
@@ -797,6 +920,11 @@ export const IDL: PingPongDemo = {
       "name": "setPaused",
       "accounts": [
         {
+          "name": "globalConfig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "config",
           "isMut": true,
           "isSigner": false
@@ -809,6 +937,10 @@ export const IDL: PingPongDemo = {
       ],
       "args": [
         {
+          "name": "counterpartChainSelector",
+          "type": "u64"
+        },
+        {
           "name": "pause",
           "type": "bool"
         }
@@ -817,6 +949,11 @@ export const IDL: PingPongDemo = {
     {
       "name": "setExtraArgs",
       "accounts": [
+        {
+          "name": "globalConfig",
+          "isMut": false,
+          "isSigner": false
+        },
         {
           "name": "config",
           "isMut": true,
@@ -835,6 +972,10 @@ export const IDL: PingPongDemo = {
       ],
       "args": [
         {
+          "name": "counterpartChainSelector",
+          "type": "u64"
+        },
+        {
           "name": "extraArgs",
           "type": "bytes"
         }
@@ -843,6 +984,11 @@ export const IDL: PingPongDemo = {
     {
       "name": "startPingPong",
       "accounts": [
+        {
+          "name": "globalConfig",
+          "isMut": false,
+          "isSigner": false
+        },
         {
           "name": "config",
           "isMut": true,
@@ -1002,7 +1148,12 @@ export const IDL: PingPongDemo = {
           "isSigner": false
         }
       ],
-      "args": []
+      "args": [
+        {
+          "name": "counterpartChainSelector",
+          "type": "u64"
+        }
+      ]
     },
     {
       "name": "ccipReceive",
@@ -1029,6 +1180,11 @@ export const IDL: PingPongDemo = {
             "CHECK PDA of the router program verifying the signer is an allowed offramp.",
             "If PDA does not exist, the router doesn't allow this offramp"
           ]
+        },
+        {
+          "name": "globalConfig",
+          "isMut": false,
+          "isSigner": false
         },
         {
           "name": "config",
@@ -1196,7 +1352,7 @@ export const IDL: PingPongDemo = {
   ],
   "accounts": [
     {
-      "name": "config",
+      "name": "globalConfig",
       "type": {
         "kind": "struct",
         "fields": [
@@ -1207,7 +1363,15 @@ export const IDL: PingPongDemo = {
           {
             "name": "router",
             "type": "publicKey"
-          },
+          }
+        ]
+      }
+    },
+    {
+      "name": "config",
+      "type": {
+        "kind": "struct",
+        "fields": [
           {
             "name": "counterpartChainSelector",
             "type": "u64"
@@ -1229,22 +1393,6 @@ export const IDL: PingPongDemo = {
           {
             "name": "extraArgs",
             "type": "bytes"
-          }
-        ]
-      }
-    },
-    {
-      "name": "nameVersion",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "name",
-            "type": "string"
-          },
-          {
-            "name": "version",
-            "type": "string"
           }
         ]
       }

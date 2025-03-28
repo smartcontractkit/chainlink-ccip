@@ -28,9 +28,17 @@ func init() {
 }
 
 var (
-	Instruction_InitializeConfig = ag_binary.TypeID([8]byte{208, 127, 21, 1, 194, 190, 196, 70})
-
+	// Initialize the global config account.
+	// Call this just once.
 	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
+
+	// Initialize the chain's config account.
+	// Call this once for each chain you want to ping-pong with.
+	Instruction_InitializeChain = ag_binary.TypeID([8]byte{109, 52, 149, 170, 73, 160, 96, 172})
+
+	// Initializes the ATA for the fee token and approve the Router for transferring from it.
+	// Call this once for each token you want to pay CCIP fees with.
+	Instruction_InitializeFeeToken = ag_binary.TypeID([8]byte{42, 70, 143, 143, 207, 142, 178, 61})
 
 	Instruction_SetCounterpart = ag_binary.TypeID([8]byte{118, 28, 243, 127, 218, 176, 228, 228})
 
@@ -46,10 +54,12 @@ var (
 // InstructionIDToName returns the name of the instruction given its ID.
 func InstructionIDToName(id ag_binary.TypeID) string {
 	switch id {
-	case Instruction_InitializeConfig:
-		return "InitializeConfig"
 	case Instruction_Initialize:
 		return "Initialize"
+	case Instruction_InitializeChain:
+		return "InitializeChain"
+	case Instruction_InitializeFeeToken:
+		return "InitializeFeeToken"
 	case Instruction_SetCounterpart:
 		return "SetCounterpart"
 	case Instruction_SetPaused:
@@ -81,10 +91,13 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 	ag_binary.AnchorTypeIDEncoding,
 	[]ag_binary.VariantType{
 		{
-			"initialize_config", (*InitializeConfig)(nil),
+			"initialize", (*Initialize)(nil),
 		},
 		{
-			"initialize", (*Initialize)(nil),
+			"initialize_chain", (*InitializeChain)(nil),
+		},
+		{
+			"initialize_fee_token", (*InitializeFeeToken)(nil),
 		},
 		{
 			"set_counterpart", (*SetCounterpart)(nil),

@@ -18,36 +18,45 @@ pub mod ping_pong_demo {
 
     use super::*;
 
-    pub fn initialize_config(
-        ctx: Context<InitializeConfig>,
-        router: Pubkey,
+    /// Initialize the global config account.
+    /// Call this just once.
+    pub fn initialize(ctx: Context<Initialize>, router: Pubkey) -> Result<()> {
+        ctx.accounts.global_config.set_inner(state::GlobalConfig {
+            router,
+            owner: ctx.accounts.authority.key(),
+        });
+        Ok(())
+    }
+
+    ////////////////////////////
+    // Only callable by owner //
+    ////////////////////////////
+
+    /// Initialize the chain's config account.
+    /// Call this once for each chain you want to ping-pong with.
+    pub fn initialize_chain(
+        ctx: Context<InitializeChain>,
         counterpart_chain_selector: u64,
         counterpart_address: Vec<u8>,
         is_paused: bool,
         extra_args: Vec<u8>,
     ) -> Result<()> {
         ctx.accounts.config.set_inner(state::Config {
-            router,
             counterpart_chain_selector,
             counterpart_address: counterpart_address.try_into()?,
             is_paused,
             extra_args,
-
             fee_token_mint: ctx.accounts.fee_token_mint.key(),
-
-            // Set owner to the upgrade authority. The context constraints enforce
-            // that the signer of the transaction (i.e. the authority) is the upgrade authority
-            owner: ctx.accounts.authority.key(),
         });
         Ok(())
     }
 
-    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
-        ctx.accounts.name_version.set_inner(state::NameVersion {
-            name: "ping-pong-demo".to_string(),
-            version: "1.6.0".to_string(),
-        });
-
+    /// Initializes the ATA for the fee token and approve the Router for transferring from it.
+    /// Call this once for each token you want to pay CCIP fees with.
+    pub fn initialize_fee_token(
+        ctx: Context<InitializeFeeToken>,
+        _counterpart_chain_selector: u64,
+    ) -> Result<()> {
         let seeds = &[seeds::CCIP_SEND_SIGNER, &[ctx.bumps.ccip_send_signer]];
         let signer_seeds = &[&seeds[..]];
         let approve_ctx = CpiContext::new_with_signer(
@@ -62,10 +71,6 @@ pub mod ping_pong_demo {
         token_interface::approve(approve_ctx, u64::MAX)
     }
 
-    ////////////////////////////
-    // Only callable by owner //
-    ////////////////////////////
-
     pub fn set_counterpart(
         ctx: Context<UpdateConfig>,
         counterpart_chain_selector: u64,
@@ -76,17 +81,27 @@ pub mod ping_pong_demo {
         Ok(())
     }
 
-    pub fn set_paused(ctx: Context<UpdateConfig>, pause: bool) -> Result<()> {
+    pub fn set_paused(
+        ctx: Context<UpdateConfig>,
+        _counterpart_chain_selector: u64,
+        pause: bool,
+    ) -> Result<()> {
         ctx.accounts.config.is_paused = pause;
         Ok(())
     }
 
-    pub fn set_extra_args(ctx: Context<UpdateReallocConfig>, extra_args: Vec<u8>) -> Result<()> {
+    pub fn set_extra_args(
+        ctx: Context<UpdateReallocConfig>,
+        _counterpart_chain_selector: u64,
+        extra_args: Vec<u8>,
+    ) -> Result<()> {
         ctx.accounts.config.extra_args = extra_args;
         Ok(())
     }
 
-    pub fn start_ping_pong(ctx: Context<Start>) -> Result<()> {
+    pub fn start_ping_pong(ctx: Context<Start>, counterpart_chain_selector: u64) -> Result<()> {
+        msg!("Starting PingPong on chain {}", counterpart_chain_selector);
+
         ctx.accounts.config.is_paused = false;
 
         let accounts = cpi::accounts::CcipSend {
@@ -121,6 +136,7 @@ pub mod ping_pong_demo {
         };
 
         helpers::respond(
+            ctx.accounts.global_config.clone().into_inner(),
             ctx.accounts.config.clone().into_inner(),
             accounts,
             BigEndianU256::from(1), // start ping-ponging from the beginning
@@ -132,11 +148,17 @@ pub mod ping_pong_demo {
     // Only callable by CCIP //
     ///////////////////////////
     pub fn ccip_receive(ctx: Context<PingPong>, message: Any2SVMMessage) -> Result<()> {
+        let received_counter = BigEndianU256::try_from(message.data)?;
+
+        msg!(
+            "Received a ping on chain {} with counter {}",
+            message.source_chain_selector,
+            received_counter
+        );
+
         if ctx.accounts.config.is_paused {
             return Ok(()); // stop ping-ponging as it is paused, but do not fail
         }
-
-        let next_count = BigEndianU256::try_from(message.data)?.incr();
 
         let accounts = cpi::accounts::CcipSend {
             config: ctx.accounts.ccip_router_config.to_account_info(),
@@ -170,9 +192,10 @@ pub mod ping_pong_demo {
         };
 
         helpers::respond(
+            ctx.accounts.global_config.clone().into_inner(),
             ctx.accounts.config.clone().into_inner(),
             accounts,
-            next_count,
+            received_counter.incr(),
             ctx.bumps.ccip_send_signer,
         )
     }
@@ -186,6 +209,7 @@ mod helpers {
     pub const CCIP_SEND_DISCRIMINATOR: [u8; 8] = [108, 216, 134, 191, 249, 234, 33, 84];
 
     pub fn respond(
+        global_config: state::GlobalConfig,
         config: state::Config,
         accounts: cpi::accounts::CcipSend,
         ping_pong_count: BigEndianU256,
@@ -221,7 +245,7 @@ mod helpers {
         data.extend_from_slice(&token_indices.try_to_vec().unwrap());
 
         let instruction = Instruction {
-            program_id: config.router,
+            program_id: global_config.router,
             accounts: acc_metas,
             data,
         };
@@ -295,6 +319,16 @@ mod helpers {
             bytes
         }
     }
+
+    impl std::fmt::Display for BigEndianU256 {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            if self.high == 0 {
+                write!(f, "{}", self.low)
+            } else {
+                write!(f, "BigEndianU256(high: {}, low: {})", self.high, self.low)
+            }
+        }
+    }
 }
 
 pub mod context {
@@ -306,6 +340,7 @@ pub mod context {
     use crate::state::*;
 
     pub mod seeds {
+        pub const GLOBAL_CONFIG: &[u8] = b"global_config";
         pub const CONFIG: &[u8] = b"config";
         pub const NAME_VERSION: &[u8] = b"name_version";
         pub const CCIP_SEND_SIGNER: &[u8] = b"ccip_send_signer";
@@ -318,24 +353,15 @@ pub mod context {
     }
 
     #[derive(Accounts)]
-    #[instruction(
-        _router: Pubkey,
-        _counterpart_chain_selector: u64,
-        _counterpart_address: Vec<u8>,
-        _is_paused: bool,
-        extra_args: Vec<u8>,
-    )]
-    pub struct InitializeConfig<'info> {
+    pub struct Initialize<'info> {
         #[account(
             init,
-            seeds = [seeds::CONFIG],
+            seeds = [seeds::GLOBAL_CONFIG],
             bump,
-            space = Config::get_space(&extra_args),
+            space = ANCHOR_DISCRIMINATOR + GlobalConfig::INIT_SPACE,
             payer = authority,
         )]
-        pub config: Account<'info, Config>,
-
-        pub fee_token_mint: InterfaceAccount<'info, Mint>,
+        pub global_config: Account<'info, GlobalConfig>,
 
         #[account(mut)]
         pub authority: Signer<'info>,
@@ -351,26 +377,58 @@ pub mod context {
     }
 
     #[derive(Accounts)]
-    pub struct Initialize<'info> {
+    #[instruction(
+        counterpart_chain_selector: u64,
+        _counterpart_address: Vec<u8>,
+        _is_paused: bool,
+        extra_args: Vec<u8>,
+    )]
+    pub struct InitializeChain<'info> {
         #[account(
-            seeds = [seeds::CONFIG],
+            seeds = [seeds::GLOBAL_CONFIG],
+            bump,
+        )]
+        pub global_config: Account<'info, GlobalConfig>,
+
+        #[account(
+            init,
+            seeds = [seeds::CONFIG, counterpart_chain_selector.to_le_bytes().as_ref()],
+            bump,
+            space = Config::get_space(&extra_args),
+            payer = authority,
+        )]
+        pub config: Account<'info, Config>,
+
+        pub fee_token_mint: InterfaceAccount<'info, Mint>,
+
+        #[account(
+            mut,
+            constraint = global_config.owner == authority.key() @ PingPongDemoError::Unauthorized,
+        )]
+        pub authority: Signer<'info>,
+
+        pub system_program: Program<'info, System>,
+    }
+
+    #[derive(Accounts)]
+    #[instruction(counterpart_chain_selector: u64)]
+    pub struct InitializeFeeToken<'info> {
+        #[account(
+            seeds = [seeds::GLOBAL_CONFIG],
+            bump,
+        )]
+        pub global_config: Account<'info, GlobalConfig>,
+
+        #[account(
+            seeds = [seeds::CONFIG, counterpart_chain_selector.to_le_bytes().as_ref()],
             bump,
         )]
         pub config: Account<'info, Config>,
 
         #[account(
-            init,
-            seeds = [seeds::NAME_VERSION],
-            bump,
-            space = ANCHOR_DISCRIMINATOR + NameVersion::INIT_SPACE,
-            payer = authority,
-        )]
-        pub name_version: Account<'info, NameVersion>, // TODO define if we keep this or remove it
-
-        #[account(
             seeds = [ccip_seeds::FEE_BILLING_SIGNER],
             bump,
-            seeds::program = config.router,
+            seeds::program = global_config.router,
         )]
         /// CHECK
         pub router_fee_billing_signer: UncheckedAccount<'info>,
@@ -399,7 +457,7 @@ pub mod context {
         /// CHECK
         pub ccip_send_signer: UncheckedAccount<'info>,
 
-        #[account(mut, address = config.owner @ PingPongDemoError::Unauthorized)]
+        #[account(mut, address = global_config.owner @ PingPongDemoError::Unauthorized)]
         pub authority: Signer<'info>,
 
         pub associated_token_program: Program<'info, AssociatedToken>,
@@ -408,27 +466,40 @@ pub mod context {
     }
 
     #[derive(Accounts)]
+    #[instruction(counterpart_chain_selector: u64)]
     pub struct UpdateConfig<'info> {
         #[account(
+            seeds = [seeds::GLOBAL_CONFIG],
+            bump,
+        )]
+        pub global_config: Account<'info, GlobalConfig>,
+
+        #[account(
             mut,
-            seeds = [seeds::CONFIG],
+            seeds = [seeds::CONFIG, counterpart_chain_selector.to_le_bytes().as_ref()],
             bump,
         )]
         pub config: Account<'info, Config>,
 
         #[account(
             mut,
-            address = config.owner @ PingPongDemoError::Unauthorized,
+            address = global_config.owner @ PingPongDemoError::Unauthorized,
         )]
         pub authority: Signer<'info>,
     }
 
     #[derive(Accounts)]
-    #[instruction(extra_args: Vec<u8>)]
+    #[instruction(counterpart_chain_selector: u64, extra_args: Vec<u8>)]
     pub struct UpdateReallocConfig<'info> {
         #[account(
+            seeds = [seeds::GLOBAL_CONFIG],
+            bump,
+        )]
+        pub global_config: Account<'info, GlobalConfig>,
+
+        #[account(
             mut,
-            seeds = [seeds::CONFIG],
+            seeds = [seeds::CONFIG, counterpart_chain_selector.to_le_bytes().as_ref()],
             bump,
             realloc = Config::get_space(&extra_args),
             realloc::payer = authority,
@@ -438,7 +509,7 @@ pub mod context {
 
         #[account(
             mut,
-            address = config.owner @ PingPongDemoError::Unauthorized,
+            address = global_config.owner @ PingPongDemoError::Unauthorized,
         )]
         pub authority: Signer<'info>,
 
@@ -446,17 +517,24 @@ pub mod context {
     }
 
     #[derive(Accounts)]
+    #[instruction(counterpart_chain_selector: u64)]
     pub struct Start<'info> {
         #[account(
+            seeds = [seeds::GLOBAL_CONFIG],
+            bump,
+        )]
+        pub global_config: Account<'info, GlobalConfig>,
+
+        #[account(
             mut,
-            seeds = [seeds::CONFIG],
+            seeds = [seeds::CONFIG, counterpart_chain_selector.to_le_bytes().as_ref()],
             bump,
         )]
         pub config: Account<'info, Config>,
 
         #[account(
             mut,
-            address = config.owner @ PingPongDemoError::Unauthorized,
+            address = global_config.owner @ PingPongDemoError::Unauthorized,
         )]
         pub authority: Signer<'info>,
 
@@ -481,7 +559,7 @@ pub mod context {
         pub fee_token_ata: InterfaceAccount<'info, TokenAccount>,
 
         #[account(
-            address = config.router,
+            address = global_config.router,
         )]
         /// CHECK
         pub ccip_router_program: UncheckedAccount<'info>,
@@ -544,19 +622,25 @@ pub mod context {
         /// CHECK PDA of the router program verifying the signer is an allowed offramp.
         /// If PDA does not exist, the router doesn't allow this offramp
         #[account(
-        owner = config.router, // this guarantees that it was initialized
+        owner = global_config.router, // this guarantees that it was initialized
         seeds = [
             ccip_seeds::ALLOWED_OFFRAMP,
             message.source_chain_selector.to_le_bytes().as_ref(),
             offramp_program.key().as_ref()
         ],
         bump,
-        seeds::program = config.router,
+        seeds::program = global_config.router,
     )]
         pub allowed_offramp: UncheckedAccount<'info>,
 
         #[account(
-            seeds = [seeds::CONFIG],
+            seeds = [seeds::GLOBAL_CONFIG],
+            bump,
+        )]
+        pub global_config: Account<'info, GlobalConfig>,
+
+        #[account(
+            seeds = [seeds::CONFIG, message.source_chain_selector.to_le_bytes().as_ref()],
             bump,
         )]
         pub config: Account<'info, Config>,
@@ -582,7 +666,7 @@ pub mod context {
         pub fee_token_ata: InterfaceAccount<'info, TokenAccount>,
 
         #[account(
-            address = config.router,
+            address = global_config.router,
         )]
         /// CHECK
         pub ccip_router_program: UncheckedAccount<'info>,
@@ -628,11 +712,14 @@ pub mod state {
 
     #[account]
     #[derive(InitSpace)]
-    pub struct Config {
-        pub owner: Pubkey, // The owner of the contract.
-
+    pub struct GlobalConfig {
+        pub owner: Pubkey,  // The owner of the contract.
         pub router: Pubkey, // The address of the CCIP router contract.
+    }
 
+    #[account]
+    #[derive(InitSpace)]
+    pub struct Config {
         pub counterpart_chain_selector: u64, // The chain ID of the counterpart ping pong contract.
         pub counterpart_address: CounterpartAddress, // The contract address of the counterpart ping pong contract.
         pub is_paused: bool,                         // Pause ping-ponging.
@@ -640,23 +727,13 @@ pub mod state {
 
         // Extra args on ccip_send
         #[max_len(0)]
-        pub extra_args: Vec<u8>, // pub default_gas_limit: u64, // Default gas limit used for EVMExtraArgsV2 construction.
-                                 // pub out_of_order_execution: bool, // Allowing out of order execution.
+        pub extra_args: Vec<u8>,
     }
 
     impl Config {
         pub fn get_space(extra_args: &[u8]) -> usize {
             ANCHOR_DISCRIMINATOR + Config::INIT_SPACE + extra_args.len()
         }
-    }
-
-    #[account]
-    #[derive(InitSpace)]
-    pub struct NameVersion {
-        #[max_len(32)]
-        pub name: String,
-        #[max_len(10)]
-        pub version: String,
     }
 
     #[derive(AnchorDeserialize, AnchorSerialize, Clone, Copy, InitSpace)]

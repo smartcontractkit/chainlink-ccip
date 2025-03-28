@@ -12,22 +12,31 @@ import (
 
 // SetExtraArgs is the `setExtraArgs` instruction.
 type SetExtraArgs struct {
-	ExtraArgs *[]byte
+	CounterpartChainSelector *uint64
+	ExtraArgs                *[]byte
 
-	// [0] = [WRITE] config
+	// [0] = [] globalConfig
 	//
-	// [1] = [WRITE, SIGNER] authority
+	// [1] = [WRITE] config
 	//
-	// [2] = [] systemProgram
+	// [2] = [WRITE, SIGNER] authority
+	//
+	// [3] = [] systemProgram
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewSetExtraArgsInstructionBuilder creates a new `SetExtraArgs` instruction builder.
 func NewSetExtraArgsInstructionBuilder() *SetExtraArgs {
 	nd := &SetExtraArgs{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 3),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 4),
 	}
 	return nd
+}
+
+// SetCounterpartChainSelector sets the "counterpartChainSelector" parameter.
+func (inst *SetExtraArgs) SetCounterpartChainSelector(counterpartChainSelector uint64) *SetExtraArgs {
+	inst.CounterpartChainSelector = &counterpartChainSelector
+	return inst
 }
 
 // SetExtraArgs sets the "extraArgs" parameter.
@@ -36,37 +45,48 @@ func (inst *SetExtraArgs) SetExtraArgs(extraArgs []byte) *SetExtraArgs {
 	return inst
 }
 
+// SetGlobalConfigAccount sets the "globalConfig" account.
+func (inst *SetExtraArgs) SetGlobalConfigAccount(globalConfig ag_solanago.PublicKey) *SetExtraArgs {
+	inst.AccountMetaSlice[0] = ag_solanago.Meta(globalConfig)
+	return inst
+}
+
+// GetGlobalConfigAccount gets the "globalConfig" account.
+func (inst *SetExtraArgs) GetGlobalConfigAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[0]
+}
+
 // SetConfigAccount sets the "config" account.
 func (inst *SetExtraArgs) SetConfigAccount(config ag_solanago.PublicKey) *SetExtraArgs {
-	inst.AccountMetaSlice[0] = ag_solanago.Meta(config).WRITE()
+	inst.AccountMetaSlice[1] = ag_solanago.Meta(config).WRITE()
 	return inst
 }
 
 // GetConfigAccount gets the "config" account.
 func (inst *SetExtraArgs) GetConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice[1]
 }
 
 // SetAuthorityAccount sets the "authority" account.
 func (inst *SetExtraArgs) SetAuthorityAccount(authority ag_solanago.PublicKey) *SetExtraArgs {
-	inst.AccountMetaSlice[1] = ag_solanago.Meta(authority).WRITE().SIGNER()
+	inst.AccountMetaSlice[2] = ag_solanago.Meta(authority).WRITE().SIGNER()
 	return inst
 }
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *SetExtraArgs) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice[2]
 }
 
 // SetSystemProgramAccount sets the "systemProgram" account.
 func (inst *SetExtraArgs) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *SetExtraArgs {
-	inst.AccountMetaSlice[2] = ag_solanago.Meta(systemProgram)
+	inst.AccountMetaSlice[3] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
 // GetSystemProgramAccount gets the "systemProgram" account.
 func (inst *SetExtraArgs) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice[3]
 }
 
 func (inst SetExtraArgs) Build() *Instruction {
@@ -89,6 +109,9 @@ func (inst SetExtraArgs) ValidateAndBuild() (*Instruction, error) {
 func (inst *SetExtraArgs) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
+		if inst.CounterpartChainSelector == nil {
+			return errors.New("CounterpartChainSelector parameter is not set")
+		}
 		if inst.ExtraArgs == nil {
 			return errors.New("ExtraArgs parameter is not set")
 		}
@@ -97,12 +120,15 @@ func (inst *SetExtraArgs) Validate() error {
 	// Check whether all (required) accounts are set:
 	{
 		if inst.AccountMetaSlice[0] == nil {
-			return errors.New("accounts.Config is not set")
+			return errors.New("accounts.GlobalConfig is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
-			return errors.New("accounts.Authority is not set")
+			return errors.New("accounts.Config is not set")
 		}
 		if inst.AccountMetaSlice[2] == nil {
+			return errors.New("accounts.Authority is not set")
+		}
+		if inst.AccountMetaSlice[3] == nil {
 			return errors.New("accounts.SystemProgram is not set")
 		}
 	}
@@ -118,21 +144,28 @@ func (inst *SetExtraArgs) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("ExtraArgs", *inst.ExtraArgs))
+					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+						paramsBranch.Child(ag_format.Param("CounterpartChainSelector", *inst.CounterpartChainSelector))
+						paramsBranch.Child(ag_format.Param("               ExtraArgs", *inst.ExtraArgs))
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("       config", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("    authority", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[2]))
+					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+						accountsBranch.Child(ag_format.Meta(" globalConfig", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("       config", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("    authority", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[3]))
 					})
 				})
 		})
 }
 
 func (obj SetExtraArgs) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `CounterpartChainSelector` param:
+	err = encoder.Encode(obj.CounterpartChainSelector)
+	if err != nil {
+		return err
+	}
 	// Serialize `ExtraArgs` param:
 	err = encoder.Encode(obj.ExtraArgs)
 	if err != nil {
@@ -141,6 +174,11 @@ func (obj SetExtraArgs) MarshalWithEncoder(encoder *ag_binary.Encoder) (err erro
 	return nil
 }
 func (obj *SetExtraArgs) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `CounterpartChainSelector`:
+	err = decoder.Decode(&obj.CounterpartChainSelector)
+	if err != nil {
+		return err
+	}
 	// Deserialize `ExtraArgs`:
 	err = decoder.Decode(&obj.ExtraArgs)
 	if err != nil {
@@ -152,13 +190,17 @@ func (obj *SetExtraArgs) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err e
 // NewSetExtraArgsInstruction declares a new SetExtraArgs instruction with the provided parameters and accounts.
 func NewSetExtraArgsInstruction(
 	// Parameters:
+	counterpartChainSelector uint64,
 	extraArgs []byte,
 	// Accounts:
+	globalConfig ag_solanago.PublicKey,
 	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *SetExtraArgs {
 	return NewSetExtraArgsInstructionBuilder().
+		SetCounterpartChainSelector(counterpartChainSelector).
 		SetExtraArgs(extraArgs).
+		SetGlobalConfigAccount(globalConfig).
 		SetConfigAccount(config).
 		SetAuthorityAccount(authority).
 		SetSystemProgramAccount(systemProgram)

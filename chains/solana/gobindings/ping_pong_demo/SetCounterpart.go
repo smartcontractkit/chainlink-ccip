@@ -15,16 +15,18 @@ type SetCounterpart struct {
 	CounterpartChainSelector *uint64
 	CounterpartAddress       *[]byte
 
-	// [0] = [WRITE] config
+	// [0] = [] globalConfig
 	//
-	// [1] = [WRITE, SIGNER] authority
+	// [1] = [WRITE] config
+	//
+	// [2] = [WRITE, SIGNER] authority
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewSetCounterpartInstructionBuilder creates a new `SetCounterpart` instruction builder.
 func NewSetCounterpartInstructionBuilder() *SetCounterpart {
 	nd := &SetCounterpart{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 2),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 3),
 	}
 	return nd
 }
@@ -41,26 +43,37 @@ func (inst *SetCounterpart) SetCounterpartAddress(counterpartAddress []byte) *Se
 	return inst
 }
 
+// SetGlobalConfigAccount sets the "globalConfig" account.
+func (inst *SetCounterpart) SetGlobalConfigAccount(globalConfig ag_solanago.PublicKey) *SetCounterpart {
+	inst.AccountMetaSlice[0] = ag_solanago.Meta(globalConfig)
+	return inst
+}
+
+// GetGlobalConfigAccount gets the "globalConfig" account.
+func (inst *SetCounterpart) GetGlobalConfigAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[0]
+}
+
 // SetConfigAccount sets the "config" account.
 func (inst *SetCounterpart) SetConfigAccount(config ag_solanago.PublicKey) *SetCounterpart {
-	inst.AccountMetaSlice[0] = ag_solanago.Meta(config).WRITE()
+	inst.AccountMetaSlice[1] = ag_solanago.Meta(config).WRITE()
 	return inst
 }
 
 // GetConfigAccount gets the "config" account.
 func (inst *SetCounterpart) GetConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice[1]
 }
 
 // SetAuthorityAccount sets the "authority" account.
 func (inst *SetCounterpart) SetAuthorityAccount(authority ag_solanago.PublicKey) *SetCounterpart {
-	inst.AccountMetaSlice[1] = ag_solanago.Meta(authority).WRITE().SIGNER()
+	inst.AccountMetaSlice[2] = ag_solanago.Meta(authority).WRITE().SIGNER()
 	return inst
 }
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *SetCounterpart) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice[2]
 }
 
 func (inst SetCounterpart) Build() *Instruction {
@@ -94,9 +107,12 @@ func (inst *SetCounterpart) Validate() error {
 	// Check whether all (required) accounts are set:
 	{
 		if inst.AccountMetaSlice[0] == nil {
-			return errors.New("accounts.Config is not set")
+			return errors.New("accounts.GlobalConfig is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
+			return errors.New("accounts.Config is not set")
+		}
+		if inst.AccountMetaSlice[2] == nil {
 			return errors.New("accounts.Authority is not set")
 		}
 	}
@@ -118,9 +134,10 @@ func (inst *SetCounterpart) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=2]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("   config", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice[1]))
+					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+						accountsBranch.Child(ag_format.Meta("globalConfig", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("      config", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("   authority", inst.AccountMetaSlice[2]))
 					})
 				})
 		})
@@ -159,11 +176,13 @@ func NewSetCounterpartInstruction(
 	counterpartChainSelector uint64,
 	counterpartAddress []byte,
 	// Accounts:
+	globalConfig ag_solanago.PublicKey,
 	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *SetCounterpart {
 	return NewSetCounterpartInstructionBuilder().
 		SetCounterpartChainSelector(counterpartChainSelector).
 		SetCounterpartAddress(counterpartAddress).
+		SetGlobalConfigAccount(globalConfig).
 		SetConfigAccount(config).
 		SetAuthorityAccount(authority)
 }
