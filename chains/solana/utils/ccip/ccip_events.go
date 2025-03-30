@@ -26,6 +26,7 @@ type EventCommitReportAccepted struct {
 }
 
 type EventCommitReportPDAClosed struct {
+	Discriminator       [8]byte
 	SourceChainSelector uint64
 	MerkleRoot          [32]byte
 }

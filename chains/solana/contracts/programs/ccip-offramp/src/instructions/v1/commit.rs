@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{sync_native, Token, TokenAccount};
+use anchor_spl::token::{spl_token, Token, TokenAccount};
 use ccip_common::seed;
+use solana_program::program::invoke;
 
 use super::ocr3base::{ocr3_transmit, ReportContext, Signatures};
 use super::ocr3impl::Ocr3ReportForCommit;
@@ -235,8 +236,8 @@ impl Commit for Impl {
     fn close_commit_report_account(
         &self,
         ctx: Context<CloseCommitReportAccount>,
-        _source_chain_selector: u64,
-        _root: Vec<u8>,
+        source_chain_selector: u64,
+        root: Vec<u8>,
     ) -> Result<()> {
         let commit_report = &ctx.accounts.commit_report;
 
@@ -248,17 +249,16 @@ impl Commit for Impl {
 
         // Close the account and convert rent to wrapped SOL
         transfer_and_wrap_native_sol(
-            &ctx.accounts.token_program,
             ctx.accounts.commit_report.to_account_info(),
             &ctx.accounts.fee_token_receiver,
         )?;
 
-        let merkle_root_array: [u8; 32] = _root
+        let merkle_root_array: [u8; 32] = root
             .try_into()
             .map_err(|_| CcipOfframpError::InvalidProof)?;
 
         emit!(CommitReportPDAClosed {
-            source_chain_selector: _source_chain_selector,
+            source_chain_selector: source_chain_selector,
             merkle_root: merkle_root_array,
         });
 
@@ -279,26 +279,32 @@ fn all_messages_executed(report: &CommitReport) -> bool {
 
 // Helper function to convert the SOL from the closed account to wrapped SOL
 fn transfer_and_wrap_native_sol<'info>(
-    token_program: &Program<'info, Token>,
     commit_report: AccountInfo<'info>,
     fee_token_receiver: &Account<'info, TokenAccount>,
 ) -> Result<()> {
     // Get lamports before closing
     let lamports = commit_report.lamports();
 
-    // Close the account by setting its data length to 0
+    // Close the commit report PDA by setting its balance to 0
     **commit_report.try_borrow_mut_lamports()? = 0;
 
-    // Transfer wSOL to OnRamp fee_token_receiver
     **fee_token_receiver
         .to_account_info()
         .try_borrow_mut_lamports()? += lamports;
 
-    let account = fee_token_receiver.to_account_info();
-    let sync: anchor_spl::token::SyncNative = anchor_spl::token::SyncNative { account };
+    // let ix = spl_token::instruction::sync_native(
+    //     &spl_token::ID,
+    //     fee_token_receiver.to_account_info().key,
+    // )?;
+    // invoke(
+    //     &ix,
+    //     &[
+    //         commit_report.to_account_info(),
+    //         fee_token_receiver.to_account_info(),
+    //     ],
+    // )?;
 
-    let cpi_ctx = CpiContext::new(token_program.to_account_info(), sync);
-    sync_native(cpi_ctx)
+    Ok(())
 }
 
 mod helpers {

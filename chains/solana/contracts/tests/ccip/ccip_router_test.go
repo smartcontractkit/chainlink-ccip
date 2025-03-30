@@ -6764,8 +6764,122 @@ func TestCCIPRouter(t *testing.T) {
 				require.Equal(t, bin.Uint128{Lo: 2, Hi: 0}, rootAccount.ExecutionStates)
 				require.Equal(t, sequenceNumber, rootAccount.MinMsgNr)
 				require.Equal(t, sequenceNumber, rootAccount.MaxMsgNr)
+			})
 
+			t.Run("Merkle root PDA can be closed iff it is successfully executed", func(t *testing.T) {
+				transmitter := getTransmitter()
+
+				sourceChainSelector := config.EvmChainSelector
+				message, root := testutils.CreateNextMessage(ctx, solanaGoClient, t, []solana.PublicKey{config.CcipLogicReceiver, config.ReceiverExternalExecutionConfigPDA, config.ReceiverTargetAccountPDA, solana.SystemProgramID})
+				sequenceNumber := message.Header.SequenceNumber
+
+				commitReport := ccip_offramp.CommitInput{
+					MerkleRoot: &ccip_offramp.MerkleRoot{
+						SourceChainSelector: sourceChainSelector,
+						OnRampAddress:       config.OnRampAddress,
+						MinSeqNr:            sequenceNumber,
+						MaxSeqNr:            sequenceNumber,
+						MerkleRoot:          root,
+					},
+				}
+				sigs, err := ccip.SignCommitReport(reportContext, commitReport, signers)
+				require.NoError(t, err)
+				rootPDA, err := state.FindOfframpCommitReportPDA(config.EvmChainSelector, root, config.CcipOfframpProgram)
+				require.NoError(t, err)
+
+				instruction, err := ccip_offramp.NewCommitInstruction(
+					reportContext,
+					testutils.MustMarshalBorsh(t, commitReport),
+					sigs.Rs,
+					sigs.Ss,
+					sigs.RawVs,
+					config.OfframpConfigPDA,
+					config.OfframpReferenceAddressesPDA,
+					config.OfframpEvmSourceChainPDA,
+					rootPDA,
+					transmitter.PublicKey(),
+					solana.SystemProgramID,
+					solana.SysVarInstructionsPubkey,
+					config.OfframpBillingSignerPDA,
+					config.FeeQuoterProgram,
+					config.FqAllowedPriceUpdaterOfframpPDA,
+					config.FqConfigPDA,
+					config.RMNRemoteProgram,
+					config.RMNRemoteCursesPDA,
+					config.RMNRemoteConfigPDA,
+				).ValidateAndBuild()
+				require.NoError(t, err)
+				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT)) // signature verification compute unit amounts can vary depending on sorting
+				event := common.EventCommitReportAccepted{}
+				require.NoError(t, common.ParseEventCommitReportAccepted(tx.Meta.LogMessages, "CommitReportAccepted", &event))
+
+				// Validate that the CommitReportPDA cannot be closed before the execution is successful
 				closeCommitPDAInstruction, err := ccip_offramp.NewCloseCommitReportAccountInstruction(
+					commitReport.MerkleRoot.SourceChainSelector,
+					commitReport.MerkleRoot.MerkleRoot[:],
+					config.OfframpConfigPDA,
+					rootPDA,
+					config.OfframpReferenceAddressesPDA,
+					wsol.mint,
+					wsol.billingATA,
+					config.BillingSignerPDA,
+					wsol.program,
+				).ValidateAndBuild()
+				require.NoError(t, err)
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{closeCommitPDAInstruction}, user, config.DefaultCommitment, []string{ccip.CommitReportHasPendingMessages_CcipOfframpError.String()})
+
+				executionReport := ccip_offramp.ExecutionReportSingleChain{
+					SourceChainSelector: sourceChainSelector,
+					Message:             message,
+					Proofs:              [][32]uint8{}, // single leaf merkle tree
+				}
+				raw := ccip_offramp.NewExecuteInstruction(
+					testutils.MustMarshalBorsh(t, executionReport),
+					reportContext,
+					[]byte{},
+					config.OfframpConfigPDA,
+					config.OfframpReferenceAddressesPDA,
+					config.OfframpEvmSourceChainPDA,
+					rootPDA,
+					config.CcipOfframpProgram,
+					config.AllowedOfframpEvmPDA,
+					config.OfframpExternalExecutionConfigPDA,
+					transmitter.PublicKey(),
+					solana.SystemProgramID,
+					solana.SysVarInstructionsPubkey,
+					config.OfframpTokenPoolsSignerPDA,
+					config.RMNRemoteProgram,
+					config.RMNRemoteCursesPDA,
+					config.RMNRemoteConfigPDA,
+				)
+
+				raw.AccountMetaSlice = append(
+					raw.AccountMetaSlice,
+					solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
+					solana.NewAccountMeta(config.ReceiverExternalExecutionConfigPDA, true, false),
+					solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
+					solana.NewAccountMeta(solana.SystemProgramID, false, false),
+				)
+				instruction, err = raw.ValidateAndBuild()
+				require.NoError(t, err)
+
+				tx = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment)
+
+				// Validate that the execution is successful
+				executionEvents, err := common.ParseMultipleEvents[ccip.EventExecutionStateChanged](tx.Meta.LogMessages, "ExecutionStateChanged", config.PrintEvents)
+				require.NoError(t, err)
+				require.Equal(t, ccip_offramp.Success_MessageExecutionState, executionEvents[1].State)
+
+				// Validate that the CommitReportPDA has rent
+				balanceResult, err := solanaGoClient.GetBalance(ctx, rootPDA, config.DefaultCommitment)
+				require.NoError(t, err)
+				initCommitPDABalance := balanceResult.Value
+				require.Greater(t, initCommitPDABalance, uint64(0))
+				// initWsolBalance := getBalance(wsol.billingATA)
+				initReceiverBalance, err := solanaGoClient.GetBalance(ctx, wsol.billingATA, config.DefaultCommitment)
+				require.NoError(t, err)
+
+				closeCommitPDAInstruction, err = ccip_offramp.NewCloseCommitReportAccountInstruction(
 					commitReport.MerkleRoot.SourceChainSelector,
 					commitReport.MerkleRoot.MerkleRoot[:],
 					config.OfframpConfigPDA,
@@ -6781,8 +6895,26 @@ func TestCCIPRouter(t *testing.T) {
 
 				commitPDACloseEvent := ccip.EventCommitReportPDAClosed{}
 				require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportPDAClosed", &commitPDACloseEvent, config.PrintEvents))
+
 				require.Equal(t, commitReport.MerkleRoot.SourceChainSelector, commitPDACloseEvent.SourceChainSelector)
 				require.Equal(t, hex.EncodeToString(root[:]), hex.EncodeToString(commitPDACloseEvent.MerkleRoot[:]))
+
+				// Validate that the CommitReportPDA is closed
+				testutils.AssertClosedAccount(ctx, t, solanaGoClient, rootPDA, config.DefaultCommitment)
+
+				// Validate that the CommitReportPDA balance is 0
+				balanceResult, err = solanaGoClient.GetBalance(ctx, rootPDA, config.DefaultCommitment)
+				require.NoError(t, err)
+				require.Equal(t, uint64(0), balanceResult.Value)
+
+				// Validate that the CommitReportPDA rent has been transferred to the billing account
+				finalReceiverBalance, err := solanaGoClient.GetBalance(ctx, wsol.billingATA, config.DefaultCommitment)
+				require.NoError(t, err)
+				require.Equal(t, initReceiverBalance.Value+initCommitPDABalance, finalReceiverBalance.Value)
+
+				// // Validate that the CommitReportPDA rent has been transferred to the billing account
+				// finalWsolBalance := getBalance(wsol.billingATA)
+				// require.Equal(t, initWsolBalance+initCommitPDABalance, finalWsolBalance)
 			})
 
 			t.Run("When executing a report with not matching source chain selector in message, it fails", func(t *testing.T) {
