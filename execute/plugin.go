@@ -31,7 +31,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/cache"
 	"github.com/smartcontractkit/chainlink-ccip/execute/metrics"
 	"github.com/smartcontractkit/chainlink-ccip/execute/report"
-	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
+	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata/observer"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery"
@@ -75,7 +75,7 @@ type Plugin struct {
 	observer     metrics.Reporter
 
 	oracleIDToP2pID   map[commontypes.OracleID]libocrtypes.PeerID
-	tokenDataObserver tokendata.TokenDataObserver
+	tokenDataObserver observer.TokenDataObserver
 	estimateProvider  cciptypes.EstimateProvider
 	lggr              logger.Logger
 	ocrTypeCodec      ocrtypecodec.ExecCodec
@@ -100,7 +100,7 @@ func NewPlugin(
 	reportCodec cciptypes.ExecutePluginCodec,
 	msgHasher cciptypes.MessageHasher,
 	homeChain reader.HomeChain,
-	tokenDataObserver tokendata.TokenDataObserver,
+	tokenDataObserver observer.TokenDataObserver,
 	estimateProvider cciptypes.EstimateProvider,
 	lggr logger.Logger,
 	metricsReporter metrics.Reporter,
@@ -267,6 +267,7 @@ func getPendingReportsForExecution(
 	ccipReader readerpkg.CCIPReader,
 	canExecute CanExecuteHandle,
 	ts time.Time,
+	cursedSourceChains map[cciptypes.ChainSelector]bool,
 	lggr logger.Logger,
 ) (
 	groupedCommits exectypes.CommitObservations,
@@ -280,7 +281,7 @@ func getPendingReportsForExecution(
 	}
 	lggr.Debugw("commit reports", "commitReports", commitReports, "count", len(commitReports))
 
-	groupedCommits = groupByChainSelector(commitReports)
+	groupedCommits = groupByChainSelectorWithFilter(lggr, commitReports, cursedSourceChains)
 	lggr.Debugw("grouped commits before removing fully executed reports",
 		"groupedCommits", groupedCommits, "count", len(groupedCommits))
 

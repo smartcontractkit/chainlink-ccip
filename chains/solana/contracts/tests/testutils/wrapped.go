@@ -62,6 +62,24 @@ func SimulateTransaction(ctx context.Context, t *testing.T, rpcClient *rpc.Clien
 	return simRes
 }
 
+func GetRequiredCUWithLookupTables(ctx context.Context, t *testing.T, client *rpc.Client, ixs []solana.Instruction, signer solana.PrivateKey, commitment rpc.CommitmentType, lookupTables map[solana.PublicKey]solana.PublicKeySlice) fees.ComputeUnitLimit {
+	// simulate the transaction with max cu to get the required CU
+	cuIx, err := computebudget.NewSetComputeUnitLimitInstruction(uint32(computebudget.MAX_COMPUTE_UNIT_LIMIT)).ValidateAndBuild()
+	require.NoError(t, err)
+	simulateIxs := append([]solana.Instruction{cuIx}, ixs...)
+	feeResult, err := common.SimulateTransactionWithLookupTables(ctx, client, simulateIxs, signer,
+		lookupTables,
+		rpc.SimulateTransactionOpts{
+			ReplaceRecentBlockhash: true,
+			Commitment:             commitment,
+		})
+	require.NoError(t, err)
+	require.Nil(t, feeResult.Value.Err)
+	// maximum cu is 1_400_000, so we can safely cast to uint32
+	//nolint:gosec
+	return fees.ComputeUnitLimit(*feeResult.Value.UnitsConsumed)
+}
+
 func GetRequiredCU(ctx context.Context, t *testing.T, client *rpc.Client, ixs []solana.Instruction, signer solana.PrivateKey, commitment rpc.CommitmentType) fees.ComputeUnitLimit {
 	// simulate the transaction with max cu to get the required CU
 	cuIx, err := computebudget.NewSetComputeUnitLimitInstruction(uint32(computebudget.MAX_COMPUTE_UNIT_LIMIT)).ValidateAndBuild()

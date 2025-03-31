@@ -195,6 +195,25 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 							&tokens.TokenInstruction{Instruction: ixConfigure, Program: poolProgram},
 							&tokens.TokenInstruction{Instruction: ixAppend, Program: poolProgram},
 						}, admin, config.DefaultCommitment)
+
+						// Test growing and shrinking allowlist (realloc test)
+						a, _ := solana.NewRandomPrivateKey()
+						b, _ := solana.NewRandomPrivateKey()
+
+						ixGrowWithDuplicates, err := tokenpool.NewConfigureAllowListInstruction([]solana.PublicKey{a.PublicKey(), b.PublicKey(), b.PublicKey()}, false, poolConfig, mint, admin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+						require.NoError(t, err)
+						testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{&tokens.TokenInstruction{Instruction: ixGrowWithDuplicates, Program: poolProgram}}, admin, rpc.CommitmentConfirmed, []string{"Key already existed in the allowlist"})
+
+						ixGrow, err := tokenpool.NewConfigureAllowListInstruction([]solana.PublicKey{a.PublicKey(), b.PublicKey()}, false, poolConfig, mint, admin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+						require.NoError(t, err)
+						testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{&tokens.TokenInstruction{Instruction: ixGrow, Program: poolProgram}}, admin, rpc.CommitmentConfirmed)
+
+						ixShrink, err := tokenpool.NewRemoveFromAllowListInstruction([]solana.PublicKey{a.PublicKey(), b.PublicKey()}, poolConfig, mint, admin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+						require.NoError(t, err)
+						testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{&tokens.TokenInstruction{Instruction: ixShrink, Program: poolProgram}}, admin, rpc.CommitmentConfirmed)
+
+						// Shrinking fails now as the entries do not exist anymore
+						testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{&tokens.TokenInstruction{Instruction: ixShrink, Program: poolProgram}}, admin, rpc.CommitmentConfirmed, []string{"Key did not exist in the allowlist"})
 					})
 
 					t.Run("lockOrBurn", func(t *testing.T) {
@@ -263,7 +282,13 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 						).ValidateAndBuild()
 						require.NoError(t, err)
 
-						res := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{rmI}, admin, config.DefaultCommitment)
+						cu := testutils.GetRequiredCU(ctx, t, solanaGoClient, []solana.Instruction{rmI}, admin, config.DefaultCommitment)
+
+						// This validation is like a snapshot for gas consumption
+						// Release or Mint CPI
+						require.LessOrEqual(t, cu, uint32(100_000))
+
+						res := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{rmI}, admin, config.DefaultCommitment, common.AddComputeUnitLimit(cu))
 						require.NotNil(t, res)
 
 						// validate balances

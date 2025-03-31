@@ -1,4 +1,4 @@
-package tokendata
+package observer
 
 import (
 	"context"
@@ -10,7 +10,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata/usdc"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
@@ -65,13 +64,14 @@ func NewConfigBasedCompositeObservers(
 		// e.g. observers[i] := config.CreateTokenDataObserver()
 		switch {
 		case c.USDCCCTPObserverConfig != nil:
-			observer, err := createUSDCTokenObserver(ctx, lggr, destChainSelector, *c.USDCCCTPObserverConfig,
-				encoder, readers, addrCodec)
+			observer, err := usdc.NewUSDCTokenDataObserver(ctx, lggr, destChainSelector,
+				*c.USDCCCTPObserverConfig,
+				encoder.EncodeUSDC, readers, addrCodec)
 			if err != nil {
 				return nil, fmt.Errorf("create USDC/CCTP token observer: %w", err)
 			}
 
-			if c.USDCCCTPObserverConfig.NumWorkers == 0 {
+			if c.USDCCCTPObserverConfig.IsForeground() {
 				lggr.Info("Using foreground observer for USDC/CCTP")
 				observers[i] = observer
 			} else {
@@ -90,41 +90,6 @@ func NewConfigBasedCompositeObservers(
 		}
 	}
 	return NewCompositeObservers(lggr, observers...), nil
-}
-
-func createUSDCTokenObserver(
-	ctx context.Context,
-	lggr logger.Logger,
-	destChainSelector cciptypes.ChainSelector,
-	cctpConfig pluginconfig.USDCCCTPObserverConfig,
-	encoder cciptypes.TokenDataEncoder,
-	readers map[cciptypes.ChainSelector]contractreader.ContractReaderFacade,
-	addrCodec cciptypes.AddressCodec,
-) (TokenDataObserver, error) {
-	usdcReader, err := reader.NewUSDCMessageReader(
-		ctx,
-		lggr,
-		cctpConfig.Tokens,
-		readers,
-		addrCodec,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	client, err := usdc.NewSequentialAttestationClient(lggr, cctpConfig)
-	if err != nil {
-		return nil, fmt.Errorf("create attestation client: %w", err)
-	}
-
-	return usdc.NewTokenDataObserver(
-		lggr,
-		destChainSelector,
-		cctpConfig.Tokens,
-		encoder.EncodeUSDC,
-		usdcReader,
-		client,
-	), nil
 }
 
 // NewCompositeObservers creates a compositeTokenDataObserver based on the provided observers.

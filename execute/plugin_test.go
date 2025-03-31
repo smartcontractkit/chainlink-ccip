@@ -31,7 +31,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
-	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
+	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata/observer"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
@@ -246,6 +246,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 		reports                 []plugintypes2.CommitPluginReportWithMeta
 		ranges                  map[cciptypes.ChainSelector][]cciptypes.SeqNum // finalized
 		unfinalizedRanges       map[cciptypes.ChainSelector][]cciptypes.SeqNum // unfinalized
+		cursedSourceChains      map[cciptypes.ChainSelector]bool               // cursed chains
 		canExec                 CanExecuteHandle
 		wantObs                 exectypes.CommitObservations
 		wantExecutedFinalized   []exectypes.CommitData
@@ -257,6 +258,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 			reports:                 nil,
 			ranges:                  nil,
 			unfinalizedRanges:       nil,
+			cursedSourceChains:      nil,
 			wantObs:                 exectypes.CommitObservations{},
 			wantExecutedFinalized:   nil,
 			wantExecutedUnfinalized: nil,
@@ -284,6 +286,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 			unfinalizedRanges: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
 				1: nil,
 			},
+			cursedSourceChains: nil,
 			wantObs: exectypes.CommitObservations{
 				1: []exectypes.CommitData{
 					{
@@ -320,6 +323,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 			unfinalizedRanges: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
 				1: {7, 8},
 			},
+			cursedSourceChains: nil, // No cursed chains
 			wantObs: exectypes.CommitObservations{
 				1: []exectypes.CommitData{
 					{
@@ -357,6 +361,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 			unfinalizedRanges: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
 				1: nil,
 			},
+			cursedSourceChains: nil, // No cursed chains
 			wantObs: exectypes.CommitObservations{
 				1: nil,
 			},
@@ -393,6 +398,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 			unfinalizedRanges: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
 				1: cciptypes.NewSeqNumRange(1, 10).ToSlice(),
 			},
+			cursedSourceChains: nil, // No cursed chains
 			wantObs: exectypes.CommitObservations{
 				1: nil,
 			},
@@ -441,6 +447,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 			unfinalizedRanges: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
 				1: cciptypes.NewSeqNumRange(11, 20).ToSlice(),
 			},
+			cursedSourceChains: nil, // No cursed chains
 			wantObs: exectypes.CommitObservations{
 				1: nil,
 			},
@@ -478,9 +485,10 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 					},
 				},
 			},
-			canExec:           canExecute(false),
-			ranges:            nil,
-			unfinalizedRanges: nil,
+			canExec:            canExecute(false),
+			ranges:             nil,
+			unfinalizedRanges:  nil,
+			cursedSourceChains: nil, // No cursed chains
 			wantObs: exectypes.CommitObservations{
 				1: nil,
 			},
@@ -535,6 +543,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 				1: {1, 2, 3, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30},
 				// First report partially executed, third report fully executed unfinalized
 			},
+			cursedSourceChains: nil, // No cursed chains
 			wantObs: exectypes.CommitObservations{
 				1: []exectypes.CommitData{
 					{
@@ -564,7 +573,204 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 			},
 			wantErr: assert.NoError,
 		},
+		{
+			name: "single partially-executed report with finalized and unfinalized",
+			reports: []plugintypes2.CommitPluginReportWithMeta{
+				{
+					BlockNum:  999,
+					Timestamp: time.UnixMilli(10101010101),
+					Report: cciptypes.CommitPluginReport{
+						BlessedMerkleRoots: []cciptypes.MerkleRootChain{
+							{
+								ChainSel:     1,
+								SeqNumsRange: cciptypes.NewSeqNumRange(1, 10),
+							},
+						},
+					},
+				},
+			},
+			ranges: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
+				1: {1, 2, 3},
+			},
+			unfinalizedRanges: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
+				1: {7, 8},
+			},
+			cursedSourceChains: nil, // No cursed chains
+			wantObs: exectypes.CommitObservations{
+				1: []exectypes.CommitData{
+					{
+						SourceChain:         1,
+						SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10),
+						Timestamp:           time.UnixMilli(10101010101),
+						BlockNum:            999,
+						ExecutedMessages:    []cciptypes.SeqNum{1, 2, 3, 7, 8},
+					},
+				},
+			},
+			wantExecutedFinalized:   nil,
+			wantExecutedUnfinalized: nil,
+			wantErr:                 assert.NoError,
+		},
+		{
+			name: "single cursed chain report",
+			reports: []plugintypes2.CommitPluginReportWithMeta{
+				{
+					BlockNum:  999,
+					Timestamp: time.UnixMilli(10101010101),
+					Report: cciptypes.CommitPluginReport{
+						BlessedMerkleRoots: []cciptypes.MerkleRootChain{
+							{
+								ChainSel:     1,
+								SeqNumsRange: cciptypes.NewSeqNumRange(1, 10),
+							},
+						},
+					},
+				},
+			},
+			ranges:            nil,
+			unfinalizedRanges: nil,
+			cursedSourceChains: map[cciptypes.ChainSelector]bool{
+				1: true, // Chain 1 is cursed
+			},
+			wantObs:                 exectypes.CommitObservations{}, // Empty observations since all chains are cursed
+			wantExecutedFinalized:   nil,
+			wantExecutedUnfinalized: nil,
+			wantErr:                 assert.NoError,
+		},
+		{
+			name: "multiple chains with one cursed",
+			reports: []plugintypes2.CommitPluginReportWithMeta{
+				{
+					BlockNum:  1000,
+					Timestamp: time.UnixMilli(10101010101),
+					Report: cciptypes.CommitPluginReport{
+						BlessedMerkleRoots: []cciptypes.MerkleRootChain{
+							{
+								ChainSel:     1, // Cursed chain
+								SeqNumsRange: cciptypes.NewSeqNumRange(1, 10),
+							},
+							{
+								ChainSel:     2, // Non-cursed chain
+								SeqNumsRange: cciptypes.NewSeqNumRange(1, 10),
+							},
+						},
+					},
+				},
+			},
+			ranges: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
+				1: {1, 2},
+				2: {1, 2},
+			},
+			unfinalizedRanges: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
+				1: {3, 4},
+				2: {3, 4},
+			},
+			cursedSourceChains: map[cciptypes.ChainSelector]bool{
+				1: true,  // Chain 1 is cursed
+				2: false, // Chain 2 is not cursed
+			},
+			wantObs: exectypes.CommitObservations{
+				2: []exectypes.CommitData{
+					{
+						SourceChain:         2,
+						SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10),
+						Timestamp:           time.UnixMilli(10101010101),
+						BlockNum:            1000,
+						ExecutedMessages:    []cciptypes.SeqNum{1, 2, 3, 4},
+					},
+				},
+			},
+			wantExecutedFinalized:   nil,
+			wantExecutedUnfinalized: nil,
+			wantErr:                 assert.NoError,
+		},
+		{
+			name: "mixed blessed and unblessed roots with cursed chains",
+			reports: []plugintypes2.CommitPluginReportWithMeta{
+				{
+					BlockNum:  1000,
+					Timestamp: time.UnixMilli(10101010101),
+					Report: cciptypes.CommitPluginReport{
+						BlessedMerkleRoots: []cciptypes.MerkleRootChain{
+							{
+								ChainSel:     1, // Non-cursed chain
+								SeqNumsRange: cciptypes.NewSeqNumRange(1, 5),
+							},
+						},
+						UnblessedMerkleRoots: []cciptypes.MerkleRootChain{
+							{
+								ChainSel:     2, // Cursed chain
+								SeqNumsRange: cciptypes.NewSeqNumRange(1, 5),
+							},
+						},
+					},
+				},
+			},
+			ranges: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
+				1: {1, 2},
+			},
+			unfinalizedRanges: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
+				1: {3, 4},
+			},
+			cursedSourceChains: map[cciptypes.ChainSelector]bool{
+				1: false, // Chain 1 is not cursed
+				2: true,  // Chain 2 is cursed
+			},
+			wantObs: exectypes.CommitObservations{
+				1: []exectypes.CommitData{
+					{
+						SourceChain:         1,
+						SequenceNumberRange: cciptypes.NewSeqNumRange(1, 5),
+						Timestamp:           time.UnixMilli(10101010101),
+						BlockNum:            1000,
+						ExecutedMessages:    []cciptypes.SeqNum{1, 2, 3, 4},
+					},
+				},
+			},
+			wantExecutedFinalized:   nil,
+			wantExecutedUnfinalized: nil,
+			wantErr:                 assert.NoError,
+		},
+		{
+			name: "nil cursed source chains map",
+			reports: []plugintypes2.CommitPluginReportWithMeta{
+				{
+					BlockNum:  1000,
+					Timestamp: time.UnixMilli(10101010101),
+					Report: cciptypes.CommitPluginReport{
+						BlessedMerkleRoots: []cciptypes.MerkleRootChain{
+							{
+								ChainSel:     1,
+								SeqNumsRange: cciptypes.NewSeqNumRange(1, 10),
+							},
+						},
+					},
+				},
+			},
+			ranges: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
+				1: {1, 2, 3},
+			},
+			unfinalizedRanges: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
+				1: {4, 5},
+			},
+			cursedSourceChains: nil, // No curse information available
+			wantObs: exectypes.CommitObservations{
+				1: []exectypes.CommitData{
+					{
+						SourceChain:         1,
+						SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10),
+						Timestamp:           time.UnixMilli(10101010101),
+						BlockNum:            1000,
+						ExecutedMessages:    []cciptypes.SeqNum{1, 2, 3, 4, 5},
+					},
+				},
+			},
+			wantExecutedFinalized:   nil,
+			wantExecutedUnfinalized: nil,
+			wantErr:                 assert.NoError,
+		},
 	}
+
 	for _, tt := range tcs {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -602,6 +808,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 				mockReader,
 				tt.canExec,
 				time.Now(),
+				tt.cursedSourceChains,
 				logger.Test(t),
 			)
 			if !tt.wantErr(t, err, "getPendingReportsForExecution(...)") {
@@ -622,9 +829,8 @@ func TestPlugin_Close(t *testing.T) {
 	mockReader.On("Close").Return(nil)
 	p := &Plugin{
 		lggr:              lggr,
-		tokenDataObserver: &tokendata.NoopTokenDataObserver{},
+		tokenDataObserver: &observer.NoopTokenDataObserver{},
 		ccipReader:        mockReader}
-
 	require.NoError(t, p.Close())
 	mockReader.AssertExpectations(t)
 }

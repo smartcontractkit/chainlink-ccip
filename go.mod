@@ -7,7 +7,7 @@ require (
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/prometheus/client_golang v1.20.0
 	github.com/prometheus/client_model v0.6.1
-	github.com/smartcontractkit/chain-selectors v1.0.34
+	github.com/smartcontractkit/chain-selectors v1.0.47
 	github.com/smartcontractkit/chainlink-common v0.4.2-0.20250121163309-3e179a73cb92
 	github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go v0.0.0-20250131130834-15e0d4cde2a6
 	github.com/smartcontractkit/libocr v0.0.0-20241007185508-adbe57025f12
