@@ -257,7 +257,7 @@ impl Commit for Impl {
             .map_err(|_| CcipOfframpError::InvalidProof)?;
 
         emit!(CommitReportPDAClosed {
-            source_chain_selector: source_chain_selector,
+            source_chain_selector,
             merkle_root: merkle_root_array,
         });
 
