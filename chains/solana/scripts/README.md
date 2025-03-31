@@ -8,7 +8,7 @@ https://solana.com/developers/guides/advanced/verified-builds
 
 ### Usage
 
-1. cd in `chains/solana/scripts`
+1. cd into `chains/solana/scripts`
 2. Enter into the nix shell: `nix-shell`
 3. Edit the vars in verify.go based on your liking
 4. Run `go run verify.go verify`
@@ -21,7 +21,7 @@ https://solana.com/developers/guides/advanced/verified-builds
 
 ### Usage
 
-1. cd in `chains/solana/scripts`
+1. cd into `chains/solana/scripts`
 2. Enter into the nix shell: `nix-shell`
 3. Edit the vars in `verify.go` based on your liking
 4. Run `go run verify.go idl`
