@@ -47,7 +47,7 @@ pub struct SVM2AnyTokenTransfer {
     pub dest_exec_data: Vec<u8>,
 }
 
-#[derive(Clone, AnchorSerialize, AnchorDeserialize)]
+#[derive(Clone, AnchorSerialize, AnchorDeserialize, PartialEq, Debug)]
 pub struct SVM2AnyMessage {
     pub receiver: Vec<u8>,
     pub data: Vec<u8>,

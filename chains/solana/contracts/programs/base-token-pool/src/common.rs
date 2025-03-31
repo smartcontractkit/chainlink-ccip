@@ -101,8 +101,8 @@ impl BaseConfig {
 
     pub fn accept_ownership(&mut self) -> Result<()> {
         let old_owner = self.owner;
+        // NOTE: take() resets proposed_owner to default
         self.owner = std::mem::take(&mut self.proposed_owner);
-        self.proposed_owner = Pubkey::default();
 
         emit!(OwnershipTransferred {
             from: old_owner,
@@ -127,31 +127,6 @@ impl BaseConfig {
             old_router,
             new_router,
         });
-        Ok(())
-    }
-
-    pub fn update_allow_list(
-        &mut self,
-        enabled: Option<bool>,
-        add: Vec<Pubkey>,
-        remove: Vec<Pubkey>,
-    ) -> Result<()> {
-        if let Some(enabled_val) = enabled {
-            self.list_enabled = enabled_val;
-        };
-
-        for k in remove {
-            if let Ok(v) = self.allow_list.binary_search(&k) {
-                self.allow_list.remove(v);
-            }
-        }
-
-        for k in add {
-            if let Err(v) = self.allow_list.binary_search(&k) {
-                self.allow_list.insert(v, k);
-            }
-        }
-
         Ok(())
     }
 
@@ -404,6 +379,10 @@ pub enum CcipTokenPoolError {
     InvalidToken,
     #[msg("Invalid token amount conversion")]
     InvalidTokenAmountConversion,
+    #[msg("Key already existed in the allowlist")]
+    AllowlistKeyAlreadyExisted,
+    #[msg("Key did not exist in the allowlist")]
+    AllowlistKeyDidNotExist,
 
     // Rate limit errors
     #[msg("RateLimit: bucket overfilled")]

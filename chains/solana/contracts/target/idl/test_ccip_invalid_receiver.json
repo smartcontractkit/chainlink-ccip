@@ -325,22 +325,6 @@
           "docs": [
             "CHECK"
           ]
-        },
-        {
-          "name": "approvedSender",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "state",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
         }
       ],
       "args": [

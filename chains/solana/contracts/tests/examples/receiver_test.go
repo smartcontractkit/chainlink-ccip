@@ -146,15 +146,18 @@ func TestCcipReceiver(t *testing.T) {
 			approvedSenderPDA, err := state.FindApprovedSender(config.EvmChainSelector, []byte{1, 2, 3}, config.CcipBaseReceiver)
 			require.NoError(t, err)
 
-			ix, err := test_ccip_invalid_receiver.NewReceiverProxyExecuteInstruction(
+			raw := test_ccip_invalid_receiver.NewReceiverProxyExecuteInstruction(
 				test_ccip_invalid_receiver.Any2SVMMessage{SourceChainSelector: config.EvmChainSelector, Sender: []byte{1, 2, 3}},
 				config.CcipBaseReceiver,
 				dumbOfframpSignerPDA,
 				dumbOfframp,
 				allowedOfframpPDA,
-				approvedSenderPDA,
-				receiverState,
-			).ValidateAndBuild()
+			)
+
+			raw.AccountMetaSlice.Append(solana.Meta(approvedSenderPDA))
+			raw.AccountMetaSlice.Append(solana.Meta(receiverState))
+
+			ix, err := raw.ValidateAndBuild()
 			require.NoError(t, err)
 			testutils.SendAndConfirm(ctx, t, solClient, []solana.Instruction{ix}, transmitter, rpc.CommitmentConfirmed)
 		})
@@ -199,16 +202,20 @@ func TestCcipReceiver(t *testing.T) {
 			approvedSenderPDA, err := state.FindApprovedSender(config.SvmChainSelector, []byte{1, 2, 3}, config.CcipBaseReceiver)
 			require.NoError(t, err)
 
-			ix, err := test_ccip_invalid_receiver.NewReceiverProxyExecuteInstruction(
+			raw := test_ccip_invalid_receiver.NewReceiverProxyExecuteInstruction(
 				// sending from Svm instead of Evm. The offramp is not approved as such for that chain
 				test_ccip_invalid_receiver.Any2SVMMessage{SourceChainSelector: config.SvmChainSelector, Sender: []byte{1, 2, 3}},
 				config.CcipBaseReceiver,
 				dumbOfframpSignerPDA,
 				dumbOfframp,
 				allowedOfframpPDA,
-				approvedSenderPDA,
-				receiverState,
-			).ValidateAndBuild()
+			)
+
+			raw.AccountMetaSlice.Append(solana.Meta(approvedSenderPDA))
+			raw.AccountMetaSlice.Append(solana.Meta(receiverState))
+
+			ix, err := raw.ValidateAndBuild()
+
 			require.NoError(t, err)
 			testutils.SendAndFailWith(ctx, t, solClient, []solana.Instruction{ix}, transmitter, rpc.CommitmentConfirmed, []string{"Error Code: " + common.AccountNotInitialized_AnchorError.String()})
 		})
@@ -218,15 +225,19 @@ func TestCcipReceiver(t *testing.T) {
 			approvedSenderPDA, err := state.FindApprovedSender(config.EvmChainSelector, []byte{3, 4, 5}, config.CcipBaseReceiver)
 			require.NoError(t, err)
 
-			ix, err := test_ccip_invalid_receiver.NewReceiverProxyExecuteInstruction(
+			raw := test_ccip_invalid_receiver.NewReceiverProxyExecuteInstruction(
 				test_ccip_invalid_receiver.Any2SVMMessage{SourceChainSelector: config.EvmChainSelector, Sender: []byte{3, 4, 5}},
 				config.CcipBaseReceiver,
 				dumbOfframpSignerPDA,
 				dumbOfframp,
 				allowedOfframpPDA,
-				approvedSenderPDA,
-				receiverState,
-			).ValidateAndBuild()
+			)
+
+			raw.AccountMetaSlice.Append(solana.Meta(approvedSenderPDA))
+			raw.AccountMetaSlice.Append(solana.Meta(receiverState))
+
+			ix, err := raw.ValidateAndBuild()
+
 			require.NoError(t, err)
 			testutils.SendAndFailWith(ctx, t, solClient, []solana.Instruction{ix}, transmitter, rpc.CommitmentConfirmed, []string{"Error Code: " + common.AccountNotInitialized_AnchorError.String()})
 		})

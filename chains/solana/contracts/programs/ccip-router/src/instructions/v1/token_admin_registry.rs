@@ -137,7 +137,7 @@ impl TokenAdminRegistry for Impl {
     ) -> Result<()> {
         let token_mint = ctx.accounts.mint.key().to_owned();
 
-        // Enable to overwrite the lookup table pool with 0 to deslist from CCIP
+        // Enable to overwrite the lookup table pool with 0 to delist from CCIP
         let token_admin_registry = &mut ctx.accounts.token_admin_registry;
         let previous_pool = token_admin_registry.lookup_table;
         let new_pool = ctx.accounts.pool_lookuptable.key();

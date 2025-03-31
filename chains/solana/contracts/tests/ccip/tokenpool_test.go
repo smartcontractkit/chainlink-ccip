@@ -166,6 +166,19 @@ func TestTokenPool(t *testing.T) {
 					releaseOrMint := poolMethodName[1]
 
 					t.Run("setup", func(t *testing.T) {
+						type ProgramData struct {
+							DataType uint32
+							Address  solana.PublicKey
+						}
+						// get program data account
+						data, err := solanaGoClient.GetAccountInfoWithOpts(ctx, config.CcipTokenPoolProgram, &rpc.GetAccountInfoOpts{
+							Commitment: config.DefaultCommitment,
+						})
+						require.NoError(t, err)
+						// Decode program data
+						var programData ProgramData
+						require.NoError(t, bin.UnmarshalBorsh(&programData, data.Bytes()))
+
 						poolInitI, err := test_token_pool.NewInitializeInstruction(
 							poolType,
 							dumbRamp,
@@ -173,7 +186,11 @@ func TestTokenPool(t *testing.T) {
 							poolConfig,
 							mint,
 							admin.PublicKey(),
-							solana.SystemProgramID).ValidateAndBuild()
+							solana.SystemProgramID,
+							config.CcipTokenPoolProgram,
+							programData.Address,
+						).ValidateAndBuild()
+
 						require.NoError(t, err)
 
 						// make pool mint_authority for token (required for burn/mint)
@@ -686,6 +703,19 @@ func TestTokenPool(t *testing.T) {
 			instructions, err := tokens.CreateToken(ctx, solana.TokenProgramID, mint, admin.PublicKey(), 0, solanaGoClient, config.DefaultCommitment)
 			require.NoError(t, err)
 
+			type ProgramData struct {
+				DataType uint32
+				Address  solana.PublicKey
+			}
+			// get program data account
+			data, err := solanaGoClient.GetAccountInfoWithOpts(ctx, config.CcipTokenPoolProgram, &rpc.GetAccountInfoOpts{
+				Commitment: config.DefaultCommitment,
+			})
+			require.NoError(t, err)
+			// Decode program data
+			var programData ProgramData
+			require.NoError(t, bin.UnmarshalBorsh(&programData, data.Bytes()))
+
 			// create pool
 			poolInitI, err := test_token_pool.NewInitializeInstruction(
 				test_token_pool.Wrapped_PoolType,
@@ -695,6 +725,8 @@ func TestTokenPool(t *testing.T) {
 				mint,
 				admin.PublicKey(),
 				solana.SystemProgramID,
+				config.CcipTokenPoolProgram,
+				programData.Address,
 			).ValidateAndBuild()
 			require.NoError(t, err)
 
