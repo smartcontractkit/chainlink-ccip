@@ -36,15 +36,13 @@ type Initialize struct {
 	// [3] = [] program
 	//
 	// [4] = [] programData
-	//
-	// [5] = [WRITE] tokenPoolsSigner
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewInitializeInstructionBuilder creates a new `Initialize` instruction builder.
 func NewInitializeInstructionBuilder() *Initialize {
 	nd := &Initialize{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 6),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 5),
 	}
 	return nd
 }
@@ -134,17 +132,6 @@ func (inst *Initialize) GetProgramDataAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[4]
 }
 
-// SetTokenPoolsSignerAccount sets the "tokenPoolsSigner" account.
-func (inst *Initialize) SetTokenPoolsSignerAccount(tokenPoolsSigner ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[5] = ag_solanago.Meta(tokenPoolsSigner).WRITE()
-	return inst
-}
-
-// GetTokenPoolsSignerAccount gets the "tokenPoolsSigner" account.
-func (inst *Initialize) GetTokenPoolsSignerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[5]
-}
-
 func (inst Initialize) Build() *Instruction {
 	return &Instruction{BaseVariant: ag_binary.BaseVariant{
 		Impl:   inst,
@@ -199,9 +186,6 @@ func (inst *Initialize) Validate() error {
 		if inst.AccountMetaSlice[4] == nil {
 			return errors.New("accounts.ProgramData is not set")
 		}
-		if inst.AccountMetaSlice[5] == nil {
-			return errors.New("accounts.TokenPoolsSigner is not set")
-		}
 	}
 	return nil
 }
@@ -224,13 +208,12 @@ func (inst *Initialize) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=6]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("          config", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("       authority", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("   systemProgram", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("         program", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("     programData", inst.AccountMetaSlice[4]))
-						accountsBranch.Child(ag_format.Meta("tokenPoolsSigner", inst.AccountMetaSlice[5]))
+					instructionBranch.Child("Accounts[len=5]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+						accountsBranch.Child(ag_format.Meta("       config", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("    authority", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("      program", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("  programData", inst.AccountMetaSlice[4]))
 					})
 				})
 		})
@@ -306,8 +289,7 @@ func NewInitializeInstruction(
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey,
 	program ag_solanago.PublicKey,
-	programData ag_solanago.PublicKey,
-	tokenPoolsSigner ag_solanago.PublicKey) *Initialize {
+	programData ag_solanago.PublicKey) *Initialize {
 	return NewInitializeInstructionBuilder().
 		SetSvmChainSelector(svmChainSelector).
 		SetFeeAggregator(feeAggregator).
@@ -318,6 +300,5 @@ func NewInitializeInstruction(
 		SetAuthorityAccount(authority).
 		SetSystemProgramAccount(systemProgram).
 		SetProgramAccount(program).
-		SetProgramDataAccount(programData).
-		SetTokenPoolsSignerAccount(tokenPoolsSigner)
+		SetProgramDataAccount(programData)
 }

@@ -51,11 +51,6 @@
           "name": "programData",
           "isMut": false,
           "isSigner": false
-        },
-        {
-          "name": "tokenPoolsSigner",
-          "isMut": true,
-          "isSigner": false
         }
       ],
       "args": [
@@ -1212,13 +1207,6 @@
             "type": "u64"
           }
         ]
-      }
-    },
-    {
-      "name": "ExternalExecutionConfig",
-      "type": {
-        "kind": "struct",
-        "fields": []
       }
     }
   ],

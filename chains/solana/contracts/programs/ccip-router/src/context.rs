@@ -6,7 +6,7 @@ use ccip_common::seed;
 
 use crate::program::CcipRouter;
 use crate::state::{Config, Nonce};
-use crate::{CcipRouterError, DestChain, DestChainConfig, ExternalExecutionConfig, SVM2AnyMessage};
+use crate::{CcipRouterError, DestChain, DestChainConfig, SVM2AnyMessage};
 
 /// Static space allocated to any account: must always be added to space calculations.
 pub const ANCHOR_DISCRIMINATOR: usize = 8;
@@ -89,15 +89,6 @@ pub struct InitializeCCIPRouter<'info> {
     // Initialization only allowed by program upgrade authority
     #[account(constraint = program_data.upgrade_authority_address == Some(authority.key()) @ CcipRouterError::Unauthorized)]
     pub program_data: Account<'info, ProgramData>,
-
-    #[account(
-        init,
-        seeds = [seed::EXTERNAL_TOKEN_POOL],
-        bump,
-        payer = authority,
-        space = ANCHOR_DISCRIMINATOR + ExternalExecutionConfig::INIT_SPACE,
-    )]
-    pub token_pools_signer: Account<'info, ExternalExecutionConfig>, // token pool CPI signer initialization
 }
 
 #[derive(Accounts)]

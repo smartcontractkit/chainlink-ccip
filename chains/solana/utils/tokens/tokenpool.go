@@ -39,6 +39,10 @@ type TokenPool struct {
 
 	// billing config lookup
 	Billing map[uint64]solana.PublicKey
+
+	// CCIP CPI signers
+	RouterSigner  solana.PublicKey
+	OfframpSigner solana.PublicKey
 }
 
 func (tp TokenPool) ToTokenPoolEntries() []solana.PublicKey {
@@ -52,6 +56,7 @@ func (tp TokenPool) ToTokenPoolEntries() []solana.PublicKey {
 		tp.Program,          // 6
 		tp.Mint,             // 7 - writable
 		tp.FeeTokenConfig,   // 8
+		tp.RouterSigner,     // 9 - writable
 	}
 	return append(list, tp.AdditionalAccounts...)
 }
@@ -83,6 +88,14 @@ func NewTokenPool(tokenProgram solana.PublicKey, poolProgram solana.PublicKey, m
 	if err != nil {
 		return TokenPool{}, err
 	}
+	routerSignerPDA, _, err := state.FindExternalTokenPoolsSignerPDA(mint, config.CcipRouterProgram)
+	if err != nil {
+		return TokenPool{}, err
+	}
+	offrampSignerPDA, _, err := state.FindExternalTokenPoolsSignerPDA(mint, config.CcipOfframpProgram)
+	if err != nil {
+		return TokenPool{}, err
+	}
 
 	p := TokenPool{
 		Program:          tokenProgram,
@@ -91,10 +104,12 @@ func NewTokenPool(tokenProgram solana.PublicKey, poolProgram solana.PublicKey, m
 		AdminRegistryPDA: tokenAdminRegistryPDA,
 		PoolProgram:      poolProgram,
 		PoolLookupTable:  solana.PublicKey{},
-		WritableIndexes:  []uint8{3, 4, 7}, // see ToTokenPoolEntries for writable indexes
+		WritableIndexes:  []uint8{3, 4, 7, 9}, // see ToTokenPoolEntries for writable indexes
 		User:             map[solana.PublicKey]solana.PublicKey{},
 		Chain:            map[uint64]solana.PublicKey{},
 		Billing:          map[uint64]solana.PublicKey{},
+		RouterSigner:     routerSignerPDA,
+		OfframpSigner:    offrampSignerPDA,
 	}
 	p.Chain[config.EvmChainSelector] = evmChainPDA
 	p.Chain[config.SvmChainSelector] = svmChainPDA

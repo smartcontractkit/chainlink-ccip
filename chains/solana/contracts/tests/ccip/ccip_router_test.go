@@ -304,7 +304,7 @@ func TestCCIPRouter(t *testing.T) {
 			).ValidateAndBuild()
 			require.NoError(t, err)
 
-			// The pools are nitially owned by the CCIP admin. For the purposes of this test, they're now transferred to the individual
+			// The pools are initially owned by the CCIP admin. For the purposes of this test, they're now transferred to the individual
 			// token admins. In practice, these token pools would've been original instantiated under separate token pool programs
 			// owned by each individual admin instead.
 			ixTransfer0, err := test_token_pool.NewTransferOwnershipInstruction(
@@ -491,7 +491,6 @@ func TestCCIPRouter(t *testing.T) {
 				link22.mint,
 				link22.userATA,
 				link22.billingATA,
-				config.ExternalTokenPoolsSignerPDA,
 			}
 			lookupTableAddr, err := common.SetupLookupTable(ctx, solanaGoClient, legacyAdmin, lookupEntries)
 			require.NoError(t, err)
@@ -601,7 +600,6 @@ func TestCCIPRouter(t *testing.T) {
 				solana.SystemProgramID,
 				config.CcipRouterProgram,
 				programData.Address,
-				config.ExternalTokenPoolsSignerPDA,
 			).ValidateAndBuild()
 			require.NoError(t, err)
 
@@ -3143,7 +3141,6 @@ func TestCCIPRouter(t *testing.T) {
 				config.RMNRemoteProgram,
 				config.RMNRemoteCursesPDA,
 				config.RMNRemoteConfigPDA,
-				config.ExternalTokenPoolsSignerPDA,
 			)
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
 			instruction, err := raw.ValidateAndBuild()
@@ -3334,7 +3331,6 @@ func TestCCIPRouter(t *testing.T) {
 				config.RMNRemoteProgram,
 				config.RMNRemoteCursesPDA,
 				config.RMNRemoteConfigPDA,
-				config.ExternalTokenPoolsSignerPDA,
 			)
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
 			instruction, err := raw.ValidateAndBuild()
@@ -3555,7 +3551,6 @@ func TestCCIPRouter(t *testing.T) {
 				config.RMNRemoteProgram,
 				config.RMNRemoteCursesPDA,
 				config.RMNRemoteConfigPDA,
-				config.ExternalTokenPoolsSignerPDA,
 			)
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
 			instruction, err := raw.ValidateAndBuild()
@@ -3615,7 +3610,6 @@ func TestCCIPRouter(t *testing.T) {
 				config.RMNRemoteProgram,
 				config.RMNRemoteCursesPDA,
 				config.RMNRemoteConfigPDA,
-				config.ExternalTokenPoolsSignerPDA,
 			)
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
 			instruction, err := raw.ValidateAndBuild()
@@ -3669,7 +3663,6 @@ func TestCCIPRouter(t *testing.T) {
 				config.RMNRemoteProgram,
 				config.RMNRemoteCursesPDA,
 				config.RMNRemoteConfigPDA,
-				config.ExternalTokenPoolsSignerPDA,
 			)
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
 			instruction, err := raw.ValidateAndBuild()
@@ -3743,7 +3736,6 @@ func TestCCIPRouter(t *testing.T) {
 				config.RMNRemoteProgram,
 				config.RMNRemoteCursesPDA,
 				config.RMNRemoteConfigPDA,
-				config.ExternalTokenPoolsSignerPDA,
 			)
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
 			instruction, err := raw.ValidateAndBuild()
@@ -3812,7 +3804,6 @@ func TestCCIPRouter(t *testing.T) {
 				config.RMNRemoteProgram,
 				config.RMNRemoteCursesPDA,
 				config.RMNRemoteConfigPDA,
-				config.ExternalTokenPoolsSignerPDA,
 			)
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
 			instruction, err := raw.ValidateAndBuild()
@@ -3882,7 +3873,6 @@ func TestCCIPRouter(t *testing.T) {
 				config.RMNRemoteProgram,
 				config.RMNRemoteCursesPDA,
 				config.RMNRemoteConfigPDA,
-				config.ExternalTokenPoolsSignerPDA,
 			)
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
 			instruction, err := raw.ValidateAndBuild()
@@ -3951,7 +3941,6 @@ func TestCCIPRouter(t *testing.T) {
 				config.RMNRemoteProgram,
 				config.RMNRemoteCursesPDA,
 				config.RMNRemoteConfigPDA,
-				config.ExternalTokenPoolsSignerPDA,
 			)
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
 			instruction, err := raw.ValidateAndBuild()
@@ -4018,7 +4007,6 @@ func TestCCIPRouter(t *testing.T) {
 				config.RMNRemoteProgram,
 				config.RMNRemoteCursesPDA,
 				config.RMNRemoteConfigPDA,
-				config.ExternalTokenPoolsSignerPDA,
 			)
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
 			instruction, err := raw.ValidateAndBuild()
@@ -4060,7 +4048,6 @@ func TestCCIPRouter(t *testing.T) {
 				config.RMNRemoteProgram,
 				config.RMNRemoteCursesPDA,
 				config.RMNRemoteConfigPDA,
-				config.ExternalTokenPoolsSignerPDA,
 			)
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
 			instruction, err := raw.ValidateAndBuild()
@@ -4101,7 +4088,6 @@ func TestCCIPRouter(t *testing.T) {
 				config.RMNRemoteProgram,
 				config.RMNRemoteCursesPDA,
 				config.RMNRemoteConfigPDA,
-				config.ExternalTokenPoolsSignerPDA,
 			)
 
 			// do NOT mark the user ATA as writable
@@ -4158,7 +4144,6 @@ func TestCCIPRouter(t *testing.T) {
 											config.RMNRemoteProgram,
 											config.RMNRemoteCursesPDA,
 											config.RMNRemoteConfigPDA,
-											config.ExternalTokenPoolsSignerPDA,
 										)
 										raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
 										instruction, err := raw.ValidateAndBuild()
@@ -4209,7 +4194,6 @@ func TestCCIPRouter(t *testing.T) {
 				config.RMNRemoteProgram,
 				config.RMNRemoteCursesPDA,
 				config.RMNRemoteConfigPDA,
-				config.ExternalTokenPoolsSignerPDA,
 			)
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
 			instruction, err := raw.ValidateAndBuild()
@@ -4251,7 +4235,6 @@ func TestCCIPRouter(t *testing.T) {
 				config.RMNRemoteProgram,
 				config.RMNRemoteCursesPDA,
 				config.RMNRemoteConfigPDA,
-				config.ExternalTokenPoolsSignerPDA,
 			)
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
 			instruction, err := raw.ValidateAndBuild()
@@ -4333,7 +4316,6 @@ func TestCCIPRouter(t *testing.T) {
 					config.RMNRemoteProgram,
 					config.RMNRemoteCursesPDA,
 					config.RMNRemoteConfigPDA,
-					config.ExternalTokenPoolsSignerPDA,
 				)
 				base.GetFeeTokenUserAssociatedAccountAccount().WRITE()
 
@@ -4344,7 +4326,7 @@ func TestCCIPRouter(t *testing.T) {
 				ix, err := base.ValidateAndBuild()
 				require.NoError(t, err)
 
-				ixApprove, err := tokens.TokenApproveChecked(1, token0Decimals, token0.Program, userTokenAccount, token0.Mint, config.ExternalTokenPoolsSignerPDA, user.PublicKey(), nil)
+				ixApprove, err := tokens.TokenApproveChecked(1, token0Decimals, token0.Program, userTokenAccount, token0.Mint, token0.RouterSigner, user.PublicKey(), nil)
 				require.NoError(t, err)
 
 				result := testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{ixApprove, ix}, user, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(300_000))
@@ -4382,7 +4364,7 @@ func TestCCIPRouter(t *testing.T) {
 				// check pool event
 				poolEvent := tokens.EventBurnLock{}
 				require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "Burned", &poolEvent, config.PrintEvents))
-				require.Equal(t, config.ExternalTokenPoolsSignerPDA, poolEvent.Sender)
+				require.Equal(t, token0.RouterSigner, poolEvent.Sender)
 				require.Equal(t, uint64(1), poolEvent.Amount)
 
 				// check balances
@@ -4449,7 +4431,6 @@ func TestCCIPRouter(t *testing.T) {
 					config.RMNRemoteProgram,
 					config.RMNRemoteCursesPDA,
 					config.RMNRemoteConfigPDA,
-					config.ExternalTokenPoolsSignerPDA,
 				)
 				base.GetFeeTokenUserAssociatedAccountAccount().WRITE()
 
@@ -4467,9 +4448,9 @@ func TestCCIPRouter(t *testing.T) {
 				ix, err := base.ValidateAndBuild()
 				require.NoError(t, err)
 
-				ixApprove0, err := tokens.TokenApproveChecked(1, token0Decimals, token0.Program, userTokenAccount0, token0.Mint, config.ExternalTokenPoolsSignerPDA, user.PublicKey(), nil)
+				ixApprove0, err := tokens.TokenApproveChecked(1, token0Decimals, token0.Program, userTokenAccount0, token0.Mint, token0.RouterSigner, user.PublicKey(), nil)
 				require.NoError(t, err)
-				ixApprove1, err := tokens.TokenApproveChecked(2, token1Decimals, token1.Program, userTokenAccount1, token1.Mint, config.ExternalTokenPoolsSignerPDA, user.PublicKey(), nil)
+				ixApprove1, err := tokens.TokenApproveChecked(2, token1Decimals, token1.Program, userTokenAccount1, token1.Mint, token1.RouterSigner, user.PublicKey(), nil)
 				require.NoError(t, err)
 
 				result := testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{ixApprove0, ixApprove1, ix}, user, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(800_000))
@@ -4546,7 +4527,6 @@ func TestCCIPRouter(t *testing.T) {
 				config.RMNRemoteProgram,
 				config.RMNRemoteCursesPDA,
 				config.RMNRemoteConfigPDA,
-				config.ExternalTokenPoolsSignerPDA,
 			)
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
 			instruction, err := raw.ValidateAndBuild()
@@ -4669,6 +4649,7 @@ func TestCCIPRouter(t *testing.T) {
 					index:    12, // only works with token0
 					errorStr: ccip.InvalidInputsLookupTableAccounts_CcipRouterError.String(),
 				},
+				// TODO add more tests here
 			}
 
 			for _, in := range inputs {
@@ -4696,7 +4677,6 @@ func TestCCIPRouter(t *testing.T) {
 						config.RMNRemoteProgram,
 						config.RMNRemoteCursesPDA,
 						config.RMNRemoteConfigPDA,
-						config.ExternalTokenPoolsSignerPDA,
 					)
 					tx.GetFeeTokenUserAssociatedAccountAccount().WRITE()
 
@@ -4787,7 +4767,6 @@ func TestCCIPRouter(t *testing.T) {
 						config.RMNRemoteProgram,
 						config.RMNRemoteCursesPDA,
 						config.RMNRemoteConfigPDA,
-						config.ExternalTokenPoolsSignerPDA,
 					)
 					raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
 					instruction, err := raw.ValidateAndBuild()
@@ -4837,7 +4816,6 @@ func TestCCIPRouter(t *testing.T) {
 				config.RMNRemoteProgram,
 				config.RMNRemoteCursesPDA,
 				config.RMNRemoteConfigPDA,
-				config.ExternalTokenPoolsSignerPDA,
 			)
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
 			instruction, err := raw.ValidateAndBuild()
@@ -4899,7 +4877,6 @@ func TestCCIPRouter(t *testing.T) {
 				config.RMNRemoteProgram,
 				config.RMNRemoteCursesPDA,
 				config.RMNRemoteConfigPDA,
-				config.ExternalTokenPoolsSignerPDA,
 			)
 
 			instruction, err := raw.ValidateAndBuild()
