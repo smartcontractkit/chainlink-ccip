@@ -31,7 +31,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
-	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
+	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata/observer"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
@@ -829,9 +829,8 @@ func TestPlugin_Close(t *testing.T) {
 	mockReader.On("Close").Return(nil)
 	p := &Plugin{
 		lggr:              lggr,
-		tokenDataObserver: &tokendata.NoopTokenDataObserver{},
+		tokenDataObserver: &observer.NoopTokenDataObserver{},
 		ccipReader:        mockReader}
-
 	require.NoError(t, p.Close())
 	mockReader.AssertExpectations(t)
 }
