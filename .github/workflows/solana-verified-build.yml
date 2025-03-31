@@ -39,7 +39,6 @@ jobs:
         path: chains/solana/contracts/target/deploy/*.so
         key: ${{ runner.os }}-solana-contract-verified-${{ hashFiles('**/Cargo.lock') }}
     - name: Build Verified Artifacts
-      if: steps.cache-target.outputs.cache-hit != 'true'
       run: |
         cd chains/solana/contracts
         solana-verify build
