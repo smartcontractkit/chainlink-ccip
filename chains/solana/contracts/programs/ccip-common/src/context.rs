@@ -28,7 +28,6 @@ pub struct TokenAccountsValidationContext<'info> {
             mint.key().as_ref(),
         ],
         seeds::program = fee_quoter.key(),
-        owner = fee_quoter.key() @ CommonCcipError::InvalidInputsTokenAccounts,
         bump
     )]
     pub token_billing_config: UncheckedAccount<'info>,
@@ -101,7 +100,6 @@ pub struct TokenAccountsValidationContext<'info> {
             mint.key().as_ref()
         ],
         seeds::program = fee_quoter.key(),
-        owner = fee_quoter.key() @ CommonCcipError::InvalidInputsTokenAccounts,
         bump
     )]
     pub fee_token_config: UncheckedAccount<'info>,
