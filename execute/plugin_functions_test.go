@@ -1751,3 +1751,111 @@ func Test_computeNoncesConsensus(t *testing.T) {
 		})
 	}
 }
+
+func Test_computeMessageHashesConsensus(t *testing.T) {
+	testCases := []struct {
+		name           string
+		observations   []map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Bytes32
+		expectedHashes exectypes.MessageHashes
+		fChain         map[cciptypes.ChainSelector]int
+	}{
+		{
+			name: "empty",
+			observations: []map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Bytes32{
+				{},
+			},
+			fChain: map[cciptypes.ChainSelector]int{},
+		},
+		{
+			name: "base scenario reaching f+1 observations while having 2 faulty observations",
+			observations: []map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Bytes32{
+				{1: {10: cciptypes.Bytes32{111}}},
+				{1: {10: cciptypes.Bytes32{111}}},
+				{1: {10: cciptypes.Bytes32{222}}}, // <--- different observation is ignored
+				{1: {10: cciptypes.Bytes32{222}}}, // <--- different observation is ignored
+				{1: {10: cciptypes.Bytes32{111}}},
+			},
+			expectedHashes: map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Bytes32{
+				1: {10: cciptypes.Bytes32{111}},
+			},
+			fChain: map[cciptypes.ChainSelector]int{
+				1: 2,
+			},
+		},
+		{
+			name: "missing one observation and not reaching consensus",
+			observations: []map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Bytes32{
+				{1: {10: cciptypes.Bytes32{111}}},
+				{1: {10: cciptypes.Bytes32{111}}},
+			},
+			fChain: map[cciptypes.ChainSelector]int{
+				1: 2,
+			},
+		},
+		{
+			name: "one observation has a different hash and we don't reach consensus",
+			observations: []map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Bytes32{
+				{1: {10: cciptypes.Bytes32{111}}},
+				{1: {10: cciptypes.Bytes32{222}}}, // <-- different hash
+				{1: {10: cciptypes.Bytes32{111}}},
+			},
+			fChain: map[cciptypes.ChainSelector]int{
+				1: 2,
+			},
+		},
+		{
+			name: "two different hashes reach consensus threshold f+1, meaning no consensus was formed",
+			observations: []map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Bytes32{
+				{1: {10: cciptypes.Bytes32{111}}},
+				{1: {10: cciptypes.Bytes32{111}}},
+				{1: {10: cciptypes.Bytes32{222}}},
+				{1: {10: cciptypes.Bytes32{222}}},
+				{1: {10: cciptypes.Bytes32{222}}},
+				{1: {10: cciptypes.Bytes32{111}}},
+			},
+			fChain: map[cciptypes.ChainSelector]int{
+				1: 2,
+			},
+		},
+		{
+			name: "three different messages, one reaching consensus, the others not",
+			observations: []map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Bytes32{
+				{1: {10: cciptypes.Bytes32{111}, 20: cciptypes.Bytes32{222}, 30: cciptypes.Bytes32{103}}},
+				{1: {10: cciptypes.Bytes32{111}, 20: cciptypes.Bytes32{222}, 30: cciptypes.Bytes32{103}}},
+				{1: {10: cciptypes.Bytes32{111}, 20: cciptypes.Bytes32{222}}},
+				{1: {10: cciptypes.Bytes32{111}, 20: cciptypes.Bytes32{221}}},
+				{1: {10: cciptypes.Bytes32{111}, 20: cciptypes.Bytes32{221}}},
+				{1: {10: cciptypes.Bytes32{111}, 20: cciptypes.Bytes32{221}}},
+			},
+			expectedHashes: map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Bytes32{
+				1: {10: cciptypes.Bytes32{111}},
+			},
+			fChain: map[cciptypes.ChainSelector]int{
+				1: 2,
+			},
+		},
+		{
+			name: "fChain not defined, chain is skipped",
+			observations: []map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Bytes32{
+				{1: {10: cciptypes.Bytes32{111}}},
+				{1: {10: cciptypes.Bytes32{111}}},
+				{1: {10: cciptypes.Bytes32{111}}},
+			},
+			fChain: map[cciptypes.ChainSelector]int{},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			observations := make([]plugincommon.AttributedObservation[exectypes.Observation], len(tc.observations))
+			for i, obs := range tc.observations {
+				observations[i] = plugincommon.AttributedObservation[exectypes.Observation]{
+					Observation: exectypes.Observation{Hashes: obs},
+					OracleID:    commontypes.OracleID(i),
+				}
+			}
+			obs := computeMessageHashesConsensus(logger.Test(t), observations, tc.fChain)
+			assert.Equal(t, tc.expectedHashes, obs)
+		})
+	}
+}

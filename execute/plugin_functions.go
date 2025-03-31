@@ -451,6 +451,76 @@ func mergeCommitObservations(
 	return results
 }
 
+// computeMessageHashesConsensus will iterate over observations of message hashes and come to consensus on them.
+// We select a hash if it has at least f+1 votes. If more than one hashes exist with at
+// least f+1 votes (reaching consensus threshold) then we log an error and skip that specific message.
+func computeMessageHashesConsensus(
+	lggr logger.Logger,
+	observations []plugincommon.AttributedObservation[exectypes.Observation],
+	fChain map[cciptypes.ChainSelector]int,
+) exectypes.MessageHashes {
+	lggr = logger.With(lggr, "function", "computeMessageHashesConsensus", "fChain", fChain)
+
+	// for each (chain, seqNum) pair keep a count of the votes for each hash
+	type chainSeqNumPair struct {
+		chain  cciptypes.ChainSelector
+		seqNum cciptypes.SeqNum
+	}
+
+	hashVotes := make(map[chainSeqNumPair]map[cciptypes.Bytes32]int)
+	for _, observation := range observations {
+		for chain, hashes := range observation.Observation.Hashes {
+			for seqNum, hash := range hashes {
+				pair := chainSeqNumPair{chain: chain, seqNum: seqNum}
+				if _, ok := hashVotes[pair]; !ok {
+					hashVotes[pair] = make(map[cciptypes.Bytes32]int)
+				}
+				hashVotes[pair][hash]++
+			}
+		}
+	}
+
+	results := make(exectypes.MessageHashes)
+
+	for chainSeqNum, hashesAndVotes := range hashVotes {
+		f, ok := fChain[chainSeqNum.chain]
+		if !ok {
+			lggr.Warnw("no fChain defined, chain skipped from message hashes consensus", "chain", chainSeqNum.chain)
+			continue
+		}
+
+		for hash, numVotes := range hashesAndVotes {
+			if consensus.LtFPlusOne(f, numVotes) {
+				lggr.Debugw("hash with less than f+1 votes was found, skipping it",
+					"chain", chainSeqNum.chain, "seqNum", chainSeqNum.seqNum, "hash", hash, "votes", numVotes)
+				continue
+			}
+
+			if _, chainResultsInitialized := results[chainSeqNum.chain]; !chainResultsInitialized {
+				results[chainSeqNum.chain] = make(map[cciptypes.SeqNum]cciptypes.Bytes32)
+			}
+
+			existingHash, hashExists := results[chainSeqNum.chain][chainSeqNum.seqNum]
+			results[chainSeqNum.chain][chainSeqNum.seqNum] = hash
+
+			if hashExists {
+				lggr.Errorw("more than one hash reached consensus for a message, message skipped",
+					"chain", chainSeqNum.chain, "seqNum", chainSeqNum.seqNum, "hash1", existingHash, "hash2", hash)
+				delete(results[chainSeqNum.chain], chainSeqNum.seqNum)
+				if len(results[chainSeqNum.chain]) == 0 {
+					delete(results, chainSeqNum.chain)
+				}
+				break
+			}
+		}
+	}
+
+	if len(results) == 0 {
+		return nil
+	}
+	return results
+}
+
 func mergeMessageHashes(
 	lggr logger.Logger,
 	aos []plugincommon.AttributedObservation[exectypes.Observation],
@@ -642,7 +712,7 @@ func computeConsensusObservation(
 		mergeTokenObservations(lggr, observations, fChain),
 		computeNoncesConsensus(lggr, observations, destFChain),
 		dt.Observation{},
-		mergeMessageHashes(lggr, observations, fChain),
+		computeMessageHashesConsensus(lggr, observations, fChain),
 	)
 
 	lggr.Debugw("computeConsensusObservation has finished computing the consensus observation",
