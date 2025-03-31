@@ -6911,10 +6911,6 @@ func TestCCIPRouter(t *testing.T) {
 				finalReceiverBalance, err := solanaGoClient.GetBalance(ctx, wsol.billingATA, config.DefaultCommitment)
 				require.NoError(t, err)
 				require.Equal(t, initReceiverBalance.Value+initCommitPDABalance, finalReceiverBalance.Value)
-
-				// // Validate that the CommitReportPDA rent has been transferred to the billing account
-				// finalWsolBalance := getBalance(wsol.billingATA)
-				// require.Equal(t, initWsolBalance+initCommitPDABalance, finalWsolBalance)
 			})
 
 			t.Run("When executing a report with not matching source chain selector in message, it fails", func(t *testing.T) {

@@ -1,7 +1,6 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{spl_token, Token, TokenAccount};
+use anchor_spl::token::TokenAccount;
 use ccip_common::seed;
-use solana_program::program::invoke;
 
 use super::ocr3base::{ocr3_transmit, ReportContext, Signatures};
 use super::ocr3impl::Ocr3ReportForCommit;
@@ -248,7 +247,7 @@ impl Commit for Impl {
         );
 
         // Close the account and convert rent to wrapped SOL
-        transfer_and_wrap_native_sol(
+        close_commit_pda(
             ctx.accounts.commit_report.to_account_info(),
             &ctx.accounts.fee_token_receiver,
         )?;
@@ -266,7 +265,7 @@ impl Commit for Impl {
     }
 }
 
-// Helper function to check if all messages have been executed
+// Check if all messages have been executed
 fn all_messages_executed(report: &CommitReport) -> bool {
     let num_messages = report.max_msg_nr.saturating_sub(report.min_msg_nr) + 1;
 
@@ -277,8 +276,8 @@ fn all_messages_executed(report: &CommitReport) -> bool {
     report.execution_states == fully_executed
 }
 
-// Helper function to convert the SOL from the closed account to wrapped SOL
-fn transfer_and_wrap_native_sol<'info>(
+// Close the commit report PDA and transfer the SOL to the fee token receiver
+fn close_commit_pda<'info>(
     commit_report: AccountInfo<'info>,
     fee_token_receiver: &Account<'info, TokenAccount>,
 ) -> Result<()> {
@@ -292,17 +291,10 @@ fn transfer_and_wrap_native_sol<'info>(
         .to_account_info()
         .try_borrow_mut_lamports()? += lamports;
 
-    // let ix = spl_token::instruction::sync_native(
-    //     &spl_token::ID,
-    //     fee_token_receiver.to_account_info().key,
-    // )?;
-    // invoke(
-    //     &ix,
-    //     &[
-    //         commit_report.to_account_info(),
-    //         fee_token_receiver.to_account_info(),
-    //     ],
-    // )?;
+    // Due to https://github.com/solana-labs/solana/issues/9711
+    // we will not call SyncNative on the sol receiver here.
+    // SyncNative will be called when ccipSend is called by user,
+    // or it can be called at time of OnRamp fee withdrawal.
 
     Ok(())
 }
