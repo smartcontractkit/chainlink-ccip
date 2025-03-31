@@ -117,6 +117,12 @@ deployments:
               endpoint: "http://prometheus-prometheus.prometheus.svc.cluster.local:9090/api/v1/write"
               tls:
                 insecure: true
+              timeout: "5s"
+              resource_to_telemetry_conversion:
+                enabled: true
+              send_metadata: true
+              retry_on_failure:
+                enabled: true
           extensions:
             # The health_check extension is mandatory for this chart.
             # Without the health_check extension the collector will fail the readiness and liveliness probes.
