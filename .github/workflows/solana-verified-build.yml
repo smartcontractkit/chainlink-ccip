@@ -37,7 +37,7 @@ jobs:
       uses: actions/cache@v4 # v4
       with:
         path: chains/solana/contracts/target/deploy/*.so
-        key: ${{ runner.os }}-solana-contract-verified-${{ hashFiles('chains/solana/contracts/*') }}
+        key: ${{ runner.os }}-solana-contract-verified-${{ hashFiles('chains/solana/contracts') }}
     - name: Build Verified Artifacts
       if: steps.cache-target.outputs.cache-hit != 'true'
       run: |
