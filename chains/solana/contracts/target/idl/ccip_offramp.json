@@ -892,11 +892,6 @@
           ]
         },
         {
-          "name": "externalExecutionConfig",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
           "name": "authority",
           "isMut": true,
           "isSigner": true
@@ -908,11 +903,6 @@
         },
         {
           "name": "sysvarInstructions",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "tokenPoolsSigner",
           "isMut": false,
           "isSigner": false
         },
@@ -1009,11 +999,6 @@
           ]
         },
         {
-          "name": "externalExecutionConfig",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
           "name": "authority",
           "isMut": true,
           "isSigner": true
@@ -1025,11 +1010,6 @@
         },
         {
           "name": "sysvarInstructions",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "tokenPoolsSigner",
           "isMut": false,
           "isSigner": false
         },
@@ -2312,6 +2292,11 @@
       "code": 9053,
       "name": "InvalidOnrampAddress",
       "msg": "Invalid onramp address"
+    },
+    {
+      "code": 9054,
+      "name": "InvalidInputsExternalExecutionSignerAccount",
+      "msg": "Invalid external execution signer account"
     }
   ]
 }

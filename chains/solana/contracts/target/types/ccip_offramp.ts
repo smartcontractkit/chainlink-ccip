@@ -892,11 +892,6 @@ export type CcipOfframp = {
           ]
         },
         {
-          "name": "externalExecutionConfig",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
           "name": "authority",
           "isMut": true,
           "isSigner": true
@@ -908,11 +903,6 @@ export type CcipOfframp = {
         },
         {
           "name": "sysvarInstructions",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "tokenPoolsSigner",
           "isMut": false,
           "isSigner": false
         },
@@ -1009,11 +999,6 @@ export type CcipOfframp = {
           ]
         },
         {
-          "name": "externalExecutionConfig",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
           "name": "authority",
           "isMut": true,
           "isSigner": true
@@ -1025,11 +1010,6 @@ export type CcipOfframp = {
         },
         {
           "name": "sysvarInstructions",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "tokenPoolsSigner",
           "isMut": false,
           "isSigner": false
         },
@@ -2312,6 +2292,11 @@ export type CcipOfframp = {
       "code": 9053,
       "name": "InvalidOnrampAddress",
       "msg": "Invalid onramp address"
+    },
+    {
+      "code": 9054,
+      "name": "InvalidInputsExternalExecutionSignerAccount",
+      "msg": "Invalid external execution signer account"
     }
   ]
 };
@@ -3210,11 +3195,6 @@ export const IDL: CcipOfframp = {
           ]
         },
         {
-          "name": "externalExecutionConfig",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
           "name": "authority",
           "isMut": true,
           "isSigner": true
@@ -3226,11 +3206,6 @@ export const IDL: CcipOfframp = {
         },
         {
           "name": "sysvarInstructions",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "tokenPoolsSigner",
           "isMut": false,
           "isSigner": false
         },
@@ -3327,11 +3302,6 @@ export const IDL: CcipOfframp = {
           ]
         },
         {
-          "name": "externalExecutionConfig",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
           "name": "authority",
           "isMut": true,
           "isSigner": true
@@ -3343,11 +3313,6 @@ export const IDL: CcipOfframp = {
         },
         {
           "name": "sysvarInstructions",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "tokenPoolsSigner",
           "isMut": false,
           "isSigner": false
         },
@@ -4630,6 +4595,11 @@ export const IDL: CcipOfframp = {
       "code": 9053,
       "name": "InvalidOnrampAddress",
       "msg": "Invalid onramp address"
+    },
+    {
+      "code": 9054,
+      "name": "InvalidInputsExternalExecutionSignerAccount",
+      "msg": "Invalid external execution signer account"
     }
   ]
 };

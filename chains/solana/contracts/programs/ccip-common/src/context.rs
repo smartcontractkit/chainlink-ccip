@@ -7,7 +7,7 @@ use crate::seed;
 use crate::CommonCcipError;
 
 #[derive(Accounts)]
-#[instruction(token_receiver: Pubkey, chain_selector: u64, router: Pubkey, fee_quoter: Pubkey)]
+#[instruction(token_receiver: Pubkey, chain_selector: u64, router: Pubkey, fee_quoter: Pubkey, offramp: Option<Pubkey>)]
 pub struct TokenAccountsValidationContext<'info> {
     #[account(
         constraint = user_token_account.key() == get_associated_token_address_with_program_id(
@@ -103,4 +103,23 @@ pub struct TokenAccountsValidationContext<'info> {
         bump
     )]
     pub fee_token_config: UncheckedAccount<'info>,
+
+    /// CHECK: The signer to be used by the router program to invoke the pool program
+    #[account(
+        mut,
+        seeds = [seed::EXTERNAL_TOKEN_POOL, pool_program.key().as_ref()],
+        bump,
+        seeds::program = router.key(),
+    )]
+    pub ccip_router_pool_signer: UncheckedAccount<'info>,
+
+    /// CHECK: The signer to be used by the offramp program to invoke the pool program.
+    /// It may be missing when the caller is the router.
+    #[account(
+        mut,
+        seeds = [seed::EXTERNAL_TOKEN_POOL, pool_program.key().as_ref()],
+        bump,
+        seeds::program = offramp.unwrap_or_default(),
+    )]
+    pub ccip_offramp_pool_signer: Option<UncheckedAccount<'info>>,
 }

@@ -342,14 +342,6 @@ export type PingPongDemo = {
           ]
         },
         {
-          "name": "tokenPoolsSigner",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
           "name": "systemProgram",
           "isMut": false,
           "isSigner": false
@@ -518,14 +510,6 @@ export type PingPongDemo = {
         {
           "name": "rmnRemoteConfig",
           "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "tokenPoolsSigner",
-          "isMut": true,
           "isSigner": false,
           "docs": [
             "CHECK"
@@ -989,14 +973,6 @@ export const IDL: PingPongDemo = {
           ]
         },
         {
-          "name": "tokenPoolsSigner",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
           "name": "systemProgram",
           "isMut": false,
           "isSigner": false
@@ -1165,14 +1141,6 @@ export const IDL: PingPongDemo = {
         {
           "name": "rmnRemoteConfig",
           "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "tokenPoolsSigner",
-          "isMut": true,
           "isSigner": false,
           "docs": [
             "CHECK"

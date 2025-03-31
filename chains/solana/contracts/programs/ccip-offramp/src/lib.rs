@@ -635,4 +635,6 @@ pub enum CcipOfframpError {
     Ocr3SignaturesOutOfRegistration,
     #[msg("Invalid onramp address")]
     InvalidOnrampAddress,
+    #[msg("Invalid external execution signer account")]
+    InvalidInputsExternalExecutionSignerAccount,
 }

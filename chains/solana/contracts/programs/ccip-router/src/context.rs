@@ -422,11 +422,7 @@ pub struct CcipSend<'info> {
         seeds::program = config.rmn_remote,
     )]
     pub rmn_remote_config: UncheckedAccount<'info>,
-
-    /// CPI signers, optional if no tokens are being transferred.
-    /// CHECK: Using this to sign.
-    #[account(mut, seeds = [seed::EXTERNAL_TOKEN_POOL], bump)]
-    pub token_pools_signer: Account<'info, ExternalExecutionConfig>,
+    //
     // remaining accounts (not explicitly listed)
     // [
     // user/sender token account (must be associated token account - derivable PDA [wallet_addr, token_program, mint])
@@ -440,6 +436,7 @@ pub struct CcipSend<'info> {
     // pool signer
     // token program
     // token mint
+    // ccip_router_pools_signer - derivable PDA [seed::EXTERNAL_TOKEN_POOL, pool_program]
     // ...additional accounts for pool config
     // ] x N tokens
 }

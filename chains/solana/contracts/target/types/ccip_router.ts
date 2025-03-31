@@ -1023,14 +1023,6 @@ export type CcipRouter = {
           "name": "rmnRemoteConfig",
           "isMut": false,
           "isSigner": false
-        },
-        {
-          "name": "tokenPoolsSigner",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "CPI signers, optional if no tokens are being transferred."
-          ]
         }
       ],
       "args": [
@@ -2958,14 +2950,6 @@ export const IDL: CcipRouter = {
           "name": "rmnRemoteConfig",
           "isMut": false,
           "isSigner": false
-        },
-        {
-          "name": "tokenPoolsSigner",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "CPI signers, optional if no tokens are being transferred."
-          ]
         }
       ],
       "args": [

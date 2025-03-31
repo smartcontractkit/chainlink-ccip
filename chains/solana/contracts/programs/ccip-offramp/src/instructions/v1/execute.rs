@@ -144,16 +144,16 @@ fn internal_execute<'info>(
     let has_messaging = should_execute_messaging(ctx.remaining_accounts, token_indexes);
 
     let hashed_leaf: [u8; 32] = if has_messaging {
-        let (msg_program, msg_accounts) = parse_messaging_accounts(
+        let msg_accs = parse_messaging_accounts(
             token_indexes,
             &execution_report.message.extra_args.is_writable_bitmap,
             ctx.remaining_accounts,
         )?;
 
         // Verify merkle root before doing any token operations or CPI calls
-        let recv_and_msg_account_keys = Some(*msg_program.key)
+        let recv_and_msg_account_keys = Some(*msg_accs.logic_receiver.key)
             .into_iter()
-            .chain(msg_accounts.iter().map(|a| *a.key));
+            .chain(msg_accs.remaining_accounts.iter().map(|a| *a.key));
 
         verify_merkle_root(
             &execution_report,
@@ -196,7 +196,6 @@ fn internal_execute<'info>(
             && token_indexes.len() == execution_report.offchain_token_data.len(),
         CcipOfframpError::InvalidInputsTokenIndices,
     );
-    let seeds = &[seed::EXTERNAL_TOKEN_POOL, &[ctx.bumps.token_pools_signer]];
     let mut token_amounts = vec![SVMTokenAmount::default(); token_indexes.len()];
 
     // handle tokens
@@ -212,7 +211,9 @@ fn internal_execute<'info>(
             token_indexes,
             i,
         )?;
-        let router_token_pool_signer = &ctx.accounts.token_pools_signer;
+        let offramp_token_pool_signer = accs
+            .ccip_offramp_pool_signer
+            .ok_or(CcipOfframpError::InvalidInputsPoolAccounts)?;
 
         let init_bal = get_balance(accs.user_token_account)?;
 
@@ -228,7 +229,7 @@ fn internal_execute<'info>(
             offchain_token_data: execution_report.offchain_token_data[i].clone(),
         };
         let mut acc_infos = vec![
-            router_token_pool_signer.to_account_info(),
+            offramp_token_pool_signer.to_account_info(),
             ctx.accounts.offramp.to_account_info(),
             ctx.accounts.allowed_offramp.to_account_info(),
             accs.pool_config.to_account_info(),
@@ -243,9 +244,15 @@ fn internal_execute<'info>(
             accs.user_token_account.to_account_info(),
         ];
         acc_infos.extend_from_slice(accs.remaining_accounts);
+
+        let seeds = &[
+            seed::EXTERNAL_TOKEN_POOL,
+            &[accs.ccip_offramp_pool_signer_bump],
+        ];
+
         let return_data = interact_with_pool(
             accs.pool_program.key(),
-            router_token_pool_signer.key(),
+            offramp_token_pool_signer.key(),
             acc_infos,
             release_or_mint,
             seeds,
@@ -282,31 +289,28 @@ fn internal_execute<'info>(
     // case: no tokens, but there are remaining_accounts passed in
     // case: tokens and messages, so the first token has a non-zero index (indicating extra accounts before token accounts)
     if has_messaging {
-        let (msg_program, msg_accounts) = parse_messaging_accounts(
+        let msg_accs = parse_messaging_accounts(
             token_indexes,
             &execution_report.message.extra_args.is_writable_bitmap,
             ctx.remaining_accounts,
         )?;
 
-        // The External Execution Config Account is used to sign the CPI instruction
-        let external_execution_config = &ctx.accounts.external_execution_config;
-
         // The accounts of the user that will be used in the CPI instruction, none of them are signers
         // They need to specify if mutable or not, but none of them is allowed to init, realloc or close
         // note: CPI signer is always first account
         let mut acc_infos = vec![
-            external_execution_config.to_account_info(),
+            msg_accs.external_execution_signer.to_account_info(),
             ctx.accounts.offramp.to_account_info(),
             ctx.accounts.allowed_offramp.to_account_info(),
         ];
-        acc_infos.extend_from_slice(msg_accounts);
+        acc_infos.extend_from_slice(msg_accs.remaining_accounts);
 
         let acc_metas: Vec<AccountMeta> = acc_infos
             .to_vec()
             .iter()
             .flat_map(|acc_info| {
                 // Check signer from PDA External Execution config
-                let is_signer = acc_info.key() == external_execution_config.key();
+                let is_signer = acc_info.key() == msg_accs.external_execution_signer.key();
                 acc_info.to_account_metas(Some(is_signer))
             })
             .collect();
@@ -314,14 +318,14 @@ fn internal_execute<'info>(
         let data = message.build_receiver_discriminator_and_data()?;
 
         let instruction = Instruction {
-            program_id: msg_program.key(), // The receiver Program Id that will handle the ccip_receive message
+            program_id: msg_accs.logic_receiver.key(), // The receiver Program Id that will handle the ccip_receive message
             accounts: acc_metas,
             data,
         };
 
         let seeds = &[
             seed::EXTERNAL_EXECUTION_CONFIG,
-            &[ctx.bumps.external_execution_config],
+            &[msg_accs.external_execution_signer_bump],
         ];
         let signer = &[&seeds[..]];
 
@@ -362,6 +366,7 @@ fn get_token_accounts_for<'a>(
         chain_selector,
         router,
         fee_quoter,
+        Some(crate::ID),
         &accounts[start..end],
     )?;
 
@@ -378,6 +383,13 @@ fn should_execute_messaging<'a>(
     !remaining_accounts.is_empty() && !only_tokens
 }
 
+pub struct MessagingAccounts<'a> {
+    pub logic_receiver: &'a AccountInfo<'a>,
+    pub external_execution_signer: &'a AccountInfo<'a>,
+    pub external_execution_signer_bump: u8,
+    pub remaining_accounts: &'a [AccountInfo<'a>],
+}
+
 /// parse_message_accounts returns all the accounts needed to execute the CPI instruction
 /// It also validates that the accounts sent in the message match the ones sent in the source chain
 /// Precondition: logic_receiver != 0 && remaining_accounts.len() > 0
@@ -385,15 +397,11 @@ fn should_execute_messaging<'a>(
 /// # Arguments
 /// * `token_indexes` - start indexes of token pool accounts, used to determine ending index for arbitrary messaging accounts
 /// * `remaining_accounts` - accounts passed via `ctx.remaining_accounts`. expected order is: [logic_receiver, ...additional message accounts]
-///
-/// # Return values
-//  * `logic_receiver` is the Program ID of the user's program that will execute the message.
-//  * `msg_accounts` the remaining list of accounts used for the arbitrary execution
 fn parse_messaging_accounts<'info>(
     token_indexes: &[u8],
     source_bitmap: &u64,
     remaining_accounts: &'info [AccountInfo<'info>],
-) -> Result<(&'info AccountInfo<'info>, &'info [AccountInfo<'info>])> {
+) -> Result<MessagingAccounts<'info>> {
     let end_index = if token_indexes.is_empty() {
         remaining_accounts.len()
     } else {
@@ -406,7 +414,26 @@ fn parse_messaging_accounts<'info>(
     ); // there could be other remaining accounts used for tokens
 
     let logic_receiver = &remaining_accounts[0];
-    let msg_accounts = &remaining_accounts[1..end_index];
+    let external_execution_signer = &remaining_accounts[1];
+    let msg_accounts = &remaining_accounts[2..end_index];
+
+    // Validate the derivation of the external_execution_signer and calculate its bump
+    let (expected_signer_key, signer_bump) = Pubkey::find_program_address(
+        &[
+            seed::EXTERNAL_EXECUTION_CONFIG,
+            logic_receiver.key().as_ref(),
+        ],
+        &crate::ID,
+    );
+    require_keys_eq!(
+        external_execution_signer.key(),
+        expected_signer_key,
+        CcipOfframpError::InvalidInputsExternalExecutionSignerAccount
+    );
+    require!(
+        external_execution_signer.is_writable,
+        CcipOfframpError::InvalidInputsMissingWritable
+    );
 
     // Validate that the bitmap corresponds to the individual writable flags
     for (i, acc) in msg_accounts.iter().enumerate().skip(1) {
@@ -416,7 +443,12 @@ fn parse_messaging_accounts<'info>(
         );
     }
 
-    Ok((logic_receiver, msg_accounts))
+    Ok(MessagingAccounts {
+        logic_receiver,
+        external_execution_signer,
+        external_execution_signer_bump: signer_bump,
+        remaining_accounts: msg_accounts,
+    })
 }
 
 pub fn verify_merkle_root(

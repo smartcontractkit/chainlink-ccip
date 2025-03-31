@@ -537,10 +537,6 @@ pub struct ExecuteReportContext<'info> {
     )]
     pub allowed_offramp: UncheckedAccount<'info>,
 
-    /// CHECK: Using this to sign
-    #[account(seeds = [seed::EXTERNAL_EXECUTION_CONFIG], bump)]
-    pub external_execution_config: Account<'info, ExternalExecutionConfig>,
-
     #[account(mut)]
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
@@ -548,9 +544,6 @@ pub struct ExecuteReportContext<'info> {
     /// CHECK: This is a sysvar account
     #[account(address = instructions::ID @ CcipOfframpError::InvalidInputsSysvarAccount)]
     pub sysvar_instructions: AccountInfo<'info>,
-
-    #[account(seeds = [seed::EXTERNAL_TOKEN_POOL], bump)]
-    pub token_pools_signer: Account<'info, ExternalExecutionConfig>,
 
     ////////////////////
     // RMN Remote CPI //
@@ -577,7 +570,7 @@ pub struct ExecuteReportContext<'info> {
     )]
     pub rmn_remote_config: UncheckedAccount<'info>,
     // remaining accounts
-    // [receiver_program, receiver_account, ...user specified accounts from message data for arbitrary messaging]
+    // [receiver_program, external_execution_signer, receiver_account, ...user specified accounts from message data for arbitrary messaging]
     // +
     // [
     // user/sender token account (must be associated token account - derivable PDA [wallet_addr, token_program, mint])
@@ -591,6 +584,8 @@ pub struct ExecuteReportContext<'info> {
     // pool signer
     // token program
     // token mint
+    // ccip_router_pools_signer - derivable PDA [seed::EXTERNAL_TOKEN_POOL, pool_program], seeds::program=router (present in lookup table)
+    // ccip_offramp_pools_signer - derivable PDA [seed::EXTERNAL_TOKEN_POOL, pool_program], seeds::program=offramp (not in lookup table)
     // ...additional accounts for pool config
     // ] x N tokens
 }

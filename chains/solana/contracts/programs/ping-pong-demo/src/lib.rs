@@ -116,7 +116,6 @@ pub mod ping_pong_demo {
             rmn_remote: ctx.accounts.rmn_remote.to_account_info(),
             rmn_remote_curses: ctx.accounts.rmn_remote_curses.to_account_info(),
             rmn_remote_config: ctx.accounts.rmn_remote_config.to_account_info(),
-            token_pools_signer: ctx.accounts.token_pools_signer.to_account_info(),
             fee_token_program: ctx.accounts.fee_token_program.to_account_info(),
         };
 
@@ -165,7 +164,6 @@ pub mod ping_pong_demo {
             rmn_remote: ctx.accounts.rmn_remote.to_account_info(),
             rmn_remote_curses: ctx.accounts.rmn_remote_curses.to_account_info(),
             rmn_remote_config: ctx.accounts.rmn_remote_config.to_account_info(),
-            token_pools_signer: ctx.accounts.token_pools_signer.to_account_info(),
             fee_token_program: ctx.accounts.fee_token_program.to_account_info(),
         };
 
@@ -514,9 +512,6 @@ pub mod context {
         pub rmn_remote_curses: UncheckedAccount<'info>,
         /// CHECK
         pub rmn_remote_config: UncheckedAccount<'info>,
-        /// CHECK
-        #[account(mut)]
-        pub token_pools_signer: UncheckedAccount<'info>,
 
         pub system_program: Program<'info, System>,
     }
@@ -615,9 +610,6 @@ pub mod context {
         pub rmn_remote_curses: UncheckedAccount<'info>,
         /// CHECK
         pub rmn_remote_config: UncheckedAccount<'info>,
-        /// CHECK
-        #[account(mut)]
-        pub token_pools_signer: UncheckedAccount<'info>,
 
         pub system_program: Program<'info, System>,
     }

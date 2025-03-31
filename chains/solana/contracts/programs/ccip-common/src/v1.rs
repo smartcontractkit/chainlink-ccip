@@ -5,10 +5,14 @@ use crate::{
     context::TokenAccountsValidationContext, router_accounts::TokenAdminRegistry, CommonCcipError,
 };
 
+pub const MIN_TOKEN_POOL_ACCOUNTS: usize = 13; // see TokenAccounts struct for all required accounts
+
 pub struct TokenAccounts<'a> {
     pub user_token_account: &'a AccountInfo<'a>,
     pub token_billing_config: &'a AccountInfo<'a>,
     pub pool_chain_config: &'a AccountInfo<'a>,
+    pub lookup_table: &'a AccountInfo<'a>,
+    pub token_admin_registry: &'a AccountInfo<'a>,
     pub pool_program: &'a AccountInfo<'a>,
     pub pool_config: &'a AccountInfo<'a>,
     pub pool_token_account: &'a AccountInfo<'a>,
@@ -16,6 +20,12 @@ pub struct TokenAccounts<'a> {
     pub token_program: &'a AccountInfo<'a>,
     pub mint: &'a AccountInfo<'a>,
     pub fee_token_config: &'a AccountInfo<'a>,
+    pub ccip_router_pool_signer: &'a AccountInfo<'a>,
+    pub ccip_offramp_pool_signer: Option<&'a AccountInfo<'a>>,
+
+    pub ccip_router_pool_signer_bump: u8,
+    pub ccip_offramp_pool_signer_bump: u8,
+
     pub remaining_accounts: &'a [AccountInfo<'a>],
 }
 
@@ -24,6 +34,7 @@ pub fn validate_and_parse_token_accounts<'info>(
     chain_selector: u64,
     router: Pubkey,
     fee_quoter: Pubkey,
+    offramp: Option<Pubkey>, // id of the program that called this function, could be the router or an offramp
     accounts: &'info [AccountInfo<'info>],
 ) -> Result<TokenAccounts> {
     // The program_id here is provided solely to satisfy the interface of try_accounts.
@@ -72,6 +83,13 @@ pub fn validate_and_parse_token_accounts<'info>(
     let token_program = next_account_info(&mut accounts_iter)?;
     let mint = next_account_info(&mut accounts_iter)?;
     let fee_token_config = next_account_info(&mut accounts_iter)?;
+    let ccip_router_pool_signer = next_account_info(&mut accounts_iter)?;
+
+    let ccip_offramp_pool_signer = if offramp.is_some() {
+        Some(next_account_info(&mut accounts_iter)?)
+    } else {
+        None // If it's the router program, this isn't used.
+    };
 
     // collect remaining accounts
     let remaining_accounts = accounts_iter.as_slice();
@@ -94,7 +112,7 @@ pub fn validate_and_parse_token_accounts<'info>(
                 .map_err(|_| CommonCcipError::InvalidInputsLookupTableAccounts)?;
 
         // reconstruct + validate expected values in token pool lookup table
-        // base set of constant accounts (9)
+        // base set of constant accounts (10)
         // + additional constant accounts (remaining_accounts) that are not required but may be used for additional token pool functionality (like CPI)
         let required_entries = [
             lookup_table,
@@ -106,6 +124,7 @@ pub fn validate_and_parse_token_accounts<'info>(
             token_program,
             mint,
             fee_token_config,
+            ccip_router_pool_signer,
         ];
         {
             // validate pool addresses
@@ -141,6 +160,8 @@ pub fn validate_and_parse_token_accounts<'info>(
         user_token_account,
         token_billing_config,
         pool_chain_config,
+        lookup_table,
+        token_admin_registry,
         pool_program,
         pool_config,
         pool_token_account,
@@ -148,6 +169,10 @@ pub fn validate_and_parse_token_accounts<'info>(
         token_program,
         mint,
         fee_token_config,
+        ccip_router_pool_signer,
+        ccip_offramp_pool_signer,
+        ccip_router_pool_signer_bump: bumps.ccip_router_pool_signer,
+        ccip_offramp_pool_signer_bump: bumps.ccip_offramp_pool_signer,
         remaining_accounts,
     })
 }
