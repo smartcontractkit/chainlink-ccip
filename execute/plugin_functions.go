@@ -621,58 +621,57 @@ func computeNoncesConsensus(
 	return consensusNonces
 }
 
-// getConsensusObservation merges all attributed observations into a single observation based on which values have
-// consensus among the observers.
-func getConsensusObservation(
+// computeConsensusObservation aggregates multiple attributed observations to produce a single consensus observation.
+// The provided f is required for computing the consensus on fChain prior to computing the observation consensus.
+func computeConsensusObservation(
 	lggr logger.Logger,
-	aos []plugincommon.AttributedObservation[exectypes.Observation],
-	destChainSelector cciptypes.ChainSelector,
-	F int,
+	observations []plugincommon.AttributedObservation[exectypes.Observation],
 	destChain cciptypes.ChainSelector,
+	f int,
 ) (exectypes.Observation, error) {
+	fChain := getConsensusFChain(lggr, observations, f)
+
+	destFChain, ok := fChain[destChain]
+	if !ok {
+		return exectypes.Observation{}, fmt.Errorf("destination chain %d is not in FChain %v", destChain, fChain)
+	}
+
+	consensusObservation := exectypes.NewObservation(
+		mergeCommitObservations(lggr, observations, fChain),
+		mergeMessageObservations(lggr, observations, fChain),
+		mergeTokenObservations(lggr, observations, fChain),
+		computeNoncesConsensus(lggr, observations, destFChain),
+		dt.Observation{},
+		mergeMessageHashes(lggr, observations, fChain),
+	)
+
+	lggr.Debugw("computeConsensusObservation has finished computing the consensus observation",
+		"fChain", fChain,
+		"observations", observations,
+		"destChain", destChain,
+		"f", f,
+		"consensusObservation", consensusObservation,
+	)
+
+	return consensusObservation, nil
+}
+
+// getConsensusFChain computes and the consensus (using 2F+1 threshold) on the observed fChain values for each chain.
+func getConsensusFChain(
+	lggr logger.Logger,
+	observations []plugincommon.AttributedObservation[exectypes.Observation],
+	f int,
+) map[cciptypes.ChainSelector]int {
 	observedFChains := make(map[cciptypes.ChainSelector][]int)
-	for _, ao := range aos {
-		obs := ao.Observation
-		for chain, f := range obs.FChain {
+	for _, ao := range observations {
+		for chain, f := range ao.Observation.FChain {
 			observedFChains[chain] = append(observedFChains[chain], f)
 		}
 	}
-	// consensus on the fChain map uses the role DON F value
-	// because all nodes can observe the home chain.
-	donThresh := consensus.MakeConstantThreshold[cciptypes.ChainSelector](consensus.TwoFPlus1(F))
+
+	// consensus on the fChain map uses the role DON F value (all nodes can observe the home chain)
+	donThresh := consensus.MakeConstantThreshold[cciptypes.ChainSelector](consensus.TwoFPlus1(f))
 	fChain := consensus.GetConsensusMap(lggr, "fChain", observedFChains, donThresh)
-	_, ok := fChain[destChain] // check if the destination chain is in the FChain.
-	if !ok {
-		return exectypes.Observation{}, fmt.Errorf("destination chain %d is not in FChain", destChain)
-	}
 
-	lggr.Debugw("getConsensusObservation decoded observations", "aos", aos)
-
-	mergedCommitObservations := mergeCommitObservations(lggr, aos, fChain)
-
-	lggr.Debugw("merged commit observations", "mergedCommitObservations", mergedCommitObservations)
-
-	mergedMessageObservations := mergeMessageObservations(lggr, aos, fChain)
-	lggr.Debugw("merged message observations", "mergedMessageObservations", mergedMessageObservations)
-
-	mergedTokenObservations := mergeTokenObservations(lggr, aos, fChain)
-
-	lggr.Debugw("merged token data observations", "mergedTokenObservations", mergedTokenObservations)
-
-	mergedHashes := mergeMessageHashes(lggr, aos, fChain)
-	lggr.Debugw("merged message hashes", "mergedHashes", mergedHashes)
-
-	agreedNoncesAmongOracles := computeNoncesConsensus(lggr, aos, fChain[destChainSelector])
-	lggr.Debugw("agreed nonces among oracles", "agreedNoncesAmongOracles", agreedNoncesAmongOracles)
-
-	observation := exectypes.NewObservation(
-		mergedCommitObservations,
-		mergedMessageObservations,
-		mergedTokenObservations,
-		agreedNoncesAmongOracles,
-		dt.Observation{},
-		mergedHashes,
-	)
-
-	return observation, nil
+	return fChain
 }

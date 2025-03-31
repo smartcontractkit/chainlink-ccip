@@ -868,7 +868,7 @@ func Test_decodeAttributedObservations(t *testing.T) {
 	}
 }
 
-func Test_getConsensusObservation(t *testing.T) {
+func Test_computeConsensusObservation(t *testing.T) {
 	type args struct {
 		observation []exectypes.Observation
 		F           int
@@ -1086,7 +1086,7 @@ func Test_getConsensusObservation(t *testing.T) {
 			}
 
 			lggr := logger.Test(t)
-			got, err := getConsensusObservation(lggr, ao, 1, tt.args.F, 1)
+			got, err := computeConsensusObservation(lggr, ao, 1, tt.args.F)
 			if !tt.wantErr(t, err, "getConsensusObservation(...)") {
 				return
 			}
