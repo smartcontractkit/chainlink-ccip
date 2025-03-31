@@ -83,8 +83,8 @@ func TestPluginReports(t *testing.T) {
 						},
 					},
 					RMNSignatures:        nil,
-					UnblessedMerkleRoots: make([]ccipocr3.MerkleRootChain, 0),
-					BlessedMerkleRoots:   make([]ccipocr3.MerkleRootChain, 0),
+					UnblessedMerkleRoots: nil,
+					BlessedMerkleRoots:   nil,
 				},
 			},
 			expReportInfo: ccipocr3.CommitReportInfo{
@@ -115,8 +115,8 @@ func TestPluginReports(t *testing.T) {
 							{GasPrice: ccipocr3.NewBigIntFromInt64(3), ChainSel: 123},
 						},
 					},
-					UnblessedMerkleRoots: make([]ccipocr3.MerkleRootChain, 0),
-					BlessedMerkleRoots:   make([]ccipocr3.MerkleRootChain, 0),
+					UnblessedMerkleRoots: nil,
+					BlessedMerkleRoots:   nil,
 					RMNSignatures:        nil,
 				},
 			},
@@ -256,10 +256,23 @@ func TestPluginReports(t *testing.T) {
 			require.NoError(t, err)
 			require.Len(t, reports, len(tc.expReports))
 			for i, report := range reports {
-				expEncodedReport, err := reportCodec.Encode(ctx, tc.expReports[i])
+				// Decoded reports should be equal (check first for a helpful error message)
+				decodedReport, err := reportCodec.Decode(ctx, report.ReportWithInfo.Report)
 				require.NoError(t, err)
-				require.Equal(t, expEncodedReport, []byte(report.ReportWithInfo.Report))
+				require.Equal(t, tc.expReports[i], decodedReport)
 
+				// Encoded bytes should be equal
+				encodedExpectedReport, err := reportCodec.Encode(ctx, tc.expReports[i])
+				require.NoError(t, err)
+				var reportBytes []byte = report.ReportWithInfo.Report
+				require.Equal(t, encodedExpectedReport, reportBytes)
+
+				// Decoded report info should be equal.
+				decodedReportInfo, err := ccipocr3.DecodeCommitReportInfo(report.ReportWithInfo.Info)
+				require.NoError(t, err)
+				require.Equal(t, tc.expReportInfo, decodedReportInfo)
+
+				// Encoded report info bytes should be equal.
 				expReportInfoBytes, err := tc.expReportInfo.Encode()
 				require.NoError(t, err)
 				require.Equal(t, expReportInfoBytes, report.ReportWithInfo.Info)

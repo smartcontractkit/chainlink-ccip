@@ -98,24 +98,7 @@ func (p *Plugin) Reports(
 		lggr.Errorw("failed to build reports",
 			"outcome", outcome,
 			"err", err)
-		return nil, fmt.Errorf("Reports err: %w", err)
-	}
-
-	// If no report was generated, check if there should have been one
-	if len(reports) == 0 {
-		dataPoints := len(outcome.MerkleRootOutcome.RootsToReport)
-		dataPoints += len(outcome.TokenPriceOutcome.TokenPrices)
-		dataPoints += len(outcome.ChainFeeOutcome.GasPrices)
-		dataPoints += len(outcome.MerkleRootOutcome.RMNReportSignatures)
-		if dataPoints > 0 {
-			lggr.Errorw("no reports generated despite having data",
-				"roots", outcome.MerkleRootOutcome.RootsToReport,
-				"tokenPriceUpdates", outcome.TokenPriceOutcome.TokenPrices,
-				"gasPriceUpdates", outcome.ChainFeeOutcome.GasPrices,
-				"rmnSignatures", outcome.MerkleRootOutcome.RMNReportSignatures,
-			)
-			return nil, fmt.Errorf("no reports generated despite having data")
-		}
+		return nil, fmt.Errorf("err in Reports(): %w", err)
 	}
 
 	encodedReports, err := encodeReports(ctx, lggr, reports, transmissionSchedule, p.reportCodec)
@@ -126,9 +109,9 @@ func (p *Plugin) Reports(
 			"err", err)
 	}
 
-	if len(encodedReports) != 0 {
-		lggr.Infof("built %d reports", len(reports))
-	}
+	lggr.Infow(fmt.Sprintf("Report building complete: built %d reports", len(reports)),
+		"numReport", len(reports),
+	)
 
 	return encodedReports, nil
 }

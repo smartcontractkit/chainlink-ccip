@@ -122,7 +122,7 @@ func TestReportBuilders(t *testing.T) {
 			},
 		},
 		{
-			name:            "multi price report builder",
+			name:            "multi price report builder with standard root report",
 			reportBuilder:   buildMultiplePriceAndMerkleRootReports,
 			maxPrices:       3, // chosen to have one report with both gas and token prices.
 			expectedReports: 5,
@@ -140,6 +140,34 @@ func TestReportBuilders(t *testing.T) {
 					assert.Equalf(t, 0, numRoots, "There should be no roots in a price report.")
 				} else {
 					require.Equalf(t, 4, numRoots, "All roots are in the final report.")
+					assert.Equalf(t, 0, numPrices, "There should be no prices in a root report.")
+				}
+			},
+		},
+		{
+			name:            "multi price report builder with root limit",
+			reportBuilder:   buildMultiplePriceAndMerkleRootReports,
+			maxPrices:       3, // chosen to have one report with both gas and token prices.
+			maxRoots:        3, // chosen to have one remainder report.
+			expectedReports: 6,
+			checkReport: func(t *testing.T, i int, report ccipocr3.CommitPluginReport) {
+				numRoots := len(report.BlessedMerkleRoots) + len(report.UnblessedMerkleRoots)
+				numPrices := len(report.PriceUpdates.TokenPriceUpdates) + len(report.PriceUpdates.GasPriceUpdates)
+
+				if i < 3 {
+					assert.Equalf(t, 3, numPrices,
+						"first 3 price reports should have maxPrices.")
+					assert.Equalf(t, 0, numRoots, "There should be no roots in a price report.")
+				} else if i < 4 {
+					assert.Equalf(t, 1, numPrices,
+						"final price report should have the remaining 1 gas price.")
+					assert.Equalf(t, 0, numRoots, "There should be no roots in a price report.")
+				} else if i < 5 {
+					require.Equalf(t, 3, numRoots, "first root report has 3 of the 4 total roots.")
+					assert.Equalf(t, 0, numPrices, "There should be no prices in a root report.")
+
+				} else {
+					require.Equalf(t, 1, numRoots, "final root report has the remaining 1 root.")
 					assert.Equalf(t, 0, numPrices, "There should be no prices in a root report.")
 				}
 			},
