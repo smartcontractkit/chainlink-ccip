@@ -325,22 +325,6 @@ export type TestCcipInvalidReceiver = {
           "docs": [
             "CHECK"
           ]
-        },
-        {
-          "name": "approvedSender",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "state",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
         }
       ],
       "args": [
@@ -780,22 +764,6 @@ export const IDL: TestCcipInvalidReceiver = {
         },
         {
           "name": "allowedOfframp",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "approvedSender",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "state",
           "isMut": false,
           "isSigner": false,
           "docs": [

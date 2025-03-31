@@ -21,6 +21,7 @@ test_ccip_invalid_receiver = "FmyF3oW69MSAhyPSiZ69C4RKBdCPv5vAFTScisV7Me2j"
 test_ccip_receiver = "EvhgrPhTDt4LcSPS2kfJgH6T6XWZ6wT3X9ncDGLT1vui"
 test_token_pool = "JuCcZ4smxAYv9QHJ36jshA7pA3FuQ3vQeWLUeAtZduJ"
 timelock = "DoajfR5tK24xVw51fWcawUZWhAXD8yrBJVacc13neVQA"
+ping_pong_demo = "PPbZmYFf5SPAM9Jhm9mNmYoCwT7icPYVKAfJoMCQovU"
 
 [registry]
 url = "https://anchor.projectserum.com"
