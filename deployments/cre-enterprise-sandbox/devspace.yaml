@@ -288,6 +288,7 @@ profiles:
             namespace: ccip
             pipeline: deploy-ccip-v2
             profiles:
+              - monitoring-service-monitor
               - network-besu-chain-alpha
               - network-besu-chain-beta
             vars:
@@ -306,6 +307,7 @@ profiles:
             namespace: cre
             pipeline: deploy
             profiles:
+              - monitoring-service-monitor
               - network-besu-chain-alpha
               - network-besu-chain-beta
               - version-from-env
