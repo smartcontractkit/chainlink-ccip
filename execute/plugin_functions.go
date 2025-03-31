@@ -521,57 +521,6 @@ func computeMessageHashesConsensus(
 	return results
 }
 
-func mergeMessageHashes(
-	lggr logger.Logger,
-	aos []plugincommon.AttributedObservation[exectypes.Observation],
-	fChain map[cciptypes.ChainSelector]int,
-) exectypes.MessageHashes {
-	// Single message can transfer multiple tokens, so we need to find consensus on the token level.
-	validators := make(map[cciptypes.ChainSelector]map[cciptypes.SeqNum]consensus.OracleMinObservation[cciptypes.Bytes32])
-	results := make(exectypes.MessageHashes)
-
-	for _, ao := range aos {
-		for selector, seqMap := range ao.Observation.Hashes {
-			f, ok := fChain[selector]
-			if !ok {
-				lggr.Warnw("no F defined for chain", "chain", selector)
-				continue
-			}
-
-			if _, ok1 := results[selector]; !ok1 {
-				results[selector] = make(map[cciptypes.SeqNum]cciptypes.Bytes32)
-			}
-
-			if _, ok1 := validators[selector]; !ok1 {
-				validators[selector] = make(map[cciptypes.SeqNum]consensus.OracleMinObservation[cciptypes.Bytes32])
-			}
-
-			for seqNr, hash := range seqMap {
-				if _, ok := validators[selector][seqNr]; !ok {
-					validators[selector][seqNr] =
-						consensus.NewOracleMinObservation[cciptypes.Bytes32](consensus.TwoFPlus1(f), nil)
-				}
-				validators[selector][seqNr].Add(hash, ao.OracleID)
-			}
-
-		}
-	}
-
-	for selector, seqNumValidator := range validators {
-		for seqNum, validator := range seqNumValidator {
-			if hashes := validator.GetValid(); len(hashes) == 1 {
-				results[selector][seqNum] = hashes[0]
-			}
-		}
-	}
-
-	if len(results) == 0 {
-		return nil
-	}
-
-	return results
-}
-
 func mergeTokenObservations(
 	lggr logger.Logger,
 	aos []plugincommon.AttributedObservation[exectypes.Observation],
