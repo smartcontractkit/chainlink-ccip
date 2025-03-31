@@ -136,14 +136,12 @@ pub mod test_ccip_invalid_receiver {
         ctx: Context<'_, '_, 'info, 'info, ReceiverProxyExecute<'info>>,
         message: Any2SVMMessage,
     ) -> Result<()> {
-        let acc_infos = vec![
+        let mut acc_infos = vec![
             ctx.accounts.cpi_signer.to_account_info(),
             ctx.accounts.offramp_program.to_account_info(),
             ctx.accounts.allowed_offramp.to_account_info(),
-            // example-receiver specific accounts
-            ctx.accounts.approved_sender.to_account_info(),
-            ctx.accounts.state.to_account_info(),
         ];
+        acc_infos.extend_from_slice(ctx.remaining_accounts); // these depend on the specific receiver
 
         let acc_metas: Vec<AccountMeta> = acc_infos
             .iter()
@@ -260,13 +258,16 @@ pub struct ReceiverProxyExecute<'info> {
 
     /// CHECK
     pub allowed_offramp: UncheckedAccount<'info>,
+    //
+    /*
+    Remaining Accounts:
+        Example-receiver specific PDAs
+            pub approved_sender: UncheckedAccount<'info>,
+            pub state: UncheckedAccount<'info>,
 
-    // -- Example-receiver specific PDAs
-    /// CHECK
-    pub approved_sender: UncheckedAccount<'info>,
-
-    /// CHECK
-    pub state: UncheckedAccount<'info>,
+        PingPong specific PDAs
+            -- see ping pong contract for more details
+    */
 }
 
 #[derive(Accounts)]
