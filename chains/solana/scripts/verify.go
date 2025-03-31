@@ -15,29 +15,29 @@ import (
 
 var (
 	// hash of chainlink-ccip commit to verify
-	COMMIT_HASH = "f93a56f0edc533b3a50c07f55182753b4c4b5b69"
+	CommitHash = "f93a56f0edc533b3a50c07f55182753b4c4b5b69"
 
 	// RPC URL based on environment (cluster)
-	SOLANA_RPC_URL = "https://api.devnet.solana.com"
-	CLUSTER        = "devnet"
+	SolanaRpcUrl = "https://api.devnet.solana.com"
+	Cluster      = "devnet"
 
 	// funded keypair
-	KEYPAIR_PATH = "$HOME/.config/solana/id_devnet.json"
+	KeypairPath = "$HOME/.config/solana/id_devnet.json"
 )
 
 const (
 	// URL of the repository to verify (FIXED)
-	REPO_URL          = "https://github.com/smartcontractkit/chainlink-ccip"
-	GITHUB_REPO       = "smartcontractkit/chainlink-ccip"
-	GITHUB_BRANCH_DIR = "chains/solana/contracts/Anchor.toml"
+	RepoUrl         = "https://github.com/smartcontractkit/chainlink-ccip"
+	GithubRepo      = "smartcontractkit/chainlink-ccip"
+	GithubBranchDir = "chains/solana/contracts/Anchor.toml"
 	// path to the directory containing the contracts (FIXED)
-	MOUNT_PATH = "chains/solana/contracts"
+	MountPath = "chains/solana/contracts"
 )
 
 // Fetches Anchor.toml from the github repo
 func fetchToml() []byte {
-	url := fmt.Sprintf("https://raw.githubusercontent.com/%s/%s/%s", GITHUB_REPO, COMMIT_HASH, GITHUB_BRANCH_DIR)
-	resp, err := http.Get(url)
+	url := fmt.Sprintf("https://raw.githubusercontent.com/%s/%s/%s", GithubRepo, CommitHash, GithubBranchDir)
+	resp, err := http.Get(url) // #nosec G107 -- URL is constructed from trusted constants
 	if err != nil {
 		log.Fatalf("HTTP GET failed: %v", err)
 	}
@@ -56,7 +56,8 @@ func fetchToml() []byte {
 
 // Downloads target/idl/<program>.json into ./idl/
 func fetchIDLs(programs map[string]string) error {
-	baseURL := fmt.Sprintf("https://raw.githubusercontent.com/%s/%s/chains/solana/contracts/target/idl", GITHUB_REPO, COMMIT_HASH)
+
+	baseURL := fmt.Sprintf("https://raw.githubusercontent.com/%s/%s/chains/solana/contracts/target/idl", GithubRepo, CommitHash)
 
 	if err := os.MkdirAll("idl", 0o755); err != nil {
 		return fmt.Errorf("creating idl dir: %w", err)
@@ -64,12 +65,11 @@ func fetchIDLs(programs map[string]string) error {
 
 	for program := range programs {
 		url := fmt.Sprintf("%s/%s.json", baseURL, program)
-		resp, err := http.Get(url)
+		resp, err := http.Get(url) // #nosec G107 -- URL is constructed from trusted constants
 		if err != nil {
 			log.Printf("❌ Failed to download IDL for %s: %v", program, err)
 			continue
 		}
-		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
 			log.Printf("⚠️ Skipping %s: IDL not found (status %d)", program, resp.StatusCode)
@@ -79,17 +79,19 @@ func fetchIDLs(programs map[string]string) error {
 		outPath := filepath.Join("idl", fmt.Sprintf("%s.json", program))
 		outFile, err := os.Create(outPath)
 		if err != nil {
+			resp.Body.Close() // Close before continuing
 			log.Printf("❌ Could not write %s: %v", outPath, err)
 			continue
 		}
 
 		_, err = io.Copy(outFile, resp.Body)
+		resp.Body.Close() // Close after we're done copying
+		outFile.Close()
 		if err != nil {
 			log.Printf("❌ Failed writing IDL for %s: %v", program, err)
 		} else {
 			fmt.Printf("✅ Downloaded IDL for %s → %s\n", program, outPath)
 		}
-		outFile.Close()
 	}
 
 	return nil
@@ -107,7 +109,7 @@ func patchIDLsWithAddresses(programs map[string]string) error {
 		}
 
 		var idl map[string]interface{}
-		if err := json.Unmarshal(data, &idl); err != nil {
+		if err = json.Unmarshal(data, &idl); err != nil {
 			log.Printf("❌ Invalid JSON in %s: %v", idlPath, err)
 			continue
 		}
@@ -124,7 +126,7 @@ func patchIDLsWithAddresses(programs map[string]string) error {
 			continue
 		}
 
-		if err := os.WriteFile(idlPath, out, 0644); err != nil {
+		if err = os.WriteFile(idlPath, out, 0644); err != nil {
 			log.Printf("❌ Could not write updated IDL to %s: %v", idlPath, err)
 			continue
 		}
@@ -159,13 +161,13 @@ func main() {
 			fmt.Printf("🔍 Verifying %s at %s \n", libName, address)
 
 			verifyCmd := []string{
-				"solana-verify", "verify-from-repo", REPO_URL,
-				"--commit-hash", COMMIT_HASH,
-				"--url", SOLANA_RPC_URL,
+				"solana-verify", "verify-from-repo", RepoUrl,
+				"--commit-hash", CommitHash,
+				"--url", SolanaRpcUrl,
 				"--program-id", address,
-				"--mount-path", MOUNT_PATH,
+				"--mount-path", MountPath,
 				"--library-name", libName,
-				"--keypair", KEYPAIR_PATH,
+				"--keypair", KeypairPath,
 				"--skip-prompt", "--remote",
 			}
 
@@ -194,8 +196,8 @@ func main() {
 		idlInitCmd := []string{
 			"anchor", "idl", "init", "-f",
 			filepath.Join("target", "idl", program+".json"),
-			"--provider.cluster", CLUSTER,
-			"--provider.wallet", KEYPAIR_PATH,
+			"--provider.cluster", Cluster,
+			"--provider.wallet", KeypairPath,
 			address,
 		}
 
