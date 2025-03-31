@@ -1,0 +1,36 @@
+[
+  {
+    "ChainID": 1337,
+    "ChainName": "evm-simulated-1337",
+    "ChainType": "EVM",
+    "WSRPCs": [
+      {
+        "External": "wss://chain-alpha-rpc.fwog.sandbox.enterprise.chain.link/ws/",
+        "Internal": "ws://besu-node-rpc-1.chain-alpha.svc.cluster.local:8546"
+      }
+    ],
+    "HTTPRPCs": [
+      {
+        "External": "https://chain-alpha-rpc.fwog.sandbox.enterprise.chain.link",
+        "Internal": "http://besu-node-rpc-1.chain-alpha.svc.cluster.local:8545"
+      }
+    ]
+  },
+  {
+    "ChainID": 2337,
+    "ChainName": "evm-simulated-2337",
+    "ChainType": "EVM",
+    "WSRPCs": [
+      {
+        "External": "wss://chain-beta-rpc.fwog.sandbox.enterprise.chain.link/ws/",
+        "Internal": "ws://besu-node-rpc-1.chain-beta.svc.cluster.local:8546"
+      }
+    ],
+    "HTTPRPCs": [
+      {
+        "External": "https://chain-beta-rpc.fwog.sandbox.enterprise.chain.link",
+        "Internal": "http://besu-node-rpc-1.chain-beta.svc.cluster.local:8545"
+      }
+    ]
+  }
+]

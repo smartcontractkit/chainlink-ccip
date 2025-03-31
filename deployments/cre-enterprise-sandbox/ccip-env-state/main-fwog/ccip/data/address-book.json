@@ -1,0 +1,178 @@
+{
+  "12922642891491394802": {
+    "0x0EB5a1B38BeCEbd4cfC85816D62AF3eA102F0Ec7": {
+      "Type": "FeeQuoter",
+      "Version": "1.6.0"
+    },
+    "0x0f908B9E910492958c6EaA269002AAf6Ae8F11bF": {
+      "Type": "RBACTimelock",
+      "Version": "1.0.0"
+    },
+    "0x1EA7432837C5e0e26209aa45aab6aA27913E51c0": {
+      "Type": "ProposerManyChainMultiSig",
+      "Version": "1.0.0"
+    },
+    "0x218d5fe2E168656eBDE49e7a4A3C97E699D0be78": {
+      "Type": "BypasserManyChainMultiSig",
+      "Version": "1.0.0"
+    },
+    "0x27A107A95b36c4510ea926f0f886Ff7772248E66": {
+      "Type": "RegistryModuleOwnerCustom",
+      "Version": "1.5.0"
+    },
+    "0x290b0cFa0AC2d8959acf8009706273ffBB9F2572": {
+      "Type": "CancellerManyChainMultiSig",
+      "Version": "1.0.0"
+    },
+    "0x297E29CD7be020C211495f98A3D794a8ae000165": {
+      "Type": "OnRamp",
+      "Version": "1.6.0"
+    },
+    "0x2B2bCA20022574e3d1C558476fd8C59B375ec4c8": {
+      "Type": "BurnMintTokenPool",
+      "Version": "1.5.1"
+    },
+    "0x2b33e63E99CBB1847a2735E08C61d9034b13a171": {
+      "Type": "ARMProxy",
+      "Version": "1.0.0"
+    },
+    "0x2f9f1bc72ff3Bf57849d83F25348f90FB8056f75": {
+      "Type": "TokenAdminRegistry",
+      "Version": "1.5.0"
+    },
+    "0x3216C8Ac30000d3Ec32Dd648f4Dd0de4f4774579": {
+      "Type": "MockRMN",
+      "Version": "1.0.0"
+    },
+    "0x4723D3AdC915D1bf65c0834Ce4CC21d2630cfd51": {
+      "Type": "OffRamp",
+      "Version": "1.6.0"
+    },
+    "0x4A6EA541263c363478da333239E38E96E2cC8653": {
+      "Type": "Router",
+      "Version": "1.2.0"
+    },
+    "0x625c70BAf2DFB2cF06Cf6673E6bBad1672427605": {
+      "Type": "TestRouter",
+      "Version": "1.2.0"
+    },
+    "0x91810eaDF2d75b4422b39d80Bc81f0AB09B44356": {
+      "Type": "CallProxy",
+      "Version": "1.0.0"
+    },
+    "0x96C1f5d31C4c627d6e84A046D4790cAC4F17d3ED": {
+      "Type": "CCIPReceiver",
+      "Version": "1.0.0"
+    },
+    "0x99c6a236913907dCe5714cfa4a179D4f2C0b93D9": {
+      "Type": "WETH9",
+      "Version": "1.0.0"
+    },
+    "0xE62b93777e666224cC8029c21a31311554e2F10E": {
+      "Type": "NonceManager",
+      "Version": "1.6.0"
+    },
+    "0xECB550dE5c73e6690AB4521C03EC9D476617167E": {
+      "Type": "RMNRemote",
+      "Version": "1.6.0"
+    },
+    "0xa767c46126e850D7D6715Aa61Cb0D0aA9ACE6E5b": {
+      "Type": "LinkToken",
+      "Version": "1.0.0"
+    }
+  },
+  "3379446385462418246": {
+    "0x05512015FF424b76Cc77F8637a306Ad3E19908d8": {
+      "Type": "CCIPReceiver",
+      "Version": "1.0.0"
+    },
+    "0x2786a30e517E66D9725d331E8f20C6F6427F2180": {
+      "Type": "NonceManager",
+      "Version": "1.6.0"
+    },
+    "0x53DaCf58813321d634f063b64fD2164421ac22fE": {
+      "Type": "BypasserManyChainMultiSig",
+      "Version": "1.0.0"
+    },
+    "0x77C570D35dA572EC0424cD0960e5968EFeacdA91": {
+      "Type": "RMNRemote",
+      "Version": "1.6.0"
+    },
+    "0x78f046eb670d1B41b4401d076990808524C3e1e9": {
+      "Type": "FeeQuoter",
+      "Version": "1.6.0"
+    },
+    "0x8dd829f665d4c96e17499Ca5167956d1c07C08AB": {
+      "Type": "ProposerManyChainMultiSig",
+      "Version": "1.0.0"
+    },
+    "0x8efC7f4AD94D12F2dC8172624D76150611465424": {
+      "Type": "WETH9",
+      "Version": "1.0.0"
+    },
+    "0x945Bb26847198f4a54BdE8a47de53450ce113E6b": {
+      "Type": "OnRamp",
+      "Version": "1.6.0"
+    },
+    "0x9B2A5CBC09a2DDFA7005DAF4E9e514DA1D56dd84": {
+      "Type": "OffRamp",
+      "Version": "1.6.0"
+    },
+    "0x9a1Cc00ff7188b348d4d4070CDC9E01283cE1F9d": {
+      "Type": "MockRMN",
+      "Version": "1.0.0"
+    },
+    "0xC320eF6F13DD0B366b314042d06BCdE1f752b544": {
+      "Type": "CapabilitiesRegistry",
+      "Version": "1.0.0"
+    },
+    "0xCA4E237FEf844082345b46d8bD7C8BA0A7385DD5": {
+      "Type": "RegistryModuleOwnerCustom",
+      "Version": "1.5.0"
+    },
+    "0xCb59E712f70bf3Ab57dc615F628834668EEDF4a0": {
+      "Type": "TokenAdminRegistry",
+      "Version": "1.5.0"
+    },
+    "0xD3e4702db965B10F86F44229691BC1cD6059db1F": {
+      "Type": "BurnMintTokenPool",
+      "Version": "1.5.1"
+    },
+    "0xEA544fcc2fDfb21584B8340626183AACCc0EcDD4": {
+      "Type": "CCIPHome",
+      "Version": "1.6.0"
+    },
+    "0xF41f070C906994B5f7f2736cd904260150383B9D": {
+      "Type": "CallProxy",
+      "Version": "1.0.0"
+    },
+    "0xF8b7d9C4523717e0FBE2FEb639e2202322B5A682": {
+      "Type": "Router",
+      "Version": "1.2.0"
+    },
+    "0xaBc42B03E8b646C767DF732718093c6fb1832E1D": {
+      "Type": "RBACTimelock",
+      "Version": "1.0.0"
+    },
+    "0xace80662470D7d0CA8605e073F546D0edBbDd0b2": {
+      "Type": "CancellerManyChainMultiSig",
+      "Version": "1.0.0"
+    },
+    "0xc59C798ECABFe121Ffd8EDa71bb2441cB05CeB02": {
+      "Type": "LinkToken",
+      "Version": "1.0.0"
+    },
+    "0xc970705401D0D61A05d49C33ab2A39A5C49b2f94": {
+      "Type": "RMNHome",
+      "Version": "1.6.0"
+    },
+    "0xd5A40380180568665F46B70E48C29A81CAB7Ff11": {
+      "Type": "ARMProxy",
+      "Version": "1.0.0"
+    },
+    "0xdD1F8DA85e10568070C82991B41d197e75dA48Fc": {
+      "Type": "TestRouter",
+      "Version": "1.2.0"
+    }
+  }
+}

@@ -83,10 +83,22 @@ To deploy the Chainlink CCIP v1.6 DON which consist of (1 boot node / 4 nodes) w
   devspace run ccip-infra
   ```
 
+#### Full Deploy with On chain state
 - To deploy both the infrastructure and the on-chain deployments with ping-pong test:
   ```sh
-  devspace run ccip
+  devspace run chainlink-ccip
   ```
+
+#### On Chain State  
+On Chain deployment will save the On Chain state in the `$TMP_DIR` dir.
+In CRE it make sense to keep the state dir in git, so it can be used as input for executing transactions.
+
+#### Re-deploying CCIP DON
+For full redeploy you need to first purge ccip namespace and clean TMP_DIR.
+```
+devspace run purge-chainlink-ccip
+```
+After that you can run full deploy with `devspace run chainlink-ccip`
 
 ### CRE Workflow/Capability DON
 

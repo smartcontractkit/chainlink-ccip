@@ -1,0 +1,6 @@
+
+[Capabilities]
+[Capabilities.ExternalRegistry]
+Address = '0xC320eF6F13DD0B366b314042d06BCdE1f752b544'
+NetworkID = 'evm'
+ChainID = '1337'

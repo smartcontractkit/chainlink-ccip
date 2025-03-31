@@ -12,28 +12,17 @@ import (
 func TestDeployCCIPAndAddLanes(t *testing.T) {
 	t.Skip()
 	t.Parallel()
-	env := getTestEnv()
+	env := TestEnvFWOG()
 
-	DeployCCIPAndAddLanes(nil, env)
+	DeployCCIPAndAddLanes(logger, env)
 
 	t.Fail()
-}
-
-func getTestEnv() config.DevspaceEnv {
-	env := config.DevspaceEnv{
-		Namespace:         "crib-local",
-		Provider:          "kind",
-		DonBootNodeCount:  1,
-		DonNodeCount:      4,
-		IngressBaseDomain: "main.stage.cldev.sh",
-	}
-	return env
 }
 
 func TestJDConnection(t *testing.T) {
 	t.Skip()
 	t.Parallel()
-	nodeInfos := config.NewCLNodeConfigurer(getTestEnv()).GetNodeInfos()
+	nodeInfos := config.NewCLNodeConfigurer(TestEnvKindLocal()).GetNodeInfos()
 	jdConfig := devenv.JDConfig{
 		// this is for our script connecting to jd
 		GRPC: "crib-local-job-distributor-grpc.crib.local:443",

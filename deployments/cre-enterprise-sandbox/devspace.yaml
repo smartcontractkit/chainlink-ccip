@@ -23,7 +23,7 @@ vars:
     default: "${CRIB_DIR}/scripts"
   TMP_DIR:
     source: env
-    default: "${CRIB_DIR}/deployments/ccip-v2/.tmp"
+    default: "${CRIB_DIR}/deployments/cre-enterprise-sandbox/ccip-env-state/${CRIB_EKS_CLUSTER_NAME}/${DEVSPACE_NAMESPACE}"
   CHAINLINK_HELM_REGISTRY_URI:
     source: env
     default: "oci://804282218731.dkr.ecr.us-west-2.amazonaws.com/infra-charts"
@@ -290,7 +290,6 @@ profiles:
             profiles:
               - network-besu-chain-alpha
               - network-besu-chain-beta
-              - version-from-env
             vars:
               DON_TYPE: ${DON_TYPE}
               DON_VERSION: ${DON_VERSION}
@@ -342,11 +341,15 @@ commands:
     description: Deploy ccip / cre
     appendArgs: true
   chainlink-ccip:
-    command: devspace run-pipeline chainlink-ccip -p chainlink
+    command: |
+      devspace run ccip-v2-scripts generate-initial-don-overrides
+      devspace run-pipeline chainlink-ccip -p chainlink
     description: Deploy CCIP v1.6 DON with full on-chain configuration
     appendArgs: true
   chainlink-ccip-infra:
-    command: devspace run-pipeline chainlink-ccip-infra -p chainlink
+    command: |
+      devspace run ccip-v2-scripts generate-initial-don-overrides
+      devspace run-pipeline chainlink-ccip-infra -p chainlink
     description: Deploy CCIP v1.6 DON infrastructure only (no on-chain deployment)
     appendArgs: true
   chainlink-cre:
@@ -391,3 +394,16 @@ commands:
         echo "Uninstallation cancelled."
       fi
     description: Use Helm uninstall to remove a component, instead of devspace purge command that removes the namespace
+  ccip-v2-scripts:
+    command: |
+      # ensure that ccip-v2-scripts binary is always up to date with local changes
+      task ccip-v2-scripts:build && ccip-v2-scripts
+    description: |
+      run ccip-v2-scripts cli command within devspace context, you can use it to deploy home chain
+      or any other command available within ccip-v2-scripts binary.
+    appendArgs: true
+  purge-chainlink-ccip:
+    command: |
+      rm -rf ${TMP_DIR}/*
+      devspace run uninstall ccip
+    description: Cleanup temp files and purge Un-install ccip component

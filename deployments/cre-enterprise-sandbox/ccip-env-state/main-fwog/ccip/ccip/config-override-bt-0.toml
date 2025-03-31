@@ -1,0 +1,4 @@
+[P2P.V2]
+Enabled = true
+ListenAddresses = ['0.0.0.0:5001']
+DefaultBootstrappers = ['12D3KooWFPnm8JSFfntuBtwQDDw3LYKVm1U1hZTCBLLwtaWF1VJV@localhost:5001']
