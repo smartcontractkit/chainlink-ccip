@@ -192,7 +192,11 @@ func main() {
 		fmt.Printf("🔍 Initializing IDL for %s\n", program)
 
 		idlInitCmd := []string{
-			"anchor", "idl", "init", "-f", filepath.Join("target", "idl", program+".json"), "--provider.cluster", CLUSTER, "--provider.wallet", KEYPAIR_PATH, address,
+			"anchor", "idl", "init", "-f",
+			filepath.Join("target", "idl", program+".json"),
+			"--provider.cluster", CLUSTER,
+			"--provider.wallet", KEYPAIR_PATH,
+			address,
 		}
 
 		fmt.Println("[DRY RUN]", strings.Join(idlInitCmd, " "))
