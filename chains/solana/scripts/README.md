@@ -2,6 +2,21 @@
 
 A collection of utilities for Solana blockchain development.
 
+## Developer Notes
+
+Can we automate both the processes completely? Maybe.
+
+Will the automation be reliable? Maybe.
+- There are some path assumptions we are making
+- Anchor version might change
+- Verify flow might change
+- The verify flow spins up a docker container on every run which is flaky
+
+Is it worth unreliably automating a process that will happen twice a year? Dont think so.
+
+Hence, we are deciding to print the commands for the user to run them manually.
+If we see the cadence of these proceseses changing, we can invest some more time in automating them.
+
 ## Contract Verification
 
 https://solana.com/developers/guides/advanced/verified-builds
@@ -18,6 +33,8 @@ https://solana.com/developers/guides/advanced/verified-builds
 
 
 ## IDL Upload
+
+https://www.anchor-lang.com/docs/references/cli#idl-init
 
 ### Usage
 
