@@ -53,7 +53,7 @@ var (
 	// router/onramp PDAs
 	RouterConfigPDA, _, _                    = state.FindConfigPDA(CcipRouterProgram)
 	ReceiverTargetAccountPDA, _, _           = solana.FindProgramAddress([][]byte{[]byte("counter")}, CcipLogicReceiver)
-	ReceiverExternalExecutionConfigPDA, _, _ = state.FindExternalExecutionConfigPDA(CcipLogicReceiver)
+	ReceiverExternalExecutionConfigPDA, _, _ = solana.FindProgramAddress([][]byte{[]byte("external_execution_config")}, CcipLogicReceiver)
 	BillingSignerPDA, _, _                   = state.FindFeeBillingSignerPDA(CcipRouterProgram)
 	SvmDestChainStatePDA, _                  = state.FindDestChainStatePDA(SvmChainSelector, CcipRouterProgram)
 	EvmDestChainStatePDA, _                  = state.FindDestChainStatePDA(EvmChainSelector, CcipRouterProgram)
@@ -61,14 +61,13 @@ var (
 	AllowedOfframpSvmPDA, _                  = state.FindAllowedOfframpPDA(SvmChainSelector, CcipOfframpProgram, CcipRouterProgram)
 
 	// Offramp PDAs
-	OfframpConfigPDA, _, _                  = state.FindOfframpConfigPDA(CcipOfframpProgram)
-	OfframpReferenceAddressesPDA, _, _      = state.FindOfframpReferenceAddressesPDA(CcipOfframpProgram)
-	OfframpEvmSourceChainPDA, _, _          = state.FindOfframpSourceChainPDA(EvmChainSelector, CcipOfframpProgram)
-	OfframpSvmSourceChainPDA, _, _          = state.FindOfframpSourceChainPDA(SvmChainSelector, CcipOfframpProgram)
-	OfframpBillingSignerPDA, _, _           = state.FindOfframpBillingSignerPDA(CcipOfframpProgram)
-	OfframpStatePDA, _, _                   = state.FindOfframpStatePDA(CcipOfframpProgram)
-	OfframpExternalExecutionConfigPDA, _, _ = state.FindExternalExecutionConfigPDA(CcipOfframpProgram)
-	OfframpTokenPoolsSignerPDA, _, _        = state.FindExternalTokenPoolsSignerPDA(CcipOfframpProgram)
+	OfframpConfigPDA, _, _               = state.FindOfframpConfigPDA(CcipOfframpProgram)
+	OfframpReferenceAddressesPDA, _, _   = state.FindOfframpReferenceAddressesPDA(CcipOfframpProgram)
+	OfframpEvmSourceChainPDA, _, _       = state.FindOfframpSourceChainPDA(EvmChainSelector, CcipOfframpProgram)
+	OfframpSvmSourceChainPDA, _, _       = state.FindOfframpSourceChainPDA(SvmChainSelector, CcipOfframpProgram)
+	OfframpBillingSignerPDA, _, _        = state.FindOfframpBillingSignerPDA(CcipOfframpProgram)
+	OfframpStatePDA, _, _                = state.FindOfframpStatePDA(CcipOfframpProgram)
+	OfframpReceiverExternalExecPDA, _, _ = state.FindExternalExecutionConfigPDA(CcipLogicReceiver, CcipOfframpProgram)
 
 	// fee quoter PDAs
 	FqConfigPDA, _, _                     = state.FindFqConfigPDA(FeeQuoterProgram)

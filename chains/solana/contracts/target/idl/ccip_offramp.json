@@ -56,16 +56,6 @@
           "isSigner": false
         },
         {
-          "name": "externalExecutionConfig",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "tokenPoolsSigner",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
           "name": "authority",
           "isMut": true,
           "isSigner": true
@@ -1150,13 +1140,6 @@
             "type": "u64"
           }
         ]
-      }
-    },
-    {
-      "name": "ExternalExecutionConfig",
-      "type": {
-        "kind": "struct",
-        "fields": []
       }
     },
     {

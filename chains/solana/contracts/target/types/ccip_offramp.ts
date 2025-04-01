@@ -56,16 +56,6 @@ export type CcipOfframp = {
           "isSigner": false
         },
         {
-          "name": "externalExecutionConfig",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "tokenPoolsSigner",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
           "name": "authority",
           "isMut": true,
           "isSigner": true
@@ -1150,13 +1140,6 @@ export type CcipOfframp = {
             "type": "u64"
           }
         ]
-      }
-    },
-    {
-      "name": "externalExecutionConfig",
-      "type": {
-        "kind": "struct",
-        "fields": []
       }
     },
     {
@@ -2359,16 +2342,6 @@ export const IDL: CcipOfframp = {
           "isSigner": false
         },
         {
-          "name": "externalExecutionConfig",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "tokenPoolsSigner",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
           "name": "authority",
           "isMut": true,
           "isSigner": true
@@ -3453,13 +3426,6 @@ export const IDL: CcipOfframp = {
             "type": "u64"
           }
         ]
-      }
-    },
-    {
-      "name": "externalExecutionConfig",
-      "type": {
-        "kind": "struct",
-        "fields": []
       }
     },
     {

@@ -180,6 +180,7 @@ impl OnRamp for Impl {
         {
             let seeds = &[
                 seed::EXTERNAL_TOKEN_POOL,
+                current_token_accounts.pool_program.key.as_ref(),
                 &[current_token_accounts.ccip_router_pool_signer_bump],
             ];
 

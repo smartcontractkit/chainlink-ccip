@@ -2,7 +2,8 @@ use anchor_lang::prelude::*;
 use solana_program::address_lookup_table::state::AddressLookupTable;
 
 use crate::{
-    context::TokenAccountsValidationContext, router_accounts::TokenAdminRegistry, CommonCcipError,
+    context::TokenAccountsValidationContext, router_accounts::TokenAdminRegistry, seed,
+    CommonCcipError,
 };
 
 pub const MIN_TOKEN_POOL_ACCOUNTS: usize = 13; // see TokenAccounts struct for all required accounts
@@ -21,7 +22,7 @@ pub struct TokenAccounts<'a> {
     pub mint: &'a AccountInfo<'a>,
     pub fee_token_config: &'a AccountInfo<'a>,
     pub ccip_router_pool_signer: &'a AccountInfo<'a>,
-    pub ccip_offramp_pool_signer: Option<&'a AccountInfo<'a>>,
+    pub ccip_offramp_pool_signer: Option<&'a AccountInfo<'a>>, // as this one is optional, it doesn't count for the MIN_TOKEN_POOL_ACCOUNTS
 
     pub ccip_router_pool_signer_bump: u8,
     pub ccip_offramp_pool_signer_bump: u8,
@@ -45,8 +46,8 @@ pub fn validate_and_parse_token_accounts<'info>(
     let program_id = Pubkey::default();
 
     let mut input_accounts = accounts;
-    let mut bumps = <TokenAccountsValidationContext as anchor_lang::Bumps>::Bumps::default();
-    let mut reallocs = std::collections::BTreeSet::new();
+    let bumps = &mut <TokenAccountsValidationContext as anchor_lang::Bumps>::Bumps::default();
+    let reallocs = &mut std::collections::BTreeSet::new();
 
     // leveraging Anchor's account context validation
     // Instead of manually checking each account (ownership, PDA derivation, constraints),
@@ -60,10 +61,11 @@ pub fn validate_and_parse_token_accounts<'info>(
             &chain_selector.to_le_bytes(),
             router.as_ref(),
             fee_quoter.as_ref(),
+            offramp.unwrap_or_default().as_ref(),
         ]
         .concat(),
-        &mut bumps,
-        &mut reallocs,
+        bumps,
+        reallocs,
     )?;
 
     let mut accounts_iter = accounts.iter();
@@ -89,6 +91,28 @@ pub fn validate_and_parse_token_accounts<'info>(
         Some(next_account_info(&mut accounts_iter)?)
     } else {
         None // If it's the router program, this isn't used.
+    };
+
+    // As the offramp signer is optional (only used when the offramp program is calling this function),
+    // the context cannot be used to validate it, as it could try to apply those validations to the wrong account
+    let ccip_offramp_pool_signer_bump = if let Some(offramp) = offramp {
+        let (expected_key, bump) = Pubkey::find_program_address(
+            &[seed::EXTERNAL_TOKEN_POOL, pool_program.key().as_ref()],
+            &offramp,
+        );
+        let acc_info = ccip_offramp_pool_signer.unwrap();
+        require_keys_eq!(
+            acc_info.key(),
+            expected_key,
+            CommonCcipError::InvalidInputsTokenAccounts // TODO
+        );
+        require!(
+            acc_info.is_writable,
+            CommonCcipError::InvalidInputsTokenAccounts // TODO
+        );
+        bump
+    } else {
+        0
     };
 
     // collect remaining accounts
@@ -172,7 +196,7 @@ pub fn validate_and_parse_token_accounts<'info>(
         ccip_router_pool_signer,
         ccip_offramp_pool_signer,
         ccip_router_pool_signer_bump: bumps.ccip_router_pool_signer,
-        ccip_offramp_pool_signer_bump: bumps.ccip_offramp_pool_signer,
+        ccip_offramp_pool_signer_bump,
         remaining_accounts,
     })
 }

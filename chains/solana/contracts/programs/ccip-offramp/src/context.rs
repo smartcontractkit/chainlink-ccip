@@ -6,8 +6,7 @@ use solana_program::sysvar::instructions;
 use crate::messages::ExecutionReportSingleChain;
 use crate::program::CcipOfframp;
 use crate::state::{
-    CommitReport, Config, ExternalExecutionConfig, GlobalState, ReferenceAddresses, SourceChain,
-    SourceChainConfig,
+    CommitReport, Config, GlobalState, ReferenceAddresses, SourceChain, SourceChainConfig,
 };
 use crate::CcipOfframpError;
 
@@ -80,24 +79,6 @@ pub struct Initialize<'info> {
         space = ANCHOR_DISCRIMINATOR + GlobalState::INIT_SPACE,
     )]
     pub state: Account<'info, GlobalState>,
-
-    #[account(
-        init,
-        seeds = [seed::EXTERNAL_EXECUTION_CONFIG],
-        bump,
-        payer = authority,
-        space = ANCHOR_DISCRIMINATOR + ExternalExecutionConfig::INIT_SPACE,
-    )]
-    pub external_execution_config: Account<'info, ExternalExecutionConfig>, // messaging CPI signer initialization
-
-    #[account(
-        init,
-        seeds = [seed::EXTERNAL_TOKEN_POOL],
-        bump,
-        payer = authority,
-        space = ANCHOR_DISCRIMINATOR + ExternalExecutionConfig::INIT_SPACE,
-    )]
-    pub token_pools_signer: Account<'info, ExternalExecutionConfig>, // token pool CPI signer initialization
 
     #[account(mut)]
     pub authority: Signer<'info>,

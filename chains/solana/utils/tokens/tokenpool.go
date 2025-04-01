@@ -88,11 +88,11 @@ func NewTokenPool(tokenProgram solana.PublicKey, poolProgram solana.PublicKey, m
 	if err != nil {
 		return TokenPool{}, err
 	}
-	routerSignerPDA, _, err := state.FindExternalTokenPoolsSignerPDA(mint, config.CcipRouterProgram)
+	routerSignerPDA, _, err := state.FindExternalTokenPoolsSignerPDA(poolProgram, config.CcipRouterProgram)
 	if err != nil {
 		return TokenPool{}, err
 	}
-	offrampSignerPDA, _, err := state.FindExternalTokenPoolsSignerPDA(mint, config.CcipOfframpProgram)
+	offrampSignerPDA, _, err := state.FindExternalTokenPoolsSignerPDA(poolProgram, config.CcipOfframpProgram)
 	if err != nil {
 		return TokenPool{}, err
 	}
