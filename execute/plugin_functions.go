@@ -1,11 +1,14 @@
 package execute
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"sort"
+	"time"
 
 	"github.com/smartcontractkit/libocr/commontypes"
+	"golang.org/x/exp/maps"
 
 	mapset "github.com/deckarep/golang-set/v2"
 
@@ -409,46 +412,116 @@ func mergeMessageObservations(
 	return results
 }
 
-// mergeCommitObservations merges all observations which reach the fChain threshold into a single result.
-// Any observations, or subsets of observations, which do not reach the threshold are ignored.
-func mergeCommitObservations(
+// computeCommitObservationsConsensus will iterate over observations of CommitData and come to consensus on them.
+// We select a merkle root and the relevant data if it has at least f+1 votes.
+// If a merkle root is agreed twice but with different relevant data (e.g. OnRampAddress) then we don't have consensus.
+// Executed messages within the root are agreed when at least f+1 nodes observed the execution.
+func computeCommitObservationsConsensus(
 	lggr logger.Logger,
-	aos []plugincommon.AttributedObservation[exectypes.Observation], fChain map[cciptypes.ChainSelector]int,
+	observations []plugincommon.AttributedObservation[exectypes.Observation],
+	fChain map[cciptypes.ChainSelector]int,
 ) exectypes.CommitObservations {
-	// Create a validator for each chain
-	validators := make(map[cciptypes.ChainSelector]consensus.OracleMinObservation[exectypes.CommitData])
-	for selector, f := range fChain {
-		validators[selector] =
-			consensus.NewOracleMinObservation[exectypes.CommitData](consensus.TwoFPlus1(f), nil)
+	merkleRootsVotes := make(map[merkleRootData]int)
+	executedMsgVotes := make(map[merkleRootData]map[cciptypes.SeqNum]int)
+
+	for _, observation := range observations {
+		for sourceChain, merkleRoots := range observation.Observation.CommitReports {
+			for _, merkleRoot := range merkleRoots {
+				data := merkleRootData{
+					SourceChain:         sourceChain,
+					OnRampAddressBase64: base64.StdEncoding.EncodeToString(merkleRoot.OnRampAddress),
+					Timestamp:           merkleRoot.Timestamp,
+					BlockNum:            merkleRoot.BlockNum,
+					MerkleRoot:          merkleRoot.MerkleRoot,
+					SequenceNumberRange: merkleRoot.SequenceNumberRange,
+				}
+
+				merkleRootsVotes[data]++
+
+				if _, ok := executedMsgVotes[data]; !ok {
+					executedMsgVotes[data] = make(map[cciptypes.SeqNum]int)
+				}
+				unqExecutedSeqNums := mapset.NewSet(merkleRoot.ExecutedMessages...).ToSlice()
+				for _, executedSeqNum := range unqExecutedSeqNums {
+					executedMsgVotes[data][executedSeqNum]++
+				}
+			}
+		}
 	}
 
-	// Add reports to the validator for each chain selector.
-	for _, ao := range aos {
-		for selector, commitReports := range ao.Observation.CommitReports {
-			validator, ok := validators[selector]
-			if !ok {
-				lggr.Warnw("no F defined for chain", "chain", selector)
+	result := make(exectypes.CommitObservations)
+	seenRoots := make(map[cciptypes.Bytes32]bool)
+	mrs := maps.Keys(merkleRootsVotes)
+	for _, mr := range mrs {
+		votes := merkleRootsVotes[mr]
+		f, ok := fChain[mr.SourceChain]
+		if !ok {
+			lggr.Warnw("no fChain defined for chain", "chain", mr.SourceChain, "fChain", fChain)
+			continue
+		}
+
+		if consensus.LtFPlusOne(f, votes) {
+			lggr.Debugw("merkle root with less than f+1 votes was found, skipping it", "mr", mr, "votes", votes)
+			delete(merkleRootsVotes, mr)
+			delete(executedMsgVotes, mr)
+			continue
+		}
+
+		executedMessages := make([]cciptypes.SeqNum, 0)
+		for seqNum, count := range executedMsgVotes[mr] {
+			if consensus.LtFPlusOne(f, count) {
+				lggr.Debugw("skipping executed msg, less than f+1 votes", "mr", mr, "votes", count, "seqNum", seqNum)
 				continue
 			}
-			// Add reports
-			for _, commitReport := range commitReports {
-				validator.Add(commitReport, ao.OracleID)
-			}
+			executedMessages = append(executedMessages, seqNum)
 		}
+
+		if seenRoots[mr.MerkleRoot] {
+			lggr.Warnw("skipping merkle root that was agreed by f+1 nodes twice but with different data", "mr", mr)
+			continue
+		}
+		seenRoots[mr.MerkleRoot] = true
+
+		if _, ok := result[mr.SourceChain]; !ok {
+			result[mr.SourceChain] = make([]exectypes.CommitData, 0)
+		}
+
+		onRampAddress, err := base64.StdEncoding.DecodeString(mr.OnRampAddressBase64)
+		if err != nil {
+			lggr.Errorw("error decoding base64 encoded onRampAddress", "err", err, "addr", mr.OnRampAddressBase64)
+			continue
+		}
+
+		sort.Slice(executedMessages, func(i, j int) bool { return executedMessages[i] < executedMessages[j] })
+		result[mr.SourceChain] = append(result[mr.SourceChain], exectypes.CommitData{
+			SourceChain:         mr.SourceChain,
+			OnRampAddress:       onRampAddress,
+			Timestamp:           mr.Timestamp,
+			BlockNum:            mr.BlockNum,
+			MerkleRoot:          mr.MerkleRoot,
+			SequenceNumberRange: mr.SequenceNumberRange,
+			ExecutedMessages:    executedMessages,
+		})
 	}
 
-	results := make(exectypes.CommitObservations)
-	for selector, validator := range validators {
-		if values := validator.GetValid(); len(values) > 0 {
-			results[selector] = validator.GetValid()
-		}
+	for _, mr := range result {
+		sort.Slice(mr, func(i, j int) bool { return mr[i].SequenceNumberRange.Start() < mr[j].SequenceNumberRange.Start() })
 	}
 
-	if len(results) == 0 {
+	if len(result) == 0 {
 		return nil
 	}
+	return result
+}
 
-	return results
+// merkleRootData is a helper comparable data structure for counting merkle root votes.
+type merkleRootData struct {
+	SourceChain         cciptypes.ChainSelector
+	OnRampAddressBase64 string
+	Timestamp           time.Time
+	BlockNum            uint64
+	MerkleRoot          cciptypes.Bytes32
+	SequenceNumberRange cciptypes.SeqNumRange
 }
 
 // computeMessageHashesConsensus will iterate over observations of message hashes and come to consensus on them.
@@ -656,7 +729,7 @@ func computeConsensusObservation(
 	}
 
 	consensusObservation := exectypes.NewObservation(
-		mergeCommitObservations(lggr, observations, fChain),
+		computeCommitObservationsConsensus(lggr, observations, fChain),
 		mergeMessageObservations(lggr, observations, fChain),
 		mergeTokenObservations(lggr, observations, fChain),
 		computeNoncesConsensus(lggr, observations, destFChain),
