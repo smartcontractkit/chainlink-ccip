@@ -399,7 +399,6 @@ func computeMessageObservationsConsensus(
 			case 0:
 				lggr.Debugw("no message reached consensus for sequence number, skipping it",
 					"chain", chain, "seqNum", seqNum)
-				continue
 			case 1:
 				if _, ok := results[chain]; !ok {
 					results[chain] = make(map[cciptypes.SeqNum]cciptypes.Message)
