@@ -1145,11 +1145,6 @@ func Test_mergeTokenDataObservation(t *testing.T) {
 						exectypes.NewNoopTokenData(),
 					),
 				},
-				{
-					1: exectypes.NewMessageTokenData(
-						exectypes.NewNoopTokenData(),
-					),
-				},
 			},
 			expected: map[cciptypes.SeqNum]expected{
 				1: {ready: true, data: [][]byte{{}}},
@@ -1186,23 +1181,9 @@ func Test_mergeTokenDataObservation(t *testing.T) {
 						exectypes.NewSuccessTokenData([]byte{32}),
 						exectypes.NewSuccessTokenData([]byte{33}),
 					),
-					5: exectypes.NewMessageTokenData(
-						exectypes.NewSuccessTokenData([]byte{51}),
-						exectypes.NewSuccessTokenData([]byte{52}),
-					),
-				},
-				{
-					1: exectypes.NewMessageTokenData(
-						exectypes.NewNoopTokenData(),
-					),
-					2: exectypes.NewMessageTokenData(
-						exectypes.NewNoopTokenData(),
-						exectypes.NewNoopTokenData(),
-					),
-					3: exectypes.NewMessageTokenData(
-						exectypes.NewSuccessTokenData([]byte{31}),
-						exectypes.NewSuccessTokenData([]byte{32}),
-						exectypes.NewSuccessTokenData([]byte{33}),
+					4: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{41}),
+						exectypes.NewSuccessTokenData([]byte{42}),
 					),
 					5: exectypes.NewMessageTokenData(
 						exectypes.NewSuccessTokenData([]byte{51}),
@@ -1214,6 +1195,7 @@ func Test_mergeTokenDataObservation(t *testing.T) {
 				1: {ready: false},
 				2: {ready: false},
 				3: {ready: false},
+				4: {ready: false},
 				5: {ready: true, data: [][]byte{{51}, {52}}},
 			},
 		},
@@ -1238,13 +1220,6 @@ func Test_mergeTokenDataObservation(t *testing.T) {
 					1: exectypes.NewMessageTokenData(
 						exectypes.NewSuccessTokenData([]byte{11}),
 						exectypes.NewSuccessTokenData([]byte{12}),
-						exectypes.NewSuccessTokenData([]byte{13}),
-					),
-				},
-				{
-					1: exectypes.NewMessageTokenData(
-						exectypes.NewSuccessTokenData([]byte{11}),
-						exectypes.NewNoopTokenData(),
 						exectypes.NewSuccessTokenData([]byte{13}),
 					),
 				},
@@ -1338,13 +1313,6 @@ func Test_mergeTokenDataObservation(t *testing.T) {
 						exectypes.NewSuccessTokenData([]byte{3}),
 					),
 				},
-				{
-					1: exectypes.NewMessageTokenData(
-						exectypes.NewSuccessTokenData([]byte{1}),
-						exectypes.NewSuccessTokenData([]byte{2}),
-						exectypes.NewSuccessTokenData([]byte{3}),
-					),
-				},
 			},
 			expected: map[cciptypes.SeqNum]expected{
 				1: {ready: true, data: [][]byte{{1}, {2}, {3}}},
@@ -1360,14 +1328,6 @@ func Test_mergeTokenDataObservation(t *testing.T) {
 					),
 					2: exectypes.NewMessageTokenData(
 						exectypes.NewSuccessTokenData([]byte{90}),
-					),
-				},
-				{
-					1: exectypes.NewMessageTokenData(
-						exectypes.NewSuccessTokenData([]byte{1}),
-					),
-					2: exectypes.NewMessageTokenData(
-						exectypes.NewSuccessTokenData([]byte{2}),
 					),
 				},
 				{
@@ -1413,11 +1373,6 @@ func Test_mergeTokenDataObservation(t *testing.T) {
 					),
 				},
 				{
-					2: exectypes.NewMessageTokenData(
-						exectypes.NewSuccessTokenData([]byte{2}),
-					),
-				},
-				{
 					1: exectypes.NewMessageTokenData(
 						exectypes.NewErrorTokenData(fmt.Errorf("error")),
 					),
@@ -1439,14 +1394,6 @@ func Test_mergeTokenDataObservation(t *testing.T) {
 					1: exectypes.NewMessageTokenData(
 						exectypes.TokenData{Ready: true, Data: []byte{1}},
 					),
-					2: exectypes.NewMessageTokenData(
-						exectypes.TokenData{Ready: true, Data: []byte{2}, Supported: true},
-					),
-					3: exectypes.NewMessageTokenData(
-						exectypes.TokenData{Ready: true, Data: []byte{3}, Supported: false},
-					),
-				},
-				{
 					2: exectypes.NewMessageTokenData(
 						exectypes.TokenData{Ready: true, Data: []byte{2}, Supported: true},
 					),
