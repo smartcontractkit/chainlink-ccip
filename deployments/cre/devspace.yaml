@@ -66,6 +66,9 @@ vars:
   CRIB_EKS_CLUSTER_NAME:
     source: env
     default: main-stage-cluster
+  ENABLE_METRICS:
+    source: env
+    default: "false"
   ENABLE_OTEL:
     source: env
     default: "false"
@@ -191,6 +194,7 @@ profiles:
               DON_TYPE: ${DON_TYPE}
               ENABLE_BASE_PROFILE: "false"
               ENABLE_DON_TYPE_OVERRIDES: "false"
+              ENABLE_METRICS: ${ENABLE_METRICS}
               ENABLE_OTEL: ${ENABLE_OTEL}
               CRIB_EKS_CLUSTER_NAME: ${CRIB_EKS_CLUSTER_NAME}
           job-distributor:

@@ -83,6 +83,9 @@ vars:
   ENABLE_JOB_DISTRIBUTOR:
     source: env
     default: "false"
+  ENABLE_METRICS:
+    source: env
+    default: "false"
   ENABLE_OTEL:
     source: env
     default: "false"
@@ -313,6 +316,9 @@ profiles:
 
   # monitoring
   - name: monitoring-service-monitor
+    activation:
+      - vars:
+          ENABLE_METRICS: "true"
     patches:
       - op: add
         path: deployments.chainlink-don.helm.valuesFiles
