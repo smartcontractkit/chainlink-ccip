@@ -1,0 +1,64 @@
+---
+# charts: https://github.com/grafana/helm-charts/tree/main/charts/promtail
+version: v2beta1
+name: cluster-services-promtail
+
+require:
+  devspace: ">= 6.0"
+
+vars:
+  # default
+  DEVSPACE_ENV_FILE:
+    source: env
+    default: .env
+  NAMESPACE:
+    source: env
+    default: ${DEVSPACE_NAMESPACE}
+  # specific
+  PROMTAIL_NAME:
+    source: env
+    default: promtail
+  PROMTAIL_PVC_SIZE:
+    source: env
+    default: 5Gi
+  PROMTAIL_RETENTION:
+    source: env
+    default: 24h
+
+pipelines:
+  deploy:
+    run: |-
+      create_deployments promtail
+  purge:
+    run: |-
+      purge_deployments promtail
+
+deployments:
+  promtail:
+    updateImageTags: false
+    namespace: ${NAMESPACE}
+    helm:
+      displayOutput: true
+      releaseName: ${PROMTAIL_NAME}
+      chart:
+        name: promtail
+        repo: https://grafana.github.io/helm-charts
+        version: 6.16.6
+      values:
+        fullnameOverride: ${PROMTAIL_NAME}
+        config:
+          logLevel: info
+          serverPort: 3101
+          clients:
+            - url: http://loki:3100/loki/api/v1/push
+
+hooks:
+  - wait:
+      running: true
+      terminatedWithCode: 0
+      timeout: 600
+    container:
+      labelSelector:
+        app.kubernetes.io/instance: ${PROMTAIL_NAME}
+        app.kubernetes.io/name: ${PROMTAIL_NAME}
+    events: ["after:deploy:promtail"]
