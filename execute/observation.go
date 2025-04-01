@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"golang.org/x/exp/maps"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
@@ -398,10 +396,10 @@ func (p *Plugin) getFilterObservation(
 	}
 
 	// Collect unique senders.
-	nonceRequestArgs := make(map[cciptypes.ChainSelector]map[string]struct{})
+	commitReportSenders := make(map[cciptypes.ChainSelector]map[string]struct{})
 	for _, commitReport := range previousOutcome.CommitReports {
-		if _, ok := nonceRequestArgs[commitReport.SourceChain]; !ok {
-			nonceRequestArgs[commitReport.SourceChain] = make(map[string]struct{})
+		if _, ok := commitReportSenders[commitReport.SourceChain]; !ok {
+			commitReportSenders[commitReport.SourceChain] = make(map[string]struct{})
 		}
 
 		for _, msg := range commitReport.Messages {
@@ -411,21 +409,24 @@ func (p *Plugin) getFilterObservation(
 				continue
 			}
 
-			nonceRequestArgs[commitReport.SourceChain][sender] = struct{}{}
+			commitReportSenders[commitReport.SourceChain][sender] = struct{}{}
+		}
+	}
+
+	requestArgs := make(map[cciptypes.ChainSelector][]string)
+	for srcChain, addrSet := range commitReportSenders {
+		requestArgs[srcChain] = make([]string, 0, len(addrSet))
+		for addr := range addrSet {
+			requestArgs[srcChain] = append(requestArgs[srcChain], addr)
 		}
 	}
 
 	// Read args from chain.
 	nonceObservations := make(exectypes.NonceObservations)
-	for srcChain, addrSet := range nonceRequestArgs {
-		// TODO: check if srcSelectors is supported.
-		addrs := maps.Keys(addrSet)
-		nonces, err := p.ccipReader.Nonces(ctx, srcChain, addrs)
-		if err != nil {
-			lggr.Errorw("unable to get nonces", "err", err)
-			continue
-		}
-		nonceObservations[srcChain] = nonces
+	nonceObservations, err = p.ccipReader.Nonces(ctx, requestArgs)
+	if err != nil {
+		lggr.Errorw("unable to get nonces", "err", err)
+		return exectypes.Observation{}, fmt.Errorf("unable to get nonces: %w", err)
 	}
 
 	// Note: it is technically possible to check for curses at this point. If a curse
