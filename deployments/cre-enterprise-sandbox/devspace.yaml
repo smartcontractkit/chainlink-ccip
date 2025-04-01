@@ -327,6 +327,7 @@ profiles:
             vars:
               DON_TYPE: ${DON_TYPE}
               DON_VERSION: ${DON_VERSION}
+              ENABLE_OTEL: "true"
               ENV: sandbox
 
   - name: chainlink-don-cre
@@ -347,6 +348,7 @@ profiles:
             vars:
               DON_TYPE: ${DON_TYPE_CRE}
               DON_VERSION: ${DON_VERSION_CRE}
+              ENABLE_OTEL: "true"
               ENV: sandbox
 
   - name: chainlink
