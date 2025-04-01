@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"math/big"
 	"slices"
 	"sort"
@@ -747,11 +748,21 @@ func (r *ccipChainReader) Nonces(
 			continue
 		}
 		for _, address := range addresses {
+			lggr.Infow("getting nonce for address",
+				"address", address, "chain", chain)
+
+			sender, err := r.addrCodec.AddressStringToBytes(address, chain)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert address %s to bytes: %w", address, err)
+			}
+			// TODO: evm only, need to make chain agnostic.
+			// pad the sender slice to 32 bytes from the left
+			sender = slicelib.LeftPadBytes(sender, 32)
 			contractInput[counter] = types.BatchRead{
 				ReadName: consts.MethodNameGetInboundNonce,
 				Params: map[string]any{
 					"sourceChainSelector": chain,
-					"sender":              address,
+					"sender":              sender,
 				},
 				ReturnVal: &responses[counter].response,
 			}
