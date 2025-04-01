@@ -79,6 +79,8 @@ pipelines:
 
   cluster-services:
     run: |-
+      run_dependency_pipelines loki
+      run_dependency_pipelines promtail
       run_dependency_pipelines prometheus
       run_dependency_pipelines tempo
       run_dependency_pipelines beholder-gateway
@@ -158,6 +160,34 @@ profiles:
               NAMESPACE: prometheus
             profiles: []
 
+  - name: cluster-services-loki
+    patches:
+      - op: add
+        path: dependencies
+        value:
+          loki:
+            path: ${DEPENDENCIES_DIR}/daas/cluster-services-loki.yaml
+            overwriteVars: true
+            namespace: prometheus
+            pipeline: deploy
+            vars:
+              NAMESPACE: prometheus
+            profiles: []
+
+  - name: cluster-services-promtail
+    patches:
+      - op: add
+        path: dependencies
+        value:
+          promtail:
+            path: ${DEPENDENCIES_DIR}/daas/cluster-services-promtail.yaml
+            overwriteVars: true
+            namespace: prometheus
+            pipeline: deploy
+            vars:
+              NAMESPACE: prometheus
+            profiles: []
+
   - name: cluster-services-beholder-gateway
     patches:
       - op: add
@@ -206,6 +236,8 @@ profiles:
 
   - name: cluster-services
     parents:
+      - profile: cluster-services-loki
+      - profile: cluster-services-promtail
       - profile: cluster-services-tempo
       - profile: cluster-services-prometheus
       - profile: cluster-services-beholder-gateway
@@ -291,6 +323,7 @@ profiles:
               - monitoring-service-monitor
               - network-besu-chain-alpha
               - network-besu-chain-beta
+              - version-from-env
             vars:
               DON_TYPE: ${DON_TYPE}
               DON_VERSION: ${DON_VERSION}

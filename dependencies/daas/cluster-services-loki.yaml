@@ -1,0 +1,61 @@
+# charts: https://github.com/grafana/loki/tree/main/production/helm/loki
+version: v2beta1
+name: cluster-services-loki
+
+require:
+  devspace: ">= 6.0"
+
+vars:
+  # default
+  DEVSPACE_ENV_FILE:
+    source: env
+    default: .env
+  NAMESPACE:
+    source: env
+    default: ${DEVSPACE_NAMESPACE}
+  # specific
+  LOKI_NAME:
+    source: env
+    default: loki
+  LOKI_PVC_SIZE:
+    source: env
+    default: 5Gi
+  LOKI_RETENTION:
+    source: env
+    default: 24h
+  LOCAL_VALUES_DIR:
+    source: env
+    default: ./values
+
+pipelines:
+  deploy:
+    run: |-
+      create_deployments loki
+  purge:
+    run: |-
+      purge_deployments loki
+
+deployments:
+  loki:
+    updateImageTags: false
+    namespace: ${NAMESPACE}
+    helm:
+      displayOutput: true
+      releaseName: ${LOKI_NAME}
+      chart:
+        name: loki
+        repo: https://grafana.github.io/helm-charts
+        version: 6.29.0
+      valuesFiles:
+        - ${LOCAL_VALUES_DIR}/loki/loki-default.yaml
+
+hooks:
+  - wait:
+      running: true
+      terminatedWithCode: 0
+      timeout: 600
+    container:
+      labelSelector:
+        app.kubernetes.io/instance: ${LOKI_NAME}
+        app.kubernetes.io/name: ${LOKI_NAME}
+    events: ["after:deploy:loki"]
