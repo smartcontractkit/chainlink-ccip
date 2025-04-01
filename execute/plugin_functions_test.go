@@ -2004,3 +2004,88 @@ func Test_computeCommitObservationsConsensus(t *testing.T) {
 		})
 	}
 }
+
+func Test_computeMessageObservationsConsensus(t *testing.T) {
+	msgWithID9 := exectypes.MessageObservations{1: map[cciptypes.SeqNum]cciptypes.Message{
+		1000: {Header: cciptypes.RampMessageHeader{SequenceNumber: 1000, MessageID: cciptypes.Bytes32{9, 9, 9, 9}, SourceChainSelector: 1, DestChainSelector: 2}}}}
+	msgWithID2 := exectypes.MessageObservations{1: map[cciptypes.SeqNum]cciptypes.Message{
+		1000: {Header: cciptypes.RampMessageHeader{SequenceNumber: 1000, MessageID: cciptypes.Bytes32{2, 2, 2, 2}, SourceChainSelector: 1, DestChainSelector: 2}}}}
+
+	testCases := []struct {
+		name         string
+		observations []exectypes.MessageObservations
+		exp          exectypes.MessageObservations
+		fChain       map[cciptypes.ChainSelector]int
+	}{
+		{
+			name:         "empty",
+			observations: []exectypes.MessageObservations{},
+			exp:          exectypes.MessageObservations(nil),
+			fChain:       map[cciptypes.ChainSelector]int{},
+		},
+		{
+			name: "base scenario reaching consensus",
+			observations: []exectypes.MessageObservations{
+				msgWithID9,
+				msgWithID9,
+				msgWithID9,
+				msgWithID9,
+			},
+			exp: msgWithID9,
+			fChain: map[cciptypes.ChainSelector]int{
+				1: 3,
+			},
+		},
+		{
+			name: "one message has different id, no consensus",
+			observations: []exectypes.MessageObservations{
+				msgWithID9,
+				msgWithID2,
+				msgWithID9,
+				msgWithID2,
+			},
+			exp: exectypes.MessageObservations(nil),
+			fChain: map[cciptypes.ChainSelector]int{
+				1: 3,
+			},
+		},
+		{
+			name: "consensus is reached on two different message ids but same seq nums",
+			observations: []exectypes.MessageObservations{
+				msgWithID9,
+				msgWithID2,
+				msgWithID9,
+				msgWithID2,
+			},
+			exp: exectypes.MessageObservations(nil),
+			fChain: map[cciptypes.ChainSelector]int{
+				1: 1,
+			},
+		},
+		{
+			name: "no consensus",
+			observations: []exectypes.MessageObservations{
+				msgWithID9,
+				msgWithID9,
+			},
+			exp: exectypes.MessageObservations(nil),
+			fChain: map[cciptypes.ChainSelector]int{
+				1: 3,
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			observations := make([]plugincommon.AttributedObservation[exectypes.Observation], len(tc.observations))
+			for i, obs := range tc.observations {
+				observations[i] = plugincommon.AttributedObservation[exectypes.Observation]{
+					Observation: exectypes.Observation{Messages: obs},
+					OracleID:    commontypes.OracleID(i),
+				}
+			}
+			obs := computeMessageObservationsConsensus(logger.Test(t), observations, tc.fChain)
+			assert.Equal(t, tc.exp, obs)
+		})
+	}
+}

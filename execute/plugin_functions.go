@@ -367,18 +367,70 @@ func decodeAttributedObservations(
 	return decoded, nil
 }
 
-func mergeMessageObservations(
+func computeMessageObservationsConsensus(
 	lggr logger.Logger,
-	aos []plugincommon.AttributedObservation[exectypes.Observation], fChain map[cciptypes.ChainSelector]int,
+	aos []plugincommon.AttributedObservation[exectypes.Observation],
+	fChain map[cciptypes.ChainSelector]int,
 ) exectypes.MessageObservations {
+	validators := prepareValidatorsForComputeMessageObservationsConsensus(lggr, aos, fChain)
+
+	messagesReachingConsensus := make(map[cciptypes.ChainSelector]map[cciptypes.SeqNum][]cciptypes.Message)
+	for selector, validator := range validators {
+		if msgs := validator.GetValid(); len(msgs) > 0 {
+			if _, ok := messagesReachingConsensus[selector]; !ok {
+				messagesReachingConsensus[selector] = make(map[cciptypes.SeqNum][]cciptypes.Message)
+			}
+			for _, msg := range msgs {
+				if _, ok := messagesReachingConsensus[selector][msg.Header.SequenceNumber]; !ok {
+					messagesReachingConsensus[selector][msg.Header.SequenceNumber] = make([]cciptypes.Message, 0)
+				}
+				messagesReachingConsensus[selector][msg.Header.SequenceNumber] = append(
+					messagesReachingConsensus[selector][msg.Header.SequenceNumber],
+					msg,
+				)
+			}
+		}
+	}
+
+	results := make(exectypes.MessageObservations)
+	for chain, seqNumToMsgs := range messagesReachingConsensus {
+		for seqNum, msgsWithConsensus := range seqNumToMsgs {
+			switch len(msgsWithConsensus) {
+			case 0:
+				lggr.Debugw("no message reached consensus for sequence number, skipping it",
+					"chain", chain, "seqNum", seqNum)
+				continue
+			case 1:
+				if _, ok := results[chain]; !ok {
+					results[chain] = make(map[cciptypes.SeqNum]cciptypes.Message)
+				}
+				results[chain][seqNum] = msgsWithConsensus[0]
+			default:
+				lggr.Warnw("more than one message reached consensus for a sequence number, skipping it",
+					"chain", chain, "seqNum", seqNum, "msgs", msgsWithConsensus)
+			}
+		}
+	}
+
+	if len(results) == 0 {
+		return nil
+	}
+	return results
+}
+
+func prepareValidatorsForComputeMessageObservationsConsensus(
+	lggr logger.Logger,
+	observations []plugincommon.AttributedObservation[exectypes.Observation],
+	fChain map[cciptypes.ChainSelector]int,
+) map[cciptypes.ChainSelector]consensus.OracleMinObservation[cciptypes.Message] {
 	// Create a validator for each chain
 	validators := make(map[cciptypes.ChainSelector]consensus.OracleMinObservation[cciptypes.Message])
 	for selector, f := range fChain {
-		validators[selector] = consensus.NewOracleMinObservation[cciptypes.Message](consensus.TwoFPlus1(f), nil)
+		validators[selector] = consensus.NewOracleMinObservation[cciptypes.Message](consensus.FPlus1(f), nil)
 	}
 
 	// Add messages to the validator for each chain selector.
-	for _, ao := range aos {
+	for _, ao := range observations {
 		for selector, messages := range ao.Observation.Messages {
 			validator, ok := validators[selector]
 			if !ok {
@@ -392,23 +444,7 @@ func mergeMessageObservations(
 		}
 	}
 
-	results := make(exectypes.MessageObservations)
-	for selector, validator := range validators {
-		if msgs := validator.GetValid(); len(msgs) > 0 {
-			if _, ok := results[selector]; !ok {
-				results[selector] = make(map[cciptypes.SeqNum]cciptypes.Message)
-			}
-			for _, msg := range msgs {
-				results[selector][msg.Header.SequenceNumber] = msg
-			}
-		}
-	}
-
-	if len(results) == 0 {
-		return nil
-	}
-
-	return results
+	return validators
 }
 
 // computeCommitObservationsConsensus come to consensus over observations of CommitData.
@@ -738,7 +774,7 @@ func computeConsensusObservation(
 
 	consensusObservation := exectypes.NewObservation(
 		computeCommitObservationsConsensus(lggr, observations, fChain),
-		mergeMessageObservations(lggr, observations, fChain),
+		computeMessageObservationsConsensus(lggr, observations, fChain),
 		mergeTokenObservations(lggr, observations, fChain),
 		computeNoncesConsensus(lggr, observations, destFChain),
 		dt.Observation{},
