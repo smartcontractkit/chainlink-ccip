@@ -1096,7 +1096,7 @@ func Test_computeConsensusObservation(t *testing.T) {
 	}
 }
 
-func Test_mergeTokenDataObservation(t *testing.T) {
+func Test_computeTokenDataObservationsConsensus(t *testing.T) {
 	chainSelector := cciptypes.ChainSelector(1)
 
 	type expected struct {
@@ -1439,7 +1439,7 @@ func Test_mergeTokenDataObservation(t *testing.T) {
 				})
 			}
 
-			obs := mergeTokenObservations(logger.Test(t), ao, fChain)
+			obs := computeTokenDataObservationsConsensus(logger.Test(t), ao, fChain)
 
 			for seqNum, exp := range tc.expected {
 				mtd, ok := obs[chainSelector][seqNum]

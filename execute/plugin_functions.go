@@ -638,7 +638,7 @@ func computeMessageHashesConsensus(
 	return results
 }
 
-func mergeTokenObservations(
+func computeTokenDataObservationsConsensus(
 	lggr logger.Logger,
 	aos []plugincommon.AttributedObservation[exectypes.Observation],
 	fChain map[cciptypes.ChainSelector]int,
@@ -775,7 +775,7 @@ func computeConsensusObservation(
 	consensusObservation := exectypes.NewObservation(
 		computeCommitObservationsConsensus(lggr, observations, fChain),
 		computeMessageObservationsConsensus(lggr, observations, fChain),
-		mergeTokenObservations(lggr, observations, fChain),
+		computeTokenDataObservationsConsensus(lggr, observations, fChain),
 		computeNoncesConsensus(lggr, observations, destFChain),
 		dt.Observation{},
 		computeMessageHashesConsensus(lggr, observations, fChain),
