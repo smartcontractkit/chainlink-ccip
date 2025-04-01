@@ -6,39 +6,3 @@ common:
     resourceAttributes:
       platformEnv: cre-sandbox
       donID: 1
-
-    # -- otel sidecar env vars
-    env:
-      - name: POD_IP
-        valueFrom:
-          fieldRef:
-            apiVersion: v1
-            fieldPath: status.podIP
-      - name: POD_NAME
-        valueFrom:
-          fieldRef:
-            apiVersion: v1
-            fieldPath: metadata.name
-      - name: OTEL_RESOURCE_ATTRIBUTES_POD_NAME
-        valueFrom:
-          fieldRef:
-            apiVersion: v1
-            fieldPath: metadata.name
-      - name: OTEL_RESOURCE_ATTRIBUTES_POD_UID
-        valueFrom:
-          fieldRef:
-            apiVersion: v1
-            fieldPath: metadata.uid
-      - name: OTEL_RESOURCE_ATTRIBUTES_NODE_NAME
-        valueFrom:
-          fieldRef:
-            apiVersion: v1
-            fieldPath: spec.nodeName
-      - name: OTEL_RESOURCE_ATTRIBUTES_NODE_NAME
-        valueFrom:
-          fieldRef:
-            apiVersion: v1
-            fieldPath: spec.nodeName
-      # the service_name tag used in OTEL traces
-      - name: OTEL_SERVICE_NAME
-        value: chainlink

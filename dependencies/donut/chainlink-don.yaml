@@ -10,6 +10,9 @@ vars:
   CHAINLINK_HELM_REGISTRY_URI:
     source: env
     default: "oci://804282218731.dkr.ecr.us-west-2.amazonaws.com/infra-charts"
+  CHAINLINK_CLUSTER_CHART_VERSION:
+    source: env
+    default: 2.6.1
   # local
   LOCAL_CHARTS_DIR:
     source: env
@@ -157,7 +160,7 @@ deployments:
       displayOutput: true
       chart:
         name: ${CHAINLINK_HELM_REGISTRY_URI}/chainlink-cluster
-        version: 2.6.0
+        version: ${CHAINLINK_CLUSTER_CHART_VERSION}
       valuesFiles: []
       values: {}
 
@@ -451,6 +454,17 @@ profiles:
       - op: add
         path: deployments.chainlink-don.helm.valuesFiles
         value: ${CRIB_DIR}/dependencies/donut/values/chainlink-cluster/otel.main-fwog.yaml
+      - op: add
+        path: deployments.chainlink-don.helm.values.common.otel
+        value:
+          resourceAttributesOverrides:
+            - action: upsert
+              key: service.name
+              value: chainlink:${DON_TYPE}
+            - action: upsert
+              key: platformEnv
+              value: cre-sandbox
+
   # instance overrides
   - name: instance-overrides
     activation:

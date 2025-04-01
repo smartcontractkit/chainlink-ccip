@@ -161,7 +161,6 @@ deployments:
             pipelines:
               logs:
                 exporters:
-                  - debug
                   - otlphttp/logs
                 processors:
                   - memory_limiter
@@ -170,7 +169,6 @@ deployments:
                   - otlp
               metrics:
                 exporters:
-                  - debug
                   - prometheusremotewrite
                 processors:
                   - memory_limiter
@@ -179,7 +177,6 @@ deployments:
                   - otlp
               traces:
                 exporters:
-                  - debug/noop
                   - otlp/tempo
                 processors:
                   - memory_limiter
