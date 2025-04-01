@@ -9,33 +9,26 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
+	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata/usdc"
 	"github.com/smartcontractkit/chainlink-ccip/internal"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
-	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
 func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 	ethereumUSDCPool := internal.RandBytes().String()
 	avalancheUSDCPool := internal.RandBytes().String()
-	config := map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig{
-		1: {
-			SourcePoolAddress:            ethereumUSDCPool,
-			SourceMessageTransmitterAddr: internal.RandBytes().String(),
-		},
-		2: {
-			SourcePoolAddress:            avalancheUSDCPool,
-			SourceMessageTransmitterAddr: internal.RandBytes().String(),
-		},
+	supportedPoolsBySelector := map[cciptypes.ChainSelector]string{
+		cciptypes.ChainSelector(1): ethereumUSDCPool,
+		cciptypes.ChainSelector(2): avalancheUSDCPool,
 	}
-
 	tests := []struct {
 		name                string
 		messageObservations exectypes.MessageObservations
 		usdcReader          reader.USDCMessageReader
-		attestationClient   usdc.AttestationClient
+		attestationClient   tokendata.AttestationClient
 		expectedTokenData   exectypes.TokenDataObservations
 	}{
 		{
@@ -43,7 +36,7 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 			messageObservations: exectypes.MessageObservations{},
 			expectedTokenData:   exectypes.TokenDataObservations{},
 			usdcReader:          reader.FakeUSDCMessageReader{},
-			attestationClient:   usdc.FakeAttestationClient{},
+			attestationClient:   &tokendata.FakeAttestationClient{},
 		},
 		{
 			name: "no USDC messages",
@@ -60,7 +53,7 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 				},
 			},
 			usdcReader:        reader.FakeUSDCMessageReader{},
-			attestationClient: usdc.FakeAttestationClient{},
+			attestationClient: &tokendata.FakeAttestationClient{},
 		},
 		{
 			name: "single USDC message per chain",
@@ -78,8 +71,8 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 					reader.NewMessageTokenID(12, 0): []byte("message12"),
 				},
 			),
-			attestationClient: usdc.FakeAttestationClient{
-				Data: map[string]usdc.AttestationStatus{
+			attestationClient: &tokendata.FakeAttestationClient{
+				Data: map[string]tokendata.AttestationStatus{
 					"message10": {Attestation: []byte{10_1}},
 					"message12": {Attestation: []byte{12_1}},
 				},
@@ -110,8 +103,8 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 					reader.NewMessageTokenID(12, 2): []byte("message12_2"),
 				},
 			),
-			attestationClient: usdc.FakeAttestationClient{
-				Data: map[string]usdc.AttestationStatus{
+			attestationClient: &tokendata.FakeAttestationClient{
+				Data: map[string]tokendata.AttestationStatus{
 					"message10_1": {Attestation: []byte{10_1}},
 					"message11_1": {Attestation: []byte{11_1}},
 					"message12_2": {Attestation: []byte{12_2}},
@@ -156,8 +149,8 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 					reader.NewMessageTokenID(12, 1): []byte("message12_1"),
 				},
 			),
-			attestationClient: usdc.FakeAttestationClient{
-				Data: map[string]usdc.AttestationStatus{
+			attestationClient: &tokendata.FakeAttestationClient{
+				Data: map[string]tokendata.AttestationStatus{
 					"message10_0": {Attestation: []byte{10_0}},
 					"message10_1": {Attestation: []byte{10_1}},
 					"message10_2": {Attestation: []byte{10_2}},
@@ -194,10 +187,10 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 					reader.NewMessageTokenID(10, 1): []byte("message10_1"),
 				},
 			),
-			attestationClient: usdc.FakeAttestationClient{
-				Data: map[string]usdc.AttestationStatus{
+			attestationClient: &tokendata.FakeAttestationClient{
+				Data: map[string]tokendata.AttestationStatus{
 					"message10_0": {Attestation: []byte{10_0}},
-					"message10_1": {Error: usdc.ErrNotReady},
+					"message10_1": {Error: tokendata.ErrNotReady},
 				},
 			},
 			expectedTokenData: exectypes.TokenDataObservations{
@@ -207,7 +200,7 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 						exectypes.TokenData{
 							Ready:     false,
 							Data:      nil,
-							Error:     usdc.ErrNotReady,
+							Error:     tokendata.ErrNotReady,
 							Supported: true,
 						},
 						exectypes.NotSupportedTokenData(),
@@ -219,10 +212,10 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			observer := usdc.NewTokenDataObserver(
+			observer := usdc.InitUSDCTokenDataObserver(
 				logger.Test(t),
 				1,
-				config,
+				supportedPoolsBySelector,
 				testhelpers.USDCEncoder,
 				test.usdcReader,
 				test.attestationClient,
