@@ -248,7 +248,7 @@ pub struct ReceiverProxyExecute<'info> {
 
     /// CHECK
     #[account(
-        seeds = [b"external_execution_config"],
+        seeds = [b"external_execution_config", test_receiver.key().as_ref()],
         bump,
     )]
     pub cpi_signer: UncheckedAccount<'info>,
@@ -278,7 +278,7 @@ pub struct PoolProxyReleaseOrMint<'info> {
 
     /// CHECK
     #[account(
-        seeds = [b"external_token_pools_signer"],
+        seeds = [b"external_token_pools_signer", test_pool.key().as_ref()],
         bump,
     )]
     pub cpi_signer: UncheckedAccount<'info>,
@@ -333,7 +333,7 @@ pub struct PoolProxyLockOrBurn<'info> {
 
     /// CHECK
     #[account(
-        seeds = [b"external_token_pools_signer"],
+        seeds = [b"external_token_pools_signer", test_pool.key().as_ref()],
         bump,
     )]
     pub cpi_signer: UncheckedAccount<'info>,

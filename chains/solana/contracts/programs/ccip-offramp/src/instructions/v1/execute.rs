@@ -247,6 +247,7 @@ fn internal_execute<'info>(
 
         let seeds = &[
             seed::EXTERNAL_TOKEN_POOL,
+            accs.pool_program.key.as_ref(),
             &[accs.ccip_offramp_pool_signer_bump],
         ];
 
@@ -325,6 +326,7 @@ fn internal_execute<'info>(
 
         let seeds = &[
             seed::EXTERNAL_EXECUTION_CONFIG,
+            msg_accs.logic_receiver.key.as_ref(),
             &[msg_accs.external_execution_signer_bump],
         ];
         let signer = &[&seeds[..]];
