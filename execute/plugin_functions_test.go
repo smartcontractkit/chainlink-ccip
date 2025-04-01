@@ -2007,9 +2007,11 @@ func Test_computeCommitObservationsConsensus(t *testing.T) {
 
 func Test_computeMessageObservationsConsensus(t *testing.T) {
 	msgWithID9 := exectypes.MessageObservations{1: map[cciptypes.SeqNum]cciptypes.Message{
-		1000: {Header: cciptypes.RampMessageHeader{SequenceNumber: 1000, MessageID: cciptypes.Bytes32{9, 9, 9, 9}, SourceChainSelector: 1, DestChainSelector: 2}}}}
+		1000: {Header: cciptypes.RampMessageHeader{SequenceNumber: 1000,
+			MessageID: cciptypes.Bytes32{9, 9, 9, 9}, SourceChainSelector: 1, DestChainSelector: 2}}}}
 	msgWithID2 := exectypes.MessageObservations{1: map[cciptypes.SeqNum]cciptypes.Message{
-		1000: {Header: cciptypes.RampMessageHeader{SequenceNumber: 1000, MessageID: cciptypes.Bytes32{2, 2, 2, 2}, SourceChainSelector: 1, DestChainSelector: 2}}}}
+		1000: {Header: cciptypes.RampMessageHeader{SequenceNumber: 1000,
+			MessageID: cciptypes.Bytes32{2, 2, 2, 2}, SourceChainSelector: 1, DestChainSelector: 2}}}}
 
 	testCases := []struct {
 		name         string
