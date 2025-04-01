@@ -126,3 +126,15 @@ func FindRMNRemoteConfigPDA(rmnRemoteProgram solana.PublicKey) (solana.PublicKey
 func FindRMNRemoteCursesPDA(rmnRemoteProgram solana.PublicKey) (solana.PublicKey, uint8, error) {
 	return solana.FindProgramAddress([][]byte{[]byte("curses")}, rmnRemoteProgram)
 }
+
+////////////////////
+// Ping Pong Demo //
+////////////////////
+
+func FindPingPongDemoConfigPDA(pingPongDemoProgram solana.PublicKey) (solana.PublicKey, uint8, error) {
+	return solana.FindProgramAddress([][]byte{[]byte("config")}, pingPongDemoProgram)
+}
+
+func FindPingPongCCIPSendSignerPDA(pingPongDemoProgram solana.PublicKey) (solana.PublicKey, uint8, error) {
+	return solana.FindProgramAddress([][]byte{[]byte("ccip_send_signer")}, pingPongDemoProgram)
+}

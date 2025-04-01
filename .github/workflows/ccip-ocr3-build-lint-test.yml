@@ -8,7 +8,7 @@ on:
 
 jobs:
   build-lint-test:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: .

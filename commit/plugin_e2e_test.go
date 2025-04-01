@@ -9,16 +9,6 @@ import (
 	"testing"
 	"time"
 
-	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-
-	"github.com/smartcontractkit/chainlink-ccip/internal"
-
-	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
-	"github.com/smartcontractkit/chainlink-ccip/commit/metrics"
-	"github.com/smartcontractkit/chainlink-ccip/internal/libs/mathslib"
-	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
-	ocrtypecodec "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
-
 	mapset "github.com/deckarep/golang-set/v2"
 
 	"github.com/stretchr/testify/assert"
@@ -27,6 +17,7 @@ import (
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
+	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
@@ -36,16 +27,23 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
+	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
+	"github.com/smartcontractkit/chainlink-ccip/commit/internal/builder"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
+	"github.com/smartcontractkit/chainlink-ccip/commit/metrics"
 	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
+	"github.com/smartcontractkit/chainlink-ccip/internal"
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/mathslib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	ocrtypecodec "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
 	reader2 "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -329,9 +327,6 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 							},
 						},
 					},
-					BlessedMerkleRoots:   make([]ccipocr3.MerkleRootChain, 0),
-					UnblessedMerkleRoots: make([]ccipocr3.MerkleRootChain, 0),
-					RMNSignatures:        make([]ccipocr3.RMNECDSASignature, 0),
 				},
 			},
 		},
@@ -431,9 +426,6 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 							},
 						},
 					},
-					BlessedMerkleRoots:   make([]ccipocr3.MerkleRootChain, 0),
-					UnblessedMerkleRoots: make([]ccipocr3.MerkleRootChain, 0),
-					RMNSignatures:        make([]ccipocr3.RMNECDSASignature, 0),
 				},
 			},
 		},
@@ -909,6 +901,12 @@ func setupNode(params SetupNodeParams) nodeSetup {
 		GetOffRampConfigDigest(mock.Anything, consts.PluginTypeCommit).
 		Return(params.reportingCfg.ConfigDigest, nil).Maybe()
 
+	cfg := pluginconfig.CommitOffchainConfig{}
+	err := cfg.ApplyDefaultsAndValidate()
+	require.NoError(params.t, err)
+	reportBuilder, err := builder.NewReportBuilder(cfg.RMNEnabled, cfg.MaxMerkleRootsPerReport, cfg.MaxPricesPerReport)
+	require.NoError(params.t, err)
+
 	mockAddrCodec := internal.NewMockAddressCodecHex(params.t)
 	p := NewPlugin(
 		params.donID,
@@ -927,6 +925,7 @@ func setupNode(params SetupNodeParams) nodeSetup {
 		params.reportingCfg,
 		&metrics.Noop{},
 		mockAddrCodec,
+		reportBuilder,
 	)
 
 	if !params.enableDiscovery {

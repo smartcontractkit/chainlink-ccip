@@ -151,11 +151,18 @@ type CommitOffchainConfig struct {
 	// MaxRootsPerReport is the maximum number of roots to include in a single report.
 	// Set this to 1 for destination chains that cannot process more than one commit root per report (e.g, Solana)
 	// Disable by setting to 0.
-	// Warning: if MaxRootsPerReport is non-zero, MultipleReportsEnabled should be set to true. In the future
-	// it may become an error to use MaxMerkleRootsPerReport without also using MultipleReportsEnabled. For now
-	// it is allowed for testing purposes.
-	// NOTE: this can only be used if RMNEnabled == false.
+	// NOTE:
+	//  * this can only be used if RMNEnabled == false.
+	//  * if MaxMerkleRootsPerReport is non-zero, MultipleReportsEnabled should be set to true.
 	MaxMerkleRootsPerReport uint64 `json:"maxRootsPerReport"`
+
+	// MaxPricesPerReport is the maximum number of token and/or gas prices that may be included in a single report.
+	// Price data will not be included with MerkleRoots when this value is set.
+	// Disable by setting to 0.
+	// NOTE:
+	//  * this can only be used if RMNEnabled == false.
+	//  * if MaxPricesPerReport is non-zero, MultipleReportsEnabled should be set to true.
+	MaxPricesPerReport uint64 `json:"maxPricesPerReport"`
 
 	// MultipleReportsEnabled is a flag to enable/disable multiple reports per round.
 	// This is typically set to true on chains that use 'MaxMerkleRootsPerReport'
@@ -287,14 +294,21 @@ func (c *CommitOffchainConfig) Validate() error {
 	var errs []error
 	if c.RMNEnabled {
 		if c.MultipleReportsEnabled {
-			errs = append(errs, fmt.Errorf("multipleReports is set with RMN enabled"))
+			errs = append(errs, fmt.Errorf("multipleReports do not support RMN, RMNEnabled cannot be true"))
 		}
 		if c.MaxMerkleRootsPerReport != 0 {
-			errs = append(errs, fmt.Errorf("maxMerkleRootsPerReport is set with RMN enabled"))
+			errs = append(errs, fmt.Errorf("maxMerkleRootsPerReport does not support RMN, RMNEnabled cannot be true"))
 		}
-		if len(errs) > 0 {
-			return errors.Join(errs...)
-		}
+	}
+	if c.MaxMerkleRootsPerReport != 0 && !c.MultipleReportsEnabled {
+		errs = append(errs, fmt.Errorf("maxMerkleRootsPerReport cannot be used without MultipleReportsEnabled"))
+	}
+	if c.MaxPricesPerReport != 0 && !c.MultipleReportsEnabled {
+		errs = append(errs, fmt.Errorf("maxPricesPerReport cannot be used without MultipleReportsEnabled"))
+	}
+
+	if len(errs) > 0 {
+		return errors.Join(errs...)
 	}
 
 	return nil
