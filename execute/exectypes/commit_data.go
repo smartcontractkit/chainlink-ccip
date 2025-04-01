@@ -7,6 +7,7 @@ import (
 )
 
 // CommitData is the data that is committed to the chain.
+// NOTE: This data structure represents a committed root (within a commit report).
 type CommitData struct {
 	// SourceChain of the chain that contains the commit report.
 	SourceChain cciptypes.ChainSelector `json:"chainSelector"`
