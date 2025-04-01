@@ -395,35 +395,35 @@ func (p *Plugin) getFilterObservation(
 		return observation, nil
 	}
 
-	// Collect unique senders.
-	commitReportSenders := make(map[cciptypes.ChainSelector]map[string]struct{})
-	for _, commitReport := range previousOutcome.CommitReports {
-		if _, ok := commitReportSenders[commitReport.SourceChain]; !ok {
-			commitReportSenders[commitReport.SourceChain] = make(map[string]struct{})
+	commitReportSenders := make(map[cciptypes.ChainSelector][]string)
+	uniqueSenders := make(map[cciptypes.ChainSelector]map[string]struct{})
+	for _, report := range previousOutcome.CommitReports {
+		srcChain := report.SourceChain
+		if _, ok := commitReportSenders[srcChain]; !ok {
+			commitReportSenders[srcChain] = make([]string, 0)
 		}
 
-		for _, msg := range commitReport.Messages {
-			sender, err := p.addrCodec.AddressBytesToString(msg.Sender[:], commitReport.SourceChain)
+		if _, ok := uniqueSenders[srcChain]; !ok {
+			uniqueSenders[srcChain] = make(map[string]struct{})
+		}
+
+		for _, msg := range report.Messages {
+			sender, err := p.addrCodec.AddressBytesToString(msg.Sender[:], srcChain)
 			if err != nil {
-				lggr.Errorw("unable to convert sender address to string", "err", err, "sender address", msg.Sender)
+				lggr.Errorw("unable to convert sender address to string",
+					"err", err, "sender address", msg.Sender)
 				continue
 			}
 
-			commitReportSenders[commitReport.SourceChain][sender] = struct{}{}
+			if _, exists := uniqueSenders[srcChain][sender]; !exists {
+				commitReportSenders[report.SourceChain] = append(commitReportSenders[srcChain], sender)
+				uniqueSenders[srcChain][sender] = struct{}{}
+			}
 		}
 	}
 
-	// convert addresses from set to slice
-	requestArgs := make(map[cciptypes.ChainSelector][]string)
-	for srcChain, addrSet := range commitReportSenders {
-		requestArgs[srcChain] = make([]string, 0, len(addrSet))
-		for addr := range addrSet {
-			requestArgs[srcChain] = append(requestArgs[srcChain], addr)
-		}
-	}
-
-	// Read args from chain.
-	nonceObservations, err := p.ccipReader.Nonces(ctx, requestArgs)
+	// Get nonces of the addresses.
+	nonceObservations, err := p.ccipReader.Nonces(ctx, commitReportSenders)
 	if err != nil {
 		lggr.Errorw("unable to get nonces", "err", err)
 		return exectypes.Observation{}, fmt.Errorf("unable to get nonces: %w", err)
