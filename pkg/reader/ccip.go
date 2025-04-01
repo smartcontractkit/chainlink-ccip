@@ -736,8 +736,8 @@ func (r *ccipChainReader) Nonces(
 		addressCount += len(addresses)
 	}
 
-	// we coordinate the index of the responses with the index in `responseIndexToKey` to know which key to assign to
-	// we need an external counter to keep track of accumulation across maps
+	// the index in `responseIndexToKey` matches the index returned by the response in chain reader
+	// Q: do we even need two slices? Or can we expand the struct to also include the result
 	contractInput := make([]types.BatchRead, addressCount)
 	responseIndexToKey := make([]chainAddressPair, addressCount)
 	responses := make([]uint64, addressCount)
@@ -777,6 +777,11 @@ func (r *ccipChainReader) Nonces(
 
 	// Process results
 	for _, results := range batchResult {
+		if len(results) != len(responseIndexToKey) {
+			return nil, fmt.Errorf("unexpected number of results in nonces call: %d, expected: %d",
+				len(results), len(responseIndexToKey))
+		}
+
 		for i, readResult := range results {
 			key := responseIndexToKey[i]
 

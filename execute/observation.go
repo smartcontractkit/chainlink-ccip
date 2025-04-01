@@ -413,6 +413,7 @@ func (p *Plugin) getFilterObservation(
 		}
 	}
 
+	// convert addresses from set to slice
 	requestArgs := make(map[cciptypes.ChainSelector][]string)
 	for srcChain, addrSet := range commitReportSenders {
 		requestArgs[srcChain] = make([]string, 0, len(addrSet))
@@ -422,8 +423,7 @@ func (p *Plugin) getFilterObservation(
 	}
 
 	// Read args from chain.
-	nonceObservations := make(exectypes.NonceObservations)
-	nonceObservations, err = p.ccipReader.Nonces(ctx, requestArgs)
+	nonceObservations, err := p.ccipReader.Nonces(ctx, requestArgs)
 	if err != nil {
 		lggr.Errorw("unable to get nonces", "err", err)
 		return exectypes.Observation{}, fmt.Errorf("unable to get nonces: %w", err)
