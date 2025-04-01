@@ -3,6 +3,7 @@ package execute
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/stretchr/testify/assert"
@@ -868,7 +869,7 @@ func Test_decodeAttributedObservations(t *testing.T) {
 	}
 }
 
-func Test_getConsensusObservation(t *testing.T) {
+func Test_computeConsensusObservation(t *testing.T) {
 	type args struct {
 		observation []exectypes.Observation
 		F           int
@@ -1086,7 +1087,7 @@ func Test_getConsensusObservation(t *testing.T) {
 			}
 
 			lggr := logger.Test(t)
-			got, err := getConsensusObservation(lggr, ao, 1, tt.args.F, 1)
+			got, err := computeConsensusObservation(lggr, ao, 1, tt.args.F)
 			if !tt.wantErr(t, err, "getConsensusObservation(...)") {
 				return
 			}
@@ -1095,7 +1096,7 @@ func Test_getConsensusObservation(t *testing.T) {
 	}
 }
 
-func Test_mergeTokenDataObservation(t *testing.T) {
+func Test_computeTokenDataObservationsConsensus(t *testing.T) {
 	chainSelector := cciptypes.ChainSelector(1)
 
 	type expected struct {
@@ -1144,11 +1145,6 @@ func Test_mergeTokenDataObservation(t *testing.T) {
 						exectypes.NewNoopTokenData(),
 					),
 				},
-				{
-					1: exectypes.NewMessageTokenData(
-						exectypes.NewNoopTokenData(),
-					),
-				},
 			},
 			expected: map[cciptypes.SeqNum]expected{
 				1: {ready: true, data: [][]byte{{}}},
@@ -1185,23 +1181,9 @@ func Test_mergeTokenDataObservation(t *testing.T) {
 						exectypes.NewSuccessTokenData([]byte{32}),
 						exectypes.NewSuccessTokenData([]byte{33}),
 					),
-					5: exectypes.NewMessageTokenData(
-						exectypes.NewSuccessTokenData([]byte{51}),
-						exectypes.NewSuccessTokenData([]byte{52}),
-					),
-				},
-				{
-					1: exectypes.NewMessageTokenData(
-						exectypes.NewNoopTokenData(),
-					),
-					2: exectypes.NewMessageTokenData(
-						exectypes.NewNoopTokenData(),
-						exectypes.NewNoopTokenData(),
-					),
-					3: exectypes.NewMessageTokenData(
-						exectypes.NewSuccessTokenData([]byte{31}),
-						exectypes.NewSuccessTokenData([]byte{32}),
-						exectypes.NewSuccessTokenData([]byte{33}),
+					4: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{41}),
+						exectypes.NewSuccessTokenData([]byte{42}),
 					),
 					5: exectypes.NewMessageTokenData(
 						exectypes.NewSuccessTokenData([]byte{51}),
@@ -1213,6 +1195,7 @@ func Test_mergeTokenDataObservation(t *testing.T) {
 				1: {ready: false},
 				2: {ready: false},
 				3: {ready: false},
+				4: {ready: false},
 				5: {ready: true, data: [][]byte{{51}, {52}}},
 			},
 		},
@@ -1237,13 +1220,6 @@ func Test_mergeTokenDataObservation(t *testing.T) {
 					1: exectypes.NewMessageTokenData(
 						exectypes.NewSuccessTokenData([]byte{11}),
 						exectypes.NewSuccessTokenData([]byte{12}),
-						exectypes.NewSuccessTokenData([]byte{13}),
-					),
-				},
-				{
-					1: exectypes.NewMessageTokenData(
-						exectypes.NewSuccessTokenData([]byte{11}),
-						exectypes.NewNoopTokenData(),
 						exectypes.NewSuccessTokenData([]byte{13}),
 					),
 				},
@@ -1337,13 +1313,6 @@ func Test_mergeTokenDataObservation(t *testing.T) {
 						exectypes.NewSuccessTokenData([]byte{3}),
 					),
 				},
-				{
-					1: exectypes.NewMessageTokenData(
-						exectypes.NewSuccessTokenData([]byte{1}),
-						exectypes.NewSuccessTokenData([]byte{2}),
-						exectypes.NewSuccessTokenData([]byte{3}),
-					),
-				},
 			},
 			expected: map[cciptypes.SeqNum]expected{
 				1: {ready: true, data: [][]byte{{1}, {2}, {3}}},
@@ -1359,14 +1328,6 @@ func Test_mergeTokenDataObservation(t *testing.T) {
 					),
 					2: exectypes.NewMessageTokenData(
 						exectypes.NewSuccessTokenData([]byte{90}),
-					),
-				},
-				{
-					1: exectypes.NewMessageTokenData(
-						exectypes.NewSuccessTokenData([]byte{1}),
-					),
-					2: exectypes.NewMessageTokenData(
-						exectypes.NewSuccessTokenData([]byte{2}),
 					),
 				},
 				{
@@ -1412,11 +1373,6 @@ func Test_mergeTokenDataObservation(t *testing.T) {
 					),
 				},
 				{
-					2: exectypes.NewMessageTokenData(
-						exectypes.NewSuccessTokenData([]byte{2}),
-					),
-				},
-				{
 					1: exectypes.NewMessageTokenData(
 						exectypes.NewErrorTokenData(fmt.Errorf("error")),
 					),
@@ -1438,14 +1394,6 @@ func Test_mergeTokenDataObservation(t *testing.T) {
 					1: exectypes.NewMessageTokenData(
 						exectypes.TokenData{Ready: true, Data: []byte{1}},
 					),
-					2: exectypes.NewMessageTokenData(
-						exectypes.TokenData{Ready: true, Data: []byte{2}, Supported: true},
-					),
-					3: exectypes.NewMessageTokenData(
-						exectypes.TokenData{Ready: true, Data: []byte{3}, Supported: false},
-					),
-				},
-				{
 					2: exectypes.NewMessageTokenData(
 						exectypes.TokenData{Ready: true, Data: []byte{2}, Supported: true},
 					),
@@ -1491,7 +1439,7 @@ func Test_mergeTokenDataObservation(t *testing.T) {
 				})
 			}
 
-			obs := mergeTokenObservations(logger.Test(t), ao, fChain)
+			obs := computeTokenDataObservationsConsensus(logger.Test(t), ao, fChain)
 
 			for seqNum, exp := range tc.expected {
 				mtd, ok := obs[chainSelector][seqNum]
@@ -1748,6 +1696,345 @@ func Test_computeNoncesConsensus(t *testing.T) {
 			}
 			obs := computeNoncesConsensus(lggr, observations, tc.fChain)
 			assert.Equal(t, tc.expNonceConsensus, obs)
+		})
+	}
+}
+
+func Test_computeMessageHashesConsensus(t *testing.T) {
+	testCases := []struct {
+		name           string
+		observations   []map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Bytes32
+		expectedHashes exectypes.MessageHashes
+		fChain         map[cciptypes.ChainSelector]int
+	}{
+		{
+			name: "empty",
+			observations: []map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Bytes32{
+				{},
+			},
+			fChain: map[cciptypes.ChainSelector]int{},
+		},
+		{
+			name: "base scenario reaching f+1 observations while having 2 faulty observations",
+			observations: []map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Bytes32{
+				{1: {10: cciptypes.Bytes32{111}}},
+				{1: {10: cciptypes.Bytes32{111}}},
+				{1: {10: cciptypes.Bytes32{222}}}, // <--- different observation is ignored
+				{1: {10: cciptypes.Bytes32{222}}}, // <--- different observation is ignored
+				{1: {10: cciptypes.Bytes32{111}}},
+			},
+			expectedHashes: map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Bytes32{
+				1: {10: cciptypes.Bytes32{111}},
+			},
+			fChain: map[cciptypes.ChainSelector]int{
+				1: 2,
+			},
+		},
+		{
+			name: "missing one observation and not reaching consensus",
+			observations: []map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Bytes32{
+				{1: {10: cciptypes.Bytes32{111}}},
+				{1: {10: cciptypes.Bytes32{111}}},
+			},
+			fChain: map[cciptypes.ChainSelector]int{
+				1: 2,
+			},
+		},
+		{
+			name: "one observation has a different hash and we don't reach consensus",
+			observations: []map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Bytes32{
+				{1: {10: cciptypes.Bytes32{111}}},
+				{1: {10: cciptypes.Bytes32{222}}}, // <-- different hash
+				{1: {10: cciptypes.Bytes32{111}}},
+			},
+			fChain: map[cciptypes.ChainSelector]int{
+				1: 2,
+			},
+		},
+		{
+			name: "two different hashes reach consensus threshold f+1, meaning no consensus was formed",
+			observations: []map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Bytes32{
+				{1: {10: cciptypes.Bytes32{111}}},
+				{1: {10: cciptypes.Bytes32{111}}},
+				{1: {10: cciptypes.Bytes32{222}}},
+				{1: {10: cciptypes.Bytes32{222}}},
+				{1: {10: cciptypes.Bytes32{222}}},
+				{1: {10: cciptypes.Bytes32{111}}},
+			},
+			fChain: map[cciptypes.ChainSelector]int{
+				1: 2,
+			},
+		},
+		{
+			name: "three different messages, one reaching consensus, the others not",
+			observations: []map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Bytes32{
+				{1: {10: cciptypes.Bytes32{111}, 20: cciptypes.Bytes32{222}, 30: cciptypes.Bytes32{103}}},
+				{1: {10: cciptypes.Bytes32{111}, 20: cciptypes.Bytes32{222}, 30: cciptypes.Bytes32{103}}},
+				{1: {10: cciptypes.Bytes32{111}, 20: cciptypes.Bytes32{222}}},
+				{1: {10: cciptypes.Bytes32{111}, 20: cciptypes.Bytes32{221}}},
+				{1: {10: cciptypes.Bytes32{111}, 20: cciptypes.Bytes32{221}}},
+				{1: {10: cciptypes.Bytes32{111}, 20: cciptypes.Bytes32{221}}},
+			},
+			expectedHashes: map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Bytes32{
+				1: {10: cciptypes.Bytes32{111}},
+			},
+			fChain: map[cciptypes.ChainSelector]int{
+				1: 2,
+			},
+		},
+		{
+			name: "fChain not defined, chain is skipped",
+			observations: []map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Bytes32{
+				{1: {10: cciptypes.Bytes32{111}}},
+				{1: {10: cciptypes.Bytes32{111}}},
+				{1: {10: cciptypes.Bytes32{111}}},
+			},
+			fChain: map[cciptypes.ChainSelector]int{},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			observations := make([]plugincommon.AttributedObservation[exectypes.Observation], len(tc.observations))
+			for i, obs := range tc.observations {
+				observations[i] = plugincommon.AttributedObservation[exectypes.Observation]{
+					Observation: exectypes.Observation{Hashes: obs},
+					OracleID:    commontypes.OracleID(i),
+				}
+			}
+			obs := computeMessageHashesConsensus(logger.Test(t), observations, tc.fChain)
+			assert.Equal(t, tc.expectedHashes, obs)
+		})
+	}
+}
+
+func Test_computeCommitObservationsConsensus(t *testing.T) {
+	t1 := time.Now()
+
+	baseObservation := map[cciptypes.ChainSelector][]exectypes.CommitData{
+		1: {
+			{
+				SourceChain:         1,
+				OnRampAddress:       []byte{5, 6, 7},
+				Timestamp:           t1,
+				BlockNum:            65535,
+				MerkleRoot:          cciptypes.Bytes32{1, 2, 3},
+				SequenceNumberRange: cciptypes.NewSeqNumRange(200, 300),
+				ExecutedMessages:    []cciptypes.SeqNum{200, 201, 202, 299},
+			},
+		},
+	}
+
+	baseObservationDifferentOnRamp := map[cciptypes.ChainSelector][]exectypes.CommitData{
+		1: {
+			{
+				SourceChain:         1,
+				OnRampAddress:       []byte{8, 9, 10}, // <-- onRamp is different
+				Timestamp:           t1,
+				BlockNum:            65535,
+				MerkleRoot:          cciptypes.Bytes32{1, 2, 3},
+				SequenceNumberRange: cciptypes.NewSeqNumRange(200, 300),
+				ExecutedMessages:    []cciptypes.SeqNum{200, 201, 202, 299},
+			},
+		},
+	}
+
+	testCases := []struct {
+		name         string
+		observations []exectypes.CommitObservations
+		exp          exectypes.CommitObservations
+		fChain       map[cciptypes.ChainSelector]int
+	}{
+		{
+			name:         "empty",
+			observations: []exectypes.CommitObservations{},
+			exp:          exectypes.CommitObservations(nil),
+			fChain:       map[cciptypes.ChainSelector]int{},
+		},
+		{
+			name: "base scenario reaching consensus",
+			observations: []exectypes.CommitObservations{
+				baseObservation,
+				baseObservation,
+				baseObservation,
+			},
+			exp: baseObservation,
+			fChain: map[cciptypes.ChainSelector]int{
+				1: 2,
+			},
+		},
+		{
+			name: "base scenario not reaching consensus, requires at least f+1=4 observations",
+			observations: []exectypes.CommitObservations{
+				baseObservation,
+				baseObservation,
+				baseObservation,
+			},
+			fChain: map[cciptypes.ChainSelector]int{
+				1: 3,
+			},
+		},
+		{
+			name: "one oracle did not observe some of the executed messages, not reaching consensus on the executions",
+			observations: []exectypes.CommitObservations{
+				baseObservation,
+				baseObservation,
+				{
+					1: {
+						{
+							SourceChain:         1,
+							OnRampAddress:       []byte{5, 6, 7},
+							Timestamp:           t1,
+							BlockNum:            65535,
+							MerkleRoot:          cciptypes.Bytes32{1, 2, 3},
+							SequenceNumberRange: cciptypes.NewSeqNumRange(200, 300),
+							ExecutedMessages:    []cciptypes.SeqNum{200, 201}, // <-- 202 and 299 not observed
+						},
+					},
+				},
+			},
+			exp: map[cciptypes.ChainSelector][]exectypes.CommitData{
+				1: {
+					{
+						SourceChain:         1,
+						OnRampAddress:       []byte{5, 6, 7},
+						Timestamp:           t1,
+						BlockNum:            65535,
+						MerkleRoot:          cciptypes.Bytes32{1, 2, 3},
+						SequenceNumberRange: cciptypes.NewSeqNumRange(200, 300),
+						ExecutedMessages:    []cciptypes.SeqNum{200, 201}, // <-- 202 and 299 not included
+					},
+				},
+			},
+			fChain: map[cciptypes.ChainSelector]int{
+				1: 2,
+			},
+		},
+		{
+			name: "same root with different data agreed twice, no consensus is reached",
+			observations: []exectypes.CommitObservations{
+				baseObservation,
+				baseObservationDifferentOnRamp,
+				baseObservation,
+				baseObservation,
+				baseObservationDifferentOnRamp,
+				baseObservation,
+				baseObservationDifferentOnRamp,
+				baseObservationDifferentOnRamp,
+			},
+			fChain: map[cciptypes.ChainSelector]int{
+				1: 2,
+			},
+		},
+		{
+			name: "fChain not defined",
+			observations: []exectypes.CommitObservations{
+				baseObservation,
+				baseObservation,
+				baseObservation,
+			},
+			fChain: map[cciptypes.ChainSelector]int{},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			observations := make([]plugincommon.AttributedObservation[exectypes.Observation], len(tc.observations))
+			for i, obs := range tc.observations {
+				observations[i] = plugincommon.AttributedObservation[exectypes.Observation]{
+					Observation: exectypes.Observation{CommitReports: obs},
+					OracleID:    commontypes.OracleID(i),
+				}
+			}
+			obs := computeCommitObservationsConsensus(logger.Test(t), observations, tc.fChain)
+			assert.Equal(t, tc.exp, obs)
+		})
+	}
+}
+
+func Test_computeMessageObservationsConsensus(t *testing.T) {
+	msgWithID9 := exectypes.MessageObservations{1: map[cciptypes.SeqNum]cciptypes.Message{
+		1000: {Header: cciptypes.RampMessageHeader{SequenceNumber: 1000,
+			MessageID: cciptypes.Bytes32{9, 9, 9, 9}, SourceChainSelector: 1, DestChainSelector: 2}}}}
+	msgWithID2 := exectypes.MessageObservations{1: map[cciptypes.SeqNum]cciptypes.Message{
+		1000: {Header: cciptypes.RampMessageHeader{SequenceNumber: 1000,
+			MessageID: cciptypes.Bytes32{2, 2, 2, 2}, SourceChainSelector: 1, DestChainSelector: 2}}}}
+
+	testCases := []struct {
+		name         string
+		observations []exectypes.MessageObservations
+		exp          exectypes.MessageObservations
+		fChain       map[cciptypes.ChainSelector]int
+	}{
+		{
+			name:         "empty",
+			observations: []exectypes.MessageObservations{},
+			exp:          exectypes.MessageObservations(nil),
+			fChain:       map[cciptypes.ChainSelector]int{},
+		},
+		{
+			name: "base scenario reaching consensus",
+			observations: []exectypes.MessageObservations{
+				msgWithID9,
+				msgWithID9,
+				msgWithID9,
+				msgWithID9,
+			},
+			exp: msgWithID9,
+			fChain: map[cciptypes.ChainSelector]int{
+				1: 3,
+			},
+		},
+		{
+			name: "one message has different id, no consensus",
+			observations: []exectypes.MessageObservations{
+				msgWithID9,
+				msgWithID2,
+				msgWithID9,
+				msgWithID2,
+			},
+			exp: exectypes.MessageObservations(nil),
+			fChain: map[cciptypes.ChainSelector]int{
+				1: 3,
+			},
+		},
+		{
+			name: "consensus is reached on two different message ids but same seq nums",
+			observations: []exectypes.MessageObservations{
+				msgWithID9,
+				msgWithID2,
+				msgWithID9,
+				msgWithID2,
+			},
+			exp: exectypes.MessageObservations(nil),
+			fChain: map[cciptypes.ChainSelector]int{
+				1: 1,
+			},
+		},
+		{
+			name: "no consensus",
+			observations: []exectypes.MessageObservations{
+				msgWithID9,
+				msgWithID9,
+			},
+			exp: exectypes.MessageObservations(nil),
+			fChain: map[cciptypes.ChainSelector]int{
+				1: 3,
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			observations := make([]plugincommon.AttributedObservation[exectypes.Observation], len(tc.observations))
+			for i, obs := range tc.observations {
+				observations[i] = plugincommon.AttributedObservation[exectypes.Observation]{
+					Observation: exectypes.Observation{Messages: obs},
+					OracleID:    commontypes.OracleID(i),
+				}
+			}
+			obs := computeMessageObservationsConsensus(logger.Test(t), observations, tc.fChain)
+			assert.Equal(t, tc.exp, obs)
 		})
 	}
 }

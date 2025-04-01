@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"sort"
 	"time"
 
 	"golang.org/x/exp/maps"
@@ -14,7 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 
-	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
+	"github.com/smartcontractkit/chainlink-ccip/commit/internal/builder"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
@@ -24,241 +23,44 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
-// reportBuilderFunc is used to inject different algorithms for building commit reports.
-type reportBuilderFunc func(
+func encodeReports(
 	ctx context.Context,
 	lggr logger.Logger,
-	reportCodec cciptypes.CommitPluginCodec,
+	reports []builder.Report,
 	transmissionSchedule *ocr3types.TransmissionSchedule,
-	outcome committypes.Outcome,
-	maxMerkleRootsPerReport uint64,
-) ([]ocr3types.ReportPlus[[]byte], error)
-
-// buildOneReport is the common logic for building a report. Different report building
-// algorithms can reassemble reports by selecting which blessed and unblessed merkle
-// roots to include in the report, and which price updates and rmn signatures to use.
-func buildOneReport(
-	ctx context.Context,
-	lggr logger.Logger,
 	reportCodec cciptypes.CommitPluginCodec,
-	transmissionSchedule *ocr3types.TransmissionSchedule,
-	merkleOutcomeType merkleroot.OutcomeType,
-	blessedMerkleRoots []cciptypes.MerkleRootChain,
-	unblessedMerkleRoots []cciptypes.MerkleRootChain,
-	rmnSignatures []cciptypes.RMNECDSASignature,
-	rmnRemoteFSign uint64,
-	priceUpdates cciptypes.PriceUpdates,
-) (*ocr3types.ReportPlus[[]byte], error) {
-	var (
-		rep     cciptypes.CommitPluginReport
-		repInfo cciptypes.CommitReportInfo
-	)
-
-	// MerkleRoots and RMNSignatures will be empty arrays if there is nothing to report
-	rep = cciptypes.CommitPluginReport{
-		BlessedMerkleRoots:   blessedMerkleRoots,
-		UnblessedMerkleRoots: unblessedMerkleRoots,
-		PriceUpdates:         priceUpdates,
-		RMNSignatures:        rmnSignatures,
-	}
-
-	// ReportEmpty and ReportInFlight means there's no roots to report.
-	// However, there still may be price updates to report.
-	if merkleOutcomeType == merkleroot.ReportEmpty || merkleOutcomeType == merkleroot.ReportInFlight {
-		rep.BlessedMerkleRoots = []cciptypes.MerkleRootChain{}
-		rep.UnblessedMerkleRoots = []cciptypes.MerkleRootChain{}
-		rep.RMNSignatures = []cciptypes.RMNECDSASignature{}
-	}
-
-	if merkleOutcomeType == merkleroot.ReportGenerated {
-		allRoots := append(blessedMerkleRoots, unblessedMerkleRoots...)
-		sort.Slice(allRoots, func(i, j int) bool { return allRoots[i].ChainSel < allRoots[j].ChainSel })
-		repInfo = cciptypes.CommitReportInfo{
-			RemoteF:     rmnRemoteFSign,
-			MerkleRoots: allRoots,
-		}
-	}
-	// in case of a price-only update, add prices regardless of outcome type.
-	repInfo.PriceUpdates = rep.PriceUpdates
-
-	if rep.IsEmpty() {
-		lggr.Infow("empty report", "report", rep)
-		return nil, nil
-	}
-
-	encodedReport, err := reportCodec.Encode(ctx, rep)
-	if err != nil {
-		return nil, fmt.Errorf("encode commit plugin report: %w", err)
-	}
-
-	encodedInfo, err := repInfo.Encode()
-	if err != nil {
-		return nil, fmt.Errorf("encode commit plugin report info: %w", err)
-	}
-
-	lggr.Infow("commit plugin generated reports", "report", rep, "reportInfo", repInfo)
-
-	return &ocr3types.ReportPlus[[]byte]{
-		ReportWithInfo: ocr3types.ReportWithInfo[[]byte]{
-			Report: encodedReport,
-			Info:   encodedInfo,
-		},
-		TransmissionScheduleOverride: transmissionSchedule,
-	}, nil
-}
-
-func buildStandardReport(
-	ctx context.Context,
-	lggr logger.Logger,
-	reportCodec cciptypes.CommitPluginCodec,
-	transmission *ocr3types.TransmissionSchedule,
-	outcome committypes.Outcome,
-	_ uint64,
 ) ([]ocr3types.ReportPlus[[]byte], error) {
-	blessedMerkleRoots := make([]cciptypes.MerkleRootChain, 0)
-	unblessedMerkleRoots := make([]cciptypes.MerkleRootChain, 0)
-
-	for _, r := range outcome.MerkleRootOutcome.RootsToReport {
-		if outcome.MerkleRootOutcome.RMNEnabledChains[r.ChainSel] {
-			blessedMerkleRoots = append(blessedMerkleRoots, r)
-		} else {
-			unblessedMerkleRoots = append(unblessedMerkleRoots, r)
+	var encodedReports []ocr3types.ReportPlus[[]byte]
+	// Encode the reports and report info
+	for _, report := range reports {
+		// the report builder should not include empty reports.
+		if report.Report.IsEmpty() {
+			return nil, fmt.Errorf("found empty report")
 		}
-	}
 
-	priceUpdates := cciptypes.PriceUpdates{
-		TokenPriceUpdates: outcome.TokenPriceOutcome.TokenPrices.ToSortedSlice(),
-		GasPriceUpdates:   outcome.ChainFeeOutcome.GasPrices,
-	}
+		lggr.Infow("encoding report and report info",
+			"report", report.Report,
+			"reportInfo", report.ReportInfo)
 
-	report, err := buildOneReport(
-		ctx,
-		lggr,
-		reportCodec,
-		transmission,
-		outcome.MerkleRootOutcome.OutcomeType,
-		blessedMerkleRoots,
-		unblessedMerkleRoots,
-		outcome.MerkleRootOutcome.RMNReportSignatures,
-		outcome.MerkleRootOutcome.RMNRemoteCfg.FSign,
-		priceUpdates,
-	)
-	if err != nil {
-		return nil, err
-	}
-	if report != nil {
-		return []ocr3types.ReportPlus[[]byte]{*report}, nil
-	}
-	return nil, nil
-}
-
-// buildMultipleReports builds many reports of with at most maxMerkleRootsPerReport roots.
-func buildMultipleReports(
-	ctx context.Context,
-	lggr logger.Logger,
-	reportCodec cciptypes.CommitPluginCodec,
-	transmissionSchedule *ocr3types.TransmissionSchedule,
-	outcome committypes.Outcome,
-	maxMerkleRootsPerReport uint64,
-) ([]ocr3types.ReportPlus[[]byte], error) {
-	var reports []ocr3types.ReportPlus[[]byte]
-
-	numRoots := uint64(0)
-	blessedMerkleRoots := make([]cciptypes.MerkleRootChain, 0)
-	unblessedMerkleRoots := make([]cciptypes.MerkleRootChain, 0)
-
-	priceUpdates := cciptypes.PriceUpdates{
-		TokenPriceUpdates: outcome.TokenPriceOutcome.TokenPrices.ToSortedSlice(),
-		GasPriceUpdates:   outcome.ChainFeeOutcome.GasPrices,
-	}
-
-	for _, r := range outcome.MerkleRootOutcome.RootsToReport {
-
-		// TODO: Support RMN.
-		/*
-			if outcome.MerkleRootOutcome.RMNEnabledChains[r.ChainSel] {
-				blessedMerkleRoots = append(blessedMerkleRoots, r)
-			} else {
-				unblessedMerkleRoots = append(unblessedMerkleRoots, r)
-			}
-		*/
-		unblessedMerkleRoots = append(unblessedMerkleRoots, r)
-		numRoots++
-
-		if numRoots == maxMerkleRootsPerReport {
-			report, err := buildOneReport(
-				ctx,
-				lggr,
-				reportCodec,
-				transmissionSchedule,
-				outcome.MerkleRootOutcome.OutcomeType,
-				blessedMerkleRoots,
-				unblessedMerkleRoots,
-				nil, // no RMN for partial reports.
-				0,   // no RMN for partial reports.
-				priceUpdates,
-			)
-			if err != nil {
-				return nil, err
-			}
-			if report != nil {
-				reports = append(reports, *report)
-			}
-
-			// reset accumulators for next report.
-			numRoots = 0
-			blessedMerkleRoots = make([]cciptypes.MerkleRootChain, 0)
-			unblessedMerkleRoots = make([]cciptypes.MerkleRootChain, 0)
-
-			// price updates are only included in the first report.
-			priceUpdates = cciptypes.PriceUpdates{}
-		}
-	}
-
-	// check for final partial report.
-	if numRoots > 0 {
-		report, err := buildOneReport(
-			ctx,
-			lggr,
-			reportCodec,
-			transmissionSchedule,
-			outcome.MerkleRootOutcome.OutcomeType,
-			blessedMerkleRoots,
-			unblessedMerkleRoots,
-			nil, // no RMN for partial reports.
-			0,   // no RMN for partial reports.
-			priceUpdates,
-		)
+		encodedReport, err := reportCodec.Encode(ctx, report.Report)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("encode commit plugin report: %w", err)
 		}
-		if report != nil {
-			reports = append(reports, *report)
+
+		encodedInfo, err := report.ReportInfo.Encode()
+		if err != nil {
+			return nil, fmt.Errorf("encode commit plugin report info: %w", err)
 		}
-	}
 
-	return reports, nil
-}
-
-// buildTruncatedReport returns a single truncated report.
-func buildTruncatedReport(
-	ctx context.Context,
-	lggr logger.Logger,
-	reportCodec cciptypes.CommitPluginCodec,
-	transmissionSchedule *ocr3types.TransmissionSchedule,
-	outcome committypes.Outcome,
-	maxMerkleRootsPerReport uint64,
-) ([]ocr3types.ReportPlus[[]byte], error) {
-	reports, err := buildMultipleReports(ctx, lggr, reportCodec, transmissionSchedule, outcome, maxMerkleRootsPerReport)
-	if err != nil {
-		return nil, err
+		encodedReports = append(encodedReports, ocr3types.ReportPlus[[]byte]{
+			ReportWithInfo: ocr3types.ReportWithInfo[[]byte]{
+				Report: encodedReport,
+				Info:   encodedInfo,
+			},
+			TransmissionScheduleOverride: transmissionSchedule,
+		})
 	}
-	if len(reports) > 1 {
-		lggr.Warnf("buildTruncatedReport: truncating report %d -> 1", len(reports))
-		return reports[:1], nil
-	}
-
-	return reports, nil
+	return encodedReports, nil
 }
 
 func (p *Plugin) Reports(
@@ -290,17 +92,28 @@ func (p *Plugin) Reports(
 	lggr.Debugw("transmission schedule override",
 		"transmissionSchedule", transmissionSchedule, "oracleIDToP2PID", p.oracleIDToP2PID)
 
-	maxRoots := p.offchainCfg.MaxMerkleRootsPerReport
-	reports, err := p.reportBuilder(ctx, lggr, p.reportCodec, transmissionSchedule, outcome, maxRoots)
-
+	// Build reports for outcome
+	reports, err := p.reportBuilder(lggr, outcome, p.offchainCfg)
 	if err != nil {
-		return nil, fmt.Errorf("error while building reports: %w", err)
-	}
-	if len(reports) != 0 {
-		lggr.Infof("built %d reports", len(reports))
+		lggr.Errorw("failed to build reports",
+			"outcome", outcome,
+			"err", err)
+		return nil, fmt.Errorf("err in Reports(): %w", err)
 	}
 
-	return reports, nil
+	encodedReports, err := encodeReports(ctx, lggr, reports, transmissionSchedule, p.reportCodec)
+	if err != nil {
+		lggr.Errorw("unable to encode reports",
+			"reports", reports,
+			"outcome", outcome,
+			"err", err)
+	}
+
+	lggr.Infow(fmt.Sprintf("Report building complete: built %d reports", len(reports)),
+		"numReport", len(reports),
+	)
+
+	return encodedReports, nil
 }
 
 // validateReport validates various aspects of the report.
