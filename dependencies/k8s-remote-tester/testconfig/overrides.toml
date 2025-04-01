@@ -1,6 +1,6 @@
 [Load.CCIP.Load]
 CribEnvDirectory = "/data/crib-env-state"
-TestLabel = "CribTest"
+TestLabel = "aw-remote-1"
 
 # 0 - no chaos, 1 - rpc latency, 2 - full chaos suite
 ChaosMode = 1
@@ -12,7 +12,6 @@ RPCJitter = "0ms"
 # The sum of all ratios should be 100
 # Messages that include data MUST have a `DataLengthBytes` field
 MessageDetails = [
- #{Ratio = 100, MsgType = "TokenTransfer"},
  {Ratio = 3, MsgType = "TokenTransfer"},
  {Ratio = 82, MsgType = "ProgrammableTokenTransfer", DataLengthBytes = 5000, DestGasLimit=650_000},
  {Ratio = 10,  MsgType = "Messaging", DataLengthBytes = 10_000, DestGasLimit=800_000},
@@ -20,11 +19,12 @@ MessageDetails = [
 ]
 # each destination chain will receive 1 incoming request per RequestFrequency for the duration of LoadDuration
 RequestFrequency = "5s"
-LoadDuration = "10m"
+LoadDuration = "8h"
 # destination chain selectors to send messages to
-NumDestinationChains = 6
-TimeoutDuration = "30m"
-#OOOExecution = false # not in the current image yet
+NumDestinationChains = 15
+TimeoutDuration = "1h"
+OOOExecution = false
+
 
 
 [CCIP.Chaos]
@@ -34,7 +34,7 @@ Namespace = "crib-aw-remote"
 DashboardUIDs = []
 WaitBeforeStart = "0s"
 # Chaos experiment total duration (chaos + recovery)
-ExperimentFullInterval = "10m"
+ExperimentFullInterval = "9h"
 # Chaos time
 ExperimentInjectionInterval = "5m"
 # Src and Dst chain URLs, change it according to your namespace name
