@@ -1347,6 +1347,8 @@ func Test_getCurseInfoFromCursedSubjects(t *testing.T) {
 		})
 	}
 }
+
+//nolint: gocyclo
 func TestCCIPChainReader_Nonces(t *testing.T) {
 	type testCase struct {
 		name           string
@@ -1377,8 +1379,6 @@ func TestCCIPChainReader_Nonces(t *testing.T) {
 				},
 			},
 			setupMock: func(destReader *reader_mocks.MockExtended) {
-
-				nonce1, nonce2 := uint64(5), uint64(10)
 				result1 := &types.BatchReadResult{ReadName: consts.MethodNameGetInboundNonce}
 				result1.SetResult(&nonce1, nil)
 				result2 := &types.BatchReadResult{ReadName: consts.MethodNameGetInboundNonce}
@@ -1441,7 +1441,6 @@ func TestCCIPChainReader_Nonces(t *testing.T) {
 								return false
 							}
 						}
-
 						return len(batch) == 4 &&
 							batch[0].Params.(map[string]any)["sender"] == addr1 &&
 							batch[1].Params.(map[string]any)["sender"] == addr2 &&

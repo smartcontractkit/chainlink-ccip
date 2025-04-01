@@ -716,9 +716,10 @@ func (r *ccipChainReader) Nonces(
 		return nil, err
 	}
 
-	type chainAddressPair struct {
-		chain   cciptypes.ChainSelector
-		address string
+	type chainAddressNonce struct {
+		chain    cciptypes.ChainSelector
+		address  string
+		response uint64
 	}
 
 	// sort the input to ensure deterministic results
@@ -736,11 +737,8 @@ func (r *ccipChainReader) Nonces(
 		addressCount += len(addresses)
 	}
 
-	// the index in `responseIndexToKey` matches the index returned by the response in chain reader
-	// Q: do we even need two slices? Or can we expand the struct to also include the result
 	contractInput := make([]types.BatchRead, addressCount)
-	responseIndexToKey := make([]chainAddressPair, addressCount)
-	responses := make([]uint64, addressCount)
+	responses := make([]chainAddressNonce, addressCount)
 	var counter int
 	for _, chain := range sortedChains {
 		addresses := addressesByChain[chain]
@@ -749,15 +747,15 @@ func (r *ccipChainReader) Nonces(
 			continue
 		}
 		for _, address := range addresses {
-			responseIndexToKey[counter] = chainAddressPair{chain: chain, address: address}
 			contractInput[counter] = types.BatchRead{
 				ReadName: consts.MethodNameGetInboundNonce,
 				Params: map[string]any{
 					"sourceChainSelector": chain,
 					"sender":              address,
 				},
-				ReturnVal: &responses[counter],
+				ReturnVal: &responses[counter].response,
 			}
+			responses[counter] = chainAddressNonce{chain: chain, address: address}
 			counter++
 		}
 	}
@@ -777,13 +775,8 @@ func (r *ccipChainReader) Nonces(
 
 	// Process results
 	for _, results := range batchResult {
-		if len(results) != len(responseIndexToKey) {
-			return nil, fmt.Errorf("unexpected number of results in nonces call: %d, expected: %d",
-				len(results), len(responseIndexToKey))
-		}
-
 		for i, readResult := range results {
-			key := responseIndexToKey[i]
+			key := responses[i]
 
 			returnVal, err := readResult.GetResult()
 			if err != nil {
