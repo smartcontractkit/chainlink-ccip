@@ -66,7 +66,7 @@ func (p *Plugin) Outcome(
 		p.contractsInitialized = true
 	}
 
-	observation, err := getConsensusObservation(lggr, decodedAos, p.destChain, p.reportingCfg.F, p.destChain)
+	observation, err := computeConsensusObservation(lggr, decodedAos, p.destChain, p.reportingCfg.F)
 	if err != nil {
 		return ocr3types.Outcome{}, fmt.Errorf("unable to get consensus observation: %w", err)
 	}
