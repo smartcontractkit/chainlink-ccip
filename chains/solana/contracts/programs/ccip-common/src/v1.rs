@@ -22,7 +22,8 @@ pub struct TokenAccounts<'a> {
     pub mint: &'a AccountInfo<'a>,
     pub fee_token_config: &'a AccountInfo<'a>,
     pub ccip_router_pool_signer: &'a AccountInfo<'a>,
-    pub ccip_offramp_pool_signer: Option<&'a AccountInfo<'a>>, // as this one is optional, it doesn't count for the MIN_TOKEN_POOL_ACCOUNTS
+    // as this one is optional, it doesn't count for the MIN_TOKEN_POOL_ACCOUNTS
+    pub ccip_offramp_pool_signer: Option<&'a AccountInfo<'a>>,
 
     pub ccip_router_pool_signer_bump: u8,
     pub ccip_offramp_pool_signer_bump: u8,

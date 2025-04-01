@@ -4408,7 +4408,7 @@ func TestCCIPRouter(t *testing.T) {
 				base := ccip_router.NewCcipSendInstruction(
 					destinationChainSelector,
 					message,
-					[]byte{0, 13}, // starting indices for accounts
+					[]byte{0, 14}, // starting indices for accounts
 					config.RouterConfigPDA,
 					destinationChainStatePDA,
 					nonceEvmPDA,
@@ -4642,7 +4642,7 @@ func TestCCIPRouter(t *testing.T) {
 				},
 				{
 					name:     "remaining accounts mismatch",
-					index:    12, // only works with token0
+					index:    13, // only works with token0
 					errorStr: ccip.InvalidInputsLookupTableAccounts_CcipRouterError.String(),
 				},
 				// TODO add more tests here
