@@ -1,14 +1,14 @@
 use anchor_lang::prelude::*;
 
 use crate::context::{
-    AcceptOwnership, AddSourceChain, CommitReportContext, ExecuteReportContext,
-    PriceOnlyCommitReportContext, SetOcrConfig, TransferOwnership, UpdateConfig,
-    UpdateReferenceAddresses, UpdateSourceChain,
+    AcceptOwnership, AddSourceChain, CloseCommitReportAccount, CommitReportContext,
+    ExecuteReportContext, PriceOnlyCommitReportContext, SetOcrConfig, TransferOwnership,
+    UpdateConfig, UpdateReferenceAddresses, UpdateSourceChain,
 };
 use crate::state::{CodeVersion, Ocr3ConfigInfo, SourceChainConfig};
 use crate::OcrPluginType;
 
-/// To be called by the commit DON.
+/// To be called for managing commit reports.
 pub trait Commit {
     fn commit<'info>(
         &self,
@@ -29,9 +29,16 @@ pub trait Commit {
         ss: Vec<[u8; 32]>,
         raw_vs: [u8; 32],
     ) -> Result<()>;
+
+    fn close_commit_report_account(
+        &self,
+        ctx: Context<CloseCommitReportAccount>,
+        source_chain_selector: u64,
+        root: Vec<u8>,
+    ) -> Result<()>;
 }
 
-/// To be called by the execute DON.
+/// To be called for execution of messages.
 pub trait Execute {
     fn execute<'info>(
         &self,
