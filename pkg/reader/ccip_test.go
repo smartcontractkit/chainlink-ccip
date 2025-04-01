@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"math/big"
 	"reflect"
 	"strings"
@@ -19,14 +18,14 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal"
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	writer_mocks "github.com/smartcontractkit/chainlink-ccip/mocks/chainlink_common"
 	reader_mocks "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
