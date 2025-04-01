@@ -7,16 +7,15 @@ import (
 	"sort"
 	"time"
 
-	"github.com/smartcontractkit/libocr/commontypes"
-	"golang.org/x/exp/maps"
-
 	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/smartcontractkit/libocr/commontypes"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
@@ -412,8 +411,8 @@ func mergeMessageObservations(
 	return results
 }
 
-// computeCommitObservationsConsensus will iterate over observations of CommitData and come to consensus on them.
-// We select a merkle root and the relevant data if it has at least f+1 votes.
+// computeCommitObservationsConsensus come to consensus over observations of CommitData.
+// Selects a merkle root and the relevant data if it has at least f+1 observations.
 // If a merkle root is agreed twice but with different relevant data (e.g. OnRampAddress) then we don't have consensus.
 // Executed messages within the root are agreed when at least f+1 nodes observed the execution.
 func computeCommitObservationsConsensus(
@@ -423,7 +422,6 @@ func computeCommitObservationsConsensus(
 ) exectypes.CommitObservations {
 	merkleRootsVotes := make(map[merkleRootData]int)
 	executedMsgVotes := make(map[merkleRootData]map[cciptypes.SeqNum]int)
-
 	for _, observation := range observations {
 		for sourceChain, merkleRoots := range observation.Observation.CommitReports {
 			for _, merkleRoot := range merkleRoots {
@@ -449,21 +447,26 @@ func computeCommitObservationsConsensus(
 		}
 	}
 
+	validRoots := make([]merkleRootData, 0, len(merkleRootsVotes))
+	for mr, votes := range merkleRootsVotes {
+		if consensus.GteFPlusOne(fChain[mr.SourceChain], votes) {
+			validRoots = append(validRoots, mr)
+		} else {
+			lggr.Debugw("merkle root with less than f+1 votes was found, skipping it", "mr", mr, "votes", votes)
+		}
+	}
+
+	seenCount := make(map[cciptypes.Bytes32]int)
+	for _, mr := range validRoots {
+		seenCount[mr.MerkleRoot]++
+	}
+	validRoots = slicelib.Filter(validRoots, func(mr merkleRootData) bool { return seenCount[mr.MerkleRoot] == 1 })
+
 	result := make(exectypes.CommitObservations)
-	seenRoots := make(map[cciptypes.Bytes32]bool)
-	mrs := maps.Keys(merkleRootsVotes)
-	for _, mr := range mrs {
-		votes := merkleRootsVotes[mr]
+	for _, mr := range validRoots {
 		f, ok := fChain[mr.SourceChain]
 		if !ok {
 			lggr.Warnw("no fChain defined for chain", "chain", mr.SourceChain, "fChain", fChain)
-			continue
-		}
-
-		if consensus.LtFPlusOne(f, votes) {
-			lggr.Debugw("merkle root with less than f+1 votes was found, skipping it", "mr", mr, "votes", votes)
-			delete(merkleRootsVotes, mr)
-			delete(executedMsgVotes, mr)
 			continue
 		}
 
@@ -475,24 +478,16 @@ func computeCommitObservationsConsensus(
 			}
 			executedMessages = append(executedMessages, seqNum)
 		}
-
-		if seenRoots[mr.MerkleRoot] {
-			lggr.Warnw("skipping merkle root that was agreed by f+1 nodes twice but with different data", "mr", mr)
-			continue
-		}
-		seenRoots[mr.MerkleRoot] = true
+		sort.Slice(executedMessages, func(i, j int) bool { return executedMessages[i] < executedMessages[j] })
 
 		if _, ok := result[mr.SourceChain]; !ok {
 			result[mr.SourceChain] = make([]exectypes.CommitData, 0)
 		}
-
 		onRampAddress, err := base64.StdEncoding.DecodeString(mr.OnRampAddressBase64)
 		if err != nil {
 			lggr.Errorw("error decoding base64 encoded onRampAddress", "err", err, "addr", mr.OnRampAddressBase64)
 			continue
 		}
-
-		sort.Slice(executedMessages, func(i, j int) bool { return executedMessages[i] < executedMessages[j] })
 		result[mr.SourceChain] = append(result[mr.SourceChain], exectypes.CommitData{
 			SourceChain:         mr.SourceChain,
 			OnRampAddress:       onRampAddress,

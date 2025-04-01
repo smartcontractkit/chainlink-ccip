@@ -3,6 +3,7 @@ package execute
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/stretchr/testify/assert"
@@ -1856,6 +1857,150 @@ func Test_computeMessageHashesConsensus(t *testing.T) {
 			}
 			obs := computeMessageHashesConsensus(logger.Test(t), observations, tc.fChain)
 			assert.Equal(t, tc.expectedHashes, obs)
+		})
+	}
+}
+
+func Test_computeCommitObservationsConsensus(t *testing.T) {
+	t1 := time.Now()
+
+	baseObservation := map[cciptypes.ChainSelector][]exectypes.CommitData{
+		1: {
+			{
+				SourceChain:         1,
+				OnRampAddress:       []byte{5, 6, 7},
+				Timestamp:           t1,
+				BlockNum:            65535,
+				MerkleRoot:          cciptypes.Bytes32{1, 2, 3},
+				SequenceNumberRange: cciptypes.NewSeqNumRange(200, 300),
+				ExecutedMessages:    []cciptypes.SeqNum{200, 201, 202, 299},
+			},
+		},
+	}
+
+	baseObservationDifferentOnRamp := map[cciptypes.ChainSelector][]exectypes.CommitData{
+		1: {
+			{
+				SourceChain:         1,
+				OnRampAddress:       []byte{8, 9, 10}, // <-- onRamp is different
+				Timestamp:           t1,
+				BlockNum:            65535,
+				MerkleRoot:          cciptypes.Bytes32{1, 2, 3},
+				SequenceNumberRange: cciptypes.NewSeqNumRange(200, 300),
+				ExecutedMessages:    []cciptypes.SeqNum{200, 201, 202, 299},
+			},
+		},
+	}
+
+	testCases := []struct {
+		name         string
+		observations []exectypes.CommitObservations
+		exp          exectypes.CommitObservations
+		fChain       map[cciptypes.ChainSelector]int
+	}{
+		{
+			name:         "empty",
+			observations: []exectypes.CommitObservations{},
+			exp:          exectypes.CommitObservations(nil),
+			fChain:       map[cciptypes.ChainSelector]int{},
+		},
+		{
+			name: "base scenario reaching consensus",
+			observations: []exectypes.CommitObservations{
+				baseObservation,
+				baseObservation,
+				baseObservation,
+			},
+			exp: baseObservation,
+			fChain: map[cciptypes.ChainSelector]int{
+				1: 2,
+			},
+		},
+		{
+			name: "base scenario not reaching consensus, requires at least f+1=4 observations",
+			observations: []exectypes.CommitObservations{
+				baseObservation,
+				baseObservation,
+				baseObservation,
+			},
+			fChain: map[cciptypes.ChainSelector]int{
+				1: 3,
+			},
+		},
+		{
+			name: "one oracle did not observe some of the executed messages, not reaching consensus on the executions",
+			observations: []exectypes.CommitObservations{
+				baseObservation,
+				baseObservation,
+				{
+					1: {
+						{
+							SourceChain:         1,
+							OnRampAddress:       []byte{5, 6, 7},
+							Timestamp:           t1,
+							BlockNum:            65535,
+							MerkleRoot:          cciptypes.Bytes32{1, 2, 3},
+							SequenceNumberRange: cciptypes.NewSeqNumRange(200, 300),
+							ExecutedMessages:    []cciptypes.SeqNum{200, 201}, // <-- 202 and 299 not observed
+						},
+					},
+				},
+			},
+			exp: map[cciptypes.ChainSelector][]exectypes.CommitData{
+				1: {
+					{
+						SourceChain:         1,
+						OnRampAddress:       []byte{5, 6, 7},
+						Timestamp:           t1,
+						BlockNum:            65535,
+						MerkleRoot:          cciptypes.Bytes32{1, 2, 3},
+						SequenceNumberRange: cciptypes.NewSeqNumRange(200, 300),
+						ExecutedMessages:    []cciptypes.SeqNum{200, 201}, // <-- 202 and 299 not included
+					},
+				},
+			},
+			fChain: map[cciptypes.ChainSelector]int{
+				1: 2,
+			},
+		},
+		{
+			name: "same root with different data agreed twice, no consensus is reached",
+			observations: []exectypes.CommitObservations{
+				baseObservation,
+				baseObservationDifferentOnRamp,
+				baseObservation,
+				baseObservation,
+				baseObservationDifferentOnRamp,
+				baseObservation,
+				baseObservationDifferentOnRamp,
+				baseObservationDifferentOnRamp,
+			},
+			fChain: map[cciptypes.ChainSelector]int{
+				1: 2,
+			},
+		},
+		{
+			name: "fChain not defined",
+			observations: []exectypes.CommitObservations{
+				baseObservation,
+				baseObservation,
+				baseObservation,
+			},
+			fChain: map[cciptypes.ChainSelector]int{},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			observations := make([]plugincommon.AttributedObservation[exectypes.Observation], len(tc.observations))
+			for i, obs := range tc.observations {
+				observations[i] = plugincommon.AttributedObservation[exectypes.Observation]{
+					Observation: exectypes.Observation{CommitReports: obs},
+					OracleID:    commontypes.OracleID(i),
+				}
+			}
+			obs := computeCommitObservationsConsensus(logger.Test(t), observations, tc.fChain)
+			assert.Equal(t, tc.exp, obs)
 		})
 	}
 }
