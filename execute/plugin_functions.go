@@ -420,32 +420,7 @@ func computeCommitObservationsConsensus(
 	observations []plugincommon.AttributedObservation[exectypes.Observation],
 	fChain map[cciptypes.ChainSelector]int,
 ) exectypes.CommitObservations {
-	merkleRootsVotes := make(map[merkleRootData]int)
-	executedMsgVotes := make(map[merkleRootData]map[cciptypes.SeqNum]int)
-	for _, observation := range observations {
-		for sourceChain, merkleRoots := range observation.Observation.CommitReports {
-			for _, merkleRoot := range merkleRoots {
-				data := merkleRootData{
-					SourceChain:         sourceChain,
-					OnRampAddressBase64: base64.StdEncoding.EncodeToString(merkleRoot.OnRampAddress),
-					Timestamp:           merkleRoot.Timestamp,
-					BlockNum:            merkleRoot.BlockNum,
-					MerkleRoot:          merkleRoot.MerkleRoot,
-					SequenceNumberRange: merkleRoot.SequenceNumberRange,
-				}
-
-				merkleRootsVotes[data]++
-
-				if _, ok := executedMsgVotes[data]; !ok {
-					executedMsgVotes[data] = make(map[cciptypes.SeqNum]int)
-				}
-				unqExecutedSeqNums := mapset.NewSet(merkleRoot.ExecutedMessages...).ToSlice()
-				for _, executedSeqNum := range unqExecutedSeqNums {
-					executedMsgVotes[data][executedSeqNum]++
-				}
-			}
-		}
-	}
+	merkleRootsVotes, executedMsgVotes := aggregateMerkleRootObservations(observations)
 
 	validRoots := make([]merkleRootData, 0, len(merkleRootsVotes))
 	for mr, votes := range merkleRootsVotes {
@@ -507,6 +482,44 @@ func computeCommitObservationsConsensus(
 		return nil
 	}
 	return result
+}
+
+// aggregateMerkleRootObservations groups the observations by merkle root and counts the votes for each.
+// It returns two maps:
+// 1. merkleRootsVotes: a map of merkle root data to the number of votes it received.
+// 2. executedMsgVotes: a map of merkle root data to a map of executed messages and the number of votes they received.
+func aggregateMerkleRootObservations(
+	observations []plugincommon.AttributedObservation[exectypes.Observation],
+) (map[merkleRootData]int, map[merkleRootData]map[cciptypes.SeqNum]int) {
+	merkleRootsVotes := make(map[merkleRootData]int)
+	executedMsgVotes := make(map[merkleRootData]map[cciptypes.SeqNum]int)
+
+	for _, observation := range observations {
+		for sourceChain, merkleRoots := range observation.Observation.CommitReports {
+			for _, merkleRoot := range merkleRoots {
+				data := merkleRootData{
+					SourceChain:         sourceChain,
+					OnRampAddressBase64: base64.StdEncoding.EncodeToString(merkleRoot.OnRampAddress),
+					Timestamp:           merkleRoot.Timestamp,
+					BlockNum:            merkleRoot.BlockNum,
+					MerkleRoot:          merkleRoot.MerkleRoot,
+					SequenceNumberRange: merkleRoot.SequenceNumberRange,
+				}
+
+				merkleRootsVotes[data]++
+
+				if _, ok := executedMsgVotes[data]; !ok {
+					executedMsgVotes[data] = make(map[cciptypes.SeqNum]int)
+				}
+				unqExecutedSeqNums := mapset.NewSet(merkleRoot.ExecutedMessages...).ToSlice()
+				for _, executedSeqNum := range unqExecutedSeqNums {
+					executedMsgVotes[data][executedSeqNum]++
+				}
+			}
+		}
+	}
+
+	return merkleRootsVotes, executedMsgVotes
 }
 
 // merkleRootData is a helper comparable data structure for counting merkle root votes.
