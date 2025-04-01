@@ -15,6 +15,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 
+	"github.com/smartcontractkit/chainlink-ccip/commit/internal/builder"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/commit/metrics"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
@@ -59,8 +60,8 @@ const (
 	// check factory_test for the calculation
 	maxReportLength = 128_2933
 
-	// maxReportCount is set to 1 because the commit plugin only generates one report per round.
-	maxReportCount = 1
+	// maxReportCount is set very high because some chains may require many reports per round.
+	maxReportCount = 1000
 )
 
 type PluginFactory struct {
@@ -216,6 +217,15 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to create metrics reporter: %w", err)
 	}
 
+	reportBuilder, err := builder.NewReportBuilder(
+		offchainConfig.RMNEnabled,
+		offchainConfig.MaxMerkleRootsPerReport,
+		offchainConfig.MaxPricesPerReport,
+	)
+	if err != nil {
+		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to create report builder: %w", err)
+	}
+
 	return NewPlugin(
 			p.donID,
 			oracleIDToP2PID,
@@ -233,6 +243,7 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 			config,
 			metricsReporter,
 			p.addrCodec,
+			reportBuilder,
 		), ocr3types.ReportingPluginInfo{
 			Name: "CCIPRoleCommit",
 			Limits: ocr3types.ReportingPluginLimits{
