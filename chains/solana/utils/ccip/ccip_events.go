@@ -25,6 +25,12 @@ type EventCommitReportAccepted struct {
 	PriceUpdates  ccip_offramp.PriceUpdates
 }
 
+type EventCommitReportPDAClosed struct {
+	Discriminator       [8]byte
+	SourceChainSelector uint64
+	MerkleRoot          [32]byte
+}
+
 type EventTransmitted struct {
 	Discriminator  [8]byte
 	OcrPluginType  uint8

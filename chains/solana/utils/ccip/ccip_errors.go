@@ -297,6 +297,7 @@ const (
 	Ocr3InvalidPluginType_CcipOfframpError
 	Ocr3InvalidSignature_CcipOfframpError
 	Ocr3SignaturesOutOfRegistration_CcipOfframpError
+	CommitReportHasPendingMessages_CcipOfframpError
 )
 
 func (value CcipOfframpError) String() string {
@@ -407,6 +408,8 @@ func (value CcipOfframpError) String() string {
 		return "Ocr3InvalidSignature"
 	case Ocr3SignaturesOutOfRegistration_CcipOfframpError:
 		return "Ocr3Ocr3SignaturesOutOfRegistration"
+	case CommitReportHasPendingMessages_CcipOfframpError:
+		return "CommitReportHasPendingMessages"
 	default:
 		return ""
 	}
