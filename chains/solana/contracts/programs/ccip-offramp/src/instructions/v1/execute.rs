@@ -216,7 +216,7 @@ fn internal_execute<'info>(
 
         let init_bal = get_balance(accs.user_token_account)?;
 
-        // CPI: call lockOrBurn on token pool
+        // CPI: call releaseOrMint on token pool
         let release_or_mint = ReleaseOrMintInV1 {
             original_sender: execution_report.message.sender.clone(),
             receiver: execution_report.message.token_receiver,

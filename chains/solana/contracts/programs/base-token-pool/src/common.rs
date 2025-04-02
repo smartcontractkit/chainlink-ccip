@@ -438,7 +438,7 @@ pub fn validate_lock_or_burn<'info>(
     outbound_rate_limit.consume::<Clock>(lock_or_burn_in.amount)
 }
 
-// validate_lock_or_burn checks for correctness on inputs
+// validate_release_or_mint checks for correctness on inputs
 // - token & pool is correct for chain
 // - rate limiting
 // - source chain is not cursed

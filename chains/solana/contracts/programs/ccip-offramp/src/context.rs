@@ -239,8 +239,7 @@ pub struct AcceptOwnership<'info> {
 #[derive(Accounts)]
 #[instruction(new_chain_selector: u64, _source_chain_config: SourceChainConfig)]
 pub struct AddSourceChain<'info> {
-    /// Adding a chain selector implies initializing the state for a new chain,
-    /// hence the need to initialize two accounts.
+    /// Adding a chain selector implies initializing the state for a new chain
     #[account(
         init,
         seeds = [seed::SOURCE_CHAIN, new_chain_selector.to_le_bytes().as_ref()],
