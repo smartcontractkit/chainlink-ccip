@@ -48,6 +48,9 @@ var (
 	// * `enable_execution_after` - The minimum amount of time required between a message has been committed and can be manually executed.
 	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
 
+	// DOCS
+	Instruction_TestId = ag_binary.TypeID([8]byte{163, 128, 154, 74, 1, 123, 242, 117})
+
 	// Transfers the ownership of the router to a new proposed owner.
 	//
 	// Shared func signature with other programs
@@ -287,6 +290,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 	switch id {
 	case Instruction_Initialize:
 		return "Initialize"
+	case Instruction_TestId:
+		return "TestId"
 	case Instruction_TransferOwnership:
 		return "TransferOwnership"
 	case Instruction_AcceptOwnership:
@@ -353,6 +358,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 	[]ag_binary.VariantType{
 		{
 			"initialize", (*Initialize)(nil),
+		},
+		{
+			"test_id", (*TestId)(nil),
 		},
 		{
 			"transfer_ownership", (*TransferOwnership)(nil),

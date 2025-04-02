@@ -82,6 +82,14 @@ export type CcipRouter = {
       ]
     },
     {
+      "name": "testId",
+      "docs": [
+        "DOCS"
+      ],
+      "accounts": [],
+      "args": []
+    },
+    {
       "name": "transferOwnership",
       "docs": [
         "Transfers the ownership of the router to a new proposed owner.",
@@ -2015,6 +2023,14 @@ export const IDL: CcipRouter = {
           "type": "publicKey"
         }
       ]
+    },
+    {
+      "name": "testId",
+      "docs": [
+        "DOCS"
+      ],
+      "accounts": [],
+      "args": []
     },
     {
       "name": "transferOwnership",

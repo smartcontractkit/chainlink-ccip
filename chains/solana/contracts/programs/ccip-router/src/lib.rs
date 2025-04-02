@@ -83,6 +83,27 @@ pub mod ccip_router {
         Ok(())
     }
 
+    /// DOCS
+    pub fn test_id(_ctx: Context<Empty>) -> Result<()> {
+        msg!("Common ID: {}", ccip_common::ID);
+        msg!(
+            "Common ID for account: {}",
+            ccip_common::router_accounts::TokenAdminRegistry::owner()
+        );
+        msg!("Router ID: {}", crate::ID);
+        require_keys_eq!(
+            ccip_common::ID,
+            crate::ID,
+            CcipRouterError::InvalidInputsTokenAdminRegistryAccounts
+        );
+        require_keys_eq!(
+            ccip_common::ID,
+            ccip_common::router_accounts::TokenAdminRegistry::owner(),
+            CcipRouterError::InvalidInputsTokenAdminRegistryAccounts
+        );
+        Ok(())
+    }
+
     /// Transfers the ownership of the router to a new proposed owner.
     ///
     /// Shared func signature with other programs

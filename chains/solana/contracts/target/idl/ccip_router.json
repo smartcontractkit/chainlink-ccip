@@ -82,6 +82,14 @@
       ]
     },
     {
+      "name": "testId",
+      "docs": [
+        "DOCS"
+      ],
+      "accounts": [],
+      "args": []
+    },
+    {
       "name": "transferOwnership",
       "docs": [
         "Transfers the ownership of the router to a new proposed owner.",

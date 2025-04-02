@@ -191,6 +191,15 @@ func TestCCIPRouter(t *testing.T) {
 				t)
 		})
 
+		t.Run("debug", func(t *testing.T) {
+			ix, err := ccip_router.NewTestIdInstruction().ValidateAndBuild()
+			require.NoError(t, err)
+			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment)
+			require.NotNil(t, result)
+			fmt.Printf("Debug: %s\n", result.Meta.LogMessages)
+			t.FailNow()
+		})
+
 		t.Run("receiver", func(t *testing.T) {
 			instruction, ixErr := test_ccip_receiver.NewInitializeInstruction(
 				config.CcipRouterProgram,

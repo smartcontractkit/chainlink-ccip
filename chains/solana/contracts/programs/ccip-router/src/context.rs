@@ -154,6 +154,9 @@ pub struct AddChainSelector<'info> {
 }
 
 #[derive(Accounts)]
+pub struct Empty {}
+
+#[derive(Accounts)]
 #[instruction(new_chain_selector: u64, dest_chain_config: DestChainConfig)]
 pub struct UpdateDestChainSelectorConfig<'info> {
     #[account(
