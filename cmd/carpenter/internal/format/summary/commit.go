@@ -15,7 +15,26 @@ import (
 
 func init() {
 	reportRegex = regexp.MustCompile("^built (\\d+) reports$")
+	divider = lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#FFFFFF")).
+		Background(lipgloss.Color("#75A3A3"))
+
+	section = lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("#FFFFFF")).
+		Background(lipgloss.Color("#3366FF"))
+	number = lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("#339966"))
+	highlight = lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("#FF9933"))
 }
+
+var divider lipgloss.Style
+var section lipgloss.Style
+var highlight lipgloss.Style
+var number lipgloss.Style
 
 var reportRegex *regexp.Regexp
 
@@ -49,11 +68,16 @@ func commitObservationSummary(logs []*parse.Data) string {
 						commitFormatSeqNumChains(obs.OffRampNextSeqNums)))
 				}
 
+				var buf strings.Builder
+				buf.WriteString(padding)
+				buf.WriteString(section.Render("Observation"))
 				if len(parts) == 0 {
-					return "Observation: no seqNum data"
+					buf.WriteString(": no seqNum data")
 				} else {
-					return fmt.Sprintf("Observation: %s%s", bullet, strings.Join(parts, bullet))
+					buf.WriteString(bullet)
+					buf.WriteString(strings.Join(parts, bullet))
 				}
+				return buf.String()
 			}
 		}
 	}
@@ -91,11 +115,6 @@ func commitOutcomeSummary(logs []*parse.Data) string {
 				default:
 					outcomeTypeName = "unknown"
 				}
-
-				/*
-					RMNEnabledChains                map[cciptypes.ChainSelector]bool `json:"rmnEnabledChains"`
-					RMNRemoteCfg                    rmntypes.RemoteConfig            `json:"rmnRemoteCfg"`
-				*/
 
 				if len(otc.RootsToReport) > 0 {
 					parts = append(parts, fmt.Sprintf("RootsToReport: %d", len(otc.RootsToReport)))
@@ -135,35 +154,62 @@ func commitOutcomeSummary(logs []*parse.Data) string {
 }
 
 func commitReportSummary(logs []*parse.Data) string {
-	style := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("#339966"))
-
+	var numReports string
+	var reportParts []string
 	for _, log := range logs {
-		reportsMatches := reportRegex.FindStringSubmatch(log.GetMessage())
-		if len(reportsMatches) > 1 {
-			return fmt.Sprintf("Number of reports: %s", style.Render(reportsMatches[1]))
+		message := log.GetMessage()
+		if message == "generating report" {
+			if roots, ok := log.RawLoggerFields["roots"].([]interface{}); ok {
+				reportParts = append(reportParts, fmt.Sprintf("Roots: %d", len(roots)))
+			}
+			if prices, ok := log.RawLoggerFields["tokenPriceUpdates"].(map[string]interface{}); ok {
+				reportParts = append(reportParts, fmt.Sprintf("TokenPriceUpdates: %d", len(prices)))
+			}
+			if gasUpdates, ok := log.RawLoggerFields["gasPriceUpdates"].([]interface{}); ok {
+				reportParts = append(reportParts, fmt.Sprintf("GasPriceUpdates: %d", len(gasUpdates)))
+			}
+			if sigs, ok := log.RawLoggerFields["rmnSignatures"].(map[string]interface{}); ok {
+				reportParts = append(reportParts, fmt.Sprintf("RMNSignatures: %d", len(sigs)))
+			}
+		} else {
+			reportsMatches := reportRegex.FindStringSubmatch(message)
+			if len(reportsMatches) > 1 {
+				numReports = reportsMatches[1]
+			}
 		}
 	}
+	if len(reportParts) > 0 || numReports != "" {
+		var buf strings.Builder
+		buf.WriteString(padding)
+		buf.WriteString(section.Render("Reports"))
+		buf.WriteString(": ")
+		buf.WriteString(number.Render(numReports))
+		if numReports != "" && len(reportParts) == 0 {
+			fmt.Println("???")
+		}
+		if len(reportParts) > 0 {
+			buf.WriteString(bullet)
+			buf.WriteString(strings.Join(reportParts, bullet))
+		}
+		return buf.String()
+	}
+
 	return ""
 }
 
 func (es commitSummary) String() string {
 	var b strings.Builder
-	b.WriteString(fmt.Sprintf("%3d: %d logs", es.seqNumber, len(es.logs)))
+	b.WriteString(divider.Render(fmt.Sprintf("%3d: %d logs                       ", es.seqNumber, len(es.logs))))
 	if obs := commitObservationSummary(es.logs); obs != "" {
 		b.WriteString("\n")
-		b.WriteString(padding)
 		b.WriteString(obs)
 	}
 	if ocm := commitOutcomeSummary(es.logs); ocm != "" {
 		b.WriteString("\n")
-		b.WriteString(padding)
 		b.WriteString(ocm)
 	}
 	if rpt := commitReportSummary(es.logs); rpt != "" {
 		b.WriteString("\n")
-		b.WriteString(padding)
 		b.WriteString(rpt)
 	}
 
