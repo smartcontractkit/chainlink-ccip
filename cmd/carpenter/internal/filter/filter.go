@@ -114,9 +114,6 @@ func Filter(data *parse.Data, filters CompiledFilterFields, op FilterOP) (bool, 
 
 			matches := compiledFilter.re.MatchString(fieldStr)
 			if compiledFilter.antiMatcher {
-
-			}
-			if compiledFilter.antiMatcher {
 				if matches {
 					return false, nil
 				} else {
