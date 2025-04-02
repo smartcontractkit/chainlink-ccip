@@ -135,10 +135,11 @@ func commitOutcomeSummary(logs []*parse.Data) string {
 						otc.ReportTransmissionCheckAttempts))
 				}
 
-				buf.WriteString(padding)
-				buf.WriteString(section.Render("Outcome"))
-				buf.WriteString(" [")
-				buf.WriteString(highlight.Render(outcomeTypeName))
+				style := lipgloss.NewStyle().
+					Bold(true).
+					Foreground(lipgloss.Color("#FF9933"))
+				buf.WriteString("Outcome [")
+				buf.WriteString(style.Render(outcomeTypeName))
 				buf.WriteString("]")
 				if len(parts) > 0 {
 					buf.WriteString(bullet)
