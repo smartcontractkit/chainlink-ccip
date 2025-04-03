@@ -1029,6 +1029,56 @@ export type CcipOfframp = {
           "type": "bytes"
         }
       ]
+    },
+    {
+      "name": "closeCommitReportAccount",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "commitReport",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "referenceAddresses",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "wsolMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feeTokenReceiver",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "feeBillingSigner",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "sourceChainSelector",
+          "type": "u64"
+        },
+        {
+          "name": "root",
+          "type": "bytes"
+        }
+      ]
     }
   ],
   "accounts": [
@@ -1875,6 +1925,26 @@ export type CcipOfframp = {
       ]
     },
     {
+      "name": "CommitReportPDAClosed",
+      "fields": [
+        {
+          "name": "sourceChainSelector",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "merkleRoot",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          },
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "SkippedAlreadyExecutedMessage",
       "fields": [
         {
@@ -2280,6 +2350,11 @@ export type CcipOfframp = {
       "code": 9054,
       "name": "InvalidInputsExternalExecutionSignerAccount",
       "msg": "Invalid external execution signer account"
+    },
+    {
+      "code": 9055,
+      "name": "CommitReportHasPendingMessages",
+      "msg": "Commit report has pending messages"
     }
   ]
 };
@@ -3315,6 +3390,56 @@ export const IDL: CcipOfframp = {
           "type": "bytes"
         }
       ]
+    },
+    {
+      "name": "closeCommitReportAccount",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "commitReport",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "referenceAddresses",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "wsolMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feeTokenReceiver",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "feeBillingSigner",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "sourceChainSelector",
+          "type": "u64"
+        },
+        {
+          "name": "root",
+          "type": "bytes"
+        }
+      ]
     }
   ],
   "accounts": [
@@ -4161,6 +4286,26 @@ export const IDL: CcipOfframp = {
       ]
     },
     {
+      "name": "CommitReportPDAClosed",
+      "fields": [
+        {
+          "name": "sourceChainSelector",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "merkleRoot",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          },
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "SkippedAlreadyExecutedMessage",
       "fields": [
         {
@@ -4566,6 +4711,11 @@ export const IDL: CcipOfframp = {
       "code": 9054,
       "name": "InvalidInputsExternalExecutionSignerAccount",
       "msg": "Invalid external execution signer account"
+    },
+    {
+      "code": 9055,
+      "name": "CommitReportHasPendingMessages",
+      "msg": "Commit report has pending messages"
     }
   ]
 };

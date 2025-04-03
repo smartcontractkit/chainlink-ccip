@@ -97,12 +97,12 @@ impl Public for Impl {
                         }
                     }
                     _ => TokenTransferAdditionalData {
-                        dest_bytes_overhead: ctx
+                        dest_bytes_overhead: CCIP_LOCK_OR_BURN_V1_RET_BYTES,
+                        dest_gas_overhead: ctx
                             .accounts
                             .dest_chain
                             .config
                             .default_token_dest_gas_overhead,
-                        dest_gas_overhead: CCIP_LOCK_OR_BURN_V1_RET_BYTES,
                     },
                 },
             )

@@ -521,6 +521,28 @@ pub mod ccip_offramp {
             &token_indexes,
         )
     }
+
+    pub fn close_commit_report_account(
+        ctx: Context<CloseCommitReportAccount>,
+        source_chain_selector: u64,
+        root: Vec<u8>,
+    ) -> Result<()> {
+        // there is no lane here in this case of commit, so use default code version
+        let lane_code_version = CodeVersion::Default;
+
+        let default_code_version: CodeVersion = ctx
+            .accounts
+            .config
+            .load()?
+            .default_code_version
+            .try_into()?;
+
+        router::commit(lane_code_version, default_code_version).close_commit_report_account(
+            ctx,
+            source_chain_selector,
+            root,
+        )
+    }
 }
 
 #[error_code]
@@ -637,4 +659,6 @@ pub enum CcipOfframpError {
     InvalidOnrampAddress,
     #[msg("Invalid external execution signer account")]
     InvalidInputsExternalExecutionSignerAccount,
+    #[msg("Commit report has pending messages")]
+    CommitReportHasPendingMessages,
 }

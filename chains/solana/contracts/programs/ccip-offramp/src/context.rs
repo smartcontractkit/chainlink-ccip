@@ -1,4 +1,6 @@
 use anchor_lang::prelude::*;
+use anchor_spl::token::spl_token::native_mint;
+use anchor_spl::token::{Mint, Token, TokenAccount};
 use bytemuck::{Pod, Zeroable};
 use ccip_common::seed;
 use solana_program::sysvar::instructions;
@@ -569,6 +571,53 @@ pub struct ExecuteReportContext<'info> {
     // ccip_offramp_pools_signer - derivable PDA [seed::EXTERNAL_TOKEN_POOL, pool_program], seeds::program=offramp (not in lookup table)
     // ...additional accounts for pool config
     // ] x N tokens
+}
+
+#[derive(Accounts)]
+#[instruction(source_chain_selector: u64, root: Vec<u8>)]
+pub struct CloseCommitReportAccount<'info> {
+    #[account(
+        seeds = [seed::CONFIG],
+        bump,
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipOfframpError::InvalidVersion,
+    )]
+    pub config: AccountLoader<'info, Config>,
+
+    #[account(
+        mut,
+        seeds = [seed::COMMIT_REPORT, source_chain_selector.to_le_bytes().as_ref(), &root],
+        bump,
+        constraint = valid_version(commit_report.version, MAX_COMMITREPORT_V) @ CcipOfframpError::InvalidVersion,
+    )]
+    pub commit_report: Account<'info, CommitReport>,
+
+    #[account(
+        seeds = [seed::REFERENCE_ADDRESSES],
+        bump,
+        constraint = valid_version(reference_addresses.load()?.version, MAX_CONFIG_V) @ CcipOfframpError::InvalidVersion,
+    )]
+    pub reference_addresses: AccountLoader<'info, ReferenceAddresses>,
+
+    #[account(address = native_mint::ID)]
+    pub wsol_mint: Account<'info, Mint>,
+
+    #[account(
+        mut,
+        associated_token::mint = wsol_mint,
+        associated_token::authority = fee_billing_signer,
+        associated_token::token_program = token_program,
+    )]
+    pub fee_token_receiver: Account<'info, TokenAccount>,
+
+    /// CHECK: This is the signer for OnRamp billing CPIs, used here to derived OnRamp's fee accum account
+    #[account(
+        seeds = [seed::FEE_BILLING_SIGNER],
+        bump,
+        seeds::program = reference_addresses.load()?.router,
+    )]
+    pub fee_billing_signer: UncheckedAccount<'info>,
+
+    pub token_program: Program<'info, Token>,
 }
 
 /// It's not possible to store enums in zero_copy accounts, so we wrap the discriminant

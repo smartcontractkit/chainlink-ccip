@@ -11,11 +11,16 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/cmd/carpenter/internal/parse"
 )
 
-// ENUM(Component, LogLevel, Message, Caller, LoggerName, )
+// ENUM(Plugin, Component, LogLevel, Message, Caller, LoggerName, DONID, SequenceNumber)
 type Field string
 
+type matcher struct {
+	antiMatcher bool
+	re          *regexp.Regexp
+}
+
 // CompiledFilterFields is a collection of compiled Field filters.
-type CompiledFilterFields map[Field][]*regexp.Regexp
+type CompiledFilterFields map[Field][]matcher
 
 // ENUM(AND, OR)
 type FilterOP string
@@ -26,6 +31,12 @@ func NewFilterFields(rawFields []string) (CompiledFilterFields, error) {
 	var invalidFields []string
 	var errs []error
 	for _, field := range rawFields {
+		antiMatch := false
+		if strings.HasPrefix(field, "!") {
+			antiMatch = true
+			field = field[1:]
+		}
+
 		if !strings.Contains(field, ":") {
 			malformedFields = append(malformedFields, field)
 			continue
@@ -48,7 +59,7 @@ func NewFilterFields(rawFields []string) (CompiledFilterFields, error) {
 				fmt.Errorf("could not compile regexp %s in %s: %w", parts[1], field, err))
 		}
 
-		fields[f] = append(fields[f], re)
+		fields[f] = append(fields[f], matcher{antiMatcher: antiMatch, re: re})
 	}
 
 	if len(malformedFields) > 0 {
@@ -93,9 +104,23 @@ func Filter(data *parse.Data, filters CompiledFilterFields, op FilterOP) (bool, 
 				fieldStr = data.GetCaller()
 			case FieldLoggerName:
 				fieldStr = data.GetLoggerName()
+			case FieldPlugin:
+				fieldStr = data.Plugin
+			case FieldDONID:
+				fieldStr = fmt.Sprintf("%d", data.DONID)
+			case FieldSequenceNumber:
+				fieldStr = fmt.Sprintf("%d", data.SequenceNumber)
 			}
 
-			matches := compiledFilter.MatchString(fieldStr)
+			matches := compiledFilter.re.MatchString(fieldStr)
+			if compiledFilter.antiMatcher {
+				if matches {
+					return false, nil
+				} else {
+					continue
+				}
+			}
+
 			anyMatch = anyMatch || matches
 			allMatch = allMatch && matches
 		}

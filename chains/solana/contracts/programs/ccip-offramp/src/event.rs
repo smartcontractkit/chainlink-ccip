@@ -10,6 +10,12 @@ pub struct CommitReportAccepted {
 }
 
 #[event]
+pub struct CommitReportPDAClosed {
+    pub source_chain_selector: u64,
+    pub merkle_root: [u8; 32],
+}
+
+#[event]
 pub struct SkippedAlreadyExecutedMessage {
     pub source_chain_selector: u64,
     pub sequence_number: u64,
