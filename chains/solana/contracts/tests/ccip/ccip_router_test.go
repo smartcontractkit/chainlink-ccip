@@ -7734,7 +7734,7 @@ func TestCCIPRouter(t *testing.T) {
 					raw := ccip_offramp.NewExecuteInstruction(
 						testutils.MustMarshalBorsh(t, executionReport),
 						reportContext,
-						[]byte{4},
+						[]byte{5},
 						config.OfframpConfigPDA,
 						config.OfframpReferenceAddressesPDA,
 						config.OfframpEvmSourceChainPDA,
@@ -7759,13 +7759,13 @@ func TestCCIPRouter(t *testing.T) {
 
 					tokenMetas, addressTables, err := tokens.ParseTokenLookupTable(ctx, solanaGoClient, token0, token0.User[config.ReceiverExternalExecutionConfigPDA])
 					require.NoError(t, err)
-					raw.AccountMetaSlice = append(raw.AccountMetaSlice, tokenMetas...)
 					raw.AccountMetaSlice = append(raw.AccountMetaSlice, solana.Meta(token0.OfframpSigner).WRITE())
+					raw.AccountMetaSlice = append(raw.AccountMetaSlice, tokenMetas...)
 
 					instruction, err = raw.ValidateAndBuild()
 					require.NoError(t, err)
 
-					tx = testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(300_000))
+					tx = testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(400_000))
 
 					executionEvents, err := common.ParseMultipleEvents[ccip.EventExecutionStateChanged](tx.Meta.LogMessages, "ExecutionStateChanged", config.PrintEvents)
 					require.NoError(t, err)
@@ -7868,7 +7868,7 @@ func TestCCIPRouter(t *testing.T) {
 					raw := ccip_offramp.NewExecuteInstruction(
 						testutils.MustMarshalBorsh(t, executionReport),
 						reportContext,
-						[]byte{0, 13},
+						[]byte{0, 15},
 						config.OfframpConfigPDA,
 						config.OfframpReferenceAddressesPDA,
 						config.OfframpEvmSourceChainPDA,
@@ -7885,13 +7885,13 @@ func TestCCIPRouter(t *testing.T) {
 
 					tokenMetas0, addressTables, err := tokens.ParseTokenLookupTable(ctx, solanaGoClient, token0, token0.User[config.ReceiverExternalExecutionConfigPDA])
 					require.NoError(t, err)
-					raw.AccountMetaSlice = append(raw.AccountMetaSlice, tokenMetas0...)
 					raw.AccountMetaSlice = append(raw.AccountMetaSlice, solana.Meta(token0.OfframpSigner).WRITE())
+					raw.AccountMetaSlice = append(raw.AccountMetaSlice, tokenMetas0...)
 
 					tokenMetas1, addressTables1, err := tokens.ParseTokenLookupTable(ctx, solanaGoClient, token1, token1.User[config.ReceiverExternalExecutionConfigPDA])
 					require.NoError(t, err)
-					raw.AccountMetaSlice = append(raw.AccountMetaSlice, tokenMetas1...)
 					raw.AccountMetaSlice = append(raw.AccountMetaSlice, solana.Meta(token1.OfframpSigner).WRITE())
+					raw.AccountMetaSlice = append(raw.AccountMetaSlice, tokenMetas1...)
 
 					maps.Copy(addressTables, addressTables1)
 					maps.Copy(addressTables, offrampLookupTable) // commonly used ccip addresses - required otherwise tx is too large
@@ -8001,7 +8001,7 @@ func TestCCIPRouter(t *testing.T) {
 					cu := testutils.GetRequiredCU(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment)
 
 					// This validation is like a snapshot for gas consumption
-					require.LessOrEqual(t, cu, uint32(100_000))
+					require.LessOrEqual(t, cu, uint32(110_000))
 
 					tx = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(cu))
 
@@ -8097,8 +8097,8 @@ func TestCCIPRouter(t *testing.T) {
 
 					tokenMetas, addressTables, err := tokens.ParseTokenLookupTable(ctx, solanaGoClient, token0, token0.User[config.ReceiverExternalExecutionConfigPDA])
 					require.NoError(t, err)
-					raw.AccountMetaSlice = append(raw.AccountMetaSlice, tokenMetas...)
 					raw.AccountMetaSlice = append(raw.AccountMetaSlice, solana.Meta(token0.OfframpSigner).WRITE())
+					raw.AccountMetaSlice = append(raw.AccountMetaSlice, tokenMetas...)
 
 					maps.Copy(addressTables, offrampLookupTable) // commonly used ccip addresses - required otherwise tx is too large
 
@@ -8190,7 +8190,7 @@ func TestCCIPRouter(t *testing.T) {
 					raw := ccip_offramp.NewExecuteInstruction(
 						testutils.MustMarshalBorsh(t, executionReport),
 						reportContext,
-						[]byte{4},
+						[]byte{5},
 						config.OfframpConfigPDA,
 						config.OfframpReferenceAddressesPDA,
 						config.OfframpEvmSourceChainPDA,
@@ -8215,8 +8215,8 @@ func TestCCIPRouter(t *testing.T) {
 
 					tokenMetas, addressTables, err := tokens.ParseTokenLookupTable(ctx, solanaGoClient, token0, token0.User[config.ReceiverExternalExecutionConfigPDA])
 					require.NoError(t, err)
-					raw.AccountMetaSlice = append(raw.AccountMetaSlice, tokenMetas...)
 					raw.AccountMetaSlice = append(raw.AccountMetaSlice, solana.Meta(token0.OfframpSigner).WRITE())
+					raw.AccountMetaSlice = append(raw.AccountMetaSlice, tokenMetas...)
 
 					maps.Copy(addressTables, offrampLookupTable) // commonly used ccip addresses - required otherwise tx is too large
 
@@ -8227,7 +8227,7 @@ func TestCCIPRouter(t *testing.T) {
 
 					// This validation is like a snapshot for gas consumption
 					// Execute: 1 Token Transfer + Message Execution
-					require.LessOrEqual(t, cu, uint32(230_000))
+					require.LessOrEqual(t, cu, uint32(240_000))
 
 					tx = testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(cu))
 
@@ -8362,7 +8362,7 @@ func TestCCIPRouter(t *testing.T) {
 					raw := ccip_offramp.NewExecuteInstruction(
 						testutils.MustMarshalBorsh(t, executionReport),
 						reportContext,
-						[]byte{4},
+						[]byte{5},
 						config.OfframpConfigPDA,
 						config.OfframpReferenceAddressesPDA,
 						config.OfframpSvmSourceChainPDA,
@@ -8385,8 +8385,8 @@ func TestCCIPRouter(t *testing.T) {
 						solana.NewAccountMeta(solana.SystemProgramID, false, false),
 					)
 
-					tokenMetas, addressTables, err := tokens.ParseTokenLookupTable(ctx, solanaGoClient, token0, token0.User[config.ReceiverExternalExecutionConfigPDA])
 					raw.AccountMetaSlice = append(raw.AccountMetaSlice, solana.Meta(token0.OfframpSigner).WRITE())
+					tokenMetas, addressTables, err := tokens.ParseTokenLookupTable(ctx, solanaGoClient, token0, token0.User[config.ReceiverExternalExecutionConfigPDA])
 					maps.Copy(addressTables, offrampLookupTable) // commonly used ccip addresses - required otherwise tx is too large
 
 					require.NoError(t, err)
@@ -8767,7 +8767,7 @@ func TestCCIPRouter(t *testing.T) {
 				require.NoError(t, err)
 				rootPDA, err := state.FindOfframpCommitReportPDA(config.EvmChainSelector, root, config.CcipOfframpProgram)
 				require.NoError(t, err)
-				instruction, err := ccip_offramp.NewCommitInstruction(
+				execIx, err := ccip_offramp.NewCommitInstruction(
 					reportContext,
 					testutils.MustMarshalBorsh(t, commitReport),
 					sigs.Rs,
@@ -8789,7 +8789,7 @@ func TestCCIPRouter(t *testing.T) {
 					config.RMNRemoteConfigPDA,
 				).ValidateAndBuild()
 				require.NoError(t, err)
-				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(300_000))
+				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{execIx}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(300_000))
 				event := common.EventCommitReportAccepted{}
 				require.NoError(t, common.ParseEventCommitReportAccepted(tx.Meta.LogMessages, "CommitReportAccepted", &event))
 
@@ -8821,13 +8821,14 @@ func TestCCIPRouter(t *testing.T) {
 
 				tokenMetas, addressTables, err := tokens.ParseTokenLookupTable(ctx, solanaGoClient, token0, token0.User[receiver.PublicKey()])
 				require.NoError(t, err)
+				raw.AccountMetaSlice = append(raw.AccountMetaSlice, solana.Meta(token0.OfframpSigner).WRITE())
 				raw.AccountMetaSlice = append(raw.AccountMetaSlice, tokenMetas...)
 				// maps.Copy(addressTables, offrampLookupTable) // commonly used ccip addresses - required otherwise tx is too large
 
-				instruction, err = raw.ValidateAndBuild()
+				execIx, err = raw.ValidateAndBuild()
 				require.NoError(t, err)
 
-				testutils.SendAndFailWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, addressTables, []string{"Error Code: " + common.AccountNotInitialized_AnchorError.String()})
+				testutils.SendAndFailWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{execIx}, transmitter, config.DefaultCommitment, addressTables, []string{"Error Code: " + common.AccountNotInitialized_AnchorError.String()})
 
 				// create associated token account for user --------------------
 				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ixATA}, legacyAdmin, config.DefaultCommitment)
@@ -8854,16 +8855,19 @@ func TestCCIPRouter(t *testing.T) {
 					config.RMNRemoteConfigPDA,
 				)
 
-				tokenMetas, addressTables, err = tokens.ParseTokenLookupTable(ctx, solanaGoClient, token0, token0.User[receiver.PublicKey()])
+				manualTokenMetas, manualAddressTables, err := tokens.ParseTokenLookupTable(ctx, solanaGoClient, token0, token0.User[receiver.PublicKey()])
 				require.NoError(t, err)
-				rawManual.AccountMetaSlice = append(rawManual.AccountMetaSlice, tokenMetas...)
-				raw.AccountMetaSlice = append(raw.AccountMetaSlice, solana.Meta(token0.OfframpSigner).WRITE())
+				rawManual.AccountMetaSlice = append(raw.AccountMetaSlice, solana.Meta(token0.OfframpSigner).WRITE())
+				rawManual.AccountMetaSlice = append(rawManual.AccountMetaSlice, manualTokenMetas...)
 
-				instruction, err = rawManual.ValidateAndBuild()
+				manualExecIx, err := rawManual.ValidateAndBuild()
 				require.NoError(t, err)
-				maps.Copy(addressTables, offrampLookupTable) // commonly used ccip addresses - required otherwise tx is too large
+				maps.Copy(manualAddressTables, offrampLookupTable) // commonly used ccip addresses - required otherwise tx is too large
 
-				testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, legacyAdmin, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(400_000))
+				fmt.Printf("Legacy Admin: %s\n", legacyAdmin)
+				fmt.Printf("Legacy Admin PubK: %s\n", legacyAdmin.PublicKey())
+
+				testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{manualExecIx}, legacyAdmin, config.DefaultCommitment, manualAddressTables, common.AddComputeUnitLimit(400_000))
 
 				_, finalBal, err := tokens.TokenBalance(ctx, solanaGoClient, token0.User[receiver.PublicKey()], config.DefaultCommitment)
 				require.NoError(t, err)

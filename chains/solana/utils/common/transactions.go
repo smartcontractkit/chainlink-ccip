@@ -167,6 +167,8 @@ func sendTransactionWithLookupTables(ctx context.Context, rpcClient *rpc.Client,
 		priv, ok := signers[pub]
 		if !ok {
 			fmt.Printf("ERROR: Missing signer private key for %s\n", pub)
+			fmt.Printf("Signers: %v\n", signers)
+			fmt.Printf("Tx: %+v\n", tx)
 		}
 		return &priv
 	}); err != nil {

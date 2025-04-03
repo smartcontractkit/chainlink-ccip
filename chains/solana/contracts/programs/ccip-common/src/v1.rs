@@ -46,7 +46,18 @@ pub fn validate_and_parse_token_accounts<'info>(
     // Changes in environment-specific program addresses will not affect the PDA derivation.
     let program_id = Pubkey::default();
 
-    let mut input_accounts = accounts;
+    let mut offramp_adjusted_accounts = accounts; // TODO better naming
+
+    let ccip_offramp_pool_signer = if offramp.is_some() {
+        // When and only when the offramp program is calling this function, the first account is the offramp pool signer.
+        // Then, the rest of the accounts are the same as when the router program is calling this function.
+        offramp_adjusted_accounts = &offramp_adjusted_accounts[1..];
+        Some(&accounts[0])
+    } else {
+        None
+    };
+    let mut input_accounts = offramp_adjusted_accounts;
+
     let bumps = &mut <TokenAccountsValidationContext as anchor_lang::Bumps>::Bumps::default();
     let reallocs = &mut std::collections::BTreeSet::new();
 
@@ -69,7 +80,7 @@ pub fn validate_and_parse_token_accounts<'info>(
         reallocs,
     )?;
 
-    let mut accounts_iter = accounts.iter();
+    let mut accounts_iter = offramp_adjusted_accounts.iter();
 
     // accounts based on user or chain
     let user_token_account = next_account_info(&mut accounts_iter)?;
@@ -87,12 +98,6 @@ pub fn validate_and_parse_token_accounts<'info>(
     let mint = next_account_info(&mut accounts_iter)?;
     let fee_token_config = next_account_info(&mut accounts_iter)?;
     let ccip_router_pool_signer = next_account_info(&mut accounts_iter)?;
-
-    let ccip_offramp_pool_signer = if offramp.is_some() {
-        Some(next_account_info(&mut accounts_iter)?)
-    } else {
-        None // If it's the router program, this isn't used.
-    };
 
     // As the offramp signer is optional (only used when the offramp program is calling this function),
     // the context cannot be used to validate it, as it could try to apply those validations to the wrong account
