@@ -409,7 +409,7 @@ fn parse_messaging_accounts<'info>(
     let msg_accounts = &remaining_accounts[1..end_index];
 
     // Validate that the bitmap corresponds to the individual writable flags
-    for (i, acc) in msg_accounts.iter().enumerate().skip(1) {
+    for (i, acc) in msg_accounts.iter().enumerate() {
         require!(
             is_writable(source_bitmap, i as u8) == acc.is_writable,
             CcipOfframpError::InvalidWritabilityBitmap
