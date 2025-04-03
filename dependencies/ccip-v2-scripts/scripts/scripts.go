@@ -33,7 +33,7 @@ func CallDeployerFn(logger *zap.SugaredLogger, env config.DevspaceEnv, stateDirP
 	betaChainSel := config.ChainSelector(2337)
 
 	reader := crib.NewOutputReader(stateDirPath)
-	addressBook := reader.ReadAddressBook()
+	addressBook, _ := reader.ReadAddressBook()
 
 	envConfig, err := config.GetEnvConfig(env)
 	if err != nil {
@@ -60,7 +60,7 @@ func CallDeployerFn(logger *zap.SugaredLogger, env config.DevspaceEnv, stateDirP
 
 func updateNodeDetails(reader *crib.OutputReader, nodeIDs []string, envState model.CCIPEnvState) {
 	// assuming that node details file already exist, as it was generated in generate_initial_node_overrides.go
-	nodesDetails := reader.ReadNodesDetails()
+	nodesDetails, _ := reader.ReadNodesDetails()
 	nodesDetails.NodeIDs = nodeIDs
 
 	envState.SaveNodeDetails(nodesDetails)

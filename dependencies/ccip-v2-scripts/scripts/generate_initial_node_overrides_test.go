@@ -38,7 +38,7 @@ func TestGenerateConfigOverrides_shouldCreateNodeDetails(t *testing.T) {
 
 	// then
 	reader := crib.NewOutputReader(env.TmpDir)
-	nodesDetails := reader.ReadNodesDetails()
+	nodesDetails, _ := reader.ReadNodesDetails()
 
 	assert.Equal(t, []string{}, nodesDetails.NodeIDs, "Node IDs should remain unchanged")
 	assert.Equal(t, "ccip-bt-0", nodesDetails.BootstrapNode.InternalHost)

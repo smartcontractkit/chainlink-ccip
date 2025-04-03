@@ -54,7 +54,7 @@ func (r RMNConfigurer) SetupRMNOnChain() {
 	alphaChainSel := config.ChainSelector(1337)
 	betaChainSel := config.ChainSelector(2337)
 
-	addressBook := r.envStateReader.ReadAddressBook()
+	addressBook, _ := r.envStateReader.ReadAddressBook()
 
 	logger.Infow("Setting up RMN On Chains")
 	output, err := crib.SetupRMNNodeOnAllChains(ctx, ccipLogger, *r.envConfig, alphaChainSel, betaChainSel, addressBook, rmnNodes)
@@ -87,7 +87,7 @@ func (r RMNConfigurer) GenerateTOMLConfigs() {
 		logger.Fatalw("unable to create devenv", "err", err)
 		os.Exit(1)
 	}
-	addressBook := r.envStateReader.ReadAddressBook()
+	addressBook, _ := r.envStateReader.ReadAddressBook()
 	devEnv.ExistingAddresses = addressBook
 	state, err := changeset.LoadOnchainState(*devEnv)
 	if err != nil {
@@ -97,7 +97,7 @@ func (r RMNConfigurer) GenerateTOMLConfigs() {
 
 	logger.Debugw("generating shared-toml config")
 
-	nodesDetails := r.envStateReader.ReadNodesDetails()
+	nodesDetails, _ := r.envStateReader.ReadNodesDetails()
 
 	err = rmn.GenerateSharedConfigTOML(state, r.envConfig, r.envState, nodesDetails.BootstrapNode)
 	if err != nil {
@@ -118,7 +118,8 @@ func (r RMNConfigurer) GenerateNodeIdentities() []crib.RMNNodeConfig {
 	if envState.RMNIdentitiesExists() {
 		logger.Info("RMN identities already exists, reusing existing identities")
 		reader := crib.NewOutputReader(r.devspaceEnv.TmpDir)
-		return reader.ReadRMNNodeConfigs()
+		rmnConfig, _ := reader.ReadRMNNodeConfigs()
+		return rmnConfig
 	}
 
 	logger.Info("Generating RMN config")
