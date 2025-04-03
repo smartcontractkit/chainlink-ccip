@@ -8857,15 +8857,12 @@ func TestCCIPRouter(t *testing.T) {
 
 				manualTokenMetas, manualAddressTables, err := tokens.ParseTokenLookupTable(ctx, solanaGoClient, token0, token0.User[receiver.PublicKey()])
 				require.NoError(t, err)
-				rawManual.AccountMetaSlice = append(raw.AccountMetaSlice, solana.Meta(token0.OfframpSigner).WRITE())
+				rawManual.AccountMetaSlice = append(rawManual.AccountMetaSlice, solana.Meta(token0.OfframpSigner).WRITE())
 				rawManual.AccountMetaSlice = append(rawManual.AccountMetaSlice, manualTokenMetas...)
 
 				manualExecIx, err := rawManual.ValidateAndBuild()
 				require.NoError(t, err)
 				maps.Copy(manualAddressTables, offrampLookupTable) // commonly used ccip addresses - required otherwise tx is too large
-
-				fmt.Printf("Legacy Admin: %s\n", legacyAdmin)
-				fmt.Printf("Legacy Admin PubK: %s\n", legacyAdmin.PublicKey())
 
 				testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{manualExecIx}, legacyAdmin, config.DefaultCommitment, manualAddressTables, common.AddComputeUnitLimit(400_000))
 
