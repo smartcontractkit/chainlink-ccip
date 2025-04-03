@@ -22,7 +22,6 @@ import (
 	ocrtypecodec "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
-	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
 // validateCommitReportsReadingEligibility validates that all commit reports' source chains are supported by observer
@@ -269,7 +268,7 @@ func computeRanges(reports []exectypes.CommitData) ([]cciptypes.SeqNumRange, err
 // groupByChainSelector groups the reports by their chain selector.
 func groupByChainSelectorWithFilter(
 	lggr logger.Logger,
-	reports []plugintypes2.CommitPluginReportWithMeta,
+	reports []cciptypes.CommitPluginReportWithMeta,
 	cursedSourceChains map[cciptypes.ChainSelector]bool,
 ) exectypes.CommitObservations {
 	commitReportCache := make(map[cciptypes.ChainSelector][]exectypes.CommitData)

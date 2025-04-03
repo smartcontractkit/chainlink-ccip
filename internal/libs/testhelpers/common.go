@@ -4,7 +4,6 @@ import (
 	"github.com/smartcontractkit/libocr/commontypes"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
-	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
@@ -32,11 +31,11 @@ func CreateOracleIDToP2pID(ids ...int) map[commontypes.OracleID]libocrtypes.Peer
 	return res
 }
 
-func CreateRMNRemoteCfg() rmntypes.RemoteConfig {
-	return rmntypes.RemoteConfig{
+func CreateRMNRemoteCfg() ccipocr3.RemoteConfig {
+	return ccipocr3.RemoteConfig{
 		ContractAddress: rand.RandomBytes(20),
 		ConfigDigest:    rand.RandomBytes32(),
-		Signers: []rmntypes.RemoteSignerInfo{
+		Signers: []ccipocr3.RemoteSignerInfo{
 			{OnchainPublicKey: append(rand.RandomBytes(20), byte(1)), NodeIndex: 1},
 			{OnchainPublicKey: append(rand.RandomBytes(20), byte(2)), NodeIndex: 2},
 		},

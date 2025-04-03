@@ -82,7 +82,7 @@ type Controller interface {
 		ctx context.Context,
 		destChain *rmnpb.LaneDest,
 		requestedUpdates []*rmnpb.FixedDestLaneUpdateRequest,
-		rmnRemoteCfg rmntypes.RemoteConfig,
+		rmnRemoteCfg cciptypes.RemoteConfig,
 	) (*ReportSignatures, error)
 }
 
@@ -157,7 +157,7 @@ func (c *controller) ComputeReportSignatures(
 	ctx context.Context,
 	destChain *rmnpb.LaneDest,
 	updateRequests []*rmnpb.FixedDestLaneUpdateRequest,
-	rmnRemoteCfg rmntypes.RemoteConfig,
+	rmnRemoteCfg cciptypes.RemoteConfig,
 ) (*ReportSignatures, error) {
 	lggr := logutil.WithContextValues(ctx, c.lggr)
 
@@ -687,7 +687,7 @@ func (c *controller) getRmnReportSignatures(
 	destChain *rmnpb.LaneDest,
 	rmnSignedObservations []rmnSignedObservationWithMeta,
 	updatesPerChain map[uint64]updateRequestWithMeta,
-	rmnRemoteCfg rmntypes.RemoteConfig,
+	rmnRemoteCfg cciptypes.RemoteConfig,
 	rmnNodeInfo map[rmntypes.NodeID]rmntypes.HomeNodeInfo,
 ) (*ReportSignatures, error) {
 	// At this point we might have multiple signedObservations for different nodes but never for the same source chain
@@ -879,7 +879,7 @@ func selectRoots(
 func (c *controller) sendReportSignatureRequest(
 	lggr logger.Logger,
 	reportSigReq *rmnpb.ReportSignatureRequest,
-	remoteSigners []rmntypes.RemoteSignerInfo,
+	remoteSigners []cciptypes.RemoteSignerInfo,
 	remoteF int,
 	rmnNodeInfo map[rmntypes.NodeID]rmntypes.HomeNodeInfo,
 ) (
@@ -940,7 +940,7 @@ func (c *controller) listenForRmnReportSignatures(
 	rmnReport cciptypes.RMNReport,
 	reportSigReq *rmnpb.ReportSignatureRequest,
 	signersRequested mapset.Set[rmntypes.NodeID],
-	signers []rmntypes.RemoteSignerInfo,
+	signers []cciptypes.RemoteSignerInfo,
 	remoteF int,
 	rmnNodeInfo map[rmntypes.NodeID]rmntypes.HomeNodeInfo,
 ) ([]*rmnpb.EcdsaSignature, error) {
@@ -1052,7 +1052,7 @@ func (c *controller) validateReportSigResponse(
 	ctx context.Context,
 	responseTyp *rmnpb.Response,
 	nodeID rmntypes.NodeID,
-	signers []rmntypes.RemoteSignerInfo,
+	signers []cciptypes.RemoteSignerInfo,
 	rmnReport cciptypes.RMNReport,
 ) (*reportSigWithSignerAddress, error) {
 	signerNode, err := c.getSignerNodeByID(signers, nodeID)
@@ -1104,8 +1104,8 @@ func (c *controller) getHomeNodeByID(
 }
 
 func (c *controller) getSignerNodeByID(
-	rmnNodes []rmntypes.RemoteSignerInfo,
-	nodeID rmntypes.NodeID) (rmntypes.RemoteSignerInfo, error) {
+	rmnNodes []cciptypes.RemoteSignerInfo,
+	nodeID rmntypes.NodeID) (cciptypes.RemoteSignerInfo, error) {
 
 	// Search for the node with the specified ID
 	for _, node := range rmnNodes {
@@ -1116,7 +1116,7 @@ func (c *controller) getSignerNodeByID(
 	}
 
 	// If the node was not found, return a "not found" error
-	return rmntypes.RemoteSignerInfo{}, ErrNotFound
+	return cciptypes.RemoteSignerInfo{}, ErrNotFound
 }
 
 type updateRequestWithMeta struct {

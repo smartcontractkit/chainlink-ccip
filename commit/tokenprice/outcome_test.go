@@ -11,7 +11,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
@@ -32,7 +31,7 @@ var feedTokenPrices = cciptypes.TokenPriceMap{
 	tokenD: feedTokenPricesMap[tokenD].Price,
 }
 
-var feeQuoterUpdates = map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig{
+var feeQuoterUpdates = map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig{
 	tokenA: {Timestamp: ts.Add(-2 * time.Minute), Value: cbi100},     // Update because of time
 	tokenB: {Timestamp: ts, Value: cbi100},                           // update because of deviation
 	tokenD: {Timestamp: ts, Value: feedTokenPricesMap[tokenD].Price}, // no update, same price and timestamp

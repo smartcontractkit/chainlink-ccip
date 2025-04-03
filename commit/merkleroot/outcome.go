@@ -15,7 +15,6 @@ import (
 	rmnpb "github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
-	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
@@ -147,7 +146,7 @@ func reportRangesOutcome(
 		return offRampNextSeqNums[i].ChainSel < offRampNextSeqNums[j].ChainSel
 	})
 
-	var rmnRemoteConfig rmntypes.RemoteConfig
+	var rmnRemoteConfig cciptypes.RemoteConfig
 	if observedRMNRemoteConfig[dstChain].IsEmpty() {
 		lggr.Warn("RMNRemoteConfig is empty")
 	} else {
@@ -394,7 +393,7 @@ func getConsensusObservation(
 	}
 
 	// convert aggObs.RMNRemoteConfigs to a map of RMNRemoteConfigs
-	rmnRemoteConfigs := map[cciptypes.ChainSelector][]rmntypes.RemoteConfig{destChain: aggObs.RMNRemoteConfigs}
+	rmnRemoteConfigs := map[cciptypes.ChainSelector][]cciptypes.RemoteConfig{destChain: aggObs.RMNRemoteConfigs}
 
 	// Get consensus using strict 2fChain+1 threshold.
 	twoFChainPlus1 := consensus.MakeMultiThreshold(fChains, consensus.TwoFPlus1)

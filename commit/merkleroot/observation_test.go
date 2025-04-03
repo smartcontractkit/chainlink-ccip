@@ -9,13 +9,14 @@ import (
 	"testing"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	"github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
-	types2 "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/maps"
+
+	"github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
+	types2 "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/ragep2p/types"
@@ -82,13 +83,13 @@ func TestObservation(t *testing.T) {
 					[]plugintypes.SeqNumChain{{ChainSel: 1, SeqNum: 10}}).Once()
 				mockObserver.EXPECT().ObserveLatestOnRampSeqNums(mock.Anything).Return(
 					[]plugintypes.SeqNumChain{{ChainSel: 1, SeqNum: 15}})
-				mockObserver.EXPECT().ObserveRMNRemoteCfg(mock.Anything).Return(rmntypes.RemoteConfig{})
+				mockObserver.EXPECT().ObserveRMNRemoteCfg(mock.Anything).Return(cciptypes.RemoteConfig{})
 				mockObserver.EXPECT().ObserveFChain(mock.Anything).Return(map[cciptypes.ChainSelector]int{1: 3})
 			},
 			expectedObs: Observation{
 				OffRampNextSeqNums: []plugintypes.SeqNumChain{{ChainSel: 1, SeqNum: 10}},
 				OnRampMaxSeqNums:   []plugintypes.SeqNumChain{{ChainSel: 1, SeqNum: 15}},
-				RMNRemoteConfig:    rmntypes.RemoteConfig{},
+				RMNRemoteConfig:    cciptypes.RemoteConfig{},
 				FChain:             map[cciptypes.ChainSelector]int{1: 3},
 			},
 		},
@@ -948,7 +949,7 @@ func Test_shouldSkipRMNVerification(t *testing.T) {
 
 			prevOutcome := Outcome{}
 			if !tc.rmnRemoteConfigEmpty {
-				prevOutcome.RMNRemoteCfg = rmntypes.RemoteConfig{FSign: 1}
+				prevOutcome.RMNRemoteCfg = cciptypes.RemoteConfig{FSign: 1}
 			}
 
 			shouldSkip, err := shouldSkipRMNVerification(tc.nextProcessorState, q, prevOutcome)

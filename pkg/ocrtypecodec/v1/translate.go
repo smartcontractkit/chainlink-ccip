@@ -3,13 +3,13 @@ package v1
 import (
 	"math/big"
 
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	rmnpb "github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
-	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1/ocrtypecodecpb"
@@ -215,7 +215,7 @@ func (t *protoTranslator) seqNumChainFromProto(pbSnc []*ocrtypecodecpb.SeqNumCha
 	return snc
 }
 
-func (t *protoTranslator) rmnRemoteConfigToProto(rmnRemoteCfg rmntypes.RemoteConfig) *ocrtypecodecpb.RmnRemoteConfig {
+func (t *protoTranslator) rmnRemoteConfigToProto(rmnRemoteCfg cciptypes.RemoteConfig) *ocrtypecodecpb.RmnRemoteConfig {
 	var rmnRemoteConfigSignersPB []*ocrtypecodecpb.RemoteSignerInfo
 	if len(rmnRemoteCfg.Signers) > 0 {
 		rmnRemoteConfigSignersPB = make([]*ocrtypecodecpb.RemoteSignerInfo, len(rmnRemoteCfg.Signers))
@@ -240,19 +240,19 @@ func (t *protoTranslator) rmnRemoteConfigToProto(rmnRemoteCfg rmntypes.RemoteCon
 
 func (t *protoTranslator) rmnRemoteConfigFromProto(
 	pbRmnRemoteCfg *ocrtypecodecpb.RmnRemoteConfig,
-) rmntypes.RemoteConfig {
-	var rmnSigners []rmntypes.RemoteSignerInfo
+) cciptypes.RemoteConfig {
+	var rmnSigners []cciptypes.RemoteSignerInfo
 	if len(pbRmnRemoteCfg.Signers) > 0 {
-		rmnSigners = make([]rmntypes.RemoteSignerInfo, len(pbRmnRemoteCfg.Signers))
+		rmnSigners = make([]cciptypes.RemoteSignerInfo, len(pbRmnRemoteCfg.Signers))
 	}
 	for i, s := range pbRmnRemoteCfg.Signers {
-		rmnSigners[i] = rmntypes.RemoteSignerInfo{
+		rmnSigners[i] = cciptypes.RemoteSignerInfo{
 			OnchainPublicKey: s.OnchainPublicKey,
 			NodeIndex:        s.NodeIndex,
 		}
 	}
 
-	return rmntypes.RemoteConfig{
+	return cciptypes.RemoteConfig{
 		ContractAddress:  pbRmnRemoteCfg.ContractAddress,
 		ConfigDigest:     cciptypes.Bytes32(pbRmnRemoteCfg.ConfigDigest),
 		Signers:          rmnSigners,
@@ -311,7 +311,7 @@ func (t *protoTranslator) feedTokenPricesFromProto(pbFeedPrices map[string][]byt
 }
 
 func (t *protoTranslator) feeQuoterTokenUpdatesToProto(
-	tokenUpdates map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig,
+	tokenUpdates map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig,
 ) map[string]*ocrtypecodecpb.TimestampedBig {
 	feeQuoterTokenUpdates := make(map[string]*ocrtypecodecpb.TimestampedBig, len(tokenUpdates))
 
@@ -327,10 +327,10 @@ func (t *protoTranslator) feeQuoterTokenUpdatesToProto(
 
 func (t *protoTranslator) feeQuoterTokenUpdatesFromProto(
 	pbTokenUpdates map[string]*ocrtypecodecpb.TimestampedBig,
-) map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig {
-	feeQuoterTokenUpdates := make(map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig, len(pbTokenUpdates))
+) map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig {
+	feeQuoterTokenUpdates := make(map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig, len(pbTokenUpdates))
 	for k, v := range pbTokenUpdates {
-		feeQuoterTokenUpdates[cciptypes.UnknownEncodedAddress(k)] = plugintypes.TimestampedBig{
+		feeQuoterTokenUpdates[cciptypes.UnknownEncodedAddress(k)] = cciptypes.TimestampedBig{
 			Value:     cciptypes.NewBigInt(big.NewInt(0).SetBytes(v.Value)),
 			Timestamp: v.Timestamp.AsTime(),
 		}

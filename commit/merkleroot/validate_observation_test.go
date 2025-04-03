@@ -8,7 +8,6 @@ import (
 
 	"github.com/smartcontractkit/libocr/commontypes"
 
-	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
@@ -240,17 +239,17 @@ func Test_validateRMNRemoteConfig(t *testing.T) {
 		name              string
 		observer          commontypes.OracleID
 		supportsDestChain bool
-		rmnRemoteConfig   types.RemoteConfig
+		rmnRemoteConfig   cciptypes.RemoteConfig
 		expectedError     bool
 	}{
 		{
 			name:              "is valid",
 			observer:          1,
 			supportsDestChain: true,
-			rmnRemoteConfig: types.RemoteConfig{
+			rmnRemoteConfig: cciptypes.RemoteConfig{
 				ContractAddress: []byte{1, 2, 3},
 				ConfigDigest:    cciptypes.Bytes32{1, 2, 3},
-				Signers: []types.RemoteSignerInfo{
+				Signers: []cciptypes.RemoteSignerInfo{
 					{OnchainPublicKey: []byte{0, 0, 1}, NodeIndex: 0},
 					{OnchainPublicKey: []byte{0, 0, 2}, NodeIndex: 1},
 					{OnchainPublicKey: []byte{0, 0, 3}, NodeIndex: 2},
@@ -264,10 +263,10 @@ func Test_validateRMNRemoteConfig(t *testing.T) {
 			name:              "does not support destination chain",
 			observer:          1,
 			supportsDestChain: false, // <--
-			rmnRemoteConfig: types.RemoteConfig{
+			rmnRemoteConfig: cciptypes.RemoteConfig{
 				ContractAddress: []byte{1, 2, 3},
 				ConfigDigest:    cciptypes.Bytes32{1, 2, 3},
-				Signers: []types.RemoteSignerInfo{
+				Signers: []cciptypes.RemoteSignerInfo{
 					{OnchainPublicKey: []byte{0, 0, 1}, NodeIndex: 0},
 					{OnchainPublicKey: []byte{0, 0, 2}, NodeIndex: 1},
 					{OnchainPublicKey: []byte{0, 0, 3}, NodeIndex: 2},
@@ -282,10 +281,10 @@ func Test_validateRMNRemoteConfig(t *testing.T) {
 			name:              "empty contract address",
 			observer:          1,
 			supportsDestChain: true,
-			rmnRemoteConfig: types.RemoteConfig{
+			rmnRemoteConfig: cciptypes.RemoteConfig{
 				ContractAddress: []byte{}, // <--
 				ConfigDigest:    cciptypes.Bytes32{1, 2, 3},
-				Signers: []types.RemoteSignerInfo{
+				Signers: []cciptypes.RemoteSignerInfo{
 					{OnchainPublicKey: []byte{0, 0, 1}, NodeIndex: 0},
 					{OnchainPublicKey: []byte{0, 0, 2}, NodeIndex: 1},
 					{OnchainPublicKey: []byte{0, 0, 3}, NodeIndex: 2},
@@ -300,10 +299,10 @@ func Test_validateRMNRemoteConfig(t *testing.T) {
 			name:              "empty config digest",
 			observer:          1,
 			supportsDestChain: true,
-			rmnRemoteConfig: types.RemoteConfig{
+			rmnRemoteConfig: cciptypes.RemoteConfig{
 				ContractAddress: []byte{1, 2, 3},
 				ConfigDigest:    cciptypes.Bytes32{}, // <---
-				Signers: []types.RemoteSignerInfo{
+				Signers: []cciptypes.RemoteSignerInfo{
 					{OnchainPublicKey: []byte{0, 0, 1}, NodeIndex: 0},
 					{OnchainPublicKey: []byte{0, 0, 2}, NodeIndex: 1},
 					{OnchainPublicKey: []byte{0, 0, 3}, NodeIndex: 2},
@@ -318,10 +317,10 @@ func Test_validateRMNRemoteConfig(t *testing.T) {
 			name:              "not enough signers to cover F+1 threshold",
 			observer:          1,
 			supportsDestChain: true,
-			rmnRemoteConfig: types.RemoteConfig{
+			rmnRemoteConfig: cciptypes.RemoteConfig{
 				ContractAddress: []byte{1, 2, 3},
 				ConfigDigest:    cciptypes.Bytes32{1, 2, 3},
-				Signers: []types.RemoteSignerInfo{
+				Signers: []cciptypes.RemoteSignerInfo{
 					{OnchainPublicKey: []byte{0, 0, 2}, NodeIndex: 1}, // <----
 				},
 				FSign:            1,
@@ -334,10 +333,10 @@ func Test_validateRMNRemoteConfig(t *testing.T) {
 			name:              "empty rmn report version",
 			observer:          1,
 			supportsDestChain: true,
-			rmnRemoteConfig: types.RemoteConfig{
+			rmnRemoteConfig: cciptypes.RemoteConfig{
 				ContractAddress: []byte{1, 2, 3},
 				ConfigDigest:    cciptypes.Bytes32{1, 2, 3},
-				Signers: []types.RemoteSignerInfo{
+				Signers: []cciptypes.RemoteSignerInfo{
 					{OnchainPublicKey: []byte{0, 0, 1}, NodeIndex: 0},
 					{OnchainPublicKey: []byte{0, 0, 2}, NodeIndex: 1},
 					{OnchainPublicKey: []byte{0, 0, 3}, NodeIndex: 2},
@@ -352,10 +351,10 @@ func Test_validateRMNRemoteConfig(t *testing.T) {
 			name:              "duplicate signers",
 			observer:          1,
 			supportsDestChain: true,
-			rmnRemoteConfig: types.RemoteConfig{
+			rmnRemoteConfig: cciptypes.RemoteConfig{
 				ContractAddress: []byte{1, 2, 3},
 				ConfigDigest:    cciptypes.Bytes32{1, 2, 3},
-				Signers: []types.RemoteSignerInfo{
+				Signers: []cciptypes.RemoteSignerInfo{
 					{OnchainPublicKey: []byte{0, 0, 1}, NodeIndex: 0},
 					{OnchainPublicKey: []byte{0, 0, 2}, NodeIndex: 1},
 					{OnchainPublicKey: []byte{0, 0, 3}, NodeIndex: 1}, // <---------
@@ -370,10 +369,10 @@ func Test_validateRMNRemoteConfig(t *testing.T) {
 			name:              "empty signer onchain public key",
 			observer:          1,
 			supportsDestChain: true,
-			rmnRemoteConfig: types.RemoteConfig{
+			rmnRemoteConfig: cciptypes.RemoteConfig{
 				ContractAddress: []byte{1, 2, 3},
 				ConfigDigest:    cciptypes.Bytes32{1, 2, 3},
-				Signers: []types.RemoteSignerInfo{
+				Signers: []cciptypes.RemoteSignerInfo{
 					{OnchainPublicKey: []byte{}, NodeIndex: 0}, // <-----
 					{OnchainPublicKey: []byte{0, 0, 2}, NodeIndex: 1},
 					{OnchainPublicKey: []byte{0, 0, 3}, NodeIndex: 2},

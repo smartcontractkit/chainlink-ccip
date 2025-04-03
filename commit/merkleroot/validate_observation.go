@@ -7,7 +7,6 @@ import (
 
 	"github.com/smartcontractkit/libocr/commontypes"
 
-	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
@@ -166,7 +165,7 @@ func validateObservedOffRampMaxSeqNums(
 func validateRMNRemoteConfig(
 	observer commontypes.OracleID,
 	supportsDestChain bool,
-	rmnRemoteConfig types.RemoteConfig,
+	rmnRemoteConfig cciptypes.RemoteConfig,
 ) error {
 	if rmnRemoteConfig.IsEmpty() {
 		return nil
