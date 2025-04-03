@@ -3,10 +3,12 @@ package reader
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -16,14 +18,14 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal"
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	writer_mocks "github.com/smartcontractkit/chainlink-ccip/mocks/chainlink_common"
 	reader_mocks "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
@@ -1349,77 +1351,177 @@ func Test_getCurseInfoFromCursedSubjects(t *testing.T) {
 }
 
 func TestCCIPChainReader_Nonces(t *testing.T) {
-	addr1 := "0x1234567890123456789012345678901234567890"
-	addr2 := "0x2234567890123456789012345678901234567890"
-	nonceManagerAddr := "0x3234567890123456789012345678901234567890"
-
-	destReader := reader_mocks.NewMockExtended(t)
-
-	// Mock Bind call
-	destReader.EXPECT().Bind(
-		mock.Anything,
-		[]types.BoundContract{{
-			Name:    consts.ContractNameNonceManager,
-			Address: nonceManagerAddr,
-		}},
-	).Return(nil)
-
-	// Setup expected responses
-	nonce1, nonce2 := uint64(5), uint64(10)
-
-	result1 := &types.BatchReadResult{ReadName: consts.MethodNameGetInboundNonce}
-	result1.SetResult(&nonce1, nil)
-
-	result2 := &types.BatchReadResult{ReadName: consts.MethodNameGetInboundNonce}
-	result2.SetResult(&nonce2, nil)
-
-	responses := types.BatchGetLatestValuesResult{
-		types.BoundContract{
-			Name:    consts.ContractNameNonceManager,
-			Address: nonceManagerAddr,
-		}: []types.BatchReadResult{*result1, *result2},
+	type testCase struct {
+		name           string
+		funcInput      map[cciptypes.ChainSelector][]string
+		expectedNonces map[cciptypes.ChainSelector]map[string]uint64
+		matchedBy      func(req contractreader.ExtendedBatchGetLatestValuesRequest) bool
+		mockResults    []*uint64
 	}
-	destReader.EXPECT().ExtendedBatchGetLatestValues(
-		mock.Anything,
-		mock.MatchedBy(func(req contractreader.ExtendedBatchGetLatestValuesRequest) bool {
-			batch := req[consts.ContractNameNonceManager]
-			return len(batch) == 2 &&
-				batch[0].ReadName == consts.MethodNameGetInboundNonce &&
-				batch[1].ReadName == consts.MethodNameGetInboundNonce
-		}),
-		false,
-	).Return(responses, []string{}, nil)
-	ccipReader := &ccipChainReader{
-		lggr: logger.Test(t),
-		contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
-			chainB: destReader,
+
+	// copies the behavior of the address codec
+	// https://github.com/smartcontractkit/chainlink/blob/develop/integration-tests/smoke/ccip/ccip_reader_test.go#L2013
+	transformAddress := func(addr string) cciptypes.UnknownAddress {
+		addrBytes, err := hex.DecodeString(strings.ToLower(strings.TrimPrefix(addr, "0x")))
+		assert.NoError(t, err)
+		return slicelib.LeftPadBytes(addrBytes, 32)
+	}
+
+	var (
+		addr1            = "0x1234567890123456789012345678901234567890"
+		addr2            = "0x2234567890123456789012345678901234567890"
+		addr3            = "0x3234567890123456789012345678901234567890"
+		addr4            = "0x4234567890123456789012345678901234567890"
+		nonceManagerAddr = "0x5234567890123456789012345678901234567890"
+		nonce1           = uint64(5)
+		nonce2           = uint64(10)
+		nonce3           = uint64(15)
+		nonce4           = uint64(20)
+	)
+	testCases := []testCase{
+		{
+			name:      "single chain, two addresses",
+			funcInput: map[cciptypes.ChainSelector][]string{chainB: {addr1, addr2}},
+			expectedNonces: map[cciptypes.ChainSelector]map[string]uint64{
+				chainB: {
+					addr1: 5,
+					addr2: 10,
+				},
+			},
+			mockResults: []*uint64{&nonce1, &nonce2},
+			matchedBy: func(req contractreader.ExtendedBatchGetLatestValuesRequest) bool {
+				batch := req[consts.ContractNameNonceManager]
+
+				assert.Len(t, batch, 2)
+				assert.Equal(t, transformAddress(addr1), batch[0].Params.(map[string]any)["sender"])
+				assert.Equal(t, transformAddress(addr2), batch[1].Params.(map[string]any)["sender"])
+				assert.Equal(t, consts.MethodNameGetInboundNonce, batch[0].ReadName)
+				assert.Equal(t, consts.MethodNameGetInboundNonce, batch[1].ReadName)
+
+				return true
+			},
 		},
-		destChain: chainB,
-		addrCodec: internal.NewMockAddressCodecHex(t),
+		{
+			name:      "two chains",
+			funcInput: map[cciptypes.ChainSelector][]string{chainA: {addr1, addr2}, chainB: {addr3, addr4}},
+			expectedNonces: map[cciptypes.ChainSelector]map[string]uint64{
+				chainA: {
+					addr1: nonce1,
+					addr2: nonce2,
+				},
+				chainB: {
+					addr3: nonce3,
+					addr4: nonce4,
+				},
+			},
+			mockResults: []*uint64{&nonce1, &nonce2, &nonce3, &nonce4},
+			matchedBy: func(req contractreader.ExtendedBatchGetLatestValuesRequest) bool {
+				batch := req[consts.ContractNameNonceManager]
+				for _, batchRead := range batch {
+					if batchRead.ReadName != consts.MethodNameGetInboundNonce {
+						return false
+					}
+				}
+
+				assert.Len(t, batch, 4)
+				assert.Equal(t, transformAddress(addr1), batch[0].Params.(map[string]any)["sender"])
+				assert.Equal(t, transformAddress(addr2), batch[1].Params.(map[string]any)["sender"])
+				assert.Equal(t, transformAddress(addr3), batch[2].Params.(map[string]any)["sender"])
+				assert.Equal(t, transformAddress(addr4), batch[3].Params.(map[string]any)["sender"])
+				assert.Equal(t, chainA, batch[0].Params.(map[string]any)["sourceChainSelector"])
+				assert.Equal(t, chainA, batch[1].Params.(map[string]any)["sourceChainSelector"])
+				assert.Equal(t, chainB, batch[2].Params.(map[string]any)["sourceChainSelector"])
+				assert.Equal(t, chainB, batch[3].Params.(map[string]any)["sourceChainSelector"])
+				return true
+			},
+		},
+		{
+			name:      "same address multiple chains",
+			funcInput: map[cciptypes.ChainSelector][]string{chainA: {addr1}, chainB: {addr1, addr2}},
+			expectedNonces: map[cciptypes.ChainSelector]map[string]uint64{
+				chainA: {
+					addr1: nonce1,
+				},
+				chainB: {
+					addr1: nonce2,
+					addr2: nonce3,
+				},
+			},
+			mockResults: []*uint64{&nonce1, &nonce2, &nonce3},
+			matchedBy: func(req contractreader.ExtendedBatchGetLatestValuesRequest) bool {
+				batch := req[consts.ContractNameNonceManager]
+
+				assert.Len(t, batch, 3)
+				assert.Equal(t, transformAddress(addr1), batch[0].Params.(map[string]any)["sender"])
+				assert.Equal(t, transformAddress(addr1), batch[1].Params.(map[string]any)["sender"])
+				assert.Equal(t, transformAddress(addr2), batch[2].Params.(map[string]any)["sender"])
+				assert.Equal(t, chainA, batch[0].Params.(map[string]any)["sourceChainSelector"])
+				assert.Equal(t, chainB, batch[1].Params.(map[string]any)["sourceChainSelector"])
+				assert.Equal(t, chainB, batch[2].Params.(map[string]any)["sourceChainSelector"])
+				return true
+			},
+		},
+		{
+			name:      "empty chain",
+			funcInput: map[cciptypes.ChainSelector][]string{chainA: {addr1}, chainB: {}},
+			expectedNonces: map[cciptypes.ChainSelector]map[string]uint64{
+				chainA: {
+					addr1: nonce1,
+				},
+			},
+			mockResults: []*uint64{&nonce1},
+			matchedBy: func(req contractreader.ExtendedBatchGetLatestValuesRequest) bool {
+				batch := req[consts.ContractNameNonceManager]
+				assert.Len(t, batch, 1)
+				assert.Equal(t, transformAddress(addr1), batch[0].Params.(map[string]any)["sender"])
+				assert.Equal(t, chainA, batch[0].Params.(map[string]any)["sourceChainSelector"])
+				return true
+			},
+		},
 	}
 
-	// Bind the contract first
-	err := ccipReader.contractReaders[chainB].Bind(
-		context.Background(),
-		[]types.BoundContract{{
-			Name:    consts.ContractNameNonceManager,
-			Address: nonceManagerAddr,
-		}},
-	)
-	require.NoError(t, err)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			destReader := reader_mocks.NewMockExtended(t)
 
-	// Call Nonces
-	nonces, err := ccipReader.Nonces(
-		context.Background(),
-		chainA,
-		[]string{addr1, addr2},
-	)
+			results := make([]types.BatchReadResult, 0, len(tc.mockResults))
+			for _, res := range tc.mockResults {
+				r := &types.BatchReadResult{ReadName: consts.MethodNameGetInboundNonce}
+				r.SetResult(res, nil)
+				results = append(results, *r)
+			}
+			responses := types.BatchGetLatestValuesResult{
+				types.BoundContract{
+					Name:    consts.ContractNameNonceManager,
+					Address: nonceManagerAddr,
+				}: results,
+			}
 
-	require.NoError(t, err)
-	assert.Equal(t, map[string]uint64{
-		addr1: 5,
-		addr2: 10,
-	}, nonces)
+			destReader.EXPECT().ExtendedBatchGetLatestValues(
+				mock.Anything,
+				mock.MatchedBy(tc.matchedBy),
+				false,
+			).Return(responses, []string{}, nil)
+
+			ccipReader := &ccipChainReader{
+				lggr: logger.Test(t),
+				contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
+					chainB: destReader,
+				},
+				destChain: chainB,
+				addrCodec: internal.NewMockAddressCodecHex(t),
+			}
+
+			// Call Nonces
+			nonces, err := ccipReader.Nonces(
+				context.Background(),
+				tc.funcInput,
+			)
+
+			require.NoError(t, err)
+			assert.Equal(t, tc.expectedNonces, nonces)
+		})
+	}
 }
 
 func TestCCIPChainReader_DiscoverContracts_Parallel(t *testing.T) {

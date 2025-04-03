@@ -148,9 +148,8 @@ func (r InMemoryCCIPReader) NextSeqNum(
 
 func (r InMemoryCCIPReader) Nonces(
 	ctx context.Context,
-	source cciptypes.ChainSelector,
-	addresses []string,
-) (map[string]uint64, error) {
+	addressesByChain map[cciptypes.ChainSelector][]string,
+) (map[cciptypes.ChainSelector]map[string]uint64, error) {
 	return nil, nil
 }
 
