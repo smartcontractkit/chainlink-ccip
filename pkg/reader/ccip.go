@@ -708,47 +708,39 @@ func (r *ccipChainReader) NextSeqNum(
 	return res, err
 }
 
+type chainAddressNonce struct {
+	chain    cciptypes.ChainSelector
+	address  string
+	response uint64
+}
+
 func (r *ccipChainReader) Nonces(
 	ctx context.Context,
-	sourceChainSelector cciptypes.ChainSelector,
-	addresses []string,
-) (map[string]uint64, error) {
+	addressesByChain map[cciptypes.ChainSelector][]string,
+) (map[cciptypes.ChainSelector]map[string]uint64, error) {
 	lggr := logutil.WithContextValues(ctx, r.lggr)
 	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
 		return nil, err
 	}
 
-	// Prepare the batch request
-	contractBatch := make([]types.BatchRead, len(addresses))
-	addressToIndex := make(map[string]int, len(addresses))
-	responses := make([]uint64, len(addresses))
+	// sort the input to ensure deterministic results
+	sortedChains := maps.Keys(addressesByChain)
+	slices.Sort(sortedChains)
 
-	for i, address := range addresses {
-		sender, err := r.addrCodec.AddressStringToBytes(address, sourceChainSelector)
-		if err != nil {
-			return nil, fmt.Errorf("failed to convert address %s to bytes: %w", address, err)
-		}
+	// create the structure that will contain our result
+	res := make(map[cciptypes.ChainSelector]map[string]uint64)
+	var addressCount int
+	for _, addresses := range addressesByChain {
+		addressCount += len(addresses)
+	}
 
-		// TODO: evm only, need to make chain agnostic.
-		// pad the sender slice to 32 bytes from the left
-		sender = slicelib.LeftPadBytes(sender, 32)
-
-		lggr.Infow("getting nonce for address",
-			"address", address, "sender", hex.EncodeToString(sender))
-
-		contractBatch[i] = types.BatchRead{
-			ReadName: consts.MethodNameGetInboundNonce,
-			Params: map[string]any{
-				"sourceChainSelector": sourceChainSelector,
-				"sender":              sender,
-			},
-			ReturnVal: &responses[i],
-		}
-		addressToIndex[address] = i
+	contractInput, responses, err := prepareNoncesInput(lggr, addressesByChain, addressCount, sortedChains, r.addrCodec)
+	if err != nil {
+		return nil, err
 	}
 
 	request := contractreader.ExtendedBatchGetLatestValuesRequest{
-		consts.ContractNameNonceManager: contractBatch,
+		consts.ContractNameNonceManager: contractInput,
 	}
 
 	batchResult, _, err := r.contractReaders[r.destChain].ExtendedBatchGetLatestValues(
@@ -760,43 +752,77 @@ func (r *ccipChainReader) Nonces(
 		return nil, fmt.Errorf("batch get nonces failed: %w", err)
 	}
 
-	// Process results
-	res := make(map[string]uint64, len(addresses))
+	// Process results, we range over batchResults, but there should only be result for nonce manager
 	for _, results := range batchResult {
+		if len(results) != len(responses) {
+			lggr.Errorw("unexpected number of nonces",
+				"expected", len(responses), "got", len(results))
+			continue
+		}
 		for i, readResult := range results {
-			address := getAddressByIndex(addressToIndex, i)
-
-			if address == "" {
-				lggr.Errorw("critical error, address not found for index", "index", i)
-				continue
-			}
+			key := responses[i]
 
 			returnVal, err := readResult.GetResult()
 			if err != nil {
-				lggr.Errorw("failed to get nonce for address", "address", address, "err", err)
+				lggr.Errorw("failed to get nonce for address", "address", key.address, "err", err)
 				continue
 			}
 
 			val, ok := returnVal.(*uint64)
 			if !ok || val == nil {
-				lggr.Errorw("invalid nonce value returned", "address", address)
+				lggr.Errorw("invalid nonce value returned", "address", key.address)
 				continue
 			}
-
-			res[address] = *val
+			if _, ok := res[key.chain]; !ok {
+				res[key.chain] = make(map[string]uint64)
+			}
+			res[key.chain][key.address] = *val
 		}
 	}
 
 	return res, nil
 }
 
-func getAddressByIndex(addressToIndex map[string]int, index int) string {
-	for address, idx := range addressToIndex {
-		if idx == index {
-			return address
+func prepareNoncesInput(
+	lggr logger.Logger,
+	addressesByChain map[cciptypes.ChainSelector][]string,
+	addressCount int,
+	sortedChains []cciptypes.ChainSelector,
+	addrCodec cciptypes.AddressCodec) ([]types.BatchRead, []chainAddressNonce, error) {
+
+	contractInput := make([]types.BatchRead, addressCount)
+	responses := make([]chainAddressNonce, addressCount)
+	var counter int
+	for _, chain := range sortedChains {
+		addresses := addressesByChain[chain]
+		// no addresses on this chain, no need to make requests
+		if len(addresses) == 0 {
+			continue
+		}
+		for _, address := range addresses {
+			lggr.Infow("getting nonce for address",
+				"address", address, "chain", chain)
+
+			sender, err := addrCodec.AddressStringToBytes(address, chain)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to convert address %s to bytes: %w", address, err)
+			}
+			// TODO: evm only, need to make chain agnostic.
+			// pad the sender slice to 32 bytes from the left
+			sender = slicelib.LeftPadBytes(sender, 32)
+			contractInput[counter] = types.BatchRead{
+				ReadName: consts.MethodNameGetInboundNonce,
+				Params: map[string]any{
+					"sourceChainSelector": chain,
+					"sender":              sender,
+				},
+				ReturnVal: &responses[counter].response,
+			}
+			responses[counter] = chainAddressNonce{chain: chain, address: address}
+			counter++
 		}
 	}
-	return ""
+	return contractInput, responses, nil
 }
 
 func (r *ccipChainReader) GetChainsFeeComponents(
