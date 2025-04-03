@@ -205,7 +205,13 @@ impl BaseChain {
 
 #[derive(InitSpace, Clone, AnchorSerialize, AnchorDeserialize)]
 pub struct RemoteConfig {
-    #[max_len(0)]
+    // Remote pool addresses is a vec to support multiple pool versions of the same token
+    // Although for a given remote chain, there should be one active pool address at a time,
+    // tokens could have been sent from earlier versions of that pool.
+    // On SVM, pools are expected to upgrade in place, but on EVM, earlier version have different addresses.
+    // Tokens could be stuck in flight for a long time, we need to support validation of these tokens even
+    // after the pool they were sent from has been decommissioned at source.
+    #[max_len(0)] // used to calculate InitSpace
     pub pool_addresses: Vec<RemoteAddress>,
     pub token_address: RemoteAddress,
     pub decimals: u8, // needed to track decimals from remote to convert properly
