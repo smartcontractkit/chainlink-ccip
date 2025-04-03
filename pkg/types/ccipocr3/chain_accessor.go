@@ -110,10 +110,9 @@ type DestinationAccessor interface {
 	// Confidence: Unconfirmed, Finalized
 	ExecutedMessages(
 		ctx context.Context,
-		source ChainSelector,
-		seqNumRange SeqNumRange,
+		ranges map[ChainSelector]SeqNumRange,
 		confidence ConfidenceLevel,
-	) ([]SeqNum, error)
+	) (map[ChainSelector][]SeqNum, error)
 
 	// NextSeqNum reads the source chain config to get the next expected
 	// sequence number for the given source chains.
