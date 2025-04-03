@@ -30,3 +30,9 @@ type HomeNodeInfo struct {
 	OffchainPublicKey     *ed25519.PublicKey                  // The public key is used to verify observations
 	StreamNamePrefix      string                              // RageP2P stream name prefix e.g. "ccip-rmn/v1_6/"
 }
+
+// Deprecated: use cciptypes.RemoteConfig
+type RemoteConfig = cciptypes.RemoteConfig
+
+// Deprecated: use cciptypes.RemoteSignerInfo
+type RemoteSignerInfo = cciptypes.RemoteSignerInfo
