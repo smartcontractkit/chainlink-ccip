@@ -2,13 +2,10 @@ package ccipocr3
 
 import (
 	"context"
+	"math/big"
 	"sort"
 	"time"
 
-	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
-	iplugintypes "github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 )
@@ -57,9 +54,13 @@ type AllAccessors interface {
 	// Access Type: Method(many, see code)
 	// Contract: Many
 	// Confidence: Unconfirmed
-	GetAllConfig(
-		ctx context.Context,
-	) (ChainConfig, error)
+	/*
+		// TODO: ChainConfig object is huge with many private components. Need to move them all here
+		// to avoid circular dependencies.
+		GetAllConfig(
+			ctx context.Context,
+		) (ChainConfig, error)
+	*/
 
 	// GetChainFeeComponents Returns all fee components for given chains if corresponding
 	// chain writer is available.
@@ -79,14 +80,6 @@ type AllAccessors interface {
 		ctx context.Context,
 	) (types.ChainFeeComponents, error)
 
-	// DiscoverContracts reads the destination chain for contract addresses. They are returned per
-	// contract and source chain selector.
-	// allChains is needed because there is no way to enumerate all chain selectors on Solana. We'll attempt to
-	// fetch the source config from the offramp for each of them.
-	//
-	// TODO: this should go away, it's a call to the ConfigPoller.
-	DiscoverContracts(ctx context.Context, allChains []ChainSelector) (ContractAddresses, error)
-
 	// Sync can be used to perform frequent syncing operations inside the reader implementation.
 	// Returns a bool indicating whether something was updated.
 	Sync(ctx context.Context, contracts ContractAddresses) error
@@ -105,7 +98,7 @@ type DestinationAccessor interface {
 		ctx context.Context,
 		ts time.Time,
 		limit int,
-	) ([]plugintypes.CommitPluginReportWithMeta, error)
+	) ([]CommitPluginReportWithMeta, error)
 
 	// ExecutedMessages looks for ExecutionStateChanged events for each sequence
 	// in a given range. The presence of these events indicates that an attempt to
@@ -251,7 +244,7 @@ type RMNAccessor interface {
 	// TODO: This function should be removed and replaced with direct access to
 	//       the ConfigPoller. It also manages chain reader contract binding
 	//       directly instead of using DiscoverContracts.
-	GetRMNRemoteConfig(ctx context.Context) (rmntypes.RemoteConfig, error)
+	GetRMNRemoteConfig(ctx context.Context) (RemoteConfig, error)
 
 	// GetRmnCurseInfo returns rmn curse/pausing information about the provided chains
 	// from the destination chain RMN remote contract. Caller should be able to access destination.
@@ -280,9 +273,41 @@ const (
 
 type ChainFeeComponents = types.ChainFeeComponents
 
-type TimestampedBig = iplugintypes.TimestampedBig
+//type ChainConfig = reader.ChainConfigSnapshot
 
-type ChainConfig = reader.ChainConfigSnapshot
+type TimestampedBig struct {
+	Timestamp time.Time `json:"timestamp"`
+	Value     BigInt    `json:"value"`
+}
+
+// TimestampedUnixBig Maps to on-chain struct
+// https://github.com/smartcontractkit/chainlink/blob/37f3132362ec90b0b1c12fb1b69b9c16c46b399d/contracts/src/v0.8/ccip/libraries/Internal.sol#L43-L47
+//
+//nolint:lll //url
+type TimestampedUnixBig struct {
+	Value     *big.Int `json:"value"`
+	Timestamp uint32   `json:"timestamp"`
+}
+
+func NewTimestampedBig(value int64, timestamp time.Time) TimestampedBig {
+	return TimestampedBig{
+		Value:     BigInt{Int: big.NewInt(value)},
+		Timestamp: timestamp,
+	}
+}
+
+func TimeStampedBigFromUnix(input TimestampedUnixBig) TimestampedBig {
+	return TimestampedBig{
+		Value:     NewBigInt(input.Value),
+		Timestamp: time.Unix(int64(input.Timestamp), 0),
+	}
+}
+
+type CommitPluginReportWithMeta struct {
+	Report    CommitPluginReport `json:"report"`
+	Timestamp time.Time          `json:"timestamp"`
+	BlockNum  uint64             `json:"blockNum"`
+}
 
 // sourceChainConfig is used to parse the response from the offRamp contract's getSourceChainConfig method.
 // See: https://github.com/smartcontractkit/ccip/blob/a3f61f7458e4499c2c62eb38581c60b4942b1160/contracts/src/v0.8/ccip/offRamp/OffRamp.sol#L94
@@ -334,4 +359,32 @@ func (ci CurseInfo) NonCursedSourceChains(inputChains []ChainSelector) []ChainSe
 var GlobalCurseSubject = [16]byte{
 	0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
+}
+
+// RemoteConfig contains the configuration fetched from the RMNRemote contract.
+type RemoteConfig struct {
+	ContractAddress UnknownAddress     `json:"contractAddress"`
+	ConfigDigest    Bytes32            `json:"configDigest"`
+	Signers         []RemoteSignerInfo `json:"signers"`
+	// F defines the max number of faulty RMN nodes; F+1 signers are required to verify a report.
+	FSign            uint64  `json:"fSign"` // previously: MinSigners
+	ConfigVersion    uint32  `json:"configVersion"`
+	RmnReportVersion Bytes32 `json:"rmnReportVersion"` // e.g., keccak256("RMN_V1_6_ANY2EVM_REPORT")
+}
+
+func (r RemoteConfig) IsEmpty() bool {
+	// NOTE: contract address will always be present, since the code auto populates it
+	return r.ConfigDigest == (cciptypes.Bytes32{}) &&
+		len(r.Signers) == 0 &&
+		r.FSign == 0 &&
+		r.ConfigVersion == 0 &&
+		r.RmnReportVersion == (Bytes32{})
+}
+
+// RemoteSignerInfo contains information about a signer from the RMNRemote contract.
+type RemoteSignerInfo struct {
+	// The signer's onchain address, used to verify report signature
+	OnchainPublicKey UnknownAddress `json:"onchainPublicKey"`
+	// The index of the node in the RMN config
+	NodeIndex uint64 `json:"nodeIndex"`
 }

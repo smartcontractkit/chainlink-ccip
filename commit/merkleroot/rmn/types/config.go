@@ -30,31 +30,3 @@ type HomeNodeInfo struct {
 	OffchainPublicKey     *ed25519.PublicKey                  // The public key is used to verify observations
 	StreamNamePrefix      string                              // RageP2P stream name prefix e.g. "ccip-rmn/v1_6/"
 }
-
-// RemoteConfig contains the configuration fetched from the RMNRemote contract.
-type RemoteConfig struct {
-	ContractAddress cciptypes.UnknownAddress `json:"contractAddress"`
-	ConfigDigest    cciptypes.Bytes32        `json:"configDigest"`
-	Signers         []RemoteSignerInfo       `json:"signers"`
-	// F defines the max number of faulty RMN nodes; F+1 signers are required to verify a report.
-	FSign            uint64            `json:"fSign"` // previously: MinSigners
-	ConfigVersion    uint32            `json:"configVersion"`
-	RmnReportVersion cciptypes.Bytes32 `json:"rmnReportVersion"` // e.g., keccak256("RMN_V1_6_ANY2EVM_REPORT")
-}
-
-func (r RemoteConfig) IsEmpty() bool {
-	// NOTE: contract address will always be present, since the code auto populates it
-	return r.ConfigDigest == (cciptypes.Bytes32{}) &&
-		len(r.Signers) == 0 &&
-		r.FSign == 0 &&
-		r.ConfigVersion == 0 &&
-		r.RmnReportVersion == (cciptypes.Bytes32{})
-}
-
-// RemoteSignerInfo contains information about a signer from the RMNRemote contract.
-type RemoteSignerInfo struct {
-	// The signer's onchain address, used to verify report signature
-	OnchainPublicKey cciptypes.UnknownAddress `json:"onchainPublicKey"`
-	// The index of the node in the RMN config
-	NodeIndex uint64 `json:"nodeIndex"`
-}
