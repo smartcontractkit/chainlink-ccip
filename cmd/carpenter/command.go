@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"slices"
 	"strings"
@@ -11,15 +12,15 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/smartcontractkit/chainlink-ccip/cmd/carpenter/internal/filter"
+	"github.com/smartcontractkit/chainlink-ccip/cmd/carpenter/internal/format"
 	"github.com/smartcontractkit/chainlink-ccip/cmd/carpenter/internal/parse"
-	"github.com/smartcontractkit/chainlink-ccip/cmd/carpenter/internal/render"
 	"github.com/smartcontractkit/chainlink-ccip/cmd/carpenter/internal/stream"
 )
 
 type arguments struct {
-	files        []string
-	logType      parse.LogType
-	rendererName string
+	files         []string
+	logType       parse.LogType
+	formatterName string
 
 	filter.CompiledFilterFields
 	filterOP filter.FilterOP
@@ -37,9 +38,10 @@ func makeCommand() *cli.Command {
 				Destination: &args.files,
 			},
 			&cli.StringFlag{
-				Name:  "logType",
-				Usage: "Specify the type of log to parse, valid options: json, mixed, ci",
-				Value: "json",
+				Name:             "logType",
+				Usage:            "Specify the type of log to parse, valid options: json, mixed, ci",
+				Value:            parse.LogTypeJSON.String(),
+				ValidateDefaults: true, // to make sure default is assigned.
 				Validator: func(s string) error {
 					var err error
 					args.logType, err = parse.ParseLogType(s)
@@ -51,13 +53,15 @@ func makeCommand() *cli.Command {
 				},
 			},
 			&cli.StringFlag{
-				OnlyOnce:    true,
-				Name:        "renderer",
-				Usage:       fmt.Sprintf("Select which rendering algorithm to use: [%s]", strings.Join(render.GetRenderers(), ", ")),
+				OnlyOnce: true,
+				Name:     "format",
+				Aliases:  []string{"formatter", "renderer"},
+				Usage: fmt.Sprintf("Select which formatting algorithm to use: [%s]",
+					strings.Join(format.GetFormatters(), ", ")),
 				Value:       "basic",
-				Destination: &args.rendererName,
+				Destination: &args.formatterName,
 				Validator: func(s string) error {
-					choices := render.GetRenderers()
+					choices := format.GetFormatters()
 					if !slices.Contains(choices, s) {
 						return fmt.Errorf("expected one of [%s]",
 							s, strings.Join(choices, ", "))
@@ -66,11 +70,11 @@ func makeCommand() *cli.Command {
 				},
 			},
 			&cli.StringSliceFlag{
-				Name: "filter",
+				Name:    "filter",
+				Aliases: []string{"f"},
 				Usage: fmt.Sprintf(
-					"Line selection filters. Format as 'FieldName:Regexp', valid fields: [%s]",
+					"Line selection filters. Format as '[!]FieldName:Regexp', the optional ! prefix will omit logs that match the pattern, valid fields: [%s]",
 					strings.Join(filter.FieldNames(), ", ")),
-				//Destination: &args.FilterFields.Filters,
 				Category: "filters",
 				Validator: func(fields []string) error {
 					var err error
@@ -86,8 +90,9 @@ func makeCommand() *cli.Command {
 				Usage: fmt.Sprintf(
 					"Operation to use when combining filters. Valid options: [%s]",
 					strings.Join(filter.FilterOPNames(), ", ")),
-				Category: "filters",
-				Value:    string(filter.FilterOPAND),
+				Category:         "filters",
+				Value:            string(filter.FilterOPAND),
+				ValidateDefaults: true, // to make sure default is assigned.
 				Validator: func(s string) error {
 					var err error
 					args.filterOP, err = filter.ParseFilterOP(s)
@@ -106,19 +111,19 @@ func makeCommand() *cli.Command {
 }
 
 func run(args arguments) error {
-	var io stream.InputOptions
+	var options stream.InputOptions
 
 	// If no files are provided the stream will read from stdin.
 	if len(args.files) != 0 {
-		io.Filenames = args.files
+		options.Filenames = args.files
 	}
 
-	renderer, err := render.GetRenderer(args.rendererName, render.Options{})
+	formatter, err := format.GetFormatter(args.formatterName, format.Options{})
 	if err != nil {
-		return fmt.Errorf("failed to get renderer: %w", err)
+		return fmt.Errorf("failed to get formatter: %w", err)
 	}
 
-	inputStream, err := stream.InitializeInputStream(io)
+	inputStream, err := stream.InitializeInputStream(options)
 	if err != nil {
 		return fmt.Errorf("failed to initialize input stream: %w", err)
 	}
@@ -145,7 +150,15 @@ func run(args arguments) error {
 			continue
 		}
 
-		renderer(data)
+		formatter.Format(data)
 	}
+
+	// Check if formatter implements io.Closer and call Close if it does
+	if closer, ok := formatter.(io.Closer); ok {
+		if err := closer.Close(); err != nil {
+			return fmt.Errorf("failed to close formatter (%s): %w", args.formatterName, err)
+		}
+	}
+
 	return nil
 }
