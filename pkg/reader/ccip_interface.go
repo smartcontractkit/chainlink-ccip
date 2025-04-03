@@ -210,9 +210,8 @@ type CCIPReader interface {
 	// it must be encoding according to the source chain requirements with typeconv.AddressBytesToString.
 	Nonces(
 		ctx context.Context,
-		source cciptypes.ChainSelector,
-		addresses []string,
-	) (map[string]uint64, error)
+		addressesByChain map[cciptypes.ChainSelector][]string,
+	) (map[cciptypes.ChainSelector]map[string]uint64, error)
 
 	// GetChainsFeeComponents Returns all fee components for given chains if corresponding
 	// chain writer is available.
