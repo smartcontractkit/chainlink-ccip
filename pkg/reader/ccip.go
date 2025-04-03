@@ -730,11 +730,7 @@ func (r *ccipChainReader) Nonces(
 	// create the structure that will contain our result
 	res := make(map[cciptypes.ChainSelector]map[string]uint64)
 	var addressCount int
-	for chain, addresses := range addressesByChain {
-		if len(addresses) == 0 {
-			continue
-		}
-		res[chain] = make(map[string]uint64, len(addresses))
+	for _, addresses := range addressesByChain {
 		addressCount += len(addresses)
 	}
 
@@ -756,8 +752,13 @@ func (r *ccipChainReader) Nonces(
 		return nil, fmt.Errorf("batch get nonces failed: %w", err)
 	}
 
-	// Process results
+	// Process results, we range over batchResults, but there should only be result for nonce manager
 	for _, results := range batchResult {
+		if len(results) != len(responses) {
+			lggr.Errorw("unexpected number of nonces",
+				"expected", len(responses), "got", len(results))
+			continue
+		}
 		for i, readResult := range results {
 			key := responses[i]
 
@@ -772,7 +773,9 @@ func (r *ccipChainReader) Nonces(
 				lggr.Errorw("invalid nonce value returned", "address", key.address)
 				continue
 			}
-
+			if _, ok := res[key.chain]; !ok {
+				res[key.chain] = make(map[string]uint64)
+			}
 			res[key.chain][key.address] = *val
 		}
 	}

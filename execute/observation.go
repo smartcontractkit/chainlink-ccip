@@ -422,18 +422,16 @@ func (p *Plugin) getFilterObservation(
 		}
 	}
 
-	// Get nonces of the addresses.
+	// Get nonces of the addresses. If the call fails, we just return other observations
 	nonceObservations, err := p.ccipReader.Nonces(ctx, commitReportSenders)
 	if err != nil {
 		lggr.Errorw("unable to get nonces", "err", err)
-		return exectypes.Observation{}, fmt.Errorf("unable to get nonces: %w", err)
+	} else {
+		// Note: it is technically possible to check for curses at this point. If a curse
+		// occurred after the GetMessages observations checking now could possibly recover a report.
+		// It would only work for ordered messages.
+
+		observation.Nonces = nonceObservations
 	}
-
-	// Note: it is technically possible to check for curses at this point. If a curse
-	// occurred after the GetMessages observations checking now could possibly recover a report.
-	// It would only work for ordered messages.
-
-	observation.Nonces = nonceObservations
-
 	return observation, nil
 }
