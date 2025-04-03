@@ -191,6 +191,18 @@ pub(super) fn ocr3_transmit<R: Ocr3Report>(
         );
 
         verify_signatures(ocr3_config, report.hash(&report_context), signatures)?;
+    } else {
+        // if signature verification is disabled, ensure that the signatures are empty
+        require_eq!(
+            signatures.rs.len(),
+            0,
+            CcipOfframpError::Ocr3SignaturesProvidedWhenVerificationDisabled
+        );
+        require_eq!(
+            signatures.ss.len(),
+            0,
+            CcipOfframpError::Ocr3SignaturesProvidedWhenVerificationDisabled
+        );
     }
 
     emit!(Transmitted {
