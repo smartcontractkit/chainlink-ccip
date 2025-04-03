@@ -45,6 +45,9 @@ type ExecuteOffchainConfig struct {
 	// MaxSingleChainReports is the maximum number of single chain reports that can be included in a report.
 	// When set to 0, this setting is ignored.
 	MaxSingleChainReports uint64 `json:"maxSingleChainReports"`
+
+	// ConfigPollerSyncFreq is the frequency at which the config poller should sync.
+	ConfigPollerSyncFreq commonconfig.Duration `json:"configPollerSyncFreq"`
 }
 
 func (e *ExecuteOffchainConfig) ApplyDefaultsAndValidate() error {
@@ -55,6 +58,10 @@ func (e *ExecuteOffchainConfig) ApplyDefaultsAndValidate() error {
 func (e *ExecuteOffchainConfig) applyDefaults() {
 	if e.TransmissionDelayMultiplier == 0 {
 		e.TransmissionDelayMultiplier = defaultTransmissionDelayMultiplier
+	}
+
+	if e.ConfigPollerSyncFreq.Duration() == 0 {
+		e.ConfigPollerSyncFreq = *commonconfig.MustNewDuration(defaultConfigPollerSyncFreq)
 	}
 }
 
@@ -76,6 +83,10 @@ func (e *ExecuteOffchainConfig) Validate() error {
 
 	if e.MessageVisibilityInterval.Duration() == 0 {
 		return errors.New("MessageVisibilityInterval not set")
+	}
+
+	if e.ConfigPollerSyncFreq.Duration() == 0 {
+		return errors.New("ConfigPollerSyncFreq not set")
 	}
 
 	set := make(map[string]struct{})

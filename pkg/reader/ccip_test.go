@@ -16,6 +16,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 
+	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
+
 	"github.com/smartcontractkit/chainlink-ccip/internal"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -33,10 +35,11 @@ import (
 )
 
 var (
-	chainA = cciptypes.ChainSelector(1)
-	chainB = cciptypes.ChainSelector(2)
-	chainC = cciptypes.ChainSelector(3)
-	chainD = cciptypes.ChainSelector(4)
+	chainA                          = cciptypes.ChainSelector(1)
+	chainB                          = cciptypes.ChainSelector(2)
+	chainC                          = cciptypes.ChainSelector(3)
+	chainD                          = cciptypes.ChainSelector(4)
+	defaultConfigPollerSyncDuration = *commonconfig.MustNewDuration(30 * time.Second)
 )
 
 func TestCCIPChainReader_CreateExecutedMessagesKeyFilter(t *testing.T) {
@@ -353,7 +356,7 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 			chainA: sourceCRs[chainA],
 			chainB: sourceCRs[chainB],
 			chainC: destCR,
-		}, nil, chainC, offrampAddress, mockAddrCodec,
+		}, nil, chainC, offrampAddress, mockAddrCodec, defaultConfigPollerSyncDuration,
 	)
 
 	// Add cleanup to ensure resources are released
@@ -1085,7 +1088,7 @@ func TestCCIPChainReader_getFeeQuoterTokenPriceUSD(t *testing.T) {
 		logger.Test(t),
 		map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
 			chainC: destCR,
-		}, nil, chainC, offrampAddress, mockAddrCodec,
+		}, nil, chainC, offrampAddress, mockAddrCodec, defaultConfigPollerSyncDuration,
 	)
 
 	// Add cleanup to properly shut down the background polling
@@ -1130,6 +1133,7 @@ func TestCCIPFeeComponents_HappyPath(t *testing.T) {
 		chainC,
 		[]byte{0x3},
 		internal.NewMockAddressCodecHex(t),
+		defaultConfigPollerSyncDuration,
 	)
 
 	// Add cleanup to ensure resources are released
@@ -1167,6 +1171,7 @@ func TestCCIPFeeComponents_NotFoundErrors(t *testing.T) {
 		chainC,
 		[]byte{0x3},
 		internal.NewMockAddressCodecHex(t),
+		defaultConfigPollerSyncDuration,
 	)
 
 	// Add cleanup to ensure resources are released

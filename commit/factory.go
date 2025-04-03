@@ -185,6 +185,7 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 		p.ocrConfig.Config.ChainSelector,
 		p.ocrConfig.Config.OfframpAddress,
 		p.addrCodec,
+		offchainConfig.ConfigPollerSyncFreq,
 	)
 
 	// The node supports the chain that the token prices are on.

@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
@@ -32,7 +33,7 @@ func setupBasicCache(t *testing.T) (*configPoller, *reader_mocks.MockExtended) {
 		destChain: chainA,
 	}
 
-	cache := newConfigPoller(logger.Test(t), reader, 1*time.Second)
+	cache := newConfigPoller(logger.Test(t), reader, *commonconfig.MustNewDuration(1 * time.Second))
 	return cache, mockReader
 }
 
@@ -215,7 +216,7 @@ func TestConfigPoller_StartStop(t *testing.T) {
 	require.NoError(t, err, "Starting config poller should not error")
 
 	// Verify it's running by letting it execute at least once
-	time.Sleep(2 * cache.refreshPeriod)
+	time.Sleep(2 * cache.refreshPeriod.Duration())
 
 	// Stop the poller
 	err = cache.Close()
@@ -229,7 +230,7 @@ func TestConfigPoller_StartStop(t *testing.T) {
 		Maybe().Return(nil, nil, nil)
 
 	// Sleep for refresh period again - no calls should occur
-	time.Sleep(2 * cache.refreshPeriod)
+	time.Sleep(2 * cache.refreshPeriod.Duration())
 
 	// Verify no calls occurred after stopping
 	reader.AssertNumberOfCalls(t, "ExtendedBatchGetLatestValues", 0)
@@ -373,7 +374,7 @@ func TestConfigPoller_TrackSourceChain(t *testing.T) {
 	require.NoError(t, err)
 
 	// Let it run for a refresh cycle (increased duration)
-	time.Sleep(3 * cache.refreshPeriod)
+	time.Sleep(3 * cache.refreshPeriod.Duration())
 
 	// Stop the poller
 	err = cache.Close()
@@ -402,7 +403,7 @@ func TestConfigPoller_BackgroundErrorHandling(t *testing.T) {
 	require.NoError(t, err)
 
 	// Let it run and encounter the error
-	time.Sleep(2 * cache.refreshPeriod)
+	time.Sleep(2 * cache.refreshPeriod.Duration())
 
 	// Stop the poller
 	err = cache.Close()
@@ -746,7 +747,7 @@ func TestConfigCache_Initialization(t *testing.T) {
 	testCases := []struct {
 		name          string
 		setupReader   func() *ccipChainReader
-		refreshPeriod time.Duration
+		refreshPeriod commonconfig.Duration
 		chainToTest   cciptypes.ChainSelector
 		expectedErr   string
 	}{
@@ -759,7 +760,7 @@ func TestConfigCache_Initialization(t *testing.T) {
 					destChain:       chainA,
 				}
 			},
-			refreshPeriod: time.Second,
+			refreshPeriod: *commonconfig.MustNewDuration(1 * time.Second),
 			chainToTest:   chainA,
 			expectedErr:   "no contract reader for chain",
 		},
@@ -772,7 +773,7 @@ func TestConfigCache_Initialization(t *testing.T) {
 					destChain:       chainA,
 				}
 			},
-			refreshPeriod: time.Second,
+			refreshPeriod: *commonconfig.MustNewDuration(1 * time.Second),
 			chainToTest:   chainA,
 			expectedErr:   "no contract reader for chain",
 		},
@@ -787,7 +788,7 @@ func TestConfigCache_Initialization(t *testing.T) {
 					destChain: chainA,
 				}
 			},
-			refreshPeriod: time.Second,
+			refreshPeriod: *commonconfig.MustNewDuration(1 * time.Second),
 			chainToTest:   chainA,
 			expectedErr:   "no contract reader for chain",
 		},
@@ -958,7 +959,7 @@ func TestConfigCache_MultipleChains(t *testing.T) {
 		destChain: chainA,
 	}
 
-	cache := newConfigPoller(logger.Test(t), reader, 1*time.Second)
+	cache := newConfigPoller(logger.Test(t), reader, *commonconfig.MustNewDuration(1 * time.Second))
 	ctx := tests.Context(t)
 
 	// Setup mock response for both chains
@@ -1046,7 +1047,7 @@ func TestConfigCache_BackgroundRefreshPeriod(t *testing.T) {
 				destChain: chainA,
 			}
 
-			cache := newConfigPoller(logger.Test(t), reader, tc.refreshPeriod)
+			cache := newConfigPoller(logger.Test(t), reader, *commonconfig.MustNewDuration(tc.refreshPeriod))
 			ctx := tests.Context(t)
 
 			mockConfig := OCRConfigResponse{
