@@ -23,7 +23,7 @@ pub struct Impl;
 impl TokenAdminRegistry for Impl {
     fn ccip_admin_propose_administrator(
         &self,
-        ctx: Context<RegisterTokenAdminRegistryByCCIPAdmin>,
+        ctx: Context<RegisterTokenAdminRegizxstryByCCIPAdmin>,
         token_admin_registry_admin: Pubkey,
     ) -> Result<()> {
         let token_mint = ctx.accounts.mint.key().to_owned();
