@@ -100,7 +100,7 @@ func (p *Plugin) Outcome(
 
 	p.observer.TrackOutcome(outcome, state)
 	lggr.Infow("generated outcome",
-		"outcome", outcome.CopyNoMsgData(),
+		"outcomeWithoutMsgData", outcome.CopyNoMsgData(),
 		"numCommitReports", len(outcome.CommitReports),
 		"numChainReports", len(outcome.Report.ChainReports),
 		"numMessages", observation.Messages.Count(),
