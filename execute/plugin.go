@@ -88,6 +88,8 @@ type Plugin struct {
 	commitRootsCache cache.CommitsRootsCache
 	// inflightMessageCache prevents duplicate reports from being sent for the same message.
 	inflightMessageCache inflightMessageCache
+	// commitReportsCache caches commit reports to avoid unnecessary DB queries.
+	commitReportsCache *cache.CommitReportsCache
 }
 
 func NewPlugin(
@@ -145,6 +147,7 @@ func NewPlugin(
 			offchainCfg.RootSnoozeTime.Duration(),
 		),
 		inflightMessageCache: cache.NewInflightMessageCache(offchainCfg.InflightCacheExpiry.Duration()),
+		commitReportsCache:   cache.NewCommitReportsCache(lggr),
 		ocrTypeCodec:         ocrTypCodec,
 		addrCodec:            addrCodec,
 	}
@@ -266,6 +269,7 @@ func getPendingReportsForExecution(
 	ctx context.Context,
 	ccipReader readerpkg.CCIPReader,
 	canExecute CanExecuteHandle,
+	commitReportsCache *cache.CommitReportsCache,
 	ts time.Time,
 	cursedSourceChains map[cciptypes.ChainSelector]bool,
 	lggr logger.Logger,
@@ -275,12 +279,17 @@ func getPendingReportsForExecution(
 	fullyExecutedUnfinalized []exectypes.CommitData,
 	err error,
 ) {
-	commitReports, err := ccipReader.CommitReportsGTETimestamp(ctx, ts, 1000) // todo: configurable limit
+	// Use cache to get commit reports - this will efficiently fetch only new reports
+	// since the last query and combine them with cached reports
+	commitReports, err := commitReportsCache.GetCachedAndNewReports(ctx, ccipReader, ts, 1000) // TODO: configurable limit
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	lggr.Debugw("commit reports", "commitReports", commitReports, "count", len(commitReports))
+	lggr.Debugw("Combined commit reports from cache and new fetch",
+		"commitReports", commitReports,
+		"count", len(commitReports))
 
+	// Group reports by chain selector, filtering out cursed chains
 	groupedCommits = groupByChainSelectorWithFilter(lggr, commitReports, cursedSourceChains)
 	lggr.Debugw("grouped commits before removing fully executed reports",
 		"groupedCommits", groupedCommits, "count", len(groupedCommits))
