@@ -30,7 +30,7 @@ func TestCcipReceiver(t *testing.T) {
 	// invalid receiver here acts as a "dumb" offramp
 	test_ccip_invalid_receiver.SetProgramID(config.CcipInvalidReceiverProgram)
 	dumbOfframp := config.CcipInvalidReceiverProgram
-	dumbOfframpSignerPDA, _, _ := state.FindExternalExecutionConfigPDA(dumbOfframp)
+	dumbOfframpSignerPDA, _, _ := state.FindExternalExecutionConfigPDA(config.CcipBaseReceiver, dumbOfframp)
 
 	tokenAdmin, _, err := solana.FindProgramAddress([][]byte{[]byte("receiver_token_admin")}, config.CcipBaseReceiver)
 	require.NoError(t, err)
@@ -78,7 +78,6 @@ func TestCcipReceiver(t *testing.T) {
 				solana.SystemProgramID,
 				config.CcipRouterProgram,
 				programData.Address,
-				config.ExternalTokenPoolsSignerPDA,
 			).ValidateAndBuild()
 			require.NoError(t, err)
 			testutils.SendAndConfirm(ctx, t, solClient, []solana.Instruction{ix}, ccipAdmin, rpc.CommitmentConfirmed)

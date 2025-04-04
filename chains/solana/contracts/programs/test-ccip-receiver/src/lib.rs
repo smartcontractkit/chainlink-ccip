@@ -121,7 +121,7 @@ pub struct CcipReceive<'info> {
     // Offramp CPI signer PDA must be first
     // It is not mutable, and thus cannot be used as payer of init/realloc of other PDAs.
     #[account(
-        seeds = [EXTERNAL_EXECUTION_CONFIG_SEED],
+        seeds = [EXTERNAL_EXECUTION_CONFIG_SEED, crate::ID.as_ref()],
         bump,
         seeds::program = offramp_program.key(),
     )]

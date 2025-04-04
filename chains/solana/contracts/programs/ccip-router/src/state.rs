@@ -105,7 +105,3 @@ pub struct Nonce {
     pub version: u8,  // version to check if nonce account is already initialized
     pub counter: u64, // Counter per user and per lane to use as nonce for all the messages to be executed in order
 }
-
-#[account]
-#[derive(InitSpace)]
-pub struct ExternalExecutionConfig {}

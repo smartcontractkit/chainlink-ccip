@@ -304,7 +304,7 @@ func TestCCIPRouter(t *testing.T) {
 			).ValidateAndBuild()
 			require.NoError(t, err)
 
-			// The pools are nitially owned by the CCIP admin. For the purposes of this test, they're now transferred to the individual
+			// The pools are initially owned by the CCIP admin. For the purposes of this test, they're now transferred to the individual
 			// token admins. In practice, these token pools would've been original instantiated under separate token pool programs
 			// owned by each individual admin instead.
 			ixTransfer0, err := test_token_pool.NewTransferOwnershipInstruction(
@@ -491,7 +491,6 @@ func TestCCIPRouter(t *testing.T) {
 				link22.mint,
 				link22.userATA,
 				link22.billingATA,
-				config.ExternalTokenPoolsSignerPDA,
 			}
 			lookupTableAddr, err := common.SetupLookupTable(ctx, solanaGoClient, legacyAdmin, lookupEntries)
 			require.NoError(t, err)
@@ -601,7 +600,6 @@ func TestCCIPRouter(t *testing.T) {
 				solana.SystemProgramID,
 				config.CcipRouterProgram,
 				programData.Address,
-				config.ExternalTokenPoolsSignerPDA,
 			).ValidateAndBuild()
 			require.NoError(t, err)
 
@@ -716,8 +714,6 @@ func TestCCIPRouter(t *testing.T) {
 				config.RMNRemoteProgram,
 				lookupTableAddr,
 				config.OfframpStatePDA,
-				config.OfframpExternalExecutionConfigPDA,
-				config.OfframpTokenPoolsSignerPDA,
 				user.PublicKey(), // not the upgrade authority
 				solana.SystemProgramID,
 				config.CcipOfframpProgram,
@@ -755,8 +751,6 @@ func TestCCIPRouter(t *testing.T) {
 				testReferenceAddresses.RmnRemote,          // will be updated in later test
 				testReferenceAddresses.OfframpLookupTable, // will be updated in later test
 				config.OfframpStatePDA,
-				config.OfframpExternalExecutionConfigPDA,
-				config.OfframpTokenPoolsSignerPDA,
 				legacyAdmin.PublicKey(),
 				solana.SystemProgramID,
 				config.CcipOfframpProgram,
@@ -3143,7 +3137,6 @@ func TestCCIPRouter(t *testing.T) {
 				config.RMNRemoteProgram,
 				config.RMNRemoteCursesPDA,
 				config.RMNRemoteConfigPDA,
-				config.ExternalTokenPoolsSignerPDA,
 			)
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
 			instruction, err := raw.ValidateAndBuild()
@@ -3334,7 +3327,6 @@ func TestCCIPRouter(t *testing.T) {
 				config.RMNRemoteProgram,
 				config.RMNRemoteCursesPDA,
 				config.RMNRemoteConfigPDA,
-				config.ExternalTokenPoolsSignerPDA,
 			)
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
 			instruction, err := raw.ValidateAndBuild()
@@ -3555,7 +3547,6 @@ func TestCCIPRouter(t *testing.T) {
 				config.RMNRemoteProgram,
 				config.RMNRemoteCursesPDA,
 				config.RMNRemoteConfigPDA,
-				config.ExternalTokenPoolsSignerPDA,
 			)
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
 			instruction, err := raw.ValidateAndBuild()
@@ -3615,7 +3606,6 @@ func TestCCIPRouter(t *testing.T) {
 				config.RMNRemoteProgram,
 				config.RMNRemoteCursesPDA,
 				config.RMNRemoteConfigPDA,
-				config.ExternalTokenPoolsSignerPDA,
 			)
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
 			instruction, err := raw.ValidateAndBuild()
@@ -3669,7 +3659,6 @@ func TestCCIPRouter(t *testing.T) {
 				config.RMNRemoteProgram,
 				config.RMNRemoteCursesPDA,
 				config.RMNRemoteConfigPDA,
-				config.ExternalTokenPoolsSignerPDA,
 			)
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
 			instruction, err := raw.ValidateAndBuild()
@@ -3743,7 +3732,6 @@ func TestCCIPRouter(t *testing.T) {
 				config.RMNRemoteProgram,
 				config.RMNRemoteCursesPDA,
 				config.RMNRemoteConfigPDA,
-				config.ExternalTokenPoolsSignerPDA,
 			)
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
 			instruction, err := raw.ValidateAndBuild()
@@ -3812,7 +3800,6 @@ func TestCCIPRouter(t *testing.T) {
 				config.RMNRemoteProgram,
 				config.RMNRemoteCursesPDA,
 				config.RMNRemoteConfigPDA,
-				config.ExternalTokenPoolsSignerPDA,
 			)
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
 			instruction, err := raw.ValidateAndBuild()
@@ -3882,7 +3869,6 @@ func TestCCIPRouter(t *testing.T) {
 				config.RMNRemoteProgram,
 				config.RMNRemoteCursesPDA,
 				config.RMNRemoteConfigPDA,
-				config.ExternalTokenPoolsSignerPDA,
 			)
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
 			instruction, err := raw.ValidateAndBuild()
@@ -3951,7 +3937,6 @@ func TestCCIPRouter(t *testing.T) {
 				config.RMNRemoteProgram,
 				config.RMNRemoteCursesPDA,
 				config.RMNRemoteConfigPDA,
-				config.ExternalTokenPoolsSignerPDA,
 			)
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
 			instruction, err := raw.ValidateAndBuild()
@@ -4018,7 +4003,6 @@ func TestCCIPRouter(t *testing.T) {
 				config.RMNRemoteProgram,
 				config.RMNRemoteCursesPDA,
 				config.RMNRemoteConfigPDA,
-				config.ExternalTokenPoolsSignerPDA,
 			)
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
 			instruction, err := raw.ValidateAndBuild()
@@ -4060,7 +4044,6 @@ func TestCCIPRouter(t *testing.T) {
 				config.RMNRemoteProgram,
 				config.RMNRemoteCursesPDA,
 				config.RMNRemoteConfigPDA,
-				config.ExternalTokenPoolsSignerPDA,
 			)
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
 			instruction, err := raw.ValidateAndBuild()
@@ -4101,7 +4084,6 @@ func TestCCIPRouter(t *testing.T) {
 				config.RMNRemoteProgram,
 				config.RMNRemoteCursesPDA,
 				config.RMNRemoteConfigPDA,
-				config.ExternalTokenPoolsSignerPDA,
 			)
 
 			// do NOT mark the user ATA as writable
@@ -4158,7 +4140,6 @@ func TestCCIPRouter(t *testing.T) {
 											config.RMNRemoteProgram,
 											config.RMNRemoteCursesPDA,
 											config.RMNRemoteConfigPDA,
-											config.ExternalTokenPoolsSignerPDA,
 										)
 										raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
 										instruction, err := raw.ValidateAndBuild()
@@ -4209,7 +4190,6 @@ func TestCCIPRouter(t *testing.T) {
 				config.RMNRemoteProgram,
 				config.RMNRemoteCursesPDA,
 				config.RMNRemoteConfigPDA,
-				config.ExternalTokenPoolsSignerPDA,
 			)
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
 			instruction, err := raw.ValidateAndBuild()
@@ -4251,7 +4231,6 @@ func TestCCIPRouter(t *testing.T) {
 				config.RMNRemoteProgram,
 				config.RMNRemoteCursesPDA,
 				config.RMNRemoteConfigPDA,
-				config.ExternalTokenPoolsSignerPDA,
 			)
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
 			instruction, err := raw.ValidateAndBuild()
@@ -4333,7 +4312,6 @@ func TestCCIPRouter(t *testing.T) {
 					config.RMNRemoteProgram,
 					config.RMNRemoteCursesPDA,
 					config.RMNRemoteConfigPDA,
-					config.ExternalTokenPoolsSignerPDA,
 				)
 				base.GetFeeTokenUserAssociatedAccountAccount().WRITE()
 
@@ -4344,7 +4322,7 @@ func TestCCIPRouter(t *testing.T) {
 				ix, err := base.ValidateAndBuild()
 				require.NoError(t, err)
 
-				ixApprove, err := tokens.TokenApproveChecked(1, token0Decimals, token0.Program, userTokenAccount, token0.Mint, config.ExternalTokenPoolsSignerPDA, user.PublicKey(), nil)
+				ixApprove, err := tokens.TokenApproveChecked(1, token0Decimals, token0.Program, userTokenAccount, token0.Mint, token0.RouterSigner, user.PublicKey(), nil)
 				require.NoError(t, err)
 
 				result := testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{ixApprove, ix}, user, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(300_000))
@@ -4382,7 +4360,7 @@ func TestCCIPRouter(t *testing.T) {
 				// check pool event
 				poolEvent := tokens.EventBurnLock{}
 				require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "Burned", &poolEvent, config.PrintEvents))
-				require.Equal(t, config.ExternalTokenPoolsSignerPDA, poolEvent.Sender)
+				require.Equal(t, token0.RouterSigner, poolEvent.Sender)
 				require.Equal(t, uint64(1), poolEvent.Amount)
 
 				// check balances
@@ -4430,7 +4408,7 @@ func TestCCIPRouter(t *testing.T) {
 				base := ccip_router.NewCcipSendInstruction(
 					destinationChainSelector,
 					message,
-					[]byte{0, 13}, // starting indices for accounts
+					[]byte{0, 14}, // starting indices for accounts
 					config.RouterConfigPDA,
 					destinationChainStatePDA,
 					nonceEvmPDA,
@@ -4449,7 +4427,6 @@ func TestCCIPRouter(t *testing.T) {
 					config.RMNRemoteProgram,
 					config.RMNRemoteCursesPDA,
 					config.RMNRemoteConfigPDA,
-					config.ExternalTokenPoolsSignerPDA,
 				)
 				base.GetFeeTokenUserAssociatedAccountAccount().WRITE()
 
@@ -4467,9 +4444,9 @@ func TestCCIPRouter(t *testing.T) {
 				ix, err := base.ValidateAndBuild()
 				require.NoError(t, err)
 
-				ixApprove0, err := tokens.TokenApproveChecked(1, token0Decimals, token0.Program, userTokenAccount0, token0.Mint, config.ExternalTokenPoolsSignerPDA, user.PublicKey(), nil)
+				ixApprove0, err := tokens.TokenApproveChecked(1, token0Decimals, token0.Program, userTokenAccount0, token0.Mint, token0.RouterSigner, user.PublicKey(), nil)
 				require.NoError(t, err)
-				ixApprove1, err := tokens.TokenApproveChecked(2, token1Decimals, token1.Program, userTokenAccount1, token1.Mint, config.ExternalTokenPoolsSignerPDA, user.PublicKey(), nil)
+				ixApprove1, err := tokens.TokenApproveChecked(2, token1Decimals, token1.Program, userTokenAccount1, token1.Mint, token1.RouterSigner, user.PublicKey(), nil)
 				require.NoError(t, err)
 
 				result := testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{ixApprove0, ixApprove1, ix}, user, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(800_000))
@@ -4546,7 +4523,6 @@ func TestCCIPRouter(t *testing.T) {
 				config.RMNRemoteProgram,
 				config.RMNRemoteCursesPDA,
 				config.RMNRemoteConfigPDA,
-				config.ExternalTokenPoolsSignerPDA,
 			)
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
 			instruction, err := raw.ValidateAndBuild()
@@ -4666,9 +4642,10 @@ func TestCCIPRouter(t *testing.T) {
 				},
 				{
 					name:     "remaining accounts mismatch",
-					index:    12, // only works with token0
+					index:    13, // only works with token0
 					errorStr: ccip.InvalidInputsLookupTableAccounts_CcipRouterError.String(),
 				},
+				// TODO add more tests here
 			}
 
 			for _, in := range inputs {
@@ -4696,7 +4673,6 @@ func TestCCIPRouter(t *testing.T) {
 						config.RMNRemoteProgram,
 						config.RMNRemoteCursesPDA,
 						config.RMNRemoteConfigPDA,
-						config.ExternalTokenPoolsSignerPDA,
 					)
 					tx.GetFeeTokenUserAssociatedAccountAccount().WRITE()
 
@@ -4787,7 +4763,6 @@ func TestCCIPRouter(t *testing.T) {
 						config.RMNRemoteProgram,
 						config.RMNRemoteCursesPDA,
 						config.RMNRemoteConfigPDA,
-						config.ExternalTokenPoolsSignerPDA,
 					)
 					raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
 					instruction, err := raw.ValidateAndBuild()
@@ -4837,7 +4812,6 @@ func TestCCIPRouter(t *testing.T) {
 				config.RMNRemoteProgram,
 				config.RMNRemoteCursesPDA,
 				config.RMNRemoteConfigPDA,
-				config.ExternalTokenPoolsSignerPDA,
 			)
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
 			instruction, err := raw.ValidateAndBuild()
@@ -4899,7 +4873,6 @@ func TestCCIPRouter(t *testing.T) {
 				config.RMNRemoteProgram,
 				config.RMNRemoteCursesPDA,
 				config.RMNRemoteConfigPDA,
-				config.ExternalTokenPoolsSignerPDA,
 			)
 
 			instruction, err := raw.ValidateAndBuild()
@@ -5047,7 +5020,6 @@ func TestCCIPRouter(t *testing.T) {
 							config.RMNRemoteProgram,
 							config.RMNRemoteCursesPDA,
 							config.RMNRemoteConfigPDA,
-							config.ExternalTokenPoolsSignerPDA,
 						).ValidateAndBuild()
 						require.NoError(t, err)
 						result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
@@ -5083,7 +5055,7 @@ func TestCCIPRouter(t *testing.T) {
 							},
 							[]byte{1, 2, 3}, // message data
 							fc.feeToken,     // empty fee token to indicate native SOL
-							[]uint8{2, 15},
+							[]uint8{2, 16},
 							senderState,
 							cc.senderChainConfig,
 							senderPDA,
@@ -5107,7 +5079,6 @@ func TestCCIPRouter(t *testing.T) {
 							config.RMNRemoteProgram,
 							config.RMNRemoteCursesPDA,
 							config.RMNRemoteConfigPDA,
-							config.ExternalTokenPoolsSignerPDA,
 						)
 						// pass user token accounts
 						base.AccountMetaSlice = append(
@@ -6786,11 +6757,9 @@ func TestCCIPRouter(t *testing.T) {
 					rootPDA,
 					config.CcipOfframpProgram,
 					config.AllowedOfframpEvmPDA,
-					config.OfframpExternalExecutionConfigPDA,
 					transmitter.PublicKey(),
 					solana.SystemProgramID,
 					solana.SysVarInstructionsPubkey,
-					config.OfframpTokenPoolsSignerPDA,
 					config.RMNRemoteProgram,
 					config.RMNRemoteCursesPDA,
 					config.RMNRemoteConfigPDA,
@@ -6799,6 +6768,7 @@ func TestCCIPRouter(t *testing.T) {
 				raw.AccountMetaSlice = append(
 					raw.AccountMetaSlice,
 					solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
+					solana.NewAccountMeta(config.OfframpReceiverExternalExecPDA, true, false),
 					solana.NewAccountMeta(config.ReceiverExternalExecutionConfigPDA, true, false),
 					solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
 					solana.NewAccountMeta(solana.SystemProgramID, false, false),
@@ -6910,11 +6880,9 @@ func TestCCIPRouter(t *testing.T) {
 					rootPDA,
 					config.CcipOfframpProgram,
 					config.AllowedOfframpEvmPDA,
-					config.OfframpExternalExecutionConfigPDA,
 					transmitter.PublicKey(),
 					solana.SystemProgramID,
 					solana.SysVarInstructionsPubkey,
-					config.OfframpTokenPoolsSignerPDA,
 					config.RMNRemoteProgram,
 					config.RMNRemoteCursesPDA,
 					config.RMNRemoteConfigPDA,
@@ -6923,6 +6891,7 @@ func TestCCIPRouter(t *testing.T) {
 				raw.AccountMetaSlice = append(
 					raw.AccountMetaSlice,
 					solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
+					solana.NewAccountMeta(config.OfframpReceiverExternalExecPDA, true, false),
 					solana.NewAccountMeta(config.ReceiverExternalExecutionConfigPDA, true, false),
 					solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
 					solana.NewAccountMeta(solana.SystemProgramID, false, false),
@@ -7043,11 +7012,9 @@ func TestCCIPRouter(t *testing.T) {
 					rootPDA,
 					config.CcipOfframpProgram,
 					config.AllowedOfframpEvmPDA,
-					config.OfframpExternalExecutionConfigPDA,
 					transmitter.PublicKey(),
 					solana.SystemProgramID,
 					solana.SysVarInstructionsPubkey,
-					config.OfframpTokenPoolsSignerPDA,
 					config.RMNRemoteProgram,
 					config.RMNRemoteCursesPDA,
 					config.RMNRemoteConfigPDA,
@@ -7055,6 +7022,7 @@ func TestCCIPRouter(t *testing.T) {
 				raw.AccountMetaSlice = append(
 					raw.AccountMetaSlice,
 					solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
+					solana.NewAccountMeta(config.OfframpReceiverExternalExecPDA, true, false),
 					solana.NewAccountMeta(config.ReceiverExternalExecutionConfigPDA, true, false),
 					solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
 					solana.NewAccountMeta(solana.SystemProgramID, false, false),
@@ -7143,11 +7111,9 @@ func TestCCIPRouter(t *testing.T) {
 					rootPDA,
 					config.CcipOfframpProgram,
 					config.AllowedOfframpEvmPDA,
-					config.OfframpExternalExecutionConfigPDA,
 					transmitter.PublicKey(),
 					solana.SystemProgramID,
 					solana.SysVarInstructionsPubkey,
-					config.OfframpTokenPoolsSignerPDA,
 					config.RMNRemoteProgram,
 					config.RMNRemoteCursesPDA,
 					config.RMNRemoteConfigPDA,
@@ -7156,6 +7122,7 @@ func TestCCIPRouter(t *testing.T) {
 				raw.AccountMetaSlice = append(
 					raw.AccountMetaSlice,
 					solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
+					solana.NewAccountMeta(config.OfframpReceiverExternalExecPDA, true, false),
 					solana.NewAccountMeta(config.ReceiverExternalExecutionConfigPDA, true, false),
 					solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
 					solana.NewAccountMeta(solana.SystemProgramID, false, false),
@@ -7176,11 +7143,9 @@ func TestCCIPRouter(t *testing.T) {
 					rootPDA,
 					config.CcipOfframpProgram,
 					config.AllowedOfframpEvmPDA,
-					config.OfframpExternalExecutionConfigPDA,
 					user.PublicKey(),
 					solana.SystemProgramID,
 					solana.SysVarInstructionsPubkey,
-					config.OfframpTokenPoolsSignerPDA,
 					config.RMNRemoteProgram,
 					config.RMNRemoteCursesPDA,
 					config.RMNRemoteConfigPDA,
@@ -7188,6 +7153,7 @@ func TestCCIPRouter(t *testing.T) {
 				manual.AccountMetaSlice = append(
 					raw.AccountMetaSlice,
 					solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
+					solana.NewAccountMeta(config.OfframpReceiverExternalExecPDA, true, false),
 					solana.NewAccountMeta(config.ReceiverExternalExecutionConfigPDA, true, false),
 					solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
 					solana.NewAccountMeta(solana.SystemProgramID, false, false),
@@ -7291,11 +7257,9 @@ func TestCCIPRouter(t *testing.T) {
 					rootPDA,
 					config.CcipOfframpProgram,
 					config.AllowedOfframpEvmPDA,
-					config.OfframpExternalExecutionConfigPDA,
 					transmitter.PublicKey(),
 					solana.SystemProgramID,
 					solana.SysVarInstructionsPubkey,
-					config.OfframpTokenPoolsSignerPDA,
 					config.RMNRemoteProgram,
 					config.RMNRemoteCursesPDA,
 					config.RMNRemoteConfigPDA,
@@ -7303,6 +7267,7 @@ func TestCCIPRouter(t *testing.T) {
 				raw.AccountMetaSlice = append(
 					raw.AccountMetaSlice,
 					solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
+					solana.NewAccountMeta(config.OfframpReceiverExternalExecPDA, true, false),
 					solana.NewAccountMeta(config.ReceiverExternalExecutionConfigPDA, true, false),
 					solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
 					solana.NewAccountMeta(solana.SystemProgramID, false, false),
@@ -7381,11 +7346,9 @@ func TestCCIPRouter(t *testing.T) {
 					rootPDA,
 					config.CcipOfframpProgram,
 					config.AllowedOfframpEvmPDA,
-					config.OfframpExternalExecutionConfigPDA,
 					transmitter.PublicKey(),
 					solana.SystemProgramID,
 					solana.SysVarInstructionsPubkey,
-					config.OfframpTokenPoolsSignerPDA,
 					config.RMNRemoteProgram,
 					config.RMNRemoteCursesPDA,
 					config.RMNRemoteConfigPDA,
@@ -7393,6 +7356,7 @@ func TestCCIPRouter(t *testing.T) {
 				raw.AccountMetaSlice = append(
 					raw.AccountMetaSlice,
 					solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
+					solana.NewAccountMeta(config.OfframpReceiverExternalExecPDA, true, false),
 					solana.NewAccountMeta(config.ReceiverExternalExecutionConfigPDA, true, false),
 					solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
 					solana.NewAccountMeta(solana.SystemProgramID, false, false),
@@ -7425,11 +7389,9 @@ func TestCCIPRouter(t *testing.T) {
 					rootPDA,
 					config.CcipOfframpProgram,
 					config.AllowedOfframpEvmPDA,
-					config.OfframpExternalExecutionConfigPDA,
 					transmitter.PublicKey(),
 					solana.SystemProgramID,
 					solana.SysVarInstructionsPubkey,
-					config.OfframpTokenPoolsSignerPDA,
 					config.RMNRemoteProgram,
 					config.RMNRemoteCursesPDA,
 					config.RMNRemoteConfigPDA,
@@ -7437,6 +7399,7 @@ func TestCCIPRouter(t *testing.T) {
 				raw.AccountMetaSlice = append(
 					raw.AccountMetaSlice,
 					solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
+					solana.NewAccountMeta(config.OfframpReceiverExternalExecPDA, true, false),
 					solana.NewAccountMeta(config.ReceiverExternalExecutionConfigPDA, true, false),
 					solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
 					solana.NewAccountMeta(solana.SystemProgramID, false, false),
@@ -7476,11 +7439,9 @@ func TestCCIPRouter(t *testing.T) {
 					rootPDA,
 					config.CcipOfframpProgram,
 					config.AllowedOfframpEvmPDA,
-					config.OfframpExternalExecutionConfigPDA,
 					transmitter.PublicKey(),
 					solana.SystemProgramID,
 					solana.SysVarInstructionsPubkey,
-					config.OfframpTokenPoolsSignerPDA,
 					config.RMNRemoteProgram,
 					config.RMNRemoteCursesPDA,
 					config.RMNRemoteConfigPDA,
@@ -7488,6 +7449,7 @@ func TestCCIPRouter(t *testing.T) {
 				raw.AccountMetaSlice = append(
 					raw.AccountMetaSlice,
 					solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
+					solana.NewAccountMeta(config.OfframpReceiverExternalExecPDA, true, false),
 					solana.NewAccountMeta(config.ReceiverExternalExecutionConfigPDA, true, false),
 					solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
 					solana.NewAccountMeta(solana.SystemProgramID, false, false),
@@ -7571,11 +7533,9 @@ func TestCCIPRouter(t *testing.T) {
 					rootPDA,
 					config.CcipOfframpProgram,
 					config.AllowedOfframpEvmPDA,
-					config.OfframpExternalExecutionConfigPDA,
 					transmitter.PublicKey(),
 					solana.SystemProgramID,
 					solana.SysVarInstructionsPubkey,
-					config.OfframpTokenPoolsSignerPDA,
 					config.RMNRemoteProgram,
 					config.RMNRemoteCursesPDA,
 					config.RMNRemoteConfigPDA,
@@ -7583,6 +7543,7 @@ func TestCCIPRouter(t *testing.T) {
 				raw.AccountMetaSlice = append(
 					raw.AccountMetaSlice,
 					solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
+					solana.NewAccountMeta(config.OfframpReceiverExternalExecPDA, true, false),
 					solana.NewAccountMeta(config.ReceiverExternalExecutionConfigPDA, true, false),
 					solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
 					solana.NewAccountMeta(solana.SystemProgramID, false, false),
@@ -7609,11 +7570,9 @@ func TestCCIPRouter(t *testing.T) {
 					rootPDA,
 					config.CcipOfframpProgram,
 					config.AllowedOfframpEvmPDA,
-					config.OfframpExternalExecutionConfigPDA,
 					transmitter.PublicKey(),
 					solana.SystemProgramID,
 					solana.SysVarInstructionsPubkey,
-					config.OfframpTokenPoolsSignerPDA,
 					config.RMNRemoteProgram,
 					config.RMNRemoteCursesPDA,
 					config.RMNRemoteConfigPDA,
@@ -7621,6 +7580,7 @@ func TestCCIPRouter(t *testing.T) {
 				raw.AccountMetaSlice = append(
 					raw.AccountMetaSlice,
 					solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
+					solana.NewAccountMeta(config.OfframpReceiverExternalExecPDA, true, false),
 					solana.NewAccountMeta(config.ReceiverExternalExecutionConfigPDA, true, false),
 					solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
 					solana.NewAccountMeta(solana.SystemProgramID, false, false),
@@ -7722,18 +7682,20 @@ func TestCCIPRouter(t *testing.T) {
 					rootPDA,
 					config.CcipOfframpProgram,
 					config.AllowedOfframpEvmPDA,
-					config.OfframpExternalExecutionConfigPDA,
 					transmitter.PublicKey(),
 					solana.SystemProgramID,
 					solana.SysVarInstructionsPubkey,
-					config.OfframpTokenPoolsSignerPDA,
 					config.RMNRemoteProgram,
 					config.RMNRemoteCursesPDA,
 					config.RMNRemoteConfigPDA,
 				)
+
+				offrampExecSignerPDA, _, _ := state.FindExternalExecutionConfigPDA(config.CcipInvalidReceiverProgram, config.CcipOfframpProgram)
+
 				raw.AccountMetaSlice = append(
 					raw.AccountMetaSlice,
 					solana.NewAccountMeta(config.CcipInvalidReceiverProgram, false, false),
+					solana.NewAccountMeta(offrampExecSignerPDA, true, false),
 					solana.NewAccountMeta(stubAccountPDA, false, false),
 					solana.NewAccountMeta(solana.SystemProgramID, false, false),
 				)
@@ -7815,11 +7777,9 @@ func TestCCIPRouter(t *testing.T) {
 					rootPDA,
 					config.CcipOfframpProgram,
 					config.AllowedOfframpEvmPDA,
-					config.OfframpExternalExecutionConfigPDA,
 					transmitter.PublicKey(),
 					solana.SystemProgramID,
 					solana.SysVarInstructionsPubkey,
-					config.OfframpTokenPoolsSignerPDA,
 					config.RMNRemoteProgram,
 					config.RMNRemoteCursesPDA,
 					config.RMNRemoteConfigPDA,
@@ -7828,6 +7788,7 @@ func TestCCIPRouter(t *testing.T) {
 				raw.AccountMetaSlice = append(
 					raw.AccountMetaSlice,
 					solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
+					solana.NewAccountMeta(config.OfframpReceiverExternalExecPDA, true, false),
 					solana.NewAccountMeta(config.ReceiverExternalExecutionConfigPDA, true, false),
 					solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
 					solana.NewAccountMeta(solana.SystemProgramID, false, false),
@@ -7913,18 +7874,16 @@ func TestCCIPRouter(t *testing.T) {
 					raw := ccip_offramp.NewExecuteInstruction(
 						testutils.MustMarshalBorsh(t, executionReport),
 						reportContext,
-						[]byte{4},
+						[]byte{5},
 						config.OfframpConfigPDA,
 						config.OfframpReferenceAddressesPDA,
 						config.OfframpEvmSourceChainPDA,
 						rootPDA,
 						config.CcipOfframpProgram,
 						config.AllowedOfframpEvmPDA,
-						config.OfframpExternalExecutionConfigPDA,
 						transmitter.PublicKey(),
 						solana.SystemProgramID,
 						solana.SysVarInstructionsPubkey,
-						config.OfframpTokenPoolsSignerPDA,
 						config.RMNRemoteProgram,
 						config.RMNRemoteCursesPDA,
 						config.RMNRemoteConfigPDA,
@@ -7932,6 +7891,7 @@ func TestCCIPRouter(t *testing.T) {
 					raw.AccountMetaSlice = append(
 						raw.AccountMetaSlice,
 						solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
+						solana.NewAccountMeta(config.OfframpReceiverExternalExecPDA, true, false),
 						solana.NewAccountMeta(config.ReceiverExternalExecutionConfigPDA, true, false),
 						solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
 						solana.NewAccountMeta(solana.SystemProgramID, false, false),
@@ -7939,11 +7899,13 @@ func TestCCIPRouter(t *testing.T) {
 
 					tokenMetas, addressTables, err := tokens.ParseTokenLookupTable(ctx, solanaGoClient, token0, token0.User[config.ReceiverExternalExecutionConfigPDA])
 					require.NoError(t, err)
+					raw.AccountMetaSlice = append(raw.AccountMetaSlice, solana.Meta(token0.OfframpSigner).WRITE())
 					raw.AccountMetaSlice = append(raw.AccountMetaSlice, tokenMetas...)
+
 					instruction, err = raw.ValidateAndBuild()
 					require.NoError(t, err)
 
-					tx = testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(300_000))
+					tx = testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(400_000))
 
 					executionEvents, err := common.ParseMultipleEvents[ccip.EventExecutionStateChanged](tx.Meta.LogMessages, "ExecutionStateChanged", config.PrintEvents)
 					require.NoError(t, err)
@@ -8046,18 +8008,16 @@ func TestCCIPRouter(t *testing.T) {
 					raw := ccip_offramp.NewExecuteInstruction(
 						testutils.MustMarshalBorsh(t, executionReport),
 						reportContext,
-						[]byte{0, 13},
+						[]byte{0, 15},
 						config.OfframpConfigPDA,
 						config.OfframpReferenceAddressesPDA,
 						config.OfframpEvmSourceChainPDA,
 						rootPDA,
 						config.CcipOfframpProgram,
 						config.AllowedOfframpEvmPDA,
-						config.OfframpExternalExecutionConfigPDA,
 						transmitter.PublicKey(),
 						solana.SystemProgramID,
 						solana.SysVarInstructionsPubkey,
-						config.OfframpTokenPoolsSignerPDA,
 						config.RMNRemoteProgram,
 						config.RMNRemoteCursesPDA,
 						config.RMNRemoteConfigPDA,
@@ -8065,10 +8025,14 @@ func TestCCIPRouter(t *testing.T) {
 
 					tokenMetas0, addressTables, err := tokens.ParseTokenLookupTable(ctx, solanaGoClient, token0, token0.User[config.ReceiverExternalExecutionConfigPDA])
 					require.NoError(t, err)
+					raw.AccountMetaSlice = append(raw.AccountMetaSlice, solana.Meta(token0.OfframpSigner).WRITE())
 					raw.AccountMetaSlice = append(raw.AccountMetaSlice, tokenMetas0...)
+
 					tokenMetas1, addressTables1, err := tokens.ParseTokenLookupTable(ctx, solanaGoClient, token1, token1.User[config.ReceiverExternalExecutionConfigPDA])
 					require.NoError(t, err)
+					raw.AccountMetaSlice = append(raw.AccountMetaSlice, solana.Meta(token1.OfframpSigner).WRITE())
 					raw.AccountMetaSlice = append(raw.AccountMetaSlice, tokenMetas1...)
+
 					maps.Copy(addressTables, addressTables1)
 					maps.Copy(addressTables, offrampLookupTable) // commonly used ccip addresses - required otherwise tx is too large
 
@@ -8155,11 +8119,9 @@ func TestCCIPRouter(t *testing.T) {
 						rootPDA,
 						config.CcipOfframpProgram,
 						config.AllowedOfframpEvmPDA,
-						config.OfframpExternalExecutionConfigPDA,
 						transmitter.PublicKey(),
 						solana.SystemProgramID,
 						solana.SysVarInstructionsPubkey,
-						config.OfframpTokenPoolsSignerPDA,
 						config.RMNRemoteProgram,
 						config.RMNRemoteCursesPDA,
 						config.RMNRemoteConfigPDA,
@@ -8167,6 +8129,7 @@ func TestCCIPRouter(t *testing.T) {
 					raw.AccountMetaSlice = append(
 						raw.AccountMetaSlice,
 						solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
+						solana.NewAccountMeta(config.OfframpReceiverExternalExecPDA, true, false),
 						solana.NewAccountMeta(config.ReceiverExternalExecutionConfigPDA, true, false),
 						solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
 						solana.NewAccountMeta(solana.SystemProgramID, false, false),
@@ -8178,7 +8141,7 @@ func TestCCIPRouter(t *testing.T) {
 					cu := testutils.GetRequiredCU(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment)
 
 					// This validation is like a snapshot for gas consumption
-					require.LessOrEqual(t, cu, uint32(100_000))
+					require.LessOrEqual(t, cu, uint32(110_000))
 
 					tx = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(cu))
 
@@ -8264,11 +8227,9 @@ func TestCCIPRouter(t *testing.T) {
 						rootPDA,
 						config.CcipOfframpProgram,
 						config.AllowedOfframpEvmPDA,
-						config.OfframpExternalExecutionConfigPDA,
 						transmitter.PublicKey(),
 						solana.SystemProgramID,
 						solana.SysVarInstructionsPubkey,
-						config.OfframpTokenPoolsSignerPDA,
 						config.RMNRemoteProgram,
 						config.RMNRemoteCursesPDA,
 						config.RMNRemoteConfigPDA,
@@ -8276,7 +8237,9 @@ func TestCCIPRouter(t *testing.T) {
 
 					tokenMetas, addressTables, err := tokens.ParseTokenLookupTable(ctx, solanaGoClient, token0, token0.User[config.ReceiverExternalExecutionConfigPDA])
 					require.NoError(t, err)
+					raw.AccountMetaSlice = append(raw.AccountMetaSlice, solana.Meta(token0.OfframpSigner).WRITE())
 					raw.AccountMetaSlice = append(raw.AccountMetaSlice, tokenMetas...)
+
 					maps.Copy(addressTables, offrampLookupTable) // commonly used ccip addresses - required otherwise tx is too large
 
 					instruction, err = raw.ValidateAndBuild()
@@ -8367,18 +8330,16 @@ func TestCCIPRouter(t *testing.T) {
 					raw := ccip_offramp.NewExecuteInstruction(
 						testutils.MustMarshalBorsh(t, executionReport),
 						reportContext,
-						[]byte{4},
+						[]byte{5},
 						config.OfframpConfigPDA,
 						config.OfframpReferenceAddressesPDA,
 						config.OfframpEvmSourceChainPDA,
 						rootPDA,
 						config.CcipOfframpProgram,
 						config.AllowedOfframpEvmPDA,
-						config.OfframpExternalExecutionConfigPDA,
 						transmitter.PublicKey(),
 						solana.SystemProgramID,
 						solana.SysVarInstructionsPubkey,
-						config.OfframpTokenPoolsSignerPDA,
 						config.RMNRemoteProgram,
 						config.RMNRemoteCursesPDA,
 						config.RMNRemoteConfigPDA,
@@ -8386,6 +8347,7 @@ func TestCCIPRouter(t *testing.T) {
 					raw.AccountMetaSlice = append(
 						raw.AccountMetaSlice,
 						solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
+						solana.NewAccountMeta(config.OfframpReceiverExternalExecPDA, true, false),
 						solana.NewAccountMeta(config.ReceiverExternalExecutionConfigPDA, true, false),
 						solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
 						solana.NewAccountMeta(solana.SystemProgramID, false, false),
@@ -8393,7 +8355,9 @@ func TestCCIPRouter(t *testing.T) {
 
 					tokenMetas, addressTables, err := tokens.ParseTokenLookupTable(ctx, solanaGoClient, token0, token0.User[config.ReceiverExternalExecutionConfigPDA])
 					require.NoError(t, err)
+					raw.AccountMetaSlice = append(raw.AccountMetaSlice, solana.Meta(token0.OfframpSigner).WRITE())
 					raw.AccountMetaSlice = append(raw.AccountMetaSlice, tokenMetas...)
+
 					maps.Copy(addressTables, offrampLookupTable) // commonly used ccip addresses - required otherwise tx is too large
 
 					instruction, err = raw.ValidateAndBuild()
@@ -8403,7 +8367,7 @@ func TestCCIPRouter(t *testing.T) {
 
 					// This validation is like a snapshot for gas consumption
 					// Execute: 1 Token Transfer + Message Execution
-					require.LessOrEqual(t, cu, uint32(230_000))
+					require.LessOrEqual(t, cu, uint32(250_000))
 
 					tx = testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(cu))
 
@@ -8538,18 +8502,16 @@ func TestCCIPRouter(t *testing.T) {
 					raw := ccip_offramp.NewExecuteInstruction(
 						testutils.MustMarshalBorsh(t, executionReport),
 						reportContext,
-						[]byte{4},
+						[]byte{5},
 						config.OfframpConfigPDA,
 						config.OfframpReferenceAddressesPDA,
 						config.OfframpSvmSourceChainPDA,
 						setup.rootPDA,
 						config.CcipOfframpProgram,
 						config.AllowedOfframpSvmPDA,
-						config.OfframpExternalExecutionConfigPDA,
 						setup.transmitter.PublicKey(),
 						solana.SystemProgramID,
 						solana.SysVarInstructionsPubkey,
-						config.OfframpTokenPoolsSignerPDA,
 						config.RMNRemoteProgram,
 						config.RMNRemoteCursesPDA,
 						config.RMNRemoteConfigPDA,
@@ -8557,11 +8519,13 @@ func TestCCIPRouter(t *testing.T) {
 					raw.AccountMetaSlice = append(
 						raw.AccountMetaSlice,
 						solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
+						solana.NewAccountMeta(config.OfframpReceiverExternalExecPDA, true, false),
 						solana.NewAccountMeta(config.ReceiverExternalExecutionConfigPDA, true, false),
 						solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
 						solana.NewAccountMeta(solana.SystemProgramID, false, false),
 					)
 
+					raw.AccountMetaSlice = append(raw.AccountMetaSlice, solana.Meta(token0.OfframpSigner).WRITE())
 					tokenMetas, addressTables, err := tokens.ParseTokenLookupTable(ctx, solanaGoClient, token0, token0.User[config.ReceiverExternalExecutionConfigPDA])
 					maps.Copy(addressTables, offrampLookupTable) // commonly used ccip addresses - required otherwise tx is too large
 
@@ -8612,11 +8576,9 @@ func TestCCIPRouter(t *testing.T) {
 					rootPDA,
 					config.CcipOfframpProgram,
 					config.AllowedOfframpEvmPDA,
-					config.OfframpExternalExecutionConfigPDA,
 					user.PublicKey(),
 					solana.SystemProgramID,
 					solana.SysVarInstructionsPubkey,
-					config.OfframpTokenPoolsSignerPDA,
 					config.RMNRemoteProgram,
 					config.RMNRemoteCursesPDA,
 					config.RMNRemoteConfigPDA,
@@ -8624,6 +8586,7 @@ func TestCCIPRouter(t *testing.T) {
 				raw.AccountMetaSlice = append(
 					raw.AccountMetaSlice,
 					solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
+					solana.NewAccountMeta(config.OfframpReceiverExternalExecPDA, true, false),
 					solana.NewAccountMeta(config.ReceiverExternalExecutionConfigPDA, true, false),
 					solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
 					solana.NewAccountMeta(solana.SystemProgramID, false, false),
@@ -8706,11 +8669,9 @@ func TestCCIPRouter(t *testing.T) {
 							rootPDA,
 							config.CcipOfframpProgram,
 							config.AllowedOfframpEvmPDA,
-							config.OfframpExternalExecutionConfigPDA,
 							user.PublicKey(),
 							solana.SystemProgramID,
 							solana.SysVarInstructionsPubkey,
-							config.OfframpTokenPoolsSignerPDA,
 							config.RMNRemoteProgram,
 							config.RMNRemoteCursesPDA,
 							config.RMNRemoteConfigPDA,
@@ -8718,6 +8679,7 @@ func TestCCIPRouter(t *testing.T) {
 						raw.AccountMetaSlice = append(
 							raw.AccountMetaSlice,
 							solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
+							solana.NewAccountMeta(config.OfframpReceiverExternalExecPDA, true, false),
 							solana.NewAccountMeta(config.ReceiverExternalExecutionConfigPDA, true, false),
 							solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
 							solana.NewAccountMeta(solana.SystemProgramID, false, false),
@@ -8747,11 +8709,9 @@ func TestCCIPRouter(t *testing.T) {
 							rootPDA,
 							config.CcipOfframpProgram,
 							config.AllowedOfframpEvmPDA,
-							config.OfframpExternalExecutionConfigPDA,
 							transmitter.PublicKey(),
 							solana.SystemProgramID,
 							solana.SysVarInstructionsPubkey,
-							config.OfframpTokenPoolsSignerPDA,
 							config.RMNRemoteProgram,
 							config.RMNRemoteCursesPDA,
 							config.RMNRemoteConfigPDA,
@@ -8759,6 +8719,7 @@ func TestCCIPRouter(t *testing.T) {
 						raw.AccountMetaSlice = append(
 							raw.AccountMetaSlice,
 							solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
+							solana.NewAccountMeta(config.OfframpReceiverExternalExecPDA, true, false),
 							solana.NewAccountMeta(config.ReceiverExternalExecutionConfigPDA, true, false),
 							solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
 							solana.NewAccountMeta(solana.SystemProgramID, false, false),
@@ -8802,11 +8763,9 @@ func TestCCIPRouter(t *testing.T) {
 							rootPDA,
 							config.CcipOfframpProgram,
 							config.AllowedOfframpEvmPDA,
-							config.OfframpExternalExecutionConfigPDA,
 							user.PublicKey(),
 							solana.SystemProgramID,
 							solana.SysVarInstructionsPubkey,
-							config.OfframpTokenPoolsSignerPDA,
 							config.RMNRemoteProgram,
 							config.RMNRemoteCursesPDA,
 							config.RMNRemoteConfigPDA,
@@ -8814,6 +8773,7 @@ func TestCCIPRouter(t *testing.T) {
 						raw.AccountMetaSlice = append(
 							raw.AccountMetaSlice,
 							solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
+							solana.NewAccountMeta(config.OfframpReceiverExternalExecPDA, true, false),
 							solana.NewAccountMeta(config.ReceiverExternalExecutionConfigPDA, true, false),
 							solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
 							solana.NewAccountMeta(solana.SystemProgramID, false, false),
@@ -8864,11 +8824,9 @@ func TestCCIPRouter(t *testing.T) {
 							rootPDA,
 							config.CcipOfframpProgram,
 							config.AllowedOfframpEvmPDA,
-							config.OfframpExternalExecutionConfigPDA,
 							transmitter.PublicKey(),
 							solana.SystemProgramID,
 							solana.SysVarInstructionsPubkey,
-							config.OfframpTokenPoolsSignerPDA,
 							config.RMNRemoteProgram,
 							config.RMNRemoteCursesPDA,
 							config.RMNRemoteConfigPDA,
@@ -8876,6 +8834,7 @@ func TestCCIPRouter(t *testing.T) {
 						raw.AccountMetaSlice = append(
 							raw.AccountMetaSlice,
 							solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
+							solana.NewAccountMeta(config.OfframpReceiverExternalExecPDA, true, false),
 							solana.NewAccountMeta(config.ReceiverExternalExecutionConfigPDA, true, false),
 							solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
 							solana.NewAccountMeta(solana.SystemProgramID, false, false),
@@ -8948,7 +8907,7 @@ func TestCCIPRouter(t *testing.T) {
 				require.NoError(t, err)
 				rootPDA, err := state.FindOfframpCommitReportPDA(config.EvmChainSelector, root, config.CcipOfframpProgram)
 				require.NoError(t, err)
-				instruction, err := ccip_offramp.NewCommitInstruction(
+				execIx, err := ccip_offramp.NewCommitInstruction(
 					reportContext,
 					testutils.MustMarshalBorsh(t, commitReport),
 					sigs.Rs,
@@ -8970,7 +8929,7 @@ func TestCCIPRouter(t *testing.T) {
 					config.RMNRemoteConfigPDA,
 				).ValidateAndBuild()
 				require.NoError(t, err)
-				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(300_000))
+				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{execIx}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(300_000))
 				event := common.EventCommitReportAccepted{}
 				require.NoError(t, common.ParseEventCommitReportAccepted(tx.Meta.LogMessages, "CommitReportAccepted", &event))
 
@@ -8992,11 +8951,9 @@ func TestCCIPRouter(t *testing.T) {
 					rootPDA,
 					config.CcipOfframpProgram,
 					config.AllowedOfframpEvmPDA,
-					config.OfframpExternalExecutionConfigPDA,
 					transmitter.PublicKey(),
 					solana.SystemProgramID,
 					solana.SysVarInstructionsPubkey,
-					config.OfframpTokenPoolsSignerPDA,
 					config.RMNRemoteProgram,
 					config.RMNRemoteCursesPDA,
 					config.RMNRemoteConfigPDA,
@@ -9004,13 +8961,14 @@ func TestCCIPRouter(t *testing.T) {
 
 				tokenMetas, addressTables, err := tokens.ParseTokenLookupTable(ctx, solanaGoClient, token0, token0.User[receiver.PublicKey()])
 				require.NoError(t, err)
+				raw.AccountMetaSlice = append(raw.AccountMetaSlice, solana.Meta(token0.OfframpSigner).WRITE())
 				raw.AccountMetaSlice = append(raw.AccountMetaSlice, tokenMetas...)
 				// maps.Copy(addressTables, offrampLookupTable) // commonly used ccip addresses - required otherwise tx is too large
 
-				instruction, err = raw.ValidateAndBuild()
+				execIx, err = raw.ValidateAndBuild()
 				require.NoError(t, err)
 
-				testutils.SendAndFailWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, addressTables, []string{"Error Code: " + common.AccountNotInitialized_AnchorError.String()})
+				testutils.SendAndFailWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{execIx}, transmitter, config.DefaultCommitment, addressTables, []string{"Error Code: " + common.AccountNotInitialized_AnchorError.String()})
 
 				// create associated token account for user --------------------
 				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ixATA}, legacyAdmin, config.DefaultCommitment)
@@ -9029,24 +8987,24 @@ func TestCCIPRouter(t *testing.T) {
 					rootPDA,
 					config.CcipOfframpProgram,
 					config.AllowedOfframpEvmPDA,
-					config.OfframpExternalExecutionConfigPDA,
 					legacyAdmin.PublicKey(),
 					solana.SystemProgramID,
 					solana.SysVarInstructionsPubkey,
-					config.OfframpTokenPoolsSignerPDA,
 					config.RMNRemoteProgram,
 					config.RMNRemoteCursesPDA,
 					config.RMNRemoteConfigPDA,
 				)
 
-				tokenMetas, addressTables, err = tokens.ParseTokenLookupTable(ctx, solanaGoClient, token0, token0.User[receiver.PublicKey()])
+				manualTokenMetas, manualAddressTables, err := tokens.ParseTokenLookupTable(ctx, solanaGoClient, token0, token0.User[receiver.PublicKey()])
 				require.NoError(t, err)
-				rawManual.AccountMetaSlice = append(rawManual.AccountMetaSlice, tokenMetas...)
-				instruction, err = rawManual.ValidateAndBuild()
-				require.NoError(t, err)
-				maps.Copy(addressTables, offrampLookupTable) // commonly used ccip addresses - required otherwise tx is too large
+				rawManual.AccountMetaSlice = append(rawManual.AccountMetaSlice, solana.Meta(token0.OfframpSigner).WRITE())
+				rawManual.AccountMetaSlice = append(rawManual.AccountMetaSlice, manualTokenMetas...)
 
-				testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, legacyAdmin, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(400_000))
+				manualExecIx, err := rawManual.ValidateAndBuild()
+				require.NoError(t, err)
+				maps.Copy(manualAddressTables, offrampLookupTable) // commonly used ccip addresses - required otherwise tx is too large
+
+				testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{manualExecIx}, legacyAdmin, config.DefaultCommitment, manualAddressTables, common.AddComputeUnitLimit(400_000))
 
 				_, finalBal, err := tokens.TokenBalance(ctx, solanaGoClient, token0.User[receiver.PublicKey()], config.DefaultCommitment)
 				require.NoError(t, err)

@@ -31,7 +31,6 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 
 	dumbRamp := config.CcipInvalidReceiverProgram
 	allowedOfframpPDA, _ := state.FindAllowedOfframpPDA(config.EvmChainSelector, dumbRamp, dumbRamp)
-	rampPoolSignerPDA, _, _ := state.FindExternalTokenPoolsSignerPDA(dumbRamp)
 
 	admin, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)
@@ -109,6 +108,8 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 
 			// for _, poolProgram := range []solana.PublicKey{config.CcipBasePoolBurnMint, config.CcipBasePoolLockRelease} {
 			for _, poolProgram := range []solana.PublicKey{config.CcipBasePoolBurnMint} {
+				rampPoolSignerPDA, _, _ := state.FindExternalTokenPoolsSignerPDA(poolProgram, dumbRamp)
+
 				mintPriv, err := solana.NewRandomPrivateKey()
 				require.NoError(t, err)
 				p, err := tokens.NewTokenPool(v.tokenProgram, poolProgram, mintPriv.PublicKey())

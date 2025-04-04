@@ -342,14 +342,6 @@
           ]
         },
         {
-          "name": "tokenPoolsSigner",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
           "name": "systemProgram",
           "isMut": false,
           "isSigner": false
@@ -518,14 +510,6 @@
         {
           "name": "rmnRemoteConfig",
           "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "tokenPoolsSigner",
-          "isMut": true,
           "isSigner": false,
           "docs": [
             "CHECK"

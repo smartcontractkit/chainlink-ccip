@@ -149,11 +149,6 @@ export type ExampleCcipSender = {
           "name": "ccipRmnRemoteConfig",
           "isMut": false,
           "isSigner": false
-        },
-        {
-          "name": "ccipTokenPoolsSigner",
-          "isMut": true,
-          "isSigner": false
         }
       ],
       "args": [
@@ -630,11 +625,6 @@ export const IDL: ExampleCcipSender = {
         {
           "name": "ccipRmnRemoteConfig",
           "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "ccipTokenPoolsSigner",
-          "isMut": true,
           "isSigner": false
         }
       ],

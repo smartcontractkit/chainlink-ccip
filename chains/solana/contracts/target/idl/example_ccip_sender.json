@@ -149,11 +149,6 @@
           "name": "ccipRmnRemoteConfig",
           "isMut": false,
           "isSigner": false
-        },
-        {
-          "name": "ccipTokenPoolsSigner",
-          "isMut": true,
-          "isSigner": false
         }
       ],
       "args": [

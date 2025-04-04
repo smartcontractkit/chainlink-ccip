@@ -2,12 +2,12 @@ package contracts
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/testutils"
@@ -36,6 +36,59 @@ func failOnExcessOnlyWithTables(tables map[solana.PublicKey]solana.PublicKeySlic
 	return len(tables) > 0
 }
 
+func toTableEntries(t interface{}) solana.PublicKeySlice {
+	fields := reflect.VisibleFields(reflect.TypeOf(t))
+	entries := make(solana.PublicKeySlice, 0, len(fields))
+	for _, field := range fields {
+		if field.Type == reflect.TypeOf(solana.PublicKey{}) {
+			entries = append(entries, reflect.ValueOf(t).FieldByName(field.Name).Interface().(solana.PublicKey))
+		}
+	}
+	return entries
+}
+
+type RouterTable struct {
+	RouterConfig        solana.PublicKey
+	SystemProgram       solana.PublicKey
+	BillingTokenProgram solana.PublicKey
+	RouterBillingSigner solana.PublicKey
+	SysVarInstruction   solana.PublicKey
+	FqBillingSinger     solana.PublicKey
+	FeeQuoterProgram    solana.PublicKey
+	FqConfigPDA         solana.PublicKey
+	FqLinkConfig        solana.PublicKey
+	RmnProgram          solana.PublicKey
+	RmnCurses           solana.PublicKey
+	RmnConfig           solana.PublicKey
+}
+
+type OfframpTable struct {
+	Config                solana.PublicKey
+	ReferenceAddresses    solana.PublicKey
+	SysVarInstruction     solana.PublicKey
+	SystemProgram         solana.PublicKey
+	BillingSinger         solana.PublicKey
+	FeeQuoterProgram      solana.PublicKey
+	FqConfig              solana.PublicKey
+	Offramp               solana.PublicKey
+	FqAllowedPriceUpdater solana.PublicKey
+	RmnProgram            solana.PublicKey
+	RmnCurses             solana.PublicKey
+	RmnConfig             solana.PublicKey
+}
+
+type TokenTable struct {
+	TokenAdminRegistryPDA solana.PublicKey
+	PoolLookupTable       solana.PublicKey
+	PoolProgram           solana.PublicKey
+	PoolConfig            solana.PublicKey
+	PoolTokenAccount      solana.PublicKey
+	PoolSigner            solana.PublicKey
+	TokenProgram          solana.PublicKey
+	Mint                  solana.PublicKey
+	RouterSigner          solana.PublicKey
+}
+
 // NOTE: this test does not execute or validate transaction inputs, it simply builds transactions to calculate the size of each transaction with signers
 func TestTransactionSizing(t *testing.T) {
 	ccip_router.SetProgramID(config.CcipRouterProgram)
@@ -45,49 +98,46 @@ func TestTransactionSizing(t *testing.T) {
 
 	// mocked router lookup table for constant accounts
 	// chain specific configs are not constant but are a small set relative to the number of users
-	routerTable := map[string]solana.PublicKey{
-		"routerConfig":          mustRandomPubkey(),
-		"destChainConfig":       mustRandomPubkey(),
-		"systemProgram":         solana.SystemProgramID,
-		"billingTokenProgram":   solana.TokenProgramID,
-		"billingTokenMint":      mustRandomPubkey(),
-		"billingTokenConfig":    mustRandomPubkey(),
-		"routerBillingTokenATA": mustRandomPubkey(),
-		"routerBillingSigner":   mustRandomPubkey(),
-		"routerTokenPoolSigner": mustRandomPubkey(),
-		"sysVarInstruction":     solana.SysVarInstructionsPubkey,
-		"fqBillingSinger":       mustRandomPubkey(),
-		"feeQuoterProgram":      mustRandomPubkey(),
-		"fqConfigPDA":           mustRandomPubkey(),
-		"fqLinkConfig":          mustRandomPubkey(),
+	routerTable := RouterTable{
+		RouterConfig:        mustRandomPubkey(),
+		SystemProgram:       solana.SystemProgramID,
+		BillingTokenProgram: solana.TokenProgramID,
+		RouterBillingSigner: mustRandomPubkey(),
+		SysVarInstruction:   solana.SysVarInstructionsPubkey,
+		FqBillingSinger:     mustRandomPubkey(),
+		FeeQuoterProgram:    mustRandomPubkey(),
+		FqConfigPDA:         mustRandomPubkey(),
+		FqLinkConfig:        mustRandomPubkey(),
+		RmnProgram:          config.RMNRemoteProgram,
+		RmnCurses:           config.RMNRemoteCursesPDA,
+		RmnConfig:           config.RMNRemoteConfigPDA,
 	}
 
-	offrampTable := map[string]solana.PublicKey{
-		"config":                mustRandomPubkey(),
-		"referenceAddresses":    mustRandomPubkey(),
-		"originChainConfig":     mustRandomPubkey(),
-		"sysVarInstruction":     solana.SysVarInstructionsPubkey,
-		"systemProgram":         solana.SystemProgramID,
-		"billingSinger":         mustRandomPubkey(),
-		"feeQuoterProgram":      mustRandomPubkey(),
-		"fqConfigPDA":           mustRandomPubkey(),
-		"billingTokenConfig":    mustRandomPubkey(),
-		"destChainConfig":       mustRandomPubkey(),
-		"arbMessagingSigner":    mustRandomPubkey(),
-		"tokenPoolSigner":       mustRandomPubkey(),
-		"offramp":               config.CcipOfframpProgram,
-		"fqAllowedPriceUpdater": mustRandomPubkey(),
+	offrampTable := OfframpTable{
+		Config:                mustRandomPubkey(),
+		ReferenceAddresses:    mustRandomPubkey(),
+		SysVarInstruction:     solana.SysVarInstructionsPubkey,
+		SystemProgram:         solana.SystemProgramID,
+		BillingSinger:         mustRandomPubkey(),
+		FeeQuoterProgram:      mustRandomPubkey(),
+		Offramp:               config.CcipOfframpProgram,
+		FqAllowedPriceUpdater: mustRandomPubkey(),
+		FqConfig:              mustRandomPubkey(),
+		RmnProgram:            config.RMNRemoteProgram,
+		RmnCurses:             config.RMNRemoteCursesPDA,
+		RmnConfig:             config.RMNRemoteConfigPDA,
 	}
 
-	tokenTable := map[string]solana.PublicKey{
-		"tokenAdminRegistryPDA": mustRandomPubkey(),
-		"poolLookupTable":       mustRandomPubkey(),
-		"poolProgram":           config.CcipTokenPoolProgram,
-		"poolConfig":            mustRandomPubkey(),
-		"poolTokenAccount":      mustRandomPubkey(),
-		"poolSigner":            mustRandomPubkey(),
-		"tokenProgram":          config.Token2022Program,
-		"mint":                  mustRandomPubkey(),
+	tokenTable := TokenTable{
+		TokenAdminRegistryPDA: mustRandomPubkey(),
+		PoolLookupTable:       mustRandomPubkey(),
+		PoolProgram:           config.CcipTokenPoolProgram,
+		PoolConfig:            mustRandomPubkey(),
+		PoolTokenAccount:      mustRandomPubkey(),
+		PoolSigner:            mustRandomPubkey(),
+		TokenProgram:          config.Token2022Program,
+		Mint:                  mustRandomPubkey(),
+		RouterSigner:          mustRandomPubkey(),
 	}
 
 	run := func(name string, failOnExcessPredicate failOnExcessTxSize, ix solana.Instruction, tables map[solana.PublicKey]solana.PublicKeySlice, opts ...common.TxModifier) string {
@@ -140,25 +190,24 @@ func TestTransactionSizing(t *testing.T) {
 			1,
 			msg,
 			tokenIndexes,
-			routerTable["routerConfig"],
-			routerTable["destChainConfig"],
+			routerTable.RouterConfig,
+			mustRandomPubkey(), // destChainConfig,
 			mustRandomPubkey(), // user nonce PDA
 			auth.PublicKey(),   // sender/authority
-			routerTable["systemProgram"],
-			routerTable["billingTokenProgram"], // fee token program
-			routerTable["billingTokenProgram"], // fee token mint
-			mustRandomPubkey(),                 // fee token user ATA
-			mustRandomPubkey(),                 // fee token receiver
-			routerTable["routerBillingSigner"], // fee billing signer
-			routerTable["feeQuoterProgram"],    // fee quoter
-			routerTable["fqConfigPDA"],         // fee quoter config
-			mustRandomPubkey(),                 // fee quoter dest chain
-			mustRandomPubkey(),                 // fee quoter billing token config
-			routerTable["fqLinkConfig"],        // fee quoter link token config
-			config.RMNRemoteProgram,
-			config.RMNRemoteCursesPDA,
-			config.RMNRemoteConfigPDA,
-			routerTable["routerTokenPoolSigner"],
+			routerTable.SystemProgram,
+			routerTable.BillingTokenProgram, // fee token program
+			routerTable.BillingTokenProgram, // fee token mint
+			mustRandomPubkey(),              // fee token user ATA
+			mustRandomPubkey(),              // fee token receiver
+			routerTable.RouterBillingSigner, // fee billing signer
+			routerTable.FeeQuoterProgram,    // fee quoter
+			routerTable.FqConfigPDA,         // fee quoter config
+			mustRandomPubkey(),              // fee quoter dest chain
+			mustRandomPubkey(),              // fee quoter billing token config
+			routerTable.FqLinkConfig,        // fee quoter link token config
+			routerTable.RmnProgram,
+			routerTable.RmnCurses,
+			routerTable.RmnConfig,
 		)
 
 		for _, v := range addAccounts {
@@ -199,20 +248,20 @@ func TestTransactionSizing(t *testing.T) {
 			make([][32]byte, 6), // f = 5, estimating f+1 signatures
 			make([][32]byte, 6), // f = 5, estimating f+1 signatures
 			[32]byte{},          // f = 5, estimating f+1 signatures
-			offrampTable["config"],
-			offrampTable["referenceAddresses"],
-			offrampTable["originChainConfig"],
+			offrampTable.Config,
+			offrampTable.ReferenceAddresses,
+			mustRandomPubkey(), // originChainConfig
 			mustRandomPubkey(), // commit report PDA
 			auth.PublicKey(),
-			offrampTable["systemProgram"],
-			offrampTable["sysVarInstruction"],
-			offrampTable["billingSinger"],
-			offrampTable["feeQuoterProgram"],
-			offrampTable["fqAllowedPriceUpdater"],
-			offrampTable["fqConfigPDA"],
-			config.RMNRemoteProgram,
-			config.RMNRemoteCursesPDA,
-			config.RMNRemoteConfigPDA,
+			offrampTable.SystemProgram,
+			offrampTable.SysVarInstruction,
+			offrampTable.BillingSinger,
+			offrampTable.FeeQuoterProgram,
+			offrampTable.FqAllowedPriceUpdater,
+			offrampTable.FqConfig,
+			offrampTable.RmnProgram,
+			offrampTable.RmnCurses,
+			offrampTable.RmnConfig,
 		)
 
 		for _, v := range addAccounts {
@@ -280,20 +329,18 @@ func TestTransactionSizing(t *testing.T) {
 			testutils.MustMarshalBorsh(t, report),
 			[2][32]byte{}, // report context
 			tokenIndexes,
-			offrampTable["config"],
-			offrampTable["referenceAddresses"],
-			offrampTable["offramp"],
+			offrampTable.Config,
+			offrampTable.ReferenceAddresses,
+			offrampTable.Offramp,
 			mustRandomPubkey(), // router's allowed_offramp (per offramp & per source chain)
-			offrampTable["originChainConfig"],
+			mustRandomPubkey(), // originChainConfig,
 			mustRandomPubkey(), // commit report PDA
-			offrampTable["arbMessagingSigner"],
 			auth.PublicKey(),
-			offrampTable["systemProgram"],
-			offrampTable["sysVarInstruction"],
-			offrampTable["tokenPoolSigner"],
-			config.RMNRemoteProgram,
-			config.RMNRemoteCursesPDA,
-			config.RMNRemoteConfigPDA,
+			offrampTable.SystemProgram,
+			offrampTable.SysVarInstruction,
+			offrampTable.RmnProgram,
+			offrampTable.RmnCurses,
+			offrampTable.RmnConfig,
 		)
 
 		for _, v := range addAccounts {
@@ -315,7 +362,7 @@ func TestTransactionSizing(t *testing.T) {
 			"ccipSend:noToken",
 			ixCcipSend(sendNoTokens, []byte{}, nil),
 			map[solana.PublicKey]solana.PublicKeySlice{
-				mustRandomPubkey(): maps.Values(routerTable),
+				mustRandomPubkey(): toTableEntries(routerTable),
 			},
 			failOnExcessAlways,
 		},
@@ -325,10 +372,10 @@ func TestTransactionSizing(t *testing.T) {
 				mustRandomPubkey(), // user ATA
 				mustRandomPubkey(), // token billing config
 				mustRandomPubkey(), // token pool chain config
-			}, maps.Values(tokenTable)...)),
+			}, toTableEntries(tokenTable)...)),
 			map[solana.PublicKey]solana.PublicKeySlice{
-				mustRandomPubkey():            maps.Values(routerTable),
-				tokenTable["poolLookupTable"]: maps.Values(tokenTable),
+				mustRandomPubkey():         toTableEntries(routerTable),
+				tokenTable.PoolLookupTable: toTableEntries(tokenTable),
 			},
 			failOnExcessOnlyWithTables, // without lookup tables, we already know it exceeds the max tx size
 		},
@@ -336,26 +383,29 @@ func TestTransactionSizing(t *testing.T) {
 			"commit:noPrices",
 			ixCommit(commitNoPrices, nil),
 			map[solana.PublicKey]solana.PublicKeySlice{
-				mustRandomPubkey(): maps.Values(offrampTable),
+				mustRandomPubkey(): toTableEntries(offrampTable),
 			},
 			failOnExcessAlways,
 		},
 		{
 			"commit:withPrices",
 			ixCommit(commitWithPrices, solana.PublicKeySlice{
-				offrampTable["billingTokenConfig"], // token price update
-				offrampTable["destChainConfig"],    // gas price update
+				mustRandomPubkey(), //billingTokenConfig --> token price update
+				mustRandomPubkey(), //destChainConfig --> gas price update
 			}),
 			map[solana.PublicKey]solana.PublicKeySlice{
-				mustRandomPubkey(): maps.Values(offrampTable),
+				mustRandomPubkey(): toTableEntries(offrampTable),
 			},
 			failOnExcessOnlyWithTables, // without lookup tables, we already know it exceeds the max tx size
 		},
 		{
-			"execute:noToken",
-			ixExecute(executeEmpty, []byte{}, nil),
+			"execute:basicMessage",
+			ixExecute(executeEmpty, []byte{}, solana.PublicKeySlice{
+				mustRandomPubkey(), // logic receiver
+				mustRandomPubkey(), // arbMessagingSigner
+			}),
 			map[solana.PublicKey]solana.PublicKeySlice{
-				mustRandomPubkey(): maps.Values(offrampTable),
+				mustRandomPubkey(): toTableEntries(offrampTable),
 			},
 			failOnExcessAlways,
 		},
@@ -365,10 +415,10 @@ func TestTransactionSizing(t *testing.T) {
 				mustRandomPubkey(), // user ATA
 				mustRandomPubkey(), // token billing config
 				mustRandomPubkey(), // token pool chain config
-			}, maps.Values(tokenTable)...)),
+			}, toTableEntries(tokenTable)...)),
 			map[solana.PublicKey]solana.PublicKeySlice{
-				mustRandomPubkey():            maps.Values(offrampTable),
-				tokenTable["poolLookupTable"]: maps.Values(tokenTable),
+				mustRandomPubkey():         toTableEntries(offrampTable),
+				tokenTable.PoolLookupTable: toTableEntries(tokenTable),
 			},
 			failOnExcessOnlyWithTables, // without lookup tables, we already know it exceeds the max tx size
 		},

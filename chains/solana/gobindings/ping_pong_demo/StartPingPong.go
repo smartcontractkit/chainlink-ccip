@@ -68,17 +68,14 @@ type StartPingPong struct {
 	// [19] = [] rmnRemoteConfig
 	// ··········· CHECK
 	//
-	// [20] = [WRITE] tokenPoolsSigner
-	// ··········· CHECK
-	//
-	// [21] = [] systemProgram
+	// [20] = [] systemProgram
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewStartPingPongInstructionBuilder creates a new `StartPingPong` instruction builder.
 func NewStartPingPongInstructionBuilder() *StartPingPong {
 	nd := &StartPingPong{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 22),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 21),
 	}
 	return nd
 }
@@ -333,28 +330,15 @@ func (inst *StartPingPong) GetRmnRemoteConfigAccount() *ag_solanago.AccountMeta 
 	return inst.AccountMetaSlice[19]
 }
 
-// SetTokenPoolsSignerAccount sets the "tokenPoolsSigner" account.
-// CHECK
-func (inst *StartPingPong) SetTokenPoolsSignerAccount(tokenPoolsSigner ag_solanago.PublicKey) *StartPingPong {
-	inst.AccountMetaSlice[20] = ag_solanago.Meta(tokenPoolsSigner).WRITE()
-	return inst
-}
-
-// GetTokenPoolsSignerAccount gets the "tokenPoolsSigner" account.
-// CHECK
-func (inst *StartPingPong) GetTokenPoolsSignerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[20]
-}
-
 // SetSystemProgramAccount sets the "systemProgram" account.
 func (inst *StartPingPong) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *StartPingPong {
-	inst.AccountMetaSlice[21] = ag_solanago.Meta(systemProgram)
+	inst.AccountMetaSlice[20] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
 // GetSystemProgramAccount gets the "systemProgram" account.
 func (inst *StartPingPong) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[21]
+	return inst.AccountMetaSlice[20]
 }
 
 func (inst StartPingPong) Build() *Instruction {
@@ -438,9 +422,6 @@ func (inst *StartPingPong) Validate() error {
 			return errors.New("accounts.RmnRemoteConfig is not set")
 		}
 		if inst.AccountMetaSlice[20] == nil {
-			return errors.New("accounts.TokenPoolsSigner is not set")
-		}
-		if inst.AccountMetaSlice[21] == nil {
 			return errors.New("accounts.SystemProgram is not set")
 		}
 	}
@@ -459,7 +440,7 @@ func (inst *StartPingPong) EncodeToTree(parent ag_treeout.Branches) {
 					instructionBranch.Child("Params[len=0]").ParentFunc(func(paramsBranch ag_treeout.Branches) {})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=22]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Accounts[len=21]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("                     config", inst.AccountMetaSlice[0]))
 						accountsBranch.Child(ag_format.Meta("                  authority", inst.AccountMetaSlice[1]))
 						accountsBranch.Child(ag_format.Meta("             ccipSendSigner", inst.AccountMetaSlice[2]))
@@ -480,8 +461,7 @@ func (inst *StartPingPong) EncodeToTree(parent ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("                  rmnRemote", inst.AccountMetaSlice[17]))
 						accountsBranch.Child(ag_format.Meta("            rmnRemoteCurses", inst.AccountMetaSlice[18]))
 						accountsBranch.Child(ag_format.Meta("            rmnRemoteConfig", inst.AccountMetaSlice[19]))
-						accountsBranch.Child(ag_format.Meta("           tokenPoolsSigner", inst.AccountMetaSlice[20]))
-						accountsBranch.Child(ag_format.Meta("              systemProgram", inst.AccountMetaSlice[21]))
+						accountsBranch.Child(ag_format.Meta("              systemProgram", inst.AccountMetaSlice[20]))
 					})
 				})
 		})
@@ -517,7 +497,6 @@ func NewStartPingPongInstruction(
 	rmnRemote ag_solanago.PublicKey,
 	rmnRemoteCurses ag_solanago.PublicKey,
 	rmnRemoteConfig ag_solanago.PublicKey,
-	tokenPoolsSigner ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *StartPingPong {
 	return NewStartPingPongInstructionBuilder().
 		SetConfigAccount(config).
@@ -540,6 +519,5 @@ func NewStartPingPongInstruction(
 		SetRmnRemoteAccount(rmnRemote).
 		SetRmnRemoteCursesAccount(rmnRemoteCurses).
 		SetRmnRemoteConfigAccount(rmnRemoteConfig).
-		SetTokenPoolsSignerAccount(tokenPoolsSigner).
 		SetSystemProgramAccount(systemProgram)
 }

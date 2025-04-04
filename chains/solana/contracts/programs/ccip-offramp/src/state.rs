@@ -83,10 +83,6 @@ pub struct GlobalState {
     pub latest_price_sequence_number: u64,
 }
 
-#[account]
-#[derive(InitSpace)]
-pub struct ExternalExecutionConfig {}
-
 #[derive(Clone, AnchorSerialize, AnchorDeserialize, InitSpace, Debug)]
 pub struct SourceChainConfig {
     pub is_enabled: bool, // Flag whether the source chain is enabled or not

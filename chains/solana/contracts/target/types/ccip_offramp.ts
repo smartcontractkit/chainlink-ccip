@@ -56,16 +56,6 @@ export type CcipOfframp = {
           "isSigner": false
         },
         {
-          "name": "externalExecutionConfig",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "tokenPoolsSigner",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
           "name": "authority",
           "isMut": true,
           "isSigner": true
@@ -892,11 +882,6 @@ export type CcipOfframp = {
           ]
         },
         {
-          "name": "externalExecutionConfig",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
           "name": "authority",
           "isMut": true,
           "isSigner": true
@@ -908,11 +893,6 @@ export type CcipOfframp = {
         },
         {
           "name": "sysvarInstructions",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "tokenPoolsSigner",
           "isMut": false,
           "isSigner": false
         },
@@ -1009,11 +989,6 @@ export type CcipOfframp = {
           ]
         },
         {
-          "name": "externalExecutionConfig",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
           "name": "authority",
           "isMut": true,
           "isSigner": true
@@ -1025,11 +1000,6 @@ export type CcipOfframp = {
         },
         {
           "name": "sysvarInstructions",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "tokenPoolsSigner",
           "isMut": false,
           "isSigner": false
         },
@@ -1220,13 +1190,6 @@ export type CcipOfframp = {
             "type": "u64"
           }
         ]
-      }
-    },
-    {
-      "name": "externalExecutionConfig",
-      "type": {
-        "kind": "struct",
-        "fields": []
       }
     },
     {
@@ -2385,6 +2348,11 @@ export type CcipOfframp = {
     },
     {
       "code": 9054,
+      "name": "InvalidInputsExternalExecutionSignerAccount",
+      "msg": "Invalid external execution signer account"
+    },
+    {
+      "code": 9055,
       "name": "CommitReportHasPendingMessages",
       "msg": "Commit report has pending messages"
     }
@@ -2449,16 +2417,6 @@ export const IDL: CcipOfframp = {
           "isSigner": false
         },
         {
-          "name": "externalExecutionConfig",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "tokenPoolsSigner",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
           "name": "authority",
           "isMut": true,
           "isSigner": true
@@ -3285,11 +3243,6 @@ export const IDL: CcipOfframp = {
           ]
         },
         {
-          "name": "externalExecutionConfig",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
           "name": "authority",
           "isMut": true,
           "isSigner": true
@@ -3301,11 +3254,6 @@ export const IDL: CcipOfframp = {
         },
         {
           "name": "sysvarInstructions",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "tokenPoolsSigner",
           "isMut": false,
           "isSigner": false
         },
@@ -3402,11 +3350,6 @@ export const IDL: CcipOfframp = {
           ]
         },
         {
-          "name": "externalExecutionConfig",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
           "name": "authority",
           "isMut": true,
           "isSigner": true
@@ -3418,11 +3361,6 @@ export const IDL: CcipOfframp = {
         },
         {
           "name": "sysvarInstructions",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "tokenPoolsSigner",
           "isMut": false,
           "isSigner": false
         },
@@ -3613,13 +3551,6 @@ export const IDL: CcipOfframp = {
             "type": "u64"
           }
         ]
-      }
-    },
-    {
-      "name": "externalExecutionConfig",
-      "type": {
-        "kind": "struct",
-        "fields": []
       }
     },
     {
@@ -4778,6 +4709,11 @@ export const IDL: CcipOfframp = {
     },
     {
       "code": 9054,
+      "name": "InvalidInputsExternalExecutionSignerAccount",
+      "msg": "Invalid external execution signer account"
+    },
+    {
+      "code": 9055,
       "name": "CommitReportHasPendingMessages",
       "msg": "Commit report has pending messages"
     }
