@@ -83,6 +83,26 @@ func (o *Outcome) Stats() map[string]int {
 	return counters
 }
 
+// CopyNoMsgData creates a copy of the outcome with the messages data removed.
+func (o Outcome) CopyNoMsgData() Outcome {
+	commitReports := make([]CommitData, len(o.CommitReports))
+	for i, report := range o.CommitReports {
+		commitReports[i] = report.CopyNoMsgData()
+	}
+	reports := make([]cciptypes.ExecutePluginReportSingleChain, len(o.Report.ChainReports))
+	for i, report := range o.Report.ChainReports {
+		reports[i] = report.CopyNoMsgData()
+	}
+	newOutcome := Outcome{
+		State:         o.State,
+		CommitReports: commitReports,
+		Report: cciptypes.ExecutePluginReport{
+			ChainReports: reports,
+		},
+	}
+	return newOutcome
+}
+
 // NewOutcome creates a new Outcome with the pending commit reports and the chain reports sorted.
 func NewOutcome(
 	state PluginState,

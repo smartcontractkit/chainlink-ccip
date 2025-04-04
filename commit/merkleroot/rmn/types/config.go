@@ -43,8 +43,8 @@ type RemoteConfig struct {
 }
 
 func (r RemoteConfig) IsEmpty() bool {
-	return len(r.ContractAddress) == 0 &&
-		r.ConfigDigest == (cciptypes.Bytes32{}) &&
+	// NOTE: contract address will always be present, since the code auto populates it
+	return r.ConfigDigest == (cciptypes.Bytes32{}) &&
 		len(r.Signers) == 0 &&
 		r.FSign == 0 &&
 		r.ConfigVersion == 0 &&
