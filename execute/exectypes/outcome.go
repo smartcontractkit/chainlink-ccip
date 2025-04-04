@@ -87,17 +87,11 @@ func (o *Outcome) Stats() map[string]int {
 func (o Outcome) CopyNoMsgData() Outcome {
 	commitReports := make([]CommitData, len(o.CommitReports))
 	for i, report := range o.CommitReports {
-		commitReports[i] = report
-		for j, msg := range report.Messages {
-			commitReports[i].Messages[j] = msg.CopyWithoutData()
-		}
+		commitReports[i] = report.CopyNoMsgData()
 	}
 	reports := make([]cciptypes.ExecutePluginReportSingleChain, len(o.Report.ChainReports))
 	for i, report := range o.Report.ChainReports {
-		reports[i] = report
-		for j, msg := range report.Messages {
-			reports[i].Messages[j] = msg.CopyWithoutData()
-		}
+		reports[i] = report.CopyNoMsgData()
 	}
 	newOutcome := Outcome{
 		State:         o.State,
