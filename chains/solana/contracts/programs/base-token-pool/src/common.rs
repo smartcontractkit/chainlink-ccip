@@ -279,9 +279,9 @@ pub struct ReleaseOrMintInV1 {
     /// @dev WARNING: sourcePoolAddress should be checked prior to any processing of funds. Make sure it matches the
     /// expected pool address for the given remoteChainSelector.
     pub source_pool_address: RemoteAddress, //       The address of the source pool, abi encoded in the case of EVM chains
-    pub source_pool_data: RemoteAddress, //          The data received from the source pool to process the release or mint
+    pub source_pool_data: Vec<u8>, //          The data received from the source pool to process the release or mint
     /// @dev WARNING: offchainTokenData is untrusted data.
-    pub offchain_token_data: RemoteAddress, //       The offchain data to process the release or mint
+    pub offchain_token_data: Vec<u8>, //       The offchain data to process the release or mint
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
