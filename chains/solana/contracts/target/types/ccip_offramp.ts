@@ -2379,11 +2379,16 @@ export type CcipOfframp = {
     },
     {
       "code": 9053,
+      "name": "Ocr3SignaturesProvidedWhenVerificationDisabled",
+      "msg": "Signatures provided when verification is disabled"
+    },
+    {
+      "code": 9054,
       "name": "InvalidOnrampAddress",
       "msg": "Invalid onramp address"
     },
     {
-      "code": 9054,
+      "code": 9055,
       "name": "CommitReportHasPendingMessages",
       "msg": "Commit report has pending messages"
     }
@@ -4771,11 +4776,16 @@ export const IDL: CcipOfframp = {
     },
     {
       "code": 9053,
+      "name": "Ocr3SignaturesProvidedWhenVerificationDisabled",
+      "msg": "Signatures provided when verification is disabled"
+    },
+    {
+      "code": 9054,
       "name": "InvalidOnrampAddress",
       "msg": "Invalid onramp address"
     },
     {
-      "code": 9054,
+      "code": 9055,
       "name": "CommitReportHasPendingMessages",
       "msg": "Commit report has pending messages"
     }
