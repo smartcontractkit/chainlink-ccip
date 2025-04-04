@@ -21,7 +21,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
-	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
@@ -297,7 +296,7 @@ type Observer interface {
 	// ObserveRMNRemoteCfg observes the RMN remote config from the configured destination chain.
 	// Check implementation specific details to learn if external calls are made, if values are cached, etc...
 	// NOTE: Make sure that caller supports the destination chain.
-	ObserveRMNRemoteCfg(ctx context.Context) rmntypes.RemoteConfig
+	ObserveRMNRemoteCfg(ctx context.Context) cciptypes.RemoteConfig
 
 	// ObserveFChain observes the FChain for each supported chain. Check implementation specific details to learn
 	// if external calls are made, if values are cached, etc...
@@ -430,7 +429,7 @@ func (o *asyncObserver) ObserveMerkleRoots(
 }
 
 // ObserveRMNRemoteCfg observes the RMN Remote Config by directly calling the base observer since this value is cached.
-func (o *asyncObserver) ObserveRMNRemoteCfg(ctx context.Context) rmntypes.RemoteConfig {
+func (o *asyncObserver) ObserveRMNRemoteCfg(ctx context.Context) cciptypes.RemoteConfig {
 	return o.syncObserver.ObserveRMNRemoteCfg(ctx)
 }
 
@@ -725,18 +724,18 @@ func (o observerImpl) computeMerkleRoot(
 
 // ObserveRMNRemoteCfg observes the RMN remote config for the given destination chain.
 // NOTE: At least two external calls are made.
-func (o observerImpl) ObserveRMNRemoteCfg(ctx context.Context) rmntypes.RemoteConfig {
+func (o observerImpl) ObserveRMNRemoteCfg(ctx context.Context) cciptypes.RemoteConfig {
 	lggr := logutil.WithContextValues(ctx, o.lggr)
 
 	rmnRemoteCfg, err := o.ccipReader.GetRMNRemoteConfig(ctx)
 	if err != nil {
 		if errors.Is(err, readerpkg.ErrContractReaderNotFound) {
 			// destination chain not supported
-			return rmntypes.RemoteConfig{}
+			return cciptypes.RemoteConfig{}
 		}
 		// legitimate error
 		lggr.Errorw("call to GetRMNRemoteConfig failed", "err", err)
-		return rmntypes.RemoteConfig{}
+		return cciptypes.RemoteConfig{}
 	}
 	return rmnRemoteCfg
 }

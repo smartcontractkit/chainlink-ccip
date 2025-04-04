@@ -19,7 +19,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
@@ -57,10 +56,10 @@ func Test_TrackingTokenPrices(t *testing.T) {
 					cciptypes.UnknownEncodedAddress("0x123"): {},
 					cciptypes.UnknownEncodedAddress("0x456"): {},
 				},
-				FeeQuoterTokenUpdates: map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig{
+				FeeQuoterTokenUpdates: map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig{
 					cciptypes.UnknownEncodedAddress("0x123"): {},
-					cciptypes.UnknownEncodedAddress("0x456"): plugintypes.NewTimestampedBig(1, time.Now()),
-					cciptypes.UnknownEncodedAddress("0x789"): plugintypes.NewTimestampedBig(2, time.Now()),
+					cciptypes.UnknownEncodedAddress("0x456"): cciptypes.NewTimestampedBig(1, time.Now()),
+					cciptypes.UnknownEncodedAddress("0x789"): cciptypes.NewTimestampedBig(2, time.Now()),
 				},
 			},
 			expectedFeedToken:      2,

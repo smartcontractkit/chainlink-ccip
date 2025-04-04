@@ -11,15 +11,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
-	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
 	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
-	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
@@ -372,12 +372,12 @@ func (d *dataGenerator) commitObservation() committypes.Observation {
 	}
 
 	feedTokenPrices := make(map[cciptypes.UnknownEncodedAddress]cciptypes.BigInt, d.numPricedTokens)
-	feeQuoterTokenUpdates := make(map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig, d.numPricedTokens)
+	feeQuoterTokenUpdates := make(map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig, d.numPricedTokens)
 
 	for i := 0; i < d.numPricedTokens; i++ {
 		feedTokenPrices[cciptypes.UnknownEncodedAddress(genRandomString(40))] = randBigInt()
 
-		feeQuoterTokenUpdates[cciptypes.UnknownEncodedAddress(genRandomString(40))] = plugintypes.TimestampedBig{
+		feeQuoterTokenUpdates[cciptypes.UnknownEncodedAddress(genRandomString(40))] = cciptypes.TimestampedBig{
 			Timestamp: time.Now().UTC(),
 			Value:     randBigInt(),
 		}
@@ -688,16 +688,16 @@ func genSeqNumChain(n int) []plugintypes.SeqNumChain {
 	return chains
 }
 
-func genRmnRemoteConfig(numSigners int) rmntypes.RemoteConfig {
-	rmnSigners := make([]rmntypes.RemoteSignerInfo, numSigners)
+func genRmnRemoteConfig(numSigners int) cciptypes.RemoteConfig {
+	rmnSigners := make([]cciptypes.RemoteSignerInfo, numSigners)
 	for i := 0; i < numSigners; i++ {
-		rmnSigners[i] = rmntypes.RemoteSignerInfo{
+		rmnSigners[i] = cciptypes.RemoteSignerInfo{
 			OnchainPublicKey: randomBytes(20),
 			NodeIndex:        rand.Uint64(),
 		}
 	}
 
-	return rmntypes.RemoteConfig{
+	return cciptypes.RemoteConfig{
 		ContractAddress:  randomBytes(40),
 		ConfigDigest:     randomBytes32(),
 		Signers:          rmnSigners,

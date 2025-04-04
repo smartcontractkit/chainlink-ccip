@@ -22,14 +22,11 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
-	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
-	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
 // Default refresh period for cache if not specified
@@ -178,7 +175,7 @@ type RMNCurseResponse struct {
 
 func (r *ccipChainReader) CommitReportsGTETimestamp(
 	ctx context.Context, ts time.Time, limit int,
-) ([]plugintypes2.CommitPluginReportWithMeta, error) {
+) ([]cciptypes.CommitPluginReportWithMeta, error) {
 	lggr := logutil.WithContextValues(ctx, r.lggr)
 
 	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
@@ -235,8 +232,8 @@ func (r *ccipChainReader) queryCommitReports(
 // and returns the ones that can be properly parsed and validated.
 func (r *ccipChainReader) processCommitReports(
 	lggr logger.Logger, iter []types.Sequence, ts time.Time, limit int,
-) []plugintypes2.CommitPluginReportWithMeta {
-	reports := make([]plugintypes2.CommitPluginReportWithMeta, 0)
+) []cciptypes.CommitPluginReportWithMeta {
+	reports := make([]cciptypes.CommitPluginReportWithMeta, 0)
 	for _, item := range iter {
 		ev, err := validateCommitReportAcceptedEvent(item, ts)
 		if err != nil {
@@ -265,7 +262,7 @@ func (r *ccipChainReader) processCommitReports(
 			continue
 		}
 
-		reports = append(reports, plugintypes2.CommitPluginReportWithMeta{
+		reports = append(reports, cciptypes.CommitPluginReportWithMeta{
 			Report: cciptypes.CommitPluginReport{
 				BlessedMerkleRoots:   blessedMerkleRoots,
 				UnblessedMerkleRoots: unblessedMerkleRoots,
@@ -901,7 +898,7 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 			continue
 		}
 
-		var update plugintypes.TimestampedUnixBig
+		var update cciptypes.TimestampedUnixBig
 		err = reader.ExtendedGetLatestValue(
 			ctx,
 			consts.ContractNameFeeQuoter,
@@ -935,16 +932,16 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 // https://github.com/smartcontractkit/chainlink/blob/60e8b1181dd74b66903cf5b9a8427557b85357ec/contracts/src/v0.8/ccip/FeeQuoter.sol#L263-L263
 //
 //nolint:lll
-func (r *ccipChainReader) GetChainFeePriceUpdate(ctx context.Context, selectors []cciptypes.ChainSelector) map[cciptypes.ChainSelector]plugintypes.TimestampedBig {
+func (r *ccipChainReader) GetChainFeePriceUpdate(ctx context.Context, selectors []cciptypes.ChainSelector) map[cciptypes.ChainSelector]cciptypes.TimestampedBig {
 	lggr := logutil.WithContextValues(ctx, r.lggr)
 	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
 		lggr.Errorw("GetChainFeePriceUpdate dest chain extended reader not exist", "err", err)
 		return nil
 	}
 
-	feeUpdates := make(map[cciptypes.ChainSelector]plugintypes.TimestampedBig, len(selectors))
+	feeUpdates := make(map[cciptypes.ChainSelector]cciptypes.TimestampedBig, len(selectors))
 	for _, chain := range selectors {
-		update := plugintypes.TimestampedUnixBig{}
+		update := cciptypes.TimestampedUnixBig{}
 		// Read from dest chain
 		err := r.contractReaders[r.destChain].ExtendedGetLatestValue(
 			ctx,
@@ -965,17 +962,17 @@ func (r *ccipChainReader) GetChainFeePriceUpdate(ctx context.Context, selectors 
 			lggr.Debugw("chain fee price update is empty", "chain", chain)
 			continue
 		}
-		feeUpdates[chain] = plugintypes.TimeStampedBigFromUnix(update)
+		feeUpdates[chain] = cciptypes.TimeStampedBigFromUnix(update)
 	}
 
 	return feeUpdates
 }
 
 // buildSigners converts internal signer representation to RMN signer info format
-func (r *ccipChainReader) buildSigners(signers []signer) []rmntypes.RemoteSignerInfo {
-	result := make([]rmntypes.RemoteSignerInfo, 0, len(signers))
+func (r *ccipChainReader) buildSigners(signers []signer) []cciptypes.RemoteSignerInfo {
+	result := make([]cciptypes.RemoteSignerInfo, 0, len(signers))
 	for _, s := range signers {
-		result = append(result, rmntypes.RemoteSignerInfo{
+		result = append(result, cciptypes.RemoteSignerInfo{
 			OnchainPublicKey: s.OnchainPublicKey,
 			NodeIndex:        s.NodeIndex,
 		})
@@ -983,27 +980,27 @@ func (r *ccipChainReader) buildSigners(signers []signer) []rmntypes.RemoteSigner
 	return result
 }
 
-func (r *ccipChainReader) GetRMNRemoteConfig(ctx context.Context) (rmntypes.RemoteConfig, error) {
+func (r *ccipChainReader) GetRMNRemoteConfig(ctx context.Context) (cciptypes.RemoteConfig, error) {
 	lggr := logutil.WithContextValues(ctx, r.lggr)
 
 	config, err := r.configPoller.GetChainConfig(ctx, r.destChain)
 	if err != nil {
-		return rmntypes.RemoteConfig{}, fmt.Errorf("get chain config: %w", err)
+		return cciptypes.RemoteConfig{}, fmt.Errorf("get chain config: %w", err)
 	}
 
 	// RMNRemote address stored in the offramp static config is actually the proxy contract address.
 	// Here we will get the RMNRemote address from the proxy contract by calling the RMNProxy contract.
 	proxyContractAddress, err := r.GetContractAddress(consts.ContractNameRMNRemote, r.destChain)
 	if err != nil {
-		return rmntypes.RemoteConfig{}, fmt.Errorf("get RMNRemote proxy contract address: %w", err)
+		return cciptypes.RemoteConfig{}, fmt.Errorf("get RMNRemote proxy contract address: %w", err)
 	}
 
 	rmnRemoteAddress, err := r.getRMNRemoteAddress(ctx, lggr, r.destChain, proxyContractAddress)
 	if err != nil {
-		return rmntypes.RemoteConfig{}, fmt.Errorf("get RMNRemote address: %w", err)
+		return cciptypes.RemoteConfig{}, fmt.Errorf("get RMNRemote address: %w", err)
 	}
 
-	return rmntypes.RemoteConfig{
+	return cciptypes.RemoteConfig{
 		ContractAddress:  rmnRemoteAddress,
 		ConfigDigest:     config.RMNRemote.VersionedConfig.Config.RMNHomeContractConfigDigest,
 		Signers:          r.buildSigners(config.RMNRemote.VersionedConfig.Config.Signers),
@@ -1324,7 +1321,7 @@ func (r *ccipChainReader) getFeeQuoterTokenPriceUSD(ctx context.Context, tokenAd
 		return cciptypes.BigInt{}, fmt.Errorf("contract reader not found for chain %d", r.destChain)
 	}
 
-	var timestampedPrice plugintypes.TimestampedUnixBig
+	var timestampedPrice cciptypes.TimestampedUnixBig
 	err := reader.ExtendedGetLatestValue(
 		ctx,
 		consts.ContractNameFeeQuoter,

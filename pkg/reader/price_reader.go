@@ -9,7 +9,6 @@ import (
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
@@ -31,7 +30,7 @@ type PriceReader interface {
 		ctx context.Context,
 		tokens []ccipocr3.UnknownEncodedAddress,
 		chain ccipocr3.ChainSelector,
-	) (map[ccipocr3.UnknownEncodedAddress]plugintypes.TimestampedBig, error)
+	) (map[ccipocr3.UnknownEncodedAddress]ccipocr3.TimestampedBig, error)
 }
 
 type priceReader struct {
@@ -83,10 +82,10 @@ func (pr *priceReader) GetFeeQuoterTokenUpdates(
 	ctx context.Context,
 	tokens []ccipocr3.UnknownEncodedAddress,
 	chain ccipocr3.ChainSelector,
-) (map[ccipocr3.UnknownEncodedAddress]plugintypes.TimestampedBig, error) {
+) (map[ccipocr3.UnknownEncodedAddress]ccipocr3.TimestampedBig, error) {
 	lggr := logutil.WithContextValues(ctx, pr.lggr)
-	updates := make([]plugintypes.TimestampedUnixBig, len(tokens))
-	updateMap := make(map[ccipocr3.UnknownEncodedAddress]plugintypes.TimestampedBig)
+	updates := make([]ccipocr3.TimestampedUnixBig, len(tokens))
+	updateMap := make(map[ccipocr3.UnknownEncodedAddress]ccipocr3.TimestampedBig)
 
 	feeQuoterAddress, err := pr.ccipReader.GetContractAddress(consts.ContractNameFeeQuoter, chain)
 	if err != nil {
@@ -150,7 +149,7 @@ func (pr *priceReader) GetFeeQuoterTokenUpdates(
 			)
 			continue
 		}
-		updateMap[token] = plugintypes.TimeStampedBigFromUnix(updates[i])
+		updateMap[token] = ccipocr3.TimeStampedBigFromUnix(updates[i])
 	}
 
 	return updateMap, nil

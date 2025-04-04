@@ -7,17 +7,11 @@ import (
 
 	ccipocr3 "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 
-	internalplugintypes "github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
-
 	mock "github.com/stretchr/testify/mock"
-
-	plugintypes "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 
 	primitives "github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
 	reader "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-
-	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 
 	time "time"
 
@@ -83,23 +77,23 @@ func (_c *MockCCIPReader_Close_Call) RunAndReturn(run func() error) *MockCCIPRea
 }
 
 // CommitReportsGTETimestamp provides a mock function with given fields: ctx, ts, limit
-func (_m *MockCCIPReader) CommitReportsGTETimestamp(ctx context.Context, ts time.Time, limit int) ([]plugintypes.CommitPluginReportWithMeta, error) {
+func (_m *MockCCIPReader) CommitReportsGTETimestamp(ctx context.Context, ts time.Time, limit int) ([]ccipocr3.CommitPluginReportWithMeta, error) {
 	ret := _m.Called(ctx, ts, limit)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CommitReportsGTETimestamp")
 	}
 
-	var r0 []plugintypes.CommitPluginReportWithMeta
+	var r0 []ccipocr3.CommitPluginReportWithMeta
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, time.Time, int) ([]plugintypes.CommitPluginReportWithMeta, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, time.Time, int) ([]ccipocr3.CommitPluginReportWithMeta, error)); ok {
 		return rf(ctx, ts, limit)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, time.Time, int) []plugintypes.CommitPluginReportWithMeta); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, time.Time, int) []ccipocr3.CommitPluginReportWithMeta); ok {
 		r0 = rf(ctx, ts, limit)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]plugintypes.CommitPluginReportWithMeta)
+			r0 = ret.Get(0).([]ccipocr3.CommitPluginReportWithMeta)
 		}
 	}
 
@@ -132,12 +126,12 @@ func (_c *MockCCIPReader_CommitReportsGTETimestamp_Call) Run(run func(ctx contex
 	return _c
 }
 
-func (_c *MockCCIPReader_CommitReportsGTETimestamp_Call) Return(_a0 []plugintypes.CommitPluginReportWithMeta, _a1 error) *MockCCIPReader_CommitReportsGTETimestamp_Call {
+func (_c *MockCCIPReader_CommitReportsGTETimestamp_Call) Return(_a0 []ccipocr3.CommitPluginReportWithMeta, _a1 error) *MockCCIPReader_CommitReportsGTETimestamp_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockCCIPReader_CommitReportsGTETimestamp_Call) RunAndReturn(run func(context.Context, time.Time, int) ([]plugintypes.CommitPluginReportWithMeta, error)) *MockCCIPReader_CommitReportsGTETimestamp_Call {
+func (_c *MockCCIPReader_CommitReportsGTETimestamp_Call) RunAndReturn(run func(context.Context, time.Time, int) ([]ccipocr3.CommitPluginReportWithMeta, error)) *MockCCIPReader_CommitReportsGTETimestamp_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -262,19 +256,19 @@ func (_c *MockCCIPReader_ExecutedMessages_Call) RunAndReturn(run func(context.Co
 }
 
 // GetChainFeePriceUpdate provides a mock function with given fields: ctx, selectors
-func (_m *MockCCIPReader) GetChainFeePriceUpdate(ctx context.Context, selectors []ccipocr3.ChainSelector) map[ccipocr3.ChainSelector]internalplugintypes.TimestampedBig {
+func (_m *MockCCIPReader) GetChainFeePriceUpdate(ctx context.Context, selectors []ccipocr3.ChainSelector) map[ccipocr3.ChainSelector]ccipocr3.TimestampedBig {
 	ret := _m.Called(ctx, selectors)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetChainFeePriceUpdate")
 	}
 
-	var r0 map[ccipocr3.ChainSelector]internalplugintypes.TimestampedBig
-	if rf, ok := ret.Get(0).(func(context.Context, []ccipocr3.ChainSelector) map[ccipocr3.ChainSelector]internalplugintypes.TimestampedBig); ok {
+	var r0 map[ccipocr3.ChainSelector]ccipocr3.TimestampedBig
+	if rf, ok := ret.Get(0).(func(context.Context, []ccipocr3.ChainSelector) map[ccipocr3.ChainSelector]ccipocr3.TimestampedBig); ok {
 		r0 = rf(ctx, selectors)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(map[ccipocr3.ChainSelector]internalplugintypes.TimestampedBig)
+			r0 = ret.Get(0).(map[ccipocr3.ChainSelector]ccipocr3.TimestampedBig)
 		}
 	}
 
@@ -300,12 +294,12 @@ func (_c *MockCCIPReader_GetChainFeePriceUpdate_Call) Run(run func(ctx context.C
 	return _c
 }
 
-func (_c *MockCCIPReader_GetChainFeePriceUpdate_Call) Return(_a0 map[ccipocr3.ChainSelector]internalplugintypes.TimestampedBig) *MockCCIPReader_GetChainFeePriceUpdate_Call {
+func (_c *MockCCIPReader_GetChainFeePriceUpdate_Call) Return(_a0 map[ccipocr3.ChainSelector]ccipocr3.TimestampedBig) *MockCCIPReader_GetChainFeePriceUpdate_Call {
 	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *MockCCIPReader_GetChainFeePriceUpdate_Call) RunAndReturn(run func(context.Context, []ccipocr3.ChainSelector) map[ccipocr3.ChainSelector]internalplugintypes.TimestampedBig) *MockCCIPReader_GetChainFeePriceUpdate_Call {
+func (_c *MockCCIPReader_GetChainFeePriceUpdate_Call) RunAndReturn(run func(context.Context, []ccipocr3.ChainSelector) map[ccipocr3.ChainSelector]ccipocr3.TimestampedBig) *MockCCIPReader_GetChainFeePriceUpdate_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -706,22 +700,22 @@ func (_c *MockCCIPReader_GetOffRampSourceChainsConfig_Call) RunAndReturn(run fun
 }
 
 // GetRMNRemoteConfig provides a mock function with given fields: ctx
-func (_m *MockCCIPReader) GetRMNRemoteConfig(ctx context.Context) (rmntypes.RemoteConfig, error) {
+func (_m *MockCCIPReader) GetRMNRemoteConfig(ctx context.Context) (ccipocr3.RemoteConfig, error) {
 	ret := _m.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetRMNRemoteConfig")
 	}
 
-	var r0 rmntypes.RemoteConfig
+	var r0 ccipocr3.RemoteConfig
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context) (rmntypes.RemoteConfig, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context) (ccipocr3.RemoteConfig, error)); ok {
 		return rf(ctx)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context) rmntypes.RemoteConfig); ok {
+	if rf, ok := ret.Get(0).(func(context.Context) ccipocr3.RemoteConfig); ok {
 		r0 = rf(ctx)
 	} else {
-		r0 = ret.Get(0).(rmntypes.RemoteConfig)
+		r0 = ret.Get(0).(ccipocr3.RemoteConfig)
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
@@ -751,12 +745,12 @@ func (_c *MockCCIPReader_GetRMNRemoteConfig_Call) Run(run func(ctx context.Conte
 	return _c
 }
 
-func (_c *MockCCIPReader_GetRMNRemoteConfig_Call) Return(_a0 rmntypes.RemoteConfig, _a1 error) *MockCCIPReader_GetRMNRemoteConfig_Call {
+func (_c *MockCCIPReader_GetRMNRemoteConfig_Call) Return(_a0 ccipocr3.RemoteConfig, _a1 error) *MockCCIPReader_GetRMNRemoteConfig_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockCCIPReader_GetRMNRemoteConfig_Call) RunAndReturn(run func(context.Context) (rmntypes.RemoteConfig, error)) *MockCCIPReader_GetRMNRemoteConfig_Call {
+func (_c *MockCCIPReader_GetRMNRemoteConfig_Call) RunAndReturn(run func(context.Context) (ccipocr3.RemoteConfig, error)) *MockCCIPReader_GetRMNRemoteConfig_Call {
 	_c.Call.Return(run)
 	return _c
 }

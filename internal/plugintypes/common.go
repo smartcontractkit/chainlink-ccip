@@ -44,3 +44,6 @@ func NewUSD18(value int64) USD18 {
 type Trackable interface {
 	Stats() map[string]int
 }
+
+// Deprecated: use cciptypes.TimestampedBig
+type TimestampedBig = cciptypes.TimestampedBig

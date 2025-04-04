@@ -10,12 +10,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
-	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
-
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
-	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
 var (
@@ -169,7 +165,7 @@ type CCIPReader interface {
 		ctx context.Context,
 		ts time.Time,
 		limit int,
-	) ([]plugintypes2.CommitPluginReportWithMeta, error)
+	) ([]cciptypes.CommitPluginReportWithMeta, error)
 
 	// ExecutedMessages finds executed messages for all source chains/ranges provided on a single destination chain.
 	// A map of source chain to slice of sequence numbers is returned to express which seqnrs have executed.
@@ -233,9 +229,9 @@ type CCIPReader interface {
 	GetChainFeePriceUpdate(
 		ctx context.Context,
 		selectors []cciptypes.ChainSelector,
-	) map[cciptypes.ChainSelector]plugintypes.TimestampedBig
+	) map[cciptypes.ChainSelector]cciptypes.TimestampedBig
 
-	GetRMNRemoteConfig(ctx context.Context) (rmntypes.RemoteConfig, error)
+	GetRMNRemoteConfig(ctx context.Context) (cciptypes.RemoteConfig, error)
 
 	// GetRmnCurseInfo returns rmn curse/pausing information about the provided chains
 	// from the destination chain RMN remote contract. Caller should be able to access destination.

@@ -204,7 +204,7 @@ func (_c *MockExtended_ExtendedBatchGetLatestValues_Call) RunAndReturn(run func(
 }
 
 // ExtendedGetLatestValue provides a mock function with given fields: ctx, contractName, methodName, confidenceLevel, params, returnVal
-func (_m *MockExtended) ExtendedGetLatestValue(ctx context.Context, contractName string, methodName string, confidenceLevel primitives.ConfidenceLevel, params interface{}, returnVal interface{}) error {
+func (_m *MockExtended) ExtendedGetLatestValue(ctx context.Context, contractName string, methodName string, confidenceLevel primitives.ConfidenceLevel, params any, returnVal any) error {
 	ret := _m.Called(ctx, contractName, methodName, confidenceLevel, params, returnVal)
 
 	if len(ret) == 0 {
@@ -212,7 +212,7 @@ func (_m *MockExtended) ExtendedGetLatestValue(ctx context.Context, contractName
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, primitives.ConfidenceLevel, interface{}, interface{}) error); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, primitives.ConfidenceLevel, any, any) error); ok {
 		r0 = rf(ctx, contractName, methodName, confidenceLevel, params, returnVal)
 	} else {
 		r0 = ret.Error(0)
@@ -231,15 +231,15 @@ type MockExtended_ExtendedGetLatestValue_Call struct {
 //   - contractName string
 //   - methodName string
 //   - confidenceLevel primitives.ConfidenceLevel
-//   - params interface{}
-//   - returnVal interface{}
+//   - params any
+//   - returnVal any
 func (_e *MockExtended_Expecter) ExtendedGetLatestValue(ctx interface{}, contractName interface{}, methodName interface{}, confidenceLevel interface{}, params interface{}, returnVal interface{}) *MockExtended_ExtendedGetLatestValue_Call {
 	return &MockExtended_ExtendedGetLatestValue_Call{Call: _e.mock.On("ExtendedGetLatestValue", ctx, contractName, methodName, confidenceLevel, params, returnVal)}
 }
 
-func (_c *MockExtended_ExtendedGetLatestValue_Call) Run(run func(ctx context.Context, contractName string, methodName string, confidenceLevel primitives.ConfidenceLevel, params interface{}, returnVal interface{})) *MockExtended_ExtendedGetLatestValue_Call {
+func (_c *MockExtended_ExtendedGetLatestValue_Call) Run(run func(ctx context.Context, contractName string, methodName string, confidenceLevel primitives.ConfidenceLevel, params any, returnVal any)) *MockExtended_ExtendedGetLatestValue_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(primitives.ConfidenceLevel), args[4].(interface{}), args[5].(interface{}))
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(primitives.ConfidenceLevel), args[4].(any), args[5].(any))
 	})
 	return _c
 }
@@ -249,13 +249,13 @@ func (_c *MockExtended_ExtendedGetLatestValue_Call) Return(_a0 error) *MockExten
 	return _c
 }
 
-func (_c *MockExtended_ExtendedGetLatestValue_Call) RunAndReturn(run func(context.Context, string, string, primitives.ConfidenceLevel, interface{}, interface{}) error) *MockExtended_ExtendedGetLatestValue_Call {
+func (_c *MockExtended_ExtendedGetLatestValue_Call) RunAndReturn(run func(context.Context, string, string, primitives.ConfidenceLevel, any, any) error) *MockExtended_ExtendedGetLatestValue_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // ExtendedQueryKey provides a mock function with given fields: ctx, contractName, filter, limitAndSort, sequenceDataType
-func (_m *MockExtended) ExtendedQueryKey(ctx context.Context, contractName string, filter query.KeyFilter, limitAndSort query.LimitAndSort, sequenceDataType interface{}) ([]types.Sequence, error) {
+func (_m *MockExtended) ExtendedQueryKey(ctx context.Context, contractName string, filter query.KeyFilter, limitAndSort query.LimitAndSort, sequenceDataType any) ([]types.Sequence, error) {
 	ret := _m.Called(ctx, contractName, filter, limitAndSort, sequenceDataType)
 
 	if len(ret) == 0 {
@@ -264,10 +264,10 @@ func (_m *MockExtended) ExtendedQueryKey(ctx context.Context, contractName strin
 
 	var r0 []types.Sequence
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, query.KeyFilter, query.LimitAndSort, interface{}) ([]types.Sequence, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, query.KeyFilter, query.LimitAndSort, any) ([]types.Sequence, error)); ok {
 		return rf(ctx, contractName, filter, limitAndSort, sequenceDataType)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, query.KeyFilter, query.LimitAndSort, interface{}) []types.Sequence); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, query.KeyFilter, query.LimitAndSort, any) []types.Sequence); ok {
 		r0 = rf(ctx, contractName, filter, limitAndSort, sequenceDataType)
 	} else {
 		if ret.Get(0) != nil {
@@ -275,7 +275,7 @@ func (_m *MockExtended) ExtendedQueryKey(ctx context.Context, contractName strin
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, query.KeyFilter, query.LimitAndSort, interface{}) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, string, query.KeyFilter, query.LimitAndSort, any) error); ok {
 		r1 = rf(ctx, contractName, filter, limitAndSort, sequenceDataType)
 	} else {
 		r1 = ret.Error(1)
@@ -294,14 +294,14 @@ type MockExtended_ExtendedQueryKey_Call struct {
 //   - contractName string
 //   - filter query.KeyFilter
 //   - limitAndSort query.LimitAndSort
-//   - sequenceDataType interface{}
+//   - sequenceDataType any
 func (_e *MockExtended_Expecter) ExtendedQueryKey(ctx interface{}, contractName interface{}, filter interface{}, limitAndSort interface{}, sequenceDataType interface{}) *MockExtended_ExtendedQueryKey_Call {
 	return &MockExtended_ExtendedQueryKey_Call{Call: _e.mock.On("ExtendedQueryKey", ctx, contractName, filter, limitAndSort, sequenceDataType)}
 }
 
-func (_c *MockExtended_ExtendedQueryKey_Call) Run(run func(ctx context.Context, contractName string, filter query.KeyFilter, limitAndSort query.LimitAndSort, sequenceDataType interface{})) *MockExtended_ExtendedQueryKey_Call {
+func (_c *MockExtended_ExtendedQueryKey_Call) Run(run func(ctx context.Context, contractName string, filter query.KeyFilter, limitAndSort query.LimitAndSort, sequenceDataType any)) *MockExtended_ExtendedQueryKey_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(query.KeyFilter), args[3].(query.LimitAndSort), args[4].(interface{}))
+		run(args[0].(context.Context), args[1].(string), args[2].(query.KeyFilter), args[3].(query.LimitAndSort), args[4].(any))
 	})
 	return _c
 }
@@ -311,7 +311,7 @@ func (_c *MockExtended_ExtendedQueryKey_Call) Return(_a0 []types.Sequence, _a1 e
 	return _c
 }
 
-func (_c *MockExtended_ExtendedQueryKey_Call) RunAndReturn(run func(context.Context, string, query.KeyFilter, query.LimitAndSort, interface{}) ([]types.Sequence, error)) *MockExtended_ExtendedQueryKey_Call {
+func (_c *MockExtended_ExtendedQueryKey_Call) RunAndReturn(run func(context.Context, string, query.KeyFilter, query.LimitAndSort, any) ([]types.Sequence, error)) *MockExtended_ExtendedQueryKey_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -365,7 +365,7 @@ func (_c *MockExtended_GetBindings_Call) RunAndReturn(run func(string) []contrac
 }
 
 // GetLatestValue provides a mock function with given fields: ctx, readIdentifier, confidenceLevel, params, returnVal
-func (_m *MockExtended) GetLatestValue(ctx context.Context, readIdentifier string, confidenceLevel primitives.ConfidenceLevel, params interface{}, returnVal interface{}) error {
+func (_m *MockExtended) GetLatestValue(ctx context.Context, readIdentifier string, confidenceLevel primitives.ConfidenceLevel, params any, returnVal any) error {
 	ret := _m.Called(ctx, readIdentifier, confidenceLevel, params, returnVal)
 
 	if len(ret) == 0 {
@@ -373,7 +373,7 @@ func (_m *MockExtended) GetLatestValue(ctx context.Context, readIdentifier strin
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, primitives.ConfidenceLevel, interface{}, interface{}) error); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, primitives.ConfidenceLevel, any, any) error); ok {
 		r0 = rf(ctx, readIdentifier, confidenceLevel, params, returnVal)
 	} else {
 		r0 = ret.Error(0)
@@ -391,15 +391,15 @@ type MockExtended_GetLatestValue_Call struct {
 //   - ctx context.Context
 //   - readIdentifier string
 //   - confidenceLevel primitives.ConfidenceLevel
-//   - params interface{}
-//   - returnVal interface{}
+//   - params any
+//   - returnVal any
 func (_e *MockExtended_Expecter) GetLatestValue(ctx interface{}, readIdentifier interface{}, confidenceLevel interface{}, params interface{}, returnVal interface{}) *MockExtended_GetLatestValue_Call {
 	return &MockExtended_GetLatestValue_Call{Call: _e.mock.On("GetLatestValue", ctx, readIdentifier, confidenceLevel, params, returnVal)}
 }
 
-func (_c *MockExtended_GetLatestValue_Call) Run(run func(ctx context.Context, readIdentifier string, confidenceLevel primitives.ConfidenceLevel, params interface{}, returnVal interface{})) *MockExtended_GetLatestValue_Call {
+func (_c *MockExtended_GetLatestValue_Call) Run(run func(ctx context.Context, readIdentifier string, confidenceLevel primitives.ConfidenceLevel, params any, returnVal any)) *MockExtended_GetLatestValue_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(primitives.ConfidenceLevel), args[3].(interface{}), args[4].(interface{}))
+		run(args[0].(context.Context), args[1].(string), args[2].(primitives.ConfidenceLevel), args[3].(any), args[4].(any))
 	})
 	return _c
 }
@@ -409,7 +409,7 @@ func (_c *MockExtended_GetLatestValue_Call) Return(_a0 error) *MockExtended_GetL
 	return _c
 }
 
-func (_c *MockExtended_GetLatestValue_Call) RunAndReturn(run func(context.Context, string, primitives.ConfidenceLevel, interface{}, interface{}) error) *MockExtended_GetLatestValue_Call {
+func (_c *MockExtended_GetLatestValue_Call) RunAndReturn(run func(context.Context, string, primitives.ConfidenceLevel, any, any) error) *MockExtended_GetLatestValue_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -462,7 +462,7 @@ func (_c *MockExtended_HealthReport_Call) RunAndReturn(run func() map[string]err
 }
 
 // QueryKey provides a mock function with given fields: ctx, contract, filter, limitAndSort, sequenceDataType
-func (_m *MockExtended) QueryKey(ctx context.Context, contract types.BoundContract, filter query.KeyFilter, limitAndSort query.LimitAndSort, sequenceDataType interface{}) ([]types.Sequence, error) {
+func (_m *MockExtended) QueryKey(ctx context.Context, contract types.BoundContract, filter query.KeyFilter, limitAndSort query.LimitAndSort, sequenceDataType any) ([]types.Sequence, error) {
 	ret := _m.Called(ctx, contract, filter, limitAndSort, sequenceDataType)
 
 	if len(ret) == 0 {
@@ -471,10 +471,10 @@ func (_m *MockExtended) QueryKey(ctx context.Context, contract types.BoundContra
 
 	var r0 []types.Sequence
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, types.BoundContract, query.KeyFilter, query.LimitAndSort, interface{}) ([]types.Sequence, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, types.BoundContract, query.KeyFilter, query.LimitAndSort, any) ([]types.Sequence, error)); ok {
 		return rf(ctx, contract, filter, limitAndSort, sequenceDataType)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, types.BoundContract, query.KeyFilter, query.LimitAndSort, interface{}) []types.Sequence); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, types.BoundContract, query.KeyFilter, query.LimitAndSort, any) []types.Sequence); ok {
 		r0 = rf(ctx, contract, filter, limitAndSort, sequenceDataType)
 	} else {
 		if ret.Get(0) != nil {
@@ -482,7 +482,7 @@ func (_m *MockExtended) QueryKey(ctx context.Context, contract types.BoundContra
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, types.BoundContract, query.KeyFilter, query.LimitAndSort, interface{}) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, types.BoundContract, query.KeyFilter, query.LimitAndSort, any) error); ok {
 		r1 = rf(ctx, contract, filter, limitAndSort, sequenceDataType)
 	} else {
 		r1 = ret.Error(1)
@@ -501,14 +501,14 @@ type MockExtended_QueryKey_Call struct {
 //   - contract types.BoundContract
 //   - filter query.KeyFilter
 //   - limitAndSort query.LimitAndSort
-//   - sequenceDataType interface{}
+//   - sequenceDataType any
 func (_e *MockExtended_Expecter) QueryKey(ctx interface{}, contract interface{}, filter interface{}, limitAndSort interface{}, sequenceDataType interface{}) *MockExtended_QueryKey_Call {
 	return &MockExtended_QueryKey_Call{Call: _e.mock.On("QueryKey", ctx, contract, filter, limitAndSort, sequenceDataType)}
 }
 
-func (_c *MockExtended_QueryKey_Call) Run(run func(ctx context.Context, contract types.BoundContract, filter query.KeyFilter, limitAndSort query.LimitAndSort, sequenceDataType interface{})) *MockExtended_QueryKey_Call {
+func (_c *MockExtended_QueryKey_Call) Run(run func(ctx context.Context, contract types.BoundContract, filter query.KeyFilter, limitAndSort query.LimitAndSort, sequenceDataType any)) *MockExtended_QueryKey_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(types.BoundContract), args[2].(query.KeyFilter), args[3].(query.LimitAndSort), args[4].(interface{}))
+		run(args[0].(context.Context), args[1].(types.BoundContract), args[2].(query.KeyFilter), args[3].(query.LimitAndSort), args[4].(any))
 	})
 	return _c
 }
@@ -518,7 +518,7 @@ func (_c *MockExtended_QueryKey_Call) Return(_a0 []types.Sequence, _a1 error) *M
 	return _c
 }
 
-func (_c *MockExtended_QueryKey_Call) RunAndReturn(run func(context.Context, types.BoundContract, query.KeyFilter, query.LimitAndSort, interface{}) ([]types.Sequence, error)) *MockExtended_QueryKey_Call {
+func (_c *MockExtended_QueryKey_Call) RunAndReturn(run func(context.Context, types.BoundContract, query.KeyFilter, query.LimitAndSort, any) ([]types.Sequence, error)) *MockExtended_QueryKey_Call {
 	_c.Call.Return(run)
 	return _c
 }
