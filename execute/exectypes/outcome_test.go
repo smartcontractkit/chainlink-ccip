@@ -1,9 +1,10 @@
 package exectypes
 
 import (
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"testing"
 	"time"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 
