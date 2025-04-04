@@ -112,7 +112,8 @@ func (p *Plugin) Observation(
 	}
 
 	p.observer.TrackObservation(observation, state)
-	lggr.Infow("execute plugin got observation", "observation", observation,
+	lggr.Infow("execute plugin got observation",
+		"observation w/o (msg data & discovery data)", observation.CopyNoMsgData().CopyNoDiscoveryData(),
 		"duration", time.Since(tStart),
 		"state", state,
 		"numCommitReports", len(observation.CommitReports),
