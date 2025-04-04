@@ -136,6 +136,7 @@ impl OnRamp for Impl {
         );
         dest_chain.state.sequence_number = overflow_add.unwrap();
 
+        // TODO: IF SVM is dest chain, then the receiver should be obtained from extra args
         let receiver = message.receiver.clone();
         let source_chain_selector = ctx.accounts.config.svm_chain_selector;
 
