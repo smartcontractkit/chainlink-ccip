@@ -46,10 +46,10 @@ deployments:
                   BlockHistorySize = {{ .ChainConfig.BlockHistorySize }}
                   ComputeUnitLimitDefault = {{ .ChainConfig.ComputeUnitLimitDefault }}
                   EstimateComputeUnitLimit = {{ .ChainConfig.EstimateComputeUnitLimit }}
+                  [Solana.MultiNode]
+                  VerifyChainID = {{ .ChainConfig.MultiNode.VerifyChainID }}
                   [[Solana.Nodes]]
                   Name = 'node-{{ .ChainId }}'
                   URL = "http://solana-{{ .PodId }}:8544"
-                  [[Solana.MultiNode]]
-                  VerifyChainID = {{ .ChainConfig.MultiNode.VerifyChainID }}
                 {{- end }}
 
