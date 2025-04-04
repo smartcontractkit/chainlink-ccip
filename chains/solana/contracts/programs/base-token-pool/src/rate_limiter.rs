@@ -57,8 +57,11 @@ impl RateLimitTokenBucket {
             // Wait required until the bucket is refilled enough to accept this value, round up to next higher second
             // Consume is not guaranteed to succeed after wait time passes if there is competing traffic.
             // This acts as a lower bound of wait time.
-            let min_wait_sec = (request_tokens.checked_sub(self.tokens).unwrap()
-                + rate.checked_sub(1).unwrap())
+            let min_wait_sec = (request_tokens
+                .checked_sub(self.tokens)
+                .unwrap()
+                .checked_add(rate.checked_sub(1).unwrap()))
+            .unwrap()
             .checked_div(rate)
             .unwrap();
 
@@ -80,7 +83,10 @@ impl RateLimitTokenBucket {
     fn refill<C: Timestamper>(&mut self) -> Result<()> {
         let current_timestamp = C::instance()?.unix_timestamp();
         let time_diff = current_timestamp.checked_sub(self.last_updated).unwrap();
-        self.tokens = min(self.cfg.capacity, self.tokens + time_diff * self.cfg.rate);
+        let increase = time_diff.checked_mul(self.cfg.rate).unwrap();
+        let refill = self.tokens.checked_add(increase).unwrap();
+
+        self.tokens = min(self.cfg.capacity, refill);
         self.last_updated = current_timestamp;
         Ok(())
     }
