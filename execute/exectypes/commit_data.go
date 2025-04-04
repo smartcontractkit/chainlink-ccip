@@ -40,3 +40,23 @@ type CommitData struct {
 	// Length of this slice should equal to the length of Messages slice.
 	MessageTokenData []MessageTokenData `json:"messageTokenData"`
 }
+
+// CopyNoMsgData creates a copy of the CommitData without the messages.Data
+func (cd CommitData) CopyNoMsgData() CommitData {
+	msgsWitoutData := make([]cciptypes.Message, len(cd.Messages))
+	for i, msg := range cd.Messages {
+		msgsWitoutData[i] = msg.CopyWithoutData()
+	}
+	return CommitData{
+		SourceChain:         cd.SourceChain,
+		OnRampAddress:       cd.OnRampAddress,
+		Timestamp:           cd.Timestamp,
+		BlockNum:            cd.BlockNum,
+		MerkleRoot:          cd.MerkleRoot,
+		SequenceNumberRange: cd.SequenceNumberRange,
+		ExecutedMessages:    append([]cciptypes.SeqNum{}, cd.ExecutedMessages...),
+		Messages:            msgsWitoutData,
+		Hashes:              append([]cciptypes.Bytes32{}, cd.Hashes...),
+		MessageTokenData:    append([]MessageTokenData{}, cd.MessageTokenData...),
+	}
+}
