@@ -1,6 +1,7 @@
 package exectypes
 
 import (
+	"fmt"
 	"sort"
 
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
@@ -83,8 +84,8 @@ func (o *Outcome) Stats() map[string]int {
 	return counters
 }
 
-// CopyNoMsgData creates a copy of the outcome with the messages data removed.
-func (o Outcome) CopyNoMsgData() Outcome {
+// ToLogFormat creates a copy of the outcome with the messages data removed.
+func (o Outcome) ToLogFormat() string {
 	commitReports := make([]CommitData, len(o.CommitReports))
 	for i, report := range o.CommitReports {
 		commitReports[i] = report.CopyNoMsgData()
@@ -93,14 +94,14 @@ func (o Outcome) CopyNoMsgData() Outcome {
 	for i, report := range o.Report.ChainReports {
 		reports[i] = report.CopyNoMsgData()
 	}
-	newOutcome := Outcome{
+	cleanedOutcome := Outcome{
 		State:         o.State,
 		CommitReports: commitReports,
 		Report: cciptypes.ExecutePluginReport{
 			ChainReports: reports,
 		},
 	}
-	return newOutcome
+	return fmt.Sprintf("%v", cleanedOutcome)
 }
 
 // NewOutcome creates a new Outcome with the pending commit reports and the chain reports sorted.
