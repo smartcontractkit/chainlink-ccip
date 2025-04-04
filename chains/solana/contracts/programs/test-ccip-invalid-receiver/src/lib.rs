@@ -158,7 +158,11 @@ pub mod test_ccip_invalid_receiver {
             data: build_receiver_discriminator_and_data(&message)?,
         };
 
-        let seeds: &[&[u8]] = &[b"external_execution_config", &[ctx.bumps.cpi_signer]];
+        let seeds: &[&[u8]] = &[
+            b"external_execution_config",
+            ctx.accounts.test_receiver.key.as_ref(),
+            &[ctx.bumps.cpi_signer],
+        ];
 
         invoke_signed(&ix, &acc_infos, &[seeds])?;
 
