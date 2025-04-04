@@ -26,6 +26,7 @@ pub fn uninitialized(v: u8) -> bool {
 const MAX_CONFIG_V: u8 = 1;
 const MAX_CHAINSTATE_V: u8 = 1;
 const MAX_TOKEN_AND_CHAIN_CONFIG_V: u8 = 1;
+const MAX_BILLING_TOKEN_CONFIG_V: u8 = 1;
 
 #[derive(Accounts)]
 pub struct Initialize<'info> {
@@ -109,6 +110,7 @@ pub struct GetFee<'info> {
             }
         ],
         bump,
+        constraint = valid_version(billing_token_config.version, MAX_BILLING_TOKEN_CONFIG_V) @ FeeQuoterError::InvalidVersion,
     )]
     pub billing_token_config: Account<'info, BillingTokenConfigWrapper>,
 
@@ -194,6 +196,7 @@ pub struct UpdateBillingTokenConfig<'info> {
         mut,
         seeds = [seed::FEE_BILLING_TOKEN_CONFIG, token_config.mint.key().as_ref()],
         bump,
+        constraint = valid_version(billing_token_config.version, MAX_BILLING_TOKEN_CONFIG_V) @ FeeQuoterError::InvalidVersion,
     )]
     pub billing_token_config: Account<'info, BillingTokenConfigWrapper>,
 
