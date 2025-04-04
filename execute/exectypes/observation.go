@@ -2,8 +2,6 @@ package exectypes
 
 import (
 	"context"
-	"fmt"
-
 	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal"
@@ -138,7 +136,7 @@ type Observation struct {
 }
 
 // ToLogFormat creates a copy of the outcome with the messages.data and discovery obs removed
-func (o Observation) ToLogFormat() string {
+func (o Observation) ToLogFormat() Observation {
 	msgsWithEmptyData := make(MessageObservations)
 	for srcChain, msgs := range o.Messages {
 		msgsWithEmptyData[srcChain] = make(map[cciptypes.SeqNum]cciptypes.Message)
@@ -156,7 +154,7 @@ func (o Observation) ToLogFormat() string {
 		Contracts:     dt.Observation{},
 	}
 
-	return fmt.Sprintf("%v", cleanedObs)
+	return cleanedObs
 }
 
 func (co CommitObservations) Flatten() []CommitData {
