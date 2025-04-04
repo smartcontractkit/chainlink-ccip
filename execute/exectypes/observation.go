@@ -136,6 +136,39 @@ type Observation struct {
 	FChain map[cciptypes.ChainSelector]int `json:"fChain"`
 }
 
+// CopyNoMsgData creates a copy of the outcome with the messages data removed.
+func (o Observation) CopyNoMsgData() Observation {
+	msgsWithEmptyData := make(MessageObservations)
+	for srcChain, msgs := range o.Messages {
+		msgsWithEmptyData[srcChain] = make(map[cciptypes.SeqNum]cciptypes.Message)
+		for seqNum, msg := range msgs {
+			msgsWithEmptyData[srcChain][seqNum] = msg.CopyWithoutData()
+		}
+	}
+	newObs := Observation{
+		CommitReports: o.CommitReports,
+		Hashes:        o.Hashes,
+		TokenData:     o.TokenData,
+		Nonces:        o.Nonces,
+		FChain:        o.FChain,
+		Messages:      msgsWithEmptyData,
+	}
+	return newObs
+}
+
+func (o Observation) CopyNoDiscoveryData() Observation {
+	newObs := Observation{
+		CommitReports: o.CommitReports,
+		Hashes:        o.Hashes,
+		TokenData:     o.TokenData,
+		Nonces:        o.Nonces,
+		FChain:        o.FChain,
+		Messages:      o.Messages,
+		Contracts:     dt.Observation{},
+	}
+	return newObs
+}
+
 func (co CommitObservations) Flatten() []CommitData {
 	var results []CommitData
 	for _, reports := range co {

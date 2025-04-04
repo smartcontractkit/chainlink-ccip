@@ -470,7 +470,7 @@ pub fn validate_release_or_mint<'info>(
     rmn_remote_curses: AccountInfo<'info>,
     rmn_remote_config: AccountInfo<'info>,
 ) -> Result<()> {
-    require_eq!(
+    require_keys_eq!(
         config_mint,
         release_or_mint_in.local_token,
         CcipTokenPoolError::InvalidToken
