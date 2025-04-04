@@ -48,6 +48,8 @@ func (p *Processor) ObservationQuorum(
 	), nil
 }
 
+const SendingObservation = "sending merkle root processor observation"
+
 // Observation makes external calls to observe information according to the current processor state.
 // According to the state it either observes sequence numbers, root hashes, RMN remote config, etc...
 func (p *Processor) Observation(
@@ -77,7 +79,7 @@ func (p *Processor) Observation(
 	if err != nil {
 		return Observation{}, fmt.Errorf("get observation: %w", err)
 	}
-	lggr.Infow("sending merkle root processor observation",
+	lggr.Infow(SendingObservation,
 		"observation", observation, "nextState", nextState, "observationDuration", time.Since(tStart))
 	return observation, nil
 }

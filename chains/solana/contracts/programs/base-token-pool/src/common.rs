@@ -205,7 +205,13 @@ impl BaseChain {
 
 #[derive(InitSpace, Clone, AnchorSerialize, AnchorDeserialize)]
 pub struct RemoteConfig {
-    #[max_len(0)]
+    // Remote pool addresses are a vec to support multiple pool versions of the same token.
+    // Although for a given remote chain, there should be one active pool address at a time,
+    // tokens could have been sent from earlier versions of that pool.
+    // On SVM, pools are expected to upgrade in place, but on EVM, earlier version have different addresses.
+    // Tokens could be stuck in flight for a long time, we need to support validation of these tokens even
+    // after the pool they were sent from has been decommissioned at source.
+    #[max_len(0)] // used to calculate InitSpace
     pub pool_addresses: Vec<RemoteAddress>,
     pub token_address: RemoteAddress,
     pub decimals: u8, // needed to track decimals from remote to convert properly
@@ -273,9 +279,9 @@ pub struct ReleaseOrMintInV1 {
     /// @dev WARNING: sourcePoolAddress should be checked prior to any processing of funds. Make sure it matches the
     /// expected pool address for the given remoteChainSelector.
     pub source_pool_address: RemoteAddress, //       The address of the source pool, abi encoded in the case of EVM chains
-    pub source_pool_data: RemoteAddress, //          The data received from the source pool to process the release or mint
+    pub source_pool_data: Vec<u8>, //          The data received from the source pool to process the release or mint
     /// @dev WARNING: offchainTokenData is untrusted data.
-    pub offchain_token_data: RemoteAddress, //       The offchain data to process the release or mint
+    pub offchain_token_data: Vec<u8>, //       The offchain data to process the release or mint
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
@@ -454,7 +460,7 @@ pub fn validate_release_or_mint<'info>(
     rmn_remote_curses: AccountInfo<'info>,
     rmn_remote_config: AccountInfo<'info>,
 ) -> Result<()> {
-    require_eq!(
+    require_keys_eq!(
         config_mint,
         release_or_mint_in.local_token,
         CcipTokenPoolError::InvalidToken

@@ -163,7 +163,7 @@ func getSortedExecutableReports(lggr logger.Logger,
 	reports []exectypes.CommitData,
 	canExecute CanExecuteHandle) []exectypes.CommitData {
 	// Filter out reports that cannot be executed (executed or snoozed).
-	var unskippedReports []exectypes.CommitData
+	var executableReports []exectypes.CommitData
 	{
 		var skippedCommitRoots []string
 		for _, commitReport := range reports {
@@ -171,7 +171,7 @@ func getSortedExecutableReports(lggr logger.Logger,
 				skippedCommitRoots = append(skippedCommitRoots, commitReport.MerkleRoot.String())
 				continue
 			}
-			unskippedReports = append(unskippedReports, commitReport)
+			executableReports = append(executableReports, commitReport)
 		}
 		lggr.Infow(
 			"skipping reports marked as executed or snoozed",
@@ -179,12 +179,12 @@ func getSortedExecutableReports(lggr logger.Logger,
 			"skippedCommitRoots", skippedCommitRoots,
 		)
 	}
-	sort.Slice(unskippedReports, func(i, j int) bool {
-		return unskippedReports[i].SequenceNumberRange.Start() <
-			unskippedReports[j].SequenceNumberRange.Start()
+	sort.Slice(executableReports, func(i, j int) bool {
+		return executableReports[i].SequenceNumberRange.Start() <
+			executableReports[j].SequenceNumberRange.Start()
 	})
 
-	return unskippedReports
+	return executableReports
 }
 
 // getExecutableReportRanges returns the ranges of reports that can be executed based on the canExecute function
