@@ -522,7 +522,7 @@ pub mod context {
         // Offramp CPI signer PDA must be first
         // It is not mutable, and thus cannot be used as payer of init/realloc of other PDAs.
         #[account(
-            seeds = [ccip_seeds::EXTERNAL_EXECUTION_CONFIG],
+            seeds = [ccip_seeds::EXTERNAL_EXECUTION_CONFIG, crate::ID.as_ref()],
             bump,
             seeds::program = offramp_program.key(),
         )]
