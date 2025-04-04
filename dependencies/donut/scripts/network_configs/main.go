@@ -86,6 +86,8 @@ func BuildSolanaNetworkConfigs(count int) []SolanaChain {
 	selectors := []string{"22222222222222222222222222222222222222222222", "33333333333333333333333333333333333333333333", "44444444444444444444444444444444444444444444"}
 	chains := make([]SolanaChain, 0, count)
 	chainConfig := solcfg.NewDefault()
+	chainConfig.Chain.ComputeUnitLimitDefault = ptr(uint32(100))
+	chainConfig.MultiNode.MultiNode.VerifyChainID = ptr(false)
 
 	for i := 0; i <= count-1; i++ {
 		chains = append(chains, SolanaChain{NetworkId: selectors[i], ChainId: selectors[i], PodId: SolStartingPodId + i, ChainConfig: *chainConfig})
@@ -117,4 +119,8 @@ func BuildEVMNetworkConfigs(chainsCount int) []EVMChain {
 	}
 
 	return chains
+}
+
+func ptr[T any](t T) *T {
+	return &t
 }

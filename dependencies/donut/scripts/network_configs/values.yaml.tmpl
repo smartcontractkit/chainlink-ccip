@@ -49,5 +49,7 @@ deployments:
                   [[Solana.Nodes]]
                   Name = 'node-{{ .ChainId }}'
                   URL = "http://solana-{{ .PodId }}:8544"
+                  [[Solana.MultiNode]]
+                  VerifyChainID = {{ .ChainConfig.MultiNode.VerifyChainID }}
                 {{- end }}
 
