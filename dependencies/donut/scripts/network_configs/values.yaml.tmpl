@@ -26,7 +26,26 @@ deployments:
                   [[Solana]]
                   ChainID = '{{ .ChainId }}'
                   Enabled = true
-
+                  ConfirmPollPeriod = '{{ .ChainConfig.ConfirmPollPeriod }}'
+                  OCR2CachePollPeriod = '{{ .ChainConfig.OCR2CachePollPeriod }}'
+                  OCR2CacheTTL = '{{ .ChainConfig.OCR2CacheTTL }}'
+                  TxTimeout = '{{ .ChainConfig.TxTimeout }}'
+                  TxRetryTimeout = '{{ .ChainConfig.TxRetryTimeout }}'
+                  TxConfirmTimeout = '{{ .ChainConfig.TxConfirmTimeout }}'
+                  TxExpirationRebroadcast = {{ .ChainConfig.TxExpirationRebroadcast }}
+                  TxRetentionTimeout = '{{ .ChainConfig.TxRetentionTimeout }}'
+                  SkipPreflight = {{ .ChainConfig.SkipPreflight }}
+                  Commitment = '{{ .ChainConfig.Commitment }}'
+                  MaxRetries = {{ .ChainConfig.MaxRetries }}
+                  FeeEstimatorMode = '{{ .ChainConfig.FeeEstimatorMode }}'
+                  ComputeUnitPriceMax = {{ .ChainConfig.ComputeUnitPriceMax }}
+                  ComputeUnitPriceMin = {{ .ChainConfig.ComputeUnitPriceMin }}
+                  ComputeUnitPriceDefault = {{ .ChainConfig.ComputeUnitPriceDefault }}
+                  FeeBumpPeriod = '{{ .ChainConfig.FeeBumpPeriod }}'
+                  BlockHistoryPollPeriod = '{{ .ChainConfig.BlockHistoryPollPeriod }}'
+                  BlockHistorySize = {{ .ChainConfig.BlockHistorySize }}
+                  ComputeUnitLimitDefault = {{ .ChainConfig.ComputeUnitLimitDefault }}
+                  EstimateComputeUnitLimit = {{ .ChainConfig.EstimateComputeUnitLimit }}
                   [[Solana.Nodes]]
                   Name = 'node-{{ .ChainId }}'
                   URL = "http://solana-{{ .PodId }}:8544"

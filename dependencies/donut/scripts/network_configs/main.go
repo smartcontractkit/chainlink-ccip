@@ -5,6 +5,13 @@ import (
 	"fmt"
 	"os"
 	"text/template"
+
+	// "time"
+	//
+	// "github.com/pelletier/go-toml/v2"
+	// "github.com/smartcontractkit/chainlink-common/pkg/config"
+	// mnCfg "github.com/smartcontractkit/chainlink-framework/multinode/config"
+	solcfg "github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 )
 
 const tmplFile = "values.yaml.tmpl"
@@ -17,9 +24,10 @@ type EVMChain struct {
 }
 
 type SolanaChain struct {
-	NetworkId string
-	ChainId   string
-	PodId     int
+	NetworkId   string
+	ChainId     string
+	PodId       int
+	ChainConfig solcfg.TOMLConfig
 }
 
 type Config struct {
@@ -77,9 +85,12 @@ func BuildSolanaNetworkConfigs(count int) []SolanaChain {
 	}
 	selectors := []string{"22222222222222222222222222222222222222222222", "33333333333333333333333333333333333333333333", "44444444444444444444444444444444444444444444"}
 	chains := make([]SolanaChain, 0, count)
+	chainConfig := solcfg.NewDefault()
+
 	for i := 0; i <= count-1; i++ {
-		chains = append(chains, SolanaChain{NetworkId: selectors[i], ChainId: selectors[i], PodId: SolStartingPodId + i})
+		chains = append(chains, SolanaChain{NetworkId: selectors[i], ChainId: selectors[i], PodId: SolStartingPodId + i, ChainConfig: *chainConfig})
 	}
+
 	return chains
 }
 
