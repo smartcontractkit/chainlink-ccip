@@ -48,13 +48,9 @@ func toTableEntries(t interface{}) solana.PublicKeySlice {
 }
 
 type RouterTable struct {
-	RouterConfig solana.PublicKey
-	// "destChainConfig":       mustRandomPubkey(),
+	RouterConfig        solana.PublicKey
 	SystemProgram       solana.PublicKey
 	BillingTokenProgram solana.PublicKey
-	// "billingTokenMint":      mustRandomPubkey(),
-	// "billingTokenConfig":    mustRandomPubkey(),
-	// "routerBillingTokenATA": mustRandomPubkey(),
 	RouterBillingSigner solana.PublicKey
 	SysVarInstruction   solana.PublicKey
 	FqBillingSinger     solana.PublicKey
@@ -67,18 +63,13 @@ type RouterTable struct {
 }
 
 type OfframpTable struct {
-	Config             solana.PublicKey
-	ReferenceAddresses solana.PublicKey
-	// "originChainConfig":     mustRandomPubkey(),
-	SysVarInstruction solana.PublicKey
-	SystemProgram     solana.PublicKey
-	BillingSinger     solana.PublicKey
-	FeeQuoterProgram  solana.PublicKey
-	FqConfig          solana.PublicKey
-	// "billingTokenConfig":    mustRandomPubkey(),
-	// "destChainConfig":       mustRandomPubkey(),
-	// "arbMessagingSigner":    mustRandomPubkey(),
-	// "tokenPoolSigner":       mustRandomPubkey(),
+	Config                solana.PublicKey
+	ReferenceAddresses    solana.PublicKey
+	SysVarInstruction     solana.PublicKey
+	SystemProgram         solana.PublicKey
+	BillingSinger         solana.PublicKey
+	FeeQuoterProgram      solana.PublicKey
+	FqConfig              solana.PublicKey
 	Offramp               solana.PublicKey
 	FqAllowedPriceUpdater solana.PublicKey
 	RmnProgram            solana.PublicKey
@@ -214,9 +205,9 @@ func TestTransactionSizing(t *testing.T) {
 			mustRandomPubkey(),              // fee quoter dest chain
 			mustRandomPubkey(),              // fee quoter billing token config
 			routerTable.FqLinkConfig,        // fee quoter link token config
-			config.RMNRemoteProgram,
-			config.RMNRemoteCursesPDA,
-			config.RMNRemoteConfigPDA,
+			routerTable.RmnProgram,
+			routerTable.RmnCurses,
+			routerTable.RmnConfig,
 		)
 
 		for _, v := range addAccounts {
