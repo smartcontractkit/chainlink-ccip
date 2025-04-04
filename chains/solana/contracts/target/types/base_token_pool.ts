@@ -227,18 +227,14 @@ export type BaseTokenPool = {
           },
           {
             "name": "sourcePoolData",
-            "type": {
-              "defined": "RemoteAddress"
-            }
+            "type": "bytes"
           },
           {
             "name": "offchainTokenData",
             "docs": [
               "@dev WARNING: offchainTokenData is untrusted data."
             ],
-            "type": {
-              "defined": "RemoteAddress"
-            }
+            "type": "bytes"
           }
         ]
       }
@@ -864,18 +860,14 @@ export const IDL: BaseTokenPool = {
           },
           {
             "name": "sourcePoolData",
-            "type": {
-              "defined": "RemoteAddress"
-            }
+            "type": "bytes"
           },
           {
             "name": "offchainTokenData",
             "docs": [
               "@dev WARNING: offchainTokenData is untrusted data."
             ],
-            "type": {
-              "defined": "RemoteAddress"
-            }
+            "type": "bytes"
           }
         ]
       }
