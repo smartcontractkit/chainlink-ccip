@@ -130,7 +130,7 @@ profiles:
           api:
             enabled: true
             ingressClassName: alb
-            host: minio-api.${HOST_NAME}
+            host: ${DEVSPACE_NAMESPACE}-minio-api.${HOST_NAME}
             path: /*
             pathType: ImplementationSpecific
             annotations:
@@ -142,7 +142,7 @@ profiles:
           console:
             enabled: true
             ingressClassName: alb
-            host: minio-console.${HOST_NAME}
+            host: ${DEVSPACE_NAMESPACE}-minio-console.${HOST_NAME}
             path: /*
             pathType: ImplementationSpecific
             annotations:
