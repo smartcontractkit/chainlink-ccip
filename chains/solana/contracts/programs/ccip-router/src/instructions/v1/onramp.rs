@@ -127,8 +127,6 @@ impl OnRamp for Impl {
             )?;
         }
 
-        let dest_chain = &mut ctx.accounts.dest_chain_state;
-
         let overflow_add = dest_chain.state.sequence_number.checked_add(1);
         require!(
             overflow_add.is_some(),
@@ -172,14 +170,14 @@ impl OnRamp for Impl {
             token_amounts: vec![SVM2AnyTokenTransfer::default(); token_count], // this will be set later
         };
 
+        let router_token_pool_signer = &ctx.accounts.token_pools_signer;
         let seeds = &[seed::EXTERNAL_TOKEN_POOL, &[ctx.bumps.token_pools_signer]];
+
         for (i, (current_token_accounts, token_amount)) in accounts_per_sent_token
             .iter()
             .zip(message.token_amounts.iter())
             .enumerate()
         {
-            let router_token_pool_signer = &ctx.accounts.token_pools_signer;
-
             // CPI: transfer token amount from user to token pool
             transfer_token(
                 token_amount.amount,

@@ -655,6 +655,8 @@ pub enum CcipOfframpError {
     Ocr3InvalidSignature,
     #[msg("Signatures out of registration")]
     Ocr3SignaturesOutOfRegistration,
+    #[msg("Signatures provided when verification is disabled")]
+    Ocr3SignaturesProvidedWhenVerificationDisabled,
     #[msg("Invalid onramp address")]
     InvalidOnrampAddress,
     #[msg("Commit report has pending messages")]
