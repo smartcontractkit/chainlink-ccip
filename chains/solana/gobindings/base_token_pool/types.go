@@ -402,10 +402,10 @@ type ReleaseOrMintInV1 struct {
 	// @dev WARNING: sourcePoolAddress should be checked prior to any processing of funds. Make sure it matches the
 	// expected pool address for the given remoteChainSelector.
 	SourcePoolAddress RemoteAddress
-	SourcePoolData    RemoteAddress
+	SourcePoolData    []byte
 
 	// @dev WARNING: offchainTokenData is untrusted data.
-	OffchainTokenData RemoteAddress
+	OffchainTokenData []byte
 }
 
 func (obj ReleaseOrMintInV1) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
