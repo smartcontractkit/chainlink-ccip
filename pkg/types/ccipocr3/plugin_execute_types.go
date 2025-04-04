@@ -25,6 +25,20 @@ type ExecuteReportInfo struct {
 	MerkleRoots     []MerkleRootChain
 }
 
+func (e ExecutePluginReportSingleChain) CopyNoMsgData() ExecutePluginReportSingleChain {
+	msgsWithoutData := make([]Message, len(e.Messages))
+	for i, msg := range e.Messages {
+		msgsWithoutData[i] = msg.CopyWithoutData()
+	}
+	return ExecutePluginReportSingleChain{
+		SourceChainSelector: e.SourceChainSelector,
+		Messages:            msgsWithoutData,
+		OffchainTokenData:   e.OffchainTokenData,
+		Proofs:              append([]Bytes32{}, e.Proofs...),
+		ProofFlagBits:       e.ProofFlagBits,
+	}
+}
+
 // Encode v1 execute report info. Very basic versioning in the first byte to
 // allow for future encoding optimizations.
 func (eri ExecuteReportInfo) Encode() ([]byte, error) {
