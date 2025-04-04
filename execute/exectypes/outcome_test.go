@@ -4,6 +4,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 
 	"github.com/stretchr/testify/require"
@@ -139,4 +141,60 @@ func TestNewSortedOutcome(t *testing.T) {
 // seqRange is a helper to create a SequenceNumberRange
 func seqRange(start, end uint64) cciptypes.SeqNumRange {
 	return cciptypes.NewSeqNumRange(cciptypes.SeqNum(start), cciptypes.SeqNum(end))
+}
+
+func TestOutcome_ToLogFormat(t *testing.T) {
+	now := time.Now()
+
+	testData1 := cciptypes.Bytes("test message data")
+	testData2 := cciptypes.Bytes("test message")
+	// Create a test outcome with some data
+	testOutcome := Outcome{
+		State: GetMessages,
+		CommitReports: []CommitData{
+			{
+				Timestamp:           now,
+				SourceChain:         1,
+				SequenceNumberRange: seqRange(1, 2),
+				// Add some message data that should be removed
+				Messages: []cciptypes.Message{
+					{Data: testData1,
+						Header: cciptypes.RampMessageHeader{
+							SourceChainSelector: 2,
+						}},
+				},
+			},
+		},
+		Report: cciptypes.ExecutePluginReport{
+			ChainReports: []cciptypes.ExecutePluginReportSingleChain{
+				{
+					SourceChainSelector: 1,
+					// Add some message data that should be removed
+					Messages: []cciptypes.Message{
+						{
+							Data: testData2,
+							Header: cciptypes.RampMessageHeader{
+								SourceChainSelector: 2,
+							},
+						}},
+				},
+			},
+		},
+	}
+
+	// Get the log format
+	logFormatOutcome := testOutcome.ToLogFormat()
+
+	lggr, _ := logger.New()
+	lggr.Infow("struct",
+		"outcome", testOutcome)
+	lggr.Infow("logFrmt",
+		"outcome", logFormatOutcome)
+
+	// Verify the original object is not modified
+	require.Equal(t, testData1, testOutcome.CommitReports[0].Messages[0].Data)
+	require.Equal(t, testData2, testOutcome.Report.ChainReports[0].Messages[0].Data)
+
+	require.Equal(t, cciptypes.Bytes{}, logFormatOutcome.CommitReports[0].Messages[0].Data)
+	require.Equal(t, cciptypes.Bytes{}, logFormatOutcome.Report.ChainReports[0].Messages[0].Data)
 }
