@@ -36,8 +36,8 @@ pub fn validate_and_parse_token_accounts<'info>(
     chain_selector: u64,
     router: Pubkey,
     fee_quoter: Pubkey,
-    offramp: Option<Pubkey>, // id of the program that called this function, could be the router or an offramp
-    accounts: &'info [AccountInfo<'info>],
+    offramp: Option<Pubkey>, // id of the offramp program that called this function, when the caller is not the router
+    raw_acc_infos: &'info [AccountInfo<'info>],
 ) -> Result<TokenAccounts> {
     // The program_id here is provided solely to satisfy the interface of try_accounts.
     // Note: All program IDs for PDA derivation are explicitly defined in the account context
@@ -46,17 +46,17 @@ pub fn validate_and_parse_token_accounts<'info>(
     // Changes in environment-specific program addresses will not affect the PDA derivation.
     let program_id = Pubkey::default();
 
-    let mut offramp_adjusted_accounts = accounts; // TODO better naming
+    let mut accounts = raw_acc_infos;
 
     let ccip_offramp_pool_signer = if offramp.is_some() {
         // When and only when the offramp program is calling this function, the first account is the offramp pool signer.
         // Then, the rest of the accounts are the same as when the router program is calling this function.
-        offramp_adjusted_accounts = &offramp_adjusted_accounts[1..];
-        Some(&accounts[0])
+        accounts = &accounts[1..];
+        Some(&raw_acc_infos[0])
     } else {
         None
     };
-    let mut input_accounts = offramp_adjusted_accounts;
+    let mut input_accounts = accounts;
 
     let bumps = &mut <TokenAccountsValidationContext as anchor_lang::Bumps>::Bumps::default();
     let reallocs = &mut std::collections::BTreeSet::new();
@@ -73,14 +73,13 @@ pub fn validate_and_parse_token_accounts<'info>(
             &chain_selector.to_le_bytes(),
             router.as_ref(),
             fee_quoter.as_ref(),
-            offramp.unwrap_or_default().as_ref(),
         ]
         .concat(),
         bumps,
         reallocs,
     )?;
 
-    let mut accounts_iter = offramp_adjusted_accounts.iter();
+    let mut accounts_iter = accounts.iter();
 
     // accounts based on user or chain
     let user_token_account = next_account_info(&mut accounts_iter)?;
@@ -110,11 +109,11 @@ pub fn validate_and_parse_token_accounts<'info>(
         require_keys_eq!(
             acc_info.key(),
             expected_key,
-            CommonCcipError::InvalidInputsTokenAccounts // TODO
+            CommonCcipError::InvalidInputsPoolAccounts
         );
         require!(
             acc_info.is_writable,
-            CommonCcipError::InvalidInputsTokenAccounts // TODO
+            CommonCcipError::InvalidInputsPoolSignerAccountWritable
         );
         bump
     } else {

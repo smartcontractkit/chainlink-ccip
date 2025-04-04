@@ -318,7 +318,7 @@ func TestPingPong(t *testing.T) {
 				t,
 				fee_quoter.SVMExtraArgsV1{
 					ComputeUnits:             400_000,
-					AccountIsWritableBitmap:  ccip.GenerateBitMapForIndexes([]int{1, 4, 7, 8, 9, 19}),
+					AccountIsWritableBitmap:  ccip.GenerateBitMapForIndexes([]int{1, 4, 7, 8, 9}),
 					AllowOutOfOrderExecution: true,
 					TokenReceiver:            [32]uint8{}, // none, no token transfer
 					Accounts: [][32]uint8{

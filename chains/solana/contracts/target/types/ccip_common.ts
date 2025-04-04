@@ -71,6 +71,16 @@ export type CcipCommon = {
       "code": 10005,
       "name": "InvalidInputsLookupTableAccountWritable",
       "msg": "Invalid LookupTable account writable access"
+    },
+    {
+      "code": 10006,
+      "name": "InvalidInputsPoolSignerAccounts",
+      "msg": "Invalid pool signer account"
+    },
+    {
+      "code": 10007,
+      "name": "InvalidInputsPoolSignerAccountWritable",
+      "msg": "Invalid pool signer account writable access"
     }
   ]
 };
@@ -148,6 +158,16 @@ export const IDL: CcipCommon = {
       "code": 10005,
       "name": "InvalidInputsLookupTableAccountWritable",
       "msg": "Invalid LookupTable account writable access"
+    },
+    {
+      "code": 10006,
+      "name": "InvalidInputsPoolSignerAccounts",
+      "msg": "Invalid pool signer account"
+    },
+    {
+      "code": 10007,
+      "name": "InvalidInputsPoolSignerAccountWritable",
+      "msg": "Invalid pool signer account writable access"
     }
   ]
 };

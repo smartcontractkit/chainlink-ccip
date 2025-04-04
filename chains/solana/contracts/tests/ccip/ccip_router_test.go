@@ -4325,7 +4325,7 @@ func TestCCIPRouter(t *testing.T) {
 				ixApprove, err := tokens.TokenApproveChecked(1, token0Decimals, token0.Program, userTokenAccount, token0.Mint, token0.RouterSigner, user.PublicKey(), nil)
 				require.NoError(t, err)
 
-				result := testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{ixApprove, ix}, user, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(1_400_000))
+				result := testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{ixApprove, ix}, user, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(300_000))
 				require.NotNil(t, result)
 
 				// check CCIP event

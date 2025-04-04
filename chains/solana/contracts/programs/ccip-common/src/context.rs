@@ -7,7 +7,7 @@ use crate::seed;
 use crate::CommonCcipError;
 
 #[derive(Accounts)]
-#[instruction(token_receiver: Pubkey, chain_selector: u64, router: Pubkey, fee_quoter: Pubkey, offramp: Pubkey)]
+#[instruction(token_receiver: Pubkey, chain_selector: u64, router: Pubkey, fee_quoter: Pubkey)]
 pub struct TokenAccountsValidationContext<'info> {
     #[account(
         constraint = user_token_account.key() == get_associated_token_address_with_program_id(
