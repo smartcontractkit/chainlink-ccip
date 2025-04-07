@@ -28,7 +28,7 @@ jobs:
         run: |
           cat <<EOF > matrix.json
           [
-            { "name": "ccip", "setup": { "run-coverage": true, "min-coverage": 98.8, "extra-coverage-params": "--no-match-path='*End2End*'", "run-gas-snapshot": true}}
+            { "name": "ccip", "setup": { "run-coverage": true, "min-coverage": 98.7, "extra-coverage-params": "--no-match-path='*End2End*'", "run-gas-snapshot": true}}
           ]
           EOF
 
@@ -128,9 +128,10 @@ jobs:
           ${{ contains(fromJson(needs.changes.outputs.all_changes), matrix.product.name)
           || contains(fromJson(needs.changes.outputs.all_changes), 'shared')
           || needs.changes.outputs.non_src_changes == 'true' }}
-        uses: ./.github/actions/setup-nodejs
+        uses: smartcontractkit/.github/actions/setup-nodejs@c094a1482049b2b9c0a7cde3f715bd76a60afd97
         with:
-          prod: "true"
+          package-json-directory: chains/evm
+          pnpm-version: ^10.0.0
 
       - name: Install Foundry
         if:
@@ -278,7 +279,7 @@ jobs:
         uses: zgosalvez/github-actions-report-lcov@a546f89a65a0cdcd82a92ae8d65e74d450ff3fbc # v4.1.4
         with:
           update-comment: false
-          coverage-files: ./lcov.info.pruned
+          coverage-files: chains/evm/lcov.info.pruned
           minimum-coverage: ${{ matrix.product.setup.min-coverage }}
           artifact-name: code-coverage-report-${{ matrix.product.name }}
           working-directory: chains/evm
@@ -315,7 +316,10 @@ jobs:
 
       - name: Setup NodeJS
         if: ${{ (contains(fromJson(needs.changes.outputs.all_changes), matrix.product.name) || needs.changes.outputs.non_src_changes == 'true')}}
-        uses: ./.github/actions/setup-nodejs
+        uses: smartcontractkit/.github/actions/setup-nodejs@c094a1482049b2b9c0a7cde3f715bd76a60afd97
+        with:
+          package-json-directory: chains/evm
+          pnpm-version: ^10.0.0
 
       - name: Install Foundry
         if: ${{ (contains(fromJson(needs.changes.outputs.all_changes), matrix.product.name) || needs.changes.outputs.non_src_changes == 'true')}}

@@ -50,7 +50,7 @@ jobs:
           persist-credentials: false
       - name: Check release tag (core)
         id: release-tag-check-core
-        uses: smartcontractkit/.github/actions/release-tag-check@c5c4a8186da4218cff6cac8184e47dd3dec69ba3 # release-tag-check@0.1.0
+        uses: smartcontractkit/.github/actions/release-tag-check@c094a1482049b2b9c0a7cde3f715bd76a60afd97 # release-tag-check@0.1.0
         env:
           # Match semver git tags with a "contracts-" prefix.
           RELEASE_REGEX: '^contracts-v[0-9]+\.[0-9]+\.[0-9]+$'
@@ -59,7 +59,7 @@ jobs:
           VERSION_PREFIX: "contracts-v"
       - name: Check release tag (ccip)
         id: release-tag-check-ccip
-        uses: smartcontractkit/.github/actions/release-tag-check@c5c4a8186da4218cff6cac8184e47dd3dec69ba3 # release-tag-check@0.1.0
+        uses: smartcontractkit/.github/actions/release-tag-check@c094a1482049b2b9c0a7cde3f715bd76a60afd97 # release-tag-check@0.1.0
         env:
           # Match semver git tags with a "contracts-ccip/" prefix.
           RELEASE_REGEX: '^contracts-ccip/v[0-9]+\.[0-9]+\.[0-9]+$'
@@ -107,12 +107,13 @@ jobs:
         run: echo "$GITHUB_WORKSPACE/diff-so-fancy" >> $GITHUB_PATH
 
       - name: Setup NodeJS
-        uses: ./.github/actions/setup-nodejs
+        uses: smartcontractkit/.github/actions/setup-nodejs@c094a1482049b2b9c0a7cde3f715bd76a60afd97
         with:
-          prod: "true"
+          package-json-directory: chains/evm
+          pnpm-version: ^10.0.0
 
       - name: Setup Go
-        uses: smartcontractkit/.github/actions/setup-golang@c5c4a8186da4218cff6cac8184e47dd3dec69ba3
+        uses: smartcontractkit/.github/actions/setup-golang@c094a1482049b2b9c0a7cde3f715bd76a60afd97
         with:
           go-version-file: "go.mod"
 
@@ -148,7 +149,10 @@ jobs:
         with:
           persist-credentials: false
       - name: Setup NodeJS
-        uses: ./.github/actions/setup-nodejs
+        uses: smartcontractkit/.github/actions/setup-nodejs@c094a1482049b2b9c0a7cde3f715bd76a60afd97
+        with:
+          package-json-directory: chains/evm
+          pnpm-version: ^10.0.0
       - name: Run solhint
         run: pnpm solhint
       - name: Run solhint on tests
@@ -167,7 +171,10 @@ jobs:
           persist-credentials: false
 
       - name: Setup NodeJS
-        uses: ./.github/actions/setup-nodejs
+        uses: smartcontractkit/.github/actions/setup-nodejs@c094a1482049b2b9c0a7cde3f715bd76a60afd97
+        with:
+          package-json-directory: chains/evm
+          pnpm-version: ^10.0.0
 
       - name: Install Foundry
         uses: ./.github/actions/install-solidity-foundry
@@ -218,7 +225,10 @@ jobs:
           persist-credentials: false
 
       - name: Setup NodeJS
-        uses: ./.github/actions/setup-nodejs
+        uses: smartcontractkit/.github/actions/setup-nodejs@c094a1482049b2b9c0a7cde3f715bd76a60afd97
+        with:
+          package-json-directory: chains/evm
+          pnpm-version: ^10.0.0
 
       - name: Install Foundry
         uses: ./.github/actions/install-solidity-foundry

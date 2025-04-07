@@ -12,26 +12,17 @@ exclusion_list_ccip=(
   "contracts/libraries/USDPriceWith18Decimals.sol"
   "contracts/libraries/MerkleMultiProof.sol"
   "contracts/applications/CCIPClientExample.sol"
+  "contracts/test/*"
 )
-
-exclusion_list_common=(
-  "vendor/*"
-  "contracts/test"
-  "shared/*"
-)
-
-all_exclusions=()
-all_exclusions+=("${exclusion_list_ccip[@]}")
-all_exclusions+=("${exclusion_list_common[@]}")
 
 echo "Excluding the following files"
-for exclusion in "${all_exclusions[@]}"; do
+for exclusion in "${exclusion_list_ccip[@]}"; do
   echo "$exclusion"
 done
 
 lcov_command="lcov --ignore-errors inconsistent --remove $input_coverage_file -o $output_coverage_file"
 
-for exclusion in "${all_exclusions[@]}"; do
+for exclusion in "${exclusion_list_ccip[@]}"; do
   lcov_command+=" \"$exclusion\""
 done
 
