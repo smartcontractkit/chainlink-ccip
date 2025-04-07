@@ -16,7 +16,7 @@ pub struct BaseState {
 
 impl BaseState {
     pub fn init(&mut self, owner: Pubkey, router: Pubkey) -> Result<()> {
-        require_eq!(self.owner, Pubkey::default());
+        require_keys_eq!(self.owner, Pubkey::default());
         self.owner = owner;
         self.update_router(owner, router)
     }
@@ -26,13 +26,13 @@ impl BaseState {
             proposed_owner != self.owner && proposed_owner != Pubkey::default(),
             CcipSenderError::InvalidProposedOwner
         );
-        require_eq!(self.owner, owner, CcipSenderError::OnlyOwner);
+        require_keys_eq!(self.owner, owner, CcipSenderError::OnlyOwner);
         self.proposed_owner = proposed_owner;
         Ok(())
     }
 
     pub fn accept_ownership(&mut self, proposed_owner: Pubkey) -> Result<()> {
-        require_eq!(
+        require_keys_eq!(
             self.proposed_owner,
             proposed_owner,
             CcipSenderError::OnlyProposedOwner
@@ -44,7 +44,7 @@ impl BaseState {
 
     pub fn update_router(&mut self, owner: Pubkey, router: Pubkey) -> Result<()> {
         require_keys_neq!(router, Pubkey::default(), CcipSenderError::InvalidRouter);
-        require_eq!(self.owner, owner, CcipSenderError::OnlyOwner);
+        require_keys_eq!(self.owner, owner, CcipSenderError::OnlyOwner);
         self.router = router;
         Ok(())
     }

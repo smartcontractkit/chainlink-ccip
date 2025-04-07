@@ -136,6 +136,28 @@ type Observation struct {
 	FChain map[cciptypes.ChainSelector]int `json:"fChain"`
 }
 
+// ToLogFormat creates a copy of the outcome with the messages.data and discovery obs removed
+func (o Observation) ToLogFormat() Observation {
+	msgsWithEmptyData := make(MessageObservations)
+	for srcChain, msgs := range o.Messages {
+		msgsWithEmptyData[srcChain] = make(map[cciptypes.SeqNum]cciptypes.Message)
+		for seqNum, msg := range msgs {
+			msgsWithEmptyData[srcChain][seqNum] = msg.CopyWithoutData()
+		}
+	}
+	cleanedObs := Observation{
+		CommitReports: o.CommitReports,
+		Hashes:        o.Hashes,
+		TokenData:     o.TokenData,
+		Nonces:        o.Nonces,
+		FChain:        o.FChain,
+		Messages:      msgsWithEmptyData,
+		Contracts:     dt.Observation{},
+	}
+
+	return cleanedObs
+}
+
 func (co CommitObservations) Flatten() []CommitData {
 	var results []CommitData
 	for _, reports := range co {
