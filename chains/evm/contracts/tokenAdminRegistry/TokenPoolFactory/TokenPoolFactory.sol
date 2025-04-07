@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IOwnable} from "../../../shared/interfaces/IOwnable.sol";
-import {ITypeAndVersion} from "../../../shared/interfaces/ITypeAndVersion.sol";
+import {IOwnable} from "@shared/interfaces/IOwnable.sol";
+import {ITypeAndVersion} from "@shared/interfaces/ITypeAndVersion.sol";
 import {ITokenAdminRegistry} from "../../interfaces/ITokenAdminRegistry.sol";
 
 import {RateLimiter} from "../../libraries/RateLimiter.sol";
@@ -10,7 +10,7 @@ import {TokenPool} from "../../pools/TokenPool.sol";
 import {RegistryModuleOwnerCustom} from "../RegistryModuleOwnerCustom.sol";
 import {FactoryBurnMintERC20} from "./FactoryBurnMintERC20.sol";
 
-import {Create2} from "../../../vendor/openzeppelin-solidity/v5.0.2/contracts/utils/Create2.sol";
+import {Create2} from "@vendor/openzeppelin-solidity/v5.0.2/contracts/utils/Create2.sol";
 
 /// @notice A contract for deploying new tokens and token pools, and configuring them with the token admin registry
 /// @dev At the end of the transaction, the ownership transfer process will begin, but the user must accept the

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {CallWithExactGas} from "../../../../shared/call/CallWithExactGas.sol";
+import {CallWithExactGas} from "@shared/call/CallWithExactGas.sol";
 import {Client} from "../../../libraries/Client.sol";
 import {Internal} from "../../../libraries/Internal.sol";
 import {Pool} from "../../../libraries/Pool.sol";
@@ -10,7 +10,7 @@ import {LockReleaseTokenPool} from "../../../pools/LockReleaseTokenPool.sol";
 import {MaybeRevertingBurnMintTokenPool} from "../../helpers/MaybeRevertingBurnMintTokenPool.sol";
 import {OffRampSetup} from "./OffRampSetup.t.sol";
 
-import {IERC20} from "../../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "@vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
 contract OffRamp_releaseOrMintTokens is OffRampSetup {
   function setUp() public virtual override {

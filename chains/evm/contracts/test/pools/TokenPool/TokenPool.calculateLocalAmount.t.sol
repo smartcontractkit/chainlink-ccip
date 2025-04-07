@@ -6,7 +6,7 @@ import {TokenPoolHelper} from "../../helpers/TokenPoolHelper.sol";
 import {TokenPoolSetup} from "./TokenPoolSetup.t.sol";
 
 import {IERC20Metadata} from
-  "../../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+  "@vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 contract TokenPool_calculateLocalAmount is TokenPoolSetup {
   function test_calculateLocalAmount() public view {

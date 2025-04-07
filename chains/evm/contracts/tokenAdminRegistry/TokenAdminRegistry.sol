@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
+import {ITypeAndVersion} from "@shared/interfaces/ITypeAndVersion.sol";
 import {IPoolV1} from "../interfaces/IPool.sol";
 import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
 
-import {Ownable2StepMsgSender} from "../../shared/access/Ownable2StepMsgSender.sol";
+import {Ownable2StepMsgSender} from "@shared/access/Ownable2StepMsgSender.sol";
 
-import {EnumerableSet} from "../../vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
+import {EnumerableSet} from "@vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
 
 /// @notice This contract stores the token pool configuration for all CCIP enabled tokens. It works
 /// on a self-serve basis, where tokens can be registered without intervention from the CCIP owner.

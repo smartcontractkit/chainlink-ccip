@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import {IMessageTransformer} from "../../../interfaces/IMessageTransformer.sol";
 
-import {AuthorizedCallers} from "../../../../shared/access/AuthorizedCallers.sol";
+import {AuthorizedCallers} from "@shared/access/AuthorizedCallers.sol";
 import {Router} from "../../../Router.sol";
 import {Internal} from "../../../libraries/Internal.sol";
 import {OffRamp} from "../../../offRamp/OffRamp.sol";

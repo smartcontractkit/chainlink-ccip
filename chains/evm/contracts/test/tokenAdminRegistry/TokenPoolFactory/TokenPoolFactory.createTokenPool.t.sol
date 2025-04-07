@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IBurnMintERC20} from "../../../../shared/token/ERC20/IBurnMintERC20.sol";
+import {IBurnMintERC20} from "@shared/token/ERC20/IBurnMintERC20.sol";
 import {IOwner} from "../../../interfaces/IOwner.sol";
 
-import {Ownable2Step} from "../../../../shared/access/Ownable2Step.sol";
+import {Ownable2Step} from "@shared/access/Ownable2Step.sol";
 
 import {Router} from "../../../Router.sol";
 import {RateLimiter} from "../../../libraries/RateLimiter.sol";
@@ -19,8 +19,8 @@ import {TokenPoolFactory} from "../../../tokenAdminRegistry/TokenPoolFactory/Tok
 import {TokenPoolFactorySetup} from "./TokenPoolFactorySetup.t.sol";
 
 import {IERC20Metadata} from
-  "../../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import {Create2} from "../../../../vendor/openzeppelin-solidity/v5.0.2/contracts/utils/Create2.sol";
+  "@vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {Create2} from "@vendor/openzeppelin-solidity/v5.0.2/contracts/utils/Create2.sol";
 
 contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
   using Create2 for bytes32;

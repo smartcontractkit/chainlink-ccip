@@ -14,6 +14,9 @@ importers:
       '@changesets/get-github-info':
         specifier: ^0.6.0
         version: 0.6.0
+      chainlink-evm:
+        specifier: git://github.com/smartcontractkit/chainlink-evm.git#82c959593df22527067f74b52dff0a289058dc30
+        version: chainlink-evm.git#82c959593df22527067f74b52dff0a289058dc30@https://codeload.github.com/smartcontractkit/chainlink-evm/tar.gz/82c959593df22527067f74b52dff0a289058dc30
       semver:
         specifier: ^7.6.3
         version: 7.7.1
@@ -296,6 +299,10 @@ packages:
   callsites@3.1.0:
     resolution: {integrity: sha512-P8BjAsXvZS+VIDUI11hHCQEv74YT67YUi5JJFNWIqL235sBmjX4+qx9Muvls5ivyNENctx46xQLQ3aTuE7ssaQ==}
     engines: {node: '>=6'}
+
+  chainlink-evm.git#82c959593df22527067f74b52dff0a289058dc30@https://codeload.github.com/smartcontractkit/chainlink-evm/tar.gz/82c959593df22527067f74b52dff0a289058dc30:
+    resolution: {tarball: https://codeload.github.com/smartcontractkit/chainlink-evm/tar.gz/82c959593df22527067f74b52dff0a289058dc30}
+    version: 0.0.0
 
   chalk@4.1.2:
     resolution: {integrity: sha512-oKnbhFyRIXpUuez8iBMmyEa4nbj4IOQyuhc/wy9kY7/WVPcwIO9VA668Pu8RkO7+0G76SLROeyw9CpQ061i4mA==}
@@ -1260,6 +1267,8 @@ snapshots:
       fill-range: 7.1.1
 
   callsites@3.1.0: {}
+
+  chainlink-evm.git#82c959593df22527067f74b52dff0a289058dc30@https://codeload.github.com/smartcontractkit/chainlink-evm/tar.gz/82c959593df22527067f74b52dff0a289058dc30: {}
 
   chalk@4.1.2:
     dependencies:

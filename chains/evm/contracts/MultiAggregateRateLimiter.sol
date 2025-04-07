@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {ITypeAndVersion} from "../shared/interfaces/ITypeAndVersion.sol";
+import {ITypeAndVersion} from "@shared/interfaces/ITypeAndVersion.sol";
 import {IFeeQuoter} from "./interfaces/IFeeQuoter.sol";
 import {IMessageInterceptor} from "./interfaces/IMessageInterceptor.sol";
 
-import {AuthorizedCallers} from "../shared/access/AuthorizedCallers.sol";
-import {EnumerableMapAddresses} from "./../shared/enumerable/EnumerableMapAddresses.sol";
+import {AuthorizedCallers} from "@shared/access/AuthorizedCallers.sol";
+import {EnumerableMapAddresses} from "@shared/enumerable/EnumerableMapAddresses.sol";
 import {Client} from "./libraries/Client.sol";
 import {RateLimiter} from "./libraries/RateLimiter.sol";
 import {USDPriceWith18Decimals} from "./libraries/USDPriceWith18Decimals.sol";

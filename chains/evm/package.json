@@ -52,7 +52,8 @@
   "dependencies": {
     "@changesets/cli": "~2.27.8",
     "@changesets/get-github-info": "^0.6.0",
-    "semver": "^7.6.3"
+    "semver": "^7.6.3",
+    "chainlink-evm": "git://github.com/smartcontractkit/chainlink-evm.git#82c959593df22527067f74b52dff0a289058dc30"
   },
   "devDependencies": {
     "@types/node": "^20.17.17",

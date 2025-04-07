@@ -7,7 +7,7 @@ import {BurnWithFromMintTokenPool} from "../../../pools/BurnWithFromMintTokenPoo
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {BurnMintSetup} from "../BurnMintTokenPool/BurnMintSetup.t.sol";
 
-import {IERC20} from "../../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "@vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
 contract BurnWithFromMintTokenPoolSetup is BurnMintSetup {
   BurnWithFromMintTokenPool internal s_pool;

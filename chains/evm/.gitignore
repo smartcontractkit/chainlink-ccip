@@ -1,1 +1,4 @@
 node_modules
+
+foundry-artifacts
+foundry-cache

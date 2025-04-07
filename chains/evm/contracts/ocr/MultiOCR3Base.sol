@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.4;
 
-import {Ownable2StepMsgSender} from "../../shared/access/Ownable2StepMsgSender.sol";
-import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
+import {Ownable2StepMsgSender} from "@shared/access/Ownable2StepMsgSender.sol";
+import {ITypeAndVersion} from "@shared/interfaces/ITypeAndVersion.sol";
 import {Internal} from "../libraries/Internal.sol";
 
 /// @notice Onchain verification of reports from the offchain reporting protocol with multiple OCR plugin support.

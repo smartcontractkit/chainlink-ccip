@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IBurnMintERC20} from "../../../shared/token/ERC20/IBurnMintERC20.sol";
+import {IBurnMintERC20} from "@shared/token/ERC20/IBurnMintERC20.sol";
 
 import {Pool} from "../../libraries/Pool.sol";
 import {MultiTokenPool} from "./MultiTokenPool.sol";
 
-import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "@vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
 contract BurnMintMultiTokenPool is MultiTokenPool {
   constructor(

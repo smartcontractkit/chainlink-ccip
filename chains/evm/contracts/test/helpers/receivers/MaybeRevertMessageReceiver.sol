@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IERC20} from "../../../../vendor/openzeppelin-solidity/v5.0.2/contracts/token/ERC20/IERC20.sol";
-import {IERC165} from "../../../../vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
+import {IERC20} from "@vendor/openzeppelin-solidity/v5.0.2/contracts/token/ERC20/IERC20.sol";
+import {IERC165} from "@vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
 import {IAny2EVMMessageReceiver} from "../../../interfaces/IAny2EVMMessageReceiver.sol";
 import {Client} from "../../../libraries/Client.sol";
 

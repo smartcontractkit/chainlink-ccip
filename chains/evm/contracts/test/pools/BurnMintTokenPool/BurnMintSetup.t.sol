@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {BurnMintERC20} from "../../../../shared/token/ERC20/BurnMintERC20.sol";
+import {BurnMintERC20} from "@shared/token/ERC20/BurnMintERC20.sol";
 import {Router} from "../../../Router.sol";
 import {BurnMintTokenPool} from "../../../pools/BurnMintTokenPool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";

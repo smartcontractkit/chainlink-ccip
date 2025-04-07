@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
+import {ITypeAndVersion} from "@shared/interfaces/ITypeAndVersion.sol";
 import {IRMN} from "../interfaces/IRMN.sol";
 import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
 
-import {Ownable2StepMsgSender} from "../../shared/access/Ownable2StepMsgSender.sol";
-import {EnumerableSet} from "../../shared/enumerable/EnumerableSetWithBytes16.sol";
+import {Ownable2StepMsgSender} from "@shared/access/Ownable2StepMsgSender.sol";
+import {EnumerableSet} from "@shared/enumerable/EnumerableSetWithBytes16.sol";
 import {Internal} from "../libraries/Internal.sol";
 
 /// @dev An active curse on this subject will cause isCursed() and isCursed(bytes16) to return true. Use this subject

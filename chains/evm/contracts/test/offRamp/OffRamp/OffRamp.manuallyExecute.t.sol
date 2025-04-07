@@ -9,7 +9,7 @@ import {MaybeRevertMessageReceiver} from "../../helpers/receivers/MaybeRevertMes
 import {ReentrancyAbuserMultiRamp} from "../../helpers/receivers/ReentrancyAbuserMultiRamp.sol";
 import {OffRampSetup} from "./OffRampSetup.t.sol";
 
-import {IERC20} from "../../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "@vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {Vm} from "forge-std/Vm.sol";
 
 contract OffRamp_manuallyExecute is OffRampSetup {

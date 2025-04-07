@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {ICapabilityConfiguration} from "../../keystone/interfaces/ICapabilityConfiguration.sol";
-import {INodeInfoProvider} from "../../keystone/interfaces/INodeInfoProvider.sol";
-import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
+import {ICapabilityConfiguration} from "@keystone/interfaces/ICapabilityConfiguration.sol";
+import {INodeInfoProvider} from "@keystone/interfaces/INodeInfoProvider.sol";
+import {ITypeAndVersion} from "@shared/interfaces/ITypeAndVersion.sol";
 
-import {Ownable2StepMsgSender} from "../../shared/access/Ownable2StepMsgSender.sol";
+import {Ownable2StepMsgSender} from "@shared/access/Ownable2StepMsgSender.sol";
 import {Internal} from "../libraries/Internal.sol";
 
-import {IERC165} from "../../vendor/openzeppelin-solidity/v5.0.2/contracts/interfaces/IERC165.sol";
-import {EnumerableSet} from "../../vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
+import {IERC165} from "@vendor/openzeppelin-solidity/v5.0.2/contracts/interfaces/IERC165.sol";
+import {EnumerableSet} from "@vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
 
 /// @notice CCIPHome stores the configuration for the CCIP capability.
 /// We have two classes of configuration: chain configuration and DON (in the CapabilitiesRegistry sense) configuration.
