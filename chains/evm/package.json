@@ -8,7 +8,7 @@
   "scripts": {
     "publish-beta": "pnpm publish --tag beta",
     "publish-prod": "npm dist-tag add @chainlink/contracts-ccip@1.6.0 latest",
-    "compile": "./scripts/native_solc_compile_all_ccip",
+    "compile": "./scripts/compile_all",
     "prepublishOnly": "pnpm compile",
     "verify:ccip-files": "diff ./release/ccip/package.json ./package.json && diff ./release/ccip/README.md ./README.md",
     "solhint": "solhint --max-warnings 0 \"./contracts/**/*.sol\"",
@@ -56,15 +56,12 @@
     "chainlink-evm": "git://github.com/smartcontractkit/chainlink-evm.git#82c959593df22527067f74b52dff0a289058dc30"
   },
   "devDependencies": {
-    "@types/node": "^20.17.17",
-    "@typescript-eslint/eslint-plugin": "^7.18.0",
-    "@typescript-eslint/parser": "^7.18.0",
-    "eslint": "^8.57.1",
-    "eslint-config-prettier": "^9.1.0",
-    "eslint-plugin-prettier": "^5.2.3",
-    "prettier": "^3.5.0",
-    "prettier-plugin-solidity": "^1.4.2",
-    "solhint-plugin-prettier": "^0.1.0",
-    "typescript": "^5.7.3"
+    "solhint": "^5.0.5",
+    "solhint-plugin-chainlink-solidity": "github:smartcontractkit/chainlink-solhint-rules#v1.2.1"
+  },
+  "pnpm": {
+    "overrides": {
+      "@babel/runtime": ">=7.26.10 "
+    }
   }
 }
