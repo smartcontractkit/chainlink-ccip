@@ -556,6 +556,7 @@ pub struct ExecuteReportContext<'info> {
     // [receiver_program, external_execution_signer, receiver_account, ...user specified accounts from message data for arbitrary messaging]
     // +
     // [
+    // ccip_offramp_pools_signer - derivable PDA [seed::EXTERNAL_TOKEN_POOL, pool_program], seeds::program=offramp (not in lookup table)
     // user/sender token account (must be associated token account - derivable PDA [wallet_addr, token_program, mint])
     // per chain per token config (ccip: billing, ccip admin controlled - derivable PDA [chain_selector, mint])
     // pool chain config (pool: custom configs that may include rate limits & remote chain configs, pool admin controlled - derivable [chain_selector, mint])
@@ -568,7 +569,6 @@ pub struct ExecuteReportContext<'info> {
     // token program
     // token mint
     // ccip_router_pools_signer - derivable PDA [seed::EXTERNAL_TOKEN_POOL, pool_program], seeds::program=router (present in lookup table)
-    // ccip_offramp_pools_signer - derivable PDA [seed::EXTERNAL_TOKEN_POOL, pool_program], seeds::program=offramp (not in lookup table)
     // ...additional accounts for pool config
     // ] x N tokens
 }
