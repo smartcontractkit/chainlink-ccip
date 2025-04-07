@@ -3,3 +3,5 @@ node_modules
 foundry-artifacts
 foundry-cache
 lcov.info
+
+scripts/abigen

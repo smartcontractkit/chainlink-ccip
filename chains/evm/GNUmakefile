@@ -53,7 +53,6 @@ ccip-lcov:
 # 		make FOUNDRY_PROFILE=llo-feeds wrappers
 .PHONY: wrappers
 wrappers: pnpmdep mockery abigen ## Recompiles solidity contracts and their go wrappers.
-	pnpm i
 	./scripts/compile_all
 	go generate ../core/gethwrappers/$(FOUNDRY_PROFILE)
 
@@ -73,7 +72,7 @@ pnpmdep: ## Install solidity contract dependencies through pnpm
 
 .PHONY: abigen
 abigen: ## Build & install abigen.
-	../tools/bin/build_abigen
+	./scripts/build_abigen
 
 .PHONY: mockery
 mockery: $(mockery) ## Install mockery.
