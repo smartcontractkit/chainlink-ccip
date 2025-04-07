@@ -111,10 +111,6 @@ pub fn validate_and_parse_token_accounts<'info>(
             expected_key,
             CommonCcipError::InvalidInputsPoolAccounts
         );
-        require!(
-            acc_info.is_writable,
-            CommonCcipError::InvalidInputsPoolSignerAccountWritable
-        );
         bump
     } else {
         0

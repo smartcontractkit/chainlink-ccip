@@ -432,10 +432,6 @@ fn parse_messaging_accounts<'info>(
         expected_signer_key,
         CcipOfframpError::InvalidInputsExternalExecutionSignerAccount
     );
-    require!(
-        external_execution_signer.is_writable,
-        CcipOfframpError::InvalidInputsMissingWritable
-    );
 
     // Validate that the bitmap corresponds to the individual writable flags
     for (i, acc) in msg_accounts.iter().enumerate() {

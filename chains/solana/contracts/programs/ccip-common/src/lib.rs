@@ -24,8 +24,6 @@ pub enum CommonCcipError {
     InvalidInputsLookupTableAccountWritable,
     #[msg("Invalid pool signer account")]
     InvalidInputsPoolSignerAccounts,
-    #[msg("Invalid pool signer account writable access")]
-    InvalidInputsPoolSignerAccountWritable,
 }
 
 // Duplicates the router ID to declare router accounts that must be visible from the common crate,
