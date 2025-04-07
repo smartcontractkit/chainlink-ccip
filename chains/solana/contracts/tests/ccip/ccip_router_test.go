@@ -4650,7 +4650,6 @@ func TestCCIPRouter(t *testing.T) {
 					index:    12,
 					errorStr: common.ConstraintSeeds_AnchorError.String(),
 				},
-				// TODO add more tests here
 			}
 
 			for _, in := range inputs {
