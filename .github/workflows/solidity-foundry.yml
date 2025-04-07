@@ -4,7 +4,7 @@ on:
   merge_group:
 
 env:
-  FOUNDRY_PROFILE: ci
+  FOUNDRY_PROFILE: ccip
 
 # Making changes:
 # * use the top-level matrix to decide, which checks should run for each product.
@@ -28,7 +28,7 @@ jobs:
         run: |
           cat <<EOF > matrix.json
           [
-            { "name": "ccip", "setup": { "run-coverage": true, "min-coverage": 98.8, "extra-coverage-params": "--no-match-path='*End2End*'", "run-gas-snapshot": true}},
+            { "name": "ccip", "setup": { "run-coverage": true, "min-coverage": 98.8, "extra-coverage-params": "--no-match-path='*End2End*'", "run-gas-snapshot": true}}
           ]
           EOF
 
@@ -138,6 +138,8 @@ jobs:
           || contains(fromJson(needs.changes.outputs.all_changes), 'shared')
           || needs.changes.outputs.non_src_changes == 'true' }}
         uses: ./.github/actions/install-solidity-foundry
+        with:
+          working-directory: chains/evm
 
       # If Solc version is not set in foundry.toml, then what `forge build` does is that it lazily-installs required solc versions
       # using SVM. This is done in parallel, but SVM has a bug and is not thread-safe, which sometimes leads to `Text file busy` error.
@@ -318,6 +320,8 @@ jobs:
       - name: Install Foundry
         if: ${{ (contains(fromJson(needs.changes.outputs.all_changes), matrix.product.name) || needs.changes.outputs.non_src_changes == 'true')}}
         uses: ./.github/actions/install-solidity-foundry
+        with:
+          working-directory: chains/evm
 
       - name: Run Forge fmt
         if: ${{ (contains(fromJson(needs.changes.outputs.all_changes), matrix.product.name) || needs.changes.outputs.non_src_changes == 'true')}}
