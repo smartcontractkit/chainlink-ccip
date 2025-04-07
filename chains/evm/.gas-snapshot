@@ -193,7 +193,6 @@ MultiAggregateRateLimiter_onOutboundMessage:test_onOutboundMessage_ValidateMessa
 MultiAggregateRateLimiter_onOutboundMessage:test_onOutboundMessage_ValidateMessageWithRateLimitReset() (gas: 78418)
 MultiAggregateRateLimiter_onOutboundMessage:test_onOutboundMessage_ValidateMessageWithTokens() (gas: 52633)
 MultiAggregateRateLimiter_onOutboundMessage:test_onOutboundMessage_ValidateMessageWithTokensOnDifferentChains() (gas: 309747)
-MultiAggregateRateLimiter_setFeeQuoter:test_Owner() (gas: 19146)
 MultiAggregateRateLimiter_updateRateLimitTokens:test_UpdateRateLimitTokensMultipleChains() (gas: 281364)
 MultiAggregateRateLimiter_updateRateLimitTokens:test_UpdateRateLimitTokensSingleChain() (gas: 255770)
 MultiAggregateRateLimiter_updateRateLimitTokens:test_UpdateRateLimitTokens_AddsAndRemoves() (gas: 205543)

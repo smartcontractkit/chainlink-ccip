@@ -13,7 +13,7 @@ To be ran from the (`./contracts`) directory.
 1. Create a changeset for your changes:
 
    ```shell
-   pnpm changeset:ccip
+   pnpm changeset
    ```
 
 2. Follow the prompts to describe your changes

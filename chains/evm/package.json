@@ -10,7 +10,6 @@
     "publish-prod": "npm dist-tag add @chainlink/contracts-ccip@1.6.0 latest",
     "compile": "./scripts/compile_all",
     "prepublishOnly": "pnpm compile",
-    "verify:ccip-files": "diff ./release/ccip/package.json ./package.json && diff ./release/ccip/README.md ./README.md",
     "solhint": "solhint --max-warnings 0 \"./contracts/**/*.sol\"",
     "solhint-test": "solhint --config \".solhint-test.json\"  --ignore-path \".solhintignore-test\" --max-warnings 0 \"./contracts/**/*.sol\"",
     "copy:ccip-files": "cp ./release/ccip/package.json release/ccip/pnpm-lock.yaml ./release/ccip/README.md ./"

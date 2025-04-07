@@ -33,16 +33,6 @@ wrappers: pnpmdep mockery abigen
 	./scripts/compile_all
 	go generate ./gobindings
 
-# Use this to generate compiled JSON artifacts for gauntlet-plus-plus.
-# This is currently only used for CCIP.
-# example: make artifact-generate contract=LockReleaseTokenPoolAndProxy solcversion=0.8.24 artifactpath=../../gauntlet-plus-plus/packages-ethereum/operations-ccip/src/artifacts/1.5.0/lock-release-token-pool-and-proxy.json
-artifact-generate: export FOUNDRY_PROFILE=ccip
-.PHONY: artifact-generate
-artifact-generate:
-	chmod +x ./scripts/generate_compiled_json_ccip.sh
-	./scripts/generate_compiled_json_ccip.sh $(contract) $(solcversion) $(artifactpath)
-
-
 .PHONY: pnpmdep
 pnpmdep: ## Install solidity contract dependencies through pnpm
 	 pnpm i
