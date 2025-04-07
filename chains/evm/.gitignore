@@ -5,3 +5,5 @@ foundry-cache
 lcov.info
 
 scripts/abigen
+abi
+solc
