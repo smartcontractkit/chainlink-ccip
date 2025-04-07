@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {AuthorizedCallers} from "@shared/access/AuthorizedCallers.sol";
 import {MultiAggregateRateLimiter} from "../../../MultiAggregateRateLimiter.sol";
 import {Client} from "../../../libraries/Client.sol";
 import {Internal} from "../../../libraries/Internal.sol";
 import {RateLimiter} from "../../../libraries/RateLimiter.sol";
+import {AuthorizedCallers} from "@shared/access/AuthorizedCallers.sol";
 
 import {MultiAggregateRateLimiterSetup} from "./MultiAggregateRateLimiterSetup.t.sol";
 

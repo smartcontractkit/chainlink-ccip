@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {ITypeAndVersion} from "@shared/interfaces/ITypeAndVersion.sol";
 import {IMessageTransmitter} from "./IMessageTransmitter.sol";
 import {ITokenMessenger} from "./ITokenMessenger.sol";
+import {ITypeAndVersion} from "@shared/interfaces/ITypeAndVersion.sol";
 
 import {Pool} from "../../libraries/Pool.sol";
 import {TokenPool} from "../TokenPool.sol";

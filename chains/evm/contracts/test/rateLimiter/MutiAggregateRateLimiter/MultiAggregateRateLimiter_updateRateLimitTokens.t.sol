@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {MultiAggregateRateLimiter} from "../../../MultiAggregateRateLimiter.sol";
 import {AuthorizedCallers} from "@shared/access/AuthorizedCallers.sol";
 import {Ownable2Step} from "@shared/access/Ownable2Step.sol";
-import {MultiAggregateRateLimiter} from "../../../MultiAggregateRateLimiter.sol";
 
 import {MultiAggregateRateLimiterSetup} from "./MultiAggregateRateLimiterSetup.t.sol";
 import {Vm} from "forge-std/Vm.sol";

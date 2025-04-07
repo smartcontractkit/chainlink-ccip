@@ -6,7 +6,6 @@ import {IMessageInterceptor} from "../../../interfaces/IMessageInterceptor.sol";
 import {IPoolV1} from "../../../interfaces/IPool.sol";
 import {IRouter} from "../../../interfaces/IRouter.sol";
 
-import {BurnMintERC20} from "@shared/token/ERC20/BurnMintERC20.sol";
 import {FeeQuoter} from "../../../FeeQuoter.sol";
 import {Client} from "../../../libraries/Client.sol";
 import {Internal} from "../../../libraries/Internal.sol";
@@ -16,6 +15,7 @@ import {TokenPool} from "../../../pools/TokenPool.sol";
 import {MaybeRevertingBurnMintTokenPool} from "../../helpers/MaybeRevertingBurnMintTokenPool.sol";
 import {MessageInterceptorHelper} from "../../helpers/MessageInterceptorHelper.sol";
 import {OnRampSetup} from "./OnRampSetup.t.sol";
+import {BurnMintERC20} from "@shared/token/ERC20/BurnMintERC20.sol";
 
 import {IERC20} from "@vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 

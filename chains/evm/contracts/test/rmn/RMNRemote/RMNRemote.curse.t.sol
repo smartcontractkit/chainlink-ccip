@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {Ownable2Step} from "@shared/access/Ownable2Step.sol";
 import {RMNRemote} from "../../../rmn/RMNRemote.sol";
 import {RMNRemoteSetup} from "./RMNRemoteSetup.t.sol";
+import {Ownable2Step} from "@shared/access/Ownable2Step.sol";
 
 contract RMNRemote_curse is RMNRemoteSetup {
   function test_curse() public {

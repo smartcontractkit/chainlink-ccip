@@ -3,9 +3,9 @@ pragma solidity ^0.8.4;
 
 import {IRouterClient} from "../interfaces/IRouterClient.sol";
 
-import {Ownable2StepMsgSender} from "@shared/access/Ownable2StepMsgSender.sol";
 import {Client} from "../libraries/Client.sol";
 import {CCIPReceiver} from "./CCIPReceiver.sol";
+import {Ownable2StepMsgSender} from "@shared/access/Ownable2StepMsgSender.sol";
 
 import {IERC20} from "@vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {ITokenAdminRegistry} from "../../interfaces/ITokenAdminRegistry.sol";
 import {IOwnable} from "@shared/interfaces/IOwnable.sol";
 import {ITypeAndVersion} from "@shared/interfaces/ITypeAndVersion.sol";
-import {ITokenAdminRegistry} from "../../interfaces/ITokenAdminRegistry.sol";
 
 import {RateLimiter} from "../../libraries/RateLimiter.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";

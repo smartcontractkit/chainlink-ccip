@@ -4,7 +4,6 @@ pragma solidity ^0.8.24;
 import {IAny2EVMMessageReceiver} from "../../../interfaces/IAny2EVMMessageReceiver.sol";
 import {IRMNRemote} from "../../../interfaces/IRMNRemote.sol";
 
-import {AuthorizedCallers} from "@shared/access/AuthorizedCallers.sol";
 import {NonceManager} from "../../../NonceManager.sol";
 import {Router} from "../../../Router.sol";
 import {Client} from "../../../libraries/Client.sol";
@@ -17,6 +16,7 @@ import {MessageInterceptorHelper} from "../../helpers/MessageInterceptorHelper.s
 import {OffRampHelper} from "../../helpers/OffRampHelper.sol";
 import {MaybeRevertMessageReceiver} from "../../helpers/receivers/MaybeRevertMessageReceiver.sol";
 import {MultiOCR3BaseSetup} from "../../ocr/MultiOCR3Base/MultiOCR3BaseSetup.t.sol";
+import {AuthorizedCallers} from "@shared/access/AuthorizedCallers.sol";
 import {Vm} from "forge-std/Test.sol";
 
 contract OffRampSetup is FeeQuoterSetup, MultiOCR3BaseSetup {

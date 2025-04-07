@@ -16,39 +16,15 @@ ALL_FOUNDRY_PRODUCTS = ccip functions keystone l2ep llo-feeds operatorforwarder 
 # a static fuzz seed by default, flaky gas results per platform are still observed.
 .PHONY: snapshot
 snapshot: ## Make a snapshot for a specific product.
-	export FOUNDRY_PROFILE=$(FOUNDRY_PROFILE) && forge snapshot --nmt "test?(Fuzz|Fork|.*_RevertWhen)_.*" --snap gas-snapshots/$(FOUNDRY_PROFILE).gas-snapshot
+	export FOUNDRY_PROFILE=ccip && forge snapshot --nmt "test?(Fuzz|Fork|.*_RevertWhen)_.*"
 
 .PHONY: snapshot-diff
 snapshot-diff: ## Make a snapshot for a specific product.
-	export FOUNDRY_PROFILE=$(FOUNDRY_PROFILE) && forge snapshot --nmt "test?(Fuzz|Fork|.*_RevertWhen)_.*" --diff gas-snapshots/$(FOUNDRY_PROFILE).gas-snapshot
-
-
-.PHONY: snapshot-all
-snapshot-all: ## Make a snapshot for all products.
-	for foundry_profile in $(ALL_FOUNDRY_PRODUCTS) ; do \
-		make snapshot FOUNDRY_PROFILE=$$foundry_profile ; \
-	done
-
-.PHONY: pnpmdep
-pnpmdep: ## Install solidity contract dependencies through pnpm
-	 pnpm i
-
-.PHONY: abigen
-abigen: ## Build & install abigen.
-	../tools/bin/build_abigen
-
-.PHONY: mockery
-mockery: $(mockery) ## Install mockery.
-	go install github.com/vektra/mockery/v2@v2.52.3
+	export FOUNDRY_PROFILE=ccip && forge snapshot --nmt "test?(Fuzz|Fork|.*_RevertWhen)_.*" --diff
 
 .PHONY: foundry
 foundry: ## Install foundry.
 	foundryup --install v1.0.0
-
-.PHONY: foundry-refresh
-foundry-refresh: foundry
-	git submodule deinit -f .
-	git submodule update --init --recursive
 
 ccip-precommit: export FOUNDRY_PROFILE=ccip
 .PHONY: ccip-precommit
@@ -62,17 +38,8 @@ ccip-lcov: export FOUNDRY_PROFILE=ccip
 .PHONY: ccip-lcov
 ccip-lcov:
 	forge coverage --report lcov
-	../tools/ci/ccip_lcov_prune ./lcov.info ./lcov.info.pruned
+	./scripts/lcov_prune ./lcov.info ./lcov.info.pruned
 	genhtml -o report lcov.info.pruned --branch-coverage
-
-data-feeds-precommit: export FOUNDRY_PROFILE=data-feeds
-.PHONY: data-feeds-precommit
-data-feeds-precommit:
-	forge test
-	make snapshot
-	forge fmt
-	make wrappers
-	pnpm solhint
 
 # To generate gethwrappers for a specific product, either set the `FOUNDRY_PROFILE`
 # env var or call the target with `FOUNDRY_PROFILE=product`
@@ -86,16 +53,9 @@ data-feeds-precommit:
 # 		make FOUNDRY_PROFILE=llo-feeds wrappers
 .PHONY: wrappers
 wrappers: pnpmdep mockery abigen ## Recompiles solidity contracts and their go wrappers.
-	./scripts/native_solc_compile_all_$(FOUNDRY_PROFILE)
+	pnpm i
+	./scripts/compile_all
 	go generate ../core/gethwrappers/$(FOUNDRY_PROFILE)
-
-# This call generates all gethwrappers for all products. It does so based on the
-# assumption that native_solc_compile_all contains sub-calls to each product, and
-# go_generate does the same.
-.PHONY: wrappers-all
-wrappers-all: pnpmdep mockery abigen ## Recompiles solidity contracts and their go wrappers.
-	# go_generate contains a call to  compile all contracts before generating wrappers
-	go generate ../core/gethwrappers/go_generate.go
 
 # Use this to generate compiled JSON artifacts for gauntlet-plus-plus.
 # This is currently only used for CCIP.
@@ -107,14 +67,14 @@ artifact-generate:
 	./scripts/generate_compiled_json_ccip.sh $(contract) $(solcversion) $(artifactpath)
 
 
-help:
-	@echo ""
-	@echo "         .__           .__       .__  .__        __"
-	@echo "    ____ |  |__ _____  |__| ____ |  | |__| ____ |  | __"
-	@echo "  _/ ___\|  |  \\\\\\__  \ |  |/    \|  | |  |/    \|  |/ /"
-	@echo "  \  \___|   Y  \/ __ \|  |   |  \  |_|  |   |  \    <"
-	@echo "   \___  >___|  (____  /__|___|  /____/__|___|  /__|_ \\"
-	@echo "       \/     \/     \/        \/             \/     \/"
-	@echo ""
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
-	awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
+.PHONY: pnpmdep
+pnpmdep: ## Install solidity contract dependencies through pnpm
+	 pnpm i
+
+.PHONY: abigen
+abigen: ## Build & install abigen.
+	../tools/bin/build_abigen
+
+.PHONY: mockery
+mockery: $(mockery) ## Install mockery.
+	go install github.com/vektra/mockery/v2@v2.52.3

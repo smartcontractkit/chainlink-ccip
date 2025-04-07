@@ -3,7 +3,6 @@ pragma solidity ^0.8.24;
 
 import {IMessageTransformer} from "../../../interfaces/IMessageTransformer.sol";
 
-import {AuthorizedCallers} from "@shared/access/AuthorizedCallers.sol";
 import {NonceManager} from "../../../NonceManager.sol";
 import {Router} from "../../../Router.sol";
 import {Client} from "../../../libraries/Client.sol";
@@ -12,6 +11,7 @@ import {OnRamp} from "../../../onRamp/OnRamp.sol";
 import {OnRampWithMessageTransformer} from "../../../onRamp/OnRampWithMessageTransformer.sol";
 import {MessageTransformerHelper} from "../../helpers/MessageTransformerHelper.sol";
 import {OnRampSetup} from "./OnRampSetup.t.sol";
+import {AuthorizedCallers} from "@shared/access/AuthorizedCallers.sol";
 
 contract OnRampWithMessageTransformer_executeSingleMessage is OnRampSetup {
   OnRampWithMessageTransformer internal s_onRampWithMessageTransformer;

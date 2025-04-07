@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {CCTPMessageTransmitterProxySetup} from "./CCTPMessageTransmitterProxySetup.t.sol";
 
 contract CCTPMessageTransmitterProxy_getCCTPTransmitter is CCTPMessageTransmitterProxySetup {
-  function test_getCCTPTransmitter() public {
+  function test_getCCTPTransmitter() public view {
     assertEq(address(s_cctpMessageTransmitterProxy.i_cctpTransmitter()), address(s_cctpMessageTransmitter));
   }
 }

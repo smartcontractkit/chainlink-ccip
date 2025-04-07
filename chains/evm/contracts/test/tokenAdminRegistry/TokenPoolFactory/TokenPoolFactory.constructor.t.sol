@@ -6,8 +6,8 @@ import {ITokenAdminRegistry} from "../../../interfaces/ITokenAdminRegistry.sol";
 import {RegistryModuleOwnerCustom} from "../../../tokenAdminRegistry/RegistryModuleOwnerCustom.sol";
 import {TokenPoolFactory} from "../../../tokenAdminRegistry/TokenPoolFactory/TokenPoolFactory.sol";
 
-import {Create2} from "@vendor/openzeppelin-solidity/v5.0.2/contracts/utils/Create2.sol";
 import {TokenPoolFactorySetup} from "./TokenPoolFactorySetup.t.sol";
+import {Create2} from "@vendor/openzeppelin-solidity/v5.0.2/contracts/utils/Create2.sol";
 
 contract TokenPoolFactory_constructor is TokenPoolFactorySetup {
   using Create2 for bytes32;

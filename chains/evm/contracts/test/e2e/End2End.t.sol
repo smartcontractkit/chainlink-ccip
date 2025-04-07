@@ -3,7 +3,6 @@ pragma solidity ^0.8.24;
 
 import {IRMNRemote} from "../../interfaces/IRMNRemote.sol";
 
-import {AuthorizedCallers} from "@shared/access/AuthorizedCallers.sol";
 import {NonceManager} from "../../NonceManager.sol";
 import {Router} from "../../Router.sol";
 import {Client} from "../../libraries/Client.sol";
@@ -16,6 +15,7 @@ import {MerkleHelper} from "../helpers/MerkleHelper.sol";
 import {OnRampHelper} from "../helpers/OnRampHelper.sol";
 import {OffRampSetup} from "../offRamp/OffRamp/OffRampSetup.t.sol";
 import {OnRampSetup} from "../onRamp/OnRamp/OnRampSetup.t.sol";
+import {AuthorizedCallers} from "@shared/access/AuthorizedCallers.sol";
 
 import {IERC20} from "@vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 

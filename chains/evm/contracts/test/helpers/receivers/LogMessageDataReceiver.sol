@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {ITypeAndVersion} from "@shared/interfaces/ITypeAndVersion.sol";
 import {IAny2EVMMessageReceiver} from "../../../interfaces/IAny2EVMMessageReceiver.sol";
+import {ITypeAndVersion} from "@shared/interfaces/ITypeAndVersion.sol";
 
 import {Client} from "../../../libraries/Client.sol";
 

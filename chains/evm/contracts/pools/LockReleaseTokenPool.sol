@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {ITypeAndVersion} from "@shared/interfaces/ITypeAndVersion.sol";
 import {ILiquidityContainer} from "../interfaces/ILiquidityContainer.sol";
+import {ITypeAndVersion} from "@shared/interfaces/ITypeAndVersion.sol";
 
 import {Pool} from "../libraries/Pool.sol";
 import {TokenPool} from "./TokenPool.sol";

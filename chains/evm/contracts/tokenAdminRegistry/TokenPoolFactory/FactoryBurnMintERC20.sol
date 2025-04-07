@@ -9,8 +9,7 @@ import {Ownable2StepMsgSender} from "@shared/access/Ownable2StepMsgSender.sol";
 
 import {ERC20} from "@vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/ERC20.sol";
 import {IERC20} from "@vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
-import {ERC20Burnable} from
-  "@vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/extensions/ERC20Burnable.sol";
+import {ERC20Burnable} from "@vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import {IERC165} from "@vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/IERC165.sol";
 import {EnumerableSet} from "@vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableSet.sol";
 

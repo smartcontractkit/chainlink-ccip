@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {Ownable2Step} from "@shared/access/Ownable2Step.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {TokenPoolHelper} from "../../helpers/TokenPoolHelper.sol";
+import {Ownable2Step} from "@shared/access/Ownable2Step.sol";
 
 import {TokenPoolWithAllowListSetup} from "./TokenPoolWithAllowListSetup.t.sol";
 

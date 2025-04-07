@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {Create2} from "@vendor/openzeppelin-solidity/v5.0.2/contracts/utils/Create2.sol";
 import {BurnMintTokenPool} from "../../../pools/BurnMintTokenPool.sol";
 import {RegistryModuleOwnerCustom} from "../../../tokenAdminRegistry/RegistryModuleOwnerCustom.sol";
 import {FactoryBurnMintERC20} from "../../../tokenAdminRegistry/TokenPoolFactory/FactoryBurnMintERC20.sol";
 import {TokenPoolFactory} from "../../../tokenAdminRegistry/TokenPoolFactory/TokenPoolFactory.sol";
 import {TokenAdminRegistrySetup} from "../TokenAdminRegistry/TokenAdminRegistrySetup.t.sol";
+import {Create2} from "@vendor/openzeppelin-solidity/v5.0.2/contracts/utils/Create2.sol";
 
 contract TokenPoolFactorySetup is TokenAdminRegistrySetup {
   using Create2 for bytes32;
