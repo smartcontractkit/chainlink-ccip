@@ -230,6 +230,11 @@ impl Admin for Impl {
 // --- helpers ---
 
 fn validate_dest_chain_config(dest_chain_selector: u64, config: &DestChainConfig) -> Result<()> {
+    require_neq!(
+        config.lane_code_version,
+        CodeVersion::Default,
+        FeeQuoterError::InvalidVersion
+    );
     require!(
         dest_chain_selector != 0,
         FeeQuoterError::InvalidInputsChainSelector
