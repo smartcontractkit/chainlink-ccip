@@ -183,6 +183,12 @@ impl OnRamp for Impl {
             .zip(message.token_amounts.iter())
             .enumerate()
         {
+            require_keys_eq!(
+                token_amount.token,
+                current_token_accounts.mint.key(),
+                CcipRouterError::InvalidInputsTokenAccounts,
+            );
+
             let router_token_pool_signer = &ctx.accounts.token_pools_signer;
 
             // CPI: transfer token amount from user to token pool
