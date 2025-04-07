@@ -101,14 +101,14 @@ pub fn validate_and_parse_token_accounts<'info>(
     // As the offramp signer is optional (only used when the offramp program is calling this function),
     // the context cannot be used to validate it, as it could try to apply those validations to the wrong account
     let ccip_offramp_pool_signer_bump = if let Some(offramp) = offramp {
-        let (expected_key, bump) = Pubkey::find_program_address(
+        let (expected_offramp_pool_signer, bump) = Pubkey::find_program_address(
             &[seed::EXTERNAL_TOKEN_POOL, pool_program.key().as_ref()],
             &offramp,
         );
         let acc_info = ccip_offramp_pool_signer.unwrap();
         require_keys_eq!(
             acc_info.key(),
-            expected_key,
+            expected_offramp_pool_signer,
             CommonCcipError::InvalidInputsPoolAccounts
         );
         bump
