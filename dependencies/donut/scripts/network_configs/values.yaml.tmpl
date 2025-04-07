@@ -40,14 +40,14 @@ deployments:
                   FeeEstimatorMode = '{{ .ChainConfig.FeeEstimatorMode }}'
                   ComputeUnitPriceMax = {{ .ChainConfig.ComputeUnitPriceMax }}
                   ComputeUnitPriceMin = {{ .ChainConfig.ComputeUnitPriceMin }}
-                  ComputeUnitPriceDefault = {{ .ChainConfig.ComputeUnitPriceDefault }}
+                  ComputeUnitPriceDefault = 100
                   FeeBumpPeriod = '{{ .ChainConfig.FeeBumpPeriod }}'
                   BlockHistoryPollPeriod = '{{ .ChainConfig.BlockHistoryPollPeriod }}'
                   BlockHistorySize = {{ .ChainConfig.BlockHistorySize }}
                   ComputeUnitLimitDefault = {{ .ChainConfig.ComputeUnitLimitDefault }}
                   EstimateComputeUnitLimit = {{ .ChainConfig.EstimateComputeUnitLimit }}
                   [Solana.MultiNode]
-                  VerifyChainID = {{ .ChainConfig.MultiNode.VerifyChainID }}
+                  VerifyChainID = false
                   [[Solana.Nodes]]
                   Name = 'node-{{ .ChainId }}'
                   URL = "http://solana-{{ .PodId }}:8544"

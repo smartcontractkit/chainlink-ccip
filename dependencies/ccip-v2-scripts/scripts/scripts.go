@@ -4,10 +4,10 @@ import (
 	"context"
 	"os"
 
+	commonLggr "github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/environment/crib"
 	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
-	v2logger "github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/crib/dependencies/ccip-v2-scripts/config"
 	"github.com/smartcontractkit/crib/dependencies/ccip-v2-scripts/model"
 	"go.uber.org/zap"
@@ -23,11 +23,11 @@ func ConfigureOCR(logger *zap.SugaredLogger, env config.DevspaceEnv) {
 	CallDeployerFn(logger, env, env.TmpDir, crib.ConfigureCCIPOCR)
 }
 
-type CCIPDeployerCallerFn func(ctx context.Context, lggr v2logger.Logger, envConfig devenv.EnvironmentConfig,
+type CCIPDeployerCallerFn func(ctx context.Context, lggr commonLggr.Logger, envConfig devenv.EnvironmentConfig,
 	homeChainSel, feedChainSel uint64, ab deployment.AddressBook, rmnEnabled bool) (crib.DeployCCIPOutput, error)
 
 func CallDeployerFn(logger *zap.SugaredLogger, env config.DevspaceEnv, stateDirPath string, deployerFn CCIPDeployerCallerFn) {
-	ccipLogger, _ := v2logger.NewLogger()
+	ccipLogger, _ := commonLggr.New()
 
 	alphaChainSel := config.ChainSelector(1337)
 	betaChainSel := config.ChainSelector(2337)
