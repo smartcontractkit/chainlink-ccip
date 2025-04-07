@@ -432,7 +432,10 @@ func writeInterface(contractName string, fileNode *ast.File) *ast.File {
 			}
 
 			typeName := star.X.(*ast.Ident).String()
-			if typeName != contractName && typeName != contractName+"Caller" && typeName != contractName+"Transactor" && typeName != contractName+"Filterer" {
+			if typeName != contractName &&
+				typeName != contractName+"Caller" &&
+				typeName != contractName+"Transactor" &&
+				typeName != contractName+"Filterer" {
 				return true
 			}
 

@@ -2,9 +2,10 @@ package main
 
 import (
 	"fmt"
-	gethwrappers "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generation"
 	"os"
 	"path/filepath"
+
+	gethwrappers "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generation"
 )
 
 var (

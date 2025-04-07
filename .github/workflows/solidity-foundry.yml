@@ -267,7 +267,7 @@ jobs:
           && matrix.product.setup.run-coverage }}
         working-directory: chains/evm
         run: |
-          ./scripts/lcov_prune ${{ matrix.product.name }} ./lcov.info ./contracts/lcov.info.pruned
+          ./scripts/lcov_prune
 
       - name: Report code coverage for ${{ matrix.product.name }}
         if:

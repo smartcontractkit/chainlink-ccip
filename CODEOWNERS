@@ -7,5 +7,5 @@
 
 # solana development ownership
 /chains/solana @smartcontractkit/ccip-onchain-solana
-./github/workflows/solana.yml @smartcontractkit/ccip-onchain-solana
+.github/workflows/solana.yml @smartcontractkit/ccip-onchain-solana
 
