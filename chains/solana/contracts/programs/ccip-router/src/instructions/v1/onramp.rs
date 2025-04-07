@@ -1,7 +1,10 @@
-use crate::events::on_ramp as events;
-use crate::messages::GetFeeResult;
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface;
+use ethnum::U256;
+
+use crate::events::on_ramp as events;
+use crate::messages::GetFeeResult;
+
 use ccip_common::seed;
 use ccip_common::v1::{validate_and_parse_token_accounts, TokenAccounts};
 use fee_quoter::messages::TokenTransferAdditionalData;
@@ -21,6 +24,8 @@ use crate::{
 };
 
 use helpers::*;
+
+const U160_MAX: U256 = U256::from_words(u32::MAX as u128, u128::MAX);
 
 pub struct Impl;
 impl OnRamp for Impl {
@@ -229,6 +234,8 @@ impl OnRamp for Impl {
                     current_token_accounts.pool_config.key(),
                     token_amount,
                     &get_fee_result.token_transfer_additional_data[i],
+                    // todo: no field `chain_family_selector` on type `state::DestChainConfig`
+                    dest_chain.config.chain_family_selector,
                 )?;
             }
         }
@@ -301,6 +308,7 @@ mod helpers {
         source_pool_address: Pubkey,
         token_amount: &SVMTokenAmount,
         additional_data: &TokenTransferAdditionalData,
+        dest_chain_family_selector: [u8; 4],
     ) -> Result<SVM2AnyTokenTransfer> {
         let dest_gas_amount = additional_data.dest_gas_overhead;
 
@@ -313,6 +321,12 @@ mod helpers {
             CcipRouterError::SourceTokenDataTooLarge
         );
 
+        // validate destination token address based on chain family
+        validate_dest_token_address(
+            &lock_or_burn_out_data.dest_token_address,
+            dest_chain_family_selector,
+        )?;
+
         let dest_exec_data = dest_gas_amount.to_be_bytes().to_vec();
 
         Ok(SVM2AnyTokenTransfer {
@@ -322,6 +336,42 @@ mod helpers {
             amount: token_amount.amount.into(), // pool on receiver chain handles decimals
             dest_exec_data,
         })
+    }
+
+    fn validate_dest_token_address(address: &[u8], chain_family_selector: [u8; 4]) -> Result<()> {
+        let selector = u32::from_be_bytes(chain_family_selector);
+        match selector {
+            fee_quoter::messages::CHAIN_FAMILY_SELECTOR_EVM => validate_evm_dest_address(address),
+            fee_quoter::messages::CHAIN_FAMILY_SELECTOR_SVM => validate_svm_dest_address(address),
+            _ => Err(CcipRouterError::InvalidChainFamilySelector.into()),
+        }
+    }
+
+    fn validate_evm_dest_address(address: &[u8]) -> Result<()> {
+        const PRECOMPILE_SPACE: u32 = 1024;
+        require_eq!(address.len(), 32, CcipRouterError::InvalidEVMAddress);
+
+        let address: U256 = U256::from_be_bytes(
+            address
+                .try_into()
+                .map_err(|_| CcipRouterError::InvalidEncoding)?,
+        );
+        require!(address <= U160_MAX, CcipRouterError::InvalidEVMAddress);
+        if let Ok(small_address) = TryInto::<u32>::try_into(address) {
+            require_gte!(
+                small_address,
+                PRECOMPILE_SPACE,
+                CcipRouterError::InvalidEVMAddress
+            )
+        };
+        Ok(())
+    }
+
+    fn validate_svm_dest_address(address: &[u8]) -> Result<()> {
+        require_eq!(address.len(), 32, CcipRouterError::InvalidSVMAddress);
+        Pubkey::try_from_slice(address)
+            .map(|_| ())
+            .map_err(|_| CcipRouterError::InvalidSVMAddress.into())
     }
 
     pub(super) fn bump_nonce(
@@ -393,6 +443,7 @@ mod helpers {
     #[cfg(test)]
     mod tests {
         use ethnum::U256;
+        use fee_quoter::messages::CHAIN_FAMILY_SELECTOR_SVM;
 
         use super::*;
 
@@ -466,6 +517,7 @@ mod helpers {
                 source_pool_address,
                 token_amount,
                 &additional_token_transfer_data,
+                CHAIN_FAMILY_SELECTOR_SVM.to_be_bytes(),
             )
             .unwrap();
 
@@ -500,6 +552,7 @@ mod helpers {
                 source_pool_address,
                 token_amount,
                 &additional_token_transfer_data,
+                CHAIN_FAMILY_SELECTOR_SVM.to_be_bytes(),
             )
             .unwrap();
 
@@ -517,6 +570,7 @@ mod helpers {
                     source_pool_address,
                     token_amount,
                     &additional_token_transfer_data,
+                    CHAIN_FAMILY_SELECTOR_SVM.to_be_bytes(),
                 )
                 .unwrap_err(),
                 CcipRouterError::SourceTokenDataTooLarge.into()
