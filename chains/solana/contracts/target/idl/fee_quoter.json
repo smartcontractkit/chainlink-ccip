@@ -987,6 +987,12 @@
           {
             "name": "allowOutOfOrderExecution",
             "type": "bool"
+          },
+          {
+            "name": "tokenReceiver",
+            "type": {
+              "option": "bytes"
+            }
           }
         ]
       }

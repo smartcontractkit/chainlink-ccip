@@ -1,0 +1,35 @@
+[profile.default]
+solc_version = '0.8.26'
+evm_version = 'paris'
+
+src = 'contracts'
+test = 'contracts'
+out = 'foundry-artifacts'
+cache_path = 'foundry-cache'
+libs = ['node_modules']
+
+bytecode_hash = "none"
+ffi = false
+optimizer = true
+# default is zero, using a non-zero amount enables us to test e.g. billing based on gas prices.
+gas_price = 1
+block_timestamp = 1234567890
+block_number = 12345
+
+# This profile should be used for testing CCIP locally and in CI.
+[profile.ccip]
+optimizer_runs = 500
+
+# This profile should be used prior to any release to ensure the tests are passing with via-ir enabled. Enabling via-ir
+# locally or in CI will slow down the compilation process, so it is not recommended to use it for everyday development.
+[profile.ccip-compile]
+optimizer_runs = 80_000
+via_ir = true
+
+[fmt]
+tab_width = 2
+multiline_func_header = "params_first"
+sort_imports = true
+single_line_statement_blocks = "preserve"
+
+# See more config options https://github.com/foundry-rs/foundry/tree/master/config
