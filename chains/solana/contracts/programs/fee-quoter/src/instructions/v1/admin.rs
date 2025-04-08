@@ -204,7 +204,7 @@ impl Admin for Impl {
             FeeQuoterError::InvalidTokenTransferFeeMaxMin
         );
 
-        require_gt!(
+        require_gte!(
             cfg.dest_bytes_overhead,
             CCIP_LOCK_OR_BURN_V1_RET_BYTES,
             FeeQuoterError::InvalidTokenTransferFeeDestBytesOverhead

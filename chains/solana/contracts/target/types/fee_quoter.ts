@@ -1668,6 +1668,16 @@ export type FeeQuoter = {
     },
     {
       "code": 8039,
+      "name": "InvalidTokenTransferFeeMaxMin",
+      "msg": "Minimum token transfer fee exceeds maximum"
+    },
+    {
+      "code": 8040,
+      "name": "InvalidTokenTransferFeeDestBytesOverhead",
+      "msg": "Insufficient dest bytes overhead on transfer fee config"
+    },
+    {
+      "code": 8041,
       "name": "InvalidCodeVersion",
       "msg": "Invalid code version"
     }
@@ -3344,6 +3354,16 @@ export const IDL: FeeQuoter = {
     },
     {
       "code": 8039,
+      "name": "InvalidTokenTransferFeeMaxMin",
+      "msg": "Minimum token transfer fee exceeds maximum"
+    },
+    {
+      "code": 8040,
+      "name": "InvalidTokenTransferFeeDestBytesOverhead",
+      "msg": "Insufficient dest bytes overhead on transfer fee config"
+    },
+    {
+      "code": 8041,
       "name": "InvalidCodeVersion",
       "msg": "Invalid code version"
     }
