@@ -273,11 +273,12 @@ func regroup(commitData []exectypes.CommitData) exectypes.CommitObservations {
 	return groupedCommits
 }
 
-func (p *Plugin) readAllMessages(
+func (p *Plugin) getObsWithoutTokenData(
 	ctx context.Context,
 	lggr logger.Logger,
 	commitData []exectypes.CommitData,
-) (exectypes.MessageObservations, exectypes.CommitObservations, exectypes.MessageHashes) {
+	observation exectypes.Observation,
+) (exectypes.Observation, error) {
 	messageObs := make(exectypes.MessageObservations)
 	availableReports := make(exectypes.CommitObservations)
 	msgHashes := make(exectypes.MessageHashes)
@@ -323,9 +324,24 @@ func (p *Plugin) readAllMessages(
 			msgHashes[srcChain][msg.Header.SequenceNumber] = hash
 		}
 		availableReports[srcChain] = append(availableReports[srcChain], report)
+
+		observation.CommitReports = availableReports
+		observation.Messages = messageObs
+		observation.Hashes = msgHashes
+		// Check for encoding size
+		encodedObsSize, err := p.ocrTypeCodec.EncodeObservation(observation)
+		if err != nil {
+			return exectypes.Observation{}, fmt.Errorf("unable to encode observation: %w", err)
+		}
+		if len(encodedObsSize) > maxObservationLength {
+			lggr.Errorw("observation size exceeds max size",
+				"maxSize", maxObservationLength, "size", encodedObsSize)
+			// TODO: truncate messages and see whether we should continue or break
+			break
+		}
 	}
 
-	return messageObs, availableReports, msgHashes
+	return observation, nil
 }
 
 func (p *Plugin) getMessagesObservation(
@@ -344,26 +360,28 @@ func (p *Plugin) getMessagesObservation(
 		return observation, nil
 	}
 
-	messageObs, commitReportCache, hashes := p.readAllMessages(
+	obsWithoutTokenData, err := p.getObsWithoutTokenData(
 		ctx,
 		lggr,
 		previousOutcome.CommitReports,
+		observation,
 	)
+	if err != nil {
+		return exectypes.Observation{}, fmt.Errorf("unable to get messages: %w", err)
+	}
 
-	tkData, err1 := p.tokenDataObserver.Observe(ctx, messageObs)
+	tkData, err1 := p.tokenDataObserver.Observe(ctx, obsWithoutTokenData.Messages)
 	if err1 != nil {
 		return exectypes.Observation{}, fmt.Errorf("unable to process token data %w", err1)
 	}
 
 	// validating before continuing with heavy operations afterwards like truncation
 	// all messages should have a token data observation even if it's empty
-	if validateTokenDataObservations(messageObs, tkData) != nil {
+	if validateTokenDataObservations(obsWithoutTokenData.Messages, tkData) != nil {
 		return exectypes.Observation{}, fmt.Errorf("invalid token data observations")
 	}
 
-	observation.CommitReports = commitReportCache
-	observation.Messages = messageObs
-	observation.Hashes = hashes
+	observation = obsWithoutTokenData
 	observation.TokenData = tkData
 
 	// Make sure encoded observation fits within the maximum observation size.
@@ -372,7 +390,7 @@ func (p *Plugin) getMessagesObservation(
 		maxObservationLength,
 		p.ocrTypeCodec,
 	)
-	observation, err := observationOptimizer.TruncateObservation(observation)
+	observation, err = observationOptimizer.TruncateObservation(observation)
 	if err != nil {
 		return exectypes.Observation{}, fmt.Errorf("unable to truncate observation: %w", err)
 	}

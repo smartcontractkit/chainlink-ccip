@@ -270,11 +270,12 @@ func Test_readAllMessages(t *testing.T) {
 	lggr := mocks.NullLogger
 	timestamp := time.Now()
 
-	// Create Plugin instance to use its readAllMessages method
+	// Create Plugin instance to use its getObsWithoutTokenData method
 	plugin := &Plugin{
-		lggr:       lggr,
-		ccipReader: ccipReader,
-		msgHasher:  msgHasher,
+		lggr:         lggr,
+		ccipReader:   ccipReader,
+		msgHasher:    msgHasher,
+		ocrTypeCodec: ocrTypeCodec,
 	}
 
 	tests := []struct {
@@ -288,9 +289,9 @@ func Test_readAllMessages(t *testing.T) {
 		{
 			name:            "no commit data",
 			commitData:      []exectypes.CommitData{},
-			expectedMsgs:    exectypes.MessageObservations{},
-			expectedReports: exectypes.CommitObservations{},
-			expectedHashes:  exectypes.MessageHashes{},
+			expectedMsgs:    nil,
+			expectedReports: nil,
+			expectedHashes:  nil,
 			expectedError:   false,
 		},
 		{
@@ -338,11 +339,14 @@ func Test_readAllMessages(t *testing.T) {
 				{Header: cciptypes.RampMessageHeader{SequenceNumber: 2, MessageID: cciptypes.Bytes32{0x02}}},
 				{Header: cciptypes.RampMessageHeader{SequenceNumber: 3, MessageID: cciptypes.Bytes32{0x03}}},
 			}, nil).Maybe()
-
-			msgs, reports, hashes := plugin.readAllMessages(ctx, lggr, tt.commitData)
-			assert.Equal(t, tt.expectedMsgs, msgs)
-			assert.Equal(t, tt.expectedReports, reports)
-			assert.Equal(t, tt.expectedHashes, hashes)
+			obs, err := plugin.getObsWithoutTokenData(ctx, lggr, tt.commitData, exectypes.Observation{})
+			require.NoError(t, err)
+			expectedObs := exectypes.Observation{
+				Messages:      tt.expectedMsgs,
+				CommitReports: tt.expectedReports,
+				Hashes:        tt.expectedHashes,
+			}
+			require.Equal(t, expectedObs, obs)
 		})
 	}
 }
