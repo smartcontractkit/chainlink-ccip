@@ -77,7 +77,20 @@ pub fn ocr3_set(
     };
 
     require!(
+        !transmitters.is_empty(),
+        CcipOfframpError::Ocr3InvalidConfigNoTransmitters
+    );
+
+    require!(
         transmitters.len() <= MAX_TRANSMITTERS,
+        CcipOfframpError::Ocr3InvalidConfigTooManyTransmitters
+    );
+
+    // NOTE: Transmitters cannot exceed signers. Transmitters do not have to be >= 3F + 1 because they can
+    // match >= 3fChain + 1, where fChain <= F. fChain is not represented in MultiOCR3Base - so we skip this check.
+    require_gte!(
+        signers.len(),
+        transmitters.len(),
         CcipOfframpError::Ocr3InvalidConfigTooManyTransmitters
     );
 
