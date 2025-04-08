@@ -3,6 +3,7 @@ package execute
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -272,6 +273,8 @@ func regroup(commitData []exectypes.CommitData) exectypes.CommitObservations {
 	return groupedCommits
 }
 
+const MAX_EXEC_MESSAGES_TENTATIVE = 20
+
 func readAllMessages(
 	ctx context.Context,
 	lggr logger.Logger,
@@ -282,44 +285,50 @@ func readAllMessages(
 	availableReports := make(exectypes.CommitObservations)
 	messageTimestamps := make(map[cciptypes.Bytes32]time.Time)
 
-	commitObs := regroup(commitData)
+	//commitObs := regroup(commitData)
+	// sort commitData by timestamp
+	sort.Slice(commitData, func(i, j int) bool {
+		return exectypes.CompareCommitData(commitData[i], commitData[j])
+	})
 
-	for srcChain, reports := range commitObs {
-		if len(reports) == 0 {
+	totalMessages := 0
+	for _, report := range commitData {
+		srcChain := report.SourceChain
+
+		if _, ok := messageObs[srcChain]; !ok {
+			messageObs[srcChain] = make(map[cciptypes.SeqNum]cciptypes.Message)
+		}
+		// Read messages for each range.
+		msgs, err := ccipReader.MsgsBetweenSeqNums(ctx, srcChain, report.SequenceNumberRange)
+		if err != nil {
+			lggr.Errorw("unable to read all messages for report",
+				"srcChain", srcChain,
+				"seqRange", report.SequenceNumberRange,
+				"merkleRoot", report.MerkleRoot,
+				"err", err,
+			)
 			continue
 		}
 
-		messageObs[srcChain] = make(map[cciptypes.SeqNum]cciptypes.Message)
-		// Read messages for each range.
-		for _, report := range reports {
-			msgs, err := ccipReader.MsgsBetweenSeqNums(ctx, srcChain, report.SequenceNumberRange)
-			if err != nil {
-				lggr.Errorw("unable to read all messages for report",
-					"srcChain", srcChain,
-					"seqRange", report.SequenceNumberRange,
-					"merkleRoot", report.MerkleRoot,
-					"err", err,
-				)
-				continue
-			}
-
-			if !msgsConformToSeqRange(msgs, report.SequenceNumberRange) {
-				lggr.Errorw("missing messages in range",
-					"srcChain", srcChain, "seqRange", report.SequenceNumberRange)
-				continue
-			}
-
-			for _, msg := range msgs {
-				messageObs[srcChain][msg.Header.SequenceNumber] = msg
-				messageTimestamps[msg.Header.MessageID] = report.Timestamp
-			}
-			availableReports[srcChain] = append(availableReports[srcChain], report)
+		if !msgsConformToSeqRange(msgs, report.SequenceNumberRange) {
+			lggr.Errorw("missing messages in range",
+				"srcChain", srcChain, "seqRange", report.SequenceNumberRange)
+			continue
 		}
-		// Remove empty chains.
-		if len(messageObs[srcChain]) == 0 {
-			delete(messageObs, srcChain)
+
+		for _, msg := range msgs {
+			messageObs[srcChain][msg.Header.SequenceNumber] = msg
+			messageTimestamps[msg.Header.MessageID] = report.Timestamp
+		}
+		availableReports[srcChain] = append(availableReports[srcChain], report)
+		totalMessages += len(msgs)
+		if totalMessages > MAX_EXEC_MESSAGES_TENTATIVE {
+			lggr.Infow("too many messages for exec report, continuing with current messages "+
+				"without reading the rest", "totalMessages", totalMessages)
+			break
 		}
 	}
+
 	return messageObs, availableReports, messageTimestamps
 }
 

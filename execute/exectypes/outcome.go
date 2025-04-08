@@ -124,14 +124,7 @@ func NewSortedOutcome(
 	sort.Slice(
 		pendingCommitsCP,
 		func(i, j int) bool {
-			// Should be very rare to have the same timestamp but better to be deterministic
-			if !pendingCommitsCP[i].Timestamp.Equal(pendingCommitsCP[j].Timestamp) {
-				return pendingCommitsCP[i].Timestamp.Before(pendingCommitsCP[j].Timestamp)
-			}
-			if pendingCommitsCP[i].SourceChain != pendingCommitsCP[j].SourceChain {
-				return pendingCommitsCP[i].SourceChain < pendingCommitsCP[j].SourceChain
-			}
-			return pendingCommitsCP[i].SequenceNumberRange.Start() < pendingCommitsCP[j].SequenceNumberRange.Start()
+			return CompareCommitData(pendingCommitsCP[i], pendingCommitsCP[j])
 		})
 	sort.Slice(
 		reportCP,

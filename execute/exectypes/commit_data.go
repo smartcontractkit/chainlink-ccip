@@ -41,6 +41,17 @@ type CommitData struct {
 	MessageTokenData []MessageTokenData `json:"messageTokenData"`
 }
 
+func CompareCommitData(i, j CommitData) bool {
+	// Should be very rare to have the same timestamp but better to be deterministic
+	if !i.Timestamp.Equal(j.Timestamp) {
+		return i.Timestamp.Before(j.Timestamp)
+	}
+	if i.SourceChain != j.SourceChain {
+		return i.SourceChain < j.SourceChain
+	}
+	return i.SequenceNumberRange.Start() < j.SequenceNumberRange.Start()
+}
+
 // CopyNoMsgData creates a copy of the CommitData without the messages.Data
 func (cd CommitData) CopyNoMsgData() CommitData {
 	msgsWitoutData := make([]cciptypes.Message, len(cd.Messages))
