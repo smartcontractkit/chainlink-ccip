@@ -62,6 +62,8 @@ compileContract MultiAggregateRateLimiter
 compileContract Router
 compileContract tokenAdminRegistry/TokenAdminRegistry
 compileContract tokenAdminRegistry/RegistryModuleOwnerCustom
+compileContract tokenAdminRegistry/TokenPoolFactory/TokenPoolFactory
+compileContract tokenAdminRegistry/TokenPoolFactory/FactoryBurnMintERC20
 compileContract capability/CCIPHome
 compileContract NonceManager
 compileContract rmn/RMNRemote
