@@ -348,6 +348,7 @@ func (p *Plugin) getObsWithoutTokenData(
 			}
 		}
 
+		//TODO: Do we need to check more reports in some cases?
 		if stop {
 			lggr.Infow("Stop processing messages, observation is too large")
 			break
