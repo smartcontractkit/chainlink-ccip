@@ -240,7 +240,7 @@ func (r *ccipChainReader) processCommitReports(
 	for _, item := range iter {
 		ev, err := validateCommitReportAcceptedEvent(item, ts)
 		if err != nil {
-			lggr.Errorw("validate commit report accepted event", "err", err, "ev", ev)
+			lggr.Errorw("validate commit report accepted event", "err", err, "ev", item.Data)
 			continue
 		}
 

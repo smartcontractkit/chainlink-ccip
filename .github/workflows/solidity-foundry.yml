@@ -1,0 +1,349 @@
+name: Solidity Foundry
+on:
+  pull_request:
+  merge_group:
+
+env:
+  FOUNDRY_PROFILE: ccip
+
+# Making changes:
+# * use the top-level matrix to decide, which checks should run for each product.
+# * when enabling code coverage, remember to adjust the minimum code coverage as it's set to 98.5% by default.
+
+# This pipeline will run product tests only if product-specific contracts were modified or if broad-impact changes were made (e.g. changes to this pipeline, Foundry configuration, etc.)
+# For modified contracts we use a LLM to extract new issues introduced by the changes. For new contracts full report is delivered.
+# Slither has a default configuration, but also supports per-product configuration. If a product-specific configuration is not found, the default one is used.
+# Changes to test files do not trigger static analysis or formatting checks.
+
+jobs:
+  define-matrix:
+    name: Define test matrix
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.define-matrix.outputs.matrix }}
+    steps:
+      - name: Define test matrix
+        id: define-matrix
+        shell: bash
+        run: |
+          cat <<EOF > matrix.json
+          [
+            { "name": "ccip", "setup": { "run-coverage": true, "min-coverage": 98.7, "extra-coverage-params": "--no-match-path='*End2End*'", "run-gas-snapshot": true}}
+          ]
+          EOF
+
+          matrix=$(cat matrix.json | jq -c .)
+          echo "matrix=$matrix" >> $GITHUB_OUTPUT
+
+      - name: Checkout the repo
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      non_src_changes: ${{ steps.changes.outputs.non_src }}
+      sol_modified_added: ${{ steps.changes.outputs.sol }}
+      sol_mod_only: ${{ steps.changes.outputs.sol_mod_only }}
+      sol_mod_only_files: ${{ steps.changes.outputs.sol_mod_only_files }}
+      not_test_sol_modified: ${{ steps.changes-non-test.outputs.not_test_sol }}
+      not_test_sol_modified_files: ${{ steps.changes-non-test.outputs.not_test_sol_files }}
+      all_changes: ${{ steps.changes.outputs.changes }}
+    steps:
+      - name: Checkout the repo
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Detect changes
+        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+        id: changes
+        with:
+          list-files: "shell"
+          filters: |
+            non_src:
+              - '.github/workflows/solidity-foundry.yml'
+              - 'chains/evm/foundry.toml'
+              - 'chains/evm/.gas-snapshot'
+              - 'chains/evm/package.json'
+              - 'chains/evm/GNUmakefile'
+            sol:
+              - modified|added: 'chains/evm/contracts/**/*.sol'
+            sol_mod_only:
+              - modified: 'chains/evm/contracts/**/!(tests|mocks)/!(*.t).sol'
+            not_test_sol:
+              - modified|added: 'chains/evm/contracts/**/!(tests|mocks)/!(*.t).sol'
+            ccip:
+              - 'chains/evm/contracts/**/*.sol'
+           
+      - name: Detect non-test changes
+        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+        id: changes-non-test
+        with:
+          list-files: "shell"
+          # This is a valid input, see https://github.com/dorny/paths-filter/pull/226
+          predicate-quantifier: every
+          filters: |
+            not_test_sol:
+              - modified|added: 'contracts/src/v0.8/**/!(*.t).sol'
+              - '!chains/evm/contracts/**/test/**'
+              - '!chains/evm/contracts/**/tests/**'
+              - '!chains/evm/contracts/**/mock/**'
+              - '!chains/evm/contracts/**/mocks/**'
+              - '!chains/evm/contracts/**/*.t.sol'
+              - '!chains/evm/contracts/*.t.sol'
+              - '!chains/evm/contracts/**/testhelpers/**'
+              - '!chains/evm/contracts/testhelpers/**'
+              - '!chains/evm/contracts/vendor/**'
+
+  tests:
+    if: ${{ needs.changes.outputs.non_src_changes == 'true' || needs.changes.outputs.sol_modified_added == 'true' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        product: ${{fromJson(needs.define-matrix.outputs.matrix)}}
+    needs: [define-matrix, changes]
+    name: Foundry Tests ${{ matrix.product.name }}
+    runs-on: ubuntu-22.04
+
+    # The if statements for steps after checkout repo is workaround for
+    # passing required check for PRs that don't have filtered changes.
+    steps:
+      - name: Checkout the repo
+        if:
+          ${{ contains(fromJson(needs.changes.outputs.all_changes), matrix.product.name)
+          || contains(fromJson(needs.changes.outputs.all_changes), 'shared')
+          || needs.changes.outputs.non_src_changes == 'true' }}
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          submodules: recursive
+
+      # Only needed because we use the NPM versions of packages
+      # and not native Foundry. This is to make sure the dependencies
+      # stay in sync.
+      - name: Setup NodeJS
+        if:
+          ${{ contains(fromJson(needs.changes.outputs.all_changes), matrix.product.name)
+          || contains(fromJson(needs.changes.outputs.all_changes), 'shared')
+          || needs.changes.outputs.non_src_changes == 'true' }}
+        uses: smartcontractkit/.github/actions/setup-nodejs@c094a1482049b2b9c0a7cde3f715bd76a60afd97
+        with:
+          package-json-directory: chains/evm
+          pnpm-version: ^10.0.0
+
+      - name: Install Foundry
+        if:
+          ${{ contains(fromJson(needs.changes.outputs.all_changes), matrix.product.name)
+          || contains(fromJson(needs.changes.outputs.all_changes), 'shared')
+          || needs.changes.outputs.non_src_changes == 'true' }}
+        uses: ./.github/actions/install-solidity-foundry
+        with:
+          working-directory: chains/evm
+
+      # If Solc version is not set in foundry.toml, then what `forge build` does is that it lazily-installs required solc versions
+      # using SVM. This is done in parallel, but SVM has a bug and is not thread-safe, which sometimes leads to `Text file busy` error.
+      # In order to avoid it, in such cases we will extract all required solc versions manually and install them sequentially.
+      # More information: https://github.com/foundry-rs/foundry/issues/4736
+      - name: Check if Solc version is set in foundry.toml
+        if:
+          ${{ contains(fromJson(needs.changes.outputs.all_changes), matrix.product.name)
+          || contains(fromJson(needs.changes.outputs.all_changes), 'shared')
+          || needs.changes.outputs.non_src_changes == 'true' }}
+        shell: bash
+        id: check-for-solc-version
+        working-directory: chains/evm
+        env:
+          FOUNDRY_PROFILE: ${{ matrix.product.name }}
+        run: |
+          VERSION_IN_PROFILE=$(forge config --json | jq .solc)
+          if [[ "$VERSION_IN_PROFILE" = "null" ]]; then
+            echo "Solc version is not set in Foundry.toml"
+            echo "has_solc_version=false" >> $GITHUB_OUTPUT
+          else
+            echo "Solc version is set in Foundry.toml to: $VERSION_IN_PROFILE"
+            echo "has_solc_version=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Install SVM
+        if: ${{ steps.check-for-solc-version.outputs.has_solc_version == 'false'
+          && (contains(fromJson(needs.changes.outputs.all_changes), matrix.product.name)
+          || contains(fromJson(needs.changes.outputs.all_changes), 'shared')
+          || needs.changes.outputs.non_src_changes == 'true') }}
+        uses: baptiste0928/cargo-install@904927dbe77864e0f2281519fe9d5bd097a220b3 # v3.1.1
+        with:
+          crate: svm-rs
+
+      - name: Find and install all Solc versions with SVM
+        if: ${{ steps.check-for-solc-version.outputs.has_solc_version == 'false'
+          && (contains(fromJson(needs.changes.outputs.all_changes), matrix.product.name)
+          || contains(fromJson(needs.changes.outputs.all_changes), 'shared')
+          || needs.changes.outputs.non_src_changes == 'true') }}
+        shell: bash
+        working-directory: chains/evm/src/v0.8
+        run: |
+          exact_versions=$(grep -rh "pragma solidity" ${{ matrix.product.name }} | sort | uniq | grep -v '\^' | awk '{print $3}' | tr -d ';')
+          for version in $exact_versions; do
+            echo "Installing exact version: $version"
+            if ! svm install "$version"; then
+                echo "::error::Failed to install solc version: $version"
+            fi
+          done
+          latest_version=$(svm list | grep -Eo '"[0-9]+\.[0-9]+\.[0-9]+"' | tr -d '"' | sort -V | tail -n1)
+          echo "Installing latest version: $latest_version"
+          if ! svm install "$latest_version"; then
+            echo "::error::Failed to install solc version: $latest_version"
+          fi
+
+      - name: Run Forge build
+        if:
+          ${{ contains(fromJson(needs.changes.outputs.all_changes), matrix.product.name)
+          || contains(fromJson(needs.changes.outputs.all_changes), 'shared')
+          || needs.changes.outputs.non_src_changes == 'true' }}
+        run: |
+          forge --version
+          forge build
+        id: build
+        working-directory: chains/evm
+        env:
+          FOUNDRY_PROFILE: ${{ matrix.product.name }}
+
+      - name: Run Forge tests
+        if:
+          ${{ contains(fromJson(needs.changes.outputs.all_changes), matrix.product.name)
+          || contains(fromJson(needs.changes.outputs.all_changes), 'shared')
+          || needs.changes.outputs.non_src_changes == 'true' }}
+        run: |
+          forge test -vvv
+        id: test
+        working-directory: chains/evm
+        env:
+          FOUNDRY_PROFILE: ${{ matrix.product.name }}
+
+      - name: Run Forge snapshot
+        if:
+          ${{ (contains(fromJson(needs.changes.outputs.all_changes), matrix.product.name)
+          || contains(fromJson(needs.changes.outputs.all_changes), 'shared')
+          || needs.changes.outputs.non_src_changes == 'true')
+          && matrix.product.setup.run-gas-snapshot }}
+        run: |
+          forge snapshot --nmt "test?(Fuzz|Fork|.*_RevertWhen)_.*" --check .gas-snapshot
+        id: snapshot
+        working-directory: chains/evm
+        env:
+          FOUNDRY_PROFILE: ${{ matrix.product.name }}
+
+      # required for code coverage report generation
+      - name: Setup LCOV
+        if:
+          ${{ (contains(fromJson(needs.changes.outputs.all_changes), matrix.product.name)
+          || contains(fromJson(needs.changes.outputs.all_changes), 'shared')
+          || needs.changes.outputs.non_src_changes == 'true')
+          && matrix.product.setup.run-coverage }}
+        uses: hrishikesh-kadam/setup-lcov@f5da1b26b0dcf5d893077a3c4f29cf78079c841d # v1.0.0
+
+      - name: Run coverage for ${{ matrix.product.name }}
+        if:
+          ${{ (contains(fromJson(needs.changes.outputs.all_changes), matrix.product.name)
+          || contains(fromJson(needs.changes.outputs.all_changes), 'shared')
+          || needs.changes.outputs.non_src_changes == 'true')
+          && matrix.product.setup.run-coverage }}
+        working-directory: chains/evm
+        shell: bash
+        run: |
+          if [[ -n "${{ matrix.product.setup.extra-coverage-params }}" ]]; then
+            forge coverage --report lcov ${{ matrix.product.setup.extra-coverage-params }}
+          else
+            forge coverage --report lcov
+          fi
+        env:
+          FOUNDRY_PROFILE: ${{ matrix.product.name }}
+
+      - name: Prune lcov report
+        if:
+          ${{ (contains(fromJson(needs.changes.outputs.all_changes), matrix.product.name)
+          || contains(fromJson(needs.changes.outputs.all_changes), 'shared')
+          || needs.changes.outputs.non_src_changes == 'true')
+          && matrix.product.setup.run-coverage }}
+        working-directory: chains/evm
+        run: |
+          ./scripts/lcov_prune
+
+      - name: Report code coverage for ${{ matrix.product.name }}
+        if:
+          ${{ (contains(fromJson(needs.changes.outputs.all_changes), matrix.product.name)
+          || contains(fromJson(needs.changes.outputs.all_changes), 'shared')
+          || needs.changes.outputs.non_src_changes == 'true')
+          && matrix.product.setup.run-coverage }}
+        uses: zgosalvez/github-actions-report-lcov@a546f89a65a0cdcd82a92ae8d65e74d450ff3fbc # v4.1.4
+        with:
+          update-comment: false
+          coverage-files: chains/evm/lcov.info.pruned
+          minimum-coverage: ${{ matrix.product.setup.min-coverage }}
+          artifact-name: code-coverage-report-${{ matrix.product.name }}
+          working-directory: chains/evm
+
+  check-tests-results:
+    if: always()
+    needs: [tests]
+    name: Check Foundry Tests Results
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Check tests statuses and fail if any of them failed or were cancelled
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        run: |
+          echo "At least one test job failed or was cancelled. Please check the logs."
+          exit 1
+      - run: echo 'Success'
+
+  solidity-forge-fmt:
+    name: Forge fmt ${{ matrix.product.name }}
+    if: ${{ needs.changes.outputs.non_src_changes == 'true' || needs.changes.outputs.sol_modified_added == 'true' }}
+    needs: [define-matrix, changes]
+    strategy:
+      fail-fast: false
+      matrix:
+        product: ${{fromJson(needs.define-matrix.outputs.matrix)}}
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout the repo
+        if: ${{ (contains(fromJson(needs.changes.outputs.all_changes), matrix.product.name) || needs.changes.outputs.non_src_changes == 'true')}}
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          submodules: recursive
+
+      - name: Setup NodeJS
+        if: ${{ (contains(fromJson(needs.changes.outputs.all_changes), matrix.product.name) || needs.changes.outputs.non_src_changes == 'true')}}
+        uses: smartcontractkit/.github/actions/setup-nodejs@c094a1482049b2b9c0a7cde3f715bd76a60afd97
+        with:
+          package-json-directory: chains/evm
+          pnpm-version: ^10.0.0
+
+      - name: Install Foundry
+        if: ${{ (contains(fromJson(needs.changes.outputs.all_changes), matrix.product.name) || needs.changes.outputs.non_src_changes == 'true')}}
+        uses: ./.github/actions/install-solidity-foundry
+        with:
+          working-directory: chains/evm
+
+      - name: Run Forge fmt
+        if: ${{ (contains(fromJson(needs.changes.outputs.all_changes), matrix.product.name) || needs.changes.outputs.non_src_changes == 'true')}}
+        run: forge fmt --check
+        id: fmt
+        working-directory: chains/evm
+        env:
+          FOUNDRY_PROFILE: ${{ matrix.product.name }}
+
+  check-fmt-results:
+    if: always()
+    needs: [solidity-forge-fmt]
+    name: Check Foundry Format Results
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Check format statuses and fail if any of them failed or were cancelled
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        run: |
+          echo "At least one format check failed or was cancelled. Please check the logs."
+          exit 1
+      - run: echo 'Success'
