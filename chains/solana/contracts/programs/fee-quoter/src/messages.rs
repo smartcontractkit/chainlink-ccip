@@ -41,6 +41,9 @@ pub struct ProcessedExtraArgs {
     pub bytes: Vec<u8>,
     pub gas_limit: u128,
     pub allow_out_of_order_execution: bool,
+    // If unspecified, the message receiver should be used (e.g. with EVM as destination.)
+    // This will also be `None` when there is no token transfer.
+    pub token_receiver: Option<Vec<u8>>,
 }
 
 impl ProcessedExtraArgs {
@@ -51,6 +54,7 @@ impl ProcessedExtraArgs {
             bytes: args.serialize_with_tag(),
             gas_limit: args.gas_limit,
             allow_out_of_order_execution: args.allow_out_of_order_execution,
+            token_receiver: None,
         }
     }
 }

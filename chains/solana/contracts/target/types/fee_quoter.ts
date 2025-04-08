@@ -987,6 +987,12 @@ export type FeeQuoter = {
           {
             "name": "allowOutOfOrderExecution",
             "type": "bool"
+          },
+          {
+            "name": "tokenReceiver",
+            "type": {
+              "option": "bytes"
+            }
           }
         ]
       }
@@ -2657,6 +2663,12 @@ export const IDL: FeeQuoter = {
           {
             "name": "allowOutOfOrderExecution",
             "type": "bool"
+          },
+          {
+            "name": "tokenReceiver",
+            "type": {
+              "option": "bytes"
+            }
           }
         ]
       }
