@@ -185,8 +185,7 @@ func Test_getMessagesObservation(t *testing.T) {
 						SequenceNumberRange: cciptypes.NewSeqNumRange(6, 10),
 					},
 					{
-						SourceChain: 1,
-						// test sets this up with missing messages
+						SourceChain:         1,
 						SequenceNumberRange: cciptypes.NewSeqNumRange(11, 12),
 					},
 				},
