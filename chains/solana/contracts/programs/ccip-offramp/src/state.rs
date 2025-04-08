@@ -113,6 +113,10 @@ impl OnRampAddress {
         self.len == 0
     }
 
+    pub fn is_zero(&self) -> bool {
+        self.bytes().iter().all(|b| *b == 0)
+    }
+
     pub const EMPTY: Self = Self {
         bytes: [0u8; 64],
         len: 0,
