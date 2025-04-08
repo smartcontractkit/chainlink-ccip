@@ -194,7 +194,12 @@ impl OnRamp for Impl {
             // CPI: call lockOrBurn on token pool
             {
                 let lock_or_burn = LockOrBurnInV1 {
-                    receiver: message.receiver.clone(),
+                    receiver: get_fee_result
+                        .processed_extra_args
+                        .token_receiver
+                        .as_ref()
+                        .unwrap_or(&message.receiver)
+                        .clone(),
                     remote_chain_selector: dest_chain_selector,
                     original_sender: ctx.accounts.authority.key(),
                     amount: token_amount.amount,

@@ -152,6 +152,7 @@ fn parse_and_validate_generic_extra_args(
                     bytes: args.serialize_with_tag(),
                     gas_limit: args.gas_limit,
                     allow_out_of_order_execution: args.allow_out_of_order_execution,
+                    token_receiver: None,
                 })
             }
         }
@@ -195,6 +196,7 @@ fn parse_and_validate_svm_extra_args(
                 bytes: args.serialize_with_tag(),
                 gas_limit: args.compute_units as u128,
                 allow_out_of_order_execution: args.allow_out_of_order_execution,
+                token_receiver: message_contains_tokens.then_some(args.token_receiver.to_vec()),
             })
         }
         _ => Err(FeeQuoterError::InvalidExtraArgsTag.into()),
@@ -390,6 +392,7 @@ pub mod tests {
         );
         assert_eq!(extra_args.gas_limit, 100);
         assert!(extra_args.allow_out_of_order_execution);
+        assert_eq!(extra_args.token_receiver, None);
 
         // unknown family - uses generic (same as evm) tag
         let extra_args = process_extra_args(
@@ -408,6 +411,7 @@ pub mod tests {
         );
         assert_eq!(extra_args.gas_limit, 100);
         assert!(extra_args.allow_out_of_order_execution);
+        assert_eq!(extra_args.token_receiver, None);
 
         // evm - fail to match
         assert_eq!(
@@ -422,6 +426,8 @@ pub mod tests {
             extra_args.gas_limit,
             svm_dest_chain.config.default_tx_gas_limit as u128
         );
+        // Reflects the no token case
+        assert_eq!(extra_args.token_receiver, None);
         assert!(!extra_args.allow_out_of_order_execution);
 
         // svm - empty tag (no data) fails
@@ -437,13 +443,14 @@ pub mod tests {
         );
 
         // svm - passed in data
+        let token_receiver = Pubkey::try_from("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTa")
+            .unwrap()
+            .to_bytes();
         let args = SVMExtraArgsV1 {
             compute_units: 100,
             account_is_writable_bitmap: 3,
             allow_out_of_order_execution: true,
-            token_receiver: Pubkey::try_from("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTa")
-                .unwrap()
-                .to_bytes(),
+            token_receiver,
             accounts: vec![
                 Pubkey::try_from("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTa")
                     .unwrap()
@@ -457,6 +464,7 @@ pub mod tests {
             process_extra_args(&svm_dest_chain.config, &args.serialize_with_tag(), true).unwrap();
         assert_eq!(extra_args.bytes, args.serialize_with_tag());
         assert_eq!(extra_args.gas_limit, 100);
+        assert_eq!(extra_args.token_receiver, Some(token_receiver.to_vec()));
         assert!(extra_args.allow_out_of_order_execution);
 
         // svm - fail to match
