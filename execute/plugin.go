@@ -275,7 +275,7 @@ func getPendingReportsForExecution(
 	fullyExecutedUnfinalized []exectypes.CommitData,
 	err error,
 ) {
-	commitReports, err := ccipReader.CommitReportsGTETimestamp(ctx, ts, 1000) // todo: configurable limit
+	commitReports, err := ccipReader.CommitReportsGTETimestamp(ctx, ts, 20) // todo: configurable limit
 	if err != nil {
 		return nil, nil, nil, err
 	}

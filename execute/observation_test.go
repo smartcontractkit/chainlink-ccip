@@ -3,6 +3,9 @@ package execute
 import (
 	"context"
 	"fmt"
+	"github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
+	"github.com/stretchr/testify/mock"
 	"testing"
 	"time"
 
@@ -102,6 +105,8 @@ func Test_Observation_CacheUpdate(t *testing.T) {
 
 }
 
+// TODO: Test Gas Limits
+// TODO: Test Size limits
 func Test_getMessagesObservation(t *testing.T) {
 	ctx := context.Background()
 
@@ -109,6 +114,9 @@ func Test_getMessagesObservation(t *testing.T) {
 	ccipReader := readerpkg_mock.NewMockCCIPReader(t)
 	msgHasher := mocks.NewMessageHasher()
 	tokenDataObserver := observer.NoopTokenDataObserver{}
+	estimateProvider := ccipocr3.NewMockEstimateProvider(t)
+	estimateProvider.EXPECT().CalculateMessageMaxGas(mock.Anything).Return(1)
+	estimateProvider.EXPECT().CalculateMerkleTreeGas(mock.Anything).Return(1)
 
 	//emptyMsgHash, err := msgHasher.Hash(ctx, cciptypes.Message{})
 	//require.NoError(t, err)
@@ -119,6 +127,10 @@ func Test_getMessagesObservation(t *testing.T) {
 		msgHasher:         msgHasher,
 		tokenDataObserver: &tokenDataObserver,
 		ocrTypeCodec:      ocrTypeCodec,
+		estimateProvider:  estimateProvider,
+		offchainCfg: pluginconfig.ExecuteOffchainConfig{
+			BatchGasLimit: 10,
+		},
 	}
 
 	tests := []struct {
@@ -265,17 +277,28 @@ func Test_readAllMessages(t *testing.T) {
 	ctx := context.Background()
 
 	// Create mock objects
-	ccipReader := readerpkg_mock.NewMockCCIPReader(t)
-	msgHasher := mocks.NewMessageHasher()
 	lggr := mocks.NullLogger
 	timestamp := time.Now()
+	ccipReader := readerpkg_mock.NewMockCCIPReader(t)
+	msgHasher := mocks.NewMessageHasher()
+	tokenDataObserver := observer.NoopTokenDataObserver{}
+	estimateProvider := ccipocr3.NewMockEstimateProvider(t)
+	estimateProvider.EXPECT().CalculateMessageMaxGas(mock.Anything).Return(1)
+	estimateProvider.EXPECT().CalculateMerkleTreeGas(mock.Anything).Return(1)
 
-	// Create Plugin instance to use its getObsWithoutTokenData method
+	//emptyMsgHash, err := msgHasher.Hash(ctx, cciptypes.Message{})
+	//require.NoError(t, err)
+	// Set up the plugin with mock objects
 	plugin := &Plugin{
-		lggr:         lggr,
-		ccipReader:   ccipReader,
-		msgHasher:    msgHasher,
-		ocrTypeCodec: ocrTypeCodec,
+		lggr:              lggr,
+		ccipReader:        ccipReader,
+		msgHasher:         msgHasher,
+		tokenDataObserver: &tokenDataObserver,
+		ocrTypeCodec:      ocrTypeCodec,
+		estimateProvider:  estimateProvider,
+		offchainCfg: pluginconfig.ExecuteOffchainConfig{
+			BatchGasLimit: 10,
+		},
 	}
 
 	tests := []struct {

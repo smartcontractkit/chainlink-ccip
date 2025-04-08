@@ -3,6 +3,7 @@ package execute
 import (
 	"context"
 	"fmt"
+	ocrtypecodec "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
 	"sort"
 	"time"
 
@@ -12,7 +13,6 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
-	"github.com/smartcontractkit/chainlink-ccip/execute/optimizers"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
@@ -287,6 +287,9 @@ func (p *Plugin) getObsWithoutTokenData(
 		return exectypes.CompareCommitData(commitData[i], commitData[j])
 	})
 
+	stop := false
+	gasSum := uint64(0)
+
 	for _, report := range commitData {
 		srcChain := report.SourceChain
 
@@ -312,36 +315,79 @@ func (p *Plugin) getObsWithoutTokenData(
 			continue
 		}
 
+		availableReports[srcChain] = append(availableReports[srcChain], report)
 		for _, msg := range msgs {
-			messageObs[srcChain][msg.Header.SequenceNumber] = msg
+			// When we need to stop we continue to process the messages to add hashes
+			if !stop {
+				messageObs[srcChain][msg.Header.SequenceNumber] = msg
+			} else {
+				messageObs[srcChain][msg.Header.SequenceNumber] = cciptypes.Message{}
+			}
+
 			hash, err := p.msgHasher.Hash(ctx, msg)
 			if err != nil {
-				lggr.Errorw("not able to compute hash for msg in range",
-					"srcChain", srcChain, "seqRange", report.SequenceNumberRange,
-					"seqNum", msg.Header.SequenceNumber, "err", err)
-				continue
+				return exectypes.Observation{}, fmt.Errorf("unable to hash message srcChain %d, seqNum %d: %w",
+					srcChain, msg.Header.SequenceNumber,
+					err)
 			}
 			msgHashes[srcChain][msg.Header.SequenceNumber] = hash
-		}
-		availableReports[srcChain] = append(availableReports[srcChain], report)
 
-		observation.CommitReports = availableReports
-		observation.Messages = messageObs
-		observation.Hashes = msgHashes
-		// Check for encoding size
-		encodedObsSize, err := p.ocrTypeCodec.EncodeObservation(observation)
-		if err != nil {
-			return exectypes.Observation{}, fmt.Errorf("unable to encode observation: %w", err)
+			gasSum += p.estimateProvider.CalculateMessageMaxGas(msg)
+			stop = p.exceedsMaxGasLimit(gasSum, msgs)
+
+			observation.CommitReports = availableReports
+			observation.Messages = messageObs
+			observation.Hashes = msgHashes
+			// we check if gas limit or size already reached first so we can skip the size check
+			if !stop && exceedsMaxEncodingSize(observation, p.ocrTypeCodec, maxObservationLength) {
+				// psuedo delete the message
+				stop = true
+				messageObs[srcChain][msg.Header.SequenceNumber] = cciptypes.Message{}
+				// Don't break, Will still continue to try adding all messages in the report,
+				// even if the rest can't be added we still need to add the hashes for proofs anyways.
+			}
 		}
-		if len(encodedObsSize) > maxObservationLength {
-			lggr.Errorw("observation size exceeds max size",
-				"maxSize", maxObservationLength, "size", encodedObsSize)
-			// TODO: truncate messages and see whether we should continue or break
+
+		if stop {
+			lggr.Infow("Stop processing messages, observation is too large")
 			break
 		}
+
 	}
 
 	return observation, nil
+}
+
+func (p *Plugin) exceedsMaxGasLimit(
+	gasSum uint64,
+	msgs []cciptypes.Message,
+) bool {
+	// calculating merkleTreeGas here is not entirely accurate as we can have multiple roots
+	// for observation, but this is a good approximation at this point as we have more in depth checks
+	// later when we built the reports
+	merkleTreeGas := p.estimateProvider.CalculateMerkleTreeGas(len(msgs))
+	totalGas := gasSum + merkleTreeGas
+
+	// even when it's equal to the limit we'll stop as this is already an approximation
+	// that is lower than the actual gas
+	if totalGas >= p.offchainCfg.BatchGasLimit {
+		p.lggr.Infow("reached max gas limit while observing",
+			"gas", totalGas, "maxGas", p.offchainCfg.BatchGasLimit)
+		return true
+	}
+	return false
+}
+
+func exceedsMaxEncodingSize(
+	observation exectypes.Observation,
+	ocrTypeCodec ocrtypecodec.ExecCodec,
+	maxSize int,
+) bool {
+	encodedObs, err := ocrTypeCodec.EncodeObservation(observation)
+	if err != nil {
+		return false
+	}
+	return len(encodedObs) >= maxSize
 }
 
 func (p *Plugin) getMessagesObservation(
@@ -370,6 +416,7 @@ func (p *Plugin) getMessagesObservation(
 		return exectypes.Observation{}, fmt.Errorf("unable to get messages: %w", err)
 	}
 
+	// TODO: if empty message don't get token data for it
 	tkData, err1 := p.tokenDataObserver.Observe(ctx, obsWithoutTokenData.Messages)
 	if err1 != nil {
 		return exectypes.Observation{}, fmt.Errorf("unable to process token data %w", err1)
@@ -383,17 +430,6 @@ func (p *Plugin) getMessagesObservation(
 
 	observation = obsWithoutTokenData
 	observation.TokenData = tkData
-
-	// Make sure encoded observation fits within the maximum observation size.
-	observationOptimizer := optimizers.NewObservationOptimizer(
-		lggr,
-		maxObservationLength,
-		p.ocrTypeCodec,
-	)
-	observation, err = observationOptimizer.TruncateObservation(observation)
-	if err != nil {
-		return exectypes.Observation{}, fmt.Errorf("unable to truncate observation: %w", err)
-	}
 
 	return observation, nil
 }
