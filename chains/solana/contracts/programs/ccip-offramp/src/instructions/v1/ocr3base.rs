@@ -86,14 +86,6 @@ pub fn ocr3_set(
         CcipOfframpError::Ocr3InvalidConfigTooManyTransmitters
     );
 
-    // NOTE: Transmitters cannot exceed signers. Transmitters do not have to be >= 3F + 1 because they can
-    // match >= 3fChain + 1, where fChain <= F. fChain is not represented in MultiOCR3Base - so we skip this check.
-    require_gte!(
-        signers.len(),
-        transmitters.len(),
-        CcipOfframpError::Ocr3InvalidConfigTooManyTransmitters
-    );
-
     clear_transmitters(ocr3_config);
 
     if cfg.is_signature_verification_enabled != 0 {
@@ -105,6 +97,14 @@ pub fn ocr3_set(
         require!(
             signers.len() > 3 * cfg.f as usize,
             CcipOfframpError::Ocr3InvalidConfigFIsTooHigh
+        );
+
+        // NOTE: Transmitters cannot exceed signers. Transmitters do not have to be >= 3F + 1 because they can
+        // match >= 3fChain + 1, where fChain <= F. fChain is not represented in MultiOCR3Base - so we skip this check.
+        require_gte!(
+            signers.len(),
+            transmitters.len(),
+            CcipOfframpError::Ocr3InvalidConfigTooManyTransmitters
         );
 
         ocr3_config.config_info.n = signers.len() as u8;
