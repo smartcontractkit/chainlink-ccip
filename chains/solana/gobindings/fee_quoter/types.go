@@ -374,6 +374,7 @@ type ProcessedExtraArgs struct {
 	Bytes                    []byte
 	GasLimit                 ag_binary.Uint128
 	AllowOutOfOrderExecution bool
+	TokenReceiver            *[]byte `bin:"optional"`
 }
 
 func (obj ProcessedExtraArgs) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
@@ -391,6 +392,24 @@ func (obj ProcessedExtraArgs) MarshalWithEncoder(encoder *ag_binary.Encoder) (er
 	err = encoder.Encode(obj.AllowOutOfOrderExecution)
 	if err != nil {
 		return err
+	}
+	// Serialize `TokenReceiver` param (optional):
+	{
+		if obj.TokenReceiver == nil {
+			err = encoder.WriteBool(false)
+			if err != nil {
+				return err
+			}
+		} else {
+			err = encoder.WriteBool(true)
+			if err != nil {
+				return err
+			}
+			err = encoder.Encode(obj.TokenReceiver)
+			if err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
@@ -410,6 +429,19 @@ func (obj *ProcessedExtraArgs) UnmarshalWithDecoder(decoder *ag_binary.Decoder) 
 	err = decoder.Decode(&obj.AllowOutOfOrderExecution)
 	if err != nil {
 		return err
+	}
+	// Deserialize `TokenReceiver` (optional):
+	{
+		ok, err := decoder.ReadBool()
+		if err != nil {
+			return err
+		}
+		if ok {
+			err = decoder.Decode(&obj.TokenReceiver)
+			if err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
