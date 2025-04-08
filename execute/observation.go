@@ -273,33 +273,28 @@ func regroup(commitData []exectypes.CommitData) exectypes.CommitObservations {
 	return groupedCommits
 }
 
-const MAX_EXEC_MESSAGES_TENTATIVE = 20
-
-func readAllMessages(
+func (p *Plugin) readAllMessages(
 	ctx context.Context,
 	lggr logger.Logger,
-	ccipReader reader.CCIPReader,
 	commitData []exectypes.CommitData,
-) (exectypes.MessageObservations, exectypes.CommitObservations, map[cciptypes.Bytes32]time.Time) {
+) (exectypes.MessageObservations, exectypes.CommitObservations, exectypes.MessageHashes) {
 	messageObs := make(exectypes.MessageObservations)
 	availableReports := make(exectypes.CommitObservations)
-	messageTimestamps := make(map[cciptypes.Bytes32]time.Time)
+	msgHashes := make(exectypes.MessageHashes)
 
-	//commitObs := regroup(commitData)
-	// sort commitData by timestamp
 	sort.Slice(commitData, func(i, j int) bool {
 		return exectypes.CompareCommitData(commitData[i], commitData[j])
 	})
 
-	totalMessages := 0
 	for _, report := range commitData {
 		srcChain := report.SourceChain
 
 		if _, ok := messageObs[srcChain]; !ok {
 			messageObs[srcChain] = make(map[cciptypes.SeqNum]cciptypes.Message)
+			msgHashes[srcChain] = make(map[cciptypes.SeqNum]cciptypes.Bytes32)
 		}
 		// Read messages for each range.
-		msgs, err := ccipReader.MsgsBetweenSeqNums(ctx, srcChain, report.SequenceNumberRange)
+		msgs, err := p.ccipReader.MsgsBetweenSeqNums(ctx, srcChain, report.SequenceNumberRange)
 		if err != nil {
 			lggr.Errorw("unable to read all messages for report",
 				"srcChain", srcChain,
@@ -318,18 +313,19 @@ func readAllMessages(
 
 		for _, msg := range msgs {
 			messageObs[srcChain][msg.Header.SequenceNumber] = msg
-			messageTimestamps[msg.Header.MessageID] = report.Timestamp
+			hash, err := p.msgHasher.Hash(ctx, msg)
+			if err != nil {
+				lggr.Errorw("not able to compute hash for msg in range",
+					"srcChain", srcChain, "seqRange", report.SequenceNumberRange,
+					"seqNum", msg.Header.SequenceNumber, "err", err)
+				continue
+			}
+			msgHashes[srcChain][msg.Header.SequenceNumber] = hash
 		}
 		availableReports[srcChain] = append(availableReports[srcChain], report)
-		totalMessages += len(msgs)
-		if totalMessages > MAX_EXEC_MESSAGES_TENTATIVE {
-			lggr.Infow("too many messages for exec report, continuing with current messages "+
-				"without reading the rest", "totalMessages", totalMessages)
-			break
-		}
 	}
 
-	return messageObs, availableReports, messageTimestamps
+	return messageObs, availableReports, msgHashes
 }
 
 func (p *Plugin) getMessagesObservation(
@@ -348,10 +344,9 @@ func (p *Plugin) getMessagesObservation(
 		return observation, nil
 	}
 
-	messageObs, commitReportCache, _ := readAllMessages(
+	messageObs, commitReportCache, hashes := p.readAllMessages(
 		ctx,
 		lggr,
-		p.ccipReader,
 		previousOutcome.CommitReports,
 	)
 
@@ -366,11 +361,6 @@ func (p *Plugin) getMessagesObservation(
 		return exectypes.Observation{}, fmt.Errorf("invalid token data observations")
 	}
 
-	hashes, err := exectypes.GetHashes(ctx, messageObs, p.msgHasher)
-	if err != nil {
-		return exectypes.Observation{}, fmt.Errorf("unable to get message hashes: %w", err)
-	}
-
 	observation.CommitReports = commitReportCache
 	observation.Messages = messageObs
 	observation.Hashes = hashes
@@ -382,7 +372,7 @@ func (p *Plugin) getMessagesObservation(
 		maxObservationLength,
 		p.ocrTypeCodec,
 	)
-	observation, err = observationOptimizer.TruncateObservation(observation)
+	observation, err := observationOptimizer.TruncateObservation(observation)
 	if err != nil {
 		return exectypes.Observation{}, fmt.Errorf("unable to truncate observation: %w", err)
 	}

@@ -266,24 +266,32 @@ func Test_readAllMessages(t *testing.T) {
 
 	// Create mock objects
 	ccipReader := readerpkg_mock.NewMockCCIPReader(t)
+	msgHasher := mocks.NewMessageHasher()
 	lggr := mocks.NullLogger
 	timestamp := time.Now()
 
+	// Create Plugin instance to use its readAllMessages method
+	plugin := &Plugin{
+		lggr:       lggr,
+		ccipReader: ccipReader,
+		msgHasher:  msgHasher,
+	}
+
 	tests := []struct {
-		name               string
-		commitData         []exectypes.CommitData
-		expectedMsgs       exectypes.MessageObservations
-		expectedReports    exectypes.CommitObservations
-		expectedTimestamps map[cciptypes.Bytes32]time.Time
-		expectedError      bool
+		name            string
+		commitData      []exectypes.CommitData
+		expectedMsgs    exectypes.MessageObservations
+		expectedReports exectypes.CommitObservations
+		expectedHashes  exectypes.MessageHashes
+		expectedError   bool
 	}{
 		{
-			name:               "no commit data",
-			commitData:         []exectypes.CommitData{},
-			expectedMsgs:       exectypes.MessageObservations{},
-			expectedReports:    exectypes.CommitObservations{},
-			expectedTimestamps: map[cciptypes.Bytes32]time.Time{},
-			expectedError:      false,
+			name:            "no commit data",
+			commitData:      []exectypes.CommitData{},
+			expectedMsgs:    exectypes.MessageObservations{},
+			expectedReports: exectypes.CommitObservations{},
+			expectedHashes:  exectypes.MessageHashes{},
+			expectedError:   false,
 		},
 		{
 			name: "valid commit data",
@@ -310,10 +318,12 @@ func Test_readAllMessages(t *testing.T) {
 					},
 				},
 			},
-			expectedTimestamps: map[cciptypes.Bytes32]time.Time{
-				{0x01}: timestamp,
-				{0x02}: timestamp,
-				{0x03}: timestamp,
+			expectedHashes: exectypes.MessageHashes{
+				1: {
+					1: cciptypes.Bytes32{0x01},
+					2: cciptypes.Bytes32{0x02},
+					3: cciptypes.Bytes32{0x03},
+				},
 			},
 			expectedError: false,
 		},
@@ -329,10 +339,10 @@ func Test_readAllMessages(t *testing.T) {
 				{Header: cciptypes.RampMessageHeader{SequenceNumber: 3, MessageID: cciptypes.Bytes32{0x03}}},
 			}, nil).Maybe()
 
-			msgs, reports, timestamps := readAllMessages(ctx, lggr, ccipReader, tt.commitData)
+			msgs, reports, hashes := plugin.readAllMessages(ctx, lggr, tt.commitData)
 			assert.Equal(t, tt.expectedMsgs, msgs)
 			assert.Equal(t, tt.expectedReports, reports)
-			assert.Equal(t, tt.expectedTimestamps, timestamps)
+			assert.Equal(t, tt.expectedHashes, hashes)
 		})
 	}
 }

@@ -41,7 +41,8 @@ const (
 	// commit reports have many messages.
 	// in order to meaningfully decrease this we need to drastically optimise
 	// our observation sizes.
-	maxObservationLength = ocr3types.MaxMaxObservationLength
+	// Using 70% of the max size to allow for some space while observing.
+	maxObservationLength = ocr3types.MaxMaxObservationLength * 0.75
 
 	// maxOutcomeLength is set to the maximum size of an outcome
 	// check factory_test for the calculation. This is not limited because
