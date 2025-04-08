@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 	"github.com/stretchr/testify/mock"
 	"testing"
 	"time"
@@ -117,6 +118,7 @@ func Test_getMessagesObservation(t *testing.T) {
 	estimateProvider := ccipocr3.NewMockEstimateProvider(t)
 	estimateProvider.EXPECT().CalculateMessageMaxGas(mock.Anything).Return(1)
 	estimateProvider.EXPECT().CalculateMerkleTreeGas(mock.Anything).Return(1)
+	ccipReader.EXPECT().ExecutedMessages(mock.Anything, mock.Anything, primitives.Unconfirmed).Return(nil, nil)
 
 	//emptyMsgHash, err := msgHasher.Hash(ctx, cciptypes.Message{})
 	//require.NoError(t, err)
@@ -285,6 +287,7 @@ func Test_readAllMessages(t *testing.T) {
 	estimateProvider := ccipocr3.NewMockEstimateProvider(t)
 	estimateProvider.EXPECT().CalculateMessageMaxGas(mock.Anything).Return(1)
 	estimateProvider.EXPECT().CalculateMerkleTreeGas(mock.Anything).Return(1)
+	ccipReader.EXPECT().ExecutedMessages(mock.Anything, mock.Anything, primitives.Unconfirmed).Return(nil, nil)
 
 	//emptyMsgHash, err := msgHasher.Hash(ctx, cciptypes.Message{})
 	//require.NoError(t, err)

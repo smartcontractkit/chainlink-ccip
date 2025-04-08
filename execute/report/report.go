@@ -167,7 +167,7 @@ func Template() Check {
 func CheckIfPseudoDeleted() Check {
 	return func(lggr logger.Logger, msg ccipocr3.Message, idx int, report exectypes.CommitData) (messageStatus, error) {
 		if msg.IsEmpty() {
-			lggr.Errorw("message pseudo deleted", "index", idx)
+			lggr.Infow("message pseudo deleted", "index", idx)
 			return PseudoDeleted, nil
 		}
 		return None, nil

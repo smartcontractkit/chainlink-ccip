@@ -36,7 +36,8 @@ func ConstructMerkleTree(
 				"malformed report, message %s sequence number %d outside of report range %s",
 				report.MerkleRoot.String(), msg.Header.SequenceNumber, report.SequenceNumberRange)
 		}
-		if report.SourceChain != msg.Header.SourceChainSelector {
+		// When msg is empty the chain selector will always be zero
+		if report.SourceChain != msg.Header.SourceChainSelector && !msg.IsEmpty() {
 			return nil, fmt.Errorf("malformed report, message %s for unexpected source chain: expected %d, got %d",
 				report.MerkleRoot.String(), report.SourceChain, msg.Header.SourceChainSelector)
 		}

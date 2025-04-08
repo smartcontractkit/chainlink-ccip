@@ -3,7 +3,9 @@ package execute
 import (
 	"context"
 	"fmt"
+	mapset "github.com/deckarep/golang-set/v2"
 	ocrtypecodec "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 	"sort"
 	"time"
 
@@ -315,25 +317,42 @@ func (p *Plugin) getObsWithoutTokenData(
 			continue
 		}
 
+		rangesBySelector := make(map[cciptypes.ChainSelector][]cciptypes.SeqNumRange)
+		rangesBySelector[srcChain] = []cciptypes.SeqNumRange{report.SequenceNumberRange}
+
+		// Get all executed messages
+		inflightMsgs, err := p.ccipReader.ExecutedMessages(ctx, rangesBySelector, primitives.Unconfirmed)
+		if err != nil {
+			lggr.Errorw("get executed messages in range %v: %w", rangesBySelector, err)
+			continue
+		}
+
+		inflightMsgsSet := mapset.NewSet(inflightMsgs[srcChain]...)
+
 		availableReports[srcChain] = append(availableReports[srcChain], report)
 		for _, msg := range msgs {
+			seqNum := msg.Header.SequenceNumber
 			// When we need to stop we continue to process the messages to add hashes
-			if !stop {
-				messageObs[srcChain][msg.Header.SequenceNumber] = msg
+			if !stop && !inflightMsgsSet.Contains(seqNum) {
+				messageObs[srcChain][seqNum] = msg
+				gasSum += p.estimateProvider.CalculateMessageMaxGas(msg)
+				stop = p.exceedsMaxGasLimit(gasSum, msgs)
 			} else {
-				messageObs[srcChain][msg.Header.SequenceNumber] = cciptypes.Message{}
+				messageObs[srcChain][seqNum] = cciptypes.Message{
+					Header: cciptypes.RampMessageHeader{
+						SequenceNumber: seqNum,
+					},
+				}
 			}
 
+			// Compute hash for all messages in report even if they are executed or not included in this round
 			hash, err := p.msgHasher.Hash(ctx, msg)
 			if err != nil {
 				return exectypes.Observation{}, fmt.Errorf("unable to hash message srcChain %d, seqNum %d: %w",
-					srcChain, msg.Header.SequenceNumber,
+					srcChain, seqNum,
 					err)
 			}
-			msgHashes[srcChain][msg.Header.SequenceNumber] = hash
-
-			gasSum += p.estimateProvider.CalculateMessageMaxGas(msg)
-			stop = p.exceedsMaxGasLimit(gasSum, msgs)
+			msgHashes[srcChain][seqNum] = hash
 
 			observation.CommitReports = availableReports
 			observation.Messages = messageObs
@@ -342,8 +361,12 @@ func (p *Plugin) getObsWithoutTokenData(
 			if !stop && exceedsMaxEncodingSize(observation, p.ocrTypeCodec, maxObservationLength) {
 				// psuedo delete the message
 				stop = true
-				messageObs[srcChain][msg.Header.SequenceNumber] = cciptypes.Message{}
-				// Don't break, Will still continue to try adding all messages in the report,
+				messageObs[srcChain][seqNum] = cciptypes.Message{
+					Header: cciptypes.RampMessageHeader{
+						SequenceNumber: seqNum,
+					},
+				}
+				// Don't break, Will still continue to try adding the rest of messages in the report,
 				// even if the rest can't be added we still need to add the hashes for proofs anyways.
 			}
 		}

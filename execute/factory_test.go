@@ -71,8 +71,8 @@ func TestObservationSize(t *testing.T) {
 	t.Skip("This test is for estimating message sizes, not for running in CI")
 	ocrTypeCodec := ocrtypecodec.DefaultExecCodec
 
-	maxCommitReports := 100
-	maxMessages := 1100
+	maxCommitReports := 200
+	maxMessages := 200
 	msgDataSize := 1000 // could be much larger than this?
 	tokenDataSize := 0  // fixed size for CCTP?
 
