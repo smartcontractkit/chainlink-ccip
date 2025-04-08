@@ -218,7 +218,7 @@ func (pr *priceReader) GetFeedPricesUSD(
 				lggr.Errorw("failed to calculate price", "token", token)
 				continue
 			}
-			prices[token] = ccipocr3.BigInt{Int: price}
+			prices[token] = ccipocr3.NewBigInt(price)
 		}
 	}
 
@@ -271,7 +271,8 @@ func (pr *priceReader) prepareBatchRequest(
 	for _, token := range tokens {
 		tokenInfo, ok := pr.tokenInfo[token]
 		if !ok {
-			return nil, nil, fmt.Errorf("get tokenInfo for %s: missing token info", token)
+			pr.lggr.Errorw("get tokenInfo for %s: missing token info, token skipped", token)
+			continue
 		}
 
 		boundContract := commontypes.BoundContract{
