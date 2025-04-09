@@ -2,8 +2,6 @@ package exectypes
 
 import (
 	"context"
-	"sort"
-
 	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal"
@@ -41,18 +39,6 @@ func (mo MessageObservations) Flatten() []cciptypes.Message {
 			results = append(results, msg)
 		}
 	}
-	return results
-}
-
-// FlattenCommitObservation CommitObservations into a slice of CommitData sorted by timestamp.
-func (co CommitObservations) FlattenCommitObservation() []CommitData {
-	var results []CommitData
-	for _, reports := range co {
-		results = append(results, reports...)
-	}
-	sort.Slice(results, func(i, j int) bool {
-		return results[i].Timestamp.Before(results[j].Timestamp)
-	})
 	return results
 }
 

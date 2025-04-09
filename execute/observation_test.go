@@ -409,7 +409,9 @@ func Test_getObsWithoutTokenData(t *testing.T) {
 		}
 	}
 
-	createMessages := func(srcChain cciptypes.ChainSelector, destChain cciptypes.ChainSelector, fromSeq, toSeq cciptypes.SeqNum) []cciptypes.Message {
+	createMessages := func(srcChain cciptypes.ChainSelector,
+		destChain cciptypes.ChainSelector,
+		fromSeq, toSeq cciptypes.SeqNum) []cciptypes.Message {
 		var msgs []cciptypes.Message
 		for seq := fromSeq; seq <= toSeq; seq++ {
 			msgs = append(msgs, NewMessage(int(seq), int(seq), int(srcChain), int(destChain)))
@@ -417,7 +419,9 @@ func Test_getObsWithoutTokenData(t *testing.T) {
 		return msgs
 	}
 
-	createHashesMap := func(srcChain cciptypes.ChainSelector, fromSeq, toSeq cciptypes.SeqNum) map[cciptypes.SeqNum]cciptypes.Bytes32 {
+	createHashesMap := func(
+		srcChain cciptypes.ChainSelector,
+		fromSeq, toSeq cciptypes.SeqNum) map[cciptypes.SeqNum]cciptypes.Bytes32 {
 		hashes := make(map[cciptypes.SeqNum]cciptypes.Bytes32)
 		for seq := fromSeq; seq <= toSeq; seq++ {
 			hashes[seq] = cciptypes.Bytes32{byte(seq)}
@@ -429,7 +433,8 @@ func Test_getObsWithoutTokenData(t *testing.T) {
 		estimateProvider.EXPECT().CalculateMerkleTreeGas(numMsgs).Return(gas)
 	}
 
-	setupMessageGasExpectations := func(estimateProvider *ccipocr3.MockEstimateProvider, msgs []cciptypes.Message, gas uint64) {
+	setupMessageGasExpectations := func(estimateProvider *ccipocr3.MockEstimateProvider, msgs []cciptypes.Message,
+		gas uint64) {
 		for _, msg := range msgs {
 			estimateProvider.EXPECT().CalculateMessageMaxGas(msg).Return(gas)
 		}
