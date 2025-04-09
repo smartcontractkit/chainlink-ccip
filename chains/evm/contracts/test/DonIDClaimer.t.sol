@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {Ownable2Step} from "@shared/access/Ownable2Step.sol";
 import {DonIDClaimer} from "../DonIDClaimer.sol";
 import {MockCapabilitiesRegistry} from "./mocks/MockCapabilitiesRegistry.sol";
+import {Ownable2Step} from "@shared/access/Ownable2Step.sol";
 import {Test} from "forge-std/Test.sol";
 
 contract DonIDClaimerTest is Test {
