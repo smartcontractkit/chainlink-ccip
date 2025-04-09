@@ -55,7 +55,11 @@ pub fn validate_svm2any(
         FeeQuoterError::ExtraArgOutOfOrderExecutionMustBeTrue,
     );
 
-    validate_dest_family_address(msg, dest_chain.config.chain_family_selector)?;
+    validate_dest_family_address(
+        msg,
+        dest_chain.config.chain_family_selector,
+        &processed_extra_args,
+    )?;
 
     Ok(processed_extra_args)
 }
@@ -63,11 +67,14 @@ pub fn validate_svm2any(
 fn validate_dest_family_address(
     msg: &SVM2AnyMessage,
     chain_family_selector: [u8; 4],
+    msg_extra_args: &ProcessedExtraArgs,
 ) -> Result<()> {
     let selector = u32::from_be_bytes(chain_family_selector);
     match selector {
         CHAIN_FAMILY_SELECTOR_EVM => validate_evm_dest_address(&msg.receiver),
-        CHAIN_FAMILY_SELECTOR_SVM => validate_svm_dest_address(&msg.receiver),
+        CHAIN_FAMILY_SELECTOR_SVM => {
+            validate_svm_dest_address(&msg.receiver, msg_extra_args.gas_limit > 0)
+        }
         _ => Err(FeeQuoterError::InvalidChainFamilySelector.into()),
     }
 }
@@ -93,8 +100,13 @@ fn validate_evm_dest_address(address: &[u8]) -> Result<()> {
     Ok(())
 }
 
-fn validate_svm_dest_address(address: &[u8]) -> Result<()> {
+fn validate_svm_dest_address(address: &[u8], address_must_be_nonzero: bool) -> Result<()> {
     require_eq!(address.len(), 32, FeeQuoterError::InvalidSVMAddress);
+    require!(
+        !address_must_be_nonzero || address.iter().any(|b| *b != 0),
+        FeeQuoterError::InvalidSVMAddress
+    );
+
     Pubkey::try_from_slice(address)
         .map(|_| ())
         .map_err(|_| FeeQuoterError::InvalidSVMAddress.into())
