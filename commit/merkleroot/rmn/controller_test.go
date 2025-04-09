@@ -52,7 +52,7 @@ type testSetup struct {
 	peerClient     *mockPeerClient
 	updateRequests []*rmnpb.FixedDestLaneUpdateRequest
 	rmnHomeMock    *readerpkg_mock.MockRMNHome
-	remoteRMNCfg   rmntypes.RemoteConfig
+	remoteRMNCfg   cciptypes.RemoteConfig
 	homeF          int
 	rmnNodes       []rmntypes.HomeNodeInfo
 }
@@ -446,11 +446,11 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 			},
 		}
 
-		rmnRemoteCfg := rmntypes.RemoteConfig{
+		rmnRemoteCfg := cciptypes.RemoteConfig{
 			ContractAddress: []byte{1, 2, 3},
 			ConfigDigest:    cciptypes.Bytes32{0x1, 0x2, 0x3},
 			FSign:           2,
-			Signers: []rmntypes.RemoteSignerInfo{
+			Signers: []cciptypes.RemoteSignerInfo{
 				{
 					OnchainPublicKey: []byte{1, 2, 3},
 					NodeIndex:        1,

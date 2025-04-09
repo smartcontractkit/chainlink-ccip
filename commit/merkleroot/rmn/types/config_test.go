@@ -11,62 +11,62 @@ import (
 func TestRMNRemoteConfig_IsEmpty(t *testing.T) {
 	tests := []struct {
 		name     string
-		config   RemoteConfig
+		config   cciptypes.RemoteConfig
 		expected bool
 	}{
 		{
 			name:     "Completely empty config",
-			config:   RemoteConfig{},
+			config:   cciptypes.RemoteConfig{},
 			expected: true,
 		},
 		{
 			name: "Config with only ContractAddress",
-			config: RemoteConfig{
+			config: cciptypes.RemoteConfig{
 				ContractAddress: cciptypes.UnknownAddress{1, 2, 3},
 			},
 			expected: true,
 		},
 		{
 			name: "Config with only ConfigDigest",
-			config: RemoteConfig{
+			config: cciptypes.RemoteConfig{
 				ConfigDigest: cciptypes.Bytes32{1},
 			},
 			expected: false,
 		},
 		{
 			name: "Config with only Signers",
-			config: RemoteConfig{
-				Signers: []RemoteSignerInfo{{}, {}},
+			config: cciptypes.RemoteConfig{
+				Signers: []cciptypes.RemoteSignerInfo{{}, {}},
 			},
 			expected: false,
 		},
 		{
 			name: "Config with only F",
-			config: RemoteConfig{
+			config: cciptypes.RemoteConfig{
 				FSign: 1,
 			},
 			expected: false,
 		},
 		{
 			name: "Config with only ConfigVersion",
-			config: RemoteConfig{
+			config: cciptypes.RemoteConfig{
 				ConfigVersion: 1,
 			},
 			expected: false,
 		},
 		{
 			name: "Config with only RmnReportVersion",
-			config: RemoteConfig{
+			config: cciptypes.RemoteConfig{
 				RmnReportVersion: cciptypes.Bytes32{1},
 			},
 			expected: false,
 		},
 		{
 			name: "Fully populated config",
-			config: RemoteConfig{
+			config: cciptypes.RemoteConfig{
 				ContractAddress:  cciptypes.UnknownAddress{1, 2, 3},
 				ConfigDigest:     cciptypes.Bytes32{1},
-				Signers:          []RemoteSignerInfo{{}, {}},
+				Signers:          []cciptypes.RemoteSignerInfo{{}, {}},
 				FSign:            2,
 				ConfigVersion:    1,
 				RmnReportVersion: cciptypes.Bytes32{1},
@@ -75,10 +75,10 @@ func TestRMNRemoteConfig_IsEmpty(t *testing.T) {
 		},
 		{
 			name: "Config with nil ContractAddress",
-			config: RemoteConfig{
+			config: cciptypes.RemoteConfig{
 				ContractAddress:  nil,
 				ConfigDigest:     cciptypes.Bytes32{1},
-				Signers:          []RemoteSignerInfo{{}, {}},
+				Signers:          []cciptypes.RemoteSignerInfo{{}, {}},
 				FSign:            2,
 				ConfigVersion:    1,
 				RmnReportVersion: cciptypes.Bytes32{1},
@@ -87,10 +87,10 @@ func TestRMNRemoteConfig_IsEmpty(t *testing.T) {
 		},
 		{
 			name: "Config with empty (non-nil) ContractAddress",
-			config: RemoteConfig{
+			config: cciptypes.RemoteConfig{
 				ContractAddress:  cciptypes.UnknownAddress{},
 				ConfigDigest:     cciptypes.Bytes32{1},
-				Signers:          []RemoteSignerInfo{{}, {}},
+				Signers:          []cciptypes.RemoteSignerInfo{{}, {}},
 				FSign:            2,
 				ConfigVersion:    1,
 				RmnReportVersion: cciptypes.Bytes32{1},

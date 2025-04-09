@@ -7,7 +7,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
@@ -156,7 +155,7 @@ func TokenPriceComparator(a, b cciptypes.TokenPrice) bool {
 }
 
 // TimestampedBigAggregator aggregates the fee quoter updates by taking the median of the prices and timestamps
-func TimestampedBigAggregator(updates []plugintypes.TimestampedBig) plugintypes.TimestampedBig {
+func TimestampedBigAggregator(updates []cciptypes.TimestampedBig) cciptypes.TimestampedBig {
 	timestamps := make([]time.Time, len(updates))
 	prices := make([]cciptypes.BigInt, len(updates))
 	for i := range updates {
@@ -165,7 +164,7 @@ func TimestampedBigAggregator(updates []plugintypes.TimestampedBig) plugintypes.
 	}
 	medianPrice := Median(prices, BigIntComparator)
 	medianTimestamp := Median(timestamps, TimestampComparator)
-	return plugintypes.TimestampedBig{
+	return cciptypes.TimestampedBig{
 		Value:     medianPrice,
 		Timestamp: medianTimestamp,
 	}

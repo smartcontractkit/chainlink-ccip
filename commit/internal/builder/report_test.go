@@ -14,7 +14,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
 	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
-	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -51,7 +50,7 @@ func TestReportBuilders(t *testing.T) {
 					MerkleRoot:    ccipocr3.Bytes32{1, 2, 3, 4, 5, 6, 7},
 				},
 			},
-			RMNRemoteCfg:     rmntypes.RemoteConfig{FSign: 123},
+			RMNRemoteCfg:     ccipocr3.RemoteConfig{FSign: 123},
 			RMNEnabledChains: map[ccipocr3.ChainSelector]bool{3: true, 2: false},
 		},
 		TokenPriceOutcome: tokenprice.Outcome{
