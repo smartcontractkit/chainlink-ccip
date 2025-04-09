@@ -86,6 +86,8 @@ impl OnRamp for Impl {
         let mut get_fee_remaining_accounts = billing_token_config_accs;
         get_fee_remaining_accounts.extend(per_chain_per_token_config_accs);
 
+        // todo: find chain familiy selector validation in fee quotor logic
+        // todo: check evm impl also
         let get_fee_result = get_fee_cpi(
             ctx.accounts.fee_quoter.to_account_info(),
             ctx.accounts.fee_quoter_config.to_account_info(),
@@ -344,42 +346,6 @@ mod helpers {
             amount: token_amount.amount.into(), // pool on receiver chain handles decimals
             dest_exec_data,
         })
-    }
-
-    fn validate_dest_token_address(address: &[u8], chain_family_selector: [u8; 4]) -> Result<()> {
-        let selector = u32::from_be_bytes(chain_family_selector);
-        match selector {
-            fee_quoter::messages::CHAIN_FAMILY_SELECTOR_EVM => validate_evm_dest_address(address),
-            fee_quoter::messages::CHAIN_FAMILY_SELECTOR_SVM => validate_svm_dest_address(address),
-            _ => Err(CcipRouterError::InvalidChainFamilySelector.into()),
-        }
-    }
-
-    fn validate_evm_dest_address(address: &[u8]) -> Result<()> {
-        const PRECOMPILE_SPACE: u32 = 1024;
-        require_eq!(address.len(), 32, CcipRouterError::InvalidEVMAddress);
-
-        let address: U256 = U256::from_be_bytes(
-            address
-                .try_into()
-                .map_err(|_| CcipRouterError::InvalidEncoding)?,
-        );
-        require!(address <= U160_MAX, CcipRouterError::InvalidEVMAddress);
-        if let Ok(small_address) = TryInto::<u32>::try_into(address) {
-            require_gte!(
-                small_address,
-                PRECOMPILE_SPACE,
-                CcipRouterError::InvalidEVMAddress
-            )
-        };
-        Ok(())
-    }
-
-    fn validate_svm_dest_address(address: &[u8]) -> Result<()> {
-        require_eq!(address.len(), 32, CcipRouterError::InvalidSVMAddress);
-        Pubkey::try_from_slice(address)
-            .map(|_| ())
-            .map_err(|_| CcipRouterError::InvalidSVMAddress.into())
     }
 
     pub(super) fn bump_nonce(
