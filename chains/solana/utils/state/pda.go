@@ -138,3 +138,11 @@ func FindPingPongDemoConfigPDA(pingPongDemoProgram solana.PublicKey) (solana.Pub
 func FindPingPongCCIPSendSignerPDA(pingPongDemoProgram solana.PublicKey) (solana.PublicKey, uint8, error) {
 	return solana.FindProgramAddress([][]byte{[]byte("ccip_send_signer")}, pingPongDemoProgram)
 }
+
+/////////////////
+// Shared PDAs //
+/////////////////
+
+func FindNameAndVersionPDA(program solana.PublicKey) (solana.PublicKey, uint8, error) {
+	return solana.FindProgramAddress([][]byte{[]byte("name_version")}, program)
+}
