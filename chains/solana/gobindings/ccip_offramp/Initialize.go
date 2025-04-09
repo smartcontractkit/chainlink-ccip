@@ -33,24 +33,20 @@ type Initialize struct {
 	//
 	// [5] = [WRITE] state
 	//
-	// [6] = [WRITE] externalExecutionConfig
+	// [6] = [WRITE, SIGNER] authority
 	//
-	// [7] = [WRITE] tokenPoolsSigner
+	// [7] = [] systemProgram
 	//
-	// [8] = [WRITE, SIGNER] authority
+	// [8] = [] program
 	//
-	// [9] = [] systemProgram
-	//
-	// [10] = [] program
-	//
-	// [11] = [] programData
+	// [9] = [] programData
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewInitializeInstructionBuilder creates a new `Initialize` instruction builder.
 func NewInitializeInstructionBuilder() *Initialize {
 	nd := &Initialize{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 12),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 10),
 	}
 	return nd
 }
@@ -121,70 +117,48 @@ func (inst *Initialize) GetStateAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[5]
 }
 
-// SetExternalExecutionConfigAccount sets the "externalExecutionConfig" account.
-func (inst *Initialize) SetExternalExecutionConfigAccount(externalExecutionConfig ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[6] = ag_solanago.Meta(externalExecutionConfig).WRITE()
-	return inst
-}
-
-// GetExternalExecutionConfigAccount gets the "externalExecutionConfig" account.
-func (inst *Initialize) GetExternalExecutionConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[6]
-}
-
-// SetTokenPoolsSignerAccount sets the "tokenPoolsSigner" account.
-func (inst *Initialize) SetTokenPoolsSignerAccount(tokenPoolsSigner ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[7] = ag_solanago.Meta(tokenPoolsSigner).WRITE()
-	return inst
-}
-
-// GetTokenPoolsSignerAccount gets the "tokenPoolsSigner" account.
-func (inst *Initialize) GetTokenPoolsSignerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[7]
-}
-
 // SetAuthorityAccount sets the "authority" account.
 func (inst *Initialize) SetAuthorityAccount(authority ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[8] = ag_solanago.Meta(authority).WRITE().SIGNER()
+	inst.AccountMetaSlice[6] = ag_solanago.Meta(authority).WRITE().SIGNER()
 	return inst
 }
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *Initialize) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[8]
+	return inst.AccountMetaSlice[6]
 }
 
 // SetSystemProgramAccount sets the "systemProgram" account.
 func (inst *Initialize) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[9] = ag_solanago.Meta(systemProgram)
+	inst.AccountMetaSlice[7] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
 // GetSystemProgramAccount gets the "systemProgram" account.
 func (inst *Initialize) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[9]
+	return inst.AccountMetaSlice[7]
 }
 
 // SetProgramAccount sets the "program" account.
 func (inst *Initialize) SetProgramAccount(program ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[10] = ag_solanago.Meta(program)
+	inst.AccountMetaSlice[8] = ag_solanago.Meta(program)
 	return inst
 }
 
 // GetProgramAccount gets the "program" account.
 func (inst *Initialize) GetProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[10]
+	return inst.AccountMetaSlice[8]
 }
 
 // SetProgramDataAccount sets the "programData" account.
 func (inst *Initialize) SetProgramDataAccount(programData ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[11] = ag_solanago.Meta(programData)
+	inst.AccountMetaSlice[9] = ag_solanago.Meta(programData)
 	return inst
 }
 
 // GetProgramDataAccount gets the "programData" account.
 func (inst *Initialize) GetProgramDataAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[11]
+	return inst.AccountMetaSlice[9]
 }
 
 func (inst Initialize) Build() *Instruction {
@@ -226,21 +200,15 @@ func (inst *Initialize) Validate() error {
 			return errors.New("accounts.State is not set")
 		}
 		if inst.AccountMetaSlice[6] == nil {
-			return errors.New("accounts.ExternalExecutionConfig is not set")
-		}
-		if inst.AccountMetaSlice[7] == nil {
-			return errors.New("accounts.TokenPoolsSigner is not set")
-		}
-		if inst.AccountMetaSlice[8] == nil {
 			return errors.New("accounts.Authority is not set")
 		}
-		if inst.AccountMetaSlice[9] == nil {
+		if inst.AccountMetaSlice[7] == nil {
 			return errors.New("accounts.SystemProgram is not set")
 		}
-		if inst.AccountMetaSlice[10] == nil {
+		if inst.AccountMetaSlice[8] == nil {
 			return errors.New("accounts.Program is not set")
 		}
-		if inst.AccountMetaSlice[11] == nil {
+		if inst.AccountMetaSlice[9] == nil {
 			return errors.New("accounts.ProgramData is not set")
 		}
 	}
@@ -259,19 +227,17 @@ func (inst *Initialize) EncodeToTree(parent ag_treeout.Branches) {
 					instructionBranch.Child("Params[len=0]").ParentFunc(func(paramsBranch ag_treeout.Branches) {})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=12]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("     referenceAddresses", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("                 router", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("              feeQuoter", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("              rmnRemote", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("     offrampLookupTable", inst.AccountMetaSlice[4]))
-						accountsBranch.Child(ag_format.Meta("                  state", inst.AccountMetaSlice[5]))
-						accountsBranch.Child(ag_format.Meta("externalExecutionConfig", inst.AccountMetaSlice[6]))
-						accountsBranch.Child(ag_format.Meta("       tokenPoolsSigner", inst.AccountMetaSlice[7]))
-						accountsBranch.Child(ag_format.Meta("              authority", inst.AccountMetaSlice[8]))
-						accountsBranch.Child(ag_format.Meta("          systemProgram", inst.AccountMetaSlice[9]))
-						accountsBranch.Child(ag_format.Meta("                program", inst.AccountMetaSlice[10]))
-						accountsBranch.Child(ag_format.Meta("            programData", inst.AccountMetaSlice[11]))
+					instructionBranch.Child("Accounts[len=10]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+						accountsBranch.Child(ag_format.Meta("referenceAddresses", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("            router", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("         feeQuoter", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("         rmnRemote", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("offrampLookupTable", inst.AccountMetaSlice[4]))
+						accountsBranch.Child(ag_format.Meta("             state", inst.AccountMetaSlice[5]))
+						accountsBranch.Child(ag_format.Meta("         authority", inst.AccountMetaSlice[6]))
+						accountsBranch.Child(ag_format.Meta("     systemProgram", inst.AccountMetaSlice[7]))
+						accountsBranch.Child(ag_format.Meta("           program", inst.AccountMetaSlice[8]))
+						accountsBranch.Child(ag_format.Meta("       programData", inst.AccountMetaSlice[9]))
 					})
 				})
 		})
@@ -293,8 +259,6 @@ func NewInitializeInstruction(
 	rmnRemote ag_solanago.PublicKey,
 	offrampLookupTable ag_solanago.PublicKey,
 	state ag_solanago.PublicKey,
-	externalExecutionConfig ag_solanago.PublicKey,
-	tokenPoolsSigner ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey,
 	program ag_solanago.PublicKey,
@@ -306,8 +270,6 @@ func NewInitializeInstruction(
 		SetRmnRemoteAccount(rmnRemote).
 		SetOfframpLookupTableAccount(offrampLookupTable).
 		SetStateAccount(state).
-		SetExternalExecutionConfigAccount(externalExecutionConfig).
-		SetTokenPoolsSignerAccount(tokenPoolsSigner).
 		SetAuthorityAccount(authority).
 		SetSystemProgramAccount(systemProgram).
 		SetProgramAccount(program).

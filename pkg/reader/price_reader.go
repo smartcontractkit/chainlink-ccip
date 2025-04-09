@@ -168,10 +168,7 @@ func (pr *priceReader) GetFeedPricesUSD(
 	}
 
 	// Create batch request grouped by contract
-	batchRequest, contractTokenMap, err := pr.prepareBatchRequest(tokens)
-	if err != nil {
-		return nil, fmt.Errorf("prepare batch request: %w", err)
-	}
+	batchRequest, contractTokenMap := pr.prepareBatchRequest(tokens)
 
 	// Execute batch request
 	results, err := pr.feedChainReader().BatchGetLatestValues(ctx, batchRequest)
@@ -217,7 +214,7 @@ func (pr *priceReader) GetFeedPricesUSD(
 				lggr.Errorw("failed to calculate price", "token", token)
 				continue
 			}
-			prices[token] = ccipocr3.BigInt{Int: price}
+			prices[token] = ccipocr3.NewBigInt(price)
 		}
 	}
 
@@ -263,14 +260,15 @@ func (pr *priceReader) getDecimals(
 // prepareBatchRequest creates a batch request grouped by contract and returns the mapping of contracts to token indices
 func (pr *priceReader) prepareBatchRequest(
 	tokens []ccipocr3.UnknownEncodedAddress,
-) (commontypes.BatchGetLatestValuesRequest, ContractTokenMap, error) {
+) (commontypes.BatchGetLatestValuesRequest, ContractTokenMap) {
 	batchRequest := make(commontypes.BatchGetLatestValuesRequest)
 	contractTokenMap := make(ContractTokenMap)
 
 	for _, token := range tokens {
 		tokenInfo, ok := pr.tokenInfo[token]
 		if !ok {
-			return nil, nil, fmt.Errorf("get tokenInfo for %s: missing token info", token)
+			pr.lggr.Errorw("get tokenInfo for %s: missing token info, token skipped", token)
+			continue
 		}
 
 		boundContract := commontypes.BoundContract{
@@ -297,7 +295,7 @@ func (pr *priceReader) prepareBatchRequest(
 		contractTokenMap[boundContract] = append(contractTokenMap[boundContract], token)
 	}
 
-	return batchRequest, contractTokenMap, nil
+	return batchRequest, contractTokenMap
 }
 
 func (pr *priceReader) normalizePrice(price *big.Int, decimals uint8) *big.Int {

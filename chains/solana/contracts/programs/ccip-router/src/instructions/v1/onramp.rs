@@ -62,6 +62,7 @@ impl OnRamp for Impl {
                 dest_chain_selector,
                 ctx.program_id.key(),
                 ctx.accounts.config.fee_quoter,
+                None,
                 &ctx.remaining_accounts[start..end],
             )?;
 
@@ -172,13 +173,16 @@ impl OnRamp for Impl {
             token_amounts: vec![SVM2AnyTokenTransfer::default(); token_count], // this will be set later
         };
 
-        let seeds = &[seed::EXTERNAL_TOKEN_POOL, &[ctx.bumps.token_pools_signer]];
         for (i, (current_token_accounts, token_amount)) in accounts_per_sent_token
             .iter()
             .zip(message.token_amounts.iter())
             .enumerate()
         {
-            let router_token_pool_signer = &ctx.accounts.token_pools_signer;
+            let seeds = &[
+                seed::EXTERNAL_TOKEN_POOL,
+                current_token_accounts.pool_program.key.as_ref(),
+                &[current_token_accounts.ccip_router_pool_signer_bump],
+            ];
 
             // CPI: transfer token amount from user to token pool
             transfer_token(
@@ -187,21 +191,28 @@ impl OnRamp for Impl {
                 current_token_accounts.mint,
                 current_token_accounts.user_token_account,
                 current_token_accounts.pool_token_account,
-                router_token_pool_signer,
+                current_token_accounts.ccip_router_pool_signer,
                 seeds,
             )?;
 
             // CPI: call lockOrBurn on token pool
             {
                 let lock_or_burn = LockOrBurnInV1 {
-                    receiver: message.receiver.clone(),
+                    receiver: get_fee_result
+                        .processed_extra_args
+                        .token_receiver
+                        .as_ref()
+                        .unwrap_or(&message.receiver)
+                        .clone(),
                     remote_chain_selector: dest_chain_selector,
                     original_sender: ctx.accounts.authority.key(),
                     amount: token_amount.amount,
                     local_token: token_amount.token,
                 };
 
-                let mut acc_infos = router_token_pool_signer.to_account_infos();
+                let mut acc_infos = current_token_accounts
+                    .ccip_router_pool_signer
+                    .to_account_infos();
                 acc_infos.extend_from_slice(&[
                     current_token_accounts.pool_config.to_account_info(),
                     current_token_accounts.token_program.to_account_info(),
@@ -217,7 +228,7 @@ impl OnRamp for Impl {
 
                 let return_data = interact_with_pool(
                     current_token_accounts.pool_program.key(),
-                    router_token_pool_signer.key(),
+                    current_token_accounts.ccip_router_pool_signer.key(),
                     acc_infos,
                     lock_or_burn,
                     seeds,

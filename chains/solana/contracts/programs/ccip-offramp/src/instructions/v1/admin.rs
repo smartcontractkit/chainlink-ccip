@@ -218,9 +218,55 @@ impl Admin for Impl {
 
 fn validate_source_chain_config(
     _source_chain_selector: u64,
-    _config: &SourceChainConfig,
+    config: &SourceChainConfig,
 ) -> Result<()> {
-    // As of now, the config has very few properties and there is nothing to validate yet.
-    // This is a placeholder to add validations as that config object grows.
+    require!(
+        !config.on_ramp.is_empty() && !config.on_ramp.is_zero(),
+        CcipOfframpError::InvalidOnrampAddress
+    );
+    // As of now, the config has very few properties and there is little to validate yet
+    // (only validity of the remote on_ramp address.) Validations will be added as that config object grows.
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::state::{OnRampAddress, SourceChainConfig};
+
+    #[test]
+    fn source_chain_config_validation() {
+        let valid_config = SourceChainConfig {
+            is_enabled: false,
+            is_rmn_verification_disabled: true,
+            lane_code_version: crate::state::CodeVersion::Default,
+            on_ramp: OnRampAddress::from([0xAB; 64]),
+        };
+
+        validate_source_chain_config(1, &valid_config).unwrap();
+
+        let invalid_config_zero_address = SourceChainConfig {
+            is_enabled: false,
+            is_rmn_verification_disabled: true,
+            lane_code_version: crate::state::CodeVersion::Default,
+            on_ramp: OnRampAddress::from([0x00; 64]),
+        };
+
+        assert_eq!(
+            validate_source_chain_config(1, &invalid_config_zero_address).unwrap_err(),
+            CcipOfframpError::InvalidOnrampAddress.into()
+        );
+
+        let invalid_config_empty_address = SourceChainConfig {
+            is_enabled: false,
+            is_rmn_verification_disabled: true,
+            lane_code_version: crate::state::CodeVersion::Default,
+            on_ramp: OnRampAddress::EMPTY,
+        };
+
+        assert_eq!(
+            validate_source_chain_config(1, &invalid_config_empty_address).unwrap_err(),
+            CcipOfframpError::InvalidOnrampAddress.into()
+        );
+    }
 }

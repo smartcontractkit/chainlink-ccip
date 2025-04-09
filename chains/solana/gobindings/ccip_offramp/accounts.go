@@ -277,36 +277,6 @@ func (obj *GlobalState) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err er
 	return nil
 }
 
-type ExternalExecutionConfig struct{}
-
-var ExternalExecutionConfigDiscriminator = [8]byte{159, 157, 150, 212, 168, 103, 117, 39}
-
-func (obj ExternalExecutionConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Write account discriminator:
-	err = encoder.WriteBytes(ExternalExecutionConfigDiscriminator[:], false)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *ExternalExecutionConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Read and check account discriminator:
-	{
-		discriminator, err := decoder.ReadTypeID()
-		if err != nil {
-			return err
-		}
-		if !discriminator.Equal(ExternalExecutionConfigDiscriminator[:]) {
-			return fmt.Errorf(
-				"wrong discriminator: wanted %s, got %s",
-				"[159 157 150 212 168 103 117 39]",
-				fmt.Sprint(discriminator[:]))
-		}
-	}
-	return nil
-}
-
 type SourceChain struct {
 	Version       uint8
 	ChainSelector uint64
