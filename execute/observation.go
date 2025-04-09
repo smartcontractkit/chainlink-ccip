@@ -310,7 +310,7 @@ func (p *Plugin) getObsWithoutTokenData(
 		for _, msg := range msgs {
 			seqNum := msg.Header.SequenceNumber
 			// When we need to stop we continue to process the messages to add hashes
-			if !stop && !p.inflightMessageCache.IsInflight(srcChain, msg.Header.MessageID) { //!inflightMsgsSet.Contains(seqNum) {
+			if !stop && !p.inflightMessageCache.IsInflight(srcChain, msg.Header.MessageID) {
 				messageObs[srcChain][seqNum] = msg
 				gasSum += p.estimateProvider.CalculateMessageMaxGas(msg)
 				stop = p.exceedsMaxGasLimit(gasSum, msgs)
