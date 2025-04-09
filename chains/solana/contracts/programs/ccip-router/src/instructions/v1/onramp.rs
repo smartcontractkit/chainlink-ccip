@@ -1,6 +1,5 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface;
-use ethnum::U256;
 
 use crate::events::on_ramp as events;
 use crate::messages::GetFeeResult;
@@ -24,8 +23,6 @@ use crate::{
 };
 
 use helpers::*;
-
-const U160_MAX: U256 = U256::from_words(u32::MAX as u128, u128::MAX);
 
 pub struct Impl;
 impl OnRamp for Impl {
@@ -415,7 +412,6 @@ mod helpers {
     #[cfg(test)]
     mod tests {
         use ethnum::U256;
-        use fee_quoter::messages::CHAIN_FAMILY_SELECTOR_SVM;
 
         use super::*;
 
@@ -489,7 +485,6 @@ mod helpers {
                 source_pool_address,
                 token_amount,
                 &additional_token_transfer_data,
-                CHAIN_FAMILY_SELECTOR_SVM.to_be_bytes(),
             )
             .unwrap();
 
@@ -524,7 +519,6 @@ mod helpers {
                 source_pool_address,
                 token_amount,
                 &additional_token_transfer_data,
-                CHAIN_FAMILY_SELECTOR_SVM.to_be_bytes(),
             )
             .unwrap();
 
@@ -542,7 +536,6 @@ mod helpers {
                     source_pool_address,
                     token_amount,
                     &additional_token_transfer_data,
-                    CHAIN_FAMILY_SELECTOR_SVM.to_be_bytes(),
                 )
                 .unwrap_err(),
                 CcipRouterError::SourceTokenDataTooLarge.into()
