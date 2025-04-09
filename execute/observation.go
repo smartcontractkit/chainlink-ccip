@@ -281,45 +281,31 @@ func (p *Plugin) getObsWithoutTokenData(
 	for _, report := range commitData {
 		srcChain := report.SourceChain
 
-		if _, ok := messageObs[srcChain]; !ok {
-			messageObs[srcChain] = make(map[cciptypes.SeqNum]cciptypes.Message)
-			msgHashes[srcChain] = make(map[cciptypes.SeqNum]cciptypes.Bytes32)
-		}
-		// Read messages for each range.
-		msgs, err := p.ccipReader.MsgsBetweenSeqNums(ctx, srcChain, report.SequenceNumberRange)
+		// Initialize data structures for this source chain if needed
+		initSourceChainMaps(srcChain, messageObs, msgHashes)
+
+		// Read messages for this report's sequence number range
+		msgs, err := p.readMessagesForReport(ctx, lggr, srcChain, report)
 		if err != nil {
-			lggr.Errorw("unable to read all messages for report",
-				"srcChain", srcChain,
-				"seqRange", report.SequenceNumberRange,
-				"merkleRoot", report.MerkleRoot,
-				"err", err,
-			)
-			continue
+			continue // Logging already done in readMessagesForReport
 		}
 
-		if !msgsConformToSeqRange(msgs, report.SequenceNumberRange) {
-			lggr.Errorw("missing messages in range",
-				"srcChain", srcChain, "seqRange", report.SequenceNumberRange)
-			continue
-		}
-
-		rangesBySelector := make(map[cciptypes.ChainSelector][]cciptypes.SeqNumRange)
-		rangesBySelector[srcChain] = []cciptypes.SeqNumRange{report.SequenceNumberRange}
-
+		// Add the report to available reports
 		availableReports[srcChain] = append(availableReports[srcChain], report)
+
+		// Process each message in the report
 		for _, msg := range msgs {
 			seqNum := msg.Header.SequenceNumber
-			// When we need to stop we continue to process the messages to add hashes
+
+			// Handle message observation and gas calculation
 			if !stop && !p.inflightMessageCache.IsInflight(srcChain, msg.Header.MessageID) {
 				messageObs[srcChain][seqNum] = msg
 				gasSum += p.estimateProvider.CalculateMessageMaxGas(msg)
 				stop = p.exceedsMaxGasLimit(gasSum, msgs)
 			} else {
-				messageObs[srcChain][seqNum] = cciptypes.Message{
-					Header: cciptypes.RampMessageHeader{
-						SequenceNumber: seqNum,
-					},
-				}
+				// This is for when we calculate roots in reports later, we need the seqNum and
+				// the hash for this message
+				messageObs[srcChain][seqNum] = createEmptyMessageWithSeqNum(seqNum)
 			}
 
 			// Compute hash for all messages in report even if they are executed or not included in this round
@@ -331,20 +317,14 @@ func (p *Plugin) getObsWithoutTokenData(
 			}
 			msgHashes[srcChain][seqNum] = hash
 
+			// Update the observation with current state
 			observation.CommitReports = availableReports
 			observation.Messages = messageObs
 			observation.Hashes = msgHashes
-			// we check if gas limit or size already reached first so we can skip the size check
-			if !stop && exceedsMaxEncodingSize(observation, p.ocrTypeCodec, maxObservationLength) {
-				// pseudo delete the message
-				stop = true
-				messageObs[srcChain][seqNum] = cciptypes.Message{
-					Header: cciptypes.RampMessageHeader{
-						SequenceNumber: seqNum,
-					},
-				}
-				// Don't break, Will still continue to try adding the rest of messages in the report,
-				// even if the rest can't be added we still need to add the hashes for proofs anyways.
+
+			// Check if we've exceeded encoding size limits
+			if !stop {
+				stop = p.handleEncodingSizeLimits(observation, messageObs, srcChain, seqNum)
 			}
 		}
 
@@ -352,10 +332,75 @@ func (p *Plugin) getObsWithoutTokenData(
 			lggr.Infow("Stop processing messages, observation is too large")
 			break
 		}
-
 	}
 
 	return observation, nil
+}
+
+// initSourceChainMaps initializes maps for a source chain if they don't exist
+func initSourceChainMaps(
+	srcChain cciptypes.ChainSelector,
+	messageObs exectypes.MessageObservations,
+	msgHashes exectypes.MessageHashes,
+) {
+	if _, ok := messageObs[srcChain]; !ok {
+		messageObs[srcChain] = make(map[cciptypes.SeqNum]cciptypes.Message)
+		msgHashes[srcChain] = make(map[cciptypes.SeqNum]cciptypes.Bytes32)
+	}
+}
+
+// readMessagesForReport reads messages for the given report and validates they conform to the sequence range
+func (p *Plugin) readMessagesForReport(
+	ctx context.Context,
+	lggr logger.Logger,
+	srcChain cciptypes.ChainSelector,
+	report exectypes.CommitData,
+) ([]cciptypes.Message, error) {
+	msgs, err := p.ccipReader.MsgsBetweenSeqNums(ctx, srcChain, report.SequenceNumberRange)
+	if err != nil {
+		lggr.Errorw("unable to read all messages for report",
+			"srcChain", srcChain,
+			"seqRange", report.SequenceNumberRange,
+			"merkleRoot", report.MerkleRoot,
+			"err", err,
+		)
+		return nil, err
+	}
+
+	if !msgsConformToSeqRange(msgs, report.SequenceNumberRange) {
+		lggr.Errorw("missing messages in range",
+			"srcChain", srcChain,
+			"seqRange", report.SequenceNumberRange,
+		)
+		return nil, fmt.Errorf("missing messages in range")
+	}
+
+	return msgs, nil
+}
+
+// createEmptyMessageWithSeqNum creates a message with just the sequence number set
+func createEmptyMessageWithSeqNum(seqNum cciptypes.SeqNum) cciptypes.Message {
+	return cciptypes.Message{
+		Header: cciptypes.RampMessageHeader{
+			SequenceNumber: seqNum,
+		},
+	}
+}
+
+// handleEncodingSizeLimits checks if observation exceeds encoding size limits and handles the msg that caused
+// it by replacing it with an empty message
+func (p *Plugin) handleEncodingSizeLimits(
+	observation exectypes.Observation,
+	messageObs exectypes.MessageObservations,
+	srcChain cciptypes.ChainSelector,
+	seqNum cciptypes.SeqNum,
+) bool {
+	if exceedsMaxEncodingSize(observation, p.ocrTypeCodec, maxObservationLength) {
+		// Replace message with empty one to reduce size
+		messageObs[srcChain][seqNum] = createEmptyMessageWithSeqNum(seqNum)
+		return true
+	}
+	return false
 }
 
 func (p *Plugin) exceedsMaxGasLimit(
