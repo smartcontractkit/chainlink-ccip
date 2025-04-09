@@ -39,7 +39,7 @@ func TestTokenPool(t *testing.T) {
 	test_ccip_invalid_receiver.SetProgramID(config.CcipInvalidReceiverProgram)
 
 	dumbRamp := config.CcipInvalidReceiverProgram
-	dumbRampPoolSigner, _, _ := solana.FindProgramAddress([][]byte{[]byte("external_token_pools_signer")}, dumbRamp)
+	dumbRampPoolSigner, _, _ := state.FindExternalTokenPoolsSignerPDA(config.CcipTokenPoolProgram, dumbRamp)
 
 	admin := solana.MustPrivateKeyFromBase58("4whgxZhpxcArYWzM1iTmokruAzws9YVi2f9M7pWwchQniaFXBr1WGSGXgadeqHtiRooxNiPosdLj2g2ohbtkWtu5")
 	anotherAdmin := solana.MustPrivateKeyFromBase58("3T3TwgX851KixNcZ2nJDftvXb5gMckHg8zzonKXpSthdDQEtttP4iY5VwetMRmoJkMDUPqSbrypFHVV2aC9FWHKE")

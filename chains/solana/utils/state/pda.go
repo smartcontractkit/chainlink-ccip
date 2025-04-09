@@ -50,12 +50,12 @@ func FindAllowedOfframpPDA(chainSelector uint64, offramp solana.PublicKey, ccipR
 // PDAs with same seeds across programs //
 //////////////////////////////////////////
 
-func FindExternalTokenPoolsSignerPDA(program solana.PublicKey) (solana.PublicKey, uint8, error) {
-	return solana.FindProgramAddress([][]byte{[]byte("external_token_pools_signer")}, program)
+func FindExternalTokenPoolsSignerPDA(poolProgram solana.PublicKey, program solana.PublicKey) (solana.PublicKey, uint8, error) {
+	return solana.FindProgramAddress([][]byte{[]byte("external_token_pools_signer"), poolProgram.Bytes()}, program)
 }
 
-func FindExternalExecutionConfigPDA(program solana.PublicKey) (solana.PublicKey, uint8, error) {
-	return solana.FindProgramAddress([][]byte{[]byte("external_execution_config")}, program)
+func FindExternalExecutionConfigPDA(logicReceiver solana.PublicKey, program solana.PublicKey) (solana.PublicKey, uint8, error) {
+	return solana.FindProgramAddress([][]byte{[]byte("external_execution_config"), logicReceiver.Bytes()}, program)
 }
 
 /////////////////////
