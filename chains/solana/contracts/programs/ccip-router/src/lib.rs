@@ -540,12 +540,4 @@ pub enum CcipRouterError {
     InvalidCodeVersion,
     #[msg("Invalid rollback attempt on the CCIP version of the onramp to the destination chain")]
     InvalidCcipVersionRollback,
-    #[msg("Invalid EVM destination address")]
-    InvalidEVMAddress,
-    #[msg("Invalid SVM destination address")]
-    InvalidSVMAddress,
-    #[msg("Invalid encoding")]
-    InvalidEncoding,
-    #[msg("Invalid chain family selector")]
-    InvalidChainFamilySelector,
 }
