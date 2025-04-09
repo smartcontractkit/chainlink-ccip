@@ -158,6 +158,7 @@ profiles:
             pipeline: deploy
             vars:
               NAMESPACE: prometheus
+              GRAFANA_ADMIN_PASSWORD: sgm7JVsGfJLUHPqweGiT
             profiles: []
 
   - name: cluster-services-loki
@@ -232,6 +233,7 @@ profiles:
               HOST_NAME: ${HOST_NAME}
               AWS_ACM_CERT_ARN: ${AWS_ACM_CERT_ARN}
               PROVIDER: ${PROVIDER}
+              MINIO_CONSOLE_PASSWORD: h9XvnTrNsEY8HRGQ9uDG
             profiles: []
 
   - name: cluster-services

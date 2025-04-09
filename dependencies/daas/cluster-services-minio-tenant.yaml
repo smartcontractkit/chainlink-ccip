@@ -29,6 +29,12 @@ vars:
   AWS_ACM_CERT_ARN:
     source: env
     default: ""
+  MINIO_CONSOLE_USERNAME:
+    source: env
+    default: minio
+  MINIO_CONSOLE_PASSWORD:
+    source: env
+    default: minio123
 
 pipelines:
   deploy:
@@ -49,6 +55,9 @@ deployments:
       values:
         tenant:
           name: chainlink
+          configSecret:
+            accessKey: ${MINIO_CONSOLE_USERNAME}
+            secretKey: ${MINIO_CONSOLE_PASSWORD}
 
 profiles:
   ###########################
