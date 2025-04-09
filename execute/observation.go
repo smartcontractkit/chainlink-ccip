@@ -348,7 +348,6 @@ func (p *Plugin) getObsWithoutTokenData(
 			}
 		}
 
-		//TODO: Do we need to check more reports in some cases?
 		if stop {
 			lggr.Infow("Stop processing messages, observation is too large")
 			break
@@ -417,7 +416,6 @@ func (p *Plugin) getMessagesObservation(
 		return exectypes.Observation{}, fmt.Errorf("unable to get messages: %w", err)
 	}
 
-	// TODO: if empty message don't get token data for it
 	tkData, err1 := p.tokenDataObserver.Observe(ctx, obsWithoutTokenData.Messages)
 	if err1 != nil {
 		return exectypes.Observation{}, fmt.Errorf("unable to process token data %w", err1)
