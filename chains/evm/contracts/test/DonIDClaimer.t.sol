@@ -113,4 +113,19 @@ contract DonIDClaimerTest is Test {
     vm.expectRevert(abi.encodeWithSelector(DonIDClaimer.ZeroAddressNotAllowed.selector));
     new DonIDClaimer(address(0));
   }
+
+  function test_RevertWhen_UnauthorizedSyncNextDONId() public {
+    vm.expectRevert(abi.encodeWithSelector(DonIDClaimer.AccessForbidden.selector, s_unauthorized));
+    vm.prank(s_unauthorized);
+    s_donIDClaimer.syncNextDONIdWithOffset(5);
+  }
+
+  function test_RevertAfterDeployerRevoked() public {
+    vm.prank(s_owner);
+    s_donIDClaimer.setAuthorizedDeployer(s_deployer, false);
+
+    vm.prank(s_deployer);
+    vm.expectRevert(abi.encodeWithSelector(DonIDClaimer.AccessForbidden.selector, s_deployer));
+    s_donIDClaimer.claimNextDONId();
+  }
 }
