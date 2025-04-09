@@ -87,8 +87,10 @@ impl BaseConfig {
         self.rate_limit_admin = owner;
         self.router = router;
         self.rmn_remote = rmn_remote;
-        (self.router_onramp_authority, _) =
-            Pubkey::find_program_address(&[EXTERNAL_TOKENPOOL_SIGNER], &router);
+        (self.router_onramp_authority, _) = Pubkey::find_program_address(
+            &[EXTERNAL_TOKENPOOL_SIGNER, pool_program.as_ref()],
+            &router,
+        );
 
         Ok(())
     }

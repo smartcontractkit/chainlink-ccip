@@ -56,16 +56,6 @@
           "isSigner": false
         },
         {
-          "name": "externalExecutionConfig",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "tokenPoolsSigner",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
           "name": "authority",
           "isMut": true,
           "isSigner": true
@@ -892,11 +882,6 @@
           ]
         },
         {
-          "name": "externalExecutionConfig",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
           "name": "authority",
           "isMut": true,
           "isSigner": true
@@ -908,11 +893,6 @@
         },
         {
           "name": "sysvarInstructions",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "tokenPoolsSigner",
           "isMut": false,
           "isSigner": false
         },
@@ -1009,11 +989,6 @@
           ]
         },
         {
-          "name": "externalExecutionConfig",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
           "name": "authority",
           "isMut": true,
           "isSigner": true
@@ -1025,11 +1000,6 @@
         },
         {
           "name": "sysvarInstructions",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "tokenPoolsSigner",
           "isMut": false,
           "isSigner": false
         },
@@ -1220,13 +1190,6 @@
             "type": "u64"
           }
         ]
-      }
-    },
-    {
-      "name": "ExternalExecutionConfig",
-      "type": {
-        "kind": "struct",
-        "fields": []
       }
     },
     {
@@ -2390,6 +2353,11 @@
     },
     {
       "code": 9055,
+      "name": "InvalidInputsExternalExecutionSignerAccount",
+      "msg": "Invalid external execution signer account"
+    },
+    {
+      "code": 9056,
       "name": "CommitReportHasPendingMessages",
       "msg": "Commit report has pending messages"
     }

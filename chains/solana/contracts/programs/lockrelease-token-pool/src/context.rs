@@ -106,7 +106,7 @@ pub struct AcceptOwnership<'info> {
 pub struct TokenOfframp<'info> {
     // CCIP accounts ------------------------
     #[account(
-        seeds = [EXTERNAL_TOKENPOOL_SIGNER],
+        seeds = [EXTERNAL_TOKENPOOL_SIGNER, crate::ID.as_ref()],
         bump,
         seeds::program = offramp_program.key(),
     )]
