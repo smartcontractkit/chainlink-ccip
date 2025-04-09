@@ -420,7 +420,6 @@ func Test_getObsWithoutTokenData(t *testing.T) {
 	}
 
 	createHashesMap := func(
-		srcChain cciptypes.ChainSelector,
 		fromSeq, toSeq cciptypes.SeqNum) map[cciptypes.SeqNum]cciptypes.Bytes32 {
 		hashes := make(map[cciptypes.SeqNum]cciptypes.Bytes32)
 		for seq := fromSeq; seq <= toSeq; seq++ {
@@ -498,7 +497,7 @@ func Test_getObsWithoutTokenData(t *testing.T) {
 					},
 				},
 				Hashes: exectypes.MessageHashes{
-					src1: createHashesMap(src1, 1, 3),
+					src1: createHashesMap(1, 3),
 				},
 			},
 			expectedError: false,
@@ -550,8 +549,8 @@ func Test_getObsWithoutTokenData(t *testing.T) {
 					},
 				},
 				Hashes: exectypes.MessageHashes{
-					src1: createHashesMap(src1, 1, 2),
-					src2: createHashesMap(src2, 5, 6),
+					src1: createHashesMap(1, 2),
+					src2: createHashesMap(5, 6),
 				},
 			},
 			expectedError: false,
@@ -634,7 +633,7 @@ func Test_getObsWithoutTokenData(t *testing.T) {
 					},
 				},
 				Hashes: exectypes.MessageHashes{
-					src1: createHashesMap(src1, 1, 2),
+					src1: createHashesMap(1, 2),
 				},
 			},
 			expectedError: false,
@@ -676,7 +675,7 @@ func Test_getObsWithoutTokenData(t *testing.T) {
 					},
 				},
 				Hashes: exectypes.MessageHashes{
-					src1: createHashesMap(src1, 1, 3),
+					src1: createHashesMap(1, 3),
 				},
 			},
 			expectedError: false,
@@ -739,8 +738,8 @@ func Test_getObsWithoutTokenData(t *testing.T) {
 					},
 				},
 				Hashes: exectypes.MessageHashes{
-					src1: createHashesMap(src1, 1, 2),
-					src2: createHashesMap(src2, 1, 3),
+					src1: createHashesMap(1, 2),
+					src2: createHashesMap(1, 3),
 				},
 			},
 			expectedError: false,
@@ -784,7 +783,7 @@ func Test_getObsWithoutTokenData(t *testing.T) {
 					},
 				},
 				Hashes: exectypes.MessageHashes{
-					src1: createHashesMap(src1, 1, 2),
+					src1: createHashesMap(1, 2),
 				},
 			},
 			expectedError: false,
@@ -843,8 +842,8 @@ func Test_getObsWithoutTokenData(t *testing.T) {
 					},
 				},
 				Hashes: exectypes.MessageHashes{
-					src1: createHashesMap(src1, 1, 2),
-					src2: createHashesMap(src2, 1, 3),
+					src1: createHashesMap(1, 2),
+					src2: createHashesMap(1, 3),
 				},
 			},
 			expectedError: false,
@@ -889,7 +888,7 @@ func Test_getObsWithoutTokenData(t *testing.T) {
 					},
 				},
 				Hashes: exectypes.MessageHashes{
-					src1: createHashesMap(src1, 1, 2),
+					src1: createHashesMap(1, 2),
 				},
 			},
 			expectedError: false,
