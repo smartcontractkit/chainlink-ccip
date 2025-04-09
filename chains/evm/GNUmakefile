@@ -12,6 +12,10 @@ snapshot-diff: ## Make a snapshot for a specific product.
 foundry: ## Install foundry.
 	foundryup --install v1.0.0
 
+.PHONY: forge-zksync
+forge-zksync: ## Install foundry.
+	./scripts/install_forge_zksync
+
 ccip-precommit: export FOUNDRY_PROFILE=ccip
 .PHONY: ccip-precommit
 ccip-precommit:
@@ -32,6 +36,11 @@ ccip-lcov:
 wrappers: pnpmdep mockery abigen
 	./scripts/compile_all
 	go generate ./gobindings
+
+.PHONY: wrappers-zksync
+wrappers-zksync: pnpmdep forge-zksync
+	ZKSYNC=true ./scripts/compile_all
+	ZKSYNC=true go generate ./gobindings
 
 .PHONY: pnpmdep
 pnpmdep: ## Install solidity contract dependencies through pnpm
