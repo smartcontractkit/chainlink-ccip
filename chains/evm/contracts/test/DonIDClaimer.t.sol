@@ -71,6 +71,31 @@ contract DonIDClaimerTest is Test {
     assertFalse(s_donIDClaimer.isAuthorizedDeployer(s_deployer), "Deployer should be deauthorized");
   }
 
+  function test_ClaimMultipleDONIds() public {
+    vm.startPrank(s_owner);
+    s_donIDClaimer.setAuthorizedDeployer(s_deployer, true);
+    vm.stopPrank();
+
+    vm.startPrank(s_deployer);
+    for (uint32 i = 0; i < 5; i++) {
+      uint32 claimed = s_donIDClaimer.claimNextDONId();
+      assertEq(claimed, INITIAL_CLAIM_ID + i, "Should claim incrementally");
+    }
+    vm.stopPrank();
+
+    assertEq(s_donIDClaimer.getNextDONId(), INITIAL_CLAIM_ID + 5, "Next ID should be 5 ahead");
+  }
+
+  function test_RevokeThenReauthorizeDeployer() public {
+    vm.startPrank(s_owner);
+    s_donIDClaimer.setAuthorizedDeployer(s_deployer, false);
+    assertFalse(s_donIDClaimer.isAuthorizedDeployer(s_deployer), "Should be deauthorized");
+
+    s_donIDClaimer.setAuthorizedDeployer(s_deployer, true);
+    assertTrue(s_donIDClaimer.isAuthorizedDeployer(s_deployer), "Should be re-authorized");
+    vm.stopPrank();
+  }
+
   // Reverts
   function test_RevertWhen_UnauthorizedSenderClaimReverts() public {
     vm.expectRevert(abi.encodeWithSelector(DonIDClaimer.AccessForbidden.selector, s_unauthorized));
