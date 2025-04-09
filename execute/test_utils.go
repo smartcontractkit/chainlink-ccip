@@ -533,3 +533,19 @@ func emptyMessagesMapForRanges(ranges []cciptypes.SeqNumRange) map[cciptypes.Seq
 	}
 	return messages
 }
+
+func NewMessage(
+	msgID int,
+	seqNum int,
+	sourceChainSelector int,
+	destChainSelector int) cciptypes.Message {
+	return cciptypes.Message{
+		Header: cciptypes.RampMessageHeader{
+			MessageID:           cciptypes.Bytes32{byte(msgID)},
+			SourceChainSelector: cciptypes.ChainSelector(sourceChainSelector),
+			DestChainSelector:   cciptypes.ChainSelector(destChainSelector),
+			SequenceNumber:      cciptypes.SeqNum(seqNum),
+			Nonce:               uint64(seqNum),
+		},
+	}
+}

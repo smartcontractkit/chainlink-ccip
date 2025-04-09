@@ -170,9 +170,9 @@ func Test_getMessagesObservation(t *testing.T) {
 				},
 				Messages: exectypes.MessageObservations{
 					1: {
-						1: cciptypes.NewMessage(1, 1, 1, 2),
-						2: cciptypes.NewMessage(2, 2, 1, 2),
-						3: cciptypes.NewMessage(3, 3, 1, 2),
+						1: NewMessage(1, 1, 1, 2),
+						2: NewMessage(2, 2, 1, 2),
+						3: NewMessage(3, 3, 1, 2),
 					},
 				},
 				TokenData: exectypes.TokenDataObservations{
@@ -219,11 +219,11 @@ func Test_getMessagesObservation(t *testing.T) {
 				},
 				Messages: exectypes.MessageObservations{
 					1: {
-						1:  cciptypes.NewMessage(1, 1, 1, 2),
-						2:  cciptypes.NewMessage(2, 2, 1, 2),
-						3:  cciptypes.NewMessage(3, 3, 1, 2),
-						11: cciptypes.NewMessage(11, 11, 1, 2),
-						12: cciptypes.NewMessage(12, 12, 1, 2),
+						1:  NewMessage(1, 1, 1, 2),
+						2:  NewMessage(2, 2, 1, 2),
+						3:  NewMessage(3, 3, 1, 2),
+						11: NewMessage(11, 11, 1, 2),
+						12: NewMessage(12, 12, 1, 2),
 					},
 				},
 				TokenData: exectypes.TokenDataObservations{
@@ -245,21 +245,21 @@ func Test_getMessagesObservation(t *testing.T) {
 			// Set up mock expectations
 			ccipReader.On("MsgsBetweenSeqNums", ctx, cciptypes.ChainSelector(1),
 				cciptypes.NewSeqNumRange(1, 3)).Return([]cciptypes.Message{
-				cciptypes.NewMessage(1, 1, 1, 2),
-				cciptypes.NewMessage(2, 2, 1, 2),
-				cciptypes.NewMessage(3, 3, 1, 2),
+				NewMessage(1, 1, 1, 2),
+				NewMessage(2, 2, 1, 2),
+				NewMessage(3, 3, 1, 2),
 			}, nil).Maybe()
 
 			// missing message from 7 to 10
 			ccipReader.On("MsgsBetweenSeqNums", ctx, cciptypes.ChainSelector(1),
 				cciptypes.NewSeqNumRange(6, 10)).Return([]cciptypes.Message{
-				cciptypes.NewMessage(6, 6, 1, 2),
+				NewMessage(6, 6, 1, 2),
 			}, nil).Maybe()
 
 			ccipReader.On("MsgsBetweenSeqNums", ctx, cciptypes.ChainSelector(1),
 				cciptypes.NewSeqNumRange(11, 12)).Return([]cciptypes.Message{
-				cciptypes.NewMessage(11, 11, 1, 2),
-				cciptypes.NewMessage(12, 12, 1, 2),
+				NewMessage(11, 11, 1, 2),
+				NewMessage(12, 12, 1, 2),
 			}, nil).Maybe()
 
 			observation := exectypes.Observation{}
@@ -330,9 +330,9 @@ func Test_readAllMessages(t *testing.T) {
 			},
 			expectedMsgs: exectypes.MessageObservations{
 				1: {
-					1: cciptypes.NewMessage(1, 1, 1, 2),
-					2: cciptypes.NewMessage(2, 2, 1, 2),
-					3: cciptypes.NewMessage(3, 3, 1, 2),
+					1: NewMessage(1, 1, 1, 2),
+					2: NewMessage(2, 2, 1, 2),
+					3: NewMessage(3, 3, 1, 2),
 				},
 			},
 			expectedReports: exectypes.CommitObservations{
@@ -360,9 +360,9 @@ func Test_readAllMessages(t *testing.T) {
 			// Set up mock expectations
 			ccipReader.On("MsgsBetweenSeqNums", ctx, cciptypes.ChainSelector(1),
 				cciptypes.NewSeqNumRange(1, 3)).Return([]cciptypes.Message{
-				cciptypes.NewMessage(1, 1, 1, 2),
-				cciptypes.NewMessage(2, 2, 1, 2),
-				cciptypes.NewMessage(3, 3, 1, 2),
+				NewMessage(1, 1, 1, 2),
+				NewMessage(2, 2, 1, 2),
+				NewMessage(3, 3, 1, 2),
 			}, nil).Maybe()
 			obs, err := plugin.getObsWithoutTokenData(ctx, lggr, tt.commitData, exectypes.Observation{})
 			require.NoError(t, err)

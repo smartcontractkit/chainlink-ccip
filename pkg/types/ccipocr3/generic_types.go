@@ -208,22 +208,6 @@ func (m Message) IsEmpty() bool {
 		m.Header.DestChainSelector == 0 && m.Header.Nonce == 0 && len(m.Header.OnRamp) == 0
 }
 
-func NewMessage(
-	msgID int,
-	seqNum int,
-	sourceChainSelector int,
-	destChainSelector int) Message {
-	return Message{
-		Header: RampMessageHeader{
-			MessageID:           Bytes32{byte(msgID)},
-			SourceChainSelector: ChainSelector(sourceChainSelector),
-			DestChainSelector:   ChainSelector(destChainSelector),
-			SequenceNumber:      SeqNum(seqNum),
-			Nonce:               uint64(seqNum),
-		},
-	}
-}
-
 // RampMessageHeader is the family-agnostic header for OnRamp and OffRamp messages.
 // The MessageID is not expected to match MsgHash, since it may originate from a different
 // ramp family.
