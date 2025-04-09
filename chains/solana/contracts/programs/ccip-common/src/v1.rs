@@ -2,13 +2,18 @@ use anchor_lang::prelude::*;
 use solana_program::address_lookup_table::state::AddressLookupTable;
 
 use crate::{
-    context::TokenAccountsValidationContext, router_accounts::TokenAdminRegistry, CommonCcipError,
+    context::TokenAccountsValidationContext, router_accounts::TokenAdminRegistry, seed,
+    CommonCcipError,
 };
+
+pub const MIN_TOKEN_POOL_ACCOUNTS: usize = 13; // see TokenAccounts struct for all required accounts
 
 pub struct TokenAccounts<'a> {
     pub user_token_account: &'a AccountInfo<'a>,
     pub token_billing_config: &'a AccountInfo<'a>,
     pub pool_chain_config: &'a AccountInfo<'a>,
+    pub lookup_table: &'a AccountInfo<'a>,
+    pub token_admin_registry: &'a AccountInfo<'a>,
     pub pool_program: &'a AccountInfo<'a>,
     pub pool_config: &'a AccountInfo<'a>,
     pub pool_token_account: &'a AccountInfo<'a>,
@@ -16,6 +21,13 @@ pub struct TokenAccounts<'a> {
     pub token_program: &'a AccountInfo<'a>,
     pub mint: &'a AccountInfo<'a>,
     pub fee_token_config: &'a AccountInfo<'a>,
+    pub ccip_router_pool_signer: &'a AccountInfo<'a>,
+    // as this one is optional, it doesn't count for the MIN_TOKEN_POOL_ACCOUNTS
+    pub ccip_offramp_pool_signer: Option<&'a AccountInfo<'a>>,
+
+    pub ccip_router_pool_signer_bump: u8,
+    pub ccip_offramp_pool_signer_bump: u8,
+
     pub remaining_accounts: &'a [AccountInfo<'a>],
 }
 
@@ -24,7 +36,8 @@ pub fn validate_and_parse_token_accounts<'info>(
     chain_selector: u64,
     router: Pubkey,
     fee_quoter: Pubkey,
-    accounts: &'info [AccountInfo<'info>],
+    offramp: Option<Pubkey>, // id of the offramp program that called this function, when the caller is not the router
+    raw_acc_infos: &'info [AccountInfo<'info>],
 ) -> Result<TokenAccounts> {
     // The program_id here is provided solely to satisfy the interface of try_accounts.
     // Note: All program IDs for PDA derivation are explicitly defined in the account context
@@ -33,9 +46,20 @@ pub fn validate_and_parse_token_accounts<'info>(
     // Changes in environment-specific program addresses will not affect the PDA derivation.
     let program_id = Pubkey::default();
 
+    let mut accounts = raw_acc_infos;
+
+    let ccip_offramp_pool_signer = if offramp.is_some() {
+        // When and only when the offramp program is calling this function, the first account is the offramp pool signer.
+        // Then, the rest of the accounts are the same as when the router program is calling this function.
+        accounts = &accounts[1..];
+        Some(&raw_acc_infos[0])
+    } else {
+        None
+    };
     let mut input_accounts = accounts;
-    let mut bumps = <TokenAccountsValidationContext as anchor_lang::Bumps>::Bumps::default();
-    let mut reallocs = std::collections::BTreeSet::new();
+
+    let bumps = &mut <TokenAccountsValidationContext as anchor_lang::Bumps>::Bumps::default();
+    let reallocs = &mut std::collections::BTreeSet::new();
 
     // leveraging Anchor's account context validation
     // Instead of manually checking each account (ownership, PDA derivation, constraints),
@@ -51,8 +75,8 @@ pub fn validate_and_parse_token_accounts<'info>(
             fee_quoter.as_ref(),
         ]
         .concat(),
-        &mut bumps,
-        &mut reallocs,
+        bumps,
+        reallocs,
     )?;
 
     let mut accounts_iter = accounts.iter();
@@ -72,6 +96,25 @@ pub fn validate_and_parse_token_accounts<'info>(
     let token_program = next_account_info(&mut accounts_iter)?;
     let mint = next_account_info(&mut accounts_iter)?;
     let fee_token_config = next_account_info(&mut accounts_iter)?;
+    let ccip_router_pool_signer = next_account_info(&mut accounts_iter)?;
+
+    // As the offramp signer is optional (only used when the offramp program is calling this function),
+    // the context cannot be used to validate it, as it could try to apply those validations to the wrong account
+    let ccip_offramp_pool_signer_bump = if let Some(offramp) = offramp {
+        let (expected_offramp_pool_signer, bump) = Pubkey::find_program_address(
+            &[seed::EXTERNAL_TOKEN_POOL, pool_program.key().as_ref()],
+            &offramp,
+        );
+        let acc_info = ccip_offramp_pool_signer.unwrap();
+        require_keys_eq!(
+            acc_info.key(),
+            expected_offramp_pool_signer,
+            CommonCcipError::InvalidInputsPoolAccounts
+        );
+        bump
+    } else {
+        0
+    };
 
     // collect remaining accounts
     let remaining_accounts = accounts_iter.as_slice();
@@ -94,7 +137,7 @@ pub fn validate_and_parse_token_accounts<'info>(
                 .map_err(|_| CommonCcipError::InvalidInputsLookupTableAccounts)?;
 
         // reconstruct + validate expected values in token pool lookup table
-        // base set of constant accounts (9)
+        // base set of constant accounts (10)
         // + additional constant accounts (remaining_accounts) that are not required but may be used for additional token pool functionality (like CPI)
         let required_entries = [
             lookup_table,
@@ -106,6 +149,7 @@ pub fn validate_and_parse_token_accounts<'info>(
             token_program,
             mint,
             fee_token_config,
+            ccip_router_pool_signer,
         ];
         {
             // validate pool addresses
@@ -141,6 +185,8 @@ pub fn validate_and_parse_token_accounts<'info>(
         user_token_account,
         token_billing_config,
         pool_chain_config,
+        lookup_table,
+        token_admin_registry,
         pool_program,
         pool_config,
         pool_token_account,
@@ -148,6 +194,10 @@ pub fn validate_and_parse_token_accounts<'info>(
         token_program,
         mint,
         fee_token_config,
+        ccip_router_pool_signer,
+        ccip_offramp_pool_signer,
+        ccip_router_pool_signer_bump: bumps.ccip_router_pool_signer,
+        ccip_offramp_pool_signer_bump,
         remaining_accounts,
     })
 }

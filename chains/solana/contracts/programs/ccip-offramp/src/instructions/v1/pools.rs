@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::TokenAccount;
+use ccip_common::v1::MIN_TOKEN_POOL_ACCOUNTS;
 use solana_program::program::get_return_data;
 use solana_program::{instruction::Instruction, program::invoke_signed};
 
@@ -8,7 +9,6 @@ use super::messages::ReleaseOrMintInV1;
 use crate::CcipOfframpError;
 
 pub const CCIP_POOL_V1_RET_BYTES: usize = 8;
-const MIN_TOKEN_POOL_ACCOUNTS: usize = 12; // see TokenAccounts struct for all required accounts
 
 pub fn calculate_token_pool_account_indices(
     i: usize,

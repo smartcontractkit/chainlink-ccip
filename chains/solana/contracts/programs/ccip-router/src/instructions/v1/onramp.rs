@@ -67,6 +67,7 @@ impl OnRamp for Impl {
                 dest_chain_selector,
                 ctx.program_id.key(),
                 ctx.accounts.config.fee_quoter,
+                None,
                 &ctx.remaining_accounts[start..end],
             )?;
 
@@ -177,7 +178,6 @@ impl OnRamp for Impl {
             token_amounts: vec![SVM2AnyTokenTransfer::default(); token_count], // this will be set later
         };
 
-        let seeds = &[seed::EXTERNAL_TOKEN_POOL, &[ctx.bumps.token_pools_signer]];
         for (i, (current_token_accounts, token_amount)) in accounts_per_sent_token
             .iter()
             .zip(message.token_amounts.iter())
@@ -189,7 +189,11 @@ impl OnRamp for Impl {
                 CcipRouterError::InvalidInputsTokenAccounts,
             );
 
-            let router_token_pool_signer = &ctx.accounts.token_pools_signer;
+            let seeds = &[
+                seed::EXTERNAL_TOKEN_POOL,
+                current_token_accounts.pool_program.key.as_ref(),
+                &[current_token_accounts.ccip_router_pool_signer_bump],
+            ];
 
             // CPI: transfer token amount from user to token pool
             transfer_token(
@@ -198,7 +202,7 @@ impl OnRamp for Impl {
                 current_token_accounts.mint,
                 current_token_accounts.user_token_account,
                 current_token_accounts.pool_token_account,
-                router_token_pool_signer,
+                current_token_accounts.ccip_router_pool_signer,
                 seeds,
             )?;
 
@@ -217,7 +221,9 @@ impl OnRamp for Impl {
                     local_token: token_amount.token,
                 };
 
-                let mut acc_infos = router_token_pool_signer.to_account_infos();
+                let mut acc_infos = current_token_accounts
+                    .ccip_router_pool_signer
+                    .to_account_infos();
                 acc_infos.extend_from_slice(&[
                     current_token_accounts.pool_config.to_account_info(),
                     current_token_accounts.token_program.to_account_info(),
@@ -233,7 +239,7 @@ impl OnRamp for Impl {
 
                 let return_data = interact_with_pool(
                     current_token_accounts.pool_program.key(),
-                    router_token_pool_signer.key(),
+                    current_token_accounts.ccip_router_pool_signer.key(),
                     acc_infos,
                     lock_or_burn,
                     seeds,
@@ -245,8 +251,6 @@ impl OnRamp for Impl {
                     current_token_accounts.pool_config.key(),
                     token_amount,
                     &get_fee_result.token_transfer_additional_data[i],
-                    // todo: no field `chain_family_selector` on type `state::DestChainConfig`
-                    dest_chain.config.chain_family_selector,
                 )?;
             }
         }
@@ -319,7 +323,6 @@ mod helpers {
         source_pool_address: Pubkey,
         token_amount: &SVMTokenAmount,
         additional_data: &TokenTransferAdditionalData,
-        dest_chain_family_selector: [u8; 4],
     ) -> Result<SVM2AnyTokenTransfer> {
         let dest_gas_amount = additional_data.dest_gas_overhead;
 
@@ -331,12 +334,6 @@ mod helpers {
                 || extra_data_length <= additional_data.dest_bytes_overhead,
             CcipRouterError::SourceTokenDataTooLarge
         );
-
-        // validate destination token address based on chain family
-        validate_dest_token_address(
-            &lock_or_burn_out_data.dest_token_address,
-            dest_chain_family_selector,
-        )?;
 
         let dest_exec_data = dest_gas_amount.to_be_bytes().to_vec();
 

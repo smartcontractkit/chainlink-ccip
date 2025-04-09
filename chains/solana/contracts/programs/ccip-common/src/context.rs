@@ -103,4 +103,12 @@ pub struct TokenAccountsValidationContext<'info> {
         bump
     )]
     pub fee_token_config: UncheckedAccount<'info>,
+
+    /// CHECK: The signer to be used by the router program to invoke the pool program
+    #[account(
+        seeds = [seed::EXTERNAL_TOKEN_POOL, pool_program.key().as_ref()],
+        bump,
+        seeds::program = router.key(),
+    )]
+    pub ccip_router_pool_signer: UncheckedAccount<'info>,
 }
