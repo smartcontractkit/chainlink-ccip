@@ -627,6 +627,8 @@ pub enum CcipOfframpError {
     Ocr3InvalidConfigFMustBePositive,
     #[msg("Invalid config: Too many transmitters")]
     Ocr3InvalidConfigTooManyTransmitters,
+    #[msg("Invalid config: No transmitters")]
+    Ocr3InvalidConfigNoTransmitters,
     #[msg("Invalid config: Too many signers")]
     Ocr3InvalidConfigTooManySigners,
     #[msg("Invalid config: F is too high")]
@@ -657,6 +659,8 @@ pub enum CcipOfframpError {
     Ocr3SignaturesOutOfRegistration,
     #[msg("Invalid onramp address")]
     InvalidOnrampAddress,
+    #[msg("Invalid external execution signer account")]
+    InvalidInputsExternalExecutionSignerAccount,
     #[msg("Commit report has pending messages")]
     CommitReportHasPendingMessages,
 }

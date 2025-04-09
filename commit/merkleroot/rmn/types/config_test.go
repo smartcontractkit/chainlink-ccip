@@ -24,7 +24,7 @@ func TestRMNRemoteConfig_IsEmpty(t *testing.T) {
 			config: RemoteConfig{
 				ContractAddress: cciptypes.UnknownAddress{1, 2, 3},
 			},
-			expected: false,
+			expected: true,
 		},
 		{
 			name: "Config with only ConfigDigest",

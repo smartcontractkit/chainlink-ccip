@@ -183,6 +183,20 @@ type Message struct {
 	TokenAmounts []RampTokenAmount `json:"tokenAmounts"`
 }
 
+func (m Message) CopyWithoutData() Message {
+	return Message{
+		Header:         m.Header,
+		Sender:         m.Sender,
+		Data:           []byte{},
+		Receiver:       m.Receiver,
+		ExtraArgs:      m.ExtraArgs,
+		FeeToken:       m.FeeToken,
+		FeeTokenAmount: m.FeeTokenAmount,
+		FeeValueJuels:  m.FeeValueJuels,
+		TokenAmounts:   m.TokenAmounts,
+	}
+}
+
 func (m Message) String() string {
 	js, _ := json.Marshal(m)
 	return string(js)

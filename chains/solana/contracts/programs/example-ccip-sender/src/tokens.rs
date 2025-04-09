@@ -85,6 +85,7 @@ pub struct TokenAccounts<'a> {
 
     // signers
     pub pool_signer: &'a AccountInfo<'a>,
+    pub ccip_router_pool_signer: &'a AccountInfo<'a>,
 
     // billing configs
     pub token_billing_config: &'a AccountInfo<'a>,
@@ -100,7 +101,7 @@ pub fn parse_and_validate_token_pool_accounts<'a>(
     all_token_accounts: &'a [AccountInfo<'a>],
 ) -> Result<(Vec<TokenAccounts<'a>>, Vec<u8>)> {
     // expected order of accounts
-    // [ATAs for user] - equal to number of tokens transfered
+    // [ATAs for user] - equal to number of tokens transferred
     // [accounts for pool 0]
     // [accounts for pool 1]
     // ...
@@ -132,6 +133,7 @@ pub fn parse_and_validate_token_pool_accounts<'a>(
             // 9 - token_program
             // 10 - mint
             // 11 - fee_token_config
+            // 12 - ccip_router_pool_signer
 
             let mint_data = &mut &accounts[10].data.borrow()[..];
             let mint_account = token_interface::Mint::try_deserialize(mint_data).unwrap();
@@ -145,6 +147,7 @@ pub fn parse_and_validate_token_pool_accounts<'a>(
                 pool_signer: &accounts[8],
                 token_billing_config: &accounts[1],
                 fee_token_config: &accounts[11],
+                ccip_router_pool_signer: &accounts[12],
                 pool_accounts: accounts,
             });
 
@@ -162,13 +165,11 @@ pub fn parse_and_validate_token_pool_accounts<'a>(
             let lookup_table_data = &mut &accounts[3].data.borrow()[..];
             let lookup_table_account: AddressLookupTable =
                 AddressLookupTable::deserialize(lookup_table_data).unwrap();
-            assert!(
-                lookup_table_account.addresses.as_ref()
-                    == accounts[3..]
-                        .iter()
-                        .map(|e| e.key())
-                        .collect::<Vec<Pubkey>>()
-            );
+            let expected = accounts[3..]
+                .iter()
+                .map(|e| e.key())
+                .collect::<Vec<Pubkey>>();
+            assert_eq!(lookup_table_account.addresses.as_ref(), expected);
         }
     };
 

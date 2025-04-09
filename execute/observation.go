@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"golang.org/x/exp/maps"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
@@ -114,7 +112,8 @@ func (p *Plugin) Observation(
 	}
 
 	p.observer.TrackObservation(observation, state)
-	lggr.Infow("execute plugin got observation", "observation", observation,
+	lggr.Infow("execute plugin got observation",
+		"observationWithoutMsgDataAndDiscoveryObs", observation.ToLogFormat(),
 		"duration", time.Since(tStart),
 		"state", state,
 		"numCommitReports", len(observation.CommitReports),
@@ -397,42 +396,43 @@ func (p *Plugin) getFilterObservation(
 		return observation, nil
 	}
 
-	// Collect unique senders.
-	nonceRequestArgs := make(map[cciptypes.ChainSelector]map[string]struct{})
-	for _, commitReport := range previousOutcome.CommitReports {
-		if _, ok := nonceRequestArgs[commitReport.SourceChain]; !ok {
-			nonceRequestArgs[commitReport.SourceChain] = make(map[string]struct{})
+	commitReportSenders := make(map[cciptypes.ChainSelector][]string)
+	uniqueSenders := make(map[cciptypes.ChainSelector]map[string]struct{})
+	for _, report := range previousOutcome.CommitReports {
+		srcChain := report.SourceChain
+		if _, ok := commitReportSenders[srcChain]; !ok {
+			commitReportSenders[srcChain] = make([]string, 0)
 		}
 
-		for _, msg := range commitReport.Messages {
-			sender, err := p.addrCodec.AddressBytesToString(msg.Sender[:], commitReport.SourceChain)
+		if _, ok := uniqueSenders[srcChain]; !ok {
+			uniqueSenders[srcChain] = make(map[string]struct{})
+		}
+
+		for _, msg := range report.Messages {
+			sender, err := p.addrCodec.AddressBytesToString(msg.Sender[:], srcChain)
 			if err != nil {
-				lggr.Errorw("unable to convert sender address to string", "err", err, "sender address", msg.Sender)
+				lggr.Errorw("unable to convert sender address to string",
+					"err", err, "sender address", msg.Sender)
 				continue
 			}
 
-			nonceRequestArgs[commitReport.SourceChain][sender] = struct{}{}
+			if _, exists := uniqueSenders[srcChain][sender]; !exists {
+				commitReportSenders[report.SourceChain] = append(commitReportSenders[srcChain], sender)
+				uniqueSenders[srcChain][sender] = struct{}{}
+			}
 		}
 	}
 
-	// Read args from chain.
-	nonceObservations := make(exectypes.NonceObservations)
-	for srcChain, addrSet := range nonceRequestArgs {
-		// TODO: check if srcSelectors is supported.
-		addrs := maps.Keys(addrSet)
-		nonces, err := p.ccipReader.Nonces(ctx, srcChain, addrs)
-		if err != nil {
-			lggr.Errorw("unable to get nonces", "err", err)
-			continue
-		}
-		nonceObservations[srcChain] = nonces
+	// Get nonces of the addresses. If the call fails, we just return other observations
+	nonceObservations, err := p.ccipReader.Nonces(ctx, commitReportSenders)
+	if err != nil {
+		lggr.Errorw("unable to get nonces", "err", err)
+	} else {
+		// Note: it is technically possible to check for curses at this point. If a curse
+		// occurred after the GetMessages observations checking now could possibly recover a report.
+		// It would only work for ordered messages.
+
+		observation.Nonces = nonceObservations
 	}
-
-	// Note: it is technically possible to check for curses at this point. If a curse
-	// occurred after the GetMessages observations checking now could possibly recover a report.
-	// It would only work for ordered messages.
-
-	observation.Nonces = nonceObservations
-
 	return observation, nil
 }
