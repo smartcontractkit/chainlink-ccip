@@ -26,6 +26,9 @@ packages:
     github.com/smartcontractkit/chainlink-ccip/execute/internal/cache:
         interfaces:
             TimeProvider:
+    github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1:
+        interfaces:
+            ExecCodec:
     github.com/smartcontractkit/chainlink-ccip/pkg/contractreader:
         interfaces:
             Extended:

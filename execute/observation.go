@@ -281,9 +281,6 @@ func (p *Plugin) getObsWithoutTokenData(
 	for _, report := range commitData {
 		srcChain := report.SourceChain
 
-		// Initialize data structures for this source chain if needed
-		initSourceChainMaps(srcChain, messageObs, msgHashes)
-
 		// Read messages for this report's sequence number range
 		msgs, err := p.readMessagesForReport(ctx, lggr, srcChain, report)
 		if err != nil {
@@ -293,6 +290,8 @@ func (p *Plugin) getObsWithoutTokenData(
 		// Add the report to available reports
 		availableReports[srcChain] = append(availableReports[srcChain], report)
 
+		// Initialize data structures for this source chain if needed
+		initSourceChainMaps(srcChain, messageObs, msgHashes)
 		// Process each message in the report
 		for _, msg := range msgs {
 			seqNum := msg.Header.SequenceNumber

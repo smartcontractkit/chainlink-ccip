@@ -1455,50 +1455,93 @@ func Test_computeTokenDataObservationsConsensus(t *testing.T) {
 	}
 }
 
-func Test_allSeqNrsObserved(t *testing.T) {
+func Test_msgsConformToSeqRange(t *testing.T) {
 	tests := []struct {
-		name        string
-		msgs        []cciptypes.Message
-		numberRange cciptypes.SeqNumRange
-		want        bool
+		name     string
+		msgs     []cciptypes.Message
+		seqRange cciptypes.SeqNumRange
+		expected bool
 	}{
 		{
-			name:        "all sequence numbers observed",
-			msgs:        emptyMessagesForRange(1, 3),
-			numberRange: cciptypes.NewSeqNumRange(1, 3),
-			want:        true,
+			name:     "empty messages",
+			msgs:     []cciptypes.Message{},
+			seqRange: cciptypes.NewSeqNumRange(1, 5),
+			expected: false,
 		},
 		{
-			name:        "missing sequence number",
-			msgs:        []cciptypes.Message{emptyMessagesForRange(1, 1)[0], emptyMessagesForRange(3, 3)[0]},
-			numberRange: cciptypes.NewSeqNumRange(1, 3),
-			want:        false,
+			name: "complete range",
+			msgs: []cciptypes.Message{
+				{Header: cciptypes.RampMessageHeader{SequenceNumber: 1}},
+				{Header: cciptypes.RampMessageHeader{SequenceNumber: 2}},
+				{Header: cciptypes.RampMessageHeader{SequenceNumber: 3}},
+				{Header: cciptypes.RampMessageHeader{SequenceNumber: 4}},
+				{Header: cciptypes.RampMessageHeader{SequenceNumber: 5}},
+			},
+			seqRange: cciptypes.NewSeqNumRange(1, 5),
+			expected: true,
 		},
 		{
-			name:        "extra sequence number",
-			msgs:        emptyMessagesForRange(1, 4),
-			numberRange: cciptypes.NewSeqNumRange(1, 3),
-			want:        false,
+			name: "missing message in middle",
+			msgs: []cciptypes.Message{
+				{Header: cciptypes.RampMessageHeader{SequenceNumber: 1}},
+				{Header: cciptypes.RampMessageHeader{SequenceNumber: 2}},
+				// Missing 3
+				{Header: cciptypes.RampMessageHeader{SequenceNumber: 4}},
+				{Header: cciptypes.RampMessageHeader{SequenceNumber: 5}},
+			},
+			seqRange: cciptypes.NewSeqNumRange(1, 5),
+			expected: false,
 		},
 		{
-			name:        "empty messages",
-			msgs:        []cciptypes.Message{},
-			numberRange: cciptypes.NewSeqNumRange(1, 3),
-			want:        false,
+			name: "missing message at start",
+			msgs: []cciptypes.Message{
+				// Missing 1
+				{Header: cciptypes.RampMessageHeader{SequenceNumber: 2}},
+				{Header: cciptypes.RampMessageHeader{SequenceNumber: 3}},
+				{Header: cciptypes.RampMessageHeader{SequenceNumber: 4}},
+				{Header: cciptypes.RampMessageHeader{SequenceNumber: 5}},
+			},
+			seqRange: cciptypes.NewSeqNumRange(1, 5),
+			expected: false,
 		},
 		{
-			name:        "empty range",
-			msgs:        emptyMessagesForRange(1, 4),
-			numberRange: cciptypes.NewSeqNumRange(0, 0),
-			want:        false,
+			name: "missing message at end",
+			msgs: []cciptypes.Message{
+				{Header: cciptypes.RampMessageHeader{SequenceNumber: 1}},
+				{Header: cciptypes.RampMessageHeader{SequenceNumber: 2}},
+				{Header: cciptypes.RampMessageHeader{SequenceNumber: 3}},
+				{Header: cciptypes.RampMessageHeader{SequenceNumber: 4}},
+				// Missing 5
+			},
+			seqRange: cciptypes.NewSeqNumRange(1, 5),
+			expected: false,
+		},
+		{
+			name: "single message range",
+			msgs: []cciptypes.Message{
+				{Header: cciptypes.RampMessageHeader{SequenceNumber: 42}},
+			},
+			seqRange: cciptypes.NewSeqNumRange(42, 42),
+			expected: true,
+		},
+		{
+			name: "out of order messages still valid",
+			msgs: []cciptypes.Message{
+				{Header: cciptypes.RampMessageHeader{SequenceNumber: 3}},
+				{Header: cciptypes.RampMessageHeader{SequenceNumber: 1}},
+				{Header: cciptypes.RampMessageHeader{SequenceNumber: 5}},
+				{Header: cciptypes.RampMessageHeader{SequenceNumber: 2}},
+				{Header: cciptypes.RampMessageHeader{SequenceNumber: 4}},
+			},
+			seqRange: cciptypes.NewSeqNumRange(1, 5),
+			expected: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := msgsConformToSeqRange(tt.msgs, tt.numberRange); got != tt.want {
-				t.Errorf("msgsConformToSeqRange() = %v, wantPending %v", got, tt.want)
-			}
+			result := msgsConformToSeqRange(tt.msgs, tt.seqRange)
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }

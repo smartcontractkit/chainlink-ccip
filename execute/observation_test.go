@@ -21,6 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata/observer"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
+	codec_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/ocrtypecodec/v1"
 	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
@@ -375,3 +376,421 @@ func Test_readAllMessages(t *testing.T) {
 		})
 	}
 }
+
+func Test_getObsWithoutTokenData(t *testing.T) {
+	ctx := context.Background()
+	timestamp := time.Now()
+
+	// Configuration constants
+	const (
+		batchGasLimit        = 10000
+		gasPerMsg            = 100
+		gasPerMerkleTree     = 200
+		highGasPerMsg        = 9000
+		highGasPerMerkleTree = 2000
+		inflightCacheTTL     = 10 * time.Minute
+	)
+
+	// Chain selectors
+	const (
+		src1 = cciptypes.ChainSelector(1)
+		src2 = cciptypes.ChainSelector(2)
+		dest = cciptypes.ChainSelector(3)
+	)
+
+	oneByte := make([]byte, 1)
+
+	// Helper functions
+	createCommitData := func(srcChain cciptypes.ChainSelector, from, to cciptypes.SeqNum) exectypes.CommitData {
+		return exectypes.CommitData{
+			SourceChain:         srcChain,
+			SequenceNumberRange: cciptypes.NewSeqNumRange(from, to),
+			Timestamp:           timestamp,
+		}
+	}
+
+	createMessages := func(srcChain cciptypes.ChainSelector, destChain cciptypes.ChainSelector, fromSeq, toSeq cciptypes.SeqNum) []cciptypes.Message {
+		var msgs []cciptypes.Message
+		for seq := fromSeq; seq <= toSeq; seq++ {
+			msgs = append(msgs, NewMessage(int(seq), int(seq), int(srcChain), int(destChain)))
+		}
+		return msgs
+	}
+
+	createHashesMap := func(srcChain cciptypes.ChainSelector, fromSeq, toSeq cciptypes.SeqNum) map[cciptypes.SeqNum]cciptypes.Bytes32 {
+		hashes := make(map[cciptypes.SeqNum]cciptypes.Bytes32)
+		for seq := fromSeq; seq <= toSeq; seq++ {
+			hashes[seq] = cciptypes.Bytes32{byte(seq)}
+		}
+		return hashes
+	}
+
+	setupMerkleGasExpectation := func(estimateProvider *ccipocr3.MockEstimateProvider, numMsgs int, gas uint64) {
+		estimateProvider.EXPECT().CalculateMerkleTreeGas(numMsgs).Return(gas)
+	}
+
+	setupMessageGasExpectations := func(estimateProvider *ccipocr3.MockEstimateProvider, msgs []cciptypes.Message, gas uint64) {
+		for _, msg := range msgs {
+			estimateProvider.EXPECT().CalculateMessageMaxGas(msg).Return(gas)
+		}
+	}
+
+	tests := []struct {
+		name           string
+		commitData     []exectypes.CommitData
+		setupMocks     func(ccipReader *readerpkg_mock.MockCCIPReader, estimateProvider *ccipocr3.MockEstimateProvider, inflightCache *cache.InflightMessageCache, codec *codec_mock.MockExecCodec)
+		expectedObs    exectypes.Observation
+		expectedError  bool
+		errorSubstring string
+	}{
+		{
+			name:       "no commit data",
+			commitData: []exectypes.CommitData{},
+			setupMocks: func(ccipReader *readerpkg_mock.MockCCIPReader, estimateProvider *ccipocr3.MockEstimateProvider, inflightCache *cache.InflightMessageCache, codec *codec_mock.MockExecCodec) {
+				// No mocks needed for empty commit data
+			},
+			expectedObs:   exectypes.Observation{},
+			expectedError: false,
+		},
+		{
+			name: "single valid commit data",
+			commitData: []exectypes.CommitData{
+				createCommitData(src1, 1, 3),
+			},
+			setupMocks: func(ccipReader *readerpkg_mock.MockCCIPReader, estimateProvider *ccipocr3.MockEstimateProvider, inflightCache *cache.InflightMessageCache, codec *codec_mock.MockExecCodec) {
+				messages := createMessages(src1, dest, 1, 3)
+
+				ccipReader.On("MsgsBetweenSeqNums", ctx, src1, cciptypes.NewSeqNumRange(1, 3)).
+					Return(messages, nil)
+				// Any small size that fits within the max observation size
+				codec.EXPECT().EncodeObservation(mock.Anything).Return(oneByte, nil).Maybe()
+
+				setupMessageGasExpectations(estimateProvider, messages, gasPerMsg)
+				setupMerkleGasExpectation(estimateProvider, len(messages), gasPerMerkleTree+100) // 300 for 3 messages
+			},
+			expectedObs: exectypes.Observation{
+				Messages: exectypes.MessageObservations{
+					src1: {
+						1: NewMessage(1, 1, int(src1), int(dest)),
+						2: NewMessage(2, 2, int(src1), int(dest)),
+						3: NewMessage(3, 3, int(src1), int(dest)),
+					},
+				},
+				CommitReports: exectypes.CommitObservations{
+					src1: []exectypes.CommitData{
+						createCommitData(src1, 1, 3),
+					},
+				},
+				Hashes: exectypes.MessageHashes{
+					src1: createHashesMap(src1, 1, 3),
+				},
+			},
+			expectedError: false,
+		},
+		{
+			name: "multiple commit data from different source chains",
+			commitData: []exectypes.CommitData{
+				createCommitData(src1, 1, 2),
+				createCommitData(src2, 5, 6),
+			},
+			setupMocks: func(ccipReader *readerpkg_mock.MockCCIPReader, estimateProvider *ccipocr3.MockEstimateProvider, inflightCache *cache.InflightMessageCache, codec *codec_mock.MockExecCodec) {
+				messages1 := createMessages(src1, dest, 1, 2)
+				messages2 := createMessages(src2, dest, 5, 6)
+				// Any small size that fits within the max observation size
+				codec.EXPECT().EncodeObservation(mock.Anything).Return(oneByte, nil).Maybe()
+
+				ccipReader.On("MsgsBetweenSeqNums", ctx, src1, cciptypes.NewSeqNumRange(1, 2)).
+					Return(messages1, nil)
+				ccipReader.On("MsgsBetweenSeqNums", ctx, src2, cciptypes.NewSeqNumRange(5, 6)).
+					Return(messages2, nil)
+
+				setupMessageGasExpectations(estimateProvider, messages1, gasPerMsg)
+				setupMessageGasExpectations(estimateProvider, messages2, gasPerMsg)
+
+				setupMerkleGasExpectation(estimateProvider, len(messages1), gasPerMerkleTree)
+				setupMerkleGasExpectation(estimateProvider, len(messages2), gasPerMerkleTree)
+			},
+			expectedObs: exectypes.Observation{
+				Messages: exectypes.MessageObservations{
+					src1: {
+						1: NewMessage(1, 1, int(src1), int(dest)),
+						2: NewMessage(2, 2, int(src1), int(dest)),
+					},
+					src2: {
+						5: NewMessage(5, 5, int(src2), int(dest)),
+						6: NewMessage(6, 6, int(src2), int(dest)),
+					},
+				},
+				CommitReports: exectypes.CommitObservations{
+					src1: []exectypes.CommitData{
+						createCommitData(src1, 1, 2),
+					},
+					src2: []exectypes.CommitData{
+						createCommitData(src2, 5, 6),
+					},
+				},
+				Hashes: exectypes.MessageHashes{
+					src1: createHashesMap(src1, 1, 2),
+					src2: createHashesMap(src2, 5, 6), // Note: This is 3 in the original test
+				},
+			},
+			expectedError: false,
+		},
+		{
+			name: "error reading messages",
+			commitData: []exectypes.CommitData{
+				createCommitData(src1, 1, 3),
+			},
+			setupMocks: func(ccipReader *readerpkg_mock.MockCCIPReader, estimateProvider *ccipocr3.MockEstimateProvider, inflightCache *cache.InflightMessageCache, codec *codec_mock.MockExecCodec) {
+				// Any small size that fits within the max observation size
+				codec.EXPECT().EncodeObservation(mock.Anything).Return(oneByte, nil).Maybe()
+				ccipReader.On("MsgsBetweenSeqNums", ctx, src1, cciptypes.NewSeqNumRange(1, 3)).
+					Return(nil, fmt.Errorf("failed to read messages"))
+			},
+			expectedObs:   exectypes.Observation{},
+			expectedError: false, // Should continue processing even with errors
+		},
+		{
+			name: "missing messages in range",
+			commitData: []exectypes.CommitData{
+				createCommitData(src1, 1, 3),
+			},
+			setupMocks: func(ccipReader *readerpkg_mock.MockCCIPReader, estimateProvider *ccipocr3.MockEstimateProvider, inflightCache *cache.InflightMessageCache, codec *codec_mock.MockExecCodec) {
+				// Any small size that fits within the max observation size
+				codec.EXPECT().EncodeObservation(mock.Anything).Return(oneByte, nil).Maybe()
+				// Return only 2 messages for range 1-3
+				incompleteMessages := []cciptypes.Message{
+					NewMessage(1, 1, int(src1), int(dest)),
+					NewMessage(3, 3, int(src1), int(dest)), // Missing message 2
+				}
+				ccipReader.On("MsgsBetweenSeqNums", ctx, src1, cciptypes.NewSeqNumRange(1, 3)).
+					Return(incompleteMessages, nil)
+			},
+			expectedObs:   exectypes.Observation{},
+			expectedError: false, // Should continue processing even with errors
+		},
+		{
+			name: "inflight messages are skipped but hashed",
+			commitData: []exectypes.CommitData{
+				createCommitData(src1, 1, 2),
+			},
+			setupMocks: func(ccipReader *readerpkg_mock.MockCCIPReader, estimateProvider *ccipocr3.MockEstimateProvider, inflightCache *cache.InflightMessageCache, codec *codec_mock.MockExecCodec) {
+				// Any small size that fits within the max observation size
+				codec.EXPECT().EncodeObservation(mock.Anything).Return(oneByte, nil).Maybe()
+				messages := createMessages(src1, dest, 1, 2)
+
+				ccipReader.On("MsgsBetweenSeqNums", ctx, src1, cciptypes.NewSeqNumRange(1, 2)).
+					Return(messages, nil)
+
+				// Mark message 1 as inflight
+				inflightCache.MarkInflight(src1, messages[0].Header.MessageID)
+
+				// Only calculate gas for non-inflight message
+				estimateProvider.EXPECT().CalculateMessageMaxGas(messages[1]).Return(uint64(gasPerMsg))
+				setupMerkleGasExpectation(estimateProvider, len(messages), gasPerMerkleTree)
+			},
+			expectedObs: exectypes.Observation{
+				Messages: exectypes.MessageObservations{
+					src1: {
+						1: cciptypes.Message{Header: cciptypes.RampMessageHeader{SequenceNumber: 1}},
+						2: NewMessage(2, 2, int(src1), int(dest)),
+					},
+				},
+				CommitReports: exectypes.CommitObservations{
+					src1: []exectypes.CommitData{
+						createCommitData(src1, 1, 2),
+					},
+				},
+				Hashes: exectypes.MessageHashes{
+					src1: createHashesMap(src1, 1, 2),
+				},
+			},
+			expectedError: false,
+		},
+		{
+			name: "gas limit exceeded",
+			commitData: []exectypes.CommitData{
+				createCommitData(src1, 1, 3),
+			},
+			setupMocks: func(ccipReader *readerpkg_mock.MockCCIPReader, estimateProvider *ccipocr3.MockEstimateProvider, inflightCache *cache.InflightMessageCache, codec *codec_mock.MockExecCodec) {
+				// Any small size that fits within the max observation size
+				codec.EXPECT().EncodeObservation(mock.Anything).Return(oneByte, nil).Maybe()
+				messages := createMessages(src1, dest, 1, 3)
+
+				ccipReader.On("MsgsBetweenSeqNums", ctx, src1, cciptypes.NewSeqNumRange(1, 3)).
+					Return(messages, nil)
+
+				// First message takes almost all gas
+				estimateProvider.EXPECT().CalculateMessageMaxGas(messages[0]).Return(uint64(highGasPerMsg))
+
+				// Merkle tree gas calculation pushes us over the limit
+				setupMerkleGasExpectation(estimateProvider, len(messages), highGasPerMerkleTree)
+			},
+			expectedObs: exectypes.Observation{
+				Messages: exectypes.MessageObservations{
+					src1: {
+						1: NewMessage(1, 1, int(src1), int(dest)),
+						2: cciptypes.Message{Header: cciptypes.RampMessageHeader{SequenceNumber: 2}},
+						3: cciptypes.Message{Header: cciptypes.RampMessageHeader{SequenceNumber: 3}},
+					},
+				},
+				CommitReports: exectypes.CommitObservations{
+					src1: []exectypes.CommitData{
+						createCommitData(src1, 1, 3),
+					},
+				},
+				Hashes: exectypes.MessageHashes{
+					src1: createHashesMap(src1, 1, 3),
+				},
+			},
+			expectedError: false,
+		},
+		{
+			name: "encoding size exceeded mid report",
+			commitData: []exectypes.CommitData{
+				createCommitData(src1, 1, 2),
+			},
+			setupMocks: func(ccipReader *readerpkg_mock.MockCCIPReader, estimateProvider *ccipocr3.MockEstimateProvider, inflightCache *cache.InflightMessageCache, codec *codec_mock.MockExecCodec) {
+				// first call to EncodeObservation returns a small size
+				codec.EXPECT().EncodeObservation(mock.Anything).
+					Return(oneByte, nil).
+					Once()
+				// second call to EncodeObservation returns a large size, second message shouldn't be included
+				codec.EXPECT().EncodeObservation(mock.Anything).
+					Return(make([]byte, maxObservationLength+1), nil).
+					Once()
+				messages := createMessages(src1, dest, 1, 2)
+
+				ccipReader.On("MsgsBetweenSeqNums", ctx, src1, cciptypes.NewSeqNumRange(1, 2)).
+					Return(messages, nil)
+
+				setupMessageGasExpectations(estimateProvider, messages, gasPerMsg)
+				setupMerkleGasExpectation(estimateProvider, len(messages), gasPerMerkleTree)
+			},
+			expectedObs: exectypes.Observation{
+				Messages: exectypes.MessageObservations{
+					src1: {
+						1: NewMessage(1, 1, int(src1), int(dest)),
+						2: cciptypes.Message{Header: cciptypes.RampMessageHeader{SequenceNumber: 2}},
+					},
+				},
+				CommitReports: exectypes.CommitObservations{
+					src1: []exectypes.CommitData{
+						createCommitData(src1, 1, 2),
+					},
+				},
+				Hashes: exectypes.MessageHashes{
+					src1: createHashesMap(src1, 1, 2),
+				},
+			},
+			expectedError: false,
+		},
+		{
+			name: "multiple sources with one failing",
+			commitData: []exectypes.CommitData{
+				createCommitData(src1, 1, 2),
+				createCommitData(src2, 1, 2),
+			},
+			setupMocks: func(ccipReader *readerpkg_mock.MockCCIPReader, estimateProvider *ccipocr3.MockEstimateProvider, inflightCache *cache.InflightMessageCache, codec *codec_mock.MockExecCodec) {
+				// Any small size that fits within the max observation size
+				codec.EXPECT().EncodeObservation(mock.Anything).Return(oneByte, nil).Maybe()
+				// Chain 1 works
+				messages1 := createMessages(src1, dest, 1, 2)
+
+				ccipReader.On("MsgsBetweenSeqNums", ctx, src1, cciptypes.NewSeqNumRange(1, 2)).
+					Return(messages1, nil)
+
+				// Chain 2 fails
+				ccipReader.On("MsgsBetweenSeqNums", ctx, src2, cciptypes.NewSeqNumRange(1, 2)).
+					Return(nil, fmt.Errorf("failed to read"))
+
+				// Process chain 1 messages
+				setupMessageGasExpectations(estimateProvider, messages1, gasPerMsg)
+				setupMerkleGasExpectation(estimateProvider, len(messages1), gasPerMerkleTree)
+			},
+			expectedObs: exectypes.Observation{
+				Messages: exectypes.MessageObservations{
+					src1: {
+						1: NewMessage(1, 1, int(src1), int(dest)),
+						2: NewMessage(2, 2, int(src1), int(dest)),
+					},
+				},
+				CommitReports: exectypes.CommitObservations{
+					src1: []exectypes.CommitData{
+						createCommitData(src1, 1, 2),
+					},
+				},
+				Hashes: exectypes.MessageHashes{
+					src1: createHashesMap(src1, 1, 2),
+				},
+			},
+			expectedError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create mock objects
+			ccipReader := readerpkg_mock.NewMockCCIPReader(t)
+			msgHasher := mocks.NewMessageHasher()
+			estimateProvider := ccipocr3.NewMockEstimateProvider(t)
+			inflightCache := cache.NewInflightMessageCache(inflightCacheTTL)
+			codec := codec_mock.NewMockExecCodec(t)
+
+			// Set up the plugin with mock objects
+			plugin := &Plugin{
+				lggr:                 mocks.NullLogger,
+				ccipReader:           ccipReader,
+				msgHasher:            msgHasher,
+				ocrTypeCodec:         codec,
+				estimateProvider:     estimateProvider,
+				inflightMessageCache: inflightCache,
+				offchainCfg: pluginconfig.ExecuteOffchainConfig{
+					BatchGasLimit: uint64(batchGasLimit),
+				},
+			}
+
+			// Setup specific mocks for this test
+			tt.setupMocks(ccipReader, estimateProvider, inflightCache, codec)
+
+			// Run the test
+			obs, err := plugin.getObsWithoutTokenData(ctx, plugin.lggr, tt.commitData, exectypes.Observation{})
+
+			if tt.expectedError {
+				require.Error(t, err)
+				if tt.errorSubstring != "" {
+					require.Contains(t, err.Error(), tt.errorSubstring)
+				}
+			} else {
+				require.NoError(t, err)
+				// Compare observations carefully because some fields may need custom comparison
+				if len(tt.expectedObs.Messages) > 0 {
+					require.Equal(t, tt.expectedObs.Messages, obs.Messages)
+				}
+				if len(tt.expectedObs.CommitReports) > 0 {
+					require.Equal(t, tt.expectedObs.CommitReports, obs.CommitReports)
+				}
+				if len(tt.expectedObs.Hashes) > 0 {
+					require.Equal(t, tt.expectedObs.Hashes, obs.Hashes)
+				}
+			}
+		})
+	}
+}
+
+//func createMessages(t *testing.T, seqRange cciptypes.SeqNumRange, src, dest int) []cciptypes.Message {
+//	messages := make([]cciptypes.Message, seqRange.Length())
+//	for i := seqRange.Start(); i <= seqRange.End(); i++ {
+//		msg := NewMessage(int(i), int(i), src, dest)
+//		messages = append(messages, msg)
+//	}
+//	return messages
+//}
+//
+//func msgsToMap(messages []cciptypes.Message) map[cciptypes.SeqNum]cciptypes.Message {
+//	msgMap := make(map[cciptypes.SeqNum]cciptypes.Message)
+//	for _, msg := range messages {
+//		msgMap[msg.Header.SequenceNumber] = msg
+//	}
+//	return msgMap
+//}
