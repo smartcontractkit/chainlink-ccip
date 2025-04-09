@@ -56,16 +56,6 @@
           "isSigner": false
         },
         {
-          "name": "externalExecutionConfig",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "tokenPoolsSigner",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
           "name": "authority",
           "isMut": true,
           "isSigner": true
@@ -892,11 +882,6 @@
           ]
         },
         {
-          "name": "externalExecutionConfig",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
           "name": "authority",
           "isMut": true,
           "isSigner": true
@@ -908,11 +893,6 @@
         },
         {
           "name": "sysvarInstructions",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "tokenPoolsSigner",
           "isMut": false,
           "isSigner": false
         },
@@ -1009,11 +989,6 @@
           ]
         },
         {
-          "name": "externalExecutionConfig",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
           "name": "authority",
           "isMut": true,
           "isSigner": true
@@ -1025,11 +1000,6 @@
         },
         {
           "name": "sysvarInstructions",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "tokenPoolsSigner",
           "isMut": false,
           "isSigner": false
         },
@@ -1220,13 +1190,6 @@
             "type": "u64"
           }
         ]
-      }
-    },
-    {
-      "name": "ExternalExecutionConfig",
-      "type": {
-        "kind": "struct",
-        "fields": []
       }
     },
     {
@@ -2310,81 +2273,91 @@
     },
     {
       "code": 9039,
+      "name": "Ocr3InvalidConfigNoTransmitters",
+      "msg": "Invalid config: No transmitters"
+    },
+    {
+      "code": 9040,
       "name": "Ocr3InvalidConfigTooManySigners",
       "msg": "Invalid config: Too many signers"
     },
     {
-      "code": 9040,
+      "code": 9041,
       "name": "Ocr3InvalidConfigFIsTooHigh",
       "msg": "Invalid config: F is too high"
     },
     {
-      "code": 9041,
+      "code": 9042,
       "name": "Ocr3InvalidConfigRepeatedOracle",
       "msg": "Invalid config: Repeated oracle address"
     },
     {
-      "code": 9042,
+      "code": 9043,
       "name": "Ocr3WrongMessageLength",
       "msg": "Wrong message length"
     },
     {
-      "code": 9043,
+      "code": 9044,
       "name": "Ocr3ConfigDigestMismatch",
       "msg": "Config digest mismatch"
     },
     {
-      "code": 9044,
+      "code": 9045,
       "name": "Ocr3WrongNumberOfSignatures",
       "msg": "Wrong number signatures"
     },
     {
-      "code": 9045,
+      "code": 9046,
       "name": "Ocr3UnauthorizedTransmitter",
       "msg": "Unauthorized transmitter"
     },
     {
-      "code": 9046,
+      "code": 9047,
       "name": "Ocr3UnauthorizedSigner",
       "msg": "Unauthorized signer"
     },
     {
-      "code": 9047,
+      "code": 9048,
       "name": "Ocr3NonUniqueSignatures",
       "msg": "Non unique signatures"
     },
     {
-      "code": 9048,
+      "code": 9049,
       "name": "Ocr3OracleCannotBeZeroAddress",
       "msg": "Oracle cannot be zero address"
     },
     {
-      "code": 9049,
+      "code": 9050,
       "name": "Ocr3StaticConfigCannotBeChanged",
       "msg": "Static config cannot be changed"
     },
     {
-      "code": 9050,
+      "code": 9051,
       "name": "Ocr3InvalidPluginType",
       "msg": "Incorrect plugin type"
     },
     {
-      "code": 9051,
+      "code": 9052,
       "name": "Ocr3InvalidSignature",
       "msg": "Invalid signature"
     },
     {
-      "code": 9052,
+      "code": 9053,
       "name": "Ocr3SignaturesOutOfRegistration",
       "msg": "Signatures out of registration"
     },
     {
-      "code": 9053,
+      "code": 9054,
       "name": "InvalidOnrampAddress",
       "msg": "Invalid onramp address"
     },
     {
-      "code": 9054,
+      "code": 9055,
+      "name": "InvalidInputsExternalExecutionSignerAccount",
+      "msg": "Invalid external execution signer account"
+    },
+    {
+      "code": 9056,
       "name": "CommitReportHasPendingMessages",
       "msg": "Commit report has pending messages"
     }
