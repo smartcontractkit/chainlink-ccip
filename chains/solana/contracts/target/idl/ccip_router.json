@@ -54,11 +54,6 @@
           "name": "programData",
           "isMut": false,
           "isSigner": false
-        },
-        {
-          "name": "tokenPoolsSigner",
-          "isMut": true,
-          "isSigner": false
         }
       ],
       "args": [
@@ -1026,14 +1021,6 @@
           "name": "rmnRemoteConfig",
           "isMut": false,
           "isSigner": false
-        },
-        {
-          "name": "tokenPoolsSigner",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "CPI signers, optional if no tokens are being transferred."
-          ]
         }
       ],
       "args": [
@@ -1223,13 +1210,6 @@
             "type": "u64"
           }
         ]
-      }
-    },
-    {
-      "name": "ExternalExecutionConfig",
-      "type": {
-        "kind": "struct",
-        "fields": []
       }
     }
   ],

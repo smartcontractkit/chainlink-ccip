@@ -1,12 +1,12 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_2022::spl_token_2022::{self, instruction::transfer_checked, state::Mint};
+use ccip_common::v1::MIN_TOKEN_POOL_ACCOUNTS;
 use solana_program::{instruction::Instruction, program::invoke_signed};
 use solana_program::{program::get_return_data, program_pack::Pack};
 
-use crate::{CcipRouterError, ExternalExecutionConfig};
+use crate::CcipRouterError;
 
 pub const CCIP_LOCK_OR_BURN_V1_RET_BYTES: u32 = 32;
-const MIN_TOKEN_POOL_ACCOUNTS: usize = 12; // see TokenAccounts struct for all required accounts
 
 pub fn calculate_token_pool_account_indices(
     i: usize,
@@ -44,7 +44,7 @@ pub fn transfer_token<'info>(
     mint: &AccountInfo<'info>,
     from: &AccountInfo<'info>,
     to: &AccountInfo<'info>,
-    signer: &Account<'info, ExternalExecutionConfig>,
+    signer: &AccountInfo<'info>,
     seeds: &[&[u8]],
 ) -> std::result::Result<(), ProgramError> {
     let mint_data = Mint::unpack(*mint.try_borrow_data()?)?;

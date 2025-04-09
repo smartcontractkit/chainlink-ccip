@@ -83,10 +83,6 @@ pub struct GlobalState {
     pub latest_price_sequence_number: u64,
 }
 
-#[account]
-#[derive(InitSpace)]
-pub struct ExternalExecutionConfig {}
-
 #[derive(Clone, AnchorSerialize, AnchorDeserialize, InitSpace, Debug)]
 pub struct SourceChainConfig {
     pub is_enabled: bool, // Flag whether the source chain is enabled or not
@@ -111,6 +107,10 @@ impl OnRampAddress {
 
     pub fn is_empty(&self) -> bool {
         self.len == 0
+    }
+
+    pub fn is_zero(&self) -> bool {
+        self.bytes().iter().all(|b| *b == 0)
     }
 
     pub const EMPTY: Self = Self {

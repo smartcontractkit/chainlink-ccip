@@ -30,7 +30,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"github.com/smartcontractkit/chainlink-ccip/commit/internal/builder"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
-	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/commit/metrics"
 	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
 	"github.com/smartcontractkit/chainlink-ccip/internal"
@@ -302,7 +301,7 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 				m.EXPECT().
 					GetFeeQuoterTokenUpdates(mock.Anything, mock.Anything, mock.Anything).
 					Return(
-						map[ccipocr3.UnknownEncodedAddress]plugintypes.TimestampedBig{}, nil,
+						map[ccipocr3.UnknownEncodedAddress]ccipocr3.TimestampedBig{}, nil,
 					).
 					Maybe()
 			},
@@ -363,7 +362,7 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 				m.EXPECT().
 					GetFeeQuoterTokenUpdates(mock.Anything, mock.Anything, mock.Anything).
 					Return(
-						map[ccipocr3.UnknownEncodedAddress]plugintypes.TimestampedBig{
+						map[ccipocr3.UnknownEncodedAddress]ccipocr3.TimestampedBig{
 							arbAddr: {Value: ccipocr3.NewBigInt(arbPrice), Timestamp: time.Now()},
 							ethAddr: {Value: ccipocr3.NewBigInt(ethPrice), Timestamp: time.Now()},
 						}, nil,
@@ -394,7 +393,7 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 				m.EXPECT().
 					GetFeeQuoterTokenUpdates(mock.Anything, mock.Anything, mock.Anything).
 					Return(
-						map[ccipocr3.UnknownEncodedAddress]plugintypes.TimestampedBig{
+						map[ccipocr3.UnknownEncodedAddress]ccipocr3.TimestampedBig{
 							// Arb is fresh, will not be updated
 							arbAddr: {Value: ccipocr3.NewBigInt(arbPrice), Timestamp: time.Now()},
 							// Eth is stale, should update
@@ -668,7 +667,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 				t := time.Now().UTC().Add(-elapsed)
 				m.EXPECT().
 					GetChainFeePriceUpdate(mock.Anything, mock.Anything).
-					Return(map[ccipocr3.ChainSelector]plugintypes.TimestampedBig{
+					Return(map[ccipocr3.ChainSelector]ccipocr3.TimestampedBig{
 						sourceChain1: {
 							Timestamp: t,
 							Value:     expectedChain1FeeOutcome.GasPrices[0].GasPrice,
@@ -735,7 +734,7 @@ func prepareCcipReaderMock(
 		Return(0, nil).Maybe()
 	ccipReader.EXPECT().
 		GetChainFeePriceUpdate(mock.Anything, mock.Anything).
-		Return(map[ccipocr3.ChainSelector]plugintypes.TimestampedBig{}).Maybe()
+		Return(map[ccipocr3.ChainSelector]ccipocr3.TimestampedBig{}).Maybe()
 	ccipReader.EXPECT().
 		GetContractAddress(mock.Anything, mock.Anything).
 		Return(ccipocr3.Bytes{1}, nil).Maybe()
@@ -790,7 +789,7 @@ type SetupNodeParams struct {
 	chainCfg          map[ccipocr3.ChainSelector]reader.ChainConfig
 	offRampNextSeqNum map[ccipocr3.ChainSelector]ccipocr3.SeqNum
 	onRampLastSeqNum  map[ccipocr3.ChainSelector]ccipocr3.SeqNum
-	rmnReportCfg      rmntypes.RemoteConfig
+	rmnReportCfg      ccipocr3.RemoteConfig
 	enableDiscovery   bool
 }
 

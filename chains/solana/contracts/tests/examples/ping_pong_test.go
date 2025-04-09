@@ -62,7 +62,7 @@ func getReusableAccounts(t *testing.T, linkMint solana.PublicKey) ReusableAccoun
 	dumbRamp := config.CcipInvalidReceiverProgram
 	allowedOfframp, err := state.FindAllowedOfframpPDA(config.SvmChainSelector, dumbRamp, config.CcipRouterProgram)
 	require.NoError(t, err)
-	rampSigner, _, err := state.FindExternalExecutionConfigPDA(dumbRamp)
+	rampSigner, _, err := state.FindExternalExecutionConfigPDA(config.PingPongProgram, dumbRamp)
 	require.NoError(t, err)
 	nonce, err := state.FindNoncePDA(config.SvmChainSelector, ppCcipSendSigner, config.CcipRouterProgram)
 	require.NoError(t, err)
@@ -183,7 +183,6 @@ func TestPingPong(t *testing.T) {
 					solana.SystemProgramID,
 					config.CcipRouterProgram,
 					programData.Address,
-					config.ExternalTokenPoolsSignerPDA,
 				).ValidateAndBuild()
 				require.NoError(t, err)
 
@@ -319,7 +318,7 @@ func TestPingPong(t *testing.T) {
 				t,
 				fee_quoter.SVMExtraArgsV1{
 					ComputeUnits:             400_000,
-					AccountIsWritableBitmap:  ccip.GenerateBitMapForIndexes([]int{1, 4, 7, 8, 9, 19}),
+					AccountIsWritableBitmap:  ccip.GenerateBitMapForIndexes([]int{1, 4, 7, 8, 9}),
 					AllowOutOfOrderExecution: true,
 					TokenReceiver:            [32]uint8{}, // none, no token transfer
 					Accounts: [][32]uint8{
@@ -342,7 +341,6 @@ func TestPingPong(t *testing.T) {
 						config.RMNRemoteProgram,
 						config.RMNRemoteCursesPDA,
 						config.RMNRemoteConfigPDA,
-						config.ExternalTokenPoolsSignerPDA, // 19
 						solana.SystemProgramID,
 					},
 				},
@@ -466,7 +464,6 @@ func TestPingPong(t *testing.T) {
 				config.RMNRemoteProgram,
 				config.RMNRemoteCursesPDA,
 				config.RMNRemoteConfigPDA,
-				config.ExternalTokenPoolsSignerPDA,
 				solana.SystemProgramID,
 			).ValidateAndBuild()
 			require.NoError(t, err)

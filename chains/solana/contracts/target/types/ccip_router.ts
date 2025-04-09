@@ -54,11 +54,6 @@ export type CcipRouter = {
           "name": "programData",
           "isMut": false,
           "isSigner": false
-        },
-        {
-          "name": "tokenPoolsSigner",
-          "isMut": true,
-          "isSigner": false
         }
       ],
       "args": [
@@ -1026,14 +1021,6 @@ export type CcipRouter = {
           "name": "rmnRemoteConfig",
           "isMut": false,
           "isSigner": false
-        },
-        {
-          "name": "tokenPoolsSigner",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "CPI signers, optional if no tokens are being transferred."
-          ]
         }
       ],
       "args": [
@@ -1223,13 +1210,6 @@ export type CcipRouter = {
             "type": "u64"
           }
         ]
-      }
-    },
-    {
-      "name": "externalExecutionConfig",
-      "type": {
-        "kind": "struct",
-        "fields": []
       }
     }
   ],
@@ -1992,11 +1972,6 @@ export const IDL: CcipRouter = {
           "name": "programData",
           "isMut": false,
           "isSigner": false
-        },
-        {
-          "name": "tokenPoolsSigner",
-          "isMut": true,
-          "isSigner": false
         }
       ],
       "args": [
@@ -2964,14 +2939,6 @@ export const IDL: CcipRouter = {
           "name": "rmnRemoteConfig",
           "isMut": false,
           "isSigner": false
-        },
-        {
-          "name": "tokenPoolsSigner",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "CPI signers, optional if no tokens are being transferred."
-          ]
         }
       ],
       "args": [
@@ -3161,13 +3128,6 @@ export const IDL: CcipRouter = {
             "type": "u64"
           }
         ]
-      }
-    },
-    {
-      "name": "externalExecutionConfig",
-      "type": {
-        "kind": "struct",
-        "fields": []
       }
     }
   ],
