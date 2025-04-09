@@ -93,6 +93,7 @@ jobs:
               - '!chains/evm/contracts/**/mocks/**'
               - '!chains/evm/contracts/**/*.t.sol'
               - '!chains/evm/contracts/*.t.sol'
+              - '!chains/evm/contracts/*.s.sol'
               - '!chains/evm/contracts/**/testhelpers/**'
               - '!chains/evm/contracts/testhelpers/**'
               - '!chains/evm/contracts/vendor/**'

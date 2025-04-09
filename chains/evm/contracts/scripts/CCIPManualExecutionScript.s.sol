@@ -18,7 +18,7 @@ contract CCIPSendTestScript is Script, Test {
 
   // Ex: "ETHEREUM_RPC_URL" as defined in .env
   string public RPC_IDENTIFIER;
-  
+
   OffRamp public s_offRamp;
 
   bytes32 public s_messageId;
@@ -47,7 +47,7 @@ contract CCIPSendTestScript is Script, Test {
       "Message is not ready for Manual Execution"
     );
 
-    // Manual Execution data can be invoked from a different tool or front-end to avoid having to 
+    // Manual Execution data can be invoked from a different tool or front-end to avoid having to
     // gather execution report data manually
     (bool success,) = address(s_offRamp).call(s_manualExecutionData);
     assertTrue(success, "Manual execution call reverted");
