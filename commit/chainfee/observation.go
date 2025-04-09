@@ -10,7 +10,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
@@ -85,7 +84,7 @@ func (p *processor) observeFChain(lggr logger.Logger) map[cciptypes.ChainSelecto
 }
 
 func feeUpdatesFromTimestampedBig(
-	updates map[cciptypes.ChainSelector]plugintypes.TimestampedBig,
+	updates map[cciptypes.ChainSelector]cciptypes.TimestampedBig,
 ) map[cciptypes.ChainSelector]Update {
 	chainFeeUpdates := make(map[cciptypes.ChainSelector]Update, len(updates))
 	for chain, u := range updates {

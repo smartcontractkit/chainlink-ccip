@@ -14,7 +14,6 @@ import (
 	rmnpb "github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
-	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
@@ -694,7 +693,7 @@ func Test_buildMerkleRootsOutcome(t *testing.T) {
 					MerkleRoot:   cciptypes.Bytes32{2},
 				},
 			},
-			RMNRemoteConfig: map[cciptypes.ChainSelector]rmntypes.RemoteConfig{
+			RMNRemoteConfig: map[cciptypes.ChainSelector]cciptypes.RemoteConfig{
 				cciptypes.ChainSelector(1): rmnRemoteCfg,
 			},
 		}
@@ -734,7 +733,7 @@ func Test_reportRangesOutcome(t *testing.T) {
 				OffRampNextSeqNums: map[cciptypes.ChainSelector]cciptypes.SeqNum{
 					1: 18, // off ramp next is 18, on ramp max is 20 so new msgs are: [18, 19, 20]
 				},
-				RMNRemoteConfig: map[cciptypes.ChainSelector]rmntypes.RemoteConfig{
+				RMNRemoteConfig: map[cciptypes.ChainSelector]cciptypes.RemoteConfig{
 					destChain: rmnRemoteCfg,
 				},
 			},
@@ -763,7 +762,7 @@ func Test_reportRangesOutcome(t *testing.T) {
 					2: 995, // off ramp next is 995, on ramp max is 1000 so new msgs are: [995, 996, 997, 998, 999, 1000]
 					3: 500, // off ramp next is 500, we have new messages up to 10000 (default limit applied)
 				},
-				RMNRemoteConfig: map[cciptypes.ChainSelector]rmntypes.RemoteConfig{
+				RMNRemoteConfig: map[cciptypes.ChainSelector]cciptypes.RemoteConfig{
 					destChain: rmnRemoteCfg,
 				},
 			},
