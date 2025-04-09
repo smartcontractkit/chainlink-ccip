@@ -86,8 +86,6 @@ impl OnRamp for Impl {
         let mut get_fee_remaining_accounts = billing_token_config_accs;
         get_fee_remaining_accounts.extend(per_chain_per_token_config_accs);
 
-        // todo: find chain familiy selector validation in fee quotor logic
-        // todo: check evm impl also
         let get_fee_result = get_fee_cpi(
             ctx.accounts.fee_quoter.to_account_info(),
             ctx.accounts.fee_quoter_config.to_account_info(),
