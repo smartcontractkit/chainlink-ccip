@@ -42,7 +42,6 @@ type CommitData struct {
 }
 
 func CompareCommitData(i, j CommitData) bool {
-	// Should be very rare to have the same timestamp but better to be deterministic
 	if !i.Timestamp.Equal(j.Timestamp) {
 		return i.Timestamp.Before(j.Timestamp)
 	}

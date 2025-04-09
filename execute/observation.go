@@ -3,11 +3,10 @@ package execute
 import (
 	"context"
 	"fmt"
-	mapset "github.com/deckarep/golang-set/v2"
-	ocrtypecodec "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 	"sort"
 	"time"
+
+	ocrtypecodec "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
@@ -262,19 +261,6 @@ func buildCombinedReports(
 	return combinedReports
 }
 
-// regroup converts the previous outcome to the observation format.
-// TODO: use same format for Observation and Outcome.
-func regroup(commitData []exectypes.CommitData) exectypes.CommitObservations {
-	groupedCommits := make(exectypes.CommitObservations)
-	for _, report := range commitData {
-		if _, ok := groupedCommits[report.SourceChain]; !ok {
-			groupedCommits[report.SourceChain] = []exectypes.CommitData{}
-		}
-		groupedCommits[report.SourceChain] = append(groupedCommits[report.SourceChain], report)
-	}
-	return groupedCommits
-}
-
 func (p *Plugin) getObsWithoutTokenData(
 	ctx context.Context,
 	lggr logger.Logger,
@@ -320,20 +306,11 @@ func (p *Plugin) getObsWithoutTokenData(
 		rangesBySelector := make(map[cciptypes.ChainSelector][]cciptypes.SeqNumRange)
 		rangesBySelector[srcChain] = []cciptypes.SeqNumRange{report.SequenceNumberRange}
 
-		// Get all executed messages
-		inflightMsgs, err := p.ccipReader.ExecutedMessages(ctx, rangesBySelector, primitives.Unconfirmed)
-		if err != nil {
-			lggr.Errorw("get executed messages in range %v: %w", rangesBySelector, err)
-			continue
-		}
-
-		inflightMsgsSet := mapset.NewSet(inflightMsgs[srcChain]...)
-
 		availableReports[srcChain] = append(availableReports[srcChain], report)
 		for _, msg := range msgs {
 			seqNum := msg.Header.SequenceNumber
 			// When we need to stop we continue to process the messages to add hashes
-			if !stop && !inflightMsgsSet.Contains(seqNum) {
+			if !stop && !p.inflightMessageCache.IsInflight(srcChain, msg.Header.MessageID) { //!inflightMsgsSet.Contains(seqNum) {
 				messageObs[srcChain][seqNum] = msg
 				gasSum += p.estimateProvider.CalculateMessageMaxGas(msg)
 				stop = p.exceedsMaxGasLimit(gasSum, msgs)
@@ -359,7 +336,7 @@ func (p *Plugin) getObsWithoutTokenData(
 			observation.Hashes = msgHashes
 			// we check if gas limit or size already reached first so we can skip the size check
 			if !stop && exceedsMaxEncodingSize(observation, p.ocrTypeCodec, maxObservationLength) {
-				// psuedo delete the message
+				// pseudo delete the message
 				stop = true
 				messageObs[srcChain][seqNum] = cciptypes.Message{
 					Header: cciptypes.RampMessageHeader{

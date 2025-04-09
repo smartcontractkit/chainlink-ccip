@@ -3,12 +3,13 @@ package execute
 import (
 	"context"
 	"fmt"
-	"github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
-	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
-	"github.com/stretchr/testify/mock"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/mock"
+
+	"github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -118,10 +119,8 @@ func Test_getMessagesObservation(t *testing.T) {
 	estimateProvider := ccipocr3.NewMockEstimateProvider(t)
 	estimateProvider.EXPECT().CalculateMessageMaxGas(mock.Anything).Return(1)
 	estimateProvider.EXPECT().CalculateMerkleTreeGas(mock.Anything).Return(1)
-	ccipReader.EXPECT().ExecutedMessages(mock.Anything, mock.Anything, primitives.Unconfirmed).Return(nil, nil)
+	//ccipReader.EXPECT().ExecutedMessages(mock.Anything, mock.Anything, primitives.Unconfirmed).Return(nil, nil)
 
-	//emptyMsgHash, err := msgHasher.Hash(ctx, cciptypes.Message{})
-	//require.NoError(t, err)
 	// Set up the plugin with mock objects
 	plugin := &Plugin{
 		lggr:              mocks.NullLogger,
@@ -133,6 +132,7 @@ func Test_getMessagesObservation(t *testing.T) {
 		offchainCfg: pluginconfig.ExecuteOffchainConfig{
 			BatchGasLimit: 10,
 		},
+		inflightMessageCache: cache.NewInflightMessageCache(1 * time.Minute),
 	}
 
 	tests := []struct {
@@ -170,9 +170,9 @@ func Test_getMessagesObservation(t *testing.T) {
 				},
 				Messages: exectypes.MessageObservations{
 					1: {
-						1: cciptypes.Message{Header: cciptypes.RampMessageHeader{SequenceNumber: 1}},
-						2: cciptypes.Message{Header: cciptypes.RampMessageHeader{SequenceNumber: 2}},
-						3: cciptypes.Message{Header: cciptypes.RampMessageHeader{SequenceNumber: 3}},
+						1: cciptypes.NewMessage(1, 1, 1, 2),
+						2: cciptypes.NewMessage(2, 2, 1, 2),
+						3: cciptypes.NewMessage(3, 3, 1, 2),
 					},
 				},
 				TokenData: exectypes.TokenDataObservations{
@@ -219,11 +219,11 @@ func Test_getMessagesObservation(t *testing.T) {
 				},
 				Messages: exectypes.MessageObservations{
 					1: {
-						1:  cciptypes.Message{Header: cciptypes.RampMessageHeader{SequenceNumber: 1}},
-						2:  cciptypes.Message{Header: cciptypes.RampMessageHeader{SequenceNumber: 2}},
-						3:  cciptypes.Message{Header: cciptypes.RampMessageHeader{SequenceNumber: 3}},
-						11: cciptypes.Message{Header: cciptypes.RampMessageHeader{SequenceNumber: 11}},
-						12: cciptypes.Message{Header: cciptypes.RampMessageHeader{SequenceNumber: 12}},
+						1:  cciptypes.NewMessage(1, 1, 1, 2),
+						2:  cciptypes.NewMessage(2, 2, 1, 2),
+						3:  cciptypes.NewMessage(3, 3, 1, 2),
+						11: cciptypes.NewMessage(11, 11, 1, 2),
+						12: cciptypes.NewMessage(12, 12, 1, 2),
 					},
 				},
 				TokenData: exectypes.TokenDataObservations{
@@ -245,21 +245,21 @@ func Test_getMessagesObservation(t *testing.T) {
 			// Set up mock expectations
 			ccipReader.On("MsgsBetweenSeqNums", ctx, cciptypes.ChainSelector(1),
 				cciptypes.NewSeqNumRange(1, 3)).Return([]cciptypes.Message{
-				{Header: cciptypes.RampMessageHeader{SequenceNumber: 1}},
-				{Header: cciptypes.RampMessageHeader{SequenceNumber: 2}},
-				{Header: cciptypes.RampMessageHeader{SequenceNumber: 3}},
+				cciptypes.NewMessage(1, 1, 1, 2),
+				cciptypes.NewMessage(2, 2, 1, 2),
+				cciptypes.NewMessage(3, 3, 1, 2),
 			}, nil).Maybe()
 
 			// missing message from 7 to 10
 			ccipReader.On("MsgsBetweenSeqNums", ctx, cciptypes.ChainSelector(1),
 				cciptypes.NewSeqNumRange(6, 10)).Return([]cciptypes.Message{
-				{Header: cciptypes.RampMessageHeader{SequenceNumber: 6}},
+				cciptypes.NewMessage(6, 6, 1, 2),
 			}, nil).Maybe()
 
 			ccipReader.On("MsgsBetweenSeqNums", ctx, cciptypes.ChainSelector(1),
 				cciptypes.NewSeqNumRange(11, 12)).Return([]cciptypes.Message{
-				{Header: cciptypes.RampMessageHeader{SequenceNumber: 11}},
-				{Header: cciptypes.RampMessageHeader{SequenceNumber: 12}},
+				cciptypes.NewMessage(11, 11, 1, 2),
+				cciptypes.NewMessage(12, 12, 1, 2),
 			}, nil).Maybe()
 
 			observation := exectypes.Observation{}
@@ -287,10 +287,8 @@ func Test_readAllMessages(t *testing.T) {
 	estimateProvider := ccipocr3.NewMockEstimateProvider(t)
 	estimateProvider.EXPECT().CalculateMessageMaxGas(mock.Anything).Return(1)
 	estimateProvider.EXPECT().CalculateMerkleTreeGas(mock.Anything).Return(1)
-	ccipReader.EXPECT().ExecutedMessages(mock.Anything, mock.Anything, primitives.Unconfirmed).Return(nil, nil)
+	//ccipReader.EXPECT().ExecutedMessages(mock.Anything, mock.Anything, primitives.Unconfirmed).Return(nil, nil)
 
-	//emptyMsgHash, err := msgHasher.Hash(ctx, cciptypes.Message{})
-	//require.NoError(t, err)
 	// Set up the plugin with mock objects
 	plugin := &Plugin{
 		lggr:              lggr,
@@ -302,6 +300,7 @@ func Test_readAllMessages(t *testing.T) {
 		offchainCfg: pluginconfig.ExecuteOffchainConfig{
 			BatchGasLimit: 10,
 		},
+		inflightMessageCache: cache.NewInflightMessageCache(1 * time.Minute),
 	}
 
 	tests := []struct {
@@ -331,9 +330,9 @@ func Test_readAllMessages(t *testing.T) {
 			},
 			expectedMsgs: exectypes.MessageObservations{
 				1: {
-					1: cciptypes.Message{Header: cciptypes.RampMessageHeader{SequenceNumber: 1, MessageID: cciptypes.Bytes32{0x01}}},
-					2: cciptypes.Message{Header: cciptypes.RampMessageHeader{SequenceNumber: 2, MessageID: cciptypes.Bytes32{0x02}}},
-					3: cciptypes.Message{Header: cciptypes.RampMessageHeader{SequenceNumber: 3, MessageID: cciptypes.Bytes32{0x03}}},
+					1: cciptypes.NewMessage(1, 1, 1, 2),
+					2: cciptypes.NewMessage(2, 2, 1, 2),
+					3: cciptypes.NewMessage(3, 3, 1, 2),
 				},
 			},
 			expectedReports: exectypes.CommitObservations{
@@ -361,9 +360,9 @@ func Test_readAllMessages(t *testing.T) {
 			// Set up mock expectations
 			ccipReader.On("MsgsBetweenSeqNums", ctx, cciptypes.ChainSelector(1),
 				cciptypes.NewSeqNumRange(1, 3)).Return([]cciptypes.Message{
-				{Header: cciptypes.RampMessageHeader{SequenceNumber: 1, MessageID: cciptypes.Bytes32{0x01}}},
-				{Header: cciptypes.RampMessageHeader{SequenceNumber: 2, MessageID: cciptypes.Bytes32{0x02}}},
-				{Header: cciptypes.RampMessageHeader{SequenceNumber: 3, MessageID: cciptypes.Bytes32{0x03}}},
+				cciptypes.NewMessage(1, 1, 1, 2),
+				cciptypes.NewMessage(2, 2, 1, 2),
+				cciptypes.NewMessage(3, 3, 1, 2),
 			}, nil).Maybe()
 			obs, err := plugin.getObsWithoutTokenData(ctx, lggr, tt.commitData, exectypes.Observation{})
 			require.NoError(t, err)
