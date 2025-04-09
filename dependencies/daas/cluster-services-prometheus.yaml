@@ -21,6 +21,9 @@ vars:
   PROMETHEUS_NAME:
     source: env
     default: prometheus
+  GRAFANA_ADMIN_PASSWORD:
+    source: env
+    default: grafanaadmin123
 
 pipelines:
   deploy:
@@ -43,6 +46,8 @@ deployments:
         version: 70.3.0
       values:
         fullnameOverride: ${PROMETHEUS_NAME}
+        grafana:
+          adminPassword: ${GRAFANA_ADMIN_PASSWORD}
       valuesFiles:
         - ${LOCAL_VALUES_DIR}/prometheus/prometheus-default.yaml
 
