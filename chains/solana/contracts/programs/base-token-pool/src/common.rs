@@ -174,7 +174,13 @@ impl BaseChain {
     ) -> Result<()> {
         let old_pools = self.remote.pool_addresses.clone();
 
-        self.remote.pool_addresses.append(&mut addresses.clone());
+        for address in addresses {
+            if !self.remote.pool_addresses.contains(&address) {
+                self.remote.pool_addresses.push(address);
+            } else {
+                return Err(CcipTokenPoolError::RemotePoolAddressAlreadyExisted.into());
+            }
+        }
 
         emit!(RemotePoolsAppended {
             chain_selector: remote_chain_selector,
@@ -391,6 +397,8 @@ pub enum CcipTokenPoolError {
     AllowlistKeyAlreadyExisted,
     #[msg("Key did not exist in the allowlist")]
     AllowlistKeyDidNotExist,
+    #[msg("Remote pool address already exists")]
+    RemotePoolAddressAlreadyExisted,
 
     // Rate limit errors
     #[msg("RateLimit: bucket overfilled")]

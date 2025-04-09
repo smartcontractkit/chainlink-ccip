@@ -595,31 +595,36 @@ export type BaseTokenPool = {
     },
     {
       "code": 6011,
+      "name": "RemotePoolAddressAlreadyExisted",
+      "msg": "Remote pool address already exists"
+    },
+    {
+      "code": 6012,
       "name": "RLBucketOverfilled",
       "msg": "RateLimit: bucket overfilled"
     },
     {
-      "code": 6012,
+      "code": 6013,
       "name": "RLMaxCapacityExceeded",
       "msg": "RateLimit: max capacity exceeded"
     },
     {
-      "code": 6013,
+      "code": 6014,
       "name": "RLRateLimitReached",
       "msg": "RateLimit: rate limit reached"
     },
     {
-      "code": 6014,
+      "code": 6015,
       "name": "RLInvalidRateLimitRate",
       "msg": "RateLimit: invalid rate limit rate"
     },
     {
-      "code": 6015,
+      "code": 6016,
       "name": "RLDisabledNonZeroRateLimit",
       "msg": "RateLimit: disabled non-zero rate limit"
     },
     {
-      "code": 6016,
+      "code": 6017,
       "name": "LiquidityNotAccepted",
       "msg": "Liquidity not accepted"
     }
@@ -1223,31 +1228,36 @@ export const IDL: BaseTokenPool = {
     },
     {
       "code": 6011,
+      "name": "RemotePoolAddressAlreadyExisted",
+      "msg": "Remote pool address already exists"
+    },
+    {
+      "code": 6012,
       "name": "RLBucketOverfilled",
       "msg": "RateLimit: bucket overfilled"
     },
     {
-      "code": 6012,
+      "code": 6013,
       "name": "RLMaxCapacityExceeded",
       "msg": "RateLimit: max capacity exceeded"
     },
     {
-      "code": 6013,
+      "code": 6014,
       "name": "RLRateLimitReached",
       "msg": "RateLimit: rate limit reached"
     },
     {
-      "code": 6014,
+      "code": 6015,
       "name": "RLInvalidRateLimitRate",
       "msg": "RateLimit: invalid rate limit rate"
     },
     {
-      "code": 6015,
+      "code": 6016,
       "name": "RLDisabledNonZeroRateLimit",
       "msg": "RateLimit: disabled non-zero rate limit"
     },
     {
-      "code": 6016,
+      "code": 6017,
       "name": "LiquidityNotAccepted",
       "msg": "Liquidity not accepted"
     }
