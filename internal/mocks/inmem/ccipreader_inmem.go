@@ -10,12 +10,9 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
-	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
-	internaltypes "github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
-	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 )
@@ -28,7 +25,7 @@ type MessagesWithMetadata struct {
 
 type InMemoryCCIPReader struct {
 	// Reports that may be returned.
-	Reports []plugintypes.CommitPluginReportWithMeta
+	Reports []cciptypes.CommitPluginReportWithMeta
 
 	// Messages that may be returned.
 	Messages map[cciptypes.ChainSelector][]MessagesWithMetadata
@@ -52,8 +49,8 @@ func (r InMemoryCCIPReader) GetExpectedNextSequenceNumber(
 
 func (r InMemoryCCIPReader) CommitReportsGTETimestamp(
 	_ context.Context, ts time.Time, limit int,
-) ([]plugintypes.CommitPluginReportWithMeta, error) {
-	results := slicelib.Filter(r.Reports, func(report plugintypes.CommitPluginReportWithMeta) bool {
+) ([]cciptypes.CommitPluginReportWithMeta, error) {
+	results := slicelib.Filter(r.Reports, func(report cciptypes.CommitPluginReportWithMeta) bool {
 		return report.Timestamp.After(ts) || report.Timestamp.Equal(ts)
 	})
 	if len(results) > limit {
@@ -178,7 +175,7 @@ func (r InMemoryCCIPReader) GetWrappedNativeTokenPriceUSD(
 func (r InMemoryCCIPReader) GetChainFeePriceUpdate(
 	ctx context.Context,
 	selectors []cciptypes.ChainSelector,
-) map[cciptypes.ChainSelector]internaltypes.TimestampedBig {
+) map[cciptypes.ChainSelector]cciptypes.TimestampedBig {
 	return nil
 }
 
@@ -188,8 +185,8 @@ func (r InMemoryCCIPReader) DiscoverContracts(
 	return nil, nil
 }
 
-func (r InMemoryCCIPReader) GetRMNRemoteConfig(ctx context.Context) (rmntypes.RemoteConfig, error) {
-	return rmntypes.RemoteConfig{}, nil
+func (r InMemoryCCIPReader) GetRMNRemoteConfig(ctx context.Context) (cciptypes.RemoteConfig, error) {
+	return cciptypes.RemoteConfig{}, nil
 }
 
 func (r InMemoryCCIPReader) GetRmnCurseInfo(ctx context.Context) (reader.CurseInfo, error) {

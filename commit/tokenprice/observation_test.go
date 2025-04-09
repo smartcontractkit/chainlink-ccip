@@ -16,7 +16,6 @@ import (
 	"github.com/smartcontractkit/libocr/commontypes"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	common_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/plugincommon"
 	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
@@ -34,9 +33,9 @@ func Test_Observation(t *testing.T) {
 		tokenA: cciptypes.NewBigInt(bi100),
 		tokenB: cciptypes.NewBigInt(bi200),
 	}
-	feeQuoterTokenUpdates := map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig{
-		tokenA: plugintypes.NewTimestampedBig(bi100.Int64(), timestamp),
-		tokenB: plugintypes.NewTimestampedBig(bi200.Int64(), timestamp),
+	feeQuoterTokenUpdates := map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig{
+		tokenA: cciptypes.NewTimestampedBig(bi100.Int64(), timestamp),
+		tokenB: cciptypes.NewTimestampedBig(bi200.Int64(), timestamp),
 	}
 	oracleID := commontypes.OracleID(1)
 	lggr := logger.Test(t)
@@ -68,9 +67,9 @@ func Test_Observation(t *testing.T) {
 						tokenB: cciptypes.NewBigInt(bi200)}, nil)
 
 				tokenPriceReader.EXPECT().GetFeeQuoterTokenUpdates(mock.Anything, mock.Anything, mock.Anything).Return(
-					map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig{
-						tokenA: plugintypes.NewTimestampedBig(bi100.Int64(), timestamp),
-						tokenB: plugintypes.NewTimestampedBig(bi200.Int64(), timestamp),
+					map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig{
+						tokenA: cciptypes.NewTimestampedBig(bi100.Int64(), timestamp),
+						tokenB: cciptypes.NewTimestampedBig(bi200.Int64(), timestamp),
 					},
 					nil,
 				)
