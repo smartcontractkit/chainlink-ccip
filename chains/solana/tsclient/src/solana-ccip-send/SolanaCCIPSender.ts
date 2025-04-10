@@ -4,6 +4,8 @@ import {
   Connection,
   Keypair,
   PublicKey,
+  sendAndConfirmTransaction,
+  Transaction,
   TransactionMessage,
   VersionedTransaction,
 } from "@solana/web3.js";
@@ -12,6 +14,8 @@ import {
   TOKEN_PROGRAM_ID,
   NATIVE_MINT,
   TOKEN_2022_PROGRAM_ID,
+  createAssociatedTokenAccountInstruction,
+  ASSOCIATED_TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
 
 import { ccipSend } from "./bindings/instructions/ccipSend";
@@ -22,12 +26,20 @@ import {
 } from "./bindings/instructions/ccipSend";
 import { SolanaCCIPSendConfig } from "./SolanaCCIPSendConfig";
 import { SolanaCCIPSendRequest } from "./SolanaCCIPSendRequest";
+import { CcipCommonClient } from "./SolanaCCIPReadAccounts";
+import BN from "bn.js";
+import { token } from "@coral-xyz/anchor/dist/cjs/utils";
 
 export class SolanaCCIPSender {
   private readonly config: SolanaCCIPSendConfig;
+  private readonly ccipCommonClient: CcipCommonClient;
 
   constructor(config: SolanaCCIPSendConfig) {
     this.config = config;
+    this.ccipCommonClient = new CcipCommonClient(
+      "./ccip-keypair.json",
+      "devnet",
+    );
   }
 
   async send(user: Keypair, msg: SolanaCCIPSendRequest): Promise<void> {
@@ -39,84 +51,12 @@ export class SolanaCCIPSender {
 
     const selectorBigInt = BigInt(msg.destChainSelector.toString());
 
-    const [config] = SolanaCCIPPDAs.findConfigPDA(
-      this.config.ccipRouterProgramId,
-    );
-    const [destChainState] = SolanaCCIPPDAs.findDestChainStatePDA(
+    const ccipSendAccounts: CcipSendAccounts = await buildCCipSendAccounts(
+      this.config,
       selectorBigInt,
-      this.config.ccipRouterProgramId,
+      user,
+      msg,
     );
-    const [nonce] = SolanaCCIPPDAs.findNoncePDA(
-      selectorBigInt,
-      user.publicKey,
-      this.config.ccipRouterProgramId,
-    );
-    const [feeBillingSigner] = SolanaCCIPPDAs.findFeeBillingSignerPDA(
-      this.config.ccipRouterProgramId,
-    );
-    const [feeQuoterConfig] = SolanaCCIPPDAs.findFqConfigPDA(
-      this.config.feeQuoterProgramId,
-    );
-    const [fqDestChain] = SolanaCCIPPDAs.findFqDestChainPDA(
-      selectorBigInt,
-      this.config.feeQuoterProgramId,
-    );
-    const [fqBillingTokenConfig] = SolanaCCIPPDAs.findFqBillingTokenConfigPDA(
-      msg.feeToken,
-      this.config.feeQuoterProgramId,
-    );
-    const [fqLinkBillingTokenConfig] =
-      SolanaCCIPPDAs.findFqBillingTokenConfigPDA(
-        this.config.linkTokenMint,
-        this.config.feeQuoterProgramId,
-      );
-    const [rmnRemoteCurses] = SolanaCCIPPDAs.findRMNRemoteCursesPDA(
-      this.config.rmnRemoteProgramId,
-    );
-    const [rmnRemoteConfig] = SolanaCCIPPDAs.findRMNRemoteConfigPDA(
-      this.config.rmnRemoteProgramId,
-    );
-    const [externalTokenPoolsSigner] =
-      SolanaCCIPPDAs.findExternalTokenPoolsSignerPDA(
-        this.config.ccipRouterProgramId,
-      );
-
-    const userATA = await getAssociatedTokenAddress(
-      NATIVE_MINT,
-      user.publicKey,
-      true,
-      TOKEN_PROGRAM_ID,
-    );
-
-    // TODO only when using native fee. Update for other fee tokens
-    const feeTokenReceiverATA = await getAssociatedTokenAddress(
-      NATIVE_MINT,
-      feeBillingSigner,
-      true,
-      TOKEN_PROGRAM_ID,
-    );
-
-    const accounts: CcipSendAccounts = {
-      config,
-      destChainState,
-      nonce,
-      authority: user.publicKey,
-      systemProgram: this.config.systemProgramId,
-      feeTokenProgram: TOKEN_PROGRAM_ID,
-      feeTokenMint: msg.feeToken,
-      feeTokenUserAssociatedAccount: userATA,
-      feeTokenReceiver: feeTokenReceiverATA,
-      feeBillingSigner,
-      feeQuoter: this.config.feeQuoterProgramId,
-      feeQuoterConfig: feeQuoterConfig,
-      feeQuoterDestChain: fqDestChain,
-      feeQuoterBillingTokenConfig: fqBillingTokenConfig,
-      feeQuoterLinkTokenConfig: fqLinkBillingTokenConfig,
-      rmnRemote: this.config.rmnRemoteProgramId,
-      rmnRemoteCurses,
-      rmnRemoteConfig,
-      tokenPoolsSigner: externalTokenPoolsSigner, // TODO: Remove this
-    };
 
     let tokenIndexes: number[] = [];
     let remainingAccounts: Array<AccountMeta> = [];
@@ -129,48 +69,21 @@ export class SolanaCCIPSender {
       const tokenMint = tm.token;
       const tokenProgram = tm.tokenProgram || TOKEN_2022_PROGRAM_ID;
 
-      const userTokenAccount = await getAssociatedTokenAddress(
+      let tokenAccounts: Array<AccountMeta> = await buildTokenAccounts(
+        this.config,
+        this.ccipCommonClient,
         tokenMint,
-        user.publicKey,
-        true,
-        tokenProgram,
-      );
-
-      const tokenAdminRegistry = getTokenAdminRegistry();
-      const lookupTable = await getLookupTableAccount(
+        user,
+        new PublicKey(tokenProgram),
         connection,
-        tokenAdminRegistry.lookupTable,
-      );
-      lookupTableList.push(lookupTable);
-      const lookupTableAccounts = lookupTable.state.addresses;
-      const poolProgram = getPoolProgram(lookupTableAccounts);
-
-      const [tokenBillingConfig] =
-        SolanaCCIPPDAs.findFqPerChainPerTokenConfigPDA(
-          BigInt(msg.destChainSelector.toString()),
-          tokenMint,
-          this.config.feeQuoterProgramId,
-        );
-
-      const [poolChainConfig] = SolanaCCIPPDAs.findTokenPoolChainConfigPDA(
-        BigInt(msg.destChainSelector.toString()),
-        tokenMint,
-        poolProgram,
-      );
-
-      let tokenAccounts: Array<AccountMeta> = toTokenAccounts(
-        userTokenAccount,
-        tokenBillingConfig,
-        poolChainConfig,
-        lookupTableAccounts,
-        tokenAdminRegistry.writableIndexes,
+        lookupTableList,
+        msg,
       );
 
       tokenIndexes.push(lastIndex);
-      let currentLen = 3 + tokenAccounts.length; // the first 3 are userTokenAccount, tokenBillingConfig, poolChainConfig (not part of the lookuptable)
+      let currentLen = tokenAccounts.length; // the first 3 are userTokenAccount, tokenBillingConfig, poolChainConfig (not part of the lookuptable)
 
       lastIndex += currentLen;
-
       remainingAccounts = remainingAccounts.concat(tokenAccounts);
     }
 
@@ -186,7 +99,8 @@ export class SolanaCCIPSender {
       tokenIndexes: new Uint8Array(tokenIndexes),
     };
 
-    const instruction = ccipSend(args, accounts);
+    const instruction = ccipSend(args, ccipSendAccounts);
+
     instruction.keys.push(...remainingAccounts);
 
     instruction.programId = this.config.ccipRouterProgramId;
@@ -220,21 +134,165 @@ export class SolanaCCIPSender {
   }
 }
 
-export type TokenAdminRegistry = {
-  version: number;
-  administrator: PublicKey;
-  pendingAdministrator: PublicKey;
-  lookupTable: PublicKey;
-  writableIndexes: [bigint, bigint];
-  mint: PublicKey;
-};
+async function buildCCipSendAccounts(
+  config: SolanaCCIPSendConfig,
+  selectorBigInt: bigint,
+  user: Keypair,
+  msg: SolanaCCIPSendRequest,
+) {
+  const [configPDA] = SolanaCCIPPDAs.findConfigPDA(config.ccipRouterProgramId);
+  const [destChainState] = SolanaCCIPPDAs.findDestChainStatePDA(
+    selectorBigInt,
+    config.ccipRouterProgramId,
+  );
+  const [nonce] = SolanaCCIPPDAs.findNoncePDA(
+    selectorBigInt,
+    user.publicKey,
+    config.ccipRouterProgramId,
+  );
+  const [feeBillingSigner] = SolanaCCIPPDAs.findFeeBillingSignerPDA(
+    config.ccipRouterProgramId,
+  );
+  const [feeQuoterConfig] = SolanaCCIPPDAs.findFqConfigPDA(
+    config.feeQuoterProgramId,
+  );
+  const [fqDestChain] = SolanaCCIPPDAs.findFqDestChainPDA(
+    selectorBigInt,
+    config.feeQuoterProgramId,
+  );
+  const [fqBillingTokenConfig] = SolanaCCIPPDAs.findFqBillingTokenConfigPDA(
+    msg.feeToken,
+    config.feeQuoterProgramId,
+  );
+  const [fqLinkBillingTokenConfig] = SolanaCCIPPDAs.findFqBillingTokenConfigPDA(
+    config.linkTokenMint,
+    config.feeQuoterProgramId,
+  );
+  const [rmnRemoteCurses] = SolanaCCIPPDAs.findRMNRemoteCursesPDA(
+    config.rmnRemoteProgramId,
+  );
+  const [rmnRemoteConfig] = SolanaCCIPPDAs.findRMNRemoteConfigPDA(
+    config.rmnRemoteProgramId,
+  );
+  const [externalTokenPoolsSigner] =
+    SolanaCCIPPDAs.findExternalTokenPoolsSignerPDA(config.ccipRouterProgramId);
+
+  const userATA = await getAssociatedTokenAddress(
+    NATIVE_MINT,
+    user.publicKey,
+    true,
+    TOKEN_PROGRAM_ID,
+  );
+
+  // TODO only when using native fee. Update for other fee tokens
+  const feeTokenReceiverATA = await getAssociatedTokenAddress(
+    NATIVE_MINT,
+    feeBillingSigner,
+    true,
+    TOKEN_PROGRAM_ID,
+  );
+
+  const accounts: CcipSendAccounts = {
+    config: configPDA,
+    destChainState,
+    nonce,
+    authority: user.publicKey,
+    systemProgram: config.systemProgramId,
+    feeTokenProgram: TOKEN_PROGRAM_ID,
+    feeTokenMint: msg.feeToken,
+    feeTokenUserAssociatedAccount: userATA,
+    feeTokenReceiver: feeTokenReceiverATA,
+    feeBillingSigner,
+    feeQuoter: config.feeQuoterProgramId,
+    feeQuoterConfig: feeQuoterConfig,
+    feeQuoterDestChain: fqDestChain,
+    feeQuoterBillingTokenConfig: fqBillingTokenConfig,
+    feeQuoterLinkTokenConfig: fqLinkBillingTokenConfig,
+    rmnRemote: config.rmnRemoteProgramId,
+    rmnRemoteCurses,
+    rmnRemoteConfig,
+    tokenPoolsSigner: externalTokenPoolsSigner, // TODO: Remove this
+  };
+  return accounts;
+}
+
+async function buildTokenAccounts(
+  config: SolanaCCIPSendConfig,
+  ccipCommonClient: CcipCommonClient,
+  tokenMint: PublicKey,
+  user: Keypair,
+  tokenProgram: PublicKey,
+  connection: Connection,
+  lookupTableList: AddressLookupTableAccount[],
+  msg: SolanaCCIPSendRequest,
+) {
+  const userTokenAccount = await getAssociatedTokenAddress(
+    tokenMint,
+    user.publicKey,
+    true,
+    tokenProgram,
+    ASSOCIATED_TOKEN_PROGRAM_ID,
+  );
+  // init token account if needed
+  const accountInfo = await connection.getAccountInfo(userTokenAccount);
+  if (!accountInfo) {
+    const ataIx = createAssociatedTokenAccountInstruction(
+      user.publicKey,        // funding address (usually the payer)
+      userTokenAccount,       // ATA to create (calculated before)
+      user.publicKey,         // owner of the token account
+      tokenMint,
+      tokenProgram,
+      ASSOCIATED_TOKEN_PROGRAM_ID,
+    );
+    const tx = new Transaction().add(ataIx);
+    const sig = await sendAndConfirmTransaction(connection, tx, [user], {
+      skipPreflight: false,
+      commitment: "confirmed",
+    });
+
+    // Confirm it explicitly at the highest commitment level
+    await connection.confirmTransaction(sig, "finalized");
+  }
+
+  const tokenAdminRegistry =
+    await ccipCommonClient.getTokenAdminRegistry(tokenMint);
+  const lookupTable = await getLookupTableAccount(
+    connection,
+    tokenAdminRegistry.lookupTable,
+  );
+  lookupTableList.push(lookupTable);
+  const lookupTableAccounts = lookupTable.state.addresses;
+  const poolProgram = getPoolProgram(lookupTableAccounts);
+
+  const [tokenBillingConfig] = SolanaCCIPPDAs.findFqPerChainPerTokenConfigPDA(
+    BigInt(msg.destChainSelector.toString()),
+    tokenMint,
+    config.feeQuoterProgramId,
+  );
+
+  const [poolChainConfig] = SolanaCCIPPDAs.findTokenPoolChainConfigPDA(
+    BigInt(msg.destChainSelector.toString()),
+    tokenMint,
+    poolProgram,
+  );
+
+  let tokenAccounts: Array<AccountMeta> = toTokenAccounts(
+    userTokenAccount,
+    tokenBillingConfig,
+    poolChainConfig,
+    lookupTableAccounts,
+    tokenAdminRegistry.writableIndexes,
+  );
+
+  return tokenAccounts;
+}
 
 function toTokenAccounts(
   userTokenAccount: PublicKey,
   tokenBillingConfig: PublicKey,
   poolChainConfig: PublicKey,
   lookupTableEntries: Array<PublicKey>,
-  writableIndexes: [bigint, bigint],
+  writableIndexes: BN[],
 ): Array<AccountMeta> {
   return [
     { pubkey: userTokenAccount, isSigner: false, isWritable: true },
@@ -243,69 +301,66 @@ function toTokenAccounts(
 
     // List of accounts from the lookup table
     {
-      pubkey: lookupTableEntries[0],
+      pubkey: lookupTableEntries[0], // poolProgram
       isSigner: false,
       isWritable: isWritable(0, writableIndexes),
-    }, // poolProgram
+    },
     {
-      pubkey: lookupTableEntries[1],
+      pubkey: lookupTableEntries[1], // poolConfig
       isSigner: false,
       isWritable: isWritable(1, writableIndexes),
-    }, // poolConfig
+    },
     {
-      pubkey: lookupTableEntries[2],
+      pubkey: lookupTableEntries[2], // poolTokenAccount
       isSigner: false,
       isWritable: isWritable(2, writableIndexes),
-    }, // poolTokenAccount
+    },
     {
-      pubkey: lookupTableEntries[3],
+      pubkey: lookupTableEntries[3], // poolSigner
       isSigner: false,
       isWritable: isWritable(3, writableIndexes),
-    }, // poolSigner
+    },
     {
-      pubkey: lookupTableEntries[4],
+      pubkey: lookupTableEntries[4], // tokenProgram
       isSigner: false,
       isWritable: isWritable(4, writableIndexes),
-    }, // tokenProgram
+    },
     {
-      pubkey: lookupTableEntries[5],
+      pubkey: lookupTableEntries[5], // mint
       isSigner: false,
       isWritable: isWritable(5, writableIndexes),
-    }, // mint
+    },
     {
-      pubkey: lookupTableEntries[6],
+      pubkey: lookupTableEntries[6], // feeTokenConfig
       isSigner: false,
       isWritable: isWritable(6, writableIndexes),
-    }, // feeTokenConfig
-
-    // pub ccip_router_pool_signer: &'a AccountInfo<'a>,
-    // pub ccip_router_pool_signer_bump: u8,
-    // pub ccip_offramp_pool_signer_bump: u8,
-
+    },
+    {
+      pubkey: lookupTableEntries[7], // ccip_router_pool_signer
+      isSigner: false,
+      isWritable: isWritable(7, writableIndexes),
+    },
+    {
+      pubkey: lookupTableEntries[8], // ccip_router_pool_signer_bump
+      isSigner: false,
+      isWritable: isWritable(8, writableIndexes),
+    },
+    {
+      pubkey: lookupTableEntries[9], // ccip_offramp_pool_signer_bump
+      isSigner: false,
+      isWritable: isWritable(9, writableIndexes),
+    },
     //remainingAccounts: [], // TODO: Check if there are
   ];
 }
 
-function isWritable(index: number, writableIndexes: [bigint, bigint]): boolean {
+function isWritable(index: number, writableIndexes: BN[]): boolean {
   return false;
   // const indexBigInt = BigInt(index);
   // return (
   //   (indexBigInt >= writableIndexes[0] && indexBigInt < writableIndexes[1]) ||
   //   (indexBigInt >= writableIndexes[1] && indexBigInt < writableIndexes[0])
   // );
-}
-
-function getTokenAdminRegistry(
-  // tokenAdminRegistryAddress: PublicKey,
-): TokenAdminRegistry {
-  return {
-    version: 1,
-    administrator: PublicKey.default,
-    pendingAdministrator: PublicKey.default,
-    lookupTable: new PublicKey(""),
-    writableIndexes: [BigInt(0), BigInt(0)],
-    mint: PublicKey.default,
-  };
 }
 
 async function getLookupTableAccount(
@@ -325,6 +380,5 @@ async function getLookupTableAccount(
 }
 
 function getPoolProgram(lookupTableAccounts: Array<PublicKey>): PublicKey {
-  // TODO: lookupTableAccount.state.addresses[0] is the pool program
   return lookupTableAccounts[0];
 }
