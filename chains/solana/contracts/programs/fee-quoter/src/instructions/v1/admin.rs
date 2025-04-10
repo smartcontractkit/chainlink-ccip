@@ -11,6 +11,7 @@ use crate::event::{
     TokenTransferFeeConfigUpdated,
 };
 use crate::instructions::interfaces::Admin;
+use crate::instructions::v1::public::CCIP_LOCK_OR_BURN_V1_RET_BYTES;
 use crate::state::{
     BillingTokenConfig, CodeVersion, DestChain, DestChainConfig, DestChainState,
     PerChainPerTokenConfig, TimestampedPackedU224, TokenTransferFeeConfig,
@@ -197,6 +198,18 @@ impl Admin for Impl {
         mint: Pubkey,
         cfg: TokenTransferFeeConfig,
     ) -> Result<()> {
+        require_gte!(
+            cfg.max_fee_usdcents,
+            cfg.min_fee_usdcents,
+            FeeQuoterError::InvalidTokenTransferFeeMaxMin
+        );
+
+        require_gte!(
+            cfg.dest_bytes_overhead,
+            CCIP_LOCK_OR_BURN_V1_RET_BYTES,
+            FeeQuoterError::InvalidTokenTransferFeeDestBytesOverhead
+        );
+
         ctx.accounts
             .per_chain_per_token_config
             .set_inner(PerChainPerTokenConfig {
