@@ -70,7 +70,7 @@ type AllAccessors interface {
 	// Confidence: N/A
 	GetChainFeeComponents(
 		ctx context.Context,
-	) map[ChainSelector]ChainFeeComponents
+	) (ChainFeeComponents, error)
 
 	// GetDestChainFeeComponents seems redundant. If the error is needed lets
 	// add it to GetChainFeeComponents.
@@ -110,7 +110,7 @@ type DestinationAccessor interface {
 	// Confidence: Unconfirmed, Finalized
 	ExecutedMessages(
 		ctx context.Context,
-		ranges map[ChainSelector]SeqNumRange,
+		ranges map[ChainSelector][]SeqNumRange,
 		confidence ConfidenceLevel,
 	) (map[ChainSelector][]SeqNum, error)
 
@@ -147,7 +147,7 @@ type DestinationAccessor interface {
 	GetChainFeePriceUpdate(
 		ctx context.Context,
 		selectors []ChainSelector,
-	) map[ChainSelector]TimestampedBig
+	) (map[ChainSelector]TimestampedBig, error)
 
 	// GetLatestPriceSeqNr returns the latest price sequence number for the destination chain.
 	// Not to confuse with the sequence number of the messages. This is the OCR sequence number.
@@ -221,7 +221,7 @@ type SourceAccessor interface {
 	GetTokenPriceUSD(
 		ctx context.Context,
 		address UnknownAddress,
-	) (BigInt, error)
+	) (TimestampedUnixBig, error)
 
 	// GetFeeQuoterDestChainConfig returns the fee quoter destination chain config.
 	//
