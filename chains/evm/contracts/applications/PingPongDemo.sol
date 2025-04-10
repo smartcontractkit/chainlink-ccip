@@ -22,7 +22,7 @@ contract PingPongDemo is CCIPReceiver, Ownable2StepMsgSender, ITypeAndVersion {
   // The chain ID of the counterpart ping pong contract.
   uint64 internal s_counterpartChainSelector;
   // The contract address of the counterpart ping pong contract.
-  address internal s_counterpartAddress;
+  bytes internal s_counterpartAddress;
   // Pause ping-ponging.
   bool private s_isPaused;
   // The fee token used to pay for CCIP transactions.
@@ -40,7 +40,7 @@ contract PingPongDemo is CCIPReceiver, Ownable2StepMsgSender, ITypeAndVersion {
     return "PingPongDemo 1.5.0";
   }
 
-  function setCounterpart(uint64 counterpartChainSelector, address counterpartAddress) external onlyOwner {
+  function setCounterpart(uint64 counterpartChainSelector, bytes calldata counterpartAddress) external onlyOwner {
     s_counterpartChainSelector = counterpartChainSelector;
     s_counterpartAddress = counterpartAddress;
   }
@@ -59,7 +59,7 @@ contract PingPongDemo is CCIPReceiver, Ownable2StepMsgSender, ITypeAndVersion {
       emit Pong(pingPongCount);
     }
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
-      receiver: abi.encode(s_counterpartAddress),
+      receiver: s_counterpartAddress,
       data: abi.encode(pingPongCount),
       tokenAmounts: new Client.EVMTokenAmount[](0),
       extraArgs: Client._argsToBytes(
@@ -89,7 +89,7 @@ contract PingPongDemo is CCIPReceiver, Ownable2StepMsgSender, ITypeAndVersion {
     s_counterpartChainSelector = chainSelector;
   }
 
-  function getCounterpartAddress() external view returns (address) {
+  function getCounterpartAddress() external view returns (bytes memory) {
     return s_counterpartAddress;
   }
 
@@ -98,7 +98,7 @@ contract PingPongDemo is CCIPReceiver, Ownable2StepMsgSender, ITypeAndVersion {
   }
 
   function setCounterpartAddress(
-    address addr
+    bytes memory addr
   ) external onlyOwner {
     s_counterpartAddress = addr;
   }
