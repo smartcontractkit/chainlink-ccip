@@ -2949,7 +2949,9 @@ func TestCCIPRouter(t *testing.T) {
 					TokenAddress:  base_token_pool.RemoteAddress{Address: []byte{4, 5, 6}},
 					Decimals:      evmToken2Decimals,
 				}, token2.PoolConfig, token2.Chain[selector], token2PoolAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+				require.NoError(t, err)
 				ix3, err := test_token_pool.NewAppendRemotePoolAddressesInstruction(selector, token1.Mint, PoolAddresses, token1.PoolConfig, token1.Chain[selector], token1PoolAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+				require.NoError(t, err)
 				ix4, err := test_token_pool.NewAppendRemotePoolAddressesInstruction(selector, token2.Mint, PoolAddresses, token2.PoolConfig, token2.Chain[selector], token2PoolAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 				require.NoError(t, err)
 				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix0, ix1, ix2, ix3, ix4}, token0PoolAdmin, config.DefaultCommitment, common.AddSigners(token1PoolAdmin, token2PoolAdmin))
