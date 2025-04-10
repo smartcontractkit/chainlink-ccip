@@ -20,14 +20,16 @@ pub mod test_token_pool {
         router: Pubkey,
         rmn_remote: Pubkey,
     ) -> Result<()> {
-        ctx.accounts.state.config.init(
-            &ctx.accounts.mint,
-            ctx.program_id.key(),
-            ctx.accounts.authority.key(),
-            router,
-            rmn_remote,
-        )?;
-        ctx.accounts.state.pool_type = pool_type;
+        ctx.accounts.state.set_inner(State {
+            pool_type,
+            config: BaseConfig::init(
+                &ctx.accounts.mint,
+                ctx.program_id.key(),
+                ctx.accounts.authority.key(),
+                router,
+                rmn_remote,
+            ),
+        });
         Ok(())
     }
 

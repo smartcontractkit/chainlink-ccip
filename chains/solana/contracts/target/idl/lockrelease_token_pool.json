@@ -121,6 +121,22 @@
       ]
     },
     {
+      "name": "initializeStateVersion",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "mint",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
       "name": "initChainRemoteConfig",
       "accounts": [
         {
