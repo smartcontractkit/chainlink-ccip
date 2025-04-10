@@ -409,6 +409,8 @@ pub enum CcipTokenPoolError {
     AllowlistKeyDidNotExist,
     #[msg("Remote pool address already exists")]
     RemotePoolAddressAlreadyExisted,
+    #[msg("Expected empty pool addresses during initialization")]
+    NonemptyPoolAddressesInit,
 
     // Rate limit errors
     #[msg("RateLimit: bucket overfilled")]
