@@ -43,7 +43,7 @@ contract CCIPSendTestScript is Script {
 
     // Check that the messageId is not empty
     Internal.MessageExecutionState executionState = s_offRamp.getExecutionState(s_sourceChainSelector, s_sequenceNumber);
-    if(
+    if (
       executionState != Internal.MessageExecutionState.FAILURE
         && executionState != Internal.MessageExecutionState.UNTOUCHED
     ) revert ManualExecutionNotAllowed();
@@ -51,10 +51,10 @@ contract CCIPSendTestScript is Script {
     // Manual Execution data can be invoked from a different tool or front-end to avoid having to
     // gather execution report data manually
     (bool success,) = address(s_offRamp).call(s_manualExecutionData);
-    if(!success) revert ManualExecutionFailed();
+    if (!success) revert ManualExecutionFailed();
 
     executionState = s_offRamp.getExecutionState(s_sourceChainSelector, s_sequenceNumber);
-    if(executionState != Internal.MessageExecutionState.SUCCESS) revert ManualExecutionFailed();
+    if (executionState != Internal.MessageExecutionState.SUCCESS) revert ManualExecutionFailed();
 
     console.log("Script completed...");
   }
