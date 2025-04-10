@@ -16,7 +16,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
-	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
 func Test_validateObserverReadingEligibility(t *testing.T) {
@@ -438,7 +437,7 @@ func Test_computeRanges(t *testing.T) {
 
 func Test_groupByChainSelectorWithFilter(t *testing.T) {
 	type args struct {
-		reports            []plugintypes2.CommitPluginReportWithMeta
+		reports            []cciptypes.CommitPluginReportWithMeta
 		cursedSourceChains map[cciptypes.ChainSelector]bool
 	}
 	tests := []struct {
@@ -449,7 +448,7 @@ func Test_groupByChainSelectorWithFilter(t *testing.T) {
 		{
 			name: "empty",
 			args: args{
-				reports:            []plugintypes2.CommitPluginReportWithMeta{},
+				reports:            []cciptypes.CommitPluginReportWithMeta{},
 				cursedSourceChains: nil,
 			},
 			want: exectypes.CommitObservations{},
@@ -457,7 +456,7 @@ func Test_groupByChainSelectorWithFilter(t *testing.T) {
 		{
 			name: "reports with no cursed chains",
 			args: args{
-				reports: []plugintypes2.CommitPluginReportWithMeta{{
+				reports: []cciptypes.CommitPluginReportWithMeta{{
 					Report: cciptypes.CommitPluginReport{
 						BlessedMerkleRoots: []cciptypes.MerkleRootChain{
 							{ChainSel: 1, SeqNumsRange: cciptypes.NewSeqNumRange(10, 20), MerkleRoot: cciptypes.Bytes32{1}},
@@ -485,7 +484,7 @@ func Test_groupByChainSelectorWithFilter(t *testing.T) {
 		{
 			name: "reports with cursed chain 1",
 			args: args{
-				reports: []plugintypes2.CommitPluginReportWithMeta{{
+				reports: []cciptypes.CommitPluginReportWithMeta{{
 					Report: cciptypes.CommitPluginReport{
 						BlessedMerkleRoots: []cciptypes.MerkleRootChain{
 							{ChainSel: 1, SeqNumsRange: cciptypes.NewSeqNumRange(10, 20), MerkleRoot: cciptypes.Bytes32{1}},
@@ -506,7 +505,7 @@ func Test_groupByChainSelectorWithFilter(t *testing.T) {
 		{
 			name: "reports with all chains cursed",
 			args: args{
-				reports: []plugintypes2.CommitPluginReportWithMeta{{
+				reports: []cciptypes.CommitPluginReportWithMeta{{
 					Report: cciptypes.CommitPluginReport{
 						BlessedMerkleRoots: []cciptypes.MerkleRootChain{
 							{ChainSel: 1, SeqNumsRange: cciptypes.NewSeqNumRange(10, 20), MerkleRoot: cciptypes.Bytes32{1}},
@@ -519,7 +518,7 @@ func Test_groupByChainSelectorWithFilter(t *testing.T) {
 		{
 			name: "reports with blessed and unblessed merkle roots",
 			args: args{
-				reports: []plugintypes2.CommitPluginReportWithMeta{{
+				reports: []cciptypes.CommitPluginReportWithMeta{{
 					Report: cciptypes.CommitPluginReport{
 						BlessedMerkleRoots: []cciptypes.MerkleRootChain{
 							{ChainSel: 1, SeqNumsRange: cciptypes.NewSeqNumRange(10, 20), MerkleRoot: cciptypes.Bytes32{1}},
@@ -542,7 +541,7 @@ func Test_groupByChainSelectorWithFilter(t *testing.T) {
 		{
 			name: "multiple reports with some cursed chains",
 			args: args{
-				reports: []plugintypes2.CommitPluginReportWithMeta{
+				reports: []cciptypes.CommitPluginReportWithMeta{
 					{
 						Report: cciptypes.CommitPluginReport{
 							BlessedMerkleRoots: []cciptypes.MerkleRootChain{
