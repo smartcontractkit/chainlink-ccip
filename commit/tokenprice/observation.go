@@ -12,7 +12,6 @@ import (
 	"github.com/smartcontractkit/libocr/commontypes"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	pkgreader "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
@@ -63,7 +62,7 @@ type observer interface {
 	observeFeedTokenPrices(ctx context.Context, lggr logger.Logger) cciptypes.TokenPriceMap
 	observeFeeQuoterTokenUpdates(
 		ctx context.Context,
-		lggr logger.Logger) map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig
+		lggr logger.Logger) map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig
 	close()
 }
 
@@ -122,20 +121,20 @@ func (b *baseObserver) observeFeedTokenPrices(ctx context.Context, lggr logger.L
 
 func (b *baseObserver) observeFeeQuoterTokenUpdates(
 	ctx context.Context,
-	lggr logger.Logger) map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig {
+	lggr logger.Logger) map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig {
 	if b.tokenPriceReader == nil {
 		lggr.Debugw("no token price reader available")
-		return map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig{}
+		return map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig{}
 	}
 
 	supportsDestChain, err := b.chainSupport.SupportsDestChain(b.oracleID)
 	if err != nil {
 		lggr.Warnw("call to SupportsDestChain failed", "err", err)
-		return map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig{}
+		return map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig{}
 	}
 	if !supportsDestChain {
 		lggr.Debugw("oracle does not support fee quoter observation")
-		return map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig{}
+		return map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig{}
 	}
 
 	tokensToQuery := maps.Keys(b.offChainCfg.TokenInfo)
@@ -145,13 +144,13 @@ func (b *baseObserver) observeFeeQuoterTokenUpdates(
 	priceUpdates, err := b.tokenPriceReader.GetFeeQuoterTokenUpdates(ctx, tokensToQuery, b.destChain)
 	if err != nil {
 		lggr.Errorw("call to GetFeeQuoterTokenUpdates failed", "err", err)
-		return map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig{}
+		return map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig{}
 	}
 
-	tokenUpdates := make(map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig)
+	tokenUpdates := make(map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig)
 
 	for token, update := range priceUpdates {
-		tokenUpdates[token] = plugintypes.TimestampedBig{
+		tokenUpdates[token] = cciptypes.TimestampedBig{
 			Value:     update.Value,
 			Timestamp: update.Timestamp,
 		}
@@ -172,7 +171,7 @@ type asyncObserver struct {
 
 	// cached values, only ever read thru mutex.
 	tokenPriceMap cciptypes.TokenPriceMap
-	tokenUpdates  map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig
+	tokenUpdates  map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig
 }
 
 func newAsyncObserver(
@@ -265,7 +264,7 @@ func (a *asyncObserver) applySyncOp(
 func (a *asyncObserver) observeFeeQuoterTokenUpdates(
 	ctx context.Context,
 	lggr logger.Logger,
-) map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig {
+) map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 	lggr.Debugw("observeFeeQuoterTokenUpdates returning cached value", "numUpdates", len(a.tokenUpdates))

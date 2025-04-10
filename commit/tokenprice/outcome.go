@@ -9,7 +9,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/mathslib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
@@ -117,7 +116,7 @@ func (p *processor) selectTokensForUpdate(
 func aggregateObservations(aos []plugincommon.AttributedObservation[Observation]) AggregateObservation {
 	aggObs := AggregateObservation{
 		FeedTokenPrices:       make(map[cciptypes.UnknownEncodedAddress][]cciptypes.TokenPrice),
-		FeeQuoterTokenUpdates: make(map[cciptypes.UnknownEncodedAddress][]plugintypes.TimestampedBig),
+		FeeQuoterTokenUpdates: make(map[cciptypes.UnknownEncodedAddress][]cciptypes.TimestampedBig),
 		FChain:                make(map[cciptypes.ChainSelector][]int),
 		Timestamps:            []time.Time{},
 	}

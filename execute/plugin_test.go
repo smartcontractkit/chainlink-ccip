@@ -43,7 +43,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	reader2 "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
-	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
 func genRandomChainReports(numReports, numMsgsPerReport int) []cciptypes.ExecutePluginReportSingleChain {
@@ -243,7 +242,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 
 	tcs := []struct {
 		name                    string
-		reports                 []plugintypes2.CommitPluginReportWithMeta
+		reports                 []cciptypes.CommitPluginReportWithMeta
 		ranges                  map[cciptypes.ChainSelector][]cciptypes.SeqNum // finalized
 		unfinalizedRanges       map[cciptypes.ChainSelector][]cciptypes.SeqNum // unfinalized
 		cursedSourceChains      map[cciptypes.ChainSelector]bool               // cursed chains
@@ -266,7 +265,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 		},
 		{
 			name: "single non-executed report",
-			reports: []plugintypes2.CommitPluginReportWithMeta{
+			reports: []cciptypes.CommitPluginReportWithMeta{
 				{
 					BlockNum:  999,
 					Timestamp: time.UnixMilli(10101010101),
@@ -303,7 +302,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 		},
 		{
 			name: "single partially-executed report with finalized and unfinalized",
-			reports: []plugintypes2.CommitPluginReportWithMeta{
+			reports: []cciptypes.CommitPluginReportWithMeta{
 				{
 					BlockNum:  999,
 					Timestamp: time.UnixMilli(10101010101),
@@ -341,7 +340,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 		},
 		{
 			name: "single fully-executed finalized report",
-			reports: []plugintypes2.CommitPluginReportWithMeta{
+			reports: []cciptypes.CommitPluginReportWithMeta{
 				{
 					BlockNum:  999,
 					Timestamp: time.UnixMilli(10101010101),
@@ -378,7 +377,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 		},
 		{
 			name: "single fully-executed unfinalized report",
-			reports: []plugintypes2.CommitPluginReportWithMeta{
+			reports: []cciptypes.CommitPluginReportWithMeta{
 				{
 					BlockNum:  999,
 					Timestamp: time.UnixMilli(10101010101),
@@ -415,7 +414,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 		},
 		{
 			name: "multiple reports with both finalized and unfinalized fully executed",
-			reports: []plugintypes2.CommitPluginReportWithMeta{
+			reports: []cciptypes.CommitPluginReportWithMeta{
 				{
 					BlockNum:  999,
 					Timestamp: time.UnixMilli(10101010101),
@@ -471,7 +470,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 		},
 		{
 			name: "single known-executed report",
-			reports: []plugintypes2.CommitPluginReportWithMeta{
+			reports: []cciptypes.CommitPluginReportWithMeta{
 				{
 					BlockNum:  999,
 					Timestamp: time.UnixMilli(10101010101),
@@ -498,7 +497,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 		},
 		{
 			name: "mixed execution states across three reports",
-			reports: []plugintypes2.CommitPluginReportWithMeta{
+			reports: []cciptypes.CommitPluginReportWithMeta{
 				{
 					BlockNum:  1000,
 					Timestamp: time.UnixMilli(10101010101),
@@ -575,7 +574,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 		},
 		{
 			name: "single partially-executed report with finalized and unfinalized",
-			reports: []plugintypes2.CommitPluginReportWithMeta{
+			reports: []cciptypes.CommitPluginReportWithMeta{
 				{
 					BlockNum:  999,
 					Timestamp: time.UnixMilli(10101010101),
@@ -613,7 +612,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 		},
 		{
 			name: "single cursed chain report",
-			reports: []plugintypes2.CommitPluginReportWithMeta{
+			reports: []cciptypes.CommitPluginReportWithMeta{
 				{
 					BlockNum:  999,
 					Timestamp: time.UnixMilli(10101010101),
@@ -639,7 +638,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 		},
 		{
 			name: "multiple chains with one cursed",
-			reports: []plugintypes2.CommitPluginReportWithMeta{
+			reports: []cciptypes.CommitPluginReportWithMeta{
 				{
 					BlockNum:  1000,
 					Timestamp: time.UnixMilli(10101010101),
@@ -686,7 +685,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 		},
 		{
 			name: "mixed blessed and unblessed roots with cursed chains",
-			reports: []plugintypes2.CommitPluginReportWithMeta{
+			reports: []cciptypes.CommitPluginReportWithMeta{
 				{
 					BlockNum:  1000,
 					Timestamp: time.UnixMilli(10101010101),
@@ -733,7 +732,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 		},
 		{
 			name: "nil cursed source chains map",
-			reports: []plugintypes2.CommitPluginReportWithMeta{
+			reports: []cciptypes.CommitPluginReportWithMeta{
 				{
 					BlockNum:  1000,
 					Timestamp: time.UnixMilli(10101010101),
