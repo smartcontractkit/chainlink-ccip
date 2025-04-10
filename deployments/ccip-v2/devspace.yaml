@@ -41,6 +41,11 @@ vars:
   DON_BOOT_NODE_COUNT:
     source: env
     default: 1
+  # Select which resource preset to use for load-testing,
+  # see the README.md#tuning-the-ccip-don-resources for more details
+  CCIP_LOAD_TESTS_RESOURCES_OVERRIDE:
+    source: env
+    default: small
   GETH_CHAINS_COUNT:
     source: env
     default: 2
@@ -244,7 +249,7 @@ profiles:
     patches:
       - op: add
         path: dependencies.ccip-don.profiles
-        value: ccip-load-testing-aws-staging
+        value: ccip-load-testing-aws-resources-override
 
   # RMN dependency requires static configuration like shared toml config to be available
   # before it can be activated
@@ -311,6 +316,12 @@ commands:
       devspace run-pipeline ccip-v2 -p ${PROVIDER}
     description: Deploy full ccip-v2 setup
     appendArgs: true
+  ccip-v2-load-tests:
+    command: |
+      devspace run ccip-v2-scripts generate-initial-don-overrides
+      devspace run-pipeline ccip-v2 -p load-tests-aws
+    description: Deploy full ccip-v2 setup to AWS with heavy load test profile. (aws only)
+    appendArgs: true
   purge:
     command: |
       rm -rf ${TMP_DIR}/*
@@ -334,12 +345,6 @@ commands:
   ccip-v2-resume-pods:
     command: devspace run-pipeline ccip-v2-resume-pods -p ${PROVIDER} --force-deploy
     description: Un-Pause paused pods and reuse existing PVCs
-    appendArgs: true
-  ccip-v2-load-tests:
-    command: |
-      devspace run ccip-v2-scripts generate-initial-don-overrides
-      devspace run-pipeline ccip-v2 -p load-tests-aws
-    description: Deploy full ccip-v2 setup to AWS with heavy load test profile. (aws only)
     appendArgs: true
   ccip-v2-infra:
     command: |

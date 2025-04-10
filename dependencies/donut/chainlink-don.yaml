@@ -34,6 +34,9 @@ vars:
   CCIP_TOOLING_VERSION:
     source: env
     default: ""
+  CCIP_LOAD_TESTS_RESOURCES_OVERRIDE:
+    source: env
+    default: small
   # Dir where CRIB will save env details, persisted between devspace pipeline reruns
   TMP_DIR:
     source: env
@@ -422,13 +425,13 @@ profiles:
         gomplate \
           --config ${LOCAL_TEMPLATES_DIR}/chainlink-don.env.crib-sandbox.yaml
       )
-  - name: ccip-load-testing-aws-staging
+  - name: ccip-load-testing-aws-resources-override
     merge: |-
       $(
         DEVSPACE_NAMESPACE=${DEVSPACE_NAMESPACE} \
         DON_TYPE="${DON_TYPE}" \
         gomplate \
-          --config ${LOCAL_TEMPLATES_DIR}/chainlink-don.env.crib-staging-ccip-load-tests.yaml
+          --config ${LOCAL_TEMPLATES_DIR}/chainlink-don.aws.ccip-load-tests.${CCIP_LOAD_TESTS_RESOURCES_OVERRIDE}.yaml
       )
   - name: crib-kind
     activation:

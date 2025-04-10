@@ -11,11 +11,11 @@ in: |
           common:
             resources:
               requests:
-                cpu: 1000m
-                memory: 4Gi
+                cpu: "4"
+                memory: 8Gi
               limits:
-                cpu: 4000m
-                memory: 10Gi
+                cpu: "4"
+                memory: 8Gi
 
     {{- if gt (conv.ToInt .Env.DON_BOOT_NODE_COUNT) 0 }}
     {{- range $i := seq 0 (math.Sub .Env.DON_BOOT_NODE_COUNT 1) }}

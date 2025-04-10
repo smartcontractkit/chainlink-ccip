@@ -41,9 +41,20 @@ Example Scenario:
 
 The commands above are wrappers to k8s-remote-tester dependency, check the [k8s-remote-tester README](../../dependencies/k8s-remote-tester/README.md) for more details.
 
-#### Updating test code and building an image
+### Tuning the CCIP DON resources
+#### CCIP Load testing
+In the donut we have a predefined presets for different sizes of CCIP Load testing env. Check [Small Size preset as an example](../../dependencies/donut/templates/chainlink-don.aws.ccip-load-tests.small.yaml)
 
+You can customize existing profiles or create a new template file with different preset suffix.
+`chainlink-don.aws.ccip-load-tests.[preset-suffix-goes-here].yaml`
 
+Once you have that, you can control which preset is used by setting the `CCIP_LOAD_TESTS_RESOURCES_OVERRIDE` in the .env file.
+
+To test if the resources were adjusted correctly:
+* use `PROVIDER=aws`
+* init crib
+* `devspace run ccip-v2-infra-render -p load-tests-aws | crib devspace split-render --output-dir .tmp-manifests/aws-load-tests-resources-1`
+* Check if resources in the output dir for each node were set correctly
 
 ## Rendering Manifests locally
 There is special devspace run command to render manifests without deploying anything.
