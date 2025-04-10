@@ -2974,13 +2974,14 @@ func TestCCIPRouter(t *testing.T) {
 		})
 
 		t.Run("Billing", func(t *testing.T) {
-			ix0, err := fee_quoter.NewSetTokenTransferFeeConfigInstruction(config.EvmChainSelector, token0.Mint, fee_quoter.TokenTransferFeeConfig{}, config.FqConfigPDA, token0.Billing[config.EvmChainSelector], ccipAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+			defaultTokenTransferFeeConfig := fee_quoter.TokenTransferFeeConfig{DestBytesOverhead: 32}
+			ix0, err := fee_quoter.NewSetTokenTransferFeeConfigInstruction(config.EvmChainSelector, token0.Mint, defaultTokenTransferFeeConfig, config.FqConfigPDA, token0.Billing[config.EvmChainSelector], ccipAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 			require.NoError(t, err)
-			ix1, err := fee_quoter.NewSetTokenTransferFeeConfigInstruction(config.EvmChainSelector, token1.Mint, fee_quoter.TokenTransferFeeConfig{}, config.FqConfigPDA, token1.Billing[config.EvmChainSelector], ccipAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+			ix1, err := fee_quoter.NewSetTokenTransferFeeConfigInstruction(config.EvmChainSelector, token1.Mint, defaultTokenTransferFeeConfig, config.FqConfigPDA, token1.Billing[config.EvmChainSelector], ccipAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 			require.NoError(t, err)
-			ix2, err := fee_quoter.NewSetTokenTransferFeeConfigInstruction(config.SvmChainSelector, token0.Mint, fee_quoter.TokenTransferFeeConfig{}, config.FqConfigPDA, token0.Billing[config.SvmChainSelector], ccipAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+			ix2, err := fee_quoter.NewSetTokenTransferFeeConfigInstruction(config.SvmChainSelector, token0.Mint, defaultTokenTransferFeeConfig, config.FqConfigPDA, token0.Billing[config.SvmChainSelector], ccipAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 			require.NoError(t, err)
-			ix3, err := fee_quoter.NewSetTokenTransferFeeConfigInstruction(config.SvmChainSelector, token1.Mint, fee_quoter.TokenTransferFeeConfig{}, config.FqConfigPDA, token1.Billing[config.SvmChainSelector], ccipAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+			ix3, err := fee_quoter.NewSetTokenTransferFeeConfigInstruction(config.SvmChainSelector, token1.Mint, defaultTokenTransferFeeConfig, config.FqConfigPDA, token1.Billing[config.SvmChainSelector], ccipAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 			require.NoError(t, err)
 
 			// Deliberately not setting configuration for token2, as it exists to test cases where the configuration doesn't exist, given that it can't
@@ -2994,26 +2995,26 @@ func TestCCIPRouter(t *testing.T) {
 
 			require.Equal(t, config.EvmChainSelector, parsedEvents[0].DestinationChainSelector)
 			require.Equal(t, token0.Mint, parsedEvents[0].Token)
-			require.Equal(t, fee_quoter.TokenTransferFeeConfig{}, parsedEvents[0].TokenTransferFeeConfig)
+			require.Equal(t, defaultTokenTransferFeeConfig, parsedEvents[0].TokenTransferFeeConfig)
 
 			require.Equal(t, config.EvmChainSelector, parsedEvents[1].DestinationChainSelector)
 			require.Equal(t, token1.Mint, parsedEvents[1].Token)
-			require.Equal(t, fee_quoter.TokenTransferFeeConfig{}, parsedEvents[1].TokenTransferFeeConfig)
+			require.Equal(t, defaultTokenTransferFeeConfig, parsedEvents[1].TokenTransferFeeConfig)
 
 			require.Equal(t, config.SvmChainSelector, parsedEvents[2].DestinationChainSelector)
 			require.Equal(t, token0.Mint, parsedEvents[2].Token)
-			require.Equal(t, fee_quoter.TokenTransferFeeConfig{}, parsedEvents[2].TokenTransferFeeConfig)
+			require.Equal(t, defaultTokenTransferFeeConfig, parsedEvents[2].TokenTransferFeeConfig)
 
 			require.Equal(t, config.SvmChainSelector, parsedEvents[3].DestinationChainSelector)
 			require.Equal(t, token1.Mint, parsedEvents[3].Token)
-			require.Equal(t, fee_quoter.TokenTransferFeeConfig{}, parsedEvents[3].TokenTransferFeeConfig)
+			require.Equal(t, defaultTokenTransferFeeConfig, parsedEvents[3].TokenTransferFeeConfig)
 		})
 
 		// validate permissions for setting config
 		t.Run("Permissions", func(t *testing.T) {
 			t.Parallel()
 			t.Run("Billing can only be set by CCIP admin", func(t *testing.T) {
-				ix, err := fee_quoter.NewSetTokenTransferFeeConfigInstruction(config.EvmChainSelector, token0.Mint, fee_quoter.TokenTransferFeeConfig{}, config.FqConfigPDA, token0.Billing[config.EvmChainSelector], token1PoolAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+				ix, err := fee_quoter.NewSetTokenTransferFeeConfigInstruction(config.EvmChainSelector, token0.Mint, fee_quoter.TokenTransferFeeConfig{DestBytesOverhead: 32}, config.FqConfigPDA, token0.Billing[config.EvmChainSelector], token1PoolAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 				require.NoError(t, err)
 				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, token1PoolAdmin, config.DefaultCommitment, []string{ccip.Unauthorized_CcipRouterError.String()})
 			})
