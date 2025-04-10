@@ -48,7 +48,6 @@ pub struct OverridePendingTokenAdminRegistryByCCIPAdmin<'info> {
         mut,
         seeds = [seed::TOKEN_ADMIN_REGISTRY, mint.key().as_ref()],
         bump,
-        constraint = valid_version(token_admin_registry.version, MAX_TOKEN_REGISTRY_V) @ CcipRouterError::InvalidVersion,
     )]
     pub token_admin_registry: Account<'info, TokenAdminRegistry>,
     pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
