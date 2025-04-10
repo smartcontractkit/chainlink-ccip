@@ -279,6 +279,7 @@ pub fn lock_tokens(sender: Pubkey, lock_or_burn: LockOrBurnInV1) -> Result<()> {
     emit!(Locked {
         sender,
         amount: lock_or_burn.amount,
+        mint: lock_or_burn.local_token,
     });
 
     Ok(())
@@ -301,7 +302,7 @@ pub fn release_tokens<'a>(
         token_program,
         receiver_token_account,
         pool_token_account,
-        mint,
+        mint.clone(),
         pool_signer.clone(),
         pool_signer_bump,
         parsed_amount,
@@ -312,6 +313,7 @@ pub fn release_tokens<'a>(
         sender: pool_signer.key(),
         recipient: release_or_mint.receiver,
         amount: parsed_amount,
+        mint: mint.key(),
     });
 
     Ok(())
