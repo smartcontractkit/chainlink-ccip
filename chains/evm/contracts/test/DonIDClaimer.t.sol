@@ -95,14 +95,14 @@ contract DonIDClaimerTest is Test {
 
   // Reverts
   function test_RevertWhen_UnauthorizedSenderClaimReverts() public {
-    vm.expectRevert(abi.encodeWithSelector(DonIDClaimer.AccessForbidden.selector, s_unauthorized));
     vm.prank(s_unauthorized);
+    vm.expectRevert(abi.encodeWithSelector(DonIDClaimer.AccessForbidden.selector, s_unauthorized));
     s_donIDClaimer.claimNextDONId();
   }
 
   function test_RevertWhen_UnauthorizedSetAuthorizedDeployer() public {
-    vm.expectRevert(Ownable2Step.OnlyCallableByOwner.selector);
     vm.prank(s_unauthorized);
+    vm.expectRevert(Ownable2Step.OnlyCallableByOwner.selector);
     s_donIDClaimer.setAuthorizedDeployer(s_unauthorized, true);
   }
 
@@ -112,8 +112,8 @@ contract DonIDClaimerTest is Test {
   }
 
   function test_RevertWhen_UnauthorizedSyncNextDONId() public {
-    vm.expectRevert(abi.encodeWithSelector(DonIDClaimer.AccessForbidden.selector, s_unauthorized));
     vm.prank(s_unauthorized);
+    vm.expectRevert(abi.encodeWithSelector(DonIDClaimer.AccessForbidden.selector, s_unauthorized));
     s_donIDClaimer.syncNextDONIdWithOffset(5);
   }
 
