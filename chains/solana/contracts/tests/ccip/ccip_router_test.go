@@ -7566,7 +7566,8 @@ func TestCCIPRouter(t *testing.T) {
 				hash2, err := ccip.HashAnyToSVMMessage(message2, config.OnRampAddress, msgAccounts)
 				require.NoError(t, err)
 
-				root := [32]byte(ccip.MerkleFrom([][]byte{hash1[:], hash2[:]}))
+				root, err := ccip.MerkleFrom([][32]byte{hash1, [32]byte(hash2)})
+				require.NoError(t, err)
 
 				commitReport := ccip_offramp.CommitInput{
 					MerkleRoot: &ccip_offramp.MerkleRoot{
@@ -8700,7 +8701,8 @@ func TestCCIPRouter(t *testing.T) {
 				hash2, err := ccip.HashAnyToSVMMessage(message2, config.OnRampAddress, msgAccounts)
 				require.NoError(t, err)
 
-				root := [32]byte(ccip.MerkleFrom([][]byte{hash1, hash2}))
+				root, err := ccip.MerkleFrom([][32]byte{[32]byte(hash1), [32]byte(hash2)})
+				require.NoError(t, err)
 
 				commitReport := ccip_offramp.CommitInput{
 					MerkleRoot: &ccip_offramp.MerkleRoot{
