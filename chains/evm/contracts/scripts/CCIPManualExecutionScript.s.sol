@@ -7,14 +7,16 @@ import {IERC20} from "@vendor/openzeppelin-solidity/v5.0.2/contracts/token/ERC20
 import {SafeERC20} from "@vendor/openzeppelin-solidity/v5.0.2/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {Script} from "forge-std/Script.sol";
-import {Test} from "forge-std/Test.sol";
 
 // solhint-disable-next-line no-console
 import {console2 as console} from "forge-std/console2.sol";
 
 /* solhint-disable no-console */
-contract CCIPSendTestScript is Script, Test {
+contract CCIPSendTestScript is Script {
   using SafeERC20 for IERC20;
+
+  error ManualExecutionFailed();
+  error ManualExecutionNotAllowed();
 
   // Ex: "ETHEREUM_RPC_URL" as defined in .env
   string public RPC_IDENTIFIER;
@@ -41,19 +43,18 @@ contract CCIPSendTestScript is Script, Test {
 
     // Check that the messageId is not empty
     Internal.MessageExecutionState executionState = s_offRamp.getExecutionState(s_sourceChainSelector, s_sequenceNumber);
-    assertTrue(
-      executionState == Internal.MessageExecutionState.FAILURE
-        || executionState == Internal.MessageExecutionState.UNTOUCHED,
-      "Message is not ready for Manual Execution"
-    );
+    if(
+      executionState != Internal.MessageExecutionState.FAILURE
+        && executionState != Internal.MessageExecutionState.UNTOUCHED
+    ) revert ManualExecutionNotAllowed();
 
     // Manual Execution data can be invoked from a different tool or front-end to avoid having to
     // gather execution report data manually
     (bool success,) = address(s_offRamp).call(s_manualExecutionData);
-    assertTrue(success, "Manual execution call reverted");
+    if(!success) revert ManualExecutionFailed();
 
     executionState = s_offRamp.getExecutionState(s_sourceChainSelector, s_sequenceNumber);
-    assertTrue(executionState == Internal.MessageExecutionState.SUCCESS, "Message was not executed successfully");
+    if(executionState != Internal.MessageExecutionState.SUCCESS) revert ManualExecutionFailed();
 
     console.log("Script completed...");
   }
