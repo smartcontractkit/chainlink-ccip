@@ -406,6 +406,10 @@ pub enum FeeQuoterError {
     UnauthorizedPriceUpdater,
     #[msg("The LINK mint uses an unsupported number of decimals")]
     InvalidLinkDecimals,
+    #[msg("Minimum token transfer fee exceeds maximum")]
+    InvalidTokenTransferFeeMaxMin,
+    #[msg("Insufficient dest bytes overhead on transfer fee config")]
+    InvalidTokenTransferFeeDestBytesOverhead,
     #[msg("Invalid code version")]
     InvalidCodeVersion,
 }
