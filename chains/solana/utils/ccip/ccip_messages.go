@@ -22,6 +22,7 @@ const GenericExtraArgsV2Tag = "181dcf10"
 const SVMExtraArgsV1Tag = "1f3b3aba"
 
 var leafDomainSeparator = [32]byte{}
+var internalDomainSeparator = [32]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}
 
 func HashCommitReport(ctx [2][32]byte, report ccip_offramp.CommitInput) ([]byte, error) {
 	hash := sha3.NewLegacyKeccak256()
@@ -194,6 +195,7 @@ func HashAnyToSVMMessage(msg ccip_offramp.Any2SVMRampMessage, onRampAddress []by
 // hashPair hashes two byte slices and returns the result as a byte slice.
 func hashPair(a, b []byte) []byte {
 	h := sha3.NewLegacyKeccak256()
+	h.Write(internalDomainSeparator[:])
 	if bytes.Compare(a, b) < 0 {
 		h.Write(a)
 		h.Write(b)
