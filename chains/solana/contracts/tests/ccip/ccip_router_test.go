@@ -2937,19 +2937,24 @@ func TestCCIPRouter(t *testing.T) {
 					Decimals:     evmToken0Decimals,
 				}, token0.PoolConfig, token0.Chain[selector], token0PoolAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 				require.NoError(t, err)
+				PoolAddresses := []base_token_pool.RemoteAddress{{Address: []byte{4, 5, 6}}}
 				ix1, err := test_token_pool.NewInitChainRemoteConfigInstruction(selector, token1.Mint, base_token_pool.RemoteConfig{
-					PoolAddresses: []base_token_pool.RemoteAddress{{Address: []byte{4, 5, 6}}},
+					PoolAddresses: []base_token_pool.RemoteAddress{},
 					TokenAddress:  base_token_pool.RemoteAddress{Address: []byte{4, 5, 6}},
 					Decimals:      evmToken1Decimals,
 				}, token1.PoolConfig, token1.Chain[selector], token1PoolAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 				require.NoError(t, err)
 				ix2, err := test_token_pool.NewInitChainRemoteConfigInstruction(selector, token2.Mint, base_token_pool.RemoteConfig{
-					PoolAddresses: []base_token_pool.RemoteAddress{{Address: []byte{4, 5, 6}}},
+					PoolAddresses: []base_token_pool.RemoteAddress{},
 					TokenAddress:  base_token_pool.RemoteAddress{Address: []byte{4, 5, 6}},
 					Decimals:      evmToken2Decimals,
 				}, token2.PoolConfig, token2.Chain[selector], token2PoolAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 				require.NoError(t, err)
-				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix0, ix1, ix2}, token0PoolAdmin, config.DefaultCommitment, common.AddSigners(token1PoolAdmin, token2PoolAdmin))
+				ix3, err := test_token_pool.NewAppendRemotePoolAddressesInstruction(selector, token1.Mint, PoolAddresses, token1.PoolConfig, token1.Chain[selector], token1PoolAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+				require.NoError(t, err)
+				ix4, err := test_token_pool.NewAppendRemotePoolAddressesInstruction(selector, token2.Mint, PoolAddresses, token2.PoolConfig, token2.Chain[selector], token2PoolAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+				require.NoError(t, err)
+				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix0, ix1, ix2, ix3, ix4}, token0PoolAdmin, config.DefaultCommitment, common.AddSigners(token1PoolAdmin, token2PoolAdmin))
 			}
 		})
 

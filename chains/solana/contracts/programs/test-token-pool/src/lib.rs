@@ -53,6 +53,11 @@ pub mod test_token_pool {
         _mint: Pubkey,
         cfg: RemoteConfig,
     ) -> Result<()> {
+        require!(
+            cfg.pool_addresses.is_empty(),
+            CcipTokenPoolError::NonemptyPoolAddressesInit
+        );
+
         ctx.accounts
             .chain_config
             .base
