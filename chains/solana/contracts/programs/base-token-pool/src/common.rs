@@ -16,6 +16,14 @@ pub const POOL_SIGNER_SEED: &[u8] = b"ccip_tokenpool_signer";
 pub const EXTERNAL_TOKENPOOL_SIGNER: &[u8] = b"external_token_pools_signer";
 pub const ALLOWED_OFFRAMP: &[u8] = b"allowed_offramp";
 
+pub const fn valid_version(v: u8, max_version: u8) -> bool {
+    !uninitialized(v) && v <= max_version
+}
+
+pub const fn uninitialized(v: u8) -> bool {
+    v == 0
+}
+
 // discriminators
 #[allow(dead_code)]
 pub const RELEASE_MINT: [u8; 8] = [0x14, 0x94, 0x71, 0xc6, 0xe5, 0xaa, 0x47, 0x30];
@@ -377,6 +385,8 @@ pub enum CcipTokenPoolError {
     Unauthorized,
     #[msg("Invalid inputs")]
     InvalidInputs,
+    #[msg("Invalid state version")]
+    InvalidVersion,
     #[msg("Caller is not ramp on router")]
     InvalidPoolCaller,
     #[msg("Sender not allowed")]
