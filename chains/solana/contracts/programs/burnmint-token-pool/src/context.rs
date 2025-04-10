@@ -8,8 +8,6 @@ use ccip_common::seed;
 
 use crate::{program::BurnmintTokenPool, ChainConfig, State};
 
-const MAX_POOL_STATE_V: u8 = 1;
-
 #[derive(Accounts)]
 pub struct InitializeTokenPool<'info> {
     #[account(

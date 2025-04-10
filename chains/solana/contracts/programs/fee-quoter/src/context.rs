@@ -26,7 +26,6 @@ pub fn uninitialized(v: u8) -> bool {
 const MAX_CONFIG_V: u8 = 1;
 const MAX_CHAINSTATE_V: u8 = 1;
 const MAX_TOKEN_AND_CHAIN_CONFIG_V: u8 = 1;
-const MAX_BILLING_TOKEN_CONFIG_V: u8 = 1;
 
 #[derive(Accounts)]
 pub struct Initialize<'info> {

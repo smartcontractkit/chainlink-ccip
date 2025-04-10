@@ -17,13 +17,6 @@ pub const MAX_CONFIG_V: u8 = 1;
 const MAX_CHAINSTATE_V: u8 = 1;
 const MAX_NONCE_V: u8 = 1;
 
-pub const fn valid_version(v: u8, max_version: u8) -> bool {
-    !uninitialized(v) && v <= max_version
-}
-
-pub const fn uninitialized(v: u8) -> bool {
-    v == 0
-}
 
 #[derive(Accounts)]
 pub struct WithdrawBilledFunds<'info> {
