@@ -74,14 +74,12 @@ contract DonIDClaimerTest is Test {
   function test_ClaimMultipleDONIds() public {
     vm.startPrank(s_owner);
     s_donIDClaimer.setAuthorizedDeployer(s_deployer, true);
-    vm.stopPrank();
 
     vm.startPrank(s_deployer);
-    for (uint32 i = 0; i < 5; i++) {
+    for (uint32 i = 0; i < 5; ++i) {
       uint32 claimed = s_donIDClaimer.claimNextDONId();
       assertEq(claimed, INITIAL_CLAIM_ID + i, "Should claim incrementally");
     }
-    vm.stopPrank();
 
     assertEq(s_donIDClaimer.getNextDONId(), INITIAL_CLAIM_ID + 5, "Next ID should be 5 ahead");
   }
@@ -93,7 +91,6 @@ contract DonIDClaimerTest is Test {
 
     s_donIDClaimer.setAuthorizedDeployer(s_deployer, true);
     assertTrue(s_donIDClaimer.isAuthorizedDeployer(s_deployer), "Should be re-authorized");
-    vm.stopPrank();
   }
 
   // Reverts
@@ -120,7 +117,7 @@ contract DonIDClaimerTest is Test {
     s_donIDClaimer.syncNextDONIdWithOffset(5);
   }
 
-  function test_RevertAfterDeployerRevoked() public {
+  function test_RevertWhen_AfterDeployerRevoked() public {
     vm.prank(s_owner);
     s_donIDClaimer.setAuthorizedDeployer(s_deployer, false);
 
