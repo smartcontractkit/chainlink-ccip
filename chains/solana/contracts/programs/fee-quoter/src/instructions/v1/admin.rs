@@ -12,6 +12,7 @@ use crate::event::{
 };
 use crate::instructions::interfaces::Admin;
 use crate::instructions::v1::public::CCIP_LOCK_OR_BURN_V1_RET_BYTES;
+use crate::messages::{CHAIN_FAMILY_SELECTOR_EVM, CHAIN_FAMILY_SELECTOR_SVM};
 use crate::state::{
     BillingTokenConfig, CodeVersion, DestChain, DestChainConfig, DestChainState,
     PerChainPerTokenConfig, TimestampedPackedU224, TokenTransferFeeConfig,
@@ -242,9 +243,14 @@ fn validate_dest_chain_config(dest_chain_selector: u64, config: &DestChainConfig
         config.default_tx_gas_limit <= config.max_per_msg_gas_limit,
         FeeQuoterError::DefaultGasLimitExceedsMaximum
     );
+
     require!(
-        config.chain_family_selector != [0; 4],
+        matches!(
+            u32::from_be_bytes(config.chain_family_selector),
+            CHAIN_FAMILY_SELECTOR_EVM | CHAIN_FAMILY_SELECTOR_SVM
+        ),
         FeeQuoterError::InvalidChainFamilySelector
     );
+
     Ok(())
 }
