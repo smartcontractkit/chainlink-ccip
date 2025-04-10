@@ -261,7 +261,7 @@ func TestPlugin_EncodingSizeLimits(t *testing.T) {
 	}
 
 	// Only half of the messages should be included in the observation
-	require.Equal(t, fullMsgCount, len(largeMessages)/2-1,
+	require.Equal(t, len(largeMessages)/2, fullMsgCount,
 		"Encoding size limit should prevent all messages from being included with their data")
 
 	// Filter round
@@ -271,7 +271,7 @@ func TestPlugin_EncodingSizeLimits(t *testing.T) {
 	// Verify report was created with the messages that were included
 	require.NotEmpty(t, outcome.Report.ChainReports)
 	sequenceNumbers := extractSequenceNumbers(outcome.Report.ChainReports[0].Messages)
-	require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{1, 2, 3, 4})
+	require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{1, 2, 3, 4, 5})
 
 	// Do another full round
 	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
@@ -293,30 +293,8 @@ func TestPlugin_EncodingSizeLimits(t *testing.T) {
 			}
 		}
 	}
-	// next 4 messages
-	require.ElementsMatch(t, seqNums, []cciptypes.SeqNum{5, 6, 7, 8})
-
-	// Last round
-	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
-	require.Equal(t, exectypes.GetCommitReports, outcome.State)
-	require.NotEmpty(t, outcome.CommitReports)
-
-	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
-	require.Equal(t, exectypes.GetMessages, outcome.State)
-	require.Len(t, outcome.CommitReports, 1)
-
-	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
-	require.Equal(t, exectypes.Filter, outcome.State)
-
-	seqNums = make([]cciptypes.SeqNum, 0)
-	for _, report := range outcome.CommitReports {
-		for _, msg := range report.Messages {
-			if len(msg.Data) > 0 {
-				seqNums = append(seqNums, msg.Header.SequenceNumber)
-			}
-		}
-	}
-	require.ElementsMatch(t, seqNums, []cciptypes.SeqNum{9, 10})
+	// next 5 messages
+	require.ElementsMatch(t, seqNums, []cciptypes.SeqNum{6, 7, 8, 9, 10})
 }
 
 func makeMessageWithData(seqNum, byteSize int, src, dst cciptypes.ChainSelector) inmem.MessagesWithMetadata {

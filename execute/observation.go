@@ -261,6 +261,8 @@ func buildCombinedReports(
 	return combinedReports
 }
 
+// TODO: Add max number of messages
+
 func (p *Plugin) getObsWithoutTokenData(
 	ctx context.Context,
 	lggr logger.Logger,
@@ -276,7 +278,7 @@ func (p *Plugin) getObsWithoutTokenData(
 	})
 
 	stop := false
-	gasSum := uint64(0)
+	//gasSum := uint64(0)
 
 	for _, report := range commitData {
 		srcChain := report.SourceChain
@@ -290,6 +292,7 @@ func (p *Plugin) getObsWithoutTokenData(
 		// Add the report to available reports
 		availableReports[srcChain] = append(availableReports[srcChain], report)
 
+		totalMsgs := 0
 		// Initialize data structures for this source chain if needed
 		initSourceChainMaps(srcChain, messageObs, msgHashes)
 		// Process each message in the report
@@ -299,8 +302,9 @@ func (p *Plugin) getObsWithoutTokenData(
 			// Handle message observation and gas calculation
 			if !stop && !p.inflightMessageCache.IsInflight(srcChain, msg.Header.MessageID) {
 				messageObs[srcChain][seqNum] = msg
-				gasSum += p.estimateProvider.CalculateMessageMaxGas(msg)
-				stop = p.exceedsMaxGasLimit(gasSum, msgs)
+				totalMsgs++
+				//gasSum += p.estimateProvider.CalculateMessageMaxGas(msg)
+				//stop = p.exceedsMaxGasLimit(gasSum, msgs)
 			} else {
 				// This is for when we calculate roots in reports later, we need the seqNum and
 				// the hash for this message
@@ -323,7 +327,8 @@ func (p *Plugin) getObsWithoutTokenData(
 
 			// Check if we've exceeded encoding size limits
 			if !stop {
-				stop = p.handleEncodingSizeLimits(observation, messageObs, srcChain, seqNum)
+				stop = totalMsgs > maxMsgsPerObs ||
+					exceedsMaxEncodingSize(observation, p.ocrTypeCodec, maxObservationLength)
 			}
 		}
 
@@ -384,22 +389,6 @@ func createEmptyMessageWithSeqNum(seqNum cciptypes.SeqNum) cciptypes.Message {
 			SequenceNumber: seqNum,
 		},
 	}
-}
-
-// handleEncodingSizeLimits checks if observation exceeds encoding size limits and handles the msg that caused
-// it by replacing it with an empty message
-func (p *Plugin) handleEncodingSizeLimits(
-	observation exectypes.Observation,
-	messageObs exectypes.MessageObservations,
-	srcChain cciptypes.ChainSelector,
-	seqNum cciptypes.SeqNum,
-) bool {
-	if exceedsMaxEncodingSize(observation, p.ocrTypeCodec, maxObservationLength) {
-		// Replace message with empty one to reduce size
-		messageObs[srcChain][seqNum] = createEmptyMessageWithSeqNum(seqNum)
-		return true
-	}
-	return false
 }
 
 func (p *Plugin) exceedsMaxGasLimit(
