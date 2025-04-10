@@ -12,6 +12,9 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 	"golang.org/x/crypto/sha3"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
+	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
+
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
@@ -191,32 +194,13 @@ func HashAnyToSVMMessage(msg ccip_offramp.Any2SVMRampMessage, onRampAddress []by
 	return hash.Sum(nil), nil
 }
 
-// hashPair hashes two byte slices and returns the result as a byte slice.
-func hashPair(a, b []byte) []byte {
-	h := sha3.NewLegacyKeccak256()
-	if bytes.Compare(a, b) < 0 {
-		h.Write(a)
-		h.Write(b)
-	} else {
-		h.Write(b)
-		h.Write(a)
-	}
-	return h.Sum(nil)
-}
-
 // merkleFrom computes the Merkle root from a slice of byte slices.
-func MerkleFrom(data [][]byte) []byte {
-	if len(data) == 1 {
-		return data[0]
+func MerkleFrom(leaves [][32]byte) ([32]byte, error) {
+	tree, err := merklemulti.NewTree(hashutil.NewKeccak(), leaves)
+	if err != nil {
+		return [32]byte{}, err
 	}
-
-	hash := hashPair(data[0], data[1])
-
-	for i := 2; i < len(data); i++ {
-		hash = hashPair(hash, data[i])
-	}
-
-	return hash
+	return tree.Root(), nil
 }
 
 func HashSVMToAnyMessage(msg ccip_router.SVM2AnyRampMessage) ([]byte, error) {
