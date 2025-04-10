@@ -28,7 +28,7 @@ jobs:
         run: |
           cat <<EOF > matrix.json
           [
-            { "name": "ccip", "setup": { "run-coverage": true, "min-coverage": 98.7, "extra-coverage-params": "--no-match-path='*End2End*'", "run-gas-snapshot": true}}
+            { "name": "ccip", "setup": { "run-coverage": true, "min-coverage": 98.7, "extra-coverage-params": "--no-match-path='*End2End*|*.s.sol'", "run-gas-snapshot": true}}
           ]
           EOF
 
@@ -93,6 +93,7 @@ jobs:
               - '!chains/evm/contracts/**/mocks/**'
               - '!chains/evm/contracts/**/*.t.sol'
               - '!chains/evm/contracts/*.t.sol'
+              - '!chains/evm/contracts/*.s.sol'
               - '!chains/evm/contracts/**/testhelpers/**'
               - '!chains/evm/contracts/testhelpers/**'
               - '!chains/evm/contracts/vendor/**'
