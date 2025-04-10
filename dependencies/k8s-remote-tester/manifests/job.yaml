@@ -15,6 +15,7 @@ spec:
         app.kubernetes.io/version: 0.1.1
       annotations:
         "prometheus.io/scrape": 'true'
+        "karpenter.sh/do-not-disrupt": 'true'
     spec:
       containers:
         - name: tester
