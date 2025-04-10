@@ -55,18 +55,13 @@ contract DonIDClaimer is ITypeAndVersion, Ownable2StepMsgSender {
     s_nextDONId = i_capabilitiesRegistry.getNextDONId();
   }
 
-  /// @notice Modifier to check if the caller is an authorized deployer
-  modifier onlyAuthorizedDeployer() {
-    if (!s_authorizedDeployers.contains(msg.sender)) {
-      revert AccessForbidden(msg.sender);
-    }
-    _;
-  }
-
   /// @notice Claims the next available DON ID and increments the internal counter
   /// @dev The function increments s_nextDONId after returning the current value
   /// @return uint32 The DON ID that was claimed
-  function claimNextDONId() external onlyAuthorizedDeployer returns (uint32) {
+  function claimNextDONId() external returns (uint32) {
+    if (!s_authorizedDeployers.contains(msg.sender)) {
+      revert AccessForbidden(msg.sender);
+    }
     emit DonIDClaimed(msg.sender, s_nextDONId);
 
     return s_nextDONId++;
@@ -77,7 +72,10 @@ contract DonIDClaimer is ITypeAndVersion, Ownable2StepMsgSender {
   /// @dev This can be used to synchronize with the CapabilitiesRegistry after some actions have occurred
   function syncNextDONIdWithOffset(
     uint32 offset
-  ) external onlyAuthorizedDeployer {
+  ) external {
+    if (!s_authorizedDeployers.contains(msg.sender)) {
+      revert AccessForbidden(msg.sender);
+    }
     s_nextDONId = i_capabilitiesRegistry.getNextDONId() + offset;
 
     emit DonIDSynced(s_nextDONId);
