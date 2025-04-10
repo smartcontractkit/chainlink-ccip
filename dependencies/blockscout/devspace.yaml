@@ -7,12 +7,12 @@ require:
 vars:
   # Check image versions against compatibility matrix
   #  https://docs.blockscout.com/setup/requirements/back-front-compatibility-matrix
-  BLOCKSCOUT_BACKEND_IMAGE_TAG:
+  BLOCKSCOUT_IMAGE_TAG:
     source: env
-    value: "v7.0.2"
+    value: "7.0.2"
   BLOCKSCOUT_FRONTEND_IMAGE_TAG:
     source: env
-    value: "v1.38.0"
+    value: "v1.38.2"
   CHAIN_ID:
     source: env
     default: ""
@@ -37,6 +37,9 @@ vars:
   NAMESPACE:
     source: env
     default: ${DEVSPACE_NAMESPACE}
+  POSTGRES_PV_SIZE:
+    source: env
+    default: 5Gi
 
 pipelines:
   deploy:

@@ -123,10 +123,11 @@ profiles:
                   - minio-console.${HOST_NAME}
                 secretName: minio-console-ingress-tls
 
-  - name: ingress-aws
+  - name: ingress-aws-sandbox
     activation:
       - vars:
           PROVIDER: aws
+          ENVIRONMENT: sandbox
     patches:
       - op: add
         path: deployments.minio-tenant.helm.values.tenant.exposeServices
@@ -139,7 +140,7 @@ profiles:
           api:
             enabled: true
             ingressClassName: alb
-            host: ${DEVSPACE_NAMESPACE}-minio-api.${HOST_NAME}
+            host: minio-api.${HOST_NAME}
             path: /*
             pathType: ImplementationSpecific
             annotations:
@@ -151,7 +152,7 @@ profiles:
           console:
             enabled: true
             ingressClassName: alb
-            host: ${DEVSPACE_NAMESPACE}-minio-console.${HOST_NAME}
+            host: minio-console.${HOST_NAME}
             path: /*
             pathType: ImplementationSpecific
             annotations:

@@ -37,6 +37,7 @@ in: |
             enabled: true
             image:
               pullPolicy: Always
+              tag: ${BLOCKSCOUT_IMAGE_TAG}
             env:
               DATABASE_URL: 'postgresql://blockscout:blockscout123@blockscout-postgres-{{ .Env.ETHEREUM_VARIANT }}-chain-{{ .Env.CHAIN_NAME }}-{{ .Env.CHAIN_ID }}.${NAMESPACE}.svc.cluster.local:5432/blockscout?ssl=false'
               ETHEREUM_JSONRPC_VARIANT: {{ .Env.ETHEREUM_VARIANT }}

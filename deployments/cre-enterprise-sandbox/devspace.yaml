@@ -275,6 +275,7 @@ profiles:
               NAMESPACE: chain-alpha
               INGRESS_CLASS_NAME: alb
               CRIB_EKS_CLUSTER_NAME: "main-fwog"
+              POSTGRES_PV_SIZE: 10Gi
 
   - name: blockchain-beta
     patches:
@@ -303,6 +304,7 @@ profiles:
               NAMESPACE: chain-beta
               INGRESS_CLASS_NAME: alb
               CRIB_EKS_CLUSTER_NAME: "main-fwog"
+              POSTGRES_PV_SIZE: 10Gi
 
   - name: blockchain
     parents:
