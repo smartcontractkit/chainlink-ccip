@@ -9,7 +9,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	ocrtypecodec "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
@@ -63,70 +62,6 @@ func TestPlugin(t *testing.T) {
 	require.Len(t, outcome.Report.ChainReports, 1)
 	sequenceNumbers := extractSequenceNumbers(outcome.Report.ChainReports[0].Messages)
 	require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{102, 103, 104, 105})
-}
-
-// TestExceedSizeObservation tests the case where the observation size exceeds the maximum size.
-// Setup multiple commit reports that the total size of the observation exceeds the maximum size.
-// Make sure that the observation reports are truncated to fit the maximum size.
-func TestExceedSizeObservation(t *testing.T) {
-	t.Skipf("Skipping, max messages set to 20 for now")
-	ctx := tests.Context(t)
-
-	srcSelector := cciptypes.ChainSelector(1)
-	dstSelector := cciptypes.ChainSelector(2)
-
-	// 1 msg * 1 byte    -> 879  | 2 msg * 1 byte -> 1311 | 3 msg * 1 byte -> 1743
-	// 3 msg * 2 bytes   -> 882  | 3 msg * 2 byte -> 1319 | 3 msg * 2 byte -> 1755
-	// 10 msg * 1 byte   -> 897
-	// 100 msg * 1 byte  -> 1077
-	// 1000 msg * 1 byte -> 2877
-	msgDataSize := 1000
-	maxMsgsPerReport := 398
-	nReports := 2
-	maxMessages := maxMsgsPerReport * nReports // Currently 398 message per report is the max with msgDataSize = 1000
-	startSeqNr := cciptypes.SeqNum(100)
-
-	messages := make([]inmem.MessagesWithMetadata, 0, maxMessages)
-	for i := 0; i < maxMessages; i++ {
-		messages = append(messages,
-			makeMsgWithMetadata(
-				startSeqNr+cciptypes.SeqNum(i),
-				srcSelector,
-				dstSelector,
-				false,
-				withData(make([]byte, msgDataSize)),
-			),
-		)
-	}
-
-	intTest := SetupSimpleTest(t, mocks.NullLogger, []cciptypes.ChainSelector{srcSelector}, dstSelector)
-	intTest.WithMessages(messages, 1000, time.Now().Add(-4*time.Hour), nReports, srcSelector)
-	runner := intTest.Start()
-	defer intTest.Close()
-
-	// Contract Discovery round.
-	outcome := runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
-	require.Equal(t, exectypes.Initialized, outcome.State)
-
-	// Round 1 - Get Commit Reports
-	// Two pending commit reports.
-	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
-	require.Len(t, outcome.Report.ChainReports, 0)
-	require.Len(t, outcome.CommitReports, nReports)
-
-	// Round 2 - Get Messages
-	// Only 1 pending report from previous round.
-	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
-	require.Len(t, outcome.Report.ChainReports, 0)
-	require.Len(t, outcome.CommitReports, 2)
-	require.Len(t, outcome.CommitReports[0].Messages, maxMsgsPerReport)
-
-	// Round 3 - Filter
-	// An execute report with the messages executed until the max per report
-	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
-	require.Len(t, outcome.Report.ChainReports, 2)
-	sequenceNumbers := extractSequenceNumbers(outcome.Report.ChainReports[0].Messages)
-	require.Len(t, sequenceNumbers, maxMsgsPerReport)
 }
 
 func TestPlugin_FinalizedUnfinalizedCaching(t *testing.T) {
@@ -270,4 +205,129 @@ func TestPlugin_CommitReportTimestampOrdering(t *testing.T) {
 		outcome.CommitReports[1].SequenceNumberRange.Start(), "middle report should be second")
 	require.Equal(t, cciptypes.SeqNum(104),
 		outcome.CommitReports[2].SequenceNumberRange.Start(), "newest report should be last")
+}
+
+func TestPlugin_EncodingSizeLimits(t *testing.T) {
+	ctx := tests.Context(t)
+
+	srcSelector := cciptypes.ChainSelector(1)
+	dstSelector := cciptypes.ChainSelector(2)
+
+	// Create messages with large data payloads
+	largeMessages := []inmem.MessagesWithMetadata{}
+	// TODO: make size co related with maxObservationSize
+	nMessages := 10
+	for i := 1; i <= nMessages; i++ {
+		// Only  (half of the messages - 1) will be included in the observation
+		// Notice that there's encoding overhead from other fields in observation, meaning that the message in the
+		// middle of the observation will be truncated.
+		size := maxObservationLength / (nMessages / 2)
+		largeMessages = append(largeMessages, inmem.MessagesWithMetadata{
+			Message:     makeMessageWithData(i, size, srcSelector, dstSelector).Message,
+			Executed:    false,
+			Destination: dstSelector,
+		})
+	}
+
+	intTest := SetupSimpleTest(t, logger.Test(t), []cciptypes.ChainSelector{srcSelector}, dstSelector)
+
+	// Add large messages
+	intTest.WithMessages(largeMessages, 1000, time.Now().Add(-4*time.Hour), 1, srcSelector)
+
+	runner := intTest.Start()
+	defer intTest.Close()
+
+	// Contract Discovery round
+	outcome := runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
+	require.Equal(t, exectypes.Initialized, outcome.State)
+
+	// GetCommitReports round
+	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
+	require.Equal(t, exectypes.GetCommitReports, outcome.State)
+	require.Len(t, outcome.CommitReports, 1)
+
+	// GetMessages round - encoding size should limit number of messages
+	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
+	require.Equal(t, exectypes.GetMessages, outcome.State)
+
+	// Count messages with data (not empty placeholder messages)
+	fullMsgCount := 0
+	for _, report := range outcome.CommitReports {
+		for _, msg := range report.Messages {
+			if len(msg.Data) > 0 {
+				fullMsgCount++
+			}
+		}
+	}
+
+	// Only half of the messages should be included in the observation
+	require.Equal(t, fullMsgCount, len(largeMessages)/2-1,
+		"Encoding size limit should prevent all messages from being included with their data")
+
+	// Filter round
+	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
+	require.Equal(t, exectypes.Filter, outcome.State)
+
+	// Verify report was created with the messages that were included
+	require.NotEmpty(t, outcome.Report.ChainReports)
+	sequenceNumbers := extractSequenceNumbers(outcome.Report.ChainReports[0].Messages)
+	require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{1, 2, 3, 4})
+
+	// Do another full round
+	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
+	require.Equal(t, exectypes.GetCommitReports, outcome.State)
+	require.NotEmpty(t, outcome.CommitReports)
+
+	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
+	require.Equal(t, exectypes.GetMessages, outcome.State)
+	require.Len(t, outcome.CommitReports, 1)
+
+	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
+	require.Equal(t, exectypes.Filter, outcome.State)
+
+	seqNums := make([]cciptypes.SeqNum, 0)
+	for _, report := range outcome.CommitReports {
+		for _, msg := range report.Messages {
+			if len(msg.Data) > 0 {
+				seqNums = append(seqNums, msg.Header.SequenceNumber)
+			}
+		}
+	}
+	// next 4 messages
+	require.ElementsMatch(t, seqNums, []cciptypes.SeqNum{5, 6, 7, 8})
+
+	// Last round
+	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
+	require.Equal(t, exectypes.GetCommitReports, outcome.State)
+	require.NotEmpty(t, outcome.CommitReports)
+
+	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
+	require.Equal(t, exectypes.GetMessages, outcome.State)
+	require.Len(t, outcome.CommitReports, 1)
+
+	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
+	require.Equal(t, exectypes.Filter, outcome.State)
+
+	seqNums = make([]cciptypes.SeqNum, 0)
+	for _, report := range outcome.CommitReports {
+		for _, msg := range report.Messages {
+			if len(msg.Data) > 0 {
+				seqNums = append(seqNums, msg.Header.SequenceNumber)
+			}
+		}
+	}
+	require.ElementsMatch(t, seqNums, []cciptypes.SeqNum{9, 10})
+}
+
+func makeMessageWithData(seqNum, byteSize int, src, dst cciptypes.ChainSelector) inmem.MessagesWithMetadata {
+	// Create a message with large data payload to test encoding size limits
+	msg := makeMsgWithMetadata(cciptypes.SeqNum(seqNum), src, dst, false)
+
+	largeData := make([]byte, byteSize)
+	for i := range largeData {
+		largeData[i] = byte(i % 256)
+	}
+
+	msg.Message.Data = largeData
+	return msg
 }
