@@ -288,8 +288,7 @@ export type CcipOfframp = {
           "isMut": true,
           "isSigner": false,
           "docs": [
-            "Adding a chain selector implies initializing the state for a new chain,",
-            "hence the need to initialize two accounts."
+            "Adding a chain selector implies initializing the state for a new chain"
           ]
         },
         {
@@ -2654,8 +2653,7 @@ export const IDL: CcipOfframp = {
           "isMut": true,
           "isSigner": false,
           "docs": [
-            "Adding a chain selector implies initializing the state for a new chain,",
-            "hence the need to initialize two accounts."
+            "Adding a chain selector implies initializing the state for a new chain"
           ]
         },
         {

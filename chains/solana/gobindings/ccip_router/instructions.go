@@ -2,7 +2,7 @@
 //
 // This is the Collapsed Router Program for CCIP.
 // As it's upgradable persisting the same program id, there is no need to have an indirection of a Proxy Program.
-// This Router handles both the OnRamp and OffRamp flow of the CCIP Messages.
+// This Router handles the OnRamp flow of the CCIP Messages.
 //
 // NOTE to devs: This file however should contain *no logic*, only the entrypoints to the different versioned modules,
 // thus making it easier to ensure later on that logic can be changed during upgrades without affecting the interface.
@@ -45,7 +45,10 @@ var (
 	//
 	// * `ctx` - The context containing the accounts required for initialization.
 	// * `svm_chain_selector` - The chain selector for SVM.
-	// * `enable_execution_after` - The minimum amount of time required between a message has been committed and can be manually executed.
+	// * `fee_aggregator` - The public key of the fee aggregator.
+	// * `fee_quoter` - The public key of the fee quoter.
+	// * `link_token_mint` - The public key of the LINK token mint.
+	// * `rmn_remote` - The public key of the RMN remote.
 	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
 
 	// Transfers the ownership of the router to a new proposed owner.

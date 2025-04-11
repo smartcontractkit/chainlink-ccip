@@ -220,8 +220,7 @@ pub struct AcceptOwnership<'info> {
 #[derive(Accounts)]
 #[instruction(new_chain_selector: u64, _source_chain_config: SourceChainConfig)]
 pub struct AddSourceChain<'info> {
-    /// Adding a chain selector implies initializing the state for a new chain,
-    /// hence the need to initialize two accounts.
+    /// Adding a chain selector implies initializing the state for a new chain
     #[account(
         init,
         seeds = [seed::SOURCE_CHAIN, new_chain_selector.to_le_bytes().as_ref()],
@@ -244,11 +243,11 @@ pub struct AddSourceChain<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(new_chain_selector: u64)]
+#[instruction(source_chain_selector: u64)]
 pub struct UpdateSourceChain<'info> {
     #[account(
         mut,
-        seeds = [seed::SOURCE_CHAIN, new_chain_selector.to_le_bytes().as_ref()],
+        seeds = [seed::SOURCE_CHAIN, source_chain_selector.to_le_bytes().as_ref()],
         bump,
         constraint = valid_version(source_chain.version, MAX_CHAIN_V) @ CcipOfframpError::InvalidVersion,
     )]
