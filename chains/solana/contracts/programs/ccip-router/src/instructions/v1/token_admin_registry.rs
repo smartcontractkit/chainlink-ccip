@@ -185,6 +185,13 @@ impl TokenAdminRegistry for Impl {
                 &ctx.accounts.config.fee_quoter,
             );
 
+            // verify token mint owner matches token program
+            require_keys_eq!(
+                *ctx.accounts.mint.to_account_info().owner,
+                token_program,
+                CcipRouterError::InvalidInputsMint
+            );
+
             let min_accounts = [
                 ctx.accounts.pool_lookuptable.key(),
                 token_admin_registry,

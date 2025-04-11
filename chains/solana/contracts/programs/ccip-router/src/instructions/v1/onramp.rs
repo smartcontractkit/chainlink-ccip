@@ -1,7 +1,9 @@
-use crate::events::on_ramp as events;
-use crate::messages::GetFeeResult;
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface;
+
+use crate::events::on_ramp as events;
+use crate::messages::GetFeeResult;
+
 use ccip_common::seed;
 use ccip_common::v1::{validate_and_parse_token_accounts, TokenAccounts};
 use fee_quoter::messages::TokenTransferAdditionalData;
@@ -178,6 +180,12 @@ impl OnRamp for Impl {
             .zip(message.token_amounts.iter())
             .enumerate()
         {
+            require_keys_eq!(
+                token_amount.token,
+                current_token_accounts.mint.key(),
+                CcipRouterError::InvalidInputsTokenAccounts,
+            );
+
             let seeds = &[
                 seed::EXTERNAL_TOKEN_POOL,
                 current_token_accounts.pool_program.key.as_ref(),
