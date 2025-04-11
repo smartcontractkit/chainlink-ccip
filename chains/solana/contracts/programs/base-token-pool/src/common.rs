@@ -62,37 +62,43 @@ pub struct BaseConfig {
 
 impl BaseConfig {
     pub fn init(
-        &mut self,
         mint: &InterfaceAccount<Mint>,
         pool_program: Pubkey,
         owner: Pubkey,
         router: Pubkey,
         rmn_remote: Pubkey,
-    ) -> Result<()> {
+    ) -> Self {
         let token_info = mint.to_account_info();
+        let token_program = *token_info.owner;
 
-        self.token_program = *token_info.owner;
-        self.mint = mint.key();
-        self.decimals = mint.decimals;
-        (self.pool_signer, _) = Pubkey::find_program_address(
-            &[POOL_SIGNER_SEED, self.mint.key().as_ref()],
-            &pool_program,
-        );
-        self.pool_token_account = get_associated_token_address_with_program_id(
-            &self.pool_signer,
-            &self.mint,
-            &self.token_program,
-        );
-        self.owner = owner;
-        self.rate_limit_admin = owner;
-        self.router = router;
-        self.rmn_remote = rmn_remote;
-        (self.router_onramp_authority, _) = Pubkey::find_program_address(
+        let (pool_signer, _) =
+            Pubkey::find_program_address(&[POOL_SIGNER_SEED, mint.key().as_ref()], &pool_program);
+
+        let (router_onramp_authority, _) = Pubkey::find_program_address(
             &[EXTERNAL_TOKENPOOL_SIGNER, pool_program.as_ref()],
             &router,
         );
 
-        Ok(())
+        let pool_token_account =
+            get_associated_token_address_with_program_id(&pool_signer, &mint.key(), &token_program);
+
+        Self {
+            token_program,
+            mint: mint.key(),
+            decimals: mint.decimals,
+            pool_signer,
+            pool_token_account,
+            owner,
+            proposed_owner: Pubkey::default(),
+            rate_limit_admin: owner,
+            router_onramp_authority,
+            router,
+            rebalancer: Pubkey::default(),
+            can_accept_liquidity: false,
+            list_enabled: false,
+            allow_list: vec![],
+            rmn_remote,
+        }
     }
 
     pub fn transfer_ownership(&mut self, proposed_owner: Pubkey) -> Result<()> {
