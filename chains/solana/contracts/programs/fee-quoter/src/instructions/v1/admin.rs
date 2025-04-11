@@ -8,7 +8,7 @@ use crate::event::{
     ConfigSet, DestChainAdded, DestChainConfigUpdated, FeeTokenAdded, FeeTokenDisabled,
     FeeTokenEnabled, OwnershipTransferRequested, OwnershipTransferred,
     PremiumMultiplierWeiPerEthUpdated, PriceUpdaterAdded, PriceUpdaterRemoved,
-    TokenTransferFeeConfigUpdated,
+    TokenTransferFeeConfigUpdated, UsdPerTokenUpdated,
 };
 use crate::instructions::interfaces::Admin;
 use crate::instructions::v1::public::CCIP_LOCK_OR_BURN_V1_RET_BYTES;
@@ -88,6 +88,11 @@ impl Admin for Impl {
         ctx: Context<UpdateBillingTokenConfig>,
         config: BillingTokenConfig,
     ) -> Result<()> {
+        require!(
+            config.mint == ctx.accounts.billing_token_config.config.mint,
+            FeeQuoterError::InvalidInputsMint
+        );
+
         if config.enabled != ctx.accounts.billing_token_config.config.enabled {
             // enabled/disabled status has changed
             match config.enabled {
@@ -112,6 +117,14 @@ impl Admin for Impl {
             emit!(PremiumMultiplierWeiPerEthUpdated {
                 token: config.mint,
                 premium_multiplier_wei_per_eth: config.premium_multiplier_wei_per_eth,
+            });
+        }
+
+        if config.usd_per_token != ctx.accounts.billing_token_config.config.usd_per_token {
+            emit!(UsdPerTokenUpdated {
+                token: config.mint,
+                value: config.usd_per_token.value,
+                timestamp: config.usd_per_token.timestamp,
             });
         }
 
@@ -231,6 +244,14 @@ impl Admin for Impl {
 // --- helpers ---
 
 fn validate_dest_chain_config(dest_chain_selector: u64, config: &DestChainConfig) -> Result<()> {
+    // check if the lane code version is supported
+    require!(
+        matches!(
+            config.lane_code_version,
+            CodeVersion::Default | CodeVersion::V1
+        ),
+        FeeQuoterError::InvalidVersion
+    );
     require!(
         dest_chain_selector != 0,
         FeeQuoterError::InvalidInputsChainSelector

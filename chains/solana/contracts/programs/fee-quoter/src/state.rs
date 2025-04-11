@@ -86,7 +86,7 @@ pub struct DestChain {
     pub config: DestChainConfig, // values configured by an admin
 }
 
-#[derive(InitSpace, Clone, AnchorSerialize, AnchorDeserialize, Debug)]
+#[derive(InitSpace, Clone, AnchorSerialize, AnchorDeserialize, Debug, PartialEq)]
 pub struct TimestampedPackedU224 {
     pub value: [u8; 28],
     pub timestamp: i64, // maintaining the type that SVM returns for the time (solana_program::clock::UnixTimestamp = i64)
