@@ -8,6 +8,8 @@ use ccip_common::seed;
 
 use crate::{program::BurnmintTokenPool, ChainConfig, State};
 
+const MAX_POOL_STATE_V: u8 = 1;
+
 #[derive(Accounts)]
 pub struct InitializeTokenPool<'info> {
     #[account(
@@ -34,11 +36,24 @@ pub struct InitializeTokenPool<'info> {
 }
 
 #[derive(Accounts)]
+#[instruction(mint: Pubkey)]
+pub struct InitializeStateVersion<'info> {
+    #[account(
+        mut,
+        seeds = [POOL_STATE_SEED, mint.as_ref()],
+        bump,
+        constraint = uninitialized(state.version) @ CcipTokenPoolError::InvalidVersion,
+    )]
+    pub state: Account<'info, State>,
+}
+
+#[derive(Accounts)]
 pub struct SetConfig<'info> {
     #[account(
         mut,
         seeds = [POOL_STATE_SEED, mint.key().as_ref()],
         bump,
+        constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub state: Account<'info, State>,
     pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps

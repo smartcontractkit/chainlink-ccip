@@ -7,8 +7,8 @@ contract PingPong_setCounterpartAddress is PingPongDappSetup {
   function testFuzz_CounterPartAddress_Success(
     address counterpartAddress
   ) public {
-    s_pingPong.setCounterpartAddress(counterpartAddress);
+    s_pingPong.setCounterpartAddress(abi.encode(counterpartAddress));
 
-    assertEq(s_pingPong.getCounterpartAddress(), counterpartAddress);
+    assertEq(s_pingPong.getCounterpartAddress(), abi.encode(counterpartAddress));
   }
 }

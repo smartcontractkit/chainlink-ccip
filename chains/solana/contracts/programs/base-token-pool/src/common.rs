@@ -16,6 +16,14 @@ pub const POOL_SIGNER_SEED: &[u8] = b"ccip_tokenpool_signer";
 pub const EXTERNAL_TOKENPOOL_SIGNER: &[u8] = b"external_token_pools_signer";
 pub const ALLOWED_OFFRAMP: &[u8] = b"allowed_offramp";
 
+pub const fn valid_version(v: u8, max_version: u8) -> bool {
+    !uninitialized(v) && v <= max_version
+}
+
+pub const fn uninitialized(v: u8) -> bool {
+    v == 0
+}
+
 // discriminators
 #[allow(dead_code)]
 pub const RELEASE_MINT: [u8; 8] = [0x14, 0x94, 0x71, 0xc6, 0xe5, 0xaa, 0x47, 0x30];
@@ -54,37 +62,43 @@ pub struct BaseConfig {
 
 impl BaseConfig {
     pub fn init(
-        &mut self,
         mint: &InterfaceAccount<Mint>,
         pool_program: Pubkey,
         owner: Pubkey,
         router: Pubkey,
         rmn_remote: Pubkey,
-    ) -> Result<()> {
+    ) -> Self {
         let token_info = mint.to_account_info();
+        let token_program = *token_info.owner;
 
-        self.token_program = *token_info.owner;
-        self.mint = mint.key();
-        self.decimals = mint.decimals;
-        (self.pool_signer, _) = Pubkey::find_program_address(
-            &[POOL_SIGNER_SEED, self.mint.key().as_ref()],
-            &pool_program,
-        );
-        self.pool_token_account = get_associated_token_address_with_program_id(
-            &self.pool_signer,
-            &self.mint,
-            &self.token_program,
-        );
-        self.owner = owner;
-        self.rate_limit_admin = owner;
-        self.router = router;
-        self.rmn_remote = rmn_remote;
-        (self.router_onramp_authority, _) = Pubkey::find_program_address(
+        let (pool_signer, _) =
+            Pubkey::find_program_address(&[POOL_SIGNER_SEED, mint.key().as_ref()], &pool_program);
+
+        let (router_onramp_authority, _) = Pubkey::find_program_address(
             &[EXTERNAL_TOKENPOOL_SIGNER, pool_program.as_ref()],
             &router,
         );
 
-        Ok(())
+        let pool_token_account =
+            get_associated_token_address_with_program_id(&pool_signer, &mint.key(), &token_program);
+
+        Self {
+            token_program,
+            mint: mint.key(),
+            decimals: mint.decimals,
+            pool_signer,
+            pool_token_account,
+            owner,
+            proposed_owner: Pubkey::default(),
+            rate_limit_admin: owner,
+            router_onramp_authority,
+            router,
+            rebalancer: Pubkey::default(),
+            can_accept_liquidity: false,
+            list_enabled: false,
+            allow_list: vec![],
+            rmn_remote,
+        }
     }
 
     pub fn transfer_ownership(&mut self, proposed_owner: Pubkey) -> Result<()> {
@@ -174,7 +188,13 @@ impl BaseChain {
     ) -> Result<()> {
         let old_pools = self.remote.pool_addresses.clone();
 
-        self.remote.pool_addresses.append(&mut addresses.clone());
+        for address in addresses {
+            if !self.remote.pool_addresses.contains(&address) {
+                self.remote.pool_addresses.push(address);
+            } else {
+                return Err(CcipTokenPoolError::RemotePoolAddressAlreadyExisted.into());
+            }
+        }
 
         emit!(RemotePoolsAppended {
             chain_selector: remote_chain_selector,
@@ -377,6 +397,8 @@ pub enum CcipTokenPoolError {
     Unauthorized,
     #[msg("Invalid inputs")]
     InvalidInputs,
+    #[msg("Invalid state version")]
+    InvalidVersion,
     #[msg("Caller is not ramp on router")]
     InvalidPoolCaller,
     #[msg("Sender not allowed")]
@@ -391,6 +413,10 @@ pub enum CcipTokenPoolError {
     AllowlistKeyAlreadyExisted,
     #[msg("Key did not exist in the allowlist")]
     AllowlistKeyDidNotExist,
+    #[msg("Remote pool address already exists")]
+    RemotePoolAddressAlreadyExisted,
+    #[msg("Expected empty pool addresses during initialization")]
+    NonemptyPoolAddressesInit,
 
     // Rate limit errors
     #[msg("RateLimit: bucket overfilled")]

@@ -4,13 +4,15 @@ use anchor_spl::{
     token_interface::{Mint, TokenAccount},
 };
 use base_token_pool::common::{
-    CcipTokenPoolError, LockOrBurnInV1, ReleaseOrMintInV1, RemoteAddress, RemoteConfig,
-    ALLOWED_OFFRAMP, ANCHOR_DISCRIMINATOR, EXTERNAL_TOKENPOOL_SIGNER, POOL_CHAINCONFIG_SEED,
-    POOL_SIGNER_SEED, POOL_STATE_SEED,
+    uninitialized, valid_version, CcipTokenPoolError, LockOrBurnInV1, ReleaseOrMintInV1,
+    RemoteAddress, RemoteConfig, ALLOWED_OFFRAMP, ANCHOR_DISCRIMINATOR, EXTERNAL_TOKENPOOL_SIGNER,
+    POOL_CHAINCONFIG_SEED, POOL_SIGNER_SEED, POOL_STATE_SEED,
 };
 use ccip_common::seed;
 
 use crate::{program::LockreleaseTokenPool, ChainConfig, State};
+
+const MAX_POOL_STATE_V: u8 = 1;
 
 #[derive(Accounts)]
 pub struct InitializeTokenPool<'info> {
@@ -37,11 +39,24 @@ pub struct InitializeTokenPool<'info> {
 }
 
 #[derive(Accounts)]
+#[instruction(mint: Pubkey)]
+pub struct InitializeStateVersion<'info> {
+    #[account(
+        mut,
+        seeds = [POOL_STATE_SEED, mint.as_ref()],
+        bump,
+        constraint = uninitialized(state.version) @ CcipTokenPoolError::InvalidVersion,
+    )]
+    pub state: Account<'info, State>,
+}
+
+#[derive(Accounts)]
 pub struct SetConfig<'info> {
     #[account(
         mut,
         seeds = [POOL_STATE_SEED, mint.key().as_ref()],
         bump,
+        constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub state: Account<'info, State>,
     pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
