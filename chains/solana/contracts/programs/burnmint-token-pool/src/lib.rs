@@ -283,11 +283,16 @@ pub fn burn_tokens<'a>(
         &mint.key().to_bytes(),
         &[pool_signer_bump],
     ];
-    invoke_signed(&ix, &[pool_token_account, mint, pool_signer], &[&seeds[..]])?;
+    invoke_signed(
+        &ix,
+        &[pool_token_account, mint.clone(), pool_signer],
+        &[&seeds[..]],
+    )?;
 
     emit!(Burned {
         sender,
         amount: lock_or_burn.amount,
+        mint: mint.key(),
     });
 
     Ok(())
@@ -321,7 +326,7 @@ pub fn mint_tokens<'a>(
     ];
     invoke_signed(
         &ix,
-        &[receiver_token_account, mint, pool_signer.clone()],
+        &[receiver_token_account, mint.clone(), pool_signer.clone()],
         &[&seeds[..]],
     )?;
 
@@ -329,6 +334,7 @@ pub fn mint_tokens<'a>(
         sender: pool_signer.key(),
         recipient: release_or_mint.receiver,
         amount: parsed_amount,
+        mint: mint.key(),
     });
 
     Ok(())
