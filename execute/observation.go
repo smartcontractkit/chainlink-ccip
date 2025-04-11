@@ -261,6 +261,22 @@ func buildCombinedReports(
 	return combinedReports
 }
 
+// getObsWithoutTokenData collects message observations from the provided commit data.
+// It processes messages for each commit report, validating them against the sequence number range,
+// and builds observation structures including message content and hashes.
+//
+// The function:
+// 1. Sorts commit data for deterministic processing
+// 2. Reads messages for each commit report
+// 3. Tracks messages by source chain and sequence number
+// 4. Computes hashes for each message for merkle tree verification
+// 5. Stops processing if the observation becomes too large to encode - This is a lenient check.
+// Note:
+// This function does not handle token data observations. This is intentional to allow batching of tokenData
+// observations afterwards especially getting tokenData relies on external calls.
+//
+// Returns:
+//   - Updated observation containing commit reports, messages, and hashes
 func (p *Plugin) getObsWithoutTokenData(
 	ctx context.Context,
 	lggr logger.Logger,
@@ -276,7 +292,6 @@ func (p *Plugin) getObsWithoutTokenData(
 	})
 
 	stop := false
-	//gasSum := uint64(0)
 
 	for _, report := range commitData {
 		srcChain := report.SourceChain
@@ -310,9 +325,10 @@ func (p *Plugin) getObsWithoutTokenData(
 			// Compute hash for all messages in report even if they are executed or not included in this round
 			hash, err := p.msgHasher.Hash(ctx, msg)
 			if err != nil {
-				return exectypes.Observation{}, fmt.Errorf("unable to hash message srcChain %d, seqNum %d: %w",
-					srcChain, seqNum,
-					err)
+				return exectypes.Observation{}, fmt.Errorf(
+					"unable to hash message srcChain %d, seqNum %d, msgId %v: %w",
+					srcChain, seqNum, msg.Header.MessageID, err,
+				)
 			}
 			msgHashes[srcChain][seqNum] = hash
 
@@ -323,7 +339,7 @@ func (p *Plugin) getObsWithoutTokenData(
 
 			// Check if we've exceeded encoding size limits
 			if !stop {
-				stop = totalMsgs > maxMsgsPerObs ||
+				stop = totalMsgs >= lenientMaxMsgsPerObs ||
 					exceedsMaxEncodingSize(observation, p.ocrTypeCodec, lenientMaxObservationLength)
 			}
 		}

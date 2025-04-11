@@ -36,8 +36,9 @@ func ConstructMerkleTree(
 				"malformed report, message %s sequence number %d outside of report range %s",
 				report.MerkleRoot.String(), msg.Header.SequenceNumber, report.SequenceNumberRange)
 		}
-		// When msg is empty the chain selector will always be zero
-		if report.SourceChain != msg.Header.SourceChainSelector && !msg.IsEmpty() {
+		// When msg is empty we don't need to check the source chain selector
+		// empty messages means they've been pseudo deleted by earlier phases and the report is still valid
+		if !msg.IsEmpty() && report.SourceChain != msg.Header.SourceChainSelector {
 			return nil, fmt.Errorf("malformed report, message %s for unexpected source chain: expected %d, got %d",
 				report.MerkleRoot.String(), report.SourceChain, msg.Header.SourceChainSelector)
 		}

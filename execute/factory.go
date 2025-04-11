@@ -37,11 +37,8 @@ const (
 	// lenientMaxObservationLength is set to  75% of ocr3 maximum recommended size
 	// check factory_test for the calculation.
 	// Using 75% to allow for some space while observing without hitting the max.
-	// this is being set to the max maximum observation length due to
-	// the observations being so large at the moment, especially when
-	// commit reports have many messages.
-	// in order to meaningfully decrease this we need to drastically optimise
-	// our observation sizes.
+	// This simplifies the truncation logic needed when observation hits this lenientMax. If it's exact
+	// we'll need to take care of more corner cases and truncation logic becomes more complex
 	// PLEASE CHANGE WITH CAUTION.
 	lenientMaxObservationLength = ocr3types.MaxMaxObservationLength * 75 / 100
 
@@ -61,9 +58,9 @@ const (
 	// per-source-chain reports. These are not limited by this value.
 	maxReportCount = 1
 
-	// maxMsgsPerQuery is set to the maximum number of messages that can be observed in one observation, this is a bit
-	// linient and acts as an indicator other than a hard limit.
-	maxMsgsPerObs = 100
+	// lenientMaxMsgsPerObs is set to the maximum number of messages that can be observed in one observation, this is a bit
+	// lenient and acts as an indicator other than a hard limit.
+	lenientMaxMsgsPerObs = 100
 )
 
 // PluginFactory implements common ReportingPluginFactory and is used for (re-)initializing commit plugin instances.
