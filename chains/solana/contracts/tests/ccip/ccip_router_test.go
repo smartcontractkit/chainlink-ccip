@@ -8885,23 +8885,23 @@ func TestCCIPRouter(t *testing.T) {
 
 						t.Run("When the receiver is rejecting calls, it fails", func(t *testing.T) {
 							// Make receiver reject calls
-							rejectIx, err := test_ccip_receiver.NewSetRejectAllInstruction(
+							rejectIx, err2 := test_ccip_receiver.NewSetRejectAllInstruction(
 								true,
 								config.ReceiverTargetAccountPDA,
 								user.PublicKey(),
 							).ValidateAndBuild()
-							require.NoError(t, err)
+							require.NoError(t, err2)
 							testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{rejectIx}, user, config.DefaultCommitment)
 
 							// Check that it fails
 							testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"RejectAll"})
 
-							acceptIx, err := test_ccip_receiver.NewSetRejectAllInstruction(
+							acceptIx, err2 := test_ccip_receiver.NewSetRejectAllInstruction(
 								false,
 								config.ReceiverTargetAccountPDA,
 								user.PublicKey(),
 							).ValidateAndBuild()
-							require.NoError(t, err)
+							require.NoError(t, err2)
 
 							// Make receiver accept calls again, to avoid disrupting following tests
 							testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{acceptIx}, user, config.DefaultCommitment)
