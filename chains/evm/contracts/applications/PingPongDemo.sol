@@ -29,6 +29,8 @@ contract PingPongDemo is CCIPReceiver, Ownable2StepMsgSender, ITypeAndVersion {
   IERC20 internal s_feeToken;
   // Allowing out of order execution.
   bool private s_outOfOrderExecution;
+  // Chain family specific extra arguments for the CCIP message.
+  bytes private s_extraArgs;
 
   constructor(address router, IERC20 feeToken) CCIPReceiver(router) {
     s_isPaused = false;
@@ -40,9 +42,10 @@ contract PingPongDemo is CCIPReceiver, Ownable2StepMsgSender, ITypeAndVersion {
     return "PingPongDemo 1.5.0";
   }
 
-  function setCounterpart(uint64 counterpartChainSelector, bytes calldata counterpartAddress) external onlyOwner {
+  function setCounterpart(uint64 counterpartChainSelector, bytes calldata counterpartAddress, bytes memory extraArgs) external onlyOwner {
     s_counterpartChainSelector = counterpartChainSelector;
     s_counterpartAddress = counterpartAddress;
+    s_extraArgs = extraArgs;
   }
 
   function startPingPong() external onlyOwner {
@@ -58,13 +61,12 @@ contract PingPongDemo is CCIPReceiver, Ownable2StepMsgSender, ITypeAndVersion {
     } else {
       emit Pong(pingPongCount);
     }
+
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
       receiver: s_counterpartAddress,
       data: abi.encode(pingPongCount),
       tokenAmounts: new Client.EVMTokenAmount[](0),
-      extraArgs: Client._argsToBytes(
-        Client.GenericExtraArgsV2({gasLimit: uint256(DEFAULT_GAS_LIMIT), allowOutOfOrderExecution: s_outOfOrderExecution})
-      ),
+      extraArgs: s_extraArgs,
       feeToken: address(s_feeToken)
     });
     IRouterClient(getRouter()).ccipSend(s_counterpartChainSelector, message);
