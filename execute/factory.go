@@ -34,14 +34,13 @@ const (
 	// maxQueryLength is set to disable queries because they are not used.
 	maxQueryLength = 0
 
-	// maxObservationLength is set to the maximum size of an observation
+	// lenientMaxObservationLength is set to  75% of ocr3 maximum recommended size
 	// check factory_test for the calculation.
-	// this is being set to the max maximum observation length due to
-	// the observations being so large at the moment, especially when
-	// commit reports have many messages.
-	// in order to meaningfully decrease this we need to drastically optimise
-	// our observation sizes.
-	maxObservationLength = ocr3types.MaxMaxObservationLength
+	// Using 75% to allow for some space while observing without hitting the max.
+	// This simplifies the truncation logic needed when observation hits this lenientMax. If it's exact
+	// we'll need to take care of more corner cases and truncation logic becomes more complex
+	// PLEASE CHANGE WITH CAUTION.
+	lenientMaxObservationLength = ocr3types.MaxMaxObservationLength * 75 / 100
 
 	// maxOutcomeLength is set to the maximum size of an outcome
 	// check factory_test for the calculation. This is not limited because
@@ -58,6 +57,10 @@ const (
 	// the actual exec report type (ExecutePluginReport) may contain multiple
 	// per-source-chain reports. These are not limited by this value.
 	maxReportCount = 1
+
+	// lenientMaxMsgsPerObs is set to the maximum number of messages that can be observed in one observation, this is a bit
+	// lenient and acts as an indicator other than a hard limit.
+	lenientMaxMsgsPerObs = 100
 )
 
 // PluginFactory implements common ReportingPluginFactory and is used for (re-)initializing commit plugin instances.
@@ -187,7 +190,7 @@ func (p PluginFactory) NewReportingPlugin(
 			Limits: ocr3types.ReportingPluginLimits{
 				// No query for this execute implementation.
 				MaxQueryLength:       maxQueryLength,
-				MaxObservationLength: maxObservationLength,
+				MaxObservationLength: ocr3types.MaxMaxObservationLength,
 				MaxOutcomeLength:     maxOutcomeLength,
 				MaxReportLength:      maxReportLength,
 				MaxReportCount:       maxReportCount,

@@ -3,7 +3,10 @@ package execute
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
+
+	ocrtypecodec "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
@@ -11,7 +14,6 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
-	"github.com/smartcontractkit/chainlink-ccip/execute/optimizers"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
@@ -259,68 +261,158 @@ func buildCombinedReports(
 	return combinedReports
 }
 
-// regroup converts the previous outcome to the observation format.
-// TODO: use same format for Observation and Outcome.
-func regroup(commitData []exectypes.CommitData) exectypes.CommitObservations {
-	groupedCommits := make(exectypes.CommitObservations)
-	for _, report := range commitData {
-		if _, ok := groupedCommits[report.SourceChain]; !ok {
-			groupedCommits[report.SourceChain] = []exectypes.CommitData{}
-		}
-		groupedCommits[report.SourceChain] = append(groupedCommits[report.SourceChain], report)
-	}
-	return groupedCommits
-}
-
-func readAllMessages(
+// getObsWithoutTokenData collects message observations from the provided commit data.
+// It processes messages for each commit report, validating them against the sequence number range,
+// and builds observation structures including message content and hashes.
+//
+// The function:
+// 1. Sorts commit data for deterministic processing
+// 2. Reads messages for each commit report
+// 3. Tracks messages by source chain and sequence number
+// 4. Computes hashes for each message for merkle tree verification
+// 5. Stops processing if the observation becomes too large to encode - This is a lenient check.
+// Note:
+// This function does not handle token data observations. This is intentional to allow batching of tokenData
+// observations afterwards especially getting tokenData relies on external calls.
+//
+// Returns:
+//   - Updated observation containing commit reports, messages, and hashes
+func (p *Plugin) getObsWithoutTokenData(
 	ctx context.Context,
 	lggr logger.Logger,
-	ccipReader reader.CCIPReader,
 	commitData []exectypes.CommitData,
-) (exectypes.MessageObservations, exectypes.CommitObservations, map[cciptypes.Bytes32]time.Time) {
+	observation exectypes.Observation,
+) (exectypes.Observation, error) {
 	messageObs := make(exectypes.MessageObservations)
 	availableReports := make(exectypes.CommitObservations)
-	messageTimestamps := make(map[cciptypes.Bytes32]time.Time)
+	msgHashes := make(exectypes.MessageHashes)
 
-	commitObs := regroup(commitData)
+	sort.Slice(commitData, func(i, j int) bool {
+		return exectypes.CompareCommitData(commitData[i], commitData[j])
+	})
 
-	for srcChain, reports := range commitObs {
-		if len(reports) == 0 {
-			continue
+	stop := false
+
+	for _, report := range commitData {
+		srcChain := report.SourceChain
+
+		// Read messages for this report's sequence number range
+		msgs, err := p.readMessagesForReport(ctx, lggr, srcChain, report)
+		if err != nil {
+			continue // Logging already done in readMessagesForReport
 		}
 
-		messageObs[srcChain] = make(map[cciptypes.SeqNum]cciptypes.Message)
-		// Read messages for each range.
-		for _, report := range reports {
-			msgs, err := ccipReader.MsgsBetweenSeqNums(ctx, srcChain, report.SequenceNumberRange)
+		// Add the report to available reports
+		availableReports[srcChain] = append(availableReports[srcChain], report)
+
+		totalMsgs := 0
+		// Initialize data structures for this source chain if needed
+		initSourceChainMaps(srcChain, messageObs, msgHashes)
+		// Process each message in the report
+		for _, msg := range msgs {
+			seqNum := msg.Header.SequenceNumber
+
+			// Handle message observation and gas calculation
+			if !stop && !p.inflightMessageCache.IsInflight(srcChain, msg.Header.MessageID) {
+				messageObs[srcChain][seqNum] = msg
+				totalMsgs++
+			} else {
+				// This is for when we calculate roots in reports later, we need the seqNum and
+				// the hash for this message
+				messageObs[srcChain][seqNum] = createEmptyMessageWithSeqNum(seqNum)
+			}
+
+			// Compute hash for all messages in report even if they are executed or not included in this round
+			hash, err := p.msgHasher.Hash(ctx, msg)
 			if err != nil {
-				lggr.Errorw("unable to read all messages for report",
-					"srcChain", srcChain,
-					"seqRange", report.SequenceNumberRange,
-					"merkleRoot", report.MerkleRoot,
-					"err", err,
+				return exectypes.Observation{}, fmt.Errorf(
+					"unable to hash message srcChain %d, seqNum %d, msgId %v: %w",
+					srcChain, seqNum, msg.Header.MessageID, err,
 				)
-				continue
 			}
+			msgHashes[srcChain][seqNum] = hash
 
-			if !msgsConformToSeqRange(msgs, report.SequenceNumberRange) {
-				lggr.Errorw("missing messages in range",
-					"srcChain", srcChain, "seqRange", report.SequenceNumberRange)
-				continue
-			}
+			// Update the observation with current state
+			observation.CommitReports = availableReports
+			observation.Messages = messageObs
+			observation.Hashes = msgHashes
 
-			for _, msg := range msgs {
-				messageObs[srcChain][msg.Header.SequenceNumber] = msg
-				messageTimestamps[msg.Header.MessageID] = report.Timestamp
+			// Check if we've exceeded encoding size limits
+			if !stop {
+				stop = totalMsgs >= lenientMaxMsgsPerObs ||
+					exceedsMaxEncodingSize(observation, p.ocrTypeCodec, lenientMaxObservationLength)
 			}
-			availableReports[srcChain] = append(availableReports[srcChain], report)
 		}
-		// Remove empty chains.
-		if len(messageObs[srcChain]) == 0 {
-			delete(messageObs, srcChain)
+
+		if stop {
+			lggr.Infow("Stop processing messages, observation is too large")
+			break
 		}
 	}
-	return messageObs, availableReports, messageTimestamps
+
+	return observation, nil
+}
+
+// initSourceChainMaps initializes maps for a source chain if they don't exist
+func initSourceChainMaps(
+	srcChain cciptypes.ChainSelector,
+	messageObs exectypes.MessageObservations,
+	msgHashes exectypes.MessageHashes,
+) {
+	if _, ok := messageObs[srcChain]; !ok {
+		messageObs[srcChain] = make(map[cciptypes.SeqNum]cciptypes.Message)
+		msgHashes[srcChain] = make(map[cciptypes.SeqNum]cciptypes.Bytes32)
+	}
+}
+
+// readMessagesForReport reads messages for the given report and validates they conform to the sequence range
+func (p *Plugin) readMessagesForReport(
+	ctx context.Context,
+	lggr logger.Logger,
+	srcChain cciptypes.ChainSelector,
+	report exectypes.CommitData,
+) ([]cciptypes.Message, error) {
+	msgs, err := p.ccipReader.MsgsBetweenSeqNums(ctx, srcChain, report.SequenceNumberRange)
+	if err != nil {
+		lggr.Errorw("unable to read all messages for report",
+			"srcChain", srcChain,
+			"seqRange", report.SequenceNumberRange,
+			"merkleRoot", report.MerkleRoot,
+			"err", err,
+		)
+		return nil, err
+	}
+
+	if !msgsConformToSeqRange(msgs, report.SequenceNumberRange) {
+		lggr.Errorw("missing messages in range",
+			"srcChain", srcChain,
+			"seqRange", report.SequenceNumberRange,
+		)
+		return nil, fmt.Errorf("missing messages in range")
+	}
+
+	return msgs, nil
+}
+
+// createEmptyMessageWithSeqNum creates a message with just the sequence number set
+func createEmptyMessageWithSeqNum(seqNum cciptypes.SeqNum) cciptypes.Message {
+	return cciptypes.Message{
+		Header: cciptypes.RampMessageHeader{
+			SequenceNumber: seqNum,
+		},
+	}
+}
+
+func exceedsMaxEncodingSize(
+	observation exectypes.Observation,
+	ocrTypeCodec ocrtypecodec.ExecCodec,
+	maxSize int,
+) bool {
+	encodedObs, err := ocrTypeCodec.EncodeObservation(observation)
+	if err != nil {
+		return false
+	}
+	return len(encodedObs) >= maxSize
 }
 
 func (p *Plugin) getMessagesObservation(
@@ -339,44 +431,29 @@ func (p *Plugin) getMessagesObservation(
 		return observation, nil
 	}
 
-	messageObs, commitReportCache, _ := readAllMessages(
+	obsWithoutTokenData, err := p.getObsWithoutTokenData(
 		ctx,
 		lggr,
-		p.ccipReader,
 		previousOutcome.CommitReports,
+		observation,
 	)
+	if err != nil {
+		return exectypes.Observation{}, fmt.Errorf("unable to get messages: %w", err)
+	}
 
-	tkData, err1 := p.tokenDataObserver.Observe(ctx, messageObs)
+	tkData, err1 := p.tokenDataObserver.Observe(ctx, obsWithoutTokenData.Messages)
 	if err1 != nil {
 		return exectypes.Observation{}, fmt.Errorf("unable to process token data %w", err1)
 	}
 
 	// validating before continuing with heavy operations afterwards like truncation
 	// all messages should have a token data observation even if it's empty
-	if validateTokenDataObservations(messageObs, tkData) != nil {
+	if validateTokenDataObservations(obsWithoutTokenData.Messages, tkData) != nil {
 		return exectypes.Observation{}, fmt.Errorf("invalid token data observations")
 	}
 
-	hashes, err := exectypes.GetHashes(ctx, messageObs, p.msgHasher)
-	if err != nil {
-		return exectypes.Observation{}, fmt.Errorf("unable to get message hashes: %w", err)
-	}
-
-	observation.CommitReports = commitReportCache
-	observation.Messages = messageObs
-	observation.Hashes = hashes
+	observation = obsWithoutTokenData
 	observation.TokenData = tkData
-
-	// Make sure encoded observation fits within the maximum observation size.
-	observationOptimizer := optimizers.NewObservationOptimizer(
-		lggr,
-		maxObservationLength,
-		p.ocrTypeCodec,
-	)
-	observation, err = observationOptimizer.TruncateObservation(observation)
-	if err != nil {
-		return exectypes.Observation{}, fmt.Errorf("unable to truncate observation: %w", err)
-	}
 
 	return observation, nil
 }
