@@ -121,6 +121,22 @@ export type LockreleaseTokenPool = {
       ]
     },
     {
+      "name": "initializeStateVersion",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "mint",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
       "name": "initChainRemoteConfig",
       "accounts": [
         {
@@ -841,6 +857,22 @@ export const IDL: LockreleaseTokenPool = {
       "args": [
         {
           "name": "newRouter",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
+      "name": "initializeStateVersion",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "mint",
           "type": "publicKey"
         }
       ]
