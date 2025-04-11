@@ -41,7 +41,6 @@ import (
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
-	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
 type IntTest struct {
@@ -75,7 +74,7 @@ func SetupSimpleTest(t *testing.T,
 	}
 	msgHasher := mocks.NewMessageHasher()
 	ccipReader := inmem.InMemoryCCIPReader{
-		Reports:  []plugintypes2.CommitPluginReportWithMeta{},
+		Reports:  []cciptypes.CommitPluginReportWithMeta{},
 		Messages: messagesMap,
 		Dest:     dstSelector,
 	}
@@ -136,7 +135,7 @@ func (it *IntTest) WithMessages(
 		tree, err := report.ConstructMerkleTree(reportData, logger.Test(it.t))
 		require.NoError(it.t, err, "failed to construct merkle tree")
 
-		it.ccipReader.Reports = append(it.ccipReader.Reports, plugintypes2.CommitPluginReportWithMeta{
+		it.ccipReader.Reports = append(it.ccipReader.Reports, cciptypes.CommitPluginReportWithMeta{
 			Report: cciptypes.CommitPluginReport{
 				BlessedMerkleRoots: []cciptypes.MerkleRootChain{
 					{

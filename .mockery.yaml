@@ -1,6 +1,7 @@
 with-expecter: true
 filename: "{{.InterfaceName | snakecase}}.go"
 dir: mocks/{{ replaceAll .InterfaceDirRelative "internal" "internal_" }}
+resolve-type-alias: false
 packages:
     github.com/smartcontractkit/chainlink-ccip/commit/merkleroot:
         interfaces:
@@ -8,7 +9,6 @@ packages:
     github.com/smartcontractkit/chainlink-ccip/internal/reader:
         interfaces:
             HomeChain:
-            CCIP:
     github.com/smartcontractkit/chainlink-ccip/internal/plugincommon:
         interfaces:
             ChainSupport:
@@ -22,7 +22,6 @@ packages:
             CCIPReader:
             PriceReader:
             RMNHome:
-            ConfigCache:
     github.com/smartcontractkit/chainlink-ccip/execute/internal/cache:
         interfaces:
             TimeProvider:
