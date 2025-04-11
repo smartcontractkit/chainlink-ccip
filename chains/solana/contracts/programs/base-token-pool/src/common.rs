@@ -318,6 +318,7 @@ pub struct ReleaseOrMintOutV1 {
 pub struct Burned {
     pub sender: Pubkey,
     pub amount: u64,
+    pub mint: Pubkey,
 }
 
 #[event]
@@ -325,12 +326,14 @@ pub struct Minted {
     pub sender: Pubkey,
     pub recipient: Pubkey,
     pub amount: u64,
+    pub mint: Pubkey,
 }
 
 #[event]
 pub struct Locked {
     pub sender: Pubkey,
     pub amount: u64,
+    pub mint: Pubkey,
 }
 
 #[event]
@@ -338,6 +341,7 @@ pub struct Released {
     pub sender: Pubkey,
     pub recipient: Pubkey,
     pub amount: u64,
+    pub mint: Pubkey,
 }
 
 // note: configuration events are slightly different than EVM chains because configuration follows different steps
