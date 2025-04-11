@@ -35,7 +35,13 @@ pub mod test_ccip_receiver {
         msg!("Called `ccip_receive` with message {:?}", message);
 
         let counter = &mut ctx.accounts.counter;
-        counter.value += 1;
+        let (incremented, wrapped_around) = counter.value.overflowing_add(1);
+        counter.value = incremented;
+        msg!(
+            "Wrapped around: {} | New Counter: {}",
+            wrapped_around,
+            counter.value
+        );
 
         // additional accounts trigger additional CPI call
         if !ctx.remaining_accounts.is_empty() {
