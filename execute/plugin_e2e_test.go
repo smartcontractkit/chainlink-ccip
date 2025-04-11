@@ -221,7 +221,7 @@ func TestPlugin_EncodingSizeLimits(t *testing.T) {
 		// Only  (half of the messages - 1) will be included in the observation
 		// Notice that there's encoding overhead from other fields in observation, meaning that the message in the
 		// middle of the observation will be truncated.
-		size := maxObservationLength / (nMessages / 2)
+		size := lenientMaxObservationLength / (nMessages / 2)
 		largeMessages = append(largeMessages, inmem.MessagesWithMetadata{
 			Message:     makeMessageWithData(i, size, srcSelector, dstSelector).Message,
 			Executed:    false,

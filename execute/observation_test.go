@@ -632,7 +632,7 @@ func Test_getObsWithoutTokenData(t *testing.T) {
 					Once()
 				// second call to EncodeObservation returns a large size, second message shouldn't be included
 				codec.EXPECT().EncodeObservation(mock.Anything).
-					Return(make([]byte, maxObservationLength+1), nil)
+					Return(make([]byte, lenientMaxObservationLength+1), nil)
 
 				messages := createMessages(src1, dest, 1, 3)
 
@@ -684,7 +684,7 @@ func Test_getObsWithoutTokenData(t *testing.T) {
 					Times(4)
 				// Fifth call to EncodeObservation returns a large size
 				codec.EXPECT().EncodeObservation(mock.Anything).
-					Return(make([]byte, maxObservationLength+1), nil)
+					Return(make([]byte, lenientMaxObservationLength+1), nil)
 
 				estimateProvider.EXPECT().CalculateMessageMaxGas(mock.Anything).Return(uint64(gasPerMsg)).Maybe()
 			},

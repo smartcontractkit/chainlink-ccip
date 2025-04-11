@@ -324,7 +324,7 @@ func (p *Plugin) getObsWithoutTokenData(
 			// Check if we've exceeded encoding size limits
 			if !stop {
 				stop = totalMsgs > maxMsgsPerObs ||
-					exceedsMaxEncodingSize(observation, p.ocrTypeCodec, maxObservationLength)
+					exceedsMaxEncodingSize(observation, p.ocrTypeCodec, lenientMaxObservationLength)
 			}
 		}
 

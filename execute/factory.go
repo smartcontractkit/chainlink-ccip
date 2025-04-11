@@ -34,15 +34,16 @@ const (
 	// maxQueryLength is set to disable queries because they are not used.
 	maxQueryLength = 0
 
-	// maxObservationLength is set to the maximum size of an observation
+	// lenientMaxObservationLength is set to  75% of ocr3 maximum recommended size
 	// check factory_test for the calculation.
+	// Using 75% to allow for some space while observing without hitting the max.
 	// this is being set to the max maximum observation length due to
 	// the observations being so large at the moment, especially when
 	// commit reports have many messages.
 	// in order to meaningfully decrease this we need to drastically optimise
 	// our observation sizes.
-	// Using 75% of the max size to allow for some space while observing.
-	maxObservationLength = ocr3types.MaxMaxObservationLength * 75 / 100
+	// PLEASE CHANGE WITH CAUTION.
+	lenientMaxObservationLength = ocr3types.MaxMaxObservationLength * 75 / 100
 
 	// maxOutcomeLength is set to the maximum size of an outcome
 	// check factory_test for the calculation. This is not limited because
