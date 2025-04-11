@@ -387,26 +387,6 @@ func createEmptyMessageWithSeqNum(seqNum cciptypes.SeqNum) cciptypes.Message {
 	}
 }
 
-func (p *Plugin) exceedsMaxGasLimit(
-	gasSum uint64,
-	msgs []cciptypes.Message,
-) bool {
-	// calculating merkleTreeGas here is not entirely accurate as we can have multiple roots
-	// for observation, but this is a good approximation at this point as we have more in depth checks
-	// later when we built the reports
-	merkleTreeGas := p.estimateProvider.CalculateMerkleTreeGas(len(msgs))
-	totalGas := gasSum + merkleTreeGas
-
-	// even when it's equal to the limit we'll stop as this is already an approximation
-	// that is lower than the actual gas
-	if totalGas >= p.offchainCfg.BatchGasLimit {
-		p.lggr.Infow("reached max gas limit while observing",
-			"gas", totalGas, "maxGas", p.offchainCfg.BatchGasLimit)
-		return true
-	}
-	return false
-}
-
 func exceedsMaxEncodingSize(
 	observation exectypes.Observation,
 	ocrTypeCodec ocrtypecodec.ExecCodec,

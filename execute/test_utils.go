@@ -396,12 +396,6 @@ func newMessageSentEvent(
 
 type msgOption func(*cciptypes.Message)
 
-func withData(data []byte) msgOption {
-	return func(m *cciptypes.Message) {
-		m.Data = data
-	}
-}
-
 func withTokens(tokenAmounts ...cciptypes.RampTokenAmount) msgOption {
 	return func(m *cciptypes.Message) {
 		m.TokenAmounts = tokenAmounts
