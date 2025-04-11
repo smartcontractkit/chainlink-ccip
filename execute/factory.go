@@ -41,8 +41,8 @@ const (
 	// commit reports have many messages.
 	// in order to meaningfully decrease this we need to drastically optimise
 	// our observation sizes.
-	// Using 70% of the max size to allow for some space while observing.
-	maxObservationLength = ocr3types.MaxMaxObservationLength * 70 / 100
+	// Using 75% of the max size to allow for some space while observing.
+	maxObservationLength = ocr3types.MaxMaxObservationLength * 75 / 100
 
 	// maxOutcomeLength is set to the maximum size of an outcome
 	// check factory_test for the calculation. This is not limited because
@@ -62,7 +62,7 @@ const (
 
 	// maxMsgsPerQuery is set to the maximum number of messages that can be observed in one observation, this is a bit
 	// linient and acts as an indicator other than a hard limit.
-	maxMsgsPerObs = 50
+	maxMsgsPerObs = 100
 )
 
 // PluginFactory implements common ReportingPluginFactory and is used for (re-)initializing commit plugin instances.
@@ -192,7 +192,7 @@ func (p PluginFactory) NewReportingPlugin(
 			Limits: ocr3types.ReportingPluginLimits{
 				// No query for this execute implementation.
 				MaxQueryLength:       maxQueryLength,
-				MaxObservationLength: maxObservationLength,
+				MaxObservationLength: ocr3types.MaxMaxObservationLength,
 				MaxOutcomeLength:     maxOutcomeLength,
 				MaxReportLength:      maxReportLength,
 				MaxReportCount:       maxReportCount,
