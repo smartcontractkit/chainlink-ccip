@@ -4368,6 +4368,7 @@ func TestCCIPRouter(t *testing.T) {
 				require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "Burned", &poolEvent, config.PrintEvents))
 				require.Equal(t, token0.RouterSigner, poolEvent.Sender)
 				require.Equal(t, uint64(1), poolEvent.Amount)
+				require.Equal(t, token0.Mint, poolEvent.Mint)
 
 				// check balances
 				_, currSupply, err := tokens.TokenSupply(ctx, solanaGoClient, token0.Mint, config.DefaultCommitment)
@@ -8016,6 +8017,7 @@ func TestCCIPRouter(t *testing.T) {
 					require.Equal(t, config.ReceiverExternalExecutionConfigPDA, mintEvent.Recipient)
 					require.Equal(t, token0.PoolSigner, mintEvent.Sender)
 					require.Equal(t, uint64(1), mintEvent.Amount)
+					require.Equal(t, token0.Mint, mintEvent.Mint)
 
 					_, finalSupply, err := tokens.TokenSupply(ctx, solanaGoClient, token0.Mint, config.DefaultCommitment)
 					require.NoError(t, err)
@@ -8360,6 +8362,7 @@ func TestCCIPRouter(t *testing.T) {
 					mintEvent := tokens.EventMintRelease{}
 					require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "Minted", &mintEvent, config.PrintEvents))
 					require.Equal(t, config.ReceiverExternalExecutionConfigPDA, mintEvent.Recipient)
+					require.Equal(t, token0.Mint, mintEvent.Mint)
 				})
 
 				t.Run("1 Test Token Transfer + Example Message Execution", func(t *testing.T) {
@@ -8478,6 +8481,7 @@ func TestCCIPRouter(t *testing.T) {
 					mintEvent := tokens.EventMintRelease{}
 					require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "Minted", &mintEvent, config.PrintEvents))
 					require.Equal(t, config.ReceiverExternalExecutionConfigPDA, mintEvent.Recipient)
+					require.Equal(t, token0.Mint, mintEvent.Mint)
 				})
 			})
 

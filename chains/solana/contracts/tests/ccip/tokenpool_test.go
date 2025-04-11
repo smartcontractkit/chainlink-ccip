@@ -310,6 +310,7 @@ func TestTokenPool(t *testing.T) {
 						require.NoError(t, common.ParseEvent(res.Meta.LogMessages, tokens.MethodToEvent(lockOrBurn), &event))
 						require.Equal(t, dumbRampPoolSigner, event.Sender)
 						require.Equal(t, amount, event.Amount)
+						require.Equal(t, mint, event.Mint)
 
 						// validate balances
 						require.Equal(t, "0", getBalance(p.User[admin.PublicKey()]))
@@ -357,6 +358,7 @@ func TestTokenPool(t *testing.T) {
 						require.Equal(t, admin.PublicKey(), event.Recipient)
 						require.Equal(t, poolSigner, event.Sender)
 						require.Equal(t, amount, event.Amount)
+						require.Equal(t, mint, event.Mint)
 
 						// validate balances
 						require.Equal(t, fmt.Sprintf("%d", amount), getBalance(p.User[admin.PublicKey()]))
