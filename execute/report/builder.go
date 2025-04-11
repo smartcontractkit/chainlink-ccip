@@ -15,7 +15,7 @@ var _ ExecReportBuilder = &execReportBuilder{}
 
 type ExecReportBuilder interface {
 	Add(ctx context.Context, report exectypes.CommitData) (exectypes.CommitData, error)
-	Build() ([]cciptypes.ExecutePluginReportSingleChain, []exectypes.CommitData, error)
+	Build() ([][]cciptypes.ExecutePluginReportSingleChain, []exectypes.CommitData, error)
 }
 
 // Option that can be passed to the builder.
@@ -53,6 +53,15 @@ func WithMaxSingleChainReports(maxSingleChainReports uint64) Option {
 func WithExtraMessageCheck(check Check) Option {
 	return func(erb *execReportBuilder) {
 		erb.checks = append(erb.checks, check)
+	}
+}
+
+// WithMultipleReports configures whether the builder should generate more than one report.
+// WARNING: this feature only supports out of order messages.
+// TODO: Move Nonce management to the Build function to support Nonce consistency across multiple reports.
+func WithMultipleReports(enabled bool) Option {
+	return func(erb *execReportBuilder) {
+		erb.multipleReportsEnabled = enabled
 	}
 }
 
@@ -126,12 +135,13 @@ type execReportBuilder struct {
 	addressCodec     cciptypes.AddressCodec
 
 	// Config
-	checks                []Check
-	destChainSelector     cciptypes.ChainSelector
-	maxReportSizeBytes    uint64
-	maxGas                uint64
-	maxMessages           uint64
-	maxSingleChainReports uint64
+	checks                 []Check
+	destChainSelector      cciptypes.ChainSelector
+	maxReportSizeBytes     uint64
+	maxGas                 uint64
+	maxMessages            uint64
+	maxSingleChainReports  uint64
+	multipleReportsEnabled bool
 
 	// State
 	accumulated validationMetadata
@@ -165,8 +175,9 @@ func (b *execReportBuilder) Add(
 }
 
 func (b *execReportBuilder) Build() (
-	[]cciptypes.ExecutePluginReportSingleChain, []exectypes.CommitData, error,
+	[][]cciptypes.ExecutePluginReportSingleChain, []exectypes.CommitData, error,
 ) {
+	var results [][]cciptypes.ExecutePluginReportSingleChain
 	if len(b.execReports) != len(b.commitReports) {
 		return nil, nil, fmt.Errorf(
 			"expected the same number of exec and commit reports, got %d and %d",
@@ -175,6 +186,8 @@ func (b *execReportBuilder) Build() (
 		)
 	}
 
+	numSingleChainReports := len(b.execReports)
+
 	// Check if limiting is required.
 	if b.maxSingleChainReports != 0 && uint64(len(b.execReports)) > b.maxSingleChainReports {
 		b.lggr.Infof(
@@ -182,14 +195,33 @@ func (b *execReportBuilder) Build() (
 			len(b.execReports),
 			b.maxSingleChainReports,
 		)
-		b.execReports = b.execReports[:b.maxSingleChainReports]
-		b.commitReports = b.commitReports[:b.maxSingleChainReports]
+
+		// split into multiple reports
+		if b.multipleReportsEnabled {
+			for len(b.execReports) > int(b.maxSingleChainReports) {
+				results = append(results, b.execReports[:b.maxSingleChainReports])
+				b.execReports = b.execReports[b.maxSingleChainReports:]
+			}
+			if len(b.execReports) > 0 {
+				results = append(results, b.execReports)
+			}
+		} else {
+			// Otherwise, truncate
+			b.execReports = b.execReports[:b.maxSingleChainReports]
+			b.commitReports = b.commitReports[:b.maxSingleChainReports]
+			results = append(results, b.execReports)
+			numSingleChainReports = len(b.execReports)
+		}
 	}
+
+	// TODO: Sort reports into a canonical form prior to returning.
 
 	b.lggr.Infow(
 		"selected commit reports for execution report",
 		"numReports", len(b.execReports),
+		"numSingleChainReports", numSingleChainReports,
+		// this is before any truncation
 		"sizeBytes", b.accumulated.encodedSizeBytes,
 		"maxSize", b.maxReportSizeBytes)
-	return b.execReports, b.commitReports, nil
+	return results, b.commitReports, nil
 }

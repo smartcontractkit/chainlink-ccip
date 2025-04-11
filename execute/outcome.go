@@ -121,7 +121,7 @@ func (p *Plugin) getCommitReportsOutcome(observation exectypes.Observation) exec
 
 	// Must use 'NewOutcome' rather than direct struct initialization to ensure the outcome is sorted.
 	// TODO: sort in the encoder.
-	return exectypes.NewOutcome(exectypes.GetCommitReports, commitReports, cciptypes.ExecutePluginReport{})
+	return exectypes.NewOutcome(exectypes.GetCommitReports, commitReports, nil)
 }
 
 func (p *Plugin) getMessagesOutcome(
@@ -163,7 +163,7 @@ func (p *Plugin) getMessagesOutcome(
 
 	// Must use 'NewOutcome' rather than direct struct initialization to ensure the outcome is sorted.
 	// TODO: sort in the encoder.
-	return exectypes.NewOutcome(exectypes.GetMessages, commitReports, cciptypes.ExecutePluginReport{})
+	return exectypes.NewOutcome(exectypes.GetMessages, commitReports, nil)
 }
 
 func (p *Plugin) getFilterOutcome(
@@ -181,6 +181,7 @@ func (p *Plugin) getFilterOutcome(
 		p.estimateProvider,
 		p.destChain,
 		p.addrCodec,
+		report.WithMultipleReports(p.offchainCfg.MultipleReportsEnabled),
 		report.WithMaxReportSizeBytes(maxReportLength),
 		report.WithMaxGas(p.offchainCfg.BatchGasLimit),
 		report.WithExtraMessageCheck(report.CheckNonces(observation.Nonces, p.addrCodec)),
@@ -199,11 +200,14 @@ func (p *Plugin) getFilterOutcome(
 		return exectypes.Outcome{}, fmt.Errorf("unable to select report: %w", err)
 	}
 
-	execReport := cciptypes.ExecutePluginReport{
-		ChainReports: outcomeReports,
+	var execReports []cciptypes.ExecutePluginReport
+	for _, r := range outcomeReports {
+		execReports = append(execReports, cciptypes.ExecutePluginReport{
+			ChainReports: r,
+		})
 	}
 
 	// Must use 'NewOutcome' rather than direct struct initialization to ensure the outcome is sorted.
 	// TODO: sort in the encoder.
-	return exectypes.NewOutcome(exectypes.Filter, selectedCommitReports, execReport), nil
+	return exectypes.NewOutcome(exectypes.Filter, selectedCommitReports, execReports), nil
 }

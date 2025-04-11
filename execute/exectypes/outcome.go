@@ -1,8 +1,6 @@
 package exectypes
 
 import (
-	"sort"
-
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
@@ -61,6 +59,8 @@ type Outcome struct {
 
 	// Report is built from the oldest pending commit reports.
 	Report cciptypes.ExecutePluginReport `json:"report"`
+
+	Reports []cciptypes.ExecutePluginReport `json:"reports"`
 }
 
 // IsEmpty returns true if the outcome has no pending commit reports or chain reports.
@@ -107,7 +107,7 @@ func (o Outcome) ToLogFormat() Outcome {
 func NewOutcome(
 	state PluginState,
 	selectedCommits []CommitData,
-	report cciptypes.ExecutePluginReport,
+	reports []cciptypes.ExecutePluginReport,
 ) Outcome {
 	return NewSortedOutcome(state, selectedCommits, report)
 }
@@ -133,7 +133,7 @@ func NewSortedOutcome(
 		})
 	return Outcome{
 		State:         state,
-		CommitReports: pendingCommitsCP,
-		Report:        cciptypes.ExecutePluginReport{ChainReports: reportCP},
+		CommitReports: selectedCommits,
+		Reports:       reports,
 	}
 }

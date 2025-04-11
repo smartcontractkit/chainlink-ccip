@@ -483,12 +483,14 @@ func (p *Plugin) ObservationQuorum(
 // out-of-order execution is detected or the message requires additional off-chain metadata which is not yet available.
 // If there is not enough space in the final report, it may be partially executed by searching for a subset of messages
 // which can fit in the final report.
+//
+// The output of this function are canonical data structures which can be directly included in the final outcome.
 func selectReport(
 	ctx context.Context,
 	lggr logger.Logger,
 	commitReports []exectypes.CommitData,
 	builder report.ExecReportBuilder,
-) ([]cciptypes.ExecutePluginReportSingleChain, []exectypes.CommitData, error) {
+) ([][]cciptypes.ExecutePluginReportSingleChain, []exectypes.CommitData, error) {
 	// TODO: It may be desirable for this entire function to be an interface so that
 	//       different selection algorithms can be used.
 

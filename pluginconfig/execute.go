@@ -45,6 +45,9 @@ type ExecuteOffchainConfig struct {
 	// MaxSingleChainReports is the maximum number of single chain reports that can be included in a report.
 	// When set to 0, this setting is ignored.
 	MaxSingleChainReports uint64 `json:"maxSingleChainReports"`
+
+	// MultipleReportsEnabled is a flag to enable/disable multiple reports per round.
+	MultipleReportsEnabled bool `json:"multipleReports"`
 }
 
 func (e *ExecuteOffchainConfig) ApplyDefaultsAndValidate() error {
