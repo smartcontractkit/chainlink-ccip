@@ -7,5 +7,7 @@ lcov.info.pruned
 report
 
 scripts/abigen
+scripts/forge_zksync
 abi
 solc
+zkout

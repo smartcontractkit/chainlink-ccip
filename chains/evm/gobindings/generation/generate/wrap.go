@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	gethwrappers "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generation"
+	zksyncwrapper "github.com/smartcontractkit/chainlink-evm/gethwrappers/generation/generate/zksync"
 )
 
 var (
@@ -22,10 +23,17 @@ func main() {
 		outDirSuffix = os.Args[4]
 	}
 
-	abiPath := rootDir + project + "/" + className + "/" + className + ".sol/" + className + ".abi.json"
-	binPath := rootDir + project + "/" + className + "/" + className + ".sol/" + className + ".bin"
+	if os.Getenv("ZKSYNC") != "true" {
+		abiPath := rootDir + project + "/" + className + "/" + className + ".sol/" + className + ".abi.json"
+		binPath := rootDir + project + "/" + className + "/" + className + ".sol/" + className + ".bin"
 
-	GenWrapper(abiPath, binPath, className, pkgName, outDirSuffix)
+		GenWrapper(abiPath, binPath, className, pkgName, outDirSuffix)
+	} else {
+		outDir := getOutDir(outDirSuffix, pkgName)
+		zksyncBytecodePath := filepath.Join("..", "zkout", className+".sol", className+".json")
+		outPath := filepath.Join(outDir, pkgName+"_zksync.go")
+		zksyncwrapper.WrapZksyncDeploy(zksyncBytecodePath, className, pkgName, outPath)
+	}
 }
 
 // GenWrapper generates a contract wrapper for the given contract.
@@ -47,16 +55,7 @@ func main() {
 func GenWrapper(abiPath, binPath, className, pkgName, outDirSuffixInput string) {
 	fmt.Println("Generating", pkgName, "contract wrapper")
 
-	cwd, err := os.Getwd() // gethwrappers directory
-	if err != nil {
-		gethwrappers.Exit("could not get working directory", err)
-	}
-	outDir := filepath.Join(cwd, "generated", outDirSuffixInput, pkgName)
-	if mkdErr := os.MkdirAll(outDir, 0700); err != nil {
-		gethwrappers.Exit(
-			fmt.Sprintf("failed to create wrapper dir, outDirSuffixInput: %s (could be empty)", outDirSuffixInput),
-			mkdErr)
-	}
+	outDir := getOutDir(outDirSuffixInput, pkgName)
 	outPath := filepath.Join(outDir, pkgName+".go")
 
 	gethwrappers.Abigen(gethwrappers.AbigenArgs{
@@ -77,4 +76,19 @@ func GenWrapper(abiPath, binPath, className, pkgName, outDirSuffixInput string) 
 	if err := gethwrappers.WriteVersionsDB(versions); err != nil {
 		gethwrappers.Exit("could not save versions db", err)
 	}
+}
+
+func getOutDir(outDirSuffixInput, pkgName string) string {
+	cwd, err := os.Getwd() // gethwrappers directory
+	if err != nil {
+		gethwrappers.Exit("could not get working directory", err)
+	}
+	outDir := filepath.Join(cwd, "generated", outDirSuffixInput, pkgName)
+	if mkdErr := os.MkdirAll(outDir, 0700); err != nil {
+		gethwrappers.Exit(
+			fmt.Sprintf("failed to create wrapper dir, outDirSuffixInput: %s (could be empty)", outDirSuffixInput),
+			mkdErr)
+	}
+
+	return outDir
 }
