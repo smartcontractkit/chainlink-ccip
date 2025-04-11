@@ -261,8 +261,6 @@ func buildCombinedReports(
 	return combinedReports
 }
 
-// TODO: Add max number of messages
-
 func (p *Plugin) getObsWithoutTokenData(
 	ctx context.Context,
 	lggr logger.Logger,
@@ -303,8 +301,6 @@ func (p *Plugin) getObsWithoutTokenData(
 			if !stop && !p.inflightMessageCache.IsInflight(srcChain, msg.Header.MessageID) {
 				messageObs[srcChain][seqNum] = msg
 				totalMsgs++
-				//gasSum += p.estimateProvider.CalculateMessageMaxGas(msg)
-				//stop = p.exceedsMaxGasLimit(gasSum, msgs)
 			} else {
 				// This is for when we calculate roots in reports later, we need the seqNum and
 				// the hash for this message

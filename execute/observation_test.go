@@ -426,17 +426,6 @@ func Test_getObsWithoutTokenData(t *testing.T) {
 		return hashes
 	}
 
-	setupMerkleGasExpectation := func(estimateProvider *ccipocr3.MockEstimateProvider, numMsgs int, gas uint64) {
-		//estimateProvider.EXPECT().CalculateMerkleTreeGas(numMsgs).Return(gas)
-	}
-
-	setupMessageGasExpectations := func(estimateProvider *ccipocr3.MockEstimateProvider, msgs []cciptypes.Message,
-		gas uint64) {
-		//for _, msg := range msgs {
-		//	estimateProvider.EXPECT().CalculateMessageMaxGas(msg).Return(gas)
-		//}
-	}
-
 	tests := []struct {
 		name       string
 		commitData []exectypes.CommitData
@@ -477,9 +466,6 @@ func Test_getObsWithoutTokenData(t *testing.T) {
 					Return(messages, nil)
 				// Any small size that fits within the max observation size
 				codec.EXPECT().EncodeObservation(mock.Anything).Return(oneByte, nil).Maybe()
-
-				setupMessageGasExpectations(estimateProvider, messages, gasPerMsg)
-				setupMerkleGasExpectation(estimateProvider, len(messages), gasPerMerkleTree) // 300 for 3 messages
 			},
 			expectedObs: exectypes.Observation{
 				Messages: exectypes.MessageObservations{
@@ -520,12 +506,6 @@ func Test_getObsWithoutTokenData(t *testing.T) {
 					Return(messages1, nil)
 				ccipReader.On("MsgsBetweenSeqNums", ctx, src2, cciptypes.NewSeqNumRange(5, 6)).
 					Return(messages2, nil)
-
-				setupMessageGasExpectations(estimateProvider, messages1, gasPerMsg)
-				setupMessageGasExpectations(estimateProvider, messages2, gasPerMsg)
-
-				setupMerkleGasExpectation(estimateProvider, len(messages1), gasPerMerkleTree)
-				setupMerkleGasExpectation(estimateProvider, len(messages2), gasPerMerkleTree)
 			},
 			expectedObs: exectypes.Observation{
 				Messages: exectypes.MessageObservations{
@@ -636,112 +616,6 @@ func Test_getObsWithoutTokenData(t *testing.T) {
 			},
 			expectedError: false,
 		},
-		//{
-		//	name: "gas limit exceeded",
-		//	commitData: []exectypes.CommitData{
-		//		createCommitData(src1, 1, 3),
-		//	},
-		//	setupMocks: func(ccipReader *readerpkg_mock.MockCCIPReader,
-		//		estimateProvider *ccipocr3.MockEstimateProvider,
-		//		inflightCache *cache.InflightMessageCache,
-		//		codec *codec_mock.MockExecCodec,
-		//	) {
-		//		// Any small size that fits within the max observation size
-		//		codec.EXPECT().EncodeObservation(mock.Anything).Return(oneByte, nil).Maybe()
-		//		messages := createMessages(src1, dest, 1, 3)
-		//
-		//		ccipReader.On("MsgsBetweenSeqNums", ctx, src1, cciptypes.NewSeqNumRange(1, 3)).
-		//			Return(messages, nil)
-		//
-		//		// First message takes almost all gas
-		//		estimateProvider.EXPECT().CalculateMessageMaxGas(messages[0]).Return(uint64(highGasPerMsg))
-		//
-		//		// Merkle tree gas calculation pushes us over the limit
-		//		setupMerkleGasExpectation(estimateProvider, len(messages), highGasPerMerkleTree)
-		//	},
-		//	expectedObs: exectypes.Observation{
-		//		Messages: exectypes.MessageObservations{
-		//			src1: {
-		//				1: NewMessage(1, 1, int(src1), int(dest)),
-		//				2: cciptypes.Message{Header: cciptypes.RampMessageHeader{SequenceNumber: 2}},
-		//				3: cciptypes.Message{Header: cciptypes.RampMessageHeader{SequenceNumber: 3}},
-		//			},
-		//		},
-		//		CommitReports: exectypes.CommitObservations{
-		//			src1: []exectypes.CommitData{
-		//				createCommitData(src1, 1, 3),
-		//			},
-		//		},
-		//		Hashes: exectypes.MessageHashes{
-		//			src1: createHashesMap(1, 3),
-		//		},
-		//	},
-		//	expectedError: false,
-		//},
-		//{
-		//	name: "gas limit exceeded mid second report",
-		//	commitData: []exectypes.CommitData{
-		//		createCommitData(src1, 1, 2),
-		//		createCommitData(src2, 1, 3),
-		//	},
-		//	setupMocks: func(ccipReader *readerpkg_mock.MockCCIPReader,
-		//		estimateProvider *ccipocr3.MockEstimateProvider,
-		//		inflightCache *cache.InflightMessageCache,
-		//		codec *codec_mock.MockExecCodec,
-		//	) {
-		//		messages1 := createMessages(src1, dest, 1, 2)
-		//		messages2 := createMessages(src2, dest, 1, 3)
-		//
-		//		// Return messages for both chains
-		//		ccipReader.On("MsgsBetweenSeqNums", ctx, src1, cciptypes.NewSeqNumRange(1, 2)).
-		//			Return(messages1, nil)
-		//		ccipReader.On("MsgsBetweenSeqNums", ctx, src2, cciptypes.NewSeqNumRange(1, 3)).
-		//			Return(messages2, nil)
-		//
-		//		// Any small size that fits within the max observation size
-		//		codec.EXPECT().EncodeObservation(mock.Anything).Return(oneByte, nil).Maybe()
-		//
-		//		// First chain consumes moderate gas
-		//		setupMessageGasExpectations(estimateProvider, messages1, gasPerMsg)
-		//		setupMerkleGasExpectation(estimateProvider, len(messages1), gasPerMerkleTree)
-		//
-		//		// First message in second chain consumes moderate gas
-		//		estimateProvider.EXPECT().CalculateMessageMaxGas(messages2[0]).Return(uint64(gasPerMsg))
-		//
-		//		// Second message in second chain pushes us over the limit
-		//		estimateProvider.EXPECT().CalculateMessageMaxGas(messages2[1]).Return(uint64(batchGasLimit - 500))
-		//
-		//		// Merkle tree gas calculation for second chain pushes us over the limit
-		//		setupMerkleGasExpectation(estimateProvider, len(messages2), 600)
-		//	},
-		//	expectedObs: exectypes.Observation{
-		//		Messages: exectypes.MessageObservations{
-		//			src1: {
-		//				1: NewMessage(1, 1, int(src1), int(dest)),
-		//				2: NewMessage(2, 2, int(src1), int(dest)),
-		//			},
-		//			src2: {
-		//				1: NewMessage(1, 1, int(src2), int(dest)),
-		//				// We still include the second message anyway
-		//				2: NewMessage(2, 2, int(src2), int(dest)),
-		//				3: cciptypes.Message{Header: cciptypes.RampMessageHeader{SequenceNumber: 3}},
-		//			},
-		//		},
-		//		CommitReports: exectypes.CommitObservations{
-		//			src1: []exectypes.CommitData{
-		//				createCommitData(src1, 1, 2),
-		//			},
-		//			src2: []exectypes.CommitData{
-		//				createCommitData(src2, 1, 3),
-		//			},
-		//		},
-		//		Hashes: exectypes.MessageHashes{
-		//			src1: createHashesMap(1, 2),
-		//			src2: createHashesMap(1, 3),
-		//		},
-		//	},
-		//	expectedError: false,
-		//},
 		{
 			name: "encoding size exceeded mid report",
 			commitData: []exectypes.CommitData{
@@ -764,9 +638,6 @@ func Test_getObsWithoutTokenData(t *testing.T) {
 
 				ccipReader.On("MsgsBetweenSeqNums", ctx, src1, cciptypes.NewSeqNumRange(1, 3)).
 					Return(messages, nil)
-
-				setupMessageGasExpectations(estimateProvider, messages, gasPerMsg)
-				setupMerkleGasExpectation(estimateProvider, len(messages), gasPerMerkleTree)
 			},
 			expectedObs: exectypes.Observation{
 				Messages: exectypes.MessageObservations{
@@ -816,8 +687,6 @@ func Test_getObsWithoutTokenData(t *testing.T) {
 					Return(make([]byte, maxObservationLength+1), nil)
 
 				estimateProvider.EXPECT().CalculateMessageMaxGas(mock.Anything).Return(uint64(gasPerMsg)).Maybe()
-				setupMerkleGasExpectation(estimateProvider, len(messages1), gasPerMerkleTree)
-				setupMerkleGasExpectation(estimateProvider, len(messages2), gasPerMerkleTree)
 			},
 			expectedObs: exectypes.Observation{
 				Messages: exectypes.MessageObservations{
@@ -869,10 +738,6 @@ func Test_getObsWithoutTokenData(t *testing.T) {
 				// Chain 2 fails
 				ccipReader.On("MsgsBetweenSeqNums", ctx, src2, cciptypes.NewSeqNumRange(1, 2)).
 					Return(nil, fmt.Errorf("failed to read"))
-
-				// Process chain 1 messages
-				setupMessageGasExpectations(estimateProvider, messages1, gasPerMsg)
-				setupMerkleGasExpectation(estimateProvider, len(messages1), gasPerMerkleTree)
 			},
 			expectedObs: exectypes.Observation{
 				Messages: exectypes.MessageObservations{

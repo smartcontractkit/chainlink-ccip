@@ -62,7 +62,7 @@ const (
 
 	// maxMsgsPerQuery is set to the maximum number of messages that can be observed in one observation, this is a bit
 	// linient and acts as an indicator other than a hard limit.
-	maxMsgsPerObs = 100
+	maxMsgsPerObs = 50
 )
 
 // PluginFactory implements common ReportingPluginFactory and is used for (re-)initializing commit plugin instances.
