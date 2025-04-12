@@ -2125,7 +2125,8 @@ func validateSendRequestedEvent(
 		return fmt.Errorf("fee token amount is zero")
 	}
 
-	if ev.Message.FeeToken.IsZeroOrEmpty() {
+	// Fee token is allowed to be zero
+	if len(ev.Message.FeeToken) == 0 {
 		return fmt.Errorf("invalid fee token: %s", ev.Message.FeeToken.String())
 	}
 
