@@ -307,6 +307,11 @@ export type BaseTokenPool = {
           "name": "amount",
           "type": "u64",
           "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
         }
       ]
     },
@@ -327,6 +332,11 @@ export type BaseTokenPool = {
           "name": "amount",
           "type": "u64",
           "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
         }
       ]
     },
@@ -341,6 +351,11 @@ export type BaseTokenPool = {
         {
           "name": "amount",
           "type": "u64",
+          "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
           "index": false
         }
       ]
@@ -361,6 +376,11 @@ export type BaseTokenPool = {
         {
           "name": "amount",
           "type": "u64",
+          "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
           "index": false
         }
       ]
@@ -600,31 +620,41 @@ export type BaseTokenPool = {
     },
     {
       "code": 6012,
+      "name": "RemotePoolAddressAlreadyExisted",
+      "msg": "Remote pool address already exists"
+    },
+    {
+      "code": 6013,
+      "name": "NonemptyPoolAddressesInit",
+      "msg": "Expected empty pool addresses during initialization"
+    },
+    {
+      "code": 6014,
       "name": "RLBucketOverfilled",
       "msg": "RateLimit: bucket overfilled"
     },
     {
-      "code": 6013,
+      "code": 6015,
       "name": "RLMaxCapacityExceeded",
       "msg": "RateLimit: max capacity exceeded"
     },
     {
-      "code": 6014,
+      "code": 6016,
       "name": "RLRateLimitReached",
       "msg": "RateLimit: rate limit reached"
     },
     {
-      "code": 6015,
+      "code": 6017,
       "name": "RLInvalidRateLimitRate",
       "msg": "RateLimit: invalid rate limit rate"
     },
     {
-      "code": 6016,
+      "code": 6018,
       "name": "RLDisabledNonZeroRateLimit",
       "msg": "RateLimit: disabled non-zero rate limit"
     },
     {
-      "code": 6017,
+      "code": 6019,
       "name": "LiquidityNotAccepted",
       "msg": "Liquidity not accepted"
     }
@@ -940,6 +970,11 @@ export const IDL: BaseTokenPool = {
           "name": "amount",
           "type": "u64",
           "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
         }
       ]
     },
@@ -960,6 +995,11 @@ export const IDL: BaseTokenPool = {
           "name": "amount",
           "type": "u64",
           "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
         }
       ]
     },
@@ -974,6 +1014,11 @@ export const IDL: BaseTokenPool = {
         {
           "name": "amount",
           "type": "u64",
+          "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
           "index": false
         }
       ]
@@ -994,6 +1039,11 @@ export const IDL: BaseTokenPool = {
         {
           "name": "amount",
           "type": "u64",
+          "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
           "index": false
         }
       ]
@@ -1233,31 +1283,41 @@ export const IDL: BaseTokenPool = {
     },
     {
       "code": 6012,
+      "name": "RemotePoolAddressAlreadyExisted",
+      "msg": "Remote pool address already exists"
+    },
+    {
+      "code": 6013,
+      "name": "NonemptyPoolAddressesInit",
+      "msg": "Expected empty pool addresses during initialization"
+    },
+    {
+      "code": 6014,
       "name": "RLBucketOverfilled",
       "msg": "RateLimit: bucket overfilled"
     },
     {
-      "code": 6013,
+      "code": 6015,
       "name": "RLMaxCapacityExceeded",
       "msg": "RateLimit: max capacity exceeded"
     },
     {
-      "code": 6014,
+      "code": 6016,
       "name": "RLRateLimitReached",
       "msg": "RateLimit: rate limit reached"
     },
     {
-      "code": 6015,
+      "code": 6017,
       "name": "RLInvalidRateLimitRate",
       "msg": "RateLimit: invalid rate limit rate"
     },
     {
-      "code": 6016,
+      "code": 6018,
       "name": "RLDisabledNonZeroRateLimit",
       "msg": "RateLimit: disabled non-zero rate limit"
     },
     {
-      "code": 6017,
+      "code": 6019,
       "name": "LiquidityNotAccepted",
       "msg": "Liquidity not accepted"
     }
