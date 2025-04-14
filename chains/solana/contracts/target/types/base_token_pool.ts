@@ -307,6 +307,11 @@ export type BaseTokenPool = {
           "name": "amount",
           "type": "u64",
           "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
         }
       ]
     },
@@ -327,6 +332,11 @@ export type BaseTokenPool = {
           "name": "amount",
           "type": "u64",
           "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
         }
       ]
     },
@@ -341,6 +351,11 @@ export type BaseTokenPool = {
         {
           "name": "amount",
           "type": "u64",
+          "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
           "index": false
         }
       ]
@@ -361,6 +376,11 @@ export type BaseTokenPool = {
         {
           "name": "amount",
           "type": "u64",
+          "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
           "index": false
         }
       ]
@@ -950,6 +970,11 @@ export const IDL: BaseTokenPool = {
           "name": "amount",
           "type": "u64",
           "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
         }
       ]
     },
@@ -970,6 +995,11 @@ export const IDL: BaseTokenPool = {
           "name": "amount",
           "type": "u64",
           "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
         }
       ]
     },
@@ -984,6 +1014,11 @@ export const IDL: BaseTokenPool = {
         {
           "name": "amount",
           "type": "u64",
+          "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
           "index": false
         }
       ]
@@ -1004,6 +1039,11 @@ export const IDL: BaseTokenPool = {
         {
           "name": "amount",
           "type": "u64",
+          "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
           "index": false
         }
       ]
