@@ -8889,31 +8889,57 @@ func TestCCIPRouter(t *testing.T) {
 						instruction, err = raw.ValidateAndBuild()
 						require.NoError(t, err)
 
-						tx = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment)
+						t.Run("When the receiver is rejecting calls, it fails", func(t *testing.T) {
+							// Make receiver reject calls
+							rejectIx, err2 := test_ccip_receiver.NewSetRejectAllInstruction(
+								true,
+								config.ReceiverTargetAccountPDA,
+								user.PublicKey(),
+							).ValidateAndBuild()
+							require.NoError(t, err2)
+							testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{rejectIx}, user, config.DefaultCommitment)
 
-						executionEvents, err2 := common.ParseMultipleEvents[ccip.EventExecutionStateChanged](tx.Meta.LogMessages, "ExecutionStateChanged", config.PrintEvents)
-						require.NoError(t, err2)
+							// Check that it fails
+							testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"RejectAll"})
 
-						require.Equal(t, 2, len(executionEvents))
-						require.Equal(t, config.EvmChainSelector, executionEvents[0].SourceChainSelector)
-						require.Equal(t, message1.Header.SequenceNumber, executionEvents[0].SequenceNumber)
-						require.Equal(t, hex.EncodeToString(message1.Header.MessageId[:]), hex.EncodeToString(executionEvents[0].MessageID[:]))
-						require.Equal(t, hex.EncodeToString(hash1[:]), hex.EncodeToString(executionEvents[0].MessageHash[:]))
-						require.Equal(t, ccip_offramp.InProgress_MessageExecutionState, executionEvents[0].State)
+							acceptIx, err2 := test_ccip_receiver.NewSetRejectAllInstruction(
+								false,
+								config.ReceiverTargetAccountPDA,
+								user.PublicKey(),
+							).ValidateAndBuild()
+							require.NoError(t, err2)
 
-						require.Equal(t, config.EvmChainSelector, executionEvents[1].SourceChainSelector)
-						require.Equal(t, message1.Header.SequenceNumber, executionEvents[1].SequenceNumber)
-						require.Equal(t, hex.EncodeToString(message1.Header.MessageId[:]), hex.EncodeToString(executionEvents[1].MessageID[:]))
-						require.Equal(t, hex.EncodeToString(hash1[:]), hex.EncodeToString(executionEvents[1].MessageHash[:]))
-						require.Equal(t, ccip_offramp.Success_MessageExecutionState, executionEvents[1].State)
+							// Make receiver accept calls again, to avoid disrupting following tests
+							testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{acceptIx}, user, config.DefaultCommitment)
+						})
 
-						var rootAccount ccip_offramp.CommitReport
-						err = common.GetAccountDataBorshInto(ctx, solanaGoClient, rootPDA, config.DefaultCommitment, &rootAccount)
-						require.NoError(t, err, "failed to get account info")
-						require.NotEqual(t, bin.Uint128{Lo: 0, Hi: 0}, rootAccount.Timestamp)
-						require.Equal(t, bin.Uint128{Lo: 2, Hi: 0}, rootAccount.ExecutionStates)
-						require.Equal(t, commitReport.MerkleRoot.MinSeqNr, rootAccount.MinMsgNr)
-						require.Equal(t, commitReport.MerkleRoot.MaxSeqNr, rootAccount.MaxMsgNr)
+						t.Run("When the receiver is accepting calls, it succeeds", func(t *testing.T) {
+							tx = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment)
+
+							executionEvents, err2 := common.ParseMultipleEvents[ccip.EventExecutionStateChanged](tx.Meta.LogMessages, "ExecutionStateChanged", config.PrintEvents)
+							require.NoError(t, err2)
+
+							require.Equal(t, 2, len(executionEvents))
+							require.Equal(t, config.EvmChainSelector, executionEvents[0].SourceChainSelector)
+							require.Equal(t, message1.Header.SequenceNumber, executionEvents[0].SequenceNumber)
+							require.Equal(t, hex.EncodeToString(message1.Header.MessageId[:]), hex.EncodeToString(executionEvents[0].MessageID[:]))
+							require.Equal(t, hex.EncodeToString(hash1[:]), hex.EncodeToString(executionEvents[0].MessageHash[:]))
+							require.Equal(t, ccip_offramp.InProgress_MessageExecutionState, executionEvents[0].State)
+
+							require.Equal(t, config.EvmChainSelector, executionEvents[1].SourceChainSelector)
+							require.Equal(t, message1.Header.SequenceNumber, executionEvents[1].SequenceNumber)
+							require.Equal(t, hex.EncodeToString(message1.Header.MessageId[:]), hex.EncodeToString(executionEvents[1].MessageID[:]))
+							require.Equal(t, hex.EncodeToString(hash1[:]), hex.EncodeToString(executionEvents[1].MessageHash[:]))
+							require.Equal(t, ccip_offramp.Success_MessageExecutionState, executionEvents[1].State)
+
+							var rootAccount ccip_offramp.CommitReport
+							err = common.GetAccountDataBorshInto(ctx, solanaGoClient, rootPDA, config.DefaultCommitment, &rootAccount)
+							require.NoError(t, err, "failed to get account info")
+							require.NotEqual(t, bin.Uint128{Lo: 0, Hi: 0}, rootAccount.Timestamp)
+							require.Equal(t, bin.Uint128{Lo: 2, Hi: 0}, rootAccount.ExecutionStates)
+							require.Equal(t, commitReport.MerkleRoot.MinSeqNr, rootAccount.MinMsgNr)
+							require.Equal(t, commitReport.MerkleRoot.MaxSeqNr, rootAccount.MaxMsgNr)
+						})
 					})
 
 					t.Run("When transmitter executing after the period of time has passed, it succeeds", func(t *testing.T) {
