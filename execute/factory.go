@@ -42,6 +42,8 @@ const (
 	// PLEASE CHANGE WITH CAUTION.
 	lenientMaxObservationLength = ocr3types.MaxMaxObservationLength * 80 / 100
 
+	maxObservationLength = ocr3types.MaxMaxObservationLength
+
 	// maxOutcomeLength is set to the maximum size of an outcome
 	// check factory_test for the calculation. This is not limited because
 	// these are not sent over the network.
@@ -190,7 +192,7 @@ func (p PluginFactory) NewReportingPlugin(
 			Limits: ocr3types.ReportingPluginLimits{
 				// No query for this execute implementation.
 				MaxQueryLength:       maxQueryLength,
-				MaxObservationLength: ocr3types.MaxMaxObservationLength,
+				MaxObservationLength: maxObservationLength,
 				MaxOutcomeLength:     maxOutcomeLength,
 				MaxReportLength:      maxReportLength,
 				MaxReportCount:       maxReportCount,
