@@ -88,11 +88,6 @@ impl Admin for Impl {
         ctx: Context<UpdateBillingTokenConfig>,
         config: BillingTokenConfig,
     ) -> Result<()> {
-        require!(
-            config.mint == ctx.accounts.billing_token_config.config.mint,
-            FeeQuoterError::InvalidInputsMint
-        );
-
         if config.enabled != ctx.accounts.billing_token_config.config.enabled {
             // enabled/disabled status has changed
             match config.enabled {

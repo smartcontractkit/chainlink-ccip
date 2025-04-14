@@ -189,6 +189,7 @@ pub struct UpdateBillingTokenConfig<'info> {
         seeds = [seed::CONFIG],
         bump,
         constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidVersion,
+        constraint = token_config.mint == billing_token_config.config.mint @ FeeQuoterError::InvalidInputsMint,
     )]
     pub config: Account<'info, Config>,
 
