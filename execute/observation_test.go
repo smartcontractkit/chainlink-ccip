@@ -113,12 +113,8 @@ func Test_getMessagesObservation(t *testing.T) {
 
 	// Configuration constants
 	const (
-		batchGasLimit        = 10000
-		gasPerMsg            = 100
-		gasPerMerkleTree     = 200
-		highGasPerMsg        = 9000
-		highGasPerMerkleTree = 2000
-		inflightCacheTTL     = 10 * time.Minute
+		batchGasLimit    = 10000
+		inflightCacheTTL = 10 * time.Minute
 	)
 
 	// Chain selectors
@@ -156,6 +152,14 @@ func Test_getMessagesObservation(t *testing.T) {
 			hashes[seq] = cciptypes.Bytes32{byte(seq)}
 		}
 		return hashes
+	}
+
+	createTokenData := func(fromSeq, toSeq cciptypes.SeqNum) map[cciptypes.SeqNum]exectypes.MessageTokenData {
+		tokenData := make(map[cciptypes.SeqNum]exectypes.MessageTokenData)
+		for seq := fromSeq; seq <= toSeq; seq++ {
+			tokenData[seq] = exectypes.NewMessageTokenData()
+		}
+		return tokenData
 	}
 
 	tests := []struct {
@@ -215,6 +219,9 @@ func Test_getMessagesObservation(t *testing.T) {
 				Hashes: exectypes.MessageHashes{
 					src1: createHashesMap(1, 3),
 				},
+				TokenData: exectypes.TokenDataObservations{
+					src1: createTokenData(1, 3),
+				},
 			},
 			expectedError: false,
 		},
@@ -261,6 +268,10 @@ func Test_getMessagesObservation(t *testing.T) {
 				Hashes: exectypes.MessageHashes{
 					src1: createHashesMap(1, 2),
 					src2: createHashesMap(5, 6),
+				},
+				TokenData: exectypes.TokenDataObservations{
+					src1: createTokenData(1, 2),
+					src2: createTokenData(5, 6),
 				},
 			},
 			expectedError: false,
@@ -323,6 +334,15 @@ func Test_getMessagesObservation(t *testing.T) {
 						3:  {3},
 						11: {11},
 						12: {12},
+					},
+				},
+				TokenData: exectypes.TokenDataObservations{
+					src1: {
+						1:  exectypes.NewMessageTokenData(),
+						2:  exectypes.NewMessageTokenData(),
+						3:  exectypes.NewMessageTokenData(),
+						11: exectypes.NewMessageTokenData(),
+						12: exectypes.NewMessageTokenData(),
 					},
 				},
 			},
@@ -404,6 +424,9 @@ func Test_getMessagesObservation(t *testing.T) {
 				Hashes: exectypes.MessageHashes{
 					src1: createHashesMap(1, 2),
 				},
+				TokenData: exectypes.TokenDataObservations{
+					src1: createTokenData(1, 2),
+				},
 			},
 			expectedError: false,
 		},
@@ -446,6 +469,9 @@ func Test_getMessagesObservation(t *testing.T) {
 				Hashes: exectypes.MessageHashes{
 					src1: createHashesMap(1, 3),
 				},
+				TokenData: exectypes.TokenDataObservations{
+					src1: createTokenData(1, 3),
+				},
 			},
 			expectedError: false,
 		},
@@ -476,8 +502,6 @@ func Test_getMessagesObservation(t *testing.T) {
 				// Fifth call to EncodeObservation returns a large size
 				codec.EXPECT().EncodeObservation(mock.Anything).
 					Return(make([]byte, lenientMaxObservationLength+1), nil)
-
-				estimateProvider.EXPECT().CalculateMessageMaxGas(mock.Anything).Return(uint64(gasPerMsg)).Maybe()
 			},
 			expectedObs: exectypes.Observation{
 				Messages: exectypes.MessageObservations{
@@ -503,6 +527,10 @@ func Test_getMessagesObservation(t *testing.T) {
 				Hashes: exectypes.MessageHashes{
 					src1: createHashesMap(1, 2),
 					src2: createHashesMap(1, 4),
+				},
+				TokenData: exectypes.TokenDataObservations{
+					src1: createTokenData(1, 2),
+					src2: createTokenData(1, 4),
 				},
 			},
 			expectedError: false,
@@ -545,6 +573,9 @@ func Test_getMessagesObservation(t *testing.T) {
 				Hashes: exectypes.MessageHashes{
 					src1: createHashesMap(1, 2),
 				},
+				TokenData: exectypes.TokenDataObservations{
+					src1: createTokenData(1, 2),
+				},
 			},
 			expectedError: false,
 		},
@@ -586,15 +617,7 @@ func Test_getMessagesObservation(t *testing.T) {
 				}
 			} else {
 				require.NoError(t, err)
-				if len(tt.expectedObs.Messages) > 0 {
-					require.Equal(t, tt.expectedObs.Messages, obs.Messages)
-				}
-				if len(tt.expectedObs.CommitReports) > 0 {
-					require.Equal(t, tt.expectedObs.CommitReports, obs.CommitReports)
-				}
-				if len(tt.expectedObs.Hashes) > 0 {
-					require.Equal(t, tt.expectedObs.Hashes, obs.Hashes)
-				}
+				require.Equal(t, tt.expectedObs, obs)
 			}
 		})
 	}

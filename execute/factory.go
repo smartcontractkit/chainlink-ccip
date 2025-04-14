@@ -36,11 +36,11 @@ const (
 
 	// lenientMaxObservationLength is set to  75% of ocr3 maximum recommended size
 	// check factory_test for the calculation.
-	// Using 75% to allow for some space while observing without hitting the max.
+	// Using 80% to allow for some space while observing without hitting the max.
 	// This simplifies the truncation logic needed when observation hits this lenientMax. If it's exact
 	// we'll need to take care of more corner cases and truncation logic becomes more complex
 	// PLEASE CHANGE WITH CAUTION.
-	lenientMaxObservationLength = ocr3types.MaxMaxObservationLength * 75 / 100
+	lenientMaxObservationLength = ocr3types.MaxMaxObservationLength * 80 / 100
 
 	// maxOutcomeLength is set to the maximum size of an outcome
 	// check factory_test for the calculation. This is not limited because

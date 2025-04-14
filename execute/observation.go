@@ -261,6 +261,12 @@ func buildCombinedReports(
 	return combinedReports
 }
 
+// observeTokenDataForMessage observes token data for a given message.
+// It uses the token data observer to fetch token data
+// and handles errors by initializing the token data with an error.
+// It's okay to fetch 1 tokenData at a time without affecting peformance
+// Reason for that is we either use background observer that caches data and returns instantly, or even in case
+// we're using the sync observers, their implementations calls attestations also one by one.
 func (p *Plugin) observeTokenDataForMessage(
 	ctx context.Context,
 	lggr logger.Logger,
@@ -414,11 +420,14 @@ func (p *Plugin) getMessagesObservation(
 			// Handle message observation and gas calculation
 			if !stop && !p.inflightMessageCache.IsInflight(srcChain, msg.Header.MessageID) {
 				messageObs[srcChain][seqNum] = msg
+				tkData[srcChain][seqNum] = p.observeTokenDataForMessage(ctx, lggr, msg)
 				totalMsgs++
 			} else {
 				// This is for when we calculate roots in reports later, we need the seqNum and
 				// the hash for this message
 				messageObs[srcChain][seqNum] = createEmptyMessageWithSeqNum(seqNum)
+				// empty, we don't need tokenData for empty messsages
+				tkData[srcChain][seqNum] = exectypes.NewMessageTokenData()
 			}
 
 			// Compute hash for all messages in report even if they are executed or not included in this round
@@ -429,9 +438,7 @@ func (p *Plugin) getMessagesObservation(
 					srcChain, seqNum, msg.Header.MessageID, err,
 				)
 			}
-
 			msgHashes[srcChain][seqNum] = hash
-			tkData[srcChain][seqNum] = p.observeTokenDataForMessage(ctx, lggr, msg)
 
 			// Update the observation with current state
 			observation.CommitReports = availableReports
