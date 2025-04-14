@@ -183,7 +183,7 @@ impl OnRamp for Impl {
             .enumerate()
         {
             let seeds = &[
-                seed::EXTERNAL_TOKEN_POOL,
+                seed::EXTERNAL_TOKEN_POOLS_SIGNER,
                 current_token_accounts.pool_program.key.as_ref(),
                 &[current_token_accounts.ccip_router_pool_signer_bump],
             ];

@@ -246,7 +246,7 @@ fn internal_execute<'info>(
         acc_infos.extend_from_slice(accs.remaining_accounts);
 
         let seeds = &[
-            seed::EXTERNAL_TOKEN_POOL,
+            seed::EXTERNAL_TOKEN_POOLS_SIGNER,
             accs.pool_program.key.as_ref(),
             &[accs.ccip_offramp_pool_signer_bump],
         ];
