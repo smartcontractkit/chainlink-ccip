@@ -119,7 +119,7 @@ export type ExampleCcipReceiver = {
       "accounts": [
         {
           "name": "state",
-          "isMut": true,
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -533,7 +533,7 @@ export const IDL: ExampleCcipReceiver = {
       "accounts": [
         {
           "name": "state",
-          "isMut": true,
+          "isMut": false,
           "isSigner": false
         },
         {

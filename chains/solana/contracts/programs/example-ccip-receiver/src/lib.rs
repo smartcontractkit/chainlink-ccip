@@ -215,7 +215,6 @@ pub struct AcceptOwnership<'info> {
 #[instruction(chain_selector: u64, remote_sender: Vec<u8>)]
 pub struct ApproveSender<'info> {
     #[account(
-        mut,
         seeds = [STATE],
         bump,
     )]
