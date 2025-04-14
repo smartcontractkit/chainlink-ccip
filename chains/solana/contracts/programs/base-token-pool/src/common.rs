@@ -13,7 +13,7 @@ pub const POOL_CHAINCONFIG_SEED: &[u8] = b"ccip_tokenpool_chainconfig"; // seed 
 pub const POOL_STATE_SEED: &[u8] = b"ccip_tokenpool_config";
 pub const POOL_SIGNER_SEED: &[u8] = b"ccip_tokenpool_signer";
 
-pub const EXTERNAL_TOKENPOOL_SIGNER: &[u8] = b"external_token_pools_signer";
+pub const EXTERNAL_TOKEN_POOLS_SIGNER: &[u8] = b"external_token_pools_signer";
 pub const ALLOWED_OFFRAMP: &[u8] = b"allowed_offramp";
 
 pub const fn valid_version(v: u8, max_version: u8) -> bool {
@@ -75,7 +75,7 @@ impl BaseConfig {
             Pubkey::find_program_address(&[POOL_SIGNER_SEED, mint.key().as_ref()], &pool_program);
 
         let (router_onramp_authority, _) = Pubkey::find_program_address(
-            &[EXTERNAL_TOKENPOOL_SIGNER, pool_program.as_ref()],
+            &[EXTERNAL_TOKEN_POOLS_SIGNER, pool_program.as_ref()],
             &router,
         );
 
@@ -128,7 +128,7 @@ impl BaseConfig {
         Ok(())
     }
 
-    pub fn set_router(&mut self, new_router: Pubkey) -> Result<()> {
+    pub fn set_router(&mut self, new_router: Pubkey, pool_program: &Pubkey) -> Result<()> {
         require_keys_neq!(
             new_router,
             Pubkey::default(),
@@ -137,8 +137,10 @@ impl BaseConfig {
 
         let old_router = self.router;
         self.router = new_router;
-        (self.router_onramp_authority, _) =
-            Pubkey::find_program_address(&[EXTERNAL_TOKENPOOL_SIGNER], &new_router);
+        (self.router_onramp_authority, _) = Pubkey::find_program_address(
+            &[EXTERNAL_TOKEN_POOLS_SIGNER, pool_program.as_ref()],
+            &new_router,
+        );
         emit!(RouterUpdated {
             old_router,
             new_router,
