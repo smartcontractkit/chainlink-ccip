@@ -261,96 +261,28 @@ func buildCombinedReports(
 	return combinedReports
 }
 
-// getObsWithoutTokenData collects message observations from the provided commit data.
-// It processes messages for each commit report, validating them against the sequence number range,
-// and builds observation structures including message content and hashes.
-//
-// The function:
-// 1. Sorts commit data for deterministic processing
-// 2. Reads messages for each commit report
-// 3. Tracks messages by source chain and sequence number
-// 4. Computes hashes for each message for merkle tree verification
-// 5. Stops processing if the observation becomes too large to encode - This is a lenient check.
-// Note:
-// This function does not handle token data observations. This is intentional to allow batching of tokenData
-// observations afterwards especially getting tokenData relies on external calls.
-//
-// Returns:
-//   - Updated observation containing commit reports, messages, and hashes
-func (p *Plugin) getObsWithoutTokenData(
+func (p *Plugin) observeTokenDataForMessage(
 	ctx context.Context,
 	lggr logger.Logger,
-	commitData []exectypes.CommitData,
-	observation exectypes.Observation,
-) (exectypes.Observation, error) {
-	messageObs := make(exectypes.MessageObservations)
-	availableReports := make(exectypes.CommitObservations)
-	msgHashes := make(exectypes.MessageHashes)
-
-	sort.Slice(commitData, func(i, j int) bool {
-		return exectypes.CompareCommitData(commitData[i], commitData[j])
-	})
-
-	stop := false
-
-	for _, report := range commitData {
-		srcChain := report.SourceChain
-
-		// Read messages for this report's sequence number range
-		msgs, err := p.readMessagesForReport(ctx, lggr, srcChain, report)
-		if err != nil {
-			continue // Logging already done in readMessagesForReport
-		}
-
-		// Add the report to available reports
-		availableReports[srcChain] = append(availableReports[srcChain], report)
-
-		totalMsgs := 0
-		// Initialize data structures for this source chain if needed
-		initSourceChainMaps(srcChain, messageObs, msgHashes)
-		// Process each message in the report
-		for _, msg := range msgs {
-			seqNum := msg.Header.SequenceNumber
-
-			// Handle message observation and gas calculation
-			if !stop && !p.inflightMessageCache.IsInflight(srcChain, msg.Header.MessageID) {
-				messageObs[srcChain][seqNum] = msg
-				totalMsgs++
-			} else {
-				// This is for when we calculate roots in reports later, we need the seqNum and
-				// the hash for this message
-				messageObs[srcChain][seqNum] = createEmptyMessageWithSeqNum(seqNum)
-			}
-
-			// Compute hash for all messages in report even if they are executed or not included in this round
-			hash, err := p.msgHasher.Hash(ctx, msg)
-			if err != nil {
-				return exectypes.Observation{}, fmt.Errorf(
-					"unable to hash message srcChain %d, seqNum %d, msgId %v: %w",
-					srcChain, seqNum, msg.Header.MessageID, err,
-				)
-			}
-			msgHashes[srcChain][seqNum] = hash
-
-			// Update the observation with current state
-			observation.CommitReports = availableReports
-			observation.Messages = messageObs
-			observation.Hashes = msgHashes
-
-			// Check if we've exceeded encoding size limits
-			if !stop {
-				stop = totalMsgs >= lenientMaxMsgsPerObs ||
-					exceedsMaxEncodingSize(observation, p.ocrTypeCodec, lenientMaxObservationLength)
-			}
-		}
-
-		if stop {
-			lggr.Infow("Stop processing messages, observation is too large")
-			break
-		}
+	msg cciptypes.Message,
+) exectypes.MessageTokenData {
+	srcChain := msg.Header.SourceChainSelector
+	seqNum := msg.Header.SequenceNumber
+	msgObs := exectypes.MessageObservations{
+		srcChain: {
+			seqNum: msg,
+		},
 	}
-
-	return observation, nil
+	msgTkData, err := p.tokenDataObserver.Observe(ctx, msgObs)
+	if err != nil {
+		lggr.Errorw("failed to observe token data", "err", err)
+		// In case of failure, initialize the token data with an error, that will prevent this specific token
+		// from being processed and sent later but won't stop the rest of messages
+		msgTkData = make(exectypes.TokenDataObservations)
+		msgTkData[srcChain] = make(map[cciptypes.SeqNum]exectypes.MessageTokenData)
+		msgTkData[srcChain][seqNum] = exectypes.NewMessageTokenData(exectypes.NewErrorTokenData(err))
+	}
+	return msgTkData[srcChain][seqNum]
 }
 
 // initSourceChainMaps initializes maps for a source chain if they don't exist
@@ -358,10 +290,12 @@ func initSourceChainMaps(
 	srcChain cciptypes.ChainSelector,
 	messageObs exectypes.MessageObservations,
 	msgHashes exectypes.MessageHashes,
+	tkData exectypes.TokenDataObservations,
 ) {
 	if _, ok := messageObs[srcChain]; !ok {
 		messageObs[srcChain] = make(map[cciptypes.SeqNum]cciptypes.Message)
 		msgHashes[srcChain] = make(map[cciptypes.SeqNum]cciptypes.Bytes32)
+		tkData[srcChain] = make(map[cciptypes.SeqNum]exectypes.MessageTokenData)
 	}
 }
 
@@ -415,6 +349,20 @@ func exceedsMaxEncodingSize(
 	return len(encodedObs) >= maxSize
 }
 
+// getMessagesObservation collects message observations from the provided commit data.
+// It processes messages for each commit report, validating them against the sequence number range,
+// and builds observation structures including message content and hashes.
+//
+// The function:
+// 1. Sorts commit data for deterministic processing
+// 2. Reads messages for each commit report
+// 3. Tracks messages by source chain and sequence number
+// 4. Computes hashes for each message for merkle tree verification
+// 5. Observes token data for each message
+// 6. Stops processing if the observation becomes too large to encode - This is a lenient check.
+//
+// Returns:
+//   - Updated observation containing commit reports, messages, and hashes
 func (p *Plugin) getMessagesObservation(
 	ctx context.Context,
 	lggr logger.Logger,
@@ -425,35 +373,84 @@ func (p *Plugin) getMessagesObservation(
 	//          These messages will not be executed in the current round, but may be executed in future rounds
 	//          (e.g. if gas prices decrease).
 	if len(previousOutcome.CommitReports) == 0 {
-		lggr.Debug("TODO: No reports to execute. This is expected after a cold start.")
+		p.lggr.Debug("TODO: No reports to execute. This is expected after a cold start.")
 		// No reports to execute.
 		// This is expected after a cold start.
 		return observation, nil
 	}
 
-	obsWithoutTokenData, err := p.getObsWithoutTokenData(
-		ctx,
-		lggr,
-		previousOutcome.CommitReports,
-		observation,
-	)
-	if err != nil {
-		return exectypes.Observation{}, fmt.Errorf("unable to get messages: %w", err)
-	}
+	commitData := previousOutcome.CommitReports
 
-	tkData, err1 := p.tokenDataObserver.Observe(ctx, obsWithoutTokenData.Messages)
-	if err1 != nil {
-		return exectypes.Observation{}, fmt.Errorf("unable to process token data %w", err1)
-	}
+	messageObs := make(exectypes.MessageObservations)
+	availableReports := make(exectypes.CommitObservations)
+	msgHashes := make(exectypes.MessageHashes)
+	tkData := make(exectypes.TokenDataObservations)
 
-	// validating before continuing with heavy operations afterwards like truncation
-	// all messages should have a token data observation even if it's empty
-	if validateTokenDataObservations(obsWithoutTokenData.Messages, tkData) != nil {
-		return exectypes.Observation{}, fmt.Errorf("invalid token data observations")
-	}
+	sort.Slice(commitData, func(i, j int) bool {
+		return exectypes.CompareCommitData(commitData[i], commitData[j])
+	})
 
-	observation = obsWithoutTokenData
-	observation.TokenData = tkData
+	stop := false
+
+	for _, report := range commitData {
+		srcChain := report.SourceChain
+
+		// Read messages for this report's sequence number range
+		msgs, err := p.readMessagesForReport(ctx, lggr, srcChain, report)
+		if err != nil {
+			continue // Logging already done in readMessagesForReport
+		}
+
+		// Add the report to available reports
+		availableReports[srcChain] = append(availableReports[srcChain], report)
+
+		totalMsgs := 0
+		// Initialize data structures for this source chain if needed
+		initSourceChainMaps(srcChain, messageObs, msgHashes, tkData)
+		// Process each message in the report
+		for _, msg := range msgs {
+			seqNum := msg.Header.SequenceNumber
+
+			// Handle message observation and gas calculation
+			if !stop && !p.inflightMessageCache.IsInflight(srcChain, msg.Header.MessageID) {
+				messageObs[srcChain][seqNum] = msg
+				totalMsgs++
+			} else {
+				// This is for when we calculate roots in reports later, we need the seqNum and
+				// the hash for this message
+				messageObs[srcChain][seqNum] = createEmptyMessageWithSeqNum(seqNum)
+			}
+
+			// Compute hash for all messages in report even if they are executed or not included in this round
+			hash, err := p.msgHasher.Hash(ctx, msg)
+			if err != nil {
+				return exectypes.Observation{}, fmt.Errorf(
+					"unable to hash message srcChain %d, seqNum %d, msgId %v: %w",
+					srcChain, seqNum, msg.Header.MessageID, err,
+				)
+			}
+
+			msgHashes[srcChain][seqNum] = hash
+			tkData[srcChain][seqNum] = p.observeTokenDataForMessage(ctx, lggr, msg)
+
+			// Update the observation with current state
+			observation.CommitReports = availableReports
+			observation.Messages = messageObs
+			observation.Hashes = msgHashes
+			observation.TokenData = tkData
+
+			// Check if we've exceeded encoding size limits
+			if !stop {
+				stop = totalMsgs >= lenientMaxMsgsPerObs ||
+					exceedsMaxEncodingSize(observation, p.ocrTypeCodec, lenientMaxObservationLength)
+			}
+		}
+
+		if stop {
+			lggr.Infow("Stop processing messages, observation is too large")
+			break
+		}
+	}
 
 	return observation, nil
 }
