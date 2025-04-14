@@ -314,12 +314,6 @@ func (p *Plugin) readMessagesForReport(
 ) ([]cciptypes.Message, error) {
 	msgs, err := p.ccipReader.MsgsBetweenSeqNums(ctx, srcChain, report.SequenceNumberRange)
 	if err != nil {
-		lggr.Errorw("unable to read all messages for report",
-			"srcChain", srcChain,
-			"seqRange", report.SequenceNumberRange,
-			"merkleRoot", report.MerkleRoot,
-			"err", err,
-		)
 		return nil, err
 	}
 
@@ -405,7 +399,13 @@ func (p *Plugin) getMessagesObservation(
 		// Read messages for this report's sequence number range
 		msgs, err := p.readMessagesForReport(ctx, lggr, srcChain, report)
 		if err != nil {
-			continue // Logging already done in readMessagesForReport
+			lggr.Errorw("unable to read all messages for report",
+				"srcChain", srcChain,
+				"seqRange", report.SequenceNumberRange,
+				"merkleRoot", report.MerkleRoot,
+				"err", err,
+			)
+			continue
 		}
 
 		// Add the report to available reports
