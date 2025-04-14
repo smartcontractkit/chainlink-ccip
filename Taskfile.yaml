@@ -268,7 +268,7 @@ tasks:
   cre-cli:clone:
     desc: Clone the dev-platform for CRE cli repository on a specific branch into /tmp and sync dependencies
     cmds:
-      - echo "Cloning the dev-platform repo to build CRE cli - you may want to tap your YubiKey! :)"
+      - echo "Cloning the dev-platform repo to build CRE cli, please ensure PassportControl is running  - you may want to tap your YubiKey! :)"
       - rm -rf /tmp/dev-platform && true
       - git clone --branch bcm-devplat-cli https://github.com/smartcontractkit/dev-platform.git /tmp/dev-platform
       - cd /tmp/dev-platform && go mod tidy

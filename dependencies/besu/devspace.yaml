@@ -166,3 +166,12 @@ profiles:
       - op: add
         path: deployments[*].helm.valuesFiles
         value: ${LOCAL_VALUES_DIR}/disable-storage.yaml
+
+  - name: kind
+    activation:
+      - vars:
+          PROVIDER: "kind"
+    patches:
+      - op: add
+        path: deployments[*].helm.valuesFiles
+        value: ${LOCAL_VALUES_DIR}/provider-kind.yaml

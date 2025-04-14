@@ -37,6 +37,11 @@ var initCmd = &cobra.Command{
 		}
 		logger.Debug("input params for PreRun", "config", viper.AllSettings())
 
+		if viper.GetBool("CRIB_SKIP_ALL_CLI_CHECKS") {
+			logger.Warn("Skipping all CLI checks as CRIB_SKIP_ALL_CLI_CHECKS is set to true. Be aware that this may result in misconfigured AWS sessions, kubectl configurations, or ECR logins.")
+			os.Exit(0)
+		}
+
 		userWasPrompted := false
 		if !viper.GetBool("CRIB_CI_ENV") {
 			// DEVSPACE_NAMESPACE and PROVIDER are the only parameters that can be set interactively so
@@ -106,7 +111,7 @@ var initCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		logger.Debug("Running with the following parameters", "config", viper.AllSettings())
 
-		if !viper.GetBool("CRIB_CI_ENV") && slices.Contains(cribManagedAwsProfiles, viper.GetString("AWS_PROFILE")) {
+		if !viper.GetBool("CRIB_CI_ENV") && !viper.GetBool("CRIB_SKIP_AWS_PROFILE_SETUP") && slices.Contains(cribManagedAwsProfiles, viper.GetString("AWS_PROFILE")) {
 			if err := utils.SetupAwsProfile(
 				viper.GetString("AWS_CONFIG_FILE"),
 				viper.GetString("AWS_PROFILE"),
@@ -143,7 +148,7 @@ var initCmd = &cobra.Command{
 		logger.Info("AWS credentials working.", slog.String("profile", viper.GetString("AWS_PROFILE")))
 
 		var k8sClient wrappers.K8sCLI
-		if !viper.GetBool("CRIB_CI_ENV") {
+		if !viper.GetBool("CRIB_CI_ENV") && !viper.GetBool("CRIB_SKIP_SETUP_KUBECONFIG") {
 			if err := utils.SetupKubeConfig(&utils.SetupKubeConfigInput{
 				EksClient:            wrappers.NewEKSClientWrapper(awsSdkConfig),
 				KubeconfigPath:       viper.GetString("KUBECONFIG"),
@@ -311,6 +316,9 @@ func init() {
 	_ = viper.BindPFlag("CRIB_EKS_ALIAS_NAME", initCmd.Flags().Lookup("crib-eks-alias-name"))
 	_ = viper.BindPFlag("DEVSPACE_NAMESPACE", initCmd.Flags().Lookup("devspace-namespace"))
 	_ = viper.BindPFlag("CRIB_SKIP_ROLE_BINDING_CHECK", initCmd.Flags().Lookup("skip-role-binding-check"))
+	_ = viper.BindPFlag("CRIB_SKIP_AWS_PROFILE_SETUP", initCmd.Flags().Lookup("skip-role-binding-check"))
+	_ = viper.BindPFlag("CRIB_SKIP_SETUP_KUBECONFIG", initCmd.Flags().Lookup("skip-role-binding-check"))
+	_ = viper.BindPFlag("CRIB_SKIP_ALL_CLI_CHECKS", initCmd.Flags().Lookup("skip-role-binding-check"))
 	_ = viper.BindPFlag("WRITE_CONFIG", initCmd.Flags().Lookup("write-config"))
 	_ = viper.BindPFlag("PROVIDER", initCmd.Flags().Lookup("provider"))
 	_ = viper.BindPFlag("CHAINLINK_COMPONENT", initCmd.Flags().Lookup("chainlink-component"))
@@ -322,6 +330,9 @@ func init() {
 	viper.SetDefault("AWS_CONFIG_FILE", initCmd.Flags().Lookup("aws-config-file").DefValue)
 	viper.SetDefault("KUBECONFIG", initCmd.Flags().Lookup("kubeconfig").DefValue)
 	viper.SetDefault("CRIB_SKIP_ROLE_BINDING_CHECK", initCmd.Flags().Lookup("skip-role-binding-check").DefValue)
+	viper.SetDefault("CRIB_SKIP_AWS_PROFILE_SETUP", initCmd.Flags().Lookup("skip-role-binding-check").DefValue)
+	viper.SetDefault("CRIB_SKIP_SETUP_KUBECONFIG", initCmd.Flags().Lookup("skip-role-binding-check").DefValue)
+	viper.SetDefault("CRIB_SKIP_ALL_CLI_CHECKS", initCmd.Flags().Lookup("skip-role-binding-check").DefValue)
 
 	// defaults that came from cribbit.sh
 	viper.SetDefault("CRIB_EKS_CLUSTER_NAME", "main-stage-cluster")
