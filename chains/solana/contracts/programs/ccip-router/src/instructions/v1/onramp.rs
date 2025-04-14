@@ -1,6 +1,7 @@
 use crate::events::on_ramp as events;
 use crate::messages::GetFeeResult;
 use anchor_lang::prelude::*;
+use anchor_spl::token::spl_token;
 use anchor_spl::token_interface;
 use ccip_common::seed;
 use ccip_common::v1::{validate_and_parse_token_accounts, TokenAccounts};
@@ -32,6 +33,8 @@ impl OnRamp for Impl {
         token_indexes: Vec<u8>,
     ) -> Result<[u8; 32]> {
         helpers::verify_uncursed_cpi(&ctx, dest_chain_selector)?;
+
+        let mut message = message.clone();
 
         let sender = ctx.accounts.authority.key.to_owned();
         let dest_chain = &mut ctx.accounts.dest_chain_state;
@@ -103,6 +106,7 @@ impl OnRamp for Impl {
                 get_fee_result.amount,
                 ctx.bumps.fee_billing_signer,
             )?;
+            message.fee_token = spl_token::native_mint::id();
         } else {
             let transfer = token_interface::TransferChecked {
                 from: ctx
