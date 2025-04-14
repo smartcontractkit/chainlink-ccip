@@ -221,7 +221,10 @@ fn verify_signatures(
     signatures: Signatures,
 ) -> Result<()> {
     let mut uniques: u16 = 0;
-    assert!(uniques.count_ones() + uniques.count_zeros() >= MAX_SIGNERS as u32); // ensure MAX_SIGNERS fit in the bits of uniques
+    // verify that uniques has no bits set (all zeros) at initialization
+    assert_eq!(uniques.count_ones(), 0);
+    // ensure the u16 type has enough bits to represent all MAX_SIGNERS
+    assert!(uniques.count_zeros() >= MAX_SIGNERS as u32);
 
     for (i, _) in signatures.rs.iter().enumerate() {
         let signer = secp256k1_recover(

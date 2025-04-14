@@ -217,7 +217,7 @@ fn internal_execute<'info>(
 
         let init_bal = get_balance(accs.user_token_account)?;
 
-        // CPI: call lockOrBurn on token pool
+        // CPI: call releaseOrMint on token pool
         let release_or_mint = ReleaseOrMintInV1 {
             original_sender: execution_report.message.sender.clone(),
             receiver: execution_report.message.token_receiver,
@@ -246,7 +246,7 @@ fn internal_execute<'info>(
         acc_infos.extend_from_slice(accs.remaining_accounts);
 
         let seeds = &[
-            seed::EXTERNAL_TOKEN_POOL,
+            seed::EXTERNAL_TOKEN_POOLS_SIGNER,
             accs.pool_program.key.as_ref(),
             &[accs.ccip_offramp_pool_signer_bump],
         ];
@@ -478,10 +478,7 @@ pub fn validate_execution_report<'info>(
     message_header: &RampMessageHeader,
     svm_chain_selector: u64,
 ) -> Result<()> {
-    require!(
-        execution_report.message.header.nonce == 0,
-        CcipOfframpError::InvalidNonce
-    );
+    require!(message_header.nonce == 0, CcipOfframpError::InvalidNonce);
 
     require!(
         source_chain_state.config.is_enabled,
@@ -489,8 +486,8 @@ pub fn validate_execution_report<'info>(
     );
 
     require!(
-        execution_report.message.header.sequence_number >= commit_report.min_msg_nr
-            && execution_report.message.header.sequence_number <= commit_report.max_msg_nr,
+        message_header.sequence_number >= commit_report.min_msg_nr
+            && message_header.sequence_number <= commit_report.max_msg_nr,
         CcipOfframpError::InvalidSequenceInterval
     );
 

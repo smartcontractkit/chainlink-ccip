@@ -132,8 +132,6 @@ impl OnRamp for Impl {
             )?;
         }
 
-        let dest_chain = &mut ctx.accounts.dest_chain_state;
-
         let overflow_add = dest_chain.state.sequence_number.checked_add(1);
         require!(
             overflow_add.is_some(),
@@ -183,7 +181,7 @@ impl OnRamp for Impl {
             .enumerate()
         {
             let seeds = &[
-                seed::EXTERNAL_TOKEN_POOL,
+                seed::EXTERNAL_TOKEN_POOLS_SIGNER,
                 current_token_accounts.pool_program.key.as_ref(),
                 &[current_token_accounts.ccip_router_pool_signer_bump],
             ];
