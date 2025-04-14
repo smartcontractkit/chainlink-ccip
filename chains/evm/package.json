@@ -10,8 +10,7 @@
     "publish-prod": "npm dist-tag add @chainlink/contracts-ccip@1.6.0 latest",
     "compile": "./scripts/compile_all",
     "solhint": "solhint --max-warnings 0 \"./contracts/**/*.sol\"",
-    "solhint-test": "solhint --config \".solhint-test.json\"  --ignore-path \".solhintignore-test\" --max-warnings 0 \"./contracts/**/*.sol\"",
-    "copy:ccip-files": "cp ./release/ccip/package.json release/ccip/pnpm-lock.yaml ./release/ccip/README.md ./"
+    "solhint-test": "solhint --config \".solhint-test.json\"  --ignore-path \".solhintignore-test\" --max-warnings 0 \"./contracts/**/*.sol\""
   },
   "files": [
     "foundry.toml",
@@ -21,8 +20,14 @@
     "!contracts/test/**/*",
     "contracts/test/mocks/**/*",
     "!contracts/test/mocks/test/*",
+    "contracts/test/helpers/**/*",
     "scripts/compile_all",
-    "abi/v0.8/"
+    "abi/v0.8/",
+    "remappings.txt",
+    ".solhint.json",
+    ".solhint-test.json",
+    ".solhintignore",
+    ".solhintignore-test"
   ],
   "engines": {
     "node": ">=20",
