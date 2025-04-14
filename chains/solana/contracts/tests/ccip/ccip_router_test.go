@@ -4899,6 +4899,12 @@ func TestCCIPRouter(t *testing.T) {
 
 			// Check that the user has paid for the tx cost and the ccip fee from their SOL
 			require.Equal(t, fee.Amount+result.Meta.Fee, initialLamports-finalLamports)
+
+			// although payment was in native SOL, this is considered equivalent to wsol
+			// and the CCIP protocol expects an SPL token always
+			var event ccip.EventCCIPMessageSent
+			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "CCIPMessageSent", &event, config.PrintEvents))
+			require.Equal(t, wsol.mint, event.Message.FeeToken)
 		})
 	})
 
