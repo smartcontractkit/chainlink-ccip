@@ -5,8 +5,8 @@ use anchor_spl::{
 };
 use base_token_pool::common::{
     uninitialized, valid_version, CcipTokenPoolError, LockOrBurnInV1, ReleaseOrMintInV1,
-    RemoteAddress, RemoteConfig, ALLOWED_OFFRAMP, ANCHOR_DISCRIMINATOR, EXTERNAL_TOKENPOOL_SIGNER,
-    POOL_CHAINCONFIG_SEED, POOL_SIGNER_SEED, POOL_STATE_SEED,
+    RemoteAddress, RemoteConfig, ALLOWED_OFFRAMP, ANCHOR_DISCRIMINATOR,
+    EXTERNAL_TOKEN_POOLS_SIGNER, POOL_CHAINCONFIG_SEED, POOL_SIGNER_SEED, POOL_STATE_SEED,
 };
 use ccip_common::seed;
 
@@ -118,7 +118,7 @@ pub struct AcceptOwnership<'info> {
 pub struct TokenOfframp<'info> {
     // CCIP accounts ------------------------
     #[account(
-        seeds = [EXTERNAL_TOKENPOOL_SIGNER, crate::ID.as_ref()],
+        seeds = [EXTERNAL_TOKEN_POOLS_SIGNER, crate::ID.as_ref()],
         bump,
         seeds::program = offramp_program.key(),
     )]
