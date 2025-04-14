@@ -3,6 +3,8 @@ package execute
 import (
 	"context"
 	"fmt"
+	"sort"
+	"sync"
 	"time"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -283,6 +285,8 @@ func readAllMessages(
 	messageTimestamps := make(map[cciptypes.Bytes32]time.Time)
 
 	commitObs := regroup(commitData)
+	wg := sync.WaitGroup{}
+	mu := &sync.Mutex{}
 
 	for srcChain, reports := range commitObs {
 		if len(reports) == 0 {
@@ -291,35 +295,58 @@ func readAllMessages(
 
 		messageObs[srcChain] = make(map[cciptypes.SeqNum]cciptypes.Message)
 		// Read messages for each range.
-		for _, report := range reports {
-			msgs, err := ccipReader.MsgsBetweenSeqNums(ctx, srcChain, report.SequenceNumberRange)
-			if err != nil {
-				lggr.Errorw("unable to read all messages for report",
-					"srcChain", srcChain,
-					"seqRange", report.SequenceNumberRange,
-					"merkleRoot", report.MerkleRoot,
-					"err", err,
-				)
-				continue
-			}
+		for _, commitRoot := range reports {
+			wg.Add(1)
+			go func(commitRoot exectypes.CommitData) {
+				defer wg.Done()
 
-			if !msgsConformToSeqRange(msgs, report.SequenceNumberRange) {
-				lggr.Errorw("missing messages in range",
-					"srcChain", srcChain, "seqRange", report.SequenceNumberRange)
-				continue
-			}
+				lggr2 := logger.With(lggr, "srcChain", srcChain,
+					"seqRange", commitRoot.SequenceNumberRange,
+					"merkleRoot", commitRoot.MerkleRoot)
 
-			for _, msg := range msgs {
-				messageObs[srcChain][msg.Header.SequenceNumber] = msg
-				messageTimestamps[msg.Header.MessageID] = report.Timestamp
-			}
-			availableReports[srcChain] = append(availableReports[srcChain], report)
+				msgs, err := ccipReader.MsgsBetweenSeqNums(ctx, srcChain, commitRoot.SequenceNumberRange)
+				if err != nil {
+					lggr2.Errorw("unable to read all messages for report",
+						"srcChain", srcChain,
+						"seqRange", commitRoot.SequenceNumberRange,
+						"merkleRoot", commitRoot.MerkleRoot,
+						"err", err,
+					)
+					return
+				}
+
+				if !msgsConformToSeqRange(msgs, commitRoot.SequenceNumberRange) {
+					lggr2.Errorw("missing messages in range",
+						"srcChain", srcChain, "seqRange", commitRoot.SequenceNumberRange)
+					return
+				}
+
+				mu.Lock()
+				for _, msg := range msgs {
+					messageObs[srcChain][msg.Header.SequenceNumber] = msg
+					messageTimestamps[msg.Header.MessageID] = commitRoot.Timestamp
+				}
+				availableReports[srcChain] = append(availableReports[srcChain], commitRoot)
+				mu.Unlock()
+
+				lggr2.Debugw("messages were added in the observation", "msgCount", len(msgs))
+			}(commitRoot)
 		}
+		wg.Wait()
+
 		// Remove empty chains.
 		if len(messageObs[srcChain]) == 0 {
 			delete(messageObs, srcChain)
 		}
 	}
+
+	for srcChain, roots := range availableReports {
+		sort.Slice(roots, func(i, j int) bool {
+			return roots[i].SequenceNumberRange.Start() < roots[j].SequenceNumberRange.Start()
+		})
+		availableReports[srcChain] = roots
+	}
+
 	return messageObs, availableReports, messageTimestamps
 }
 
