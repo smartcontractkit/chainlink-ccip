@@ -99,7 +99,6 @@ impl Admin for Impl {
                 }),
             }
         }
-        // TODO should we emit an event if the config has changed regardless of the enabled/disabled?
 
         // emit an event if the premium multiplier has changed, before updating the config
         if config.premium_multiplier_wei_per_eth
