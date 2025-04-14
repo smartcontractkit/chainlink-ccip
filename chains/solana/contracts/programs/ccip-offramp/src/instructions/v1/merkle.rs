@@ -1,6 +1,11 @@
 use anchor_lang::solana_program::keccak;
 
 pub const LEAF_DOMAIN_SEPARATOR: [u8; 32] = [0; 32];
+pub const INTERNAL_DOMAIN_SEPARATOR: [u8; 32] = {
+    let mut arr = [0u8; 32];
+    arr[31] = 1;
+    arr
+};
 const MAX_NUM_HASHES: usize = 128; // TODO: Change this to 256 when supporting commit reports with 256 messages
 
 #[derive(Debug)]
@@ -10,9 +15,9 @@ pub(super) enum MerkleError {
 
 fn hash_pair(hash1: &[u8; 32], hash2: &[u8; 32]) -> [u8; 32] {
     if hash1 < hash2 {
-        keccak::hashv(&[hash1, hash2]).to_bytes()
+        keccak::hashv(&[&INTERNAL_DOMAIN_SEPARATOR, hash1, hash2]).to_bytes()
     } else {
-        keccak::hashv(&[hash2, hash1]).to_bytes()
+        keccak::hashv(&[&INTERNAL_DOMAIN_SEPARATOR, hash2, hash1]).to_bytes()
     }
 }
 
@@ -58,7 +63,7 @@ mod tests {
                     .unwrap(),
             ];
         let expected_root: [u8; 32] =
-            hex::decode("94b949ca8fd6307aa72481fe44eca36c63686f8e85acac99e4f0cd2b36a99d33")
+            hex::decode("4ba232dc2d71873bc9fe7d7c8d8075a9b02eb5a402b38500ff41486a0edfa587")
                 .unwrap()
                 .to_owned()
                 .try_into()
@@ -126,7 +131,7 @@ mod tests {
         ];
 
         let expected_root: [u8; 32] =
-            hex::decode("577252413aa3c3c02bca5a8e30ad69fdf1b138d4ccc3d834d3c6934775ceaf87")
+            hex::decode("7a380f4183f5b64263e6c9a6a359adc4edac13b6898c927a2d4689a1502e21cc")
                 .unwrap()
                 .to_owned()
                 .try_into()

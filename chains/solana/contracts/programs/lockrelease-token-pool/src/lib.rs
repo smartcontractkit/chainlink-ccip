@@ -18,13 +18,17 @@ pub mod lockrelease_token_pool {
         router: Pubkey,
         rmn_remote: Pubkey,
     ) -> Result<()> {
-        ctx.accounts.state.config.init(
-            &ctx.accounts.mint,
-            ctx.program_id.key(),
-            ctx.accounts.authority.key(),
-            router,
-            rmn_remote,
-        )
+        ctx.accounts.state.set_inner(State {
+            version: 1,
+            config: BaseConfig::init(
+                &ctx.accounts.mint,
+                ctx.program_id.key(),
+                ctx.accounts.authority.key(),
+                router,
+                rmn_remote,
+            ),
+        });
+        Ok(())
     }
 
     pub fn transfer_ownership(ctx: Context<SetConfig>, proposed_owner: Pubkey) -> Result<()> {
@@ -42,6 +46,16 @@ pub mod lockrelease_token_pool {
         ctx.accounts.state.config.set_router(new_router)
     }
 
+    // permissionless method to set a pool's `state.version` value, only when
+    // it was not set during the original initialization of the pool
+    pub fn initialize_state_version(
+        ctx: Context<InitializeStateVersion>,
+        _mint: Pubkey,
+    ) -> Result<()> {
+        ctx.accounts.state.version = 1;
+        Ok(())
+    }
+
     // initialize remote config (with no remote pools as it must be zero sized)
     pub fn init_chain_remote_config(
         ctx: Context<InitializeChainConfig>,
@@ -49,6 +63,11 @@ pub mod lockrelease_token_pool {
         _mint: Pubkey,
         cfg: RemoteConfig,
     ) -> Result<()> {
+        require!(
+            cfg.pool_addresses.is_empty(),
+            CcipTokenPoolError::NonemptyPoolAddressesInit
+        );
+
         ctx.accounts
             .chain_config
             .base
@@ -274,6 +293,7 @@ pub fn lock_tokens(sender: Pubkey, lock_or_burn: LockOrBurnInV1) -> Result<()> {
     emit!(Locked {
         sender,
         amount: lock_or_burn.amount,
+        mint: lock_or_burn.local_token,
     });
 
     Ok(())
@@ -296,7 +316,7 @@ pub fn release_tokens<'a>(
         token_program,
         receiver_token_account,
         pool_token_account,
-        mint,
+        mint.clone(),
         pool_signer.clone(),
         pool_signer_bump,
         parsed_amount,
@@ -307,6 +327,7 @@ pub fn release_tokens<'a>(
         sender: pool_signer.key(),
         recipient: release_or_mint.receiver,
         amount: parsed_amount,
+        mint: mint.key(),
     });
 
     Ok(())
