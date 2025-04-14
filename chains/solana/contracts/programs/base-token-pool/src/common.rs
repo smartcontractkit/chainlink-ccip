@@ -128,7 +128,7 @@ impl BaseConfig {
         Ok(())
     }
 
-    pub fn set_router(&mut self, new_router: Pubkey) -> Result<()> {
+    pub fn set_router(&mut self, new_router: Pubkey, pool_program: &Pubkey) -> Result<()> {
         require_keys_neq!(
             new_router,
             Pubkey::default(),
@@ -137,8 +137,10 @@ impl BaseConfig {
 
         let old_router = self.router;
         self.router = new_router;
-        (self.router_onramp_authority, _) =
-            Pubkey::find_program_address(&[EXTERNAL_TOKENPOOL_SIGNER], &new_router);
+        (self.router_onramp_authority, _) = Pubkey::find_program_address(
+            &[EXTERNAL_TOKENPOOL_SIGNER, pool_program.as_ref()],
+            &new_router,
+        );
         emit!(RouterUpdated {
             old_router,
             new_router,
