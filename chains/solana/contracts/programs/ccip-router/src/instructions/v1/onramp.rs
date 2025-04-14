@@ -132,8 +132,6 @@ impl OnRamp for Impl {
             )?;
         }
 
-        let dest_chain = &mut ctx.accounts.dest_chain_state;
-
         let overflow_add = dest_chain.state.sequence_number.checked_add(1);
         require!(
             overflow_add.is_some(),
