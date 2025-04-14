@@ -124,7 +124,7 @@ func NewSortedOutcome(
 	sort.Slice(
 		pendingCommitsCP,
 		func(i, j int) bool {
-			return CompareCommitData(pendingCommitsCP[i], pendingCommitsCP[j])
+			return LessThan(pendingCommitsCP[i], pendingCommitsCP[j])
 		})
 	sort.Slice(
 		reportCP,

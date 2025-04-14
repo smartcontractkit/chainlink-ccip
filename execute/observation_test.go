@@ -458,8 +458,8 @@ func Test_getMessagesObservation(t *testing.T) {
 				Messages: exectypes.MessageObservations{
 					src1: {
 						1: NewMessage(1, 1, int(src1), int(dest)),
-						2: NewMessage(2, 2, int(src1), int(dest)),
 						// pseudo deleted
+						2: NewMessage(2, 2, 0, 0),
 						3: NewMessage(3, 3, 0, 0),
 					},
 				},
@@ -514,8 +514,8 @@ func Test_getMessagesObservation(t *testing.T) {
 					src2: {
 						1: NewMessage(1, 1, int(src2), int(dest)),
 						2: NewMessage(2, 2, int(src2), int(dest)),
-						3: NewMessage(3, 3, int(src2), int(dest)),
 						// pseudo deleted
+						3: NewMessage(3, 3, 0, 0),
 						4: NewMessage(4, 4, 0, 0),
 					},
 				},

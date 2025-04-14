@@ -388,11 +388,12 @@ func (p *Plugin) getMessagesObservation(
 	tkData := make(exectypes.TokenDataObservations)
 
 	sort.Slice(commitData, func(i, j int) bool {
-		return exectypes.CompareCommitData(commitData[i], commitData[j])
+		return exectypes.LessThan(commitData[i], commitData[j])
 	})
 
 	stop := false
 
+	totalMsgs := 0
 	for _, report := range commitData {
 		srcChain := report.SourceChain
 
@@ -410,28 +411,18 @@ func (p *Plugin) getMessagesObservation(
 
 		// Add the report to available reports
 		availableReports[srcChain] = append(availableReports[srcChain], report)
-
-		totalMsgs := 0
 		// Initialize data structures for this source chain if needed
 		initSourceChainMaps(srcChain, messageObs, msgHashes, tkData)
-		// Process each message in the report
+
+		// Initialize msg hashes with empty messages and empty token data
+		// for all messages in the report
+		// We need to have it like that to be able to build the merkle tree and proofs in later stages
+		// nolint:lll // link
+		// https://github.com/smartcontractkit/chainlink-ccip/blob/5d360b7c90126631c51f3e84f26c0417dc3877b6/execute/report/roots.go#L14-L14
 		for _, msg := range msgs {
 			seqNum := msg.Header.SequenceNumber
-
-			// Handle message observation and gas calculation
-			if !stop && !p.inflightMessageCache.IsInflight(srcChain, msg.Header.MessageID) {
-				messageObs[srcChain][seqNum] = msg
-				tkData[srcChain][seqNum] = p.observeTokenDataForMessage(ctx, lggr, msg)
-				totalMsgs++
-			} else {
-				// This is for when we calculate roots in reports later, we need the seqNum and
-				// the hash for this message
-				messageObs[srcChain][seqNum] = createEmptyMessageWithIDAndSeqNum(msg)
-				// empty, we don't need tokenData for empty messsages
-				tkData[srcChain][seqNum] = exectypes.NewMessageTokenData()
-			}
-
-			// Compute hash for all messages in report even if they are executed or not included in this round
+			messageObs[srcChain][seqNum] = createEmptyMessageWithIDAndSeqNum(msg)
+			tkData[srcChain][seqNum] = exectypes.NewMessageTokenData()
 			hash, err := p.msgHasher.Hash(ctx, msg)
 			if err != nil {
 				return exectypes.Observation{}, fmt.Errorf(
@@ -440,17 +431,34 @@ func (p *Plugin) getMessagesObservation(
 				)
 			}
 			msgHashes[srcChain][seqNum] = hash
+		}
 
-			// Update the observation with current state
-			observation.CommitReports = availableReports
+		observation.CommitReports = availableReports
+		observation.Hashes = msgHashes
+		observation.Messages = messageObs
+		observation.TokenData = tkData
+
+		// Process each message in the report and override the empty message and token data if everything fits within
+		// the size limits
+		for _, msg := range msgs {
+			// If msg is not already inflight, add it
+			if p.inflightMessageCache.IsInflight(srcChain, msg.Header.MessageID) {
+				continue
+			}
+			seqNum := msg.Header.SequenceNumber
+			messageObs[srcChain][seqNum] = msg
+			tkData[srcChain][seqNum] = p.observeTokenDataForMessage(ctx, lggr, msg)
 			observation.Messages = messageObs
-			observation.Hashes = msgHashes
 			observation.TokenData = tkData
+			totalMsgs++
 
-			// Check if we've exceeded encoding size limits
-			if !stop {
-				stop = totalMsgs >= lenientMaxMsgsPerObs ||
-					exceedsMaxEncodingSize(observation, p.ocrTypeCodec, lenientMaxObservationLength)
+			if totalMsgs > lenientMaxMsgsPerObs ||
+				exceedsMaxEncodingSize(observation, p.ocrTypeCodec, lenientMaxObservationLength) {
+				// remove the last message and token data
+				observation.Messages[srcChain][seqNum] = createEmptyMessageWithIDAndSeqNum(msg)
+				observation.TokenData[srcChain][seqNum] = exectypes.NewMessageTokenData()
+				stop = true
+				break
 			}
 		}
 
