@@ -417,7 +417,7 @@ func (p *Plugin) getMessagesObservation(
 		// Initialize msg hashes with empty messages and empty token data
 		// for all messages in the report
 		// We need to have it like that to be able to build the merkle tree and proofs in later stages
-		// nolint:lll // link
+		//nolint:lll // link
 		// https://github.com/smartcontractkit/chainlink-ccip/blob/5d360b7c90126631c51f3e84f26c0417dc3877b6/execute/report/roots.go#L14-L14
 		for _, msg := range msgs {
 			seqNum := msg.Header.SequenceNumber

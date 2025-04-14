@@ -39,8 +39,9 @@ const (
 	// Using lower value to allow for some space while observing without hitting the max.
 	// This simplifies the truncation logic needed when observation hits this lenientMax. If it's exact
 	// we'll need to take care of more corner cases and truncation logic becomes more complex
+	// It's recommended from research to not exceed 50% of the maxObservationLength
 	// PLEASE CHANGE WITH CAUTION.
-	lenientMaxObservationLength = maxObservationLength * 80 / 100
+	lenientMaxObservationLength = maxObservationLength * 50 / 100
 
 	// maxOutcomeLength is set to the maximum size of an outcome
 	// check factory_test for the calculation. This is not limited because
