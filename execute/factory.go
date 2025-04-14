@@ -34,15 +34,13 @@ const (
 	// maxQueryLength is set to disable queries because they are not used.
 	maxQueryLength = 0
 
-	// lenientMaxObservationLength is set to  75% of ocr3 maximum recommended size
-	// check factory_test for the calculation.
-	// Using 80% to allow for some space while observing without hitting the max.
+	maxObservationLength = ocr3types.MaxMaxObservationLength
+	// lenientMaxObservationLength is set to value that's lower than the maxObservationLength
+	// Using lower value to allow for some space while observing without hitting the max.
 	// This simplifies the truncation logic needed when observation hits this lenientMax. If it's exact
 	// we'll need to take care of more corner cases and truncation logic becomes more complex
 	// PLEASE CHANGE WITH CAUTION.
-	lenientMaxObservationLength = ocr3types.MaxMaxObservationLength * 80 / 100
-
-	maxObservationLength = ocr3types.MaxMaxObservationLength
+	lenientMaxObservationLength = maxObservationLength * 80 / 100
 
 	// maxOutcomeLength is set to the maximum size of an outcome
 	// check factory_test for the calculation. This is not limited because

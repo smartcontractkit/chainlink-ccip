@@ -334,11 +334,12 @@ func (p *Plugin) readMessagesForReport(
 	return msgs, nil
 }
 
-// createEmptyMessageWithSeqNum creates a message with just the sequence number set
-func createEmptyMessageWithSeqNum(seqNum cciptypes.SeqNum) cciptypes.Message {
+// createEmptyMessageWithIDAndSeqNum creates a message with just the sequence number set
+func createEmptyMessageWithIDAndSeqNum(msg cciptypes.Message) cciptypes.Message {
 	return cciptypes.Message{
 		Header: cciptypes.RampMessageHeader{
-			SequenceNumber: seqNum,
+			MessageID:      msg.Header.MessageID,
+			SequenceNumber: msg.Header.SequenceNumber,
 		},
 	}
 }
@@ -425,7 +426,7 @@ func (p *Plugin) getMessagesObservation(
 			} else {
 				// This is for when we calculate roots in reports later, we need the seqNum and
 				// the hash for this message
-				messageObs[srcChain][seqNum] = createEmptyMessageWithSeqNum(seqNum)
+				messageObs[srcChain][seqNum] = createEmptyMessageWithIDAndSeqNum(msg)
 				// empty, we don't need tokenData for empty messsages
 				tkData[srcChain][seqNum] = exectypes.NewMessageTokenData()
 			}

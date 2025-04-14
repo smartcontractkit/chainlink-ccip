@@ -412,7 +412,8 @@ func Test_getMessagesObservation(t *testing.T) {
 			expectedObs: exectypes.Observation{
 				Messages: exectypes.MessageObservations{
 					src1: {
-						1: cciptypes.Message{Header: cciptypes.RampMessageHeader{SequenceNumber: 1}},
+						// pseudo deleted
+						1: NewMessage(1, 1, 0, 0),
 						2: NewMessage(2, 2, int(src1), int(dest)),
 					},
 				},
@@ -458,7 +459,8 @@ func Test_getMessagesObservation(t *testing.T) {
 					src1: {
 						1: NewMessage(1, 1, int(src1), int(dest)),
 						2: NewMessage(2, 2, int(src1), int(dest)),
-						3: cciptypes.Message{Header: cciptypes.RampMessageHeader{SequenceNumber: 3}},
+						// pseudo deleted
+						3: NewMessage(3, 3, 0, 0),
 					},
 				},
 				CommitReports: exectypes.CommitObservations{
@@ -513,7 +515,8 @@ func Test_getMessagesObservation(t *testing.T) {
 						1: NewMessage(1, 1, int(src2), int(dest)),
 						2: NewMessage(2, 2, int(src2), int(dest)),
 						3: NewMessage(3, 3, int(src2), int(dest)),
-						4: cciptypes.Message{Header: cciptypes.RampMessageHeader{SequenceNumber: 4}},
+						// pseudo deleted
+						4: NewMessage(4, 4, 0, 0),
 					},
 				},
 				CommitReports: exectypes.CommitObservations{

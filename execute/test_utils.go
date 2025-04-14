@@ -538,7 +538,6 @@ func NewMessage(
 			SourceChainSelector: cciptypes.ChainSelector(sourceChainSelector),
 			DestChainSelector:   cciptypes.ChainSelector(destChainSelector),
 			SequenceNumber:      cciptypes.SeqNum(seqNum),
-			Nonce:               uint64(seqNum),
 		},
 	}
 }

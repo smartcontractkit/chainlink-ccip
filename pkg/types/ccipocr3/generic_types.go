@@ -204,7 +204,7 @@ func (m Message) String() string {
 
 // IsEmpty returns true if the message is empty. Can't use == Message{} without using reflect.DeepEqual.
 func (m Message) IsEmpty() bool {
-	return m.Header.MessageID == Bytes32{} && m.Header.SourceChainSelector == 0 &&
+	return m.Header.SourceChainSelector == 0 &&
 		m.Header.DestChainSelector == 0 && m.Header.Nonce == 0 && len(m.Header.OnRamp) == 0
 }
 
