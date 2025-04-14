@@ -394,7 +394,7 @@ commands:
     description: Deploy CCIP v1.6 DON infrastructure only (no on-chain deployment)
     appendArgs: true
   chainlink-cre:
-    command: devspace run-pipeline cre -p chainlink
+    command: devspace run-pipeline chainlink-cre -p chainlink
     description: Deploy the Chainlink workflow/capability CRE DON infrastructure with a gateway node
     appendArgs: true
   uninstall:
