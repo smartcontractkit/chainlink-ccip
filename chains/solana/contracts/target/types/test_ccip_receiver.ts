@@ -62,6 +62,38 @@ export type TestCcipReceiver = {
       ]
     },
     {
+      "name": "transferOwnership",
+      "accounts": [
+        {
+          "name": "counter",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "newOwner",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
+      "name": "echo",
+      "accounts": [],
+      "args": [
+        {
+          "name": "msg",
+          "type": "string"
+        }
+      ],
+      "returns": "string"
+    },
+    {
       "name": "ccipReceive",
       "docs": [
         "This function is called by the CCIP Router to execute the CCIP message.",
@@ -371,6 +403,38 @@ export const IDL: TestCcipReceiver = {
           "type": "bool"
         }
       ]
+    },
+    {
+      "name": "transferOwnership",
+      "accounts": [
+        {
+          "name": "counter",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "newOwner",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
+      "name": "echo",
+      "accounts": [],
+      "args": [
+        {
+          "name": "msg",
+          "type": "string"
+        }
+      ],
+      "returns": "string"
     },
     {
       "name": "ccipReceive",

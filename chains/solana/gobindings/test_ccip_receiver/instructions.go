@@ -35,6 +35,10 @@ var (
 
 	Instruction_SetRejectAll = ag_binary.TypeID([8]byte{42, 90, 30, 32, 7, 99, 130, 151})
 
+	Instruction_TransferOwnership = ag_binary.TypeID([8]byte{65, 177, 215, 73, 53, 45, 99, 47})
+
+	Instruction_Echo = ag_binary.TypeID([8]byte{102, 179, 238, 10, 105, 99, 36, 251})
+
 	// This function is called by the CCIP Router to execute the CCIP message.
 	// The method name needs to be ccip_receive with Anchor encoding,
 	// if not using Anchor the discriminator needs to be [0x0b, 0xf4, 0x09, 0xf9, 0x2c, 0x53, 0x2f, 0xf5]
@@ -55,6 +59,10 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "Initialize"
 	case Instruction_SetRejectAll:
 		return "SetRejectAll"
+	case Instruction_TransferOwnership:
+		return "TransferOwnership"
+	case Instruction_Echo:
+		return "Echo"
 	case Instruction_CcipReceive:
 		return "CcipReceive"
 	case Instruction_CcipTokenReleaseMint:
@@ -86,6 +94,12 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"set_reject_all", (*SetRejectAll)(nil),
+		},
+		{
+			"transfer_ownership", (*TransferOwnership)(nil),
+		},
+		{
+			"echo", (*Echo)(nil),
 		},
 		{
 			"ccip_receive", (*CcipReceive)(nil),

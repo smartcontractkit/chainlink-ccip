@@ -46,6 +46,14 @@ func TestReceiverDevnet(t *testing.T) {
 	externalExecConfigPDA, _, err := solana.FindProgramAddress([][]byte{[]byte("external_execution_config")}, testReceiverAddress)
 	require.NoError(t, err)
 
+	t.Run("Echo!", func(t *testing.T) {
+		ix, err := test_ccip_receiver.NewEchoInstruction("Hello World!").ValidateAndBuild()
+		require.NoError(t, err)
+		result := testutils.SendAndConfirm(ctx, t, client, []solana.Instruction{ix}, admin, rpc.CommitmentConfirmed)
+		require.NotNil(t, result)
+		fmt.Printf("Result: %s\n", result.Meta.LogMessages)
+	})
+
 	t.Run("Initialize test receiver", func(t *testing.T) {
 		t.Skip()
 
@@ -66,6 +74,8 @@ func TestReceiverDevnet(t *testing.T) {
 	})
 
 	t.Run("Toggle Receiver RejectAll", func(t *testing.T) {
+		t.Skip()
+
 		ix, err := test_ccip_receiver.NewSetRejectAllInstruction(false, counterPDA, admin.PublicKey()).ValidateAndBuild()
 		require.NoError(t, err)
 
