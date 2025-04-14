@@ -1,7 +1,7 @@
 node:
   besu:
     resources:
-      cpuLimit: 1
-      cpuRequest: 0.2
+      cpuLimit: "1"
+      cpuRequest: "0.2"
       memLimit: "2G"
       memRequest: "512Mi"
