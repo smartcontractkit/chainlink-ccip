@@ -219,48 +219,99 @@ func buildMerkleRootsOutcome(
 }
 
 // filterRootsBasedOnRmnSigs filters the roots to only include the ones that are either:
-// 1) RMN-enabled and have RMN signatures
+// 1) RMN-enabled and we have signatures for all the roots of RMN-enabled chains
 // 2) RMN-disabled and do not have RMN signatures
 func filterRootsBasedOnRmnSigs(
 	lggr logger.Logger,
 	signedLaneUpdates []*rmnpb.FixedDestLaneUpdate,
-	roots []cciptypes.MerkleRootChain,
+	proposedRoots []cciptypes.MerkleRootChain,
 	rmnEnabledChains map[cciptypes.ChainSelector]bool,
 	addressCodec cciptypes.AddressCodec,
 ) []cciptypes.MerkleRootChain {
-	// Create a set of signed roots for quick lookup.
+	signedRoots, err := computeSignedRootsSet(lggr, signedLaneUpdates, addressCodec)
+	if err != nil {
+		lggr.Errorw("failed to compute signed roots set, skipping RMN-enabled roots", "err", err)
+		// we don't return since we still want to make progress with the non-RMN related roots (RMN disabled chains)
+	}
+	lggr.Debugw("computed signed roots set", "signedRoots", signedRoots.ToSlice())
+
+	// If at least ONE root that is signed is not proposed
+	// then we cannot make progress with ANY of the existing signed roots
+	// since the signature will be invalid
+	proposedRootsSet := mapset.NewSet[rootKey]()
+	for _, root := range proposedRoots {
+		addrStr, err := addressCodec.AddressBytesToString(root.OnRampAddress, root.ChainSel)
+		if err != nil {
+			lggr.Errorw("convert proposed root OnRamp address to string to build a set", "root", root, "err", err)
+			continue
+		}
+		proposedRootsSet.Add(rootKey{
+			ChainSel:      root.ChainSel,
+			SeqNumsRange:  root.SeqNumsRange,
+			MerkleRoot:    root.MerkleRoot,
+			OnRampAddress: addrStr,
+		})
+	}
+	if !signedRoots.IsSubset(proposedRootsSet) {
+		lggr.Errorw("signed roots are not a subset of proposed roots, skipping RMN-enabled roots",
+			"proposedRoots", proposedRootsSet.ToSlice(), "signedRoots", signedRoots.ToSlice())
+		// clear signed roots, so we can make progress with the non-signed roots below
+		signedRoots = mapset.NewSet[rootKey]()
+	}
+
+	validRoots := filterValidRoots(lggr, proposedRoots, signedRoots, addressCodec, rmnEnabledChains)
+	return validRoots
+}
+
+// computeSignedRootsSet generates a set of signed roots based on the provided signed lane updates.
+func computeSignedRootsSet(
+	lggr logger.Logger,
+	signedLaneUpdates []*rmnpb.FixedDestLaneUpdate,
+	addressCodec cciptypes.AddressCodec,
+) (mapset.Set[rootKey], error) {
 	signedRoots := mapset.NewSet[rootKey]()
 	for _, laneUpdate := range signedLaneUpdates {
 		addrStr, err := addressCodec.AddressBytesToString(
 			laneUpdate.LaneSource.OnrampAddress,
-			cciptypes.ChainSelector(laneUpdate.LaneSource.SourceChainSelector))
+			cciptypes.ChainSelector(laneUpdate.LaneSource.SourceChainSelector),
+		)
 		if err != nil {
-			lggr.Errorw("can't convert Onramp address to string",
-				"err", err,
-				"sourceChainSelector", laneUpdate.LaneSource.SourceChainSelector,
-				"onrampAddress", laneUpdate.LaneSource.OnrampAddress)
-			continue
+			return mapset.NewSet[rootKey](), fmt.Errorf("convert address to string %v : %w", laneUpdate.LaneSource, err)
 		}
+
 		rk := rootKey{
 			ChainSel: cciptypes.ChainSelector(laneUpdate.LaneSource.SourceChainSelector),
 			SeqNumsRange: cciptypes.NewSeqNumRange(
 				cciptypes.SeqNum(laneUpdate.ClosedInterval.MinMsgNr),
 				cciptypes.SeqNum(laneUpdate.ClosedInterval.MaxMsgNr),
 			),
-			MerkleRoot: cciptypes.Bytes32(laneUpdate.Root),
-			// NOTE: convert address into a comparable value for mapset.
+			MerkleRoot:    cciptypes.Bytes32(laneUpdate.Root),
 			OnRampAddress: addrStr,
 		}
-		lggr.Infow("Found signed root", "root", rk)
+
+		lggr.Debugw("found signed root", "root", rk)
 		signedRoots.Add(rk)
 	}
 
+	return signedRoots, nil
+}
+
+// filterValidRoots filters the roots based on the RMN-enabled chains and signed roots and returns the ones that
+// are valid to proceed with. Valid roots are either:
+// 1) RMN-enabled and signed
+// 2) RMN-disabled and not signed
+func filterValidRoots(
+	lggr logger.Logger,
+	proposedRoots []cciptypes.MerkleRootChain,
+	signedRoots mapset.Set[rootKey],
+	addressCodec cciptypes.AddressCodec,
+	rmnEnabledChains map[cciptypes.ChainSelector]bool,
+) []cciptypes.MerkleRootChain {
 	validRoots := make([]cciptypes.MerkleRootChain, 0)
-	for _, root := range roots {
+	for _, root := range proposedRoots {
 		addrStr, err := addressCodec.AddressBytesToString(root.OnRampAddress, root.ChainSel)
 		if err != nil {
-			lggr.Errorw("can't convert Onramp address to string",
-				"err", err, "sourceChainSelector", root.ChainSel, "onrampAddress", root.OnRampAddress)
+			lggr.Errorw("convert proposed root OnRamp address to string to check root", "root", root, "err", err)
 			continue
 		}
 		rk := rootKey{
@@ -270,24 +321,17 @@ func filterRootsBasedOnRmnSigs(
 			OnRampAddress: addrStr,
 		}
 
-		rootIsSignedAndRmnEnabled := signedRoots.Contains(rk) &&
-			rmnEnabledChains[root.ChainSel]
+		rootIsSignedAndRmnEnabled := signedRoots.Contains(rk) && rmnEnabledChains[root.ChainSel]
+		rootNotSignedAndRmnDisabled := !signedRoots.Contains(rk) && !rmnEnabledChains[root.ChainSel]
+		rootIsValid := rootIsSignedAndRmnEnabled || rootNotSignedAndRmnDisabled
+		lggr2 := logger.With(lggr,
+			"root", rk, "isSigned", signedRoots.Contains(rk), "rmnEnabled", rmnEnabledChains[root.ChainSel])
 
-		rootNotSignedButRmnDisabled := !signedRoots.Contains(rk) &&
-			!rmnEnabledChains[root.ChainSel]
-
-		if rootIsSignedAndRmnEnabled || rootNotSignedButRmnDisabled {
-			lggr.Infow("Adding root to the report",
-				"root", rk,
-				"rootIsSignedAndRmnEnabled", rootIsSignedAndRmnEnabled,
-				"rootNotSignedButRmnDisabled", rootNotSignedButRmnDisabled)
+		if rootIsValid {
+			lggr2.Infow("root valid, added to the results")
 			validRoots = append(validRoots, root)
 		} else {
-			lggr.Infow("Root invalid, skipping from the report",
-				"root", rk,
-				"rootIsSignedAndRmnEnabled", rootIsSignedAndRmnEnabled,
-				"rootNotSignedButRmnDisabled", rootNotSignedButRmnDisabled,
-			)
+			lggr2.Infow("root invalid, skipping")
 		}
 	}
 
