@@ -219,8 +219,8 @@ func buildMerkleRootsOutcome(
 }
 
 // filterRootsBasedOnRmnSigs filters the roots to only include the ones that are either:
-// 1) RMN-enabled and we have signatures for all the roots of RMN-enabled chains
-// 2) RMN-disabled and do not have RMN signatures
+// 1) RMN-enabled and roots exist for all the roots that are included in the RMN signature.
+// 2) RMN-disabled and we do not have RMN signatures
 func filterRootsBasedOnRmnSigs(
 	lggr logger.Logger,
 	signedLaneUpdates []*rmnpb.FixedDestLaneUpdate,
