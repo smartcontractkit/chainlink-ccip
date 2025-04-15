@@ -1031,10 +1031,6 @@ func Test_Processor_Outcome(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
-			js1, _ := json.Marshal(outc)
-			js2, _ := json.Marshal(tc.expOutcome)
-			t.Logf("outcome: %s", string(js1))
-			t.Logf("expecte: %s", string(js2))
 			require.Equal(t, tc.expOutcome, outc)
 		})
 	}
