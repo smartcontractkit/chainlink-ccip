@@ -127,7 +127,7 @@ pub fn validate_and_parse_token_accounts<'info>(
         // Check Lookup Table Address configured in TokenAdminRegistry
         let token_admin_registry_account: Account<TokenAdminRegistry> =
             Account::try_from(token_admin_registry)?;
-        require_eq!(
+        require_keys_eq!(
             token_admin_registry_account.lookup_table,
             lookup_table.key(),
             CommonCcipError::InvalidInputsLookupTableAccounts
