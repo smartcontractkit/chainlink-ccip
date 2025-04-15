@@ -41,7 +41,7 @@
       ]
     },
     {
-      "name": "setRejectAll",
+      "name": "setBehavior",
       "accounts": [
         {
           "name": "counter",
@@ -56,8 +56,10 @@
       ],
       "args": [
         {
-          "name": "rejectAll",
-          "type": "bool"
+          "name": "behavior",
+          "type": {
+            "defined": "Behavior"
+          }
         }
       ]
     },
@@ -230,8 +232,10 @@
             "type": "u64"
           },
           {
-            "name": "rejectAll",
-            "type": "bool"
+            "name": "behavior",
+            "type": {
+              "defined": "Behavior"
+            }
           },
           {
             "name": "state",
@@ -327,6 +331,23 @@
               "@dev WARNING: offchainTokenData is untrusted data."
             ],
             "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Behavior",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Normal"
+          },
+          {
+            "name": "RejectAll"
+          },
+          {
+            "name": "ExtraCUs"
           }
         ]
       }

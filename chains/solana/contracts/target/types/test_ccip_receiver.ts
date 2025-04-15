@@ -41,7 +41,7 @@ export type TestCcipReceiver = {
       ]
     },
     {
-      "name": "setRejectAll",
+      "name": "setBehavior",
       "accounts": [
         {
           "name": "counter",
@@ -56,8 +56,10 @@ export type TestCcipReceiver = {
       ],
       "args": [
         {
-          "name": "rejectAll",
-          "type": "bool"
+          "name": "behavior",
+          "type": {
+            "defined": "Behavior"
+          }
         }
       ]
     },
@@ -230,8 +232,10 @@ export type TestCcipReceiver = {
             "type": "u64"
           },
           {
-            "name": "rejectAll",
-            "type": "bool"
+            "name": "behavior",
+            "type": {
+              "defined": "Behavior"
+            }
           },
           {
             "name": "state",
@@ -327,6 +331,23 @@ export type TestCcipReceiver = {
               "@dev WARNING: offchainTokenData is untrusted data."
             ],
             "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Behavior",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Normal"
+          },
+          {
+            "name": "RejectAll"
+          },
+          {
+            "name": "ExtraCUs"
           }
         ]
       }
@@ -384,7 +405,7 @@ export const IDL: TestCcipReceiver = {
       ]
     },
     {
-      "name": "setRejectAll",
+      "name": "setBehavior",
       "accounts": [
         {
           "name": "counter",
@@ -399,8 +420,10 @@ export const IDL: TestCcipReceiver = {
       ],
       "args": [
         {
-          "name": "rejectAll",
-          "type": "bool"
+          "name": "behavior",
+          "type": {
+            "defined": "Behavior"
+          }
         }
       ]
     },
@@ -573,8 +596,10 @@ export const IDL: TestCcipReceiver = {
             "type": "u64"
           },
           {
-            "name": "rejectAll",
-            "type": "bool"
+            "name": "behavior",
+            "type": {
+              "defined": "Behavior"
+            }
           },
           {
             "name": "state",
@@ -670,6 +695,23 @@ export const IDL: TestCcipReceiver = {
               "@dev WARNING: offchainTokenData is untrusted data."
             ],
             "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Behavior",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Normal"
+          },
+          {
+            "name": "RejectAll"
+          },
+          {
+            "name": "ExtraCUs"
           }
         ]
       }

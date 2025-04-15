@@ -33,7 +33,7 @@ var (
 	// The initialization is responsibility of the External User, CCIP is not handling initialization of Accounts
 	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
 
-	Instruction_SetRejectAll = ag_binary.TypeID([8]byte{42, 90, 30, 32, 7, 99, 130, 151})
+	Instruction_SetBehavior = ag_binary.TypeID([8]byte{95, 73, 143, 97, 203, 43, 87, 35})
 
 	Instruction_TransferOwnership = ag_binary.TypeID([8]byte{65, 177, 215, 73, 53, 45, 99, 47})
 
@@ -57,8 +57,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 	switch id {
 	case Instruction_Initialize:
 		return "Initialize"
-	case Instruction_SetRejectAll:
-		return "SetRejectAll"
+	case Instruction_SetBehavior:
+		return "SetBehavior"
 	case Instruction_TransferOwnership:
 		return "TransferOwnership"
 	case Instruction_Echo:
@@ -93,7 +93,7 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 			"initialize", (*Initialize)(nil),
 		},
 		{
-			"set_reject_all", (*SetRejectAll)(nil),
+			"set_behavior", (*SetBehavior)(nil),
 		},
 		{
 			"transfer_ownership", (*TransferOwnership)(nil),

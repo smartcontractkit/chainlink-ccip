@@ -8,9 +8,9 @@ import (
 )
 
 type Counter struct {
-	Value     uint64
-	RejectAll bool
-	State     BaseState
+	Value    uint64
+	Behavior Behavior
+	State    BaseState
 }
 
 var CounterDiscriminator = [8]byte{255, 176, 4, 245, 188, 253, 124, 25}
@@ -26,8 +26,8 @@ func (obj Counter) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	if err != nil {
 		return err
 	}
-	// Serialize `RejectAll` param:
-	err = encoder.Encode(obj.RejectAll)
+	// Serialize `Behavior` param:
+	err = encoder.Encode(obj.Behavior)
 	if err != nil {
 		return err
 	}
@@ -58,8 +58,8 @@ func (obj *Counter) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error)
 	if err != nil {
 		return err
 	}
-	// Deserialize `RejectAll`:
-	err = decoder.Decode(&obj.RejectAll)
+	// Deserialize `Behavior`:
+	err = decoder.Decode(&obj.Behavior)
 	if err != nil {
 		return err
 	}

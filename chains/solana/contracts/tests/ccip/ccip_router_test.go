@@ -8889,10 +8889,10 @@ func TestCCIPRouter(t *testing.T) {
 						instruction, err = raw.ValidateAndBuild()
 						require.NoError(t, err)
 
-						t.Run("When the receiver is rejecting calls, it fails", func(t *testing.T) {
+						t.Run("When the receiver is in abnormal behavior, it fails", func(t *testing.T) {
 							// Make receiver reject calls
-							rejectIx, err2 := test_ccip_receiver.NewSetRejectAllInstruction(
-								true,
+							rejectIx, err2 := test_ccip_receiver.NewSetBehaviorInstruction(
+								test_ccip_receiver.RejectAll_Behavior,
 								config.ReceiverTargetAccountPDA,
 								user.PublicKey(),
 							).ValidateAndBuild()
@@ -8902,8 +8902,20 @@ func TestCCIPRouter(t *testing.T) {
 							// Check that it fails
 							testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"RejectAll"})
 
-							acceptIx, err2 := test_ccip_receiver.NewSetRejectAllInstruction(
-								false,
+							// Check that it uses extra CUs
+							extraCuIx, err2 := test_ccip_receiver.NewSetBehaviorInstruction(
+								test_ccip_receiver.ExtraCUs_Behavior,
+								config.ReceiverTargetAccountPDA,
+								user.PublicKey(),
+							).ValidateAndBuild()
+							require.NoError(t, err2)
+							testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{extraCuIx}, user, config.DefaultCommitment)
+
+							// Check that it uses a lot of CUs
+							testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Program EvhgrPhTDt4LcSPS2kfJgH6T6XWZ6wT3X9ncDGLT1vui failed: Computational budget exceeded "}, common.AddComputeUnitLimit(700_000))
+
+							acceptIx, err2 := test_ccip_receiver.NewSetBehaviorInstruction(
+								test_ccip_receiver.Normal_Behavior,
 								config.ReceiverTargetAccountPDA,
 								user.PublicKey(),
 							).ValidateAndBuild()

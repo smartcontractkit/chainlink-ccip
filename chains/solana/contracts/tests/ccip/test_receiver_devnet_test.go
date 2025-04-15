@@ -73,10 +73,14 @@ func TestReceiverDevnet(t *testing.T) {
 		fmt.Printf("Result: %s\n", result.Meta.LogMessages)
 	})
 
-	t.Run("Toggle Receiver RejectAll", func(t *testing.T) {
+	t.Run("Toggle Receiver Behavior", func(t *testing.T) {
 		t.Skip()
 
-		ix, err := test_ccip_receiver.NewSetRejectAllInstruction(false, counterPDA, admin.PublicKey()).ValidateAndBuild()
+		ix, err := test_ccip_receiver.NewSetBehaviorInstruction(
+			test_ccip_receiver.Normal_Behavior,
+			counterPDA,
+			admin.PublicKey(),
+		).ValidateAndBuild()
 		require.NoError(t, err)
 
 		result := testutils.SendAndConfirm(ctx, t, client, []solana.Instruction{ix}, admin, rpc.CommitmentConfirmed)
