@@ -41,6 +41,27 @@ export type TestCcipReceiver = {
       ]
     },
     {
+      "name": "setRejectAll",
+      "accounts": [
+        {
+          "name": "counter",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "rejectAll",
+          "type": "bool"
+        }
+      ]
+    },
+    {
       "name": "ccipReceive",
       "docs": [
         "This function is called by the CCIP Router to execute the CCIP message.",
@@ -174,7 +195,11 @@ export type TestCcipReceiver = {
         "fields": [
           {
             "name": "value",
-            "type": "u8"
+            "type": "u64"
+          },
+          {
+            "name": "rejectAll",
+            "type": "bool"
           },
           {
             "name": "state",
@@ -273,6 +298,13 @@ export type TestCcipReceiver = {
           }
         ]
       }
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "RejectAll",
+      "msg": "Rejecting all messages"
     }
   ]
 };
@@ -320,6 +352,27 @@ export const IDL: TestCcipReceiver = {
       ]
     },
     {
+      "name": "setRejectAll",
+      "accounts": [
+        {
+          "name": "counter",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "rejectAll",
+          "type": "bool"
+        }
+      ]
+    },
+    {
       "name": "ccipReceive",
       "docs": [
         "This function is called by the CCIP Router to execute the CCIP message.",
@@ -453,7 +506,11 @@ export const IDL: TestCcipReceiver = {
         "fields": [
           {
             "name": "value",
-            "type": "u8"
+            "type": "u64"
+          },
+          {
+            "name": "rejectAll",
+            "type": "bool"
           },
           {
             "name": "state",
@@ -552,6 +609,13 @@ export const IDL: TestCcipReceiver = {
           }
         ]
       }
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "RejectAll",
+      "msg": "Rejecting all messages"
     }
   ]
 };
