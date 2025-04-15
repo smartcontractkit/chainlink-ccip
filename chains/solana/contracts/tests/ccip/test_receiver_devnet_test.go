@@ -87,4 +87,19 @@ func TestReceiverDevnet(t *testing.T) {
 		require.NotNil(t, result)
 		fmt.Printf("Result: %s\n", result.Meta.LogMessages)
 	})
+
+	t.Run("Transfer ownership", func(t *testing.T) {
+		t.Skip()
+
+		ix, err := test_ccip_receiver.NewTransferOwnershipInstruction(
+			admin.PublicKey(), //* Substitute here the new owner
+			counterPDA,
+			admin.PublicKey(),
+		).ValidateAndBuild()
+		require.NoError(t, err)
+
+		result := testutils.SendAndConfirm(ctx, t, client, []solana.Instruction{ix}, admin, rpc.CommitmentConfirmed)
+		require.NotNil(t, result)
+		fmt.Printf("Result: %s\n", result.Meta.LogMessages)
+	})
 }
