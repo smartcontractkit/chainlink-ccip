@@ -1,5 +1,6 @@
 offramp: offVkroQ4wYMv6QFPBvJazAx2p8BnLh7sJRdyQ5GYfx
 test_receiver: <PUT YOUR TEST RECEIVER ADDRESS HERE>
+example_sender: <PUT YOUR EXAMPLE SENDER ADDRESS HERE>
 
 chain_selectors:
   sepolia: 16015286601757825753

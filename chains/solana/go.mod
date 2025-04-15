@@ -13,6 +13,7 @@ require (
 	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250320090719-315440f5b0a7
 	github.com/smartcontractkit/chainlink-common v0.4.2-0.20250121163309-3e179a73cb92
 	github.com/stretchr/testify v1.10.0
+	github.com/test-go/testify v1.1.4
 	golang.org/x/crypto v0.36.0
 	golang.org/x/exp v0.0.0-20241210194714-1829a127f884
 	gopkg.in/yaml.v2 v2.4.0

@@ -11,11 +11,11 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/testutils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_ccip_receiver"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/example_ccip_sender"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 )
 
-func TestReceiverDevnet(t *testing.T) {
+func TestSenderDevnet(t *testing.T) {
 	devnetInfo, err := getDevnetInfo()
 	require.NoError(t, err)
 
@@ -38,31 +38,18 @@ func TestReceiverDevnet(t *testing.T) {
 		fmt.Printf("Reference Addresses: %+v\n", referenceAddresses)
 	})
 
-	testReceiverAddress := solana.MustPublicKeyFromBase58(devnetInfo.TestReceiver)
-	test_ccip_receiver.SetProgramID(testReceiverAddress)
+	exampleSenderAddress := solana.MustPublicKeyFromBase58(devnetInfo.ExampleSender)
+	example_ccip_sender.SetProgramID(exampleSenderAddress)
 
-	counterPDA, _, err := solana.FindProgramAddress([][]byte{[]byte("counter")}, testReceiverAddress)
-	require.NoError(t, err)
-	externalExecConfigPDA, _, err := solana.FindProgramAddress([][]byte{[]byte("external_execution_config")}, testReceiverAddress)
+	senderPDAs, err := getSenderPDAs(exampleSenderAddress)
 	require.NoError(t, err)
 
-	t.Run("Echo!", func(t *testing.T) {
+	t.Run("Initialize Sender", func(t *testing.T) {
 		t.Skip()
 
-		ix, err := test_ccip_receiver.NewEchoInstruction("Hello World!").ValidateAndBuild()
-		require.NoError(t, err)
-		result := testutils.SendAndConfirm(ctx, t, client, []solana.Instruction{ix}, admin, rpc.CommitmentConfirmed)
-		require.NotNil(t, result)
-		fmt.Printf("Result: %s\n", result.Meta.LogMessages)
-	})
-
-	t.Run("Initialize test receiver", func(t *testing.T) {
-		t.Skip()
-
-		ix, err := test_ccip_receiver.NewInitializeInstruction(
+		ix, err := example_ccip_sender.NewInitializeInstruction(
 			referenceAddresses.Router,
-			counterPDA,
-			externalExecConfigPDA,
+			senderPDAs.state,
 			admin.PublicKey(),
 			solana.SystemProgramID,
 		).ValidateAndBuild()
@@ -73,10 +60,37 @@ func TestReceiverDevnet(t *testing.T) {
 		fmt.Printf("Result: %s\n", result.Meta.LogMessages)
 	})
 
-	t.Run("Toggle Receiver RejectAll", func(t *testing.T) {
-		t.Skip()
+	t.Run("Initialize Sepolia Dest Chain", func(t *testing.T) {
+		selector := devnetInfo.ChainSelectors.Sepolia
 
-		ix, err := test_ccip_receiver.NewSetRejectAllInstruction(false, counterPDA, admin.PublicKey()).ValidateAndBuild()
+		ix, err := example_ccip_sender.NewInitChainConfigInstruction(
+			selector,
+			[]byte{1}, // recipient
+			[]byte{2}, // extra args bytes
+			senderPDAs.state,
+			senderPDAs.FindChainConfig(t, selector),
+			admin.PublicKey(),
+			solana.SystemProgramID,
+		).ValidateAndBuild()
+		require.NoError(t, err)
+
+		result := testutils.SendAndConfirm(ctx, t, client, []solana.Instruction{ix}, admin, rpc.CommitmentConfirmed)
+		require.NotNil(t, result)
+		fmt.Printf("Result: %s\n", result.Meta.LogMessages)
+	})
+
+	t.Run("Update Sepolia Dest Chain", func(t *testing.T) {
+		selector := devnetInfo.ChainSelectors.Sepolia
+
+		ix, err := example_ccip_sender.NewUpdateChainConfigInstruction(
+			selector,
+			[]byte{3}, // recipient
+			[]byte{4}, // extra args bytes
+			senderPDAs.state,
+			senderPDAs.FindChainConfig(t, selector),
+			admin.PublicKey(),
+			solana.SystemProgramID,
+		).ValidateAndBuild()
 		require.NoError(t, err)
 
 		result := testutils.SendAndConfirm(ctx, t, client, []solana.Instruction{ix}, admin, rpc.CommitmentConfirmed)

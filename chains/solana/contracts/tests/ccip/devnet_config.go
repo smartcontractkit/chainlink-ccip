@@ -2,12 +2,15 @@ package contracts
 
 import (
 	_ "embed"
+	"testing"
 
 	"fmt"
 
 	"github.com/gagliardetto/solana-go"
+	"github.com/test-go/testify/require"
 	"gopkg.in/yaml.v2"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 )
 
@@ -15,9 +18,10 @@ import (
 var devnetInfoBuffer []byte
 
 type DevnetInfo struct {
-	Offramp      string `yaml:"offramp"`
-	TestReceiver string `yaml:"test_receiver"`
-	PrivateKeys  struct {
+	Offramp       string `yaml:"offramp"`
+	TestReceiver  string `yaml:"test_receiver"`
+	ExampleSender string `yaml:"example_sender"`
+	PrivateKeys   struct {
 		Admin []byte `yaml:"admin"`
 	} `yaml:"private_keys"`
 	ChainSelectors struct {
@@ -69,5 +73,29 @@ func getOfframpPDAs(offrampAddress solana.PublicKey) (offrampPDAs, error) {
 		referenceAddresses: offrampReferenceAddressesPDA,
 		billingSigner:      offrampBillingSignerPDA,
 		state:              offrampStatePDA,
+	}, nil
+}
+
+type senderPDAs struct {
+	program solana.PublicKey
+	state   solana.PublicKey
+}
+
+func (s *senderPDAs) FindChainConfig(t *testing.T, chainSelector uint64) solana.PublicKey {
+	chainSelectorLE := common.Uint64ToLE(chainSelector)
+	pda, _, err := solana.FindProgramAddress([][]byte{[]byte("remote_chain_config"), chainSelectorLE}, s.program)
+	require.NoError(t, err)
+	return pda
+}
+
+func getSenderPDAs(senderProgram solana.PublicKey) (senderPDAs, error) {
+	senderStatePDA, _, err := solana.FindProgramAddress([][]byte{[]byte("state")}, senderProgram)
+	if err != nil {
+		return senderPDAs{}, err
+	}
+
+	return senderPDAs{
+		program: senderProgram,
+		state:   senderStatePDA,
 	}, nil
 }
