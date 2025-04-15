@@ -33,6 +33,24 @@ func (p *processor) Observation(
 	feedTokenPrices := p.obs.observeFeedTokenPrices(ctx, lggr)
 	feeQuoterUpdates := p.obs.observeFeeQuoterTokenUpdates(ctx, lggr)
 	now := time.Now().UTC()
+
+	// Log detailed information about fee quoter token updates
+	for token, update := range feeQuoterUpdates {
+		// Common fields for all token update logs
+		commonFields := []interface{}{
+			"token", token,
+			"timestamp", update.Timestamp,
+			"price", update.Value.Int,
+			"age", now.Sub(update.Timestamp),
+		}
+
+		// Add next update time field
+		nextUpdateFields := append(commonFields,
+			"nextUpdateTime", update.Timestamp.Add(p.offChainCfg.TokenPriceBatchWriteFrequency.Duration()))
+
+		lggr.Infow("existing token price update", nextUpdateFields...)
+	}
+
 	lggr.Infow(
 		"observed token prices",
 		"feed prices", feedTokenPrices,
