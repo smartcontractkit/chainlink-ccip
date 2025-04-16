@@ -78,7 +78,7 @@ pub mod example_ccip_sender {
                 acc.from_ata,
                 acc.self_ata,
                 &ctx.accounts.ccip_sender.to_account_info(),
-                &acc.ccip_router_pool_signer.to_account_info(),
+                &ctx.accounts.ccip_fee_billing_signer.to_account_info(),
                 seeds,
                 token_amounts[i].amount,
                 acc.decimals,
