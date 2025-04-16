@@ -986,4 +986,266 @@ mod tests {
 
         assert_eq!(juels, fee.amount as u128 * 1u32.e(18));
     }
+
+    #[test]
+    fn test_max_fee_juels_per_msg_validation() {
+        set_syscall_stubs(Box::new(TestStubs));
+
+        // create custom billing configs with identical prices for deterministic testing
+        let mut fee_token_config = sample_billing_config();
+        let mut link_config = sample_billing_config();
+
+        // set a specific timestamp and price value
+        let timestamp = 100;
+
+        // create a value for 1 USD per token with 18 decimals precision
+        // this is a simplified value (1 * 10^18) for easier calculations
+        let price_bytes = [
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0d, 0xe0, 0xb6, 0xb3, 0xa7, 0x64, 0x00,
+        ]; // 1 * 10^18 (1.0 with 18 decimals)
+
+        fee_token_config.usd_per_token.value = price_bytes;
+        fee_token_config.usd_per_token.timestamp = timestamp;
+
+        link_config.usd_per_token.value = price_bytes;
+        link_config.usd_per_token.timestamp = timestamp;
+
+        // define LINK mint pubkey
+        let link_mint = Pubkey::new_unique();
+        link_config.mint = link_mint;
+
+        // use 9 decimals for local LINK representation (typical for Solana)
+        let link_local_decimals = 9;
+
+        // set max fee to exactly 1 LINK in juels (18 decimals)
+        let max_fee_juels = 1_000_000_000_000_000_000u128;
+
+        // test with fee amount just below max (should pass)
+        // 0.999999999 LINK in 9 decimals = 999,999,999
+        // converts to 999,999,999,000,000,000 juels (< max)
+        let under_fee = SVMTokenAmount {
+            token: fee_token_config.mint,
+            amount: 999_999_999,
+        };
+
+        let result = fee_juels(
+            &under_fee,
+            &fee_token_config,
+            &link_config,
+            link_local_decimals,
+            link_mint,
+            max_fee_juels,
+        );
+
+        assert!(result.is_ok(), "under max fee should be accepted");
+
+        // test with fee amount over max (should fail)
+        // 1.000000001 LINK in 9 decimals = 1,000,000,001
+        // converts to 1,000,000,001,000,000,000 juels (> max)
+        let over_fee = SVMTokenAmount {
+            token: fee_token_config.mint,
+            amount: 1_000_000_001,
+        };
+
+        let result = fee_juels(
+            &over_fee,
+            &fee_token_config,
+            &link_config,
+            link_local_decimals,
+            link_mint,
+            max_fee_juels,
+        );
+
+        assert!(result.is_err(), "over max fee should be rejected");
+        assert_eq!(
+            result.unwrap_err(),
+            FeeQuoterError::MessageFeeTooHigh.into()
+        );
+    }
+
+    #[test]
+    fn test_fee_juels_decimal_conversions() {
+        set_syscall_stubs(Box::new(TestStubs));
+
+        // create test billing configs with identical prices
+        let mut fee_token_config = sample_billing_config();
+        let mut link_config = sample_billing_config();
+
+        // set a specific timestamp and price value
+        let timestamp = 100;
+
+        // create a value for 1 USD per token with 18 decimals precision
+        let price_bytes = [
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0d, 0xe0, 0xb6, 0xb3, 0xa7, 0x64, 0x00,
+        ]; // 1 * 10^18 (1.0 with 18 decimals)
+
+        fee_token_config.usd_per_token.value = price_bytes;
+        fee_token_config.usd_per_token.timestamp = timestamp;
+
+        link_config.usd_per_token.value = price_bytes;
+        link_config.usd_per_token.timestamp = timestamp;
+
+        // define LINK mint pubkey
+        let link_mint = Pubkey::new_unique();
+        link_config.mint = link_mint;
+
+        // case 1: 9 decimals local, fee under limit
+        {
+            let link_local_decimals = 9;
+            let fee_amount = 100_000_000; // 0.1 LINK in 9 decimals
+            let max_juels = 100_000_000_000_000_000; // 0.1 LINK in 18 decimals
+
+            let fee = SVMTokenAmount {
+                token: fee_token_config.mint,
+                amount: fee_amount,
+            };
+
+            let result = fee_juels(
+                &fee,
+                &fee_token_config,
+                &link_config,
+                link_local_decimals,
+                link_mint,
+                max_juels,
+            );
+
+            if result.is_err() {
+                println!("Case 1 error: {:?}", result.unwrap_err());
+                unreachable!("Case 1 should pass");
+            } else {
+                let juels = result.unwrap();
+                println!(
+                    "Case 1: {} with {} decimals converted to {} juels",
+                    fee_amount, link_local_decimals, juels
+                );
+            }
+        }
+
+        // case 2: 9 decimals local, fee over limit
+        {
+            let link_local_decimals = 9;
+            let fee_amount = 200_000_000; // 0.2 LINK in 9 decimals
+            let max_juels = 100_000_000_000_000_000; // 0.1 LINK in 18 decimals
+
+            let fee = SVMTokenAmount {
+                token: fee_token_config.mint,
+                amount: fee_amount,
+            };
+
+            let result = fee_juels(
+                &fee,
+                &fee_token_config,
+                &link_config,
+                link_local_decimals,
+                link_mint,
+                max_juels,
+            );
+
+            assert!(result.is_err(), "Case 2 should fail");
+            if let Err(err) = result {
+                assert_eq!(err, FeeQuoterError::MessageFeeTooHigh.into());
+            }
+        }
+
+        // case 3: same decimals (18), no scaling needed
+        {
+            let link_local_decimals = 18;
+            let fee_amount = 50_000_000_000_000_000; // 0.05 LINK in 18 decimals
+            let max_juels = 100_000_000_000_000_000; // 0.1 LINK in 18 decimals
+
+            let fee = SVMTokenAmount {
+                token: fee_token_config.mint,
+                amount: fee_amount,
+            };
+
+            let result = fee_juels(
+                &fee,
+                &fee_token_config,
+                &link_config,
+                link_local_decimals,
+                link_mint,
+                max_juels,
+            );
+
+            if result.is_err() {
+                println!("Case 3 error: {:?}", result.unwrap_err());
+                unreachable!("Case 3 should pass");
+            } else {
+                let juels = result.unwrap();
+                println!(
+                    "Case 3: {} with {} decimals converted to {} juels",
+                    fee_amount, link_local_decimals, juels
+                );
+                assert_eq!(juels, fee_amount as u128);
+            }
+        }
+
+        // case 4: 6 decimals local (scale up by 12)
+        {
+            let link_local_decimals = 6;
+            let fee_amount = 50_000; // 0.05 LINK in 6 decimals
+            let max_juels = 100_000_000_000_000_000; // 0.1 LINK in 18 decimals
+
+            let fee = SVMTokenAmount {
+                token: fee_token_config.mint,
+                amount: fee_amount,
+            };
+
+            let result = fee_juels(
+                &fee,
+                &fee_token_config,
+                &link_config,
+                link_local_decimals,
+                link_mint,
+                max_juels,
+            );
+
+            if result.is_err() {
+                println!("Case 4 error: {:?}", result.unwrap_err());
+                unreachable!("Case 4 should pass");
+            } else {
+                let juels = result.unwrap();
+                println!(
+                    "Case 4: {} with {} decimals converted to {} juels",
+                    fee_amount, link_local_decimals, juels
+                );
+                assert_eq!(juels, 50_000_000_000_000_000, "Case 4 juels mismatch");
+            }
+        }
+
+        // case 5: 0 decimals local (scale up by 18)
+        {
+            let link_local_decimals = 0;
+            let fee_amount = 1; // 1 LINK in 0 decimals
+            let max_juels = 2_000_000_000_000_000_000; // 2 LINK in 18 decimals
+
+            let fee = SVMTokenAmount {
+                token: fee_token_config.mint,
+                amount: fee_amount,
+            };
+
+            let result = fee_juels(
+                &fee,
+                &fee_token_config,
+                &link_config,
+                link_local_decimals,
+                link_mint,
+                max_juels,
+            );
+
+            if result.is_err() {
+                println!("Case 5 error: {:?}", result.unwrap_err());
+                unreachable!("Case 5 should pass");
+            } else {
+                let juels = result.unwrap();
+                println!(
+                    "Case 5: {} with {} decimals converted to {} juels",
+                    fee_amount, link_local_decimals, juels
+                );
+                assert_eq!(juels, 1_000_000_000_000_000_000, "Case 5 juels mismatch");
+            }
+        }
+    }
 }

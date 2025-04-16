@@ -30,6 +30,8 @@ pub struct Config {
     // Static config fields
     //
     // Maximum fee that can be charged for a message.
+    // This value is stored with 18 decimals of precision (LINK_JUEL_DECIMALS).
+    // 1 LINK = 1,000,000,000,000,000,000 juels (1e18).
     pub max_fee_juels_per_msg: u128,
     pub link_token_mint: Pubkey,
     // local LINK mint may not use 18 decimals as EVM, so we store local decimals
