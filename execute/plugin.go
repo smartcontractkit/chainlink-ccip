@@ -275,7 +275,8 @@ func getPendingReportsForExecution(
 	fullyExecutedUnfinalized []exectypes.CommitData,
 	err error,
 ) {
-	commitReports, err := ccipReader.CommitReportsGTETimestamp(ctx, ts, 1000) // todo: configurable limit
+	// Assuming each report can have minimum one message, max reports shouldn't exceed the max messages
+	commitReports, err := ccipReader.CommitReportsGTETimestamp(ctx, ts, lenientMaxMsgsPerObs)
 	if err != nil {
 		return nil, nil, nil, err
 	}
