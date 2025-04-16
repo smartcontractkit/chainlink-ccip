@@ -407,8 +407,6 @@ pub enum FeeQuoterError {
     InvalidSVMAddress,
     #[msg("The caller is not an authorized price updater")]
     UnauthorizedPriceUpdater,
-    #[msg("The LINK mint uses an unsupported number of decimals")]
-    InvalidLinkDecimals,
     #[msg("Minimum token transfer fee exceeds maximum")]
     InvalidTokenTransferFeeMaxMin,
     #[msg("Insufficient dest bytes overhead on transfer fee config")]
