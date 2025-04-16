@@ -191,19 +191,36 @@ func TestCCIPRouter(t *testing.T) {
 				t)
 		})
 
-		t.Run("Git", func(t *testing.T) {
-			ix, err := ccip_router.NewTypeVersionInstruction().ValidateAndBuild()
-			require.NoError(t, err)
-			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, legacyAdmin, config.DefaultCommitment)
-			require.NotNil(t, result)
-			fmt.Printf("Type Version: %s\n", result.Meta.LogMessages)
+		t.Run("Type version", func(t *testing.T) {
+			type_version_cases := []struct {
+				ContractName              string
+				NewTypeVersionInstruction solana.Instruction
+			}{
+				{"ccip-router", ccip_router.NewTypeVersionInstruction(solana.SysVarClockPubkey).Build()},
+				{"fee-quoter", fee_quoter.NewTypeVersionInstruction(solana.SysVarClockPubkey).Build()},
+				{"ccip-offramp", ccip_offramp.NewTypeVersionInstruction(solana.SysVarClockPubkey).Build()},
+				// {"burnmint-token-pool", burnmint_token_pool.NewTypeVersionInstruction(solana.SysVarClockPubkey).Build()},
+				// {"lockrelease-token-pool", ccip_router.NewTypeVersionInstruction(solana.SysVarClockPubkey).Build()},
+				{"rmn-remote", rmn_remote.NewTypeVersionInstruction(solana.SysVarClockPubkey).Build()},
+			}
+			for _, testcase := range type_version_cases {
+				t.Run(testcase.ContractName, func(t *testing.T) {
+					t.Parallel()
 
-			output, err := common.ExtractTypedReturnValue(ctx, result.Meta.LogMessages, config.CcipRouterProgram.String(), func(b []byte) string {
-				require.Len(t, b, int(binary.LittleEndian.Uint32(b[0:4]))+4) // the first 4 bytes just encodes the length
-				return string(b[4:])
-			})
-			require.NoError(t, err)
-			require.Regexp(t, "^ccip-router [0-9a-f]{40}$", output)
+					ix, err := ccip_router.NewTypeVersionInstruction(solana.SysVarClockPubkey).ValidateAndBuild()
+					require.NoError(t, err)
+					result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, legacyAdmin, config.DefaultCommitment)
+					require.NotNil(t, result)
+					fmt.Printf("Type Version: %s\n", result.Meta.LogMessages)
+
+					output, err := common.ExtractTypedReturnValue(ctx, result.Meta.LogMessages, config.CcipRouterProgram.String(), func(b []byte) string {
+						require.Len(t, b, int(binary.LittleEndian.Uint32(b[0:4]))+4) // the first 4 bytes just encodes the length
+						return string(b[4:])
+					})
+					require.NoError(t, err)
+					require.Regexp(t, "^"+testcase.ContractName+" [0-9a-f]{40}$", output)
+				})
+			}
 		})
 
 		t.Run("receiver", func(t *testing.T) {

@@ -62,6 +62,20 @@ pub mod ping_pong_demo {
         token_interface::approve(approve_ctx, u64::MAX)
     }
 
+    /// Returns the program type (name) and version.
+    /// Used by offchain code to easily determine which program & version is being interacted with.
+    ///
+    /// # Arguments
+    /// * `ctx`` - The context
+    pub fn type_version(_ctx: Context<Empty>) -> Result<String> {
+        let response = format!(
+            "{} {}",
+            env!("CCIP_BUILD_PROGRAM_NAME"),
+            env!("CCIP_BUILD_GIT_HASH")
+        );
+        msg!("{}", response);
+        Ok(response)
+    }
     ////////////////////////////
     // Only callable by owner //
     ////////////////////////////
@@ -346,6 +360,12 @@ pub mod context {
         // Initialization only allowed by program upgrade authority
         #[account(constraint = program_data.upgrade_authority_address == Some(authority.key()) @ PingPongDemoError::Unauthorized)]
         pub program_data: Account<'info, ProgramData>,
+    }
+
+    #[derive(Accounts)]
+    pub struct Empty<'info> {
+        // This is unused, but Anchor requires that there is at least one account in the context
+        pub clock: Sysvar<'info, Clock>,
     }
 
     #[derive(Accounts)]

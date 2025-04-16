@@ -32,6 +32,13 @@ var (
 
 	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
 
+	// Returns the program type (name) and version.
+	// Used by offchain code to easily determine which program & version is being interacted with.
+	//
+	// # Arguments
+	// * `ctx`` - The context, which contains no accounts.
+	Instruction_TypeVersion = ag_binary.TypeID([8]byte{129, 251, 8, 243, 122, 229, 252, 164})
+
 	Instruction_SetCounterpart = ag_binary.TypeID([8]byte{118, 28, 243, 127, 218, 176, 228, 228})
 
 	Instruction_SetPaused = ag_binary.TypeID([8]byte{91, 60, 125, 192, 176, 225, 166, 218})
@@ -50,6 +57,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "InitializeConfig"
 	case Instruction_Initialize:
 		return "Initialize"
+	case Instruction_TypeVersion:
+		return "TypeVersion"
 	case Instruction_SetCounterpart:
 		return "SetCounterpart"
 	case Instruction_SetPaused:
@@ -85,6 +94,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"initialize", (*Initialize)(nil),
+		},
+		{
+			"type_version", (*TypeVersion)(nil),
 		},
 		{
 			"set_counterpart", (*SetCounterpart)(nil),

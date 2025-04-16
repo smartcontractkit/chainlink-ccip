@@ -90,12 +90,14 @@ pub mod ccip_router {
     /// Used by offchain code to easily determine which program & version is being interacted with.
     ///
     /// # Arguments
-    /// * `ctx`` - The context, which contains no accounts.
+    /// * `ctx`` - The context
     pub fn type_version(_ctx: Context<Empty>) -> Result<String> {
-        let commit = env!("CCIP_BUILD_GIT_HASH");
-        let mut response = String::from("ccip-router ");
-        response.push_str(commit);
-        msg!("Type&version: {}", response);
+        let response = format!(
+            "{} {}",
+            env!("CCIP_BUILD_PROGRAM_NAME"),
+            env!("CCIP_BUILD_GIT_HASH")
+        );
+        msg!("{}", response);
         Ok(response)
     }
 

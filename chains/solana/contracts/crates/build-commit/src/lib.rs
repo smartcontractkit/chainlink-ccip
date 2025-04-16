@@ -1,6 +1,9 @@
 use std::process::Command;
 
-pub fn cargo_instructions() {
+pub fn cargo_instructions(source_file: &str) {
+    let program_name = source_file.split('/').nth_back(1).unwrap();
+    println!("cargo:rustc-env=CCIP_BUILD_PROGRAM_NAME={}", program_name);
+
     let hash_output = Command::new("git")
         .args(&["rev-parse", "HEAD"])
         .output()
@@ -40,6 +43,6 @@ mod tests {
 
     #[test]
     fn test_cargo_instructions() {
-        cargo_instructions();
+        cargo_instructions("<some_prefix>/chainlink-ccip/chains/solana/contracts/programs/burnmint-token-pool/build.rs");
     }
 }
