@@ -101,13 +101,22 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 		{tokenName: "spl-token", tokenProgram: solana.TokenProgramID},
 		{tokenName: "spl-token-2022", tokenProgram: config.Token2022Program},
 	} {
-		t.Run(v.tokenName, func(t *testing.T) {
-			t.Parallel()
-			decimals := uint8(0)
-			amount := uint64(1000)
+		// test functionality with each pool type (burnmint & lockrelease)
+		for _, p := range []struct {
+			poolName    string
+			poolProgram solana.PublicKey
+		}{
+			{poolName: "burnmint", poolProgram: config.CcipBasePoolBurnMint},
+			{poolName: "lockrelease", poolProgram: config.CcipBasePoolLockRelease},
+		} {
+			t.Run(p.poolName+" "+v.tokenName, func(t *testing.T) {
+				t.Parallel()
 
-			// for _, poolProgram := range []solana.PublicKey{config.CcipBasePoolBurnMint, config.CcipBasePoolLockRelease} {
-			for _, poolProgram := range []solana.PublicKey{config.CcipBasePoolBurnMint} {
+				decimals := uint8(0)
+				amount := uint64(1000)
+				poolProgram := p.poolProgram
+
+				// for _, poolProgram := range []solana.PublicKey{config.CcipBasePoolBurnMint} {
 				rampPoolSignerPDA, _, _ := state.FindExternalTokenPoolsSignerPDA(poolProgram, dumbRamp)
 
 				mintPriv, err := solana.NewRandomPrivateKey()
@@ -215,6 +224,20 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 
 						// Shrinking fails now as the entries do not exist anymore
 						testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{&tokens.TokenInstruction{Instruction: ixShrink, Program: poolProgram}}, admin, rpc.CommitmentConfirmed, []string{"Key did not exist in the allowlist"})
+					})
+
+					t.Run("Cannot re-initialize the state version", func(t *testing.T) {
+						var state tokenpool.State
+						err := common.GetAccountDataBorshInto(ctx, solanaGoClient, poolConfig, config.DefaultCommitment, &state)
+						require.NoError(t, err)
+						require.Equal(t, state.Version, uint8(1))
+
+						ix, err := tokenpool.NewInitializeStateVersionInstruction(mint, poolConfig).ValidateAndBuild()
+						require.NoError(t, err)
+
+						testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{
+							&tokens.TokenInstruction{Instruction: ix, Program: poolProgram},
+						}, admin, rpc.CommitmentConfirmed, []string{"Invalid state version"})
 					})
 
 					t.Run("lockOrBurn", func(t *testing.T) {
@@ -340,7 +363,7 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 						require.Equal(t, "0", getBalance(poolTokenAccount))
 					})
 				})
-			}
-		})
+			})
+		}
 	}
 }

@@ -20,14 +20,16 @@ pub mod test_token_pool {
         router: Pubkey,
         rmn_remote: Pubkey,
     ) -> Result<()> {
-        ctx.accounts.state.config.init(
-            &ctx.accounts.mint,
-            ctx.program_id.key(),
-            ctx.accounts.authority.key(),
-            router,
-            rmn_remote,
-        )?;
-        ctx.accounts.state.pool_type = pool_type;
+        ctx.accounts.state.set_inner(State {
+            pool_type,
+            config: BaseConfig::init(
+                &ctx.accounts.mint,
+                ctx.program_id.key(),
+                ctx.accounts.authority.key(),
+                router,
+                rmn_remote,
+            ),
+        });
         Ok(())
     }
 
@@ -43,7 +45,10 @@ pub mod test_token_pool {
     // set_router changes the expected signers for mint/release + burn/lock method calls
     // this is used to update the router address
     pub fn set_router(ctx: Context<SetConfig>, new_router: Pubkey) -> Result<()> {
-        ctx.accounts.state.config.set_router(new_router)
+        ctx.accounts
+            .state
+            .config
+            .set_router(new_router, ctx.program_id)
     }
 
     // initialize remote config (with no remote pools as it must be zero sized)

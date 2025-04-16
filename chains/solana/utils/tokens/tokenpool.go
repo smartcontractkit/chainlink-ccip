@@ -157,6 +157,7 @@ type EventBurnLock struct {
 	Discriminator [8]byte
 	Sender        solana.PublicKey
 	Amount        uint64
+	Mint          solana.PublicKey
 }
 
 type EventMintRelease struct {
@@ -164,6 +165,7 @@ type EventMintRelease struct {
 	Sender        solana.PublicKey
 	Recipient     solana.PublicKey
 	Amount        uint64
+	Mint          solana.PublicKey
 }
 
 type EventChainConfigured struct {

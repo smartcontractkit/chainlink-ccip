@@ -36,6 +36,18 @@ pub struct InitializeTokenPool<'info> {
 }
 
 #[derive(Accounts)]
+#[instruction(mint: Pubkey)]
+pub struct InitializeStateVersion<'info> {
+    #[account(
+        mut,
+        seeds = [POOL_STATE_SEED, mint.as_ref()],
+        bump,
+        constraint = uninitialized(state.version) @ CcipTokenPoolError::InvalidVersion,
+    )]
+    pub state: Account<'info, State>,
+}
+
+#[derive(Accounts)]
 pub struct SetConfig<'info> {
     #[account(
         mut,
@@ -103,7 +115,7 @@ pub struct AcceptOwnership<'info> {
 pub struct TokenOfframp<'info> {
     // CCIP accounts ------------------------
     #[account(
-        seeds = [EXTERNAL_TOKENPOOL_SIGNER, crate::ID.as_ref()],
+        seeds = [EXTERNAL_TOKEN_POOLS_SIGNER, crate::ID.as_ref()],
         bump,
         seeds::program = offramp_program.key(),
     )]
