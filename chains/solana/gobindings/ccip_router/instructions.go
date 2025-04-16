@@ -51,6 +51,9 @@ var (
 	// * `rmn_remote` - The public key of the RMN remote.
 	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
 
+	// Print commit SHA
+	Instruction_GitCommit = ag_binary.TypeID([8]byte{24, 10, 239, 86, 212, 22, 126, 255})
+
 	// Transfers the ownership of the router to a new proposed owner.
 	//
 	// Shared func signature with other programs
@@ -290,6 +293,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 	switch id {
 	case Instruction_Initialize:
 		return "Initialize"
+	case Instruction_GitCommit:
+		return "GitCommit"
 	case Instruction_TransferOwnership:
 		return "TransferOwnership"
 	case Instruction_AcceptOwnership:
@@ -356,6 +361,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 	[]ag_binary.VariantType{
 		{
 			"initialize", (*Initialize)(nil),
+		},
+		{
+			"git_commit", (*GitCommit)(nil),
 		},
 		{
 			"transfer_ownership", (*TransferOwnership)(nil),
