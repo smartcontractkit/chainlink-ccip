@@ -201,6 +201,7 @@ func (p *Plugin) getCommitReportsObservation(
 		ctx,
 		p.ccipReader,
 		p.commitRootsCache.CanExecute,
+		p.commitReportsCache,
 		fetchFrom,
 		ci.CursedSourceChains,
 		lggr,
