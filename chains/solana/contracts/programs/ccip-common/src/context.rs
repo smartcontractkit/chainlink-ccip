@@ -106,7 +106,7 @@ pub struct TokenAccountsValidationContext<'info> {
 
     /// CHECK: The signer to be used by the router program to invoke the pool program
     #[account(
-        seeds = [seed::EXTERNAL_TOKEN_POOL, pool_program.key().as_ref()],
+        seeds = [seed::EXTERNAL_TOKEN_POOLS_SIGNER, pool_program.key().as_ref()],
         bump,
         seeds::program = router.key(),
     )]

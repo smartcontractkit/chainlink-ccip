@@ -13,7 +13,7 @@ pub const POOL_CHAINCONFIG_SEED: &[u8] = b"ccip_tokenpool_chainconfig"; // seed 
 pub const POOL_STATE_SEED: &[u8] = b"ccip_tokenpool_config";
 pub const POOL_SIGNER_SEED: &[u8] = b"ccip_tokenpool_signer";
 
-pub const EXTERNAL_TOKENPOOL_SIGNER: &[u8] = b"external_token_pools_signer";
+pub const EXTERNAL_TOKEN_POOLS_SIGNER: &[u8] = b"external_token_pools_signer";
 pub const ALLOWED_OFFRAMP: &[u8] = b"allowed_offramp";
 
 pub const fn valid_version(v: u8, max_version: u8) -> bool {
@@ -62,37 +62,43 @@ pub struct BaseConfig {
 
 impl BaseConfig {
     pub fn init(
-        &mut self,
         mint: &InterfaceAccount<Mint>,
         pool_program: Pubkey,
         owner: Pubkey,
         router: Pubkey,
         rmn_remote: Pubkey,
-    ) -> Result<()> {
+    ) -> Self {
         let token_info = mint.to_account_info();
+        let token_program = *token_info.owner;
 
-        self.token_program = *token_info.owner;
-        self.mint = mint.key();
-        self.decimals = mint.decimals;
-        (self.pool_signer, _) = Pubkey::find_program_address(
-            &[POOL_SIGNER_SEED, self.mint.key().as_ref()],
-            &pool_program,
-        );
-        self.pool_token_account = get_associated_token_address_with_program_id(
-            &self.pool_signer,
-            &self.mint,
-            &self.token_program,
-        );
-        self.owner = owner;
-        self.rate_limit_admin = owner;
-        self.router = router;
-        self.rmn_remote = rmn_remote;
-        (self.router_onramp_authority, _) = Pubkey::find_program_address(
-            &[EXTERNAL_TOKENPOOL_SIGNER, pool_program.as_ref()],
+        let (pool_signer, _) =
+            Pubkey::find_program_address(&[POOL_SIGNER_SEED, mint.key().as_ref()], &pool_program);
+
+        let (router_onramp_authority, _) = Pubkey::find_program_address(
+            &[EXTERNAL_TOKEN_POOLS_SIGNER, pool_program.as_ref()],
             &router,
         );
 
-        Ok(())
+        let pool_token_account =
+            get_associated_token_address_with_program_id(&pool_signer, &mint.key(), &token_program);
+
+        Self {
+            token_program,
+            mint: mint.key(),
+            decimals: mint.decimals,
+            pool_signer,
+            pool_token_account,
+            owner,
+            proposed_owner: Pubkey::default(),
+            rate_limit_admin: owner,
+            router_onramp_authority,
+            router,
+            rebalancer: Pubkey::default(),
+            can_accept_liquidity: false,
+            list_enabled: false,
+            allow_list: vec![],
+            rmn_remote,
+        }
     }
 
     pub fn transfer_ownership(&mut self, proposed_owner: Pubkey) -> Result<()> {
@@ -122,7 +128,7 @@ impl BaseConfig {
         Ok(())
     }
 
-    pub fn set_router(&mut self, new_router: Pubkey) -> Result<()> {
+    pub fn set_router(&mut self, new_router: Pubkey, pool_program: &Pubkey) -> Result<()> {
         require_keys_neq!(
             new_router,
             Pubkey::default(),
@@ -131,8 +137,10 @@ impl BaseConfig {
 
         let old_router = self.router;
         self.router = new_router;
-        (self.router_onramp_authority, _) =
-            Pubkey::find_program_address(&[EXTERNAL_TOKENPOOL_SIGNER], &new_router);
+        (self.router_onramp_authority, _) = Pubkey::find_program_address(
+            &[EXTERNAL_TOKEN_POOLS_SIGNER, pool_program.as_ref()],
+            &new_router,
+        );
         emit!(RouterUpdated {
             old_router,
             new_router,
@@ -312,6 +320,7 @@ pub struct ReleaseOrMintOutV1 {
 pub struct Burned {
     pub sender: Pubkey,
     pub amount: u64,
+    pub mint: Pubkey,
 }
 
 #[event]
@@ -319,12 +328,14 @@ pub struct Minted {
     pub sender: Pubkey,
     pub recipient: Pubkey,
     pub amount: u64,
+    pub mint: Pubkey,
 }
 
 #[event]
 pub struct Locked {
     pub sender: Pubkey,
     pub amount: u64,
+    pub mint: Pubkey,
 }
 
 #[event]
@@ -332,6 +343,7 @@ pub struct Released {
     pub sender: Pubkey,
     pub recipient: Pubkey,
     pub amount: u64,
+    pub mint: Pubkey,
 }
 
 // note: configuration events are slightly different than EVM chains because configuration follows different steps
@@ -466,7 +478,7 @@ pub fn validate_lock_or_burn<'info>(
     outbound_rate_limit.consume::<Clock>(lock_or_burn_in.amount)
 }
 
-// validate_lock_or_burn checks for correctness on inputs
+// validate_release_or_mint checks for correctness on inputs
 // - token & pool is correct for chain
 // - rate limiting
 // - source chain is not cursed

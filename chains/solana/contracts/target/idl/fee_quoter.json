@@ -12,10 +12,10 @@
         "# Arguments",
         "",
         "* `ctx` - The context containing the accounts required for initialization.",
-        "* `svm_chain_selector` - The chain selector for SVM.",
-        "* `default_gas_limit` - The default gas limit for other destination chains.",
-        "* `default_allow_out_of_order_execution` - Whether out-of-order execution is allowed by default for other destination chains.",
-        "* `enable_execution_after` - The minimum amount of time required between a message has been committed and can be manually executed."
+        "* `max_fee_juels_per_msg` - The maximum fee in juels that can be charged per message.",
+        "* `onramp` - The public key of the onramp.",
+        "",
+        "The function also uses the link_token_mint account from the context."
       ],
       "accounts": [
         {

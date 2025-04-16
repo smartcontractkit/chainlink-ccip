@@ -4,9 +4,9 @@ use anchor_spl::{
     token_interface::{Mint, TokenAccount},
 };
 use base_token_pool::common::{
-    valid_version, CcipTokenPoolError, LockOrBurnInV1, ReleaseOrMintInV1, RemoteAddress,
-    RemoteConfig, ALLOWED_OFFRAMP, ANCHOR_DISCRIMINATOR, EXTERNAL_TOKENPOOL_SIGNER,
-    POOL_CHAINCONFIG_SEED, POOL_SIGNER_SEED, POOL_STATE_SEED,
+    uninitialized, valid_version, CcipTokenPoolError, LockOrBurnInV1, ReleaseOrMintInV1,
+    RemoteAddress, RemoteConfig, ALLOWED_OFFRAMP, ANCHOR_DISCRIMINATOR,
+    EXTERNAL_TOKEN_POOLS_SIGNER, POOL_CHAINCONFIG_SEED, POOL_SIGNER_SEED, POOL_STATE_SEED,
 };
 use ccip_common::seed;
 
@@ -36,6 +36,18 @@ pub struct InitializeTokenPool<'info> {
     // by the CLL deployment of this program is limited to CLL. Users must deploy their own instance of this program.
     #[account(constraint = program_data.upgrade_authority_address == Some(authority.key()) @ CcipTokenPoolError::Unauthorized)]
     pub program_data: Account<'info, ProgramData>,
+}
+
+#[derive(Accounts)]
+#[instruction(mint: Pubkey)]
+pub struct InitializeStateVersion<'info> {
+    #[account(
+        mut,
+        seeds = [POOL_STATE_SEED, mint.as_ref()],
+        bump,
+        constraint = uninitialized(state.version) @ CcipTokenPoolError::InvalidVersion,
+    )]
+    pub state: Account<'info, State>,
 }
 
 #[derive(Accounts)]
@@ -106,7 +118,7 @@ pub struct AcceptOwnership<'info> {
 pub struct TokenOfframp<'info> {
     // CCIP accounts ------------------------
     #[account(
-        seeds = [EXTERNAL_TOKENPOOL_SIGNER, crate::ID.as_ref()],
+        seeds = [EXTERNAL_TOKEN_POOLS_SIGNER, crate::ID.as_ref()],
         bump,
         seeds::program = offramp_program.key(),
     )]
