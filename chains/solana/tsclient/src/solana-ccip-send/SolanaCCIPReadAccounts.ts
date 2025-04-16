@@ -1,4 +1,3 @@
-import * as anchor from "@coral-xyz/anchor";
 import { AnchorProvider, Program, BN } from "@coral-xyz/anchor";
 import { Keypair, PublicKey, Connection } from "@solana/web3.js";
 import fs from "fs";

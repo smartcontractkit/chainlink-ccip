@@ -28,7 +28,6 @@ import { SolanaCCIPSendConfig } from "./SolanaCCIPSendConfig";
 import { SolanaCCIPSendRequest } from "./SolanaCCIPSendRequest";
 import { CcipCommonClient } from "./SolanaCCIPReadAccounts";
 import BN from "bn.js";
-import { token } from "@coral-xyz/anchor/dist/cjs/utils";
 
 export class SolanaCCIPSender {
   private readonly config: SolanaCCIPSendConfig;

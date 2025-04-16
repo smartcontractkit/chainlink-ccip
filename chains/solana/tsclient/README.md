@@ -109,3 +109,64 @@ Example output:
 📤 Transaction sent:
 ✅ Done
 ```
+
+
+### Setup your token, deploy your token pool and configure them through the Token Admin Registry
+
+### 1. Deploy the token pool
+
+First you need to modify the program id. After that, deploy it:
+
+```bash
+anchor deploy --program-name burnmint_token_pool
+```
+
+TODO: fix this
+Upload the IDL:
+
+```bash
+anchor idl upgrade <PROGRAM_ID> --filepath target/idl/burnmint_token_pool.json
+```
+
+
+### 2. Create your token
+
+
+```bash
+spl-token create-token
+```
+
+```bash
+spl-token create-account  <TOKEN_MINT>
+```
+
+
+```bash
+spl-token mint <TOKEN_MINT> 100
+```
+
+
+## 3. Configure the token pool
+
+Initialize the token pool
+
+```bash
+npx ts-node src/solana-ccip-token-admin-registry/InitializeTokenPool.ts
+```
+
+Set Router
+```bash
+npx ts-node src/solana-ccip-token-admin-registry/SetRouter.ts
+```
+
+## 4. Create the lookup table
+
+```bash
+npx ts-node src/create-lookup-table.ts <ACCOUNT_0> <ACCOUNT_1> ...
+```
+
+## 5. Configure it in the token admin registry
+
+```bash
+npx ts-node src/setup-token-admin-registry.ts
+```
