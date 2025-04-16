@@ -19,8 +19,8 @@ import {Pool} from "../libraries/Pool.sol";
 import {MultiOCR3Base} from "../ocr/MultiOCR3Base.sol";
 import {CallWithExactGas} from "@shared/call/CallWithExactGas.sol";
 
-import {IERC20} from "@vendor/openzeppelin-solidity/v5.0.2/contracts/token/ERC20/IERC20.sol";
-import {EnumerableSet} from "@vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
+import {IERC20} from "@openzeppelin/contracts@5/token/ERC20/IERC20.sol";
+import {EnumerableSet} from "@openzeppelin/contracts@5/utils/structs/EnumerableSet.sol";
 
 /// @notice OffRamp enables OCR networks to execute multiple messages in an OffRamp in a single transaction.
 /// @dev The OnRamp and OffRamp form a cross chain upgradeable unit. Any change to one of them results an

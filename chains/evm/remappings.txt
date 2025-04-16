@@ -2,3 +2,4 @@ forge-std/=node_modules/chainlink-evm/contracts/src/v0.8/vendor/forge-std/src/
 @shared=node_modules/chainlink-evm/contracts/src/v0.8/shared
 @keystone=node_modules/chainlink-evm/contracts/src/v0.8/keystone
 @vendor=node_modules/chainlink-evm/contracts/src/v0.8/vendor
+@openzeppelin@5/=node_modules/@openzeppelin@5/

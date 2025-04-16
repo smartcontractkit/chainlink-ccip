@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {ICapabilityConfiguration} from "@keystone/interfaces/ICapabilityConfiguration.sol";
 
 import {CCIPHomeTestSetup} from "./CCIPHomeTestSetup.t.sol";
-import {IERC165} from "@vendor/openzeppelin-solidity/v5.0.2/contracts/interfaces/IERC165.sol";
+import {IERC165} from "@openzeppelin/contracts@5/interfaces/IERC165.sol";
 
 contract CCIPHome_supportsInterface is CCIPHomeTestSetup {
   function test_supportsInterface() public view {
