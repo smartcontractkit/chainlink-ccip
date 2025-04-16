@@ -88,8 +88,14 @@ func (p *processor) selectTokensForUpdate(
 
 	for token, feedPrice := range obs.FeedTokenPrices {
 		lastUpdate, exists := obs.FeeQuoterTokenUpdates[token]
+		lggr := logger.With(lggr,
+			"token", token,
+			"feedPrice", feedPrice,
+			"lastUpdate", lastUpdate,
+			"consensusTimestamp", obs.Timestamp,
+		)
 		if !exists {
-			// if the token is not in the fee quoter updates, then we should update it
+			lggr.Infow("token price update needed: no previous update exists")
 			tokenPrices[token] = cciptypes.NewBigInt(feedPrice.Price.Int)
 			continue
 		}
@@ -101,11 +107,21 @@ func (p *processor) selectTokensForUpdate(
 		}
 
 		nextUpdateTime := lastUpdate.Timestamp.Add(cfg.TokenPriceBatchWriteFrequency.Duration())
-		shouldUpdate :=
-			obs.Timestamp.After(nextUpdateTime) ||
-				mathslib.Deviates(feedPrice.Price.Int, lastUpdate.Value.Int, ti.DeviationPPB.Int64())
-		if shouldUpdate {
+		priceDeviates := mathslib.Deviates(feedPrice.Price.Int, lastUpdate.Value.Int, ti.DeviationPPB.Int64())
+		heartbeatPassed := obs.Timestamp.After(nextUpdateTime)
+
+		if heartbeatPassed {
+			lggr.Infow("token price update needed: heartbeat time passed",
+				"nextUpdateTime", nextUpdateTime,
+				"heartbeatInterval", cfg.TokenPriceBatchWriteFrequency)
 			tokenPrices[token] = cciptypes.NewBigInt(feedPrice.Price.Int)
+		} else if priceDeviates {
+			lggr.Infow("token price update needed: deviation threshold exceeded",
+				"deviationPPB", ti.DeviationPPB)
+			tokenPrices[token] = cciptypes.NewBigInt(feedPrice.Price.Int)
+		} else {
+			lggr.Debugw("token price update not needed: within deviation threshold",
+				"deviationPPB", ti.DeviationPPB)
 		}
 	}
 
