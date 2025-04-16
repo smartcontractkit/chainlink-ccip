@@ -75,8 +75,13 @@ func (p *Processor) getOutcome(
 			return previousOutcome, buildingReport, nil
 		}
 
+		rmnSigs := rmn.ReportSignatures{}
+		if q.RMNSignatures != nil {
+			rmnSigs = *q.RMNSignatures
+		}
+
 		merkleRootsOutcome, err := buildMerkleRootsOutcome(
-			q, p.offchainCfg.RMNEnabled, lggr, consObservation, previousOutcome, p.addressCodec)
+			rmnSigs, p.offchainCfg.RMNEnabled, lggr, consObservation, previousOutcome, p.addressCodec)
 
 		return merkleRootsOutcome, nextState, err
 	case waitingForReportTransmission:
@@ -171,7 +176,7 @@ func reportRangesOutcome(
 // buildMerkleRootsOutcome is given a set of agreed observed merkle roots and RMN signatures
 // and construct a merkleRoots outcome.
 func buildMerkleRootsOutcome(
-	q Query,
+	rmnSigs rmn.ReportSignatures,
 	rmnEnabled bool,
 	lggr logger.Logger,
 	consensusObservation consensusObservation,
@@ -189,7 +194,7 @@ func buildMerkleRootsOutcome(
 		"rmnEnabled", rmnEnabled,
 		"rmnEnabledChains", consensusObservation.RMNEnabledChains,
 		"roots", roots,
-		"rmnSignatures", q.RMNSignatures)
+		"rmnSignatures", rmnSigs)
 
 	sort.Slice(roots, func(i, j int) bool { return roots[i].ChainSel < roots[j].ChainSel })
 
@@ -197,13 +202,13 @@ func buildMerkleRootsOutcome(
 	var err error
 
 	if len(roots) > 0 && rmnEnabled {
-		sigs, err = rmn.NewECDSASigsFromPB(q.RMNSignatures.Signatures)
+		sigs, err = rmn.NewECDSASigsFromPB(rmnSigs.Signatures)
 		if err != nil {
 			return Outcome{}, fmt.Errorf("failed to parse RMN signatures: %w", err)
 		}
 
 		roots = filterRootsBasedOnRmnSigs(
-			lggr, q.RMNSignatures.LaneUpdates, roots, consensusObservation.RMNEnabledChains, addressCodec)
+			lggr, rmnSigs.LaneUpdates, roots, consensusObservation.RMNEnabledChains, addressCodec)
 	}
 
 	outcome := Outcome{
