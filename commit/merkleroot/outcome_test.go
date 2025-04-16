@@ -992,6 +992,89 @@ func Test_Processor_Outcome(t *testing.T) {
 			},
 			expErr: false,
 		},
+		{
+			name: "if query is empty then progress should be made with rmn-disabled chains",
+			prevOutcome: Outcome{
+				OutcomeType: ReportIntervalsSelected,
+			},
+			q: Query{},
+			observations: []func(testCase) Observation{
+				func(tc testCase) Observation {
+					return Observation{
+						MerkleRoots: []cciptypes.MerkleRootChain{
+							{
+								ChainSel:      chainA,
+								OnRampAddress: []byte{0xa},
+								SeqNumsRange:  cciptypes.NewSeqNumRange(10, 20),
+								MerkleRoot:    bytes32a,
+							},
+							{
+								ChainSel:      chainB,
+								OnRampAddress: []byte{0xb},
+								SeqNumsRange:  cciptypes.NewSeqNumRange(11, 21),
+								MerkleRoot:    bytes32a,
+							},
+							{
+								ChainSel:      chainC,
+								OnRampAddress: []byte{0xc},
+								SeqNumsRange:  cciptypes.NewSeqNumRange(12, 22),
+								MerkleRoot:    bytes32a,
+							},
+							{
+								ChainSel:      chainD,
+								OnRampAddress: []byte{0xd},
+								SeqNumsRange:  cciptypes.NewSeqNumRange(13, 23),
+								MerkleRoot:    bytes32a,
+							},
+						},
+						RMNEnabledChains: map[cciptypes.ChainSelector]bool{
+							chainA: true,
+							chainB: false,
+							chainC: false,
+							chainD: true,
+						},
+						FChain: map[cciptypes.ChainSelector]int{
+							chainA: 1,
+							chainB: 0,
+							chainC: 0,
+							chainD: 1,
+						},
+					}
+				},
+				func(tc testCase) Observation { return tc.observations[0](tc) },
+				func(tc testCase) Observation { return tc.observations[0](tc) },
+			},
+			observers:         []commontypes.OracleID{1, 2, 3},
+			bigF:              1,
+			destChainSel:      chainD,
+			maxMerkleTreeSize: 10,
+			rmnEnabled:        true,
+			expOutcome: Outcome{
+				OutcomeType: ReportGenerated,
+				RootsToReport: []cciptypes.MerkleRootChain{
+					{
+						ChainSel:      chainB,
+						OnRampAddress: []byte{0xb},
+						SeqNumsRange:  cciptypes.NewSeqNumRange(11, 21),
+						MerkleRoot:    bytes32a,
+					},
+					{
+						ChainSel:      chainC,
+						OnRampAddress: []byte{0xc},
+						SeqNumsRange:  cciptypes.NewSeqNumRange(12, 22),
+						MerkleRoot:    bytes32a,
+					},
+				},
+				RMNEnabledChains: map[cciptypes.ChainSelector]bool{
+					chainA: true,
+					chainB: false,
+					chainC: false,
+					chainD: true,
+				},
+				RMNReportSignatures: []cciptypes.RMNECDSASignature{},
+			},
+			expErr: false,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -1060,9 +1143,9 @@ func Test_buildMerkleRootsOutcome(t *testing.T) {
 
 		lggr := logger.Test(t)
 		for i := 0; i < rounds; i++ {
-			report1, err := buildMerkleRootsOutcome(Query{}, false, lggr, obs, Outcome{}, mockAddrCodec)
+			report1, err := buildMerkleRootsOutcome(rmn.ReportSignatures{}, false, lggr, obs, Outcome{}, mockAddrCodec)
 			require.NoError(t, err)
-			report2, err := buildMerkleRootsOutcome(Query{}, false, lggr, obs, Outcome{}, mockAddrCodec)
+			report2, err := buildMerkleRootsOutcome(rmn.ReportSignatures{}, false, lggr, obs, Outcome{}, mockAddrCodec)
 			require.NoError(t, err)
 			require.Equal(t, report1, report2)
 		}
