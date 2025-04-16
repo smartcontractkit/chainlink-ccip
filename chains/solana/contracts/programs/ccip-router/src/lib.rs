@@ -86,6 +86,13 @@ pub mod ccip_router {
         Ok(())
     }
 
+    /// Print commit SHA
+    pub fn git_commit(_ctx: Context<Empty>) -> Result<String> {
+        let commit = env!("GIT_HASH");
+        msg!("Git commit: {}", commit);
+        Ok(commit.to_string())
+    }
+
     /// Transfers the ownership of the router to a new proposed owner.
     ///
     /// Shared func signature with other programs

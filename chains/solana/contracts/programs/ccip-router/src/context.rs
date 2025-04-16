@@ -69,6 +69,9 @@ pub struct WithdrawBilledFunds<'info> {
 }
 
 #[derive(Accounts)]
+pub struct Empty {}
+
+#[derive(Accounts)]
 pub struct InitializeCCIPRouter<'info> {
     #[account(
         init,

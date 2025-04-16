@@ -3,6 +3,7 @@ name = "ccip_router"
 version = "0.1.0-dev"
 description = "Created with Anchor"
 edition = "2021"
+build = "build.rs"
 
 [lib]
 crate-type = ["cdylib", "lib"]
