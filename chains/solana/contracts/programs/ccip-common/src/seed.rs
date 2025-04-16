@@ -16,7 +16,7 @@ pub const ALLOWED_OFFRAMP: &[u8] = b"allowed_offramp";
 // arbitrary messaging signer
 pub const EXTERNAL_EXECUTION_CONFIG: &[u8] = b"external_execution_config";
 // token pool interaction signer
-pub const EXTERNAL_TOKEN_POOL: &[u8] = b"external_token_pools_signer";
+pub const EXTERNAL_TOKEN_POOLS_SIGNER: &[u8] = b"external_token_pools_signer";
 // signer for billing fee token transfer
 pub const FEE_BILLING_SIGNER: &[u8] = b"fee_billing_signer";
 

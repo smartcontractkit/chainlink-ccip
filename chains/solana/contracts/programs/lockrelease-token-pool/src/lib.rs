@@ -43,7 +43,10 @@ pub mod lockrelease_token_pool {
     // set_router changes the expected signers for mint/release + burn/lock method calls
     // this is used to update the router address
     pub fn set_router(ctx: Context<SetConfig>, new_router: Pubkey) -> Result<()> {
-        ctx.accounts.state.config.set_router(new_router)
+        ctx.accounts
+            .state
+            .config
+            .set_router(new_router, ctx.program_id)
     }
 
     // permissionless method to set a pool's `state.version` value, only when
@@ -293,6 +296,7 @@ pub fn lock_tokens(sender: Pubkey, lock_or_burn: LockOrBurnInV1) -> Result<()> {
     emit!(Locked {
         sender,
         amount: lock_or_burn.amount,
+        mint: lock_or_burn.local_token,
     });
 
     Ok(())
@@ -315,7 +319,7 @@ pub fn release_tokens<'a>(
         token_program,
         receiver_token_account,
         pool_token_account,
-        mint,
+        mint.clone(),
         pool_signer.clone(),
         pool_signer_bump,
         parsed_amount,
@@ -326,6 +330,7 @@ pub fn release_tokens<'a>(
         sender: pool_signer.key(),
         recipient: release_or_mint.receiver,
         amount: parsed_amount,
+        mint: mint.key(),
     });
 
     Ok(())
