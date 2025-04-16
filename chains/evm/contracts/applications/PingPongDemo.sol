@@ -57,7 +57,9 @@ contract PingPongDemo is CCIPReceiver, Ownable2StepMsgSender, ITypeAndVersion {
     _respond(1);
   }
 
-  function _respond(uint256 pingPongCount) internal virtual {
+  function _respond(
+    uint256 pingPongCount
+  ) internal virtual {
     if (pingPongCount & 1 == 1) {
       emit Ping(pingPongCount);
     } else {
@@ -74,7 +76,9 @@ contract PingPongDemo is CCIPReceiver, Ownable2StepMsgSender, ITypeAndVersion {
     IRouterClient(getRouter()).ccipSend(s_counterpartChainSelector, message);
   }
 
-  function _ccipReceive(Client.Any2EVMMessage memory message) internal override {
+  function _ccipReceive(
+    Client.Any2EVMMessage memory message
+  ) internal override {
     uint256 pingPongCount = abi.decode(message.data, (uint256));
     if (!s_isPaused) {
       _respond(pingPongCount + 1);
@@ -85,7 +89,9 @@ contract PingPongDemo is CCIPReceiver, Ownable2StepMsgSender, ITypeAndVersion {
     return s_counterpartChainSelector;
   }
 
-  function setCounterpartChainSelector(uint64 chainSelector) external onlyOwner {
+  function setCounterpartChainSelector(
+    uint64 chainSelector
+  ) external onlyOwner {
     s_counterpartChainSelector = chainSelector;
   }
 
@@ -97,7 +103,9 @@ contract PingPongDemo is CCIPReceiver, Ownable2StepMsgSender, ITypeAndVersion {
     return s_feeToken;
   }
 
-  function setCounterpartAddress(bytes memory addr) external onlyOwner {
+  function setCounterpartAddress(
+    bytes memory addr
+  ) external onlyOwner {
     s_counterpartAddress = addr;
   }
 
@@ -105,7 +113,9 @@ contract PingPongDemo is CCIPReceiver, Ownable2StepMsgSender, ITypeAndVersion {
     return s_isPaused;
   }
 
-  function setPaused(bool pause) external onlyOwner {
+  function setPaused(
+    bool pause
+  ) external onlyOwner {
     s_isPaused = pause;
   }
 
@@ -113,7 +123,9 @@ contract PingPongDemo is CCIPReceiver, Ownable2StepMsgSender, ITypeAndVersion {
     return s_outOfOrderExecution;
   }
 
-  function setOutOfOrderExecution(bool outOfOrderExecution) external onlyOwner {
+  function setOutOfOrderExecution(
+    bool outOfOrderExecution
+  ) external onlyOwner {
     s_outOfOrderExecution = outOfOrderExecution;
     emit OutOfOrderExecutionChange(outOfOrderExecution);
   }
