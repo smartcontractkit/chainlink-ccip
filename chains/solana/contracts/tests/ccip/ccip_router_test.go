@@ -4328,7 +4328,7 @@ func TestCCIPRouter(t *testing.T) {
 				ix, err := base.ValidateAndBuild()
 				require.NoError(t, err)
 
-				ixApprove, err := tokens.TokenApproveChecked(1, token0Decimals, token0.Program, userTokenAccount, token0.Mint, token0.RouterSigner, user.PublicKey(), nil)
+				ixApprove, err := tokens.TokenApproveChecked(1, token0Decimals, token0.Program, userTokenAccount, token0.Mint, config.BillingSignerPDA, user.PublicKey(), nil)
 				require.NoError(t, err)
 
 				result := testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{ixApprove, ix}, user, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(300_000))
@@ -4451,9 +4451,9 @@ func TestCCIPRouter(t *testing.T) {
 				ix, err := base.ValidateAndBuild()
 				require.NoError(t, err)
 
-				ixApprove0, err := tokens.TokenApproveChecked(1, token0Decimals, token0.Program, userTokenAccount0, token0.Mint, token0.RouterSigner, user.PublicKey(), nil)
+				ixApprove0, err := tokens.TokenApproveChecked(1, token0Decimals, token0.Program, userTokenAccount0, token0.Mint, config.BillingSignerPDA, user.PublicKey(), nil)
 				require.NoError(t, err)
-				ixApprove1, err := tokens.TokenApproveChecked(2, token1Decimals, token1.Program, userTokenAccount1, token1.Mint, token1.RouterSigner, user.PublicKey(), nil)
+				ixApprove1, err := tokens.TokenApproveChecked(2, token1Decimals, token1.Program, userTokenAccount1, token1.Mint, config.BillingSignerPDA, user.PublicKey(), nil)
 				require.NoError(t, err)
 
 				result := testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{ixApprove0, ixApprove1, ix}, user, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(800_000))
