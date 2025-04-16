@@ -113,15 +113,15 @@ func (p *processor) selectTokensForUpdate(
 		if heartbeatPassed {
 			lggr.Infow("token price update needed: heartbeat time passed",
 				"nextUpdateTime", nextUpdateTime,
-				"heartbeatInterval", cfg.TokenPriceBatchWriteFrequency.Duration())
+				"heartbeatInterval", cfg.TokenPriceBatchWriteFrequency)
 			tokenPrices[token] = cciptypes.NewBigInt(feedPrice.Price.Int)
 		} else if priceDeviates {
 			lggr.Infow("token price update needed: deviation threshold exceeded",
-				"deviationPPB", ti.DeviationPPB.Int64())
+				"deviationPPB", ti.DeviationPPB)
 			tokenPrices[token] = cciptypes.NewBigInt(feedPrice.Price.Int)
 		} else {
 			lggr.Debugw("token price update not needed: within deviation threshold",
-				"deviationPPB", ti.DeviationPPB.Int64())
+				"deviationPPB", ti.DeviationPPB)
 		}
 	}
 

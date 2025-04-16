@@ -252,7 +252,7 @@ func (p *processor) getGasPricesToUpdate(
 			lggr.Infow("chain fee update needed: heartbeat time passed",
 				"nextUpdateTime", nextUpdateTime,
 				"consensusTimestamp", consensusTimestamp,
-				"heartbeatInterval", p.cfg.RemoteGasPriceBatchWriteFrequency.Duration())
+				"heartbeatInterval", p.cfg.RemoteGasPriceBatchWriteFrequency)
 			gasPrices = append(gasPrices, cciptypes.GasPriceChain{
 				ChainSel: chain,
 				GasPrice: packedFee,
@@ -288,16 +288,16 @@ func (p *processor) getGasPricesToUpdate(
 				"chain fee update needed: deviation threshold exceeded for either execution or data availability fee",
 				"executionFeeDeviates", executionFeeDeviates,
 				"dataAvFeeDeviates", dataAvFeeDeviates,
-				"executionFeeDeviationPPB", feeConfig.GasPriceDeviationPPB.Int64(),
-				"dataAvFeeDeviationPPB", feeConfig.DAGasPriceDeviationPPB.Int64())
+				"executionFeeDeviationPPB", feeConfig.GasPriceDeviationPPB,
+				"dataAvFeeDeviationPPB", feeConfig.DAGasPriceDeviationPPB)
 			gasPrices = append(gasPrices, cciptypes.GasPriceChain{
 				ChainSel: chain,
 				GasPrice: packedFee,
 			})
 		} else {
 			lggr.Debugw("chain fee update not needed: within deviation thresholds",
-				"executionFeeDeviationPPB", feeConfig.GasPriceDeviationPPB.Int64(),
-				"dataAvFeeDeviationPPB", feeConfig.DAGasPriceDeviationPPB.Int64())
+				"executionFeeDeviationPPB", feeConfig.GasPriceDeviationPPB,
+				"dataAvFeeDeviationPPB", feeConfig.DAGasPriceDeviationPPB)
 		}
 	}
 
