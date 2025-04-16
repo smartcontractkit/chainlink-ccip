@@ -202,10 +202,12 @@ func (m Message) String() string {
 	return string(js)
 }
 
-// IsEmpty returns true if the message is empty. Can't use == Message{} without using reflect.DeepEqual.
-func (m Message) IsEmpty() bool {
-	return m.Header.SourceChainSelector == 0 &&
-		m.Header.DestChainSelector == 0 && m.Header.Nonce == 0 && len(m.Header.OnRamp) == 0
+// IsPseudoDeleted returns true when the message is stripped out of some fields that makes it usable. Message still
+// contains some metaData like seqNumber and SourceChainSelector to be able to distinguish it from other messages while
+// still in the pseudo deleted state.
+func (m Message) IsPseudoDeleted() bool {
+	return m.Header.DestChainSelector == 0 && m.Header.SourceChainSelector == 0 &&
+		len(m.Header.OnRamp) == 0 && len(m.Receiver) == 0 && len(m.Sender) == 0
 }
 
 // RampMessageHeader is the family-agnostic header for OnRamp and OffRamp messages.

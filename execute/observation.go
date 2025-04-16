@@ -6,8 +6,6 @@ import (
 	"sort"
 	"time"
 
-	ocrtypecodec "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
@@ -281,28 +279,14 @@ func (p *Plugin) observeTokenDataForMessage(
 	}
 	msgTkData, err := p.tokenDataObserver.Observe(ctx, msgObs)
 	if err != nil {
-		lggr.Errorw("failed to observe token data", "err", err)
 		// In case of failure, initialize the token data with an error, that will prevent this specific token
+		lggr.Errorw("failed to observe token data", "err", err, "messageID", msg.Header.MessageID)
 		// from being processed and sent later but won't stop the rest of messages
 		msgTkData = make(exectypes.TokenDataObservations)
 		msgTkData[srcChain] = make(map[cciptypes.SeqNum]exectypes.MessageTokenData)
 		msgTkData[srcChain][seqNum] = exectypes.NewMessageTokenData(exectypes.NewErrorTokenData(err))
 	}
 	return msgTkData[srcChain][seqNum]
-}
-
-// initSourceChainMaps initializes maps for a source chain if they don't exist
-func initSourceChainMaps(
-	srcChain cciptypes.ChainSelector,
-	messageObs exectypes.MessageObservations,
-	msgHashes exectypes.MessageHashes,
-	tkData exectypes.TokenDataObservations,
-) {
-	if _, ok := messageObs[srcChain]; !ok {
-		messageObs[srcChain] = make(map[cciptypes.SeqNum]cciptypes.Message)
-		msgHashes[srcChain] = make(map[cciptypes.SeqNum]cciptypes.Bytes32)
-		tkData[srcChain] = make(map[cciptypes.SeqNum]exectypes.MessageTokenData)
-	}
 }
 
 // readMessagesForReport reads messages for the given report and validates they conform to the sequence range
@@ -338,18 +322,6 @@ func createEmptyMessageWithIDAndSeqNum(msg cciptypes.Message) cciptypes.Message 
 	}
 }
 
-func exceedsMaxEncodingSize(
-	observation exectypes.Observation,
-	ocrTypeCodec ocrtypecodec.ExecCodec,
-	maxSize int,
-) bool {
-	encodedObs, err := ocrTypeCodec.EncodeObservation(observation)
-	if err != nil {
-		return false
-	}
-	return len(encodedObs) >= maxSize
-}
-
 // getMessagesObservation collects message observations from the provided commit data.
 // It processes messages for each commit report, validating them against the sequence number range,
 // and builds observation structures including message content and hashes.
@@ -374,7 +346,7 @@ func (p *Plugin) getMessagesObservation(
 	//          These messages will not be executed in the current round, but may be executed in future rounds
 	//          (e.g. if gas prices decrease).
 	if len(previousOutcome.CommitReports) == 0 {
-		p.lggr.Debug("TODO: No reports to execute. This is expected after a cold start.")
+		lggr.Debug("TODO: No reports to execute. This is expected after a cold start.")
 		// No reports to execute.
 		// This is expected after a cold start.
 		return observation, nil
@@ -394,6 +366,7 @@ func (p *Plugin) getMessagesObservation(
 	stop := false
 
 	totalMsgs := 0
+	encodedObsSize := 0
 	for _, report := range commitData {
 		srcChain := report.SourceChain
 
@@ -412,7 +385,11 @@ func (p *Plugin) getMessagesObservation(
 		// Add the report to available reports
 		availableReports[srcChain] = append(availableReports[srcChain], report)
 		// Initialize data structures for this source chain if needed
-		initSourceChainMaps(srcChain, messageObs, msgHashes, tkData)
+		if _, ok := messageObs[srcChain]; !ok {
+			messageObs[srcChain] = make(map[cciptypes.SeqNum]cciptypes.Message)
+			msgHashes[srcChain] = make(map[cciptypes.SeqNum]cciptypes.Bytes32)
+			tkData[srcChain] = make(map[cciptypes.SeqNum]exectypes.MessageTokenData)
+		}
 
 		// Initialize msg hashes with empty messages and empty token data
 		// for all messages in the report
@@ -452,8 +429,12 @@ func (p *Plugin) getMessagesObservation(
 			observation.TokenData = tkData
 			totalMsgs++
 
-			if totalMsgs > lenientMaxMsgsPerObs ||
-				exceedsMaxEncodingSize(observation, p.ocrTypeCodec, lenientMaxObservationLength) {
+			encodedObs, err := p.ocrTypeCodec.EncodeObservation(observation)
+			if err != nil {
+				return exectypes.Observation{}, fmt.Errorf("unable to encode observation: %w", err)
+			}
+			encodedObsSize = len(encodedObs)
+			if totalMsgs > lenientMaxMsgsPerObs || encodedObsSize > lenientMaxObservationLength {
 				// remove the last message and token data
 				observation.Messages[srcChain][seqNum] = createEmptyMessageWithIDAndSeqNum(msg)
 				observation.TokenData[srcChain][seqNum] = exectypes.NewMessageTokenData()
@@ -463,7 +444,8 @@ func (p *Plugin) getMessagesObservation(
 		}
 
 		if stop {
-			lggr.Infow("Stop processing messages, observation is too large")
+			lggr.Infow("Stop processing messages, observation is too large",
+				"totalMsgs", totalMsgs, "encodedObsSize", encodedObsSize)
 			break
 		}
 	}
