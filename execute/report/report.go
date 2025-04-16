@@ -166,8 +166,8 @@ func Template() Check {
 // This check should happen early because other checks are likely to fail if the message has been deleted.
 func CheckIfPseudoDeleted() Check {
 	return func(lggr logger.Logger, msg ccipocr3.Message, idx int, report exectypes.CommitData) (messageStatus, error) {
-		if msg.IsEmpty() {
-			lggr.Errorw("message pseudo deleted", "index", idx)
+		if msg.IsPseudoDeleted() {
+			lggr.Infow("message pseudo deleted", "index", idx, "messageID", msg.Header.MessageID)
 			return PseudoDeleted, nil
 		}
 		return None, nil
