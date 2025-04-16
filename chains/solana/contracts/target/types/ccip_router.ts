@@ -80,9 +80,13 @@ export type CcipRouter = {
       ]
     },
     {
-      "name": "gitCommit",
+      "name": "typeVersion",
       "docs": [
-        "Print commit SHA"
+        "Returns the program type (name) and version.",
+        "Used by offchain code to easily determine which program & version is being interacted with.",
+        "",
+        "# Arguments",
+        "* `ctx`` - The context, which contains no accounts."
       ],
       "accounts": [],
       "args": [],
@@ -2007,9 +2011,13 @@ export const IDL: CcipRouter = {
       ]
     },
     {
-      "name": "gitCommit",
+      "name": "typeVersion",
       "docs": [
-        "Print commit SHA"
+        "Returns the program type (name) and version.",
+        "Used by offchain code to easily determine which program & version is being interacted with.",
+        "",
+        "# Arguments",
+        "* `ctx`` - The context, which contains no accounts."
       ],
       "accounts": [],
       "args": [],

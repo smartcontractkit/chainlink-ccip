@@ -15,7 +15,7 @@ fn main() {
         .expect("Failed to execute git");
     let git_dir = String::from_utf8(dir_output.stdout).expect("Invalid UTF-8");
 
-    println!("cargo:rustc-env=GIT_HASH={}", git_hash.trim());
+    println!("cargo:rustc-env=CCIP_BUILD_GIT_HASH={}", git_hash.trim());
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed={}/HEAD", git_dir.trim());
 }

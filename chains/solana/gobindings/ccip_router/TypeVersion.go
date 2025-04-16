@@ -9,48 +9,52 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// Print commit SHA
-type GitCommit struct {
+// Returns the program type (name) and version.
+// Used by offchain code to easily determine which program & version is being interacted with.
+//
+// # Arguments
+// * `ctx“ - The context, which contains no accounts.
+type TypeVersion struct {
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
-// NewGitCommitInstructionBuilder creates a new `GitCommit` instruction builder.
-func NewGitCommitInstructionBuilder() *GitCommit {
-	nd := &GitCommit{
+// NewTypeVersionInstructionBuilder creates a new `TypeVersion` instruction builder.
+func NewTypeVersionInstructionBuilder() *TypeVersion {
+	nd := &TypeVersion{
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 0),
 	}
 	return nd
 }
 
-func (inst GitCommit) Build() *Instruction {
+func (inst TypeVersion) Build() *Instruction {
 	return &Instruction{BaseVariant: ag_binary.BaseVariant{
 		Impl:   inst,
-		TypeID: Instruction_GitCommit,
+		TypeID: Instruction_TypeVersion,
 	}}
 }
 
 // ValidateAndBuild validates the instruction parameters and accounts;
 // if there is a validation error, it returns the error.
 // Otherwise, it builds and returns the instruction.
-func (inst GitCommit) ValidateAndBuild() (*Instruction, error) {
+func (inst TypeVersion) ValidateAndBuild() (*Instruction, error) {
 	if err := inst.Validate(); err != nil {
 		return nil, err
 	}
 	return inst.Build(), nil
 }
 
-func (inst *GitCommit) Validate() error {
+func (inst *TypeVersion) Validate() error {
 	// Check whether all (required) accounts are set:
 	{
 	}
 	return nil
 }
 
-func (inst *GitCommit) EncodeToTree(parent ag_treeout.Branches) {
+func (inst *TypeVersion) EncodeToTree(parent ag_treeout.Branches) {
 	parent.Child(ag_format.Program(ProgramName, ProgramID)).
 		//
 		ParentFunc(func(programBranch ag_treeout.Branches) {
-			programBranch.Child(ag_format.Instruction("GitCommit")).
+			programBranch.Child(ag_format.Instruction("TypeVersion")).
 				//
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
@@ -63,14 +67,14 @@ func (inst *GitCommit) EncodeToTree(parent ag_treeout.Branches) {
 		})
 }
 
-func (obj GitCommit) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj TypeVersion) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	return nil
 }
-func (obj *GitCommit) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *TypeVersion) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	return nil
 }
 
-// NewGitCommitInstruction declares a new GitCommit instruction with the provided parameters and accounts.
-func NewGitCommitInstruction() *GitCommit {
-	return NewGitCommitInstructionBuilder()
+// NewTypeVersionInstruction declares a new TypeVersion instruction with the provided parameters and accounts.
+func NewTypeVersionInstruction() *TypeVersion {
+	return NewTypeVersionInstructionBuilder()
 }
