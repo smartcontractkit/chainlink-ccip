@@ -80,6 +80,15 @@ export type CcipRouter = {
       ]
     },
     {
+      "name": "gitCommit",
+      "docs": [
+        "Print commit SHA"
+      ],
+      "accounts": [],
+      "args": [],
+      "returns": "string"
+    },
+    {
       "name": "transferOwnership",
       "docs": [
         "Transfers the ownership of the router to a new proposed owner.",
@@ -1996,6 +2005,15 @@ export const IDL: CcipRouter = {
           "type": "publicKey"
         }
       ]
+    },
+    {
+      "name": "gitCommit",
+      "docs": [
+        "Print commit SHA"
+      ],
+      "accounts": [],
+      "args": [],
+      "returns": "string"
     },
     {
       "name": "transferOwnership",

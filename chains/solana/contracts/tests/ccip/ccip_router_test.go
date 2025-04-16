@@ -191,6 +191,18 @@ func TestCCIPRouter(t *testing.T) {
 				t)
 		})
 
+		t.Run("Git", func(t *testing.T) {
+			ix, err := ccip_router.NewGitCommitInstruction().ValidateAndBuild()
+			require.NoError(t, err)
+			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, legacyAdmin, config.DefaultCommitment)
+			require.NotNil(t, result)
+			fmt.Printf("Git commit: %s\n", result.Meta.LogMessages)
+
+			output, err := common.ExtractAnchorTypedReturnValue[bin.SafeString](ctx, result.Meta.LogMessages, config.CcipRouterProgram.String())
+			require.NoError(t, err)
+			require.Len(t, *output, 40) // this is the commit SHA length in git
+		})
+
 		t.Run("receiver", func(t *testing.T) {
 			instruction, ixErr := test_ccip_receiver.NewInitializeInstruction(
 				config.CcipRouterProgram,

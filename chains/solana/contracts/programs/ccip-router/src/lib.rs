@@ -90,7 +90,7 @@ pub mod ccip_router {
     pub fn git_commit(_ctx: Context<Empty>) -> Result<String> {
         let commit = env!("GIT_HASH");
         msg!("Git commit: {}", commit);
-        Ok(commit.to_string())
+        Ok(String::from(commit))
     }
 
     /// Transfers the ownership of the router to a new proposed owner.

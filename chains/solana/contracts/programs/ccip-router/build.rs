@@ -17,5 +17,5 @@ fn main() {
 
     println!("cargo:rustc-env=GIT_HASH={}", git_hash.trim());
     println!("cargo:rerun-if-changed=build.rs");
-    println!("cargo:rerun-if-changed={}/HEAD", git_dir);
+    println!("cargo:rerun-if-changed={}/HEAD", git_dir.trim());
 }
