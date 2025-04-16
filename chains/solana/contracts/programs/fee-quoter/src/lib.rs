@@ -49,6 +49,9 @@ pub mod fee_quoter {
             FeeQuoterError::InvalidInputsMint
         );
 
+        // trivial non-zero check, the value is provided in the expected 18-decimal format
+        require!(max_fee_juels_per_msg > 0, FeeQuoterError::InvalidInputs);
+
         ctx.accounts.config.set_inner(Config {
             version: 1,
             owner: ctx.accounts.authority.key(),
