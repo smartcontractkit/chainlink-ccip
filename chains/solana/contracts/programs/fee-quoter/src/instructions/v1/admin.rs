@@ -206,9 +206,8 @@ impl Admin for Impl {
         mint: Pubkey,
         cfg: TokenTransferFeeConfig,
     ) -> Result<()> {
-        require_gte!(
-            cfg.max_fee_usdcents,
-            cfg.min_fee_usdcents,
+        require!(
+            cfg.max_fee_usdcents > cfg.min_fee_usdcents,
             FeeQuoterError::InvalidTokenTransferFeeMaxMin
         );
 
