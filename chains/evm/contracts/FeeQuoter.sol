@@ -888,10 +888,12 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
       return Internal._validateEVMAddress(destAddress);
     }
     if (chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SVM) {
-      return Internal._validate32ByteAddress(destAddress, gasLimit > 0);
+      // SVM addresses don't have a precompile space at the first X addresses, instead we validate that if the gasLimit
+      // is non-zero, the address must not be 0x0.
+      return Internal._validate32ByteAddress(destAddress, gasLimit > 0 ? 1 : 0);
     }
     if (chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_APTOS) {
-      return Internal._validate32ByteAddress(destAddress, true);
+      return Internal._validate32ByteAddress(destAddress, Internal.APTOS_PRECOMPILE_SPACE);
     }
     revert InvalidChainFamilySelector(chainFamilySelector);
   }
