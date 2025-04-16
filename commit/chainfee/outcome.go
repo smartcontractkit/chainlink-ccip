@@ -87,7 +87,10 @@ func (p *processor) Outcome(
 		return gasPrices[i].ChainSel < gasPrices[j].ChainSel
 	})
 
-	lggr.Infow("Gas Prices Outcome", "gasPrices", gasPrices)
+	lggr.Infow("Gas Prices Outcome",
+		"gasPrices", gasPrices,
+		"consensusTimestamp", consensusObs.TimestampNow,
+	)
 	out := Outcome{GasPrices: gasPrices}
 	return out, nil
 }
@@ -214,22 +217,29 @@ func (p *processor) getGasPricesToUpdate(
 	lggr logger.Logger,
 	currentChainUSDFees map[cciptypes.ChainSelector]ComponentsUSDPrices,
 	latestUpdates map[cciptypes.ChainSelector]Update,
-	obsTimestamp time.Time,
+	consensusTimestamp time.Time,
 ) []cciptypes.GasPriceChain {
 	var gasPrices []cciptypes.GasPriceChain
 
 	for chain, currentChainFee := range currentChainUSDFees {
 		chainCfg, err := p.homeChain.GetChainConfig(chain)
-
-		feeConfig := chainCfg.Config
 		if err != nil {
 			lggr.Errorw("error getting chain config", "chain", chain, "err", err)
 			continue
 		}
+
+		feeConfig := chainCfg.Config
 		packedFee := cciptypes.NewBigInt(FeeComponentsToPackedFee(currentChainFee))
 		lastUpdate, exists := latestUpdates[chain]
+		lggr := logger.With(lggr,
+			"chain", chain,
+			"consensusTimestamp", consensusTimestamp,
+			"currentChainFee", currentChainFee,
+			"packedFee", packedFee,
+			"lastUpdate", lastUpdate)
 		// If the chain is not in the fee quoter updates or is stale, then we should update it
 		if !exists {
+			lggr.Infow("chain fee update needed: no previous update exists")
 			gasPrices = append(gasPrices, cciptypes.GasPriceChain{
 				ChainSel: chain,
 				GasPrice: packedFee,
@@ -238,7 +248,11 @@ func (p *processor) getGasPricesToUpdate(
 		}
 
 		nextUpdateTime := lastUpdate.Timestamp.Add(p.cfg.RemoteGasPriceBatchWriteFrequency.Duration())
-		if obsTimestamp.After(nextUpdateTime) {
+		if consensusTimestamp.After(nextUpdateTime) {
+			lggr.Infow("chain fee update needed: heartbeat time passed",
+				"nextUpdateTime", nextUpdateTime,
+				"consensusTimestamp", consensusTimestamp,
+				"heartbeatInterval", p.cfg.RemoteGasPriceBatchWriteFrequency)
 			gasPrices = append(gasPrices, cciptypes.GasPriceChain{
 				ChainSel: chain,
 				GasPrice: packedFee,
@@ -247,13 +261,13 @@ func (p *processor) getGasPricesToUpdate(
 		}
 
 		if feeConfig.ChainFeeDeviationDisabled {
-			lggr.Debugw("chain fee deviation disabled", "chain", chain)
+			lggr.Debugw("chain fee deviation disabled")
 			continue
 		}
 
 		// Validating later as chain can be updated even if the config is invalid when write frequency is reached
 		if feeConfig.Validate() != nil {
-			lggr.Errorw("invalid chain config", "chain", chain, "err", err)
+			lggr.Errorw("invalid fee config for chain", "err", err)
 			continue
 		}
 
@@ -270,10 +284,20 @@ func (p *processor) getGasPricesToUpdate(
 		)
 
 		if executionFeeDeviates || dataAvFeeDeviates {
+			lggr.Infow(
+				"chain fee update needed: deviation threshold exceeded for either execution or data availability fee",
+				"executionFeeDeviates", executionFeeDeviates,
+				"dataAvFeeDeviates", dataAvFeeDeviates,
+				"executionFeeDeviationPPB", feeConfig.GasPriceDeviationPPB,
+				"dataAvFeeDeviationPPB", feeConfig.DAGasPriceDeviationPPB)
 			gasPrices = append(gasPrices, cciptypes.GasPriceChain{
 				ChainSel: chain,
 				GasPrice: packedFee,
 			})
+		} else {
+			lggr.Debugw("chain fee update not needed: within deviation thresholds",
+				"executionFeeDeviationPPB", feeConfig.GasPriceDeviationPPB,
+				"dataAvFeeDeviationPPB", feeConfig.DAGasPriceDeviationPPB)
 		}
 	}
 
