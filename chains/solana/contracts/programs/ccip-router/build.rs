@@ -1,3 +1,3 @@
 fn main() {
-    build_commit::main();
+    build_commit::cargo_instructions();
 }
