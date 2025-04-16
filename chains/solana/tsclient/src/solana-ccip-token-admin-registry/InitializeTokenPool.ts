@@ -9,7 +9,6 @@ import { tokenAdminRegistry } from "../staging";
 import { getCCIPSendConfig } from "../solana-ccip-send/SolanaCCIPSendConfig";
 import { createInitializeInstruction } from "./bnm-instructions";
 
-const BPF_LOADER_UPGRADEABLE_PROGRAM_ID = new PublicKey("BPFLoaderUpgradeab1e11111111111111111111111");
 const POOL_STATE_SEED = Buffer.from("ccip_tokenpool_config");
 
 const keypair = Keypair.fromSecretKey(
@@ -19,6 +18,15 @@ new Uint8Array(JSON.parse(readFileSync("../contracts/id.json", "utf-8")))
 const config = getCCIPSendConfig("devnet");
 const connection = config.connection;
 
+const BPF_LOADER_UPGRADEABLE_PROGRAM_ID = new PublicKey("BPFLoaderUpgradeab1e11111111111111111111111");
+
+export function getProgramDataAddress(programId: PublicKey): PublicKey {
+  const [programData] = PublicKey.findProgramAddressSync(
+    [programId.toBuffer()],
+    BPF_LOADER_UPGRADEABLE_PROGRAM_ID
+  );
+  return programData;
+}
 
 async function main() {
   const PROGRAM_ID = tokenAdminRegistry.token_pool_program;
@@ -28,6 +36,7 @@ async function main() {
     [POOL_STATE_SEED, MINT.toBuffer()],
     PROGRAM_ID
   );
+  console.log("Using PROGRAM_ID:", PROGRAM_ID.toBase58());
 
   const ix = createInitializeInstruction(
     {
@@ -36,7 +45,7 @@ async function main() {
       authority: keypair.publicKey,
       systemProgram: config.systemProgramId,
       program: PROGRAM_ID,
-      programData: tokenAdminRegistry.program_data,
+      programData: getProgramDataAddress(PROGRAM_ID),
     },
     {
       router: config.ccipRouterProgramId,
@@ -76,13 +85,3 @@ main()
   .catch((err) => {
     console.error("❌ Error:", err);
   });
-
-function getProgramDataAddress(PROGRAM_ID: PublicKey) {
-
-    const [programData] = PublicKey.findProgramAddressSync(
-        [PROGRAM_ID.toBuffer()],
-        BPF_LOADER_UPGRADEABLE_PROGRAM_ID
-    );
-
-    return programData;
-}
