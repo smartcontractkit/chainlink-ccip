@@ -3,20 +3,20 @@ pragma solidity ^0.8.24;
 
 import {IFeeQuoter} from "./interfaces/IFeeQuoter.sol";
 import {IPriceRegistry} from "./interfaces/IPriceRegistry.sol";
-import {IReceiver} from "@keystone/interfaces/IReceiver.sol";
-import {ITypeAndVersion} from "@shared/interfaces/ITypeAndVersion.sol";
+import {IReceiver} from "@chainlink/keystone/interfaces/IReceiver.sol";
+import {ITypeAndVersion} from "@chainlink/shared/interfaces/ITypeAndVersion.sol";
 
 import {Client} from "./libraries/Client.sol";
 import {Internal} from "./libraries/Internal.sol";
 import {Pool} from "./libraries/Pool.sol";
 import {USDPriceWith18Decimals} from "./libraries/USDPriceWith18Decimals.sol";
-import {KeystoneFeedsPermissionHandler} from "@keystone/KeystoneFeedsPermissionHandler.sol";
-import {KeystoneFeedDefaultMetadataLib} from "@keystone/lib/KeystoneFeedDefaultMetadataLib.sol";
-import {AuthorizedCallers} from "@shared/access/AuthorizedCallers.sol";
-import {AggregatorV3Interface} from "@shared/interfaces/AggregatorV3Interface.sol";
+import {KeystoneFeedsPermissionHandler} from "@chainlink/keystone/KeystoneFeedsPermissionHandler.sol";
+import {KeystoneFeedDefaultMetadataLib} from "@chainlink/keystone/lib/KeystoneFeedDefaultMetadataLib.sol";
+import {AuthorizedCallers} from "@chainlink/shared/access/AuthorizedCallers.sol";
+import {AggregatorV3Interface} from "@chainlink/shared/interfaces/AggregatorV3Interface.sol";
 
-import {IERC165} from "@vendor/openzeppelin-solidity/v5.0.2/contracts/interfaces/IERC165.sol";
-import {EnumerableSet} from "@vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
+import {IERC165} from "@chainlink/vendor/openzeppelin-solidity/v5.0.2/contracts/interfaces/IERC165.sol";
+import {EnumerableSet} from "@chainlink/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
 
 /// @notice The FeeQuoter contract responsibility is to:
 ///   - Store the current gas price in USD for a given destination chain.
