@@ -2,14 +2,12 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::spl_token;
 use anchor_spl::token_interface;
 
-use crate::context::ANCHOR_DISCRIMINATOR;
 use crate::events::on_ramp as events;
 use crate::messages::GetFeeResult;
 
 use ccip_common::seed;
 use ccip_common::v1::{validate_and_parse_token_accounts, TokenAccounts};
 use fee_quoter::messages::TokenTransferAdditionalData;
-use fee_quoter::state::DestChain;
 
 use super::super::interfaces::OnRamp;
 use super::fees::{get_fee_cpi, transfer_and_wrap_native_sol, transfer_fee};
@@ -190,12 +188,6 @@ impl OnRamp for Impl {
                 CcipRouterError::InvalidInputsTokenAccounts,
             );
 
-            require_gt!(
-                token_amount.amount,
-                0,
-                CcipRouterError::InvalidInputsTokenAmount
-            );
-
             let seeds = &[
                 seed::EXTERNAL_TOKEN_POOLS_SIGNER,
                 current_token_accounts.pool_program.key.as_ref(),
@@ -253,21 +245,6 @@ impl OnRamp for Impl {
                 )?;
 
                 let lock_or_burn_out_data = LockOrBurnOutV1::try_from_slice(&return_data)?;
-
-                {
-                    // validate the token address based on the destination chain family selector
-                    let dest_chain_info = ctx.accounts.fee_quoter_dest_chain.to_account_info();
-                    let dest_chain = DestChain::try_from_slice(
-                        &dest_chain_info.data.borrow()[ANCHOR_DISCRIMINATOR..],
-                    )?;
-                    let dest_chain_family_selector = dest_chain.config.chain_family_selector;
-
-                    helpers::validate_transfer_dest_address(
-                        dest_chain_family_selector,
-                        &lock_or_burn_out_data.dest_token_address,
-                    )?;
-                }
-
                 new_message.token_amounts[i] = token_transfer(
                     lock_or_burn_out_data,
                     current_token_accounts.pool_config.key(),
@@ -318,10 +295,6 @@ impl OnRamp for Impl {
 }
 
 mod helpers {
-    use ccip_common::{
-        v1::{validate_evm_address, validate_svm_address},
-        CommonCcipError, CHAIN_FAMILY_SELECTOR_EVM, CHAIN_FAMILY_SELECTOR_SVM,
-    };
     use rmn_remote::state::CurseSubject;
 
     use super::*;
@@ -436,18 +409,6 @@ mod helpers {
         ]);
 
         result.to_bytes()
-    }
-
-    pub(super) fn validate_transfer_dest_address(
-        chain_family_selector: [u8; 4],
-        dest_token_address: &[u8],
-    ) -> Result<()> {
-        let selector = u32::from_be_bytes(chain_family_selector);
-        match selector {
-            CHAIN_FAMILY_SELECTOR_EVM => validate_evm_address(dest_token_address),
-            CHAIN_FAMILY_SELECTOR_SVM => validate_svm_address(dest_token_address, true),
-            _ => Err(CommonCcipError::InvalidChainFamilySelector.into()),
-        }
     }
 
     #[cfg(test)]

@@ -377,6 +377,10 @@ pub enum FeeQuoterError {
     MessageTooLarge,
     #[msg("Message contains an unsupported number of tokens")]
     UnsupportedNumberOfTokens,
+    #[msg("Invalid EVM address")]
+    InvalidEVMAddress,
+    #[msg("Invalid encoding")]
+    InvalidEncoding,
     #[msg("Invalid token price")]
     InvalidTokenPrice,
     #[msg("Stale gas price")]
@@ -395,8 +399,12 @@ pub enum FeeQuoterError {
     InvalidExtraArgsAccounts,
     #[msg("Invalid writability bitmap in extra args")]
     InvalidExtraArgsWritabilityBitmap,
+    #[msg("Invalid chain family selector")]
+    InvalidChainFamilySelector,
     #[msg("Invalid token receiver")]
     InvalidTokenReceiver,
+    #[msg("Invalid SVM address")]
+    InvalidSVMAddress,
     #[msg("The caller is not an authorized price updater")]
     UnauthorizedPriceUpdater,
     #[msg("Minimum token transfer fee exceeds maximum")]

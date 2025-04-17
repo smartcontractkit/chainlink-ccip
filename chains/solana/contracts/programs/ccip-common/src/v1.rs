@@ -1,5 +1,4 @@
 use anchor_lang::prelude::*;
-use ethnum::U256;
 use solana_program::address_lookup_table::state::AddressLookupTable;
 
 use crate::{
@@ -8,8 +7,6 @@ use crate::{
 };
 
 pub const MIN_TOKEN_POOL_ACCOUNTS: usize = 13; // see TokenAccounts struct for all required accounts
-const U160_MAX: U256 = U256::from_words(u32::MAX as u128, u128::MAX);
-const EVM_PRECOMPILE_SPACE: u32 = 1024;
 
 pub struct TokenAccounts<'a> {
     pub user_token_account: &'a AccountInfo<'a>,
@@ -305,36 +302,4 @@ pub mod token_admin_registry_writable {
             assert!(is(state, 128 + 100));
         }
     }
-}
-
-// address validation helpers based on the chain family selector
-pub fn validate_evm_address(address: &[u8]) -> Result<()> {
-    require_eq!(address.len(), 32, CommonCcipError::InvalidEVMAddress);
-
-    let address: U256 = U256::from_be_bytes(
-        address
-            .try_into()
-            .map_err(|_| CommonCcipError::InvalidEncoding)?,
-    );
-    require!(address <= U160_MAX, CommonCcipError::InvalidEVMAddress);
-    if let Ok(small_address) = TryInto::<u32>::try_into(address) {
-        require_gte!(
-            small_address,
-            EVM_PRECOMPILE_SPACE,
-            CommonCcipError::InvalidEVMAddress
-        )
-    };
-    Ok(())
-}
-
-pub fn validate_svm_address(address: &[u8], address_must_be_nonzero: bool) -> Result<()> {
-    require_eq!(address.len(), 32, CommonCcipError::InvalidSVMAddress);
-    require!(
-        !address_must_be_nonzero || address.iter().any(|b| *b != 0),
-        CommonCcipError::InvalidSVMAddress
-    );
-
-    Pubkey::try_from_slice(address)
-        .map(|_| ())
-        .map_err(|_| CommonCcipError::InvalidSVMAddress.into())
 }

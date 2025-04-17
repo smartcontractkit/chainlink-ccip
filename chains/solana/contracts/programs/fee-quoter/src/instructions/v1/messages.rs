@@ -1,15 +1,17 @@
 use anchor_lang::prelude::*;
-
-use ccip_common::v1::{validate_evm_address, validate_svm_address};
-use ccip_common::{CommonCcipError, CHAIN_FAMILY_SELECTOR_EVM, CHAIN_FAMILY_SELECTOR_SVM};
+use ethnum::U256;
 
 use crate::extra_args::{
     GenericExtraArgsV2, SVMExtraArgsV1, GENERIC_EXTRA_ARGS_V2_TAG, SVM_EXTRA_ARGS_MAX_ACCOUNTS,
     SVM_EXTRA_ARGS_V1_TAG,
 };
-use crate::messages::{ProcessedExtraArgs, SVM2AnyMessage};
+use crate::messages::{
+    ProcessedExtraArgs, SVM2AnyMessage, CHAIN_FAMILY_SELECTOR_EVM, CHAIN_FAMILY_SELECTOR_SVM,
+};
 use crate::state::{BillingTokenConfig, DestChain, DestChainConfig};
 use crate::FeeQuoterError;
+
+const U160_MAX: U256 = U256::from_words(u32::MAX as u128, u128::MAX);
 
 pub fn validate_svm2any(
     msg: &SVM2AnyMessage,
@@ -69,12 +71,45 @@ fn validate_dest_family_address(
 ) -> Result<()> {
     let selector = u32::from_be_bytes(chain_family_selector);
     match selector {
-        CHAIN_FAMILY_SELECTOR_EVM => validate_evm_address(&msg.receiver),
+        CHAIN_FAMILY_SELECTOR_EVM => validate_evm_dest_address(&msg.receiver),
         CHAIN_FAMILY_SELECTOR_SVM => {
-            validate_svm_address(&msg.receiver, msg_extra_args.gas_limit > 0)
+            validate_svm_dest_address(&msg.receiver, msg_extra_args.gas_limit > 0)
         }
-        _ => Err(CommonCcipError::InvalidChainFamilySelector.into()),
+        _ => Err(FeeQuoterError::InvalidChainFamilySelector.into()),
     }
+}
+
+fn validate_evm_dest_address(address: &[u8]) -> Result<()> {
+    const PRECOMPILE_SPACE: u32 = 1024;
+
+    require_eq!(address.len(), 32, FeeQuoterError::InvalidEVMAddress);
+
+    let address: U256 = U256::from_be_bytes(
+        address
+            .try_into()
+            .map_err(|_| FeeQuoterError::InvalidEncoding)?,
+    );
+    require!(address <= U160_MAX, FeeQuoterError::InvalidEVMAddress);
+    if let Ok(small_address) = TryInto::<u32>::try_into(address) {
+        require_gte!(
+            small_address,
+            PRECOMPILE_SPACE,
+            FeeQuoterError::InvalidEVMAddress
+        )
+    };
+    Ok(())
+}
+
+fn validate_svm_dest_address(address: &[u8], address_must_be_nonzero: bool) -> Result<()> {
+    require_eq!(address.len(), 32, FeeQuoterError::InvalidSVMAddress);
+    require!(
+        !address_must_be_nonzero || address.iter().any(|b| *b != 0),
+        FeeQuoterError::InvalidSVMAddress
+    );
+
+    Pubkey::try_from_slice(address)
+        .map(|_| ())
+        .map_err(|_| FeeQuoterError::InvalidSVMAddress.into())
 }
 
 // process_extra_args returns serialized extraArgs, gas_limit, allow_out_of_order_execution
@@ -187,7 +222,6 @@ pub mod tests {
     use crate::{SVMTokenAmount, TimestampedPackedU224};
     use anchor_lang::solana_program::pubkey::Pubkey;
     use anchor_spl::token::spl_token::native_mint;
-    use ethnum::U256;
 
     #[test]
     fn message_not_validated_for_disabled_destination_chain() {
@@ -242,7 +276,7 @@ pub mod tests {
             assert_eq!(
                 validate_svm2any(&message, &sample_dest_chain(), &sample_billing_config())
                     .unwrap_err(),
-                CommonCcipError::InvalidEVMAddress.into()
+                FeeQuoterError::InvalidEVMAddress.into()
             );
         }
     }
