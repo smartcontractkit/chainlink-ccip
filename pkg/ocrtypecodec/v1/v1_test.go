@@ -45,10 +45,10 @@ func TestCommitQuery(t *testing.T) {
 			t,
 			gen.name,
 			gen.commitQuery(),
-			func(b []byte) (interface{}, error) { return jsonCodec.DecodeQuery(b) },
-			func(i interface{}) ([]byte, error) { return jsonCodec.EncodeQuery(i.(committypes.Query)) },
-			func(b []byte) (interface{}, error) { return protoCodec.DecodeQuery(b) },
-			func(i interface{}) ([]byte, error) { return protoCodec.EncodeQuery(i.(committypes.Query)) },
+			func(b []byte) (any, error) { return jsonCodec.DecodeQuery(b) },
+			func(i any) ([]byte, error) { return jsonCodec.EncodeQuery(i.(committypes.Query)) },
+			func(b []byte) (any, error) { return protoCodec.DecodeQuery(b) },
+			func(i any) ([]byte, error) { return protoCodec.EncodeQuery(i.(committypes.Query)) },
 		)
 		results = append(results, result)
 	}
@@ -65,10 +65,10 @@ func TestCommitObservation(t *testing.T) {
 			t,
 			gen.name,
 			gen.commitObservation(),
-			func(b []byte) (interface{}, error) { return jsonCodec.DecodeObservation(b) },
-			func(i interface{}) ([]byte, error) { return jsonCodec.EncodeObservation(i.(committypes.Observation)) },
-			func(b []byte) (interface{}, error) { return protoCodec.DecodeObservation(b) },
-			func(i interface{}) ([]byte, error) { return protoCodec.EncodeObservation(i.(committypes.Observation)) },
+			func(b []byte) (any, error) { return jsonCodec.DecodeObservation(b) },
+			func(i any) ([]byte, error) { return jsonCodec.EncodeObservation(i.(committypes.Observation)) },
+			func(b []byte) (any, error) { return protoCodec.DecodeObservation(b) },
+			func(i any) ([]byte, error) { return protoCodec.EncodeObservation(i.(committypes.Observation)) },
 		)
 		results = append(results, result)
 	}
@@ -85,10 +85,10 @@ func TestCommitOutcome(t *testing.T) {
 			t,
 			gen.name,
 			gen.commitOutcome(),
-			func(b []byte) (interface{}, error) { return jsonCodec.DecodeOutcome(b) },
-			func(i interface{}) ([]byte, error) { return jsonCodec.EncodeOutcome(i.(committypes.Outcome)) },
-			func(b []byte) (interface{}, error) { return protoCodec.DecodeOutcome(b) },
-			func(i interface{}) ([]byte, error) { return protoCodec.EncodeOutcome(i.(committypes.Outcome)) },
+			func(b []byte) (any, error) { return jsonCodec.DecodeOutcome(b) },
+			func(i any) ([]byte, error) { return jsonCodec.EncodeOutcome(i.(committypes.Outcome)) },
+			func(b []byte) (any, error) { return protoCodec.DecodeOutcome(b) },
+			func(i any) ([]byte, error) { return protoCodec.EncodeOutcome(i.(committypes.Outcome)) },
 		)
 		results = append(results, result)
 	}
@@ -105,10 +105,10 @@ func TestExecObservation(t *testing.T) {
 			t,
 			gen.name,
 			gen.execObservation(),
-			func(b []byte) (interface{}, error) { return jsonCodec.DecodeObservation(b) },
-			func(i interface{}) ([]byte, error) { return jsonCodec.EncodeObservation(i.(exectypes.Observation)) },
-			func(b []byte) (interface{}, error) { return protoCodec.DecodeObservation(b) },
-			func(i interface{}) ([]byte, error) { return protoCodec.EncodeObservation(i.(exectypes.Observation)) },
+			func(b []byte) (any, error) { return jsonCodec.DecodeObservation(b) },
+			func(i any) ([]byte, error) { return jsonCodec.EncodeObservation(i.(exectypes.Observation)) },
+			func(b []byte) (any, error) { return protoCodec.DecodeObservation(b) },
+			func(i any) ([]byte, error) { return protoCodec.EncodeObservation(i.(exectypes.Observation)) },
 		)
 		results = append(results, result)
 	}
@@ -125,10 +125,10 @@ func TestExecOutcome(t *testing.T) {
 			t,
 			gen.name,
 			gen.execOutcome(),
-			func(b []byte) (interface{}, error) { return jsonCodec.DecodeOutcome(b) },
-			func(i interface{}) ([]byte, error) { return jsonCodec.EncodeOutcome(i.(exectypes.Outcome)) },
-			func(b []byte) (interface{}, error) { return protoCodec.DecodeOutcome(b) },
-			func(i interface{}) ([]byte, error) { return protoCodec.EncodeOutcome(i.(exectypes.Outcome)) },
+			func(b []byte) (any, error) { return jsonCodec.DecodeOutcome(b) },
+			func(i any) ([]byte, error) { return jsonCodec.EncodeOutcome(i.(exectypes.Outcome)) },
+			func(b []byte) (any, error) { return protoCodec.DecodeOutcome(b) },
+			func(i any) ([]byte, error) { return protoCodec.EncodeOutcome(i.(exectypes.Outcome)) },
 		)
 		results = append(results, result)
 	}
@@ -140,11 +140,11 @@ func TestExecOutcome(t *testing.T) {
 func runBenchmark(
 	t *testing.T,
 	name string,
-	obj interface{},
-	decodeJSONFunc func([]byte) (interface{}, error),
-	encodeJSONFunc func(interface{}) ([]byte, error),
-	decodeProtoFunc func([]byte) (interface{}, error),
-	encodeProtoFunc func(interface{}) ([]byte, error),
+	obj any,
+	decodeJSONFunc func([]byte) (any, error),
+	encodeJSONFunc func(any) ([]byte, error),
+	decodeProtoFunc func([]byte) (any, error),
+	encodeProtoFunc func(any) ([]byte, error),
 ) resultData {
 	result := resultData{name: name}
 
@@ -307,7 +307,7 @@ var (
 
 func (d *dataGenerator) commitQuery() committypes.Query {
 	sigs := make([]*serialization.EcdsaSignature, d.numRmnNodes)
-	for i := 0; i < d.numRmnNodes; i++ {
+	for i := range d.numRmnNodes {
 		sigs[i] = &serialization.EcdsaSignature{
 			R: randomBytes(32),
 			S: randomBytes(32),
@@ -315,7 +315,7 @@ func (d *dataGenerator) commitQuery() committypes.Query {
 	}
 
 	laneUpdates := make([]*serialization.FixedDestLaneUpdate, d.numSourceChains)
-	for i := 0; i < d.numSourceChains; i++ {
+	for i := range d.numSourceChains {
 		laneUpdates[i] = &serialization.FixedDestLaneUpdate{
 			LaneSource: &serialization.LaneSource{
 				SourceChainSelector: rand.Uint64(),
@@ -352,7 +352,7 @@ func (d *dataGenerator) commitObservation() committypes.Observation {
 	nativeTokenPrices := make(map[cciptypes.ChainSelector]cciptypes.BigInt, d.numSourceChains)
 	chainFeeUpdates := make(map[cciptypes.ChainSelector]chainfee.Update, d.numSourceChains)
 
-	for i := 0; i < d.numSourceChains; i++ {
+	for range d.numSourceChains {
 		fChain[cciptypes.ChainSelector(rand.Uint64())] = rand.Intn(256)
 
 		feeComponents[cciptypes.ChainSelector(rand.Uint64())] = types.ChainFeeComponents{
@@ -374,7 +374,7 @@ func (d *dataGenerator) commitObservation() committypes.Observation {
 	feedTokenPrices := make(map[cciptypes.UnknownEncodedAddress]cciptypes.BigInt, d.numPricedTokens)
 	feeQuoterTokenUpdates := make(map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig, d.numPricedTokens)
 
-	for i := 0; i < d.numPricedTokens; i++ {
+	for range d.numPricedTokens {
 		feedTokenPrices[cciptypes.UnknownEncodedAddress(genRandomString(40))] = randBigInt()
 
 		feeQuoterTokenUpdates[cciptypes.UnknownEncodedAddress(genRandomString(40))] = cciptypes.TimestampedBig{
@@ -412,7 +412,7 @@ func (d *dataGenerator) commitObservation() committypes.Observation {
 
 func (d *dataGenerator) commitOutcome() committypes.Outcome {
 	rmnReportSigs := make([]cciptypes.RMNECDSASignature, d.numRmnNodes)
-	for i := 0; i < d.numRmnNodes; i++ {
+	for i := range d.numRmnNodes {
 		rmnReportSigs[i] = cciptypes.RMNECDSASignature{
 			R: randomBytes32(),
 			S: randomBytes32(),
@@ -420,12 +420,12 @@ func (d *dataGenerator) commitOutcome() committypes.Outcome {
 	}
 
 	tokenPrices := make(cciptypes.TokenPriceMap)
-	for i := 0; i < d.numPricedTokens; i++ {
+	for range d.numPricedTokens {
 		tokenPrices[cciptypes.UnknownEncodedAddress(genRandomString(40))] = randBigInt()
 	}
 
 	gasPrices := make([]cciptypes.GasPriceChain, d.numSourceChains)
-	for i := 0; i < d.numSourceChains; i++ {
+	for i := range d.numSourceChains {
 		gasPrices[i] = cciptypes.GasPriceChain{
 			ChainSel: cciptypes.ChainSelector(rand.Uint64()),
 			GasPrice: randBigInt(),
@@ -465,7 +465,7 @@ func (d *dataGenerator) execObservation() exectypes.Observation {
 	msgHashObservations := make(map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Bytes32)
 	nonces := make(map[cciptypes.ChainSelector]map[string]uint64)
 	msgObservations := make(map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Message)
-	for i := 0; i < d.numSourceChains; i++ {
+	for range d.numSourceChains {
 		chainSel := cciptypes.ChainSelector(rand.Uint64())
 		nonces[chainSel] = map[string]uint64{
 			genRandomString(5): rand.Uint64(),
@@ -475,7 +475,7 @@ func (d *dataGenerator) execObservation() exectypes.Observation {
 		msgHashObservations[chainSel] = make(map[cciptypes.SeqNum]cciptypes.Bytes32, d.numMessagesPerChain)
 		msgObservations[chainSel] = make(map[cciptypes.SeqNum]cciptypes.Message, d.numMessagesPerChain)
 
-		for j := 0; j < d.numMessagesPerChain; j++ {
+		for range d.numMessagesPerChain {
 			tokenDataObservations[chainSel][cciptypes.SeqNum(rand.Uint64())] = exectypes.MessageTokenData{
 				TokenData: []exectypes.TokenData{
 					{
@@ -494,7 +494,7 @@ func (d *dataGenerator) execObservation() exectypes.Observation {
 	}
 
 	commitReports := make(map[cciptypes.ChainSelector][]exectypes.CommitData)
-	for i := 0; i < d.numSourceChains; i++ {
+	for range d.numSourceChains {
 		commitReports[cciptypes.ChainSelector(rand.Uint64())] = []exectypes.CommitData{
 			{
 				SourceChain:   cciptypes.ChainSelector(rand.Uint64()),
@@ -540,7 +540,7 @@ func (d *dataGenerator) execOutcome() exectypes.Outcome {
 	commitReports := make([]exectypes.CommitData, d.numSourceChains)
 	msgs := genMessages(d.numMessagesPerChain, d.numTokensPerMsg)
 
-	for i := 0; i < d.numSourceChains; i++ {
+	for i := range d.numSourceChains {
 		commitReports[i] = exectypes.CommitData{
 			SourceChain:   cciptypes.ChainSelector(rand.Uint64()),
 			OnRampAddress: randomBytes(40),
@@ -570,9 +570,9 @@ func (d *dataGenerator) execOutcome() exectypes.Outcome {
 	}
 
 	chainReports := make([]cciptypes.ExecutePluginReportSingleChain, d.numSourceChains)
-	for i := 0; i < d.numSourceChains; i++ {
+	for i := range d.numSourceChains {
 		tokenData := make([][][]byte, 0)
-		for j := 0; j < d.numTokensPerMsg/4; j++ {
+		for range d.numTokensPerMsg / 4 {
 			tokenData = append(tokenData,
 				[][]byte{randomBytes(32), randomBytes(32), randomBytes(32), randomBytes(32)})
 		}
@@ -599,15 +599,15 @@ func (d *dataGenerator) execOutcome() exectypes.Outcome {
 
 func genDiscoveryObservation(numSourceChains, numContractsPerChain int) dt.Observation {
 	fChain := make(map[cciptypes.ChainSelector]int, numSourceChains)
-	for i := 0; i < numSourceChains; i++ {
+	for range numSourceChains {
 		fChain[cciptypes.ChainSelector(rand.Uint64())] = rand.Intn(256)
 	}
 
 	contractAddresses := make(reader.ContractAddresses, numContractsPerChain)
-	for i := 0; i < numContractsPerChain; i++ {
+	for i := range numContractsPerChain {
 		contractName := fmt.Sprintf("contract-%d", i)
 		contractAddresses[contractName] = make(map[cciptypes.ChainSelector]cciptypes.UnknownAddress, numSourceChains)
-		for j := 0; j < numSourceChains; j++ {
+		for range numSourceChains {
 			contractAddresses[contractName][cciptypes.ChainSelector(rand.Uint64())] = randomBytes(40)
 		}
 	}
@@ -620,7 +620,7 @@ func genDiscoveryObservation(numSourceChains, numContractsPerChain int) dt.Obser
 
 func genMessages(numMsgs, numTokensPerMsg int) []cciptypes.Message {
 	tokenAmounts := make([]cciptypes.RampTokenAmount, numTokensPerMsg)
-	for i := 0; i < numTokensPerMsg; i++ {
+	for i := range numTokensPerMsg {
 		tokenAmounts[i] = cciptypes.RampTokenAmount{
 			SourcePoolAddress: randomBytes(40),
 			DestTokenAddress:  randomBytes(40),
@@ -631,7 +631,7 @@ func genMessages(numMsgs, numTokensPerMsg int) []cciptypes.Message {
 	}
 
 	msgs := make([]cciptypes.Message, numMsgs)
-	for i := 0; i < numMsgs; i++ {
+	for i := range numMsgs {
 		msgs[i] = cciptypes.Message{
 			Header: cciptypes.RampMessageHeader{
 				MessageID:           randomBytes32(),
@@ -658,7 +658,7 @@ func genMessages(numMsgs, numTokensPerMsg int) []cciptypes.Message {
 
 func genMerkleRootChain(n int) []cciptypes.MerkleRootChain {
 	mrcs := make([]cciptypes.MerkleRootChain, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		mrcs[i] = cciptypes.MerkleRootChain{
 			ChainSel:      cciptypes.ChainSelector(rand.Uint64()),
 			OnRampAddress: randomBytes(40),
@@ -671,7 +671,7 @@ func genMerkleRootChain(n int) []cciptypes.MerkleRootChain {
 
 func genRmnEnabledChains(n int) map[cciptypes.ChainSelector]bool {
 	m := make(map[cciptypes.ChainSelector]bool)
-	for i := 0; i < n; i++ {
+	for range n {
 		m[cciptypes.ChainSelector(rand.Uint64())] = rand.Int()%2 == 0
 	}
 	return m
@@ -679,7 +679,7 @@ func genRmnEnabledChains(n int) map[cciptypes.ChainSelector]bool {
 
 func genSeqNumChain(n int) []plugintypes.SeqNumChain {
 	chains := make([]plugintypes.SeqNumChain, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		chains[i] = plugintypes.SeqNumChain{
 			ChainSel: cciptypes.ChainSelector(rand.Uint64()),
 			SeqNum:   cciptypes.SeqNum(rand.Uint64()),
@@ -690,7 +690,7 @@ func genSeqNumChain(n int) []plugintypes.SeqNumChain {
 
 func genRmnRemoteConfig(numSigners int) cciptypes.RemoteConfig {
 	rmnSigners := make([]cciptypes.RemoteSignerInfo, numSigners)
-	for i := 0; i < numSigners; i++ {
+	for i := range numSigners {
 		rmnSigners[i] = cciptypes.RemoteSignerInfo{
 			OnchainPublicKey: randomBytes(20),
 			NodeIndex:        rand.Uint64(),
@@ -713,7 +713,7 @@ func randBigInt() cciptypes.BigInt {
 
 func genChainRanges(n int) []plugintypes.ChainRange {
 	ranges := make([]plugintypes.ChainRange, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		ranges[i] = plugintypes.ChainRange{
 			ChainSel: cciptypes.ChainSelector(rand.Uint64()),
 			SeqNumRange: cciptypes.NewSeqNumRange(
@@ -749,7 +749,7 @@ func randomBytes32() [32]byte {
 
 func genSeqNums(n int) []cciptypes.SeqNum {
 	seqNums := make([]cciptypes.SeqNum, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		seqNums[i] = cciptypes.SeqNum(rand.Uint64())
 	}
 	return seqNums
@@ -757,7 +757,7 @@ func genSeqNums(n int) []cciptypes.SeqNum {
 
 func genBytes32Slice(n int) []cciptypes.Bytes32 {
 	result := make([]cciptypes.Bytes32, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		result[i] = randomBytes32()
 	}
 	return result

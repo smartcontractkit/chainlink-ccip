@@ -150,7 +150,7 @@ func generateMsgObservations(
 	errorMsgs := make(map[cciptypes.ChainSelector][]cciptypes.SeqNum)
 	for chain, numMsgs := range numMsgsPerChain {
 		msgObservations[chain] = make(map[cciptypes.SeqNum]cciptypes.Message, numMsgs)
-		for i := 0; i < numMsgs; i++ {
+		for i := range numMsgs {
 			seqNum := cciptypes.SeqNum(i)
 			msgIDStr := fmt.Sprintf("%d-%d", chain, i)
 			msgID := cciptypes.Bytes32{}

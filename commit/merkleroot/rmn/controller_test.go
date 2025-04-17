@@ -30,6 +30,7 @@ import (
 
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	"maps"
 )
 
 var (
@@ -415,7 +416,7 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 
 		const numNodes = 8
 		rmnNodes := make([]rmntypes.HomeNodeInfo, numNodes)
-		for i := 0; i < numNodes; i++ {
+		for i := range numNodes {
 			rmnNodes[i] = rmntypes.HomeNodeInfo{
 				ID:                    rmntypes.NodeID(i + 1),
 				PeerID:                [32]byte{1, 2, 3},
@@ -733,7 +734,7 @@ func Test_controller_validateSignedObservationResponse(t *testing.T) {
 
 func Test_newRequestID(t *testing.T) {
 	ids := map[uint64]struct{}{}
-	for i := 0; i < 1000; i++ {
+	for range 1000 {
 		id := newRequestID(logger.Test(t))
 		_, ok := ids[id]
 		assert.False(t, ok)
@@ -913,11 +914,11 @@ func (ts *testSetup) nodesRespondToTheObservationRequests(
 		laneUpdates := make([]*rmnpb.FixedDestLaneUpdate, 0)
 		for _, laneUpdate := range allLaneUpdates {
 			if requestedChains[nodeID].Contains(laneUpdate.LaneSource.SourceChainSelector) {
-				root := sha256.Sum256([]byte(fmt.Sprintf("%d[%d,%d]",
+				root := sha256.Sum256(fmt.Appendf(nil, "%d[%d,%d]",
 					laneUpdate.LaneSource.SourceChainSelector,
 					laneUpdate.ClosedInterval.MinMsgNr,
 					laneUpdate.ClosedInterval.MaxMsgNr,
-				)))
+				))
 				laneUpdates = append(laneUpdates, &rmnpb.FixedDestLaneUpdate{
 					LaneSource:     laneUpdate.LaneSource,
 					ClosedInterval: laneUpdate.ClosedInterval,
@@ -1054,9 +1055,7 @@ func (m *mockPeerClient) getReceivedRequests() map[rmntypes.NodeID][]*rmnpb.Requ
 	cp := make(map[rmntypes.NodeID][]*rmnpb.Request)
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	for k, v := range m.receivedRequests {
-		cp[k] = v
-	}
+	maps.Copy(cp, m.receivedRequests)
 	return cp
 }
 

@@ -405,7 +405,7 @@ func Test_ExecLatency(t *testing.T) {
 
 	t.Run("multiple latency outcomes", func(t *testing.T) {
 		passCounter := 10
-		for i := 0; i < passCounter; i++ {
+		for range passCounter {
 			reporter.TrackLatency(exectypes.Filter, plugincommon.OutcomeMethod, time.Second, nil)
 		}
 		l2 := internal.CounterFromHistogramByLabels(t, reporter.latencyHistogram, chainID, "outcome", "Filter")
@@ -414,7 +414,7 @@ func Test_ExecLatency(t *testing.T) {
 
 	t.Run("multiple latency observation with errors", func(t *testing.T) {
 		errCounter := 5
-		for i := 0; i < errCounter; i++ {
+		for range errCounter {
 			reporter.TrackLatency(exectypes.GetMessages, plugincommon.ObservationMethod, time.Second, fmt.Errorf("error"))
 		}
 		errs := testutil.ToFloat64(
@@ -447,7 +447,7 @@ func Test_LatencyAndErrors(t *testing.T) {
 		method := "observation"
 
 		passCounter := 10
-		for i := 0; i < passCounter; i++ {
+		for range passCounter {
 			reporter.TrackProcessorLatency(processor, method, time.Second, nil)
 		}
 		l2 := internal.CounterFromHistogramByLabels(t, reporter.processorLatencyHistogram, chainID, processor, method)
@@ -459,7 +459,7 @@ func Test_LatencyAndErrors(t *testing.T) {
 		method := "outcome"
 
 		errCounter := 5
-		for i := 0; i < errCounter; i++ {
+		for range errCounter {
 			reporter.TrackProcessorLatency(processor, method, time.Second, fmt.Errorf("error"))
 		}
 		errs := testutil.ToFloat64(

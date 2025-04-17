@@ -94,7 +94,7 @@ func Test_CommitReportValidator_ExecutePluginCommitData(t *testing.T) {
 
 			// Initialize the minObservation
 			idFunc := func(data exectypes.CommitData) [32]byte {
-				return sha3.Sum256([]byte(fmt.Sprintf("%v", data)))
+				return sha3.Sum256(fmt.Appendf(nil, "%v", data))
 			}
 			validator := consensus.NewMinObservation[exectypes.CommitData](tt.min, idFunc)
 			for _, report := range tt.reports {
@@ -128,7 +128,7 @@ func Test_CommitReportValidator_Generics(t *testing.T) {
 
 	// Initialize the minObservation
 	idFunc := func(data Generic) [32]byte {
-		return sha3.Sum256([]byte(fmt.Sprintf("%v", data)))
+		return sha3.Sum256(fmt.Appendf(nil, "%v", data))
 	}
 	validator := consensus.NewMinObservation[Generic](2, idFunc)
 

@@ -4,6 +4,7 @@ import (
 	"sort"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	"slices"
 )
 
 // CurseInfo contains cursing information that are fetched from the rmn remote contract.
@@ -27,7 +28,7 @@ func (ci CurseInfo) NonCursedSourceChains(inputChains []ccipocr3.ChainSelector) 
 			sourceChains = append(sourceChains, ch)
 		}
 	}
-	sort.Slice(sourceChains, func(i, j int) bool { return sourceChains[i] < sourceChains[j] })
+	slices.Sort(sourceChains)
 
 	return sourceChains
 }

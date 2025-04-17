@@ -16,6 +16,7 @@ import (
 	pkgreader "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
+	"slices"
 )
 
 func (p *processor) Observation(
@@ -139,7 +140,7 @@ func (b *baseObserver) observeFeeQuoterTokenUpdates(
 
 	tokensToQuery := maps.Keys(b.offChainCfg.TokenInfo)
 	// sort tokens to query to ensure deterministic order
-	sort.Slice(tokensToQuery, func(i, j int) bool { return tokensToQuery[i] < tokensToQuery[j] })
+	slices.Sort(tokensToQuery)
 	lggr.Infow("observing fee quoter token updates")
 	priceUpdates, err := b.tokenPriceReader.GetFeeQuoterTokenUpdates(ctx, tokensToQuery, b.destChain)
 	if err != nil {

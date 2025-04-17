@@ -22,6 +22,7 @@ import (
 	ocrtypecodec "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	"slices"
 )
 
 // validateCommitReportsReadingEligibility validates that all commit reports' source chains are supported by observer
@@ -338,9 +339,7 @@ func combineReportsAndMessages(
 			continue
 		}
 
-		sort.Slice(executedMsgsInReportRange, func(i, j int) bool {
-			return executedMsgsInReportRange[i] < executedMsgsInReportRange[j]
-		})
+		slices.Sort(executedMsgsInReportRange)
 		report.ExecutedMessages = append(reports[i].ExecutedMessages, executedMsgsInReportRange...)
 		pending = append(pending, report)
 	}
@@ -487,7 +486,7 @@ func computeCommitObservationsConsensus(
 			}
 			executedMessages = append(executedMessages, seqNum)
 		}
-		sort.Slice(executedMessages, func(i, j int) bool { return executedMessages[i] < executedMessages[j] })
+		slices.Sort(executedMessages)
 
 		if _, ok := result[mr.SourceChain]; !ok {
 			result[mr.SourceChain] = make([]exectypes.CommitData, 0)
@@ -743,7 +742,7 @@ func computeNoncesConsensus(
 			continue
 		}
 
-		sort.Slice(nonces, func(i, j int) bool { return nonces[i] < nonces[j] })
+		slices.Sort(nonces)
 		consensusNonce := nonces[fChainDest]
 
 		if _, ok := consensusNonces[pair.chain]; !ok {

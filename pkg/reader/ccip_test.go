@@ -994,18 +994,18 @@ func TestCCIPChainReader_DiscoverContracts_GetOfframpStaticConfig_Errors(t *test
 
 // withReturnValueOverridden is a helper function to override the return value of a mocked out
 // ExtendedGetLatestValue call.
-func withReturnValueOverridden(mapper func(returnVal interface{})) func(ctx context.Context,
+func withReturnValueOverridden(mapper func(returnVal any)) func(ctx context.Context,
 	contractName,
 	methodName string,
 	confidenceLevel primitives.ConfidenceLevel,
 	params,
-	returnVal interface{}) {
+	returnVal any) {
 	return func(ctx context.Context,
 		contractName,
 		methodName string,
 		confidenceLevel primitives.ConfidenceLevel,
 		params,
-		returnVal interface{}) {
+		returnVal any) {
 		mapper(returnVal)
 	}
 }
@@ -1066,8 +1066,8 @@ func TestCCIPChainReader_getFeeQuoterTokenPriceUSD(t *testing.T) {
 		ctx context.Context,
 		readIdentifier string,
 		confidenceLevel primitives.ConfidenceLevel,
-		params interface{},
-		returnVal interface{},
+		params any,
+		returnVal any,
 	) {
 		givenTokenAddr := params.(map[string]any)["token"].([]byte)
 		if bytes.Equal(tokenAddr, givenTokenAddr) {
@@ -1210,9 +1210,9 @@ func TestCCIPChainReader_LinkPriceUSD(t *testing.T) {
 		consts.ContractNameFeeQuoter,
 		consts.MethodNameFeeQuoterGetTokenPrice,
 		primitives.Unconfirmed,
-		map[string]interface{}{"token": tokenAddr},
+		map[string]any{"token": tokenAddr},
 		mock.Anything,
-	).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
+	).Return(nil).Run(withReturnValueOverridden(func(returnVal any) {
 		price := returnVal.(*cciptypes.TimestampedUnixBig)
 		price.Value = big.NewInt(145)
 	}))
@@ -1704,7 +1704,7 @@ func TestCCIPChainReader_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 			consts.ContractNameFeeQuoter,
 			consts.MethodNameFeeQuoterGetTokenPrice,
 			primitives.Unconfirmed,
-			map[string]interface{}{"token": wrappedNative1},
+			map[string]any{"token": wrappedNative1},
 			mock.Anything,
 		).Run(
 			func(
@@ -1727,7 +1727,7 @@ func TestCCIPChainReader_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 			consts.ContractNameFeeQuoter,
 			consts.MethodNameFeeQuoterGetTokenPrice,
 			primitives.Unconfirmed,
-			map[string]interface{}{"token": wrappedNative2},
+			map[string]any{"token": wrappedNative2},
 			mock.Anything,
 		).Run(
 			func(
@@ -1777,7 +1777,7 @@ func TestCCIPChainReader_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 			consts.ContractNameFeeQuoter,
 			consts.MethodNameFeeQuoterGetTokenPrice,
 			primitives.Unconfirmed,
-			map[string]interface{}{"token": wrappedNative2},
+			map[string]any{"token": wrappedNative2},
 			mock.Anything,
 		).Run(func(
 			ctx context.Context,
@@ -1821,7 +1821,7 @@ func TestCCIPChainReader_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 			consts.ContractNameFeeQuoter,
 			consts.MethodNameFeeQuoterGetTokenPrice,
 			primitives.Unconfirmed,
-			map[string]interface{}{"token": wrappedNative1},
+			map[string]any{"token": wrappedNative1},
 			mock.Anything,
 		).Return(fmt.Errorf("price fetch failed"))
 

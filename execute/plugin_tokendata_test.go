@@ -118,7 +118,7 @@ func Test_USDC_Transfer(t *testing.T) {
 		}`)
 
 	// Run 3 more rounds to get all attestations
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
 	}
 

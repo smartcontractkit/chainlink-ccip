@@ -86,7 +86,7 @@ func TestExceedSizeObservation(t *testing.T) {
 	startSeqNr := cciptypes.SeqNum(100)
 
 	messages := make([]inmem.MessagesWithMetadata, 0, maxMessages)
-	for i := 0; i < maxMessages; i++ {
+	for i := range maxMessages {
 		messages = append(messages,
 			makeMsgWithMetadata(
 				startSeqNr+cciptypes.SeqNum(i),
@@ -256,7 +256,7 @@ func TestPlugin_CommitReportTimestampOrdering(t *testing.T) {
 	require.Len(t, outcome.CommitReports, 3)
 
 	// Verify timestamps are in ascending order
-	for i := 0; i < len(outcome.CommitReports)-1; i++ {
+	for i := range len(outcome.CommitReports) - 1 {
 		require.True(t, outcome.CommitReports[i].Timestamp.Before(
 			outcome.CommitReports[i+1].Timestamp),
 			"commit reports should be ordered by timestamp")

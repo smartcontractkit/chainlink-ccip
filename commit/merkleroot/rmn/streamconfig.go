@@ -100,7 +100,7 @@ func bytesLimit(roundInterval time.Duration) ragep2p.TokenBucketParams {
 // compute max observation request size and max report signatures request size
 func init() {
 	fixedDestLaneUpdates := make([]*rmnpb.FixedDestLaneUpdate, 0, estimatedMaxNumberOfSourceChains)
-	for i := 0; i < estimatedMaxNumberOfSourceChains; i++ {
+	for range estimatedMaxNumberOfSourceChains {
 		fixedDestLaneUpdates = append(fixedDestLaneUpdates, &rmnpb.FixedDestLaneUpdate{
 			LaneSource: &rmnpb.LaneSource{
 				SourceChainSelector: math.MaxUint64,

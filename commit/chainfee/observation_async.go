@@ -14,6 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	ccipreader "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	"slices"
 )
 
 type observer interface {
@@ -101,7 +102,7 @@ func (o *baseObserver) getSupportedChains(
 	}
 
 	supportedChainsSlice := supportedChains.ToSlice()
-	sort.Slice(supportedChainsSlice, func(i, j int) bool { return supportedChainsSlice[i] < supportedChainsSlice[j] })
+	slices.Sort(supportedChainsSlice)
 
 	return supportedChainsSlice, nil
 }

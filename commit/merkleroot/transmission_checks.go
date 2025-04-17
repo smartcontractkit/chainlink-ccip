@@ -10,6 +10,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	"slices"
 )
 
 // ValidateMerkleRootsState validates the proposed merkle roots against the current on-chain state.
@@ -38,7 +39,7 @@ func ValidateMerkleRootsState(
 	}
 
 	chainSlice := chainSet.ToSlice()
-	sort.Slice(chainSlice, func(i, j int) bool { return chainSlice[i] < chainSlice[j] })
+	slices.Sort(chainSlice)
 
 	offRampExpNextSeqNums, err := reader.NextSeqNum(ctx, chainSlice)
 	if err != nil {

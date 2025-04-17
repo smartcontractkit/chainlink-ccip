@@ -194,7 +194,7 @@ func Test_HTTPClient_Cooldown(t *testing.T) {
 	require.EqualError(t, err, tokendata.ErrUnknownResponse.Error())
 
 	// First rate-limit activates cooldown and other requests should return rate limit immediately
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		_, _, err = client.Get(tests.Context(t), cciptypes.Bytes32{1, 2, 3}.String())
 		require.EqualError(t, err, tokendata.ErrRateLimit.Error())
 	}
@@ -334,7 +334,7 @@ func Test_HTTPClient_RateLimiting_Parallel(t *testing.T) {
 			trigger := make(chan struct{})
 			errorChan := make(chan error, tc.requests)
 			wg := sync.WaitGroup{}
-			for i := 0; i < int(tc.requests); i++ {
+			for range int(tc.requests) {
 				wg.Add(1)
 				go func() {
 					defer wg.Done()

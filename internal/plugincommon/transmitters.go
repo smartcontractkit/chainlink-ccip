@@ -7,6 +7,7 @@ import (
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
+	"slices"
 )
 
 // GetTransmissionSchedule returns a TransmissionSchedule for the provided oracles.
@@ -35,7 +36,7 @@ func GetTransmissionSchedule(
 	}
 
 	// transmissionSchedule must be deterministic
-	sort.Slice(transmitters, func(i, j int) bool { return transmitters[i] < transmitters[j] })
+	slices.Sort(transmitters)
 
 	transmissionDelays := make([]time.Duration, len(transmitters))
 

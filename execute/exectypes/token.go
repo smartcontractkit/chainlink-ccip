@@ -138,7 +138,7 @@ func NotReadyToken() TokenData {
 // It intentionally skips the fields that are not relevant for the consensus process and are
 // not serialized when nodes gossiping
 func TokenDataHash(td TokenData) [32]byte {
-	return sha3.Sum256([]byte(fmt.Sprintf("%v_%v", td.Ready, td.Data)))
+	return sha3.Sum256(fmt.Appendf(nil, "%v_%v", td.Ready, td.Data))
 }
 
 func (td TokenData) IsReady() bool {

@@ -561,7 +561,7 @@ func TestPreventRMNEnabledBeingChanged(t *testing.T) {
 
 	typ := reflect.TypeOf(CommitOffchainConfig{})
 	numFields := typ.NumField()
-	for i := 0; i < numFields; i++ {
+	for i := range numFields {
 		field := typ.Field(i)
 		if field.Name == expectedField &&
 			field.Type.String() == expectedType &&

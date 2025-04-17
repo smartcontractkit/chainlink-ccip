@@ -12,6 +12,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	ocrtypecodec "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	"slices"
 )
 
 type ObservationOptimizer struct {
@@ -76,9 +77,7 @@ func (op ObservationOptimizer) TruncateObservation(observation exectypes.Observa
 	}
 
 	chains := maps.Keys(obs.CommitReports)
-	sort.Slice(chains, func(i, j int) bool {
-		return chains[i] < chains[j]
-	})
+	slices.Sort(chains)
 
 	messageAndTokenDataEncodedSizes := exectypes.GetEncodedMsgAndTokenDataSizes(obs.Messages, obs.TokenData)
 	// While the encoded obs is too large, continue filtering data.

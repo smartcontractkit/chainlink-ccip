@@ -106,7 +106,7 @@ func (it *IntTest) WithMessages(
 	totalMessages := len(mapped)
 	messagesPerReport := totalMessages / numReports
 
-	for i := 0; i < numReports; i++ {
+	for i := range numReports {
 		startIndex := i * messagesPerReport
 		endIndex := startIndex + messagesPerReport
 		if i == numReports-1 {
@@ -453,7 +453,7 @@ func setupHomeChainPoller(
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
-		mock.MatchedBy(func(input map[string]interface{}) bool {
+		mock.MatchedBy(func(input map[string]any) bool {
 			_, pageIndexExists := input["pageIndex"]
 			_, pageSizeExists := input["pageSize"]
 			return pageIndexExists && pageSizeExists

@@ -4,6 +4,7 @@ import (
 	"time"
 
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	"slices"
 )
 
 // CommitData is the data that is committed to the chain.
@@ -54,9 +55,9 @@ func (cd CommitData) CopyNoMsgData() CommitData {
 		BlockNum:            cd.BlockNum,
 		MerkleRoot:          cd.MerkleRoot,
 		SequenceNumberRange: cd.SequenceNumberRange,
-		ExecutedMessages:    append([]cciptypes.SeqNum{}, cd.ExecutedMessages...),
+		ExecutedMessages:    slices.Clone(cd.ExecutedMessages),
 		Messages:            msgsWitoutData,
-		Hashes:              append([]cciptypes.Bytes32{}, cd.Hashes...),
-		MessageTokenData:    append([]MessageTokenData{}, cd.MessageTokenData...),
+		Hashes:              slices.Clone(cd.Hashes),
+		MessageTokenData:    slices.Clone(cd.MessageTokenData),
 	}
 }

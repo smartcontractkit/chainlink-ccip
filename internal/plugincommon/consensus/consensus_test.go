@@ -237,7 +237,7 @@ func TestMakeConstantThreshold(t *testing.T) {
 		f := 3
 		threshold := MakeConstantThreshold[cciptypes.ChainSelector](Threshold(f))
 
-		for i := 0; i < 10; i++ {
+		for i := range 10 {
 			thresh, ok := threshold.Get(cciptypes.ChainSelector(i))
 			assert.True(t, ok)
 			assert.Equal(t, Threshold(f), thresh)
@@ -247,7 +247,7 @@ func TestMakeConstantThreshold(t *testing.T) {
 		f := 3.5
 		threshold := MakeConstantThreshold[float64](Threshold(f))
 
-		for i := 0; i < 10; i++ {
+		for i := range 10 {
 			thresh, ok := threshold.Get(float64(i))
 			assert.True(t, ok)
 			assert.Equal(t, Threshold(f), thresh)

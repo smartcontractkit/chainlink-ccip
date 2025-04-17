@@ -101,7 +101,7 @@ func feeUpdatesFromTimestampedBig(
 // packedFee = (dataAvFeeUSD << 112) | executionFeeUSD
 func fromPackedFee(packedFee *big.Int) ComponentsUSDPrices {
 	ones112 := big.NewInt(0)
-	for i := 0; i < 112; i++ {
+	for i := range 112 {
 		ones112 = ones112.SetBit(ones112, i, 1)
 	}
 

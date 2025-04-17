@@ -80,7 +80,7 @@ func TestObservationSize(t *testing.T) {
 
 	commitObs := make(exectypes.CommitObservations, estimatedMaxNumberOfSourceChains)
 	bigSeqNum := ccipocr3.SeqNum(100000)
-	for i := 0; i < maxCommitReports; i++ {
+	for i := range maxCommitReports {
 		idx := ccipocr3.ChainSelector(i % estimatedMaxNumberOfSourceChains)
 		seqNum := bigSeqNum + ccipocr3.SeqNum(i)
 		commitObs[idx] = append(commitObs[idx], exectypes.CommitData{
@@ -100,7 +100,7 @@ func TestObservationSize(t *testing.T) {
 	}
 
 	msgObs := make(exectypes.MessageObservations, estimatedMaxNumberOfSourceChains)
-	for i := 0; i < maxMessages; i++ {
+	for i := range maxMessages {
 		idx := ccipocr3.ChainSelector(i % estimatedMaxNumberOfSourceChains % maxCommitReports)
 		if nil == msgObs[idx] {
 			msgObs[idx] = make(map[ccipocr3.SeqNum]ccipocr3.Message)
@@ -130,7 +130,7 @@ func TestObservationSize(t *testing.T) {
 
 	// This could be bigger, since each message could send multiple tokens.
 	tokenDataObs := make(exectypes.TokenDataObservations, estimatedMaxNumberOfSourceChains)
-	for i := 0; i < maxMessages; i++ {
+	for i := range maxMessages {
 		idx := ccipocr3.ChainSelector(i % estimatedMaxNumberOfSourceChains)
 		if nil == tokenDataObs[idx] {
 			tokenDataObs[idx] = make(map[ccipocr3.SeqNum]exectypes.MessageTokenData)
@@ -151,7 +151,7 @@ func TestObservationSize(t *testing.T) {
 	// separate sender for each message
 	noncesObs := make(exectypes.NonceObservations, maxMessages)
 	mockAddrCodec := internal.NewMockAddressCodecHex(t)
-	for i := 0; i < maxMessages; i++ {
+	for i := range maxMessages {
 		idx := ccipocr3.ChainSelector(i % estimatedMaxNumberOfSourceChains)
 		if nil == noncesObs[idx] {
 			noncesObs[idx] = make(map[string]uint64)
@@ -178,7 +178,7 @@ func TestObservationSize(t *testing.T) {
 		//type ContractAddresses map[string]map[cciptypes.ChainSelector]cciptypes.UnknownAddress
 		discoveryObs.Addresses[contract] =
 			make(map[ccipocr3.ChainSelector]ccipocr3.UnknownAddress, estimatedMaxNumberOfSourceChains)
-		for i := 0; i < estimatedMaxNumberOfSourceChains; i++ {
+		for i := range estimatedMaxNumberOfSourceChains {
 			discoveryObs.Addresses[contract][ccipocr3.ChainSelector(i)] = addr[:]
 		}
 	}

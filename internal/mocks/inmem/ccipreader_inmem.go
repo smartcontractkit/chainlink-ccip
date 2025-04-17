@@ -15,6 +15,7 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	"slices"
 )
 
 type MessagesWithMetadata struct {
@@ -109,7 +110,7 @@ func (r InMemoryCCIPReader) ExecutedMessages(
 		}
 
 		unqSeqNums := mapset.NewSet(seqNums...).ToSlice()
-		sort.Slice(unqSeqNums, func(i, j int) bool { return unqSeqNums[i] < unqSeqNums[j] })
+		slices.Sort(unqSeqNums)
 		ret[source] = unqSeqNums
 	}
 	return ret, nil

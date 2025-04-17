@@ -23,6 +23,7 @@ import (
 	reader2 "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	"github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	"slices"
 )
 
 func Test_processor_Observation(t *testing.T) {
@@ -134,7 +135,7 @@ func Test_processor_Observation(t *testing.T) {
 
 			supportedSet.Remove(tc.dstChain)
 			slicesWithoutDst := supportedSet.ToSlice()
-			sort.Slice(slicesWithoutDst, func(i, j int) bool { return slicesWithoutDst[i] < slicesWithoutDst[j] })
+			slices.Sort(slicesWithoutDst)
 
 			if len(slicesWithoutDst) == 0 {
 				slicesWithoutDst = []ccipocr3.ChainSelector(nil)
@@ -333,7 +334,7 @@ func Test_unique_chain_filter_in_Observation(t *testing.T) {
 
 			supportedSet.Remove(tc.dstChain)
 			slicesWithoutDst := supportedSet.ToSlice()
-			sort.Slice(slicesWithoutDst, func(i, j int) bool { return slicesWithoutDst[i] < slicesWithoutDst[j] })
+			slices.Sort(slicesWithoutDst)
 
 			ccipReader.EXPECT().GetChainsFeeComponents(ctx, slicesWithoutDst).
 				Return(tc.chainFeeComponents).Maybe()

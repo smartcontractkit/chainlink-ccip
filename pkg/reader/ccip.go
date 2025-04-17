@@ -1084,7 +1084,7 @@ func (r *ccipChainReader) discoverOffRampContracts(
 
 		// Iterate results in sourceChain selector order so that the router config is deterministic.
 		keys := maps.Keys(sourceConfigs)
-		sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
+		slices.Sort(keys)
 		for _, sourceChain := range keys {
 			cfg := sourceConfigs[sourceChain]
 			resp = resp.Append(consts.ContractNameOnRamp, sourceChain, cfg.OnRamp)
@@ -1842,7 +1842,7 @@ func (r *ccipChainReader) processOfframpResults(
 	// Define processors for each expected result
 	processors := []resultProcessor{
 		// CommitLatestOCRConfig
-		func(val interface{}) error {
+		func(val any) error {
 			typed, ok := val.(*OCRConfigResponse)
 			if !ok {
 				return fmt.Errorf("invalid type for CommitLatestOCRConfig: %T", val)
@@ -1851,7 +1851,7 @@ func (r *ccipChainReader) processOfframpResults(
 			return nil
 		},
 		// ExecLatestOCRConfig
-		func(val interface{}) error {
+		func(val any) error {
 			typed, ok := val.(*OCRConfigResponse)
 			if !ok {
 				return fmt.Errorf("invalid type for ExecLatestOCRConfig: %T", val)
@@ -1860,7 +1860,7 @@ func (r *ccipChainReader) processOfframpResults(
 			return nil
 		},
 		// StaticConfig
-		func(val interface{}) error {
+		func(val any) error {
 			typed, ok := val.(*offRampStaticChainConfig)
 			if !ok {
 				return fmt.Errorf("invalid type for StaticConfig: %T", val)
@@ -1869,7 +1869,7 @@ func (r *ccipChainReader) processOfframpResults(
 			return nil
 		},
 		// DynamicConfig
-		func(val interface{}) error {
+		func(val any) error {
 			typed, ok := val.(*offRampDynamicChainConfig)
 			if !ok {
 				return fmt.Errorf("invalid type for DynamicConfig: %T", val)

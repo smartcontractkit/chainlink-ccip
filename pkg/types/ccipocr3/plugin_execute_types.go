@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"slices"
 )
 
 type ExecutePluginReport struct {
@@ -34,7 +35,7 @@ func (e ExecutePluginReportSingleChain) CopyNoMsgData() ExecutePluginReportSingl
 		SourceChainSelector: e.SourceChainSelector,
 		Messages:            msgsWithoutData,
 		OffchainTokenData:   e.OffchainTokenData,
-		Proofs:              append([]Bytes32{}, e.Proofs...),
+		Proofs:              slices.Clone(e.Proofs),
 		ProofFlagBits:       e.ProofFlagBits,
 	}
 }

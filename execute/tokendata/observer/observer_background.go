@@ -12,6 +12,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	"slices"
 )
 
 type backgroundObserver struct {
@@ -145,7 +146,7 @@ func (o *backgroundObserver) startWorkers() {
 	o.wg.Wait()
 	o.lggr.Info("all workers stopped, new workers are starting...")
 
-	for i := 0; i < o.numWorkers; i++ {
+	for i := range o.numWorkers {
 		o.wg.Add(1)
 		workerID := i
 		go o.worker(workerID)
@@ -300,7 +301,7 @@ func (q *msgQueue) dequeue() (cciptypes.Message, bool) {
 				"availableSince", time.Since(msg.availableAt),
 			)
 			q.msgIDs.Remove(msg.msg.Header.MessageID)
-			q.msgs = append(q.msgs[:i], q.msgs[i+1:]...)
+			q.msgs = slices.Delete(q.msgs, i, i+1)
 			return msg.msg, true
 		}
 	}

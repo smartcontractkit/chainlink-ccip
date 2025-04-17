@@ -725,7 +725,7 @@ func TestConfigCache_ConcurrentAccess(t *testing.T) {
 	// Run concurrent fetches on the filled cache
 	const numGoroutines = 10
 	errCh := make(chan error, numGoroutines)
-	for i := 0; i < numGoroutines; i++ {
+	for range numGoroutines {
 		go func() {
 			_, err := cache.GetChainConfig(ctx, chainA)
 			errCh <- err
@@ -733,7 +733,7 @@ func TestConfigCache_ConcurrentAccess(t *testing.T) {
 	}
 
 	// Collect results
-	for i := 0; i < numGoroutines; i++ {
+	for range numGoroutines {
 		err := <-errCh
 		require.NoError(t, err)
 	}

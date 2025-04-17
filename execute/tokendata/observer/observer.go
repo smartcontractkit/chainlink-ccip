@@ -12,6 +12,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
+	"slices"
 )
 
 type TokenDataObserver interface {
@@ -252,13 +253,7 @@ func (n *NoopTokenDataObserver) isError(selector cciptypes.ChainSelector, seq cc
 		return false
 	}
 
-	for _, idx := range tokenIdxs {
-		if idx == tokenIdx {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(tokenIdxs, tokenIdx)
 }
 
 func (n *NoopTokenDataObserver) IsTokenSupported(_ cciptypes.ChainSelector, _ cciptypes.RampTokenAmount) bool {

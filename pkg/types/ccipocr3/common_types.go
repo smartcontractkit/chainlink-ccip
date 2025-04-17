@@ -73,7 +73,7 @@ func (b Bytes) String() string {
 }
 
 func (b Bytes) MarshalJSON() ([]byte, error) {
-	return []byte(fmt.Sprintf(`"%s"`, b.String())), nil
+	return fmt.Appendf(nil, `"%s"`, b.String()), nil
 }
 
 func (b *Bytes) UnmarshalJSON(data []byte) error {
@@ -129,7 +129,7 @@ func (b Bytes32) IsEmpty() bool {
 }
 
 func (b Bytes32) MarshalJSON() ([]byte, error) {
-	return []byte(fmt.Sprintf(`"%s"`, b.String())), nil
+	return fmt.Appendf(nil, `"%s"`, b.String()), nil
 }
 
 func (b *Bytes32) UnmarshalJSON(data []byte) error {
@@ -176,7 +176,7 @@ func (b BigInt) MarshalJSON() ([]byte, error) {
 	if b.Int == nil {
 		return []byte("null"), nil
 	}
-	return []byte(fmt.Sprintf(`"%s"`, b.String())), nil
+	return fmt.Appendf(nil, `"%s"`, b.String()), nil
 }
 
 func (b *BigInt) UnmarshalJSON(p []byte) error {

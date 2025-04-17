@@ -387,7 +387,7 @@ func writeAdditionalMethods(contractName string, logNames []string, abi abi.ABI,
 `, contractName, logName, contractName, logName)
 		}
 
-		bs = append(bs, []byte(fmt.Sprintf(`
+		bs = append(bs, fmt.Appendf(nil, `
 func (_%v *%v) ParseLog(log types.Log) (generated.AbigenLog, error) {
     switch log.Topics[0] {
     %v
@@ -395,24 +395,24 @@ func (_%v *%v) ParseLog(log types.Log) (generated.AbigenLog, error) {
         return nil, fmt.Errorf("abigen wrapper received unknown log topic: %%v", log.Topics[0])
     }
 }
-`, contractName, contractName, logSwitchBody))...)
+`, contractName, contractName, logSwitchBody)...)
 	}
 
 	// Write the Topic method
 	for _, logName := range logNames {
-		bs = append(bs, []byte(fmt.Sprintf(`
+		bs = append(bs, fmt.Appendf(nil, `
 func (%v%v) Topic() common.Hash {
     return common.HexToHash("%v")
 }
-`, contractName, logName, abi.Events[logName].ID.Hex()))...)
+`, contractName, logName, abi.Events[logName].ID.Hex())...)
 	}
 
 	// Write the Address method to the bottom of the file
-	bs = append(bs, []byte(fmt.Sprintf(`
+	bs = append(bs, fmt.Appendf(nil, `
 func (_%v *%v) Address() common.Address {
     return _%v.address
 }
-`, contractName, contractName, contractName))...)
+`, contractName, contractName, contractName)...)
 
 	return bs
 }

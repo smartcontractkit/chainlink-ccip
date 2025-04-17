@@ -248,7 +248,7 @@ func makeTestCommitReport(
 		}
 	}
 	var messages []cciptypes.Message
-	for i := 0; i < numMessages; i++ {
+	for i := range numMessages {
 		var msg cciptypes.Message
 		if zeroNonces {
 			msg = makeMessage(
@@ -270,7 +270,7 @@ func makeTestCommitReport(
 	}
 
 	var hashes []cciptypes.Bytes32
-	for i := 0; i < len(messages); i++ {
+	for i := range messages {
 		hash, err := hasher.Hash(context.Background(), messages[i])
 		if err != nil {
 			panic(fmt.Sprintf("unable to hash message: %s", err))
@@ -279,12 +279,12 @@ func makeTestCommitReport(
 	}
 
 	messageTokenData := make([]exectypes.MessageTokenData, numMessages)
-	for i := 0; i < len(messages); i++ {
+	for i := range messages {
 		messageTokenData[i] = exectypes.MessageTokenData{
 			TokenData: []exectypes.TokenData{
 				{
 					Ready: true,
-					Data:  []byte(fmt.Sprintf("data %d", i)),
+					Data:  fmt.Appendf(nil, "data %d", i),
 				},
 			},
 		}
@@ -434,7 +434,7 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 			t.Parallel()
 
 			msgs := make(map[int]struct{})
-			for i := 0; i < len(tt.args.report.Messages); i++ {
+			for i := range tt.args.report.Messages {
 				msgs[i] = struct{}{}
 			}
 

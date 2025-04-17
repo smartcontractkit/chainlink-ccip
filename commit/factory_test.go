@@ -168,10 +168,7 @@ func Test_maxObservationLength(t *testing.T) {
 // Generate a string with a counter and fill the rest with 'x's
 func generateStringWithCounter(counter, length int) string {
 	counterStr := fmt.Sprintf("%d", counter)
-	paddingLength := length - len(counterStr)
-	if paddingLength < 0 {
-		paddingLength = 0
-	}
+	paddingLength := max(length-len(counterStr), 0)
 	return counterStr + strings.Repeat("x", paddingLength)
 }
 

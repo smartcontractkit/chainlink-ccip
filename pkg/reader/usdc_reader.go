@@ -17,6 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
+	"maps"
 )
 
 type USDCMessageReader interface {
@@ -123,9 +124,7 @@ func AllAvailableDomains() map[uint64]uint32 {
 	}
 
 	destDomains := make(map[uint64]uint32)
-	for k, v := range CCTPDestDomains {
-		destDomains[k] = v
-	}
+	maps.Copy(destDomains, CCTPDestDomains)
 
 	for i, chainID := range chainIDs {
 		chainSelector, _ := sel.SelectorFromChainId(chainID)

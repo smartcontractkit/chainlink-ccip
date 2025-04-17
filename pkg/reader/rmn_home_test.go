@@ -108,7 +108,7 @@ func Test_CachingInstances(t *testing.T) {
 		pollers := make([]*rmnHome, 1000)
 
 		eg := new(errgroup.Group)
-		for i := 0; i < 1000; i++ {
+		for i := range 1000 {
 			j := i
 			eg.Go(func() error {
 				pollers[j] = newRMNHomeCasted(ctx, t, lggr, chainSelector, address, chain1)
@@ -120,7 +120,7 @@ func Test_CachingInstances(t *testing.T) {
 
 		// 999 closed, but still one reference remains therefore bgPoller is running
 		eg = new(errgroup.Group)
-		for i := 0; i < 999; i++ {
+		for i := range 999 {
 			j := i
 			eg.Go(func() error {
 				requirePollerStarted(t, pollers[j])

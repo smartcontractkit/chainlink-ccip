@@ -8,6 +8,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
+	"slices"
 )
 
 // AccessorMetadata contains metadata about the chain accessor.
@@ -345,7 +346,7 @@ func (ci CurseInfo) NonCursedSourceChains(inputChains []ChainSelector) []ChainSe
 			sourceChains = append(sourceChains, ch)
 		}
 	}
-	sort.Slice(sourceChains, func(i, j int) bool { return sourceChains[i] < sourceChains[j] })
+	slices.Sort(sourceChains)
 
 	return sourceChains
 }

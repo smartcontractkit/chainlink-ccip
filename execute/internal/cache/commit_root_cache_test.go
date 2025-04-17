@@ -763,7 +763,7 @@ func TestCommitRootsCache_AdditionalEdgeCases(t *testing.T) {
 		allReports := make(map[ccipocr3.ChainSelector][]exectypes.CommitData)
 		allReports[selector] = make([]exectypes.CommitData, 0, 20)
 
-		for i := 0; i < 20; i++ {
+		for i := range 20 {
 			root := ccipocr3.Bytes32{byte(i)}
 			timestamp := now.Add(time.Duration(-100+i*5) * time.Minute)
 			report := createCommitData(timestamp, selector, root)
@@ -778,7 +778,7 @@ func TestCommitRootsCache_AdditionalEdgeCases(t *testing.T) {
 			"Initial earliest should be first root")
 
 		// Execute roots one by one from first to last
-		for i := 0; i < 20; i++ {
+		for i := range 20 {
 			cache.MarkAsExecuted(selector, allReports[selector][i].MerkleRoot)
 
 			// Create remaining reports

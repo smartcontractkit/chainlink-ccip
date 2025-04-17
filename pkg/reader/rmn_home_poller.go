@@ -238,7 +238,7 @@ func (r *rmnHomePoller) fetchAndSetRmnHomeConfigs(ctx context.Context) error {
 		ctx,
 		r.rmnHomeBoundContract.ReadIdentifier(consts.MethodNameGetAllConfigs),
 		primitives.Unconfirmed,
-		map[string]interface{}{},
+		map[string]any{},
 		&activeAndCandidateConfigs,
 	)
 	if err != nil {
@@ -341,7 +341,7 @@ func convertOnChainConfigToRMNHomeChainConfig(
 
 		for _, chain := range cfg.DynamicConfig.SourceChains {
 			homeFMap[chain.ChainSelector] = int(chain.FObserve)
-			for j := 0; j < len(nodes); j++ {
+			for j := range nodes {
 				isObserver, err := isNodeObserver(chain, j, len(nodes))
 				if err != nil {
 					lggr.Warnw("failed to check if node is observer", "err", err)

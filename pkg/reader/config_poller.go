@@ -14,6 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	"maps"
 )
 
 // refreshAllKnownChains refreshes all known chains in background using batched requests where possible
@@ -589,9 +590,7 @@ func (c *configPoller) GetOfframpSourceChainConfigs(
 	}
 
 	// Merge the new configs with existing cached results
-	for chain, config := range newCachedConfigs {
-		cachedSourceConfigs[chain] = config
-	}
+	maps.Copy(cachedSourceConfigs, newCachedConfigs)
 
 	return cachedSourceConfigs, nil
 }
@@ -770,7 +769,7 @@ func staticSourceChainConfigFromSourceChainConfig(sc SourceChainConfig) StaticSo
 }
 
 // resultProcessor defines a function type for processing individual results
-type resultProcessor func(interface{}) error
+type resultProcessor func(any) error
 
 // Ensure configCache implements ConfigPoller
 var _ ConfigPoller = (*configPoller)(nil)

@@ -20,6 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
+	"slices"
 )
 
 var rmnRemoteCfg = testhelpers.CreateRMNRemoteCfg()
@@ -401,7 +402,7 @@ func Test_Processor_Outcome(t *testing.T) {
 				func(tc testCase) Observation { return tc.observations[0](tc) },
 				func(tc testCase) Observation {
 					baseObs := tc.observations[0](tc)
-					baseObs.MerkleRoots = append(baseObs.MerkleRoots[:1], baseObs.MerkleRoots[2:]...) // skip chainB
+					baseObs.MerkleRoots = slices.Delete(baseObs.MerkleRoots, 1, 2) // skip chainB
 
 					// report a different onRamp address for chainC this leads to no consensus for chainC merkle roots
 					baseObs.MerkleRoots[1].OnRampAddress = []byte{0xd}
@@ -699,7 +700,7 @@ func Test_buildMerkleRootsOutcome(t *testing.T) {
 		}
 
 		lggr := logger.Test(t)
-		for i := 0; i < rounds; i++ {
+		for range rounds {
 			report1, err := buildMerkleRootsOutcome(Query{}, false, lggr, obs, Outcome{}, mockAddrCodec)
 			require.NoError(t, err)
 			report2, err := buildMerkleRootsOutcome(Query{}, false, lggr, obs, Outcome{}, mockAddrCodec)

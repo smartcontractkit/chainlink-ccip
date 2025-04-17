@@ -35,7 +35,7 @@ type minObservation[T any] struct {
 func NewMinObservation[T any](minThreshold Threshold, idFunc func(T) [32]byte) MinObservation[T] {
 	if idFunc == nil {
 		idFunc = func(data T) [32]byte {
-			return sha3.Sum256([]byte(fmt.Sprintf("%v", data)))
+			return sha3.Sum256(fmt.Appendf(nil, "%v", data))
 		}
 	}
 	return &minObservation[T]{

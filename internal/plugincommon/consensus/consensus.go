@@ -8,6 +8,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	"slices"
 )
 
 // GetConsensusMap takes a mapping from chains to a list of items,
@@ -132,7 +133,7 @@ func GetOrderedConsensus[K comparable, T cmp.Ordered](
 			continue
 		}
 
-		sort.Slice(items, func(i, j int) bool { return items[i] < items[j] })
+		slices.Sort(items)
 		result[key] = items[minThresh]
 	}
 	return result

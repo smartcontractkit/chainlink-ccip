@@ -341,10 +341,10 @@ func Test_TokenDataObserver_Marshal(t *testing.T) {
 				assert.ErrorContains(t, err, tt.errMsg)
 			} else {
 				assert.NoError(t, err)
-				var expected []map[string]interface{}
+				var expected []map[string]any
 				err := json.Unmarshal([]byte(tt.wantJSON), &expected)
 				require.NoError(t, err)
-				var actual []map[string]interface{}
+				var actual []map[string]any
 				err = json.Unmarshal(actualJSON, &actual)
 				require.NoError(t, err)
 				assert.Equal(t, actual, expected)

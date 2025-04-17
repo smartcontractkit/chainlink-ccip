@@ -14,6 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	"slices"
 )
 
 // ChainSupport contains functions that enable an oracle to determine which chains are accessible by itself and
@@ -72,7 +73,7 @@ func (c ccipChainSupport) KnownSourceChainsSlice() ([]cciptypes.ChainSelector, e
 	}
 
 	allChains := allChainsSet.ToSlice()
-	sort.Slice(allChains, func(i, j int) bool { return allChains[i] < allChains[j] })
+	slices.Sort(allChains)
 
 	sourceChains := slicelib.Filter(allChains, func(ch cciptypes.ChainSelector) bool { return ch != c.destChain })
 

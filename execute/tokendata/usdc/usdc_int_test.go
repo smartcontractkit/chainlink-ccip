@@ -56,7 +56,7 @@ type usdcMessage struct {
 // TODO actual tokenData bytes would be abi encoded, but we can't use abi in the repo so only
 // passing attestation as it is
 func (u *usdcMessage) tokenData() []byte {
-	var result map[string]interface{}
+	var result map[string]any
 
 	err := json.Unmarshal([]byte(u.attestationResponse), &result)
 	if err != nil {

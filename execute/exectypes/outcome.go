@@ -4,6 +4,7 @@ import (
 	"sort"
 
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	"slices"
 )
 
 type PluginState string
@@ -119,8 +120,8 @@ func NewSortedOutcome(
 	pendingCommits []CommitData,
 	report cciptypes.ExecutePluginReport,
 ) Outcome {
-	pendingCommitsCP := append([]CommitData{}, pendingCommits...)
-	reportCP := append([]cciptypes.ExecutePluginReportSingleChain{}, report.ChainReports...)
+	pendingCommitsCP := slices.Clone(pendingCommits)
+	reportCP := slices.Clone(report.ChainReports)
 	sort.Slice(
 		pendingCommitsCP,
 		func(i, j int) bool {

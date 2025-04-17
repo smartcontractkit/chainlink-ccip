@@ -252,7 +252,7 @@ func Test_USDCMessageReader_MessagesByTokenID(t *testing.T) {
 
 func Test_MessageSentEvent_unpackID(t *testing.T) {
 	nonEmptyEvent := eventID{}
-	for i := 0; i < 32; i++ {
+	for i := range 32 {
 		nonEmptyEvent[i] = byte(i)
 	}
 
