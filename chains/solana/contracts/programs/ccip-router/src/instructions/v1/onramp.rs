@@ -2,6 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::spl_token;
 use anchor_spl::token_interface;
 
+use crate::context::ANCHOR_DISCRIMINATOR;
 use crate::events::on_ramp as events;
 use crate::messages::GetFeeResult;
 
@@ -250,7 +251,9 @@ impl OnRamp for Impl {
                 {
                     // validate the token address based on the destination chain family selector
                     let dest_chain_info = ctx.accounts.fee_quoter_dest_chain.to_account_info();
-                    let dest_chain = DestChain::try_from_slice(&dest_chain_info.data.borrow())?;
+                    let dest_chain = DestChain::try_from_slice(
+                        &dest_chain_info.data.borrow()[ANCHOR_DISCRIMINATOR..],
+                    )?;
                     let dest_chain_family_selector = dest_chain.config.chain_family_selector;
 
                     helpers::validate_transfer_dest_address(
