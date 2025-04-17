@@ -58,12 +58,9 @@ impl RateLimitTokenBucket {
             // Consume is not guaranteed to succeed after wait time passes if there is competing traffic.
             // This acts as a lower bound of wait time.
             let min_wait_sec = (request_tokens
-                .checked_sub(self.tokens)
-                .unwrap()
-                .checked_add(rate.checked_sub(1).unwrap()))
-            .unwrap()
-            .checked_div(rate)
-            .unwrap();
+                .saturating_sub(self.tokens)
+                .saturating_add(rate.saturating_sub(1)))
+            .saturating_div(rate);
 
             // print human readable message before reverting with total wait time
             let msg = "min wait (s): ".to_owned() + &min_wait_sec.to_string();
@@ -72,7 +69,7 @@ impl RateLimitTokenBucket {
             return Err(CcipTokenPoolError::RLRateLimitReached.into());
         }
 
-        self.tokens = self.tokens.checked_sub(request_tokens).unwrap();
+        self.tokens = self.tokens.saturating_sub(request_tokens);
         emit!(TokensConsumed {
             tokens: request_tokens
         });
@@ -82,9 +79,10 @@ impl RateLimitTokenBucket {
 
     fn refill<C: Timestamper>(&mut self) -> Result<()> {
         let current_timestamp = C::instance()?.unix_timestamp();
-        let time_diff = current_timestamp.checked_sub(self.last_updated).unwrap();
-        let increase = time_diff.checked_mul(self.cfg.rate).unwrap();
-        let refill = self.tokens.checked_add(increase).unwrap();
+        // use of saturating - prevent overflow
+        let time_diff = current_timestamp.saturating_sub(self.last_updated);
+        let increase = time_diff.saturating_mul(self.cfg.rate);
+        let refill = self.tokens.saturating_add(increase);
 
         self.tokens = min(self.cfg.capacity, refill);
         self.last_updated = current_timestamp;
