@@ -73,12 +73,12 @@ func (obj *GasPriceUpdate) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err
 	return nil
 }
 
-type EVMExtraArgsV2 struct {
+type GenericExtraArgsV2 struct {
 	GasLimit                 ag_binary.Uint128
 	AllowOutOfOrderExecution bool
 }
 
-func (obj EVMExtraArgsV2) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj GenericExtraArgsV2) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `GasLimit` param:
 	err = encoder.Encode(obj.GasLimit)
 	if err != nil {
@@ -92,7 +92,7 @@ func (obj EVMExtraArgsV2) MarshalWithEncoder(encoder *ag_binary.Encoder) (err er
 	return nil
 }
 
-func (obj *EVMExtraArgsV2) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *GenericExtraArgsV2) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `GasLimit`:
 	err = decoder.Decode(&obj.GasLimit)
 	if err != nil {
@@ -307,7 +307,7 @@ func (obj *TokenTransferAdditionalData) UnmarshalWithDecoder(decoder *ag_binary.
 type GetFeeResult struct {
 	Token                       ag_solanago.PublicKey
 	Amount                      uint64
-	Juels                       uint64
+	Juels                       ag_binary.Uint128
 	TokenTransferAdditionalData []TokenTransferAdditionalData
 	ProcessedExtraArgs          ProcessedExtraArgs
 }
@@ -374,6 +374,7 @@ type ProcessedExtraArgs struct {
 	Bytes                    []byte
 	GasLimit                 ag_binary.Uint128
 	AllowOutOfOrderExecution bool
+	TokenReceiver            *[]byte `bin:"optional"`
 }
 
 func (obj ProcessedExtraArgs) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
@@ -391,6 +392,24 @@ func (obj ProcessedExtraArgs) MarshalWithEncoder(encoder *ag_binary.Encoder) (er
 	err = encoder.Encode(obj.AllowOutOfOrderExecution)
 	if err != nil {
 		return err
+	}
+	// Serialize `TokenReceiver` param (optional):
+	{
+		if obj.TokenReceiver == nil {
+			err = encoder.WriteBool(false)
+			if err != nil {
+				return err
+			}
+		} else {
+			err = encoder.WriteBool(true)
+			if err != nil {
+				return err
+			}
+			err = encoder.Encode(obj.TokenReceiver)
+			if err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
@@ -410,6 +429,19 @@ func (obj *ProcessedExtraArgs) UnmarshalWithDecoder(decoder *ag_binary.Decoder) 
 	err = decoder.Decode(&obj.AllowOutOfOrderExecution)
 	if err != nil {
 		return err
+	}
+	// Deserialize `TokenReceiver` (optional):
+	{
+		ok, err := decoder.ReadBool()
+		if err != nil {
+			return err
+		}
+		if ok {
+			err = decoder.Decode(&obj.TokenReceiver)
+			if err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
@@ -845,129 +877,6 @@ func (value CodeVersion) String() string {
 		return "Default"
 	case V1_CodeVersion:
 		return "V1"
-	default:
-		return ""
-	}
-}
-
-type FeeQuoterError ag_binary.BorshEnum
-
-const (
-	Unauthorized_FeeQuoterError FeeQuoterError = iota
-	InvalidInputs_FeeQuoterError
-	ZeroGasLimit_FeeQuoterError
-	DefaultGasLimitExceedsMaximum_FeeQuoterError
-	InvalidVersion_FeeQuoterError
-	RedundantOwnerProposal_FeeQuoterError
-	InvalidInputsMissingWritable_FeeQuoterError
-	InvalidInputsChainSelector_FeeQuoterError
-	InvalidInputsMint_FeeQuoterError
-	InvalidInputsMintOwner_FeeQuoterError
-	InvalidInputsTokenConfigAccount_FeeQuoterError
-	InvalidInputsMissingExtraArgs_FeeQuoterError
-	InvalidInputsMissingDataAfterExtraArgs_FeeQuoterError
-	InvalidInputsDestChainStateAccount_FeeQuoterError
-	InvalidInputsPerChainPerTokenConfig_FeeQuoterError
-	InvalidInputsBillingTokenConfig_FeeQuoterError
-	InvalidInputsAccountCount_FeeQuoterError
-	InvalidInputsNoUpdates_FeeQuoterError
-	InvalidInputsTokenAccounts_FeeQuoterError
-	DestinationChainDisabled_FeeQuoterError
-	FeeTokenDisabled_FeeQuoterError
-	MessageTooLarge_FeeQuoterError
-	UnsupportedNumberOfTokens_FeeQuoterError
-	InvalidEVMAddress_FeeQuoterError
-	InvalidEncoding_FeeQuoterError
-	InvalidTokenPrice_FeeQuoterError
-	StaleGasPrice_FeeQuoterError
-	InvalidInputsMissingTokenConfig_FeeQuoterError
-	MessageFeeTooHigh_FeeQuoterError
-	MessageGasLimitTooHigh_FeeQuoterError
-	ExtraArgOutOfOrderExecutionMustBeTrue_FeeQuoterError
-	InvalidExtraArgsTag_FeeQuoterError
-	InvalidChainFamilySelector_FeeQuoterError
-	InvalidTokenReceiver_FeeQuoterError
-	InvalidSVMAddress_FeeQuoterError
-	UnauthorizedPriceUpdater_FeeQuoterError
-	InvalidCodeVersion_FeeQuoterError
-)
-
-func (value FeeQuoterError) String() string {
-	switch value {
-	case Unauthorized_FeeQuoterError:
-		return "Unauthorized"
-	case InvalidInputs_FeeQuoterError:
-		return "InvalidInputs"
-	case ZeroGasLimit_FeeQuoterError:
-		return "ZeroGasLimit"
-	case DefaultGasLimitExceedsMaximum_FeeQuoterError:
-		return "DefaultGasLimitExceedsMaximum"
-	case InvalidVersion_FeeQuoterError:
-		return "InvalidVersion"
-	case RedundantOwnerProposal_FeeQuoterError:
-		return "RedundantOwnerProposal"
-	case InvalidInputsMissingWritable_FeeQuoterError:
-		return "InvalidInputsMissingWritable"
-	case InvalidInputsChainSelector_FeeQuoterError:
-		return "InvalidInputsChainSelector"
-	case InvalidInputsMint_FeeQuoterError:
-		return "InvalidInputsMint"
-	case InvalidInputsMintOwner_FeeQuoterError:
-		return "InvalidInputsMintOwner"
-	case InvalidInputsTokenConfigAccount_FeeQuoterError:
-		return "InvalidInputsTokenConfigAccount"
-	case InvalidInputsMissingExtraArgs_FeeQuoterError:
-		return "InvalidInputsMissingExtraArgs"
-	case InvalidInputsMissingDataAfterExtraArgs_FeeQuoterError:
-		return "InvalidInputsMissingDataAfterExtraArgs"
-	case InvalidInputsDestChainStateAccount_FeeQuoterError:
-		return "InvalidInputsDestChainStateAccount"
-	case InvalidInputsPerChainPerTokenConfig_FeeQuoterError:
-		return "InvalidInputsPerChainPerTokenConfig"
-	case InvalidInputsBillingTokenConfig_FeeQuoterError:
-		return "InvalidInputsBillingTokenConfig"
-	case InvalidInputsAccountCount_FeeQuoterError:
-		return "InvalidInputsAccountCount"
-	case InvalidInputsNoUpdates_FeeQuoterError:
-		return "InvalidInputsNoUpdates"
-	case InvalidInputsTokenAccounts_FeeQuoterError:
-		return "InvalidInputsTokenAccounts"
-	case DestinationChainDisabled_FeeQuoterError:
-		return "DestinationChainDisabled"
-	case FeeTokenDisabled_FeeQuoterError:
-		return "FeeTokenDisabled"
-	case MessageTooLarge_FeeQuoterError:
-		return "MessageTooLarge"
-	case UnsupportedNumberOfTokens_FeeQuoterError:
-		return "UnsupportedNumberOfTokens"
-	case InvalidEVMAddress_FeeQuoterError:
-		return "InvalidEVMAddress"
-	case InvalidEncoding_FeeQuoterError:
-		return "InvalidEncoding"
-	case InvalidTokenPrice_FeeQuoterError:
-		return "InvalidTokenPrice"
-	case StaleGasPrice_FeeQuoterError:
-		return "StaleGasPrice"
-	case InvalidInputsMissingTokenConfig_FeeQuoterError:
-		return "InvalidInputsMissingTokenConfig"
-	case MessageFeeTooHigh_FeeQuoterError:
-		return "MessageFeeTooHigh"
-	case MessageGasLimitTooHigh_FeeQuoterError:
-		return "MessageGasLimitTooHigh"
-	case ExtraArgOutOfOrderExecutionMustBeTrue_FeeQuoterError:
-		return "ExtraArgOutOfOrderExecutionMustBeTrue"
-	case InvalidExtraArgsTag_FeeQuoterError:
-		return "InvalidExtraArgsTag"
-	case InvalidChainFamilySelector_FeeQuoterError:
-		return "InvalidChainFamilySelector"
-	case InvalidTokenReceiver_FeeQuoterError:
-		return "InvalidTokenReceiver"
-	case InvalidSVMAddress_FeeQuoterError:
-		return "InvalidSVMAddress"
-	case UnauthorizedPriceUpdater_FeeQuoterError:
-		return "UnauthorizedPriceUpdater"
-	case InvalidCodeVersion_FeeQuoterError:
-		return "InvalidCodeVersion"
 	default:
 		return ""
 	}

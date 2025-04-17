@@ -15,6 +15,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 
+	"github.com/smartcontractkit/chainlink-ccip/commit/internal/builder"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/commit/metrics"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
@@ -45,22 +46,22 @@ const (
 	// that assumes estimatedMaxNumberOfSourceChains source chains and
 	// estimatedMaxRmnNodesCount (theoretical max) RMN nodes.
 	// check factory_test for the calculation
-	maxQueryLength = 559_320
+	maxQueryLength = 242_869
 
 	// maxObservationLength is set to the maximum size of an observation
 	// check factory_test for the calculation
-	maxObservationLength = 1_047_206
+	maxObservationLength = 650_307
 
 	// maxOutcomeLength is set to the maximum size of an outcome
 	// check factory_test for the calculation
-	maxOutcomeLength = 1_167_845
+	maxOutcomeLength = 700_620
 
 	// maxReportLength is set to an estimate of a maximum report size
 	// check factory_test for the calculation
 	maxReportLength = 128_2933
 
-	// maxReportCount is set to 1 because the commit plugin only generates one report per round.
-	maxReportCount = 1
+	// maxReportCount is set very high because some chains may require many reports per round.
+	maxReportCount = 1000
 )
 
 type PluginFactory struct {
@@ -69,6 +70,7 @@ type PluginFactory struct {
 	ocrConfig         reader.OCR3ConfigWithMeta
 	commitCodec       cciptypes.CommitPluginCodec
 	msgHasher         cciptypes.MessageHasher
+	addrCodec         cciptypes.AddressCodec
 	homeChainReader   reader.HomeChain
 	homeChainSelector cciptypes.ChainSelector
 	contractReaders   map[cciptypes.ChainSelector]types.ContractReader
@@ -83,6 +85,7 @@ type CommitPluginFactoryParams struct {
 	OcrConfig         reader.OCR3ConfigWithMeta
 	CommitCodec       cciptypes.CommitPluginCodec
 	MsgHasher         cciptypes.MessageHasher
+	AddrCodec         cciptypes.AddressCodec
 	HomeChainReader   reader.HomeChain
 	HomeChainSelector cciptypes.ChainSelector
 	ContractReaders   map[cciptypes.ChainSelector]types.ContractReader
@@ -100,6 +103,7 @@ func NewCommitPluginFactory(params CommitPluginFactoryParams) *PluginFactory {
 		ocrConfig:         params.OcrConfig,
 		commitCodec:       params.CommitCodec,
 		msgHasher:         params.MsgHasher,
+		addrCodec:         params.AddrCodec,
 		homeChainReader:   params.HomeChainReader,
 		homeChainSelector: params.HomeChainSelector,
 		contractReaders:   params.ContractReaders,
@@ -180,6 +184,7 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 		p.chainWriters,
 		p.ocrConfig.Config.ChainSelector,
 		p.ocrConfig.Config.OfframpAddress,
+		p.addrCodec,
 	)
 
 	// The node supports the chain that the token prices are on.
@@ -204,11 +209,21 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 		offchainConfig.TokenInfo,
 		ccipReader,
 		offchainConfig.PriceFeedChainSelector,
+		p.addrCodec,
 	)
 
 	metricsReporter, err := metrics.NewPromReporter(lggr, p.ocrConfig.Config.ChainSelector)
 	if err != nil {
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to create metrics reporter: %w", err)
+	}
+
+	reportBuilder, err := builder.NewReportBuilder(
+		offchainConfig.RMNEnabled,
+		offchainConfig.MaxMerkleRootsPerReport,
+		offchainConfig.MaxPricesPerReport,
+	)
+	if err != nil {
+		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to create report builder: %w", err)
 	}
 
 	return NewPlugin(
@@ -227,6 +242,8 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 			p.rmnPeerClient,
 			config,
 			metricsReporter,
+			p.addrCodec,
+			reportBuilder,
 		), ocr3types.ReportingPluginInfo{
 			Name: "CCIPRoleCommit",
 			Limits: ocr3types.ReportingPluginLimits{

@@ -45,6 +45,7 @@ type Config struct {
 	Owner              ag_solanago.PublicKey
 	ProposedOwner      ag_solanago.PublicKey
 	FeeQuoter          ag_solanago.PublicKey
+	RmnRemote          ag_solanago.PublicKey
 	LinkTokenMint      ag_solanago.PublicKey
 	FeeAggregator      ag_solanago.PublicKey
 }
@@ -84,6 +85,11 @@ func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	}
 	// Serialize `FeeQuoter` param:
 	err = encoder.Encode(obj.FeeQuoter)
+	if err != nil {
+		return err
+	}
+	// Serialize `RmnRemote` param:
+	err = encoder.Encode(obj.RmnRemote)
 	if err != nil {
 		return err
 	}
@@ -141,6 +147,11 @@ func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 	}
 	// Deserialize `FeeQuoter`:
 	err = decoder.Decode(&obj.FeeQuoter)
+	if err != nil {
+		return err
+	}
+	// Deserialize `RmnRemote`:
+	err = decoder.Decode(&obj.RmnRemote)
 	if err != nil {
 		return err
 	}
@@ -279,133 +290,6 @@ func (obj *Nonce) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	}
 	// Deserialize `Counter`:
 	err = decoder.Decode(&obj.Counter)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-type ExternalExecutionConfig struct{}
-
-var ExternalExecutionConfigDiscriminator = [8]byte{159, 157, 150, 212, 168, 103, 117, 39}
-
-func (obj ExternalExecutionConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Write account discriminator:
-	err = encoder.WriteBytes(ExternalExecutionConfigDiscriminator[:], false)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *ExternalExecutionConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Read and check account discriminator:
-	{
-		discriminator, err := decoder.ReadTypeID()
-		if err != nil {
-			return err
-		}
-		if !discriminator.Equal(ExternalExecutionConfigDiscriminator[:]) {
-			return fmt.Errorf(
-				"wrong discriminator: wanted %s, got %s",
-				"[159 157 150 212 168 103 117 39]",
-				fmt.Sprint(discriminator[:]))
-		}
-	}
-	return nil
-}
-
-type TokenAdminRegistry struct {
-	Version              uint8
-	Administrator        ag_solanago.PublicKey
-	PendingAdministrator ag_solanago.PublicKey
-	LookupTable          ag_solanago.PublicKey
-	WritableIndexes      [2]ag_binary.Uint128
-	Mint                 ag_solanago.PublicKey
-}
-
-var TokenAdminRegistryDiscriminator = [8]byte{70, 92, 207, 200, 76, 17, 57, 114}
-
-func (obj TokenAdminRegistry) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Write account discriminator:
-	err = encoder.WriteBytes(TokenAdminRegistryDiscriminator[:], false)
-	if err != nil {
-		return err
-	}
-	// Serialize `Version` param:
-	err = encoder.Encode(obj.Version)
-	if err != nil {
-		return err
-	}
-	// Serialize `Administrator` param:
-	err = encoder.Encode(obj.Administrator)
-	if err != nil {
-		return err
-	}
-	// Serialize `PendingAdministrator` param:
-	err = encoder.Encode(obj.PendingAdministrator)
-	if err != nil {
-		return err
-	}
-	// Serialize `LookupTable` param:
-	err = encoder.Encode(obj.LookupTable)
-	if err != nil {
-		return err
-	}
-	// Serialize `WritableIndexes` param:
-	err = encoder.Encode(obj.WritableIndexes)
-	if err != nil {
-		return err
-	}
-	// Serialize `Mint` param:
-	err = encoder.Encode(obj.Mint)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *TokenAdminRegistry) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Read and check account discriminator:
-	{
-		discriminator, err := decoder.ReadTypeID()
-		if err != nil {
-			return err
-		}
-		if !discriminator.Equal(TokenAdminRegistryDiscriminator[:]) {
-			return fmt.Errorf(
-				"wrong discriminator: wanted %s, got %s",
-				"[70 92 207 200 76 17 57 114]",
-				fmt.Sprint(discriminator[:]))
-		}
-	}
-	// Deserialize `Version`:
-	err = decoder.Decode(&obj.Version)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Administrator`:
-	err = decoder.Decode(&obj.Administrator)
-	if err != nil {
-		return err
-	}
-	// Deserialize `PendingAdministrator`:
-	err = decoder.Decode(&obj.PendingAdministrator)
-	if err != nil {
-		return err
-	}
-	// Deserialize `LookupTable`:
-	err = decoder.Decode(&obj.LookupTable)
-	if err != nil {
-		return err
-	}
-	// Deserialize `WritableIndexes`:
-	err = decoder.Decode(&obj.WritableIndexes)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Mint`:
-	err = decoder.Decode(&obj.Mint)
 	if err != nil {
 		return err
 	}

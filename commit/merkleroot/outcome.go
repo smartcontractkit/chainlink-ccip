@@ -15,15 +15,14 @@ import (
 	rmnpb "github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
-	typconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
-
-	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
+
+const SendingOutcome = "Sending Outcome"
 
 // Outcome depending on the current state, either:
 // - chooses the seq num ranges for the next round
@@ -45,7 +44,7 @@ func (p *Processor) Outcome(
 		return Outcome{}, err
 	}
 
-	lggr.Infow("Sending Outcome",
+	lggr.Infow(SendingOutcome,
 		"outcome", outcome, "nextState", nextState, "outcomeDuration", time.Since(tStart))
 	return outcome, nil
 }
@@ -76,13 +75,20 @@ func (p *Processor) getOutcome(
 			return previousOutcome, buildingReport, nil
 		}
 
+		rmnSigs := rmn.ReportSignatures{}
+		if q.RMNSignatures != nil {
+			rmnSigs = *q.RMNSignatures
+		}
+
 		merkleRootsOutcome, err := buildMerkleRootsOutcome(
-			q, p.offchainCfg.RMNEnabled, lggr, consObservation, previousOutcome)
+			rmnSigs, p.offchainCfg.RMNEnabled, lggr, consObservation, previousOutcome, p.addressCodec)
 
 		return merkleRootsOutcome, nextState, err
 	case waitingForReportTransmission:
-		return checkForReportTransmission(
-			lggr, p.offchainCfg.MaxReportTransmissionCheckAttempts, previousOutcome, consObservation), nextState, nil
+		attempts := p.offchainCfg.MaxReportTransmissionCheckAttempts
+		multipleReports := p.offchainCfg.MultipleReportsEnabled
+		outcome := checkForReportTransmission(lggr, attempts, multipleReports, previousOutcome, consObservation)
+		return outcome, nextState, nil
 	default:
 		return Outcome{}, nextState, fmt.Errorf("unexpected next state in Outcome: %v", nextState)
 	}
@@ -145,11 +151,16 @@ func reportRangesOutcome(
 		return offRampNextSeqNums[i].ChainSel < offRampNextSeqNums[j].ChainSel
 	})
 
-	var rmnRemoteConfig rmntypes.RemoteConfig
+	var rmnRemoteConfig cciptypes.RemoteConfig
 	if observedRMNRemoteConfig[dstChain].IsEmpty() {
 		lggr.Warn("RMNRemoteConfig is empty")
 	} else {
 		rmnRemoteConfig = observedRMNRemoteConfig[dstChain]
+	}
+
+	if len(rangesToReport) == 0 {
+		lggr.Info("No ranges to report, outcomeType is ReportEmpty")
+		return Outcome{OutcomeType: ReportEmpty}
 	}
 
 	outcome := Outcome{
@@ -165,11 +176,12 @@ func reportRangesOutcome(
 // buildMerkleRootsOutcome is given a set of agreed observed merkle roots and RMN signatures
 // and construct a merkleRoots outcome.
 func buildMerkleRootsOutcome(
-	q Query,
+	rmnSigs rmn.ReportSignatures,
 	rmnEnabled bool,
 	lggr logger.Logger,
 	consensusObservation consensusObservation,
 	prevOutcome Outcome,
+	addressCodec cciptypes.AddressCodec,
 ) (Outcome, error) {
 	roots := maps.Values(consensusObservation.MerkleRoots)
 
@@ -182,7 +194,7 @@ func buildMerkleRootsOutcome(
 		"rmnEnabled", rmnEnabled,
 		"rmnEnabledChains", consensusObservation.RMNEnabledChains,
 		"roots", roots,
-		"rmnSignatures", q.RMNSignatures)
+		"rmnSignatures", rmnSigs)
 
 	sort.Slice(roots, func(i, j int) bool { return roots[i].ChainSel < roots[j].ChainSel })
 
@@ -190,17 +202,13 @@ func buildMerkleRootsOutcome(
 	var err error
 
 	if len(roots) > 0 && rmnEnabled {
-		if q.RMNSignatures == nil {
-			return Outcome{}, fmt.Errorf("RMN signatures are nil while RMN is enabled")
-		}
-
-		sigs, err = rmn.NewECDSASigsFromPB(q.RMNSignatures.Signatures)
+		sigs, err = rmn.NewECDSASigsFromPB(rmnSigs.Signatures)
 		if err != nil {
 			return Outcome{}, fmt.Errorf("failed to parse RMN signatures: %w", err)
 		}
 
 		roots = filterRootsBasedOnRmnSigs(
-			lggr, q.RMNSignatures.LaneUpdates, roots, consensusObservation.RMNEnabledChains)
+			lggr, rmnSigs.LaneUpdates, roots, consensusObservation.RMNEnabledChains, addressCodec)
 	}
 
 	outcome := Outcome{
@@ -216,60 +224,119 @@ func buildMerkleRootsOutcome(
 }
 
 // filterRootsBasedOnRmnSigs filters the roots to only include the ones that are either:
-// 1) RMN-enabled and have RMN signatures
-// 2) RMN-disabled and do not have RMN signatures
+// 1) RMN-enabled and roots exist for all the roots that are included in the RMN signature.
+// 2) RMN-disabled and we do not have RMN signatures
 func filterRootsBasedOnRmnSigs(
 	lggr logger.Logger,
 	signedLaneUpdates []*rmnpb.FixedDestLaneUpdate,
-	roots []cciptypes.MerkleRootChain,
+	proposedRoots []cciptypes.MerkleRootChain,
 	rmnEnabledChains map[cciptypes.ChainSelector]bool,
+	addressCodec cciptypes.AddressCodec,
 ) []cciptypes.MerkleRootChain {
-	// Create a set of signed roots for quick lookup.
+	signedRoots, err := computeSignedRootsSet(lggr, signedLaneUpdates, addressCodec)
+	if err != nil {
+		lggr.Errorw("failed to compute signed roots set, skipping RMN-enabled roots", "err", err)
+		// we don't return since we still want to make progress with the non-RMN related roots (RMN disabled chains)
+	}
+	lggr.Debugw("computed signed roots set", "signedRoots", signedRoots.ToSlice())
+
+	// If at least ONE root that is signed is not proposed
+	// then we cannot make progress with ANY of the existing signed roots
+	// since the signature will be invalid
+	proposedRootsSet := mapset.NewSet[rootKey]()
+	for _, root := range proposedRoots {
+		addrStr, err := addressCodec.AddressBytesToString(root.OnRampAddress, root.ChainSel)
+		if err != nil {
+			lggr.Errorw("convert proposed root OnRamp address to string to build a set", "root", root, "err", err)
+			continue
+		}
+		proposedRootsSet.Add(rootKey{
+			ChainSel:      root.ChainSel,
+			SeqNumsRange:  root.SeqNumsRange,
+			MerkleRoot:    root.MerkleRoot,
+			OnRampAddress: addrStr,
+		})
+	}
+	if !signedRoots.IsSubset(proposedRootsSet) {
+		lggr.Errorw("signed roots are not a subset of proposed roots, skipping RMN-enabled roots",
+			"proposedRoots", proposedRootsSet.ToSlice(), "signedRoots", signedRoots.ToSlice())
+		// clear signed roots, so we can make progress with the non-signed roots below
+		signedRoots = mapset.NewSet[rootKey]()
+	}
+
+	validRoots := filterValidRoots(lggr, proposedRoots, signedRoots, addressCodec, rmnEnabledChains)
+	return validRoots
+}
+
+// computeSignedRootsSet generates a set of signed roots based on the provided signed lane updates.
+func computeSignedRootsSet(
+	lggr logger.Logger,
+	signedLaneUpdates []*rmnpb.FixedDestLaneUpdate,
+	addressCodec cciptypes.AddressCodec,
+) (mapset.Set[rootKey], error) {
 	signedRoots := mapset.NewSet[rootKey]()
 	for _, laneUpdate := range signedLaneUpdates {
+		addrStr, err := addressCodec.AddressBytesToString(
+			laneUpdate.LaneSource.OnrampAddress,
+			cciptypes.ChainSelector(laneUpdate.LaneSource.SourceChainSelector),
+		)
+		if err != nil {
+			return mapset.NewSet[rootKey](), fmt.Errorf("convert address to string %v : %w", laneUpdate.LaneSource, err)
+		}
+
 		rk := rootKey{
 			ChainSel: cciptypes.ChainSelector(laneUpdate.LaneSource.SourceChainSelector),
 			SeqNumsRange: cciptypes.NewSeqNumRange(
 				cciptypes.SeqNum(laneUpdate.ClosedInterval.MinMsgNr),
 				cciptypes.SeqNum(laneUpdate.ClosedInterval.MaxMsgNr),
 			),
-			MerkleRoot: cciptypes.Bytes32(laneUpdate.Root),
-			// NOTE: convert address into a comparable value for mapset.
-			OnRampAddress: typconv.AddressBytesToString(
-				laneUpdate.LaneSource.OnrampAddress,
-				laneUpdate.LaneSource.SourceChainSelector),
+			MerkleRoot:    cciptypes.Bytes32(laneUpdate.Root),
+			OnRampAddress: addrStr,
 		}
-		lggr.Infow("Found signed root", "root", rk)
+
+		lggr.Debugw("found signed root", "root", rk)
 		signedRoots.Add(rk)
 	}
 
+	return signedRoots, nil
+}
+
+// filterValidRoots filters the roots based on the RMN-enabled chains and signed roots and returns the ones that
+// are valid to proceed with. Valid roots are either:
+// 1) RMN-enabled and signed
+// 2) RMN-disabled and not signed
+func filterValidRoots(
+	lggr logger.Logger,
+	proposedRoots []cciptypes.MerkleRootChain,
+	signedRoots mapset.Set[rootKey],
+	addressCodec cciptypes.AddressCodec,
+	rmnEnabledChains map[cciptypes.ChainSelector]bool,
+) []cciptypes.MerkleRootChain {
 	validRoots := make([]cciptypes.MerkleRootChain, 0)
-	for _, root := range roots {
+	for _, root := range proposedRoots {
+		addrStr, err := addressCodec.AddressBytesToString(root.OnRampAddress, root.ChainSel)
+		if err != nil {
+			lggr.Errorw("convert proposed root OnRamp address to string to check root", "root", root, "err", err)
+			continue
+		}
 		rk := rootKey{
 			ChainSel:      root.ChainSel,
 			SeqNumsRange:  root.SeqNumsRange,
 			MerkleRoot:    root.MerkleRoot,
-			OnRampAddress: typconv.AddressBytesToString(root.OnRampAddress, uint64(root.ChainSel)),
+			OnRampAddress: addrStr,
 		}
 
-		rootIsSignedAndRmnEnabled := signedRoots.Contains(rk) &&
-			rmnEnabledChains[root.ChainSel]
+		rootIsSignedAndRmnEnabled := signedRoots.Contains(rk) && rmnEnabledChains[root.ChainSel]
+		rootNotSignedAndRmnDisabled := !signedRoots.Contains(rk) && !rmnEnabledChains[root.ChainSel]
+		rootIsValid := rootIsSignedAndRmnEnabled || rootNotSignedAndRmnDisabled
+		lggr2 := logger.With(lggr,
+			"root", rk, "isSigned", signedRoots.Contains(rk), "rmnEnabled", rmnEnabledChains[root.ChainSel])
 
-		rootNotSignedButRmnDisabled := !signedRoots.Contains(rk) &&
-			!rmnEnabledChains[root.ChainSel]
-
-		if rootIsSignedAndRmnEnabled || rootNotSignedButRmnDisabled {
-			lggr.Infow("Adding root to the report",
-				"root", rk,
-				"rootIsSignedAndRmnEnabled", rootIsSignedAndRmnEnabled,
-				"rootNotSignedButRmnDisabled", rootNotSignedButRmnDisabled)
+		if rootIsValid {
+			lggr2.Infow("root valid, added to the results")
 			validRoots = append(validRoots, root)
 		} else {
-			lggr.Infow("Root invalid, skipping from the report",
-				"root", rk,
-				"rootIsSignedAndRmnEnabled", rootIsSignedAndRmnEnabled,
-				"rootNotSignedButRmnDisabled", rootNotSignedButRmnDisabled,
-			)
+			lggr2.Infow("root invalid, skipping")
 		}
 	}
 
@@ -293,15 +360,28 @@ type rootKey struct {
 func checkForReportTransmission(
 	lggr logger.Logger,
 	maxReportTransmissionCheckAttempts uint,
+	multipleReports bool,
 	previousOutcome Outcome,
 	consensusObservation consensusObservation,
 ) Outcome {
-	offRampUpdated := false
+	// Check that all sources have been updates using a set initialized from the previous outcome.
+	// Check that all have been updated in case there were multiple reports generated in the previous round.
+	pendingSources := make(map[cciptypes.ChainSelector]struct{})
+	for _, root := range previousOutcome.RootsToReport {
+		pendingSources[root.ChainSel] = struct{}{}
+	}
+
 	for _, previousSeqNumChain := range previousOutcome.OffRampNextSeqNums {
 		if currentSeqNum, exists := consensusObservation.OffRampNextSeqNums[previousSeqNumChain.ChainSel]; exists {
 			if previousSeqNumChain.SeqNum < currentSeqNum {
-				offRampUpdated = true
-				break
+				// if there is only one report, any single update means the report has been transmitted.
+				if !multipleReports {
+					return Outcome{
+						OutcomeType: ReportTransmitted,
+					}
+				}
+
+				delete(pendingSources, previousSeqNumChain.ChainSel)
 			}
 
 			if previousSeqNumChain.SeqNum > currentSeqNum {
@@ -315,7 +395,8 @@ func checkForReportTransmission(
 		}
 	}
 
-	if offRampUpdated {
+	// All pending sources have been updated, we can move to the next state.
+	if len(pendingSources) == 0 {
 		return Outcome{
 			OutcomeType: ReportTransmitted,
 		}
@@ -332,6 +413,9 @@ func checkForReportTransmission(
 		OutcomeType:                     ReportInFlight,
 		OffRampNextSeqNums:              previousOutcome.OffRampNextSeqNums,
 		ReportTransmissionCheckAttempts: previousOutcome.ReportTransmissionCheckAttempts + 1,
+		// Carry over the previous roots since they're still in-flight.
+		// We won't re-report since outcome type is ReportInFlight.
+		RootsToReport: previousOutcome.RootsToReport,
 	}
 }
 
@@ -358,19 +442,25 @@ func getConsensusObservation(
 	}
 
 	// convert aggObs.RMNRemoteConfigs to a map of RMNRemoteConfigs
-	rmnRemoteConfigs := map[cciptypes.ChainSelector][]rmntypes.RemoteConfig{destChain: aggObs.RMNRemoteConfigs}
+	rmnRemoteConfigs := map[cciptypes.ChainSelector][]cciptypes.RemoteConfig{destChain: aggObs.RMNRemoteConfigs}
 
 	// Get consensus using strict 2fChain+1 threshold.
 	twoFChainPlus1 := consensus.MakeMultiThreshold(fChains, consensus.TwoFPlus1)
+	fChain := consensus.MakeMultiThreshold(fChains, consensus.F)
+
 	consensusObs := consensusObservation{
 		MerkleRoots:      consensus.GetConsensusMap(lggr, "Merkle Root", aggObs.MerkleRoots, twoFChainPlus1),
 		RMNEnabledChains: consensus.GetConsensusMap(lggr, "RMNEnabledChains", aggObs.RMNEnabledChains, twoFChainPlus1),
-		OnRampMaxSeqNums: consensus.GetConsensusMap(lggr, "OnRamp Max Seq Nums", aggObs.OnRampMaxSeqNums, twoFChainPlus1),
-		OffRampNextSeqNums: consensus.GetConsensusMap(
+		OnRampMaxSeqNums: consensus.GetOrderedConsensus(
+			lggr,
+			"OnRamp Max Seq Nums",
+			aggObs.OnRampMaxSeqNums,
+			fChain),
+		OffRampNextSeqNums: consensus.GetOrderedConsensus(
 			lggr,
 			"OffRamp Next Seq Nums",
 			aggObs.OffRampNextSeqNums,
-			twoFChainPlus1),
+			fChain),
 		RMNRemoteConfig: consensus.GetConsensusMap(lggr, "RMNRemote cfg", rmnRemoteConfigs, twoFChainPlus1),
 		FChain:          fChains,
 	}

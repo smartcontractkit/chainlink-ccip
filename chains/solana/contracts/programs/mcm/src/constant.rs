@@ -6,7 +6,7 @@ pub const NUM_GROUPS: usize = 32; // maximum number of signer groups supported
 pub const MULTISIG_ID_PADDED: usize = 32;
 
 // PDA seeds
-// Note: These seeds are not full seed, for unique seeds per instance, multisi_id should be appended
+// Note: These seeds are not full seed, for unique seeds per instance, multisig_id should be appended
 pub const SIGNER_SEED: &[u8] = b"multisig_signer"; // seed for dataless pda signing CPI
 pub const CONFIG_SEED: &[u8] = b"multisig_config";
 pub const CONFIG_SIGNERS_SEED: &[u8] = b"multisig_config_signers";
@@ -18,7 +18,3 @@ pub const SEEN_SIGNED_HASHES_SEED: &[u8] = b"seen_signed_hashes";
 
 // Fixed sizes in bytes
 pub const ANCHOR_DISCRIMINATOR: usize = 8;
-pub const U8: usize = 1;
-pub const U64: usize = 8;
-pub const VEC_PREFIX: usize = 4;
-pub const STRING_PREFIX: usize = 4;

@@ -2,10 +2,11 @@ use anchor_lang::prelude::*;
 use anchor_spl::associated_token::get_associated_token_address_with_program_id;
 use anchor_spl::token::spl_token::native_mint;
 use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
+use ccip_common::seed;
 
 use crate::program::CcipRouter;
 use crate::state::{Config, Nonce};
-use crate::{CcipRouterError, DestChain, DestChainConfig, ExternalExecutionConfig, SVM2AnyMessage};
+use crate::{CcipRouterError, DestChain, DestChainConfig, SVM2AnyMessage};
 
 /// Static space allocated to any account: must always be added to space calculations.
 pub const ANCHOR_DISCRIMINATOR: usize = 8;
@@ -22,25 +23,6 @@ pub const fn valid_version(v: u8, max_version: u8) -> bool {
 
 pub const fn uninitialized(v: u8) -> bool {
     v == 0
-}
-
-/// Fixed seeds for PDA derivation: different context must use different seeds.
-pub mod seed {
-    pub const DEST_CHAIN_STATE: &[u8] = b"dest_chain_state";
-    pub const NONCE: &[u8] = b"nonce";
-    pub const CONFIG: &[u8] = b"config";
-    pub const ALLOWED_OFFRAMP: &[u8] = b"allowed_offramp";
-
-    // token pool interaction signer
-    pub const EXTERNAL_TOKEN_POOL: &[u8] = b"external_token_pools_signer";
-    // signer for billing fee token transfer
-    pub const FEE_BILLING_SIGNER: &[u8] = b"fee_billing_signer";
-
-    // token specific
-    pub const TOKEN_ADMIN_REGISTRY: &[u8] = b"token_admin_registry";
-    pub const CCIP_TOKENPOOL_CONFIG: &[u8] = b"ccip_tokenpool_config";
-    pub const CCIP_TOKENPOOL_SIGNER: &[u8] = b"ccip_tokenpool_signer";
-    pub const TOKEN_POOL_CONFIG: &[u8] = b"ccip_tokenpool_chainconfig";
 }
 
 #[derive(Accounts)]
@@ -107,15 +89,6 @@ pub struct InitializeCCIPRouter<'info> {
     // Initialization only allowed by program upgrade authority
     #[account(constraint = program_data.upgrade_authority_address == Some(authority.key()) @ CcipRouterError::Unauthorized)]
     pub program_data: Account<'info, ProgramData>,
-
-    #[account(
-        init,
-        seeds = [seed::EXTERNAL_TOKEN_POOL],
-        bump,
-        payer = authority,
-        space = ANCHOR_DISCRIMINATOR + ExternalExecutionConfig::INIT_SPACE,
-    )]
-    pub token_pools_signer: Account<'info, ExternalExecutionConfig>, // token pool CPI signer initialization
 }
 
 #[derive(Accounts)]
@@ -198,6 +171,29 @@ pub struct UpdateDestChainSelectorConfig<'info> {
     #[account(mut, address = config.owner @ CcipRouterError::Unauthorized)]
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(new_chain_selector: u64)]
+// Similar to `UpdateDestChainSelectorConfig` but with no realloc
+pub struct UpdateDestChainSelectorConfigNoRealloc<'info> {
+    #[account(
+        mut,
+        seeds = [seed::DEST_CHAIN_STATE, new_chain_selector.to_le_bytes().as_ref()],
+        bump,
+        constraint = valid_version(dest_chain_state.version, MAX_CHAINSTATE_V) @ CcipRouterError::InvalidVersion,
+    )]
+    pub dest_chain_state: Account<'info, DestChain>,
+
+    #[account(
+        seeds = [seed::CONFIG],
+        bump,
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
+    )]
+    pub config: Account<'info, Config>,
+
+    #[account(mut, address = config.owner @ CcipRouterError::Unauthorized)]
+    pub authority: Signer<'info>,
 }
 
 #[derive(Accounts)]
@@ -355,7 +351,7 @@ pub struct CcipSend<'info> {
 
     /// CHECK: This account is just used in the CPI to the Fee Quoter program
     #[account(
-        seeds = [fee_quoter::context::seed::CONFIG],
+        seeds = [seed::CONFIG],
         bump,
         seeds::program = config.fee_quoter,
     )]
@@ -363,7 +359,7 @@ pub struct CcipSend<'info> {
 
     /// CHECK: This account is just used in the CPI to the Fee Quoter program
     #[account(
-        seeds = [fee_quoter::context::seed::DEST_CHAIN, destination_chain_selector.to_le_bytes().as_ref()],
+        seeds = [seed::DEST_CHAIN, destination_chain_selector.to_le_bytes().as_ref()],
         bump,
         seeds::program = config.fee_quoter,
     )]
@@ -371,7 +367,7 @@ pub struct CcipSend<'info> {
 
     /// CHECK: This account is just used in the CPI to the Fee Quoter program
     #[account(
-        seeds = [fee_quoter::context::seed::FEE_BILLING_TOKEN_CONFIG,
+        seeds = [seed::FEE_BILLING_TOKEN_CONFIG,
             if message.fee_token == Pubkey::default() {
                 native_mint::ID.as_ref() // pre-2022 WSOL
             } else {
@@ -385,7 +381,7 @@ pub struct CcipSend<'info> {
 
     /// CHECK: This account is just used in the CPI to the Fee Quoter program
     #[account(
-        seeds = [fee_quoter::context::seed::FEE_BILLING_TOKEN_CONFIG,
+        seeds = [seed::FEE_BILLING_TOKEN_CONFIG,
             config.link_token_mint.key().as_ref(),
         ],
         bump,
@@ -393,10 +389,31 @@ pub struct CcipSend<'info> {
     )]
     pub fee_quoter_link_token_config: UncheckedAccount<'info>,
 
-    /// CPI signers, optional if no tokens are being transferred.
-    /// CHECK: Using this to sign.
-    #[account(mut, seeds = [seed::EXTERNAL_TOKEN_POOL], bump)]
-    pub token_pools_signer: Account<'info, ExternalExecutionConfig>,
+    ////////////////////
+    // RMN Remote CPI //
+    ////////////////////
+    /// CHECK: This is the account for the RMN Remote program
+    #[account(
+        address = config.rmn_remote @ CcipRouterError::InvalidRMNRemoteAddress,
+    )]
+    pub rmn_remote: UncheckedAccount<'info>,
+
+    /// CHECK: This account is just used in the CPI to the RMN Remote program
+    #[account(
+        seeds = [seed::CURSES],
+        bump,
+        seeds::program = config.rmn_remote,
+    )]
+    pub rmn_remote_curses: UncheckedAccount<'info>,
+
+    /// CHECK: This account is just used in the CPI to the RMN Remote program
+    #[account(
+        seeds = [seed::CONFIG],
+        bump,
+        seeds::program = config.rmn_remote,
+    )]
+    pub rmn_remote_config: UncheckedAccount<'info>,
+    //
     // remaining accounts (not explicitly listed)
     // [
     // user/sender token account (must be associated token account - derivable PDA [wallet_addr, token_program, mint])
@@ -410,6 +427,79 @@ pub struct CcipSend<'info> {
     // pool signer
     // token program
     // token mint
+    // ccip_router_pools_signer - derivable PDA [seed::EXTERNAL_TOKEN_POOL, pool_program]
     // ...additional accounts for pool config
     // ] x N tokens
+}
+
+#[derive(Accounts)]
+#[instruction(destination_chain_selector: u64, message: SVM2AnyMessage)]
+pub struct GetFee<'info> {
+    #[account(
+        seeds = [seed::CONFIG],
+        bump,
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
+    )]
+    pub config: Account<'info, Config>,
+
+    // Only used to retrieve the lane version to select the correct program version.
+    #[account(
+        seeds = [seed::DEST_CHAIN_STATE, destination_chain_selector.to_le_bytes().as_ref()],
+        bump,
+        constraint = valid_version(dest_chain_state.version, MAX_CHAINSTATE_V) @ CcipRouterError::InvalidVersion,
+    )]
+    pub dest_chain_state: Account<'info, DestChain>,
+
+    ////////////////////
+    // fee quoter CPI //
+    ////////////////////
+    /// CHECK: This is the account for the Fee Quoter program
+    #[account(
+        address = config.fee_quoter @ CcipRouterError::InvalidVersion,
+    )]
+    pub fee_quoter: UncheckedAccount<'info>,
+
+    /// CHECK: This account is just used in the CPI to the Fee Quoter program
+    #[account(
+        seeds = [seed::CONFIG],
+        bump,
+        seeds::program = config.fee_quoter,
+    )]
+    pub fee_quoter_config: UncheckedAccount<'info>,
+
+    /// CHECK: This account is just used in the CPI to the Fee Quoter program
+    #[account(
+        seeds = [seed::DEST_CHAIN, destination_chain_selector.to_le_bytes().as_ref()],
+        bump,
+        seeds::program = config.fee_quoter,
+    )]
+    pub fee_quoter_dest_chain: UncheckedAccount<'info>,
+
+    /// CHECK: This account is just used in the CPI to the Fee Quoter program
+    #[account(
+        seeds = [seed::FEE_BILLING_TOKEN_CONFIG,
+            if message.fee_token == Pubkey::default() {
+                native_mint::ID.as_ref() // pre-2022 WSOL
+            } else {
+                message.fee_token.as_ref()
+            },
+        ],
+        bump,
+        seeds::program = config.fee_quoter,
+    )]
+    pub fee_quoter_billing_token_config: UncheckedAccount<'info>,
+
+    /// CHECK: This account is just used in the CPI to the Fee Quoter program
+    #[account(
+        seeds = [seed::FEE_BILLING_TOKEN_CONFIG,
+            config.link_token_mint.key().as_ref(),
+        ],
+        bump,
+        seeds::program = config.fee_quoter,
+    )]
+    pub fee_quoter_link_token_config: UncheckedAccount<'info>,
+    //
+    // remaining_accounts:
+    // - First all BillingTokenConfigWrapper accounts (one per token transferred)
+    // - Then all PerChainPerTokenConfig accounts (one per token transferred)
 }

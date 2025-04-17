@@ -30,7 +30,7 @@ func TestCcipReceiver(t *testing.T) {
 	// invalid receiver here acts as a "dumb" offramp
 	test_ccip_invalid_receiver.SetProgramID(config.CcipInvalidReceiverProgram)
 	dumbOfframp := config.CcipInvalidReceiverProgram
-	dumbOfframpSignerPDA, _, _ := state.FindExternalExecutionConfigPDA(dumbOfframp)
+	dumbOfframpSignerPDA, _, _ := state.FindExternalExecutionConfigPDA(config.CcipBaseReceiver, dumbOfframp)
 
 	tokenAdmin, _, err := solana.FindProgramAddress([][]byte{[]byte("receiver_token_admin")}, config.CcipBaseReceiver)
 	require.NoError(t, err)
@@ -72,12 +72,12 @@ func TestCcipReceiver(t *testing.T) {
 				feeAggregator.PublicKey(),
 				config.FeeQuoterProgram,
 				linkTokenMint.PublicKey(),
+				config.RMNRemoteProgram,
 				config.RouterConfigPDA,
 				ccipAdmin.PublicKey(),
 				solana.SystemProgramID,
 				config.CcipRouterProgram,
 				programData.Address,
-				config.ExternalTokenPoolsSignerPDA,
 			).ValidateAndBuild()
 			require.NoError(t, err)
 			testutils.SendAndConfirm(ctx, t, solClient, []solana.Instruction{ix}, ccipAdmin, rpc.CommitmentConfirmed)
@@ -145,15 +145,18 @@ func TestCcipReceiver(t *testing.T) {
 			approvedSenderPDA, err := state.FindApprovedSender(config.EvmChainSelector, []byte{1, 2, 3}, config.CcipBaseReceiver)
 			require.NoError(t, err)
 
-			ix, err := test_ccip_invalid_receiver.NewReceiverProxyExecuteInstruction(
+			raw := test_ccip_invalid_receiver.NewReceiverProxyExecuteInstruction(
 				test_ccip_invalid_receiver.Any2SVMMessage{SourceChainSelector: config.EvmChainSelector, Sender: []byte{1, 2, 3}},
 				config.CcipBaseReceiver,
 				dumbOfframpSignerPDA,
 				dumbOfframp,
 				allowedOfframpPDA,
-				approvedSenderPDA,
-				receiverState,
-			).ValidateAndBuild()
+			)
+
+			raw.AccountMetaSlice.Append(solana.Meta(approvedSenderPDA))
+			raw.AccountMetaSlice.Append(solana.Meta(receiverState))
+
+			ix, err := raw.ValidateAndBuild()
 			require.NoError(t, err)
 			testutils.SendAndConfirm(ctx, t, solClient, []solana.Instruction{ix}, transmitter, rpc.CommitmentConfirmed)
 		})
@@ -188,7 +191,7 @@ func TestCcipReceiver(t *testing.T) {
 						receiverState,
 					).ValidateAndBuild()
 					require.NoError(t, err)
-					testutils.SendAndFailWith(ctx, t, solClient, []solana.Instruction{ix}, transmitter, rpc.CommitmentConfirmed, []string{"ConstraintSeeds"})
+					testutils.SendAndFailWith(ctx, t, solClient, []solana.Instruction{ix}, transmitter, rpc.CommitmentConfirmed, []string{"Error Code: " + common.ConstraintSeeds_AnchorError.String()})
 				})
 			}
 		})
@@ -198,18 +201,22 @@ func TestCcipReceiver(t *testing.T) {
 			approvedSenderPDA, err := state.FindApprovedSender(config.SvmChainSelector, []byte{1, 2, 3}, config.CcipBaseReceiver)
 			require.NoError(t, err)
 
-			ix, err := test_ccip_invalid_receiver.NewReceiverProxyExecuteInstruction(
+			raw := test_ccip_invalid_receiver.NewReceiverProxyExecuteInstruction(
 				// sending from Svm instead of Evm. The offramp is not approved as such for that chain
 				test_ccip_invalid_receiver.Any2SVMMessage{SourceChainSelector: config.SvmChainSelector, Sender: []byte{1, 2, 3}},
 				config.CcipBaseReceiver,
 				dumbOfframpSignerPDA,
 				dumbOfframp,
 				allowedOfframpPDA,
-				approvedSenderPDA,
-				receiverState,
-			).ValidateAndBuild()
+			)
+
+			raw.AccountMetaSlice.Append(solana.Meta(approvedSenderPDA))
+			raw.AccountMetaSlice.Append(solana.Meta(receiverState))
+
+			ix, err := raw.ValidateAndBuild()
+
 			require.NoError(t, err)
-			testutils.SendAndFailWith(ctx, t, solClient, []solana.Instruction{ix}, transmitter, rpc.CommitmentConfirmed, []string{"AccountNotInitialized"})
+			testutils.SendAndFailWith(ctx, t, solClient, []solana.Instruction{ix}, transmitter, rpc.CommitmentConfirmed, []string{"Error Code: " + common.AccountNotInitialized_AnchorError.String()})
 		})
 
 		t.Run("invalid sender", func(t *testing.T) {
@@ -217,17 +224,21 @@ func TestCcipReceiver(t *testing.T) {
 			approvedSenderPDA, err := state.FindApprovedSender(config.EvmChainSelector, []byte{3, 4, 5}, config.CcipBaseReceiver)
 			require.NoError(t, err)
 
-			ix, err := test_ccip_invalid_receiver.NewReceiverProxyExecuteInstruction(
+			raw := test_ccip_invalid_receiver.NewReceiverProxyExecuteInstruction(
 				test_ccip_invalid_receiver.Any2SVMMessage{SourceChainSelector: config.EvmChainSelector, Sender: []byte{3, 4, 5}},
 				config.CcipBaseReceiver,
 				dumbOfframpSignerPDA,
 				dumbOfframp,
 				allowedOfframpPDA,
-				approvedSenderPDA,
-				receiverState,
-			).ValidateAndBuild()
+			)
+
+			raw.AccountMetaSlice.Append(solana.Meta(approvedSenderPDA))
+			raw.AccountMetaSlice.Append(solana.Meta(receiverState))
+
+			ix, err := raw.ValidateAndBuild()
+
 			require.NoError(t, err)
-			testutils.SendAndFailWith(ctx, t, solClient, []solana.Instruction{ix}, transmitter, rpc.CommitmentConfirmed, []string{"AccountNotInitialized"})
+			testutils.SendAndFailWith(ctx, t, solClient, []solana.Instruction{ix}, transmitter, rpc.CommitmentConfirmed, []string{"Error Code: " + common.AccountNotInitialized_AnchorError.String()})
 		})
 	})
 
@@ -235,21 +246,21 @@ func TestCcipReceiver(t *testing.T) {
 		// use token pool for address derivation & state management
 		mint := solana.MustPrivateKeyFromBase58("4dD1x6rv1uLHKWCrYBY9WYa781YgNQGocVpqrS1EzfDQAq9TK4Vdyju6eLXicoSmjiGU9uZ9ExJHmC5GzwGoQUWD")
 		require.NoError(t, err)
-		token, err := tokens.NewTokenPool(solana.TokenProgramID, config.CcipTokenPoolProgram, mint)
+		token, err := tokens.NewTokenPool(solana.TokenProgramID, config.CcipTokenPoolProgram, mint.PublicKey())
 		require.NoError(t, err)
 
-		ixs, ixErr := tokens.CreateToken(ctx, token.Program, token.Mint.PublicKey(), ccipAdmin.PublicKey(), 0, solClient, rpc.CommitmentConfirmed)
+		ixs, ixErr := tokens.CreateToken(ctx, token.Program, token.Mint, ccipAdmin.PublicKey(), 0, solClient, rpc.CommitmentConfirmed)
 		require.NoError(t, ixErr)
 
-		ixAta, tokenAdminATA, err := tokens.CreateAssociatedTokenAccount(token.Program, token.Mint.PublicKey(), tokenAdmin, ccipAdmin.PublicKey())
+		ixAta, tokenAdminATA, err := tokens.CreateAssociatedTokenAccount(token.Program, token.Mint, tokenAdmin, ccipAdmin.PublicKey())
 		require.NoError(t, err)
-		ixAtaOwner, ccipAdminATA, err := tokens.CreateAssociatedTokenAccount(token.Program, token.Mint.PublicKey(), ccipAdmin.PublicKey(), ccipAdmin.PublicKey())
+		ixAtaOwner, ccipAdminATA, err := tokens.CreateAssociatedTokenAccount(token.Program, token.Mint, ccipAdmin.PublicKey(), ccipAdmin.PublicKey())
 		require.NoError(t, err)
 
-		ixMintTo, mintErr := tokens.MintTo(123, token.Program, token.Mint.PublicKey(), tokenAdminATA, ccipAdmin.PublicKey())
+		ixMintTo, mintErr := tokens.MintTo(123, token.Program, token.Mint, tokenAdminATA, ccipAdmin.PublicKey())
 		require.NoError(t, mintErr)
 
-		testutils.SendAndConfirm(ctx, t, solClient, append(ixs, ixAta, ixAtaOwner, ixMintTo), ccipAdmin, rpc.CommitmentConfirmed, common.AddSigners(token.Mint))
+		testutils.SendAndConfirm(ctx, t, solClient, append(ixs, ixAta, ixAtaOwner, ixMintTo), ccipAdmin, rpc.CommitmentConfirmed, common.AddSigners(mint))
 
 		// withdraw
 		_, initBal, err := tokens.TokenBalance(ctx, solClient, tokenAdminATA, rpc.CommitmentConfirmed)
@@ -259,7 +270,7 @@ func TestCcipReceiver(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 0, initBalOwner)
 
-		ix, err := ccip_receiver.NewWithdrawTokensInstruction(123, 0, receiverState, tokenAdminATA, ccipAdminATA, token.Mint.PublicKey(), token.Program, tokenAdmin, user.PublicKey()).ValidateAndBuild()
+		ix, err := ccip_receiver.NewWithdrawTokensInstruction(123, 0, receiverState, tokenAdminATA, ccipAdminATA, token.Mint, token.Program, tokenAdmin, user.PublicKey()).ValidateAndBuild()
 		require.NoError(t, err)
 		testutils.SendAndConfirm(ctx, t, solClient, []solana.Instruction{ix}, user, rpc.CommitmentConfirmed)
 

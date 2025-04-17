@@ -237,11 +237,32 @@ func (obj *MerkleRoot) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 	return nil
 }
 
+type ConfigOcrPluginType struct {
+	Discriminant uint8
+}
+
+func (obj ConfigOcrPluginType) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Discriminant` param:
+	err = encoder.Encode(obj.Discriminant)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *ConfigOcrPluginType) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Discriminant`:
+	err = decoder.Decode(&obj.Discriminant)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 type ExecutionReportSingleChain struct {
 	SourceChainSelector uint64
 	Message             Any2SVMRampMessage
 	OffchainTokenData   [][]byte
-	Root                [32]uint8
 	Proofs              [][32]uint8
 }
 
@@ -258,11 +279,6 @@ func (obj ExecutionReportSingleChain) MarshalWithEncoder(encoder *ag_binary.Enco
 	}
 	// Serialize `OffchainTokenData` param:
 	err = encoder.Encode(obj.OffchainTokenData)
-	if err != nil {
-		return err
-	}
-	// Serialize `Root` param:
-	err = encoder.Encode(obj.Root)
 	if err != nil {
 		return err
 	}
@@ -287,11 +303,6 @@ func (obj *ExecutionReportSingleChain) UnmarshalWithDecoder(decoder *ag_binary.D
 	}
 	// Deserialize `OffchainTokenData`:
 	err = decoder.Decode(&obj.OffchainTokenData)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Root`:
-	err = decoder.Decode(&obj.Root)
 	if err != nil {
 		return err
 	}
@@ -409,7 +420,6 @@ type Any2SVMRampMessage struct {
 	TokenReceiver ag_solanago.PublicKey
 	TokenAmounts  []Any2SVMTokenTransfer
 	ExtraArgs     Any2SVMRampExtraArgs
-	OnRampAddress []byte
 }
 
 func (obj Any2SVMRampMessage) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
@@ -440,11 +450,6 @@ func (obj Any2SVMRampMessage) MarshalWithEncoder(encoder *ag_binary.Encoder) (er
 	}
 	// Serialize `ExtraArgs` param:
 	err = encoder.Encode(obj.ExtraArgs)
-	if err != nil {
-		return err
-	}
-	// Serialize `OnRampAddress` param:
-	err = encoder.Encode(obj.OnRampAddress)
 	if err != nil {
 		return err
 	}
@@ -479,11 +484,6 @@ func (obj *Any2SVMRampMessage) UnmarshalWithDecoder(decoder *ag_binary.Decoder) 
 	}
 	// Deserialize `ExtraArgs`:
 	err = decoder.Decode(&obj.ExtraArgs)
-	if err != nil {
-		return err
-	}
-	// Deserialize `OnRampAddress`:
-	err = decoder.Decode(&obj.OnRampAddress)
 	if err != nil {
 		return err
 	}
@@ -667,7 +667,7 @@ func (obj *Ocr3ConfigInfo) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err
 }
 
 type Ocr3Config struct {
-	PluginType   uint8
+	PluginType   ConfigOcrPluginType
 	ConfigInfo   Ocr3ConfigInfo
 	Signers      [16][20]uint8
 	Transmitters [16][32]uint8
@@ -722,14 +722,20 @@ func (obj *Ocr3Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 }
 
 type SourceChainConfig struct {
-	IsEnabled       bool
-	LaneCodeVersion CodeVersion
-	OnRamp          [2][64]uint8
+	IsEnabled                 bool
+	IsRmnVerificationDisabled bool
+	LaneCodeVersion           CodeVersion
+	OnRamp                    OnRampAddress
 }
 
 func (obj SourceChainConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `IsEnabled` param:
 	err = encoder.Encode(obj.IsEnabled)
+	if err != nil {
+		return err
+	}
+	// Serialize `IsRmnVerificationDisabled` param:
+	err = encoder.Encode(obj.IsRmnVerificationDisabled)
 	if err != nil {
 		return err
 	}
@@ -752,6 +758,11 @@ func (obj *SourceChainConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (
 	if err != nil {
 		return err
 	}
+	// Deserialize `IsRmnVerificationDisabled`:
+	err = decoder.Decode(&obj.IsRmnVerificationDisabled)
+	if err != nil {
+		return err
+	}
 	// Deserialize `LaneCodeVersion`:
 	err = decoder.Decode(&obj.LaneCodeVersion)
 	if err != nil {
@@ -759,6 +770,39 @@ func (obj *SourceChainConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (
 	}
 	// Deserialize `OnRamp`:
 	err = decoder.Decode(&obj.OnRamp)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type OnRampAddress struct {
+	Bytes [64]uint8
+	Len   uint32
+}
+
+func (obj OnRampAddress) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Bytes` param:
+	err = encoder.Encode(obj.Bytes)
+	if err != nil {
+		return err
+	}
+	// Serialize `Len` param:
+	err = encoder.Encode(obj.Len)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *OnRampAddress) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Bytes`:
+	err = decoder.Decode(&obj.Bytes)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Len`:
+	err = decoder.Decode(&obj.Len)
 	if err != nil {
 		return err
 	}
@@ -842,129 +886,6 @@ func (value CodeVersion) String() string {
 		return "Default"
 	case V1_CodeVersion:
 		return "V1"
-	default:
-		return ""
-	}
-}
-
-type CcipOfframpError ag_binary.BorshEnum
-
-const (
-	InvalidSequenceInterval_CcipOfframpError CcipOfframpError = iota
-	RootNotCommitted_CcipOfframpError
-	ExistingMerkleRoot_CcipOfframpError
-	Unauthorized_CcipOfframpError
-	InvalidNonce_CcipOfframpError
-	InvalidInputsMissingWritable_CcipOfframpError
-	OnrampNotConfigured_CcipOfframpError
-	FailedToDeserializeReport_CcipOfframpError
-	InvalidPluginType_CcipOfframpError
-	InvalidVersion_CcipOfframpError
-	MissingExpectedPriceUpdates_CcipOfframpError
-	MissingExpectedMerkleRoot_CcipOfframpError
-	UnexpectedMerkleRoot_CcipOfframpError
-	RedundantOwnerProposal_CcipOfframpError
-	UnsupportedSourceChainSelector_CcipOfframpError
-	UnsupportedDestinationChainSelector_CcipOfframpError
-	InvalidProof_CcipOfframpError
-	InvalidMessage_CcipOfframpError
-	ReachedMaxSequenceNumber_CcipOfframpError
-	ManualExecutionNotAllowed_CcipOfframpError
-	InvalidInputsNumberOfAccounts_CcipOfframpError
-	InvalidInputsGlobalStateAccount_CcipOfframpError
-	InvalidInputsTokenIndices_CcipOfframpError
-	InvalidInputsPoolAccounts_CcipOfframpError
-	InvalidInputsTokenAccounts_CcipOfframpError
-	InvalidInputsSysvarAccount_CcipOfframpError
-	InvalidInputsFeeQuoterAccount_CcipOfframpError
-	InvalidInputsAllowedOfframpAccount_CcipOfframpError
-	InvalidInputsConfigAccounts_CcipOfframpError
-	InvalidInputsTokenAdminRegistryAccounts_CcipOfframpError
-	InvalidInputsLookupTableAccounts_CcipOfframpError
-	InvalidInputsLookupTableAccountWritable_CcipOfframpError
-	OfframpReleaseMintBalanceMismatch_CcipOfframpError
-	OfframpInvalidDataLength_CcipOfframpError
-	StaleCommitReport_CcipOfframpError
-	InvalidWritabilityBitmap_CcipOfframpError
-	InvalidCodeVersion_CcipOfframpError
-)
-
-func (value CcipOfframpError) String() string {
-	switch value {
-	case InvalidSequenceInterval_CcipOfframpError:
-		return "InvalidSequenceInterval"
-	case RootNotCommitted_CcipOfframpError:
-		return "RootNotCommitted"
-	case ExistingMerkleRoot_CcipOfframpError:
-		return "ExistingMerkleRoot"
-	case Unauthorized_CcipOfframpError:
-		return "Unauthorized"
-	case InvalidNonce_CcipOfframpError:
-		return "InvalidNonce"
-	case InvalidInputsMissingWritable_CcipOfframpError:
-		return "InvalidInputsMissingWritable"
-	case OnrampNotConfigured_CcipOfframpError:
-		return "OnrampNotConfigured"
-	case FailedToDeserializeReport_CcipOfframpError:
-		return "FailedToDeserializeReport"
-	case InvalidPluginType_CcipOfframpError:
-		return "InvalidPluginType"
-	case InvalidVersion_CcipOfframpError:
-		return "InvalidVersion"
-	case MissingExpectedPriceUpdates_CcipOfframpError:
-		return "MissingExpectedPriceUpdates"
-	case MissingExpectedMerkleRoot_CcipOfframpError:
-		return "MissingExpectedMerkleRoot"
-	case UnexpectedMerkleRoot_CcipOfframpError:
-		return "UnexpectedMerkleRoot"
-	case RedundantOwnerProposal_CcipOfframpError:
-		return "RedundantOwnerProposal"
-	case UnsupportedSourceChainSelector_CcipOfframpError:
-		return "UnsupportedSourceChainSelector"
-	case UnsupportedDestinationChainSelector_CcipOfframpError:
-		return "UnsupportedDestinationChainSelector"
-	case InvalidProof_CcipOfframpError:
-		return "InvalidProof"
-	case InvalidMessage_CcipOfframpError:
-		return "InvalidMessage"
-	case ReachedMaxSequenceNumber_CcipOfframpError:
-		return "ReachedMaxSequenceNumber"
-	case ManualExecutionNotAllowed_CcipOfframpError:
-		return "ManualExecutionNotAllowed"
-	case InvalidInputsNumberOfAccounts_CcipOfframpError:
-		return "InvalidInputsNumberOfAccounts"
-	case InvalidInputsGlobalStateAccount_CcipOfframpError:
-		return "InvalidInputsGlobalStateAccount"
-	case InvalidInputsTokenIndices_CcipOfframpError:
-		return "InvalidInputsTokenIndices"
-	case InvalidInputsPoolAccounts_CcipOfframpError:
-		return "InvalidInputsPoolAccounts"
-	case InvalidInputsTokenAccounts_CcipOfframpError:
-		return "InvalidInputsTokenAccounts"
-	case InvalidInputsSysvarAccount_CcipOfframpError:
-		return "InvalidInputsSysvarAccount"
-	case InvalidInputsFeeQuoterAccount_CcipOfframpError:
-		return "InvalidInputsFeeQuoterAccount"
-	case InvalidInputsAllowedOfframpAccount_CcipOfframpError:
-		return "InvalidInputsAllowedOfframpAccount"
-	case InvalidInputsConfigAccounts_CcipOfframpError:
-		return "InvalidInputsConfigAccounts"
-	case InvalidInputsTokenAdminRegistryAccounts_CcipOfframpError:
-		return "InvalidInputsTokenAdminRegistryAccounts"
-	case InvalidInputsLookupTableAccounts_CcipOfframpError:
-		return "InvalidInputsLookupTableAccounts"
-	case InvalidInputsLookupTableAccountWritable_CcipOfframpError:
-		return "InvalidInputsLookupTableAccountWritable"
-	case OfframpReleaseMintBalanceMismatch_CcipOfframpError:
-		return "OfframpReleaseMintBalanceMismatch"
-	case OfframpInvalidDataLength_CcipOfframpError:
-		return "OfframpInvalidDataLength"
-	case StaleCommitReport_CcipOfframpError:
-		return "StaleCommitReport"
-	case InvalidWritabilityBitmap_CcipOfframpError:
-		return "InvalidWritabilityBitmap"
-	case InvalidCodeVersion_CcipOfframpError:
-		return "InvalidCodeVersion"
 	default:
 		return ""
 	}

@@ -1,7 +1,22 @@
+//! # Timelock Operation Management
+//!
+//! This module implements the core data structures and functions for managing timelock operations.
+//! Operations represent batches of instructions that can be scheduled for delayed execution,
+//! providing governance safeguards for critical administrative actions.
+//!
+//! The timelock system uses a state machine approach where operations progress through
+//! several defined states, with cryptographic verification to ensure integrity.
+
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::instruction::Instruction;
 use anchor_lang::solana_program::keccak::{hashv, HASH_BYTES};
 
+use crate::constants::ANCHOR_DISCRIMINATOR;
+
+/// Represents the current state of a timelock operation in its lifecycle.
+///
+/// Operations move through these states sequentially as they are prepared,
+/// scheduled, and eventually executed.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, PartialEq, PartialOrd)]
 pub enum OperationState {
     /// Operation is created but not yet finalized.
@@ -14,6 +29,12 @@ pub enum OperationState {
     Done,
 }
 
+/// Represents a batch of instructions that can be scheduled for delayed execution.
+///
+/// Operations are the core data structure of the timelock system. Each operation contains
+/// a set of instructions that will be executed atomically once the operation is ready.
+/// Operations include cryptographic safeguards (ID verification) and dependency tracking
+/// to ensure proper sequencing.
 #[account]
 pub struct Operation {
     pub state: OperationState,
@@ -31,6 +52,22 @@ impl Space for Operation {
 }
 
 impl Operation {
+    pub fn space_after_init_instruction(&self, new_accounts: &[InstructionAccount]) -> usize {
+        ANCHOR_DISCRIMINATOR + Self::INIT_SPACE
+            // space for existing instructions
+            + self.instructions.iter().map(|ix| ix.space()).sum::<usize>()
+            // space for new instruction(program_id + data vec prefix + accounts vec prefix + account metas(pubkey + is_signer + is_writable))
+            + (32 + 4 + 4 + new_accounts.len() * (32 + 1 + 1))
+    }
+
+    pub fn space_after_append_instruction(&self, new_data: &[u8]) -> usize {
+        ANCHOR_DISCRIMINATOR + Self::INIT_SPACE
+            // space for existing instructions
+            + self.instructions.iter().map(|ix| ix.space()).sum::<usize>()
+            // space for new instruction data
+            + new_data.len()
+    }
+
     // before scheduling, timestamp should be 0
     pub fn is_scheduled(&self) -> bool {
         self.state >= OperationState::Scheduled
@@ -70,7 +107,7 @@ impl Operation {
     pub fn hash_instructions(&self, salt: [u8; HASH_BYTES]) -> [u8; HASH_BYTES] {
         let total_size = self.instructions.iter().map(|ix| ix.space()).sum::<usize>()
             + HASH_BYTES * 2 // predecessor and salt
-            + 4; // instruction array prefix
+            + 4; // instruction array vector prefix
 
         let mut encoded_data = Vec::with_capacity(total_size);
 
@@ -109,13 +146,15 @@ impl Operation {
     }
 }
 
-// The native SVM's Instruction type from solana_program doesn't implement the AnchorSerialize trait.
-// This is a wrapper that provides serialization capabilities while maintaining the same functionality
+/// A serializable representation of a Solana instruction.
+///
+/// The native SVM's Instruction type from solana_program doesn't implement the AnchorSerialize trait.
+/// This wrapper provides serialization capabilities while maintaining the same functionality.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default, Debug)]
 pub struct InstructionData {
-    pub program_id: Pubkey,
-    pub data: Vec<u8>,
-    pub accounts: Vec<InstructionAccount>,
+    pub program_id: Pubkey, // Target program that will process this instruction
+    pub data: Vec<u8>,      // Instruction data passed to the program
+    pub accounts: Vec<InstructionAccount>, // Accounts required for this instruction
 }
 
 impl InstructionData {
@@ -135,12 +174,16 @@ impl From<&InstructionData> for Instruction {
     }
 }
 
+/// Represents an account used in an instruction, including its metadata.
+///
+/// This structure mirrors the AccountMeta used in Solana instructions
+/// but implements Anchor's serialization traits.
 // NOTE: space for InstructionAccount is calculated with InitSpace trait since it's static
 #[derive(InitSpace, AnchorSerialize, AnchorDeserialize, Clone, Default, Debug)]
 pub struct InstructionAccount {
-    pub pubkey: Pubkey,
-    pub is_signer: bool,
-    pub is_writable: bool,
+    pub pubkey: Pubkey,    // The account's public key
+    pub is_signer: bool,   // Whether the account is a signer for the instruction
+    pub is_writable: bool, // Whether the account is writable in the instruction
 }
 
 impl From<&InstructionAccount> for AccountMeta {

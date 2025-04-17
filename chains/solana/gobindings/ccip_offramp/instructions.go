@@ -82,7 +82,19 @@ var (
 	// * `code_version` - The new code version to be set as default.
 	Instruction_SetDefaultCodeVersion = ag_binary.TypeID([8]byte{47, 151, 233, 254, 121, 82, 206, 152})
 
-	// Config //
+	// Updates reference addresses in the offramp contract, such as
+	// the CCIP router, Fee Quoter, and the Offramp Lookup Table.
+	// Only the Admin may update these addresses.
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for updating the reference addresses.
+	// * `router` - The router address to be set.
+	// * `fee_quoter` - The fee_quoter address to be set.
+	// * `offramp_lookup_table` - The offramp_lookup_table address to be set.
+	// * `rmn_remote` - The rmn_remote address to be set.
+	Instruction_UpdateReferenceAddresses = ag_binary.TypeID([8]byte{119, 179, 218, 249, 217, 184, 181, 9})
+
 	// Adds a new source chain selector with its config to the offramp.
 	//
 	// The Admin needs to add any new chain supported.
@@ -224,6 +236,8 @@ var (
 	// * `ctx` - The context containing the accounts required for the execution.
 	// * `raw_execution_report` - The serialized execution report containing the message and proofs.
 	Instruction_ManuallyExecute = ag_binary.TypeID([8]byte{238, 219, 224, 11, 226, 248, 47, 192})
+
+	Instruction_CloseCommitReportAccount = ag_binary.TypeID([8]byte{109, 145, 129, 64, 226, 172, 61, 106})
 )
 
 // InstructionIDToName returns the name of the instruction given its ID.
@@ -239,6 +253,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "AcceptOwnership"
 	case Instruction_SetDefaultCodeVersion:
 		return "SetDefaultCodeVersion"
+	case Instruction_UpdateReferenceAddresses:
+		return "UpdateReferenceAddresses"
 	case Instruction_AddSourceChain:
 		return "AddSourceChain"
 	case Instruction_DisableSourceChainSelector:
@@ -259,6 +275,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "Execute"
 	case Instruction_ManuallyExecute:
 		return "ManuallyExecute"
+	case Instruction_CloseCommitReportAccount:
+		return "CloseCommitReportAccount"
 	default:
 		return ""
 	}
@@ -295,6 +313,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 			"set_default_code_version", (*SetDefaultCodeVersion)(nil),
 		},
 		{
+			"update_reference_addresses", (*UpdateReferenceAddresses)(nil),
+		},
+		{
 			"add_source_chain", (*AddSourceChain)(nil),
 		},
 		{
@@ -323,6 +344,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"manually_execute", (*ManuallyExecute)(nil),
+		},
+		{
+			"close_commit_report_account", (*CloseCommitReportAccount)(nil),
 		},
 	},
 )

@@ -22,20 +22,13 @@ const (
 	defaultNewMsgScanBatchSize                = merklemulti.MaxNumberTreeLeaves
 	defaultEvmDefaultMaxMerkleTreeSize        = merklemulti.MaxNumberTreeLeaves
 	defaultMaxReportTransmissionCheckAttempts = 5
-	defaultRMNEnabled                         = false
 	defaultRemoteGasPriceBatchWriteFrequency  = 1 * time.Minute
 	defaultSignObservationPrefix              = "chainlink ccip 1.6 rmn observation"
 	defaultTransmissionDelayMultiplier        = 30 * time.Second
 	defaultInflightPriceCheckRetries          = 5
-	defaultRelativeBoostPerWaitHour           = 0.2 // 20 percent
-	defaultMerkleRootAsyncObserverSyncFreq    = 5 * time.Second
-	defaultMerkleRootAsyncObserverSyncTimeout = 10 * time.Second
+	defaultAsyncObserverSyncFreq              = 5 * time.Second
+	defaultAsyncObserverSyncTimeout           = 10 * time.Second
 )
-
-type FeeInfo struct {
-	ExecDeviationPPB             cciptypes.BigInt `json:"execDeviationPPB"`
-	DataAvailabilityDeviationPPB cciptypes.BigInt `json:"dataAvailabilityDeviationPPB"`
-}
 
 type TokenInfo struct {
 	// AggregatorAddress is the address of the price feed TOKEN/USD aggregator on the feed chain.
@@ -85,8 +78,6 @@ type CommitOffchainConfig struct {
 	//TODO: Rename to something with ChainFee
 	RemoteGasPriceBatchWriteFrequency commonconfig.Duration `json:"remoteGasPriceBatchWriteFrequency"`
 
-	FeeInfo map[cciptypes.ChainSelector]FeeInfo `json:"feeInfo"`
-
 	// TokenPriceBatchWriteFrequency is the frequency at which the commit plugin should
 	// write token prices to the remote chain.
 	// If set to zero, no prices will be written (i.e keystone feeds would be active).
@@ -124,7 +115,7 @@ type CommitOffchainConfig struct {
 	// SignObservationPrefix is the prefix used by the RMN node to sign observations.
 	SignObservationPrefix string `json:"signObservationPrefix"`
 
-	// transmissionDelayMultiplier is used to calculate the transmission delay for each oracle.
+	// TransmissionDelayMultiplier is used to calculate the transmission delay for each oracle.
 	TransmissionDelayMultiplier time.Duration `json:"transmissionDelayMultiplier"`
 
 	// InflightPriceCheckRetries is the number of rounds we wait for a price report to get recorded on the blockchain.
@@ -134,13 +125,53 @@ type CommitOffchainConfig struct {
 	MerkleRootAsyncObserverDisabled bool `json:"merkleRootAsyncObserverDisabled"`
 
 	// MerkleRootAsyncObserverSyncFreq defines how frequently the async merkle roots observer should sync.
-	// Zero indicates that operations are done synchronously.
 	MerkleRootAsyncObserverSyncFreq time.Duration `json:"merkleRootAsyncObserverSyncFreq"`
 
 	// MerkleRootAsyncObserverSyncTimeout defines the timeout for a single sync operation (e.g. fetch seqNums).
 	MerkleRootAsyncObserverSyncTimeout time.Duration `json:"merkleRootAsyncObserverSyncTimeout"`
+
+	// ChainFeeAsyncObserverDisabled defines whether the async observer should be disabled. Default it is enabled.
+	ChainFeeAsyncObserverDisabled bool `json:"chainFeeAsyncObserverDisabled"`
+
+	// ChainFeeAsyncObserverSyncFreq defines how frequently the async chain fee observer should sync.
+	ChainFeeAsyncObserverSyncFreq time.Duration `json:"chainFeeAsyncObserverSyncFreq"`
+
+	// ChainFeeAsyncObserverSyncTimeout defines the timeout for a single sync operation (e.g. fetch token prices).
+	ChainFeeAsyncObserverSyncTimeout time.Duration `json:"chainFeeAsyncObserverSyncTimeout"`
+
+	// TokenPriceAsyncObserverDisabled defines whether the async observer should be disabled. Default it is enabled.
+	TokenPriceAsyncObserverDisabled bool `json:"tokenPriceAsyncObserverDisabled"`
+
+	// TokenPriceAsyncObserverSyncFreq defines how frequently the async token price observer should sync.
+	TokenPriceAsyncObserverSyncFreq commonconfig.Duration `json:"tokenPriceAsyncObserverSyncFreq"`
+
+	// TokenPriceAsyncObserverSyncTimeout defines the timeout for a single sync operation (e.g. fetch token prices).
+	TokenPriceAsyncObserverSyncTimeout commonconfig.Duration `json:"tokenPriceAsyncObserverSyncTimeout"`
+
+	// MaxRootsPerReport is the maximum number of roots to include in a single report.
+	// Set this to 1 for destination chains that cannot process more than one commit root per report (e.g, Solana)
+	// Disable by setting to 0.
+	// NOTE:
+	//  * this can only be used if RMNEnabled == false.
+	//  * if MaxMerkleRootsPerReport is non-zero, MultipleReportsEnabled should be set to true.
+	MaxMerkleRootsPerReport uint64 `json:"maxRootsPerReport"`
+
+	// MaxPricesPerReport is the maximum number of token and/or gas prices that may be included in a single report.
+	// Price data will not be included with MerkleRoots when this value is set.
+	// Disable by setting to 0.
+	// NOTE:
+	//  * this can only be used if RMNEnabled == false.
+	//  * if MaxPricesPerReport is non-zero, MultipleReportsEnabled should be set to true.
+	MaxPricesPerReport uint64 `json:"maxPricesPerReport"`
+
+	// MultipleReportsEnabled is a flag to enable/disable multiple reports per round.
+	// This is typically set to true on chains that use 'MaxMerkleRootsPerReport'
+	// in order to avoid delays when there are reports from multiple sources.
+	// NOTE: this can only be used if RMNEnabled == false.
+	MultipleReportsEnabled bool `json:"multipleReports"`
 }
 
+//nolint:gocyclo // it is considered ok since we don't have complicated logic here
 func (c *CommitOffchainConfig) applyDefaults() {
 	if c.RMNEnabled && c.RMNSignaturesTimeout == 0 {
 		c.RMNSignaturesTimeout = defaultRMNSignaturesTimeout
@@ -177,10 +208,28 @@ func (c *CommitOffchainConfig) applyDefaults() {
 	// We want to apply defaults only if the async feature is enabled.
 	if !c.MerkleRootAsyncObserverDisabled {
 		if c.MerkleRootAsyncObserverSyncFreq == 0 {
-			c.MerkleRootAsyncObserverSyncFreq = defaultMerkleRootAsyncObserverSyncFreq
+			c.MerkleRootAsyncObserverSyncFreq = defaultAsyncObserverSyncFreq
 		}
 		if c.MerkleRootAsyncObserverSyncTimeout == 0 {
-			c.MerkleRootAsyncObserverSyncTimeout = defaultMerkleRootAsyncObserverSyncTimeout
+			c.MerkleRootAsyncObserverSyncTimeout = defaultAsyncObserverSyncTimeout
+		}
+	}
+
+	if !c.ChainFeeAsyncObserverDisabled {
+		if c.ChainFeeAsyncObserverSyncFreq == 0 {
+			c.ChainFeeAsyncObserverSyncFreq = defaultAsyncObserverSyncFreq
+		}
+		if c.ChainFeeAsyncObserverSyncTimeout == 0 {
+			c.ChainFeeAsyncObserverSyncTimeout = defaultAsyncObserverSyncTimeout
+		}
+	}
+
+	if !c.TokenPriceAsyncObserverDisabled {
+		if c.TokenPriceAsyncObserverSyncFreq.Duration() == 0 {
+			c.TokenPriceAsyncObserverSyncFreq = *commonconfig.MustNewDuration(defaultAsyncObserverSyncFreq)
+		}
+		if c.TokenPriceAsyncObserverSyncTimeout.Duration() == 0 {
+			c.TokenPriceAsyncObserverSyncTimeout = *commonconfig.MustNewDuration(defaultAsyncObserverSyncTimeout)
 		}
 	}
 }
@@ -231,6 +280,35 @@ func (c *CommitOffchainConfig) Validate() error {
 		(c.MerkleRootAsyncObserverSyncFreq == 0 || c.MerkleRootAsyncObserverSyncTimeout == 0) {
 		return fmt.Errorf("merkle root async observer sync freq (%s) or sync timeout (%s) not set",
 			c.MerkleRootAsyncObserverSyncFreq, c.MerkleRootAsyncObserverSyncTimeout)
+	}
+
+	if !c.ChainFeeAsyncObserverDisabled &&
+		(c.ChainFeeAsyncObserverSyncFreq == 0 || c.ChainFeeAsyncObserverSyncTimeout == 0) {
+		return fmt.Errorf("chain fee async observer sync freq (%s) or sync timeout (%s) not set",
+			c.ChainFeeAsyncObserverSyncFreq, c.ChainFeeAsyncObserverSyncTimeout)
+	}
+
+	// Options for multiple reports. These settings were added so that Solana can be configured
+	// to split merkle roots across multiple reports. The functions do not support RMN, so it is
+	// an error to use them unless RMNEnabled == false.
+	var errs []error
+	if c.RMNEnabled {
+		if c.MultipleReportsEnabled {
+			errs = append(errs, fmt.Errorf("multipleReports do not support RMN, RMNEnabled cannot be true"))
+		}
+		if c.MaxMerkleRootsPerReport != 0 {
+			errs = append(errs, fmt.Errorf("maxMerkleRootsPerReport does not support RMN, RMNEnabled cannot be true"))
+		}
+	}
+	if c.MaxMerkleRootsPerReport != 0 && !c.MultipleReportsEnabled {
+		errs = append(errs, fmt.Errorf("maxMerkleRootsPerReport cannot be used without MultipleReportsEnabled"))
+	}
+	if c.MaxPricesPerReport != 0 && !c.MultipleReportsEnabled {
+		errs = append(errs, fmt.Errorf("maxPricesPerReport cannot be used without MultipleReportsEnabled"))
+	}
+
+	if len(errs) > 0 {
+		return errors.Join(errs...)
 	}
 
 	return nil

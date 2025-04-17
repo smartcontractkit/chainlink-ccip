@@ -1,3 +1,18 @@
+//! # Ethereum Cryptographic Utilities
+//!
+//! This module provides cryptographic primitives and utilities required for Ethereum-compatible
+//! signature verification and Merkle tree operations. It enables the MCM program to verify
+//! ECDSA signatures and validate Merkle proofs across multiple chains.
+//!
+//! ## Domain Separators
+//!
+//! The module uses domain separators to ensure cryptographic isolation between different
+//! parts of the system:
+//!
+//! - `MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_METADATA_SOLANA`: Used when hashing root metadata
+//! - `MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_OP_SOLANA`: Used when hashing operation data
+//!
+//! These separators ensure that hashes for different purposes cannot be reused or confused.
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::keccak::{hash, hashv, Hash, HASH_BYTES}; // use keccak256 for EVM compatibility
 use anchor_lang::solana_program::secp256k1_recover::{
@@ -11,18 +26,41 @@ use crate::state::root::RootMetadataInput;
 // NOTE: chain-specific mcm contract should has its own domain separator to avoid ambiguity
 // https://github.com/smartcontractkit/ccip-owner-contracts#porting
 //
-// result of keccak256("MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_METADATA_SOLANA")
+
+/// Domain separator for metadata leaves in the Merkle tree.
+///
+/// Result of keccak256("MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_METADATA_SOLANA").
+/// This value is unique to the Solana implementation to prevent cross-chain replay attacks.
 pub const MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_METADATA: &[u8; HASH_BYTES] = &[
     0x47, 0xfd, 0xed, 0x70, 0x90, 0x1d, 0x27, 0x3, 0x83, 0x94, 0xdb, 0x90, 0x5a, 0x72, 0x56, 0x3c,
     0xad, 0x6f, 0x7, 0x58, 0x1d, 0xbc, 0xdd, 0x14, 0x72, 0xcc, 0xd2, 0xf7, 0x42, 0xaf, 0x63, 0x60,
 ];
-// result of keccak256("MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_OP_SOLANA")
+
+/// Domain separator for operation leaves in the Merkle tree.
+///
+/// Result of keccak256("MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_OP_SOLANA").
+/// This value is unique to the Solana implementation to prevent cross-chain replay attacks.
 pub const MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_OP: &[u8; HASH_BYTES] = &[
     0xfb, 0x98, 0x81, 0x6f, 0xf3, 0xc5, 0x13, 0x8a, 0x68, 0xab, 0xfd, 0x40, 0xb8, 0xd8, 0xfb, 0xc2,
     0x29, 0x72, 0xfe, 0xa1, 0xdd, 0x89, 0x75, 0x73, 0x31, 0x32, 0x7e, 0x6e, 0xa, 0x94, 0x40, 0xb7,
 ];
+/// Size of an Ethereum address in bytes (20 bytes / 160 bits)
 pub const EVM_ADDRESS_BYTES: usize = 20;
 
+/// Recovers an Ethereum address from an ECDSA signature on a given message hash.
+///
+/// This function is used to verify signatures during root setting and retrieves the
+/// signer's Ethereum address (the last 20 bytes of the keccak256 hash of the recovered public key).
+///
+/// # Parameters
+///
+/// - `eth_signed_msg_hash`: 32-byte hash of the Ethereum signed message
+/// - `sig`: The ECDSA signature containing v, r, s components
+///
+/// # Returns
+///
+/// - The recovered 20-byte Ethereum address if successful
+/// - An error if recovery fails
 pub fn ecdsa_recover_evm_addr(
     eth_signed_msg_hash: &[u8; HASH_BYTES],
     sig: &Signature,
@@ -43,6 +81,19 @@ pub fn ecdsa_recover_evm_addr(
     Ok(evm_addr)
 }
 
+/// Computes the Ethereum-compatible message hash for root validation.
+///
+/// Creates a hash that matches Ethereum's personal sign message format:
+/// "\x19Ethereum Signed Message:\n32" + keccak256(root || valid_until)
+///
+/// # Parameters
+///
+/// - `root`: The 32-byte Merkle root
+/// - `valid_until`: Timestamp until which the root is valid
+///
+/// # Returns
+///
+/// - The 32-byte message hash ready for ECDSA verification
 pub fn compute_eth_message_hash(root: &[u8; HASH_BYTES], valid_until: u32) -> Hash {
     // Use big-endian encoding for EVM compatibility
     let valid_until_bytes = left_pad_vec(&valid_until.to_be_bytes());
@@ -54,6 +105,20 @@ pub fn compute_eth_message_hash(root: &[u8; HASH_BYTES], valid_until: u32) -> Ha
     ])
 }
 
+/// Calculates a Merkle root from a leaf node and a proof path.
+///
+/// This function iteratively combines a leaf hash with the provided proof elements
+/// to reconstruct the Merkle root. It allows verification that a specific leaf
+/// (operation or metadata) is included in the tree with the given root.
+///
+/// # Parameters
+///
+/// - `proof`: Ordered list of sibling hashes needed to reconstruct the path to the root
+/// - `leaf`: The leaf hash being verified
+///
+/// # Returns
+///
+/// - The computed 32-byte Merkle root
 pub fn calculate_merkle_root(
     proof: Vec<[u8; HASH_BYTES]>,
     leaf: &[u8; HASH_BYTES],
@@ -65,11 +130,34 @@ pub fn calculate_merkle_root(
     computed_hash
 }
 
+/// Hashes two nodes to create their parent node in the Merkle tree.
+///
+/// Ensures consistent ordering of hashing by sorting the nodes lexicographically first.
+/// This matches the OpenZeppelin implementation used in the Ethereum contract.
+///
+/// # Parameters
+///
+/// - `a`: First 32-byte hash
+/// - `b`: Second 32-byte hash
+///
+/// # Returns
+///
+/// - The 32-byte hash of the parent node
 fn hash_pair(a: &[u8; HASH_BYTES], b: &[u8; HASH_BYTES]) -> [u8; HASH_BYTES] {
     let (left, right) = if a < b { (a, b) } else { (b, a) };
     hashv(&[left, right]).to_bytes()
 }
 
+/// Left-pads a byte array to the target size with zeros.
+///
+/// # Parameters
+///
+/// - `input`: The input byte array
+/// - `num_bytes`: Target size for the padded result
+///
+/// # Returns
+///
+/// - A vector containing the left-padded result
 fn _left_pad_vec(input: &[u8], num_bytes: usize) -> Vec<u8> {
     let mut padded: Vec<u8> = Vec::with_capacity(num_bytes);
     padded.resize(num_bytes - input.len(), 0);
@@ -77,10 +165,22 @@ fn _left_pad_vec(input: &[u8], num_bytes: usize) -> Vec<u8> {
     padded
 }
 
+/// Left-pads a byte array to 32 bytes with zeros.
+///
+/// Used for consistent encoding of numeric values in the Merkle tree.
+///
+/// # Parameters
+///
+/// - `input`: The input byte array
+///
+/// # Returns
+///
+/// - A vector containing the left-padded result (32 bytes)
 pub fn left_pad_vec(input: &[u8]) -> Vec<u8> {
     _left_pad_vec(input, HASH_BYTES)
 }
 
+/// ECDSA signature with components used in Ethereum signature verification.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace, Debug)]
 pub struct Signature {
     pub v: u8,
@@ -89,6 +189,18 @@ pub struct Signature {
 }
 
 impl Signature {
+    /// Recovers the public key from this signature and a message hash.
+    ///
+    /// Used internally for ECDSA recovery of signer addresses.
+    ///
+    /// # Parameters
+    ///
+    /// - `eth_signed_msg_hash`: The 32-byte hash of the signed message
+    ///
+    /// # Returns
+    ///
+    /// - The recovered secp256k1 public key if successful
+    /// - A Secp256k1RecoverError if recovery fails
     fn secp256k1_recover_from(
         &self,
         eth_signed_msg_hash: &[u8; HASH_BYTES],
@@ -104,6 +216,14 @@ impl Signature {
 }
 
 impl RootMetadataInput {
+    /// Computes the Merkle leaf hash for this metadata.
+    ///
+    /// Combines the domain separator with the metadata fields to create a unique
+    /// leaf hash that can be included in the Merkle tree.
+    ///
+    /// # Returns
+    ///
+    /// - The 32-byte hash representing this metadata as a Merkle leaf
     pub fn hash_leaf(&self) -> [u8; HASH_BYTES] {
         let chain_id = left_pad_vec(&self.chain_id.to_le_bytes());
         let pre_op_count = left_pad_vec(&self.pre_op_count.to_le_bytes());

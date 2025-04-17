@@ -14,9 +14,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 
-	"github.com/smartcontractkit/chainlink-ccip/execute/costlymessages"
 	"github.com/smartcontractkit/chainlink-ccip/execute/metrics"
-	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
+	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata/observer"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
@@ -35,14 +34,14 @@ const (
 	// maxQueryLength is set to disable queries because they are not used.
 	maxQueryLength = 0
 
-	// maxObservationLength is set to the maximum size of an observation
-	// check factory_test for the calculation.
-	// this is being set to the max maximum observation length due to
-	// the observations being so large at the moment, especially when
-	// commit reports have many messages.
-	// in order to meaningfully decrease this we need to drastically optimise
-	// our observation sizes.
 	maxObservationLength = ocr3types.MaxMaxObservationLength
+	// lenientMaxObservationLength is set to value that's lower than the maxObservationLength
+	// Using lower value to allow for some space while observing without hitting the max.
+	// This simplifies the truncation logic needed when observation hits this lenientMax. If it's exact
+	// we'll need to take care of more corner cases and truncation logic becomes more complex
+	// It's recommended from research to not exceed 50% of the maxObservationLength
+	// PLEASE CHANGE WITH CAUTION.
+	lenientMaxObservationLength = maxObservationLength * 50 / 100
 
 	// maxOutcomeLength is set to the maximum size of an outcome
 	// check factory_test for the calculation. This is not limited because
@@ -59,6 +58,10 @@ const (
 	// the actual exec report type (ExecutePluginReport) may contain multiple
 	// per-source-chain reports. These are not limited by this value.
 	maxReportCount = 1
+
+	// lenientMaxMsgsPerObs is set to the maximum number of messages that can be observed in one observation, this is a bit
+	// lenient and acts as an indicator other than a hard limit.
+	lenientMaxMsgsPerObs = 100
 )
 
 // PluginFactory implements common ReportingPluginFactory and is used for (re-)initializing commit plugin instances.
@@ -68,6 +71,7 @@ type PluginFactory struct {
 	ocrConfig        reader.OCR3ConfigWithMeta
 	execCodec        cciptypes.ExecutePluginCodec
 	msgHasher        cciptypes.MessageHasher
+	addrCodec        cciptypes.AddressCodec
 	homeChainReader  reader.HomeChain
 	estimateProvider cciptypes.EstimateProvider
 	tokenDataEncoder cciptypes.TokenDataEncoder
@@ -81,7 +85,7 @@ type PluginFactoryParams struct {
 	OcrConfig        reader.OCR3ConfigWithMeta
 	ExecCodec        cciptypes.ExecutePluginCodec
 	MsgHasher        cciptypes.MessageHasher
-	ExtraDataCodec   cciptypes.ExtraDataCodec
+	AddrCodec        cciptypes.AddressCodec
 	HomeChainReader  reader.HomeChain
 	TokenDataEncoder cciptypes.TokenDataEncoder
 	EstimateProvider cciptypes.EstimateProvider
@@ -98,6 +102,7 @@ func NewExecutePluginFactory(params PluginFactoryParams) *PluginFactory {
 		ocrConfig:        params.OcrConfig,
 		execCodec:        params.ExecCodec,
 		msgHasher:        params.MsgHasher,
+		addrCodec:        params.AddrCodec,
 		homeChainReader:  params.HomeChainReader,
 		estimateProvider: params.EstimateProvider,
 		tokenDataEncoder: params.TokenDataEncoder,
@@ -145,27 +150,21 @@ func (p PluginFactory) NewReportingPlugin(
 		p.chainWriters,
 		p.ocrConfig.Config.ChainSelector,
 		p.ocrConfig.Config.OfframpAddress,
+		p.addrCodec,
 	)
 
-	tokenDataObserver, err := tokendata.NewConfigBasedCompositeObservers(
+	tokenDataObserver, err := observer.NewConfigBasedCompositeObservers(
 		ctx,
 		logutil.WithComponent(lggr, "TokenDataObserver"),
 		p.ocrConfig.Config.ChainSelector,
 		offchainConfig.TokenDataObservers,
 		p.tokenDataEncoder,
 		readers,
+		p.addrCodec,
 	)
 	if err != nil {
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to create token data observer: %w", err)
 	}
-
-	costlyMessageObserver := costlymessages.NewObserverWithDefaults(
-		logutil.WithComponent(lggr, "CostlyMessages"),
-		false,
-		ccipReader,
-		offchainConfig.RelativeBoostPerWaitHour,
-		p.estimateProvider,
-	)
 
 	metricsReporter, err := metrics.NewPromReporter(lggr, p.ocrConfig.Config.ChainSelector)
 	if err != nil {
@@ -185,8 +184,8 @@ func (p PluginFactory) NewReportingPlugin(
 			tokenDataObserver,
 			p.estimateProvider,
 			lggr,
-			costlyMessageObserver,
 			metricsReporter,
+			p.addrCodec,
 		), ocr3types.ReportingPluginInfo{
 			Name: "CCIPRoleExecute",
 			Limits: ocr3types.ReportingPluginLimits{

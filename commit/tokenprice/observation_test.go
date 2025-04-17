@@ -13,9 +13,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/libocr/commontypes"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	common_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/plugincommon"
 	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
@@ -33,23 +33,25 @@ func Test_Observation(t *testing.T) {
 		tokenA: cciptypes.NewBigInt(bi100),
 		tokenB: cciptypes.NewBigInt(bi200),
 	}
-	feeQuoterTokenUpdates := map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig{
-		tokenA: plugintypes.NewTimestampedBig(bi100.Int64(), timestamp),
-		tokenB: plugintypes.NewTimestampedBig(bi200.Int64(), timestamp),
+	feeQuoterTokenUpdates := map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig{
+		tokenA: cciptypes.NewTimestampedBig(bi100.Int64(), timestamp),
+		tokenB: cciptypes.NewTimestampedBig(bi200.Int64(), timestamp),
 	}
+	oracleID := commontypes.OracleID(1)
+	lggr := logger.Test(t)
 
 	testCases := []struct {
 		name         string
-		getProcessor func(t *testing.T) *processor
+		getProcessor func(t *testing.T) plugincommon.PluginProcessor[Query, Observation, Outcome]
 		expObs       Observation
 		expErr       error
 	}{
 		{
 			name: "Successful observation",
-			getProcessor: func(t *testing.T) *processor {
+			getProcessor: func(t *testing.T) plugincommon.PluginProcessor[Query, Observation, Outcome] {
 				chainSupport := common_mock.NewMockChainSupport(t)
 				chainSupport.EXPECT().SupportedChains(mock.Anything).Return(
-					mapset.NewSet[cciptypes.ChainSelector](feedChainSel, destChainSel), nil,
+					mapset.NewSet(feedChainSel, destChainSel), nil,
 				)
 				chainSupport.EXPECT().SupportsDestChain(mock.Anything).Return(true, nil).Maybe()
 
@@ -65,9 +67,9 @@ func Test_Observation(t *testing.T) {
 						tokenB: cciptypes.NewBigInt(bi200)}, nil)
 
 				tokenPriceReader.EXPECT().GetFeeQuoterTokenUpdates(mock.Anything, mock.Anything, mock.Anything).Return(
-					map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig{
-						tokenA: plugintypes.NewTimestampedBig(bi100.Int64(), timestamp),
-						tokenB: plugintypes.NewTimestampedBig(bi200.Int64(), timestamp),
+					map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig{
+						tokenA: cciptypes.NewTimestampedBig(bi100.Int64(), timestamp),
+						tokenB: cciptypes.NewTimestampedBig(bi200.Int64(), timestamp),
 					},
 					nil,
 				)
@@ -78,17 +80,17 @@ func Test_Observation(t *testing.T) {
 					nil,
 				)
 
-				return &processor{
-					oracleID:         1,
-					lggr:             logger.Test(t),
-					chainSupport:     chainSupport,
-					tokenPriceReader: tokenPriceReader,
-					homeChain:        homeChain,
-					offChainCfg:      defaultCfg,
-					destChain:        destChainSel,
-					fRoleDON:         f,
-					metricsReporter:  plugincommon.NoopReporter{},
-				}
+				return NewProcessor(
+					oracleID,
+					lggr,
+					defaultCfg,
+					destChainSel,
+					chainSupport,
+					tokenPriceReader,
+					homeChain,
+					f,
+					plugincommon.NoopReporter{},
+				)
 			},
 			expObs: Observation{
 				FeedTokenPrices:       feedTokenPrices,
@@ -99,24 +101,24 @@ func Test_Observation(t *testing.T) {
 		},
 		{
 			name: "Failed to get FDestChain",
-			getProcessor: func(t *testing.T) *processor {
+			getProcessor: func(t *testing.T) plugincommon.PluginProcessor[Query, Observation, Outcome] {
 				homeChain := readermock.NewMockHomeChain(t)
 				homeChain.EXPECT().GetFChain().Return(nil, errors.New("failed to get FChain"))
 
 				chainSupport := common_mock.NewMockChainSupport(t)
 				tokenPriceReader := readerpkg_mock.NewMockPriceReader(t)
 
-				return &processor{
-					oracleID:         1,
-					lggr:             logger.Test(t),
-					chainSupport:     chainSupport,
-					tokenPriceReader: tokenPriceReader,
-					homeChain:        homeChain,
-					destChain:        destChainSel,
-					offChainCfg:      defaultCfg,
-					fRoleDON:         f,
-					metricsReporter:  plugincommon.NoopReporter{},
-				}
+				return NewProcessor(
+					oracleID,
+					lggr,
+					defaultCfg,
+					destChainSel,
+					chainSupport,
+					tokenPriceReader,
+					homeChain,
+					f,
+					plugincommon.NoopReporter{},
+				)
 			},
 			expObs: Observation{},
 		},
@@ -155,4 +157,6 @@ var defaultCfg = pluginconfig.CommitOffchainConfig{
 			DeviationPPB:      cciptypes.BigInt{Int: big.NewInt(1)}},
 	},
 	PriceFeedChainSelector: feedChainSel,
+	// Have this disabled for testing purposes
+	TokenPriceAsyncObserverDisabled: true,
 }

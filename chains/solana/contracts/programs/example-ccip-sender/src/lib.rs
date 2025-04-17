@@ -1,12 +1,24 @@
+#![allow(unexpected_cfgs)]
+
 use anchor_lang::prelude::*;
 use anchor_spl::token_2022::spl_token_2022::{self, instruction::transfer_checked};
-use fee_quoter::messages::{GetFeeResult, SVM2AnyMessage, SVMTokenAmount};
 use solana_program::{
     instruction::Instruction,
     program::{get_return_data, invoke, invoke_signed},
 };
 
-declare_id!("CcipSender111111111111111111111111111111111");
+use ccip_router::messages::{GetFeeResult, SVM2AnyMessage, SVMTokenAmount};
+
+declare_id!("4LfBQWYaU6zQZbDyYjX8pbY4qjzrhoumUFYZEZEqMNhJ");
+
+#[cfg(target_os = "solana")]
+#[global_allocator]
+static ALLOC: smalloc::Smalloc<
+    { solana_program::entrypoint::HEAP_START_ADDRESS as usize },
+    { solana_program::entrypoint::HEAP_LENGTH as usize },
+    16,
+    1024,
+> = smalloc::Smalloc::new();
 
 pub mod context;
 use context::*;
@@ -20,7 +32,7 @@ use tokens::*;
 pub const CHAIN_CONFIG_SEED: &[u8] = b"remote_chain_config";
 pub const CCIP_SENDER: &[u8] = b"ccip_sender";
 
-pub const CCIP_SEND_DISCIRIMINATOR: [u8; 8] = [108, 216, 134, 191, 249, 234, 33, 84]; // ccip_send
+pub const CCIP_SEND_DISCRIMINATOR: [u8; 8] = [108, 216, 134, 191, 249, 234, 33, 84]; // ccip_send
 pub const CCIP_GET_FEE_DISCRIMINATOR: [u8; 8] = [115, 195, 235, 161, 25, 219, 60, 29]; // get_fee
 
 /// This program an example of a CCIP Sender Program.
@@ -66,7 +78,7 @@ pub mod example_ccip_sender {
                 acc.from_ata,
                 acc.self_ata,
                 &ctx.accounts.ccip_sender.to_account_info(),
-                &ctx.accounts.ccip_token_pools_signer.to_account_info(),
+                &acc.ccip_router_pool_signer.to_account_info(),
                 seeds,
                 token_amounts[i].amount,
                 acc.decimals,
@@ -76,6 +88,9 @@ pub mod example_ccip_sender {
         // CPI: get fee from router
         let fee: GetFeeResult = {
             let mut acc_infos: Vec<AccountInfo> = [
+                ctx.accounts.ccip_config.to_account_info(),
+                ctx.accounts.ccip_dest_chain_state.to_account_info(),
+                ctx.accounts.ccip_fee_quoter.to_account_info(),
                 ctx.accounts.ccip_fee_quoter_config.to_account_info(),
                 ctx.accounts.ccip_fee_quoter_dest_chain.to_account_info(),
                 ctx.accounts
@@ -106,7 +121,7 @@ pub mod example_ccip_sender {
                 .collect();
 
             let instruction = Instruction {
-                program_id: ctx.accounts.ccip_fee_quoter.key(),
+                program_id: ctx.accounts.ccip_router.key(),
                 accounts: acc_metas,
                 data: builder::instruction(
                     &message,
@@ -156,7 +171,9 @@ pub mod example_ccip_sender {
             ctx.accounts
                 .ccip_fee_quoter_link_token_config
                 .to_account_info(),
-            ctx.accounts.ccip_token_pools_signer.to_account_info(),
+            ctx.accounts.ccip_rmn_remote.to_account_info(),
+            ctx.accounts.ccip_rmn_remote_curses.to_account_info(),
+            ctx.accounts.ccip_rmn_remote_config.to_account_info(),
         ]
         .to_vec();
 
@@ -180,7 +197,7 @@ pub mod example_ccip_sender {
             accounts: acc_metas,
             data: builder::instruction_with_token_indexes(
                 &message,
-                CCIP_SEND_DISCIRIMINATOR,
+                CCIP_SEND_DISCRIMINATOR,
                 dest_chain_selector,
                 &ccip_token_indexes,
             ),

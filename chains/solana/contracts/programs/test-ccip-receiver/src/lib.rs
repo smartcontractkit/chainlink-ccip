@@ -4,7 +4,7 @@ use example_ccip_receiver::{
     Any2SVMMessage, BaseState, CcipReceiverError, ALLOWED_OFFRAMP, EXTERNAL_EXECUTION_CONFIG_SEED,
 };
 
-declare_id!("CtEVnHsQzhTNWav8skikiV2oF6Xx7r7uGGa8eCDQtTjH");
+declare_id!("EvhgrPhTDt4LcSPS2kfJgH6T6XWZ6wT3X9ncDGLT1vui");
 
 /// This program an example of a CCIP Receiver Program.
 /// Used to test CCIP Router execute.
@@ -17,12 +17,17 @@ pub mod test_ccip_receiver {
 
     /// The initialization is responsibility of the External User, CCIP is not handling initialization of Accounts
     pub fn initialize(ctx: Context<Initialize>, router: Pubkey) -> Result<()> {
-        msg!("Called `initialize` {:?}", ctx);
         ctx.accounts.counter.value = 0;
+        ctx.accounts.counter.reject_all = false;
         ctx.accounts
             .counter
             .state
             .init(ctx.accounts.authority.key(), router)
+    }
+
+    pub fn set_reject_all(ctx: Context<SetRejectAll>, reject_all: bool) -> Result<()> {
+        ctx.accounts.counter.reject_all = reject_all;
+        Ok(())
     }
 
     /// This function is called by the CCIP Router to execute the CCIP message.
@@ -34,8 +39,19 @@ pub mod test_ccip_receiver {
     pub fn ccip_receive(ctx: Context<CcipReceive>, message: Any2SVMMessage) -> Result<()> {
         msg!("Called `ccip_receive` with message {:?}", message);
 
+        require!(
+            !ctx.accounts.counter.reject_all,
+            CcipTestReceiverError::RejectAll
+        );
+
         let counter = &mut ctx.accounts.counter;
-        counter.value += 1;
+        let (incremented, wrapped_around) = counter.value.overflowing_add(1);
+        counter.value = incremented;
+        msg!(
+            "Wrapped around: {} | New Counter: {}",
+            wrapped_around,
+            counter.value
+        );
 
         // additional accounts trigger additional CPI call
         if !ctx.remaining_accounts.is_empty() {
@@ -87,6 +103,12 @@ pub mod test_ccip_receiver {
     }
 }
 
+#[error_code]
+pub enum CcipTestReceiverError {
+    #[msg("Rejecting all messages")]
+    RejectAll,
+}
+
 const ANCHOR_DISCRIMINATOR: usize = 8;
 
 #[derive(Accounts, Debug)]
@@ -115,13 +137,28 @@ pub struct Initialize<'info> {
     pub system_program: Program<'info, System>,
 }
 
+#[derive(Accounts)]
+pub struct SetRejectAll<'info> {
+    #[account(
+        mut,
+        seeds = [b"counter"],
+        bump,
+    )]
+    pub counter: Account<'info, Counter>,
+
+    #[account(
+        address = counter.state.owner @ CcipReceiverError::OnlyOwner,
+    )]
+    pub authority: Signer<'info>,
+}
+
 #[derive(Accounts, Debug)]
 #[instruction(message: Any2SVMMessage)]
 pub struct CcipReceive<'info> {
     // Offramp CPI signer PDA must be first
     // It is not mutable, and thus cannot be used as payer of init/realloc of other PDAs.
     #[account(
-        seeds = [EXTERNAL_EXECUTION_CONFIG_SEED],
+        seeds = [EXTERNAL_EXECUTION_CONFIG_SEED, crate::ID.as_ref()],
         bump,
         seeds::program = offramp_program.key(),
     )]
@@ -178,7 +215,8 @@ pub struct TokenPool<'info> {
 #[account]
 #[derive(InitSpace, Debug)]
 pub struct Counter {
-    pub value: u8,
+    pub value: u64,
+    pub reject_all: bool,
     pub state: BaseState,
 }
 
@@ -208,4 +246,23 @@ pub struct ReleaseOrMintInV1 {
     source_pool_data: Vec<u8>, //          The data received from the source pool to process the release or mint
     /// @dev WARNING: offchainTokenData is untrusted data.
     offchain_token_data: Vec<u8>, //       The offchain data to process the release or mint
+}
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn wrap_around() {
+        let i: u8 = 255;
+        let (incremented, wrapped_around) = i.overflowing_add(1);
+        assert_eq!(incremented, 0);
+        assert_eq!(wrapped_around, true);
+    }
+
+    #[test]
+    fn dont_wrap_around() {
+        let i: u8 = 254;
+        let (incremented, wrapped_around) = i.overflowing_add(1);
+        assert_eq!(incremented, 255);
+        assert_eq!(wrapped_around, false);
+    }
 }

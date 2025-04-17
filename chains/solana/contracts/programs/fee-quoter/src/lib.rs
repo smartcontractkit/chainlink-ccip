@@ -1,7 +1,7 @@
 use anchor_lang::error_code;
 use anchor_lang::prelude::*;
 
-declare_id!("FeeVB9Q77QvyaENRL1i77BjW6cTkaWwNLjNbZg9JHqpw");
+declare_id!("FeeQPGkKDeRV1MgoYfMH6L8o3KeuYjwUZrgn4LRKfjHi");
 
 pub mod context;
 use context::*;
@@ -20,6 +20,9 @@ pub mod extra_args;
 mod instructions;
 use instructions::router;
 
+// 1e18 Juels = 1 LINK natively (in EVM.) In SVM, the LINK mint likely has different decimals.
+pub const LINK_JUEL_DECIMALS: u8 = 18;
+
 #[program]
 pub mod fee_quoter {
     use super::*;
@@ -31,30 +34,39 @@ pub mod fee_quoter {
     /// # Arguments
     ///
     /// * `ctx` - The context containing the accounts required for initialization.
-    /// * `svm_chain_selector` - The chain selector for SVM.
-    /// * `default_gas_limit` - The default gas limit for other destination chains.
-    /// * `default_allow_out_of_order_execution` - Whether out-of-order execution is allowed by default for other destination chains.
-    /// * `enable_execution_after` - The minimum amount of time required between a message has been committed and can be manually executed.
+    /// * `max_fee_juels_per_msg` - The maximum fee in juels that can be charged per message.
+    /// * `onramp` - The public key of the onramp.
+    ///
+    /// The function also uses the link_token_mint account from the context.
     #[allow(clippy::too_many_arguments)]
     pub fn initialize(
         ctx: Context<Initialize>,
-        link_token_mint: Pubkey,
         max_fee_juels_per_msg: u128,
         onramp: Pubkey,
     ) -> Result<()> {
+        require!(
+            ctx.accounts.link_token_mint.decimals <= LINK_JUEL_DECIMALS,
+            FeeQuoterError::InvalidInputsMint
+        );
+
+        // trivial non-zero check, the value is provided in the expected 18-decimal format
+        require!(max_fee_juels_per_msg > 0, FeeQuoterError::InvalidInputs);
+
         ctx.accounts.config.set_inner(Config {
             version: 1,
             owner: ctx.accounts.authority.key(),
             proposed_owner: Pubkey::default(),
             max_fee_juels_per_msg,
-            link_token_mint,
+            link_token_mint: ctx.accounts.link_token_mint.key(),
+            link_token_local_decimals: ctx.accounts.link_token_mint.decimals,
             onramp,
             default_code_version: CodeVersion::V1,
         });
 
         emit!(ConfigSet {
             max_fee_juels_per_msg,
-            link_token_mint,
+            link_token_mint: ctx.accounts.link_token_mint.key(),
+            link_token_local_decimals: ctx.accounts.link_token_mint.decimals,
             onramp,
             default_code_version: CodeVersion::V1,
         });
@@ -315,18 +327,12 @@ pub mod fee_quoter {
     }
 }
 
-// TODO this is a hack because Anchor + Anchor-Go fail to include all errors in the IDL and the gobindings.
-// By having this first (though unused) error enum here, it does pick up the actual (second) error enum
-#[error_code]
-pub enum AnchorErrorHack {
-    Something,
-    Else,
-}
-
 #[error_code]
 pub enum FeeQuoterError {
     #[msg("The signer is unauthorized")]
-    Unauthorized,
+    // offset error code so that they don't clash with other programs
+    // (Anchor's base custom error code 6000 + offset 2000 = start at 8000)
+    Unauthorized = 2000,
     #[msg("Invalid inputs")]
     InvalidInputs,
     #[msg("Gas limit is zero")]
@@ -389,6 +395,10 @@ pub enum FeeQuoterError {
     ExtraArgOutOfOrderExecutionMustBeTrue,
     #[msg("Invalid extra args tag")]
     InvalidExtraArgsTag,
+    #[msg("Invalid amount of accounts in extra args")]
+    InvalidExtraArgsAccounts,
+    #[msg("Invalid writability bitmap in extra args")]
+    InvalidExtraArgsWritabilityBitmap,
     #[msg("Invalid chain family selector")]
     InvalidChainFamilySelector,
     #[msg("Invalid token receiver")]
@@ -397,6 +407,10 @@ pub enum FeeQuoterError {
     InvalidSVMAddress,
     #[msg("The caller is not an authorized price updater")]
     UnauthorizedPriceUpdater,
+    #[msg("Minimum token transfer fee exceeds maximum")]
+    InvalidTokenTransferFeeMaxMin,
+    #[msg("Insufficient dest bytes overhead on transfer fee config")]
+    InvalidTokenTransferFeeDestBytesOverhead,
     #[msg("Invalid code version")]
     InvalidCodeVersion,
 }

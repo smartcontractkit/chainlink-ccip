@@ -10,13 +10,25 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// Execute a bypasser operation immediately.
+// Execute operations immediately using the bypasser flow, bypassing time delays
+// and predecessor checks.
+//
+// This function provides an emergency execution mechanism that:
+// 1. Skips the timelock waiting period required for standard operations
+// 2. Does not enforce predecessor dependencies
+// 3. Closes the operation account after execution
+//
+// # Emergency Use Only
+//
+// The bypasser flow is intended strictly for emergency situations where
+// waiting for the standard timelock delay would cause harm. Access to this
+// function is tightly controlled through the Bypasser role.
 //
 // # Parameters
 //
-// - `ctx`: The context containing the bypasser execution account.
-// - `timelock_id`: The timelock identifier.
-// - `id`: The operation identifier.
+// - `ctx`: Context containing operation accounts and signer information
+// - `timelock_id`: Identifier for the timelock instance
+// - `_id`: Operation ID (used for PDA derivation)
 type BypasserExecuteBatch struct {
 	TimelockId *[32]uint8
 	Id         *[32]uint8

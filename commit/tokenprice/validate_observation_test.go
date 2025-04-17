@@ -8,10 +8,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	mapset "github.com/deckarep/golang-set/v2"
+
 	"github.com/smartcontractkit/libocr/commontypes"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	commonmock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/plugincommon"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -131,7 +131,7 @@ func TestValidateObservation(t *testing.T) {
 		FeedTokenPrices: cciptypes.TokenPriceMap{
 			"0x1": oneBig,
 		},
-		FeeQuoterTokenUpdates: map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig{
+		FeeQuoterTokenUpdates: map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig{
 			"0x1": {Value: oneBig, Timestamp: time.Now().Add(-time.Hour)},
 		},
 		Timestamp: time.Now().Add(-time.Hour),
@@ -221,7 +221,7 @@ func TestValidateObservation(t *testing.T) {
 			name: "invalid token update",
 			obs: func() Observation {
 				obs := defaultObs
-				obs.FeeQuoterTokenUpdates = map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig{
+				obs.FeeQuoterTokenUpdates = map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig{
 					"0x1": {Value: oneBig, Timestamp: time.Now().Add(time.Hour)}, // future timestamp
 				}
 				return obs
@@ -270,18 +270,18 @@ func TestValidateObservation(t *testing.T) {
 func TestValidateObservedTokenUpdates(t *testing.T) {
 	testCases := []struct {
 		name          string
-		tokenUpdates  map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig
+		tokenUpdates  map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig
 		tokensToQuery map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo
 		expErr        bool
 	}{
 		{
 			name:         "empty is valid",
-			tokenUpdates: map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig{},
+			tokenUpdates: map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig{},
 			expErr:       false,
 		},
 		{
 			name: "all valid",
-			tokenUpdates: map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig{
+			tokenUpdates: map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig{
 				"0x1": {Value: oneBig, Timestamp: time.Now().Add(-time.Hour)},
 				"0xa": {Value: oneBig, Timestamp: time.Now().Add(-time.Hour)},
 			},
@@ -290,7 +290,7 @@ func TestValidateObservedTokenUpdates(t *testing.T) {
 		},
 		{
 			name: "nil value",
-			tokenUpdates: map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig{
+			tokenUpdates: map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig{
 				"0x1": {Value: oneBig, Timestamp: time.Now().Add(-time.Hour)},
 				"0x3": {Value: nilBig, Timestamp: time.Now().Add(-time.Hour)}, // nil value
 			},
@@ -299,7 +299,7 @@ func TestValidateObservedTokenUpdates(t *testing.T) {
 		},
 		{
 			name: "invalid timestamp",
-			tokenUpdates: map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig{
+			tokenUpdates: map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig{
 				"0x1": {Value: oneBig, Timestamp: time.Now().Add(-time.Hour)},
 				"0x3": {Value: oneBig, Timestamp: time.Now().Add(time.Hour)}, // future timestamp
 			},
@@ -308,7 +308,7 @@ func TestValidateObservedTokenUpdates(t *testing.T) {
 		},
 		{
 			name: "non queryable token",
-			tokenUpdates: map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig{
+			tokenUpdates: map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig{
 				"0x5": {Value: oneBig, Timestamp: time.Now().Add(-time.Hour)},
 			},
 			tokensToQuery: defaultTokensToQuery,

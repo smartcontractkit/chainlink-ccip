@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
-	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
@@ -23,12 +22,17 @@ type Query struct {
 	RMNSignatures      *rmn.ReportSignatures
 }
 
+// ContainsRmnSignatures returns true if the query contains RMN signatures.
+func (q Query) ContainsRmnSignatures() bool {
+	return q.RMNSignatures != nil && len(q.RMNSignatures.Signatures) > 0
+}
+
 type Observation struct {
 	MerkleRoots        []cciptypes.MerkleRootChain      `json:"merkleRoots"`
 	RMNEnabledChains   map[cciptypes.ChainSelector]bool `json:"rmnEnabledChains"`
 	OnRampMaxSeqNums   []plugintypes.SeqNumChain        `json:"onRampMaxSeqNums"`
 	OffRampNextSeqNums []plugintypes.SeqNumChain        `json:"offRampNextSeqNums"`
-	RMNRemoteConfig    rmntypes.RemoteConfig            `json:"rmnRemoteConfig"`
+	RMNRemoteConfig    cciptypes.RemoteConfig           `json:"rmnRemoteConfig"`
 	FChain             map[cciptypes.ChainSelector]int  `json:"fChain"`
 }
 
@@ -66,7 +70,7 @@ type aggregatedObservation struct {
 	OffRampNextSeqNums map[cciptypes.ChainSelector][]cciptypes.SeqNum
 
 	// The RMNRemoteConfig observed
-	RMNRemoteConfigs []rmntypes.RemoteConfig
+	RMNRemoteConfigs []cciptypes.RemoteConfig
 
 	// A map from chain selectors to the list of f (failure tolerance) observed for each chain
 	FChain map[cciptypes.ChainSelector][]int
@@ -79,7 +83,7 @@ func aggregateObservations(aos []plugincommon.AttributedObservation[Observation]
 		RMNEnabledChains:   make(map[cciptypes.ChainSelector][]bool),
 		OnRampMaxSeqNums:   make(map[cciptypes.ChainSelector][]cciptypes.SeqNum),
 		OffRampNextSeqNums: make(map[cciptypes.ChainSelector][]cciptypes.SeqNum),
-		RMNRemoteConfigs:   make([]rmntypes.RemoteConfig, 0),
+		RMNRemoteConfigs:   make([]cciptypes.RemoteConfig, 0),
 		FChain:             make(map[cciptypes.ChainSelector][]int),
 	}
 
@@ -138,7 +142,7 @@ type consensusObservation struct {
 	OffRampNextSeqNums map[cciptypes.ChainSelector]cciptypes.SeqNum
 
 	// The consensus RMNRemoteConfig
-	RMNRemoteConfig map[cciptypes.ChainSelector]rmntypes.RemoteConfig
+	RMNRemoteConfig map[cciptypes.ChainSelector]cciptypes.RemoteConfig
 
 	// A map from chain selectors to each chain's consensus f (failure tolerance)
 	FChain map[cciptypes.ChainSelector]int
@@ -163,7 +167,7 @@ type Outcome struct {
 	OffRampNextSeqNums              []plugintypes.SeqNumChain        `json:"offRampNextSeqNums"`
 	ReportTransmissionCheckAttempts uint                             `json:"reportTransmissionCheckAttempts"`
 	RMNReportSignatures             []cciptypes.RMNECDSASignature    `json:"rmnReportSignatures"`
-	RMNRemoteCfg                    rmntypes.RemoteConfig            `json:"rmnRemoteCfg"`
+	RMNRemoteCfg                    cciptypes.RemoteConfig           `json:"rmnRemoteCfg"`
 }
 
 func (o Outcome) Stats() map[string]int {

@@ -10,15 +10,15 @@ import (
 	"golang.org/x/exp/maps"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/libocr/commontypes"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	plugincommon2 "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/mocks/internal_/plugincommon"
 	reader2 "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	"github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
@@ -33,7 +33,7 @@ func Test_processor_Observation(t *testing.T) {
 		supportedChains              []ccipocr3.ChainSelector
 		chainFeeComponents           map[ccipocr3.ChainSelector]types.ChainFeeComponents
 		nativeTokenPrices            map[ccipocr3.ChainSelector]ccipocr3.BigInt
-		existingChainFeePriceUpdates map[ccipocr3.ChainSelector]plugintypes.TimestampedBig
+		existingChainFeePriceUpdates map[ccipocr3.ChainSelector]ccipocr3.TimestampedBig
 		fChain                       map[ccipocr3.ChainSelector]int
 		expectedChainFeePriceUpdates map[ccipocr3.ChainSelector]Update
 
@@ -60,7 +60,7 @@ func Test_processor_Observation(t *testing.T) {
 				1: ccipocr3.NewBigIntFromInt64(1000),
 				2: ccipocr3.NewBigIntFromInt64(2000),
 			},
-			existingChainFeePriceUpdates: map[ccipocr3.ChainSelector]plugintypes.TimestampedBig{
+			existingChainFeePriceUpdates: map[ccipocr3.ChainSelector]ccipocr3.TimestampedBig{
 				1: {
 					Timestamp: fourHoursAgo,
 					Value: ccipocr3.NewBigInt(FeeComponentsToPackedFee(ComponentsUSDPrices{
@@ -124,6 +124,7 @@ func Test_processor_Observation(t *testing.T) {
 				oracleID:        oracleID,
 				homeChain:       homeChain,
 				metricsReporter: plugincommon2.NoopReporter{},
+				obs:             newBaseObserver(ccipReader, tc.dstChain, oracleID, cs),
 			}
 
 			supportedSet := mapset.NewSet(tc.supportedChains...)
@@ -134,6 +135,10 @@ func Test_processor_Observation(t *testing.T) {
 			supportedSet.Remove(tc.dstChain)
 			slicesWithoutDst := supportedSet.ToSlice()
 			sort.Slice(slicesWithoutDst, func(i, j int) bool { return slicesWithoutDst[i] < slicesWithoutDst[j] })
+
+			if len(slicesWithoutDst) == 0 {
+				slicesWithoutDst = []ccipocr3.ChainSelector(nil)
+			}
 
 			ccipReader.EXPECT().GetChainsFeeComponents(ctx, slicesWithoutDst).
 				Return(tc.chainFeeComponents).Maybe()
@@ -180,7 +185,7 @@ func Test_unique_chain_filter_in_Observation(t *testing.T) {
 		supportedChains              []ccipocr3.ChainSelector
 		chainFeeComponents           map[ccipocr3.ChainSelector]types.ChainFeeComponents
 		nativeTokenPrices            map[ccipocr3.ChainSelector]ccipocr3.BigInt
-		existingChainFeePriceUpdates map[ccipocr3.ChainSelector]plugintypes.TimestampedBig
+		existingChainFeePriceUpdates map[ccipocr3.ChainSelector]ccipocr3.TimestampedBig
 		fChain                       map[ccipocr3.ChainSelector]int
 		dstChain                     ccipocr3.ChainSelector
 		expUniqueChains              int
@@ -203,7 +208,7 @@ func Test_unique_chain_filter_in_Observation(t *testing.T) {
 				1: ccipocr3.NewBigIntFromInt64(1000),
 				2: ccipocr3.NewBigIntFromInt64(2000),
 			},
-			existingChainFeePriceUpdates: map[ccipocr3.ChainSelector]plugintypes.TimestampedBig{
+			existingChainFeePriceUpdates: map[ccipocr3.ChainSelector]ccipocr3.TimestampedBig{
 				1: {
 					Timestamp: fourHoursAgo,
 					Value: ccipocr3.NewBigInt(FeeComponentsToPackedFee(ComponentsUSDPrices{
@@ -243,7 +248,7 @@ func Test_unique_chain_filter_in_Observation(t *testing.T) {
 			nativeTokenPrices: map[ccipocr3.ChainSelector]ccipocr3.BigInt{
 				1: ccipocr3.NewBigIntFromInt64(1000),
 			},
-			existingChainFeePriceUpdates: map[ccipocr3.ChainSelector]plugintypes.TimestampedBig{
+			existingChainFeePriceUpdates: map[ccipocr3.ChainSelector]ccipocr3.TimestampedBig{
 				1: {
 					Timestamp: fourHoursAgo,
 					Value: ccipocr3.NewBigInt(FeeComponentsToPackedFee(ComponentsUSDPrices{
@@ -283,7 +288,7 @@ func Test_unique_chain_filter_in_Observation(t *testing.T) {
 			nativeTokenPrices: map[ccipocr3.ChainSelector]ccipocr3.BigInt{
 				3: ccipocr3.NewBigIntFromInt64(1000),
 			},
-			existingChainFeePriceUpdates: map[ccipocr3.ChainSelector]plugintypes.TimestampedBig{
+			existingChainFeePriceUpdates: map[ccipocr3.ChainSelector]ccipocr3.TimestampedBig{
 				3: {
 					Timestamp: fourHoursAgo,
 					Value: ccipocr3.NewBigInt(FeeComponentsToPackedFee(ComponentsUSDPrices{
@@ -318,6 +323,7 @@ func Test_unique_chain_filter_in_Observation(t *testing.T) {
 				oracleID:        oracleID,
 				homeChain:       homeChain,
 				metricsReporter: plugincommon2.NoopReporter{},
+				obs:             newBaseObserver(ccipReader, tc.dstChain, oracleID, cs),
 			}
 
 			supportedSet := mapset.NewSet(tc.supportedChains...)

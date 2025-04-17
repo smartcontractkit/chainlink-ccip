@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	mapset "github.com/deckarep/golang-set/v2"
 	"golang.org/x/sync/errgroup"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
@@ -22,7 +21,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
-	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
@@ -48,6 +46,8 @@ func (p *Processor) ObservationQuorum(
 		aos,
 	), nil
 }
+
+const SendingObservation = "sending merkle root processor observation"
 
 // Observation makes external calls to observe information according to the current processor state.
 // According to the state it either observes sequence numbers, root hashes, RMN remote config, etc...
@@ -78,7 +78,7 @@ func (p *Processor) Observation(
 	if err != nil {
 		return Observation{}, fmt.Errorf("get observation: %w", err)
 	}
-	lggr.Infow("sending merkle root processor observation",
+	lggr.Infow(SendingObservation,
 		"observation", observation, "nextState", nextState, "observationDuration", time.Since(tStart))
 	return observation, nil
 }
@@ -197,36 +197,32 @@ func (p *Processor) verifyQuery(ctx context.Context, prevOutcome Outcome, q Quer
 
 // shouldSkipRMNVerification checks whether RMN verification should be skipped based on the current state and query.
 func shouldSkipRMNVerification(nextState processorState, q Query, prevOutcome Outcome) (bool, error) {
-	// Skip verification if RMN signatures are not expected in the current state.
-	if nextState != buildingReport && q.RMNSignatures == nil {
-		return true, nil
-	}
+	emptySigs := !q.ContainsRmnSignatures()
 
-	// Skip verification if we are retrying RMN signatures in the next round.
-	if nextState == buildingReport && q.RetryRMNSignatures {
-		if q.RMNSignatures != nil {
+	switch nextState {
+	case buildingReport:
+		if q.RetryRMNSignatures {
+			if emptySigs {
+				return true, nil
+			}
 			return false, fmt.Errorf("RMN signatures are provided but not expected if retrying is set to true")
 		}
-		return true, nil
-	}
 
-	// If in the BuildingReport state and RMN signatures are required but not provided, return an error.
-	if nextState == buildingReport && !q.RetryRMNSignatures && q.RMNSignatures == nil {
-		return false, ErrSignaturesNotProvidedByLeader
-	}
+		if prevOutcome.RMNRemoteCfg.IsEmpty() {
+			return false, fmt.Errorf("RMN report config is not provided from the previous outcome")
+		}
 
-	// If in the BuildingReport state but RMN remote config is not available, return an error.
-	if nextState == buildingReport && prevOutcome.RMNRemoteCfg.IsEmpty() {
-		return false, fmt.Errorf("RMN report config is not provided from the previous outcome")
-	}
+		// we don't want to check for empty sigs since at this point we don't know which chains are RMN-disabled.
+		// if signatures are missing for specific chains they will be caught in the outcome phase.
 
-	// If RMN signatures are unexpectedly provided in a non-BuildingReport state, return an error.
-	if nextState != buildingReport && q.RMNSignatures != nil {
+		return false, nil
+	default:
+		if emptySigs {
+			return true, nil // Sigs not expected
+		}
+		// If RMN signatures are unexpectedly provided in a non-BuildingReport state, return an error.
 		return false, fmt.Errorf("RMN signatures are provided but not expected in the %d state", nextState)
 	}
-
-	// Proceed with RMN verification.
-	return false, nil
 }
 
 func (p *Processor) getObservation(
@@ -297,10 +293,10 @@ type Observer interface {
 	// NOTE: Make sure that caller supports the provided chains.
 	ObserveMerkleRoots(ctx context.Context, ranges []plugintypes.ChainRange) []cciptypes.MerkleRootChain
 
-	// ObserveRMNRemoteCfg observes the RMN remote config for the given destination chain.
+	// ObserveRMNRemoteCfg observes the RMN remote config from the configured destination chain.
 	// Check implementation specific details to learn if external calls are made, if values are cached, etc...
 	// NOTE: Make sure that caller supports the destination chain.
-	ObserveRMNRemoteCfg(ctx context.Context) rmntypes.RemoteConfig
+	ObserveRMNRemoteCfg(ctx context.Context) cciptypes.RemoteConfig
 
 	// ObserveFChain observes the FChain for each supported chain. Check implementation specific details to learn
 	// if external calls are made, if values are cached, etc...
@@ -433,7 +429,7 @@ func (o *asyncObserver) ObserveMerkleRoots(
 }
 
 // ObserveRMNRemoteCfg observes the RMN Remote Config by directly calling the base observer since this value is cached.
-func (o *asyncObserver) ObserveRMNRemoteCfg(ctx context.Context) rmntypes.RemoteConfig {
+func (o *asyncObserver) ObserveRMNRemoteCfg(ctx context.Context) cciptypes.RemoteConfig {
 	return o.syncObserver.ObserveRMNRemoteCfg(ctx)
 }
 
@@ -501,7 +497,7 @@ func (o observerImpl) ObserveOffRampNextSeqNums(ctx context.Context) []plugintyp
 		return nil
 	}
 
-	curseInfo, err := o.ccipReader.GetRmnCurseInfo(ctx, allSourceChains)
+	curseInfo, err := o.ccipReader.GetRmnCurseInfo(ctx)
 	if err != nil {
 		lggr.Errorw("nothing to observe: rmn read error",
 			"err", err,
@@ -548,25 +544,28 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(ctx context.Context) []pluginty
 		return nil
 	}
 
-	supportedChains, err := o.chainSupport.SupportedChains(o.oracleID)
+	sourceChainsConfig, err := o.ccipReader.GetOffRampSourceChainsConfig(ctx, allSourceChains)
 	if err != nil {
-		lggr.Warnw("call to KnownSourceChainsSlice failed", "err", err)
+		lggr.Errorw("get offRamp source chains config failed", "err", err)
 		return nil
 	}
 
-	sourceChains := mapset.NewSet(allSourceChains...).Intersect(supportedChains).ToSlice()
-	sort.Slice(sourceChains, func(i, j int) bool { return sourceChains[i] < sourceChains[j] })
-
 	mu := &sync.Mutex{}
-	latestOnRampSeqNums := make([]plugintypes.SeqNumChain, 0, len(sourceChains))
-	eg := &errgroup.Group{}
+	latestOnRampSeqNums := make([]plugintypes.SeqNumChain, 0, len(sourceChainsConfig))
 
-	for _, sourceChain := range sourceChains {
-		eg.Go(func() error {
+	wg := &sync.WaitGroup{}
+	for sourceChain, cfg := range sourceChainsConfig {
+		if !cfg.IsEnabled {
+			lggr.Debugw("ObserveLatestOnRampSeqNums source chain is disabled, skipping", "chain", sourceChain)
+			continue
+		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
 			latestOnRampSeqNum, err := o.ccipReader.LatestMsgSeqNum(ctx, sourceChain)
 			if err != nil {
 				lggr.Errorf("failed to get latest msg seq num for source chain %d: %s", sourceChain, err)
-				return nil
+				return
 			}
 
 			mu.Lock()
@@ -575,19 +574,14 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(ctx context.Context) []pluginty
 				plugintypes.NewSeqNumChain(sourceChain, latestOnRampSeqNum),
 			)
 			mu.Unlock()
-
-			return nil
-		})
+		}()
 	}
-
-	if err := eg.Wait(); err != nil {
-		lggr.Warnw("call to GetExpectedNextSequenceNumber failed", "err", err)
-		return nil
-	}
+	wg.Wait()
 
 	sort.Slice(latestOnRampSeqNums, func(i, j int) bool {
 		return latestOnRampSeqNums[i].ChainSel < latestOnRampSeqNums[j].ChainSel
 	})
+	lggr.Debugw("fetched latestOnRampSeqNums", "seqNums", latestOnRampSeqNums)
 	return latestOnRampSeqNums
 }
 
@@ -703,7 +697,7 @@ func (o observerImpl) computeMerkleRoot(
 
 			msgHash, err := o.msgHasher.Hash(ctx, msg)
 			if err != nil {
-				lggr.Warnw("failed to hash message", "msg", msg, "err", err)
+				lggr.Warnw("failed to hash message", "message", msg, "err", err)
 				return fmt.Errorf("hash message with id %s: %w", msg.Header.MessageID, err)
 			}
 
@@ -730,18 +724,18 @@ func (o observerImpl) computeMerkleRoot(
 
 // ObserveRMNRemoteCfg observes the RMN remote config for the given destination chain.
 // NOTE: At least two external calls are made.
-func (o observerImpl) ObserveRMNRemoteCfg(ctx context.Context) rmntypes.RemoteConfig {
+func (o observerImpl) ObserveRMNRemoteCfg(ctx context.Context) cciptypes.RemoteConfig {
 	lggr := logutil.WithContextValues(ctx, o.lggr)
 
 	rmnRemoteCfg, err := o.ccipReader.GetRMNRemoteConfig(ctx)
 	if err != nil {
 		if errors.Is(err, readerpkg.ErrContractReaderNotFound) {
 			// destination chain not supported
-			return rmntypes.RemoteConfig{}
+			return cciptypes.RemoteConfig{}
 		}
 		// legitimate error
 		lggr.Errorw("call to GetRMNRemoteConfig failed", "err", err)
-		return rmntypes.RemoteConfig{}
+		return cciptypes.RemoteConfig{}
 	}
 	return rmnRemoteCfg
 }

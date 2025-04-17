@@ -5,10 +5,14 @@ use crate::state::MessageExecutionState;
 
 #[event]
 pub struct CommitReportAccepted {
-    // Will be zero'd (MerkleRoot::Default() in case the commit report included no
-    // merkle root. This is to circumvent a Go deserialization issue.)
-    pub merkle_root: MerkleRoot,
+    pub merkle_root: Option<MerkleRoot>,
     pub price_updates: PriceUpdates,
+}
+
+#[event]
+pub struct CommitReportPDAClosed {
+    pub source_chain_selector: u64,
+    pub merkle_root: [u8; 32],
 }
 
 #[event]
@@ -66,5 +70,6 @@ pub mod admin {
         pub router: Pubkey,
         pub fee_quoter: Pubkey,
         pub offramp_lookup_table: Pubkey,
+        pub rmn_remote: Pubkey,
     }
 }

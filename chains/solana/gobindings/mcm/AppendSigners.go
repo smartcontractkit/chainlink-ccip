@@ -10,7 +10,15 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// AppendSigners is the `appendSigners` instruction.
+// Append a batch of signer addresses to the temporary storage.
+//
+// Allows adding multiple signer addresses in batches to overcome transaction size limits.
+//
+// # Parameters
+//
+// - `ctx`: The context containing required accounts.
+// - `multisig_id`: The multisig instance identifier.
+// - `signers_batch`: A batch of Ethereum addresses (20 bytes each) to be added as signers.
 type AppendSigners struct {
 	MultisigId   *[32]uint8
 	SignersBatch *[][20]uint8

@@ -7,7 +7,6 @@ use crate::eth_utils::*;
 use crate::event::*;
 use crate::state::root::*;
 
-/// Set the configuration for the multisig instance after validating the input
 pub fn set_config(
     ctx: Context<SetConfig>,
     _multisig_id: [u8; MULTISIG_ID_PADDED], // for pda derivation

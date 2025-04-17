@@ -2,9 +2,10 @@ use anchor_lang::prelude::*;
 
 use crate::context::{
     AcceptOwnership, AddChainSelector, AddOfframp, CcipSend, RemoveOfframp, TransferOwnership,
-    UpdateConfigCCIPRouter, UpdateDestChainSelectorConfig, WithdrawBilledFunds,
+    UpdateConfigCCIPRouter, UpdateDestChainSelectorConfig, UpdateDestChainSelectorConfigNoRealloc,
+    WithdrawBilledFunds,
 };
-use crate::messages::SVM2AnyMessage;
+use crate::messages::{GetFeeResult, SVM2AnyMessage};
 use crate::state::{CodeVersion, DestChainConfig};
 use crate::token_context::{
     AcceptAdminRoleTokenAdminRegistry, ModifyTokenAdminRegistry,
@@ -12,6 +13,7 @@ use crate::token_context::{
     RegisterTokenAdminRegistryByCCIPAdmin, RegisterTokenAdminRegistryByOwner,
     SetPoolTokenAdminRegistry,
 };
+use crate::GetFee;
 
 pub trait Admin {
     fn transfer_ownership(
@@ -34,6 +36,12 @@ pub trait Admin {
         fee_aggregator: Pubkey,
     ) -> Result<()>;
 
+    fn update_rmn_remote(
+        &self,
+        ctx: Context<UpdateConfigCCIPRouter>,
+        rmn_remote: Pubkey,
+    ) -> Result<()>;
+
     fn add_chain_selector(
         &self,
         ctx: Context<AddChainSelector>,
@@ -50,13 +58,13 @@ pub trait Admin {
 
     fn bump_ccip_version_for_dest_chain(
         &self,
-        ctx: Context<UpdateDestChainSelectorConfig>,
+        ctx: Context<UpdateDestChainSelectorConfigNoRealloc>,
         dest_chain_selector: u64,
     ) -> Result<()>;
 
     fn rollback_ccip_version_for_dest_chain(
         &self,
-        ctx: Context<UpdateDestChainSelectorConfig>,
+        ctx: Context<UpdateDestChainSelectorConfigNoRealloc>,
         dest_chain_selector: u64,
     ) -> Result<()>;
 
@@ -96,6 +104,13 @@ pub trait OnRamp {
         message: SVM2AnyMessage,
         token_indexes: Vec<u8>,
     ) -> Result<[u8; 32]>;
+
+    fn get_fee<'info>(
+        &self,
+        ctx: Context<'_, '_, 'info, 'info, GetFee<'info>>,
+        dest_chain_selector: u64,
+        message: SVM2AnyMessage,
+    ) -> Result<GetFeeResult>;
 }
 
 pub trait TokenAdminRegistry {

@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface;
 
+use crate::context::UpdateDestChainSelectorConfigNoRealloc;
 use crate::events::admin as events;
 use crate::state::{CodeVersion, RestoreOnAction};
 use crate::{
@@ -38,8 +39,8 @@ impl Admin for Impl {
             from: config.owner,
             to: config.proposed_owner,
         });
+        // NOTE: take() resets proposed_owner to default
         config.owner = std::mem::take(&mut config.proposed_owner);
-        config.proposed_owner = Pubkey::new_from_array([0; 32]);
         Ok(())
     }
 
@@ -67,6 +68,24 @@ impl Admin for Impl {
         emit!(events::ConfigSet {
             svm_chain_selector: config.svm_chain_selector,
             fee_quoter: config.fee_quoter,
+            rmn_remote: config.rmn_remote,
+            link_token_mint: config.link_token_mint,
+            fee_aggregator: config.fee_aggregator,
+        });
+        Ok(())
+    }
+
+    fn update_rmn_remote(
+        &self,
+        ctx: Context<UpdateConfigCCIPRouter>,
+        rmn_remote: Pubkey,
+    ) -> Result<()> {
+        let config = &mut ctx.accounts.config;
+        config.rmn_remote = rmn_remote;
+        emit!(events::ConfigSet {
+            svm_chain_selector: config.svm_chain_selector,
+            fee_quoter: config.fee_quoter,
+            rmn_remote: config.rmn_remote,
             link_token_mint: config.link_token_mint,
             fee_aggregator: config.fee_aggregator,
         });
@@ -118,7 +137,7 @@ impl Admin for Impl {
 
     fn bump_ccip_version_for_dest_chain(
         &self,
-        ctx: Context<UpdateDestChainSelectorConfig>,
+        ctx: Context<UpdateDestChainSelectorConfigNoRealloc>,
         dest_chain_selector: u64,
     ) -> Result<()> {
         let dest_chain_state = &mut ctx.accounts.dest_chain_state.state;
@@ -138,7 +157,7 @@ impl Admin for Impl {
 
     fn rollback_ccip_version_for_dest_chain(
         &self,
-        ctx: Context<UpdateDestChainSelectorConfig>,
+        ctx: Context<UpdateDestChainSelectorConfigNoRealloc>,
         dest_chain_selector: u64,
     ) -> Result<()> {
         let dest_chain_state = &mut ctx.accounts.dest_chain_state.state;
@@ -194,6 +213,7 @@ impl Admin for Impl {
         emit!(events::ConfigSet {
             svm_chain_selector: config.svm_chain_selector,
             fee_quoter: config.fee_quoter,
+            rmn_remote: config.rmn_remote,
             link_token_mint: config.link_token_mint,
             fee_aggregator: config.fee_aggregator,
         });
@@ -205,7 +225,7 @@ impl Admin for Impl {
         &self,
         ctx: Context<WithdrawBilledFunds>,
         transfer_all: bool,
-        desired_amount: u64, // if transfer_all is false, this value must be 0
+        desired_amount: u64, // if transfer_all is true, this value must be 0
     ) -> Result<()> {
         let transfer = token_interface::TransferChecked {
             from: ctx.accounts.fee_token_accum.to_account_info(),

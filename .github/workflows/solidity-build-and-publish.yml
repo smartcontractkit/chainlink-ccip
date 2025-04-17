@@ -1,0 +1,229 @@
+name: Solidity
+
+on:
+  merge_group:
+  push:
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      changes: ${{ steps.ch.outputs.changes }}
+    steps:
+      - name: Checkout the repo
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Detect changes
+        id: ch
+        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+        with:
+          list-files: 'csv'
+          filters: |
+            src:
+              - 'chains/evm/**/*'
+              - '.github/workflows/solidity-build-and-publish.yml'
+              - '.github/workflows/solidity-wrappers.yml'
+
+  tag-check:
+    needs: [changes]
+    name: Tag Check
+    runs-on: ubuntu-latest
+    outputs:
+      is-release-ccip: ${{ steps.release-tag-check.outputs.is-release }}
+      is-pre-release-ccip: ${{ steps.release-tag-check.outputs.is-pre-release }}
+      release-version-ccip: ${{ steps.release-tag-check.outputs.release-version }}
+      pre-release-version-ccip: ${{ steps.release-tag-check.outputs.pre-release-version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check release tag
+        id: release-tag-check
+        uses: smartcontractkit/.github/actions/release-tag-check@c094a1482049b2b9c0a7cde3f715bd76a60afd97 # release-tag-check@0.1.0
+        env:
+          # Match semver git tags with a "contracts-ccip/" prefix.
+          RELEASE_REGEX: '^contracts-ccip/v[0-9]+\.[0-9]+\.[0-9]+$'
+          PRE_RELEASE_REGEX: '^contracts-ccip/v[0-9]+\.[0-9]+\.[0-9]+-(.+)$'
+          # Get the version by stripping the "contracts-v" prefix.
+          VERSION_PREFIX: "contracts-ccip/v"
+
+  native-compile:
+    needs: [changes, tag-check]
+    if: needs.changes.outputs.changes == 'true' || needs.tag-check.outputs.is-release-ccip == 'true' || needs.tag-check.outputs.is-pre-release-ccip == 'true'
+    name: Native Compilation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the repo
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Checkout diff-so-fancy
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          repository: so-fancy/diff-so-fancy
+          ref: a673cb4d2707f64d92b86498a2f5f71c8e2643d5 # v1.4.3
+          path: diff-so-fancy
+
+      - name: Install diff-so-fancy
+        run: echo "$GITHUB_WORKSPACE/diff-so-fancy" >> $GITHUB_PATH
+
+      - name: Setup NodeJS
+        uses: smartcontractkit/.github/actions/setup-nodejs@c094a1482049b2b9c0a7cde3f715bd76a60afd97
+        with:
+          package-json-directory: chains/evm
+          pnpm-version: ^10.0.0
+
+      - name: Setup Go
+        uses: smartcontractkit/.github/actions/setup-golang@c094a1482049b2b9c0a7cde3f715bd76a60afd97
+        with:
+          go-version-file: "go.mod"
+
+      - name: Install Foundry
+        uses: ./.github/actions/install-solidity-foundry
+        with:
+          working-directory: chains/evm
+
+      - name: Run native compile and generate wrappers
+        working-directory: chains/evm
+        run: make wrappers
+
+      - name: Check if Go solidity wrappers are updated
+        if: ${{ needs.changes.outputs.changes == 'true' }}
+        working-directory: chains/evm
+        run: |
+          git add --all
+          git diff --minimal --color --cached --exit-code | diff-so-fancy
+
+  # The if statements for steps after checkout repo is a workaround for
+  # passing required check for PRs that don't have filtered changes.
+  lint:
+    defaults:
+      run:
+        working-directory: chains/evm
+    needs: [changes]
+    if: needs.changes.outputs.changes == 'true'
+    name: Solidity Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the repo
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Setup NodeJS
+        uses: smartcontractkit/.github/actions/setup-nodejs@c094a1482049b2b9c0a7cde3f715bd76a60afd97
+        with:
+          package-json-directory: chains/evm
+          pnpm-version: ^10.0.0
+      - name: Run solhint
+        run: pnpm solhint
+      - name: Run solhint on tests
+        run: pnpm solhint-test
+
+  publish-beta:
+    name: Publish Beta NPM
+    environment: publish-contracts
+    needs: [tag-check, changes, lint, native-compile]
+    if: needs.tag-check.outputs.is-pre-release-ccip == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the repo
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup NodeJS
+        uses: smartcontractkit/.github/actions/setup-nodejs@c094a1482049b2b9c0a7cde3f715bd76a60afd97
+        with:
+          package-json-directory: chains/evm
+          pnpm-version: ^10.0.0
+
+      - name: Install Foundry
+        uses: ./.github/actions/install-solidity-foundry
+        with:
+          working-directory: chainlink/contracts
+
+      - name: Version package.json
+        working-directory: chains/evm
+        shell: bash
+        env:
+          IS_PRE_RELEASE_CCIP: ${{ needs.tag-check.outputs.is-pre-release-ccip }}
+          PRE_RELEASE_VERSION_CCIP: ${{ needs.tag-check.outputs.pre-release-version-ccip }}
+        run: |
+          version=""
+          if [[ $IS_PRE_RELEASE_CCIP == 'true' ]]; then
+            version="${PRE_RELEASE_VERSION_CCIP}"
+          else
+            echo "::error::No pre-release version found."
+            exit 1
+          fi
+          echo "Bumping version to ${version}"
+          pnpm version "${version}" --no-git-tag-version --no-commit-hooks --no-git-checks
+
+      - name: Publish to NPM (beta)
+        uses: smartcontractkit/.github/actions/ci-publish-npm@4b0ab756abcb1760cb82e1e87b94ff431905bffc # ci-publish-npm@0.4.0
+        with:
+          npm-token: ${{ secrets.NPM_TOKEN }}
+          create-github-release: false
+          publish-command: "pnpm publish-beta --no-git-checks"
+          package-json-directory: contracts
+
+  publish-prod:
+    name: Publish Prod NPM
+    environment: publish-contracts
+    needs: [tag-check, changes, lint, native-compile]
+    if: needs.tag-check.outputs.is-release-ccip == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout the repo
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup NodeJS
+        uses: smartcontractkit/.github/actions/setup-nodejs@c094a1482049b2b9c0a7cde3f715bd76a60afd97
+        with:
+          package-json-directory: chains/evm
+          pnpm-version: ^10.0.0
+
+      - name: Install Foundry
+        uses: ./.github/actions/install-solidity-foundry
+        with:
+          working-directory: chainlink/contracts
+
+      - name: Validate version
+        working-directory: chains/evm
+        shell: bash
+        env:
+          IS_RELEASE_CCIP: ${{ needs.tag-check.outputs.is-release-ccip }}
+          RELEASE_VERSION_CCIP: ${{ needs.tag-check.outputs.release-version-ccip }}
+        run: |
+          version=""
+          if [[ $IS_RELEASE_CCIP == 'true' ]]; then
+            version="${RELEASE_VERSION_CCIP}"
+          else
+            echo "::error::No release version found."
+            exit 1
+          fi
+          package_json_version="$(jq -r '.version' package.json)"
+          if [[ "$PACKAGE_JSON_VERSION" != "${version}" ]]; then
+            echo "::error version mismatch: package.json version ($package_json_version) does not match version computed from tag ${version}"
+            exit 1
+          fi
+
+      - name: Publish to NPM (latest)
+        uses: smartcontractkit/.github/actions/ci-publish-npm@4b0ab756abcb1760cb82e1e87b94ff431905bffc # ci-publish-npm@0.4.0
+        with:
+          npm-token: ${{ secrets.NPM_TOKEN }}
+          create-github-release: false
+          publish-command: "pnpm publish-prod --no-git-checks"
+          package-json-directory: contracts

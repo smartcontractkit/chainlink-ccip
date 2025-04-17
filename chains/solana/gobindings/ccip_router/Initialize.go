@@ -19,12 +19,16 @@ import (
 //
 // * `ctx` - The context containing the accounts required for initialization.
 // * `svm_chain_selector` - The chain selector for SVM.
-// * `enable_execution_after` - The minimum amount of time required between a message has been committed and can be manually executed.
+// * `fee_aggregator` - The public key of the fee aggregator.
+// * `fee_quoter` - The public key of the fee quoter.
+// * `link_token_mint` - The public key of the LINK token mint.
+// * `rmn_remote` - The public key of the RMN remote.
 type Initialize struct {
 	SvmChainSelector *uint64
 	FeeAggregator    *ag_solanago.PublicKey
 	FeeQuoter        *ag_solanago.PublicKey
 	LinkTokenMint    *ag_solanago.PublicKey
+	RmnRemote        *ag_solanago.PublicKey
 
 	// [0] = [WRITE] config
 	//
@@ -35,15 +39,13 @@ type Initialize struct {
 	// [3] = [] program
 	//
 	// [4] = [] programData
-	//
-	// [5] = [WRITE] tokenPoolsSigner
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewInitializeInstructionBuilder creates a new `Initialize` instruction builder.
 func NewInitializeInstructionBuilder() *Initialize {
 	nd := &Initialize{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 6),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 5),
 	}
 	return nd
 }
@@ -69,6 +71,12 @@ func (inst *Initialize) SetFeeQuoter(feeQuoter ag_solanago.PublicKey) *Initializ
 // SetLinkTokenMint sets the "linkTokenMint" parameter.
 func (inst *Initialize) SetLinkTokenMint(linkTokenMint ag_solanago.PublicKey) *Initialize {
 	inst.LinkTokenMint = &linkTokenMint
+	return inst
+}
+
+// SetRmnRemote sets the "rmnRemote" parameter.
+func (inst *Initialize) SetRmnRemote(rmnRemote ag_solanago.PublicKey) *Initialize {
+	inst.RmnRemote = &rmnRemote
 	return inst
 }
 
@@ -127,17 +135,6 @@ func (inst *Initialize) GetProgramDataAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[4]
 }
 
-// SetTokenPoolsSignerAccount sets the "tokenPoolsSigner" account.
-func (inst *Initialize) SetTokenPoolsSignerAccount(tokenPoolsSigner ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[5] = ag_solanago.Meta(tokenPoolsSigner).WRITE()
-	return inst
-}
-
-// GetTokenPoolsSignerAccount gets the "tokenPoolsSigner" account.
-func (inst *Initialize) GetTokenPoolsSignerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[5]
-}
-
 func (inst Initialize) Build() *Instruction {
 	return &Instruction{BaseVariant: ag_binary.BaseVariant{
 		Impl:   inst,
@@ -170,6 +167,9 @@ func (inst *Initialize) Validate() error {
 		if inst.LinkTokenMint == nil {
 			return errors.New("LinkTokenMint parameter is not set")
 		}
+		if inst.RmnRemote == nil {
+			return errors.New("RmnRemote parameter is not set")
+		}
 	}
 
 	// Check whether all (required) accounts are set:
@@ -189,9 +189,6 @@ func (inst *Initialize) Validate() error {
 		if inst.AccountMetaSlice[4] == nil {
 			return errors.New("accounts.ProgramData is not set")
 		}
-		if inst.AccountMetaSlice[5] == nil {
-			return errors.New("accounts.TokenPoolsSigner is not set")
-		}
 	}
 	return nil
 }
@@ -205,21 +202,21 @@ func (inst *Initialize) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=4]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Params[len=5]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
 						paramsBranch.Child(ag_format.Param("SvmChainSelector", *inst.SvmChainSelector))
 						paramsBranch.Child(ag_format.Param("   FeeAggregator", *inst.FeeAggregator))
 						paramsBranch.Child(ag_format.Param("       FeeQuoter", *inst.FeeQuoter))
 						paramsBranch.Child(ag_format.Param("   LinkTokenMint", *inst.LinkTokenMint))
+						paramsBranch.Child(ag_format.Param("       RmnRemote", *inst.RmnRemote))
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=6]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("          config", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("       authority", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("   systemProgram", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("         program", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("     programData", inst.AccountMetaSlice[4]))
-						accountsBranch.Child(ag_format.Meta("tokenPoolsSigner", inst.AccountMetaSlice[5]))
+					instructionBranch.Child("Accounts[len=5]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+						accountsBranch.Child(ag_format.Meta("       config", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("    authority", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("      program", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("  programData", inst.AccountMetaSlice[4]))
 					})
 				})
 		})
@@ -246,6 +243,11 @@ func (obj Initialize) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error)
 	if err != nil {
 		return err
 	}
+	// Serialize `RmnRemote` param:
+	err = encoder.Encode(obj.RmnRemote)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 func (obj *Initialize) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
@@ -269,6 +271,11 @@ func (obj *Initialize) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 	if err != nil {
 		return err
 	}
+	// Deserialize `RmnRemote`:
+	err = decoder.Decode(&obj.RmnRemote)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -279,22 +286,22 @@ func NewInitializeInstruction(
 	feeAggregator ag_solanago.PublicKey,
 	feeQuoter ag_solanago.PublicKey,
 	linkTokenMint ag_solanago.PublicKey,
+	rmnRemote ag_solanago.PublicKey,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey,
 	program ag_solanago.PublicKey,
-	programData ag_solanago.PublicKey,
-	tokenPoolsSigner ag_solanago.PublicKey) *Initialize {
+	programData ag_solanago.PublicKey) *Initialize {
 	return NewInitializeInstructionBuilder().
 		SetSvmChainSelector(svmChainSelector).
 		SetFeeAggregator(feeAggregator).
 		SetFeeQuoter(feeQuoter).
 		SetLinkTokenMint(linkTokenMint).
+		SetRmnRemote(rmnRemote).
 		SetConfigAccount(config).
 		SetAuthorityAccount(authority).
 		SetSystemProgramAccount(systemProgram).
 		SetProgramAccount(program).
-		SetProgramDataAccount(programData).
-		SetTokenPoolsSignerAccount(tokenPoolsSigner)
+		SetProgramDataAccount(programData)
 }

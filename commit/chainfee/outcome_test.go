@@ -5,6 +5,17 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/mock"
+
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/mathslib"
+
+	mapset "github.com/deckarep/golang-set/v2"
+	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
+
+	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
+	mock_home_chain "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -44,8 +55,32 @@ var obsNeedUpdate = Observation{
 	NativeTokenPrices: nativeTokenPricesMap,
 	FChain:            fChains,
 	ChainFeeUpdates: map[cciptypes.ChainSelector]Update{
-		1: {Timestamp: ts},
-		2: {Timestamp: ts.Add(-chainFeePriceBatchWriteFrequency.Duration() * 2)}, // Needs updating
+		1: {
+			Timestamp: ts,
+			ChainFee: ComponentsUSDPrices{
+				ExecutionFeePriceUSD: mathslib.CalculateUsdPerUnitGas(
+					feeComponentsMap[1].ExecutionFee, nativeTokenPricesMap[1].Int,
+				),
+				DataAvFeePriceUSD: mathslib.CalculateUsdPerUnitGas(
+					feeComponentsMap[1].DataAvailabilityFee,
+					nativeTokenPricesMap[1].Int,
+				),
+			},
+		},
+		2: {
+			// Need update because timestamp is older than batch write frequency
+			Timestamp: ts.Add(-chainFeePriceBatchWriteFrequency.Duration() * 2),
+			ChainFee: ComponentsUSDPrices{
+				ExecutionFeePriceUSD: mathslib.CalculateUsdPerUnitGas(
+					feeComponentsMap[2].ExecutionFee,
+					nativeTokenPricesMap[2].Int,
+				),
+				DataAvFeePriceUSD: mathslib.CalculateUsdPerUnitGas(
+					feeComponentsMap[2].DataAvailabilityFee,
+					nativeTokenPricesMap[2].Int,
+				),
+			},
+		},
 	},
 	TimestampNow: ts,
 }
@@ -55,10 +90,44 @@ var obsNoUpdate = Observation{
 	NativeTokenPrices: nativeTokenPricesMap,
 	FChain:            fChains,
 	ChainFeeUpdates: map[cciptypes.ChainSelector]Update{
-		1: {Timestamp: ts},
-		2: {Timestamp: ts},
+		1: {
+			ChainFee: ComponentsUSDPrices{
+				ExecutionFeePriceUSD: mathslib.CalculateUsdPerUnitGas(
+					feeComponentsMap[1].ExecutionFee, nativeTokenPricesMap[1].Int,
+				),
+				DataAvFeePriceUSD: mathslib.CalculateUsdPerUnitGas(
+					feeComponentsMap[1].DataAvailabilityFee,
+					nativeTokenPricesMap[1].Int,
+				),
+			},
+			Timestamp: ts,
+		},
+		2: {
+			ChainFee: ComponentsUSDPrices{
+				ExecutionFeePriceUSD: mathslib.CalculateUsdPerUnitGas(
+					feeComponentsMap[2].ExecutionFee,
+					nativeTokenPricesMap[2].Int,
+				),
+				DataAvFeePriceUSD: mathslib.CalculateUsdPerUnitGas(
+					feeComponentsMap[2].DataAvailabilityFee,
+					nativeTokenPricesMap[2].Int,
+				),
+			},
+			Timestamp: ts,
+		},
 	},
 	TimestampNow: ts,
+}
+
+var defaultChainConfig = reader.ChainConfig{
+	FChain: 1,
+	// not necessary for test, using some peerIDs
+	SupportedNodes: mapset.NewSet(libocrtypes.PeerID{1}, libocrtypes.PeerID{2}),
+	Config: chainconfig.ChainConfig{
+		GasPriceDeviationPPB:    cciptypes.NewBigInt(big.NewInt(1)),
+		DAGasPriceDeviationPPB:  cciptypes.NewBigInt(big.NewInt(1)),
+		OptimisticConfirmations: 1,
+	},
 }
 
 // sameObs returns n observations with the same observation but from different oracle ids
@@ -68,6 +137,20 @@ func sameObs(n int, obs Observation) []plugincommon.AttributedObservation[Observ
 		aos[i] = plugincommon.AttributedObservation[Observation]{OracleID: commontypes.OracleID(i), Observation: obs}
 	}
 	return aos
+}
+
+type FeeInfo struct {
+	// ExecDeviationPPB is the deviation threshold in parts per billion that determines whether or not
+	// the exec portion of the gas price has deviated and needs to be reported on chain.
+	ExecDeviationPPB cciptypes.BigInt `json:"execDeviationPPB"`
+
+	// DataAvailabilityDeviationPPB is the deviation threshold in parts per billion that determines whether or not
+	// the data availability portion of the gas price has deviated and needs to be reported on chain.
+	DataAvailabilityDeviationPPB cciptypes.BigInt `json:"dataAvailabilityDeviationPPB"`
+
+	// ChainFeeDeviationDisabled is a flag to disable deviation-based reporting. If true, we will only report
+	// prices based on the heartbeat.
+	ChainFeeDeviationDisabled bool `json:"chainFeeDeviationDisabled"`
 }
 
 func TestGetConsensusObservation(t *testing.T) {
@@ -117,7 +200,7 @@ func TestProcessor_Outcome(t *testing.T) {
 	cases := []struct {
 		name                   string
 		chainFeeWriteFrequency commonconfig.Duration
-		feeInfo                map[cciptypes.ChainSelector]pluginconfig.FeeInfo
+		feeInfo                map[cciptypes.ChainSelector]FeeInfo
 		aos                    []plugincommon.AttributedObservation[Observation]
 		expectedError          bool
 		expectedOutcome        func() Outcome
@@ -165,7 +248,7 @@ func TestProcessor_Outcome(t *testing.T) {
 		{
 			name:                   "happy path with a price deviation",
 			chainFeeWriteFrequency: *commonconfig.MustNewDuration(time.Hour),
-			feeInfo: map[cciptypes.ChainSelector]pluginconfig.FeeInfo{
+			feeInfo: map[cciptypes.ChainSelector]FeeInfo{
 				1: {
 					ExecDeviationPPB:             cciptypes.NewBigInt(big.NewInt(1)),
 					DataAvailabilityDeviationPPB: cciptypes.NewBigInt(big.NewInt(1)),
@@ -213,20 +296,73 @@ func TestProcessor_Outcome(t *testing.T) {
 				}
 			},
 		},
+		{
+			name:                   "deviation check disabled",
+			chainFeeWriteFrequency: *commonconfig.MustNewDuration(time.Hour),
+			feeInfo: map[cciptypes.ChainSelector]FeeInfo{
+				1: {
+					ExecDeviationPPB:             cciptypes.NewBigInt(big.NewInt(1)),
+					DataAvailabilityDeviationPPB: cciptypes.NewBigInt(big.NewInt(1)),
+					ChainFeeDeviationDisabled:    true,
+				},
+			},
+			aos: sameObs(5, Observation{
+				FeeComponents: map[cciptypes.ChainSelector]types.ChainFeeComponents{
+					1: {ExecutionFee: big.NewInt(2), DataAvailabilityFee: big.NewInt(1)},
+				},
+				NativeTokenPrices: map[cciptypes.ChainSelector]cciptypes.BigInt{
+					1: cciptypes.NewBigInt(big.NewInt(2e18)), // <----------- token price increased deviation reached
+				},
+				ChainFeeUpdates: map[cciptypes.ChainSelector]Update{
+					1: {
+						Timestamp: oneMinuteAgo,
+						ChainFee: ComponentsUSDPrices{
+							ExecutionFeePriceUSD: big.NewInt(2), DataAvFeePriceUSD: big.NewInt(1),
+						},
+					},
+				},
+				FChain:       map[cciptypes.ChainSelector]int{1: 1},
+				TimestampNow: time.Now().UTC(),
+			}),
+			expectedError: false,
+			expectedOutcome: func() Outcome {
+				return Outcome{
+					GasPrices: nil,
+				}
+			},
+		},
 	}
 
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := tests.Context(t)
+			homeChainMock := mock_home_chain.NewMockHomeChain(t)
+			if tt.feeInfo == nil {
+				homeChainMock.EXPECT().GetChainConfig(mock.Anything).
+					Return(defaultChainConfig, nil).Maybe()
+			}
+			for chain, info := range tt.feeInfo {
+				homeChainMock.EXPECT().GetChainConfig(chain).Return(reader.ChainConfig{
+					FChain: 1,
+					// not necessary for test, using some peerIDs
+					SupportedNodes: mapset.NewSet(libocrtypes.PeerID{1}, libocrtypes.PeerID{2}),
+					Config: chainconfig.ChainConfig{
+						GasPriceDeviationPPB:      info.ExecDeviationPPB,
+						DAGasPriceDeviationPPB:    info.DataAvailabilityDeviationPPB,
+						OptimisticConfirmations:   1,
+						ChainFeeDeviationDisabled: info.ChainFeeDeviationDisabled,
+					},
+				}, nil).Maybe()
+			}
 			p := &processor{
 				lggr:      logger.Test(t),
 				destChain: 1,
 				fRoleDON:  1,
 				cfg: pluginconfig.CommitOffchainConfig{
 					RemoteGasPriceBatchWriteFrequency: tt.chainFeeWriteFrequency,
-					FeeInfo:                           tt.feeInfo,
 				},
 				metricsReporter: plugincommon.NoopReporter{},
+				homeChain:       homeChainMock,
 			}
 
 			outcome, err := p.Outcome(ctx, Outcome{}, Query{}, tt.aos)

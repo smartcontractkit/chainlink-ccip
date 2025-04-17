@@ -5,7 +5,10 @@ import (
 	"fmt"
 	"os"
 
-	_ "github.com/smartcontractkit/chainlink-ccip/cmd/carpenter/internal/filter"
+	// Register the formatters
+	_ "github.com/smartcontractkit/chainlink-ccip/cmd/carpenter/internal/format/basic"
+	_ "github.com/smartcontractkit/chainlink-ccip/cmd/carpenter/internal/format/fancy"
+	_ "github.com/smartcontractkit/chainlink-ccip/cmd/carpenter/internal/format/summary"
 )
 
 func main() {

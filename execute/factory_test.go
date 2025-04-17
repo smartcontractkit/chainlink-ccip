@@ -9,13 +9,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal"
+
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
-	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec"
+	ocrtypecodec "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
@@ -27,7 +28,6 @@ Total size of observation: 1056507
 200 CommitReports: 60635
 200 Messages: 583635
 TokenData: 112035
-Costly Messages: 13945
 Nonces: 12035
 Contracts: 274962
 
@@ -37,7 +37,6 @@ Total size of observation: 937407
 900 CommitReports: 302235
 100 Messages: 291835
 TokenData: 56035
-Costly Messages: 7045
 Nonces: 6035
 Contracts: 274962
 
@@ -47,7 +46,6 @@ Total size of observation: 665507
 100 CommitReports: 30335
 100 Messages: 291835
 TokenData: 56035
-Costly Messages: 7045
 Nonces: 6035
 Contracts: 274962
 
@@ -57,7 +55,6 @@ Total size of observation: 1025407
 100 CommitReports: 30335
 200 Messages: 582835
 TokenData: 112035
-Costly Messages: 13945
 Nonces: 12035
 Contracts: 274962
 
@@ -67,13 +64,12 @@ Total size of observation: 1565257
 100 CommitReports: 30335
 350 Messages: 1019335
 TokenData: 196035
-Costly Messages: 24295
 Nonces: 21035
 Contracts: 274962
 */
 func TestObservationSize(t *testing.T) {
 	t.Skip("This test is for estimating message sizes, not for running in CI")
-	ocrTypeCodec := ocrtypecodec.NewExecCodecJSON()
+	ocrTypeCodec := ocrtypecodec.DefaultExecCodec
 
 	maxCommitReports := 100
 	maxMessages := 1100
@@ -99,7 +95,6 @@ func TestObservationSize(t *testing.T) {
 
 			// These fields are all empty during this observation phase.
 			//Messages []cciptypes.Message `json:"messages"`
-			//CostlyMessages []cciptypes.Bytes32 `json:"costlyMessages"`
 			//MessageTokenData []MessageTokenData `json:"messageTokenData"`
 		})
 	}
@@ -155,12 +150,14 @@ func TestObservationSize(t *testing.T) {
 
 	// separate sender for each message
 	noncesObs := make(exectypes.NonceObservations, maxMessages)
+	mockAddrCodec := internal.NewMockAddressCodecHex(t)
 	for i := 0; i < maxMessages; i++ {
 		idx := ccipocr3.ChainSelector(i % estimatedMaxNumberOfSourceChains)
 		if nil == noncesObs[idx] {
 			noncesObs[idx] = make(map[string]uint64)
 		}
-		encAddr := typeconv.AddressBytesToString(addr[:], 123456)
+		encAddr, err := mockAddrCodec.AddressBytesToString(addr[:], idx)
+		require.NoError(t, err)
 		noncesObs[idx][encAddr] = uint64(bigSeqNum + ccipocr3.SeqNum(i))
 	}
 
@@ -189,15 +186,12 @@ func TestObservationSize(t *testing.T) {
 		set(contract)
 	}
 
-	costlyMessagesObs := make([]ccipocr3.Bytes32, maxMessages)
-
 	maxObs := exectypes.Observation{
-		CommitReports:  commitObs,
-		Messages:       msgObs,
-		TokenData:      tokenDataObs,
-		CostlyMessages: costlyMessagesObs,
-		Nonces:         noncesObs,
-		Contracts:      discoveryObs,
+		CommitReports: commitObs,
+		Messages:      msgObs,
+		TokenData:     tokenDataObs,
+		Nonces:        noncesObs,
+		Contracts:     discoveryObs,
 	}
 
 	encSize := func(obs exectypes.Observation) int {
@@ -215,12 +209,11 @@ func TestObservationSize(t *testing.T) {
 		encSize(exectypes.Observation{CommitReports: commitObs}))
 	fmt.Printf("%d Messages: %d\n", msgSum, encSize(exectypes.Observation{Messages: msgObs}))
 	fmt.Printf("TokenData: %d\n", encSize(exectypes.Observation{TokenData: tokenDataObs}))
-	fmt.Printf("Costly Messages: %d\n", encSize(exectypes.Observation{CostlyMessages: costlyMessagesObs}))
 	fmt.Printf("Nonces: %d\n", encSize(exectypes.Observation{Nonces: noncesObs}))
 	fmt.Printf("Contracts: %d\n", encSize(exectypes.Observation{Contracts: discoveryObs}))
 
 	b, err := ocrTypeCodec.EncodeObservation(maxObs)
 	require.NoError(t, err)
-	assert.Greater(t, maxObservationLength, len(b))
-	assert.LessOrEqual(t, maxObservationLength, ocr3types.MaxMaxObservationLength)
+	assert.Greater(t, lenientMaxObservationLength, len(b))
+	assert.LessOrEqual(t, lenientMaxObservationLength, ocr3types.MaxMaxObservationLength)
 }

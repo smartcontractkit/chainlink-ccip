@@ -47,7 +47,7 @@ pub struct SVM2AnyTokenTransfer {
     pub dest_exec_data: Vec<u8>,
 }
 
-#[derive(Clone, AnchorSerialize, AnchorDeserialize)]
+#[derive(Clone, AnchorSerialize, AnchorDeserialize, PartialEq, Debug)]
 pub struct SVM2AnyMessage {
     pub receiver: Vec<u8>,
     pub data: Vec<u8>,
@@ -79,4 +79,11 @@ impl<T: Into<ethnum::U256>> From<T> for CrossChainAmount {
             le_bytes: value.into().to_le_bytes(),
         }
     }
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Default, Debug)]
+pub struct GetFeeResult {
+    pub amount: u64,
+    pub juels: u128,
+    pub token: Pubkey,
 }

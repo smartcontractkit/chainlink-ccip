@@ -10,7 +10,43 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// SetConfig is the `setConfig` instruction.
+// Set up the configuration for the multisig instance.
+//
+// Validates and establishes the signer hierarchy, group structure, and quorum requirements.
+// If `clear_root` is true, it also invalidates the current Merkle root.
+//
+// # Parameters
+//
+// - `ctx`: The context containing the multisig configuration account.
+// - `multisig_id`: The unique identifier for this multisig instance.
+// - `signer_groups`: Vector assigning each signer to a specific group (must match signers length).
+// - `group_quorums`: Array defining the required signatures for each group. A group with quorum=0 is disabled.
+// - `group_parents`: Array defining the hierarchical relationship between groups, forming a tree structure.
+// - `clear_root`: If true, invalidates the current root to prevent further operations from being executed.
+//
+// # Example
+//
+// A group structure like this:
+//
+// ```text
+// ┌──────┐
+// ┌─►│2-of-3│◄───────┐
+// │  └──────┘        │
+// │        ▲         │
+// │        │         │
+// ┌──┴───┐ ┌──┴───┐ ┌───┴────┐
+// ┌──►│1-of-2│ │2-of-2│ │signer A│
+// │   └──────┘ └──────┘ └────────┘
+// │       ▲      ▲  ▲
+// │       │      │  │
+// ┌───────┴┐ ┌────┴───┐ ┌┴───────┐
+// │signer B│ │signer C│ │signer D│
+// └────────┘ └────────┘ └────────┘
+// ```
+//
+// Would be configured with:
+// - group_quorums = [2, 1, 2, ...] (root: 2-of-3, group1: 1-of-2, group2: 2-of-2)
+// - group_parents = [0, 0, 0, ...] (all groups under root)
 type SetConfig struct {
 	MultisigId   *[32]uint8
 	SignerGroups *[]byte

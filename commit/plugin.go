@@ -20,6 +20,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
 	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
+	"github.com/smartcontractkit/chainlink-ccip/commit/internal/builder"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/commit/metrics"
@@ -30,7 +31,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec"
+	ocrtypecodec "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -48,6 +49,7 @@ type Plugin struct {
 	ccipReader        readerpkg.CCIPReader
 	tokenPricesReader readerpkg.PriceReader
 	reportCodec       cciptypes.CommitPluginCodec
+	reportBuilder     builder.ReportBuilderFunc
 	// Don't use this logger directly but rather through logutil\.WithContextValues where possible
 	lggr                logger.Logger
 	homeChain           reader.HomeChain
@@ -81,6 +83,8 @@ func NewPlugin(
 	rmnPeerClient rmn.PeerClient,
 	reportingCfg ocr3types.ReportingPluginConfig,
 	reporter metrics.Reporter,
+	addressCodec cciptypes.AddressCodec,
+	reportBuilder builder.ReportBuilderFunc,
 ) *Plugin {
 	lggr.Infow("creating new plugin instance", "p2pID", oracleIDToP2pID[reportingCfg.OracleID])
 
@@ -124,6 +128,7 @@ func NewPlugin(
 		rmnCrypto,
 		rmnHomeReader,
 		reporter,
+		addressCodec,
 	)
 
 	tokenPriceProcessor := tokenprice.NewProcessor(
@@ -145,6 +150,7 @@ func NewPlugin(
 		destChain,
 		reportingCfg.F,
 		oracleIDToP2pID,
+		reporter,
 	)
 
 	chainFeeProcessr := chainfee.NewProcessor(
@@ -177,7 +183,8 @@ func NewPlugin(
 		chainFeeProcessor:   chainFeeProcessr,
 		discoveryProcessor:  discoveryProcessor,
 		metricsReporter:     reporter,
-		ocrTypeCodec:        ocrtypecodec.NewCommitCodecJSON(),
+		ocrTypeCodec:        ocrtypecodec.DefaultCommitCodec,
+		reportBuilder:       reportBuilder,
 	}
 }
 
@@ -528,6 +535,7 @@ func (p *Plugin) Close() error {
 		p.tokenPriceProcessor,
 		p.chainFeeProcessor,
 		p.discoveryProcessor,
+		p.ccipReader,
 	}
 
 	// Chains without RMN don't initialize the RMNHomeReader

@@ -25,19 +25,13 @@ type ReceiverProxyExecute struct {
 	//
 	// [3] = [] allowedOfframp
 	// ··········· CHECK
-	//
-	// [4] = [] approvedSender
-	// ··········· CHECK
-	//
-	// [5] = [] state
-	// ··········· CHECK
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewReceiverProxyExecuteInstructionBuilder creates a new `ReceiverProxyExecute` instruction builder.
 func NewReceiverProxyExecuteInstructionBuilder() *ReceiverProxyExecute {
 	nd := &ReceiverProxyExecute{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 6),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 4),
 	}
 	return nd
 }
@@ -100,32 +94,6 @@ func (inst *ReceiverProxyExecute) GetAllowedOfframpAccount() *ag_solanago.Accoun
 	return inst.AccountMetaSlice[3]
 }
 
-// SetApprovedSenderAccount sets the "approvedSender" account.
-// CHECK
-func (inst *ReceiverProxyExecute) SetApprovedSenderAccount(approvedSender ag_solanago.PublicKey) *ReceiverProxyExecute {
-	inst.AccountMetaSlice[4] = ag_solanago.Meta(approvedSender)
-	return inst
-}
-
-// GetApprovedSenderAccount gets the "approvedSender" account.
-// CHECK
-func (inst *ReceiverProxyExecute) GetApprovedSenderAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[4]
-}
-
-// SetStateAccount sets the "state" account.
-// CHECK
-func (inst *ReceiverProxyExecute) SetStateAccount(state ag_solanago.PublicKey) *ReceiverProxyExecute {
-	inst.AccountMetaSlice[5] = ag_solanago.Meta(state)
-	return inst
-}
-
-// GetStateAccount gets the "state" account.
-// CHECK
-func (inst *ReceiverProxyExecute) GetStateAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[5]
-}
-
 func (inst ReceiverProxyExecute) Build() *Instruction {
 	return &Instruction{BaseVariant: ag_binary.BaseVariant{
 		Impl:   inst,
@@ -165,12 +133,6 @@ func (inst *ReceiverProxyExecute) Validate() error {
 		if inst.AccountMetaSlice[3] == nil {
 			return errors.New("accounts.AllowedOfframp is not set")
 		}
-		if inst.AccountMetaSlice[4] == nil {
-			return errors.New("accounts.ApprovedSender is not set")
-		}
-		if inst.AccountMetaSlice[5] == nil {
-			return errors.New("accounts.State is not set")
-		}
 	}
 	return nil
 }
@@ -189,13 +151,11 @@ func (inst *ReceiverProxyExecute) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=6]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("  testReceiver", inst.AccountMetaSlice[0]))
 						accountsBranch.Child(ag_format.Meta("     cpiSigner", inst.AccountMetaSlice[1]))
 						accountsBranch.Child(ag_format.Meta("offrampProgram", inst.AccountMetaSlice[2]))
 						accountsBranch.Child(ag_format.Meta("allowedOfframp", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("approvedSender", inst.AccountMetaSlice[4]))
-						accountsBranch.Child(ag_format.Meta("         state", inst.AccountMetaSlice[5]))
 					})
 				})
 		})
@@ -226,15 +186,11 @@ func NewReceiverProxyExecuteInstruction(
 	testReceiver ag_solanago.PublicKey,
 	cpiSigner ag_solanago.PublicKey,
 	offrampProgram ag_solanago.PublicKey,
-	allowedOfframp ag_solanago.PublicKey,
-	approvedSender ag_solanago.PublicKey,
-	state ag_solanago.PublicKey) *ReceiverProxyExecute {
+	allowedOfframp ag_solanago.PublicKey) *ReceiverProxyExecute {
 	return NewReceiverProxyExecuteInstructionBuilder().
 		SetMessage(message).
 		SetTestReceiverAccount(testReceiver).
 		SetCpiSignerAccount(cpiSigner).
 		SetOfframpProgramAccount(offrampProgram).
-		SetAllowedOfframpAccount(allowedOfframp).
-		SetApprovedSenderAccount(approvedSender).
-		SetStateAccount(state)
+		SetAllowedOfframpAccount(allowedOfframp)
 }

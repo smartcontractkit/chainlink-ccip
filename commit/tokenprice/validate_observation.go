@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
@@ -70,7 +69,7 @@ func validateObservedTokenPrices(
 }
 
 func validateObservedTokenUpdates(
-	tokenUpdates map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig,
+	tokenUpdates map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig,
 	tokensToQuery map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo) error {
 	for tokenID, update := range tokenUpdates {
 		if _, ok := tokensToQuery[tokenID]; !ok {

@@ -9,7 +9,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/mathslib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
@@ -89,8 +88,14 @@ func (p *processor) selectTokensForUpdate(
 
 	for token, feedPrice := range obs.FeedTokenPrices {
 		lastUpdate, exists := obs.FeeQuoterTokenUpdates[token]
+		lggr := logger.With(lggr,
+			"token", token,
+			"feedPrice", feedPrice,
+			"lastUpdate", lastUpdate,
+			"consensusTimestamp", obs.Timestamp,
+		)
 		if !exists {
-			// if the token is not in the fee quoter updates, then we should update it
+			lggr.Infow("token price update needed: no previous update exists")
 			tokenPrices[token] = cciptypes.NewBigInt(feedPrice.Price.Int)
 			continue
 		}
@@ -102,11 +107,21 @@ func (p *processor) selectTokensForUpdate(
 		}
 
 		nextUpdateTime := lastUpdate.Timestamp.Add(cfg.TokenPriceBatchWriteFrequency.Duration())
-		shouldUpdate :=
-			obs.Timestamp.After(nextUpdateTime) ||
-				mathslib.Deviates(feedPrice.Price.Int, lastUpdate.Value.Int, ti.DeviationPPB.Int64())
-		if shouldUpdate {
+		priceDeviates := mathslib.Deviates(feedPrice.Price.Int, lastUpdate.Value.Int, ti.DeviationPPB.Int64())
+		heartbeatPassed := obs.Timestamp.After(nextUpdateTime)
+
+		if heartbeatPassed {
+			lggr.Infow("token price update needed: heartbeat time passed",
+				"nextUpdateTime", nextUpdateTime,
+				"heartbeatInterval", cfg.TokenPriceBatchWriteFrequency)
 			tokenPrices[token] = cciptypes.NewBigInt(feedPrice.Price.Int)
+		} else if priceDeviates {
+			lggr.Infow("token price update needed: deviation threshold exceeded",
+				"deviationPPB", ti.DeviationPPB)
+			tokenPrices[token] = cciptypes.NewBigInt(feedPrice.Price.Int)
+		} else {
+			lggr.Debugw("token price update not needed: within deviation threshold",
+				"deviationPPB", ti.DeviationPPB)
 		}
 	}
 
@@ -117,7 +132,7 @@ func (p *processor) selectTokensForUpdate(
 func aggregateObservations(aos []plugincommon.AttributedObservation[Observation]) AggregateObservation {
 	aggObs := AggregateObservation{
 		FeedTokenPrices:       make(map[cciptypes.UnknownEncodedAddress][]cciptypes.TokenPrice),
-		FeeQuoterTokenUpdates: make(map[cciptypes.UnknownEncodedAddress][]plugintypes.TimestampedBig),
+		FeeQuoterTokenUpdates: make(map[cciptypes.UnknownEncodedAddress][]cciptypes.TimestampedBig),
 		FChain:                make(map[cciptypes.ChainSelector][]int),
 		Timestamps:            []time.Time{},
 	}

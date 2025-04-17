@@ -2,20 +2,14 @@ package chainfee
 
 import (
 	"context"
-	"fmt"
 	"math/big"
-	"sort"
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"golang.org/x/exp/maps"
 
-	"golang.org/x/sync/errgroup"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
@@ -34,58 +28,13 @@ func (p *processor) Observation(
 ) (Observation, error) {
 	lggr := logutil.WithContextValues(ctx, p.lggr)
 
-	supportedChains, err := p.chainSupport.SupportedChains(p.oracleID)
-	if err != nil {
-		return Observation{}, err
-	}
-
-	supportedChains.Remove(p.destChain)
-	if supportedChains.Cardinality() == 0 {
-		lggr.Info("no supported chains other than dest chain to observe")
-		return Observation{}, nil
-	}
-
-	supportedChainsSlice := supportedChains.ToSlice()
-	sort.Slice(supportedChainsSlice, func(i, j int) bool { return supportedChainsSlice[i] < supportedChainsSlice[j] })
-
-	var (
-		feeComponents     = map[cciptypes.ChainSelector]types.ChainFeeComponents{}
-		nativeTokenPrices = map[cciptypes.ChainSelector]cciptypes.BigInt{}
-		chainFeeUpdates   = map[cciptypes.ChainSelector]Update{}
-	)
-
-	eg := new(errgroup.Group)
-
-	// Get the fee components for all available chains that we can read from
-	eg.Go(func() error {
-		feeComponents = p.ccipReader.GetChainsFeeComponents(ctx, supportedChainsSlice)
-		return nil
-	})
-
-	// Get the native token prices for all available chains that we can read from
-	eg.Go(func() error {
-		nativeTokenPrices = p.ccipReader.GetWrappedNativeTokenPriceUSD(ctx, supportedChainsSlice)
-		return nil
-	})
-
-	// Get the latest chain fee price updates for the source chains and
-	// Convert them to a map of chain fee updates
-	eg.Go(func() error {
-		chainFeeUpdates = feeUpdatesFromTimestampedBig(
-			p.ccipReader.GetChainFeePriceUpdate(ctx, supportedChainsSlice),
-		)
-		return nil
-	})
-
-	if err := eg.Wait(); err != nil {
-		return Observation{}, fmt.Errorf("unexpected error: %w", err)
-	}
-
+	feeComponents := p.obs.getChainsFeeComponents(ctx, lggr)
+	nativeTokenPrices := p.obs.getNativeTokenPrices(ctx, lggr)
+	chainFeeUpdates := p.obs.getChainFeePriceUpdates(ctx, lggr)
 	fChain := p.observeFChain(lggr)
 	now := time.Now().UTC()
 
 	lggr.Infow("observed fee components",
-		"supportedChains", supportedChainsSlice,
 		"feeComponents", feeComponents,
 		"nativeTokenPrices", nativeTokenPrices,
 		"chainFeeUpdates", chainFeeUpdates,
@@ -135,7 +84,7 @@ func (p *processor) observeFChain(lggr logger.Logger) map[cciptypes.ChainSelecto
 }
 
 func feeUpdatesFromTimestampedBig(
-	updates map[cciptypes.ChainSelector]plugintypes.TimestampedBig,
+	updates map[cciptypes.ChainSelector]cciptypes.TimestampedBig,
 ) map[cciptypes.ChainSelector]Update {
 	chainFeeUpdates := make(map[cciptypes.ChainSelector]Update, len(updates))
 	for chain, u := range updates {

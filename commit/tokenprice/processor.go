@@ -26,6 +26,7 @@ type processor struct {
 	homeChain        reader.HomeChain
 	metricsReporter  plugincommon.MetricsReporter
 	fRoleDON         int
+	obs              observer
 }
 
 func NewProcessor(
@@ -39,6 +40,24 @@ func NewProcessor(
 	fRoleDON int,
 	metricsReporter plugincommon.MetricsReporter,
 ) plugincommon.PluginProcessor[Query, Observation, Outcome] {
+	var obs observer
+	baseObs := newBaseObserver(
+		tokenPriceReader,
+		destChain,
+		oracleID,
+		chainSupport,
+		offChainCfg,
+	)
+	if !offChainCfg.TokenPriceAsyncObserverDisabled {
+		obs = newAsyncObserver(
+			lggr,
+			baseObs,
+			offChainCfg.TokenPriceAsyncObserverSyncFreq.Duration(),
+			offChainCfg.TokenPriceAsyncObserverSyncTimeout.Duration(),
+		)
+	} else {
+		obs = baseObs
+	}
 	p := &processor{
 		oracleID:         oracleID,
 		lggr:             lggr,
@@ -49,6 +68,7 @@ func NewProcessor(
 		homeChain:        homeChain,
 		fRoleDON:         fRoleDON,
 		metricsReporter:  metricsReporter,
+		obs:              obs,
 	}
 	return plugincommon.NewTrackedProcessor(lggr, p, processorsLabel, metricsReporter)
 }
@@ -93,6 +113,7 @@ func (p *processor) Outcome(
 }
 
 func (p *processor) Close() error {
+	p.obs.close()
 	return nil
 }
 

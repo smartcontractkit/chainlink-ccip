@@ -3,17 +3,15 @@ package reader
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-
-	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
-	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
 var (
@@ -33,6 +31,7 @@ type ChainConfigSnapshot struct {
 	FeeQuoter FeeQuoterConfig
 	OnRamp    OnRampConfig
 	Router    RouterConfig
+	CurseInfo CurseInfo
 }
 
 type OnRampConfig struct {
@@ -76,6 +75,48 @@ func (ca ContractAddresses) Append(contract string, chain cciptypes.ChainSelecto
 	return resp
 }
 
+// StaticSourceChainConfig stores the static parts of SourceChainConfig
+// that don't change frequently and are safe to cache.
+type StaticSourceChainConfig struct {
+	Router                    []byte
+	IsEnabled                 bool
+	IsRMNVerificationDisabled bool
+	OnRamp                    cciptypes.UnknownAddress
+}
+
+// ToSourceChainConfig converts a CachedSourceChainConfig to a full SourceChainConfig
+// by adding the provided sequence number.
+func (s StaticSourceChainConfig) ToSourceChainConfig(minSeqNr uint64) SourceChainConfig {
+	return SourceChainConfig{
+		Router:                    s.Router,
+		IsEnabled:                 s.IsEnabled,
+		IsRMNVerificationDisabled: s.IsRMNVerificationDisabled,
+		OnRamp:                    s.OnRamp,
+		MinSeqNr:                  minSeqNr,
+	}
+}
+
+func (s StaticSourceChainConfig) check() (bool /* enabled */, error) {
+	// The chain may be set in CCIPHome's ChainConfig map but not hooked up yet in the offramp.
+	if !s.IsEnabled {
+		return false, nil
+	}
+	// This may happen due to some sort of regression in the codec that unmarshals
+	// chain data -> go struct.
+	if len(s.OnRamp) == 0 {
+		return false, fmt.Errorf(
+			"onRamp misconfigured/didn't unmarshal: %x",
+			s.OnRamp,
+		)
+	}
+
+	if len(s.Router) == 0 {
+		return false, fmt.Errorf("router is empty: %v", s.Router)
+	}
+
+	return s.IsEnabled, nil
+}
+
 func NewCCIPChainReader(
 	ctx context.Context,
 	lggr logger.Logger,
@@ -83,6 +124,7 @@ func NewCCIPChainReader(
 	contractWriters map[cciptypes.ChainSelector]types.ContractWriter,
 	destChain cciptypes.ChainSelector,
 	offrampAddress []byte,
+	addrCodec cciptypes.AddressCodec,
 ) CCIPReader {
 	return NewObservedCCIPReader(
 		newCCIPChainReaderInternal(
@@ -92,6 +134,7 @@ func NewCCIPChainReader(
 			contractWriters,
 			destChain,
 			offrampAddress,
+			addrCodec,
 		),
 		lggr,
 		destChain,
@@ -106,8 +149,9 @@ func NewCCIPReaderWithExtendedContractReaders(
 	contractWriters map[cciptypes.ChainSelector]types.ContractWriter,
 	destChain cciptypes.ChainSelector,
 	offrampAddress []byte,
+	addrCodec cciptypes.AddressCodec,
 ) CCIPReader {
-	cr := newCCIPChainReaderInternal(ctx, lggr, nil, contractWriters, destChain, offrampAddress)
+	cr := newCCIPChainReaderInternal(ctx, lggr, nil, contractWriters, destChain, offrampAddress, addrCodec)
 	for ch, extendedCr := range contractReaders {
 		cr.WithExtendedContractReader(ch, extendedCr)
 	}
@@ -121,15 +165,15 @@ type CCIPReader interface {
 		ctx context.Context,
 		ts time.Time,
 		limit int,
-	) ([]plugintypes2.CommitPluginReportWithMeta, error)
+	) ([]cciptypes.CommitPluginReportWithMeta, error)
 
-	// ExecutedMessages reads the destination chain and finds which messages are executed from the provided source chain.
-	// A slice of sequence numbers is returned to express which messages are executed.
+	// ExecutedMessages finds executed messages for all source chains/ranges provided on a single destination chain.
+	// A map of source chain to slice of sequence numbers is returned to express which seqnrs have executed.
 	ExecutedMessages(
 		ctx context.Context,
-		source cciptypes.ChainSelector,
-		seqNumRange cciptypes.SeqNumRange,
-	) ([]cciptypes.SeqNum, error)
+		rangesPerChain map[cciptypes.ChainSelector][]cciptypes.SeqNumRange,
+		confidence primitives.ConfidenceLevel,
+	) (map[cciptypes.ChainSelector][]cciptypes.SeqNum, error)
 
 	// MsgsBetweenSeqNums reads the provided chains, finds and returns ccip messages
 	// submitted between the provided sequence numbers. Messages are sorted ascending based on
@@ -155,15 +199,15 @@ type CCIPReader interface {
 		seqNum map[cciptypes.ChainSelector]cciptypes.SeqNum, err error)
 
 	// GetContractAddress returns the contract address that is registered for the provided contract name and chain.
+	// WARNING: This function will fail if the oracle does not support the requested chain.
 	GetContractAddress(contractName string, chain cciptypes.ChainSelector) ([]byte, error)
 
 	// Nonces fetches all nonces for the provided selector/address pairs. Addresses are a string encoded raw address,
 	// it must be encoding according to the source chain requirements with typeconv.AddressBytesToString.
 	Nonces(
 		ctx context.Context,
-		source cciptypes.ChainSelector,
-		addresses []string,
-	) (map[string]uint64, error)
+		addressesByChain map[cciptypes.ChainSelector][]string,
+	) (map[cciptypes.ChainSelector]map[string]uint64, error)
 
 	// GetChainsFeeComponents Returns all fee components for given chains if corresponding
 	// chain writer is available.
@@ -185,13 +229,13 @@ type CCIPReader interface {
 	GetChainFeePriceUpdate(
 		ctx context.Context,
 		selectors []cciptypes.ChainSelector,
-	) map[cciptypes.ChainSelector]plugintypes.TimestampedBig
+	) map[cciptypes.ChainSelector]cciptypes.TimestampedBig
 
-	GetRMNRemoteConfig(ctx context.Context) (rmntypes.RemoteConfig, error)
+	GetRMNRemoteConfig(ctx context.Context) (cciptypes.RemoteConfig, error)
 
 	// GetRmnCurseInfo returns rmn curse/pausing information about the provided chains
 	// from the destination chain RMN remote contract. Caller should be able to access destination.
-	GetRmnCurseInfo(ctx context.Context, sourceChainSelectors []cciptypes.ChainSelector) (*CurseInfo, error)
+	GetRmnCurseInfo(ctx context.Context) (CurseInfo, error)
 
 	// DiscoverContracts reads the destination chain for contract addresses. They are returned per
 	// contract and source chain selector.
@@ -209,9 +253,6 @@ type CCIPReader interface {
 	// Returns a bool indicating whether something was updated.
 	Sync(ctx context.Context, contracts ContractAddresses) error
 
-	// GetMedianDataAvailabilityGasConfig returns the median of the DataAvailabilityGasConfig values from all FeeQuoters
-	GetMedianDataAvailabilityGasConfig(ctx context.Context) (cciptypes.DataAvailabilityGasConfig, error)
-
 	// GetLatestPriceSeqNr returns the latest price sequence number for the destination chain.
 	// Not to confuse with the sequence number of the messages. This is the OCR sequence number.
 	GetLatestPriceSeqNr(ctx context.Context) (uint64, error)
@@ -219,8 +260,11 @@ type CCIPReader interface {
 	// GetOffRampConfigDigest returns the offramp config digest for the provided plugin type.
 	GetOffRampConfigDigest(ctx context.Context, pluginType uint8) ([32]byte, error)
 
-	// GetOffRampSourceChainsConfig returns the sourceChains config for all the provided source chains.
+	// GetOffRampSourceChainsConfig returns the source chain static configs for all the provided source chains.
+	// This method returns StaticSourceChainConfig objects which deliberately exclude MinSeqNr.
 	// If a config was not found it will be missing from the returned map.
 	GetOffRampSourceChainsConfig(ctx context.Context, sourceChains []cciptypes.ChainSelector,
-	) (map[cciptypes.ChainSelector]SourceChainConfig, error)
+	) (map[cciptypes.ChainSelector]StaticSourceChainConfig, error)
+
+	Close() error
 }

@@ -8,7 +8,7 @@ use example_ccip_receiver::Any2SVMMessage;
 use program::TestCcipInvalidReceiver;
 use solana_program::pubkey;
 
-declare_id!("9Vjda3WU2gsJgE4VdU6QuDw8rfHLyigfFyWs3XDPNUn8");
+declare_id!("FmyF3oW69MSAhyPSiZ69C4RKBdCPv5vAFTScisV7Me2j");
 
 #[program]
 pub mod test_ccip_invalid_receiver {
@@ -55,6 +55,9 @@ pub mod test_ccip_invalid_receiver {
             ctx.accounts.pool_signer.to_account_info(),
             ctx.accounts.pool_token_account.to_account_info(),
             ctx.accounts.chain_config.to_account_info(),
+            ctx.accounts.rmn_remote.to_account_info(),
+            ctx.accounts.rmn_remote_curses.to_account_info(),
+            ctx.accounts.rmn_remote_config.to_account_info(),
             ctx.accounts.receiver_token_account.to_account_info(),
         ];
 
@@ -75,7 +78,11 @@ pub mod test_ccip_invalid_receiver {
             data: release_or_mint.to_tx_data(),
         };
 
-        let seeds: &[&[u8]] = &[b"external_token_pools_signer", &[ctx.bumps.cpi_signer]];
+        let seeds: &[&[u8]] = &[
+            b"external_token_pools_signer",
+            ctx.accounts.test_pool.key.as_ref(),
+            &[ctx.bumps.cpi_signer],
+        ];
 
         invoke_signed(&ix, &acc_infos, &[seeds])?;
 
@@ -97,6 +104,9 @@ pub mod test_ccip_invalid_receiver {
             ctx.accounts.mint.to_account_info(),
             ctx.accounts.pool_signer.to_account_info(),
             ctx.accounts.pool_token_account.to_account_info(),
+            ctx.accounts.rmn_remote.to_account_info(),
+            ctx.accounts.rmn_remote_curses.to_account_info(),
+            ctx.accounts.rmn_remote_config.to_account_info(),
             ctx.accounts.chain_config.to_account_info(),
         ];
 
@@ -117,7 +127,11 @@ pub mod test_ccip_invalid_receiver {
             data: lock_or_burn.to_tx_data(),
         };
 
-        let seeds: &[&[u8]] = &[b"external_token_pools_signer", &[ctx.bumps.cpi_signer]];
+        let seeds: &[&[u8]] = &[
+            b"external_token_pools_signer",
+            ctx.accounts.test_pool.key.as_ref(),
+            &[ctx.bumps.cpi_signer],
+        ];
 
         invoke_signed(&ix, &acc_infos, &[seeds])?;
 
@@ -130,14 +144,12 @@ pub mod test_ccip_invalid_receiver {
         ctx: Context<'_, '_, 'info, 'info, ReceiverProxyExecute<'info>>,
         message: Any2SVMMessage,
     ) -> Result<()> {
-        let acc_infos = vec![
+        let mut acc_infos = vec![
             ctx.accounts.cpi_signer.to_account_info(),
             ctx.accounts.offramp_program.to_account_info(),
             ctx.accounts.allowed_offramp.to_account_info(),
-            // example-receiver specific accounts
-            ctx.accounts.approved_sender.to_account_info(),
-            ctx.accounts.state.to_account_info(),
         ];
+        acc_infos.extend_from_slice(ctx.remaining_accounts); // these depend on the specific receiver
 
         let acc_metas: Vec<AccountMeta> = acc_infos
             .iter()
@@ -154,7 +166,11 @@ pub mod test_ccip_invalid_receiver {
             data: build_receiver_discriminator_and_data(&message)?,
         };
 
-        let seeds: &[&[u8]] = &[b"external_execution_config", &[ctx.bumps.cpi_signer]];
+        let seeds: &[&[u8]] = &[
+            b"external_execution_config",
+            ctx.accounts.test_receiver.key.as_ref(),
+            &[ctx.bumps.cpi_signer],
+        ];
 
         invoke_signed(&ix, &acc_infos, &[seeds])?;
 
@@ -164,7 +180,7 @@ pub mod test_ccip_invalid_receiver {
 
 const ANCHOR_DISCRIMINATOR: usize = 8;
 
-const TEST_ROUTER: Pubkey = pubkey!("C8WSPj3yyus1YN3yNB6YA5zStYtbjQWtpmKadmvyUXq8");
+const TEST_ROUTER: Pubkey = pubkey!("Ccip842gzYHhvdDkSyi2YVCoAWPbYJoApMFzSxQroE9C");
 
 #[derive(Accounts, Debug)]
 #[instruction(message: Any2SVMMessage)]
@@ -244,7 +260,7 @@ pub struct ReceiverProxyExecute<'info> {
 
     /// CHECK
     #[account(
-        seeds = [b"external_execution_config"],
+        seeds = [b"external_execution_config", test_receiver.key().as_ref()],
         bump,
     )]
     pub cpi_signer: UncheckedAccount<'info>,
@@ -254,13 +270,16 @@ pub struct ReceiverProxyExecute<'info> {
 
     /// CHECK
     pub allowed_offramp: UncheckedAccount<'info>,
+    //
+    /*
+    Remaining Accounts:
+        Example-receiver specific PDAs
+            pub approved_sender: UncheckedAccount<'info>,
+            pub state: UncheckedAccount<'info>,
 
-    // -- Example-receiver specific PDAs
-    /// CHECK
-    pub approved_sender: UncheckedAccount<'info>,
-
-    /// CHECK
-    pub state: UncheckedAccount<'info>,
+        PingPong specific PDAs
+            -- see ping pong contract for more details
+    */
 }
 
 #[derive(Accounts)]
@@ -271,7 +290,7 @@ pub struct PoolProxyReleaseOrMint<'info> {
 
     /// CHECK
     #[account(
-        seeds = [b"external_token_pools_signer"],
+        seeds = [b"external_token_pools_signer", test_pool.key().as_ref()],
         bump,
     )]
     pub cpi_signer: UncheckedAccount<'info>,
@@ -305,6 +324,15 @@ pub struct PoolProxyReleaseOrMint<'info> {
     pub chain_config: UncheckedAccount<'info>,
 
     /// CHECK
+    pub rmn_remote: UncheckedAccount<'info>,
+
+    /// CHECK
+    pub rmn_remote_curses: UncheckedAccount<'info>,
+
+    /// CHECK
+    pub rmn_remote_config: UncheckedAccount<'info>,
+
+    /// CHECK
     #[account(mut)]
     pub receiver_token_account: UncheckedAccount<'info>,
 }
@@ -317,7 +345,7 @@ pub struct PoolProxyLockOrBurn<'info> {
 
     /// CHECK
     #[account(
-        seeds = [b"external_token_pools_signer"],
+        seeds = [b"external_token_pools_signer", test_pool.key().as_ref()],
         bump,
     )]
     pub cpi_signer: UncheckedAccount<'info>,
@@ -340,6 +368,15 @@ pub struct PoolProxyLockOrBurn<'info> {
 
     #[account(mut)]
     pub pool_token_account: InterfaceAccount<'info, TokenAccount>,
+
+    /// CHECK
+    pub rmn_remote: UncheckedAccount<'info>,
+
+    /// CHECK
+    pub rmn_remote_curses: UncheckedAccount<'info>,
+
+    /// CHECK
+    pub rmn_remote_config: UncheckedAccount<'info>,
 
     /// CHECK
     #[account(mut)]
@@ -398,7 +435,7 @@ pub const CCIP_RECEIVE_DISCRIMINATOR: [u8; 8] = [0x0b, 0xf4, 0x09, 0xf9, 0x2c, 0
 pub fn build_receiver_discriminator_and_data(msg: &Any2SVMMessage) -> Result<Vec<u8>> {
     let message = msg.try_to_vec()?;
 
-    let mut data = Vec::with_capacity(8);
+    let mut data = Vec::with_capacity(8 + message.len());
     data.extend_from_slice(&CCIP_RECEIVE_DISCRIMINATOR);
     data.extend_from_slice(&message);
 

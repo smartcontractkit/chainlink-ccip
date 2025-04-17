@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{extra_args::EVMExtraArgsV2, DestChainConfig};
+use crate::{extra_args::GenericExtraArgsV2, DestChainConfig};
 
 // https://github.com/smartcontractkit/chainlink/blob/ff8a597fd9df653f8967427498eaa5a04b19febb/contracts/src/v0.8/ccip/libraries/Internal.sol#L276
 pub const CHAIN_FAMILY_SELECTOR_EVM: u32 = 0x2812d52c;
@@ -31,7 +31,7 @@ pub struct TokenTransferAdditionalData {
 pub struct GetFeeResult {
     pub token: Pubkey,
     pub amount: u64,
-    pub juels: u64,
+    pub juels: u128,
     pub token_transfer_additional_data: Vec<TokenTransferAdditionalData>,
     pub processed_extra_args: ProcessedExtraArgs,
 }
@@ -41,16 +41,20 @@ pub struct ProcessedExtraArgs {
     pub bytes: Vec<u8>,
     pub gas_limit: u128,
     pub allow_out_of_order_execution: bool,
+    // If unspecified, the message receiver should be used (e.g. with EVM as destination.)
+    // This will also be `None` when there is no token transfer.
+    pub token_receiver: Option<Vec<u8>>,
 }
 
 impl ProcessedExtraArgs {
     pub fn defaults(config: &DestChainConfig) -> Self {
-        let args = EVMExtraArgsV2::default_config(config);
+        let args = GenericExtraArgsV2::default_config(config);
 
         ProcessedExtraArgs {
             bytes: args.serialize_with_tag(),
             gas_limit: args.gas_limit,
             allow_out_of_order_execution: args.allow_out_of_order_execution,
+            token_receiver: None,
         }
     }
 }

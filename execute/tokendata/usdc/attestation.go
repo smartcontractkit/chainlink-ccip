@@ -2,11 +2,14 @@ package usdc
 
 import (
 	"context"
-	"errors"
+	"encoding/json"
 	"fmt"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+
+	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
+	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata/http"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
@@ -14,37 +17,46 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
-var (
-	ErrDataMissing     = errors.New("token data missing")
-	ErrNotReady        = errors.New("token data not ready")
-	ErrRateLimit       = errors.New("token data API is being rate limited")
-	ErrTimeout         = errors.New("token data API timed out")
-	ErrUnknownResponse = errors.New("unexpected response from attestation API")
+type attestationStatus string
+
+const (
+	apiVersion      = "v1"
+	attestationPath = "attestations"
+
+	attestationStatusSuccess attestationStatus = "complete"
+	attestationStatusPending attestationStatus = "pending_confirmations"
 )
 
-// AttestationStatus is a struct holding all the necessary information to build payload to
-// mint USDC on the destination chain. Valid AttestationStatus always contains MessageHash and Attestation.
-// In case of failure, Error is populated with more details.
-type AttestationStatus struct {
-	// MessageHash is the hash of the message that the attestation was fetched for. It's going to be MessageSent event hash
-	MessageHash cciptypes.Bytes
-	// Attestation is the attestation data fetched from the API, encoded in bytes
-	Attestation cciptypes.Bytes
-	// Error is the error that occurred during fetching the attestation data
-	Error error
+type httpResponse struct {
+	Status      attestationStatus `json:"status"`
+	Attestation string            `json:"attestation"`
+	Error       string            `json:"error"`
 }
 
-func SuccessAttestationStatus(messageHash cciptypes.Bytes, attestation cciptypes.Bytes) AttestationStatus {
-	return AttestationStatus{MessageHash: messageHash, Attestation: attestation}
+func (r httpResponse) validate() error {
+	if r.Error != "" {
+		return fmt.Errorf("attestation API error: %s", r.Error)
+	}
+	if r.Status == "" {
+		return fmt.Errorf("invalid attestation response")
+	}
+	if r.Status != attestationStatusSuccess {
+		return tokendata.ErrNotReady
+	}
+	return nil
 }
 
-func ErrorAttestationStatus(err error) AttestationStatus {
-	return AttestationStatus{Error: err}
+func (r httpResponse) attestationToBytes() (cciptypes.Bytes, error) {
+	attestationBytes, err := cciptypes.NewBytesFromString(r.Attestation)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode attestation hex: %w", err)
+	}
+	return attestationBytes, nil
 }
 
 type AttestationEncoder func(context.Context, cciptypes.Bytes, cciptypes.Bytes) (cciptypes.Bytes, error)
 
-// AttestationClient is an interface for fetching attestation data from the Circle API.
+// USDCAttestationClient is an client for fetching attestation data from the Circle API.
 // It returns a data grouped by chainSelector, sequenceNumber and tokenIndex
 //
 // Example: if we have two USDC tokens transferred (slot 0 and slot 2) within a single message with sequence number 12
@@ -54,48 +66,42 @@ type AttestationEncoder func(context.Context, cciptypes.Bytes, cciptypes.Bytes) 
 //	12 ->
 //	  0 -> AttestationStatus{Error: nil, Attestation: "ABCDEF", MessageHash: bytes}
 //	  2 -> AttestationStatus{Error: ErrNotRead, Attestation: nil, MessageHash: nil}
-type AttestationClient interface {
-	Attestations(
-		ctx context.Context,
-		msgs map[cciptypes.ChainSelector]map[reader.MessageTokenID]cciptypes.Bytes,
-	) (map[cciptypes.ChainSelector]map[reader.MessageTokenID]AttestationStatus, error)
-}
-
-type sequentialAttestationClient struct {
+type USDCAttestationClient struct {
 	lggr   logger.Logger
-	client HTTPClient
+	client http.HTTPClient
 	hasher hashutil.Hasher[[32]byte]
 }
 
 func NewSequentialAttestationClient(
 	lggr logger.Logger,
 	config pluginconfig.USDCCCTPObserverConfig,
-) (AttestationClient, error) {
-	client, err := GetHTTPClient(
+) (tokendata.AttestationClient, error) {
+	client, err := http.GetHTTPClient(
 		lggr,
 		config.AttestationAPI,
 		config.AttestationAPIInterval.Duration(),
 		config.AttestationAPITimeout.Duration(),
+		config.AttestationAPICooldown.Duration(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("create HTTP client: %w", err)
 	}
-	return &sequentialAttestationClient{
+	return &USDCAttestationClient{
 		lggr:   lggr,
 		client: client,
 		hasher: hashutil.NewKeccak(),
 	}, nil
 }
 
-func (s *sequentialAttestationClient) Attestations(
+func (s *USDCAttestationClient) Attestations(
 	ctx context.Context,
 	messagesByChain map[cciptypes.ChainSelector]map[reader.MessageTokenID]cciptypes.Bytes,
-) (map[cciptypes.ChainSelector]map[reader.MessageTokenID]AttestationStatus, error) {
+) (map[cciptypes.ChainSelector]map[reader.MessageTokenID]tokendata.AttestationStatus, error) {
 	lggr := logutil.WithContextValues(ctx, s.lggr)
-	outcome := make(map[cciptypes.ChainSelector]map[reader.MessageTokenID]AttestationStatus)
+	outcome := make(map[cciptypes.ChainSelector]map[reader.MessageTokenID]tokendata.AttestationStatus)
 
 	for chainSelector, messagesByTokenID := range messagesByChain {
-		outcome[chainSelector] = make(map[reader.MessageTokenID]AttestationStatus)
+		outcome[chainSelector] = make(map[reader.MessageTokenID]tokendata.AttestationStatus)
 
 		for tokenID, message := range messagesByTokenID {
 			lggr.Debugw(
@@ -104,41 +110,41 @@ func (s *sequentialAttestationClient) Attestations(
 				"message", message,
 				"messageTokenID", tokenID,
 			)
-			// TODO sequential processing
 			outcome[chainSelector][tokenID] = s.fetchSingleMessage(ctx, message)
 		}
 	}
 	return outcome, nil
 }
 
-func (s *sequentialAttestationClient) fetchSingleMessage(
+func (s *USDCAttestationClient) Token() string {
+	return USDCToken
+}
+
+func (s *USDCAttestationClient) fetchSingleMessage(
 	ctx context.Context,
 	message cciptypes.Bytes,
-) AttestationStatus {
-	response, _, err := s.client.Get(ctx, s.hasher.Hash(message))
+) tokendata.AttestationStatus {
+	messageHash := cciptypes.Bytes32(s.hasher.Hash(message))
+	body, _, err := s.client.Get(ctx, fmt.Sprintf("%s/%s/%s", apiVersion, attestationPath, messageHash.String()))
 	if err != nil {
-		return ErrorAttestationStatus(err)
+		return tokendata.ErrorAttestationStatus(err)
 	}
-
-	return SuccessAttestationStatus(message, response)
+	response, err := attestationFromResponse(body)
+	if err != nil {
+		return tokendata.ErrorAttestationStatus(err)
+	}
+	return tokendata.SuccessAttestationStatus(messageHash[:], message, response)
 }
 
-type FakeAttestationClient struct {
-	Data map[string]AttestationStatus
-}
-
-func (f FakeAttestationClient) Attestations(
-	_ context.Context,
-	messagesByChain map[cciptypes.ChainSelector]map[reader.MessageTokenID]cciptypes.Bytes,
-) (map[cciptypes.ChainSelector]map[reader.MessageTokenID]AttestationStatus, error) {
-	outcome := make(map[cciptypes.ChainSelector]map[reader.MessageTokenID]AttestationStatus)
-
-	for chainSelector, messagesByTokenID := range messagesByChain {
-		outcome[chainSelector] = make(map[reader.MessageTokenID]AttestationStatus)
-
-		for tokenID, message := range messagesByTokenID {
-			outcome[chainSelector][tokenID] = f.Data[string(message)]
-		}
+func attestationFromResponse(body cciptypes.Bytes) (cciptypes.Bytes, error) {
+	var response httpResponse
+	if err := json.Unmarshal(body, &response); err != nil {
+		return nil, fmt.Errorf("failed to decode json: %w", err)
 	}
-	return outcome, nil
+
+	if err := response.validate(); err != nil {
+		return nil, err
+	}
+
+	return response.attestationToBytes()
 }

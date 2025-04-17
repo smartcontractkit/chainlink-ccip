@@ -20,11 +20,9 @@ type MessageHasher interface {
 	Hash(context.Context, Message) (Bytes32, error)
 }
 
-type ExtraDataCodec interface {
-	// DecodeExtraArgs reformat bytes into a chain agnostic map[string]any representation for extra args
-	DecodeExtraArgs(extraArgs Bytes, sourceChainSelector ChainSelector) (map[string]any, error)
-	// DecodeTokenAmountDestExecData reformat bytes to chain-agnostic map[string]any for tokenAmount DestExecData field
-	DecodeTokenAmountDestExecData(destExecData Bytes, sourceChainSelector ChainSelector) (map[string]any, error)
+type AddressCodec interface {
+	AddressBytesToString(UnknownAddress, ChainSelector) (string, error)
+	AddressStringToBytes(string, ChainSelector) (UnknownAddress, error)
 }
 
 // RMNCrypto provides a chain-agnostic interface for verifying RMN signatures.

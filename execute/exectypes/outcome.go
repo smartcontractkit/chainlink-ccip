@@ -83,6 +83,26 @@ func (o *Outcome) Stats() map[string]int {
 	return counters
 }
 
+// ToLogFormat creates a copy of the outcome with the messages data removed.
+func (o Outcome) ToLogFormat() Outcome {
+	commitReports := make([]CommitData, len(o.CommitReports))
+	for i, report := range o.CommitReports {
+		commitReports[i] = report.CopyNoMsgData()
+	}
+	reports := make([]cciptypes.ExecutePluginReportSingleChain, len(o.Report.ChainReports))
+	for i, report := range o.Report.ChainReports {
+		reports[i] = report.CopyNoMsgData()
+	}
+	cleanedOutcome := Outcome{
+		State:         o.State,
+		CommitReports: commitReports,
+		Report: cciptypes.ExecutePluginReport{
+			ChainReports: reports,
+		},
+	}
+	return cleanedOutcome
+}
+
 // NewOutcome creates a new Outcome with the pending commit reports and the chain reports sorted.
 func NewOutcome(
 	state PluginState,
@@ -104,10 +124,7 @@ func NewSortedOutcome(
 	sort.Slice(
 		pendingCommitsCP,
 		func(i, j int) bool {
-			if pendingCommitsCP[i].SourceChain != pendingCommitsCP[j].SourceChain {
-				return pendingCommitsCP[i].SourceChain < pendingCommitsCP[j].SourceChain
-			}
-			return pendingCommitsCP[i].SequenceNumberRange.Start() < pendingCommitsCP[j].SequenceNumberRange.Start()
+			return LessThan(pendingCommitsCP[i], pendingCommitsCP[j])
 		})
 	sort.Slice(
 		reportCP,

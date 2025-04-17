@@ -21,7 +21,23 @@ func FetchCCIPOfframpIDL() string {
 //go:embed contracts/target/idl/fee_quoter.json
 var feeQuoterIdl string
 
-// FetchCCIPOfframpIDL returns
+// FetchFeeQuoterIDL returns
 func FetchFeeQuoterIDL() string {
 	return feeQuoterIdl
+}
+
+//go:embed contracts/target/idl/rmn_remote.json
+var rmnRemoteIdl string
+
+// FetchRMNRemoteIDL returne
+func FetchRMNRemoteIDL() string {
+	return rmnRemoteIdl
+}
+
+//go:embed contracts/target/idl/ccip_common.json
+var ccipCommonIdl string
+
+// FetchCommonIDL returns
+func FetchCommonIDL() string {
+	return ccipCommonIdl
 }

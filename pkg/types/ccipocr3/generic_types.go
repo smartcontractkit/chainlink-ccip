@@ -54,6 +54,15 @@ func (s SeqNum) String() string {
 	return strconv.FormatUint(uint64(s), 10)
 }
 
+func (s SeqNum) IsWithinRanges(ranges []SeqNumRange) bool {
+	for _, r := range ranges {
+		if r.Contains(s) {
+			return true
+		}
+	}
+	return false
+}
+
 func NewSeqNumRange(start, end SeqNum) SeqNumRange {
 	return SeqNumRange{start, end}
 }
@@ -174,15 +183,31 @@ type Message struct {
 	TokenAmounts []RampTokenAmount `json:"tokenAmounts"`
 }
 
+func (m Message) CopyWithoutData() Message {
+	return Message{
+		Header:         m.Header,
+		Sender:         m.Sender,
+		Data:           []byte{},
+		Receiver:       m.Receiver,
+		ExtraArgs:      m.ExtraArgs,
+		FeeToken:       m.FeeToken,
+		FeeTokenAmount: m.FeeTokenAmount,
+		FeeValueJuels:  m.FeeValueJuels,
+		TokenAmounts:   m.TokenAmounts,
+	}
+}
+
 func (m Message) String() string {
 	js, _ := json.Marshal(m)
 	return string(js)
 }
 
-// IsEmpty returns true if the message is empty. Can't use == Message{} without using reflect.DeepEqual.
-func (m Message) IsEmpty() bool {
-	return m.Header.MessageID == Bytes32{} && m.Header.SourceChainSelector == 0 &&
-		m.Header.DestChainSelector == 0 && m.Header.SequenceNumber == 0 && m.Header.Nonce == 0
+// IsPseudoDeleted returns true when the message is stripped out of some fields that makes it usable. Message still
+// contains some metaData like seqNumber and SourceChainSelector to be able to distinguish it from other messages while
+// still in the pseudo deleted state.
+func (m Message) IsPseudoDeleted() bool {
+	return m.Header.DestChainSelector == 0 && m.Header.SourceChainSelector == 0 &&
+		len(m.Header.OnRamp) == 0 && len(m.Receiver) == 0 && len(m.Sender) == 0
 }
 
 // RampMessageHeader is the family-agnostic header for OnRamp and OffRamp messages.

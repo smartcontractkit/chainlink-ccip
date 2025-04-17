@@ -28,8 +28,15 @@ pub struct Config {
     pub proposed_owner: Pubkey,
 
     // Static config fields
-    pub max_fee_juels_per_msg: u128, // Maximum fee that can be charged for a message.
+    //
+    // Maximum fee that can be charged for a message.
+    // This value is stored with 18 decimals of precision (LINK_JUEL_DECIMALS).
+    // 1 LINK = 1,000,000,000,000,000,000 juels (1e18).
+    pub max_fee_juels_per_msg: u128,
     pub link_token_mint: Pubkey,
+    // local LINK mint may not use 18 decimals as EVM, so we store local decimals
+    // to calculate the transfer fees in juels later.
+    pub link_token_local_decimals: u8,
     // TODO The following field is unused until the day we integrate with feeds to fetch fresh values
     // pub token_price_staleness_threshold: u32,
     pub onramp: Pubkey,
@@ -81,7 +88,7 @@ pub struct DestChain {
     pub config: DestChainConfig, // values configured by an admin
 }
 
-#[derive(InitSpace, Clone, AnchorSerialize, AnchorDeserialize, Debug)]
+#[derive(InitSpace, Clone, AnchorSerialize, AnchorDeserialize, Debug, PartialEq)]
 pub struct TimestampedPackedU224 {
     pub value: [u8; 28],
     pub timestamp: i64, // maintaining the type that SVM returns for the time (solana_program::clock::UnixTimestamp = i64)

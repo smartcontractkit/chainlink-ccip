@@ -10,7 +10,32 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// Execute is the `execute` instruction.
+// Executes an operation after verifying it's authorized in the current Merkle root.
+//
+// This function:
+// 1. Performs extensive validation checks on the operation
+// - Ensures the operation is within the allowed count range
+// - Verifies chain ID matches the configured chain
+// - Checks the root has not expired
+// - Validates the operation's nonce against current state
+// 2. Verifies the operation's inclusion in the Merkle tree
+// 3. Executes the cross-program invocation with the multisig signer PDA
+//
+// # Parameters
+//
+// - `ctx`: Context containing operation accounts and signer information
+// - `multisig_id`: Identifier for the multisig instance
+// - `chain_id`: Network identifier that must match configuration
+// - `nonce`: Operation counter that must match current state
+// - `data`: Instruction data to be executed
+// - `proof`: Merkle proof for operation verification
+//
+// # Security Considerations
+//
+// This instruction implements secure privilege delegation through PDA signing.
+// The multisig's signer PDA becomes the authoritative signer for the operation,
+// allowing controlled execution of privileged actions while maintaining the
+// security guarantees of the Merkle root validation.
 type Execute struct {
 	MultisigId *[32]uint8
 	ChainId    *uint64

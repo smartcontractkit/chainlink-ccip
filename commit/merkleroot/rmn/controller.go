@@ -17,8 +17,9 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"golang.org/x/exp/maps"
-	rand2 "golang.org/x/exp/rand"
 	"google.golang.org/protobuf/proto"
+
+	typconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
@@ -28,8 +29,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 
 	rmnpb "github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
-
-	typconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
@@ -83,7 +82,7 @@ type Controller interface {
 		ctx context.Context,
 		destChain *rmnpb.LaneDest,
 		requestedUpdates []*rmnpb.FixedDestLaneUpdateRequest,
-		rmnRemoteCfg rmntypes.RemoteConfig,
+		rmnRemoteCfg cciptypes.RemoteConfig,
 	) (*ReportSignatures, error)
 }
 
@@ -158,7 +157,7 @@ func (c *controller) ComputeReportSignatures(
 	ctx context.Context,
 	destChain *rmnpb.LaneDest,
 	updateRequests []*rmnpb.FixedDestLaneUpdateRequest,
-	rmnRemoteCfg rmntypes.RemoteConfig,
+	rmnRemoteCfg cciptypes.RemoteConfig,
 ) (*ReportSignatures, error) {
 	lggr := logutil.WithContextValues(ctx, c.lggr)
 
@@ -400,7 +399,9 @@ func (c *controller) sendObservationRequests(
 			fixedDestLaneUpdateRequests = append(fixedDestLaneUpdateRequests, &rmnpb.FixedDestLaneUpdateRequest{
 				LaneSource: &rmnpb.LaneSource{
 					SourceChainSelector: request.LaneSource.SourceChainSelector,
-					OnrampAddress:       typconv.KeepNRightBytes(request.LaneSource.OnrampAddress, 20),
+					// TODO check if we can remove the call for keepNRightBytes
+					// https://github.com/smartcontractkit/chainlink-ccip/pull/647/files#r1966165319
+					OnrampAddress: typconv.KeepNRightBytes(request.LaneSource.OnrampAddress, 20),
 				},
 				ClosedInterval: request.ClosedInterval,
 			})
@@ -541,6 +542,8 @@ func (c *controller) listenForRmnObservationResponses(
 				if !finishedRequestIDs.Contains(requestID) {
 					c.metricsReporter.TrackRmnRequest(RmnMethodObservation, requestInfo.Latency(),
 						requestInfo.nodeID, "timeout")
+					lggr.Warnw("Timed out waiting for an observation response from RMN",
+						"requestID", requestID, "nodeID", requestInfo.nodeID, "latency", requestInfo.Latency())
 				}
 			}
 			return nil, ErrTimeout
@@ -659,6 +662,9 @@ func (c *controller) validateSignedObservationResponse(
 
 		// todo: The original updateReq contains abi encoded onRamp address, the one in the RMN response
 		// is 20 bytes evm address. This is chain specific and should be handled in a chain specific way.
+
+		// TODO check if we can remove the call for keepNRightBytes
+		// https://github.com/smartcontractkit/chainlink-ccip/pull/647/files#r1966165319
 		expOnRampAddress := typconv.KeepNRightBytes(updateReq.Data.LaneSource.OnrampAddress, 20)
 		if !bytes.Equal(expOnRampAddress, signedObsLu.LaneSource.OnrampAddress) {
 			return fmt.Errorf("unexpected lane source %v", signedObsLu.LaneSource)
@@ -681,7 +687,7 @@ func (c *controller) getRmnReportSignatures(
 	destChain *rmnpb.LaneDest,
 	rmnSignedObservations []rmnSignedObservationWithMeta,
 	updatesPerChain map[uint64]updateRequestWithMeta,
-	rmnRemoteCfg rmntypes.RemoteConfig,
+	rmnRemoteCfg cciptypes.RemoteConfig,
 	rmnNodeInfo map[rmntypes.NodeID]rmntypes.HomeNodeInfo,
 ) (*ReportSignatures, error) {
 	// At this point we might have multiple signedObservations for different nodes but never for the same source chain
@@ -822,7 +828,7 @@ func transformAndSortObservations(
 	return attrSigObservations
 }
 
-// selectsRoots selects the roots from the signed observations.
+// selectRoots selects the roots from the signed observations.
 // If there are more than one valid roots based on the provided F it returns an error.
 func selectRoots(
 	observations []rmnSignedObservationWithMeta,
@@ -873,7 +879,7 @@ func selectRoots(
 func (c *controller) sendReportSignatureRequest(
 	lggr logger.Logger,
 	reportSigReq *rmnpb.ReportSignatureRequest,
-	remoteSigners []rmntypes.RemoteSignerInfo,
+	remoteSigners []cciptypes.RemoteSignerInfo,
 	remoteF int,
 	rmnNodeInfo map[rmntypes.NodeID]rmntypes.HomeNodeInfo,
 ) (
@@ -934,7 +940,7 @@ func (c *controller) listenForRmnReportSignatures(
 	rmnReport cciptypes.RMNReport,
 	reportSigReq *rmnpb.ReportSignatureRequest,
 	signersRequested mapset.Set[rmntypes.NodeID],
-	signers []rmntypes.RemoteSignerInfo,
+	signers []cciptypes.RemoteSignerInfo,
 	remoteF int,
 	rmnNodeInfo map[rmntypes.NodeID]rmntypes.HomeNodeInfo,
 ) ([]*rmnpb.EcdsaSignature, error) {
@@ -1019,6 +1025,8 @@ func (c *controller) listenForRmnReportSignatures(
 				if !finishedRequests.Contains(requestID) {
 					c.metricsReporter.TrackRmnRequest(RmnMethodReportSignature, requestInfo.Latency(),
 						requestInfo.nodeID, "timeout")
+					lggr.Warnw("Timed out waiting for a report signature response from RMN",
+						"requestID", requestID, "nodeID", requestInfo.nodeID, "latency", requestInfo.Latency())
 				}
 			}
 			return nil, ErrTimeout
@@ -1044,7 +1052,7 @@ func (c *controller) validateReportSigResponse(
 	ctx context.Context,
 	responseTyp *rmnpb.Response,
 	nodeID rmntypes.NodeID,
-	signers []rmntypes.RemoteSignerInfo,
+	signers []cciptypes.RemoteSignerInfo,
 	rmnReport cciptypes.RMNReport,
 ) (*reportSigWithSignerAddress, error) {
 	signerNode, err := c.getSignerNodeByID(signers, nodeID)
@@ -1096,8 +1104,8 @@ func (c *controller) getHomeNodeByID(
 }
 
 func (c *controller) getSignerNodeByID(
-	rmnNodes []rmntypes.RemoteSignerInfo,
-	nodeID rmntypes.NodeID) (rmntypes.RemoteSignerInfo, error) {
+	rmnNodes []cciptypes.RemoteSignerInfo,
+	nodeID rmntypes.NodeID) (cciptypes.RemoteSignerInfo, error) {
 
 	// Search for the node with the specified ID
 	for _, node := range rmnNodes {
@@ -1108,7 +1116,7 @@ func (c *controller) getSignerNodeByID(
 	}
 
 	// If the node was not found, return a "not found" error
-	return rmntypes.RemoteSignerInfo{}, ErrNotFound
+	return cciptypes.RemoteSignerInfo{}, ErrNotFound
 }
 
 type updateRequestWithMeta struct {
@@ -1183,8 +1191,9 @@ func newRequestID(lggr logger.Logger) uint64 {
 		lggr.Warnw("failed to generate random request id, falling back to golang.org/x/exp/rand",
 			"err", err,
 		)
-		rand2.Seed(uint64(time.Now().UnixNano()))
-		return rand2.Uint64()
+		//nolint:gosec // this is unlikely to occur and is not a security concern.
+		rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
+		return rnd.Uint64()
 	}
 	randomUint64 := binary.LittleEndian.Uint64(b)
 	return randomUint64

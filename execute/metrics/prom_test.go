@@ -88,13 +88,12 @@ func Test_TrackingObservations(t *testing.T) {
 	t.Cleanup(cleanupMetrics(reporter))
 
 	tcs := []struct {
-		name                   string
-		observation            exectypes.Observation
-		state                  exectypes.PluginState
-		expectedMessageCount   int
-		expectedCommitReports  int
-		expectedNonces         int
-		expectedCostlyMessages int
+		name                  string
+		observation           exectypes.Observation
+		state                 exectypes.PluginState
+		expectedMessageCount  int
+		expectedCommitReports int
+		expectedNonces        int
 	}{
 		{
 			name: "empty/missing structs should not report anything",
@@ -102,33 +101,9 @@ func Test_TrackingObservations(t *testing.T) {
 				CommitReports: make(exectypes.CommitObservations),
 				Messages:      make(exectypes.MessageObservations),
 			},
-			state:                  exectypes.GetCommitReports,
-			expectedCommitReports:  0,
-			expectedMessageCount:   0,
-			expectedNonces:         0,
-			expectedCostlyMessages: 0,
-		},
-		{
-			name: "observation with messages which some of them are costly",
-			observation: exectypes.Observation{
-				CommitReports: exectypes.CommitObservations{
-					cciptypes.ChainSelector(123): make([]exectypes.CommitData, 2),
-					cciptypes.ChainSelector(456): nil,
-					cciptypes.ChainSelector(780): make([]exectypes.CommitData, 1),
-				},
-				Messages: exectypes.MessageObservations{
-					cciptypes.ChainSelector(123): map[cciptypes.SeqNum]cciptypes.Message{
-						1: {},
-						2: {},
-					},
-				},
-				CostlyMessages: make([]cciptypes.Bytes32, 1),
-			},
-			state:                  exectypes.Filter,
-			expectedCommitReports:  3,
-			expectedMessageCount:   2,
-			expectedNonces:         0,
-			expectedCostlyMessages: 1,
+			state:                 exectypes.GetCommitReports,
+			expectedCommitReports: 0,
+			expectedMessageCount:  0,
 		},
 		{
 			name: "observation with nonces",
@@ -144,24 +119,16 @@ func Test_TrackingObservations(t *testing.T) {
 					cciptypes.ChainSelector(789): nil,
 				},
 			},
-			state:                  exectypes.GetMessages,
-			expectedCommitReports:  0,
-			expectedMessageCount:   0,
-			expectedNonces:         3,
-			expectedCostlyMessages: 0,
+			state:                 exectypes.GetMessages,
+			expectedCommitReports: 0,
+			expectedMessageCount:  0,
+			expectedNonces:        3,
 		},
 	}
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
 			reporter.TrackObservation(tc.observation, tc.state)
-
-			costlyMsgs := testutil.ToFloat64(
-				reporter.outputDetailsCounter.WithLabelValues(
-					chainID, plugincommon.ObservationMethod, string(tc.state), "costlyMessages",
-				),
-			)
-			require.Equal(t, tc.expectedCostlyMessages, int(costlyMsgs))
 
 			nonces := testutil.ToFloat64(
 				reporter.outputDetailsCounter.WithLabelValues(
@@ -457,11 +424,58 @@ func Test_ExecLatency(t *testing.T) {
 	})
 }
 
+func Test_LatencyAndErrors(t *testing.T) {
+	reporter, err := NewPromReporter(logger.Test(t), selector)
+	require.NoError(t, err)
+
+	t.Run("single latency metric", func(t *testing.T) {
+		processor := "discovery1"
+		method := "query"
+
+		reporter.TrackProcessorLatency(processor, method, time.Second, nil)
+		l1 := internal.CounterFromHistogramByLabels(t, reporter.processorLatencyHistogram, chainID, processor, method)
+		require.Equal(t, 1, l1)
+
+		errs := testutil.ToFloat64(
+			reporter.processorErrors.WithLabelValues(chainID, processor, method),
+		)
+		require.Equal(t, float64(0), errs)
+	})
+
+	t.Run("multiple latency metrics", func(t *testing.T) {
+		processor := "discovery2"
+		method := "observation"
+
+		passCounter := 10
+		for i := 0; i < passCounter; i++ {
+			reporter.TrackProcessorLatency(processor, method, time.Second, nil)
+		}
+		l2 := internal.CounterFromHistogramByLabels(t, reporter.processorLatencyHistogram, chainID, processor, method)
+		require.Equal(t, passCounter, l2)
+	})
+
+	t.Run("multiple error metrics", func(t *testing.T) {
+		processor := "discovery3"
+		method := "outcome"
+
+		errCounter := 5
+		for i := 0; i < errCounter; i++ {
+			reporter.TrackProcessorLatency(processor, method, time.Second, fmt.Errorf("error"))
+		}
+		errs := testutil.ToFloat64(
+			reporter.processorErrors.WithLabelValues(chainID, processor, method),
+		)
+		require.Equal(t, float64(errCounter), errs)
+	})
+}
+
 func cleanupMetrics(p *PromReporter) func() {
 	return func() {
 		p.sequenceNumbers.Reset()
 		p.outputDetailsCounter.Reset()
 		p.latencyHistogram.Reset()
 		p.execErrors.Reset()
+		p.processorLatencyHistogram.Reset()
+		p.processorErrors.Reset()
 	}
 }

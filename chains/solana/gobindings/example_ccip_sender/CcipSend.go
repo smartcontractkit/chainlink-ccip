@@ -58,14 +58,18 @@ type CcipSend struct {
 	//
 	// [19] = [] ccipFeeQuoterLinkTokenConfig
 	//
-	// [20] = [WRITE] ccipTokenPoolsSigner
+	// [20] = [] ccipRmnRemote
+	//
+	// [21] = [] ccipRmnRemoteCurses
+	//
+	// [22] = [] ccipRmnRemoteConfig
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewCcipSendInstructionBuilder creates a new `CcipSend` instruction builder.
 func NewCcipSendInstructionBuilder() *CcipSend {
 	nd := &CcipSend{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 21),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 23),
 	}
 	return nd
 }
@@ -320,15 +324,37 @@ func (inst *CcipSend) GetCcipFeeQuoterLinkTokenConfigAccount() *ag_solanago.Acco
 	return inst.AccountMetaSlice[19]
 }
 
-// SetCcipTokenPoolsSignerAccount sets the "ccipTokenPoolsSigner" account.
-func (inst *CcipSend) SetCcipTokenPoolsSignerAccount(ccipTokenPoolsSigner ag_solanago.PublicKey) *CcipSend {
-	inst.AccountMetaSlice[20] = ag_solanago.Meta(ccipTokenPoolsSigner).WRITE()
+// SetCcipRmnRemoteAccount sets the "ccipRmnRemote" account.
+func (inst *CcipSend) SetCcipRmnRemoteAccount(ccipRmnRemote ag_solanago.PublicKey) *CcipSend {
+	inst.AccountMetaSlice[20] = ag_solanago.Meta(ccipRmnRemote)
 	return inst
 }
 
-// GetCcipTokenPoolsSignerAccount gets the "ccipTokenPoolsSigner" account.
-func (inst *CcipSend) GetCcipTokenPoolsSignerAccount() *ag_solanago.AccountMeta {
+// GetCcipRmnRemoteAccount gets the "ccipRmnRemote" account.
+func (inst *CcipSend) GetCcipRmnRemoteAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[20]
+}
+
+// SetCcipRmnRemoteCursesAccount sets the "ccipRmnRemoteCurses" account.
+func (inst *CcipSend) SetCcipRmnRemoteCursesAccount(ccipRmnRemoteCurses ag_solanago.PublicKey) *CcipSend {
+	inst.AccountMetaSlice[21] = ag_solanago.Meta(ccipRmnRemoteCurses)
+	return inst
+}
+
+// GetCcipRmnRemoteCursesAccount gets the "ccipRmnRemoteCurses" account.
+func (inst *CcipSend) GetCcipRmnRemoteCursesAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[21]
+}
+
+// SetCcipRmnRemoteConfigAccount sets the "ccipRmnRemoteConfig" account.
+func (inst *CcipSend) SetCcipRmnRemoteConfigAccount(ccipRmnRemoteConfig ag_solanago.PublicKey) *CcipSend {
+	inst.AccountMetaSlice[22] = ag_solanago.Meta(ccipRmnRemoteConfig)
+	return inst
+}
+
+// GetCcipRmnRemoteConfigAccount gets the "ccipRmnRemoteConfig" account.
+func (inst *CcipSend) GetCcipRmnRemoteConfigAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[22]
 }
 
 func (inst CcipSend) Build() *Instruction {
@@ -431,7 +457,13 @@ func (inst *CcipSend) Validate() error {
 			return errors.New("accounts.CcipFeeQuoterLinkTokenConfig is not set")
 		}
 		if inst.AccountMetaSlice[20] == nil {
-			return errors.New("accounts.CcipTokenPoolsSigner is not set")
+			return errors.New("accounts.CcipRmnRemote is not set")
+		}
+		if inst.AccountMetaSlice[21] == nil {
+			return errors.New("accounts.CcipRmnRemoteCurses is not set")
+		}
+		if inst.AccountMetaSlice[22] == nil {
+			return errors.New("accounts.CcipRmnRemoteConfig is not set")
 		}
 	}
 	return nil
@@ -455,7 +487,7 @@ func (inst *CcipSend) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=21]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Accounts[len=23]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("                          state", inst.AccountMetaSlice[0]))
 						accountsBranch.Child(ag_format.Meta("                    chainConfig", inst.AccountMetaSlice[1]))
 						accountsBranch.Child(ag_format.Meta("                     ccipSender", inst.AccountMetaSlice[2]))
@@ -476,7 +508,9 @@ func (inst *CcipSend) EncodeToTree(parent ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("         ccipFeeQuoterDestChain", inst.AccountMetaSlice[17]))
 						accountsBranch.Child(ag_format.Meta("ccipFeeQuoterBillingTokenConfig", inst.AccountMetaSlice[18]))
 						accountsBranch.Child(ag_format.Meta("   ccipFeeQuoterLinkTokenConfig", inst.AccountMetaSlice[19]))
-						accountsBranch.Child(ag_format.Meta("           ccipTokenPoolsSigner", inst.AccountMetaSlice[20]))
+						accountsBranch.Child(ag_format.Meta("                  ccipRmnRemote", inst.AccountMetaSlice[20]))
+						accountsBranch.Child(ag_format.Meta("            ccipRmnRemoteCurses", inst.AccountMetaSlice[21]))
+						accountsBranch.Child(ag_format.Meta("            ccipRmnRemoteConfig", inst.AccountMetaSlice[22]))
 					})
 				})
 		})
@@ -568,7 +602,9 @@ func NewCcipSendInstruction(
 	ccipFeeQuoterDestChain ag_solanago.PublicKey,
 	ccipFeeQuoterBillingTokenConfig ag_solanago.PublicKey,
 	ccipFeeQuoterLinkTokenConfig ag_solanago.PublicKey,
-	ccipTokenPoolsSigner ag_solanago.PublicKey) *CcipSend {
+	ccipRmnRemote ag_solanago.PublicKey,
+	ccipRmnRemoteCurses ag_solanago.PublicKey,
+	ccipRmnRemoteConfig ag_solanago.PublicKey) *CcipSend {
 	return NewCcipSendInstructionBuilder().
 		SetDestChainSelector(destChainSelector).
 		SetTokenAmounts(tokenAmounts).
@@ -595,5 +631,7 @@ func NewCcipSendInstruction(
 		SetCcipFeeQuoterDestChainAccount(ccipFeeQuoterDestChain).
 		SetCcipFeeQuoterBillingTokenConfigAccount(ccipFeeQuoterBillingTokenConfig).
 		SetCcipFeeQuoterLinkTokenConfigAccount(ccipFeeQuoterLinkTokenConfig).
-		SetCcipTokenPoolsSignerAccount(ccipTokenPoolsSigner)
+		SetCcipRmnRemoteAccount(ccipRmnRemote).
+		SetCcipRmnRemoteCursesAccount(ccipRmnRemoteCurses).
+		SetCcipRmnRemoteConfigAccount(ccipRmnRemoteConfig)
 }

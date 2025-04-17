@@ -10,7 +10,14 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// FinalizeSigners is the `finalizeSigners` instruction.
+// Finalize the signer configuration.
+//
+// Marks the signer list as complete and ready for incorporation into the multisig configuration.
+//
+// # Parameters
+//
+// - `ctx`: The context containing required accounts.
+// - `multisig_id`: The multisig instance identifier.
 type FinalizeSigners struct {
 	MultisigId *[32]uint8
 

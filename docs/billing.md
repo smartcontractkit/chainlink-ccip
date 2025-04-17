@@ -22,8 +22,6 @@ We have 2 plugins (Commit and Execute).
 
 Commit is the one responsible for reporting gas prices, and token prices that don't come from keystone.
 
-Execute is responsible for [fee boosting](https://github.com/smartcontractkit/chainlink-ccip/blob/28a1b54783a0023e82f92833aa8379164e799bf2/docs/billing.md#fee-boosting) during the actual execution of messages.
-
 ## Fee Structure
 
 To send a message from sourceChain to destinationChain we need to account for multiple fees. For more details [billing documentation](https://docs.chain.link/ccip/billing)
@@ -78,9 +76,4 @@ For each round, these are the steps:
 
 One more thing that is done is to calculate the gas price in USD using the native token price from 1b. This is done to be able to calculate the fees in USD. For details on the calculation and the representation onchain please check the [code](https://github.com/smartcontractkit/chainlink-ccip/blob/5c54ab8396e3409cefef84dfa29d27920fc0ca46/commit/chainfee/outcome.go#L35-L81) with the comments.
 
-## Fee Boosting
-
-Assigning inflight messages that were previously skipped due to being underpaid an increasing weight for execution as time passes
-
 ## Aggregate Rate Limiting
-

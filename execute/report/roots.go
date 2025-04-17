@@ -36,7 +36,8 @@ func ConstructMerkleTree(
 				"malformed report, message %s sequence number %d outside of report range %s",
 				report.MerkleRoot.String(), msg.Header.SequenceNumber, report.SequenceNumberRange)
 		}
-		if report.SourceChain != msg.Header.SourceChainSelector {
+		// When msg is pseudo deleted we don't need to check the source chain selector
+		if !msg.IsPseudoDeleted() && report.SourceChain != msg.Header.SourceChainSelector {
 			return nil, fmt.Errorf("malformed report, message %s for unexpected source chain: expected %d, got %d",
 				report.MerkleRoot.String(), report.SourceChain, msg.Header.SourceChainSelector)
 		}
@@ -46,7 +47,7 @@ func ConstructMerkleTree(
 		leaf := report.Hashes[i]
 		lggr.Debugw("Hashed message, adding to tree leaves",
 			"hash", leaf,
-			"msg", msg,
+			"message", msg,
 			"merkleRoot", report.MerkleRoot,
 			"sourceChain", report.SourceChain)
 		treeLeaves = append(treeLeaves, leaf)

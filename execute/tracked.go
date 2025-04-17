@@ -11,7 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/metrics"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec"
+	ocrtypecodec "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
 )
 
 // TrackedPlugin tracks latency of the basic ReportingPlugin's methods. The special ingredient (compared to OCR3)
@@ -21,14 +21,14 @@ type TrackedPlugin struct {
 	ocr3types.ReportingPlugin[[]byte]
 	lggr     logger.Logger
 	reporter metrics.Reporter
-	codec    *ocrtypecodec.ExecCodecJSON
+	codec    ocrtypecodec.ExecCodec
 }
 
 func NewTrackedPlugin(
 	plugin ocr3types.ReportingPlugin[[]byte],
 	lggr logger.Logger,
 	reporter metrics.Reporter,
-	codec *ocrtypecodec.ExecCodecJSON,
+	codec ocrtypecodec.ExecCodec,
 ) ocr3types.ReportingPlugin[[]byte] {
 	return &TrackedPlugin{
 		ReportingPlugin: plugin,
@@ -85,7 +85,7 @@ func withTrackedMethod[T any](
 
 	p.reporter.TrackLatency(state, method, latency, err)
 	p.lggr.Debugw("tracking exec latency",
-		"state",
+		"state", state,
 		"method", method,
 		"latency", latency,
 	)

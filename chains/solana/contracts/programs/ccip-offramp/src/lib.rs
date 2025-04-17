@@ -1,7 +1,7 @@
 use anchor_lang::error_code;
 use anchor_lang::prelude::*;
 
-declare_id!("offRPDpDxT5MGFNmMh99QKTZfPWTkqYUrStEriAS1H5");
+declare_id!("offqSMQWgQud6WJz694LRzkeN5kMYpCHTpXQr3Rkcjm");
 
 mod event;
 mod messages;
@@ -35,14 +35,14 @@ pub mod ccip_offramp {
     ///
     /// * `ctx` - The context containing the accounts required for initialization.
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
-        ctx.accounts
-            .reference_addresses
-            .set_inner(ReferenceAddresses {
-                version: 1,
-                router: ctx.accounts.router.key(),
-                fee_quoter: ctx.accounts.fee_quoter.key(),
-                offramp_lookup_table: ctx.accounts.offramp_lookup_table.key(),
-            });
+        let mut reference_addresses = ctx.accounts.reference_addresses.load_init()?;
+        *reference_addresses = ReferenceAddresses {
+            version: 1,
+            router: ctx.accounts.router.key(),
+            fee_quoter: ctx.accounts.fee_quoter.key(),
+            rmn_remote: ctx.accounts.rmn_remote.key(),
+            offramp_lookup_table: ctx.accounts.offramp_lookup_table.key(),
+        };
 
         ctx.accounts.state.latest_price_sequence_number = 0;
 
@@ -50,6 +50,7 @@ pub mod ccip_offramp {
             router: ctx.accounts.router.key(),
             fee_quoter: ctx.accounts.fee_quoter.key(),
             offramp_lookup_table: ctx.accounts.offramp_lookup_table.key(),
+            rmn_remote: ctx.accounts.rmn_remote.key(),
         });
 
         Ok(())
@@ -78,8 +79,8 @@ pub mod ccip_offramp {
         config.enable_manual_execution_after = enable_execution_after;
         config.owner = ctx.accounts.authority.key();
         config.ocr3 = [
-            Ocr3Config::new(OcrPluginType::Commit as u8),
-            Ocr3Config::new(OcrPluginType::Execution as u8),
+            Ocr3Config::new(OcrPluginType::Commit),
+            Ocr3Config::new(OcrPluginType::Execution),
         ];
 
         emit!(ConfigSet {
@@ -131,6 +132,10 @@ pub mod ccip_offramp {
         router::admin(default_code_version).accept_ownership(ctx)
     }
 
+    /////////////
+    // Config //
+    /////////////
+
     /// Sets the default code version to be used. This is then used by the slim routing layer to determine
     /// which version of the versioned business logic module (`instructions`) to use. Only the admin may set this.
     ///
@@ -154,9 +159,39 @@ pub mod ccip_offramp {
         router::admin(default_code_version).set_default_code_version(ctx, code_version)
     }
 
-    /////////////
-    /// Config //
-    /////////////
+    /// Updates reference addresses in the offramp contract, such as
+    /// the CCIP router, Fee Quoter, and the Offramp Lookup Table.
+    /// Only the Admin may update these addresses.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for updating the reference addresses.
+    /// * `router` - The router address to be set.
+    /// * `fee_quoter` - The fee_quoter address to be set.
+    /// * `offramp_lookup_table` - The offramp_lookup_table address to be set.
+    /// * `rmn_remote` - The rmn_remote address to be set.
+    pub fn update_reference_addresses(
+        ctx: Context<UpdateReferenceAddresses>,
+        router: Pubkey,
+        fee_quoter: Pubkey,
+        offramp_lookup_table: Pubkey,
+        rmn_remote: Pubkey,
+    ) -> Result<()> {
+        let default_code_version: CodeVersion = ctx
+            .accounts
+            .config
+            .load()?
+            .default_code_version
+            .try_into()?;
+
+        router::admin(default_code_version).update_reference_addresses(
+            ctx,
+            router,
+            fee_quoter,
+            offramp_lookup_table,
+            rmn_remote,
+        )
+    }
 
     /// Adds a new source chain selector with its config to the offramp.
     ///
@@ -292,7 +327,7 @@ pub mod ccip_offramp {
     /// * `transmitters` - The list of transmitters.
     pub fn set_ocr_config(
         ctx: Context<SetOcrConfig>,
-        plugin_type: u8, // OcrPluginType, u8 used because anchor tests did not work with an enum
+        plugin_type: OcrPluginType,
         config_info: Ocr3ConfigInfo,
         signers: Vec<[u8; 20]>,
         transmitters: Vec<Pubkey>,
@@ -486,14 +521,40 @@ pub mod ccip_offramp {
             &token_indexes,
         )
     }
+
+    pub fn close_commit_report_account(
+        ctx: Context<CloseCommitReportAccount>,
+        source_chain_selector: u64,
+        root: Vec<u8>,
+    ) -> Result<()> {
+        // there is no lane here in this case of commit, so use default code version
+        let lane_code_version = CodeVersion::Default;
+
+        let default_code_version: CodeVersion = ctx
+            .accounts
+            .config
+            .load()?
+            .default_code_version
+            .try_into()?;
+
+        router::commit(lane_code_version, default_code_version).close_commit_report_account(
+            ctx,
+            source_chain_selector,
+            root,
+        )
+    }
 }
 
 #[error_code]
 pub enum CcipOfframpError {
     #[msg("The given sequence interval is invalid")]
-    InvalidSequenceInterval,
+    // offset error code so that they don't clash with other programs
+    // (Anchor's base custom error code 6000 + offset 3000 = start at 9000)
+    InvalidSequenceInterval = 3000,
     #[msg("The given Merkle Root is missing")]
     RootNotCommitted,
+    #[msg("Invalid RMN Remote Address")]
+    InvalidRMNRemoteAddress,
     #[msg("The given Merkle Root is already committed")]
     ExistingMerkleRoot,
     #[msg("The signer is unauthorized")]
@@ -546,8 +607,6 @@ pub enum CcipOfframpError {
     InvalidInputsFeeQuoterAccount,
     #[msg("Invalid offramp authorization account")]
     InvalidInputsAllowedOfframpAccount,
-    #[msg("Invalid config account")]
-    InvalidInputsConfigAccounts,
     #[msg("Invalid Token Admin Registry account")]
     InvalidInputsTokenAdminRegistryAccounts,
     #[msg("Invalid LookupTable account")]
@@ -564,4 +623,44 @@ pub enum CcipOfframpError {
     InvalidWritabilityBitmap,
     #[msg("Invalid code version")]
     InvalidCodeVersion,
+    #[msg("Invalid config: F must be positive")]
+    Ocr3InvalidConfigFMustBePositive,
+    #[msg("Invalid config: Too many transmitters")]
+    Ocr3InvalidConfigTooManyTransmitters,
+    #[msg("Invalid config: No transmitters")]
+    Ocr3InvalidConfigNoTransmitters,
+    #[msg("Invalid config: Too many signers")]
+    Ocr3InvalidConfigTooManySigners,
+    #[msg("Invalid config: F is too high")]
+    Ocr3InvalidConfigFIsTooHigh,
+    #[msg("Invalid config: Repeated oracle address")]
+    Ocr3InvalidConfigRepeatedOracle,
+    #[msg("Wrong message length")]
+    Ocr3WrongMessageLength,
+    #[msg("Config digest mismatch")]
+    Ocr3ConfigDigestMismatch,
+    #[msg("Wrong number signatures")]
+    Ocr3WrongNumberOfSignatures,
+    #[msg("Unauthorized transmitter")]
+    Ocr3UnauthorizedTransmitter,
+    #[msg("Unauthorized signer")]
+    Ocr3UnauthorizedSigner,
+    #[msg("Non unique signatures")]
+    Ocr3NonUniqueSignatures,
+    #[msg("Oracle cannot be zero address")]
+    Ocr3OracleCannotBeZeroAddress,
+    #[msg("Static config cannot be changed")]
+    Ocr3StaticConfigCannotBeChanged,
+    #[msg("Incorrect plugin type")]
+    Ocr3InvalidPluginType,
+    #[msg("Invalid signature")]
+    Ocr3InvalidSignature,
+    #[msg("Signatures out of registration")]
+    Ocr3SignaturesOutOfRegistration,
+    #[msg("Invalid onramp address")]
+    InvalidOnrampAddress,
+    #[msg("Invalid external execution signer account")]
+    InvalidInputsExternalExecutionSignerAccount,
+    #[msg("Commit report has pending messages")]
+    CommitReportHasPendingMessages,
 }

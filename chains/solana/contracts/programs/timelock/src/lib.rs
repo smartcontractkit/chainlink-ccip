@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-declare_id!("LoCoNsJFuhTkSQjfdDfn3yuwqhSYoPujmviRHVCzsqn");
+declare_id!("DoajfR5tK24xVw51fWcawUZWhAXD8yrBJVacc13neVQA");
 
 mod constants;
 pub use constants::*;
@@ -41,8 +41,6 @@ use instructions::*;
 /// All operations enforce state transitions, size limits, and role-based access.
 pub mod timelock {
     #![warn(missing_docs)]
-    use bytemuck::Zeroable;
-
     use super::*;
 
     /// Initialize the timelock configuration.
@@ -219,13 +217,26 @@ pub mod timelock {
         cancel::cancel(ctx, timelock_id, id)
     }
 
-    /// Execute a scheduled batch of instructions.
+    /// Executes a scheduled batch of operations after validating readiness and predecessor dependencies.
+    ///
+    /// This function:
+    /// 1. Verifies the operation is ready for execution (delay period has passed)
+    /// 2. Validates that any predecessor operation has been completed
+    /// 3. Executes each instruction in the operation using the timelock signer PDA
+    /// 4. Emits events for each executed instruction
     ///
     /// # Parameters
     ///
-    /// - `ctx`: The context containing the accounts required for execution.
-    /// - `timelock_id`: The timelock identifier.
-    /// - `id`: The operation identifier.
+    /// - `ctx`: Context containing operation accounts and signer information
+    /// - `timelock_id`: Identifier for the timelock instance
+    /// - `_id`: Operation ID (used for PDA derivation)
+    ///
+    /// # Security Considerations
+    ///
+    /// This instruction uses PDA signing to create a trusted execution environment.
+    /// The timelock's signer PDA will replace any account marked as a signer in the
+    /// original instructions, providing the necessary privileges while maintaining
+    /// security through program derivation.
     #[access_control(require_role_or_admin!(ctx, Role::Executor))]
     pub fn execute_batch<'info>(
         ctx: Context<'_, '_, '_, 'info, ExecuteBatch<'info>>,
@@ -342,13 +353,25 @@ pub mod timelock {
         Ok(())
     }
 
-    /// Execute a bypasser operation immediately.
+    /// Execute operations immediately using the bypasser flow, bypassing time delays
+    /// and predecessor checks.
+    ///
+    /// This function provides an emergency execution mechanism that:
+    /// 1. Skips the timelock waiting period required for standard operations
+    /// 2. Does not enforce predecessor dependencies
+    /// 3. Closes the operation account after execution
+    ///
+    /// # Emergency Use Only
+    ///
+    /// The bypasser flow is intended strictly for emergency situations where
+    /// waiting for the standard timelock delay would cause harm. Access to this
+    /// function is tightly controlled through the Bypasser role.
     ///
     /// # Parameters
     ///
-    /// - `ctx`: The context containing the bypasser execution account.
-    /// - `timelock_id`: The timelock identifier.
-    /// - `id`: The operation identifier.
+    /// - `ctx`: Context containing operation accounts and signer information
+    /// - `timelock_id`: Identifier for the timelock instance
+    /// - `_id`: Operation ID (used for PDA derivation)
     #[access_control(require_role_or_admin!(ctx, Role::Bypasser))]
     pub fn bypasser_execute_batch<'info>(
         ctx: Context<'_, '_, '_, 'info, BypasserExecuteBatch<'info>>,
@@ -375,7 +398,7 @@ pub mod timelock {
         _timelock_id: [u8; TIMELOCK_ID_PADDED],
         delay: u64,
     ) -> Result<()> {
-        let config = &mut ctx.accounts.config;
+        let mut config = ctx.accounts.config.load_mut()?;
         require!(delay > 0, TimelockError::InvalidInput);
         emit!(MinDelayChange {
             old_duration: config.min_delay,
@@ -400,7 +423,7 @@ pub mod timelock {
         _timelock_id: [u8; TIMELOCK_ID_PADDED],
         selector: [u8; 8],
     ) -> Result<()> {
-        let config = &mut ctx.accounts.config;
+        let mut config = ctx.accounts.config.load_mut()?;
         config.blocked_selectors.block_selector(selector)?;
         emit!(FunctionSelectorBlocked { selector });
         Ok(())
@@ -421,13 +444,13 @@ pub mod timelock {
         _timelock_id: [u8; TIMELOCK_ID_PADDED],
         selector: [u8; 8],
     ) -> Result<()> {
-        let config = &mut ctx.accounts.config;
+        let mut config = ctx.accounts.config.load_mut()?;
         config.blocked_selectors.unblock_selector(selector)?;
         emit!(FunctionSelectorUnblocked { selector });
         Ok(())
     }
 
-    /// Propose a new owner for the timelock.
+    /// Propose a new owner for the timelock instance config.
     ///
     /// Only the current owner (admin) can propose a new owner.
     ///
@@ -442,13 +465,16 @@ pub mod timelock {
         _timelock_id: [u8; TIMELOCK_ID_PADDED],
         proposed_owner: Pubkey,
     ) -> Result<()> {
-        let config = &mut ctx.accounts.config;
-        require!(proposed_owner != config.owner, TimelockError::InvalidInput);
+        let mut config = ctx.accounts.config.load_mut()?;
+        require!(
+            proposed_owner != config.owner && proposed_owner != Pubkey::default(),
+            TimelockError::InvalidInput
+        );
         config.proposed_owner = proposed_owner;
         Ok(())
     }
 
-    /// Accept ownership of the timelock.
+    /// Accept ownership of the timelock config.
     ///
     /// The proposed new owner must call this function to assume ownership.
     ///
@@ -460,8 +486,9 @@ pub mod timelock {
         ctx: Context<AcceptOwnership>,
         _timelock_id: [u8; TIMELOCK_ID_PADDED],
     ) -> Result<()> {
-        ctx.accounts.config.owner = std::mem::take(&mut ctx.accounts.config.proposed_owner);
-        ctx.accounts.config.proposed_owner = Pubkey::zeroed();
+        let mut config = ctx.accounts.config.load_mut()?;
+        // NOTE: take() resets proposed_owner to default
+        config.owner = std::mem::take(&mut config.proposed_owner);
         Ok(())
     }
 }
@@ -470,7 +497,7 @@ pub mod timelock {
 #[instruction(timelock_id: [u8; TIMELOCK_ID_PADDED])]
 pub struct TransferOwnership<'info> {
     #[account(mut, seeds = [TIMELOCK_CONFIG_SEED, timelock_id.as_ref()], bump)]
-    pub config: Account<'info, Config>,
+    pub config: AccountLoader<'info, Config>,
     // owner(admin) only, access control with only_admin macro
     pub authority: Signer<'info>,
 }
@@ -479,8 +506,8 @@ pub struct TransferOwnership<'info> {
 #[instruction(timelock_id: [u8; TIMELOCK_ID_PADDED])]
 pub struct AcceptOwnership<'info> {
     #[account(mut, seeds = [TIMELOCK_CONFIG_SEED, timelock_id.as_ref()], bump)]
-    pub config: Account<'info, Config>,
-    #[account(address = config.proposed_owner @ AuthError::Unauthorized)]
+    pub config: AccountLoader<'info, Config>,
+    #[account(address = config.load()?.proposed_owner @ AuthError::Unauthorized)]
     pub authority: Signer<'info>,
 }
 
@@ -488,7 +515,7 @@ pub struct AcceptOwnership<'info> {
 #[instruction(timelock_id: [u8; TIMELOCK_ID_PADDED])]
 pub struct UpdateDelay<'info> {
     #[account(mut, seeds = [TIMELOCK_CONFIG_SEED, timelock_id.as_ref()], bump)]
-    pub config: Account<'info, Config>,
+    pub config: AccountLoader<'info, Config>,
     // owner(admin) only, access control with only_admin macro
     pub authority: Signer<'info>,
 }
@@ -497,7 +524,7 @@ pub struct UpdateDelay<'info> {
 #[instruction(timelock_id: [u8; TIMELOCK_ID_PADDED])]
 pub struct BlockFunctionSelector<'info> {
     #[account(mut, seeds = [TIMELOCK_CONFIG_SEED, timelock_id.as_ref()], bump)]
-    pub config: Account<'info, Config>,
+    pub config: AccountLoader<'info, Config>,
     // owner(admin) only, access control with only_admin macro
     pub authority: Signer<'info>,
 }
@@ -506,7 +533,7 @@ pub struct BlockFunctionSelector<'info> {
 #[instruction(timelock_id: [u8; TIMELOCK_ID_PADDED])]
 pub struct UnblockFunctionSelector<'info> {
     #[account(mut, seeds = [TIMELOCK_CONFIG_SEED, timelock_id.as_ref()], bump)]
-    pub config: Account<'info, Config>,
+    pub config: AccountLoader<'info, Config>,
     // owner(admin) only, access control with only_admin macro
     pub authority: Signer<'info>,
 }

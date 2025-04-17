@@ -8,14 +8,15 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
+
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
-	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
 func TestInMemoryCCIPReader_CommitReportsGTETimestamp(t *testing.T) {
 	type fields struct {
-		Reports []plugintypes2.CommitPluginReportWithMeta
+		Reports []cciptypes.CommitPluginReportWithMeta
 	}
 	type args struct {
 		ts    time.Time
@@ -44,7 +45,7 @@ func TestInMemoryCCIPReader_CommitReportsGTETimestamp(t *testing.T) {
 				limit: 1000,
 			},
 			fields: fields{
-				Reports: []plugintypes2.CommitPluginReportWithMeta{
+				Reports: []cciptypes.CommitPluginReportWithMeta{
 					{
 						Timestamp: time.UnixMicro(100000000),
 						BlockNum:  1000,
@@ -69,7 +70,7 @@ func TestInMemoryCCIPReader_CommitReportsGTETimestamp(t *testing.T) {
 				limit: 1,
 			},
 			fields: fields{
-				Reports: []plugintypes2.CommitPluginReportWithMeta{
+				Reports: []cciptypes.CommitPluginReportWithMeta{
 					{
 						Timestamp: time.UnixMicro(100000000),
 						BlockNum:  1000,
@@ -99,7 +100,7 @@ func TestInMemoryCCIPReader_CommitReportsGTETimestamp(t *testing.T) {
 				t.Errorf("CommitReportsGTETimestamp() got = %v, want %v", got, tt.want)
 				return
 			}
-			gotBlocks := slicelib.Map(got, func(report plugintypes2.CommitPluginReportWithMeta) expected {
+			gotBlocks := slicelib.Map(got, func(report cciptypes.CommitPluginReportWithMeta) expected {
 				return expected{block: report.BlockNum}
 			})
 			require.ElementsMatchf(t, gotBlocks, tt.want, "CommitReportsGTETimestamp() got = %v, want %v", got, tt.want)
@@ -125,28 +126,28 @@ func TestInMemoryCCIPReader_ExecutedMessages(t *testing.T) {
 		Dest                 cciptypes.ChainSelector
 	}
 	type args struct {
-		source      cciptypes.ChainSelector
-		dest        cciptypes.ChainSelector
-		seqNumRange cciptypes.SeqNumRange
+		dest          cciptypes.ChainSelector
+		rangesByChain map[cciptypes.ChainSelector][]cciptypes.SeqNumRange
 	}
 	tests := []struct {
 		name    string
 		fields  fields
 		args    args
-		want    []cciptypes.SeqNum
+		want    map[cciptypes.ChainSelector][]cciptypes.SeqNum
 		wantErr bool
 	}{
 		{
 			name:    "empty",
-			want:    nil,
+			want:    map[cciptypes.ChainSelector][]cciptypes.SeqNum{},
 			wantErr: false,
 		},
 		{
 			name: "single executed message",
 			args: args{
-				source:      1,
-				dest:        2,
-				seqNumRange: cciptypes.NewSeqNumRange(1, 100),
+				rangesByChain: map[cciptypes.ChainSelector][]cciptypes.SeqNumRange{
+					1: {cciptypes.NewSeqNumRange(1, 100)},
+				},
+				dest: 2,
 			},
 			fields: fields{
 				MessagesWithExecuted: map[cciptypes.ChainSelector][]MessagesWithMetadata{
@@ -158,15 +159,18 @@ func TestInMemoryCCIPReader_ExecutedMessages(t *testing.T) {
 				},
 				Dest: 2,
 			},
-			want:    cciptypes.NewSeqNumRange(51, 51).ToSlice(),
+			want: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
+				1: cciptypes.NewSeqNumRange(51, 51).ToSlice(),
+			},
 			wantErr: false,
 		},
 		{
 			name: "multiple executed message ranges",
 			args: args{
-				source:      1,
-				dest:        2,
-				seqNumRange: cciptypes.NewSeqNumRange(1, 100),
+				rangesByChain: map[cciptypes.ChainSelector][]cciptypes.SeqNumRange{
+					1: {cciptypes.NewSeqNumRange(1, 100)},
+				},
+				dest: 2,
 			},
 			fields: fields{
 				MessagesWithExecuted: map[cciptypes.ChainSelector][]MessagesWithMetadata{
@@ -178,15 +182,18 @@ func TestInMemoryCCIPReader_ExecutedMessages(t *testing.T) {
 				},
 				Dest: 2,
 			},
-			want:    []cciptypes.SeqNum{50, 52},
+			want: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
+				1: {50, 52},
+			},
 			wantErr: false,
 		},
 		{
 			name: "multiple messages in range",
 			args: args{
-				source:      1,
-				dest:        2,
-				seqNumRange: cciptypes.NewSeqNumRange(1, 100),
+				rangesByChain: map[cciptypes.ChainSelector][]cciptypes.SeqNumRange{
+					1: {cciptypes.NewSeqNumRange(1, 100)},
+				},
+				dest: 2,
 			},
 			fields: fields{
 				MessagesWithExecuted: map[cciptypes.ChainSelector][]MessagesWithMetadata{
@@ -198,7 +205,104 @@ func TestInMemoryCCIPReader_ExecutedMessages(t *testing.T) {
 				},
 				Dest: 2,
 			},
-			want:    cciptypes.NewSeqNumRange(50, 52).ToSlice(),
+			want: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
+				1: cciptypes.NewSeqNumRange(50, 52).ToSlice(),
+			},
+			wantErr: false,
+		},
+		{
+			name: "disjoint range",
+			args: args{
+				rangesByChain: map[cciptypes.ChainSelector][]cciptypes.SeqNumRange{
+					1: {
+						cciptypes.NewSeqNumRange(1, 50),
+						cciptypes.NewSeqNumRange(100, 150),
+					},
+				},
+				dest: 2,
+			},
+			fields: fields{
+				MessagesWithExecuted: map[cciptypes.ChainSelector][]MessagesWithMetadata{
+					1: {
+						makeMsg(25, 2, true),
+						makeMsg(26, 2, true),
+						makeMsg(75, 2, true),
+						makeMsg(125, 2, true),
+						makeMsg(126, 2, false),
+						makeMsg(127, 2, true),
+					},
+				},
+				Dest: 2,
+			},
+			want: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
+				1: {25, 26, 125, 127},
+			},
+			wantErr: false,
+		},
+		{
+			name: "overlapping range",
+			args: args{
+				rangesByChain: map[cciptypes.ChainSelector][]cciptypes.SeqNumRange{
+					1: {
+						cciptypes.NewSeqNumRange(1, 50),
+						cciptypes.NewSeqNumRange(40, 100),
+					},
+				},
+				dest: 2,
+			},
+			fields: fields{
+				MessagesWithExecuted: map[cciptypes.ChainSelector][]MessagesWithMetadata{
+					1: {
+						makeMsg(25, 2, true),
+						makeMsg(45, 2, true),
+						makeMsg(46, 2, true),
+						makeMsg(75, 2, true),
+					},
+				},
+				Dest: 2,
+			},
+			want: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
+				1: {25, 45, 46, 75},
+			},
+			wantErr: false,
+		},
+		{
+			name: "multiple chains",
+			args: args{
+				rangesByChain: map[cciptypes.ChainSelector][]cciptypes.SeqNumRange{
+					1: {
+						cciptypes.NewSeqNumRange(1, 25),
+						cciptypes.NewSeqNumRange(50, 75),
+					},
+					3: {
+						cciptypes.NewSeqNumRange(1, 50),
+						cciptypes.NewSeqNumRange(51, 100),
+					},
+				},
+				dest: 2,
+			},
+			fields: fields{
+				MessagesWithExecuted: map[cciptypes.ChainSelector][]MessagesWithMetadata{
+					1: {
+						makeMsg(25, 2, true),
+						makeMsg(45, 2, true),
+						makeMsg(46, 2, true),
+						makeMsg(75, 2, true),
+					},
+					3: {
+						makeMsg(25, 2, true),
+						makeMsg(50, 2, true),
+						makeMsg(51, 2, true),
+						makeMsg(74, 2, false),
+						makeMsg(75, 2, true),
+					},
+				},
+				Dest: 2,
+			},
+			want: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
+				1: {25, 75},
+				3: {25, 50, 51, 75},
+			},
 			wantErr: false,
 		},
 	}
@@ -209,13 +313,13 @@ func TestInMemoryCCIPReader_ExecutedMessages(t *testing.T) {
 				Messages: tt.fields.MessagesWithExecuted,
 				Dest:     tt.fields.Dest,
 			}
-			got, err := r.ExecutedMessages(context.Background(), tt.args.source, tt.args.seqNumRange)
+			got, err := r.ExecutedMessages(context.Background(), tt.args.rangesByChain, primitives.Finalized)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ExecutedMessages() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("ExecutedMessages() got = %v, want %v", got, tt.want)
+				t.Errorf("ExecutedMessages() got = %+v, want %+v", got, tt.want)
 			}
 		})
 	}

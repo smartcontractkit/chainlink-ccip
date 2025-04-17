@@ -9,8 +9,6 @@ import (
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
-	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
@@ -32,7 +30,7 @@ type PriceReader interface {
 		ctx context.Context,
 		tokens []ccipocr3.UnknownEncodedAddress,
 		chain ccipocr3.ChainSelector,
-	) (map[ccipocr3.UnknownEncodedAddress]plugintypes.TimestampedBig, error)
+	) (map[ccipocr3.UnknownEncodedAddress]ccipocr3.TimestampedBig, error)
 }
 
 type priceReader struct {
@@ -41,6 +39,7 @@ type priceReader struct {
 	tokenInfo    map[ccipocr3.UnknownEncodedAddress]pluginconfig.TokenInfo
 	ccipReader   CCIPReader
 	feedChain    ccipocr3.ChainSelector
+	addressCodec ccipocr3.AddressCodec
 }
 
 func NewPriceReader(
@@ -49,6 +48,7 @@ func NewPriceReader(
 	tokenInfo map[ccipocr3.UnknownEncodedAddress]pluginconfig.TokenInfo,
 	ccipReader CCIPReader,
 	feedChain ccipocr3.ChainSelector,
+	addressCodec ccipocr3.AddressCodec,
 ) PriceReader {
 	return &priceReader{
 		lggr:         lggr,
@@ -56,6 +56,7 @@ func NewPriceReader(
 		tokenInfo:    tokenInfo,
 		ccipReader:   ccipReader,
 		feedChain:    feedChain,
+		addressCodec: addressCodec,
 	}
 }
 
@@ -81,10 +82,10 @@ func (pr *priceReader) GetFeeQuoterTokenUpdates(
 	ctx context.Context,
 	tokens []ccipocr3.UnknownEncodedAddress,
 	chain ccipocr3.ChainSelector,
-) (map[ccipocr3.UnknownEncodedAddress]plugintypes.TimestampedBig, error) {
+) (map[ccipocr3.UnknownEncodedAddress]ccipocr3.TimestampedBig, error) {
 	lggr := logutil.WithContextValues(ctx, pr.lggr)
-	updates := make([]plugintypes.TimestampedUnixBig, len(tokens))
-	updateMap := make(map[ccipocr3.UnknownEncodedAddress]plugintypes.TimestampedBig)
+	updates := make([]ccipocr3.TimestampedUnixBig, len(tokens))
+	updateMap := make(map[ccipocr3.UnknownEncodedAddress]ccipocr3.TimestampedBig)
 
 	feeQuoterAddress, err := pr.ccipReader.GetContractAddress(consts.ContractNameFeeQuoter, chain)
 	if err != nil {
@@ -92,25 +93,30 @@ func (pr *priceReader) GetFeeQuoterTokenUpdates(
 		return updateMap, nil
 	}
 
+	feeQuoterAddressStr, err := pr.addressCodec.AddressBytesToString(feeQuoterAddress[:], chain)
+	if err != nil {
+		lggr.Warnw("failed to convert fee quoter address to string", "chain", chain, "err", err)
+		return updateMap, nil
+	}
 	lggr.Infow("getting fee quoter token updates",
 		"tokens", tokens,
 		"chain", chain,
-		"feeQuoterAddress", typeconv.AddressBytesToString(feeQuoterAddress, uint64(chain)),
+		"feeQuoterAddress", feeQuoterAddressStr,
 	)
 
 	byteTokens := make([][]byte, 0, len(tokens))
 	for _, token := range tokens {
-		byteToken, err := typeconv.AddressStringToBytes(string(token), uint64(chain))
+		tokenAddressBytes, err := pr.addressCodec.AddressStringToBytes(string(token), chain)
 		if err != nil {
 			lggr.Warnw("failed to convert token address to bytes", "token", token, "err", err)
 			continue
 		}
 
-		byteTokens = append(byteTokens, byteToken)
+		byteTokens = append(byteTokens, tokenAddressBytes)
 	}
 
 	boundContract := commontypes.BoundContract{
-		Address: typeconv.AddressBytesToString(feeQuoterAddress[:], uint64(chain)),
+		Address: feeQuoterAddressStr,
 		Name:    consts.ContractNameFeeQuoter,
 	}
 
@@ -143,7 +149,7 @@ func (pr *priceReader) GetFeeQuoterTokenUpdates(
 			)
 			continue
 		}
-		updateMap[token] = plugintypes.TimeStampedBigFromUnix(updates[i])
+		updateMap[token] = ccipocr3.TimeStampedBigFromUnix(updates[i])
 	}
 
 	return updateMap, nil
@@ -162,10 +168,7 @@ func (pr *priceReader) GetFeedPricesUSD(
 	}
 
 	// Create batch request grouped by contract
-	batchRequest, contractTokenMap, err := pr.prepareBatchRequest(tokens)
-	if err != nil {
-		return nil, fmt.Errorf("prepare batch request: %w", err)
-	}
+	batchRequest, contractTokenMap := pr.prepareBatchRequest(tokens)
 
 	// Execute batch request
 	results, err := pr.feedChainReader().BatchGetLatestValues(ctx, batchRequest)
@@ -211,7 +214,7 @@ func (pr *priceReader) GetFeedPricesUSD(
 				lggr.Errorw("failed to calculate price", "token", token)
 				continue
 			}
-			prices[token] = ccipocr3.BigInt{Int: price}
+			prices[token] = ccipocr3.NewBigInt(price)
 		}
 	}
 
@@ -257,14 +260,15 @@ func (pr *priceReader) getDecimals(
 // prepareBatchRequest creates a batch request grouped by contract and returns the mapping of contracts to token indices
 func (pr *priceReader) prepareBatchRequest(
 	tokens []ccipocr3.UnknownEncodedAddress,
-) (commontypes.BatchGetLatestValuesRequest, ContractTokenMap, error) {
+) (commontypes.BatchGetLatestValuesRequest, ContractTokenMap) {
 	batchRequest := make(commontypes.BatchGetLatestValuesRequest)
 	contractTokenMap := make(ContractTokenMap)
 
 	for _, token := range tokens {
 		tokenInfo, ok := pr.tokenInfo[token]
 		if !ok {
-			return nil, nil, fmt.Errorf("get tokenInfo for %s: missing token info", token)
+			pr.lggr.Errorw("get tokenInfo for %s: missing token info, token skipped", token)
+			continue
 		}
 
 		boundContract := commontypes.BoundContract{
@@ -291,7 +295,7 @@ func (pr *priceReader) prepareBatchRequest(
 		contractTokenMap[boundContract] = append(contractTokenMap[boundContract], token)
 	}
 
-	return batchRequest, contractTokenMap, nil
+	return batchRequest, contractTokenMap
 }
 
 func (pr *priceReader) normalizePrice(price *big.Int, decimals uint8) *big.Int {

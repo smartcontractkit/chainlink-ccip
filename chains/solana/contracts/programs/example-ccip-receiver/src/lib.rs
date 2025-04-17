@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{Mint, TokenAccount};
 
-declare_id!("CcipReceiver1111111111111111111111111111111");
+declare_id!("48LGpn6tPn5SjTtK2wL9uUx48JUWZdZBv11sboy2orCc");
 
 pub const EXTERNAL_EXECUTION_CONFIG_SEED: &[u8] = b"external_execution_config";
 pub const APPROVED_SENDER_SEED: &[u8] = b"approved_ccip_sender";
@@ -137,7 +137,7 @@ pub struct CcipReceive<'info> {
     // Offramp CPI signer PDA must be first.
     // It is not mutable, and thus cannot be used as payer of init/realloc of other PDAs.
     #[account(
-        seeds = [EXTERNAL_EXECUTION_CONFIG_SEED],
+        seeds = [EXTERNAL_EXECUTION_CONFIG_SEED, crate::ID.as_ref()],
         bump,
         seeds::program = offramp_program.key(),
     )]
@@ -215,7 +215,6 @@ pub struct AcceptOwnership<'info> {
 #[instruction(chain_selector: u64, remote_sender: Vec<u8>)]
 pub struct ApproveSender<'info> {
     #[account(
-        mut,
         seeds = [STATE],
         bump,
     )]
@@ -319,25 +318,29 @@ pub struct BaseState {
 
 impl BaseState {
     pub fn init(&mut self, owner: Pubkey, router: Pubkey) -> Result<()> {
-        require_eq!(self.owner, Pubkey::default());
+        require_keys_eq!(self.owner, Pubkey::default());
         self.owner = owner;
         self.update_router(owner, router)
     }
 
     pub fn transfer_ownership(&mut self, owner: Pubkey, proposed_owner: Pubkey) -> Result<()> {
-        require_eq!(self.owner, owner, CcipReceiverError::OnlyOwner);
+        require!(
+            proposed_owner != self.owner && proposed_owner != Pubkey::default(),
+            CcipReceiverError::InvalidProposedOwner
+        );
+        require_keys_eq!(self.owner, owner, CcipReceiverError::OnlyOwner);
         self.proposed_owner = proposed_owner;
         Ok(())
     }
 
     pub fn accept_ownership(&mut self, proposed_owner: Pubkey) -> Result<()> {
-        require_eq!(
+        require_keys_eq!(
             self.proposed_owner,
             proposed_owner,
             CcipReceiverError::OnlyProposedOwner
         );
-        self.proposed_owner = Pubkey::default();
-        self.owner = proposed_owner;
+        // NOTE: take() resets proposed_owner to default
+        self.owner = std::mem::take(&mut self.proposed_owner);
         Ok(())
     }
 
@@ -347,7 +350,7 @@ impl BaseState {
 
     pub fn update_router(&mut self, owner: Pubkey, router: Pubkey) -> Result<()> {
         require_keys_neq!(router, Pubkey::default(), CcipReceiverError::InvalidRouter);
-        require_eq!(self.owner, owner, CcipReceiverError::OnlyOwner);
+        require_keys_eq!(self.owner, owner, CcipReceiverError::OnlyOwner);
         self.router = router;
         Ok(())
     }
@@ -386,6 +389,8 @@ pub enum CcipReceiverError {
     OnlyProposedOwner,
     #[msg("Caller is not allowed")]
     InvalidCaller,
+    #[msg("Proposed owner is invalid")]
+    InvalidProposedOwner,
 }
 
 #[event]

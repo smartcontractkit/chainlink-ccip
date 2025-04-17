@@ -116,11 +116,6 @@ type ExecuteOffchainConfig struct {
 	// EVM only.
 	BatchGasLimit uint64 `json:"batchGasLimit"`
 
-	// RelativeBoostPerWaitHour indicates how much to increase (artificially) the fee paid on the source chain per hour
-	// of wait time, such that eventually the fee paid is greater than the execution cost, and we’ll execute it.
-	// For example: if set to 0.5, that means the fee paid is increased by 50% every hour the message has been waiting.
-	RelativeBoostPerWaitHour float64 `json:"relativeBoostPerWaitHour"`
-
 	// InflightCacheExpiry indicates how long we keep a report in the plugin cache before we expire it.
 	// The caching prevents us from issuing another report while one is already in flight.
 	InflightCacheExpiry commonconfig.Duration `json:"inflightCacheExpiry"`

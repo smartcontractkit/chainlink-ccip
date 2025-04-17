@@ -97,9 +97,12 @@ pub struct CcipSend<'info> {
     pub ccip_fee_quoter_billing_token_config: UncheckedAccount<'info>,
     /// CHECK: validated during CPI
     pub ccip_fee_quoter_link_token_config: UncheckedAccount<'info>,
-    #[account(mut)]
     /// CHECK: validated during CPI
-    pub ccip_token_pools_signer: UncheckedAccount<'info>,
+    pub ccip_rmn_remote: UncheckedAccount<'info>,
+    /// CHECK: validated during CPI
+    pub ccip_rmn_remote_curses: UncheckedAccount<'info>,
+    /// CHECK: validated during CPI
+    pub ccip_rmn_remote_config: UncheckedAccount<'info>,
 }
 
 #[derive(Accounts, Debug)]

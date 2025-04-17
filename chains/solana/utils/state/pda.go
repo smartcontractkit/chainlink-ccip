@@ -50,12 +50,12 @@ func FindAllowedOfframpPDA(chainSelector uint64, offramp solana.PublicKey, ccipR
 // PDAs with same seeds across programs //
 //////////////////////////////////////////
 
-func FindExternalTokenPoolsSignerPDA(program solana.PublicKey) (solana.PublicKey, uint8, error) {
-	return solana.FindProgramAddress([][]byte{[]byte("external_token_pools_signer")}, program)
+func FindExternalTokenPoolsSignerPDA(poolProgram solana.PublicKey, program solana.PublicKey) (solana.PublicKey, uint8, error) {
+	return solana.FindProgramAddress([][]byte{[]byte("external_token_pools_signer"), poolProgram.Bytes()}, program)
 }
 
-func FindExternalExecutionConfigPDA(program solana.PublicKey) (solana.PublicKey, uint8, error) {
-	return solana.FindProgramAddress([][]byte{[]byte("external_execution_config")}, program)
+func FindExternalExecutionConfigPDA(logicReceiver solana.PublicKey, program solana.PublicKey) (solana.PublicKey, uint8, error) {
+	return solana.FindProgramAddress([][]byte{[]byte("external_execution_config"), logicReceiver.Bytes()}, program)
 }
 
 /////////////////////
@@ -113,4 +113,36 @@ func FindOfframpCommitReportPDA(chainSelector uint64, root [32]byte, offrampProg
 	chainSelectorLE := common.Uint64ToLE(chainSelector)
 	p, _, err := solana.FindProgramAddress([][]byte{[]byte("commit_report"), chainSelectorLE, root[:]}, offrampProgram)
 	return p, err
+}
+
+/////////////////////
+// RMN Remote PDAs //
+/////////////////////
+
+func FindRMNRemoteConfigPDA(rmnRemoteProgram solana.PublicKey) (solana.PublicKey, uint8, error) {
+	return solana.FindProgramAddress([][]byte{[]byte("config")}, rmnRemoteProgram)
+}
+
+func FindRMNRemoteCursesPDA(rmnRemoteProgram solana.PublicKey) (solana.PublicKey, uint8, error) {
+	return solana.FindProgramAddress([][]byte{[]byte("curses")}, rmnRemoteProgram)
+}
+
+////////////////////
+// Ping Pong Demo //
+////////////////////
+
+func FindPingPongDemoConfigPDA(pingPongDemoProgram solana.PublicKey) (solana.PublicKey, uint8, error) {
+	return solana.FindProgramAddress([][]byte{[]byte("config")}, pingPongDemoProgram)
+}
+
+func FindPingPongCCIPSendSignerPDA(pingPongDemoProgram solana.PublicKey) (solana.PublicKey, uint8, error) {
+	return solana.FindProgramAddress([][]byte{[]byte("ccip_send_signer")}, pingPongDemoProgram)
+}
+
+/////////////////
+// Shared PDAs //
+/////////////////
+
+func FindNameAndVersionPDA(program solana.PublicKey) (solana.PublicKey, uint8, error) {
+	return solana.FindProgramAddress([][]byte{[]byte("name_version")}, program)
 }

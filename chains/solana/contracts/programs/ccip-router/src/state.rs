@@ -30,6 +30,7 @@ pub struct Config {
     pub owner: Pubkey,
     pub proposed_owner: Pubkey,
     pub fee_quoter: Pubkey,
+    pub rmn_remote: Pubkey,
     pub link_token_mint: Pubkey,
     pub fee_aggregator: Pubkey, // Allowed address to withdraw billed fees to (will use ATAs derived from it)
 }
@@ -104,7 +105,3 @@ pub struct Nonce {
     pub version: u8,  // version to check if nonce account is already initialized
     pub counter: u64, // Counter per user and per lane to use as nonce for all the messages to be executed in order
 }
-
-#[account]
-#[derive(InitSpace)]
-pub struct ExternalExecutionConfig {}

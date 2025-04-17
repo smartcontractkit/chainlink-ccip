@@ -40,22 +40,24 @@ type ManuallyExecute struct {
 	// ··········· so that token pools and receivers can then check that the caller is an actual offramp that
 	// ··········· has been registered in the router as such for that source chain.
 	//
-	// [6] = [] externalExecutionConfig
+	// [6] = [WRITE, SIGNER] authority
 	//
-	// [7] = [WRITE, SIGNER] authority
+	// [7] = [] systemProgram
 	//
-	// [8] = [] systemProgram
+	// [8] = [] sysvarInstructions
 	//
-	// [9] = [] sysvarInstructions
+	// [9] = [] rmnRemote
 	//
-	// [10] = [] tokenPoolsSigner
+	// [10] = [] rmnRemoteCurses
+	//
+	// [11] = [] rmnRemoteConfig
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewManuallyExecuteInstructionBuilder creates a new `ManuallyExecute` instruction builder.
 func NewManuallyExecuteInstructionBuilder() *ManuallyExecute {
 	nd := &ManuallyExecute{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 11),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 12),
 	}
 	return nd
 }
@@ -146,59 +148,70 @@ func (inst *ManuallyExecute) GetAllowedOfframpAccount() *ag_solanago.AccountMeta
 	return inst.AccountMetaSlice[5]
 }
 
-// SetExternalExecutionConfigAccount sets the "externalExecutionConfig" account.
-func (inst *ManuallyExecute) SetExternalExecutionConfigAccount(externalExecutionConfig ag_solanago.PublicKey) *ManuallyExecute {
-	inst.AccountMetaSlice[6] = ag_solanago.Meta(externalExecutionConfig)
-	return inst
-}
-
-// GetExternalExecutionConfigAccount gets the "externalExecutionConfig" account.
-func (inst *ManuallyExecute) GetExternalExecutionConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[6]
-}
-
 // SetAuthorityAccount sets the "authority" account.
 func (inst *ManuallyExecute) SetAuthorityAccount(authority ag_solanago.PublicKey) *ManuallyExecute {
-	inst.AccountMetaSlice[7] = ag_solanago.Meta(authority).WRITE().SIGNER()
+	inst.AccountMetaSlice[6] = ag_solanago.Meta(authority).WRITE().SIGNER()
 	return inst
 }
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *ManuallyExecute) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[7]
+	return inst.AccountMetaSlice[6]
 }
 
 // SetSystemProgramAccount sets the "systemProgram" account.
 func (inst *ManuallyExecute) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *ManuallyExecute {
-	inst.AccountMetaSlice[8] = ag_solanago.Meta(systemProgram)
+	inst.AccountMetaSlice[7] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
 // GetSystemProgramAccount gets the "systemProgram" account.
 func (inst *ManuallyExecute) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[8]
+	return inst.AccountMetaSlice[7]
 }
 
 // SetSysvarInstructionsAccount sets the "sysvarInstructions" account.
 func (inst *ManuallyExecute) SetSysvarInstructionsAccount(sysvarInstructions ag_solanago.PublicKey) *ManuallyExecute {
-	inst.AccountMetaSlice[9] = ag_solanago.Meta(sysvarInstructions)
+	inst.AccountMetaSlice[8] = ag_solanago.Meta(sysvarInstructions)
 	return inst
 }
 
 // GetSysvarInstructionsAccount gets the "sysvarInstructions" account.
 func (inst *ManuallyExecute) GetSysvarInstructionsAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[9]
+	return inst.AccountMetaSlice[8]
 }
 
-// SetTokenPoolsSignerAccount sets the "tokenPoolsSigner" account.
-func (inst *ManuallyExecute) SetTokenPoolsSignerAccount(tokenPoolsSigner ag_solanago.PublicKey) *ManuallyExecute {
-	inst.AccountMetaSlice[10] = ag_solanago.Meta(tokenPoolsSigner)
+// SetRmnRemoteAccount sets the "rmnRemote" account.
+func (inst *ManuallyExecute) SetRmnRemoteAccount(rmnRemote ag_solanago.PublicKey) *ManuallyExecute {
+	inst.AccountMetaSlice[9] = ag_solanago.Meta(rmnRemote)
 	return inst
 }
 
-// GetTokenPoolsSignerAccount gets the "tokenPoolsSigner" account.
-func (inst *ManuallyExecute) GetTokenPoolsSignerAccount() *ag_solanago.AccountMeta {
+// GetRmnRemoteAccount gets the "rmnRemote" account.
+func (inst *ManuallyExecute) GetRmnRemoteAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[9]
+}
+
+// SetRmnRemoteCursesAccount sets the "rmnRemoteCurses" account.
+func (inst *ManuallyExecute) SetRmnRemoteCursesAccount(rmnRemoteCurses ag_solanago.PublicKey) *ManuallyExecute {
+	inst.AccountMetaSlice[10] = ag_solanago.Meta(rmnRemoteCurses)
+	return inst
+}
+
+// GetRmnRemoteCursesAccount gets the "rmnRemoteCurses" account.
+func (inst *ManuallyExecute) GetRmnRemoteCursesAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[10]
+}
+
+// SetRmnRemoteConfigAccount sets the "rmnRemoteConfig" account.
+func (inst *ManuallyExecute) SetRmnRemoteConfigAccount(rmnRemoteConfig ag_solanago.PublicKey) *ManuallyExecute {
+	inst.AccountMetaSlice[11] = ag_solanago.Meta(rmnRemoteConfig)
+	return inst
+}
+
+// GetRmnRemoteConfigAccount gets the "rmnRemoteConfig" account.
+func (inst *ManuallyExecute) GetRmnRemoteConfigAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[11]
 }
 
 func (inst ManuallyExecute) Build() *Instruction {
@@ -250,19 +263,22 @@ func (inst *ManuallyExecute) Validate() error {
 			return errors.New("accounts.AllowedOfframp is not set")
 		}
 		if inst.AccountMetaSlice[6] == nil {
-			return errors.New("accounts.ExternalExecutionConfig is not set")
-		}
-		if inst.AccountMetaSlice[7] == nil {
 			return errors.New("accounts.Authority is not set")
 		}
-		if inst.AccountMetaSlice[8] == nil {
+		if inst.AccountMetaSlice[7] == nil {
 			return errors.New("accounts.SystemProgram is not set")
 		}
-		if inst.AccountMetaSlice[9] == nil {
+		if inst.AccountMetaSlice[8] == nil {
 			return errors.New("accounts.SysvarInstructions is not set")
 		}
+		if inst.AccountMetaSlice[9] == nil {
+			return errors.New("accounts.RmnRemote is not set")
+		}
 		if inst.AccountMetaSlice[10] == nil {
-			return errors.New("accounts.TokenPoolsSigner is not set")
+			return errors.New("accounts.RmnRemoteCurses is not set")
+		}
+		if inst.AccountMetaSlice[11] == nil {
+			return errors.New("accounts.RmnRemoteConfig is not set")
 		}
 	}
 	return nil
@@ -283,18 +299,19 @@ func (inst *ManuallyExecute) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=11]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("                 config", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("     referenceAddresses", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("            sourceChain", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("           commitReport", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("                offramp", inst.AccountMetaSlice[4]))
-						accountsBranch.Child(ag_format.Meta("         allowedOfframp", inst.AccountMetaSlice[5]))
-						accountsBranch.Child(ag_format.Meta("externalExecutionConfig", inst.AccountMetaSlice[6]))
-						accountsBranch.Child(ag_format.Meta("              authority", inst.AccountMetaSlice[7]))
-						accountsBranch.Child(ag_format.Meta("          systemProgram", inst.AccountMetaSlice[8]))
-						accountsBranch.Child(ag_format.Meta("     sysvarInstructions", inst.AccountMetaSlice[9]))
-						accountsBranch.Child(ag_format.Meta("       tokenPoolsSigner", inst.AccountMetaSlice[10]))
+					instructionBranch.Child("Accounts[len=12]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+						accountsBranch.Child(ag_format.Meta("            config", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("referenceAddresses", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("       sourceChain", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("      commitReport", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("           offramp", inst.AccountMetaSlice[4]))
+						accountsBranch.Child(ag_format.Meta("    allowedOfframp", inst.AccountMetaSlice[5]))
+						accountsBranch.Child(ag_format.Meta("         authority", inst.AccountMetaSlice[6]))
+						accountsBranch.Child(ag_format.Meta("     systemProgram", inst.AccountMetaSlice[7]))
+						accountsBranch.Child(ag_format.Meta("sysvarInstructions", inst.AccountMetaSlice[8]))
+						accountsBranch.Child(ag_format.Meta("         rmnRemote", inst.AccountMetaSlice[9]))
+						accountsBranch.Child(ag_format.Meta("   rmnRemoteCurses", inst.AccountMetaSlice[10]))
+						accountsBranch.Child(ag_format.Meta("   rmnRemoteConfig", inst.AccountMetaSlice[11]))
 					})
 				})
 		})
@@ -339,11 +356,12 @@ func NewManuallyExecuteInstruction(
 	commitReport ag_solanago.PublicKey,
 	offramp ag_solanago.PublicKey,
 	allowedOfframp ag_solanago.PublicKey,
-	externalExecutionConfig ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey,
 	sysvarInstructions ag_solanago.PublicKey,
-	tokenPoolsSigner ag_solanago.PublicKey) *ManuallyExecute {
+	rmnRemote ag_solanago.PublicKey,
+	rmnRemoteCurses ag_solanago.PublicKey,
+	rmnRemoteConfig ag_solanago.PublicKey) *ManuallyExecute {
 	return NewManuallyExecuteInstructionBuilder().
 		SetRawExecutionReport(rawExecutionReport).
 		SetTokenIndexes(tokenIndexes).
@@ -353,9 +371,10 @@ func NewManuallyExecuteInstruction(
 		SetCommitReportAccount(commitReport).
 		SetOfframpAccount(offramp).
 		SetAllowedOfframpAccount(allowedOfframp).
-		SetExternalExecutionConfigAccount(externalExecutionConfig).
 		SetAuthorityAccount(authority).
 		SetSystemProgramAccount(systemProgram).
 		SetSysvarInstructionsAccount(sysvarInstructions).
-		SetTokenPoolsSignerAccount(tokenPoolsSigner)
+		SetRmnRemoteAccount(rmnRemote).
+		SetRmnRemoteCursesAccount(rmnRemoteCurses).
+		SetRmnRemoteConfigAccount(rmnRemoteConfig)
 }

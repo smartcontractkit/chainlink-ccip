@@ -10,7 +10,6 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// Config //
 // Adds a new source chain selector with its config to the offramp.
 //
 // The Admin needs to add any new chain supported.
@@ -22,8 +21,7 @@ type AddSourceChain struct {
 	SourceChainConfig *SourceChainConfig
 
 	// [0] = [WRITE] sourceChain
-	// ··········· Adding a chain selector implies initializing the state for a new chain,
-	// ··········· hence the need to initialize two accounts.
+	// ··········· Adding a chain selector implies initializing the state for a new chain
 	//
 	// [1] = [] config
 	//
@@ -54,16 +52,14 @@ func (inst *AddSourceChain) SetSourceChainConfig(sourceChainConfig SourceChainCo
 }
 
 // SetSourceChainAccount sets the "sourceChain" account.
-// Adding a chain selector implies initializing the state for a new chain,
-// hence the need to initialize two accounts.
+// Adding a chain selector implies initializing the state for a new chain
 func (inst *AddSourceChain) SetSourceChainAccount(sourceChain ag_solanago.PublicKey) *AddSourceChain {
 	inst.AccountMetaSlice[0] = ag_solanago.Meta(sourceChain).WRITE()
 	return inst
 }
 
 // GetSourceChainAccount gets the "sourceChain" account.
-// Adding a chain selector implies initializing the state for a new chain,
-// hence the need to initialize two accounts.
+// Adding a chain selector implies initializing the state for a new chain
 func (inst *AddSourceChain) GetSourceChainAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }

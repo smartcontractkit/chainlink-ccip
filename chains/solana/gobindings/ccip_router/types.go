@@ -370,6 +370,50 @@ func (obj *CrossChainAmount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (e
 	return nil
 }
 
+type GetFeeResult struct {
+	Amount uint64
+	Juels  ag_binary.Uint128
+	Token  ag_solanago.PublicKey
+}
+
+func (obj GetFeeResult) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Amount` param:
+	err = encoder.Encode(obj.Amount)
+	if err != nil {
+		return err
+	}
+	// Serialize `Juels` param:
+	err = encoder.Encode(obj.Juels)
+	if err != nil {
+		return err
+	}
+	// Serialize `Token` param:
+	err = encoder.Encode(obj.Token)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *GetFeeResult) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Amount`:
+	err = decoder.Decode(&obj.Amount)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Juels`:
+	err = decoder.Decode(&obj.Juels)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Token`:
+	err = decoder.Decode(&obj.Token)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 type DestChainState struct {
 	SequenceNumber          uint64
 	SequenceNumberToRestore uint64
@@ -492,96 +536,6 @@ func (value RestoreOnAction) String() string {
 		return "Upgrade"
 	case Rollback_RestoreOnAction:
 		return "Rollback"
-	default:
-		return ""
-	}
-}
-
-type CcipRouterError ag_binary.BorshEnum
-
-const (
-	Unauthorized_CcipRouterError CcipRouterError = iota
-	InvalidInputsMint_CcipRouterError
-	InvalidVersion_CcipRouterError
-	FeeTokenMismatch_CcipRouterError
-	RedundantOwnerProposal_CcipRouterError
-	ReachedMaxSequenceNumber_CcipRouterError
-	InvalidInputsTokenIndices_CcipRouterError
-	InvalidInputsPoolAccounts_CcipRouterError
-	InvalidInputsTokenAccounts_CcipRouterError
-	InvalidInputsConfigAccounts_CcipRouterError
-	InvalidInputsTokenAdminRegistryAccounts_CcipRouterError
-	InvalidInputsLookupTableAccounts_CcipRouterError
-	InvalidInputsLookupTableAccountWritable_CcipRouterError
-	InvalidInputsTokenAmount_CcipRouterError
-	InvalidInputsTransferAllAmount_CcipRouterError
-	InvalidInputsAtaAddress_CcipRouterError
-	InvalidInputsAtaWritable_CcipRouterError
-	InvalidInputsChainSelector_CcipRouterError
-	InsufficientLamports_CcipRouterError
-	InsufficientFunds_CcipRouterError
-	SourceTokenDataTooLarge_CcipRouterError
-	InvalidTokenAdminRegistryInputsZeroAddress_CcipRouterError
-	InvalidTokenAdminRegistryProposedAdmin_CcipRouterError
-	SenderNotAllowed_CcipRouterError
-	InvalidCodeVersion_CcipRouterError
-	InvalidCcipVersionRollback_CcipRouterError
-)
-
-func (value CcipRouterError) String() string {
-	switch value {
-	case Unauthorized_CcipRouterError:
-		return "Unauthorized"
-	case InvalidInputsMint_CcipRouterError:
-		return "InvalidInputsMint"
-	case InvalidVersion_CcipRouterError:
-		return "InvalidVersion"
-	case FeeTokenMismatch_CcipRouterError:
-		return "FeeTokenMismatch"
-	case RedundantOwnerProposal_CcipRouterError:
-		return "RedundantOwnerProposal"
-	case ReachedMaxSequenceNumber_CcipRouterError:
-		return "ReachedMaxSequenceNumber"
-	case InvalidInputsTokenIndices_CcipRouterError:
-		return "InvalidInputsTokenIndices"
-	case InvalidInputsPoolAccounts_CcipRouterError:
-		return "InvalidInputsPoolAccounts"
-	case InvalidInputsTokenAccounts_CcipRouterError:
-		return "InvalidInputsTokenAccounts"
-	case InvalidInputsConfigAccounts_CcipRouterError:
-		return "InvalidInputsConfigAccounts"
-	case InvalidInputsTokenAdminRegistryAccounts_CcipRouterError:
-		return "InvalidInputsTokenAdminRegistryAccounts"
-	case InvalidInputsLookupTableAccounts_CcipRouterError:
-		return "InvalidInputsLookupTableAccounts"
-	case InvalidInputsLookupTableAccountWritable_CcipRouterError:
-		return "InvalidInputsLookupTableAccountWritable"
-	case InvalidInputsTokenAmount_CcipRouterError:
-		return "InvalidInputsTokenAmount"
-	case InvalidInputsTransferAllAmount_CcipRouterError:
-		return "InvalidInputsTransferAllAmount"
-	case InvalidInputsAtaAddress_CcipRouterError:
-		return "InvalidInputsAtaAddress"
-	case InvalidInputsAtaWritable_CcipRouterError:
-		return "InvalidInputsAtaWritable"
-	case InvalidInputsChainSelector_CcipRouterError:
-		return "InvalidInputsChainSelector"
-	case InsufficientLamports_CcipRouterError:
-		return "InsufficientLamports"
-	case InsufficientFunds_CcipRouterError:
-		return "InsufficientFunds"
-	case SourceTokenDataTooLarge_CcipRouterError:
-		return "SourceTokenDataTooLarge"
-	case InvalidTokenAdminRegistryInputsZeroAddress_CcipRouterError:
-		return "InvalidTokenAdminRegistryInputsZeroAddress"
-	case InvalidTokenAdminRegistryProposedAdmin_CcipRouterError:
-		return "InvalidTokenAdminRegistryProposedAdmin"
-	case SenderNotAllowed_CcipRouterError:
-		return "SenderNotAllowed"
-	case InvalidCodeVersion_CcipRouterError:
-		return "InvalidCodeVersion"
-	case InvalidCcipVersionRollback_CcipRouterError:
-		return "InvalidCcipVersionRollback"
 	default:
 		return ""
 	}

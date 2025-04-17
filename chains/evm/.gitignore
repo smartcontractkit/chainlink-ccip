@@ -1,0 +1,11 @@
+node_modules
+
+foundry-artifacts
+foundry-cache
+lcov.info
+lcov.info.pruned
+report
+
+scripts/abigen
+abi
+solc

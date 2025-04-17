@@ -229,6 +229,32 @@ func buildSignedTx(ctx context.Context, rpcClient *rpc.Client, instructions []so
 	return tx, err
 }
 
+func buildSignedTxWithLookupTables(ctx context.Context, rpcClient *rpc.Client, instructions []solana.Instruction,
+	signer solana.PrivateKey, lookupTables map[solana.PublicKey]solana.PublicKeySlice) (*solana.Transaction, error) {
+	hashRes, err := rpcClient.GetLatestBlockhash(ctx, rpc.CommitmentFinalized)
+	if err != nil {
+		return nil, err
+	}
+
+	tx, err := solana.NewTransaction(
+		instructions,
+		hashRes.Value.Blockhash,
+		solana.TransactionAddressTables(lookupTables),
+		solana.TransactionPayer(signer.PublicKey()),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err = tx.Sign(func(_ solana.PublicKey) *solana.PrivateKey {
+		return &signer
+	}); err != nil {
+		return nil, err
+	}
+
+	return tx, err
+}
+
 func SimulateTransaction(ctx context.Context, rpcClient *rpc.Client, instructions []solana.Instruction,
 	signer solana.PrivateKey) (*rpc.SimulateTransactionResponse, error) {
 	tx, err := buildSignedTx(ctx, rpcClient, instructions, signer)
@@ -241,6 +267,15 @@ func SimulateTransaction(ctx context.Context, rpcClient *rpc.Client, instruction
 func SimulateTransactionWithOpts(ctx context.Context, rpcClient *rpc.Client, instructions []solana.Instruction,
 	signer solana.PrivateKey, opts rpc.SimulateTransactionOpts) (*rpc.SimulateTransactionResponse, error) {
 	tx, err := buildSignedTx(ctx, rpcClient, instructions, signer)
+	if err != nil {
+		return nil, err
+	}
+	return rpcClient.SimulateTransactionWithOpts(ctx, tx, &opts)
+}
+
+func SimulateTransactionWithLookupTables(ctx context.Context, rpcClient *rpc.Client, instructions []solana.Instruction,
+	signer solana.PrivateKey, lookupTables map[solana.PublicKey]solana.PublicKeySlice, opts rpc.SimulateTransactionOpts) (*rpc.SimulateTransactionResponse, error) {
+	tx, err := buildSignedTxWithLookupTables(ctx, rpcClient, instructions, signer, lookupTables)
 	if err != nil {
 		return nil, err
 	}
@@ -277,6 +312,24 @@ func ExtractReturnedError(ctx context.Context, logs []string, programID string) 
 		}
 	}
 	return nil
+}
+
+type anchorType[T any] interface {
+	*T
+	UnmarshalWithDecoder(decoder *bin.Decoder) (err error)
+}
+
+func ExtractAnchorTypedReturnValue[T any, PT anchorType[T]](ctx context.Context, logs []string, programID string) (*T, error) {
+	var result T
+	bytes, err := ExtractReturnValue(ctx, logs, programID)
+	if err != nil {
+		return nil, err
+	}
+	err = PT(&result).UnmarshalWithDecoder(bin.NewBinDecoder(bytes))
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
 }
 
 func ExtractTypedReturnValue[T any](ctx context.Context, logs []string, programID string, decoderFn func([]byte) T) (T, error) {

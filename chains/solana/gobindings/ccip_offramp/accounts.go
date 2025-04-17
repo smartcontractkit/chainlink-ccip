@@ -154,6 +154,7 @@ type ReferenceAddresses struct {
 	Router             ag_solanago.PublicKey
 	FeeQuoter          ag_solanago.PublicKey
 	OfframpLookupTable ag_solanago.PublicKey
+	RmnRemote          ag_solanago.PublicKey
 }
 
 var ReferenceAddressesDiscriminator = [8]byte{99, 5, 216, 212, 250, 75, 74, 12}
@@ -181,6 +182,11 @@ func (obj ReferenceAddresses) MarshalWithEncoder(encoder *ag_binary.Encoder) (er
 	}
 	// Serialize `OfframpLookupTable` param:
 	err = encoder.Encode(obj.OfframpLookupTable)
+	if err != nil {
+		return err
+	}
+	// Serialize `RmnRemote` param:
+	err = encoder.Encode(obj.RmnRemote)
 	if err != nil {
 		return err
 	}
@@ -218,6 +224,11 @@ func (obj *ReferenceAddresses) UnmarshalWithDecoder(decoder *ag_binary.Decoder) 
 	}
 	// Deserialize `OfframpLookupTable`:
 	err = decoder.Decode(&obj.OfframpLookupTable)
+	if err != nil {
+		return err
+	}
+	// Deserialize `RmnRemote`:
+	err = decoder.Decode(&obj.RmnRemote)
 	if err != nil {
 		return err
 	}
@@ -262,36 +273,6 @@ func (obj *GlobalState) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err er
 	err = decoder.Decode(&obj.LatestPriceSequenceNumber)
 	if err != nil {
 		return err
-	}
-	return nil
-}
-
-type ExternalExecutionConfig struct{}
-
-var ExternalExecutionConfigDiscriminator = [8]byte{159, 157, 150, 212, 168, 103, 117, 39}
-
-func (obj ExternalExecutionConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Write account discriminator:
-	err = encoder.WriteBytes(ExternalExecutionConfigDiscriminator[:], false)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *ExternalExecutionConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Read and check account discriminator:
-	{
-		discriminator, err := decoder.ReadTypeID()
-		if err != nil {
-			return err
-		}
-		if !discriminator.Equal(ExternalExecutionConfigDiscriminator[:]) {
-			return fmt.Errorf(
-				"wrong discriminator: wanted %s, got %s",
-				"[159 157 150 212 168 103 117 39]",
-				fmt.Sprint(discriminator[:]))
-		}
 	}
 	return nil
 }

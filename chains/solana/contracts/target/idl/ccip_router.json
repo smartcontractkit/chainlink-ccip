@@ -6,7 +6,7 @@
     "",
     "This is the Collapsed Router Program for CCIP.",
     "As it's upgradable persisting the same program id, there is no need to have an indirection of a Proxy Program.",
-    "This Router handles both the OnRamp and OffRamp flow of the CCIP Messages.",
+    "This Router handles the OnRamp flow of the CCIP Messages.",
     "",
     "NOTE to devs: This file however should contain *no logic*, only the entrypoints to the different versioned modules,",
     "thus making it easier to ensure later on that logic can be changed during upgrades without affecting the interface."
@@ -24,7 +24,10 @@
         "",
         "* `ctx` - The context containing the accounts required for initialization.",
         "* `svm_chain_selector` - The chain selector for SVM.",
-        "* `enable_execution_after` - The minimum amount of time required between a message has been committed and can be manually executed."
+        "* `fee_aggregator` - The public key of the fee aggregator.",
+        "* `fee_quoter` - The public key of the fee quoter.",
+        "* `link_token_mint` - The public key of the LINK token mint.",
+        "* `rmn_remote` - The public key of the RMN remote."
       ],
       "accounts": [
         {
@@ -51,11 +54,6 @@
           "name": "programData",
           "isMut": false,
           "isSigner": false
-        },
-        {
-          "name": "tokenPoolsSigner",
-          "isMut": true,
-          "isSigner": false
         }
       ],
       "args": [
@@ -73,6 +71,10 @@
         },
         {
           "name": "linkTokenMint",
+          "type": "publicKey"
+        },
+        {
+          "name": "rmnRemote",
           "type": "publicKey"
         }
       ]
@@ -205,6 +207,41 @@
       "args": [
         {
           "name": "feeAggregator",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
+      "name": "updateRmnRemote",
+      "docs": [
+        "Updates the RMN remote program in the router configuration.",
+        "The Admin is the only one able to update the RMN remote program.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for updating the configuration.",
+        "* `rmn_remote,` - The new RMN remote address."
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "rmnRemote",
           "type": "publicKey"
         }
       ]
@@ -463,11 +500,6 @@
           "name": "authority",
           "isMut": true,
           "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
         }
       ],
       "args": [
@@ -504,11 +536,6 @@
           "name": "authority",
           "isMut": true,
           "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
         }
       ],
       "args": [
@@ -671,7 +698,7 @@
         },
         {
           "name": "tokenAdminRegistry",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         },
         {
@@ -898,7 +925,8 @@
         "",
         "* `ctx` - The context containing the accounts required for sending the message.",
         "* `dest_chain_selector` - The chain selector for the destination chain.",
-        "* `message` - The message to be sent. The size limit of data is 256 bytes."
+        "* `message` - The message to be sent. The size limit of data is 256 bytes.",
+        "* `token_indexes` - Indices into the remaining accounts vector where the subslice for a token begins."
       ],
       "accounts": [
         {
@@ -980,12 +1008,19 @@
           "isSigner": false
         },
         {
-          "name": "tokenPoolsSigner",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "CPI signers, optional if no tokens are being transferred."
-          ]
+          "name": "rmnRemote",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemoteCurses",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemoteConfig",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": [
@@ -1009,6 +1044,73 @@
           "u8",
           32
         ]
+      }
+    },
+    {
+      "name": "getFee",
+      "docs": [
+        "Queries the onramp for the fee required to send a message.",
+        "",
+        "This call is permissionless. Note it does not verify whether there's a curse active",
+        "in order to avoid the RMN CPI overhead.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for obtaining the message fee.",
+        "* `dest_chain_selector` - The chain selector for the destination chain.",
+        "* `message` - The message to be sent. The size limit of data is 256 bytes."
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "destChainState",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feeQuoter",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feeQuoterConfig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feeQuoterDestChain",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feeQuoterBillingTokenConfig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feeQuoterLinkTokenConfig",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "destChainSelector",
+          "type": "u64"
+        },
+        {
+          "name": "message",
+          "type": {
+            "defined": "SVM2AnyMessage"
+          }
+        }
+      ],
+      "returns": {
+        "defined": "GetFeeResult"
       }
     }
   ],
@@ -1049,6 +1151,10 @@
           },
           {
             "name": "feeQuoter",
+            "type": "publicKey"
+          },
+          {
+            "name": "rmnRemote",
             "type": "publicKey"
           },
           {
@@ -1102,50 +1208,6 @@
           {
             "name": "counter",
             "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "ExternalExecutionConfig",
-      "type": {
-        "kind": "struct",
-        "fields": []
-      }
-    },
-    {
-      "name": "TokenAdminRegistry",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "version",
-            "type": "u8"
-          },
-          {
-            "name": "administrator",
-            "type": "publicKey"
-          },
-          {
-            "name": "pendingAdministrator",
-            "type": "publicKey"
-          },
-          {
-            "name": "lookupTable",
-            "type": "publicKey"
-          },
-          {
-            "name": "writableIndexes",
-            "type": {
-              "array": [
-                "u128",
-                2
-              ]
-            }
-          },
-          {
-            "name": "mint",
-            "type": "publicKey"
           }
         ]
       }
@@ -1335,6 +1397,26 @@
       }
     },
     {
+      "name": "GetFeeResult",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "juels",
+            "type": "u128"
+          },
+          {
+            "name": "token",
+            "type": "publicKey"
+          }
+        ]
+      }
+    },
+    {
       "name": "DestChainState",
       "type": {
         "kind": "struct",
@@ -1410,92 +1492,6 @@
           }
         ]
       }
-    },
-    {
-      "name": "CcipRouterError",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "Unauthorized"
-          },
-          {
-            "name": "InvalidInputsMint"
-          },
-          {
-            "name": "InvalidVersion"
-          },
-          {
-            "name": "FeeTokenMismatch"
-          },
-          {
-            "name": "RedundantOwnerProposal"
-          },
-          {
-            "name": "ReachedMaxSequenceNumber"
-          },
-          {
-            "name": "InvalidInputsTokenIndices"
-          },
-          {
-            "name": "InvalidInputsPoolAccounts"
-          },
-          {
-            "name": "InvalidInputsTokenAccounts"
-          },
-          {
-            "name": "InvalidInputsConfigAccounts"
-          },
-          {
-            "name": "InvalidInputsTokenAdminRegistryAccounts"
-          },
-          {
-            "name": "InvalidInputsLookupTableAccounts"
-          },
-          {
-            "name": "InvalidInputsLookupTableAccountWritable"
-          },
-          {
-            "name": "InvalidInputsTokenAmount"
-          },
-          {
-            "name": "InvalidInputsTransferAllAmount"
-          },
-          {
-            "name": "InvalidInputsAtaAddress"
-          },
-          {
-            "name": "InvalidInputsAtaWritable"
-          },
-          {
-            "name": "InvalidInputsChainSelector"
-          },
-          {
-            "name": "InsufficientLamports"
-          },
-          {
-            "name": "InsufficientFunds"
-          },
-          {
-            "name": "SourceTokenDataTooLarge"
-          },
-          {
-            "name": "InvalidTokenAdminRegistryInputsZeroAddress"
-          },
-          {
-            "name": "InvalidTokenAdminRegistryProposedAdmin"
-          },
-          {
-            "name": "SenderNotAllowed"
-          },
-          {
-            "name": "InvalidCodeVersion"
-          },
-          {
-            "name": "InvalidCcipVersionRollback"
-          }
-        ]
-      }
     }
   ],
   "events": [
@@ -1509,6 +1505,11 @@
         },
         {
           "name": "feeQuoter",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "rmnRemote",
           "type": "publicKey",
           "index": false
         },
@@ -1783,12 +1784,134 @@
   ],
   "errors": [
     {
-      "code": 6000,
-      "name": "Something"
+      "code": 7000,
+      "name": "Unauthorized",
+      "msg": "The signer is unauthorized"
     },
     {
-      "code": 6001,
-      "name": "Else"
+      "code": 7001,
+      "name": "InvalidRMNRemoteAddress",
+      "msg": "Invalid RMN Remote Address"
+    },
+    {
+      "code": 7002,
+      "name": "InvalidInputsMint",
+      "msg": "Mint account input is invalid"
+    },
+    {
+      "code": 7003,
+      "name": "InvalidVersion",
+      "msg": "Invalid version of the onchain state"
+    },
+    {
+      "code": 7004,
+      "name": "FeeTokenMismatch",
+      "msg": "Fee token doesn't match transfer token"
+    },
+    {
+      "code": 7005,
+      "name": "RedundantOwnerProposal",
+      "msg": "Proposed owner is the current owner"
+    },
+    {
+      "code": 7006,
+      "name": "ReachedMaxSequenceNumber",
+      "msg": "Reached max sequence number"
+    },
+    {
+      "code": 7007,
+      "name": "InvalidInputsTokenIndices",
+      "msg": "Invalid pool account account indices"
+    },
+    {
+      "code": 7008,
+      "name": "InvalidInputsPoolAccounts",
+      "msg": "Invalid pool accounts"
+    },
+    {
+      "code": 7009,
+      "name": "InvalidInputsTokenAccounts",
+      "msg": "Invalid token accounts"
+    },
+    {
+      "code": 7010,
+      "name": "InvalidInputsTokenAdminRegistryAccounts",
+      "msg": "Invalid Token Admin Registry account"
+    },
+    {
+      "code": 7011,
+      "name": "InvalidInputsLookupTableAccounts",
+      "msg": "Invalid LookupTable account"
+    },
+    {
+      "code": 7012,
+      "name": "InvalidInputsLookupTableAccountWritable",
+      "msg": "Invalid LookupTable account writable access"
+    },
+    {
+      "code": 7013,
+      "name": "InvalidInputsTokenAmount",
+      "msg": "Cannot send zero tokens"
+    },
+    {
+      "code": 7014,
+      "name": "InvalidInputsTransferAllAmount",
+      "msg": "Must specify zero amount to send alongside transfer_all"
+    },
+    {
+      "code": 7015,
+      "name": "InvalidInputsAtaAddress",
+      "msg": "Invalid Associated Token Account address"
+    },
+    {
+      "code": 7016,
+      "name": "InvalidInputsAtaWritable",
+      "msg": "Invalid Associated Token Account writable flag"
+    },
+    {
+      "code": 7017,
+      "name": "InvalidInputsChainSelector",
+      "msg": "Chain selector is invalid"
+    },
+    {
+      "code": 7018,
+      "name": "InsufficientLamports",
+      "msg": "Insufficient lamports"
+    },
+    {
+      "code": 7019,
+      "name": "InsufficientFunds",
+      "msg": "Insufficient funds"
+    },
+    {
+      "code": 7020,
+      "name": "SourceTokenDataTooLarge",
+      "msg": "Source token data is too large"
+    },
+    {
+      "code": 7021,
+      "name": "InvalidTokenAdminRegistryInputsZeroAddress",
+      "msg": "New Admin can not be zero address"
+    },
+    {
+      "code": 7022,
+      "name": "InvalidTokenAdminRegistryProposedAdmin",
+      "msg": "An already owned registry can not be proposed"
+    },
+    {
+      "code": 7023,
+      "name": "SenderNotAllowed",
+      "msg": "Sender not allowed for that destination chain"
+    },
+    {
+      "code": 7024,
+      "name": "InvalidCodeVersion",
+      "msg": "Invalid code version"
+    },
+    {
+      "code": 7025,
+      "name": "InvalidCcipVersionRollback",
+      "msg": "Invalid rollback attempt on the CCIP version of the onramp to the destination chain"
     }
   ]
 }
