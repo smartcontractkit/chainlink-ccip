@@ -296,7 +296,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
   function testFuzz_ForwardFromRouter_Success(address originalSender, address receiver, uint96 feeTokenAmount) public {
     // To avoid RouterMustSetOriginalSender
     vm.assume(originalSender != address(0));
-    vm.assume(uint160(receiver) >= Internal.PRECOMPILE_SPACE);
+    vm.assume(uint160(receiver) >= Internal.EVM_PRECOMPILE_SPACE);
     feeTokenAmount = uint96(bound(feeTokenAmount, 0, MAX_MSG_FEES_JUELS));
     vm.stopPrank();
 
