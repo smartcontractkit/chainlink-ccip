@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
 use ccip_common::v1::{validate_evm_address, validate_svm_address};
-use ccip_common::{CHAIN_FAMILY_SELECTOR_EVM, CHAIN_FAMILY_SELECTOR_SVM};
+use ccip_common::{CommonCcipError, CHAIN_FAMILY_SELECTOR_EVM, CHAIN_FAMILY_SELECTOR_SVM};
 
 use crate::extra_args::{
     GenericExtraArgsV2, SVMExtraArgsV1, GENERIC_EXTRA_ARGS_V2_TAG, SVM_EXTRA_ARGS_MAX_ACCOUNTS,
@@ -73,7 +73,7 @@ fn validate_dest_family_address(
         CHAIN_FAMILY_SELECTOR_SVM => {
             validate_svm_address(&msg.receiver, msg_extra_args.gas_limit > 0)
         }
-        _ => Err(FeeQuoterError::InvalidChainFamilySelector.into()),
+        _ => Err(CommonCcipError::InvalidChainFamilySelector.into()),
     }
 }
 

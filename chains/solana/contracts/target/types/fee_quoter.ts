@@ -1633,31 +1633,26 @@ export type FeeQuoter = {
     },
     {
       "code": 8032,
-      "name": "InvalidChainFamilySelector",
-      "msg": "Invalid chain family selector"
-    },
-    {
-      "code": 8033,
       "name": "InvalidTokenReceiver",
       "msg": "Invalid token receiver"
     },
     {
-      "code": 8034,
+      "code": 8033,
       "name": "UnauthorizedPriceUpdater",
       "msg": "The caller is not an authorized price updater"
     },
     {
-      "code": 8035,
+      "code": 8034,
       "name": "InvalidTokenTransferFeeMaxMin",
       "msg": "Minimum token transfer fee exceeds maximum"
     },
     {
-      "code": 8036,
+      "code": 8035,
       "name": "InvalidTokenTransferFeeDestBytesOverhead",
       "msg": "Insufficient dest bytes overhead on transfer fee config"
     },
     {
-      "code": 8037,
+      "code": 8036,
       "name": "InvalidCodeVersion",
       "msg": "Invalid code version"
     }
@@ -3299,31 +3294,26 @@ export const IDL: FeeQuoter = {
     },
     {
       "code": 8032,
-      "name": "InvalidChainFamilySelector",
-      "msg": "Invalid chain family selector"
-    },
-    {
-      "code": 8033,
       "name": "InvalidTokenReceiver",
       "msg": "Invalid token receiver"
     },
     {
-      "code": 8034,
+      "code": 8033,
       "name": "UnauthorizedPriceUpdater",
       "msg": "The caller is not an authorized price updater"
     },
     {
-      "code": 8035,
+      "code": 8034,
       "name": "InvalidTokenTransferFeeMaxMin",
       "msg": "Minimum token transfer fee exceeds maximum"
     },
     {
-      "code": 8036,
+      "code": 8035,
       "name": "InvalidTokenTransferFeeDestBytesOverhead",
       "msg": "Insufficient dest bytes overhead on transfer fee config"
     },
     {
-      "code": 8037,
+      "code": 8036,
       "name": "InvalidCodeVersion",
       "msg": "Invalid code version"
     }

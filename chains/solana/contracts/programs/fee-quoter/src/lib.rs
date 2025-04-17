@@ -395,8 +395,6 @@ pub enum FeeQuoterError {
     InvalidExtraArgsAccounts,
     #[msg("Invalid writability bitmap in extra args")]
     InvalidExtraArgsWritabilityBitmap,
-    #[msg("Invalid chain family selector")]
-    InvalidChainFamilySelector,
     #[msg("Invalid token receiver")]
     InvalidTokenReceiver,
     #[msg("The caller is not an authorized price updater")]
