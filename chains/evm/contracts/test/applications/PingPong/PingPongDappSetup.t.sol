@@ -17,7 +17,7 @@ contract PingPongDappSetup is OnRampSetup {
 
     s_feeToken = IERC20(s_sourceTokens[0]);
     s_pingPong = new PingPongDemo(address(s_sourceRouter), s_feeToken);
-    s_pingPong.setCounterpart(DEST_CHAIN_SELECTOR, abi.encode(i_pongContract));
+    s_pingPong.setCounterpart(DEST_CHAIN_SELECTOR, abi.encode(i_pongContract), abi.encode(""));
 
     uint256 fundingAmount = 1e18;
 
