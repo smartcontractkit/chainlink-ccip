@@ -214,6 +214,6 @@ func TestObservationSize(t *testing.T) {
 
 	b, err := ocrTypeCodec.EncodeObservation(maxObs)
 	require.NoError(t, err)
-	assert.Greater(t, maxObservationLength, len(b))
-	assert.LessOrEqual(t, maxObservationLength, ocr3types.MaxMaxObservationLength)
+	assert.Greater(t, lenientMaxObservationLength, len(b))
+	assert.LessOrEqual(t, lenientMaxObservationLength, ocr3types.MaxMaxObservationLength)
 }
