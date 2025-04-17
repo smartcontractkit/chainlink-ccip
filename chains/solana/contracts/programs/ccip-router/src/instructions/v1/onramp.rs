@@ -188,6 +188,12 @@ impl OnRamp for Impl {
                 CcipRouterError::InvalidInputsTokenAccounts,
             );
 
+            require_gt!(
+                token_amount.amount,
+                0,
+                CcipRouterError::InvalidInputsTokenAmount
+            );
+
             let seeds = &[
                 seed::EXTERNAL_TOKEN_POOLS_SIGNER,
                 current_token_accounts.pool_program.key.as_ref(),
