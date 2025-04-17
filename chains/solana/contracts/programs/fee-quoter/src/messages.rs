@@ -2,6 +2,10 @@ use anchor_lang::prelude::*;
 
 use crate::{extra_args::GenericExtraArgsV2, DestChainConfig};
 
+// https://github.com/smartcontractkit/chainlink/blob/ff8a597fd9df653f8967427498eaa5a04b19febb/contracts/src/v0.8/ccip/libraries/Internal.sol#L276
+pub const CHAIN_FAMILY_SELECTOR_EVM: u32 = 0x2812d52c;
+pub const CHAIN_FAMILY_SELECTOR_SVM: u32 = 0x1e10bdc4;
+
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
 pub struct SVM2AnyMessage {
     pub receiver: Vec<u8>,
