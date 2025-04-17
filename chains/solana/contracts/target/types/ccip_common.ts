@@ -76,6 +76,26 @@ export type CcipCommon = {
       "code": 10006,
       "name": "InvalidInputsPoolSignerAccounts",
       "msg": "Invalid pool signer account"
+    },
+    {
+      "code": 10007,
+      "name": "InvalidChainFamilySelector",
+      "msg": "Invalid chain family selector"
+    },
+    {
+      "code": 10008,
+      "name": "InvalidEncoding",
+      "msg": "Invalid encoding"
+    },
+    {
+      "code": 10009,
+      "name": "InvalidEVMAddress",
+      "msg": "Invalid EVM address"
+    },
+    {
+      "code": 10010,
+      "name": "InvalidSVMAddress",
+      "msg": "Invalid SVM address"
     }
   ]
 };
@@ -158,6 +178,26 @@ export const IDL: CcipCommon = {
       "code": 10006,
       "name": "InvalidInputsPoolSignerAccounts",
       "msg": "Invalid pool signer account"
+    },
+    {
+      "code": 10007,
+      "name": "InvalidChainFamilySelector",
+      "msg": "Invalid chain family selector"
+    },
+    {
+      "code": 10008,
+      "name": "InvalidEncoding",
+      "msg": "Invalid encoding"
+    },
+    {
+      "code": 10009,
+      "name": "InvalidEVMAddress",
+      "msg": "Invalid EVM address"
+    },
+    {
+      "code": 10010,
+      "name": "InvalidSVMAddress",
+      "msg": "Invalid SVM address"
     }
   ]
 };
