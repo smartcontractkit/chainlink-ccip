@@ -169,7 +169,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   /// @dev The decimals that Keystone reports prices in.
   uint256 public constant KEYSTONE_PRICE_DECIMALS = 18;
 
-  string public constant override typeAndVersion = "FeeQuoter 1.6.1-dev";
+  string public constant override typeAndVersion = "FeeQuoter 1.6.0";
 
   /// @dev The gas price per unit of gas for a given destination chain, in USD with 18 decimals. Multiple gas prices can
   /// be encoded into the same value. Each price takes {Internal.GAS_PRICE_BITS} bits. For example, if Optimism is the
@@ -888,10 +888,12 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
       return Internal._validateEVMAddress(destAddress);
     }
     if (chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SVM) {
-      return Internal._validate32ByteAddress(destAddress, gasLimit > 0);
+      // SVM addresses don't have a precompile space at the first X addresses, instead we validate that if the gasLimit
+      // is non-zero, the address must not be 0x0.
+      return Internal._validate32ByteAddress(destAddress, gasLimit > 0 ? 1 : 0);
     }
     if (chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_APTOS) {
-      return Internal._validate32ByteAddress(destAddress, true);
+      return Internal._validate32ByteAddress(destAddress, Internal.APTOS_PRECOMPILE_SPACE);
     }
     revert InvalidChainFamilySelector(chainFamilySelector);
   }
