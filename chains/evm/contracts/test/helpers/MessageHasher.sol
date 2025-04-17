@@ -108,19 +108,28 @@ contract MessageHasher {
     return Client._svmArgsToBytes(extraArgs);
   }
 
-  function decodeSVMExtraArgsV1(
-    uint32 computeUnits,
-    uint64 accountIsWritableBitmap,
-    bool allowOutOfOrderExecution,
-    bytes32 tokenReceiver,
-    bytes32[] memory accounts
-  ) public pure returns (Client.SVMExtraArgsV1 memory) {
-    return Client.SVMExtraArgsV1({
-      computeUnits: computeUnits,
-      accountIsWritableBitmap: accountIsWritableBitmap,
-      allowOutOfOrderExecution: allowOutOfOrderExecution,
-      tokenReceiver: tokenReceiver,
-      accounts: accounts
-    });
+  /// @notice used offchain to decode an encoded SVMExtraArgsV1 struct.
+  /// @dev The unrolled version fails due to differences in encoding when the accounts[] array
+  /// is empty or not.
+  function decodeSVMExtraArgsStruct(
+    Client.SVMExtraArgsV1 memory extraArgs
+  )
+    public
+    pure
+    returns (
+      uint32 computeUnits,
+      uint64 accountIsWritableBitmap,
+      bool allowOutOfOrderExecution,
+      bytes32 tokenReceiver,
+      bytes32[] memory accounts
+    )
+  {
+    return (
+      extraArgs.computeUnits,
+      extraArgs.accountIsWritableBitmap,
+      extraArgs.allowOutOfOrderExecution,
+      extraArgs.tokenReceiver,
+      extraArgs.accounts
+    );
   }
 }
