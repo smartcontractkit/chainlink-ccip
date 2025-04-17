@@ -40,14 +40,14 @@ contract FeeQuoter_validateDestFamilyAddress is FeeQuoterSetup {
   }
 
   function test_validateDestFamilyAddress_EVM_RevertWhen_InvalidEVMAddressPrecompiles() public {
-    for (uint160 i = 0; i < Internal.PRECOMPILE_SPACE; ++i) {
+    for (uint160 i = 0; i < Internal.EVM_PRECOMPILE_SPACE; ++i) {
       bytes memory invalidAddress = abi.encode(address(i));
       vm.expectRevert(abi.encodeWithSelector(Internal.InvalidEVMAddress.selector, invalidAddress));
       s_feeQuoter.validateDestFamilyAddress(Internal.CHAIN_FAMILY_SELECTOR_EVM, invalidAddress, 0);
     }
 
     s_feeQuoter.validateDestFamilyAddress(
-      Internal.CHAIN_FAMILY_SELECTOR_EVM, abi.encode(address(uint160(Internal.PRECOMPILE_SPACE))), 0
+      Internal.CHAIN_FAMILY_SELECTOR_EVM, abi.encode(address(uint160(Internal.EVM_PRECOMPILE_SPACE))), 0
     );
   }
 
