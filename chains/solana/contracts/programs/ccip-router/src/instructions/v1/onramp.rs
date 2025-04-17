@@ -323,6 +323,10 @@ mod helpers {
         token_amount: &SVMTokenAmount,
         additional_data: &TokenTransferAdditionalData,
     ) -> Result<SVM2AnyTokenTransfer> {
+        // todo: get chain family selector
+
+        // todo: validate transfer destination address
+
         let dest_gas_amount = additional_data.dest_gas_overhead;
 
         let extra_data = lock_or_burn_out_data.dest_pool_data;
