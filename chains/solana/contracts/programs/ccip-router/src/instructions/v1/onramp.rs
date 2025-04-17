@@ -309,7 +309,6 @@ impl OnRamp for Impl {
 }
 
 mod helpers {
-
     use ccip_common::{
         v1::{validate_evm_address, validate_svm_address},
         CommonCcipError, CHAIN_FAMILY_SELECTOR_EVM, CHAIN_FAMILY_SELECTOR_SVM,
