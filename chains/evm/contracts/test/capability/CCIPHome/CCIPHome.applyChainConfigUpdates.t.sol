@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {INodeInfoProvider} from "@keystone/interfaces/INodeInfoProvider.sol";
+import {INodeInfoProvider} from "@chainlink/keystone/interfaces/INodeInfoProvider.sol";
 
 import {CCIPHome} from "../../../capability/CCIPHome.sol";
 import {CCIPHomeHelper} from "../../helpers/CCIPHomeHelper.sol";
