@@ -187,7 +187,7 @@ pub mod tests {
     use crate::{SVMTokenAmount, TimestampedPackedU224};
     use anchor_lang::solana_program::pubkey::Pubkey;
     use anchor_spl::token::spl_token::native_mint;
-    use ccip_common::{CHAIN_FAMILY_SELECTOR_EVM, CHAIN_FAMILY_SELECTOR_SVM};
+    use ccip_common::{CommonCcipError, CHAIN_FAMILY_SELECTOR_EVM, CHAIN_FAMILY_SELECTOR_SVM};
     use ethnum::U256;
 
     #[test]
@@ -243,7 +243,7 @@ pub mod tests {
             assert_eq!(
                 validate_svm2any(&message, &sample_dest_chain(), &sample_billing_config())
                     .unwrap_err(),
-                FeeQuoterError::InvalidEVMAddress.into()
+                CommonCcipError::InvalidEVMAddress.into()
             );
         }
     }
