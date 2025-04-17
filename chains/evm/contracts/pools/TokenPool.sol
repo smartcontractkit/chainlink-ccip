@@ -10,7 +10,8 @@ import {RateLimiter} from "../libraries/RateLimiter.sol";
 import {Ownable2StepMsgSender} from "@chainlink/shared/access/Ownable2StepMsgSender.sol";
 
 import {IERC20} from "@chainlink/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
-import {IERC20Metadata} from "@chainlink/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {IERC20Metadata} from
+  "@chainlink/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {IERC165} from "@chainlink/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
 import {EnumerableSet} from "@chainlink/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
 

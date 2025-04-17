@@ -7,7 +7,8 @@ import {Client} from "../../../libraries/Client.sol";
 import {OnRampSetup} from "../../onRamp/OnRamp/OnRampSetup.t.sol";
 
 import {IERC20} from "@chainlink/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
-import {ERC165Checker} from "@chainlink/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/ERC165Checker.sol";
+import {ERC165Checker} from
+  "@chainlink/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/ERC165Checker.sol";
 
 contract CCIPClientExample_sanity is OnRampSetup {
   function test_ImmutableExamples() public {
