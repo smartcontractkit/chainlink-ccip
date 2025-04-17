@@ -187,7 +187,6 @@ pub mod tests {
     use crate::{SVMTokenAmount, TimestampedPackedU224};
     use anchor_lang::solana_program::pubkey::Pubkey;
     use anchor_spl::token::spl_token::native_mint;
-    use ccip_common::{CommonCcipError, CHAIN_FAMILY_SELECTOR_EVM, CHAIN_FAMILY_SELECTOR_SVM};
     use ethnum::U256;
 
     #[test]
