@@ -112,8 +112,18 @@ contract MessageHasher {
   /// @dev The unrolled version fails due to differences in encoding when the accounts[] array
   /// is empty or not.
   function decodeSVMExtraArgsStruct(
-    Client.SVMExtraArgsV1 memory extraArgs  
-  ) public pure returns (uint32 computeUnits, uint64 accountIsWritableBitmap, bool allowOutOfOrderExecution, bytes32 tokenReceiver, bytes32[] memory accounts) {
+    Client.SVMExtraArgsV1 memory extraArgs
+  )
+    public
+    pure
+    returns (
+      uint32 computeUnits,
+      uint64 accountIsWritableBitmap,
+      bool allowOutOfOrderExecution,
+      bytes32 tokenReceiver,
+      bytes32[] memory accounts
+    )
+  {
     return (
       extraArgs.computeUnits,
       extraArgs.accountIsWritableBitmap,
