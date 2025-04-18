@@ -181,7 +181,7 @@ func commitReportSummary(logs []*parse.Data) string {
 	if len(reportParts) > 0 || numReports != "" {
 		var buf strings.Builder
 		buf.WriteString(padding)
-		buf.WriteString(section.Render("UnfinalizedReports"))
+		buf.WriteString(section.Render("Reports"))
 		buf.WriteString(": ")
 		buf.WriteString(number.Render(numReports))
 		if numReports != "" && len(reportParts) == 0 {
