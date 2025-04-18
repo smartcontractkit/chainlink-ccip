@@ -89,7 +89,7 @@ func Test_USDC_Transfer(t *testing.T) {
 	outcome := runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
 	require.Equal(t, exectypes.Initialized, outcome.State)
 
-	// Round 1 - Get Commit Reports
+	// Round 1 - Get Commit UnfinalizedReports
 	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
 	require.Len(t, outcome.Report.ChainReports, 0)
 	require.Len(t, outcome.CommitReports, 1)

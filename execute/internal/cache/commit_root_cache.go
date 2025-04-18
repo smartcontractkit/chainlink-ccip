@@ -50,6 +50,8 @@ type CommitsRootsCache interface {
 	// UpdateEarliestUnexecutedRoot updates the earliest unexecuted root timestamp
 	// based on the remaining unexecuted and executed but not finalized reports.
 	UpdateEarliestUnexecutedRoot(remainingReports map[ccipocr3.ChainSelector][]exectypes.CommitData)
+
+	UpdateLatestEmptyRootTimestamp(timestamp time.Time)
 }
 
 func NewCommitRootsCache(
@@ -127,7 +129,16 @@ type commitRootsCache struct {
 	// to optimize database queries by potentially starting from a later timestamp
 	earliestUnexecutedRoot time.Time
 
+	// latestEmptyRoot tracks the timestamp of the latest Finalized empty root,
+	// This is to ensure that the plugin is moving forward if all reports within round limit are empty
+
 	latestEmptyRoot time.Time
+}
+
+func (r *commitRootsCache) UpdateLatestEmptyRootTimestamp(timestamp time.Time) {
+	if timestamp.After(r.latestEmptyRoot) {
+		r.latestEmptyRoot = timestamp
+	}
 }
 
 func getKey(source ccipocr3.ChainSelector, merkleRoot ccipocr3.Bytes32) string {
@@ -193,6 +204,10 @@ func (r *commitRootsCache) GetTimestampToQueryFrom() time.Time {
 			"earliestUnexecutedRoot", r.earliestUnexecutedRoot,
 			"messageVisibilityWindow", messageVisibilityWindow)
 	}
+
+	//if !r.latestEmptyRoot.IsZero() && r.latestEmptyRoot.Before(commitRootsFilterTimestamp) {
+	//
+	//}
 
 	r.lggr.Debugw("Getting timestamp to query from",
 		"earliestUnexecutedRoot", r.earliestUnexecutedRoot,

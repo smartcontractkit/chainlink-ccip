@@ -804,7 +804,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 			}
 			mockReader.On("ExecutedMessages", mock.Anything, mock.Anything, primitives.Unconfirmed).Return(unfinalized, nil)
 
-			got, gotFinalized, gotUnfinalized, err := getPendingReportsForExecution(
+			got, gotFinalized, gotUnfinalized, _, err := getPendingReportsForExecution(
 				tests.Context(t),
 				mockReader,
 				tt.canExec,
@@ -976,7 +976,7 @@ func TestPlugin_ValidateObservation_ValidateObservedSeqNum_Error(t *testing.T) {
 		ocrTypeCodec: ocrTypeCodec,
 	}
 
-	// Reports with duplicate roots.
+	// UnfinalizedReports with duplicate roots.
 	root := cciptypes.Bytes32{}
 	commitReports := map[cciptypes.ChainSelector][]exectypes.CommitData{
 		1: {
@@ -1015,7 +1015,7 @@ func TestPlugin_ValidateObservation_CallsDiscoveryValidateObservation(t *testing
 		ocrTypeCodec: ocrTypeCodec,
 	}
 
-	// Reports with duplicate roots.
+	// UnfinalizedReports with duplicate roots.
 	root := cciptypes.Bytes32{}
 	commitReports := map[cciptypes.ChainSelector][]exectypes.CommitData{
 		1: {

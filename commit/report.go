@@ -98,7 +98,7 @@ func (p *Plugin) Reports(
 		lggr.Errorw("failed to build reports",
 			"outcome", outcome,
 			"err", err)
-		return nil, fmt.Errorf("err in Reports(): %w", err)
+		return nil, fmt.Errorf("err in UnfinalizedReports(): %w", err)
 	}
 
 	encodedReports, err := encodeReports(ctx, lggr, reports, transmissionSchedule, p.reportCodec)

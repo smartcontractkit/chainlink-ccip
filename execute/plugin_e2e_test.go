@@ -42,7 +42,79 @@ func TestPlugin(t *testing.T) {
 	outcome := runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
 	require.Equal(t, exectypes.Initialized, outcome.State)
 
-	// Round 1 - Get Commit Reports
+	// Round 1 - Get Commit UnfinalizedReports
+	// One pending commit report only.
+	// Two of the messages are executed which should be indicated in the Outcome.
+	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
+	require.Len(t, outcome.Report.ChainReports, 0)
+	require.Len(t, outcome.CommitReports, 1)
+	require.ElementsMatch(t, outcome.CommitReports[0].ExecutedMessages, []cciptypes.SeqNum{100, 101})
+
+	// Round 2 - Get Messages
+	// Messages now attached to the pending commit.
+	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
+	require.Len(t, outcome.Report.ChainReports, 0)
+	require.Len(t, outcome.CommitReports, 1)
+
+	// Round 3 - Filter
+	// An execute report with the following messages executed: 102, 103, 104, 105.
+	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
+	require.Len(t, outcome.Report.ChainReports, 1)
+	sequenceNumbers := extractSequenceNumbers(outcome.Report.ChainReports[0].Messages)
+	require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{102, 103, 104, 105})
+}
+
+func TestPluginSkipEmptyReports(t *testing.T) {
+	ctx := tests.Context(t)
+
+	srcSelector := cciptypes.ChainSelector(1)
+	dstSelector := cciptypes.ChainSelector(2)
+
+	crBlockNumber := uint64(1000)
+	currentTimestamp := time.Now().Add(-4 * time.Hour)
+
+	intTest := SetupSimpleTest(t, logger.Test(t), []cciptypes.ChainSelector{srcSelector}, dstSelector)
+	// Add empty reports to the reader, these are to mock price reports without merkle roots.
+	// All of them are finalized,
+	// Note: As the time of writing this test unfinalized in ContractReader includes finalized and unfinalized.
+	for i := 0; i < lenientMaxMsgsPerObs; i++ {
+		currentTimestamp = currentTimestamp.Add(time.Second)
+		crBlockNumber++
+		commitReportWithMeta := cciptypes.CommitPluginReportWithMeta{
+			Report:    cciptypes.CommitPluginReport{},
+			BlockNum:  crBlockNumber,
+			Timestamp: currentTimestamp,
+		}
+		intTest.ccipReader.UnfinalizedReports = append(intTest.ccipReader.UnfinalizedReports, commitReportWithMeta)
+		intTest.ccipReader.FinalizedReports = append(intTest.ccipReader.FinalizedReports, commitReportWithMeta)
+	}
+
+	// Add messages, These will be in an unfinalized report.
+	messages := []inmem.MessagesWithMetadata{
+		makeMsgWithMetadata(100, srcSelector, dstSelector, true),
+		makeMsgWithMetadata(101, srcSelector, dstSelector, true),
+		makeMsgWithMetadata(102, srcSelector, dstSelector, false),
+		makeMsgWithMetadata(103, srcSelector, dstSelector, false),
+		makeMsgWithMetadata(104, srcSelector, dstSelector, false),
+		makeMsgWithMetadata(105, srcSelector, dstSelector, false),
+	}
+	intTest.WithMessages(messages, crBlockNumber, currentTimestamp, 1, srcSelector)
+
+	runner := intTest.Start()
+	defer intTest.Close()
+
+	// Contract Discovery round.
+	outcome := runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
+	require.Equal(t, exectypes.Initialized, outcome.State)
+
+	// Round 1 - Get Commit UnfinalizedReports
+	// No pending commit reports, all lenientMaxMsgsPerObs reports are with no merkelRoots.
+	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
+	require.Len(t, outcome.Report.ChainReports, 0)
+	require.Len(t, outcome.CommitReports, 0)
+
+	// Should have updated
+	// Round 1 - Get Commit UnfinalizedReports
 	// One pending commit report only.
 	// Two of the messages are executed which should be indicated in the Outcome.
 	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
