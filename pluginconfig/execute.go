@@ -106,6 +106,19 @@ func (e *ExecuteOffchainConfig) IsUSDCEnabled() bool {
 	return false
 }
 
+func (e *ExecuteOffchainConfig) IsLBTCEnabled() bool {
+	for _, ob := range e.TokenDataObservers {
+		if ob.WellFormed() != nil {
+			continue
+		}
+		if ob.IsLBTC() {
+			return true
+		}
+	}
+
+	return false
+}
+
 // EncodeExecuteOffchainConfig encodes a ExecuteOffchainConfig into bytes using JSON.
 func EncodeExecuteOffchainConfig(e ExecuteOffchainConfig) ([]byte, error) {
 	return json.Marshal(e)
