@@ -185,7 +185,9 @@ func (r *commitRootsCache) isExecuted(key string) bool {
 // GetTimestampToQueryFrom returns the timestamp to use when querying for commit reports.
 // It optimizes the query window by using the later of:
 // 1. The message visibility window
-// 2. The earliest unexecuted root timestamp (if available)
+// 2. Min(earliestUnexecutedRoot, latestEmptyRoot) if it's after the message visibility window
+// TODO: add diagram in github instead of using external link
+// For illustration check https://app.excalidraw.com/l/AdjkJ3DaenS/84EpHxkgbND
 func (r *commitRootsCache) GetTimestampToQueryFrom() time.Time {
 	r.cacheMu.RLock()
 	defer r.cacheMu.RUnlock()
@@ -196,21 +198,36 @@ func (r *commitRootsCache) GetTimestampToQueryFrom() time.Time {
 	// Start with message visibility window as the default (lower bound)
 	commitRootsFilterTimestamp := messageVisibilityWindow
 
-	// If we know the earliest unexecuted root and it's AFTER the visibility window,
+	// Determine the earliest timestamp between unexecuted root and latest empty root
+	var minTimestamp time.Time
+
+	// Check if earliestUnexecutedRoot is set
+	if !r.earliestUnexecutedRoot.IsZero() {
+		minTimestamp = r.earliestUnexecutedRoot
+		r.lggr.Debugw("MinTimeStamp set to earliest unexecuted root")
+	}
+
+	// Check if latestEmptyRoot is set
+	if !r.latestEmptyRoot.IsZero() {
+		// If minTimestamp is not set or latestEmptyRoot is earlier, use latestEmptyRoot
+		if minTimestamp.IsZero() || r.latestEmptyRoot.Before(minTimestamp) {
+			minTimestamp = r.latestEmptyRoot
+		}
+		r.lggr.Debugw("MinTimeStamp set to latest empty finalized root")
+	}
+
+	// If we know the earliest unexecuted root or latestEmptymTimestamp and it's AFTER the visibility window,
 	// we can optimize by starting our query from that timestamp instead
-	if !r.earliestUnexecutedRoot.IsZero() && r.earliestUnexecutedRoot.After(messageVisibilityWindow) {
-		commitRootsFilterTimestamp = r.earliestUnexecutedRoot
-		r.lggr.Debugw("Using earliest unexecuted root as query timestamp",
-			"earliestUnexecutedRoot", r.earliestUnexecutedRoot,
+	if minTimestamp.After(messageVisibilityWindow) {
+		commitRootsFilterTimestamp = minTimestamp
+		r.lggr.Debugw("Using minTimestamp to optimize query",
+			"minTimestamp", minTimestamp,
 			"messageVisibilityWindow", messageVisibilityWindow)
 	}
 
-	//if !r.latestEmptyRoot.IsZero() && r.latestEmptyRoot.Before(commitRootsFilterTimestamp) {
-	//
-	//}
-
 	r.lggr.Debugw("Getting timestamp to query from",
 		"earliestUnexecutedRoot", r.earliestUnexecutedRoot,
+		"latestEmptyRoot", r.latestEmptyRoot,
 		"messageVisibilityWindow", messageVisibilityWindow,
 		"commitRootsFilterTimestamp", commitRootsFilterTimestamp,
 		"optimized", commitRootsFilterTimestamp.After(messageVisibilityWindow))

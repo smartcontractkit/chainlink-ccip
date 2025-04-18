@@ -64,6 +64,9 @@ func TestPlugin(t *testing.T) {
 	require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{102, 103, 104, 105})
 }
 
+// Testing first scenario from the diagram:
+// TODO: add diagram in github instead of using external link
+// https://app.excalidraw.com/l/AdjkJ3DaenS/84EpHxkgbND
 func TestPluginSkipEmptyReports(t *testing.T) {
 	ctx := tests.Context(t)
 
