@@ -77,24 +77,22 @@ func (_c *MockCCIPReader_Close_Call) RunAndReturn(run func() error) *MockCCIPRea
 }
 
 // CommitReportsGTETimestamp provides a mock function with given fields: ctx, ts, limit
-func (_m *MockCCIPReader) CommitReportsGTETimestamp(ctx context.Context, ts time.Time, limit int) ([]ccipocr3.CommitPluginReportWithMeta, error) {
+func (_m *MockCCIPReader) CommitReportsGTETimestamp(ctx context.Context, ts time.Time, limit int) (ccipocr3.CommitReportsByConfidenceLevel, error) {
 	ret := _m.Called(ctx, ts, limit)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CommitReportsGTETimestamp")
 	}
 
-	var r0 []ccipocr3.CommitPluginReportWithMeta
+	var r0 ccipocr3.CommitReportsByConfidenceLevel
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, time.Time, int) ([]ccipocr3.CommitPluginReportWithMeta, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, time.Time, int) (ccipocr3.CommitReportsByConfidenceLevel, error)); ok {
 		return rf(ctx, ts, limit)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, time.Time, int) []ccipocr3.CommitPluginReportWithMeta); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, time.Time, int) ccipocr3.CommitReportsByConfidenceLevel); ok {
 		r0 = rf(ctx, ts, limit)
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]ccipocr3.CommitPluginReportWithMeta)
-		}
+		r0 = ret.Get(0).(ccipocr3.CommitReportsByConfidenceLevel)
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, time.Time, int) error); ok {
@@ -126,12 +124,12 @@ func (_c *MockCCIPReader_CommitReportsGTETimestamp_Call) Run(run func(ctx contex
 	return _c
 }
 
-func (_c *MockCCIPReader_CommitReportsGTETimestamp_Call) Return(_a0 []ccipocr3.CommitPluginReportWithMeta, _a1 error) *MockCCIPReader_CommitReportsGTETimestamp_Call {
+func (_c *MockCCIPReader_CommitReportsGTETimestamp_Call) Return(_a0 ccipocr3.CommitReportsByConfidenceLevel, _a1 error) *MockCCIPReader_CommitReportsGTETimestamp_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockCCIPReader_CommitReportsGTETimestamp_Call) RunAndReturn(run func(context.Context, time.Time, int) ([]ccipocr3.CommitPluginReportWithMeta, error)) *MockCCIPReader_CommitReportsGTETimestamp_Call {
+func (_c *MockCCIPReader_CommitReportsGTETimestamp_Call) RunAndReturn(run func(context.Context, time.Time, int) (ccipocr3.CommitReportsByConfidenceLevel, error)) *MockCCIPReader_CommitReportsGTETimestamp_Call {
 	_c.Call.Return(run)
 	return _c
 }

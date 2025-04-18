@@ -180,8 +180,7 @@ func getSortedExecutableReports(lggr logger.Logger,
 		)
 	}
 	sort.Slice(executableReports, func(i, j int) bool {
-		return executableReports[i].SequenceNumberRange.Start() <
-			executableReports[j].SequenceNumberRange.Start()
+		return exectypes.LessThan(executableReports[i], executableReports[j])
 	})
 
 	return executableReports
@@ -273,34 +272,36 @@ func getPendingReportsForExecution(
 	groupedCommits exectypes.CommitObservations,
 	fullyExecutedFinalized []exectypes.CommitData,
 	fullyExecutedUnfinalized []exectypes.CommitData,
+	latestEmptyRootTimestamp time.Time,
 	err error,
 ) {
 	// Assuming each report can have minimum one message, max reports shouldn't exceed the max messages
 	commitReports, err := ccipReader.CommitReportsGTETimestamp(ctx, ts, lenientMaxMsgsPerObs)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, time.UnixMilli(0), err
 	}
-	lggr.Debugw("commit reports", "commitReports", commitReports, "count", len(commitReports))
+	lggr.Debugw("commit reports", "commitReports", commitReports,
+		"count", len(commitReports.Unfinalized))
 
-	groupedCommits = groupByChainSelectorWithFilter(lggr, commitReports, cursedSourceChains)
+	groupedCommits = groupByChainSelectorWithFilter(lggr, commitReports.Unfinalized, cursedSourceChains)
 	lggr.Debugw("grouped commits before removing fully executed reports",
 		"groupedCommits", groupedCommits, "count", len(groupedCommits))
 
 	rangesBySelector, executableReports, err := getExecutableReportRanges(lggr, groupedCommits, canExecute)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, time.UnixMilli(0), err
 	}
 
 	// Get all executed messages
 	unconfirmedMessages, err := ccipReader.ExecutedMessages(ctx, rangesBySelector, primitives.Unconfirmed)
 	if err != nil {
-		return nil, nil, nil,
+		return nil, nil, nil, time.UnixMilli(0),
 			fmt.Errorf("get executed messages in range %v: %w", rangesBySelector, err)
 	}
 	// Get finalized messages
 	finalizedMessages, err := ccipReader.ExecutedMessages(ctx, rangesBySelector, primitives.Finalized)
 	if err != nil {
-		return nil, nil, nil,
+		return nil, nil, nil, time.UnixMilli(0),
 			fmt.Errorf("get finalized executed messages in range %v: %w", rangesBySelector, err)
 	}
 
@@ -311,7 +312,26 @@ func getPendingReportsForExecution(
 		"countFinalized", len(fullyExecutedFinalized),
 		"countUnfinalized", len(fullyExecutedUnfinalized))
 
-	return remainingReportsBySelector, fullyExecutedFinalized, fullyExecutedUnfinalized, nil
+	return remainingReportsBySelector,
+		fullyExecutedFinalized,
+		fullyExecutedUnfinalized,
+		getLatestEmptyRootTimestamp(commitReports.Finalized),
+		nil
+}
+
+func getLatestEmptyRootTimestamp(
+	commitReports []cciptypes.CommitPluginReportWithMeta,
+) time.Time {
+	latestEmptyRootTimestamp := time.UnixMilli(0)
+	for _, commitReport := range commitReports {
+		if commitReport.Report.HasNoRoots() {
+			if commitReport.Timestamp.After(latestEmptyRootTimestamp) {
+				latestEmptyRootTimestamp = commitReport.Timestamp
+			}
+		}
+	}
+
+	return latestEmptyRootTimestamp
 }
 
 func (p *Plugin) ValidateObservation(
@@ -541,7 +561,7 @@ func (p *Plugin) Reports(
 	}
 
 	reportInfo := extractReportInfo(decodedOutcome)
-	lggr.Debugw("report info in Reports()", "reportInfo", reportInfo)
+	lggr.Debugw("report info in UnfinalizedReports()", "reportInfo", reportInfo)
 	encodedInfo, err := reportInfo.Encode()
 	if err != nil {
 		return nil, err

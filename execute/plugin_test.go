@@ -780,7 +780,9 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 			mockReader := readerpkg_mock.NewMockCCIPReader(t)
 			mockReader.On(
 				"CommitReportsGTETimestamp", mock.Anything, mock.Anything, mock.Anything,
-			).Return(tt.reports, nil)
+			).Return(cciptypes.CommitReportsByConfidenceLevel{
+				Unfinalized: tt.reports,
+			}, nil)
 
 			// Set up finalized messages mock
 			executed := make(map[cciptypes.ChainSelector][]cciptypes.SeqNum)
@@ -802,7 +804,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 			}
 			mockReader.On("ExecutedMessages", mock.Anything, mock.Anything, primitives.Unconfirmed).Return(unfinalized, nil)
 
-			got, gotFinalized, gotUnfinalized, err := getPendingReportsForExecution(
+			got, gotFinalized, gotUnfinalized, _, err := getPendingReportsForExecution(
 				tests.Context(t),
 				mockReader,
 				tt.canExec,

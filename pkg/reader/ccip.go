@@ -173,40 +173,33 @@ type RMNCurseResponse struct {
 
 // ---------------------------------------------------
 
-func (r *ccipChainReader) CommitReportsGTETimestamp(
-	ctx context.Context, ts time.Time, limit int,
-) ([]cciptypes.CommitPluginReportWithMeta, error) {
-	lggr := logutil.WithContextValues(ctx, r.lggr)
+func (r *ccipChainReader) CommitReportsGTETimestamp(ctx context.Context, ts time.Time, limit int) (cciptypes.CommitReportsByConfidenceLevel, error) {
 
 	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
-		return nil, err
+		return cciptypes.CommitReportsByConfidenceLevel{}, err
 	}
 
-	ev := CommitReportAcceptedEvent{}
-	iter, err := r.queryCommitReports(ctx, ts, limit, &ev)
+	unfinalizedReports, err := r.queryCommitReports(ctx, ts, primitives.Unconfirmed, limit)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query offRamp: %w", err)
+		return cciptypes.CommitReportsByConfidenceLevel{}, err
+	}
+	finalizedReports, err := r.queryCommitReports(ctx, ts, primitives.Finalized, limit)
+	if err != nil {
+		return cciptypes.CommitReportsByConfidenceLevel{}, err
 	}
 
-	lggr.Debugw("queried commit reports", "numReports", len(iter),
-		"destChain", r.destChain,
-		"ts", ts,
-		"limit", limit*2)
-
-	reports := r.processCommitReports(lggr, iter, ts, limit)
-
-	lggr.Debugw("decoded commit reports", "reports", reports)
-
-	if len(reports) < limit {
-		return reports, nil
-	}
-	return reports[:limit], nil
+	return cciptypes.CommitReportsByConfidenceLevel{
+		Unfinalized: unfinalizedReports,
+		Finalized:   finalizedReports,
+	}, nil
 }
 
 func (r *ccipChainReader) queryCommitReports(
-	ctx context.Context, ts time.Time, limit int, ev *CommitReportAcceptedEvent,
-) ([]types.Sequence, error) {
-	return r.contractReaders[r.destChain].ExtendedQueryKey(
+	ctx context.Context, ts time.Time, confidence primitives.ConfidenceLevel, limit int,
+) ([]cciptypes.CommitPluginReportWithMeta, error) {
+	lggr := logutil.WithContextValues(ctx, r.lggr)
+	internalLimit := limit * 2
+	iter, err := r.contractReaders[r.destChain].ExtendedQueryKey(
 		ctx,
 		consts.ContractNameOffRamp,
 		query.KeyFilter{
@@ -215,17 +208,31 @@ func (r *ccipChainReader) queryCommitReports(
 				query.Timestamp(uint64(ts.Unix()), primitives.Gte),
 				// We don't need to wait for the commit report accepted event to be finalized
 				// before we can start optimistically processing it.
-				query.Confidence(primitives.Unconfirmed),
+				query.Confidence(confidence),
 			},
 		},
 		query.LimitAndSort{
 			SortBy: []query.SortBy{query.NewSortBySequence(query.Asc)},
 			Limit: query.Limit{
-				Count: uint64(limit * 2),
+				Count: uint64(internalLimit),
 			},
 		},
-		ev,
+		&CommitReportAcceptedEvent{},
 	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query offRamp: %w", err)
+	}
+
+	lggr.Debugw("queried commit reports", "numReports", len(iter),
+		"confidence", confidence,
+		"destChain", r.destChain,
+		"ts", ts,
+		"limit", internalLimit)
+
+	reports := r.processCommitReports(lggr, iter, ts, limit)
+
+	lggr.Debugw("decoded commit reports", "reports", reports)
+	return reports, nil
 }
 
 // processCommitReports decodes the commit reports from the query results

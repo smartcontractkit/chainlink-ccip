@@ -40,6 +40,10 @@ func (r CommitPluginReport) IsEmpty() bool {
 		len(r.PriceUpdates.GasPriceUpdates) == 0
 }
 
+func (r CommitPluginReport) HasNoRoots() bool {
+	return len(r.BlessedMerkleRoots) == 0 && len(r.UnblessedMerkleRoots) == 0
+}
+
 // MerkleRootChain Mirroring https://github.com/smartcontractkit/chainlink/blob/cd5c78959575f593b27fd83d8766086d0c678487/contracts/src/v0.8/ccip/libraries/Internal.sol#L356-L362
 //
 //nolint:lll // it's a url
