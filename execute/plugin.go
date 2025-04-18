@@ -280,9 +280,10 @@ func getPendingReportsForExecution(
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	lggr.Debugw("commit reports", "commitReports", commitReports, "count", len(commitReports))
+	lggr.Debugw("commit reports", "commitReports", commitReports,
+		"count", len(commitReports.Unfinalized))
 
-	groupedCommits = groupByChainSelectorWithFilter(lggr, commitReports, cursedSourceChains)
+	groupedCommits = groupByChainSelectorWithFilter(lggr, commitReports.Unfinalized, cursedSourceChains)
 	lggr.Debugw("grouped commits before removing fully executed reports",
 		"groupedCommits", groupedCommits, "count", len(groupedCommits))
 

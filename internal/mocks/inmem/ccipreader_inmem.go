@@ -47,16 +47,20 @@ func (r InMemoryCCIPReader) GetExpectedNextSequenceNumber(
 	panic("unimplemented")
 }
 
-func (r InMemoryCCIPReader) CommitReportsGTETimestamp(
-	_ context.Context, ts time.Time, limit int,
-) ([]cciptypes.CommitPluginReportWithMeta, error) {
+func (r InMemoryCCIPReader) CommitReportsGTETimestamp(ctx context.Context, ts time.Time, limit int) (
+	cciptypes.CommitReportsByConfidenceLevel, error) {
 	results := slicelib.Filter(r.Reports, func(report cciptypes.CommitPluginReportWithMeta) bool {
 		return report.Timestamp.After(ts) || report.Timestamp.Equal(ts)
 	})
+
 	if len(results) > limit {
-		return results[:limit], nil
+		return cciptypes.CommitReportsByConfidenceLevel{
+			Unfinalized: results[:limit],
+		}, nil
 	}
-	return results, nil
+	return cciptypes.CommitReportsByConfidenceLevel{
+		Unfinalized: results,
+	}, nil
 }
 
 func (r InMemoryCCIPReader) ExecutedMessages(

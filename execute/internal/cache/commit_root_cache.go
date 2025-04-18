@@ -126,6 +126,8 @@ type commitRootsCache struct {
 	// earliestUnexecutedRoot tracks the timestamp of the earliest unexecuted root
 	// to optimize database queries by potentially starting from a later timestamp
 	earliestUnexecutedRoot time.Time
+
+	latestEmptyRoot time.Time
 }
 
 func getKey(source ccipocr3.ChainSelector, merkleRoot ccipocr3.Bytes32) string {
