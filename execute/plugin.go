@@ -257,7 +257,7 @@ func removeUnconfirmedAndFinalizedMessages(
 // 1. Gets all executed messages (both finalized and unfinalized) via primitives.Unconfirmed
 // 2. Gets only finalized executed messages via primitives.Finalized
 //
-// UnfinalizedReports are then classified as:
+// Reports are then classified as:
 // - fullyExecutedFinalized: All messages executed with finality (mark as executed)
 // - fullyExecutedUnfinalized: All messages executed but not finalized (snooze)
 // - groupedCommits: UnfinalizedReports with unexecuted messages (available for execution)

@@ -42,7 +42,7 @@ func TestPlugin(t *testing.T) {
 	outcome := runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
 	require.Equal(t, exectypes.Initialized, outcome.State)
 
-	// Round 1 - Get Commit UnfinalizedReports
+	// Round 1 - Get Commit Reports
 	// One pending commit report only.
 	// Two of the messages are executed which should be indicated in the Outcome.
 	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
