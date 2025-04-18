@@ -319,7 +319,7 @@ func groupByChainSelectorWithFilter(
 }
 
 // combineReportsAndMessages returns a new reports slice with fully executed messages removed.
-// UnfinalizedReports that have all of their messages executed are not included in the result.
+// Reports that have all of their messages executed are not included in the result.
 // The provided reports must be sorted by sequence number range starting sequence number.
 func combineReportsAndMessages(
 	reports []exectypes.CommitData, executedMessages []cciptypes.SeqNum,

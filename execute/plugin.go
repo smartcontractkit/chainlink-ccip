@@ -260,7 +260,7 @@ func removeUnconfirmedAndFinalizedMessages(
 // Reports are then classified as:
 // - fullyExecutedFinalized: All messages executed with finality (mark as executed)
 // - fullyExecutedUnfinalized: All messages executed but not finalized (snooze)
-// - groupedCommits: UnfinalizedReports with unexecuted messages (available for execution)
+// - groupedCommits: Reports with unexecuted messages (available for execution)
 func getPendingReportsForExecution(
 	ctx context.Context,
 	ccipReader readerpkg.CCIPReader,

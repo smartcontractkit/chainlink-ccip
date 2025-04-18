@@ -976,7 +976,7 @@ func TestPlugin_ValidateObservation_ValidateObservedSeqNum_Error(t *testing.T) {
 		ocrTypeCodec: ocrTypeCodec,
 	}
 
-	// UnfinalizedReports with duplicate roots.
+	// Reports with duplicate roots.
 	root := cciptypes.Bytes32{}
 	commitReports := map[cciptypes.ChainSelector][]exectypes.CommitData{
 		1: {
@@ -1015,7 +1015,7 @@ func TestPlugin_ValidateObservation_CallsDiscoveryValidateObservation(t *testing
 		ocrTypeCodec: ocrTypeCodec,
 	}
 
-	// UnfinalizedReports with duplicate roots.
+	// Reports with duplicate roots.
 	root := cciptypes.Bytes32{}
 	commitReports := map[cciptypes.ChainSelector][]exectypes.CommitData{
 		1: {
