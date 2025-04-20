@@ -936,33 +936,119 @@ func (r *ccipChainReader) GetChainFeePriceUpdate(ctx context.Context, selectors 
 	lggr := logutil.WithContextValues(ctx, r.lggr)
 	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
 		lggr.Errorw("GetChainFeePriceUpdate dest chain extended reader not exist", "err", err)
+		// Return nil as per original logic if reader doesn't exist
 		return nil
 	}
 
+	// Initialize the result map once at the beginning
 	feeUpdates := make(map[cciptypes.ChainSelector]cciptypes.TimestampedBig, len(selectors))
+
+	if len(selectors) == 0 {
+		return feeUpdates // Return the initialized empty map
+	}
+
+	// 1. Build Batch Request
+	contractBatch := make([]types.BatchRead, 0, len(selectors))
 	for _, chain := range selectors {
-		update := cciptypes.TimestampedUnixBig{}
-		// Read from dest chain
-		err := r.contractReaders[r.destChain].ExtendedGetLatestValue(
-			ctx,
-			consts.ContractNameFeeQuoter,
-			consts.MethodNameGetFeePriceUpdate,
-			primitives.Unconfirmed,
-			map[string]any{
+		contractBatch = append(contractBatch, types.BatchRead{
+			ReadName: consts.MethodNameGetFeePriceUpdate,
+			Params: map[string]any{
 				// That actually means that this selector is a source chain for the destChain
 				"destChainSelector": chain,
 			},
-			&update,
-		)
+			// Pass a new pointer directly for type inference by the reader
+			ReturnVal: new(cciptypes.TimestampedUnixBig),
+		})
+	}
+
+	// 2. Execute Batch Request
+	batchResult, _, err := r.contractReaders[r.destChain].ExtendedBatchGetLatestValues(
+		ctx,
+		contractreader.ExtendedBatchGetLatestValuesRequest{
+			consts.ContractNameFeeQuoter: contractBatch,
+		},
+		false, // Don't allow stale reads for fee updates
+	)
+
+	if err != nil {
+		lggr.Errorw("failed to batch get chain fee price updates", "err", err)
+		return feeUpdates // Return the initialized empty map
+	}
+
+	// 3. Find FeeQuoter Results
+	var feeQuoterResults []types.BatchReadResult
+	found := false
+	for contract, results := range batchResult {
+		if contract.Name == consts.ContractNameFeeQuoter {
+			feeQuoterResults = results
+			found = true
+			break // Found the results, exit loop
+		}
+	}
+
+	if !found {
+		lggr.Errorw("FeeQuoter results missing from batch response")
+		return feeUpdates // Return the initialized empty map
+	}
+
+	if len(feeQuoterResults) != len(selectors) {
+		lggr.Errorw("Mismatch between requested selectors and results count",
+			"selectors", len(selectors),
+			"results", len(feeQuoterResults))
+		// Continue processing the results we did get, but this might indicate an issue
+	}
+
+	// 4. Process Results using helper
+	return r.processFeePriceUpdateResults(lggr, selectors, feeQuoterResults, feeUpdates)
+}
+
+// processFeePriceUpdateResults iterates through batch results, validates them,
+// and populates the feeUpdates map.
+func (r *ccipChainReader) processFeePriceUpdateResults(
+	lggr logger.Logger,
+	selectors []cciptypes.ChainSelector,
+	results []types.BatchReadResult,
+	feeUpdates map[cciptypes.ChainSelector]cciptypes.TimestampedBig,
+) map[cciptypes.ChainSelector]cciptypes.TimestampedBig {
+	for i, chain := range selectors {
+		if i >= len(results) {
+			// Log error if we have fewer results than requested selectors
+			lggr.Errorw("Skipping selector due to missing result",
+				"selectorIndex", i,
+				"chain", chain,
+				"lenFeeQuoterResults", len(results))
+			continue
+		}
+
+		readResult := results[i]
+		val, err := readResult.GetResult()
 		if err != nil {
-			lggr.Warnw("failed to get chain fee price update", "chain", chain, "err", err)
+			lggr.Warnw("failed to get chain fee price update from batch result",
+				"chain", chain,
+				"err", err)
 			continue
 		}
+
+		// Type assert the result
+		update, ok := val.(*cciptypes.TimestampedUnixBig)
+		if !ok || update == nil {
+			lggr.Errorw("Invalid type or nil value received for chain fee price update",
+				"chain", chain,
+				"type", fmt.Sprintf("%T", val),
+				"ok", ok)
+			continue
+		}
+
+		// Check if the update is empty (timestamp or value is zero/nil)
 		if update.Timestamp == 0 || update.Value == nil || update.Value.Cmp(big.NewInt(0)) == 0 {
-			lggr.Debugw("chain fee price update is empty", "chain", chain)
+			lggr.Debugw("chain fee price update is empty",
+				"chain", chain,
+				"update", update)
 			continue
 		}
-		feeUpdates[chain] = cciptypes.TimeStampedBigFromUnix(update)
+
+		// Add valid update to the map
+		feeUpdates[chain] = cciptypes.TimeStampedBigFromUnix(*update)
 	}
 
 	return feeUpdates
