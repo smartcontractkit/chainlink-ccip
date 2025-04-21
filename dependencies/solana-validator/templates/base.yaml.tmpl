@@ -6,7 +6,7 @@ deployments:
       releaseName: "solana-{{ .NetworkId }}"
       chart:
         name: "${CHAINLINK_HELM_REGISTRY_URI}/crib-solana-validator"
-        version: "0.3.0"
+        version: "0.4.2"
       valuesFiles:
         {{- if eq $.Provider "kind" }}
         - ${LOCAL_VALUES_DIR}/node/env.kind.yaml
