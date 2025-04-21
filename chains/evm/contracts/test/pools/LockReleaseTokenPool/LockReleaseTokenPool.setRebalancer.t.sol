@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {LockReleaseTokenPoolSetup} from "./LockReleaseTokenPoolSetup.t.sol";
-import {Ownable2Step} from "@shared/access/Ownable2Step.sol";
+import {Ownable2Step} from "@chainlink/shared/access/Ownable2Step.sol";
 
 contract LockReleaseTokenPool_setRebalancer is LockReleaseTokenPoolSetup {
   function test_SetRebalancer() public {

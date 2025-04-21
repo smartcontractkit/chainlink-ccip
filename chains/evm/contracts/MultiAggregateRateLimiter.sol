@@ -3,13 +3,13 @@ pragma solidity ^0.8.24;
 
 import {IFeeQuoter} from "./interfaces/IFeeQuoter.sol";
 import {IMessageInterceptor} from "./interfaces/IMessageInterceptor.sol";
-import {ITypeAndVersion} from "@shared/interfaces/ITypeAndVersion.sol";
+import {ITypeAndVersion} from "@chainlink/shared/interfaces/ITypeAndVersion.sol";
 
 import {Client} from "./libraries/Client.sol";
 import {RateLimiter} from "./libraries/RateLimiter.sol";
 import {USDPriceWith18Decimals} from "./libraries/USDPriceWith18Decimals.sol";
-import {AuthorizedCallers} from "@shared/access/AuthorizedCallers.sol";
-import {EnumerableMapAddresses} from "@shared/enumerable/EnumerableMapAddresses.sol";
+import {AuthorizedCallers} from "@chainlink/shared/access/AuthorizedCallers.sol";
+import {EnumerableMapAddresses} from "@chainlink/shared/enumerable/EnumerableMapAddresses.sol";
 
 /// @notice The aggregate rate limiter is a wrapper of the token bucket rate limiter which permits rate limiting based
 /// on the aggregate value of a group of token transfers , using a fee quoter to convert to a numeraire asset e.g. USD.
