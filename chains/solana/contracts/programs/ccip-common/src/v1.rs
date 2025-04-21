@@ -102,7 +102,10 @@ pub fn validate_and_parse_token_accounts<'info>(
     // the context cannot be used to validate it, as it could try to apply those validations to the wrong account
     let ccip_offramp_pool_signer_bump = if let Some(offramp) = offramp {
         let (expected_offramp_pool_signer, bump) = Pubkey::find_program_address(
-            &[seed::EXTERNAL_TOKEN_POOL, pool_program.key().as_ref()],
+            &[
+                seed::EXTERNAL_TOKEN_POOLS_SIGNER,
+                pool_program.key().as_ref(),
+            ],
             &offramp,
         );
         let acc_info = ccip_offramp_pool_signer.unwrap();
@@ -124,7 +127,7 @@ pub fn validate_and_parse_token_accounts<'info>(
         // Check Lookup Table Address configured in TokenAdminRegistry
         let token_admin_registry_account: Account<TokenAdminRegistry> =
             Account::try_from(token_admin_registry)?;
-        require_eq!(
+        require_keys_eq!(
             token_admin_registry_account.lookup_table,
             lookup_table.key(),
             CommonCcipError::InvalidInputsLookupTableAccounts

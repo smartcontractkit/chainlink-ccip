@@ -5,7 +5,7 @@ import {MultiAggregateRateLimiter} from "../../../MultiAggregateRateLimiter.sol"
 import {Client} from "../../../libraries/Client.sol";
 import {Internal} from "../../../libraries/Internal.sol";
 import {RateLimiter} from "../../../libraries/RateLimiter.sol";
-import {AuthorizedCallers} from "@shared/access/AuthorizedCallers.sol";
+import {AuthorizedCallers} from "@chainlink/shared/access/AuthorizedCallers.sol";
 
 import {MultiAggregateRateLimiterSetup} from "./MultiAggregateRateLimiterSetup.t.sol";
 import {Vm} from "forge-std/Vm.sol";

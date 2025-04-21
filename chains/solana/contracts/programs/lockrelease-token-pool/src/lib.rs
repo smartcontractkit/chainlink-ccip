@@ -43,7 +43,10 @@ pub mod lockrelease_token_pool {
     // set_router changes the expected signers for mint/release + burn/lock method calls
     // this is used to update the router address
     pub fn set_router(ctx: Context<SetConfig>, new_router: Pubkey) -> Result<()> {
-        ctx.accounts.state.config.set_router(new_router)
+        ctx.accounts
+            .state
+            .config
+            .set_router(new_router, ctx.program_id)
     }
 
     // permissionless method to set a pool's `state.version` value, only when

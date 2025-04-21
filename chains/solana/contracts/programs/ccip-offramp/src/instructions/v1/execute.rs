@@ -143,6 +143,7 @@ fn internal_execute<'info>(
 
     let has_messaging = should_execute_messaging(ctx.remaining_accounts, token_indexes);
 
+    let mut msg_accs_opt: Option<MessagingAccounts> = None;
     let hashed_leaf: [u8; 32] = if has_messaging {
         let msg_accs = parse_messaging_accounts(
             token_indexes,
@@ -154,6 +155,8 @@ fn internal_execute<'info>(
         let recv_and_msg_account_keys = Some(*msg_accs.logic_receiver.key)
             .into_iter()
             .chain(msg_accs.remaining_accounts.iter().map(|a| *a.key));
+
+        msg_accs_opt = Some(msg_accs);
 
         verify_merkle_root(
             &execution_report,
@@ -246,7 +249,7 @@ fn internal_execute<'info>(
         acc_infos.extend_from_slice(accs.remaining_accounts);
 
         let seeds = &[
-            seed::EXTERNAL_TOKEN_POOL,
+            seed::EXTERNAL_TOKEN_POOLS_SIGNER,
             accs.pool_program.key.as_ref(),
             &[accs.ccip_offramp_pool_signer_bump],
         ];
@@ -290,11 +293,7 @@ fn internal_execute<'info>(
     // case: no tokens, but there are remaining_accounts passed in
     // case: tokens and messages, so the first token has a non-zero index (indicating extra accounts before token accounts)
     if has_messaging {
-        let msg_accs = parse_messaging_accounts(
-            token_indexes,
-            &execution_report.message.extra_args.is_writable_bitmap,
-            ctx.remaining_accounts,
-        )?;
+        let msg_accs = msg_accs_opt.unwrap(); // as there is messaging, the option is guaranteed to be Some
 
         // The accounts of the user that will be used in the CPI instruction, none of them are signers
         // They need to specify if mutable or not, but none of them is allowed to init, realloc or close
@@ -478,7 +477,7 @@ pub fn validate_execution_report<'info>(
     message_header: &RampMessageHeader,
     svm_chain_selector: u64,
 ) -> Result<()> {
-    require!(message_header.nonce == 0, CcipOfframpError::InvalidNonce);
+    require_eq!(message_header.nonce, 0, CcipOfframpError::InvalidNonce);
 
     require!(
         source_chain_state.config.is_enabled,

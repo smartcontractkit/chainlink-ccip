@@ -1920,6 +1920,263 @@ func TestCCIPChainReader_prepareBatchConfigRequests(t *testing.T) {
 	})
 }
 
+func TestCCIPChainReader_GetChainFeePriceUpdate(t *testing.T) {
+	ctx := tests.Context(t)
+	destChain := cciptypes.ChainSelector(1)
+	sourceChain1 := cciptypes.ChainSelector(2)
+	sourceChain2 := cciptypes.ChainSelector(3)
+	sourceChain3 := cciptypes.ChainSelector(4) // Chain with error/empty result
+
+	lggr := logger.Test(t)
+
+	// Helper to create BatchReadResult
+	createBatchReadResult := func(value *big.Int, ts uint32, err error) types.BatchReadResult {
+		var resultVal *cciptypes.TimestampedUnixBig
+		if value != nil {
+			resultVal = &cciptypes.TimestampedUnixBig{
+				Value:     value,
+				Timestamp: ts,
+			}
+		}
+		brr := types.BatchReadResult{ReadName: consts.MethodNameGetFeePriceUpdate}
+		brr.SetResult(resultVal, err)
+		return brr
+	}
+
+	t.Run("happy path", func(t *testing.T) {
+		mockReader := reader_mocks.NewMockExtended(t)
+		selectors := []cciptypes.ChainSelector{sourceChain1, sourceChain2}
+
+		// Expected batch request structure
+		expectedBatchRequest := contractreader.ExtendedBatchGetLatestValuesRequest{
+			consts.ContractNameFeeQuoter: []types.BatchRead{
+				{
+					ReadName:  consts.MethodNameGetFeePriceUpdate,
+					Params:    map[string]any{"destChainSelector": sourceChain1},
+					ReturnVal: new(cciptypes.TimestampedUnixBig),
+				},
+				{
+					ReadName:  consts.MethodNameGetFeePriceUpdate,
+					Params:    map[string]any{"destChainSelector": sourceChain2},
+					ReturnVal: new(cciptypes.TimestampedUnixBig),
+				},
+			},
+		}
+
+		// Mock response
+		mockResults := types.BatchGetLatestValuesResult{
+			types.BoundContract{Name: consts.ContractNameFeeQuoter}: []types.BatchReadResult{
+				createBatchReadResult(big.NewInt(100), uint32(time.Now().Unix()), nil), // sourceChain1
+				createBatchReadResult(big.NewInt(200), uint32(time.Now().Unix()), nil), // sourceChain2
+			},
+		}
+
+		mockReader.EXPECT().ExtendedBatchGetLatestValues(
+			ctx,
+			expectedBatchRequest,
+			false,
+		).
+			Return(
+				mockResults,
+				nil,
+				nil,
+			).Once()
+
+		ccipReader := &ccipChainReader{
+			lggr:      lggr,
+			destChain: destChain,
+			contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
+				destChain: mockReader,
+			},
+		}
+
+		feeUpdates := ccipReader.GetChainFeePriceUpdate(ctx, selectors)
+
+		require.Len(t, feeUpdates, 2)
+		assert.NotNil(t, feeUpdates[sourceChain1].Value)
+		assert.Equal(t, 0, feeUpdates[sourceChain1].Value.Cmp(big.NewInt(100)))
+		assert.NotZero(t, feeUpdates[sourceChain1].Timestamp)
+		assert.NotNil(t, feeUpdates[sourceChain2].Value)
+		assert.Equal(t, 0, feeUpdates[sourceChain2].Value.Cmp(big.NewInt(200)))
+		assert.NotZero(t, feeUpdates[sourceChain2].Timestamp)
+
+		mockReader.AssertExpectations(t)
+	})
+
+	t.Run("empty selectors", func(t *testing.T) {
+		mockReader := reader_mocks.NewMockExtended(t)
+		ccipReader := &ccipChainReader{
+			lggr:      lggr,
+			destChain: destChain,
+			contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
+				destChain: mockReader,
+			},
+		}
+
+		feeUpdates := ccipReader.GetChainFeePriceUpdate(ctx, []cciptypes.ChainSelector{})
+		require.Empty(t, feeUpdates)
+		// No calls expected to the reader
+		mockReader.AssertExpectations(t)
+	})
+
+	t.Run("batch call error", func(t *testing.T) {
+		mockReader := reader_mocks.NewMockExtended(t)
+		selectors := []cciptypes.ChainSelector{sourceChain1}
+		expectedErr := errors.New("batch failed")
+
+		mockReader.EXPECT().ExtendedBatchGetLatestValues(ctx, mock.Anything, false).Return(nil, nil, expectedErr).Once()
+
+		ccipReader := &ccipChainReader{
+			lggr:      lggr,
+			destChain: destChain,
+			contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
+				destChain: mockReader,
+			},
+		}
+
+		feeUpdates := ccipReader.GetChainFeePriceUpdate(ctx, selectors)
+		require.Empty(t, feeUpdates)
+		mockReader.AssertExpectations(t)
+	})
+
+	t.Run("partial success - one result empty", func(t *testing.T) {
+		mockReader := reader_mocks.NewMockExtended(t)
+		selectors := []cciptypes.ChainSelector{sourceChain1, sourceChain3}
+
+		// Mock response
+		mockResults := types.BatchGetLatestValuesResult{
+			types.BoundContract{Name: consts.ContractNameFeeQuoter}: []types.BatchReadResult{
+				createBatchReadResult(big.NewInt(100), uint32(time.Now().Unix()), nil), // sourceChain1
+				createBatchReadResult(big.NewInt(0), uint32(time.Now().Unix()), nil),   // sourceChain3 (empty value)
+			},
+		}
+
+		mockReader.EXPECT().ExtendedBatchGetLatestValues(ctx, mock.Anything, false).Return(mockResults, nil, nil).Once()
+
+		ccipReader := &ccipChainReader{
+			lggr:      lggr,
+			destChain: destChain,
+			contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
+				destChain: mockReader,
+			},
+		}
+
+		feeUpdates := ccipReader.GetChainFeePriceUpdate(ctx, selectors)
+
+		require.Len(t, feeUpdates, 1)
+		require.Contains(t, feeUpdates, sourceChain1)
+		assert.NotNil(t, feeUpdates[sourceChain1].Value)
+		assert.Equal(t, 0, feeUpdates[sourceChain1].Value.Cmp(big.NewInt(100)))
+		assert.NotContains(t, feeUpdates, sourceChain3)
+
+		mockReader.AssertExpectations(t)
+	})
+
+	t.Run("partial success - one result error", func(t *testing.T) {
+		mockReader := reader_mocks.NewMockExtended(t)
+		selectors := []cciptypes.ChainSelector{sourceChain1, sourceChain3}
+		getResultError := errors.New("get result failed")
+
+		// Mock response
+		mockResults := types.BatchGetLatestValuesResult{
+			types.BoundContract{Name: consts.ContractNameFeeQuoter}: []types.BatchReadResult{
+				createBatchReadResult(big.NewInt(100), uint32(time.Now().Unix()), nil), // sourceChain1
+				createBatchReadResult(nil, 0, getResultError),                          // sourceChain3 (error)
+			},
+		}
+
+		mockReader.EXPECT().ExtendedBatchGetLatestValues(ctx, mock.Anything, false).Return(mockResults, nil, nil).Once()
+
+		ccipReader := &ccipChainReader{
+			lggr:      lggr,
+			destChain: destChain,
+			contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
+				destChain: mockReader,
+			},
+		}
+
+		feeUpdates := ccipReader.GetChainFeePriceUpdate(ctx, selectors)
+
+		require.Len(t, feeUpdates, 1)
+		require.Contains(t, feeUpdates, sourceChain1)
+		assert.NotNil(t, feeUpdates[sourceChain1].Value)
+		assert.Equal(t, 0, feeUpdates[sourceChain1].Value.Cmp(big.NewInt(100)))
+		assert.NotContains(t, feeUpdates, sourceChain3)
+
+		mockReader.AssertExpectations(t)
+	})
+
+	t.Run("result count mismatch", func(t *testing.T) {
+		mockReader := reader_mocks.NewMockExtended(t)
+		// Request two selectors, but mock response only has one result
+		selectors := []cciptypes.ChainSelector{sourceChain1, sourceChain2}
+
+		// Mock response with fewer results than selectors
+		mockResults := types.BatchGetLatestValuesResult{
+			types.BoundContract{Name: consts.ContractNameFeeQuoter}: []types.BatchReadResult{
+				createBatchReadResult(big.NewInt(100), uint32(time.Now().Unix()), nil), // Only result for sourceChain1
+			},
+		}
+
+		mockReader.EXPECT().ExtendedBatchGetLatestValues(ctx, mock.Anything, false).Return(mockResults, nil, nil).Once()
+
+		ccipReader := &ccipChainReader{
+			lggr:      lggr,
+			destChain: destChain,
+			contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
+				destChain: mockReader,
+			},
+		}
+
+		feeUpdates := ccipReader.GetChainFeePriceUpdate(ctx, selectors)
+
+		// Should still process the results it received
+		require.Len(t, feeUpdates, 1)
+		require.Contains(t, feeUpdates, sourceChain1)
+		assert.NotNil(t, feeUpdates[sourceChain1].Value)
+		assert.Equal(t, 0, feeUpdates[sourceChain1].Value.Cmp(big.NewInt(100)))
+		assert.NotContains(t, feeUpdates, sourceChain2)
+
+		mockReader.AssertExpectations(t)
+	})
+
+	t.Run("missing fee quoter result in batch response", func(t *testing.T) {
+		mockReader := reader_mocks.NewMockExtended(t)
+		selectors := []cciptypes.ChainSelector{sourceChain1}
+
+		// Mock response without the FeeQuoter contract key
+		mockResults := types.BatchGetLatestValuesResult{
+			// Empty map, or map with a different contract
+		}
+
+		mockReader.EXPECT().ExtendedBatchGetLatestValues(ctx, mock.Anything, false).Return(mockResults, nil, nil).Once()
+
+		ccipReader := &ccipChainReader{
+			lggr:      lggr,
+			destChain: destChain,
+			contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
+				destChain: mockReader,
+			},
+		}
+
+		feeUpdates := ccipReader.GetChainFeePriceUpdate(ctx, selectors)
+		require.Empty(t, feeUpdates)
+		mockReader.AssertExpectations(t)
+	})
+
+	t.Run("reader does not exist for dest chain", func(t *testing.T) {
+		ccipReader := &ccipChainReader{
+			lggr:            lggr,
+			destChain:       destChain,
+			contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{ /* destChain missing */ },
+		}
+
+		feeUpdates := ccipReader.GetChainFeePriceUpdate(ctx, []cciptypes.ChainSelector{sourceChain1})
+		// Original logic returned nil in this case
+		assert.Nil(t, feeUpdates)
+	})
+}
+
 type mockConfigCache struct {
 	mock.Mock
 }

@@ -35,8 +35,8 @@ func (p *processor) Observation(
 	now := time.Now().UTC()
 	lggr.Infow(
 		"observed token prices",
-		"feed prices", feedTokenPrices,
-		"fee quoter updates", feeQuoterUpdates,
+		"feedPrices", feedTokenPrices,
+		"feeQuoterUpdates", feeQuoterUpdates,
 		"timestampNow", now,
 	)
 
