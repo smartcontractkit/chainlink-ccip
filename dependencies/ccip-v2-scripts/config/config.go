@@ -439,7 +439,7 @@ func (c ChainConfigurer) InternalHTTPRPC() *string {
 }
 
 func (c ChainConfigurer) GetChainName() string {
-	return fmt.Sprintf("%s-simulated-%d", strings.ToLower(c.chainType.String()), c.chainID)
+	return fmt.Sprintf("%s-simulated-%s", strings.ToLower(c.chainType.String()), c.chainID)
 }
 
 func BuildEVMNetworkConfigs(chainsCount int) []EVMChain {

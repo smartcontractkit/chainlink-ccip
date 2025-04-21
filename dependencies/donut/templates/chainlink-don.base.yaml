@@ -38,6 +38,8 @@ in: |
                   99-config-override.toml: |
                     {{- printf "\n" }}
                     {{- file.Read (printf "%s/%s/config-override-bt-%d.toml" (getenv "CONFIG_OVERRIDES_DIR") (getenv "DON_TYPE") $i) | strings.Indent 18 }}
+                configEnv:
+                  CL_SOLANA_CMD: ""
                 v2Secret:
                   99-secrets-override.toml: |
                     {{- printf "\n" }}
@@ -59,6 +61,8 @@ in: |
                   99-config-override.toml: |
                     {{- printf "\n" }}
                     {{- file.Read (printf "%s/%s/config-override-%d.toml" (getenv "CONFIG_OVERRIDES_DIR") (getenv "DON_TYPE") $i) | strings.Indent 18 }}
+                configEnv:
+                  CL_SOLANA_CMD: ""
                 v2Secret:
                   99-secrets-override.toml: |
                     {{- printf "\n" }}
