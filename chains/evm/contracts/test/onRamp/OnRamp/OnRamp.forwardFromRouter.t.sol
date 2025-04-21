@@ -15,9 +15,9 @@ import {TokenPool} from "../../../pools/TokenPool.sol";
 import {MaybeRevertingBurnMintTokenPool} from "../../helpers/MaybeRevertingBurnMintTokenPool.sol";
 import {MessageInterceptorHelper} from "../../helpers/MessageInterceptorHelper.sol";
 import {OnRampSetup} from "./OnRampSetup.t.sol";
-import {BurnMintERC20} from "@shared/token/ERC20/BurnMintERC20.sol";
+import {BurnMintERC20} from "@chainlink/shared/token/ERC20/BurnMintERC20.sol";
 
-import {IERC20} from "@vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "@chainlink/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
 contract OnRamp_forwardFromRouter is OnRampSetup {
   struct LegacyExtraArgs {
@@ -296,7 +296,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
   function testFuzz_ForwardFromRouter_Success(address originalSender, address receiver, uint96 feeTokenAmount) public {
     // To avoid RouterMustSetOriginalSender
     vm.assume(originalSender != address(0));
-    vm.assume(uint160(receiver) >= Internal.PRECOMPILE_SPACE);
+    vm.assume(uint160(receiver) >= Internal.EVM_PRECOMPILE_SPACE);
     feeTokenAmount = uint96(bound(feeTokenAmount, 0, MAX_MSG_FEES_JUELS));
     vm.stopPrank();
 

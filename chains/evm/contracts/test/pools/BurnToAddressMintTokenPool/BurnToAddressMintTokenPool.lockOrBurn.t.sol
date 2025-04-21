@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {Pool} from "../../../libraries/Pool.sol";
 import {BurnToAddressMintTokenPoolSetup} from "./BurnToAddressMintTokenPoolSetup.t.sol";
 
-import {IERC20} from "@vendor/openzeppelin-solidity/v4.8.3/contracts/interfaces/IERC20.sol";
+import {IERC20} from "@chainlink/vendor/openzeppelin-solidity/v4.8.3/contracts/interfaces/IERC20.sol";
 
 contract BurnToAddressMintTokenPool_lockOrBurn is BurnToAddressMintTokenPoolSetup {
   uint256 public constant AMOUNT = 1e24;

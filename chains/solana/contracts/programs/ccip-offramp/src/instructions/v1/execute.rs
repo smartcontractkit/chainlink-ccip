@@ -477,7 +477,7 @@ pub fn validate_execution_report<'info>(
     message_header: &RampMessageHeader,
     svm_chain_selector: u64,
 ) -> Result<()> {
-    require!(message_header.nonce == 0, CcipOfframpError::InvalidNonce);
+    require_eq!(message_header.nonce, 0, CcipOfframpError::InvalidNonce);
 
     require!(
         source_chain_state.config.is_enabled,

@@ -1,8 +1,10 @@
-use crate::events::on_ramp as events;
-use crate::messages::GetFeeResult;
 use anchor_lang::prelude::*;
 use anchor_spl::token::spl_token;
 use anchor_spl::token_interface;
+
+use crate::events::on_ramp as events;
+use crate::messages::GetFeeResult;
+
 use ccip_common::seed;
 use ccip_common::v1::{validate_and_parse_token_accounts, TokenAccounts};
 use fee_quoter::messages::TokenTransferAdditionalData;
@@ -180,7 +182,14 @@ impl OnRamp for Impl {
             .zip(message.token_amounts.iter())
             .enumerate()
         {
+            require_keys_eq!(
+                token_amount.token,
+                current_token_accounts.mint.key(),
+                CcipRouterError::InvalidInputsTokenAccounts,
+            );
+
             let transfer_seeds = &[seed::FEE_BILLING_SIGNER, &[ctx.bumps.fee_billing_signer]];
+
             // CPI: transfer token amount from user to token pool
             transfer_token(
                 token_amount.amount,
