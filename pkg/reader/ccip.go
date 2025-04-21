@@ -936,15 +936,11 @@ func (r *ccipChainReader) GetChainFeePriceUpdate(ctx context.Context, selectors 
 	lggr := logutil.WithContextValues(ctx, r.lggr)
 	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
 		lggr.Errorw("GetChainFeePriceUpdate dest chain extended reader not exist", "err", err)
-		// Return nil as per original logic if reader doesn't exist
 		return nil
 	}
 
-	// Initialize the result map once at the beginning
-	feeUpdates := make(map[cciptypes.ChainSelector]cciptypes.TimestampedBig, len(selectors))
-
 	if len(selectors) == 0 {
-		return feeUpdates // Return the initialized empty map
+		return make(map[cciptypes.ChainSelector]cciptypes.TimestampedBig) // Return a new empty map
 	}
 
 	// 1. Build Batch Request
@@ -972,7 +968,7 @@ func (r *ccipChainReader) GetChainFeePriceUpdate(ctx context.Context, selectors 
 
 	if err != nil {
 		lggr.Errorw("failed to batch get chain fee price updates", "err", err)
-		return feeUpdates // Return the initialized empty map
+		return make(map[cciptypes.ChainSelector]cciptypes.TimestampedBig) // Return a new empty map
 	}
 
 	// 3. Find FeeQuoter Results
@@ -988,7 +984,7 @@ func (r *ccipChainReader) GetChainFeePriceUpdate(ctx context.Context, selectors 
 
 	if !found {
 		lggr.Errorw("FeeQuoter results missing from batch response")
-		return feeUpdates // Return the initialized empty map
+		return make(map[cciptypes.ChainSelector]cciptypes.TimestampedBig) // Return a new empty map
 	}
 
 	if len(feeQuoterResults) != len(selectors) {
@@ -999,17 +995,18 @@ func (r *ccipChainReader) GetChainFeePriceUpdate(ctx context.Context, selectors 
 	}
 
 	// 4. Process Results using helper
-	return r.processFeePriceUpdateResults(lggr, selectors, feeQuoterResults, feeUpdates)
+	return r.processFeePriceUpdateResults(lggr, selectors, feeQuoterResults)
 }
 
 // processFeePriceUpdateResults iterates through batch results, validates them,
-// and populates the feeUpdates map.
+// and returns a new feeUpdates map.
 func (r *ccipChainReader) processFeePriceUpdateResults(
 	lggr logger.Logger,
 	selectors []cciptypes.ChainSelector,
 	results []types.BatchReadResult,
-	feeUpdates map[cciptypes.ChainSelector]cciptypes.TimestampedBig,
 ) map[cciptypes.ChainSelector]cciptypes.TimestampedBig {
+	feeUpdates := make(map[cciptypes.ChainSelector]cciptypes.TimestampedBig)
+
 	for i, chain := range selectors {
 		if i >= len(results) {
 			// Log error if we have fewer results than requested selectors
@@ -1032,7 +1029,7 @@ func (r *ccipChainReader) processFeePriceUpdateResults(
 		// Type assert the result
 		update, ok := val.(*cciptypes.TimestampedUnixBig)
 		if !ok || update == nil {
-			lggr.Errorw("Invalid type or nil value received for chain fee price update",
+			lggr.Warnw("Invalid type or nil value received for chain fee price update",
 				"chain", chain,
 				"type", fmt.Sprintf("%T", val),
 				"ok", ok)
