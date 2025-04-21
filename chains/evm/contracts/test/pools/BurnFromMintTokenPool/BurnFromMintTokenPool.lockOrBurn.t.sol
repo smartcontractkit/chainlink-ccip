@@ -6,7 +6,7 @@ import {RateLimiter} from "../../../libraries/RateLimiter.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {BurnFromMintTokenPoolSetup} from "./BurnFromMintTokenPoolSetup.t.sol";
 
-import {IERC20} from "@vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "@chainlink/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
 contract BurnFromMintTokenPool_lockOrBurn is BurnFromMintTokenPoolSetup {
   function test_setup() public view {

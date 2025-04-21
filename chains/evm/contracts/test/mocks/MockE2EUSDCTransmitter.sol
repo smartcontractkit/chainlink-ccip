@@ -17,7 +17,7 @@ pragma solidity ^0.8.0;
 
 import {IMessageTransmitterWithRelay} from "./interfaces/IMessageTransmitterWithRelay.sol";
 
-import {BurnMintERC20} from "@shared/token/ERC20/BurnMintERC20.sol";
+import {BurnMintERC20} from "@chainlink/shared/token/ERC20/BurnMintERC20.sol";
 
 // solhint-disable
 contract MockE2EUSDCTransmitter is IMessageTransmitterWithRelay {

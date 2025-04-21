@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {FeeQuoter} from "../../FeeQuoter.sol";
 import {Pool} from "../../libraries/Pool.sol";
 import {FeeQuoterSetup} from "./FeeQuoterSetup.t.sol";
-import {Ownable2Step} from "@shared/access/Ownable2Step.sol";
+import {Ownable2Step} from "@chainlink/shared/access/Ownable2Step.sol";
 
 contract FeeQuoter_applyTokenTransferFeeConfigUpdates is FeeQuoterSetup {
   function testFuzz_ApplyTokenTransferFeeConfig_Success(

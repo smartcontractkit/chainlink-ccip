@@ -3011,7 +3011,7 @@ func TestCCIPRouter(t *testing.T) {
 		})
 
 		t.Run("Billing", func(t *testing.T) {
-			defaultTokenTransferFeeConfig := fee_quoter.TokenTransferFeeConfig{DestBytesOverhead: 32}
+			defaultTokenTransferFeeConfig := fee_quoter.TokenTransferFeeConfig{DestBytesOverhead: 32, MinFeeUsdcents: 0, MaxFeeUsdcents: 1}
 			ix0, err := fee_quoter.NewSetTokenTransferFeeConfigInstruction(config.EvmChainSelector, token0.Mint, defaultTokenTransferFeeConfig, config.FqConfigPDA, token0.Billing[config.EvmChainSelector], ccipAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 			require.NoError(t, err)
 			ix1, err := fee_quoter.NewSetTokenTransferFeeConfigInstruction(config.EvmChainSelector, token1.Mint, defaultTokenTransferFeeConfig, config.FqConfigPDA, token1.Billing[config.EvmChainSelector], ccipAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()

@@ -1682,21 +1682,16 @@ export type FeeQuoter = {
     },
     {
       "code": 8038,
-      "name": "InvalidLinkDecimals",
-      "msg": "The LINK mint uses an unsupported number of decimals"
-    },
-    {
-      "code": 8039,
       "name": "InvalidTokenTransferFeeMaxMin",
       "msg": "Minimum token transfer fee exceeds maximum"
     },
     {
-      "code": 8040,
+      "code": 8039,
       "name": "InvalidTokenTransferFeeDestBytesOverhead",
       "msg": "Insufficient dest bytes overhead on transfer fee config"
     },
     {
-      "code": 8041,
+      "code": 8040,
       "name": "InvalidCodeVersion",
       "msg": "Invalid code version"
     }
@@ -3387,21 +3382,16 @@ export const IDL: FeeQuoter = {
     },
     {
       "code": 8038,
-      "name": "InvalidLinkDecimals",
-      "msg": "The LINK mint uses an unsupported number of decimals"
-    },
-    {
-      "code": 8039,
       "name": "InvalidTokenTransferFeeMaxMin",
       "msg": "Minimum token transfer fee exceeds maximum"
     },
     {
-      "code": 8040,
+      "code": 8039,
       "name": "InvalidTokenTransferFeeDestBytesOverhead",
       "msg": "Insufficient dest bytes overhead on transfer fee config"
     },
     {
-      "code": 8041,
+      "code": 8040,
       "name": "InvalidCodeVersion",
       "msg": "Invalid code version"
     }
