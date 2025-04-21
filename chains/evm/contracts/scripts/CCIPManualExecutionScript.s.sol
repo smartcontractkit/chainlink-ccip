@@ -3,8 +3,8 @@ pragma solidity ^0.8.24;
 import {Internal} from "../libraries/Internal.sol";
 import {OffRamp} from "../offRamp/OffRamp.sol";
 
-import {IERC20} from "@vendor/openzeppelin-solidity/v5.0.2/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@vendor/openzeppelin-solidity/v5.0.2/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@chainlink/vendor/openzeppelin-solidity/v5.0.2/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@chainlink/vendor/openzeppelin-solidity/v5.0.2/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {Script} from "forge-std/Script.sol";
 

@@ -3,8 +3,8 @@ pragma solidity ^0.8.24;
 import {Router} from "../Router.sol";
 import {Client} from "../libraries/Client.sol";
 
-import {IERC20} from "@vendor/openzeppelin-solidity/v5.0.2/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@vendor/openzeppelin-solidity/v5.0.2/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@chainlink/vendor/openzeppelin-solidity/v5.0.2/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@chainlink/vendor/openzeppelin-solidity/v5.0.2/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {Script} from "forge-std/Script.sol";
 
@@ -44,12 +44,14 @@ contract CCIPSendTestScript is Script {
     console.log("Sender: %s", sender);
     console.log("Starting Script...");
 
+    // Create the EVMTokenAmount array and populate with the first token
     Client.EVMTokenAmount[] memory tokens;
     if (TOKEN0 != address(0)) {
       tokens = new Client.EVMTokenAmount[](1);
       tokens[0] = Client.EVMTokenAmount({token: TOKEN0, amount: TOKEN0_AMOUNT});
     }
 
+    // Construct the EVM2AnyMessage
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
       receiver: abi.encode(sender),
       data: s_data,
@@ -75,7 +77,6 @@ contract CCIPSendTestScript is Script {
       }
     }
 
-    // Uncomment the following line for debugging purposes
     console.log("--- Tokens Approved ---");
 
     console.log("2. Approving Fee Token");
