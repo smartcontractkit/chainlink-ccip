@@ -893,8 +893,9 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 		}
 		nativeTokenAddress := config.Router.WrappedNativeAddress
 
-		if nativeTokenAddress.String() == "0x" {
-			lggr.Errorw("native token address is empty", "chain", chain)
+		if cciptypes.UnknownAddress(nativeTokenAddress).IsZeroOrEmpty() {
+			lggr.Warnw("Native token address is zero or empty. Ignore for disabled chains otherwise "+
+				"check for router misconfiguration", "chain", chain, "address", nativeTokenAddress.String())
 			continue
 		}
 
