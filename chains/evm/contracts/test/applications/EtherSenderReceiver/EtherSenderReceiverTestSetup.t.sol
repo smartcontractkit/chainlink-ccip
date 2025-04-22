@@ -7,8 +7,8 @@ import {ICCIPRouter} from "../../../applications/EtherSenderReceiver.sol";
 
 import {EtherSenderReceiverHelper} from "../../helpers/EtherSenderReceiverHelper.sol";
 
-import {WETH9} from "@vendor/canonical-weth/WETH9.sol";
-import {ERC20} from "@vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/ERC20.sol";
+import {WETH9} from "@chainlink/vendor/canonical-weth/WETH9.sol";
+import {ERC20} from "@chainlink/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/ERC20.sol";
 
 contract EtherSenderReceiverTestSetup is Test {
   EtherSenderReceiverHelper internal s_etherSenderReceiver;
