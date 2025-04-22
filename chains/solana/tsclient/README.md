@@ -159,14 +159,29 @@ Set Router
 npx ts-node src/solana-ccip-token-admin-registry/SetRouter.ts
 ```
 
-## 4. Create the lookup table
+## 4. Configure it in the token admin registry
+
+```bash
+npx ts-node src/solana-ccip-token-admin-registry/ProposeTokenAdmin.ts
+```
+
+```bash
+npx ts-node src/solana-ccip-token-admin-registry/AcceptAdmin.ts
+```
+
+
+## 5. Create the lookup table
 
 ```bash
 npx ts-node src/create-lookup-table.ts <ACCOUNT_0> <ACCOUNT_1> ...
 ```
 
-## 5. Configure it in the token admin registry
 
-```bash
-npx ts-node src/setup-token-admin-registry.ts
-```
+TODO: init_chain_remote_config
+
+TODO: edit_chain_remote_config
+
+
+## 6. Modify mint authority to be the Token Pool PDA
+
+TODO
