@@ -33,16 +33,16 @@ type attestationRequest struct {
 }
 
 type AttestationResponse struct {
-	Attestations []MessageAttestationResponse `json:"attestations"`
+	Attestations []Attestation `json:"attestations"`
 	// fields in case of error
 	Code    int    `json:"code,omitempty"`
 	Message string `json:"message,omitempty"`
 }
 
-type MessageAttestationResponse struct {
+type Attestation struct {
 	MessageHash string            `json:"message_hash"`
 	Status      AttestationStatus `json:"status"`
-	Attestation string            `json:"attestation,omitempty"` // Attestation represented by abi.encode(payload, proof)
+	Data        string            `json:"attestation,omitempty"` // Data is represented by abi.encode(payload, proof)
 }
 
 type LBTCAttestationClient struct {
@@ -60,7 +60,7 @@ func NewLBTCAttestationClient(
 		config.AttestationAPI,
 		config.AttestationAPIInterval.Duration(),
 		config.AttestationAPITimeout.Duration(),
-		0,
+		0, // no LBTC API cooldown
 	)
 	if err != nil {
 		return nil, fmt.Errorf("get http client: %w", err)
@@ -74,6 +74,8 @@ func NewLBTCAttestationClient(
 	), nil
 }
 
+// Attestations is an AttestationClient method that accepts dict of messages and returns attestations under same keys.
+// As values in input it accepts ExtraData bytes from incoming TokenData
 func (c *LBTCAttestationClient) Attestations(
 	ctx context.Context,
 	messages map[cciptypes.ChainSelector]map[reader.MessageTokenID]cciptypes.Bytes,
@@ -112,15 +114,17 @@ func (c *LBTCAttestationClient) Attestations(
 	return res, nil
 }
 
-func (c *LBTCAttestationClient) Token() string {
-	return LBTCToken
+func (c *LBTCAttestationClient) Type() string {
+	return pluginconfig.LBTCHandlerType
 }
 
+// fetchBatch makes an HTTP Post request to Lombard Attestation API, requesting all messageHashes at once.
+// This method doesn't check for input batch size.
 func (c *LBTCAttestationClient) fetchBatch(
 	ctx context.Context,
-	batch []string,
+	messageHashes []string,
 ) (map[string]tokendata.AttestationStatus, error) {
-	request := attestationRequest{PayloadHashes: batch}
+	request := attestationRequest{PayloadHashes: messageHashes}
 	encodedRequest, err := json.Marshal(request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal attestation request: %w", err)
@@ -128,7 +132,7 @@ func (c *LBTCAttestationClient) fetchBatch(
 	attestations := make(map[string]tokendata.AttestationStatus)
 	respRaw, _, err := c.httpClient.Post(ctx, fmt.Sprintf("bridge/%s/%s", apiVersion, attestationPath), encodedRequest)
 	if err != nil {
-		for _, inputMessageHash := range batch {
+		for _, inputMessageHash := range messageHashes {
 			attestations[inputMessageHash] = tokendata.ErrorAttestationStatus(err)
 		}
 		// absorb api error to each token data status
@@ -140,16 +144,16 @@ func (c *LBTCAttestationClient) fetchBatch(
 		return nil, fmt.Errorf("failed to unmarshal attestation response: %w", err)
 	}
 	if attestationResp.Code != 0 {
-		for _, inputMessageHash := range batch {
+		for _, inputMessageHash := range messageHashes {
 			attestations[inputMessageHash] = tokendata.ErrorAttestationStatus(
 				fmt.Errorf("attestation request failed: %s", attestationResp.Message),
 			)
 		}
 	}
 	for _, attestation := range attestationResp.Attestations {
-		attestations[attestation.MessageHash] = attestationToTokenData(attestation)
+		attestations[attestation.MessageHash] = attestationToAttestationStatus(attestation)
 	}
-	for _, inputMessageHash := range batch {
+	for _, inputMessageHash := range messageHashes {
 		if _, ok := attestations[inputMessageHash]; !ok {
 			c.lggr.Warnw(
 				"Requested messageHash is missing in the response. Considering tokendata.ErrDataMissing",
@@ -160,7 +164,7 @@ func (c *LBTCAttestationClient) fetchBatch(
 	return attestations, nil
 }
 
-func attestationToTokenData(attestation MessageAttestationResponse) tokendata.AttestationStatus {
+func attestationToAttestationStatus(attestation Attestation) tokendata.AttestationStatus {
 	if attestation.Status == attestationStatusSubmitted || attestation.Status == attestationStatusPending {
 		return tokendata.ErrorAttestationStatus(tokendata.ErrNotReady)
 	}
@@ -171,7 +175,7 @@ func attestationToTokenData(attestation MessageAttestationResponse) tokendata.At
 	if err != nil {
 		return tokendata.ErrorAttestationStatus(fmt.Errorf("failed to decode message hash in attestation: %w", err))
 	}
-	attestationBytes, err := cciptypes.NewBytesFromString(attestation.Attestation)
+	attestationBytes, err := cciptypes.NewBytesFromString(attestation.Data)
 	if err != nil {
 		return tokendata.ErrorAttestationStatus(fmt.Errorf("failed to decode attestation: %w", err))
 	}

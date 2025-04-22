@@ -14,10 +14,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
-const (
-	LBTCToken = "lbtc"
-)
-
 type LBTCTokenDataObserver struct {
 	lggr                     logger.Logger
 	destChainSelector        cciptypes.ChainSelector
@@ -65,7 +61,7 @@ func (o *LBTCTokenDataObserver) Observe(
 	// 2. Request attestations
 	attestations, err := o.client.Attestations(ctx, lbtcMessages)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to fetch attestations: %w", err)
 	}
 	// 3. Map to result
 	return o.createTokenDataObservations(observations, attestations)
