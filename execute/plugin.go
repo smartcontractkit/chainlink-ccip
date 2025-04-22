@@ -277,7 +277,7 @@ func getPendingReportsForExecution(
 ) {
 	// Assuming each report can have minimum one message, max reports shouldn't exceed the max messages
 	unfinalizedReports, err := ccipReader.CommitReportsGTETimestamp(
-		ctx, ts, primitives.Unconfirmed, lenientMaxMsgsPerObs,
+		ctx, ts, primitives.Unconfirmed, maxCommitReportsToFetch,
 	)
 	if err != nil {
 		return nil, nil, nil, time.Time{}, err
@@ -286,7 +286,7 @@ func getPendingReportsForExecution(
 		"count", len(unfinalizedReports))
 
 	finalizedReports, err := ccipReader.CommitReportsGTETimestamp(
-		ctx, ts, primitives.Finalized, lenientMaxMsgsPerObs,
+		ctx, ts, primitives.Finalized, maxCommitReportsToFetch,
 	)
 	if err != nil {
 		return nil, nil, nil, time.Time{}, err

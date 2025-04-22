@@ -193,39 +193,40 @@ func (r *commitRootsCache) isExecuted(key string) bool {
 func (r *commitRootsCache) GetTimestampToQueryFrom() time.Time {
 	r.cacheMu.RLock()
 	defer r.cacheMu.RUnlock()
-
 	// Calculate current visibility window based on stored interval
 	messageVisibilityWindow := r.timeProvider.Now().Add(-r.messageVisibilityInterval).UTC()
-	minTimestamp := messageVisibilityWindow
-
+	// Start with message visibility window as the default (lower bound)
+	commitRootsFilterTimestamp := messageVisibilityWindow
+	// Determine the earliest timestamp between unexecuted root and latest empty root
+	var minTimestamp time.Time
 	// Check if earliestUnexecutedRoot is set
-	if r.earliestUnexecutedRoot.After(minTimestamp) {
+	if !r.earliestUnexecutedRoot.IsZero() {
 		minTimestamp = r.earliestUnexecutedRoot
 		r.lggr.Debugw("MinTimeStamp set to earliest unexecuted root")
 	}
-
 	// Check if latestEmptyRoot is set
-	if r.latestEmptyRoot.After(minTimestamp) {
-		minTimestamp = r.latestEmptyRoot
+	if !r.latestEmptyRoot.IsZero() {
+		// If minTimestamp is not set or latestEmptyRoot is earlier, use latestEmptyRoot
+		if minTimestamp.IsZero() || r.latestEmptyRoot.Before(minTimestamp) {
+			minTimestamp = r.latestEmptyRoot
+		}
 		r.lggr.Debugw("MinTimeStamp set to latest empty finalized root")
 	}
-
-	// If we know the earliest unexecuted root or latestEmptyTimestamp and it's AFTER the visibility window,
-	// we can optimize by starting our query from that timestamp instead
+	// If we know the earliest unexecuted root or latestEmptymTimestamp and it's AFTER the visibility window,
+	// we can optimize by starting our query from that earliest timestamp of them instead
 	if minTimestamp.After(messageVisibilityWindow) {
+		commitRootsFilterTimestamp = minTimestamp
 		r.lggr.Debugw("Using minTimestamp to optimize query",
 			"minTimestamp", minTimestamp,
 			"messageVisibilityWindow", messageVisibilityWindow)
 	}
-
 	r.lggr.Debugw("Getting timestamp to query from",
 		"earliestUnexecutedRoot", r.earliestUnexecutedRoot,
 		"latestEmptyRoot", r.latestEmptyRoot,
 		"messageVisibilityWindow", messageVisibilityWindow,
-		"commitRootsFilterTimestamp", minTimestamp,
-		"optimized", minTimestamp.After(messageVisibilityWindow))
-
-	return minTimestamp
+		"commitRootsFilterTimestamp", commitRootsFilterTimestamp,
+		"optimized", commitRootsFilterTimestamp.After(messageVisibilityWindow))
+	return commitRootsFilterTimestamp
 }
 
 // UpdateEarliestUnexecutedRoot updates the earliest unexecuted root timestamp

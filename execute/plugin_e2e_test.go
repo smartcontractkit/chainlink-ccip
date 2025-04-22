@@ -80,7 +80,7 @@ func TestPluginSkipEmptyReports(t *testing.T) {
 	// Add empty reports to the reader, these are to mock price reports without merkle roots.
 	// All of them are finalized,
 	// Note: As the time of writing this test unfinalized in ContractReader includes finalized and unfinalized.
-	for i := 0; i < lenientMaxMsgsPerObs; i++ {
+	for i := 0; i < maxCommitReportsToFetch; i++ {
 		currentTimestamp = currentTimestamp.Add(time.Second)
 		crBlockNumber++
 		commitReportWithMeta := cciptypes.CommitPluginReportWithMeta{
