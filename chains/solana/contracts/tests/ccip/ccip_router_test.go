@@ -673,7 +673,7 @@ func TestCCIPRouter(t *testing.T) {
 		})
 
 		t.Run("FeeQuoter: Update max fee juels per msg", func(t *testing.T) {
-			defaultMaxFeeJuelsPerMsg := bin.Uint128{Lo: 300000000000000000, Hi: 0, Endianness: nil} // this gets updated in a later test
+			defaultMaxFeeJuelsPerMsg := bin.Uint128{Lo: 300000000000000000, Hi: 0, Endianness: nil}
 
 			t.Run("When a non-admin tries to make the update, it fails", func(t *testing.T) {
 				ix, err := fee_quoter.NewSetMaxFeeJuelsPerMsgInstruction(
