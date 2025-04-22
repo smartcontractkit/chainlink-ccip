@@ -210,7 +210,7 @@ func (r *commitRootsCache) GetTimestampToQueryFrom() time.Time {
 		r.lggr.Debugw("MinTimeStamp set to latest empty finalized root")
 	}
 
-	// If we know the earliest unexecuted root or latestEmptymTimestamp and it's AFTER the visibility window,
+	// If we know the earliest unexecuted root or latestEmptyTimestamp and it's AFTER the visibility window,
 	// we can optimize by starting our query from that timestamp instead
 	if minTimestamp.After(messageVisibilityWindow) {
 		r.lggr.Debugw("Using minTimestamp to optimize query",
