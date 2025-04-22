@@ -2,8 +2,8 @@
 pragma solidity ^0.8.24;
 
 import {MultiAggregateRateLimiter} from "../../../MultiAggregateRateLimiter.sol";
-import {AuthorizedCallers} from "@shared/access/AuthorizedCallers.sol";
-import {Ownable2Step} from "@shared/access/Ownable2Step.sol";
+import {AuthorizedCallers} from "@chainlink/shared/access/AuthorizedCallers.sol";
+import {Ownable2Step} from "@chainlink/shared/access/Ownable2Step.sol";
 
 import {MultiAggregateRateLimiterSetup} from "./MultiAggregateRateLimiterSetup.t.sol";
 import {Vm} from "forge-std/Vm.sol";
