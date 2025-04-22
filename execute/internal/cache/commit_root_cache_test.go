@@ -41,6 +41,51 @@ func newFixedTimeProvider(t *testing.T, fixedTime time.Time) *cachemock.MockTime
 	return mockTime
 }
 
+func TestCommitRootsCache_GetTimestampToQueryFrom_MinimumTimestamp(t *testing.T) {
+	lggr := logger.Nop()
+	messageVisibilityInterval := 8 * time.Hour
+	rootSnoozeTime := 5 * time.Minute
+
+	now := time.Now().UTC()
+	fixedTimeProvider := newFixedTimeProvider(t, now)
+	messageVisibilityWindow := now.Add(-messageVisibilityInterval).UTC()
+
+	t.Run("Should use earlier timestamp between earliestUnexecutedRoot and latestEmptyRoot", func(t *testing.T) {
+		cache := internalNewCommitRootsCache(
+			lggr,
+			messageVisibilityInterval,
+			rootSnoozeTime,
+			fixedTimeProvider,
+		)
+
+		// Set up timestamps for testing
+		// Both timestamps are after the visibility window but earliestUnexecutedRoot is earlier
+		earliestUnexecutedRootTime := messageVisibilityWindow.Add(1 * time.Hour)
+		latestEmptyRootTime := messageVisibilityWindow.Add(2 * time.Hour)
+
+		// Set the earliestUnexecutedRoot directly for testing
+		cache.earliestUnexecutedRoot = earliestUnexecutedRootTime
+
+		// Set the latestEmptyRoot directly for testing
+		cache.latestEmptyRoot = latestEmptyRootTime
+
+		// Get the query timestamp
+		queryTimestamp := cache.GetTimestampToQueryFrom()
+
+		assert.Equal(t, earliestUnexecutedRootTime, queryTimestamp,
+			"Query timestamp should match the earlier of earliestUnexecutedRoot and latestEmptyRoot")
+
+		// Test the reverse case where latestEmptyRoot is earlier
+		cache.earliestUnexecutedRoot = latestEmptyRootTime
+		cache.latestEmptyRoot = earliestUnexecutedRootTime
+
+		queryTimestamp = cache.GetTimestampToQueryFrom()
+
+		assert.Equal(t, earliestUnexecutedRootTime, queryTimestamp,
+			"Query timestamp should match the earlier of earliestUnexecutedRoot and latestEmptyRoot")
+	})
+}
+
 func TestCommitRootsCache_GetTimestampToQueryFrom(t *testing.T) {
 	lggr := logger.Nop()
 	messageVisibilityInterval := 8 * time.Hour

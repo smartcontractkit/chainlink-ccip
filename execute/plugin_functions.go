@@ -266,6 +266,7 @@ func computeRanges(reports []exectypes.CommitData) ([]cciptypes.SeqNumRange, err
 }
 
 // groupByChainSelector groups the reports by their chain selector.
+// This skips cursed chains and reports with empty roots.
 func groupByChainSelectorWithFilter(
 	lggr logger.Logger,
 	reports []cciptypes.CommitPluginReportWithMeta,
