@@ -5,7 +5,7 @@ import {Pool} from "../../../libraries/Pool.sol";
 import {SiloedLockReleaseTokenPool} from "../../../pools/SiloedLockReleaseTokenPool.sol";
 import {SiloedLockReleaseTokenPoolSetup} from "./SiloedLockReleaseTokenPoolSetup.t.sol";
 
-import {IERC20} from "@vendor/openzeppelin-solidity/v4.8.3/contracts/interfaces/IERC20.sol";
+import {IERC20} from "@chainlink/vendor/openzeppelin-solidity/v4.8.3/contracts/interfaces/IERC20.sol";
 
 contract SiloedLockReleaseTokenPool_releaseOrMint is SiloedLockReleaseTokenPoolSetup {
   function test_ReleaseOrMint_SiloedChain() public {

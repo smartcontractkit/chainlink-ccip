@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {ITypeAndVersion} from "@shared/interfaces/ITypeAndVersion.sol";
+import {ITypeAndVersion} from "@chainlink/shared/interfaces/ITypeAndVersion.sol";
 
-import {OwnerIsCreator} from "@shared/access/OwnerIsCreator.sol";
+import {OwnerIsCreator} from "@chainlink/shared/access/OwnerIsCreator.sol";
 
 /// @notice The RMNProxy serves to allow CCIP contracts
 /// to point to a static address for ARM queries, which saves gas

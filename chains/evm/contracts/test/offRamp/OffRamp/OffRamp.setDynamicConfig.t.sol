@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import {OffRamp} from "../../../offRamp/OffRamp.sol";
 import {OffRampSetup} from "./OffRampSetup.t.sol";
-import {Ownable2Step} from "@shared/access/Ownable2Step.sol";
+import {Ownable2Step} from "@chainlink/shared/access/Ownable2Step.sol";
 
 contract OffRamp_setDynamicConfig is OffRampSetup {
   function test_SetDynamicConfig() public {
