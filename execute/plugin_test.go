@@ -779,10 +779,13 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 			}
 			mockReader := readerpkg_mock.NewMockCCIPReader(t)
 			mockReader.On(
-				"CommitReportsGTETimestamp", mock.Anything, mock.Anything, mock.Anything,
-			).Return(cciptypes.CommitReportsByConfidenceLevel{
-				Unfinalized: tt.reports,
-			}, nil)
+				"CommitReportsGTETimestamp", mock.Anything, mock.Anything, primitives.Unconfirmed,
+				mock.Anything,
+			).Return(tt.reports, nil)
+			mockReader.On(
+				"CommitReportsGTETimestamp", mock.Anything, mock.Anything, primitives.Finalized,
+				mock.Anything,
+			).Return([]cciptypes.CommitPluginReportWithMeta{}, nil)
 
 			// Set up finalized messages mock
 			executed := make(map[cciptypes.ChainSelector][]cciptypes.SeqNum)

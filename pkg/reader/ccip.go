@@ -173,30 +173,12 @@ type RMNCurseResponse struct {
 
 // ---------------------------------------------------
 
-func (r *ccipChainReader) CommitReportsGTETimestamp(ctx context.Context, ts time.Time, limit int) (cciptypes.CommitReportsByConfidenceLevel, error) {
+func (r *ccipChainReader) CommitReportsGTETimestamp(ctx context.Context, ts time.Time, confidence primitives.ConfidenceLevel, limit int) ([]cciptypes.CommitPluginReportWithMeta, error) {
 
 	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
-		return cciptypes.CommitReportsByConfidenceLevel{}, err
+		return []cciptypes.CommitPluginReportWithMeta{}, err
 	}
 
-	unfinalizedReports, err := r.queryCommitReports(ctx, ts, primitives.Unconfirmed, limit)
-	if err != nil {
-		return cciptypes.CommitReportsByConfidenceLevel{}, err
-	}
-	finalizedReports, err := r.queryCommitReports(ctx, ts, primitives.Finalized, limit)
-	if err != nil {
-		return cciptypes.CommitReportsByConfidenceLevel{}, err
-	}
-
-	return cciptypes.CommitReportsByConfidenceLevel{
-		Unfinalized: unfinalizedReports,
-		Finalized:   finalizedReports,
-	}, nil
-}
-
-func (r *ccipChainReader) queryCommitReports(
-	ctx context.Context, ts time.Time, confidence primitives.ConfidenceLevel, limit int,
-) ([]cciptypes.CommitPluginReportWithMeta, error) {
 	lggr := logutil.WithContextValues(ctx, r.lggr)
 	internalLimit := limit * 2
 	iter, err := r.contractReaders[r.destChain].ExtendedQueryKey(

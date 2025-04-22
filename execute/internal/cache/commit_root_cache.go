@@ -136,6 +136,8 @@ type commitRootsCache struct {
 }
 
 func (r *commitRootsCache) UpdateLatestEmptyRootTimestamp(timestamp time.Time) {
+	r.cacheMu.Lock()
+	defer r.cacheMu.Unlock()
 	if timestamp.After(r.latestEmptyRoot) {
 		r.latestEmptyRoot = timestamp
 	}

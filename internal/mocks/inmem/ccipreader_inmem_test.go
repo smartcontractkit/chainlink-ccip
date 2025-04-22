@@ -90,17 +90,22 @@ func TestInMemoryCCIPReader_CommitReportsGTETimestamp(t *testing.T) {
 			t.Parallel()
 			r := InMemoryCCIPReader{
 				UnfinalizedReports: tt.fields.Reports}
-			got, err := r.CommitReportsGTETimestamp(context.Background(), tt.args.ts, tt.args.limit)
+			got, err := r.CommitReportsGTETimestamp(
+				context.Background(),
+				tt.args.ts,
+				primitives.Unconfirmed,
+				tt.args.limit,
+			)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("CommitReportsGTETimestamp() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 
-			if len(got.Unfinalized) != len(tt.want) {
+			if len(got) != len(tt.want) {
 				t.Errorf("CommitReportsGTETimestamp() got = %v, want %v", got, tt.want)
 				return
 			}
-			gotBlocks := slicelib.Map(got.Unfinalized, func(report cciptypes.CommitPluginReportWithMeta) expected {
+			gotBlocks := slicelib.Map(got, func(report cciptypes.CommitPluginReportWithMeta) expected {
 				return expected{block: report.BlockNum}
 			})
 			require.ElementsMatchf(t, gotBlocks, tt.want, "CommitReportsGTETimestamp() got = %v, want %v", got, tt.want)

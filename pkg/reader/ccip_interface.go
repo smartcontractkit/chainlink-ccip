@@ -161,7 +161,11 @@ func NewCCIPReaderWithExtendedContractReaders(
 type CCIPReader interface {
 	// CommitReportsGTETimestamp reads the destination chain starting at a given timestamp
 	// and finds all ReportAccepted up to the provided limit.
-	CommitReportsGTETimestamp(ctx context.Context, ts time.Time, limit int) (cciptypes.CommitReportsByConfidenceLevel, error)
+	CommitReportsGTETimestamp(ctx context.Context,
+		ts time.Time,
+		confidence primitives.ConfidenceLevel,
+		limit int,
+	) ([]cciptypes.CommitPluginReportWithMeta, error)
 
 	// ExecutedMessages finds executed messages for all source chains/ranges provided on a single destination chain.
 	// A map of source chain to slice of sequence numbers is returned to express which seqnrs have executed.

@@ -276,14 +276,23 @@ func getPendingReportsForExecution(
 	err error,
 ) {
 	// Assuming each report can have minimum one message, max reports shouldn't exceed the max messages
-	commitReports, err := ccipReader.CommitReportsGTETimestamp(ctx, ts, lenientMaxMsgsPerObs)
+	unfinalizedReports, err := ccipReader.CommitReportsGTETimestamp(
+		ctx, ts, primitives.Unconfirmed, lenientMaxMsgsPerObs,
+	)
 	if err != nil {
-		return nil, nil, nil, time.UnixMilli(0), err
+		return nil, nil, nil, time.Time{}, err
 	}
-	lggr.Debugw("commit reports", "commitReports", commitReports,
-		"count", len(commitReports.Unfinalized))
+	lggr.Debugw("commit reports", "unfinalizedReports", unfinalizedReports,
+		"count", len(unfinalizedReports))
 
-	groupedCommits = groupByChainSelectorWithFilter(lggr, commitReports.Unfinalized, cursedSourceChains)
+	finalizedReports, err := ccipReader.CommitReportsGTETimestamp(
+		ctx, ts, primitives.Finalized, lenientMaxMsgsPerObs,
+	)
+	if err != nil {
+		return nil, nil, nil, time.Time{}, err
+	}
+
+	groupedCommits = groupByChainSelectorWithFilter(lggr, unfinalizedReports, cursedSourceChains)
 	lggr.Debugw("grouped commits before removing fully executed reports",
 		"groupedCommits", groupedCommits, "count", len(groupedCommits))
 
@@ -315,14 +324,14 @@ func getPendingReportsForExecution(
 	return remainingReportsBySelector,
 		fullyExecutedFinalized,
 		fullyExecutedUnfinalized,
-		getLatestEmptyRootTimestamp(commitReports.Finalized),
+		getLatestEmptyRootTimestamp(finalizedReports),
 		nil
 }
 
 func getLatestEmptyRootTimestamp(
 	commitReports []cciptypes.CommitPluginReportWithMeta,
 ) time.Time {
-	latestEmptyRootTimestamp := time.UnixMilli(0)
+	latestEmptyRootTimestamp := time.Time{}
 	for _, commitReport := range commitReports {
 		if commitReport.Report.HasNoRoots() {
 			if commitReport.Timestamp.After(latestEmptyRootTimestamp) {
