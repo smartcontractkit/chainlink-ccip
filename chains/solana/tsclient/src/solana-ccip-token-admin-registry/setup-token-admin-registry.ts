@@ -108,3 +108,50 @@ export function createAcceptAdminRoleInstruction(
     data: encodedArgs,
   });
 }
+
+export interface TransferAdminRoleArgs {
+  newAdmin: PublicKey;
+}
+
+export interface TransferAdminRoleAccounts {
+  config: PublicKey;
+  tokenAdminRegistry: PublicKey;
+  mint: PublicKey;
+  authority: PublicKey;
+}
+
+const transferAdminRoleLayout = borsh.struct([
+  borsh.publicKey("newAdmin"),
+]);
+
+const TRANSFER_ADMIN_ROLE_DISCRIMINATOR = crypto
+  .createHash("sha256")
+  .update("global:transfer_admin_role_token_admin_registry")
+  .digest()
+  .subarray(0, 8);
+
+export function createTransferAdminRoleInstruction(
+  accounts: TransferAdminRoleAccounts,
+  args: TransferAdminRoleArgs,
+  programId: PublicKey
+): TransactionInstruction {
+  const data = Buffer.alloc(1000);
+  const len = transferAdminRoleLayout.encode(args, data);
+  const encodedArgs = Buffer.concat([
+    TRANSFER_ADMIN_ROLE_DISCRIMINATOR,
+    data.subarray(0, len),
+  ]);
+
+  const keys = [
+    { pubkey: accounts.config, isWritable: false, isSigner: false },
+    { pubkey: accounts.tokenAdminRegistry, isWritable: true, isSigner: false },
+    { pubkey: accounts.mint, isWritable: false, isSigner: false },
+    { pubkey: accounts.authority, isWritable: true, isSigner: true },
+  ];
+
+  return new TransactionInstruction({
+    programId,
+    keys,
+    data: encodedArgs,
+  });
+}
