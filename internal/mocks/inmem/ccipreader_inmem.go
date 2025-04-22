@@ -69,9 +69,8 @@ func (r InMemoryCCIPReader) CommitReportsGTETimestamp(ctx context.Context,
 
 	if confidence == primitives.Unconfirmed {
 		return unfinalized, nil
-	} else {
-		return finalized, nil
 	}
+	return finalized, nil
 }
 
 func (r InMemoryCCIPReader) ExecutedMessages(

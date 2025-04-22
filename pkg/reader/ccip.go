@@ -173,7 +173,11 @@ type RMNCurseResponse struct {
 
 // ---------------------------------------------------
 
-func (r *ccipChainReader) CommitReportsGTETimestamp(ctx context.Context, ts time.Time, confidence primitives.ConfidenceLevel, limit int) ([]cciptypes.CommitPluginReportWithMeta, error) {
+func (r *ccipChainReader) CommitReportsGTETimestamp(
+	ctx context.Context,
+	ts time.Time,
+	confidence primitives.ConfidenceLevel,
+	limit int) ([]cciptypes.CommitPluginReportWithMeta, error) {
 
 	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
 		return []cciptypes.CommitPluginReportWithMeta{}, err
