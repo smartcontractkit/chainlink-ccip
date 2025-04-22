@@ -31,8 +31,9 @@ func main() {
 	} else {
 		outDir := getOutDir(outDirSuffix, pkgName)
 		zksyncBytecodePath := filepath.Join("..", "zkout", className+".sol", className+".json")
+		zksyncBytecode := zksyncwrapper.ReadBytecodeFromForgeJson(zksyncBytecodePath)
 		outPath := filepath.Join(outDir, pkgName+"_zksync.go")
-		zksyncwrapper.WrapZksyncDeploy(zksyncBytecodePath, className, pkgName, outPath)
+		zksyncwrapper.WrapZksyncDeploy(zksyncBytecode, className, pkgName, outPath)
 	}
 }
 
