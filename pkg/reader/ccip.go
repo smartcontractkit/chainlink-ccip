@@ -878,6 +878,14 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 	// 2. Call chain's FeeQuoter to get native tokens price  https://github.com/smartcontractkit/chainlink/blob/60e8b1181dd74b66903cf5b9a8427557b85357ec/contracts/src/v0.8/ccip/FeeQuoter.sol#L229-L229
 	//
 	//nolint:lll
+
+	enabledSourceChains, err := r.filterEnabledSourceChains(ctx, selectors)
+	if err != nil {
+		lggr.Errorw("failed to filter enabled source chains", "err", err, "selectors", selectors)
+		return nil
+	}
+	lggr.Debugw("filtered enabled source chains", "enabledSourceChains", enabledSourceChains, "allChains", selectors)
+
 	prices := make(map[cciptypes.ChainSelector]cciptypes.BigInt)
 	for _, chain := range selectors {
 		reader, ok := r.contractReaders[chain]
@@ -893,8 +901,10 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 		}
 		nativeTokenAddress := config.Router.WrappedNativeAddress
 
-		if nativeTokenAddress.String() == "0x" {
-			lggr.Errorw("native token address is empty", "chain", chain)
+		if cciptypes.UnknownAddress(nativeTokenAddress).IsZeroOrEmpty() {
+			if enabledSourceChains.Contains(chain) {
+				lggr.Errorw("native token address is empty for enabled chain", "chain", chain, "config", config)
+			}
 			continue
 		}
 
@@ -1493,6 +1503,26 @@ func (r *ccipChainReader) fetchFreshSourceChainConfigs(
 	}
 
 	return configs, nil
+}
+
+// filterEnabledSourceChains filters the source chains to only include those that are enabled.
+func (r *ccipChainReader) filterEnabledSourceChains(
+	ctx context.Context,
+	sourceChains []cciptypes.ChainSelector,
+) (mapset.Set[cciptypes.ChainSelector], error) {
+	sourceChainConfigs, err := r.configPoller.GetOfframpSourceChainConfigs(ctx, r.destChain, sourceChains)
+	if err != nil {
+		return nil, fmt.Errorf("get source chains config: %w", err)
+	}
+
+	enabledSourceChains := mapset.NewSet[cciptypes.ChainSelector]()
+	for sourceChain, cfg := range sourceChainConfigs {
+		if cfg.IsEnabled {
+			enabledSourceChains.Add(sourceChain)
+		}
+	}
+
+	return enabledSourceChains, nil
 }
 
 // offRampStaticChainConfig is used to parse the response from the offRamp contract's getStaticConfig method.

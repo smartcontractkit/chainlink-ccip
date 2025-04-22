@@ -1690,6 +1690,12 @@ func TestCCIPChainReader_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 			},
 		}
 
+		mockCache.On("GetOfframpSourceChainConfigs",
+			mock.Anything, destChain, []cciptypes.ChainSelector{sourceChain1, sourceChain2}).
+			Return(map[cciptypes.ChainSelector]StaticSourceChainConfig{
+				sourceChain1: {IsEnabled: true},
+				sourceChain2: {IsEnabled: true},
+			}, nil).Once()
 		mockCache.On("GetChainConfig", mock.Anything, sourceChain1).Return(sourceChain1Config, nil)
 		mockCache.On("GetChainConfig", mock.Anything, sourceChain2).Return(sourceChain2Config, nil)
 
@@ -1766,6 +1772,12 @@ func TestCCIPChainReader_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 				WrappedNativeAddress: wrappedNative2,
 			},
 		}, nil)
+		mockCache.On("GetOfframpSourceChainConfigs",
+			mock.Anything, destChain, []cciptypes.ChainSelector{sourceChain1, sourceChain2}).
+			Return(map[cciptypes.ChainSelector]StaticSourceChainConfig{
+				sourceChain1: {IsEnabled: true},
+				sourceChain2: {IsEnabled: true},
+			}, nil).Once()
 
 		sourceReader2 := reader_mocks.NewMockExtended(t)
 		price2 := cciptypes.TimestampedUnixBig{
@@ -1814,6 +1826,11 @@ func TestCCIPChainReader_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 			},
 		}
 		mockCache.On("GetChainConfig", mock.Anything, sourceChain1).Return(sourceConfig, nil)
+		mockCache.On("GetOfframpSourceChainConfigs",
+			mock.Anything, destChain, []cciptypes.ChainSelector{sourceChain1}).
+			Return(map[cciptypes.ChainSelector]StaticSourceChainConfig{
+				sourceChain1: {IsEnabled: true},
+			}, nil).Once()
 
 		sourceReader := reader_mocks.NewMockExtended(t)
 		sourceReader.EXPECT().ExtendedGetLatestValue(

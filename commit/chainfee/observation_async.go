@@ -6,9 +6,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/smartcontractkit/libocr/commontypes"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	"github.com/smartcontractkit/libocr/commontypes"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
@@ -48,7 +49,7 @@ func (o *baseObserver) getChainsFeeComponents(
 	ctx context.Context,
 	lggr logger.Logger,
 ) map[cciptypes.ChainSelector]types.ChainFeeComponents {
-	supportedChains, err := o.getSupportedChains(lggr, o.cs, o.oracleID, o.destChain)
+	supportedChains, err := o.getSupportedSourceChains(lggr, o.cs, o.oracleID, o.destChain)
 	if err != nil {
 		lggr.Errorw("failed to get supported chains unable to get chains fee components", "err", err)
 		return map[cciptypes.ChainSelector]types.ChainFeeComponents{}
@@ -60,7 +61,7 @@ func (o *baseObserver) getNativeTokenPrices(
 	ctx context.Context,
 	lggr logger.Logger,
 ) map[cciptypes.ChainSelector]cciptypes.BigInt {
-	supportedChains, err := o.getSupportedChains(lggr, o.cs, o.oracleID, o.destChain)
+	supportedChains, err := o.getSupportedSourceChains(lggr, o.cs, o.oracleID, o.destChain)
 	if err != nil {
 		lggr.Errorw("failed to get supported chains unable to get native token prices", "err", err)
 		return map[cciptypes.ChainSelector]cciptypes.BigInt{}
@@ -72,7 +73,7 @@ func (o *baseObserver) getChainFeePriceUpdates(
 	ctx context.Context,
 	lggr logger.Logger,
 ) map[cciptypes.ChainSelector]Update {
-	supportedChains, err := o.getSupportedChains(lggr, o.cs, o.oracleID, o.destChain)
+	supportedChains, err := o.getSupportedSourceChains(lggr, o.cs, o.oracleID, o.destChain)
 	if err != nil {
 		lggr.Errorw("failed to get supported chains unable to get chain fee price updates", "err", err)
 		return map[cciptypes.ChainSelector]Update{}
@@ -83,7 +84,7 @@ func (o *baseObserver) getChainFeePriceUpdates(
 func (o *baseObserver) close() {
 }
 
-func (o *baseObserver) getSupportedChains(
+func (o *baseObserver) getSupportedSourceChains(
 	lggr logger.Logger,
 	cs plugincommon.ChainSupport,
 	oracleID commontypes.OracleID,
