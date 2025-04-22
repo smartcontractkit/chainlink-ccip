@@ -475,7 +475,7 @@ mod tests {
     };
 
     use super::super::messages::tests::{sample_billing_config, sample_dest_chain, sample_message};
-    use crate::TokenTransferFeeConfig;
+    use crate::{instructions::v1::messages::tests::as_u8_28, TokenTransferFeeConfig};
 
     use super::*;
 
@@ -1062,6 +1062,45 @@ mod tests {
             result.unwrap_err(),
             FeeQuoterError::MessageFeeTooHigh.into()
         );
+    }
+
+    #[test]
+    fn test_fee_juels_magnitudes() {
+        let mut fee_token_config_usd_tether = sample_billing_config();
+        fee_token_config_usd_tether.usd_per_token = TimestampedPackedU224 {
+            timestamp: 100,
+            value: as_u8_28(1u32.e(18)),
+        };
+
+        let mut link_config = sample_billing_config();
+        link_config.usd_per_token = TimestampedPackedU224 {
+            timestamp: 100,
+            // 10 dollars per link
+            value: as_u8_28(10u32.e(27)),
+        };
+
+        // define LINK mint pubkey
+        let link_mint = Pubkey::new_unique();
+        link_config.mint = link_mint;
+
+        let one_dollar_fee = SVMTokenAmount {
+            token: fee_token_config_usd_tether.mint,
+            amount: 1u32.e(18).try_into().unwrap(),
+        };
+
+        let result = fee_juels(
+            &one_dollar_fee,
+            &fee_token_config_usd_tether,
+            &link_config,
+            9,
+            link_mint,
+            100u32.e(18).try_into().unwrap(),
+        )
+        .unwrap();
+
+        // 1 dollar in juels (By definition 1e18 juels = 1 LINK)
+        // We established that 10 dollars = 1 link, so we need 0.1 link == ie17 juels here.
+        assert_eq!(result, 1u32.e(17));
     }
 
     #[test]
