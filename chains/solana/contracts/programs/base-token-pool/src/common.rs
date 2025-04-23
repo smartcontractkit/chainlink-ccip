@@ -363,27 +363,27 @@ pub struct Released {
 #[event]
 pub struct RemoteChainConfigured {
     pub chain_selector: u64,
-    pub mint: Pubkey,
     pub token: RemoteAddress,
     pub previous_token: RemoteAddress,
     pub pool_addresses: Vec<RemoteAddress>,
     pub previous_pool_addresses: Vec<RemoteAddress>,
+    pub mint: Pubkey,
 }
 
 #[event]
 pub struct RateLimitConfigured {
     pub chain_selector: u64,
-    pub mint: Pubkey,
     pub outbound_rate_limit: RateLimitConfig,
     pub inbound_rate_limit: RateLimitConfig,
+    pub mint: Pubkey,
 }
 
 #[event]
 pub struct RemotePoolsAppended {
     pub chain_selector: u64,
-    pub mint: Pubkey,
     pub pool_addresses: Vec<RemoteAddress>,
     pub previous_pool_addresses: Vec<RemoteAddress>,
+    pub mint: Pubkey,
 }
 
 #[event]
@@ -394,23 +394,23 @@ pub struct RemoteChainRemoved {
 
 #[event]
 pub struct RouterUpdated {
-    pub mint: Pubkey,
     pub old_router: Pubkey,
     pub new_router: Pubkey,
+    pub mint: Pubkey,
 }
 
 #[event]
 pub struct OwnershipTransferRequested {
-    pub mint: Pubkey,
     pub from: Pubkey,
     pub to: Pubkey,
+    pub mint: Pubkey,
 }
 
 #[event]
 pub struct OwnershipTransferred {
-    pub mint: Pubkey,
     pub from: Pubkey,
     pub to: Pubkey,
+    pub mint: Pubkey,
 }
 
 #[error_code]
