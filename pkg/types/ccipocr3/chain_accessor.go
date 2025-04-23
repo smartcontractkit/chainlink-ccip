@@ -308,6 +308,11 @@ type CommitPluginReportWithMeta struct {
 	BlockNum  uint64             `json:"blockNum"`
 }
 
+type CommitReportsByConfidenceLevel struct {
+	Finalized   []CommitPluginReportWithMeta `json:"finalized"`
+	Unfinalized []CommitPluginReportWithMeta `json:"unfinalized"`
+}
+
 // sourceChainConfig is used to parse the response from the offRamp contract's getSourceChainConfig method.
 // See: https://github.com/smartcontractkit/ccip/blob/a3f61f7458e4499c2c62eb38581c60b4942b1160/contracts/src/v0.8/ccip/offRamp/OffRamp.sol#L94
 //
