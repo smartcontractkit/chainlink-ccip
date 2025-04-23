@@ -394,11 +394,6 @@ export type BaseTokenPool = {
           "index": false
         },
         {
-          "name": "mint",
-          "type": "publicKey",
-          "index": false
-        },
-        {
           "name": "token",
           "type": {
             "defined": "RemoteAddress"
@@ -429,6 +424,11 @@ export type BaseTokenPool = {
             }
           },
           "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
         }
       ]
     },
@@ -438,11 +438,6 @@ export type BaseTokenPool = {
         {
           "name": "chainSelector",
           "type": "u64",
-          "index": false
-        },
-        {
-          "name": "mint",
-          "type": "publicKey",
           "index": false
         },
         {
@@ -458,6 +453,11 @@ export type BaseTokenPool = {
             "defined": "RateLimitConfig"
           },
           "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
         }
       ]
     },
@@ -467,11 +467,6 @@ export type BaseTokenPool = {
         {
           "name": "chainSelector",
           "type": "u64",
-          "index": false
-        },
-        {
-          "name": "mint",
-          "type": "publicKey",
           "index": false
         },
         {
@@ -490,6 +485,11 @@ export type BaseTokenPool = {
               "defined": "RemoteAddress"
             }
           },
+          "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
           "index": false
         }
       ]
@@ -513,17 +513,17 @@ export type BaseTokenPool = {
       "name": "RouterUpdated",
       "fields": [
         {
-          "name": "mint",
-          "type": "publicKey",
-          "index": false
-        },
-        {
           "name": "oldRouter",
           "type": "publicKey",
           "index": false
         },
         {
           "name": "newRouter",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mint",
           "type": "publicKey",
           "index": false
         }
@@ -533,17 +533,17 @@ export type BaseTokenPool = {
       "name": "OwnershipTransferRequested",
       "fields": [
         {
-          "name": "mint",
-          "type": "publicKey",
-          "index": false
-        },
-        {
           "name": "from",
           "type": "publicKey",
           "index": false
         },
         {
           "name": "to",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mint",
           "type": "publicKey",
           "index": false
         }
@@ -553,17 +553,17 @@ export type BaseTokenPool = {
       "name": "OwnershipTransferred",
       "fields": [
         {
-          "name": "mint",
-          "type": "publicKey",
-          "index": false
-        },
-        {
           "name": "from",
           "type": "publicKey",
           "index": false
         },
         {
           "name": "to",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mint",
           "type": "publicKey",
           "index": false
         }
@@ -1092,11 +1092,6 @@ export const IDL: BaseTokenPool = {
           "index": false
         },
         {
-          "name": "mint",
-          "type": "publicKey",
-          "index": false
-        },
-        {
           "name": "token",
           "type": {
             "defined": "RemoteAddress"
@@ -1127,6 +1122,11 @@ export const IDL: BaseTokenPool = {
             }
           },
           "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
         }
       ]
     },
@@ -1136,11 +1136,6 @@ export const IDL: BaseTokenPool = {
         {
           "name": "chainSelector",
           "type": "u64",
-          "index": false
-        },
-        {
-          "name": "mint",
-          "type": "publicKey",
           "index": false
         },
         {
@@ -1156,6 +1151,11 @@ export const IDL: BaseTokenPool = {
             "defined": "RateLimitConfig"
           },
           "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
         }
       ]
     },
@@ -1165,11 +1165,6 @@ export const IDL: BaseTokenPool = {
         {
           "name": "chainSelector",
           "type": "u64",
-          "index": false
-        },
-        {
-          "name": "mint",
-          "type": "publicKey",
           "index": false
         },
         {
@@ -1188,6 +1183,11 @@ export const IDL: BaseTokenPool = {
               "defined": "RemoteAddress"
             }
           },
+          "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
           "index": false
         }
       ]
@@ -1211,17 +1211,17 @@ export const IDL: BaseTokenPool = {
       "name": "RouterUpdated",
       "fields": [
         {
-          "name": "mint",
-          "type": "publicKey",
-          "index": false
-        },
-        {
           "name": "oldRouter",
           "type": "publicKey",
           "index": false
         },
         {
           "name": "newRouter",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mint",
           "type": "publicKey",
           "index": false
         }
@@ -1231,17 +1231,17 @@ export const IDL: BaseTokenPool = {
       "name": "OwnershipTransferRequested",
       "fields": [
         {
-          "name": "mint",
-          "type": "publicKey",
-          "index": false
-        },
-        {
           "name": "from",
           "type": "publicKey",
           "index": false
         },
         {
           "name": "to",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mint",
           "type": "publicKey",
           "index": false
         }
@@ -1251,17 +1251,17 @@ export const IDL: BaseTokenPool = {
       "name": "OwnershipTransferred",
       "fields": [
         {
-          "name": "mint",
-          "type": "publicKey",
-          "index": false
-        },
-        {
           "name": "from",
           "type": "publicKey",
           "index": false
         },
         {
           "name": "to",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mint",
           "type": "publicKey",
           "index": false
         }

@@ -394,11 +394,6 @@
           "index": false
         },
         {
-          "name": "mint",
-          "type": "publicKey",
-          "index": false
-        },
-        {
           "name": "token",
           "type": {
             "defined": "RemoteAddress"
@@ -429,6 +424,11 @@
             }
           },
           "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
         }
       ]
     },
@@ -438,11 +438,6 @@
         {
           "name": "chainSelector",
           "type": "u64",
-          "index": false
-        },
-        {
-          "name": "mint",
-          "type": "publicKey",
           "index": false
         },
         {
@@ -458,6 +453,11 @@
             "defined": "RateLimitConfig"
           },
           "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
         }
       ]
     },
@@ -467,11 +467,6 @@
         {
           "name": "chainSelector",
           "type": "u64",
-          "index": false
-        },
-        {
-          "name": "mint",
-          "type": "publicKey",
           "index": false
         },
         {
@@ -490,6 +485,11 @@
               "defined": "RemoteAddress"
             }
           },
+          "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
           "index": false
         }
       ]
@@ -513,17 +513,17 @@
       "name": "RouterUpdated",
       "fields": [
         {
-          "name": "mint",
-          "type": "publicKey",
-          "index": false
-        },
-        {
           "name": "oldRouter",
           "type": "publicKey",
           "index": false
         },
         {
           "name": "newRouter",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mint",
           "type": "publicKey",
           "index": false
         }
@@ -533,17 +533,17 @@
       "name": "OwnershipTransferRequested",
       "fields": [
         {
-          "name": "mint",
-          "type": "publicKey",
-          "index": false
-        },
-        {
           "name": "from",
           "type": "publicKey",
           "index": false
         },
         {
           "name": "to",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mint",
           "type": "publicKey",
           "index": false
         }
@@ -553,17 +553,17 @@
       "name": "OwnershipTransferred",
       "fields": [
         {
-          "name": "mint",
-          "type": "publicKey",
-          "index": false
-        },
-        {
           "name": "from",
           "type": "publicKey",
           "index": false
         },
         {
           "name": "to",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mint",
           "type": "publicKey",
           "index": false
         }
