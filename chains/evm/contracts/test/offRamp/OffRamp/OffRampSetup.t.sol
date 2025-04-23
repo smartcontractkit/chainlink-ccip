@@ -16,7 +16,7 @@ import {MessageInterceptorHelper} from "../../helpers/MessageInterceptorHelper.s
 import {OffRampHelper} from "../../helpers/OffRampHelper.sol";
 import {MaybeRevertMessageReceiver} from "../../helpers/receivers/MaybeRevertMessageReceiver.sol";
 import {MultiOCR3BaseSetup} from "../../ocr/MultiOCR3Base/MultiOCR3BaseSetup.t.sol";
-import {AuthorizedCallers} from "@shared/access/AuthorizedCallers.sol";
+import {AuthorizedCallers} from "@chainlink/shared/access/AuthorizedCallers.sol";
 import {Vm} from "forge-std/Test.sol";
 
 contract OffRampSetup is FeeQuoterSetup, MultiOCR3BaseSetup {

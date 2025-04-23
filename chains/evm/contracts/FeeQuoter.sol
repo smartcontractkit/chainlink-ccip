@@ -3,20 +3,20 @@ pragma solidity ^0.8.24;
 
 import {IFeeQuoter} from "./interfaces/IFeeQuoter.sol";
 import {IPriceRegistry} from "./interfaces/IPriceRegistry.sol";
-import {IReceiver} from "@keystone/interfaces/IReceiver.sol";
-import {ITypeAndVersion} from "@shared/interfaces/ITypeAndVersion.sol";
+import {IReceiver} from "@chainlink/keystone/interfaces/IReceiver.sol";
+import {ITypeAndVersion} from "@chainlink/shared/interfaces/ITypeAndVersion.sol";
 
 import {Client} from "./libraries/Client.sol";
 import {Internal} from "./libraries/Internal.sol";
 import {Pool} from "./libraries/Pool.sol";
 import {USDPriceWith18Decimals} from "./libraries/USDPriceWith18Decimals.sol";
-import {KeystoneFeedsPermissionHandler} from "@keystone/KeystoneFeedsPermissionHandler.sol";
-import {KeystoneFeedDefaultMetadataLib} from "@keystone/lib/KeystoneFeedDefaultMetadataLib.sol";
-import {AuthorizedCallers} from "@shared/access/AuthorizedCallers.sol";
-import {AggregatorV3Interface} from "@shared/interfaces/AggregatorV3Interface.sol";
+import {KeystoneFeedsPermissionHandler} from "@chainlink/keystone/KeystoneFeedsPermissionHandler.sol";
+import {KeystoneFeedDefaultMetadataLib} from "@chainlink/keystone/lib/KeystoneFeedDefaultMetadataLib.sol";
+import {AuthorizedCallers} from "@chainlink/shared/access/AuthorizedCallers.sol";
+import {AggregatorV3Interface} from "@chainlink/shared/interfaces/AggregatorV3Interface.sol";
 
-import {IERC165} from "@vendor/openzeppelin-solidity/v5.0.2/contracts/interfaces/IERC165.sol";
-import {EnumerableSet} from "@vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
+import {IERC165} from "@chainlink/vendor/openzeppelin-solidity/v5.0.2/contracts/interfaces/IERC165.sol";
+import {EnumerableSet} from "@chainlink/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
 
 /// @notice The FeeQuoter contract responsibility is to:
 ///   - Store the current gas price in USD for a given destination chain.
@@ -169,7 +169,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   /// @dev The decimals that Keystone reports prices in.
   uint256 public constant KEYSTONE_PRICE_DECIMALS = 18;
 
-  string public constant override typeAndVersion = "FeeQuoter 1.6.1-dev";
+  string public constant override typeAndVersion = "FeeQuoter 1.6.0";
 
   /// @dev The gas price per unit of gas for a given destination chain, in USD with 18 decimals. Multiple gas prices can
   /// be encoded into the same value. Each price takes {Internal.GAS_PRICE_BITS} bits. For example, if Optimism is the
@@ -888,10 +888,12 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
       return Internal._validateEVMAddress(destAddress);
     }
     if (chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SVM) {
-      return Internal._validate32ByteAddress(destAddress, gasLimit > 0);
+      // SVM addresses don't have a precompile space at the first X addresses, instead we validate that if the gasLimit
+      // is non-zero, the address must not be 0x0.
+      return Internal._validate32ByteAddress(destAddress, gasLimit > 0 ? 1 : 0);
     }
     if (chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_APTOS) {
-      return Internal._validate32ByteAddress(destAddress, true);
+      return Internal._validate32ByteAddress(destAddress, Internal.APTOS_PRECOMPILE_SPACE);
     }
     revert InvalidChainFamilySelector(chainFamilySelector);
   }

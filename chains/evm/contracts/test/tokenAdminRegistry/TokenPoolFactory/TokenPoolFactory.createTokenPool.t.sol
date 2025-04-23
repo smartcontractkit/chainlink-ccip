@@ -2,9 +2,9 @@
 pragma solidity ^0.8.24;
 
 import {IOwner} from "../../../interfaces/IOwner.sol";
-import {IBurnMintERC20} from "@shared/token/ERC20/IBurnMintERC20.sol";
+import {IBurnMintERC20} from "@chainlink/shared/token/ERC20/IBurnMintERC20.sol";
 
-import {Ownable2Step} from "@shared/access/Ownable2Step.sol";
+import {Ownable2Step} from "@chainlink/shared/access/Ownable2Step.sol";
 
 import {Router} from "../../../Router.sol";
 import {RateLimiter} from "../../../libraries/RateLimiter.sol";
@@ -18,8 +18,9 @@ import {FactoryBurnMintERC20} from "../../../tokenAdminRegistry/TokenPoolFactory
 import {TokenPoolFactory} from "../../../tokenAdminRegistry/TokenPoolFactory/TokenPoolFactory.sol";
 import {TokenPoolFactorySetup} from "./TokenPoolFactorySetup.t.sol";
 
-import {IERC20Metadata} from "@vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import {Create2} from "@vendor/openzeppelin-solidity/v5.0.2/contracts/utils/Create2.sol";
+import {IERC20Metadata} from
+  "@chainlink/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {Create2} from "@chainlink/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/Create2.sol";
 
 contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
   using Create2 for bytes32;
