@@ -197,7 +197,8 @@ func (p *Plugin) getCommitReportsObservation(
 	}
 
 	// Get pending exec reports.
-	groupedCommits, fullyExecutedFinalized, fullyExecutedUnfinalized, err := getPendingReportsForExecution(
+	groupedCommits, fullyExecutedFinalized, fullyExecutedUnfinalized, latestEmptyRootTimestamp,
+		err := getPendingReportsForExecution(
 		ctx,
 		p.ccipReader,
 		p.commitRootsCache.CanExecute,
@@ -208,6 +209,8 @@ func (p *Plugin) getCommitReportsObservation(
 	if err != nil {
 		return exectypes.Observation{}, err
 	}
+
+	p.commitRootsCache.UpdateLatestEmptyRootTimestamp(latestEmptyRootTimestamp)
 
 	// TODO: message from fullyExecutedCommits which are in the inflight messages cache could be cleared here.
 

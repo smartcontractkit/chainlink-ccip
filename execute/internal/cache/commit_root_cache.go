@@ -50,6 +50,8 @@ type CommitsRootsCache interface {
 	// UpdateEarliestUnexecutedRoot updates the earliest unexecuted root timestamp
 	// based on the remaining unexecuted and executed but not finalized reports.
 	UpdateEarliestUnexecutedRoot(remainingReports map[ccipocr3.ChainSelector][]exectypes.CommitData)
+
+	UpdateLatestEmptyRootTimestamp(timestamp time.Time)
 }
 
 func NewCommitRootsCache(
@@ -126,6 +128,19 @@ type commitRootsCache struct {
 	// earliestUnexecutedRoot tracks the timestamp of the earliest unexecuted root
 	// to optimize database queries by potentially starting from a later timestamp
 	earliestUnexecutedRoot time.Time
+
+	// latestEmptyRoot tracks the timestamp of the latest Finalized empty root,
+	// This is to ensure that the plugin is moving forward if all reports within round limit are empty
+
+	latestEmptyRoot time.Time
+}
+
+func (r *commitRootsCache) UpdateLatestEmptyRootTimestamp(timestamp time.Time) {
+	r.cacheMu.Lock()
+	defer r.cacheMu.Unlock()
+	if timestamp.After(r.latestEmptyRoot) {
+		r.latestEmptyRoot = timestamp
+	}
 }
 
 func getKey(source ccipocr3.ChainSelector, merkleRoot ccipocr3.Bytes32) string {
@@ -172,32 +187,45 @@ func (r *commitRootsCache) isExecuted(key string) bool {
 // GetTimestampToQueryFrom returns the timestamp to use when querying for commit reports.
 // It optimizes the query window by using the later of:
 // 1. The message visibility window
-// 2. The earliest unexecuted root timestamp (if available)
+// 2. Min(earliestUnexecutedRoot, latestEmptyRoot) if it's after the message visibility window
+// TODO: add diagram in github instead of using external link
+// For illustration check https://app.excalidraw.com/l/AdjkJ3DaenS/84EpHxkgbND
 func (r *commitRootsCache) GetTimestampToQueryFrom() time.Time {
 	r.cacheMu.RLock()
 	defer r.cacheMu.RUnlock()
-
 	// Calculate current visibility window based on stored interval
 	messageVisibilityWindow := r.timeProvider.Now().Add(-r.messageVisibilityInterval).UTC()
-
 	// Start with message visibility window as the default (lower bound)
 	commitRootsFilterTimestamp := messageVisibilityWindow
-
-	// If we know the earliest unexecuted root and it's AFTER the visibility window,
-	// we can optimize by starting our query from that timestamp instead
-	if !r.earliestUnexecutedRoot.IsZero() && r.earliestUnexecutedRoot.After(messageVisibilityWindow) {
-		commitRootsFilterTimestamp = r.earliestUnexecutedRoot
-		r.lggr.Debugw("Using earliest unexecuted root as query timestamp",
-			"earliestUnexecutedRoot", r.earliestUnexecutedRoot,
+	// Determine the earliest timestamp between unexecuted root and latest empty root
+	var minTimestamp time.Time
+	// Check if earliestUnexecutedRoot is set
+	if !r.earliestUnexecutedRoot.IsZero() {
+		minTimestamp = r.earliestUnexecutedRoot
+		r.lggr.Debugw("MinTimeStamp set to earliest unexecuted root")
+	}
+	// Check if latestEmptyRoot is set
+	if !r.latestEmptyRoot.IsZero() {
+		// If minTimestamp is not set or latestEmptyRoot is earlier, use latestEmptyRoot
+		if minTimestamp.IsZero() || r.latestEmptyRoot.Before(minTimestamp) {
+			minTimestamp = r.latestEmptyRoot
+		}
+		r.lggr.Debugw("MinTimeStamp set to latest empty finalized root")
+	}
+	// If we know the earliest unexecuted root or latestEmptymTimestamp and it's AFTER the visibility window,
+	// we can optimize by starting our query from that earliest timestamp of them instead
+	if minTimestamp.After(messageVisibilityWindow) {
+		commitRootsFilterTimestamp = minTimestamp
+		r.lggr.Debugw("Using minTimestamp to optimize query",
+			"minTimestamp", minTimestamp,
 			"messageVisibilityWindow", messageVisibilityWindow)
 	}
-
 	r.lggr.Debugw("Getting timestamp to query from",
 		"earliestUnexecutedRoot", r.earliestUnexecutedRoot,
+		"latestEmptyRoot", r.latestEmptyRoot,
 		"messageVisibilityWindow", messageVisibilityWindow,
 		"commitRootsFilterTimestamp", commitRootsFilterTimestamp,
 		"optimized", commitRootsFilterTimestamp.After(messageVisibilityWindow))
-
 	return commitRootsFilterTimestamp
 }
 
