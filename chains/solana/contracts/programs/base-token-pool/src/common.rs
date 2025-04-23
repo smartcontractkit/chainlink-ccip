@@ -109,6 +109,7 @@ impl BaseConfig {
         self.proposed_owner = proposed_owner;
 
         emit!(OwnershipTransferRequested {
+            mint: self.mint,
             from: self.owner,
             to: self.proposed_owner,
         });
@@ -121,6 +122,7 @@ impl BaseConfig {
         self.owner = std::mem::take(&mut self.proposed_owner);
 
         emit!(OwnershipTransferred {
+            mint: self.mint,
             from: old_owner,
             to: self.owner,
         });
@@ -142,6 +144,7 @@ impl BaseConfig {
             &new_router,
         );
         emit!(RouterUpdated {
+            mint: self.mint,
             old_router,
             new_router,
         });
@@ -167,7 +170,12 @@ pub struct BaseChain {
 }
 
 impl BaseChain {
-    pub fn set(&mut self, remote_chain_selector: u64, new_cfg: RemoteConfig) -> Result<()> {
+    pub fn set(
+        &mut self,
+        remote_chain_selector: u64,
+        mint: Pubkey,
+        new_cfg: RemoteConfig,
+    ) -> Result<()> {
         let old_mint = self.remote.token_address.clone();
         let old_pools = self.remote.pool_addresses.clone();
 
@@ -175,6 +183,7 @@ impl BaseChain {
 
         emit!(RemoteChainConfigured {
             chain_selector: remote_chain_selector,
+            mint,
             token: self.remote.token_address.clone(),
             previous_token: old_mint,
             pool_addresses: self.remote.pool_addresses.clone(),
@@ -186,6 +195,7 @@ impl BaseChain {
     pub fn append_remote_pool_addresses(
         &mut self,
         remote_chain_selector: u64,
+        mint: Pubkey,
         addresses: Vec<RemoteAddress>,
     ) -> Result<()> {
         let old_pools = self.remote.pool_addresses.clone();
@@ -200,6 +210,7 @@ impl BaseChain {
 
         emit!(RemotePoolsAppended {
             chain_selector: remote_chain_selector,
+            mint,
             pool_addresses: self.remote.pool_addresses.clone(),
             previous_pool_addresses: old_pools,
         });
@@ -209,6 +220,7 @@ impl BaseChain {
     pub fn set_chain_rate_limit(
         &mut self,
         remote_chain_selector: u64,
+        mint: Pubkey,
         inbound: RateLimitConfig,
         outbound: RateLimitConfig,
     ) -> Result<()> {
@@ -219,6 +231,7 @@ impl BaseChain {
 
         emit!(RateLimitConfigured {
             chain_selector: remote_chain_selector,
+            mint,
             outbound_rate_limit: outbound,
             inbound_rate_limit: inbound,
         });
@@ -350,6 +363,7 @@ pub struct Released {
 #[event]
 pub struct RemoteChainConfigured {
     pub chain_selector: u64,
+    pub mint: Pubkey,
     pub token: RemoteAddress,
     pub previous_token: RemoteAddress,
     pub pool_addresses: Vec<RemoteAddress>,

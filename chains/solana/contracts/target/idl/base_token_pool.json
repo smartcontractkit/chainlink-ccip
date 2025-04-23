@@ -394,6 +394,11 @@
           "index": false
         },
         {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
+        },
+        {
           "name": "token",
           "type": {
             "defined": "RemoteAddress"
@@ -436,6 +441,11 @@
           "index": false
         },
         {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
+        },
+        {
           "name": "outboundRateLimit",
           "type": {
             "defined": "RateLimitConfig"
@@ -457,6 +467,11 @@
         {
           "name": "chainSelector",
           "type": "u64",
+          "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
           "index": false
         },
         {
@@ -486,12 +501,22 @@
           "name": "chainSelector",
           "type": "u64",
           "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
         }
       ]
     },
     {
       "name": "RouterUpdated",
       "fields": [
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
+        },
         {
           "name": "oldRouter",
           "type": "publicKey",
@@ -508,6 +533,11 @@
       "name": "OwnershipTransferRequested",
       "fields": [
         {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
+        },
+        {
           "name": "from",
           "type": "publicKey",
           "index": false
@@ -522,6 +552,11 @@
     {
       "name": "OwnershipTransferred",
       "fields": [
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
+        },
         {
           "name": "from",
           "type": "publicKey",
