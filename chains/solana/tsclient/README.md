@@ -118,6 +118,7 @@ IN `src/staging.ts`, set the following variables:
 
 ```typescript
   export const tokenAdminRegistry = {
+    key_pair_path: "./ccip-keypair.json",
     mint: new web3.PublicKey(""), // Token Mint
     token_program: new web3.PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"), // spl token program
     token_pool_program: new web3.PublicKey(""), // Token Pool Program

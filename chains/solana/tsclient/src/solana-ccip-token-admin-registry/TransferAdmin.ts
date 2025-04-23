@@ -11,7 +11,7 @@ import {
 
   async function transferAdmin() {
     const keypair = Keypair.fromSecretKey(
-      new Uint8Array(JSON.parse(readFileSync("../contracts/id.json", "utf-8")))
+      new Uint8Array(JSON.parse(readFileSync(tokenAdminRegistry.key_pair_path, "utf-8")))
     );
 
     const config = getCCIPSendConfig("devnet");

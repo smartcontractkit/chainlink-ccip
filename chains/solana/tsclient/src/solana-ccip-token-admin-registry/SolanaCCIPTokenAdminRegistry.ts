@@ -10,13 +10,14 @@ import {
   import { ownerProposeAdministrator } from "./../solana-ccip-send/bindings/instructions/ownerProposeAdministrator";
 import { getCCIPSendConfig } from "../solana-ccip-send/SolanaCCIPSendConfig";
 import { SolanaCCIPPDAs } from "../solana-ccip-send/SolanaCCIPPDAs";
+import { tokenAdminRegistry } from "../staging";
 
   export class SolanaTokenAdmin {
     readonly connection: Connection;
     readonly keypair: Keypair;
 
     constructor(readonly config = getCCIPSendConfig("devnet")) {
-      const keypairPath = "./ccip-keypair.json";
+      const keypairPath = tokenAdminRegistry.key_pair_path;
       const secret = Uint8Array.from(
         JSON.parse(fs.readFileSync(keypairPath, "utf-8")),
       );

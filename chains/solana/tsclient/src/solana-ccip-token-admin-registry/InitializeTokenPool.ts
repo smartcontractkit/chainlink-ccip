@@ -12,7 +12,7 @@ import { createInitializeInstruction } from "./bnm-instructions";
 const POOL_STATE_SEED = Buffer.from("ccip_tokenpool_config");
 
 const keypair = Keypair.fromSecretKey(
-new Uint8Array(JSON.parse(readFileSync("../contracts/id.json", "utf-8")))
+new Uint8Array(JSON.parse(readFileSync(tokenAdminRegistry.key_pair_path, "utf-8")))
 );
 
 const config = getCCIPSendConfig("devnet");
