@@ -235,12 +235,14 @@ func TestTokenPool(t *testing.T) {
 						require.Equal(t, 0, len(eventConfigured.PreviousPoolAddresses))
 						require.Equal(t, remoteToken, eventConfigured.Token)
 						require.Equal(t, 0, len(eventConfigured.PreviousToken.Address))
+						require.Equal(t, mint, eventConfigured.Mint)
 
 						eventAppended := tokens.EventRemotePoolsAppended{}
 						require.NoError(t, common.ParseEvent(res.Meta.LogMessages, "RemotePoolsAppended", &eventAppended, config.PrintEvents))
 						require.Equal(t, config.EvmChainSelector, eventAppended.ChainSelector)
 						require.Equal(t, []test_token_pool.RemoteAddress{remotePool}, eventAppended.PoolAddresses)
 						require.Equal(t, 0, len(eventAppended.PreviousPoolAddresses))
+						require.Equal(t, mint, eventAppended.Mint)
 
 						eventRateLimit := tokens.EventRateLimitConfigured{}
 						require.NoError(t, common.ParseEvent(res.Meta.LogMessages, "RateLimitConfigured", &eventRateLimit, config.PrintEvents))
@@ -251,6 +253,7 @@ func TestTokenPool(t *testing.T) {
 						require.Equal(t, false, eventRateLimit.OutboundRateLimit.Enabled)
 						require.Equal(t, uint64(0), eventRateLimit.OutboundRateLimit.Capacity)
 						require.Equal(t, uint64(0), eventRateLimit.OutboundRateLimit.Rate)
+						require.Equal(t, mint, eventRateLimit.Mint)
 					})
 
 					t.Run("admin:ownership", func(t *testing.T) {
@@ -675,11 +678,13 @@ func TestTokenPool(t *testing.T) {
 						eventDelete := tokens.EventChainRemoved{}
 						require.NoError(t, common.ParseEvent(res.Meta.LogMessages, "RemoteChainRemoved", &eventDelete, config.PrintEvents))
 						require.Equal(t, config.EvmChainSelector, eventDelete.ChainSelector)
+						require.Equal(t, mint, eventDelete.Mint)
 
 						eventRouter := tokens.EventRouterUpdated{}
 						require.NoError(t, common.ParseEvent(res.Meta.LogMessages, "RouterUpdated", &eventRouter, config.PrintEvents))
 						require.Equal(t, config.CcipRouterProgram, eventRouter.NewRouter)
 						require.Equal(t, dumbRamp, eventRouter.OldRouter)
+						require.Equal(t, mint, eventRouter.Mint)
 					})
 				})
 			}
