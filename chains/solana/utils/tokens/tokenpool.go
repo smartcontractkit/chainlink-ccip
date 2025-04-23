@@ -175,6 +175,7 @@ type EventChainConfigured struct {
 	PreviousToken         test_token_pool.RemoteAddress
 	PoolAddresses         []test_token_pool.RemoteAddress
 	PreviousPoolAddresses []test_token_pool.RemoteAddress
+	Mint                  solana.PublicKey
 }
 
 type EventRemotePoolsAppended struct {
@@ -182,6 +183,7 @@ type EventRemotePoolsAppended struct {
 	ChainSelector         uint64
 	PoolAddresses         []test_token_pool.RemoteAddress
 	PreviousPoolAddresses []test_token_pool.RemoteAddress
+	Mint                  solana.PublicKey
 }
 
 type EventRateLimitConfigured struct {
@@ -189,17 +191,20 @@ type EventRateLimitConfigured struct {
 	ChainSelector     uint64
 	OutboundRateLimit test_token_pool.RateLimitConfig
 	InboundRateLimit  test_token_pool.RateLimitConfig
+	Mint              solana.PublicKey
 }
 
 type EventChainRemoved struct {
 	Discriminator [8]byte
 	ChainSelector uint64
+	Mint          solana.PublicKey
 }
 
 type EventRouterUpdated struct {
 	Discriminator [8]byte
 	OldRouter     solana.PublicKey
 	NewRouter     solana.PublicKey
+	Mint          solana.PublicKey
 }
 
 func MethodToEvent(m string) string {
