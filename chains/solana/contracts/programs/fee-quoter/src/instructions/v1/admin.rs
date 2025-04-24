@@ -69,6 +69,24 @@ impl Admin for Impl {
         Ok(())
     }
 
+    fn set_max_fee_juels_per_msg(
+        &self,
+        ctx: Context<UpdateConfig>,
+        max_fee_juels_per_msg: u128,
+    ) -> Result<()> {
+        let config = &mut ctx.accounts.config;
+        config.max_fee_juels_per_msg = max_fee_juels_per_msg;
+
+        emit!(ConfigSet {
+            max_fee_juels_per_msg: config.max_fee_juels_per_msg,
+            link_token_mint: config.link_token_mint,
+            link_token_local_decimals: config.link_token_local_decimals,
+            onramp: config.onramp,
+            default_code_version: config.default_code_version
+        });
+        Ok(())
+    }
+
     fn add_billing_token_config(
         &self,
         ctx: Context<AddBillingTokenConfig>,
