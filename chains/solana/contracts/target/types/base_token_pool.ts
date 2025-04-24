@@ -424,6 +424,11 @@ export type BaseTokenPool = {
             }
           },
           "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
         }
       ]
     },
@@ -447,6 +452,11 @@ export type BaseTokenPool = {
           "type": {
             "defined": "RateLimitConfig"
           },
+          "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
           "index": false
         }
       ]
@@ -476,6 +486,11 @@ export type BaseTokenPool = {
             }
           },
           "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
         }
       ]
     },
@@ -485,6 +500,11 @@ export type BaseTokenPool = {
         {
           "name": "chainSelector",
           "type": "u64",
+          "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
           "index": false
         }
       ]
@@ -499,6 +519,11 @@ export type BaseTokenPool = {
         },
         {
           "name": "newRouter",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mint",
           "type": "publicKey",
           "index": false
         }
@@ -516,6 +541,11 @@ export type BaseTokenPool = {
           "name": "to",
           "type": "publicKey",
           "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
         }
       ]
     },
@@ -529,6 +559,11 @@ export type BaseTokenPool = {
         },
         {
           "name": "to",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mint",
           "type": "publicKey",
           "index": false
         }
@@ -1087,6 +1122,11 @@ export const IDL: BaseTokenPool = {
             }
           },
           "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
         }
       ]
     },
@@ -1110,6 +1150,11 @@ export const IDL: BaseTokenPool = {
           "type": {
             "defined": "RateLimitConfig"
           },
+          "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
           "index": false
         }
       ]
@@ -1139,6 +1184,11 @@ export const IDL: BaseTokenPool = {
             }
           },
           "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
         }
       ]
     },
@@ -1148,6 +1198,11 @@ export const IDL: BaseTokenPool = {
         {
           "name": "chainSelector",
           "type": "u64",
+          "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
           "index": false
         }
       ]
@@ -1162,6 +1217,11 @@ export const IDL: BaseTokenPool = {
         },
         {
           "name": "newRouter",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mint",
           "type": "publicKey",
           "index": false
         }
@@ -1179,6 +1239,11 @@ export const IDL: BaseTokenPool = {
           "name": "to",
           "type": "publicKey",
           "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
         }
       ]
     },
@@ -1192,6 +1257,11 @@ export const IDL: BaseTokenPool = {
         },
         {
           "name": "to",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mint",
           "type": "publicKey",
           "index": false
         }
