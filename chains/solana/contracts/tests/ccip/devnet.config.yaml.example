@@ -1,0 +1,15 @@
+offramp: offVkroQ4wYMv6QFPBvJazAx2p8BnLh7sJRdyQ5GYfx
+test_receiver: <PUT YOUR TEST RECEIVER ADDRESS HERE>
+example_sender: <PUT YOUR EXAMPLE SENDER ADDRESS HERE>
+
+chain_selectors:
+  sepolia: 16015286601757825753
+  fuji: 14767482510784806043
+  svm: 16423721717087811551
+
+rpc: https://api.devnet.solana.com
+
+private_keys:
+  #### REPLACE WITH YOUR PRIVATE KEY ####
+  # The example below is a keypair generated just for this example, is not used anywhere
+  admin: [254,131,249,178,60,188,104,103,38,182,42,56,146,74,186,219,227,127,204,77,136,133,252,51,172,243,221,198,28,9,28,201,121,122,174,213,128,129,135,244,56,9,227,34,95,35,124,222,13,206,165,222,239,77,87,206,65,57,223,199,34,80,206,143]

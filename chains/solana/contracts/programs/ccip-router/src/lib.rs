@@ -23,7 +23,7 @@ use crate::instructions::router;
 const TOKENPOOL_LOCK_OR_BURN_DISCRIMINATOR: [u8; 8] =
     [0x72, 0xa1, 0x5e, 0x1d, 0x93, 0x19, 0xe8, 0xbf]; // lock_or_burn_tokens
 
-declare_id!("Ccip842gzYHhvdDkSyi2YVCoAWPbYJoApMFzSxQroE9C");
+declare_id!("GVf3xbRe5jAfmkpcYvdQheFZV5pugY3n1ZinfQMSDxiw");
 
 #[program]
 /// The `ccip_router` module contains the implementation of the Cross-Chain Interoperability Protocol (CCIP) Router.

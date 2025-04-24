@@ -29,7 +29,7 @@ pub enum CommonCcipError {
 // Duplicates the router ID to declare router accounts that must be visible from the common crate,
 // avoiding a circular dependency. This means this crate may only declare accounts that belong
 // to the router, and no other program.
-declare_id!("Ccip842gzYHhvdDkSyi2YVCoAWPbYJoApMFzSxQroE9C");
+declare_id!("JDXoMnGDrpRZgAz12JpcwKTk3oyxPQzCaCSFsXRuqrS");
 // null contract required for IDL + gobinding generation
 #[program]
 pub mod ccip_common {}

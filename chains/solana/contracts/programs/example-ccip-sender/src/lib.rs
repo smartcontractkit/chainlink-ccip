@@ -9,7 +9,7 @@ use solana_program::{
 
 use ccip_router::messages::{GetFeeResult, SVM2AnyMessage, SVMTokenAmount};
 
-declare_id!("4LfBQWYaU6zQZbDyYjX8pbY4qjzrhoumUFYZEZEqMNhJ");
+declare_id!("136AcFw47eeks46fpQZBsofNhLD5CrhQqi76JTbPJW6F");
 
 #[cfg(target_os = "solana")]
 #[global_allocator]

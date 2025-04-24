@@ -1,10 +1,9 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{Mint, TokenAccount};
 
-declare_id!("48LGpn6tPn5SjTtK2wL9uUx48JUWZdZBv11sboy2orCc");
+declare_id!("BW5cxJ6oQGehcWYHZ2XXyZDHDda8tfJCcYKPZJXfQW38");
 
 pub const EXTERNAL_EXECUTION_CONFIG_SEED: &[u8] = b"external_execution_config";
-pub const APPROVED_SENDER_SEED: &[u8] = b"approved_ccip_sender";
 pub const TOKEN_ADMIN_SEED: &[u8] = b"receiver_token_admin";
 pub const ALLOWED_OFFRAMP: &[u8] = b"allowed_offramp";
 pub const STATE: &[u8] = b"state";
@@ -12,7 +11,7 @@ pub const STATE: &[u8] = b"state";
 /// This program an example of a CCIP Receiver Program.
 /// Used to test CCIP Router execute.
 #[program]
-pub mod example_ccip_receiver {
+pub mod redirecting_ccip_receiver {
     use anchor_spl::token_2022::spl_token_2022::{self, instruction::transfer_checked};
     use solana_program::program::invoke_signed;
 
