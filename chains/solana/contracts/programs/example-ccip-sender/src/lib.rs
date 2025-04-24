@@ -39,6 +39,8 @@ pub const CCIP_GET_FEE_DISCRIMINATOR: [u8; 8] = [115, 195, 235, 161, 25, 219, 60
 /// Used to test CCIP Router ccip_send.
 #[program]
 pub mod example_ccip_sender {
+    use std::collections::BTreeSet;
+
     use super::*;
 
     pub fn initialize(ctx: Context<Initialize>, router: Pubkey) -> Result<()> {
@@ -64,6 +66,13 @@ pub mod example_ccip_sender {
         };
         let seeds = &[CCIP_SENDER, &[ctx.bumps.ccip_sender]];
 
+        // Check that no token is transferred more than once
+        let mints: BTreeSet<Pubkey> = token_amounts.iter().map(|ta| ta.token).collect();
+        require!(
+            token_amounts.len() == mints.len(),
+            SenderError::TransferTokenDuplicated
+        );
+
         // process token accounts
         let (token_accounts, ccip_token_indexes) = parse_and_validate_token_pool_accounts(
             &token_amounts,
@@ -72,13 +81,16 @@ pub mod example_ccip_sender {
         )?;
         for (i, acc) in token_accounts.iter().enumerate() {
             // transfer tokens to this contract and approve the router to take possession during message processing
+            if acc.mint.key() == fee_token {
+                continue; // skip this one, as it will be handled together with the fee later
+            }
             transfer_to_self_and_approve(
                 acc.program,
                 acc.mint,
                 acc.from_ata,
                 acc.self_ata,
                 &ctx.accounts.ccip_sender.to_account_info(),
-                &acc.ccip_router_pool_signer.to_account_info(),
+                &ctx.accounts.ccip_fee_billing_signer.to_account_info(),
                 seeds,
                 token_amounts[i].amount,
                 acc.decimals,
@@ -137,6 +149,12 @@ pub mod example_ccip_sender {
 
         // if fee token is not native, transfer the fee amounts from sender to the program and approve the router
         if fee_token != Pubkey::default() {
+            // if paying fees with a token that is also being transferred, consider the amount to for both operations
+            let transferred_amount = token_amounts
+                .iter()
+                .find(|ta| ta.token == fee_token)
+                .map_or(0, |ta| ta.amount);
+
             transfer_to_self_and_approve(
                 &ctx.accounts.ccip_fee_token_program.to_account_info(),
                 &ctx.accounts.ccip_fee_token_mint.to_account_info(),
@@ -145,7 +163,7 @@ pub mod example_ccip_sender {
                 &ctx.accounts.ccip_sender.to_account_info(),
                 &ctx.accounts.ccip_fee_billing_signer.to_account_info(),
                 seeds,
-                fee.amount,
+                fee.amount + transferred_amount,
                 ctx.accounts.ccip_fee_token_mint.decimals,
             )?;
         }
@@ -295,4 +313,10 @@ pub mod example_ccip_sender {
     ) -> Result<()> {
         Ok(())
     }
+}
+
+#[error_code]
+pub enum SenderError {
+    #[msg("The same token is being transferred more than once")]
+    TransferTokenDuplicated,
 }
