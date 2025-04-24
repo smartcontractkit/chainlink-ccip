@@ -200,8 +200,6 @@ func TestCCIPRouter(t *testing.T) {
 				{"ccip-router", config.CcipRouterProgram, ccip_router.NewTypeVersionInstruction(solana.SysVarClockPubkey).Build()},
 				{"fee-quoter", config.FeeQuoterProgram, fee_quoter.NewTypeVersionInstruction(solana.SysVarClockPubkey).Build()},
 				{"ccip-offramp", config.CcipOfframpProgram, ccip_offramp.NewTypeVersionInstruction(solana.SysVarClockPubkey).Build()},
-				// {"burnmint-token-pool", burnmint_token_pool.NewTypeVersionInstruction(solana.SysVarClockPubkey).Build()},
-				// {"lockrelease-token-pool", ccip_router.NewTypeVersionInstruction(solana.SysVarClockPubkey).Build()},
 				{"rmn-remote", config.RMNRemoteProgram, rmn_remote.NewTypeVersionInstruction(solana.SysVarClockPubkey).Build()},
 			}
 			for _, testcase := range type_version_cases {
@@ -210,7 +208,6 @@ func TestCCIPRouter(t *testing.T) {
 
 					result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{testcase.NewTypeVersionInstruction}, legacyAdmin, config.DefaultCommitment)
 					require.NotNil(t, result)
-					fmt.Printf("Type Version: %s\n", result.Meta.LogMessages)
 
 					output, err := common.ExtractTypedReturnValue(ctx, result.Meta.LogMessages, testcase.Program.String(), func(b []byte) string {
 						require.Len(t, b, int(binary.LittleEndian.Uint32(b[0:4]))+4) // the first 4 bytes just encodes the length
@@ -218,6 +215,7 @@ func TestCCIPRouter(t *testing.T) {
 					})
 					require.NoError(t, err)
 					require.Regexp(t, "^"+testcase.ContractName+" [0-9a-f]{40}$", output)
+					fmt.Printf(testcase.ContractName+" Type Version: %s\n", output)
 				})
 			}
 		})
