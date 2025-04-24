@@ -89,6 +89,7 @@ func TestCCIPRouter(t *testing.T) {
 	evmToken0Decimals := uint8(18)
 	evmToken1Decimals := uint8(18)
 	evmToken2Decimals := uint8(18)
+	evmToken3Decimals := uint8(18)
 
 	token0Decimals := uint8(9)
 	token1Decimals := uint8(18)
@@ -3096,8 +3097,8 @@ func TestCCIPRouter(t *testing.T) {
 				require.NoError(t, err)
 				ixLink, err := test_token_pool.NewInitChainRemoteConfigInstruction(selector, linkPool.Mint, base_token_pool.RemoteConfig{
 					PoolAddresses: []base_token_pool.RemoteAddress{},
-					TokenAddress:  base_token_pool.RemoteAddress{Address: []byte{4, 5, 6}},
-					Decimals:      18,
+					TokenAddress:  base_token_pool.RemoteAddress{Address: config.EVMToken3AddressBytes},
+					Decimals:      evmToken3Decimals,
 				}, linkPool.PoolConfig, linkPool.Chain[selector], legacyAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 				require.NoError(t, err)
 
@@ -3106,7 +3107,9 @@ func TestCCIPRouter(t *testing.T) {
 				ix4, err := test_token_pool.NewAppendRemotePoolAddressesInstruction(selector, token2.Mint, PoolAddresses, token2.PoolConfig, token2.Chain[selector], token2PoolAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 				require.NoError(t, err)
 
-				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix0, ix1, ix2, ix3, ix4, ixLink}, token0PoolAdmin, config.DefaultCommitment, common.AddSigners(token1PoolAdmin, token2PoolAdmin, legacyAdmin))
+				// Note: Splitted into two transactions to avoid exceeding the Solana transaction size limit
+				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix0, ix1, ix2}, token0PoolAdmin, config.DefaultCommitment, common.AddSigners(token1PoolAdmin, token2PoolAdmin, legacyAdmin))
+				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix3, ix4, ixLink}, token0PoolAdmin, config.DefaultCommitment, common.AddSigners(token1PoolAdmin, token2PoolAdmin, legacyAdmin))
 			}
 		})
 
