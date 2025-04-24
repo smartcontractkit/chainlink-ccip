@@ -79,6 +79,17 @@ var (
 	// * `code_version` - The new code version to be set as default.
 	Instruction_SetDefaultCodeVersion = ag_binary.TypeID([8]byte{47, 151, 233, 254, 121, 82, 206, 152})
 
+	// Sets the max_fee_juels_per_msg, which is an upper bound on how much can be billed for any message.
+	// (1 juels = 1e-18 LINK)
+	//
+	// Only the admin may set this.
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for updating the configuration.
+	// * `max_fee_juels_per_msg` - The new value for the max_feel_juels_per_msg config.
+	Instruction_SetMaxFeeJuelsPerMsg = ag_binary.TypeID([8]byte{50, 235, 110, 147, 169, 199, 69, 46})
+
 	// Adds a billing token configuration.
 	// Only CCIP Admin can add a billing token configuration.
 	//
@@ -223,6 +234,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "AcceptOwnership"
 	case Instruction_SetDefaultCodeVersion:
 		return "SetDefaultCodeVersion"
+	case Instruction_SetMaxFeeJuelsPerMsg:
+		return "SetMaxFeeJuelsPerMsg"
 	case Instruction_AddBillingTokenConfig:
 		return "AddBillingTokenConfig"
 	case Instruction_UpdateBillingTokenConfig:
@@ -277,6 +290,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"set_default_code_version", (*SetDefaultCodeVersion)(nil),
+		},
+		{
+			"set_max_fee_juels_per_msg", (*SetMaxFeeJuelsPerMsg)(nil),
 		},
 		{
 			"add_billing_token_config", (*AddBillingTokenConfig)(nil),

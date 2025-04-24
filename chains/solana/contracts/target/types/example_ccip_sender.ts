@@ -434,6 +434,19 @@ export type ExampleCcipSender = {
       }
     }
   ],
+  "types": [
+    {
+      "name": "SenderError",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "TransferTokenDuplicated"
+          }
+        ]
+      }
+    }
+  ],
   "events": [
     {
       "name": "MessageSent",
@@ -906,6 +919,19 @@ export const IDL: ExampleCcipSender = {
           {
             "name": "extraArgsBytes",
             "type": "bytes"
+          }
+        ]
+      }
+    }
+  ],
+  "types": [
+    {
+      "name": "SenderError",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "TransferTokenDuplicated"
           }
         ]
       }
