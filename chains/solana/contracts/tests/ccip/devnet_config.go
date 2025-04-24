@@ -18,9 +18,11 @@ import (
 var devnetInfoBuffer []byte
 
 type DevnetInfo struct {
-	Offramp             string `yaml:"offramp"`
-	RedirectingReceiver string `yaml:"redirecting_receiver"`
-	PrivateKeys         struct {
+	Offramp                  string `yaml:"offramp"`
+	RedirectingReceiver      string `yaml:"redirecting_receiver"`
+	TokenMintForRedirectTest string `yaml:"token_mint_for_redirect_test"`
+	FinalReceiverForRedirect string `yaml:"final_receiver_for_redirect"`
+	PrivateKeys              struct {
 		Admin []byte `yaml:"admin"`
 	} `yaml:"private_keys"`
 	ChainSelectors struct {

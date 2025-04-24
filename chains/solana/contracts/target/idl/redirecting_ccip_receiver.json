@@ -330,6 +330,11 @@
       "code": 6008,
       "name": "InvalidMint",
       "msg": "The provided mint account doesn't correspond to the transferred token"
+    },
+    {
+      "code": 6009,
+      "name": "InvalidMessage",
+      "msg": "The message provided is not the address of the final receiver in b58 format"
     }
   ]
 }

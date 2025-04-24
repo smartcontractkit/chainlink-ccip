@@ -12,6 +12,8 @@ pub const STATE: &[u8] = b"state";
 /// Used to test CCIP Router execute.
 #[program]
 pub mod redirecting_ccip_receiver {
+    use std::str::FromStr;
+
     use anchor_spl::token_2022::spl_token_2022::{self, instruction::transfer_checked};
     use solana_program::program::invoke_signed;
 
@@ -42,6 +44,20 @@ pub mod redirecting_ccip_receiver {
             token_amount.token,
             ctx.accounts.mint.key(),
             CcipReceiverError::InvalidMint
+        );
+
+        // Message data must correspond to the receiver address in b58. It's not too practical (the caller
+        // needs to bundle the key as part as the accounts provided anyway) but it serves to prove the
+        // message processing.
+        let address_in_message = Pubkey::from_str(
+            &String::from_utf8(message.data).map_err(|_| CcipReceiverError::InvalidMessage)?,
+        )
+        .map_err(|_| CcipReceiverError::InvalidMessage)?;
+
+        require_eq!(
+            address_in_message,
+            ctx.accounts.to_token_account.key(),
+            CcipReceiverError::InvalidMessage
         );
 
         let mut ix = transfer_checked(
@@ -310,6 +326,8 @@ pub enum CcipReceiverError {
     UnsupportedNumberOfTokens,
     #[msg("The provided mint account doesn't correspond to the transferred token")]
     InvalidMint,
+    #[msg("The message provided is not the address of the final receiver in b58 format")]
+    InvalidMessage,
 }
 
 #[event]
