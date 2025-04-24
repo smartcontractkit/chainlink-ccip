@@ -37,11 +37,7 @@ pub mod lockrelease_token_pool {
     /// # Arguments
     /// * `ctx`` - The context
     pub fn type_version(_ctx: Context<Empty>) -> Result<String> {
-        let response = format!(
-            "{} {}",
-            env!("CCIP_BUILD_PROGRAM_NAME"),
-            env!("CCIP_BUILD_GIT_HASH")
-        );
+        let response = env!("CCIP_BUILD_TYPE_VERSION").to_string();
         msg!("{}", response);
         Ok(response)
     }

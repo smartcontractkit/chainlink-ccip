@@ -210,7 +210,7 @@ func TestCCIPRouter(t *testing.T) {
 					require.NotNil(t, result)
 
 					output, err := common.ExtractTypedReturnValue(ctx, result.Meta.LogMessages, testcase.Program.String(), func(b []byte) string {
-						require.Len(t, b, int(binary.LittleEndian.Uint32(b[0:4]))+4) // the first 4 bytes just encodes the length
+						require.Len(t, b, int(binary.LittleEndian.Uint32(b[:4]))+4) // the first 4 bytes just encodes the length
 						return string(b[4:])
 					})
 					require.NoError(t, err)

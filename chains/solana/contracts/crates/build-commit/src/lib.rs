@@ -59,6 +59,9 @@ mod tests {
 
     #[test]
     fn test_cargo_instructions() {
+        // This test is meant to be manually run and inspect the output.
+        // Not asserting anything programmatically, as the method prints directly to stdout and the output
+        // varies depending on the current git branch/commit
         cargo_instructions("<some_prefix>/chainlink-ccip/chains/solana/contracts/programs/burnmint-token-pool/build.rs");
     }
 }
