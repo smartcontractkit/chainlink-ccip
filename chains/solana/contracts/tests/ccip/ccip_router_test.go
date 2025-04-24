@@ -3054,6 +3054,7 @@ func TestCCIPRouter(t *testing.T) {
 					TokenAddress:  base_token_pool.RemoteAddress{Address: []byte{4, 5, 6}},
 					Decimals:      evmToken2Decimals,
 				}, token2.PoolConfig, token2.Chain[selector], token2PoolAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+				require.NoError(t, err)
 				ixLink, err := test_token_pool.NewInitChainRemoteConfigInstruction(selector, linkPool.Mint, base_token_pool.RemoteConfig{
 					PoolAddresses: []base_token_pool.RemoteAddress{},
 					TokenAddress:  base_token_pool.RemoteAddress{Address: []byte{4, 5, 6}},
