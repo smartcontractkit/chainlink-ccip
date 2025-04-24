@@ -155,10 +155,7 @@ pub mod example_ccip_sender {
                 .find(|ta| ta.token == fee_token)
                 .map_or(0, |ta| ta.amount)
                 .checked_add(fee.amount)
-                .expect(&format!(
-                    "The fee + transfer amount of token {} is too large",
-                    fee_token
-                ));
+                .expect("The fee + transfer amount of token {} is too large");
 
             transfer_to_self_and_approve(
                 &ctx.accounts.ccip_fee_token_program.to_account_info(),
