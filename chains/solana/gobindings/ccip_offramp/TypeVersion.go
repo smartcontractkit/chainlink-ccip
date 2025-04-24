@@ -14,7 +14,7 @@ import (
 // Used by offchain code to easily determine which program & version is being interacted with.
 //
 // # Arguments
-// * `ctx“ - The context, which contains no accounts.
+// * `ctx` - The context
 type TypeVersion struct {
 
 	// [0] = [] clock

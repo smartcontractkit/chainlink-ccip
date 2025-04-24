@@ -45,7 +45,7 @@ var (
 	// Used by offchain code to easily determine which program & version is being interacted with.
 	//
 	// # Arguments
-	// * `ctx`` - The context, which contains no accounts.
+	// * `ctx`` - The context
 	Instruction_TypeVersion = ag_binary.TypeID([8]byte{129, 251, 8, 243, 122, 229, 252, 164})
 
 	// Transfers the ownership of the fee quoter to a new proposed owner.

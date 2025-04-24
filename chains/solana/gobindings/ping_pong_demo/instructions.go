@@ -36,7 +36,7 @@ var (
 	// Used by offchain code to easily determine which program & version is being interacted with.
 	//
 	// # Arguments
-	// * `ctx`` - The context, which contains no accounts.
+	// * `ctx` - The context
 	Instruction_TypeVersion = ag_binary.TypeID([8]byte{129, 251, 8, 243, 122, 229, 252, 164})
 
 	Instruction_SetCounterpart = ag_binary.TypeID([8]byte{118, 28, 243, 127, 218, 176, 228, 228})
