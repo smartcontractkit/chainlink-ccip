@@ -726,7 +726,7 @@ func TestCCIPRouter(t *testing.T) {
 		})
 
 		t.Run("FeeQuoter is initialized", func(t *testing.T) {
-			defaultMaxFeeJuelsPerMsg := bin.Uint128{Lo: 300000000000000000, Hi: 0, Endianness: nil}
+			initialMaxFeeJuelsPerMsg := bin.Uint128{Lo: 100000000000000000, Hi: 0, Endianness: nil} // this gets updated in a later test
 
 			// get program data account
 			data, err := solanaGoClient.GetAccountInfoWithOpts(ctx, config.FeeQuoterProgram, &rpc.GetAccountInfoOpts{
@@ -739,7 +739,7 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, bin.UnmarshalBorsh(&programData, data.Bytes()))
 
 			ix, err := fee_quoter.NewInitializeInstruction(
-				defaultMaxFeeJuelsPerMsg,
+				initialMaxFeeJuelsPerMsg,
 				config.CcipRouterProgram,
 				// config solana.PublicKey, authority solana.PublicKey, systemProgram solana.PublicKey, program solana.PublicKey, programData solana.PublicKey
 				config.FqConfigPDA,
@@ -756,7 +756,7 @@ func TestCCIPRouter(t *testing.T) {
 
 			var configSetEvent ccip.EventFeeQuoterConfigSet
 			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "ConfigSet", &configSetEvent, config.PrintEvents))
-			require.Equal(t, defaultMaxFeeJuelsPerMsg, configSetEvent.MaxFeeJuelsPerMsg)
+			require.Equal(t, initialMaxFeeJuelsPerMsg, configSetEvent.MaxFeeJuelsPerMsg)
 			require.Equal(t, link22.mint, configSetEvent.LinkTokenMint)
 			require.Equal(t, uint8(9), configSetEvent.LinkTokenDecimals)
 			require.Equal(t, config.CcipRouterProgram, configSetEvent.Onramp)
@@ -767,10 +767,49 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.FqConfigPDA, config.DefaultCommitment, &fqConfig))
 
 			require.Equal(t, link22.mint, fqConfig.LinkTokenMint)
-			require.Equal(t, defaultMaxFeeJuelsPerMsg, fqConfig.MaxFeeJuelsPerMsg)
+			require.Equal(t, initialMaxFeeJuelsPerMsg, fqConfig.MaxFeeJuelsPerMsg)
 			require.Equal(t, legacyAdmin.PublicKey(), fqConfig.Owner)
 			require.True(t, fqConfig.ProposedOwner.IsZero())
 			require.Equal(t, config.CcipRouterProgram, fqConfig.Onramp)
+		})
+
+		t.Run("FeeQuoter: Update max fee juels per msg", func(t *testing.T) {
+			defaultMaxFeeJuelsPerMsg := bin.Uint128{Lo: 300000000000000000, Hi: 0, Endianness: nil}
+
+			t.Run("When a non-admin tries to make the update, it fails", func(t *testing.T) {
+				ix, err := fee_quoter.NewSetMaxFeeJuelsPerMsgInstruction(
+					defaultMaxFeeJuelsPerMsg,
+					config.FqConfigPDA,
+					user.PublicKey(),
+				).ValidateAndBuild()
+				require.NoError(t, err)
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment, []string{ccip.Unauthorized_CcipRouterError.String()})
+			})
+			t.Run("When an admin tries to make the update, it succeeds", func(t *testing.T) {
+				// Check that initial value is different to what is going to be set
+				var fqConfig fee_quoter.Config
+				require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.FqConfigPDA, config.DefaultCommitment, &fqConfig))
+				require.NotEqual(t, defaultMaxFeeJuelsPerMsg, fqConfig.MaxFeeJuelsPerMsg)
+
+				// Actually update it
+				ix, err := fee_quoter.NewSetMaxFeeJuelsPerMsgInstruction(
+					defaultMaxFeeJuelsPerMsg,
+					config.FqConfigPDA,
+					legacyAdmin.PublicKey(),
+				).ValidateAndBuild()
+				require.NoError(t, err)
+				result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, legacyAdmin, config.DefaultCommitment)
+				require.NotNil(t, result)
+
+				// Check that the event was emitted with the updated value
+				var configSetEvent ccip.EventFeeQuoterConfigSet
+				require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "ConfigSet", &configSetEvent, config.PrintEvents))
+				require.Equal(t, defaultMaxFeeJuelsPerMsg, configSetEvent.MaxFeeJuelsPerMsg)
+
+				// Check that the final value is the expected one
+				require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.FqConfigPDA, config.DefaultCommitment, &fqConfig))
+				require.Equal(t, defaultMaxFeeJuelsPerMsg, fqConfig.MaxFeeJuelsPerMsg)
+			})
 		})
 
 		t.Run("FeeQuoter: Add offramp as price updater", func(t *testing.T) {

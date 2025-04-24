@@ -37,6 +37,12 @@ pub trait Admin {
         code_version: CodeVersion,
     ) -> Result<()>;
 
+    fn set_max_fee_juels_per_msg(
+        &self,
+        ctx: Context<UpdateConfig>,
+        max_fee_juels_per_msg: u128,
+    ) -> Result<()>;
+
     fn add_billing_token_config(
         &self,
         ctx: Context<AddBillingTokenConfig>,

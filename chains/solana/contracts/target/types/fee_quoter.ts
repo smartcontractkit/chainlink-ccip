@@ -152,6 +152,38 @@ export type FeeQuoter = {
       ]
     },
     {
+      "name": "setMaxFeeJuelsPerMsg",
+      "docs": [
+        "Sets the max_fee_juels_per_msg, which is an upper bound on how much can be billed for any message.",
+        "(1 juels = 1e-18 LINK)",
+        "",
+        "Only the admin may set this.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for updating the configuration.",
+        "* `max_fee_juels_per_msg` - The new value for the max_feel_juels_per_msg config."
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "maxFeeJuelsPerMsg",
+          "type": "u128"
+        }
+      ]
+    },
+    {
       "name": "addBillingTokenConfig",
       "docs": [
         "Adds a billing token configuration.",
@@ -1809,6 +1841,38 @@ export const IDL: FeeQuoter = {
           "type": {
             "defined": "CodeVersion"
           }
+        }
+      ]
+    },
+    {
+      "name": "setMaxFeeJuelsPerMsg",
+      "docs": [
+        "Sets the max_fee_juels_per_msg, which is an upper bound on how much can be billed for any message.",
+        "(1 juels = 1e-18 LINK)",
+        "",
+        "Only the admin may set this.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for updating the configuration.",
+        "* `max_fee_juels_per_msg` - The new value for the max_feel_juels_per_msg config."
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "maxFeeJuelsPerMsg",
+          "type": "u128"
         }
       ]
     },
