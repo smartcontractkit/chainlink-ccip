@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	gethwrappers "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generation"
+
 	zksyncwrapper "github.com/smartcontractkit/chainlink-evm/gethwrappers/generation/generate/zksync"
 )
 
