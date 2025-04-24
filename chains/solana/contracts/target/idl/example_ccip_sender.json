@@ -434,6 +434,19 @@
       }
     }
   ],
+  "types": [
+    {
+      "name": "SenderError",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "TransferTokenDuplicated"
+          }
+        ]
+      }
+    }
+  ],
   "events": [
     {
       "name": "MessageSent",

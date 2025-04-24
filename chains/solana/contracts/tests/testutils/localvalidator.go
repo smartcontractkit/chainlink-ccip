@@ -2,7 +2,9 @@ package testutils
 
 import (
 	"bytes"
+	"fmt"
 	"os/exec"
+	"strconv"
 	"testing"
 	"time"
 
@@ -24,31 +26,35 @@ func SetupLocalSolNode(t *testing.T) string {
 	return url
 }
 
-// helper function to get a random open port that is different from other ports
-// as they may have already been selected but not yet actively used
-func randomUniquePort(t *testing.T, remainingAttempts int, usedPorts ...string) string {
+// helper function to get a set of different random open ports
+func getPorts(t *testing.T) (port string, wsPort string, faucetPort string) {
 	t.Helper()
 
-	if remainingAttempts <= 0 {
-		panic("unable to find unique open port")
-	}
+	attempts := 5
 
-	port := utils.MustRandomPort(t)
-	for _, usedPort := range usedPorts {
-		if port == usedPort {
-			return randomUniquePort(t, remainingAttempts-1, usedPorts...)
+	for i := 0; i < attempts; i++ {
+		port = utils.MustRandomPort(t)
+
+		portInt, _ := strconv.Atoi(port)
+		wsPort = strconv.Itoa(portInt + 1) // ws port is always +1 from the rpc port, required by solana
+		if !utils.IsPortOpen(t, wsPort) {
+			continue
+		}
+
+		faucetPort = utils.MustRandomPort(t)
+		if faucetPort != port && faucetPort != wsPort {
+			return
 		}
 	}
-	return port
+
+	panic(fmt.Sprintf("unable to find unique open ports after %d attempts", attempts))
 }
 
 // SetupLocalSolNode sets up a local solana node via solana cli, and returns the url
 func SetupLocalSolNodeWithFlags(t *testing.T, flags ...string) (string, string) {
 	t.Helper()
 
-	port := utils.MustRandomPort(t)
-	wsPort := randomUniquePort(t, 3, port)
-	faucetPort := randomUniquePort(t, 3, port, wsPort)
+	port, wsPort, faucetPort := getPorts(t)
 
 	url := "http://127.0.0.1:" + port
 	wsURL := "ws://127.0.0.1:" + wsPort
