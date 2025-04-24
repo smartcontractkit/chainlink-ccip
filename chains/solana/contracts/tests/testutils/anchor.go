@@ -24,7 +24,7 @@ func DeployAllPrograms(t *testing.T, pathToAnchorConfig string, admin solana.Pri
 
 func FundAccounts(ctx context.Context, accounts []solana.PrivateKey, solanaGoClient *rpc.Client, t *testing.T) {
 	fundAccounts(ctx, accounts, solanaGoClient, t, waitAndRetryOpts{
-		RemainingAttempts: 3,
+		RemainingAttempts: 5,
 		Timeout:           30 * time.Second,
 		Timestep:          500 * time.Millisecond,
 	})
