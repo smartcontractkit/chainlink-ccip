@@ -1731,6 +1731,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "redirecting_ccip_receiver"
+version = "0.1.0-dev"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "solana-program",
+]
+
+[[package]]
 name = "redox_syscall"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
