@@ -188,11 +188,7 @@ impl OnRamp for Impl {
                 CcipRouterError::InvalidInputsTokenAccounts,
             );
 
-            let seeds = &[
-                seed::EXTERNAL_TOKEN_POOLS_SIGNER,
-                current_token_accounts.pool_program.key.as_ref(),
-                &[current_token_accounts.ccip_router_pool_signer_bump],
-            ];
+            let transfer_seeds = &[seed::FEE_BILLING_SIGNER, &[ctx.bumps.fee_billing_signer]];
 
             // CPI: transfer token amount from user to token pool
             transfer_token(
@@ -201,8 +197,8 @@ impl OnRamp for Impl {
                 current_token_accounts.mint,
                 current_token_accounts.user_token_account,
                 current_token_accounts.pool_token_account,
-                current_token_accounts.ccip_router_pool_signer,
-                seeds,
+                &ctx.accounts.fee_billing_signer.to_account_info(),
+                transfer_seeds,
             )?;
 
             // CPI: call lockOrBurn on token pool
@@ -236,12 +232,18 @@ impl OnRamp for Impl {
                 ]);
                 acc_infos.extend_from_slice(current_token_accounts.remaining_accounts);
 
+                let pool_seeds = &[
+                    seed::EXTERNAL_TOKEN_POOLS_SIGNER,
+                    current_token_accounts.pool_program.key.as_ref(),
+                    &[current_token_accounts.ccip_router_pool_signer_bump],
+                ];
+
                 let return_data = interact_with_pool(
                     current_token_accounts.pool_program.key(),
                     current_token_accounts.ccip_router_pool_signer.key(),
                     acc_infos,
                     lock_or_burn,
-                    seeds,
+                    pool_seeds,
                 )?;
 
                 let lock_or_burn_out_data = LockOrBurnOutV1::try_from_slice(&return_data)?;
