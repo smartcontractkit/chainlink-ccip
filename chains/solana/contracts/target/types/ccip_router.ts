@@ -86,7 +86,7 @@ export type CcipRouter = {
         "Used by offchain code to easily determine which program & version is being interacted with.",
         "",
         "# Arguments",
-        "* `ctx`` - The context"
+        "* `ctx` - The context"
       ],
       "accounts": [
         {
@@ -2023,7 +2023,7 @@ export const IDL: CcipRouter = {
         "Used by offchain code to easily determine which program & version is being interacted with.",
         "",
         "# Arguments",
-        "* `ctx`` - The context"
+        "* `ctx` - The context"
       ],
       "accounts": [
         {

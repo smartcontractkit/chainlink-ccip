@@ -54,7 +54,7 @@ export type BurnmintTokenPool = {
         "Used by offchain code to easily determine which program & version is being interacted with.",
         "",
         "# Arguments",
-        "* `ctx`` - The context"
+        "* `ctx` - The context"
       ],
       "accounts": [
         {
@@ -670,7 +670,7 @@ export const IDL: BurnmintTokenPool = {
         "Used by offchain code to easily determine which program & version is being interacted with.",
         "",
         "# Arguments",
-        "* `ctx`` - The context"
+        "* `ctx` - The context"
       ],
       "accounts": [
         {
