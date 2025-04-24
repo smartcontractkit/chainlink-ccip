@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-declare_id!("4YeSAss7sTV3Tn3y7cgoMHGjdoKvGsMnqBngsiK5fTt5");
+declare_id!("RmnXLft1mSEwDgMKu2okYuHkiazxntFFcZFrrcXxYg7");
 
 pub mod context;
 use context::*;

@@ -57,7 +57,6 @@ func TestSetupRedirectingReceiver(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("Initialize redirecting receiver", func(t *testing.T) {
-		t.Skip()
 		ix, err := redirecting_ccip_receiver.NewInitializeInstruction(
 			referenceAddresses.Router,
 			statePDA,

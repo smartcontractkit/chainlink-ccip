@@ -4,7 +4,7 @@ use program::PingPongDemo;
 use ccip_router::cpi;
 use example_ccip_receiver::Any2SVMMessage;
 
-declare_id!("5PNadBFwQuB46YcUJvgSPRmLepSuk8f9Dpy1UckUFAQ6");
+declare_id!("PPbZmYFf5SPAM9Jhm9mNmYoCwT7icPYVKAfJoMCQovU");
 
 const ANCHOR_DISCRIMINATOR: usize = 8; // nr of bytes for the anchor discriminator.
 
