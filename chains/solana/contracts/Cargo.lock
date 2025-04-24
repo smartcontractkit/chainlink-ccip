@@ -611,6 +611,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "build_commit"
+version = "1.0.0"
+
+[[package]]
 name = "bumpalo"
 version = "3.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -623,6 +627,7 @@ dependencies = [
  "anchor-lang",
  "anchor-spl",
  "base-token-pool",
+ "build_commit",
  "ccip_common",
  "rmn_remote",
  "solana-program",
@@ -690,6 +695,7 @@ version = "0.1.0-dev"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
+ "build_commit",
  "bytemuck",
  "ccip_common",
  "ethnum",
@@ -705,6 +711,7 @@ version = "0.1.0-dev"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
+ "build_commit",
  "bytemuck",
  "ccip_common",
  "ethnum",
@@ -1024,6 +1031,7 @@ version = "0.1.0-dev"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
+ "build_commit",
  "bytemuck",
  "ccip_common",
  "ethnum",
@@ -1321,6 +1329,7 @@ dependencies = [
  "anchor-lang",
  "anchor-spl",
  "base-token-pool",
+ "build_commit",
  "ccip_common",
  "rmn_remote",
  "solana-program",
@@ -1541,6 +1550,7 @@ version = "0.1.0-dev"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
+ "build_commit",
  "ccip_router",
  "example_ccip_receiver",
  "solana-program",
@@ -1773,6 +1783,7 @@ name = "rmn_remote"
 version = "0.1.0-dev"
 dependencies = [
  "anchor-lang",
+ "build_commit",
  "bytemuck",
  "ccip_common",
 ]
