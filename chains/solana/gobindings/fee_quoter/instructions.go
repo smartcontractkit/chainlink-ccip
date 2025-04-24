@@ -73,6 +73,8 @@ var (
 	Instruction_SetDefaultCodeVersion = ag_binary.TypeID([8]byte{47, 151, 233, 254, 121, 82, 206, 152})
 
 	// Sets the max_fee_juels_per_msg, which is an upper bound on how much can be billed for any message.
+	// (1 juels = 1e-18 LINK)
+	//
 	// Only the admin may set this.
 	//
 	// # Arguments
