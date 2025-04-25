@@ -22,7 +22,7 @@ test_ccip_receiver = "EvhgrPhTDt4LcSPS2kfJgH6T6XWZ6wT3X9ncDGLT1vui"
 test_token_pool = "JuCcZ4smxAYv9QHJ36jshA7pA3FuQ3vQeWLUeAtZduJ"
 timelock = "DoajfR5tK24xVw51fWcawUZWhAXD8yrBJVacc13neVQA"
 ping_pong_demo = "PPbZmYFf5SPAM9Jhm9mNmYoCwT7icPYVKAfJoMCQovU"
-redirecting_ccip_receiver = "HGSBtcz7JW5X6rmfktqfgkN85WXkPifJrjch4yx42Bvr"
+redirecting_ccip_receiver = "redGLzHHb1xEQi5GksPH9hmoM2xyfoT4iVFCescrrf4"
 
 [registry]
 url = "https://anchor.projectserum.com"
