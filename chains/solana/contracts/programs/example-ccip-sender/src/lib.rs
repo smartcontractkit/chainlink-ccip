@@ -150,10 +150,12 @@ pub mod example_ccip_sender {
         // if fee token is not native, transfer the fee amounts from sender to the program and approve the router
         if fee_token != Pubkey::default() {
             // if paying fees with a token that is also being transferred, consider the amount to for both operations
-            let transferred_amount = token_amounts
+            let amount = token_amounts
                 .iter()
                 .find(|ta| ta.token == fee_token)
-                .map_or(0, |ta| ta.amount);
+                .map_or(0, |ta| ta.amount)
+                .checked_add(fee.amount)
+                .expect("The fee + transfer amount of token {} is too large");
 
             transfer_to_self_and_approve(
                 &ctx.accounts.ccip_fee_token_program.to_account_info(),
@@ -163,7 +165,7 @@ pub mod example_ccip_sender {
                 &ctx.accounts.ccip_sender.to_account_info(),
                 &ctx.accounts.ccip_fee_billing_signer.to_account_info(),
                 seeds,
-                fee.amount + transferred_amount,
+                amount,
                 ctx.accounts.ccip_fee_token_mint.decimals,
             )?;
         }

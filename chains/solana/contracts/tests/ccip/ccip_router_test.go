@@ -89,6 +89,7 @@ func TestCCIPRouter(t *testing.T) {
 	evmToken0Decimals := uint8(18)
 	evmToken1Decimals := uint8(18)
 	evmToken2Decimals := uint8(18)
+	evmToken3Decimals := uint8(18)
 
 	token0Decimals := uint8(9)
 	token1Decimals := uint8(18)
@@ -3106,27 +3107,27 @@ func TestCCIPRouter(t *testing.T) {
 		t.Run("RemoteConfig", func(t *testing.T) {
 			for _, selector := range []uint64{config.EvmChainSelector, config.SvmChainSelector} {
 				ix0, err := test_token_pool.NewInitChainRemoteConfigInstruction(selector, token0.Mint, base_token_pool.RemoteConfig{
-					TokenAddress: base_token_pool.RemoteAddress{Address: []byte{1, 2, 3}},
+					TokenAddress: base_token_pool.RemoteAddress{Address: config.EVMToken0AddressBytes},
 					Decimals:     evmToken0Decimals,
 				}, token0.PoolConfig, token0.Chain[selector], token0PoolAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 				require.NoError(t, err)
 				PoolAddresses := []base_token_pool.RemoteAddress{{Address: []byte{4, 5, 6}}}
 				ix1, err := test_token_pool.NewInitChainRemoteConfigInstruction(selector, token1.Mint, base_token_pool.RemoteConfig{
 					PoolAddresses: []base_token_pool.RemoteAddress{},
-					TokenAddress:  base_token_pool.RemoteAddress{Address: []byte{4, 5, 6}},
+					TokenAddress:  base_token_pool.RemoteAddress{Address: config.EVMToken1AddressBytes},
 					Decimals:      evmToken1Decimals,
 				}, token1.PoolConfig, token1.Chain[selector], token1PoolAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 				require.NoError(t, err)
 				ix2, err := test_token_pool.NewInitChainRemoteConfigInstruction(selector, token2.Mint, base_token_pool.RemoteConfig{
 					PoolAddresses: []base_token_pool.RemoteAddress{},
-					TokenAddress:  base_token_pool.RemoteAddress{Address: []byte{4, 5, 6}},
+					TokenAddress:  base_token_pool.RemoteAddress{Address: config.EVMToken2AddressBytes},
 					Decimals:      evmToken2Decimals,
 				}, token2.PoolConfig, token2.Chain[selector], token2PoolAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 				require.NoError(t, err)
 				ixLink, err := test_token_pool.NewInitChainRemoteConfigInstruction(selector, linkPool.Mint, base_token_pool.RemoteConfig{
 					PoolAddresses: []base_token_pool.RemoteAddress{},
-					TokenAddress:  base_token_pool.RemoteAddress{Address: []byte{4, 5, 6}},
-					Decimals:      18,
+					TokenAddress:  base_token_pool.RemoteAddress{Address: config.EVMToken3AddressBytes},
+					Decimals:      evmToken3Decimals,
 				}, linkPool.PoolConfig, linkPool.Chain[selector], legacyAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 				require.NoError(t, err)
 
@@ -3135,7 +3136,9 @@ func TestCCIPRouter(t *testing.T) {
 				ix4, err := test_token_pool.NewAppendRemotePoolAddressesInstruction(selector, token2.Mint, PoolAddresses, token2.PoolConfig, token2.Chain[selector], token2PoolAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 				require.NoError(t, err)
 
-				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix0, ix1, ix2, ix3, ix4, ixLink}, token0PoolAdmin, config.DefaultCommitment, common.AddSigners(token1PoolAdmin, token2PoolAdmin, legacyAdmin))
+				// Note: Splitted into two transactions to avoid exceeding the Solana transaction size limit
+				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix0, ix1, ix2}, token0PoolAdmin, config.DefaultCommitment, common.AddSigners(token1PoolAdmin, token2PoolAdmin, legacyAdmin))
+				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix3, ix4, ixLink}, token0PoolAdmin, config.DefaultCommitment, common.AddSigners(token1PoolAdmin, token2PoolAdmin, legacyAdmin))
 			}
 		})
 
@@ -4530,7 +4533,7 @@ func TestCCIPRouter(t *testing.T) {
 				// decimals.
 				require.Equal(t, tokens.ToLittleEndianU256(3633302000000000), ccipMessageSentEvent.Message.FeeValueJuels.LeBytes)
 				require.Equal(t, token0.PoolConfig, ta.SourcePoolAddress)
-				require.Equal(t, []byte{1, 2, 3}, ta.DestTokenAddress)
+				require.Equal(t, config.EVMToken0AddressBytes, ta.DestTokenAddress)
 				// Local decimals are encoded in the extra data. By default, 9 decimals in Solana.
 				expectedExtraData := make([]byte, 32)
 				expectedExtraData[31] = token0Decimals

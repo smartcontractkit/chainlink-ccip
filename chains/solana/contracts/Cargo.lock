@@ -686,6 +686,7 @@ version = "0.1.0-dev"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
+ "ethnum",
  "solana-program",
 ]
 

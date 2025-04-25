@@ -2091,8 +2091,8 @@ func validateCommitReportAcceptedEvent(seq types.Sequence, gteTimestamp time.Tim
 	}
 
 	for _, gpus := range ev.PriceUpdates.GasPriceUpdates {
-		if gpus.UsdPerUnitGas == nil || gpus.UsdPerUnitGas.Cmp(big.NewInt(0)) <= 0 {
-			return nil, fmt.Errorf("nil or non-positive usd per unit gas")
+		if gpus.UsdPerUnitGas == nil || gpus.UsdPerUnitGas.Cmp(big.NewInt(0)) < 0 {
+			return nil, fmt.Errorf("nil or negative usd per unit gas: %s", gpus.UsdPerUnitGas.String())
 		}
 	}
 
