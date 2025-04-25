@@ -1,6 +1,8 @@
 offramp: offVkroQ4wYMv6QFPBvJazAx2p8BnLh7sJRdyQ5GYfx
-test_receiver: <PUT YOUR TEST RECEIVER ADDRESS HERE>
+redirecting_receiver: <PUT YOUR REDIRECTING RECEIVER ADDRESS HERE>
 example_sender: <PUT YOUR EXAMPLE SENDER ADDRESS HERE>
+token_mint_for_redirect_test: <PUT THE SOLANA MINT ADDRESS FOR THE TOKEN HERE>
+final_receiver_for_redirect: <PUT THE ADDRESS OF THE USER TO WHOM THE TOKENS WILL BE REDIRECTED HERE>
 
 chain_selectors:
   sepolia: 16015286601757825753

@@ -8,13 +8,16 @@ pub const TOKEN_ADMIN_SEED: &[u8] = b"receiver_token_admin";
 pub const ALLOWED_OFFRAMP: &[u8] = b"allowed_offramp";
 pub const STATE: &[u8] = b"state";
 
-/// This program an example of a CCIP Receiver Program.
-/// Used to test CCIP Router execute.
+/// This program implements a simple token redirection: It will redirect tokens
+/// to the ATA of a user described in the message's `data` field.
 #[program]
 pub mod redirecting_ccip_receiver {
     use std::str::FromStr;
 
-    use anchor_spl::token_2022::spl_token_2022::{self, instruction::transfer_checked};
+    use anchor_spl::{
+        associated_token::get_associated_token_address_with_program_id,
+        token_2022::spl_token_2022::{self, instruction::transfer_checked},
+    };
     use solana_program::program::invoke_signed;
 
     use super::*;
@@ -46,16 +49,21 @@ pub mod redirecting_ccip_receiver {
             CcipReceiverError::InvalidMint
         );
 
-        // Message data must correspond to the receiver address in b58. It's not too practical (the caller
-        // needs to bundle the key as part as the accounts provided anyway) but it serves to prove the
-        // message processing.
+        // Message data must correspond to the receiver address in b58. We ensure this is correct
+        // by asserting that the destination token account is an ATA of the user provided
         let address_in_message = Pubkey::from_str(
             &String::from_utf8(message.data).map_err(|_| CcipReceiverError::InvalidMessage)?,
         )
         .map_err(|_| CcipReceiverError::InvalidMessage)?;
 
+        let ata_of_address_in_message = get_associated_token_address_with_program_id(
+            &address_in_message,
+            &ctx.accounts.mint.key(),
+            &ctx.accounts.token_program.key(),
+        );
+
         require_eq!(
-            address_in_message,
+            ata_of_address_in_message,
             ctx.accounts.to_token_account.key(),
             CcipReceiverError::InvalidMessage
         );

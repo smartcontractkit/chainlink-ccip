@@ -2,8 +2,8 @@
   "version": "0.1.0-dev",
   "name": "redirecting_ccip_receiver",
   "docs": [
-    "This program an example of a CCIP Receiver Program.",
-    "Used to test CCIP Router execute."
+    "This program implements a simple token redirection: It will redirect tokens",
+    "to the ATA of a user described in the message's `data` field."
   ],
   "instructions": [
     {

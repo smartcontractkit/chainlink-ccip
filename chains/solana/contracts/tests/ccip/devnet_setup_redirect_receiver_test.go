@@ -9,15 +9,24 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/require"
 
-	// "github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/testutils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/redirecting_ccip_receiver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
-	// "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 )
 
+// This test performs all setup necessary to test PTT logic manuall, using a redirecting receiver.
+// It is not meant to be used by itself, but rather alongside an existing devnet deployment.
+//
+// The steps required are:
+//
+//   - Anchor Manually deploy the redirecting-ccip-receiver program.
+//   - Fill in `devnet.config.yaml` with the address from the above and all other required data (see `devnet.config.yaml.example`)
+//   - Run this setup to initialize the program and its token ATA, and to generate a command to be run in CLD. You might
+//     need to modify this command further.
+//
+// If you need to invoke it further to obtain the command without re-initializing, you may skip the first two tests.
 func TestSetupRedirectingReceiver(t *testing.T) {
 	devnetInfo, err := getDevnetInfo()
 	require.NoError(t, err)
