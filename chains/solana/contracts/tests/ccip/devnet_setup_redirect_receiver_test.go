@@ -113,6 +113,7 @@ func TestSetupRedirectingReceiver(t *testing.T) {
 		fmt.Printf("--sol-account-is-writable-bitmap 1 \\\n")
 		fmt.Printf("--sol-account-is-writable-bitmap 2 \\\n")
 		fmt.Printf("--sol-account-is-writable-bitmap 3 \\\n")
+		fmt.Printf("--sol-compute-units \"80000\" \\\n", tokenAdminPDA)
 		// Note: The admin PDA, not the ATA, as offchain will derive it.
 		fmt.Printf("--sol-token-receiver \"%s\" \\\n", tokenAdminPDA)
 		fmt.Printf("--token-address \"<SEPOLIA_MINT_FOR_THIS_TOKEN>\"")
