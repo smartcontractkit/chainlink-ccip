@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{Mint, TokenAccount};
 
-declare_id!("HGSBtcz7JW5X6rmfktqfgkN85WXkPifJrjch4yx42Bvr");
+declare_id!("redGLzHHb1xEQi5GksPH9hmoM2xyfoT4iVFCescrrf4");
 
 pub const EXTERNAL_EXECUTION_CONFIG_SEED: &[u8] = b"external_execution_config";
 pub const TOKEN_ADMIN_SEED: &[u8] = b"receiver_token_admin";
