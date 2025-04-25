@@ -333,9 +333,11 @@ func (p *Plugin) getPriceRelatedObservations(
 			lggr.Errorw("get latest price sequence number", "err", err)
 			// Observe fChain so we don't get cryptic fChain errors in the outcome phase.
 			return tokenprice.Observation{
-					FChain: p.ObserveFChain(lggr),
+					FChain:    p.ObserveFChain(lggr),
+					Timestamp: time.Now().UTC(),
 				}, chainfee.Observation{
-					FChain: p.ObserveFChain(lggr),
+					FChain:       p.ObserveFChain(lggr),
+					TimestampNow: time.Now().UTC(),
 				}
 		}
 
@@ -353,9 +355,11 @@ func (p *Plugin) getPriceRelatedObservations(
 		)
 		// Observe fChain so we don't get cryptic fChain errors in the outcome phase.
 		return tokenprice.Observation{
-				FChain: p.ObserveFChain(lggr),
+				FChain:    p.ObserveFChain(lggr),
+				Timestamp: time.Now().UTC(),
 			}, chainfee.Observation{
-				FChain: p.ObserveFChain(lggr),
+				FChain:       p.ObserveFChain(lggr),
+				TimestampNow: time.Now().UTC(),
 			}
 	}
 
