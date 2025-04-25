@@ -115,6 +115,23 @@ pub mod fee_quoter {
             .set_default_code_version(ctx, code_version)
     }
 
+    /// Sets the max_fee_juels_per_msg, which is an upper bound on how much can be billed for any message.
+    /// (1 juels = 1e-18 LINK)
+    ///
+    /// Only the admin may set this.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for updating the configuration.
+    /// * `max_fee_juels_per_msg` - The new value for the max_feel_juels_per_msg config.
+    pub fn set_max_fee_juels_per_msg(
+        ctx: Context<UpdateConfig>,
+        max_fee_juels_per_msg: u128,
+    ) -> Result<()> {
+        router::admin(ctx.accounts.config.default_code_version)
+            .set_max_fee_juels_per_msg(ctx, max_fee_juels_per_msg)
+    }
+
     /// Adds a billing token configuration.
     /// Only CCIP Admin can add a billing token configuration.
     ///
@@ -377,10 +394,6 @@ pub enum FeeQuoterError {
     MessageTooLarge,
     #[msg("Message contains an unsupported number of tokens")]
     UnsupportedNumberOfTokens,
-    #[msg("Invalid EVM address")]
-    InvalidEVMAddress,
-    #[msg("Invalid encoding")]
-    InvalidEncoding,
     #[msg("Invalid token price")]
     InvalidTokenPrice,
     #[msg("Stale gas price")]
@@ -399,12 +412,8 @@ pub enum FeeQuoterError {
     InvalidExtraArgsAccounts,
     #[msg("Invalid writability bitmap in extra args")]
     InvalidExtraArgsWritabilityBitmap,
-    #[msg("Invalid chain family selector")]
-    InvalidChainFamilySelector,
     #[msg("Invalid token receiver")]
     InvalidTokenReceiver,
-    #[msg("Invalid SVM address")]
-    InvalidSVMAddress,
     #[msg("The caller is not an authorized price updater")]
     UnauthorizedPriceUpdater,
     #[msg("Minimum token transfer fee exceeds maximum")]
