@@ -1,12 +1,13 @@
+use std::path::Path;
 use std::process::Command;
 
 pub fn cargo_instructions(source_file: &str) {
-    let program_name = source_file
-        .split('/')
-        .nth_back(1)
+    let program_name = Path::new(source_file)
+        .parent()
+        .and_then(|p| p.file_name())
+        .and_then(|name| name.to_str())
         .unwrap()
-        .trim()
-        .to_string();
+        .trim();
 
     let hash_output = Command::new("git")
         .args(["rev-parse", "HEAD"])
