@@ -62,6 +62,7 @@ jobs:
           set -eoux pipefail &&\
           RUSTUP_HOME=\"/root/.rustup\" &&\
           FORCE_COLOR=1 &&\
+          CCIP_BUILD_GIT_HASH={{ github.sha }} &&\
           cd /solana/contracts &&\
           anchor build &&\
           chmod -R 755 ./target"
@@ -94,6 +95,7 @@ jobs:
           set -eoux pipefail &&\
           RUSTUP_HOME=\"/root/.rustup\" &&\
           FORCE_COLOR=1 &&\
+          CCIP_BUILD_GIT_HASH={{ github.sha }} &&\
           cd /solana/contracts &&\
           anchor build &&\
           cargo check &&\
@@ -142,6 +144,7 @@ jobs:
           set -eoux pipefail &&\
           RUSTUP_HOME=\"/root/.rustup\" &&\
           FORCE_COLOR=1 &&\
+          CCIP_BUILD_GIT_HASH={{ github.sha }} &&\
           cd /solana/contracts &&\
           anchor build"
           make go-tests
@@ -182,6 +185,7 @@ jobs:
           set -eoux pipefail &&\
           RUSTUP_HOME=\"/root/.rustup\" &&\
           FORCE_COLOR=1 &&\
+          CCIP_BUILD_GIT_HASH={{ github.sha }} &&\
           cd /solana/contracts &&\
           rm -rf target/idl target/types &&\
           anchor build"

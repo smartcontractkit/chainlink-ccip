@@ -8,10 +8,6 @@ pub fn cargo_instructions(source_file: &str) {
     let program_name = get_program_name(source_file);
 
     let git_hash = if let Ok(git_hash) = var(GIT_HASH_ENV_VAR) {
-        assert!(
-            git_hash.len() == 40,
-            "GIT_HASH_ENV_VAR must be a 40 character hash"
-        );
         git_hash
     } else {
         let (git_hash, git_dir, git_ref) = git_strategy();
@@ -22,6 +18,11 @@ pub fn cargo_instructions(source_file: &str) {
 
         git_hash
     };
+
+    assert!(
+        git_hash.len() == 40,
+        "GIT_HASH_ENV_VAR must be a 40 character hash, or there must be a git repository in the current directory"
+    );
 
     println!("cargo:rerun-if-env-changed={}", GIT_HASH_ENV_VAR);
     println!("cargo:rustc-env=CCIP_BUILD_PROGRAM_NAME={}", program_name);
