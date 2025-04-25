@@ -96,7 +96,7 @@ jobs:
           RUSTUP_HOME=\"/root/.rustup\" &&\
           FORCE_COLOR=1 &&\
           cd /solana/contracts &&\
-          CCIP_BUILD_GIT_HASH=${{ github.sha }} \
+          export CCIP_BUILD_GIT_HASH=${{ github.sha }} &&\
           anchor build &&\
           cargo check &&\
           cargo clippy -- -D warnings &&\

@@ -88,6 +88,14 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_cargo_instructions() {
+        // This test is meant to be manually run and inspect the output.
+        // Not asserting anything programmatically, as the method prints directly to stdout and the output
+        // varies depending on the current git branch/commit
+        cargo_instructions("<some_prefix>/chainlink-ccip/chains/solana/contracts/programs/burnmint-token-pool/build.rs");
+    }
+
+    #[test]
     fn test_cargo_instructions_with_env_var() {
         std::env::set_var(GIT_HASH_ENV_VAR, "1234567890123456789012345678901234567890");
 
