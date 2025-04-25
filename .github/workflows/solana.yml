@@ -53,7 +53,8 @@ jobs:
       if: steps.cache-image.outputs.cache-hit != 'true'
       run: |
         cd contracts
-        docker buildx build . -t ccip-solana:build --build-arg ANCHOR_CLI=${{ needs.get_anchor_version.outputs.anchor_version }}
+        GIT_HEAD=$(git rev-parse HEAD)
+        docker buildx build . -t ccip-solana:build --build-arg ANCHOR_CLI=${{ needs.get_anchor_version.outputs.anchor_version }} --env CCIP_BUILD_GIT_HASH=${GIT_HEAD}
         docker save -o docker-build.tar ccip-solana
     - name: build & save contract compilation artifacts
       if: steps.cache-target.outputs.cache-hit != 'true'
@@ -199,5 +200,3 @@ jobs:
         if: failure()
         shell: bash
         run: cat ./golangci-lint-report.xml
-          
-
