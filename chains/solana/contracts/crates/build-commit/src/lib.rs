@@ -21,7 +21,7 @@ pub fn cargo_instructions(source_file: &str) {
 
     assert!(
         git_hash.len() == 40,
-        "GIT_HASH_ENV_VAR must be a 40 character hash, or there must be a git repository in the current directory"
+        "CCIP_BUILD_GIT_HASH must be a 40 character hash, or there must be a git repository in the current directory"
     );
 
     println!("cargo:rerun-if-env-changed={}", GIT_HASH_ENV_VAR);

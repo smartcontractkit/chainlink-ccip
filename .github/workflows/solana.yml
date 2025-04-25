@@ -62,8 +62,8 @@ jobs:
           set -eoux pipefail &&\
           RUSTUP_HOME=\"/root/.rustup\" &&\
           FORCE_COLOR=1 &&\
-          CCIP_BUILD_GIT_HASH=${{ github.sha }} &&\
           cd /solana/contracts &&\
+          CCIP_BUILD_GIT_HASH=${{ github.sha }} \
           anchor build &&\
           chmod -R 755 ./target"
 
@@ -95,8 +95,8 @@ jobs:
           set -eoux pipefail &&\
           RUSTUP_HOME=\"/root/.rustup\" &&\
           FORCE_COLOR=1 &&\
-          CCIP_BUILD_GIT_HASH=${{ github.sha }} &&\
           cd /solana/contracts &&\
+          CCIP_BUILD_GIT_HASH=${{ github.sha }} \
           anchor build &&\
           cargo check &&\
           cargo clippy -- -D warnings &&\
@@ -144,8 +144,8 @@ jobs:
           set -eoux pipefail &&\
           RUSTUP_HOME=\"/root/.rustup\" &&\
           FORCE_COLOR=1 &&\
-          CCIP_BUILD_GIT_HASH=${{ github.sha }} &&\
           cd /solana/contracts &&\
+          CCIP_BUILD_GIT_HASH=${{ github.sha }} \
           anchor build"
           make go-tests
 
@@ -185,9 +185,9 @@ jobs:
           set -eoux pipefail &&\
           RUSTUP_HOME=\"/root/.rustup\" &&\
           FORCE_COLOR=1 &&\
-          CCIP_BUILD_GIT_HASH=${{ github.sha }} &&\
           cd /solana/contracts &&\
           rm -rf target/idl target/types &&\
+          CCIP_BUILD_GIT_HASH=${{ github.sha }} \
           anchor build"
 
           go install github.com/gagliardetto/anchor-go@v0.2.3
