@@ -53,7 +53,7 @@ jobs:
       if: steps.cache-image.outputs.cache-hit != 'true'
       run: |
         cd contracts
-        docker buildx build . -t ccip-solana:build --build-arg ANCHOR_CLI=${{ needs.get_anchor_version.outputs.anchor_version }}
+        docker buildx build . -t ccip-solana:build --build-arg ANCHOR_CLI=${{ needs.get_anchor_version.outputs.anchor_version }} --env CCIP_BUILD_GIT_HASH=${{ github.sha }}
         docker save -o docker-build.tar ccip-solana
     - name: build & save contract compilation artifacts
       if: steps.cache-target.outputs.cache-hit != 'true'
@@ -63,6 +63,7 @@ jobs:
           RUSTUP_HOME=\"/root/.rustup\" &&\
           FORCE_COLOR=1 &&\
           cd /solana/contracts &&\
+          CCIP_BUILD_GIT_HASH=${{ github.sha }} \
           anchor build &&\
           chmod -R 755 ./target"
 
@@ -95,6 +96,7 @@ jobs:
           RUSTUP_HOME=\"/root/.rustup\" &&\
           FORCE_COLOR=1 &&\
           cd /solana/contracts &&\
+          export CCIP_BUILD_GIT_HASH=${{ github.sha }} &&\
           anchor build &&\
           cargo check &&\
           cargo clippy -- -D warnings &&\
@@ -143,6 +145,7 @@ jobs:
           RUSTUP_HOME=\"/root/.rustup\" &&\
           FORCE_COLOR=1 &&\
           cd /solana/contracts &&\
+          CCIP_BUILD_GIT_HASH=${{ github.sha }} \
           anchor build"
           make go-tests
 
@@ -184,6 +187,7 @@ jobs:
           FORCE_COLOR=1 &&\
           cd /solana/contracts &&\
           rm -rf target/idl target/types &&\
+          CCIP_BUILD_GIT_HASH=${{ github.sha }} \
           anchor build"
 
           go install github.com/gagliardetto/anchor-go@v0.2.3
@@ -199,5 +203,3 @@ jobs:
         if: failure()
         shell: bash
         run: cat ./golangci-lint-report.xml
-          
-
