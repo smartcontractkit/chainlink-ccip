@@ -41,11 +41,7 @@ import {
       [Buffer.from("token_admin_registry"), MINT.toBuffer()],
       PROGRAM_ID
     );
-
-    // Define writableIndexes bitmap: 10 accounts, 3 writable: [1, 4, 5]
-    const bitmap = new Uint8Array(2); // up to 16 bits
-    bitmap[0] = 0b00110010; // bit 1, 4, 5 set
-    const args = { writableIndexes: Buffer.from(bitmap) };
+    const args = { writableIndexes: Buffer.from([3, 4, 7]) };
 
     const data = Buffer.alloc(100);
     const len = setPoolLayout.encode(args, data);

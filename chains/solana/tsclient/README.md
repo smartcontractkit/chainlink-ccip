@@ -211,7 +211,17 @@ npx ts-node src/solana-ccip-token-admin-registry/TransferAdmin.ts
 
 ## 8. Setup the Token Pool Program configuration
 
-TODO: init_chain_remote_config
+Init the ATA for the token pool
+
+```bash
+npx ts-node src/solana-ccip-token-admin-registry/InitAta.ts
+```
+
+Init the token pool config
+
+```bash
+npx ts-node src/solana-ccip-token-admin-registry/InitChainRemoteConfig.ts
+```
 
 TODO: edit_chain_remote_config
 

@@ -50,6 +50,8 @@ async function createLookupTable() {
     token_program
   );
 
+  // Init pool_token_account ATA
+
   const [fee_token_config] = PublicKey.findProgramAddressSync(
     [Buffer.from("fee_billing_token_config"), mint.toBuffer()],
     fee_quoter
