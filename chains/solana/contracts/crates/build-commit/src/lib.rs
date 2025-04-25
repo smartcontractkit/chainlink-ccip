@@ -9,7 +9,7 @@ pub fn cargo_instructions(source_file: &str) {
         .to_string();
 
     let hash_output = Command::new("git")
-        .args(&["rev-parse", "HEAD"])
+        .args(["rev-parse", "HEAD"])
         .output()
         .expect("Failed to execute git");
 
@@ -19,7 +19,7 @@ pub fn cargo_instructions(source_file: &str) {
         .to_string();
 
     let dir_output = Command::new("git")
-        .args(&["rev-parse", "--git-dir"])
+        .args(["rev-parse", "--git-dir"])
         .output()
         .expect("Failed to execute git");
     let git_dir = String::from_utf8(dir_output.stdout)
@@ -28,7 +28,7 @@ pub fn cargo_instructions(source_file: &str) {
         .to_string();
 
     let head_output = Command::new("cat")
-        .args(&[format!("{}/HEAD", git_dir.trim())])
+        .args([format!("{}/HEAD", git_dir.trim())])
         .output()
         .expect("Failed to execute git");
     let head = String::from_utf8(head_output.stdout)

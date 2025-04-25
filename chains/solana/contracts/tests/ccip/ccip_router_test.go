@@ -198,7 +198,7 @@ func TestCCIPRouter(t *testing.T) {
 		})
 
 		t.Run("Type version", func(t *testing.T) {
-			type_version_cases := []struct {
+			testcases := []struct {
 				ContractName              string
 				Program                   solana.PublicKey
 				NewTypeVersionInstruction solana.Instruction
@@ -208,7 +208,7 @@ func TestCCIPRouter(t *testing.T) {
 				{"ccip-offramp", config.CcipOfframpProgram, ccip_offramp.NewTypeVersionInstruction(solana.SysVarClockPubkey).Build()},
 				{"rmn-remote", config.RMNRemoteProgram, rmn_remote.NewTypeVersionInstruction(solana.SysVarClockPubkey).Build()},
 			}
-			for _, testcase := range type_version_cases {
+			for _, testcase := range testcases {
 				t.Run(testcase.ContractName, func(t *testing.T) {
 					t.Parallel()
 
