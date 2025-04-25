@@ -331,7 +331,14 @@ func (p *Plugin) getPriceRelatedObservations(
 		latestPriceOcrSeqNum, err := p.ccipReader.GetLatestPriceSeqNr(ctx)
 		if err != nil {
 			lggr.Errorw("get latest price sequence number", "err", err)
-			return tokenprice.Observation{}, chainfee.Observation{}
+			// Observe fChain so we don't get cryptic fChain errors in the outcome phase.
+			return tokenprice.Observation{
+					FChain:    p.ObserveFChain(lggr),
+					Timestamp: time.Now().UTC(),
+				}, chainfee.Observation{
+					FChain:       p.ObserveFChain(lggr),
+					TimestampNow: time.Now().UTC(),
+				}
 		}
 
 		if cciptypes.SeqNum(latestPriceOcrSeqNum) >= prevOutcome.MainOutcome.InflightPriceOcrSequenceNumber {
@@ -346,7 +353,14 @@ func (p *Plugin) getPriceRelatedObservations(
 			"inflightPriceOcrSequenceNumber", prevOutcome.MainOutcome.InflightPriceOcrSequenceNumber,
 			"remainingPriceChecks", prevOutcome.MainOutcome.RemainingPriceChecks,
 		)
-		return tokenprice.Observation{}, chainfee.Observation{}
+		// Observe fChain so we don't get cryptic fChain errors in the outcome phase.
+		return tokenprice.Observation{
+				FChain:    p.ObserveFChain(lggr),
+				Timestamp: time.Now().UTC(),
+			}, chainfee.Observation{
+				FChain:       p.ObserveFChain(lggr),
+				TimestampNow: time.Now().UTC(),
+			}
 	}
 
 	var tokenPriceObs tokenprice.Observation

@@ -1,5 +1,7 @@
 use anchor_lang::prelude::*;
 
+use ccip_common::{CommonCcipError, CHAIN_FAMILY_SELECTOR_EVM, CHAIN_FAMILY_SELECTOR_SVM};
+
 use crate::context::{
     AcceptOwnership, AddBillingTokenConfig, AddDestChain, AddPriceUpdater, RemovePriceUpdater,
     SetTokenTransferFeeConfig, UpdateBillingTokenConfig, UpdateConfig, UpdateDestChainConfig,
@@ -12,7 +14,6 @@ use crate::event::{
 };
 use crate::instructions::interfaces::Admin;
 use crate::instructions::v1::public::CCIP_LOCK_OR_BURN_V1_RET_BYTES;
-use crate::messages::{CHAIN_FAMILY_SELECTOR_EVM, CHAIN_FAMILY_SELECTOR_SVM};
 use crate::state::{
     BillingTokenConfig, CodeVersion, DestChain, DestChainConfig, DestChainState,
     PerChainPerTokenConfig, TimestampedPackedU224, TokenTransferFeeConfig,
@@ -281,7 +282,7 @@ fn validate_dest_chain_config(dest_chain_selector: u64, config: &DestChainConfig
             u32::from_be_bytes(config.chain_family_selector),
             CHAIN_FAMILY_SELECTOR_EVM | CHAIN_FAMILY_SELECTOR_SVM
         ),
-        FeeQuoterError::InvalidChainFamilySelector
+        CommonCcipError::InvalidChainFamilySelector
     );
 
     Ok(())

@@ -695,13 +695,13 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 			assert.NoError(t, err)
 			runner := testhelpers.NewOCR3Runner(nodes, oracleIDs, encodedPrevOutcome)
 			res, err := runner.RunRound(params.ctx)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			decodedOutcome, err := ocrTypCodec.DecodeOutcome(res.Outcome)
-			assert.NoError(t, err)
-			assert.Equal(t, normalizeOutcome(tc.expOutcome), normalizeOutcome(decodedOutcome))
+			require.NoError(t, err)
+			require.Equal(t, normalizeOutcome(tc.expOutcome), normalizeOutcome(decodedOutcome))
 
-			assert.Len(t, res.Transmitted, tc.expTransmittedReportLen)
+			require.Len(t, res.Transmitted, tc.expTransmittedReportLen)
 		})
 	}
 }
