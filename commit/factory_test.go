@@ -3,11 +3,12 @@ package commit
 import (
 	"encoding/json"
 	"fmt"
-	mock_ccipocr3 "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
 	"math"
 	"strings"
 	"testing"
 	"time"
+
+	mock_ccipocr3 "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

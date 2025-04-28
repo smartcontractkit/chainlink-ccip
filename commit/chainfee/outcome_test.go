@@ -1,10 +1,11 @@
 package chainfee
 
 import (
-	mock_ccipocr3 "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
 	"math/big"
 	"testing"
 	"time"
+
+	mock_ccipocr3 "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
 
 	"github.com/stretchr/testify/mock"
 
@@ -477,9 +478,8 @@ func TestProcessor_OutcomeWithDifferentDecimalCalculation(t *testing.T) {
 	expectedDataAvFeeUSD := big.NewInt(200000) // 200 * 1e3
 
 	// Calculate packed fee: (dataAvFeeUSD << 112) | executionFeeUSD
-	expectedPackedFee := new(big.Int)
 	dataAvShifted := new(big.Int).Lsh(expectedDataAvFeeUSD, 112)
-	expectedPackedFee = new(big.Int).Or(dataAvShifted, expectedExecFeeUSD)
+	expectedPackedFee := new(big.Int).Or(dataAvShifted, expectedExecFeeUSD)
 
 	// Verify outcome contains expected gas price
 	require.Len(t, outcome.GasPrices, 1)
