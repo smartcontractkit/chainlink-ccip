@@ -10,7 +10,7 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// Overrides the pending admin of the Token Admin Registry by the token owner
+// Overrides the pending admin of the Token Admin Registry by the token owner.
 //
 // # Arguments
 //

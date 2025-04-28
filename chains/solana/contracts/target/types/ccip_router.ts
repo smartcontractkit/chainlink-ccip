@@ -612,7 +612,7 @@ export type CcipRouter = {
     {
       "name": "ccipAdminOverridePendingAdministrator",
       "docs": [
-        "Overrides the pending admin of the Token Admin Registry",
+        "Overrides the pending admin of the Token Admin Registry.",
         "",
         "# Arguments",
         "",
@@ -702,7 +702,7 @@ export type CcipRouter = {
     {
       "name": "ownerOverridePendingAdministrator",
       "docs": [
-        "Overrides the pending admin of the Token Admin Registry by the token owner",
+        "Overrides the pending admin of the Token Admin Registry by the token owner.",
         "",
         "# Arguments",
         "",
@@ -2549,7 +2549,7 @@ export const IDL: CcipRouter = {
     {
       "name": "ccipAdminOverridePendingAdministrator",
       "docs": [
-        "Overrides the pending admin of the Token Admin Registry",
+        "Overrides the pending admin of the Token Admin Registry.",
         "",
         "# Arguments",
         "",
@@ -2639,7 +2639,7 @@ export const IDL: CcipRouter = {
     {
       "name": "ownerOverridePendingAdministrator",
       "docs": [
-        "Overrides the pending admin of the Token Admin Registry by the token owner",
+        "Overrides the pending admin of the Token Admin Registry by the token owner.",
         "",
         "# Arguments",
         "",

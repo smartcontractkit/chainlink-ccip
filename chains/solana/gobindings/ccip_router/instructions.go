@@ -194,7 +194,7 @@ var (
 	// * `token_admin_registry_admin` - The public key of the token admin registry admin to propose.
 	Instruction_CcipAdminProposeAdministrator = ag_binary.TypeID([8]byte{218, 37, 139, 107, 142, 228, 51, 219})
 
-	// Overrides the pending admin of the Token Admin Registry
+	// Overrides the pending admin of the Token Admin Registry.
 	//
 	// # Arguments
 	//
@@ -212,7 +212,7 @@ var (
 	// * `token_admin_registry_admin` - The public key of the token admin registry admin to propose.
 	Instruction_OwnerProposeAdministrator = ag_binary.TypeID([8]byte{175, 81, 160, 246, 206, 132, 18, 22})
 
-	// Overrides the pending admin of the Token Admin Registry by the token owner
+	// Overrides the pending admin of the Token Admin Registry by the token owner.
 	//
 	// # Arguments
 	//
