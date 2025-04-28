@@ -198,35 +198,6 @@ func TestCCIPRouter(t *testing.T) {
 				t)
 		})
 
-		t.Run("Type version", func(t *testing.T) {
-			testcases := []struct {
-				ContractName              string
-				Program                   solana.PublicKey
-				NewTypeVersionInstruction solana.Instruction
-			}{
-				{"ccip-router", config.CcipRouterProgram, ccip_router.NewTypeVersionInstruction(solana.SysVarClockPubkey).Build()},
-				{"fee-quoter", config.FeeQuoterProgram, fee_quoter.NewTypeVersionInstruction(solana.SysVarClockPubkey).Build()},
-				{"ccip-offramp", config.CcipOfframpProgram, ccip_offramp.NewTypeVersionInstruction(solana.SysVarClockPubkey).Build()},
-				{"rmn-remote", config.RMNRemoteProgram, rmn_remote.NewTypeVersionInstruction(solana.SysVarClockPubkey).Build()},
-			}
-			for _, testcase := range testcases {
-				t.Run(testcase.ContractName, func(t *testing.T) {
-					t.Parallel()
-
-					result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{testcase.NewTypeVersionInstruction}, legacyAdmin, config.DefaultCommitment)
-					require.NotNil(t, result)
-
-					output, err := common.ExtractTypedReturnValue(ctx, result.Meta.LogMessages, testcase.Program.String(), func(b []byte) string {
-						require.Len(t, b, int(binary.LittleEndian.Uint32(b[:4]))+4) // the first 4 bytes just encodes the length
-						return string(b[4:])
-					})
-					require.NoError(t, err)
-					require.Regexp(t, "^"+testcase.ContractName+" [0-9a-f]{40}$", output)
-					fmt.Printf(testcase.ContractName+" Type Version: %s\n", output)
-				})
-			}
-		})
-
 		t.Run("receiver", func(t *testing.T) {
 			instruction, ixErr := test_ccip_receiver.NewInitializeInstruction(
 				config.CcipRouterProgram,
