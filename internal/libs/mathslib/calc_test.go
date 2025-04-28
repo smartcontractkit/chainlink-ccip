@@ -4,7 +4,16 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+
 	"github.com/stretchr/testify/assert"
+)
+
+var (
+	SolChainSelector = ccipocr3.ChainSelector(16423721717087811551)
+	EvmChainSelector = ccipocr3.ChainSelector(16015286601757825753)
 )
 
 func TestDeviates(t *testing.T) {
@@ -105,26 +114,38 @@ func TestCalculateUsdPerUnitGas(t *testing.T) {
 		name           string
 		sourceGasPrice *big.Int
 		usdPerFeeCoin  *big.Int
+		chainSelector  ccipocr3.ChainSelector
 		exp            *big.Int
 	}{
 		{
-			name:           "base case",
+			name:           "evm base case",
 			sourceGasPrice: big.NewInt(2e18),
 			usdPerFeeCoin:  big.NewInt(3e18),
+			chainSelector:  EvmChainSelector, // evm
 			exp:            big.NewInt(6e18),
 		},
 		{
-			name:           "small numbers",
+			name:           "evm small numbers",
 			sourceGasPrice: big.NewInt(1000),
 			usdPerFeeCoin:  big.NewInt(2000),
-			exp:            big.NewInt(0), // What do we do in these cases? Charge the user 0?
+			chainSelector:  EvmChainSelector, // evm
+			exp:            big.NewInt(0),    // What do we do in these cases? Charge the user 0?
+		},
+		{
+			name:           "sol base case",
+			sourceGasPrice: big.NewInt(2000),
+			usdPerFeeCoin:  big.NewInt(3e18),
+			chainSelector:  SolChainSelector, // sol
+			exp:            big.NewInt(6e6),
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			res := CalculateUsdPerUnitGas(tc.sourceGasPrice, tc.usdPerFeeCoin)
-			assert.Zero(t, tc.exp.Cmp(res))
+			res, err := CalculateUsdPerUnitGas(tc.chainSelector, tc.sourceGasPrice, tc.usdPerFeeCoin)
+			println(res.Int64())
+			require.NoError(t, err)
+			require.Zero(t, tc.exp.Cmp(res))
 		})
 	}
 }

@@ -1,7 +1,12 @@
 package mathslib
 
 import (
+	"fmt"
 	"math/big"
+
+	chainsel "github.com/smartcontractkit/chain-selectors"
+
+	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 // Deviates checks if x1 and x2 deviates based on the provided ppb (parts per billion)
@@ -24,8 +29,26 @@ func Deviates(x1, x2 *big.Int, ppb int64) bool {
 }
 
 // CalculateUsdPerUnitGas returns: (sourceGasPrice * usdPerFeeCoin) / 1e18
-func CalculateUsdPerUnitGas(sourceGasPrice *big.Int, usdPerFeeCoin *big.Int) *big.Int {
-	// (wei / gas) * (usd / eth) * (1 eth / 1e18 wei)  = usd/gas
-	tmp := new(big.Int).Mul(sourceGasPrice, usdPerFeeCoin)
-	return tmp.Div(tmp, big.NewInt(1e18))
+func CalculateUsdPerUnitGas(sourceChainSelector ccipocr3.ChainSelector, sourceGasPrice *big.Int, usdPerFeeCoin *big.Int) (*big.Int, error) {
+
+	family, err := chainsel.GetSelectorFamily(uint64(sourceChainSelector))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get chain family for selector %d: %w", sourceChainSelector, err)
+	}
+
+	switch family {
+	case chainsel.FamilyEVM:
+		// (wei / gas) * (usd / eth) * (1 eth / 1e18 wei)  = usd/gas
+		tmp := new(big.Int).Mul(sourceGasPrice, usdPerFeeCoin)
+		return tmp.Div(tmp, big.NewInt(1e18)), nil
+
+	case chainsel.FamilySolana:
+		// (micro lamport / compute units) * (usd / 1 sol) * (1 sol / 1e15 micro lamport)  = usd/cu
+		tmp := new(big.Int).Mul(sourceGasPrice, usdPerFeeCoin)
+		return tmp.Div(tmp, big.NewInt(1e15)), nil
+
+	default:
+		return nil, fmt.Errorf("unsupported family for extra args type %s", family)
+	}
+
 }

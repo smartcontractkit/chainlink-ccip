@@ -33,7 +33,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/commit/metrics"
 	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
 	"github.com/smartcontractkit/chainlink-ccip/internal"
-	"github.com/smartcontractkit/chainlink-ccip/internal/libs/mathslib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
@@ -50,8 +49,8 @@ import (
 
 const (
 	destChain         = ccipocr3.ChainSelector(1)
-	sourceChain1      = ccipocr3.ChainSelector(2)
-	sourceChain2      = ccipocr3.ChainSelector(3)
+	sourceEvmChain1   = ccipocr3.ChainSelector(16015286601757825753)
+	sourceSolChain    = ccipocr3.ChainSelector(16423721717087811551)
 	arbAddr           = ccipocr3.UnknownEncodedAddress("0xa100000000000000000000000000000000000000")
 	arbAggregatorAddr = ccipocr3.UnknownEncodedAddress("0xa2000000000000000000000000000000000000000")
 
@@ -86,8 +85,8 @@ var (
 	}
 
 	sourceChainConfigs = map[ccipocr3.ChainSelector]reader2.StaticSourceChainConfig{
-		sourceChain1: {IsEnabled: true, IsRMNVerificationDisabled: true},
-		sourceChain2: {IsEnabled: true, IsRMNVerificationDisabled: true},
+		sourceEvmChain1: {IsEnabled: true, IsRMNVerificationDisabled: true},
+		sourceSolChain:  {IsEnabled: true, IsRMNVerificationDisabled: true},
 	}
 )
 
@@ -101,12 +100,12 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 		MerkleRootOutcome: merkleroot.Outcome{
 			OutcomeType: merkleroot.ReportIntervalsSelected,
 			RangesSelectedForReport: []plugintypes.ChainRange{
-				{ChainSel: sourceChain1, SeqNumRange: ccipocr3.SeqNumRange{10, 10}},
-				{ChainSel: sourceChain2, SeqNumRange: ccipocr3.SeqNumRange{20, 20}},
+				{ChainSel: sourceEvmChain1, SeqNumRange: ccipocr3.SeqNumRange{10, 10}},
+				{ChainSel: sourceSolChain, SeqNumRange: ccipocr3.SeqNumRange{20, 20}},
 			},
 			OffRampNextSeqNums: []plugintypes.SeqNumChain{
-				{ChainSel: sourceChain1, SeqNum: 10},
-				{ChainSel: sourceChain2, SeqNum: 20},
+				{ChainSel: sourceEvmChain1, SeqNum: 10},
+				{ChainSel: sourceSolChain, SeqNum: 20},
 			},
 			RMNRemoteCfg: params.rmnReportCfg,
 		},
@@ -117,15 +116,15 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 			OutcomeType: merkleroot.ReportGenerated,
 			RootsToReport: []ccipocr3.MerkleRootChain{
 				{
-					ChainSel:      sourceChain1,
+					ChainSel:      sourceEvmChain1,
 					OnRampAddress: ccipocr3.UnknownAddress{1},
 					SeqNumsRange:  ccipocr3.SeqNumRange{0xa, 0xa},
 					MerkleRoot:    merkleRoot1,
 				},
 			},
 			OffRampNextSeqNums: []plugintypes.SeqNumChain{
-				{ChainSel: sourceChain1, SeqNum: 10},
-				{ChainSel: sourceChain2, SeqNum: 20},
+				{ChainSel: sourceEvmChain1, SeqNum: 10},
+				{ChainSel: sourceSolChain, SeqNum: 20},
 			},
 			RMNRemoteCfg: params.rmnReportCfg,
 		},
@@ -164,7 +163,7 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 				{
 					UnblessedMerkleRoots: []ccipocr3.MerkleRootChain{
 						{
-							ChainSel:      sourceChain1,
+							ChainSel:      sourceEvmChain1,
 							SeqNumsRange:  ccipocr3.NewSeqNumRange(0xa, 0xa),
 							OnRampAddress: ccipocr3.UnknownAddress{1},
 							MerkleRoot:    merkleRoot1,
@@ -183,12 +182,12 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 					OutcomeType:                     merkleroot.ReportInFlight,
 					ReportTransmissionCheckAttempts: 1,
 					OffRampNextSeqNums: []plugintypes.SeqNumChain{
-						{ChainSel: sourceChain1, SeqNum: 10},
-						{ChainSel: sourceChain2, SeqNum: 20},
+						{ChainSel: sourceEvmChain1, SeqNum: 10},
+						{ChainSel: sourceSolChain, SeqNum: 20},
 					},
 					RootsToReport: []ccipocr3.MerkleRootChain{
 						{
-							ChainSel:      sourceChain1,
+							ChainSel:      sourceEvmChain1,
 							SeqNumsRange:  ccipocr3.NewSeqNumRange(0xa, 0xa),
 							OnRampAddress: ccipocr3.UnknownAddress{1},
 							MerkleRoot:    merkleRoot1,
@@ -209,10 +208,10 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 		{
 			name:                                 "report generated in previous outcome, transmitted with success",
 			prevOutcome:                          outcomeReportGenerated,
-			offRampNextSeqNumDefaultOverrideKeys: []ccipocr3.ChainSelector{sourceChain1, sourceChain2},
+			offRampNextSeqNumDefaultOverrideKeys: []ccipocr3.ChainSelector{sourceEvmChain1, sourceSolChain},
 			offRampNextSeqNumDefaultOverrideValues: map[ccipocr3.ChainSelector]ccipocr3.SeqNum{
-				sourceChain1: 11,
-				sourceChain2: 20,
+				sourceEvmChain1: 11,
+				sourceSolChain:  20,
 			},
 			expOutcome: committypes.Outcome{
 				MerkleRootOutcome: merkleroot.Outcome{
@@ -471,17 +470,19 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 	merkleOutcome := reportEmptyMerkleRootOutcome()
 	nodes := make([]ocr3types.ReportingPlugin[[]byte], len(oracleIDs))
 
-	newFeeComponents, newNativePrice, packedGasPrice := newRandomFees()
+	// evm selector
+	evmFeeComponents, evmNativePrice, evmPackedGasPrice := newRandomFees(sourceEvmChain1)
 	expectedChain1FeeOutcome := chainfee.Outcome{
 		GasPrices: []ccipocr3.GasPriceChain{
 			{
-				GasPrice: packedGasPrice,
-				ChainSel: sourceChain1,
+				GasPrice: evmPackedGasPrice,
+				ChainSel: sourceEvmChain1,
 			},
 		},
 	}
 
-	newFeeComponents2, newNativePrice2, newPackedGasPrice2 := newRandomFees()
+	// sol selector
+	solFeeComponents, solNativePrice, solPackedPrice := newRandomFees(sourceSolChain)
 
 	testCases := []struct {
 		name                    string
@@ -499,12 +500,12 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 				ChainFeeOutcome: chainfee.Outcome{
 					GasPrices: []ccipocr3.GasPriceChain{
 						{
-							GasPrice: packedGasPrice,
-							ChainSel: sourceChain1,
+							GasPrice: evmPackedGasPrice,
+							ChainSel: sourceEvmChain1,
 						},
 						{
-							GasPrice: packedGasPrice,
-							ChainSel: sourceChain2,
+							GasPrice: solPackedPrice,
+							ChainSel: sourceSolChain,
 						},
 					},
 				},
@@ -516,15 +517,15 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 					GetChainsFeeComponents(mock.Anything, mock.Anything).
 					Return(
 						map[ccipocr3.ChainSelector]types.ChainFeeComponents{
-							sourceChain1: newFeeComponents,
-							sourceChain2: newFeeComponents,
+							sourceEvmChain1: evmFeeComponents,
+							sourceSolChain:  solFeeComponents,
 						})
 
 				m.EXPECT().
 					GetWrappedNativeTokenPriceUSD(mock.Anything, mock.Anything).
 					Return(map[ccipocr3.ChainSelector]ccipocr3.BigInt{
-						sourceChain1: newNativePrice,
-						sourceChain2: newNativePrice,
+						sourceEvmChain1: evmNativePrice,
+						sourceSolChain:  solNativePrice,
 					})
 			},
 		},
@@ -542,14 +543,14 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 					GetChainsFeeComponents(mock.Anything, mock.Anything).
 					Return(
 						map[ccipocr3.ChainSelector]types.ChainFeeComponents{
-							sourceChain1: newFeeComponents,
+							sourceEvmChain1: evmFeeComponents,
 						})
 
 				m.EXPECT().
 					GetWrappedNativeTokenPriceUSD(mock.Anything, mock.Anything).
 					Return(map[ccipocr3.ChainSelector]ccipocr3.BigInt{
-						sourceChain1: newNativePrice,
-						sourceChain2: newNativePrice,
+						sourceEvmChain1: evmNativePrice,
+						sourceSolChain:  solNativePrice,
 					})
 			},
 		},
@@ -585,13 +586,13 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 					GetChainsFeeComponents(mock.Anything, mock.Anything).
 					Return(
 						map[ccipocr3.ChainSelector]types.ChainFeeComponents{
-							sourceChain1: newFeeComponents,
+							sourceEvmChain1: evmFeeComponents,
 						})
 
 				m.EXPECT().
 					GetWrappedNativeTokenPriceUSD(mock.Anything, mock.Anything).
 					Return(map[ccipocr3.ChainSelector]ccipocr3.BigInt{
-						sourceChain1: newNativePrice,
+						sourceEvmChain1: evmNativePrice,
 					})
 			},
 		},
@@ -606,8 +607,8 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 				ChainFeeOutcome: chainfee.Outcome{
 					GasPrices: []ccipocr3.GasPriceChain{
 						{
-							GasPrice: newPackedGasPrice2,
-							ChainSel: sourceChain1,
+							GasPrice: solPackedPrice,
+							ChainSel: sourceSolChain,
 						},
 					},
 				},
@@ -619,13 +620,13 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 					GetChainsFeeComponents(mock.Anything, mock.Anything).
 					Return(
 						map[ccipocr3.ChainSelector]types.ChainFeeComponents{
-							sourceChain1: newFeeComponents2,
+							sourceSolChain: solFeeComponents,
 						})
 
 				m.EXPECT().
 					GetWrappedNativeTokenPriceUSD(mock.Anything, mock.Anything).
 					Return(map[ccipocr3.ChainSelector]ccipocr3.BigInt{
-						sourceChain1: newNativePrice2,
+						sourceSolChain: solNativePrice,
 					})
 			},
 		},
@@ -640,8 +641,8 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 				ChainFeeOutcome: chainfee.Outcome{
 					GasPrices: []ccipocr3.GasPriceChain{
 						{
-							GasPrice: newPackedGasPrice2,
-							ChainSel: sourceChain1,
+							GasPrice: solPackedPrice,
+							ChainSel: sourceSolChain,
 						},
 					},
 				},
@@ -653,12 +654,12 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 					GetChainsFeeComponents(mock.Anything, mock.Anything).
 					Return(
 						map[ccipocr3.ChainSelector]types.ChainFeeComponents{
-							sourceChain1: newFeeComponents2,
+							sourceSolChain: solFeeComponents,
 						})
 				m.EXPECT().
 					GetWrappedNativeTokenPriceUSD(mock.Anything, mock.Anything).
 					Return(map[ccipocr3.ChainSelector]ccipocr3.BigInt{
-						sourceChain1: newNativePrice2,
+						sourceSolChain: solNativePrice,
 					})
 
 				m.EXPECT().GetChainFeePriceUpdate(mock.Anything, mock.Anything).Unset()
@@ -668,7 +669,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 				m.EXPECT().
 					GetChainFeePriceUpdate(mock.Anything, mock.Anything).
 					Return(map[ccipocr3.ChainSelector]ccipocr3.TimestampedBig{
-						sourceChain1: {
+						sourceSolChain: {
 							Timestamp: t,
 							Value:     expectedChain1FeeOutcome.GasPrices[0].GasPrice,
 						},
@@ -803,8 +804,8 @@ func setupNode(params SetupNodeParams) nodeSetup {
 	rmnHomeReader := readerpkg_mock.NewMockRMNHome(params.t)
 
 	rmnHomeReader.EXPECT().GetRMNEnabledSourceChains(mock.Anything).Return(map[ccipocr3.ChainSelector]bool{
-		sourceChain1: false,
-		sourceChain2: false,
+		sourceEvmChain1: false,
+		sourceSolChain:  false,
 	}, nil).Maybe()
 
 	fChain := map[ccipocr3.ChainSelector]int{}
@@ -959,19 +960,19 @@ func defaultNodeParams(t *testing.T) SetupNodeParams {
 
 	peerIDsMap := mapset.NewSet(peerIDs...)
 	homeChainConfig := map[ccipocr3.ChainSelector]reader.ChainConfig{
-		destChain:    {FChain: 1, SupportedNodes: peerIDsMap, Config: chainconfig.ChainConfig{}},
-		sourceChain1: {FChain: 1, SupportedNodes: peerIDsMap, Config: chainconfig.ChainConfig{}},
-		sourceChain2: {FChain: 1, SupportedNodes: peerIDsMap, Config: chainconfig.ChainConfig{}},
+		destChain:       {FChain: 1, SupportedNodes: peerIDsMap, Config: chainconfig.ChainConfig{}},
+		sourceEvmChain1: {FChain: 1, SupportedNodes: peerIDsMap, Config: chainconfig.ChainConfig{}},
+		sourceSolChain:  {FChain: 1, SupportedNodes: peerIDsMap, Config: chainconfig.ChainConfig{}},
 	}
 
 	offRampNextSeqNum := map[ccipocr3.ChainSelector]ccipocr3.SeqNum{
-		sourceChain1: 10,
-		sourceChain2: 20,
+		sourceEvmChain1: 10,
+		sourceSolChain:  20,
 	}
 
 	onRampLastSeqNum := map[ccipocr3.ChainSelector]ccipocr3.SeqNum{
-		sourceChain1: 10, // one new msg -> 10
-		sourceChain2: 19, // no new msg, still on 19
+		sourceEvmChain1: 10, // one new msg -> 10
+		sourceSolChain:  19, // no new msg, still on 19
 	}
 
 	rmnRemoteCfg := testhelpers.CreateRMNRemoteCfg()
@@ -985,7 +986,7 @@ func defaultNodeParams(t *testing.T) SetupNodeParams {
 			arbAddr: arbInfo,
 			ethAddr: ethInfo,
 		},
-		PriceFeedChainSelector:          sourceChain1,
+		PriceFeedChainSelector:          sourceEvmChain1,
 		InflightPriceCheckRetries:       10,
 		MerkleRootAsyncObserverDisabled: true, // we want to keep it disabled since this test is deterministic
 		ChainFeeAsyncObserverDisabled:   true,
@@ -1022,13 +1023,13 @@ func reportEmptyMerkleRootOutcome() merkleroot.Outcome {
 	return merkleroot.Outcome{OutcomeType: merkleroot.ReportEmpty}
 }
 
-func newRandomFees() (components types.ChainFeeComponents, nativePrice ccipocr3.BigInt, usdPrices ccipocr3.BigInt) {
+func newRandomFees(selector ccipocr3.ChainSelector) (components types.ChainFeeComponents, nativePrice ccipocr3.BigInt, usdPrices ccipocr3.BigInt) {
 	execFee := big.NewInt(rand.RandomInt64())
 	dataAvFee := big.NewInt(rand.RandomInt64())
 	nativePriceI := big.NewInt(rand.RandomInt64())
 	usdPricesF := chainfee.FeeComponentsToPackedFee(chainfee.ComponentsUSDPrices{
-		ExecutionFeePriceUSD: mathslib.CalculateUsdPerUnitGas(execFee, nativePriceI),
-		DataAvFeePriceUSD:    mathslib.CalculateUsdPerUnitGas(dataAvFee, nativePriceI),
+		ExecutionFeePriceUSD: internal.MustCalculateUsdPerUnitGas(selector, execFee, nativePriceI),
+		DataAvFeePriceUSD:    internal.MustCalculateUsdPerUnitGas(selector, dataAvFee, nativePriceI),
 	})
 
 	return types.ChainFeeComponents{ExecutionFee: execFee, DataAvailabilityFee: dataAvFee},
