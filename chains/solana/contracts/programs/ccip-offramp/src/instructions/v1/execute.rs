@@ -306,12 +306,21 @@ fn internal_execute<'info>(
         acc_infos.extend_from_slice(msg_accs.remaining_accounts);
 
         let acc_metas: Vec<AccountMeta> = acc_infos
-            .to_vec()
             .iter()
-            .flat_map(|acc_info| {
+            .enumerate()
+            .map(|(i, acc_info)| {
                 // Check signer from PDA External Execution config
                 let is_signer = acc_info.key() == msg_accs.external_execution_signer.key();
-                acc_info.to_account_metas(Some(is_signer))
+                let is_writable = is_writable(
+                    &execution_report.message.extra_args.is_writable_bitmap,
+                    i as u8,
+                );
+
+                if is_writable {
+                    AccountMeta::new(*acc_info.key, is_signer)
+                } else {
+                    AccountMeta::new_readonly(*acc_info.key, is_signer)
+                }
             })
             .collect();
 
@@ -435,7 +444,7 @@ fn parse_messaging_accounts<'info>(
     // Validate that the bitmap corresponds to the individual writable flags
     for (i, acc) in msg_accounts.iter().enumerate() {
         require!(
-            is_writable(source_bitmap, i as u8) == acc.is_writable,
+            !is_writable(source_bitmap, i as u8) || acc.is_writable,
             CcipOfframpError::InvalidWritabilityBitmap
         );
     }
