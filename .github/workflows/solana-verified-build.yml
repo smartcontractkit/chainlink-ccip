@@ -42,7 +42,7 @@ jobs:
       if: steps.cache-target.outputs.cache-hit != 'true'
       run: |
         cd chains/solana/contracts
-        echo -n ${{ github.sha }} > CCIP_BUILD_GIT_HASH
+        echo -n ${{ steps.get_sha.outputs.full_sha }} > CCIP_BUILD_GIT_HASH
         solana-verify build
     - name: Generate release files
       run: |
