@@ -3,7 +3,7 @@ use std::convert::Into;
 use anchor_lang::prelude::*;
 
 #[derive(Clone, Copy, AnchorSerialize, AnchorDeserialize)]
-// Family-agnostic header for OnRamp & OffRamp messages.
+// Family-agnostic header for OnRamp & OffRamp messages
 // The messageId is not expected to match hash(message), since it may originate from another ramp family
 pub struct RampMessageHeader {
     pub message_id: [u8; 32], // Unique identifier for the message, generated with the source chain's encoding scheme

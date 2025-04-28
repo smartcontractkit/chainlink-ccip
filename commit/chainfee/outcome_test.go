@@ -196,6 +196,7 @@ func TestGetConsensusObservation(t *testing.T) {
 
 func TestProcessor_Outcome(t *testing.T) {
 	oneMinuteAgo := time.Now().Add(-time.Minute).UTC()
+	numOracles := 5 // Use a consistent number for generating aos
 
 	cases := []struct {
 		name                   string
@@ -207,7 +208,7 @@ func TestProcessor_Outcome(t *testing.T) {
 	}{
 		{
 			name:          "Outcome gas prices when earliest update is before batch write frequency duration",
-			aos:           sameObs(5, obsNeedUpdate),
+			aos:           sameObs(numOracles, obsNeedUpdate),
 			expectedError: false,
 			expectedOutcome: func() Outcome {
 				gas2 := new(big.Int)
@@ -230,15 +231,15 @@ func TestProcessor_Outcome(t *testing.T) {
 		},
 		{
 			name:          "no consensus",
-			aos:           []plugincommon.AttributedObservation[Observation]{},
-			expectedError: true, // No f chains to calculate consensus
+			aos:           []plugincommon.AttributedObservation[Observation]{}, // Empty aos slice
+			expectedError: true,                                                // No f chains to calculate consensus
 			expectedOutcome: func() Outcome {
 				return Outcome{}
 			},
 		},
 		{
 			name:          "Empty Outcome when no need to update",
-			aos:           sameObs(5, obsNoUpdate),
+			aos:           sameObs(numOracles, obsNoUpdate),
 			expectedError: false,
 			expectedOutcome: func() Outcome {
 				return Outcome{}
@@ -258,7 +259,7 @@ func TestProcessor_Outcome(t *testing.T) {
 					DataAvailabilityDeviationPPB: cciptypes.NewBigInt(big.NewInt(1)),
 				},
 			},
-			aos: sameObs(5, Observation{
+			aos: sameObs(numOracles, Observation{
 				FeeComponents: map[cciptypes.ChainSelector]types.ChainFeeComponents{
 					1: {ExecutionFee: big.NewInt(2), DataAvailabilityFee: big.NewInt(1)},
 					2: {ExecutionFee: big.NewInt(2), DataAvailabilityFee: big.NewInt(1)},
@@ -306,7 +307,7 @@ func TestProcessor_Outcome(t *testing.T) {
 					ChainFeeDeviationDisabled:    true,
 				},
 			},
-			aos: sameObs(5, Observation{
+			aos: sameObs(numOracles, Observation{
 				FeeComponents: map[cciptypes.ChainSelector]types.ChainFeeComponents{
 					1: {ExecutionFee: big.NewInt(2), DataAvailabilityFee: big.NewInt(1)},
 				},
@@ -330,6 +331,28 @@ func TestProcessor_Outcome(t *testing.T) {
 					GasPrices: nil,
 				}
 			},
+		},
+		{
+			name: "Empty Observations with only FChain and TimestampNow",
+			aos: func() []plugincommon.AttributedObservation[Observation] {
+				aos := make([]plugincommon.AttributedObservation[Observation], numOracles)
+				for i := 0; i < numOracles; i++ {
+					aos[i] = plugincommon.AttributedObservation[Observation]{
+						OracleID: commontypes.OracleID(i),
+						Observation: Observation{
+							FChain:       fChains,
+							TimestampNow: ts,
+							// FeeComponents, NativeTokenPrices, ChainFeeUpdates are zero/empty
+						},
+					}
+				}
+				return aos
+			}(),
+			expectedError: false, // No error expected, just an empty outcome
+			expectedOutcome: func() Outcome {
+				return Outcome{}
+			},
+			chainFeeWriteFrequency: chainFeePriceBatchWriteFrequency, // Needs a frequency
 		},
 	}
 
