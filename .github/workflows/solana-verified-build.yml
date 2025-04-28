@@ -40,6 +40,8 @@ jobs:
         key: ${{ runner.os }}-solana-contract-verified-${{ hashFiles('chains/solana/contracts/**/*.rs', 'chains/solana/contracts/**/Cargo.lock') }}
     - name: Build Verified Artifacts
       if: steps.cache-target.outputs.cache-hit != 'true'
+      env:
+        CCIP_BUILD_GIT_HASH: ${{ steps.get_sha.outputs.full_sha }}
       run: |
         cd chains/solana/contracts
         solana-verify build
