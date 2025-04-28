@@ -3,6 +3,8 @@
 package ccipocr3
 
 import (
+	big "math/big"
+
 	ccipocr3 "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	mock "github.com/stretchr/testify/mock"
 )
@@ -108,6 +110,55 @@ func (_c *MockEstimateProvider_CalculateMessageMaxGas_Call) Return(_a0 uint64) *
 }
 
 func (_c *MockEstimateProvider_CalculateMessageMaxGas_Call) RunAndReturn(run func(ccipocr3.Message) uint64) *MockEstimateProvider_CalculateMessageMaxGas_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// CalculateUsdPerUnitGas provides a mock function with given fields: sourceGasPrice, usdPerFeeCoin
+func (_m *MockEstimateProvider) CalculateUsdPerUnitGas(sourceGasPrice *big.Int, usdPerFeeCoin *big.Int) *big.Int {
+	ret := _m.Called(sourceGasPrice, usdPerFeeCoin)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CalculateUsdPerUnitGas")
+	}
+
+	var r0 *big.Int
+	if rf, ok := ret.Get(0).(func(*big.Int, *big.Int) *big.Int); ok {
+		r0 = rf(sourceGasPrice, usdPerFeeCoin)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*big.Int)
+		}
+	}
+
+	return r0
+}
+
+// MockEstimateProvider_CalculateUsdPerUnitGas_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CalculateUsdPerUnitGas'
+type MockEstimateProvider_CalculateUsdPerUnitGas_Call struct {
+	*mock.Call
+}
+
+// CalculateUsdPerUnitGas is a helper method to define mock.On call
+//   - sourceGasPrice *big.Int
+//   - usdPerFeeCoin *big.Int
+func (_e *MockEstimateProvider_Expecter) CalculateUsdPerUnitGas(sourceGasPrice interface{}, usdPerFeeCoin interface{}) *MockEstimateProvider_CalculateUsdPerUnitGas_Call {
+	return &MockEstimateProvider_CalculateUsdPerUnitGas_Call{Call: _e.mock.On("CalculateUsdPerUnitGas", sourceGasPrice, usdPerFeeCoin)}
+}
+
+func (_c *MockEstimateProvider_CalculateUsdPerUnitGas_Call) Run(run func(sourceGasPrice *big.Int, usdPerFeeCoin *big.Int)) *MockEstimateProvider_CalculateUsdPerUnitGas_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(*big.Int), args[1].(*big.Int))
+	})
+	return _c
+}
+
+func (_c *MockEstimateProvider_CalculateUsdPerUnitGas_Call) Return(_a0 *big.Int) *MockEstimateProvider_CalculateUsdPerUnitGas_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockEstimateProvider_CalculateUsdPerUnitGas_Call) RunAndReturn(run func(*big.Int, *big.Int) *big.Int) *MockEstimateProvider_CalculateUsdPerUnitGas_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -85,6 +85,7 @@ func NewPlugin(
 	reporter metrics.Reporter,
 	addressCodec cciptypes.AddressCodec,
 	reportBuilder builder.ReportBuilderFunc,
+	estimateProvider cciptypes.EstimateProvider,
 ) *Plugin {
 	lggr.Infow("creating new plugin instance", "p2pID", oracleIDToP2pID[reportingCfg.OracleID])
 
@@ -163,6 +164,7 @@ func NewPlugin(
 		chainSupport,
 		reportingCfg.F,
 		reporter,
+		estimateProvider,
 	)
 
 	return &Plugin{

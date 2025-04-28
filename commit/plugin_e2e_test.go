@@ -46,6 +46,8 @@ import (
 	reader2 "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
+
+	mock_ccipocr3 "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
 )
 
 const (
@@ -925,6 +927,7 @@ func setupNode(params SetupNodeParams) nodeSetup {
 		&metrics.Noop{},
 		mockAddrCodec,
 		reportBuilder,
+		mock_ccipocr3.NewMockEstimateProvider(params.t),
 	)
 
 	if !params.enableDiscovery {

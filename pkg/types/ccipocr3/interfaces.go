@@ -2,6 +2,7 @@ package ccipocr3
 
 import (
 	"context"
+	"math/big"
 )
 
 // TODO: Consolidate CommitPluginCodec, ExecutePluginCodec, MessageHasher, ExtraDataCodec into a single Codec interface.
@@ -50,4 +51,5 @@ type TokenDataEncoder interface {
 type EstimateProvider interface {
 	CalculateMerkleTreeGas(numRequests int) uint64
 	CalculateMessageMaxGas(msg Message) uint64
+	CalculateUsdPerUnitGas(sourceGasPrice *big.Int, usdPerFeeCoin *big.Int) *big.Int
 }

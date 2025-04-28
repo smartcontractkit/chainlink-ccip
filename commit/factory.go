@@ -77,6 +77,7 @@ type PluginFactory struct {
 	chainWriters      map[cciptypes.ChainSelector]types.ContractWriter
 	rmnPeerClient     rmn.PeerClient
 	rmnCrypto         cciptypes.RMNCrypto
+	estimateProvider  cciptypes.EstimateProvider
 }
 
 type CommitPluginFactoryParams struct {
@@ -92,6 +93,7 @@ type CommitPluginFactoryParams struct {
 	ContractWriters   map[cciptypes.ChainSelector]types.ContractWriter
 	RmnPeerClient     rmn.PeerClient
 	RmnCrypto         cciptypes.RMNCrypto
+	EstimateProvider  cciptypes.EstimateProvider
 }
 
 // NewCommitPluginFactory creates a new PluginFactory instance. For commit plugin, oracle instances are not managed by
@@ -110,6 +112,7 @@ func NewCommitPluginFactory(params CommitPluginFactoryParams) *PluginFactory {
 		chainWriters:      params.ContractWriters,
 		rmnPeerClient:     params.RmnPeerClient,
 		rmnCrypto:         params.RmnCrypto,
+		estimateProvider:  params.EstimateProvider,
 	}
 }
 
@@ -244,6 +247,7 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 			metricsReporter,
 			p.addrCodec,
 			reportBuilder,
+			p.estimateProvider,
 		), ocr3types.ReportingPluginInfo{
 			Name: "CCIPRoleCommit",
 			Limits: ocr3types.ReportingPluginLimits{

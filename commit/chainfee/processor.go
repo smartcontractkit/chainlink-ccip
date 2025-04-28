@@ -17,14 +17,15 @@ type processor struct {
 	oracleID  commontypes.OracleID
 	destChain cciptypes.ChainSelector
 	// Don't use this logger directly but rather through logutil\.WithContextValues where possible
-	lggr            logger.Logger
-	homeChain       reader.HomeChain
-	ccipReader      readerpkg.CCIPReader
-	cfg             pluginconfig.CommitOffchainConfig
-	chainSupport    plugincommon.ChainSupport
-	metricsReporter plugincommon.MetricsReporter
-	fRoleDON        int
-	obs             observer
+	lggr             logger.Logger
+	homeChain        reader.HomeChain
+	ccipReader       readerpkg.CCIPReader
+	cfg              pluginconfig.CommitOffchainConfig
+	chainSupport     plugincommon.ChainSupport
+	metricsReporter  plugincommon.MetricsReporter
+	estimateProvider cciptypes.EstimateProvider
+	fRoleDON         int
+	obs              observer
 }
 
 func NewProcessor(
@@ -37,6 +38,7 @@ func NewProcessor(
 	chainSupport plugincommon.ChainSupport,
 	fRoleDON int,
 	metricsReporter plugincommon.MetricsReporter,
+	estimateProvider cciptypes.EstimateProvider,
 ) plugincommon.PluginProcessor[Query, Observation, Outcome] {
 	var obs observer
 	baseObs := newBaseObserver(
@@ -57,16 +59,17 @@ func NewProcessor(
 	}
 
 	p := &processor{
-		lggr:            lggr,
-		oracleID:        oracleID,
-		destChain:       destChain,
-		homeChain:       homeChain,
-		ccipReader:      ccipReader,
-		fRoleDON:        fRoleDON,
-		chainSupport:    chainSupport,
-		cfg:             offChainConfig,
-		metricsReporter: metricsReporter,
-		obs:             obs,
+		lggr:             lggr,
+		oracleID:         oracleID,
+		destChain:        destChain,
+		homeChain:        homeChain,
+		ccipReader:       ccipReader,
+		fRoleDON:         fRoleDON,
+		chainSupport:     chainSupport,
+		cfg:              offChainConfig,
+		metricsReporter:  metricsReporter,
+		obs:              obs,
+		estimateProvider: estimateProvider,
 	}
 	return plugincommon.NewTrackedProcessor(lggr, p, processorLabel, metricsReporter)
 }
