@@ -328,7 +328,7 @@ pub mod ccip_router {
             .ccip_admin_propose_administrator(ctx, token_admin_registry_admin)
     }
 
-    /// Overrides the pending admin of the Token Admin Registry
+    /// Overrides the pending admin of the Token Admin Registry.
     ///
     /// # Arguments
     ///
@@ -358,7 +358,7 @@ pub mod ccip_router {
             .owner_propose_administrator(ctx, token_admin_registry_admin)
     }
 
-    /// Overrides the pending admin of the Token Admin Registry by the token owner
+    /// Overrides the pending admin of the Token Admin Registry by the token owner.
     ///
     /// # Arguments
     ///
