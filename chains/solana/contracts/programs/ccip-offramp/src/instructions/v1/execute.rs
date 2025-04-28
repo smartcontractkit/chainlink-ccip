@@ -303,9 +303,17 @@ fn internal_execute<'info>(
             ctx.accounts.offramp.to_account_info(),
             ctx.accounts.allowed_offramp.to_account_info(),
         ];
-        acc_infos.extend_from_slice(msg_accs.remaining_accounts);
 
-        let acc_metas: Vec<AccountMeta> = acc_infos
+        let mut acc_metas: Vec<AccountMeta> = acc_infos
+            .iter()
+            .flat_map(|acc_info| {
+                let is_signer = acc_info.key() == msg_accs.external_execution_signer.key();
+                acc_info.to_account_metas(Some(is_signer))
+            })
+            .collect();
+
+        let remaining_metas: Vec<AccountMeta> = msg_accs
+            .remaining_accounts
             .iter()
             .enumerate()
             .map(|(i, acc_info)| {
@@ -323,6 +331,9 @@ fn internal_execute<'info>(
                 }
             })
             .collect();
+
+        acc_infos.extend_from_slice(msg_accs.remaining_accounts);
+        acc_metas.extend_from_slice(&remaining_metas);
 
         let data = message.build_receiver_discriminator_and_data()?;
 
