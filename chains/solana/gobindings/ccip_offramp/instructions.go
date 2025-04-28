@@ -51,13 +51,6 @@ var (
 	// * `enable_execution_after` - The minimum amount of time required between a message has been committed and can be manually executed.
 	Instruction_InitializeConfig = ag_binary.TypeID([8]byte{208, 127, 21, 1, 194, 190, 196, 70})
 
-	// Returns the program type (name) and version.
-	// Used by offchain code to easily determine which program & version is being interacted with.
-	//
-	// # Arguments
-	// * `ctx` - The context
-	Instruction_TypeVersion = ag_binary.TypeID([8]byte{129, 251, 8, 243, 122, 229, 252, 164})
-
 	// Transfers the ownership of the router to a new proposed owner.
 	//
 	// Shared func signature with other programs
@@ -254,8 +247,6 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "Initialize"
 	case Instruction_InitializeConfig:
 		return "InitializeConfig"
-	case Instruction_TypeVersion:
-		return "TypeVersion"
 	case Instruction_TransferOwnership:
 		return "TransferOwnership"
 	case Instruction_AcceptOwnership:
@@ -311,9 +302,6 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"initialize_config", (*InitializeConfig)(nil),
-		},
-		{
-			"type_version", (*TypeVersion)(nil),
 		},
 		{
 			"transfer_ownership", (*TransferOwnership)(nil),
