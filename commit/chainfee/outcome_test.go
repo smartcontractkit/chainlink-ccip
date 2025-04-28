@@ -409,3 +409,80 @@ func TestProcessor_Outcome(t *testing.T) {
 		})
 	}
 }
+
+func TestProcessor_OutcomeWithDifferentDecimalCalculation(t *testing.T) {
+	lggr := logger.Test(t)
+	ctx := tests.Context(t)
+	numOracles := 5
+	oneMinuteAgo := time.Now().Add(-time.Minute).UTC()
+
+	// Setup mock for home chain
+	homeChainMock := mock_home_chain.NewMockHomeChain(t)
+	homeChainMock.EXPECT().GetChainConfig(mock.Anything).
+		Return(defaultChainConfig, nil).Maybe()
+
+	// Mock the estimate provider with custom decimal calculation (1e15 instead of 1e18)
+	estimateProvider := mock_ccipocr3.NewMockEstimateProvider(t)
+	estimateProvider.EXPECT().CalculateUsdPerUnitGas(mock.Anything, mock.Anything).RunAndReturn(
+		func(sourceGasPrice *big.Int, usdPerFeeCoin *big.Int) *big.Int {
+			// Using 1e15 division instead of 1e18
+			tmp := new(big.Int).Mul(sourceGasPrice, usdPerFeeCoin)
+			return tmp.Div(tmp, big.NewInt(1e15))
+		}).Maybe()
+
+	// Create processor with custom estimate provider
+	p := &processor{
+		lggr:      lggr,
+		destChain: 1,
+		fRoleDON:  1,
+		cfg: pluginconfig.CommitOffchainConfig{
+			RemoteGasPriceBatchWriteFrequency: chainFeePriceBatchWriteFrequency,
+		},
+		metricsReporter:  plugincommon.NoopReporter{},
+		homeChain:        homeChainMock,
+		estimateProvider: estimateProvider,
+	}
+
+	// Create observation with timestamp old enough to trigger update
+	observation := Observation{
+		FeeComponents: map[cciptypes.ChainSelector]types.ChainFeeComponents{
+			1: {ExecutionFee: big.NewInt(100), DataAvailabilityFee: big.NewInt(200)},
+		},
+		NativeTokenPrices: map[cciptypes.ChainSelector]cciptypes.BigInt{
+			1: cciptypes.NewBigInt(big.NewInt(1e18)),
+		},
+		ChainFeeUpdates: map[cciptypes.ChainSelector]Update{
+			1: {
+				Timestamp: oneMinuteAgo.Add(-2 * chainFeePriceBatchWriteFrequency.Duration()), // Old enough to trigger update
+				ChainFee: ComponentsUSDPrices{
+					ExecutionFeePriceUSD: big.NewInt(100),
+					DataAvFeePriceUSD:    big.NewInt(200),
+				},
+			},
+		},
+		FChain:       map[cciptypes.ChainSelector]int{1: 1},
+		TimestampNow: time.Now().UTC(),
+	}
+
+	// Run the test
+	aos := sameObs(numOracles, observation)
+	outcome, err := p.Outcome(ctx, Outcome{}, Query{}, aos)
+	require.NoError(t, err)
+
+	// Calculate expected packed fee using 1e15 denomination
+	// With 1e15 divisor instead of 1e18:
+	// executionFeeUSD = 100 * 1e18 / 1e15 = 100 * 1e3 = 100000
+	// dataAvFeeUSD = 200 * 1e18 / 1e15 = 200 * 1e3 = 200000
+	expectedExecFeeUSD := big.NewInt(100000)   // 100 * 1e3
+	expectedDataAvFeeUSD := big.NewInt(200000) // 200 * 1e3
+
+	// Calculate packed fee: (dataAvFeeUSD << 112) | executionFeeUSD
+	expectedPackedFee := new(big.Int)
+	dataAvShifted := new(big.Int).Lsh(expectedDataAvFeeUSD, 112)
+	expectedPackedFee = new(big.Int).Or(dataAvShifted, expectedExecFeeUSD)
+
+	// Verify outcome contains expected gas price
+	require.Len(t, outcome.GasPrices, 1)
+	assert.Equal(t, cciptypes.ChainSelector(1), outcome.GasPrices[0].ChainSel)
+	assert.Equal(t, cciptypes.NewBigInt(expectedPackedFee), outcome.GasPrices[0].GasPrice)
+}
