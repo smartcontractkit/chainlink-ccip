@@ -3,6 +3,7 @@ package commit
 import (
 	"encoding/json"
 	"fmt"
+	mock_ccipocr3 "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
 	"math"
 	"strings"
 	"testing"
@@ -318,7 +319,8 @@ func TestPluginFactory_NewReportingPlugin(t *testing.T) {
 					ChainSelector: 12922642891491394802,
 				},
 			},
-			addrCodec: mockAddrCodec,
+			addrCodec:        mockAddrCodec,
+			estimateProvider: mock_ccipocr3.NewMockEstimateProvider(t),
 		}
 
 		plugin, pluginInfo, err := p.NewReportingPlugin(ctx, ocr3types.ReportingPluginConfig{

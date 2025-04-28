@@ -1,6 +1,7 @@
 package chainfee
 
 import (
+	mock_ccipocr3 "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
 	"math/big"
 	"testing"
 	"time"
@@ -377,6 +378,15 @@ func TestProcessor_Outcome(t *testing.T) {
 					},
 				}, nil).Maybe()
 			}
+
+			estimateProvider := mock_ccipocr3.NewMockEstimateProvider(t)
+			estimateProvider.EXPECT().CalculateUsdPerUnitGas(mock.Anything, mock.Anything).RunAndReturn(
+				func(sourceGasPrice *big.Int, usdPerFeeCoin *big.Int) *big.Int {
+					// (wei / gas) * (usd / eth) * (1 eth / 1e18 wei)  = usd/gas
+					tmp := new(big.Int).Mul(sourceGasPrice, usdPerFeeCoin)
+					return tmp.Div(tmp, big.NewInt(1e18))
+				}).Maybe()
+
 			p := &processor{
 				lggr:      logger.Test(t),
 				destChain: 1,
@@ -384,8 +394,9 @@ func TestProcessor_Outcome(t *testing.T) {
 				cfg: pluginconfig.CommitOffchainConfig{
 					RemoteGasPriceBatchWriteFrequency: tt.chainFeeWriteFrequency,
 				},
-				metricsReporter: plugincommon.NoopReporter{},
-				homeChain:       homeChainMock,
+				metricsReporter:  plugincommon.NoopReporter{},
+				homeChain:        homeChainMock,
+				estimateProvider: estimateProvider,
 			}
 
 			outcome, err := p.Outcome(ctx, Outcome{}, Query{}, tt.aos)

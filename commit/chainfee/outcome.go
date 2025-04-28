@@ -68,8 +68,11 @@ func (p *processor) Outcome(
 		// 1 gas = 1 wei = XUSD18
 		// execFee = 30 Gwei = 30e9 wei = 30e9 * XUSD18
 		chainFeeUsd := ComponentsUSDPrices{
-			ExecutionFeePriceUSD: mathslib.CalculateUsdPerUnitGas(feeComp.ExecutionFee, usdPerFeeToken.Int),
-			DataAvFeePriceUSD:    mathslib.CalculateUsdPerUnitGas(feeComp.DataAvailabilityFee, usdPerFeeToken.Int),
+			ExecutionFeePriceUSD: p.estimateProvider.CalculateUsdPerUnitGas(feeComp.ExecutionFee, usdPerFeeToken.Int),
+			DataAvFeePriceUSD: p.estimateProvider.CalculateUsdPerUnitGas(
+				feeComp.DataAvailabilityFee,
+				usdPerFeeToken.Int,
+			),
 		}
 
 		chainFeeUSDPrices[chain] = chainFeeUsd

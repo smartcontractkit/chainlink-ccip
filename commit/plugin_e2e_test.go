@@ -689,6 +689,12 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 				prepareCcipReaderMock(n.ccipReader, true, false, false)
 
 				preparePriceReaderMock(n.priceReader)
+				n.estimateProvider.EXPECT().CalculateUsdPerUnitGas(mock.Anything, mock.Anything).RunAndReturn(
+					func(sourceGasPrice *big.Int, usdPerFeeCoin *big.Int) *big.Int {
+						// (wei / gas) * (usd / eth) * (1 eth / 1e18 wei)  = usd/gas
+						tmp := new(big.Int).Mul(sourceGasPrice, usdPerFeeCoin)
+						return tmp.Div(tmp, big.NewInt(1e18))
+					}).Maybe()
 
 				tc.mockCCIPReader(n.ccipReader)
 			}
@@ -772,11 +778,12 @@ func preparePriceReaderMock(priceReader *readerpkg_mock.MockPriceReader) {
 }
 
 type nodeSetup struct {
-	node        *Plugin
-	ccipReader  *readerpkg_mock.MockCCIPReader
-	priceReader *readerpkg_mock.MockPriceReader
-	reportCodec *mocks.CommitPluginJSONReportCodec
-	msgHasher   *mocks.MessageHasher
+	node             *Plugin
+	ccipReader       *readerpkg_mock.MockCCIPReader
+	priceReader      *readerpkg_mock.MockPriceReader
+	reportCodec      *mocks.CommitPluginJSONReportCodec
+	msgHasher        *mocks.MessageHasher
+	estimateProvider *mock_ccipocr3.MockEstimateProvider
 }
 
 // Define a struct to hold the parameters
@@ -803,6 +810,7 @@ func setupNode(params SetupNodeParams) nodeSetup {
 	msgHasher := mocks.NewMessageHasher()
 	homeChainReader := reader_mock.NewMockHomeChain(params.t)
 	rmnHomeReader := readerpkg_mock.NewMockRMNHome(params.t)
+	estimateProvider := mock_ccipocr3.NewMockEstimateProvider(params.t)
 
 	rmnHomeReader.EXPECT().GetRMNEnabledSourceChains(mock.Anything).Return(map[ccipocr3.ChainSelector]bool{
 		sourceChain1: false,
@@ -927,18 +935,19 @@ func setupNode(params SetupNodeParams) nodeSetup {
 		&metrics.Noop{},
 		mockAddrCodec,
 		reportBuilder,
-		mock_ccipocr3.NewMockEstimateProvider(params.t),
+		estimateProvider,
 	)
 
 	if !params.enableDiscovery {
 		p.discoveryProcessor = nil
 	}
 	return nodeSetup{
-		node:        p,
-		ccipReader:  ccipReader,
-		priceReader: tokenPricesReader,
-		reportCodec: reportCodec,
-		msgHasher:   msgHasher,
+		node:             p,
+		ccipReader:       ccipReader,
+		priceReader:      tokenPricesReader,
+		reportCodec:      reportCodec,
+		msgHasher:        msgHasher,
+		estimateProvider: estimateProvider,
 	}
 }
 
