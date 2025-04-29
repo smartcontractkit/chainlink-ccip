@@ -59,9 +59,6 @@ func CalculateUsdPerUnitGas(
 		// To keep precision, we want to divide at the very end.
 		// The above cancels out, the net result is we need to further divide by 1e6,
 		// or 1e18 * 1e6 = 1e24 in total.
-
-		// (microlamport / cu) * (usd18 / 1e9 sol) * (1e9 sol / 1e24 microlamport)
-		//(microlamport / cu) * (usd18 / 1e18 lamport) * (1 lamport / 1e6 microlamport)
 		tmp := new(big.Int).Mul(sourceGasPrice, usdPerFeeCoin)
 		power24 := big.NewInt(0).Exp(big.NewInt(10), big.NewInt(24), nil)
 		return tmp.Div(tmp, power24), nil
