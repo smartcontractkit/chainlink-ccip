@@ -44,11 +44,16 @@ func CalculateUsdPerUnitGas(sourceChainSelector ccipocr3.ChainSelector, sourceGa
 
 	case chainsel.FamilySolana:
 		// (micro lamport / compute units) * (usd / 1 sol) * (1 sol / 1e15 micro lamport)  = usd/cu
-		tmp := new(big.Int).Mul(sourceGasPrice, usdPerFeeCoin)
-		return tmp.Div(tmp, big.NewInt(1e15)), nil
+		usdPrice18 := new(big.Int).Mul(sourceGasPrice, usdPerFeeCoin)
+		// Adjust the price for token scaling as sourceGas is in MicroLamport and not Lamport
+		scaledPrice := new(big.Int).Div(usdPrice18, big.NewInt(1e15))
+		// Convert to USD per lamport (dividing by 1e9 for lamport conversion)
+		usdPerLamport := new(big.Int).Div(scaledPrice, big.NewInt(1e9))
+
+		return usdPerLamport, nil
 
 	default:
-		return nil, fmt.Errorf("unsupported family for extra args type %s", family)
+		return nil, fmt.Errorf("unsupported family")
 	}
 
 }

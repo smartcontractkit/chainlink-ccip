@@ -138,6 +138,13 @@ func TestCalculateUsdPerUnitGas(t *testing.T) {
 			chainSelector:  SolChainSelector, // sol
 			exp:            big.NewInt(6e6),
 		},
+		{
+			name:           "sol base case",
+			sourceGasPrice: big.NewInt(2773),
+			usdPerFeeCoin:  big.NewInt(150e18),
+			chainSelector:  SolChainSelector, // sol
+			exp:            big.NewInt(415950000),
+		},
 	}
 
 	for _, tc := range testCases {
