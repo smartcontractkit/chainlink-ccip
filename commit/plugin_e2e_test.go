@@ -1023,7 +1023,9 @@ func reportEmptyMerkleRootOutcome() merkleroot.Outcome {
 	return merkleroot.Outcome{OutcomeType: merkleroot.ReportEmpty}
 }
 
-func newRandomFees(selector ccipocr3.ChainSelector) (components types.ChainFeeComponents, nativePrice ccipocr3.BigInt, usdPrices ccipocr3.BigInt) {
+func newRandomFees(selector ccipocr3.ChainSelector) (components types.ChainFeeComponents,
+	nativePrice ccipocr3.BigInt,
+	usdPrices ccipocr3.BigInt) {
 	execFee := big.NewInt(rand.RandomInt64())
 	dataAvFee := big.NewInt(rand.RandomInt64())
 	nativePriceI := big.NewInt(rand.RandomInt64())

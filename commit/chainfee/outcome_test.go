@@ -275,8 +275,10 @@ func TestProcessor_Outcome(t *testing.T) {
 					internal.EvmChainSelector2: {ExecutionFee: big.NewInt(2), DataAvailabilityFee: big.NewInt(1)},
 				},
 				NativeTokenPrices: map[cciptypes.ChainSelector]cciptypes.BigInt{
-					internal.EvmChainSelector:  cciptypes.NewBigInt(big.NewInt(2e18)), // <----------- token price increased deviation reached
-					internal.EvmChainSelector2: cciptypes.NewBigInt(big.NewInt(1e18)), // <----------- token price same deviation not reached
+					// <----------- token price increased deviation reached
+					internal.EvmChainSelector: cciptypes.NewBigInt(big.NewInt(2e18)),
+					// <----------- token price same deviation not reached
+					internal.EvmChainSelector2: cciptypes.NewBigInt(big.NewInt(1e18)),
 				},
 				ChainFeeUpdates: map[cciptypes.ChainSelector]Update{
 					internal.EvmChainSelector: {
@@ -322,7 +324,8 @@ func TestProcessor_Outcome(t *testing.T) {
 					internal.EvmChainSelector: {ExecutionFee: big.NewInt(2), DataAvailabilityFee: big.NewInt(1)},
 				},
 				NativeTokenPrices: map[cciptypes.ChainSelector]cciptypes.BigInt{
-					internal.EvmChainSelector: cciptypes.NewBigInt(big.NewInt(2e18)), // <----------- token price increased deviation reached
+					// <----------- token price increased deviation reached
+					internal.EvmChainSelector: cciptypes.NewBigInt(big.NewInt(2e18)),
 				},
 				ChainFeeUpdates: map[cciptypes.ChainSelector]Update{
 					internal.EvmChainSelector: {
