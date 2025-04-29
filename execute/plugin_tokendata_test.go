@@ -91,24 +91,25 @@ func Test_USDC_Transfer(t *testing.T) {
 
 	// Round 1 - Get Commit Reports
 	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
-	require.Len(t, outcome.Report.ChainReports, 0)
+	require.Len(t, outcome.Reports, 0)
 	require.Len(t, outcome.CommitReports, 1)
 
 	// Round 2 - Get Messages
 	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
-	require.Len(t, outcome.Report.ChainReports, 0)
+	require.Len(t, outcome.Reports, 0)
 	require.Len(t, outcome.CommitReports, 1)
 
 	// Round 3 - Filter
 	// Messages 102-104,106 are executed, 105 doesn't have token data ready
 	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
 	require.NoError(t, err)
-	require.Len(t, outcome.Report.ChainReports, 1)
-	sequenceNumbers := extractSequenceNumbers(outcome.Report.ChainReports[0].Messages)
+	require.Len(t, outcome.Reports, 1)
+	require.Len(t, outcome.Reports[0].ChainReports, 1)
+	sequenceNumbers := extractSequenceNumbers(outcome.Reports[0].ChainReports[0].Messages)
 	assert.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{102, 103, 104, 106})
 	//Attestation data added to the USDC
-	assert.Equal(t, internal.MustDecodeRaw("0x100001"), outcome.Report.ChainReports[0].OffchainTokenData[2][0])
-	assert.Equal(t, internal.MustDecodeRaw("0x100003"), outcome.Report.ChainReports[0].OffchainTokenData[3][0])
+	assert.Equal(t, internal.MustDecodeRaw("0x100001"), outcome.Reports[0].ChainReports[0].OffchainTokenData[2][0])
+	assert.Equal(t, internal.MustDecodeRaw("0x100003"), outcome.Reports[0].ChainReports[0].OffchainTokenData[3][0])
 
 	intTest.usdcServer.AddResponse(
 		"0x70ef528624085241badbff913575c0ab50241e7cb6db183a5614922ab0bcba5d",
@@ -122,10 +123,11 @@ func Test_USDC_Transfer(t *testing.T) {
 		outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
 	}
 
-	require.Len(t, outcome.Report.ChainReports, 1)
-	sequenceNumbers = extractSequenceNumbers(outcome.Report.ChainReports[0].Messages)
+	require.Len(t, outcome.Reports, 1)
+	require.Len(t, outcome.Reports[0].ChainReports, 1)
+	sequenceNumbers = extractSequenceNumbers(outcome.Reports[0].ChainReports[0].Messages)
 	// 102, 103 and 104 are in the inflight message cache.
 	assert.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{105})
 	//Attestation data added to the remaining USDC messages
-	assert.Equal(t, internal.MustDecodeRaw("0x100002"), outcome.Report.ChainReports[0].OffchainTokenData[0][0])
+	assert.Equal(t, internal.MustDecodeRaw("0x100002"), outcome.Reports[0].ChainReports[0].OffchainTokenData[0][0])
 }

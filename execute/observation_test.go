@@ -48,7 +48,7 @@ func Test_Observation_CacheUpdate(t *testing.T) {
 	}
 
 	outcome := exectypes.Outcome{
-		Report: cciptypes.ExecutePluginReport{
+		Reports: []cciptypes.ExecutePluginReport{{
 			ChainReports: []cciptypes.ExecutePluginReportSingleChain{
 				{
 					SourceChainSelector: 1,
@@ -67,7 +67,7 @@ func Test_Observation_CacheUpdate(t *testing.T) {
 					},
 				},
 			},
-		},
+		}},
 	}
 
 	// No state, report only generated in Filter state so cache is not updated.

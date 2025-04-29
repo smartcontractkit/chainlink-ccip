@@ -79,14 +79,12 @@ func (e *ExecCodecProto) DecodeObservation(data []byte) (exectypes.Observation, 
 }
 
 func (e *ExecCodecProto) EncodeOutcome(outcome exectypes.Outcome) ([]byte, error) {
-	outcome = exectypes.NewSortedOutcome(outcome.State, outcome.CommitReports, outcome.Report)
+	outcome = exectypes.NewOutcome(outcome.State, outcome.CommitReports, outcome.Reports)
 
 	pbObs := &ocrtypecodecpb.ExecOutcome{
-		PluginState:   string(outcome.State),
-		CommitReports: e.tr.commitDataSliceToProto(outcome.CommitReports),
-		ExecutePluginReport: &ocrtypecodecpb.ExecutePluginReport{
-			ChainReports: e.tr.chainReportsToProto(outcome.Report.ChainReports),
-		},
+		PluginState:          string(outcome.State),
+		CommitReports:        e.tr.commitDataSliceToProto(outcome.CommitReports),
+		ExecutePluginReports: e.tr.execPluginReportsToProto(outcome.Reports),
 	}
 
 	return proto.MarshalOptions{Deterministic: true}.Marshal(pbObs)
@@ -102,12 +100,19 @@ func (e *ExecCodecProto) DecodeOutcome(data []byte) (exectypes.Outcome, error) {
 		return exectypes.Outcome{}, fmt.Errorf("proto unmarshal ExecOutcome: %w", err)
 	}
 
+	var reports []cciptypes.ExecutePluginReport
+	if pbOutc.ExecutePluginReport != nil {
+		// This is a legacy field, seeing it means that we're in a compatibility mode.
+		// Convert it to the "Reports" format.
+		reports = e.tr.execPluginReportsFromProto([]*ocrtypecodecpb.ExecutePluginReport{pbOutc.ExecutePluginReport})
+	} else {
+		reports = e.tr.execPluginReportsFromProto(pbOutc.ExecutePluginReports)
+	}
+
 	outc := exectypes.Outcome{
 		State:         exectypes.PluginState(pbOutc.PluginState),
 		CommitReports: e.tr.commitDataSliceFromProto(pbOutc.CommitReports),
-		Report: cciptypes.ExecutePluginReport{
-			ChainReports: e.tr.chainReportsFromProto(pbOutc.ExecutePluginReport.ChainReports),
-		},
+		Reports:       reports,
 	}
 
 	return outc, nil
@@ -137,7 +142,7 @@ func (*ExecCodecJSON) DecodeObservation(data []byte) (exectypes.Observation, err
 
 func (*ExecCodecJSON) EncodeOutcome(outcome exectypes.Outcome) ([]byte, error) {
 	// We sort again here in case construction is not via the constructor.
-	return json.Marshal(exectypes.NewSortedOutcome(outcome.State, outcome.CommitReports, outcome.Report))
+	return json.Marshal(exectypes.NewOutcome(outcome.State, outcome.CommitReports, outcome.Reports))
 }
 
 func (*ExecCodecJSON) DecodeOutcome(data []byte) (exectypes.Outcome, error) {

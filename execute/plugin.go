@@ -530,22 +530,31 @@ func selectReport(
 	return execReports, selectedReports, err
 }
 
-func extractReportInfo(report exectypes.Outcome) cciptypes.ExecuteReportInfo {
-	merkleRoots := []cciptypes.MerkleRootChain{}
+func extractReportInfo(report exectypes.Outcome) []cciptypes.ExecuteReportInfo {
+	var ri []cciptypes.ExecuteReportInfo
+	commitReportIdx := 0
 
-	for _, commitReport := range report.CommitReports {
-		merkleRoots = append(merkleRoots, cciptypes.MerkleRootChain{
-			ChainSel:      commitReport.SourceChain,
-			OnRampAddress: commitReport.OnRampAddress,
-			SeqNumsRange:  commitReport.SequenceNumberRange,
-			MerkleRoot:    commitReport.MerkleRoot,
+	for _, execReport := range report.Reports {
+		var merkleRoots []cciptypes.MerkleRootChain
+
+		for i := 0; i < len(execReport.ChainReports); i++ {
+			cr := report.CommitReports[commitReportIdx]
+			merkleRoots = append(merkleRoots, cciptypes.MerkleRootChain{
+				ChainSel:      cr.SourceChain,
+				OnRampAddress: cr.OnRampAddress,
+				SeqNumsRange:  cr.SequenceNumberRange,
+				MerkleRoot:    cr.MerkleRoot,
+			})
+			commitReportIdx++
+		}
+
+		ri = append(ri, cciptypes.ExecuteReportInfo{
+			AbstractReports: execReport.ChainReports,
+			MerkleRoots:     merkleRoots,
 		})
 	}
 
-	return cciptypes.ExecuteReportInfo{
-		AbstractReports: report.Report.ChainReports,
-		MerkleRoots:     merkleRoots,
-	}
+	return ri
 }
 
 func (p *Plugin) Reports(
@@ -563,19 +572,21 @@ func (p *Plugin) Reports(
 		return nil, fmt.Errorf("unable to decode outcome: %w", err)
 	}
 
-	if len(decodedOutcome.Report.ChainReports) == 0 {
-		lggr.Warn("empty report", "report", decodedOutcome.Report)
+	if len(decodedOutcome.Reports) == 0 {
+		lggr.Warn("empty report", "outcome", decodedOutcome)
 		return nil, nil
 	}
 
-	encodedReport, err := p.reportCodec.Encode(ctx, decodedOutcome.Report)
+	// TODO: Handle multiple reports.
+	encodedReport, err := p.reportCodec.Encode(ctx, decodedOutcome.Reports[0])
 	if err != nil {
 		return nil, fmt.Errorf("unable to encode report: %w", err)
 	}
 
 	reportInfo := extractReportInfo(decodedOutcome)
 	lggr.Debugw("report info in UnfinalizedReports()", "reportInfo", reportInfo)
-	encodedInfo, err := reportInfo.Encode()
+	// TODO: Handle multiple reports.
+	encodedInfo, err := reportInfo[0].Encode()
 	if err != nil {
 		return nil, err
 	}

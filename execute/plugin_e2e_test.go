@@ -46,21 +46,22 @@ func TestPlugin(t *testing.T) {
 	// One pending commit report only.
 	// Two of the messages are executed which should be indicated in the Outcome.
 	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
-	require.Len(t, outcome.Report.ChainReports, 0)
+	require.Len(t, outcome.Reports, 0)
 	require.Len(t, outcome.CommitReports, 1)
 	require.ElementsMatch(t, outcome.CommitReports[0].ExecutedMessages, []cciptypes.SeqNum{100, 101})
 
 	// Round 2 - Get Messages
 	// Messages now attached to the pending commit.
 	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
-	require.Len(t, outcome.Report.ChainReports, 0)
+	require.Len(t, outcome.Reports, 0)
 	require.Len(t, outcome.CommitReports, 1)
 
 	// Round 3 - Filter
 	// An execute report with the following messages executed: 102, 103, 104, 105.
 	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
-	require.Len(t, outcome.Report.ChainReports, 1)
-	sequenceNumbers := extractSequenceNumbers(outcome.Report.ChainReports[0].Messages)
+	require.Len(t, outcome.Reports, 1)
+	require.Len(t, outcome.Reports[0].ChainReports, 1)
+	sequenceNumbers := extractSequenceNumbers(outcome.Reports[0].ChainReports[0].Messages)
 	require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{102, 103, 104, 105})
 }
 
@@ -113,7 +114,7 @@ func TestPluginSkipEmptyReports(t *testing.T) {
 	// Round 1 - Get Commit UnfinalizedReports
 	// No pending commit reports, all lenientMaxMsgsPerObs reports are with no merkelRoots.
 	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
-	require.Len(t, outcome.Report.ChainReports, 0)
+	require.Len(t, outcome.Reports, 0)
 	require.Len(t, outcome.CommitReports, 0)
 
 	// Should have updated
@@ -121,21 +122,22 @@ func TestPluginSkipEmptyReports(t *testing.T) {
 	// One pending commit report only.
 	// Two of the messages are executed which should be indicated in the Outcome.
 	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
-	require.Len(t, outcome.Report.ChainReports, 0)
+	require.Len(t, outcome.Reports, 0)
 	require.Len(t, outcome.CommitReports, 1)
 	require.ElementsMatch(t, outcome.CommitReports[0].ExecutedMessages, []cciptypes.SeqNum{100, 101})
 
 	// Round 2 - Get Messages
 	// Messages now attached to the pending commit.
 	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
-	require.Len(t, outcome.Report.ChainReports, 0)
+	require.Len(t, outcome.Reports, 0)
 	require.Len(t, outcome.CommitReports, 1)
 
 	// Round 3 - Filter
 	// An execute report with the following messages executed: 102, 103, 104, 105.
 	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
-	require.Len(t, outcome.Report.ChainReports, 1)
-	sequenceNumbers := extractSequenceNumbers(outcome.Report.ChainReports[0].Messages)
+	require.Len(t, outcome.Reports, 1)
+	require.Len(t, outcome.Reports[0].ChainReports, 1)
+	sequenceNumbers := extractSequenceNumbers(outcome.Reports[0].ChainReports[0].Messages)
 	require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{102, 103, 104, 105})
 }
 
@@ -344,8 +346,9 @@ func TestPlugin_EncodingSizeLimits(t *testing.T) {
 	require.Equal(t, exectypes.Filter, outcome.State)
 
 	// Verify report was created with the messages that were included
-	require.NotEmpty(t, outcome.Report.ChainReports)
-	sequenceNumbers := extractSequenceNumbers(outcome.Report.ChainReports[0].Messages)
+	require.NotEmpty(t, outcome.Reports)
+	require.NotEmpty(t, outcome.Reports[0].ChainReports)
+	sequenceNumbers := extractSequenceNumbers(outcome.Reports[0].ChainReports[0].Messages)
 	require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{1, 2, 3, 4})
 
 	// Do another full round

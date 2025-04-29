@@ -625,9 +625,9 @@ func Test_Builder_Build(t *testing.T) {
 				reports: []exectypes.CommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						sender,
-						cciptypes.Bytes32{},                         // generate a correct root.
+						cciptypes.Bytes32{}, // generate a correct root.
 						[]cciptypes.SeqNum{100, 101, 102, 103, 104}, // executed
-						false,                                       // zeroNonces
+						false, // zeroNonces
 					),
 				},
 			},
@@ -648,9 +648,9 @@ func Test_Builder_Build(t *testing.T) {
 				reports: []exectypes.CommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						sender,
-						cciptypes.Bytes32{},                         // generate a correct root.
+						cciptypes.Bytes32{}, // generate a correct root.
 						[]cciptypes.SeqNum{100, 101, 102, 103, 104}, // executed
-						false,                                       // zeroNonces
+						false, // zeroNonces
 					),
 				},
 			},

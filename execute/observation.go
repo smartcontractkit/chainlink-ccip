@@ -50,9 +50,11 @@ func (p *Plugin) Observation(
 
 	// If the previous outcome was the filter state, and reports were built, mark the messages as inflight.
 	if previousOutcome.State == exectypes.Filter {
-		for _, chainReport := range previousOutcome.Report.ChainReports {
-			for _, message := range chainReport.Messages {
-				p.inflightMessageCache.MarkInflight(chainReport.SourceChainSelector, message.Header.MessageID)
+		for _, execReport := range previousOutcome.Reports {
+			for _, chainReport := range execReport.ChainReports {
+				for _, message := range chainReport.Messages {
+					p.inflightMessageCache.MarkInflight(chainReport.SourceChainSelector, message.Header.MessageID)
+				}
 			}
 		}
 	}
