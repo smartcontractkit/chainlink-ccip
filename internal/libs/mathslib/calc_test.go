@@ -136,16 +136,18 @@ func TestCalculateUsdPerUnitGas(t *testing.T) {
 		{
 			name:           "sol base case",
 			sourceGasPrice: new(big.Int).SetUint64(2773),
-			usdPerFeeCoin:  MustBigIntSetString("150", 18),
-			chainSelector:  SolChainSelector,
-			exp:            new(big.Int).SetUint64(415),
+			// 27 for 1e18 * 1e9 SOL
+			// 1e9 SOL = 1 lamport
+			usdPerFeeCoin: MustBigIntSetString("150", 27),
+			chainSelector: SolChainSelector,
+			exp:           new(big.Int).SetUint64(415950000),
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			res, err := CalculateUsdPerUnitGas(tc.chainSelector, tc.sourceGasPrice, tc.usdPerFeeCoin)
-			t.Log(res.Int64())
+			t.Log(res.String())
 			require.NoError(t, err)
 			require.Zero(t, tc.exp.Cmp(res))
 		})

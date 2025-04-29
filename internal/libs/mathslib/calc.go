@@ -46,13 +46,11 @@ func CalculateUsdPerUnitGas(
 		return tmp.Div(tmp, big.NewInt(1e18)), nil
 
 	case chainsel.FamilySolana:
-		// (micro lamport / compute units) * (usd * 1e18 / 1e9 sol) / 1e15 = usd/cu
-		// Convert microlamport/cu to lompart/cu (multiply by 1e6)
-		sourceGasInLompart := new(big.Int).Mul(sourceGasPrice, big.NewInt(1e6))
-		// Solana lowest denomination is 1e9, so we need to divide by 1e9
-		usdPerFeeToken18 := new(big.Int).Div(usdPerFeeCoin, big.NewInt(1e9))
-		usdGasPrice18 := new(big.Int).Mul(sourceGasInLompart, usdPerFeeToken18)
-		scaledGasPrice := new(big.Int).Div(usdGasPrice18, big.NewInt(1e18))
+		// (microlamport / cu) * (usd18 / 1e9 sol) * (1e9 sol / 1e24 microlamport)
+		//(microlamport / cu) * (usd18 / 1e18 lamport) * (1 lamport / 1e6 microlamport)
+		usdGasPrice18 := new(big.Int).Mul(sourceGasPrice, usdPerFeeCoin)
+		scaledGasPrice := new(big.Int).Div(usdGasPrice18, new(big.Int).SetUint64(1e18))
+		scaledGasPrice = scaledGasPrice.Div(scaledGasPrice, big.NewInt(1e6))
 		return scaledGasPrice, nil
 
 	default:
