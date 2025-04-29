@@ -64,19 +64,21 @@ func (p *processor) ValidateObservation(
 func validateChainFeeUpdates(
 	ao plugincommon.AttributedObservation[Observation],
 ) error {
-	for _, update := range ao.Observation.ChainFeeUpdates {
+	for chainSelector, update := range ao.Observation.ChainFeeUpdates {
 		if update.ChainFee.ExecutionFeePriceUSD == nil || update.ChainFee.ExecutionFeePriceUSD.Cmp(big.NewInt(0)) < 0 {
-			return fmt.Errorf("nil or negative execution fee: %+v", update.ChainFee.ExecutionFeePriceUSD)
+			return fmt.Errorf("nil or negative execution fee: %+v, chain: %d",
+				update.ChainFee.ExecutionFeePriceUSD, chainSelector)
 		}
 
 		if update.ChainFee.DataAvFeePriceUSD == nil || update.ChainFee.DataAvFeePriceUSD.Cmp(big.NewInt(0)) < 0 {
-			return fmt.Errorf("nil or negative data availability fee: %+v", update.ChainFee.DataAvFeePriceUSD)
+			return fmt.Errorf("nil or negative data availability fee: %+v, chain: %d",
+				update.ChainFee.DataAvFeePriceUSD, chainSelector)
 		}
 		if update.Timestamp.IsZero() {
-			return fmt.Errorf("timestamp cannot be zero")
+			return fmt.Errorf("timestamp cannot be zero, chain: %d", chainSelector)
 		}
 		if update.Timestamp.After(time.Now().UTC()) {
-			return fmt.Errorf("timestamp %s cannot be in the future", update.Timestamp.String())
+			return fmt.Errorf("timestamp %s cannot be in the future, chain: %d", update.Timestamp.String(), chainSelector)
 		}
 	}
 	return nil
@@ -85,13 +87,15 @@ func validateChainFeeUpdates(
 func validateFeeComponents(
 	ao plugincommon.AttributedObservation[Observation],
 ) error {
-	for _, feeComponent := range ao.Observation.FeeComponents {
+	for chainSelector, feeComponent := range ao.Observation.FeeComponents {
 		if feeComponent.ExecutionFee == nil || feeComponent.ExecutionFee.Cmp(big.NewInt(0)) < 0 {
-			return fmt.Errorf("nil or negative execution fee: %+v", feeComponent.ExecutionFee)
+			return fmt.Errorf("nil or negative execution fee: %+v, chain: %d",
+				feeComponent.ExecutionFee, chainSelector)
 		}
 
 		if feeComponent.DataAvailabilityFee == nil || feeComponent.DataAvailabilityFee.Cmp(big.NewInt(0)) < 0 {
-			return fmt.Errorf("nil or negative data availability fee: %+v", feeComponent.DataAvailabilityFee)
+			return fmt.Errorf("nil or negative data availability fee: %+v, chain: %d",
+				feeComponent.DataAvailabilityFee, chainSelector)
 		}
 	}
 	return nil
