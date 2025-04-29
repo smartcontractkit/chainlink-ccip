@@ -166,6 +166,8 @@ func (p *Plugin) getMessagesOutcome(
 	return exectypes.NewOutcome(exectypes.GetMessages, commitReports, nil)
 }
 
+// getFilterOutcome is the final phase of the execution plugin. Filter refers to the Nonces
+// being passed along with message data to perform a final filtering of messages.
 func (p *Plugin) getFilterOutcome(
 	ctx context.Context,
 	lggr logger.Logger,

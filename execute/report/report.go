@@ -446,7 +446,8 @@ func (b *execReportBuilder) verifyReport(
 		return false, validationMetadata{}, fmt.Errorf("unable to encode report: %w", err)
 	}
 
-	maxSizeBytes := int(b.maxReportSizeBytes - b.accumulated.encodedSizeBytes)
+	accumulated := b.accumulated[len(b.accumulated)-1]
+	maxSizeBytes := int(b.maxReportSizeBytes - accumulated.encodedSizeBytes)
 	if len(encoded) > maxSizeBytes {
 		b.lggr.Infow("invalid report, report size exceeds limit", "size", len(encoded), "maxSize", maxSizeBytes)
 		return false, validationMetadata{}, nil
@@ -463,7 +464,7 @@ func (b *execReportBuilder) verifyReport(
 	merkleTreeGas := b.estimateProvider.CalculateMerkleTreeGas(len(execReport.Messages))
 	totalGas := gasSum + merkleTreeGas
 
-	maxGas := b.maxGas - b.accumulated.gas
+	maxGas := b.maxGas - accumulated.gas
 	if totalGas > maxGas {
 		b.lggr.Infow("invalid report, report estimated gas usage exceeds limit", "gas", totalGas, "maxGas", maxGas)
 		return false, validationMetadata{}, nil
@@ -477,6 +478,7 @@ func (b *execReportBuilder) verifyReport(
 
 // buildSingleChainReport generates the largest report which fits into maxSizeBytes.
 // See buildSingleChainReport for more details about how a report is built.
+//
 // returns
 // 1. exec report for the builder
 // 2. updated commit report after marking new messages from the exec report as executed
@@ -485,26 +487,17 @@ func (b *execReportBuilder) verifyReport(
 func (b *execReportBuilder) buildSingleChainReport(
 	ctx context.Context,
 	commitData exectypes.CommitData,
+	readyMessages map[int]struct{},
 ) (ccipocr3.ExecutePluginReportSingleChain, exectypes.CommitData, error) {
 	finalize := func(
 		execReport ccipocr3.ExecutePluginReportSingleChain,
 		commitReport exectypes.CommitData,
 		meta validationMetadata,
 	) (ccipocr3.ExecutePluginReportSingleChain, exectypes.CommitData, error) {
-		b.accumulated = b.accumulated.accumulate(meta)
+		idx := len(b.accumulated) - 1
+		b.accumulated[idx] = b.accumulated[idx].accumulate(meta)
 		commitReport = markNewMessagesExecuted(execReport, commitReport)
 		return execReport, commitReport, nil
-	}
-
-	// Check which messages are ready to execute, and update report with any additional metadata needed for execution.
-	readyMessages, err := b.checkMessages(ctx, commitData)
-	if err != nil {
-		return ccipocr3.ExecutePluginReportSingleChain{},
-			exectypes.CommitData{},
-			fmt.Errorf("unable to check message: %w", err)
-	}
-	if len(readyMessages) == 0 {
-		return ccipocr3.ExecutePluginReportSingleChain{}, commitData, ErrEmptyReport
 	}
 
 	// Unless there is a message limit, attempt to build a report for executing all ready messages.

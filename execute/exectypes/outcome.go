@@ -1,6 +1,8 @@
 package exectypes
 
 import (
+	"sort"
+
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
@@ -109,7 +111,7 @@ func NewOutcome(
 	selectedCommits []CommitData,
 	reports []cciptypes.ExecutePluginReport,
 ) Outcome {
-	return NewSortedOutcome(state, selectedCommits, report)
+	return NewSortedOutcome(state, selectedCommits, reports)
 }
 
 // NewSortedOutcome ensures canonical ordering of the outcome.
@@ -117,7 +119,7 @@ func NewOutcome(
 func NewSortedOutcome(
 	state PluginState,
 	pendingCommits []CommitData,
-	report cciptypes.ExecutePluginReport,
+	reports []cciptypes.ExecutePluginReport,
 ) Outcome {
 	pendingCommitsCP := append([]CommitData{}, pendingCommits...)
 	reportCP := append([]cciptypes.ExecutePluginReportSingleChain{}, report.ChainReports...)

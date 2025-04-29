@@ -5,17 +5,16 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 )
 
 var _ ExecReportBuilder = &execReportBuilder{}
 
 type ExecReportBuilder interface {
 	Add(ctx context.Context, report exectypes.CommitData) (exectypes.CommitData, error)
-	Build() ([][]cciptypes.ExecutePluginReportSingleChain, []exectypes.CommitData, error)
+	Build() ([]cciptypes.ExecutePluginReport, [][]exectypes.CommitData, error)
 }
 
 // Option that can be passed to the builder.
@@ -144,23 +143,53 @@ type execReportBuilder struct {
 	multipleReportsEnabled bool
 
 	// State
-	accumulated validationMetadata
+	// accumulated keeps track of per exec report metadata as commit reports are added
+	// to the builder. It is used to limit what gets included in a report based on the
+	// builder configuration. Metadata is added to the slice as multiple reports are
+	// generated, with the last value in the slice being the currently building report.
+	accumulated []validationMetadata
 
 	// Result
-	execReports   []cciptypes.ExecutePluginReportSingleChain
-	commitReports []exectypes.CommitData
+	// execReports is the final output of the builder.
+	execReports []cciptypes.ExecutePluginReport
+	// commitReports is the updated CommitData based on the reports being built. If
+	// multiple reports are being built, it's possible for the same CommitData object
+	// to be included multiple times.
+	commitReports [][]exectypes.CommitData
+}
+
+// checkInitialize initializes builder state if needed.
+func (b *execReportBuilder) checkInitialize() {
+	if b.accumulated == nil {
+		b.accumulated = append(b.accumulated, validationMetadata{})
+	}
+	if b.execReports == nil {
+		b.execReports = append(b.execReports, cciptypes.ExecutePluginReport{})
+	}
 }
 
 // Add an exec report for as many messages as possible in the given commit report.
-// The commit report with updated metadata is returned, it reflects which messages
+// The commit report with updated metadata is returned. It reflects which messages
 // were selected for the exec report.
 func (b *execReportBuilder) Add(
 	ctx context.Context,
 	commitReport exectypes.CommitData,
 ) (exectypes.CommitData, error) {
-	execReport, updatedReport, err := b.buildSingleChainReport(ctx, commitReport)
+	b.checkInitialize()
 
-	// No messages fit into the report, move to next report
+	// Check which messages are ready to execute and update the report with additional metadata needed for execution.
+	readyMessages, err := b.checkMessages(ctx, commitReport)
+	if err != nil {
+		return commitReport,
+			fmt.Errorf("unable to check message: %w", err)
+	}
+	if len(readyMessages) == 0 {
+		return commitReport, ErrEmptyReport
+	}
+
+	execReport, updatedReport, err := b.buildSingleChainReport(ctx, commitReport, readyMessages)
+
+	// No messages fit into the exec report, move to next commit report
 	if errors.Is(err, ErrEmptyReport) {
 		return commitReport, nil
 	}
@@ -168,16 +197,19 @@ func (b *execReportBuilder) Add(
 		return commitReport, fmt.Errorf("unable to add a single chain report: %w", err)
 	}
 
-	b.execReports = append(b.execReports, execReport)
-	b.commitReports = append(b.commitReports, updatedReport)
+	index := len(b.execReports) - 1
+	b.execReports[index].ChainReports = append(b.execReports[index].ChainReports, execReport)
+	b.commitReports[index] = append(b.commitReports[index], updatedReport)
+
+	// TODO: Check if there are any remaining readyMessages and try to build the next report.
 
 	return updatedReport, nil
 }
 
 func (b *execReportBuilder) Build() (
-	[][]cciptypes.ExecutePluginReportSingleChain, []exectypes.CommitData, error,
+	[]cciptypes.ExecutePluginReport, [][]exectypes.CommitData, error,
 ) {
-	var results [][]cciptypes.ExecutePluginReportSingleChain
+	var results []cciptypes.ExecutePluginReport
 	if len(b.execReports) != len(b.commitReports) {
 		return nil, nil, fmt.Errorf(
 			"expected the same number of exec and commit reports, got %d and %d",
@@ -188,31 +220,33 @@ func (b *execReportBuilder) Build() (
 
 	numSingleChainReports := len(b.execReports)
 
-	// Check if limiting is required.
-	if b.maxSingleChainReports != 0 && uint64(len(b.execReports)) > b.maxSingleChainReports {
-		b.lggr.Infof(
-			"limiting number of reports to maxReports from %d to %d",
-			len(b.execReports),
-			b.maxSingleChainReports,
-		)
+	// this now happens when adding the reports, so we don't need to do it here
+	/*
+		// Check if limiting is required.
+		if b.maxSingleChainReports != 0 && uint64(len(b.execReports)) > b.maxSingleChainReports {
+			b.lggr.Infof(
+				"limiting number of reports to maxReports from %d to %d",
+				len(b.execReports),
+				b.maxSingleChainReports,
+			)
 
-		// split into multiple reports
-		if b.multipleReportsEnabled {
-			for len(b.execReports) > int(b.maxSingleChainReports) {
-				results = append(results, b.execReports[:b.maxSingleChainReports])
-				b.execReports = b.execReports[b.maxSingleChainReports:]
-			}
-			if len(b.execReports) > 0 {
+			if b.multipleReportsEnabled {
+				for len(b.execReports) > int(b.maxSingleChainReports) {
+					results = append(results, b.execReports[:b.maxSingleChainReports])
+					b.execReports = b.execReports[b.maxSingleChainReports:]
+				}
+				if len(b.execReports) > 0 {
+					results = append(results, b.execReports)
+				}
+			} else {
+				// Otherwise, truncate
+				b.execReports = b.execReports[:b.maxSingleChainReports]
+				b.commitReports = b.commitReports[:b.maxSingleChainReports]
 				results = append(results, b.execReports)
+				numSingleChainReports = len(b.execReports)
 			}
-		} else {
-			// Otherwise, truncate
-			b.execReports = b.execReports[:b.maxSingleChainReports]
-			b.commitReports = b.commitReports[:b.maxSingleChainReports]
-			results = append(results, b.execReports)
-			numSingleChainReports = len(b.execReports)
 		}
-	}
+	*/
 
 	// TODO: Sort reports into a canonical form prior to returning.
 
@@ -221,7 +255,8 @@ func (b *execReportBuilder) Build() (
 		"numReports", len(b.execReports),
 		"numSingleChainReports", numSingleChainReports,
 		// this is before any truncation
-		"sizeBytes", b.accumulated.encodedSizeBytes,
+		// TODO: info for all of the reports?
+		//"sizeBytes", b.accumulated.encodedSizeBytes,
 		"maxSize", b.maxReportSizeBytes)
 	return results, b.commitReports, nil
 }

@@ -490,7 +490,7 @@ func selectReport(
 	lggr logger.Logger,
 	commitReports []exectypes.CommitData,
 	builder report.ExecReportBuilder,
-) ([][]cciptypes.ExecutePluginReportSingleChain, []exectypes.CommitData, error) {
+) ([]cciptypes.ExecutePluginReportSingleChain, []exectypes.CommitData, error) {
 	// TODO: It may be desirable for this entire function to be an interface so that
 	//       different selection algorithms can be used.
 
@@ -511,7 +511,7 @@ func selectReport(
 			continue
 		}
 
-		// If the report has not been fully executed, keep it for the next round.
+		// If the commit report has not been fully executed, keep it for the next round.
 		// Detect a report was not fully executed
 		if len(commitReports[i].Messages) > len(commitReports[i].ExecutedMessages) {
 			pendingReports++
