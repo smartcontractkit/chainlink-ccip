@@ -121,26 +121,52 @@ func TestCalculateUsdPerUnitGas(t *testing.T) {
 	}{
 		{
 			name:           "evm base case",
+			sourceGasPrice: big.NewInt(1e9),
+			usdPerFeeCoin:  new(big.Int).Mul(big.NewInt(2000), big.NewInt(1e18)), // $2000/Eth
+			chainSelector:  EvmChainSelector,
+			exp:            big.NewInt(2000e9),
+		},
+		{
+			name:           "evm high fee case",
 			sourceGasPrice: big.NewInt(2e18),
-			usdPerFeeCoin:  big.NewInt(3e18),
-			chainSelector:  EvmChainSelector, // evm
-			exp:            big.NewInt(6e18),
+			usdPerFeeCoin:  new(big.Int).Mul(big.NewInt(4000), big.NewInt(1e18)),
+			chainSelector:  EvmChainSelector,
+			exp:            new(big.Int).Mul(big.NewInt(8000), big.NewInt(1e18)),
 		},
 		{
-			name:           "evm small numbers",
-			sourceGasPrice: big.NewInt(1000),
-			usdPerFeeCoin:  big.NewInt(2000),
-			chainSelector:  EvmChainSelector, // evm
-			exp:            big.NewInt(0),    // What do we do in these cases? Charge the user 0?
+			name:           "evm low fee case",
+			sourceGasPrice: big.NewInt(1e3),
+			usdPerFeeCoin:  new(big.Int).Mul(big.NewInt(1000), big.NewInt(1e18)),
+			chainSelector:  EvmChainSelector,
+			exp:            big.NewInt(1000e3),
 		},
 		{
-			name:           "sol base case",
-			sourceGasPrice: new(big.Int).SetUint64(2773),
-			// 27 for 1e18 * 1e9 SOL
-			// 1e9 SOL = 1 lamport
-			usdPerFeeCoin: MustBigIntSetString("150", 27),
-			chainSelector: SolChainSelector,
-			exp:           new(big.Int).SetUint64(415950000),
+			name:           "sol base fee case",
+			sourceGasPrice: big.NewInt(2000),
+			usdPerFeeCoin:  new(big.Int).Mul(big.NewInt(150e9), big.NewInt(1e18)), // $150/Eth
+			chainSelector:  SolChainSelector,
+			exp:            big.NewInt(3e8),
+		},
+		{
+			name:           "sol high fee case",
+			sourceGasPrice: big.NewInt(400000),
+			usdPerFeeCoin:  new(big.Int).Mul(big.NewInt(300e9), big.NewInt(1e18)),
+			chainSelector:  SolChainSelector,
+			exp:            big.NewInt(12e10),
+		},
+		{
+			name:           "sol low fee case",
+			sourceGasPrice: big.NewInt(10),
+			usdPerFeeCoin:  new(big.Int).Mul(big.NewInt(1e9), big.NewInt(1e18)),
+			chainSelector:  SolChainSelector,
+			exp:            big.NewInt(10000),
+		},
+		{
+			name:           "sol 0 fee case",
+			sourceGasPrice: big.NewInt(0),
+			usdPerFeeCoin:  new(big.Int).Mul(big.NewInt(150e9), big.NewInt(1e18)),
+			chainSelector:  SolChainSelector,
+			exp:            big.NewInt(0),
 		},
 	}
 
