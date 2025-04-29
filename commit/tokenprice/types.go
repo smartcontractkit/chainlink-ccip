@@ -17,8 +17,10 @@ const (
 type Query struct {
 }
 
+//nolint:lll
 type Outcome struct {
-	TokenPrices cciptypes.TokenPriceMap `json:"tokenPrices"`
+	TokenPrices               cciptypes.TokenPriceMap                                      `json:"tokenPrices"`
+	InflightTokenPriceUpdates map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig `json:"inflightTokenPriceUpdates"`
 }
 
 func (out Outcome) Stats() map[string]int {

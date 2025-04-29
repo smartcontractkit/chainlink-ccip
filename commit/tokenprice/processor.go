@@ -3,9 +3,11 @@ package tokenprice
 import (
 	"context"
 	"fmt"
+	"time"
+
+	"github.com/smartcontractkit/libocr/commontypes"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/libocr/commontypes"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
@@ -79,7 +81,7 @@ func (p *processor) Query(ctx context.Context, prevOutcome Outcome) (Query, erro
 
 func (p *processor) Outcome(
 	ctx context.Context,
-	_ Outcome,
+	prevOutcome Outcome,
 	_ Query,
 	aos []plugincommon.AttributedObservation[Observation],
 ) (Outcome, error) {
@@ -89,12 +91,14 @@ func (p *processor) Outcome(
 	// If set to zero, no prices will be reported (i.e keystone feeds would be active).
 	if p.offChainCfg.TokenPriceBatchWriteFrequency.Duration() == 0 {
 		lggr.Debugw("TokenPriceBatchWriteFrequency is set to zero, no prices will be reported")
-		return Outcome{}, nil
+		return Outcome{InflightTokenPriceUpdates: prevOutcome.InflightTokenPriceUpdates}, nil
 	}
 
 	consensusObservation, err := p.getConsensusObservation(lggr, aos)
 	if err != nil {
-		return Outcome{}, fmt.Errorf("get consensus observation: %w", err)
+		return Outcome{
+			InflightTokenPriceUpdates: prevOutcome.InflightTokenPriceUpdates,
+		}, fmt.Errorf("get consensus observation: %w", err)
 	}
 
 	tokenPriceOutcome := p.selectTokensForUpdate(lggr, consensusObservation)
@@ -105,10 +109,44 @@ func (p *processor) Outcome(
 
 	if len(tokenPriceOutcome) == 0 {
 		lggr.Debugw("No token prices to report")
-		return Outcome{}, nil
+		return Outcome{InflightTokenPriceUpdates: prevOutcome.InflightTokenPriceUpdates}, nil
 	}
 
-	out := Outcome{TokenPrices: tokenPriceOutcome}
+	// Check if we have inflight token price updates. If we do and they are still inflight (at least one of them) then
+	// our Outcome will not include new token price updates.
+	for chainSel, inflightUpdate := range prevOutcome.InflightTokenPriceUpdates {
+		lggr2 := logger.With(lggr, "chainSel", chainSel, "prevUpdate", inflightUpdate,
+			"currUpdates", consensusObservation.FeeQuoterTokenUpdates)
+
+		currUpdate, exists := consensusObservation.FeeQuoterTokenUpdates[chainSel]
+		if !exists {
+			lggr2.Warnw("previously transmitted token price update not found in current round, assuming not transmitted")
+			return Outcome{InflightTokenPriceUpdates: prevOutcome.InflightTokenPriceUpdates}, nil
+		}
+
+		if currUpdate.Timestamp.After(inflightUpdate.Timestamp) {
+			lggr2.Debugw("previously transmitted token price update appeared on-chain")
+			continue
+		}
+
+		lggr2.Warnw("waiting for previously transmitted token price update to appear on-chain")
+		return Outcome{InflightTokenPriceUpdates: prevOutcome.InflightTokenPriceUpdates}, nil
+	}
+
+	inflightTokenPriceUpdates := make(map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig)
+	for tokenAddr := range tokenPriceOutcome {
+		oldTokenPriceUpdate, exists := consensusObservation.FeeQuoterTokenUpdates[tokenAddr]
+		if !exists {
+			inflightTokenPriceUpdates[tokenAddr] = cciptypes.NewTimestampedBig(0, time.Now().Add(-24*time.Hour))
+		} else {
+			inflightTokenPriceUpdates[tokenAddr] = oldTokenPriceUpdate
+		}
+	}
+
+	out := Outcome{
+		TokenPrices:               tokenPriceOutcome,
+		InflightTokenPriceUpdates: inflightTokenPriceUpdates,
+	}
 	return out, nil
 }
 

@@ -20,7 +20,7 @@ import (
 
 func (p *processor) Outcome(
 	ctx context.Context,
-	_ Outcome,
+	prevOutcome Outcome,
 	_ Query,
 	aos []plugincommon.AttributedObservation[Observation],
 ) (Outcome, error) {
@@ -28,14 +28,41 @@ func (p *processor) Outcome(
 
 	consensusObs, err := p.getConsensusObservation(lggr, aos)
 	if err != nil {
-		return Outcome{}, fmt.Errorf("get consensus observation: %w", err)
+		return Outcome{InflightChainFeeUpdates: prevOutcome.InflightChainFeeUpdates},
+			fmt.Errorf("get consensus observation: %w", err)
 	}
 
 	// No need to update yet
 	if len(consensusObs.FeeComponents) == 0 {
 		lggr.Warn("no consensus on fee components, nothing to update",
 			"consensusObs", consensusObs)
-		return Outcome{}, nil
+		return Outcome{InflightChainFeeUpdates: prevOutcome.InflightChainFeeUpdates}, nil
+	}
+
+	// Check if we have pending chain fee updates.
+	for chainSel, inflightUpdate := range prevOutcome.InflightChainFeeUpdates {
+		lggr2 := logger.With(lggr,
+			"chainSel", chainSel, "prevUpdate", inflightUpdate, "currUpdates", consensusObs.ChainFeeUpdates)
+
+		currUpdate, exists := consensusObs.ChainFeeUpdates[chainSel]
+		if !exists {
+			lggr2.Warnw("previously transmitted chain fee update not found in current round, assuming not transmitted")
+			return Outcome{
+				GasPrices:               nil,
+				InflightChainFeeUpdates: prevOutcome.InflightChainFeeUpdates,
+			}, nil
+		}
+
+		if currUpdate.Timestamp.After(inflightUpdate.Timestamp) {
+			lggr2.Debugw("previously transmitted chain fee price update appeared on-chain")
+			continue
+		}
+
+		lggr2.Warnw("waiting for previously transmitted chain fee price update to appear on-chain")
+		return Outcome{
+			GasPrices:               nil,
+			InflightChainFeeUpdates: prevOutcome.InflightChainFeeUpdates,
+		}, nil
 	}
 
 	chainFeeUSDPrices := make(map[cciptypes.ChainSelector]ComponentsUSDPrices)
@@ -91,7 +118,22 @@ func (p *processor) Outcome(
 		"gasPrices", gasPrices,
 		"consensusTimestamp", consensusObs.TimestampNow,
 	)
-	out := Outcome{GasPrices: gasPrices}
+
+	inflightChainFeeUpdates := make(map[cciptypes.ChainSelector]Update)
+	for _, gasPriceUpdate := range gasPrices {
+		chainSel := gasPriceUpdate.ChainSel
+		oldChainFeeUpdate, ok := consensusObs.ChainFeeUpdates[chainSel]
+		if !ok {
+			inflightChainFeeUpdates[chainSel] = Update{Timestamp: time.Now().Add(-24 * time.Hour)}
+		} else {
+			inflightChainFeeUpdates[chainSel] = oldChainFeeUpdate
+		}
+	}
+
+	out := Outcome{
+		GasPrices:               gasPrices,
+		InflightChainFeeUpdates: inflightChainFeeUpdates,
+	}
 	return out, nil
 }
 

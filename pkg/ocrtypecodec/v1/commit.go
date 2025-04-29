@@ -174,7 +174,8 @@ func (c *CommitCodecProto) EncodeOutcome(outcome committypes.Outcome) ([]byte, e
 			TokenPrices: c.tr.feedTokenPricesToProto(outcome.TokenPriceOutcome.TokenPrices),
 		},
 		ChainFeeOutcome: &ocrtypecodecpb.ChainFeeOutcome{
-			GasPrices: c.tr.gasPriceChainToProto(outcome.ChainFeeOutcome.GasPrices),
+			GasPrices:               c.tr.gasPriceChainToProto(outcome.ChainFeeOutcome.GasPrices),
+			InflightChainFeeUpdates: c.tr.chainFeeUpdatesToProto(outcome.ChainFeeOutcome.InflightChainFeeUpdates),
 		},
 		MainOutcome: &ocrtypecodecpb.MainOutcome{
 			InflightPriceOcrSequenceNumber: uint64(outcome.MainOutcome.InflightPriceOcrSequenceNumber),
@@ -210,7 +211,8 @@ func (c *CommitCodecProto) DecodeOutcome(data []byte) (committypes.Outcome, erro
 			TokenPrices: c.tr.feedTokenPricesFromProto(pbOutcome.TokenPriceOutcome.TokenPrices),
 		},
 		ChainFeeOutcome: chainfee.Outcome{
-			GasPrices: c.tr.gasPriceChainFromProto(pbOutcome.ChainFeeOutcome.GasPrices),
+			GasPrices:               c.tr.gasPriceChainFromProto(pbOutcome.ChainFeeOutcome.GasPrices),
+			InflightChainFeeUpdates: c.tr.chainFeeUpdatesFromProto(pbOutcome.ChainFeeOutcome.InflightChainFeeUpdates),
 		},
 		MainOutcome: committypes.MainOutcome{
 			InflightPriceOcrSequenceNumber: cciptypes.SeqNum(pbOutcome.MainOutcome.InflightPriceOcrSequenceNumber),

@@ -315,54 +315,6 @@ func (p *Plugin) getPriceRelatedObservations(
 	prevOutcome committypes.Outcome,
 	decodedQ committypes.Query,
 ) (tokenprice.Observation, chainfee.Observation) {
-	waitingForPriceUpdatesToMakeItOnchain := prevOutcome.MainOutcome.InflightPriceOcrSequenceNumber > 0
-
-	// If we are waiting for price updates to make it onchain, but we have no more checks remaining, stop waiting.
-	if waitingForPriceUpdatesToMakeItOnchain && prevOutcome.MainOutcome.RemainingPriceChecks == 0 {
-		lggr.Warnw(
-			"no more price checks remaining, prices of previous outcome did not make it through",
-			"inflightPriceOcrSequenceNumber", prevOutcome.MainOutcome.InflightPriceOcrSequenceNumber,
-		)
-		waitingForPriceUpdatesToMakeItOnchain = false
-	}
-
-	// If we still wait for price updates to make it onchain, check if the latest price report made it through.
-	if waitingForPriceUpdatesToMakeItOnchain {
-		latestPriceOcrSeqNum, err := p.ccipReader.GetLatestPriceSeqNr(ctx)
-		if err != nil {
-			lggr.Errorw("get latest price sequence number", "err", err)
-			// Observe fChain so we don't get cryptic fChain errors in the outcome phase.
-			return tokenprice.Observation{
-					FChain:    p.ObserveFChain(lggr),
-					Timestamp: time.Now().UTC(),
-				}, chainfee.Observation{
-					FChain:       p.ObserveFChain(lggr),
-					TimestampNow: time.Now().UTC(),
-				}
-		}
-
-		if cciptypes.SeqNum(latestPriceOcrSeqNum) >= prevOutcome.MainOutcome.InflightPriceOcrSequenceNumber {
-			lggr.Infow("previous price report made it through", "ocrSeqNum", latestPriceOcrSeqNum)
-			waitingForPriceUpdatesToMakeItOnchain = false
-		}
-	}
-
-	// If we are still waiting for price updates to make it onchain, don't make any price observations.
-	if waitingForPriceUpdatesToMakeItOnchain {
-		lggr.Infow("waiting for price updates to make it onchain, no prices observed in this round",
-			"inflightPriceOcrSequenceNumber", prevOutcome.MainOutcome.InflightPriceOcrSequenceNumber,
-			"remainingPriceChecks", prevOutcome.MainOutcome.RemainingPriceChecks,
-		)
-		// Observe fChain so we don't get cryptic fChain errors in the outcome phase.
-		return tokenprice.Observation{
-				FChain:    p.ObserveFChain(lggr),
-				Timestamp: time.Now().UTC(),
-			}, chainfee.Observation{
-				FChain:       p.ObserveFChain(lggr),
-				TimestampNow: time.Now().UTC(),
-			}
-	}
-
 	var tokenPriceObs tokenprice.Observation
 	var chainFeeObs chainfee.Observation
 
@@ -511,34 +463,7 @@ func (p *Plugin) getMainOutcome(
 	tokenPriceOutcome tokenprice.Outcome,
 	chainFeeOutcome chainfee.Outcome,
 ) committypes.MainOutcome {
-	pricesObservedInThisRound := len(tokenPriceOutcome.TokenPrices) > 0 || len(chainFeeOutcome.GasPrices) > 0
-	if pricesObservedInThisRound {
-		return committypes.MainOutcome{
-			InflightPriceOcrSequenceNumber: cciptypes.SeqNum(outCtx.SeqNr),
-			RemainingPriceChecks:           p.offchainCfg.InflightPriceCheckRetries,
-		}
-	}
-
-	waitingForPriceUpdatesToMakeItOnchain := prevOutcome.MainOutcome.InflightPriceOcrSequenceNumber > 0
-	if waitingForPriceUpdatesToMakeItOnchain {
-		remainingPriceChecks := prevOutcome.MainOutcome.RemainingPriceChecks - 1
-		inflightOcrSeqNum := prevOutcome.MainOutcome.InflightPriceOcrSequenceNumber
-
-		if remainingPriceChecks < 0 {
-			remainingPriceChecks = 0
-			inflightOcrSeqNum = 0
-		}
-
-		return committypes.MainOutcome{
-			InflightPriceOcrSequenceNumber: inflightOcrSeqNum,
-			RemainingPriceChecks:           remainingPriceChecks,
-		}
-	}
-
-	return committypes.MainOutcome{
-		InflightPriceOcrSequenceNumber: 0,
-		RemainingPriceChecks:           0,
-	}
+	return committypes.MainOutcome{}
 }
 
 func (p *Plugin) Close() error {

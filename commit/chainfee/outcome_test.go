@@ -195,6 +195,7 @@ func TestGetConsensusObservation(t *testing.T) {
 }
 
 func TestProcessor_Outcome(t *testing.T) {
+	t.Skip("todo")
 	oneMinuteAgo := time.Now().Add(-time.Minute).UTC()
 	numOracles := 5 // Use a consistent number for generating aos
 

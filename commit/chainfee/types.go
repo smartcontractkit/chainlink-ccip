@@ -23,6 +23,8 @@ type Query struct {
 type Outcome struct {
 	// Each Gas Price is the combination of Execution and DataAvailability Fees using bitwise operations
 	GasPrices []cciptypes.GasPriceChain `json:"gasPrices"`
+
+	InflightChainFeeUpdates map[cciptypes.ChainSelector]Update `json:"inflightChainFeeUpdates"`
 }
 
 func (o Outcome) Stats() map[string]int {
