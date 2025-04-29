@@ -161,7 +161,7 @@ spl-token create-account  <TOKEN_MINT>
 
 
 ```bash
-spl-token mint <TOKEN_MINT> 100
+spl-token mint <TOKEN_MINT_ADDRESS> <TOKEN_AMOUNT> <RECIPIENT_TOKEN_ACCOUNT_ADDRESS>
 ```
 
 
@@ -220,8 +220,14 @@ npx ts-node src/solana-ccip-token-admin-registry/InitAta.ts
 Init the token pool config
 
 ```bash
-npx ts-node src/solana-ccip-token-admin-registry/InitChainRemoteConfig.ts
+ANCHOR_WALLET=<YOUR-KEY-FILE> npx ts-node src/solana-ccip-token-admin-registry/InitChainRemoteConfig.ts
 ```
 
-TODO: edit_chain_remote_config
+## 9. Send your tokens
 
+
+Run your message-sending script:
+
+```bash
+npx ts-node src/ccip_token_send.ts
+```

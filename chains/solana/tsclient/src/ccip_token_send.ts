@@ -7,6 +7,7 @@ import { ChainRegistry } from './common/ChainRegistry';
 import { SolanaToEVMUtils } from './solana-ccip-send/SolanaToEVMUtils';
 import BN from 'bn.js';
 import accounts, { tokenAdminRegistry } from './staging';
+import { token } from '@coral-xyz/anchor/dist/cjs/utils';
 
 async function main() {
   const keypairPath = tokenAdminRegistry.key_pair_path;
@@ -23,29 +24,24 @@ async function main() {
   const messageArg = args.find(arg => arg.startsWith('--message='));
   const message = messageArg ? messageArg.split('=')[1] : 'Hello from Solana! Agus';
 
-  const tokens = args.includes('--tokens');
-
+  const token_mint = new PublicKey(tokenAdminRegistry.mint);
+  const token_amount = new BN('1000000000000000000'); // 1 BnM token
   let tokenAmounts: Array<{
-      token: PublicKey;
-      amount: BN;
-      tokenProgram?: PublicKey;
-    }> = [];
-
-  if (tokens) {
-    const token_mint = new PublicKey(accounts.addresses.tokenMint);
-    const token_amount = new BN('1000000000000000000'); // 1 BnM token
-    tokenAmounts = [{
-      token: token_mint,
-      amount: token_amount,
-    }];
-  }
+    token: PublicKey;
+    amount: BN;
+    tokenProgram?: PublicKey;
+  }> = [{
+    token: token_mint,
+    amount: token_amount,
+    tokenProgram: tokenAdminRegistry.token_program,
+  }];
 
   const config = getCCIPSendConfig('devnet');
   const ccip = new SolanaCCIPSender(config);
 
   const request: SolanaCCIPSendRequest = {
-    destChainSelector: ChainRegistry.getChainSelector(accounts.remoteChain.chainName),
-    receiver: SolanaToEVMUtils.evmAddressToSolanaBytes(accounts.remoteChain.receiver),
+    destChainSelector: tokenAdminRegistry.remoteChainSelector,
+    receiver:  SolanaToEVMUtils.evmAddressToSolanaBytes(tokenAdminRegistry.remoteAddress),
     data: Buffer.from(message),
     tokenAmounts,
     feeToken: PublicKey.default,
