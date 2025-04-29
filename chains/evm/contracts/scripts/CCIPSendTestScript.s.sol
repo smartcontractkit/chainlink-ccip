@@ -5,99 +5,133 @@ import {Client} from "../libraries/Client.sol";
 
 import {IERC20} from "@chainlink/vendor/openzeppelin-solidity/v5.0.2/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@chainlink/vendor/openzeppelin-solidity/v5.0.2/contracts/token/ERC20/utils/SafeERC20.sol";
-
 import {Script} from "forge-std/Script.sol";
 
-/* solhint-disable-next-line no-console */
+// solhint-disable-next-line no-console
 import {console2 as console} from "forge-std/console2.sol";
 
 /* solhint-disable no-console */
+/// @title CCIPSendTestScript
+/// @notice This is a foundry script for sending messages through CCIP.
+/// @dev This script has NOT been audited, and is NOT intended for use in production. It is intended to aid in
+/// local debugging and testing with existing deployed contracts.
+/// @dev Usage: "forge script scripts/CCIPSendTestScript.s.sol:CCIPSendTestScript"
 contract CCIPSendTestScript is Script {
   using SafeERC20 for IERC20;
 
-  address public ROUTER;
-  address public FEE_TOKEN;
-
-  address public TOKEN0;
-  uint256 public TOKEN0_AMOUNT;
-
-  uint64 public DESTINATION_CHAIN_SELECTOR;
-  uint64 public SOURCE_CHAIN_SELECTOR;
-
-  // Ex: "ETHEREUM_RPC_URL" as defined in .env
-  string public RPC_DESCRIPTOR;
-
-  bytes public s_extraArgs;
-  bytes public s_recipient;
-  bytes public s_data;
+  error ChainNotSupported(uint64 destChainSelector);
 
   function run() public {
-    vm.createSelectFork(RPC_DESCRIPTOR);
+    // 1. Define which chain you would like to use (Ex: "ETHEREUM" as defined in .env)
+    // [INSERT BELOW]
+    string memory chainIdentifier;
 
-    uint256 privateKey = vm.envUint("PRIVATE_KEY");
+    // Retrieve the RPC-URL based on the identifier and defined in .env
+    // Ex: "ETHEREUM" -> "ETHEREUM_RPC_URL"
+    vm.createSelectFork(string.concat(chainIdentifier, "_RPC_URL"));
 
+    uint256 privateKey = vm.envUint("PRIVATE_KEY"); // Acquire the private key from the .env file and derive address
     address sender = vm.rememberKey(privateKey);
-    s_recipient = abi.encode(sender);
 
     vm.startBroadcast(privateKey);
 
     console.log("Sender: %s", sender);
     console.log("Starting Script...");
 
-    // Create the EVMTokenAmount array and populate with the first token
-    Client.EVMTokenAmount[] memory tokens;
-    if (TOKEN0 != address(0)) {
-      tokens = new Client.EVMTokenAmount[](1);
-      tokens[0] = Client.EVMTokenAmount({token: TOKEN0, amount: TOKEN0_AMOUNT});
-    }
+    Client.EVM2AnyMessage memory message;
+    address feeToken;
 
-    // Construct the EVM2AnyMessage
-    Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
-      receiver: abi.encode(sender),
-      data: s_data,
-      tokenAmounts: tokens,
-      feeToken: address(0),
-      extraArgs: s_extraArgs
-    });
+    // 1. Define the CCIP-Specific Chain Selector to send the message to. Automatic
+    // [INSERT BELOW]
+    uint64 destChainSelector;
 
-    uint256 fee = Router(ROUTER).getFee(DESTINATION_CHAIN_SELECTOR, message);
+    // 2. Get the router address based on the current local chain identifier
+    // Ex: "ETHEREUM" -> "ETHEREUM_ROUTER"
+    address router = vm.envAddress(string.concat(chainIdentifier, "_ROUTER"));
 
-    console.log("Fee in WEI: %s", fee);
+    // Scoping to prevent a "stack-too-deep" error.
+    {
+      // 3. Validate that the destination chain selector is supported by CCIP, and revert if not.
+      bool isSupported = Router(router).isChainSupported(destChainSelector);
+      if (!isSupported) revert ChainNotSupported(destChainSelector);
 
-    console.log("1. Approving Send Tokens...");
+      // 4. Declare how many unique tokens should be sent in the message
+      // [INSERT BELOW]
+      uint256 numTokens;
 
-    for (uint256 i = 0; i < tokens.length; i++) {
-      // Since sender may be an EOA with an existing approval, the allowance should be checked first
-      uint256 allowance = IERC20(tokens[i].token).allowance(sender, ROUTER);
+      address[] memory tokenAddresses = new address[](numTokens);
+      uint256[] memory tokenAmounts = new uint256[](numTokens);
 
-      // Approving Tokens for Router if allowance is currently insufficient.
-      if (allowance < tokens[i].amount) {
-        console.log("Approving %i tokens to Router for %s", tokens[i].amount, tokens[i].token);
-        IERC20(tokens[i].token).safeIncreaseAllowance(ROUTER, tokens[i].amount);
+      // 5. Manually define the addresses and amounts of each token that should be sent. They will automatically
+      // be converted into a Client.EVMTokenAmount format for the CCIP-Message.
+      // Ex: tokenAddresses[0] = address(1);
+      // Ex: tokenAmounts[0] = 1e18;
+      // [INSERT HERE]
+
+      console.log("1. Approving Send Tokens...");
+
+      Client.EVMTokenAmount[] memory tokens = new Client.EVMTokenAmount[](numTokens);
+      for (uint256 i = 0; i < tokens.length; ++i) {
+        if (tokenAddresses[i] != address(0)) {
+          // Since the sender may be an EOA with an existing approval, the allowance is checked first.
+          uint256 allowance = IERC20(tokens[i].token).allowance(sender, router);
+
+          // If the existing allowance is insufficient, increase it to allow sending through CCIP.
+          if (allowance < tokens[i].amount) {
+            console.log("Approving %i tokens to Router for %s", tokenAmounts[i], tokenAddresses[i]);
+            IERC20(tokens[i].token).safeIncreaseAllowance(router, tokenAmounts[i]);
+          }
+
+          // Once approval is granted, copy into the EVM Token Amount Array to be included in the message-proper.
+          tokens[i] = Client.EVMTokenAmount({token: tokenAddresses[i], amount: tokenAmounts[i]});
+        }
       }
+      console.log("--- Tokens Approved ---");
+
+      // 6. Define the message recipient.
+      // [INSERT BELOW]
+      bytes memory recipient;
+
+      // 7. Define the message data to be passed to the recipient if it is NOT an EOA.
+      // [INSERT BELOW]
+      bytes memory data;
+
+      // 8. If any extraArgs are needed, define below. Due to different chains families having different
+      // extraArgs formats, they should be passed as raw bytes, and encoded separately.
+      // [INSERT BELOW]
+      bytes memory extraArgs;
+
+      // 9. Define the fee token to pay for the message.
+      // Ex: feeToken = address(0);
+      // [INSERT BELOW]
+
+      // 10. Construct the EVM2AnyMessage using the fields defined above.
+      message = Client.EVM2AnyMessage({
+        receiver: recipient,
+        data: data,
+        tokenAmounts: tokens,
+        feeToken: feeToken,
+        extraArgs: extraArgs
+      });
     }
 
-    console.log("--- Tokens Approved ---");
-
-    console.log("2. Approving Fee Token");
-    if (FEE_TOKEN != address(0)) {
-      console.log("Approving Fee Token %s to Router", FEE_TOKEN);
-      IERC20(FEE_TOKEN).safeIncreaseAllowance(ROUTER, fee);
+    // 11. Calculate the fee in WEI for the message and approve the router if necessary.
+    // Note: Even if the token is not native, it will still be provided in WEI.
+    uint256 fee = Router(router).getFee(destChainSelector, message);
+    console.log("Fee in WEI: %s", fee);
+    if (feeToken != address(0)) {
+      console.log("Approving Fee Token %s to Router", feeToken);
+      IERC20(feeToken).safeIncreaseAllowance(router, fee);
     }
-    // --- Fee Token Approved ---
 
-    console.log("3. Sending message from: %i to %i", SOURCE_CHAIN_SELECTOR, DESTINATION_CHAIN_SELECTOR);
+    // 12. Send the message, forwarding native tokens if necessary to pay the fee.
+    console.log("Sending message to %i", destChainSelector);
+    bytes32 messageId = Router(router).ccipSend{value: feeToken == address(0) ? fee : 0}(destChainSelector, message);
 
-    // Send the message, forwarding native tokens if necessary to pay the fee
-    bytes32 messageId =
-      Router(ROUTER).ccipSend{value: FEE_TOKEN == address(0) ? fee : 0}(DESTINATION_CHAIN_SELECTOR, message);
-
+    // Foundry's console library does not support including bytes32 as a parameter so it is printed separately.
     console.log("--- Message sent: MessageId ---");
-
     console.logBytes32(messageId);
-    vm.stopBroadcast();
 
-    console.log("Script completed...");
+    vm.stopBroadcast();
   }
 }
-/* solhint-enable no-console */
