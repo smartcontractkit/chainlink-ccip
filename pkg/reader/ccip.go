@@ -1030,8 +1030,8 @@ func (r *ccipChainReader) processFeePriceUpdateResults(
 			continue
 		}
 
-		// Check if the update is empty (timestamp or value is zero/nil)
-		if update.Timestamp == 0 || update.Value == nil || update.Value.Cmp(big.NewInt(0)) == 0 {
+		// Check if the update is empty
+		if update.Timestamp == 0 || update.Value == nil {
 			lggr.Debugw("chain fee price update is empty",
 				"chain", chain,
 				"update", update)
