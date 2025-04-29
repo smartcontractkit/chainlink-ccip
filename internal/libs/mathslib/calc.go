@@ -64,7 +64,7 @@ func CalculateUsdPerUnitGas(
 		return tmp.Div(tmp, power24), nil
 
 	default:
-		return nil, fmt.Errorf("unsupported family")
+		return nil, fmt.Errorf("unsupported family %s", family)
 	}
 
 }

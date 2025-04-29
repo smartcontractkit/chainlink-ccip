@@ -20,6 +20,8 @@ import (
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
+	sel "github.com/smartcontractkit/chain-selectors"
+
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -49,8 +51,6 @@ import (
 
 const (
 	destChain         = ccipocr3.ChainSelector(1)
-	sourceEvmChain1   = ccipocr3.ChainSelector(16015286601757825753)
-	sourceSolChain    = ccipocr3.ChainSelector(16423721717087811551)
 	arbAddr           = ccipocr3.UnknownEncodedAddress("0xa100000000000000000000000000000000000000")
 	arbAggregatorAddr = ccipocr3.UnknownEncodedAddress("0xa2000000000000000000000000000000000000000")
 
@@ -59,6 +59,9 @@ const (
 )
 
 var (
+	sourceEvmChain1 = ccipocr3.ChainSelector(sel.ETHEREUM_TESTNET_SEPOLIA.Selector)
+	sourceSolChain  = ccipocr3.ChainSelector(sel.SOLANA_DEVNET.Selector)
+
 	oracleIDs = []commontypes.OracleID{1, 2, 3}
 	peerIDs   = []libocrtypes.PeerID{{1}, {2}, {3}}
 
