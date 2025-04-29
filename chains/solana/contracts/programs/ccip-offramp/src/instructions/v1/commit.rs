@@ -348,7 +348,7 @@ mod helpers {
         let mut global_state: Account<'info, GlobalState> =
             Account::try_from(&remaining_accounts[0])?;
 
-        if global_state.latest_price_sequence_number < ocr_sequence_number {
+        if global_state.latest_price_sequence_number <= ocr_sequence_number {
             // Update the persisted sequence number
             global_state.latest_price_sequence_number = ocr_sequence_number;
             global_state.exit(&crate::ID)?; // as it is manually loaded, it also has to be manually written back

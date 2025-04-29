@@ -96,12 +96,6 @@ pub struct Initialize<'info> {
 }
 
 #[derive(Accounts)]
-pub struct Empty<'info> {
-    // This is unused, but Anchor requires that there is at least one account in the context
-    pub clock: Sysvar<'info, Clock>,
-}
-
-#[derive(Accounts)]
 pub struct UpdateReferenceAddresses<'info> {
     #[account(
         seeds = [seed::CONFIG],
@@ -122,7 +116,7 @@ pub struct UpdateReferenceAddresses<'info> {
 }
 
 /// Input from an offchain node, containing the Merkle root and interval for
-/// the source chain, and optionally some price updates alongside it
+/// the source chain, and optionally some price updates alongside it.
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
 pub struct CommitInput {
     pub price_updates: PriceUpdates,

@@ -48,12 +48,6 @@ pub struct InitializeStateVersion<'info> {
 }
 
 #[derive(Accounts)]
-pub struct Empty<'info> {
-    // This is unused, but Anchor requires that there is at least one account in the context
-    pub clock: Sysvar<'info, Clock>,
-}
-
-#[derive(Accounts)]
 pub struct SetConfig<'info> {
     #[account(
         mut,
