@@ -9,11 +9,13 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 
 	"github.com/stretchr/testify/assert"
+
+	sel "github.com/smartcontractkit/chain-selectors"
 )
 
 var (
-	SolChainSelector = ccipocr3.ChainSelector(16423721717087811551)
-	EvmChainSelector = ccipocr3.ChainSelector(16015286601757825753)
+	SolChainSelector = ccipocr3.ChainSelector(sel.SOLANA_DEVNET.Selector)
+	EvmChainSelector = ccipocr3.ChainSelector(sel.ETHEREUM_TESTNET_SEPOLIA.Selector)
 )
 
 func TestDeviates(t *testing.T) {
@@ -133,26 +135,31 @@ func TestCalculateUsdPerUnitGas(t *testing.T) {
 		},
 		{
 			name:           "sol base case",
-			sourceGasPrice: big.NewInt(2000),
-			usdPerFeeCoin:  big.NewInt(3e18),
-			chainSelector:  SolChainSelector, // sol
-			exp:            big.NewInt(6e6),
-		},
-		{
-			name:           "sol base case",
-			sourceGasPrice: big.NewInt(2773),
-			usdPerFeeCoin:  big.NewInt(150e18),
-			chainSelector:  SolChainSelector, // sol
-			exp:            big.NewInt(415950000),
+			sourceGasPrice: new(big.Int).SetUint64(2773),
+			usdPerFeeCoin:  MustBigIntSetString("150", 18),
+			chainSelector:  SolChainSelector,
+			exp:            new(big.Int).SetUint64(415),
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			res, err := CalculateUsdPerUnitGas(tc.chainSelector, tc.sourceGasPrice, tc.usdPerFeeCoin)
-			println(res.Int64())
+			t.Log(res.Int64())
 			require.NoError(t, err)
 			require.Zero(t, tc.exp.Cmp(res))
 		})
 	}
+}
+
+func MustBigIntSetString(s string, zeroSuffixSize int) *big.Int {
+	// append zeroes to the string
+	for i := 0; i < zeroSuffixSize; i++ {
+		s += "0"
+	}
+	bi, ok := new(big.Int).SetString(s, 10)
+	if !ok {
+		panic("failed to parse big int")
+	}
+	return bi
 }

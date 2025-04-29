@@ -3,6 +3,7 @@ package internal
 import (
 	"crypto/rand"
 	"encoding/hex"
+	sel "github.com/smartcontractkit/chain-selectors"
 	"math/big"
 	"strings"
 	"testing"
@@ -20,9 +21,9 @@ import (
 )
 
 var (
-	SolChainSelector  = cciptypes.ChainSelector(16423721717087811551)
-	EvmChainSelector  = cciptypes.ChainSelector(16015286601757825753)
-	EvmChainSelector2 = cciptypes.ChainSelector(5224473277236331295)
+	SolChainSelector  = cciptypes.ChainSelector(sel.SOLANA_DEVNET.Selector)
+	EvmChainSelector  = cciptypes.ChainSelector(sel.ETHEREUM_TESTNET_SEPOLIA.Selector)
+	EvmChainSelector2 = cciptypes.ChainSelector(sel.ETHEREUM_TESTNET_SEPOLIA_ARBITRUM_1.Selector)
 )
 
 func MessageWithTokens(t *testing.T, tokenPoolAddr ...string) cciptypes.Message {

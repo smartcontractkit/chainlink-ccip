@@ -29,7 +29,10 @@ func Deviates(x1, x2 *big.Int, ppb int64) bool {
 }
 
 // CalculateUsdPerUnitGas returns: (sourceGasPrice * usdPerFeeCoin) / 1e18
-func CalculateUsdPerUnitGas(sourceChainSelector ccipocr3.ChainSelector, sourceGasPrice *big.Int, usdPerFeeCoin *big.Int) (*big.Int, error) {
+func CalculateUsdPerUnitGas(
+	sourceChainSelector ccipocr3.ChainSelector,
+	sourceGasPrice *big.Int,
+	usdPerFeeCoin *big.Int) (*big.Int, error) {
 
 	family, err := chainsel.GetSelectorFamily(uint64(sourceChainSelector))
 	if err != nil {
@@ -43,14 +46,14 @@ func CalculateUsdPerUnitGas(sourceChainSelector ccipocr3.ChainSelector, sourceGa
 		return tmp.Div(tmp, big.NewInt(1e18)), nil
 
 	case chainsel.FamilySolana:
-		// (micro lamport / compute units) * (usd / 1 sol) * (1 sol / 1e15 micro lamport)  = usd/cu
-		usdPrice18 := new(big.Int).Mul(sourceGasPrice, usdPerFeeCoin)
-		// Adjust the price for token scaling as sourceGas is in MicroLamport and not Lamport
-		scaledPrice := new(big.Int).Div(usdPrice18, big.NewInt(1e15))
-		// Convert to USD per lamport (dividing by 1e9 for lamport conversion)
-		usdPerLamport := new(big.Int).Div(scaledPrice, big.NewInt(1e9))
-
-		return usdPerLamport, nil
+		// (micro lamport / compute units) * (usd * 1e18 / 1e9 sol) / 1e15 = usd/cu
+		// Convert microlamport/cu to lompart/cu (multiply by 1e6)
+		sourceGasInLompart := new(big.Int).Mul(sourceGasPrice, big.NewInt(1e6))
+		// Solana lowest denomination is 1e9, so we need to divide by 1e9
+		usdPerFeeToken18 := new(big.Int).Div(usdPerFeeCoin, big.NewInt(1e9))
+		usdGasPrice18 := new(big.Int).Mul(sourceGasInLompart, usdPerFeeToken18)
+		scaledGasPrice := new(big.Int).Div(usdGasPrice18, big.NewInt(1e18))
+		return scaledGasPrice, nil
 
 	default:
 		return nil, fmt.Errorf("unsupported family")
