@@ -174,39 +174,18 @@ type RMNCurseResponse struct {
 // ---------------------------------------------------
 
 func (r *ccipChainReader) CommitReportsGTETimestamp(
-	ctx context.Context, ts time.Time, limit int,
-) ([]cciptypes.CommitPluginReportWithMeta, error) {
-	lggr := logutil.WithContextValues(ctx, r.lggr)
+	ctx context.Context,
+	ts time.Time,
+	confidence primitives.ConfidenceLevel,
+	limit int) ([]cciptypes.CommitPluginReportWithMeta, error) {
 
 	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
-		return nil, err
+		return []cciptypes.CommitPluginReportWithMeta{}, err
 	}
 
-	ev := CommitReportAcceptedEvent{}
-	iter, err := r.queryCommitReports(ctx, ts, limit, &ev)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query offRamp: %w", err)
-	}
-
-	lggr.Debugw("queried commit reports", "numReports", len(iter),
-		"destChain", r.destChain,
-		"ts", ts,
-		"limit", limit*2)
-
-	reports := r.processCommitReports(lggr, iter, ts, limit)
-
-	lggr.Debugw("decoded commit reports", "reports", reports)
-
-	if len(reports) < limit {
-		return reports, nil
-	}
-	return reports[:limit], nil
-}
-
-func (r *ccipChainReader) queryCommitReports(
-	ctx context.Context, ts time.Time, limit int, ev *CommitReportAcceptedEvent,
-) ([]types.Sequence, error) {
-	return r.contractReaders[r.destChain].ExtendedQueryKey(
+	lggr := logutil.WithContextValues(ctx, r.lggr)
+	internalLimit := limit * 2
+	iter, err := r.contractReaders[r.destChain].ExtendedQueryKey(
 		ctx,
 		consts.ContractNameOffRamp,
 		query.KeyFilter{
@@ -215,17 +194,31 @@ func (r *ccipChainReader) queryCommitReports(
 				query.Timestamp(uint64(ts.Unix()), primitives.Gte),
 				// We don't need to wait for the commit report accepted event to be finalized
 				// before we can start optimistically processing it.
-				query.Confidence(primitives.Unconfirmed),
+				query.Confidence(confidence),
 			},
 		},
 		query.LimitAndSort{
 			SortBy: []query.SortBy{query.NewSortBySequence(query.Asc)},
 			Limit: query.Limit{
-				Count: uint64(limit * 2),
+				Count: uint64(internalLimit),
 			},
 		},
-		ev,
+		&CommitReportAcceptedEvent{},
 	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query offRamp: %w", err)
+	}
+
+	lggr.Debugw("queried commit reports", "numReports", len(iter),
+		"confidence", confidence,
+		"destChain", r.destChain,
+		"ts", ts,
+		"limit", internalLimit)
+
+	reports := r.processCommitReports(lggr, iter, ts, limit)
+
+	lggr.Debugw("decoded commit reports", "reports", reports)
+	return reports, nil
 }
 
 // processCommitReports decodes the commit reports from the query results
@@ -893,8 +886,9 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 		}
 		nativeTokenAddress := config.Router.WrappedNativeAddress
 
-		if nativeTokenAddress.String() == "0x" {
-			lggr.Errorw("native token address is empty", "chain", chain)
+		if cciptypes.UnknownAddress(nativeTokenAddress).IsZeroOrEmpty() {
+			lggr.Warnw("Native token address is zero or empty. Ignore for disabled chains otherwise "+
+				"check for router misconfiguration", "chain", chain, "address", nativeTokenAddress.String())
 			continue
 		}
 
@@ -1036,8 +1030,8 @@ func (r *ccipChainReader) processFeePriceUpdateResults(
 			continue
 		}
 
-		// Check if the update is empty (timestamp or value is zero/nil)
-		if update.Timestamp == 0 || update.Value == nil || update.Value.Cmp(big.NewInt(0)) == 0 {
+		// Check if the update is empty
+		if update.Timestamp == 0 || update.Value == nil {
 			lggr.Debugw("chain fee price update is empty",
 				"chain", chain,
 				"update", update)
@@ -2097,8 +2091,8 @@ func validateCommitReportAcceptedEvent(seq types.Sequence, gteTimestamp time.Tim
 	}
 
 	for _, gpus := range ev.PriceUpdates.GasPriceUpdates {
-		if gpus.UsdPerUnitGas == nil || gpus.UsdPerUnitGas.Cmp(big.NewInt(0)) <= 0 {
-			return nil, fmt.Errorf("nil or non-positive usd per unit gas")
+		if gpus.UsdPerUnitGas == nil || gpus.UsdPerUnitGas.Cmp(big.NewInt(0)) < 0 {
+			return nil, fmt.Errorf("nil or negative usd per unit gas: %s", gpus.UsdPerUnitGas.String())
 		}
 	}
 
