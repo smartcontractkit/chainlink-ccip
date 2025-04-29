@@ -44,21 +44,31 @@ func CalculateUsdPerUnitGas(
 	switch family {
 	case chainsel.FamilyEVM:
 		// In EVM, sourceGasPrice is denoted in wei/gas.
-		// Eth has 18 decimals, usdPerFeeCoin represents 1e18 USD/1e18 wei.
-		// To get 1e18 USD/gas, we multiply sourceGasPrice by usdPerFeeCoin and divide by 1e18.
+		// Eth has 18 decimals, usdPerFeeCoin represents 1e18 USD * 1e18 / wei.
+		// To get 1e18 USD/gas, we have
+		//   sourceGasPrice * usdPerFeeCoin / 1e18
+		//     = (wei / gas) * (1e18 USD * 1e18 / wei) / 1e18
+		//     = 1e18 USD * 1e18 / gas / 1e18
+		//     = 1e18 USD / gas
 		tmp := new(big.Int).Mul(sourceGasPrice, usdPerFeeCoin)
 		return tmp.Div(tmp, big.NewInt(1e18)), nil
 
 	case chainsel.FamilySolana:
 		// In SVM, sourceGasPrice is denoted in microlamports/cu, or 1e-15 SOL/cu.
-		// We need to multiply by 1e3 to be in units of 1e-18 SOL/cu, equivalent to wei/gas.
+		// sourceGasPrice * 1e3 become in units of 1e-18 SOL/cu == wei/gas.
 
 		// Sol has 9 decimals, usdPerFeeCoin represents 1e18 USD per 1e9 whole sol, or 1e18 USD/1e27wei.
-		// We need to divide by 1e9 to be in units of 1e18 USD/1e18 wei, equivalent to EVM model.
+		// usdPerFeeCoin / 1e9 become in units of 1e18 USD * 1e18 / wei.
 
-		// To keep precision, we want to divide at the very end.
-		// The above cancels out, the net result is we need to further divide by 1e6,
-		// or 1e18 * 1e6 = 1e24 in total.
+		// To get 1e18 USD/gas, we have
+		//   (sourceGasPrice * 1e3) * (usdPerFeeCoin / 1e9) / 1e18
+		//     = (wei / gas) * (1e18 USD * 1e18 / wei) / 1e18
+		//     = 1e18 USD * 1e18 / gas / 1e18
+		//     = 1e18 USD / gas
+
+		// To keep precision, we want to divide at the very end,
+		//   (sourceGasPrice * 1e3) * (usdPerFeeCoin / 1e9) / 1e18
+		//      = (sourceGasPrice * usdPerFeeCoin) / 1e24
 		tmp := new(big.Int).Mul(sourceGasPrice, usdPerFeeCoin)
 		power24 := big.NewInt(0).Exp(big.NewInt(10), big.NewInt(24), nil)
 		return tmp.Div(tmp, power24), nil
