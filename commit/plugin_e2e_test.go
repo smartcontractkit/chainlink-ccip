@@ -472,7 +472,7 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 
 func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 	t.Skip("todo")
-	
+
 	params := defaultNodeParams(t)
 	merkleOutcome := reportEmptyMerkleRootOutcome()
 	nodes := make([]ocr3types.ReportingPlugin[[]byte], len(oracleIDs))
