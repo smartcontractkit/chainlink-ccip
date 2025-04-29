@@ -625,9 +625,9 @@ func Test_Builder_Build(t *testing.T) {
 				reports: []exectypes.CommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						sender,
-						cciptypes.Bytes32{}, // generate a correct root.
+						cciptypes.Bytes32{},                         // generate a correct root.
 						[]cciptypes.SeqNum{100, 101, 102, 103, 104}, // executed
-						false, // zeroNonces
+						false,                                       // zeroNonces
 					),
 				},
 			},
@@ -648,9 +648,9 @@ func Test_Builder_Build(t *testing.T) {
 				reports: []exectypes.CommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						sender,
-						cciptypes.Bytes32{}, // generate a correct root.
+						cciptypes.Bytes32{},                         // generate a correct root.
 						[]cciptypes.SeqNum{100, 101, 102, 103, 104}, // executed
-						false, // zeroNonces
+						false,                                       // zeroNonces
 					),
 				},
 			},
@@ -955,16 +955,23 @@ func Test_Builder_Build(t *testing.T) {
 				assert.Contains(t, err.Error(), tt.wantErr)
 				return
 			}
+
+			require.LessOrEqual(t, len(execReports), 1, "These tests should not enable multiple reports.")
+
 			require.NoError(t, err)
-			require.Len(t, execReports, tt.expectedExecReports)
-			require.Equal(t, len(execReports), len(commitReports))
-			for i, execReport := range execReports {
-				require.Lenf(t, execReport.Messages, tt.expectedExecThings[i],
-					"Unexpected number of messages, iter %d", i)
-				require.Lenf(t, execReport.OffchainTokenData, tt.expectedExecThings[i],
-					"Unexpected number of token data, iter %d", i)
-				require.NotEmptyf(t, execReport.Proofs, "Proof should not be empty.")
-				assertMerkleRoot(t, hasher, execReport, tt.args.reports[i])
+			if len(execReports) > 0 {
+				chainReports := execReports[0].ChainReports
+				require.Len(t, chainReports, tt.expectedExecReports)
+				require.Equal(t, len(chainReports), len(commitReports))
+
+				for i, chainReport := range chainReports {
+					require.Lenf(t, chainReport.Messages, tt.expectedExecThings[i],
+						"Unexpected number of messages, iter %d", i)
+					require.Lenf(t, chainReport.OffchainTokenData, tt.expectedExecThings[i],
+						"Unexpected number of token data, iter %d", i)
+					require.NotEmptyf(t, chainReport.Proofs, "Proof should not be empty.")
+					assertMerkleRoot(t, hasher, chainReport, tt.args.reports[i])
+				}
 			}
 			// If the last report is partially executed, the executed messages can be checked.
 			if len(updatedMessages) > 0 && len(tt.lastReportExecuted) > 0 {
@@ -1136,7 +1143,7 @@ func Test_execReportBuilder_verifyReport(t *testing.T) {
 				WithMaxReportSizeBytes(tt.fields.maxReportSizeBytes),
 				WithMaxGas(tt.fields.maxGas),
 			)
-			b.accumulated = tt.fields.accumulated
+			b.accumulated = []validationMetadata{tt.fields.accumulated}
 
 			isValid, metadata, err := b.verifyReport(context.Background(), tt.args.execReport)
 			if tt.expectedError != "" {

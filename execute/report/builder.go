@@ -166,11 +166,16 @@ func (b *execReportBuilder) checkInitialize() {
 	if b.execReports == nil {
 		b.execReports = append(b.execReports, cciptypes.ExecutePluginReport{})
 	}
+	if b.commitReports == nil {
+		b.commitReports = append(b.commitReports, []exectypes.CommitData{})
+	}
 }
 
 // Add an exec report for as many messages as possible in the given commit report.
 // The commit report with updated metadata is returned. It reflects which messages
 // were selected for the exec report.
+//
+// TODO: Finish this function to generate multiple reports..
 func (b *execReportBuilder) Add(
 	ctx context.Context,
 	commitReport exectypes.CommitData,
@@ -189,9 +194,14 @@ func (b *execReportBuilder) Add(
 
 	execReport, updatedReport, err := b.buildSingleChainReport(ctx, commitReport, readyMessages)
 
-	// No messages fit into the exec report, move to next commit report
+	// No messages fit into the exec report
 	if errors.Is(err, ErrEmptyReport) {
-		return commitReport, nil
+		if !b.multipleReportsEnabled {
+			return commitReport, nil
+		}
+		// start a new exec report and try again.
+		// TODO: start a new exec report and try again.
+		panic("multiple reports enabled but not implemented")
 	}
 	if err != nil {
 		return commitReport, fmt.Errorf("unable to add a single chain report: %w", err)

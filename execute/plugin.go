@@ -490,7 +490,7 @@ func selectReport(
 	lggr logger.Logger,
 	commitReports []exectypes.CommitData,
 	builder report.ExecReportBuilder,
-) ([]cciptypes.ExecutePluginReportSingleChain, []exectypes.CommitData, error) {
+) ([]cciptypes.ExecutePluginReport, [][]exectypes.CommitData, error) {
 	// TODO: It may be desirable for this entire function to be an interface so that
 	//       different selection algorithms can be used.
 
@@ -519,6 +519,8 @@ func selectReport(
 	}
 
 	execReports, selectedReports, err := builder.Build()
+
+	// TODO: count pending reports during Build() when we select which reports can be returned.
 
 	lggr.Debugw("selected report to be executed", "reports", selectedReports)
 	lggr.Infow(

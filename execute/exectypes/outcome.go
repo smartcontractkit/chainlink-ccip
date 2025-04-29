@@ -121,21 +121,27 @@ func NewSortedOutcome(
 	pendingCommits []CommitData,
 	reports []cciptypes.ExecutePluginReport,
 ) Outcome {
-	pendingCommitsCP := append([]CommitData{}, pendingCommits...)
-	reportCP := append([]cciptypes.ExecutePluginReportSingleChain{}, report.ChainReports...)
+	sortedPendingCommits := append([]CommitData{}, pendingCommits...)
 	sort.Slice(
-		pendingCommitsCP,
+		sortedPendingCommits,
 		func(i, j int) bool {
-			return LessThan(pendingCommitsCP[i], pendingCommitsCP[j])
+			return LessThan(sortedPendingCommits[i], sortedPendingCommits[j])
 		})
-	sort.Slice(
-		reportCP,
-		func(i, j int) bool {
-			return reportCP[i].SourceChainSelector < reportCP[j].SourceChainSelector
-		})
+
+	var sortedReports []cciptypes.ExecutePluginReport
+	for _, report := range reports {
+		sortedReport := append([]cciptypes.ExecutePluginReportSingleChain{}, report.ChainReports...)
+		sort.Slice(
+			sortedReport,
+			func(i, j int) bool {
+				return sortedReport[i].SourceChainSelector < sortedReport[j].SourceChainSelector
+			})
+		sortedReports = append(sortedReports, cciptypes.ExecutePluginReport{ChainReports: sortedReport})
+	}
+
 	return Outcome{
 		State:         state,
-		CommitReports: selectedCommits,
-		Reports:       reports,
+		CommitReports: sortedPendingCommits,
+		Reports:       sortedReports,
 	}
 }
