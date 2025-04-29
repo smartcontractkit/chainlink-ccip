@@ -65,12 +65,12 @@ func validateChainFeeUpdates(
 	ao plugincommon.AttributedObservation[Observation],
 ) error {
 	for _, update := range ao.Observation.ChainFeeUpdates {
-		if update.ChainFee.ExecutionFeePriceUSD == nil || update.ChainFee.ExecutionFeePriceUSD.Cmp(big.NewInt(0)) <= 0 {
-			return fmt.Errorf("nil or non-positive %s", "execution fee price")
+		if update.ChainFee.ExecutionFeePriceUSD == nil || update.ChainFee.ExecutionFeePriceUSD.Cmp(big.NewInt(0)) < 0 {
+			return fmt.Errorf("nil or negative execution fee: %+v", update.ChainFee.ExecutionFeePriceUSD)
 		}
 
 		if update.ChainFee.DataAvFeePriceUSD == nil || update.ChainFee.DataAvFeePriceUSD.Cmp(big.NewInt(0)) < 0 {
-			return fmt.Errorf("nil or negative %s", "data availability fee price")
+			return fmt.Errorf("nil or negative data availability fee: %+v", update.ChainFee.DataAvFeePriceUSD)
 		}
 		if update.Timestamp.IsZero() {
 			return fmt.Errorf("timestamp cannot be zero")
@@ -86,12 +86,12 @@ func validateFeeComponents(
 	ao plugincommon.AttributedObservation[Observation],
 ) error {
 	for _, feeComponent := range ao.Observation.FeeComponents {
-		if feeComponent.ExecutionFee == nil || feeComponent.ExecutionFee.Cmp(big.NewInt(0)) <= 0 {
-			return fmt.Errorf("nil or non-positive %s", "execution fee")
+		if feeComponent.ExecutionFee == nil || feeComponent.ExecutionFee.Cmp(big.NewInt(0)) < 0 {
+			return fmt.Errorf("nil or negative execution fee: %+v", feeComponent.ExecutionFee)
 		}
 
 		if feeComponent.DataAvailabilityFee == nil || feeComponent.DataAvailabilityFee.Cmp(big.NewInt(0)) < 0 {
-			return fmt.Errorf("nil or negative %s", "data availability fee")
+			return fmt.Errorf("nil or negative data availability fee: %+v", feeComponent.DataAvailabilityFee)
 		}
 	}
 	return nil
