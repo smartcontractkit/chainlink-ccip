@@ -3,8 +3,11 @@ package internal
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"math/big"
 	"strings"
 	"testing"
+
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/mathslib"
 
 	"github.com/prometheus/client_golang/prometheus"
 	io_prometheus_client "github.com/prometheus/client_model/go"
@@ -13,7 +16,15 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
 
+	sel "github.com/smartcontractkit/chain-selectors"
+
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+)
+
+var (
+	SolChainSelector  = cciptypes.ChainSelector(sel.SOLANA_DEVNET.Selector)
+	EvmChainSelector  = cciptypes.ChainSelector(sel.ETHEREUM_TESTNET_SEPOLIA.Selector)
+	EvmChainSelector2 = cciptypes.ChainSelector(sel.ETHEREUM_TESTNET_SEPOLIA_ARBITRUM_1.Selector)
 )
 
 func MessageWithTokens(t *testing.T, tokenPoolAddr ...string) cciptypes.Message {
@@ -84,4 +95,15 @@ func NewMockAddressCodecHex(t *testing.T) *ccipocr3.MockAddressCodec {
 			return addrBytes, nil
 		}).Maybe()
 	return mockAddrCodec
+}
+
+func MustCalculateUsdPerUnitGas(sourceChainSelector cciptypes.ChainSelector,
+	sourceGasPrice *big.Int,
+	usdPerFeeCoin *big.Int) *big.Int {
+	gas, err := mathslib.CalculateUsdPerUnitGas(sourceChainSelector, sourceGasPrice, usdPerFeeCoin)
+	if err != nil {
+		panic("failed to CalculateUsdPerUnitGas: " + err.Error())
+	}
+
+	return gas
 }
