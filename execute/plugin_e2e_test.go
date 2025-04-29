@@ -19,7 +19,7 @@ import (
 var ocrTypeCodec = ocrtypecodec.DefaultExecCodec
 
 func TestPlugin(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	srcSelector := cciptypes.ChainSelector(1)
 	dstSelector := cciptypes.ChainSelector(2)

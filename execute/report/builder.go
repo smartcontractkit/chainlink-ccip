@@ -230,6 +230,14 @@ func (b *execReportBuilder) Build() (
 
 	numSingleChainReports := len(b.execReports)
 
+	for _, report := range b.execReports {
+		results = append(results, report)
+		if !b.multipleReportsEnabled {
+			// skip remaining reports if they aren't enabled.
+			break
+		}
+	}
+
 	// this now happens when adding the reports, so we don't need to do it here
 	/*
 		// Check if limiting is required.
