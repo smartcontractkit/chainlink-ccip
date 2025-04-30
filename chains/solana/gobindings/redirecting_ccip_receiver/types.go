@@ -105,3 +105,21 @@ func (obj *SVMTokenAmount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err
 	}
 	return nil
 }
+
+type Behavior ag_binary.BorshEnum
+
+const (
+	Normal_Behavior Behavior = iota
+	ExtraCUs_Behavior
+)
+
+func (value Behavior) String() string {
+	switch value {
+	case Normal_Behavior:
+		return "Normal"
+	case ExtraCUs_Behavior:
+		return "ExtraCUs"
+	default:
+		return ""
+	}
+}

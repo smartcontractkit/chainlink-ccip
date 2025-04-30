@@ -8,17 +8,18 @@ import (
 	ag_solanago "github.com/gagliardetto/solana-go"
 )
 
-type BaseState struct {
+type State struct {
 	Owner         ag_solanago.PublicKey
 	ProposedOwner ag_solanago.PublicKey
 	Router        ag_solanago.PublicKey
+	Behavior      Behavior
 }
 
-var BaseStateDiscriminator = [8]byte{46, 139, 13, 192, 80, 181, 96, 46}
+var StateDiscriminator = [8]byte{216, 146, 107, 94, 104, 75, 182, 177}
 
-func (obj BaseState) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj State) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Write account discriminator:
-	err = encoder.WriteBytes(BaseStateDiscriminator[:], false)
+	err = encoder.WriteBytes(StateDiscriminator[:], false)
 	if err != nil {
 		return err
 	}
@@ -37,20 +38,25 @@ func (obj BaseState) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) 
 	if err != nil {
 		return err
 	}
+	// Serialize `Behavior` param:
+	err = encoder.Encode(obj.Behavior)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
-func (obj *BaseState) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *State) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Read and check account discriminator:
 	{
 		discriminator, err := decoder.ReadTypeID()
 		if err != nil {
 			return err
 		}
-		if !discriminator.Equal(BaseStateDiscriminator[:]) {
+		if !discriminator.Equal(StateDiscriminator[:]) {
 			return fmt.Errorf(
 				"wrong discriminator: wanted %s, got %s",
-				"[46 139 13 192 80 181 96 46]",
+				"[216 146 107 94 104 75 182 177]",
 				fmt.Sprint(discriminator[:]))
 		}
 	}
@@ -66,6 +72,11 @@ func (obj *BaseState) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err erro
 	}
 	// Deserialize `Router`:
 	err = decoder.Decode(&obj.Router)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Behavior`:
+	err = decoder.Decode(&obj.Behavior)
 	if err != nil {
 		return err
 	}

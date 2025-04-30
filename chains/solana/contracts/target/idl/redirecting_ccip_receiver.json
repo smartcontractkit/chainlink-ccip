@@ -114,6 +114,29 @@
       ]
     },
     {
+      "name": "setBehavior",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "behavior",
+          "type": {
+            "defined": "Behavior"
+          }
+        }
+      ]
+    },
+    {
       "name": "updateRouter",
       "accounts": [
         {
@@ -174,7 +197,7 @@
   ],
   "accounts": [
     {
-      "name": "BaseState",
+      "name": "State",
       "type": {
         "kind": "struct",
         "fields": [
@@ -189,6 +212,12 @@
           {
             "name": "router",
             "type": "publicKey"
+          },
+          {
+            "name": "behavior",
+            "type": {
+              "defined": "Behavior"
+            }
           }
         ]
       }
@@ -251,6 +280,20 @@
           {
             "name": "amount",
             "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Behavior",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Normal"
+          },
+          {
+            "name": "ExtraCUs"
           }
         ]
       }

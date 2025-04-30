@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{Mint, TokenAccount};
 
-declare_id!("redGLzHHb1xEQi5GksPH9hmoM2xyfoT4iVFCescrrf4");
+declare_id!("Redic2v6fBaUoHovjaKPEAQXFgwJVbEuyAiWyytdR5S");
 
 pub const EXTERNAL_EXECUTION_CONFIG_SEED: &[u8] = b"external_execution_config";
 pub const TOKEN_ADMIN_SEED: &[u8] = b"receiver_token_admin";
@@ -18,7 +18,7 @@ pub mod redirecting_ccip_receiver {
         associated_token::get_associated_token_address_with_program_id,
         token_2022::spl_token_2022::{self, instruction::transfer_checked},
     };
-    use solana_program::program::invoke_signed;
+    use solana_program::{keccak::hash, program::invoke_signed};
 
     use super::*;
 
@@ -48,6 +48,14 @@ pub mod redirecting_ccip_receiver {
             ctx.accounts.mint.key(),
             CcipReceiverError::InvalidMint
         );
+
+        if ctx.accounts.state.behavior == Behavior::ExtraCUs {
+            // Extra CUs for testing
+            let mut h = hash(b"something!");
+            for _ in 1..5000 {
+                h = hash(&h.0);
+            }
+        }
 
         // Message data must correspond to the receiver address in b58. We ensure this is correct
         // by asserting that the destination token account is an ATA of the user provided
@@ -101,6 +109,11 @@ pub mod redirecting_ccip_receiver {
         Ok(())
     }
 
+    pub fn set_behavior(ctx: Context<UpdateConfig>, behavior: Behavior) -> Result<()> {
+        ctx.accounts.state.behavior = behavior;
+        Ok(())
+    }
+
     pub fn update_router(ctx: Context<UpdateConfig>, new_router: Pubkey) -> Result<()> {
         ctx.accounts
             .state
@@ -129,9 +142,9 @@ pub struct Initialize<'info> {
         seeds = [b"state"],
         bump,
         payer = authority,
-        space = ANCHOR_DISCRIMINATOR + BaseState::INIT_SPACE,
+        space = ANCHOR_DISCRIMINATOR + State::INIT_SPACE,
     )]
-    pub state: Account<'info, BaseState>,
+    pub state: Account<'info, State>,
     #[account(
         init,
         seeds = [TOKEN_ADMIN_SEED],
@@ -187,7 +200,7 @@ pub struct CcipReceive<'info> {
         seeds = [STATE],
         bump,
     )]
-    pub state: Account<'info, BaseState>,
+    pub state: Account<'info, State>,
 
     //////////////////////////////////////////
     // Accounts required for token redirect //
@@ -224,7 +237,7 @@ pub struct UpdateConfig<'info> {
         seeds = [STATE],
         bump,
     )]
-    pub state: Account<'info, BaseState>,
+    pub state: Account<'info, State>,
     #[account(
         address = state.owner @ CcipReceiverError::OnlyOwner,
     )]
@@ -238,24 +251,41 @@ pub struct AcceptOwnership<'info> {
         seeds = [STATE],
         bump,
     )]
-    pub state: Account<'info, BaseState>,
+    pub state: Account<'info, State>,
     #[account(
         address = state.proposed_owner @ CcipReceiverError::OnlyProposedOwner,
     )]
     pub authority: Signer<'info>,
 }
 
-// BaseState contains the state for core safety checks that can be leveraged by the implementer
 #[account]
 #[derive(InitSpace, Default, Debug)]
-pub struct BaseState {
+pub struct State {
     pub owner: Pubkey,
     pub proposed_owner: Pubkey,
 
     pub router: Pubkey,
+    pub behavior: Behavior,
 }
 
-impl BaseState {
+#[repr(u8)]
+#[derive(InitSpace, AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Debug, Default)]
+pub enum Behavior {
+    #[default]
+    Normal = 0,
+    ExtraCUs = 1,
+}
+
+impl std::fmt::Display for Behavior {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Behavior::Normal => write!(f, "Normal"),
+            Behavior::ExtraCUs => write!(f, "ExtraCUs"),
+        }
+    }
+}
+
+impl State {
     pub fn init(&mut self, owner: Pubkey, router: Pubkey) -> Result<()> {
         require_keys_eq!(self.owner, Pubkey::default());
         self.owner = owner;
@@ -349,10 +379,10 @@ pub struct TokensRedirected {
 mod tests {
     use super::*;
 
-    fn create_state() -> BaseState {
-        BaseState {
+    fn create_state() -> State {
+        State {
             owner: Pubkey::new_unique(),
-            ..BaseState::default()
+            ..State::default()
         }
     }
 

@@ -89,6 +89,12 @@ func TestSetupRedirectingReceiver(t *testing.T) {
 		fmt.Printf("Result: %s\n", result.Meta.LogMessages)
 	})
 
+	t.Run("Set behaviour for receiver", func(t *testing.T) {
+		ix, _ := redirecting_ccip_receiver.NewSetBehaviorInstruction(redirecting_ccip_receiver.ExtraCUs_Behavior, statePDA, admin.PublicKey()).ValidateAndBuild()
+		result := testutils.SendAndConfirm(ctx, t, client, []solana.Instruction{ix}, admin, rpc.CommitmentConfirmed)
+		require.NotNil(t, result)
+	})
+
 	t.Run("Print required extra accounts", func(t *testing.T) {
 		fmt.Printf("Account 4 (state): %s\n", statePDA)
 		programATA, _, _ := tokens.FindAssociatedTokenAddress(solana.Token2022ProgramID, tokenMintForRedirect, tokenAdminPDA)
@@ -113,7 +119,7 @@ func TestSetupRedirectingReceiver(t *testing.T) {
 		fmt.Printf("--sol-account-is-writable-bitmap 1 \\\n")
 		fmt.Printf("--sol-account-is-writable-bitmap 2 \\\n")
 		fmt.Printf("--sol-account-is-writable-bitmap 3 \\\n")
-		fmt.Printf("--sol-compute-units \"80000\" \\\n", tokenAdminPDA)
+		fmt.Printf("--sol-compute-units \"80000\" \\\n")
 		// Note: The admin PDA, not the ATA, as offchain will derive it.
 		fmt.Printf("--sol-token-receiver \"%s\" \\\n", tokenAdminPDA)
 		fmt.Printf("--token-address \"<SEPOLIA_MINT_FOR_THIS_TOKEN>\"")

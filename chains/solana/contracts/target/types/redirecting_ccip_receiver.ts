@@ -114,6 +114,29 @@ export type RedirectingCcipReceiver = {
       ]
     },
     {
+      "name": "setBehavior",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "behavior",
+          "type": {
+            "defined": "Behavior"
+          }
+        }
+      ]
+    },
+    {
       "name": "updateRouter",
       "accounts": [
         {
@@ -174,7 +197,7 @@ export type RedirectingCcipReceiver = {
   ],
   "accounts": [
     {
-      "name": "baseState",
+      "name": "state",
       "type": {
         "kind": "struct",
         "fields": [
@@ -189,6 +212,12 @@ export type RedirectingCcipReceiver = {
           {
             "name": "router",
             "type": "publicKey"
+          },
+          {
+            "name": "behavior",
+            "type": {
+              "defined": "Behavior"
+            }
           }
         ]
       }
@@ -251,6 +280,20 @@ export type RedirectingCcipReceiver = {
           {
             "name": "amount",
             "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Behavior",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Normal"
+          },
+          {
+            "name": "ExtraCUs"
           }
         ]
       }
@@ -455,6 +498,29 @@ export const IDL: RedirectingCcipReceiver = {
       ]
     },
     {
+      "name": "setBehavior",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "behavior",
+          "type": {
+            "defined": "Behavior"
+          }
+        }
+      ]
+    },
+    {
       "name": "updateRouter",
       "accounts": [
         {
@@ -515,7 +581,7 @@ export const IDL: RedirectingCcipReceiver = {
   ],
   "accounts": [
     {
-      "name": "baseState",
+      "name": "state",
       "type": {
         "kind": "struct",
         "fields": [
@@ -530,6 +596,12 @@ export const IDL: RedirectingCcipReceiver = {
           {
             "name": "router",
             "type": "publicKey"
+          },
+          {
+            "name": "behavior",
+            "type": {
+              "defined": "Behavior"
+            }
           }
         ]
       }
@@ -592,6 +664,20 @@ export const IDL: RedirectingCcipReceiver = {
           {
             "name": "amount",
             "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Behavior",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Normal"
+          },
+          {
+            "name": "ExtraCUs"
           }
         ]
       }
