@@ -181,6 +181,17 @@ func (b *execReportBuilder) Add(
 	commitReport exectypes.CommitData,
 ) (exectypes.CommitData, error) {
 	b.checkInitialize()
+	index := len(b.execReports) - 1
+
+	// Check if max is reached.
+	if b.maxSingleChainReports != 0 && len(b.execReports[index].ChainReports) >= int(b.maxSingleChainReports) {
+		if !b.multipleReportsEnabled {
+			// TODO: this is the previous behavior. Should we return an empty report error?
+			return commitReport, nil
+		} else {
+			// TODO: start a new exec report.
+		}
+	}
 
 	// Check which messages are ready to execute and update the report with additional metadata needed for execution.
 	readyMessages, err := b.checkMessages(ctx, commitReport)
@@ -207,7 +218,6 @@ func (b *execReportBuilder) Add(
 		return commitReport, fmt.Errorf("unable to add a single chain report: %w", err)
 	}
 
-	index := len(b.execReports) - 1
 	b.execReports[index].ChainReports = append(b.execReports[index].ChainReports, execReport)
 	b.commitReports[index] = append(b.commitReports[index], updatedReport)
 

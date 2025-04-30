@@ -625,9 +625,9 @@ func Test_Builder_Build(t *testing.T) {
 				reports: []exectypes.CommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						sender,
-						cciptypes.Bytes32{}, // generate a correct root.
+						cciptypes.Bytes32{},                         // generate a correct root.
 						[]cciptypes.SeqNum{100, 101, 102, 103, 104}, // executed
-						false, // zeroNonces
+						false,                                       // zeroNonces
 					),
 				},
 			},
@@ -648,9 +648,9 @@ func Test_Builder_Build(t *testing.T) {
 				reports: []exectypes.CommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						sender,
-						cciptypes.Bytes32{}, // generate a correct root.
+						cciptypes.Bytes32{},                         // generate a correct root.
 						[]cciptypes.SeqNum{100, 101, 102, 103, 104}, // executed
-						false, // zeroNonces
+						false,                                       // zeroNonces
 					),
 				},
 			},
@@ -962,7 +962,7 @@ func Test_Builder_Build(t *testing.T) {
 			if len(execReports) > 0 {
 				chainReports := execReports[0].ChainReports
 				require.Len(t, chainReports, tt.expectedExecReports)
-				require.Equal(t, len(chainReports), len(commitReports))
+				require.Equal(t, len(chainReports), len(commitReports[0]))
 
 				for i, chainReport := range chainReports {
 					require.Lenf(t, chainReport.Messages, tt.expectedExecThings[i],
