@@ -42,17 +42,17 @@ func Test_validateFeeComponentsAndChainFeeUpdates(t *testing.T) {
 					DataAvailabilityFee: big.NewInt(20),
 				},
 			},
-			expectedFeeComponentError: "nil or non-positive execution fee",
+			expectedFeeComponentError: "nil or negative execution fee: <nil>",
 		},
 		{
-			name: "non-positive execution fee",
+			name: "negative execution fee",
 			feeComponents: map[ccipocr3.ChainSelector]types.ChainFeeComponents{
 				1: {
-					ExecutionFee:        big.NewInt(0),
+					ExecutionFee:        big.NewInt(-1),
 					DataAvailabilityFee: big.NewInt(20),
 				},
 			},
-			expectedFeeComponentError: "nil or non-positive execution fee",
+			expectedFeeComponentError: "nil or negative execution fee: -1",
 		},
 		{
 			name: "nil data availability fee",
@@ -62,7 +62,7 @@ func Test_validateFeeComponentsAndChainFeeUpdates(t *testing.T) {
 					DataAvailabilityFee: nil,
 				},
 			},
-			expectedFeeComponentError: "nil or negative data availability fee",
+			expectedFeeComponentError: "nil or negative data availability fee: <nil>",
 		},
 		{
 			name: "negative data availability fee",
@@ -72,7 +72,7 @@ func Test_validateFeeComponentsAndChainFeeUpdates(t *testing.T) {
 					DataAvailabilityFee: big.NewInt(-1),
 				},
 			},
-			expectedFeeComponentError: "nil or negative data availability fee",
+			expectedFeeComponentError: "nil or negative data availability fee: -1",
 		},
 		{
 			name: "valid chain fee updates",
@@ -98,20 +98,20 @@ func Test_validateFeeComponentsAndChainFeeUpdates(t *testing.T) {
 					Timestamp: fourHoursAgo,
 				},
 			},
-			expectedChainFeeUpdatesError: "nil or non-positive execution fee price",
+			expectedChainFeeUpdatesError: "nil or negative execution fee: <nil>",
 		},
 		{
-			name: "non-positive execution fee price - chain fee updates",
+			name: "negative execution fee price - chain fee updates",
 			chainFeeUpdates: map[ccipocr3.ChainSelector]Update{
 				1: {
 					ChainFee: ComponentsUSDPrices{
-						ExecutionFeePriceUSD: big.NewInt(0),
+						ExecutionFeePriceUSD: big.NewInt(-1),
 						DataAvFeePriceUSD:    big.NewInt(20),
 					},
 					Timestamp: fourHoursAgo,
 				},
 			},
-			expectedChainFeeUpdatesError: "nil or non-positive execution fee price",
+			expectedChainFeeUpdatesError: "nil or negative execution fee: -1",
 		},
 		{
 			name: "nil data availability fee price - chain fee updates",
@@ -124,7 +124,7 @@ func Test_validateFeeComponentsAndChainFeeUpdates(t *testing.T) {
 					Timestamp: fourHoursAgo,
 				},
 			},
-			expectedChainFeeUpdatesError: "nil or negative data availability fee price",
+			expectedChainFeeUpdatesError: "nil or negative data availability fee: <nil>",
 		},
 		{
 			name: "negative data availability fee price - chain fee updates",
@@ -137,7 +137,7 @@ func Test_validateFeeComponentsAndChainFeeUpdates(t *testing.T) {
 					Timestamp: fourHoursAgo,
 				},
 			},
-			expectedChainFeeUpdatesError: "nil or negative data availability fee price",
+			expectedChainFeeUpdatesError: "nil or negative data availability fee: -1",
 		},
 		{
 			name: "zero timestamp - chain fee updates",
