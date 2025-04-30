@@ -127,7 +127,12 @@ func Test_getMessagesObservation(t *testing.T) {
 	oneByte := make([]byte, 1)
 
 	// Helper functions
-	createCommitData := func(srcChain cciptypes.ChainSelector, from, to cciptypes.SeqNum, executedMessages ...cciptypes.SeqNum) exectypes.CommitData {
+	createCommitData := func(
+		srcChain cciptypes.ChainSelector,
+		from,
+		to cciptypes.SeqNum,
+		executedMessages ...cciptypes.SeqNum,
+	) exectypes.CommitData {
 		return exectypes.CommitData{
 			SourceChain:         srcChain,
 			SequenceNumberRange: cciptypes.NewSeqNumRange(from, to),

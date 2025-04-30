@@ -340,6 +340,8 @@ func createEmptyMessageWithIDAndSeqNum(msg cciptypes.Message) cciptypes.Message 
 //
 // Returns:
 //   - Updated observation containing commit reports, messages, and hashes
+//
+//nolint:gocyclo // TODO: pull out appropriate helpers.
 func (p *Plugin) getMessagesObservation(
 	ctx context.Context,
 	lggr logger.Logger,
