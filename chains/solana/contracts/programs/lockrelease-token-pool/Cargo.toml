@@ -23,3 +23,6 @@ spl-math = { version = "0.2.0", features = [ "no-entrypoint" ] }
 base-token-pool = { version = "0.1.0-dev", path = "../base-token-pool/", features = ["no-entrypoint"] }
 rmn_remote = {path = "../rmn-remote", features = ["cpi"]}
 ccip_common = {path = "../ccip-common"}
+
+[build-dependencies]
+build_commit = { path = "../../crates/build-commit" }

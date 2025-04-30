@@ -1925,7 +1925,7 @@ func TestCCIPChainReader_GetChainFeePriceUpdate(t *testing.T) {
 	destChain := cciptypes.ChainSelector(1)
 	sourceChain1 := cciptypes.ChainSelector(2)
 	sourceChain2 := cciptypes.ChainSelector(3)
-	sourceChain3 := cciptypes.ChainSelector(4) // Chain with error/empty result
+	sourceChain3 := cciptypes.ChainSelector(4) // Chain with zero gas price result
 
 	lggr := logger.Test(t)
 
@@ -2063,11 +2063,11 @@ func TestCCIPChainReader_GetChainFeePriceUpdate(t *testing.T) {
 
 		feeUpdates := ccipReader.GetChainFeePriceUpdate(ctx, selectors)
 
-		require.Len(t, feeUpdates, 1)
+		require.Len(t, feeUpdates, 2)
 		require.Contains(t, feeUpdates, sourceChain1)
 		assert.NotNil(t, feeUpdates[sourceChain1].Value)
 		assert.Equal(t, 0, feeUpdates[sourceChain1].Value.Cmp(big.NewInt(100)))
-		assert.NotContains(t, feeUpdates, sourceChain3)
+		assert.Contains(t, feeUpdates, sourceChain3)
 
 		mockReader.AssertExpectations(t)
 	})

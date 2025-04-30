@@ -63,6 +63,7 @@ jobs:
           RUSTUP_HOME=\"/root/.rustup\" &&\
           FORCE_COLOR=1 &&\
           cd /solana/contracts &&\
+          CCIP_BUILD_GIT_HASH=${{ github.sha }} \
           anchor build &&\
           chmod -R 755 ./target"
 
@@ -95,6 +96,7 @@ jobs:
           RUSTUP_HOME=\"/root/.rustup\" &&\
           FORCE_COLOR=1 &&\
           cd /solana/contracts &&\
+          export CCIP_BUILD_GIT_HASH=${{ github.sha }} &&\
           anchor build &&\
           cargo check &&\
           cargo clippy -- -D warnings &&\
@@ -143,6 +145,7 @@ jobs:
           RUSTUP_HOME=\"/root/.rustup\" &&\
           FORCE_COLOR=1 &&\
           cd /solana/contracts &&\
+          CCIP_BUILD_GIT_HASH=${{ github.sha }} \
           anchor build"
           make go-tests
 
@@ -184,6 +187,7 @@ jobs:
           FORCE_COLOR=1 &&\
           cd /solana/contracts &&\
           rm -rf target/idl target/types &&\
+          CCIP_BUILD_GIT_HASH=${{ github.sha }} \
           anchor build"
 
           go install github.com/gagliardetto/anchor-go@v0.2.3
@@ -199,5 +203,3 @@ jobs:
         if: failure()
         shell: bash
         run: cat ./golangci-lint-report.xml
-          
-

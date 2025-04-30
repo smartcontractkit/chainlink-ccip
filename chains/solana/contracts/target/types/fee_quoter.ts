@@ -61,6 +61,25 @@ export type FeeQuoter = {
       ]
     },
     {
+      "name": "typeVersion",
+      "docs": [
+        "Returns the program type (name) and version.",
+        "Used by offchain code to easily determine which program & version is being interacted with.",
+        "",
+        "# Arguments",
+        "* `ctx` - The context"
+      ],
+      "accounts": [
+        {
+          "name": "clock",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [],
+      "returns": "string"
+    },
+    {
       "name": "transferOwnership",
       "docs": [
         "Transfers the ownership of the fee quoter to a new proposed owner.",
@@ -1752,6 +1771,25 @@ export const IDL: FeeQuoter = {
           "type": "publicKey"
         }
       ]
+    },
+    {
+      "name": "typeVersion",
+      "docs": [
+        "Returns the program type (name) and version.",
+        "Used by offchain code to easily determine which program & version is being interacted with.",
+        "",
+        "# Arguments",
+        "* `ctx` - The context"
+      ],
+      "accounts": [
+        {
+          "name": "clock",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [],
+      "returns": "string"
     },
     {
       "name": "transferOwnership",

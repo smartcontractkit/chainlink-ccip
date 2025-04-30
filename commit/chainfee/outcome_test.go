@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/mock"
+	"github.com/smartcontractkit/chainlink-ccip/internal"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal/libs/mathslib"
+	"github.com/stretchr/testify/mock"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
@@ -34,20 +34,20 @@ import (
 var ts = time.Now().UTC()
 
 var feeComponentsMap = map[cciptypes.ChainSelector]types.ChainFeeComponents{
-	1: {ExecutionFee: big.NewInt(100), DataAvailabilityFee: big.NewInt(200)},
-	2: {ExecutionFee: big.NewInt(150), DataAvailabilityFee: big.NewInt(250)},
+	internal.EvmChainSelector:  {ExecutionFee: big.NewInt(100), DataAvailabilityFee: big.NewInt(200)},
+	internal.EvmChainSelector2: {ExecutionFee: big.NewInt(150), DataAvailabilityFee: big.NewInt(250)},
 }
 
 var chainFeePriceBatchWriteFrequency = *commonconfig.MustNewDuration(time.Minute)
 
 var nativeTokenPricesMap = map[cciptypes.ChainSelector]cciptypes.BigInt{
-	1: cciptypes.NewBigInt(big.NewInt(1e18)),
-	2: cciptypes.NewBigInt(big.NewInt(2e18)),
+	internal.EvmChainSelector:  cciptypes.NewBigInt(big.NewInt(1e18)),
+	internal.EvmChainSelector2: cciptypes.NewBigInt(big.NewInt(2e18)),
 }
 
 var fChains = map[cciptypes.ChainSelector]int{
-	1: 1,
-	2: 2,
+	internal.EvmChainSelector:  1,
+	internal.EvmChainSelector2: 2,
 }
 
 var obsNeedUpdate = Observation{
@@ -55,29 +55,34 @@ var obsNeedUpdate = Observation{
 	NativeTokenPrices: nativeTokenPricesMap,
 	FChain:            fChains,
 	ChainFeeUpdates: map[cciptypes.ChainSelector]Update{
-		1: {
+		internal.EvmChainSelector: {
 			Timestamp: ts,
 			ChainFee: ComponentsUSDPrices{
-				ExecutionFeePriceUSD: mathslib.CalculateUsdPerUnitGas(
-					feeComponentsMap[1].ExecutionFee, nativeTokenPricesMap[1].Int,
+				ExecutionFeePriceUSD: internal.MustCalculateUsdPerUnitGas(
+					internal.EvmChainSelector,
+					feeComponentsMap[internal.EvmChainSelector].ExecutionFee,
+					nativeTokenPricesMap[internal.EvmChainSelector].Int,
 				),
-				DataAvFeePriceUSD: mathslib.CalculateUsdPerUnitGas(
-					feeComponentsMap[1].DataAvailabilityFee,
-					nativeTokenPricesMap[1].Int,
+				DataAvFeePriceUSD: internal.MustCalculateUsdPerUnitGas(
+					internal.EvmChainSelector,
+					feeComponentsMap[internal.EvmChainSelector].DataAvailabilityFee,
+					nativeTokenPricesMap[internal.EvmChainSelector].Int,
 				),
 			},
 		},
-		2: {
+		internal.EvmChainSelector2: {
 			// Need update because timestamp is older than batch write frequency
 			Timestamp: ts.Add(-chainFeePriceBatchWriteFrequency.Duration() * 2),
 			ChainFee: ComponentsUSDPrices{
-				ExecutionFeePriceUSD: mathslib.CalculateUsdPerUnitGas(
-					feeComponentsMap[2].ExecutionFee,
-					nativeTokenPricesMap[2].Int,
+				ExecutionFeePriceUSD: internal.MustCalculateUsdPerUnitGas(
+					internal.EvmChainSelector2,
+					feeComponentsMap[internal.EvmChainSelector2].ExecutionFee,
+					nativeTokenPricesMap[internal.EvmChainSelector2].Int,
 				),
-				DataAvFeePriceUSD: mathslib.CalculateUsdPerUnitGas(
-					feeComponentsMap[2].DataAvailabilityFee,
-					nativeTokenPricesMap[2].Int,
+				DataAvFeePriceUSD: internal.MustCalculateUsdPerUnitGas(
+					internal.EvmChainSelector2,
+					feeComponentsMap[internal.EvmChainSelector2].DataAvailabilityFee,
+					nativeTokenPricesMap[internal.EvmChainSelector2].Int,
 				),
 			},
 		},
@@ -90,27 +95,32 @@ var obsNoUpdate = Observation{
 	NativeTokenPrices: nativeTokenPricesMap,
 	FChain:            fChains,
 	ChainFeeUpdates: map[cciptypes.ChainSelector]Update{
-		1: {
+		internal.EvmChainSelector: {
 			ChainFee: ComponentsUSDPrices{
-				ExecutionFeePriceUSD: mathslib.CalculateUsdPerUnitGas(
-					feeComponentsMap[1].ExecutionFee, nativeTokenPricesMap[1].Int,
+				ExecutionFeePriceUSD: internal.MustCalculateUsdPerUnitGas(
+					internal.EvmChainSelector,
+					feeComponentsMap[internal.EvmChainSelector].ExecutionFee,
+					nativeTokenPricesMap[internal.EvmChainSelector].Int,
 				),
-				DataAvFeePriceUSD: mathslib.CalculateUsdPerUnitGas(
-					feeComponentsMap[1].DataAvailabilityFee,
-					nativeTokenPricesMap[1].Int,
+				DataAvFeePriceUSD: internal.MustCalculateUsdPerUnitGas(
+					internal.EvmChainSelector,
+					feeComponentsMap[internal.EvmChainSelector].DataAvailabilityFee,
+					nativeTokenPricesMap[internal.EvmChainSelector].Int,
 				),
 			},
 			Timestamp: ts,
 		},
-		2: {
+		internal.EvmChainSelector2: {
 			ChainFee: ComponentsUSDPrices{
-				ExecutionFeePriceUSD: mathslib.CalculateUsdPerUnitGas(
-					feeComponentsMap[2].ExecutionFee,
-					nativeTokenPricesMap[2].Int,
+				ExecutionFeePriceUSD: internal.MustCalculateUsdPerUnitGas(
+					internal.EvmChainSelector2,
+					feeComponentsMap[internal.EvmChainSelector2].ExecutionFee,
+					nativeTokenPricesMap[internal.EvmChainSelector2].Int,
 				),
-				DataAvFeePriceUSD: mathslib.CalculateUsdPerUnitGas(
-					feeComponentsMap[2].DataAvailabilityFee,
-					nativeTokenPricesMap[2].Int,
+				DataAvFeePriceUSD: internal.MustCalculateUsdPerUnitGas(
+					internal.EvmChainSelector2,
+					feeComponentsMap[internal.EvmChainSelector2].DataAvailabilityFee,
+					nativeTokenPricesMap[internal.EvmChainSelector2].Int,
 				),
 			},
 			Timestamp: ts,
@@ -157,7 +167,7 @@ func TestGetConsensusObservation(t *testing.T) {
 	lggr := logger.Test(t)
 	p := &processor{
 		lggr:      lggr,
-		destChain: 1,
+		destChain: internal.EvmChainSelector,
 		fRoleDON:  1,
 	}
 
@@ -220,7 +230,7 @@ func TestProcessor_Outcome(t *testing.T) {
 				expectedOutcome := Outcome{
 					GasPrices: []cciptypes.GasPriceChain{
 						{
-							ChainSel: 2,
+							ChainSel: internal.EvmChainSelector2,
 							GasPrice: cciptypes.NewBigInt(gas2),
 						},
 					},
@@ -250,39 +260,41 @@ func TestProcessor_Outcome(t *testing.T) {
 			name:                   "happy path with a price deviation",
 			chainFeeWriteFrequency: *commonconfig.MustNewDuration(time.Hour),
 			feeInfo: map[cciptypes.ChainSelector]FeeInfo{
-				1: {
+				internal.EvmChainSelector: {
 					ExecDeviationPPB:             cciptypes.NewBigInt(big.NewInt(1)),
 					DataAvailabilityDeviationPPB: cciptypes.NewBigInt(big.NewInt(1)),
 				},
-				2: {
+				internal.EvmChainSelector2: {
 					ExecDeviationPPB:             cciptypes.NewBigInt(big.NewInt(1)),
 					DataAvailabilityDeviationPPB: cciptypes.NewBigInt(big.NewInt(1)),
 				},
 			},
 			aos: sameObs(numOracles, Observation{
 				FeeComponents: map[cciptypes.ChainSelector]types.ChainFeeComponents{
-					1: {ExecutionFee: big.NewInt(2), DataAvailabilityFee: big.NewInt(1)},
-					2: {ExecutionFee: big.NewInt(2), DataAvailabilityFee: big.NewInt(1)},
+					internal.EvmChainSelector:  {ExecutionFee: big.NewInt(2), DataAvailabilityFee: big.NewInt(1)},
+					internal.EvmChainSelector2: {ExecutionFee: big.NewInt(2), DataAvailabilityFee: big.NewInt(1)},
 				},
 				NativeTokenPrices: map[cciptypes.ChainSelector]cciptypes.BigInt{
-					1: cciptypes.NewBigInt(big.NewInt(2e18)), // <----------- token price increased deviation reached
-					2: cciptypes.NewBigInt(big.NewInt(1e18)), // <----------- token price same deviation not reached
+					// <----------- token price increased deviation reached
+					internal.EvmChainSelector: cciptypes.NewBigInt(big.NewInt(2e18)),
+					// <----------- token price same deviation not reached
+					internal.EvmChainSelector2: cciptypes.NewBigInt(big.NewInt(1e18)),
 				},
 				ChainFeeUpdates: map[cciptypes.ChainSelector]Update{
-					1: {
+					internal.EvmChainSelector: {
 						Timestamp: oneMinuteAgo,
 						ChainFee: ComponentsUSDPrices{
 							ExecutionFeePriceUSD: big.NewInt(2), DataAvFeePriceUSD: big.NewInt(1),
 						},
 					},
-					2: {
+					internal.EvmChainSelector2: {
 						Timestamp: oneMinuteAgo,
 						ChainFee: ComponentsUSDPrices{
 							ExecutionFeePriceUSD: big.NewInt(2), DataAvFeePriceUSD: big.NewInt(1),
 						},
 					},
 				},
-				FChain:       map[cciptypes.ChainSelector]int{1: 1},
+				FChain:       map[cciptypes.ChainSelector]int{internal.EvmChainSelector: 1},
 				TimestampNow: time.Now().UTC(),
 			}),
 			expectedError: false,
@@ -292,7 +304,7 @@ func TestProcessor_Outcome(t *testing.T) {
 				require.True(t, ok)
 				return Outcome{
 					GasPrices: []cciptypes.GasPriceChain{
-						{GasPrice: cciptypes.NewBigInt(exp), ChainSel: 1}, // only chainSel=1
+						{GasPrice: cciptypes.NewBigInt(exp), ChainSel: internal.EvmChainSelector}, // only chainSel=1
 					},
 				}
 			},
@@ -301,7 +313,7 @@ func TestProcessor_Outcome(t *testing.T) {
 			name:                   "deviation check disabled",
 			chainFeeWriteFrequency: *commonconfig.MustNewDuration(time.Hour),
 			feeInfo: map[cciptypes.ChainSelector]FeeInfo{
-				1: {
+				internal.EvmChainSelector: {
 					ExecDeviationPPB:             cciptypes.NewBigInt(big.NewInt(1)),
 					DataAvailabilityDeviationPPB: cciptypes.NewBigInt(big.NewInt(1)),
 					ChainFeeDeviationDisabled:    true,
@@ -309,20 +321,21 @@ func TestProcessor_Outcome(t *testing.T) {
 			},
 			aos: sameObs(numOracles, Observation{
 				FeeComponents: map[cciptypes.ChainSelector]types.ChainFeeComponents{
-					1: {ExecutionFee: big.NewInt(2), DataAvailabilityFee: big.NewInt(1)},
+					internal.EvmChainSelector: {ExecutionFee: big.NewInt(2), DataAvailabilityFee: big.NewInt(1)},
 				},
 				NativeTokenPrices: map[cciptypes.ChainSelector]cciptypes.BigInt{
-					1: cciptypes.NewBigInt(big.NewInt(2e18)), // <----------- token price increased deviation reached
+					// <----------- token price increased deviation reached
+					internal.EvmChainSelector: cciptypes.NewBigInt(big.NewInt(2e18)),
 				},
 				ChainFeeUpdates: map[cciptypes.ChainSelector]Update{
-					1: {
+					internal.EvmChainSelector: {
 						Timestamp: oneMinuteAgo,
 						ChainFee: ComponentsUSDPrices{
 							ExecutionFeePriceUSD: big.NewInt(2), DataAvFeePriceUSD: big.NewInt(1),
 						},
 					},
 				},
-				FChain:       map[cciptypes.ChainSelector]int{1: 1},
+				FChain:       map[cciptypes.ChainSelector]int{internal.EvmChainSelector: 1},
 				TimestampNow: time.Now().UTC(),
 			}),
 			expectedError: false,
@@ -379,7 +392,7 @@ func TestProcessor_Outcome(t *testing.T) {
 			}
 			p := &processor{
 				lggr:      logger.Test(t),
-				destChain: 1,
+				destChain: internal.EvmChainSelector,
 				fRoleDON:  1,
 				cfg: pluginconfig.CommitOffchainConfig{
 					RemoteGasPriceBatchWriteFrequency: tt.chainFeeWriteFrequency,
