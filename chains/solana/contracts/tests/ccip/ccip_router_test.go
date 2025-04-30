@@ -8135,7 +8135,12 @@ func TestCCIPRouter(t *testing.T) {
 				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"writable privilege escalated", "Cross-program invocation with unauthorized signer or writable account"})
 			})
 
-			t.Run("When executing a report with an account with read permissions but sent as write, it succeeds", func(t *testing.T) {
+			t.Run("When executing a report with an account with read permissions but sent as write, it uses the correct permissions", func(t *testing.T) {
+				// This test is to check that the receiver program can execute a message with an account that is configured as readable but sent as writable
+				// This is for a particular case when an account used in the message as read is also sent in the transaction (for example for the token pool program)
+				// as writable. So, the CCIP Receiver program should be able to use the account as readable and NOT as writable.
+				// All the accounts sent in the CPI to the CCIP Receiver must used the writable bitmap declared on source, but the check for that bitmap should be
+				// as flexible to support using the same account with different permissions in the same message.
 				transmitter := getTransmitter()
 
 				msgAccounts := []solana.PublicKey{config.CcipLogicReceiver, config.ReceiverExternalExecutionConfigPDA, config.ReceiverTargetAccountPDA, solana.SystemProgramID}
@@ -8220,8 +8225,8 @@ func TestCCIPRouter(t *testing.T) {
 				instruction, err = raw.ValidateAndBuild()
 				require.NoError(t, err)
 
-				// Fails as it expectes the config.ReceiverExternalExecutionConfigPDA account to be writable
-				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"Error Message: A mut constraint was violated."})
+				// Fails in the CCIP Receiver contract as it expects the config.ReceiverExternalExecutionConfigPDA account to be writable, but it was sent as read only (the same way it was configured on source).
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"Program log: Instruction: CcipReceive Program log: AnchorError caused by account: external_execution_config. Error Code: ConstraintMut. Error Number: 2000. Error Message: A mut constraint was violated."})
 			})
 
 			t.Run("message can be executed with empty Any2SVMRampMessage.Data", func(t *testing.T) {
