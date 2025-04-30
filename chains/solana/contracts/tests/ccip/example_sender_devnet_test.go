@@ -61,6 +61,8 @@ func TestSenderDevnet(t *testing.T) {
 	})
 
 	t.Run("Initialize Sepolia Dest Chain", func(t *testing.T) {
+		t.Skip()
+
 		selector := devnetInfo.ChainSelectors.Sepolia
 
 		ix, err := example_ccip_sender.NewInitChainConfigInstruction(
@@ -80,6 +82,8 @@ func TestSenderDevnet(t *testing.T) {
 	})
 
 	t.Run("Update Sepolia Dest Chain", func(t *testing.T) {
+		t.Skip()
+
 		selector := devnetInfo.ChainSelectors.Sepolia
 
 		ix, err := example_ccip_sender.NewUpdateChainConfigInstruction(
@@ -93,6 +97,33 @@ func TestSenderDevnet(t *testing.T) {
 		).ValidateAndBuild()
 		require.NoError(t, err)
 
+		result := testutils.SendAndConfirm(ctx, t, client, []solana.Instruction{ix}, admin, rpc.CommitmentConfirmed)
+		require.NotNil(t, result)
+		fmt.Printf("Result: %s\n", result.Meta.LogMessages)
+	})
+
+	t.Run("Transfer ownership", func(t *testing.T) {
+		t.Skip()
+
+		ix, err := example_ccip_sender.NewTransferOwnershipInstruction(
+			solana.MustPublicKeyFromBase58("<REPLACE_WITH_NEW_OWNER>"),
+			senderPDAs.state,
+			admin.PublicKey(),
+		).ValidateAndBuild()
+		require.NoError(t, err)
+		result := testutils.SendAndConfirm(ctx, t, client, []solana.Instruction{ix}, admin, rpc.CommitmentConfirmed)
+		require.NotNil(t, result)
+		fmt.Printf("Result: %s\n", result.Meta.LogMessages)
+	})
+
+	t.Run("Accept ownership", func(t *testing.T) {
+		t.Skip()
+
+		ix, err := example_ccip_sender.NewAcceptOwnershipInstruction(
+			senderPDAs.state,
+			admin.PublicKey(), // make sure the admin is the new owner
+		).ValidateAndBuild()
+		require.NoError(t, err)
 		result := testutils.SendAndConfirm(ctx, t, client, []solana.Instruction{ix}, admin, rpc.CommitmentConfirmed)
 		require.NotNil(t, result)
 		fmt.Printf("Result: %s\n", result.Meta.LogMessages)
