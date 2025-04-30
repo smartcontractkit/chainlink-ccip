@@ -3,6 +3,7 @@ package execute
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sort"
 	"time"
 
@@ -349,7 +350,7 @@ func (p *Plugin) getMessagesObservation(
 	//          These messages will not be executed in the current round, but may be executed in future rounds
 	//          (e.g. if gas prices decrease).
 	if len(previousOutcome.CommitReports) == 0 {
-		lggr.Debug("TODO: No reports to execute. This is expected after a cold start.")
+		lggr.Info("No reports to execute. This is expected after a cold start.")
 		// No reports to execute.
 		// This is expected after a cold start.
 		return observation, nil
@@ -421,10 +422,15 @@ func (p *Plugin) getMessagesObservation(
 		// Process each message in the report and override the empty message and token data if everything fits within
 		// the size limits
 		for _, msg := range msgs {
-			// If msg is not already inflight, add it
+			// If a message is inflight or already executed, don't include it fully in the observation
+			// because its already been transmitted in a previous report or executed onchain.
 			if p.inflightMessageCache.IsInflight(srcChain, msg.Header.MessageID) {
 				continue
 			}
+			if slices.Contains(report.ExecutedMessages, msg.Header.SequenceNumber) {
+				continue
+			}
+
 			seqNum := msg.Header.SequenceNumber
 			messageObs[srcChain][seqNum] = msg
 			tkData[srcChain][seqNum] = p.observeTokenDataForMessage(ctx, lggr, msg)
