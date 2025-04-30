@@ -21,6 +21,6 @@ var PlaceholderContractNameMetaData = IPlaceholderContractNameMetaData{
 
 var ZkBytecode = []byte{}
 
-func NewPlaceholderContractName(address common.Address, backend bind.ContractBackend) (*PlaceholderContractName, error) {
+func NewPlaceholderContractName(address common.Address, backend bind.ContractBackend) (*PlaceholderContractName, error) { //nolint:lll // this is a template
 	return nil, nil
 }

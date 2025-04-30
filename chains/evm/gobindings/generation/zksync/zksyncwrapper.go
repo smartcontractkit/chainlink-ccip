@@ -12,7 +12,7 @@ import (
 	"strings"
 )
 
-func ReadBytecodeFromForgeJson(srcFile string) string {
+func ReadBytecodeFromForgeJSON(srcFile string) string {
 	jsonData, err := os.ReadFile(srcFile)
 	if err != nil {
 		panic(err)
