@@ -15,13 +15,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
+	"github.com/smartcontractkit/chainlink-ccip/internal"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	testhelpersrand "github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
@@ -625,9 +624,9 @@ func Test_Builder_Build(t *testing.T) {
 				reports: []exectypes.CommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						sender,
-						cciptypes.Bytes32{},                         // generate a correct root.
+						cciptypes.Bytes32{}, // generate a correct root.
 						[]cciptypes.SeqNum{100, 101, 102, 103, 104}, // executed
-						false,                                       // zeroNonces
+						false, // zeroNonces
 					),
 				},
 			},
@@ -648,9 +647,9 @@ func Test_Builder_Build(t *testing.T) {
 				reports: []exectypes.CommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						sender,
-						cciptypes.Bytes32{},                         // generate a correct root.
+						cciptypes.Bytes32{}, // generate a correct root.
 						[]cciptypes.SeqNum{100, 101, 102, 103, 104}, // executed
-						false,                                       // zeroNonces
+						false, // zeroNonces
 					),
 				},
 			},

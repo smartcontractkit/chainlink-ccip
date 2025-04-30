@@ -486,8 +486,6 @@ func (b *execReportBuilder) verifyReport(
 // returns
 // 1. exec report for the builder
 // 2. updated commit report after marking new messages from the exec report as executed
-//
-//nolint:gocyclo // todo
 func (b *execReportBuilder) buildSingleChainReport(
 	ctx context.Context,
 	commitData exectypes.CommitData,

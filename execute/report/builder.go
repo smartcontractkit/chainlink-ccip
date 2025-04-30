@@ -5,9 +5,10 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 )
 
 var _ ExecReportBuilder = &execReportBuilder{}
@@ -188,9 +189,9 @@ func (b *execReportBuilder) Add(
 		if !b.multipleReportsEnabled {
 			// TODO: this is the previous behavior. Should we return an empty report error?
 			return commitReport, nil
-		} else {
+		} /* else {
 			// TODO: start a new exec report.
-		}
+		}*/
 	}
 
 	// Check which messages are ready to execute and update the report with additional metadata needed for execution.
