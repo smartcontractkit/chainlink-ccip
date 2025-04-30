@@ -8135,6 +8135,100 @@ func TestCCIPRouter(t *testing.T) {
 				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"writable privilege escalated", "Cross-program invocation with unauthorized signer or writable account"})
 			})
 
+			t.Run("When executing a report with an account with read permissions but sent as write, it uses the correct permissions", func(t *testing.T) {
+				// This test is to check that the receiver program can execute a message with an account that is configured as readable but sent as writable
+				// This is for a particular case when an account used in the message as read is also sent in the transaction (for example for the token pool program)
+				// as writable. So, the CCIP Receiver program should be able to use the account as readable and NOT as writable.
+				// All the accounts sent in the CPI to the CCIP Receiver must used the writable bitmap declared on source, but the check for that bitmap should be
+				// as flexible to support using the same account with different permissions in the same message.
+				transmitter := getTransmitter()
+
+				msgAccounts := []solana.PublicKey{config.CcipLogicReceiver, config.ReceiverExternalExecutionConfigPDA, config.ReceiverTargetAccountPDA, solana.SystemProgramID}
+				message, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t, msgAccounts)
+				message.ExtraArgs.IsWritableBitmap = ccip.GenerateBitMapForIndexes([]int{1})
+
+				hash, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress, msgAccounts)
+				require.NoError(t, err)
+
+				root := [32]byte(hash)
+
+				commitReport := ccip_offramp.CommitInput{
+					MerkleRoot: &ccip_offramp.MerkleRoot{
+						SourceChainSelector: config.EvmChainSelector,
+						OnRampAddress:       config.OnRampAddress,
+						MinSeqNr:            message.Header.SequenceNumber,
+						MaxSeqNr:            message.Header.SequenceNumber,
+						MerkleRoot:          root,
+					},
+				}
+				sigs, err := ccip.SignCommitReport(reportContext, commitReport, signers)
+				require.NoError(t, err)
+				rootPDA, err := state.FindOfframpCommitReportPDA(config.EvmChainSelector, root, config.CcipOfframpProgram)
+				require.NoError(t, err)
+
+				instruction, err := ccip_offramp.NewCommitInstruction(
+					reportContext,
+					testutils.MustMarshalBorsh(t, commitReport),
+					sigs.Rs,
+					sigs.Ss,
+					sigs.RawVs,
+					config.OfframpConfigPDA,
+					config.OfframpReferenceAddressesPDA,
+					config.OfframpEvmSourceChainPDA,
+					rootPDA,
+					transmitter.PublicKey(),
+					solana.SystemProgramID,
+					solana.SysVarInstructionsPubkey,
+					config.OfframpBillingSignerPDA,
+					config.FeeQuoterProgram,
+					config.FqAllowedPriceUpdaterOfframpPDA,
+					config.FqConfigPDA,
+					config.RMNRemoteProgram,
+					config.RMNRemoteCursesPDA,
+					config.RMNRemoteConfigPDA,
+				).ValidateAndBuild()
+				require.NoError(t, err)
+				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(300_000))
+				event := common.EventCommitReportAccepted{}
+				require.NoError(t, common.ParseEventCommitReportAccepted(tx.Meta.LogMessages, "CommitReportAccepted", &event))
+
+				executionReport := ccip_offramp.ExecutionReportSingleChain{
+					SourceChainSelector: config.EvmChainSelector,
+					Message:             message,
+					Proofs:              [][32]uint8{}, // single leaf merkle tree
+				}
+				raw := ccip_offramp.NewExecuteInstruction(
+					testutils.MustMarshalBorsh(t, executionReport),
+					reportContext,
+					[]byte{},
+					config.OfframpConfigPDA,
+					config.OfframpReferenceAddressesPDA,
+					config.OfframpEvmSourceChainPDA,
+					rootPDA,
+					config.CcipOfframpProgram,
+					config.AllowedOfframpEvmPDA,
+					transmitter.PublicKey(),
+					solana.SystemProgramID,
+					solana.SysVarInstructionsPubkey,
+					config.RMNRemoteProgram,
+					config.RMNRemoteCursesPDA,
+					config.RMNRemoteConfigPDA,
+				)
+				raw.AccountMetaSlice = append(
+					raw.AccountMetaSlice,
+					solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
+					solana.NewAccountMeta(config.OfframpReceiverExternalExecPDA, false, false),
+					solana.NewAccountMeta(config.ReceiverExternalExecutionConfigPDA, true, false), // index 0 --> configured as readable
+					solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),           // index 1
+					solana.NewAccountMeta(solana.SystemProgramID, false, false),                   // index 2
+				)
+				instruction, err = raw.ValidateAndBuild()
+				require.NoError(t, err)
+
+				// Fails in the CCIP Receiver contract as it expects the config.ReceiverExternalExecutionConfigPDA account to be writable, but it was sent as read only (the same way it was configured on source).
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"Program log: Instruction: CcipReceive Program log: AnchorError caused by account: external_execution_config. Error Code: ConstraintMut. Error Number: 2000. Error Message: A mut constraint was violated."})
+			})
+
 			t.Run("message can be executed with empty Any2SVMRampMessage.Data", func(t *testing.T) {
 				transmitter := getTransmitter()
 
