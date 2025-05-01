@@ -27,6 +27,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/example_ccip_sender"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/execution_buffer"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/rmn_remote"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_ccip_receiver"
@@ -47,6 +48,7 @@ func TestCCIPRouter(t *testing.T) {
 	ccip_offramp.SetProgramID(config.CcipOfframpProgram)
 	example_ccip_sender.SetProgramID(config.CcipBaseSender)
 	rmn_remote.SetProgramID(config.RMNRemoteProgram)
+	execution_buffer.SetProgramID(config.ExecutionBuffer)
 
 	ctx := tests.Context(t)
 	user := solana.MustPrivateKeyFromBase58("ZZdVf32Npuhci4u4ir2NW9491Y3FTv2Gwk41HMpvgJoh81UM42LcNqAN8SXapHfPcr61QP7sJj7K2mKHt7qFCoV")
@@ -9422,6 +9424,176 @@ func TestCCIPRouter(t *testing.T) {
 						require.Equal(t, commitReport.MerkleRoot.MaxSeqNr, rootAccount.MaxMsgNr)
 					})
 				})
+			})
+
+			t.Run("When executing a report with oversized data, it fails, but it succeeds when buffered", func(t *testing.T) {
+				transmitter := getTransmitter()
+
+				msgAccounts := []solana.PublicKey{config.CcipLogicReceiver, config.ReceiverExternalExecutionConfigPDA, config.ReceiverTargetAccountPDA, solana.SystemProgramID}
+
+				sourceChainSelector := config.EvmChainSelector
+				message, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t, msgAccounts)
+				message.Data = bytes.Repeat([]byte{42}, 1000)
+				sequenceNumber := message.Header.SequenceNumber
+				executedSequenceNumber = sequenceNumber // persist this number as executed, for later tests
+
+				hash, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress, msgAccounts)
+				require.NoError(t, err)
+				root, err := ccip.MerkleFrom([][32]byte{[32]byte(hash)})
+
+				commitReport := ccip_offramp.CommitInput{
+					MerkleRoot: &ccip_offramp.MerkleRoot{
+						SourceChainSelector: sourceChainSelector,
+						OnRampAddress:       config.OnRampAddress,
+						MinSeqNr:            sequenceNumber,
+						MaxSeqNr:            sequenceNumber,
+						MerkleRoot:          root,
+					},
+				}
+				sigs, err := ccip.SignCommitReport(reportContext, commitReport, signers)
+				require.NoError(t, err)
+				rootPDA, err := state.FindOfframpCommitReportPDA(config.EvmChainSelector, root, config.CcipOfframpProgram)
+				require.NoError(t, err)
+
+				instruction, err := ccip_offramp.NewCommitInstruction(
+					reportContext,
+					testutils.MustMarshalBorsh(t, commitReport),
+					sigs.Rs,
+					sigs.Ss,
+					sigs.RawVs,
+					config.OfframpConfigPDA,
+					config.OfframpReferenceAddressesPDA,
+					config.OfframpEvmSourceChainPDA,
+					rootPDA,
+					transmitter.PublicKey(),
+					solana.SystemProgramID,
+					solana.SysVarInstructionsPubkey,
+					config.OfframpBillingSignerPDA,
+					config.FeeQuoterProgram,
+					config.FqAllowedPriceUpdaterOfframpPDA,
+					config.FqConfigPDA,
+					config.RMNRemoteProgram,
+					config.RMNRemoteCursesPDA,
+					config.RMNRemoteConfigPDA,
+				).ValidateAndBuild()
+				require.NoError(t, err)
+				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT)) // signature verification compute unit amounts can vary depending on sorting
+				event := common.EventCommitReportAccepted{}
+				require.NoError(t, common.ParseEventCommitReportAccepted(tx.Meta.LogMessages, "CommitReportAccepted", &event))
+
+				executionReport := ccip_offramp.ExecutionReportSingleChain{
+					SourceChainSelector: sourceChainSelector,
+					Message:             message,
+					Proofs:              [][32]uint8{}, // single leaf merkle tree
+				}
+				rawReport := testutils.MustMarshalBorsh(t, executionReport)
+				raw := ccip_offramp.NewExecuteInstruction(
+					rawReport,
+					reportContext,
+					[]byte{},
+					config.OfframpConfigPDA,
+					config.OfframpReferenceAddressesPDA,
+					config.OfframpEvmSourceChainPDA,
+					rootPDA,
+					config.CcipOfframpProgram,
+					config.AllowedOfframpEvmPDA,
+					transmitter.PublicKey(),
+					solana.SystemProgramID,
+					solana.SysVarInstructionsPubkey,
+					config.RMNRemoteProgram,
+					config.RMNRemoteCursesPDA,
+					config.RMNRemoteConfigPDA,
+				)
+
+				raw.AccountMetaSlice = append(
+					raw.AccountMetaSlice,
+					solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
+					solana.NewAccountMeta(config.OfframpReceiverExternalExecPDA, false, false),
+					solana.NewAccountMeta(config.ReceiverExternalExecutionConfigPDA, true, false),
+					solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
+					solana.NewAccountMeta(solana.SystemProgramID, false, false),
+				)
+				instruction, err = raw.ValidateAndBuild()
+				require.NoError(t, err)
+
+				testutils.SendAndFailWithRPCError(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"VersionedTransaction too large"})
+				// We now build a buffer for the report and CPI to the executor instead.
+
+				// Arbitrary number decided by the caller, as long as it's not repeated between reports.
+				bufferId := uint64(0)
+
+				bufferIdLE := common.Uint64ToLE(bufferId)
+				bufferPDA, _, _ := solana.FindProgramAddress([][]byte{[]byte("execution_buffer"), transmitter.PublicKey().Bytes(), bufferIdLE}, config.ExecutionBuffer)
+
+				bufferInitIx, err := execution_buffer.NewInitializeExecutionReportBufferInstruction(bufferId, bufferPDA, transmitter.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+				require.NoError(t, err)
+				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{bufferInitIx}, transmitter, config.DefaultCommitment)
+
+				const chunkSize = 250
+
+				for i := 0; i < len(rawReport); i += chunkSize {
+					end := min(i+chunkSize, len(rawReport))
+
+					chunk := rawReport[i:end]
+
+					appendIx, err := execution_buffer.NewAppendExecutionReportDataInstruction(bufferId, chunk, bufferPDA, transmitter.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+					require.NoError(t, err)
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{appendIx}, transmitter, config.DefaultCommitment)
+				}
+
+				raw2 := execution_buffer.NewManuallyExecuteBufferedInstruction(
+					bufferId,
+					[]byte{},
+					bufferPDA,
+					config.OfframpConfigPDA,
+					config.OfframpReferenceAddressesPDA,
+					config.OfframpEvmSourceChainPDA,
+					rootPDA,
+					config.CcipOfframpProgram,
+					config.AllowedOfframpEvmPDA,
+					config.RMNRemoteProgram,
+					config.RMNRemoteCursesPDA,
+					config.RMNRemoteConfigPDA,
+					solana.SysVarInstructionsPubkey,
+					transmitter.PublicKey(),
+					solana.SystemProgramID,
+				)
+				raw2.AccountMetaSlice = append(
+					raw2.AccountMetaSlice,
+					solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
+					solana.NewAccountMeta(config.OfframpReceiverExternalExecPDA, false, false),
+					solana.NewAccountMeta(config.ReceiverExternalExecutionConfigPDA, true, false),
+					solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
+					solana.NewAccountMeta(solana.SystemProgramID, false, false),
+				)
+
+				bufferedExecutionIx, err := raw2.ValidateAndBuild()
+				require.NoError(t, err)
+				tx = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{bufferedExecutionIx}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(1000000))
+
+				executionEvents, err2 := common.ParseMultipleEvents[ccip.EventExecutionStateChanged](tx.Meta.LogMessages, "ExecutionStateChanged", config.PrintEvents)
+				require.NoError(t, err2)
+
+				require.Equal(t, 2, len(executionEvents))
+				require.Equal(t, config.EvmChainSelector, executionEvents[0].SourceChainSelector)
+				require.Equal(t, message.Header.SequenceNumber, executionEvents[0].SequenceNumber)
+				require.Equal(t, hex.EncodeToString(message.Header.MessageId[:]), hex.EncodeToString(executionEvents[0].MessageID[:]))
+				require.Equal(t, hex.EncodeToString(hash[:]), hex.EncodeToString(executionEvents[0].MessageHash[:]))
+				require.Equal(t, ccip_offramp.InProgress_MessageExecutionState, executionEvents[0].State)
+
+				require.Equal(t, config.EvmChainSelector, executionEvents[1].SourceChainSelector)
+				require.Equal(t, message.Header.SequenceNumber, executionEvents[1].SequenceNumber)
+				require.Equal(t, hex.EncodeToString(message.Header.MessageId[:]), hex.EncodeToString(executionEvents[1].MessageID[:]))
+				require.Equal(t, hex.EncodeToString(hash[:]), hex.EncodeToString(executionEvents[1].MessageHash[:]))
+				require.Equal(t, ccip_offramp.Success_MessageExecutionState, executionEvents[1].State)
+
+				var rootAccount ccip_offramp.CommitReport
+				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, rootPDA, config.DefaultCommitment, &rootAccount)
+				require.NoError(t, err, "failed to get account info")
+				require.NotEqual(t, bin.Uint128{Lo: 0, Hi: 0}, rootAccount.Timestamp)
+				require.Equal(t, bin.Uint128{Lo: 2, Hi: 0}, rootAccount.ExecutionStates)
+				require.Equal(t, commitReport.MerkleRoot.MinSeqNr, rootAccount.MinMsgNr)
+				require.Equal(t, commitReport.MerkleRoot.MaxSeqNr, rootAccount.MaxMsgNr)
 			})
 
 			t.Run("uninitialized token account can be manually executed", func(t *testing.T) {
