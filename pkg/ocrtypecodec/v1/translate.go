@@ -910,8 +910,6 @@ func (t *protoTranslator) execPluginReportsToProto(
 func (t *protoTranslator) execPluginReportsFromProto(
 	pbReports []*ocrtypecodecpb.ExecutePluginReport,
 ) []cciptypes.ExecutePluginReport {
-	// TODO: For backwards compatibility, check for contents in the singleton "Report" field and convert it to "Reports"
-
 	reports := make([]cciptypes.ExecutePluginReport, len(pbReports))
 
 	for i, r := range pbReports {

@@ -87,6 +87,14 @@ func (e *ExecCodecProto) EncodeOutcome(outcome exectypes.Outcome) ([]byte, error
 		ExecutePluginReports: e.tr.execPluginReportsToProto(outcome.Reports),
 	}
 
+	// If there is only one report, use the legacy field. This way new clients can still
+	// form consensus with old ones.
+	// TODO: Remove backwards compatibility code after a few releases.
+	if len(pbObs.ExecutePluginReports) == 1 {
+		pbObs.ExecutePluginReport = pbObs.ExecutePluginReports[0]
+		pbObs.ExecutePluginReports = nil
+	}
+
 	return proto.MarshalOptions{Deterministic: true}.Marshal(pbObs)
 }
 
@@ -102,8 +110,8 @@ func (e *ExecCodecProto) DecodeOutcome(data []byte) (exectypes.Outcome, error) {
 
 	var reports []cciptypes.ExecutePluginReport
 	if pbOutc.ExecutePluginReport != nil {
-		// This is a legacy field, seeing it means that we're in a compatibility mode.
-		// Convert it to the "Reports" format.
+		// Migrate legacy field by wrapping it in a slice and assigning it to the new field.
+		// TODO: Remove temporary migration code after a few releases.
 		reports = e.tr.execPluginReportsFromProto([]*ocrtypecodecpb.ExecutePluginReport{pbOutc.ExecutePluginReport})
 	} else {
 		reports = e.tr.execPluginReportsFromProto(pbOutc.ExecutePluginReports)
