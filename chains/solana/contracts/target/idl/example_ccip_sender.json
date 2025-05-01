@@ -472,5 +472,8 @@
       "name": "InvalidProposedOwner",
       "msg": "Proposed owner is invalid"
     }
-  ]
+  ],
+  "metadata": {
+    "address": "9tuddMwvfb2U1j7HmQVA5mqYYofgoWNYb2eNf4FTtUQD"
+  }
 }

@@ -20,6 +20,8 @@ require (
 )
 
 require (
+	github.com/ethereum/go-ethereum v1.15.10 // indirect
+	github.com/holiman/uint256 v1.3.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	golang.org/x/net v0.37.0 // indirect
 )
@@ -63,7 +65,7 @@ require (
 	go.uber.org/zap v1.27.0 // indirect
 	golang.org/x/sys v0.31.0 // indirect
 	golang.org/x/term v0.30.0 // indirect
-	golang.org/x/time v0.3.0 // indirect
+	golang.org/x/time v0.9.0 // indirect
 	google.golang.org/protobuf v1.35.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

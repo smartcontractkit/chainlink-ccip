@@ -7,7 +7,10 @@ use anchor_spl::{
     token_interface,
 };
 use ccip_router::messages::SVMTokenAmount;
-use solana_program::{address_lookup_table::state::AddressLookupTable, program::invoke_signed};
+use solana_program::{
+    address_lookup_table::state::AddressLookupTable,
+    program::{invoke, invoke_signed},
+};
 
 #[allow(clippy::too_many_arguments)]
 pub fn transfer_to_self_and_approve<'a>(
@@ -15,6 +18,7 @@ pub fn transfer_to_self_and_approve<'a>(
     token_mint: &AccountInfo<'a>,
     from_ata: &AccountInfo<'a>,
     self_ata: &AccountInfo<'a>,
+    user_signer: &AccountInfo<'a>,
     self_signer: &AccountInfo<'a>,
     to_signer: &AccountInfo<'a>,
     seeds: &[&[u8]],
@@ -23,27 +27,27 @@ pub fn transfer_to_self_and_approve<'a>(
 ) -> Result<()> {
     // transfer to this program
     {
-        // build transfer from token_2022 SDK, but set expected token program ID
         let mut ix = transfer_checked(
             &spl_token_2022::ID,
             &from_ata.key(),
             &token_mint.key(),
             &self_ata.key(),
-            &self_signer.key(),
+            &user_signer.key(),
             &[],
             amount,
             decimals,
         )?;
-        ix.program_id = token_program.key(); // allow any custom token program
-        invoke_signed(
+        ix.program_id = token_program.key();
+
+        invoke(
             &ix,
             &[
                 from_ata.clone(),
                 token_mint.clone(),
                 self_ata.clone(),
-                self_signer.clone(),
+                user_signer.clone(),
+                token_program.clone(),
             ],
-            &[seeds],
         )?;
     }
 
@@ -59,7 +63,8 @@ pub fn transfer_to_self_and_approve<'a>(
             amount,
             decimals,
         )?;
-        ix.program_id = token_program.key(); // allow any custom token program
+        ix.program_id = token_program.key();
+
         invoke_signed(
             &ix,
             &[
@@ -67,6 +72,7 @@ pub fn transfer_to_self_and_approve<'a>(
                 token_mint.clone(),
                 to_signer.clone(),
                 self_signer.clone(),
+                token_program.clone(),
             ],
             &[seeds],
         )?;

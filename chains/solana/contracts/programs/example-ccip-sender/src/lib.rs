@@ -9,7 +9,7 @@ use solana_program::{
 
 use ccip_router::messages::{GetFeeResult, SVM2AnyMessage, SVMTokenAmount};
 
-declare_id!("4LfBQWYaU6zQZbDyYjX8pbY4qjzrhoumUFYZEZEqMNhJ");
+declare_id!("9tuddMwvfb2U1j7HmQVA5mqYYofgoWNYb2eNf4FTtUQD");
 
 #[cfg(target_os = "solana")]
 #[global_allocator]
@@ -77,6 +77,7 @@ pub mod example_ccip_sender {
                 acc.mint,
                 acc.from_ata,
                 acc.self_ata,
+                &ctx.accounts.authority.to_account_info(),
                 &ctx.accounts.ccip_sender.to_account_info(),
                 &acc.ccip_router_pool_signer.to_account_info(),
                 seeds,
@@ -142,6 +143,7 @@ pub mod example_ccip_sender {
                 &ctx.accounts.ccip_fee_token_mint.to_account_info(),
                 &ctx.accounts.authority_fee_token_ata.to_account_info(),
                 &ctx.accounts.ccip_fee_token_user_ata.to_account_info(),
+                &ctx.accounts.authority.to_account_info(),
                 &ctx.accounts.ccip_sender.to_account_info(),
                 &ctx.accounts.ccip_fee_billing_signer.to_account_info(),
                 seeds,

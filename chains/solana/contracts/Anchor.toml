@@ -23,9 +23,12 @@ test_token_pool = "JuCcZ4smxAYv9QHJ36jshA7pA3FuQ3vQeWLUeAtZduJ"
 timelock = "DoajfR5tK24xVw51fWcawUZWhAXD8yrBJVacc13neVQA"
 ping_pong_demo = "PPbZmYFf5SPAM9Jhm9mNmYoCwT7icPYVKAfJoMCQovU"
 
+[programs.devnet]
+example_ccip_sender = "2zzXhZX96Z6VtowsdH9chgmZehN31b3AQ6448oWtWqQB"
+
 [registry]
 url = "https://anchor.projectserum.com"
 
 [provider]
-cluster = "Localnet"
+cluster = "devnet"
 wallet = "id.json"
