@@ -561,9 +561,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
     if (!s_feeTokens.contains(message.feeToken)) revert FeeTokenNotSupported(message.feeToken);
 
     uint256 numberOfTokens = message.tokenAmounts.length;
-    uint256 gasLimit = _validateMessageAndResolveGasLimitForDestination(
-      destChainConfig, message.data.length, numberOfTokens, message.extraArgs, message.receiver
-    );
+    uint256 gasLimit = _validateMessageAndResolveGasLimitForDestination(destChainSelector, destChainConfig, message);
 
     // The below call asserts that feeToken is a supported token.
     uint224 feeTokenPrice = _getValidatedTokenPrice(message.feeToken);
@@ -981,18 +979,18 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
 
   /// @notice Validate the forwarded message to ensure it matches the configuration limits (message length, number of
   /// tokens) and family-specific expectations (address format).
+  /// @param destChainSelector The destination chain selector.
   /// @param destChainConfig The destination chain config.
-  /// @param dataLength The length of the data field of the message.
-  /// @param numberOfTokens The number of tokens to be sent.
-  /// @param receiver Message receiver on the dest chain.
+  /// @param message The message to validate.
   /// @return gasLimit The gas limit to use for the message.
   function _validateMessageAndResolveGasLimitForDestination(
+    uint64 destChainSelector,
     DestChainConfig memory destChainConfig,
-    uint256 dataLength,
-    uint256 numberOfTokens,
-    bytes calldata extraArgs,
-    bytes memory receiver
-  ) internal pure returns (uint256 gasLimit) {
+    Client.EVM2AnyMessage calldata message
+  ) internal view returns (uint256 gasLimit) {
+    uint256 dataLength = message.data.length;
+    uint256 numberOfTokens = message.tokenAmounts.length;
+
     // Check that payload is formed correctly.
     if (dataLength > uint256(destChainConfig.maxDataBytes)) {
       revert MessageTooLarge(uint256(destChainConfig.maxDataBytes), dataLength);
@@ -1007,24 +1005,25 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
         || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_APTOS
     ) {
       gasLimit = _parseGenericExtraArgsFromBytes(
-        extraArgs,
+        message.extraArgs,
         destChainConfig.defaultTxGasLimit,
         destChainConfig.maxPerMsgGasLimit,
         destChainConfig.enforceOutOfOrder
       ).gasLimit;
 
-      _validateDestFamilyAddress(destChainConfig.chainFamilySelector, receiver, gasLimit);
+      _validateDestFamilyAddress(destChainConfig.chainFamilySelector, message.receiver, gasLimit);
     } else if (destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SVM) {
-      Client.SVMExtraArgsV1 memory svmExtraArgsV1 =
-        _parseSVMExtraArgsFromBytes(extraArgs, destChainConfig.maxPerMsgGasLimit, destChainConfig.enforceOutOfOrder);
+      Client.SVMExtraArgsV1 memory svmExtraArgsV1 = _parseSVMExtraArgsFromBytes(
+        message.extraArgs, destChainConfig.maxPerMsgGasLimit, destChainConfig.enforceOutOfOrder
+      );
 
       gasLimit = svmExtraArgsV1.computeUnits;
 
-      _validateDestFamilyAddress(destChainConfig.chainFamilySelector, receiver, gasLimit);
+      _validateDestFamilyAddress(destChainConfig.chainFamilySelector, message.receiver, gasLimit);
 
       uint256 accountsLength = svmExtraArgsV1.accounts.length;
       // This abi.decode is safe because the address is validated above.
-      if (accountsLength > 0 && abi.decode(receiver, (uint256)) == 0) {
+      if (accountsLength > 0 && abi.decode(message.receiver, (uint256)) == 0) {
         revert TooManySVMExtraArgsAccounts(accountsLength, 0);
       }
 
@@ -1040,7 +1039,21 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
       // The max payload size for SVM is heavily dependent on the accounts passed into extra args and the number of
       // tokens. Including the token and account overhead allows us to set the maxDataBytes to a higher value.
       uint256 svmExpandedDataLength =
-        dataLength + (accountsLength * 32) + (numberOfTokens * Client.SVM_TOKEN_TRANSFER_OVERHEAD);
+        dataLength + (accountsLength * 32) + (numberOfTokens * Client.SVM_TOKEN_TRANSFER_DATA_OVERHEAD);
+
+      // The token destBytesOverhead can be very different per token so we have to take it into account as well.
+      for (uint256 i = 0; i < numberOfTokens; ++i) {
+        uint256 destBytesOverhead =
+          s_tokenTransferFeeConfig[destChainSelector][message.tokenAmounts[i].token].destBytesOverhead;
+
+        // Pools get Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES by default, but if an override is set we use that instead.
+        if (destBytesOverhead > 0) {
+          svmExpandedDataLength += destBytesOverhead;
+        } else {
+          svmExpandedDataLength += Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES;
+        }
+      }
+
       if (svmExpandedDataLength > uint256(destChainConfig.maxDataBytes)) {
         revert MessageTooLarge(uint256(destChainConfig.maxDataBytes), svmExpandedDataLength);
       }
