@@ -9,7 +9,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1/ocrtypecodecpb"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 var DefaultExecCodec ExecCodec = NewExecCodecProto()
@@ -108,19 +107,17 @@ func (e *ExecCodecProto) DecodeOutcome(data []byte) (exectypes.Outcome, error) {
 		return exectypes.Outcome{}, fmt.Errorf("proto unmarshal ExecOutcome: %w", err)
 	}
 
-	var reports []cciptypes.ExecutePluginReport
-	if pbOutc.ExecutePluginReport != nil {
-		// Migrate legacy field by wrapping it in a slice and assigning it to the new field.
-		// TODO: Remove temporary migration code after a few releases.
-		reports = e.tr.execPluginReportsFromProto([]*ocrtypecodecpb.ExecutePluginReport{pbOutc.ExecutePluginReport})
-	} else {
-		reports = e.tr.execPluginReportsFromProto(pbOutc.ExecutePluginReports)
-	}
-
 	outc := exectypes.Outcome{
 		State:         exectypes.PluginState(pbOutc.PluginState),
 		CommitReports: e.tr.commitDataSliceFromProto(pbOutc.CommitReports),
-		Reports:       reports,
+		Reports:       e.tr.execPluginReportsFromProto(pbOutc.ExecutePluginReports),
+	}
+
+	// Decode the legacy Report field into the new Reports field. This way the plugin layer doesn't
+	// need to worry about type migration.
+	// TODO: Remove temporary migration code after a few releases.
+	if pbOutc.ExecutePluginReport != nil {
+		outc.Reports = e.tr.execPluginReportsFromProto([]*ocrtypecodecpb.ExecutePluginReport{pbOutc.ExecutePluginReport})
 	}
 
 	return outc, nil
