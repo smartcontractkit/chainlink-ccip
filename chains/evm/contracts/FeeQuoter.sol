@@ -1022,24 +1022,25 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
 
       _validateDestFamilyAddress(destChainConfig.chainFamilySelector, receiver, gasLimit);
 
+      uint256 accountsLength = svmExtraArgsV1.accounts.length;
       // This abi.decode is safe because the address is validated above.
-      if (svmExtraArgsV1.accounts.length > 0 && abi.decode(receiver, (uint256)) == 0) {
-        revert TooManySVMExtraArgsAccounts(svmExtraArgsV1.accounts.length, 0);
+      if (accountsLength > 0 && abi.decode(receiver, (uint256)) == 0) {
+        revert TooManySVMExtraArgsAccounts(accountsLength, 0);
       }
 
       if (numberOfTokens > 0 && svmExtraArgsV1.tokenReceiver == bytes32(0)) {
         revert InvalidTokenReceiver();
       }
-      if (svmExtraArgsV1.accounts.length > Client.SVM_EXTRA_ARGS_MAX_ACCOUNTS) {
-        revert TooManySVMExtraArgsAccounts(svmExtraArgsV1.accounts.length, Client.SVM_EXTRA_ARGS_MAX_ACCOUNTS);
+      if (accountsLength > Client.SVM_EXTRA_ARGS_MAX_ACCOUNTS) {
+        revert TooManySVMExtraArgsAccounts(accountsLength, Client.SVM_EXTRA_ARGS_MAX_ACCOUNTS);
       }
-      if (svmExtraArgsV1.accountIsWritableBitmap >> svmExtraArgsV1.accounts.length != 0) {
-        revert InvalidSVMExtraArgsWritableBitmap(svmExtraArgsV1.accountIsWritableBitmap, svmExtraArgsV1.accounts.length);
+      if (svmExtraArgsV1.accountIsWritableBitmap >> accountsLength != 0) {
+        revert InvalidSVMExtraArgsWritableBitmap(svmExtraArgsV1.accountIsWritableBitmap, accountsLength);
       }
       // The max payload size for SVM is heavily dependent on the accounts passed into extra args and the number of
       // tokens. Including the token and account overhead allows us to set the maxDataBytes to a higher value.
       uint256 svmExpandedDataLength =
-        dataLength + (svmExtraArgsV1.accounts.length * 32) + (numberOfTokens * Client.SVM_TOKEN_TRANSFER_OVERHEAD);
+        dataLength + (accountsLength * 32) + (numberOfTokens * Client.SVM_TOKEN_TRANSFER_OVERHEAD);
       if (svmExpandedDataLength > uint256(destChainConfig.maxDataBytes)) {
         revert MessageTooLarge(uint256(destChainConfig.maxDataBytes), svmExpandedDataLength);
       }
