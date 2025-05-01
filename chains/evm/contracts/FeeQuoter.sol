@@ -1012,9 +1012,21 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
         destChainConfig.maxPerMsgGasLimit,
         destChainConfig.enforceOutOfOrder
       ).gasLimit;
+
+      _validateDestFamilyAddress(destChainConfig.chainFamilySelector, receiver, gasLimit);
     } else if (destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SVM) {
       Client.SVMExtraArgsV1 memory svmExtraArgsV1 =
         _parseSVMExtraArgsFromBytes(extraArgs, destChainConfig.maxPerMsgGasLimit, destChainConfig.enforceOutOfOrder);
+
+      gasLimit = svmExtraArgsV1.computeUnits;
+
+      _validateDestFamilyAddress(destChainConfig.chainFamilySelector, receiver, gasLimit);
+
+      // This abi.decode is safe because the address is validated above.
+      if (svmExtraArgsV1.accounts.length > 0 && abi.decode(receiver, (uint256)) == 0) {
+        revert TooManySVMExtraArgsAccounts(svmExtraArgsV1.accounts.length, 0);
+      }
+
       if (numberOfTokens > 0 && svmExtraArgsV1.tokenReceiver == bytes32(0)) {
         revert InvalidTokenReceiver();
       }
@@ -1031,13 +1043,9 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
       if (svmExpandedDataLength > uint256(destChainConfig.maxDataBytes)) {
         revert MessageTooLarge(uint256(destChainConfig.maxDataBytes), svmExpandedDataLength);
       }
-
-      gasLimit = svmExtraArgsV1.computeUnits;
     } else {
       revert InvalidChainFamilySelector(destChainConfig.chainFamilySelector);
     }
-
-    _validateDestFamilyAddress(destChainConfig.chainFamilySelector, receiver, gasLimit);
 
     return gasLimit;
   }
