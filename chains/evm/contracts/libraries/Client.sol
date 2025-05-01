@@ -69,6 +69,14 @@ library Client {
   /// @dev The maximum number of accounts that can be passed in SVMExtraArgs.
   uint256 public constant SVM_EXTRA_ARGS_MAX_ACCOUNTS = 64;
 
+  /// @dev The expected payload size of a token transfer on SVM. Some payloads can be larger as custom extra data
+  /// lengths can be specified. This static value covers the most common use cases where no such override exists.
+  uint256 public constant SVM_TOKEN_TRANSFER_OVERHEAD = (4 + 32) // source_pool
+    + 32 // token_address
+    + 4 // gas_amount
+    + (4 + 32) // extra_data
+    + 32; // amount
+
   function _argsToBytes(
     GenericExtraArgsV2 memory extraArgs
   ) internal pure returns (bytes memory bts) {

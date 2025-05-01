@@ -1024,6 +1024,14 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
       if (svmExtraArgsV1.accountIsWritableBitmap >> svmExtraArgsV1.accounts.length != 0) {
         revert InvalidSVMExtraArgsWritableBitmap(svmExtraArgsV1.accountIsWritableBitmap, svmExtraArgsV1.accounts.length);
       }
+      // The max payload size for SVM is heavily dependent on the accounts passed into extra args and the number of
+      // tokens. Including the token and account overhead allows us to set the maxDataBytes to a higher value.
+      uint256 svmExpandedDataLength =
+        dataLength + (svmExtraArgsV1.accounts.length * 32) + (numberOfTokens * Client.SVM_TOKEN_TRANSFER_OVERHEAD);
+      if (svmExpandedDataLength > uint256(destChainConfig.maxDataBytes)) {
+        revert MessageTooLarge(uint256(destChainConfig.maxDataBytes), svmExpandedDataLength);
+      }
+
       gasLimit = svmExtraArgsV1.computeUnits;
     } else {
       revert InvalidChainFamilySelector(destChainConfig.chainFamilySelector);
