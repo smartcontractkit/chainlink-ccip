@@ -329,6 +329,8 @@ func (p *Plugin) getPriceRelatedObservations(
 	// If we still wait for price updates to make it onchain, check if the latest price report made it through.
 	if waitingForPriceUpdatesToMakeItOnchain {
 		latestPriceOcrSeqNum, err := p.ccipReader.GetLatestPriceSeqNr(ctx)
+		lggr.Infow("onChain price ocr seq num", "seqNum", latestPriceOcrSeqNum, "err", err)
+
 		if err != nil {
 			lggr.Errorw("get latest price sequence number", "err", err)
 			// Observe fChain so we don't get cryptic fChain errors in the outcome phase.
