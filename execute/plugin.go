@@ -358,6 +358,11 @@ func (p *Plugin) ValidateObservation(
 		return fmt.Errorf("unable to decode previous outcome: %w", err)
 	}
 
+	// TODO: Support "Reports" field.
+	if len(previousOutcome.Reports) > 0 {
+		previousOutcome.Report = previousOutcome.Reports[0]
+	}
+
 	supportedChains, err := p.supportedChains(ao.Observer)
 	if err != nil {
 		return fmt.Errorf("error finding supported chains by node: %w", err)
@@ -557,6 +562,11 @@ func (p *Plugin) Reports(
 	decodedOutcome, err := p.ocrTypeCodec.DecodeOutcome(outcome)
 	if err != nil {
 		return nil, fmt.Errorf("unable to decode outcome: %w", err)
+	}
+
+	// TODO: Support "Reports" field.
+	if len(decodedOutcome.Reports) > 0 {
+		decodedOutcome.Report = decodedOutcome.Reports[0]
 	}
 
 	if len(decodedOutcome.Report.ChainReports) == 0 {
