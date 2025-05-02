@@ -328,9 +328,10 @@ type ExecOutcome struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	PluginState         string               `protobuf:"bytes,1,opt,name=plugin_state,json=pluginState,proto3" json:"plugin_state,omitempty"`
-	CommitReports       []*CommitData        `protobuf:"bytes,2,rep,name=commit_reports,json=commitReports,proto3" json:"commit_reports,omitempty"`
-	ExecutePluginReport *ExecutePluginReport `protobuf:"bytes,3,opt,name=execute_plugin_report,json=executePluginReport,proto3" json:"execute_plugin_report,omitempty"`
+	PluginState          string                 `protobuf:"bytes,1,opt,name=plugin_state,json=pluginState,proto3" json:"plugin_state,omitempty"`
+	CommitReports        []*CommitData          `protobuf:"bytes,2,rep,name=commit_reports,json=commitReports,proto3" json:"commit_reports,omitempty"`
+	ExecutePluginReport  *ExecutePluginReport   `protobuf:"bytes,3,opt,name=execute_plugin_report,json=executePluginReport,proto3" json:"execute_plugin_report,omitempty"`
+	ExecutePluginReports []*ExecutePluginReport `protobuf:"bytes,4,rep,name=execute_plugin_reports,json=executePluginReports,proto3" json:"execute_plugin_reports,omitempty"`
 }
 
 func (x *ExecOutcome) Reset() {
@@ -382,6 +383,13 @@ func (x *ExecOutcome) GetCommitReports() []*CommitData {
 func (x *ExecOutcome) GetExecutePluginReport() *ExecutePluginReport {
 	if x != nil {
 		return x.ExecutePluginReport
+	}
+	return nil
+}
+
+func (x *ExecOutcome) GetExecutePluginReports() []*ExecutePluginReport {
+	if x != nil {
+		return x.ExecutePluginReports
 	}
 	return nil
 }
@@ -3068,7 +3076,7 @@ var file_pkg_ocrtypecodec_v1_ocrtypes_proto_rawDesc = []byte{
 	0x61, 0x69, 0x6e, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x12, 0x10, 0x0a, 0x03, 0x6b, 0x65, 0x79, 0x18,
 	0x01, 0x20, 0x01, 0x28, 0x04, 0x52, 0x03, 0x6b, 0x65, 0x79, 0x12, 0x14, 0x0a, 0x05, 0x76, 0x61,
 	0x6c, 0x75, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x05, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65,
-	0x3a, 0x02, 0x38, 0x01, 0x22, 0xd6, 0x01, 0x0a, 0x0b, 0x45, 0x78, 0x65, 0x63, 0x4f, 0x75, 0x74,
+	0x3a, 0x02, 0x38, 0x01, 0x22, 0xb6, 0x02, 0x0a, 0x0b, 0x45, 0x78, 0x65, 0x63, 0x4f, 0x75, 0x74,
 	0x63, 0x6f, 0x6d, 0x65, 0x12, 0x21, 0x0a, 0x0c, 0x70, 0x6c, 0x75, 0x67, 0x69, 0x6e, 0x5f, 0x73,
 	0x74, 0x61, 0x74, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0b, 0x70, 0x6c, 0x75, 0x67,
 	0x69, 0x6e, 0x53, 0x74, 0x61, 0x74, 0x65, 0x12, 0x46, 0x0a, 0x0e, 0x63, 0x6f, 0x6d, 0x6d, 0x69,
@@ -3081,7 +3089,13 @@ var file_pkg_ocrtypecodec_v1_ocrtypes_proto_rawDesc = []byte{
 	0x2e, 0x70, 0x6b, 0x67, 0x2e, 0x6f, 0x63, 0x72, 0x74, 0x79, 0x70, 0x65, 0x63, 0x6f, 0x64, 0x65,
 	0x63, 0x2e, 0x76, 0x31, 0x2e, 0x45, 0x78, 0x65, 0x63, 0x75, 0x74, 0x65, 0x50, 0x6c, 0x75, 0x67,
 	0x69, 0x6e, 0x52, 0x65, 0x70, 0x6f, 0x72, 0x74, 0x52, 0x13, 0x65, 0x78, 0x65, 0x63, 0x75, 0x74,
-	0x65, 0x50, 0x6c, 0x75, 0x67, 0x69, 0x6e, 0x52, 0x65, 0x70, 0x6f, 0x72, 0x74, 0x22, 0x91, 0x01,
+	0x65, 0x50, 0x6c, 0x75, 0x67, 0x69, 0x6e, 0x52, 0x65, 0x70, 0x6f, 0x72, 0x74, 0x12, 0x5e, 0x0a,
+	0x16, 0x65, 0x78, 0x65, 0x63, 0x75, 0x74, 0x65, 0x5f, 0x70, 0x6c, 0x75, 0x67, 0x69, 0x6e, 0x5f,
+	0x72, 0x65, 0x70, 0x6f, 0x72, 0x74, 0x73, 0x18, 0x04, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x28, 0x2e,
+	0x70, 0x6b, 0x67, 0x2e, 0x6f, 0x63, 0x72, 0x74, 0x79, 0x70, 0x65, 0x63, 0x6f, 0x64, 0x65, 0x63,
+	0x2e, 0x76, 0x31, 0x2e, 0x45, 0x78, 0x65, 0x63, 0x75, 0x74, 0x65, 0x50, 0x6c, 0x75, 0x67, 0x69,
+	0x6e, 0x52, 0x65, 0x70, 0x6f, 0x72, 0x74, 0x52, 0x14, 0x65, 0x78, 0x65, 0x63, 0x75, 0x74, 0x65,
+	0x50, 0x6c, 0x75, 0x67, 0x69, 0x6e, 0x52, 0x65, 0x70, 0x6f, 0x72, 0x74, 0x73, 0x22, 0x91, 0x01,
 	0x0a, 0x0f, 0x4d, 0x65, 0x72, 0x6b, 0x6c, 0x65, 0x52, 0x6f, 0x6f, 0x74, 0x51, 0x75, 0x65, 0x72,
 	0x79, 0x12, 0x30, 0x0a, 0x14, 0x72, 0x65, 0x74, 0x72, 0x79, 0x5f, 0x72, 0x6d, 0x6e, 0x5f, 0x73,
 	0x69, 0x67, 0x6e, 0x61, 0x74, 0x75, 0x72, 0x65, 0x73, 0x18, 0x01, 0x20, 0x01, 0x28, 0x08, 0x52,
@@ -3753,76 +3767,77 @@ var file_pkg_ocrtypecodec_v1_ocrtypes_proto_depIdxs = []int32{
 	51, // 16: pkg.ocrtypecodec.v1.ExecObservation.f_chain:type_name -> pkg.ocrtypecodec.v1.ExecObservation.FChainEntry
 	26, // 17: pkg.ocrtypecodec.v1.ExecOutcome.commit_reports:type_name -> pkg.ocrtypecodec.v1.CommitData
 	37, // 18: pkg.ocrtypecodec.v1.ExecOutcome.execute_plugin_report:type_name -> pkg.ocrtypecodec.v1.ExecutePluginReport
-	6,  // 19: pkg.ocrtypecodec.v1.MerkleRootQuery.rmn_signatures:type_name -> pkg.ocrtypecodec.v1.ReportSignatures
-	7,  // 20: pkg.ocrtypecodec.v1.ReportSignatures.signatures:type_name -> pkg.ocrtypecodec.v1.SignatureEcdsa
-	8,  // 21: pkg.ocrtypecodec.v1.ReportSignatures.lane_updates:type_name -> pkg.ocrtypecodec.v1.DestChainUpdate
-	43, // 22: pkg.ocrtypecodec.v1.DestChainUpdate.lane_source:type_name -> pkg.ocrtypecodec.v1.SourceChainMeta
-	40, // 23: pkg.ocrtypecodec.v1.DestChainUpdate.seq_num_range:type_name -> pkg.ocrtypecodec.v1.SeqNumRange
-	44, // 24: pkg.ocrtypecodec.v1.MerkleRootObservation.merkle_roots:type_name -> pkg.ocrtypecodec.v1.MerkleRootChain
-	52, // 25: pkg.ocrtypecodec.v1.MerkleRootObservation.rmn_enabled_chains:type_name -> pkg.ocrtypecodec.v1.MerkleRootObservation.RmnEnabledChainsEntry
-	41, // 26: pkg.ocrtypecodec.v1.MerkleRootObservation.on_ramp_max_seq_nums:type_name -> pkg.ocrtypecodec.v1.SeqNumChain
-	41, // 27: pkg.ocrtypecodec.v1.MerkleRootObservation.off_ramp_next_seq_nums:type_name -> pkg.ocrtypecodec.v1.SeqNumChain
-	10, // 28: pkg.ocrtypecodec.v1.MerkleRootObservation.rmn_remote_config:type_name -> pkg.ocrtypecodec.v1.RmnRemoteConfig
-	53, // 29: pkg.ocrtypecodec.v1.MerkleRootObservation.f_chain:type_name -> pkg.ocrtypecodec.v1.MerkleRootObservation.FChainEntry
-	11, // 30: pkg.ocrtypecodec.v1.RmnRemoteConfig.signers:type_name -> pkg.ocrtypecodec.v1.RemoteSignerInfo
-	54, // 31: pkg.ocrtypecodec.v1.TokenPriceObservation.feed_token_prices:type_name -> pkg.ocrtypecodec.v1.TokenPriceObservation.FeedTokenPricesEntry
-	55, // 32: pkg.ocrtypecodec.v1.TokenPriceObservation.fee_quoter_token_updates:type_name -> pkg.ocrtypecodec.v1.TokenPriceObservation.FeeQuoterTokenUpdatesEntry
-	56, // 33: pkg.ocrtypecodec.v1.TokenPriceObservation.f_chain:type_name -> pkg.ocrtypecodec.v1.TokenPriceObservation.FChainEntry
-	71, // 34: pkg.ocrtypecodec.v1.TokenPriceObservation.timestamp:type_name -> google.protobuf.Timestamp
-	57, // 35: pkg.ocrtypecodec.v1.ChainFeeObservation.fee_components:type_name -> pkg.ocrtypecodec.v1.ChainFeeObservation.FeeComponentsEntry
-	58, // 36: pkg.ocrtypecodec.v1.ChainFeeObservation.native_token_prices:type_name -> pkg.ocrtypecodec.v1.ChainFeeObservation.NativeTokenPricesEntry
-	59, // 37: pkg.ocrtypecodec.v1.ChainFeeObservation.chain_fee_updates:type_name -> pkg.ocrtypecodec.v1.ChainFeeObservation.ChainFeeUpdatesEntry
-	60, // 38: pkg.ocrtypecodec.v1.ChainFeeObservation.f_chain:type_name -> pkg.ocrtypecodec.v1.ChainFeeObservation.FChainEntry
-	71, // 39: pkg.ocrtypecodec.v1.ChainFeeObservation.timestamp_now:type_name -> google.protobuf.Timestamp
-	16, // 40: pkg.ocrtypecodec.v1.ChainFeeUpdate.chain_fee:type_name -> pkg.ocrtypecodec.v1.ComponentsUSDPrices
-	71, // 41: pkg.ocrtypecodec.v1.ChainFeeUpdate.timestamp:type_name -> google.protobuf.Timestamp
-	61, // 42: pkg.ocrtypecodec.v1.DiscoveryObservation.f_chain:type_name -> pkg.ocrtypecodec.v1.DiscoveryObservation.FChainEntry
-	18, // 43: pkg.ocrtypecodec.v1.DiscoveryObservation.contract_names:type_name -> pkg.ocrtypecodec.v1.ContractNameChainAddresses
-	62, // 44: pkg.ocrtypecodec.v1.ContractNameChainAddresses.addresses:type_name -> pkg.ocrtypecodec.v1.ContractNameChainAddresses.AddressesEntry
-	63, // 45: pkg.ocrtypecodec.v1.ChainAddressMap.chain_addresses:type_name -> pkg.ocrtypecodec.v1.ChainAddressMap.ChainAddressesEntry
-	42, // 46: pkg.ocrtypecodec.v1.MerkleRootOutcome.ranges_selected_for_report:type_name -> pkg.ocrtypecodec.v1.ChainRange
-	44, // 47: pkg.ocrtypecodec.v1.MerkleRootOutcome.roots_to_report:type_name -> pkg.ocrtypecodec.v1.MerkleRootChain
-	64, // 48: pkg.ocrtypecodec.v1.MerkleRootOutcome.rmn_enabled_chains:type_name -> pkg.ocrtypecodec.v1.MerkleRootOutcome.RmnEnabledChainsEntry
-	41, // 49: pkg.ocrtypecodec.v1.MerkleRootOutcome.off_ramp_next_seq_nums:type_name -> pkg.ocrtypecodec.v1.SeqNumChain
-	7,  // 50: pkg.ocrtypecodec.v1.MerkleRootOutcome.rmn_report_signatures:type_name -> pkg.ocrtypecodec.v1.SignatureEcdsa
-	10, // 51: pkg.ocrtypecodec.v1.MerkleRootOutcome.rmn_remote_cfg:type_name -> pkg.ocrtypecodec.v1.RmnRemoteConfig
-	65, // 52: pkg.ocrtypecodec.v1.TokenPriceOutcome.token_prices:type_name -> pkg.ocrtypecodec.v1.TokenPriceOutcome.TokenPricesEntry
-	23, // 53: pkg.ocrtypecodec.v1.ChainFeeOutcome.gas_prices:type_name -> pkg.ocrtypecodec.v1.GasPriceChain
-	26, // 54: pkg.ocrtypecodec.v1.CommitObservations.commit_data:type_name -> pkg.ocrtypecodec.v1.CommitData
-	71, // 55: pkg.ocrtypecodec.v1.CommitData.timestamp:type_name -> google.protobuf.Timestamp
-	40, // 56: pkg.ocrtypecodec.v1.CommitData.sequence_number_range:type_name -> pkg.ocrtypecodec.v1.SeqNumRange
-	33, // 57: pkg.ocrtypecodec.v1.CommitData.messages:type_name -> pkg.ocrtypecodec.v1.Message
-	27, // 58: pkg.ocrtypecodec.v1.CommitData.message_token_data:type_name -> pkg.ocrtypecodec.v1.MessageTokenData
-	28, // 59: pkg.ocrtypecodec.v1.MessageTokenData.token_data:type_name -> pkg.ocrtypecodec.v1.TokenData
-	66, // 60: pkg.ocrtypecodec.v1.SeqNumToMessage.messages:type_name -> pkg.ocrtypecodec.v1.SeqNumToMessage.MessagesEntry
-	67, // 61: pkg.ocrtypecodec.v1.SeqNumToBytes.seq_num_to_bytes:type_name -> pkg.ocrtypecodec.v1.SeqNumToBytes.SeqNumToBytesEntry
-	68, // 62: pkg.ocrtypecodec.v1.TokenDataObservations.token_data:type_name -> pkg.ocrtypecodec.v1.TokenDataObservations.TokenDataEntry
-	69, // 63: pkg.ocrtypecodec.v1.SeqNumToTokenData.token_data:type_name -> pkg.ocrtypecodec.v1.SeqNumToTokenData.TokenDataEntry
-	34, // 64: pkg.ocrtypecodec.v1.Message.header:type_name -> pkg.ocrtypecodec.v1.RampMessageHeader
-	35, // 65: pkg.ocrtypecodec.v1.Message.token_amounts:type_name -> pkg.ocrtypecodec.v1.RampTokenAmount
-	70, // 66: pkg.ocrtypecodec.v1.StringAddrToNonce.nonces:type_name -> pkg.ocrtypecodec.v1.StringAddrToNonce.NoncesEntry
-	38, // 67: pkg.ocrtypecodec.v1.ExecutePluginReport.chain_reports:type_name -> pkg.ocrtypecodec.v1.ChainReport
-	33, // 68: pkg.ocrtypecodec.v1.ChainReport.messages:type_name -> pkg.ocrtypecodec.v1.Message
-	39, // 69: pkg.ocrtypecodec.v1.ChainReport.offchain_token_data:type_name -> pkg.ocrtypecodec.v1.RepeatedBytes
-	40, // 70: pkg.ocrtypecodec.v1.ChainRange.seq_num_range:type_name -> pkg.ocrtypecodec.v1.SeqNumRange
-	40, // 71: pkg.ocrtypecodec.v1.MerkleRootChain.seq_nums_range:type_name -> pkg.ocrtypecodec.v1.SeqNumRange
-	71, // 72: pkg.ocrtypecodec.v1.TimestampedBig.timestamp:type_name -> google.protobuf.Timestamp
-	25, // 73: pkg.ocrtypecodec.v1.ExecObservation.CommitReportsEntry.value:type_name -> pkg.ocrtypecodec.v1.CommitObservations
-	29, // 74: pkg.ocrtypecodec.v1.ExecObservation.SeqNumsToMsgsEntry.value:type_name -> pkg.ocrtypecodec.v1.SeqNumToMessage
-	30, // 75: pkg.ocrtypecodec.v1.ExecObservation.MsgHashesEntry.value:type_name -> pkg.ocrtypecodec.v1.SeqNumToBytes
-	36, // 76: pkg.ocrtypecodec.v1.ExecObservation.NoncesEntry.value:type_name -> pkg.ocrtypecodec.v1.StringAddrToNonce
-	45, // 77: pkg.ocrtypecodec.v1.TokenPriceObservation.FeeQuoterTokenUpdatesEntry.value:type_name -> pkg.ocrtypecodec.v1.TimestampedBig
-	14, // 78: pkg.ocrtypecodec.v1.ChainFeeObservation.FeeComponentsEntry.value:type_name -> pkg.ocrtypecodec.v1.ChainFeeComponents
-	15, // 79: pkg.ocrtypecodec.v1.ChainFeeObservation.ChainFeeUpdatesEntry.value:type_name -> pkg.ocrtypecodec.v1.ChainFeeUpdate
-	19, // 80: pkg.ocrtypecodec.v1.ContractNameChainAddresses.AddressesEntry.value:type_name -> pkg.ocrtypecodec.v1.ChainAddressMap
-	33, // 81: pkg.ocrtypecodec.v1.SeqNumToMessage.MessagesEntry.value:type_name -> pkg.ocrtypecodec.v1.Message
-	32, // 82: pkg.ocrtypecodec.v1.TokenDataObservations.TokenDataEntry.value:type_name -> pkg.ocrtypecodec.v1.SeqNumToTokenData
-	27, // 83: pkg.ocrtypecodec.v1.SeqNumToTokenData.TokenDataEntry.value:type_name -> pkg.ocrtypecodec.v1.MessageTokenData
-	84, // [84:84] is the sub-list for method output_type
-	84, // [84:84] is the sub-list for method input_type
-	84, // [84:84] is the sub-list for extension type_name
-	84, // [84:84] is the sub-list for extension extendee
-	0,  // [0:84] is the sub-list for field type_name
+	37, // 19: pkg.ocrtypecodec.v1.ExecOutcome.execute_plugin_reports:type_name -> pkg.ocrtypecodec.v1.ExecutePluginReport
+	6,  // 20: pkg.ocrtypecodec.v1.MerkleRootQuery.rmn_signatures:type_name -> pkg.ocrtypecodec.v1.ReportSignatures
+	7,  // 21: pkg.ocrtypecodec.v1.ReportSignatures.signatures:type_name -> pkg.ocrtypecodec.v1.SignatureEcdsa
+	8,  // 22: pkg.ocrtypecodec.v1.ReportSignatures.lane_updates:type_name -> pkg.ocrtypecodec.v1.DestChainUpdate
+	43, // 23: pkg.ocrtypecodec.v1.DestChainUpdate.lane_source:type_name -> pkg.ocrtypecodec.v1.SourceChainMeta
+	40, // 24: pkg.ocrtypecodec.v1.DestChainUpdate.seq_num_range:type_name -> pkg.ocrtypecodec.v1.SeqNumRange
+	44, // 25: pkg.ocrtypecodec.v1.MerkleRootObservation.merkle_roots:type_name -> pkg.ocrtypecodec.v1.MerkleRootChain
+	52, // 26: pkg.ocrtypecodec.v1.MerkleRootObservation.rmn_enabled_chains:type_name -> pkg.ocrtypecodec.v1.MerkleRootObservation.RmnEnabledChainsEntry
+	41, // 27: pkg.ocrtypecodec.v1.MerkleRootObservation.on_ramp_max_seq_nums:type_name -> pkg.ocrtypecodec.v1.SeqNumChain
+	41, // 28: pkg.ocrtypecodec.v1.MerkleRootObservation.off_ramp_next_seq_nums:type_name -> pkg.ocrtypecodec.v1.SeqNumChain
+	10, // 29: pkg.ocrtypecodec.v1.MerkleRootObservation.rmn_remote_config:type_name -> pkg.ocrtypecodec.v1.RmnRemoteConfig
+	53, // 30: pkg.ocrtypecodec.v1.MerkleRootObservation.f_chain:type_name -> pkg.ocrtypecodec.v1.MerkleRootObservation.FChainEntry
+	11, // 31: pkg.ocrtypecodec.v1.RmnRemoteConfig.signers:type_name -> pkg.ocrtypecodec.v1.RemoteSignerInfo
+	54, // 32: pkg.ocrtypecodec.v1.TokenPriceObservation.feed_token_prices:type_name -> pkg.ocrtypecodec.v1.TokenPriceObservation.FeedTokenPricesEntry
+	55, // 33: pkg.ocrtypecodec.v1.TokenPriceObservation.fee_quoter_token_updates:type_name -> pkg.ocrtypecodec.v1.TokenPriceObservation.FeeQuoterTokenUpdatesEntry
+	56, // 34: pkg.ocrtypecodec.v1.TokenPriceObservation.f_chain:type_name -> pkg.ocrtypecodec.v1.TokenPriceObservation.FChainEntry
+	71, // 35: pkg.ocrtypecodec.v1.TokenPriceObservation.timestamp:type_name -> google.protobuf.Timestamp
+	57, // 36: pkg.ocrtypecodec.v1.ChainFeeObservation.fee_components:type_name -> pkg.ocrtypecodec.v1.ChainFeeObservation.FeeComponentsEntry
+	58, // 37: pkg.ocrtypecodec.v1.ChainFeeObservation.native_token_prices:type_name -> pkg.ocrtypecodec.v1.ChainFeeObservation.NativeTokenPricesEntry
+	59, // 38: pkg.ocrtypecodec.v1.ChainFeeObservation.chain_fee_updates:type_name -> pkg.ocrtypecodec.v1.ChainFeeObservation.ChainFeeUpdatesEntry
+	60, // 39: pkg.ocrtypecodec.v1.ChainFeeObservation.f_chain:type_name -> pkg.ocrtypecodec.v1.ChainFeeObservation.FChainEntry
+	71, // 40: pkg.ocrtypecodec.v1.ChainFeeObservation.timestamp_now:type_name -> google.protobuf.Timestamp
+	16, // 41: pkg.ocrtypecodec.v1.ChainFeeUpdate.chain_fee:type_name -> pkg.ocrtypecodec.v1.ComponentsUSDPrices
+	71, // 42: pkg.ocrtypecodec.v1.ChainFeeUpdate.timestamp:type_name -> google.protobuf.Timestamp
+	61, // 43: pkg.ocrtypecodec.v1.DiscoveryObservation.f_chain:type_name -> pkg.ocrtypecodec.v1.DiscoveryObservation.FChainEntry
+	18, // 44: pkg.ocrtypecodec.v1.DiscoveryObservation.contract_names:type_name -> pkg.ocrtypecodec.v1.ContractNameChainAddresses
+	62, // 45: pkg.ocrtypecodec.v1.ContractNameChainAddresses.addresses:type_name -> pkg.ocrtypecodec.v1.ContractNameChainAddresses.AddressesEntry
+	63, // 46: pkg.ocrtypecodec.v1.ChainAddressMap.chain_addresses:type_name -> pkg.ocrtypecodec.v1.ChainAddressMap.ChainAddressesEntry
+	42, // 47: pkg.ocrtypecodec.v1.MerkleRootOutcome.ranges_selected_for_report:type_name -> pkg.ocrtypecodec.v1.ChainRange
+	44, // 48: pkg.ocrtypecodec.v1.MerkleRootOutcome.roots_to_report:type_name -> pkg.ocrtypecodec.v1.MerkleRootChain
+	64, // 49: pkg.ocrtypecodec.v1.MerkleRootOutcome.rmn_enabled_chains:type_name -> pkg.ocrtypecodec.v1.MerkleRootOutcome.RmnEnabledChainsEntry
+	41, // 50: pkg.ocrtypecodec.v1.MerkleRootOutcome.off_ramp_next_seq_nums:type_name -> pkg.ocrtypecodec.v1.SeqNumChain
+	7,  // 51: pkg.ocrtypecodec.v1.MerkleRootOutcome.rmn_report_signatures:type_name -> pkg.ocrtypecodec.v1.SignatureEcdsa
+	10, // 52: pkg.ocrtypecodec.v1.MerkleRootOutcome.rmn_remote_cfg:type_name -> pkg.ocrtypecodec.v1.RmnRemoteConfig
+	65, // 53: pkg.ocrtypecodec.v1.TokenPriceOutcome.token_prices:type_name -> pkg.ocrtypecodec.v1.TokenPriceOutcome.TokenPricesEntry
+	23, // 54: pkg.ocrtypecodec.v1.ChainFeeOutcome.gas_prices:type_name -> pkg.ocrtypecodec.v1.GasPriceChain
+	26, // 55: pkg.ocrtypecodec.v1.CommitObservations.commit_data:type_name -> pkg.ocrtypecodec.v1.CommitData
+	71, // 56: pkg.ocrtypecodec.v1.CommitData.timestamp:type_name -> google.protobuf.Timestamp
+	40, // 57: pkg.ocrtypecodec.v1.CommitData.sequence_number_range:type_name -> pkg.ocrtypecodec.v1.SeqNumRange
+	33, // 58: pkg.ocrtypecodec.v1.CommitData.messages:type_name -> pkg.ocrtypecodec.v1.Message
+	27, // 59: pkg.ocrtypecodec.v1.CommitData.message_token_data:type_name -> pkg.ocrtypecodec.v1.MessageTokenData
+	28, // 60: pkg.ocrtypecodec.v1.MessageTokenData.token_data:type_name -> pkg.ocrtypecodec.v1.TokenData
+	66, // 61: pkg.ocrtypecodec.v1.SeqNumToMessage.messages:type_name -> pkg.ocrtypecodec.v1.SeqNumToMessage.MessagesEntry
+	67, // 62: pkg.ocrtypecodec.v1.SeqNumToBytes.seq_num_to_bytes:type_name -> pkg.ocrtypecodec.v1.SeqNumToBytes.SeqNumToBytesEntry
+	68, // 63: pkg.ocrtypecodec.v1.TokenDataObservations.token_data:type_name -> pkg.ocrtypecodec.v1.TokenDataObservations.TokenDataEntry
+	69, // 64: pkg.ocrtypecodec.v1.SeqNumToTokenData.token_data:type_name -> pkg.ocrtypecodec.v1.SeqNumToTokenData.TokenDataEntry
+	34, // 65: pkg.ocrtypecodec.v1.Message.header:type_name -> pkg.ocrtypecodec.v1.RampMessageHeader
+	35, // 66: pkg.ocrtypecodec.v1.Message.token_amounts:type_name -> pkg.ocrtypecodec.v1.RampTokenAmount
+	70, // 67: pkg.ocrtypecodec.v1.StringAddrToNonce.nonces:type_name -> pkg.ocrtypecodec.v1.StringAddrToNonce.NoncesEntry
+	38, // 68: pkg.ocrtypecodec.v1.ExecutePluginReport.chain_reports:type_name -> pkg.ocrtypecodec.v1.ChainReport
+	33, // 69: pkg.ocrtypecodec.v1.ChainReport.messages:type_name -> pkg.ocrtypecodec.v1.Message
+	39, // 70: pkg.ocrtypecodec.v1.ChainReport.offchain_token_data:type_name -> pkg.ocrtypecodec.v1.RepeatedBytes
+	40, // 71: pkg.ocrtypecodec.v1.ChainRange.seq_num_range:type_name -> pkg.ocrtypecodec.v1.SeqNumRange
+	40, // 72: pkg.ocrtypecodec.v1.MerkleRootChain.seq_nums_range:type_name -> pkg.ocrtypecodec.v1.SeqNumRange
+	71, // 73: pkg.ocrtypecodec.v1.TimestampedBig.timestamp:type_name -> google.protobuf.Timestamp
+	25, // 74: pkg.ocrtypecodec.v1.ExecObservation.CommitReportsEntry.value:type_name -> pkg.ocrtypecodec.v1.CommitObservations
+	29, // 75: pkg.ocrtypecodec.v1.ExecObservation.SeqNumsToMsgsEntry.value:type_name -> pkg.ocrtypecodec.v1.SeqNumToMessage
+	30, // 76: pkg.ocrtypecodec.v1.ExecObservation.MsgHashesEntry.value:type_name -> pkg.ocrtypecodec.v1.SeqNumToBytes
+	36, // 77: pkg.ocrtypecodec.v1.ExecObservation.NoncesEntry.value:type_name -> pkg.ocrtypecodec.v1.StringAddrToNonce
+	45, // 78: pkg.ocrtypecodec.v1.TokenPriceObservation.FeeQuoterTokenUpdatesEntry.value:type_name -> pkg.ocrtypecodec.v1.TimestampedBig
+	14, // 79: pkg.ocrtypecodec.v1.ChainFeeObservation.FeeComponentsEntry.value:type_name -> pkg.ocrtypecodec.v1.ChainFeeComponents
+	15, // 80: pkg.ocrtypecodec.v1.ChainFeeObservation.ChainFeeUpdatesEntry.value:type_name -> pkg.ocrtypecodec.v1.ChainFeeUpdate
+	19, // 81: pkg.ocrtypecodec.v1.ContractNameChainAddresses.AddressesEntry.value:type_name -> pkg.ocrtypecodec.v1.ChainAddressMap
+	33, // 82: pkg.ocrtypecodec.v1.SeqNumToMessage.MessagesEntry.value:type_name -> pkg.ocrtypecodec.v1.Message
+	32, // 83: pkg.ocrtypecodec.v1.TokenDataObservations.TokenDataEntry.value:type_name -> pkg.ocrtypecodec.v1.SeqNumToTokenData
+	27, // 84: pkg.ocrtypecodec.v1.SeqNumToTokenData.TokenDataEntry.value:type_name -> pkg.ocrtypecodec.v1.MessageTokenData
+	85, // [85:85] is the sub-list for method output_type
+	85, // [85:85] is the sub-list for method input_type
+	85, // [85:85] is the sub-list for extension type_name
+	85, // [85:85] is the sub-list for extension extendee
+	0,  // [0:85] is the sub-list for field type_name
 }
 
 func init() { file_pkg_ocrtypecodec_v1_ocrtypes_proto_init() }

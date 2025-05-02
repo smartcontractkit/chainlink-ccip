@@ -66,6 +66,7 @@ func TestPluginState_Next(t *testing.T) {
 	}
 }
 
+/*
 func TestNewSortedOutcome(t *testing.T) {
 	now := time.Now()
 
@@ -137,6 +138,7 @@ func TestNewSortedOutcome(t *testing.T) {
 		})
 	}
 }
+*/
 
 // seqRange is a helper to create a SequenceNumberRange
 func seqRange(start, end uint64) cciptypes.SeqNumRange {
