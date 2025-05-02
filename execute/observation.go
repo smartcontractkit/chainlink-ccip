@@ -57,6 +57,11 @@ func (p *Plugin) Observation(
 		}
 	}
 
+	// TODO: Support "Reports" field.
+	if len(previousOutcome.Reports) > 0 {
+		previousOutcome.Report = previousOutcome.Reports[0]
+	}
+
 	fChain, err := p.homeChain.GetFChain()
 	if err != nil {
 		return types.Observation{}, fmt.Errorf("unable to get FChain: %w", err)
