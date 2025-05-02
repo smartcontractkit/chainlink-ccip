@@ -890,7 +890,10 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
       // is non-zero, the address must not be 0x0.
       return Internal._validate32ByteAddress(destAddress, gasLimit > 0 ? 1 : 0);
     }
-    if (chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_APTOS) {
+    if (
+      chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_APTOS
+        || chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_c4e05953
+    ) {
       return Internal._validate32ByteAddress(destAddress, Internal.APTOS_PRECOMPILE_SPACE);
     }
     revert InvalidChainFamilySelector(chainFamilySelector);
@@ -1003,6 +1006,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
     if (
       destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_EVM
         || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_APTOS
+        || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_c4e05953
     ) {
       gasLimit = _parseGenericExtraArgsFromBytes(
         message.extraArgs,
@@ -1112,6 +1116,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
     if (
       destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_EVM
         || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_APTOS
+        || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_c4e05953
     ) {
       Client.GenericExtraArgsV2 memory parsedExtraArgs =
         _parseUnvalidatedEVMExtraArgsFromBytes(extraArgs, destChainConfig.defaultTxGasLimit);
@@ -1211,6 +1216,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
             destChainConfig.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_EVM
               && destChainConfig.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_SVM
               && destChainConfig.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_APTOS
+              && destChainConfig.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_c4e05953
           )
       ) {
         revert InvalidDestChainConfig(destChainSelector);
