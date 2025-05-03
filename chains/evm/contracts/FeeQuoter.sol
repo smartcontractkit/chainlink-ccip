@@ -1026,9 +1026,21 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
       _validateDestFamilyAddress(destChainConfig.chainFamilySelector, message.receiver, gasLimit);
 
       uint256 accountsLength = svmExtraArgsV1.accounts.length;
+      // The max payload size for SVM is heavily dependent on the accounts passed into extra args and the number of
+      // tokens. Below, token and account overhead will count towards maxDataBytes.
+      uint256 svmExpandedDataLength = dataLength;
+
       // This abi.decode is safe because the address is validated above.
-      if (accountsLength > 0 && abi.decode(message.receiver, (uint256)) == 0) {
-        revert TooManySVMExtraArgsAccounts(accountsLength, 0);
+      if (abi.decode(message.receiver, (uint256)) == 0) {
+        // When message receiver is zero, CCIP receiver is not invoked on SVM.
+        // There should not be additional accounts specified for the receiver.
+        if (accountsLength > 0 ) {
+          revert TooManySVMExtraArgsAccounts(accountsLength, 0);
+        } 
+      } else {
+        // The additional accounts needed for CCIP receiver on SVM are the message receiver,
+        // plus remaining accounts specified in SVM extraArgs. Each account is 32 bytes.
+        svmExpandedDataLength += ((accountsLength + 1) * 32);
       }
 
       if (numberOfTokens > 0 && svmExtraArgsV1.tokenReceiver == bytes32(0)) {
@@ -1040,10 +1052,8 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
       if (svmExtraArgsV1.accountIsWritableBitmap >> accountsLength != 0) {
         revert InvalidSVMExtraArgsWritableBitmap(svmExtraArgsV1.accountIsWritableBitmap, accountsLength);
       }
-      // The max payload size for SVM is heavily dependent on the accounts passed into extra args and the number of
-      // tokens. Including the token and account overhead allows us to set the maxDataBytes to a higher value.
-      uint256 svmExpandedDataLength =
-        dataLength + (accountsLength * 32) + (numberOfTokens * Client.SVM_TOKEN_TRANSFER_DATA_OVERHEAD);
+
+      svmExpandedDataLength += (numberOfTokens * Client.SVM_TOKEN_TRANSFER_DATA_OVERHEAD);
 
       // The token destBytesOverhead can be very different per token so we have to take it into account as well.
       for (uint256 i = 0; i < numberOfTokens; ++i) {
