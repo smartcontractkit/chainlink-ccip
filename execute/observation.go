@@ -50,8 +50,11 @@ func (p *Plugin) Observation(
 
 	// If the previous outcome was the filter state, and reports were built, mark the messages as inflight.
 	if previousOutcome.State == exectypes.Filter {
+		lggr.Infow("previous outcome was the filter state, marking messages as inflight", "previousOutcome", previousOutcome)
 		for _, chainReport := range previousOutcome.Report.ChainReports {
+			lggr.Infow("marking messages as inflight", "chainReport", chainReport)
 			for _, message := range chainReport.Messages {
+				lggr.Infow("marking message as inflight", "message", message)
 				p.inflightMessageCache.MarkInflight(chainReport.SourceChainSelector, message.Header.MessageID)
 			}
 		}
@@ -424,8 +427,13 @@ func (p *Plugin) getMessagesObservation(
 		// Process each message in the report and override the empty message and token data if everything fits within
 		// the size limits
 		for _, msg := range msgs {
+<<<<<<< Updated upstream
 			// If a message is inflight or already executed, don't include it fully in the observation
 			// because its already been transmitted in a previous report or executed onchain.
+=======
+			// If msg is not already inflight, add it
+			lggr.Infow("checking if message is inflight", "messageID", msg.Header.MessageID, "srcChain", srcChain)
+>>>>>>> Stashed changes
 			if p.inflightMessageCache.IsInflight(srcChain, msg.Header.MessageID) {
 				continue
 			}
