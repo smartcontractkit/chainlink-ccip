@@ -1036,7 +1036,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
         // There should not be additional accounts specified for the receiver.
         if (accountsLength > 0) {
           revert TooManySVMExtraArgsAccounts(accountsLength, 0);
-        } 
+        }
       } else {
         // The additional accounts needed for CCIP receiver on SVM are the message receiver,
         // plus remaining accounts specified in SVM extraArgs. Each account is 32 bytes.

@@ -371,9 +371,7 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
         accounts: new bytes32[](1)
       })
     );
-    vm.expectRevert(
-      abi.encodeWithSelector(FeeQuoter.TooManySVMExtraArgsAccounts.selector, 1, 0)
-    );
+    vm.expectRevert(abi.encodeWithSelector(FeeQuoter.TooManySVMExtraArgsAccounts.selector, 1, 0));
     s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, message);
   }
 
@@ -421,11 +419,11 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
         accounts: new bytes32[](numAccounts)
       })
     );
-    vm.expectRevert(abi.encodeWithSelector(
-      FeeQuoter.MessageTooLarge.selector,
-      SVM_DEFAULT_MAX_DATA_BYTES,
-      dataSize + (numAccounts + 1) * SVM_ACCOUNT_BYTES
-    ));
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        FeeQuoter.MessageTooLarge.selector, SVM_DEFAULT_MAX_DATA_BYTES, dataSize + (numAccounts + 1) * SVM_ACCOUNT_BYTES
+      )
+    );
     s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, message);
   }
 
@@ -454,11 +452,13 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
     uint32 destBytesOverhead =
       s_feeQuoter.getTokenTransferFeeConfig(DEST_CHAIN_SELECTOR, message.tokenAmounts[0].token).destBytesOverhead;
 
-    vm.expectRevert(abi.encodeWithSelector(
-      FeeQuoter.MessageTooLarge.selector,
-      SVM_DEFAULT_MAX_DATA_BYTES,
-      Client.SVM_TOKEN_TRANSFER_DATA_OVERHEAD + dataSize + destBytesOverhead
-    ));
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        FeeQuoter.MessageTooLarge.selector,
+        SVM_DEFAULT_MAX_DATA_BYTES,
+        Client.SVM_TOKEN_TRANSFER_DATA_OVERHEAD + dataSize + destBytesOverhead
+      )
+    );
     s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, message);
   }
 
@@ -486,37 +486,27 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
 
     uint32 destBytesOverhead =
       s_feeQuoter.getTokenTransferFeeConfig(DEST_CHAIN_SELECTOR, message.tokenAmounts[0].token).destBytesOverhead;
-    uint256 expandedDataSize = Client.SVM_TOKEN_TRANSFER_DATA_OVERHEAD
-      + dataSize
-      + (numAccounts + 1) * SVM_ACCOUNT_BYTES
-      + destBytesOverhead;
+    uint256 expandedDataSize =
+      Client.SVM_TOKEN_TRANSFER_DATA_OVERHEAD + dataSize + (numAccounts + 1) * SVM_ACCOUNT_BYTES + destBytesOverhead;
 
-    vm.expectRevert(abi.encodeWithSelector(
-      FeeQuoter.MessageTooLarge.selector,
-      SVM_DEFAULT_MAX_DATA_BYTES,
-      expandedDataSize
-    ));
+    vm.expectRevert(
+      abi.encodeWithSelector(FeeQuoter.MessageTooLarge.selector, SVM_DEFAULT_MAX_DATA_BYTES, expandedDataSize)
+    );
     s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, message);
 
     // Remove token config to use default extra data overhead
     FeeQuoter.TokenTransferFeeConfigRemoveArgs[] memory tokensToRemove =
       new FeeQuoter.TokenTransferFeeConfigRemoveArgs[](1);
-    tokensToRemove[0] = FeeQuoter.TokenTransferFeeConfigRemoveArgs({
-      destChainSelector: DEST_CHAIN_SELECTOR,
-      token: CUSTOM_TOKEN
-    });
+    tokensToRemove[0] =
+      FeeQuoter.TokenTransferFeeConfigRemoveArgs({destChainSelector: DEST_CHAIN_SELECTOR, token: CUSTOM_TOKEN});
     s_feeQuoter.applyTokenTransferFeeConfigUpdates(new FeeQuoter.TokenTransferFeeConfigArgs[](0), tokensToRemove);
 
-    expandedDataSize = Client.SVM_TOKEN_TRANSFER_DATA_OVERHEAD
-      + dataSize
-      + (numAccounts + 1) * SVM_ACCOUNT_BYTES
+    expandedDataSize = Client.SVM_TOKEN_TRANSFER_DATA_OVERHEAD + dataSize + (numAccounts + 1) * SVM_ACCOUNT_BYTES
       + Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES;
 
-    vm.expectRevert(abi.encodeWithSelector(
-      FeeQuoter.MessageTooLarge.selector,
-      SVM_DEFAULT_MAX_DATA_BYTES,
-      expandedDataSize
-    ));
+    vm.expectRevert(
+      abi.encodeWithSelector(FeeQuoter.MessageTooLarge.selector, SVM_DEFAULT_MAX_DATA_BYTES, expandedDataSize)
+    );
     s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, message);
   }
 }
