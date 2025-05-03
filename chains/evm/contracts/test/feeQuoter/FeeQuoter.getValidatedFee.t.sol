@@ -383,8 +383,8 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
 
     s_feeQuoter.applyDestChainConfigUpdates(destChainConfigArgs);
 
-    uint256 numAccounts = 4;
-    uint64 wrongBitmap = uint64(1 << (numAccounts + 1));
+    uint256 accounts = 4;
+    uint64 wrongBitmap = uint64(1 << (accounts + 1));
 
     Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(s_sourceFeeToken, 1);
     message.extraArgs = Client._svmArgsToBytes(
@@ -393,10 +393,10 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
         accountIsWritableBitmap: wrongBitmap,
         allowOutOfOrderExecution: true,
         tokenReceiver: bytes32(uint256(1)),
-        accounts: new bytes32[](numAccounts)
+        accounts: new bytes32[](accounts)
       })
     );
-    vm.expectRevert(abi.encodeWithSelector(FeeQuoter.InvalidSVMExtraArgsWritableBitmap.selector, wrongBitmap, numAccounts));
+    vm.expectRevert(abi.encodeWithSelector(FeeQuoter.InvalidSVMExtraArgsWritableBitmap.selector, wrongBitmap, accounts));
     s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, message);
   }
 

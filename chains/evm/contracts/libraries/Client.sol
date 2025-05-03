@@ -63,7 +63,7 @@ library Client {
     uint64 accountIsWritableBitmap;
     bool allowOutOfOrderExecution;
     bytes32 tokenReceiver;
-    // Additional accounts needed for execution of CCIP receiver. Must be empty if message.receiver is not specified.
+    // Additional accounts needed for execution of CCIP receiver. Must be empty if message.receiver is zero.
     // Token transfer related accounts are specified in the token pool lookup table on SVM.
     bytes32[] accounts;
   }

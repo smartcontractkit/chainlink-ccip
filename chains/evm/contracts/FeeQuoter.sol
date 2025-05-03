@@ -1034,7 +1034,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
       if (abi.decode(message.receiver, (uint256)) == 0) {
         // When message receiver is zero, CCIP receiver is not invoked on SVM.
         // There should not be additional accounts specified for the receiver.
-        if (accountsLength > 0 ) {
+        if (accountsLength > 0) {
           revert TooManySVMExtraArgsAccounts(accountsLength, 0);
         } 
       } else {
