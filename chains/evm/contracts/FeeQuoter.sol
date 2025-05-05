@@ -1038,9 +1038,10 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
           revert TooManySVMExtraArgsAccounts(accountsLength, 0);
         }
       } else {
-        // The additional accounts needed for CCIP receiver on SVM are the message receiver,
+        // The messaging accounts needed for CCIP receiver on SVM are:
+        // message receiver, offramp PDA signer,
         // plus remaining accounts specified in SVM extraArgs. Each account is 32 bytes.
-        svmExpandedDataLength += ((accountsLength + 1) * 32);
+        svmExpandedDataLength += ((accountsLength + 2) * 32);
       }
 
       if (numberOfTokens > 0 && svmExtraArgsV1.tokenReceiver == bytes32(0)) {
