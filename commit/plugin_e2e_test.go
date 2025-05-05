@@ -94,8 +94,6 @@ var (
 var ocrTypCodec = ocrtypecodec.DefaultCommitCodec
 
 func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
-	t.Skip("todo")
-
 	params := defaultNodeParams(t)
 	nodes := make([]ocr3types.ReportingPlugin[[]byte], len(oracleIDs))
 
@@ -271,8 +269,6 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 }
 
 func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
-	t.Skip("todo")
-
 	params := defaultNodeParams(t)
 
 	nodes := make([]ocr3types.ReportingPlugin[[]byte], len(oracleIDs))
@@ -313,8 +309,12 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 				MerkleRootOutcome: merkleOutcome,
 				TokenPriceOutcome: tokenprice.Outcome{
 					TokenPrices: tokenPriceMap,
+					InflightTokenPriceUpdates: map[ccipocr3.UnknownEncodedAddress]time.Time{
+						arbAddr: time.Now(),
+						ethAddr: time.Now(),
+					},
+					InflightRemainingChecks: 10,
 				},
-				MainOutcome: committypes.MainOutcome{InflightPriceOcrSequenceNumber: 1, RemainingPriceChecks: 10},
 			},
 			expTransmittedReports: []ccipocr3.CommitPluginReport{
 				{
@@ -336,13 +336,44 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 		{
 			name: "prices already inflight, no prices to report",
 			prevOutcome: committypes.Outcome{
-				MainOutcome: committypes.MainOutcome{InflightPriceOcrSequenceNumber: 1, RemainingPriceChecks: 4},
+				TokenPriceOutcome: tokenprice.Outcome{
+					TokenPrices: tokenPriceMap,
+					InflightTokenPriceUpdates: map[ccipocr3.UnknownEncodedAddress]time.Time{
+						arbAddr: time.Now().Add(-5 * time.Minute),
+						ethAddr: time.Now().Add(-5 * time.Minute),
+					},
+					InflightRemainingChecks: 7,
+				},
 			},
-			mockPriceReader: func(m *readerpkg_mock.MockPriceReader) {},
+			mockPriceReader: func(m *readerpkg_mock.MockPriceReader) {
+				m.EXPECT().
+					GetFeedPricesUSD(mock.Anything, mock.MatchedBy(func(tokens []ccipocr3.UnknownEncodedAddress) bool {
+						expectedTokens := mapset.NewSet(arbAddr, ethAddr)
+						actualTokens := mapset.NewSet(tokens...)
+						return expectedTokens.Equal(actualTokens)
+					})).
+					Return(ccipocr3.TokenPriceMap{
+						arbAddr: ccipocr3.NewBigInt(arbPrice),
+						ethAddr: ccipocr3.NewBigInt(ethPrice),
+					}, nil).Maybe()
+
+				m.EXPECT().
+					GetFeeQuoterTokenUpdates(mock.Anything, mock.Anything, mock.Anything).
+					Return(
+						map[ccipocr3.UnknownEncodedAddress]ccipocr3.TimestampedBig{}, nil,
+					).
+					Maybe()
+			},
 			expOutcome: committypes.Outcome{
 				MerkleRootOutcome: merkleOutcome,
-				TokenPriceOutcome: tokenprice.Outcome{},
-				MainOutcome:       committypes.MainOutcome{InflightPriceOcrSequenceNumber: 1, RemainingPriceChecks: 3},
+				TokenPriceOutcome: tokenprice.Outcome{
+					TokenPrices: nil,
+					InflightTokenPriceUpdates: map[ccipocr3.UnknownEncodedAddress]time.Time{
+						arbAddr: time.Now().Add(-4 * time.Minute),
+						ethAddr: time.Now().Add(-4 * time.Minute),
+					},
+					InflightRemainingChecks: 6,
+				},
 			},
 			expTransmittedReports: []ccipocr3.CommitPluginReport{},
 		},
@@ -416,8 +447,11 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 					TokenPrices: ccipocr3.TokenPriceMap{
 						ethAddr: ccipocr3.NewBigInt(ethPrice),
 					},
+					InflightTokenPriceUpdates: map[ccipocr3.UnknownEncodedAddress]time.Time{
+						ethAddr: time.Now(),
+					},
+					InflightRemainingChecks: 10,
 				},
-				MainOutcome: committypes.MainOutcome{InflightPriceOcrSequenceNumber: 1, RemainingPriceChecks: 10},
 			},
 			expTransmittedReports: []ccipocr3.CommitPluginReport{
 				{
@@ -458,7 +492,19 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 
 			decodedOutcome, err := ocrTypCodec.DecodeOutcome(res.Outcome)
 			assert.NoError(t, err)
-			assert.Equal(t, normalizeOutcome(tc.expOutcome), normalizeOutcome(decodedOutcome))
+
+			actOutcome := decodedOutcome
+			expOutcome := tc.expOutcome
+
+			require.Equal(t, len(actOutcome.TokenPriceOutcome.InflightTokenPriceUpdates),
+				len(expOutcome.TokenPriceOutcome.InflightTokenPriceUpdates))
+			for k, v := range actOutcome.TokenPriceOutcome.InflightTokenPriceUpdates {
+				require.True(t, v.Before(expOutcome.TokenPriceOutcome.InflightTokenPriceUpdates[k]))
+			}
+
+			actOutcome.TokenPriceOutcome.InflightTokenPriceUpdates = nil
+			expOutcome.TokenPriceOutcome.InflightTokenPriceUpdates = nil
+			assert.Equal(t, normalizeOutcome(expOutcome), normalizeOutcome(actOutcome))
 
 			assert.Len(t, res.Transmitted, len(tc.expTransmittedReports))
 			for i := range res.Transmitted {
