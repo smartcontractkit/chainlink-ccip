@@ -213,6 +213,7 @@ func (c *CommitCodecProto) DecodeOutcome(data []byte) (committypes.Outcome, erro
 		ChainFeeOutcome: chainfee.Outcome{
 			GasPrices:               c.tr.gasPriceChainFromProto(pbOutcome.ChainFeeOutcome.GasPrices),
 			InflightChainFeeUpdates: c.tr.chainFeeUpdatesFromProto(pbOutcome.ChainFeeOutcome.InflightChainFeeUpdates),
+			InflightRemainingChecks: pbOutcome.ChainFeeOutcome.InflightRemainingChecks,
 		},
 		MainOutcome: committypes.MainOutcome{
 			InflightPriceOcrSequenceNumber: cciptypes.SeqNum(pbOutcome.MainOutcome.InflightPriceOcrSequenceNumber),

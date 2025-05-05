@@ -25,6 +25,7 @@ type Outcome struct {
 	GasPrices []cciptypes.GasPriceChain `json:"gasPrices"`
 
 	InflightChainFeeUpdates map[cciptypes.ChainSelector]Update `json:"inflightChainFeeUpdates"`
+	InflightRemainingChecks int64                              `json:"inflightRemainingChecks"`
 }
 
 func (o Outcome) Stats() map[string]int {

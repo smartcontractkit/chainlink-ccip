@@ -28,7 +28,7 @@ func (p *processor) Outcome(
 
 	consensusObs, err := p.getConsensusObservation(lggr, aos)
 	if err != nil {
-		return Outcome{InflightChainFeeUpdates: prevOutcome.InflightChainFeeUpdates},
+		return Outcome{},
 			fmt.Errorf("get consensus observation: %w", err)
 	}
 
@@ -36,13 +36,13 @@ func (p *processor) Outcome(
 	if len(consensusObs.FeeComponents) == 0 {
 		lggr.Warn("no consensus on fee components, nothing to update",
 			"consensusObs", consensusObs)
-		return Outcome{InflightChainFeeUpdates: prevOutcome.InflightChainFeeUpdates}, nil
+		return Outcome{}, nil
 	}
 
 	// Check if we have pending chain fee updates.
 	for chainSel, inflightUpdate := range prevOutcome.InflightChainFeeUpdates {
-		lggr2 := logger.With(lggr,
-			"chainSel", chainSel, "prevUpdate", inflightUpdate, "currUpdates", consensusObs.ChainFeeUpdates)
+		lggr2 := logger.With(lggr, "chainSel", chainSel, "prevUpdate", inflightUpdate,
+			"currUpdates", consensusObs.ChainFeeUpdates, "remRetries", prevOutcome.InflightRemainingChecks)
 
 		currUpdate, exists := consensusObs.ChainFeeUpdates[chainSel]
 		if !exists {
@@ -50,6 +50,7 @@ func (p *processor) Outcome(
 			return Outcome{
 				GasPrices:               nil,
 				InflightChainFeeUpdates: prevOutcome.InflightChainFeeUpdates,
+				InflightRemainingChecks: prevOutcome.InflightRemainingChecks - 1,
 			}, nil
 		}
 
@@ -62,6 +63,7 @@ func (p *processor) Outcome(
 		return Outcome{
 			GasPrices:               nil,
 			InflightChainFeeUpdates: prevOutcome.InflightChainFeeUpdates,
+			InflightRemainingChecks: prevOutcome.InflightRemainingChecks - 1,
 		}, nil
 	}
 
@@ -133,6 +135,7 @@ func (p *processor) Outcome(
 	out := Outcome{
 		GasPrices:               gasPrices,
 		InflightChainFeeUpdates: inflightChainFeeUpdates,
+		InflightRemainingChecks: int64(p.cfg.InflightPriceCheckRetries),
 	}
 	return out, nil
 }

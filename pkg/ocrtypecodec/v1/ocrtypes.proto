@@ -147,6 +147,7 @@ message TokenPriceOutcome {
 message ChainFeeOutcome {
   repeated GasPriceChain gas_prices = 1;
   map<uint64, ChainFeeUpdate> inflight_chain_fee_updates = 2; // chainSelector to ChainFeeUpdate
+  int64 inflight_remaining_checks = 3;
 }
 
 message GasPriceChain {
