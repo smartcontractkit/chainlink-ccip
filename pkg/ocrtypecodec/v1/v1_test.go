@@ -76,7 +76,6 @@ func TestCommitObservation(t *testing.T) {
 }
 
 func TestCommitOutcome(t *testing.T) {
-	t.Skip("todo")
 	jsonCodec := NewCommitCodecJSON()
 	protoCodec := NewCommitCodecProto()
 
