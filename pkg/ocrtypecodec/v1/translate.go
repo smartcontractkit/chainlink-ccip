@@ -2,6 +2,7 @@ package v1
 
 import (
 	"math/big"
+	"time"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -923,6 +924,56 @@ func (t *protoTranslator) chainReportsFromProto(
 	}
 
 	return reports
+}
+
+func (t *protoTranslator) mapChainTimeToProto(
+	m map[cciptypes.ChainSelector]time.Time) map[uint64]*timestamppb.Timestamp {
+	var pbMap map[uint64]*timestamppb.Timestamp
+	if len(m) > 0 {
+		pbMap = make(map[uint64]*timestamppb.Timestamp, len(m))
+	}
+
+	for k, v := range m {
+		pbMap[uint64(k)] = timestamppb.New(v)
+	}
+	return pbMap
+}
+
+func (t *protoTranslator) mapChainTimeFromProto(
+	pbMap map[uint64]*timestamppb.Timestamp) map[cciptypes.ChainSelector]time.Time {
+	var m map[cciptypes.ChainSelector]time.Time
+	if len(pbMap) > 0 {
+		m = make(map[cciptypes.ChainSelector]time.Time, len(pbMap))
+	}
+	for k, v := range pbMap {
+		m[cciptypes.ChainSelector(k)] = v.AsTime()
+	}
+	return m
+}
+
+func (t *protoTranslator) mapAddrTimeToProto(
+	m map[cciptypes.UnknownEncodedAddress]time.Time) map[string]*timestamppb.Timestamp {
+	var pbMap map[string]*timestamppb.Timestamp
+	if len(m) > 0 {
+		pbMap = make(map[string]*timestamppb.Timestamp, len(m))
+	}
+
+	for k, v := range m {
+		pbMap[string(k)] = timestamppb.New(v)
+	}
+	return pbMap
+}
+
+func (t *protoTranslator) mapStringTimeFromProto(
+	pbMap map[string]*timestamppb.Timestamp) map[cciptypes.UnknownEncodedAddress]time.Time {
+	var m map[cciptypes.UnknownEncodedAddress]time.Time
+	if len(pbMap) > 0 {
+		m = make(map[cciptypes.UnknownEncodedAddress]time.Time, len(pbMap))
+	}
+	for k, v := range pbMap {
+		m[cciptypes.UnknownEncodedAddress(k)] = v.AsTime()
+	}
+	return m
 }
 
 func (t *protoTranslator) decodeMessageTokenData(data []*ocrtypecodecpb.MessageTokenData) []exectypes.MessageTokenData {

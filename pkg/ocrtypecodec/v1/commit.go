@@ -171,11 +171,14 @@ func (c *CommitCodecProto) EncodeOutcome(outcome committypes.Outcome) ([]byte, e
 			RmnRemoteCfg:                    c.tr.rmnRemoteConfigToProto(outcome.MerkleRootOutcome.RMNRemoteCfg),
 		},
 		TokenPriceOutcome: &ocrtypecodecpb.TokenPriceOutcome{
-			TokenPrices: c.tr.feedTokenPricesToProto(outcome.TokenPriceOutcome.TokenPrices),
+			TokenPrices:               c.tr.feedTokenPricesToProto(outcome.TokenPriceOutcome.TokenPrices),
+			InflightTokenPriceUpdates: c.tr.mapAddrTimeToProto(outcome.TokenPriceOutcome.InflightTokenPriceUpdates),
+			InflightRemainingChecks:   outcome.TokenPriceOutcome.InflightRemainingChecks,
 		},
 		ChainFeeOutcome: &ocrtypecodecpb.ChainFeeOutcome{
 			GasPrices:               c.tr.gasPriceChainToProto(outcome.ChainFeeOutcome.GasPrices),
-			InflightChainFeeUpdates: c.tr.chainFeeUpdatesToProto(outcome.ChainFeeOutcome.InflightChainFeeUpdates),
+			InflightChainFeeUpdates: c.tr.mapChainTimeToProto(outcome.ChainFeeOutcome.InflightChainFeeUpdates),
+			InflightRemainingChecks: outcome.ChainFeeOutcome.InflightRemainingChecks,
 		},
 		MainOutcome: &ocrtypecodecpb.MainOutcome{
 			InflightPriceOcrSequenceNumber: uint64(outcome.MainOutcome.InflightPriceOcrSequenceNumber),
@@ -208,11 +211,13 @@ func (c *CommitCodecProto) DecodeOutcome(data []byte) (committypes.Outcome, erro
 			RMNRemoteCfg:                    c.tr.rmnRemoteConfigFromProto(pbOutcome.MerkleRootOutcome.RmnRemoteCfg),
 		},
 		TokenPriceOutcome: tokenprice.Outcome{
-			TokenPrices: c.tr.feedTokenPricesFromProto(pbOutcome.TokenPriceOutcome.TokenPrices),
+			TokenPrices:               c.tr.feedTokenPricesFromProto(pbOutcome.TokenPriceOutcome.TokenPrices),
+			InflightTokenPriceUpdates: c.tr.mapStringTimeFromProto(pbOutcome.TokenPriceOutcome.InflightTokenPriceUpdates),
+			InflightRemainingChecks:   pbOutcome.TokenPriceOutcome.InflightRemainingChecks,
 		},
 		ChainFeeOutcome: chainfee.Outcome{
 			GasPrices:               c.tr.gasPriceChainFromProto(pbOutcome.ChainFeeOutcome.GasPrices),
-			InflightChainFeeUpdates: c.tr.chainFeeUpdatesFromProto(pbOutcome.ChainFeeOutcome.InflightChainFeeUpdates),
+			InflightChainFeeUpdates: c.tr.mapChainTimeFromProto(pbOutcome.ChainFeeOutcome.InflightChainFeeUpdates),
 			InflightRemainingChecks: pbOutcome.ChainFeeOutcome.InflightRemainingChecks,
 		},
 		MainOutcome: committypes.MainOutcome{

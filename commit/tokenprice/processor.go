@@ -115,12 +115,12 @@ func (p *processor) Outcome(
 		return p.computeInflightPricesOutcome(lggr, consensusObservation, prevOutcome), nil
 	}
 
-	inflightTokenPriceUpdates := make(map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig)
+	inflightTokenPriceUpdates := make(map[cciptypes.UnknownEncodedAddress]time.Time)
 	for tokenAddr := range tokenPriceOutcome {
 		oldTokenPriceUpdate, exists := consensusObservation.FeeQuoterTokenUpdates[tokenAddr]
-		inflightTokenPriceUpdates[tokenAddr] = cciptypes.NewTimestampedBig(0, time.Time{})
+		inflightTokenPriceUpdates[tokenAddr] = time.Time{}
 		if exists {
-			inflightTokenPriceUpdates[tokenAddr] = oldTokenPriceUpdate
+			inflightTokenPriceUpdates[tokenAddr] = oldTokenPriceUpdate.Timestamp
 		}
 	}
 
@@ -149,7 +149,7 @@ func (p *processor) computeInflightPricesOutcome(
 			"currUpdates", consensusObservation.FeeQuoterTokenUpdates)
 
 		currUpdate, exists := consensusObservation.FeeQuoterTokenUpdates[chainSel]
-		priceAppearedOnChain := exists && currUpdate.Timestamp.After(inflightUpdate.Timestamp)
+		priceAppearedOnChain := exists && currUpdate.Timestamp.After(inflightUpdate)
 		if !priceAppearedOnChain {
 			lggr2.Infow("waiting for previously transmitted token price update to appear on-chain")
 			return newInflightPricesOutcome(

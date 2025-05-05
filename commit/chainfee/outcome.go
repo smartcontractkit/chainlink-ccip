@@ -98,13 +98,13 @@ func (p *processor) Outcome(
 		"consensusTimestamp", consensusObs.TimestampNow,
 	)
 
-	inflightChainFeeUpdates := make(map[cciptypes.ChainSelector]Update)
+	inflightChainFeeUpdates := make(map[cciptypes.ChainSelector]time.Time)
 	for _, gasPriceUpdate := range gasPrices {
 		chainSel := gasPriceUpdate.ChainSel
-		inflightChainFeeUpdates[chainSel] = Update{Timestamp: time.Time{}}
+		inflightChainFeeUpdates[chainSel] = time.Time{}
 		oldChainFeeUpdate, ok := consensusObs.ChainFeeUpdates[chainSel]
 		if ok {
-			inflightChainFeeUpdates[chainSel] = oldChainFeeUpdate
+			inflightChainFeeUpdates[chainSel] = oldChainFeeUpdate.Timestamp
 		}
 	}
 
@@ -129,7 +129,7 @@ func (p *processor) computeInflightPricesOutcome(
 			"currUpdates", consensusObs.ChainFeeUpdates, "remRetries", prevOutcome.InflightRemainingChecks)
 
 		currUpdate, exists := consensusObs.ChainFeeUpdates[chainSel]
-		priceAppearedOnChain := exists && currUpdate.Timestamp.After(inflightUpdate.Timestamp)
+		priceAppearedOnChain := exists && currUpdate.Timestamp.After(inflightUpdate)
 
 		if !priceAppearedOnChain {
 			lggr2.Infow("waiting for previously transmitted chain fee price update to appear on-chain")
@@ -398,7 +398,7 @@ func newEmptyOutcome() Outcome {
 }
 
 func newInflightPricesOutcome(
-	inflightPrices map[cciptypes.ChainSelector]Update,
+	inflightPrices map[cciptypes.ChainSelector]time.Time,
 	inflightRemainingChecks int64,
 ) Outcome {
 	if inflightRemainingChecks <= 0 || len(inflightPrices) == 0 {
@@ -412,7 +412,7 @@ func newInflightPricesOutcome(
 
 func newPricesOutcome(
 	gasPrices []cciptypes.GasPriceChain,
-	inflightPrices map[cciptypes.ChainSelector]Update,
+	inflightPrices map[cciptypes.ChainSelector]time.Time,
 	inflightRemainingChecks int64,
 ) Outcome {
 	return Outcome{
