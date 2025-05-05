@@ -411,12 +411,12 @@ func newInflightPricesOutcome(
 }
 
 func newPricesOutcome(
-	tokenPrices []cciptypes.GasPriceChain,
+	gasPrices []cciptypes.GasPriceChain,
 	inflightPrices map[cciptypes.ChainSelector]Update,
 	inflightRemainingChecks int64,
 ) Outcome {
 	return Outcome{
-		GasPrices:               tokenPrices,
+		GasPrices:               gasPrices,
 		InflightChainFeeUpdates: inflightPrices,
 		InflightRemainingChecks: inflightRemainingChecks,
 	}
