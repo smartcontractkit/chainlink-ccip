@@ -421,7 +421,9 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
     );
     vm.expectRevert(
       abi.encodeWithSelector(
-        FeeQuoter.MessageTooLarge.selector, SVM_DEFAULT_MAX_DATA_BYTES, dataSize + (numAccounts + 2) * SVM_ACCOUNT_BYTES
+        FeeQuoter.MessageTooLarge.selector,
+        SVM_DEFAULT_MAX_DATA_BYTES,
+        dataSize + (numAccounts + Client.SVM_MESSAGING_ACCOUNTS_OVERHEAD) * Client.SVM_ACCOUNT_BYTE_SIZE
       )
     );
     s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, message);
@@ -486,8 +488,8 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
 
     uint32 destBytesOverhead =
       s_feeQuoter.getTokenTransferFeeConfig(DEST_CHAIN_SELECTOR, message.tokenAmounts[0].token).destBytesOverhead;
-    uint256 expandedDataSize =
-      Client.SVM_TOKEN_TRANSFER_DATA_OVERHEAD + dataSize + (numAccounts + 2) * SVM_ACCOUNT_BYTES + destBytesOverhead;
+    uint256 expandedDataSize = Client.SVM_TOKEN_TRANSFER_DATA_OVERHEAD + dataSize
+      + (numAccounts + Client.SVM_MESSAGING_ACCOUNTS_OVERHEAD) * Client.SVM_ACCOUNT_BYTE_SIZE + destBytesOverhead;
 
     vm.expectRevert(
       abi.encodeWithSelector(FeeQuoter.MessageTooLarge.selector, SVM_DEFAULT_MAX_DATA_BYTES, expandedDataSize)
@@ -501,7 +503,8 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
       FeeQuoter.TokenTransferFeeConfigRemoveArgs({destChainSelector: DEST_CHAIN_SELECTOR, token: CUSTOM_TOKEN});
     s_feeQuoter.applyTokenTransferFeeConfigUpdates(new FeeQuoter.TokenTransferFeeConfigArgs[](0), tokensToRemove);
 
-    expandedDataSize = Client.SVM_TOKEN_TRANSFER_DATA_OVERHEAD + dataSize + (numAccounts + 2) * SVM_ACCOUNT_BYTES
+    expandedDataSize = Client.SVM_TOKEN_TRANSFER_DATA_OVERHEAD + dataSize
+      + (numAccounts + Client.SVM_MESSAGING_ACCOUNTS_OVERHEAD) * Client.SVM_ACCOUNT_BYTE_SIZE
       + Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES;
 
     vm.expectRevert(

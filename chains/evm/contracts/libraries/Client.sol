@@ -81,6 +81,13 @@ library Client {
     + 32 // size of the token lookup table account
     + 32; // token-related accounts in the lookup table
 
+  /// @dev Number of overhead accounts needed for message execution on SVM.
+  /// @dev These are message.receiver, and the OffRamp Signer PDA specific to the receiver.
+  uint256 public constant SVM_MESSAGING_ACCOUNTS_OVERHEAD = 2;
+
+  /// @dev The size of each SVM account address in bytes.
+  uint256 public constant SVM_ACCOUNT_BYTE_SIZE = 32;
+
   function _argsToBytes(
     GenericExtraArgsV2 memory extraArgs
   ) internal pure returns (bytes memory bts) {
