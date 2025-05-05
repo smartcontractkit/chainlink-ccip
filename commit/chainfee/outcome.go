@@ -18,6 +18,7 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
+//nolint:gocyclo // todo
 func (p *processor) Outcome(
 	ctx context.Context,
 	prevOutcome Outcome,
