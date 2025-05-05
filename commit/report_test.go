@@ -292,11 +292,12 @@ func TestPluginReports_InvalidOutcome(t *testing.T) {
 
 func Test_Plugin_isStaleReport(t *testing.T) {
 	testCases := []struct {
-		name           string
-		onChainSeqNum  uint64
-		reportSeqNum   uint64
-		lenMerkleRoots int
-		shouldBeStale  bool
+		name              string
+		onChainSeqNum     uint64
+		reportSeqNum      uint64
+		lenMerkleRoots    int
+		shouldBeStale     bool
+		multiPriceReports bool
 	}{
 		{
 			name:           "report is not stale when merkle roots exist no matter the seq nums",
@@ -311,6 +312,14 @@ func Test_Plugin_isStaleReport(t *testing.T) {
 			reportSeqNum:   33,
 			lenMerkleRoots: 0,
 			shouldBeStale:  true,
+		},
+		{
+			name:              "report is not stale when onChainSeqNum is equal to report seq num with multiPriceReports",
+			onChainSeqNum:     33,
+			reportSeqNum:      33,
+			lenMerkleRoots:    0,
+			shouldBeStale:     false,
+			multiPriceReports: true,
 		},
 		{
 			name:           "report is stale when onChainSeqNum is greater than report seq num",
@@ -336,7 +345,7 @@ func Test_Plugin_isStaleReport(t *testing.T) {
 			report := ccipocr3.CommitPluginReport{
 				BlessedMerkleRoots: make([]ccipocr3.MerkleRootChain, tc.lenMerkleRoots),
 			}
-			stale := p.isStaleReport(p.lggr, tc.reportSeqNum, tc.onChainSeqNum, report)
+			stale := p.isStaleReport(p.lggr, tc.reportSeqNum, tc.onChainSeqNum, report, tc.multiPriceReports)
 			require.Equal(t, tc.shouldBeStale, stale)
 		})
 	}
