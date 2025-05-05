@@ -91,20 +91,22 @@ func (p *processor) Outcome(
 	// If set to zero, no prices will be reported (i.e keystone feeds would be active).
 	if p.offChainCfg.TokenPriceBatchWriteFrequency.Duration() == 0 {
 		lggr.Debugw("TokenPriceBatchWriteFrequency is set to zero, no prices will be reported")
-		return Outcome{}, nil
+		return newEmptyOutcome(), nil
 	}
 
 	consensusObservation, err := p.getConsensusObservation(lggr, aos)
 	if err != nil {
-		return Outcome{}, fmt.Errorf("get consensus observation: %w", err)
+		return newEmptyOutcome(), fmt.Errorf("get consensus observation: %w", err)
 	}
 
 	tokenPriceOutcome := p.selectTokensForUpdate(lggr, consensusObservation)
 	lggr.Infow("outcome token prices", "tokenPrices", tokenPriceOutcome)
+	inflightTokenPricesOutcome := newInflightPricesOutcome(
+		prevOutcome.InflightTokenPriceUpdates, prevOutcome.InflightRemainingChecks-1)
 
 	if len(tokenPriceOutcome) == 0 {
 		lggr.Debugw("No token prices to report")
-		return Outcome{}, nil
+		return inflightTokenPricesOutcome, nil
 	}
 
 	// Check if we have inflight token price updates. If we do and they are still inflight (at least one of them) then
@@ -116,7 +118,7 @@ func (p *processor) Outcome(
 		currUpdate, exists := consensusObservation.FeeQuoterTokenUpdates[chainSel]
 		if !exists {
 			lggr2.Warnw("previously transmitted token price update not found in current round, assuming not transmitted")
-			return Outcome{InflightTokenPriceUpdates: prevOutcome.InflightTokenPriceUpdates}, nil
+			return inflightTokenPricesOutcome, nil
 		}
 
 		if currUpdate.Timestamp.After(inflightUpdate.Timestamp) {
@@ -125,7 +127,7 @@ func (p *processor) Outcome(
 		}
 
 		lggr2.Warnw("waiting for previously transmitted token price update to appear on-chain")
-		return Outcome{InflightTokenPriceUpdates: prevOutcome.InflightTokenPriceUpdates}, nil
+		return inflightTokenPricesOutcome, nil
 	}
 
 	inflightTokenPriceUpdates := make(map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig)
@@ -138,12 +140,11 @@ func (p *processor) Outcome(
 		}
 	}
 
-	out := Outcome{
-		TokenPrices:               tokenPriceOutcome,
-		InflightTokenPriceUpdates: inflightTokenPriceUpdates,
-		InflightRemainingChecks:   int64(p.offChainCfg.InflightPriceCheckRetries),
-	}
-	return out, nil
+	return newTokenPricesOutcome(
+		tokenPriceOutcome,
+		inflightTokenPriceUpdates,
+		int64(p.offChainCfg.InflightPriceCheckRetries),
+	), nil
 }
 
 func (p *processor) Close() error {
