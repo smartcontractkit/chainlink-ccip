@@ -3216,9 +3216,9 @@ func TestCCIPRouter(t *testing.T) {
 	t.Run("Manual Cursing", func(t *testing.T) {
 		t.Run("no curses by default", func(t *testing.T) {
 			svmCurse := rmn_remote.CurseSubject{}
-			binary.LittleEndian.PutUint64(svmCurse.Value[:], config.SvmChainSelector)
+			binary.BigEndian.PutUint64(svmCurse.Value[8:], config.SvmChainSelector)
 			evmCurse := rmn_remote.CurseSubject{}
-			binary.LittleEndian.PutUint64(evmCurse.Value[:], config.EvmChainSelector)
+			binary.BigEndian.PutUint64(evmCurse.Value[8:], config.EvmChainSelector)
 
 			ix, err := rmn_remote.NewVerifyNotCursedInstruction(
 				evmCurse,
@@ -3263,9 +3263,9 @@ func TestCCIPRouter(t *testing.T) {
 
 			// All subjects are cursed now
 			svmCurse := rmn_remote.CurseSubject{}
-			binary.LittleEndian.PutUint64(svmCurse.Value[:], config.SvmChainSelector)
+			binary.BigEndian.PutUint64(svmCurse.Value[8:], config.SvmChainSelector)
 			evmCurse := rmn_remote.CurseSubject{}
-			binary.LittleEndian.PutUint64(evmCurse.Value[:], config.EvmChainSelector)
+			binary.BigEndian.PutUint64(evmCurse.Value[8:], config.EvmChainSelector)
 
 			ix, err = rmn_remote.NewVerifyNotCursedInstruction(
 				evmCurse,
@@ -3399,9 +3399,9 @@ func TestCCIPRouter(t *testing.T) {
 
 		t.Run("adding chain selector curses", func(t *testing.T) {
 			svmCurse := rmn_remote.CurseSubject{}
-			binary.LittleEndian.PutUint64(svmCurse.Value[:], config.SvmChainSelector)
+			binary.BigEndian.PutUint64(svmCurse.Value[8:], config.SvmChainSelector)
 			evmCurse := rmn_remote.CurseSubject{}
-			binary.LittleEndian.PutUint64(evmCurse.Value[:], config.EvmChainSelector)
+			binary.BigEndian.PutUint64(evmCurse.Value[8:], config.EvmChainSelector)
 
 			ix, err := rmn_remote.NewCurseInstruction(
 				svmCurse,
@@ -3527,7 +3527,7 @@ func TestCCIPRouter(t *testing.T) {
 
 		t.Run("cleanup", func(t *testing.T) {
 			evmCurse := rmn_remote.CurseSubject{}
-			binary.LittleEndian.PutUint64(evmCurse.Value[:], config.EvmChainSelector)
+			binary.BigEndian.PutUint64(evmCurse.Value[8:], config.EvmChainSelector)
 			ix, err := rmn_remote.NewUncurseInstruction(
 				evmCurse,
 				config.RMNRemoteConfigPDA,

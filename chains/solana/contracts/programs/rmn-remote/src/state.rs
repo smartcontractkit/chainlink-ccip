@@ -28,7 +28,8 @@ impl CurseSubject {
 
     pub const fn from_chain_selector(selector: u64) -> Self {
         Self {
-            value: (selector as u128).to_le_bytes(),
+            // Big endian for compatibility with EVM chains.
+            value: (selector as u128).to_be_bytes(),
         }
     }
 
