@@ -9,6 +9,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1/ocrtypecodecpb"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 var DefaultExecCodec ExecCodec = NewExecCodecProto()
@@ -92,6 +93,14 @@ func (e *ExecCodecProto) EncodeOutcome(outcome exectypes.Outcome) ([]byte, error
 	if len(pbObs.ExecutePluginReports) == 1 {
 		pbObs.ExecutePluginReport = pbObs.ExecutePluginReports[0]
 		pbObs.ExecutePluginReports = nil
+	}
+
+	// TODO: Remove after "Reports" is fully supported.
+	if len(outcome.Report.ChainReports) != 0 {
+		r := e.tr.execPluginReportsToProto([]ccipocr3.ExecutePluginReport{outcome.Report})
+		if len(r) > 0 {
+			pbObs.ExecutePluginReport = r[0]
+		}
 	}
 
 	return proto.MarshalOptions{Deterministic: true}.Marshal(pbObs)

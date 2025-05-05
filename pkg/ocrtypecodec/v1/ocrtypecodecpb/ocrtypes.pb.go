@@ -330,7 +330,7 @@ type ExecOutcome struct {
 
 	PluginState          string                 `protobuf:"bytes,1,opt,name=plugin_state,json=pluginState,proto3" json:"plugin_state,omitempty"`
 	CommitReports        []*CommitData          `protobuf:"bytes,2,rep,name=commit_reports,json=commitReports,proto3" json:"commit_reports,omitempty"`
-	ExecutePluginReport  *ExecutePluginReport   `protobuf:"bytes,3,opt,name=execute_plugin_report,json=executePluginReport,proto3" json:"execute_plugin_report,omitempty"`
+	ExecutePluginReport  *ExecutePluginReport   `protobuf:"bytes,3,opt,name=execute_plugin_report,json=executePluginReport,proto3" json:"execute_plugin_report,omitempty"` // DEPRECATED: Use execute_plugin_reports instead
 	ExecutePluginReports []*ExecutePluginReport `protobuf:"bytes,4,rep,name=execute_plugin_reports,json=executePluginReports,proto3" json:"execute_plugin_reports,omitempty"`
 }
 
