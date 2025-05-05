@@ -430,6 +430,8 @@ func (p *Plugin) Outcome(
 		decodedQ.TokenPriceQuery,
 		tokenPricesObservations,
 	)
+	lggr.Debugw("token price outcome", "tokenPriceOutcome", tokenPriceOutcome,
+		"prevTokenPriceOutcome", prevOutcome.TokenPriceOutcome, "observations", tokenPricesObservations, "err", err)
 	if err != nil {
 		lggr.Warnw("failed to get token prices outcome", "err", err)
 	}
@@ -440,8 +442,10 @@ func (p *Plugin) Outcome(
 		decodedQ.ChainFeeQuery,
 		chainFeeObservations,
 	)
+	lggr.Debugw("chain fee outcome", "chainFeeOutcome", chainFeeOutcome,
+		"prevChainFeeOutcome", prevOutcome.ChainFeeOutcome, "observations", chainFeeObservations, "err", err)
 	if err != nil {
-		lggr.Warnw("failed to get gas prices outcome", "err", err)
+		lggr.Warnw("failed to get chain fee outcome", "err", err)
 	}
 
 	out := committypes.Outcome{
