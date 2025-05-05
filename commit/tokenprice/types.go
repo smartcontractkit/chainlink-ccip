@@ -30,6 +30,10 @@ func (out Outcome) Stats() map[string]int {
 	}
 }
 
+func (out Outcome) HasInflightTokenPriceUpdates() bool {
+	return len(out.InflightTokenPriceUpdates) > 0 && out.InflightRemainingChecks > 0
+}
+
 type Observation struct {
 	FeedTokenPrices       cciptypes.TokenPriceMap                                      `json:"feedTokenPrices"`
 	FeeQuoterTokenUpdates map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig `json:"feeQuoterTokenUpdates"`

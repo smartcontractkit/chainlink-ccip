@@ -34,6 +34,11 @@ func (o Outcome) Stats() map[string]int {
 	}
 }
 
+// HasInflightPrices checks if there are any inflight prices in the outcome.
+func (o Outcome) HasInflightPrices() bool {
+	return o.InflightRemainingChecks > 0 && len(o.InflightChainFeeUpdates) > 0
+}
+
 type Observation struct {
 	// FeeComponents: from the source chains, via chain writer
 	FeeComponents map[cciptypes.ChainSelector]types.ChainFeeComponents `json:"feeComponents"`

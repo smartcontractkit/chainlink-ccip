@@ -111,44 +111,15 @@ func (p *processor) Outcome(
 	}
 
 	// Check if we have inflight token price updates.
-	if prevOutcome.InflightRemainingChecks > 0 && len(prevOutcome.InflightTokenPriceUpdates) > 0 {
-		lggr.Debugw("checking for previously transmitted token price price updates to appear on-chain",
-			"prevUpdate", prevOutcome.InflightTokenPriceUpdates,
-			"currUpdates", consensusObservation.FeeQuoterTokenUpdates,
-			"remRetries", prevOutcome.InflightRemainingChecks,
-		)
-
-		for chainSel, inflightUpdate := range prevOutcome.InflightTokenPriceUpdates {
-			lggr2 := logger.With(lggr, "chainSel", chainSel, "prevUpdate", inflightUpdate,
-				"currUpdates", consensusObservation.FeeQuoterTokenUpdates)
-
-			currUpdate, exists := consensusObservation.FeeQuoterTokenUpdates[chainSel]
-			if !exists {
-				lggr2.Warnw("previously transmitted token price update not found in current round, assuming not transmitted")
-				return inflightTokenPricesOutcome, nil
-			}
-
-			if currUpdate.Timestamp.After(inflightUpdate.Timestamp) {
-				lggr2.Debugw("previously transmitted token price update appeared on-chain")
-				continue
-			}
-
-			lggr2.Warnw("waiting for previously transmitted token price update to appear on-chain")
-			return inflightTokenPricesOutcome, nil
-		}
-
-		// we don't want to transmit the current prices in this round because they might have been recorded onChain
-		// in-between Observation and Outcome ocr3 phases, and we might be reporting duplicates. We instead want to send
-		// an empty outcome so that in the next round we can properly send new prices.
-		return newEmptyOutcome(), nil
+	if prevOutcome.HasInflightTokenPriceUpdates() {
+		return p.computeInflightPricesOutcome(lggr, consensusObservation, prevOutcome), nil
 	}
 
 	inflightTokenPriceUpdates := make(map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig)
 	for tokenAddr := range tokenPriceOutcome {
 		oldTokenPriceUpdate, exists := consensusObservation.FeeQuoterTokenUpdates[tokenAddr]
-		if !exists {
-			inflightTokenPriceUpdates[tokenAddr] = cciptypes.NewTimestampedBig(0, time.Time{})
-		} else {
+		inflightTokenPriceUpdates[tokenAddr] = cciptypes.NewTimestampedBig(0, time.Time{})
+		if exists {
 			inflightTokenPriceUpdates[tokenAddr] = oldTokenPriceUpdate
 		}
 	}
@@ -158,6 +129,41 @@ func (p *processor) Outcome(
 		inflightTokenPriceUpdates,
 		int64(p.offChainCfg.InflightPriceCheckRetries),
 	), nil
+}
+
+// computeInflightPricesOutcome is called if in this round we wait for prices to appear OnChain.
+// If we still wait for some prices it will decrement the number of available retries.
+// If all prices appeared OnChain or no retries left it sends an empty outcome so we can transmit fresh prices in the
+// next round.
+func (p *processor) computeInflightPricesOutcome(
+	lggr logger.Logger, consensusObservation ConsensusObservation, prevOutcome Outcome,
+) Outcome {
+	lggr.Debugw("checking for previously transmitted token price price updates to appear on-chain",
+		"prevUpdate", prevOutcome.InflightTokenPriceUpdates,
+		"currUpdates", consensusObservation.FeeQuoterTokenUpdates,
+		"remRetries", prevOutcome.InflightRemainingChecks,
+	)
+
+	for chainSel, inflightUpdate := range prevOutcome.InflightTokenPriceUpdates {
+		lggr2 := logger.With(lggr, "chainSel", chainSel, "prevUpdate", inflightUpdate,
+			"currUpdates", consensusObservation.FeeQuoterTokenUpdates)
+
+		currUpdate, exists := consensusObservation.FeeQuoterTokenUpdates[chainSel]
+		priceAppearedOnChain := exists && currUpdate.Timestamp.After(inflightUpdate.Timestamp)
+		if !priceAppearedOnChain {
+			lggr2.Infow("waiting for previously transmitted token price updates to appear on-chain")
+			return newInflightPricesOutcome(
+				prevOutcome.InflightTokenPriceUpdates, prevOutcome.InflightRemainingChecks-1)
+		}
+
+		lggr2.Debugw("previously transmitted token price update appeared on-chain")
+	}
+
+	// we don't want to transmit the current prices in this round because they might have been recorded onChain
+	// in-between Observation and Outcome ocr3 phases, and we might be reporting duplicates. We instead want to send
+	// an empty outcome so that in the next round we can properly send new prices.
+	lggr.Infow("all inflight token prices appeared OnChain")
+	return newEmptyOutcome()
 }
 
 func (p *processor) Close() error {
