@@ -91,25 +91,20 @@ func (p *processor) Outcome(
 	// If set to zero, no prices will be reported (i.e keystone feeds would be active).
 	if p.offChainCfg.TokenPriceBatchWriteFrequency.Duration() == 0 {
 		lggr.Debugw("TokenPriceBatchWriteFrequency is set to zero, no prices will be reported")
-		return Outcome{InflightTokenPriceUpdates: prevOutcome.InflightTokenPriceUpdates}, nil
+		return Outcome{}, nil
 	}
 
 	consensusObservation, err := p.getConsensusObservation(lggr, aos)
 	if err != nil {
-		return Outcome{
-			InflightTokenPriceUpdates: prevOutcome.InflightTokenPriceUpdates,
-		}, fmt.Errorf("get consensus observation: %w", err)
+		return Outcome{}, fmt.Errorf("get consensus observation: %w", err)
 	}
 
 	tokenPriceOutcome := p.selectTokensForUpdate(lggr, consensusObservation)
-	lggr.Infow(
-		"outcome token prices",
-		"tokenPrices", tokenPriceOutcome,
-	)
+	lggr.Infow("outcome token prices", "tokenPrices", tokenPriceOutcome)
 
 	if len(tokenPriceOutcome) == 0 {
 		lggr.Debugw("No token prices to report")
-		return Outcome{InflightTokenPriceUpdates: prevOutcome.InflightTokenPriceUpdates}, nil
+		return Outcome{}, nil
 	}
 
 	// Check if we have inflight token price updates. If we do and they are still inflight (at least one of them) then
@@ -137,7 +132,7 @@ func (p *processor) Outcome(
 	for tokenAddr := range tokenPriceOutcome {
 		oldTokenPriceUpdate, exists := consensusObservation.FeeQuoterTokenUpdates[tokenAddr]
 		if !exists {
-			inflightTokenPriceUpdates[tokenAddr] = cciptypes.NewTimestampedBig(0, time.Now().Add(-24*time.Hour))
+			inflightTokenPriceUpdates[tokenAddr] = cciptypes.NewTimestampedBig(0, time.Time{})
 		} else {
 			inflightTokenPriceUpdates[tokenAddr] = oldTokenPriceUpdate
 		}
@@ -146,6 +141,7 @@ func (p *processor) Outcome(
 	out := Outcome{
 		TokenPrices:               tokenPriceOutcome,
 		InflightTokenPriceUpdates: inflightTokenPriceUpdates,
+		InflightRemainingChecks:   int64(p.offChainCfg.InflightPriceCheckRetries),
 	}
 	return out, nil
 }

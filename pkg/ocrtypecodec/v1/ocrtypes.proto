@@ -142,6 +142,7 @@ message MerkleRootOutcome {
 message TokenPriceOutcome {
   map<string, bytes> token_prices = 1;
   map<string, TimestampedBig> inflight_token_price_updates = 2; // address to timestamp
+  int64 inflight_remaining_checks = 3;
 }
 
 message ChainFeeOutcome {
