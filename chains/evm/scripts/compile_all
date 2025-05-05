@@ -22,15 +22,21 @@ compileContract() {
   local contract
   contract=$(basename "$1")
   echo "Compiling" "$contract"
+  dir=$CONTRACTS_DIR/solc/$PROJECT/$contract
 
   local command
   command="forge build $CONTRACTS_DIR/contracts/"$1.sol" \
    --root $CONTRACTS_DIR \
    $(getOptimizations "$contract") \
    --extra-output-files bin abi metadata \
-   -o $CONTRACTS_DIR/solc/$PROJECT/$contract"
+   --build-info \
+   --build-info-path $dir/build \
+   -o $dir"
 
   $command
+
+  # Move the build info to an expected file name
+  mv $(find $dir/build -type f -name '*.json' ! -name 'build.json') $dir/build/build.json
 
   # Copy the generated abi files to a single folder
   cp "$CONTRACTS_DIR"/solc/$PROJECT/"$contract"/"$contract".sol/"$contract".abi.json "$ABI_DIR""$contract".abi

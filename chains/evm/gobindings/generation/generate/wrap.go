@@ -24,7 +24,7 @@ func main() {
 
 	abiPath := rootDir + project + "/" + className + "/" + className + ".sol/" + className + ".abi.json"
 	binPath := rootDir + project + "/" + className + "/" + className + ".sol/" + className + ".bin"
-	metadataPath := rootDir + project + "/" + className + "/" + className + ".sol/" + className + ".metadata.json"
+	metadataPath := rootDir + project + "/" + className + "/build/build.json"
 
 	GenWrapper(abiPath, binPath, metadataPath, className, pkgName, outDirSuffix)
 }
