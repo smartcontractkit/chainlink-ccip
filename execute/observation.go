@@ -454,6 +454,10 @@ func (p *Plugin) getMessagesObservation(
 			}
 		}
 
+		// TODO: check if the commit report is all fully executed and inflight messages.
+		// Might be able to just not include it in the observation at all? Or is there a
+		// risk with that?
+
 		if stop {
 			lggr.Infow("Stop processing messages, observation is too large",
 				"totalMsgs", totalMsgs, "encodedObsSize", encodedObsSize)
@@ -492,10 +496,23 @@ func (p *Plugin) getFilterObservation(
 		}
 
 		for _, msg := range report.Messages {
+			// The GetMessages observation could potentially include a pseudo-deleted message,
+			// which is either:
+			// - a message that is inflight
+			// - a message that has already been executed
+			// - a message that was not included in the observation due to size limits
+			// In all cases, since we don't need to execute these messages, we don't need to fetch their sender's nonce.
+			if msg.IsPseudoDeleted() {
+				lggr.Debugw("skipping pseudo-deleted message",
+					"messageID", msg.Header.MessageID,
+				)
+				continue
+			}
+
 			sender, err := p.addrCodec.AddressBytesToString(msg.Sender[:], srcChain)
 			if err != nil {
 				lggr.Errorw("unable to convert sender address to string",
-					"err", err, "sender address", msg.Sender)
+					"err", err, "senderAddress", msg.Sender)
 				continue
 			}
 
