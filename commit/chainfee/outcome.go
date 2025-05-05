@@ -40,24 +40,36 @@ func (p *processor) Outcome(
 		return inflightPricesOutcome, nil
 	}
 
-	// Check if we have pending chain fee updates.
-	for chainSel, inflightUpdate := range prevOutcome.InflightChainFeeUpdates {
-		lggr2 := logger.With(lggr, "chainSel", chainSel, "prevUpdate", inflightUpdate,
-			"currUpdates", consensusObs.ChainFeeUpdates, "remRetries", prevOutcome.InflightRemainingChecks)
+	if prevOutcome.InflightRemainingChecks > 0 && len(prevOutcome.InflightChainFeeUpdates) > 0 {
+		lggr.Debugw("checking for previously transmitted chain fee price updates to appear on-chain",
+			"prevUpdate", prevOutcome.InflightChainFeeUpdates,
+			"currUpdates", consensusObs.ChainFeeUpdates,
+			"remRetries", prevOutcome.InflightRemainingChecks,
+		)
 
-		currUpdate, exists := consensusObs.ChainFeeUpdates[chainSel]
-		if !exists {
-			lggr2.Warnw("previously transmitted chain fee update not found in current round, assuming not transmitted")
+		for chainSel, inflightUpdate := range prevOutcome.InflightChainFeeUpdates {
+			lggr2 := logger.With(lggr, "chainSel", chainSel, "prevUpdate", inflightUpdate,
+				"currUpdates", consensusObs.ChainFeeUpdates, "remRetries", prevOutcome.InflightRemainingChecks)
+
+			currUpdate, exists := consensusObs.ChainFeeUpdates[chainSel]
+			if !exists {
+				lggr2.Warnw("previously transmitted chain fee update not found in current round, assuming not transmitted")
+				continue
+			}
+
+			if currUpdate.Timestamp.After(inflightUpdate.Timestamp) {
+				lggr2.Debugw("previously transmitted chain fee price update appeared on-chain")
+				continue
+			}
+
+			lggr2.Warnw("waiting for previously transmitted chain fee price update to appear on-chain")
 			return inflightPricesOutcome, nil
 		}
 
-		if currUpdate.Timestamp.After(inflightUpdate.Timestamp) {
-			lggr2.Debugw("previously transmitted chain fee price update appeared on-chain")
-			continue
-		}
-
-		lggr2.Warnw("waiting for previously transmitted chain fee price update to appear on-chain")
-		return inflightPricesOutcome, nil
+		// we don't want to transmit the current prices in this round because they might have been recorded onChain
+		// in-between Observation and Outcome ocr3 phases, and we might be reporting duplicates. We instead want to send
+		// an empty outcome so that in the next round we can properly send new prices.
+		return newEmptyOutcome(), nil
 	}
 
 	chainFeeUSDPrices := make(map[cciptypes.ChainSelector]ComponentsUSDPrices)
@@ -383,7 +395,7 @@ func newInflightPricesOutcome(
 	inflightPrices map[cciptypes.ChainSelector]Update,
 	inflightRemainingChecks int64,
 ) Outcome {
-	if inflightRemainingChecks <= 0 {
+	if inflightRemainingChecks <= 0 || len(inflightPrices) == 0 {
 		return newEmptyOutcome()
 	}
 	return Outcome{

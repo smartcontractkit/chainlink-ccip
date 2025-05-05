@@ -110,25 +110,37 @@ func (p *processor) Outcome(
 		return inflightTokenPricesOutcome, nil
 	}
 
-	// Check if we have inflight token price updates. If we do and they are still inflight (at least one of them) then
-	// our Outcome will not include new token price updates.
-	for chainSel, inflightUpdate := range prevOutcome.InflightTokenPriceUpdates {
-		lggr2 := logger.With(lggr, "chainSel", chainSel, "prevUpdate", inflightUpdate,
-			"currUpdates", consensusObservation.FeeQuoterTokenUpdates)
+	// Check if we have inflight token price updates.
+	if prevOutcome.InflightRemainingChecks > 0 && len(prevOutcome.InflightTokenPriceUpdates) > 0 {
+		lggr.Debugw("checking for previously transmitted token price price updates to appear on-chain",
+			"prevUpdate", prevOutcome.InflightTokenPriceUpdates,
+			"currUpdates", consensusObservation.FeeQuoterTokenUpdates,
+			"remRetries", prevOutcome.InflightRemainingChecks,
+		)
 
-		currUpdate, exists := consensusObservation.FeeQuoterTokenUpdates[chainSel]
-		if !exists {
-			lggr2.Warnw("previously transmitted token price update not found in current round, assuming not transmitted")
+		for chainSel, inflightUpdate := range prevOutcome.InflightTokenPriceUpdates {
+			lggr2 := logger.With(lggr, "chainSel", chainSel, "prevUpdate", inflightUpdate,
+				"currUpdates", consensusObservation.FeeQuoterTokenUpdates)
+
+			currUpdate, exists := consensusObservation.FeeQuoterTokenUpdates[chainSel]
+			if !exists {
+				lggr2.Warnw("previously transmitted token price update not found in current round, assuming not transmitted")
+				return inflightTokenPricesOutcome, nil
+			}
+
+			if currUpdate.Timestamp.After(inflightUpdate.Timestamp) {
+				lggr2.Debugw("previously transmitted token price update appeared on-chain")
+				continue
+			}
+
+			lggr2.Warnw("waiting for previously transmitted token price update to appear on-chain")
 			return inflightTokenPricesOutcome, nil
 		}
 
-		if currUpdate.Timestamp.After(inflightUpdate.Timestamp) {
-			lggr2.Debugw("previously transmitted token price update appeared on-chain")
-			continue
-		}
-
-		lggr2.Warnw("waiting for previously transmitted token price update to appear on-chain")
-		return inflightTokenPricesOutcome, nil
+		// we don't want to transmit the current prices in this round because they might have been recorded onChain
+		// in-between Observation and Outcome ocr3 phases, and we might be reporting duplicates. We instead want to send
+		// an empty outcome so that in the next round we can properly send new prices.
+		return newEmptyOutcome(), nil
 	}
 
 	inflightTokenPriceUpdates := make(map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig)
