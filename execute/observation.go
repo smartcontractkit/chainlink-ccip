@@ -48,11 +48,6 @@ func (p *Plugin) Observation(
 	}
 	lggr.Infow("decoded previous outcome", "previousOutcome", previousOutcome)
 
-	// TODO: Support "Reports" field.
-	if len(previousOutcome.Reports) > 0 {
-		previousOutcome.Report = previousOutcome.Reports[0]
-	}
-
 	// If the previous outcome was the filter state, and reports were built, mark the messages as inflight.
 	if previousOutcome.State == exectypes.Filter {
 		for _, chainReport := range previousOutcome.Report.ChainReports {

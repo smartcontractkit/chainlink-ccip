@@ -103,9 +103,6 @@ func currentState(p *TrackedPlugin, outctx ocr3types.OutcomeContext) exectypes.P
 	}
 
 	// TODO: Support "Reports" field.
-	if len(out.Reports) > 0 {
-		out.Report = out.Reports[0]
-	}
 
 	return out.State.Next()
 }

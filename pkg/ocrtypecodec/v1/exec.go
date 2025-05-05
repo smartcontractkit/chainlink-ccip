@@ -120,6 +120,12 @@ func (e *ExecCodecProto) DecodeOutcome(data []byte) (exectypes.Outcome, error) {
 		outc.Reports = e.tr.execPluginReportsFromProto([]*ocrtypecodecpb.ExecutePluginReport{pbOutc.ExecutePluginReport})
 	}
 
+	// Decode the new report format into the legacy field as an intermediate step for implementing this feature.
+	// TODO: Remove temporary function after the 'Reports' field is fully implemented.
+	if len(outc.Reports) > 0 {
+		outc.Report = outc.Reports[0]
+	}
+
 	return outc, nil
 }
 

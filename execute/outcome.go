@@ -35,11 +35,6 @@ func (p *Plugin) Outcome(
 		return nil, fmt.Errorf("unable to decode previous outcome: %w", err)
 	}
 
-	// TODO: Support "Reports" field.
-	if len(previousOutcome.Reports) > 0 {
-		previousOutcome.Report = previousOutcome.Reports[0]
-	}
-
 	state := previousOutcome.State.Next()
 	lggr = logger.With(lggr, "execPluginState", state)
 	lggr.Debugw("Execute plugin performing outcome",
