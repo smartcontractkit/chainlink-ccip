@@ -195,7 +195,6 @@ func TestGetConsensusObservation(t *testing.T) {
 }
 
 func TestProcessor_Outcome(t *testing.T) {
-	t.Skip("todo")
 	oneMinuteAgo := time.Now().Add(-time.Minute).UTC()
 	numOracles := 5 // Use a consistent number for generating aos
 
@@ -225,6 +224,10 @@ func TestProcessor_Outcome(t *testing.T) {
 							GasPrice: cciptypes.NewBigInt(gas2),
 						},
 					},
+					InflightChainFeeUpdates: map[cciptypes.ChainSelector]time.Time{
+						2: time.Now(),
+					},
+					InflightRemainingChecks: 10,
 				}
 				return expectedOutcome
 			},
@@ -295,6 +298,10 @@ func TestProcessor_Outcome(t *testing.T) {
 					GasPrices: []cciptypes.GasPriceChain{
 						{GasPrice: cciptypes.NewBigInt(exp), ChainSel: 1}, // only chainSel=1
 					},
+					InflightChainFeeUpdates: map[cciptypes.ChainSelector]time.Time{
+						1: time.Now(),
+					},
+					InflightRemainingChecks: 10,
 				}
 			},
 		},
@@ -384,6 +391,7 @@ func TestProcessor_Outcome(t *testing.T) {
 				fRoleDON:  1,
 				cfg: pluginconfig.CommitOffchainConfig{
 					RemoteGasPriceBatchWriteFrequency: tt.chainFeeWriteFrequency,
+					InflightPriceCheckRetries:         10,
 				},
 				metricsReporter: plugincommon.NoopReporter{},
 				homeChain:       homeChainMock,
@@ -394,7 +402,18 @@ func TestProcessor_Outcome(t *testing.T) {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				assert.Equal(t, tt.expectedOutcome(), outcome)
+
+				expOutcome := tt.expectedOutcome()
+				actOutcome := outcome
+
+				require.Equal(t, len(expOutcome.InflightChainFeeUpdates), len(actOutcome.InflightChainFeeUpdates))
+				for chainSel, actTs := range actOutcome.InflightChainFeeUpdates {
+					require.Greater(t, expOutcome.InflightChainFeeUpdates[chainSel], actTs)
+				}
+
+				expOutcome.InflightChainFeeUpdates = nil
+				actOutcome.InflightChainFeeUpdates = nil
+				assert.Equal(t, expOutcome, actOutcome)
 			}
 		})
 	}

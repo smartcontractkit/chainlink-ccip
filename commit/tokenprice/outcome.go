@@ -172,7 +172,7 @@ func newInflightPricesOutcome(
 	inflightPrices map[cciptypes.UnknownEncodedAddress]time.Time,
 	remainingChecks int64,
 ) Outcome {
-	if remainingChecks <= 0 {
+	if remainingChecks <= 0 || len(inflightPrices) == 0 {
 		return newEmptyOutcome()
 	}
 	return Outcome{
@@ -186,6 +186,9 @@ func newTokenPricesOutcome(
 	inflightPrices map[cciptypes.UnknownEncodedAddress]time.Time,
 	remainingChecks int64,
 ) Outcome {
+	if len(tokenPrices) == 0 {
+		return newInflightPricesOutcome(inflightPrices, remainingChecks)
+	}
 	return Outcome{
 		TokenPrices:               tokenPrices,
 		InflightTokenPriceUpdates: inflightPrices,

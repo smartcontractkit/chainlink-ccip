@@ -415,6 +415,9 @@ func newPricesOutcome(
 	inflightPrices map[cciptypes.ChainSelector]time.Time,
 	inflightRemainingChecks int64,
 ) Outcome {
+	if len(gasPrices) == 0 {
+		return newInflightPricesOutcome(inflightPrices, inflightRemainingChecks)
+	}
 	return Outcome{
 		GasPrices:               gasPrices,
 		InflightChainFeeUpdates: inflightPrices,
