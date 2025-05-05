@@ -94,15 +94,16 @@ func (p *processor) Outcome(
 		return newEmptyOutcome(), nil
 	}
 
+	inflightTokenPricesOutcome := newInflightPricesOutcome(
+		prevOutcome.InflightTokenPriceUpdates, prevOutcome.InflightRemainingChecks-1)
+
 	consensusObservation, err := p.getConsensusObservation(lggr, aos)
 	if err != nil {
-		return newEmptyOutcome(), fmt.Errorf("get consensus observation: %w", err)
+		return inflightTokenPricesOutcome, fmt.Errorf("get consensus observation: %w", err)
 	}
 
 	tokenPriceOutcome := p.selectTokensForUpdate(lggr, consensusObservation)
 	lggr.Infow("outcome token prices", "tokenPrices", tokenPriceOutcome)
-	inflightTokenPricesOutcome := newInflightPricesOutcome(
-		prevOutcome.InflightTokenPriceUpdates, prevOutcome.InflightRemainingChecks-1)
 
 	if len(tokenPriceOutcome) == 0 {
 		lggr.Debugw("No token prices to report")

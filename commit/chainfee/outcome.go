@@ -26,17 +26,18 @@ func (p *processor) Outcome(
 ) (Outcome, error) {
 	lggr := logutil.WithContextValues(ctx, p.lggr)
 
+	inflightPricesOutcome := newInflightPricesOutcome(
+		prevOutcome.InflightChainFeeUpdates, prevOutcome.InflightRemainingChecks-1)
+
 	consensusObs, err := p.getConsensusObservation(lggr, aos)
 	if err != nil {
-		return Outcome{},
-			fmt.Errorf("get consensus observation: %w", err)
+		return inflightPricesOutcome, fmt.Errorf("get consensus observation: %w", err)
 	}
 
 	// No need to update yet
 	if len(consensusObs.FeeComponents) == 0 {
-		lggr.Warn("no consensus on fee components, nothing to update",
-			"consensusObs", consensusObs)
-		return Outcome{}, nil
+		lggr.Warn("no consensus on fee components, nothing to update", "consensusObs", consensusObs)
+		return inflightPricesOutcome, nil
 	}
 
 	// Check if we have pending chain fee updates.
@@ -47,11 +48,7 @@ func (p *processor) Outcome(
 		currUpdate, exists := consensusObs.ChainFeeUpdates[chainSel]
 		if !exists {
 			lggr2.Warnw("previously transmitted chain fee update not found in current round, assuming not transmitted")
-			return Outcome{
-				GasPrices:               nil,
-				InflightChainFeeUpdates: prevOutcome.InflightChainFeeUpdates,
-				InflightRemainingChecks: prevOutcome.InflightRemainingChecks - 1,
-			}, nil
+			return inflightPricesOutcome, nil
 		}
 
 		if currUpdate.Timestamp.After(inflightUpdate.Timestamp) {
@@ -60,11 +57,7 @@ func (p *processor) Outcome(
 		}
 
 		lggr2.Warnw("waiting for previously transmitted chain fee price update to appear on-chain")
-		return Outcome{
-			GasPrices:               nil,
-			InflightChainFeeUpdates: prevOutcome.InflightChainFeeUpdates,
-			InflightRemainingChecks: prevOutcome.InflightRemainingChecks - 1,
-		}, nil
+		return inflightPricesOutcome, nil
 	}
 
 	chainFeeUSDPrices := make(map[cciptypes.ChainSelector]ComponentsUSDPrices)
@@ -132,12 +125,7 @@ func (p *processor) Outcome(
 		}
 	}
 
-	out := Outcome{
-		GasPrices:               gasPrices,
-		InflightChainFeeUpdates: inflightChainFeeUpdates,
-		InflightRemainingChecks: int64(p.cfg.InflightPriceCheckRetries),
-	}
-	return out, nil
+	return newPricesOutcome(gasPrices, inflightChainFeeUpdates, int64(p.cfg.InflightPriceCheckRetries)), nil
 }
 
 func (p *processor) getConsensusObservation(
@@ -385,4 +373,33 @@ func chainFeeUpdateAggregator(updates []Update) Update {
 func FeeComponentsToPackedFee(c ComponentsUSDPrices) *big.Int {
 	daShifted := new(big.Int).Lsh(c.DataAvFeePriceUSD, 112)
 	return new(big.Int).Or(daShifted, c.ExecutionFeePriceUSD)
+}
+
+func newEmptyOutcome() Outcome {
+	return Outcome{}
+}
+
+func newInflightPricesOutcome(
+	inflightPrices map[cciptypes.ChainSelector]Update,
+	inflightRemainingChecks int64,
+) Outcome {
+	if inflightRemainingChecks <= 0 {
+		return newEmptyOutcome()
+	}
+	return Outcome{
+		InflightChainFeeUpdates: inflightPrices,
+		InflightRemainingChecks: inflightRemainingChecks,
+	}
+}
+
+func newPricesOutcome(
+	tokenPrices []cciptypes.GasPriceChain,
+	inflightPrices map[cciptypes.ChainSelector]Update,
+	inflightRemainingChecks int64,
+) Outcome {
+	return Outcome{
+		GasPrices:               tokenPrices,
+		InflightChainFeeUpdates: inflightPrices,
+		InflightRemainingChecks: inflightRemainingChecks,
+	}
 }
