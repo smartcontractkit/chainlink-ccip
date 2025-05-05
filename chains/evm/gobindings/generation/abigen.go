@@ -82,7 +82,7 @@ func Abigen(a AbigenArgs) {
 	if err := json.Compact(&buf, metadataBytes); err != nil {
 		Exit("Error while compacting metadata JSON", err)
 	}
-	goCode := fmt.Sprintf("%s\n\npackage %s\n\nvar Metadata = %s\n", headerComment, a.Pkg, strconv.Quote(buf.String()))
+	goCode := fmt.Sprintf("%s\npackage %s\n\nvar Metadata = %s\n", headerComment, a.Pkg, strconv.Quote(buf.String()))
 	err = os.WriteFile(a.MetadataOut, []byte(goCode), 0600)
 	if err != nil {
 		Exit("Error while writing metadata file", err)
