@@ -86,6 +86,17 @@ pub mod ccip_router {
         Ok(())
     }
 
+    /// Returns the program type (name) and version.
+    /// Used by offchain code to easily determine which program & version is being interacted with.
+    ///
+    /// # Arguments
+    /// * `ctx` - The context
+    pub fn type_version(_ctx: Context<Empty>) -> Result<String> {
+        let response = env!("CCIP_BUILD_TYPE_VERSION").to_string();
+        msg!("{}", response);
+        Ok(response)
+    }
+
     /// Transfers the ownership of the router to a new proposed owner.
     ///
     /// Shared func signature with other programs

@@ -39,6 +39,12 @@ pub struct InitializeTokenPool<'info> {
 }
 
 #[derive(Accounts)]
+pub struct Empty<'info> {
+    // This is unused, but Anchor requires that there is at least one account in the context
+    pub clock: Sysvar<'info, Clock>,
+}
+
+#[derive(Accounts)]
 #[instruction(mint: Pubkey)]
 pub struct InitializeStateVersion<'info> {
     #[account(
