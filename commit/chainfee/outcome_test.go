@@ -235,7 +235,7 @@ func TestProcessor_Outcome(t *testing.T) {
 						},
 					},
 					InflightChainFeeUpdates: map[cciptypes.ChainSelector]time.Time{
-						2: time.Now(),
+						internal.EvmChainSelector2: time.Now(),
 					},
 					InflightRemainingChecks: 10,
 				}
@@ -311,7 +311,7 @@ func TestProcessor_Outcome(t *testing.T) {
 						{GasPrice: cciptypes.NewBigInt(exp), ChainSel: internal.EvmChainSelector}, // only chainSel=1
 					},
 					InflightChainFeeUpdates: map[cciptypes.ChainSelector]time.Time{
-						1: time.Now(),
+						internal.EvmChainSelector: time.Now(),
 					},
 					InflightRemainingChecks: 10,
 				}

@@ -533,7 +533,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 			},
 		},
 		InflightChainFeeUpdates: map[ccipocr3.ChainSelector]time.Time{
-			sourceChain1: time.Now(),
+			sourceEvmChain1: time.Now(),
 		},
 		InflightRemainingChecks: 10,
 	}
@@ -566,8 +566,8 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 						},
 					},
 					InflightChainFeeUpdates: map[ccipocr3.ChainSelector]time.Time{
-						sourceChain1: time.Now(),
-						sourceChain2: time.Now(),
+						sourceEvmChain1: time.Now(),
+						sourceSolChain:  time.Now(),
 					},
 					InflightRemainingChecks: 10,
 				},
@@ -623,7 +623,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 				MerkleRootOutcome: merkleOutcome,
 				ChainFeeOutcome: chainfee.Outcome{
 					InflightChainFeeUpdates: map[ccipocr3.ChainSelector]time.Time{
-						sourceChain1: time.Now(),
+						sourceEvmChain1: time.Now(),
 					},
 					InflightRemainingChecks: 9,
 				},
@@ -634,14 +634,14 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 					GetChainsFeeComponents(mock.Anything, mock.Anything).
 					Return(
 						map[ccipocr3.ChainSelector]types.ChainFeeComponents{
-							sourceChain1: newFeeComponents,
+							sourceEvmChain1: evmFeeComponents,
 						})
 
 				m.EXPECT().
 					GetWrappedNativeTokenPriceUSD(mock.Anything, mock.Anything).
 					Return(map[ccipocr3.ChainSelector]ccipocr3.BigInt{
-						sourceChain1: newNativePrice,
-						sourceChain2: newNativePrice,
+						sourceEvmChain1: evmNativePrice,
+						sourceSolChain:  solNativePrice,
 					})
 			},
 		},
@@ -687,7 +687,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 						},
 					},
 					InflightChainFeeUpdates: map[ccipocr3.ChainSelector]time.Time{
-						sourceChain1: time.Now(),
+						sourceSolChain: time.Now(),
 					},
 					InflightRemainingChecks: 10,
 				},
@@ -724,7 +724,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 						},
 					},
 					InflightChainFeeUpdates: map[ccipocr3.ChainSelector]time.Time{
-						sourceChain1: time.Now(),
+						sourceSolChain: time.Now(),
 					},
 					InflightRemainingChecks: 10,
 				},
