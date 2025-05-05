@@ -517,8 +517,6 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 }
 
 func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
-	t.Skip("todo")
-
 	params := defaultNodeParams(t)
 	merkleOutcome := reportEmptyMerkleRootOutcome()
 	nodes := make([]ocr3types.ReportingPlugin[[]byte], len(oracleIDs))
@@ -531,6 +529,10 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 				ChainSel: sourceChain1,
 			},
 		},
+		InflightChainFeeUpdates: map[ccipocr3.ChainSelector]time.Time{
+			sourceChain1: time.Now(),
+		},
+		InflightRemainingChecks: 10,
 	}
 
 	newFeeComponents2, newNativePrice2, newPackedGasPrice2 := newRandomFees()
@@ -559,8 +561,12 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 							ChainSel: sourceChain2,
 						},
 					},
+					InflightChainFeeUpdates: map[ccipocr3.ChainSelector]time.Time{
+						sourceChain1: time.Now(),
+						sourceChain2: time.Now(),
+					},
+					InflightRemainingChecks: 10,
 				},
-				MainOutcome: committypes.MainOutcome{InflightPriceOcrSequenceNumber: 1, RemainingPriceChecks: 10},
 			},
 			expTransmittedReportLen: 1,
 			mockCCIPReader: func(m *readerpkg_mock.MockCCIPReader) {
@@ -586,7 +592,6 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 			expOutcome: committypes.Outcome{
 				MerkleRootOutcome: merkleOutcome,
 				ChainFeeOutcome:   expectedChain1FeeOutcome,
-				MainOutcome:       committypes.MainOutcome{InflightPriceOcrSequenceNumber: 1, RemainingPriceChecks: 10},
 			},
 			expTransmittedReportLen: 1,
 			mockCCIPReader: func(m *readerpkg_mock.MockCCIPReader) {
@@ -608,28 +613,43 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 		{
 			name: "fee components should not be updated when there's a subset of chains but we wait for prices",
 			prevOutcome: committypes.Outcome{
-				MainOutcome: committypes.MainOutcome{InflightPriceOcrSequenceNumber: 1, RemainingPriceChecks: 4},
+				ChainFeeOutcome: expectedChain1FeeOutcome,
 			},
 			expOutcome: committypes.Outcome{
 				MerkleRootOutcome: merkleOutcome,
-				MainOutcome:       committypes.MainOutcome{InflightPriceOcrSequenceNumber: 1, RemainingPriceChecks: 3},
+				ChainFeeOutcome: chainfee.Outcome{
+					InflightChainFeeUpdates: map[ccipocr3.ChainSelector]time.Time{
+						sourceChain1: time.Now(),
+					},
+					InflightRemainingChecks: 9,
+				},
 			},
 			expTransmittedReportLen: 0,
 			mockCCIPReader: func(m *readerpkg_mock.MockCCIPReader) {
-				m.EXPECT().GetLatestPriceSeqNr(mock.Anything).Unset()
-				m.EXPECT().GetLatestPriceSeqNr(mock.Anything).Return(0, nil).Maybe()
+				m.EXPECT().
+					GetChainsFeeComponents(mock.Anything, mock.Anything).
+					Return(
+						map[ccipocr3.ChainSelector]types.ChainFeeComponents{
+							sourceChain1: newFeeComponents,
+						})
+
+				m.EXPECT().
+					GetWrappedNativeTokenPriceUSD(mock.Anything, mock.Anything).
+					Return(map[ccipocr3.ChainSelector]ccipocr3.BigInt{
+						sourceChain1: newNativePrice,
+						sourceChain2: newNativePrice,
+					})
 			},
 		},
 		{
 			name: "fee components should not be updated within deviation",
 			prevOutcome: committypes.Outcome{
 				MerkleRootOutcome: merkleOutcome,
-				ChainFeeOutcome:   expectedChain1FeeOutcome,
+				ChainFeeOutcome:   chainfee.Outcome{},
 			},
 			expOutcome: committypes.Outcome{
 				MerkleRootOutcome: merkleOutcome,
 				ChainFeeOutcome:   expectedChain1FeeOutcome,
-				MainOutcome:       committypes.MainOutcome{InflightPriceOcrSequenceNumber: 1, RemainingPriceChecks: 10},
 			},
 			expTransmittedReportLen: 1,
 			mockCCIPReader: func(m *readerpkg_mock.MockCCIPReader) {
@@ -651,7 +671,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 			name: "fresh fees (timestamped) should not be updated, even outside of deviation",
 			prevOutcome: committypes.Outcome{
 				MerkleRootOutcome: merkleOutcome,
-				ChainFeeOutcome:   expectedChain1FeeOutcome,
+				ChainFeeOutcome:   chainfee.Outcome{},
 			},
 			expOutcome: committypes.Outcome{
 				MerkleRootOutcome: reportEmptyMerkleRootOutcome(),
@@ -662,8 +682,11 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 							ChainSel: sourceChain1,
 						},
 					},
+					InflightChainFeeUpdates: map[ccipocr3.ChainSelector]time.Time{
+						sourceChain1: time.Now(),
+					},
+					InflightRemainingChecks: 10,
 				},
-				MainOutcome: committypes.MainOutcome{InflightPriceOcrSequenceNumber: 1, RemainingPriceChecks: 10},
 			},
 			expTransmittedReportLen: 1,
 			mockCCIPReader: func(m *readerpkg_mock.MockCCIPReader) {
@@ -685,7 +708,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 			name: "stale fees should be updated",
 			prevOutcome: committypes.Outcome{
 				MerkleRootOutcome: merkleOutcome,
-				ChainFeeOutcome:   expectedChain1FeeOutcome,
+				ChainFeeOutcome:   chainfee.Outcome{},
 			},
 			expOutcome: committypes.Outcome{
 				MerkleRootOutcome: reportEmptyMerkleRootOutcome(),
@@ -696,8 +719,11 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 							ChainSel: sourceChain1,
 						},
 					},
+					InflightChainFeeUpdates: map[ccipocr3.ChainSelector]time.Time{
+						sourceChain1: time.Now(),
+					},
+					InflightRemainingChecks: 10,
 				},
-				MainOutcome: committypes.MainOutcome{InflightPriceOcrSequenceNumber: 1, RemainingPriceChecks: 10},
 			},
 			expTransmittedReportLen: 1,
 			mockCCIPReader: func(m *readerpkg_mock.MockCCIPReader) {
@@ -751,7 +777,16 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 
 			decodedOutcome, err := ocrTypCodec.DecodeOutcome(res.Outcome)
 			require.NoError(t, err)
-			require.Equal(t, normalizeOutcome(tc.expOutcome), normalizeOutcome(decodedOutcome))
+			actOutcome := decodedOutcome
+			expOutcome := tc.expOutcome
+			require.Equal(t, len(actOutcome.ChainFeeOutcome.InflightChainFeeUpdates),
+				len(expOutcome.ChainFeeOutcome.InflightChainFeeUpdates))
+			for k, v := range actOutcome.ChainFeeOutcome.InflightChainFeeUpdates {
+				require.True(t, v.Before(expOutcome.ChainFeeOutcome.InflightChainFeeUpdates[k]))
+			}
+			actOutcome.ChainFeeOutcome.InflightChainFeeUpdates = nil
+			expOutcome.ChainFeeOutcome.InflightChainFeeUpdates = nil
+			require.Equal(t, normalizeOutcome(expOutcome), normalizeOutcome(actOutcome))
 
 			require.Len(t, res.Transmitted, tc.expTransmittedReportLen)
 		})
