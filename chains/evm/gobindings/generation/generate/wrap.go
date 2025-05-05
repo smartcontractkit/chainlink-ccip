@@ -24,8 +24,9 @@ func main() {
 
 	abiPath := rootDir + project + "/" + className + "/" + className + ".sol/" + className + ".abi.json"
 	binPath := rootDir + project + "/" + className + "/" + className + ".sol/" + className + ".bin"
+	metadataPath := rootDir + project + "/" + className + "/build/build.json"
 
-	GenWrapper(abiPath, binPath, className, pkgName, outDirSuffix)
+	GenWrapper(abiPath, binPath, metadataPath, className, pkgName, outDirSuffix)
 }
 
 // GenWrapper generates a contract wrapper for the given contract.
@@ -44,7 +45,7 @@ func main() {
 // <project>/generated/<pkgName>/<pkgName>.go. The suffix will take place after
 // the <project>/generated, so the overridden location would be
 // <project>/generated/<outDirSuffixInput>/<pkgName>/<pkgName>.go.
-func GenWrapper(abiPath, binPath, className, pkgName, outDirSuffixInput string) {
+func GenWrapper(abiPath, binPath, metadataPath, className, pkgName, outDirSuffixInput string) {
 	fmt.Println("Generating", pkgName, "contract wrapper")
 
 	cwd, err := os.Getwd() // gethwrappers directory
@@ -58,9 +59,16 @@ func GenWrapper(abiPath, binPath, className, pkgName, outDirSuffixInput string) 
 			mkdErr)
 	}
 	outPath := filepath.Join(outDir, pkgName+".go")
+	metadataOutPath := filepath.Join(outDir, pkgName+"_metadata.go")
 
 	gethwrappers.Abigen(gethwrappers.AbigenArgs{
-		Bin: binPath, ABI: abiPath, Out: outPath, Type: className, Pkg: pkgName,
+		Bin:         binPath,
+		ABI:         abiPath,
+		Metadata:    metadataPath,
+		Out:         outPath,
+		MetadataOut: metadataOutPath,
+		Type:        className,
+		Pkg:         pkgName,
 	})
 
 	// Build succeeded, so update the versions db with the new contract data
