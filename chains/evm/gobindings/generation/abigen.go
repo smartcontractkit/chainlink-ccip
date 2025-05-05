@@ -28,7 +28,7 @@ const headerComment = `// Code generated - DO NOT EDIT.
 var GethVersion = fmt.Sprintf("%d.%d.%d", version.Major, version.Minor, version.Patch)
 
 // AbigenArgs is the arguments to the abigen executable. E.g., Bin is the -bin arg.
-// Metadata is the only exception, as it is not passed to abigen, but used to create a separate metadata variable.
+// Metadata is the only exception, as it is not passed to abigen but rather used to create a separate metadata variable.
 type AbigenArgs struct {
 	Bin, ABI, Metadata, Out, MetadataOut, Type, Pkg string
 }

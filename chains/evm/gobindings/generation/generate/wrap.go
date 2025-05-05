@@ -62,7 +62,13 @@ func GenWrapper(abiPath, binPath, metadataPath, className, pkgName, outDirSuffix
 	metadataOutPath := filepath.Join(outDir, pkgName+"_metadata.go")
 
 	gethwrappers.Abigen(gethwrappers.AbigenArgs{
-		Bin: binPath, ABI: abiPath, Metadata: metadataPath, Out: outPath, MetadataOut: metadataOutPath, Type: className, Pkg: pkgName,
+		Bin:         binPath,
+		ABI:         abiPath,
+		Metadata:    metadataPath,
+		Out:         outPath,
+		MetadataOut: metadataOutPath,
+		Type:        className,
+		Pkg:         pkgName,
 	})
 
 	// Build succeeded, so update the versions db with the new contract data
