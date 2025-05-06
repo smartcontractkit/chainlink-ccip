@@ -423,6 +423,88 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 				})
 
 				t.Run("success: op1 executed", func(t *testing.T) {
+					var scheduledOp timelock.Operation
+					err := common.GetAccountDataBorshInto(ctx, solanaGoClient, op1.OperationPDA(), config.DefaultCommitment, &scheduledOp)
+					require.NoError(t, err, "failed to get operation PDA account")
+
+					t.Logf("scheduledOpAccount: %+v", scheduledOp)
+
+					accountMap := make(map[string]*solana.AccountMeta)
+					for _, ixx := range scheduledOp.Instructions {
+						// add program ID of the instruction as an account(CPI)
+						progKey := ixx.ProgramId.String()
+						if _, exists := accountMap[progKey]; !exists {
+							accountMap[progKey] = &solana.AccountMeta{
+								PublicKey:  ixx.ProgramId,
+								IsSigner:   false,
+								IsWritable: false, // program accounts are never writable
+							}
+						}
+
+						// all other accounts from the instruction
+						for _, account := range ixx.Accounts {
+							key := account.Pubkey.String()
+							if existing, exists := accountMap[key]; exists {
+								// if account already exists, keep it writable if either occurrence is writable
+								existing.IsWritable = existing.IsWritable || account.IsWritable
+							} else {
+								// create a new entry with IsSigner forced to false for CPI
+								accountMap[key] = &solana.AccountMeta{
+									PublicKey:  account.Pubkey,
+									IsSigner:   false, // force false for CPI
+									IsWritable: account.IsWritable,
+								}
+							}
+						}
+					}
+
+					remainingAccounts := make([]*solana.AccountMeta, 0, len(accountMap))
+					for _, acc := range accountMap {
+						remainingAccounts = append(remainingAccounts, acc)
+					}
+
+					// todo: debugging, remove after PoC
+					t.Log(len(remainingAccounts), "remaining accounts")
+					t.Log(len(op1.RemainingAccounts()), "original remaining accounts")
+
+					t.Log("--- NEW IMPLEMENTATION ACCOUNTS ---")
+					for i, acc := range remainingAccounts {
+						t.Logf("Account %d: PubKey=%s, IsSigner=%t, IsWritable=%t",
+							i, acc.PublicKey.String(), acc.IsSigner, acc.IsWritable)
+					}
+
+					t.Log("--- ORIGINAL IMPLEMENTATION ACCOUNTS ---")
+					for i, acc := range op1.RemainingAccounts() {
+						t.Logf("Account %d: PubKey=%s, IsSigner=%t, IsWritable=%t",
+							i, acc.PublicKey.String(), acc.IsSigner, acc.IsWritable)
+					}
+
+					t.Log("--- CHECKING FOR MISSING ACCOUNTS ---")
+					originalMap := make(map[string]bool)
+					for _, acc := range op1.RemainingAccounts() {
+						originalMap[acc.PublicKey.String()] = true
+					}
+
+					for _, acc := range remainingAccounts {
+						if _, exists := originalMap[acc.PublicKey.String()]; !exists {
+							t.Logf("WARNING: Account in new implementation NOT found in original: %s",
+								acc.PublicKey.String())
+						}
+					}
+
+					// Check for extra accounts
+					newMap := make(map[string]bool)
+					for _, acc := range remainingAccounts {
+						newMap[acc.PublicKey.String()] = true
+					}
+
+					for _, acc := range op1.RemainingAccounts() {
+						if _, exists := newMap[acc.PublicKey.String()]; !exists {
+							t.Logf("WARNING: Account in original implementation NOT found in new: %s",
+								acc.PublicKey.String())
+						}
+					}
+
 					ix := timelock.NewExecuteBatchInstruction(
 						config.TestTimelockID,
 						op1.OperationID(),
@@ -434,7 +516,9 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 						executor.PublicKey(),
 					)
 
-					ix.AccountMetaSlice = append(ix.AccountMetaSlice, op1.RemainingAccounts()...)
+					// todo: remove this
+					// ix.AccountMetaSlice = append(ix.AccountMetaSlice, op1.RemainingAccounts()...)
+					ix.AccountMetaSlice = append(ix.AccountMetaSlice, remainingAccounts...)
 
 					vIx, err := ix.ValidateAndBuild()
 					require.NoError(t, err)
@@ -456,15 +540,15 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 						require.Equal(t, ixx.Data, common.NormalizeData(event.Data))
 					}
 
-					var opAccount timelock.Operation
-					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, op1.OperationPDA(), config.DefaultCommitment, &opAccount)
+					var executedOp timelock.Operation
+					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, op1.OperationPDA(), config.DefaultCommitment, &executedOp)
 					if err != nil {
 						require.NoError(t, err, "failed to get account info")
 					}
 
 					require.Equal(t,
 						timelock.Done_OperationState,
-						opAccount.State,
+						executedOp.State,
 						"Executed operation should be marked as done",
 					)
 				})
