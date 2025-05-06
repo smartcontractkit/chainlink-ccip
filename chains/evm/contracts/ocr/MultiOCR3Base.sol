@@ -2,8 +2,8 @@
 pragma solidity ^0.8.4;
 
 import {Internal} from "../libraries/Internal.sol";
-import {Ownable2StepMsgSender} from "@shared/access/Ownable2StepMsgSender.sol";
-import {ITypeAndVersion} from "@shared/interfaces/ITypeAndVersion.sol";
+import {Ownable2StepMsgSender} from "@chainlink/shared/access/Ownable2StepMsgSender.sol";
+import {ITypeAndVersion} from "@chainlink/shared/interfaces/ITypeAndVersion.sol";
 
 /// @notice Onchain verification of reports from the offchain reporting protocol with multiple OCR plugin support.
 abstract contract MultiOCR3Base is ITypeAndVersion, Ownable2StepMsgSender {

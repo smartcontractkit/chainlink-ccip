@@ -2,7 +2,7 @@
 //
 // This is the Collapsed Router Program for CCIP.
 // As it's upgradable persisting the same program id, there is no need to have an indirection of a Proxy Program.
-// This Router handles both the OnRamp and OffRamp flow of the CCIP Messages.
+// This Router handles the OnRamp flow of the CCIP Messages.
 //
 // NOTE to devs: This file however should contain *no logic*, only the entrypoints to the different versioned modules,
 // thus making it easier to ensure later on that logic can be changed during upgrades without affecting the interface.
@@ -45,8 +45,18 @@ var (
 	//
 	// * `ctx` - The context containing the accounts required for initialization.
 	// * `svm_chain_selector` - The chain selector for SVM.
-	// * `enable_execution_after` - The minimum amount of time required between a message has been committed and can be manually executed.
+	// * `fee_aggregator` - The public key of the fee aggregator.
+	// * `fee_quoter` - The public key of the fee quoter.
+	// * `link_token_mint` - The public key of the LINK token mint.
+	// * `rmn_remote` - The public key of the RMN remote.
 	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
+
+	// Returns the program type (name) and version.
+	// Used by offchain code to easily determine which program & version is being interacted with.
+	//
+	// # Arguments
+	// * `ctx` - The context
+	Instruction_TypeVersion = ag_binary.TypeID([8]byte{129, 251, 8, 243, 122, 229, 252, 164})
 
 	// Transfers the ownership of the router to a new proposed owner.
 	//
@@ -287,6 +297,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 	switch id {
 	case Instruction_Initialize:
 		return "Initialize"
+	case Instruction_TypeVersion:
+		return "TypeVersion"
 	case Instruction_TransferOwnership:
 		return "TransferOwnership"
 	case Instruction_AcceptOwnership:
@@ -353,6 +365,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 	[]ag_binary.VariantType{
 		{
 			"initialize", (*Initialize)(nil),
+		},
+		{
+			"type_version", (*TypeVersion)(nil),
 		},
 		{
 			"transfer_ownership", (*TransferOwnership)(nil),

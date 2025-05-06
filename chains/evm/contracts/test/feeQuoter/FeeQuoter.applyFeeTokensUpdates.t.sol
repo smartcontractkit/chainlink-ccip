@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import {FeeQuoter} from "../../FeeQuoter.sol";
 import {FeeQuoterSetup} from "./FeeQuoterSetup.t.sol";
-import {Ownable2Step} from "@shared/access/Ownable2Step.sol";
+import {Ownable2Step} from "@chainlink/shared/access/Ownable2Step.sol";
 
 contract FeeQuoter_applyFeeTokensUpdates is FeeQuoterSetup {
   function test_ApplyFeeTokensUpdates() public {

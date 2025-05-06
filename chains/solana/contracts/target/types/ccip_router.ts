@@ -6,7 +6,7 @@ export type CcipRouter = {
     "",
     "This is the Collapsed Router Program for CCIP.",
     "As it's upgradable persisting the same program id, there is no need to have an indirection of a Proxy Program.",
-    "This Router handles both the OnRamp and OffRamp flow of the CCIP Messages.",
+    "This Router handles the OnRamp flow of the CCIP Messages.",
     "",
     "NOTE to devs: This file however should contain *no logic*, only the entrypoints to the different versioned modules,",
     "thus making it easier to ensure later on that logic can be changed during upgrades without affecting the interface."
@@ -24,7 +24,10 @@ export type CcipRouter = {
         "",
         "* `ctx` - The context containing the accounts required for initialization.",
         "* `svm_chain_selector` - The chain selector for SVM.",
-        "* `enable_execution_after` - The minimum amount of time required between a message has been committed and can be manually executed."
+        "* `fee_aggregator` - The public key of the fee aggregator.",
+        "* `fee_quoter` - The public key of the fee quoter.",
+        "* `link_token_mint` - The public key of the LINK token mint.",
+        "* `rmn_remote` - The public key of the RMN remote."
       ],
       "accounts": [
         {
@@ -75,6 +78,25 @@ export type CcipRouter = {
           "type": "publicKey"
         }
       ]
+    },
+    {
+      "name": "typeVersion",
+      "docs": [
+        "Returns the program type (name) and version.",
+        "Used by offchain code to easily determine which program & version is being interacted with.",
+        "",
+        "# Arguments",
+        "* `ctx` - The context"
+      ],
+      "accounts": [
+        {
+          "name": "clock",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [],
+      "returns": "string"
     },
     {
       "name": "transferOwnership",
@@ -1921,7 +1943,7 @@ export const IDL: CcipRouter = {
     "",
     "This is the Collapsed Router Program for CCIP.",
     "As it's upgradable persisting the same program id, there is no need to have an indirection of a Proxy Program.",
-    "This Router handles both the OnRamp and OffRamp flow of the CCIP Messages.",
+    "This Router handles the OnRamp flow of the CCIP Messages.",
     "",
     "NOTE to devs: This file however should contain *no logic*, only the entrypoints to the different versioned modules,",
     "thus making it easier to ensure later on that logic can be changed during upgrades without affecting the interface."
@@ -1939,7 +1961,10 @@ export const IDL: CcipRouter = {
         "",
         "* `ctx` - The context containing the accounts required for initialization.",
         "* `svm_chain_selector` - The chain selector for SVM.",
-        "* `enable_execution_after` - The minimum amount of time required between a message has been committed and can be manually executed."
+        "* `fee_aggregator` - The public key of the fee aggregator.",
+        "* `fee_quoter` - The public key of the fee quoter.",
+        "* `link_token_mint` - The public key of the LINK token mint.",
+        "* `rmn_remote` - The public key of the RMN remote."
       ],
       "accounts": [
         {
@@ -1990,6 +2015,25 @@ export const IDL: CcipRouter = {
           "type": "publicKey"
         }
       ]
+    },
+    {
+      "name": "typeVersion",
+      "docs": [
+        "Returns the program type (name) and version.",
+        "Used by offchain code to easily determine which program & version is being interacted with.",
+        "",
+        "# Arguments",
+        "* `ctx` - The context"
+      ],
+      "accounts": [
+        {
+          "name": "clock",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [],
+      "returns": "string"
     },
     {
       "name": "transferOwnership",

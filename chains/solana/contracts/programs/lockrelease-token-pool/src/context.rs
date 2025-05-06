@@ -5,8 +5,8 @@ use anchor_spl::{
 };
 use base_token_pool::common::{
     uninitialized, valid_version, CcipTokenPoolError, LockOrBurnInV1, ReleaseOrMintInV1,
-    RemoteAddress, RemoteConfig, ALLOWED_OFFRAMP, ANCHOR_DISCRIMINATOR, EXTERNAL_TOKENPOOL_SIGNER,
-    POOL_CHAINCONFIG_SEED, POOL_SIGNER_SEED, POOL_STATE_SEED,
+    RemoteAddress, RemoteConfig, ALLOWED_OFFRAMP, ANCHOR_DISCRIMINATOR,
+    EXTERNAL_TOKEN_POOLS_SIGNER, POOL_CHAINCONFIG_SEED, POOL_SIGNER_SEED, POOL_STATE_SEED,
 };
 use ccip_common::seed;
 
@@ -36,6 +36,12 @@ pub struct InitializeTokenPool<'info> {
     // by the CLL deployment of this program is limited to CLL. Users must deploy their own instance of this program.
     #[account(constraint = program_data.upgrade_authority_address == Some(authority.key()) @ CcipTokenPoolError::Unauthorized)]
     pub program_data: Account<'info, ProgramData>,
+}
+
+#[derive(Accounts)]
+pub struct Empty<'info> {
+    // This is unused, but Anchor requires that there is at least one account in the context
+    pub clock: Sysvar<'info, Clock>,
 }
 
 #[derive(Accounts)]
@@ -118,7 +124,7 @@ pub struct AcceptOwnership<'info> {
 pub struct TokenOfframp<'info> {
     // CCIP accounts ------------------------
     #[account(
-        seeds = [EXTERNAL_TOKENPOOL_SIGNER, crate::ID.as_ref()],
+        seeds = [EXTERNAL_TOKEN_POOLS_SIGNER, crate::ID.as_ref()],
         bump,
         seeds::program = offramp_program.key(),
     )]

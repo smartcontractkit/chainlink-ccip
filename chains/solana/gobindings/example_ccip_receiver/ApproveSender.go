@@ -15,7 +15,7 @@ type ApproveSender struct {
 	ChainSelector *uint64
 	RemoteAddress *[]byte
 
-	// [0] = [WRITE] state
+	// [0] = [] state
 	//
 	// [1] = [WRITE] approvedSender
 	//
@@ -47,7 +47,7 @@ func (inst *ApproveSender) SetRemoteAddress(remoteAddress []byte) *ApproveSender
 
 // SetStateAccount sets the "state" account.
 func (inst *ApproveSender) SetStateAccount(state ag_solanago.PublicKey) *ApproveSender {
-	inst.AccountMetaSlice[0] = ag_solanago.Meta(state).WRITE()
+	inst.AccountMetaSlice[0] = ag_solanago.Meta(state)
 	return inst
 }
 

@@ -55,6 +55,12 @@ pub struct Initialize<'info> {
 }
 
 #[derive(Accounts)]
+pub struct Empty<'info> {
+    // This is unused, but Anchor requires that there is at least one account in the context
+    pub clock: Sysvar<'info, Clock>,
+}
+
+#[derive(Accounts)]
 pub struct UpdateConfig<'info> {
     #[account(
         mut,
@@ -197,6 +203,7 @@ pub struct UpdateBillingTokenConfig<'info> {
         seeds = [seed::FEE_BILLING_TOKEN_CONFIG, token_config.mint.key().as_ref()],
         bump,
         constraint = valid_version(billing_token_config.version, MAX_BILLING_TOKEN_CONFIG_V) @ FeeQuoterError::InvalidVersion,
+        constraint = billing_token_config.config.mint == token_config.mint @ FeeQuoterError::InvalidInputsMint,
     )]
     pub billing_token_config: Account<'info, BillingTokenConfigWrapper>,
 

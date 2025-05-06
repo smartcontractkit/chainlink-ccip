@@ -45,14 +45,17 @@ pub mod test_token_pool {
     // set_router changes the expected signers for mint/release + burn/lock method calls
     // this is used to update the router address
     pub fn set_router(ctx: Context<SetConfig>, new_router: Pubkey) -> Result<()> {
-        ctx.accounts.state.config.set_router(new_router)
+        ctx.accounts
+            .state
+            .config
+            .set_router(new_router, ctx.program_id)
     }
 
     // initialize remote config (with no remote pools as it must be zero sized)
     pub fn init_chain_remote_config(
         ctx: Context<InitializeChainConfig>,
         remote_chain_selector: u64,
-        _mint: Pubkey,
+        mint: Pubkey,
         cfg: RemoteConfig,
     ) -> Result<()> {
         require!(
@@ -63,20 +66,20 @@ pub mod test_token_pool {
         ctx.accounts
             .chain_config
             .base
-            .set(remote_chain_selector, cfg)
+            .set(remote_chain_selector, mint, cfg)
     }
 
     // edit remote config
     pub fn edit_chain_remote_config(
         ctx: Context<EditChainConfigDynamicSize>,
         remote_chain_selector: u64,
-        _mint: Pubkey,
+        mint: Pubkey,
         cfg: RemoteConfig,
     ) -> Result<()> {
         ctx.accounts
             .chain_config
             .base
-            .set(remote_chain_selector, cfg)
+            .set(remote_chain_selector, mint, cfg)
     }
 
     // Add remote pool addresses
@@ -86,22 +89,24 @@ pub mod test_token_pool {
         _mint: Pubkey,
         addresses: Vec<RemoteAddress>,
     ) -> Result<()> {
-        ctx.accounts
-            .chain_config
-            .base
-            .append_remote_pool_addresses(remote_chain_selector, addresses)
+        ctx.accounts.chain_config.base.append_remote_pool_addresses(
+            remote_chain_selector,
+            _mint,
+            addresses,
+        )
     }
 
     // set rate limit
     pub fn set_chain_rate_limit(
         ctx: Context<SetChainRateLimit>,
         remote_chain_selector: u64,
-        _mint: Pubkey,
+        mint: Pubkey,
         inbound: RateLimitConfig,
         outbound: RateLimitConfig,
     ) -> Result<()> {
         ctx.accounts.chain_config.base.set_chain_rate_limit(
             remote_chain_selector,
+            mint,
             inbound,
             outbound,
         )
@@ -111,10 +116,11 @@ pub mod test_token_pool {
     pub fn delete_chain_config(
         _ctx: Context<DeleteChainConfig>,
         remote_chain_selector: u64,
-        _mint: Pubkey,
+        mint: Pubkey,
     ) -> Result<()> {
         emit!(RemoteChainRemoved {
             chain_selector: remote_chain_selector,
+            mint
         });
         Ok(())
     }

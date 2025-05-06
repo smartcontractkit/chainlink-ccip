@@ -12,10 +12,10 @@ export type FeeQuoter = {
         "# Arguments",
         "",
         "* `ctx` - The context containing the accounts required for initialization.",
-        "* `svm_chain_selector` - The chain selector for SVM.",
-        "* `default_gas_limit` - The default gas limit for other destination chains.",
-        "* `default_allow_out_of_order_execution` - Whether out-of-order execution is allowed by default for other destination chains.",
-        "* `enable_execution_after` - The minimum amount of time required between a message has been committed and can be manually executed."
+        "* `max_fee_juels_per_msg` - The maximum fee in juels that can be charged per message.",
+        "* `onramp` - The public key of the onramp.",
+        "",
+        "The function also uses the link_token_mint account from the context."
       ],
       "accounts": [
         {
@@ -59,6 +59,25 @@ export type FeeQuoter = {
           "type": "publicKey"
         }
       ]
+    },
+    {
+      "name": "typeVersion",
+      "docs": [
+        "Returns the program type (name) and version.",
+        "Used by offchain code to easily determine which program & version is being interacted with.",
+        "",
+        "# Arguments",
+        "* `ctx` - The context"
+      ],
+      "accounts": [
+        {
+          "name": "clock",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [],
+      "returns": "string"
     },
     {
       "name": "transferOwnership",
@@ -148,6 +167,38 @@ export type FeeQuoter = {
           "type": {
             "defined": "CodeVersion"
           }
+        }
+      ]
+    },
+    {
+      "name": "setMaxFeeJuelsPerMsg",
+      "docs": [
+        "Sets the max_fee_juels_per_msg, which is an upper bound on how much can be billed for any message.",
+        "(1 juels = 1e-18 LINK)",
+        "",
+        "Only the admin may set this.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for updating the configuration.",
+        "* `max_fee_juels_per_msg` - The new value for the max_feel_juels_per_msg config."
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "maxFeeJuelsPerMsg",
+          "type": "u128"
         }
       ]
     },
@@ -1588,96 +1639,71 @@ export type FeeQuoter = {
     },
     {
       "code": 8023,
-      "name": "InvalidEVMAddress",
-      "msg": "Invalid EVM address"
-    },
-    {
-      "code": 8024,
-      "name": "InvalidEncoding",
-      "msg": "Invalid encoding"
-    },
-    {
-      "code": 8025,
       "name": "InvalidTokenPrice",
       "msg": "Invalid token price"
     },
     {
-      "code": 8026,
+      "code": 8024,
       "name": "StaleGasPrice",
       "msg": "Stale gas price"
     },
     {
-      "code": 8027,
+      "code": 8025,
       "name": "InvalidInputsMissingTokenConfig",
       "msg": "Inputs are missing token configuration"
     },
     {
-      "code": 8028,
+      "code": 8026,
       "name": "MessageFeeTooHigh",
       "msg": "Message fee is too high"
     },
     {
-      "code": 8029,
+      "code": 8027,
       "name": "MessageGasLimitTooHigh",
       "msg": "Message gas limit too high"
     },
     {
-      "code": 8030,
+      "code": 8028,
       "name": "ExtraArgOutOfOrderExecutionMustBeTrue",
       "msg": "Extra arg out of order execution must be true"
     },
     {
-      "code": 8031,
+      "code": 8029,
       "name": "InvalidExtraArgsTag",
       "msg": "Invalid extra args tag"
     },
     {
-      "code": 8032,
+      "code": 8030,
       "name": "InvalidExtraArgsAccounts",
       "msg": "Invalid amount of accounts in extra args"
     },
     {
-      "code": 8033,
+      "code": 8031,
       "name": "InvalidExtraArgsWritabilityBitmap",
       "msg": "Invalid writability bitmap in extra args"
     },
     {
-      "code": 8034,
-      "name": "InvalidChainFamilySelector",
-      "msg": "Invalid chain family selector"
-    },
-    {
-      "code": 8035,
+      "code": 8032,
       "name": "InvalidTokenReceiver",
       "msg": "Invalid token receiver"
     },
     {
-      "code": 8036,
-      "name": "InvalidSVMAddress",
-      "msg": "Invalid SVM address"
-    },
-    {
-      "code": 8037,
+      "code": 8033,
       "name": "UnauthorizedPriceUpdater",
       "msg": "The caller is not an authorized price updater"
     },
     {
-      "code": 8038,
-      "name": "InvalidLinkDecimals",
-      "msg": "The LINK mint uses an unsupported number of decimals"
-    },
-    {
-      "code": 8039,
+      "code": 8034,
       "name": "InvalidTokenTransferFeeMaxMin",
       "msg": "Minimum token transfer fee exceeds maximum"
     },
     {
-      "code": 8040,
+      "code": 8035,
       "name": "InvalidTokenTransferFeeDestBytesOverhead",
       "msg": "Insufficient dest bytes overhead on transfer fee config"
     },
     {
-      "code": 8041,
+      "code": 8036,
       "name": "InvalidCodeVersion",
       "msg": "Invalid code version"
     }
@@ -1698,10 +1724,10 @@ export const IDL: FeeQuoter = {
         "# Arguments",
         "",
         "* `ctx` - The context containing the accounts required for initialization.",
-        "* `svm_chain_selector` - The chain selector for SVM.",
-        "* `default_gas_limit` - The default gas limit for other destination chains.",
-        "* `default_allow_out_of_order_execution` - Whether out-of-order execution is allowed by default for other destination chains.",
-        "* `enable_execution_after` - The minimum amount of time required between a message has been committed and can be manually executed."
+        "* `max_fee_juels_per_msg` - The maximum fee in juels that can be charged per message.",
+        "* `onramp` - The public key of the onramp.",
+        "",
+        "The function also uses the link_token_mint account from the context."
       ],
       "accounts": [
         {
@@ -1745,6 +1771,25 @@ export const IDL: FeeQuoter = {
           "type": "publicKey"
         }
       ]
+    },
+    {
+      "name": "typeVersion",
+      "docs": [
+        "Returns the program type (name) and version.",
+        "Used by offchain code to easily determine which program & version is being interacted with.",
+        "",
+        "# Arguments",
+        "* `ctx` - The context"
+      ],
+      "accounts": [
+        {
+          "name": "clock",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [],
+      "returns": "string"
     },
     {
       "name": "transferOwnership",
@@ -1834,6 +1879,38 @@ export const IDL: FeeQuoter = {
           "type": {
             "defined": "CodeVersion"
           }
+        }
+      ]
+    },
+    {
+      "name": "setMaxFeeJuelsPerMsg",
+      "docs": [
+        "Sets the max_fee_juels_per_msg, which is an upper bound on how much can be billed for any message.",
+        "(1 juels = 1e-18 LINK)",
+        "",
+        "Only the admin may set this.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for updating the configuration.",
+        "* `max_fee_juels_per_msg` - The new value for the max_feel_juels_per_msg config."
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "maxFeeJuelsPerMsg",
+          "type": "u128"
         }
       ]
     },
@@ -3274,96 +3351,71 @@ export const IDL: FeeQuoter = {
     },
     {
       "code": 8023,
-      "name": "InvalidEVMAddress",
-      "msg": "Invalid EVM address"
-    },
-    {
-      "code": 8024,
-      "name": "InvalidEncoding",
-      "msg": "Invalid encoding"
-    },
-    {
-      "code": 8025,
       "name": "InvalidTokenPrice",
       "msg": "Invalid token price"
     },
     {
-      "code": 8026,
+      "code": 8024,
       "name": "StaleGasPrice",
       "msg": "Stale gas price"
     },
     {
-      "code": 8027,
+      "code": 8025,
       "name": "InvalidInputsMissingTokenConfig",
       "msg": "Inputs are missing token configuration"
     },
     {
-      "code": 8028,
+      "code": 8026,
       "name": "MessageFeeTooHigh",
       "msg": "Message fee is too high"
     },
     {
-      "code": 8029,
+      "code": 8027,
       "name": "MessageGasLimitTooHigh",
       "msg": "Message gas limit too high"
     },
     {
-      "code": 8030,
+      "code": 8028,
       "name": "ExtraArgOutOfOrderExecutionMustBeTrue",
       "msg": "Extra arg out of order execution must be true"
     },
     {
-      "code": 8031,
+      "code": 8029,
       "name": "InvalidExtraArgsTag",
       "msg": "Invalid extra args tag"
     },
     {
-      "code": 8032,
+      "code": 8030,
       "name": "InvalidExtraArgsAccounts",
       "msg": "Invalid amount of accounts in extra args"
     },
     {
-      "code": 8033,
+      "code": 8031,
       "name": "InvalidExtraArgsWritabilityBitmap",
       "msg": "Invalid writability bitmap in extra args"
     },
     {
-      "code": 8034,
-      "name": "InvalidChainFamilySelector",
-      "msg": "Invalid chain family selector"
-    },
-    {
-      "code": 8035,
+      "code": 8032,
       "name": "InvalidTokenReceiver",
       "msg": "Invalid token receiver"
     },
     {
-      "code": 8036,
-      "name": "InvalidSVMAddress",
-      "msg": "Invalid SVM address"
-    },
-    {
-      "code": 8037,
+      "code": 8033,
       "name": "UnauthorizedPriceUpdater",
       "msg": "The caller is not an authorized price updater"
     },
     {
-      "code": 8038,
-      "name": "InvalidLinkDecimals",
-      "msg": "The LINK mint uses an unsupported number of decimals"
-    },
-    {
-      "code": 8039,
+      "code": 8034,
       "name": "InvalidTokenTransferFeeMaxMin",
       "msg": "Minimum token transfer fee exceeds maximum"
     },
     {
-      "code": 8040,
+      "code": 8035,
       "name": "InvalidTokenTransferFeeDestBytesOverhead",
       "msg": "Insufficient dest bytes overhead on transfer fee config"
     },
     {
-      "code": 8041,
+      "code": 8036,
       "name": "InvalidCodeVersion",
       "msg": "Invalid code version"
     }

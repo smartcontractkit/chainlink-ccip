@@ -1,5 +1,7 @@
 use anchor_lang::prelude::*;
 
+use ccip_common::{CommonCcipError, CHAIN_FAMILY_SELECTOR_EVM, CHAIN_FAMILY_SELECTOR_SVM};
+
 use crate::context::{
     AcceptOwnership, AddBillingTokenConfig, AddDestChain, AddPriceUpdater, RemovePriceUpdater,
     SetTokenTransferFeeConfig, UpdateBillingTokenConfig, UpdateConfig, UpdateDestChainConfig,
@@ -8,11 +10,10 @@ use crate::event::{
     ConfigSet, DestChainAdded, DestChainConfigUpdated, FeeTokenAdded, FeeTokenDisabled,
     FeeTokenEnabled, OwnershipTransferRequested, OwnershipTransferred,
     PremiumMultiplierWeiPerEthUpdated, PriceUpdaterAdded, PriceUpdaterRemoved,
-    TokenTransferFeeConfigUpdated,
+    TokenTransferFeeConfigUpdated, UsdPerTokenUpdated,
 };
 use crate::instructions::interfaces::Admin;
 use crate::instructions::v1::public::CCIP_LOCK_OR_BURN_V1_RET_BYTES;
-use crate::messages::{CHAIN_FAMILY_SELECTOR_EVM, CHAIN_FAMILY_SELECTOR_SVM};
 use crate::state::{
     BillingTokenConfig, CodeVersion, DestChain, DestChainConfig, DestChainState,
     PerChainPerTokenConfig, TimestampedPackedU224, TokenTransferFeeConfig,
@@ -69,6 +70,24 @@ impl Admin for Impl {
         Ok(())
     }
 
+    fn set_max_fee_juels_per_msg(
+        &self,
+        ctx: Context<UpdateConfig>,
+        max_fee_juels_per_msg: u128,
+    ) -> Result<()> {
+        let config = &mut ctx.accounts.config;
+        config.max_fee_juels_per_msg = max_fee_juels_per_msg;
+
+        emit!(ConfigSet {
+            max_fee_juels_per_msg: config.max_fee_juels_per_msg,
+            link_token_mint: config.link_token_mint,
+            link_token_local_decimals: config.link_token_local_decimals,
+            onramp: config.onramp,
+            default_code_version: config.default_code_version
+        });
+        Ok(())
+    }
+
     fn add_billing_token_config(
         &self,
         ctx: Context<AddBillingTokenConfig>,
@@ -99,7 +118,6 @@ impl Admin for Impl {
                 }),
             }
         }
-        // TODO should we emit an event if the config has changed regardless of the enabled/disabled?
 
         // emit an event if the premium multiplier has changed, before updating the config
         if config.premium_multiplier_wei_per_eth
@@ -112,6 +130,14 @@ impl Admin for Impl {
             emit!(PremiumMultiplierWeiPerEthUpdated {
                 token: config.mint,
                 premium_multiplier_wei_per_eth: config.premium_multiplier_wei_per_eth,
+            });
+        }
+
+        if config.usd_per_token != ctx.accounts.billing_token_config.config.usd_per_token {
+            emit!(UsdPerTokenUpdated {
+                token: config.mint,
+                value: config.usd_per_token.value,
+                timestamp: config.usd_per_token.timestamp,
             });
         }
 
@@ -199,9 +225,8 @@ impl Admin for Impl {
         mint: Pubkey,
         cfg: TokenTransferFeeConfig,
     ) -> Result<()> {
-        require_gte!(
-            cfg.max_fee_usdcents,
-            cfg.min_fee_usdcents,
+        require!(
+            cfg.max_fee_usdcents > cfg.min_fee_usdcents,
             FeeQuoterError::InvalidTokenTransferFeeMaxMin
         );
 
@@ -231,6 +256,14 @@ impl Admin for Impl {
 // --- helpers ---
 
 fn validate_dest_chain_config(dest_chain_selector: u64, config: &DestChainConfig) -> Result<()> {
+    // check if the lane code version is supported
+    require!(
+        matches!(
+            config.lane_code_version,
+            CodeVersion::Default | CodeVersion::V1
+        ),
+        FeeQuoterError::InvalidVersion
+    );
     require!(
         dest_chain_selector != 0,
         FeeQuoterError::InvalidInputsChainSelector
@@ -249,7 +282,7 @@ fn validate_dest_chain_config(dest_chain_selector: u64, config: &DestChainConfig
             u32::from_be_bytes(config.chain_family_selector),
             CHAIN_FAMILY_SELECTOR_EVM | CHAIN_FAMILY_SELECTOR_SVM
         ),
-        FeeQuoterError::InvalidChainFamilySelector
+        CommonCcipError::InvalidChainFamilySelector
     );
 
     Ok(())

@@ -74,9 +74,9 @@ func SetupSimpleTest(t *testing.T,
 	}
 	msgHasher := mocks.NewMessageHasher()
 	ccipReader := inmem.InMemoryCCIPReader{
-		Reports:  []cciptypes.CommitPluginReportWithMeta{},
-		Messages: messagesMap,
-		Dest:     dstSelector,
+		UnfinalizedReports: []cciptypes.CommitPluginReportWithMeta{},
+		Messages:           messagesMap,
+		Dest:               dstSelector,
 	}
 
 	return &IntTest{
@@ -135,7 +135,7 @@ func (it *IntTest) WithMessages(
 		tree, err := report.ConstructMerkleTree(reportData, logger.Test(it.t))
 		require.NoError(it.t, err, "failed to construct merkle tree")
 
-		it.ccipReader.Reports = append(it.ccipReader.Reports, cciptypes.CommitPluginReportWithMeta{
+		it.ccipReader.UnfinalizedReports = append(it.ccipReader.UnfinalizedReports, cciptypes.CommitPluginReportWithMeta{
 			Report: cciptypes.CommitPluginReport{
 				BlessedMerkleRoots: []cciptypes.MerkleRootChain{
 					{
@@ -395,12 +395,6 @@ func newMessageSentEvent(
 
 type msgOption func(*cciptypes.Message)
 
-func withData(data []byte) msgOption {
-	return func(m *cciptypes.Message) {
-		m.Data = data
-	}
-}
-
 func withTokens(tokenAmounts ...cciptypes.RampTokenAmount) msgOption {
 	return func(m *cciptypes.Message) {
 		m.TokenAmounts = tokenAmounts
@@ -531,4 +525,19 @@ func emptyMessagesMapForRanges(ranges []cciptypes.SeqNumRange) map[cciptypes.Seq
 		}
 	}
 	return messages
+}
+
+func NewMessage(
+	msgID int,
+	seqNum int,
+	sourceChainSelector int,
+	destChainSelector int) cciptypes.Message {
+	return cciptypes.Message{
+		Header: cciptypes.RampMessageHeader{
+			MessageID:           cciptypes.Bytes32{byte(msgID)},
+			SourceChainSelector: cciptypes.ChainSelector(sourceChainSelector),
+			DestChainSelector:   cciptypes.ChainSelector(destChainSelector),
+			SequenceNumber:      cciptypes.SeqNum(seqNum),
+		},
+	}
 }

@@ -34,10 +34,10 @@ pub mod fee_quoter {
     /// # Arguments
     ///
     /// * `ctx` - The context containing the accounts required for initialization.
-    /// * `svm_chain_selector` - The chain selector for SVM.
-    /// * `default_gas_limit` - The default gas limit for other destination chains.
-    /// * `default_allow_out_of_order_execution` - Whether out-of-order execution is allowed by default for other destination chains.
-    /// * `enable_execution_after` - The minimum amount of time required between a message has been committed and can be manually executed.
+    /// * `max_fee_juels_per_msg` - The maximum fee in juels that can be charged per message.
+    /// * `onramp` - The public key of the onramp.
+    ///
+    /// The function also uses the link_token_mint account from the context.
     #[allow(clippy::too_many_arguments)]
     pub fn initialize(
         ctx: Context<Initialize>,
@@ -48,6 +48,9 @@ pub mod fee_quoter {
             ctx.accounts.link_token_mint.decimals <= LINK_JUEL_DECIMALS,
             FeeQuoterError::InvalidInputsMint
         );
+
+        // trivial non-zero check, the value is provided in the expected 18-decimal format
+        require!(max_fee_juels_per_msg > 0, FeeQuoterError::InvalidInputs);
 
         ctx.accounts.config.set_inner(Config {
             version: 1,
@@ -69,6 +72,17 @@ pub mod fee_quoter {
         });
 
         Ok(())
+    }
+
+    /// Returns the program type (name) and version.
+    /// Used by offchain code to easily determine which program & version is being interacted with.
+    ///
+    /// # Arguments
+    /// * `ctx` - The context
+    pub fn type_version(_ctx: Context<Empty>) -> Result<String> {
+        let response = env!("CCIP_BUILD_TYPE_VERSION").to_string();
+        msg!("{}", response);
+        Ok(response)
     }
 
     /// Transfers the ownership of the fee quoter to a new proposed owner.
@@ -110,6 +124,23 @@ pub mod fee_quoter {
     ) -> Result<()> {
         router::admin(ctx.accounts.config.default_code_version)
             .set_default_code_version(ctx, code_version)
+    }
+
+    /// Sets the max_fee_juels_per_msg, which is an upper bound on how much can be billed for any message.
+    /// (1 juels = 1e-18 LINK)
+    ///
+    /// Only the admin may set this.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for updating the configuration.
+    /// * `max_fee_juels_per_msg` - The new value for the max_feel_juels_per_msg config.
+    pub fn set_max_fee_juels_per_msg(
+        ctx: Context<UpdateConfig>,
+        max_fee_juels_per_msg: u128,
+    ) -> Result<()> {
+        router::admin(ctx.accounts.config.default_code_version)
+            .set_max_fee_juels_per_msg(ctx, max_fee_juels_per_msg)
     }
 
     /// Adds a billing token configuration.
@@ -374,10 +405,6 @@ pub enum FeeQuoterError {
     MessageTooLarge,
     #[msg("Message contains an unsupported number of tokens")]
     UnsupportedNumberOfTokens,
-    #[msg("Invalid EVM address")]
-    InvalidEVMAddress,
-    #[msg("Invalid encoding")]
-    InvalidEncoding,
     #[msg("Invalid token price")]
     InvalidTokenPrice,
     #[msg("Stale gas price")]
@@ -396,16 +423,10 @@ pub enum FeeQuoterError {
     InvalidExtraArgsAccounts,
     #[msg("Invalid writability bitmap in extra args")]
     InvalidExtraArgsWritabilityBitmap,
-    #[msg("Invalid chain family selector")]
-    InvalidChainFamilySelector,
     #[msg("Invalid token receiver")]
     InvalidTokenReceiver,
-    #[msg("Invalid SVM address")]
-    InvalidSVMAddress,
     #[msg("The caller is not an authorized price updater")]
     UnauthorizedPriceUpdater,
-    #[msg("The LINK mint uses an unsupported number of decimals")]
-    InvalidLinkDecimals,
     #[msg("Minimum token transfer fee exceeds maximum")]
     InvalidTokenTransferFeeMaxMin,
     #[msg("Insufficient dest bytes overhead on transfer fee config")]

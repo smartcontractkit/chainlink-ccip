@@ -13,7 +13,7 @@ pub const POOL_CHAINCONFIG_SEED: &[u8] = b"ccip_tokenpool_chainconfig"; // seed 
 pub const POOL_STATE_SEED: &[u8] = b"ccip_tokenpool_config";
 pub const POOL_SIGNER_SEED: &[u8] = b"ccip_tokenpool_signer";
 
-pub const EXTERNAL_TOKENPOOL_SIGNER: &[u8] = b"external_token_pools_signer";
+pub const EXTERNAL_TOKEN_POOLS_SIGNER: &[u8] = b"external_token_pools_signer";
 pub const ALLOWED_OFFRAMP: &[u8] = b"allowed_offramp";
 
 pub const fn valid_version(v: u8, max_version: u8) -> bool {
@@ -75,7 +75,7 @@ impl BaseConfig {
             Pubkey::find_program_address(&[POOL_SIGNER_SEED, mint.key().as_ref()], &pool_program);
 
         let (router_onramp_authority, _) = Pubkey::find_program_address(
-            &[EXTERNAL_TOKENPOOL_SIGNER, pool_program.as_ref()],
+            &[EXTERNAL_TOKEN_POOLS_SIGNER, pool_program.as_ref()],
             &router,
         );
 
@@ -109,6 +109,7 @@ impl BaseConfig {
         self.proposed_owner = proposed_owner;
 
         emit!(OwnershipTransferRequested {
+            mint: self.mint,
             from: self.owner,
             to: self.proposed_owner,
         });
@@ -121,6 +122,7 @@ impl BaseConfig {
         self.owner = std::mem::take(&mut self.proposed_owner);
 
         emit!(OwnershipTransferred {
+            mint: self.mint,
             from: old_owner,
             to: self.owner,
         });
@@ -128,7 +130,7 @@ impl BaseConfig {
         Ok(())
     }
 
-    pub fn set_router(&mut self, new_router: Pubkey) -> Result<()> {
+    pub fn set_router(&mut self, new_router: Pubkey, pool_program: &Pubkey) -> Result<()> {
         require_keys_neq!(
             new_router,
             Pubkey::default(),
@@ -137,9 +139,12 @@ impl BaseConfig {
 
         let old_router = self.router;
         self.router = new_router;
-        (self.router_onramp_authority, _) =
-            Pubkey::find_program_address(&[EXTERNAL_TOKENPOOL_SIGNER], &new_router);
+        (self.router_onramp_authority, _) = Pubkey::find_program_address(
+            &[EXTERNAL_TOKEN_POOLS_SIGNER, pool_program.as_ref()],
+            &new_router,
+        );
         emit!(RouterUpdated {
+            mint: self.mint,
             old_router,
             new_router,
         });
@@ -165,7 +170,12 @@ pub struct BaseChain {
 }
 
 impl BaseChain {
-    pub fn set(&mut self, remote_chain_selector: u64, new_cfg: RemoteConfig) -> Result<()> {
+    pub fn set(
+        &mut self,
+        remote_chain_selector: u64,
+        mint: Pubkey,
+        new_cfg: RemoteConfig,
+    ) -> Result<()> {
         let old_mint = self.remote.token_address.clone();
         let old_pools = self.remote.pool_addresses.clone();
 
@@ -173,6 +183,7 @@ impl BaseChain {
 
         emit!(RemoteChainConfigured {
             chain_selector: remote_chain_selector,
+            mint,
             token: self.remote.token_address.clone(),
             previous_token: old_mint,
             pool_addresses: self.remote.pool_addresses.clone(),
@@ -184,6 +195,7 @@ impl BaseChain {
     pub fn append_remote_pool_addresses(
         &mut self,
         remote_chain_selector: u64,
+        mint: Pubkey,
         addresses: Vec<RemoteAddress>,
     ) -> Result<()> {
         let old_pools = self.remote.pool_addresses.clone();
@@ -198,6 +210,7 @@ impl BaseChain {
 
         emit!(RemotePoolsAppended {
             chain_selector: remote_chain_selector,
+            mint,
             pool_addresses: self.remote.pool_addresses.clone(),
             previous_pool_addresses: old_pools,
         });
@@ -207,6 +220,7 @@ impl BaseChain {
     pub fn set_chain_rate_limit(
         &mut self,
         remote_chain_selector: u64,
+        mint: Pubkey,
         inbound: RateLimitConfig,
         outbound: RateLimitConfig,
     ) -> Result<()> {
@@ -217,6 +231,7 @@ impl BaseChain {
 
         emit!(RateLimitConfigured {
             chain_selector: remote_chain_selector,
+            mint,
             outbound_rate_limit: outbound,
             inbound_rate_limit: inbound,
         });
@@ -352,6 +367,7 @@ pub struct RemoteChainConfigured {
     pub previous_token: RemoteAddress,
     pub pool_addresses: Vec<RemoteAddress>,
     pub previous_pool_addresses: Vec<RemoteAddress>,
+    pub mint: Pubkey,
 }
 
 #[event]
@@ -359,6 +375,7 @@ pub struct RateLimitConfigured {
     pub chain_selector: u64,
     pub outbound_rate_limit: RateLimitConfig,
     pub inbound_rate_limit: RateLimitConfig,
+    pub mint: Pubkey,
 }
 
 #[event]
@@ -366,29 +383,34 @@ pub struct RemotePoolsAppended {
     pub chain_selector: u64,
     pub pool_addresses: Vec<RemoteAddress>,
     pub previous_pool_addresses: Vec<RemoteAddress>,
+    pub mint: Pubkey,
 }
 
 #[event]
 pub struct RemoteChainRemoved {
     pub chain_selector: u64,
+    pub mint: Pubkey,
 }
 
 #[event]
 pub struct RouterUpdated {
     pub old_router: Pubkey,
     pub new_router: Pubkey,
+    pub mint: Pubkey,
 }
 
 #[event]
 pub struct OwnershipTransferRequested {
     pub from: Pubkey,
     pub to: Pubkey,
+    pub mint: Pubkey,
 }
 
 #[event]
 pub struct OwnershipTransferred {
     pub from: Pubkey,
     pub to: Pubkey,
+    pub mint: Pubkey,
 }
 
 #[error_code]
@@ -476,7 +498,7 @@ pub fn validate_lock_or_burn<'info>(
     outbound_rate_limit.consume::<Clock>(lock_or_burn_in.amount)
 }
 
-// validate_lock_or_burn checks for correctness on inputs
+// validate_release_or_mint checks for correctness on inputs
 // - token & pool is correct for chain
 // - rate limiting
 // - source chain is not cursed

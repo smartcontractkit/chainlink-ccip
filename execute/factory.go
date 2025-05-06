@@ -34,14 +34,14 @@ const (
 	// maxQueryLength is set to disable queries because they are not used.
 	maxQueryLength = 0
 
-	// maxObservationLength is set to the maximum size of an observation
-	// check factory_test for the calculation.
-	// this is being set to the max maximum observation length due to
-	// the observations being so large at the moment, especially when
-	// commit reports have many messages.
-	// in order to meaningfully decrease this we need to drastically optimise
-	// our observation sizes.
 	maxObservationLength = ocr3types.MaxMaxObservationLength
+	// lenientMaxObservationLength is set to value that's lower than the maxObservationLength
+	// Using lower value to allow for some space while observing without hitting the max.
+	// This simplifies the truncation logic needed when observation hits this lenientMax. If it's exact
+	// we'll need to take care of more corner cases and truncation logic becomes more complex
+	// It's recommended from research to not exceed 50% of the maxObservationLength
+	// PLEASE CHANGE WITH CAUTION.
+	lenientMaxObservationLength = maxObservationLength * 50 / 100
 
 	// maxOutcomeLength is set to the maximum size of an outcome
 	// check factory_test for the calculation. This is not limited because
@@ -58,6 +58,13 @@ const (
 	// the actual exec report type (ExecutePluginReport) may contain multiple
 	// per-source-chain reports. These are not limited by this value.
 	maxReportCount = 1
+
+	// lenientMaxMsgsPerObs is set to the maximum number of messages that can be observed in one observation, this is a bit
+	// lenient and acts as an indicator other than a hard limit.
+	lenientMaxMsgsPerObs = 100
+
+	// maxCommitReportsToFetch is set to the maximum number of commit reports that can be fetched in each round.
+	maxCommitReportsToFetch = 1000
 )
 
 // PluginFactory implements common ReportingPluginFactory and is used for (re-)initializing commit plugin instances.

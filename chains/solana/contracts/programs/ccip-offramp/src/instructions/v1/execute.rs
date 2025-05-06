@@ -143,6 +143,7 @@ fn internal_execute<'info>(
 
     let has_messaging = should_execute_messaging(ctx.remaining_accounts, token_indexes);
 
+    let mut msg_accs_opt: Option<MessagingAccounts> = None;
     let hashed_leaf: [u8; 32] = if has_messaging {
         let msg_accs = parse_messaging_accounts(
             token_indexes,
@@ -154,6 +155,8 @@ fn internal_execute<'info>(
         let recv_and_msg_account_keys = Some(*msg_accs.logic_receiver.key)
             .into_iter()
             .chain(msg_accs.remaining_accounts.iter().map(|a| *a.key));
+
+        msg_accs_opt = Some(msg_accs);
 
         verify_merkle_root(
             &execution_report,
@@ -217,7 +220,7 @@ fn internal_execute<'info>(
 
         let init_bal = get_balance(accs.user_token_account)?;
 
-        // CPI: call lockOrBurn on token pool
+        // CPI: call releaseOrMint on token pool
         let release_or_mint = ReleaseOrMintInV1 {
             original_sender: execution_report.message.sender.clone(),
             receiver: execution_report.message.token_receiver,
@@ -246,7 +249,7 @@ fn internal_execute<'info>(
         acc_infos.extend_from_slice(accs.remaining_accounts);
 
         let seeds = &[
-            seed::EXTERNAL_TOKEN_POOL,
+            seed::EXTERNAL_TOKEN_POOLS_SIGNER,
             accs.pool_program.key.as_ref(),
             &[accs.ccip_offramp_pool_signer_bump],
         ];
@@ -290,11 +293,7 @@ fn internal_execute<'info>(
     // case: no tokens, but there are remaining_accounts passed in
     // case: tokens and messages, so the first token has a non-zero index (indicating extra accounts before token accounts)
     if has_messaging {
-        let msg_accs = parse_messaging_accounts(
-            token_indexes,
-            &execution_report.message.extra_args.is_writable_bitmap,
-            ctx.remaining_accounts,
-        )?;
+        let msg_accs = msg_accs_opt.unwrap(); // as there is messaging, the option is guaranteed to be Some
 
         // The accounts of the user that will be used in the CPI instruction, none of them are signers
         // They need to specify if mutable or not, but none of them is allowed to init, realloc or close
@@ -304,17 +303,37 @@ fn internal_execute<'info>(
             ctx.accounts.offramp.to_account_info(),
             ctx.accounts.allowed_offramp.to_account_info(),
         ];
-        acc_infos.extend_from_slice(msg_accs.remaining_accounts);
 
-        let acc_metas: Vec<AccountMeta> = acc_infos
-            .to_vec()
+        let mut acc_metas: Vec<AccountMeta> = acc_infos
             .iter()
             .flat_map(|acc_info| {
-                // Check signer from PDA External Execution config
                 let is_signer = acc_info.key() == msg_accs.external_execution_signer.key();
                 acc_info.to_account_metas(Some(is_signer))
             })
             .collect();
+
+        let remaining_metas: Vec<AccountMeta> = msg_accs
+            .remaining_accounts
+            .iter()
+            .enumerate()
+            .map(|(i, acc_info)| {
+                // Check signer from PDA External Execution config
+                let is_signer = acc_info.key() == msg_accs.external_execution_signer.key();
+                let is_writable = is_writable(
+                    &execution_report.message.extra_args.is_writable_bitmap,
+                    i as u8,
+                );
+
+                if is_writable {
+                    AccountMeta::new(*acc_info.key, is_signer)
+                } else {
+                    AccountMeta::new_readonly(*acc_info.key, is_signer)
+                }
+            })
+            .collect();
+
+        acc_infos.extend_from_slice(msg_accs.remaining_accounts);
+        acc_metas.extend_from_slice(&remaining_metas);
 
         let data = message.build_receiver_discriminator_and_data()?;
 
@@ -436,7 +455,7 @@ fn parse_messaging_accounts<'info>(
     // Validate that the bitmap corresponds to the individual writable flags
     for (i, acc) in msg_accounts.iter().enumerate() {
         require!(
-            is_writable(source_bitmap, i as u8) == acc.is_writable,
+            !is_writable(source_bitmap, i as u8) || acc.is_writable,
             CcipOfframpError::InvalidWritabilityBitmap
         );
     }
@@ -478,10 +497,7 @@ pub fn validate_execution_report<'info>(
     message_header: &RampMessageHeader,
     svm_chain_selector: u64,
 ) -> Result<()> {
-    require!(
-        execution_report.message.header.nonce == 0,
-        CcipOfframpError::InvalidNonce
-    );
+    require_eq!(message_header.nonce, 0, CcipOfframpError::InvalidNonce);
 
     require!(
         source_chain_state.config.is_enabled,
@@ -489,8 +505,8 @@ pub fn validate_execution_report<'info>(
     );
 
     require!(
-        execution_report.message.header.sequence_number >= commit_report.min_msg_nr
-            && execution_report.message.header.sequence_number <= commit_report.max_msg_nr,
+        message_header.sequence_number >= commit_report.min_msg_nr
+            && message_header.sequence_number <= commit_report.max_msg_nr,
         CcipOfframpError::InvalidSequenceInterval
     );
 

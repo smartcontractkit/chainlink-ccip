@@ -131,8 +131,8 @@ impl Commit for Impl {
 
         let clock: Clock = Clock::get()?;
         commit_report.version = 1;
-        commit_report.chain_selector = report.merkle_root.as_ref().unwrap().source_chain_selector;
-        commit_report.merkle_root = report.merkle_root.as_ref().unwrap().merkle_root;
+        commit_report.chain_selector = root.source_chain_selector;
+        commit_report.merkle_root = root.merkle_root;
         commit_report.timestamp = clock.unix_timestamp;
         commit_report.execution_states = 0;
         commit_report.min_msg_nr = root.min_seq_nr;
@@ -348,7 +348,7 @@ mod helpers {
         let mut global_state: Account<'info, GlobalState> =
             Account::try_from(&remaining_accounts[0])?;
 
-        if global_state.latest_price_sequence_number < ocr_sequence_number {
+        if global_state.latest_price_sequence_number <= ocr_sequence_number {
             // Update the persisted sequence number
             global_state.latest_price_sequence_number = ocr_sequence_number;
             global_state.exit(&crate::ID)?; // as it is manually loaded, it also has to be manually written back

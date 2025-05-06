@@ -96,6 +96,12 @@ pub struct Initialize<'info> {
 }
 
 #[derive(Accounts)]
+pub struct Empty<'info> {
+    // This is unused, but Anchor requires that there is at least one account in the context
+    pub clock: Sysvar<'info, Clock>,
+}
+
+#[derive(Accounts)]
 pub struct UpdateReferenceAddresses<'info> {
     #[account(
         seeds = [seed::CONFIG],
@@ -116,7 +122,7 @@ pub struct UpdateReferenceAddresses<'info> {
 }
 
 /// Input from an offchain node, containing the Merkle root and interval for
-/// the source chain, and optionally some price updates alongside it.
+/// the source chain, and optionally some price updates alongside it
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
 pub struct CommitInput {
     pub price_updates: PriceUpdates,
@@ -220,8 +226,7 @@ pub struct AcceptOwnership<'info> {
 #[derive(Accounts)]
 #[instruction(new_chain_selector: u64, _source_chain_config: SourceChainConfig)]
 pub struct AddSourceChain<'info> {
-    /// Adding a chain selector implies initializing the state for a new chain,
-    /// hence the need to initialize two accounts.
+    /// Adding a chain selector implies initializing the state for a new chain
     #[account(
         init,
         seeds = [seed::SOURCE_CHAIN, new_chain_selector.to_le_bytes().as_ref()],
@@ -244,11 +249,11 @@ pub struct AddSourceChain<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(new_chain_selector: u64)]
+#[instruction(source_chain_selector: u64)]
 pub struct UpdateSourceChain<'info> {
     #[account(
         mut,
-        seeds = [seed::SOURCE_CHAIN, new_chain_selector.to_le_bytes().as_ref()],
+        seeds = [seed::SOURCE_CHAIN, source_chain_selector.to_le_bytes().as_ref()],
         bump,
         constraint = valid_version(source_chain.version, MAX_CHAIN_V) @ CcipOfframpError::InvalidVersion,
     )]
