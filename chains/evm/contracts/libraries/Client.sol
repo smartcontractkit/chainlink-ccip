@@ -79,7 +79,11 @@ library Client {
     + 4 // extra_data overhead
     + 32 // amount
     + 32 // size of the token lookup table account
-    + 32; // token-related accounts in the lookup table
+    + 32 // token-related accounts in the lookup table, over-estimated to 32, typically between 11 - 13
+    + 32 // token account belonging to the token receiver, e.g ATA, not included in the token lookup table
+    + 32 // per-chain token pool config, not included in the token lookup table
+    + 32 // per-chain token billing config, not always included in the token lookup table
+    + 32; // OffRamp pool signer PDA, not included in the token lookup table
 
   /// @dev Number of overhead accounts needed for message execution on SVM.
   /// @dev These are message.receiver, and the OffRamp Signer PDA specific to the receiver.
