@@ -250,7 +250,7 @@ type CCIPReader interface {
 	LinkPriceUSD(ctx context.Context) (cciptypes.BigInt, error)
 
 	// Sync can be used to perform frequent syncing operations inside the reader implementation.
-	// Returns a bool indicating whether something was updated.
+	// NOTE: this method may make network calls.
 	Sync(ctx context.Context, contracts ContractAddresses) error
 
 	// GetLatestPriceSeqNr returns the latest price sequence number for the destination chain.
