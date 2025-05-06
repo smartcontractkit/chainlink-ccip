@@ -102,17 +102,17 @@ func (p *processor) Outcome(
 		return inflightTokenPricesOutcome, fmt.Errorf("get consensus observation: %w", err)
 	}
 
+	// Check if we have inflight token price updates.
+	if prevOutcome.HasInflightTokenPriceUpdates() {
+		return p.computeInflightPricesOutcome(lggr, consensusObservation, prevOutcome), nil
+	}
+
 	tokenPriceOutcome := p.selectTokensForUpdate(lggr, consensusObservation)
 	lggr.Infow("outcome token prices", "tokenPrices", tokenPriceOutcome)
 
 	if len(tokenPriceOutcome) == 0 {
 		lggr.Debugw("No token prices to report")
 		return inflightTokenPricesOutcome, nil
-	}
-
-	// Check if we have inflight token price updates.
-	if prevOutcome.HasInflightTokenPriceUpdates() {
-		return p.computeInflightPricesOutcome(lggr, consensusObservation, prevOutcome), nil
 	}
 
 	inflightTokenPriceUpdates := make(map[cciptypes.UnknownEncodedAddress]time.Time)

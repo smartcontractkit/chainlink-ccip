@@ -452,22 +452,13 @@ func (p *Plugin) Outcome(
 		MerkleRootOutcome: merkleRootOutcome,
 		TokenPriceOutcome: tokenPriceOutcome,
 		ChainFeeOutcome:   chainFeeOutcome,
-		MainOutcome:       p.getMainOutcome(outCtx, prevOutcome, tokenPriceOutcome, chainFeeOutcome),
+		MainOutcome:       committypes.MainOutcome{},
 	}
 	p.metricsReporter.TrackOutcome(out)
 
 	lggr.Infow("Commit plugin finished outcome", "outcome", out)
 
 	return p.ocrTypeCodec.EncodeOutcome(out)
-}
-
-func (p *Plugin) getMainOutcome(
-	outCtx ocr3types.OutcomeContext,
-	prevOutcome committypes.Outcome,
-	tokenPriceOutcome tokenprice.Outcome,
-	chainFeeOutcome chainfee.Outcome,
-) committypes.MainOutcome {
-	return committypes.MainOutcome{}
 }
 
 func (p *Plugin) Close() error {

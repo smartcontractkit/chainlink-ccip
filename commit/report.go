@@ -308,7 +308,8 @@ func (p *Plugin) isStaleReport(
 		len(decodedReport.UnblessedMerkleRoots) == 0 {
 		lggr.Infow(
 			"skipping stale report due to stale price seq nr and no merkle roots",
-			"latestPriceSeqNr", latestOnChainReportSeqNr)
+			"latestPriceSeqNr", latestOnChainReportSeqNr,
+			"multiPriceReportsEnabled", multiPriceReports)
 		return true
 	}
 	return false

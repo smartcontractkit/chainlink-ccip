@@ -36,7 +36,7 @@ func (p *processor) Outcome(
 
 	// No need to update yet
 	if len(consensusObs.FeeComponents) == 0 {
-		lggr.Warn("no consensus on fee components, nothing to update", "consensusObs", consensusObs)
+		lggr.Warnw("no consensus on fee components, nothing to update", "consensusObs", consensusObs)
 		return inflightPricesOutcome, nil
 	}
 
@@ -128,7 +128,7 @@ func (p *processor) Outcome(
 func (p *processor) computeInflightPricesOutcome(
 	lggr logger.Logger, consensusObs Observation, prevOutcome Outcome,
 ) Outcome {
-	lggr.Debugw("checking for previously transmitted chain fee price updates to appear on-chain",
+	lggr.Infow("checking for previously transmitted chain fee price updates to appear on-chain",
 		"prevUpdate", prevOutcome.InflightChainFeeUpdates,
 		"currUpdates", consensusObs.ChainFeeUpdates,
 		"remRetries", prevOutcome.InflightRemainingChecks,
