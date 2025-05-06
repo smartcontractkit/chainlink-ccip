@@ -9440,6 +9440,7 @@ func TestCCIPRouter(t *testing.T) {
 				hash, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress, msgAccounts)
 				require.NoError(t, err)
 				root, err := ccip.MerkleFrom([][32]byte{[32]byte(hash)})
+				require.NoError(t, err)
 
 				commitReport := ccip_offramp.CommitInput{
 					MerkleRoot: &ccip_offramp.MerkleRoot{
@@ -9520,12 +9521,12 @@ func TestCCIPRouter(t *testing.T) {
 				// We now build a buffer for the report and CPI to the executor instead.
 
 				// Arbitrary number decided by the caller, as long as it's not repeated between reports.
-				bufferId := uint64(0)
+				bufferID := uint64(0)
 
-				bufferIdLE := common.Uint64ToLE(bufferId)
-				bufferPDA, _, _ := solana.FindProgramAddress([][]byte{[]byte("execution_buffer"), transmitter.PublicKey().Bytes(), bufferIdLE}, config.ExecutionBuffer)
+				bufferIDLittleEndian := common.Uint64ToLE(bufferID)
+				bufferPDA, _, _ := solana.FindProgramAddress([][]byte{[]byte("execution_buffer"), transmitter.PublicKey().Bytes(), bufferIDLittleEndian}, config.ExecutionBuffer)
 
-				bufferInitIx, err := execution_buffer.NewInitializeExecutionReportBufferInstruction(bufferId, bufferPDA, transmitter.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+				bufferInitIx, err := execution_buffer.NewInitializeExecutionReportBufferInstruction(bufferID, bufferPDA, transmitter.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 				require.NoError(t, err)
 				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{bufferInitIx}, transmitter, config.DefaultCommitment)
 
@@ -9536,13 +9537,13 @@ func TestCCIPRouter(t *testing.T) {
 
 					chunk := rawReport[i:end]
 
-					appendIx, err := execution_buffer.NewAppendExecutionReportDataInstruction(bufferId, chunk, bufferPDA, transmitter.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
-					require.NoError(t, err)
+					appendIx, appendErr := execution_buffer.NewAppendExecutionReportDataInstruction(bufferID, chunk, bufferPDA, transmitter.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+					require.NoError(t, appendErr)
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{appendIx}, transmitter, config.DefaultCommitment)
 				}
 
 				raw2 := execution_buffer.NewManuallyExecuteBufferedInstruction(
-					bufferId,
+					bufferID,
 					[]byte{},
 					bufferPDA,
 					config.OfframpConfigPDA,
