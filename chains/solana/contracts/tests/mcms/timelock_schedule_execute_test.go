@@ -516,7 +516,7 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 						executor.PublicKey(),
 					)
 
-					// todo: remove this
+					// todo: remove this comment after PoC, use accounts retrieved from the op account instead of predefined ones
 					// ix.AccountMetaSlice = append(ix.AccountMetaSlice, op1.RemainingAccounts()...)
 					ix.AccountMetaSlice = append(ix.AccountMetaSlice, remainingAccounts...)
 
