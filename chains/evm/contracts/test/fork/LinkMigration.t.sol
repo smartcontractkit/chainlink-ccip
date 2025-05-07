@@ -46,15 +46,19 @@ contract LinkMigrationTest is Test {
     address public constant ETHEREUM_OFFRAMP_FROM_BASE = 0x6B4B6359Dd5B47Cdb030E5921456D2a0625a9EbD;
     address public constant BASE_LINK_POOL = 0x0A995a72D8346683c97514990F802F4778B7ac72;
     address public constant LINK_TOKEN_BASE = 0x88Fb150BDc53A65fe94Dea0c9BA0a6dAf8C6e196;
+    
+    address public alice = makeAddr("ALICE");
+    address public currentPoolOwner;
 
     address public MCMS;
     LockReleaseTokenPool public newTokenPool;
+
 
     function testLinkMigration() public {
         vm.createSelectFork(vm.envString("ETHEREUM_RPC_URL"));
 
         // Get the owner of the current pool, should just be MCMS
-        address currentPoolOwner = IOwner(EXISTING_LINK_TOKEN_POOL).owner();
+        currentPoolOwner = IOwner(EXISTING_LINK_TOKEN_POOL).owner();
 
         // Prank the owner to deploy a new pool
         vm.startPrank(currentPoolOwner);
@@ -174,7 +178,6 @@ contract LinkMigrationTest is Test {
         newTokenPool.applyChainUpdates(new uint64[](0), chainUpdates);
 
         // Test that the new token Pool is being used correctly for outgoing messages
-        address alice = makeAddr("ALICE");
         uint256 alicePreAmount = 100 ether;
         deal(alice, alicePreAmount);
         deal(address(LINK_TOKEN), alice, alicePreAmount);
@@ -188,43 +191,57 @@ contract LinkMigrationTest is Test {
             amount: sendAmount
         });
 
-        // Craft the message
-        Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
-            receiver: abi.encode(alice),
-            data: "",
-            tokenAmounts: tokens,
-            feeToken: address(LINK_TOKEN),
-            extraArgs: ""
+        {
+            // Craft the message
+            Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
+                receiver: abi.encode(alice),
+                data: "",
+                tokenAmounts: tokens,
+                feeToken: address(LINK_TOKEN),
+                extraArgs: ""
+            });
+            uint256 fee = Router(ROUTER).getFee(BASE_CHAIN_SELECTOR, message);
+
+            // Send the outgoing message
+            vm.expectEmit();
+            emit TokenPool.Locked(ETHEREUM_BASE_ONRAMP, sendAmount);
+            Router(ROUTER).ccipSend(BASE_CHAIN_SELECTOR, message);
+
+            // Test an incoming message from that same chain
+            vm.startPrank(ETHEREUM_OFFRAMP_FROM_BASE);
+            Pool.ReleaseOrMintInV1 memory testReleaseData = Pool.ReleaseOrMintInV1({
+                originalSender: abi.encode(alice),
+                remoteChainSelector: BASE_CHAIN_SELECTOR,
+                receiver: alice,
+                amount: sendAmount,
+                localToken: address(LINK_TOKEN),
+                sourcePoolAddress: abi.encode(BASE_LINK_POOL),
+                sourcePoolData: "",
+                offchainTokenData: ""
+            });
+            // Check that funds were removed from Alice's wallet for sending the message
+            assertEq(LINK_TOKEN.balanceOf(alice), alicePreAmount - sendAmount - fee);
+
+            vm.expectEmit();
+            emit TokenPool.Released(ETHEREUM_OFFRAMP_FROM_BASE, alice, sendAmount);
+            newTokenPool.releaseOrMint(testReleaseData);
+
+            // Alice's balance after funds are returned should be the same minus the amount
+            // used to pay for the initial outgoing message
+            assertEq(LINK_TOKEN.balanceOf(alice), alicePreAmount - fee);
+        }
+
+        // Remove the Off Ramp from the router for safety purposes
+        Router.OffRamp[] memory offRampRemoves = new Router.OffRamp[](1);
+        offRampRemoves[0] = Router.OffRamp({
+            sourceChainSelector: MOCK_CHAIN_SELECTOR,
+            offRamp: currentPoolOwner
         });
 
-        uint256 fee = Router(ROUTER).getFee(BASE_CHAIN_SELECTOR, message);
+        // Remove MCMS as an offRamp and confirm through an assertion
+        vm.startPrank(routerOwner);
+        Router(ROUTER).applyRampUpdates(new Router.OnRamp[](0), offRampRemoves, new Router.OffRamp[](0));
 
-        // Send the outgoing message
-        vm.expectEmit();
-        emit TokenPool.Locked(ETHEREUM_BASE_ONRAMP, sendAmount);
-        Router(ROUTER).ccipSend(BASE_CHAIN_SELECTOR, message);
-
-        // Test an incoming message from that same chain
-        vm.startPrank(ETHEREUM_OFFRAMP_FROM_BASE);
-        Pool.ReleaseOrMintInV1 memory testReleaseData = Pool.ReleaseOrMintInV1({
-            originalSender: abi.encode(alice),
-            remoteChainSelector: BASE_CHAIN_SELECTOR,
-            receiver: alice,
-            amount: sendAmount,
-            localToken: address(LINK_TOKEN),
-            sourcePoolAddress: abi.encode(BASE_LINK_POOL),
-            sourcePoolData: "",
-            offchainTokenData: ""
-        });
-        // Check that funds were removed from Alice's wallet for sending the message
-        assertEq(LINK_TOKEN.balanceOf(alice), alicePreAmount - sendAmount - fee);
-
-        vm.expectEmit();
-        emit TokenPool.Released(ETHEREUM_OFFRAMP_FROM_BASE, alice, sendAmount);
-        newTokenPool.releaseOrMint(testReleaseData);
-
-        // Alice's balance after funds are returned should be the same minus the amount
-        // used to pay for the initial outgoing message
-        assertEq(LINK_TOKEN.balanceOf(alice), alicePreAmount - fee);
+        assertFalse(Router(ROUTER).isOffRamp(MOCK_CHAIN_SELECTOR, currentPoolOwner), "Owner should NOT be an offRamp");
     }
 }
