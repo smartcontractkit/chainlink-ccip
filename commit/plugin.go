@@ -430,11 +430,12 @@ func (p *Plugin) Outcome(
 	for _, ao := range aos {
 		obs, err := p.ocrTypeCodec.DecodeObservation(ao.Observation)
 		if err != nil {
-			lggr.Warnw("failed to decode observation, observation skipped", "err", err)
+			lggr.Warnw("failed to decode observation, observation skipped",
+				"err", err, "observer", ao.Observer, "observation", ao.Observation)
 			continue
 		}
 
-		lggr.Debugw("Commit plugin outcome decoded observation", "observation", obs)
+		lggr.Debugw("Commit plugin outcome decoded observation", "observation", obs, "observer", ao.Observer)
 
 		merkleRootObservations = append(merkleRootObservations, attributedMerkleRootObservation{
 			OracleID: ao.Observer, Observation: obs.MerkleRootObs})
@@ -457,9 +458,9 @@ func (p *Plugin) Outcome(
 		_, err = p.discoveryProcessor.Outcome(ctx, dt.Outcome{}, dt.Query{}, discoveryObservations)
 		if err != nil {
 			lggr.Errorw("failed to get discovery processor outcome", "err", err)
-			return nil, nil
+		} else {
+			p.contractsInitialized.Store(true)
 		}
-		p.contractsInitialized.Store(true)
 	}
 
 	merkleRootOutcome, err := p.merkleRootProcessor.Outcome(
