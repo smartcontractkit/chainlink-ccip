@@ -3,20 +3,20 @@ pragma solidity ^0.8.24;
 
 import {IFeeQuoter} from "./interfaces/IFeeQuoter.sol";
 import {IPriceRegistry} from "./interfaces/IPriceRegistry.sol";
-import {IReceiver} from "@keystone/interfaces/IReceiver.sol";
-import {ITypeAndVersion} from "@shared/interfaces/ITypeAndVersion.sol";
+import {IReceiver} from "@chainlink/keystone/interfaces/IReceiver.sol";
+import {ITypeAndVersion} from "@chainlink/shared/interfaces/ITypeAndVersion.sol";
 
 import {Client} from "./libraries/Client.sol";
 import {Internal} from "./libraries/Internal.sol";
 import {Pool} from "./libraries/Pool.sol";
 import {USDPriceWith18Decimals} from "./libraries/USDPriceWith18Decimals.sol";
-import {KeystoneFeedsPermissionHandler} from "@keystone/KeystoneFeedsPermissionHandler.sol";
-import {KeystoneFeedDefaultMetadataLib} from "@keystone/lib/KeystoneFeedDefaultMetadataLib.sol";
-import {AuthorizedCallers} from "@shared/access/AuthorizedCallers.sol";
-import {AggregatorV3Interface} from "@shared/interfaces/AggregatorV3Interface.sol";
+import {KeystoneFeedsPermissionHandler} from "@chainlink/keystone/KeystoneFeedsPermissionHandler.sol";
+import {KeystoneFeedDefaultMetadataLib} from "@chainlink/keystone/lib/KeystoneFeedDefaultMetadataLib.sol";
+import {AuthorizedCallers} from "@chainlink/shared/access/AuthorizedCallers.sol";
+import {AggregatorV3Interface} from "@chainlink/shared/interfaces/AggregatorV3Interface.sol";
 
-import {IERC165} from "@vendor/openzeppelin-solidity/v5.0.2/contracts/interfaces/IERC165.sol";
-import {EnumerableSet} from "@vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
+import {IERC165} from "@chainlink/vendor/openzeppelin-solidity/v5.0.2/contracts/interfaces/IERC165.sol";
+import {EnumerableSet} from "@chainlink/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
 
 /// @notice The FeeQuoter contract responsibility is to:
 ///   - Store the current gas price in USD for a given destination chain.
@@ -561,9 +561,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
     if (!s_feeTokens.contains(message.feeToken)) revert FeeTokenNotSupported(message.feeToken);
 
     uint256 numberOfTokens = message.tokenAmounts.length;
-    uint256 gasLimit = _validateMessageAndResolveGasLimitForDestination(
-      destChainConfig, message.data.length, numberOfTokens, message.extraArgs, message.receiver
-    );
+    uint256 gasLimit = _validateMessageAndResolveGasLimitForDestination(destChainSelector, destChainConfig, message);
 
     // The below call asserts that feeToken is a supported token.
     uint224 feeTokenPrice = _getValidatedTokenPrice(message.feeToken);
@@ -892,7 +890,10 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
       // is non-zero, the address must not be 0x0.
       return Internal._validate32ByteAddress(destAddress, gasLimit > 0 ? 1 : 0);
     }
-    if (chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_APTOS) {
+    if (
+      chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_APTOS
+        || chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_c4e05953
+    ) {
       return Internal._validate32ByteAddress(destAddress, Internal.APTOS_PRECOMPILE_SPACE);
     }
     revert InvalidChainFamilySelector(chainFamilySelector);
@@ -981,18 +982,18 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
 
   /// @notice Validate the forwarded message to ensure it matches the configuration limits (message length, number of
   /// tokens) and family-specific expectations (address format).
+  /// @param destChainSelector The destination chain selector.
   /// @param destChainConfig The destination chain config.
-  /// @param dataLength The length of the data field of the message.
-  /// @param numberOfTokens The number of tokens to be sent.
-  /// @param receiver Message receiver on the dest chain.
+  /// @param message The message to validate.
   /// @return gasLimit The gas limit to use for the message.
   function _validateMessageAndResolveGasLimitForDestination(
+    uint64 destChainSelector,
     DestChainConfig memory destChainConfig,
-    uint256 dataLength,
-    uint256 numberOfTokens,
-    bytes calldata extraArgs,
-    bytes memory receiver
-  ) internal pure returns (uint256 gasLimit) {
+    Client.EVM2AnyMessage calldata message
+  ) internal view returns (uint256 gasLimit) {
+    uint256 dataLength = message.data.length;
+    uint256 numberOfTokens = message.tokenAmounts.length;
+
     // Check that payload is formed correctly.
     if (dataLength > uint256(destChainConfig.maxDataBytes)) {
       revert MessageTooLarge(uint256(destChainConfig.maxDataBytes), dataLength);
@@ -1005,31 +1006,76 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
     if (
       destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_EVM
         || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_APTOS
+        || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_c4e05953
     ) {
       gasLimit = _parseGenericExtraArgsFromBytes(
-        extraArgs,
+        message.extraArgs,
         destChainConfig.defaultTxGasLimit,
         destChainConfig.maxPerMsgGasLimit,
         destChainConfig.enforceOutOfOrder
       ).gasLimit;
+
+      _validateDestFamilyAddress(destChainConfig.chainFamilySelector, message.receiver, gasLimit);
     } else if (destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SVM) {
-      Client.SVMExtraArgsV1 memory svmExtraArgsV1 =
-        _parseSVMExtraArgsFromBytes(extraArgs, destChainConfig.maxPerMsgGasLimit, destChainConfig.enforceOutOfOrder);
+      Client.SVMExtraArgsV1 memory svmExtraArgsV1 = _parseSVMExtraArgsFromBytes(
+        message.extraArgs, destChainConfig.maxPerMsgGasLimit, destChainConfig.enforceOutOfOrder
+      );
+
+      gasLimit = svmExtraArgsV1.computeUnits;
+
+      _validateDestFamilyAddress(destChainConfig.chainFamilySelector, message.receiver, gasLimit);
+
+      uint256 accountsLength = svmExtraArgsV1.accounts.length;
+      // The max payload size for SVM is heavily dependent on the accounts passed into extra args and the number of
+      // tokens. Below, token and account overhead will count towards maxDataBytes.
+      uint256 svmExpandedDataLength = dataLength;
+
+      // This abi.decode is safe because the address is validated above.
+      if (abi.decode(message.receiver, (uint256)) == 0) {
+        // When message receiver is zero, CCIP receiver is not invoked on SVM.
+        // There should not be additional accounts specified for the receiver.
+        if (accountsLength > 0) {
+          revert TooManySVMExtraArgsAccounts(accountsLength, 0);
+        }
+      } else {
+        // The messaging accounts needed for CCIP receiver on SVM are:
+        // message receiver, offramp PDA signer,
+        // plus remaining accounts specified in SVM extraArgs. Each account is 32 bytes.
+        svmExpandedDataLength +=
+          ((accountsLength + Client.SVM_MESSAGING_ACCOUNTS_OVERHEAD) * Client.SVM_ACCOUNT_BYTE_SIZE);
+      }
+
       if (numberOfTokens > 0 && svmExtraArgsV1.tokenReceiver == bytes32(0)) {
         revert InvalidTokenReceiver();
       }
-      if (svmExtraArgsV1.accounts.length > Client.SVM_EXTRA_ARGS_MAX_ACCOUNTS) {
-        revert TooManySVMExtraArgsAccounts(svmExtraArgsV1.accounts.length, Client.SVM_EXTRA_ARGS_MAX_ACCOUNTS);
+      if (accountsLength > Client.SVM_EXTRA_ARGS_MAX_ACCOUNTS) {
+        revert TooManySVMExtraArgsAccounts(accountsLength, Client.SVM_EXTRA_ARGS_MAX_ACCOUNTS);
       }
-      if (svmExtraArgsV1.accountIsWritableBitmap >> svmExtraArgsV1.accounts.length != 0) {
-        revert InvalidSVMExtraArgsWritableBitmap(svmExtraArgsV1.accountIsWritableBitmap, svmExtraArgsV1.accounts.length);
+      if (svmExtraArgsV1.accountIsWritableBitmap >> accountsLength != 0) {
+        revert InvalidSVMExtraArgsWritableBitmap(svmExtraArgsV1.accountIsWritableBitmap, accountsLength);
       }
-      gasLimit = svmExtraArgsV1.computeUnits;
+
+      svmExpandedDataLength += (numberOfTokens * Client.SVM_TOKEN_TRANSFER_DATA_OVERHEAD);
+
+      // The token destBytesOverhead can be very different per token so we have to take it into account as well.
+      for (uint256 i = 0; i < numberOfTokens; ++i) {
+        uint256 destBytesOverhead =
+          s_tokenTransferFeeConfig[destChainSelector][message.tokenAmounts[i].token].destBytesOverhead;
+
+        // Pools get Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES by default, but if an override is set we use that instead.
+        if (destBytesOverhead > 0) {
+          svmExpandedDataLength += destBytesOverhead;
+        } else {
+          svmExpandedDataLength += Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES;
+        }
+      }
+
+      if (svmExpandedDataLength > uint256(destChainConfig.maxDataBytes)) {
+        revert MessageTooLarge(uint256(destChainConfig.maxDataBytes), svmExpandedDataLength);
+      }
     } else {
       revert InvalidChainFamilySelector(destChainConfig.chainFamilySelector);
     }
-
-    _validateDestFamilyAddress(destChainConfig.chainFamilySelector, receiver, gasLimit);
 
     return gasLimit;
   }
@@ -1082,6 +1128,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
     if (
       destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_EVM
         || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_APTOS
+        || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_c4e05953
     ) {
       Client.GenericExtraArgsV2 memory parsedExtraArgs =
         _parseUnvalidatedEVMExtraArgsFromBytes(extraArgs, destChainConfig.defaultTxGasLimit);
@@ -1181,6 +1228,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
             destChainConfig.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_EVM
               && destChainConfig.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_SVM
               && destChainConfig.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_APTOS
+              && destChainConfig.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_c4e05953
           )
       ) {
         revert InvalidDestChainConfig(destChainSelector);

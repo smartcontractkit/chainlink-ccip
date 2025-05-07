@@ -3,6 +3,7 @@ package execute
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sort"
 	"time"
 
@@ -197,7 +198,8 @@ func (p *Plugin) getCommitReportsObservation(
 	}
 
 	// Get pending exec reports.
-	groupedCommits, fullyExecutedFinalized, fullyExecutedUnfinalized, err := getPendingReportsForExecution(
+	groupedCommits, fullyExecutedFinalized, fullyExecutedUnfinalized, latestEmptyRootTimestamp,
+		err := getPendingReportsForExecution(
 		ctx,
 		p.ccipReader,
 		p.commitRootsCache.CanExecute,
@@ -208,6 +210,8 @@ func (p *Plugin) getCommitReportsObservation(
 	if err != nil {
 		return exectypes.Observation{}, err
 	}
+
+	p.commitRootsCache.UpdateLatestEmptyRootTimestamp(latestEmptyRootTimestamp)
 
 	// TODO: message from fullyExecutedCommits which are in the inflight messages cache could be cleared here.
 
@@ -336,6 +340,8 @@ func createEmptyMessageWithIDAndSeqNum(msg cciptypes.Message) cciptypes.Message 
 //
 // Returns:
 //   - Updated observation containing commit reports, messages, and hashes
+//
+//nolint:gocyclo // TODO: pull out appropriate helpers.
 func (p *Plugin) getMessagesObservation(
 	ctx context.Context,
 	lggr logger.Logger,
@@ -346,7 +352,7 @@ func (p *Plugin) getMessagesObservation(
 	//          These messages will not be executed in the current round, but may be executed in future rounds
 	//          (e.g. if gas prices decrease).
 	if len(previousOutcome.CommitReports) == 0 {
-		lggr.Debug("TODO: No reports to execute. This is expected after a cold start.")
+		lggr.Info("No reports to execute. This is expected after a cold start.")
 		// No reports to execute.
 		// This is expected after a cold start.
 		return observation, nil
@@ -418,10 +424,15 @@ func (p *Plugin) getMessagesObservation(
 		// Process each message in the report and override the empty message and token data if everything fits within
 		// the size limits
 		for _, msg := range msgs {
-			// If msg is not already inflight, add it
+			// If a message is inflight or already executed, don't include it fully in the observation
+			// because its already been transmitted in a previous report or executed onchain.
 			if p.inflightMessageCache.IsInflight(srcChain, msg.Header.MessageID) {
 				continue
 			}
+			if slices.Contains(report.ExecutedMessages, msg.Header.SequenceNumber) {
+				continue
+			}
+
 			seqNum := msg.Header.SequenceNumber
 			messageObs[srcChain][seqNum] = msg
 			tkData[srcChain][seqNum] = p.observeTokenDataForMessage(ctx, lggr, msg)
@@ -442,6 +453,10 @@ func (p *Plugin) getMessagesObservation(
 				break
 			}
 		}
+
+		// TODO: check if the commit report is all fully executed and inflight messages.
+		// Might be able to just not include it in the observation at all? Or is there a
+		// risk with that?
 
 		if stop {
 			lggr.Infow("Stop processing messages, observation is too large",
@@ -481,10 +496,23 @@ func (p *Plugin) getFilterObservation(
 		}
 
 		for _, msg := range report.Messages {
+			// The GetMessages observation could potentially include a pseudo-deleted message,
+			// which is either:
+			// - a message that is inflight
+			// - a message that has already been executed
+			// - a message that was not included in the observation due to size limits
+			// In all cases, since we don't need to execute these messages, we don't need to fetch their sender's nonce.
+			if msg.IsPseudoDeleted() {
+				lggr.Debugw("skipping pseudo-deleted message",
+					"messageID", msg.Header.MessageID,
+				)
+				continue
+			}
+
 			sender, err := p.addrCodec.AddressBytesToString(msg.Sender[:], srcChain)
 			if err != nil {
 				lggr.Errorw("unable to convert sender address to string",
-					"err", err, "sender address", msg.Sender)
+					"err", err, "senderAddress", msg.Sender)
 				continue
 			}
 

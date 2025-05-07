@@ -353,6 +353,28 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
     s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, message);
   }
 
+  function test_getValidatedFee_RevertWhen_TooManySVMExtraArgsAccountsWhenReceiverIsEmpty() public {
+    FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
+    destChainConfigArgs[0].destChainConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_SVM;
+
+    s_feeQuoter.applyDestChainConfigUpdates(destChainConfigArgs);
+
+    Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(s_sourceFeeToken, 1);
+    message.receiver = abi.encode(address(0));
+
+    message.extraArgs = Client._svmArgsToBytes(
+      Client.SVMExtraArgsV1({
+        computeUnits: 0,
+        accountIsWritableBitmap: 0,
+        allowOutOfOrderExecution: true,
+        tokenReceiver: bytes32(uint256(1)),
+        accounts: new bytes32[](1)
+      })
+    );
+    vm.expectRevert(abi.encodeWithSelector(FeeQuoter.TooManySVMExtraArgsAccounts.selector, 1, 0));
+    s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, message);
+  }
+
   function test_getValidatedFee_RevertWhen_InvalidSVMExtraArgsWritableBitmap() public {
     FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
     destChainConfigArgs[0].destChainConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_SVM;
@@ -373,6 +395,121 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
       })
     );
     vm.expectRevert(abi.encodeWithSelector(FeeQuoter.InvalidSVMExtraArgsWritableBitmap.selector, wrongBitmap, accounts));
+    s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, message);
+  }
+
+  function test_getValidatedFee_RevertWhen_SVMMessageTooLargeDueToDataAndAccounts() public {
+    uint256 dataSize = 100;
+    uint256 numAccounts = 20;
+
+    FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
+    destChainConfigArgs[0].destChainConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_SVM;
+    destChainConfigArgs[0].destChainConfig.maxDataBytes = SVM_DEFAULT_MAX_DATA_BYTES;
+
+    s_feeQuoter.applyDestChainConfigUpdates(destChainConfigArgs);
+
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    message.data = new bytes(dataSize);
+    message.extraArgs = Client._svmArgsToBytes(
+      Client.SVMExtraArgsV1({
+        computeUnits: GAS_LIMIT,
+        accountIsWritableBitmap: 0,
+        allowOutOfOrderExecution: true,
+        tokenReceiver: bytes32(0),
+        accounts: new bytes32[](numAccounts)
+      })
+    );
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        FeeQuoter.MessageTooLarge.selector,
+        SVM_DEFAULT_MAX_DATA_BYTES,
+        dataSize + (numAccounts + Client.SVM_MESSAGING_ACCOUNTS_OVERHEAD) * Client.SVM_ACCOUNT_BYTE_SIZE
+      )
+    );
+    s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, message);
+  }
+
+  function test_getValidatedFee_RevertWhen_SVMMessageTooLargeDueToDataAndToken() public {
+    uint256 dataSize = 500;
+
+    FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
+    destChainConfigArgs[0].destChainConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_SVM;
+    destChainConfigArgs[0].destChainConfig.maxDataBytes = SVM_DEFAULT_MAX_DATA_BYTES;
+
+    s_feeQuoter.applyDestChainConfigUpdates(destChainConfigArgs);
+
+    Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(CUSTOM_TOKEN, 1);
+    message.data = new bytes(dataSize);
+    message.receiver = abi.encode(address(0));
+    message.extraArgs = Client._svmArgsToBytes(
+      Client.SVMExtraArgsV1({
+        computeUnits: 0,
+        accountIsWritableBitmap: 0,
+        allowOutOfOrderExecution: true,
+        tokenReceiver: bytes32(uint256(1)),
+        accounts: new bytes32[](0)
+      })
+    );
+
+    uint32 destBytesOverhead =
+      s_feeQuoter.getTokenTransferFeeConfig(DEST_CHAIN_SELECTOR, message.tokenAmounts[0].token).destBytesOverhead;
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        FeeQuoter.MessageTooLarge.selector,
+        SVM_DEFAULT_MAX_DATA_BYTES,
+        Client.SVM_TOKEN_TRANSFER_DATA_OVERHEAD + dataSize + destBytesOverhead
+      )
+    );
+    s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, message);
+  }
+
+  function test_getValidatedFee_RevertWhen_SVMMessageTooLargeDueToDataTokenAndAccounts() public {
+    uint256 dataSize = 100;
+    uint256 numAccounts = 20;
+
+    FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
+    destChainConfigArgs[0].destChainConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_SVM;
+    destChainConfigArgs[0].destChainConfig.maxDataBytes = SVM_DEFAULT_MAX_DATA_BYTES;
+
+    s_feeQuoter.applyDestChainConfigUpdates(destChainConfigArgs);
+
+    Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(CUSTOM_TOKEN, 1);
+    message.data = new bytes(dataSize);
+    message.extraArgs = Client._svmArgsToBytes(
+      Client.SVMExtraArgsV1({
+        computeUnits: GAS_LIMIT,
+        accountIsWritableBitmap: 0,
+        allowOutOfOrderExecution: true,
+        tokenReceiver: bytes32(uint256(1)),
+        accounts: new bytes32[](numAccounts)
+      })
+    );
+
+    uint32 destBytesOverhead =
+      s_feeQuoter.getTokenTransferFeeConfig(DEST_CHAIN_SELECTOR, message.tokenAmounts[0].token).destBytesOverhead;
+    uint256 expandedDataSize = Client.SVM_TOKEN_TRANSFER_DATA_OVERHEAD + dataSize
+      + (numAccounts + Client.SVM_MESSAGING_ACCOUNTS_OVERHEAD) * Client.SVM_ACCOUNT_BYTE_SIZE + destBytesOverhead;
+
+    vm.expectRevert(
+      abi.encodeWithSelector(FeeQuoter.MessageTooLarge.selector, SVM_DEFAULT_MAX_DATA_BYTES, expandedDataSize)
+    );
+    s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, message);
+
+    // Remove token config to use default extra data overhead
+    FeeQuoter.TokenTransferFeeConfigRemoveArgs[] memory tokensToRemove =
+      new FeeQuoter.TokenTransferFeeConfigRemoveArgs[](1);
+    tokensToRemove[0] =
+      FeeQuoter.TokenTransferFeeConfigRemoveArgs({destChainSelector: DEST_CHAIN_SELECTOR, token: CUSTOM_TOKEN});
+    s_feeQuoter.applyTokenTransferFeeConfigUpdates(new FeeQuoter.TokenTransferFeeConfigArgs[](0), tokensToRemove);
+
+    expandedDataSize = Client.SVM_TOKEN_TRANSFER_DATA_OVERHEAD + dataSize
+      + (numAccounts + Client.SVM_MESSAGING_ACCOUNTS_OVERHEAD) * Client.SVM_ACCOUNT_BYTE_SIZE
+      + Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES;
+
+    vm.expectRevert(
+      abi.encodeWithSelector(FeeQuoter.MessageTooLarge.selector, SVM_DEFAULT_MAX_DATA_BYTES, expandedDataSize)
+    );
     s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, message);
   }
 }

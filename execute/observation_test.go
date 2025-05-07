@@ -127,11 +127,17 @@ func Test_getMessagesObservation(t *testing.T) {
 	oneByte := make([]byte, 1)
 
 	// Helper functions
-	createCommitData := func(srcChain cciptypes.ChainSelector, from, to cciptypes.SeqNum) exectypes.CommitData {
+	createCommitData := func(
+		srcChain cciptypes.ChainSelector,
+		from,
+		to cciptypes.SeqNum,
+		executedMessages ...cciptypes.SeqNum,
+	) exectypes.CommitData {
 		return exectypes.CommitData{
 			SourceChain:         srcChain,
 			SequenceNumberRange: cciptypes.NewSeqNumRange(from, to),
 			Timestamp:           timestamp,
+			ExecutedMessages:    executedMessages,
 		}
 	}
 
@@ -427,6 +433,46 @@ func Test_getMessagesObservation(t *testing.T) {
 				},
 				TokenData: exectypes.TokenDataObservations{
 					src1: createTokenData(1, 2),
+				},
+			},
+			expectedError: false,
+		},
+		{
+			name: "executed messages are skipped but hashed",
+			commitData: []exectypes.CommitData{
+				createCommitData(src1, 1, 3, 1, 2), // 1 and 2 are already executed
+			},
+			setupMocks: func(ccipReader *readerpkg_mock.MockCCIPReader,
+				estimateProvider *ccipocr3.MockEstimateProvider,
+				inflightCache *cache.InflightMessageCache,
+				codec *codec_mock.MockExecCodec,
+			) {
+				// Any small size that fits within the max observation size
+				codec.EXPECT().EncodeObservation(mock.Anything).Return(oneByte, nil).Maybe()
+				messages := createMessages(src1, dest, 1, 3)
+
+				ccipReader.On("MsgsBetweenSeqNums", ctx, src1, cciptypes.NewSeqNumRange(1, 3)).
+					Return(messages, nil)
+			},
+			expectedObs: exectypes.Observation{
+				Messages: exectypes.MessageObservations{
+					src1: {
+						// 1 and 2 are pseudo deleted because they are already executed
+						1: NewMessage(1, 1, 0, 0),
+						2: NewMessage(2, 2, 0, 0),
+						3: NewMessage(3, 3, int(src1), int(dest)),
+					},
+				},
+				CommitReports: exectypes.CommitObservations{
+					src1: []exectypes.CommitData{
+						createCommitData(src1, 1, 3, 1, 2), // 1 and 2 are already executed
+					},
+				},
+				Hashes: exectypes.MessageHashes{
+					src1: createHashesMap(1, 3),
+				},
+				TokenData: exectypes.TokenDataObservations{
+					src1: createTokenData(1, 3),
 				},
 			},
 			expectedError: false,
