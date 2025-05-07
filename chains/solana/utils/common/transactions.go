@@ -181,7 +181,7 @@ func sendTransactionWithLookupTables(ctx context.Context, rpcClient *rpc.Client,
 
 	var txStatus rpc.ConfirmationStatusType
 	count := 0
-	for txStatus != rpc.ConfirmationStatusConfirmed && txStatus != rpc.ConfirmationStatusFinalized {
+	for txStatus != rpc.ConfirmationStatusFinalized {
 		count++
 		statusRes, sigErr := rpcClient.GetSignatureStatuses(ctx, true, txsig)
 		if sigErr != nil {
@@ -191,7 +191,7 @@ func sendTransactionWithLookupTables(ctx context.Context, rpcClient *rpc.Client,
 			txStatus = statusRes.Value[0].ConfirmationStatus
 		}
 		time.Sleep(50 * time.Millisecond)
-		if count > 500 {
+		if count > 2000 {
 			return nil, fmt.Errorf("unable to find transaction within timeout")
 		}
 	}
