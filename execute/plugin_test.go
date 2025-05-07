@@ -854,6 +854,7 @@ func TestPlugin_ObservationQuorum(t *testing.T) {
 	got, err := p.ObservationQuorum(ctx, ocr3types.OutcomeContext{}, nil, []types.AttributedObservation{
 		{Observation: []byte{}},
 		{Observation: []byte{}},
+		{Observation: []byte{}},
 	})
 	require.NoError(t, err)
 	assert.Equal(t, true, got)
