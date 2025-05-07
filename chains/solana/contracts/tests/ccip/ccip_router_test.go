@@ -221,7 +221,10 @@ func TestCCIPRouter(t *testing.T) {
 						return string(b[4:])
 					})
 					require.NoError(t, err)
-					require.Regexp(t, "^"+testcase.ContractName+" [0-9a-f]{40}$", output)
+
+					// regex from https://semver.org/#is-there-a-suggested-regular-expression-regex-to-check-a-semver-string
+					semverRegex := "(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-((?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?"
+					require.Regexp(t, fmt.Sprintf("^%s %s$", testcase.ContractName, semverRegex), output)
 					fmt.Printf(testcase.ContractName+" Type Version: %s\n", output)
 				})
 			}

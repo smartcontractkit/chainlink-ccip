@@ -28,6 +28,3 @@ eslint-report.json
 override*.toml
 # go work files
 go.work*
-
-# Used internally in Rust build-scripts
-CCIP_BUILD_GIT_HASH
