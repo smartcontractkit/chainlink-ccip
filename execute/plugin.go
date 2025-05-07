@@ -473,9 +473,9 @@ func validateMessagesRelatedObservations(
 func (p *Plugin) ObservationQuorum(
 	_ context.Context, outctx ocr3types.OutcomeContext, query types.Query, aos []types.AttributedObservation,
 ) (bool, error) {
-	// TODO: should we use f+1 (or less) instead of 2f+1 because it is not needed for security?
+	// 2f+1 is required for fChain consensus.
 	return quorumhelper.ObservationCountReachesObservationQuorum(
-		quorumhelper.QuorumFPlusOne, p.reportingCfg.N, p.reportingCfg.F, aos), nil
+		quorumhelper.QuorumTwoFPlusOne, p.reportingCfg.N, p.reportingCfg.F, aos), nil
 }
 
 // selectReport takes a list of reports in execution order and selects the first reports that fit within the
