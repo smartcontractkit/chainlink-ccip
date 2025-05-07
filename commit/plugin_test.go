@@ -4,9 +4,11 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"testing"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	v1 "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/stretchr/testify/assert"
@@ -159,6 +161,11 @@ func Test_DetectProblematicOracles(t *testing.T) {
 		15971525489660198786, // ethereum-mainnet-base-1
 		11344663589394136015, // binance_smart_chain-mainnet
 	}
+	contractsWeNeedToDiscoverOnSourceChains := []string{
+		consts.ContractNameRouter,
+		consts.ContractNameFeeQuoter,
+		consts.ContractNameOnRamp,
+	}
 	var oracleProblems = make(map[int][]string)
 	for _, attObs := range lg.AttributedObservations {
 		decoded, err := base64.StdEncoding.DecodeString(attObs.Observation)
@@ -171,7 +178,23 @@ func Test_DetectProblematicOracles(t *testing.T) {
 		for _, chain := range chainsToObserve {
 			_, ok := obs.ChainFeeObs.FeeComponents[cciptypes.ChainSelector(chain)]
 			if !ok {
-				problems = append(problems, fmt.Sprintf("oracle %d does not have a fee component for %d", attObs.Observer, chain))
+				problems = append(problems, fmt.Sprintf("oracle %d does not have a fee component for %d (reads from chainWriter)", attObs.Observer, chain))
+			}
+
+			_, ok = obs.ChainFeeObs.ChainFeeUpdates[cciptypes.ChainSelector(chain)]
+			if !ok {
+				problems = append(problems, fmt.Sprintf("oracle %d does not have a chain fee update for %d (reads from destination chain chainReader)", attObs.Observer, chain))
+			}
+
+			// check discovery observations
+			for contractName, chainToAddressMap := range obs.DiscoveryObs.Addresses {
+				if !slices.Contains(contractsWeNeedToDiscoverOnSourceChains, contractName) {
+					continue
+				}
+				_, ok := chainToAddressMap[cciptypes.ChainSelector(chain)]
+				if !ok {
+					problems = append(problems, fmt.Sprintf("oracle %d has not discovered %s on %d", attObs.Observer, contractName, chain))
+				}
 			}
 
 			var found bool
@@ -182,7 +205,7 @@ func Test_DetectProblematicOracles(t *testing.T) {
 				}
 			}
 			if !found {
-				problems = append(problems, fmt.Sprintf("oracle %d does not have a MerkleRootObs.OnRampMaxSeqNums observation for %d", attObs.Observer, chain))
+				problems = append(problems, fmt.Sprintf("oracle %d does not have a MerkleRootObs.OnRampMaxSeqNums observation for %d (reads from source chain chainReader)", attObs.Observer, chain))
 			}
 
 			found = false
@@ -193,7 +216,7 @@ func Test_DetectProblematicOracles(t *testing.T) {
 				}
 			}
 			if !found {
-				problems = append(problems, fmt.Sprintf("oracle %d does not have a MerkleRootObs.OffRampNextSeqNums observation for %d", attObs.Observer, chain))
+				problems = append(problems, fmt.Sprintf("oracle %d does not have a MerkleRootObs.OffRampNextSeqNums observation for %d (reads from destination chain chainReader)", attObs.Observer, chain))
 			}
 		}
 		if len(problems) > 0 {
