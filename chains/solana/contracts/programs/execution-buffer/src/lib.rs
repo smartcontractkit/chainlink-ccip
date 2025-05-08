@@ -4,16 +4,18 @@ mod context;
 use crate::context::*;
 
 mod state;
+use crate::state::*;
 
 declare_id!("buffGjr75PtEtV6D3pbKhaq59CR2qp4mwZDYGspggxZ");
 
 #[program]
 pub mod execution_buffer {
+
     use super::*;
 
     pub fn manually_execute_buffered<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteContext<'info>>,
-        _buffer_id: u64,
+        _buffer_id: BufferId,
         token_indexes: Vec<u8>,
     ) -> Result<()> {
         let cpi_accounts = ccip_offramp::cpi::accounts::ExecuteReportContext {
@@ -42,7 +44,7 @@ pub mod execution_buffer {
 
     pub fn append_execution_report_data<'info>(
         ctx: Context<'_, '_, 'info, 'info, AppendExecutionReportData>,
-        _buffer_id: u64,
+        _buffer_id: BufferId,
         data: Vec<u8>,
     ) -> Result<()> {
         ctx.accounts
@@ -54,14 +56,14 @@ pub mod execution_buffer {
 
     pub fn initialize_execution_report_buffer<'info>(
         _ctx: Context<'_, '_, 'info, 'info, InitializeExecutionReportBuffer>,
-        _buffer_id: u64,
+        _buffer_id: BufferId,
     ) -> Result<()> {
         Ok(())
     }
 
     pub fn close_buffer<'info>(
         _ctx: Context<'_, '_, 'info, 'info, CloseBuffer>,
-        _buffer_id: u64,
+        _buffer_id: BufferId,
     ) -> Result<()> {
         Ok(())
     }

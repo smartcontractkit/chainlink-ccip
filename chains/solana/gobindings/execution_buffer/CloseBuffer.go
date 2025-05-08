@@ -12,7 +12,7 @@ import (
 
 // CloseBuffer is the `closeBuffer` instruction.
 type CloseBuffer struct {
-	BufferId *uint64
+	BufferId *BufferId
 
 	// [0] = [WRITE] bufferedReport
 	//
@@ -29,7 +29,7 @@ func NewCloseBufferInstructionBuilder() *CloseBuffer {
 }
 
 // SetBufferId sets the "bufferId" parameter.
-func (inst *CloseBuffer) SetBufferId(bufferId uint64) *CloseBuffer {
+func (inst *CloseBuffer) SetBufferId(bufferId BufferId) *CloseBuffer {
 	inst.BufferId = &bufferId
 	return inst
 }
@@ -135,7 +135,7 @@ func (obj *CloseBuffer) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err er
 // NewCloseBufferInstruction declares a new CloseBuffer instruction with the provided parameters and accounts.
 func NewCloseBufferInstruction(
 	// Parameters:
-	bufferId uint64,
+	bufferId BufferId,
 	// Accounts:
 	bufferedReport ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *CloseBuffer {

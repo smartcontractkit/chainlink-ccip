@@ -12,7 +12,7 @@ import (
 
 // ManuallyExecuteBuffered is the `manuallyExecuteBuffered` instruction.
 type ManuallyExecuteBuffered struct {
-	BufferId     *uint64
+	BufferId     *BufferId
 	TokenIndexes *[]byte
 
 	// [0] = [WRITE] bufferedReport
@@ -52,7 +52,7 @@ func NewManuallyExecuteBufferedInstructionBuilder() *ManuallyExecuteBuffered {
 }
 
 // SetBufferId sets the "bufferId" parameter.
-func (inst *ManuallyExecuteBuffered) SetBufferId(bufferId uint64) *ManuallyExecuteBuffered {
+func (inst *ManuallyExecuteBuffered) SetBufferId(bufferId BufferId) *ManuallyExecuteBuffered {
 	inst.BufferId = &bufferId
 	return inst
 }
@@ -343,7 +343,7 @@ func (obj *ManuallyExecuteBuffered) UnmarshalWithDecoder(decoder *ag_binary.Deco
 // NewManuallyExecuteBufferedInstruction declares a new ManuallyExecuteBuffered instruction with the provided parameters and accounts.
 func NewManuallyExecuteBufferedInstruction(
 	// Parameters:
-	bufferId uint64,
+	bufferId BufferId,
 	tokenIndexes []byte,
 	// Accounts:
 	bufferedReport ag_solanago.PublicKey,

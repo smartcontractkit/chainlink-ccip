@@ -12,7 +12,7 @@ import (
 
 // AppendExecutionReportData is the `appendExecutionReportData` instruction.
 type AppendExecutionReportData struct {
-	BufferId *uint64
+	BufferId *BufferId
 	Data     *[]byte
 
 	// [0] = [WRITE] bufferedReport
@@ -32,7 +32,7 @@ func NewAppendExecutionReportDataInstructionBuilder() *AppendExecutionReportData
 }
 
 // SetBufferId sets the "bufferId" parameter.
-func (inst *AppendExecutionReportData) SetBufferId(bufferId uint64) *AppendExecutionReportData {
+func (inst *AppendExecutionReportData) SetBufferId(bufferId BufferId) *AppendExecutionReportData {
 	inst.BufferId = &bufferId
 	return inst
 }
@@ -173,7 +173,7 @@ func (obj *AppendExecutionReportData) UnmarshalWithDecoder(decoder *ag_binary.De
 // NewAppendExecutionReportDataInstruction declares a new AppendExecutionReportData instruction with the provided parameters and accounts.
 func NewAppendExecutionReportDataInstruction(
 	// Parameters:
-	bufferId uint64,
+	bufferId BufferId,
 	data []byte,
 	// Accounts:
 	bufferedReport ag_solanago.PublicKey,

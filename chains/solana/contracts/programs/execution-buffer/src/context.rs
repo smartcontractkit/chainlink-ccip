@@ -1,15 +1,15 @@
-use crate::state::BufferedReport;
+use crate::state::{BufferId, BufferedReport};
 use anchor_lang::prelude::*;
 use ccip_common::seed;
 
 pub const ANCHOR_DISCRIMINATOR: usize = 8; // size in bytes
 
 #[derive(Accounts)]
-#[instruction(buffer_id: u64, data: Vec<u8>)]
+#[instruction(buffer_id: BufferId, data: Vec<u8>)]
 pub struct AppendExecutionReportData<'info> {
     #[account(
         mut,
-        seeds = [seed::EXECUTION_BUFFER, authority.key().as_ref(), &buffer_id.to_le_bytes()],
+        seeds = [seed::EXECUTION_BUFFER, authority.key().as_ref(), &buffer_id.bytes],
         bump,
         realloc = ANCHOR_DISCRIMINATOR + BufferedReport::INIT_SPACE + buffered_report.raw_report_data.len() + data.len(),
         realloc::payer = authority,
@@ -23,11 +23,11 @@ pub struct AppendExecutionReportData<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(buffer_id: u64)]
+#[instruction(buffer_id: BufferId)]
 pub struct InitializeExecutionReportBuffer<'info> {
     #[account(
         init,
-        seeds = [seed::EXECUTION_BUFFER, authority.key().as_ref(), &buffer_id.to_le_bytes()],
+        seeds = [seed::EXECUTION_BUFFER, authority.key().as_ref(), &buffer_id.bytes],
         bump,
         space = ANCHOR_DISCRIMINATOR + BufferedReport::INIT_SPACE,
         payer = authority,
@@ -40,11 +40,11 @@ pub struct InitializeExecutionReportBuffer<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(buffer_id: u64)]
+#[instruction(buffer_id: BufferId)]
 pub struct CloseBuffer<'info> {
     #[account(
         mut,
-        seeds = [seed::EXECUTION_BUFFER, authority.key().as_ref(), &buffer_id.to_le_bytes()],
+        seeds = [seed::EXECUTION_BUFFER, authority.key().as_ref(), &buffer_id.bytes],
         bump,
         close = authority,
     )]
@@ -55,11 +55,11 @@ pub struct CloseBuffer<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(buffer_id: u64, _token_indices: Vec<u8>)]
+#[instruction(buffer_id: BufferId, _token_indices: Vec<u8>)]
 pub struct ExecuteContext<'info> {
     #[account(
         mut,
-        seeds = [seed::EXECUTION_BUFFER, authority.key().as_ref(), &buffer_id.to_le_bytes()],
+        seeds = [seed::EXECUTION_BUFFER, authority.key().as_ref(), &buffer_id.bytes],
         bump,
         close = authority,
     )]

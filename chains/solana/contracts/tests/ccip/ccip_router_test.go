@@ -9520,11 +9520,10 @@ func TestCCIPRouter(t *testing.T) {
 				testutils.SendAndFailWithRPCError(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"VersionedTransaction too large"})
 				// We now build a buffer for the report and CPI to the executor instead.
 
-				// Arbitrary number decided by the caller, as long as it's not repeated between reports.
-				bufferID := uint64(0)
+				// Arbitrary ID decided by the caller, as long as it's not repeated between reports.
+				bufferID := execution_buffer.BufferId{Bytes: [32]uint8{1, 2, 3, 4, 5}}
 
-				bufferIDLittleEndian := common.Uint64ToLE(bufferID)
-				bufferPDA, _, _ := solana.FindProgramAddress([][]byte{[]byte("execution_buffer"), transmitter.PublicKey().Bytes(), bufferIDLittleEndian}, config.ExecutionBuffer)
+				bufferPDA, _, _ := solana.FindProgramAddress([][]byte{[]byte("execution_buffer"), transmitter.PublicKey().Bytes(), bufferID.Bytes[:]}, config.ExecutionBuffer)
 
 				bufferInitIx, err := execution_buffer.NewInitializeExecutionReportBufferInstruction(bufferID, bufferPDA, transmitter.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 				require.NoError(t, err)

@@ -74,7 +74,9 @@ export type ExecutionBuffer = {
       "args": [
         {
           "name": "bufferId",
-          "type": "u64"
+          "type": {
+            "defined": "BufferId"
+          }
         },
         {
           "name": "tokenIndexes",
@@ -104,7 +106,9 @@ export type ExecutionBuffer = {
       "args": [
         {
           "name": "bufferId",
-          "type": "u64"
+          "type": {
+            "defined": "BufferId"
+          }
         },
         {
           "name": "data",
@@ -134,7 +138,9 @@ export type ExecutionBuffer = {
       "args": [
         {
           "name": "bufferId",
-          "type": "u64"
+          "type": {
+            "defined": "BufferId"
+          }
         }
       ]
     },
@@ -155,7 +161,9 @@ export type ExecutionBuffer = {
       "args": [
         {
           "name": "bufferId",
-          "type": "u64"
+          "type": {
+            "defined": "BufferId"
+          }
         }
       ]
     }
@@ -169,6 +177,25 @@ export type ExecutionBuffer = {
           {
             "name": "rawReportData",
             "type": "bytes"
+          }
+        ]
+      }
+    }
+  ],
+  "types": [
+    {
+      "name": "BufferId",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bytes",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
           }
         ]
       }
@@ -252,7 +279,9 @@ export const IDL: ExecutionBuffer = {
       "args": [
         {
           "name": "bufferId",
-          "type": "u64"
+          "type": {
+            "defined": "BufferId"
+          }
         },
         {
           "name": "tokenIndexes",
@@ -282,7 +311,9 @@ export const IDL: ExecutionBuffer = {
       "args": [
         {
           "name": "bufferId",
-          "type": "u64"
+          "type": {
+            "defined": "BufferId"
+          }
         },
         {
           "name": "data",
@@ -312,7 +343,9 @@ export const IDL: ExecutionBuffer = {
       "args": [
         {
           "name": "bufferId",
-          "type": "u64"
+          "type": {
+            "defined": "BufferId"
+          }
         }
       ]
     },
@@ -333,7 +366,9 @@ export const IDL: ExecutionBuffer = {
       "args": [
         {
           "name": "bufferId",
-          "type": "u64"
+          "type": {
+            "defined": "BufferId"
+          }
         }
       ]
     }
@@ -347,6 +382,25 @@ export const IDL: ExecutionBuffer = {
           {
             "name": "rawReportData",
             "type": "bytes"
+          }
+        ]
+      }
+    }
+  ],
+  "types": [
+    {
+      "name": "BufferId",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bytes",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
           }
         ]
       }

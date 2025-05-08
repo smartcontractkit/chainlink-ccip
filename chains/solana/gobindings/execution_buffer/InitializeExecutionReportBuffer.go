@@ -12,7 +12,7 @@ import (
 
 // InitializeExecutionReportBuffer is the `initializeExecutionReportBuffer` instruction.
 type InitializeExecutionReportBuffer struct {
-	BufferId *uint64
+	BufferId *BufferId
 
 	// [0] = [WRITE] bufferedReport
 	//
@@ -31,7 +31,7 @@ func NewInitializeExecutionReportBufferInstructionBuilder() *InitializeExecution
 }
 
 // SetBufferId sets the "bufferId" parameter.
-func (inst *InitializeExecutionReportBuffer) SetBufferId(bufferId uint64) *InitializeExecutionReportBuffer {
+func (inst *InitializeExecutionReportBuffer) SetBufferId(bufferId BufferId) *InitializeExecutionReportBuffer {
 	inst.BufferId = &bufferId
 	return inst
 }
@@ -152,7 +152,7 @@ func (obj *InitializeExecutionReportBuffer) UnmarshalWithDecoder(decoder *ag_bin
 // NewInitializeExecutionReportBufferInstruction declares a new InitializeExecutionReportBuffer instruction with the provided parameters and accounts.
 func NewInitializeExecutionReportBufferInstruction(
 	// Parameters:
-	bufferId uint64,
+	bufferId BufferId,
 	// Accounts:
 	bufferedReport ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,

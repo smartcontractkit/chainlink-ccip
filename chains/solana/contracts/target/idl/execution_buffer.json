@@ -74,7 +74,9 @@
       "args": [
         {
           "name": "bufferId",
-          "type": "u64"
+          "type": {
+            "defined": "BufferId"
+          }
         },
         {
           "name": "tokenIndexes",
@@ -104,7 +106,9 @@
       "args": [
         {
           "name": "bufferId",
-          "type": "u64"
+          "type": {
+            "defined": "BufferId"
+          }
         },
         {
           "name": "data",
@@ -134,7 +138,9 @@
       "args": [
         {
           "name": "bufferId",
-          "type": "u64"
+          "type": {
+            "defined": "BufferId"
+          }
         }
       ]
     },
@@ -155,7 +161,9 @@
       "args": [
         {
           "name": "bufferId",
-          "type": "u64"
+          "type": {
+            "defined": "BufferId"
+          }
         }
       ]
     }
@@ -169,6 +177,25 @@
           {
             "name": "rawReportData",
             "type": "bytes"
+          }
+        ]
+      }
+    }
+  ],
+  "types": [
+    {
+      "name": "BufferId",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bytes",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
           }
         ]
       }
