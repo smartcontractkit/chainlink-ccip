@@ -2,6 +2,7 @@ package gethwrappers
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"go/ast"
 	"go/format"
@@ -11,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -25,10 +27,23 @@ const headerComment = `// Code generated - DO NOT EDIT.
 
 var GethVersion = fmt.Sprintf("%d.%d.%d", version.Major, version.Minor, version.Patch)
 
-// AbigenArgs is the arguments to the abigen executable. E.g., Bin is the -bin
-// arg.
+// AbigenArgs is the arguments to the abigen executable. E.g., Bin is the -bin arg.
+// Metadata is the only exception, as it is not passed to abigen but rather used to create a separate metadata variable.
 type AbigenArgs struct {
-	Bin, ABI, Out, Type, Pkg string
+	Bin, ABI, Metadata, Out, MetadataOut, Type, Pkg string
+}
+
+// standardInput defines the sections of the Solidity standard input required for verification.
+type standardInput struct {
+	Version  string         `json:"version"`
+	Language string         `json:"language"`
+	Settings map[string]any `json:"settings"`
+	Sources  map[string]any `json:"sources"`
+}
+
+// buildInfo defines the sections of the build info JSON file required for verification.
+type buildInfo struct {
+	Input standardInput `json:"input"`
 }
 
 // Abigen calls Abigen  with the given arguments
@@ -70,6 +85,38 @@ func Abigen(a AbigenArgs) {
 	}
 
 	ImproveAbigenOutput(a.Out, a.ABI)
+
+	// Add metadata to exported package
+	allMeta, err := os.ReadFile(a.Metadata)
+	if err != nil {
+		Exit("Error while reading metadata file", err)
+	}
+	// Unmarshal into BuildInfo struct to filter out unnecessary fields
+	// and marshal back to JSON bytes afterwards
+	var build buildInfo
+	err = json.Unmarshal(allMeta, &build)
+	if err != nil {
+		Exit("Error while unmarshalling metadata JSON", err)
+	}
+	refinedMeta, err := json.Marshal(build.Input)
+	if err != nil {
+		Exit("Error while marshalling metadata JSON", err)
+	}
+	// Export the metadata as a variable in the generated Go file
+	var buf bytes.Buffer
+	if err := json.Compact(&buf, refinedMeta); err != nil {
+		Exit("Error while compacting metadata JSON", err)
+	}
+	code := fmt.Sprintf(
+		"%s\npackage %s\n\nvar SolidityStandardInput = %s\n",
+		headerComment,
+		a.Pkg,
+		strconv.Quote(buf.String()),
+	)
+	err = os.WriteFile(a.MetadataOut, []byte(code), 0600)
+	if err != nil {
+		Exit("Error while writing metadata file", err)
+	}
 }
 
 func ImproveAbigenOutput(path string, abiPath string) {

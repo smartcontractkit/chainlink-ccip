@@ -29,6 +29,8 @@ contract BaseTest is Test {
   uint8 internal constant DEFAULT_TOKEN_DECIMALS = 18;
   uint16 internal constant GAS_FOR_CALL_EXACT_CHECK = 5_000;
 
+  uint32 internal constant SVM_DEFAULT_MAX_DATA_BYTES = 600;
+
   bool private s_baseTestInitialized;
 
   IRMNRemote internal s_mockRMNRemote;
