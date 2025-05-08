@@ -1,7 +1,7 @@
 {
-  "name": "Chainlink",
+  "name": "Chainlink Token",
   "symbol": "LINK",
-  "description": "Chainlink Labs Token",
+  "description": "Chainlink Token (LINK)",
   "image": "https://d2f70xi62kby8n.cloudfront.net/LINK.svg",
   "attributes": [],
   "properties": {
