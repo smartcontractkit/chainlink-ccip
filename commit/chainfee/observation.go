@@ -57,10 +57,9 @@ func (p *processor) Observation(
 		lggr.Infow("don't have any chains with native token prices, only observing fChain",
 			"chainsWithoutNativeTokenPrices", chainsWithoutNativeTokenPrices.ToSlice())
 		return Observation{
-			// Observe at least fChain so we don't get misleading fChain consensus logs
-			// when in the outcome phase, despite not having anything to report.
-			FChain:       fChain,
-			TimestampNow: now,
+			FChain:          fChain,
+			TimestampNow:    now,
+			ChainFeeUpdates: chainFeeUpdates,
 		}, nil
 	}
 
