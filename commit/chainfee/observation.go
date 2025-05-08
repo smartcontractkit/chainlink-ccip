@@ -54,7 +54,7 @@ func (p *processor) Observation(
 	)
 
 	if len(chainsWithNativeTokenPrices.ToSlice()) == 0 {
-		lggr.Infow("don't have any chains with native token prices, only observing fChain",
+		lggr.Infow("don't have any chains with native token prices",
 			"chainsWithoutNativeTokenPrices", chainsWithoutNativeTokenPrices.ToSlice())
 		return Observation{
 			FChain:          fChain,
