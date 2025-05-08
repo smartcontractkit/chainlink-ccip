@@ -1,13 +1,13 @@
 {
-  "name": "Link Token",
+  "name": "Chainlink",
   "symbol": "LINK",
   "description": "Chainlink Labs Token",
-  "image": "https://raw.githubusercontent.com/smartcontractkit/chainlink-ccip/e5805433301e336fce200b5475de61f0ab3fa2ad/chains/solana/chainlink_icon.svg",
+  "image": "https://d2f70xi62kby8n.cloudfront.net/LINK.svg",
   "attributes": [],
   "properties": {
     "files": [
       {
-        "uri": "https://raw.githubusercontent.com/smartcontractkit/chainlink-ccip/e5805433301e336fce200b5475de61f0ab3fa2ad/chains/solana/chainlink_icon.svg",
+        "uri": "https://d2f70xi62kby8n.cloudfront.net/LINK.svg",
         "type": "image/svg+xml"
       }
     ]
