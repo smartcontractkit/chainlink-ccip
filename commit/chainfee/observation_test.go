@@ -97,13 +97,19 @@ func Test_processor_Observation(t *testing.T) {
 				2: 2,
 				3: 1,
 			},
-			expErr: false,
+			expErr:   false,
+			emptyObs: false,
 		},
 		{
 			name:            "only dest chain",
 			supportedChains: []ccipocr3.ChainSelector{1},
 			dstChain:        1,
-			emptyObs:        true,
+			fChain: map[ccipocr3.ChainSelector]int{
+				1: 1,
+				2: 2,
+				3: 1,
+			},
+			emptyObs: true,
 		},
 	}
 
@@ -159,7 +165,8 @@ func Test_processor_Observation(t *testing.T) {
 				return
 			}
 			if tc.emptyObs {
-				require.Empty(t, obs)
+				require.Equal(t, tc.fChain, obs.FChain)
+				require.NotEqual(t, time.Time{}, obs.TimestampNow)
 				return
 			}
 
@@ -349,7 +356,8 @@ func Test_unique_chain_filter_in_Observation(t *testing.T) {
 			obs, err := p.Observation(ctx, Outcome{}, Query{})
 			require.NoError(t, err)
 			if tc.expUniqueChains == 0 {
-				require.Empty(t, obs)
+				require.Equal(t, tc.fChain, obs.FChain)
+				require.NotEqual(t, time.Time{}, obs.TimestampNow)
 				return
 			}
 
