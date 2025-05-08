@@ -1,0 +1,15 @@
+{
+  "name": "Link Token",
+  "symbol": "LINK",
+  "description": "Chainlink Labs Token",
+  "image": "",
+  "attributes": [],
+  "properties": {
+    "files": [
+      {
+        "uri": "",
+        "type": "image/png"
+      }
+    ]
+  }
+}
