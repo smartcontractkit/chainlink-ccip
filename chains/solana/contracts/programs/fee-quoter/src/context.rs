@@ -76,6 +76,23 @@ pub struct UpdateConfig<'info> {
 }
 
 #[derive(Accounts)]
+pub struct UpdateConfigLinkMint<'info> {
+    #[account(
+        mut,
+        seeds = [seed::CONFIG],
+        bump,
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidVersion,
+    )]
+    pub config: Account<'info, Config>,
+
+    pub link_token_mint: InterfaceAccount<'info, Mint>,
+
+    // validate signer is registered admin
+    #[account(address = config.owner @ FeeQuoterError::Unauthorized)]
+    pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
 pub struct AcceptOwnership<'info> {
     #[account(
         mut,
