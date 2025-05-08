@@ -58,6 +58,22 @@ impl Admin for Impl {
         Ok(())
     }
 
+    fn set_link_token_mint(
+        &self,
+        ctx: Context<UpdateConfigCCIPRouter>,
+        link_token_mint: Pubkey,
+    ) -> Result<()> {
+        ctx.accounts.config.link_token_mint = link_token_mint;
+        emit!(events::ConfigSet {
+            svm_chain_selector: ctx.accounts.config.svm_chain_selector,
+            fee_quoter: ctx.accounts.config.fee_quoter,
+            rmn_remote: ctx.accounts.config.rmn_remote,
+            link_token_mint: ctx.accounts.config.link_token_mint,
+            fee_aggregator: ctx.accounts.config.fee_aggregator,
+        });
+        Ok(())
+    }
+
     fn update_fee_aggregator(
         &self,
         ctx: Context<UpdateConfigCCIPRouter>,
