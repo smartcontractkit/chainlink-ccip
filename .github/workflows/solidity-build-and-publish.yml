@@ -108,8 +108,8 @@ jobs:
     defaults:
       run:
         working-directory: chains/evm
-    needs: [changes]
-    if: needs.changes.outputs.changes == 'true'
+    needs: [changes, tag-check]
+    if: needs.changes.outputs.changes == 'true' || needs.tag-check.outputs.is-release-ccip == 'true' || needs.tag-check.outputs.is-pre-release-ccip == 'true'
     name: Solidity Lint
     runs-on: ubuntu-latest
     steps:
@@ -148,7 +148,7 @@ jobs:
       - name: Install Foundry
         uses: ./.github/actions/install-solidity-foundry
         with:
-          working-directory: chainlink/contracts
+          working-directory: chains/evm
 
       - name: Version package.json
         working-directory: chains/evm
@@ -170,10 +170,10 @@ jobs:
       - name: Publish to NPM (beta)
         uses: smartcontractkit/.github/actions/ci-publish-npm@4b0ab756abcb1760cb82e1e87b94ff431905bffc # ci-publish-npm@0.4.0
         with:
-          npm-token: ${{ secrets.NPM_TOKEN }}
+          npm-token: ${{ secrets.NPM_CHAINLINK_CCIP }}
           create-github-release: false
           publish-command: "pnpm publish-beta --no-git-checks"
-          package-json-directory: contracts
+          package-json-directory: chains/evm
 
   publish-prod:
     name: Publish Prod NPM
@@ -198,7 +198,7 @@ jobs:
       - name: Install Foundry
         uses: ./.github/actions/install-solidity-foundry
         with:
-          working-directory: chainlink/contracts
+          working-directory: chains/evm
 
       - name: Validate version
         working-directory: chains/evm
@@ -223,7 +223,7 @@ jobs:
       - name: Publish to NPM (latest)
         uses: smartcontractkit/.github/actions/ci-publish-npm@4b0ab756abcb1760cb82e1e87b94ff431905bffc # ci-publish-npm@0.4.0
         with:
-          npm-token: ${{ secrets.NPM_TOKEN }}
+          npm-token: ${{ secrets.NPM_CHAINLINK_CCIP }}
           create-github-release: false
           publish-command: "pnpm publish-prod --no-git-checks"
-          package-json-directory: contracts
+          package-json-directory: chains/evm
