@@ -17,6 +17,7 @@
     "no-unused-import": "error",
     "gas-struct-packing": "warn",
     "interface-starts-with-i": "warn",
+    "import-path-check": "off",
     "func-visibility": [
       "error",
       {
