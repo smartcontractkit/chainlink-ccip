@@ -18,13 +18,19 @@ type Query struct {
 }
 
 type Outcome struct {
-	TokenPrices cciptypes.TokenPriceMap `json:"tokenPrices"`
+	TokenPrices               cciptypes.TokenPriceMap                       `json:"tokenPrices"`
+	InflightTokenPriceUpdates map[cciptypes.UnknownEncodedAddress]time.Time `json:"inflightTokenPriceUpdates"`
+	InflightRemainingChecks   int64                                         `json:"inflightRemainingChecks"`
 }
 
 func (out Outcome) Stats() map[string]int {
 	return map[string]int{
 		tokenPricesLabel: len(out.TokenPrices),
 	}
+}
+
+func (out Outcome) HasInflightTokenPriceUpdates() bool {
+	return len(out.InflightTokenPriceUpdates) > 0 && out.InflightRemainingChecks > 0
 }
 
 type Observation struct {

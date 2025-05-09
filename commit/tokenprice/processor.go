@@ -3,9 +3,11 @@ package tokenprice
 import (
 	"context"
 	"fmt"
+	"time"
+
+	"github.com/smartcontractkit/libocr/commontypes"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/libocr/commontypes"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
@@ -79,7 +81,7 @@ func (p *processor) Query(ctx context.Context, prevOutcome Outcome) (Query, erro
 
 func (p *processor) Outcome(
 	ctx context.Context,
-	_ Outcome,
+	prevOutcome Outcome,
 	_ Query,
 	aos []plugincommon.AttributedObservation[Observation],
 ) (Outcome, error) {
@@ -89,27 +91,75 @@ func (p *processor) Outcome(
 	// If set to zero, no prices will be reported (i.e keystone feeds would be active).
 	if p.offChainCfg.TokenPriceBatchWriteFrequency.Duration() == 0 {
 		lggr.Debugw("TokenPriceBatchWriteFrequency is set to zero, no prices will be reported")
-		return Outcome{}, nil
+		return newEmptyOutcome(), nil
 	}
+
+	inflightTokenPricesOutcome := newInflightPricesOutcome(
+		prevOutcome.InflightTokenPriceUpdates, prevOutcome.InflightRemainingChecks-1)
 
 	consensusObservation, err := p.getConsensusObservation(lggr, aos)
 	if err != nil {
-		return Outcome{}, fmt.Errorf("get consensus observation: %w", err)
+		return inflightTokenPricesOutcome, fmt.Errorf("get consensus observation: %w", err)
+	}
+
+	// Check if we have inflight token price updates.
+	if prevOutcome.HasInflightTokenPriceUpdates() {
+		return p.computeInflightPricesOutcome(lggr, consensusObservation, prevOutcome), nil
 	}
 
 	tokenPriceOutcome := p.selectTokensForUpdate(lggr, consensusObservation)
-	lggr.Infow(
-		"outcome token prices",
-		"tokenPrices", tokenPriceOutcome,
-	)
+	lggr.Infow("outcome token prices", "tokenPrices", tokenPriceOutcome)
 
 	if len(tokenPriceOutcome) == 0 {
 		lggr.Debugw("No token prices to report")
-		return Outcome{}, nil
+		return inflightTokenPricesOutcome, nil
 	}
 
-	out := Outcome{TokenPrices: tokenPriceOutcome}
-	return out, nil
+	inflightTokenPriceUpdates := make(map[cciptypes.UnknownEncodedAddress]time.Time)
+	for tokenAddr := range tokenPriceOutcome {
+		oldTokenPriceUpdate, exists := consensusObservation.FeeQuoterTokenUpdates[tokenAddr]
+		inflightTokenPriceUpdates[tokenAddr] = time.Time{}
+		if exists {
+			inflightTokenPriceUpdates[tokenAddr] = oldTokenPriceUpdate.Timestamp
+		}
+	}
+
+	return newTokenPricesOutcome(
+		tokenPriceOutcome,
+		inflightTokenPriceUpdates,
+		int64(p.offChainCfg.InflightPriceCheckRetries),
+	), nil
+}
+
+// computeInflightPricesOutcome is called when we're waiting for prices to appear on-chain in the current round.
+// If some prices are still missing, it decrements the retry counter.
+// If all prices have appeared on-chain, or if no retries remain, it returns an empty outcome
+// to signal that new prices should be transmitted in the next round.
+func (p *processor) computeInflightPricesOutcome(
+	lggr logger.Logger, consensusObservation ConsensusObservation, prevOutcome Outcome,
+) Outcome {
+	lggr.Debugw("computing inflight prices outcome",
+		"prevUpdate", prevOutcome.InflightTokenPriceUpdates,
+		"currUpdates", consensusObservation.FeeQuoterTokenUpdates,
+		"remRetries", prevOutcome.InflightRemainingChecks,
+	)
+
+	for chainSel, inflightUpdate := range prevOutcome.InflightTokenPriceUpdates {
+		lggr2 := logger.With(lggr, "chainSel", chainSel, "prevUpdate", inflightUpdate,
+			"currUpdates", consensusObservation.FeeQuoterTokenUpdates)
+
+		currUpdate, exists := consensusObservation.FeeQuoterTokenUpdates[chainSel]
+		priceAppearedOnChain := exists && currUpdate.Timestamp.After(inflightUpdate)
+		if !priceAppearedOnChain {
+			lggr2.Infow("waiting for previously transmitted token price update to appear on-chain")
+			return newInflightPricesOutcome(
+				prevOutcome.InflightTokenPriceUpdates, prevOutcome.InflightRemainingChecks-1)
+		}
+		lggr2.Debugw("previously transmitted token price update appeared on-chain")
+	}
+
+	lggr.Infow("all inflight token prices appeared OnChain")
+	return newEmptyOutcome()
 }
 
 func (p *processor) Close() error {
