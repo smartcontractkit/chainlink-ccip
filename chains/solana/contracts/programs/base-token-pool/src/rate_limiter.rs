@@ -83,8 +83,11 @@ impl RateLimitTokenBucket {
     fn refill<C: Timestamper>(&mut self) -> Result<()> {
         let current_timestamp = C::instance()?.unix_timestamp();
         let time_diff = current_timestamp.checked_sub(self.last_updated).unwrap();
-        let increase = time_diff.checked_mul(self.cfg.rate).unwrap();
-        let refill = self.tokens.checked_add(increase).unwrap();
+
+        // Use saturating arithmetic to avoid overflow during the first refill,
+        // when the last_updated timestamp is 0 so the time_diff is big.
+        let increase = time_diff.saturating_mul(self.cfg.rate);
+        let refill = self.tokens.saturating_add(increase);
 
         self.tokens = min(self.cfg.capacity, refill);
         self.last_updated = current_timestamp;
