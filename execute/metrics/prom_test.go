@@ -6,8 +6,9 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal"
@@ -171,8 +172,10 @@ func Test_TrackingOutcomes(t *testing.T) {
 		{
 			name: "empty structs should not report anything",
 			outcome: exectypes.Outcome{
-				Report: cciptypes.ExecutePluginReport{
-					ChainReports: []cciptypes.ExecutePluginReportSingleChain{},
+				Reports: []cciptypes.ExecutePluginReport{
+					{
+						ChainReports: []cciptypes.ExecutePluginReportSingleChain{},
+					},
 				},
 			},
 			state:                    exectypes.GetCommitReports,
@@ -183,12 +186,14 @@ func Test_TrackingOutcomes(t *testing.T) {
 		{
 			name: "single chain report should be properly tracked",
 			outcome: exectypes.Outcome{
-				Report: cciptypes.ExecutePluginReport{
-					ChainReports: []cciptypes.ExecutePluginReportSingleChain{
-						{
-							SourceChainSelector: 123,
-							Messages:            make([]cciptypes.Message, 2),
-							OffchainTokenData:   make([][][]byte, 0),
+				Reports: []cciptypes.ExecutePluginReport{
+					{
+						ChainReports: []cciptypes.ExecutePluginReportSingleChain{
+							{
+								SourceChainSelector: 123,
+								Messages:            make([]cciptypes.Message, 2),
+								OffchainTokenData:   make([][][]byte, 0),
+							},
 						},
 					},
 				},
@@ -201,17 +206,19 @@ func Test_TrackingOutcomes(t *testing.T) {
 		{
 			name: "multiple chain reports should be tracked",
 			outcome: exectypes.Outcome{
-				Report: cciptypes.ExecutePluginReport{
-					ChainReports: []cciptypes.ExecutePluginReportSingleChain{
-						{
-							SourceChainSelector: 123,
-							Messages:            make([]cciptypes.Message, 10),
-							OffchainTokenData:   make([][][]byte, 20),
-						},
-						{
-							SourceChainSelector: 250,
-							Messages:            make([]cciptypes.Message, 5),
-							OffchainTokenData:   make([][][]byte, 10),
+				Reports: []cciptypes.ExecutePluginReport{
+					{
+						ChainReports: []cciptypes.ExecutePluginReportSingleChain{
+							{
+								SourceChainSelector: 123,
+								Messages:            make([]cciptypes.Message, 10),
+								OffchainTokenData:   make([][][]byte, 20),
+							},
+							{
+								SourceChainSelector: 250,
+								Messages:            make([]cciptypes.Message, 5),
+								OffchainTokenData:   make([][][]byte, 10),
+							},
 						},
 					},
 				},

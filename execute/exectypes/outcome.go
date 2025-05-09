@@ -1,8 +1,6 @@
 package exectypes
 
 import (
-	"sort"
-
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
@@ -56,16 +54,16 @@ type Outcome struct {
 	// the state:
 	// * GetCommitReports: All pending commit reports which were observed.
 	// * GetMessages: All pending commit reports with messages.
-	// * Filter: Commit reports associated with the final execution report.
+	// * Filter: Commit reports associated with the final execution report, concatenated together.
 	CommitReports []CommitData `json:"commitReports"`
 
-	// Report is built from the oldest pending commit reports.
-	Report cciptypes.ExecutePluginReport `json:"report"`
+	// Reports are built from the oldest pending commit reports.
+	Reports []cciptypes.ExecutePluginReport `json:"reports"`
 }
 
 // IsEmpty returns true if the outcome has no pending commit reports or chain reports.
 func (o Outcome) IsEmpty() bool {
-	return len(o.CommitReports) == 0 && len(o.Report.ChainReports) == 0
+	return len(o.CommitReports) == 0 && (len(o.Reports) == 0 || len(o.Reports[0].ChainReports) == 0)
 }
 
 func (o *Outcome) Stats() map[string]int {
@@ -75,10 +73,12 @@ func (o *Outcome) Stats() map[string]int {
 		sourceChainsLabel: 0,
 	}
 
-	for _, report := range o.Report.ChainReports {
-		counters[sourceChainsLabel]++
-		counters[messagesLabel] += len(report.Messages)
-		counters[tokenDataLabel] += len(report.OffchainTokenData)
+	for _, execReport := range o.Reports {
+		for _, report := range execReport.ChainReports {
+			counters[sourceChainsLabel]++
+			counters[messagesLabel] += len(report.Messages)
+			counters[tokenDataLabel] += len(report.OffchainTokenData)
+		}
 	}
 	return counters
 }
@@ -89,51 +89,31 @@ func (o Outcome) ToLogFormat() Outcome {
 	for i, report := range o.CommitReports {
 		commitReports[i] = report.CopyNoMsgData()
 	}
-	reports := make([]cciptypes.ExecutePluginReportSingleChain, len(o.Report.ChainReports))
-	for i, report := range o.Report.ChainReports {
-		reports[i] = report.CopyNoMsgData()
+	truncatedReports := make([]cciptypes.ExecutePluginReport, len(o.Reports))
+	for i, execReport := range o.Reports {
+		truncatedReports[i].ChainReports = make([]cciptypes.ExecutePluginReportSingleChain, len(execReport.ChainReports))
+		for j, report := range execReport.ChainReports {
+			truncatedReports[i].ChainReports[j] = report.CopyNoMsgData()
+		}
 	}
 	cleanedOutcome := Outcome{
 		State:         o.State,
 		CommitReports: commitReports,
-		Report: cciptypes.ExecutePluginReport{
-			ChainReports: reports,
-		},
+		Reports:       truncatedReports,
 	}
 	return cleanedOutcome
 }
 
 // NewOutcome creates a new Outcome with the pending commit reports and the chain reports sorted.
+// No sorting is needed, they are already in a canonical representation from the builder.
 func NewOutcome(
 	state PluginState,
 	selectedCommits []CommitData,
-	report cciptypes.ExecutePluginReport,
+	reports []cciptypes.ExecutePluginReport,
 ) Outcome {
-	return NewSortedOutcome(state, selectedCommits, report)
-}
-
-// NewSortedOutcome ensures canonical ordering of the outcome.
-// TODO: handle canonicalization in the encoder.
-func NewSortedOutcome(
-	state PluginState,
-	pendingCommits []CommitData,
-	report cciptypes.ExecutePluginReport,
-) Outcome {
-	pendingCommitsCP := append([]CommitData{}, pendingCommits...)
-	reportCP := append([]cciptypes.ExecutePluginReportSingleChain{}, report.ChainReports...)
-	sort.Slice(
-		pendingCommitsCP,
-		func(i, j int) bool {
-			return LessThan(pendingCommitsCP[i], pendingCommitsCP[j])
-		})
-	sort.Slice(
-		reportCP,
-		func(i, j int) bool {
-			return reportCP[i].SourceChainSelector < reportCP[j].SourceChainSelector
-		})
 	return Outcome{
 		State:         state,
-		CommitReports: pendingCommitsCP,
-		Report:        cciptypes.ExecutePluginReport{ChainReports: reportCP},
+		CommitReports: selectedCommits,
+		Reports:       reports,
 	}
 }
