@@ -19,9 +19,11 @@ pub mod test_token_pool {
         pool_type: PoolType,
         router: Pubkey,
         rmn_remote: Pubkey,
+        multisig: bool,
     ) -> Result<()> {
         ctx.accounts.state.set_inner(State {
             pool_type,
+            multisig,
             config: BaseConfig::init(
                 &ctx.accounts.mint,
                 ctx.program_id.key(),
@@ -172,6 +174,15 @@ pub mod test_token_pool {
                 ctx.bumps.pool_signer,
                 release_or_mint,
                 parsed_amount,
+                if ctx.accounts.state.multisig {
+                    Some(
+                        ctx.remaining_accounts
+                            .get(0)
+                            .ok_or(CcipTokenPoolError::InvalidInputs)?,
+                    )
+                } else {
+                    None
+                },
             )?,
             PoolType::Wrapped => {
                 // The External Execution Config Account is used to sign the CPI instruction
@@ -320,6 +331,7 @@ pub mod test_token_pool {
 #[derive(InitSpace)]
 pub struct State {
     pub pool_type: PoolType,
+    pub multisig: bool,
     pub config: BaseConfig,
 }
 

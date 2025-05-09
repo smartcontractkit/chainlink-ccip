@@ -215,6 +215,7 @@ pub mod burnmint_token_pool {
             ctx.bumps.pool_signer,
             release_or_mint,
             parsed_amount,
+            None,
         )?;
 
         Ok(ReleaseOrMintOutV1 {
@@ -323,6 +324,7 @@ pub fn mint_tokens<'a>(
     pool_signer_bump: u8,
     release_or_mint: ReleaseOrMintInV1,
     parsed_amount: u64,
+    multisig: Option<&AccountInfo<'a>>,
 ) -> Result<()> {
     // mint to receiver
     // https://docs.rs/spl-token-2022/latest/spl_token_2022/instruction/fn.mint_to.html
@@ -330,8 +332,8 @@ pub fn mint_tokens<'a>(
         &spl_token_2022::ID, // use spl-token-2022 to compile instruction - change program later
         &mint.key(),
         &receiver_token_account.key(),
-        &pool_signer.key(),
-        &[],
+        &multisig.clone().unwrap_or(&pool_signer).key(),
+        &[pool_signer.key],
         parsed_amount,
     )?;
     ix.program_id = token_program.key(); // set to user specified program
@@ -341,11 +343,19 @@ pub fn mint_tokens<'a>(
         &mint.key().to_bytes(),
         &[pool_signer_bump],
     ];
-    invoke_signed(
-        &ix,
-        &[receiver_token_account, mint.clone(), pool_signer.clone()],
-        &[&seeds[..]],
-    )?;
+
+    let account_infos: Vec<AccountInfo> = if multisig.is_some() {
+        vec![
+            receiver_token_account,
+            mint.clone(),
+            multisig.unwrap().clone(),
+            pool_signer.clone(),
+        ]
+    } else {
+        vec![receiver_token_account, mint.clone(), pool_signer.clone()]
+    };
+
+    invoke_signed(&ix, &account_infos, &[&seeds[..]])?;
 
     emit!(Minted {
         sender: pool_signer.key(),
