@@ -150,6 +150,10 @@ jobs:
         with:
           working-directory: chains/evm
 
+      - name: Run native compile and generate wrappers
+        working-directory: chains/evm
+        run: make wrappers
+
       - name: Version package.json
         working-directory: chains/evm
         shell: bash
@@ -199,6 +203,10 @@ jobs:
         uses: ./.github/actions/install-solidity-foundry
         with:
           working-directory: chains/evm
+
+      - name: Run native compile and generate wrappers
+        working-directory: chains/evm
+        run: make wrappers
 
       - name: Validate version
         working-directory: chains/evm
