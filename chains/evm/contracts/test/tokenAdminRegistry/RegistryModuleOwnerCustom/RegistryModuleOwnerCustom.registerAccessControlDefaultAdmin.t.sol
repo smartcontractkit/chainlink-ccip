@@ -4,7 +4,8 @@ pragma solidity ^0.8.0;
 import {RegistryModuleOwnerCustom} from "../../../tokenAdminRegistry/RegistryModuleOwnerCustom.sol";
 import {TokenAdminRegistry} from "../../../tokenAdminRegistry/TokenAdminRegistry.sol";
 
-import {AccessControl} from "@chainlink/vendor/openzeppelin-solidity/v5.0.2/contracts/access/AccessControl.sol";
+import {AccessControl} from
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/access/AccessControl.sol";
 
 import {RegistryModuleOwnerCustomSetup} from "./RegistryModuleOwnerCustomSetup.t.sol";
 

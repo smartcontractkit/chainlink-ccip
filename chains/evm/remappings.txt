@@ -1,2 +1,2 @@
 forge-std/=node_modules/@chainlink/contracts/src/v0.8/vendor/forge-std/src/
-@chainlink/=node_modules/@chainlink/contracts/src/v0.8/
+@chainlink/contracts/=node_modules/@chainlink/contracts/

@@ -5,7 +5,8 @@ import {IPoolV1} from "../../../interfaces/IPool.sol";
 
 import {LockReleaseTokenPoolSetup} from "./LockReleaseTokenPoolSetup.t.sol";
 
-import {IERC165} from "@chainlink/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
+import {IERC165} from
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
 
 contract LockReleaseTokenPool_supportsInterface is LockReleaseTokenPoolSetup {
   function test_SupportsInterface() public view {
