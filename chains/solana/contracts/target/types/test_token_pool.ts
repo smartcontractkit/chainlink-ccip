@@ -50,6 +50,10 @@ export type TestTokenPool = {
         {
           "name": "rmnRemote",
           "type": "publicKey"
+        },
+        {
+          "name": "multisig",
+          "type": "bool"
         }
       ]
     },
@@ -500,6 +504,10 @@ export type TestTokenPool = {
             "type": {
               "defined": "PoolType"
             }
+          },
+          {
+            "name": "multisig",
+            "type": "bool"
           },
           {
             "name": "config",
@@ -598,6 +606,10 @@ export const IDL: TestTokenPool = {
         {
           "name": "rmnRemote",
           "type": "publicKey"
+        },
+        {
+          "name": "multisig",
+          "type": "bool"
         }
       ]
     },
@@ -1048,6 +1060,10 @@ export const IDL: TestTokenPool = {
             "type": {
               "defined": "PoolType"
             }
+          },
+          {
+            "name": "multisig",
+            "type": "bool"
           },
           {
             "name": "config",
