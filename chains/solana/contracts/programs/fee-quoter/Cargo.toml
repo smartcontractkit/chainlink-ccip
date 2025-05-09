@@ -25,3 +25,6 @@ ccip_common = {path = "../ccip-common"}
 
 [dev-dependencies]
 hex = "0.4.3"
+
+[build-dependencies]
+build_commit = { path = "../../crates/build-commit" }

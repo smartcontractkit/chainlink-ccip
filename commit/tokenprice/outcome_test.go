@@ -9,6 +9,7 @@ import (
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+	"github.com/smartcontractkit/libocr/commontypes"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
@@ -161,4 +162,40 @@ func TestOutcome(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, outcome.TokenPrices, 3)
 	assert.Equal(t, expectedOutcome, outcome.TokenPrices)
+}
+
+// TestOutcome_EmptyObservations tests the Outcome method when observations only contain minimal data.
+func TestOutcome_EmptyObservations(t *testing.T) {
+	ctx := tests.Context(t)
+	lggr := logger.Test(t)
+	numOracles := 5 // Need enough oracles for consensus
+
+	p := &processor{
+		lggr:            lggr,
+		destChain:       destChainSel,
+		offChainCfg:     offChainCfg,
+		fRoleDON:        fChains[destChainSel], // Use f from fChains for the destination chain
+		metricsReporter: plugincommon.NoopReporter{},
+	}
+
+	// Prepare attributed observations with only minimal data
+	aos := make([]plugincommon.AttributedObservation[Observation], numOracles)
+	for i := 0; i < numOracles; i++ {
+		obs := Observation{
+			FChain:    fChains,
+			Timestamp: ts,
+			// FeedTokenPrices and FeeQuoterTokenUpdates are nil/empty
+		}
+		aos[i] = plugincommon.AttributedObservation[Observation]{
+			Observation: obs,
+			OracleID:    commontypes.OracleID(i),
+		}
+	}
+
+	// Call Outcome
+	outcome, err := p.Outcome(ctx, Outcome{}, Query{}, aos)
+
+	// Assertions
+	assert.NoError(t, err)
+	assert.Empty(t, outcome.TokenPrices, "Expected TokenPrices to be empty when observations have no price data")
 }

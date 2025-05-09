@@ -424,6 +424,11 @@
             }
           },
           "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
         }
       ]
     },
@@ -447,6 +452,11 @@
           "type": {
             "defined": "RateLimitConfig"
           },
+          "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
           "index": false
         }
       ]
@@ -476,6 +486,11 @@
             }
           },
           "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
         }
       ]
     },
@@ -485,6 +500,11 @@
         {
           "name": "chainSelector",
           "type": "u64",
+          "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
           "index": false
         }
       ]
@@ -499,6 +519,11 @@
         },
         {
           "name": "newRouter",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mint",
           "type": "publicKey",
           "index": false
         }
@@ -516,6 +541,11 @@
           "name": "to",
           "type": "publicKey",
           "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
         }
       ]
     },
@@ -529,6 +559,11 @@
         },
         {
           "name": "to",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mint",
           "type": "publicKey",
           "index": false
         }

@@ -67,9 +67,19 @@ func (p *processor) Outcome(
 		// Price per Wei = Xe18USD18/1e18 = XUSD18
 		// 1 gas = 1 wei = XUSD18
 		// execFee = 30 Gwei = 30e9 wei = 30e9 * XUSD18
+		execFee, err := mathslib.CalculateUsdPerUnitGas(chain, feeComp.ExecutionFee, usdPerFeeToken.Int)
+		if err != nil {
+			lggr.Errorw("error calculating USD per unit gas", "chain", chain, "err", err)
+			continue
+		}
+		daFee, err := mathslib.CalculateUsdPerUnitGas(chain, feeComp.DataAvailabilityFee, usdPerFeeToken.Int)
+		if err != nil {
+			lggr.Errorw("error calculating USD per unit gas", "chain", chain, "err", err)
+			continue
+		}
 		chainFeeUsd := ComponentsUSDPrices{
-			ExecutionFeePriceUSD: mathslib.CalculateUsdPerUnitGas(feeComp.ExecutionFee, usdPerFeeToken.Int),
-			DataAvFeePriceUSD:    mathslib.CalculateUsdPerUnitGas(feeComp.DataAvailabilityFee, usdPerFeeToken.Int),
+			ExecutionFeePriceUSD: execFee,
+			DataAvFeePriceUSD:    daFee,
 		}
 
 		chainFeeUSDPrices[chain] = chainFeeUsd

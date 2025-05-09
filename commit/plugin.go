@@ -331,7 +331,14 @@ func (p *Plugin) getPriceRelatedObservations(
 		latestPriceOcrSeqNum, err := p.ccipReader.GetLatestPriceSeqNr(ctx)
 		if err != nil {
 			lggr.Errorw("get latest price sequence number", "err", err)
-			return tokenprice.Observation{}, chainfee.Observation{}
+			// Observe fChain so we don't get cryptic fChain errors in the outcome phase.
+			return tokenprice.Observation{
+					FChain:    p.ObserveFChain(lggr),
+					Timestamp: time.Now().UTC(),
+				}, chainfee.Observation{
+					FChain:       p.ObserveFChain(lggr),
+					TimestampNow: time.Now().UTC(),
+				}
 		}
 
 		if cciptypes.SeqNum(latestPriceOcrSeqNum) >= prevOutcome.MainOutcome.InflightPriceOcrSequenceNumber {
@@ -346,7 +353,14 @@ func (p *Plugin) getPriceRelatedObservations(
 			"inflightPriceOcrSequenceNumber", prevOutcome.MainOutcome.InflightPriceOcrSequenceNumber,
 			"remainingPriceChecks", prevOutcome.MainOutcome.RemainingPriceChecks,
 		)
-		return tokenprice.Observation{}, chainfee.Observation{}
+		// Observe fChain so we don't get cryptic fChain errors in the outcome phase.
+		return tokenprice.Observation{
+				FChain:    p.ObserveFChain(lggr),
+				Timestamp: time.Now().UTC(),
+			}, chainfee.Observation{
+				FChain:       p.ObserveFChain(lggr),
+				TimestampNow: time.Now().UTC(),
+			}
 	}
 
 	var tokenPriceObs tokenprice.Observation
@@ -416,11 +430,12 @@ func (p *Plugin) Outcome(
 	for _, ao := range aos {
 		obs, err := p.ocrTypeCodec.DecodeObservation(ao.Observation)
 		if err != nil {
-			lggr.Warnw("failed to decode observation, observation skipped", "err", err)
+			lggr.Warnw("failed to decode observation, observation skipped",
+				"err", err, "observer", ao.Observer, "observation", ao.Observation)
 			continue
 		}
 
-		lggr.Debugw("Commit plugin outcome decoded observation", "observation", obs)
+		lggr.Debugw("Commit plugin outcome decoded observation", "observation", obs, "observer", ao.Observer)
 
 		merkleRootObservations = append(merkleRootObservations, attributedMerkleRootObservation{
 			OracleID: ao.Observer, Observation: obs.MerkleRootObs})
@@ -443,9 +458,9 @@ func (p *Plugin) Outcome(
 		_, err = p.discoveryProcessor.Outcome(ctx, dt.Outcome{}, dt.Query{}, discoveryObservations)
 		if err != nil {
 			lggr.Errorw("failed to get discovery processor outcome", "err", err)
-			return nil, nil
+		} else {
+			p.contractsInitialized.Store(true)
 		}
-		p.contractsInitialized.Store(true)
 	}
 
 	merkleRootOutcome, err := p.merkleRootProcessor.Outcome(

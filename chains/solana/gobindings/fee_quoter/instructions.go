@@ -41,6 +41,13 @@ var (
 	// The function also uses the link_token_mint account from the context.
 	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
 
+	// Returns the program type (name) and version.
+	// Used by offchain code to easily determine which program & version is being interacted with.
+	//
+	// # Arguments
+	// * `ctx` - The context
+	Instruction_TypeVersion = ag_binary.TypeID([8]byte{129, 251, 8, 243, 122, 229, 252, 164})
+
 	// Transfers the ownership of the fee quoter to a new proposed owner.
 	//
 	// Shared func signature with other programs
@@ -71,6 +78,26 @@ var (
 	// * `ctx` - The context containing the accounts required for updating the configuration.
 	// * `code_version` - The new code version to be set as default.
 	Instruction_SetDefaultCodeVersion = ag_binary.TypeID([8]byte{47, 151, 233, 254, 121, 82, 206, 152})
+
+	// Sets the max_fee_juels_per_msg, which is an upper bound on how much can be billed for any message.
+	// (1 juels = 1e-18 LINK)
+	//
+	// Only the admin may set this.
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for updating the configuration.
+	// * `max_fee_juels_per_msg` - The new value for the max_feel_juels_per_msg config.
+	Instruction_SetMaxFeeJuelsPerMsg = ag_binary.TypeID([8]byte{50, 235, 110, 147, 169, 199, 69, 46})
+
+	// Sets the link_token_mint and updates the link_token_local_decimals.
+	//
+	// Only the admin may set this.
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for updating the configuration.
+	Instruction_SetLinkTokenMint = ag_binary.TypeID([8]byte{190, 216, 49, 254, 200, 81, 12, 17})
 
 	// Adds a billing token configuration.
 	// Only CCIP Admin can add a billing token configuration.
@@ -208,12 +235,18 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 	switch id {
 	case Instruction_Initialize:
 		return "Initialize"
+	case Instruction_TypeVersion:
+		return "TypeVersion"
 	case Instruction_TransferOwnership:
 		return "TransferOwnership"
 	case Instruction_AcceptOwnership:
 		return "AcceptOwnership"
 	case Instruction_SetDefaultCodeVersion:
 		return "SetDefaultCodeVersion"
+	case Instruction_SetMaxFeeJuelsPerMsg:
+		return "SetMaxFeeJuelsPerMsg"
+	case Instruction_SetLinkTokenMint:
+		return "SetLinkTokenMint"
 	case Instruction_AddBillingTokenConfig:
 		return "AddBillingTokenConfig"
 	case Instruction_UpdateBillingTokenConfig:
@@ -258,6 +291,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 			"initialize", (*Initialize)(nil),
 		},
 		{
+			"type_version", (*TypeVersion)(nil),
+		},
+		{
 			"transfer_ownership", (*TransferOwnership)(nil),
 		},
 		{
@@ -265,6 +301,12 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"set_default_code_version", (*SetDefaultCodeVersion)(nil),
+		},
+		{
+			"set_max_fee_juels_per_msg", (*SetMaxFeeJuelsPerMsg)(nil),
+		},
+		{
+			"set_link_token_mint", (*SetLinkTokenMint)(nil),
 		},
 		{
 			"add_billing_token_config", (*AddBillingTokenConfig)(nil),

@@ -80,6 +80,25 @@
       ]
     },
     {
+      "name": "typeVersion",
+      "docs": [
+        "Returns the program type (name) and version.",
+        "Used by offchain code to easily determine which program & version is being interacted with.",
+        "",
+        "# Arguments",
+        "* `ctx` - The context"
+      ],
+      "accounts": [
+        {
+          "name": "clock",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [],
+      "returns": "string"
+    },
+    {
       "name": "transferOwnership",
       "docs": [
         "Transfers the ownership of the router to a new proposed owner.",
@@ -173,6 +192,41 @@
           "type": {
             "defined": "CodeVersion"
           }
+        }
+      ]
+    },
+    {
+      "name": "setLinkTokenMint",
+      "docs": [
+        "Sets the address of the LINK token mint.",
+        "The Admin is the only one able to set it.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for updating the configuration.",
+        "* `link_token_mint` - The new address of the LINK token mint."
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "linkTokenMint",
+          "type": "publicKey"
         }
       ]
     },

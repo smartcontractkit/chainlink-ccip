@@ -78,9 +78,9 @@ func SetupSimpleTest(t *testing.T,
 	}
 	msgHasher := mocks.NewMessageHasher()
 	ccipReader := inmem.InMemoryCCIPReader{
-		Reports:  []cciptypes.CommitPluginReportWithMeta{},
-		Messages: messagesMap,
-		Dest:     dstSelector,
+		UnfinalizedReports: []cciptypes.CommitPluginReportWithMeta{},
+		Messages:           messagesMap,
+		Dest:               dstSelector,
 	}
 
 	return &IntTest{
@@ -139,7 +139,7 @@ func (it *IntTest) WithMessages(
 		tree, err := report.ConstructMerkleTree(reportData, logger.Test(it.t))
 		require.NoError(it.t, err, "failed to construct merkle tree")
 
-		it.ccipReader.Reports = append(it.ccipReader.Reports, cciptypes.CommitPluginReportWithMeta{
+		it.ccipReader.UnfinalizedReports = append(it.ccipReader.UnfinalizedReports, cciptypes.CommitPluginReportWithMeta{
 			Report: cciptypes.CommitPluginReport{
 				BlessedMerkleRoots: []cciptypes.MerkleRootChain{
 					{

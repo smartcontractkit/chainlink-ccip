@@ -1,8 +1,11 @@
 use anchor_lang::prelude::*;
 
+use ccip_common::{CommonCcipError, CHAIN_FAMILY_SELECTOR_EVM, CHAIN_FAMILY_SELECTOR_SVM};
+
 use crate::context::{
     AcceptOwnership, AddBillingTokenConfig, AddDestChain, AddPriceUpdater, RemovePriceUpdater,
-    SetTokenTransferFeeConfig, UpdateBillingTokenConfig, UpdateConfig, UpdateDestChainConfig,
+    SetTokenTransferFeeConfig, UpdateBillingTokenConfig, UpdateConfig, UpdateConfigLinkMint,
+    UpdateDestChainConfig,
 };
 use crate::event::{
     ConfigSet, DestChainAdded, DestChainConfigUpdated, FeeTokenAdded, FeeTokenDisabled,
@@ -12,7 +15,6 @@ use crate::event::{
 };
 use crate::instructions::interfaces::Admin;
 use crate::instructions::v1::public::CCIP_LOCK_OR_BURN_V1_RET_BYTES;
-use crate::messages::{CHAIN_FAMILY_SELECTOR_EVM, CHAIN_FAMILY_SELECTOR_SVM};
 use crate::state::{
     BillingTokenConfig, CodeVersion, DestChain, DestChainConfig, DestChainState,
     PerChainPerTokenConfig, TimestampedPackedU224, TokenTransferFeeConfig,
@@ -58,6 +60,39 @@ impl Admin for Impl {
         );
         let config = &mut ctx.accounts.config;
         config.default_code_version = code_version;
+
+        emit!(ConfigSet {
+            max_fee_juels_per_msg: config.max_fee_juels_per_msg,
+            link_token_mint: config.link_token_mint,
+            link_token_local_decimals: config.link_token_local_decimals,
+            onramp: config.onramp,
+            default_code_version: config.default_code_version
+        });
+        Ok(())
+    }
+
+    fn set_max_fee_juels_per_msg(
+        &self,
+        ctx: Context<UpdateConfig>,
+        max_fee_juels_per_msg: u128,
+    ) -> Result<()> {
+        let config = &mut ctx.accounts.config;
+        config.max_fee_juels_per_msg = max_fee_juels_per_msg;
+
+        emit!(ConfigSet {
+            max_fee_juels_per_msg: config.max_fee_juels_per_msg,
+            link_token_mint: config.link_token_mint,
+            link_token_local_decimals: config.link_token_local_decimals,
+            onramp: config.onramp,
+            default_code_version: config.default_code_version
+        });
+        Ok(())
+    }
+
+    fn set_link_token_mint(&self, ctx: Context<UpdateConfigLinkMint>) -> Result<()> {
+        let config = &mut ctx.accounts.config;
+        config.link_token_mint = ctx.accounts.link_token_mint.key();
+        config.link_token_local_decimals = ctx.accounts.link_token_mint.decimals;
 
         emit!(ConfigSet {
             max_fee_juels_per_msg: config.max_fee_juels_per_msg,
@@ -263,7 +298,7 @@ fn validate_dest_chain_config(dest_chain_selector: u64, config: &DestChainConfig
             u32::from_be_bytes(config.chain_family_selector),
             CHAIN_FAMILY_SELECTOR_EVM | CHAIN_FAMILY_SELECTOR_SVM
         ),
-        FeeQuoterError::InvalidChainFamilySelector
+        CommonCcipError::InvalidChainFamilySelector
     );
 
     Ok(())

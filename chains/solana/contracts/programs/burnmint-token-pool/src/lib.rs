@@ -33,6 +33,17 @@ pub mod burnmint_token_pool {
         Ok(())
     }
 
+    /// Returns the program type (name) and version.
+    /// Used by offchain code to easily determine which program & version is being interacted with.
+    ///
+    /// # Arguments
+    /// * `ctx` - The context
+    pub fn type_version(_ctx: Context<Empty>) -> Result<String> {
+        let response = env!("CCIP_BUILD_TYPE_VERSION").to_string();
+        msg!("{}", response);
+        Ok(response)
+    }
+
     pub fn transfer_ownership(ctx: Context<SetConfig>, proposed_owner: Pubkey) -> Result<()> {
         ctx.accounts.state.config.transfer_ownership(proposed_owner)
     }
@@ -65,7 +76,7 @@ pub mod burnmint_token_pool {
     pub fn init_chain_remote_config(
         ctx: Context<InitializeChainConfig>,
         remote_chain_selector: u64,
-        _mint: Pubkey,
+        mint: Pubkey,
         cfg: RemoteConfig,
     ) -> Result<()> {
         require!(
@@ -76,20 +87,20 @@ pub mod burnmint_token_pool {
         ctx.accounts
             .chain_config
             .base
-            .set(remote_chain_selector, cfg)
+            .set(remote_chain_selector, mint, cfg)
     }
 
     // edit remote config
     pub fn edit_chain_remote_config(
         ctx: Context<EditChainConfigDynamicSize>,
         remote_chain_selector: u64,
-        _mint: Pubkey,
+        mint: Pubkey,
         cfg: RemoteConfig,
     ) -> Result<()> {
         ctx.accounts
             .chain_config
             .base
-            .set(remote_chain_selector, cfg)
+            .set(remote_chain_selector, mint, cfg)
     }
 
     // Add remote pool addresses
@@ -99,22 +110,24 @@ pub mod burnmint_token_pool {
         _mint: Pubkey,
         addresses: Vec<RemoteAddress>,
     ) -> Result<()> {
-        ctx.accounts
-            .chain_config
-            .base
-            .append_remote_pool_addresses(remote_chain_selector, addresses)
+        ctx.accounts.chain_config.base.append_remote_pool_addresses(
+            remote_chain_selector,
+            _mint,
+            addresses,
+        )
     }
 
     // set rate limit
     pub fn set_chain_rate_limit(
         ctx: Context<SetChainRateLimit>,
         remote_chain_selector: u64,
-        _mint: Pubkey,
+        mint: Pubkey,
         inbound: RateLimitConfig,
         outbound: RateLimitConfig,
     ) -> Result<()> {
         ctx.accounts.chain_config.base.set_chain_rate_limit(
             remote_chain_selector,
+            mint,
             inbound,
             outbound,
         )
@@ -124,10 +137,11 @@ pub mod burnmint_token_pool {
     pub fn delete_chain_config(
         _ctx: Context<DeleteChainConfig>,
         remote_chain_selector: u64,
-        _mint: Pubkey,
+        mint: Pubkey,
     ) -> Result<()> {
         emit!(RemoteChainRemoved {
             chain_selector: remote_chain_selector,
+            mint
         });
         Ok(())
     }
