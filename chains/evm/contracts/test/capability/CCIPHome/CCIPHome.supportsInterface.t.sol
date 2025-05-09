@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {ICapabilityConfiguration} from "@chainlink/keystone/interfaces/ICapabilityConfiguration.sol";
+import {ICapabilityConfiguration} from "@chainlink/contracts/src/v0.8/keystone/interfaces/ICapabilityConfiguration.sol";
 
 import {CCIPHomeTestSetup} from "./CCIPHomeTestSetup.t.sol";
-import {IERC165} from "@chainlink/vendor/openzeppelin-solidity/v5.0.2/contracts/interfaces/IERC165.sol";
+import {IERC165} from
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/interfaces/IERC165.sol";
 
 contract CCIPHome_supportsInterface is CCIPHomeTestSetup {
   function test_supportsInterface() public view {

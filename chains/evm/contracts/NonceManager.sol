@@ -3,9 +3,9 @@ pragma solidity ^0.8.24;
 
 import {IEVM2AnyOnRamp} from "./interfaces/IEVM2AnyOnRamp.sol";
 import {INonceManager} from "./interfaces/INonceManager.sol";
-import {ITypeAndVersion} from "@chainlink/shared/interfaces/ITypeAndVersion.sol";
+import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
-import {AuthorizedCallers} from "@chainlink/shared/access/AuthorizedCallers.sol";
+import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
 /// @title NonceManager
 /// @notice NonceManager contract that manages sender nonces for the on/off ramps.
