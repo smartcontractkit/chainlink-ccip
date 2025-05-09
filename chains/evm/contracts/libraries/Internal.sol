@@ -287,7 +287,8 @@ library Internal {
   // bytes4(keccak256("CCIP ChainFamilySelector APTOS"));
   bytes4 public constant CHAIN_FAMILY_SELECTOR_APTOS = 0xac77ffec;
 
-  bytes4 public constant CHAIN_FAMILY_SELECTOR_c4e05953 = 0xc4e05953;
+  // bytes4(keccak256("CCIP ChainFamilySelector SUI"));
+  bytes4 public constant CHAIN_FAMILY_SELECTOR_SUI = 0xc4e05953;
 
   /// @dev Holds a merkle root and interval for a source chain so that an array of these can be passed in the CommitReport.
   /// @dev RMN depends on this struct, if changing, please notify the RMN maintainers.

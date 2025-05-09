@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import {TokenAdminRegistrySetup} from "./TokenAdminRegistrySetup.t.sol";
-import {Ownable2Step} from "@chainlink/shared/access/Ownable2Step.sol";
+import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 
 contract TokenAdminRegistry_addRegistryModule is TokenAdminRegistrySetup {
   function test_addRegistryModule() public {
