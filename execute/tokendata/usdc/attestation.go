@@ -116,8 +116,8 @@ func (s *USDCAttestationClient) Attestations(
 	return outcome, nil
 }
 
-func (s *USDCAttestationClient) Token() string {
-	return USDCToken
+func (s *USDCAttestationClient) Type() string {
+	return pluginconfig.USDCCCTPHandlerType
 }
 
 func (s *USDCAttestationClient) fetchSingleMessage(

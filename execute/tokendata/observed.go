@@ -81,15 +81,15 @@ func (o *ObservedAttestationClient) Attestations(
 		for _, attestation := range msgIDToAttestation {
 			o.trackTimeToAttestation(start, hex.EncodeToString(attestation.ID), attestation.Error)
 			promAttestationDurations.
-				WithLabelValues(o.Token()).
+				WithLabelValues(o.Type()).
 				Observe(float64(duration))
 		}
 	}
 	return attestations, err
 }
 
-func (o *ObservedAttestationClient) Token() string {
-	return o.delegate.Token()
+func (o *ObservedAttestationClient) Type() string {
+	return o.delegate.Type()
 }
 
 func (o *ObservedAttestationClient) trackTimeToAttestation(start time.Time, id string, err error) {
@@ -107,9 +107,9 @@ func (o *ObservedAttestationClient) trackTimeToAttestation(start time.Time, id s
 		// and we don't need to track that
 		if seen {
 			duration := time.Since(messageSeenFirst.(time.Time))
-			promTimeToAttestation.WithLabelValues(o.Token()).Observe(float64(duration))
+			promTimeToAttestation.WithLabelValues(o.Type()).Observe(float64(duration))
 			o.lggr.Infow("Observed time to attestation for a message",
-				"token", o.Token(),
+				"type", o.Type(),
 				"hash", id,
 				"duration", duration.String(),
 			)

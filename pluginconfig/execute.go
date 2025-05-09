@@ -95,10 +95,17 @@ func (e *ExecuteOffchainConfig) Validate() error {
 
 func (e *ExecuteOffchainConfig) IsUSDCEnabled() bool {
 	for _, ob := range e.TokenDataObservers {
-		if ob.WellFormed() != nil {
-			continue
+		if ob.WellFormed() == nil && ob.IsUSDC() {
+			return true
 		}
-		if ob.IsUSDC() {
+	}
+
+	return false
+}
+
+func (e *ExecuteOffchainConfig) IsLBTCEnabled() bool {
+	for _, ob := range e.TokenDataObservers {
+		if ob.WellFormed() == nil && ob.IsLBTC() {
 			return true
 		}
 	}

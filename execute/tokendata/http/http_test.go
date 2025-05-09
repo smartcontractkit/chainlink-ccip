@@ -49,7 +49,7 @@ func Test_NewHTTPClient_New(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(tc.api, func(t *testing.T) {
-			client, err := newHTTPClient(logger.Test(t), tc.api, 1*time.Millisecond, longTimeout, maxCoolDownDuration)
+			client, err := newHTTPClient(logger.Test(t), tc.api, 1*time.Millisecond, longTimeout, 0)
 			if tc.wantErr {
 				require.Error(t, err)
 			} else {
@@ -156,7 +156,7 @@ func Test_HTTPClient_Get(t *testing.T) {
 			attestationURI, err := url.ParseRequestURI(ts.URL)
 			require.NoError(t, err)
 
-			client, err := newHTTPClient(logger.Test(t), attestationURI.String(), tc.timeout, tc.timeout, maxCoolDownDuration)
+			client, err := newHTTPClient(logger.Test(t), attestationURI.String(), tc.timeout, tc.timeout, 0)
 			require.NoError(t, err)
 			response, statusCode, err := client.Get(tests.Context(t), tc.messageHash.String())
 
@@ -187,8 +187,7 @@ func Test_HTTPClient_Cooldown(t *testing.T) {
 	attestationURI, err := url.ParseRequestURI(ts.URL)
 	require.NoError(t, err)
 
-	client, err := newHTTPClient(logger.Test(t), attestationURI.String(),
-		1*time.Millisecond, longTimeout, maxCoolDownDuration)
+	client, err := newHTTPClient(logger.Test(t), attestationURI.String(), time.Millisecond, longTimeout, time.Minute)
 	require.NoError(t, err)
 	_, _, err = client.Get(tests.Context(t), cciptypes.Bytes32{1, 2, 3}.String())
 	require.EqualError(t, err, tokendata.ErrUnknownResponse.Error())
@@ -208,13 +207,13 @@ func Test_HTTPClient_GetInstance(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	client1, err := GetHTTPClient(logger.Test(t), ts.URL, 1*time.Hour, longTimeout, maxCoolDownDuration)
+	client1, err := GetHTTPClient(logger.Test(t), ts.URL, 1*time.Hour, longTimeout, 0)
 	require.NoError(t, err)
 
-	client2, err := GetHTTPClient(logger.Test(t), ts.URL, 1*time.Hour, longTimeout, maxCoolDownDuration)
+	client2, err := GetHTTPClient(logger.Test(t), ts.URL, 1*time.Hour, longTimeout, 0)
 	require.NoError(t, err)
 
-	client3, err := newHTTPClient(logger.Test(t), ts.URL, 1*time.Hour, longTimeout, maxCoolDownDuration)
+	client3, err := newHTTPClient(logger.Test(t), ts.URL, 1*time.Hour, longTimeout, 0)
 	require.NoError(t, err)
 
 	assert.True(t, client1 == client2)
@@ -251,9 +250,7 @@ func Test_HTTPClient_CoolDownWithRetryHeader(t *testing.T) {
 	attestationURI, err := url.ParseRequestURI(ts.URL)
 	require.NoError(t, err)
 
-	client, err := newHTTPClient(
-		logger.Test(t), attestationURI.String(), 1*time.Millisecond, time.Hour, maxCoolDownDuration,
-	)
+	client, err := newHTTPClient(logger.Test(t), attestationURI.String(), 1*time.Millisecond, time.Hour, 0)
 	require.NoError(t, err)
 	_, _, err = client.Get(tests.Context(t), cciptypes.Bytes32{1, 2, 3}.String())
 	require.EqualError(t, err, tokendata.ErrUnknownResponse.Error())
@@ -321,7 +318,7 @@ func Test_HTTPClient_RateLimiting_Parallel(t *testing.T) {
 			attestationURI, err := url.ParseRequestURI(ts.URL)
 			require.NoError(t, err)
 
-			client, err := newHTTPClient(lggr, attestationURI.String(), tc.rateConfig, longTimeout, maxCoolDownDuration)
+			client, err := newHTTPClient(lggr, attestationURI.String(), tc.rateConfig, longTimeout, 0)
 			require.NoError(t, err)
 
 			ctx := context.Background()
