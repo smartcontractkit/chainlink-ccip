@@ -111,8 +111,9 @@ func NewOutcome(
 	state PluginState,
 	selectedCommits []CommitData,
 	report cciptypes.ExecutePluginReport,
+	reports []cciptypes.ExecutePluginReport,
 ) Outcome {
-	return NewSortedOutcome(state, selectedCommits, report)
+	return NewSortedOutcome(state, selectedCommits, report, reports)
 }
 
 // NewSortedOutcome ensures canonical ordering of the outcome.
@@ -121,6 +122,7 @@ func NewSortedOutcome(
 	state PluginState,
 	pendingCommits []CommitData,
 	report cciptypes.ExecutePluginReport,
+	reports []cciptypes.ExecutePluginReport,
 ) Outcome {
 	pendingCommitsCP := append([]CommitData{}, pendingCommits...)
 	reportCP := append([]cciptypes.ExecutePluginReportSingleChain{}, report.ChainReports...)
@@ -138,5 +140,6 @@ func NewSortedOutcome(
 		State:         state,
 		CommitReports: pendingCommitsCP,
 		Report:        cciptypes.ExecutePluginReport{ChainReports: reportCP},
+		Reports:       reports,
 	}
 }

@@ -79,7 +79,7 @@ func (e *ExecCodecProto) DecodeObservation(data []byte) (exectypes.Observation, 
 }
 
 func (e *ExecCodecProto) EncodeOutcome(outcome exectypes.Outcome) ([]byte, error) {
-	outcome = exectypes.NewOutcome(outcome.State, outcome.CommitReports, outcome.Report)
+	outcome = exectypes.NewOutcome(outcome.State, outcome.CommitReports, outcome.Report, outcome.Reports)
 
 	pbObs := &ocrtypecodecpb.ExecOutcome{
 		PluginState:          string(outcome.State),
@@ -162,7 +162,7 @@ func (*ExecCodecJSON) DecodeObservation(data []byte) (exectypes.Observation, err
 
 func (*ExecCodecJSON) EncodeOutcome(outcome exectypes.Outcome) ([]byte, error) {
 	// We sort again here in case construction is not via the constructor.
-	return json.Marshal(exectypes.NewOutcome(outcome.State, outcome.CommitReports, outcome.Report))
+	return json.Marshal(exectypes.NewOutcome(outcome.State, outcome.CommitReports, outcome.Report, outcome.Reports))
 }
 
 func (*ExecCodecJSON) DecodeOutcome(data []byte) (exectypes.Outcome, error) {
