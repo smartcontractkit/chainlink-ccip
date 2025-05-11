@@ -10,7 +10,7 @@ use crate::common::CcipTokenPoolError;
 #[derive(InitSpace, Clone, AnchorSerialize, AnchorDeserialize)]
 pub struct RateLimitTokenBucket {
     pub tokens: u64, // Current number of tokens that are in the bucket. Represents how many tokens a single transaction can consume in a single transaction - different than total number of tokens within a pool
-    pub last_updated: u64, // Timestamp in seconds of the last token refill, good for 100+ years.
+    pub last_updated: u64, // Timestamp in seconds of the last token refill, or since setting the config initially. Good for 100+ years.
     cfg: RateLimitConfig,
 }
 

@@ -181,6 +181,10 @@ impl BaseChain {
 
         self.remote = new_cfg;
 
+        let now = Clock::get()?.unix_timestamp as u64;
+        self.inbound_rate_limit.last_updated = now;
+        self.outbound_rate_limit.last_updated = now;
+
         emit!(RemoteChainConfigured {
             chain_selector: remote_chain_selector,
             mint,
