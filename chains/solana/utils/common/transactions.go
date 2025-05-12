@@ -185,7 +185,9 @@ func sendTransactionWithLookupTables(ctx context.Context, rpcClient *rpc.Client,
 		count++
 		statusRes, sigErr := rpcClient.GetSignatureStatuses(ctx, true, txsig)
 		if sigErr != nil {
-			return nil, sigErr
+			fmt.Println(sigErr) // debugging if tx errors; mainnet can be flakey
+			time.Sleep(50 * time.Millisecond)
+			continue
 		}
 		if statusRes != nil && len(statusRes.Value) > 0 && statusRes.Value[0] != nil {
 			txStatus = statusRes.Value[0].ConfirmationStatus
