@@ -19,10 +19,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
-const (
-	USDCToken = "USDC"
-)
-
 type USDCTokenDataObserver struct {
 	lggr                     logger.Logger
 	destChainSelector        cciptypes.ChainSelector
