@@ -79,12 +79,7 @@ func (p *Processor) Query(ctx context.Context, prevOutcome Outcome) (Query, erro
 	if len(reqUpdates) == 0 {
 		lggr.Debugw("no RMN-enabled chains to request signatures, empty query returned",
 			"rmnEnabledChains", rmnEnabledChains)
-		return Query{
-			RMNSignatures: &rmn.ReportSignatures{
-				Signatures:  []*rmnpb.EcdsaSignature{},
-				LaneUpdates: []*rmnpb.FixedDestLaneUpdate{},
-			},
-		}, nil
+		return Query{}, nil
 	}
 
 	ctxQuery, cancel := context.WithTimeout(ctx, p.offchainCfg.RMNSignaturesTimeout)

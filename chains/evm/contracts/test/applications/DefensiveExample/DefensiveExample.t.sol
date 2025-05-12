@@ -5,7 +5,8 @@ import {DefensiveExample} from "../../../applications/DefensiveExample.sol";
 import {Client} from "../../../libraries/Client.sol";
 import {OnRampSetup} from "../../onRamp/OnRamp/OnRampSetup.t.sol";
 
-import {IERC20} from "@vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import {IERC20} from
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
 contract DefensiveExampleTest is OnRampSetup {
   event MessageFailed(bytes32 indexed messageId, bytes reason);

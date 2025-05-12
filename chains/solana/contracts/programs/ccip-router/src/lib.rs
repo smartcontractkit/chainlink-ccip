@@ -86,6 +86,17 @@ pub mod ccip_router {
         Ok(())
     }
 
+    /// Returns the program type (name) and version.
+    /// Used by offchain code to easily determine which program & version is being interacted with.
+    ///
+    /// # Arguments
+    /// * `ctx` - The context
+    pub fn type_version(_ctx: Context<Empty>) -> Result<String> {
+        let response = env!("CCIP_BUILD_TYPE_VERSION").to_string();
+        msg!("{}", response);
+        Ok(response)
+    }
+
     /// Transfers the ownership of the router to a new proposed owner.
     ///
     /// Shared func signature with other programs
@@ -133,6 +144,21 @@ pub mod ccip_router {
     ) -> Result<()> {
         router::admin(ctx.accounts.config.default_code_version)
             .set_default_code_version(ctx, code_version)
+    }
+
+    /// Sets the address of the LINK token mint.
+    /// The Admin is the only one able to set it.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for updating the configuration.
+    /// * `link_token_mint` - The new address of the LINK token mint.
+    pub fn set_link_token_mint(
+        ctx: Context<UpdateConfigCCIPRouter>,
+        link_token_mint: Pubkey,
+    ) -> Result<()> {
+        router::admin(ctx.accounts.config.default_code_version)
+            .set_link_token_mint(ctx, link_token_mint)
     }
 
     /// Updates the fee aggregator in the router configuration.

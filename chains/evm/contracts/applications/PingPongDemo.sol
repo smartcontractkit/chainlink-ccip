@@ -2,13 +2,14 @@
 pragma solidity ^0.8.4;
 
 import {IRouterClient} from "../interfaces/IRouterClient.sol";
-import {ITypeAndVersion} from "@shared/interfaces/ITypeAndVersion.sol";
+import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {Client} from "../libraries/Client.sol";
 import {CCIPReceiver} from "./CCIPReceiver.sol";
-import {Ownable2StepMsgSender} from "@shared/access/Ownable2StepMsgSender.sol";
+import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 
-import {IERC20} from "@vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import {IERC20} from
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
 /// @title PingPongDemo - A simple ping-pong contract for demonstrating cross-chain communication.
 contract PingPongDemo is CCIPReceiver, Ownable2StepMsgSender, ITypeAndVersion {

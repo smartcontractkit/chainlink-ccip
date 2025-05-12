@@ -174,39 +174,18 @@ type RMNCurseResponse struct {
 // ---------------------------------------------------
 
 func (r *ccipChainReader) CommitReportsGTETimestamp(
-	ctx context.Context, ts time.Time, limit int,
-) ([]cciptypes.CommitPluginReportWithMeta, error) {
-	lggr := logutil.WithContextValues(ctx, r.lggr)
+	ctx context.Context,
+	ts time.Time,
+	confidence primitives.ConfidenceLevel,
+	limit int) ([]cciptypes.CommitPluginReportWithMeta, error) {
 
 	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
-		return nil, err
+		return []cciptypes.CommitPluginReportWithMeta{}, err
 	}
 
-	ev := CommitReportAcceptedEvent{}
-	iter, err := r.queryCommitReports(ctx, ts, limit, &ev)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query offRamp: %w", err)
-	}
-
-	lggr.Debugw("queried commit reports", "numReports", len(iter),
-		"destChain", r.destChain,
-		"ts", ts,
-		"limit", limit*2)
-
-	reports := r.processCommitReports(lggr, iter, ts, limit)
-
-	lggr.Debugw("decoded commit reports", "reports", reports)
-
-	if len(reports) < limit {
-		return reports, nil
-	}
-	return reports[:limit], nil
-}
-
-func (r *ccipChainReader) queryCommitReports(
-	ctx context.Context, ts time.Time, limit int, ev *CommitReportAcceptedEvent,
-) ([]types.Sequence, error) {
-	return r.contractReaders[r.destChain].ExtendedQueryKey(
+	lggr := logutil.WithContextValues(ctx, r.lggr)
+	internalLimit := limit * 2
+	iter, err := r.contractReaders[r.destChain].ExtendedQueryKey(
 		ctx,
 		consts.ContractNameOffRamp,
 		query.KeyFilter{
@@ -215,17 +194,31 @@ func (r *ccipChainReader) queryCommitReports(
 				query.Timestamp(uint64(ts.Unix()), primitives.Gte),
 				// We don't need to wait for the commit report accepted event to be finalized
 				// before we can start optimistically processing it.
-				query.Confidence(primitives.Unconfirmed),
+				query.Confidence(confidence),
 			},
 		},
 		query.LimitAndSort{
 			SortBy: []query.SortBy{query.NewSortBySequence(query.Asc)},
 			Limit: query.Limit{
-				Count: uint64(limit * 2),
+				Count: uint64(internalLimit),
 			},
 		},
-		ev,
+		&CommitReportAcceptedEvent{},
 	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query offRamp: %w", err)
+	}
+
+	lggr.Debugw("queried commit reports", "numReports", len(iter),
+		"confidence", confidence,
+		"destChain", r.destChain,
+		"ts", ts,
+		"limit", internalLimit)
+
+	reports := r.processCommitReports(lggr, iter, ts, limit)
+
+	lggr.Debugw("decoded commit reports", "reports", reports)
+	return reports, nil
 }
 
 // processCommitReports decodes the commit reports from the query results
@@ -893,8 +886,9 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 		}
 		nativeTokenAddress := config.Router.WrappedNativeAddress
 
-		if nativeTokenAddress.String() == "0x" {
-			lggr.Errorw("native token address is empty", "chain", chain)
+		if cciptypes.UnknownAddress(nativeTokenAddress).IsZeroOrEmpty() {
+			lggr.Warnw("Native token address is zero or empty. Ignore for disabled chains otherwise "+
+				"check for router misconfiguration", "chain", chain, "address", nativeTokenAddress.String())
 			continue
 		}
 
@@ -939,30 +933,113 @@ func (r *ccipChainReader) GetChainFeePriceUpdate(ctx context.Context, selectors 
 		return nil
 	}
 
-	feeUpdates := make(map[cciptypes.ChainSelector]cciptypes.TimestampedBig, len(selectors))
+	if len(selectors) == 0 {
+		return make(map[cciptypes.ChainSelector]cciptypes.TimestampedBig) // Return a new empty map
+	}
+
+	// 1. Build Batch Request
+	contractBatch := make([]types.BatchRead, 0, len(selectors))
 	for _, chain := range selectors {
-		update := cciptypes.TimestampedUnixBig{}
-		// Read from dest chain
-		err := r.contractReaders[r.destChain].ExtendedGetLatestValue(
-			ctx,
-			consts.ContractNameFeeQuoter,
-			consts.MethodNameGetFeePriceUpdate,
-			primitives.Unconfirmed,
-			map[string]any{
+		contractBatch = append(contractBatch, types.BatchRead{
+			ReadName: consts.MethodNameGetFeePriceUpdate,
+			Params: map[string]any{
 				// That actually means that this selector is a source chain for the destChain
 				"destChainSelector": chain,
 			},
-			&update,
-		)
+			// Pass a new pointer directly for type inference by the reader
+			ReturnVal: new(cciptypes.TimestampedUnixBig),
+		})
+	}
+
+	// 2. Execute Batch Request
+	batchResult, _, err := r.contractReaders[r.destChain].ExtendedBatchGetLatestValues(
+		ctx,
+		contractreader.ExtendedBatchGetLatestValuesRequest{
+			consts.ContractNameFeeQuoter: contractBatch,
+		},
+		false, // Don't allow stale reads for fee updates
+	)
+
+	if err != nil {
+		lggr.Errorw("failed to batch get chain fee price updates", "err", err)
+		return make(map[cciptypes.ChainSelector]cciptypes.TimestampedBig) // Return a new empty map
+	}
+
+	// 3. Find FeeQuoter Results
+	var feeQuoterResults []types.BatchReadResult
+	found := false
+	for contract, results := range batchResult {
+		if contract.Name == consts.ContractNameFeeQuoter {
+			feeQuoterResults = results
+			found = true
+			break // Found the results, exit loop
+		}
+	}
+
+	if !found {
+		lggr.Errorw("FeeQuoter results missing from batch response")
+		return make(map[cciptypes.ChainSelector]cciptypes.TimestampedBig) // Return a new empty map
+	}
+
+	if len(feeQuoterResults) != len(selectors) {
+		lggr.Errorw("Mismatch between requested selectors and results count",
+			"selectors", len(selectors),
+			"results", len(feeQuoterResults))
+		// Continue processing the results we did get, but this might indicate an issue
+	}
+
+	// 4. Process Results using helper
+	return r.processFeePriceUpdateResults(lggr, selectors, feeQuoterResults)
+}
+
+// processFeePriceUpdateResults iterates through batch results, validates them,
+// and returns a new feeUpdates map.
+func (r *ccipChainReader) processFeePriceUpdateResults(
+	lggr logger.Logger,
+	selectors []cciptypes.ChainSelector,
+	results []types.BatchReadResult,
+) map[cciptypes.ChainSelector]cciptypes.TimestampedBig {
+	feeUpdates := make(map[cciptypes.ChainSelector]cciptypes.TimestampedBig)
+
+	for i, chain := range selectors {
+		if i >= len(results) {
+			// Log error if we have fewer results than requested selectors
+			lggr.Errorw("Skipping selector due to missing result",
+				"selectorIndex", i,
+				"chain", chain,
+				"lenFeeQuoterResults", len(results))
+			continue
+		}
+
+		readResult := results[i]
+		val, err := readResult.GetResult()
 		if err != nil {
-			lggr.Warnw("failed to get chain fee price update", "chain", chain, "err", err)
+			lggr.Warnw("failed to get chain fee price update from batch result",
+				"chain", chain,
+				"err", err)
 			continue
 		}
-		if update.Timestamp == 0 || update.Value == nil || update.Value.Cmp(big.NewInt(0)) == 0 {
-			lggr.Debugw("chain fee price update is empty", "chain", chain)
+
+		// Type assert the result
+		update, ok := val.(*cciptypes.TimestampedUnixBig)
+		if !ok || update == nil {
+			lggr.Warnw("Invalid type or nil value received for chain fee price update",
+				"chain", chain,
+				"type", fmt.Sprintf("%T", val),
+				"ok", ok)
 			continue
 		}
-		feeUpdates[chain] = cciptypes.TimeStampedBigFromUnix(update)
+
+		// Check if the update is empty
+		if update.Timestamp == 0 || update.Value == nil {
+			lggr.Debugw("chain fee price update is empty",
+				"chain", chain,
+				"update", update)
+			continue
+		}
+
+		// Add valid update to the map
+		feeUpdates[chain] = cciptypes.TimeStampedBigFromUnix(*update)
 	}
 
 	return feeUpdates
@@ -2014,8 +2091,8 @@ func validateCommitReportAcceptedEvent(seq types.Sequence, gteTimestamp time.Tim
 	}
 
 	for _, gpus := range ev.PriceUpdates.GasPriceUpdates {
-		if gpus.UsdPerUnitGas == nil || gpus.UsdPerUnitGas.Cmp(big.NewInt(0)) <= 0 {
-			return nil, fmt.Errorf("nil or non-positive usd per unit gas")
+		if gpus.UsdPerUnitGas == nil || gpus.UsdPerUnitGas.Cmp(big.NewInt(0)) < 0 {
+			return nil, fmt.Errorf("nil or negative usd per unit gas: %s", gpus.UsdPerUnitGas.String())
 		}
 	}
 

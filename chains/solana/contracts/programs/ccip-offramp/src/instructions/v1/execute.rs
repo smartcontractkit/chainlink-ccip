@@ -303,17 +303,37 @@ fn internal_execute<'info>(
             ctx.accounts.offramp.to_account_info(),
             ctx.accounts.allowed_offramp.to_account_info(),
         ];
-        acc_infos.extend_from_slice(msg_accs.remaining_accounts);
 
-        let acc_metas: Vec<AccountMeta> = acc_infos
-            .to_vec()
+        let mut acc_metas: Vec<AccountMeta> = acc_infos
             .iter()
             .flat_map(|acc_info| {
-                // Check signer from PDA External Execution config
                 let is_signer = acc_info.key() == msg_accs.external_execution_signer.key();
                 acc_info.to_account_metas(Some(is_signer))
             })
             .collect();
+
+        let remaining_metas: Vec<AccountMeta> = msg_accs
+            .remaining_accounts
+            .iter()
+            .enumerate()
+            .map(|(i, acc_info)| {
+                // Check signer from PDA External Execution config
+                let is_signer = acc_info.key() == msg_accs.external_execution_signer.key();
+                let is_writable = is_writable(
+                    &execution_report.message.extra_args.is_writable_bitmap,
+                    i as u8,
+                );
+
+                if is_writable {
+                    AccountMeta::new(*acc_info.key, is_signer)
+                } else {
+                    AccountMeta::new_readonly(*acc_info.key, is_signer)
+                }
+            })
+            .collect();
+
+        acc_infos.extend_from_slice(msg_accs.remaining_accounts);
+        acc_metas.extend_from_slice(&remaining_metas);
 
         let data = message.build_receiver_discriminator_and_data()?;
 
@@ -435,7 +455,7 @@ fn parse_messaging_accounts<'info>(
     // Validate that the bitmap corresponds to the individual writable flags
     for (i, acc) in msg_accounts.iter().enumerate() {
         require!(
-            is_writable(source_bitmap, i as u8) == acc.is_writable,
+            !is_writable(source_bitmap, i as u8) || acc.is_writable,
             CcipOfframpError::InvalidWritabilityBitmap
         );
     }
@@ -477,7 +497,7 @@ pub fn validate_execution_report<'info>(
     message_header: &RampMessageHeader,
     svm_chain_selector: u64,
 ) -> Result<()> {
-    require!(message_header.nonce == 0, CcipOfframpError::InvalidNonce);
+    require_eq!(message_header.nonce, 0, CcipOfframpError::InvalidNonce);
 
     require!(
         source_chain_state.config.is_enabled,

@@ -4,9 +4,10 @@ pragma solidity ^0.8.24;
 import {IGetCCIPAdmin} from "../interfaces/IGetCCIPAdmin.sol";
 import {IOwner} from "../interfaces/IOwner.sol";
 import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
-import {ITypeAndVersion} from "@shared/interfaces/ITypeAndVersion.sol";
+import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
-import {AccessControl} from "@vendor/openzeppelin-solidity/v5.0.2/contracts/access/AccessControl.sol";
+import {AccessControl} from
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/access/AccessControl.sol";
 
 contract RegistryModuleOwnerCustom is ITypeAndVersion {
   error CanOnlySelfRegister(address admin, address token);

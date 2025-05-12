@@ -5,10 +5,11 @@ import {RateLimiter} from "../../../libraries/RateLimiter.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {BaseTest} from "../../BaseTest.t.sol";
 import {TokenPoolHelper} from "../../helpers/TokenPoolHelper.sol";
-import {Ownable2Step} from "@shared/access/Ownable2Step.sol";
-import {BurnMintERC677} from "@shared/token/ERC677/BurnMintERC677.sol";
+import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
+import {BurnMintERC677} from "@chainlink/contracts/src/v0.8/shared/token/ERC677/BurnMintERC677.sol";
 
-import {IERC20} from "@vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import {IERC20} from
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
 contract TokenPool_applyChainUpdates is BaseTest {
   IERC20 internal s_token;

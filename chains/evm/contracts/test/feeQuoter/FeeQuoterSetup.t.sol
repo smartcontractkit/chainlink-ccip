@@ -7,7 +7,7 @@ import {Internal} from "../../libraries/Internal.sol";
 import {TokenAdminRegistry} from "../../tokenAdminRegistry/TokenAdminRegistry.sol";
 import {TokenSetup} from "../TokenSetup.t.sol";
 import {FeeQuoterHelper} from "../helpers/FeeQuoterHelper.sol";
-import {MockV3Aggregator} from "@shared/mocks/MockV3Aggregator.sol";
+import {MockV3Aggregator} from "@chainlink/contracts/src/v0.8/shared/mocks/MockV3Aggregator.sol";
 
 contract FeeQuoterSetup is TokenSetup {
   uint112 internal constant USD_PER_GAS = 1e6; // 0.001 gwei

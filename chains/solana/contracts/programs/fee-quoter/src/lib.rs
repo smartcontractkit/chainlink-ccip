@@ -49,6 +49,9 @@ pub mod fee_quoter {
             FeeQuoterError::InvalidInputsMint
         );
 
+        // trivial non-zero check, the value is provided in the expected 18-decimal format
+        require!(max_fee_juels_per_msg > 0, FeeQuoterError::InvalidInputs);
+
         ctx.accounts.config.set_inner(Config {
             version: 1,
             owner: ctx.accounts.authority.key(),
@@ -69,6 +72,17 @@ pub mod fee_quoter {
         });
 
         Ok(())
+    }
+
+    /// Returns the program type (name) and version.
+    /// Used by offchain code to easily determine which program & version is being interacted with.
+    ///
+    /// # Arguments
+    /// * `ctx` - The context
+    pub fn type_version(_ctx: Context<Empty>) -> Result<String> {
+        let response = env!("CCIP_BUILD_TYPE_VERSION").to_string();
+        msg!("{}", response);
+        Ok(response)
     }
 
     /// Transfers the ownership of the fee quoter to a new proposed owner.
@@ -110,6 +124,34 @@ pub mod fee_quoter {
     ) -> Result<()> {
         router::admin(ctx.accounts.config.default_code_version)
             .set_default_code_version(ctx, code_version)
+    }
+
+    /// Sets the max_fee_juels_per_msg, which is an upper bound on how much can be billed for any message.
+    /// (1 juels = 1e-18 LINK)
+    ///
+    /// Only the admin may set this.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for updating the configuration.
+    /// * `max_fee_juels_per_msg` - The new value for the max_feel_juels_per_msg config.
+    pub fn set_max_fee_juels_per_msg(
+        ctx: Context<UpdateConfig>,
+        max_fee_juels_per_msg: u128,
+    ) -> Result<()> {
+        router::admin(ctx.accounts.config.default_code_version)
+            .set_max_fee_juels_per_msg(ctx, max_fee_juels_per_msg)
+    }
+
+    /// Sets the link_token_mint and updates the link_token_local_decimals.
+    ///
+    /// Only the admin may set this.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for updating the configuration.
+    pub fn set_link_token_mint(ctx: Context<UpdateConfigLinkMint>) -> Result<()> {
+        router::admin(ctx.accounts.config.default_code_version).set_link_token_mint(ctx)
     }
 
     /// Adds a billing token configuration.
@@ -374,10 +416,6 @@ pub enum FeeQuoterError {
     MessageTooLarge,
     #[msg("Message contains an unsupported number of tokens")]
     UnsupportedNumberOfTokens,
-    #[msg("Invalid EVM address")]
-    InvalidEVMAddress,
-    #[msg("Invalid encoding")]
-    InvalidEncoding,
     #[msg("Invalid token price")]
     InvalidTokenPrice,
     #[msg("Stale gas price")]
@@ -396,16 +434,10 @@ pub enum FeeQuoterError {
     InvalidExtraArgsAccounts,
     #[msg("Invalid writability bitmap in extra args")]
     InvalidExtraArgsWritabilityBitmap,
-    #[msg("Invalid chain family selector")]
-    InvalidChainFamilySelector,
     #[msg("Invalid token receiver")]
     InvalidTokenReceiver,
-    #[msg("Invalid SVM address")]
-    InvalidSVMAddress,
     #[msg("The caller is not an authorized price updater")]
     UnauthorizedPriceUpdater,
-    #[msg("The LINK mint uses an unsupported number of decimals")]
-    InvalidLinkDecimals,
     #[msg("Minimum token transfer fee exceeds maximum")]
     InvalidTokenTransferFeeMaxMin,
     #[msg("Insufficient dest bytes overhead on transfer fee config")]

@@ -779,8 +779,13 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 			}
 			mockReader := readerpkg_mock.NewMockCCIPReader(t)
 			mockReader.On(
-				"CommitReportsGTETimestamp", mock.Anything, mock.Anything, mock.Anything,
+				"CommitReportsGTETimestamp", mock.Anything, mock.Anything, primitives.Unconfirmed,
+				mock.Anything,
 			).Return(tt.reports, nil)
+			mockReader.On(
+				"CommitReportsGTETimestamp", mock.Anything, mock.Anything, primitives.Finalized,
+				mock.Anything,
+			).Return([]cciptypes.CommitPluginReportWithMeta{}, nil)
 
 			// Set up finalized messages mock
 			executed := make(map[cciptypes.ChainSelector][]cciptypes.SeqNum)
@@ -802,7 +807,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 			}
 			mockReader.On("ExecutedMessages", mock.Anything, mock.Anything, primitives.Unconfirmed).Return(unfinalized, nil)
 
-			got, gotFinalized, gotUnfinalized, err := getPendingReportsForExecution(
+			got, gotFinalized, gotUnfinalized, _, err := getPendingReportsForExecution(
 				tests.Context(t),
 				mockReader,
 				tt.canExec,
@@ -847,6 +852,7 @@ func TestPlugin_ObservationQuorum(t *testing.T) {
 		reportingCfg: ocr3types.ReportingPluginConfig{F: 1},
 	}
 	got, err := p.ObservationQuorum(ctx, ocr3types.OutcomeContext{}, nil, []types.AttributedObservation{
+		{Observation: []byte{}},
 		{Observation: []byte{}},
 		{Observation: []byte{}},
 	})

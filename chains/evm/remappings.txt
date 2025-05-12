@@ -1,4 +1,2 @@
-forge-std/=node_modules/chainlink-evm/contracts/src/v0.8/vendor/forge-std/src/
-@shared=node_modules/chainlink-evm/contracts/src/v0.8/shared
-@keystone=node_modules/chainlink-evm/contracts/src/v0.8/keystone
-@vendor=node_modules/chainlink-evm/contracts/src/v0.8/vendor
+forge-std/=node_modules/@chainlink/contracts/src/v0.8/vendor/forge-std/src/
+@chainlink/contracts/=node_modules/@chainlink/contracts/

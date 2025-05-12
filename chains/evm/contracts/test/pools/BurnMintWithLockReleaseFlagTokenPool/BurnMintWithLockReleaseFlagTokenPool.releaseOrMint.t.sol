@@ -7,7 +7,8 @@ import {HybridLockReleaseUSDCTokenPoolSetup} from
   "../USDC/HybridLockReleaseUSDCTokenPool/HybridLockReleaseUSDCTokenPoolSetup.t.sol";
 import {BurnMintWithLockReleaseFlagTokenPoolSetup} from "./BurnMintWithLockReleaseFlagTokenPoolSetup.t.sol";
 
-import {IERC20} from "@vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import {IERC20} from
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
 contract BurnMintWithLockReleaseFlagTokenPool_releaseOrMint is BurnMintWithLockReleaseFlagTokenPoolSetup {
   function test_releaseOrMint_LockReleaseFlagInSourcePoolData() public {

@@ -162,7 +162,11 @@ library Internal {
   /// precompiles, but EIP-7587 proposes to reserve the range 0x100 to 0x1ff. Our range is more conservative, even
   /// though it might not be exhaustive for all chains, which is OK. We also disallow the zero address, which is a
   /// common practice.
-  uint256 public constant PRECOMPILE_SPACE = 1024;
+  uint256 public constant EVM_PRECOMPILE_SPACE = 1024;
+
+  // According to the Aptos docs, the first 0xa addresses are reserved for precompiles.
+  // https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/doc/account.md#function-create_framework_reserved_account-1
+  uint256 public constant APTOS_PRECOMPILE_SPACE = 0x0b;
 
   /// @notice This methods provides validation for parsing abi encoded addresses by ensuring the address is within the
   /// EVM address space. If it isn't it will revert with an InvalidEVMAddress error, which we can catch and handle
@@ -172,15 +176,17 @@ library Internal {
   ) internal pure {
     if (encodedAddress.length != 32) revert InvalidEVMAddress(encodedAddress);
     uint256 encodedAddressUint = abi.decode(encodedAddress, (uint256));
-    if (encodedAddressUint > type(uint160).max || encodedAddressUint < PRECOMPILE_SPACE) {
+    if (encodedAddressUint > type(uint160).max || encodedAddressUint < EVM_PRECOMPILE_SPACE) {
       revert InvalidEVMAddress(encodedAddress);
     }
   }
 
-  function _validate32ByteAddress(bytes memory encodedAddress, bool mustBeNonZero) internal pure {
+  /// @notice This methods provides validation for parsing abi encoded addresses by ensuring the address is within the
+  /// bounds of [minValue, uint256.max]. If it isn't it will revert with an Invalid32ByteAddress error.
+  function _validate32ByteAddress(bytes memory encodedAddress, uint256 minValue) internal pure {
     if (encodedAddress.length != 32) revert Invalid32ByteAddress(encodedAddress);
-    if (mustBeNonZero) {
-      if (abi.decode(encodedAddress, (bytes32)) == bytes32(0)) {
+    if (minValue > 0) {
+      if (abi.decode(encodedAddress, (uint256)) < minValue) {
         revert Invalid32ByteAddress(encodedAddress);
       }
     }
@@ -280,6 +286,9 @@ library Internal {
 
   // bytes4(keccak256("CCIP ChainFamilySelector APTOS"));
   bytes4 public constant CHAIN_FAMILY_SELECTOR_APTOS = 0xac77ffec;
+
+  // bytes4(keccak256("CCIP ChainFamilySelector SUI"));
+  bytes4 public constant CHAIN_FAMILY_SELECTOR_SUI = 0xc4e05953;
 
   /// @dev Holds a merkle root and interval for a source chain so that an array of these can be passed in the CommitReport.
   /// @dev RMN depends on this struct, if changing, please notify the RMN maintainers.

@@ -24,8 +24,9 @@ type MessagesWithMetadata struct {
 }
 
 type InMemoryCCIPReader struct {
-	// Reports that may be returned.
-	Reports []cciptypes.CommitPluginReportWithMeta
+	// UnfinalizedReports that may be returned.
+	UnfinalizedReports []cciptypes.CommitPluginReportWithMeta
+	FinalizedReports   []cciptypes.CommitPluginReportWithMeta
 
 	// Messages that may be returned.
 	Messages map[cciptypes.ChainSelector][]MessagesWithMetadata
@@ -47,16 +48,29 @@ func (r InMemoryCCIPReader) GetExpectedNextSequenceNumber(
 	panic("unimplemented")
 }
 
-func (r InMemoryCCIPReader) CommitReportsGTETimestamp(
-	_ context.Context, ts time.Time, limit int,
-) ([]cciptypes.CommitPluginReportWithMeta, error) {
-	results := slicelib.Filter(r.Reports, func(report cciptypes.CommitPluginReportWithMeta) bool {
+func (r InMemoryCCIPReader) CommitReportsGTETimestamp(ctx context.Context,
+	ts time.Time,
+	confidence primitives.ConfidenceLevel,
+	limit int) ([]cciptypes.CommitPluginReportWithMeta, error) {
+	unfinalized := slicelib.Filter(r.UnfinalizedReports, func(report cciptypes.CommitPluginReportWithMeta) bool {
 		return report.Timestamp.After(ts) || report.Timestamp.Equal(ts)
 	})
-	if len(results) > limit {
-		return results[:limit], nil
+
+	finalized := slicelib.Filter(r.FinalizedReports, func(report cciptypes.CommitPluginReportWithMeta) bool {
+		return report.Timestamp.After(ts) || report.Timestamp.Equal(ts)
+	})
+
+	if len(unfinalized) > limit {
+		unfinalized = unfinalized[:limit]
 	}
-	return results, nil
+	if len(finalized) > limit {
+		finalized = finalized[:limit]
+	}
+
+	if confidence == primitives.Unconfirmed {
+		return unfinalized, nil
+	}
+	return finalized, nil
 }
 
 func (r InMemoryCCIPReader) ExecutedMessages(

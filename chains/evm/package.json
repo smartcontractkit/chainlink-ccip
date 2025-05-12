@@ -34,13 +34,13 @@
     "pnpm": ">=10"
   },
   "dependencies": {
-    "@changesets/cli": "^2.28.1",
+    "@changesets/cli": "^2.29.3",
     "@changesets/get-github-info": "^0.6.0",
     "semver": "^7.6.3",
-    "chainlink-evm": "git://github.com/smartcontractkit/chainlink-evm.git#82c959593df22527067f74b52dff0a289058dc30"
+    "@chainlink/contracts": "1.4.0"
   },
   "devDependencies": {
-    "solhint": "^5.0.5",
+    "solhint": "^5.1.0",
     "solhint-plugin-chainlink-solidity": "github:smartcontractkit/chainlink-solhint-rules#v1.2.1"
   },
   "pnpm": {

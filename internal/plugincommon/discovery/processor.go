@@ -338,8 +338,15 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 	contracts[consts.ContractNameRouter] = routerConsensus
 
 	// call Sync to bind contracts.
+	// NOTE: since Sync may make network calls, it could potentially fail and we don't want to
+	// fail the entire outcome because of that. The reason being is that if this node is a leader
+	// of an OCR round, it will NOT be able to complete the round due to failing to compute the Outcome.
+	// TODO: we should move Sync calls to observation but that requires updates to the Outcome struct for discovery.
 	if err := (*cdp.reader).Sync(ctx, contracts); err != nil {
-		return dt.Outcome{}, fmt.Errorf("unable to sync contracts: %w", err)
+		lggr.Errorw(
+			"unable to sync contracts - this is usually due to RPC issues,"+
+				" please check your RPC endpoints and their health!",
+			"err", err)
 	}
 
 	return dt.Outcome{}, nil

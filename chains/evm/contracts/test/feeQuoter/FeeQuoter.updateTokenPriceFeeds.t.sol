@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {FeeQuoter} from "../../FeeQuoter.sol";
 import {Internal} from "../../libraries/Internal.sol";
 import {FeeQuoterSetup} from "./FeeQuoterSetup.t.sol";
-import {Ownable2Step} from "@shared/access/Ownable2Step.sol";
+import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 
 import {Vm} from "forge-std/Vm.sol";
 

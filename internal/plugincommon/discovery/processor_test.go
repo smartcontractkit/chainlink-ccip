@@ -537,9 +537,8 @@ func TestContractDiscoveryProcessor_Outcome_ErrorSyncingContracts(t *testing.T) 
 
 	ctx := tests.Context(t)
 	outcome, err := cdp.Outcome(ctx, discoverytypes.Outcome{}, discoverytypes.Query{}, aos)
-	assert.Error(t, err)
-	assert.ErrorIs(t, err, syncErr)
-	assert.Empty(t, outcome)
+	require.NoError(t, err)
+	require.Equal(t, outcome, discoverytypes.Outcome{})
 }
 
 func TestContractDiscoveryProcessor_ValidateObservation_HappyPath(t *testing.T) {

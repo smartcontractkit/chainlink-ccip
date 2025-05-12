@@ -8,9 +8,10 @@ import {OffRamp} from "../../../offRamp/OffRamp.sol";
 import {LockReleaseTokenPool} from "../../../pools/LockReleaseTokenPool.sol";
 import {MaybeRevertingBurnMintTokenPool} from "../../helpers/MaybeRevertingBurnMintTokenPool.sol";
 import {OffRampSetup} from "./OffRampSetup.t.sol";
-import {CallWithExactGas} from "@shared/call/CallWithExactGas.sol";
+import {CallWithExactGas} from "@chainlink/contracts/src/v0.8/shared/call/CallWithExactGas.sol";
 
-import {IERC20} from "@vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import {IERC20} from
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
 contract OffRamp_releaseOrMintTokens is OffRampSetup {
   function setUp() public virtual override {

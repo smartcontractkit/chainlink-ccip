@@ -1,11 +1,15 @@
-use crate::events::on_ramp as events;
-use crate::messages::GetFeeResult;
 use anchor_lang::prelude::*;
 use anchor_spl::token::spl_token;
 use anchor_spl::token_interface;
+
+use crate::context::ANCHOR_DISCRIMINATOR;
+use crate::events::on_ramp as events;
+use crate::messages::GetFeeResult;
+
 use ccip_common::seed;
 use ccip_common::v1::{validate_and_parse_token_accounts, TokenAccounts};
 use fee_quoter::messages::TokenTransferAdditionalData;
+use fee_quoter::state::DestChain;
 
 use super::super::interfaces::OnRamp;
 use super::fees::{get_fee_cpi, transfer_and_wrap_native_sol, transfer_fee};
@@ -180,11 +184,13 @@ impl OnRamp for Impl {
             .zip(message.token_amounts.iter())
             .enumerate()
         {
-            let seeds = &[
-                seed::EXTERNAL_TOKEN_POOLS_SIGNER,
-                current_token_accounts.pool_program.key.as_ref(),
-                &[current_token_accounts.ccip_router_pool_signer_bump],
-            ];
+            require_keys_eq!(
+                token_amount.token,
+                current_token_accounts.mint.key(),
+                CcipRouterError::InvalidInputsTokenAccounts,
+            );
+
+            let transfer_seeds = &[seed::FEE_BILLING_SIGNER, &[ctx.bumps.fee_billing_signer]];
 
             // CPI: transfer token amount from user to token pool
             transfer_token(
@@ -193,8 +199,8 @@ impl OnRamp for Impl {
                 current_token_accounts.mint,
                 current_token_accounts.user_token_account,
                 current_token_accounts.pool_token_account,
-                current_token_accounts.ccip_router_pool_signer,
-                seeds,
+                &ctx.accounts.fee_billing_signer.to_account_info(),
+                transfer_seeds,
             )?;
 
             // CPI: call lockOrBurn on token pool
@@ -228,15 +234,36 @@ impl OnRamp for Impl {
                 ]);
                 acc_infos.extend_from_slice(current_token_accounts.remaining_accounts);
 
+                let pool_seeds = &[
+                    seed::EXTERNAL_TOKEN_POOLS_SIGNER,
+                    current_token_accounts.pool_program.key.as_ref(),
+                    &[current_token_accounts.ccip_router_pool_signer_bump],
+                ];
+
                 let return_data = interact_with_pool(
                     current_token_accounts.pool_program.key(),
                     current_token_accounts.ccip_router_pool_signer.key(),
                     acc_infos,
                     lock_or_burn,
-                    seeds,
+                    pool_seeds,
                 )?;
 
                 let lock_or_burn_out_data = LockOrBurnOutV1::try_from_slice(&return_data)?;
+
+                {
+                    // validate the token address based on the destination chain family selector
+                    let dest_chain_info = ctx.accounts.fee_quoter_dest_chain.to_account_info();
+                    let dest_chain = DestChain::try_from_slice(
+                        &dest_chain_info.data.borrow()[ANCHOR_DISCRIMINATOR..],
+                    )?;
+                    let dest_chain_family_selector = dest_chain.config.chain_family_selector;
+
+                    helpers::validate_transfer_dest_address(
+                        dest_chain_family_selector,
+                        &lock_or_burn_out_data.dest_token_address,
+                    )?;
+                }
+
                 new_message.token_amounts[i] = token_transfer(
                     lock_or_burn_out_data,
                     current_token_accounts.pool_config.key(),
@@ -287,6 +314,10 @@ impl OnRamp for Impl {
 }
 
 mod helpers {
+    use ccip_common::{
+        v1::{validate_evm_address, validate_svm_address},
+        CommonCcipError, CHAIN_FAMILY_SELECTOR_EVM, CHAIN_FAMILY_SELECTOR_SVM,
+    };
     use rmn_remote::state::CurseSubject;
 
     use super::*;
@@ -401,6 +432,18 @@ mod helpers {
         ]);
 
         result.to_bytes()
+    }
+
+    pub(super) fn validate_transfer_dest_address(
+        chain_family_selector: [u8; 4],
+        dest_token_address: &[u8],
+    ) -> Result<()> {
+        let selector = u32::from_be_bytes(chain_family_selector);
+        match selector {
+            CHAIN_FAMILY_SELECTOR_EVM => validate_evm_address(dest_token_address),
+            CHAIN_FAMILY_SELECTOR_SVM => validate_svm_address(dest_token_address, true),
+            _ => Err(CommonCcipError::InvalidChainFamilySelector.into()),
+        }
     }
 
     #[cfg(test)]

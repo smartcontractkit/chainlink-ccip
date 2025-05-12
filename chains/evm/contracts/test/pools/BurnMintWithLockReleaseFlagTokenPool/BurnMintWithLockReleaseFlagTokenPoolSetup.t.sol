@@ -2,7 +2,7 @@ pragma solidity ^0.8.24;
 
 import {BurnMintWithLockReleaseFlagTokenPool} from "../../../pools/USDC/BurnMintWithLockReleaseFlagTokenPool.sol";
 import {BurnMintSetup} from "../BurnMintTokenPool/BurnMintSetup.t.sol";
-import {BurnMintERC20} from "@shared/token/ERC20/BurnMintERC20.sol";
+import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
 contract BurnMintWithLockReleaseFlagTokenPoolSetup is BurnMintSetup {
   BurnMintWithLockReleaseFlagTokenPool internal s_pool;

@@ -3,7 +3,7 @@ use anchor_lang::prelude::*;
 use crate::context::{
     AcceptOwnership, AddBillingTokenConfig, AddDestChain, AddPriceUpdater, GasPriceUpdate, GetFee,
     RemovePriceUpdater, SetTokenTransferFeeConfig, TokenPriceUpdate, UpdateBillingTokenConfig,
-    UpdateConfig, UpdateDestChainConfig, UpdatePrices,
+    UpdateConfig, UpdateConfigLinkMint, UpdateDestChainConfig, UpdatePrices,
 };
 use crate::messages::{GetFeeResult, SVM2AnyMessage};
 use crate::state::{BillingTokenConfig, CodeVersion, DestChainConfig, TokenTransferFeeConfig};
@@ -36,6 +36,14 @@ pub trait Admin {
         ctx: Context<UpdateConfig>,
         code_version: CodeVersion,
     ) -> Result<()>;
+
+    fn set_max_fee_juels_per_msg(
+        &self,
+        ctx: Context<UpdateConfig>,
+        max_fee_juels_per_msg: u128,
+    ) -> Result<()>;
+
+    fn set_link_token_mint(&self, ctx: Context<UpdateConfigLinkMint>) -> Result<()>;
 
     fn add_billing_token_config(
         &self,

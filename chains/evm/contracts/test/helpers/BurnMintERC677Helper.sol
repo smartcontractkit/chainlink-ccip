@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {IGetCCIPAdmin} from "../../interfaces/IGetCCIPAdmin.sol";
-import {BurnMintERC677} from "@shared/token/ERC677/BurnMintERC677.sol";
+import {BurnMintERC677} from "@chainlink/contracts/src/v0.8/shared/token/ERC677/BurnMintERC677.sol";
 
 contract BurnMintERC677Helper is BurnMintERC677, IGetCCIPAdmin {
   constructor(string memory name, string memory symbol) BurnMintERC677(name, symbol, 18, 0) {}

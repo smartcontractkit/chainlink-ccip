@@ -7,9 +7,10 @@ import {TokenPool} from "../pools/TokenPool.sol";
 import {TokenAdminRegistry} from "../tokenAdminRegistry/TokenAdminRegistry.sol";
 import {BaseTest} from "./BaseTest.t.sol";
 import {MaybeRevertingBurnMintTokenPool} from "./helpers/MaybeRevertingBurnMintTokenPool.sol";
-import {BurnMintERC20} from "@shared/token/ERC20/BurnMintERC20.sol";
+import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
-import {IERC20} from "@vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import {IERC20} from
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
 contract TokenSetup is BaseTest {
   address[] internal s_sourceTokens;

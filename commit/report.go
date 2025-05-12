@@ -331,7 +331,7 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 
 	decodedReport, err := p.validateReport(ctx, lggr, seqNr, r)
 	if errors.Is(err, plugincommon.ErrInvalidReport) {
-		lggr.Infow("report not valid, transmitting", "err", err)
+		lggr.Infow("report not valid, not transmitting", "err", err)
 		return false, nil
 	}
 	if err != nil {

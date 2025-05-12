@@ -41,6 +41,23 @@ type CommitData struct {
 	MessageTokenData []MessageTokenData `json:"messageTokenData"`
 }
 
+// LessThan CommitData comparator
+// Ordering priority is:
+// 1. By timestamp (earlier timestamps first)
+// 2. By source chain selector (smaller chain selectors first)
+// 3. By sequence number range (smaller starting sequence numbers first)
+// This function is used for stable sorting of CommitData objects.
+// CHANGE WITH CAUTION, not giving priority to timestamps causes lane starvation
+func LessThan(i, j CommitData) bool {
+	if !i.Timestamp.Equal(j.Timestamp) {
+		return i.Timestamp.Before(j.Timestamp)
+	}
+	if i.SourceChain != j.SourceChain {
+		return i.SourceChain < j.SourceChain
+	}
+	return i.SequenceNumberRange.Start() < j.SequenceNumberRange.Start()
+}
+
 // CopyNoMsgData creates a copy of the CommitData without the messages.Data
 func (cd CommitData) CopyNoMsgData() CommitData {
 	msgsWitoutData := make([]cciptypes.Message, len(cd.Messages))

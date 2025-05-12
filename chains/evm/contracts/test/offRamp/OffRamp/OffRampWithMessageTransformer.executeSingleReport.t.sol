@@ -10,7 +10,7 @@ import {MessageTransformerHelper} from "../../helpers/MessageTransformerHelper.s
 import {OffRampWithMessageTransformerHelper} from "../../helpers/OffRampWithMessageTransformerHelper.sol";
 import {LogMessageDataReceiver} from "../../helpers/receivers/LogMessageDataReceiver.sol";
 import {OffRampSetup} from "./OffRampSetup.t.sol";
-import {AuthorizedCallers} from "@shared/access/AuthorizedCallers.sol";
+import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
 contract OffRampWithMessageTransformer_executeSingleReport is OffRampSetup {
   OffRampWithMessageTransformerHelper internal s_offRampWithMessageTransformer;

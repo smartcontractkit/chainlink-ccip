@@ -9,7 +9,7 @@ import {Router} from "../Router.sol";
 import {Internal} from "../libraries/Internal.sol";
 import {RateLimiter} from "../libraries/RateLimiter.sol";
 
-import {WETH9} from "@vendor/canonical-weth/WETH9.sol";
+import {WETH9} from "@chainlink/contracts/src/v0.8/vendor/canonical-weth/WETH9.sol";
 import {Test} from "forge-std/Test.sol";
 
 contract BaseTest is Test {
@@ -28,6 +28,8 @@ contract BaseTest is Test {
   uint32 internal constant DEFAULT_TOKEN_DEST_GAS_OVERHEAD = 90_000;
   uint8 internal constant DEFAULT_TOKEN_DECIMALS = 18;
   uint16 internal constant GAS_FOR_CALL_EXACT_CHECK = 5_000;
+
+  uint32 internal constant SVM_DEFAULT_MAX_DATA_BYTES = 600;
 
   bool private s_baseTestInitialized;
 

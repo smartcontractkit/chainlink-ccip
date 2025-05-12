@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {Ownable2StepMsgSender} from "@shared/access/Ownable2StepMsgSender.sol";
-import {IBurnMintERC20} from "@shared/token/ERC20/IBurnMintERC20.sol";
+import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
+import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
 
-import {EnumerableSet} from "@vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableSet.sol";
+import {EnumerableSet} from
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableSet.sol";
 
 /// @notice Allows migration of a lane in a token pool from Lock/Release to CCTP supported Burn/Mint. Contract
 /// functionality is based on hard requirements defined by Circle to allow for future CCTP compatibility

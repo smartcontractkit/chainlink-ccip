@@ -3,8 +3,11 @@ package execute
 import (
 	"context"
 	"encoding/binary"
+	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -55,6 +58,7 @@ type IntTest struct {
 	msgHasher           cciptypes.MessageHasher
 	ccipReader          *inmem.InMemoryCCIPReader
 	usdcServer          *ConfigurableAttestationServer
+	lbtcServer          *ConfigurableAttestationServer
 	tokenObserverConfig []pluginconfig.TokenDataObserverConfig
 	tokenChainReader    map[cciptypes.ChainSelector]contractreader.ContractReaderFacade
 }
@@ -74,9 +78,9 @@ func SetupSimpleTest(t *testing.T,
 	}
 	msgHasher := mocks.NewMessageHasher()
 	ccipReader := inmem.InMemoryCCIPReader{
-		Reports:  []cciptypes.CommitPluginReportWithMeta{},
-		Messages: messagesMap,
-		Dest:     dstSelector,
+		UnfinalizedReports: []cciptypes.CommitPluginReportWithMeta{},
+		Messages:           messagesMap,
+		Dest:               dstSelector,
 	}
 
 	return &IntTest{
@@ -135,7 +139,7 @@ func (it *IntTest) WithMessages(
 		tree, err := report.ConstructMerkleTree(reportData, logger.Test(it.t))
 		require.NoError(it.t, err, "failed to construct merkle tree")
 
-		it.ccipReader.Reports = append(it.ccipReader.Reports, cciptypes.CommitPluginReportWithMeta{
+		it.ccipReader.UnfinalizedReports = append(it.ccipReader.UnfinalizedReports, cciptypes.CommitPluginReportWithMeta{
 			Report: cciptypes.CommitPluginReport{
 				BlessedMerkleRoots: []cciptypes.MerkleRootChain{
 					{
@@ -201,6 +205,29 @@ func (it *IntTest) WithUSDC(
 		srcSelector:    r,
 		it.dstSelector: r,
 	}
+}
+
+func (it *IntTest) WithLBTC(
+	sourcePoolAddress string,
+	attestations map[string]string,
+	srcSelector cciptypes.ChainSelector,
+) {
+	it.lbtcServer = newConfigurableAttestationServer(attestations)
+	it.tokenObserverConfig = append(it.tokenObserverConfig, pluginconfig.TokenDataObserverConfig{
+		Type:    "lbtc",
+		Version: "1",
+		LBTCObserverConfig: &pluginconfig.LBTCObserverConfig{
+			AttestationConfig: pluginconfig.AttestationConfig{
+				AttestationAPI:         it.lbtcServer.server.URL,
+				AttestationAPIInterval: commonconfig.MustNewDuration(1 * time.Millisecond),
+				AttestationAPITimeout:  commonconfig.MustNewDuration(1 * time.Second),
+			},
+			SourcePoolAddressByChain: map[cciptypes.ChainSelector]string{
+				srcSelector: sourcePoolAddress,
+			},
+			AttestationAPIBatchSize: 1,
+		},
+	})
 }
 
 func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
@@ -279,6 +306,9 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 func (it *IntTest) Close() {
 	if it.usdcServer != nil {
 		it.usdcServer.Close()
+	}
+	if it.lbtcServer != nil {
+		it.lbtcServer.Close()
 	}
 }
 
@@ -360,10 +390,55 @@ func newConfigurableAttestationServer(responses map[string]string) *Configurable
 				}
 			}
 		}
+		if r.Method == http.MethodPost {
+			var request map[string]interface{}
+			bodyRaw, err := io.ReadAll(r.Body)
+			if err != nil {
+				panic(err)
+			}
+			err = json.Unmarshal(bodyRaw, &request)
+			if err != nil {
+				panic(err)
+			}
+			payloadHashesUntyped := request["messageHash"].([]interface{})
+			if len(payloadHashesUntyped) == 0 {
+				w.WriteHeader(http.StatusBadRequest)
+			}
+			payloadHashes := make([]string, len(payloadHashesUntyped))
+			for i, hash := range payloadHashesUntyped {
+				payloadHashes[i] = hash.(string)
+			}
+			attestationResponse := attestationBatchByMessageHashes(payloadHashes, c.responses)
+			responseBytes, err := json.Marshal(attestationResponse)
+			if err != nil {
+				panic(err)
+			}
+			_, err = w.Write(responseBytes)
+			if err != nil {
+				panic(err)
+			}
+		}
 		w.WriteHeader(http.StatusNotFound)
 	}))
 	c.server = server
 	return c
+}
+
+func attestationBatchByMessageHashes(payloadHashes []string, responses map[string]string) map[string]interface{} {
+	attestations := make([]interface{}, 0, len(responses))
+	for payloadHash, attestationRaw := range responses {
+		if slices.Contains(payloadHashes, payloadHash) {
+			var attestation map[string]interface{}
+			err := json.Unmarshal([]byte(attestationRaw), &attestation)
+			if err != nil {
+				panic(err)
+			}
+			attestations = append(attestations, attestation)
+		}
+	}
+	attestationResponse := make(map[string]interface{})
+	attestationResponse["attestations"] = attestations
+	return attestationResponse
 }
 
 func (c *ConfigurableAttestationServer) AddResponse(key, response string) {
@@ -394,12 +469,6 @@ func newMessageSentEvent(
 }
 
 type msgOption func(*cciptypes.Message)
-
-func withData(data []byte) msgOption {
-	return func(m *cciptypes.Message) {
-		m.Data = data
-	}
-}
 
 func withTokens(tokenAmounts ...cciptypes.RampTokenAmount) msgOption {
 	return func(m *cciptypes.Message) {
@@ -531,4 +600,19 @@ func emptyMessagesMapForRanges(ranges []cciptypes.SeqNumRange) map[cciptypes.Seq
 		}
 	}
 	return messages
+}
+
+func NewMessage(
+	msgID int,
+	seqNum int,
+	sourceChainSelector int,
+	destChainSelector int) cciptypes.Message {
+	return cciptypes.Message{
+		Header: cciptypes.RampMessageHeader{
+			MessageID:           cciptypes.Bytes32{byte(msgID)},
+			SourceChainSelector: cciptypes.ChainSelector(sourceChainSelector),
+			DestChainSelector:   cciptypes.ChainSelector(destChainSelector),
+			SequenceNumber:      cciptypes.SeqNum(seqNum),
+		},
+	}
 }

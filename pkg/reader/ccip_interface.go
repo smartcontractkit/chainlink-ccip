@@ -161,9 +161,9 @@ func NewCCIPReaderWithExtendedContractReaders(
 type CCIPReader interface {
 	// CommitReportsGTETimestamp reads the destination chain starting at a given timestamp
 	// and finds all ReportAccepted up to the provided limit.
-	CommitReportsGTETimestamp(
-		ctx context.Context,
+	CommitReportsGTETimestamp(ctx context.Context,
 		ts time.Time,
+		confidence primitives.ConfidenceLevel,
 		limit int,
 	) ([]cciptypes.CommitPluginReportWithMeta, error)
 
@@ -250,7 +250,7 @@ type CCIPReader interface {
 	LinkPriceUSD(ctx context.Context) (cciptypes.BigInt, error)
 
 	// Sync can be used to perform frequent syncing operations inside the reader implementation.
-	// Returns a bool indicating whether something was updated.
+	// NOTE: this method may make network calls.
 	Sync(ctx context.Context, contracts ContractAddresses) error
 
 	// GetLatestPriceSeqNr returns the latest price sequence number for the destination chain.

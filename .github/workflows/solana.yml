@@ -199,5 +199,3 @@ jobs:
         if: failure()
         shell: bash
         run: cat ./golangci-lint-report.xml
-          
-
