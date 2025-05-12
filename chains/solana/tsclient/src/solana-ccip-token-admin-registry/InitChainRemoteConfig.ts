@@ -1,33 +1,19 @@
-import fs from "fs";
 import {
-  Keypair,
   PublicKey,
   TransactionMessage,
   VersionedTransaction,
   SystemProgram,
-  Connection,
-  Commitment,
 } from "@solana/web3.js";
-import { Program, Idl, AnchorProvider, Wallet, EventParser, BorshCoder } from '@coral-xyz/anchor'
-import { readFileSync } from "fs";
+import { EventParser, BorshCoder } from '@coral-xyz/anchor'
 import { tokenAdminRegistry } from "../staging";
 import { Buffer } from "buffer";
-import { BurnmintTokenPool } from '../../../contracts/target/types/burnmint_token_pool';
 
-const POOL_STATE_SEED = Buffer.from("ccip_tokenpool_config");
+import { loadTokenPoolProgram } from "./bnm-instructions";
 
-const keypair = Keypair.fromSecretKey(
-  new Uint8Array(JSON.parse(readFileSync(tokenAdminRegistry.key_pair_path, "utf-8")))
-);
 
 async function main() {
-  const PROGRAM_ID = tokenAdminRegistry.token_pool_program;
-  const MINT = tokenAdminRegistry.mint;
 
-  const [statePda] = PublicKey.findProgramAddressSync(
-    [POOL_STATE_SEED, MINT.toBuffer()],
-    PROGRAM_ID
-  );
+  const bnMProgramContext = await loadTokenPoolProgram();
 
   const remoteChainSelector = tokenAdminRegistry.remoteChainSelector;
   const remoteChainSelector64 = remoteChainSelector.toArrayLike(Buffer, "le", 8);
@@ -36,26 +22,12 @@ async function main() {
     [
       Buffer.from("ccip_tokenpool_chainconfig"),
       remoteChainSelector64,
-      MINT.toBuffer(),
+      bnMProgramContext.mint.toBuffer(),
     ],
-    PROGRAM_ID
+    bnMProgramContext.programId
   );
 
-  const idlFile = fs.readFileSync(tokenAdminRegistry.burnmint_token_pool_idl_path);
-  const idlJson: Idl = JSON.parse(idlFile.toString());
-  const connection = new Connection(
-    "https://api.devnet.solana.com",
-    { commitment: 'confirmed' as Commitment }
-  )
-  const wallet = new Wallet(keypair)
-  const provider = new AnchorProvider(connection, wallet, {
-    preflightCommitment: 'confirmed' as Commitment,
-    commitment: 'confirmed' as Commitment,
-  })
-
-  const BnMTokenPoolProgram = new Program<BurnmintTokenPool>(idlJson as BurnmintTokenPool, PROGRAM_ID, provider);
-
-  const ix = await BnMTokenPoolProgram.methods.initChainRemoteConfig(
+  const ix = await bnMProgramContext.program.methods.initChainRemoteConfig(
     remoteChainSelector,
     tokenAdminRegistry.mint,
     {
@@ -64,8 +36,8 @@ async function main() {
       decimals: 8,
     },
   ).accounts({
-    state: statePda,
-    authority: keypair.publicKey,
+    state: bnMProgramContext.statePda,
+    authority: bnMProgramContext.keypair.publicKey,
     systemProgram: SystemProgram.programId,
     chainConfig: chainConfigPda,
   }).instruction();
@@ -73,7 +45,7 @@ async function main() {
   const remoteAddressBytes = padTo32Bytes(Buffer.from(tokenAdminRegistry.remoteAddress.replace(/^0x/, ""), "hex"));
   const tokenAddressBytes = padTo32Bytes(Buffer.from(tokenAdminRegistry.tokenAddress.replace(/^0x/, ""), "hex"));
 
-  const ix2 = await BnMTokenPoolProgram.methods.editChainRemoteConfig(
+  const ix2 = await bnMProgramContext.program.methods.editChainRemoteConfig(
     remoteChainSelector,
     tokenAdminRegistry.mint,
     {
@@ -82,32 +54,32 @@ async function main() {
       decimals: 8,
     },
   ).accounts({
-    state: statePda,
-    authority: keypair.publicKey,
+    state: bnMProgramContext.statePda,
+    authority: bnMProgramContext.keypair.publicKey,
     systemProgram: SystemProgram.programId,
     chainConfig: chainConfigPda,
   }).instruction();
 
-  const { blockhash } = await connection.getLatestBlockhash();
+  const { blockhash } = await bnMProgramContext.connection.getLatestBlockhash();
 
   const message = new TransactionMessage({
-    payerKey: keypair.publicKey,
+    payerKey: bnMProgramContext.keypair.publicKey,
     recentBlockhash: blockhash,
     instructions: [ix, ix2],
   }).compileToV0Message([]);
 
   const vtx = new VersionedTransaction(message);
-  vtx.sign([keypair]);
+  vtx.sign([bnMProgramContext.keypair]);
 
   console.log("🔍 Simulating...");
-  const sim = await connection.simulateTransaction(vtx);
+  const sim = await bnMProgramContext.connection.simulateTransaction(vtx);
   if (sim.value.err) {
     console.error("❌ Simulation failed:", sim.value.logs);
     throw new Error("Simulation failed");
   }
 
   console.log("✅ Simulation passed");
-  const sig = await connection.sendTransaction(vtx, {
+  const sig = await bnMProgramContext.connection.sendTransaction(vtx, {
     skipPreflight: false,
     preflightCommitment: "confirmed",
   });
@@ -116,12 +88,12 @@ async function main() {
 
   await new Promise((resolve) => setTimeout(resolve, 5000));
   // Verify that the chain config PDA contains the expected data
-  const tx = await provider.connection.getTransaction(sig, {
+  const tx = await bnMProgramContext.provider.connection.getTransaction(sig, {
     commitment: "confirmed",
     maxSupportedTransactionVersion: 0,
   });
 
-  const eventParser = new EventParser(PROGRAM_ID, new BorshCoder(idlJson));
+  const eventParser = new EventParser(bnMProgramContext.programId, new BorshCoder(bnMProgramContext.idl));
   const events = eventParser.parseLogs(tx?.meta?.logMessages!);
   for (let event of events) {
     console.log(event);

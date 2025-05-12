@@ -48,6 +48,25 @@
       ]
     },
     {
+      "name": "typeVersion",
+      "docs": [
+        "Returns the program type (name) and version.",
+        "Used by offchain code to easily determine which program & version is being interacted with.",
+        "",
+        "# Arguments",
+        "* `ctx` - The context"
+      ],
+      "accounts": [
+        {
+          "name": "clock",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [],
+      "returns": "string"
+    },
+    {
       "name": "transferOwnership",
       "accounts": [
         {
@@ -593,7 +612,7 @@
       }
     }
   ],
-  "types": [
+    "types": [
     {
       "name": "BaseConfig",
       "type": {
@@ -1015,6 +1034,11 @@
             }
           },
           "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
         }
       ]
     },
@@ -1038,6 +1062,11 @@
           "type": {
             "defined": "RateLimitConfig"
           },
+          "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
           "index": false
         }
       ]
@@ -1067,6 +1096,11 @@
             }
           },
           "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
         }
       ]
     },
@@ -1076,6 +1110,11 @@
         {
           "name": "chainSelector",
           "type": "u64",
+          "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
           "index": false
         }
       ]
@@ -1090,6 +1129,11 @@
         },
         {
           "name": "newRouter",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mint",
           "type": "publicKey",
           "index": false
         }
@@ -1107,6 +1151,11 @@
           "name": "to",
           "type": "publicKey",
           "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
         }
       ]
     },
@@ -1120,6 +1169,11 @@
         },
         {
           "name": "to",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mint",
           "type": "publicKey",
           "index": false
         }

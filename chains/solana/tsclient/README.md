@@ -117,6 +117,15 @@ Example output:
 IN `src/staging.ts`, set the following variables:
 
 ```typescript
+  const accounts = {
+    addresses: {
+      router: new web3.PublicKey(""),
+      feeQuoter: new web3.PublicKey(""),
+      rmnRemote: new web3.PublicKey("RmnXLft1mSEDgMKu2okYuHkiazxntFFcZFrrcXxYg7"),
+    },
+  };
+  export default accounts;
+
   export const tokenAdminRegistry = {
     key_pair_path: "./ccip-keypair.json",
     mint: new web3.PublicKey(""), // Token Mint
@@ -125,6 +134,8 @@ IN `src/staging.ts`, set the following variables:
     user: new web3.PublicKey(""), // my token mint authority
     zero: web3.PublicKey.default,
     lookup_table: new web3.PublicKey(""), // Lookup table
+    burnmint_token_pool_idl_path: '<Full Path>/chainlink-ccip/chains/solana/tsclient/src/modified-idl/burnmint_token_pool.json',
+    ccip_router_idl_path: '<Full Path>/chainlink-ccip/chains/solana/contracts/target/idl/ccip_router.json',
   };
 ```
 
@@ -204,9 +215,10 @@ npx ts-node src/solana-ccip-token-admin-registry/SetPool.ts
 ```
 
 ## 7. Modify mint authority to be the Token Pool PDA
+// TODO: Create a sript to calculate the token pool signer pda from the token pool program id and the token mint address
 
 ```bash
-npx ts-node src/solana-ccip-token-admin-registry/TransferAdmin.ts
+spl-token authorize <MINT_ADDRESS> mint <TOKEN_POOL_SIGNER_PDA>
 ```
 
 ## 8. Setup the Token Pool Program configuration
@@ -220,14 +232,5 @@ npx ts-node src/solana-ccip-token-admin-registry/InitAta.ts
 Init the token pool config
 
 ```bash
-ANCHOR_WALLET=<YOUR-KEY-FILE> npx ts-node src/solana-ccip-token-admin-registry/InitChainRemoteConfig.ts
-```
-
-## 9. Send your tokens
-
-
-Run your message-sending script:
-
-```bash
-npx ts-node src/ccip_token_send.ts
+npx ts-node src/solana-ccip-token-admin-registry/InitChainRemoteConfig.ts
 ```

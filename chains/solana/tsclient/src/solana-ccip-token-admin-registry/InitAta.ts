@@ -5,14 +5,13 @@ import {
 import {
   Keypair,
   PublicKey,
-  TransactionMessage,
-  VersionedTransaction,
 } from "@solana/web3.js";
 import { readFileSync } from "fs";
 import { tokenAdminRegistry } from "../staging";
 import { getCCIPSendConfig } from "../solana-ccip-send/SolanaCCIPSendConfig";
+import { sendTransaction } from "./program-instructions";
 
-async function createATA() {
+async function main() {
   const keypair = Keypair.fromSecretKey(
     new Uint8Array(JSON.parse(readFileSync(tokenAdminRegistry.key_pair_path, "utf-8")))
   );
@@ -47,31 +46,10 @@ async function createATA() {
     token_program,
   );
 
-  const { blockhash } = await connection.getLatestBlockhash();
-
-  const message = new TransactionMessage({
-    payerKey: keypair.publicKey,
-    recentBlockhash: blockhash,
-    instructions: [ix],
-  }).compileToV0Message([]);
-
-  const tx = new VersionedTransaction(message);
-  tx.sign([keypair]);
-
-  console.log("🔍 Simulating...");
-  const sim = await connection.simulateTransaction(tx);
-  if (sim.value.err) {
-    console.error("❌ Simulation failed:", sim.value.logs);
-    throw new Error("Simulation failed");
-  }
-
-  console.log("✅ Simulation passed");
-  const sig = await connection.sendTransaction(tx);
-  console.log("📤 Tx sent:", sig);
-  console.log("🏦 Created ATA:", ata.toBase58());
+  await sendTransaction(connection, keypair, ix);
 }
 
-createATA()
+main()
   .then(() => {
     console.log("✅ Done");
   })
