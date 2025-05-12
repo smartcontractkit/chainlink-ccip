@@ -49,7 +49,7 @@ type AttestationClient interface {
 		msgs map[cciptypes.ChainSelector]map[reader.MessageTokenID]cciptypes.Bytes,
 	) (map[cciptypes.ChainSelector]map[reader.MessageTokenID]AttestationStatus, error)
 
-	Token() string
+	Type() string
 }
 
 type FakeAttestationClient struct {
@@ -70,6 +70,6 @@ func (f *FakeAttestationClient) Attestations(
 	return outcome, nil
 }
 
-func (f *FakeAttestationClient) Token() string {
+func (f *FakeAttestationClient) Type() string {
 	return ""
 }
