@@ -133,7 +133,7 @@ IN `src/staging.ts`, set the following variables:
 First you need to modify the program id. After that, deploy it:
 
 ```bash
-anchor deploy --program-name burnmint_token_pool
+anchor deploy --program-name burnmint_token_pool --provider.cluster https://api.devnet.solana.com
 ```
 
 Add the token pool program id to `staging.tokenAdminRegistry.token_pool_program`
@@ -156,7 +156,7 @@ spl-token create-token
 Add the token mint to `staging.tokenAdminRegistry.mint`
 
 ```bash
-spl-token create-account  <TOKEN_MINT>
+spl-token create-account <TOKEN_MINT>
 ```
 
 

@@ -127,12 +127,6 @@ async function main() {
     console.log(event);
   }
 
-  const tpstate = (await BnMTokenPoolProgram.account.state.fetch("4U55f3yBpWMwcgvE6MvGg7Eqe46gZdq9YmUKyqVi4x96", 'confirmed')) as any;
-  console.log("📜 Chain Config State:", JSON.stringify(tpstate, null, "  "));
-
-  const chainConfig = (await BnMTokenPoolProgram.account.chainConfig.fetch("4kKMcdVGKQ3idqjMc19LmsST3wXZrRQ6xMpf8w1QybJc", 'confirmed')) as any;
-  console.log("📜 Whatever State:", JSON.stringify(chainConfig, null, "  "));
-
 }
 
 main()
