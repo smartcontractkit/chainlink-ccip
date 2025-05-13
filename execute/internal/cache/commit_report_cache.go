@@ -21,16 +21,28 @@ type CommitReportsCache struct {
 	lggr               logger.Logger
 	reports            *cache.Cache // key string -> CommitPluginReportWithMeta
 	lastQueryTimestamp time.Time    // timestamp of the most recent query
+	ccipReader         readerpkg.CCIPReader
+	queryLimit         int
+	returnLimit        int
 }
 
 // NewCommitReportsCache creates a new commit reports cache.
 // Cached items live for messageVisibilityInterval + EvictionGracePeriod, mirroring
 // the lifetime used in commitRootsCache for executed roots.
-func NewCommitReportsCache(lggr logger.Logger, messageVisibilityInterval time.Duration) *CommitReportsCache {
+func NewCommitReportsCache(
+	lggr logger.Logger,
+	messageVisibilityInterval time.Duration,
+	ccipReader readerpkg.CCIPReader,
+	queryLimit int,
+	returnLimit int,
+) *CommitReportsCache {
 	ttl := messageVisibilityInterval + EvictionGracePeriod
 	return &CommitReportsCache{
-		lggr:    lggr,
-		reports: cache.New(ttl, CleanupInterval),
+		lggr:        lggr,
+		reports:     cache.New(ttl, CleanupInterval),
+		ccipReader:  ccipReader,
+		queryLimit:  queryLimit,
+		returnLimit: returnLimit,
 	}
 }
 
@@ -54,12 +66,11 @@ func generateKey(report ccipocr3.CommitPluginReportWithMeta) string {
 // GetCachedAndNewReports combines cached reports with newly fetched ones
 func (c *CommitReportsCache) GetCachedAndNewReports(
 	ctx context.Context,
-	ccipReader readerpkg.CCIPReader,
 	fetchFrom time.Time,
-	limit int,
 ) ([]ccipocr3.CommitPluginReportWithMeta, error) {
 	// Start with cached reports that are newer than or equal to fetchFrom
-	cachedReports := c.getCachedReports(fetchFrom)
+	// These are used if we don't have enough after adding finalized reports and need to merge with unconfirmed.
+	initialCachedReports := c.getCachedReports(fetchFrom)
 
 	// Determine if we need to fetch new reports
 	var queryFrom time.Time
@@ -74,7 +85,7 @@ func (c *CommitReportsCache) GetCachedAndNewReports(
 	}
 
 	// Fetch finalized reports since last query and update the cache with them.
-	newFinalizedReports, err := ccipReader.CommitReportsGTETimestamp(ctx, queryFrom, primitives.Finalized, limit)
+	newFinalizedReports, err := c.ccipReader.CommitReportsGTETimestamp(ctx, queryFrom, primitives.Finalized, c.queryLimit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch finalized commit reports: %w", err)
 	}
@@ -87,8 +98,27 @@ func (c *CommitReportsCache) GetCachedAndNewReports(
 		c.lastQueryTimestamp = queryFrom
 	}
 
+	// Optimization: Check if the cache (after adding finalized reports) now has enough reports.
+	currentAllCachedReports := c.getCachedReports(fetchFrom) // Get all cached reports >= fetchFrom
+	sort.Slice(currentAllCachedReports, func(i, j int) bool {
+		return currentAllCachedReports[i].Timestamp.After(currentAllCachedReports[j].Timestamp)
+	})
+
+	if len(currentAllCachedReports) >= c.returnLimit {
+		c.lggr.Debugw("Returning early with sufficient reports from cache after finalized update",
+			"count", len(currentAllCachedReports),
+			"returnLimit", c.returnLimit,
+			"fetchFrom", fetchFrom)
+		if len(currentAllCachedReports) > c.returnLimit { // Ensure we don't exceed the returnLimit
+			return currentAllCachedReports[:c.returnLimit], nil
+		}
+		return currentAllCachedReports, nil
+	}
+
 	// 2. Fetch unconfirmed (finalized + unfinalized) reports for returning to the caller.
-	newUnconfirmedReports, err := ccipReader.CommitReportsGTETimestamp(ctx, queryFrom, primitives.Unconfirmed, limit)
+	newUnconfirmedReports, err := c.ccipReader.CommitReportsGTETimestamp(
+		ctx, queryFrom, primitives.Unconfirmed, c.queryLimit,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch unconfirmed commit reports: %w", err)
 	}
@@ -99,7 +129,7 @@ func (c *CommitReportsCache) GetCachedAndNewReports(
 		"queryFrom", queryFrom)
 
 	// Merge cached finalized reports with fresh unconfirmed ones (which include finalized+unfinalized).
-	allReports := c.mergeCachedAndNewReports(cachedReports, newUnconfirmedReports, fetchFrom, limit)
+	allReports := c.mergeCachedAndNewReports(initialCachedReports, newUnconfirmedReports, fetchFrom)
 
 	return allReports, nil
 }
@@ -151,7 +181,6 @@ func (c *CommitReportsCache) mergeCachedAndNewReports(
 	cachedReports []ccipocr3.CommitPluginReportWithMeta,
 	newReports []ccipocr3.CommitPluginReportWithMeta,
 	minTimestamp time.Time,
-	limit int,
 ) []ccipocr3.CommitPluginReportWithMeta {
 	// Create a map to deduplicate reports
 	reportMap := make(map[string]ccipocr3.CommitPluginReportWithMeta)
@@ -182,8 +211,8 @@ func (c *CommitReportsCache) mergeCachedAndNewReports(
 	})
 
 	// Limit the number of reports
-	if len(allReports) > limit {
-		allReports = allReports[:limit]
+	if len(allReports) > c.returnLimit {
+		allReports = allReports[:c.returnLimit]
 	}
 
 	return allReports
