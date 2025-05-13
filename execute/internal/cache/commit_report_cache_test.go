@@ -16,8 +16,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
-// Test using the generated testify-mock CCIPReader rather than a hand-rolled fake.
-
 func TestCommitReportsCache_GetCachedAndNewReports(t *testing.T) {
 	lggr := logger.Test(t)
 
@@ -31,7 +29,7 @@ func TestCommitReportsCache_GetCachedAndNewReports(t *testing.T) {
 	// We capture the timestamp parameters to ensure they advance between calls.
 	var tsFinalizedCalls []time.Time
 
-	// First round expectations --------------------------------------
+	// First round expectations
 	mockReader.
 		EXPECT().
 		CommitReportsGTETimestamp(mock.Anything, mock.AnythingOfType("time.Time"), primitives.Finalized, 10).
@@ -49,7 +47,7 @@ func TestCommitReportsCache_GetCachedAndNewReports(t *testing.T) {
 		CommitReportsGTETimestamp(mock.Anything, mock.AnythingOfType("time.Time"), primitives.Unconfirmed, 10).
 		Return([]ccipocr3.CommitPluginReportWithMeta{r1, r2}, nil)
 
-	// Second round expectations -------------------------------------
+	// Second round expectations
 	// finalized query returns nothing new but we record the ts to ensure advancement
 	mockReader.
 		EXPECT().
