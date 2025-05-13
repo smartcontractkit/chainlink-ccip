@@ -150,29 +150,47 @@ func (c *CommitReportsCache) getCachedReports(minTimestamp time.Time) []ccipocr3
 func (c *CommitReportsCache) addReportsToCache(
 	reports []ccipocr3.CommitPluginReportWithMeta,
 	queryTimestamp time.Time) {
-	if len(reports) == 0 {
-		return
-	}
-
 	// Add reports to cache
-	var mostRecentTimestamp time.Time
+	var mostRecentCachedTimestamp time.Time
+	addedToCacheCount := 0
 	for _, report := range reports {
+		if report.Report.HasNoRoots() {
+			c.lggr.Debugw(
+				"Skipping report with no Merkle roots in addReportsToCache",
+				"timestamp", report.Timestamp,
+				"blockNum", report.BlockNum)
+			continue
+		}
 		key := generateKey(report)
 		c.reports.SetDefault(key, report)
+		addedToCacheCount++
 
-		// Keep track of the most recent report timestamp
-		if mostRecentTimestamp.Before(report.Timestamp) {
-			mostRecentTimestamp = report.Timestamp
+		// Keep track of the most recent report timestamp that was actually cached
+		if mostRecentCachedTimestamp.Before(report.Timestamp) {
+			mostRecentCachedTimestamp = report.Timestamp
 		}
 	}
 
-	// Update last query timestamp to the most recent report timestamp
-	// Only update if we found a newer timestamp
-	if !mostRecentTimestamp.IsZero() && mostRecentTimestamp.After(c.lastQueryTimestamp) {
-		c.lastQueryTimestamp = mostRecentTimestamp
+	if addedToCacheCount > 0 {
+		c.lggr.Debugw(
+			"Added reports to cache",
+			"count", addedToCacheCount,
+			"mostRecentCachedTimestamp", mostRecentCachedTimestamp)
+	}
+
+	// Update last query timestamp.
+	// If we cached any new reports with timestamps newer than the current lastQueryTimestamp, update to that.
+	// Otherwise, update to the queryTimestamp to ensure we advance the window even if reports had no roots or were older.
+	if !mostRecentCachedTimestamp.IsZero() && mostRecentCachedTimestamp.After(c.lastQueryTimestamp) {
+		c.lastQueryTimestamp = mostRecentCachedTimestamp
 	} else {
-		// Fallback: if no newer timestamp found, use the query timestamp
-		c.lastQueryTimestamp = queryTimestamp
+		// Fallback: if no newer timestamp found from cached reports, or no reports were cached in this batch,
+		// use the queryTimestamp to ensure the window progresses.
+		// This handles cases where newFinalizedReports were fetched but all were rootless or older than lastQueryTimestamp.
+		// Also, if reports (newFinalizedReports) itself was empty, lastQueryTimestamp is handled by the caller.
+		if len(reports) > 0 { // Only update if there were reports to process, even if none were cached.
+			c.lastQueryTimestamp = queryTimestamp
+		}
 	}
 }
 
@@ -185,8 +203,10 @@ func (c *CommitReportsCache) mergeCachedAndNewReports(
 	// Create a map to deduplicate reports
 	reportMap := make(map[string]ccipocr3.CommitPluginReportWithMeta)
 
-	// Add cached reports
+	// Add cached reports (already filtered for roots and >= minTimestamp from getCachedReports)
 	for _, report := range cachedReports {
+		// Double check minTimestamp, though getCachedReports should handle this.
+		// No need to check HasNoRoots, as they wouldn't be in cachedReports if they didn't have them.
 		if !report.Timestamp.Before(minTimestamp) {
 			key := generateKey(report)
 			reportMap[key] = report
@@ -194,9 +214,22 @@ func (c *CommitReportsCache) mergeCachedAndNewReports(
 	}
 
 	// Add new reports (will override cached ones if duplicates)
+	// Filter for roots here as newReports come directly from the reader.
 	for _, report := range newReports {
-		key := generateKey(report)
-		reportMap[key] = report
+		if report.Report.HasNoRoots() {
+			c.lggr.Debugw("Skipping new report with no Merkle roots in mergeCachedAndNewReports",
+				"timestamp", report.Timestamp, "blockNum", report.BlockNum)
+			continue
+		}
+		// Only add if newer than minTimestamp. Note: the primary time filtering happens
+		// via queryFrom and lastQueryTimestamp for fetching, and getCachedReports for initial cached set.
+		// This minTimestamp check here is mostly for reports in newReports that might be older
+		// than an explicit fetchFrom provided to GetCachedAndNewReports, though typically queryFrom
+		// would align or be newer than fetchFrom.
+		if !report.Timestamp.Before(minTimestamp) {
+			key := generateKey(report)
+			reportMap[key] = report
+		}
 	}
 
 	// Convert map to slice

@@ -21,39 +21,46 @@ const (
 	defaultReturnLimit = 10
 )
 
+// Helper to create a report with a single blessed root for brevity in tests
+func newReportWithRoot(ts time.Time, rootByte byte) ccipocr3.CommitPluginReportWithMeta {
+	return ccipocr3.CommitPluginReportWithMeta{
+		Timestamp: ts,
+		Report: ccipocr3.CommitPluginReport{
+			BlessedMerkleRoots: []ccipocr3.MerkleRootChain{
+				{ChainSel: 1, MerkleRoot: ccipocr3.Bytes32{rootByte}},
+			},
+		},
+	}
+}
+
+func newRootlessReport(ts time.Time) ccipocr3.CommitPluginReportWithMeta {
+	return ccipocr3.CommitPluginReportWithMeta{
+		Timestamp: ts,
+		Report:    ccipocr3.CommitPluginReport{ /* No roots */ },
+	}
+}
+
 func TestCommitReportsCache_GetCachedAndNewReports(t *testing.T) {
 	lggr := logger.Test(t)
 
 	now := time.Now().UTC()
 	fetchFrom := now.Add(-10 * time.Minute)
-	r1 := ccipocr3.CommitPluginReportWithMeta{
-		Timestamp: now.Add(-8 * time.Minute),
-		Report: ccipocr3.CommitPluginReport{
-			BlessedMerkleRoots: []ccipocr3.MerkleRootChain{
-				{ChainSel: 1, MerkleRoot: ccipocr3.Bytes32{0xa1}},
-			},
-		},
-	}
-	r2 := ccipocr3.CommitPluginReportWithMeta{
-		Timestamp: now.Add(-5 * time.Minute),
-		Report: ccipocr3.CommitPluginReport{
-			BlessedMerkleRoots: []ccipocr3.MerkleRootChain{
-				{ChainSel: 1, MerkleRoot: ccipocr3.Bytes32{0xa2}},
-			},
-		},
-	}
+
+	rWithRoots1 := newReportWithRoot(now.Add(-8*time.Minute), 0xa1)      // Older, with roots
+	rWithRoots2 := newReportWithRoot(now.Add(-5*time.Minute), 0xa2)      // Newer, with roots
+	rFinalizedRootless := newRootlessReport(now.Add(-7 * time.Minute))   // Newer than rWithRoots1, but rootless
+	rUnconfirmedRootless := newRootlessReport(now.Add(-4 * time.Minute)) // Newest overall, but rootless
 
 	mockReader := readerpkg_mock.NewMockCCIPReader(t)
 	cache := NewCommitReportsCache(lggr, 2*time.Hour, mockReader, defaultQueryLimit, defaultReturnLimit)
 
-	// We capture the timestamp parameters to ensure they advance between calls.
 	var tsFinalizedCalls []time.Time
 
-	// First round expectations
+	// --- First invocation ---
 	mockReader.
 		EXPECT().
 		CommitReportsGTETimestamp(
-			mock.Anything, mock.AnythingOfType("time.Time"), primitives.Finalized, defaultQueryLimit,
+			mock.Anything, fetchFrom, primitives.Finalized, defaultQueryLimit,
 		).
 		RunAndReturn(func(
 			_ context.Context,
@@ -61,56 +68,60 @@ func TestCommitReportsCache_GetCachedAndNewReports(t *testing.T) {
 			_ primitives.ConfidenceLevel,
 			_ int) ([]ccipocr3.CommitPluginReportWithMeta, error) {
 			tsFinalizedCalls = append(tsFinalizedCalls, ts)
-			return []ccipocr3.CommitPluginReportWithMeta{r1}, nil
+			// Return one with roots, one without. rWithRoots1 is older.
+			return []ccipocr3.CommitPluginReportWithMeta{rWithRoots1, rFinalizedRootless}, nil
 		}).Once()
 
 	mockReader.
 		EXPECT().
 		CommitReportsGTETimestamp(
-			mock.Anything, mock.AnythingOfType("time.Time"), primitives.Unconfirmed, defaultQueryLimit,
+			mock.Anything, fetchFrom, primitives.Unconfirmed, defaultQueryLimit,
 		).
-		Return([]ccipocr3.CommitPluginReportWithMeta{r1, r2}, nil).Once()
+		// rUnconfirmedRootless is newest overall but should be filtered.
+		Return([]ccipocr3.CommitPluginReportWithMeta{rWithRoots1, rWithRoots2, rUnconfirmedRootless}, nil).Once()
 
-	// First invocation
 	got, err := cache.GetCachedAndNewReports(context.Background(), fetchFrom)
 	assert.NoError(t, err)
+	// Expected: rWithRoots2, rWithRoots1 (sorted, rootless ones filtered)
 	assert.Len(t, got, 2)
+	assert.Equal(t, rWithRoots2.Report.BlessedMerkleRoots[0].MerkleRoot, got[0].Report.BlessedMerkleRoots[0].MerkleRoot)
+	assert.Equal(t, rWithRoots1.Report.BlessedMerkleRoots[0].MerkleRoot, got[1].Report.BlessedMerkleRoots[0].MerkleRoot)
 
-	// Second round expectations
-	// finalized query returns nothing new but we record the ts to ensure advancement
+	// lastQueryTimestamp should be rWithRoots1.Timestamp as rFinalizedRootless was skipped for caching
+	assert.Equal(t, rWithRoots1.Timestamp, cache.lastQueryTimestamp)
+
+	// --- Second invocation ---
+	// queryFrom should be rWithRoots1.Timestamp (previous lastQueryTimestamp)
 	mockReader.
 		EXPECT().
 		CommitReportsGTETimestamp(
-			mock.Anything, mock.AnythingOfType("time.Time"), primitives.Finalized, defaultQueryLimit,
+			mock.Anything, rWithRoots1.Timestamp, primitives.Finalized, defaultQueryLimit,
 		).
 		RunAndReturn(func(_ context.Context, ts time.Time, _ primitives.ConfidenceLevel, _ int) (
 			[]ccipocr3.CommitPluginReportWithMeta,
 			error) {
 			tsFinalizedCalls = append(tsFinalizedCalls, ts)
-			return nil, nil
+			return nil, nil // No new finalized reports with roots
 		}).Once()
 
 	mockReader.
 		EXPECT().
 		CommitReportsGTETimestamp(
-			mock.Anything, mock.AnythingOfType("time.Time"), primitives.Unconfirmed, defaultQueryLimit,
+			mock.Anything, rWithRoots1.Timestamp, primitives.Unconfirmed, defaultQueryLimit,
 		).
-		Return([]ccipocr3.CommitPluginReportWithMeta{r1, r2}, nil).Once()
+		Return([]ccipocr3.CommitPluginReportWithMeta{rWithRoots1, rWithRoots2, rUnconfirmedRootless}, nil).Once()
 
-	// Second invocation (no new finalized data)
 	got2, err := cache.GetCachedAndNewReports(context.Background(), fetchFrom)
 	assert.NoError(t, err)
+	// Expected: rWithRoots2, rWithRoots1 (rootless still filtered)
 	assert.Len(t, got2, 2)
+	assert.Equal(t, rWithRoots2.Report.BlessedMerkleRoots[0].MerkleRoot, got2[0].Report.BlessedMerkleRoots[0].MerkleRoot)
+	assert.Equal(t, rWithRoots1.Report.BlessedMerkleRoots[0].MerkleRoot, got2[1].Report.BlessedMerkleRoots[0].MerkleRoot)
 
-	// Validate timestamp advancement
+	// Validate timestamp advancement for CommitReportsGTETimestamp(Finalized) calls
 	assert.Len(t, tsFinalizedCalls, 2)
-	firstTs := tsFinalizedCalls[0]
-	secondTs := tsFinalizedCalls[1]
-	assert.Equal(t, fetchFrom, firstTs) // First call uses fetchFrom
-	// Second call's queryFrom should be the timestamp of the latest finalized report from the first call (r1)
-	// or fetchFrom if no finalized reports were returned in the first call. Here it's r1.
-	assert.Equal(t, r1.Timestamp, secondTs)
-	assert.True(t, secondTs.After(firstTs)) // Ensure time advanced
+	assert.Equal(t, fetchFrom, tsFinalizedCalls[0])             // First call uses fetchFrom
+	assert.Equal(t, rWithRoots1.Timestamp, tsFinalizedCalls[1]) // Second call uses previous lastQueryTimestamp
 	mockReader.AssertExpectations(t)
 }
 
@@ -122,59 +133,50 @@ func TestCommitReportsCache_LimitAndDeduplication(t *testing.T) {
 	now := time.Now().UTC()
 	initialFetchFrom := now.Add(-10 * time.Minute)
 
-	// Create 5 reports with unique timestamps (descending)
-	reports := make([]ccipocr3.CommitPluginReportWithMeta, 5)
+	// Create reports with unique timestamps (descending)
+	reportsWithRoots := make([]ccipocr3.CommitPluginReportWithMeta, 5)
 	for i := 0; i < 5; i++ {
-		// Add unique MerkleRoot to ensure generateKey creates unique keys
-		reports[i] = ccipocr3.CommitPluginReportWithMeta{
-			Timestamp: now.Add(-time.Duration(i) * time.Minute),
-			Report: ccipocr3.CommitPluginReport{
-				BlessedMerkleRoots: []ccipocr3.MerkleRootChain{
-					{ChainSel: 1, MerkleRoot: ccipocr3.Bytes32{byte(i + 1)}},
-				},
-			},
-		}
+		// reportsWithRoots[0] is newest
+		reportsWithRoots[i] = newReportWithRoot(now.Add(-time.Duration(i)*time.Minute), byte(i+1))
 	}
 
 	mockReader := readerpkg_mock.NewMockCCIPReader(t)
 	cache := NewCommitReportsCache(lggr, 1*time.Hour, mockReader, testQueryLimit, testReturnLimit)
 
-	// First call: finalized returns first 3 (reports[0], reports[1], reports[2]).
-	// queryLimit is 3 for reader calls.
+	// --- First call ---
+	// Finalized returns first 3 reports with roots.
 	// Early exit will occur because len(3) >= returnLimit(3), so unconfirmed is not called.
 	mockReader.
 		EXPECT().
 		CommitReportsGTETimestamp(
 			mock.Anything, initialFetchFrom, primitives.Finalized, testQueryLimit,
 		).
-		Return(reports[:3], nil).Once()
+		Return(reportsWithRoots[:3], nil).Once()
 
-	// returnLimit = 3 should truncate to newest 3
 	got, err := cache.GetCachedAndNewReports(context.Background(), initialFetchFrom)
 	assert.NoError(t, err)
 	assert.Len(t, got, testReturnLimit)
-	// Ensure dedup preserved order newest first (reports[0] is newest)
-	assert.Equal(t, reports[0].Timestamp, got[0].Timestamp)
-	assert.Equal(t, reports[1].Timestamp, got[1].Timestamp)
-	assert.Equal(t, reports[2].Timestamp, got[2].Timestamp)
+	assert.Equal(t, reportsWithRoots[0].Timestamp, got[0].Timestamp)
+	assert.Equal(t, reportsWithRoots[1].Timestamp, got[1].Timestamp)
+	assert.Equal(t, reportsWithRoots[2].Timestamp, got[2].Timestamp)
 
-	// Second call:
-	// lastQueryTimestamp should be reports[0].Timestamp (most recent from previous finalized set).
+	// --- Second call ---
+	// lastQueryTimestamp should be reportsWithRoots[0].Timestamp (most recent from previous finalized set).
 	// Finalized returns nothing.
 	// Early exit will occur again because cache still has 3 items and returnLimit is 3.
 	mockReader.
 		EXPECT().
 		CommitReportsGTETimestamp(
-			mock.Anything, reports[0].Timestamp, primitives.Finalized, testQueryLimit,
+			mock.Anything, reportsWithRoots[0].Timestamp, primitives.Finalized, testQueryLimit,
 		).
 		Return(nil, nil).Once()
 
 	got2, err := cache.GetCachedAndNewReports(context.Background(), initialFetchFrom)
 	assert.NoError(t, err)
 	assert.Len(t, got2, testReturnLimit)
-	assert.Equal(t, reports[0].Timestamp, got2[0].Timestamp)
-	assert.Equal(t, reports[1].Timestamp, got2[1].Timestamp)
-	assert.Equal(t, reports[2].Timestamp, got2[2].Timestamp)
+	assert.Equal(t, reportsWithRoots[0].Timestamp, got2[0].Timestamp)
+	assert.Equal(t, reportsWithRoots[1].Timestamp, got2[1].Timestamp)
+	assert.Equal(t, reportsWithRoots[2].Timestamp, got2[2].Timestamp)
 	mockReader.AssertExpectations(t)
 }
 
@@ -321,66 +323,23 @@ func TestCommitReportsCache_MergeSortLimit(t *testing.T) {
 	mockReader := readerpkg_mock.NewMockCCIPReader(t)
 	now := time.Now().UTC()
 
-	testQueryLimit := 3
-	testReturnLimit := 3
+	testQueryLimit := 5  // Allow fetching more to test merge logic properly
+	testReturnLimit := 3 // Final result should be 3
 
 	// Reports to be initially in cache (simulated by first fetch)
-	rOld1 := ccipocr3.CommitPluginReportWithMeta{
-		Timestamp: now.Add(-20 * time.Minute),
-		Report: ccipocr3.CommitPluginReport{
-			BlessedMerkleRoots: []ccipocr3.MerkleRootChain{
-				{ChainSel: 1, MerkleRoot: ccipocr3.Bytes32{0x01}},
-			},
-		},
-	}
-	rOld2 := ccipocr3.CommitPluginReportWithMeta{
-		Timestamp: now.Add(-10 * time.Minute),
-		Report: ccipocr3.CommitPluginReport{
-			BlessedMerkleRoots: []ccipocr3.MerkleRootChain{
-				{ChainSel: 1, MerkleRoot: ccipocr3.Bytes32{0x02}},
-			},
-		},
-	}
+	rOld1 := newReportWithRoot(now.Add(-20*time.Minute), 0x01)
+	rOld2 := newReportWithRoot(now.Add(-10*time.Minute), 0x02)
 
 	// Reports to be returned by the unconfirmed reader call
-	rNew1 := ccipocr3.CommitPluginReportWithMeta{ // Newest
-		Timestamp: now.Add(-5 * time.Minute),
-		Report: ccipocr3.CommitPluginReport{
-			BlessedMerkleRoots: []ccipocr3.MerkleRootChain{
-				{ChainSel: 1, MerkleRoot: ccipocr3.Bytes32{0x03}},
-			},
-		},
-	}
-	rNew2DupOld2 := ccipocr3.CommitPluginReportWithMeta{ // Duplicate of rOld2, same timestamp
-		Timestamp: now.Add(-10 * time.Minute), // Key will be same as rOld2
-		Report: ccipocr3.CommitPluginReport{
-			BlessedMerkleRoots: []ccipocr3.MerkleRootChain{
-				{ChainSel: 1, MerkleRoot: ccipocr3.Bytes32{0x02}},
-			},
-		},
-	}
-	rNew3 := ccipocr3.CommitPluginReportWithMeta{ // Older than rOld2/rNew2_DupOld2 but newer than rOld1
-		Timestamp: now.Add(-15 * time.Minute),
-		Report: ccipocr3.CommitPluginReport{
-			BlessedMerkleRoots: []ccipocr3.MerkleRootChain{
-				{ChainSel: 1, MerkleRoot: ccipocr3.Bytes32{0x04}},
-			},
-		},
-	}
-	rNew4 := ccipocr3.CommitPluginReportWithMeta{ // Oldest
-		Timestamp: now.Add(-25 * time.Minute),
-		Report: ccipocr3.CommitPluginReport{
-			BlessedMerkleRoots: []ccipocr3.MerkleRootChain{
-				{ChainSel: 1, MerkleRoot: ccipocr3.Bytes32{0x05}},
-			},
-		},
-	}
+	rNewWithRoots1 := newReportWithRoot(now.Add(-5*time.Minute), 0x03)         // Newest with roots
+	rNewRootless := newRootlessReport(now.Add(-2 * time.Minute))               // Absolute newest, but rootless
+	rNewWithRoots2DupOld2 := newReportWithRoot(now.Add(-10*time.Minute), 0x02) // Same as rOld2
+	rNewWithRoots3 := newReportWithRoot(now.Add(-15*time.Minute), 0x04)
 
 	c := NewCommitReportsCache(lggr, 1*time.Hour, mockReader, testQueryLimit, testReturnLimit)
 	initialFetchFrom := now.Add(-30 * time.Minute)
 
-	// First call: Populate cache with rOld1, rOld2 from finalized & unconfirmed
-	// queryLimit is testQueryLimit (3). Reader returns 2 reports, which is fine.
+	// --- First call: Populate cache with rOld1, rOld2 ---
 	mockReader.EXPECT().
 		CommitReportsGTETimestamp(
 			mock.Anything, initialFetchFrom, primitives.Finalized, testQueryLimit,
@@ -392,61 +351,55 @@ func TestCommitReportsCache_MergeSortLimit(t *testing.T) {
 		).
 		Return([]ccipocr3.CommitPluginReportWithMeta{rOld1, rOld2}, nil).Once()
 
-	// The result of this call will be limited by testReturnLimit (3). Here it returns 2.
 	_, err := c.GetCachedAndNewReports(context.Background(), initialFetchFrom)
 	assert.NoError(t, err)
-	// lastQueryTimestamp is now rOld2.Timestamp
+	// lastQueryTimestamp is now rOld2.Timestamp (newest from rOld1, rOld2)
 
-	// Second call: Test merge, sort, limit
-	// Cached: rOld1, rOld2 (rOld2 is newer). LastQueryTimestamp should be rOld2.Timestamp.
-	// Unconfirmed fetch will return: rNew1, rNew2_DupOld2, rNew3, rNew4
-
-	// Expect finalized to be called from rOld2.Timestamp, return nothing new for simplicity
+	// --- Second call: Test merge, sort, limit with rootless filtering ---
+	// Cached: rOld1, rOld2. LastQueryTimestamp should be rOld2.Timestamp.
 	mockReader.EXPECT().
 		CommitReportsGTETimestamp(
 			mock.Anything, rOld2.Timestamp, primitives.Finalized, testQueryLimit,
 		).
-		Return([]ccipocr3.CommitPluginReportWithMeta{}, nil).Once()
-	// Expect unconfirmed to be called from rOld2.Timestamp
+		Return([]ccipocr3.CommitPluginReportWithMeta{}, nil).Once() // No new finalized
+
+	newUnconfirmedReports := []ccipocr3.CommitPluginReportWithMeta{
+		rNewWithRoots1, rNewRootless, rNewWithRoots2DupOld2, rNewWithRoots3,
+	}
 	mockReader.EXPECT().
 		CommitReportsGTETimestamp(
 			mock.Anything, rOld2.Timestamp, primitives.Unconfirmed, testQueryLimit,
 		).
-		Return([]ccipocr3.CommitPluginReportWithMeta{rNew1, rNew2DupOld2, rNew3, rNew4}, nil).Once()
+		Return(newUnconfirmedReports, nil).Once()
 
-	// For this call, we are interested in reports >= initialFetchFrom. All our reports satisfy this.
 	finalReports, err := c.GetCachedAndNewReports(context.Background(), initialFetchFrom)
 	assert.NoError(t, err)
 
-	// Expected unique reports after merge and sort, before limit:
-	// rNew1 (ts: now-5m, key 0x03)
-	// rNew2_DupOld2 (ts: now-10m, key 0x02) - this overwrites rOld2 due to same key
-	// rNew3 (ts: now-15m, key 0x04)
-	// rOld1 (ts: now-20m, key 0x01)
-	// rNew4 (ts: now-25m, key 0x05) - this would be included if limit was higher and queryLimit was higher
+	// Expected unique reports *with roots* after merge and sort, before limit:
+	// rNewWithRoots1 (ts: now-5m)
+	// rNewWithRoots2DupOld2 (ts: now-10m) (effectively rOld2)
+	// rNewWithRoots3 (ts: now-15m)
+	// rOld1 (ts: now-20m)
+	// rNewRootless (ts: now-2m) is filtered out.
 
 	// After sorting (newest first) and limiting to testReturnLimit (3):
-	// 1. rNew1 (now-5m)
-	// 2. rNew2_DupOld2 (now-10m)
-	// 3. rNew3 (now-15m)
+	// 1. rNewWithRoots1
+	// 2. rNewWithRoots2DupOld2 (or rOld2)
+	// 3. rNewWithRoots3
 
 	assert.Len(t, finalReports, testReturnLimit)
 	assert.Equal(t,
-		rNew1.Report.BlessedMerkleRoots[0].MerkleRoot,
+		rNewWithRoots1.Report.BlessedMerkleRoots[0].MerkleRoot,
 		finalReports[0].Report.BlessedMerkleRoots[0].MerkleRoot,
 	)
 	assert.Equal(t,
-		rNew2DupOld2.Report.BlessedMerkleRoots[0].MerkleRoot,
+		rNewWithRoots2DupOld2.Report.BlessedMerkleRoots[0].MerkleRoot,
 		finalReports[1].Report.BlessedMerkleRoots[0].MerkleRoot,
 	)
 	assert.Equal(t,
-		rNew3.Report.BlessedMerkleRoots[0].MerkleRoot,
+		rNewWithRoots3.Report.BlessedMerkleRoots[0].MerkleRoot,
 		finalReports[2].Report.BlessedMerkleRoots[0].MerkleRoot,
 	)
-
-	// Ensure timestamps are in correct descending order
-	assert.True(t, finalReports[0].Timestamp.After(finalReports[1].Timestamp))
-	assert.True(t, finalReports[1].Timestamp.After(finalReports[2].Timestamp))
 
 	mockReader.AssertExpectations(t)
 }
@@ -457,93 +410,59 @@ func TestCommitReportsCache_EarlyExitOptimization(t *testing.T) {
 	fetchFrom := now.Add(-30 * time.Minute)
 
 	queryLimit := 5
-	returnLimit := 2 // We want to exit early if cache has 2 or more
+	returnLimit := 2 // We want to exit early if cache has 2 or more reports with roots
 
-	rCached1 := ccipocr3.CommitPluginReportWithMeta{
-		Timestamp: now.Add(-20 * time.Minute),
-		Report: ccipocr3.CommitPluginReport{
-			BlessedMerkleRoots: []ccipocr3.MerkleRootChain{
-				{ChainSel: 1, MerkleRoot: ccipocr3.Bytes32{0xc1}},
-			},
-		},
-	}
-	rFinalized1 := ccipocr3.CommitPluginReportWithMeta{
-		Timestamp: now.Add(-5 * time.Minute),
-		Report: ccipocr3.CommitPluginReport{
-			BlessedMerkleRoots: []ccipocr3.MerkleRootChain{
-				{ChainSel: 1, MerkleRoot: ccipocr3.Bytes32{0xf1}},
-			},
-		},
-	}
-	rFinalized2 := ccipocr3.CommitPluginReportWithMeta{
-		Timestamp: now.Add(-10 * time.Minute),
-		Report: ccipocr3.CommitPluginReport{
-			BlessedMerkleRoots: []ccipocr3.MerkleRootChain{
-				{ChainSel: 1, MerkleRoot: ccipocr3.Bytes32{0xf2}},
-			},
-		},
-	}
-	// This report would be fetched by unconfirmed if early exit didn't happen
-	// rUnconfirmedSkipped := ccipocr3.CommitPluginReportWithMeta{
-	// 	Timestamp: now.Add(-1 * time.Minute),
-	// 	Report: ccipocr3.CommitPluginReport{
-	// 		BlessedMerkleRoots: []ccipocr3.MerkleRootChain{
-	// 			{ChainSel: 1, MerkleRoot: ccipocr3.Bytes32{0x5A}},
-	// 		},
-	// 	},
-	// }
+	rCachedWithRoots1 := newReportWithRoot(now.Add(-20*time.Minute), 0xc1)
+	// rFinalizedRootless1 is newer but has no roots, should be processed by addReportsToCache but not cached
+	rFinalizedRootless1 := newRootlessReport(now.Add(-5 * time.Minute))
+	rFinalizedWithRoots2 := newReportWithRoot(now.Add(-10*time.Minute), 0xf2)
 
 	mockReader := readerpkg_mock.NewMockCCIPReader(t)
 	cache := NewCommitReportsCache(lggr, 1*time.Hour, mockReader, queryLimit, returnLimit)
 
-	// 1. Pre-populate cache with rCached1 (simulating it's already there from a previous run)
-	// For this, we make a setup call.
+	// --- 1. Pre-populate cache with rCachedWithRoots1 ---
 	mockReader.EXPECT().
 		CommitReportsGTETimestamp(
 			mock.Anything, fetchFrom, primitives.Finalized, queryLimit,
 		).
-		Return([]ccipocr3.CommitPluginReportWithMeta{rCached1}, nil).Once()
+		Return([]ccipocr3.CommitPluginReportWithMeta{rCachedWithRoots1}, nil).Once()
 	mockReader.EXPECT().
 		CommitReportsGTETimestamp(
 			mock.Anything, fetchFrom, primitives.Unconfirmed, queryLimit,
 		).
-		Return([]ccipocr3.CommitPluginReportWithMeta{rCached1}, nil).Once()
+		Return([]ccipocr3.CommitPluginReportWithMeta{rCachedWithRoots1}, nil).Once()
 	_, err := cache.GetCachedAndNewReports(context.Background(), fetchFrom)
 	assert.NoError(t, err)
-	// lastQueryTimestamp is now rCached1.Timestamp
+	// lastQueryTimestamp is now rCachedWithRoots1.Timestamp
+	assert.Equal(t, rCachedWithRoots1.Timestamp, cache.lastQueryTimestamp)
 
-	// 2. Test call that should trigger early exit
-	// Finalized reports fetch will bring in rFinalized1, rFinalized2
-	// Query from rCached1.Timestamp
+	// --- 2. Test call that should trigger early exit ---
+	// Finalized reports fetch will bring in rFinalizedRootless1 and rFinalizedWithRoots2.
+	// Query from rCachedWithRoots1.Timestamp.
 	mockReader.EXPECT().
 		CommitReportsGTETimestamp(
-			mock.Anything, rCached1.Timestamp, primitives.Finalized, queryLimit,
+			mock.Anything, rCachedWithRoots1.Timestamp, primitives.Finalized, queryLimit,
 		).
-		Return([]ccipocr3.CommitPluginReportWithMeta{rFinalized1, rFinalized2}, nil).Once()
+		Return([]ccipocr3.CommitPluginReportWithMeta{rFinalizedRootless1, rFinalizedWithRoots2}, nil).Once()
 
 	// IMPORTANT: Unconfirmed reader should NOT be called due to early exit.
-	// We don't set an EXPECT for it for this specific interaction path.
-	// If it were called, the mock would complain about an unexpected call.
 
 	reports, err := cache.GetCachedAndNewReports(context.Background(), fetchFrom)
 	assert.NoError(t, err)
 
-	// After new finalized reports are added, cache has: rCached1, rFinalized1, rFinalized2
-	// Sorted by time (newest first): rFinalized1, rFinalized2, rCached1
-	// Since len (3) >= returnLimit (2), we should get the newest 2.
+	// After new finalized reports are processed:
+	// - rFinalizedRootless1 is skipped by addReportsToCache.
+	// - rFinalizedWithRoots2 is added to cache.
+	// Cache now effectively contains: {rCachedWithRoots1, rFinalizedWithRoots2}
+	// Sorted by time (newest first for early exit check): {rFinalizedWithRoots2, rCachedWithRoots1}
+	// Since len (2) >= returnLimit (2), we should get these newest 2 with roots.
+
 	assert.Len(t, reports, returnLimit)
-	assert.Equal(t, rFinalized1, reports[0]) // Newest
-	assert.Equal(t, rFinalized2, reports[1]) // Second newest
+	assert.Equal(t, rFinalizedWithRoots2, reports[0]) // Newest with roots
+	assert.Equal(t, rCachedWithRoots1, reports[1])    // Second newest with roots
 
-	// Verify that unconfirmed was not called for the second GetCachedAndNewReports interaction.
-	// AssertExpectations will check if all *defined* expectations were met.
-	// The absence of an expectation for unconfirmed for the second call is key.
+	// lastQueryTimestamp should update to rFinalizedWithRoots2.Timestamp, as rFinalizedRootless1 was skipped
+	assert.Equal(t, rFinalizedWithRoots2.Timestamp, cache.lastQueryTimestamp)
+
 	mockReader.AssertExpectations(t)
-
-	// As an extra check, if we somehow defined an unconfirmed call that should not happen:
-	// mockReader.EXPECT().
-	// 	CommitReportsGTETimestamp(mock.Anything, mock.Anything, primitives.Unconfirmed, mock.Anything).
-	// 	Return([]ccipocr3.CommitPluginReportWithMeta{rUnconfirmedSkipped}, nil).Times(0)
-	// This .Times(0) would also work but not setting it is cleaner if that's the only
-	// interaction we want to avoid for a path.
 }
