@@ -173,14 +173,22 @@ func sendTransactionWithLookupTables(ctx context.Context, rpcClient *rpc.Client,
 		return nil, err
 	}
 
-	txsig, err := rpcClient.SendTransactionWithOpts(ctx, tx, rpc.TransactionOpts{SkipPreflight: skipPreflight, PreflightCommitment: rpc.CommitmentProcessed})
-	if err != nil {
-		fmt.Println(tx) // debugging if tx errors
-		return nil, err
+	count := 0
+	var txsig solana.Signature
+	for count < 500 {
+		count++
+		txsig, err = rpcClient.SendTransactionWithOpts(ctx, tx, rpc.TransactionOpts{SkipPreflight: skipPreflight, PreflightCommitment: commitment})
+		if err != nil {
+			fmt.Println("Error sending transaction:", err)
+			time.Sleep(50 * time.Millisecond)
+			continue
+		}
+		// no error = success
+		break
 	}
 
 	var txStatus rpc.ConfirmationStatusType
-	count := 0
+	count = 0
 	for txStatus != rpc.ConfirmationStatusConfirmed && txStatus != rpc.ConfirmationStatusFinalized {
 		if count > 1200 { // try up to 60 seconds
 			return nil, fmt.Errorf("unable to find transaction within timeout (sig: %v)", txsig)
