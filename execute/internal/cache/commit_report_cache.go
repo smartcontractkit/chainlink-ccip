@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"sync"
 	"time"
 
+	"github.com/patrickmn/go-cache"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
@@ -17,16 +19,18 @@ import (
 // and only fetching new reports since the last successful query.
 type CommitReportsCache struct {
 	lggr               logger.Logger
-	reportsMu          sync.RWMutex
-	reports            map[string]ccipocr3.CommitPluginReportWithMeta // key is source_chain + merkle_root
-	lastQueryTimestamp time.Time                                      // timestamp of the most recent query
+	reports            *cache.Cache // key string -> CommitPluginReportWithMeta
+	lastQueryTimestamp time.Time    // timestamp of the most recent query
 }
 
-// NewCommitReportsCache creates a new commit reports cache
-func NewCommitReportsCache(lggr logger.Logger) *CommitReportsCache {
+// NewCommitReportsCache creates a new commit reports cache.
+// Cached items live for messageVisibilityInterval + EvictionGracePeriod, mirroring
+// the lifetime used in commitRootsCache for executed roots.
+func NewCommitReportsCache(lggr logger.Logger, messageVisibilityInterval time.Duration) *CommitReportsCache {
+	ttl := messageVisibilityInterval + EvictionGracePeriod
 	return &CommitReportsCache{
 		lggr:    lggr,
-		reports: make(map[string]ccipocr3.CommitPluginReportWithMeta),
+		reports: cache.New(ttl, CleanupInterval),
 	}
 }
 
@@ -59,7 +63,7 @@ func (c *CommitReportsCache) GetCachedAndNewReports(
 
 	// Determine if we need to fetch new reports
 	var queryFrom time.Time
-	c.reportsMu.RLock()
+	// No lock required for reports (go-cache is thread-safe), but we still protect lastQueryTimestamp.
 	if c.lastQueryTimestamp.IsZero() {
 		// First query, use the original fetchFrom
 		queryFrom = fetchFrom
@@ -68,44 +72,47 @@ func (c *CommitReportsCache) GetCachedAndNewReports(
 		// This is the key optimization: we only query for new reports since our last query
 		queryFrom = c.lastQueryTimestamp
 	}
-	c.reportsMu.RUnlock()
 
-	// Fetch new reports since the last query
-	c.lggr.Debugw("Fetching new commit reports",
-		"originalFetchFrom", fetchFrom,
-		"optimizedQueryFrom", queryFrom,
-		"cachedReportsCount", len(cachedReports))
-
-	newReports, err := ccipReader.CommitReportsGTETimestamp(ctx, queryFrom, limit)
+	// Fetch finalized reports since last query and update the cache with them.
+	newFinalizedReports, err := ccipReader.CommitReportsGTETimestamp(ctx, queryFrom, primitives.Finalized, limit)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch commit reports: %w", err)
+		return nil, fmt.Errorf("failed to fetch finalized commit reports: %w", err)
+	}
+	c.addReportsToCache(newFinalizedReports, queryFrom)
+
+	// Even if there were no new finalized reports, we want to avoid repeatedly querying the
+	// same range. Advance the lastQueryTimestamp optimistically to queryFrom so that on the
+	// next invocation we start from this point onward.
+	if len(newFinalizedReports) == 0 {
+		c.lastQueryTimestamp = queryFrom
+	}
+
+	// 2. Fetch unconfirmed (finalized + unfinalized) reports for returning to the caller.
+	newUnconfirmedReports, err := ccipReader.CommitReportsGTETimestamp(ctx, queryFrom, primitives.Unconfirmed, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch unconfirmed commit reports: %w", err)
 	}
 
 	c.lggr.Debugw("Fetched new commit reports",
-		"count", len(newReports),
+		"finalized", len(newFinalizedReports),
+		"unconfirmed", len(newUnconfirmedReports),
 		"queryFrom", queryFrom)
 
-	// Update the cache with new reports
-	c.addReportsToCache(newReports, queryFrom)
-
-	// Merge cached and new reports, ensuring we don't exceed the limit
-	allReports := c.mergeCachedAndNewReports(cachedReports, newReports, fetchFrom, limit)
+	// Merge cached finalized reports with fresh unconfirmed ones (which include finalized+unfinalized).
+	allReports := c.mergeCachedAndNewReports(cachedReports, newUnconfirmedReports, fetchFrom, limit)
 
 	return allReports, nil
 }
 
 // getCachedReports returns cached reports newer than or equal to the given timestamp
 func (c *CommitReportsCache) getCachedReports(minTimestamp time.Time) []ccipocr3.CommitPluginReportWithMeta {
-	c.reportsMu.RLock()
-	defer c.reportsMu.RUnlock()
-
-	reports := make([]ccipocr3.CommitPluginReportWithMeta, 0, len(c.reports))
-	for _, report := range c.reports {
-		if report.Timestamp.Equal(minTimestamp) || report.Timestamp.After(minTimestamp) {
-			reports = append(reports, report)
+	var reports []ccipocr3.CommitPluginReportWithMeta
+	for _, item := range c.reports.Items() {
+		rpt := item.Object.(ccipocr3.CommitPluginReportWithMeta)
+		if rpt.Timestamp.Equal(minTimestamp) || rpt.Timestamp.After(minTimestamp) {
+			reports = append(reports, rpt)
 		}
 	}
-
 	return reports
 }
 
@@ -117,14 +124,11 @@ func (c *CommitReportsCache) addReportsToCache(
 		return
 	}
 
-	c.reportsMu.Lock()
-	defer c.reportsMu.Unlock()
-
 	// Add reports to cache
 	var mostRecentTimestamp time.Time
 	for _, report := range reports {
 		key := generateKey(report)
-		c.reports[key] = report
+		c.reports.SetDefault(key, report)
 
 		// Keep track of the most recent report timestamp
 		if mostRecentTimestamp.Before(report.Timestamp) {
@@ -183,22 +187,4 @@ func (c *CommitReportsCache) mergeCachedAndNewReports(
 	}
 
 	return allReports
-}
-
-// RemoveReport removes a report from the cache
-func (c *CommitReportsCache) RemoveReport(report ccipocr3.CommitPluginReportWithMeta) {
-	c.reportsMu.Lock()
-	defer c.reportsMu.Unlock()
-
-	key := generateKey(report)
-	delete(c.reports, key)
-}
-
-// Clear empties the cache
-func (c *CommitReportsCache) Clear() {
-	c.reportsMu.Lock()
-	defer c.reportsMu.Unlock()
-
-	c.reports = make(map[string]ccipocr3.CommitPluginReportWithMeta)
-	c.lastQueryTimestamp = time.Time{}
 }
