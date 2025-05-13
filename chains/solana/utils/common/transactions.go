@@ -183,6 +183,8 @@ func sendTransactionWithLookupTables(ctx context.Context, rpcClient *rpc.Client,
 			time.Sleep(50 * time.Millisecond)
 			continue
 		}
+		// no error = success
+		break
 	}
 
 	var txStatus rpc.ConfirmationStatusType
