@@ -18,9 +18,12 @@ import (
 // CommitReportsCache optimizes calls to CommitReportsGTETimestamp by caching reports
 // and only fetching new reports since the last successful query.
 type CommitReportsCache struct {
-	lggr               logger.Logger
-	reports            *cache.Cache // key string -> CommitPluginReportWithMeta
-	lastQueryTimestamp time.Time    // timestamp of the most recent query
+	lggr    logger.Logger
+	reports *cache.Cache // key string -> CommitPluginReportWithMeta
+	// lastQueryTimestamp is the starting point for the next finalized reports query to the CCIP reader.
+	// It is updated to the timestamp of the newest cached finalized report (with roots) or the reader query time,
+	// ensuring the query window always moves forward to optimize fetching and avoid redundant calls.
+	lastQueryTimestamp time.Time
 	ccipReader         readerpkg.CCIPReader
 	queryLimit         int
 	returnLimit        int
@@ -46,24 +49,40 @@ func NewCommitReportsCache(
 	}
 }
 
-// generateKey creates a unique key for a commit report
-func generateKey(report ccipocr3.CommitPluginReportWithMeta) string {
+// generateKey creates a unique key for a commit report.
+// It expects reports to have Merkle roots, as rootless reports should be filtered out by callers.
+// If a report without roots is passed (which indicates a logic error in filtering), it returns an error.
+func generateKey(report ccipocr3.CommitPluginReportWithMeta) (string, error) {
 	// We'll create a unique key for each report by combining relevant fields
 	// For each blessed merkle root
 	for _, mrc := range report.Report.BlessedMerkleRoots {
-		return fmt.Sprintf("%s_%s", mrc.ChainSel.String(), mrc.MerkleRoot.String())
+		return fmt.Sprintf("%d_%x", mrc.ChainSel, mrc.MerkleRoot), nil
 	}
 
-	// If no blessed roots (unlikely but possible), check unblessed roots
+	// If no blessed roots (solana or other non-rmn enabled chains), check unblessed roots
 	for _, mrc := range report.Report.UnblessedMerkleRoots {
-		return fmt.Sprintf("%s_%s", mrc.ChainSel.String(), mrc.MerkleRoot.String())
+		return fmt.Sprintf("%d_%x", mrc.ChainSel, mrc.MerkleRoot), nil
 	}
 
-	// Fallback if no merkle roots (should never happen)
-	return fmt.Sprintf("%d_%d", report.Timestamp.Unix(), report.BlockNum)
+	// Fallback: This should ideally not be reached if callers correctly filter reports using HasNoRoots().
+	// If reached, it indicates a logic error where a rootless report was passed for key generation.
+	return "", fmt.Errorf(
+		"generateKey: report at timestamp %d, block %d has no roots but was not filtered before key generation",
+		report.Timestamp.Unix(), report.BlockNum)
 }
 
-// GetCachedAndNewReports combines cached reports with newly fetched ones
+// GetCachedAndNewReports fetches and combines cached and new commit reports.
+// It aims to return up to `c.returnLimit` of the newest reports >= `fetchFrom`.
+// Key steps:
+//  1. Determine `queryFrom` timestamp: Uses `fetchFrom` for the first call, or `c.lastQueryTimestamp`
+//     for subsequent calls to fetch only newer reports.
+//  2. Fetch and cache finalized reports: Retrieves finalized reports since `queryFrom`,
+//     adds them to the cache, and updates `c.lastQueryTimestamp`.
+//  3. Early exit: If cached reports (including newly finalized ones) are sufficient to meet
+//     `c.returnLimit`, returns them directly, sorted by newest first.
+//  4. Fetch unconfirmed reports: If early exit isn't taken, fetches unconfirmed reports since `queryFrom`.
+//  5. Merge, sort, and limit: Combines initial cached reports (from before finalized fetch) with
+//     new unconfirmed reports, de-duplicates, filters by `fetchFrom`, sorts by newest, and limits to `c.returnLimit`.
 func (c *CommitReportsCache) GetCachedAndNewReports(
 	ctx context.Context,
 	fetchFrom time.Time,
@@ -91,12 +110,17 @@ func (c *CommitReportsCache) GetCachedAndNewReports(
 	}
 	c.addReportsToCache(newFinalizedReports, queryFrom)
 
-	// Even if there were no new finalized reports, we want to avoid repeatedly querying the
-	// same range. Advance the lastQueryTimestamp optimistically to queryFrom so that on the
-	// next invocation we start from this point onward.
+	// If the reader returned no new finalized reports for the query window [queryFrom, limit):
+	// - If queryFrom itself was more recent than c.lastQueryTimestamp, then c.lastQueryTimestamp
+	//   should advance to queryFrom to avoid re-querying an empty range from an older LQT.
+	// - If queryFrom was not more recent (i.e., c.lastQueryTimestamp was already >= queryFrom),
+	//   c.lastQueryTimestamp should not change (it shouldn't regress).
 	if len(newFinalizedReports) == 0 {
-		c.lastQueryTimestamp = queryFrom
+		if queryFrom.After(c.lastQueryTimestamp) {
+			c.lastQueryTimestamp = queryFrom
+		}
 	}
+	// If newFinalizedReports was not empty, addReportsToCache has already handled updating c.lastQueryTimestamp.
 
 	// Optimization: Check if the cache (after adding finalized reports) now has enough reports.
 	currentAllCachedReports := c.getCachedReports(fetchFrom) // Get all cached reports >= fetchFrom
@@ -161,7 +185,14 @@ func (c *CommitReportsCache) addReportsToCache(
 				"blockNum", report.BlockNum)
 			continue
 		}
-		key := generateKey(report)
+		key, err := generateKey(report)
+		if err != nil {
+			c.lggr.Errorw("Failed to generate key for report in addReportsToCache",
+				"error", err,
+				"timestamp", report.Timestamp,
+				"blockNum", report.BlockNum)
+			continue // Skip this report
+		}
 		c.reports.SetDefault(key, report)
 		addedToCacheCount++
 
@@ -183,15 +214,34 @@ func (c *CommitReportsCache) addReportsToCache(
 	// Otherwise, update to the queryTimestamp to ensure we advance the window even if reports had no roots or were older.
 	if !mostRecentCachedTimestamp.IsZero() && mostRecentCachedTimestamp.After(c.lastQueryTimestamp) {
 		c.lastQueryTimestamp = mostRecentCachedTimestamp
-	} else {
-		// Fallback: if no newer timestamp found from cached reports, or no reports were cached in this batch,
-		// use the queryTimestamp to ensure the window progresses.
-		// This handles cases where newFinalizedReports were fetched but all were rootless or older than lastQueryTimestamp.
-		// Also, if reports (newFinalizedReports) itself was empty, lastQueryTimestamp is handled by the caller.
-		if len(reports) > 0 { // Only update if there were reports to process, even if none were cached.
+	} else if len(reports) > 0 {
+		// Only proceed if there were reports in this batch
+		// This block handles cases where:
+		// - mostRecentCachedTimestamp was zero (no rooted reports cached from this batch)
+		// - OR mostRecentCachedTimestamp was not after c.lastQueryTimestamp (cached reports were not newer)
+		// We need to ensure LQT advances if possible, especially past a batch of rootless reports.
+		maxTimestampInBatch := time.Time{} // Zero time
+		for _, r := range reports {
+			if r.Timestamp.After(maxTimestampInBatch) {
+				maxTimestampInBatch = r.Timestamp
+			}
+		}
+
+		// If the latest timestamp from this batch is newer than current LQT, advance LQT.
+		// This handles advancing LQT past a batch of (potentially all) rootless reports.
+		if !maxTimestampInBatch.IsZero() && maxTimestampInBatch.After(c.lastQueryTimestamp) {
+			c.lastQueryTimestamp = maxTimestampInBatch
+		} else if queryTimestamp.After(c.lastQueryTimestamp) {
+			// Fallback: If batch didn't provide a newer timestamp (e.g., all reports in batch were older than or same as LQT),
+			// but the query itself started from a more recent point than LQT (e.g. initial fetchFrom was newer).
 			c.lastQueryTimestamp = queryTimestamp
 		}
+		// If none of these conditions are met, LQT remains unchanged by this function.
+		// This is appropriate if the current batch of reports and the queryTimestamp were all
+		// not newer than the existing c.lastQueryTimestamp.
 	}
+	// If len(reports) == 0 (i.e., newFinalizedReports was empty), LQT is not changed by this function.
+	// That case is handled by the caller (GetCachedAndNewReports).
 }
 
 // mergeCachedAndNewReports combines cached and new reports, removing duplicates
@@ -208,7 +258,14 @@ func (c *CommitReportsCache) mergeCachedAndNewReports(
 		// Double check minTimestamp, though getCachedReports should handle this.
 		// No need to check HasNoRoots, as they wouldn't be in cachedReports if they didn't have them.
 		if !report.Timestamp.Before(minTimestamp) {
-			key := generateKey(report)
+			key, err := generateKey(report)
+			if err != nil {
+				c.lggr.Errorw("Failed to generate key for cachedReport in mergeCachedAndNewReports",
+					"error", err,
+					"timestamp", report.Timestamp,
+					"blockNum", report.BlockNum)
+				continue // Skip this report
+			}
 			reportMap[key] = report
 		}
 	}
@@ -227,7 +284,14 @@ func (c *CommitReportsCache) mergeCachedAndNewReports(
 		// than an explicit fetchFrom provided to GetCachedAndNewReports, though typically queryFrom
 		// would align or be newer than fetchFrom.
 		if !report.Timestamp.Before(minTimestamp) {
-			key := generateKey(report)
+			key, err := generateKey(report)
+			if err != nil {
+				c.lggr.Errorw("Failed to generate key for newReport in mergeCachedAndNewReports",
+					"error", err,
+					"timestamp", report.Timestamp,
+					"blockNum", report.BlockNum)
+				continue // Skip this report
+			}
 			reportMap[key] = report
 		}
 	}
