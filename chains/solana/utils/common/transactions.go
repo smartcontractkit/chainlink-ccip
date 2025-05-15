@@ -159,9 +159,20 @@ type TransactionConfigs struct {
 
 func sendTransactionWithLookupTables(ctx context.Context, rpcClient *rpc.Client, instructions []solana.Instruction,
 	signerAndPayer solana.PrivateKey, commitment rpc.CommitmentType, transactionConfigs TransactionConfigs, lookupTables map[solana.PublicKey]solana.PublicKeySlice, opts ...TxModifier) (*rpc.GetTransactionResult, error) {
-	hashRes, err := rpcClient.GetLatestBlockhash(ctx, rpc.CommitmentFinalized)
-	if err != nil {
-		return nil, err
+	var errBlockHash error
+	var hashRes *rpc.GetLatestBlockhashResult
+	for i := 0; i < transactionConfigs.Retries; i++ {
+		hashRes, errBlockHash = rpcClient.GetLatestBlockhash(ctx, rpc.CommitmentConfirmed)
+		if errBlockHash != nil {
+			fmt.Println("GetLatestBlockhash error:", errBlockHash)
+			time.Sleep(50 * time.Millisecond)
+			continue
+		}
+		break
+	}
+	if errBlockHash != nil {
+		fmt.Println("GetLatestBlockhash error after retries:", errBlockHash)
+		return nil, errBlockHash
 	}
 
 	tx, err := solana.NewTransaction(
@@ -195,10 +206,8 @@ func sendTransactionWithLookupTables(ctx context.Context, rpcClient *rpc.Client,
 		return nil, err
 	}
 
-	retryCount := 0
 	var txsig solana.Signature
-	for retryCount < transactionConfigs.Retries {
-		retryCount++
+	for i := 0; i < transactionConfigs.Retries; i++ {
 		txsig, err = rpcClient.SendTransactionWithOpts(ctx, tx, rpc.TransactionOpts{SkipPreflight: transactionConfigs.SkipPreflight, PreflightCommitment: commitment})
 		if err != nil {
 			fmt.Println("Error sending transaction:", err)
