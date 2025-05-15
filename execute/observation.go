@@ -167,7 +167,16 @@ func (p *Plugin) getCommitReportsObservation(
 	lggr logger.Logger,
 	observation exectypes.Observation,
 ) (exectypes.Observation, error) {
+	// Refresh the commit report cache first
+	if err := p.commitReportCache.RefreshCache(ctx); err != nil {
+		// Log error but proceed. If RefreshCache fails, GetReportsToQueryFromTimestamp
+		// will likely use a less optimal (wider) window based on its internal state or defaults,
+		// which is safer than halting observation entirely.
+		lggr.Errorw("failed to refresh commit report cache, proceeding with potentially wider query window", "err", err)
+	}
+
 	// Get the optimized timestamp using the cache
+	// TODO: update with p.commitReportCache.GetReportsToQueryFromTimestamp()
 	fetchFrom := p.commitRootsCache.GetTimestampToQueryFrom()
 
 	lggr.Infow("Querying commit reports", "fetchFrom", fetchFrom)
