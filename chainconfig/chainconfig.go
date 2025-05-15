@@ -46,6 +46,16 @@ type ChainConfig struct {
 	// on this chain. If true, we will only report prices based on the heartbeat (configured
 	// in the commit plugin offchain config).
 	ChainFeeDeviationDisabled bool `json:"chainFeeDeviationDisabled"`
+
+	// ExecNoDeviationThresholdUSDWei is the lower bound *no* deviation threshold for exec gas.
+	// If the exec gas price is less than this value, we should never trigger a deviation since the
+	// value is so small any deviation is negligible. A value of 5e9 would correspond to 0.000000005 USD.
+	ExecNoDeviationThresholdUSDWei cciptypes.BigInt `json:"execNoDeviationThresholdUSDWei"`
+
+	// DataAvNoDeviationThresholdUSDWei is the lower bound *no* deviation threshold for DA gas.
+	// If the DA gas price is less than this value, we should never trigger a deviation since the
+	// value is so small any deviation is negligible. A value of 5e9 would correspond to 0.000000005 USD.
+	DataAvNoDeviationThresholdUSDWei cciptypes.BigInt `json:"dataAvNoDeviationThresholdUSDWei"`
 }
 
 func (cc ChainConfig) Validate() error {
@@ -63,6 +73,22 @@ func (cc ChainConfig) Validate() error {
 
 	if cc.DAGasPriceDeviationPPB.Int.Cmp(big.NewInt(0)) <= 0 {
 		return errors.New("DAGasPriceDeviationPPB not set or negative")
+	}
+
+	if cc.ExecNoDeviationThresholdUSDWei.Int == nil {
+		return errors.New("ExecNoDeviationThresholdUSDWei not set. Default value is 10e9")
+	}
+
+	if cc.ExecNoDeviationThresholdUSDWei.Int.Cmp(big.NewInt(0)) < 0 {
+		return errors.New("ExecNoDeviationThresholdUSDWei not set or negative. Default value is 10e9")
+	}
+
+	if cc.DataAvNoDeviationThresholdUSDWei.Int == nil {
+		return errors.New("DataAvNoDeviationThresholdUSDWei not set. Default value is 20e9")
+	}
+
+	if cc.DataAvNoDeviationThresholdUSDWei.Int.Cmp(big.NewInt(0)) < 0 {
+		return errors.New("DataAvNoDeviationThresholdUSDWei not set or negative. Default value is 20e9")
 	}
 
 	// No validation for OptimisticConfirmations as it is deprecated

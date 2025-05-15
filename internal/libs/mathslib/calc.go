@@ -2,6 +2,7 @@ package mathslib
 
 import (
 	"fmt"
+	"math"
 	"math/big"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
@@ -77,4 +78,44 @@ func CalculateUsdPerUnitGas(
 		return nil, fmt.Errorf("unsupported family %s", family)
 	}
 
+}
+
+// DeviatesOnCurve calculates a deviation threshold on the fly using xNew. For now it's only used for gas price
+// deviation calculation. It's important to make sure the order of xNew and xOld is correct when passed into this
+// function to get an accurate deviation threshold. This is used instead of Deviates() to fit gas price updates
+// into a curve that is more sensitive to gas price changes at lower gas prices and less sensitive at higher gas prices.
+// See this article on power law curves: https://en.wikipedia.org/wiki/Power_law
+func DeviatesOnCurve(xNew, xOld, noDeviationLowerBound *big.Int) bool {
+	// If xNew < noDeviationLowerBound, Deviates should never be true
+	if xNew.Cmp(noDeviationLowerBound) < 0 {
+		return false
+	}
+
+	// We use xNew to generate the threshold so that when going from cheap --> expensive, xNew generates a smaller
+	// deviation threshold so we are more likely to update the gas price on chain. When going from expensive --> cheap,
+	// xNew generates a larger deviation threshold since it's not as urgent to update the gas price on chain.
+	xNewFloat := new(big.Float).SetInt(xNew)
+	curveThresholdPPB := calculateCurveThresholdPPB(xNewFloat)
+	return Deviates(xNew, xOld, curveThresholdPPB)
+}
+
+// calculateCurveThresholdPPB calculates the deviation threshold percentage with x using the formula:
+// y = (10e11) / (x^0.665). This sliding scale curve was created by collecting several thousands of historical
+// PriceRegistry gas price update samples from chains with volatile gas prices like Zircuit and Mode and then using that
+// historical data to define thresholds of gas deviations that were acceptable given their USD value. The gas prices
+// (X coordinates) and these new thresholds (Y coordinates) were used to fit this sliding scale curve that returns large
+// thresholds at low gas prices and smaller thresholds at higher gas prices. Constructing the curve in USD terms allows
+// us to more easily reason about these thresholds and also better translates to non-evm chains. For example, when the
+// per unit gas price is 0.000006 USD, (6e12 USDgwei), the curve will output a threshold of around 3,000%. However, when
+// the per unit gas price is 0.005 USD (5e15 USDgwei), the curve will output a threshold of only ~30%.
+func calculateCurveThresholdPPB(x *big.Float) int64 {
+	const constantFactor = 10e11
+	const exponent = 0.665
+	xFloat64, _ := x.Float64()
+	xPower := math.Pow(xFloat64, exponent)
+	threshold := constantFactor / xPower
+
+	// Convert curve output percentage to PPB
+	thresholdPPB := int64(threshold * 1e7)
+	return thresholdPPB
 }
