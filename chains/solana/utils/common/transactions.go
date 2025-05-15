@@ -202,17 +202,23 @@ func sendTransactionWithLookupTables(ctx context.Context, rpcClient *rpc.Client,
 		txsig, err = rpcClient.SendTransactionWithOpts(ctx, tx, rpc.TransactionOpts{SkipPreflight: transactionConfigs.SkipPreflight, PreflightCommitment: commitment})
 		if err != nil {
 			fmt.Println("Error sending transaction:", err)
-			time.Sleep(50 * time.Millisecond)
+			time.Sleep(100 * time.Millisecond)
 			continue
 		}
 		// no error = success
 		break
 	}
 
+	// If tx failed with rpc error, we should not retry as confirmation will never happen
+	if err != nil {
+		fmt.Println("Error sending transaction after retries:", err)
+		return nil, err
+	}
+
 	var txStatus rpc.ConfirmationStatusType
 	count := 0
 	for txStatus != rpc.ConfirmationStatusConfirmed && txStatus != rpc.ConfirmationStatusFinalized {
-		if count > 1200 { // try up to 60 seconds
+		if count > 500 {
 			return nil, fmt.Errorf("unable to find transaction within timeout (sig: %v)", txsig)
 		}
 		count++
@@ -229,10 +235,19 @@ func sendTransactionWithLookupTables(ctx context.Context, rpcClient *rpc.Client,
 	}
 
 	v := uint64(0)
-	return rpcClient.GetTransaction(ctx, txsig, &rpc.GetTransactionOpts{
-		Commitment:                     commitment,
-		MaxSupportedTransactionVersion: &v,
-	})
+	var errGetTx error
+	var transactionRes *rpc.GetTransactionResult
+	for i := 0; i < transactionConfigs.Retries; i++ {
+		transactionRes, errGetTx = rpcClient.GetTransaction(ctx, txsig, &rpc.GetTransactionOpts{
+			Commitment:                     commitment,
+			MaxSupportedTransactionVersion: &v,
+		})
+		if errGetTx == nil {
+			time.Sleep(100 * time.Millisecond)
+			break
+		}
+	}
+	return transactionRes, errGetTx
 }
 
 // shared function for transaction simulation
