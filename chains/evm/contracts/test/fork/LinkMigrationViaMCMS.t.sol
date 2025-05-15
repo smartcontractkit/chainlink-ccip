@@ -35,6 +35,14 @@ interface ILegacyPool {
     function isOffRamp(address offRamp) external view returns (bool);
 }
 
+interface Burnable {
+    function burn(uint256 amount) external;
+}
+
+interface Mintable {
+    function mint(address to, uint256 amount) external;
+}
+
 struct StaticConfig {
     address linkToken; // ────────╮ Link token address
     uint64 chainSelector; // ─────╯ Source chainSelector
@@ -193,6 +201,20 @@ contract LinkMigrationViaMCMSTest is Test {
         for (uint256 i = 0; i < dests.length; ++i) {
             _executeProposalOnTimeLock(dests[i]);
             _checkDestSetup(i);
+        }
+    }
+
+    function testBurningAndMinting() public {
+        for (uint256 i = 0; i < dests.length; ++i) {
+            ChainConfig memory dest = dests[i];
+            vm.selectFork(dest.forkId);
+            TokenAdminRegistry.TokenConfig memory cfg = TokenAdminRegistry(dest.tokenAdminRegistry).getTokenConfig(dest.linkToken);
+            vm.startPrank(cfg.tokenPool);
+            Mintable(dest.linkToken).mint(cfg.tokenPool, 1 ether);
+            assertEq(IERC20(dest.linkToken).balanceOf(cfg.tokenPool), 1 ether, "Token pool should have 1 ether");
+            Burnable(dest.linkToken).burn(1 ether);
+            assertEq(IERC20(dest.linkToken).balanceOf(cfg.tokenPool), 0, "Token pool should have 0 ether");
+            vm.stopPrank();
         }
     }
 
