@@ -242,9 +242,9 @@ func sendTransactionWithLookupTables(ctx context.Context, rpcClient *rpc.Client,
 			Commitment:                     commitment,
 			MaxSupportedTransactionVersion: &v,
 		})
-		if errGetTx == nil {
-			time.Sleep(100 * time.Millisecond)
-			break
+		if errGetTx != nil {
+			time.Sleep(50 * time.Millisecond)
+			continue
 		}
 	}
 	return transactionRes, errGetTx
