@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {FeeQuoter} from "../../FeeQuoter.sol";
 import {Internal} from "../../libraries/Internal.sol";
 import {FeeQuoterSetup} from "./FeeQuoterSetup.t.sol";
-import {MockV3Aggregator} from "@chainlink/shared/mocks/MockV3Aggregator.sol";
+import {MockV3Aggregator} from "@chainlink/contracts/src/v0.8/shared/mocks/MockV3Aggregator.sol";
 
 contract FeeQuoter_getValidatedTokenPrice is FeeQuoterSetup {
   function test_GetValidatedTokenPrice() public view {
