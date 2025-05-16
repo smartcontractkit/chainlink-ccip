@@ -52,12 +52,12 @@ func (p *processor) Observation(
 	wg := sync.WaitGroup{}
 	wg.Add(len(operations))
 	for i, op := range operations {
-		go func(i int) {
+		go func(i int, op func(ctx context.Context, l logger.Logger)) {
 			defer wg.Done()
 			tStart := time.Now()
 			op(callCtx, logger.With(lggr, "opID", i))
 			lggr.Debugw("observing goroutine finished", "opID", i, "duration", time.Since(tStart))
-		}(i)
+		}(i, op)
 	}
 	wg.Wait()
 	now := time.Now().UTC()
