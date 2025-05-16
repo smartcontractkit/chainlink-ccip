@@ -64,9 +64,7 @@ func TestCctpDevnet(t *testing.T) {
 
 		t.Parallel()
 
-		t.Run("OnRamp: Deposit for Burn", func(t *testing.T) {
-			// t.Skip()
-
+		t.Run("Deposit for Burn", func(t *testing.T) {
 			pdas, err := getDepositForBurnPDAs(tokenMessageMinter, messageTransmitter, usdcAddress, chosenDomain.Domain)
 
 			messageSentEventKeypair, err := solana.NewRandomPrivateKey()
@@ -128,8 +126,6 @@ func TestCctpDevnet(t *testing.T) {
 
 		t.Run("Await attestation", func(t *testing.T) {
 			messageHash := hex.EncodeToString(eth.Keccak256(messageSent.Message))
-
-			// t.Skip()
 
 			startTime := time.Now()
 			for elapsed := time.Since(startTime); elapsed < time.Second*90; elapsed = time.Since(startTime) {
@@ -215,7 +211,9 @@ func TestCctpDevnet(t *testing.T) {
 		attestationBytes, err := hex.DecodeString(devnetInfo.CCTP.Message.AttestationBytesHex)
 		require.NoError(t, err)
 
-		pdas, err := getReceiveMessagePdas(tokenMessageMinter, messageTransmitter, usdcAddress, chosenDomain.Domain, devnetInfo.CCTP.Message.Nonce)
+		nonce := binary.BigEndian.Uint64(messageBytes[12:20][:])
+
+		pdas, err := getReceiveMessagePdas(tokenMessageMinter, messageTransmitter, usdcAddress, chosenDomain.Domain, nonce)
 
 		metas := []*solana.AccountMeta{
 			solana.Meta(pdas.tokenMessengerAccount),
@@ -402,14 +400,6 @@ func getReceiveMessagePdas(tokenMessageMinter, messageTransmitter, usdcAddress s
 		[]byte(""), // used_nonces_seed_delimiter - this is empty when the domain is a valid one
 		firstNonceSeed(nonce),
 	}, messageTransmitter)
-
-	fmt.Println("Used nonces seeds:", [][]byte{
-		[]byte("used_nonces"),
-		numToSeed(domain),
-		[]byte(""), // used_nonces_seed_delimiter - this is empty when the domain is a valid one
-		firstNonceSeed(nonce),
-	})
-	fmt.Println("Used nonces:", usedNonces)
 
 	return ReceiveMessagePDAs{
 		messageTransmitterAccount:    messageTransmitterAccount,
