@@ -3,12 +3,14 @@ package chainfee
 import (
 	"context"
 	"math/big"
+	"sync"
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
@@ -28,10 +30,44 @@ func (p *processor) Observation(
 ) (Observation, error) {
 	lggr := logutil.WithContextValues(ctx, p.lggr)
 
-	feeComponents := p.obs.getChainsFeeComponents(ctx, lggr)
-	nativeTokenPrices := p.obs.getNativeTokenPrices(ctx, lggr)
-	chainFeeUpdates := p.obs.getChainFeePriceUpdates(ctx, lggr)
-	fChain := p.observeFChain(lggr)
+	var (
+		feeComponents     map[cciptypes.ChainSelector]types.ChainFeeComponents
+		nativeTokenPrices map[cciptypes.ChainSelector]cciptypes.BigInt
+		chainFeeUpdates   map[cciptypes.ChainSelector]Update
+		fChain            map[cciptypes.ChainSelector]int
+	)
+
+	operations := map[string]func(ctx context.Context, l logger.Logger){
+		"getChainsFeeComponents": func(ctx context.Context, l logger.Logger) {
+			feeComponents = p.obs.getChainsFeeComponents(ctx, l)
+		},
+		"getNativeTokenPrices": func(ctx context.Context, l logger.Logger) {
+			nativeTokenPrices = p.obs.getNativeTokenPrices(ctx, l)
+		},
+		"getChainFeePriceUpdates": func(ctx context.Context, l logger.Logger) {
+			chainFeeUpdates = p.obs.getChainFeePriceUpdates(ctx, l)
+		},
+		"observeFChain": func(_ context.Context, l logger.Logger) {
+			fChain = p.observeFChain(l)
+		},
+	}
+
+	callTimeout := p.cfg.ChainFeeAsyncObserverSyncTimeout
+	callCtx, cf := context.WithTimeout(ctx, callTimeout)
+	defer cf()
+	lggr.Debugw("spawning observing goroutines", "timeout", callTimeout)
+
+	wg := sync.WaitGroup{}
+	wg.Add(len(operations))
+	for opName, op := range operations {
+		go func(opName string, op func(ctx context.Context, l logger.Logger)) {
+			defer wg.Done()
+			tStart := time.Now()
+			op(callCtx, logger.With(lggr, "opID", opName))
+			lggr.Debugw("observing goroutine finished", "opID", opName, "duration", time.Since(tStart))
+		}(opName, op)
+	}
+	wg.Wait()
 	now := time.Now().UTC()
 
 	lggr.Infow("observed fee components",
