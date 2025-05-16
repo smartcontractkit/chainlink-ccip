@@ -1,8 +1,15 @@
 package contracts
 
 import (
+	"encoding/binary"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+	"strconv"
 	"testing"
+	"time"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
@@ -11,6 +18,7 @@ import (
 	message_transmitter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/cctp_message_transmitter"
 	token_messenger_minter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/cctp_token_message_minter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/eth"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/require"
@@ -32,68 +40,222 @@ func TestCctpDevnet(t *testing.T) {
 	message_transmitter.SetProgramID(messageTransmitter)
 
 	usdcAddress := solana.MustPublicKeyFromBase58("4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU")
+
+	type RemoteDomain struct {
+		Domain    uint32
+		Recipient solana.PublicKey
+	}
 	domains := struct {
 		Sepolia,
 		Sui,
-		Solana uint32
+		Solana RemoteDomain
 	}{ // https://developers.circle.com/stablecoins/supported-domains
-		Sepolia: 0,
-		Solana:  5,
-		Sui:     8,
+		Sepolia: RemoteDomain{0, solana.MustPublicKeyFromBase58(devnetInfo.CCTP.Sepolia.RecipientBase58)},
 	}
-	chosenDomain := domains.Sui
+	chosenDomain := domains.Sepolia
 
 	usdcATA, _, err := tokens.FindAssociatedTokenAddress(solana.TokenProgramID, usdcAddress, admin.PublicKey())
 	require.NoError(t, err)
 
-	t.Run("OnRamp: Deposit for Burn", func(t *testing.T) {
-		t.Skip()
+	var messageSent message_transmitter.MessageSent
 
-		pdas, err := getDepositForBurnPDAs(tokenMessageMinter, messageTransmitter, usdcAddress, chosenDomain)
+	t.Run("OnRamp", func(t *testing.T) {
+		// t.Skip()
 
-		// messageSentEventKeypair, err := solana.NewRandomPrivateKey()
-		messageSentEventKeypair, err := solana.PrivateKeyFromBase58("4aufxGiqtjJySZ4RrCzAU55jKniMgKbzEhnCoVUyNxi8wcSUxJ5c7GSR2BLXF8SjDJdywL7Hydsqus27iSoRBU6n")
+		t.Parallel()
+
+		t.Run("OnRamp: Deposit for Burn", func(t *testing.T) {
+			// t.Skip()
+
+			pdas, err := getDepositForBurnPDAs(tokenMessageMinter, messageTransmitter, usdcAddress, chosenDomain.Domain)
+
+			messageSentEventKeypair, err := solana.NewRandomPrivateKey()
+			// messageSentEventKeypair, err := solana.PrivateKeyFromBase58("4aufxGiqtjJySZ4RrCzAU55jKniMgKbzEhnCoVUyNxi8wcSUxJ5c7GSR2BLXF8SjDJdywL7Hydsqus27iSoRBU6n")
+			require.NoError(t, err)
+			fmt.Println("Message Sent Event Keypair:", messageSentEventKeypair.PublicKey(), messageSentEventKeypair)
+			pdas.Print()
+
+			ix, err := token_messenger_minter.NewDepositForBurnInstruction(
+				token_messenger_minter.DepositForBurnParams{
+					Amount:            1e4, // 1 cent, as USDC has 6 decimals
+					DestinationDomain: uint32(chosenDomain.Domain),
+					MintRecipient:     chosenDomain.Recipient,
+				},
+				admin.PublicKey(), // owner
+				admin.PublicKey(), // event rent payer
+				pdas.authorityPda,
+				usdcATA,
+				pdas.messageTransmitterAccount,
+				pdas.tokenMessengerAccount,
+				pdas.remoteTokenMessengerKey,
+				pdas.tokenMinterAccount,
+				pdas.localToken,
+				usdcAddress,
+				messageSentEventKeypair.PublicKey(),
+				messageTransmitter,
+				tokenMessageMinter,
+				solana.TokenProgramID,
+				solana.SystemProgramID,
+				pdas.eventAuthority,
+				pdas.program,
+			).ValidateAndBuild()
+			require.NoError(t, err)
+
+			result := testutils.SendAndConfirm(ctx, t, client, []solana.Instruction{ix}, admin, config.DefaultCommitment, common.AddSigners(messageSentEventKeypair))
+			require.NotNil(t, result)
+
+			tx, err := result.Transaction.GetTransaction()
+			require.NoError(t, err)
+
+			fmt.Println("Transaction signature:", tx.Signatures)
+			fmt.Println(result.Meta.LogMessages)
+
+			returnedNonce, err := common.ExtractTypedReturnValue(ctx, result.Meta.LogMessages, tokenMessageMinter.String(), binary.LittleEndian.Uint64)
+			require.NoError(t, err)
+			fmt.Println("Nonce:", returnedNonce)
+			fmt.Println("Result return data:", result.Meta.ReturnData.Data.String())
+
+			require.NoError(t, common.GetAccountDataBorshInto(ctx, client, messageSentEventKeypair.PublicKey(), config.DefaultCommitment, &messageSent))
+			fmt.Println("Message Sent Event Account Data:", messageSent)
+		})
+
+		var attestation []byte
+
+		type AttestationResponse struct {
+			Attestation string `json:"attestation"`
+			Status      string `json:"status"`
+		}
+
+		t.Run("Await attestation", func(t *testing.T) {
+			messageHash := hex.EncodeToString(eth.Keccak256(messageSent.Message))
+
+			// t.Skip()
+
+			startTime := time.Now()
+			for elapsed := time.Since(startTime); elapsed < time.Second*90; elapsed = time.Since(startTime) {
+				time.Sleep(time.Second * 5)
+
+				url := fmt.Sprintf("https://iris-api-sandbox.circle.com/v1/attestations/0x%s", messageHash)
+				req, err := http.NewRequest("GET", url, nil)
+				require.NoError(t, err)
+				req.Header.Set("Content-Type", "application/json")
+				req.Header.Set("Accept", "application/json")
+
+				resp, err := http.DefaultClient.Do(req)
+				require.NoError(t, err)
+				defer resp.Body.Close()
+
+				body, err := ioutil.ReadAll(resp.Body)
+				fmt.Printf("StatusCode: %d - Body: %s\n", resp.StatusCode, body)
+
+				if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+					fmt.Println("Success:", resp.Status)
+					var attestationResponse AttestationResponse
+					err = json.Unmarshal(body, &attestationResponse)
+					fmt.Println("AttestationResponse:", attestationResponse)
+					require.NoError(t, err)
+
+					if attestationResponse.Status == "complete" {
+						fmt.Println("Attestation completed")
+						attestation, err = hex.DecodeString(attestationResponse.Attestation[2:]) // remove 0x prefix
+						require.NoError(t, err)
+						fmt.Println("Attestation:", attestation)
+						break
+					} else {
+						fmt.Println("Attestation not completed yet, retrying...")
+						continue
+					}
+				}
+
+				if resp.StatusCode >= 400 && resp.StatusCode < 500 {
+					fmt.Println("Client error:", resp.Status)
+					if resp.StatusCode == 404 {
+						fmt.Println("Attestation not found, retrying...")
+						continue
+					}
+					if resp.StatusCode == 429 {
+						fmt.Println("Rate limit exceeded, retrying...")
+						retryAfter := resp.Header.Get("Retry-After")
+						if retryAfter != "" {
+							retryAfterInt, err := strconv.Atoi(retryAfter)
+							if err != nil {
+								fmt.Println("Error parsing Retry-After header:", err)
+							} else {
+								fmt.Printf("Retrying after %d seconds...\n", retryAfterInt)
+								time.Sleep(time.Duration(retryAfterInt) * time.Second)
+							}
+						} else {
+							fmt.Println("Retry-After header not found, retrying after default timestep...")
+						}
+						continue
+					}
+					t.Error(fmt.Sprintf("Unexpected status code: %s", resp.Status))
+					break
+				}
+
+				if resp.StatusCode >= 500 && resp.StatusCode < 600 {
+					fmt.Println("Server error:", resp.Status)
+					break
+				}
+
+				t.Error(fmt.Sprintf("Unexpected status code: %s", resp.Status))
+				break
+			}
+		})
+	})
+
+	t.Run("OffRamp: Receive Message", func(t *testing.T) {
+		t.Parallel()
+
+		// t.Skip()
+
+		messageBytes, err := hex.DecodeString(devnetInfo.CCTP.Message.MessageBytesHex)
+		fmt.Println("Message bytes:", messageBytes)
 		require.NoError(t, err)
-		fmt.Println("Message Sent Event Keypair:", messageSentEventKeypair.PublicKey(), messageSentEventKeypair)
-		pdas.Print()
+		attestationBytes, err := hex.DecodeString(devnetInfo.CCTP.Message.AttestationBytesHex)
+		require.NoError(t, err)
 
-		ix, err := token_messenger_minter.NewDepositForBurnInstruction(
-			token_messenger_minter.DepositForBurnParams{
-				Amount:            1e4, // 1 cent, as USDC has 6 decimals
-				DestinationDomain: uint32(chosenDomain),
-				MintRecipient:     admin.PublicKey(),
+		pdas, err := getReceiveMessagePdas(tokenMessageMinter, messageTransmitter, usdcAddress, chosenDomain.Domain, devnetInfo.CCTP.Message.Nonce)
+
+		metas := []*solana.AccountMeta{
+			solana.Meta(pdas.tokenMessengerAccount),
+			solana.Meta(pdas.remoteTokenMessengerKey),
+			solana.Meta(pdas.tokenMinterAccount).WRITE(),
+			solana.Meta(pdas.localToken).WRITE(),
+			solana.Meta(pdas.tokenPair),
+			solana.Meta(usdcATA).WRITE(), // userATA
+			solana.Meta(pdas.custodyTokenAccount).WRITE(),
+			solana.Meta(solana.TokenProgramID),
+			solana.Meta(pdas.tokenMessengerEventAuthority),
+			solana.Meta(tokenMessageMinter),
+		}
+
+		raw := message_transmitter.NewReceiveMessageInstruction(
+			message_transmitter.ReceiveMessageParams{
+				Message:     messageBytes,
+				Attestation: attestationBytes,
 			},
-			admin.PublicKey(), // owner
-			admin.PublicKey(), // event rent payer
+			admin.PublicKey(), // payer
+			admin.PublicKey(), // caller
 			pdas.authorityPda,
-			usdcATA,
 			pdas.messageTransmitterAccount,
-			pdas.tokenMessengerAccount,
-			pdas.remoteTokenMessengerKey,
-			pdas.tokenMinterAccount,
-			pdas.localToken,
-			usdcAddress,
-			messageSentEventKeypair.PublicKey(),
-			messageTransmitter,
-			tokenMessageMinter,
-			solana.TokenProgramID,
+			pdas.usedNonces,
+			tokenMessageMinter, // receiver
 			solana.SystemProgramID,
 			pdas.eventAuthority,
-			pdas.program,
-		).ValidateAndBuild()
+			messageTransmitter,
+		)
+		raw.AccountMetaSlice = append(raw.AccountMetaSlice, metas...)
+		ix, err := raw.ValidateAndBuild()
 		require.NoError(t, err)
 
-		result := testutils.SendAndConfirm(ctx, t, client, []solana.Instruction{ix}, admin, config.DefaultCommitment, common.AddSigners(messageSentEventKeypair))
+		result := testutils.SendAndConfirm(ctx, t, client, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 		require.NotNil(t, result)
-
 		tx, err := result.Transaction.GetTransaction()
 		require.NoError(t, err)
-
 		fmt.Println("Transaction signature:", tx.Signatures)
 		fmt.Println(result.Meta.LogMessages)
 	})
-
-	t.Run("OffRamp: Receive Message", func(t *testing.T) {})
 }
 
 type DepositForBurnPDAs struct {
@@ -207,8 +369,7 @@ func getReceiveMessagePdas(tokenMessageMinter, messageTransmitter, usdcAddress s
 		return ReceiveMessagePDAs{}, err
 	}
 
-	// const remoteTokenKey = new PublicKey(hexToBytes(remoteUsdcAddressHex));
-	remoteTokenKey := solana.PublicKey{} // TODO
+	remoteTokenKey := solana.MustPublicKeyFromBase58("111111111111Q2C3h43sGe552tUtBG3FqBKz8gX") // usdc sepolia address
 
 	tokenPair, _, err := solana.FindProgramAddress([][]byte{[]byte("token_pair"), numToSeed(domain), remoteTokenKey.Bytes()}, tokenMessageMinter)
 	if err != nil {
@@ -242,6 +403,14 @@ func getReceiveMessagePdas(tokenMessageMinter, messageTransmitter, usdcAddress s
 		firstNonceSeed(nonce),
 	}, messageTransmitter)
 
+	fmt.Println("Used nonces seeds:", [][]byte{
+		[]byte("used_nonces"),
+		numToSeed(domain),
+		[]byte(""), // used_nonces_seed_delimiter - this is empty when the domain is a valid one
+		firstNonceSeed(nonce),
+	})
+	fmt.Println("Used nonces:", usedNonces)
+
 	return ReceiveMessagePDAs{
 		messageTransmitterAccount:    messageTransmitterAccount,
 		tokenMessengerAccount:        tokenMessengerAccount,
@@ -264,6 +433,7 @@ func firstNonceSeed(nonce uint64) []byte {
 	// So, the first chunk is 1-6400, the second is 6401-12800, etc.
 	// The "first_nonce" is the first nonce in the chunk that contains the given nonce.
 	firstNonce := ((nonce-1)/MAX_NONCES)*MAX_NONCES + 1
+	fmt.Println("First nonce:", firstNonce, "from original nonce:", nonce)
 	return numToSeed(firstNonce)
 }
 
