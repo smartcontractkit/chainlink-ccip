@@ -37,11 +37,19 @@ func (p *processor) Observation(
 		fChain            map[cciptypes.ChainSelector]int
 	)
 
-	operations := []func(ctx context.Context, l logger.Logger){
-		func(ctx context.Context, l logger.Logger) { feeComponents = p.obs.getChainsFeeComponents(ctx, l) },
-		func(ctx context.Context, l logger.Logger) { nativeTokenPrices = p.obs.getNativeTokenPrices(ctx, l) },
-		func(ctx context.Context, l logger.Logger) { chainFeeUpdates = p.obs.getChainFeePriceUpdates(ctx, l) },
-		func(ctx context.Context, l logger.Logger) { fChain = p.observeFChain(l) },
+	operations := map[string]func(ctx context.Context, l logger.Logger){
+		"getChainsFeeComponents": func(ctx context.Context, l logger.Logger) {
+			feeComponents = p.obs.getChainsFeeComponents(ctx, l)
+		},
+		"getNativeTokenPrices": func(ctx context.Context, l logger.Logger) {
+			nativeTokenPrices = p.obs.getNativeTokenPrices(ctx, l)
+		},
+		"getChainFeePriceUpdates": func(ctx context.Context, l logger.Logger) {
+			chainFeeUpdates = p.obs.getChainFeePriceUpdates(ctx, l)
+		},
+		"observeFChain": func(_ context.Context, l logger.Logger) {
+			fChain = p.observeFChain(l)
+		},
 	}
 
 	callTimeout := p.cfg.ChainFeeAsyncObserverSyncTimeout
@@ -51,13 +59,13 @@ func (p *processor) Observation(
 
 	wg := sync.WaitGroup{}
 	wg.Add(len(operations))
-	for i, op := range operations {
-		go func(i int, op func(ctx context.Context, l logger.Logger)) {
+	for opName, op := range operations {
+		go func(opName string, op func(ctx context.Context, l logger.Logger)) {
 			defer wg.Done()
 			tStart := time.Now()
-			op(callCtx, logger.With(lggr, "opID", i))
-			lggr.Debugw("observing goroutine finished", "opID", i, "duration", time.Since(tStart))
-		}(i, op)
+			op(callCtx, logger.With(lggr, "opID", opName))
+			lggr.Debugw("observing goroutine finished", "opID", opName, "duration", time.Since(tStart))
+		}(opName, op)
 	}
 	wg.Wait()
 	now := time.Now().UTC()
