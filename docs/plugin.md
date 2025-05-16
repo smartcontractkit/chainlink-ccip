@@ -71,15 +71,42 @@ A global identification system is required for all chains (mainnet, testnet, dev
 
 - Previously located in `core.capabilities.ccip.oraclecreator`
 - Now chain-family agnostic
-- Uses a `plugin` struct per chain:
+- Uses a `pluginConfig` struct per chain under `core.capabilities.ccip.common.pluginconfig`:
 
 ```go
-type plugin struct {
-   CommitPluginCodec   cciptypes.CommitPluginCodec
-   ExecutePluginCodec  cciptypes.ExecutePluginCodec
-   ExtraArgsCodec      cciptypes.ExtraDataCodec
-   MessageHasher       func(lggr logger.Logger) cciptypes.MessageHasher
-   TokenDataEncoder    cciptypes.TokenDataEncoder
-   GasEstimateProvider cciptypes.EstimateProvider
-   RMNCrypto           func(lggr logger.Logger) cciptypes.RMNCrypto
+// PluginServices aggregates services for a specific chain family.
+type PluginServices struct {
+    PluginConfig   PluginConfig
+    AddrCodec      AddressCodec
+    ExtraDataCodec *ExtraDataCodec
+    ChainRW        MultiChainRW
 }
+
+type PluginConfig struct {
+    CommitPluginCodec          cciptypes.CommitPluginCodec
+    ExecutePluginCodec         cciptypes.ExecutePluginCodec
+    MessageHasher              cciptypes.MessageHasher
+    TokenDataEncoder           cciptypes.TokenDataEncoder
+    GasEstimateProvider        cciptypes.EstimateProvider
+    RMNCrypto                  cciptypes.RMNCrypto
+    ContractTransmitterFactory cctypes.ContractTransmitterFactory
+    // PriceOnlyCommitFn optional method override for price only commit reports.
+    PriceOnlyCommitFn string
+    ChainRW           ChainRWProvider
+    AddressCodec      ChainSpecificAddressCodec
+    ExtraDataCodec    SourceChainExtraDataCodec
+}
+
+// InitFunction defines a function to initialize a PluginConfig.
+type InitFunction func(logger.Logger, *ExtraDataCodec) PluginConfig
+
+var registeredFactories = make(map[string]InitFunction)
+
+// RegisterPluginConfig registers a plugin config factory for a chain family.
+func RegisterPluginConfig(chainFamily string, factory InitFunction) {
+registeredFactories[chainFamily] = factory
+}
+```
+Each chain family has its own plugin implementation under core.capabilities.ccip.ccipxxx, and it will be registered in a `init()` function by calling `RegisterPluginConfig()`  under the chain specific module.
+
+So now all future non-EVM integration will no longer need to modify oracle creator and common interface.
