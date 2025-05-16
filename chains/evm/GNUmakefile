@@ -12,9 +12,9 @@ snapshot-diff: ## Make a snapshot for a specific product.
 foundry: ## Install foundry.
 	foundryup --install v1.0.0
 
-.PHONY: forge-zksync
-forge-zksync: ## Install foundry.
-	./scripts/install_forge_zksync
+.PHONY: foundry-zksync
+foundry-zksync: ## Install foundry.
+	./scripts/install_foundry_zksync
 
 ccip-precommit: export FOUNDRY_PROFILE=ccip
 .PHONY: ccip-precommit
@@ -38,7 +38,7 @@ wrappers: pnpmdep mockery abigen
 	go generate ./gobindings
 
 .PHONY: wrappers-zksync
-wrappers-zksync: pnpmdep forge-zksync
+wrappers-zksync: pnpmdep foundry-zksync
 	ZKSYNC=true ./scripts/compile_all
 	ZKSYNC=true go generate ./gobindings
 
