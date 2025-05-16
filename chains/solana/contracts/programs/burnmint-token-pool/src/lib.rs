@@ -29,6 +29,7 @@ pub mod burnmint_token_pool {
                 router,
                 rmn_remote,
             ),
+            multisig: Pubkey::default(),
         });
         Ok(())
     }
@@ -42,6 +43,11 @@ pub mod burnmint_token_pool {
         let response = env!("CCIP_BUILD_TYPE_VERSION").to_string();
         msg!("{}", response);
         Ok(response)
+    }
+
+    pub fn setup_multisig(ctx: Context<SetConfig>, multisig: Pubkey) -> Result<()> {
+        ctx.accounts.state.multisig = multisig;
+        Ok(())
     }
 
     pub fn transfer_ownership(ctx: Context<SetConfig>, proposed_owner: Pubkey) -> Result<()> {
@@ -180,8 +186,8 @@ pub mod burnmint_token_pool {
         Ok(())
     }
 
-    pub fn release_or_mint_tokens(
-        ctx: Context<TokenOfframp>,
+    pub fn release_or_mint_tokens<'info>(
+        ctx: Context<'_, '_, '_, 'info, TokenOfframp<'info>>,
         release_or_mint: ReleaseOrMintInV1,
     ) -> Result<ReleaseOrMintOutV1> {
         let parsed_amount = to_svm_token_amount(
@@ -207,6 +213,18 @@ pub mod burnmint_token_pool {
             ctx.accounts.rmn_remote_config.to_account_info(),
         )?;
 
+        let multisig = if ctx.accounts.state.multisig != Pubkey::default() {
+            let multisig_account = ctx
+                .remaining_accounts
+                .get(0)
+                .ok_or(CcipTokenPoolError::InvalidMultisig)?;
+            require_eq!(ctx.accounts.state.multisig, multisig_account.key());
+
+            Some(multisig_account)
+        } else {
+            None
+        };
+
         mint_tokens(
             ctx.accounts.token_program.key(),
             ctx.accounts.receiver_token_account.to_account_info(),
@@ -215,7 +233,7 @@ pub mod burnmint_token_pool {
             ctx.bumps.pool_signer,
             release_or_mint,
             parsed_amount,
-            None,
+            multisig,
         )?;
 
         Ok(ReleaseOrMintOutV1 {
@@ -265,6 +283,7 @@ pub mod burnmint_token_pool {
 #[derive(InitSpace)]
 pub struct State {
     pub version: u8,
+    pub multisig: Pubkey,
     pub config: BaseConfig,
 }
 
