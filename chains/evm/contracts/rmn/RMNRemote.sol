@@ -3,11 +3,11 @@ pragma solidity ^0.8.24;
 
 import {IRMN} from "../interfaces/IRMN.sol";
 import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
-import {ITypeAndVersion} from "@chainlink/shared/interfaces/ITypeAndVersion.sol";
+import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {Internal} from "../libraries/Internal.sol";
-import {Ownable2StepMsgSender} from "@chainlink/shared/access/Ownable2StepMsgSender.sol";
-import {EnumerableSet} from "@chainlink/shared/enumerable/EnumerableSetWithBytes16.sol";
+import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
+import {EnumerableSet} from "@chainlink/contracts/src/v0.8/shared/enumerable/EnumerableSetWithBytes16.sol";
 
 /// @dev An active curse on this subject will cause isCursed() and isCursed(bytes16) to return true. Use this subject
 /// for issues affecting all of CCIP chains, or pertaining to the chain that this contract is deployed on, instead of

@@ -231,6 +231,14 @@ func (p *processor) getGasPricesToUpdate(
 ) []cciptypes.GasPriceChain {
 	var gasPrices []cciptypes.GasPriceChain
 
+	destChainCfg, err := p.homeChain.GetChainConfig(p.destChain)
+	if err != nil {
+		lggr.Errorw("error getting dest chain config", "chain", p.destChain, "err", err)
+		return gasPrices
+	}
+	execGasPriceDeviation := destChainCfg.Config.GasPriceDeviationPPB.Int64()
+	daGasPriceDeviation := destChainCfg.Config.DAGasPriceDeviationPPB.Int64()
+
 	for chain, currentChainFee := range currentChainUSDFees {
 		chainCfg, err := p.homeChain.GetChainConfig(chain)
 		if err != nil {
@@ -284,13 +292,13 @@ func (p *processor) getGasPricesToUpdate(
 		executionFeeDeviates := mathslib.Deviates(
 			currentChainFee.ExecutionFeePriceUSD,
 			lastUpdate.ChainFee.ExecutionFeePriceUSD,
-			feeConfig.GasPriceDeviationPPB.Int64(),
+			execGasPriceDeviation,
 		)
 
 		dataAvFeeDeviates := mathslib.Deviates(
 			currentChainFee.DataAvFeePriceUSD,
 			lastUpdate.ChainFee.DataAvFeePriceUSD,
-			feeConfig.DAGasPriceDeviationPPB.Int64(),
+			daGasPriceDeviation,
 		)
 
 		if executionFeeDeviates || dataAvFeeDeviates {
