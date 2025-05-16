@@ -167,11 +167,6 @@ func (p *Plugin) getCommitReportsObservation(
 	lggr logger.Logger,
 	observation exectypes.Observation,
 ) (exectypes.Observation, error) {
-	// Get the optimized timestamp using the cache
-	fetchFrom := p.commitRootsCache.GetTimestampToQueryFrom()
-
-	lggr.Infow("Querying commit reports", "fetchFrom", fetchFrom)
-
 	// Phase 1: Gather commit reports from the destination chain and determine which messages are required to build
 	//          a valid execution report.
 	supportsDest, err := p.supportsDestChain()
@@ -183,6 +178,20 @@ func (p *Plugin) getCommitReportsObservation(
 	if !supportsDest {
 		return observation, nil
 	}
+
+	// Refresh the commit report cache first
+	if err := p.commitReportCache.RefreshCache(ctx); err != nil {
+		// Log error but proceed. If RefreshCache fails, GetReportsToQueryFromTimestamp
+		// will likely use a less optimal (wider) window based on its internal state or defaults,
+		// which is safer than halting observation entirely.
+		lggr.Errorw("failed to refresh commit report cache, proceeding with potentially wider query window", "err", err)
+	}
+
+	// Get the optimized timestamp using the cache
+	// TODO: update with p.commitReportCache.GetReportsToQueryFromTimestamp()
+	fetchFrom := p.commitRootsCache.GetTimestampToQueryFrom()
+
+	lggr.Infow("Querying commit reports", "fetchFrom", fetchFrom)
 
 	// Get curse information from the destination chain.
 	ci, err := p.getCurseInfo(ctx, lggr)
@@ -454,6 +463,10 @@ func (p *Plugin) getMessagesObservation(
 			}
 		}
 
+		// TODO: check if the commit report is all fully executed and inflight messages.
+		// Might be able to just not include it in the observation at all? Or is there a
+		// risk with that?
+
 		if stop {
 			lggr.Infow("Stop processing messages, observation is too large",
 				"totalMsgs", totalMsgs, "encodedObsSize", encodedObsSize)
@@ -492,10 +505,23 @@ func (p *Plugin) getFilterObservation(
 		}
 
 		for _, msg := range report.Messages {
+			// The GetMessages observation could potentially include a pseudo-deleted message,
+			// which is either:
+			// - a message that is inflight
+			// - a message that has already been executed
+			// - a message that was not included in the observation due to size limits
+			// In all cases, since we don't need to execute these messages, we don't need to fetch their sender's nonce.
+			if msg.IsPseudoDeleted() {
+				lggr.Debugw("skipping pseudo-deleted message",
+					"messageID", msg.Header.MessageID,
+				)
+				continue
+			}
+
 			sender, err := p.addrCodec.AddressBytesToString(msg.Sender[:], srcChain)
 			if err != nil {
 				lggr.Errorw("unable to convert sender address to string",
-					"err", err, "sender address", msg.Sender)
+					"err", err, "senderAddress", msg.Sender)
 				continue
 			}
 

@@ -30,6 +30,12 @@ pub trait Admin {
         code_version: CodeVersion,
     ) -> Result<()>;
 
+    fn set_link_token_mint(
+        &self,
+        ctx: Context<UpdateConfigCCIPRouter>,
+        link_token_mint: Pubkey,
+    ) -> Result<()>;
+
     fn update_fee_aggregator(
         &self,
         ctx: Context<UpdateConfigCCIPRouter>,

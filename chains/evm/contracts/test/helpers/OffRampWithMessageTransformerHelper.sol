@@ -6,7 +6,8 @@ import {Internal} from "../../libraries/Internal.sol";
 import {OffRampWithMessageTransformer} from "../../offRamp/OffRampWithMessageTransformer.sol";
 import {IgnoreContractSize} from "./IgnoreContractSize.sol";
 
-import {EnumerableSet} from "@chainlink/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
+import {EnumerableSet} from
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
 
 contract OffRampWithMessageTransformerHelper is OffRampWithMessageTransformer, IgnoreContractSize {
   using EnumerableSet for EnumerableSet.UintSet;

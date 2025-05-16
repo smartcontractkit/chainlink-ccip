@@ -27,8 +27,9 @@ func main() {
 	if os.Getenv("ZKSYNC") != "true" {
 		abiPath := rootDir + project + "/" + className + "/" + className + ".sol/" + className + ".abi.json"
 		binPath := rootDir + project + "/" + className + "/" + className + ".sol/" + className + ".bin"
+		metadataPath := rootDir + project + "/" + className + "/build/build.json"
 
-		GenWrapper(abiPath, binPath, className, pkgName, outDirSuffix)
+		GenWrapper(abiPath, binPath, metadataPath, className, pkgName, outDirSuffix)
 	} else {
 		outDir := getOutDir(outDirSuffix, pkgName)
 		zksyncBytecodePath := filepath.Join("..", "zkout", className+".sol", className+".json")
@@ -54,14 +55,21 @@ func main() {
 // <project>/generated/<pkgName>/<pkgName>.go. The suffix will take place after
 // the <project>/generated, so the overridden location would be
 // <project>/generated/<outDirSuffixInput>/<pkgName>/<pkgName>.go.
-func GenWrapper(abiPath, binPath, className, pkgName, outDirSuffixInput string) {
+func GenWrapper(abiPath, binPath, metadataPath, className, pkgName, outDirSuffixInput string) {
 	fmt.Println("Generating", pkgName, "contract wrapper")
 
 	outDir := getOutDir(outDirSuffixInput, pkgName)
 	outPath := filepath.Join(outDir, pkgName+".go")
+	metadataOutPath := filepath.Join(outDir, pkgName+"_metadata.go")
 
 	gethwrappers.Abigen(gethwrappers.AbigenArgs{
-		Bin: binPath, ABI: abiPath, Out: outPath, Type: className, Pkg: pkgName,
+		Bin:         binPath,
+		ABI:         abiPath,
+		Metadata:    metadataPath,
+		Out:         outPath,
+		MetadataOut: metadataOutPath,
+		Type:        className,
+		Pkg:         pkgName,
 	})
 
 	// Build succeeded, so update the versions db with the new contract data

@@ -9,7 +9,7 @@ echo " └───────────────────────�
 # The offRamp uses a specific lower optimization runs value. All other contracts use the default value
 # as specified in the foundry.toml.
 OPTIMIZE_RUNS_OFFRAMP=800
-OPTIMIZE_RUNS_FEE_QUOTER=10000
+OPTIMIZE_RUNS_FEE_QUOTER=8000
 PROJECT="ccip"
 FOUNDRY_PROJECT_SUFFIX="-compile"
 export FOUNDRY_PROFILE="$PROJECT"$FOUNDRY_PROJECT_SUFFIX
@@ -22,15 +22,24 @@ compileContract() {
   local contract
   contract=$(basename "$1")
   echo "Compiling" "$contract"
-
-  local args
+  dir=$CONTRACTS_DIR/solc/$PROJECT/$contract
+  
+  local args # base args for forge
   args="build $CONTRACTS_DIR/contracts/"$1.sol" --root $CONTRACTS_DIR"
-
+  
   if [ "$ZKSYNC" != "true" ]; then
-    forge $args \
-      $(getOptimizations "$contract") \
-      --extra-output-files bin abi \
-      -o $CONTRACTS_DIR/solc/$PROJECT/$contract
+    local command
+    command="forge $args \
+    $(getOptimizations "$contract") \
+    --extra-output-files bin abi metadata \
+    --build-info \
+    --build-info-path $dir/build \
+    -o $dir"
+
+    $command
+
+    # Move the build info to an expected file name
+    mv $(find $dir/build -type f -name '*.json' ! -name 'build.json') $dir/build/build.json
 
     # Copy the generated abi files to a single folder
     cp "$CONTRACTS_DIR"/solc/$PROJECT/"$contract"/"$contract".sol/"$contract".abi.json "$ABI_DIR""$contract".abi
@@ -101,5 +110,4 @@ compileContract test/helpers/EncodingUtils
 # Message Transformer On/OffRamps
 compileContract offRamp/OffRampWithMessageTransformer
 compileContract onRamp/OnRampWithMessageTransformer
-
 
