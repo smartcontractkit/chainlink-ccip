@@ -345,11 +345,11 @@ pub struct MintTokenAccountsInfo<'a> {
     pub multisig: Option<AccountInfo<'a>>,
 }
 
-pub fn mint_tokens<'a>(
+pub fn mint_tokens(
     token_program: Pubkey,
     release_or_mint: ReleaseOrMintInV1,
     parsed_amount: u64,
-    accounts: MintTokenAccountsInfo<'a>,
+    accounts: MintTokenAccountsInfo,
 ) -> Result<()> {
     // mint to receiver
     // https://docs.rs/spl-token-2022/latest/spl_token_2022/instruction/fn.mint_to.html
