@@ -147,7 +147,9 @@ type CommitOffchainConfig struct {
 	// TokenPriceAsyncObserverSyncFreq defines how frequently the async token price observer should sync.
 	TokenPriceAsyncObserverSyncFreq commonconfig.Duration `json:"tokenPriceAsyncObserverSyncFreq"`
 
-	// TokenPriceAsyncObserverSyncTimeout defines the timeout for a single sync operation (e.g. fetch token prices).
+	// TokenPriceAsyncObserverSyncTimeout defines the timeout for a single
+	// token price observation operation (e.g. fetch token prices).
+	// NOTE: It is also used when the async observer is disabled, while making the sync calls.
 	TokenPriceAsyncObserverSyncTimeout commonconfig.Duration `json:"tokenPriceAsyncObserverSyncTimeout"`
 
 	// MaxRootsPerReport is the maximum number of roots to include in a single report.
