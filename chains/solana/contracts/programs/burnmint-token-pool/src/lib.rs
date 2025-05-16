@@ -220,20 +220,22 @@ pub mod burnmint_token_pool {
                 .ok_or(CcipTokenPoolError::InvalidMultisig)?;
             require_eq!(ctx.accounts.state.multisig, multisig_account.key());
 
-            Some(multisig_account)
+            Some(multisig_account.clone())
         } else {
             None
         };
 
         mint_tokens(
             ctx.accounts.token_program.key(),
-            ctx.accounts.receiver_token_account.to_account_info(),
-            ctx.accounts.mint.to_account_info(),
-            ctx.accounts.pool_signer.to_account_info(),
-            ctx.bumps.pool_signer,
             release_or_mint,
             parsed_amount,
-            multisig,
+            MintTokenAccountsInfo {
+                receiver_token_account: ctx.accounts.receiver_token_account.to_account_info(),
+                mint: ctx.accounts.mint.to_account_info(),
+                pool_signer: ctx.accounts.pool_signer.to_account_info(),
+                pool_signer_bump: ctx.bumps.pool_signer,
+                multisig,
+            },
         )?;
 
         Ok(ReleaseOrMintOutV1 {
@@ -335,52 +337,64 @@ pub fn burn_tokens<'a>(
     Ok(())
 }
 
+pub struct MintTokenAccountsInfo<'a> {
+    pub receiver_token_account: AccountInfo<'a>,
+    pub mint: AccountInfo<'a>,
+    pub pool_signer: AccountInfo<'a>,
+    pub pool_signer_bump: u8,
+    pub multisig: Option<AccountInfo<'a>>,
+}
+
 pub fn mint_tokens<'a>(
     token_program: Pubkey,
-    receiver_token_account: AccountInfo<'a>,
-    mint: AccountInfo<'a>,
-    pool_signer: AccountInfo<'a>,
-    pool_signer_bump: u8,
     release_or_mint: ReleaseOrMintInV1,
     parsed_amount: u64,
-    multisig: Option<&AccountInfo<'a>>,
+    accounts: MintTokenAccountsInfo<'a>,
 ) -> Result<()> {
     // mint to receiver
     // https://docs.rs/spl-token-2022/latest/spl_token_2022/instruction/fn.mint_to.html
     let mut ix = mint_to(
         &spl_token_2022::ID, // use spl-token-2022 to compile instruction - change program later
-        &mint.key(),
-        &receiver_token_account.key(),
-        &multisig.clone().unwrap_or(&pool_signer).key(),
-        &[pool_signer.key],
+        &accounts.mint.key(),
+        &accounts.receiver_token_account.key(),
+        &accounts
+            .multisig
+            .clone()
+            .unwrap_or(accounts.pool_signer.clone())
+            .key(),
+        &[accounts.pool_signer.key],
         parsed_amount,
     )?;
     ix.program_id = token_program.key(); // set to user specified program
 
     let seeds = &[
         POOL_SIGNER_SEED,
-        &mint.key().to_bytes(),
-        &[pool_signer_bump],
+        &accounts.mint.key().to_bytes(),
+        &[accounts.pool_signer_bump],
     ];
 
-    let account_infos: Vec<AccountInfo> = if multisig.is_some() {
+    let account_infos: Vec<AccountInfo> = if accounts.multisig.is_some() {
         vec![
-            receiver_token_account,
-            mint.clone(),
-            multisig.unwrap().clone(),
-            pool_signer.clone(),
+            accounts.receiver_token_account,
+            accounts.mint.clone(),
+            accounts.multisig.unwrap(),
+            accounts.pool_signer.clone(),
         ]
     } else {
-        vec![receiver_token_account, mint.clone(), pool_signer.clone()]
+        vec![
+            accounts.receiver_token_account,
+            accounts.mint.clone(),
+            accounts.pool_signer.clone(),
+        ]
     };
 
     invoke_signed(&ix, &account_infos, &[&seeds[..]])?;
 
     emit!(Minted {
-        sender: pool_signer.key(),
+        sender: accounts.pool_signer.key(),
         recipient: release_or_mint.receiver,
         amount: parsed_amount,
-        mint: mint.key(),
+        mint: accounts.mint.key(),
     });
 
     Ok(())
