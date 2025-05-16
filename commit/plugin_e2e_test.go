@@ -696,7 +696,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 			}
 
 			encodedPrevOutcome, err := ocrTypCodec.EncodeOutcome(tc.prevOutcome)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			runner := testhelpers.NewOCR3Runner(nodes, oracleIDs, encodedPrevOutcome)
 			res, err := runner.RunRound(params.ctx)
 			require.NoError(t, err)
@@ -963,9 +963,18 @@ func defaultNodeParams(t *testing.T) SetupNodeParams {
 
 	peerIDsMap := mapset.NewSet(peerIDs...)
 	homeChainConfig := map[ccipocr3.ChainSelector]reader.ChainConfig{
-		destChain:       {FChain: 1, SupportedNodes: peerIDsMap, Config: chainconfig.ChainConfig{}},
-		sourceEvmChain1: {FChain: 1, SupportedNodes: peerIDsMap, Config: chainconfig.ChainConfig{}},
-		sourceSolChain:  {FChain: 1, SupportedNodes: peerIDsMap, Config: chainconfig.ChainConfig{}},
+		destChain: {FChain: 1, SupportedNodes: peerIDsMap, Config: chainconfig.ChainConfig{
+			GasPriceDeviationPPB:   ccipocr3.NewBigInt(big.NewInt(1e9)), // 100% deviation
+			DAGasPriceDeviationPPB: ccipocr3.NewBigInt(big.NewInt(5e8)), // 50% deviation
+		}},
+		sourceEvmChain1: {FChain: 1, SupportedNodes: peerIDsMap, Config: chainconfig.ChainConfig{
+			GasPriceDeviationPPB:   ccipocr3.NewBigInt(big.NewInt(1e9)), // 100% deviation
+			DAGasPriceDeviationPPB: ccipocr3.NewBigInt(big.NewInt(5e8)), // 50% deviation
+		}},
+		sourceSolChain: {FChain: 1, SupportedNodes: peerIDsMap, Config: chainconfig.ChainConfig{
+			GasPriceDeviationPPB:   ccipocr3.NewBigInt(big.NewInt(1e9)), // 100% deviation
+			DAGasPriceDeviationPPB: ccipocr3.NewBigInt(big.NewInt(5e8)), // 50% deviation
+		}},
 	}
 
 	offRampNextSeqNum := map[ccipocr3.ChainSelector]ccipocr3.SeqNum{

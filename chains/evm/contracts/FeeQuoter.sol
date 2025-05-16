@@ -3,20 +3,23 @@ pragma solidity ^0.8.24;
 
 import {IFeeQuoter} from "./interfaces/IFeeQuoter.sol";
 import {IPriceRegistry} from "./interfaces/IPriceRegistry.sol";
-import {IReceiver} from "@chainlink/keystone/interfaces/IReceiver.sol";
-import {ITypeAndVersion} from "@chainlink/shared/interfaces/ITypeAndVersion.sol";
+import {IReceiver} from "@chainlink/contracts/src/v0.8/keystone/interfaces/IReceiver.sol";
+import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {Client} from "./libraries/Client.sol";
 import {Internal} from "./libraries/Internal.sol";
 import {Pool} from "./libraries/Pool.sol";
 import {USDPriceWith18Decimals} from "./libraries/USDPriceWith18Decimals.sol";
-import {KeystoneFeedsPermissionHandler} from "@chainlink/keystone/KeystoneFeedsPermissionHandler.sol";
-import {KeystoneFeedDefaultMetadataLib} from "@chainlink/keystone/lib/KeystoneFeedDefaultMetadataLib.sol";
-import {AuthorizedCallers} from "@chainlink/shared/access/AuthorizedCallers.sol";
-import {AggregatorV3Interface} from "@chainlink/shared/interfaces/AggregatorV3Interface.sol";
+import {KeystoneFeedsPermissionHandler} from "@chainlink/contracts/src/v0.8/keystone/KeystoneFeedsPermissionHandler.sol";
+import {KeystoneFeedDefaultMetadataLib} from
+  "@chainlink/contracts/src/v0.8/keystone/lib/KeystoneFeedDefaultMetadataLib.sol";
+import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
+import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 
-import {IERC165} from "@chainlink/vendor/openzeppelin-solidity/v5.0.2/contracts/interfaces/IERC165.sol";
-import {EnumerableSet} from "@chainlink/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
+import {IERC165} from
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/interfaces/IERC165.sol";
+import {EnumerableSet} from
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
 
 /// @notice The FeeQuoter contract responsibility is to:
 ///   - Store the current gas price in USD for a given destination chain.
@@ -892,7 +895,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
     }
     if (
       chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_APTOS
-        || chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_c4e05953
+        || chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SUI
     ) {
       return Internal._validate32ByteAddress(destAddress, Internal.APTOS_PRECOMPILE_SPACE);
     }
@@ -1006,7 +1009,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
     if (
       destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_EVM
         || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_APTOS
-        || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_c4e05953
+        || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SUI
     ) {
       gasLimit = _parseGenericExtraArgsFromBytes(
         message.extraArgs,
@@ -1128,7 +1131,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
     if (
       destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_EVM
         || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_APTOS
-        || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_c4e05953
+        || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SUI
     ) {
       Client.GenericExtraArgsV2 memory parsedExtraArgs =
         _parseUnvalidatedEVMExtraArgsFromBytes(extraArgs, destChainConfig.defaultTxGasLimit);
@@ -1228,7 +1231,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
             destChainConfig.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_EVM
               && destChainConfig.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_SVM
               && destChainConfig.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_APTOS
-              && destChainConfig.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_c4e05953
+              && destChainConfig.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_SUI
           )
       ) {
         revert InvalidDestChainConfig(destChainSelector);

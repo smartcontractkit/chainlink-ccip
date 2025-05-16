@@ -10,7 +10,7 @@ import {ConformingReceiver} from "../../helpers/receivers/ConformingReceiver.sol
 import {MaybeRevertMessageReceiver} from "../../helpers/receivers/MaybeRevertMessageReceiver.sol";
 import {MaybeRevertMessageReceiverNo165} from "../../helpers/receivers/MaybeRevertMessageReceiverNo165.sol";
 import {OffRampSetup} from "./OffRampSetup.t.sol";
-import {CallWithExactGas} from "@chainlink/shared/call/CallWithExactGas.sol";
+import {CallWithExactGas} from "@chainlink/contracts/src/v0.8/shared/call/CallWithExactGas.sol";
 
 import {Vm} from "forge-std/Vm.sol";
 

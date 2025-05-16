@@ -15,9 +15,10 @@ import {MerkleHelper} from "../helpers/MerkleHelper.sol";
 import {OnRampHelper} from "../helpers/OnRampHelper.sol";
 import {OffRampSetup} from "../offRamp/OffRamp/OffRampSetup.t.sol";
 import {OnRampSetup} from "../onRamp/OnRamp/OnRampSetup.t.sol";
-import {AuthorizedCallers} from "@chainlink/shared/access/AuthorizedCallers.sol";
+import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
-import {IERC20} from "@chainlink/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import {IERC20} from
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
 /// @notice This E2E test implements the following scenario:
 /// 1. Send multiple messages from multiple source chains to a single destination chain (2 messages from source chain
