@@ -11,6 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/libocr/commontypes"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/asynclib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	pkgreader "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
@@ -25,14 +26,27 @@ func (p *processor) Observation(
 ) (Observation, error) {
 	lggr := logutil.WithContextValues(ctx, p.lggr)
 
-	fChain := p.observeFChain(lggr)
-	if len(fChain) == 0 {
-		return Observation{}, nil
+	var (
+		fChain           map[cciptypes.ChainSelector]int
+		feedTokenPrices  cciptypes.TokenPriceMap
+		feeQuoterUpdates map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig
+	)
+
+	operations := asynclib.AsyncNoErrOperationsMap{
+		"observeFeedTokenPrices": func(ctx context.Context, l logger.Logger) {
+			feedTokenPrices = p.obs.observeFeedTokenPrices(ctx, l)
+		},
+		"observeFeeQuoterTokenUpdates": func(ctx context.Context, l logger.Logger) {
+			feeQuoterUpdates = p.obs.observeFeeQuoterTokenUpdates(ctx, l)
+		},
+		"observeFChain": func(_ context.Context, l logger.Logger) {
+			fChain = p.observeFChain(l)
+		},
 	}
 
-	feedTokenPrices := p.obs.observeFeedTokenPrices(ctx, lggr)
-	feeQuoterUpdates := p.obs.observeFeeQuoterTokenUpdates(ctx, lggr)
+	asynclib.WaitForAllNoErrOperations(ctx, p.offChainCfg.TokenPriceAsyncObserverSyncTimeout.Duration(), operations, lggr)
 	now := time.Now().UTC()
+
 	lggr.Infow(
 		"observed token prices",
 		"feedPrices", feedTokenPrices,

@@ -82,11 +82,9 @@ type Plugin struct {
 	addrCodec         cciptypes.AddressCodec
 
 	// state
-
 	contractsInitialized bool
-	// commitRootsCache remembers commit root details to optimize DB lookups.
-	commitRootsCache cache.CommitsRootsCache
-	// inflightMessageCache prevents duplicate reports from being sent for the same message.
+	commitRootsCache     cache.CommitsRootsCache
+	commitReportCache    cache.CommitReportCache
 	inflightMessageCache inflightMessageCache
 }
 
@@ -109,6 +107,15 @@ func NewPlugin(
 	lggr.Infow("creating new plugin instance", "p2pID", oracleIDToP2pID[reportingCfg.OracleID])
 
 	ocrTypCodec := ocrtypecodec.DefaultExecCodec
+
+	// Initialize CommitReportCacheConfig
+	commitReportCacheCfg := cache.CommitReportCacheConfig{
+		MessageVisibilityInterval: offchainCfg.MessageVisibilityInterval.Duration(),
+		EvictionGracePeriod:       cache.EvictionGracePeriod,
+		CleanupInterval:           cache.CleanupInterval,
+		LookbackGracePeriod:       offchainCfg.MessageVisibilityInterval.Duration() / 8,
+	}
+
 	p := &Plugin{
 		donID:             donID,
 		reportingCfg:      reportingCfg,
@@ -143,6 +150,12 @@ func NewPlugin(
 			logutil.WithComponent(lggr, "CommitRootsCache"),
 			offchainCfg.MessageVisibilityInterval.Duration(),
 			offchainCfg.RootSnoozeTime.Duration(),
+		),
+		commitReportCache: cache.NewCommitReportCache(
+			logutil.WithComponent(lggr, "CommitReportCache"),
+			commitReportCacheCfg,
+			&cache.RealTimeProvider{},
+			ccipReader,
 		),
 		inflightMessageCache: cache.NewInflightMessageCache(offchainCfg.InflightCacheExpiry.Duration()),
 		ocrTypeCodec:         ocrTypCodec,
