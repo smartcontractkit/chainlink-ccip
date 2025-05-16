@@ -3,7 +3,6 @@ package chainfee
 import (
 	"context"
 	"math/big"
-	"sync"
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -11,6 +10,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
+
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/asynclib"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
@@ -37,7 +38,7 @@ func (p *processor) Observation(
 		fChain            map[cciptypes.ChainSelector]int
 	)
 
-	operations := map[string]func(ctx context.Context, l logger.Logger){
+	operations := asynclib.AsyncNoErrOperationsMap{
 		"getChainsFeeComponents": func(ctx context.Context, l logger.Logger) {
 			feeComponents = p.obs.getChainsFeeComponents(ctx, l)
 		},
@@ -52,22 +53,7 @@ func (p *processor) Observation(
 		},
 	}
 
-	callTimeout := p.cfg.ChainFeeAsyncObserverSyncTimeout
-	callCtx, cf := context.WithTimeout(ctx, callTimeout)
-	defer cf()
-	lggr.Debugw("spawning observing goroutines", "timeout", callTimeout)
-
-	wg := sync.WaitGroup{}
-	wg.Add(len(operations))
-	for opName, op := range operations {
-		go func(opName string, op func(ctx context.Context, l logger.Logger)) {
-			defer wg.Done()
-			tStart := time.Now()
-			op(callCtx, logger.With(lggr, "opID", opName))
-			lggr.Debugw("observing goroutine finished", "opID", opName, "duration", time.Since(tStart))
-		}(opName, op)
-	}
-	wg.Wait()
+	asynclib.WaitForAllNoErrOperations(ctx, p.cfg.ChainFeeAsyncObserverSyncTimeout, operations, lggr)
 	now := time.Now().UTC()
 
 	lggr.Infow("observed fee components",
