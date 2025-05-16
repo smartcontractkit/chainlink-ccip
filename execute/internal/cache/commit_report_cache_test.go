@@ -261,8 +261,10 @@ func TestGenerateKey(t *testing.T) {
 		},
 		Timestamp: ts, BlockNum: 1,
 	}
-	expectedKeyBlessed := fmt.Sprintf("%s_%s", ccipocr3.ChainSelector(1).String(), ccipocr3.Bytes32{10}.String())
-	assert.Equal(t, expectedKeyBlessed, generateKey(reportBlessed))
+	expectedKeyBlessed := fmt.Sprintf("%d_%x", uint64(1), ccipocr3.Bytes32{10})
+	key, err := generateKey(reportBlessed)
+	require.NoError(t, err)
+	assert.Equal(t, expectedKeyBlessed, key)
 
 	reportUnblessed := ccipocr3.CommitPluginReportWithMeta{
 		Report: ccipocr3.CommitPluginReport{
@@ -270,8 +272,10 @@ func TestGenerateKey(t *testing.T) {
 		},
 		Timestamp: ts, BlockNum: 2,
 	}
-	expectedKeyUnblessed := fmt.Sprintf("%s_%s", ccipocr3.ChainSelector(2).String(), ccipocr3.Bytes32{20}.String())
-	assert.Equal(t, expectedKeyUnblessed, generateKey(reportUnblessed))
+	expectedKeyUnblessed := fmt.Sprintf("%d_%x", uint64(2), ccipocr3.Bytes32{20})
+	key, err = generateKey(reportUnblessed)
+	require.NoError(t, err)
+	assert.Equal(t, expectedKeyUnblessed, key)
 
 	reportBoth := ccipocr3.CommitPluginReportWithMeta{
 		Report: ccipocr3.CommitPluginReport{
@@ -280,11 +284,14 @@ func TestGenerateKey(t *testing.T) {
 		},
 		Timestamp: ts, BlockNum: 3,
 	}
-	assert.Equal(t, expectedKeyBlessed, generateKey(reportBoth), "Should prioritize blessed root")
+	key, err = generateKey(reportBoth)
+	require.NoError(t, err)
+	assert.Equal(t, expectedKeyBlessed, key, "Should prioritize blessed root")
 
 	reportNone := ccipocr3.CommitPluginReportWithMeta{Report: ccipocr3.CommitPluginReport{}, Timestamp: ts, BlockNum: 4}
-	expectedKeyNone := fmt.Sprintf("%d_%d", ts.Unix(), uint64(4))
-	assert.Equal(t, expectedKeyNone, generateKey(reportNone))
+	key, err = generateKey(reportNone)
+	require.Error(t, err, "Should return error for report with no roots")
+	assert.Empty(t, key, "Key should be empty when there are no roots")
 }
 
 func TestCommitReportCache_GetReportsToQueryFromTimestamp_EmptyCache(t *testing.T) {

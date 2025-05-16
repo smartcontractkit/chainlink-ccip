@@ -72,9 +72,6 @@ func NewCommitReportCache(
 		// A zero lookback might defeat the purpose of the cache for LogPoller delays.
 		// Setting a sensible default or requiring it to be explicitly set is important.
 		defaultLookback := cfg.MessageVisibilityInterval / 8
-		if defaultLookback < 1*time.Minute && cfg.CleanupInterval > 0 {
-			defaultLookback = cfg.CleanupInterval / 4
-		}
 		if defaultLookback < 1*time.Minute {
 			// absolute minimum fallback
 			defaultLookback = 1 * time.Minute
@@ -104,25 +101,22 @@ func NewCommitReportCache(
 }
 
 // generateKey creates a unique key for a commit report
-func generateKey(report ccipocr3.CommitPluginReportWithMeta) string {
-	// We'll create a unique key for each report by combining relevant fields
-	// For each blessed merkle root
-	// NOTE: This keying strategy means if a report has multiple blessed/unblessed roots,
-	// only the *first* one encountered will define its key. This might be problematic if reports
-	// can have multiple roots that need to be treated as distinct entries or if the order is not guaranteed.
-	// For now, implementing as requested.
-	for _, mrc := range report.Report.BlessedMerkleRoots {
-		return fmt.Sprintf("%s_%s", mrc.ChainSel.String(), mrc.MerkleRoot.String())
+// Returns an error if the report has no Merkle roots
+func generateKey(report ccipocr3.CommitPluginReportWithMeta) (string, error) {
+	// Check for blessed roots first
+	if len(report.Report.BlessedMerkleRoots) > 0 {
+		root := report.Report.BlessedMerkleRoots[0]
+		return fmt.Sprintf("%d_%x", root.ChainSel, root.MerkleRoot), nil
 	}
 
-	// If no blessed roots (unlikely but possible), check unblessed roots
-	for _, mrc := range report.Report.UnblessedMerkleRoots {
-		return fmt.Sprintf("%s_%s", mrc.ChainSel.String(), mrc.MerkleRoot.String())
+	// Then check for unblessed roots
+	if len(report.Report.UnblessedMerkleRoots) > 0 {
+		root := report.Report.UnblessedMerkleRoots[0]
+		return fmt.Sprintf("%d_%x", root.ChainSel, root.MerkleRoot), nil
 	}
 
-	// Fallback if no merkle roots (this should ideally not be reached if reports are pre-filtered
-	// before attempting to add to a cache that expects roots, or if generateKey is only called for reports with roots)
-	return fmt.Sprintf("%d_%d", report.Timestamp.Unix(), report.BlockNum)
+	// Return error if no roots
+	return "", fmt.Errorf("report has no Merkle roots")
 }
 
 func (c *commitReportCache) RefreshCache(ctx context.Context) error {
@@ -155,7 +149,14 @@ func (c *commitReportCache) RefreshCache(ctx context.Context) error {
 			continue
 		}
 
-		key := generateKey(report)
+		key, err := generateKey(report)
+		if err != nil {
+			c.lggr.Errorw("RefreshCache: failed to generate key for report",
+				"err", err,
+				"timestamp", report.Timestamp,
+				"blockNum", report.BlockNum)
+			continue
+		}
 		// Add to cache with default expiration (MessageVisibilityInterval + EvictionGracePeriod)
 		c.reportsCache.SetDefault(key, report)
 		addedCount++
@@ -231,7 +232,6 @@ func (c *commitReportCache) GetCachedReports(fromTimestamp time.Time) []ccipocr3
 
 		// Filter by fromTimestamp. We want reports >= fromTimestamp.
 		// The cache stores items that are within (MessageVisibilityInterval + EvictionGracePeriod)
-		// So, they should generally be recent enough.
 		if report.Timestamp.After(fromTimestamp) || report.Timestamp.Equal(fromTimestamp) {
 			result = append(result, report)
 		}
