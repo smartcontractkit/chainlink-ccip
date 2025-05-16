@@ -163,3 +163,35 @@ func aggregateObservations(aos []plugincommon.AttributedObservation[Observation]
 
 	return aggObs
 }
+
+func newEmptyOutcome() Outcome {
+	return Outcome{}
+}
+
+func newInflightPricesOutcome(
+	inflightPrices map[cciptypes.UnknownEncodedAddress]time.Time,
+	remainingChecks int64,
+) Outcome {
+	if remainingChecks <= 0 || len(inflightPrices) == 0 {
+		return newEmptyOutcome()
+	}
+	return Outcome{
+		InflightTokenPriceUpdates: inflightPrices,
+		InflightRemainingChecks:   remainingChecks,
+	}
+}
+
+func newTokenPricesOutcome(
+	tokenPrices cciptypes.TokenPriceMap,
+	inflightPrices map[cciptypes.UnknownEncodedAddress]time.Time,
+	remainingChecks int64,
+) Outcome {
+	if len(tokenPrices) == 0 {
+		return newInflightPricesOutcome(inflightPrices, remainingChecks)
+	}
+	return Outcome{
+		TokenPrices:               tokenPrices,
+		InflightTokenPriceUpdates: inflightPrices,
+		InflightRemainingChecks:   remainingChecks,
+	}
+}

@@ -23,12 +23,20 @@ type Query struct {
 type Outcome struct {
 	// Each Gas Price is the combination of Execution and DataAvailability Fees using bitwise operations
 	GasPrices []cciptypes.GasPriceChain `json:"gasPrices"`
+
+	InflightChainFeeUpdates map[cciptypes.ChainSelector]time.Time `json:"inflightChainFeeUpdates"`
+	InflightRemainingChecks int64                                 `json:"inflightRemainingChecks"`
 }
 
 func (o Outcome) Stats() map[string]int {
 	return map[string]int{
 		gasPricesLabel: len(o.GasPrices),
 	}
+}
+
+// HasInflightPrices checks if there are any inflight prices in the outcome.
+func (o Outcome) HasInflightPrices() bool {
+	return o.InflightRemainingChecks > 0 && len(o.InflightChainFeeUpdates) > 0
 }
 
 type Observation struct {

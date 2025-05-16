@@ -10,8 +10,9 @@ import (
 
 	"golang.org/x/exp/maps"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/internal/builder"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
@@ -226,7 +227,8 @@ func (p *Plugin) validateReport(
 			plugincommon.NewErrValidatingReport(fmt.Errorf("get latest price seq nr: %w", err))
 	}
 
-	if p.isStaleReport(lggr, seqNr, latestPriceSeqNr, decodedReport) {
+	multiPriceReports := p.offchainCfg.MaxPricesPerReport > 0
+	if p.isStaleReport(lggr, seqNr, latestPriceSeqNr, decodedReport, multiPriceReports) {
 		return cciptypes.CommitPluginReport{}, plugincommon.NewErrInvalidReport("stale report")
 	}
 
@@ -291,16 +293,23 @@ func (p *Plugin) decodeReport(
 
 func (p *Plugin) isStaleReport(
 	lggr logger.Logger,
-	seqNr,
-	latestPriceSeqNr uint64,
+	reportSeqNr,
+	latestOnChainReportSeqNr uint64,
 	decodedReport cciptypes.CommitPluginReport,
+	multiPriceReports bool, // multiple price reports within the same ocr round
 ) bool {
-	if seqNr <= latestPriceSeqNr &&
+	reportSeqNumStale := reportSeqNr <= latestOnChainReportSeqNr
+	if multiPriceReports {
+		reportSeqNumStale = reportSeqNr < latestOnChainReportSeqNr
+	}
+
+	if reportSeqNumStale &&
 		len(decodedReport.BlessedMerkleRoots) == 0 &&
 		len(decodedReport.UnblessedMerkleRoots) == 0 {
 		lggr.Infow(
 			"skipping stale report due to stale price seq nr and no merkle roots",
-			"latestPriceSeqNr", latestPriceSeqNr)
+			"latestPriceSeqNr", latestOnChainReportSeqNr,
+			"multiPriceReportsEnabled", multiPriceReports)
 		return true
 	}
 	return false

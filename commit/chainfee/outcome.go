@@ -20,22 +20,28 @@ import (
 
 func (p *processor) Outcome(
 	ctx context.Context,
-	_ Outcome,
+	prevOutcome Outcome,
 	_ Query,
 	aos []plugincommon.AttributedObservation[Observation],
 ) (Outcome, error) {
 	lggr := logutil.WithContextValues(ctx, p.lggr)
 
+	inflightPricesOutcome := newInflightPricesOutcome(
+		prevOutcome.InflightChainFeeUpdates, prevOutcome.InflightRemainingChecks-1)
+
 	consensusObs, err := p.getConsensusObservation(lggr, aos)
 	if err != nil {
-		return Outcome{}, fmt.Errorf("get consensus observation: %w", err)
+		return inflightPricesOutcome, fmt.Errorf("get consensus observation: %w", err)
 	}
 
 	// No need to update yet
 	if len(consensusObs.FeeComponents) == 0 {
-		lggr.Warn("no consensus on fee components, nothing to update",
-			"consensusObs", consensusObs)
-		return Outcome{}, nil
+		lggr.Warnw("no consensus on fee components, nothing to update", "consensusObs", consensusObs)
+		return inflightPricesOutcome, nil
+	}
+
+	if prevOutcome.HasInflightPrices() {
+		return p.computeInflightPricesOutcome(lggr, consensusObs, prevOutcome), nil
 	}
 
 	chainFeeUSDPrices := make(map[cciptypes.ChainSelector]ComponentsUSDPrices)
@@ -101,8 +107,53 @@ func (p *processor) Outcome(
 		"gasPrices", gasPrices,
 		"consensusTimestamp", consensusObs.TimestampNow,
 	)
-	out := Outcome{GasPrices: gasPrices}
-	return out, nil
+
+	inflightChainFeeUpdates := make(map[cciptypes.ChainSelector]time.Time)
+	for _, gasPriceUpdate := range gasPrices {
+		chainSel := gasPriceUpdate.ChainSel
+		inflightChainFeeUpdates[chainSel] = time.Time{}
+		oldChainFeeUpdate, ok := consensusObs.ChainFeeUpdates[chainSel]
+		if ok {
+			inflightChainFeeUpdates[chainSel] = oldChainFeeUpdate.Timestamp
+		}
+	}
+
+	return newPricesOutcome(gasPrices, inflightChainFeeUpdates, int64(p.cfg.InflightPriceCheckRetries)), nil
+}
+
+// computeInflightPricesOutcome is called if in this round we wait for prices to appear OnChain.
+// If we still wait for some prices it will decrement the number of available retries.
+// If all prices appeared OnChain or no retries left it sends an empty outcome so we can transmit fresh prices in the
+// next round.
+func (p *processor) computeInflightPricesOutcome(
+	lggr logger.Logger, consensusObs Observation, prevOutcome Outcome,
+) Outcome {
+	lggr.Infow("checking for previously transmitted chain fee price updates to appear on-chain",
+		"prevUpdate", prevOutcome.InflightChainFeeUpdates,
+		"currUpdates", consensusObs.ChainFeeUpdates,
+		"remRetries", prevOutcome.InflightRemainingChecks,
+	)
+
+	for chainSel, inflightUpdate := range prevOutcome.InflightChainFeeUpdates {
+		lggr2 := logger.With(lggr, "chainSel", chainSel, "prevUpdate", inflightUpdate,
+			"currUpdates", consensusObs.ChainFeeUpdates, "remRetries", prevOutcome.InflightRemainingChecks)
+
+		currUpdate, exists := consensusObs.ChainFeeUpdates[chainSel]
+		priceAppearedOnChain := exists && currUpdate.Timestamp.After(inflightUpdate)
+
+		if !priceAppearedOnChain {
+			lggr2.Infow("waiting for previously transmitted chain fee price update to appear on-chain")
+			return newInflightPricesOutcome(prevOutcome.InflightChainFeeUpdates, prevOutcome.InflightRemainingChecks-1)
+		}
+
+		lggr2.Debugw("previously transmitted chain fee price update appeared on-chain")
+	}
+
+	// we don't want to transmit the current prices in this round because they might have been recorded onChain
+	// in-between Observation and Outcome ocr3 phases, and we might be reporting duplicates. We instead want to send
+	// an empty outcome so that in the next round we can properly send new prices.
+	lggr.Infow("all inflight prices appeared OnChain")
+	return newEmptyOutcome()
 }
 
 func (p *processor) getConsensusObservation(
@@ -358,4 +409,36 @@ func chainFeeUpdateAggregator(updates []Update) Update {
 func FeeComponentsToPackedFee(c ComponentsUSDPrices) *big.Int {
 	daShifted := new(big.Int).Lsh(c.DataAvFeePriceUSD, 112)
 	return new(big.Int).Or(daShifted, c.ExecutionFeePriceUSD)
+}
+
+func newEmptyOutcome() Outcome {
+	return Outcome{}
+}
+
+func newInflightPricesOutcome(
+	inflightPrices map[cciptypes.ChainSelector]time.Time,
+	inflightRemainingChecks int64,
+) Outcome {
+	if inflightRemainingChecks <= 0 || len(inflightPrices) == 0 {
+		return newEmptyOutcome()
+	}
+	return Outcome{
+		InflightChainFeeUpdates: inflightPrices,
+		InflightRemainingChecks: inflightRemainingChecks,
+	}
+}
+
+func newPricesOutcome(
+	gasPrices []cciptypes.GasPriceChain,
+	inflightPrices map[cciptypes.ChainSelector]time.Time,
+	inflightRemainingChecks int64,
+) Outcome {
+	if len(gasPrices) == 0 {
+		return newInflightPricesOutcome(inflightPrices, inflightRemainingChecks)
+	}
+	return Outcome{
+		GasPrices:               gasPrices,
+		InflightChainFeeUpdates: inflightPrices,
+		InflightRemainingChecks: inflightRemainingChecks,
+	}
 }
