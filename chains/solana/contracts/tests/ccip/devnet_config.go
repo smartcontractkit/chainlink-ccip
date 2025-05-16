@@ -31,6 +31,14 @@ type DevnetInfo struct {
 	CCTP struct {
 		MessageTransmitter string `yaml:"message_transmitter"`
 		TokenMessageMinter string `yaml:"token_message_minter"`
+		Message            struct {
+			MessageBytesHex     string `yaml:"message_bytes_hex"`
+			AttestationBytesHex string `yaml:"attestation_bytes_hex"`
+			Nonce               uint64 `yaml:"nonce"`
+		} `yaml:"message"`
+		Sepolia struct {
+			RecipientBase58 string `yaml:"recipient_base58"`
+		} `yaml:"sepolia"`
 	} `yaml:"cctp"`
 	RPC string `yaml:"rpc"`
 }
