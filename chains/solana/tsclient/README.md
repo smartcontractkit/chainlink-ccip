@@ -234,3 +234,8 @@ Init the token pool config
 ```bash
 npx ts-node src/solana-ccip-token-admin-registry/InitChainRemoteConfig.ts
 ```
+
+## 9. Set Rate limits
+```bash
+npx ts-node src/solana-ccip-token-admin-registry/SetRateLimits.ts
+```
