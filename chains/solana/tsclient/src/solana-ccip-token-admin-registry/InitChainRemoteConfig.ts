@@ -33,7 +33,7 @@ async function main() {
     {
       poolAddresses: [],
       tokenAddress: Uint8Array.from(Buffer.from(tokenAdminRegistry.tokenAddress.replace(/^0x/, ""), "hex")),
-      decimals: 8,
+      decimals: 18,
     },
   ).accounts({
     state: bnMProgramContext.statePda,
@@ -43,7 +43,7 @@ async function main() {
   }).instruction();
 
   const remoteAddressBytes = Buffer.from(tokenAdminRegistry.remoteAddress.replace(/^0x/, ""), "hex");
-  const tokenAddressBytes = Buffer.from(tokenAdminRegistry.tokenAddress.replace(/^0x/, ""), "hex");
+  const tokenAddressBytes = padTo32Bytes(Buffer.from(tokenAdminRegistry.tokenAddress.replace(/^0x/, ""), "hex"));
 
   const ix2 = await bnMProgramContext.program.methods.editChainRemoteConfig(
     remoteChainSelector,
@@ -51,7 +51,7 @@ async function main() {
     {
       poolAddresses: [{ address: remoteAddressBytes }],
       tokenAddress: { address: tokenAddressBytes },
-      decimals: 8,
+      decimals: 18,
     },
   ).accounts({
     state: bnMProgramContext.statePda,
@@ -108,3 +108,18 @@ main()
   .catch((err) => {
     console.error("❌ Error:", err);
   });
+
+function padTo32Bytes(buffer: Buffer): Buffer {
+  if (buffer.length >= 32) {
+    return buffer;
+  }
+
+  // Create a new buffer of 32 bytes
+  const paddedBuffer = Buffer.alloc(32, 0); // Initialize with zeros
+
+  // Copy the original buffer data to the end of the new buffer (right-aligned)
+  // This is the standard Ethereum-style padding
+  buffer.copy(paddedBuffer, 32 - buffer.length);
+
+  return paddedBuffer;
+}
