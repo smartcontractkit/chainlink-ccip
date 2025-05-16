@@ -19,6 +19,9 @@ import (
 const (
 	// DefaultMaxCommitReportsToFetch defines the default limit for fetching commit reports in one go.
 	DefaultMaxCommitReportsToFetch = 1000
+	MinimumLookbackGracePeriod     = 1 * time.Minute  // Minimum sensible lookback (potential LogPoller delays)
+	DefaultLookbackGracePeriod     = 30 * time.Minute // Default lookback grace period if not set
+
 )
 
 // CommitReportCache stores CommitPluginReportWithMeta objects.
@@ -44,10 +47,10 @@ type commitReportCache struct {
 	cfg    CommitReportCacheConfig
 	reader reader.CCIPReader
 
-	cacheMu               sync.RWMutex
-	reportsCache          *cache.Cache
-	latestReportTimestamp time.Time
-	timeProvider          TimeProvider
+	cacheMu                        sync.RWMutex
+	reportsCache                   *cache.Cache
+	latestFinalizedReportTimestamp time.Time
+	timeProvider                   TimeProvider
 }
 
 // CommitReportCacheConfig holds configuration for the CommitReportCache.
@@ -66,18 +69,9 @@ func NewCommitReportCache(
 	reader reader.CCIPReader,
 ) CommitReportCache {
 	if cfg.LookbackGracePeriod == 0 {
-		// Default lookback grace period if not set, e.g., messageVisibilityInterval / 8
-		// This should be configured based on expected LogPoller delays.
-		// For now, let's ensure it's at least a fraction of the cleanup interval or a fixed minimum.
-		// A zero lookback might defeat the purpose of the cache for LogPoller delays.
-		// Setting a sensible default or requiring it to be explicitly set is important.
-		defaultLookback := cfg.MessageVisibilityInterval / 8
-		if defaultLookback < 1*time.Minute {
-			// absolute minimum fallback
-			defaultLookback = 1 * time.Minute
-		}
-		lggr.Warnw("LookbackGracePeriod is zero, setting a default.", "defaultLookback", defaultLookback)
-		cfg.LookbackGracePeriod = defaultLookback
+		// Use a fixed default of 30 minutes instead of calculating based on messageVisibilityInterval
+		lggr.Warnf("LookbackGracePeriod is not set, using default of %v", DefaultLookbackGracePeriod)
+		cfg.LookbackGracePeriod = DefaultLookbackGracePeriod
 	}
 
 	lggr.Infow(
@@ -91,28 +85,33 @@ func NewCommitReportCache(
 	reportsCacheInstance := cache.New(cfg.MessageVisibilityInterval+cfg.EvictionGracePeriod, cfg.CleanupInterval)
 
 	return &commitReportCache{
-		lggr:                  lggr,
-		cfg:                   cfg,
-		reportsCache:          reportsCacheInstance,
-		timeProvider:          timeProvider,
-		reader:                reader,
-		latestReportTimestamp: time.Time{}, // Initialize to zero, will be updated as reports are added
+		lggr:                           lggr,
+		cfg:                            cfg,
+		reportsCache:                   reportsCacheInstance,
+		timeProvider:                   timeProvider,
+		reader:                         reader,
+		latestFinalizedReportTimestamp: time.Time{}, // Initialize to zero, will be updated as reports are added
 	}
 }
 
-// generateKey creates a unique key for a commit report
-// Returns an error if the report has no Merkle roots
+// generateKey creates a unique key for a commit report.
+// The key is based on the ChainSelector and MerkleRoot of the first Merkle root found,
+// prioritizing BlessedMerkleRoots over UnblessedMerkleRoots.
+// It is sufficient to use only the first Merkle root (e.g., BlessedMerkleRoots[0] or UnblessedMerkleRoots[0])
+// because this cache stores finalized commit reports. For finalized reports, the set of Merkle roots
+// and their order within the report are stable. We do not expect re-organizations to cause these.
+// Returns an error if the report has no Merkle roots.
 func generateKey(report ccipocr3.CommitPluginReportWithMeta) (string, error) {
 	// Check for blessed roots first
 	if len(report.Report.BlessedMerkleRoots) > 0 {
 		root := report.Report.BlessedMerkleRoots[0]
-		return fmt.Sprintf("%d_%x", root.ChainSel, root.MerkleRoot), nil
+		return fmt.Sprintf("%d_%s", root.ChainSel, root.MerkleRoot), nil
 	}
 
 	// Then check for unblessed roots
 	if len(report.Report.UnblessedMerkleRoots) > 0 {
 		root := report.Report.UnblessedMerkleRoots[0]
-		return fmt.Sprintf("%d_%x", root.ChainSel, root.MerkleRoot), nil
+		return fmt.Sprintf("%d_%s", root.ChainSel, root.MerkleRoot), nil
 	}
 
 	// Return error if no roots
@@ -136,10 +135,10 @@ func (c *commitReportCache) RefreshCache(ctx context.Context) error {
 
 	c.lggr.Debugw("RefreshCache: received reports from reader", "count", len(reports), "queryTimestamp", queryTs)
 
-	c.cacheMu.Lock()
-	defer c.cacheMu.Unlock()
-
 	addedCount := 0
+
+	// The for loop structure itself is maintained as per the selection boundaries.
+	// Filtering and key generation are done outside the lock.
 	for _, report := range reports {
 		// Filter: only store reports that have Merkle roots.
 		if len(report.Report.BlessedMerkleRoots) == 0 && len(report.Report.UnblessedMerkleRoots) == 0 {
@@ -157,13 +156,16 @@ func (c *commitReportCache) RefreshCache(ctx context.Context) error {
 				"blockNum", report.BlockNum)
 			continue
 		}
+		c.cacheMu.Lock()
 		// Add to cache with default expiration (MessageVisibilityInterval + EvictionGracePeriod)
 		c.reportsCache.SetDefault(key, report)
-		addedCount++
 
-		if report.Timestamp.After(c.latestReportTimestamp) {
-			c.latestReportTimestamp = report.Timestamp.UTC()
+		if report.Timestamp.After(c.latestFinalizedReportTimestamp) {
+			c.latestFinalizedReportTimestamp = report.Timestamp.UTC()
 		}
+		c.cacheMu.Unlock()
+
+		addedCount++ // Increment for each report successfully processed and added.
 	}
 
 	if addedCount > 0 {
@@ -171,7 +173,7 @@ func (c *commitReportCache) RefreshCache(ctx context.Context) error {
 			"addedCount", addedCount,
 			"fetchedCount", len(reports),
 			"totalItemsInCache", c.reportsCache.ItemCount(),
-			"latestReportTimestamp", c.latestReportTimestamp,
+			"latestReportTimestamp", c.latestFinalizedReportTimestamp,
 			"queryTimestampUsed", queryTs)
 	}
 	return nil
@@ -182,22 +184,24 @@ func (c *commitReportCache) GetReportsToQueryFromTimestamp() time.Time {
 	defer c.cacheMu.RUnlock()
 
 	now := c.timeProvider.Now()
-	// Lower bound for query is dictated by the message visibility window.
-	// We should not query for reports older than this, as they are no longer actionable for execution.
-	visibilityWindowStart := now.Add(-c.cfg.MessageVisibilityInterval)
+	// Default query start time is the beginning of the visibility window (messageVisibilityInterval ago).
+	// This also serves as the lower bound for the query (reports older non actionable).
+	queryFrom := now.Add(-c.cfg.MessageVisibilityInterval)
 
-	// Default query start time is the beginning of the visibility window.
-	queryFrom := visibilityWindowStart
+	// visibilityWindowStart is defined here to capture the initial queryFrom value,
+	// as this specific variable name is used in logging outside this selection.
+	visibilityWindowStart := queryFrom
 
 	// If we have a latest report timestamp from the cache, we can potentially optimize.
 	// We need to look back from this latest timestamp by the LookbackGracePeriod
 	// to account for LogPoller delays.
-	if !c.latestReportTimestamp.IsZero() {
-		potentialQueryStart := c.latestReportTimestamp.Add(-c.cfg.LookbackGracePeriod)
-		// We take the later of the visibilityWindowStart or (latestReportTimestamp - lookback).
-		// This ensures we don't query too far back if latestReportTimestamp is very old,
-		// but also ensures we apply the lookback if latestReportTimestamp is recent.
-		if potentialQueryStart.After(queryFrom) {
+	if !c.latestFinalizedReportTimestamp.IsZero() {
+		potentialQueryStart := c.latestFinalizedReportTimestamp.Add(-c.cfg.LookbackGracePeriod)
+		// We take the later of the initial queryFrom value (i.e., visibilityWindowStart)
+		// or (latestReportTimestamp - lookbackGracePeriod).
+		// This ensures we don't query too far back if latestFinalizedReportTimestamp is very old,
+		// but also ensures we apply the lookback if latestFinalizedReportTimestamp is recent.
+		if potentialQueryStart.After(queryFrom) { // queryFrom here is effectively visibilityWindowStart
 			queryFrom = potentialQueryStart
 		}
 	}
@@ -206,7 +210,7 @@ func (c *commitReportCache) GetReportsToQueryFromTimestamp() time.Time {
 		"now", now,
 		"messageVisibilityInterval", c.cfg.MessageVisibilityInterval,
 		"visibilityWindowStart", visibilityWindowStart,
-		"latestReportTimestampInCache", c.latestReportTimestamp,
+		"latestReportTimestampInCache", c.latestFinalizedReportTimestamp,
 		"lookbackGracePeriod", c.cfg.LookbackGracePeriod,
 		"calculatedQueryFrom", queryFrom,
 	)
@@ -232,9 +236,10 @@ func (c *commitReportCache) GetCachedReports(fromTimestamp time.Time) []ccipocr3
 
 		// Filter by fromTimestamp. We want reports >= fromTimestamp.
 		// The cache stores items that are within (MessageVisibilityInterval + EvictionGracePeriod)
-		if report.Timestamp.After(fromTimestamp) || report.Timestamp.Equal(fromTimestamp) {
-			result = append(result, report)
+		if report.Timestamp.Before(fromTimestamp) {
+			continue
 		}
+		result = append(result, report)
 	}
 
 	// Sort reports by timestamp (ascending)

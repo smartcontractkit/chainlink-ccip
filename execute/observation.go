@@ -167,6 +167,18 @@ func (p *Plugin) getCommitReportsObservation(
 	lggr logger.Logger,
 	observation exectypes.Observation,
 ) (exectypes.Observation, error) {
+	// Phase 1: Gather commit reports from the destination chain and determine which messages are required to build
+	//          a valid execution report.
+	supportsDest, err := p.supportsDestChain()
+	if err != nil {
+		return exectypes.Observation{}, fmt.Errorf("unable to determine if the destination chain is supported: %w", err)
+	}
+
+	// No observation for non-dest readers.
+	if !supportsDest {
+		return observation, nil
+	}
+
 	// Refresh the commit report cache first
 	if err := p.commitReportCache.RefreshCache(ctx); err != nil {
 		// Log error but proceed. If RefreshCache fails, GetReportsToQueryFromTimestamp
@@ -180,18 +192,6 @@ func (p *Plugin) getCommitReportsObservation(
 	fetchFrom := p.commitRootsCache.GetTimestampToQueryFrom()
 
 	lggr.Infow("Querying commit reports", "fetchFrom", fetchFrom)
-
-	// Phase 1: Gather commit reports from the destination chain and determine which messages are required to build
-	//          a valid execution report.
-	supportsDest, err := p.supportsDestChain()
-	if err != nil {
-		return exectypes.Observation{}, fmt.Errorf("unable to determine if the destination chain is supported: %w", err)
-	}
-
-	// No observation for non-dest readers.
-	if !supportsDest {
-		return observation, nil
-	}
 
 	// Get curse information from the destination chain.
 	ci, err := p.getCurseInfo(ctx, lggr)

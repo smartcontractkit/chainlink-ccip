@@ -56,7 +56,7 @@ func TestCommitReportCache_NewCommitReportCache_DefaultLookback(t *testing.T) {
 	visInterval := 8 * time.Hour
 	cleanupInterval := 30 * time.Minute
 
-	// Test case 1: LookbackGracePeriod = 0, defaults to visInterval / 8
+	// Test case 1: LookbackGracePeriod = 0, defaults to fixed 30 minutes
 	cfg1 := CommitReportCacheConfig{
 		MessageVisibilityInterval: visInterval,
 		EvictionGracePeriod:       1 * time.Hour,
@@ -64,26 +64,23 @@ func TestCommitReportCache_NewCommitReportCache_DefaultLookback(t *testing.T) {
 		LookbackGracePeriod:       0, // Test this
 	}
 	cache1 := NewCommitReportCache(lggr, cfg1, tp, mockRdr).(*commitReportCache)
-	expectedLookback1 := visInterval / 8
-	assert.Equal(t, expectedLookback1, cache1.cfg.LookbackGracePeriod, "Test Case 1 Failed")
+	expectedLookback := 30 * time.Minute
+	assert.Equal(t, expectedLookback, cache1.cfg.LookbackGracePeriod, "Test Case 1 Failed")
 
-	// Test case 2: visInterval / 8 is less than 1 minute, cleanupInterval / 4 is used
-	shortVisInterval := 30 * time.Minute // -> visInterval/8 = 3.75 min
+	// Test case 2: LookbackGracePeriod = 0, same fixed default used regardless of visInterval
+	shortVisInterval := 30 * time.Minute
 	cfg2 := CommitReportCacheConfig{
 		MessageVisibilityInterval: shortVisInterval,
 		EvictionGracePeriod:       1 * time.Hour,
-		CleanupInterval:           8 * time.Minute, // -> cleanupInterval/4 = 2 min
+		CleanupInterval:           8 * time.Minute,
 		LookbackGracePeriod:       0,
 	}
 	cache2 := NewCommitReportCache(lggr, cfg2, tp, mockRdr).(*commitReportCache)
-	//expectedLookback2 := cfg2.CleanupInterval / 4  // Original logic had this if defaultLookback < 1min
-	// Current logic: defaultLookback = shortVisInterval / 8 = 3.75min. This is > 1min.
-	expectedLookback2 := shortVisInterval / 8
-	assert.Equal(t, expectedLookback2, cache2.cfg.LookbackGracePeriod, "Test Case 2 Failed")
+	assert.Equal(t, expectedLookback, cache2.cfg.LookbackGracePeriod, "Test Case 2 Failed")
 
-	// Test case 3: visInterval / 8 is very small, cleanupInterval / 4 is also small, defaults to 1 minute
-	veryShortVisInterval := 1 * time.Minute // -> visInterval/8 = 7.5s
-	shortCleanupInterval := 2 * time.Minute // -> cleanupInterval/4 = 30s
+	// Test case 3: LookbackGracePeriod = 0, same fixed default even for very short intervals
+	veryShortVisInterval := 1 * time.Minute
+	shortCleanupInterval := 2 * time.Minute
 	cfg3 := CommitReportCacheConfig{
 		MessageVisibilityInterval: veryShortVisInterval,
 		EvictionGracePeriod:       1 * time.Hour,
@@ -91,9 +88,7 @@ func TestCommitReportCache_NewCommitReportCache_DefaultLookback(t *testing.T) {
 		LookbackGracePeriod:       0,
 	}
 	cache3 := NewCommitReportCache(lggr, cfg3, tp, mockRdr).(*commitReportCache)
-	// defaultLookback = 7.5s. 7.5s < 1min. cleanupInterval > 0. defaultLookback becomes cleanupInterval / 4 = 30s.
-	// 30s < 1min. defaultLookback becomes 1min.
-	assert.Equal(t, 1*time.Minute, cache3.cfg.LookbackGracePeriod, "Test Case 3 Failed")
+	assert.Equal(t, expectedLookback, cache3.cfg.LookbackGracePeriod, "Test Case 3 Failed")
 
 	// Test case 4: LookbackGracePeriod is already set
 	presetLookback := 15 * time.Minute
@@ -199,8 +194,8 @@ func TestCommitReportCache_RefreshCache_ConvertsLatestReportTimestampToUTC(t *te
 	err = cache.RefreshCache(context.Background())
 	require.NoError(t, err)
 
-	assert.Equal(t, time.UTC, cache.latestReportTimestamp.Location())
-	assert.True(t, cache.latestReportTimestamp.Equal(reportTimeNonUTC.UTC()))
+	assert.Equal(t, time.UTC, cache.latestFinalizedReportTimestamp.Location())
+	assert.True(t, cache.latestFinalizedReportTimestamp.Equal(reportTimeNonUTC.UTC()))
 	mockRdr.AssertExpectations(t)
 }
 
@@ -248,7 +243,7 @@ func TestCommitReportCache_RefreshCache_UpdatesLatestReportTimestampToMostRecent
 
 	err := cache.RefreshCache(context.Background())
 	require.NoError(t, err)
-	assert.True(t, r2.Timestamp.UTC().Equal(cache.latestReportTimestamp))
+	assert.True(t, r2.Timestamp.UTC().Equal(cache.latestFinalizedReportTimestamp))
 	mockRdr.AssertExpectations(t)
 }
 
@@ -261,7 +256,7 @@ func TestGenerateKey(t *testing.T) {
 		},
 		Timestamp: ts, BlockNum: 1,
 	}
-	expectedKeyBlessed := fmt.Sprintf("%d_%x", uint64(1), ccipocr3.Bytes32{10})
+	expectedKeyBlessed := fmt.Sprintf("%d_%s", uint64(1), reportBlessed.Report.BlessedMerkleRoots[0].MerkleRoot)
 	key, err := generateKey(reportBlessed)
 	require.NoError(t, err)
 	assert.Equal(t, expectedKeyBlessed, key)
@@ -272,7 +267,7 @@ func TestGenerateKey(t *testing.T) {
 		},
 		Timestamp: ts, BlockNum: 2,
 	}
-	expectedKeyUnblessed := fmt.Sprintf("%d_%x", uint64(2), ccipocr3.Bytes32{20})
+	expectedKeyUnblessed := fmt.Sprintf("%d_%s", uint64(2), reportUnblessed.Report.UnblessedMerkleRoots[0].MerkleRoot)
 	key, err = generateKey(reportUnblessed)
 	require.NoError(t, err)
 	assert.Equal(t, expectedKeyUnblessed, key)
@@ -325,7 +320,7 @@ func TestCommitReportCache_GetReportsToQueryFromTimestamp_LookbackApplied(t *tes
 	}
 	cache := NewCommitReportCache(lggr, cacheCfg, tp, mockRdr).(*commitReportCache)
 
-	cache.latestReportTimestamp = now.Add(-1 * time.Hour)
+	cache.latestFinalizedReportTimestamp = now.Add(-1 * time.Hour)
 
 	expectedQueryTs := now.Add(-1 * time.Hour).Add(-lookback)
 	assert.True(t, expectedQueryTs.Equal(cache.GetReportsToQueryFromTimestamp()))
@@ -345,7 +340,7 @@ func TestCommitReportCache_GetReportsToQueryFromTimestamp_VisibilityWindowDomina
 	}
 	cache := NewCommitReportCache(lggr, cacheCfg, tp, mockRdr).(*commitReportCache)
 
-	cache.latestReportTimestamp = now.Add(-3 * time.Hour)
+	cache.latestFinalizedReportTimestamp = now.Add(-3 * time.Hour)
 
 	expectedQueryTs := now.Add(-visInterval)
 	assert.True(t, expectedQueryTs.Equal(cache.GetReportsToQueryFromTimestamp()))
