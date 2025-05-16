@@ -24,18 +24,18 @@ func main() {
 		outDirSuffix = os.Args[4]
 	}
 
-	if os.Getenv("ZKSYNC") != "true" {
-		abiPath := rootDir + project + "/" + className + "/" + className + ".sol/" + className + ".abi.json"
-		binPath := rootDir + project + "/" + className + "/" + className + ".sol/" + className + ".bin"
-		metadataPath := rootDir + project + "/" + className + "/build/build.json"
-
-		GenWrapper(abiPath, binPath, metadataPath, className, pkgName, outDirSuffix)
-	} else {
+	if os.Getenv("ZKSYNC") == "true" {
 		outDir := getOutDir(outDirSuffix, pkgName)
 		zksyncBytecodePath := filepath.Join("..", "zkout", className+".sol", className+".json")
 		zksyncBytecode := zksyncwrapper.ReadBytecodeFromForgeJSON(zksyncBytecodePath)
 		outPath := filepath.Join(outDir, pkgName+"_zksync.go")
 		zksyncwrapper.WrapZksyncDeploy(zksyncBytecode, className, pkgName, outPath)
+	} else {
+		abiPath := rootDir + project + "/" + className + "/" + className + ".sol/" + className + ".abi.json"
+		binPath := rootDir + project + "/" + className + "/" + className + ".sol/" + className + ".bin"
+		metadataPath := rootDir + project + "/" + className + "/build/build.json"
+
+		GenWrapper(abiPath, binPath, metadataPath, className, pkgName, outDirSuffix)
 	}
 }
 

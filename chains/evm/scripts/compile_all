@@ -27,7 +27,9 @@ compileContract() {
   local args # base args for forge
   args="build $CONTRACTS_DIR/contracts/"$1.sol" --root $CONTRACTS_DIR"
   
-  if [ "$ZKSYNC" != "true" ]; then
+  if [ "$ZKSYNC" = "true" ]; then
+    $(dirname "$0")/forge_zksync $args --zksync
+  else
     local command
     command="forge $args \
     $(getOptimizations "$contract") \
@@ -43,8 +45,6 @@ compileContract() {
 
     # Copy the generated abi files to a single folder
     cp "$CONTRACTS_DIR"/solc/$PROJECT/"$contract"/"$contract".sol/"$contract".abi.json "$ABI_DIR""$contract".abi
-  else
-    $(dirname "$0")/forge_zksync $args --zksync
   fi
 }
 
