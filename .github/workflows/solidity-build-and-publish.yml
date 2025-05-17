@@ -207,16 +207,16 @@ jobs:
           IS_RELEASE_CCIP: ${{ needs.tag-check.outputs.is-release-ccip }}
           RELEASE_VERSION_CCIP: ${{ needs.tag-check.outputs.release-version-ccip }}
         run: |
-          version=""
-          if [[ $IS_RELEASE_CCIP == 'true' ]]; then
-            version="${RELEASE_VERSION_CCIP}"
+          VERSION=""
+          if [[ "${IS_RELEASE_CCIP}" == 'true' ]]; then
+            VERSION="${RELEASE_VERSION_CCIP}"
           else
             echo "::error::No release version found."
             exit 1
           fi
-          package_json_version="$(jq -r '.version' package.json)"
-          if [[ "$PACKAGE_JSON_VERSION" != "${version}" ]]; then
-            echo "::error version mismatch: package.json version ($package_json_version) does not match version computed from tag ${version}"
+          PACKAGE_JSON_VERSION="$(jq -r '.version' package.json)"
+          if [[ "${PACKAGE_JSON_VERSION}" != "${VERSION}" ]]; then
+            echo "::error::Version mismatch: package.json version (${PACKAGE_JSON_VERSION}) does not match version computed from tag ${VERSION}"
             exit 1
           fi
 
