@@ -22,7 +22,7 @@
     "!contracts/test/mocks/test/*",
     "contracts/test/helpers/**/*",
     "scripts/compile_all",
-    "abi/v0.8/",
+    "abi/*.abi",
     "remappings.txt",
     ".solhint.json",
     ".solhint-test.json",
