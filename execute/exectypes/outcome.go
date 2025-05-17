@@ -61,6 +61,9 @@ type Outcome struct {
 
 	// Report is built from the oldest pending commit reports.
 	Report cciptypes.ExecutePluginReport `json:"report"`
+
+	// Reports are built from the oldest pending commit reports.
+	Reports []cciptypes.ExecutePluginReport `json:"reports"`
 }
 
 // IsEmpty returns true if the outcome has no pending commit reports or chain reports.
@@ -108,16 +111,18 @@ func NewOutcome(
 	state PluginState,
 	selectedCommits []CommitData,
 	report cciptypes.ExecutePluginReport,
+	reports []cciptypes.ExecutePluginReport,
 ) Outcome {
-	return NewSortedOutcome(state, selectedCommits, report)
+	return NewSortedOutcome(state, selectedCommits, report, reports)
 }
 
 // NewSortedOutcome ensures canonical ordering of the outcome.
-// TODO: handle canonicalization in the encoder.
+// TODO: this sorting doesn't make sense for all states.
 func NewSortedOutcome(
 	state PluginState,
 	pendingCommits []CommitData,
 	report cciptypes.ExecutePluginReport,
+	reports []cciptypes.ExecutePluginReport,
 ) Outcome {
 	pendingCommitsCP := append([]CommitData{}, pendingCommits...)
 	reportCP := append([]cciptypes.ExecutePluginReportSingleChain{}, report.ChainReports...)
@@ -135,5 +140,6 @@ func NewSortedOutcome(
 		State:         state,
 		CommitReports: pendingCommitsCP,
 		Report:        cciptypes.ExecutePluginReport{ChainReports: reportCP},
+		Reports:       reports,
 	}
 }

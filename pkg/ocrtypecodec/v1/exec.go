@@ -9,7 +9,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1/ocrtypecodecpb"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 var DefaultExecCodec ExecCodec = NewExecCodecProto()
@@ -79,14 +79,28 @@ func (e *ExecCodecProto) DecodeObservation(data []byte) (exectypes.Observation, 
 }
 
 func (e *ExecCodecProto) EncodeOutcome(outcome exectypes.Outcome) ([]byte, error) {
-	outcome = exectypes.NewSortedOutcome(outcome.State, outcome.CommitReports, outcome.Report)
+	outcome = exectypes.NewOutcome(outcome.State, outcome.CommitReports, outcome.Report, outcome.Reports)
 
 	pbObs := &ocrtypecodecpb.ExecOutcome{
-		PluginState:   string(outcome.State),
-		CommitReports: e.tr.commitDataSliceToProto(outcome.CommitReports),
-		ExecutePluginReport: &ocrtypecodecpb.ExecutePluginReport{
-			ChainReports: e.tr.chainReportsToProto(outcome.Report.ChainReports),
-		},
+		PluginState:          string(outcome.State),
+		CommitReports:        e.tr.commitDataSliceToProto(outcome.CommitReports),
+		ExecutePluginReports: e.tr.execPluginReportsToProto(outcome.Reports),
+	}
+
+	// If there is only one report, use the legacy field. This way new clients can still
+	// form consensus with old ones.
+	// TODO: Remove backwards compatibility code after a few releases.
+	if len(pbObs.ExecutePluginReports) == 1 {
+		pbObs.ExecutePluginReport = pbObs.ExecutePluginReports[0]
+		pbObs.ExecutePluginReports = nil
+	}
+
+	// TODO: Remove after "Reports" is fully supported.
+	if len(outcome.Report.ChainReports) != 0 {
+		r := e.tr.execPluginReportsToProto([]ccipocr3.ExecutePluginReport{outcome.Report})
+		if len(r) > 0 {
+			pbObs.ExecutePluginReport = r[0]
+		}
 	}
 
 	return proto.MarshalOptions{Deterministic: true}.Marshal(pbObs)
@@ -105,9 +119,20 @@ func (e *ExecCodecProto) DecodeOutcome(data []byte) (exectypes.Outcome, error) {
 	outc := exectypes.Outcome{
 		State:         exectypes.PluginState(pbOutc.PluginState),
 		CommitReports: e.tr.commitDataSliceFromProto(pbOutc.CommitReports),
-		Report: cciptypes.ExecutePluginReport{
-			ChainReports: e.tr.chainReportsFromProto(pbOutc.ExecutePluginReport.ChainReports),
-		},
+		Reports:       e.tr.execPluginReportsFromProto(pbOutc.ExecutePluginReports),
+	}
+
+	// Decode the legacy Report field into the new Reports field. This way the plugin layer doesn't
+	// need to worry about type migration.
+	// TODO: Remove temporary migration code after a few releases.
+	if pbOutc.ExecutePluginReport != nil {
+		outc.Reports = e.tr.execPluginReportsFromProto([]*ocrtypecodecpb.ExecutePluginReport{pbOutc.ExecutePluginReport})
+	}
+
+	// Decode the new report format into the legacy field as an intermediate step for implementing this feature.
+	// TODO: Remove temporary function after the 'Reports' field is fully implemented.
+	if len(outc.Reports) > 0 {
+		outc.Report = outc.Reports[0]
 	}
 
 	return outc, nil
@@ -137,7 +162,7 @@ func (*ExecCodecJSON) DecodeObservation(data []byte) (exectypes.Observation, err
 
 func (*ExecCodecJSON) EncodeOutcome(outcome exectypes.Outcome) ([]byte, error) {
 	// We sort again here in case construction is not via the constructor.
-	return json.Marshal(exectypes.NewSortedOutcome(outcome.State, outcome.CommitReports, outcome.Report))
+	return json.Marshal(exectypes.NewOutcome(outcome.State, outcome.CommitReports, outcome.Report, outcome.Reports))
 }
 
 func (*ExecCodecJSON) DecodeOutcome(data []byte) (exectypes.Outcome, error) {
