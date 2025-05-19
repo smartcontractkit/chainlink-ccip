@@ -206,23 +206,10 @@ func sendTransactionWithLookupTables(ctx context.Context, rpcClient *rpc.Client,
 		return nil, err
 	}
 
-	var txsig solana.Signature
-	for i := 0; i < transactionConfigs.Retries; i++ {
-		// TODO: this err seems to be genuine, we should not retry here
-		// however if the blockhash is expired by the time the tx gets submitted, we wont be able to find the confirmed status below
-		txsig, err = rpcClient.SendTransactionWithOpts(ctx, tx, rpc.TransactionOpts{SkipPreflight: transactionConfigs.SkipPreflight, PreflightCommitment: commitment})
-		if err != nil {
-			fmt.Println("Error sending transaction:", err)
-			time.Sleep(50 * time.Millisecond)
-			continue
-		}
-		// no error = success
-		break
-	}
-
+	txsig, err := rpcClient.SendTransactionWithOpts(ctx, tx, rpc.TransactionOpts{SkipPreflight: transactionConfigs.SkipPreflight, PreflightCommitment: commitment})
 	// If tx failed with rpc error, we should not retry as confirmation will never happen
 	if err != nil {
-		fmt.Println("Error sending transaction after retries:", err)
+		fmt.Println("Error sending transaction to nodes rpc service:", err)
 		return nil, err
 	}
 
