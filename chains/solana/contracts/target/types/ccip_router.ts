@@ -196,6 +196,41 @@ export type CcipRouter = {
       ]
     },
     {
+      "name": "setLinkTokenMint",
+      "docs": [
+        "Sets the address of the LINK token mint.",
+        "The Admin is the only one able to set it.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for updating the configuration.",
+        "* `link_token_mint` - The new address of the LINK token mint."
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "linkTokenMint",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
       "name": "updateFeeAggregator",
       "docs": [
         "Updates the fee aggregator in the router configuration.",
@@ -2129,6 +2164,41 @@ export const IDL: CcipRouter = {
           "type": {
             "defined": "CodeVersion"
           }
+        }
+      ]
+    },
+    {
+      "name": "setLinkTokenMint",
+      "docs": [
+        "Sets the address of the LINK token mint.",
+        "The Admin is the only one able to set it.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for updating the configuration.",
+        "* `link_token_mint` - The new address of the LINK token mint."
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "linkTokenMint",
+          "type": "publicKey"
         }
       ]
     },

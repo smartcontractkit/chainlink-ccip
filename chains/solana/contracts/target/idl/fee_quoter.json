@@ -203,6 +203,36 @@
       ]
     },
     {
+      "name": "setLinkTokenMint",
+      "docs": [
+        "Sets the link_token_mint and updates the link_token_local_decimals.",
+        "",
+        "Only the admin may set this.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for updating the configuration."
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "linkTokenMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "addBillingTokenConfig",
       "docs": [
         "Adds a billing token configuration.",
