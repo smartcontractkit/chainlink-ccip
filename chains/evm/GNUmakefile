@@ -40,8 +40,7 @@ wrappers: pnpmdep mockery abigen
 
 .PHONY: wrappers-zksync
 wrappers-zksync: pnpmdep foundry-zksync
-	ZKSYNC=true ./scripts/compile_all
-	ZKSYNC=true go generate ./gobindings
+	ZKSYNC=true make wrappers
 
 .PHONY: pnpmdep
 pnpmdep: ## Install solidity contract dependencies through pnpm
