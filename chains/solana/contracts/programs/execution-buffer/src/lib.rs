@@ -6,7 +6,7 @@ use crate::context::*;
 mod state;
 use crate::state::*;
 
-declare_id!("buffGjr75PtEtV6D3pbKhaq59CR2qp4mwZDYGspggxZ");
+declare_id!("Buff7ufrtmskFnHtGd9LXaWSAjX6wAMQ2q2s2WSWoSGS");
 
 #[program]
 pub mod execution_buffer {
