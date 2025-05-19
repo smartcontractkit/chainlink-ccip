@@ -3,6 +3,7 @@ package common
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -211,10 +212,11 @@ func sendTransactionWithLookupTables(ctx context.Context, rpcClient *rpc.Client,
 	for i := 0; i < transactionConfigs.Retries; i++ {
 		txsig, err = rpcClient.SendTransactionWithOpts(ctx, tx, rpc.TransactionOpts{SkipPreflight: transactionConfigs.SkipPreflight, PreflightCommitment: commitment})
 		if err != nil {
-			if rpcErr, ok := err.(*jsonrpc.RPCError); ok {
+			var rpcErr *jsonrpc.RPCError
+			if errors.As(err, &rpcErr) {
 				fmt.Println("RPC Error:", rpcErr.Message)
 				fmt.Println("RPC Error Code:", rpcErr.Code)
-				if !strings.Contains(rpcErr.Message, "Blockhash not found") {
+				if strings.Contains(rpcErr.Message, "Blockhash not found") {
 					// this can happen when the blockhash we retrieved above is not yet visible to the rpc
 					// given we get the blockhash from the same rpc, this should not happen, but we see it in practice
 					// retrying fixes this
