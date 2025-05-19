@@ -12,6 +12,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/asynclib"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
@@ -30,6 +31,10 @@ func (p *processor) Observation(
 	_ Query,
 ) (Observation, error) {
 	lggr := logutil.WithContextValues(ctx, p.lggr)
+
+	if invalidateCache, ok := ctx.Value(consts.InvalidateCacheKey).(bool); ok && invalidateCache {
+		p.obs.invalidateCaches(ctx, lggr)
+	}
 
 	var (
 		feeComponents     map[cciptypes.ChainSelector]types.ChainFeeComponents

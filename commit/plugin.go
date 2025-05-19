@@ -30,6 +30,7 @@ import (
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	ocrtypecodec "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
@@ -343,6 +344,7 @@ func (p *Plugin) getPriceRelatedObservations(
 
 		if cciptypes.SeqNum(latestPriceOcrSeqNum) >= prevOutcome.MainOutcome.InflightPriceOcrSequenceNumber {
 			lggr.Infow("previous price report made it through", "ocrSeqNum", latestPriceOcrSeqNum)
+			ctx = context.WithValue(ctx, consts.InvalidateCacheKey, true)
 			waitingForPriceUpdatesToMakeItOnchain = false
 		}
 	}

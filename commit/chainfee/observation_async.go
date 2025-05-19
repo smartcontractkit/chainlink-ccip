@@ -20,6 +20,7 @@ type observer interface {
 	getChainsFeeComponents(ctx context.Context, lggr logger.Logger) map[cciptypes.ChainSelector]types.ChainFeeComponents
 	getNativeTokenPrices(ctx context.Context, lggr logger.Logger) map[cciptypes.ChainSelector]cciptypes.BigInt
 	getChainFeePriceUpdates(ctx context.Context, lggr logger.Logger) map[cciptypes.ChainSelector]Update
+	invalidateCaches(ctx context.Context, lggr logger.Logger)
 	close()
 }
 
@@ -80,6 +81,8 @@ func (o *baseObserver) getChainFeePriceUpdates(
 	return feeUpdatesFromTimestampedBig(o.ccipReader.GetChainFeePriceUpdate(ctx, supportedChains))
 }
 
+func (o *baseObserver) invalidateCaches(_ context.Context, _ logger.Logger) {}
+
 func (o *baseObserver) close() {
 }
 
@@ -114,6 +117,7 @@ type asyncObserver struct {
 	chainsFeeComponents  map[cciptypes.ChainSelector]types.ChainFeeComponents
 	nativeTokenPrices    map[cciptypes.ChainSelector]cciptypes.BigInt
 	chainFeePriceUpdates map[cciptypes.ChainSelector]Update
+	triggerSyncChan      chan time.Time
 }
 
 func newAsyncObserver(
@@ -124,15 +128,27 @@ func newAsyncObserver(
 	ctx, cf := context.WithCancel(context.Background())
 
 	obs := &asyncObserver{
-		baseObserver: baseObserver,
-		lggr:         logutil.WithComponent(lggr, "chainfeeAsyncObserver"),
-		cancelFunc:   nil,
-		mu:           &sync.RWMutex{},
+		baseObserver:    baseObserver,
+		lggr:            logutil.WithComponent(lggr, "chainfeeAsyncObserver"),
+		cancelFunc:      nil,
+		mu:              &sync.RWMutex{},
+		triggerSyncChan: make(chan time.Time),
 	}
 
 	ticker := time.NewTicker(tickDur)
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				obs.triggerSyncChan <- time.Now()
+			}
+		}
+	}()
+
 	lggr.Debugw("async chainfee observer started", "tickDur", tickDur, "syncTimeout", syncTimeout)
-	obs.start(ctx, ticker.C, syncTimeout)
+	obs.start(ctx, obs.triggerSyncChan, syncTimeout)
 
 	obs.cancelFunc = func() {
 		cf()
@@ -142,7 +158,7 @@ func newAsyncObserver(
 	return obs
 }
 
-func (o *asyncObserver) start(ctx context.Context, ticker <-chan time.Time, syncTimeout time.Duration) {
+func (o *asyncObserver) start(ctx context.Context, ticker chan time.Time, syncTimeout time.Duration) {
 	go func() {
 		for {
 			select {
@@ -240,6 +256,17 @@ func (o *asyncObserver) getChainFeePriceUpdates(
 	defer o.mu.RUnlock()
 	lggr.Debugw("getChainFeePriceUpdates returning cached value", "numUpdates", len(o.chainFeePriceUpdates))
 	return o.chainFeePriceUpdates
+}
+
+func (o *asyncObserver) invalidateCaches(ctx context.Context, lggr logger.Logger) {
+	lggr.Debugw("invalidating caches, acquiring lock")
+	o.mu.Lock()
+	o.chainsFeeComponents = nil
+	o.nativeTokenPrices = nil
+	o.chainFeePriceUpdates = nil
+	o.mu.Unlock()
+	lggr.Debugw("caches invalidated, lock released, triggering custom sync operation")
+	o.triggerSyncChan <- time.Now()
 }
 
 func (o *asyncObserver) close() {
