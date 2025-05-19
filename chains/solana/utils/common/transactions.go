@@ -175,7 +175,7 @@ func sendTransactionWithLookupTables(ctx context.Context, rpcClient *rpc.Client,
 		fmt.Println("GetLatestBlockhash error after retries:", errBlockHash)
 		return nil, errBlockHash
 	}
-	// fakeBlockHash, _ := solana.HashFromBase58("CQXcbRShpZz2eLqLLr5ShBc4Cw9VdQRSchFTcF7JBv3y")
+
 	tx, err := solana.NewTransaction(
 		instructions,
 		hashRes.Value.Blockhash,
