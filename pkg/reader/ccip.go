@@ -14,6 +14,7 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/chain_accessor"
 	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -53,8 +54,14 @@ func newCCIPChainReaderInternal(
 	addrCodec cciptypes.AddressCodec,
 ) *ccipChainReader {
 	var crs = make(map[cciptypes.ChainSelector]contractreader.Extended)
+	var cas = make(map[cciptypes.ChainSelector]cciptypes.ChainAccessor)
 	for chainSelector, cr := range contractReaders {
 		crs[chainSelector] = contractreader.NewExtendedContractReader(cr)
+
+		if contractWriters[chainSelector] == nil {
+			panic(fmt.Sprintf("contract writer not found for chain %d", chainSelector))
+		}
+		cas[chainSelector] = chain_accessor.NewLegacyAccessor(chainSelector, crs[chainSelector], contractWriters[chainSelector], addrCodec)
 	}
 
 	offrampAddrStr, err := addrCodec.AddressBytesToString(offrampAddress, destChain)
@@ -69,6 +76,7 @@ func newCCIPChainReaderInternal(
 		destChain:       destChain,
 		offrampAddress:  offrampAddrStr,
 		addrCodec:       addrCodec,
+		accessors:       cas,
 	}
 
 	// Initialize cache with readers
@@ -488,18 +496,6 @@ func (r *ccipChainReader) GetChainFeePriceUpdate(ctx context.Context, selectors 
 		return nil
 	}
 	return feeUpdates
-}
-
-// buildSigners converts internal signer representation to RMN signer info format
-func (r *ccipChainReader) buildSigners(signers []signer) []cciptypes.RemoteSignerInfo {
-	result := make([]cciptypes.RemoteSignerInfo, 0, len(signers))
-	for _, s := range signers {
-		result = append(result, cciptypes.RemoteSignerInfo{
-			OnchainPublicKey: s.OnchainPublicKey,
-			NodeIndex:        s.NodeIndex,
-		})
-	}
-	return result
 }
 
 func (r *ccipChainReader) GetRMNRemoteConfig(ctx context.Context) (cciptypes.RemoteConfig, error) {
