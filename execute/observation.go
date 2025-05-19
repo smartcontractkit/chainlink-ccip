@@ -187,12 +187,6 @@ func (p *Plugin) getCommitReportsObservation(
 		lggr.Errorw("failed to refresh commit report cache, proceeding with potentially wider query window", "err", err)
 	}
 
-	// Get the optimized timestamp using the cache
-	// TODO: update with p.commitReportCache.GetReportsToQueryFromTimestamp()
-	fetchFrom := p.commitRootsCache.GetTimestampToQueryFrom()
-
-	lggr.Infow("Querying commit reports", "fetchFrom", fetchFrom)
-
 	// Get curse information from the destination chain.
 	ci, err := p.getCurseInfo(ctx, lggr)
 	if err != nil {
@@ -207,20 +201,18 @@ func (p *Plugin) getCommitReportsObservation(
 	}
 
 	// Get pending exec reports.
-	groupedCommits, fullyExecutedFinalized, fullyExecutedUnfinalized, latestEmptyRootTimestamp,
+	groupedCommits, fullyExecutedFinalized, fullyExecutedUnfinalized,
 		err := getPendingReportsForExecution(
 		ctx,
 		p.ccipReader,
+		p.commitReportCache,
 		p.commitRootsCache.CanExecute,
-		fetchFrom,
 		ci.CursedSourceChains,
 		lggr,
 	)
 	if err != nil {
 		return exectypes.Observation{}, err
 	}
-
-	p.commitRootsCache.UpdateLatestEmptyRootTimestamp(latestEmptyRootTimestamp)
 
 	// TODO: message from fullyExecutedCommits which are in the inflight messages cache could be cleared here.
 
@@ -236,40 +228,10 @@ func (p *Plugin) getCommitReportsObservation(
 		p.commitRootsCache.Snooze(fullyExecutedCommit.SourceChain, fullyExecutedCommit.MerkleRoot)
 	}
 
-	// Update the earliest unexecuted root based on remaining reports
-	p.commitRootsCache.UpdateEarliestUnexecutedRoot(buildCombinedReports(groupedCommits, fullyExecutedUnfinalized))
-
 	observation.CommitReports = groupedCommits
 
 	// TODO: truncate grouped to a maximum observation size?
 	return observation, nil
-}
-
-// buildCombinedReports creates a combined map for updating the earliest unexecuted root
-func buildCombinedReports(
-	groupedCommits map[cciptypes.ChainSelector][]exectypes.CommitData,
-	fullyExecutedUnfinalized []exectypes.CommitData,
-) map[cciptypes.ChainSelector][]exectypes.CommitData {
-	combinedReports := make(map[cciptypes.ChainSelector][]exectypes.CommitData)
-
-	// Add all unexecuted commits
-	for chain, commits := range groupedCommits {
-		combinedReports[chain] = append(combinedReports[chain], commits...)
-	}
-
-	// Add all unfinalized executions
-	for _, commit := range fullyExecutedUnfinalized {
-		combinedReports[commit.SourceChain] = append(
-			combinedReports[commit.SourceChain],
-			exectypes.CommitData{
-				Timestamp:   commit.Timestamp,
-				SourceChain: commit.SourceChain,
-				MerkleRoot:  commit.MerkleRoot,
-			},
-		)
-	}
-
-	return combinedReports
 }
 
 // observeTokenDataForMessage observes token data for a given message.

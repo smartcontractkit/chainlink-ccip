@@ -545,3 +545,170 @@ func TestCommitReportCache_RefreshCache_RespectsReaderLimit(t *testing.T) {
 
 	mockRdr.AssertExpectations(t)
 }
+
+func TestCommitReportCache_DeduplicateReports(t *testing.T) {
+	t.Parallel()
+	lggr := logger.Test(t)
+	now := time.Now().UTC()
+	tp := newMockTimeProvider(now)
+	mockRdr := readerMocks.NewMockCCIPReader(t)
+	cacheCfg := CommitReportCacheConfig{
+		MessageVisibilityInterval: 1 * time.Hour,
+		LookbackGracePeriod:       5 * time.Minute,
+	}
+	cache := NewCommitReportCache(lggr, cacheCfg, tp, mockRdr)
+
+	// Create test reports with different configurations
+
+	// Report with blessed root 1
+	r1 := ccipocr3.CommitPluginReportWithMeta{
+		Report: ccipocr3.CommitPluginReport{
+			BlessedMerkleRoots: []ccipocr3.MerkleRootChain{
+				{ChainSel: 1, MerkleRoot: ccipocr3.Bytes32{1}},
+			},
+		},
+		Timestamp: now.Add(-30 * time.Minute),
+		BlockNum:  100,
+	}
+
+	// Report with blessed root 2
+	r2 := ccipocr3.CommitPluginReportWithMeta{
+		Report: ccipocr3.CommitPluginReport{
+			BlessedMerkleRoots: []ccipocr3.MerkleRootChain{
+				{ChainSel: 1, MerkleRoot: ccipocr3.Bytes32{2}},
+			},
+		},
+		Timestamp: now.Add(-25 * time.Minute),
+		BlockNum:  200,
+	}
+
+	// Duplicate of r1 (same root) but with different timestamp and block
+	r3Dupe := ccipocr3.CommitPluginReportWithMeta{
+		Report: ccipocr3.CommitPluginReport{
+			BlessedMerkleRoots: []ccipocr3.MerkleRootChain{
+				{ChainSel: 1, MerkleRoot: ccipocr3.Bytes32{1}},
+			},
+		},
+		Timestamp: now.Add(-20 * time.Minute),
+		BlockNum:  300,
+	}
+
+	// Report with unblessed root
+	r4 := ccipocr3.CommitPluginReportWithMeta{
+		Report: ccipocr3.CommitPluginReport{
+			UnblessedMerkleRoots: []ccipocr3.MerkleRootChain{
+				{ChainSel: 2, MerkleRoot: ccipocr3.Bytes32{3}},
+			},
+		},
+		Timestamp: now.Add(-15 * time.Minute),
+		BlockNum:  400,
+	}
+
+	// No merkle roots - should be skipped
+	r5NoRoots := ccipocr3.CommitPluginReportWithMeta{
+		Report:    ccipocr3.CommitPluginReport{},
+		Timestamp: now.Add(-10 * time.Minute),
+		BlockNum:  500,
+	}
+
+	// Duplicate of r4 (same chain selector and root)
+	r6Dupe := ccipocr3.CommitPluginReportWithMeta{
+		Report: ccipocr3.CommitPluginReport{
+			UnblessedMerkleRoots: []ccipocr3.MerkleRootChain{
+				{ChainSel: 2, MerkleRoot: ccipocr3.Bytes32{3}},
+			},
+		},
+		Timestamp: now.Add(-5 * time.Minute),
+		BlockNum:  600,
+	}
+
+	// Different chain selector but same root value as r1
+	r7DiffChain := ccipocr3.CommitPluginReportWithMeta{
+		Report: ccipocr3.CommitPluginReport{
+			BlessedMerkleRoots: []ccipocr3.MerkleRootChain{
+				{ChainSel: 3, MerkleRoot: ccipocr3.Bytes32{1}}, // Same root value but different chain
+			},
+		},
+		Timestamp: now,
+		BlockNum:  700,
+	}
+
+	// Test cases
+	testCases := []struct {
+		name     string
+		reports  []ccipocr3.CommitPluginReportWithMeta
+		expected []ccipocr3.CommitPluginReportWithMeta
+	}{
+		{
+			name:     "Empty input",
+			reports:  []ccipocr3.CommitPluginReportWithMeta{},
+			expected: []ccipocr3.CommitPluginReportWithMeta{},
+		},
+		{
+			name:     "Single report",
+			reports:  []ccipocr3.CommitPluginReportWithMeta{r1},
+			expected: []ccipocr3.CommitPluginReportWithMeta{r1},
+		},
+		{
+			name:     "No duplicates",
+			reports:  []ccipocr3.CommitPluginReportWithMeta{r1, r2},
+			expected: []ccipocr3.CommitPluginReportWithMeta{r1, r2},
+		},
+		{
+			name:     "With duplicates",
+			reports:  []ccipocr3.CommitPluginReportWithMeta{r1, r2, r3Dupe},
+			expected: []ccipocr3.CommitPluginReportWithMeta{r1, r2}, // r3Dupe should be filtered out
+		},
+		{
+			name:     "Mix of blessed and unblessed roots",
+			reports:  []ccipocr3.CommitPluginReportWithMeta{r1, r4},
+			expected: []ccipocr3.CommitPluginReportWithMeta{r1, r4},
+		},
+		{
+			name:     "Report without roots skipped",
+			reports:  []ccipocr3.CommitPluginReportWithMeta{r1, r5NoRoots},
+			expected: []ccipocr3.CommitPluginReportWithMeta{r1}, // r5 should be filtered out
+		},
+		{
+			name:    "Multiple dupes with different chain selectors",
+			reports: []ccipocr3.CommitPluginReportWithMeta{r1, r2, r3Dupe, r4, r5NoRoots, r6Dupe, r7DiffChain},
+			expected: []ccipocr3.CommitPluginReportWithMeta{
+				r1, r2, r4, r7DiffChain,
+			}, // r3Dupe, r5NoRoots, r6Dupe should be filtered out
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := cache.DeduplicateReports(tc.reports)
+
+			// Verify length
+			assert.Equal(t, len(tc.expected), len(result), "Result length mismatch")
+
+			// Convert to map by key for easier comparison
+			resultKeys := make(map[string]bool)
+			for _, r := range result {
+				key, err := generateKey(r)
+				require.NoError(t, err)
+				resultKeys[key] = true
+			}
+
+			// Verify all expected reports are present by checking their keys
+			for _, r := range tc.expected {
+				key, err := generateKey(r)
+				require.NoError(t, err)
+				assert.True(t, resultKeys[key], "Expected report with key %s not found in result", key)
+			}
+
+			// Verify first occurrence is kept when duplicates exist
+			if tc.name == "With duplicates" {
+				for _, r := range result {
+					key, _ := generateKey(r)
+					if key == "1_0100000000000000000000000000000000000000000000000000000000000000" {
+						assert.Equal(t, r1.BlockNum, r.BlockNum, "First occurrence should be kept")
+					}
+				}
+			}
+		})
+	}
+}

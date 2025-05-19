@@ -24,6 +24,18 @@ const (
 
 )
 
+// TimeProvider interface to make time testable
+type TimeProvider interface {
+	Now() time.Time
+}
+
+// RealTimeProvider provides actual current time
+type RealTimeProvider struct{}
+
+func (r *RealTimeProvider) Now() time.Time {
+	return time.Now().UTC()
+}
+
 // CommitReportCache stores CommitPluginReportWithMeta objects.
 // It's designed to handle potential LogPoller delays by using a lookback grace period.
 type CommitReportCache interface {
@@ -40,6 +52,9 @@ type CommitReportCache interface {
 	// GetCachedReports retrieves reports from the cache that have a timestamp greater than or equal to fromTimestamp.
 	// Reports are sorted by their timestamp.
 	GetCachedReports(fromTimestamp time.Time) []ccipocr3.CommitPluginReportWithMeta
+
+	// DeduplicateReports deduplicates reports by their Merkle root.
+	DeduplicateReports(reports []ccipocr3.CommitPluginReportWithMeta) []ccipocr3.CommitPluginReportWithMeta
 }
 
 type commitReportCache struct {
@@ -256,6 +271,32 @@ func (c *commitReportCache) GetCachedReports(fromTimestamp time.Time) []ccipocr3
 		"count", len(result),
 		"totalItemsInCache", len(items))
 	return result
+}
+
+func (c *commitReportCache) DeduplicateReports(
+	reports []ccipocr3.CommitPluginReportWithMeta) []ccipocr3.CommitPluginReportWithMeta {
+	seen := make(map[string]bool)
+	deduplicated := make([]ccipocr3.CommitPluginReportWithMeta, 0, len(reports)) // Pre-allocate with a reasonable capacity
+
+	for _, report := range reports {
+		key, err := generateKey(report)
+		if err != nil {
+			// If a key cannot be generated (e.g., no Merkle roots),
+			// this report cannot be uniquely identified for deduplication.
+			// We skip such reports.
+			c.lggr.Errorw("Failed to generate key for report",
+				"err", err,
+				"timestamp", report.Timestamp,
+				"blockNum", report.BlockNum)
+			continue
+		}
+
+		if !seen[key] {
+			deduplicated = append(deduplicated, report)
+			seen[key] = true
+		}
+	}
+	return deduplicated
 }
 
 // Ensure commitReportCache implements CommitReportCache.

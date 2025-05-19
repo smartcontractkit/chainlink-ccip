@@ -10,7 +10,6 @@ import (
 	"io"
 	"slices"
 	"sort"
-	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"golang.org/x/exp/maps"
@@ -277,33 +276,35 @@ func removeUnconfirmedAndFinalizedMessages(
 func getPendingReportsForExecution(
 	ctx context.Context,
 	ccipReader readerpkg.CCIPReader,
+	commitReportCache cache.CommitReportCache,
 	canExecute CanExecuteHandle,
-	ts time.Time,
 	cursedSourceChains map[cciptypes.ChainSelector]bool,
 	lggr logger.Logger,
 ) (
 	groupedCommits exectypes.CommitObservations,
 	fullyExecutedFinalized []exectypes.CommitData,
 	fullyExecutedUnfinalized []exectypes.CommitData,
-	latestEmptyRootTimestamp time.Time,
 	err error,
 ) {
-	// Assuming each report can have minimum one message, max reports shouldn't exceed the max messages
-	unfinalizedReports, err := ccipReader.CommitReportsGTETimestamp(
-		ctx, ts, primitives.Unconfirmed, maxCommitReportsToFetch,
-	)
-	if err != nil {
-		return nil, nil, nil, time.Time{}, err
-	}
-	lggr.Debugw("commit reports", "unfinalizedReports", unfinalizedReports,
-		"count", len(unfinalizedReports))
+	// get the timestamp to fetch from
+	fetchFrom := commitReportCache.GetReportsToQueryFromTimestamp()
+	lggr.Infow("Querying commit reports", "fetchFrom", fetchFrom)
 
-	finalizedReports, err := ccipReader.CommitReportsGTETimestamp(
-		ctx, ts, primitives.Finalized, maxCommitReportsToFetch,
+	// get the reports from the cache
+	reportsFromCache := commitReportCache.GetCachedReports(fetchFrom)
+
+	// Assuming each report can have minimum one message, max reports shouldn't exceed the max messages
+	unfinalizedIncrementReports, err := ccipReader.CommitReportsGTETimestamp(
+		ctx, fetchFrom, primitives.Unconfirmed, maxCommitReportsToFetch,
 	)
 	if err != nil {
-		return nil, nil, nil, time.Time{}, err
+		return nil, nil, nil, err
 	}
+
+	// merge the reports from the cache and the reports from the reader (might be duplicate so we need to deduplicate)
+	unfinalizedReports := commitReportCache.DeduplicateReports(append(reportsFromCache, unfinalizedIncrementReports...))
+
+	lggr.Debugw("commit reports", "unfinalizedReports", unfinalizedReports, "count", len(unfinalizedReports))
 
 	groupedCommits = groupByChainSelectorWithFilter(lggr, unfinalizedReports, cursedSourceChains)
 	lggr.Debugw("grouped commits before removing fully executed reports",
@@ -311,19 +312,19 @@ func getPendingReportsForExecution(
 
 	rangesBySelector, executableReports, err := getExecutableReportRanges(lggr, groupedCommits, canExecute)
 	if err != nil {
-		return nil, nil, nil, time.UnixMilli(0), err
+		return nil, nil, nil, err
 	}
 
 	// Get all executed messages
 	unconfirmedMessages, err := ccipReader.ExecutedMessages(ctx, rangesBySelector, primitives.Unconfirmed)
 	if err != nil {
-		return nil, nil, nil, time.UnixMilli(0),
+		return nil, nil, nil,
 			fmt.Errorf("get executed messages in range %v: %w", rangesBySelector, err)
 	}
 	// Get finalized messages
 	finalizedMessages, err := ccipReader.ExecutedMessages(ctx, rangesBySelector, primitives.Finalized)
 	if err != nil {
-		return nil, nil, nil, time.UnixMilli(0),
+		return nil, nil, nil,
 			fmt.Errorf("get finalized executed messages in range %v: %w", rangesBySelector, err)
 	}
 
@@ -337,23 +338,7 @@ func getPendingReportsForExecution(
 	return remainingReportsBySelector,
 		fullyExecutedFinalized,
 		fullyExecutedUnfinalized,
-		getLatestEmptyRootTimestamp(finalizedReports),
 		nil
-}
-
-func getLatestEmptyRootTimestamp(
-	commitReports []cciptypes.CommitPluginReportWithMeta,
-) time.Time {
-	latestEmptyRootTimestamp := time.Time{}
-	for _, commitReport := range commitReports {
-		if commitReport.Report.HasNoRoots() {
-			if commitReport.Timestamp.After(latestEmptyRootTimestamp) {
-				latestEmptyRootTimestamp = commitReport.Timestamp
-			}
-		}
-	}
-
-	return latestEmptyRootTimestamp
 }
 
 func (p *Plugin) ValidateObservation(
