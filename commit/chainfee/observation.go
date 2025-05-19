@@ -56,34 +56,49 @@ func (p *processor) Observation(
 	asynclib.WaitForAllNoErrOperations(ctx, p.cfg.ChainFeeAsyncObserverSyncTimeout, operations, lggr)
 	now := time.Now().UTC()
 
+	chainsWithNativeTokenPrices := mapset.NewSet(maps.Keys(feeComponents)...).
+		Intersect(
+			mapset.NewSet(maps.Keys(nativeTokenPrices)...),
+		)
+	chainsWithoutNativeTokenPrices := mapset.NewSet(maps.Keys(feeComponents)...).
+		Difference(
+			mapset.NewSet(maps.Keys(nativeTokenPrices)...),
+		)
+
 	lggr.Infow("observed fee components",
 		"feeComponents", feeComponents,
 		"nativeTokenPrices", nativeTokenPrices,
 		"chainFeeUpdates", chainFeeUpdates,
 		"fChain", fChain,
 		"timestampNow", now,
+		"chainsWithNativeTokenPrices", chainsWithNativeTokenPrices.ToSlice(),
+		"chainsWithoutNativeTokenPrices", chainsWithoutNativeTokenPrices.ToSlice(),
 	)
 
-	uniqueChains := mapset.NewSet[cciptypes.ChainSelector](maps.Keys(feeComponents)...)
-	uniqueChains = uniqueChains.Intersect(mapset.NewSet(maps.Keys(nativeTokenPrices)...))
-
-	if len(uniqueChains.ToSlice()) == 0 {
-		lggr.Info("observations don't have any unique chains")
-		return Observation{}, nil
+	if len(chainsWithNativeTokenPrices.ToSlice()) == 0 {
+		lggr.Infow("don't have any chains with native token prices",
+			"chainsWithoutNativeTokenPrices", chainsWithoutNativeTokenPrices.ToSlice())
+		return Observation{
+			FChain:          fChain,
+			TimestampNow:    now,
+			ChainFeeUpdates: chainFeeUpdates,
+		}, nil
 	}
 
 	obs := Observation{
 		FChain:            fChain,
-		FeeComponents:     filterMapByUniqueChains(feeComponents, uniqueChains),
-		NativeTokenPrices: filterMapByUniqueChains(nativeTokenPrices, uniqueChains),
+		FeeComponents:     selectMapKeysInSet(feeComponents, chainsWithNativeTokenPrices),
+		NativeTokenPrices: selectMapKeysInSet(nativeTokenPrices, chainsWithNativeTokenPrices),
 		ChainFeeUpdates:   chainFeeUpdates,
 		TimestampNow:      now,
 	}
 	return obs, nil
 }
 
-// filterMapBySet filters a map based on the keys present in the set.
-func filterMapByUniqueChains[T comparable](
+// selectMapKeysInSet returns a new map containing only the key-value pairs
+// from the input map whose keys are present in the specified set.
+// This effectively performs an intersection between the map keys and the set.
+func selectMapKeysInSet[T comparable](
 	m map[cciptypes.ChainSelector]T,
 	s mapset.Set[cciptypes.ChainSelector],
 ) map[cciptypes.ChainSelector]T {
