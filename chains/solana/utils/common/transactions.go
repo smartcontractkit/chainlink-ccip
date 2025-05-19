@@ -10,6 +10,7 @@ import (
 	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
+	"github.com/gagliardetto/solana-go/rpc/jsonrpc"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/fees"
 )
@@ -162,7 +163,7 @@ func sendTransactionWithLookupTables(ctx context.Context, rpcClient *rpc.Client,
 	var errBlockHash error
 	var hashRes *rpc.GetLatestBlockhashResult
 	for i := 0; i < transactionConfigs.Retries; i++ {
-		hashRes, errBlockHash = rpcClient.GetLatestBlockhash(ctx, rpc.CommitmentConfirmed)
+		hashRes, errBlockHash = rpcClient.GetLatestBlockhash(ctx, commitment)
 		if errBlockHash != nil {
 			fmt.Println("GetLatestBlockhash error:", errBlockHash)
 			time.Sleep(50 * time.Millisecond)
@@ -174,7 +175,7 @@ func sendTransactionWithLookupTables(ctx context.Context, rpcClient *rpc.Client,
 		fmt.Println("GetLatestBlockhash error after retries:", errBlockHash)
 		return nil, errBlockHash
 	}
-
+	// fakeBlockHash, _ := solana.HashFromBase58("CQXcbRShpZz2eLqLLr5ShBc4Cw9VdQRSchFTcF7JBv3y")
 	tx, err := solana.NewTransaction(
 		instructions,
 		hashRes.Value.Blockhash,
@@ -206,11 +207,31 @@ func sendTransactionWithLookupTables(ctx context.Context, rpcClient *rpc.Client,
 		return nil, err
 	}
 
-	txsig, err := rpcClient.SendTransactionWithOpts(ctx, tx, rpc.TransactionOpts{SkipPreflight: transactionConfigs.SkipPreflight, PreflightCommitment: commitment})
-	// If tx failed with rpc error, we should not retry as confirmation will never happen
-	if err != nil {
-		fmt.Println("Error sending transaction to nodes rpc service:", err)
-		return nil, err
+	var txsig solana.Signature
+	for i := 0; i < transactionConfigs.Retries; i++ {
+		txsig, err = rpcClient.SendTransactionWithOpts(ctx, tx, rpc.TransactionOpts{SkipPreflight: transactionConfigs.SkipPreflight, PreflightCommitment: commitment})
+		if err != nil {
+			if rpcErr, ok := err.(*jsonrpc.RPCError); ok {
+				fmt.Println("RPC Error:", rpcErr.Message)
+				fmt.Println("RPC Error Code:", rpcErr.Code)
+				if strings.Contains(rpcErr.Message, "Blockhash not found") {
+					// this can happen when the blockhash we retrieved above takes some time to be visible to the rpc
+					// given we get the blockhash from the same rpc, this should not happen, but we see it in practice
+					fmt.Println("Blockhash not found, retrying...")
+					time.Sleep(50 * time.Millisecond)
+					continue
+				} else {
+					fmt.Println("Unexpected error (most likely contract related), no point in retrying:", err)
+					return nil, err
+				}
+			} else {
+				// Not an RPC error — should only happen when we fail to hit the rpc service
+				fmt.Println("Unexpected error (could not hit rpc service), retrying:", err)
+				time.Sleep(50 * time.Millisecond)
+				continue
+			}
+		}
+		break
 	}
 
 	var txStatus rpc.ConfirmationStatusType
