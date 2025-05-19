@@ -10,6 +10,7 @@ import (
 	"io"
 	"slices"
 	"sort"
+	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"golang.org/x/exp/maps"
@@ -265,19 +266,26 @@ func removeUnconfirmedAndFinalizedMessages(
 
 // getPendingReportsForExecution is used to find commit reports which need to be executed.
 //
-// The function checks execution status at two levels:
+// The function leverages an optimized caching strategy for commit reports:
+// 1. Uses CommitReportCache to determine the optimal timestamp to query from
+// 2. Retrieves previously cached reports (filtered to only contain those with Merkle roots)
+// 3. Fetches incremental reports from the chain reader
+// 4. Deduplicates combined reports to prevent redundant processing
+//
+// Execution status is checked at two levels:
 // 1. Gets all executed messages (both finalized and unfinalized) via primitives.Unconfirmed
 // 2. Gets only finalized executed messages via primitives.Finalized
 //
-// Reports are then classified as:
-// - fullyExecutedFinalized: All messages executed with finality (mark as executed)
-// - fullyExecutedUnfinalized: All messages executed but not finalized (snooze)
+// Reports are then classified into three categories:
+// - fullyExecutedFinalized: All messages executed with finality (permanently marked as executed)
+// - fullyExecutedUnfinalized: All messages executed but not finalized (temporarily snoozed)
 // - groupedCommits: Reports with unexecuted messages (available for execution)
 func getPendingReportsForExecution(
 	ctx context.Context,
 	ccipReader readerpkg.CCIPReader,
 	commitReportCache cache.CommitReportCache,
 	canExecute CanExecuteHandle,
+	fetchFrom time.Time,
 	cursedSourceChains map[cciptypes.ChainSelector]bool,
 	lggr logger.Logger,
 ) (
@@ -286,27 +294,28 @@ func getPendingReportsForExecution(
 	fullyExecutedUnfinalized []exectypes.CommitData,
 	err error,
 ) {
-	// get the timestamp to fetch from
-	fetchFrom := commitReportCache.GetReportsToQueryFromTimestamp()
-	lggr.Infow("Querying commit reports", "fetchFrom", fetchFrom)
-
 	// get the reports from the cache
 	reportsFromCache := commitReportCache.GetCachedReports(fetchFrom)
+	lggr.Infow("Querying commit reports from chain", "fetchFrom", fetchFrom)
+
+	// get the timestamp to fetch from cache
+	latestReportTimestampInCache := commitReportCache.GetReportsToQueryFromTimestamp()
+	lggr.Infow("Querying commit reports from cache", "latestReportTimestampInCache", latestReportTimestampInCache)
 
 	// Assuming each report can have minimum one message, max reports shouldn't exceed the max messages
 	unfinalizedIncrementReports, err := ccipReader.CommitReportsGTETimestamp(
-		ctx, fetchFrom, primitives.Unconfirmed, maxCommitReportsToFetch,
+		ctx, latestReportTimestampInCache, primitives.Unconfirmed, maxCommitReportsToFetch,
 	)
 	if err != nil {
 		return nil, nil, nil, err
 	}
 
-	// merge the reports from the cache and the reports from the reader (might be duplicate so we need to deduplicate)
-	unfinalizedReports := commitReportCache.DeduplicateReports(append(reportsFromCache, unfinalizedIncrementReports...))
+	// merge the reports from the cache and the reports from the reader
+	candidateReports := commitReportCache.DeduplicateReports(append(reportsFromCache, unfinalizedIncrementReports...))
 
-	lggr.Debugw("commit reports", "unfinalizedReports", unfinalizedReports, "count", len(unfinalizedReports))
+	lggr.Debugw("commit reports", "candidateReports", candidateReports, "count", len(candidateReports))
 
-	groupedCommits = groupByChainSelectorWithFilter(lggr, unfinalizedReports, cursedSourceChains)
+	groupedCommits = groupByChainSelectorWithFilter(lggr, candidateReports, cursedSourceChains)
 	lggr.Debugw("grouped commits before removing fully executed reports",
 		"groupedCommits", groupedCommits, "count", len(groupedCommits))
 

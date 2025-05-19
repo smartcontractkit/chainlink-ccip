@@ -146,6 +146,12 @@ func (p *Plugin) getCurseInfo(ctx context.Context, lggr logger.Logger) (reader.C
 // the destination chain and determines which messages are ready to be executed. These are added to the provided
 // observation object.
 //
+// This function leverages an optimized caching strategy for commit reports:
+// 1. Uses CommitReportCache to determine the optimal timestamp to query from
+// 2. Efficiently refreshes the cache with reports containing Merkle roots
+// 3. Automatically filters out reports without Merkle roots
+// 4. Applies deduplication to prevent redundant processing
+//
 // Execution and Snoozing Logic:
 // 1. For finalized executions:
 //   - When messages are executed with finality (on destChain), they are permanently marked as executed
@@ -173,6 +179,9 @@ func (p *Plugin) getCommitReportsObservation(
 	if err != nil {
 		return exectypes.Observation{}, fmt.Errorf("unable to determine if the destination chain is supported: %w", err)
 	}
+
+	// Get the timestamp to fetch from.
+	fetchFrom := time.Now().Add(-p.offchainCfg.MessageVisibilityInterval.Duration()).UTC()
 
 	// No observation for non-dest readers.
 	if !supportsDest {
@@ -207,6 +216,7 @@ func (p *Plugin) getCommitReportsObservation(
 		p.ccipReader,
 		p.commitReportCache,
 		p.commitRootsCache.CanExecute,
+		fetchFrom,
 		ci.CursedSourceChains,
 		lggr,
 	)

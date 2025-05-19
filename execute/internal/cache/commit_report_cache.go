@@ -21,7 +21,6 @@ const (
 	DefaultMaxCommitReportsToFetch = 1000
 	MinimumLookbackGracePeriod     = 1 * time.Minute  // Minimum sensible lookback (potential LogPoller delays)
 	DefaultLookbackGracePeriod     = 30 * time.Minute // Default lookback grace period if not set
-
 )
 
 // TimeProvider interface to make time testable
@@ -276,7 +275,7 @@ func (c *commitReportCache) GetCachedReports(fromTimestamp time.Time) []ccipocr3
 func (c *commitReportCache) DeduplicateReports(
 	reports []ccipocr3.CommitPluginReportWithMeta) []ccipocr3.CommitPluginReportWithMeta {
 	seen := make(map[string]bool)
-	deduplicated := make([]ccipocr3.CommitPluginReportWithMeta, 0, len(reports)) // Pre-allocate with a reasonable capacity
+	deduplicated := make([]ccipocr3.CommitPluginReportWithMeta, 0, len(reports))
 
 	for _, report := range reports {
 		key, err := generateKey(report)
