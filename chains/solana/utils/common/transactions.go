@@ -214,23 +214,21 @@ func sendTransactionWithLookupTables(ctx context.Context, rpcClient *rpc.Client,
 			if rpcErr, ok := err.(*jsonrpc.RPCError); ok {
 				fmt.Println("RPC Error:", rpcErr.Message)
 				fmt.Println("RPC Error Code:", rpcErr.Code)
-				if strings.Contains(rpcErr.Message, "Blockhash not found") {
+				if !strings.Contains(rpcErr.Message, "Blockhash not found") {
 					// this can happen when the blockhash we retrieved above is not yet visible to the rpc
 					// given we get the blockhash from the same rpc, this should not happen, but we see it in practice
 					// retrying fixes this
 					fmt.Println("Blockhash not found, retrying...")
 					time.Sleep(50 * time.Millisecond)
 					continue
-				} else {
-					fmt.Println("Unexpected error (most likely contract related), no point in retrying:", err)
-					return nil, err
 				}
-			} else {
-				// Not an RPC error — should only happen when we fail to hit the rpc service
-				fmt.Println("Unexpected error (could not hit rpc service), retrying:", err)
-				time.Sleep(50 * time.Millisecond)
-				continue
+				fmt.Println("Unexpected error (most likely contract related), no point in retrying:", err)
+				return nil, err
 			}
+			// Not an RPC error — should only happen when we fail to hit the rpc service
+			fmt.Println("Unexpected error (could not hit rpc service), retrying:", err)
+			time.Sleep(50 * time.Millisecond)
+			continue
 		}
 		// no error = success
 		break
