@@ -215,8 +215,9 @@ func sendTransactionWithLookupTables(ctx context.Context, rpcClient *rpc.Client,
 				fmt.Println("RPC Error:", rpcErr.Message)
 				fmt.Println("RPC Error Code:", rpcErr.Code)
 				if strings.Contains(rpcErr.Message, "Blockhash not found") {
-					// this can happen when the blockhash we retrieved above takes some time to be visible to the rpc
+					// this can happen when the blockhash we retrieved above is not yet visible to the rpc
 					// given we get the blockhash from the same rpc, this should not happen, but we see it in practice
+					// retrying fixes this
 					fmt.Println("Blockhash not found, retrying...")
 					time.Sleep(50 * time.Millisecond)
 					continue
@@ -231,7 +232,13 @@ func sendTransactionWithLookupTables(ctx context.Context, rpcClient *rpc.Client,
 				continue
 			}
 		}
+		// no error = success
 		break
+	}
+
+	if err != nil {
+		fmt.Println("Error sending transaction after retries:", err)
+		return nil, err
 	}
 
 	var txStatus rpc.ConfirmationStatusType
