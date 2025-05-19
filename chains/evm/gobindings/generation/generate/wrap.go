@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 
 	gethwrappers "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generation"
+
+	zksyncwrapper "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generation/zksync"
 )
 
 var (
@@ -22,12 +24,20 @@ func main() {
 		outDirSuffix = os.Args[4]
 	}
 
-	abiPath := rootDir + project + "/" + className + "/" + className + ".sol/" + className + ".abi.json"
-	metadataPath := rootDir + project + "/" + className + "/" + className + ".sol/" + className + ".metadata.json"
-	binPath := rootDir + project + "/" + className + "/" + className + ".sol/" + className + ".bin"
-	buildInfoPath := rootDir + project + "/" + className + "/build/build.json"
+	if os.Getenv("ZKSYNC") == "true" {
+		outDir := getOutDir(outDirSuffix, pkgName)
+		zksyncBytecodePath := filepath.Join("..", "zkout", className+".sol", className+".json")
+		zksyncBytecode := zksyncwrapper.ReadBytecodeFromForgeJSON(zksyncBytecodePath)
+		outPath := filepath.Join(outDir, pkgName+"_zksync.go")
+		zksyncwrapper.WrapZksyncDeploy(zksyncBytecode, className, pkgName, outPath)
+	} else {
+		abiPath := rootDir + project + "/" + className + "/" + className + ".sol/" + className + ".abi.json"
+		metadataPath := rootDir + project + "/" + className + "/" + className + ".sol/" + className + ".metadata.json"
+		binPath := rootDir + project + "/" + className + "/" + className + ".sol/" + className + ".bin"
+		buildInfoPath := rootDir + project + "/" + className + "/build/build.json"
 
-	GenWrapper(abiPath, binPath, buildInfoPath, metadataPath, className, pkgName, outDirSuffix)
+		GenWrapper(abiPath, binPath, buildInfoPath, metadataPath, className, pkgName, outDirSuffix)
+	}
 }
 
 // GenWrapper generates a contract wrapper for the given contract.
@@ -49,16 +59,7 @@ func main() {
 func GenWrapper(abiPath, binPath, buildInfoPath, metadataPath, className, pkgName, outDirSuffixInput string) {
 	fmt.Println("Generating", pkgName, "contract wrapper")
 
-	cwd, err := os.Getwd() // gethwrappers directory
-	if err != nil {
-		gethwrappers.Exit("could not get working directory", err)
-	}
-	outDir := filepath.Join(cwd, "generated", outDirSuffixInput, pkgName)
-	if mkdErr := os.MkdirAll(outDir, 0700); err != nil {
-		gethwrappers.Exit(
-			fmt.Sprintf("failed to create wrapper dir, outDirSuffixInput: %s (could be empty)", outDirSuffixInput),
-			mkdErr)
-	}
+	outDir := getOutDir(outDirSuffixInput, pkgName)
 	outPath := filepath.Join(outDir, pkgName+".go")
 	metadataOutPath := filepath.Join(outDir, pkgName+"_metadata.go")
 
@@ -87,4 +88,19 @@ func GenWrapper(abiPath, binPath, buildInfoPath, metadataPath, className, pkgNam
 	if err := gethwrappers.WriteVersionsDB(versions); err != nil {
 		gethwrappers.Exit("could not save versions db", err)
 	}
+}
+
+func getOutDir(outDirSuffixInput, pkgName string) string {
+	cwd, err := os.Getwd() // gethwrappers directory
+	if err != nil {
+		gethwrappers.Exit("could not get working directory", err)
+	}
+	outDir := filepath.Join(cwd, "generated", outDirSuffixInput, pkgName)
+	if mkdErr := os.MkdirAll(outDir, 0700); err != nil {
+		gethwrappers.Exit(
+			fmt.Sprintf("failed to create wrapper dir, outDirSuffixInput: %s (could be empty)", outDirSuffixInput),
+			mkdErr)
+	}
+
+	return outDir
 }
