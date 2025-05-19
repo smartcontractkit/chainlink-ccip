@@ -1,7 +1,7 @@
 {
   "name": "CCIP-BnM",
   "symbol": "CCIP-BnM",
-  "description": "Chainlink Token (LINK)",
+  "description": "Chainlink CCIP BnM token",
   "image": "https://d2f70xi62kby8n.cloudfront.net/tokens/ccip-bnm.webp",
   "attributes": [],
   "properties": {
