@@ -119,7 +119,8 @@ func Abigen(a AbigenArgs) {
 		Exit("Error while unmarshalling metadata JSON", err)
 	}
 	if !strings.HasPrefix(metadata.Compiler.Version, "v") {
-		metadata.Compiler.Version = "v" + metadata.Compiler.Version // Verification requires the version to be prefixed with "v"
+		// Verification requires the version to be prefixed with "v"
+		metadata.Compiler.Version = "v" + metadata.Compiler.Version
 	}
 	build.Input.Version = metadata.Compiler.Version
 
