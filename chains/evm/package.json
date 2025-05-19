@@ -3,6 +3,7 @@
   "version": "1.6.0",
   "description": "Chainlink smart contracts for CCIP",
   "author": "Chainlink devs",
+  "repository": "github:smartcontractkit/chainlink-ccip",
   "license": "BUSL-1.1",
   "private": false,
   "scripts": {
