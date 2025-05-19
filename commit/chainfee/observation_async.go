@@ -137,6 +137,7 @@ func newAsyncObserver(
 
 	ticker := time.NewTicker(tickDur)
 	go func() {
+		obs.triggerSyncChan <- time.Now() // trigger an initial sync operation
 		for {
 			select {
 			case <-ctx.Done():
