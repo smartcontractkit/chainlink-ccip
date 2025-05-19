@@ -22,6 +22,7 @@ func SendAndConfirm(ctx context.Context, rpcClient *rpc.Client, instructions []s
 
 func SendAndConfirmWithLookupTables(ctx context.Context, rpcClient *rpc.Client, instructions []solana.Instruction,
 	signer solana.PrivateKey, commitment rpc.CommitmentType, lookupTables map[solana.PublicKey]solana.PublicKeySlice, opts ...TxModifier) (*rpc.GetTransactionResult, error) {
+	// TODO: how come retries is hardcoded to 1 ?
 	txres, err := sendTransactionWithLookupTables(ctx, rpcClient, instructions, signer, commitment, TransactionConfigs{SkipPreflight: false, Retries: 1}, lookupTables, opts...) // do not skipPreflight when expected to pass, preflight can help debug
 	if err != nil {
 		return nil, err
@@ -161,6 +162,7 @@ func sendTransactionWithLookupTables(ctx context.Context, rpcClient *rpc.Client,
 	signerAndPayer solana.PrivateKey, commitment rpc.CommitmentType, transactionConfigs TransactionConfigs, lookupTables map[solana.PublicKey]solana.PublicKeySlice, opts ...TxModifier) (*rpc.GetTransactionResult, error) {
 	var errBlockHash error
 	var hashRes *rpc.GetLatestBlockhashResult
+	// retries is hardcoded to 1 above
 	for i := 0; i < transactionConfigs.Retries; i++ {
 		hashRes, errBlockHash = rpcClient.GetLatestBlockhash(ctx, rpc.CommitmentConfirmed)
 		if errBlockHash != nil {
@@ -208,6 +210,7 @@ func sendTransactionWithLookupTables(ctx context.Context, rpcClient *rpc.Client,
 
 	var txsig solana.Signature
 	for i := 0; i < transactionConfigs.Retries; i++ {
+		// TODO: this err seems to be genuine, we should not retry here
 		txsig, err = rpcClient.SendTransactionWithOpts(ctx, tx, rpc.TransactionOpts{SkipPreflight: transactionConfigs.SkipPreflight, PreflightCommitment: commitment})
 		if err != nil {
 			fmt.Println("Error sending transaction:", err)
@@ -226,6 +229,7 @@ func sendTransactionWithLookupTables(ctx context.Context, rpcClient *rpc.Client,
 
 	var txStatus rpc.ConfirmationStatusType
 	count := 0
+	// should this status not equal to the commitment that we are using ?
 	for txStatus != rpc.ConfirmationStatusConfirmed && txStatus != rpc.ConfirmationStatusFinalized {
 		if count > 500 {
 			return nil, fmt.Errorf("unable to find transaction within timeout (sig: %v)", txsig)
@@ -246,6 +250,7 @@ func sendTransactionWithLookupTables(ctx context.Context, rpcClient *rpc.Client,
 	v := uint64(0)
 	var errGetTx error
 	var transactionRes *rpc.GetTransactionResult
+	// retries is hardcoded to 1 above
 	for i := 0; i < transactionConfigs.Retries; i++ {
 		transactionRes, errGetTx = rpcClient.GetTransaction(ctx, txsig, &rpc.GetTransactionOpts{
 			Commitment:                     commitment,
