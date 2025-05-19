@@ -215,7 +215,6 @@ func sendTransactionWithLookupTables(ctx context.Context, rpcClient *rpc.Client,
 
 	var txStatus rpc.ConfirmationStatusType
 	count := 0
-	// should this status not equal to the commitment that we are using ?
 	for txStatus != rpc.ConfirmationStatusConfirmed && txStatus != rpc.ConfirmationStatusFinalized {
 		if count > 500 {
 			return nil, fmt.Errorf("unable to find transaction within timeout (sig: %v)", txsig)
