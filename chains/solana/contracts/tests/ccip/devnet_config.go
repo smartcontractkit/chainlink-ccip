@@ -4,8 +4,6 @@ import (
 	_ "embed"
 	"testing"
 
-	"fmt"
-
 	"github.com/gagliardetto/solana-go"
 	"github.com/test-go/testify/require"
 	"gopkg.in/yaml.v2"
@@ -47,7 +45,7 @@ func getDevnetInfo() (DevnetInfo, error) {
 	if err := yaml.Unmarshal(devnetInfoBuffer, &devnetInfo); err != nil {
 		return DevnetInfo{}, err
 	}
-	fmt.Printf("Devnet info: %+v\n", devnetInfo)
+	// fmt.Printf("Devnet info: %+v\n", devnetInfo)
 	return devnetInfo, nil
 }
 
