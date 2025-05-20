@@ -21,8 +21,19 @@ const (
 	DefaultMaxCommitReportsToFetch = 1000
 	MinimumLookbackGracePeriod     = 1 * time.Minute  // Minimum sensible lookback (potential LogPoller delays)
 	DefaultLookbackGracePeriod     = 30 * time.Minute // Default lookback grace period if not set
-
 )
+
+// TimeProvider interface to make time testable
+type TimeProvider interface {
+	Now() time.Time
+}
+
+// RealTimeProvider provides actual current time
+type RealTimeProvider struct{}
+
+func (r *RealTimeProvider) Now() time.Time {
+	return time.Now().UTC()
+}
 
 // CommitReportCache stores CommitPluginReportWithMeta objects.
 // It's designed to handle potential LogPoller delays by using a lookback grace period.
@@ -256,6 +267,35 @@ func (c *commitReportCache) GetCachedReports(fromTimestamp time.Time) []ccipocr3
 		"count", len(result),
 		"totalItemsInCache", len(items))
 	return result
+}
+
+// DeduplicateReports deduplicates reports by their Merkle root.
+// It uses the generateKey function to identify unique reports.
+// Reports for which a key cannot be generated (e.g., no Merkle roots)
+// are logged and skipped.
+func DeduplicateReports(
+	lggr logger.Logger,
+	reports []ccipocr3.CommitPluginReportWithMeta,
+) []ccipocr3.CommitPluginReportWithMeta {
+	seen := make(map[string]bool)
+	deduplicated := make([]ccipocr3.CommitPluginReportWithMeta, 0, len(reports))
+
+	for _, report := range reports {
+		key, err := generateKey(report) // generateKey is already in the package
+		if err != nil {
+			lggr.Errorw("DeduplicateReports: Failed to generate key for report, skipping",
+				"err", err,
+				"timestamp", report.Timestamp,
+				"blockNum", report.BlockNum)
+			continue
+		}
+
+		if !seen[key] {
+			deduplicated = append(deduplicated, report)
+			seen[key] = true
+		}
+	}
+	return deduplicated
 }
 
 // Ensure commitReportCache implements CommitReportCache.
