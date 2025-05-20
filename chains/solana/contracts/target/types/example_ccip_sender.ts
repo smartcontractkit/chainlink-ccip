@@ -475,23 +475,8 @@ export type ExampleCcipSender = {
   "errors": [
     {
       "code": 6000,
-      "name": "invalidRouter",
-      "msg": "Invalid router address"
-    },
-    {
-      "code": 6001,
-      "name": "onlyOwner",
-      "msg": "Address is not owner"
-    },
-    {
-      "code": 6002,
-      "name": "onlyProposedOwner",
-      "msg": "Address is not proposed_owner"
-    },
-    {
-      "code": 6003,
-      "name": "invalidProposedOwner",
-      "msg": "Proposed owner is invalid"
+      "name": "transferTokenDuplicated",
+      "msg": "The same token is being transferred more than once"
     }
   ],
   "types": [

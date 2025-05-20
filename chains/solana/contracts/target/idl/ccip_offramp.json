@@ -854,7 +854,7 @@
           "name": "config_info",
           "type": {
             "defined": {
-              "name": "Ocr3ConfigInfo"
+              "name": "Ocr3ConfigInfoInput"
             }
           }
         },
@@ -2040,6 +2040,35 @@
       "repr": {
         "kind": "c"
       },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "config_digest",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "f",
+            "type": "u8"
+          },
+          {
+            "name": "n",
+            "type": "u8"
+          },
+          {
+            "name": "is_signature_verification_enabled",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Ocr3ConfigInfoInput",
       "type": {
         "kind": "struct",
         "fields": [

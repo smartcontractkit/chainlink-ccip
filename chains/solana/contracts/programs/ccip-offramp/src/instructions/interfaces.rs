@@ -5,7 +5,7 @@ use crate::context::{
     ExecuteReportContext, PriceOnlyCommitReportContext, SetOcrConfig, TransferOwnership,
     UpdateConfig, UpdateReferenceAddresses, UpdateSourceChain,
 };
-use crate::state::{CodeVersion, Ocr3ConfigInfo, SourceChainConfig};
+use crate::state::{CodeVersion, Ocr3ConfigInfoInput, SourceChainConfig};
 use crate::OcrPluginType;
 
 /// To be called for managing commit reports.
@@ -117,7 +117,7 @@ pub trait Admin {
         &self,
         ctx: Context<SetOcrConfig>,
         plugin_type: OcrPluginType,
-        config_info: Ocr3ConfigInfo,
+        config_info: Ocr3ConfigInfoInput,
         signers: Vec<[u8; 20]>,
         transmitters: Vec<Pubkey>,
     ) -> Result<()>;
