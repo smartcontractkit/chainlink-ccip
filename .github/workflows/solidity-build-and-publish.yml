@@ -47,11 +47,11 @@ jobs:
         id: release-tag-check
         uses: smartcontractkit/.github/actions/release-tag-check@c094a1482049b2b9c0a7cde3f715bd76a60afd97 # release-tag-check@0.1.0
         env:
-          # Match semver git tags with a "contracts-ccip/" prefix.
-          RELEASE_REGEX: '^contracts-ccip/v[0-9]+\.[0-9]+\.[0-9]+$'
-          PRE_RELEASE_REGEX: '^contracts-ccip/v[0-9]+\.[0-9]+\.[0-9]+-(.+)$'
+          # Match semver git tags with a "contracts-ccip" prefix.
+          RELEASE_REGEX: '^contracts-ccip-v[0-9]+\.[0-9]+\.[0-9]+$'
+          PRE_RELEASE_REGEX: '^contracts-ccip-v[0-9]+\.[0-9]+\.[0-9]+-(.+)$'
           # Get the version by stripping the "contracts-v" prefix.
-          VERSION_PREFIX: "contracts-ccip/v"
+          VERSION_PREFIX: "contracts-ccip-v"
 
   native-compile:
     needs: [changes, tag-check]
