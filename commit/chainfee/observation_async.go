@@ -262,9 +262,9 @@ func (o *asyncObserver) getChainFeePriceUpdates(
 func (o *asyncObserver) invalidateCaches(ctx context.Context, lggr logger.Logger) {
 	lggr.Debugw("invalidating caches, acquiring lock")
 	o.mu.Lock()
-	o.chainsFeeComponents = nil
-	o.nativeTokenPrices = nil
-	o.chainFeePriceUpdates = nil
+	o.chainsFeeComponents = make(map[cciptypes.ChainSelector]types.ChainFeeComponents)
+	o.nativeTokenPrices = make(map[cciptypes.ChainSelector]cciptypes.BigInt)
+	o.chainFeePriceUpdates = make(map[cciptypes.ChainSelector]Update)
 	o.mu.Unlock()
 	lggr.Debugw("caches invalidated, lock released, triggering custom sync operation")
 	o.triggerSyncChan <- time.Now()
