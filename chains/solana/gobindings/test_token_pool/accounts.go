@@ -5,11 +5,12 @@ package test_token_pool
 import (
 	"fmt"
 	ag_binary "github.com/gagliardetto/binary"
+	ag_solanago "github.com/gagliardetto/solana-go"
 )
 
 type State struct {
 	PoolType PoolType
-	Multisig bool
+	Multisig ag_solanago.PublicKey
 	Config   BaseConfig
 }
 

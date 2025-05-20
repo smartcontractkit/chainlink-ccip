@@ -19,8 +19,10 @@ pub mod test_token_pool {
         pool_type: PoolType,
         router: Pubkey,
         rmn_remote: Pubkey,
-        multisig: bool,
+        multisig: Pubkey,
     ) -> Result<()> {
+        msg!("Agustina!! El multisig es ");
+        msg!("{}", multisig);
         ctx.accounts.state.set_inner(State {
             pool_type,
             multisig,
@@ -128,7 +130,7 @@ pub mod test_token_pool {
     }
 
     pub fn release_or_mint_tokens<'info>(
-        ctx: Context<'_, '_, '_, 'info, TokenOfframp<'info>>,
+        ctx: Context<'_, '_, 'info, 'info, TokenOfframp<'info>>,
         release_or_mint: ReleaseOrMintInV1,
     ) -> Result<ReleaseOrMintOutV1> {
         let parsed_amount = to_svm_token_amount(
@@ -175,16 +177,8 @@ pub mod test_token_pool {
                     mint: ctx.accounts.mint.to_account_info(),
                     pool_signer: ctx.accounts.pool_signer.to_account_info(),
                     pool_signer_bump: ctx.bumps.pool_signer,
-                    multisig: if ctx.accounts.state.multisig {
-                        Some(
-                            ctx.remaining_accounts
-                                .get(0)
-                                .ok_or(CcipTokenPoolError::InvalidInputs)?
-                                .clone(),
-                        )
-                    } else {
-                        None
-                    },
+                    multisig: ctx.accounts.state.multisig,
+                    remaining_accounts: ctx.remaining_accounts,
                 },
             )?,
             PoolType::Wrapped => {
@@ -334,7 +328,7 @@ pub mod test_token_pool {
 #[derive(InitSpace)]
 pub struct State {
     pub pool_type: PoolType,
-    pub multisig: bool,
+    pub multisig: Pubkey,
     pub config: BaseConfig,
 }
 

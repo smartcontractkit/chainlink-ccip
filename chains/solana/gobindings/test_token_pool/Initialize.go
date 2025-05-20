@@ -15,7 +15,7 @@ type Initialize struct {
 	PoolType  *PoolType
 	Router    *ag_solanago.PublicKey
 	RmnRemote *ag_solanago.PublicKey
-	Multisig  *bool
+	Multisig  *ag_solanago.PublicKey
 
 	// [0] = [WRITE] state
 	//
@@ -58,7 +58,7 @@ func (inst *Initialize) SetRmnRemote(rmnRemote ag_solanago.PublicKey) *Initializ
 }
 
 // SetMultisig sets the "multisig" parameter.
-func (inst *Initialize) SetMultisig(multisig bool) *Initialize {
+func (inst *Initialize) SetMultisig(multisig ag_solanago.PublicKey) *Initialize {
 	inst.Multisig = &multisig
 	return inst
 }
@@ -269,7 +269,7 @@ func NewInitializeInstruction(
 	poolType PoolType,
 	router ag_solanago.PublicKey,
 	rmnRemote ag_solanago.PublicKey,
-	multisig bool,
+	multisig ag_solanago.PublicKey,
 	// Accounts:
 	state ag_solanago.PublicKey,
 	mint ag_solanago.PublicKey,

@@ -53,7 +53,7 @@
         },
         {
           "name": "multisig",
-          "type": "bool"
+          "type": "publicKey"
         }
       ]
     },
@@ -507,7 +507,7 @@
           },
           {
             "name": "multisig",
-            "type": "bool"
+            "type": "publicKey"
           },
           {
             "name": "config",

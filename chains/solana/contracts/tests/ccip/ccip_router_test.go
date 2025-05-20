@@ -457,7 +457,7 @@ func TestCCIPRouter(t *testing.T) {
 				test_token_pool.BurnAndMint_PoolType,
 				config.CcipRouterProgram,
 				config.RMNRemoteProgram,
-				true,
+				solana.PublicKey(token0Multisig),
 				token0.PoolConfig,
 				token0.Mint,
 				legacyAdmin.PublicKey(),
@@ -471,7 +471,7 @@ func TestCCIPRouter(t *testing.T) {
 				test_token_pool.BurnAndMint_PoolType,
 				config.CcipRouterProgram,
 				config.RMNRemoteProgram,
-				false,
+				solana.PublicKey{},
 				token1.PoolConfig,
 				token1.Mint,
 				legacyAdmin.PublicKey(),
@@ -485,7 +485,7 @@ func TestCCIPRouter(t *testing.T) {
 				test_token_pool.BurnAndMint_PoolType,
 				config.CcipRouterProgram,
 				config.RMNRemoteProgram,
-				false,
+				solana.PublicKey{},
 				token2.PoolConfig,
 				token2.Mint,
 				legacyAdmin.PublicKey(),
@@ -499,7 +499,7 @@ func TestCCIPRouter(t *testing.T) {
 				test_token_pool.BurnAndMint_PoolType,
 				config.CcipRouterProgram,
 				config.RMNRemoteProgram,
-				false,
+				solana.PublicKey{},
 				linkPool.PoolConfig,
 				linkPool.Mint,
 				legacyAdmin.PublicKey(),
@@ -8514,6 +8514,9 @@ func TestCCIPRouter(t *testing.T) {
 					)
 
 					tokenMetas, addressTables, err := tokens.ParseTokenLookupTable(ctx, solanaGoClient, token0, token0.User[config.ReceiverExternalExecutionConfigPDA])
+					fmt.Println("Agussss")
+					fmt.Println(addressTables)
+					fmt.Println("Multisig " + token0Multisig.PublicKey().String())
 					require.NoError(t, err)
 					raw.AccountMetaSlice = append(raw.AccountMetaSlice, solana.Meta(token0.OfframpSigner))
 					raw.AccountMetaSlice = append(raw.AccountMetaSlice, tokenMetas...)

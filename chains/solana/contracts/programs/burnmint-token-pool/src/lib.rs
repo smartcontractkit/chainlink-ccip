@@ -1,3 +1,5 @@
+use std::clone;
+
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::program::invoke_signed;
 use anchor_spl::token_2022::spl_token_2022::{
@@ -187,7 +189,7 @@ pub mod burnmint_token_pool {
     }
 
     pub fn release_or_mint_tokens<'info>(
-        ctx: Context<'_, '_, '_, 'info, TokenOfframp<'info>>,
+        ctx: Context<'_, '_, 'info, 'info, TokenOfframp<'info>>,
         release_or_mint: ReleaseOrMintInV1,
     ) -> Result<ReleaseOrMintOutV1> {
         let parsed_amount = to_svm_token_amount(
@@ -213,18 +215,6 @@ pub mod burnmint_token_pool {
             ctx.accounts.rmn_remote_config.to_account_info(),
         )?;
 
-        let multisig = if ctx.accounts.state.multisig != Pubkey::default() {
-            let multisig_account = ctx
-                .remaining_accounts
-                .get(0)
-                .ok_or(CcipTokenPoolError::InvalidMultisig)?;
-            require_eq!(ctx.accounts.state.multisig, multisig_account.key());
-
-            Some(multisig_account.clone())
-        } else {
-            None
-        };
-
         mint_tokens(
             ctx.accounts.token_program.key(),
             release_or_mint,
@@ -234,7 +224,8 @@ pub mod burnmint_token_pool {
                 mint: ctx.accounts.mint.to_account_info(),
                 pool_signer: ctx.accounts.pool_signer.to_account_info(),
                 pool_signer_bump: ctx.bumps.pool_signer,
-                multisig,
+                multisig: ctx.accounts.state.multisig,
+                remaining_accounts: ctx.remaining_accounts,
             },
         )?;
 
@@ -342,27 +333,51 @@ pub struct MintTokenAccountsInfo<'a> {
     pub mint: AccountInfo<'a>,
     pub pool_signer: AccountInfo<'a>,
     pub pool_signer_bump: u8,
-    pub multisig: Option<AccountInfo<'a>>,
+    pub multisig: Pubkey,
+    pub remaining_accounts: &'a [AccountInfo<'a>],
 }
 
-pub fn mint_tokens(
+pub fn mint_tokens<'info>(
     token_program: Pubkey,
     release_or_mint: ReleaseOrMintInV1,
     parsed_amount: u64,
-    accounts: MintTokenAccountsInfo,
+    accounts: MintTokenAccountsInfo<'info>,
 ) -> Result<()> {
+    let mut owner_pubkey: &Pubkey = &accounts.pool_signer.clone().key();
+    let mut account_infos: Vec<AccountInfo> = vec![
+        accounts.receiver_token_account.clone(),
+        accounts.mint.clone(),
+        accounts.pool_signer.clone(),
+    ];
+    let mut signer_pubkeys: &[&Pubkey] = &[];
+    let pool_signer_key = &[&accounts.pool_signer.clone().key()];
+
+    if accounts.multisig != Pubkey::default() {
+        let multisig_account = accounts
+            .remaining_accounts
+            .iter()
+            .find(|a| a.key.eq(&accounts.multisig))
+            .ok_or(CcipTokenPoolError::InvalidMultisig)?;
+
+        owner_pubkey = &accounts.multisig;
+        signer_pubkeys = pool_signer_key;
+
+        account_infos = vec![
+            accounts.receiver_token_account.clone(),
+            accounts.mint.clone(),
+            multisig_account.clone(),
+            accounts.pool_signer.clone(),
+        ];
+    };
+
     // mint to receiver
     // https://docs.rs/spl-token-2022/latest/spl_token_2022/instruction/fn.mint_to.html
     let mut ix = mint_to(
         &spl_token_2022::ID, // use spl-token-2022 to compile instruction - change program later
         &accounts.mint.key(),
         &accounts.receiver_token_account.key(),
-        &accounts
-            .multisig
-            .clone()
-            .unwrap_or(accounts.pool_signer.clone())
-            .key(),
-        &[accounts.pool_signer.key],
+        owner_pubkey,
+        signer_pubkeys,
         parsed_amount,
     )?;
     ix.program_id = token_program.key(); // set to user specified program
@@ -372,21 +387,6 @@ pub fn mint_tokens(
         &accounts.mint.key().to_bytes(),
         &[accounts.pool_signer_bump],
     ];
-
-    let account_infos: Vec<AccountInfo> = if accounts.multisig.is_some() {
-        vec![
-            accounts.receiver_token_account,
-            accounts.mint.clone(),
-            accounts.multisig.unwrap(),
-            accounts.pool_signer.clone(),
-        ]
-    } else {
-        vec![
-            accounts.receiver_token_account,
-            accounts.mint.clone(),
-            accounts.pool_signer.clone(),
-        ]
-    };
 
     invoke_signed(&ix, &account_infos, &[&seeds[..]])?;
 

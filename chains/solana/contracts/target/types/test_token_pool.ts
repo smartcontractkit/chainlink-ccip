@@ -53,7 +53,7 @@ export type TestTokenPool = {
         },
         {
           "name": "multisig",
-          "type": "bool"
+          "type": "publicKey"
         }
       ]
     },
@@ -507,7 +507,7 @@ export type TestTokenPool = {
           },
           {
             "name": "multisig",
-            "type": "bool"
+            "type": "publicKey"
           },
           {
             "name": "config",
@@ -609,7 +609,7 @@ export const IDL: TestTokenPool = {
         },
         {
           "name": "multisig",
-          "type": "bool"
+          "type": "publicKey"
         }
       ]
     },
@@ -1063,7 +1063,7 @@ export const IDL: TestTokenPool = {
           },
           {
             "name": "multisig",
-            "type": "bool"
+            "type": "publicKey"
           },
           {
             "name": "config",
