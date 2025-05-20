@@ -5,7 +5,8 @@ use crate::OcrPluginType;
 pub const MAX_ORACLES: usize = 16; // can set a maximum of 16 transmitters + 16 signers simultaneously in a single set config tx
 
 #[event]
-pub struct OcrConfigSet {  // TODO: This is a breaking change in the event discriminator
+pub struct OcrConfigSet {
+    // TODO: This is a breaking change in the event discriminator
     pub ocr_plugin_type: OcrPluginType,
     pub config_digest: [u8; 32],
     pub signers: Vec<[u8; 20]>,

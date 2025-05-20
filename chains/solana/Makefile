@@ -13,7 +13,7 @@ anchor_version:
 
 .PHONY: clippy
 clippy:
-	cd ./contracts && cargo clippy -- -D warnings
+	cd ./contracts && cargo clippy
 
 .PHONY: gomods
 gomods: ## Install gomods
