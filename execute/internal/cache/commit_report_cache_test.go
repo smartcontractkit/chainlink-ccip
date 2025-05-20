@@ -550,13 +550,10 @@ func TestCommitReportCache_DeduplicateReports(t *testing.T) {
 	t.Parallel()
 	lggr := logger.Test(t)
 	now := time.Now().UTC()
-	tp := newMockTimeProvider(now)
-	mockRdr := readerMocks.NewMockCCIPReader(t)
-	cacheCfg := CommitReportCacheConfig{
-		MessageVisibilityInterval: 1 * time.Hour,
-		LookbackGracePeriod:       5 * time.Minute,
-	}
-	cache := NewCommitReportCache(lggr, cacheCfg, tp, mockRdr)
+	// tp and mockRdr are not used by the package-level DeduplicateReports function,
+	// but are kept here for consistency with other tests in case they are needed later.
+	newMockTimeProvider(now)
+	readerMocks.NewMockCCIPReader(t)
 
 	// Create test reports with different configurations
 
@@ -680,7 +677,7 @@ func TestCommitReportCache_DeduplicateReports(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result := cache.DeduplicateReports(tc.reports)
+			result := DeduplicateReports(lggr, tc.reports)
 
 			// Verify length
 			assert.Equal(t, len(tc.expected), len(result), "Result length mismatch")

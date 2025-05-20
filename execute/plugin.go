@@ -299,19 +299,19 @@ func getPendingReportsForExecution(
 	lggr.Infow("Querying commit reports from chain", "fetchFrom", fetchFrom)
 
 	// get the timestamp to fetch from cache
-	latestReportTimestampInCache := commitReportCache.GetReportsToQueryFromTimestamp()
-	lggr.Infow("Querying commit reports from cache", "latestReportTimestampInCache", latestReportTimestampInCache)
+	queryFromTimestampForNewReports := commitReportCache.GetReportsToQueryFromTimestamp()
+	lggr.Infow("Querying commit reports from cache", "queryFromTimestampForNewReports", queryFromTimestampForNewReports)
 
 	// Assuming each report can have minimum one message, max reports shouldn't exceed the max messages
 	unfinalizedIncrementReports, err := ccipReader.CommitReportsGTETimestamp(
-		ctx, latestReportTimestampInCache, primitives.Unconfirmed, maxCommitReportsToFetch,
+		ctx, queryFromTimestampForNewReports, primitives.Unconfirmed, maxCommitReportsToFetch,
 	)
 	if err != nil {
 		return nil, nil, nil, err
 	}
 
 	// merge the reports from the cache and the reports from the reader
-	candidateReports := commitReportCache.DeduplicateReports(append(reportsFromCache, unfinalizedIncrementReports...))
+	candidateReports := cache.DeduplicateReports(lggr, append(reportsFromCache, unfinalizedIncrementReports...))
 
 	lggr.Debugw("commit reports", "candidateReports", candidateReports, "count", len(candidateReports))
 

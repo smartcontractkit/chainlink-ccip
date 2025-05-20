@@ -51,9 +51,6 @@ type CommitReportCache interface {
 	// GetCachedReports retrieves reports from the cache that have a timestamp greater than or equal to fromTimestamp.
 	// Reports are sorted by their timestamp.
 	GetCachedReports(fromTimestamp time.Time) []ccipocr3.CommitPluginReportWithMeta
-
-	// DeduplicateReports deduplicates reports by their Merkle root.
-	DeduplicateReports(reports []ccipocr3.CommitPluginReportWithMeta) []ccipocr3.CommitPluginReportWithMeta
 }
 
 type commitReportCache struct {
@@ -272,18 +269,21 @@ func (c *commitReportCache) GetCachedReports(fromTimestamp time.Time) []ccipocr3
 	return result
 }
 
-func (c *commitReportCache) DeduplicateReports(
-	reports []ccipocr3.CommitPluginReportWithMeta) []ccipocr3.CommitPluginReportWithMeta {
+// DeduplicateReports deduplicates reports by their Merkle root.
+// It uses the generateKey function to identify unique reports.
+// Reports for which a key cannot be generated (e.g., no Merkle roots)
+// are logged and skipped.
+func DeduplicateReports(
+	lggr logger.Logger,
+	reports []ccipocr3.CommitPluginReportWithMeta,
+) []ccipocr3.CommitPluginReportWithMeta {
 	seen := make(map[string]bool)
 	deduplicated := make([]ccipocr3.CommitPluginReportWithMeta, 0, len(reports))
 
 	for _, report := range reports {
-		key, err := generateKey(report)
+		key, err := generateKey(report) // generateKey is already in the package
 		if err != nil {
-			// If a key cannot be generated (e.g., no Merkle roots),
-			// this report cannot be uniquely identified for deduplication.
-			// We skip such reports.
-			c.lggr.Errorw("Failed to generate key for report",
+			lggr.Errorw("DeduplicateReports: Failed to generate key for report, skipping",
 				"err", err,
 				"timestamp", report.Timestamp,
 				"blockNum", report.BlockNum)
