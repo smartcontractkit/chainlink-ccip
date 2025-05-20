@@ -136,3 +136,7 @@ const (
 	PluginTypeCommit  uint8 = 0
 	PluginTypeExecute uint8 = 1
 )
+
+type CtxKey string
+
+const InvalidateCacheKey = CtxKey("invalidate-cache")
