@@ -17,7 +17,7 @@ defaults:
 jobs:
   get_anchor_version:
     name: Get Anchor Version
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-8cores-32GB
     outputs:
       anchor_version: ${{ steps.anchorversion.outputs.anchor }}
     steps:
@@ -68,7 +68,7 @@ jobs:
 
   rust:
     name: rust tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-8cores-32GB
     needs: [get_anchor_version, build_solana]
     steps:
     - uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
@@ -148,7 +148,7 @@ jobs:
 
   lint:
     name: lint + check artifacts
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-8cores-32GB
     needs: [get_anchor_version, build_solana]
     steps:
       - uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
@@ -186,7 +186,7 @@ jobs:
           rm -rf target/idl target/types &&\
           anchor build"
 
-          go install github.com/gagliardetto/anchor-go@v0.2.3
+          go install github.com/fragmetric-labs/solana-anchor-go
           ./scripts/anchor-go-gen.sh
           make format
           git diff --exit-code

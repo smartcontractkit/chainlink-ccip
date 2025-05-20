@@ -18,8 +18,22 @@ require (
 )
 
 require (
+	github.com/aybabtme/rgbterm v0.0.0-20170906152045-cc83f3b3ce59 // indirect
+	github.com/buger/goterm v0.0.0-20200322175922-2f3e71b85129 // indirect
+	github.com/dave/jennifer v1.7.0 // indirect
+	github.com/fragmetric-labs/solana-anchor-go v1.0.2 // indirect
+	github.com/gagliardetto/utilz v0.1.3 // indirect
+	github.com/hako/durafmt v0.0.0-20200710122514-c0fb7b4da026 // indirect
+	github.com/kr/pretty v0.3.1 // indirect
+	github.com/kr/text v0.2.0 // indirect
+	github.com/miekg/dns v1.1.35 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
+	github.com/rogpeppe/go-internal v1.12.0 // indirect
+	github.com/ryanuber/go-glob v1.0.0 // indirect
+	golang.org/x/mod v0.22.0 // indirect
 	golang.org/x/net v0.37.0 // indirect
+	golang.org/x/sync v0.10.0 // indirect
+	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
 
 require (

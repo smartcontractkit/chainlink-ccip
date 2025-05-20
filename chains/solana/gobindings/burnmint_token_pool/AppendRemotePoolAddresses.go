@@ -10,7 +10,7 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// AppendRemotePoolAddresses is the `appendRemotePoolAddresses` instruction.
+// AppendRemotePoolAddresses is the `append_remote_pool_addresses` instruction.
 type AppendRemotePoolAddresses struct {
 	RemoteChainSelector *uint64
 	Mint                *ag_solanago.PublicKey
@@ -18,12 +18,12 @@ type AppendRemotePoolAddresses struct {
 
 	// [0] = [] state
 	//
-	// [1] = [WRITE] chainConfig
+	// [1] = [WRITE] chain_config
 	//
 	// [2] = [WRITE, SIGNER] authority
 	//
-	// [3] = [] systemProgram
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	// [3] = [] system_program
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewAppendRemotePoolAddressesInstructionBuilder creates a new `AppendRemotePoolAddresses` instruction builder.
@@ -34,15 +34,15 @@ func NewAppendRemotePoolAddressesInstructionBuilder() *AppendRemotePoolAddresses
 	return nd
 }
 
-// SetRemoteChainSelector sets the "remoteChainSelector" parameter.
-func (inst *AppendRemotePoolAddresses) SetRemoteChainSelector(remoteChainSelector uint64) *AppendRemotePoolAddresses {
-	inst.RemoteChainSelector = &remoteChainSelector
+// SetRemoteChainSelector sets the "remote_chain_selector" parameter.
+func (inst *AppendRemotePoolAddresses) SetRemoteChainSelector(remote_chain_selector uint64) *AppendRemotePoolAddresses {
+	inst.RemoteChainSelector = &remote_chain_selector
 	return inst
 }
 
-// SetMint sets the "mint" parameter.
-func (inst *AppendRemotePoolAddresses) SetMint(mint ag_solanago.PublicKey) *AppendRemotePoolAddresses {
-	inst.Mint = &mint
+// SetMint sets the "_mint" parameter.
+func (inst *AppendRemotePoolAddresses) SetMint(_mint ag_solanago.PublicKey) *AppendRemotePoolAddresses {
+	inst.Mint = &_mint
 	return inst
 }
 
@@ -60,18 +60,18 @@ func (inst *AppendRemotePoolAddresses) SetStateAccount(state ag_solanago.PublicK
 
 // GetStateAccount gets the "state" account.
 func (inst *AppendRemotePoolAddresses) GetStateAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
-// SetChainConfigAccount sets the "chainConfig" account.
+// SetChainConfigAccount sets the "chain_config" account.
 func (inst *AppendRemotePoolAddresses) SetChainConfigAccount(chainConfig ag_solanago.PublicKey) *AppendRemotePoolAddresses {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(chainConfig).WRITE()
 	return inst
 }
 
-// GetChainConfigAccount gets the "chainConfig" account.
+// GetChainConfigAccount gets the "chain_config" account.
 func (inst *AppendRemotePoolAddresses) GetChainConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -82,18 +82,18 @@ func (inst *AppendRemotePoolAddresses) SetAuthorityAccount(authority ag_solanago
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *AppendRemotePoolAddresses) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
-// SetSystemProgramAccount sets the "systemProgram" account.
+// SetSystemProgramAccount sets the "system_program" account.
 func (inst *AppendRemotePoolAddresses) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *AppendRemotePoolAddresses {
 	inst.AccountMetaSlice[3] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
-// GetSystemProgramAccount gets the "systemProgram" account.
+// GetSystemProgramAccount gets the "system_program" account.
 func (inst *AppendRemotePoolAddresses) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice.Get(3)
 }
 
 func (inst AppendRemotePoolAddresses) Build() *Instruction {
@@ -155,17 +155,17 @@ func (inst *AppendRemotePoolAddresses) EncodeToTree(parent ag_treeout.Branches) 
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=3]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("RemoteChainSelector", *inst.RemoteChainSelector))
-						paramsBranch.Child(ag_format.Param("               Mint", *inst.Mint))
-						paramsBranch.Child(ag_format.Param("          Addresses", *inst.Addresses))
+						paramsBranch.Child(ag_format.Param("  RemoteChainSelector", *inst.RemoteChainSelector))
+						paramsBranch.Child(ag_format.Param("                 Mint", *inst.Mint))
+						paramsBranch.Child(ag_format.Param("            Addresses", *inst.Addresses))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("        state", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("  chainConfig", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("    authority", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("         state", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("  chain_config", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("     authority", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("system_program", inst.AccountMetaSlice.Get(3)))
 					})
 				})
 		})
@@ -211,8 +211,8 @@ func (obj *AppendRemotePoolAddresses) UnmarshalWithDecoder(decoder *ag_binary.De
 // NewAppendRemotePoolAddressesInstruction declares a new AppendRemotePoolAddresses instruction with the provided parameters and accounts.
 func NewAppendRemotePoolAddressesInstruction(
 	// Parameters:
-	remoteChainSelector uint64,
-	mint ag_solanago.PublicKey,
+	remote_chain_selector uint64,
+	_mint ag_solanago.PublicKey,
 	addresses []RemoteAddress,
 	// Accounts:
 	state ag_solanago.PublicKey,
@@ -220,8 +220,8 @@ func NewAppendRemotePoolAddressesInstruction(
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *AppendRemotePoolAddresses {
 	return NewAppendRemotePoolAddressesInstructionBuilder().
-		SetRemoteChainSelector(remoteChainSelector).
-		SetMint(mint).
+		SetRemoteChainSelector(remote_chain_selector).
+		SetMint(_mint).
 		SetAddresses(addresses).
 		SetStateAccount(state).
 		SetChainConfigAccount(chainConfig).

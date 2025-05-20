@@ -10,17 +10,17 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// DeleteChainConfig is the `deleteChainConfig` instruction.
+// DeleteChainConfig is the `delete_chain_config` instruction.
 type DeleteChainConfig struct {
 	RemoteChainSelector *uint64
 	Mint                *ag_solanago.PublicKey
 
 	// [0] = [] state
 	//
-	// [1] = [WRITE] chainConfig
+	// [1] = [WRITE] chain_config
 	//
 	// [2] = [WRITE, SIGNER] authority
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewDeleteChainConfigInstructionBuilder creates a new `DeleteChainConfig` instruction builder.
@@ -31,9 +31,9 @@ func NewDeleteChainConfigInstructionBuilder() *DeleteChainConfig {
 	return nd
 }
 
-// SetRemoteChainSelector sets the "remoteChainSelector" parameter.
-func (inst *DeleteChainConfig) SetRemoteChainSelector(remoteChainSelector uint64) *DeleteChainConfig {
-	inst.RemoteChainSelector = &remoteChainSelector
+// SetRemoteChainSelector sets the "remote_chain_selector" parameter.
+func (inst *DeleteChainConfig) SetRemoteChainSelector(remote_chain_selector uint64) *DeleteChainConfig {
+	inst.RemoteChainSelector = &remote_chain_selector
 	return inst
 }
 
@@ -51,18 +51,18 @@ func (inst *DeleteChainConfig) SetStateAccount(state ag_solanago.PublicKey) *Del
 
 // GetStateAccount gets the "state" account.
 func (inst *DeleteChainConfig) GetStateAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
-// SetChainConfigAccount sets the "chainConfig" account.
+// SetChainConfigAccount sets the "chain_config" account.
 func (inst *DeleteChainConfig) SetChainConfigAccount(chainConfig ag_solanago.PublicKey) *DeleteChainConfig {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(chainConfig).WRITE()
 	return inst
 }
 
-// GetChainConfigAccount gets the "chainConfig" account.
+// GetChainConfigAccount gets the "chain_config" account.
 func (inst *DeleteChainConfig) GetChainConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -73,7 +73,7 @@ func (inst *DeleteChainConfig) SetAuthorityAccount(authority ag_solanago.PublicK
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *DeleteChainConfig) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
 func (inst DeleteChainConfig) Build() *Instruction {
@@ -129,15 +129,15 @@ func (inst *DeleteChainConfig) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("RemoteChainSelector", *inst.RemoteChainSelector))
-						paramsBranch.Child(ag_format.Param("               Mint", *inst.Mint))
+						paramsBranch.Child(ag_format.Param("  RemoteChainSelector", *inst.RemoteChainSelector))
+						paramsBranch.Child(ag_format.Param("                 Mint", *inst.Mint))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("      state", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("chainConfig", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("  authority", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("       state", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("chain_config", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("   authority", inst.AccountMetaSlice.Get(2)))
 					})
 				})
 		})
@@ -173,14 +173,14 @@ func (obj *DeleteChainConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (
 // NewDeleteChainConfigInstruction declares a new DeleteChainConfig instruction with the provided parameters and accounts.
 func NewDeleteChainConfigInstruction(
 	// Parameters:
-	remoteChainSelector uint64,
+	remote_chain_selector uint64,
 	mint ag_solanago.PublicKey,
 	// Accounts:
 	state ag_solanago.PublicKey,
 	chainConfig ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *DeleteChainConfig {
 	return NewDeleteChainConfigInstructionBuilder().
-		SetRemoteChainSelector(remoteChainSelector).
+		SetRemoteChainSelector(remote_chain_selector).
 		SetMint(mint).
 		SetStateAccount(state).
 		SetChainConfigAccount(chainConfig).

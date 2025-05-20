@@ -10,7 +10,7 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// LockOrBurnTokens is the `lockOrBurnTokens` instruction.
+// LockOrBurnTokens is the `lock_or_burn_tokens` instruction.
 type LockOrBurnTokens struct {
 	LockOrBurn *LockOrBurnInV1
 
@@ -18,22 +18,22 @@ type LockOrBurnTokens struct {
 	//
 	// [1] = [] state
 	//
-	// [2] = [] tokenProgram
+	// [2] = [] token_program
 	//
 	// [3] = [WRITE] mint
 	//
-	// [4] = [] poolSigner
+	// [4] = [] pool_signer
 	//
-	// [5] = [WRITE] poolTokenAccount
+	// [5] = [WRITE] pool_token_account
 	//
-	// [6] = [] rmnRemote
+	// [6] = [] rmn_remote
 	//
-	// [7] = [] rmnRemoteCurses
+	// [7] = [] rmn_remote_curses
 	//
-	// [8] = [] rmnRemoteConfig
+	// [8] = [] rmn_remote_config
 	//
-	// [9] = [WRITE] chainConfig
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	// [9] = [WRITE] chain_config
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewLockOrBurnTokensInstructionBuilder creates a new `LockOrBurnTokens` instruction builder.
@@ -44,9 +44,9 @@ func NewLockOrBurnTokensInstructionBuilder() *LockOrBurnTokens {
 	return nd
 }
 
-// SetLockOrBurn sets the "lockOrBurn" parameter.
-func (inst *LockOrBurnTokens) SetLockOrBurn(lockOrBurn LockOrBurnInV1) *LockOrBurnTokens {
-	inst.LockOrBurn = &lockOrBurn
+// SetLockOrBurn sets the "lock_or_burn" parameter.
+func (inst *LockOrBurnTokens) SetLockOrBurn(lock_or_burn LockOrBurnInV1) *LockOrBurnTokens {
+	inst.LockOrBurn = &lock_or_burn
 	return inst
 }
 
@@ -58,7 +58,7 @@ func (inst *LockOrBurnTokens) SetAuthorityAccount(authority ag_solanago.PublicKe
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *LockOrBurnTokens) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
 // SetStateAccount sets the "state" account.
@@ -69,18 +69,18 @@ func (inst *LockOrBurnTokens) SetStateAccount(state ag_solanago.PublicKey) *Lock
 
 // GetStateAccount gets the "state" account.
 func (inst *LockOrBurnTokens) GetStateAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
-// SetTokenProgramAccount sets the "tokenProgram" account.
+// SetTokenProgramAccount sets the "token_program" account.
 func (inst *LockOrBurnTokens) SetTokenProgramAccount(tokenProgram ag_solanago.PublicKey) *LockOrBurnTokens {
 	inst.AccountMetaSlice[2] = ag_solanago.Meta(tokenProgram)
 	return inst
 }
 
-// GetTokenProgramAccount gets the "tokenProgram" account.
+// GetTokenProgramAccount gets the "token_program" account.
 func (inst *LockOrBurnTokens) GetTokenProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
 // SetMintAccount sets the "mint" account.
@@ -91,73 +91,73 @@ func (inst *LockOrBurnTokens) SetMintAccount(mint ag_solanago.PublicKey) *LockOr
 
 // GetMintAccount gets the "mint" account.
 func (inst *LockOrBurnTokens) GetMintAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice.Get(3)
 }
 
-// SetPoolSignerAccount sets the "poolSigner" account.
+// SetPoolSignerAccount sets the "pool_signer" account.
 func (inst *LockOrBurnTokens) SetPoolSignerAccount(poolSigner ag_solanago.PublicKey) *LockOrBurnTokens {
 	inst.AccountMetaSlice[4] = ag_solanago.Meta(poolSigner)
 	return inst
 }
 
-// GetPoolSignerAccount gets the "poolSigner" account.
+// GetPoolSignerAccount gets the "pool_signer" account.
 func (inst *LockOrBurnTokens) GetPoolSignerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[4]
+	return inst.AccountMetaSlice.Get(4)
 }
 
-// SetPoolTokenAccountAccount sets the "poolTokenAccount" account.
+// SetPoolTokenAccountAccount sets the "pool_token_account" account.
 func (inst *LockOrBurnTokens) SetPoolTokenAccountAccount(poolTokenAccount ag_solanago.PublicKey) *LockOrBurnTokens {
 	inst.AccountMetaSlice[5] = ag_solanago.Meta(poolTokenAccount).WRITE()
 	return inst
 }
 
-// GetPoolTokenAccountAccount gets the "poolTokenAccount" account.
+// GetPoolTokenAccountAccount gets the "pool_token_account" account.
 func (inst *LockOrBurnTokens) GetPoolTokenAccountAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[5]
+	return inst.AccountMetaSlice.Get(5)
 }
 
-// SetRmnRemoteAccount sets the "rmnRemote" account.
+// SetRmnRemoteAccount sets the "rmn_remote" account.
 func (inst *LockOrBurnTokens) SetRmnRemoteAccount(rmnRemote ag_solanago.PublicKey) *LockOrBurnTokens {
 	inst.AccountMetaSlice[6] = ag_solanago.Meta(rmnRemote)
 	return inst
 }
 
-// GetRmnRemoteAccount gets the "rmnRemote" account.
+// GetRmnRemoteAccount gets the "rmn_remote" account.
 func (inst *LockOrBurnTokens) GetRmnRemoteAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[6]
+	return inst.AccountMetaSlice.Get(6)
 }
 
-// SetRmnRemoteCursesAccount sets the "rmnRemoteCurses" account.
+// SetRmnRemoteCursesAccount sets the "rmn_remote_curses" account.
 func (inst *LockOrBurnTokens) SetRmnRemoteCursesAccount(rmnRemoteCurses ag_solanago.PublicKey) *LockOrBurnTokens {
 	inst.AccountMetaSlice[7] = ag_solanago.Meta(rmnRemoteCurses)
 	return inst
 }
 
-// GetRmnRemoteCursesAccount gets the "rmnRemoteCurses" account.
+// GetRmnRemoteCursesAccount gets the "rmn_remote_curses" account.
 func (inst *LockOrBurnTokens) GetRmnRemoteCursesAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[7]
+	return inst.AccountMetaSlice.Get(7)
 }
 
-// SetRmnRemoteConfigAccount sets the "rmnRemoteConfig" account.
+// SetRmnRemoteConfigAccount sets the "rmn_remote_config" account.
 func (inst *LockOrBurnTokens) SetRmnRemoteConfigAccount(rmnRemoteConfig ag_solanago.PublicKey) *LockOrBurnTokens {
 	inst.AccountMetaSlice[8] = ag_solanago.Meta(rmnRemoteConfig)
 	return inst
 }
 
-// GetRmnRemoteConfigAccount gets the "rmnRemoteConfig" account.
+// GetRmnRemoteConfigAccount gets the "rmn_remote_config" account.
 func (inst *LockOrBurnTokens) GetRmnRemoteConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[8]
+	return inst.AccountMetaSlice.Get(8)
 }
 
-// SetChainConfigAccount sets the "chainConfig" account.
+// SetChainConfigAccount sets the "chain_config" account.
 func (inst *LockOrBurnTokens) SetChainConfigAccount(chainConfig ag_solanago.PublicKey) *LockOrBurnTokens {
 	inst.AccountMetaSlice[9] = ag_solanago.Meta(chainConfig).WRITE()
 	return inst
 }
 
-// GetChainConfigAccount gets the "chainConfig" account.
+// GetChainConfigAccount gets the "chain_config" account.
 func (inst *LockOrBurnTokens) GetChainConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[9]
+	return inst.AccountMetaSlice.Get(9)
 }
 
 func (inst LockOrBurnTokens) Build() *Instruction {
@@ -231,21 +231,21 @@ func (inst *LockOrBurnTokens) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("LockOrBurn", *inst.LockOrBurn))
+						paramsBranch.Child(ag_format.Param("  LockOrBurn", *inst.LockOrBurn))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=10]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("      authority", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("          state", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("   tokenProgram", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("           mint", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("     poolSigner", inst.AccountMetaSlice[4]))
-						accountsBranch.Child(ag_format.Meta("      poolToken", inst.AccountMetaSlice[5]))
-						accountsBranch.Child(ag_format.Meta("      rmnRemote", inst.AccountMetaSlice[6]))
-						accountsBranch.Child(ag_format.Meta("rmnRemoteCurses", inst.AccountMetaSlice[7]))
-						accountsBranch.Child(ag_format.Meta("rmnRemoteConfig", inst.AccountMetaSlice[8]))
-						accountsBranch.Child(ag_format.Meta("    chainConfig", inst.AccountMetaSlice[9]))
+						accountsBranch.Child(ag_format.Meta("        authority", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("            state", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("    token_program", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("             mint", inst.AccountMetaSlice.Get(3)))
+						accountsBranch.Child(ag_format.Meta("      pool_signer", inst.AccountMetaSlice.Get(4)))
+						accountsBranch.Child(ag_format.Meta("      pool_token_", inst.AccountMetaSlice.Get(5)))
+						accountsBranch.Child(ag_format.Meta("       rmn_remote", inst.AccountMetaSlice.Get(6)))
+						accountsBranch.Child(ag_format.Meta("rmn_remote_curses", inst.AccountMetaSlice.Get(7)))
+						accountsBranch.Child(ag_format.Meta("rmn_remote_config", inst.AccountMetaSlice.Get(8)))
+						accountsBranch.Child(ag_format.Meta("     chain_config", inst.AccountMetaSlice.Get(9)))
 					})
 				})
 		})
@@ -271,7 +271,7 @@ func (obj *LockOrBurnTokens) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (e
 // NewLockOrBurnTokensInstruction declares a new LockOrBurnTokens instruction with the provided parameters and accounts.
 func NewLockOrBurnTokensInstruction(
 	// Parameters:
-	lockOrBurn LockOrBurnInV1,
+	lock_or_burn LockOrBurnInV1,
 	// Accounts:
 	authority ag_solanago.PublicKey,
 	state ag_solanago.PublicKey,
@@ -284,7 +284,7 @@ func NewLockOrBurnTokensInstruction(
 	rmnRemoteConfig ag_solanago.PublicKey,
 	chainConfig ag_solanago.PublicKey) *LockOrBurnTokens {
 	return NewLockOrBurnTokensInstructionBuilder().
-		SetLockOrBurn(lockOrBurn).
+		SetLockOrBurn(lock_or_burn).
 		SetAuthorityAccount(authority).
 		SetStateAccount(state).
 		SetTokenProgramAccount(tokenProgram).

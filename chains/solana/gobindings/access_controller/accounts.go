@@ -8,17 +8,17 @@ import (
 	ag_solanago "github.com/gagliardetto/solana-go"
 )
 
-type AccessController struct {
+type AccessControllerAccount struct {
 	Owner         ag_solanago.PublicKey
 	ProposedOwner ag_solanago.PublicKey
 	AccessList    AccessList
 }
 
-var AccessControllerDiscriminator = [8]byte{143, 45, 12, 204, 220, 20, 114, 87}
+var AccessControllerAccountDiscriminator = [8]byte{143, 45, 12, 204, 220, 20, 114, 87}
 
-func (obj AccessController) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj AccessControllerAccount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Write account discriminator:
-	err = encoder.WriteBytes(AccessControllerDiscriminator[:], false)
+	err = encoder.WriteBytes(AccessControllerAccountDiscriminator[:], false)
 	if err != nil {
 		return err
 	}
@@ -40,14 +40,14 @@ func (obj AccessController) MarshalWithEncoder(encoder *ag_binary.Encoder) (err 
 	return nil
 }
 
-func (obj *AccessController) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *AccessControllerAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Read and check account discriminator:
 	{
 		discriminator, err := decoder.ReadTypeID()
 		if err != nil {
 			return err
 		}
-		if !discriminator.Equal(AccessControllerDiscriminator[:]) {
+		if !discriminator.Equal(AccessControllerAccountDiscriminator[:]) {
 			return fmt.Errorf(
 				"wrong discriminator: wanted %s, got %s",
 				"[143 45 12 204 220 20 114 87]",

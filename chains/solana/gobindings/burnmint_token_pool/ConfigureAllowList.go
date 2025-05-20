@@ -10,7 +10,7 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// ConfigureAllowList is the `configureAllowList` instruction.
+// ConfigureAllowList is the `configure_allow_list` instruction.
 type ConfigureAllowList struct {
 	Add     *[]ag_solanago.PublicKey
 	Enabled *bool
@@ -21,8 +21,8 @@ type ConfigureAllowList struct {
 	//
 	// [2] = [WRITE, SIGNER] authority
 	//
-	// [3] = [] systemProgram
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	// [3] = [] system_program
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewConfigureAllowListInstructionBuilder creates a new `ConfigureAllowList` instruction builder.
@@ -53,7 +53,7 @@ func (inst *ConfigureAllowList) SetStateAccount(state ag_solanago.PublicKey) *Co
 
 // GetStateAccount gets the "state" account.
 func (inst *ConfigureAllowList) GetStateAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
 // SetMintAccount sets the "mint" account.
@@ -64,7 +64,7 @@ func (inst *ConfigureAllowList) SetMintAccount(mint ag_solanago.PublicKey) *Conf
 
 // GetMintAccount gets the "mint" account.
 func (inst *ConfigureAllowList) GetMintAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -75,18 +75,18 @@ func (inst *ConfigureAllowList) SetAuthorityAccount(authority ag_solanago.Public
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *ConfigureAllowList) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
-// SetSystemProgramAccount sets the "systemProgram" account.
+// SetSystemProgramAccount sets the "system_program" account.
 func (inst *ConfigureAllowList) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *ConfigureAllowList {
 	inst.AccountMetaSlice[3] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
-// GetSystemProgramAccount gets the "systemProgram" account.
+// GetSystemProgramAccount gets the "system_program" account.
 func (inst *ConfigureAllowList) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice.Get(3)
 }
 
 func (inst ConfigureAllowList) Build() *Instruction {
@@ -151,10 +151,10 @@ func (inst *ConfigureAllowList) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("        state", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("         mint", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("    authority", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("         state", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("          mint", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("     authority", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("system_program", inst.AccountMetaSlice.Get(3)))
 					})
 				})
 		})
