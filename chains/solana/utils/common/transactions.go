@@ -236,11 +236,6 @@ func sendTransactionWithLookupTables(ctx context.Context, rpcClient *rpc.Client,
 		break
 	}
 
-	if err != nil {
-		fmt.Println("Error sending transaction after retries:", err)
-		return nil, err
-	}
-
 	var txStatus rpc.ConfirmationStatusType
 	count := 0
 	for txStatus != rpc.ConfirmationStatusConfirmed && txStatus != rpc.ConfirmationStatusFinalized {
