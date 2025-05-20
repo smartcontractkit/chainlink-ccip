@@ -1,109 +1,14 @@
 {
-  "version": "0.1.0-dev",
-  "name": "rmn_remote",
+  "address": "RmnXLft1mSEwDgMKu2okYuHkiazxntFFcZFrrcXxYg7",
+  "metadata": {
+    "name": "rmn_remote",
+    "version": "0.1.0-dev",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
   "instructions": [
     {
-      "name": "initialize",
-      "docs": [
-        "Initializes the Rmn Remote contract.",
-        "",
-        "The initialization is responsibility of Admin, nothing more than calling this method should be done first.",
-        "",
-        "# Arguments",
-        "",
-        "* `ctx` - The context containing the accounts required for initialization."
-      ],
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "curses",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "programData",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "typeVersion",
-      "docs": [
-        "Returns the program type (name) and version.",
-        "Used by offchain code to easily determine which program & version is being interacted with.",
-        "",
-        "# Arguments",
-        "* `ctx` - The context"
-      ],
-      "accounts": [
-        {
-          "name": "clock",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [],
-      "returns": "string"
-    },
-    {
-      "name": "transferOwnership",
-      "docs": [
-        "Transfers the ownership of the fee quoter to a new proposed owner.",
-        "",
-        "Shared func signature with other programs.",
-        "",
-        "# Arguments",
-        "",
-        "* `ctx` - The context containing the accounts required for the transfer.",
-        "* `proposed_owner` - The public key of the new proposed owner."
-      ],
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "curses",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "newOwner",
-          "type": "publicKey"
-        }
-      ]
-    },
-    {
-      "name": "acceptOwnership",
+      "name": "accept_ownership",
       "docs": [
         "Accepts the ownership of the fee quoter by the proposed owner.",
         "",
@@ -114,58 +19,27 @@
         "* `ctx` - The context containing the accounts required for accepting ownership.",
         "The new owner must be a signer of the transaction."
       ],
+      "discriminator": [
+        172,
+        23,
+        43,
+        13,
+        238,
+        213,
+        85,
+        150
+      ],
       "accounts": [
         {
           "name": "config",
-          "isMut": true,
-          "isSigner": false
+          "writable": true
         },
         {
           "name": "authority",
-          "isMut": false,
-          "isSigner": true
+          "signer": true
         }
       ],
       "args": []
-    },
-    {
-      "name": "setDefaultCodeVersion",
-      "docs": [
-        "Sets the default code version to be used. This is then used by the slim routing layer to determine",
-        "which version of the versioned business logic module (`instructions`) to use. Only the admin may set this.",
-        "",
-        "Shared func signature with other programs.",
-        "",
-        "# Arguments",
-        "",
-        "* `ctx` - The context containing the accounts required for updating the configuration.",
-        "* `code_version` - The new code version to be set as default."
-      ],
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "curses",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "codeVersion",
-          "type": {
-            "defined": "CodeVersion"
-          }
-        }
-      ]
     },
     {
       "name": "curse",
@@ -180,36 +54,206 @@
         "* `ctx` - The context containing the accounts required for adding a new curse.",
         "* `subject` - The subject to curse."
       ],
+      "discriminator": [
+        10,
+        127,
+        226,
+        227,
+        138,
+        3,
+        192,
+        73
+      ],
       "accounts": [
         {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
+          "name": "config"
         },
         {
           "name": "authority",
-          "isMut": true,
-          "isSigner": true
+          "writable": true,
+          "signer": true
         },
         {
           "name": "curses",
-          "isMut": true,
-          "isSigner": false
+          "writable": true
         },
         {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "system_program"
         }
       ],
       "args": [
         {
           "name": "subject",
           "type": {
-            "defined": "CurseSubject"
+            "defined": {
+              "name": "CurseSubject"
+            }
           }
         }
       ]
+    },
+    {
+      "name": "initialize",
+      "docs": [
+        "Initializes the Rmn Remote contract.",
+        "",
+        "The initialization is responsibility of Admin, nothing more than calling this method should be done first.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for initialization."
+      ],
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true
+        },
+        {
+          "name": "curses",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program"
+        },
+        {
+          "name": "program"
+        },
+        {
+          "name": "program_data"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "set_default_code_version",
+      "docs": [
+        "Sets the default code version to be used. This is then used by the slim routing layer to determine",
+        "which version of the versioned business logic module (`instructions`) to use. Only the admin may set this.",
+        "",
+        "Shared func signature with other programs.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for updating the configuration.",
+        "* `code_version` - The new code version to be set as default."
+      ],
+      "discriminator": [
+        47,
+        151,
+        233,
+        254,
+        121,
+        82,
+        206,
+        152
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true
+        },
+        {
+          "name": "curses"
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "code_version",
+          "type": {
+            "defined": {
+              "name": "CodeVersion"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "transfer_ownership",
+      "docs": [
+        "Transfers the ownership of the fee quoter to a new proposed owner.",
+        "",
+        "Shared func signature with other programs.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for the transfer.",
+        "* `proposed_owner` - The public key of the new proposed owner."
+      ],
+      "discriminator": [
+        65,
+        177,
+        215,
+        73,
+        53,
+        45,
+        99,
+        47
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true
+        },
+        {
+          "name": "curses"
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "new_owner",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "type_version",
+      "docs": [
+        "Returns the program type (name) and version.",
+        "Used by offchain code to easily determine which program & version is being interacted with.",
+        "",
+        "# Arguments",
+        "* `ctx` - The context"
+      ],
+      "discriminator": [
+        129,
+        251,
+        8,
+        243,
+        122,
+        229,
+        252,
+        164
+      ],
+      "accounts": [
+        {
+          "name": "clock"
+        }
+      ],
+      "args": [],
+      "returns": "string"
     },
     {
       "name": "uncurse",
@@ -225,39 +269,46 @@
         "* `ctx` - The context containing the accounts required for removing a curse.",
         "* `subject` - The subject to uncurse."
       ],
+      "discriminator": [
+        235,
+        227,
+        61,
+        167,
+        15,
+        109,
+        129,
+        79
+      ],
       "accounts": [
         {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
+          "name": "config"
         },
         {
           "name": "authority",
-          "isMut": true,
-          "isSigner": true
+          "writable": true,
+          "signer": true
         },
         {
           "name": "curses",
-          "isMut": true,
-          "isSigner": false
+          "writable": true
         },
         {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "system_program"
         }
       ],
       "args": [
         {
           "name": "subject",
           "type": {
-            "defined": "CurseSubject"
+            "defined": {
+              "name": "CurseSubject"
+            }
           }
         }
       ]
     },
     {
-      "name": "verifyNotCursed",
+      "name": "verify_not_cursed",
       "docs": [
         "Verifies that the subject is not cursed AND that this chain is not globally cursed.",
         "In case either of those assumptions fail, the instruction reverts.",
@@ -268,23 +319,31 @@
         "* `subject` - The subject to verify. Note that this instruction will revert if the chain",
         "is globally cursed too, even if the provided subject is not explicitly cursed."
       ],
+      "discriminator": [
+        86,
+        200,
+        58,
+        143,
+        7,
+        109,
+        155,
+        125
+      ],
       "accounts": [
         {
-          "name": "curses",
-          "isMut": false,
-          "isSigner": false
+          "name": "curses"
         },
         {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
+          "name": "config"
         }
       ],
       "args": [
         {
           "name": "subject",
           "type": {
-            "defined": "CurseSubject"
+            "defined": {
+              "name": "CurseSubject"
+            }
           }
         }
       ]
@@ -293,158 +352,95 @@
   "accounts": [
     {
       "name": "Config",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "version",
-            "type": "u8"
-          },
-          {
-            "name": "owner",
-            "type": "publicKey"
-          },
-          {
-            "name": "proposedOwner",
-            "type": "publicKey"
-          },
-          {
-            "name": "defaultCodeVersion",
-            "type": {
-              "defined": "CodeVersion"
-            }
-          }
-        ]
-      }
+      "discriminator": [
+        155,
+        12,
+        170,
+        224,
+        30,
+        250,
+        204,
+        130
+      ]
     },
     {
       "name": "Curses",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "version",
-            "type": "u8"
-          },
-          {
-            "name": "cursedSubjects",
-            "type": {
-              "vec": {
-                "defined": "CurseSubject"
-              }
-            }
-          }
-        ]
-      }
-    }
-  ],
-  "types": [
-    {
-      "name": "CurseSubject",
-      "docs": [
-        "Abstract curse subject.",
-        "",
-        "In particular, a curse subject can be constructed from a chain",
-        "selector to signify that any lane involving that chain as `destination` or `source` is",
-        "cursed.",
-        "",
-        "The above is not exhaustive: there may be other ways to define subjects."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "value",
-            "type": {
-              "array": [
-                "u8",
-                16
-              ]
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "CodeVersion",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "Default"
-          },
-          {
-            "name": "V1"
-          }
-        ]
-      }
+      "discriminator": [
+        129,
+        28,
+        49,
+        58,
+        74,
+        237,
+        146,
+        202
+      ]
     }
   ],
   "events": [
     {
+      "name": "ConfigSet",
+      "discriminator": [
+        15,
+        104,
+        59,
+        16,
+        236,
+        241,
+        8,
+        6
+      ]
+    },
+    {
       "name": "OwnershipTransferRequested",
-      "fields": [
-        {
-          "name": "from",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "to",
-          "type": "publicKey",
-          "index": false
-        }
+      "discriminator": [
+        79,
+        54,
+        99,
+        123,
+        57,
+        244,
+        134,
+        35
       ]
     },
     {
       "name": "OwnershipTransferred",
-      "fields": [
-        {
-          "name": "from",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "to",
-          "type": "publicKey",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "ConfigSet",
-      "fields": [
-        {
-          "name": "defaultCodeVersion",
-          "type": {
-            "defined": "CodeVersion"
-          },
-          "index": false
-        }
+      "discriminator": [
+        172,
+        61,
+        205,
+        183,
+        250,
+        50,
+        38,
+        98
       ]
     },
     {
       "name": "SubjectCursed",
-      "fields": [
-        {
-          "name": "subject",
-          "type": {
-            "defined": "CurseSubject"
-          },
-          "index": false
-        }
+      "discriminator": [
+        64,
+        234,
+        236,
+        62,
+        237,
+        179,
+        9,
+        192
       ]
     },
     {
       "name": "SubjectUncursed",
-      "fields": [
-        {
-          "name": "subject",
-          "type": {
-            "defined": "CurseSubject"
-          },
-          "index": false
-        }
+      "discriminator": [
+        238,
+        50,
+        186,
+        246,
+        156,
+        119,
+        251,
+        250
       ]
     }
   ],
@@ -488,6 +484,181 @@
       "code": 9007,
       "name": "InvalidCodeVersion",
       "msg": "Invalid code version"
+    }
+  ],
+  "types": [
+    {
+      "name": "CodeVersion",
+      "repr": {
+        "kind": "rust"
+      },
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Default"
+          },
+          {
+            "name": "V1"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Config",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposed_owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "default_code_version",
+            "type": {
+              "defined": {
+                "name": "CodeVersion"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ConfigSet",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "default_code_version",
+            "type": {
+              "defined": {
+                "name": "CodeVersion"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "CurseSubject",
+      "docs": [
+        "Abstract curse subject.",
+        "",
+        "In particular, a curse subject can be constructed from a chain",
+        "selector to signify that any lane involving that chain as `destination` or `source` is",
+        "cursed.",
+        "",
+        "The above is not exhaustive: there may be other ways to define subjects."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "value",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Curses",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "cursed_subjects",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "CurseSubject"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "OwnershipTransferRequested",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "from",
+            "type": "pubkey"
+          },
+          {
+            "name": "to",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OwnershipTransferred",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "from",
+            "type": "pubkey"
+          },
+          {
+            "name": "to",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SubjectCursed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "subject",
+            "type": {
+              "defined": {
+                "name": "CurseSubject"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "SubjectUncursed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "subject",
+            "type": {
+              "defined": {
+                "name": "CurseSubject"
+              }
+            }
+          }
+        ]
+      }
     }
   ]
 }

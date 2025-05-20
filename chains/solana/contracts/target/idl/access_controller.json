@@ -1,157 +1,157 @@
 {
-  "version": "1.0.1",
-  "name": "access_controller",
-  "constants": [
-    {
-      "name": "MAX_ADDRS",
-      "type": {
-        "defined": "usize"
-      },
-      "value": "64"
-    }
-  ],
+  "address": "6KsN58MTnRQ8FfPaXHiFPPFGDRioikj9CdPvPxZJdCjb",
+  "metadata": {
+    "name": "access_controller",
+    "version": "1.0.1",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
   "instructions": [
     {
-      "name": "initialize",
+      "name": "accept_ownership",
+      "discriminator": [
+        172,
+        23,
+        43,
+        13,
+        238,
+        213,
+        85,
+        150
+      ],
       "accounts": [
         {
           "name": "state",
-          "isMut": true,
-          "isSigner": false
+          "writable": true
         },
         {
-          "name": "owner",
-          "isMut": false,
-          "isSigner": true
+          "name": "authority",
+          "signer": true
         }
       ],
       "args": []
     },
     {
-      "name": "transferOwnership",
+      "name": "add_access",
+      "discriminator": [
+        151,
+        189,
+        105,
+        24,
+        113,
+        60,
+        99,
+        138
+      ],
       "accounts": [
         {
           "name": "state",
-          "isMut": true,
-          "isSigner": false
+          "writable": true
+        },
+        {
+          "name": "owner",
+          "signer": true
+        },
+        {
+          "name": "address"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize",
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "writable": true
+        },
+        {
+          "name": "owner",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "remove_access",
+      "discriminator": [
+        92,
+        172,
+        70,
+        124,
+        83,
+        45,
+        88,
+        22
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "writable": true
+        },
+        {
+          "name": "owner",
+          "signer": true
+        },
+        {
+          "name": "address"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "transfer_ownership",
+      "discriminator": [
+        65,
+        177,
+        215,
+        73,
+        53,
+        45,
+        99,
+        47
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "writable": true
         },
         {
           "name": "authority",
-          "isMut": false,
-          "isSigner": true
+          "signer": true
         }
       ],
       "args": [
         {
-          "name": "proposedOwner",
-          "type": "publicKey"
+          "name": "proposed_owner",
+          "type": "pubkey"
         }
       ]
-    },
-    {
-      "name": "acceptOwnership",
-      "accounts": [
-        {
-          "name": "state",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "addAccess",
-      "accounts": [
-        {
-          "name": "state",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "owner",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "address",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "removeAccess",
-      "accounts": [
-        {
-          "name": "state",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "owner",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "address",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": []
     }
   ],
   "accounts": [
     {
       "name": "AccessController",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "owner",
-            "type": "publicKey"
-          },
-          {
-            "name": "proposedOwner",
-            "type": "publicKey"
-          },
-          {
-            "name": "accessList",
-            "type": {
-              "defined": "AccessList"
-            }
-          }
-        ]
-      }
-    }
-  ],
-  "types": [
-    {
-      "name": "AccessList",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "xs",
-            "type": {
-              "array": [
-                "publicKey",
-                64
-              ]
-            }
-          },
-          {
-            "name": "len",
-            "type": "u64"
-          }
-        ]
-      }
+      "discriminator": [
+        143,
+        45,
+        12,
+        204,
+        220,
+        20,
+        114,
+        87
+      ]
     }
   ],
   "errors": [
@@ -169,6 +169,61 @@
       "code": 6002,
       "name": "Full",
       "msg": "Access list is full"
+    }
+  ],
+  "types": [
+    {
+      "name": "AccessController",
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposed_owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "access_list",
+            "type": {
+              "defined": {
+                "name": "AccessList"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "AccessList",
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "xs",
+            "type": {
+              "array": [
+                "pubkey",
+                64
+              ]
+            }
+          },
+          {
+            "name": "len",
+            "type": "u64"
+          }
+        ]
+      }
     }
   ]
 }

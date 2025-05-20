@@ -1,166 +1,142 @@
 {
-  "version": "0.1.0-dev",
-  "name": "example_ccip_sender",
+  "address": "4LfBQWYaU6zQZbDyYjX8pbY4qjzrhoumUFYZEZEqMNhJ",
+  "metadata": {
+    "name": "example_ccip_sender",
+    "version": "0.1.0-dev",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
   "docs": [
     "This program an example of a CCIP Sender Program.",
     "Used to test CCIP Router ccip_send."
   ],
   "instructions": [
     {
-      "name": "initialize",
+      "name": "accept_ownership",
+      "discriminator": [
+        172,
+        23,
+        43,
+        13,
+        238,
+        213,
+        85,
+        150
+      ],
       "accounts": [
         {
           "name": "state",
-          "isMut": true,
-          "isSigner": false
+          "writable": true
         },
         {
           "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
+          "signer": true
         }
       ],
-      "args": [
-        {
-          "name": "router",
-          "type": "publicKey"
-        }
-      ]
+      "args": []
     },
     {
-      "name": "ccipSend",
+      "name": "ccip_send",
+      "discriminator": [
+        108,
+        216,
+        134,
+        191,
+        249,
+        234,
+        33,
+        84
+      ],
       "accounts": [
         {
-          "name": "state",
-          "isMut": false,
-          "isSigner": false
+          "name": "state"
         },
         {
-          "name": "chainConfig",
-          "isMut": false,
-          "isSigner": false
+          "name": "chain_config"
         },
         {
-          "name": "ccipSender",
-          "isMut": true,
-          "isSigner": false
+          "name": "ccip_sender",
+          "writable": true
         },
         {
-          "name": "authorityFeeTokenAta",
-          "isMut": true,
-          "isSigner": false
+          "name": "authority_fee_token_ata",
+          "writable": true
         },
         {
           "name": "authority",
-          "isMut": false,
-          "isSigner": true
+          "signer": true
         },
         {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "system_program"
         },
         {
-          "name": "ccipRouter",
-          "isMut": false,
-          "isSigner": false
+          "name": "ccip_router"
         },
         {
-          "name": "ccipConfig",
-          "isMut": false,
-          "isSigner": false
+          "name": "ccip_config"
         },
         {
-          "name": "ccipDestChainState",
-          "isMut": true,
-          "isSigner": false
+          "name": "ccip_dest_chain_state",
+          "writable": true
         },
         {
-          "name": "ccipSenderNonce",
-          "isMut": true,
-          "isSigner": false
+          "name": "ccip_sender_nonce",
+          "writable": true
         },
         {
-          "name": "ccipFeeTokenProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "ccip_fee_token_program"
         },
         {
-          "name": "ccipFeeTokenMint",
-          "isMut": false,
-          "isSigner": false
+          "name": "ccip_fee_token_mint"
         },
         {
-          "name": "ccipFeeTokenUserAta",
-          "isMut": true,
-          "isSigner": false
+          "name": "ccip_fee_token_user_ata",
+          "writable": true
         },
         {
-          "name": "ccipFeeTokenReceiver",
-          "isMut": true,
-          "isSigner": false
+          "name": "ccip_fee_token_receiver",
+          "writable": true
         },
         {
-          "name": "ccipFeeBillingSigner",
-          "isMut": false,
-          "isSigner": false
+          "name": "ccip_fee_billing_signer"
         },
         {
-          "name": "ccipFeeQuoter",
-          "isMut": false,
-          "isSigner": false
+          "name": "ccip_fee_quoter"
         },
         {
-          "name": "ccipFeeQuoterConfig",
-          "isMut": false,
-          "isSigner": false
+          "name": "ccip_fee_quoter_config"
         },
         {
-          "name": "ccipFeeQuoterDestChain",
-          "isMut": false,
-          "isSigner": false
+          "name": "ccip_fee_quoter_dest_chain"
         },
         {
-          "name": "ccipFeeQuoterBillingTokenConfig",
-          "isMut": false,
-          "isSigner": false
+          "name": "ccip_fee_quoter_billing_token_config"
         },
         {
-          "name": "ccipFeeQuoterLinkTokenConfig",
-          "isMut": false,
-          "isSigner": false
+          "name": "ccip_fee_quoter_link_token_config"
         },
         {
-          "name": "ccipRmnRemote",
-          "isMut": false,
-          "isSigner": false
+          "name": "ccip_rmn_remote"
         },
         {
-          "name": "ccipRmnRemoteCurses",
-          "isMut": false,
-          "isSigner": false
+          "name": "ccip_rmn_remote_curses"
         },
         {
-          "name": "ccipRmnRemoteConfig",
-          "isMut": false,
-          "isSigner": false
+          "name": "ccip_rmn_remote_config"
         }
       ],
       "args": [
         {
-          "name": "destChainSelector",
+          "name": "dest_chain_selector",
           "type": "u64"
         },
         {
-          "name": "tokenAmounts",
+          "name": "token_amounts",
           "type": {
             "vec": {
-              "defined": "SVMTokenAmount"
+              "defined": {
+                "name": "SVMTokenAmount"
+              }
             }
           }
         },
@@ -169,110 +145,270 @@
           "type": "bytes"
         },
         {
-          "name": "feeToken",
-          "type": "publicKey"
+          "name": "fee_token",
+          "type": "pubkey"
         },
         {
-          "name": "tokenIndexes",
+          "name": "token_indexes",
           "type": "bytes"
         }
       ]
     },
     {
-      "name": "updateRouter",
+      "name": "init_chain_config",
+      "discriminator": [
+        21,
+        94,
+        4,
+        115,
+        130,
+        211,
+        10,
+        229
+      ],
       "accounts": [
         {
           "name": "state",
-          "isMut": true,
-          "isSigner": false
+          "writable": true
+        },
+        {
+          "name": "chain_config",
+          "writable": true
         },
         {
           "name": "authority",
-          "isMut": false,
-          "isSigner": true
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program"
         }
       ],
       "args": [
         {
-          "name": "newRouter",
-          "type": "publicKey"
+          "name": "_chain_selector",
+          "type": "u64"
+        },
+        {
+          "name": "recipient",
+          "type": "bytes"
+        },
+        {
+          "name": "extra_args_bytes",
+          "type": "bytes"
         }
       ]
     },
     {
-      "name": "transferOwnership",
+      "name": "initialize",
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
       "accounts": [
         {
           "name": "state",
-          "isMut": true,
-          "isSigner": false
+          "writable": true
         },
         {
           "name": "authority",
-          "isMut": false,
-          "isSigner": true
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program"
         }
       ],
       "args": [
         {
-          "name": "proposedOwner",
-          "type": "publicKey"
+          "name": "router",
+          "type": "pubkey"
         }
       ]
     },
     {
-      "name": "acceptOwnership",
+      "name": "remove_chain_config",
+      "discriminator": [
+        212,
+        220,
+        209,
+        147,
+        118,
+        171,
+        38,
+        48
+      ],
       "accounts": [
         {
           "name": "state",
-          "isMut": true,
-          "isSigner": false
+          "writable": true
+        },
+        {
+          "name": "chain_config",
+          "writable": true
         },
         {
           "name": "authority",
-          "isMut": false,
-          "isSigner": true
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program"
         }
       ],
-      "args": []
+      "args": [
+        {
+          "name": "_chain_selector",
+          "type": "u64"
+        }
+      ]
     },
     {
-      "name": "withdrawTokens",
+      "name": "transfer_ownership",
+      "discriminator": [
+        65,
+        177,
+        215,
+        73,
+        53,
+        45,
+        99,
+        47
+      ],
       "accounts": [
         {
           "name": "state",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "programTokenAccount",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "toTokenAccount",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "mint",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "ccipSender",
-          "isMut": false,
-          "isSigner": false
+          "writable": true
         },
         {
           "name": "authority",
-          "isMut": false,
-          "isSigner": true
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "proposed_owner",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "update_chain_config",
+      "discriminator": [
+        192,
+        127,
+        91,
+        206,
+        38,
+        245,
+        41,
+        121
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "writable": true
+        },
+        {
+          "name": "chain_config",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "_chain_selector",
+          "type": "u64"
+        },
+        {
+          "name": "recipient",
+          "type": "bytes"
+        },
+        {
+          "name": "extra_args_bytes",
+          "type": "bytes"
+        }
+      ]
+    },
+    {
+      "name": "update_router",
+      "discriminator": [
+        32,
+        109,
+        12,
+        153,
+        101,
+        129,
+        64,
+        70
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "new_router",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "withdraw_tokens",
+      "discriminator": [
+        2,
+        4,
+        225,
+        61,
+        19,
+        182,
+        106,
+        170
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "writable": true
+        },
+        {
+          "name": "program_token_account",
+          "writable": true
+        },
+        {
+          "name": "to_token_account",
+          "writable": true
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "ccip_sender"
+        },
+        {
+          "name": "authority",
+          "signer": true
         }
       ],
       "args": [
@@ -285,118 +421,59 @@
           "type": "u8"
         }
       ]
-    },
-    {
-      "name": "initChainConfig",
-      "accounts": [
-        {
-          "name": "state",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "chainConfig",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "chainSelector",
-          "type": "u64"
-        },
-        {
-          "name": "recipient",
-          "type": "bytes"
-        },
-        {
-          "name": "extraArgsBytes",
-          "type": "bytes"
-        }
-      ]
-    },
-    {
-      "name": "updateChainConfig",
-      "accounts": [
-        {
-          "name": "state",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "chainConfig",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "chainSelector",
-          "type": "u64"
-        },
-        {
-          "name": "recipient",
-          "type": "bytes"
-        },
-        {
-          "name": "extraArgsBytes",
-          "type": "bytes"
-        }
-      ]
-    },
-    {
-      "name": "removeChainConfig",
-      "accounts": [
-        {
-          "name": "state",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "chainConfig",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "chainSelector",
-          "type": "u64"
-        }
-      ]
     }
   ],
   "accounts": [
+    {
+      "name": "BaseState",
+      "discriminator": [
+        46,
+        139,
+        13,
+        192,
+        80,
+        181,
+        96,
+        46
+      ]
+    },
+    {
+      "name": "RemoteChainConfig",
+      "discriminator": [
+        248,
+        170,
+        246,
+        200,
+        84,
+        101,
+        138,
+        67
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "MessageSent",
+      "discriminator": [
+        116,
+        70,
+        224,
+        76,
+        128,
+        28,
+        110,
+        55
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "TransferTokenDuplicated",
+      "msg": "The same token is being transferred more than once"
+    }
+  ],
+  "types": [
     {
       "name": "BaseState",
       "type": {
@@ -404,15 +481,32 @@
         "fields": [
           {
             "name": "owner",
-            "type": "publicKey"
+            "type": "pubkey"
           },
           {
-            "name": "proposedOwner",
-            "type": "publicKey"
+            "name": "proposed_owner",
+            "type": "pubkey"
           },
           {
             "name": "router",
-            "type": "publicKey"
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MessageSent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "message_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
           }
         ]
       }
@@ -427,63 +521,27 @@
             "type": "bytes"
           },
           {
-            "name": "extraArgsBytes",
+            "name": "extra_args_bytes",
             "type": "bytes"
           }
         ]
       }
-    }
-  ],
-  "types": [
+    },
     {
-      "name": "SenderError",
+      "name": "SVMTokenAmount",
       "type": {
-        "kind": "enum",
-        "variants": [
+        "kind": "struct",
+        "fields": [
           {
-            "name": "TransferTokenDuplicated"
+            "name": "token",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
           }
         ]
       }
-    }
-  ],
-  "events": [
-    {
-      "name": "MessageSent",
-      "fields": [
-        {
-          "name": "messageId",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          },
-          "index": false
-        }
-      ]
-    }
-  ],
-  "errors": [
-    {
-      "code": 6000,
-      "name": "InvalidRouter",
-      "msg": "Invalid router address"
-    },
-    {
-      "code": 6001,
-      "name": "OnlyOwner",
-      "msg": "Address is not owner"
-    },
-    {
-      "code": 6002,
-      "name": "OnlyProposedOwner",
-      "msg": "Address is not proposed_owner"
-    },
-    {
-      "code": 6003,
-      "name": "InvalidProposedOwner",
-      "msg": "Proposed owner is invalid"
     }
   ]
 }

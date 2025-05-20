@@ -26,3 +26,4 @@
 .idea
 
 vendor/
+chains/solana/tsclient

@@ -7,7 +7,7 @@ use crate::{CcipOfframpError, ConfigOcrPluginType, OcrPluginType};
 
 // zero_copy is used to prevent hitting stack/heap memory limits
 #[account(zero_copy)]
-#[derive(InitSpace, AnchorSerialize, AnchorDeserialize)]
+#[derive(InitSpace)]
 pub struct Config {
     pub version: u8,
     pub default_code_version: u8,
@@ -34,7 +34,7 @@ pub struct ReferenceAddresses {
 }
 
 #[zero_copy]
-#[derive(AnchorSerialize, AnchorDeserialize, InitSpace, Default)]
+#[derive(InitSpace, Default, BorshDeserialize, BorshSerialize)]
 pub struct Ocr3ConfigInfo {
     pub config_digest: [u8; 32], // 32-byte hash of configuration
     pub f: u8,                   // f+1 = number of signatures per report
@@ -46,8 +46,8 @@ pub struct Ocr3ConfigInfo {
 // signers: pubkey is 20-byte address, secp256k1 curve ECDSA
 // transmitters: 32-byte pubkey, ed25519
 
-#[derive(AnchorSerialize, AnchorDeserialize, InitSpace)]
 #[zero_copy]
+#[derive(InitSpace)]
 pub struct Ocr3Config {
     pub plugin_type: ConfigOcrPluginType, // plugin identifier for validation (example: ccip:commit = 0, ccip:execute = 1)
     pub config_info: Ocr3ConfigInfo,
@@ -233,6 +233,14 @@ impl TryFrom<u8> for CodeVersion {
             _ => Err(CcipOfframpError::InvalidCodeVersion),
         }
     }
+}
+
+#[cfg(feature = "idl-build")]
+impl anchor_lang::IdlBuild for CodeVersion {}
+
+#[cfg(feature = "idl-build")]
+impl anchor_lang::Discriminator for CodeVersion {
+    const DISCRIMINATOR: &'static [u8] = &[];
 }
 
 #[cfg(test)]

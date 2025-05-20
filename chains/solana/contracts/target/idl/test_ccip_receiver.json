@@ -1,68 +1,18 @@
 {
-  "version": "0.1.0-dev",
-  "name": "test_ccip_receiver",
+  "address": "EvhgrPhTDt4LcSPS2kfJgH6T6XWZ6wT3X9ncDGLT1vui",
+  "metadata": {
+    "name": "test_ccip_receiver",
+    "version": "0.1.0-dev",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
   "docs": [
     "This program an example of a CCIP Receiver Program.",
     "Used to test CCIP Router execute."
   ],
   "instructions": [
     {
-      "name": "initialize",
-      "docs": [
-        "The initialization is responsibility of the External User, CCIP is not handling initialization of Accounts"
-      ],
-      "accounts": [
-        {
-          "name": "counter",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "externalExecutionConfig",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "router",
-          "type": "publicKey"
-        }
-      ]
-    },
-    {
-      "name": "setRejectAll",
-      "accounts": [
-        {
-          "name": "counter",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "rejectAll",
-          "type": "bool"
-        }
-      ]
-    },
-    {
-      "name": "ccipReceive",
+      "name": "ccip_receive",
       "docs": [
         "This function is called by the CCIP Router to execute the CCIP message.",
         "The method name needs to be ccip_receive with Anchor encoding,",
@@ -71,123 +21,301 @@
         "But none of them could be an init, realloc or close.",
         "In this case, it increments the counter value by 1 and logs the parsed message."
       ],
+      "discriminator": [
+        11,
+        244,
+        9,
+        249,
+        44,
+        83,
+        47,
+        245
+      ],
       "accounts": [
         {
           "name": "authority",
-          "isMut": false,
-          "isSigner": true
+          "signer": true
         },
         {
-          "name": "offrampProgram",
-          "isMut": false,
-          "isSigner": false,
+          "name": "offramp_program",
           "docs": [
             "CHECK offramp program: exists only to derive the allowed offramp PDA",
             "and the authority PDA. Must be second."
           ]
         },
         {
-          "name": "allowedOfframp",
-          "isMut": false,
-          "isSigner": false,
+          "name": "allowed_offramp",
           "docs": [
             "CHECK PDA of the router program verifying the signer is an allowed offramp.",
             "If PDA does not exist, the router doesn't allow this offramp"
           ]
         },
         {
-          "name": "externalExecutionConfig",
-          "isMut": true,
-          "isSigner": false
+          "name": "external_execution_config",
+          "writable": true
         },
         {
           "name": "counter",
-          "isMut": true,
-          "isSigner": false
+          "writable": true
         },
         {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "system_program"
         }
       ],
       "args": [
         {
           "name": "message",
           "type": {
-            "defined": "Any2SVMMessage"
+            "defined": {
+              "name": "Any2SVMMessage"
+            }
           }
         }
       ]
     },
     {
-      "name": "ccipTokenReleaseMint",
+      "name": "ccip_token_lock_burn",
+      "discriminator": [
+        200,
+        14,
+        50,
+        9,
+        44,
+        91,
+        121,
+        37
+      ],
       "accounts": [
         {
           "name": "authority",
-          "isMut": false,
-          "isSigner": true
+          "signer": true
         },
         {
-          "name": "poolTokenAccount",
-          "isMut": true,
-          "isSigner": false
+          "name": "pool_token_account",
+          "writable": true
         },
         {
-          "name": "mint",
-          "isMut": false,
-          "isSigner": false
+          "name": "mint"
         },
         {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "token_program"
         }
       ],
       "args": [
         {
           "name": "input",
           "type": {
-            "defined": "ReleaseOrMintInV1"
+            "defined": {
+              "name": "LockOrBurnInV1"
+            }
           }
         }
       ]
     },
     {
-      "name": "ccipTokenLockBurn",
+      "name": "ccip_token_release_mint",
+      "discriminator": [
+        20,
+        148,
+        113,
+        198,
+        229,
+        170,
+        71,
+        48
+      ],
       "accounts": [
         {
           "name": "authority",
-          "isMut": false,
-          "isSigner": true
+          "signer": true
         },
         {
-          "name": "poolTokenAccount",
-          "isMut": true,
-          "isSigner": false
+          "name": "pool_token_account",
+          "writable": true
         },
         {
-          "name": "mint",
-          "isMut": false,
-          "isSigner": false
+          "name": "mint"
         },
         {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "token_program"
         }
       ],
       "args": [
         {
           "name": "input",
           "type": {
-            "defined": "LockOrBurnInV1"
+            "defined": {
+              "name": "ReleaseOrMintInV1"
+            }
           }
+        }
+      ]
+    },
+    {
+      "name": "initialize",
+      "docs": [
+        "The initialization is responsibility of the External User, CCIP is not handling initialization of Accounts"
+      ],
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "counter",
+          "writable": true
+        },
+        {
+          "name": "external_execution_config",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "router",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "set_reject_all",
+      "discriminator": [
+        42,
+        90,
+        30,
+        32,
+        7,
+        99,
+        130,
+        151
+      ],
+      "accounts": [
+        {
+          "name": "counter",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "reject_all",
+          "type": "bool"
         }
       ]
     }
   ],
   "accounts": [
+    {
+      "name": "Counter",
+      "discriminator": [
+        255,
+        176,
+        4,
+        245,
+        188,
+        253,
+        124,
+        25
+      ]
+    },
+    {
+      "name": "ExternalExecutionConfig",
+      "discriminator": [
+        159,
+        157,
+        150,
+        212,
+        168,
+        103,
+        117,
+        39
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "RejectAll",
+      "msg": "Rejecting all messages"
+    }
+  ],
+  "types": [
+    {
+      "name": "Any2SVMMessage",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "message_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "source_chain_selector",
+            "type": "u64"
+          },
+          {
+            "name": "sender",
+            "type": "bytes"
+          },
+          {
+            "name": "data",
+            "type": "bytes"
+          },
+          {
+            "name": "token_amounts",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "SVMTokenAmount"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "BaseState",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposed_owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "router",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
     {
       "name": "Counter",
       "type": {
@@ -198,13 +326,15 @@
             "type": "u64"
           },
           {
-            "name": "rejectAll",
+            "name": "reject_all",
             "type": "bool"
           },
           {
             "name": "state",
             "type": {
-              "defined": "BaseState"
+              "defined": {
+                "name": "BaseState"
+              }
             }
           }
         ]
@@ -216,9 +346,7 @@
         "kind": "struct",
         "fields": []
       }
-    }
-  ],
-  "types": [
+    },
     {
       "name": "LockOrBurnInV1",
       "type": {
@@ -229,20 +357,20 @@
             "type": "bytes"
           },
           {
-            "name": "remoteChainSelector",
+            "name": "remote_chain_selector",
             "type": "u64"
           },
           {
-            "name": "originalSender",
-            "type": "publicKey"
+            "name": "original_sender",
+            "type": "pubkey"
           },
           {
             "name": "amount",
             "type": "u64"
           },
           {
-            "name": "localToken",
-            "type": "publicKey"
+            "name": "local_token",
+            "type": "pubkey"
           }
         ]
       }
@@ -253,16 +381,16 @@
         "kind": "struct",
         "fields": [
           {
-            "name": "originalSender",
+            "name": "original_sender",
             "type": "bytes"
           },
           {
-            "name": "remoteChainSelector",
+            "name": "remote_chain_selector",
             "type": "u64"
           },
           {
             "name": "receiver",
-            "type": "publicKey"
+            "type": "pubkey"
           },
           {
             "name": "amount",
@@ -274,11 +402,11 @@
             }
           },
           {
-            "name": "localToken",
-            "type": "publicKey"
+            "name": "local_token",
+            "type": "pubkey"
           },
           {
-            "name": "sourcePoolAddress",
+            "name": "source_pool_address",
             "docs": [
               "@dev WARNING: sourcePoolAddress should be checked prior to any processing of funds. Make sure it matches the",
               "expected pool address for the given remoteChainSelector."
@@ -286,11 +414,11 @@
             "type": "bytes"
           },
           {
-            "name": "sourcePoolData",
+            "name": "source_pool_data",
             "type": "bytes"
           },
           {
-            "name": "offchainTokenData",
+            "name": "offchain_token_data",
             "docs": [
               "@dev WARNING: offchainTokenData is untrusted data."
             ],
@@ -298,13 +426,22 @@
           }
         ]
       }
-    }
-  ],
-  "errors": [
+    },
     {
-      "code": 6000,
-      "name": "RejectAll",
-      "msg": "Rejecting all messages"
+      "name": "SVMTokenAmount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "token",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
     }
   ]
 }

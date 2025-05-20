@@ -1,117 +1,14 @@
 {
-  "version": "0.1.0-dev",
-  "name": "fee_quoter",
+  "address": "FeeQPGkKDeRV1MgoYfMH6L8o3KeuYjwUZrgn4LRKfjHi",
+  "metadata": {
+    "name": "fee_quoter",
+    "version": "0.1.0-dev",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
   "instructions": [
     {
-      "name": "initialize",
-      "docs": [
-        "Initializes the Fee Quoter.",
-        "",
-        "The initialization is responsibility of Admin, nothing more than calling this method should be done first.",
-        "",
-        "# Arguments",
-        "",
-        "* `ctx` - The context containing the accounts required for initialization.",
-        "* `max_fee_juels_per_msg` - The maximum fee in juels that can be charged per message.",
-        "* `onramp` - The public key of the onramp.",
-        "",
-        "The function also uses the link_token_mint account from the context."
-      ],
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "linkTokenMint",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "programData",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "maxFeeJuelsPerMsg",
-          "type": "u128"
-        },
-        {
-          "name": "onramp",
-          "type": "publicKey"
-        }
-      ]
-    },
-    {
-      "name": "typeVersion",
-      "docs": [
-        "Returns the program type (name) and version.",
-        "Used by offchain code to easily determine which program & version is being interacted with.",
-        "",
-        "# Arguments",
-        "* `ctx` - The context"
-      ],
-      "accounts": [
-        {
-          "name": "clock",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [],
-      "returns": "string"
-    },
-    {
-      "name": "transferOwnership",
-      "docs": [
-        "Transfers the ownership of the fee quoter to a new proposed owner.",
-        "",
-        "Shared func signature with other programs",
-        "",
-        "# Arguments",
-        "",
-        "* `ctx` - The context containing the accounts required for the transfer.",
-        "* `proposed_owner` - The public key of the new proposed owner."
-      ],
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "newOwner",
-          "type": "publicKey"
-        }
-      ]
-    },
-    {
-      "name": "acceptOwnership",
+      "name": "accept_ownership",
       "docs": [
         "Accepts the ownership of the fee quoter by the proposed owner.",
         "",
@@ -122,118 +19,30 @@
         "* `ctx` - The context containing the accounts required for accepting ownership.",
         "The new owner must be a signer of the transaction."
       ],
+      "discriminator": [
+        172,
+        23,
+        43,
+        13,
+        238,
+        213,
+        85,
+        150
+      ],
       "accounts": [
         {
           "name": "config",
-          "isMut": true,
-          "isSigner": false
+          "writable": true
         },
         {
           "name": "authority",
-          "isMut": false,
-          "isSigner": true
+          "signer": true
         }
       ],
       "args": []
     },
     {
-      "name": "setDefaultCodeVersion",
-      "docs": [
-        "Sets the default code version to be used. This is then used by the slim routing layer to determine",
-        "which version of the versioned business logic module (`instructions`) to use. Only the admin may set this.",
-        "",
-        "Shared func signature with other programs",
-        "",
-        "# Arguments",
-        "",
-        "* `ctx` - The context containing the accounts required for updating the configuration.",
-        "* `code_version` - The new code version to be set as default."
-      ],
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "codeVersion",
-          "type": {
-            "defined": "CodeVersion"
-          }
-        }
-      ]
-    },
-    {
-      "name": "setMaxFeeJuelsPerMsg",
-      "docs": [
-        "Sets the max_fee_juels_per_msg, which is an upper bound on how much can be billed for any message.",
-        "(1 juels = 1e-18 LINK)",
-        "",
-        "Only the admin may set this.",
-        "",
-        "# Arguments",
-        "",
-        "* `ctx` - The context containing the accounts required for updating the configuration.",
-        "* `max_fee_juels_per_msg` - The new value for the max_feel_juels_per_msg config."
-      ],
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "maxFeeJuelsPerMsg",
-          "type": "u128"
-        }
-      ]
-    },
-    {
-      "name": "setLinkTokenMint",
-      "docs": [
-        "Sets the link_token_mint and updates the link_token_local_decimals.",
-        "",
-        "Only the admin may set this.",
-        "",
-        "# Arguments",
-        "",
-        "* `ctx` - The context containing the accounts required for updating the configuration."
-      ],
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "linkTokenMint",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "addBillingTokenConfig",
+      "name": "add_billing_token_config",
       "docs": [
         "Adds a billing token configuration.",
         "Only CCIP Admin can add a billing token configuration.",
@@ -243,101 +52,62 @@
         "* `ctx` - The context containing the accounts required for adding the billing token configuration.",
         "* `config` - The billing token configuration to be added."
       ],
+      "discriminator": [
+        63,
+        156,
+        254,
+        216,
+        227,
+        53,
+        0,
+        69
+      ],
       "accounts": [
         {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
+          "name": "config"
         },
         {
-          "name": "billingTokenConfig",
-          "isMut": true,
-          "isSigner": false
+          "name": "billing_token_config",
+          "writable": true
         },
         {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "token_program"
         },
         {
-          "name": "feeTokenMint",
-          "isMut": false,
-          "isSigner": false
+          "name": "fee_token_mint"
         },
         {
-          "name": "feeTokenReceiver",
-          "isMut": true,
-          "isSigner": false
+          "name": "fee_token_receiver",
+          "writable": true
         },
         {
           "name": "authority",
-          "isMut": true,
-          "isSigner": true
+          "writable": true,
+          "signer": true
         },
         {
-          "name": "feeBillingSigner",
-          "isMut": false,
-          "isSigner": false
+          "name": "fee_billing_signer"
         },
         {
-          "name": "associatedTokenProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "associated_token_program"
         },
         {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "system_program"
         }
       ],
       "args": [
         {
           "name": "config",
           "type": {
-            "defined": "BillingTokenConfig"
+            "defined": {
+              "name": "BillingTokenConfig"
+            }
           }
         }
       ]
     },
     {
-      "name": "updateBillingTokenConfig",
-      "docs": [
-        "Updates the billing token configuration.",
-        "Only CCIP Admin can update a billing token configuration.",
-        "",
-        "# Arguments",
-        "",
-        "* `ctx` - The context containing the accounts required for updating the billing token configuration.",
-        "* `config` - The new billing token configuration."
-      ],
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "billingTokenConfig",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "config",
-          "type": {
-            "defined": "BillingTokenConfig"
-          }
-        }
-      ]
-    },
-    {
-      "name": "addDestChain",
+      "name": "add_dest_chain",
       "docs": [
         "Adds a new destination chain selector to the fee quoter.",
         "",
@@ -350,43 +120,95 @@
         "* `chain_selector` - The new chain selector to be added.",
         "* `dest_chain_config` - The configuration for the chain as destination."
       ],
+      "discriminator": [
+        122,
+        202,
+        174,
+        155,
+        55,
+        100,
+        102,
+        36
+      ],
       "accounts": [
         {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
+          "name": "config"
         },
         {
-          "name": "destChain",
-          "isMut": true,
-          "isSigner": false
+          "name": "dest_chain",
+          "writable": true
         },
         {
           "name": "authority",
-          "isMut": true,
-          "isSigner": true
+          "writable": true,
+          "signer": true
         },
         {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "system_program"
         }
       ],
       "args": [
         {
-          "name": "chainSelector",
+          "name": "chain_selector",
           "type": "u64"
         },
         {
-          "name": "destChainConfig",
+          "name": "dest_chain_config",
           "type": {
-            "defined": "DestChainConfig"
+            "defined": {
+              "name": "DestChainConfig"
+            }
           }
         }
       ]
     },
     {
-      "name": "disableDestChain",
+      "name": "add_price_updater",
+      "docs": [
+        "Add a price updater address to the list of allowed price updaters.",
+        "On price updates, the fee quoter will check the that caller is allowed.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for this operation.",
+        "* `price_updater` - The price updater address."
+      ],
+      "discriminator": [
+        200,
+        26,
+        13,
+        120,
+        226,
+        182,
+        64,
+        16
+      ],
+      "accounts": [
+        {
+          "name": "allowed_price_updater",
+          "writable": true
+        },
+        {
+          "name": "config"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "price_updater",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "disable_dest_chain",
       "docs": [
         "Disables the destination chain selector.",
         "",
@@ -397,209 +219,39 @@
         "* `ctx` - The context containing the accounts required for disabling the chain selector.",
         "* `chain_selector` - The destination chain selector to be disabled."
       ],
+      "discriminator": [
+        200,
+        195,
+        114,
+        206,
+        152,
+        86,
+        50,
+        41
+      ],
       "accounts": [
         {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
+          "name": "config"
         },
         {
-          "name": "destChain",
-          "isMut": true,
-          "isSigner": false
+          "name": "dest_chain",
+          "writable": true
         },
         {
           "name": "authority",
-          "isMut": true,
-          "isSigner": true
+          "writable": true,
+          "signer": true
         }
       ],
       "args": [
         {
-          "name": "chainSelector",
+          "name": "chain_selector",
           "type": "u64"
         }
       ]
     },
     {
-      "name": "updateDestChainConfig",
-      "docs": [
-        "Updates the configuration of the destination chain selector.",
-        "",
-        "The Admin is the only one able to update the destination chain config.",
-        "",
-        "# Arguments",
-        "",
-        "* `ctx` - The context containing the accounts required for updating the chain selector.",
-        "* `chain_selector` - The destination chain selector to be updated.",
-        "* `dest_chain_config` - The new configuration for the destination chain."
-      ],
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "destChain",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "chainSelector",
-          "type": "u64"
-        },
-        {
-          "name": "destChainConfig",
-          "type": {
-            "defined": "DestChainConfig"
-          }
-        }
-      ]
-    },
-    {
-      "name": "setTokenTransferFeeConfig",
-      "docs": [
-        "Sets the token transfer fee configuration for a particular token when it's transferred to a particular dest chain.",
-        "It is an upsert, initializing the per-chain-per-token config account if it doesn't exist",
-        "and overwriting it if it does.",
-        "",
-        "Only the Admin can perform this operation.",
-        "",
-        "# Arguments",
-        "",
-        "* `ctx` - The context containing the accounts required for setting the token billing configuration.",
-        "* `chain_selector` - The chain selector.",
-        "* `mint` - The public key of the token mint.",
-        "* `cfg` - The token transfer fee configuration."
-      ],
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "perChainPerTokenConfig",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "chainSelector",
-          "type": "u64"
-        },
-        {
-          "name": "mint",
-          "type": "publicKey"
-        },
-        {
-          "name": "cfg",
-          "type": {
-            "defined": "TokenTransferFeeConfig"
-          }
-        }
-      ]
-    },
-    {
-      "name": "addPriceUpdater",
-      "docs": [
-        "Add a price updater address to the list of allowed price updaters.",
-        "On price updates, the fee quoter will check the that caller is allowed.",
-        "",
-        "# Arguments",
-        "",
-        "* `ctx` - The context containing the accounts required for this operation.",
-        "* `price_updater` - The price updater address."
-      ],
-      "accounts": [
-        {
-          "name": "allowedPriceUpdater",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "priceUpdater",
-          "type": "publicKey"
-        }
-      ]
-    },
-    {
-      "name": "removePriceUpdater",
-      "docs": [
-        "Remove a price updater address from the list of allowed price updaters.",
-        "",
-        "# Arguments",
-        "",
-        "* `ctx` - The context containing the accounts required for this operation.",
-        "* `price_updater` - The price updater address."
-      ],
-      "accounts": [
-        {
-          "name": "allowedPriceUpdater",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "priceUpdater",
-          "type": "publicKey"
-        }
-      ]
-    },
-    {
-      "name": "getFee",
+      "name": "get_fee",
       "docs": [
         "Calculates the fee for sending a message to the destination chain.",
         "",
@@ -629,46 +281,500 @@
         "- additional data required when performing the cross-chain transfer of tokens in that message",
         "- deserialized and processed extra args"
       ],
+      "discriminator": [
+        115,
+        195,
+        235,
+        161,
+        25,
+        219,
+        60,
+        29
+      ],
       "accounts": [
         {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
+          "name": "config"
         },
         {
-          "name": "destChain",
-          "isMut": false,
-          "isSigner": false
+          "name": "dest_chain"
         },
         {
-          "name": "billingTokenConfig",
-          "isMut": false,
-          "isSigner": false
+          "name": "billing_token_config"
         },
         {
-          "name": "linkTokenConfig",
-          "isMut": false,
-          "isSigner": false
+          "name": "link_token_config"
         }
       ],
       "args": [
         {
-          "name": "destChainSelector",
+          "name": "dest_chain_selector",
           "type": "u64"
         },
         {
           "name": "message",
           "type": {
-            "defined": "SVM2AnyMessage"
+            "defined": {
+              "name": "SVM2AnyMessage"
+            }
           }
         }
       ],
       "returns": {
-        "defined": "GetFeeResult"
+        "defined": {
+          "name": "GetFeeResult"
+        }
       }
     },
     {
-      "name": "updatePrices",
+      "name": "initialize",
+      "docs": [
+        "Initializes the Fee Quoter.",
+        "",
+        "The initialization is responsibility of Admin, nothing more than calling this method should be done first.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for initialization.",
+        "* `max_fee_juels_per_msg` - The maximum fee in juels that can be charged per message.",
+        "* `onramp` - The public key of the onramp.",
+        "",
+        "The function also uses the link_token_mint account from the context."
+      ],
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true
+        },
+        {
+          "name": "link_token_mint"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program"
+        },
+        {
+          "name": "program"
+        },
+        {
+          "name": "program_data"
+        }
+      ],
+      "args": [
+        {
+          "name": "max_fee_juels_per_msg",
+          "type": "u128"
+        },
+        {
+          "name": "onramp",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "remove_price_updater",
+      "docs": [
+        "Remove a price updater address from the list of allowed price updaters.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for this operation.",
+        "* `price_updater` - The price updater address."
+      ],
+      "discriminator": [
+        10,
+        61,
+        172,
+        48,
+        110,
+        8,
+        162,
+        198
+      ],
+      "accounts": [
+        {
+          "name": "allowed_price_updater",
+          "writable": true
+        },
+        {
+          "name": "config"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "price_updater",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "set_default_code_version",
+      "docs": [
+        "Sets the default code version to be used. This is then used by the slim routing layer to determine",
+        "which version of the versioned business logic module (`instructions`) to use. Only the admin may set this.",
+        "",
+        "Shared func signature with other programs",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for updating the configuration.",
+        "* `code_version` - The new code version to be set as default."
+      ],
+      "discriminator": [
+        47,
+        151,
+        233,
+        254,
+        121,
+        82,
+        206,
+        152
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "code_version",
+          "type": {
+            "defined": {
+              "name": "CodeVersion"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "set_link_token_mint",
+      "docs": [
+        "Sets the link_token_mint and updates the link_token_local_decimals.",
+        "",
+        "Only the admin may set this.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for updating the configuration."
+      ],
+      "discriminator": [
+        190,
+        216,
+        49,
+        254,
+        200,
+        81,
+        12,
+        17
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true
+        },
+        {
+          "name": "link_token_mint"
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "set_max_fee_juels_per_msg",
+      "docs": [
+        "Sets the max_fee_juels_per_msg, which is an upper bound on how much can be billed for any message.",
+        "(1 juels = 1e-18 LINK)",
+        "",
+        "Only the admin may set this.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for updating the configuration.",
+        "* `max_fee_juels_per_msg` - The new value for the max_feel_juels_per_msg config."
+      ],
+      "discriminator": [
+        50,
+        235,
+        110,
+        147,
+        169,
+        199,
+        69,
+        46
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "max_fee_juels_per_msg",
+          "type": "u128"
+        }
+      ]
+    },
+    {
+      "name": "set_token_transfer_fee_config",
+      "docs": [
+        "Sets the token transfer fee configuration for a particular token when it's transferred to a particular dest chain.",
+        "It is an upsert, initializing the per-chain-per-token config account if it doesn't exist",
+        "and overwriting it if it does.",
+        "",
+        "Only the Admin can perform this operation.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for setting the token billing configuration.",
+        "* `chain_selector` - The chain selector.",
+        "* `mint` - The public key of the token mint.",
+        "* `cfg` - The token transfer fee configuration."
+      ],
+      "discriminator": [
+        76,
+        243,
+        16,
+        214,
+        126,
+        11,
+        254,
+        77
+      ],
+      "accounts": [
+        {
+          "name": "config"
+        },
+        {
+          "name": "per_chain_per_token_config",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "chain_selector",
+          "type": "u64"
+        },
+        {
+          "name": "mint",
+          "type": "pubkey"
+        },
+        {
+          "name": "cfg",
+          "type": {
+            "defined": {
+              "name": "TokenTransferFeeConfig"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "transfer_ownership",
+      "docs": [
+        "Transfers the ownership of the fee quoter to a new proposed owner.",
+        "",
+        "Shared func signature with other programs",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for the transfer.",
+        "* `proposed_owner` - The public key of the new proposed owner."
+      ],
+      "discriminator": [
+        65,
+        177,
+        215,
+        73,
+        53,
+        45,
+        99,
+        47
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "new_owner",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "type_version",
+      "docs": [
+        "Returns the program type (name) and version.",
+        "Used by offchain code to easily determine which program & version is being interacted with.",
+        "",
+        "# Arguments",
+        "* `ctx` - The context"
+      ],
+      "discriminator": [
+        129,
+        251,
+        8,
+        243,
+        122,
+        229,
+        252,
+        164
+      ],
+      "accounts": [
+        {
+          "name": "clock"
+        }
+      ],
+      "args": [],
+      "returns": "string"
+    },
+    {
+      "name": "update_billing_token_config",
+      "docs": [
+        "Updates the billing token configuration.",
+        "Only CCIP Admin can update a billing token configuration.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for updating the billing token configuration.",
+        "* `config` - The new billing token configuration."
+      ],
+      "discriminator": [
+        140,
+        184,
+        124,
+        146,
+        204,
+        62,
+        244,
+        79
+      ],
+      "accounts": [
+        {
+          "name": "config"
+        },
+        {
+          "name": "billing_token_config",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "config",
+          "type": {
+            "defined": {
+              "name": "BillingTokenConfig"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "update_dest_chain_config",
+      "docs": [
+        "Updates the configuration of the destination chain selector.",
+        "",
+        "The Admin is the only one able to update the destination chain config.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for updating the chain selector.",
+        "* `chain_selector` - The destination chain selector to be updated.",
+        "* `dest_chain_config` - The new configuration for the destination chain."
+      ],
+      "discriminator": [
+        215,
+        122,
+        81,
+        22,
+        190,
+        58,
+        219,
+        13
+      ],
+      "accounts": [
+        {
+          "name": "config"
+        },
+        {
+          "name": "dest_chain",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "chain_selector",
+          "type": "u64"
+        },
+        {
+          "name": "dest_chain_config",
+          "type": {
+            "defined": {
+              "name": "DestChainConfig"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "update_prices",
       "docs": [
         "Updates prices for tokens and gas. This method may only be called by an allowed price updater.",
         "",
@@ -688,41 +794,50 @@
         "* Then, the dest chain accounts of every chain whose gas price is being updated, in the same order as the",
         "gas_updates vector."
       ],
+      "discriminator": [
+        62,
+        161,
+        234,
+        136,
+        106,
+        26,
+        18,
+        160
+      ],
       "accounts": [
         {
           "name": "authority",
-          "isMut": false,
-          "isSigner": true
+          "signer": true
         },
         {
-          "name": "allowedPriceUpdater",
-          "isMut": false,
-          "isSigner": false,
+          "name": "allowed_price_updater",
           "docs": [
             "was added by the owner as an allowed price updater. The constraints enforced guarantee that it is the right PDA",
             "and that it was initialized."
           ]
         },
         {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
+          "name": "config"
         }
       ],
       "args": [
         {
-          "name": "tokenUpdates",
+          "name": "token_updates",
           "type": {
             "vec": {
-              "defined": "TokenPriceUpdate"
+              "defined": {
+                "name": "TokenPriceUpdate"
+              }
             }
           }
         },
         {
-          "name": "gasUpdates",
+          "name": "gas_updates",
           "type": {
             "vec": {
-              "defined": "GasPriceUpdate"
+              "defined": {
+                "name": "GasPriceUpdate"
+              }
             }
           }
         }
@@ -731,823 +846,278 @@
   ],
   "accounts": [
     {
-      "name": "Config",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "version",
-            "type": "u8"
-          },
-          {
-            "name": "owner",
-            "type": "publicKey"
-          },
-          {
-            "name": "proposedOwner",
-            "type": "publicKey"
-          },
-          {
-            "name": "maxFeeJuelsPerMsg",
-            "type": "u128"
-          },
-          {
-            "name": "linkTokenMint",
-            "type": "publicKey"
-          },
-          {
-            "name": "linkTokenLocalDecimals",
-            "type": "u8"
-          },
-          {
-            "name": "onramp",
-            "type": "publicKey"
-          },
-          {
-            "name": "defaultCodeVersion",
-            "type": {
-              "defined": "CodeVersion"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "DestChain",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "version",
-            "type": "u8"
-          },
-          {
-            "name": "chainSelector",
-            "type": "u64"
-          },
-          {
-            "name": "state",
-            "type": {
-              "defined": "DestChainState"
-            }
-          },
-          {
-            "name": "config",
-            "type": {
-              "defined": "DestChainConfig"
-            }
-          }
-        ]
-      }
+      "name": "AllowedPriceUpdater",
+      "discriminator": [
+        51,
+        136,
+        222,
+        161,
+        38,
+        7,
+        184,
+        190
+      ]
     },
     {
       "name": "BillingTokenConfigWrapper",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "version",
-            "type": "u8"
-          },
-          {
-            "name": "config",
-            "type": {
-              "defined": "BillingTokenConfig"
-            }
-          }
-        ]
-      }
+      "discriminator": [
+        63,
+        178,
+        72,
+        57,
+        171,
+        66,
+        44,
+        151
+      ]
+    },
+    {
+      "name": "Config",
+      "discriminator": [
+        155,
+        12,
+        170,
+        224,
+        30,
+        250,
+        204,
+        130
+      ]
+    },
+    {
+      "name": "DestChain",
+      "discriminator": [
+        77,
+        18,
+        241,
+        132,
+        212,
+        54,
+        218,
+        16
+      ]
     },
     {
       "name": "PerChainPerTokenConfig",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "version",
-            "type": "u8"
-          },
-          {
-            "name": "chainSelector",
-            "type": "u64"
-          },
-          {
-            "name": "mint",
-            "type": "publicKey"
-          },
-          {
-            "name": "tokenTransferConfig",
-            "type": {
-              "defined": "TokenTransferFeeConfig"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "AllowedPriceUpdater",
-      "type": {
-        "kind": "struct",
-        "fields": []
-      }
-    }
-  ],
-  "types": [
-    {
-      "name": "TokenPriceUpdate",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "sourceToken",
-            "type": "publicKey"
-          },
-          {
-            "name": "usdPerToken",
-            "type": {
-              "array": [
-                "u8",
-                28
-              ]
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "GasPriceUpdate",
-      "docs": [
-        "Gas price for a given chain in USD; its value may contain tightly packed fields."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "destChainSelector",
-            "type": "u64"
-          },
-          {
-            "name": "usdPerUnitGas",
-            "type": {
-              "array": [
-                "u8",
-                28
-              ]
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "GenericExtraArgsV2",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "gasLimit",
-            "type": "u128"
-          },
-          {
-            "name": "allowOutOfOrderExecution",
-            "type": "bool"
-          }
-        ]
-      }
-    },
-    {
-      "name": "SVMExtraArgsV1",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "computeUnits",
-            "type": "u32"
-          },
-          {
-            "name": "accountIsWritableBitmap",
-            "type": "u64"
-          },
-          {
-            "name": "allowOutOfOrderExecution",
-            "type": "bool"
-          },
-          {
-            "name": "tokenReceiver",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
-            "name": "accounts",
-            "type": {
-              "vec": {
-                "array": [
-                  "u8",
-                  32
-                ]
-              }
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "SVM2AnyMessage",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "receiver",
-            "type": "bytes"
-          },
-          {
-            "name": "data",
-            "type": "bytes"
-          },
-          {
-            "name": "tokenAmounts",
-            "type": {
-              "vec": {
-                "defined": "SVMTokenAmount"
-              }
-            }
-          },
-          {
-            "name": "feeToken",
-            "type": "publicKey"
-          },
-          {
-            "name": "extraArgs",
-            "type": "bytes"
-          }
-        ]
-      }
-    },
-    {
-      "name": "SVMTokenAmount",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "token",
-            "type": "publicKey"
-          },
-          {
-            "name": "amount",
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "TokenTransferAdditionalData",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "destBytesOverhead",
-            "type": "u32"
-          },
-          {
-            "name": "destGasOverhead",
-            "type": "u32"
-          }
-        ]
-      }
-    },
-    {
-      "name": "GetFeeResult",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "token",
-            "type": "publicKey"
-          },
-          {
-            "name": "amount",
-            "type": "u64"
-          },
-          {
-            "name": "juels",
-            "type": "u128"
-          },
-          {
-            "name": "tokenTransferAdditionalData",
-            "type": {
-              "vec": {
-                "defined": "TokenTransferAdditionalData"
-              }
-            }
-          },
-          {
-            "name": "processedExtraArgs",
-            "type": {
-              "defined": "ProcessedExtraArgs"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "ProcessedExtraArgs",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "bytes",
-            "type": "bytes"
-          },
-          {
-            "name": "gasLimit",
-            "type": "u128"
-          },
-          {
-            "name": "allowOutOfOrderExecution",
-            "type": "bool"
-          },
-          {
-            "name": "tokenReceiver",
-            "type": {
-              "option": "bytes"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "DestChainConfig",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "isEnabled",
-            "type": "bool"
-          },
-          {
-            "name": "laneCodeVersion",
-            "type": {
-              "defined": "CodeVersion"
-            }
-          },
-          {
-            "name": "maxNumberOfTokensPerMsg",
-            "type": "u16"
-          },
-          {
-            "name": "maxDataBytes",
-            "type": "u32"
-          },
-          {
-            "name": "maxPerMsgGasLimit",
-            "type": "u32"
-          },
-          {
-            "name": "destGasOverhead",
-            "type": "u32"
-          },
-          {
-            "name": "destGasPerPayloadByteBase",
-            "type": "u32"
-          },
-          {
-            "name": "destGasPerPayloadByteHigh",
-            "type": "u32"
-          },
-          {
-            "name": "destGasPerPayloadByteThreshold",
-            "type": "u32"
-          },
-          {
-            "name": "destDataAvailabilityOverheadGas",
-            "type": "u32"
-          },
-          {
-            "name": "destGasPerDataAvailabilityByte",
-            "type": "u16"
-          },
-          {
-            "name": "destDataAvailabilityMultiplierBps",
-            "type": "u16"
-          },
-          {
-            "name": "defaultTokenFeeUsdcents",
-            "type": "u16"
-          },
-          {
-            "name": "defaultTokenDestGasOverhead",
-            "type": "u32"
-          },
-          {
-            "name": "defaultTxGasLimit",
-            "type": "u32"
-          },
-          {
-            "name": "gasMultiplierWeiPerEth",
-            "type": "u64"
-          },
-          {
-            "name": "networkFeeUsdcents",
-            "type": "u32"
-          },
-          {
-            "name": "gasPriceStalenessThreshold",
-            "type": "u32"
-          },
-          {
-            "name": "enforceOutOfOrder",
-            "type": "bool"
-          },
-          {
-            "name": "chainFamilySelector",
-            "type": {
-              "array": [
-                "u8",
-                4
-              ]
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "DestChainState",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "usdPerUnitGas",
-            "type": {
-              "defined": "TimestampedPackedU224"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "TimestampedPackedU224",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "value",
-            "type": {
-              "array": [
-                "u8",
-                28
-              ]
-            }
-          },
-          {
-            "name": "timestamp",
-            "type": "i64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "BillingTokenConfig",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "enabled",
-            "type": "bool"
-          },
-          {
-            "name": "mint",
-            "type": "publicKey"
-          },
-          {
-            "name": "usdPerToken",
-            "type": {
-              "defined": "TimestampedPackedU224"
-            }
-          },
-          {
-            "name": "premiumMultiplierWeiPerEth",
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "TokenTransferFeeConfig",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "minFeeUsdcents",
-            "type": "u32"
-          },
-          {
-            "name": "maxFeeUsdcents",
-            "type": "u32"
-          },
-          {
-            "name": "deciBps",
-            "type": "u16"
-          },
-          {
-            "name": "destGasOverhead",
-            "type": "u32"
-          },
-          {
-            "name": "destBytesOverhead",
-            "type": "u32"
-          },
-          {
-            "name": "isEnabled",
-            "type": "bool"
-          }
-        ]
-      }
-    },
-    {
-      "name": "CodeVersion",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "Default"
-          },
-          {
-            "name": "V1"
-          }
-        ]
-      }
+      "discriminator": [
+        183,
+        88,
+        20,
+        99,
+        246,
+        46,
+        51,
+        230
+      ]
     }
   ],
   "events": [
     {
       "name": "ConfigSet",
-      "fields": [
-        {
-          "name": "maxFeeJuelsPerMsg",
-          "type": "u128",
-          "index": false
-        },
-        {
-          "name": "linkTokenMint",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "linkTokenLocalDecimals",
-          "type": "u8",
-          "index": false
-        },
-        {
-          "name": "onramp",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "defaultCodeVersion",
-          "type": {
-            "defined": "CodeVersion"
-          },
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "FeeTokenAdded",
-      "fields": [
-        {
-          "name": "feeToken",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "enabled",
-          "type": "bool",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "FeeTokenEnabled",
-      "fields": [
-        {
-          "name": "feeToken",
-          "type": "publicKey",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "FeeTokenDisabled",
-      "fields": [
-        {
-          "name": "feeToken",
-          "type": "publicKey",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "FeeTokenRemoved",
-      "fields": [
-        {
-          "name": "feeToken",
-          "type": "publicKey",
-          "index": false
-        }
+      "discriminator": [
+        15,
+        104,
+        59,
+        16,
+        236,
+        241,
+        8,
+        6
       ]
     },
     {
       "name": "DestChainAdded",
-      "fields": [
-        {
-          "name": "destChainSelector",
-          "type": "u64",
-          "index": false
-        },
-        {
-          "name": "destChainConfig",
-          "type": {
-            "defined": "DestChainConfig"
-          },
-          "index": false
-        }
+      "discriminator": [
+        59,
+        154,
+        48,
+        81,
+        230,
+        41,
+        80,
+        200
       ]
     },
     {
       "name": "DestChainConfigUpdated",
-      "fields": [
-        {
-          "name": "destChainSelector",
-          "type": "u64",
-          "index": false
-        },
-        {
-          "name": "destChainConfig",
-          "type": {
-            "defined": "DestChainConfig"
-          },
-          "index": false
-        }
+      "discriminator": [
+        3,
+        141,
+        73,
+        190,
+        73,
+        231,
+        51,
+        80
+      ]
+    },
+    {
+      "name": "FeeTokenAdded",
+      "discriminator": [
+        181,
+        180,
+        252,
+        21,
+        215,
+        79,
+        93,
+        237
+      ]
+    },
+    {
+      "name": "FeeTokenDisabled",
+      "discriminator": [
+        34,
+        139,
+        66,
+        75,
+        30,
+        17,
+        45,
+        151
+      ]
+    },
+    {
+      "name": "FeeTokenEnabled",
+      "discriminator": [
+        106,
+        180,
+        145,
+        189,
+        113,
+        180,
+        21,
+        15
+      ]
+    },
+    {
+      "name": "FeeTokenRemoved",
+      "discriminator": [
+        40,
+        31,
+        230,
+        252,
+        183,
+        150,
+        147,
+        201
       ]
     },
     {
       "name": "OwnershipTransferRequested",
-      "fields": [
-        {
-          "name": "from",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "to",
-          "type": "publicKey",
-          "index": false
-        }
+      "discriminator": [
+        79,
+        54,
+        99,
+        123,
+        57,
+        244,
+        134,
+        35
       ]
     },
     {
       "name": "OwnershipTransferred",
-      "fields": [
-        {
-          "name": "from",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "to",
-          "type": "publicKey",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "UsdPerUnitGasUpdated",
-      "fields": [
-        {
-          "name": "destChain",
-          "type": "u64",
-          "index": false
-        },
-        {
-          "name": "value",
-          "type": {
-            "array": [
-              "u8",
-              28
-            ]
-          },
-          "index": false
-        },
-        {
-          "name": "timestamp",
-          "type": "i64",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "UsdPerTokenUpdated",
-      "fields": [
-        {
-          "name": "token",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "value",
-          "type": {
-            "array": [
-              "u8",
-              28
-            ]
-          },
-          "index": false
-        },
-        {
-          "name": "timestamp",
-          "type": "i64",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "TokenPriceUpdateIgnored",
-      "fields": [
-        {
-          "name": "token",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "value",
-          "type": {
-            "array": [
-              "u8",
-              28
-            ]
-          },
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "TokenTransferFeeConfigUpdated",
-      "fields": [
-        {
-          "name": "destChainSelector",
-          "type": "u64",
-          "index": false
-        },
-        {
-          "name": "token",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "tokenTransferFeeConfig",
-          "type": {
-            "defined": "TokenTransferFeeConfig"
-          },
-          "index": false
-        }
+      "discriminator": [
+        172,
+        61,
+        205,
+        183,
+        250,
+        50,
+        38,
+        98
       ]
     },
     {
       "name": "PremiumMultiplierWeiPerEthUpdated",
-      "fields": [
-        {
-          "name": "token",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "premiumMultiplierWeiPerEth",
-          "type": "u64",
-          "index": false
-        }
+      "discriminator": [
+        151,
+        5,
+        223,
+        182,
+        215,
+        187,
+        249,
+        225
       ]
     },
     {
       "name": "PriceUpdaterAdded",
-      "fields": [
-        {
-          "name": "priceUpdater",
-          "type": "publicKey",
-          "index": false
-        }
+      "discriminator": [
+        87,
+        31,
+        151,
+        133,
+        151,
+        187,
+        97,
+        186
       ]
     },
     {
       "name": "PriceUpdaterRemoved",
-      "fields": [
-        {
-          "name": "priceUpdater",
-          "type": "publicKey",
-          "index": false
-        }
+      "discriminator": [
+        225,
+        194,
+        40,
+        213,
+        212,
+        39,
+        76,
+        148
+      ]
+    },
+    {
+      "name": "TokenPriceUpdateIgnored",
+      "discriminator": [
+        68,
+        119,
+        161,
+        131,
+        128,
+        65,
+        69,
+        201
+      ]
+    },
+    {
+      "name": "TokenTransferFeeConfigUpdated",
+      "discriminator": [
+        253,
+        199,
+        166,
+        1,
+        178,
+        150,
+        242,
+        253
+      ]
+    },
+    {
+      "name": "UsdPerTokenUpdated",
+      "discriminator": [
+        67,
+        154,
+        252,
+        56,
+        104,
+        14,
+        192,
+        219
+      ]
+    },
+    {
+      "name": "UsdPerUnitGasUpdated",
+      "discriminator": [
+        174,
+        255,
+        2,
+        41,
+        197,
+        110,
+        31,
+        40
       ]
     }
   ],
@@ -1736,6 +1306,820 @@
       "code": 8036,
       "name": "InvalidCodeVersion",
       "msg": "Invalid code version"
+    }
+  ],
+  "types": [
+    {
+      "name": "AllowedPriceUpdater",
+      "type": {
+        "kind": "struct",
+        "fields": []
+      }
+    },
+    {
+      "name": "BillingTokenConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "enabled",
+            "type": "bool"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "usd_per_token",
+            "type": {
+              "defined": {
+                "name": "TimestampedPackedU224"
+              }
+            }
+          },
+          {
+            "name": "premium_multiplier_wei_per_eth",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "BillingTokenConfigWrapper",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "config",
+            "type": {
+              "defined": {
+                "name": "BillingTokenConfig"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "CodeVersion",
+      "repr": {
+        "kind": "rust"
+      },
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Default"
+          },
+          {
+            "name": "V1"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Config",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposed_owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "max_fee_juels_per_msg",
+            "type": "u128"
+          },
+          {
+            "name": "link_token_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "link_token_local_decimals",
+            "type": "u8"
+          },
+          {
+            "name": "onramp",
+            "type": "pubkey"
+          },
+          {
+            "name": "default_code_version",
+            "type": {
+              "defined": {
+                "name": "CodeVersion"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ConfigSet",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "max_fee_juels_per_msg",
+            "type": "u128"
+          },
+          {
+            "name": "link_token_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "link_token_local_decimals",
+            "type": "u8"
+          },
+          {
+            "name": "onramp",
+            "type": "pubkey"
+          },
+          {
+            "name": "default_code_version",
+            "type": {
+              "defined": {
+                "name": "CodeVersion"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "DestChain",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "chain_selector",
+            "type": "u64"
+          },
+          {
+            "name": "state",
+            "type": {
+              "defined": {
+                "name": "DestChainState"
+              }
+            }
+          },
+          {
+            "name": "config",
+            "type": {
+              "defined": {
+                "name": "DestChainConfig"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "DestChainAdded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dest_chain_selector",
+            "type": "u64"
+          },
+          {
+            "name": "dest_chain_config",
+            "type": {
+              "defined": {
+                "name": "DestChainConfig"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "DestChainConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "is_enabled",
+            "type": "bool"
+          },
+          {
+            "name": "lane_code_version",
+            "type": {
+              "defined": {
+                "name": "CodeVersion"
+              }
+            }
+          },
+          {
+            "name": "max_number_of_tokens_per_msg",
+            "type": "u16"
+          },
+          {
+            "name": "max_data_bytes",
+            "type": "u32"
+          },
+          {
+            "name": "max_per_msg_gas_limit",
+            "type": "u32"
+          },
+          {
+            "name": "dest_gas_overhead",
+            "type": "u32"
+          },
+          {
+            "name": "dest_gas_per_payload_byte_base",
+            "type": "u32"
+          },
+          {
+            "name": "dest_gas_per_payload_byte_high",
+            "type": "u32"
+          },
+          {
+            "name": "dest_gas_per_payload_byte_threshold",
+            "type": "u32"
+          },
+          {
+            "name": "dest_data_availability_overhead_gas",
+            "type": "u32"
+          },
+          {
+            "name": "dest_gas_per_data_availability_byte",
+            "type": "u16"
+          },
+          {
+            "name": "dest_data_availability_multiplier_bps",
+            "type": "u16"
+          },
+          {
+            "name": "default_token_fee_usdcents",
+            "type": "u16"
+          },
+          {
+            "name": "default_token_dest_gas_overhead",
+            "type": "u32"
+          },
+          {
+            "name": "default_tx_gas_limit",
+            "type": "u32"
+          },
+          {
+            "name": "gas_multiplier_wei_per_eth",
+            "type": "u64"
+          },
+          {
+            "name": "network_fee_usdcents",
+            "type": "u32"
+          },
+          {
+            "name": "gas_price_staleness_threshold",
+            "type": "u32"
+          },
+          {
+            "name": "enforce_out_of_order",
+            "type": "bool"
+          },
+          {
+            "name": "chain_family_selector",
+            "type": {
+              "array": [
+                "u8",
+                4
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "DestChainConfigUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dest_chain_selector",
+            "type": "u64"
+          },
+          {
+            "name": "dest_chain_config",
+            "type": {
+              "defined": {
+                "name": "DestChainConfig"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "DestChainState",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "usd_per_unit_gas",
+            "type": {
+              "defined": {
+                "name": "TimestampedPackedU224"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "FeeTokenAdded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "fee_token",
+            "type": "pubkey"
+          },
+          {
+            "name": "enabled",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FeeTokenDisabled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "fee_token",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FeeTokenEnabled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "fee_token",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FeeTokenRemoved",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "fee_token",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GasPriceUpdate",
+      "docs": [
+        "Gas price for a given chain in USD; its value may contain tightly packed fields."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dest_chain_selector",
+            "type": "u64"
+          },
+          {
+            "name": "usd_per_unit_gas",
+            "type": {
+              "array": [
+                "u8",
+                28
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "GetFeeResult",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "token",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "juels",
+            "type": "u128"
+          },
+          {
+            "name": "token_transfer_additional_data",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "TokenTransferAdditionalData"
+                }
+              }
+            }
+          },
+          {
+            "name": "processed_extra_args",
+            "type": {
+              "defined": {
+                "name": "ProcessedExtraArgs"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "OwnershipTransferRequested",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "from",
+            "type": "pubkey"
+          },
+          {
+            "name": "to",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OwnershipTransferred",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "from",
+            "type": "pubkey"
+          },
+          {
+            "name": "to",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PerChainPerTokenConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "chain_selector",
+            "type": "u64"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "token_transfer_config",
+            "type": {
+              "defined": {
+                "name": "TokenTransferFeeConfig"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "PremiumMultiplierWeiPerEthUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "token",
+            "type": "pubkey"
+          },
+          {
+            "name": "premium_multiplier_wei_per_eth",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PriceUpdaterAdded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "price_updater",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PriceUpdaterRemoved",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "price_updater",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProcessedExtraArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bytes",
+            "type": "bytes"
+          },
+          {
+            "name": "gas_limit",
+            "type": "u128"
+          },
+          {
+            "name": "allow_out_of_order_execution",
+            "type": "bool"
+          },
+          {
+            "name": "token_receiver",
+            "type": {
+              "option": "bytes"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "SVM2AnyMessage",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "receiver",
+            "type": "bytes"
+          },
+          {
+            "name": "data",
+            "type": "bytes"
+          },
+          {
+            "name": "token_amounts",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "SVMTokenAmount"
+                }
+              }
+            }
+          },
+          {
+            "name": "fee_token",
+            "type": "pubkey"
+          },
+          {
+            "name": "extra_args",
+            "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SVMTokenAmount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "token",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TimestampedPackedU224",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "value",
+            "type": {
+              "array": [
+                "u8",
+                28
+              ]
+            }
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TokenPriceUpdate",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "source_token",
+            "type": "pubkey"
+          },
+          {
+            "name": "usd_per_token",
+            "type": {
+              "array": [
+                "u8",
+                28
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "TokenPriceUpdateIgnored",
+      "docs": [
+        "Emitted when the price update corresponds to a token that isn't registered",
+        "for price tracking."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "token",
+            "type": "pubkey"
+          },
+          {
+            "name": "value",
+            "type": {
+              "array": [
+                "u8",
+                28
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "TokenTransferAdditionalData",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dest_bytes_overhead",
+            "type": "u32"
+          },
+          {
+            "name": "dest_gas_overhead",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TokenTransferFeeConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "min_fee_usdcents",
+            "type": "u32"
+          },
+          {
+            "name": "max_fee_usdcents",
+            "type": "u32"
+          },
+          {
+            "name": "deci_bps",
+            "type": "u16"
+          },
+          {
+            "name": "dest_gas_overhead",
+            "type": "u32"
+          },
+          {
+            "name": "dest_bytes_overhead",
+            "type": "u32"
+          },
+          {
+            "name": "is_enabled",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TokenTransferFeeConfigUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dest_chain_selector",
+            "type": "u64"
+          },
+          {
+            "name": "token",
+            "type": "pubkey"
+          },
+          {
+            "name": "token_transfer_fee_config",
+            "type": {
+              "defined": {
+                "name": "TokenTransferFeeConfig"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "UsdPerTokenUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "token",
+            "type": "pubkey"
+          },
+          {
+            "name": "value",
+            "type": {
+              "array": [
+                "u8",
+                28
+              ]
+            }
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "UsdPerUnitGasUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dest_chain",
+            "type": "u64"
+          },
+          {
+            "name": "value",
+            "type": {
+              "array": [
+                "u8",
+                28
+              ]
+            }
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
     }
   ]
 }

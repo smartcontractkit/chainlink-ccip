@@ -6,6 +6,12 @@ use arrayvec::arrayvec;
 
 declare_id!("6KsN58MTnRQ8FfPaXHiFPPFGDRioikj9CdPvPxZJdCjb");
 
+impl anchor_lang::Id for AccessController {
+    fn id() -> Pubkey {
+        crate::ID
+    }
+}
+
 #[error_code]
 pub enum ErrorCode {
     #[msg("Unauthorized")]
@@ -18,7 +24,6 @@ pub enum ErrorCode {
     Full = 2,
 }
 
-#[constant]
 pub const MAX_ADDRS: usize = 64;
 
 #[zero_copy]

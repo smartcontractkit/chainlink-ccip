@@ -17,7 +17,7 @@ pub enum Role {
 }
 
 #[account(zero_copy)]
-#[derive(InitSpace, AnchorSerialize, AnchorDeserialize)]
+#[derive(InitSpace)]
 pub struct Config {
     pub timelock_id: [u8; TIMELOCK_ID_PADDED],
 
@@ -47,7 +47,6 @@ impl Config {
 }
 
 #[zero_copy]
-#[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct BlockedSelectors {
     pub xs: [[u8; 8]; MAX_SELECTORS],
     pub len: u64,

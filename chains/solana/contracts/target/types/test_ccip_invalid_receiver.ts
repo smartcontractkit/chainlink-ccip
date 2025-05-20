@@ -1,70 +1,42 @@
+/**
+ * Program IDL in camelCase format in order to be used in JS/TS.
+ *
+ * Note that this is only a type helper and is not the actual IDL. The original
+ * IDL can be found at `target/idl/test_ccip_invalid_receiver.json`.
+ */
 export type TestCcipInvalidReceiver = {
-  "version": "0.0.0-dev",
-  "name": "test_ccip_invalid_receiver",
+  "address": "FmyF3oW69MSAhyPSiZ69C4RKBdCPv5vAFTScisV7Me2j",
+  "metadata": {
+    "name": "testCcipInvalidReceiver",
+    "version": "0.0.0-dev",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
   "instructions": [
     {
-      "name": "ccipReceive",
-      "accounts": [
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "offrampProgram",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK offramp program: exists only to derive the allowed offramp PDA",
-            "and the authority PDA. Must be second."
-          ]
-        },
-        {
-          "name": "allowedOfframp",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK PDA of the router program verifying the signer is an allowed offramp.",
-            "If PDA does not exist, the router doesn't allow this offramp"
-          ]
-        },
-        {
-          "name": "counter",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "message",
-          "type": {
-            "defined": "Any2SVMMessage"
-          }
-        }
-      ]
-    },
-    {
       "name": "addOfframp",
+      "discriminator": [
+        164,
+        255,
+        154,
+        96,
+        204,
+        239,
+        24,
+        2
+      ],
       "accounts": [
         {
           "name": "allowedOfframp",
-          "isMut": true,
-          "isSigner": false
+          "writable": true
         },
         {
           "name": "authority",
-          "isMut": true,
-          "isSigner": true
+          "writable": true,
+          "signer": true
         },
         {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "systemProgram"
         }
       ],
       "args": [
@@ -74,218 +46,252 @@ export type TestCcipInvalidReceiver = {
         },
         {
           "name": "offramp",
-          "type": "publicKey"
+          "type": "pubkey"
         }
       ]
     },
     {
-      "name": "poolProxyReleaseOrMint",
+      "name": "ccipReceive",
+      "discriminator": [
+        11,
+        244,
+        9,
+        249,
+        44,
+        83,
+        47,
+        245
+      ],
       "accounts": [
         {
-          "name": "testPool",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "cpiSigner",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
+          "name": "authority",
+          "writable": true,
+          "signer": true
         },
         {
           "name": "offrampProgram",
-          "isMut": false,
-          "isSigner": false
+          "docs": [
+            "CHECK offramp program: exists only to derive the allowed offramp PDA",
+            "and the authority PDA. Must be second."
+          ]
         },
         {
           "name": "allowedOfframp",
-          "isMut": false,
-          "isSigner": false,
           "docs": [
-            "CHECK"
+            "CHECK PDA of the router program verifying the signer is an allowed offramp.",
+            "If PDA does not exist, the router doesn't allow this offramp"
           ]
         },
         {
-          "name": "state",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
+          "name": "counter",
+          "writable": true
         },
         {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "mint",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "poolSigner",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "poolTokenAccount",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "chainConfig",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "rmnRemote",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "rmnRemoteCurses",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "rmnRemoteConfig",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "receiverTokenAccount",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
+          "name": "systemProgram"
         }
       ],
       "args": [
         {
-          "name": "releaseOrMint",
+          "name": "message",
           "type": {
-            "defined": "ReleaseOrMintInV1"
+            "defined": {
+              "name": "any2SvmMessage"
+            }
           }
         }
-      ],
-      "returns": "bytes"
+      ]
     },
     {
       "name": "poolProxyLockOrBurn",
+      "discriminator": [
+        123,
+        20,
+        147,
+        83,
+        195,
+        25,
+        120,
+        101
+      ],
       "accounts": [
         {
           "name": "testPool",
-          "isMut": false,
-          "isSigner": false,
           "docs": [
             "CHECK"
           ]
         },
         {
           "name": "cpiSigner",
-          "isMut": false,
-          "isSigner": false,
           "docs": [
             "CHECK"
           ]
         },
         {
           "name": "state",
-          "isMut": true,
-          "isSigner": false,
           "docs": [
             "CHECK"
-          ]
+          ],
+          "writable": true
         },
         {
           "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false,
           "docs": [
             "CHECK"
           ]
         },
         {
           "name": "mint",
-          "isMut": true,
-          "isSigner": false
+          "writable": true
         },
         {
           "name": "poolSigner",
-          "isMut": false,
-          "isSigner": false,
           "docs": [
             "CHECK"
           ]
         },
         {
           "name": "poolTokenAccount",
-          "isMut": true,
-          "isSigner": false
+          "writable": true
         },
         {
           "name": "rmnRemote",
-          "isMut": false,
-          "isSigner": false,
           "docs": [
             "CHECK"
           ]
         },
         {
           "name": "rmnRemoteCurses",
-          "isMut": false,
-          "isSigner": false,
           "docs": [
             "CHECK"
           ]
         },
         {
           "name": "rmnRemoteConfig",
-          "isMut": false,
-          "isSigner": false,
           "docs": [
             "CHECK"
           ]
         },
         {
           "name": "chainConfig",
-          "isMut": true,
-          "isSigner": false,
           "docs": [
             "CHECK"
-          ]
+          ],
+          "writable": true
         }
       ],
       "args": [
         {
           "name": "lockOrBurn",
           "type": {
-            "defined": "LockOrBurnInV1"
+            "defined": {
+              "name": "lockOrBurnInV1"
+            }
+          }
+        }
+      ],
+      "returns": "bytes"
+    },
+    {
+      "name": "poolProxyReleaseOrMint",
+      "discriminator": [
+        22,
+        95,
+        117,
+        49,
+        2,
+        121,
+        100,
+        188
+      ],
+      "accounts": [
+        {
+          "name": "testPool",
+          "docs": [
+            "CHECK"
+          ]
+        },
+        {
+          "name": "cpiSigner",
+          "docs": [
+            "CHECK"
+          ]
+        },
+        {
+          "name": "offrampProgram"
+        },
+        {
+          "name": "allowedOfframp",
+          "docs": [
+            "CHECK"
+          ]
+        },
+        {
+          "name": "state",
+          "docs": [
+            "CHECK"
+          ],
+          "writable": true
+        },
+        {
+          "name": "tokenProgram",
+          "docs": [
+            "CHECK"
+          ]
+        },
+        {
+          "name": "mint",
+          "writable": true
+        },
+        {
+          "name": "poolSigner",
+          "docs": [
+            "CHECK"
+          ]
+        },
+        {
+          "name": "poolTokenAccount",
+          "writable": true
+        },
+        {
+          "name": "chainConfig",
+          "docs": [
+            "CHECK"
+          ],
+          "writable": true
+        },
+        {
+          "name": "rmnRemote",
+          "docs": [
+            "CHECK"
+          ]
+        },
+        {
+          "name": "rmnRemoteCurses",
+          "docs": [
+            "CHECK"
+          ]
+        },
+        {
+          "name": "rmnRemoteConfig",
+          "docs": [
+            "CHECK"
+          ]
+        },
+        {
+          "name": "receiverTokenAccount",
+          "docs": [
+            "CHECK"
+          ],
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "releaseOrMint",
+          "type": {
+            "defined": {
+              "name": "releaseOrMintInV1"
+            }
           }
         }
       ],
@@ -293,35 +299,37 @@ export type TestCcipInvalidReceiver = {
     },
     {
       "name": "receiverProxyExecute",
+      "discriminator": [
+        99,
+        169,
+        76,
+        14,
+        44,
+        89,
+        147,
+        67
+      ],
       "accounts": [
         {
           "name": "testReceiver",
-          "isMut": false,
-          "isSigner": false,
           "docs": [
             "CHECK"
           ]
         },
         {
           "name": "cpiSigner",
-          "isMut": false,
-          "isSigner": false,
           "docs": [
             "CHECK"
           ]
         },
         {
           "name": "offrampProgram",
-          "isMut": false,
-          "isSigner": false,
           "docs": [
             "CHECK"
           ]
         },
         {
           "name": "allowedOfframp",
-          "isMut": false,
-          "isSigner": false,
           "docs": [
             "CHECK"
           ]
@@ -331,7 +339,9 @@ export type TestCcipInvalidReceiver = {
         {
           "name": "message",
           "type": {
-            "defined": "Any2SVMMessage"
+            "defined": {
+              "name": "any2SvmMessage"
+            }
           }
         }
       ]
@@ -340,9 +350,76 @@ export type TestCcipInvalidReceiver = {
   "accounts": [
     {
       "name": "allowedOfframp",
+      "discriminator": [
+        247,
+        97,
+        179,
+        16,
+        207,
+        36,
+        236,
+        132
+      ]
+    },
+    {
+      "name": "counter",
+      "discriminator": [
+        255,
+        176,
+        4,
+        245,
+        188,
+        253,
+        124,
+        25
+      ]
+    }
+  ],
+  "types": [
+    {
+      "name": "allowedOfframp",
       "type": {
         "kind": "struct",
         "fields": []
+      }
+    },
+    {
+      "name": "any2SvmMessage",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "messageId",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "sourceChainSelector",
+            "type": "u64"
+          },
+          {
+            "name": "sender",
+            "type": "bytes"
+          },
+          {
+            "name": "data",
+            "type": "bytes"
+          },
+          {
+            "name": "tokenAmounts",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "svmTokenAmount"
+                }
+              }
+            }
+          }
+        ]
       }
     },
     {
@@ -356,11 +433,37 @@ export type TestCcipInvalidReceiver = {
           }
         ]
       }
-    }
-  ],
-  "types": [
+    },
     {
-      "name": "ReleaseOrMintInV1",
+      "name": "lockOrBurnInV1",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "receiver",
+            "type": "bytes"
+          },
+          {
+            "name": "remoteChainSelector",
+            "type": "u64"
+          },
+          {
+            "name": "originalSender",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "localToken",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "releaseOrMintInV1",
       "type": {
         "kind": "struct",
         "fields": [
@@ -374,7 +477,7 @@ export type TestCcipInvalidReceiver = {
           },
           {
             "name": "receiver",
-            "type": "publicKey"
+            "type": "pubkey"
           },
           {
             "name": "amount",
@@ -387,7 +490,7 @@ export type TestCcipInvalidReceiver = {
           },
           {
             "name": "localToken",
-            "type": "publicKey"
+            "type": "pubkey"
           },
           {
             "name": "sourcePoolAddress",
@@ -412,473 +515,17 @@ export type TestCcipInvalidReceiver = {
       }
     },
     {
-      "name": "LockOrBurnInV1",
+      "name": "svmTokenAmount",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "receiver",
-            "type": "bytes"
-          },
-          {
-            "name": "remoteChainSelector",
-            "type": "u64"
-          },
-          {
-            "name": "originalSender",
-            "type": "publicKey"
+            "name": "token",
+            "type": "pubkey"
           },
           {
             "name": "amount",
             "type": "u64"
-          },
-          {
-            "name": "localToken",
-            "type": "publicKey"
-          }
-        ]
-      }
-    }
-  ]
-};
-
-export const IDL: TestCcipInvalidReceiver = {
-  "version": "0.0.0-dev",
-  "name": "test_ccip_invalid_receiver",
-  "instructions": [
-    {
-      "name": "ccipReceive",
-      "accounts": [
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "offrampProgram",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK offramp program: exists only to derive the allowed offramp PDA",
-            "and the authority PDA. Must be second."
-          ]
-        },
-        {
-          "name": "allowedOfframp",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK PDA of the router program verifying the signer is an allowed offramp.",
-            "If PDA does not exist, the router doesn't allow this offramp"
-          ]
-        },
-        {
-          "name": "counter",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "message",
-          "type": {
-            "defined": "Any2SVMMessage"
-          }
-        }
-      ]
-    },
-    {
-      "name": "addOfframp",
-      "accounts": [
-        {
-          "name": "allowedOfframp",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "sourceChainSelector",
-          "type": "u64"
-        },
-        {
-          "name": "offramp",
-          "type": "publicKey"
-        }
-      ]
-    },
-    {
-      "name": "poolProxyReleaseOrMint",
-      "accounts": [
-        {
-          "name": "testPool",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "cpiSigner",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "offrampProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "allowedOfframp",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "state",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "mint",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "poolSigner",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "poolTokenAccount",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "chainConfig",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "rmnRemote",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "rmnRemoteCurses",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "rmnRemoteConfig",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "receiverTokenAccount",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        }
-      ],
-      "args": [
-        {
-          "name": "releaseOrMint",
-          "type": {
-            "defined": "ReleaseOrMintInV1"
-          }
-        }
-      ],
-      "returns": "bytes"
-    },
-    {
-      "name": "poolProxyLockOrBurn",
-      "accounts": [
-        {
-          "name": "testPool",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "cpiSigner",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "state",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "mint",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "poolSigner",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "poolTokenAccount",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "rmnRemote",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "rmnRemoteCurses",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "rmnRemoteConfig",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "chainConfig",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        }
-      ],
-      "args": [
-        {
-          "name": "lockOrBurn",
-          "type": {
-            "defined": "LockOrBurnInV1"
-          }
-        }
-      ],
-      "returns": "bytes"
-    },
-    {
-      "name": "receiverProxyExecute",
-      "accounts": [
-        {
-          "name": "testReceiver",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "cpiSigner",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "offrampProgram",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "allowedOfframp",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        }
-      ],
-      "args": [
-        {
-          "name": "message",
-          "type": {
-            "defined": "Any2SVMMessage"
-          }
-        }
-      ]
-    }
-  ],
-  "accounts": [
-    {
-      "name": "allowedOfframp",
-      "type": {
-        "kind": "struct",
-        "fields": []
-      }
-    },
-    {
-      "name": "counter",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "value",
-            "type": "u8"
-          }
-        ]
-      }
-    }
-  ],
-  "types": [
-    {
-      "name": "ReleaseOrMintInV1",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "originalSender",
-            "type": "bytes"
-          },
-          {
-            "name": "remoteChainSelector",
-            "type": "u64"
-          },
-          {
-            "name": "receiver",
-            "type": "publicKey"
-          },
-          {
-            "name": "amount",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
-            "name": "localToken",
-            "type": "publicKey"
-          },
-          {
-            "name": "sourcePoolAddress",
-            "docs": [
-              "@dev WARNING: sourcePoolAddress should be checked prior to any processing of funds. Make sure it matches the",
-              "expected pool address for the given remoteChainSelector."
-            ],
-            "type": "bytes"
-          },
-          {
-            "name": "sourcePoolData",
-            "type": "bytes"
-          },
-          {
-            "name": "offchainTokenData",
-            "docs": [
-              "@dev WARNING: offchainTokenData is untrusted data."
-            ],
-            "type": "bytes"
-          }
-        ]
-      }
-    },
-    {
-      "name": "LockOrBurnInV1",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "receiver",
-            "type": "bytes"
-          },
-          {
-            "name": "remoteChainSelector",
-            "type": "u64"
-          },
-          {
-            "name": "originalSender",
-            "type": "publicKey"
-          },
-          {
-            "name": "amount",
-            "type": "u64"
-          },
-          {
-            "name": "localToken",
-            "type": "publicKey"
           }
         ]
       }

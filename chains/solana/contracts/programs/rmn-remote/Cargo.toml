@@ -13,10 +13,12 @@ no-entrypoint = []
 no-idl = []
 no-log-ix-name = []
 cpi = ["no-entrypoint"]
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
 default = []
 
 [dependencies]
-anchor-lang = "0.29.0"
+anchor-lang = "0.31.0"
+anchor-spl = "0.31.0"
 bytemuck = "1.7"
 ccip_common = {path = "../ccip-common"}
 

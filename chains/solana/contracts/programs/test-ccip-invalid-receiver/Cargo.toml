@@ -13,10 +13,11 @@ no-entrypoint = []
 no-idl = []
 no-log-ix-name = []
 cpi = ["no-entrypoint"]
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
 default = []
 
 [dependencies]
-anchor-lang = "0.29.0"
-anchor-spl = "0.29.0"
-solana-program = "1.17.25" # pin solana to 1.17
+anchor-lang = "0.31.0"
+anchor-spl = "0.31.0"
+solana-program = "2.1.0"
 example_ccip_receiver = { version = "0.1.0-dev", path = "../example-ccip-receiver", features = ["no-entrypoint"] }
