@@ -13,6 +13,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/asynclib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	pkgreader "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
@@ -25,6 +26,10 @@ func (p *processor) Observation(
 	query Query,
 ) (Observation, error) {
 	lggr := logutil.WithContextValues(ctx, p.lggr)
+
+	if invalidateCache, ok := ctx.Value(consts.InvalidateCacheKey).(bool); ok && invalidateCache {
+		p.obs.invalidateCaches(ctx, lggr)
+	}
 
 	var (
 		fChain           map[cciptypes.ChainSelector]int
@@ -77,6 +82,7 @@ type observer interface {
 	observeFeeQuoterTokenUpdates(
 		ctx context.Context,
 		lggr logger.Logger) map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig
+	invalidateCaches(ctx context.Context, lggr logger.Logger)
 	close()
 }
 
@@ -173,15 +179,18 @@ func (b *baseObserver) observeFeeQuoterTokenUpdates(
 	return tokenUpdates
 }
 
+func (b *baseObserver) invalidateCaches(ctx context.Context, lggr logger.Logger) {}
+
 func (b *baseObserver) close() {}
 
 // asyncObserver wraps baseObserver and periodically syncs the tokenPriceMap and tokenUpdates.
 // It is used to avoid blocking the processor when querying the tokenPriceReader.
 type asyncObserver struct {
-	lggr       logger.Logger
-	base       *baseObserver
-	cancelFunc func()
-	mu         sync.RWMutex
+	lggr            logger.Logger
+	base            *baseObserver
+	cancelFunc      func()
+	mu              sync.RWMutex
+	triggerSyncChan chan time.Time
 
 	// cached values, only ever read thru mutex.
 	tokenPriceMap cciptypes.TokenPriceMap
@@ -196,14 +205,27 @@ func newAsyncObserver(
 	ctx, cancel := context.WithCancel(context.Background())
 
 	obs := &asyncObserver{
-		lggr: logutil.WithComponent(lggr, "tokenpriceAsyncObserver"),
-		base: base,
-		mu:   sync.RWMutex{},
+		lggr:            logutil.WithComponent(lggr, "tokenpriceAsyncObserver"),
+		base:            base,
+		mu:              sync.RWMutex{},
+		triggerSyncChan: make(chan time.Time),
 	}
 
 	ticker := time.NewTicker(tickDuration)
+	go func() {
+		obs.triggerSyncChan <- time.Now() // trigger an initial sync operation
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				obs.triggerSyncChan <- time.Now()
+			}
+		}
+	}()
+
 	lggr.Debugw("async tokenprice observer started", "tickDuration", tickDuration, "syncTimeout", syncTimeout)
-	obs.start(ctx, ticker.C, syncTimeout)
+	obs.start(ctx, obs.triggerSyncChan, syncTimeout)
 
 	obs.cancelFunc = func() {
 		cancel()
@@ -294,6 +316,16 @@ func (a *asyncObserver) observeFeedTokenPrices(
 	defer a.mu.RUnlock()
 	lggr.Debugw("observeFeedTokenPrices returning cached value", "numPrices", len(a.tokenPriceMap))
 	return a.tokenPriceMap
+}
+
+func (a *asyncObserver) invalidateCaches(_ context.Context, lggr logger.Logger) {
+	lggr.Debugw("invalidating caches, acquiring lock")
+	a.mu.Lock()
+	a.tokenPriceMap = make(cciptypes.TokenPriceMap)
+	a.tokenUpdates = make(map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig)
+	a.mu.Unlock()
+	lggr.Debugw("caches invalidated, lock released, triggering custom sync operation")
+	a.triggerSyncChan <- time.Now()
 }
 
 func (a *asyncObserver) close() {
