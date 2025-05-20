@@ -24,7 +24,7 @@ func SendAndConfirm(ctx context.Context, rpcClient *rpc.Client, instructions []s
 
 func SendAndConfirmWithLookupTables(ctx context.Context, rpcClient *rpc.Client, instructions []solana.Instruction,
 	signer solana.PrivateKey, commitment rpc.CommitmentType, lookupTables map[solana.PublicKey]solana.PublicKeySlice, opts ...TxModifier) (*rpc.GetTransactionResult, error) {
-	txres, err := sendTransactionWithLookupTables(ctx, rpcClient, instructions, signer, commitment, TransactionConfigs{SkipPreflight: false, Retries: 1}, lookupTables, opts...) // do not skipPreflight when expected to pass, preflight can help debug
+	txres, err := sendTransactionWithLookupTables(ctx, rpcClient, instructions, signer, commitment, TransactionConfigs{SkipPreflight: false, Retries: 1, RetryDelay: 50 * time.Millisecond}, lookupTables, opts...) // do not skipPreflight when expected to pass, preflight can help debug
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +41,7 @@ func SendAndConfirmWithLookupTables(ctx context.Context, rpcClient *rpc.Client, 
 
 func SendAndConfirmWithLookupTablesAndRetries(ctx context.Context, rpcClient *rpc.Client, instructions []solana.Instruction,
 	signer solana.PrivateKey, commitment rpc.CommitmentType, lookupTables map[solana.PublicKey]solana.PublicKeySlice, opts ...TxModifier) (*rpc.GetTransactionResult, error) {
-	txres, err := sendTransactionWithLookupTables(ctx, rpcClient, instructions, signer, commitment, TransactionConfigs{SkipPreflight: false, Retries: 500}, lookupTables, opts...) // do not skipPreflight when expected to pass, preflight can help debug
+	txres, err := sendTransactionWithLookupTables(ctx, rpcClient, instructions, signer, commitment, TransactionConfigs{SkipPreflight: false, Retries: 500, RetryDelay: 50 * time.Millisecond}, lookupTables, opts...) // do not skipPreflight when expected to pass, preflight can help debug
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +64,7 @@ func SendAndFailWith(ctx context.Context, rpcClient *rpc.Client, instructions []
 
 func SendAndFailWithLookupTables(ctx context.Context, rpcClient *rpc.Client, instructions []solana.Instruction,
 	signer solana.PrivateKey, commitment rpc.CommitmentType, lookupTables map[solana.PublicKey]solana.PublicKeySlice, expectedErrors []string, opts ...TxModifier) (*rpc.GetTransactionResult, error) {
-	txres, err := sendTransactionWithLookupTables(ctx, rpcClient, instructions, signer, commitment, TransactionConfigs{SkipPreflight: true, Retries: 1}, lookupTables, opts...) // skipPreflight when expected to fail so revert captured onchain
+	txres, err := sendTransactionWithLookupTables(ctx, rpcClient, instructions, signer, commitment, TransactionConfigs{SkipPreflight: true, Retries: 1, RetryDelay: 50 * time.Millisecond}, lookupTables, opts...) // skipPreflight when expected to fail so revert captured onchain
 	if err != nil {
 		return nil, err
 	}
@@ -157,6 +157,7 @@ func AddComputeUnitPrice(v fees.ComputeUnitPrice) TxModifier {
 type TransactionConfigs struct {
 	SkipPreflight bool
 	Retries       int
+	RetryDelay    time.Duration
 }
 
 func sendTransactionWithLookupTables(ctx context.Context, rpcClient *rpc.Client, instructions []solana.Instruction,
@@ -167,7 +168,7 @@ func sendTransactionWithLookupTables(ctx context.Context, rpcClient *rpc.Client,
 		hashRes, errBlockHash = rpcClient.GetLatestBlockhash(ctx, commitment)
 		if errBlockHash != nil {
 			fmt.Println("GetLatestBlockhash error:", errBlockHash)
-			time.Sleep(50 * time.Millisecond)
+			time.Sleep(transactionConfigs.RetryDelay)
 			continue
 		}
 		break
@@ -229,7 +230,7 @@ func sendTransactionWithLookupTables(ctx context.Context, rpcClient *rpc.Client,
 			}
 			// Not an RPC error — should only happen when we fail to hit the rpc service
 			fmt.Println("Unexpected error (could not hit rpc service), retrying:", err)
-			time.Sleep(50 * time.Millisecond)
+			time.Sleep(transactionConfigs.RetryDelay)
 			continue
 		}
 		// no error = success
@@ -246,13 +247,13 @@ func sendTransactionWithLookupTables(ctx context.Context, rpcClient *rpc.Client,
 		statusRes, sigErr := rpcClient.GetSignatureStatuses(ctx, true, txsig)
 		if sigErr != nil {
 			fmt.Println(sigErr) // debugging if tx errors; mainnet can be flakey
-			time.Sleep(50 * time.Millisecond)
+			time.Sleep(transactionConfigs.RetryDelay)
 			continue
 		}
 		if statusRes != nil && len(statusRes.Value) > 0 && statusRes.Value[0] != nil {
 			txStatus = statusRes.Value[0].ConfirmationStatus
 		}
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(transactionConfigs.RetryDelay)
 	}
 
 	v := uint64(0)
@@ -265,7 +266,7 @@ func sendTransactionWithLookupTables(ctx context.Context, rpcClient *rpc.Client,
 		})
 		if errGetTx != nil {
 			fmt.Println("Error getting transaction:", errGetTx)
-			time.Sleep(50 * time.Millisecond)
+			time.Sleep(transactionConfigs.RetryDelay)
 			continue
 		}
 		break
