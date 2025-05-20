@@ -61,7 +61,7 @@ func newCCIPChainReaderInternal(
 		if contractWriters[chainSelector] == nil {
 			panic(fmt.Sprintf("contract writer not found for chain %d", chainSelector))
 		}
-		cas[chainSelector] = chain_accessor.NewLegacyAccessor(chainSelector, crs[chainSelector], contractWriters[chainSelector], addrCodec)
+		cas[chainSelector] = chain_accessor.NewLegacyAccessor(lggr, chainSelector, crs[chainSelector], contractWriters[chainSelector], addrCodec)
 	}
 
 	offrampAddrStr, err := addrCodec.AddressBytesToString(offrampAddress, destChain)

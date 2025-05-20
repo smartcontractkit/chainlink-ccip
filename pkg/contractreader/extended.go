@@ -35,6 +35,8 @@ type Extended interface {
 
 	GetBindings(contractName string) []ExtendedBoundContract
 
+	GetAllBindings() map[string][]ExtendedBoundContract
+
 	// QueryKey is from the base contract reader interface.
 	QueryKey(
 		ctx context.Context,
@@ -321,6 +323,18 @@ func (e *extendedContractReader) GetBindings(contractName string) []ExtendedBoun
 		return []ExtendedBoundContract{}
 	}
 	return bindings
+}
+
+func (e *extendedContractReader) GetAllBindings() map[string][]ExtendedBoundContract {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	allBindings := make(map[string][]ExtendedBoundContract, len(e.contractBindingsByName))
+	for key, bindings := range e.contractBindingsByName {
+		allBindings[key] = bindings
+	}
+
+	return allBindings
 }
 
 func (e *extendedContractReader) bindingExists(b types.BoundContract) bool {
