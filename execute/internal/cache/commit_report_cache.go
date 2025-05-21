@@ -39,13 +39,14 @@ func (r *RealTimeProvider) Now() time.Time {
 // It's designed to handle potential LogPoller delays by using a lookback grace period.
 type CommitReportCache interface {
 	// RefreshCache fetches new reports using the configured reader and adds them to the cache.
-	// It filters out reports without Merkle roots.
+	// It filters out reports without Merkle roots before storing them.
 	// It returns an error if fetching reports fails.
 	RefreshCache(ctx context.Context) error
 
 	// GetReportsToQueryFromTimestamp determines the timestamp from which new reports should be queried.
-	// This considers the messageVisibilityInterval, the latest report timestamp in the cache,
-	// and a lookbackGracePeriod to account for LogPoller delays.
+	// This considers the messageVisibilityInterval, the timestamp of the latest report seen by the
+	// reader during the last refresh (latestFinalizedReportTimestamp), and a lookbackGracePeriod
+	// to account for LogPoller delays or other potential inconsistencies.
 	GetReportsToQueryFromTimestamp() time.Time
 
 	// GetCachedReports retrieves reports from the cache that have a timestamp greater than or equal to fromTimestamp.
@@ -60,7 +61,7 @@ type commitReportCache struct {
 
 	cacheMu                        sync.RWMutex
 	reportsCache                   *cache.Cache
-	latestFinalizedReportTimestamp time.Time
+	latestFinalizedReportTimestamp time.Time // Considering also empty merkle root reports
 	timeProvider                   TimeProvider
 }
 
@@ -148,6 +149,25 @@ func (c *commitReportCache) RefreshCache(ctx context.Context) error {
 
 	addedCount := 0
 
+	// Update latestFinalizedReportTimestamp based on all fetched reports before filtering
+	if len(reports) > 0 {
+		maxTs := reports[0].Timestamp
+		for _, r := range reports {
+			if r.Timestamp.After(maxTs) {
+				maxTs = r.Timestamp
+			}
+		}
+
+		c.cacheMu.Lock()
+		if maxTs.After(c.latestFinalizedReportTimestamp) {
+			c.latestFinalizedReportTimestamp = maxTs.UTC()
+			c.lggr.Debugw("RefreshCache: updated latestFinalizedReportTimestamp from fetched batch",
+				"newLatest", c.latestFinalizedReportTimestamp,
+				"previousLatest", c.latestFinalizedReportTimestamp)
+		}
+		c.cacheMu.Unlock()
+	}
+
 	// The for loop structure itself is maintained as per the selection boundaries.
 	// Filtering and key generation are done outside the lock.
 	for _, report := range reports {
@@ -170,10 +190,6 @@ func (c *commitReportCache) RefreshCache(ctx context.Context) error {
 		c.cacheMu.Lock()
 		// Add to cache with default expiration (MessageVisibilityInterval + EvictionGracePeriod)
 		c.reportsCache.SetDefault(key, report)
-
-		if report.Timestamp.After(c.latestFinalizedReportTimestamp) {
-			c.latestFinalizedReportTimestamp = report.Timestamp.UTC()
-		}
 		c.cacheMu.Unlock()
 
 		addedCount++ // Increment for each report successfully processed and added.
