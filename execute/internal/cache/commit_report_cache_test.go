@@ -709,3 +709,87 @@ func TestCommitReportCache_DeduplicateReports(t *testing.T) {
 		})
 	}
 }
+
+func TestCommitReportCache_RefreshCache_LatestTimestampAdvancesWithRootlessReports(t *testing.T) {
+	t.Parallel()
+	lggr := logger.Test(t)
+	baseTime := time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC)
+	tp := newMockTimeProvider(baseTime)
+	mockRdr := readerMocks.NewMockCCIPReader(t)
+	cfg := CommitReportCacheConfig{
+		MessageVisibilityInterval: 1 * time.Hour,
+		EvictionGracePeriod:       10 * time.Minute,
+		CleanupInterval:           5 * time.Minute,
+		LookbackGracePeriod:       5 * time.Minute,
+	}
+	cache := NewCommitReportCache(lggr, cfg, tp, mockRdr).(*commitReportCache)
+
+	// Initial state: no reports, latest timestamp is zero
+	require.True(t, cache.latestFinalizedReportTimestamp.IsZero())
+
+	// --- First Refresh: Report with no roots but a newer timestamp ---
+	rootlessReportTime := baseTime.Add(10 * time.Minute)
+	reportWithoutRoots := ccipocr3.CommitPluginReportWithMeta{
+		Report:    ccipocr3.CommitPluginReport{ /* No roots */ },
+		Timestamp: rootlessReportTime,
+		BlockNum:  100,
+	}
+	reportWithOldRoot := ccipocr3.CommitPluginReportWithMeta{
+		Report: ccipocr3.CommitPluginReport{
+			BlessedMerkleRoots: []ccipocr3.MerkleRootChain{{ChainSel: 1, MerkleRoot: ccipocr3.Bytes32{1}}},
+		},
+		Timestamp: baseTime.Add(-5 * time.Minute), // Older than rootlessReportTime
+		BlockNum:  99,
+	}
+
+	mockRdr.On("CommitReportsGTETimestamp",
+		mock.Anything, mock.AnythingOfType("time.Time"), primitives.Finalized, DefaultMaxCommitReportsToFetch,
+	).Return([]ccipocr3.CommitPluginReportWithMeta{reportWithOldRoot, reportWithoutRoots}, nil).Once()
+
+	err := cache.RefreshCache(context.Background())
+	require.NoError(t, err)
+
+	// Assert: latestFinalizedReportTimestamp should be updated to the timestamp of the rootless report
+	// because it was the latest processed by the reader.
+	assert.True(t, cache.latestFinalizedReportTimestamp.Equal(rootlessReportTime.UTC()))
+	// Assert: cache should still be empty or contain only reportWithOldRoot, as reportWithoutRoots has no key
+	assert.Equal(t, 1, cache.reportsCache.ItemCount())
+	keyOldRoot, _ := generateKey(reportWithOldRoot)
+	_, foundOld := cache.reportsCache.Get(keyOldRoot)
+	assert.True(t, foundOld, "reportWithOldRoot should be in cache")
+
+	mockRdr.AssertExpectations(t) // Ensures the first call was made
+
+	// --- Second Refresh: Report with roots and an even newer timestamp ---
+	// Reset the mock for a new set of expectations for the second call
+	mockRdr = readerMocks.NewMockCCIPReader(t)         // New mock to avoid issues with previous .Once()
+	cache.reader = mockRdr                             // Update cache to use the new mock
+	cache.latestFinalizedReportTimestamp = time.Time{} // Reset for clarity, though After check would handle it
+	cache.reportsCache.Flush()                         // Clear cache for this part of test
+	tp.SetTime(baseTime.Add(20 * time.Minute))         // Advance time
+
+	newReportTime := baseTime.Add(15 * time.Minute) // Newer than rootlessReportTime
+	reportWithNewRoot := ccipocr3.CommitPluginReportWithMeta{
+		Report: ccipocr3.CommitPluginReport{
+			BlessedMerkleRoots: []ccipocr3.MerkleRootChain{{ChainSel: 1, MerkleRoot: ccipocr3.Bytes32{2}}},
+		},
+		Timestamp: newReportTime,
+		BlockNum:  101,
+	}
+
+	mockRdr.On("CommitReportsGTETimestamp",
+		mock.Anything, mock.AnythingOfType("time.Time"), primitives.Finalized, DefaultMaxCommitReportsToFetch,
+	).Return([]ccipocr3.CommitPluginReportWithMeta{reportWithNewRoot}, nil).Once()
+
+	err = cache.RefreshCache(context.Background())
+	require.NoError(t, err)
+
+	// Assert: latestFinalizedReportTimestamp should be updated to newReportTime
+	assert.True(t, cache.latestFinalizedReportTimestamp.Equal(newReportTime.UTC()))
+	// Assert: reportWithNewRoot should be in the cache
+	assert.Equal(t, 1, cache.reportsCache.ItemCount())
+	keyNewRoot, _ := generateKey(reportWithNewRoot)
+	_, foundNew := cache.reportsCache.Get(keyNewRoot)
+	assert.True(t, foundNew, "reportWithNewRoot should be in cache")
+	mockRdr.AssertExpectations(t)
+}

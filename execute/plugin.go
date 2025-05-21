@@ -113,7 +113,6 @@ func NewPlugin(
 		MessageVisibilityInterval: offchainCfg.MessageVisibilityInterval.Duration(),
 		EvictionGracePeriod:       cache.EvictionGracePeriod,
 		CleanupInterval:           cache.CleanupInterval,
-		LookbackGracePeriod:       offchainCfg.MessageVisibilityInterval.Duration() / 8,
 	}
 
 	p := &Plugin{
@@ -296,11 +295,10 @@ func getPendingReportsForExecution(
 ) {
 	// get the reports from the cache
 	reportsFromCache := commitReportCache.GetCachedReports(fetchFrom)
-	lggr.Infow("Querying commit reports from chain", "fetchFrom", fetchFrom)
+	lggr.Infow("Querying commit reports from cache", "fetchFrom", fetchFrom)
 
 	// get the timestamp to fetch from cache
 	queryFromTimestampForNewReports := commitReportCache.GetReportsToQueryFromTimestamp()
-	lggr.Infow("Querying commit reports from cache", "queryFromTimestampForNewReports", queryFromTimestampForNewReports)
 
 	// Assuming each report can have minimum one message, max reports shouldn't exceed the max messages
 	unfinalizedIncrementReports, err := ccipReader.CommitReportsGTETimestamp(
@@ -309,6 +307,7 @@ func getPendingReportsForExecution(
 	if err != nil {
 		return nil, nil, nil, err
 	}
+	lggr.Infow("Querying commit reports from chain", "fetchFrom", queryFromTimestampForNewReports)
 
 	// merge the reports from the cache and the reports from the reader
 	candidateReports := cache.DeduplicateReports(lggr, append(reportsFromCache, unfinalizedIncrementReports...))
