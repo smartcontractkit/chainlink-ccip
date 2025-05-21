@@ -152,7 +152,7 @@ func (c *commitReportCache) RefreshCache(ctx context.Context) error {
 	// Update latestFinalizedReportTimestamp based on all fetched reports before filtering
 	if len(reports) > 0 {
 		maxTs := reports[0].Timestamp
-		for _, r := range reports {
+		for _, r := range reports[1:] {
 			if r.Timestamp.After(maxTs) {
 				maxTs = r.Timestamp
 			}
@@ -163,7 +163,7 @@ func (c *commitReportCache) RefreshCache(ctx context.Context) error {
 			c.latestFinalizedReportTimestamp = maxTs.UTC()
 			c.lggr.Debugw("RefreshCache: updated latestFinalizedReportTimestamp from fetched batch",
 				"newLatest", c.latestFinalizedReportTimestamp,
-				"previousLatest", c.latestFinalizedReportTimestamp)
+				"previousLatest", queryTs)
 		}
 		c.cacheMu.Unlock()
 	}
