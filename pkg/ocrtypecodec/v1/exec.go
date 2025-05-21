@@ -81,7 +81,7 @@ func (e *ExecCodecProto) DecodeObservation(data []byte) (exectypes.Observation, 
 func (e *ExecCodecProto) EncodeOutcome(outcome exectypes.Outcome) ([]byte, error) {
 	outcome = exectypes.NewOutcome(outcome.State, outcome.CommitReports, outcome.Report, outcome.Reports)
 
-	pbObs := &ocrtypecodecpb.ExecOutcome{
+	pbOtcm := &ocrtypecodecpb.ExecOutcome{
 		PluginState:          string(outcome.State),
 		CommitReports:        e.tr.commitDataSliceToProto(outcome.CommitReports),
 		ExecutePluginReports: e.tr.execPluginReportsToProto(outcome.Reports),
@@ -90,20 +90,20 @@ func (e *ExecCodecProto) EncodeOutcome(outcome exectypes.Outcome) ([]byte, error
 	// If there is only one report, use the legacy field. This way new clients can still
 	// form consensus with old ones.
 	// TODO: Remove backwards compatibility code after a few releases.
-	if len(pbObs.ExecutePluginReports) == 1 {
-		pbObs.ExecutePluginReport = pbObs.ExecutePluginReports[0]
-		pbObs.ExecutePluginReports = nil
+	if len(pbOtcm.ExecutePluginReports) == 1 {
+		pbOtcm.ExecutePluginReport = pbOtcm.ExecutePluginReports[0]
+		pbOtcm.ExecutePluginReports = nil
 	}
 
 	// TODO: Remove after "Reports" is fully supported.
 	if len(outcome.Report.ChainReports) != 0 {
 		r := e.tr.execPluginReportsToProto([]ccipocr3.ExecutePluginReport{outcome.Report})
 		if len(r) > 0 {
-			pbObs.ExecutePluginReport = r[0]
+			pbOtcm.ExecutePluginReport = r[0]
 		}
 	}
 
-	return proto.MarshalOptions{Deterministic: true}.Marshal(pbObs)
+	return proto.MarshalOptions{Deterministic: true}.Marshal(pbOtcm)
 }
 
 func (e *ExecCodecProto) DecodeOutcome(data []byte) (exectypes.Outcome, error) {
@@ -111,31 +111,31 @@ func (e *ExecCodecProto) DecodeOutcome(data []byte) (exectypes.Outcome, error) {
 		return exectypes.Outcome{}, nil
 	}
 
-	pbOutc := &ocrtypecodecpb.ExecOutcome{}
-	if err := proto.Unmarshal(data, pbOutc); err != nil {
+	pbOtcm := &ocrtypecodecpb.ExecOutcome{}
+	if err := proto.Unmarshal(data, pbOtcm); err != nil {
 		return exectypes.Outcome{}, fmt.Errorf("proto unmarshal ExecOutcome: %w", err)
 	}
 
-	outc := exectypes.Outcome{
-		State:         exectypes.PluginState(pbOutc.PluginState),
-		CommitReports: e.tr.commitDataSliceFromProto(pbOutc.CommitReports),
-		Reports:       e.tr.execPluginReportsFromProto(pbOutc.ExecutePluginReports),
+	otcm := exectypes.Outcome{
+		State:         exectypes.PluginState(pbOtcm.PluginState),
+		CommitReports: e.tr.commitDataSliceFromProto(pbOtcm.CommitReports),
+		Reports:       e.tr.execPluginReportsFromProto(pbOtcm.ExecutePluginReports),
 	}
 
 	// Decode the legacy Report field into the new Reports field. This way the plugin layer doesn't
 	// need to worry about type migration.
 	// TODO: Remove temporary migration code after a few releases.
-	if pbOutc.ExecutePluginReport != nil {
-		outc.Reports = e.tr.execPluginReportsFromProto([]*ocrtypecodecpb.ExecutePluginReport{pbOutc.ExecutePluginReport})
+	if pbOtcm.ExecutePluginReport != nil {
+		otcm.Reports = e.tr.execPluginReportsFromProto([]*ocrtypecodecpb.ExecutePluginReport{pbOtcm.ExecutePluginReport})
 	}
 
 	// Decode the new report format into the legacy field as an intermediate step for implementing this feature.
 	// TODO: Remove temporary function after the 'Reports' field is fully implemented.
-	if len(outc.Reports) > 0 {
-		outc.Report = outc.Reports[0]
+	if len(otcm.Reports) > 0 {
+		otcm.Report = otcm.Reports[0]
 	}
 
-	return outc, nil
+	return otcm, nil
 }
 
 // ExecCodecJSON is an implementation of ExecCodec that uses JSON.
