@@ -6,7 +6,6 @@ export ANCHOR_IMAGE ?= backpackapp/build:$(ANCHOR_VERSION)
 export ANCHOR_BUILD_ARGS ?=
 # Allow overriding the output directory for docker builds
 TARGET_DIR ?= $(PWD)/contracts/target
-CCIP_BUILD_GIT_HASH := $(shell git rev-parse HEAD)
 
 .PHONY: projectserum_version
 anchor_version:
@@ -73,7 +72,6 @@ docker-build-contracts:
 		-v ${TARGET_DIR}:/workdir/target \
 		-e CARGO_TARGET_DIR=/workdir/target \
 		-e CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse \
-		-e CCIP_BUILD_GIT_HASH=${CCIP_BUILD_GIT_HASH} \
 		${ANCHOR_IMAGE} anchor build ${ANCHOR_BUILD_ARGS}
 
 .PHONY: docker-update-contracts
@@ -83,7 +81,6 @@ docker-update-contracts:
 		-v ${TARGET_DIR}:/workdir/target \
 		-e CARGO_TARGET_DIR=/workdir/target \
 		-e CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse \
-		-e CCIP_BUILD_GIT_HASH=${CCIP_BUILD_GIT_HASH} \
 		${ANCHOR_IMAGE} anchor keys sync
 
 .PHONY: solana-checks

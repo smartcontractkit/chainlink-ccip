@@ -367,6 +367,26 @@ func TestProcessor_Outcome(t *testing.T) {
 			},
 			chainFeeWriteFrequency: chainFeePriceBatchWriteFrequency, // Needs a frequency
 		},
+		{
+			name: "Observations with FChain, TimestampNow, and ChainFeeUpdates",
+			aos: sameObs(numOracles, Observation{
+				FChain:       fChains,
+				TimestampNow: ts,
+				ChainFeeUpdates: map[cciptypes.ChainSelector]Update{
+					internal.EvmChainSelector: {
+						Timestamp: ts,
+						ChainFee: ComponentsUSDPrices{
+							ExecutionFeePriceUSD: big.NewInt(1),
+							DataAvFeePriceUSD:    big.NewInt(1),
+						},
+					},
+				},
+			}),
+			expectedError: false,
+			expectedOutcome: func() Outcome {
+				return Outcome{}
+			},
+		},
 	}
 
 	for _, tt := range cases {

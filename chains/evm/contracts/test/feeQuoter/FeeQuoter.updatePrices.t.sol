@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {FeeQuoter} from "../../FeeQuoter.sol";
 import {Internal} from "../../libraries/Internal.sol";
 import {FeeQuoterSetup} from "./FeeQuoterSetup.t.sol";
-import {AuthorizedCallers} from "@chainlink/shared/access/AuthorizedCallers.sol";
+import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
 contract FeeQuoter_updatePrices is FeeQuoterSetup {
   function test_OnlyTokenPrice() public {

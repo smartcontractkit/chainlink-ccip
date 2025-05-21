@@ -25,6 +25,11 @@ The solidity smart contracts themselves can be imported via the `contracts` dire
 import '@chainlink/contracts-ccip/contracts/applications/CCIPReceiver.sol';
 ```
 
+### Remapping
+
+This repository uses [Solidity remappings](https://docs.soliditylang.org/en/v0.8.20/using-the-compiler.html#compiler-remapping) to resolve imports.
+The remapping is defined in the `remappings.txt` file in the root of the repository.
+
 ### Changesets
 
 We use [changesets](https://github.com/changesets/changesets) to manage versioning the contracts.

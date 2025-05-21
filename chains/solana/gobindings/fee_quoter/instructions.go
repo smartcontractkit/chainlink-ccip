@@ -90,6 +90,15 @@ var (
 	// * `max_fee_juels_per_msg` - The new value for the max_feel_juels_per_msg config.
 	Instruction_SetMaxFeeJuelsPerMsg = ag_binary.TypeID([8]byte{50, 235, 110, 147, 169, 199, 69, 46})
 
+	// Sets the link_token_mint and updates the link_token_local_decimals.
+	//
+	// Only the admin may set this.
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for updating the configuration.
+	Instruction_SetLinkTokenMint = ag_binary.TypeID([8]byte{190, 216, 49, 254, 200, 81, 12, 17})
+
 	// Adds a billing token configuration.
 	// Only CCIP Admin can add a billing token configuration.
 	//
@@ -236,6 +245,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "SetDefaultCodeVersion"
 	case Instruction_SetMaxFeeJuelsPerMsg:
 		return "SetMaxFeeJuelsPerMsg"
+	case Instruction_SetLinkTokenMint:
+		return "SetLinkTokenMint"
 	case Instruction_AddBillingTokenConfig:
 		return "AddBillingTokenConfig"
 	case Instruction_UpdateBillingTokenConfig:
@@ -293,6 +304,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"set_max_fee_juels_per_msg", (*SetMaxFeeJuelsPerMsg)(nil),
+		},
+		{
+			"set_link_token_mint", (*SetLinkTokenMint)(nil),
 		},
 		{
 			"add_billing_token_config", (*AddBillingTokenConfig)(nil),
