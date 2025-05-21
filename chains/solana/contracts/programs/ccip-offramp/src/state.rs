@@ -34,32 +34,12 @@ pub struct ReferenceAddresses {
 }
 
 #[zero_copy]
-#[derive(InitSpace, Default)]
+#[derive(InitSpace, Default, BorshDeserialize, BorshSerialize)]
 pub struct Ocr3ConfigInfo {
     pub config_digest: [u8; 32], // 32-byte hash of configuration
     pub f: u8,                   // f+1 = number of signatures per report
     pub n: u8,                   // number of signers
     pub is_signature_verification_enabled: u8, // bool -> bytemuck::Pod compliant required for zero_copy
-}
-
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
-pub struct Ocr3ConfigInfoInput {
-    pub config_digest: [u8; 32],
-    pub f: u8,
-    pub n: u8,
-    pub is_signature_verification_enabled: u8,
-}
-
-// conversion from the input type to the stored type.
-impl From<Ocr3ConfigInfoInput> for Ocr3ConfigInfo {
-    fn from(input: Ocr3ConfigInfoInput) -> Self {
-        Self {
-            config_digest: input.config_digest,
-            f: input.f,
-            n: input.n,
-            is_signature_verification_enabled: input.is_signature_verification_enabled,
-        }
-    }
 }
 
 // TODO: do we need to verify signers and transmitters are different? (between the two groups)

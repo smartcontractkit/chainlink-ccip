@@ -3,7 +3,7 @@ use anchor_lang::solana_program::sysvar;
 use anchor_lang::solana_program::{keccak, secp256k1_recover::*};
 
 use crate::ocr3base::{OcrConfigSet, Transmitted, MAX_ORACLES};
-use crate::state::{Ocr3Config, Ocr3ConfigInfoInput};
+use crate::state::{Ocr3Config, Ocr3ConfigInfo};
 use crate::CcipOfframpError;
 use crate::OcrPluginType;
 
@@ -51,7 +51,7 @@ impl ReportContext {
 pub fn ocr3_set(
     ocr3_config: &mut Ocr3Config,
     plugin_type: OcrPluginType,
-    cfg: Ocr3ConfigInfoInput,
+    cfg: Ocr3ConfigInfo,
     signers: Vec<[u8; 20]>,
     transmitters: Vec<Pubkey>,
 ) -> Result<()> {

@@ -860,7 +860,7 @@ export type CcipOfframp = {
           "name": "configInfo",
           "type": {
             "defined": {
-              "name": "ocr3ConfigInfoInput"
+              "name": "ocr3ConfigInfo"
             }
           }
         },
@@ -2046,35 +2046,6 @@ export type CcipOfframp = {
       "repr": {
         "kind": "c"
       },
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "configDigest",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
-            "name": "f",
-            "type": "u8"
-          },
-          {
-            "name": "n",
-            "type": "u8"
-          },
-          {
-            "name": "isSignatureVerificationEnabled",
-            "type": "u8"
-          }
-        ]
-      }
-    },
-    {
-      "name": "ocr3ConfigInfoInput",
       "type": {
         "kind": "struct",
         "fields": [

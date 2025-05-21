@@ -339,7 +339,7 @@ pub mod ccip_offramp {
     pub fn set_ocr_config(
         ctx: Context<SetOcrConfig>,
         plugin_type: OcrPluginType,
-        config_info: Ocr3ConfigInfoInput,
+        config_info: Ocr3ConfigInfo,
         signers: Vec<[u8; 20]>,
         transmitters: Vec<Pubkey>,
     ) -> Result<()> {
