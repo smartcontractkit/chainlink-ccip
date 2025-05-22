@@ -5,13 +5,11 @@ package burnmint_token_pool
 import (
 	"fmt"
 	ag_binary "github.com/gagliardetto/binary"
-	ag_solanago "github.com/gagliardetto/solana-go"
 )
 
 type State struct {
-	Version  uint8
-	Multisig ag_solanago.PublicKey
-	Config   BaseConfig
+	Version uint8
+	Config  BaseConfig
 }
 
 var StateDiscriminator = [8]byte{216, 146, 107, 94, 104, 75, 182, 177}
@@ -24,11 +22,6 @@ func (obj State) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	}
 	// Serialize `Version` param:
 	err = encoder.Encode(obj.Version)
-	if err != nil {
-		return err
-	}
-	// Serialize `Multisig` param:
-	err = encoder.Encode(obj.Multisig)
 	if err != nil {
 		return err
 	}
@@ -56,11 +49,6 @@ func (obj *State) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	}
 	// Deserialize `Version`:
 	err = decoder.Decode(&obj.Version)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Multisig`:
-	err = decoder.Decode(&obj.Multisig)
 	if err != nil {
 		return err
 	}

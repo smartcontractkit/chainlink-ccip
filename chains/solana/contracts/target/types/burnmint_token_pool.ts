@@ -67,32 +67,6 @@ export type BurnmintTokenPool = {
       "returns": "string"
     },
     {
-      "name": "setupMultisig",
-      "accounts": [
-        {
-          "name": "state",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "mint",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "multisig",
-          "type": "publicKey"
-        }
-      ]
-    },
-    {
       "name": "transferOwnership",
       "accounts": [
         {
@@ -613,10 +587,6 @@ export type BurnmintTokenPool = {
           {
             "name": "version",
             "type": "u8"
-          },
-          {
-            "name": "multisig",
-            "type": "publicKey"
           },
           {
             "name": "config",
@@ -713,32 +683,6 @@ export const IDL: BurnmintTokenPool = {
       "returns": "string"
     },
     {
-      "name": "setupMultisig",
-      "accounts": [
-        {
-          "name": "state",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "mint",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "multisig",
-          "type": "publicKey"
-        }
-      ]
-    },
-    {
       "name": "transferOwnership",
       "accounts": [
         {
@@ -1259,10 +1203,6 @@ export const IDL: BurnmintTokenPool = {
           {
             "name": "version",
             "type": "u8"
-          },
-          {
-            "name": "multisig",
-            "type": "publicKey"
           },
           {
             "name": "config",

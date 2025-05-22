@@ -29,7 +29,6 @@ pub mod burnmint_token_pool {
                 router,
                 rmn_remote,
             ),
-            multisig: Pubkey::default(),
         });
         Ok(())
     }
@@ -43,11 +42,6 @@ pub mod burnmint_token_pool {
         let response = env!("CCIP_BUILD_TYPE_VERSION").to_string();
         msg!("{}", response);
         Ok(response)
-    }
-
-    pub fn setup_multisig(ctx: Context<SetConfig>, multisig: Pubkey) -> Result<()> {
-        ctx.accounts.state.multisig = multisig;
-        Ok(())
     }
 
     pub fn transfer_ownership(ctx: Context<SetConfig>, proposed_owner: Pubkey) -> Result<()> {
@@ -213,12 +207,14 @@ pub mod burnmint_token_pool {
             ctx.accounts.rmn_remote_config.to_account_info(),
         )?;
 
-        let multisig = if ctx.accounts.state.multisig != Pubkey::default() {
+        let mint_authority = ctx.accounts.mint.mint_authority.unwrap_or_default();
+
+        let multisig = if mint_authority != ctx.accounts.pool_signer.key() {
             let multisig_account = ctx
                 .remaining_accounts
                 .get(0)
                 .ok_or(CcipTokenPoolError::InvalidMultisig)?;
-            require_eq!(ctx.accounts.state.multisig, multisig_account.key());
+            require_eq!(mint_authority, multisig_account.key());
 
             Some(multisig_account.clone())
         } else {
@@ -285,7 +281,6 @@ pub mod burnmint_token_pool {
 #[derive(InitSpace)]
 pub struct State {
     pub version: u8,
-    pub multisig: Pubkey,
     pub config: BaseConfig,
 }
 
