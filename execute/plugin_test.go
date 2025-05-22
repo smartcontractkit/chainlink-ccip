@@ -2162,7 +2162,8 @@ func (c *configurableCommitReportCache) RefreshCache(ctx context.Context) error 
 func (c *configurableCommitReportCache) GetReportsToQueryFromTimestamp() time.Time {
 	return c.reportsToQueryFrom
 }
-func (c *configurableCommitReportCache) GetCachedReports(fromTimestamp time.Time) []cciptypes.CommitPluginReportWithMeta {
+func (c *configurableCommitReportCache) GetCachedReports(
+	fromTimestamp time.Time) []cciptypes.CommitPluginReportWithMeta {
 	return c.cachedReportsToReturn
 }
 func (c *configurableCommitReportCache) DeduplicateReports(
