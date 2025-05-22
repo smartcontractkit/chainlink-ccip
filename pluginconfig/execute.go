@@ -45,6 +45,9 @@ type ExecuteOffchainConfig struct {
 	// MaxSingleChainReports is the maximum number of single chain reports that can be included in a report.
 	// When set to 0, this setting is ignored.
 	MaxSingleChainReports uint64 `json:"maxSingleChainReports"`
+
+	// MaxCommitReportsToFetch is the maximum number of commit reports that can be fetched in each round.
+	MaxCommitReportsToFetch uint64 `json:"maxCommitReportsToFetch"`
 }
 
 func (e *ExecuteOffchainConfig) ApplyDefaultsAndValidate() error {
@@ -76,6 +79,10 @@ func (e *ExecuteOffchainConfig) Validate() error {
 
 	if e.MessageVisibilityInterval.Duration() == 0 {
 		return errors.New("MessageVisibilityInterval not set")
+	}
+
+	if e.MaxCommitReportsToFetch == 0 {
+		return errors.New("MaxCommitReportsToFetch not set")
 	}
 
 	set := make(map[string]struct{})

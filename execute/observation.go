@@ -218,6 +218,7 @@ func (p *Plugin) getCommitReportsObservation(
 		p.commitRootsCache.CanExecute,
 		fetchFrom,
 		ci.CursedSourceChains,
+		int(p.offchainCfg.MaxCommitReportsToFetch),
 		lggr,
 	)
 	if err != nil {

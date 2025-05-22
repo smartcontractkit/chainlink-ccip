@@ -793,6 +793,60 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 			wantExecutedUnfinalized: nil,
 			wantErr:                 assert.NoError,
 		},
+		{
+			name: "filters_price_reports_and_processes_merkle_report",
+			reports: []cciptypes.CommitPluginReportWithMeta{
+				// Price report 1 (no Merkle roots)
+				{
+					BlockNum:  1000,
+					Timestamp: time.UnixMilli(10101010101),
+					Report: cciptypes.CommitPluginReport{
+						BlessedMerkleRoots: nil, // Indicates a price-only report or similar non-executable
+					},
+				},
+				// Price report 2 (no Merkle roots)
+				{
+					BlockNum:  1001,
+					Timestamp: time.UnixMilli(10101010102),
+					Report: cciptypes.CommitPluginReport{
+						BlessedMerkleRoots: []cciptypes.MerkleRootChain{}, // Also indicates non-executable for messages
+					},
+				},
+				// Report with an actual Merkle root
+				{
+					BlockNum:  1002,
+					Timestamp: time.UnixMilli(10101010103),
+					Report: cciptypes.CommitPluginReport{
+						BlessedMerkleRoots: []cciptypes.MerkleRootChain{
+							{
+								ChainSel:     1, // Source chain selector
+								SeqNumsRange: cciptypes.NewSeqNumRange(1, 10),
+								MerkleRoot:   cciptypes.Bytes32{0x01}, // Example Merkle root
+							},
+						},
+					},
+				},
+			},
+			ranges:             nil, // No finalized messages for this new report
+			unfinalizedRanges:  nil, // No unfinalized messages for this new report
+			cursedSourceChains: nil,
+			fetchFrom:          time.Time{},
+			canExec:            canExecute(true), // Assume the Merkle root is executable
+			wantObs: exectypes.CommitObservations{
+				1: []exectypes.CommitData{ // Expecting only the report with the Merkle root to be processed
+					{
+						SourceChain:         1,
+						SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10),
+						Timestamp:           time.UnixMilli(10101010103),
+						BlockNum:            1002,
+						MerkleRoot:          cciptypes.Bytes32{0x01},
+					},
+				},
+			},
+			wantExecutedFinalized:   nil,
+			wantExecutedUnfinalized: nil,
+			wantErr:                 assert.NoError,
+		},
 	}
 
 	for _, tt := range tcs {
@@ -842,6 +896,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 				tt.canExec,
 				tt.fetchFrom,
 				tt.cursedSourceChains,
+				10,
 				logger.Test(t),
 			)
 			if !tt.wantErr(t, err, "getPendingReportsForExecution(...)") {
