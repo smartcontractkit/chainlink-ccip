@@ -30,7 +30,7 @@ export async function loadTokenPoolProgram(): Promise<TokenPoolProgramContext> {
 
     const bnMTokenPoolIdlFile = fs.readFileSync(tokenAdminRegistry.burnmint_token_pool_idl_path);
     const bnMTokenPoolIdl: Idl = JSON.parse(bnMTokenPoolIdlFile.toString());
-    const bnMTokenPoolProgram = new Program<BurnmintTokenPool>(bnMTokenPoolIdl as BurnmintTokenPool, provider); // tokenPoolProgramId,
+    const bnMTokenPoolProgram = new Program<BurnmintTokenPool>(bnMTokenPoolIdl as BurnmintTokenPool, provider);
 
     const [statePda] = PublicKey.findProgramAddressSync(
         [CCIP_TOKENPOOL_CONFIG_SEED, tokenAdminRegistry.mint.toBuffer()],
