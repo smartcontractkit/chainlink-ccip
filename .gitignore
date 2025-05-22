@@ -26,5 +26,5 @@
 .idea
 
 vendor/
-chains/solana/tsclient
+chains/solana/tsclient/staging.ts
 .vscode
