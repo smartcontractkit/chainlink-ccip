@@ -8,6 +8,10 @@ import (
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 )
 
+const (
+	defaultMaxCommitReportsToFetch = 500
+)
+
 // ExecuteOffchainConfig is the OCR offchainConfig for the exec plugin.
 // This is posted onchain as part of the OCR configuration process of the exec plugin.
 // Every plugin is provided this configuration in its encoded form in the NewReportingPlugin
@@ -58,6 +62,9 @@ func (e *ExecuteOffchainConfig) ApplyDefaultsAndValidate() error {
 func (e *ExecuteOffchainConfig) applyDefaults() {
 	if e.TransmissionDelayMultiplier == 0 {
 		e.TransmissionDelayMultiplier = defaultTransmissionDelayMultiplier
+	}
+	if e.MaxCommitReportsToFetch == 0 {
+		e.MaxCommitReportsToFetch = defaultMaxCommitReportsToFetch
 	}
 }
 
