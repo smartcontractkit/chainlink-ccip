@@ -1014,6 +1014,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "execution_buffer"
+version = "0.1.0-dev"
+dependencies = [
+ "anchor-lang",
+ "bytemuck",
+ "ccip_common",
+ "ccip_offramp",
+ "solana-program",
+]
+
+[[package]]
 name = "external-program-cpi-stub"
 version = "0.0.0-dev"
 dependencies = [
