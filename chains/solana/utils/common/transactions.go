@@ -3,6 +3,7 @@ package common
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -10,6 +11,7 @@ import (
 	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
+	"github.com/gagliardetto/solana-go/rpc/jsonrpc"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/fees"
 )
@@ -22,7 +24,7 @@ func SendAndConfirm(ctx context.Context, rpcClient *rpc.Client, instructions []s
 
 func SendAndConfirmWithLookupTables(ctx context.Context, rpcClient *rpc.Client, instructions []solana.Instruction,
 	signer solana.PrivateKey, commitment rpc.CommitmentType, lookupTables map[solana.PublicKey]solana.PublicKeySlice, opts ...TxModifier) (*rpc.GetTransactionResult, error) {
-	txres, err := sendTransactionWithLookupTables(ctx, rpcClient, instructions, signer, commitment, TransactionConfigs{SkipPreflight: false, Retries: 1}, lookupTables, opts...) // do not skipPreflight when expected to pass, preflight can help debug
+	txres, err := sendTransactionWithLookupTables(ctx, rpcClient, instructions, signer, commitment, TransactionConfigs{SkipPreflight: false, Retries: 1, RetryDelay: 50 * time.Millisecond}, lookupTables, opts...) // do not skipPreflight when expected to pass, preflight can help debug
 	if err != nil {
 		return nil, err
 	}
@@ -39,7 +41,7 @@ func SendAndConfirmWithLookupTables(ctx context.Context, rpcClient *rpc.Client, 
 
 func SendAndConfirmWithLookupTablesAndRetries(ctx context.Context, rpcClient *rpc.Client, instructions []solana.Instruction,
 	signer solana.PrivateKey, commitment rpc.CommitmentType, lookupTables map[solana.PublicKey]solana.PublicKeySlice, opts ...TxModifier) (*rpc.GetTransactionResult, error) {
-	txres, err := sendTransactionWithLookupTables(ctx, rpcClient, instructions, signer, commitment, TransactionConfigs{SkipPreflight: false, Retries: 500}, lookupTables, opts...) // do not skipPreflight when expected to pass, preflight can help debug
+	txres, err := sendTransactionWithLookupTables(ctx, rpcClient, instructions, signer, commitment, TransactionConfigs{SkipPreflight: false, Retries: 500, RetryDelay: 50 * time.Millisecond}, lookupTables, opts...) // do not skipPreflight when expected to pass, preflight can help debug
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +64,7 @@ func SendAndFailWith(ctx context.Context, rpcClient *rpc.Client, instructions []
 
 func SendAndFailWithLookupTables(ctx context.Context, rpcClient *rpc.Client, instructions []solana.Instruction,
 	signer solana.PrivateKey, commitment rpc.CommitmentType, lookupTables map[solana.PublicKey]solana.PublicKeySlice, expectedErrors []string, opts ...TxModifier) (*rpc.GetTransactionResult, error) {
-	txres, err := sendTransactionWithLookupTables(ctx, rpcClient, instructions, signer, commitment, TransactionConfigs{SkipPreflight: true, Retries: 1}, lookupTables, opts...) // skipPreflight when expected to fail so revert captured onchain
+	txres, err := sendTransactionWithLookupTables(ctx, rpcClient, instructions, signer, commitment, TransactionConfigs{SkipPreflight: true, Retries: 1, RetryDelay: 50 * time.Millisecond}, lookupTables, opts...) // skipPreflight when expected to fail so revert captured onchain
 	if err != nil {
 		return nil, err
 	}
@@ -155,6 +157,7 @@ func AddComputeUnitPrice(v fees.ComputeUnitPrice) TxModifier {
 type TransactionConfigs struct {
 	SkipPreflight bool
 	Retries       int
+	RetryDelay    time.Duration
 }
 
 func sendTransactionWithLookupTables(ctx context.Context, rpcClient *rpc.Client, instructions []solana.Instruction,
@@ -162,10 +165,10 @@ func sendTransactionWithLookupTables(ctx context.Context, rpcClient *rpc.Client,
 	var errBlockHash error
 	var hashRes *rpc.GetLatestBlockhashResult
 	for i := 0; i < transactionConfigs.Retries; i++ {
-		hashRes, errBlockHash = rpcClient.GetLatestBlockhash(ctx, rpc.CommitmentConfirmed)
+		hashRes, errBlockHash = rpcClient.GetLatestBlockhash(ctx, commitment)
 		if errBlockHash != nil {
 			fmt.Println("GetLatestBlockhash error:", errBlockHash)
-			time.Sleep(50 * time.Millisecond)
+			time.Sleep(transactionConfigs.RetryDelay)
 			continue
 		}
 		break
@@ -210,18 +213,28 @@ func sendTransactionWithLookupTables(ctx context.Context, rpcClient *rpc.Client,
 	for i := 0; i < transactionConfigs.Retries; i++ {
 		txsig, err = rpcClient.SendTransactionWithOpts(ctx, tx, rpc.TransactionOpts{SkipPreflight: transactionConfigs.SkipPreflight, PreflightCommitment: commitment})
 		if err != nil {
-			fmt.Println("Error sending transaction:", err)
-			time.Sleep(50 * time.Millisecond)
+			var rpcErr *jsonrpc.RPCError
+			if errors.As(err, &rpcErr) {
+				fmt.Println("RPC Error:", rpcErr.Message)
+				fmt.Println("RPC Error Code:", rpcErr.Code)
+				if strings.Contains(rpcErr.Message, "Blockhash not found") {
+					// this can happen when the blockhash we retrieved above is not yet visible to the rpc
+					// given we get the blockhash from the same rpc, this should not happen, but we see it in practice
+					// retrying fixes this
+					fmt.Println("Blockhash not found, retrying...")
+					time.Sleep(50 * time.Millisecond)
+					continue
+				}
+				fmt.Println("Unexpected error (most likely contract related), no point in retrying:", err)
+				return nil, err
+			}
+			// Not an RPC error — should only happen when we fail to hit the rpc service
+			fmt.Println("Unexpected error (could not hit rpc service), retrying:", err)
+			time.Sleep(transactionConfigs.RetryDelay)
 			continue
 		}
 		// no error = success
 		break
-	}
-
-	// If tx failed with rpc error, we should not retry as confirmation will never happen
-	if err != nil {
-		fmt.Println("Error sending transaction after retries:", err)
-		return nil, err
 	}
 
 	var txStatus rpc.ConfirmationStatusType
@@ -234,13 +247,13 @@ func sendTransactionWithLookupTables(ctx context.Context, rpcClient *rpc.Client,
 		statusRes, sigErr := rpcClient.GetSignatureStatuses(ctx, true, txsig)
 		if sigErr != nil {
 			fmt.Println(sigErr) // debugging if tx errors; mainnet can be flakey
-			time.Sleep(50 * time.Millisecond)
+			time.Sleep(transactionConfigs.RetryDelay)
 			continue
 		}
 		if statusRes != nil && len(statusRes.Value) > 0 && statusRes.Value[0] != nil {
 			txStatus = statusRes.Value[0].ConfirmationStatus
 		}
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(transactionConfigs.RetryDelay)
 	}
 
 	v := uint64(0)
@@ -253,7 +266,7 @@ func sendTransactionWithLookupTables(ctx context.Context, rpcClient *rpc.Client,
 		})
 		if errGetTx != nil {
 			fmt.Println("Error getting transaction:", errGetTx)
-			time.Sleep(50 * time.Millisecond)
+			time.Sleep(transactionConfigs.RetryDelay)
 			continue
 		}
 		break

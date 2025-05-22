@@ -30,6 +30,7 @@ import (
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	ocrtypecodec "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
@@ -315,6 +316,7 @@ func (p *Plugin) getPriceRelatedObservations(
 	prevOutcome committypes.Outcome,
 	decodedQ committypes.Query,
 ) (tokenprice.Observation, chainfee.Observation) {
+	invalidatePriceCache := false
 	waitingForPriceUpdatesToMakeItOnchain := prevOutcome.MainOutcome.InflightPriceOcrSequenceNumber > 0
 
 	// If we are waiting for price updates to make it onchain, but we have no more checks remaining, stop waiting.
@@ -343,6 +345,7 @@ func (p *Plugin) getPriceRelatedObservations(
 
 		if cciptypes.SeqNum(latestPriceOcrSeqNum) >= prevOutcome.MainOutcome.InflightPriceOcrSequenceNumber {
 			lggr.Infow("previous price report made it through", "ocrSeqNum", latestPriceOcrSeqNum)
+			invalidatePriceCache = true
 			waitingForPriceUpdatesToMakeItOnchain = false
 		}
 	}
@@ -368,6 +371,8 @@ func (p *Plugin) getPriceRelatedObservations(
 
 	wg := sync.WaitGroup{}
 	wg.Add(2)
+
+	ctx = context.WithValue(ctx, consts.InvalidateCacheKey, invalidatePriceCache)
 
 	go func() {
 		defer wg.Done()
