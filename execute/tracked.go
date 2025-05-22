@@ -101,5 +101,8 @@ func currentState(p *TrackedPlugin, outctx ocr3types.OutcomeContext) exectypes.P
 		p.lggr.Errorw("unable to get state", "error", err)
 		return exectypes.Unknown
 	}
+
+	// TODO: Support "Reports" field.
+
 	return out.State.Next()
 }

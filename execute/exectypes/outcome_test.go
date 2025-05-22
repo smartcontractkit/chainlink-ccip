@@ -126,7 +126,7 @@ func TestNewSortedOutcome(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := NewSortedOutcome(Unknown, tt.pendingCommits, tt.report)
+			got := NewSortedOutcome(Unknown, tt.pendingCommits, tt.report, nil)
 
 			if len(tt.wantCommits) > 0 {
 				require.Equal(t, tt.wantCommits, got.CommitReports)
