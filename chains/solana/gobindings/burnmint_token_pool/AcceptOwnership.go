@@ -10,7 +10,7 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// AcceptOwnership is the `acceptOwnership` instruction.
+// AcceptOwnership is the `accept_ownership` instruction.
 type AcceptOwnership struct {
 
 	// [0] = [WRITE] state
@@ -18,7 +18,7 @@ type AcceptOwnership struct {
 	// [1] = [] mint
 	//
 	// [2] = [SIGNER] authority
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewAcceptOwnershipInstructionBuilder creates a new `AcceptOwnership` instruction builder.
@@ -37,7 +37,7 @@ func (inst *AcceptOwnership) SetStateAccount(state ag_solanago.PublicKey) *Accep
 
 // GetStateAccount gets the "state" account.
 func (inst *AcceptOwnership) GetStateAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
 // SetMintAccount sets the "mint" account.
@@ -48,7 +48,7 @@ func (inst *AcceptOwnership) SetMintAccount(mint ag_solanago.PublicKey) *AcceptO
 
 // GetMintAccount gets the "mint" account.
 func (inst *AcceptOwnership) GetMintAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -59,7 +59,7 @@ func (inst *AcceptOwnership) SetAuthorityAccount(authority ag_solanago.PublicKey
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *AcceptOwnership) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
 func (inst AcceptOwnership) Build() *Instruction {
@@ -108,9 +108,9 @@ func (inst *AcceptOwnership) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("    state", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("     mint", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("    state", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("     mint", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice.Get(2)))
 					})
 				})
 		})

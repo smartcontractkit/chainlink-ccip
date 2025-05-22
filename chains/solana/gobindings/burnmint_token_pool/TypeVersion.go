@@ -18,7 +18,7 @@ import (
 type TypeVersion struct {
 
 	// [0] = [] clock
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewTypeVersionInstructionBuilder creates a new `TypeVersion` instruction builder.
@@ -37,7 +37,7 @@ func (inst *TypeVersion) SetClockAccount(clock ag_solanago.PublicKey) *TypeVersi
 
 // GetClockAccount gets the "clock" account.
 func (inst *TypeVersion) GetClockAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
 func (inst TypeVersion) Build() *Instruction {
@@ -80,7 +80,7 @@ func (inst *TypeVersion) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=1]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("clock", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("clock", inst.AccountMetaSlice.Get(0)))
 					})
 				})
 		})

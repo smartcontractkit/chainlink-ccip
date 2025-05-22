@@ -1,28 +1,76 @@
 {
-  "version": "0.0.0-dev",
-  "name": "test_ccip_invalid_receiver",
+  "address": "FmyF3oW69MSAhyPSiZ69C4RKBdCPv5vAFTScisV7Me2j",
+  "metadata": {
+    "name": "test_ccip_invalid_receiver",
+    "version": "0.0.0-dev",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
   "instructions": [
     {
-      "name": "ccipReceive",
+      "name": "add_offramp",
+      "discriminator": [
+        164,
+        255,
+        154,
+        96,
+        204,
+        239,
+        24,
+        2
+      ],
+      "accounts": [
+        {
+          "name": "allowed_offramp",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "_source_chain_selector",
+          "type": "u64"
+        },
+        {
+          "name": "_offramp",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "ccip_receive",
+      "discriminator": [
+        11,
+        244,
+        9,
+        249,
+        44,
+        83,
+        47,
+        245
+      ],
       "accounts": [
         {
           "name": "authority",
-          "isMut": true,
-          "isSigner": true
+          "writable": true,
+          "signer": true
         },
         {
-          "name": "offrampProgram",
-          "isMut": false,
-          "isSigner": false,
+          "name": "offramp_program",
           "docs": [
             "CHECK offramp program: exists only to derive the allowed offramp PDA",
             "and the authority PDA. Must be second."
           ]
         },
         {
-          "name": "allowedOfframp",
-          "isMut": false,
-          "isSigner": false,
+          "name": "allowed_offramp",
           "docs": [
             "CHECK PDA of the router program verifying the signer is an allowed offramp.",
             "If PDA does not exist, the router doesn't allow this offramp"
@@ -30,298 +78,252 @@
         },
         {
           "name": "counter",
-          "isMut": true,
-          "isSigner": false
+          "writable": true
         },
         {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "system_program"
         }
       ],
       "args": [
         {
-          "name": "message",
+          "name": "_message",
           "type": {
-            "defined": "Any2SVMMessage"
+            "defined": {
+              "name": "Any2SVMMessage"
+            }
           }
         }
       ]
     },
     {
-      "name": "addOfframp",
-      "accounts": [
-        {
-          "name": "allowedOfframp",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
+      "name": "pool_proxy_lock_or_burn",
+      "discriminator": [
+        123,
+        20,
+        147,
+        83,
+        195,
+        25,
+        120,
+        101
       ],
-      "args": [
-        {
-          "name": "sourceChainSelector",
-          "type": "u64"
-        },
-        {
-          "name": "offramp",
-          "type": "publicKey"
-        }
-      ]
-    },
-    {
-      "name": "poolProxyReleaseOrMint",
       "accounts": [
         {
-          "name": "testPool",
-          "isMut": false,
-          "isSigner": false,
+          "name": "test_pool",
           "docs": [
             "CHECK"
           ]
         },
         {
-          "name": "cpiSigner",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "offrampProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "allowedOfframp",
-          "isMut": false,
-          "isSigner": false,
+          "name": "cpi_signer",
           "docs": [
             "CHECK"
           ]
         },
         {
           "name": "state",
-          "isMut": true,
-          "isSigner": false,
           "docs": [
             "CHECK"
-          ]
+          ],
+          "writable": true
         },
         {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false,
+          "name": "token_program",
           "docs": [
             "CHECK"
           ]
         },
         {
           "name": "mint",
-          "isMut": true,
-          "isSigner": false
+          "writable": true
         },
         {
-          "name": "poolSigner",
-          "isMut": false,
-          "isSigner": false,
+          "name": "pool_signer",
           "docs": [
             "CHECK"
           ]
         },
         {
-          "name": "poolTokenAccount",
-          "isMut": true,
-          "isSigner": false
+          "name": "pool_token_account",
+          "writable": true
         },
         {
-          "name": "chainConfig",
-          "isMut": true,
-          "isSigner": false,
+          "name": "rmn_remote",
           "docs": [
             "CHECK"
           ]
         },
         {
-          "name": "rmnRemote",
-          "isMut": false,
-          "isSigner": false,
+          "name": "rmn_remote_curses",
           "docs": [
             "CHECK"
           ]
         },
         {
-          "name": "rmnRemoteCurses",
-          "isMut": false,
-          "isSigner": false,
+          "name": "rmn_remote_config",
           "docs": [
             "CHECK"
           ]
         },
         {
-          "name": "rmnRemoteConfig",
-          "isMut": false,
-          "isSigner": false,
+          "name": "chain_config",
           "docs": [
             "CHECK"
-          ]
-        },
-        {
-          "name": "receiverTokenAccount",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
+          ],
+          "writable": true
         }
       ],
       "args": [
         {
-          "name": "releaseOrMint",
+          "name": "lock_or_burn",
           "type": {
-            "defined": "ReleaseOrMintInV1"
+            "defined": {
+              "name": "LockOrBurnInV1"
+            }
           }
         }
       ],
       "returns": "bytes"
     },
     {
-      "name": "poolProxyLockOrBurn",
+      "name": "pool_proxy_release_or_mint",
+      "discriminator": [
+        22,
+        95,
+        117,
+        49,
+        2,
+        121,
+        100,
+        188
+      ],
       "accounts": [
         {
-          "name": "testPool",
-          "isMut": false,
-          "isSigner": false,
+          "name": "test_pool",
           "docs": [
             "CHECK"
           ]
         },
         {
-          "name": "cpiSigner",
-          "isMut": false,
-          "isSigner": false,
+          "name": "cpi_signer",
+          "docs": [
+            "CHECK"
+          ]
+        },
+        {
+          "name": "offramp_program"
+        },
+        {
+          "name": "allowed_offramp",
           "docs": [
             "CHECK"
           ]
         },
         {
           "name": "state",
-          "isMut": true,
-          "isSigner": false,
           "docs": [
             "CHECK"
-          ]
+          ],
+          "writable": true
         },
         {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false,
+          "name": "token_program",
           "docs": [
             "CHECK"
           ]
         },
         {
           "name": "mint",
-          "isMut": true,
-          "isSigner": false
+          "writable": true
         },
         {
-          "name": "poolSigner",
-          "isMut": false,
-          "isSigner": false,
+          "name": "pool_signer",
           "docs": [
             "CHECK"
           ]
         },
         {
-          "name": "poolTokenAccount",
-          "isMut": true,
-          "isSigner": false
+          "name": "pool_token_account",
+          "writable": true
         },
         {
-          "name": "rmnRemote",
-          "isMut": false,
-          "isSigner": false,
+          "name": "chain_config",
+          "docs": [
+            "CHECK"
+          ],
+          "writable": true
+        },
+        {
+          "name": "rmn_remote",
           "docs": [
             "CHECK"
           ]
         },
         {
-          "name": "rmnRemoteCurses",
-          "isMut": false,
-          "isSigner": false,
+          "name": "rmn_remote_curses",
           "docs": [
             "CHECK"
           ]
         },
         {
-          "name": "rmnRemoteConfig",
-          "isMut": false,
-          "isSigner": false,
+          "name": "rmn_remote_config",
           "docs": [
             "CHECK"
           ]
         },
         {
-          "name": "chainConfig",
-          "isMut": true,
-          "isSigner": false,
+          "name": "receiver_token_account",
           "docs": [
             "CHECK"
-          ]
+          ],
+          "writable": true
         }
       ],
       "args": [
         {
-          "name": "lockOrBurn",
+          "name": "release_or_mint",
           "type": {
-            "defined": "LockOrBurnInV1"
+            "defined": {
+              "name": "ReleaseOrMintInV1"
+            }
           }
         }
       ],
       "returns": "bytes"
     },
     {
-      "name": "receiverProxyExecute",
+      "name": "receiver_proxy_execute",
+      "discriminator": [
+        99,
+        169,
+        76,
+        14,
+        44,
+        89,
+        147,
+        67
+      ],
       "accounts": [
         {
-          "name": "testReceiver",
-          "isMut": false,
-          "isSigner": false,
+          "name": "test_receiver",
           "docs": [
             "CHECK"
           ]
         },
         {
-          "name": "cpiSigner",
-          "isMut": false,
-          "isSigner": false,
+          "name": "cpi_signer",
           "docs": [
             "CHECK"
           ]
         },
         {
-          "name": "offrampProgram",
-          "isMut": false,
-          "isSigner": false,
+          "name": "offramp_program",
           "docs": [
             "CHECK"
           ]
         },
         {
-          "name": "allowedOfframp",
-          "isMut": false,
-          "isSigner": false,
+          "name": "allowed_offramp",
           "docs": [
             "CHECK"
           ]
@@ -331,7 +333,9 @@
         {
           "name": "message",
           "type": {
-            "defined": "Any2SVMMessage"
+            "defined": {
+              "name": "Any2SVMMessage"
+            }
           }
         }
       ]
@@ -340,9 +344,76 @@
   "accounts": [
     {
       "name": "AllowedOfframp",
+      "discriminator": [
+        247,
+        97,
+        179,
+        16,
+        207,
+        36,
+        236,
+        132
+      ]
+    },
+    {
+      "name": "Counter",
+      "discriminator": [
+        255,
+        176,
+        4,
+        245,
+        188,
+        253,
+        124,
+        25
+      ]
+    }
+  ],
+  "types": [
+    {
+      "name": "AllowedOfframp",
       "type": {
         "kind": "struct",
         "fields": []
+      }
+    },
+    {
+      "name": "Any2SVMMessage",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "message_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "source_chain_selector",
+            "type": "u64"
+          },
+          {
+            "name": "sender",
+            "type": "bytes"
+          },
+          {
+            "name": "data",
+            "type": "bytes"
+          },
+          {
+            "name": "token_amounts",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "SVMTokenAmount"
+                }
+              }
+            }
+          }
+        ]
       }
     },
     {
@@ -353,60 +424,6 @@
           {
             "name": "value",
             "type": "u8"
-          }
-        ]
-      }
-    }
-  ],
-  "types": [
-    {
-      "name": "ReleaseOrMintInV1",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "originalSender",
-            "type": "bytes"
-          },
-          {
-            "name": "remoteChainSelector",
-            "type": "u64"
-          },
-          {
-            "name": "receiver",
-            "type": "publicKey"
-          },
-          {
-            "name": "amount",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
-            "name": "localToken",
-            "type": "publicKey"
-          },
-          {
-            "name": "sourcePoolAddress",
-            "docs": [
-              "@dev WARNING: sourcePoolAddress should be checked prior to any processing of funds. Make sure it matches the",
-              "expected pool address for the given remoteChainSelector."
-            ],
-            "type": "bytes"
-          },
-          {
-            "name": "sourcePoolData",
-            "type": "bytes"
-          },
-          {
-            "name": "offchainTokenData",
-            "docs": [
-              "@dev WARNING: offchainTokenData is untrusted data."
-            ],
-            "type": "bytes"
           }
         ]
       }
@@ -421,20 +438,88 @@
             "type": "bytes"
           },
           {
-            "name": "remoteChainSelector",
+            "name": "remote_chain_selector",
             "type": "u64"
           },
           {
-            "name": "originalSender",
-            "type": "publicKey"
+            "name": "original_sender",
+            "type": "pubkey"
           },
           {
             "name": "amount",
             "type": "u64"
           },
           {
-            "name": "localToken",
-            "type": "publicKey"
+            "name": "local_token",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ReleaseOrMintInV1",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "original_sender",
+            "type": "bytes"
+          },
+          {
+            "name": "remote_chain_selector",
+            "type": "u64"
+          },
+          {
+            "name": "receiver",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "local_token",
+            "type": "pubkey"
+          },
+          {
+            "name": "source_pool_address",
+            "docs": [
+              "@dev WARNING: sourcePoolAddress should be checked prior to any processing of funds. Make sure it matches the",
+              "expected pool address for the given remoteChainSelector."
+            ],
+            "type": "bytes"
+          },
+          {
+            "name": "source_pool_data",
+            "type": "bytes"
+          },
+          {
+            "name": "offchain_token_data",
+            "docs": [
+              "@dev WARNING: offchainTokenData is untrusted data."
+            ],
+            "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SVMTokenAmount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "token",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
           }
         ]
       }

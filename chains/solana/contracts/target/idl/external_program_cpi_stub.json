@@ -1,91 +1,72 @@
 {
-  "version": "0.0.0-dev",
-  "name": "external_program_cpi_stub",
+  "address": "2zZwzyptLqwFJFEFxjPvrdhiGpH9pJ3MfrrmZX6NTKxm",
+  "metadata": {
+    "name": "external_program_cpi_stub",
+    "version": "0.0.0-dev",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
   "instructions": [
     {
-      "name": "initialize",
+      "name": "account_mut",
+      "discriminator": [
+        12,
+        2,
+        137,
+        19,
+        22,
+        235,
+        144,
+        70
+      ],
       "accounts": [
         {
-          "name": "u8Value",
-          "isMut": true,
-          "isSigner": false
+          "name": "u8_value",
+          "writable": true
         },
         {
-          "name": "stubCaller",
-          "isMut": true,
-          "isSigner": true
+          "name": "stub_caller",
+          "signer": true
         },
         {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "system_program"
         }
       ],
       "args": []
     },
     {
-      "name": "empty",
-      "accounts": [],
-      "args": []
-    },
-    {
-      "name": "u8InstructionData",
-      "accounts": [],
-      "args": [
-        {
-          "name": "data",
-          "type": "u8"
-        }
-      ]
-    },
-    {
-      "name": "structInstructionData",
-      "accounts": [],
-      "args": [
-        {
-          "name": "data",
-          "type": {
-            "defined": "Value"
-          }
-        }
-      ]
-    },
-    {
-      "name": "accountRead",
+      "name": "account_read",
+      "discriminator": [
+        79,
+        53,
+        80,
+        124,
+        182,
+        81,
+        206,
+        85
+      ],
       "accounts": [
         {
-          "name": "u8Value",
-          "isMut": false,
-          "isSigner": false
+          "name": "u8_value"
         }
       ],
       "args": []
     },
     {
-      "name": "accountMut",
-      "accounts": [
-        {
-          "name": "u8Value",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "stubCaller",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "bigInstructionData",
+      "name": "big_instruction_data",
       "docs": [
         "instruction that accepts arbitrarily large instruction data."
+      ],
+      "discriminator": [
+        250,
+        215,
+        200,
+        174,
+        42,
+        217,
+        129,
+        182
       ],
       "accounts": [],
       "args": [
@@ -96,15 +77,17 @@
       ]
     },
     {
-      "name": "noOp",
-      "docs": [
-        "no-op instruction that does nothing, also can be used to test maximum account references(remaining_accounts)"
+      "name": "compute_heavy",
+      "discriminator": [
+        114,
+        240,
+        76,
+        252,
+        181,
+        175,
+        211,
+        78
       ],
-      "accounts": [],
-      "args": []
-    },
-    {
-      "name": "computeHeavy",
       "accounts": [],
       "args": [
         {
@@ -112,9 +95,129 @@
           "type": "u32"
         }
       ]
+    },
+    {
+      "name": "empty",
+      "discriminator": [
+        214,
+        44,
+        4,
+        247,
+        12,
+        41,
+        217,
+        110
+      ],
+      "accounts": [],
+      "args": []
+    },
+    {
+      "name": "initialize",
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "u8_value",
+          "writable": true
+        },
+        {
+          "name": "stub_caller",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "no_op",
+      "docs": [
+        "no-op instruction that does nothing, also can be used to test maximum account references(remaining_accounts)"
+      ],
+      "discriminator": [
+        36,
+        122,
+        159,
+        43,
+        166,
+        240,
+        121,
+        88
+      ],
+      "accounts": [],
+      "args": []
+    },
+    {
+      "name": "struct_instruction_data",
+      "discriminator": [
+        132,
+        84,
+        80,
+        47,
+        117,
+        198,
+        94,
+        67
+      ],
+      "accounts": [],
+      "args": [
+        {
+          "name": "data",
+          "type": {
+            "defined": {
+              "name": "Value"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "u8_instruction_data",
+      "discriminator": [
+        17,
+        175,
+        156,
+        253,
+        91,
+        173,
+        26,
+        228
+      ],
+      "accounts": [],
+      "args": [
+        {
+          "name": "data",
+          "type": "u8"
+        }
+      ]
     }
   ],
   "accounts": [
+    {
+      "name": "Value",
+      "discriminator": [
+        135,
+        158,
+        244,
+        117,
+        72,
+        203,
+        24,
+        194
+      ]
+    }
+  ],
+  "types": [
     {
       "name": "Value",
       "type": {
