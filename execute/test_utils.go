@@ -234,6 +234,7 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 	cfg := pluginconfig.ExecuteOffchainConfig{
 		MessageVisibilityInterval: *commonconfig.MustNewDuration(8 * time.Hour),
 		BatchGasLimit:             100000000,
+		MaxCommitReportsToFetch:   10,
 	}
 	chainConfigInfos := []reader.ChainConfigInfo{
 		{

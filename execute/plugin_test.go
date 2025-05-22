@@ -44,6 +44,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	reader2 "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
 func genRandomChainReports(numReports, numMsgsPerReport int) []cciptypes.ExecutePluginReportSingleChain {
@@ -793,29 +794,140 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 			wantExecutedUnfinalized: nil,
 			wantErr:                 assert.NoError,
 		},
+		{
+			name: "filters_price_reports_and_processes_merkle_report",
+			reports: []cciptypes.CommitPluginReportWithMeta{
+				// Price report 1 (no Merkle roots)
+				{
+					BlockNum:  1000,
+					Timestamp: time.UnixMilli(10101010101),
+					Report: cciptypes.CommitPluginReport{
+						BlessedMerkleRoots: nil, // Indicates a price-only report or similar non-executable
+					},
+				},
+				// Price report 2 (no Merkle roots)
+				{
+					BlockNum:  1001,
+					Timestamp: time.UnixMilli(10101010102),
+					Report: cciptypes.CommitPluginReport{
+						BlessedMerkleRoots: []cciptypes.MerkleRootChain{}, // Also indicates non-executable for messages
+					},
+				},
+				// Report with an actual Merkle root
+				{
+					BlockNum:  1002,
+					Timestamp: time.UnixMilli(10101010103),
+					Report: cciptypes.CommitPluginReport{
+						BlessedMerkleRoots: []cciptypes.MerkleRootChain{
+							{
+								ChainSel:     1, // Source chain selector
+								SeqNumsRange: cciptypes.NewSeqNumRange(1, 10),
+								MerkleRoot:   cciptypes.Bytes32{0x01}, // Example Merkle root
+							},
+						},
+					},
+				},
+			},
+			ranges:             nil, // No finalized messages for this new report
+			unfinalizedRanges:  nil, // No unfinalized messages for this new report
+			cursedSourceChains: nil,
+			fetchFrom:          time.Time{},
+			canExec:            canExecute(true), // Assume the Merkle root is executable
+			wantObs: exectypes.CommitObservations{
+				1: []exectypes.CommitData{ // Expecting only the report with the Merkle root to be processed
+					{
+						SourceChain:         1,
+						SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10),
+						Timestamp:           time.UnixMilli(10101010103),
+						BlockNum:            1002,
+						MerkleRoot:          cciptypes.Bytes32{0x01},
+					},
+				},
+			},
+			wantExecutedFinalized:   nil,
+			wantExecutedUnfinalized: nil,
+			wantErr:                 assert.NoError,
+		},
+		{ // New test case for progress with low limit due to cache advancing
+			name: "progress_with_low_limit_due_to_cache_advancing",
+			// reports that the mockReader.CommitReportsGTETimestamp should return in this specific call
+			reports: []cciptypes.CommitPluginReportWithMeta{
+				{
+					BlockNum:  1002,
+					Timestamp: time.UnixMilli(10101010103), // Timestamp of the executable report
+					Report: cciptypes.CommitPluginReport{
+						BlessedMerkleRoots: []cciptypes.MerkleRootChain{
+							{
+								ChainSel:     1,
+								SeqNumsRange: cciptypes.NewSeqNumRange(1, 10),
+								MerkleRoot:   cciptypes.Bytes32{0x01},
+							},
+						},
+					},
+				},
+			},
+			ranges:             nil,
+			unfinalizedRanges:  nil,
+			cursedSourceChains: nil,
+			fetchFrom:          time.UnixMilli(10101010000), // Broader visibility window
+			canExec:            canExecute(true),
+			wantObs: exectypes.CommitObservations{
+				1: []exectypes.CommitData{
+					{
+						SourceChain:         1,
+						SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10),
+						Timestamp:           time.UnixMilli(10101010103),
+						BlockNum:            1002,
+						MerkleRoot:          cciptypes.Bytes32{0x01},
+					},
+				},
+			},
+			wantExecutedFinalized:   nil,
+			wantExecutedUnfinalized: nil,
+			wantErr:                 assert.NoError,
+		},
 	}
 
 	for _, tt := range tcs {
 		t.Run(tt.name, func(t *testing.T) {
+			currentTestLogger := logger.Test(t)
 			if tt.canExec == nil {
 				tt.canExec = canExecute(true)
 			}
 
-			// Create a mock CCIPReader
 			mockReader := readerpkg_mock.NewMockCCIPReader(t)
+			var mockCache cache.CommitReportCache = &noopCommitReportCache{}
 
-			// Create a noopCommitReportCache instead of a mock
-			mockCache := &noopCommitReportCache{}
+			offchainConfigForTest := pluginconfig.ExecuteOffchainConfig{MaxCommitReportsToFetch: 10} // Default for most tests
 
-			// Setup expectations for the CCIPReader
-			mockReader.EXPECT().CommitReportsGTETimestamp(
-				mock.Anything,
-				mock.Anything, // We don't care about the exact timestamp here
-				primitives.Unconfirmed,
-				mock.Anything,
-			).Return(tt.reports, nil)
+			if tt.name == "progress_with_low_limit_due_to_cache_advancing" {
+				configurableCache := &configurableCommitReportCache{
+					reportsToQueryFrom:    time.UnixMilli(10101010102), // Advanced timestamp
+					cachedReportsToReturn: []cciptypes.CommitPluginReportWithMeta{},
+					lggr:                  currentTestLogger,
+				}
+				// For this specific test, DeduplicateReports should directly return what CommitReportsGTETimestamp returns
+				// as we assume cachedReportsToReturn is empty and the new reports are tt.reports.
+				configurableCache.deduplicateShouldReturn = tt.reports
+				mockCache = configurableCache
+				offchainConfigForTest.MaxCommitReportsToFetch = 1 // Crucial for this test case
 
-			// Set up finalized messages mock
+				mockReader.EXPECT().CommitReportsGTETimestamp(
+					mock.Anything,               // context
+					time.UnixMilli(10101010102), // Expecting the advanced timestamp from cache
+					primitives.Unconfirmed,
+					int(1), // Expecting the low fetch limit
+				).Return(tt.reports, nil)
+			} else {
+				// Default mock setup for other tests
+				mockReader.EXPECT().CommitReportsGTETimestamp(
+					mock.Anything,
+					mock.Anything,
+					primitives.Unconfirmed,
+					mock.Anything, // Most tests use a default MaxCommitReportsToFetch or don't care about this specific arg
+				).Return(tt.reports, nil)
+			}
+
 			executed := make(map[cciptypes.ChainSelector][]cciptypes.SeqNum)
 			for k, v := range tt.ranges {
 				if _, exists := executed[k]; !exists {
@@ -825,7 +937,6 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 			}
 			mockReader.EXPECT().ExecutedMessages(mock.Anything, mock.Anything, primitives.Finalized).Return(executed, nil)
 
-			// Set up unfinalized messages mock
 			unfinalized := make(map[cciptypes.ChainSelector][]cciptypes.SeqNum)
 			for k, v := range tt.unfinalizedRanges {
 				if _, exists := unfinalized[k]; !exists {
@@ -842,7 +953,8 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 				tt.canExec,
 				tt.fetchFrom,
 				tt.cursedSourceChains,
-				logger.Test(t),
+				int(offchainConfigForTest.MaxCommitReportsToFetch), // limit int
+				currentTestLogger, // lggr logger.Logger
 			)
 			if !tt.wantErr(t, err, "getPendingReportsForExecution(...)") {
 				return
@@ -2035,4 +2147,34 @@ func TestCommitRootsCache_SkippedRootScenario(t *testing.T) {
 		assert.False(t, cache.CanExecute(selector, root3),
 			"Root3 should not be executable")
 	})
+}
+
+// configurableCommitReportCache is a mock for testing specific cache behaviors.
+// Define this near Test_getPendingReportsForExecution or in a test helper section
+type configurableCommitReportCache struct {
+	reportsToQueryFrom      time.Time
+	cachedReportsToReturn   []cciptypes.CommitPluginReportWithMeta
+	lggr                    logger.Logger
+	deduplicateShouldReturn []cciptypes.CommitPluginReportWithMeta // Control what DeduplicateReports returns
+}
+
+func (c *configurableCommitReportCache) RefreshCache(ctx context.Context) error { return nil }
+func (c *configurableCommitReportCache) GetReportsToQueryFromTimestamp() time.Time {
+	return c.reportsToQueryFrom
+}
+func (c *configurableCommitReportCache) GetCachedReports(
+	fromTimestamp time.Time) []cciptypes.CommitPluginReportWithMeta {
+	return c.cachedReportsToReturn
+}
+func (c *configurableCommitReportCache) DeduplicateReports(
+	reports []cciptypes.CommitPluginReportWithMeta,
+) []cciptypes.CommitPluginReportWithMeta {
+	if c.deduplicateShouldReturn != nil {
+		return c.deduplicateShouldReturn
+	}
+	// Fallback to real deduplication if not overridden, requires lggr to be set.
+	if c.lggr != nil {
+		return cache.DeduplicateReports(c.lggr, reports)
+	}
+	return reports // Or panic, or handle error, if lggr is essential but not provided
 }

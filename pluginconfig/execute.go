@@ -8,6 +8,10 @@ import (
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 )
 
+const (
+	defaultMaxCommitReportsToFetch = 250
+)
+
 // ExecuteOffchainConfig is the OCR offchainConfig for the exec plugin.
 // This is posted onchain as part of the OCR configuration process of the exec plugin.
 // Every plugin is provided this configuration in its encoded form in the NewReportingPlugin
@@ -45,6 +49,9 @@ type ExecuteOffchainConfig struct {
 	// MaxSingleChainReports is the maximum number of single chain reports that can be included in a report.
 	// When set to 0, this setting is ignored.
 	MaxSingleChainReports uint64 `json:"maxSingleChainReports"`
+
+	// MaxCommitReportsToFetch is the maximum number of commit reports that can be fetched in each round.
+	MaxCommitReportsToFetch uint64 `json:"maxCommitReportsToFetch"`
 }
 
 func (e *ExecuteOffchainConfig) ApplyDefaultsAndValidate() error {
@@ -55,6 +62,9 @@ func (e *ExecuteOffchainConfig) ApplyDefaultsAndValidate() error {
 func (e *ExecuteOffchainConfig) applyDefaults() {
 	if e.TransmissionDelayMultiplier == 0 {
 		e.TransmissionDelayMultiplier = defaultTransmissionDelayMultiplier
+	}
+	if e.MaxCommitReportsToFetch == 0 {
+		e.MaxCommitReportsToFetch = defaultMaxCommitReportsToFetch
 	}
 }
 
@@ -76,6 +86,10 @@ func (e *ExecuteOffchainConfig) Validate() error {
 
 	if e.MessageVisibilityInterval.Duration() == 0 {
 		return errors.New("MessageVisibilityInterval not set")
+	}
+
+	if e.MaxCommitReportsToFetch == 0 {
+		return errors.New("MaxCommitReportsToFetch not set")
 	}
 
 	set := make(map[string]struct{})
