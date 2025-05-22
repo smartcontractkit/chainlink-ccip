@@ -9,7 +9,7 @@ use crate::context::*;
 #[program]
 pub mod test_token_pool {
     use anchor_lang::solana_program::{instruction::Instruction, program::invoke_signed};
-    use burnmint_token_pool::{burn_tokens, mint_tokens};
+    use burnmint_token_pool::{burn_tokens, mint_tokens, MintTokenAccountsInfo};
     use lockrelease_token_pool::{lock_tokens, release_tokens};
 
     use super::*;
@@ -19,9 +19,11 @@ pub mod test_token_pool {
         pool_type: PoolType,
         router: Pubkey,
         rmn_remote: Pubkey,
+        multisig: bool,
     ) -> Result<()> {
         ctx.accounts.state.set_inner(State {
             pool_type,
+            multisig,
             config: BaseConfig::init(
                 &ctx.accounts.mint,
                 ctx.program_id.key(),
@@ -166,12 +168,24 @@ pub mod test_token_pool {
             )?,
             PoolType::BurnAndMint => mint_tokens(
                 ctx.accounts.token_program.key(),
-                ctx.accounts.receiver_token_account.to_account_info(),
-                ctx.accounts.mint.to_account_info(),
-                ctx.accounts.pool_signer.to_account_info(),
-                ctx.bumps.pool_signer,
                 release_or_mint,
                 parsed_amount,
+                MintTokenAccountsInfo {
+                    receiver_token_account: ctx.accounts.receiver_token_account.to_account_info(),
+                    mint: ctx.accounts.mint.to_account_info(),
+                    pool_signer: ctx.accounts.pool_signer.to_account_info(),
+                    pool_signer_bump: ctx.bumps.pool_signer,
+                    multisig: if ctx.accounts.state.multisig {
+                        Some(
+                            ctx.remaining_accounts
+                                .get(0)
+                                .ok_or(CcipTokenPoolError::InvalidInputs)?
+                                .clone(),
+                        )
+                    } else {
+                        None
+                    },
+                },
             )?,
             PoolType::Wrapped => {
                 // The External Execution Config Account is used to sign the CPI instruction
@@ -320,6 +334,7 @@ pub mod test_token_pool {
 #[derive(InitSpace)]
 pub struct State {
     pub pool_type: PoolType,
+    pub multisig: bool,
     pub config: BaseConfig,
 }
 

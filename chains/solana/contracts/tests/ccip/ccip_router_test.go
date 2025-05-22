@@ -101,6 +101,8 @@ func TestCCIPRouter(t *testing.T) {
 	// Random-generated key, but fixing it adds determinism to tests to make it easier to debug.
 	linkMintPrivK := solana.MustPrivateKeyFromBase58("32YVeJArcWWWV96fztfkRQhohyFz5Hwno93AeGVrN4g2LuFyvwznrNd9A6tbvaTU6BuyBsynwJEMLre8vSy3CrVU")
 
+	token0Multisig := solana.MustPrivateKeyFromBase58("5BayUa1C1nfiSptuV521hYPKZZsjHJM5YDfWZJkyrDgnEhzvZS4x5Nuqn6n4E6anuqAc7dJpAr1faNUwyK99cf3C") // EkopXthh6nbLKkgEnACc94mygKsSfcaX4EjXLgt1LiR4
+
 	token0Mint := solana.MustPrivateKeyFromBase58("42uJJqZk4gFz6Q6ghMiaYrFdDapXhbufQdTCGJDMeyv2wN6wNBbXkBBPibF7xQQZemzRaDH66ouJmjfvWhPJKtQC")
 	token0, gerr := tokens.NewTokenPool(config.Token2022Program, config.CcipTokenPoolProgram, token0Mint.PublicKey())
 	require.NoError(t, gerr)
@@ -382,6 +384,10 @@ func TestCCIPRouter(t *testing.T) {
 			ix0, ixErr0 := tokens.CreateToken(ctx, token0.Program, token0.Mint, token0PoolAdmin.PublicKey(), token0Decimals, solanaGoClient, config.DefaultCommitment)
 			require.NoError(t, ixErr0)
 
+			ixMsig, ixErrMsig := tokens.CreateMultisig(ctx, user.PublicKey(), token0.Program, token0Multisig.PublicKey(), []solana.PublicKey{token0PoolAdmin.PublicKey(), token0.PoolSigner}, solanaGoClient, config.DefaultCommitment)
+			require.NoError(t, ixErrMsig)
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, ixMsig, token0PoolAdmin, config.DefaultCommitment, common.AddSigners(token0Multisig, user))
+
 			ix1, ixErr1 := tokens.CreateToken(ctx, token1.Program, token1.Mint, token1PoolAdmin.PublicKey(), token1Decimals, solanaGoClient, config.DefaultCommitment)
 			require.NoError(t, ixErr1)
 
@@ -432,7 +438,7 @@ func TestCCIPRouter(t *testing.T) {
 		})
 
 		t.Run("token-pool", func(t *testing.T) {
-			token0.AdditionalAccounts = append(token0.AdditionalAccounts, solana.MemoProgramID) // add test additional accounts in pool interactions
+			token0.AdditionalAccounts = append(token0.AdditionalAccounts, token0Multisig.PublicKey()) // add test additional accounts in pool interactions
 
 			type ProgramData struct {
 				DataType uint32
@@ -451,6 +457,7 @@ func TestCCIPRouter(t *testing.T) {
 				test_token_pool.BurnAndMint_PoolType,
 				config.CcipRouterProgram,
 				config.RMNRemoteProgram,
+				true,
 				token0.PoolConfig,
 				token0.Mint,
 				legacyAdmin.PublicKey(),
@@ -464,6 +471,7 @@ func TestCCIPRouter(t *testing.T) {
 				test_token_pool.BurnAndMint_PoolType,
 				config.CcipRouterProgram,
 				config.RMNRemoteProgram,
+				false,
 				token1.PoolConfig,
 				token1.Mint,
 				legacyAdmin.PublicKey(),
@@ -477,6 +485,7 @@ func TestCCIPRouter(t *testing.T) {
 				test_token_pool.BurnAndMint_PoolType,
 				config.CcipRouterProgram,
 				config.RMNRemoteProgram,
+				false,
 				token2.PoolConfig,
 				token2.Mint,
 				legacyAdmin.PublicKey(),
@@ -490,6 +499,7 @@ func TestCCIPRouter(t *testing.T) {
 				test_token_pool.BurnAndMint_PoolType,
 				config.CcipRouterProgram,
 				config.RMNRemoteProgram,
+				false,
 				linkPool.PoolConfig,
 				linkPool.Mint,
 				legacyAdmin.PublicKey(),
@@ -560,7 +570,7 @@ func TestCCIPRouter(t *testing.T) {
 			linkPool.PoolTokenAccount = addrLink
 			linkPool.User[linkPool.PoolSigner] = linkPool.PoolTokenAccount
 
-			ixAuth, err := tokens.SetTokenMintAuthority(token0.Program, token0.PoolSigner, token0.Mint, token0PoolAdmin.PublicKey())
+			ixAuth, err := tokens.SetTokenMintAuthority(token0.Program, token0Multisig.PublicKey(), token0.Mint, token0PoolAdmin.PublicKey())
 			require.NoError(t, err)
 
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ixInit0, ixInit1, ixInit2, ixInitLink}, legacyAdmin, config.DefaultCommitment)
