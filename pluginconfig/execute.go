@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	defaultMaxCommitReportsToFetch = 500
+	defaultMaxCommitReportsToFetch = 250
 )
 
 // ExecuteOffchainConfig is the OCR offchainConfig for the exec plugin.
