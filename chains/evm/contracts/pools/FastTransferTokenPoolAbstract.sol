@@ -17,7 +17,7 @@ import {IERC20} from
 /// @title Abstract Fast-Transfer Pool
 /// @notice Base contract for fast-transfer pools that provides common functionality
 ///         for quoting, fill-tracking, and CCIP send helpers.
-abstract contract AbstractFastTransferPool is CCIPReceiver, Ownable2StepMsgSender, ITypeAndVersion, IFastTransferPool {
+abstract contract FastTransferTokenPoolAbstract is CCIPReceiver, ITypeAndVersion, IFastTransferPool {
   error WhitelistNotEnabled();
   error InvalidSourcePoolAddress(bytes sender);
 
@@ -63,12 +63,6 @@ abstract contract AbstractFastTransferPool is CCIPReceiver, Ownable2StepMsgSende
     return s_fastTransferLaneConfig[chainSelector].destinationPool;
   }
 
-  /// @notice Transfers tokens from the filler to the receiver
-  /// @param filler The address of the filler
-  /// @param receiver The address of the receiver
-  /// @param amount The amount to transfer
-  function _transferFromFiller(address filler, address receiver, uint256 amount) internal virtual;
-
   /// @notice Sets the lane configuration
   /// @param dst The destination chain selector
   /// @param bps The fee basis points (0-10000)
@@ -84,7 +78,8 @@ abstract contract AbstractFastTransferPool is CCIPReceiver, Ownable2StepMsgSende
     uint256 fillAmountMaxPerRequest,
     address[] memory addFillers,
     address[] memory removeFillers
-  ) external virtual onlyOwner {
+  ) external virtual {
+    _checkAdmin();
     if (bps > 10_000) revert InvalidLaneConfig();
     LaneConfig storage laneConfig = s_fastTransferLaneConfig[dst];
     laneConfig.destinationPool = destinationPool;
@@ -108,7 +103,8 @@ abstract contract AbstractFastTransferPool is CCIPReceiver, Ownable2StepMsgSende
     uint64 dst,
     address[] memory addFillers,
     address[] memory removeFillers
-  ) external virtual onlyOwner {
+  ) external virtual {
+    _checkAdmin();
     LaneConfig storage laneConfig = s_fastTransferLaneConfig[dst];
     for (uint256 i; i < addFillers.length; ++i) {
       laneConfig.fillerWhitelist[addFillers[i]] = true;
@@ -240,7 +236,7 @@ abstract contract AbstractFastTransferPool is CCIPReceiver, Ownable2StepMsgSende
 
     // not fast-filled
     if (filler == address(0)) {
-      _settle(address(uint160(uint256(bytes32(mintMsg.receiver)))), mintMsg.amountToTransfer + mintMsg.fastTransferFee);
+      _settle(message.sourceChainSelector, address(uint160(uint256(bytes32(mintMsg.receiver)))), mintMsg.amountToTransfer + mintMsg.fastTransferFee, true);
     }
     // already finalized
     else if (filler == address(1)) {
@@ -249,7 +245,7 @@ abstract contract AbstractFastTransferPool is CCIPReceiver, Ownable2StepMsgSende
     // fast-filled; verify amount
     else {
       // Honest filler -> pay them back + fee
-      _settle(filler, mintMsg.amountToTransfer + mintMsg.fastTransferFee);
+      _settle(message.sourceChainSelector, filler, filler, mintMsg.amountToTransfer + mintMsg.fastTransferFee, false);
     }
     // Mark completed
     s_fills[fillId] = address(1); //sentinel value
@@ -257,9 +253,26 @@ abstract contract AbstractFastTransferPool is CCIPReceiver, Ownable2StepMsgSende
     emit FastFillCompleted(message.messageId);
   }
 
-  /// @notice Override this function in your implementation.
-  function _handleTokenToTransfer(address sender, uint256 amount) internal virtual;
+  /// @notice Handles the token to transfer on fast fill request at source chain
+  /// @param destinationChainSelector The destination chain selector to which the fast fill request is sent
+  /// @param sender The sender address
+  /// @param amount The amount to transfer
+  function _handleTokenToTransfer(uint64 destinationChainSelector, address sender, uint256 amount) internal virtual;
+
+  /// @notice Transfers tokens from the filler to the receiver
+  /// @param filler The address of the filler
+  /// @param receiver The address of the receiver
+  /// @param amount The amount to transfer
+  function _transferFromFiller(address filler, address receiver, uint256 amount) internal virtual;
+
+  /// @notice Handles the settlement of a fast fill request at destination chain
+  /// @param sourceChainSelector The source chain of the fast fill request
+  /// @param filler The filler of the fast fill request
+  /// @param settlementReceiver The receiver of settlement on destination chain
+  /// @param amount The amount to settle
+  function _settle(uint64 sourceChainSelector, address settlementReceiver, uint256 amount, bool shouldConsumeRateLimit) internal virtual;
 
   /// @notice Override this function in your implementation.
-  function _settle(address receiver, uint256 amount) internal virtual;
+  /// @dev The check is dependent on the ownership implementation of the pool, we do not enforce the ownership implementation here
+  function _checkAdmin() internal view virtual;
 }
