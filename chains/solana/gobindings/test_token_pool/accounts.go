@@ -9,7 +9,6 @@ import (
 
 type State struct {
 	PoolType PoolType
-	Multisig bool
 	Config   BaseConfig
 }
 
@@ -23,11 +22,6 @@ func (obj State) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	}
 	// Serialize `PoolType` param:
 	err = encoder.Encode(obj.PoolType)
-	if err != nil {
-		return err
-	}
-	// Serialize `Multisig` param:
-	err = encoder.Encode(obj.Multisig)
 	if err != nil {
 		return err
 	}
@@ -55,11 +49,6 @@ func (obj *State) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	}
 	// Deserialize `PoolType`:
 	err = decoder.Decode(&obj.PoolType)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Multisig`:
-	err = decoder.Decode(&obj.Multisig)
 	if err != nil {
 		return err
 	}

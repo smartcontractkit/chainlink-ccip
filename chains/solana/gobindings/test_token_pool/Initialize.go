@@ -15,7 +15,6 @@ type Initialize struct {
 	PoolType  *PoolType
 	Router    *ag_solanago.PublicKey
 	RmnRemote *ag_solanago.PublicKey
-	Multisig  *bool
 
 	// [0] = [WRITE] state
 	//
@@ -54,12 +53,6 @@ func (inst *Initialize) SetRouter(router ag_solanago.PublicKey) *Initialize {
 // SetRmnRemote sets the "rmnRemote" parameter.
 func (inst *Initialize) SetRmnRemote(rmnRemote ag_solanago.PublicKey) *Initialize {
 	inst.RmnRemote = &rmnRemote
-	return inst
-}
-
-// SetMultisig sets the "multisig" parameter.
-func (inst *Initialize) SetMultisig(multisig bool) *Initialize {
-	inst.Multisig = &multisig
 	return inst
 }
 
@@ -158,9 +151,6 @@ func (inst *Initialize) Validate() error {
 		if inst.RmnRemote == nil {
 			return errors.New("RmnRemote parameter is not set")
 		}
-		if inst.Multisig == nil {
-			return errors.New("Multisig parameter is not set")
-		}
 	}
 
 	// Check whether all (required) accounts are set:
@@ -196,11 +186,10 @@ func (inst *Initialize) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=4]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Params[len=3]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
 						paramsBranch.Child(ag_format.Param(" PoolType", *inst.PoolType))
 						paramsBranch.Child(ag_format.Param("   Router", *inst.Router))
 						paramsBranch.Child(ag_format.Param("RmnRemote", *inst.RmnRemote))
-						paramsBranch.Child(ag_format.Param(" Multisig", *inst.Multisig))
 					})
 
 					// Accounts of the instruction:
@@ -232,11 +221,6 @@ func (obj Initialize) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error)
 	if err != nil {
 		return err
 	}
-	// Serialize `Multisig` param:
-	err = encoder.Encode(obj.Multisig)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 func (obj *Initialize) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
@@ -255,11 +239,6 @@ func (obj *Initialize) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 	if err != nil {
 		return err
 	}
-	// Deserialize `Multisig`:
-	err = decoder.Decode(&obj.Multisig)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
@@ -269,7 +248,6 @@ func NewInitializeInstruction(
 	poolType PoolType,
 	router ag_solanago.PublicKey,
 	rmnRemote ag_solanago.PublicKey,
-	multisig bool,
 	// Accounts:
 	state ag_solanago.PublicKey,
 	mint ag_solanago.PublicKey,
@@ -281,7 +259,6 @@ func NewInitializeInstruction(
 		SetPoolType(poolType).
 		SetRouter(router).
 		SetRmnRemote(rmnRemote).
-		SetMultisig(multisig).
 		SetStateAccount(state).
 		SetMintAccount(mint).
 		SetAuthorityAccount(authority).
