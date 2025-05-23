@@ -73,6 +73,43 @@ contract MockE2EUSDCTokenMessenger is ITokenMessenger {
     return s_nonce;
   }
 
+  // The mock function is based on the same function in https://github.com/circlefin/evm-cctp-contracts/blob/master/src/v2/TokenMessengerV2.sol
+  function depositForBurn(
+    uint256 amount,
+    uint32 destinationDomain,
+    bytes32 mintRecipient,
+    address burnToken,
+    bytes32 destinationCaller,
+    uint32 maxFee,
+    uint32 minFinalityThreshold
+  ) external {
+    IBurnMintERC20(burnToken).transferFrom(msg.sender, address(this), amount);
+    IBurnMintERC20(burnToken).burn(amount);
+    // Format message body
+    bytes memory _burnMessage = _formatMessage(
+      i_messageBodyVersion,
+      bytes32(uint256(uint160(burnToken))),
+      mintRecipient,
+      amount,
+      bytes32(uint256(uint160(msg.sender)))
+    );
+    
+    _sendDepositForBurnMessage(destinationDomain, DESTINATION_TOKEN_MESSENGER, destinationCaller, _burnMessage);
+    
+    emit DepositForBurn(
+      burnToken,
+      amount,
+      msg.sender,
+      mintRecipient,
+      destinationDomain,
+      DESTINATION_TOKEN_MESSENGER,
+      destinationCaller,
+      maxFee,
+      minFinalityThreshold,
+      ""
+    );
+  }
+
   function messageBodyVersion() external view returns (uint32) {
     return i_messageBodyVersion;
   }

@@ -42,6 +42,32 @@ contract MockUSDCTokenMessenger is ITokenMessenger {
     return s_nonce++;
   }
 
+  function depositForBurn(
+    uint256 amount,
+    uint32 destinationDomain,
+    bytes32 mintRecipient,
+    address burnToken,
+    bytes32 destinationCaller,
+    uint32 maxFee,
+    uint32 minFinalityThreshold
+  ) external {
+    IBurnMintERC20(burnToken).transferFrom(msg.sender, address(this), amount);
+    IBurnMintERC20(burnToken).burn(amount);
+   
+    emit DepositForBurn(
+      burnToken,
+      amount,
+      msg.sender,
+      mintRecipient,
+      destinationDomain,
+      DESTINATION_TOKEN_MESSENGER,
+      destinationCaller,
+      maxFee,
+      minFinalityThreshold,
+      ""
+    );
+  }
+
   function messageBodyVersion() external view returns (uint32) {
     return i_messageBodyVersion;
   }

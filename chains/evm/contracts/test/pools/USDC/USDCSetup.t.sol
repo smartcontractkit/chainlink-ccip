@@ -24,6 +24,19 @@ contract USDCSetup is BaseTest {
     bytes messageBody;
   }
 
+  struct USDCMessageCCTPV2 {
+    uint32 version;
+    uint32 sourceDomain;
+    uint32 destinationDomain;
+    bytes32 nonce;
+    bytes32 sender;
+    bytes32 recipient;
+    bytes32 destinationCaller;
+    uint32 minFinalityThreshold;
+    uint32 finalityThresholdExecuted;
+    bytes messageBody;
+  }
+
   uint32 internal constant USDC_DEST_TOKEN_GAS = 180_000;
   uint32 internal constant SOURCE_DOMAIN_IDENTIFIER = 0x02020202;
   uint32 internal constant DEST_DOMAIN_IDENTIFIER = 0;
@@ -110,6 +123,23 @@ contract USDCSetup is BaseTest {
       usdcMessage.sender,
       usdcMessage.recipient,
       usdcMessage.destinationCaller,
+      usdcMessage.messageBody
+    );
+  }
+
+  function _generateUSDCMessageCCTPV2(
+    USDCMessageCCTPV2 memory usdcMessage
+  ) internal pure returns (bytes memory) {
+    return abi.encodePacked(
+      usdcMessage.version,
+      usdcMessage.sourceDomain,
+      usdcMessage.destinationDomain,
+      usdcMessage.nonce,
+      usdcMessage.sender,
+      usdcMessage.recipient,
+      usdcMessage.destinationCaller,
+      usdcMessage.minFinalityThreshold,
+      usdcMessage.finalityThresholdExecuted,
       usdcMessage.messageBody
     );
   }

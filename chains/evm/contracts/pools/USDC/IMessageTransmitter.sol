@@ -17,7 +17,7 @@ pragma solidity ^0.8.0;
 
 interface IMessageTransmitter {
   /// @notice Unlocks USDC tokens on the destination chain
-  /// @param message The original message on the source chain
+  /// @param message The original message on the source chain in CCTP V1 format:
   ///     * Message format:
   ///     * Field                 Bytes      Type       Index
   ///     * version               4          uint32     0
@@ -28,6 +28,21 @@ interface IMessageTransmitter {
   ///     * recipient             32         bytes32    52
   ///     * destinationCaller     32         bytes32    84
   ///     * messageBody           dynamic    bytes      116
+
+  /// The original message on the source chain in CCTP V2 format:
+  ///     * Message format:
+  ///     * Field                      Bytes      Type       Index
+  ///     * version                    4          uint32     0
+  ///     * sourceDomain               4          uint32     4
+  ///     * destinationDomain          4          uint32     8
+  ///     * nonce                      32         bytes32   12
+  ///     * sender                     32         bytes32   44
+  ///     * recipient                  32         bytes32   76
+  ///     * destinationCaller          32         bytes32   108
+  ///     * minFinalityThreshold       32         uint32    140
+  ///     * finalityThresholdExecuted  32         uint32    144
+  ///     * messageBody                dynamic    bytes     148
+  
   /// param attestation A valid attestation is the concatenated 65-byte signature(s) of
   /// exactly `thresholdSignature` signatures, in increasing order of attester address.
   /// ***If the attester addresses recovered from signatures are not in increasing order,
