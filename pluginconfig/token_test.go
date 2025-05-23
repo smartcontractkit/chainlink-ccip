@@ -21,7 +21,8 @@ func Test_TokenDataObserver_Unmarshal(t *testing.T) {
 					  "inflightCacheExpiry": "1s",
 					  "rootSnoozeTime": "1s",
 					  "messageVisibilityInterval": "1s",
-					  "batchingStrategyID": 0
+					  "batchingStrategyID": 0,
+					  "maxCommitReportsToFetch": 1
 				}`
 
 	tests := []struct {
@@ -521,6 +522,7 @@ func Test_TokenDataObserver_Validation(t *testing.T) {
 			RootSnoozeTime:            *commonconfig.MustNewDuration(1),
 			MessageVisibilityInterval: *commonconfig.MustNewDuration(1),
 			BatchingStrategyID:        0,
+			MaxCommitReportsToFetch:   1,
 			TokenDataObservers:        configs,
 		}
 	}
