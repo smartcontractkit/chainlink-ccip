@@ -1,17 +1,20 @@
 use anchor_lang::prelude::*;
-use anchor_lang::solana_program::{
-    instruction::{AccountMeta, Instruction},
-    program::invoke_signed,
-};
-use base_token_pool::{common::*, rate_limiter::*};
+use anchor_lang::solana_program::instruction::{AccountMeta, Instruction};
+use anchor_lang::solana_program::program::invoke_signed;
+
+use base_token_pool::common::*;
+use base_token_pool::rate_limiter::*;
 
 declare_id!("UsDcjWP1QYak64nKofkmA5ZWPrceoXsyZKiXZMvjk5V");
 
 pub const RECEIVE_MESSAGE_DISCRIMINATOR: [u8; 8] = [0xd2, 0xf3, 0x33, 0xf6, 0x02, 0xf2, 0xea, 0x35]; // global:receive_message
-pub const DEPOSIT_FOR_BURN_WITH_CALLER_DISCRIMINATOR: [u8; 8] = [0x90, 0x88, 0x2a, 0x0c, 0xa4, 0x58, 0x3a, 0x2a]; // global:deposit_for_burn_with_caller
+pub const DEPOSIT_FOR_BURN_WITH_CALLER_DISCRIMINATOR: [u8; 8] =
+    [0x90, 0x88, 0x2a, 0x0c, 0xa4, 0x58, 0x3a, 0x2a]; // global:deposit_for_burn_with_caller
 
-pub const TOKEN_MESSENGER_MINTER: Pubkey = solana_program::pubkey!("CCTPiPYPc6AsJuwueEnWgSgucamXDZwBd53dQ11YiKX3");
-pub const MESSAGE_TRANSMITTER: Pubkey = solana_program::pubkey!("CCTPmbSD7gX1bxKPAmg77w8oFzNFpaQiQUWD43TKaecd");
+pub const TOKEN_MESSENGER_MINTER: Pubkey =
+    solana_program::pubkey!("CCTPiPYPc6AsJuwueEnWgSgucamXDZwBd53dQ11YiKX3");
+pub const MESSAGE_TRANSMITTER: Pubkey =
+    solana_program::pubkey!("CCTPmbSD7gX1bxKPAmg77w8oFzNFpaQiQUWD43TKaecd");
 
 pub mod context;
 use crate::context::*;
@@ -39,7 +42,7 @@ pub mod usdc_token_pool {
         Ok(())
     }
 
-    pub fn type_version(_ctx: Context<TypeVersion>) -> Result<String> {
+    pub fn type_version(_ctx: Context<Empty>) -> Result<String> {
         let response = env!("CCIP_BUILD_TYPE_VERSION").to_string();
         msg!("{}", response);
         Ok(response)
@@ -59,7 +62,6 @@ pub mod usdc_token_pool {
             .config
             .set_router(new_router, ctx.program_id)
     }
-
 
     pub fn init_chain_remote_config(
         ctx: Context<InitializeChainConfig>,
@@ -196,13 +198,13 @@ pub mod usdc_token_pool {
             UsdcTokenPoolError::InvalidTokenData
         );
 
-        let message_and_attestation: MessageAndAttestation =
-            try_from_slice_unchecked(&release_or_mint.offchain_token_data)
-                .map_err(|_| UsdcTokenPoolError::InvalidTokenData)?;
+        let msg_att = MessageAndAttestation::try_from_slice(&release_or_mint.offchain_token_data)
+            .map_err(|_| UsdcTokenPoolError::InvalidTokenData)?;
 
-
-        let message_and_attestation_bytes = message_and_attestation.try_to_vec().unwrap();
-        let mut instruction_data = Vec::with_capacity(8 + message_and_attestation_bytes.len());
+        let message_and_attestation_bytes = msg_att.try_to_vec().unwrap();
+        let mut instruction_data = Vec::with_capacity(
+            RECEIVE_MESSAGE_DISCRIMINATOR.len() + message_and_attestation_bytes.len(),
+        );
         instruction_data.extend_from_slice(&RECEIVE_MESSAGE_DISCRIMINATOR);
         instruction_data.extend_from_slice(&message_and_attestation_bytes);
 
@@ -268,10 +270,11 @@ pub mod usdc_token_pool {
             32,
             UsdcTokenPoolError::InvalidReceiver
         );
-        let mint_recipient = Pubkey::new_from_array(lock_or_burn.receiver[0..32].try_into().unwrap());
+        let mint_recipient =
+            Pubkey::new_from_array(lock_or_burn.receiver[0..32].try_into().unwrap());
 
-        let destination_domain = match lock_or_burn.destination_chain_selector {
-        // TODO update this mapping to be from ChainSelector -> DomainID
+        let destination_domain = match lock_or_burn.remote_chain_selector {
+            // TODO update this mapping to be from ChainSelector -> DomainID
             1 => 0, // Ethereum Mainnet
             2 => 1, // Optimism
             3 => 2, // Arbitrum
@@ -307,9 +310,9 @@ pub mod usdc_token_pool {
             data: instruction_data,
         };
 
-        let pool_signer_seeds = &[
+        let pool_signer_seeds: &[&[u8]] = &[
             POOL_SIGNER_SEED,
-            ctx.accounts.mint.key().as_ref(),
+            &ctx.accounts.mint.key().to_bytes(),
             &[ctx.bumps.pool_signer],
         ];
 
@@ -342,8 +345,6 @@ pub mod usdc_token_pool {
             },
         })
     }
-
-
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
@@ -359,8 +360,6 @@ pub struct DepositForBurnWithCallerParams {
     pub mint_recipient: Pubkey,
     pub destination_caller: Pubkey,
 }
-
-
 
 #[error_code]
 pub enum UsdcTokenPoolError {

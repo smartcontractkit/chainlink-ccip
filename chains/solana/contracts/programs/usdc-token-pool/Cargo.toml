@@ -24,4 +24,4 @@ ccip_common = {path = "../ccip-common"}
 solana-program = "1.17.25"
 
 [build-dependencies]
-build-commit = { path = "../../crates/build-commit" }
+build_commit = { path = "../../crates/build-commit" }

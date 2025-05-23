@@ -723,6 +723,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "cctp-message-transmitter-mock"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+]
+
+[[package]]
 name = "cfg-if"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2699,6 +2706,7 @@ dependencies = [
  "anchor-lang",
  "anchor-spl",
  "base-token-pool",
+ "build_commit",
  "burnmint-token-pool",
  "ccip_common",
  "solana-program",

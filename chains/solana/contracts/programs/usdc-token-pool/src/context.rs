@@ -1,9 +1,9 @@
+use crate::MESSAGE_TRANSMITTER;
+use crate::TOKEN_MESSENGER_MINTER;
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{Mint, TokenAccount};
 use base_token_pool::common::*;
 use burnmint_token_pool::ChainConfig;
-use crate::TOKEN_MESSENGER_MINTER;
-use crate::MESSAGE_TRANSMITTER;
 
 const MAX_POOL_STATE_V: u8 = 1;
 const ANCHOR_DISCRIMINATOR: usize = 8;
@@ -22,7 +22,6 @@ pub struct InitializeTokenPool<'info> {
         constraint = valid_version(1, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion
     )]
     pub state: Account<'info, burnmint_token_pool::State>,
-
 
     pub mint: InterfaceAccount<'info, Mint>,
 
@@ -75,8 +74,8 @@ pub struct AcceptOwnership<'info> {
     pub authority: Signer<'info>,
 }
 
-
 #[derive(Accounts)]
+#[instruction(release_or_mint: ReleaseOrMintInV1)]
 pub struct TokenOfframp<'info> {
     #[account(constraint = authority.key() == offramp_program.key() || authority.key() == allowed_offramp.key() @ CcipTokenPoolError::Unauthorized)]
     pub authority: Signer<'info>,
@@ -104,8 +103,6 @@ pub struct TokenOfframp<'info> {
         constraint = state.config.router != Pubkey::default() @ CcipTokenPoolError::InvalidInputs,
     )]
     pub state: Account<'info, burnmint_token_pool::State>,
-    
-
 
     pub token_program: Program<'info, anchor_spl::token::Token>,
 
@@ -127,7 +124,7 @@ pub struct TokenOfframp<'info> {
         seeds = [
             POOL_CHAINCONFIG_SEED,
             state.key().as_ref(),
-            &release_or_mint.source_chain_selector.to_le_bytes(),
+            &release_or_mint.remote_chain_selector.to_le_bytes(),
         ],
         bump,
     )]
@@ -147,7 +144,7 @@ pub struct TokenOfframp<'info> {
         constraint = receiver_token_account.mint == state.config.mint @ CcipTokenPoolError::InvalidInputs
     )]
     pub receiver_token_account: InterfaceAccount<'info, TokenAccount>,
-    
+
     #[account(constraint = message_transmitter.key() == MESSAGE_TRANSMITTER @ crate::UsdcTokenPoolError::InvalidMessageTransmitter)]
     pub message_transmitter: UncheckedAccount<'info>,
 
@@ -158,11 +155,12 @@ pub struct TokenOfframp<'info> {
 
     #[account(mut)]
     pub cctp_payer: Signer<'info>,
-    
+
     pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
+#[instruction(lock_or_burn: LockOrBurnInV1)]
 pub struct TokenOnramp<'info> {
     pub authority: Signer<'info>,
 
@@ -175,8 +173,6 @@ pub struct TokenOnramp<'info> {
         constraint = state.config.router == authority.key() || state.config.owner == authority.key() @ CcipTokenPoolError::Unauthorized,
     )]
     pub state: Account<'info, burnmint_token_pool::State>,
-    
-
 
     pub token_program: Program<'info, anchor_spl::token::Token>,
 
@@ -198,7 +194,7 @@ pub struct TokenOnramp<'info> {
         seeds = [
             POOL_CHAINCONFIG_SEED,
             state.key().as_ref(),
-            &lock_or_burn.destination_chain_selector.to_le_bytes(),
+            &lock_or_burn.remote_chain_selector.to_le_bytes(),
         ],
         bump,
     )]
@@ -212,7 +208,7 @@ pub struct TokenOnramp<'info> {
     pub rmn_remote_curses: UncheckedAccount<'info>,
 
     pub rmn_remote_config: UncheckedAccount<'info>,
-    
+
     #[account(constraint = token_messenger.key() == TOKEN_MESSENGER_MINTER @ crate::UsdcTokenPoolError::InvalidTokenMessenger)]
     pub token_messenger: UncheckedAccount<'info>,
 
@@ -221,13 +217,12 @@ pub struct TokenOnramp<'info> {
 
     #[account(mut)]
     pub cctp_event_rent_payer: Signer<'info>,
-    
+
     pub system_program: Program<'info, System>,
 }
 
-
-
 #[derive(Accounts)]
+#[instruction(remote_chain_selector: u64, mint: Pubkey)]
 pub struct InitializeChainConfig<'info> {
     #[account(
         seeds = [
@@ -259,6 +254,7 @@ pub struct InitializeChainConfig<'info> {
 }
 
 #[derive(Accounts)]
+#[instruction(remote_chain_selector: u64, mint: Pubkey)]
 pub struct EditChainConfigDynamicSize<'info> {
     #[account(
         seeds = [
@@ -291,17 +287,17 @@ pub struct EditChainConfigDynamicSize<'info> {
 }
 
 #[derive(Accounts)]
+#[instruction(remote_chain_selector: u64, mint: Pubkey, addresses: Vec<RemoteAddress>)]
 pub struct AppendRemotePoolAddresses<'info> {
     #[account(
         seeds = [
             POOL_STATE_SEED,
-            _mint.key().as_ref()
+            mint.key().as_ref()
         ],
         bump,
         constraint = state.config.owner == authority.key() @ CcipTokenPoolError::Unauthorized,
     )]
     pub state: Account<'info, burnmint_token_pool::State>,
-
 
     #[account(
         mut,
@@ -324,6 +320,7 @@ pub struct AppendRemotePoolAddresses<'info> {
 }
 
 #[derive(Accounts)]
+#[instruction(remote_chain_selector: u64, mint: Pubkey)]
 pub struct SetChainRateLimit<'info> {
     #[account(
         seeds = [
@@ -351,6 +348,7 @@ pub struct SetChainRateLimit<'info> {
 }
 
 #[derive(Accounts)]
+#[instruction(remote_chain_selector: u64, mint: Pubkey)]
 pub struct DeleteChainConfig<'info> {
     #[account(
         seeds = [
@@ -379,6 +377,7 @@ pub struct DeleteChainConfig<'info> {
 }
 
 #[derive(Accounts)]
+#[instruction(add: Vec<Pubkey>)]
 pub struct AddToAllowList<'info> {
     #[account(
         mut,
@@ -403,6 +402,7 @@ pub struct AddToAllowList<'info> {
 }
 
 #[derive(Accounts)]
+#[instruction(remove: Vec<Pubkey>)]
 pub struct RemoveFromAllowlist<'info> {
     #[account(
         mut,
@@ -424,6 +424,7 @@ pub struct RemoveFromAllowlist<'info> {
 }
 
 #[derive(Accounts)]
-pub struct TypeVersion<'info> {
+pub struct Empty<'info> {
+    // This is unused, but Anchor requires that there is at least one account in the context
     pub clock: Sysvar<'info, Clock>,
 }
