@@ -34,8 +34,8 @@ func TestCctpDevnet(t *testing.T) {
 	admin := solana.PrivateKey(devnetInfo.PrivateKeys.Admin)
 	require.True(t, admin.IsValid())
 
-	tokenMessageMinter := solana.MustPublicKeyFromBase58(devnetInfo.CCTP.TokenMessageMinter)
-	token_messenger_minter.SetProgramID(tokenMessageMinter)
+	tokenMessengerMinter := solana.MustPublicKeyFromBase58(devnetInfo.CCTP.TokenMessengerMinter)
+	token_messenger_minter.SetProgramID(tokenMessengerMinter)
 	messageTransmitter := solana.MustPublicKeyFromBase58(devnetInfo.CCTP.MessageTransmitter)
 	message_transmitter.SetProgramID(messageTransmitter)
 
@@ -65,7 +65,7 @@ func TestCctpDevnet(t *testing.T) {
 		t.Parallel()
 
 		t.Run("Deposit for Burn", func(t *testing.T) {
-			pdas, err := getDepositForBurnPDAs(tokenMessageMinter, messageTransmitter, usdcAddress, chosenDomain.Domain)
+			pdas, err := getDepositForBurnPDAs(tokenMessengerMinter, messageTransmitter, usdcAddress, chosenDomain.Domain)
 
 			messageSentEventKeypair, err := solana.NewRandomPrivateKey()
 			// messageSentEventKeypair, err := solana.PrivateKeyFromBase58("4aufxGiqtjJySZ4RrCzAU55jKniMgKbzEhnCoVUyNxi8wcSUxJ5c7GSR2BLXF8SjDJdywL7Hydsqus27iSoRBU6n")
@@ -91,7 +91,7 @@ func TestCctpDevnet(t *testing.T) {
 				usdcAddress,
 				messageSentEventKeypair.PublicKey(),
 				messageTransmitter,
-				tokenMessageMinter,
+				tokenMessengerMinter,
 				solana.TokenProgramID,
 				solana.SystemProgramID,
 				pdas.eventAuthority,
@@ -108,7 +108,7 @@ func TestCctpDevnet(t *testing.T) {
 			fmt.Println("Transaction signature:", tx.Signatures)
 			fmt.Println(result.Meta.LogMessages)
 
-			returnedNonce, err := common.ExtractTypedReturnValue(ctx, result.Meta.LogMessages, tokenMessageMinter.String(), binary.LittleEndian.Uint64)
+			returnedNonce, err := common.ExtractTypedReturnValue(ctx, result.Meta.LogMessages, tokenMessengerMinter.String(), binary.LittleEndian.Uint64)
 			require.NoError(t, err)
 			fmt.Println("Nonce:", returnedNonce)
 			fmt.Println("Result return data:", result.Meta.ReturnData.Data.String())
@@ -214,7 +214,7 @@ func TestCctpDevnet(t *testing.T) {
 
 		nonce := binary.BigEndian.Uint64(messageBytes[12:20][:])
 
-		pdas, err := getReceiveMessagePdas(tokenMessageMinter, messageTransmitter, usdcAddress, chosenDomain.Domain, nonce)
+		pdas, err := getReceiveMessagePdas(tokenMessengerMinter, messageTransmitter, usdcAddress, chosenDomain.Domain, nonce)
 
 		metas := []*solana.AccountMeta{
 			solana.Meta(pdas.tokenMessengerAccount),
@@ -226,7 +226,7 @@ func TestCctpDevnet(t *testing.T) {
 			solana.Meta(pdas.custodyTokenAccount).WRITE(),
 			solana.Meta(solana.TokenProgramID),
 			solana.Meta(pdas.tokenMessengerEventAuthority),
-			solana.Meta(tokenMessageMinter),
+			solana.Meta(tokenMessengerMinter),
 		}
 
 		raw := message_transmitter.NewReceiveMessageInstruction(
@@ -239,7 +239,7 @@ func TestCctpDevnet(t *testing.T) {
 			pdas.authorityPda,
 			pdas.messageTransmitterAccount,
 			pdas.usedNonces,
-			tokenMessageMinter, // receiver
+			tokenMessengerMinter, // receiver
 			solana.SystemProgramID,
 			pdas.eventAuthority,
 			messageTransmitter,
@@ -342,8 +342,8 @@ type ReceiveMessagePDAs struct {
 
 const MAX_NONCES uint64 = 6400
 
-func getReceiveMessagePdas(tokenMessageMinter, messageTransmitter, usdcAddress solana.PublicKey, domain uint32, nonce uint64) (ReceiveMessagePDAs, error) {
-	tokenMessengerAccount, _, err := solana.FindProgramAddress([][]byte{[]byte("token_messenger")}, tokenMessageMinter)
+func getReceiveMessagePdas(tokenMessengerMinter, messageTransmitter, usdcAddress solana.PublicKey, domain uint32, nonce uint64) (ReceiveMessagePDAs, error) {
+	tokenMessengerAccount, _, err := solana.FindProgramAddress([][]byte{[]byte("token_messenger")}, tokenMessengerMinter)
 	if err != nil {
 		return ReceiveMessagePDAs{}, err
 	}
@@ -353,39 +353,39 @@ func getReceiveMessagePdas(tokenMessageMinter, messageTransmitter, usdcAddress s
 		return ReceiveMessagePDAs{}, err
 	}
 
-	tokenMinterAccount, _, err := solana.FindProgramAddress([][]byte{[]byte("token_minter")}, tokenMessageMinter)
+	tokenMinterAccount, _, err := solana.FindProgramAddress([][]byte{[]byte("token_minter")}, tokenMessengerMinter)
 	if err != nil {
 		return ReceiveMessagePDAs{}, err
 	}
 
-	localToken, _, err := solana.FindProgramAddress([][]byte{[]byte("local_token"), usdcAddress.Bytes()}, tokenMessageMinter)
+	localToken, _, err := solana.FindProgramAddress([][]byte{[]byte("local_token"), usdcAddress.Bytes()}, tokenMessengerMinter)
 	if err != nil {
 		return ReceiveMessagePDAs{}, err
 	}
 
-	remoteTokenMessengerKey, _, err := solana.FindProgramAddress([][]byte{[]byte("remote_token_messenger"), numToSeed(domain)}, tokenMessageMinter)
+	remoteTokenMessengerKey, _, err := solana.FindProgramAddress([][]byte{[]byte("remote_token_messenger"), numToSeed(domain)}, tokenMessengerMinter)
 	if err != nil {
 		return ReceiveMessagePDAs{}, err
 	}
 
 	remoteTokenKey := solana.MustPublicKeyFromBase58("111111111111Q2C3h43sGe552tUtBG3FqBKz8gX") // usdc sepolia address
 
-	tokenPair, _, err := solana.FindProgramAddress([][]byte{[]byte("token_pair"), numToSeed(domain), remoteTokenKey.Bytes()}, tokenMessageMinter)
+	tokenPair, _, err := solana.FindProgramAddress([][]byte{[]byte("token_pair"), numToSeed(domain), remoteTokenKey.Bytes()}, tokenMessengerMinter)
 	if err != nil {
 		return ReceiveMessagePDAs{}, err
 	}
 
-	custodyTokenAccount, _, err := solana.FindProgramAddress([][]byte{[]byte("custody"), usdcAddress.Bytes()}, tokenMessageMinter)
+	custodyTokenAccount, _, err := solana.FindProgramAddress([][]byte{[]byte("custody"), usdcAddress.Bytes()}, tokenMessengerMinter)
 	if err != nil {
 		return ReceiveMessagePDAs{}, err
 	}
 
-	authorityPda, _, err := solana.FindProgramAddress([][]byte{[]byte("message_transmitter_authority"), tokenMessageMinter.Bytes()}, messageTransmitter)
+	authorityPda, _, err := solana.FindProgramAddress([][]byte{[]byte("message_transmitter_authority"), tokenMessengerMinter.Bytes()}, messageTransmitter)
 	if err != nil {
 		return ReceiveMessagePDAs{}, err
 	}
 
-	tokenMessengerEventAuthority, _, err := solana.FindProgramAddress([][]byte{[]byte("__event_authority")}, tokenMessageMinter)
+	tokenMessengerEventAuthority, _, err := solana.FindProgramAddress([][]byte{[]byte("__event_authority")}, tokenMessengerMinter)
 	if err != nil {
 		return ReceiveMessagePDAs{}, err
 	}

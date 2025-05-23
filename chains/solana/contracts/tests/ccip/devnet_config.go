@@ -27,9 +27,9 @@ type DevnetInfo struct {
 		Svm     uint64 `yaml:"svm"`
 	} `yaml:"chain_selectors"`
 	CCTP struct {
-		MessageTransmitter string `yaml:"message_transmitter"`
-		TokenMessageMinter string `yaml:"token_message_minter"`
-		Message            struct {
+		MessageTransmitter   string `yaml:"message_transmitter"`
+		TokenMessengerMinter string `yaml:"token_messenger_minter"`
+		Message              struct {
 			MessageBytesHex     string `yaml:"message_bytes_hex"`
 			AttestationBytesHex string `yaml:"attestation_bytes_hex"`
 		} `yaml:"message"`

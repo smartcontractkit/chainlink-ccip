@@ -5,22 +5,17 @@ use anchor_lang::solana_program::program::invoke_signed;
 use base_token_pool::common::*;
 use base_token_pool::rate_limiter::*;
 
-declare_id!("UsDcjWP1QYak64nKofkmA5ZWPrceoXsyZKiXZMvjk5V");
+declare_id!("CCitPr8yZbN8zEBEdwju8bnGgKMYcz6XSTbU61CMedj");
 
 pub const RECEIVE_MESSAGE_DISCRIMINATOR: [u8; 8] = [0xd2, 0xf3, 0x33, 0xf6, 0x02, 0xf2, 0xea, 0x35]; // global:receive_message
 pub const DEPOSIT_FOR_BURN_WITH_CALLER_DISCRIMINATOR: [u8; 8] =
     [0x90, 0x88, 0x2a, 0x0c, 0xa4, 0x58, 0x3a, 0x2a]; // global:deposit_for_burn_with_caller
 
-pub const TOKEN_MESSENGER_MINTER: Pubkey =
-    solana_program::pubkey!("CCTPiPYPc6AsJuwueEnWgSgucamXDZwBd53dQ11YiKX3");
-pub const MESSAGE_TRANSMITTER: Pubkey =
-    solana_program::pubkey!("CCTPmbSD7gX1bxKPAmg77w8oFzNFpaQiQUWD43TKaecd");
-
 pub mod context;
 use crate::context::*;
 
 #[program]
-pub mod usdc_token_pool {
+pub mod cctp_token_pool {
     use super::*;
 
     pub fn initialize(
@@ -195,11 +190,11 @@ pub mod usdc_token_pool {
 
         require!(
             !release_or_mint.offchain_token_data.is_empty(),
-            UsdcTokenPoolError::InvalidTokenData
+            CctpTokenPoolError::InvalidTokenData
         );
 
         let msg_att = MessageAndAttestation::try_from_slice(&release_or_mint.offchain_token_data)
-            .map_err(|_| UsdcTokenPoolError::InvalidTokenData)?;
+            .map_err(|_| CctpTokenPoolError::InvalidTokenData)?;
 
         let message_and_attestation_bytes = msg_att.try_to_vec().unwrap();
         let mut instruction_data = Vec::with_capacity(
@@ -208,35 +203,55 @@ pub mod usdc_token_pool {
         instruction_data.extend_from_slice(&RECEIVE_MESSAGE_DISCRIMINATOR);
         instruction_data.extend_from_slice(&message_and_attestation_bytes);
 
-        let accounts = vec![
-            AccountMeta::new(ctx.accounts.cctp_payer.key(), true),
-            AccountMeta::new_readonly(ctx.accounts.cctp_payer.key(), true),
-            AccountMeta::new_readonly(ctx.accounts.authority.key(), false),
-            AccountMeta::new_readonly(ctx.accounts.message_transmitter.key(), false),
-            AccountMeta::new(ctx.accounts.used_nonces.key(), false),
-            AccountMeta::new_readonly(ctx.accounts.receiver.key(), false),
-            AccountMeta::new_readonly(ctx.accounts.system_program.key(), false),
+        let acc_infos = vec![
+            ctx.accounts.pool_signer.to_account_info(),
+            ctx.accounts.pool_signer.to_account_info(),
+            ctx.accounts.cctp_authority_pda.to_account_info(),
+            ctx.accounts
+                .cctp_message_transmitter_account
+                .to_account_info(),
+            ctx.accounts.cctp_used_nonces.to_account_info(),
+            ctx.accounts.cctp_token_messenger_minter.to_account_info(),
+            ctx.accounts.system_program.to_account_info(),
+            ctx.accounts.cctp_event_authority.to_account_info(),
+            ctx.accounts.cctp_message_transmitter.to_account_info(),
+            ctx.accounts.cctp_token_messenger_account.to_account_info(),
+            ctx.accounts
+                .cctp_remote_token_messenger_key
+                .to_account_info(),
+            ctx.accounts.cctp_token_minter_account.to_account_info(),
+            ctx.accounts.cctp_local_token.to_account_info(),
+            ctx.accounts.cctp_token_pair.to_account_info(),
+            ctx.accounts.receiver_token_account.to_account_info(),
+            ctx.accounts.cctp_custody_token_account.to_account_info(),
+            ctx.accounts.token_program.to_account_info(),
+            ctx.accounts
+                .cctp_token_messenger_event_authority
+                .to_account_info(),
+            ctx.accounts.cctp_token_messenger_minter.to_account_info(),
         ];
 
+        let acc_metas: Vec<AccountMeta> = acc_infos
+            .iter()
+            .flat_map(|acc_info| {
+                let is_signer = acc_info.key() == ctx.accounts.pool_signer.key();
+                acc_info.to_account_metas(Some(is_signer))
+            })
+            .collect();
+
         let instruction = Instruction {
-            program_id: ctx.accounts.message_transmitter.key(),
-            accounts,
+            program_id: ctx.accounts.cctp_message_transmitter.key(),
+            accounts: acc_metas,
             data: instruction_data,
         };
 
-        invoke_signed(
-            &instruction,
-            &[
-                ctx.accounts.cctp_payer.to_account_info(),
-                ctx.accounts.cctp_payer.to_account_info(),
-                ctx.accounts.authority.to_account_info(),
-                ctx.accounts.message_transmitter.to_account_info(),
-                ctx.accounts.used_nonces.to_account_info(),
-                ctx.accounts.receiver.to_account_info(),
-                ctx.accounts.system_program.to_account_info(),
-            ],
-            &[],
-        )?;
+        let signer_seeds: &[&[u8]] = &[
+            POOL_SIGNER_SEED,
+            &ctx.accounts.mint.key().to_bytes(),
+            &[ctx.bumps.pool_signer],
+        ];
+
+        invoke_signed(&instruction, &acc_infos, &[signer_seeds])?;
 
         emit!(Minted {
             sender: ctx.accounts.authority.key(),
@@ -268,7 +283,7 @@ pub mod usdc_token_pool {
         require_eq!(
             lock_or_burn.receiver.len(),
             32,
-            UsdcTokenPoolError::InvalidReceiver
+            CctpTokenPoolError::InvalidReceiver
         );
         let mint_recipient =
             Pubkey::new_from_array(lock_or_burn.receiver[0..32].try_into().unwrap());
@@ -279,7 +294,7 @@ pub mod usdc_token_pool {
             2 => 1, // Optimism
             3 => 2, // Arbitrum
             4 => 3, // Avalanche
-            _ => return Err(UsdcTokenPoolError::InvalidDomain.into()),
+            _ => return Err(CctpTokenPoolError::InvalidDomain.into()),
         };
 
         let deposit_for_burn_params = DepositForBurnWithCallerParams {
@@ -294,19 +309,41 @@ pub mod usdc_token_pool {
         instruction_data.extend_from_slice(&DEPOSIT_FOR_BURN_WITH_CALLER_DISCRIMINATOR);
         instruction_data.extend_from_slice(&deposit_for_burn_params_bytes);
 
-        let accounts = vec![
-            AccountMeta::new(ctx.accounts.cctp_event_rent_payer.key(), true),
-            AccountMeta::new_readonly(ctx.accounts.authority.key(), true),
-            AccountMeta::new_readonly(ctx.accounts.token_messenger.key(), false),
-            AccountMeta::new_readonly(ctx.accounts.message_transmitter.key(), false),
-            AccountMeta::new_readonly(ctx.accounts.mint.key(), false),
-            AccountMeta::new_readonly(ctx.accounts.pool_token_account.key(), false),
-            AccountMeta::new_readonly(ctx.accounts.system_program.key(), false),
+        let acc_infos = vec![
+            ctx.accounts.pool_signer.to_account_info(),
+            ctx.accounts.pool_signer.to_account_info(),
+            ctx.accounts.cctp_authority_pda.to_account_info(),
+            ctx.accounts.pool_token_account.to_account_info(),
+            ctx.accounts
+                .cctp_message_transmitter_account
+                .to_account_info(),
+            ctx.accounts.cctp_token_messenger_account.to_account_info(),
+            ctx.accounts
+                .cctp_remote_token_messenger_key
+                .to_account_info(),
+            ctx.accounts.cctp_token_minter_account.to_account_info(),
+            ctx.accounts.cctp_local_token.to_account_info(),
+            ctx.accounts.mint.to_account_info(),
+            ctx.accounts.cctp_message_sent_event.to_account_info(),
+            ctx.accounts.cctp_message_transmitter.to_account_info(),
+            ctx.accounts.cctp_token_messenger_minter.to_account_info(),
+            ctx.accounts.token_program.to_account_info(),
+            ctx.accounts.system_program.to_account_info(),
+            ctx.accounts.cctp_event_authority.to_account_info(),
+            ctx.accounts.cctp_token_messenger_minter.to_account_info(),
         ];
 
+        let acc_metas: Vec<AccountMeta> = acc_infos
+            .iter()
+            .flat_map(|acc_info| {
+                let is_signer = acc_info.key() == ctx.accounts.pool_signer.key();
+                acc_info.to_account_metas(Some(is_signer))
+            })
+            .collect();
+
         let instruction = Instruction {
-            program_id: ctx.accounts.token_messenger.key(),
-            accounts,
+            program_id: ctx.accounts.cctp_token_messenger_minter.key(),
+            accounts: acc_metas,
             data: instruction_data,
         };
 
@@ -316,19 +353,7 @@ pub mod usdc_token_pool {
             &[ctx.bumps.pool_signer],
         ];
 
-        invoke_signed(
-            &instruction,
-            &[
-                ctx.accounts.cctp_event_rent_payer.to_account_info(),
-                ctx.accounts.authority.to_account_info(),
-                ctx.accounts.token_messenger.to_account_info(),
-                ctx.accounts.message_transmitter.to_account_info(),
-                ctx.accounts.mint.to_account_info(),
-                ctx.accounts.pool_token_account.to_account_info(),
-                ctx.accounts.system_program.to_account_info(),
-            ],
-            &[&pool_signer_seeds],
-        )?;
+        invoke_signed(&instruction, &acc_infos, &[&pool_signer_seeds])?;
 
         emit!(Burned {
             sender: ctx.accounts.authority.key(),
@@ -362,15 +387,15 @@ pub struct DepositForBurnWithCallerParams {
 }
 
 #[error_code]
-pub enum UsdcTokenPoolError {
+pub enum CctpTokenPoolError {
     #[msg("Invalid token data")]
     InvalidTokenData,
     #[msg("Invalid receiver")]
     InvalidReceiver,
     #[msg("Invalid domain")]
     InvalidDomain,
-    #[msg("Invalid token messenger")]
-    InvalidTokenMessenger,
-    #[msg("Invalid message transmitter")]
+    #[msg("Invalid Token Messenger Minter")]
+    InvalidTokenMessengerMinter,
+    #[msg("Invalid Message Transmitter")]
     InvalidMessageTransmitter,
 }

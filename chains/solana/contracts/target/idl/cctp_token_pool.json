@@ -1,0 +1,829 @@
+{
+  "version": "0.1.0-dev",
+  "name": "cctp_token_pool",
+  "instructions": [
+    {
+      "name": "initialize",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "router",
+          "type": "publicKey"
+        },
+        {
+          "name": "rmnRemote",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
+      "name": "typeVersion",
+      "accounts": [
+        {
+          "name": "clock",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [],
+      "returns": "string"
+    },
+    {
+      "name": "transferOwnership",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "proposedOwner",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
+      "name": "acceptOwnership",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "setRouter",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "newRouter",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
+      "name": "initChainRemoteConfig",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "chainConfig",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "remoteChainSelector",
+          "type": "u64"
+        },
+        {
+          "name": "mint",
+          "type": "publicKey"
+        },
+        {
+          "name": "cfg",
+          "type": {
+            "defined": "RemoteConfig"
+          }
+        }
+      ]
+    },
+    {
+      "name": "editChainRemoteConfig",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "chainConfig",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "remoteChainSelector",
+          "type": "u64"
+        },
+        {
+          "name": "mint",
+          "type": "publicKey"
+        },
+        {
+          "name": "cfg",
+          "type": {
+            "defined": "RemoteConfig"
+          }
+        }
+      ]
+    },
+    {
+      "name": "appendRemotePoolAddresses",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "chainConfig",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "remoteChainSelector",
+          "type": "u64"
+        },
+        {
+          "name": "mint",
+          "type": "publicKey"
+        },
+        {
+          "name": "addresses",
+          "type": {
+            "vec": {
+              "defined": "RemoteAddress"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "setChainRateLimit",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "chainConfig",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "remoteChainSelector",
+          "type": "u64"
+        },
+        {
+          "name": "mint",
+          "type": "publicKey"
+        },
+        {
+          "name": "inbound",
+          "type": {
+            "defined": "RateLimitConfig"
+          }
+        },
+        {
+          "name": "outbound",
+          "type": {
+            "defined": "RateLimitConfig"
+          }
+        }
+      ]
+    },
+    {
+      "name": "deleteChainConfig",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "chainConfig",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "remoteChainSelector",
+          "type": "u64"
+        },
+        {
+          "name": "mint",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
+      "name": "configureAllowList",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "add",
+          "type": {
+            "vec": "publicKey"
+          }
+        },
+        {
+          "name": "enabled",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "removeFromAllowList",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "remove",
+          "type": {
+            "vec": "publicKey"
+          }
+        }
+      ]
+    },
+    {
+      "name": "releaseOrMintTokens",
+      "accounts": [
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "offrampProgram",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK offramp program: exists only to derive the allowed offramp PDA",
+            "and the authority PDA."
+          ]
+        },
+        {
+          "name": "allowedOfframp",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK PDA of the router program verifying the signer is an allowed offramp.",
+            "If PDA does not exist, the router doesn't allow this offramp"
+          ]
+        },
+        {
+          "name": "state",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "poolSigner",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "poolTokenAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "chainConfig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemote",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemoteCurses",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemoteConfig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "receiverTokenAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "cctpAuthorityPda",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK this is not read by the pool, just forwarded to CCTP"
+          ]
+        },
+        {
+          "name": "cctpMessageTransmitterAccount",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK this is not read by the pool, just forwarded to CCTP"
+          ]
+        },
+        {
+          "name": "cctpUsedNonces",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK this is not read by the pool, just forwarded to CCTP"
+          ]
+        },
+        {
+          "name": "cctpTokenMessengerMinter",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK this is CCTP's TokenMessengerMinter program, which",
+            "is invoked by CCTP's MessageTransmitter as it is the receiver of the CCTP message."
+          ]
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "cctpEventAuthority",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK this is not read by the pool, just forwarded to CCTP"
+          ]
+        },
+        {
+          "name": "cctpMessageTransmitter",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK this is the CCTP Message Transmitter program, which",
+            "is invoked by this program."
+          ]
+        },
+        {
+          "name": "cctpTokenMessengerAccount",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK this is not read by the pool, just forwarded to CCTP"
+          ]
+        },
+        {
+          "name": "cctpTokenMinterAccount",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK this is not read by the pool, just forwarded to CCTP"
+          ]
+        },
+        {
+          "name": "cctpLocalToken",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK this is not read by the pool, just forwarded to CCTP"
+          ]
+        },
+        {
+          "name": "cctpRemoteTokenMessengerKey",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK this is not read by the pool, just forwarded to CCTP"
+          ]
+        },
+        {
+          "name": "cctpTokenPair",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK this is not read by the pool, just forwarded to CCTP"
+          ]
+        },
+        {
+          "name": "cctpCustodyTokenAccount",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK this is not read by the pool, just forwarded to CCTP"
+          ]
+        },
+        {
+          "name": "cctpTokenMessengerEventAuthority",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK this is not read by the pool, just forwarded to CCTP"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "releaseOrMint",
+          "type": {
+            "defined": "ReleaseOrMintInV1"
+          }
+        }
+      ],
+      "returns": {
+        "defined": "ReleaseOrMintOutV1"
+      }
+    },
+    {
+      "name": "lockOrBurnTokens",
+      "accounts": [
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "state",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "poolSigner",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "hold a balance to pay for the rent of initializing the CCTP MessageSentEvent account"
+          ]
+        },
+        {
+          "name": "poolTokenAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemote",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemoteCurses",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemoteConfig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "chainConfig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "cctpAuthorityPda",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK this is not read by the pool, just forwarded to CCTP"
+          ]
+        },
+        {
+          "name": "cctpMessageTransmitterAccount",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK this is not read by the pool, just forwarded to CCTP"
+          ]
+        },
+        {
+          "name": "cctpTokenMessengerAccount",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK this is not read by the pool, just forwarded to CCTP"
+          ]
+        },
+        {
+          "name": "cctpRemoteTokenMessengerKey",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK this is not read by the pool, just forwarded to CCTP"
+          ]
+        },
+        {
+          "name": "cctpTokenMinterAccount",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK this is not read by the pool, just forwarded to CCTP"
+          ]
+        },
+        {
+          "name": "cctpLocalToken",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK this is not read by the pool, just forwarded to CCTP"
+          ]
+        },
+        {
+          "name": "cctpMessageSentEvent",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK this is the account in which CCTP will store the event. It is not a PDA of CCTP,",
+            "but CCTP is the owner for it"
+          ]
+        },
+        {
+          "name": "cctpMessageTransmitter",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK this is CCTP's MessageTransmitter program, which",
+            "is invoked CCTP's TokenMessengerMinter by this program."
+          ]
+        },
+        {
+          "name": "cctpTokenMessengerMinter",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK this is CCTP's TokenMessengerMinter program, which",
+            "is invoked by this program."
+          ]
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "cctpEventAuthority",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK this is not read by the pool, just forwarded to CCTP"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "lockOrBurn",
+          "type": {
+            "defined": "LockOrBurnInV1"
+          }
+        }
+      ],
+      "returns": {
+        "defined": "LockOrBurnOutV1"
+      }
+    }
+  ],
+  "types": [
+    {
+      "name": "MessageAndAttestation",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "message",
+            "type": "bytes"
+          },
+          {
+            "name": "attestation",
+            "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DepositForBurnWithCallerParams",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "destinationDomain",
+            "type": "u32"
+          },
+          {
+            "name": "mintRecipient",
+            "type": "publicKey"
+          },
+          {
+            "name": "destinationCaller",
+            "type": "publicKey"
+          }
+        ]
+      }
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidTokenData",
+      "msg": "Invalid token data"
+    },
+    {
+      "code": 6001,
+      "name": "InvalidReceiver",
+      "msg": "Invalid receiver"
+    },
+    {
+      "code": 6002,
+      "name": "InvalidDomain",
+      "msg": "Invalid domain"
+    },
+    {
+      "code": 6003,
+      "name": "InvalidTokenMessengerMinter",
+      "msg": "Invalid Token Messenger Minter"
+    },
+    {
+      "code": 6004,
+      "name": "InvalidMessageTransmitter",
+      "msg": "Invalid Message Transmitter"
+    }
+  ]
+}

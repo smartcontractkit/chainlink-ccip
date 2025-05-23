@@ -24,7 +24,7 @@ timelock = "DoajfR5tK24xVw51fWcawUZWhAXD8yrBJVacc13neVQA"
 ping_pong_demo = "PPbZmYFf5SPAM9Jhm9mNmYoCwT7icPYVKAfJoMCQovU"
 cctp_message_transmitter_mock = "CCTPmbSD7gX1bxKPAmg77w8oFzNFpaQiQUWD43TKaecd"
 cctp_token_messenger_minter_mock = "CCTPiPYPc6AsJuwueEnWgSgucamXDZwBd53dQ11YiKX3"
-usdc_token_pool = "UsDcjWP1QYak64nKofkmA5ZWPrceoXsyZKiXZMvjk5V"
+cctp_token_pool = "CCitPr8yZbN8zEBEdwju8bnGgKMYcz6XSTbU61CMedj"
 
 [registry]
 url = "https://anchor.projectserum.com"

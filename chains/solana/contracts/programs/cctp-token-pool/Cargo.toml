@@ -1,12 +1,12 @@
 [package]
-name = "usdc-token-pool"
+name = "cctp-token-pool"
 version = "0.1.0-dev"
 description = "USDC Token Pool for CCIP utilizing CCTP"
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "usdc_token_pool"
+name = "cctp_token_pool"
 
 [features]
 no-entrypoint = []
