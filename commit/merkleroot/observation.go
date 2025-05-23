@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	mapset "github.com/deckarep/golang-set/v2"
 	"golang.org/x/sync/errgroup"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
@@ -25,6 +26,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
@@ -544,27 +546,32 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(ctx context.Context) []pluginty
 		return nil
 	}
 
-	sourceChainsConfig, err := o.ccipReader.GetOffRampSourceChainsConfig(ctx, allSourceChains)
+	supportedChains, err := o.chainSupport.SupportedChains(o.oracleID)
 	if err != nil {
-		lggr.Errorw("get offRamp source chains config failed", "err", err)
+		lggr.Warnw("call to SupportedChains failed", "err", err, "oracleID", o.oracleID)
 		return nil
 	}
 
+	sourceChains := mapset.NewSet(allSourceChains...).Intersect(supportedChains).ToSlice()
+	sort.Slice(sourceChains, func(i, j int) bool { return sourceChains[i] < sourceChains[j] })
+
 	mu := &sync.Mutex{}
-	latestOnRampSeqNums := make([]plugintypes.SeqNumChain, 0, len(sourceChainsConfig))
+	latestOnRampSeqNums := make([]plugintypes.SeqNumChain, 0, len(sourceChains))
 
 	wg := &sync.WaitGroup{}
-	for sourceChain, cfg := range sourceChainsConfig {
-		if !cfg.IsEnabled {
-			lggr.Debugw("ObserveLatestOnRampSeqNums source chain is disabled, skipping", "chain", sourceChain)
-			continue
-		}
+	for _, sourceChain := range sourceChains {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			latestOnRampSeqNum, err := o.ccipReader.LatestMsgSeqNum(ctx, sourceChain)
 			if err != nil {
-				lggr.Errorf("failed to get latest msg seq num for source chain %d: %s", sourceChain, err)
+				if errors.Is(err, contractreader.ErrNoBindings) {
+					// when a source chain is disabled there will not be a binding for the onRamp contract
+					// we don't want to log this as an error.
+					lggr.Debugw("no bindings for source chain, ignore if chain is disabled", "sourceChain", sourceChain)
+				} else {
+					lggr.Errorf("failed to get latest msg seq num for source chain %d: %s", sourceChain, err)
+				}
 				return
 			}
 
