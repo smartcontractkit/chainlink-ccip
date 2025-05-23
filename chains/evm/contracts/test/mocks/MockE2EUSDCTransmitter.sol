@@ -66,7 +66,9 @@ contract MockE2EUSDCTransmitter is IMessageTransmitterWithRelay {
     //  ) internal pure returns (bytes memory) {
     //    return abi.encodePacked(_version, _burnToken, _mintRecipient, _amount, _messageSender);
     //  }
+    // TODO: Comments for CCTP V2 Message Format
     address recipient = address(bytes20(message[116 + 36 + 12:116 + 36 + 12 + 20]));
+
     // We always mint 1 token to not complicate the test.
     i_token.mint(recipient, 1);
 
