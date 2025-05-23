@@ -93,9 +93,9 @@ contract MockE2EUSDCTokenMessenger is ITokenMessenger {
       amount,
       bytes32(uint256(uint160(msg.sender)))
     );
-    
+
     _sendDepositForBurnMessage(destinationDomain, DESTINATION_TOKEN_MESSENGER, destinationCaller, _burnMessage);
-    
+
     emit DepositForBurn(
       burnToken,
       amount,

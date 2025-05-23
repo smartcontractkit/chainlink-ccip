@@ -51,16 +51,16 @@ interface ITokenMessenger {
   /// @param minFinalityThreshold the minimum finality at which the message should be attested to.
   /// @param hookData optional hook for execution on destination domain
   event DepositForBurn(
-      address indexed burnToken,
-      uint256 amount,
-      address indexed depositor,
-      bytes32 mintRecipient,
-      uint32 destinationDomain,
-      bytes32 destinationTokenMessenger,
-      bytes32 destinationCaller,
-      uint32 maxFee,
-      uint32 indexed minFinalityThreshold,
-      bytes hookData
+    address indexed burnToken,
+    uint256 amount,
+    address indexed depositor,
+    bytes32 mintRecipient,
+    uint32 destinationDomain,
+    bytes32 destinationTokenMessenger,
+    bytes32 destinationCaller,
+    uint32 maxFee,
+    uint32 indexed minFinalityThreshold,
+    bytes hookData
   );
 
   /// @notice Burns the tokens on the source side to produce a nonce through
@@ -99,7 +99,6 @@ interface ITokenMessenger {
     uint32 maxFee,
     uint32 minFinalityThreshold
   ) external;
-
 
   /// Returns the version of the message body format.
   /// @dev immutable

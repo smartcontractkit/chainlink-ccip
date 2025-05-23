@@ -42,7 +42,7 @@ interface IMessageTransmitter {
   ///     * minFinalityThreshold       32         uint32    140
   ///     * finalityThresholdExecuted  32         uint32    144
   ///     * messageBody                dynamic    bytes     148
-  
+
   /// param attestation A valid attestation is the concatenated 65-byte signature(s) of
   /// exactly `thresholdSignature` signatures, in increasing order of attester address.
   /// ***If the attester addresses recovered from signatures are not in increasing order,

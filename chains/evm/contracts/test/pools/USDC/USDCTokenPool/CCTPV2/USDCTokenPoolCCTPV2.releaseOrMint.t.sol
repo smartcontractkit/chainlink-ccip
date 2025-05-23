@@ -27,8 +27,9 @@ contract USDCTokenPoolCCTPV2_releaseOrMint is USDCTokenPoolCCTPV2Setup {
     uint256 _expirationBlock,
     bytes memory _hookData
   ) internal pure returns (bytes memory) {
-    return abi.encodePacked(_version, _burnToken, _mintRecipient, _amount, _messageSender, _maxFee,
-    _feeExecuted, _expirationBlock, _hookData);
+    return abi.encodePacked(
+      _version, _burnToken, _mintRecipient, _amount, _messageSender, _maxFee, _feeExecuted, _expirationBlock, _hookData
+    );
   }
 
   function testFuzz_ReleaseOrMint_Success(address recipient, uint256 amount) public {
@@ -45,7 +46,6 @@ contract USDCTokenPoolCCTPV2_releaseOrMint is USDCTokenPoolCCTPV2Setup {
       destinationCaller: bytes32(uint256(uint160(address(s_usdcTokenPool)))),
       minFinalityThreshold: MIN_FINALITY_THRESHOLD_SLOW,
       finalityThresholdExecuted: MIN_FINALITY_THRESHOLD_SLOW,
-
       // TODO: Add Comments about each field
       messageBody: _formatMessage(
         0,
@@ -54,7 +54,7 @@ contract USDCTokenPoolCCTPV2_releaseOrMint is USDCTokenPoolCCTPV2Setup {
         amount,
         bytes32(uint256(uint160(OWNER))),
         0,
-        0, 
+        0,
         block.number + (1 days / 12), // TODO: Add Comment about being a block 24-hours in the future
         ""
       )
@@ -66,9 +66,7 @@ contract USDCTokenPoolCCTPV2_releaseOrMint is USDCTokenPoolCCTPV2Setup {
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: abi.encode(
-        SOURCE_DOMAIN_IDENTIFIER
-      ),
+      extraData: abi.encode(SOURCE_DOMAIN_IDENTIFIER),
       destGasAmount: USDC_DEST_TOKEN_GAS
     });
 
@@ -118,7 +116,6 @@ contract USDCTokenPoolCCTPV2_releaseOrMint is USDCTokenPoolCCTPV2Setup {
       destinationCaller: bytes32(uint256(uint160(address(s_usdcTokenPool)))),
       minFinalityThreshold: MIN_FINALITY_THRESHOLD_SLOW,
       finalityThresholdExecuted: MIN_FINALITY_THRESHOLD_SLOW,
-
       // TODO: Add Comments
       messageBody: _formatMessage(
         0,
@@ -126,19 +123,17 @@ contract USDCTokenPoolCCTPV2_releaseOrMint is USDCTokenPoolCCTPV2Setup {
         bytes32(uint256(uint160(OWNER))),
         amount,
         bytes32(uint256(uint160(OWNER))),
-        0, 
-        0, 
+        0,
+        0,
         block.number + (1 days / 12), // TODO: Comments
-        "" 
+        ""
       )
     });
 
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: abi.encode(
-        SOURCE_DOMAIN_IDENTIFIER
-      ),
+      extraData: abi.encode(SOURCE_DOMAIN_IDENTIFIER),
       destGasAmount: USDC_DEST_TOKEN_GAS
     });
 

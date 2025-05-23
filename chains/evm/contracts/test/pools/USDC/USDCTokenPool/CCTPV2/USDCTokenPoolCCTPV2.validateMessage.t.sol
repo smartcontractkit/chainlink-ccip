@@ -6,7 +6,6 @@ import {USDCTokenPoolCCTPV2} from "../../../../../pools/USDC/cctpV2/USDCTokenPoo
 import {USDCTokenPoolCCTPV2Setup} from "./USDCTokenPoolCCTPV2Setup.t.sol";
 
 contract USDCTokenPoolCCTPV2__validateMessage is USDCTokenPoolCCTPV2Setup {
-
   function testFuzz_ValidateMessage_Success(uint32 sourceDomain, bytes32 nonce) public {
     vm.pauseGasMetering();
     USDCMessageCCTPV2 memory usdcMessage = USDCMessageCCTPV2({
@@ -25,8 +24,7 @@ contract USDCTokenPoolCCTPV2__validateMessage is USDCTokenPoolCCTPV2Setup {
     bytes memory encodedUsdcMessage = _generateUSDCMessageCCTPV2(usdcMessage);
 
     vm.resumeGasMetering();
-    s_usdcTokenPool.validateMessage(
-      encodedUsdcMessage, sourceDomain);
+    s_usdcTokenPool.validateMessage(encodedUsdcMessage, sourceDomain);
   }
 
   // Reverts
@@ -54,10 +52,7 @@ contract USDCTokenPoolCCTPV2__validateMessage is USDCTokenPoolCCTPV2Setup {
     vm.expectRevert(
       abi.encodeWithSelector(USDCTokenPool.InvalidSourceDomain.selector, expectedSourceDomain, usdcMessage.sourceDomain)
     );
-    s_usdcTokenPool.validateMessage(
-      encodedUsdcMessage,
-      expectedSourceDomain
-    );
+    s_usdcTokenPool.validateMessage(encodedUsdcMessage, expectedSourceDomain);
 
     usdcMessage.destinationDomain = DEST_DOMAIN_IDENTIFIER + 1;
     vm.expectRevert(
@@ -66,10 +61,7 @@ contract USDCTokenPoolCCTPV2__validateMessage is USDCTokenPoolCCTPV2Setup {
       )
     );
 
-    s_usdcTokenPool.validateMessage(
-      _generateUSDCMessageCCTPV2(usdcMessage),
-      usdcMessage.sourceDomain
-    );
+    s_usdcTokenPool.validateMessage(_generateUSDCMessageCCTPV2(usdcMessage), usdcMessage.sourceDomain);
     usdcMessage.destinationDomain = DEST_DOMAIN_IDENTIFIER;
 
     uint32 wrongVersion = usdcMessage.version + 1;
@@ -79,7 +71,23 @@ contract USDCTokenPoolCCTPV2__validateMessage is USDCTokenPoolCCTPV2Setup {
 
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidMessageVersion.selector, wrongVersion));
     s_usdcTokenPool.validateMessage(encodedUsdcMessage, usdcMessage.sourceDomain);
+    usdcMessage.version = 0;
 
     // TODO: Change Finality threshold and thfinalityThresholdExecuted to 1000 and revert
+    usdcMessage.minFinalityThreshold = 1000;
+    encodedUsdcMessage = _generateUSDCMessageCCTPV2(usdcMessage);
+
+    vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolCCTPV2.InvalidMinFinalityThreshold.selector, 2000, 1000));
+
+    s_usdcTokenPool.validateMessage(encodedUsdcMessage, usdcMessage.sourceDomain);
+
+    // Change the min threshold back to 2k and the finality threshold to 1k to trigger
+    // the other short half of the short-circuit.
+    usdcMessage.minFinalityThreshold = 2000;
+    usdcMessage.finalityThresholdExecuted = 1000;
+    encodedUsdcMessage = _generateUSDCMessageCCTPV2(usdcMessage);
+
+    vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolCCTPV2.InvalidExecutionFinalityThreshold.selector, 2000, 1000));
+    s_usdcTokenPool.validateMessage(encodedUsdcMessage, usdcMessage.sourceDomain);
   }
 }

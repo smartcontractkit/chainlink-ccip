@@ -53,7 +53,7 @@ contract MockUSDCTokenMessenger is ITokenMessenger {
   ) external {
     IBurnMintERC20(burnToken).transferFrom(msg.sender, address(this), amount);
     IBurnMintERC20(burnToken).burn(amount);
-   
+
     emit DepositForBurn(
       burnToken,
       amount,

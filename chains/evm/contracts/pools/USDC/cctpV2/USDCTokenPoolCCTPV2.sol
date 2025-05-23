@@ -1,15 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {USDCTokenPool} from "../USDCTokenPool.sol";
-
-import {IMessageTransmitter} from "../IMessageTransmitter.sol";
 import {ITokenMessenger} from "../ITokenMessenger.sol";
-import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {Pool} from "../../../libraries/Pool.sol";
-import {TokenPool} from "../../TokenPool.sol";
 import {CCTPMessageTransmitterProxy} from "../CCTPMessageTransmitterProxy.sol";
+import {USDCTokenPool} from "../USDCTokenPool.sol";
 
 import {IERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
@@ -17,11 +13,15 @@ import {SafeERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /// @notice This pool mints and burns USDC tokens through the Cross Chain Transfer
-/// Protocol (CCTP).
+/// Protocol (CCTP) V2, which uses a different contract and message format as V1.
+/// @dev The code for the message transmitter proxy does NOT need to be modified since both CCTP V1 and V2 utilize the same
+/// interface for its MessageTransmitter, but the CCTP-controlled address that the proxy points to will be different
+/// than its V1 predecessor
 contract USDCTokenPoolCCTPV2 is USDCTokenPool {
   using SafeERC20 for IERC20;
 
-  error InvalidFinalityThreshold(uint32 expected, uint32 got);
+  error InvalidMinFinalityThreshold(uint32 expected, uint32 got);
+  error InvalidExecutionFinalityThreshold(uint32 expected, uint32 got);
 
   // CCTP's max fee is based on the use of fast-burn. Since this pool does not utilize that feature, max fee should be 0.
   uint32 public constant MAX_FEE = 0;
@@ -36,9 +36,7 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
     address[] memory allowlist,
     address rmnProxy,
     address router
-  ) USDCTokenPool(tokenMessenger, cctpMessageTransmitterProxy, token, allowlist, rmnProxy, router) {
-   
-  }
+  ) USDCTokenPool(tokenMessenger, cctpMessageTransmitterProxy, token, allowlist, rmnProxy, router) {}
 
   /// @notice Burn tokens from the pool to initiate cross-chain transfer.
   /// @notice Outgoing messages (burn operations) are routed via `i_tokenMessenger.depositForBurnWithCaller`.
@@ -68,8 +66,13 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
     // upon sending the message, and will therefore not be included in the destPoolData. It will instead be
     // acquired off-chain and included in the destination-message's offchainTokenData.
     i_tokenMessenger.depositForBurn(
-      lockOrBurnIn.amount, domain.domainIdentifier, decodedReceiver, address(i_token), domain.allowedCaller,
-      MAX_FEE, FINALITY_THRESHOLD
+      lockOrBurnIn.amount, // amount
+      domain.domainIdentifier, // destinationDomain
+      decodedReceiver, // mintRecipient
+      address(i_token), // burnToken
+      domain.allowedCaller, // destinationCaller
+      MAX_FEE, // maxFee
+      FINALITY_THRESHOLD // minFinalityThreshold
     );
 
     emit Burned(msg.sender, lockOrBurnIn.amount);
@@ -97,7 +100,7 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
     _validateReleaseOrMint(releaseOrMintIn);
 
     // uint32 sourceTokenDataPayload =
-      // abi.decode(releaseOrMintIn.sourcePoolData, (SourceTokenDataPayload));
+    // abi.decode(releaseOrMintIn.sourcePoolData, (SourceTokenDataPayload));
     uint32 sourceDomainIdentifier = abi.decode(releaseOrMintIn.sourcePoolData, (uint32));
 
     MessageAndAttestation memory msgAndAttestation =
@@ -165,14 +168,12 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
       revert InvalidDestinationDomain(i_localDomainIdentifier, destinationDomain);
     }
 
-    // Note: Unlike CCTP V1, the nonce is deterministic and not sequential. As a result it is not known when the 
-    // message was originally sent, and as a result cannot be validated now.
+    if (minFinalityThreshold != FINALITY_THRESHOLD) {
+      revert InvalidMinFinalityThreshold(FINALITY_THRESHOLD, minFinalityThreshold);
+    }
 
-    // TODO: Figure out if this should be a constant or a parameter, based on potential future implementation
-    // of fast-burn on CCTP.
-    if (minFinalityThreshold != FINALITY_THRESHOLD || finalityThresholdExecuted != FINALITY_THRESHOLD) {
-      revert InvalidFinalityThreshold(minFinalityThreshold, FINALITY_THRESHOLD);
+    if (finalityThresholdExecuted != FINALITY_THRESHOLD) {
+      revert InvalidExecutionFinalityThreshold(FINALITY_THRESHOLD, finalityThresholdExecuted);
     }
   }
-
 }

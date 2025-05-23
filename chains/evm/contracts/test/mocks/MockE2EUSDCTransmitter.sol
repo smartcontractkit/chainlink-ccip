@@ -19,8 +19,6 @@ import {IMessageTransmitterWithRelay} from "./interfaces/IMessageTransmitterWith
 
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
-import {console2 as console} from "forge-std/console2.sol";
-
 // solhint-disable
 contract MockE2EUSDCTransmitter is IMessageTransmitterWithRelay {
   // Indicated whether the receiveMessage() call should succeed.
@@ -68,11 +66,8 @@ contract MockE2EUSDCTransmitter is IMessageTransmitterWithRelay {
     //  ) internal pure returns (bytes memory) {
     //    return abi.encodePacked(_version, _burnToken, _mintRecipient, _amount, _messageSender);
     //  }
+    // TODO: Comments for CCTP V2 Message Format
     address recipient = address(bytes20(message[116 + 36 + 12:116 + 36 + 12 + 20]));
-
-    console.log("TESTING MINT");
-    console.log(recipient);
-    console.log(address(i_token));
 
     // We always mint 1 token to not complicate the test.
     i_token.mint(recipient, 1);
