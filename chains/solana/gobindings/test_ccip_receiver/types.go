@@ -176,3 +176,24 @@ func (obj *ReleaseOrMintInV1) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (
 	}
 	return nil
 }
+
+type Behavior ag_binary.BorshEnum
+
+const (
+	Normal_Behavior Behavior = iota
+	RejectAll_Behavior
+	ExtraCUs_Behavior
+)
+
+func (value Behavior) String() string {
+	switch value {
+	case Normal_Behavior:
+		return "Normal"
+	case RejectAll_Behavior:
+		return "RejectAll"
+	case ExtraCUs_Behavior:
+		return "ExtraCUs"
+	default:
+		return ""
+	}
+}
