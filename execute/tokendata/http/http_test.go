@@ -3,6 +3,7 @@ package http
 import (
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -61,10 +62,11 @@ func Test_NewHTTPClient_New(t *testing.T) {
 	}
 }
 
-func Test_HTTPClient_Get(t *testing.T) {
+func Test_HTTPClient_Get_Post(t *testing.T) {
 	tt := []struct {
 		name               string
 		getTs              func(t *testing.T) *httptest.Server
+		interval           time.Duration
 		timeout            time.Duration
 		messageHash        cciptypes.Bytes32
 		expectedError      error
@@ -89,6 +91,8 @@ func Test_HTTPClient_Get(t *testing.T) {
 					ctx := r.Context()
 					done := make(chan struct{})
 					go func() {
+						// for some reason server.Close() hangs when there is POST request with non-drained body
+						_, _ = io.ReadAll(r.Body)
 						defer close(done)
 						time.Sleep(time.Hour) // Simulate long processing time
 					}()
@@ -107,7 +111,7 @@ func Test_HTTPClient_Get(t *testing.T) {
 			expectedStatusCode: http.StatusRequestTimeout,
 		},
 		{
-			name: "rate limit",
+			name: "external rate limit",
 			getTs: func(t *testing.T) *httptest.Server {
 				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					w.WriteHeader(http.StatusTooManyRequests)
@@ -148,27 +152,40 @@ func Test_HTTPClient_Get(t *testing.T) {
 		},
 	}
 
-	for _, tc := range tt {
-		t.Run(tc.name, func(t *testing.T) {
-			ts := tc.getTs(t)
-			defer ts.Close()
+	methods := []string{http.MethodGet, http.MethodPost}
+	for _, method := range methods {
+		for _, tc := range tt {
+			t.Run(tc.name+" "+method, func(t *testing.T) {
+				ts := tc.getTs(t)
+				defer ts.Close()
 
-			attestationURI, err := url.ParseRequestURI(ts.URL)
-			require.NoError(t, err)
-
-			client, err := newHTTPClient(logger.Test(t), attestationURI.String(), tc.timeout, tc.timeout, 0)
-			require.NoError(t, err)
-			response, statusCode, err := client.Get(tests.Context(t), tc.messageHash.String())
-
-			require.Equal(t, tc.expectedStatusCode, statusCode)
-
-			if tc.expectedError != nil {
-				require.EqualError(t, err, tc.expectedError.Error())
-			} else {
+				attestationURI, err := url.ParseRequestURI(ts.URL)
 				require.NoError(t, err)
-				require.Equal(t, tc.expectedResponse, response)
-			}
-		})
+
+				client, err := newHTTPClient(logger.Test(t), attestationURI.String(), tc.interval, tc.timeout, 0)
+				require.NoError(t, err)
+
+				var response cciptypes.Bytes
+				var statusCode HTTPStatus
+				switch method {
+				case http.MethodGet:
+					response, statusCode, err = client.Get(tests.Context(t), tc.messageHash.String())
+				case http.MethodPost:
+					response, statusCode, err = client.Post(tests.Context(t), tc.messageHash.String(), []byte("{}"))
+				default:
+					t.Fatalf("unknown method %s", method)
+				}
+
+				require.Equal(t, tc.expectedStatusCode, statusCode)
+
+				if tc.expectedError != nil {
+					require.EqualError(t, err, tc.expectedError.Error())
+				} else {
+					require.NoError(t, err)
+					require.Equal(t, tc.expectedResponse, response)
+				}
+			})
+		}
 	}
 }
 

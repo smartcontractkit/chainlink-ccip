@@ -125,6 +125,7 @@ func (h *httpClient) Get(ctx context.Context, requestPath string) (cciptypes.Byt
 	response, httpStatus, err := h.callAPI(ctx, lggr, http.MethodGet, requestURL, nil)
 	lggr.Debugw(
 		"Response from attestation API",
+		"Method", "GET",
 		"requestURL", requestURL.String(),
 		"status", httpStatus,
 		"err", err,
@@ -142,9 +143,10 @@ func (h *httpClient) Post(
 	requestURL := *h.apiURL
 	requestURL.Path = path.Join(requestURL.Path, requestPath)
 
-	response, httpStatus, err := h.callAPI(ctx, lggr, http.MethodPost, *h.apiURL, bytes.NewBuffer(requestData))
+	response, httpStatus, err := h.callAPI(ctx, lggr, http.MethodPost, requestURL, bytes.NewBuffer(requestData))
 	h.lggr.Debugw(
 		"Response from attestation API",
+		"Method", "POST",
 		"requestURL", requestURL.String(),
 		"requestBody", string(requestData),
 		"status", httpStatus,
