@@ -899,6 +899,9 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
     ) {
       return Internal._validate32ByteAddress(destAddress, Internal.APTOS_PRECOMPILE_SPACE);
     }
+    if (chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_TVM) {
+      return Internal._validateTVMAddress(destAddress);
+    }
     revert InvalidChainFamilySelector(chainFamilySelector);
   }
 
@@ -1010,6 +1013,8 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
       destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_EVM
         || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_APTOS
         || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SUI
+        // TODO: temp, get review from CCIP core team, this is only for e2e scoping.
+        || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_TVM
     ) {
       gasLimit = _parseGenericExtraArgsFromBytes(
         message.extraArgs,
@@ -1132,6 +1137,8 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
       destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_EVM
         || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_APTOS
         || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SUI
+        // TODO: temp, remove once we have a proper TVM extra args.
+        || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_TVM
     ) {
       Client.GenericExtraArgsV2 memory parsedExtraArgs =
         _parseUnvalidatedEVMExtraArgsFromBytes(extraArgs, destChainConfig.defaultTxGasLimit);
@@ -1232,6 +1239,8 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
               && destChainConfig.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_SVM
               && destChainConfig.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_APTOS
               && destChainConfig.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_SUI
+              // TODO: temp, get review from CCIP core team, this is only for e2e scoping.
+              && destChainConfig.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_TVM
           )
       ) {
         revert InvalidDestChainConfig(destChainSelector);
