@@ -467,8 +467,8 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
 
     for (uint256 i = 0; i < chainsToAdd.length; ++i) {
       ChainUpdate memory newChain = chainsToAdd[i];
-      RateLimiter._validateTokenBucketConfig(newChain.outboundRateLimiterConfig, false);
-      RateLimiter._validateTokenBucketConfig(newChain.inboundRateLimiterConfig, false);
+      RateLimiter._validateTokenBucketConfig(newChain.outboundRateLimiterConfig);
+      RateLimiter._validateTokenBucketConfig(newChain.inboundRateLimiterConfig);
 
       if (newChain.remoteTokenAddress.length == 0) {
         revert ZeroAddressNotAllowed();
@@ -633,9 +633,9 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
     RateLimiter.Config memory inboundConfig
   ) internal {
     if (!isSupportedChain(remoteChainSelector)) revert NonExistentChain(remoteChainSelector);
-    RateLimiter._validateTokenBucketConfig(outboundConfig, false);
+    RateLimiter._validateTokenBucketConfig(outboundConfig);
     s_remoteChainConfigs[remoteChainSelector].outboundRateLimiterConfig._setTokenBucketConfig(outboundConfig);
-    RateLimiter._validateTokenBucketConfig(inboundConfig, false);
+    RateLimiter._validateTokenBucketConfig(inboundConfig);
     s_remoteChainConfigs[remoteChainSelector].inboundRateLimiterConfig._setTokenBucketConfig(inboundConfig);
     emit ChainConfigured(remoteChainSelector, outboundConfig, inboundConfig);
   }
