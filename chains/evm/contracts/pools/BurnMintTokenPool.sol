@@ -24,7 +24,7 @@ contract BurnMintTokenPool is BurnMintTokenPoolAbstract, ITypeAndVersion {
     address router
   ) TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) {}
 
-  /// @inheritdoc BurnMintTokenPoolAbstract
+  /// @inheritdoc TokenPool
   function _lockOrBurn(
     uint256 amount
   ) internal virtual override {

@@ -62,7 +62,7 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
   /// @dev The _validateLockOrBurn check is an essential security check
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
-  ) external virtual override returns (Pool.LockOrBurnOutV1 memory) {
+  ) public virtual override returns (Pool.LockOrBurnOutV1 memory) {
     _validateLockOrBurn(lockOrBurnIn);
 
     // If funds need to be siloed, update internal accounting;
@@ -88,7 +88,7 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
   /// measure to prevent funds from a Silo being released by another chain.
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
-  ) external virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
+  ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
     _validateReleaseOrMint(releaseOrMintIn);
 
     // Calculate the local amount

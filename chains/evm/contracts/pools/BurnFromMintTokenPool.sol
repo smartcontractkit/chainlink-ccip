@@ -33,7 +33,7 @@ contract BurnFromMintTokenPool is BurnMintTokenPoolAbstract, ITypeAndVersion {
     token.safeIncreaseAllowance(address(this), type(uint256).max);
   }
 
-  /// @inheritdoc BurnMintTokenPoolAbstract
+  /// @inheritdoc TokenPool
   function _lockOrBurn(
     uint256 amount
   ) internal virtual override {

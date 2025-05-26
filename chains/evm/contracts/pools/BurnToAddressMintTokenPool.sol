@@ -39,7 +39,7 @@ contract BurnToAddressMintTokenPool is BurnMintTokenPoolAbstract, ITypeAndVersio
     i_burnAddress = burnAddress;
   }
 
-  /// @inheritdoc BurnMintTokenPoolAbstract
+  /// @inheritdoc TokenPool
   /// @notice Tokens are burned by sending to an address which can never transfer them,
   /// making the tokens unrecoverable without reducing the total supply.
   function _lockOrBurn(
