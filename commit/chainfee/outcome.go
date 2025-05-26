@@ -11,7 +11,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/mathslib"
-
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
@@ -236,8 +235,6 @@ func (p *processor) getGasPricesToUpdate(
 		lggr.Errorw("error getting dest chain config", "chain", p.destChain, "err", err)
 		return gasPrices
 	}
-	execGasPriceDeviation := destChainCfg.Config.GasPriceDeviationPPB.Int64()
-	daGasPriceDeviation := destChainCfg.Config.DAGasPriceDeviationPPB.Int64()
 
 	for chain, currentChainFee := range currentChainUSDFees {
 		chainCfg, err := p.homeChain.GetChainConfig(chain)
@@ -289,33 +286,35 @@ func (p *processor) getGasPricesToUpdate(
 			continue
 		}
 
-		executionFeeDeviates := mathslib.Deviates(
+		var executionFeeDeviates, dataAvFeeDeviates bool
+		executionFeeDeviates = mathslib.DeviatesOnCurve(
 			currentChainFee.ExecutionFeePriceUSD,
 			lastUpdate.ChainFee.ExecutionFeePriceUSD,
-			execGasPriceDeviation,
+			destChainCfg.Config.ExecNoDeviationThresholdUSDWei.Int,
 		)
-
-		dataAvFeeDeviates := mathslib.Deviates(
+		dataAvFeeDeviates = mathslib.DeviatesOnCurve(
 			currentChainFee.DataAvFeePriceUSD,
 			lastUpdate.ChainFee.DataAvFeePriceUSD,
-			daGasPriceDeviation,
+			destChainCfg.Config.DataAvNoDeviationThresholdUSDWei.Int,
 		)
 
+		deviationLogKeysAndValues := map[string]any{
+			"chain":                                chain,
+			"executionFeeDeviates":                 executionFeeDeviates,
+			"currentChainFee.executionFeePriceUSD": currentChainFee.ExecutionFeePriceUSD.String(),
+			"lastUpdate.executionFeePriceUSD":      lastUpdate.ChainFee.ExecutionFeePriceUSD.String(),
+			"dataAvFeeDeviates":                    dataAvFeeDeviates,
+			"currentChainFee.dataAvFeePriceUSD":    currentChainFee.DataAvFeePriceUSD.String(),
+			"lastUpdate.dataAvFeePriceUSD":         lastUpdate.ChainFee.DataAvFeePriceUSD.String(),
+		}
 		if executionFeeDeviates || dataAvFeeDeviates {
-			lggr.Infow(
-				"chain fee update needed: deviation threshold exceeded for either execution or data availability fee",
-				"executionFeeDeviates", executionFeeDeviates,
-				"dataAvFeeDeviates", dataAvFeeDeviates,
-				"executionFeeDeviationPPB", feeConfig.GasPriceDeviationPPB,
-				"dataAvFeeDeviationPPB", feeConfig.DAGasPriceDeviationPPB)
+			lggr.Infow("chain fee update needed: deviation threshold exceeded for either execution or data availability fee", deviationLogKeysAndValues)
 			gasPrices = append(gasPrices, cciptypes.GasPriceChain{
 				ChainSel: chain,
 				GasPrice: packedFee,
 			})
 		} else {
-			lggr.Debugw("chain fee update not needed: within deviation thresholds",
-				"executionFeeDeviationPPB", feeConfig.GasPriceDeviationPPB,
-				"dataAvFeeDeviationPPB", feeConfig.DAGasPriceDeviationPPB)
+			lggr.Debugw("chain fee update not needed: within deviation thresholds", deviationLogKeysAndValues)
 		}
 	}
 
