@@ -52,7 +52,7 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     vm.expectCall(
       s_destPoolByToken[s_destTokens[0]],
       abi.encodeWithSelector(
-        LockReleaseTokenPool.releaseOrMint.selector,
+        TokenPool.releaseOrMint.selector,
         Pool.ReleaseOrMintInV1({
           originalSender: message.sender,
           receiver: message.receiver,

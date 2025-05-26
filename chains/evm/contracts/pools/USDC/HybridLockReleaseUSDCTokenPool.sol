@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {ILiquidityContainer} from "../../interfaces/ILiquidityContainer.sol";
 import {ITokenMessenger} from "../USDC/ITokenMessenger.sol";
 
 import {Pool} from "../../libraries/Pool.sol";
@@ -33,6 +32,8 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
   event LiquidityProviderSet(
     address indexed oldProvider, address indexed newProvider, uint64 indexed remoteChainSelector
   );
+  event LiquidityAdded(address indexed provider, uint256 indexed amount);
+  event LiquidityRemoved(address indexed provider, uint256 indexed amount);
 
   event LockReleaseEnabled(uint64 indexed remoteChainSelector);
   event LockReleaseDisabled(uint64 indexed remoteChainSelector);
@@ -193,7 +194,7 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
 
     i_token.safeTransferFrom(msg.sender, address(this), amount);
 
-    emit ILiquidityContainer.LiquidityAdded(msg.sender, amount);
+    emit LiquidityAdded(msg.sender, amount);
   }
 
   /// @notice Removed liquidity to the pool. The tokens will be sent to msg.sender.
@@ -213,7 +214,7 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
 
     i_token.safeTransfer(msg.sender, amount);
 
-    emit ILiquidityContainer.LiquidityRemoved(msg.sender, amount);
+    emit LiquidityRemoved(msg.sender, amount);
   }
 
   // ================================================================

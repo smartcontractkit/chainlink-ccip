@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {ILiquidityContainer} from "../interfaces/ILiquidityContainer.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {Pool} from "../libraries/Pool.sol";
@@ -18,12 +17,14 @@ import {IERC165} from
 /// Because of lock/unlock requiring liquidity, this pool contract also has function to add and remove
 /// liquidity. This allows for proper bookkeeping for both user and liquidity provider balances.
 /// @dev One token per LockReleaseTokenPool.
-contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion {
+contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
   using SafeERC20 for IERC20;
 
   error InsufficientLiquidity();
 
   event LiquidityTransferred(address indexed from, uint256 amount);
+  event LiquidityAdded(address indexed provider, uint256 indexed amount);
+  event LiquidityRemoved(address indexed provider, uint256 indexed amount);
 
   string public constant override typeAndVersion = "LockReleaseTokenPool 1.5.1";
 
@@ -38,45 +39,8 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
     address router
   ) TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) {}
 
-  /// @notice Locks the token in the pool
-  /// @dev The _validateLockOrBurn check is an essential security check
-  function lockOrBurn(
-    Pool.LockOrBurnInV1 calldata lockOrBurnIn
-  ) public virtual override returns (Pool.LockOrBurnOutV1 memory) {
-    _validateLockOrBurn(lockOrBurnIn);
-
-    emit LockedOrBurned(msg.sender, lockOrBurnIn.amount);
-
-    return Pool.LockOrBurnOutV1({
-      destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
-      destPoolData: _encodeLocalDecimals()
-    });
-  }
-
-  /// @notice Release tokens from the pool to the recipient
-  /// @dev The _validateReleaseOrMint check is an essential security check
-  function releaseOrMint(
-    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
-  ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
-    _validateReleaseOrMint(releaseOrMintIn);
-
-    // Calculate the local amount
-    uint256 localAmount =
-      _calculateLocalAmount(releaseOrMintIn.amount, _parseRemoteDecimals(releaseOrMintIn.sourcePoolData));
-
-    // Release to the recipient
-    getToken().safeTransfer(releaseOrMintIn.receiver, localAmount);
-
-    emit ReleasedOrMinted(msg.sender, releaseOrMintIn.receiver, localAmount);
-
-    return Pool.ReleaseOrMintOutV1({destinationAmount: localAmount});
-  }
-
-  /// @inheritdoc IERC165
-  function supportsInterface(
-    bytes4 interfaceId
-  ) public pure virtual override returns (bool) {
-    return interfaceId == type(ILiquidityContainer).interfaceId || super.supportsInterface(interfaceId);
+  function _releaseOrMint(address receiver, uint256 amount) internal virtual override {
+    getToken().safeTransfer(receiver, amount);
   }
 
   /// @notice Gets rebalancer, can be address(0) if none is configured.
@@ -86,6 +50,7 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
   }
 
   /// @notice Sets the rebalancer address.
+  /// @dev Address(0) can be used to disable the rebalancer.
   /// @dev Only callable by the owner.
   function setRebalancer(
     address rebalancer

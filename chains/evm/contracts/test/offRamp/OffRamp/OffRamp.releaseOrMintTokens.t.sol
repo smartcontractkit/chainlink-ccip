@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {IPoolV1} from "../../../interfaces/IPool.sol";
+
 import {Client} from "../../../libraries/Client.sol";
 import {Internal} from "../../../libraries/Internal.sol";
 import {Pool} from "../../../libraries/Pool.sol";
@@ -34,7 +36,7 @@ contract OffRamp_releaseOrMintTokens is OffRampSetup {
     vm.expectCall(
       s_destPoolBySourceToken[srcTokenAmounts[0].token],
       abi.encodeWithSelector(
-        LockReleaseTokenPool.releaseOrMint.selector,
+        IPoolV1.releaseOrMint.selector,
         Pool.ReleaseOrMintInV1({
           originalSender: abi.encode(OWNER),
           receiver: OWNER,
@@ -70,7 +72,7 @@ contract OffRamp_releaseOrMintTokens is OffRampSetup {
     vm.expectCall(
       s_destPoolBySourceToken[srcTokenAmounts[0].token],
       abi.encodeWithSelector(
-        LockReleaseTokenPool.releaseOrMint.selector,
+        IPoolV1.releaseOrMint.selector,
         Pool.ReleaseOrMintInV1({
           originalSender: abi.encode(OWNER),
           receiver: OWNER,
@@ -150,7 +152,7 @@ contract OffRamp_releaseOrMintTokens is OffRampSetup {
     vm.mockCall(
       s_destPoolBySourceToken[srcTokenAmounts[0].token],
       abi.encodeWithSelector(
-        LockReleaseTokenPool.releaseOrMint.selector,
+        IPoolV1.releaseOrMint.selector,
         Pool.ReleaseOrMintInV1({
           originalSender: abi.encode(OWNER),
           receiver: OWNER,
@@ -205,7 +207,7 @@ contract OffRamp_releaseOrMintTokens is OffRampSetup {
     vm.expectCall(
       s_destPoolBySourceToken[srcTokenAmounts[0].token],
       abi.encodeWithSelector(
-        LockReleaseTokenPool.releaseOrMint.selector,
+        IPoolV1.releaseOrMint.selector,
         Pool.ReleaseOrMintInV1({
           originalSender: abi.encode(OWNER),
           receiver: OWNER,
