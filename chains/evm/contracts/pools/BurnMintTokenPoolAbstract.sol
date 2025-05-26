@@ -7,17 +7,17 @@ import {Pool} from "../libraries/Pool.sol";
 import {TokenPool} from "./TokenPool.sol";
 
 abstract contract BurnMintTokenPoolAbstract is TokenPool {
-  /// @notice Contains the specific burn call for a pool.
-  /// @dev overriding this method allows us to create pools with different burn signatures
+  /// @notice Contains the specific lock or burn token logic for a pool.
+  /// @dev overriding this method allows us to create pools with different lock/burn signatures
   /// without duplicating the underlying logic.
-  function _burn(
+  function _lockOrBurn(
     uint256 amount
   ) internal virtual;
 
-  /// @notice Contains the specific mint call for a pool.
-  /// @dev overriding this method allows us to create pools with different mint signatures
+  /// @notice Contains the specific release or mint token logic for a pool.
+  /// @dev overriding this method allows us to create pools with different release/mint signatures
   /// without duplicating the underlying logic.
-  function _mint(address receiver, uint256 amount) internal virtual {
+  function _releaseOrMint(address receiver, uint256 amount) internal virtual {
     IBurnMintERC20(address(i_token)).mint(receiver, amount);
   }
 
@@ -28,7 +28,7 @@ abstract contract BurnMintTokenPoolAbstract is TokenPool {
   ) public virtual override returns (Pool.LockOrBurnOutV1 memory) {
     _validateLockOrBurn(lockOrBurnIn);
 
-    _burn(lockOrBurnIn.amount);
+    _lockOrBurn(lockOrBurnIn.amount);
 
     emit LockedOrBurned(msg.sender, lockOrBurnIn.amount);
 
@@ -50,7 +50,7 @@ abstract contract BurnMintTokenPoolAbstract is TokenPool {
       _calculateLocalAmount(releaseOrMintIn.amount, _parseRemoteDecimals(releaseOrMintIn.sourcePoolData));
 
     // Mint to the receiver
-    _mint(releaseOrMintIn.receiver, localAmount);
+    _releaseOrMint(releaseOrMintIn.receiver, localAmount);
 
     emit ReleasedOrMinted(msg.sender, releaseOrMintIn.receiver, localAmount);
 

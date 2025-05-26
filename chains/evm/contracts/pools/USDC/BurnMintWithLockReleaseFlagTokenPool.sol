@@ -48,7 +48,7 @@ contract BurnMintWithLockReleaseFlagTokenPool is BurnMintTokenPool {
   ) public override returns (Pool.LockOrBurnOutV1 memory) {
     _validateLockOrBurn(lockOrBurnIn);
 
-    _burn(lockOrBurnIn.amount);
+    _lockOrBurn(lockOrBurnIn.amount);
 
     emit LockedOrBurned(msg.sender, lockOrBurnIn.amount);
 
