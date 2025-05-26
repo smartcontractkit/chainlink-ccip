@@ -57,6 +57,9 @@ type Outcome struct {
 	// * Filter: Commit reports associated with the final execution report, concatenated together.
 	CommitReports []CommitData `json:"commitReports"`
 
+	// Report is built from the oldest pending commit reports.
+	Report cciptypes.ExecutePluginReport `json:"report"`
+
 	// Reports are built from the oldest pending commit reports.
 	Reports []cciptypes.ExecutePluginReport `json:"reports"`
 }
@@ -109,11 +112,13 @@ func (o Outcome) ToLogFormat() Outcome {
 func NewOutcome(
 	state PluginState,
 	selectedCommits []CommitData,
+	report cciptypes.ExecutePluginReport,
 	reports []cciptypes.ExecutePluginReport,
 ) Outcome {
 	return Outcome{
 		State:         state,
 		CommitReports: selectedCommits,
+		Report:        report,
 		Reports:       reports,
 	}
 }
