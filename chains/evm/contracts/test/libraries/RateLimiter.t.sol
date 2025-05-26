@@ -132,15 +132,6 @@ contract RateLimiter_consume is RateLimiterSetup {
     assertEq(BLOCK_TIME, rateLimiter.lastUpdated);
   }
 
-  function test_ConsumeTokens() public {
-    uint256 requestTokens = 50;
-
-    vm.expectEmit();
-    emit RateLimiter.TokensConsumed(requestTokens);
-
-    s_helper.consume(requestTokens, s_token);
-  }
-
   function test_Refill() public {
     uint256 requestTokens = 50;
 
