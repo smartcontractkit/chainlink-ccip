@@ -45,7 +45,7 @@ contract BurnMintWithLockReleaseFlagTokenPool is BurnMintTokenPool {
   /// as the destPoolData to signal to the remote pool to release tokens instead of minting them.
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
-  ) external override returns (Pool.LockOrBurnOutV1 memory) {
+  ) public override returns (Pool.LockOrBurnOutV1 memory) {
     _validateLockOrBurn(lockOrBurnIn);
 
     _burn(lockOrBurnIn.amount);

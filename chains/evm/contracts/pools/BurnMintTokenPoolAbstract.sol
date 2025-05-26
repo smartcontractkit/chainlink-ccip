@@ -14,11 +14,18 @@ abstract contract BurnMintTokenPoolAbstract is TokenPool {
     uint256 amount
   ) internal virtual;
 
+  /// @notice Contains the specific mint call for a pool.
+  /// @dev overriding this method allows us to create pools with different mint signatures
+  /// without duplicating the underlying logic.
+  function _mint(address receiver, uint256 amount) internal virtual {
+    IBurnMintERC20(address(i_token)).mint(receiver, amount);
+  }
+
   /// @notice Burn the token in the pool
   /// @dev The _validateLockOrBurn check is an essential security check
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
-  ) external virtual override returns (Pool.LockOrBurnOutV1 memory) {
+  ) public virtual override returns (Pool.LockOrBurnOutV1 memory) {
     _validateLockOrBurn(lockOrBurnIn);
 
     _burn(lockOrBurnIn.amount);
@@ -43,7 +50,7 @@ abstract contract BurnMintTokenPoolAbstract is TokenPool {
       _calculateLocalAmount(releaseOrMintIn.amount, _parseRemoteDecimals(releaseOrMintIn.sourcePoolData));
 
     // Mint to the receiver
-    IBurnMintERC20(address(i_token)).mint(releaseOrMintIn.receiver, localAmount);
+    _mint(releaseOrMintIn.receiver, localAmount);
 
     emit Minted(msg.sender, releaseOrMintIn.receiver, localAmount);
 

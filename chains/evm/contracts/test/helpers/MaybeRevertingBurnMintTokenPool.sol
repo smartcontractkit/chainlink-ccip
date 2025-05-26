@@ -39,7 +39,7 @@ contract MaybeRevertingBurnMintTokenPool is BurnMintTokenPool {
 
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
-  ) external virtual override returns (Pool.LockOrBurnOutV1 memory) {
+  ) public virtual override returns (Pool.LockOrBurnOutV1 memory) {
     _validateLockOrBurn(lockOrBurnIn);
 
     bytes memory revertReason = s_revertReason;
