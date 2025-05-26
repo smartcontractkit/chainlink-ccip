@@ -11,7 +11,7 @@ jobs:
     name: Detect changes
     runs-on: ubuntu-latest
     outputs:
-      non_src_changes: ${{ steps.changes.outputs.non_src }}
+      e2e_should_run: ${{ steps.changes.outputs.e2e_should_run }}
     steps:
       - name: Checkout the repo
         uses: actions/checkout@v4
