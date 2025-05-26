@@ -3,11 +3,12 @@
   "version": "1.6.0",
   "description": "Chainlink smart contracts for CCIP",
   "author": "Chainlink devs",
+  "repository": "github:smartcontractkit/chainlink-ccip",
   "license": "BUSL-1.1",
   "private": false,
   "scripts": {
     "publish-beta": "pnpm publish --tag beta",
-    "publish-prod": "npm dist-tag add @chainlink/contracts-ccip@1.6.0 latest",
+    "publish-prod": "pnpm publish --tag latest",
     "compile": "./scripts/compile_all",
     "solhint": "solhint --max-warnings 0 \"./contracts/**/*.sol\"",
     "solhint-test": "solhint --config \".solhint-test.json\"  --ignore-path \".solhintignore-test\" --max-warnings 0 \"./contracts/**/*.sol\""
@@ -22,7 +23,7 @@
     "!contracts/test/mocks/test/*",
     "contracts/test/helpers/**/*",
     "scripts/compile_all",
-    "abi/v0.8/",
+    "abi/*.abi",
     "remappings.txt",
     ".solhint.json",
     ".solhint-test.json",
