@@ -7,13 +7,6 @@ import {Pool} from "../libraries/Pool.sol";
 import {TokenPool} from "./TokenPool.sol";
 
 abstract contract BurnMintTokenPoolAbstract is TokenPool {
-  //  /// @notice Contains the specific lock or burn token logic for a pool.
-  //  /// @dev overriding this method allows us to create pools with different lock/burn signatures
-  //  /// without duplicating the underlying logic.
-  //  function _lockOrBurn(
-  //    uint256 amount
-  //  ) internal virtual;
-
   /// @notice Contains the specific release or mint token logic for a pool.
   /// @dev overriding this method allows us to create pools with different release/mint signatures
   /// without duplicating the underlying logic.

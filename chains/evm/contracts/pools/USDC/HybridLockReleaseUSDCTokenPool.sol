@@ -82,6 +82,23 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
     return _lockReleaseOutgoingMessage(lockOrBurnIn);
   }
 
+  /// @notice Contains the alternative mechanism, in this implementation is "Lock" on outgoing tokens
+  function _lockReleaseOutgoingMessage(
+    Pool.LockOrBurnInV1 calldata lockOrBurnIn
+  ) internal virtual returns (Pool.LockOrBurnOutV1 memory) {
+    _validateLockOrBurn(lockOrBurnIn);
+
+    // Increase internal accounting of locked tokens for burnLockedUSDC() migration
+    s_lockedTokensByChainSelector[lockOrBurnIn.remoteChainSelector] += lockOrBurnIn.amount;
+
+    emit LockedOrBurned(msg.sender, lockOrBurnIn.amount);
+
+    return Pool.LockOrBurnOutV1({
+      destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
+      destPoolData: abi.encode(LOCK_RELEASE_FLAG)
+    });
+  }
+
   /// @notice Release tokens from the pool to the recipient
   /// @dev The _validateReleaseOrMint check is an essential security check
   function releaseOrMint(
@@ -127,23 +144,6 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
     emit ReleasedOrMinted(msg.sender, releaseOrMintIn.receiver, releaseOrMintIn.amount);
 
     return Pool.ReleaseOrMintOutV1({destinationAmount: releaseOrMintIn.amount});
-  }
-
-  /// @notice Contains the alternative mechanism, in this implementation is "Lock" on outgoing tokens
-  function _lockReleaseOutgoingMessage(
-    Pool.LockOrBurnInV1 calldata lockOrBurnIn
-  ) internal virtual returns (Pool.LockOrBurnOutV1 memory) {
-    _validateLockOrBurn(lockOrBurnIn);
-
-    // Increase internal accounting of locked tokens for burnLockedUSDC() migration
-    s_lockedTokensByChainSelector[lockOrBurnIn.remoteChainSelector] += lockOrBurnIn.amount;
-
-    emit LockedOrBurned(msg.sender, lockOrBurnIn.amount);
-
-    return Pool.LockOrBurnOutV1({
-      destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
-      destPoolData: abi.encode(LOCK_RELEASE_FLAG)
-    });
   }
 
   // ================================================================

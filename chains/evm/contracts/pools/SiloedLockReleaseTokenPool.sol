@@ -59,11 +59,11 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
   ) TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) {}
 
   /// @notice Locks the token in the pool
-  /// @dev The _validateLockOrBurn check is an essential security check
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
-  ) public virtual override returns (Pool.LockOrBurnOutV1 memory) {
-    _validateLockOrBurn(lockOrBurnIn);
+  ) public virtual override returns (Pool.LockOrBurnOutV1 memory out) {
+    // super.lockOrBurn will validate the lockOrBurnIn and revert if invalid.
+    out = super.lockOrBurn(lockOrBurnIn);
 
     // If funds need to be siloed, update internal accounting;
     if (s_chainConfigs[lockOrBurnIn.remoteChainSelector].isSiloed) {
@@ -74,12 +74,7 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
       s_unsiloedTokenBalance += lockOrBurnIn.amount;
     }
 
-    emit LockedOrBurned(msg.sender, lockOrBurnIn.amount);
-
-    return Pool.LockOrBurnOutV1({
-      destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
-      destPoolData: _encodeLocalDecimals()
-    });
+    return out;
   }
 
   /// @notice Release tokens from the pool to the recipient
@@ -221,7 +216,6 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     SiloConfig storage remoteConfig = s_chainConfigs[remoteChainSelector];
 
     if (!remoteConfig.isSiloed) revert ChainNotSiloed(remoteChainSelector);
-    if (newRebalancer == address(0)) revert ZeroAddressNotAllowed();
 
     address oldRebalancer = remoteConfig.rebalancer;
 
@@ -236,8 +230,6 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
   function setRebalancer(
     address newRebalancer
   ) external onlyOwner {
-    if (newRebalancer == address(0)) revert ZeroAddressNotAllowed();
-
     address oldRebalancer = s_rebalancer;
 
     s_rebalancer = newRebalancer;
