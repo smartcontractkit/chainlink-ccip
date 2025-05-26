@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/mock"
 	"golang.org/x/exp/maps"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -97,13 +98,19 @@ func Test_processor_Observation(t *testing.T) {
 				2: 2,
 				3: 1,
 			},
-			expErr: false,
+			expErr:   false,
+			emptyObs: false,
 		},
 		{
 			name:            "only dest chain",
 			supportedChains: []ccipocr3.ChainSelector{1},
 			dstChain:        1,
-			emptyObs:        true,
+			fChain: map[ccipocr3.ChainSelector]int{
+				1: 1,
+				2: 2,
+				3: 1,
+			},
+			emptyObs: true,
 		},
 	}
 
@@ -140,13 +147,13 @@ func Test_processor_Observation(t *testing.T) {
 				slicesWithoutDst = []ccipocr3.ChainSelector(nil)
 			}
 
-			ccipReader.EXPECT().GetChainsFeeComponents(ctx, slicesWithoutDst).
+			ccipReader.EXPECT().GetChainsFeeComponents(mock.Anything, slicesWithoutDst).
 				Return(tc.chainFeeComponents).Maybe()
 
-			ccipReader.EXPECT().GetWrappedNativeTokenPriceUSD(ctx, slicesWithoutDst).
+			ccipReader.EXPECT().GetWrappedNativeTokenPriceUSD(mock.Anything, slicesWithoutDst).
 				Return(tc.nativeTokenPrices).Maybe()
 
-			ccipReader.EXPECT().GetChainFeePriceUpdate(ctx, slicesWithoutDst).
+			ccipReader.EXPECT().GetChainFeePriceUpdate(mock.Anything, slicesWithoutDst).
 				Return(tc.existingChainFeePriceUpdates).Maybe()
 
 			homeChain.EXPECT().GetFChain().Return(tc.fChain, nil).Maybe()
@@ -159,7 +166,8 @@ func Test_processor_Observation(t *testing.T) {
 				return
 			}
 			if tc.emptyObs {
-				require.Empty(t, obs)
+				require.Equal(t, tc.fChain, obs.FChain)
+				require.NotEqual(t, time.Time{}, obs.TimestampNow)
 				return
 			}
 
@@ -335,13 +343,13 @@ func Test_unique_chain_filter_in_Observation(t *testing.T) {
 			slicesWithoutDst := supportedSet.ToSlice()
 			sort.Slice(slicesWithoutDst, func(i, j int) bool { return slicesWithoutDst[i] < slicesWithoutDst[j] })
 
-			ccipReader.EXPECT().GetChainsFeeComponents(ctx, slicesWithoutDst).
+			ccipReader.EXPECT().GetChainsFeeComponents(mock.Anything, slicesWithoutDst).
 				Return(tc.chainFeeComponents).Maybe()
 
-			ccipReader.EXPECT().GetWrappedNativeTokenPriceUSD(ctx, slicesWithoutDst).
+			ccipReader.EXPECT().GetWrappedNativeTokenPriceUSD(mock.Anything, slicesWithoutDst).
 				Return(tc.nativeTokenPrices).Maybe()
 
-			ccipReader.EXPECT().GetChainFeePriceUpdate(ctx, slicesWithoutDst).
+			ccipReader.EXPECT().GetChainFeePriceUpdate(mock.Anything, slicesWithoutDst).
 				Return(tc.existingChainFeePriceUpdates).Maybe()
 
 			homeChain.EXPECT().GetFChain().Return(tc.fChain, nil).Maybe()
@@ -349,7 +357,8 @@ func Test_unique_chain_filter_in_Observation(t *testing.T) {
 			obs, err := p.Observation(ctx, Outcome{}, Query{})
 			require.NoError(t, err)
 			if tc.expUniqueChains == 0 {
-				require.Empty(t, obs)
+				require.Equal(t, tc.fChain, obs.FChain)
+				require.NotEqual(t, time.Time{}, obs.TimestampNow)
 				return
 			}
 

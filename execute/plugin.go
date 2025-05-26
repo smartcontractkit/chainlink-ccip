@@ -82,11 +82,9 @@ type Plugin struct {
 	addrCodec         cciptypes.AddressCodec
 
 	// state
-
 	contractsInitialized bool
-	// commitRootsCache remembers commit root details to optimize DB lookups.
-	commitRootsCache cache.CommitsRootsCache
-	// inflightMessageCache prevents duplicate reports from being sent for the same message.
+	commitRootsCache     cache.CommitsRootsCache
+	commitReportCache    cache.CommitReportCache
 	inflightMessageCache inflightMessageCache
 }
 
@@ -109,6 +107,14 @@ func NewPlugin(
 	lggr.Infow("creating new plugin instance", "p2pID", oracleIDToP2pID[reportingCfg.OracleID])
 
 	ocrTypCodec := ocrtypecodec.DefaultExecCodec
+
+	// Initialize CommitReportCacheConfig
+	commitReportCacheCfg := cache.CommitReportCacheConfig{
+		MessageVisibilityInterval: offchainCfg.MessageVisibilityInterval.Duration(),
+		EvictionGracePeriod:       cache.EvictionGracePeriod,
+		CleanupInterval:           cache.CleanupInterval,
+	}
+
 	p := &Plugin{
 		donID:             donID,
 		reportingCfg:      reportingCfg,
@@ -143,6 +149,12 @@ func NewPlugin(
 			logutil.WithComponent(lggr, "CommitRootsCache"),
 			offchainCfg.MessageVisibilityInterval.Duration(),
 			offchainCfg.RootSnoozeTime.Duration(),
+		),
+		commitReportCache: cache.NewCommitReportCache(
+			logutil.WithComponent(lggr, "CommitReportCache"),
+			commitReportCacheCfg,
+			&cache.RealTimeProvider{},
+			ccipReader,
 		),
 		inflightMessageCache: cache.NewInflightMessageCache(offchainCfg.InflightCacheExpiry.Duration()),
 		ocrTypeCodec:         ocrTypCodec,
@@ -253,64 +265,75 @@ func removeUnconfirmedAndFinalizedMessages(
 
 // getPendingReportsForExecution is used to find commit reports which need to be executed.
 //
-// The function checks execution status at two levels:
+// The function leverages an optimized caching strategy for commit reports:
+// 1. Uses CommitReportCache to determine the optimal timestamp to query from
+// 2. Retrieves previously cached reports (filtered to only contain those with Merkle roots)
+// 3. Fetches incremental reports from the chain reader
+// 4. Deduplicates combined reports to prevent redundant processing
+//
+// Execution status is checked at two levels:
 // 1. Gets all executed messages (both finalized and unfinalized) via primitives.Unconfirmed
 // 2. Gets only finalized executed messages via primitives.Finalized
 //
-// Reports are then classified as:
-// - fullyExecutedFinalized: All messages executed with finality (mark as executed)
-// - fullyExecutedUnfinalized: All messages executed but not finalized (snooze)
+// Reports are then classified into three categories:
+// - fullyExecutedFinalized: All messages executed with finality (permanently marked as executed)
+// - fullyExecutedUnfinalized: All messages executed but not finalized (temporarily snoozed)
 // - groupedCommits: Reports with unexecuted messages (available for execution)
 func getPendingReportsForExecution(
 	ctx context.Context,
 	ccipReader readerpkg.CCIPReader,
+	commitReportCache cache.CommitReportCache,
 	canExecute CanExecuteHandle,
-	ts time.Time,
+	fetchFrom time.Time,
 	cursedSourceChains map[cciptypes.ChainSelector]bool,
+	limit int,
 	lggr logger.Logger,
 ) (
 	groupedCommits exectypes.CommitObservations,
 	fullyExecutedFinalized []exectypes.CommitData,
 	fullyExecutedUnfinalized []exectypes.CommitData,
-	latestEmptyRootTimestamp time.Time,
 	err error,
 ) {
+	// get the reports from the cache
+	reportsFromCache := commitReportCache.GetCachedReports(fetchFrom)
+	lggr.Infow("Querying commit reports from cache", "fetchFrom", fetchFrom)
+
+	// get the timestamp to fetch from cache
+	queryFromTimestampForNewReports := commitReportCache.GetReportsToQueryFromTimestamp()
+
 	// Assuming each report can have minimum one message, max reports shouldn't exceed the max messages
-	unfinalizedReports, err := ccipReader.CommitReportsGTETimestamp(
-		ctx, ts, primitives.Unconfirmed, maxCommitReportsToFetch,
+	unfinalizedIncrementReports, err := ccipReader.CommitReportsGTETimestamp(
+		ctx, queryFromTimestampForNewReports, primitives.Unconfirmed, limit,
 	)
 	if err != nil {
-		return nil, nil, nil, time.Time{}, err
+		return nil, nil, nil, err
 	}
-	lggr.Debugw("commit reports", "unfinalizedReports", unfinalizedReports,
-		"count", len(unfinalizedReports))
+	lggr.Infow("Querying commit reports from chain", "fetchFrom", queryFromTimestampForNewReports)
 
-	finalizedReports, err := ccipReader.CommitReportsGTETimestamp(
-		ctx, ts, primitives.Finalized, maxCommitReportsToFetch,
-	)
-	if err != nil {
-		return nil, nil, nil, time.Time{}, err
-	}
+	// merge the reports from the cache and the reports from the reader
+	candidateReports := cache.DeduplicateReports(lggr, append(reportsFromCache, unfinalizedIncrementReports...))
 
-	groupedCommits = groupByChainSelectorWithFilter(lggr, unfinalizedReports, cursedSourceChains)
+	lggr.Debugw("commit reports", "candidateReports", candidateReports, "count", len(candidateReports))
+
+	groupedCommits = groupByChainSelectorWithFilter(lggr, candidateReports, cursedSourceChains)
 	lggr.Debugw("grouped commits before removing fully executed reports",
 		"groupedCommits", groupedCommits, "count", len(groupedCommits))
 
 	rangesBySelector, executableReports, err := getExecutableReportRanges(lggr, groupedCommits, canExecute)
 	if err != nil {
-		return nil, nil, nil, time.UnixMilli(0), err
+		return nil, nil, nil, err
 	}
 
 	// Get all executed messages
 	unconfirmedMessages, err := ccipReader.ExecutedMessages(ctx, rangesBySelector, primitives.Unconfirmed)
 	if err != nil {
-		return nil, nil, nil, time.UnixMilli(0),
+		return nil, nil, nil,
 			fmt.Errorf("get executed messages in range %v: %w", rangesBySelector, err)
 	}
 	// Get finalized messages
 	finalizedMessages, err := ccipReader.ExecutedMessages(ctx, rangesBySelector, primitives.Finalized)
 	if err != nil {
-		return nil, nil, nil, time.UnixMilli(0),
+		return nil, nil, nil,
 			fmt.Errorf("get finalized executed messages in range %v: %w", rangesBySelector, err)
 	}
 
@@ -324,23 +347,7 @@ func getPendingReportsForExecution(
 	return remainingReportsBySelector,
 		fullyExecutedFinalized,
 		fullyExecutedUnfinalized,
-		getLatestEmptyRootTimestamp(finalizedReports),
 		nil
-}
-
-func getLatestEmptyRootTimestamp(
-	commitReports []cciptypes.CommitPluginReportWithMeta,
-) time.Time {
-	latestEmptyRootTimestamp := time.Time{}
-	for _, commitReport := range commitReports {
-		if commitReport.Report.HasNoRoots() {
-			if commitReport.Timestamp.After(latestEmptyRootTimestamp) {
-				latestEmptyRootTimestamp = commitReport.Timestamp
-			}
-		}
-	}
-
-	return latestEmptyRootTimestamp
 }
 
 func (p *Plugin) ValidateObservation(
@@ -473,9 +480,9 @@ func validateMessagesRelatedObservations(
 func (p *Plugin) ObservationQuorum(
 	_ context.Context, outctx ocr3types.OutcomeContext, query types.Query, aos []types.AttributedObservation,
 ) (bool, error) {
-	// TODO: should we use f+1 (or less) instead of 2f+1 because it is not needed for security?
+	// 2f+1 is required for fChain consensus.
 	return quorumhelper.ObservationCountReachesObservationQuorum(
-		quorumhelper.QuorumFPlusOne, p.reportingCfg.N, p.reportingCfg.F, aos), nil
+		quorumhelper.QuorumTwoFPlusOne, p.reportingCfg.N, p.reportingCfg.F, aos), nil
 }
 
 // selectReport takes a list of reports in execution order and selects the first reports that fit within the

@@ -3,8 +3,9 @@ package execute
 import (
 	"context"
 	"fmt"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"sort"
+
+	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
@@ -61,9 +62,10 @@ func (p *Plugin) Outcome(
 		discoveryAos := slicelib.Map(decodedAos, mapper)
 		_, err = p.discovery.Outcome(ctx, dt.Outcome{}, dt.Query{}, discoveryAos)
 		if err != nil {
-			return nil, fmt.Errorf("unable to process outcome of discovery processor: %w", err)
+			lggr.Errorw("discovery processor outcome errored", "err", err)
+		} else {
+			p.contractsInitialized = true
 		}
-		p.contractsInitialized = true
 	}
 
 	observation, err := computeConsensusObservation(lggr, decodedAos, p.destChain, p.reportingCfg.F)
