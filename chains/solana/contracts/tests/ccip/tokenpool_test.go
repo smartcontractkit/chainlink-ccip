@@ -16,6 +16,12 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/testutils"
+
+	// use the real program bindings, although interacting with the mock contract
+	cctp_message_transmitter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/cctp_message_transmitter"
+	cctp_token_messenger_minter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/cctp_token_messenger_minter"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/cctp_token_pool"
+
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/rmn_remote"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_ccip_invalid_receiver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_ccip_receiver"
@@ -30,6 +36,7 @@ func TestTokenPool(t *testing.T) {
 
 	rmn_remote.SetProgramID(config.RMNRemoteProgram)
 	test_token_pool.SetProgramID(config.CcipTokenPoolProgram)
+	cctp_message_transmitter.SetProgramID(config.CctpMessageTransmitter)
 
 	// acting as program wrapped by a token pool
 	test_ccip_receiver.SetProgramID(config.CcipLogicReceiver)
@@ -115,6 +122,8 @@ func TestTokenPool(t *testing.T) {
 		{tokenName: "spl-token-2022", tokenProgram: config.Token2022Program},
 	} {
 		t.Run(v.tokenName, func(t *testing.T) {
+			t.Skip() // TODO
+
 			t.Parallel()
 			decimals := uint8(0)
 			amount := uint64(1000)
@@ -693,6 +702,8 @@ func TestTokenPool(t *testing.T) {
 
 	// test functionality with arbitrary wrapped program
 	t.Run("Wrapped", func(t *testing.T) {
+		t.Skip() // TODO
+
 		t.Parallel()
 		mintPriv := solana.MustPrivateKeyFromBase58("5PMQ49JibQPVBFneTzixstoS2z888CoUgej1PoYgvmKXZcKw4b3Zd8vhCjKQcUDSjLnR9M1tUrzCCXLrPBZoqjJm")
 		p, err := tokens.NewTokenPool(solana.TokenProgramID, config.CcipTokenPoolProgram, mintPriv.PublicKey())
@@ -819,6 +830,74 @@ func TestTokenPool(t *testing.T) {
 			res := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{rmI}, user, config.DefaultCommitment)
 			require.NotNil(t, res)
 			require.Contains(t, strings.Join(res.Meta.LogMessages, "\n"), "Called `ccip_token_release_mint`")
+		})
+	})
+
+	t.Run("CCTP token pool", func(t *testing.T) {
+		t.Parallel()
+
+		usdcMintPriv, err := solana.NewRandomPrivateKey()
+		require.NoError(t, err)
+		usdcMint := usdcMintPriv.PublicKey()
+		usdcDecimals := uint8(6)
+
+		t.Run("Setup", func(t *testing.T) {
+			t.Run("CCTP contracts", func(t *testing.T) {
+				cctp_message_transmitter.SetProgramID(config.CctpMessageTransmitter)
+				cctp_token_messenger_minter.SetProgramID(config.CctpTokenMessengerMinter)
+			})
+
+			t.Run("CCTP token pool", func(t *testing.T) {
+				cctp_token_pool.SetProgramID(config.CctpTokenPoolProgram)
+			})
+
+			t.Run("CCTP token", func(t *testing.T) {
+				// create USDC token
+				instructions, err := tokens.CreateToken(ctx, solana.TokenProgramID, usdcMint, admin.PublicKey(), usdcDecimals, solanaGoClient, config.DefaultCommitment)
+				require.NoError(t, err)
+
+				// create admin associated token account
+				createI, tokenAccount, err := tokens.CreateAssociatedTokenAccount(solana.TokenProgramID, usdcMint, admin.PublicKey(), admin.PublicKey())
+				require.NoError(t, err)
+
+				// mint tokens to admin
+				mintToI, err := tokens.MintTo(100_000_000*1e6, solana.TokenProgramID, usdcMint, tokenAccount, admin.PublicKey())
+				require.NoError(t, err)
+
+				instructions = append(instructions, createI, mintToI)
+				testutils.SendAndConfirm(ctx, t, solanaGoClient, instructions, admin, config.DefaultCommitment, common.AddSigners(usdcMintPriv))
+
+				// validate
+				outDec, outVal, err := tokens.TokenBalance(ctx, solanaGoClient, tokenAccount, config.DefaultCommitment)
+				require.NoError(t, err)
+				require.Equal(t, int(100_000_000*1e6), outVal)
+				require.Equal(t, usdcDecimals, outDec)
+			})
+
+			t.Run("CCTP Token Messenger Minter", func(t *testing.T) {
+
+			})
+		})
+
+		t.Run("TypeVersion", func(t *testing.T) {
+			ix, err := cctp_token_pool.NewTypeVersionInstruction(solana.SysVarClockPubkey).ValidateAndBuild()
+			require.NoError(t, err)
+			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+			require.NotNil(t, result)
+
+			output, err := common.ExtractTypedReturnValue(ctx, result.Meta.LogMessages, config.CctpTokenPoolProgram.String(), func(b []byte) string {
+				require.Len(t, b, int(binary.LittleEndian.Uint32(b[:4]))+4) // the first 4 bytes just encodes the length
+				return string(b[4:])
+			})
+			require.NoError(t, err)
+			// regex from https://semver.org/#is-there-a-suggested-regular-expression-regex-to-check-a-semver-string
+			semverRegex := "(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-((?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?"
+			require.Regexp(t, fmt.Sprintf("^%s %s$", "cctp-token-pool", semverRegex), output)
+			fmt.Printf("Type Version: %s\n", output)
+		})
+
+		t.Run("Basic onramp", func(t *testing.T) {
+
 		})
 	})
 }

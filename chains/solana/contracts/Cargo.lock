@@ -740,21 +740,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cctp-message-transmitter-mock"
-version = "0.1.0"
-dependencies = [
- "anchor-lang",
-]
-
-[[package]]
-name = "cctp-token-messenger-minter-mock"
-version = "0.1.0"
-dependencies = [
- "anchor-lang",
- "anchor-spl",
-]
-
-[[package]]
 name = "cctp-token-pool"
 version = "0.1.0-dev"
 dependencies = [
@@ -765,6 +750,22 @@ dependencies = [
  "burnmint-token-pool",
  "ccip_common",
  "solana-program",
+]
+
+[[package]]
+name = "cctp_message_transmitter_mock"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+]
+
+[[package]]
+name = "cctp_token_messenger_minter_mock"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "cctp_message_transmitter_mock",
 ]
 
 [[package]]

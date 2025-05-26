@@ -26,7 +26,8 @@ var (
 	RMNRemoteProgram           = GetProgramID("rmn_remote")
 	PingPongProgram            = GetProgramID("ping_pong_demo")
 	CctpMessageTransmitter     = GetProgramID("cctp_message_transmitter_mock")
-	CctpTokenMessengerMinter   = GetProgramID("cctp_token_messenger_minter")
+	CctpTokenMessengerMinter   = GetProgramID("cctp_token_messenger_minter_mock")
+	CctpTokenPoolProgram       = GetProgramID("cctp_token_pool")
 
 	// test values
 	OnRampAddress                   = []byte{1, 2, 3}

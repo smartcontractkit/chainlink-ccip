@@ -30,19 +30,11 @@ func init() {
 var (
 	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
 
-	Instruction_TransferOwnership = ag_binary.TypeID([8]byte{65, 177, 215, 73, 53, 45, 99, 47})
-
-	Instruction_AcceptOwnership = ag_binary.TypeID([8]byte{172, 23, 43, 13, 238, 213, 85, 150})
-
 	Instruction_AddRemoteTokenMessenger = ag_binary.TypeID([8]byte{12, 149, 172, 165, 111, 202, 24, 33})
-
-	Instruction_RemoveRemoteTokenMessenger = ag_binary.TypeID([8]byte{65, 114, 66, 85, 169, 98, 177, 146})
 
 	Instruction_DepositForBurn = ag_binary.TypeID([8]byte{215, 60, 61, 46, 114, 55, 128, 176})
 
 	Instruction_DepositForBurnWithCaller = ag_binary.TypeID([8]byte{167, 222, 19, 114, 85, 21, 14, 118})
-
-	Instruction_ReplaceDepositForBurn = ag_binary.TypeID([8]byte{7, 27, 93, 132, 1, 80, 19, 163})
 
 	Instruction_HandleReceiveMessage = ag_binary.TypeID([8]byte{133, 102, 1, 180, 145, 11, 138, 180})
 
@@ -58,13 +50,7 @@ var (
 
 	Instruction_AddLocalToken = ag_binary.TypeID([8]byte{213, 199, 205, 18, 98, 124, 73, 198})
 
-	Instruction_RemoveLocalToken = ag_binary.TypeID([8]byte{27, 43, 66, 170, 188, 44, 109, 97})
-
 	Instruction_LinkTokenPair = ag_binary.TypeID([8]byte{68, 162, 24, 104, 125, 46, 130, 12})
-
-	Instruction_UnlinkTokenPair = ag_binary.TypeID([8]byte{52, 198, 100, 114, 104, 174, 85, 58})
-
-	Instruction_BurnTokenCustody = ag_binary.TypeID([8]byte{233, 136, 180, 175, 112, 41, 62, 71})
 )
 
 // InstructionIDToName returns the name of the instruction given its ID.
@@ -72,20 +58,12 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 	switch id {
 	case Instruction_Initialize:
 		return "Initialize"
-	case Instruction_TransferOwnership:
-		return "TransferOwnership"
-	case Instruction_AcceptOwnership:
-		return "AcceptOwnership"
 	case Instruction_AddRemoteTokenMessenger:
 		return "AddRemoteTokenMessenger"
-	case Instruction_RemoveRemoteTokenMessenger:
-		return "RemoveRemoteTokenMessenger"
 	case Instruction_DepositForBurn:
 		return "DepositForBurn"
 	case Instruction_DepositForBurnWithCaller:
 		return "DepositForBurnWithCaller"
-	case Instruction_ReplaceDepositForBurn:
-		return "ReplaceDepositForBurn"
 	case Instruction_HandleReceiveMessage:
 		return "HandleReceiveMessage"
 	case Instruction_SetTokenController:
@@ -100,14 +78,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "SetMaxBurnAmountPerMessage"
 	case Instruction_AddLocalToken:
 		return "AddLocalToken"
-	case Instruction_RemoveLocalToken:
-		return "RemoveLocalToken"
 	case Instruction_LinkTokenPair:
 		return "LinkTokenPair"
-	case Instruction_UnlinkTokenPair:
-		return "UnlinkTokenPair"
-	case Instruction_BurnTokenCustody:
-		return "BurnTokenCustody"
 	default:
 		return ""
 	}
@@ -132,25 +104,13 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 			"initialize", (*Initialize)(nil),
 		},
 		{
-			"transfer_ownership", (*TransferOwnership)(nil),
-		},
-		{
-			"accept_ownership", (*AcceptOwnership)(nil),
-		},
-		{
 			"add_remote_token_messenger", (*AddRemoteTokenMessenger)(nil),
-		},
-		{
-			"remove_remote_token_messenger", (*RemoveRemoteTokenMessenger)(nil),
 		},
 		{
 			"deposit_for_burn", (*DepositForBurn)(nil),
 		},
 		{
 			"deposit_for_burn_with_caller", (*DepositForBurnWithCaller)(nil),
-		},
-		{
-			"replace_deposit_for_burn", (*ReplaceDepositForBurn)(nil),
 		},
 		{
 			"handle_receive_message", (*HandleReceiveMessage)(nil),
@@ -174,16 +134,7 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 			"add_local_token", (*AddLocalToken)(nil),
 		},
 		{
-			"remove_local_token", (*RemoveLocalToken)(nil),
-		},
-		{
 			"link_token_pair", (*LinkTokenPair)(nil),
-		},
-		{
-			"unlink_token_pair", (*UnlinkTokenPair)(nil),
-		},
-		{
-			"burn_token_custody", (*BurnTokenCustody)(nil),
 		},
 	},
 )

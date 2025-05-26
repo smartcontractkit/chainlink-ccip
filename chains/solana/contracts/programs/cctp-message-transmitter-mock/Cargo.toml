@@ -1,5 +1,5 @@
 [package]
-name = "cctp-message-transmitter-mock"
+name = "cctp_message_transmitter_mock"
 version = "0.1.0"
 description = "Mock implementation of Message Transmitter for Cross-Chain Transfer Protocol"
 edition = "2021"

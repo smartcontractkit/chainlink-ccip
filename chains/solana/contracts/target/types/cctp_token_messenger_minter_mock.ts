@@ -23,12 +23,12 @@ export type CctpTokenMessengerMinterMock = {
         {
           "name": "tokenMessenger",
           "isMut": true,
-          "isSigner": true
+          "isSigner": false
         },
         {
           "name": "tokenMinter",
           "isMut": true,
-          "isSigner": true
+          "isSigner": false
         },
         {
           "name": "tokenMessengerMinterProgramData",
@@ -44,16 +44,6 @@ export type CctpTokenMessengerMinterMock = {
           "name": "systemProgram",
           "isMut": false,
           "isSigner": false
-        },
-        {
-          "name": "eventAuthority",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
         }
       ],
       "args": [
@@ -61,72 +51,6 @@ export type CctpTokenMessengerMinterMock = {
           "name": "params",
           "type": {
             "defined": "InitializeParams"
-          }
-        }
-      ]
-    },
-    {
-      "name": "transferOwnership",
-      "accounts": [
-        {
-          "name": "owner",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "tokenMessenger",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "eventAuthority",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "params",
-          "type": {
-            "defined": "TransferOwnershipParams"
-          }
-        }
-      ]
-    },
-    {
-      "name": "acceptOwnership",
-      "accounts": [
-        {
-          "name": "pendingOwner",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "tokenMessenger",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "eventAuthority",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "params",
-          "type": {
-            "defined": "AcceptOwnershipParams"
           }
         }
       ]
@@ -175,49 +99,6 @@ export type CctpTokenMessengerMinterMock = {
           "name": "params",
           "type": {
             "defined": "AddRemoteTokenMessengerParams"
-          }
-        }
-      ]
-    },
-    {
-      "name": "removeRemoteTokenMessenger",
-      "accounts": [
-        {
-          "name": "payee",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "owner",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "tokenMessenger",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "remoteTokenMessenger",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "eventAuthority",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "params",
-          "type": {
-            "defined": "RemoveRemoteTokenMessengerParams"
           }
         }
       ]
@@ -415,75 +296,6 @@ export type CctpTokenMessengerMinterMock = {
           "name": "params",
           "type": {
             "defined": "DepositForBurnWithCallerParams"
-          }
-        }
-      ],
-      "returns": "u64"
-    },
-    {
-      "name": "replaceDepositForBurn",
-      "accounts": [
-        {
-          "name": "owner",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "eventRentPayer",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "senderAuthorityPda",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "messageTransmitter",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "tokenMessenger",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "messageSentEventData",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "messageTransmitterProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "tokenMessengerMinterProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "eventAuthority",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "params",
-          "type": {
-            "defined": "ReplaceDepositForBurnParams"
           }
         }
       ],
@@ -801,59 +613,6 @@ export type CctpTokenMessengerMinterMock = {
       ]
     },
     {
-      "name": "removeLocalToken",
-      "accounts": [
-        {
-          "name": "payee",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "tokenController",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "tokenMinter",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "localToken",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "custodyTokenAccount",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "eventAuthority",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "params",
-          "type": {
-            "defined": "RemoveLocalTokenParams"
-          }
-        }
-      ]
-    },
-    {
       "name": "linkTokenPair",
       "accounts": [
         {
@@ -897,107 +656,6 @@ export type CctpTokenMessengerMinterMock = {
           "name": "params",
           "type": {
             "defined": "LinkTokenPairParams"
-          }
-        }
-      ]
-    },
-    {
-      "name": "unlinkTokenPair",
-      "accounts": [
-        {
-          "name": "payee",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "tokenController",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "tokenMinter",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "tokenPair",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "eventAuthority",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "params",
-          "type": {
-            "defined": "UninkTokenPairParams"
-          }
-        }
-      ]
-    },
-    {
-      "name": "burnTokenCustody",
-      "accounts": [
-        {
-          "name": "payee",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "tokenController",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "tokenMinter",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "localToken",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "custodyTokenAccount",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "custodyTokenMint",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "eventAuthority",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "params",
-          "type": {
-            "defined": "BurnTokenCustodyParams"
           }
         }
       ]
@@ -1163,25 +821,6 @@ export type CctpTokenMessengerMinterMock = {
       }
     },
     {
-      "name": "TransferOwnershipParams",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "newOwner",
-            "type": "publicKey"
-          }
-        ]
-      }
-    },
-    {
-      "name": "AcceptOwnershipParams",
-      "type": {
-        "kind": "struct",
-        "fields": []
-      }
-    },
-    {
       "name": "AddRemoteTokenMessengerParams",
       "type": {
         "kind": "struct",
@@ -1195,13 +834,6 @@ export type CctpTokenMessengerMinterMock = {
             "type": "publicKey"
           }
         ]
-      }
-    },
-    {
-      "name": "RemoveRemoteTokenMessengerParams",
-      "type": {
-        "kind": "struct",
-        "fields": []
       }
     },
     {
@@ -1243,30 +875,6 @@ export type CctpTokenMessengerMinterMock = {
           },
           {
             "name": "destinationCaller",
-            "type": "publicKey"
-          }
-        ]
-      }
-    },
-    {
-      "name": "ReplaceDepositForBurnParams",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "originalMessage",
-            "type": "bytes"
-          },
-          {
-            "name": "originalAttestation",
-            "type": "bytes"
-          },
-          {
-            "name": "newDestinationCaller",
-            "type": "publicKey"
-          },
-          {
-            "name": "newMintRecipient",
             "type": "publicKey"
           }
         ]
@@ -1354,13 +962,6 @@ export type CctpTokenMessengerMinterMock = {
       }
     },
     {
-      "name": "RemoveLocalTokenParams",
-      "type": {
-        "kind": "struct",
-        "fields": []
-      }
-    },
-    {
       "name": "LinkTokenPairParams",
       "type": {
         "kind": "struct",
@@ -1379,58 +980,9 @@ export type CctpTokenMessengerMinterMock = {
           }
         ]
       }
-    },
-    {
-      "name": "UninkTokenPairParams",
-      "type": {
-        "kind": "struct",
-        "fields": []
-      }
-    },
-    {
-      "name": "BurnTokenCustodyParams",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "amount",
-            "type": "u64"
-          }
-        ]
-      }
     }
   ],
   "events": [
-    {
-      "name": "OwnershipTransferStarted",
-      "fields": [
-        {
-          "name": "previousOwner",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "newOwner",
-          "type": "publicKey",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "OwnershipTransferred",
-      "fields": [
-        {
-          "name": "previousOwner",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "newOwner",
-          "type": "publicKey",
-          "index": false
-        }
-      ]
-    },
     {
       "name": "DepositForBurn",
       "fields": [
@@ -1498,21 +1050,6 @@ export type CctpTokenMessengerMinterMock = {
     },
     {
       "name": "RemoteTokenMessengerAdded",
-      "fields": [
-        {
-          "name": "domain",
-          "type": "u32",
-          "index": false
-        },
-        {
-          "name": "tokenMessenger",
-          "type": "publicKey",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "RemoteTokenMessengerRemoved",
       "fields": [
         {
           "name": "domain",
@@ -1612,47 +1149,12 @@ export type CctpTokenMessengerMinterMock = {
       ]
     },
     {
-      "name": "TokenPairUnlinked",
-      "fields": [
-        {
-          "name": "localToken",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "remoteDomain",
-          "type": "u32",
-          "index": false
-        },
-        {
-          "name": "remoteToken",
-          "type": "publicKey",
-          "index": false
-        }
-      ]
-    },
-    {
       "name": "Pause",
       "fields": []
     },
     {
       "name": "Unpause",
       "fields": []
-    },
-    {
-      "name": "TokenCustodyBurned",
-      "fields": [
-        {
-          "name": "custodyTokenAccount",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "amount",
-          "type": "u64",
-          "index": false
-        }
-      ]
     }
   ],
   "errors": [
@@ -1700,6 +1202,26 @@ export type CctpTokenMessengerMinterMock = {
       "code": 6008,
       "name": "InvalidAmount",
       "msg": "Invalid amount"
+    },
+    {
+      "code": 6009,
+      "name": "InvalidDestinationDomain",
+      "msg": "Invalid destination domain"
+    },
+    {
+      "code": 6010,
+      "name": "InvalidTokenPair",
+      "msg": "Invalid token pair"
+    },
+    {
+      "code": 6011,
+      "name": "MalformedMessage",
+      "msg": "Malformed message"
+    },
+    {
+      "code": 6012,
+      "name": "InvalidMessageBodyVersion",
+      "msg": "Invalid message body version"
     }
   ]
 };
@@ -1729,12 +1251,12 @@ export const IDL: CctpTokenMessengerMinterMock = {
         {
           "name": "tokenMessenger",
           "isMut": true,
-          "isSigner": true
+          "isSigner": false
         },
         {
           "name": "tokenMinter",
           "isMut": true,
-          "isSigner": true
+          "isSigner": false
         },
         {
           "name": "tokenMessengerMinterProgramData",
@@ -1750,16 +1272,6 @@ export const IDL: CctpTokenMessengerMinterMock = {
           "name": "systemProgram",
           "isMut": false,
           "isSigner": false
-        },
-        {
-          "name": "eventAuthority",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
         }
       ],
       "args": [
@@ -1767,72 +1279,6 @@ export const IDL: CctpTokenMessengerMinterMock = {
           "name": "params",
           "type": {
             "defined": "InitializeParams"
-          }
-        }
-      ]
-    },
-    {
-      "name": "transferOwnership",
-      "accounts": [
-        {
-          "name": "owner",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "tokenMessenger",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "eventAuthority",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "params",
-          "type": {
-            "defined": "TransferOwnershipParams"
-          }
-        }
-      ]
-    },
-    {
-      "name": "acceptOwnership",
-      "accounts": [
-        {
-          "name": "pendingOwner",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "tokenMessenger",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "eventAuthority",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "params",
-          "type": {
-            "defined": "AcceptOwnershipParams"
           }
         }
       ]
@@ -1881,49 +1327,6 @@ export const IDL: CctpTokenMessengerMinterMock = {
           "name": "params",
           "type": {
             "defined": "AddRemoteTokenMessengerParams"
-          }
-        }
-      ]
-    },
-    {
-      "name": "removeRemoteTokenMessenger",
-      "accounts": [
-        {
-          "name": "payee",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "owner",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "tokenMessenger",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "remoteTokenMessenger",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "eventAuthority",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "params",
-          "type": {
-            "defined": "RemoveRemoteTokenMessengerParams"
           }
         }
       ]
@@ -2121,75 +1524,6 @@ export const IDL: CctpTokenMessengerMinterMock = {
           "name": "params",
           "type": {
             "defined": "DepositForBurnWithCallerParams"
-          }
-        }
-      ],
-      "returns": "u64"
-    },
-    {
-      "name": "replaceDepositForBurn",
-      "accounts": [
-        {
-          "name": "owner",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "eventRentPayer",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "senderAuthorityPda",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "messageTransmitter",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "tokenMessenger",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "messageSentEventData",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "messageTransmitterProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "tokenMessengerMinterProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "eventAuthority",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "params",
-          "type": {
-            "defined": "ReplaceDepositForBurnParams"
           }
         }
       ],
@@ -2507,59 +1841,6 @@ export const IDL: CctpTokenMessengerMinterMock = {
       ]
     },
     {
-      "name": "removeLocalToken",
-      "accounts": [
-        {
-          "name": "payee",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "tokenController",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "tokenMinter",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "localToken",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "custodyTokenAccount",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "eventAuthority",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "params",
-          "type": {
-            "defined": "RemoveLocalTokenParams"
-          }
-        }
-      ]
-    },
-    {
       "name": "linkTokenPair",
       "accounts": [
         {
@@ -2603,107 +1884,6 @@ export const IDL: CctpTokenMessengerMinterMock = {
           "name": "params",
           "type": {
             "defined": "LinkTokenPairParams"
-          }
-        }
-      ]
-    },
-    {
-      "name": "unlinkTokenPair",
-      "accounts": [
-        {
-          "name": "payee",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "tokenController",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "tokenMinter",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "tokenPair",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "eventAuthority",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "params",
-          "type": {
-            "defined": "UninkTokenPairParams"
-          }
-        }
-      ]
-    },
-    {
-      "name": "burnTokenCustody",
-      "accounts": [
-        {
-          "name": "payee",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "tokenController",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "tokenMinter",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "localToken",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "custodyTokenAccount",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "custodyTokenMint",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "eventAuthority",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "params",
-          "type": {
-            "defined": "BurnTokenCustodyParams"
           }
         }
       ]
@@ -2869,25 +2049,6 @@ export const IDL: CctpTokenMessengerMinterMock = {
       }
     },
     {
-      "name": "TransferOwnershipParams",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "newOwner",
-            "type": "publicKey"
-          }
-        ]
-      }
-    },
-    {
-      "name": "AcceptOwnershipParams",
-      "type": {
-        "kind": "struct",
-        "fields": []
-      }
-    },
-    {
       "name": "AddRemoteTokenMessengerParams",
       "type": {
         "kind": "struct",
@@ -2901,13 +2062,6 @@ export const IDL: CctpTokenMessengerMinterMock = {
             "type": "publicKey"
           }
         ]
-      }
-    },
-    {
-      "name": "RemoveRemoteTokenMessengerParams",
-      "type": {
-        "kind": "struct",
-        "fields": []
       }
     },
     {
@@ -2949,30 +2103,6 @@ export const IDL: CctpTokenMessengerMinterMock = {
           },
           {
             "name": "destinationCaller",
-            "type": "publicKey"
-          }
-        ]
-      }
-    },
-    {
-      "name": "ReplaceDepositForBurnParams",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "originalMessage",
-            "type": "bytes"
-          },
-          {
-            "name": "originalAttestation",
-            "type": "bytes"
-          },
-          {
-            "name": "newDestinationCaller",
-            "type": "publicKey"
-          },
-          {
-            "name": "newMintRecipient",
             "type": "publicKey"
           }
         ]
@@ -3060,13 +2190,6 @@ export const IDL: CctpTokenMessengerMinterMock = {
       }
     },
     {
-      "name": "RemoveLocalTokenParams",
-      "type": {
-        "kind": "struct",
-        "fields": []
-      }
-    },
-    {
       "name": "LinkTokenPairParams",
       "type": {
         "kind": "struct",
@@ -3085,58 +2208,9 @@ export const IDL: CctpTokenMessengerMinterMock = {
           }
         ]
       }
-    },
-    {
-      "name": "UninkTokenPairParams",
-      "type": {
-        "kind": "struct",
-        "fields": []
-      }
-    },
-    {
-      "name": "BurnTokenCustodyParams",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "amount",
-            "type": "u64"
-          }
-        ]
-      }
     }
   ],
   "events": [
-    {
-      "name": "OwnershipTransferStarted",
-      "fields": [
-        {
-          "name": "previousOwner",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "newOwner",
-          "type": "publicKey",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "OwnershipTransferred",
-      "fields": [
-        {
-          "name": "previousOwner",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "newOwner",
-          "type": "publicKey",
-          "index": false
-        }
-      ]
-    },
     {
       "name": "DepositForBurn",
       "fields": [
@@ -3204,21 +2278,6 @@ export const IDL: CctpTokenMessengerMinterMock = {
     },
     {
       "name": "RemoteTokenMessengerAdded",
-      "fields": [
-        {
-          "name": "domain",
-          "type": "u32",
-          "index": false
-        },
-        {
-          "name": "tokenMessenger",
-          "type": "publicKey",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "RemoteTokenMessengerRemoved",
       "fields": [
         {
           "name": "domain",
@@ -3318,47 +2377,12 @@ export const IDL: CctpTokenMessengerMinterMock = {
       ]
     },
     {
-      "name": "TokenPairUnlinked",
-      "fields": [
-        {
-          "name": "localToken",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "remoteDomain",
-          "type": "u32",
-          "index": false
-        },
-        {
-          "name": "remoteToken",
-          "type": "publicKey",
-          "index": false
-        }
-      ]
-    },
-    {
       "name": "Pause",
       "fields": []
     },
     {
       "name": "Unpause",
       "fields": []
-    },
-    {
-      "name": "TokenCustodyBurned",
-      "fields": [
-        {
-          "name": "custodyTokenAccount",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "amount",
-          "type": "u64",
-          "index": false
-        }
-      ]
     }
   ],
   "errors": [
@@ -3406,6 +2430,26 @@ export const IDL: CctpTokenMessengerMinterMock = {
       "code": 6008,
       "name": "InvalidAmount",
       "msg": "Invalid amount"
+    },
+    {
+      "code": 6009,
+      "name": "InvalidDestinationDomain",
+      "msg": "Invalid destination domain"
+    },
+    {
+      "code": 6010,
+      "name": "InvalidTokenPair",
+      "msg": "Invalid token pair"
+    },
+    {
+      "code": 6011,
+      "name": "MalformedMessage",
+      "msg": "Malformed message"
+    },
+    {
+      "code": 6012,
+      "name": "InvalidMessageBodyVersion",
+      "msg": "Invalid message body version"
     }
   ]
 };

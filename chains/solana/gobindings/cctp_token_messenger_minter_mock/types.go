@@ -51,38 +51,6 @@ func (obj *InitializeParams) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (e
 	return nil
 }
 
-type TransferOwnershipParams struct {
-	NewOwner ag_solanago.PublicKey
-}
-
-func (obj TransferOwnershipParams) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `NewOwner` param:
-	err = encoder.Encode(obj.NewOwner)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *TransferOwnershipParams) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `NewOwner`:
-	err = decoder.Decode(&obj.NewOwner)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-type AcceptOwnershipParams struct{}
-
-func (obj AcceptOwnershipParams) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	return nil
-}
-
-func (obj *AcceptOwnershipParams) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	return nil
-}
-
 type AddRemoteTokenMessengerParams struct {
 	Domain         uint32
 	TokenMessenger ag_solanago.PublicKey
@@ -113,16 +81,6 @@ func (obj *AddRemoteTokenMessengerParams) UnmarshalWithDecoder(decoder *ag_binar
 	if err != nil {
 		return err
 	}
-	return nil
-}
-
-type RemoveRemoteTokenMessengerParams struct{}
-
-func (obj RemoveRemoteTokenMessengerParams) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	return nil
-}
-
-func (obj *RemoveRemoteTokenMessengerParams) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	return nil
 }
 
@@ -219,61 +177,6 @@ func (obj *DepositForBurnWithCallerParams) UnmarshalWithDecoder(decoder *ag_bina
 	}
 	// Deserialize `DestinationCaller`:
 	err = decoder.Decode(&obj.DestinationCaller)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-type ReplaceDepositForBurnParams struct {
-	OriginalMessage      []byte
-	OriginalAttestation  []byte
-	NewDestinationCaller ag_solanago.PublicKey
-	NewMintRecipient     ag_solanago.PublicKey
-}
-
-func (obj ReplaceDepositForBurnParams) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `OriginalMessage` param:
-	err = encoder.Encode(obj.OriginalMessage)
-	if err != nil {
-		return err
-	}
-	// Serialize `OriginalAttestation` param:
-	err = encoder.Encode(obj.OriginalAttestation)
-	if err != nil {
-		return err
-	}
-	// Serialize `NewDestinationCaller` param:
-	err = encoder.Encode(obj.NewDestinationCaller)
-	if err != nil {
-		return err
-	}
-	// Serialize `NewMintRecipient` param:
-	err = encoder.Encode(obj.NewMintRecipient)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *ReplaceDepositForBurnParams) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `OriginalMessage`:
-	err = decoder.Decode(&obj.OriginalMessage)
-	if err != nil {
-		return err
-	}
-	// Deserialize `OriginalAttestation`:
-	err = decoder.Decode(&obj.OriginalAttestation)
-	if err != nil {
-		return err
-	}
-	// Deserialize `NewDestinationCaller`:
-	err = decoder.Decode(&obj.NewDestinationCaller)
-	if err != nil {
-		return err
-	}
-	// Deserialize `NewMintRecipient`:
-	err = decoder.Decode(&obj.NewMintRecipient)
 	if err != nil {
 		return err
 	}
@@ -431,16 +334,6 @@ func (obj *AddLocalTokenParams) UnmarshalWithDecoder(decoder *ag_binary.Decoder)
 	return nil
 }
 
-type RemoveLocalTokenParams struct{}
-
-func (obj RemoveLocalTokenParams) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	return nil
-}
-
-func (obj *RemoveLocalTokenParams) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	return nil
-}
-
 type LinkTokenPairParams struct {
 	LocalToken   ag_solanago.PublicKey
 	RemoteDomain uint32
@@ -479,38 +372,6 @@ func (obj *LinkTokenPairParams) UnmarshalWithDecoder(decoder *ag_binary.Decoder)
 	}
 	// Deserialize `RemoteToken`:
 	err = decoder.Decode(&obj.RemoteToken)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-type UninkTokenPairParams struct{}
-
-func (obj UninkTokenPairParams) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	return nil
-}
-
-func (obj *UninkTokenPairParams) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	return nil
-}
-
-type BurnTokenCustodyParams struct {
-	Amount uint64
-}
-
-func (obj BurnTokenCustodyParams) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `Amount` param:
-	err = encoder.Encode(obj.Amount)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *BurnTokenCustodyParams) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `Amount`:
-	err = decoder.Decode(&obj.Amount)
 	if err != nil {
 		return err
 	}

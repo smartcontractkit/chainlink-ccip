@@ -20,26 +20,22 @@ type Initialize struct {
 	//
 	// [2] = [WRITE] authorityPda
 	//
-	// [3] = [WRITE, SIGNER] tokenMessenger
+	// [3] = [WRITE] tokenMessenger
 	//
-	// [4] = [WRITE, SIGNER] tokenMinter
+	// [4] = [WRITE] tokenMinter
 	//
 	// [5] = [] tokenMessengerMinterProgramData
 	//
 	// [6] = [] tokenMessengerMinterProgram
 	//
 	// [7] = [] systemProgram
-	//
-	// [8] = [] eventAuthority
-	//
-	// [9] = [] program
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewInitializeInstructionBuilder creates a new `Initialize` instruction builder.
 func NewInitializeInstructionBuilder() *Initialize {
 	nd := &Initialize{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 10),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 8),
 	}
 	return nd
 }
@@ -85,7 +81,7 @@ func (inst *Initialize) GetAuthorityPdaAccount() *ag_solanago.AccountMeta {
 
 // SetTokenMessengerAccount sets the "tokenMessenger" account.
 func (inst *Initialize) SetTokenMessengerAccount(tokenMessenger ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[3] = ag_solanago.Meta(tokenMessenger).WRITE().SIGNER()
+	inst.AccountMetaSlice[3] = ag_solanago.Meta(tokenMessenger).WRITE()
 	return inst
 }
 
@@ -96,7 +92,7 @@ func (inst *Initialize) GetTokenMessengerAccount() *ag_solanago.AccountMeta {
 
 // SetTokenMinterAccount sets the "tokenMinter" account.
 func (inst *Initialize) SetTokenMinterAccount(tokenMinter ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[4] = ag_solanago.Meta(tokenMinter).WRITE().SIGNER()
+	inst.AccountMetaSlice[4] = ag_solanago.Meta(tokenMinter).WRITE()
 	return inst
 }
 
@@ -136,28 +132,6 @@ func (inst *Initialize) SetSystemProgramAccount(systemProgram ag_solanago.Public
 // GetSystemProgramAccount gets the "systemProgram" account.
 func (inst *Initialize) GetSystemProgramAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[7]
-}
-
-// SetEventAuthorityAccount sets the "eventAuthority" account.
-func (inst *Initialize) SetEventAuthorityAccount(eventAuthority ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[8] = ag_solanago.Meta(eventAuthority)
-	return inst
-}
-
-// GetEventAuthorityAccount gets the "eventAuthority" account.
-func (inst *Initialize) GetEventAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[8]
-}
-
-// SetProgramAccount sets the "program" account.
-func (inst *Initialize) SetProgramAccount(program ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[9] = ag_solanago.Meta(program)
-	return inst
-}
-
-// GetProgramAccount gets the "program" account.
-func (inst *Initialize) GetProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[9]
 }
 
 func (inst Initialize) Build() *Instruction {
@@ -211,12 +185,6 @@ func (inst *Initialize) Validate() error {
 		if inst.AccountMetaSlice[7] == nil {
 			return errors.New("accounts.SystemProgram is not set")
 		}
-		if inst.AccountMetaSlice[8] == nil {
-			return errors.New("accounts.EventAuthority is not set")
-		}
-		if inst.AccountMetaSlice[9] == nil {
-			return errors.New("accounts.Program is not set")
-		}
 	}
 	return nil
 }
@@ -235,7 +203,7 @@ func (inst *Initialize) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=10]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Accounts[len=8]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("                          payer", inst.AccountMetaSlice[0]))
 						accountsBranch.Child(ag_format.Meta("               upgradeAuthority", inst.AccountMetaSlice[1]))
 						accountsBranch.Child(ag_format.Meta("                   authorityPda", inst.AccountMetaSlice[2]))
@@ -244,8 +212,6 @@ func (inst *Initialize) EncodeToTree(parent ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("tokenMessengerMinterProgramData", inst.AccountMetaSlice[5]))
 						accountsBranch.Child(ag_format.Meta("    tokenMessengerMinterProgram", inst.AccountMetaSlice[6]))
 						accountsBranch.Child(ag_format.Meta("                  systemProgram", inst.AccountMetaSlice[7]))
-						accountsBranch.Child(ag_format.Meta("                 eventAuthority", inst.AccountMetaSlice[8]))
-						accountsBranch.Child(ag_format.Meta("                        program", inst.AccountMetaSlice[9]))
 					})
 				})
 		})
@@ -280,9 +246,7 @@ func NewInitializeInstruction(
 	tokenMinter ag_solanago.PublicKey,
 	tokenMessengerMinterProgramData ag_solanago.PublicKey,
 	tokenMessengerMinterProgram ag_solanago.PublicKey,
-	systemProgram ag_solanago.PublicKey,
-	eventAuthority ag_solanago.PublicKey,
-	program ag_solanago.PublicKey) *Initialize {
+	systemProgram ag_solanago.PublicKey) *Initialize {
 	return NewInitializeInstructionBuilder().
 		SetParams(params).
 		SetPayerAccount(payer).
@@ -292,7 +256,5 @@ func NewInitializeInstruction(
 		SetTokenMinterAccount(tokenMinter).
 		SetTokenMessengerMinterProgramDataAccount(tokenMessengerMinterProgramData).
 		SetTokenMessengerMinterProgramAccount(tokenMessengerMinterProgram).
-		SetSystemProgramAccount(systemProgram).
-		SetEventAuthorityAccount(eventAuthority).
-		SetProgramAccount(program)
+		SetSystemProgramAccount(systemProgram)
 }
