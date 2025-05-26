@@ -9,13 +9,12 @@ import {IRouterClient} from "../../../interfaces/IRouterClient.sol";
 import {IWrappedNative} from "../../../interfaces/IWrappedNative.sol";
 import {Client} from "../../../libraries/Client.sol";
 import {Internal} from "../../../libraries/Internal.sol";
+import {TokenPool} from "../../../pools/TokenPool.sol";
 
 import {OnRamp} from "../../../onRamp/OnRamp.sol";
 import {OnRampSetup} from "../../onRamp/OnRamp/OnRampSetup.t.sol";
 
 contract Router_ccipSend is OnRampSetup {
-  event Burned(address indexed sender, uint256 amount);
-
   function test_CCIPSendLinkFeeOneTokenSuccess_gas() public {
     vm.pauseGasMetering();
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
@@ -34,7 +33,7 @@ contract Router_ccipSend is OnRampSetup {
 
     // Assert that the tokens are burned
     vm.expectEmit();
-    emit Burned(address(s_onRamp), message.tokenAmounts[0].amount);
+    emit TokenPool.LockedOrBurned(address(s_onRamp), message.tokenAmounts[0].amount);
 
     Internal.EVM2AnyRampMessage memory msgEvent = _messageToEvent(message, 1, 1, expectedFee, OWNER);
 
@@ -96,7 +95,7 @@ contract Router_ccipSend is OnRampSetup {
     message.feeToken = address(0);
     // Assert that the tokens are burned
     vm.expectEmit();
-    emit Burned(address(s_onRamp), message.tokenAmounts[0].amount);
+    emit TokenPool.LockedOrBurned(address(s_onRamp), message.tokenAmounts[0].amount);
 
     vm.expectEmit();
     emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, msgEvent.header.sequenceNumber, msgEvent);

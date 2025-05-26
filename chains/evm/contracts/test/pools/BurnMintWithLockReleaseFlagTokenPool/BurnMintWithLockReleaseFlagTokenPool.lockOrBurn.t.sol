@@ -27,7 +27,7 @@ contract BurnMintWithLockReleaseFlagTokenPool_lockOrBurn is BurnMintWithLockRele
     emit IERC20.Transfer(address(s_pool), address(0), burnAmount);
 
     vm.expectEmit();
-    emit TokenPool.Burned(address(s_burnMintOnRamp), burnAmount);
+    emit TokenPool.LockedOrBurned(address(s_burnMintOnRamp), burnAmount);
 
     bytes4 expectedSignature = bytes4(keccak256("burn(uint256)"));
     vm.expectCall(address(s_burnMintERC20), abi.encodeWithSelector(expectedSignature, burnAmount));

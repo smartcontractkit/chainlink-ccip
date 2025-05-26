@@ -33,7 +33,7 @@ contract BurnFromMintTokenPool_lockOrBurn is BurnFromMintTokenPoolSetup {
     emit IERC20.Transfer(address(s_pool), address(0), burnAmount);
 
     vm.expectEmit();
-    emit TokenPool.Burned(address(s_burnMintOnRamp), burnAmount);
+    emit TokenPool.LockedOrBurned(address(s_burnMintOnRamp), burnAmount);
 
     bytes4 expectedSignature = bytes4(keccak256("burnFrom(address,uint256)"));
     vm.expectCall(address(s_burnMintERC20), abi.encodeWithSelector(expectedSignature, address(s_pool), burnAmount));

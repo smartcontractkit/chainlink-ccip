@@ -36,7 +36,7 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
     vm.expectEmit();
     emit RateLimiter.TokensConsumed(amount);
     vm.expectEmit();
-    emit TokenPool.Released(s_allowedOffRamp, OWNER, amount);
+    emit TokenPool.ReleasedOrMinted(s_allowedOffRamp, OWNER, amount);
 
     s_lockReleaseTokenPool.releaseOrMint(
       Pool.ReleaseOrMintInV1({
@@ -76,7 +76,7 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
       }
 
       vm.expectEmit();
-      emit TokenPool.Released(s_allowedOffRamp, recipient, amount);
+      emit TokenPool.ReleasedOrMinted(s_allowedOffRamp, recipient, amount);
     }
 
     s_lockReleaseTokenPool.releaseOrMint(

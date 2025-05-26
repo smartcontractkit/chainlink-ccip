@@ -17,7 +17,7 @@ contract SiloedLockReleaseTokenPool_lockOrBurn is SiloedLockReleaseTokenPoolSetu
     vm.expectEmit();
     emit RateLimiter.TokensConsumed(AMOUNT);
     vm.expectEmit();
-    emit TokenPool.Locked(s_allowedOnRamp, AMOUNT);
+    emit TokenPool.LockedOrBurned(s_allowedOnRamp, AMOUNT);
 
     s_siloedLockReleaseTokenPool.lockOrBurn(
       Pool.LockOrBurnInV1({
@@ -40,7 +40,7 @@ contract SiloedLockReleaseTokenPool_lockOrBurn is SiloedLockReleaseTokenPoolSetu
     vm.expectEmit();
     emit RateLimiter.TokensConsumed(AMOUNT);
     vm.expectEmit();
-    emit TokenPool.Locked(s_allowedOnRamp, AMOUNT);
+    emit TokenPool.LockedOrBurned(s_allowedOnRamp, AMOUNT);
 
     s_siloedLockReleaseTokenPool.lockOrBurn(
       Pool.LockOrBurnInV1({

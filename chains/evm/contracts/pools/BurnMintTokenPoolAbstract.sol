@@ -30,7 +30,7 @@ abstract contract BurnMintTokenPoolAbstract is TokenPool {
 
     _burn(lockOrBurnIn.amount);
 
-    emit Burned(msg.sender, lockOrBurnIn.amount);
+    emit LockedOrBurned(msg.sender, lockOrBurnIn.amount);
 
     return Pool.LockOrBurnOutV1({
       destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
@@ -52,7 +52,7 @@ abstract contract BurnMintTokenPoolAbstract is TokenPool {
     // Mint to the receiver
     _mint(releaseOrMintIn.receiver, localAmount);
 
-    emit Minted(msg.sender, releaseOrMintIn.receiver, localAmount);
+    emit ReleasedOrMinted(msg.sender, releaseOrMintIn.receiver, localAmount);
 
     return Pool.ReleaseOrMintOutV1({destinationAmount: localAmount});
   }

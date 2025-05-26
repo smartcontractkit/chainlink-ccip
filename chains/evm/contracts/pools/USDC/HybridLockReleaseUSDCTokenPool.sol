@@ -123,7 +123,7 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
 
     getToken().safeTransfer(releaseOrMintIn.receiver, releaseOrMintIn.amount);
 
-    emit Released(msg.sender, releaseOrMintIn.receiver, releaseOrMintIn.amount);
+    emit ReleasedOrMinted(msg.sender, releaseOrMintIn.receiver, releaseOrMintIn.amount);
 
     return Pool.ReleaseOrMintOutV1({destinationAmount: releaseOrMintIn.amount});
   }
@@ -137,7 +137,7 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
     // Increase internal accounting of locked tokens for burnLockedUSDC() migration
     s_lockedTokensByChainSelector[lockOrBurnIn.remoteChainSelector] += lockOrBurnIn.amount;
 
-    emit Locked(msg.sender, lockOrBurnIn.amount);
+    emit LockedOrBurned(msg.sender, lockOrBurnIn.amount);
 
     return Pool.LockOrBurnOutV1({
       destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),

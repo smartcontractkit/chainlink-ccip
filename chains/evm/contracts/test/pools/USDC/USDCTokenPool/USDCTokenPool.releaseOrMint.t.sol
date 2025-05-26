@@ -61,7 +61,7 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
     deal(address(s_token), address(s_usdcTokenPool), amount);
 
     vm.expectEmit();
-    emit TokenPool.Minted(s_routerAllowedOffRamp, recipient, amount);
+    emit TokenPool.ReleasedOrMinted(s_routerAllowedOffRamp, recipient, amount);
 
     vm.expectCall(
       address(s_mockUSDCTransmitter),

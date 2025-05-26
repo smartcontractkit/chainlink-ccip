@@ -74,7 +74,7 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
       s_unsiloedTokenBalance += lockOrBurnIn.amount;
     }
 
-    emit Locked(msg.sender, lockOrBurnIn.amount);
+    emit LockedOrBurned(msg.sender, lockOrBurnIn.amount);
 
     return Pool.LockOrBurnOutV1({
       destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
@@ -115,7 +115,7 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     // Release to the recipient
     getToken().safeTransfer(releaseOrMintIn.receiver, localAmount);
 
-    emit Released(msg.sender, releaseOrMintIn.receiver, localAmount);
+    emit ReleasedOrMinted(msg.sender, releaseOrMintIn.receiver, localAmount);
 
     return Pool.ReleaseOrMintOutV1({destinationAmount: localAmount});
   }

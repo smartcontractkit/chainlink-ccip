@@ -32,7 +32,7 @@ contract HybridLockReleaseUSDCTokenPool_lockOrBurn is HybridLockReleaseUSDCToken
     vm.startPrank(s_routerAllowedOnRamp);
 
     vm.expectEmit();
-    emit TokenPool.Locked(s_routerAllowedOnRamp, amount);
+    emit TokenPool.LockedOrBurned(s_routerAllowedOnRamp, amount);
 
     s_usdcTokenPool.lockOrBurn(
       Pool.LockOrBurnInV1({
@@ -75,7 +75,7 @@ contract HybridLockReleaseUSDCTokenPool_lockOrBurn is HybridLockReleaseUSDCToken
     );
 
     vm.expectEmit();
-    emit TokenPool.Burned(s_routerAllowedOnRamp, amount);
+    emit TokenPool.LockedOrBurned(s_routerAllowedOnRamp, amount);
 
     Pool.LockOrBurnOutV1 memory poolReturnDataV1 = s_usdcTokenPool.lockOrBurn(
       Pool.LockOrBurnInV1({

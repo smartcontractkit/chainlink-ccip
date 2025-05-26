@@ -127,7 +127,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
       lockOrBurnIn.amount, domain.domainIdentifier, decodedReceiver, address(i_token), domain.allowedCaller
     );
 
-    emit Burned(msg.sender, lockOrBurnIn.amount);
+    emit LockedOrBurned(msg.sender, lockOrBurnIn.amount);
 
     return Pool.LockOrBurnOutV1({
       destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
@@ -161,7 +161,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
       revert UnlockingUSDCFailed();
     }
 
-    emit Minted(msg.sender, releaseOrMintIn.receiver, releaseOrMintIn.amount);
+    emit ReleasedOrMinted(msg.sender, releaseOrMintIn.receiver, releaseOrMintIn.amount);
     return Pool.ReleaseOrMintOutV1({destinationAmount: releaseOrMintIn.amount});
   }
 

@@ -30,7 +30,7 @@ contract USDCBridgeMigrator_BurnLockedUSDC is HybridLockReleaseUSDCTokenPool_loc
     vm.startPrank(s_routerAllowedOnRamp);
 
     vm.expectEmit();
-    emit TokenPool.Locked(s_routerAllowedOnRamp, amount);
+    emit TokenPool.LockedOrBurned(s_routerAllowedOnRamp, amount);
 
     s_usdcTokenPool.lockOrBurn(
       Pool.LockOrBurnInV1({

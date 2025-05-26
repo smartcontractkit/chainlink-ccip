@@ -59,10 +59,8 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   error OverflowDetected(uint8 remoteDecimals, uint8 localDecimals, uint256 remoteAmount);
   error InvalidDecimalArgs(uint8 expected, uint8 actual);
 
-  event Locked(address indexed sender, uint256 amount);
-  event Burned(address indexed sender, uint256 amount);
-  event Released(address indexed sender, address indexed recipient, uint256 amount);
-  event Minted(address indexed sender, address indexed recipient, uint256 amount);
+  event LockedOrBurned(address indexed sender, uint256 amount);
+  event ReleasedOrMinted(address indexed sender, address indexed recipient, uint256 amount);
   event ChainAdded(
     uint64 remoteChainSelector,
     bytes remoteToken,
