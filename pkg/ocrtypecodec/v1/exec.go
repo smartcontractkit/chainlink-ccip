@@ -79,7 +79,6 @@ func (e *ExecCodecProto) DecodeObservation(data []byte) (exectypes.Observation, 
 }
 
 func (e *ExecCodecProto) EncodeOutcome(outcome exectypes.Outcome) ([]byte, error) {
-	outcome = exectypes.NewOutcome(outcome.State, outcome.CommitReports, outcome.Report, outcome.Reports)
 
 	pbOtcm := &ocrtypecodecpb.ExecOutcome{
 		PluginState:          string(outcome.State),
@@ -162,7 +161,6 @@ func (*ExecCodecJSON) DecodeObservation(data []byte) (exectypes.Observation, err
 
 func (*ExecCodecJSON) EncodeOutcome(outcome exectypes.Outcome) ([]byte, error) {
 	// Create a new outcome with the same data for consistent representation
-	outcome = exectypes.NewOutcome(outcome.State, outcome.CommitReports, outcome.Report, outcome.Reports)
 
 	// Backward compatibility handling (similar to Proto version)
 	// Ensure Report field is populated if Reports has data

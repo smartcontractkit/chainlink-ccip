@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"sort"
 
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal"
@@ -123,7 +121,7 @@ func (p *Plugin) getCommitReportsOutcome(observation exectypes.Observation) exec
 
 	// Must use 'NewOutcome' rather than direct struct initialization to ensure the outcome is sorted.
 	// TODO: sort in the encoder.
-	return exectypes.NewOutcome(exectypes.GetCommitReports, commitReports, cciptypes.ExecutePluginReport{}, nil)
+	return exectypes.NewOutcome(exectypes.GetCommitReports, commitReports, nil)
 }
 
 func (p *Plugin) getMessagesOutcome(
@@ -165,7 +163,7 @@ func (p *Plugin) getMessagesOutcome(
 
 	// Must use 'NewOutcome' rather than direct struct initialization to ensure the outcome is sorted.
 	// TODO: sort in the encoder.
-	return exectypes.NewOutcome(exectypes.GetMessages, commitReports, cciptypes.ExecutePluginReport{}, nil)
+	return exectypes.NewOutcome(exectypes.GetMessages, commitReports, nil)
 }
 
 // getFilterOutcome is the final phase of the execution plugin. Filter refers to the Nonces
@@ -211,5 +209,5 @@ func (p *Plugin) getFilterOutcome(
 	}
 
 	// Must use 'NewOutcome' rather than direct struct initialization to ensure the outcome is sorted.
-	return exectypes.NewOutcome(exectypes.Filter, mergedData, cciptypes.ExecutePluginReport{}, execReports), nil
+	return exectypes.NewOutcome(exectypes.Filter, mergedData, execReports), nil
 }
