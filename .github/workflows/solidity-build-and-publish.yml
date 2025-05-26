@@ -47,11 +47,11 @@ jobs:
         id: release-tag-check
         uses: smartcontractkit/.github/actions/release-tag-check@c094a1482049b2b9c0a7cde3f715bd76a60afd97 # release-tag-check@0.1.0
         env:
-          # Match semver git tags with a "contracts-ccip/" prefix.
-          RELEASE_REGEX: '^contracts-ccip/v[0-9]+\.[0-9]+\.[0-9]+$'
-          PRE_RELEASE_REGEX: '^contracts-ccip/v[0-9]+\.[0-9]+\.[0-9]+-(.+)$'
+          # Match semver git tags with a "contracts-ccip" prefix.
+          RELEASE_REGEX: '^contracts-ccip-v[0-9]+\.[0-9]+\.[0-9]+$'
+          PRE_RELEASE_REGEX: '^contracts-ccip-v[0-9]+\.[0-9]+\.[0-9]+-(.+)$'
           # Get the version by stripping the "contracts-v" prefix.
-          VERSION_PREFIX: "contracts-ccip/v"
+          VERSION_PREFIX: "contracts-ccip-v"
 
   native-compile:
     needs: [changes, tag-check]
@@ -112,8 +112,8 @@ jobs:
     defaults:
       run:
         working-directory: chains/evm
-    needs: [changes]
-    if: needs.changes.outputs.changes == 'true'
+    needs: [changes, tag-check]
+    if: needs.changes.outputs.changes == 'true' || needs.tag-check.outputs.is-release-ccip == 'true' || needs.tag-check.outputs.is-pre-release-ccip == 'true'
     name: Solidity Lint
     runs-on: ubuntu-latest
     steps:
@@ -152,7 +152,11 @@ jobs:
       - name: Install Foundry
         uses: ./.github/actions/install-solidity-foundry
         with:
-          working-directory: chainlink/contracts
+          working-directory: chains/evm
+
+      - name: Run native compile and generate wrappers
+        working-directory: chains/evm
+        run: make wrappers
 
       - name: Version package.json
         working-directory: chains/evm
@@ -174,10 +178,10 @@ jobs:
       - name: Publish to NPM (beta)
         uses: smartcontractkit/.github/actions/ci-publish-npm@4b0ab756abcb1760cb82e1e87b94ff431905bffc # ci-publish-npm@0.4.0
         with:
-          npm-token: ${{ secrets.NPM_TOKEN }}
+          npm-token: ${{ secrets.NPM_CHAINLINK_CCIP }}
           create-github-release: false
           publish-command: "pnpm publish-beta --no-git-checks"
-          package-json-directory: contracts
+          package-json-directory: chains/evm
 
   publish-prod:
     name: Publish Prod NPM
@@ -202,7 +206,11 @@ jobs:
       - name: Install Foundry
         uses: ./.github/actions/install-solidity-foundry
         with:
-          working-directory: chainlink/contracts
+          working-directory: chains/evm
+
+      - name: Run native compile and generate wrappers
+        working-directory: chains/evm
+        run: make wrappers
 
       - name: Validate version
         working-directory: chains/evm
@@ -211,23 +219,23 @@ jobs:
           IS_RELEASE_CCIP: ${{ needs.tag-check.outputs.is-release-ccip }}
           RELEASE_VERSION_CCIP: ${{ needs.tag-check.outputs.release-version-ccip }}
         run: |
-          version=""
-          if [[ $IS_RELEASE_CCIP == 'true' ]]; then
-            version="${RELEASE_VERSION_CCIP}"
+          VERSION=""
+          if [[ "${IS_RELEASE_CCIP}" == 'true' ]]; then
+            VERSION="${RELEASE_VERSION_CCIP}"
           else
             echo "::error::No release version found."
             exit 1
           fi
-          package_json_version="$(jq -r '.version' package.json)"
-          if [[ "$PACKAGE_JSON_VERSION" != "${version}" ]]; then
-            echo "::error version mismatch: package.json version ($package_json_version) does not match version computed from tag ${version}"
+          PACKAGE_JSON_VERSION="$(jq -r '.version' package.json)"
+          if [[ "${PACKAGE_JSON_VERSION}" != "${VERSION}" ]]; then
+            echo "::error::Version mismatch: package.json version (${PACKAGE_JSON_VERSION}) does not match version computed from tag ${VERSION}"
             exit 1
           fi
 
       - name: Publish to NPM (latest)
         uses: smartcontractkit/.github/actions/ci-publish-npm@4b0ab756abcb1760cb82e1e87b94ff431905bffc # ci-publish-npm@0.4.0
         with:
-          npm-token: ${{ secrets.NPM_TOKEN }}
+          npm-token: ${{ secrets.NPM_CHAINLINK_CCIP }}
           create-github-release: false
           publish-command: "pnpm publish-prod --no-git-checks"
-          package-json-directory: contracts
+          package-json-directory: chains/evm
