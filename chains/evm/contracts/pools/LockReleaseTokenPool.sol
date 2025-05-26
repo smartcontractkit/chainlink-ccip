@@ -22,17 +22,11 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
   using SafeERC20 for IERC20;
 
   error InsufficientLiquidity();
-  error LiquidityNotAccepted();
 
   event LiquidityTransferred(address indexed from, uint256 amount);
 
   string public constant override typeAndVersion = "LockReleaseTokenPool 1.5.1";
 
-  /// @dev Whether or not the pool accepts liquidity.
-  /// External liquidity is not required when there is one canonical token deployed to a chain,
-  /// and CCIP is facilitating mint/burn on all the other chains, in which case the invariant
-  /// balanceOf(pool) on home chain >= sum(totalSupply(mint/burn "wrapped" token) on all remote chains) should always hold
-  bool internal immutable i_acceptLiquidity;
   /// @notice The address of the rebalancer.
   address internal s_rebalancer;
 
@@ -41,11 +35,8 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
     uint8 localTokenDecimals,
     address[] memory allowlist,
     address rmnProxy,
-    bool acceptLiquidity,
     address router
-  ) TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) {
-    i_acceptLiquidity = acceptLiquidity;
-  }
+  ) TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) {}
 
   /// @notice Locks the token in the pool
   /// @dev The _validateLockOrBurn check is an essential security check
@@ -102,18 +93,11 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
     s_rebalancer = rebalancer;
   }
 
-  /// @notice Checks if the pool can accept liquidity.
-  /// @return true if the pool can accept liquidity, false otherwise.
-  function canAcceptLiquidity() external view returns (bool) {
-    return i_acceptLiquidity;
-  }
-
   /// @notice Adds liquidity to the pool. The tokens should be approved first.
   /// @param amount The amount of liquidity to provide.
   function provideLiquidity(
     uint256 amount
   ) external {
-    if (!i_acceptLiquidity) revert LiquidityNotAccepted();
     if (s_rebalancer != msg.sender) revert Unauthorized(msg.sender);
 
     i_token.safeTransferFrom(msg.sender, address(this), amount);
