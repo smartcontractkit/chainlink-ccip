@@ -91,8 +91,12 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
   /// TokenAdminRegistry, which will activate the new pool. All new transactions will use the new pool and its
   /// liquidity. Finally, the remaining liquidity can be transferred to the new pool using this function one more time.
   /// @param from The address of the old pool.
-  /// @param amount The amount of liquidity to transfer.
+  /// @param amount The amount of liquidity to transfer. If uint256.max is passed, all liquidity will be transferred.
   function transferLiquidity(address from, uint256 amount) external onlyOwner {
+    if (amount == type(uint256).max) {
+      amount = IERC20(i_token).balanceOf(from);
+    }
+
     LockReleaseTokenPool(from).withdrawLiquidity(amount);
 
     emit LiquidityTransferred(from, amount);
