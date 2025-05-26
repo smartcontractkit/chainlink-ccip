@@ -15,6 +15,7 @@ type ReclaimEventAccount struct {
 	Params *ReclaimEventAccountParams
 
 	// [0] = [WRITE, SIGNER] payee
+	// ··········· rent SOL receiver, should match original rent payer
 	//
 	// [1] = [WRITE] messageTransmitter
 	//
@@ -37,12 +38,14 @@ func (inst *ReclaimEventAccount) SetParams(params ReclaimEventAccountParams) *Re
 }
 
 // SetPayeeAccount sets the "payee" account.
+// rent SOL receiver, should match original rent payer
 func (inst *ReclaimEventAccount) SetPayeeAccount(payee ag_solanago.PublicKey) *ReclaimEventAccount {
 	inst.AccountMetaSlice[0] = ag_solanago.Meta(payee).WRITE().SIGNER()
 	return inst
 }
 
 // GetPayeeAccount gets the "payee" account.
+// rent SOL receiver, should match original rent payer
 func (inst *ReclaimEventAccount) GetPayeeAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }

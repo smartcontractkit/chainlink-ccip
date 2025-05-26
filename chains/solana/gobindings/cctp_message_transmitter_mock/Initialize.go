@@ -18,7 +18,7 @@ type Initialize struct {
 	//
 	// [1] = [SIGNER] upgradeAuthority
 	//
-	// [2] = [WRITE, SIGNER] messageTransmitter
+	// [2] = [WRITE] messageTransmitter
 	//
 	// [3] = [] messageTransmitterProgramData
 	//
@@ -70,7 +70,7 @@ func (inst *Initialize) GetUpgradeAuthorityAccount() *ag_solanago.AccountMeta {
 
 // SetMessageTransmitterAccount sets the "messageTransmitter" account.
 func (inst *Initialize) SetMessageTransmitterAccount(messageTransmitter ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[2] = ag_solanago.Meta(messageTransmitter).WRITE().SIGNER()
+	inst.AccountMetaSlice[2] = ag_solanago.Meta(messageTransmitter).WRITE()
 	return inst
 }
 

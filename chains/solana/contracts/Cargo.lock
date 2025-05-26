@@ -757,6 +757,7 @@ name = "cctp_message_transmitter_mock"
 version = "0.1.0"
 dependencies = [
  "anchor-lang",
+ "solana-program",
 ]
 
 [[package]]

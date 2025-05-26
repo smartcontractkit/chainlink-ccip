@@ -22,7 +22,7 @@ type ReceiveMessage struct {
 	//
 	// [3] = [] messageTransmitter
 	//
-	// [4] = [WRITE, SIGNER] usedNonces
+	// [4] = [WRITE] usedNonces
 	//
 	// [5] = [] receiver
 	//
@@ -94,7 +94,7 @@ func (inst *ReceiveMessage) GetMessageTransmitterAccount() *ag_solanago.AccountM
 
 // SetUsedNoncesAccount sets the "usedNonces" account.
 func (inst *ReceiveMessage) SetUsedNoncesAccount(usedNonces ag_solanago.PublicKey) *ReceiveMessage {
-	inst.AccountMetaSlice[4] = ag_solanago.Meta(usedNonces).WRITE().SIGNER()
+	inst.AccountMetaSlice[4] = ag_solanago.Meta(usedNonces).WRITE()
 	return inst
 }
 

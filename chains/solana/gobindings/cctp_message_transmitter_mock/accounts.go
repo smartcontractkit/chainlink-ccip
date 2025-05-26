@@ -8,6 +8,59 @@ import (
 	ag_solanago "github.com/gagliardetto/solana-go"
 )
 
+type MessageSent struct {
+	RentPayer ag_solanago.PublicKey
+	Message   []byte
+}
+
+var MessageSentDiscriminator = [8]byte{131, 100, 133, 56, 166, 225, 151, 60}
+
+func (obj MessageSent) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Write account discriminator:
+	err = encoder.WriteBytes(MessageSentDiscriminator[:], false)
+	if err != nil {
+		return err
+	}
+	// Serialize `RentPayer` param:
+	err = encoder.Encode(obj.RentPayer)
+	if err != nil {
+		return err
+	}
+	// Serialize `Message` param:
+	err = encoder.Encode(obj.Message)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *MessageSent) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Read and check account discriminator:
+	{
+		discriminator, err := decoder.ReadTypeID()
+		if err != nil {
+			return err
+		}
+		if !discriminator.Equal(MessageSentDiscriminator[:]) {
+			return fmt.Errorf(
+				"wrong discriminator: wanted %s, got %s",
+				"[131 100 133 56 166 225 151 60]",
+				fmt.Sprint(discriminator[:]))
+		}
+	}
+	// Deserialize `RentPayer`:
+	err = decoder.Decode(&obj.RentPayer)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Message`:
+	err = decoder.Decode(&obj.Message)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 type MessageTransmitter struct {
 	Owner              ag_solanago.PublicKey
 	PendingOwner       ag_solanago.PublicKey

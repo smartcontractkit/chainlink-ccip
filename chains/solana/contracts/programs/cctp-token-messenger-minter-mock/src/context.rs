@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};
-use cctp_message_transmitter_mock::{program::CctpMessageTransmitterMock, MessageTransmitter};
+use cctp_message_transmitter_mock::program::CctpMessageTransmitterMock;
+use cctp_message_transmitter_mock::state::MessageTransmitter;
 
 use crate::burn_message::BurnMessage;
 use crate::program::CctpTokenMessengerMinterMock;

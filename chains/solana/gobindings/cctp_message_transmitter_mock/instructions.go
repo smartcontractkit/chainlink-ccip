@@ -30,31 +30,9 @@ func init() {
 var (
 	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
 
-	Instruction_TransferOwnership = ag_binary.TypeID([8]byte{65, 177, 215, 73, 53, 45, 99, 47})
-
-	Instruction_AcceptOwnership = ag_binary.TypeID([8]byte{172, 23, 43, 13, 238, 213, 85, 150})
-
-	Instruction_UpdatePauser = ag_binary.TypeID([8]byte{140, 171, 211, 132, 57, 201, 16, 254})
-
-	Instruction_UpdateAttesterManager = ag_binary.TypeID([8]byte{175, 245, 178, 104, 85, 179, 71, 16})
-
-	Instruction_Pause = ag_binary.TypeID([8]byte{211, 22, 221, 251, 74, 121, 193, 47})
-
-	Instruction_Unpause = ag_binary.TypeID([8]byte{169, 144, 4, 38, 10, 141, 188, 255})
-
-	Instruction_SetMaxMessageBodySize = ag_binary.TypeID([8]byte{168, 178, 8, 117, 217, 167, 219, 31})
-
-	Instruction_EnableAttester = ag_binary.TypeID([8]byte{2, 11, 193, 115, 5, 148, 4, 198})
-
-	Instruction_DisableAttester = ag_binary.TypeID([8]byte{61, 171, 131, 95, 172, 15, 227, 229})
-
-	Instruction_SetSignatureThreshold = ag_binary.TypeID([8]byte{163, 19, 154, 168, 82, 209, 214, 219})
-
 	Instruction_SendMessage = ag_binary.TypeID([8]byte{57, 40, 34, 178, 189, 10, 65, 26})
 
 	Instruction_SendMessageWithCaller = ag_binary.TypeID([8]byte{212, 47, 34, 52, 91, 32, 176, 204})
-
-	Instruction_ReplaceMessage = ag_binary.TypeID([8]byte{189, 189, 210, 163, 149, 205, 69, 229})
 
 	Instruction_ReceiveMessage = ag_binary.TypeID([8]byte{38, 144, 127, 225, 31, 225, 238, 25})
 
@@ -70,32 +48,10 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 	switch id {
 	case Instruction_Initialize:
 		return "Initialize"
-	case Instruction_TransferOwnership:
-		return "TransferOwnership"
-	case Instruction_AcceptOwnership:
-		return "AcceptOwnership"
-	case Instruction_UpdatePauser:
-		return "UpdatePauser"
-	case Instruction_UpdateAttesterManager:
-		return "UpdateAttesterManager"
-	case Instruction_Pause:
-		return "Pause"
-	case Instruction_Unpause:
-		return "Unpause"
-	case Instruction_SetMaxMessageBodySize:
-		return "SetMaxMessageBodySize"
-	case Instruction_EnableAttester:
-		return "EnableAttester"
-	case Instruction_DisableAttester:
-		return "DisableAttester"
-	case Instruction_SetSignatureThreshold:
-		return "SetSignatureThreshold"
 	case Instruction_SendMessage:
 		return "SendMessage"
 	case Instruction_SendMessageWithCaller:
 		return "SendMessageWithCaller"
-	case Instruction_ReplaceMessage:
-		return "ReplaceMessage"
 	case Instruction_ReceiveMessage:
 		return "ReceiveMessage"
 	case Instruction_ReclaimEventAccount:
@@ -128,43 +84,10 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 			"initialize", (*Initialize)(nil),
 		},
 		{
-			"transfer_ownership", (*TransferOwnership)(nil),
-		},
-		{
-			"accept_ownership", (*AcceptOwnership)(nil),
-		},
-		{
-			"update_pauser", (*UpdatePauser)(nil),
-		},
-		{
-			"update_attester_manager", (*UpdateAttesterManager)(nil),
-		},
-		{
-			"pause", (*Pause)(nil),
-		},
-		{
-			"unpause", (*Unpause)(nil),
-		},
-		{
-			"set_max_message_body_size", (*SetMaxMessageBodySize)(nil),
-		},
-		{
-			"enable_attester", (*EnableAttester)(nil),
-		},
-		{
-			"disable_attester", (*DisableAttester)(nil),
-		},
-		{
-			"set_signature_threshold", (*SetSignatureThreshold)(nil),
-		},
-		{
 			"send_message", (*SendMessage)(nil),
 		},
 		{
 			"send_message_with_caller", (*SendMessageWithCaller)(nil),
-		},
-		{
-			"replace_message", (*ReplaceMessage)(nil),
 		},
 		{
 			"receive_message", (*ReceiveMessage)(nil),

@@ -18,7 +18,7 @@ export type CctpMessageTransmitterMock = {
         {
           "name": "messageTransmitter",
           "isMut": true,
-          "isSigner": true
+          "isSigner": false
         },
         {
           "name": "messageTransmitterProgramData",
@@ -51,336 +51,6 @@ export type CctpMessageTransmitterMock = {
           "name": "params",
           "type": {
             "defined": "InitializeParams"
-          }
-        }
-      ]
-    },
-    {
-      "name": "transferOwnership",
-      "accounts": [
-        {
-          "name": "owner",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "messageTransmitter",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "eventAuthority",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "params",
-          "type": {
-            "defined": "TransferOwnershipParams"
-          }
-        }
-      ]
-    },
-    {
-      "name": "acceptOwnership",
-      "accounts": [
-        {
-          "name": "pendingOwner",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "messageTransmitter",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "eventAuthority",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "params",
-          "type": {
-            "defined": "AcceptOwnershipParams"
-          }
-        }
-      ]
-    },
-    {
-      "name": "updatePauser",
-      "accounts": [
-        {
-          "name": "owner",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "messageTransmitter",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "eventAuthority",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "params",
-          "type": {
-            "defined": "UpdatePauserParams"
-          }
-        }
-      ]
-    },
-    {
-      "name": "updateAttesterManager",
-      "accounts": [
-        {
-          "name": "owner",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "messageTransmitter",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "eventAuthority",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "params",
-          "type": {
-            "defined": "UpdateAttesterManagerParams"
-          }
-        }
-      ]
-    },
-    {
-      "name": "pause",
-      "accounts": [
-        {
-          "name": "pauser",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "messageTransmitter",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "eventAuthority",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "params",
-          "type": {
-            "defined": "PauseParams"
-          }
-        }
-      ]
-    },
-    {
-      "name": "unpause",
-      "accounts": [
-        {
-          "name": "pauser",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "messageTransmitter",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "eventAuthority",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "params",
-          "type": {
-            "defined": "UnpauseParams"
-          }
-        }
-      ]
-    },
-    {
-      "name": "setMaxMessageBodySize",
-      "accounts": [
-        {
-          "name": "owner",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "messageTransmitter",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "eventAuthority",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "params",
-          "type": {
-            "defined": "SetMaxMessageBodySizeParams"
-          }
-        }
-      ]
-    },
-    {
-      "name": "enableAttester",
-      "accounts": [
-        {
-          "name": "attesterManager",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "messageTransmitter",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "eventAuthority",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "params",
-          "type": {
-            "defined": "EnableAttesterParams"
-          }
-        }
-      ]
-    },
-    {
-      "name": "disableAttester",
-      "accounts": [
-        {
-          "name": "attesterManager",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "messageTransmitter",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "eventAuthority",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "params",
-          "type": {
-            "defined": "DisableAttesterParams"
-          }
-        }
-      ]
-    },
-    {
-      "name": "setSignatureThreshold",
-      "accounts": [
-        {
-          "name": "attesterManager",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "messageTransmitter",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "eventAuthority",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "params",
-          "type": {
-            "defined": "SetSignatureThresholdParams"
           }
         }
       ]
@@ -474,50 +144,6 @@ export type CctpMessageTransmitterMock = {
       "returns": "u64"
     },
     {
-      "name": "replaceMessage",
-      "accounts": [
-        {
-          "name": "eventRentPayer",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "senderAuthorityPda",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "messageTransmitter",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "messageSentEventData",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "senderProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "params",
-          "type": {
-            "defined": "ReplaceMessageParams"
-          }
-        }
-      ],
-      "returns": "u64"
-    },
-    {
       "name": "receiveMessage",
       "accounts": [
         {
@@ -543,7 +169,7 @@ export type CctpMessageTransmitterMock = {
         {
           "name": "usedNonces",
           "isMut": true,
-          "isSigner": true
+          "isSigner": false
         },
         {
           "name": "receiver",
@@ -581,7 +207,10 @@ export type CctpMessageTransmitterMock = {
         {
           "name": "payee",
           "isMut": true,
-          "isSigner": true
+          "isSigner": true,
+          "docs": [
+            "rent SOL receiver, should match original rent payer"
+          ]
         },
         {
           "name": "messageTransmitter",
@@ -644,7 +273,26 @@ export type CctpMessageTransmitterMock = {
   ],
   "accounts": [
     {
+      "name": "messageSent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "rentPayer",
+            "type": "publicKey"
+          },
+          {
+            "name": "message",
+            "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
       "name": "messageTransmitter",
+      "docs": [
+        "Main state of the MessageTransmitter program"
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -749,111 +397,6 @@ export type CctpMessageTransmitterMock = {
       }
     },
     {
-      "name": "TransferOwnershipParams",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "newOwner",
-            "type": "publicKey"
-          }
-        ]
-      }
-    },
-    {
-      "name": "AcceptOwnershipParams",
-      "type": {
-        "kind": "struct",
-        "fields": []
-      }
-    },
-    {
-      "name": "UpdatePauserParams",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "newPauser",
-            "type": "publicKey"
-          }
-        ]
-      }
-    },
-    {
-      "name": "UpdateAttesterManagerParams",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "newAttesterManager",
-            "type": "publicKey"
-          }
-        ]
-      }
-    },
-    {
-      "name": "PauseParams",
-      "type": {
-        "kind": "struct",
-        "fields": []
-      }
-    },
-    {
-      "name": "UnpauseParams",
-      "type": {
-        "kind": "struct",
-        "fields": []
-      }
-    },
-    {
-      "name": "SetMaxMessageBodySizeParams",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "newMaxMessageBodySize",
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "EnableAttesterParams",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "newAttester",
-            "type": "publicKey"
-          }
-        ]
-      }
-    },
-    {
-      "name": "DisableAttesterParams",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "attester",
-            "type": "publicKey"
-          }
-        ]
-      }
-    },
-    {
-      "name": "SetSignatureThresholdParams",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "newSignatureThreshold",
-            "type": "u32"
-          }
-        ]
-      }
-    },
-    {
       "name": "SendMessageParams",
       "type": {
         "kind": "struct",
@@ -892,30 +435,6 @@ export type CctpMessageTransmitterMock = {
           },
           {
             "name": "destinationCaller",
-            "type": "publicKey"
-          }
-        ]
-      }
-    },
-    {
-      "name": "ReplaceMessageParams",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "originalMessage",
-            "type": "bytes"
-          },
-          {
-            "name": "originalAttestation",
-            "type": "bytes"
-          },
-          {
-            "name": "newMessageBody",
-            "type": "bytes"
-          },
-          {
-            "name": "newDestinationCaller",
             "type": "publicKey"
           }
         ]
@@ -1116,6 +635,173 @@ export type CctpMessageTransmitterMock = {
     {
       "name": "Unpause",
       "fields": []
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidAuthority",
+      "msg": "Invalid authority"
+    },
+    {
+      "code": 6001,
+      "name": "ProgramPaused",
+      "msg": "Instruction is not allowed at this time"
+    },
+    {
+      "code": 6002,
+      "name": "InvalidMessageTransmitterState",
+      "msg": "Invalid message transmitter state"
+    },
+    {
+      "code": 6003,
+      "name": "InvalidSignatureThreshold",
+      "msg": "Invalid signature threshold"
+    },
+    {
+      "code": 6004,
+      "name": "SignatureThresholdAlreadySet",
+      "msg": "Signature threshold already set"
+    },
+    {
+      "code": 6005,
+      "name": "InvalidOwner",
+      "msg": "Invalid owner"
+    },
+    {
+      "code": 6006,
+      "name": "InvalidPauser",
+      "msg": "Invalid pauser"
+    },
+    {
+      "code": 6007,
+      "name": "InvalidAttesterManager",
+      "msg": "Invalid attester manager"
+    },
+    {
+      "code": 6008,
+      "name": "InvalidAttester",
+      "msg": "Invalid attester"
+    },
+    {
+      "code": 6009,
+      "name": "AttesterAlreadyEnabled",
+      "msg": "Attester already enabled"
+    },
+    {
+      "code": 6010,
+      "name": "TooFewEnabledAttesters",
+      "msg": "Too few enabled attesters"
+    },
+    {
+      "code": 6011,
+      "name": "SignatureThresholdTooLow",
+      "msg": "Signature threshold is too low"
+    },
+    {
+      "code": 6012,
+      "name": "AttesterAlreadyDisabled",
+      "msg": "Attester already disabled"
+    },
+    {
+      "code": 6013,
+      "name": "MessageBodyLimitExceeded",
+      "msg": "Message body exceeds max size"
+    },
+    {
+      "code": 6014,
+      "name": "InvalidDestinationCaller",
+      "msg": "Invalid destination caller"
+    },
+    {
+      "code": 6015,
+      "name": "InvalidRecipient",
+      "msg": "Invalid message recipient"
+    },
+    {
+      "code": 6016,
+      "name": "SenderNotPermitted",
+      "msg": "Sender is not permitted"
+    },
+    {
+      "code": 6017,
+      "name": "InvalidSourceDomain",
+      "msg": "Invalid source domain"
+    },
+    {
+      "code": 6018,
+      "name": "InvalidDestinationDomain",
+      "msg": "Invalid destination domain"
+    },
+    {
+      "code": 6019,
+      "name": "InvalidMessageVersion",
+      "msg": "Invalid message version"
+    },
+    {
+      "code": 6020,
+      "name": "InvalidUsedNoncesAccount",
+      "msg": "Invalid used nonces account"
+    },
+    {
+      "code": 6021,
+      "name": "InvalidRecipientProgram",
+      "msg": "Invalid recipient program"
+    },
+    {
+      "code": 6022,
+      "name": "InvalidNonce",
+      "msg": "Invalid nonce"
+    },
+    {
+      "code": 6023,
+      "name": "NonceAlreadyUsed",
+      "msg": "Nonce already used"
+    },
+    {
+      "code": 6024,
+      "name": "MessageTooShort",
+      "msg": "Message is too short"
+    },
+    {
+      "code": 6025,
+      "name": "MalformedMessage",
+      "msg": "Malformed message"
+    },
+    {
+      "code": 6026,
+      "name": "InvalidSignatureOrderOrDupe",
+      "msg": "Invalid signature order or dupe"
+    },
+    {
+      "code": 6027,
+      "name": "InvalidAttesterSignature",
+      "msg": "Invalid attester signature"
+    },
+    {
+      "code": 6028,
+      "name": "InvalidAttestationLength",
+      "msg": "Invalid attestation length"
+    },
+    {
+      "code": 6029,
+      "name": "InvalidSignatureRecoveryId",
+      "msg": "Invalid signature recovery ID"
+    },
+    {
+      "code": 6030,
+      "name": "InvalidSignatureSValue",
+      "msg": "Invalid signature S value"
+    },
+    {
+      "code": 6031,
+      "name": "InvalidMessageHash",
+      "msg": "Invalid message hash"
+    },
+    {
+      "code": 6032,
+      "name": "MathError",
+      "msg": "MathError"
     }
   ]
 };
@@ -1140,7 +826,7 @@ export const IDL: CctpMessageTransmitterMock = {
         {
           "name": "messageTransmitter",
           "isMut": true,
-          "isSigner": true
+          "isSigner": false
         },
         {
           "name": "messageTransmitterProgramData",
@@ -1173,336 +859,6 @@ export const IDL: CctpMessageTransmitterMock = {
           "name": "params",
           "type": {
             "defined": "InitializeParams"
-          }
-        }
-      ]
-    },
-    {
-      "name": "transferOwnership",
-      "accounts": [
-        {
-          "name": "owner",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "messageTransmitter",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "eventAuthority",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "params",
-          "type": {
-            "defined": "TransferOwnershipParams"
-          }
-        }
-      ]
-    },
-    {
-      "name": "acceptOwnership",
-      "accounts": [
-        {
-          "name": "pendingOwner",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "messageTransmitter",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "eventAuthority",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "params",
-          "type": {
-            "defined": "AcceptOwnershipParams"
-          }
-        }
-      ]
-    },
-    {
-      "name": "updatePauser",
-      "accounts": [
-        {
-          "name": "owner",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "messageTransmitter",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "eventAuthority",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "params",
-          "type": {
-            "defined": "UpdatePauserParams"
-          }
-        }
-      ]
-    },
-    {
-      "name": "updateAttesterManager",
-      "accounts": [
-        {
-          "name": "owner",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "messageTransmitter",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "eventAuthority",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "params",
-          "type": {
-            "defined": "UpdateAttesterManagerParams"
-          }
-        }
-      ]
-    },
-    {
-      "name": "pause",
-      "accounts": [
-        {
-          "name": "pauser",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "messageTransmitter",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "eventAuthority",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "params",
-          "type": {
-            "defined": "PauseParams"
-          }
-        }
-      ]
-    },
-    {
-      "name": "unpause",
-      "accounts": [
-        {
-          "name": "pauser",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "messageTransmitter",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "eventAuthority",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "params",
-          "type": {
-            "defined": "UnpauseParams"
-          }
-        }
-      ]
-    },
-    {
-      "name": "setMaxMessageBodySize",
-      "accounts": [
-        {
-          "name": "owner",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "messageTransmitter",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "eventAuthority",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "params",
-          "type": {
-            "defined": "SetMaxMessageBodySizeParams"
-          }
-        }
-      ]
-    },
-    {
-      "name": "enableAttester",
-      "accounts": [
-        {
-          "name": "attesterManager",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "messageTransmitter",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "eventAuthority",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "params",
-          "type": {
-            "defined": "EnableAttesterParams"
-          }
-        }
-      ]
-    },
-    {
-      "name": "disableAttester",
-      "accounts": [
-        {
-          "name": "attesterManager",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "messageTransmitter",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "eventAuthority",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "params",
-          "type": {
-            "defined": "DisableAttesterParams"
-          }
-        }
-      ]
-    },
-    {
-      "name": "setSignatureThreshold",
-      "accounts": [
-        {
-          "name": "attesterManager",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "messageTransmitter",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "eventAuthority",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "params",
-          "type": {
-            "defined": "SetSignatureThresholdParams"
           }
         }
       ]
@@ -1596,50 +952,6 @@ export const IDL: CctpMessageTransmitterMock = {
       "returns": "u64"
     },
     {
-      "name": "replaceMessage",
-      "accounts": [
-        {
-          "name": "eventRentPayer",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "senderAuthorityPda",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "messageTransmitter",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "messageSentEventData",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "senderProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "params",
-          "type": {
-            "defined": "ReplaceMessageParams"
-          }
-        }
-      ],
-      "returns": "u64"
-    },
-    {
       "name": "receiveMessage",
       "accounts": [
         {
@@ -1665,7 +977,7 @@ export const IDL: CctpMessageTransmitterMock = {
         {
           "name": "usedNonces",
           "isMut": true,
-          "isSigner": true
+          "isSigner": false
         },
         {
           "name": "receiver",
@@ -1703,7 +1015,10 @@ export const IDL: CctpMessageTransmitterMock = {
         {
           "name": "payee",
           "isMut": true,
-          "isSigner": true
+          "isSigner": true,
+          "docs": [
+            "rent SOL receiver, should match original rent payer"
+          ]
         },
         {
           "name": "messageTransmitter",
@@ -1766,7 +1081,26 @@ export const IDL: CctpMessageTransmitterMock = {
   ],
   "accounts": [
     {
+      "name": "messageSent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "rentPayer",
+            "type": "publicKey"
+          },
+          {
+            "name": "message",
+            "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
       "name": "messageTransmitter",
+      "docs": [
+        "Main state of the MessageTransmitter program"
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -1871,111 +1205,6 @@ export const IDL: CctpMessageTransmitterMock = {
       }
     },
     {
-      "name": "TransferOwnershipParams",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "newOwner",
-            "type": "publicKey"
-          }
-        ]
-      }
-    },
-    {
-      "name": "AcceptOwnershipParams",
-      "type": {
-        "kind": "struct",
-        "fields": []
-      }
-    },
-    {
-      "name": "UpdatePauserParams",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "newPauser",
-            "type": "publicKey"
-          }
-        ]
-      }
-    },
-    {
-      "name": "UpdateAttesterManagerParams",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "newAttesterManager",
-            "type": "publicKey"
-          }
-        ]
-      }
-    },
-    {
-      "name": "PauseParams",
-      "type": {
-        "kind": "struct",
-        "fields": []
-      }
-    },
-    {
-      "name": "UnpauseParams",
-      "type": {
-        "kind": "struct",
-        "fields": []
-      }
-    },
-    {
-      "name": "SetMaxMessageBodySizeParams",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "newMaxMessageBodySize",
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "EnableAttesterParams",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "newAttester",
-            "type": "publicKey"
-          }
-        ]
-      }
-    },
-    {
-      "name": "DisableAttesterParams",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "attester",
-            "type": "publicKey"
-          }
-        ]
-      }
-    },
-    {
-      "name": "SetSignatureThresholdParams",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "newSignatureThreshold",
-            "type": "u32"
-          }
-        ]
-      }
-    },
-    {
       "name": "SendMessageParams",
       "type": {
         "kind": "struct",
@@ -2014,30 +1243,6 @@ export const IDL: CctpMessageTransmitterMock = {
           },
           {
             "name": "destinationCaller",
-            "type": "publicKey"
-          }
-        ]
-      }
-    },
-    {
-      "name": "ReplaceMessageParams",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "originalMessage",
-            "type": "bytes"
-          },
-          {
-            "name": "originalAttestation",
-            "type": "bytes"
-          },
-          {
-            "name": "newMessageBody",
-            "type": "bytes"
-          },
-          {
-            "name": "newDestinationCaller",
             "type": "publicKey"
           }
         ]
@@ -2238,6 +1443,173 @@ export const IDL: CctpMessageTransmitterMock = {
     {
       "name": "Unpause",
       "fields": []
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidAuthority",
+      "msg": "Invalid authority"
+    },
+    {
+      "code": 6001,
+      "name": "ProgramPaused",
+      "msg": "Instruction is not allowed at this time"
+    },
+    {
+      "code": 6002,
+      "name": "InvalidMessageTransmitterState",
+      "msg": "Invalid message transmitter state"
+    },
+    {
+      "code": 6003,
+      "name": "InvalidSignatureThreshold",
+      "msg": "Invalid signature threshold"
+    },
+    {
+      "code": 6004,
+      "name": "SignatureThresholdAlreadySet",
+      "msg": "Signature threshold already set"
+    },
+    {
+      "code": 6005,
+      "name": "InvalidOwner",
+      "msg": "Invalid owner"
+    },
+    {
+      "code": 6006,
+      "name": "InvalidPauser",
+      "msg": "Invalid pauser"
+    },
+    {
+      "code": 6007,
+      "name": "InvalidAttesterManager",
+      "msg": "Invalid attester manager"
+    },
+    {
+      "code": 6008,
+      "name": "InvalidAttester",
+      "msg": "Invalid attester"
+    },
+    {
+      "code": 6009,
+      "name": "AttesterAlreadyEnabled",
+      "msg": "Attester already enabled"
+    },
+    {
+      "code": 6010,
+      "name": "TooFewEnabledAttesters",
+      "msg": "Too few enabled attesters"
+    },
+    {
+      "code": 6011,
+      "name": "SignatureThresholdTooLow",
+      "msg": "Signature threshold is too low"
+    },
+    {
+      "code": 6012,
+      "name": "AttesterAlreadyDisabled",
+      "msg": "Attester already disabled"
+    },
+    {
+      "code": 6013,
+      "name": "MessageBodyLimitExceeded",
+      "msg": "Message body exceeds max size"
+    },
+    {
+      "code": 6014,
+      "name": "InvalidDestinationCaller",
+      "msg": "Invalid destination caller"
+    },
+    {
+      "code": 6015,
+      "name": "InvalidRecipient",
+      "msg": "Invalid message recipient"
+    },
+    {
+      "code": 6016,
+      "name": "SenderNotPermitted",
+      "msg": "Sender is not permitted"
+    },
+    {
+      "code": 6017,
+      "name": "InvalidSourceDomain",
+      "msg": "Invalid source domain"
+    },
+    {
+      "code": 6018,
+      "name": "InvalidDestinationDomain",
+      "msg": "Invalid destination domain"
+    },
+    {
+      "code": 6019,
+      "name": "InvalidMessageVersion",
+      "msg": "Invalid message version"
+    },
+    {
+      "code": 6020,
+      "name": "InvalidUsedNoncesAccount",
+      "msg": "Invalid used nonces account"
+    },
+    {
+      "code": 6021,
+      "name": "InvalidRecipientProgram",
+      "msg": "Invalid recipient program"
+    },
+    {
+      "code": 6022,
+      "name": "InvalidNonce",
+      "msg": "Invalid nonce"
+    },
+    {
+      "code": 6023,
+      "name": "NonceAlreadyUsed",
+      "msg": "Nonce already used"
+    },
+    {
+      "code": 6024,
+      "name": "MessageTooShort",
+      "msg": "Message is too short"
+    },
+    {
+      "code": 6025,
+      "name": "MalformedMessage",
+      "msg": "Malformed message"
+    },
+    {
+      "code": 6026,
+      "name": "InvalidSignatureOrderOrDupe",
+      "msg": "Invalid signature order or dupe"
+    },
+    {
+      "code": 6027,
+      "name": "InvalidAttesterSignature",
+      "msg": "Invalid attester signature"
+    },
+    {
+      "code": 6028,
+      "name": "InvalidAttestationLength",
+      "msg": "Invalid attestation length"
+    },
+    {
+      "code": 6029,
+      "name": "InvalidSignatureRecoveryId",
+      "msg": "Invalid signature recovery ID"
+    },
+    {
+      "code": 6030,
+      "name": "InvalidSignatureSValue",
+      "msg": "Invalid signature S value"
+    },
+    {
+      "code": 6031,
+      "name": "InvalidMessageHash",
+      "msg": "Invalid message hash"
+    },
+    {
+      "code": 6032,
+      "name": "MathError",
+      "msg": "MathError"
     }
   ]
 };
