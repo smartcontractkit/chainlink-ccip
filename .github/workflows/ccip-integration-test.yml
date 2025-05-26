@@ -7,7 +7,32 @@ on:
       - 'main'
 
 jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      e2e_should_run: ${{ steps.changes.outputs.e2e_should_run }}
+    steps:
+      - name: Checkout the repo
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Detect changes
+        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+        id: changes
+        with:
+          list-files: "shell"
+          # Run on all, except the chains/evm folder unless it's in a released version.
+          filters: |
+            e2e_should_run:
+              - '**'
+              - '!chains/evm/**'
+              - 'chains/evm/gobindings/generated/**'
+              - '!chains/evm/gobindings/generated/latest'
+
   integration-test-matrix:
+    needs: [changes]
+    if: ${{ needs.changes.outputs.e2e_should_run == 'true' }}
     env:
       # We explicitly have this env var not be "CL_DATABASE_URL" to avoid having it be used by core related tests
       # when they should not be using it, while still allowing us to DRY up the setup
@@ -49,7 +74,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout the chainlink-ccip repo
-        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+        uses: actions/checkout@v4
       - name: Determine Go version
         id: go_version
         run: echo "GO_VERSION=$(cat go.mod |grep "^go"|cut -d' ' -f 2)" >> $GITHUB_ENV
@@ -94,7 +119,7 @@ jobs:
             echo "::set-output name=ref::$default"
           fi
       - name: Clone Chainlink repo
-        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+        uses: actions/checkout@v4
         with:
           repository: smartcontractkit/chainlink
           ref: ${{ steps.get_chainlink_sha.outputs.ref }}
