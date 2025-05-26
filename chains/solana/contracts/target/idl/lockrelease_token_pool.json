@@ -1,386 +1,123 @@
 {
-  "version": "0.1.0-dev",
-  "name": "lockrelease_token_pool",
+  "address": "8eqh8wppT9c5rw4ERqNCffvU6cNFJWff9WmkcYtmGiqC",
+  "metadata": {
+    "name": "lockrelease_token_pool",
+    "version": "0.1.0-dev",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
   "instructions": [
     {
-      "name": "initialize",
+      "name": "accept_ownership",
+      "discriminator": [
+        172,
+        23,
+        43,
+        13,
+        238,
+        213,
+        85,
+        150
+      ],
       "accounts": [
         {
           "name": "state",
-          "isMut": true,
-          "isSigner": false
+          "writable": true
         },
         {
-          "name": "mint",
-          "isMut": false,
-          "isSigner": false
+          "name": "mint"
         },
         {
           "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "programData",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "router",
-          "type": "publicKey"
-        },
-        {
-          "name": "rmnRemote",
-          "type": "publicKey"
-        }
-      ]
-    },
-    {
-      "name": "typeVersion",
-      "docs": [
-        "Returns the program type (name) and version.",
-        "Used by offchain code to easily determine which program & version is being interacted with.",
-        "",
-        "# Arguments",
-        "* `ctx` - The context"
-      ],
-      "accounts": [
-        {
-          "name": "clock",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [],
-      "returns": "string"
-    },
-    {
-      "name": "transferOwnership",
-      "accounts": [
-        {
-          "name": "state",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "mint",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "proposedOwner",
-          "type": "publicKey"
-        }
-      ]
-    },
-    {
-      "name": "acceptOwnership",
-      "accounts": [
-        {
-          "name": "state",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "mint",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
+          "signer": true
         }
       ],
       "args": []
     },
     {
-      "name": "setRouter",
+      "name": "append_remote_pool_addresses",
+      "discriminator": [
+        172,
+        57,
+        83,
+        55,
+        70,
+        112,
+        26,
+        197
+      ],
       "accounts": [
         {
-          "name": "state",
-          "isMut": true,
-          "isSigner": false
+          "name": "state"
         },
         {
-          "name": "mint",
-          "isMut": false,
-          "isSigner": false
+          "name": "chain_config",
+          "writable": true
         },
         {
           "name": "authority",
-          "isMut": false,
-          "isSigner": true
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program"
         }
       ],
       "args": [
         {
-          "name": "newRouter",
-          "type": "publicKey"
-        }
-      ]
-    },
-    {
-      "name": "initializeStateVersion",
-      "accounts": [
-        {
-          "name": "state",
-          "isMut": true,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "mint",
-          "type": "publicKey"
-        }
-      ]
-    },
-    {
-      "name": "initChainRemoteConfig",
-      "accounts": [
-        {
-          "name": "state",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "chainConfig",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "remoteChainSelector",
+          "name": "remote_chain_selector",
           "type": "u64"
         },
         {
-          "name": "mint",
-          "type": "publicKey"
-        },
-        {
-          "name": "cfg",
-          "type": {
-            "defined": "RemoteConfig"
-          }
-        }
-      ]
-    },
-    {
-      "name": "editChainRemoteConfig",
-      "accounts": [
-        {
-          "name": "state",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "chainConfig",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "remoteChainSelector",
-          "type": "u64"
-        },
-        {
-          "name": "mint",
-          "type": "publicKey"
-        },
-        {
-          "name": "cfg",
-          "type": {
-            "defined": "RemoteConfig"
-          }
-        }
-      ]
-    },
-    {
-      "name": "appendRemotePoolAddresses",
-      "accounts": [
-        {
-          "name": "state",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "chainConfig",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "remoteChainSelector",
-          "type": "u64"
-        },
-        {
-          "name": "mint",
-          "type": "publicKey"
+          "name": "_mint",
+          "type": "pubkey"
         },
         {
           "name": "addresses",
           "type": {
             "vec": {
-              "defined": "RemoteAddress"
+              "defined": {
+                "name": "RemoteAddress"
+              }
             }
           }
         }
       ]
     },
     {
-      "name": "setChainRateLimit",
-      "accounts": [
-        {
-          "name": "state",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "chainConfig",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        }
+      "name": "configure_allow_list",
+      "discriminator": [
+        18,
+        180,
+        102,
+        187,
+        209,
+        0,
+        130,
+        191
       ],
-      "args": [
-        {
-          "name": "remoteChainSelector",
-          "type": "u64"
-        },
-        {
-          "name": "mint",
-          "type": "publicKey"
-        },
-        {
-          "name": "inbound",
-          "type": {
-            "defined": "RateLimitConfig"
-          }
-        },
-        {
-          "name": "outbound",
-          "type": {
-            "defined": "RateLimitConfig"
-          }
-        }
-      ]
-    },
-    {
-      "name": "deleteChainConfig",
       "accounts": [
         {
           "name": "state",
-          "isMut": false,
-          "isSigner": false
+          "writable": true
         },
         {
-          "name": "chainConfig",
-          "isMut": true,
-          "isSigner": false
+          "name": "mint"
         },
         {
           "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "remoteChainSelector",
-          "type": "u64"
+          "writable": true,
+          "signer": true
         },
         {
-          "name": "mint",
-          "type": "publicKey"
-        }
-      ]
-    },
-    {
-      "name": "configureAllowList",
-      "accounts": [
-        {
-          "name": "state",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "mint",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "system_program"
         }
       ],
       "args": [
         {
           "name": "add",
           "type": {
-            "vec": "publicKey"
+            "vec": "pubkey"
           }
         },
         {
@@ -390,282 +127,310 @@
       ]
     },
     {
-      "name": "removeFromAllowList",
+      "name": "delete_chain_config",
+      "discriminator": [
+        241,
+        159,
+        142,
+        210,
+        64,
+        173,
+        77,
+        179
+      ],
       "accounts": [
         {
-          "name": "state",
-          "isMut": true,
-          "isSigner": false
+          "name": "state"
         },
         {
-          "name": "mint",
-          "isMut": false,
-          "isSigner": false
+          "name": "chain_config",
+          "writable": true
         },
         {
           "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
+          "writable": true,
+          "signer": true
         }
       ],
       "args": [
         {
-          "name": "remove",
+          "name": "remote_chain_selector",
+          "type": "u64"
+        },
+        {
+          "name": "mint",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "edit_chain_remote_config",
+      "discriminator": [
+        149,
+        112,
+        186,
+        72,
+        116,
+        217,
+        159,
+        175
+      ],
+      "accounts": [
+        {
+          "name": "state"
+        },
+        {
+          "name": "chain_config",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "remote_chain_selector",
+          "type": "u64"
+        },
+        {
+          "name": "mint",
+          "type": "pubkey"
+        },
+        {
+          "name": "cfg",
           "type": {
-            "vec": "publicKey"
+            "defined": {
+              "name": "RemoteConfig"
+            }
           }
         }
       ]
     },
     {
-      "name": "releaseOrMintTokens",
+      "name": "init_chain_remote_config",
+      "discriminator": [
+        21,
+        150,
+        133,
+        36,
+        2,
+        116,
+        199,
+        129
+      ],
       "accounts": [
         {
+          "name": "state"
+        },
+        {
+          "name": "chain_config",
+          "writable": true
+        },
+        {
           "name": "authority",
-          "isMut": false,
-          "isSigner": true
+          "writable": true,
+          "signer": true
         },
         {
-          "name": "offrampProgram",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK offramp program: exists only to derive the allowed offramp PDA",
-            "and the authority PDA."
-          ]
-        },
-        {
-          "name": "allowedOfframp",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK PDA of the router program verifying the signer is an allowed offramp.",
-            "If PDA does not exist, the router doesn't allow this offramp"
-          ]
-        },
-        {
-          "name": "state",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "mint",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "poolSigner",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "poolTokenAccount",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "chainConfig",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "rmnRemote",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "rmnRemoteCurses",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "rmnRemoteConfig",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "receiverTokenAccount",
-          "isMut": true,
-          "isSigner": false
+          "name": "system_program"
         }
       ],
       "args": [
         {
-          "name": "releaseOrMint",
+          "name": "remote_chain_selector",
+          "type": "u64"
+        },
+        {
+          "name": "mint",
+          "type": "pubkey"
+        },
+        {
+          "name": "cfg",
           "type": {
-            "defined": "ReleaseOrMintInV1"
+            "defined": {
+              "name": "RemoteConfig"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "initialize",
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "writable": true
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program"
+        },
+        {
+          "name": "program"
+        },
+        {
+          "name": "program_data"
+        }
+      ],
+      "args": [
+        {
+          "name": "router",
+          "type": "pubkey"
+        },
+        {
+          "name": "rmn_remote",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "initialize_state_version",
+      "discriminator": [
+        54,
+        186,
+        181,
+        26,
+        2,
+        198,
+        200,
+        158
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "_mint",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "lock_or_burn_tokens",
+      "discriminator": [
+        114,
+        161,
+        94,
+        29,
+        147,
+        25,
+        232,
+        191
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "state"
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "mint",
+          "writable": true
+        },
+        {
+          "name": "pool_signer"
+        },
+        {
+          "name": "pool_token_account",
+          "writable": true
+        },
+        {
+          "name": "rmn_remote"
+        },
+        {
+          "name": "rmn_remote_curses"
+        },
+        {
+          "name": "rmn_remote_config"
+        },
+        {
+          "name": "chain_config",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "lock_or_burn",
+          "type": {
+            "defined": {
+              "name": "LockOrBurnInV1"
+            }
           }
         }
       ],
       "returns": {
-        "defined": "ReleaseOrMintOutV1"
+        "defined": {
+          "name": "LockOrBurnOutV1"
+        }
       }
     },
     {
-      "name": "lockOrBurnTokens",
+      "name": "provide_liquidity",
+      "discriminator": [
+        40,
+        110,
+        107,
+        116,
+        174,
+        127,
+        97,
+        204
+      ],
       "accounts": [
         {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
+          "name": "state"
         },
         {
-          "name": "state",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "token_program"
         },
         {
           "name": "mint",
-          "isMut": true,
-          "isSigner": false
+          "writable": true
         },
         {
-          "name": "poolSigner",
-          "isMut": false,
-          "isSigner": false
+          "name": "pool_signer"
         },
         {
-          "name": "poolTokenAccount",
-          "isMut": true,
-          "isSigner": false
+          "name": "pool_token_account",
+          "writable": true
         },
         {
-          "name": "rmnRemote",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "rmnRemoteCurses",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "rmnRemoteConfig",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "chainConfig",
-          "isMut": true,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "lockOrBurn",
-          "type": {
-            "defined": "LockOrBurnInV1"
-          }
-        }
-      ],
-      "returns": {
-        "defined": "LockOrBurnOutV1"
-      }
-    },
-    {
-      "name": "setRebalancer",
-      "accounts": [
-        {
-          "name": "state",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "mint",
-          "isMut": false,
-          "isSigner": false
+          "name": "remote_token_account",
+          "writable": true
         },
         {
           "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "rebalancer",
-          "type": "publicKey"
-        }
-      ]
-    },
-    {
-      "name": "setCanAcceptLiquidity",
-      "accounts": [
-        {
-          "name": "state",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "mint",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "allow",
-          "type": "bool"
-        }
-      ]
-    },
-    {
-      "name": "provideLiquidity",
-      "accounts": [
-        {
-          "name": "state",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "mint",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "poolSigner",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "poolTokenAccount",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "remoteTokenAccount",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
+          "signer": true
         }
       ],
       "args": [
@@ -676,42 +441,370 @@
       ]
     },
     {
-      "name": "withdrawLiquidity",
+      "name": "release_or_mint_tokens",
+      "discriminator": [
+        92,
+        100,
+        150,
+        198,
+        252,
+        63,
+        164,
+        228
+      ],
       "accounts": [
         {
-          "name": "state",
-          "isMut": false,
-          "isSigner": false
+          "name": "authority",
+          "signer": true
         },
         {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "offramp_program",
+          "docs": [
+            "CHECK offramp program: exists only to derive the allowed offramp PDA",
+            "and the authority PDA."
+          ]
+        },
+        {
+          "name": "allowed_offramp",
+          "docs": [
+            "CHECK PDA of the router program verifying the signer is an allowed offramp.",
+            "If PDA does not exist, the router doesn't allow this offramp"
+          ]
+        },
+        {
+          "name": "state"
+        },
+        {
+          "name": "token_program"
         },
         {
           "name": "mint",
-          "isMut": true,
-          "isSigner": false
+          "writable": true
         },
         {
-          "name": "poolSigner",
-          "isMut": false,
-          "isSigner": false
+          "name": "pool_signer"
         },
         {
-          "name": "poolTokenAccount",
-          "isMut": true,
-          "isSigner": false
+          "name": "pool_token_account",
+          "writable": true
         },
         {
-          "name": "remoteTokenAccount",
-          "isMut": true,
-          "isSigner": false
+          "name": "chain_config",
+          "writable": true
+        },
+        {
+          "name": "rmn_remote"
+        },
+        {
+          "name": "rmn_remote_curses"
+        },
+        {
+          "name": "rmn_remote_config"
+        },
+        {
+          "name": "receiver_token_account",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "release_or_mint",
+          "type": {
+            "defined": {
+              "name": "ReleaseOrMintInV1"
+            }
+          }
+        }
+      ],
+      "returns": {
+        "defined": {
+          "name": "ReleaseOrMintOutV1"
+        }
+      }
+    },
+    {
+      "name": "remove_from_allow_list",
+      "discriminator": [
+        44,
+        46,
+        123,
+        213,
+        40,
+        11,
+        107,
+        18
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "writable": true
+        },
+        {
+          "name": "mint"
         },
         {
           "name": "authority",
-          "isMut": false,
-          "isSigner": true
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "remove",
+          "type": {
+            "vec": "pubkey"
+          }
+        }
+      ]
+    },
+    {
+      "name": "set_can_accept_liquidity",
+      "discriminator": [
+        118,
+        130,
+        209,
+        172,
+        190,
+        90,
+        146,
+        130
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "writable": true
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "allow",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "set_chain_rate_limit",
+      "discriminator": [
+        188,
+        188,
+        161,
+        37,
+        100,
+        249,
+        123,
+        170
+      ],
+      "accounts": [
+        {
+          "name": "state"
+        },
+        {
+          "name": "chain_config",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "remote_chain_selector",
+          "type": "u64"
+        },
+        {
+          "name": "mint",
+          "type": "pubkey"
+        },
+        {
+          "name": "inbound",
+          "type": {
+            "defined": {
+              "name": "RateLimitConfig"
+            }
+          }
+        },
+        {
+          "name": "outbound",
+          "type": {
+            "defined": {
+              "name": "RateLimitConfig"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "set_rebalancer",
+      "discriminator": [
+        28,
+        161,
+        168,
+        250,
+        215,
+        4,
+        144,
+        154
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "writable": true
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "rebalancer",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "set_router",
+      "discriminator": [
+        236,
+        248,
+        107,
+        200,
+        151,
+        160,
+        44,
+        250
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "writable": true
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "new_router",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "transfer_ownership",
+      "discriminator": [
+        65,
+        177,
+        215,
+        73,
+        53,
+        45,
+        99,
+        47
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "writable": true
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "proposed_owner",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "type_version",
+      "docs": [
+        "Returns the program type (name) and version.",
+        "Used by offchain code to easily determine which program & version is being interacted with.",
+        "",
+        "# Arguments",
+        "* `ctx` - The context"
+      ],
+      "discriminator": [
+        129,
+        251,
+        8,
+        243,
+        122,
+        229,
+        252,
+        164
+      ],
+      "accounts": [
+        {
+          "name": "clock"
+        }
+      ],
+      "args": [],
+      "returns": "string"
+    },
+    {
+      "name": "withdraw_liquidity",
+      "discriminator": [
+        149,
+        158,
+        33,
+        185,
+        47,
+        243,
+        253,
+        31
+      ],
+      "accounts": [
+        {
+          "name": "state"
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "mint",
+          "writable": true
+        },
+        {
+          "name": "pool_signer"
+        },
+        {
+          "name": "pool_token_account",
+          "writable": true
+        },
+        {
+          "name": "remote_token_account",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "signer": true
         }
       ],
       "args": [
@@ -724,19 +817,131 @@
   ],
   "accounts": [
     {
+      "name": "ChainConfig",
+      "discriminator": [
+        13,
+        177,
+        233,
+        141,
+        212,
+        29,
+        148,
+        56
+      ]
+    },
+    {
       "name": "State",
+      "discriminator": [
+        216,
+        146,
+        107,
+        94,
+        104,
+        75,
+        182,
+        177
+      ]
+    }
+  ],
+  "types": [
+    {
+      "name": "BaseChain",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "version",
+            "name": "remote",
+            "type": {
+              "defined": {
+                "name": "RemoteConfig"
+              }
+            }
+          },
+          {
+            "name": "inbound_rate_limit",
+            "type": {
+              "defined": {
+                "name": "RateLimitTokenBucket"
+              }
+            }
+          },
+          {
+            "name": "outbound_rate_limit",
+            "type": {
+              "defined": {
+                "name": "RateLimitTokenBucket"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "BaseConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "token_program",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "decimals",
             "type": "u8"
           },
           {
-            "name": "config",
+            "name": "pool_signer",
+            "type": "pubkey"
+          },
+          {
+            "name": "pool_token_account",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposed_owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "rate_limit_admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "router_onramp_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "router",
+            "type": "pubkey"
+          },
+          {
+            "name": "rebalancer",
+            "type": "pubkey"
+          },
+          {
+            "name": "can_accept_liquidity",
+            "type": "bool"
+          },
+          {
+            "name": "list_enabled",
+            "type": "bool"
+          },
+          {
+            "name": "allow_list",
             "type": {
-              "defined": "BaseConfig"
+              "vec": "pubkey"
             }
+          },
+          {
+            "name": "rmn_remote",
+            "type": "pubkey"
           }
         ]
       }
@@ -749,7 +954,235 @@
           {
             "name": "base",
             "type": {
-              "defined": "BaseChain"
+              "defined": {
+                "name": "BaseChain"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "LockOrBurnInV1",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "receiver",
+            "type": "bytes"
+          },
+          {
+            "name": "remote_chain_selector",
+            "type": "u64"
+          },
+          {
+            "name": "original_sender",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "local_token",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LockOrBurnOutV1",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dest_token_address",
+            "type": {
+              "defined": {
+                "name": "RemoteAddress"
+              }
+            }
+          },
+          {
+            "name": "dest_pool_data",
+            "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RateLimitConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "enabled",
+            "type": "bool"
+          },
+          {
+            "name": "capacity",
+            "type": "u64"
+          },
+          {
+            "name": "rate",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RateLimitTokenBucket",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "tokens",
+            "type": "u64"
+          },
+          {
+            "name": "last_updated",
+            "type": "u64"
+          },
+          {
+            "name": "cfg",
+            "type": {
+              "defined": {
+                "name": "RateLimitConfig"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ReleaseOrMintInV1",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "original_sender",
+            "type": {
+              "defined": {
+                "name": "RemoteAddress"
+              }
+            }
+          },
+          {
+            "name": "remote_chain_selector",
+            "type": "u64"
+          },
+          {
+            "name": "receiver",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "local_token",
+            "type": "pubkey"
+          },
+          {
+            "name": "source_pool_address",
+            "docs": [
+              "@dev WARNING: sourcePoolAddress should be checked prior to any processing of funds. Make sure it matches the",
+              "expected pool address for the given remoteChainSelector."
+            ],
+            "type": {
+              "defined": {
+                "name": "RemoteAddress"
+              }
+            }
+          },
+          {
+            "name": "source_pool_data",
+            "type": "bytes"
+          },
+          {
+            "name": "offchain_token_data",
+            "docs": [
+              "@dev WARNING: offchainTokenData is untrusted data."
+            ],
+            "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ReleaseOrMintOutV1",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "destination_amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RemoteAddress",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "address",
+            "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RemoteConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool_addresses",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "RemoteAddress"
+                }
+              }
+            }
+          },
+          {
+            "name": "token_address",
+            "type": {
+              "defined": {
+                "name": "RemoteAddress"
+              }
+            }
+          },
+          {
+            "name": "decimals",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "State",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "config",
+            "type": {
+              "defined": {
+                "name": "BaseConfig"
+              }
             }
           }
         ]

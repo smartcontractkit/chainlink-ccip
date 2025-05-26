@@ -1,0 +1,20 @@
+# Node
+node_modules/
+dist/
+.env
+
+# Keypairs
+ccip-keypair.json
+ccip-keypair-*.json
+evm-keyfile.json
+
+# Logs
+*.log
+
+# IDE/editor settings
+.vscode/
+.idea/
+.DS_Store
+
+# CCIP
+staging.ts

@@ -1,45 +1,266 @@
+/**
+ * Program IDL in camelCase format in order to be used in JS/TS.
+ *
+ * Note that this is only a type helper and is not the actual IDL. The original
+ * IDL can be found at `target/idl/ping_pong_demo.json`.
+ */
 export type PingPongDemo = {
-  "version": "0.1.0-dev",
-  "name": "ping_pong_demo",
+  "address": "PPbZmYFf5SPAM9Jhm9mNmYoCwT7icPYVKAfJoMCQovU",
+  "metadata": {
+    "name": "pingPongDemo",
+    "version": "0.1.0-dev",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
   "instructions": [
     {
-      "name": "initializeConfig",
+      "name": "ccipReceive",
+      "discriminator": [
+        11,
+        244,
+        9,
+        249,
+        44,
+        83,
+        47,
+        245
+      ],
       "accounts": [
         {
-          "name": "config",
-          "isMut": true,
-          "isSigner": false
+          "name": "authority",
+          "signer": true
         },
         {
-          "name": "feeTokenMint",
-          "isMut": false,
-          "isSigner": false
+          "name": "offrampProgram",
+          "docs": [
+            "CHECK offramp program: exists only to derive the allowed offramp PDA",
+            "and the authority PDA. Must be second."
+          ]
+        },
+        {
+          "name": "allowedOfframp",
+          "docs": [
+            "CHECK PDA of the router program verifying the signer is an allowed offramp.",
+            "If PDA does not exist, the router doesn't allow this offramp"
+          ]
+        },
+        {
+          "name": "config"
+        },
+        {
+          "name": "ccipSendSigner",
+          "docs": [
+            "CHECK"
+          ],
+          "writable": true
+        },
+        {
+          "name": "feeTokenProgram"
+        },
+        {
+          "name": "feeTokenMint"
+        },
+        {
+          "name": "feeTokenAta",
+          "writable": true
+        },
+        {
+          "name": "ccipRouterProgram",
+          "docs": [
+            "CHECK"
+          ]
+        },
+        {
+          "name": "ccipRouterConfig",
+          "docs": [
+            "CHECK"
+          ]
+        },
+        {
+          "name": "ccipRouterDestChainState",
+          "docs": [
+            "CHECK"
+          ],
+          "writable": true
+        },
+        {
+          "name": "ccipRouterNonce",
+          "docs": [
+            "CHECK"
+          ],
+          "writable": true
+        },
+        {
+          "name": "ccipRouterFeeReceiver",
+          "docs": [
+            "CHECK"
+          ],
+          "writable": true
+        },
+        {
+          "name": "ccipRouterFeeBillingSigner",
+          "docs": [
+            "CHECK"
+          ]
+        },
+        {
+          "name": "feeQuoter",
+          "docs": [
+            "CHECK"
+          ]
+        },
+        {
+          "name": "feeQuoterConfig",
+          "docs": [
+            "CHECK"
+          ]
+        },
+        {
+          "name": "feeQuoterDestChain",
+          "docs": [
+            "CHECK"
+          ]
+        },
+        {
+          "name": "feeQuoterBillingTokenConfig",
+          "docs": [
+            "CHECK"
+          ]
+        },
+        {
+          "name": "feeQuoterLinkTokenConfig",
+          "docs": [
+            "CHECK"
+          ]
+        },
+        {
+          "name": "rmnRemote",
+          "docs": [
+            "CHECK"
+          ]
+        },
+        {
+          "name": "rmnRemoteCurses",
+          "docs": [
+            "CHECK"
+          ]
+        },
+        {
+          "name": "rmnRemoteConfig",
+          "docs": [
+            "CHECK"
+          ]
+        },
+        {
+          "name": "systemProgram"
+        }
+      ],
+      "args": [
+        {
+          "name": "message",
+          "type": {
+            "defined": {
+              "name": "any2SvmMessage"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "initialize",
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "config"
+        },
+        {
+          "name": "nameVersion",
+          "writable": true
+        },
+        {
+          "name": "routerFeeBillingSigner",
+          "docs": [
+            "CHECK"
+          ]
+        },
+        {
+          "name": "feeTokenProgram"
+        },
+        {
+          "name": "feeTokenMint"
+        },
+        {
+          "name": "feeTokenAta",
+          "writable": true
+        },
+        {
+          "name": "ccipSendSigner",
+          "docs": [
+            "CHECK"
+          ]
         },
         {
           "name": "authority",
-          "isMut": true,
-          "isSigner": true
+          "writable": true,
+          "signer": true
         },
         {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "associatedTokenProgram"
         },
         {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
+          "name": "systemProgram"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initializeConfig",
+      "discriminator": [
+        208,
+        127,
+        21,
+        1,
+        194,
+        190,
+        196,
+        70
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true
         },
         {
-          "name": "programData",
-          "isMut": false,
-          "isSigner": false
+          "name": "feeTokenMint"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "systemProgram"
+        },
+        {
+          "name": "program"
+        },
+        {
+          "name": "programData"
         }
       ],
       "args": [
         {
           "name": "router",
-          "type": "publicKey"
+          "type": "pubkey"
         },
         {
           "name": "counterpartChainSelector",
@@ -60,98 +281,26 @@ export type PingPongDemo = {
       ]
     },
     {
-      "name": "initialize",
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "nameVersion",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "routerFeeBillingSigner",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "feeTokenProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "feeTokenMint",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "feeTokenAta",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "ccipSendSigner",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "associatedTokenProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "typeVersion",
-      "docs": [
-        "Returns the program type (name) and version.",
-        "Used by offchain code to easily determine which program & version is being interacted with.",
-        "",
-        "# Arguments",
-        "* `ctx` - The context"
-      ],
-      "accounts": [
-        {
-          "name": "clock",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [],
-      "returns": "string"
-    },
-    {
       "name": "setCounterpart",
+      "discriminator": [
+        118,
+        28,
+        243,
+        127,
+        218,
+        176,
+        228,
+        228
+      ],
       "accounts": [
         {
           "name": "config",
-          "isMut": true,
-          "isSigner": false
+          "writable": true
         },
         {
           "name": "authority",
-          "isMut": true,
-          "isSigner": true
+          "writable": true,
+          "signer": true
         }
       ],
       "args": [
@@ -166,43 +315,29 @@ export type PingPongDemo = {
       ]
     },
     {
-      "name": "setPaused",
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "pause",
-          "type": "bool"
-        }
-      ]
-    },
-    {
       "name": "setExtraArgs",
+      "discriminator": [
+        103,
+        87,
+        237,
+        252,
+        141,
+        176,
+        81,
+        193
+      ],
       "accounts": [
         {
           "name": "config",
-          "isMut": true,
-          "isSigner": false
+          "writable": true
         },
         {
           "name": "authority",
-          "isMut": true,
-          "isSigner": true
+          "writable": true,
+          "signer": true
         },
         {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "systemProgram"
         }
       ],
       "args": [
@@ -213,344 +348,280 @@ export type PingPongDemo = {
       ]
     },
     {
-      "name": "startPingPong",
+      "name": "setPaused",
+      "discriminator": [
+        91,
+        60,
+        125,
+        192,
+        176,
+        225,
+        166,
+        218
+      ],
       "accounts": [
         {
           "name": "config",
-          "isMut": true,
-          "isSigner": false
+          "writable": true
         },
         {
           "name": "authority",
-          "isMut": true,
-          "isSigner": true
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "pause",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "startPingPong",
+      "discriminator": [
+        53,
+        36,
+        169,
+        135,
+        221,
+        239,
+        52,
+        103
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
         },
         {
           "name": "ccipSendSigner",
-          "isMut": true,
-          "isSigner": false,
           "docs": [
             "CHECK"
-          ]
+          ],
+          "writable": true
         },
         {
-          "name": "feeTokenProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "feeTokenProgram"
         },
         {
-          "name": "feeTokenMint",
-          "isMut": false,
-          "isSigner": false
+          "name": "feeTokenMint"
         },
         {
           "name": "feeTokenAta",
-          "isMut": true,
-          "isSigner": false
+          "writable": true
         },
         {
           "name": "ccipRouterProgram",
-          "isMut": false,
-          "isSigner": false,
           "docs": [
             "CHECK"
           ]
         },
         {
           "name": "ccipRouterConfig",
-          "isMut": false,
-          "isSigner": false,
           "docs": [
             "CHECK"
           ]
         },
         {
           "name": "ccipRouterDestChainState",
-          "isMut": true,
-          "isSigner": false,
           "docs": [
             "CHECK"
-          ]
+          ],
+          "writable": true
         },
         {
           "name": "ccipRouterNonce",
-          "isMut": true,
-          "isSigner": false,
           "docs": [
             "CHECK"
-          ]
+          ],
+          "writable": true
         },
         {
           "name": "ccipRouterFeeReceiver",
-          "isMut": true,
-          "isSigner": false,
           "docs": [
             "CHECK"
-          ]
+          ],
+          "writable": true
         },
         {
           "name": "ccipRouterFeeBillingSigner",
-          "isMut": false,
-          "isSigner": false,
           "docs": [
             "CHECK"
           ]
         },
         {
           "name": "feeQuoter",
-          "isMut": false,
-          "isSigner": false,
           "docs": [
             "CHECK"
           ]
         },
         {
           "name": "feeQuoterConfig",
-          "isMut": false,
-          "isSigner": false,
           "docs": [
             "CHECK"
           ]
         },
         {
           "name": "feeQuoterDestChain",
-          "isMut": false,
-          "isSigner": false,
           "docs": [
             "CHECK"
           ]
         },
         {
           "name": "feeQuoterBillingTokenConfig",
-          "isMut": false,
-          "isSigner": false,
           "docs": [
             "CHECK"
           ]
         },
         {
           "name": "feeQuoterLinkTokenConfig",
-          "isMut": false,
-          "isSigner": false,
           "docs": [
             "CHECK"
           ]
         },
         {
           "name": "rmnRemote",
-          "isMut": false,
-          "isSigner": false,
           "docs": [
             "CHECK"
           ]
         },
         {
           "name": "rmnRemoteCurses",
-          "isMut": false,
-          "isSigner": false,
           "docs": [
             "CHECK"
           ]
         },
         {
           "name": "rmnRemoteConfig",
-          "isMut": false,
-          "isSigner": false,
           "docs": [
             "CHECK"
           ]
         },
         {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "systemProgram"
         }
       ],
       "args": []
     },
     {
-      "name": "ccipReceive",
+      "name": "typeVersion",
+      "docs": [
+        "Returns the program type (name) and version.",
+        "Used by offchain code to easily determine which program & version is being interacted with.",
+        "",
+        "# Arguments",
+        "* `ctx` - The context"
+      ],
+      "discriminator": [
+        129,
+        251,
+        8,
+        243,
+        122,
+        229,
+        252,
+        164
+      ],
       "accounts": [
         {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "offrampProgram",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK offramp program: exists only to derive the allowed offramp PDA",
-            "and the authority PDA. Must be second."
-          ]
-        },
-        {
-          "name": "allowedOfframp",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK PDA of the router program verifying the signer is an allowed offramp.",
-            "If PDA does not exist, the router doesn't allow this offramp"
-          ]
-        },
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "ccipSendSigner",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "feeTokenProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "feeTokenMint",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "feeTokenAta",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "ccipRouterProgram",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "ccipRouterConfig",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "ccipRouterDestChainState",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "ccipRouterNonce",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "ccipRouterFeeReceiver",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "ccipRouterFeeBillingSigner",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "feeQuoter",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "feeQuoterConfig",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "feeQuoterDestChain",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "feeQuoterBillingTokenConfig",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "feeQuoterLinkTokenConfig",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "rmnRemote",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "rmnRemoteCurses",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "rmnRemoteConfig",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "clock"
         }
       ],
-      "args": [
-        {
-          "name": "message",
-          "type": {
-            "defined": "Any2SVMMessage"
-          }
-        }
-      ]
+      "args": [],
+      "returns": "string"
     }
   ],
   "accounts": [
+    {
+      "name": "config",
+      "discriminator": [
+        155,
+        12,
+        170,
+        224,
+        30,
+        250,
+        204,
+        130
+      ]
+    },
+    {
+      "name": "nameVersion",
+      "discriminator": [
+        4,
+        169,
+        171,
+        229,
+        87,
+        69,
+        68,
+        244
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "unauthorized",
+      "msg": "unauthorized"
+    },
+    {
+      "code": 6001,
+      "name": "invalidMessageDataLength",
+      "msg": "Invalid message data length"
+    },
+    {
+      "code": 6002,
+      "name": "invalidCounterpartAddress",
+      "msg": "Invalid counterpart address"
+    }
+  ],
+  "types": [
+    {
+      "name": "any2SvmMessage",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "messageId",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "sourceChainSelector",
+            "type": "u64"
+          },
+          {
+            "name": "sender",
+            "type": "bytes"
+          },
+          {
+            "name": "data",
+            "type": "bytes"
+          },
+          {
+            "name": "tokenAmounts",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "svmTokenAmount"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
     {
       "name": "config",
       "type": {
@@ -558,11 +629,11 @@ export type PingPongDemo = {
         "fields": [
           {
             "name": "owner",
-            "type": "publicKey"
+            "type": "pubkey"
           },
           {
             "name": "router",
-            "type": "publicKey"
+            "type": "pubkey"
           },
           {
             "name": "counterpartChainSelector",
@@ -571,7 +642,9 @@ export type PingPongDemo = {
           {
             "name": "counterpartAddress",
             "type": {
-              "defined": "CounterpartAddress"
+              "defined": {
+                "name": "counterpartAddress"
+              }
             }
           },
           {
@@ -580,11 +653,32 @@ export type PingPongDemo = {
           },
           {
             "name": "feeTokenMint",
-            "type": "publicKey"
+            "type": "pubkey"
           },
           {
             "name": "extraArgs",
             "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "counterpartAddress",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bytes",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          },
+          {
+            "name": "len",
+            "type": "u8"
           }
         ]
       }
@@ -604,696 +698,22 @@ export type PingPongDemo = {
           }
         ]
       }
-    }
-  ],
-  "types": [
+    },
     {
-      "name": "CounterpartAddress",
+      "name": "svmTokenAmount",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "bytes",
-            "type": {
-              "array": [
-                "u8",
-                64
-              ]
-            }
+            "name": "token",
+            "type": "pubkey"
           },
           {
-            "name": "len",
-            "type": "u8"
-          }
-        ]
-      }
-    }
-  ],
-  "errors": [
-    {
-      "code": 6000,
-      "name": "Unauthorized",
-      "msg": "Unauthorized"
-    },
-    {
-      "code": 6001,
-      "name": "InvalidMessageDataLength",
-      "msg": "Invalid message data length"
-    },
-    {
-      "code": 6002,
-      "name": "InvalidCounterpartAddress",
-      "msg": "Invalid counterpart address"
-    }
-  ]
-};
-
-export const IDL: PingPongDemo = {
-  "version": "0.1.0-dev",
-  "name": "ping_pong_demo",
-  "instructions": [
-    {
-      "name": "initializeConfig",
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "feeTokenMint",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "programData",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "router",
-          "type": "publicKey"
-        },
-        {
-          "name": "counterpartChainSelector",
-          "type": "u64"
-        },
-        {
-          "name": "counterpartAddress",
-          "type": "bytes"
-        },
-        {
-          "name": "isPaused",
-          "type": "bool"
-        },
-        {
-          "name": "extraArgs",
-          "type": "bytes"
-        }
-      ]
-    },
-    {
-      "name": "initialize",
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "nameVersion",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "routerFeeBillingSigner",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "feeTokenProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "feeTokenMint",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "feeTokenAta",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "ccipSendSigner",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "associatedTokenProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "typeVersion",
-      "docs": [
-        "Returns the program type (name) and version.",
-        "Used by offchain code to easily determine which program & version is being interacted with.",
-        "",
-        "# Arguments",
-        "* `ctx` - The context"
-      ],
-      "accounts": [
-        {
-          "name": "clock",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [],
-      "returns": "string"
-    },
-    {
-      "name": "setCounterpart",
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "counterpartChainSelector",
-          "type": "u64"
-        },
-        {
-          "name": "counterpartAddress",
-          "type": "bytes"
-        }
-      ]
-    },
-    {
-      "name": "setPaused",
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "pause",
-          "type": "bool"
-        }
-      ]
-    },
-    {
-      "name": "setExtraArgs",
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "extraArgs",
-          "type": "bytes"
-        }
-      ]
-    },
-    {
-      "name": "startPingPong",
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "ccipSendSigner",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "feeTokenProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "feeTokenMint",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "feeTokenAta",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "ccipRouterProgram",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "ccipRouterConfig",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "ccipRouterDestChainState",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "ccipRouterNonce",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "ccipRouterFeeReceiver",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "ccipRouterFeeBillingSigner",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "feeQuoter",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "feeQuoterConfig",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "feeQuoterDestChain",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "feeQuoterBillingTokenConfig",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "feeQuoterLinkTokenConfig",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "rmnRemote",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "rmnRemoteCurses",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "rmnRemoteConfig",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "ccipReceive",
-      "accounts": [
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "offrampProgram",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK offramp program: exists only to derive the allowed offramp PDA",
-            "and the authority PDA. Must be second."
-          ]
-        },
-        {
-          "name": "allowedOfframp",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK PDA of the router program verifying the signer is an allowed offramp.",
-            "If PDA does not exist, the router doesn't allow this offramp"
-          ]
-        },
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "ccipSendSigner",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "feeTokenProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "feeTokenMint",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "feeTokenAta",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "ccipRouterProgram",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "ccipRouterConfig",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "ccipRouterDestChainState",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "ccipRouterNonce",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "ccipRouterFeeReceiver",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "ccipRouterFeeBillingSigner",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "feeQuoter",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "feeQuoterConfig",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "feeQuoterDestChain",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "feeQuoterBillingTokenConfig",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "feeQuoterLinkTokenConfig",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "rmnRemote",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "rmnRemoteCurses",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "rmnRemoteConfig",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "message",
-          "type": {
-            "defined": "Any2SVMMessage"
-          }
-        }
-      ]
-    }
-  ],
-  "accounts": [
-    {
-      "name": "config",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "owner",
-            "type": "publicKey"
-          },
-          {
-            "name": "router",
-            "type": "publicKey"
-          },
-          {
-            "name": "counterpartChainSelector",
+            "name": "amount",
             "type": "u64"
-          },
-          {
-            "name": "counterpartAddress",
-            "type": {
-              "defined": "CounterpartAddress"
-            }
-          },
-          {
-            "name": "isPaused",
-            "type": "bool"
-          },
-          {
-            "name": "feeTokenMint",
-            "type": "publicKey"
-          },
-          {
-            "name": "extraArgs",
-            "type": "bytes"
           }
         ]
       }
-    },
-    {
-      "name": "nameVersion",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "name",
-            "type": "string"
-          },
-          {
-            "name": "version",
-            "type": "string"
-          }
-        ]
-      }
-    }
-  ],
-  "types": [
-    {
-      "name": "CounterpartAddress",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "bytes",
-            "type": {
-              "array": [
-                "u8",
-                64
-              ]
-            }
-          },
-          {
-            "name": "len",
-            "type": "u8"
-          }
-        ]
-      }
-    }
-  ],
-  "errors": [
-    {
-      "code": 6000,
-      "name": "Unauthorized",
-      "msg": "Unauthorized"
-    },
-    {
-      "code": 6001,
-      "name": "InvalidMessageDataLength",
-      "msg": "Invalid message data length"
-    },
-    {
-      "code": 6002,
-      "name": "InvalidCounterpartAddress",
-      "msg": "Invalid counterpart address"
     }
   ]
 };

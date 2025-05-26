@@ -12,10 +12,10 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-var ProgramID ag_solanago.PublicKey
+var ProgramID ag_solanago.PublicKey = ag_solanago.MustPublicKeyFromBase58("41FGToCmdaWa1dgZLKFAjvmx6e6AjVTX7SVRibvsMGVB")
 
-func SetProgramID(pubkey ag_solanago.PublicKey) {
-	ProgramID = pubkey
+func SetProgramID(PublicKey ag_solanago.PublicKey) {
+	ProgramID = PublicKey
 	ag_solanago.RegisterInstructionDecoder(ProgramID, registryDecodeInstruction)
 }
 
@@ -28,7 +28,33 @@ func init() {
 }
 
 var (
+	Instruction_AcceptOwnership = ag_binary.TypeID([8]byte{172, 23, 43, 13, 238, 213, 85, 150})
+
+	Instruction_AppendRemotePoolAddresses = ag_binary.TypeID([8]byte{172, 57, 83, 55, 70, 112, 26, 197})
+
+	Instruction_ConfigureAllowList = ag_binary.TypeID([8]byte{18, 180, 102, 187, 209, 0, 130, 191})
+
+	Instruction_DeleteChainConfig = ag_binary.TypeID([8]byte{241, 159, 142, 210, 64, 173, 77, 179})
+
+	Instruction_EditChainRemoteConfig = ag_binary.TypeID([8]byte{149, 112, 186, 72, 116, 217, 159, 175})
+
+	Instruction_InitChainRemoteConfig = ag_binary.TypeID([8]byte{21, 150, 133, 36, 2, 116, 199, 129})
+
 	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
+
+	Instruction_InitializeStateVersion = ag_binary.TypeID([8]byte{54, 186, 181, 26, 2, 198, 200, 158})
+
+	Instruction_LockOrBurnTokens = ag_binary.TypeID([8]byte{114, 161, 94, 29, 147, 25, 232, 191})
+
+	Instruction_ReleaseOrMintTokens = ag_binary.TypeID([8]byte{92, 100, 150, 198, 252, 63, 164, 228})
+
+	Instruction_RemoveFromAllowList = ag_binary.TypeID([8]byte{44, 46, 123, 213, 40, 11, 107, 18})
+
+	Instruction_SetChainRateLimit = ag_binary.TypeID([8]byte{188, 188, 161, 37, 100, 249, 123, 170})
+
+	Instruction_SetRouter = ag_binary.TypeID([8]byte{236, 248, 107, 200, 151, 160, 44, 250})
+
+	Instruction_TransferOwnership = ag_binary.TypeID([8]byte{65, 177, 215, 73, 53, 45, 99, 47})
 
 	// Returns the program type (name) and version.
 	// Used by offchain code to easily determine which program & version is being interacted with.
@@ -36,67 +62,41 @@ var (
 	// # Arguments
 	// * `ctx` - The context
 	Instruction_TypeVersion = ag_binary.TypeID([8]byte{129, 251, 8, 243, 122, 229, 252, 164})
-
-	Instruction_TransferOwnership = ag_binary.TypeID([8]byte{65, 177, 215, 73, 53, 45, 99, 47})
-
-	Instruction_AcceptOwnership = ag_binary.TypeID([8]byte{172, 23, 43, 13, 238, 213, 85, 150})
-
-	Instruction_SetRouter = ag_binary.TypeID([8]byte{236, 248, 107, 200, 151, 160, 44, 250})
-
-	Instruction_InitializeStateVersion = ag_binary.TypeID([8]byte{54, 186, 181, 26, 2, 198, 200, 158})
-
-	Instruction_InitChainRemoteConfig = ag_binary.TypeID([8]byte{21, 150, 133, 36, 2, 116, 199, 129})
-
-	Instruction_EditChainRemoteConfig = ag_binary.TypeID([8]byte{149, 112, 186, 72, 116, 217, 159, 175})
-
-	Instruction_AppendRemotePoolAddresses = ag_binary.TypeID([8]byte{172, 57, 83, 55, 70, 112, 26, 197})
-
-	Instruction_SetChainRateLimit = ag_binary.TypeID([8]byte{188, 188, 161, 37, 100, 249, 123, 170})
-
-	Instruction_DeleteChainConfig = ag_binary.TypeID([8]byte{241, 159, 142, 210, 64, 173, 77, 179})
-
-	Instruction_ConfigureAllowList = ag_binary.TypeID([8]byte{18, 180, 102, 187, 209, 0, 130, 191})
-
-	Instruction_RemoveFromAllowList = ag_binary.TypeID([8]byte{44, 46, 123, 213, 40, 11, 107, 18})
-
-	Instruction_ReleaseOrMintTokens = ag_binary.TypeID([8]byte{92, 100, 150, 198, 252, 63, 164, 228})
-
-	Instruction_LockOrBurnTokens = ag_binary.TypeID([8]byte{114, 161, 94, 29, 147, 25, 232, 191})
 )
 
 // InstructionIDToName returns the name of the instruction given its ID.
 func InstructionIDToName(id ag_binary.TypeID) string {
 	switch id {
-	case Instruction_Initialize:
-		return "Initialize"
-	case Instruction_TypeVersion:
-		return "TypeVersion"
-	case Instruction_TransferOwnership:
-		return "TransferOwnership"
 	case Instruction_AcceptOwnership:
 		return "AcceptOwnership"
-	case Instruction_SetRouter:
-		return "SetRouter"
-	case Instruction_InitializeStateVersion:
-		return "InitializeStateVersion"
-	case Instruction_InitChainRemoteConfig:
-		return "InitChainRemoteConfig"
-	case Instruction_EditChainRemoteConfig:
-		return "EditChainRemoteConfig"
 	case Instruction_AppendRemotePoolAddresses:
 		return "AppendRemotePoolAddresses"
-	case Instruction_SetChainRateLimit:
-		return "SetChainRateLimit"
-	case Instruction_DeleteChainConfig:
-		return "DeleteChainConfig"
 	case Instruction_ConfigureAllowList:
 		return "ConfigureAllowList"
-	case Instruction_RemoveFromAllowList:
-		return "RemoveFromAllowList"
-	case Instruction_ReleaseOrMintTokens:
-		return "ReleaseOrMintTokens"
+	case Instruction_DeleteChainConfig:
+		return "DeleteChainConfig"
+	case Instruction_EditChainRemoteConfig:
+		return "EditChainRemoteConfig"
+	case Instruction_InitChainRemoteConfig:
+		return "InitChainRemoteConfig"
+	case Instruction_Initialize:
+		return "Initialize"
+	case Instruction_InitializeStateVersion:
+		return "InitializeStateVersion"
 	case Instruction_LockOrBurnTokens:
 		return "LockOrBurnTokens"
+	case Instruction_ReleaseOrMintTokens:
+		return "ReleaseOrMintTokens"
+	case Instruction_RemoveFromAllowList:
+		return "RemoveFromAllowList"
+	case Instruction_SetChainRateLimit:
+		return "SetChainRateLimit"
+	case Instruction_SetRouter:
+		return "SetRouter"
+	case Instruction_TransferOwnership:
+		return "TransferOwnership"
+	case Instruction_TypeVersion:
+		return "TypeVersion"
 	default:
 		return ""
 	}
@@ -118,49 +118,49 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 	ag_binary.AnchorTypeIDEncoding,
 	[]ag_binary.VariantType{
 		{
-			"initialize", (*Initialize)(nil),
+			Name: "accept_ownership", Type: (*AcceptOwnership)(nil),
 		},
 		{
-			"type_version", (*TypeVersion)(nil),
+			Name: "append_remote_pool_addresses", Type: (*AppendRemotePoolAddresses)(nil),
 		},
 		{
-			"transfer_ownership", (*TransferOwnership)(nil),
+			Name: "configure_allow_list", Type: (*ConfigureAllowList)(nil),
 		},
 		{
-			"accept_ownership", (*AcceptOwnership)(nil),
+			Name: "delete_chain_config", Type: (*DeleteChainConfig)(nil),
 		},
 		{
-			"set_router", (*SetRouter)(nil),
+			Name: "edit_chain_remote_config", Type: (*EditChainRemoteConfig)(nil),
 		},
 		{
-			"initialize_state_version", (*InitializeStateVersion)(nil),
+			Name: "init_chain_remote_config", Type: (*InitChainRemoteConfig)(nil),
 		},
 		{
-			"init_chain_remote_config", (*InitChainRemoteConfig)(nil),
+			Name: "initialize", Type: (*Initialize)(nil),
 		},
 		{
-			"edit_chain_remote_config", (*EditChainRemoteConfig)(nil),
+			Name: "initialize_state_version", Type: (*InitializeStateVersion)(nil),
 		},
 		{
-			"append_remote_pool_addresses", (*AppendRemotePoolAddresses)(nil),
+			Name: "lock_or_burn_tokens", Type: (*LockOrBurnTokens)(nil),
 		},
 		{
-			"set_chain_rate_limit", (*SetChainRateLimit)(nil),
+			Name: "release_or_mint_tokens", Type: (*ReleaseOrMintTokens)(nil),
 		},
 		{
-			"delete_chain_config", (*DeleteChainConfig)(nil),
+			Name: "remove_from_allow_list", Type: (*RemoveFromAllowList)(nil),
 		},
 		{
-			"configure_allow_list", (*ConfigureAllowList)(nil),
+			Name: "set_chain_rate_limit", Type: (*SetChainRateLimit)(nil),
 		},
 		{
-			"remove_from_allow_list", (*RemoveFromAllowList)(nil),
+			Name: "set_router", Type: (*SetRouter)(nil),
 		},
 		{
-			"release_or_mint_tokens", (*ReleaseOrMintTokens)(nil),
+			Name: "transfer_ownership", Type: (*TransferOwnership)(nil),
 		},
 		{
-			"lock_or_burn_tokens", (*LockOrBurnTokens)(nil),
+			Name: "type_version", Type: (*TypeVersion)(nil),
 		},
 	},
 )
@@ -198,14 +198,14 @@ func (inst *Instruction) MarshalWithEncoder(encoder *ag_binary.Encoder) error {
 }
 
 func registryDecodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (interface{}, error) {
-	inst, err := DecodeInstruction(accounts, data)
+	inst, err := decodeInstruction(accounts, data)
 	if err != nil {
 		return nil, err
 	}
 	return inst, nil
 }
 
-func DecodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (*Instruction, error) {
+func decodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (*Instruction, error) {
 	inst := new(Instruction)
 	if err := ag_binary.NewBorshDecoder(data).Decode(inst); err != nil {
 		return nil, fmt.Errorf("unable to decode instruction: %w", err)
@@ -217,4 +217,26 @@ func DecodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (*Instr
 		}
 	}
 	return inst, nil
+}
+
+func DecodeInstructions(message *ag_solanago.Message) (instructions []*Instruction, err error) {
+	for _, ins := range message.Instructions {
+		var programID ag_solanago.PublicKey
+		if programID, err = message.Program(ins.ProgramIDIndex); err != nil {
+			return
+		}
+		if !programID.Equals(ProgramID) {
+			continue
+		}
+		var accounts []*ag_solanago.AccountMeta
+		if accounts, err = ins.ResolveInstructionAccounts(message); err != nil {
+			return
+		}
+		var insDecoded *Instruction
+		if insDecoded, err = decodeInstruction(accounts, ins.Data); err != nil {
+			return
+		}
+		instructions = append(instructions, insDecoded)
+	}
+	return
 }

@@ -10,12 +10,12 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// InitializeStateVersion is the `initializeStateVersion` instruction.
+// InitializeStateVersion is the `initialize_state_version` instruction.
 type InitializeStateVersion struct {
 	Mint *ag_solanago.PublicKey
 
 	// [0] = [WRITE] state
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewInitializeStateVersionInstructionBuilder creates a new `InitializeStateVersion` instruction builder.
@@ -26,9 +26,9 @@ func NewInitializeStateVersionInstructionBuilder() *InitializeStateVersion {
 	return nd
 }
 
-// SetMint sets the "mint" parameter.
-func (inst *InitializeStateVersion) SetMint(mint ag_solanago.PublicKey) *InitializeStateVersion {
-	inst.Mint = &mint
+// SetMint sets the "_mint" parameter.
+func (inst *InitializeStateVersion) SetMint(_mint ag_solanago.PublicKey) *InitializeStateVersion {
+	inst.Mint = &_mint
 	return inst
 }
 
@@ -40,7 +40,7 @@ func (inst *InitializeStateVersion) SetStateAccount(state ag_solanago.PublicKey)
 
 // GetStateAccount gets the "state" account.
 func (inst *InitializeStateVersion) GetStateAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
 func (inst InitializeStateVersion) Build() *Instruction {
@@ -87,12 +87,12 @@ func (inst *InitializeStateVersion) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("Mint", *inst.Mint))
+						paramsBranch.Child(ag_format.Param(" Mint", *inst.Mint))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=1]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("state", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("state", inst.AccountMetaSlice.Get(0)))
 					})
 				})
 		})
@@ -118,10 +118,10 @@ func (obj *InitializeStateVersion) UnmarshalWithDecoder(decoder *ag_binary.Decod
 // NewInitializeStateVersionInstruction declares a new InitializeStateVersion instruction with the provided parameters and accounts.
 func NewInitializeStateVersionInstruction(
 	// Parameters:
-	mint ag_solanago.PublicKey,
+	_mint ag_solanago.PublicKey,
 	// Accounts:
 	state ag_solanago.PublicKey) *InitializeStateVersion {
 	return NewInitializeStateVersionInstructionBuilder().
-		SetMint(mint).
+		SetMint(_mint).
 		SetStateAccount(state)
 }

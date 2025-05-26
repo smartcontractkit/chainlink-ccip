@@ -10,7 +10,7 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// SetChainRateLimit is the `setChainRateLimit` instruction.
+// SetChainRateLimit is the `set_chain_rate_limit` instruction.
 type SetChainRateLimit struct {
 	RemoteChainSelector *uint64
 	Mint                *ag_solanago.PublicKey
@@ -19,10 +19,10 @@ type SetChainRateLimit struct {
 
 	// [0] = [] state
 	//
-	// [1] = [WRITE] chainConfig
+	// [1] = [WRITE] chain_config
 	//
 	// [2] = [WRITE, SIGNER] authority
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewSetChainRateLimitInstructionBuilder creates a new `SetChainRateLimit` instruction builder.
@@ -33,9 +33,9 @@ func NewSetChainRateLimitInstructionBuilder() *SetChainRateLimit {
 	return nd
 }
 
-// SetRemoteChainSelector sets the "remoteChainSelector" parameter.
-func (inst *SetChainRateLimit) SetRemoteChainSelector(remoteChainSelector uint64) *SetChainRateLimit {
-	inst.RemoteChainSelector = &remoteChainSelector
+// SetRemoteChainSelector sets the "remote_chain_selector" parameter.
+func (inst *SetChainRateLimit) SetRemoteChainSelector(remote_chain_selector uint64) *SetChainRateLimit {
+	inst.RemoteChainSelector = &remote_chain_selector
 	return inst
 }
 
@@ -65,18 +65,18 @@ func (inst *SetChainRateLimit) SetStateAccount(state ag_solanago.PublicKey) *Set
 
 // GetStateAccount gets the "state" account.
 func (inst *SetChainRateLimit) GetStateAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
-// SetChainConfigAccount sets the "chainConfig" account.
+// SetChainConfigAccount sets the "chain_config" account.
 func (inst *SetChainRateLimit) SetChainConfigAccount(chainConfig ag_solanago.PublicKey) *SetChainRateLimit {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(chainConfig).WRITE()
 	return inst
 }
 
-// GetChainConfigAccount gets the "chainConfig" account.
+// GetChainConfigAccount gets the "chain_config" account.
 func (inst *SetChainRateLimit) GetChainConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -87,7 +87,7 @@ func (inst *SetChainRateLimit) SetAuthorityAccount(authority ag_solanago.PublicK
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *SetChainRateLimit) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
 func (inst SetChainRateLimit) Build() *Instruction {
@@ -149,17 +149,17 @@ func (inst *SetChainRateLimit) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=4]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("RemoteChainSelector", *inst.RemoteChainSelector))
-						paramsBranch.Child(ag_format.Param("               Mint", *inst.Mint))
-						paramsBranch.Child(ag_format.Param("            Inbound", *inst.Inbound))
-						paramsBranch.Child(ag_format.Param("           Outbound", *inst.Outbound))
+						paramsBranch.Child(ag_format.Param("  RemoteChainSelector", *inst.RemoteChainSelector))
+						paramsBranch.Child(ag_format.Param("                 Mint", *inst.Mint))
+						paramsBranch.Child(ag_format.Param("              Inbound", *inst.Inbound))
+						paramsBranch.Child(ag_format.Param("             Outbound", *inst.Outbound))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("      state", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("chainConfig", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("  authority", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("       state", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("chain_config", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("   authority", inst.AccountMetaSlice.Get(2)))
 					})
 				})
 		})
@@ -215,7 +215,7 @@ func (obj *SetChainRateLimit) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (
 // NewSetChainRateLimitInstruction declares a new SetChainRateLimit instruction with the provided parameters and accounts.
 func NewSetChainRateLimitInstruction(
 	// Parameters:
-	remoteChainSelector uint64,
+	remote_chain_selector uint64,
 	mint ag_solanago.PublicKey,
 	inbound RateLimitConfig,
 	outbound RateLimitConfig,
@@ -224,7 +224,7 @@ func NewSetChainRateLimitInstruction(
 	chainConfig ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *SetChainRateLimit {
 	return NewSetChainRateLimitInstructionBuilder().
-		SetRemoteChainSelector(remoteChainSelector).
+		SetRemoteChainSelector(remote_chain_selector).
 		SetMint(mint).
 		SetInbound(inbound).
 		SetOutbound(outbound).
