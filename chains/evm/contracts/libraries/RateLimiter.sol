@@ -9,11 +9,8 @@ pragma solidity ^0.8.4;
 /// than uint128, e.g. compromised issuer, an enabled RateLimiter will check and revert.
 library RateLimiter {
   error BucketOverfilled();
-  error OnlyCallableByAdminOrOwner();
   error TokenMaxCapacityExceeded(uint256 capacity, uint256 requested, address tokenAddress);
   error TokenRateLimitReached(uint256 minWaitInSeconds, uint256 available, address tokenAddress);
-  error AggregateValueMaxCapacityExceeded(uint256 capacity, uint256 requested);
-  error AggregateValueRateLimitReached(uint256 minWaitInSeconds, uint256 available);
   error InvalidRateLimitRate(Config rateLimiterConfig);
   error DisabledNonZeroRateLimit(Config config);
 
@@ -21,17 +18,17 @@ library RateLimiter {
   event ConfigChanged(Config config);
 
   struct TokenBucket {
-    uint128 tokens; // ──────╮ Current number of tokens that are in the bucket.
-    uint32 lastUpdated; //   │ Timestamp in seconds of the last token refill, good for 100+ years.
-    bool isEnabled; // ──────╯ Indication whether the rate limiting is enabled or not.
-    uint128 capacity; // ────╮ Maximum number of tokens that can be in the bucket.
-    uint128 rate; // ────────╯ Number of tokens per second that the bucket is refilled.
+    uint128 tokens; // ────╮ Current number of tokens that are in the bucket.
+    uint32 lastUpdated; // │ Timestamp in seconds of the last token refill, good for 100+ years.
+    bool isEnabled; // ────╯ Indication whether the rate limiting is enabled or not.
+    uint128 capacity; // ──╮ Maximum number of tokens that can be in the bucket.
+    uint128 rate; // ──────╯ Number of tokens per second that the bucket is refilled.
   }
 
   struct Config {
     bool isEnabled; // Indication whether the rate limiting should be enabled.
-    uint128 capacity; // ────╮ Specifies the capacity of the rate limiter.
-    uint128 rate; //  ───────╯ Specifies the rate of the rate limiter.
+    uint128 capacity; // ──╮ Specifies the capacity of the rate limiter.
+    uint128 rate; //  ─────╯ Specifies the rate of the rate limiter.
   }
 
   /// @notice _consume removes the given tokens from the pool, lowering the rate tokens allowed to be
@@ -60,8 +57,6 @@ library RateLimiter {
     }
 
     if (capacity < requestTokens) {
-      // Token address 0 indicates consuming aggregate value rate limit capacity.
-      if (tokenAddress == address(0)) revert AggregateValueMaxCapacityExceeded(capacity, requestTokens);
       revert TokenMaxCapacityExceeded(capacity, requestTokens, tokenAddress);
     }
     if (tokens < requestTokens) {
@@ -71,7 +66,6 @@ library RateLimiter {
       // This acts as a lower bound of wait time.
       uint256 minWaitInSeconds = ((requestTokens - tokens) + (rate - 1)) / rate;
 
-      if (tokenAddress == address(0)) revert AggregateValueRateLimitReached(minWaitInSeconds, tokens);
       revert TokenRateLimitReached(minWaitInSeconds, tokens, tokenAddress);
     }
     tokens -= requestTokens;

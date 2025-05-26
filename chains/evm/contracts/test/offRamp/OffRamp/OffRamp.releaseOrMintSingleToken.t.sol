@@ -7,7 +7,6 @@ import {ITokenAdminRegistry} from "../../../interfaces/ITokenAdminRegistry.sol";
 import {Internal} from "../../../libraries/Internal.sol";
 import {Pool} from "../../../libraries/Pool.sol";
 import {OffRamp} from "../../../offRamp/OffRamp.sol";
-import {LockReleaseTokenPool} from "../../../pools/LockReleaseTokenPool.sol";
 import {OffRampSetup} from "./OffRampSetup.t.sol";
 
 import {IERC20} from
