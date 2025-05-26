@@ -1,5 +1,7 @@
 use anchor_lang::prelude::*;
 
+use crate::{state::ExecutionReportBuffer, CcipOfframpError};
+
 pub const CCIP_RECEIVE_DISCRIMINATOR: [u8; 8] = [0x0b, 0xf4, 0x09, 0xf9, 0x2c, 0x53, 0x2f, 0xf5]; // ccip_receive
 pub const TOKENPOOL_RELEASE_OR_MINT_DISCRIMINATOR: [u8; 8] =
     [0x5c, 0x64, 0x96, 0xc6, 0xfc, 0x3f, 0xa4, 0xe4]; // release_or_mint_tokens
@@ -11,6 +13,35 @@ pub struct ExecutionReportSingleChain {
     pub message: Any2SVMRampMessage,
     pub offchain_token_data: Vec<Vec<u8>>, // https://github.com/smartcontractkit/chainlink/blob/885baff9479e935e0fc34d9f52214a32c158eac5/contracts/src/v0.8/ccip/libraries/Internal.sol#L72
     pub proofs: Vec<[u8; 32]>,
+}
+
+impl ExecutionReportSingleChain {
+    // Attempts to deserialize from a raw report or, if empty, from an optional buffer account.
+    pub fn deserialize_either(
+        raw_execution_report: &[u8],
+        execution_report_buffer: &AccountInfo,
+        authority: &Pubkey,
+    ) -> Result<Self> {
+        if !raw_execution_report.is_empty() {
+            Ok(ExecutionReportSingleChain::deserialize(&mut {
+                raw_execution_report
+            })?)
+        } else {
+            // Ensures the buffer is initialized, and owned by the executor.
+            require!(
+                execution_report_buffer.owner == authority,
+                CcipOfframpError::ExecutionReportUnavailable
+            );
+
+            let buffer = ExecutionReportBuffer::try_deserialize(
+                &mut execution_report_buffer.data.borrow().as_ref(),
+            )?;
+
+            Ok(ExecutionReportSingleChain::deserialize(
+                &mut buffer.bytes()?,
+            )?)
+        }
+    }
 }
 
 #[derive(Clone, Copy, AnchorSerialize, AnchorDeserialize)]

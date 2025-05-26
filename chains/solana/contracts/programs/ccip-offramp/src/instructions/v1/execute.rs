@@ -4,7 +4,7 @@ use ccip_common::v1::{validate_and_parse_token_accounts, TokenAccounts};
 use solana_program::instruction::Instruction;
 use solana_program::program::invoke_signed;
 
-use crate::context::{ExecuteReportContext, OcrPluginType};
+use crate::context::{BufferExecutionReportContext, ExecuteReportContext, OcrPluginType};
 use crate::event::{ExecutionStateChanged, SkippedAlreadyExecutedMessage};
 use crate::instructions::interfaces::Execute;
 use crate::messages::{
@@ -31,9 +31,12 @@ impl Execute for Impl {
         report_context_byte_words: [[u8; 32]; 2],
         token_indexes: &[u8],
     ) -> Result<()> {
-        let execution_report =
-            ExecutionReportSingleChain::deserialize(&mut raw_execution_report.as_ref())
-                .map_err(|_| CcipOfframpError::FailedToDeserializeReport)?;
+        let execution_report = ExecutionReportSingleChain::deserialize_either(
+            &raw_execution_report,
+            &ctx.accounts.execution_report_buffer,
+            &ctx.accounts.authority.key(),
+        )?;
+
         let report_context = ReportContext::from_byte_words(report_context_byte_words);
         verify_uncursed_cpi(
             ctx.accounts.rmn_remote.to_account_info(),
@@ -42,24 +45,7 @@ impl Execute for Impl {
             execution_report.source_chain_selector,
         )?;
 
-        // limit borrowing of ctx
-        {
-            let config = ctx.accounts.config.load()?;
-            ocr3_transmit(
-                &config.ocr3[OcrPluginType::Execution as usize],
-                &ctx.accounts.sysvar_instructions,
-                ctx.accounts.authority.key(),
-                OcrPluginType::Execution,
-                report_context,
-                &Ocr3ReportForExecutionReportSingleChain(&execution_report),
-                Signatures {
-                    rs: vec![],
-                    ss: vec![],
-                    raw_vs: [0u8; 32],
-                },
-            )?;
-        }
-
+        ocr3_transmit_report(&ctx, &execution_report, report_context)?;
         internal_execute(ctx, execution_report, token_indexes)
     }
 
@@ -82,9 +68,11 @@ impl Execute for Impl {
                 CcipOfframpError::ManualExecutionNotAllowed
             );
         }
-        let execution_report =
-            ExecutionReportSingleChain::deserialize(&mut raw_execution_report.as_ref())
-                .map_err(|_| CcipOfframpError::FailedToDeserializeReport)?;
+        let execution_report = ExecutionReportSingleChain::deserialize_either(
+            &raw_execution_report,
+            &ctx.accounts.execution_report_buffer,
+            &ctx.accounts.authority.key(),
+        )?;
         verify_uncursed_cpi(
             ctx.accounts.rmn_remote.to_account_info(),
             ctx.accounts.rmn_remote_config.to_account_info(),
@@ -93,11 +81,51 @@ impl Execute for Impl {
         )?;
         internal_execute(ctx, execution_report, token_indexes)
     }
+
+    fn buffer_execution_report<'info>(
+        &self,
+        ctx: Context<'_, '_, 'info, 'info, BufferExecutionReportContext<'info>>,
+        _root: Vec<u8>,
+        report_length: u32,
+        chunk: Vec<u8>,
+        chunk_index: u8,
+    ) -> Result<()> {
+        if !ctx.accounts.execution_report_buffer.is_initialized() {
+            ctx.accounts
+                .execution_report_buffer
+                .initialize(report_length, chunk.len() as u32)?;
+        }
+        ctx.accounts
+            .execution_report_buffer
+            .add_chunk(chunk, chunk_index)
+    }
 }
 
 /////////////
 // Helpers //
 /////////////
+
+fn ocr3_transmit_report<'info>(
+    ctx: &Context<'_, '_, 'info, 'info, ExecuteReportContext<'info>>,
+    execution_report: &ExecutionReportSingleChain,
+    report_context: ReportContext,
+) -> Result<()> {
+    let config = ctx.accounts.config.load()?;
+    ocr3_transmit(
+        &config.ocr3[OcrPluginType::Execution as usize],
+        &ctx.accounts.sysvar_instructions,
+        ctx.accounts.authority.key(),
+        OcrPluginType::Execution,
+        report_context,
+        &Ocr3ReportForExecutionReportSingleChain(execution_report),
+        Signatures {
+            rs: vec![],
+            ss: vec![],
+            raw_vs: [0u8; 32],
+        },
+    )?;
+    Ok(())
+}
 
 // internal_execute is the base execution logic without any additional validation
 fn internal_execute<'info>(
@@ -520,6 +548,10 @@ pub fn validate_execution_report<'info>(
     );
     require!(
         commit_report.timestamp != 0,
+        CcipOfframpError::RootNotCommitted
+    );
+    require!(
+        commit_report.chain_selector == execution_report.source_chain_selector,
         CcipOfframpError::RootNotCommitted
     );
 

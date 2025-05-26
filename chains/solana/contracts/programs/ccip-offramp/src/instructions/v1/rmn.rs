@@ -1,6 +1,8 @@
 use anchor_lang::prelude::*;
 use rmn_remote::state::CurseSubject;
 
+use crate::state::ExecutionReportBuffer;
+
 pub fn verify_uncursed_cpi<'info>(
     rmn_remote: AccountInfo<'info>,
     rmn_remote_config: AccountInfo<'info>,

@@ -533,6 +533,58 @@ pub mod ccip_offramp {
         )
     }
 
+    /// Initializes and/or inserts a chunk of report data to an execution report buffer.
+    ///
+    /// When execution reports are too large to fit in a single transaction, they can be chopped
+    /// up in chunks first (as a special case, one chunk is also acceptable), and pre-buffered
+    /// via multiple calls to this instruction.
+    ///
+    /// There's no need to pre-initialize the buffer: all chunks can be sent concurrently, and the
+    /// first one to arrive will initialize the buffer. Once there's no further use for the buffer,
+    /// it can be closed in order to retrieve the funds via `close_execution_report_buffer`.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for buffering.
+    /// * `root` - The merkle root as per the commit report.
+    /// * `report_length` - Total length in bytes of the execution report.
+    /// * `chunk` - The specific chunk to add to the buffer. Chunk must have a consistent size, except
+    ///    the last one in the buffer, which may be smaller.
+    /// * `chunk_index` - The index of this chunk.
+    pub fn buffer_execution_report<'info>(
+        ctx: Context<'_, '_, 'info, 'info, BufferExecutionReportContext<'info>>,
+        root: Vec<u8>,
+        report_length: u32,
+        chunk: Vec<u8>,
+        chunk_index: u8,
+    ) -> Result<()> {
+        // Execution report buffering doesn't need to be done differently per lane, so we
+        // use the default code version here.
+        let lane_code_version = CodeVersion::Default;
+
+        let default_code_version: CodeVersion = ctx
+            .accounts
+            .config
+            .load()?
+            .default_code_version
+            .try_into()?;
+
+        router::execute(lane_code_version, default_code_version).buffer_execution_report(
+            ctx,
+            root,
+            report_length,
+            chunk,
+            chunk_index,
+        )
+    }
+
+    /// Closes the execution report buffer to reclaim funds.
+    pub fn close_execution_report_buffer<'info>(
+        _ctx: Context<'_, '_, 'info, 'info, CloseExecutionReportBufferContext<'info>>,
+    ) -> Result<()> {
+        Ok(())
+    }
+
     pub fn close_commit_report_account(
         ctx: Context<CloseCommitReportAccount>,
         source_chain_selector: u64,
@@ -674,4 +726,20 @@ pub enum CcipOfframpError {
     InvalidInputsExternalExecutionSignerAccount,
     #[msg("Commit report has pending messages")]
     CommitReportHasPendingMessages,
+    #[msg("The execution report buffer already contains that chunk")]
+    ExecutionReportBufferAlreadyContainsChunk,
+    #[msg("The execution report buffer is already initialized")]
+    ExecutionReportBufferAlreadyInitialized,
+    #[msg("Invalid length for execution report buffer")]
+    ExecutionReportBufferInvalidLength,
+    #[msg("Chunk lies outside the execution report buffer")]
+    ExecutionReportBufferInvalidChunkIndex,
+    #[msg("Chunk size is too small.")]
+    ExecutionReportBufferChunkSizeTooSmall,
+    #[msg("Invalid chunk size. Remember that the last chunk should be right-padded with zeros.")]
+    ExecutionReportBufferInvalidChunkSize,
+    #[msg("Execution report buffer is not complete: chunks are missing")]
+    ExecutionReportBufferIncomplete,
+    #[msg("Execution report wasn't provided either directly or via buffer")]
+    ExecutionReportUnavailable,
 }
