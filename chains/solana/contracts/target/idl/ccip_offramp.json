@@ -1049,6 +1049,93 @@
       ]
     },
     {
+      "name": "bufferExecutionReport",
+      "docs": [
+        "Initializes and/or inserts a chunk of report data to an execution report buffer.",
+        "",
+        "When execution reports are too large to fit in a single transaction, they can be chopped",
+        "up in chunks first (as a special case, one chunk is also acceptable), and pre-buffered",
+        "via multiple calls to this instruction.",
+        "",
+        "There's no need to pre-initialize the buffer: all chunks can be sent concurrently, and the",
+        "first one to arrive will initialize the buffer. Once there's no further use for the buffer,",
+        "it can be closed in order to retrieve the funds via `close_execution_report_buffer`.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for buffering.",
+        "* `root` - The merkle root as per the commit report.",
+        "* `report_length` - Total length in bytes of the execution report.",
+        "* `chunk` - The specific chunk to add to the buffer. Chunk must have a consistent size, except",
+        "the last one in the buffer, which may be smaller.",
+        "* `chunk_index` - The index of this chunk."
+      ],
+      "accounts": [
+        {
+          "name": "executionReportBuffer",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "root",
+          "type": "bytes"
+        },
+        {
+          "name": "reportLength",
+          "type": "u32"
+        },
+        {
+          "name": "chunk",
+          "type": "bytes"
+        },
+        {
+          "name": "chunkIndex",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "closeExecutionReportBuffer",
+      "docs": [
+        "Closes the execution report buffer to reclaim funds."
+      ],
+      "accounts": [
+        {
+          "name": "executionReportBuffer",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "closeCommitReportAccount",
       "accounts": [
         {
@@ -1194,6 +1281,30 @@
           {
             "name": "rmnRemote",
             "type": "publicKey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ExecutionReportBuffer",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "data",
+            "type": "bytes"
+          },
+          {
+            "name": "chunkBitmap",
+            "type": "u64"
+          },
+          {
+            "name": "totalChunks",
+            "type": "u32"
+          },
+          {
+            "name": "chunkLength",
+            "type": "u32"
           }
         ]
       }
@@ -2378,6 +2489,46 @@
       "code": 9056,
       "name": "CommitReportHasPendingMessages",
       "msg": "Commit report has pending messages"
+    },
+    {
+      "code": 9057,
+      "name": "ExecutionReportBufferAlreadyContainsChunk",
+      "msg": "The execution report buffer already contains that chunk"
+    },
+    {
+      "code": 9058,
+      "name": "ExecutionReportBufferAlreadyInitialized",
+      "msg": "The execution report buffer is already initialized"
+    },
+    {
+      "code": 9059,
+      "name": "ExecutionReportBufferInvalidLength",
+      "msg": "Invalid length for execution report buffer"
+    },
+    {
+      "code": 9060,
+      "name": "ExecutionReportBufferInvalidChunkIndex",
+      "msg": "Chunk lies outside the execution report buffer"
+    },
+    {
+      "code": 9061,
+      "name": "ExecutionReportBufferChunkSizeTooSmall",
+      "msg": "Chunk size is too small."
+    },
+    {
+      "code": 9062,
+      "name": "ExecutionReportBufferInvalidChunkSize",
+      "msg": "Invalid chunk size. Remember that the last chunk should be right-padded with zeros."
+    },
+    {
+      "code": 9063,
+      "name": "ExecutionReportBufferIncomplete",
+      "msg": "Execution report buffer is not complete: chunks are missing"
+    },
+    {
+      "code": 9064,
+      "name": "ExecutionReportUnavailable",
+      "msg": "Execution report wasn't provided either directly or via buffer"
     }
   ]
 }

@@ -244,6 +244,29 @@ var (
 	// * `raw_execution_report` - The serialized execution report containing the message and proofs.
 	Instruction_ManuallyExecute = ag_binary.TypeID([8]byte{238, 219, 224, 11, 226, 248, 47, 192})
 
+	// Initializes and/or inserts a chunk of report data to an execution report buffer.
+	//
+	// When execution reports are too large to fit in a single transaction, they can be chopped
+	// up in chunks first (as a special case, one chunk is also acceptable), and pre-buffered
+	// via multiple calls to this instruction.
+	//
+	// There's no need to pre-initialize the buffer: all chunks can be sent concurrently, and the
+	// first one to arrive will initialize the buffer. Once there's no further use for the buffer,
+	// it can be closed in order to retrieve the funds via `close_execution_report_buffer`.
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for buffering.
+	// * `root` - The merkle root as per the commit report.
+	// * `report_length` - Total length in bytes of the execution report.
+	// * `chunk` - The specific chunk to add to the buffer. Chunk must have a consistent size, except
+	// the last one in the buffer, which may be smaller.
+	// * `chunk_index` - The index of this chunk.
+	Instruction_BufferExecutionReport = ag_binary.TypeID([8]byte{35, 202, 252, 220, 2, 82, 189, 23})
+
+	// Closes the execution report buffer to reclaim funds.
+	Instruction_CloseExecutionReportBuffer = ag_binary.TypeID([8]byte{0, 16, 4, 246, 238, 95, 223, 31})
+
 	Instruction_CloseCommitReportAccount = ag_binary.TypeID([8]byte{109, 145, 129, 64, 226, 172, 61, 106})
 )
 
@@ -284,6 +307,10 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "Execute"
 	case Instruction_ManuallyExecute:
 		return "ManuallyExecute"
+	case Instruction_BufferExecutionReport:
+		return "BufferExecutionReport"
+	case Instruction_CloseExecutionReportBuffer:
+		return "CloseExecutionReportBuffer"
 	case Instruction_CloseCommitReportAccount:
 		return "CloseCommitReportAccount"
 	default:
@@ -356,6 +383,12 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"manually_execute", (*ManuallyExecute)(nil),
+		},
+		{
+			"buffer_execution_report", (*BufferExecutionReport)(nil),
+		},
+		{
+			"close_execution_report_buffer", (*CloseExecutionReportBuffer)(nil),
 		},
 		{
 			"close_commit_report_account", (*CloseCommitReportAccount)(nil),

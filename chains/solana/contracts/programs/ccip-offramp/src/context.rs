@@ -497,7 +497,9 @@ pub struct ExecuteReportContext<'info> {
     pub reference_addresses: AccountLoader<'info, ReferenceAddresses>,
 
     #[account(
-        seeds = [seed::SOURCE_CHAIN, commit_report.chain_selector.to_le_bytes().as_ref()],
+        // The second seed here is self referencing, but it gets tied together with the `execution_report`
+        // in `validate_execution_report`.
+        seeds = [seed::SOURCE_CHAIN, source_chain.chain_selector.to_le_bytes().as_ref()],
         bump,
         constraint = valid_version(source_chain.version, MAX_CHAIN_V) @ CcipOfframpError::InvalidVersion,
     )]
@@ -505,8 +507,6 @@ pub struct ExecuteReportContext<'info> {
 
     #[account(
         mut,
-        // The second seed here is a circular reference with `source_chain`, but it gets tied together with the `execution_report`
-        // later in the instruction logic, as it may be retrieved from different locations.
         seeds = [seed::COMMIT_REPORT, source_chain.chain_selector.to_le_bytes().as_ref(), commit_report.merkle_root.as_ref()],
         bump,
         constraint = valid_version(commit_report.version, MAX_COMMITREPORT_V) @ CcipOfframpError::InvalidVersion,

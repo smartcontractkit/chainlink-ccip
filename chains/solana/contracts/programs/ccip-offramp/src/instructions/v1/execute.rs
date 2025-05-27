@@ -1,7 +1,8 @@
 use anchor_lang::prelude::*;
 use ccip_common::seed;
-use ccip_common::v1::{validate_and_parse_token_accounts, TokenAccounts};
+use ccip_common::v1::{validate_and_parse_token_accounts, TokenAccounts, MIN_TOKEN_POOL_ACCOUNTS};
 use solana_program::instruction::Instruction;
+use solana_program::log::sol_log;
 use solana_program::program::invoke_signed;
 
 use crate::context::{BufferExecutionReportContext, ExecuteReportContext, OcrPluginType};
@@ -17,9 +18,7 @@ use super::merkle::{calculate_merkle_root, MerkleError, LEAF_DOMAIN_SEPARATOR};
 use super::messages::{is_writable, Any2SVMMessage, ReleaseOrMintInV1, ReleaseOrMintOutV1};
 use super::ocr3base::{ocr3_transmit, ReportContext, Signatures};
 use super::ocr3impl::Ocr3ReportForExecutionReportSingleChain;
-use super::pools::{
-    calculate_token_pool_account_indices, get_balance, interact_with_pool, CCIP_POOL_V1_RET_BYTES,
-};
+use super::pools::{get_balance, interact_with_pool, CCIP_POOL_V1_RET_BYTES};
 use super::rmn::verify_uncursed_cpi;
 
 pub struct Impl;
@@ -245,13 +244,11 @@ fn internal_execute<'info>(
     // note: indexes are used instead of counts in case more accounts need to be passed in remaining_accounts before token accounts
     // token_indexes = [2, 4] where remaining_accounts is [custom_account, custom_account, token1_account1, token1_account2, token2_account1, token2_account2] for example
     for (i, token_amount) in execution_report.message.token_amounts.iter().enumerate() {
-        let accs = get_token_accounts_for(
+        let accs = remaining_accounts_layout.get_token_accounts_for(
             ctx.accounts.reference_addresses.load()?.router,
             ctx.accounts.reference_addresses.load()?.fee_quoter,
-            ctx.remaining_accounts,
             execution_report.message.token_receiver,
             execution_report.message.header.source_chain_selector,
-            token_indexes,
             i,
         )?;
         let offramp_token_pool_signer = accs
@@ -333,7 +330,10 @@ fn internal_execute<'info>(
     // case: no tokens, but there are remaining_accounts passed in
     // case: tokens and messages, so the first token has a non-zero index (indicating extra accounts before token accounts)
     if remaining_accounts_layout.should_execute_messaging() {
-        let msg_accs = remaining_accounts_layout.messaging_accounts.unwrap(); // as there is messaging, the option is guaranteed to be Some
+        let msg_accs = remaining_accounts_layout
+            .messaging_accounts
+            .as_ref()
+            .unwrap(); // as there is messaging, the option is guaranteed to be Some
 
         // The accounts of the user that will be used in the CPI instruction, none of them are signers
         // They need to specify if mutable or not, but none of them is allowed to init, realloc or close
@@ -411,29 +411,6 @@ fn internal_execute<'info>(
     Ok(())
 }
 
-fn get_token_accounts_for<'a>(
-    router: Pubkey,
-    fee_quoter: Pubkey,
-    accounts: &'a [AccountInfo<'a>],
-    token_receiver: Pubkey,
-    chain_selector: u64,
-    token_indexes: &[u8],
-    i: usize,
-) -> Result<TokenAccounts<'a>> {
-    let (start, end) = calculate_token_pool_account_indices(i, token_indexes, accounts.len())?;
-
-    let accs = validate_and_parse_token_accounts(
-        token_receiver,
-        chain_selector,
-        router,
-        fee_quoter,
-        Some(crate::ID),
-        &accounts[start..end],
-    )?;
-
-    Ok(accs)
-}
-
 // Encodes the structured layout of the Execute Report Context remaining accounts, so they can
 // be accurately used where needed instead of passed as a raw array.
 pub struct ExecuteReportContextRemainingAccountsLayout<'a> {
@@ -476,6 +453,30 @@ impl<'a> ExecuteReportContextRemainingAccountsLayout<'a> {
         keys.into_iter()
     }
 
+    pub fn get_token_accounts_for<'b>(
+        &'b self,
+        router: Pubkey,
+        fee_quoter: Pubkey,
+        token_receiver: Pubkey,
+        chain_selector: u64,
+        i: usize,
+    ) -> Result<TokenAccounts<'a>> {
+        let accs = self
+            .token_accounts_per_token
+            .get(i)
+            .map(|accounts_per_token| accounts_per_token.accounts)
+            .ok_or(CcipOfframpError::InvalidInputsTokenIndices)?;
+
+        validate_and_parse_token_accounts(
+            token_receiver,
+            chain_selector,
+            router,
+            fee_quoter,
+            Some(crate::ID),
+            accs,
+        )
+    }
+
     pub fn new(
         remaining_accounts: &'a [AccountInfo<'a>],
         token_indices: &[u8],
@@ -487,9 +488,10 @@ impl<'a> ExecuteReportContextRemainingAccountsLayout<'a> {
         ////////////////////////
 
         // First, if the report is buffered, it means the last account is the buffering account.
-        let (remaining_accounts, buffering_accounts) = if report_is_buffered {
+        // We can simply remove it from consideration from now on.
+        let (remaining_accounts_without_buffering, buffering_accounts) = if report_is_buffered {
             (
-                &remaining_accounts[0..remaining_accounts.len() - 1],
+                &remaining_accounts[0..(remaining_accounts.len() - 1)],
                 Some(ExecuteContextRemainingBufferingAccounts {
                     execution_buffer_account: remaining_accounts
                         .last()
@@ -504,23 +506,22 @@ impl<'a> ExecuteReportContextRemainingAccountsLayout<'a> {
         // Messaging subslice //
         ////////////////////////
         let only_tokens = token_indices.first().map(|i| *i == 0).unwrap_or_default();
-        let messaging_accounts_exist = !remaining_accounts.is_empty() && !only_tokens;
-        let (remaining_accounts, messaging_accounts) = if messaging_accounts_exist {
-            let remaining_accounts: &'a [AccountInfo<'a>] = remaining_accounts;
-            let end_index = if token_indices.is_empty() {
-                remaining_accounts.len()
-            } else {
-                token_indices[0] as usize
-            };
+        let messaging_accounts_exist =
+            !remaining_accounts_without_buffering.is_empty() && !only_tokens;
+        let messaging_accounts = if messaging_accounts_exist {
+            let end_index = token_indices
+                .first()
+                .map(|i| *i as usize)
+                .unwrap_or(remaining_accounts_without_buffering.len());
 
             require!(
-                1 <= end_index && end_index <= remaining_accounts.len(), // program id and message accounts need to fit in remaining accounts
+                1 <= end_index && end_index <= remaining_accounts_without_buffering.len(), // program id and message accounts need to fit in remaining accounts
                 CcipOfframpError::InvalidInputsTokenIndices
             ); // there could be other remaining accounts used for tokens
 
-            let logic_receiver = &remaining_accounts[0];
-            let external_execution_signer = &remaining_accounts[1];
-            let msg_accounts = &remaining_accounts[2..end_index];
+            let logic_receiver = &remaining_accounts_without_buffering[0];
+            let external_execution_signer = &remaining_accounts_without_buffering[1];
+            let msg_accounts = &remaining_accounts_without_buffering[2..end_index];
 
             // Validate the derivation of the external_execution_signer and calculate its bump
             let (expected_signer_key, signer_bump) = Pubkey::find_program_address(
@@ -548,12 +549,12 @@ impl<'a> ExecuteReportContextRemainingAccountsLayout<'a> {
                 logic_receiver,
                 external_execution_signer,
                 external_execution_signer_bump: signer_bump,
-                remaining_messaging_accounts: &remaining_accounts[2..end_index],
+                remaining_messaging_accounts: msg_accounts,
             };
 
-            (&remaining_accounts[end_index..], Some(messaging_accounts))
+            Some(messaging_accounts)
         } else {
-            (remaining_accounts, None)
+            None
         };
 
         ////////////////////
@@ -564,14 +565,22 @@ impl<'a> ExecuteReportContextRemainingAccountsLayout<'a> {
             .copied()
             .map(|i| i as usize)
             // We add a sentinel for the last token range ending at the end of the account list.
-            .chain(Some(remaining_accounts.len()));
+            .chain(Some(remaining_accounts_without_buffering.len()));
         let pairwise_indices = indices_with_sentinel
             .clone()
             .zip(indices_with_sentinel.skip(1));
 
         let token_accounts_per_token: Vec<ExecuteContextRemainingTokenAccounts> = pairwise_indices
-            .map(|(start, end)| ExecuteContextRemainingTokenAccounts {
-                accounts: &remaining_accounts[start..end],
+            .map(|(start, end)| {
+                assert!(
+                    start < end
+                        && end <= remaining_accounts_without_buffering.len()
+                        && end - start >= MIN_TOKEN_POOL_ACCOUNTS,
+                );
+
+                ExecuteContextRemainingTokenAccounts {
+                    accounts: &remaining_accounts_without_buffering[start..end],
+                }
             })
             .collect();
 
