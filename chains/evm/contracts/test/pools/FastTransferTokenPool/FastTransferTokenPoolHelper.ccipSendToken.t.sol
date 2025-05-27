@@ -1,13 +1,11 @@
   // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.10;
 
-// Local interfaces and contracts
-
 import {IFastTransferPool} from "../../../interfaces/IFastTransferPool.sol";
 import {IRouterClient} from "../../../interfaces/IRouterClient.sol";
+
 import {FastTransferTokenPoolAbstract} from "../../../pools/FastTransferTokenPoolAbstract.sol";
 
-// Test setup
 import {FastTransferTokenPoolHelperSetup} from "./FastTransferTokenPoolHelperSetup.t.sol";
 
 contract FastTransferTokenPoolHelper_ccipSendToken_Test is FastTransferTokenPoolHelperSetup {
