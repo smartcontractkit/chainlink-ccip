@@ -19,8 +19,6 @@ import (
 // readyMessages is empty all messages will be included. This allows the caller to create smaller reports if needed.
 //
 // Before calling this function all messages should have been checked and processed by the checkMessage function.
-//
-// The hasher and encoding codec are provided as arguments to allow for chain-specific formats to be used.
 func buildSingleChainReportHelper(
 	lggr logger.Logger,
 	report exectypes.CommitData,
@@ -525,7 +523,7 @@ func (b *execReportBuilder) buildSingleChainReport(
 	// In that case, we will execute the loop below to iteratively build a report
 	// with fewer messages until we find a valid report.
 	if b.maxMessages == 0 {
-		finalReport, err :=
+		allMessagesReport, err :=
 			buildSingleChainReportHelper(b.lggr, commitData, readyMessages)
 		if err != nil {
 			return ccipocr3.ExecutePluginReportSingleChain{},
@@ -533,13 +531,13 @@ func (b *execReportBuilder) buildSingleChainReport(
 				fmt.Errorf("unable to build a single chain report (max): %w", err)
 		}
 
-		validReport, meta, err := b.verifyReport(ctx, finalReport)
+		validReport, meta, err := b.verifyReport(ctx, allMessagesReport)
 		if err != nil {
 			return ccipocr3.ExecutePluginReportSingleChain{},
 				exectypes.CommitData{},
 				fmt.Errorf("unable to verify report: %w", err)
 		} else if validReport {
-			return finalize(finalReport, commitData, meta)
+			return finalize(allMessagesReport, commitData, meta)
 		}
 	}
 
@@ -555,20 +553,20 @@ func (b *execReportBuilder) buildSingleChainReport(
 
 		msgs[i] = struct{}{}
 
-		finalReport2, err := buildSingleChainReportHelper(b.lggr, commitData, msgs)
+		candidateReport, err := buildSingleChainReportHelper(b.lggr, commitData, msgs)
 		if err != nil {
 			return ccipocr3.ExecutePluginReportSingleChain{},
 				exectypes.CommitData{},
 				fmt.Errorf("unable to build a single chain report (messages %d): %w", len(msgs), err)
 		}
 
-		validReport, meta2, err := b.verifyReport(ctx, finalReport2)
+		validReport, meta2, err := b.verifyReport(ctx, candidateReport)
 		if err != nil {
 			return ccipocr3.ExecutePluginReportSingleChain{},
 				exectypes.CommitData{},
 				fmt.Errorf("unable to verify report: %w", err)
 		} else if validReport {
-			finalReport = finalReport2
+			finalReport = candidateReport
 			meta = meta2
 
 			// Stop searching if we reach the maximum number of messages.

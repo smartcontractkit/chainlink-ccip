@@ -176,7 +176,7 @@ func (b *execReportBuilder) checkInitialize() {
 // The commit report with updated metadata is returned. It reflects which messages
 // were selected for the exec report.
 //
-// TODO: Finish this function to generate multiple reports..
+// TODO: Add support for multiple reports with ordered messages.
 func (b *execReportBuilder) Add(
 	ctx context.Context,
 	commitReport exectypes.CommitData,
@@ -184,28 +184,26 @@ func (b *execReportBuilder) Add(
 	b.checkInitialize()
 
 	// Check if all messages have zero nonces - if not, we should only process the first report
-	hasNonZeroNonce := false
-	for _, msg := range commitReport.Messages {
-		if msg.Header.Nonce > 0 {
-			hasNonZeroNonce = true
-			b.lggr.Errorw("Found message with non-zero nonce",
-				"sourceChain", msg.Header.SourceChainSelector,
-				"messageID", msg.Header.MessageID,
-				"nonce", msg.Header.Nonce)
+	if b.multipleReportsEnabled {
+		for _, msg := range commitReport.Messages {
+			if msg.Header.Nonce > 0 {
+				b.lggr.Errorw("Found message with non-zero nonce when multiple reports are enabled",
+					"sourceChain", msg.Header.SourceChainSelector,
+					"messageID", msg.Header.MessageID,
+					"nonce", msg.Header.Nonce)
+				// If multiple reports are enabled, we can still process the report, but we need to limit it to a single report
+				// If we didn't even build the first report yet, then break and process the first report only.
+				if len(b.execReports) > 1 {
+					b.execReports = []cciptypes.ExecutePluginReport{b.execReports[0]}
+					b.commitReports = [][]exectypes.CommitData{b.commitReports[0]}
+					b.accumulated = []validationMetadata{b.accumulated[0]}
+					return commitReport, fmt.Errorf("messages with non-zero nonces detected, limiting to single report")
+				}
+			}
 			break
 		}
 	}
 
-	if hasNonZeroNonce && b.multipleReportsEnabled {
-		b.lggr.Warnw("Messages with non-zero nonces detected, limiting to single report")
-		// reset exec reports to only include the first one
-		b.execReports = []cciptypes.ExecutePluginReport{b.execReports[0]}
-		b.commitReports = [][]exectypes.CommitData{b.commitReports[0]}
-		b.accumulated = []validationMetadata{b.accumulated[0]}
-		return commitReport, fmt.Errorf("messages with non-zero nonces detected, limiting to single report")
-	}
-
-	// We'll use this to track our original commit report and return it at the end with all updates
 	currentCommitReport := commitReport
 	// Main processing loop - continue until no more messages or reports can be created
 	for {
@@ -251,6 +249,10 @@ func (b *execReportBuilder) Add(
 
 			execReport, updatedReport, err = b.buildSingleChainReport(ctx, currentCommitReport, readyMessages)
 			if errors.Is(err, ErrEmptyReport) {
+				// Remove the empty report we just added
+				b.execReports = b.execReports[:len(b.execReports)-1]
+				b.commitReports = b.commitReports[:len(b.commitReports)-1]
+				b.accumulated = b.accumulated[:len(b.accumulated)-1]
 				return currentCommitReport, nil
 			}
 		}
@@ -267,6 +269,12 @@ func (b *execReportBuilder) Add(
 		// If multiple reports aren't enabled, we're done after the first report
 		if !b.multipleReportsEnabled {
 			break
+		}
+
+		// Check if we've processed all messages - if so, exit the loop
+		readyMessagesLeft, _ := b.checkMessages(ctx, currentCommitReport)
+		if len(readyMessagesLeft) == 0 {
+			return currentCommitReport, nil
 		}
 	}
 

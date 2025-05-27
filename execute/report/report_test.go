@@ -1577,3 +1577,242 @@ func Test_checkSkippedNonces(t *testing.T) {
 		})
 	}
 }
+
+func Test_Builder_MultiReport(t *testing.T) {
+	hasher := mocks.NewMessageHasher()
+	codec := mocks.NewExecutePluginJSONReportCodec()
+	lggr := logger.Test(t)
+	sender, err := cciptypes.NewUnknownAddressFromHex(randomAddress())
+	require.NoError(t, err)
+	defaultNonces := map[cciptypes.ChainSelector]map[string]uint64{
+		1: {
+			sender.String(): 0,
+		},
+		2: {
+			sender.String(): 0,
+		},
+		3: {
+			sender.String(): 0,
+		},
+		4: {
+			sender.String(): 0,
+		},
+	}
+
+	type args struct {
+		reports                []exectypes.CommitData
+		nonces                 map[cciptypes.ChainSelector]map[string]uint64
+		maxReportSize          uint64
+		maxGasLimit            uint64
+		maxMessages            uint64
+		maxSingleChainReports  uint64
+		multipleReportsEnabled bool
+	}
+	tests := []struct {
+		name                        string
+		args                        args
+		expectedExecReports         int
+		expectedChainReportsPerExec []int
+		wantErr                     string
+	}{
+		{
+			name: "break down one report into multiple reports - single message each",
+			args: args{
+				maxReportSize:          2800,
+				maxGasLimit:            10000000,
+				maxMessages:            1,
+				maxSingleChainReports:  1,
+				nonces:                 defaultNonces,
+				multipleReportsEnabled: true,
+				reports: []exectypes.CommitData{
+					makeTestCommitReport(hasher, 6, 2, 100, 999, 10101010101,
+						sender,
+						cciptypes.Bytes32{},
+						nil,
+						true,
+					),
+				},
+			},
+			expectedExecReports:         6,
+			expectedChainReportsPerExec: []int{1, 1, 1, 1, 1, 1}, // Each report has one chain report
+		},
+		{
+			name: "Solana case: report multiple reports when input multiple reports with single message each",
+			args: args{
+				maxReportSize:          2800,
+				maxGasLimit:            10000000,
+				maxMessages:            1,
+				maxSingleChainReports:  1,
+				nonces:                 defaultNonces,
+				multipleReportsEnabled: true,
+				reports: []exectypes.CommitData{
+					makeTestCommitReport(hasher, 1, 2, 100, 999, 10101010101,
+						sender,
+						cciptypes.Bytes32{},
+						nil,
+						true,
+					),
+					makeTestCommitReport(hasher, 1, 2, 101, 999, 10101010101,
+						sender,
+						cciptypes.Bytes32{},
+						nil,
+						true,
+					),
+					makeTestCommitReport(hasher, 1, 2, 102, 999, 10101010101,
+						sender,
+						cciptypes.Bytes32{},
+						nil,
+						true,
+					),
+					makeTestCommitReport(hasher, 1, 2, 103, 999, 10101010101,
+						sender,
+						cciptypes.Bytes32{},
+						nil,
+						true,
+					),
+				},
+			},
+			expectedExecReports:         4,
+			expectedChainReportsPerExec: []int{1, 1, 1, 1}, // Each report has one chain report
+		},
+		{
+			name: "multiple reports - max single chain reports",
+			args: args{
+				maxReportSize:          10000,
+				maxGasLimit:            10000000,
+				maxSingleChainReports:  2,
+				multipleReportsEnabled: true,
+				nonces:                 defaultNonces,
+				reports: []exectypes.CommitData{
+					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
+						sender,
+						cciptypes.Bytes32{},
+						nil,
+						true,
+					),
+					makeTestCommitReport(hasher, 10, 2, 100, 999, 10101010101,
+						sender,
+						cciptypes.Bytes32{},
+						nil,
+						true,
+					),
+					makeTestCommitReport(hasher, 10, 3, 100, 999, 10101010101,
+						sender,
+						cciptypes.Bytes32{},
+						nil,
+						true,
+					),
+				},
+			},
+			expectedExecReports:         2,           // Should create 2 exec reports
+			expectedChainReportsPerExec: []int{2, 1}, // 2 chains in first exec report, 1 in second
+		},
+		{
+			name: "non-zero nonces limit to single report despite multipleReportsEnabled",
+			args: args{
+				maxReportSize:          2800,
+				maxGasLimit:            10000000,
+				multipleReportsEnabled: true,
+				nonces:                 defaultNonces,
+				reports: []exectypes.CommitData{
+					makeTestCommitReport(hasher, 20, 2, 100, 999, 10101010101,
+						sender,
+						cciptypes.Bytes32{},
+						nil,
+						false, // non-zero nonces
+					),
+					makeTestCommitReport(hasher, 20, 3, 100, 999, 10101010101,
+						sender,
+						cciptypes.Bytes32{},
+						nil,
+						false, // non-zero nonces
+					),
+					makeTestCommitReport(hasher, 20, 4, 100, 999, 10101010101,
+						sender,
+						cciptypes.Bytes32{},
+						nil,
+						false, // non-zero nonces
+					),
+				},
+			},
+			expectedExecReports:         1,
+			expectedChainReportsPerExec: []int{1}, // Only one chain report despite size
+			wantErr:                     "messages with non-zero nonces detected, limiting to single report",
+		},
+		{
+			name: "multiple input reports splitting across maxMessages - no maxSingleChainReports",
+			args: args{
+				maxReportSize:          10000000,
+				maxGasLimit:            10000000,
+				maxMessages:            1,
+				nonces:                 defaultNonces,
+				multipleReportsEnabled: true,
+				reports: []exectypes.CommitData{
+					makeTestCommitReport(hasher, 2, 1, 100, 999, 10101010101,
+						sender, cciptypes.Bytes32{}, nil, true),
+					makeTestCommitReport(hasher, 2, 1, 200, 999, 10101010102,
+						sender, cciptypes.Bytes32{}, nil, true),
+				},
+			},
+			expectedExecReports:         1,
+			expectedChainReportsPerExec: []int{4},
+		},
+	}
+
+	mockAddrCodec := internal.NewMockAddressCodecHex(t)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := context.Background()
+
+			ep := gasmock.NewMockEstimateProvider(t)
+			ep.EXPECT().CalculateMessageMaxGas(mock.Anything).Return(uint64(0)).Maybe()
+			ep.EXPECT().CalculateMerkleTreeGas(mock.Anything).Return(uint64(0)).Maybe()
+
+			builder := NewBuilder(
+				lggr,
+				hasher,
+				codec,
+				ep,
+				1, // destChainSelector
+				mockAddrCodec,
+				WithMaxReportSizeBytes(tt.args.maxReportSize),
+				WithMaxGas(tt.args.maxGasLimit),
+				WithMaxMessages(tt.args.maxMessages),
+				WithMaxSingleChainReports(tt.args.maxSingleChainReports),
+				WithExtraMessageCheck(CheckNonces(tt.args.nonces, mockAddrCodec)),
+				WithMultipleReports(tt.args.multipleReportsEnabled),
+			)
+
+			for _, report := range tt.args.reports {
+				_, err := builder.Add(ctx, report)
+				if err != nil && tt.wantErr != "" {
+					require.Contains(t, err.Error(), tt.wantErr)
+					// Continue testing even with expected error
+				} else {
+					require.NoError(t, err)
+				}
+			}
+
+			execReports, commitReports, err := builder.Build()
+			require.NoError(t, err)
+
+			// Verify expected number of exec reports
+			require.Equal(t, tt.expectedExecReports, len(execReports))
+
+			// Verify expected chain reports per exec report
+			for i := 0; i < tt.expectedExecReports; i++ {
+				if i < len(tt.expectedChainReportsPerExec) {
+					require.Equal(t, tt.expectedChainReportsPerExec[i], len(execReports[i].ChainReports),
+						"Unexpected number of chain reports in exec report %d", i)
+				}
+			}
+
+			// Check that commit reports match exec reports structure
+			for i, execReport := range execReports {
+				require.Equal(t, len(execReport.ChainReports), len(commitReports[i]),
+					"Mismatch between exec reports and commit reports for report %d", i)
+			}
+		})
+	}
+}
