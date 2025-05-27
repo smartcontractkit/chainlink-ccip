@@ -182,49 +182,95 @@ func (b *execReportBuilder) Add(
 	commitReport exectypes.CommitData,
 ) (exectypes.CommitData, error) {
 	b.checkInitialize()
-	index := len(b.execReports) - 1
 
-	// Check if max is reached.
-	if b.maxSingleChainReports != 0 && len(b.execReports[index].ChainReports) >= int(b.maxSingleChainReports) {
-		if !b.multipleReportsEnabled {
-			// TODO: this is the previous behavior. Should we return an empty report error?
-			return commitReport, nil
-		} /* else {
-			// TODO: start a new exec report.
-		}*/
-	}
-
-	// Check which messages are ready to execute and update the report with additional metadata needed for execution.
-	readyMessages, err := b.checkMessages(ctx, commitReport)
-	if err != nil {
-		return commitReport,
-			fmt.Errorf("unable to check message: %w", err)
-	}
-	if len(readyMessages) == 0 {
-		return commitReport, ErrEmptyReport
-	}
-
-	execReport, updatedReport, err := b.buildSingleChainReport(ctx, commitReport, readyMessages)
-
-	// No messages fit into the exec report
-	if errors.Is(err, ErrEmptyReport) {
-		if !b.multipleReportsEnabled {
-			return commitReport, nil
+	// Check if all messages have zero nonces - if not, we should only process the first report
+	hasNonZeroNonce := false
+	for _, msg := range commitReport.Messages {
+		if msg.Header.Nonce > 0 {
+			hasNonZeroNonce = true
+			b.lggr.Errorw("Found message with non-zero nonce",
+				"sourceChain", msg.Header.SourceChainSelector,
+				"messageID", msg.Header.MessageID,
+				"nonce", msg.Header.Nonce)
+			break
 		}
-		// start a new exec report and try again.
-		// TODO: start a new exec report and try again.
-		panic("multiple reports enabled but not implemented")
-	}
-	if err != nil {
-		return commitReport, fmt.Errorf("unable to add a single chain report: %w", err)
 	}
 
-	b.execReports[index].ChainReports = append(b.execReports[index].ChainReports, execReport)
-	b.commitReports[index] = append(b.commitReports[index], updatedReport)
+	if hasNonZeroNonce && b.multipleReportsEnabled {
+		b.lggr.Warnw("Messages with non-zero nonces detected, limiting to single report")
+		// reset exec reports to only include the first one
+		b.execReports = []cciptypes.ExecutePluginReport{b.execReports[0]}
+		b.commitReports = [][]exectypes.CommitData{b.commitReports[0]}
+		b.accumulated = []validationMetadata{b.accumulated[0]}
+		return commitReport, fmt.Errorf("messages with non-zero nonces detected, limiting to single report")
+	}
 
-	// TODO: Check if there are any remaining readyMessages and try to build the next report.
+	// We'll use this to track our original commit report and return it at the end with all updates
+	currentCommitReport := commitReport
+	// Main processing loop - continue until no more messages or reports can be created
+	for {
+		index := len(b.execReports) - 1
 
-	return updatedReport, nil
+		// Check if we've reached max reports for the current exec report
+		if b.maxSingleChainReports != 0 && len(b.execReports[index].ChainReports) >= int(b.maxSingleChainReports) {
+			if !b.multipleReportsEnabled {
+				return currentCommitReport, nil
+			}
+
+			// Start a new exec report
+			b.execReports = append(b.execReports, cciptypes.ExecutePluginReport{})
+			b.commitReports = append(b.commitReports, []exectypes.CommitData{})
+			b.accumulated = append(b.accumulated, validationMetadata{})
+			index = len(b.execReports) - 1
+		}
+
+		// Check which messages are ready to execute, excluding already processed ones
+		readyMessages, err := b.checkMessages(ctx, currentCommitReport)
+		if err != nil {
+			return currentCommitReport, fmt.Errorf("unable to check messages: %w", err)
+		}
+
+		if len(readyMessages) == 0 {
+			// No more messages to process
+			return currentCommitReport, nil
+		}
+
+		execReport, updatedReport, err := b.buildSingleChainReport(ctx, currentCommitReport, readyMessages)
+
+		if errors.Is(err, ErrEmptyReport) {
+			// No messages fit into the report
+			if !b.multipleReportsEnabled {
+				return currentCommitReport, nil
+			}
+
+			// Try with a new exec report
+			b.execReports = append(b.execReports, cciptypes.ExecutePluginReport{})
+			b.commitReports = append(b.commitReports, []exectypes.CommitData{})
+			b.accumulated = append(b.accumulated, validationMetadata{})
+			index = len(b.execReports) - 1
+
+			execReport, updatedReport, err = b.buildSingleChainReport(ctx, currentCommitReport, readyMessages)
+			if errors.Is(err, ErrEmptyReport) {
+				return currentCommitReport, nil
+			}
+		}
+
+		if err != nil {
+			return currentCommitReport, fmt.Errorf("unable to add a single chain report: %w", err)
+		}
+
+		// Update our data structures
+		b.execReports[index].ChainReports = append(b.execReports[index].ChainReports, execReport)
+		b.commitReports[index] = append(b.commitReports[index], updatedReport)
+		currentCommitReport = updatedReport
+
+		// If multiple reports aren't enabled, we're done after the first report
+		if !b.multipleReportsEnabled {
+			break
+		}
+	}
+
+	return currentCommitReport, nil
 }
 
 func (b *execReportBuilder) Build() (
