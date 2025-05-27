@@ -20,8 +20,8 @@ import {SafeERC20} from
 contract USDCTokenPoolCCTPV2 is USDCTokenPool {
   using SafeERC20 for IERC20;
 
-  error InvalidMinFinalityThreshold(uint32 expected, uint32 got);
-  error InvalidExecutionFinalityThreshold(uint32 expected, uint32 got);
+  error InvalidMinFinalityThreshold(uint32 expected, uint32 actual);
+  error InvalidExecutionFinalityThreshold(uint32 expected, uint32 actual);
 
   // CCTP's max fee is based on the use of fast-burn. Since this pool does not utilize that feature, max fee should be 0.
   uint32 public constant MAX_FEE = 0;
@@ -99,8 +99,6 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
     _validateReleaseOrMint(releaseOrMintIn);
 
-    // uint32 sourceTokenDataPayload =
-    // abi.decode(releaseOrMintIn.sourcePoolData, (SourceTokenDataPayload));
     uint32 sourceDomainIdentifier = abi.decode(releaseOrMintIn.sourcePoolData, (uint32));
 
     MessageAndAttestation memory msgAndAttestation =

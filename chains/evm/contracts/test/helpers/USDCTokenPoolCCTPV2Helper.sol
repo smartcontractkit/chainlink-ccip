@@ -5,7 +5,7 @@ import {ITokenMessenger} from "../../pools/USDC/ITokenMessenger.sol";
 import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
 
 import {CCTPMessageTransmitterProxy} from "../../pools/USDC/CCTPMessageTransmitterProxy.sol";
-import {USDCTokenPoolCCTPV2} from "../../pools/USDC/cctpV2/USDCTokenPoolCCTPV2.sol";
+import {USDCTokenPoolCCTPV2} from "../../pools/USDC/CCTPV2/USDCTokenPoolCCTPV2.sol";
 
 contract USDCTokenPoolCCTPV2Helper is USDCTokenPoolCCTPV2 {
   constructor(

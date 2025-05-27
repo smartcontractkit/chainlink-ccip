@@ -5,13 +5,15 @@ import {Internal} from "../../../../../libraries/Internal.sol";
 import {Pool} from "../../../../../libraries/Pool.sol";
 import {RateLimiter} from "../../../../../libraries/RateLimiter.sol";
 import {TokenPool} from "../../../../../pools/TokenPool.sol";
+
+import {USDCTokenPoolCCTPV2} from "../../../../../pools/USDC/CCTPV2/USDCTokenPoolCCTPV2.sol";
 import {USDCTokenPool} from "../../../../../pools/USDC/USDCTokenPool.sol";
-import {USDCTokenPoolCCTPV2} from "../../../../../pools/USDC/cctpV2/USDCTokenPoolCCTPV2.sol";
 import {MockE2EUSDCTransmitter} from "../../../../mocks/MockE2EUSDCTransmitter.sol";
 import {USDCTokenPoolCCTPV2Setup} from "./USDCTokenPoolCCTPV2Setup.t.sol";
 
 contract USDCTokenPoolCCTPV2_releaseOrMint is USDCTokenPoolCCTPV2Setup {
-  // TODO: Better define what this means
+  // The threshold at which CCTP will attest to a message. A fast threshold only waites for tx-confirmation
+  // while slow threshold requires finalization. Any minFinalityThreshold value below 1000 is treated as 1000, and any value above 1000 is treated as 2000 as defined at https://developers.circle.com/stablecoins/cctp-finality-and-fees
   uint32 public constant MIN_FINALITY_THRESHOLD_SLOW = 2000;
   uint32 public constant MIN_FINALITY_THRESHOLD_FAST = 1000;
 
@@ -46,17 +48,16 @@ contract USDCTokenPoolCCTPV2_releaseOrMint is USDCTokenPoolCCTPV2Setup {
       destinationCaller: bytes32(uint256(uint160(address(s_usdcTokenPool)))),
       minFinalityThreshold: MIN_FINALITY_THRESHOLD_SLOW,
       finalityThresholdExecuted: MIN_FINALITY_THRESHOLD_SLOW,
-      // TODO: Add Comments about each field
       messageBody: _formatMessage(
-        0,
-        bytes32(uint256(uint160(address(OWNER)))),
-        bytes32(uint256(uint160(recipient))),
-        amount,
-        bytes32(uint256(uint160(OWNER))),
-        0,
-        0,
-        block.number + (1 days / 12), // TODO: Add Comment about being a block 24-hours in the future
-        ""
+        0, // version
+        bytes32(uint256(uint160(address(OWNER)))), // burnToken
+        bytes32(uint256(uint160(recipient))), // mintRecipient
+        amount, // amount
+        bytes32(uint256(uint160(OWNER))), // messageSender
+        0, // maxFee
+        0, // feeExecuted
+        block.number + (1 days / 12), // expirationBlock 1-day in the future assuming a 12-second block time.
+        "" // hookData
       )
     });
 
@@ -116,17 +117,16 @@ contract USDCTokenPoolCCTPV2_releaseOrMint is USDCTokenPoolCCTPV2Setup {
       destinationCaller: bytes32(uint256(uint160(address(s_usdcTokenPool)))),
       minFinalityThreshold: MIN_FINALITY_THRESHOLD_SLOW,
       finalityThresholdExecuted: MIN_FINALITY_THRESHOLD_SLOW,
-      // TODO: Add Comments
       messageBody: _formatMessage(
-        0,
-        bytes32(uint256(uint160(address(OWNER)))),
-        bytes32(uint256(uint160(OWNER))),
-        amount,
-        bytes32(uint256(uint160(OWNER))),
-        0,
-        0,
-        block.number + (1 days / 12), // TODO: Comments
-        ""
+        0, // version
+        bytes32(uint256(uint160(address(OWNER)))), // burnToken
+        bytes32(uint256(uint160(OWNER))), // mintRecipient
+        amount, // amount
+        bytes32(uint256(uint160(OWNER))), // messageSender
+        0, // maxFee
+        0, // feeExecuted
+        block.number + (1 days / 12), // expirationBlock 1-day in the future assuming a 12-second block time.
+        "" // hookData
       )
     });
 

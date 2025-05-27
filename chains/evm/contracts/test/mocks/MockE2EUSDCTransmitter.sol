@@ -55,6 +55,7 @@ contract MockE2EUSDCTransmitter is IMessageTransmitterWithRelay {
   ///     * recipient             32         bytes32    52
   ///     * destinationCaller     32         bytes32    84
   ///     * messageBody           dynamic    bytes      116
+  /// @dev This function assumes a message format under CCTP-V1.
   function receiveMessage(bytes calldata message, bytes calldata) external returns (bool success) {
     // The receiver of the funds is the _mintRecipient in the following encoded format
     //   function _formatMessage(
@@ -66,7 +67,6 @@ contract MockE2EUSDCTransmitter is IMessageTransmitterWithRelay {
     //  ) internal pure returns (bytes memory) {
     //    return abi.encodePacked(_version, _burnToken, _mintRecipient, _amount, _messageSender);
     //  }
-    // TODO: Comments for CCTP V2 Message Format
     address recipient = address(bytes20(message[116 + 36 + 12:116 + 36 + 12 + 20]));
 
     // We always mint 1 token to not complicate the test.

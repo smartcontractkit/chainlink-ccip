@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {USDCTokenPoolCCTPV2} from "../../../../../pools/USDC/CCTPV2/USDCTokenPoolCCTPV2.sol";
 import {USDCTokenPool} from "../../../../../pools/USDC/USDCTokenPool.sol";
-import {USDCTokenPoolCCTPV2} from "../../../../../pools/USDC/cctpV2/USDCTokenPoolCCTPV2.sol";
 import {USDCTokenPoolCCTPV2Setup} from "./USDCTokenPoolCCTPV2Setup.t.sol";
 
 contract USDCTokenPoolCCTPV2__validateMessage is USDCTokenPoolCCTPV2Setup {
@@ -73,7 +73,7 @@ contract USDCTokenPoolCCTPV2__validateMessage is USDCTokenPoolCCTPV2Setup {
     s_usdcTokenPool.validateMessage(encodedUsdcMessage, usdcMessage.sourceDomain);
     usdcMessage.version = 0;
 
-    // TODO: Change Finality threshold and thfinalityThresholdExecuted to 1000 and revert
+    // Change Finality threshold and finalityThresholdExecuted to 1000 to intentionally revert
     usdcMessage.minFinalityThreshold = 1000;
     encodedUsdcMessage = _generateUSDCMessageCCTPV2(usdcMessage);
 
