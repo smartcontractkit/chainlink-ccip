@@ -14,7 +14,7 @@ import {IERC20} from
 import {SafeERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 import {EnumerableSet} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableSet.sol";
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
 
 // bytes4(keccak256("NO_CCTP_USE_LOCK_RELEASE"))
 bytes4 constant LOCK_RELEASE_FLAG = 0xfa7c07de;
