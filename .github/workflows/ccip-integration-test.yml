@@ -25,10 +25,8 @@ jobs:
           # Run on all, except the chains/evm folder unless it's in a released version.
           filters: |
             e2e_should_run:
-              - '**'
-              - '!chains/evm/**'
-              - 'chains/evm/gobindings/generated/**'
-              - '!chains/evm/gobindings/generated/latest'
+              - '!(chains/evm/**)'
+              - 'chains/evm/gobindings/generated/!(latest/**)/**'
 
   integration-test-matrix:
     needs: [changes]
