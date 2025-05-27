@@ -26,7 +26,7 @@ contract FastTransferTokenPoolHelper is FastTransferTokenPoolAbstract {
     WETH9 wrappedNative,
     address router,
     FastTransferTokenPoolAbstract.LaneConfigArgs[] memory laneConfigArgs
-  ) FastTransferTokenPoolAbstract(router, address(wrappedNative), laneConfigArgs) {
+  ) FastTransferTokenPoolAbstract(router, laneConfigArgs) {
     i_admin = msg.sender;
     i_token = token;
   }

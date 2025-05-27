@@ -38,52 +38,56 @@ abstract contract FastTransferTokenPoolAbstract is CCIPReceiver, ITypeAndVersion
     address[] addFillers,
     address[] removeFillers
   );
-  event FillerWhitelistUpdated(uint64 indexed dst, address[] addFillers, address[] removeFillers);
+  event fillerAllowListUpdated(uint64 indexed dst, address[] addFillers, address[] removeFillers);
   event DestinationPoolUpdated(uint64 indexed dst, address destinationPool);
   event FastFillCompleted(bytes32 indexed fillRequestId);
 
   struct LaneConfig {
-    uint16 bpsFastFee; // 0-10_000
-    bool enabled; // pause per lane
-    bool whitelistEnabled; // whitelist for fillers
-    address destinationPool;
-    uint256 fillAmountMaxPerRequest; // max amount that can be filled per request
-    mapping(address filler => bool isWhitelisted) fillerWhitelist; // whitelist for fillers allowed to fill for this lane
+    uint256 fillAmountMaxPerRequest; //    max amount that can be filled per request
+    address destinationPool; // ─────────╮
+    uint16 bpsFastFee; //                │ 0-10_000
+    bool enabled; //                     │ pause per lane
+    bool whitelistEnabled; // ───────────╯ whitelist for fillers
+    mapping(address filler => bool isAllowed) fillerAllowList; // whitelist of fillers
   }
 
   struct LaneConfigView {
-    uint16 bpsFastFee; // 0-10_000
-    bool enabled; // pause per lane
-    bool whitelistEnabled; // whitelist for fillers
-    address destinationPool;
-    uint256 fillAmountMaxPerRequest; // max amount that can be filled per request
+    uint256 fillAmountMaxPerRequest; //    max amount that can be filled per request
+    address destinationPool; // ─────────╮
+    uint16 bpsFastFee; //                │ 0-10_000
+    bool enabled; //                     │ pause per lane
+    bool whitelistEnabled; // ───────────╯ whitelist for fillers
   }
 
   struct LaneConfigArgs {
-    uint64 remoteChainSelector;
-    uint16 bpsFastFee; // 0-10_000
-    bool enabled; // pause per lane
-    bool whitelistEnabled;
-    address destinationPool;
-    uint256 fillAmountMaxPerRequest; // max amount that can be filled per request
-    address[] addFillers; // address allowed to fill
-    address[] removeFillers; // addresses to remove from the whitelist
+    uint256 fillAmountMaxPerRequest; //    max amount that can be filled per request
+    address[] addFillers; //               address allowed to fill
+    address[] removeFillers; //            addresses to remove from the whitelist
+    address destinationPool; // ─────────╮
+    uint64 remoteChainSelector; //       │
+    uint16 bpsFastFee; //                │ 0-10_000
+    bool enabled; //                     │ pause per lane
+    bool whitelistEnabled; // ───────────╯
   }
 
   struct MintMessage {
-    uint256 srcAmountToTransfer;
-    uint8 srcDecimals;
-    uint256 fastTransferFee;
-    bytes receiver;
+    uint256 srcAmountToTransfer; // source amount from fill request
+    uint256 fastTransferFee; // fast transfer fee in the source token
+    bytes receiver; // receiver address on the destination chain
+    uint8 srcDecimals; // decimals of the source token
   }
+  //
 
-  // Storage layout
-  mapping(uint64 remoteChainSelector => LaneConfig laneConfig) public s_fastTransferLaneConfig;
-  mapping(bytes32 fillRequestId => address filler) internal s_fills;
-  address private s_wrappedNative;
+  /// @dev Mapping of remote chain selector to lane configuration
+  mapping(uint64 remoteChainSelector => LaneConfig laneConfig) private s_fastTransferLaneConfig;
 
-  constructor(address router, address wrappedNative, LaneConfigArgs[] memory laneConfigArgs) CCIPReceiver(router) {
-    s_wrappedNative = wrappedNative;
+  /// @dev Mapping of fill request ID to filler address
+  mapping(bytes32 fillRequestId => address filler) private s_fills;
+
+  /// @notice Initializes the fast transfer pool
+  /// @param router Address of the CCIP router
+  /// @param laneConfigArgs Initial lane configurations
+  constructor(address router, LaneConfigArgs[] memory laneConfigArgs) CCIPReceiver(router) {
     for (uint256 i; i < laneConfigArgs.length; ++i) {
       _updateLaneConfig(laneConfigArgs[i]);
     }
@@ -111,10 +115,10 @@ abstract contract FastTransferTokenPoolAbstract is CCIPReceiver, ITypeAndVersion
     laneConfig.whitelistEnabled = laneConfigArgs.whitelistEnabled;
     laneConfig.fillAmountMaxPerRequest = laneConfigArgs.fillAmountMaxPerRequest;
     for (uint256 i; i < laneConfigArgs.addFillers.length; ++i) {
-      laneConfig.fillerWhitelist[laneConfigArgs.addFillers[i]] = true;
+      laneConfig.fillerAllowList[laneConfigArgs.addFillers[i]] = true;
     }
     for (uint256 i; i < laneConfigArgs.removeFillers.length; ++i) {
-      laneConfig.fillerWhitelist[laneConfigArgs.removeFillers[i]] = false;
+      laneConfig.fillerAllowList[laneConfigArgs.removeFillers[i]] = false;
     }
     emit LaneUpdated(
       laneConfigArgs.remoteChainSelector,
@@ -131,7 +135,7 @@ abstract contract FastTransferTokenPoolAbstract is CCIPReceiver, ITypeAndVersion
   /// @param destinationChainSelector The destination chain selector
   /// @param addFillers The addresses to add to the whitelist
   /// @param removeFillers The addresses to remove from the whitelist
-  function updateFillerWhitelist(
+  function updatefillerAllowList(
     uint64 destinationChainSelector,
     address[] memory addFillers,
     address[] memory removeFillers
@@ -139,12 +143,12 @@ abstract contract FastTransferTokenPoolAbstract is CCIPReceiver, ITypeAndVersion
     _checkAdmin();
     LaneConfig storage laneConfig = s_fastTransferLaneConfig[destinationChainSelector];
     for (uint256 i; i < addFillers.length; ++i) {
-      laneConfig.fillerWhitelist[addFillers[i]] = true;
+      laneConfig.fillerAllowList[addFillers[i]] = true;
     }
     for (uint256 i; i < removeFillers.length; ++i) {
-      laneConfig.fillerWhitelist[removeFillers[i]] = false;
+      laneConfig.fillerAllowList[removeFillers[i]] = false;
     }
-    emit FillerWhitelistUpdated(destinationChainSelector, addFillers, removeFillers);
+    emit fillerAllowListUpdated(destinationChainSelector, addFillers, removeFillers);
   }
 
   /// @notice Gets the lane configuration for a given destination chain selector
@@ -167,8 +171,8 @@ abstract contract FastTransferTokenPoolAbstract is CCIPReceiver, ITypeAndVersion
   /// @param remoteChainSelector The remote chain selector
   /// @param filler The filler address to check
   /// @return isWhitelisted Whether the filler is whitelisted
-  function isFillerWhitelisted(uint64 remoteChainSelector, address filler) external view returns (bool) {
-    return s_fastTransferLaneConfig[remoteChainSelector].fillerWhitelist[filler];
+  function isfillerAllowListed(uint64 remoteChainSelector, address filler) external view returns (bool) {
+    return s_fastTransferLaneConfig[remoteChainSelector].fillerAllowList[filler];
   }
 
   /// @inheritdoc IFastTransferPool
@@ -263,7 +267,7 @@ abstract contract FastTransferTokenPoolAbstract is CCIPReceiver, ITypeAndVersion
     {
       LaneConfig storage laneConfig = s_fastTransferLaneConfig[sourceChainSelector];
       if (laneConfig.whitelistEnabled) {
-        if (!laneConfig.fillerWhitelist[msg.sender]) revert FillerNotWhitelisted(sourceChainSelector, msg.sender);
+        if (!laneConfig.fillerAllowList[msg.sender]) revert FillerNotWhitelisted(sourceChainSelector, msg.sender);
       }
     }
     // Transfer tokens from filler to receiver
@@ -295,7 +299,7 @@ abstract contract FastTransferTokenPoolAbstract is CCIPReceiver, ITypeAndVersion
   }
 
   /// @notice Handles the token to transfer on fast fill request at source chain
-  /// @param destinationChainSelector The destination chain selector to which the fast fill request is sent
+  /// @param destinationChainSelector The destination chain selector
   /// @param sender The sender address
   /// @param amount The amount to transfer
   function _handleTokenToTransfer(uint64 destinationChainSelector, address sender, uint256 amount) internal virtual;
