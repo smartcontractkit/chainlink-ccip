@@ -12,7 +12,7 @@ interface IFastTransferPool {
 
   error AlreadyFilled(bytes32 fillRequestId);
   error MessageAlreadySettled(bytes32 fillRequestId);
-  error InvalidLaneConfig();
+  error LaneDisabled();
 
   event FastFillRequest(
     bytes32 indexed fillRequestId,
