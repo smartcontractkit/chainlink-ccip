@@ -107,6 +107,7 @@ func (o *baseObserver) getEnabledSourceChains(ctx context.Context) ([]cciptypes.
 		}
 	}
 
+	sort.Slice(enabledSourceChains, func(i, j int) bool { return enabledSourceChains[i] < enabledSourceChains[j] })
 	return enabledSourceChains, nil
 }
 
