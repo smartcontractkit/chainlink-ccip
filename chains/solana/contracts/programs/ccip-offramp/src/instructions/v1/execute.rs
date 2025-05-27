@@ -31,11 +31,15 @@ impl Execute for Impl {
         report_context_byte_words: [[u8; 32]; 2],
         token_indexes: &[u8],
     ) -> Result<()> {
-        let execution_report = ExecutionReportSingleChain::deserialize_either(
-            &raw_execution_report,
-            &ctx.accounts.execution_report_buffer,
-            &ctx.accounts.authority.key(),
-        )?;
+        let execution_report = if !raw_execution_report.is_empty() {
+            ExecutionReportSingleChain::deserialize(&mut { &raw_execution_report })?
+        } else {
+            ExecutionReportSingleChain::deserialize_from_buffer_account(
+                ctx.remaining_accounts.last().unwrap(),
+                ctx.accounts.authority.key(),
+                &ctx.accounts.commit_report.merkle_root,
+            )?
+        };
 
         let report_context = ReportContext::from_byte_words(report_context_byte_words);
         verify_uncursed_cpi(
@@ -73,11 +77,15 @@ impl Execute for Impl {
                 CcipOfframpError::ManualExecutionNotAllowed
             );
         }
-        let execution_report = ExecutionReportSingleChain::deserialize_either(
-            &raw_execution_report,
-            &ctx.accounts.execution_report_buffer,
-            &ctx.accounts.authority.key(),
-        )?;
+        let execution_report = if !raw_execution_report.is_empty() {
+            ExecutionReportSingleChain::deserialize(&mut { &raw_execution_report })?
+        } else {
+            ExecutionReportSingleChain::deserialize_from_buffer_account(
+                ctx.remaining_accounts.last().unwrap(),
+                ctx.accounts.authority.key(),
+                &ctx.accounts.commit_report.merkle_root,
+            )?
+        };
         verify_uncursed_cpi(
             ctx.accounts.rmn_remote.to_account_info(),
             ctx.accounts.rmn_remote_config.to_account_info(),
@@ -474,6 +482,10 @@ impl<'a> ExecuteReportContextRemainingAccountsLayout<'a> {
         report_is_buffered: bool,
         source_bitmap: &u64,
     ) -> Result<Self> {
+        ////////////////////////
+        // Buffering subslice //
+        ////////////////////////
+
         // First, if the report is buffered, it means the last account is the buffering account.
         let (remaining_accounts, buffering_accounts) = if report_is_buffered {
             (
@@ -488,6 +500,9 @@ impl<'a> ExecuteReportContextRemainingAccountsLayout<'a> {
             (remaining_accounts, None)
         };
 
+        ////////////////////////
+        // Messaging subslice //
+        ////////////////////////
         let only_tokens = token_indices.first().map(|i| *i == 0).unwrap_or_default();
         let messaging_accounts_exist = !remaining_accounts.is_empty() && !only_tokens;
         let (remaining_accounts, messaging_accounts) = if messaging_accounts_exist {
@@ -541,6 +556,9 @@ impl<'a> ExecuteReportContextRemainingAccountsLayout<'a> {
             (remaining_accounts, None)
         };
 
+        ////////////////////
+        // Token subslice //
+        ////////////////////
         let indices_with_sentinel = token_indices
             .iter()
             .copied()

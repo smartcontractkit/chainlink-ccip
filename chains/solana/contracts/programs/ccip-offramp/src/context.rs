@@ -513,12 +513,6 @@ pub struct ExecuteReportContext<'info> {
     )]
     pub commit_report: Account<'info, CommitReport>,
 
-    #[account(
-        seeds = [seed::EXECUTION_REPORT_BUFFER, commit_report.merkle_root.as_ref(), authority.key().as_ref()],
-        bump,
-    )]
-    pub execution_report_buffer: AccountInfo<'info>,
-
     pub offramp: Program<'info, CcipOfframp>,
 
     /// CHECK PDA of the router program verifying the signer is an allowed offramp.
@@ -584,7 +578,16 @@ pub struct ExecuteReportContext<'info> {
     // ccip_router_pools_signer - derivable PDA [seed::EXTERNAL_TOKEN_POOL, pool_program], seeds::program=router (present in lookup table)
     // ...additional accounts for pool config
     // ] x N tokens
+    // +
+    // [execution_report_buffer] - optional account containing a buffered execution report. Must be last if present, and must only exist
+    // alongside an empty raw_execution_report parameter.
 }
+
+// #[account(
+//     seeds = [seed::EXECUTION_REPORT_BUFFER, commit_report.merkle_root.as_ref(), authority.key().as_ref()],
+//     bump,
+// )]
+// pub execution_report_buffer: AccountInfo<'info>,
 
 // pub struct ExecuteReportContextTokenTransferRemainingAccounts<'info> {
 //     ccip_offramp_pools_signer: &'info AccountInfo<'info>,

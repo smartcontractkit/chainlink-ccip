@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use ccip_common::seed;
 
 use crate::{state::ExecutionReportBuffer, CcipOfframpError};
 
@@ -16,31 +17,39 @@ pub struct ExecutionReportSingleChain {
 }
 
 impl ExecutionReportSingleChain {
-    // Attempts to deserialize from a raw report or, if empty, from an optional buffer account.
-    pub fn deserialize_either(
-        raw_execution_report: &[u8],
+    pub fn deserialize_from_buffer_account(
         execution_report_buffer: &AccountInfo,
-        authority: &Pubkey,
+        authority: Pubkey,
+        merkle_root: &[u8],
     ) -> Result<Self> {
-        if !raw_execution_report.is_empty() {
-            Ok(ExecutionReportSingleChain::deserialize(&mut {
-                raw_execution_report
-            })?)
-        } else {
-            // Ensures the buffer is initialized, and owned by the executor.
-            require!(
-                execution_report_buffer.owner == authority,
-                CcipOfframpError::ExecutionReportUnavailable
-            );
+        // Ensures the buffer is initialized, and owned by the executor.
+        // It must be the last entry in the remaining account list.
+        require_keys_eq!(
+            *execution_report_buffer.owner,
+            authority,
+            CcipOfframpError::ExecutionReportUnavailable
+        );
+        let (expected_buffer_key, _) = Pubkey::find_program_address(
+            &[
+                seed::EXECUTION_REPORT_BUFFER,
+                merkle_root,
+                authority.as_ref(),
+            ],
+            &crate::ID,
+        );
+        require_keys_eq!(
+            expected_buffer_key,
+            execution_report_buffer.key(),
+            CcipOfframpError::ExecutionReportUnavailable
+        );
 
-            let buffer = ExecutionReportBuffer::try_deserialize(
-                &mut execution_report_buffer.data.borrow().as_ref(),
-            )?;
+        let buffer = ExecutionReportBuffer::try_deserialize(
+            &mut execution_report_buffer.data.borrow().as_ref(),
+        )?;
 
-            Ok(ExecutionReportSingleChain::deserialize(
-                &mut buffer.bytes()?,
-            )?)
-        }
+        Ok(ExecutionReportSingleChain::deserialize(
+            &mut buffer.bytes()?,
+        )?)
     }
 }
 
