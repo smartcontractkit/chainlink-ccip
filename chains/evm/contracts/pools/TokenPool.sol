@@ -79,8 +79,8 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   event AllowListRemove(address sender);
   event RouterUpdated(address oldRouter, address newRouter);
   event RateLimitAdminSet(address rateLimitAdmin);
-  event OutboundRateLimitConsumed(uint64 indexed remoteChainSelector, uint256 amount, address token);
-  event InboundRateLimitConsumed(uint64 indexed remoteChainSelector, uint256 amount, address token);
+  event OutboundRateLimitConsumed(address token, uint64 indexed remoteChainSelector, uint256 amount);
+  event InboundRateLimitConsumed(address token, uint64 indexed remoteChainSelector, uint256 amount);
 
   struct ChainUpdate {
     uint64 remoteChainSelector; // Remote chain selector
@@ -574,14 +574,14 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   function _consumeOutboundRateLimit(uint64 remoteChainSelector, uint256 amount) internal {
     s_remoteChainConfigs[remoteChainSelector].outboundRateLimiterConfig._consume(amount, address(i_token));
 
-    emit OutboundRateLimitConsumed({remoteChainSelector: remoteChainSelector, amount: amount, token: address(i_token)});
+    emit OutboundRateLimitConsumed({token: address(i_token), remoteChainSelector: remoteChainSelector, amount: amount});
   }
 
   /// @notice Consumes inbound rate limiting capacity in this pool
   function _consumeInboundRateLimit(uint64 remoteChainSelector, uint256 amount) internal {
     s_remoteChainConfigs[remoteChainSelector].inboundRateLimiterConfig._consume(amount, address(i_token));
 
-    emit InboundRateLimitConsumed({remoteChainSelector: remoteChainSelector, amount: amount, token: address(i_token)});
+    emit InboundRateLimitConsumed({token: address(i_token), remoteChainSelector: remoteChainSelector, amount: amount});
   }
 
   /// @notice Gets the token bucket with its values for the block it was requested at.
