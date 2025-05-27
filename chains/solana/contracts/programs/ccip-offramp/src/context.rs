@@ -5,7 +5,6 @@ use bytemuck::{Pod, Zeroable};
 use ccip_common::seed;
 use solana_program::sysvar::instructions;
 
-use crate::messages::ExecutionReportSingleChain;
 use crate::program::CcipOfframp;
 use crate::state::{
     CommitReport, Config, ExecutionReportBuffer, GlobalState, ReferenceAddresses, SourceChain,
@@ -587,114 +586,20 @@ pub struct ExecuteReportContext<'info> {
     // ] x N tokens
 }
 
-#[derive(Accounts)]
-pub struct ExecuteBufferedReportContext<'info> {
-    #[account(
-        seeds = [seed::CONFIG],
-        bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipOfframpError::InvalidVersion,
-    )]
-    pub config: AccountLoader<'info, Config>,
-
-    #[account(
-        mut,
-        seeds = [seed::EXECUTION_REPORT_BUFFER, commit_report.merkle_root.as_ref(), authority.key().as_ref()],
-        bump,
-        constraint = execution_report_buffer.is_complete() @ CcipOfframpError::ExecutionReportBufferIncomplete,
-    )]
-    pub execution_report_buffer: Account<'info, ExecutionReportBuffer>,
-
-    #[account(
-        seeds = [seed::REFERENCE_ADDRESSES],
-        bump,
-        constraint = valid_version(reference_addresses.load()?.version, MAX_CONFIG_V) @ CcipOfframpError::InvalidVersion,
-    )]
-    pub reference_addresses: AccountLoader<'info, ReferenceAddresses>,
-
-    #[account(
-        seeds = [seed::SOURCE_CHAIN, ExecutionReportSingleChain::deserialize(&mut execution_report_buffer.bytes()?)?.source_chain_selector.to_le_bytes().as_ref()],
-        bump,
-        constraint = valid_version(source_chain.version, MAX_CHAIN_V) @ CcipOfframpError::InvalidVersion,
-    )]
-    pub source_chain: Account<'info, SourceChain>,
-
-    #[account(
-        mut,
-        seeds = [seed::COMMIT_REPORT, ExecutionReportSingleChain::deserialize(&mut execution_report_buffer.bytes()?)?.source_chain_selector.to_le_bytes().as_ref(), commit_report.merkle_root.as_ref()],
-        bump,
-        constraint = valid_version(commit_report.version, MAX_COMMITREPORT_V) @ CcipOfframpError::InvalidVersion,
-    )]
-    pub commit_report: Account<'info, CommitReport>,
-
-    pub offramp: Program<'info, CcipOfframp>,
-
-    /// CHECK PDA of the router program verifying the signer is an allowed offramp.
-    /// If PDA does not exist, the router doesn't allow this offramp. This is just used
-    /// so that token pools and receivers can then check that the caller is an actual offramp that
-    /// has been registered in the router as such for that source chain.
-    #[account(
-        owner = reference_addresses.load()?.router @ CcipOfframpError::InvalidInputsAllowedOfframpAccount, // this guarantees that it was initialized
-        seeds = [ALLOWED_OFFRAMP, source_chain.chain_selector.to_le_bytes().as_ref(), offramp.key().as_ref()],
-        bump,
-        seeds::program = reference_addresses.load()?.router,
-    )]
-    pub allowed_offramp: UncheckedAccount<'info>,
-
-    #[account(mut)]
-    pub authority: Signer<'info>,
-    pub system_program: Program<'info, System>,
-
-    /// CHECK: This is a sysvar account
-    #[account(address = instructions::ID @ CcipOfframpError::InvalidInputsSysvarAccount)]
-    pub sysvar_instructions: AccountInfo<'info>,
-
-    ////////////////////
-    // RMN Remote CPI //
-    ////////////////////
-    /// CHECK: This is the account for the RMN Remote program
-    #[account(
-        address = reference_addresses.load()?.rmn_remote @ CcipOfframpError::InvalidRMNRemoteAddress,
-    )]
-    pub rmn_remote: UncheckedAccount<'info>,
-
-    /// CHECK: This account is just used in the CPI to the RMN Remote program
-    #[account(
-        seeds = [seed::CURSES],
-        bump,
-        seeds::program = reference_addresses.load()?.rmn_remote,
-    )]
-    pub rmn_remote_curses: UncheckedAccount<'info>,
-
-    /// CHECK: This account is just used in the CPI to the RMN Remote program
-    #[account(
-        seeds = [seed::CONFIG],
-        bump,
-        seeds::program = reference_addresses.load()?.rmn_remote,
-    )]
-    pub rmn_remote_config: UncheckedAccount<'info>,
-    // remaining accounts
-    // [receiver_program, external_execution_signer, receiver_account, ...user specified accounts from message data for arbitrary messaging]
-    // +
-    // [
-    // ccip_offramp_pools_signer - derivable PDA [seed::EXTERNAL_TOKEN_POOL, pool_program], seeds::program=offramp (not in lookup table)
-    // user/sender token account (must be associated token account - derivable PDA [wallet_addr, token_program, mint])
-    // per chain per token config (ccip: billing, ccip admin controlled - derivable PDA [chain_selector, mint])
-    // pool chain config (pool: custom configs that may include rate limits & remote chain configs, pool admin controlled - derivable [chain_selector, mint])
-    // token pool lookup table
-    // token registry PDA
-    // pool program
-    // pool config
-    // pool token account (must be associated token account - derivable PDA [wallet_addr, token_program, mint])
-    // pool signer
-    // token program
-    // token mint
-    // ccip_router_pools_signer - derivable PDA [seed::EXTERNAL_TOKEN_POOL, pool_program], seeds::program=router (present in lookup table)
-    // ...additional accounts for pool config
-    // ] x N tokens
-    // +
-    // execution_buffer - OPTIONAL derivable PDA [seed::BUFFERED_EXECUTION_REPORT, merkle_root]. Present when `raw_report.len() == 0` only.
-    // Contains a pre-buffered execution report. Used in cases where the execution report is too large to fit in a single transaction.
-}
+// pub struct ExecuteReportContextTokenTransferRemainingAccounts<'info> {
+//     ccip_offramp_pools_signer: &'info AccountInfo<'info>,
+//     sender_token_account: &'info AccountInfo<'info>,
+//     per_chain_per_token_config: &'info AccountInfo<'info>,
+//     pool_chain_config: &'info AccountInfo<'info>,
+//     token_pool_lookup_table: &'info AccountInfo<'info>,
+//     token_registry: &'info AccountInfo<'info>,
+//     pool_program: &'info AccountInfo<'info>,
+//     pool_config: &'info AccountInfo<'info>,
+//     pool_token_account: &'info AccountInfo<'info>,
+//     pool_signer: &'info AccountInfo<'info>,
+//     token_program: &'info AccountInfo<'info>,
+//     token_mint: &'info AccountInfo<'info>,
+// }
 
 #[derive(Accounts)]
 #[instruction(source_chain_selector: u64, root: Vec<u8>)]

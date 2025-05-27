@@ -46,7 +46,12 @@ impl Execute for Impl {
         )?;
 
         ocr3_transmit_report(&ctx, &execution_report, report_context)?;
-        internal_execute(ctx, execution_report, token_indexes)
+        internal_execute(
+            ctx,
+            execution_report,
+            token_indexes,
+            raw_execution_report.is_empty(),
+        )
     }
 
     fn manually_execute<'info>(
@@ -79,7 +84,12 @@ impl Execute for Impl {
             ctx.accounts.rmn_remote_curses.to_account_info(),
             execution_report.source_chain_selector,
         )?;
-        internal_execute(ctx, execution_report, token_indexes)
+        internal_execute(
+            ctx,
+            execution_report,
+            token_indexes,
+            raw_execution_report.is_empty(),
+        )
     }
 
     fn buffer_execution_report<'info>(
@@ -132,6 +142,7 @@ fn internal_execute<'info>(
     ctx: Context<'_, '_, 'info, 'info, ExecuteReportContext<'info>>,
     execution_report: ExecutionReportSingleChain,
     token_indexes: &[u8],
+    report_is_buffered: bool,
 ) -> Result<()> {
     // TODO: Limit send size data to 256
 
@@ -169,27 +180,20 @@ fn internal_execute<'info>(
         return Ok(());
     }
 
-    let has_messaging = should_execute_messaging(ctx.remaining_accounts, token_indexes);
+    let remaining_accounts_layout = ExecuteReportContextRemainingAccountsLayout::new(
+        ctx.remaining_accounts,
+        token_indexes,
+        report_is_buffered,
+        &execution_report.message.extra_args.is_writable_bitmap,
+    )?;
 
-    let mut msg_accs_opt: Option<MessagingAccounts> = None;
-    let hashed_leaf: [u8; 32] = if has_messaging {
-        let msg_accs = parse_messaging_accounts(
-            token_indexes,
-            &execution_report.message.extra_args.is_writable_bitmap,
-            ctx.remaining_accounts,
-        )?;
-
+    let hashed_leaf: [u8; 32] = if remaining_accounts_layout.should_execute_messaging() {
         // Verify merkle root before doing any token operations or CPI calls
-        let recv_and_msg_account_keys = Some(*msg_accs.logic_receiver.key)
-            .into_iter()
-            .chain(msg_accs.remaining_accounts.iter().map(|a| *a.key));
-
-        msg_accs_opt = Some(msg_accs);
-
+        let keys = remaining_accounts_layout.receiver_and_message_account_keys();
         verify_merkle_root(
             &execution_report,
             commit_report.merkle_root,
-            recv_and_msg_account_keys,
+            keys,
             &source_chain.config.on_ramp,
         )?
     } else {
@@ -320,8 +324,8 @@ fn internal_execute<'info>(
     // handle CPI call if there are message accounts in the remaining_accounts
     // case: no tokens, but there are remaining_accounts passed in
     // case: tokens and messages, so the first token has a non-zero index (indicating extra accounts before token accounts)
-    if has_messaging {
-        let msg_accs = msg_accs_opt.unwrap(); // as there is messaging, the option is guaranteed to be Some
+    if remaining_accounts_layout.should_execute_messaging() {
+        let msg_accs = remaining_accounts_layout.messaging_accounts.unwrap(); // as there is messaging, the option is guaranteed to be Some
 
         // The accounts of the user that will be used in the CPI instruction, none of them are signers
         // They need to specify if mutable or not, but none of them is allowed to init, realloc or close
@@ -341,7 +345,7 @@ fn internal_execute<'info>(
             .collect();
 
         let remaining_metas: Vec<AccountMeta> = msg_accs
-            .remaining_accounts
+            .remaining_messaging_accounts
             .iter()
             .enumerate()
             .map(|(i, acc_info)| {
@@ -360,7 +364,7 @@ fn internal_execute<'info>(
             })
             .collect();
 
-        acc_infos.extend_from_slice(msg_accs.remaining_accounts);
+        acc_infos.extend_from_slice(msg_accs.remaining_messaging_accounts);
         acc_metas.extend_from_slice(&remaining_metas);
 
         let data = message.build_receiver_discriminator_and_data()?;
@@ -422,78 +426,143 @@ fn get_token_accounts_for<'a>(
     Ok(accs)
 }
 
-// There is at least one account used for messaging (the first subset of accounts). This is because the first account is the program id to do the CPI
-fn should_execute_messaging<'a>(
-    remaining_accounts: &'a [AccountInfo<'a>],
-    token_indices: &[u8],
-) -> bool {
-    // The first entry in the accounts corresponds to a token, which means there is no logic receiver
-    let only_tokens = token_indices.first().map(|i| *i == 0).unwrap_or_default();
-    !remaining_accounts.is_empty() && !only_tokens
+// Encodes the structured layout of the Execute Report Context remaining accounts, so they can
+// be accurately used where needed instead of passed as a raw array.
+pub struct ExecuteReportContextRemainingAccountsLayout<'a> {
+    pub messaging_accounts: Option<ExecuteContextRemainingMessagingAccounts<'a>>,
+    pub token_accounts_per_token: Vec<ExecuteContextRemainingTokenAccounts<'a>>,
+    pub buffering_accounts: Option<ExecuteContextRemainingBufferingAccounts<'a>>,
 }
 
-pub struct MessagingAccounts<'a> {
+pub struct ExecuteContextRemainingMessagingAccounts<'a> {
     pub logic_receiver: &'a AccountInfo<'a>,
     pub external_execution_signer: &'a AccountInfo<'a>,
     pub external_execution_signer_bump: u8,
-    pub remaining_accounts: &'a [AccountInfo<'a>],
+    pub remaining_messaging_accounts: &'a [AccountInfo<'a>],
 }
 
-/// parse_message_accounts returns all the accounts needed to execute the CPI instruction
-/// It also validates that the accounts sent in the message match the ones sent in the source chain
-/// Precondition: logic_receiver != 0 && remaining_accounts.len() > 0
-///
-/// # Arguments
-/// * `token_indexes` - start indexes of token pool accounts, used to determine ending index for arbitrary messaging accounts
-/// * `remaining_accounts` - accounts passed via `ctx.remaining_accounts`. expected order is: [logic_receiver, ...additional message accounts]
-fn parse_messaging_accounts<'info>(
-    token_indexes: &[u8],
-    source_bitmap: &u64,
-    remaining_accounts: &'info [AccountInfo<'info>],
-) -> Result<MessagingAccounts<'info>> {
-    let end_index = if token_indexes.is_empty() {
-        remaining_accounts.len()
-    } else {
-        token_indexes[0] as usize
-    };
+pub struct ExecuteContextRemainingTokenAccounts<'a> {
+    pub accounts: &'a [AccountInfo<'a>],
+}
 
-    require!(
-        1 <= end_index && end_index <= remaining_accounts.len(), // program id and message accounts need to fit in remaining accounts
-        CcipOfframpError::InvalidInputsTokenIndices
-    ); // there could be other remaining accounts used for tokens
+pub struct ExecuteContextRemainingBufferingAccounts<'a> {
+    pub execution_buffer_account: &'a AccountInfo<'a>,
+}
 
-    let logic_receiver = &remaining_accounts[0];
-    let external_execution_signer = &remaining_accounts[1];
-    let msg_accounts = &remaining_accounts[2..end_index];
-
-    // Validate the derivation of the external_execution_signer and calculate its bump
-    let (expected_signer_key, signer_bump) = Pubkey::find_program_address(
-        &[
-            seed::EXTERNAL_EXECUTION_CONFIG,
-            logic_receiver.key().as_ref(),
-        ],
-        &crate::ID,
-    );
-    require_keys_eq!(
-        external_execution_signer.key(),
-        expected_signer_key,
-        CcipOfframpError::InvalidInputsExternalExecutionSignerAccount
-    );
-
-    // Validate that the bitmap corresponds to the individual writable flags
-    for (i, acc) in msg_accounts.iter().enumerate() {
-        require!(
-            !is_writable(source_bitmap, i as u8) || acc.is_writable,
-            CcipOfframpError::InvalidWritabilityBitmap
-        );
+impl<'a> ExecuteReportContextRemainingAccountsLayout<'a> {
+    pub fn should_execute_messaging(&self) -> bool {
+        self.messaging_accounts.is_some()
     }
 
-    Ok(MessagingAccounts {
-        logic_receiver,
-        external_execution_signer,
-        external_execution_signer_bump: signer_bump,
-        remaining_accounts: msg_accounts,
-    })
+    pub fn receiver_and_message_account_keys(&self) -> impl Iterator<Item = Pubkey> {
+        let keys: Vec<Pubkey> = self
+            .messaging_accounts
+            .iter()
+            .flat_map(|accs| {
+                Some(accs.logic_receiver.key())
+                    .into_iter()
+                    .chain(accs.remaining_messaging_accounts.iter().map(|a| a.key()))
+            })
+            .collect();
+
+        keys.into_iter()
+    }
+
+    pub fn new(
+        remaining_accounts: &'a [AccountInfo<'a>],
+        token_indices: &[u8],
+        report_is_buffered: bool,
+        source_bitmap: &u64,
+    ) -> Result<Self> {
+        // First, if the report is buffered, it means the last account is the buffering account.
+        let (remaining_accounts, buffering_accounts) = if report_is_buffered {
+            (
+                &remaining_accounts[0..remaining_accounts.len() - 1],
+                Some(ExecuteContextRemainingBufferingAccounts {
+                    execution_buffer_account: remaining_accounts
+                        .last()
+                        .ok_or(CcipOfframpError::ExecutionReportUnavailable)?,
+                }),
+            )
+        } else {
+            (remaining_accounts, None)
+        };
+
+        let only_tokens = token_indices.first().map(|i| *i == 0).unwrap_or_default();
+        let messaging_accounts_exist = !remaining_accounts.is_empty() && !only_tokens;
+        let (remaining_accounts, messaging_accounts) = if messaging_accounts_exist {
+            let remaining_accounts: &'a [AccountInfo<'a>] = remaining_accounts;
+            let end_index = if token_indices.is_empty() {
+                remaining_accounts.len()
+            } else {
+                token_indices[0] as usize
+            };
+
+            require!(
+                1 <= end_index && end_index <= remaining_accounts.len(), // program id and message accounts need to fit in remaining accounts
+                CcipOfframpError::InvalidInputsTokenIndices
+            ); // there could be other remaining accounts used for tokens
+
+            let logic_receiver = &remaining_accounts[0];
+            let external_execution_signer = &remaining_accounts[1];
+            let msg_accounts = &remaining_accounts[2..end_index];
+
+            // Validate the derivation of the external_execution_signer and calculate its bump
+            let (expected_signer_key, signer_bump) = Pubkey::find_program_address(
+                &[
+                    seed::EXTERNAL_EXECUTION_CONFIG,
+                    logic_receiver.key().as_ref(),
+                ],
+                &crate::ID,
+            );
+            require_keys_eq!(
+                external_execution_signer.key(),
+                expected_signer_key,
+                CcipOfframpError::InvalidInputsExternalExecutionSignerAccount
+            );
+
+            // Validate that the bitmap corresponds to the individual writable flags
+            for (i, acc) in msg_accounts.iter().enumerate() {
+                require!(
+                    !is_writable(source_bitmap, i as u8) || acc.is_writable,
+                    CcipOfframpError::InvalidWritabilityBitmap
+                );
+            }
+
+            let messaging_accounts = ExecuteContextRemainingMessagingAccounts {
+                logic_receiver,
+                external_execution_signer,
+                external_execution_signer_bump: signer_bump,
+                remaining_messaging_accounts: &remaining_accounts[2..end_index],
+            };
+
+            (&remaining_accounts[end_index..], Some(messaging_accounts))
+        } else {
+            (remaining_accounts, None)
+        };
+
+        let indices_with_sentinel = token_indices
+            .iter()
+            .copied()
+            .map(|i| i as usize)
+            // We add a sentinel for the last token range ending at the end of the account list.
+            .chain(Some(remaining_accounts.len()));
+        let pairwise_indices = indices_with_sentinel
+            .clone()
+            .zip(indices_with_sentinel.skip(1));
+
+        let token_accounts_per_token: Vec<ExecuteContextRemainingTokenAccounts> = pairwise_indices
+            .map(|(start, end)| ExecuteContextRemainingTokenAccounts {
+                accounts: &remaining_accounts[start..end],
+            })
+            .collect();
+
+        Ok(Self {
+            messaging_accounts,
+            token_accounts_per_token,
+            buffering_accounts,
+        })
+    }
 }
 
 pub fn verify_merkle_root(
