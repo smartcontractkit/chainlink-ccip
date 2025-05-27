@@ -189,6 +189,7 @@ func (p *Plugin) getCommitReportsObservation(
 	}
 
 	// Refresh the commit report cache first
+	// TODO: make this refresh async
 	if err := p.commitReportCache.RefreshCache(ctx); err != nil {
 		// Log error but proceed. If RefreshCache fails, GetReportsToQueryFromTimestamp
 		// will likely use a less optimal (wider) window based on its internal state or defaults,
@@ -218,6 +219,7 @@ func (p *Plugin) getCommitReportsObservation(
 		p.commitRootsCache.CanExecute,
 		fetchFrom,
 		ci.CursedSourceChains,
+		int(p.offchainCfg.MaxCommitReportsToFetch),
 		lggr,
 	)
 	if err != nil {
