@@ -3,7 +3,8 @@ pragma solidity ^0.8.0;
 
 import {Pool} from "../libraries/Pool.sol";
 
-import {IERC165} from "@chainlink/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
+import {IERC165} from
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
 
 /// @notice Shared public interface for multiple V1 pool types.
 /// Each pool type handles a different child token model e.g. lock/unlock, mint/burn.

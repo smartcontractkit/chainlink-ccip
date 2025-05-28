@@ -62,9 +62,6 @@ const (
 	// lenientMaxMsgsPerObs is set to the maximum number of messages that can be observed in one observation, this is a bit
 	// lenient and acts as an indicator other than a hard limit.
 	lenientMaxMsgsPerObs = 100
-
-	// maxCommitReportsToFetch is set to the maximum number of commit reports that can be fetched in each round.
-	maxCommitReportsToFetch = 1000
 )
 
 // PluginFactory implements common ReportingPluginFactory and is used for (re-)initializing commit plugin instances.

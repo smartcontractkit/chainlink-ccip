@@ -146,6 +146,21 @@ pub mod ccip_router {
             .set_default_code_version(ctx, code_version)
     }
 
+    /// Sets the address of the LINK token mint.
+    /// The Admin is the only one able to set it.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for updating the configuration.
+    /// * `link_token_mint` - The new address of the LINK token mint.
+    pub fn set_link_token_mint(
+        ctx: Context<UpdateConfigCCIPRouter>,
+        link_token_mint: Pubkey,
+    ) -> Result<()> {
+        router::admin(ctx.accounts.config.default_code_version)
+            .set_link_token_mint(ctx, link_token_mint)
+    }
+
     /// Updates the fee aggregator in the router configuration.
     /// The Admin is the only one able to update the fee aggregator.
     ///

@@ -3,6 +3,7 @@ package http
 import (
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -49,7 +50,7 @@ func Test_NewHTTPClient_New(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(tc.api, func(t *testing.T) {
-			client, err := newHTTPClient(logger.Test(t), tc.api, 1*time.Millisecond, longTimeout, maxCoolDownDuration)
+			client, err := newHTTPClient(logger.Test(t), tc.api, 1*time.Millisecond, longTimeout, 0)
 			if tc.wantErr {
 				require.Error(t, err)
 			} else {
@@ -61,10 +62,11 @@ func Test_NewHTTPClient_New(t *testing.T) {
 	}
 }
 
-func Test_HTTPClient_Get(t *testing.T) {
+func Test_HTTPClient_Get_Post(t *testing.T) {
 	tt := []struct {
 		name               string
 		getTs              func(t *testing.T) *httptest.Server
+		interval           time.Duration
 		timeout            time.Duration
 		messageHash        cciptypes.Bytes32
 		expectedError      error
@@ -89,6 +91,8 @@ func Test_HTTPClient_Get(t *testing.T) {
 					ctx := r.Context()
 					done := make(chan struct{})
 					go func() {
+						// for some reason server.Close() hangs when there is POST request with non-drained body
+						_, _ = io.ReadAll(r.Body)
 						defer close(done)
 						time.Sleep(time.Hour) // Simulate long processing time
 					}()
@@ -107,7 +111,7 @@ func Test_HTTPClient_Get(t *testing.T) {
 			expectedStatusCode: http.StatusRequestTimeout,
 		},
 		{
-			name: "rate limit",
+			name: "external rate limit",
 			getTs: func(t *testing.T) *httptest.Server {
 				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					w.WriteHeader(http.StatusTooManyRequests)
@@ -148,27 +152,40 @@ func Test_HTTPClient_Get(t *testing.T) {
 		},
 	}
 
-	for _, tc := range tt {
-		t.Run(tc.name, func(t *testing.T) {
-			ts := tc.getTs(t)
-			defer ts.Close()
+	methods := []string{http.MethodGet, http.MethodPost}
+	for _, method := range methods {
+		for _, tc := range tt {
+			t.Run(tc.name+" "+method, func(t *testing.T) {
+				ts := tc.getTs(t)
+				defer ts.Close()
 
-			attestationURI, err := url.ParseRequestURI(ts.URL)
-			require.NoError(t, err)
-
-			client, err := newHTTPClient(logger.Test(t), attestationURI.String(), tc.timeout, tc.timeout, maxCoolDownDuration)
-			require.NoError(t, err)
-			response, statusCode, err := client.Get(tests.Context(t), tc.messageHash.String())
-
-			require.Equal(t, tc.expectedStatusCode, statusCode)
-
-			if tc.expectedError != nil {
-				require.EqualError(t, err, tc.expectedError.Error())
-			} else {
+				attestationURI, err := url.ParseRequestURI(ts.URL)
 				require.NoError(t, err)
-				require.Equal(t, tc.expectedResponse, response)
-			}
-		})
+
+				client, err := newHTTPClient(logger.Test(t), attestationURI.String(), tc.interval, tc.timeout, 0)
+				require.NoError(t, err)
+
+				var response cciptypes.Bytes
+				var statusCode HTTPStatus
+				switch method {
+				case http.MethodGet:
+					response, statusCode, err = client.Get(tests.Context(t), tc.messageHash.String())
+				case http.MethodPost:
+					response, statusCode, err = client.Post(tests.Context(t), tc.messageHash.String(), []byte("{}"))
+				default:
+					t.Fatalf("unknown method %s", method)
+				}
+
+				require.Equal(t, tc.expectedStatusCode, statusCode)
+
+				if tc.expectedError != nil {
+					require.EqualError(t, err, tc.expectedError.Error())
+				} else {
+					require.NoError(t, err)
+					require.Equal(t, tc.expectedResponse, response)
+				}
+			})
+		}
 	}
 }
 
@@ -187,8 +204,7 @@ func Test_HTTPClient_Cooldown(t *testing.T) {
 	attestationURI, err := url.ParseRequestURI(ts.URL)
 	require.NoError(t, err)
 
-	client, err := newHTTPClient(logger.Test(t), attestationURI.String(),
-		1*time.Millisecond, longTimeout, maxCoolDownDuration)
+	client, err := newHTTPClient(logger.Test(t), attestationURI.String(), time.Millisecond, longTimeout, time.Minute)
 	require.NoError(t, err)
 	_, _, err = client.Get(tests.Context(t), cciptypes.Bytes32{1, 2, 3}.String())
 	require.EqualError(t, err, tokendata.ErrUnknownResponse.Error())
@@ -208,13 +224,13 @@ func Test_HTTPClient_GetInstance(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	client1, err := GetHTTPClient(logger.Test(t), ts.URL, 1*time.Hour, longTimeout, maxCoolDownDuration)
+	client1, err := GetHTTPClient(logger.Test(t), ts.URL, 1*time.Hour, longTimeout, 0)
 	require.NoError(t, err)
 
-	client2, err := GetHTTPClient(logger.Test(t), ts.URL, 1*time.Hour, longTimeout, maxCoolDownDuration)
+	client2, err := GetHTTPClient(logger.Test(t), ts.URL, 1*time.Hour, longTimeout, 0)
 	require.NoError(t, err)
 
-	client3, err := newHTTPClient(logger.Test(t), ts.URL, 1*time.Hour, longTimeout, maxCoolDownDuration)
+	client3, err := newHTTPClient(logger.Test(t), ts.URL, 1*time.Hour, longTimeout, 0)
 	require.NoError(t, err)
 
 	assert.True(t, client1 == client2)
@@ -251,9 +267,7 @@ func Test_HTTPClient_CoolDownWithRetryHeader(t *testing.T) {
 	attestationURI, err := url.ParseRequestURI(ts.URL)
 	require.NoError(t, err)
 
-	client, err := newHTTPClient(
-		logger.Test(t), attestationURI.String(), 1*time.Millisecond, time.Hour, maxCoolDownDuration,
-	)
+	client, err := newHTTPClient(logger.Test(t), attestationURI.String(), 1*time.Millisecond, time.Hour, 0)
 	require.NoError(t, err)
 	_, _, err = client.Get(tests.Context(t), cciptypes.Bytes32{1, 2, 3}.String())
 	require.EqualError(t, err, tokendata.ErrUnknownResponse.Error())
@@ -321,7 +335,7 @@ func Test_HTTPClient_RateLimiting_Parallel(t *testing.T) {
 			attestationURI, err := url.ParseRequestURI(ts.URL)
 			require.NoError(t, err)
 
-			client, err := newHTTPClient(lggr, attestationURI.String(), tc.rateConfig, longTimeout, maxCoolDownDuration)
+			client, err := newHTTPClient(lggr, attestationURI.String(), tc.rateConfig, longTimeout, 0)
 			require.NoError(t, err)
 
 			ctx := context.Background()
