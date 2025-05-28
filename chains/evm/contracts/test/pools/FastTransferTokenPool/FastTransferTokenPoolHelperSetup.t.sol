@@ -15,15 +15,16 @@ import {IERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
 contract FastTransferTokenPoolHelperSetup is BaseTest {
+  uint16 public constant FAST_FEE_BPS = 100; // 1%
   IERC20 internal s_token;
   FastTransferTokenPoolHelper public s_tokenPool;
   WETH9 public wrappedNative;
-  bytes public constant destPoolAddress = abi.encode(address(0x4));
+  bytes public destPoolAddress;
   address public s_filler;
-  uint16 public constant FAST_FEE_BPS = 100; // 1%
 
   function setUp() public virtual override {
     super.setUp();
+    destPoolAddress = abi.encode(makeAddr("destPool"));
     address onRamp = makeAddr("onRamp");
     Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](1);
     onRampUpdates[0] = Router.OnRamp({destChainSelector: DEST_CHAIN_SELECTOR, onRamp: onRamp});
