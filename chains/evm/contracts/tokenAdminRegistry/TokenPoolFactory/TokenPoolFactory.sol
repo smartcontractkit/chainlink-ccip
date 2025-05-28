@@ -225,14 +225,7 @@ contract TokenPoolFactory is ITypeAndVersion {
     }
 
     // Construct the initArgs for the token pool using the immutable contracts for CCIP on the local chain
-    bytes memory tokenPoolInitArgs;
-    if (poolType == PoolType.BURN_MINT) {
-      tokenPoolInitArgs = abi.encode(token, localTokenDecimals, new address[](0), i_rmnProxy, i_ccipRouter);
-    } else if (poolType == PoolType.LOCK_RELEASE) {
-      // Lock/Release pools have an additional boolean constructor parameter that must be accounted for, acceptLiquidity,
-      // which is set to true by default in this case. Users wishing to set it to false must deploy the pool manually.
-      tokenPoolInitArgs = abi.encode(token, localTokenDecimals, new address[](0), i_rmnProxy, true, i_ccipRouter);
-    }
+    bytes memory tokenPoolInitArgs = abi.encode(token, localTokenDecimals, new address[](0), i_rmnProxy, i_ccipRouter);
 
     // Construct the deployment code from the initCode and the initArgs and then deploy
     address poolAddress = Create2.deploy(0, salt, abi.encodePacked(tokenPoolInitCode, tokenPoolInitArgs));
@@ -261,37 +254,19 @@ contract TokenPoolFactory is ITypeAndVersion {
     address remoteTokenAddress,
     PoolType poolType
   ) private pure returns (bytes32) {
-    if (poolType == PoolType.BURN_MINT) {
-      return keccak256(
-        abi.encodePacked(
-          initCode,
-          // constructor(address token, uint8 localTokenDecimals, address[] allowlist, address rmnProxy, address router)
-          abi.encode(
-            remoteTokenAddress,
-            remoteChainConfig.remoteTokenDecimals,
-            new address[](0),
-            remoteChainConfig.remoteRMNProxy,
-            remoteChainConfig.remoteRouter
-          )
+    return keccak256(
+      abi.encodePacked(
+        initCode,
+        // constructor(address token, uint8 localTokenDecimals, address[] allowlist, address rmnProxy, address router)
+        abi.encode(
+          remoteTokenAddress,
+          remoteChainConfig.remoteTokenDecimals,
+          new address[](0),
+          remoteChainConfig.remoteRMNProxy,
+          remoteChainConfig.remoteRouter
         )
-      );
-    } else {
-      // if poolType is PoolType.LOCK_RELEASE, but may be expanded in future versions
-      return keccak256(
-        abi.encodePacked(
-          initCode,
-          // constructor(address token, uint8 localTokenDecimals, address[] allowList, address rmnProxy, bool acceptLiquidity, address router)
-          abi.encode(
-            remoteTokenAddress,
-            remoteChainConfig.remoteTokenDecimals,
-            new address[](0),
-            remoteChainConfig.remoteRMNProxy,
-            true,
-            remoteChainConfig.remoteRouter
-          )
-        )
-      );
-    }
+      )
+    );
   }
 
   /// @notice Sets the token pool address in the token admin registry for a newly deployed token pool.
