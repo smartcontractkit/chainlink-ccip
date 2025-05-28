@@ -64,6 +64,8 @@ type buildInfo struct {
 //
 // Check whether native abigen is installed, and has correct version
 func Abigen(a AbigenArgs) {
+	includeMetadata := os.Getenv("metadata") == "true"
+
 	var versionResponse bytes.Buffer
 	abigenExecutablePath := filepath.Join(GetProjectRoot(), "chains/evm/scripts/abigen")
 	abigenVersionCheck := exec.Command(abigenExecutablePath, "--version")
@@ -95,6 +97,11 @@ func Abigen(a AbigenArgs) {
 	}
 
 	ImproveAbigenOutput(a.Out, a.ABI)
+
+	if !includeMetadata {
+		// If metadata is not included, we are done here.
+		return
+	}
 
 	// Add build info to exported package
 	info, err := os.ReadFile(a.BuildInfo)
