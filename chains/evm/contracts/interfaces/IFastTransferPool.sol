@@ -6,8 +6,8 @@ pragma solidity ^0.8.0;
 interface IFastTransferPool {
   /// @notice Quote struct containing fee information
   struct Quote {
-    uint256 sendTokenFee; // paid in feeToken
-    uint256 fastTransferFee; // paid in asset
+    uint256 ccipSettlementFee; // Fee paid to for settlement contract in CCIP supported fee tokens
+    uint256 fastTransferFee; // paid to the fast transfer filler in the same asset as requested
   }
 
   error AlreadyFilled(bytes32 fillRequestId);
