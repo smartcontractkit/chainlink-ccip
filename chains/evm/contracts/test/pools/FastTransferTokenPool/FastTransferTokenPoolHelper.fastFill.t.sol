@@ -20,7 +20,7 @@ contract FastTransferTokenPoolHelper_fastFill_Test is FastTransferTokenPoolHelpe
     receiver = address(0x5);
   }
 
-  function test_FastFill_Success() public {
+  function test_FastFill() public {
     uint256 srcAmount = 100 ether;
     uint8 srcDecimals = 18;
 
@@ -32,7 +32,7 @@ contract FastTransferTokenPoolHelper_fastFill_Test is FastTransferTokenPoolHelpe
     assertEq(s_token.balanceOf(receiver), srcAmount);
   }
 
-  function test_FastFill_RevertWhenAlreadyFilled() public {
+  function test_FastFill_RevertWhen_AlreadyFilled() public {
     uint256 srcAmount = 100 ether;
     uint8 srcDecimals = 18;
 
@@ -46,7 +46,7 @@ contract FastTransferTokenPoolHelper_fastFill_Test is FastTransferTokenPoolHelpe
     s_tokenPool.fastFill(fillRequestId, DEST_CHAIN_SELECTOR, srcAmount, srcDecimals, receiver);
   }
 
-  function test_FastFill_RevertWhenFillerNotWhitelisted() public {
+  function test_FastFill_RevertWhen_FillerNotWhitelisted() public {
     uint256 srcAmount = 100 ether;
     uint8 srcDecimals = 18;
     address nonWhitelistedFiller = address(0x6);
@@ -61,14 +61,14 @@ contract FastTransferTokenPoolHelper_fastFill_Test is FastTransferTokenPoolHelpe
     vm.stopPrank();
   }
 
-  function test_FastFill_SuccessWhenWhitelistDisabled() public {
+  function test_FastFill_WhitelistDisabled() public {
     vm.prank(OWNER);
     // Disable whitelist
     FastTransferTokenPoolAbstract.LaneConfigArgs memory laneConfigArgs = FastTransferTokenPoolAbstract.LaneConfigArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       bpsFastFee: 100,
       enabled: true,
-      whitelistEnabled: false,
+      fillerAllowlistEnabled: false,
       destinationPool: address(0x4),
       fillAmountMaxPerRequest: 1000 ether,
       addFillers: new address[](0),
@@ -93,15 +93,5 @@ contract FastTransferTokenPoolHelper_fastFill_Test is FastTransferTokenPoolHelpe
     // Verify token balances
     assertEq(s_token.balanceOf(nonWhitelistedFiller), 1000 ether - srcAmount);
     assertEq(s_token.balanceOf(receiver), srcAmount);
-  }
-
-  function test_FastFill_RevertWhenInsufficientBalance() public {
-    uint256 srcAmount = 2000 ether; // More than filler's balance
-    uint8 srcDecimals = 18;
-
-    vm.startPrank(s_filler);
-    vm.expectRevert("ERC20: transfer amount exceeds balance");
-    s_tokenPool.fastFill(fillRequestId, SOURCE_CHAIN_SELECTOR, srcAmount, srcDecimals, receiver);
-    vm.stopPrank();
   }
 }

@@ -29,7 +29,7 @@ contract FastTransferTokenPoolHelper_ccipReceive_Test is FastTransferTokenPoolHe
     receiver = address(0x5);
   }
 
-  function test_CcipReceive_Success() public {
+  function test_CcipReceive() public {
     // Prepare CCIP message
     bytes memory data = abi.encode(srcAmount, srcDecimals, fastTransferFee, abi.encodePacked(receiver));
     Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
@@ -47,7 +47,7 @@ contract FastTransferTokenPoolHelper_ccipReceive_Test is FastTransferTokenPoolHe
     s_tokenPool.ccipReceive(message);
   }
 
-  function test_CcipReceive_RevertWhenInvalidData() public {
+  function test_CcipReceive_RevertWhen_InvalidData() public {
     // Prepare CCIP message with invalid data
     bytes memory invalidData = abi.encode(srcAmount, srcDecimals); // Missing fastTransferFee and receiver
     Client.Any2EVMMessage memory message = Client.Any2EVMMessage({

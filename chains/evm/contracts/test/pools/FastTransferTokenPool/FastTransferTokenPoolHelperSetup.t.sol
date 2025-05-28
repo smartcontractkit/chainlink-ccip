@@ -40,14 +40,15 @@ contract FastTransferTokenPoolHelperSetup is BaseTest {
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       bpsFastFee: FAST_FEE_BPS, // 1%
       enabled: true,
-      whitelistEnabled: true,
+      fillerAllowlistEnabled: true,
       destinationPool: address(0x4),
       fillAmountMaxPerRequest: 1000 ether,
       addFillers: addFillers,
       removeFillers: new address[](0)
     });
 
-    s_tokenPool = new FastTransferTokenPoolHelper(s_token, wrappedNative, address(s_sourceRouter), laneConfigArgs);
+    s_tokenPool = new FastTransferTokenPoolHelper(s_token, wrappedNative, address(s_sourceRouter));
+    s_tokenPool.updateLaneConfig(laneConfigArgs[0]);
 
     // Approve tokens
     s_token.approve(address(s_tokenPool), type(uint256).max);

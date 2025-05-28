@@ -16,7 +16,7 @@ contract FastTransferTokenPoolHelper_getCcipSendTokenFee_Test is FastTransferTok
     s_receiver = vm.randomAddress();
   }
 
-  function test_GetCcipSendTokenFee_Success() public {
+  function test_GetCcipSendTokenFee() public {
     uint256 amount = 100 ether;
     bytes memory receiver = abi.encodePacked(s_receiver);
     bytes memory extraArgs = "";
@@ -34,12 +34,12 @@ contract FastTransferTokenPoolHelper_getCcipSendTokenFee_Test is FastTransferTok
     assertEq(quote.sendTokenFee, feeQuoterQuote);
   }
 
-  function test_GetCcipSendTokenFee_RevertWhenLaneDisabled() public {
+  function test_GetCcipSendTokenFee_RevertWhen_LaneDisabled() public {
     FastTransferTokenPoolAbstract.LaneConfigArgs memory laneConfigArgs = FastTransferTokenPoolAbstract.LaneConfigArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       bpsFastFee: 100,
       enabled: false,
-      whitelistEnabled: true,
+      fillerAllowlistEnabled: true,
       destinationPool: address(0x4),
       fillAmountMaxPerRequest: 1000 ether,
       addFillers: new address[](0),

@@ -5,6 +5,7 @@ import {FastTransferTokenPoolAbstract} from "../../pools/FastTransferTokenPoolAb
 import {TokenPool} from "../../pools/TokenPool.sol";
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
+import {CCIPReceiver} from "../../applications/CCIPReceiver.sol";
 import {WETH9} from "@chainlink/contracts/src/v0.8/vendor/canonical-weth/WETH9.sol";
 import {IERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
@@ -24,9 +25,11 @@ contract FastTransferTokenPoolHelper is FastTransferTokenPoolAbstract {
   constructor(
     IERC20 token,
     WETH9 wrappedNative,
-    address router,
-    FastTransferTokenPoolAbstract.LaneConfigArgs[] memory laneConfigArgs
-  ) FastTransferTokenPoolAbstract(router, laneConfigArgs) {
+    address router //CCIPReceiver(router)
+  )
+    //FastTransferTokenPoolAbstract.LaneConfigArgs[] memory laneConfigArgs
+    FastTransferTokenPoolAbstract(router)
+  {
     i_admin = msg.sender;
     i_token = token;
   }
@@ -44,18 +47,6 @@ contract FastTransferTokenPoolHelper is FastTransferTokenPoolAbstract {
     uint8 srcDecimals
   ) public returns (uint256) {
     return _transferFromFiller(sourceChainSelector, filler, receiver, srcAmount, srcDecimals);
-  }
-
-  function settle(
-    uint64 sourceChainSelector,
-    bytes32 fillRequestId,
-    bytes memory sourcePoolAddress,
-    uint256 srcAmount,
-    uint8 srcDecimal,
-    uint256 fastTransferFee,
-    address receiver
-  ) public {
-    _settle(sourceChainSelector, fillRequestId, sourcePoolAddress, srcAmount, srcDecimal, fastTransferFee, receiver);
   }
 
   // Implementation of abstract functions

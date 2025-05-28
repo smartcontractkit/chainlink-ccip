@@ -47,7 +47,7 @@ abstract contract FastTransferTokenPoolAbstract is CCIPReceiver, ITypeAndVersion
     address destinationPool; // ─────────╮
     uint16 bpsFastFee; //                │ 0-10_000
     bool enabled; //                     │ pause per lane
-    bool whitelistEnabled; // ───────────╯ whitelist for fillers
+    bool fillerAllowlistEnabled; // ───────────╯ whitelist for fillers
     mapping(address filler => bool isAllowed) fillerAllowList; // whitelist of fillers
   }
 
@@ -56,7 +56,7 @@ abstract contract FastTransferTokenPoolAbstract is CCIPReceiver, ITypeAndVersion
     address destinationPool; // ─────────╮
     uint16 bpsFastFee; //                │ 0-10_000
     bool enabled; //                     │ pause per lane
-    bool whitelistEnabled; // ───────────╯ whitelist for fillers
+    bool fillerAllowlistEnabled; // ───────────╯ whitelist for fillers
   }
 
   struct LaneConfigArgs {
@@ -67,7 +67,7 @@ abstract contract FastTransferTokenPoolAbstract is CCIPReceiver, ITypeAndVersion
     uint64 remoteChainSelector; //       │
     uint16 bpsFastFee; //                │ 0-10_000
     bool enabled; //                     │ pause per lane
-    bool whitelistEnabled; // ───────────╯
+    bool fillerAllowlistEnabled; // ───────────╯
   }
 
   struct MintMessage {
@@ -82,16 +82,21 @@ abstract contract FastTransferTokenPoolAbstract is CCIPReceiver, ITypeAndVersion
   mapping(uint64 remoteChainSelector => LaneConfig laneConfig) private s_fastTransferLaneConfig;
 
   /// @dev Mapping of fill request ID to filler address
-  mapping(bytes32 fillRequestId => address filler) private s_fills;
+  /// This is used to track which filler has filled a request
+  /// @dev The filler address is set to address(0) if the request has not been filled
+  /// @dev The filler address is set to address(1) if the request has been settled
+  /// @dev The filler address is set to the filler address if the request has been filled by that filler
+  mapping(bytes32 fillId => address filler) internal s_fills;
 
   /// @notice Initializes the fast transfer pool
   /// @param router Address of the CCIP router
-  /// @param laneConfigArgs Initial lane configurations
-  constructor(address router, LaneConfigArgs[] memory laneConfigArgs) CCIPReceiver(router) {
-    for (uint256 i; i < laneConfigArgs.length; ++i) {
-      _updateLaneConfig(laneConfigArgs[i]);
-    }
-  }
+
+  constructor(
+    address router
+  )
+    //LaneConfigArgs[] memory laneConfigArgs
+    CCIPReceiver(router)
+  {}
 
   /// @notice Updates the lane configuration
   /// @param laneConfigArgs The lane configuration arguments
@@ -112,7 +117,7 @@ abstract contract FastTransferTokenPoolAbstract is CCIPReceiver, ITypeAndVersion
     laneConfig.destinationPool = laneConfigArgs.destinationPool;
     laneConfig.bpsFastFee = laneConfigArgs.bpsFastFee;
     laneConfig.enabled = laneConfigArgs.enabled;
-    laneConfig.whitelistEnabled = laneConfigArgs.whitelistEnabled;
+    laneConfig.fillerAllowlistEnabled = laneConfigArgs.fillerAllowlistEnabled;
     laneConfig.fillAmountMaxPerRequest = laneConfigArgs.fillAmountMaxPerRequest;
     for (uint256 i; i < laneConfigArgs.addFillers.length; ++i) {
       laneConfig.fillerAllowList[laneConfigArgs.addFillers[i]] = true;
@@ -161,7 +166,7 @@ abstract contract FastTransferTokenPoolAbstract is CCIPReceiver, ITypeAndVersion
     return LaneConfigView({
       bpsFastFee: config.bpsFastFee,
       enabled: config.enabled,
-      whitelistEnabled: config.whitelistEnabled,
+      fillerAllowlistEnabled: config.fillerAllowlistEnabled,
       destinationPool: config.destinationPool,
       fillAmountMaxPerRequest: config.fillAmountMaxPerRequest
     });
@@ -200,14 +205,11 @@ abstract contract FastTransferTokenPoolAbstract is CCIPReceiver, ITypeAndVersion
       _getFeeQuoteAndCCIPMessage(feeToken, destinationChainSelector, amount, receiver, extraArgs);
     _handleTokenToTransfer(destinationChainSelector, msg.sender, amount + quote.fastTransferFee);
 
-    if (feeToken == address(0)) {
-      fillRequestId = IRouterClient(getRouter()).ccipSend{value: msg.value}(destinationChainSelector, message);
-    } else {
+    if (feeToken != address(0)) {
       IERC20(feeToken).safeTransferFrom(msg.sender, address(this), quote.sendTokenFee);
       IERC20(feeToken).safeApprove(i_ccipRouter, quote.sendTokenFee);
-      fillRequestId = IRouterClient(getRouter()).ccipSend(destinationChainSelector, message);
     }
-
+    fillRequestId = IRouterClient(getRouter()).ccipSend{value: msg.value}(destinationChainSelector, message);
     emit FastFillRequest(fillRequestId, destinationChainSelector, amount, quote.fastTransferFee, receiver);
   }
 
@@ -223,9 +225,9 @@ abstract contract FastTransferTokenPoolAbstract is CCIPReceiver, ITypeAndVersion
     if (!lane.enabled) revert IFastTransferPool.LaneDisabled();
 
     // compute fastFee
-    bool slow = extraArgs.length > 0 && (extraArgs[0] & bytes1(0x01)) == bytes1(0x01);
-    quote.fastTransferFee = slow ? 0 : (amount * lane.bpsFastFee) / 10_000;
-
+    // bool slow = extraArgs.length > 0 && (extraArgs[0] & bytes1(0x01)) == bytes1(0x01);
+    // quote.fastTransferFee = slow ? 0 : (amount * lane.bpsFastFee) / 10_000;
+    quote.fastTransferFee = (amount * lane.bpsFastFee) / 10_000;
     // pack the MintMessage
     bytes memory data = abi.encode(
       MintMessage({
@@ -266,7 +268,7 @@ abstract contract FastTransferTokenPoolAbstract is CCIPReceiver, ITypeAndVersion
 
     {
       LaneConfig storage laneConfig = s_fastTransferLaneConfig[sourceChainSelector];
-      if (laneConfig.whitelistEnabled) {
+      if (laneConfig.fillerAllowlistEnabled) {
         if (!laneConfig.fillerAllowList[msg.sender]) revert FillerNotWhitelisted(sourceChainSelector, msg.sender);
       }
     }
@@ -319,14 +321,6 @@ abstract contract FastTransferTokenPoolAbstract is CCIPReceiver, ITypeAndVersion
     uint8 srcDecimals
   ) internal virtual returns (uint256 destAmount);
 
-  /// @notice Handles the settlement of a fast fill request at destination chain
-  /// @param sourceChainSelector The source chain selector
-  /// @param fillRequestId The fill request ID
-  /// @param sourcePoolAddress The source pool address
-  /// @param srcAmount The amount to transfer
-  /// @param srcDecimal The decimals of the source token
-  /// @param fastTransferFee The fast transfer fee
-  /// @param receiver The receiver address
   function _settle(
     uint64 sourceChainSelector,
     bytes32 fillRequestId,
