@@ -421,6 +421,7 @@ func Test_LBTC_Flow(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
+			// todo fix context?
 			got, err1 := baseObserver.Observe(context.Background(), tc.messages)
 			require.NoError(t, err1)
 			require.Equal(t, tc.want, got)
