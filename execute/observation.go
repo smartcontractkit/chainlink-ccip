@@ -185,6 +185,7 @@ func (p *Plugin) getCommitReportsObservation(
 
 	// No observation for non-dest readers.
 	if !supportsDest {
+		lggr.Debugw("destination chain not supported, skipping commit reports observation")
 		return observation, nil
 	}
 
