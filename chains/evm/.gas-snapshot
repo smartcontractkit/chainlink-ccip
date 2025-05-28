@@ -5,7 +5,7 @@ BurnMintFastTransferTokenPool_ccipReceive:test_CcipReceive_NotFastFilled() (gas:
 BurnMintFastTransferTokenPool_ccipReceive:test_CcipReceive_OnlyRouter() (gas: 17406)
 BurnMintFastTransferTokenPool_ccipReceive:test_CcipReceive_WithDifferentDecimals() (gas: 97509)
 BurnMintFastTransferTokenPool_ccipSendToken:test_CcipSendToken() (gas: 106147)
-BurnMintFastTransferTokenPool_ccipSendToken:test_CcipSendToken_WithERC20FeeToken() (gas: 146414)
+BurnMintFastTransferTokenPool_ccipSendToken:test_CcipSendToken_WithERC20FeeToken() (gas: 142928)
 BurnMintFastTransferTokenPool_constructor:test_Constructor() (gas: 23521)
 BurnMintFastTransferTokenPool_constructor:test_GetLaneConfig() (gas: 17500)
 BurnMintFastTransferTokenPool_constructor:test_IsFillerAllowListed() (gas: 18618)

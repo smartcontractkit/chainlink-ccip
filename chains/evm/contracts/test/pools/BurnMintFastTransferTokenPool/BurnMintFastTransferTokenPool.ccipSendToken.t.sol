@@ -63,8 +63,6 @@ contract BurnMintFastTransferTokenPool_ccipSendToken is BurnMintFastTransferToke
   function test_CcipSendToken_WithERC20FeeToken() public {
     // Setup fee token
     address feeToken = address(s_burnMintERC20);
-    IERC20(feeToken).approve(address(s_pool), type(uint256).max);
-
     uint256 balanceBefore = s_burnMintERC20.balanceOf(OWNER);
 
     IFastTransferPool.Quote memory quote =
