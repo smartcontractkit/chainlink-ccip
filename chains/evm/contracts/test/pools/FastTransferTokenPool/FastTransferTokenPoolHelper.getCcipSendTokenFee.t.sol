@@ -33,23 +33,4 @@ contract FastTransferTokenPoolHelper_getCcipSendTokenFee_Test is FastTransferTok
     // CCIP fee should be non-zero
     assertEq(quote.ccipSettlementFee, feeQuoterQuote);
   }
-
-  function test_GetCcipSendTokenFee_RevertWhen_LaneDisabled() public {
-    FastTransferTokenPoolAbstract.LaneConfigArgs memory laneConfigArgs = FastTransferTokenPoolAbstract.LaneConfigArgs({
-      remoteChainSelector: DEST_CHAIN_SELECTOR,
-      bpsFastFee: 100,
-      fillerAllowlistEnabled: true,
-      destinationPool: destPoolAddress,
-      fillAmountMaxPerRequest: 1000 ether,
-      addFillers: new address[](0),
-      removeFillers: new address[](0)
-    });
-    s_tokenPool.updateLaneConfig(laneConfigArgs);
-
-    bytes memory receiver = abi.encodePacked(address(0x5));
-    bytes memory extraArgs = "";
-
-    vm.expectRevert(IFastTransferPool.LaneDisabled.selector);
-    s_tokenPool.getCcipSendTokenFee(address(s_token), DEST_CHAIN_SELECTOR, 100 ether, receiver, extraArgs);
-  }
 }

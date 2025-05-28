@@ -74,15 +74,26 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     uint8 srcDecimals; // decimals of the source token
   }
 
+  /// @notice Enum representing the state of a fill request
+  enum FillState {
+    NotFilled, // Request has not been filled yet
+    Filled, // Request has been filled by a filler
+    Settled // Request has been settled via CCIP
+
+  }
+
+  /// @notice Struct to track fill request information
+  struct FillInfo {
+    FillState state; // Current state of the fill request
+    address filler; // Address of the filler (only relevant when state is Filled)
+  }
+
   /// @dev Mapping of remote chain selector to lane configuration
   mapping(uint64 remoteChainSelector => LaneConfig laneConfig) private s_fastTransferLaneConfig;
 
-  /// @dev Mapping of fill request ID to filler address
-  /// This is used to track which filler has filled a request
-  /// @dev If the request has not been filled slot set to address(0) by default
-  /// @dev If the request has been settled slot is set to address(1)
-  /// @dev If the request has been filled, slot will be set to the address which filled it"
-  mapping(bytes32 fillId => address filler) internal s_fills;
+  /// @dev Mapping of fill request ID to fill information
+  /// This is used to track the state and filler of each fill request
+  mapping(bytes32 fillId => FillInfo fillInfo) internal s_fills;
 
   /// @notice Initializes the fast transfer pool
   /// @param token The token this pool manages
@@ -175,6 +186,24 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     return s_fastTransferLaneConfig[remoteChainSelector].fillerAllowList[filler];
   }
 
+  /// @notice Gets the fill information for a given fill ID
+  /// @param fillId The fill ID to query
+  /// @return fillInfo The fill information including state and filler address
+  function getFillInfo(
+    bytes32 fillId
+  ) external view returns (FillInfo memory) {
+    return s_fills[fillId];
+  }
+
+  /// @notice Helper function to generate fill ID from request parameters
+  /// @param fillRequestId The original fill request ID
+  /// @param amount The amount being filled
+  /// @param receiver The receiver address
+  /// @return fillId The computed fill ID
+  function computeFillId(bytes32 fillRequestId, uint256 amount, address receiver) external pure returns (bytes32) {
+    return keccak256(abi.encodePacked(fillRequestId, amount, receiver));
+  }
+
   /// @inheritdoc IFastTransferPool
   function getCcipSendTokenFee(
     address settlementFeeToken,
@@ -199,9 +228,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     // burn/lock tokens + pay fastFee (in _handleTokenToTransfer)
     (Quote memory quote, Client.EVM2AnyMessage memory message) =
       _getFeeQuoteAndCCIPMessage(feeToken, destinationChainSelector, amount, receiver, extraArgs);
-    if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(destinationChainSelector)))) revert CursedByRMN();
-    _checkAllowList(msg.sender);
-    if (!isSupportedChain(destinationChainSelector)) revert ChainNotAllowed(destinationChainSelector);
+    _validateSendRequest(destinationChainSelector);
     _consumeOutboundRateLimit(destinationChainSelector, amount);
     _handleTokenToTransfer(destinationChainSelector, msg.sender, amount + quote.fastTransferFee);
 
@@ -260,8 +287,8 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     address receiver
   ) public virtual {
     bytes32 fillId = keccak256(abi.encodePacked(fillRequestId, srcAmount, receiver));
-    address filler = s_fills[fillId];
-    if (filler != address(0)) revert AlreadyFilled(fillRequestId);
+    FillInfo memory fillInfo = s_fills[fillId];
+    if (fillInfo.state != FillState.NotFilled) revert AlreadyFilled(fillRequestId);
 
     {
       LaneConfig storage laneConfig = s_fastTransferLaneConfig[sourceChainSelector];
@@ -272,7 +299,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     // Transfer tokens from filler to receiver
     uint256 destAmount = _transferFromFiller(sourceChainSelector, msg.sender, receiver, srcAmount, srcDecimals);
     // Record fill
-    s_fills[fillId] = msg.sender;
+    s_fills[fillId] = FillInfo({state: FillState.Filled, filler: msg.sender});
     emit FastFill(fillRequestId, fillId, msg.sender, destAmount, receiver);
   }
 
@@ -332,22 +359,22 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     uint256 settlementAmountLocal = localAmount + _calculateLocalAmount(fastTransferFee, srcDecimal);
 
     bytes32 fillId = keccak256(abi.encodePacked(fillRequestId, localAmount, receiver));
-    address filler = s_fills[fillId];
+    FillInfo memory fillInfo = s_fills[fillId];
 
     // Handle settlement based on fill state
-    if (filler == address(0)) {
+    if (fillInfo.state == FillState.NotFilled) {
       // Not fast-filled - mint/release to receiver
       _handleNotFastFilled(sourceChainSelector, settlementAmountLocal, receiver);
-    } else if (filler == address(1)) {
+    } else if (fillInfo.state == FillState.Settled) {
       // Already settled
       revert MessageAlreadySettled(fillRequestId);
     } else {
       // Fast-filled - reimburse filler
-      _handleFastFilledReimbursement(filler, settlementAmountLocal);
+      _handleFastFilledReimbursement(fillInfo.filler, settlementAmountLocal);
     }
 
     // Mark as settled
-    s_fills[fillId] = address(1);
+    s_fills[fillId] = FillInfo({state: FillState.Settled, filler: address(0)});
   }
 
   /// @notice Validates settlement prerequisites
@@ -359,6 +386,14 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     if (!isRemotePool(sourceChainSelector, sourcePoolAddress)) {
       revert InvalidSourcePoolAddress(sourcePoolAddress);
     }
+  }
+
+  function _validateSendRequest(
+    uint64 destinationChainSelector
+  ) internal view virtual {
+    if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(destinationChainSelector)))) revert CursedByRMN();
+    _checkAllowList(msg.sender);
+    if (!isSupportedChain(destinationChainSelector)) revert ChainNotAllowed(destinationChainSelector);
   }
 
   /// @notice Handles settlement when the request was not fast-filled

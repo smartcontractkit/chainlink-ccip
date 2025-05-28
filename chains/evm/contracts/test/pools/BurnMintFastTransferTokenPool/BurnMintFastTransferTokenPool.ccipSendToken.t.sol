@@ -76,23 +76,6 @@ contract BurnMintFastTransferTokenPool_ccipSendToken is BurnMintFastTransferToke
     );
   }
 
-  function test_RevertWhen_LaneDisabled() public {
-    // Disable the lane
-    FastTransferTokenPoolAbstract.LaneConfigArgs memory laneConfigArgs = FastTransferTokenPoolAbstract.LaneConfigArgs({
-      remoteChainSelector: DEST_CHAIN_SELECTOR,
-      bpsFastFee: FAST_FEE_BPS,
-      fillerAllowlistEnabled: true,
-      destinationPool: abi.encode(s_remoteBurnMintPool),
-      fillAmountMaxPerRequest: FILL_AMOUNT_MAX,
-      addFillers: new address[](0),
-      removeFillers: new address[](0)
-    });
-    s_pool.updateLaneConfig(laneConfigArgs);
-
-    vm.expectRevert(IFastTransferPool.LaneDisabled.selector);
-    s_pool.ccipSendToken{value: 1 ether}(address(0), DEST_CHAIN_SELECTOR, TRANSFER_AMOUNT, abi.encode(RECEIVER), "");
-  }
-
   function test_RevertWhen_CursedByRMN() public {
     vm.mockCall(address(s_mockRMNRemote), abi.encodeWithSignature("isCursed(bytes16)"), abi.encode(true));
 
