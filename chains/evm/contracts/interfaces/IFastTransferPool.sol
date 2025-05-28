@@ -30,14 +30,14 @@ interface IFastTransferPool {
   );
 
   /// @notice Gets the CCIP send token fee and fast transfer fee for a given transfer
-  /// @param feeToken The token used to pay the CCIP fee
+  /// @param settlementFeeToken The token used to pay the CCIP settlement fee
   /// @param destinationChainSelector The destination chain selector
   /// @param amount The amount to transfer
   /// @param receiver The receiver address
   /// @param extraArgs Extra arguments for the transfer
   /// @return Quote containing the CCIP fee and fast transfer fee
   function getCcipSendTokenFee(
-    address feeToken,
+    address settlementFeeToken,
     uint64 destinationChainSelector,
     uint256 amount,
     bytes calldata receiver,

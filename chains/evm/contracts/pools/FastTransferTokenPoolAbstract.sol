@@ -177,13 +177,13 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
 
   /// @inheritdoc IFastTransferPool
   function getCcipSendTokenFee(
-    address feeToken,
+    address settlementFeeToken,
     uint64 destinationChainSelector,
     uint256 amount,
     bytes calldata receiver,
     bytes calldata extraArgs
   ) public view virtual override returns (Quote memory) {
-    (Quote memory quote,) = _getFeeQuoteAndCCIPMessage(feeToken, destinationChainSelector, amount, receiver, extraArgs);
+    (Quote memory quote,) = _getFeeQuoteAndCCIPMessage(settlementFeeToken, destinationChainSelector, amount, receiver, extraArgs);
     return quote;
   }
 
@@ -215,7 +215,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
 
   /// @notice Pulls out all of the fee‐quotation + message‐build logic
   function _getFeeQuoteAndCCIPMessage(
-    address feeToken,
+    address settlementFeeToken,
     uint64 destinationChainSelector,
     uint256 amount,
     bytes calldata receiver,
@@ -223,9 +223,6 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   ) internal view returns (IFastTransferPool.Quote memory quote, Client.EVM2AnyMessage memory message) {
     LaneConfig storage lane = s_fastTransferLaneConfig[destinationChainSelector];
 
-    // compute fastFee
-    // bool slow = extraArgs.length > 0 && (extraArgs[0] & bytes1(0x01)) == bytes1(0x01);
-    // quote.fastTransferFee = slow ? 0 : (amount * lane.bpsFastFee) / 10_000;
     quote.fastTransferFee = (amount * lane.bpsFastFee) / 10_000;
     // pack the MintMessage
     bytes memory data = abi.encode(
@@ -241,7 +238,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
       receiver: abi.encode(lane.destinationPool),
       data: data,
       tokenAmounts: new Client.EVMTokenAmount[](0),
-      feeToken: feeToken,
+      feeToken: settlementFeeToken,
       extraArgs: ""
     });
 
@@ -330,11 +327,9 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   ) internal virtual {
     _validateSettlement(sourceChainSelector, sourcePoolAddress);
 
-    // Common calculations
     uint256 localAmount = _calculateLocalAmount(srcAmount, srcDecimal);
     uint256 settlementAmountLocal = localAmount + _calculateLocalAmount(fastTransferFee, srcDecimal);
 
-    // Common fill tracking logic
     bytes32 fillId = keccak256(abi.encodePacked(fillRequestId, localAmount, receiver));
     address filler = s_fills[fillId];
 
