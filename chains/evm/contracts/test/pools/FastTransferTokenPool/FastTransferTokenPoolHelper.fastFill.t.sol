@@ -67,7 +67,6 @@ contract FastTransferTokenPoolHelper_fastFill_Test is FastTransferTokenPoolHelpe
     FastTransferTokenPoolAbstract.LaneConfigArgs memory laneConfigArgs = FastTransferTokenPoolAbstract.LaneConfigArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       bpsFastFee: 100,
-
       fillerAllowlistEnabled: false,
       destinationPool: destPoolAddress,
       fillAmountMaxPerRequest: 1000 ether,

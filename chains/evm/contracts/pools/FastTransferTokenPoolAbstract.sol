@@ -183,7 +183,8 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     bytes calldata receiver,
     bytes calldata extraArgs
   ) public view virtual override returns (Quote memory) {
-    (Quote memory quote,) = _getFeeQuoteAndCCIPMessage(settlementFeeToken, destinationChainSelector, amount, receiver, extraArgs);
+    (Quote memory quote,) =
+      _getFeeQuoteAndCCIPMessage(settlementFeeToken, destinationChainSelector, amount, receiver, extraArgs);
     return quote;
   }
 

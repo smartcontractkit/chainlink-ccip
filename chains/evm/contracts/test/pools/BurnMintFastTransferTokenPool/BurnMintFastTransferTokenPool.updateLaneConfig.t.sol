@@ -18,7 +18,6 @@ contract BurnMintFastTransferTokenPool_updateLaneConfig is BurnMintFastTransferT
     FastTransferTokenPoolAbstract.LaneConfigArgs memory laneConfigArgs = FastTransferTokenPoolAbstract.LaneConfigArgs({
       remoteChainSelector: NEW_CHAIN_SELECTOR,
       bpsFastFee: NEW_FAST_FEE_BPS,
-
       fillerAllowlistEnabled: false,
       destinationPool: NEW_DESTINATION_POOL,
       fillAmountMaxPerRequest: NEW_FILL_AMOUNT_MAX,
@@ -28,12 +27,7 @@ contract BurnMintFastTransferTokenPool_updateLaneConfig is BurnMintFastTransferT
 
     vm.expectEmit();
     emit FastTransferTokenPoolAbstract.LaneUpdated(
-      NEW_CHAIN_SELECTOR,
-      NEW_FAST_FEE_BPS,
-      NEW_FILL_AMOUNT_MAX,
-      NEW_DESTINATION_POOL,
-      addFillers,
-      new address[](0)
+      NEW_CHAIN_SELECTOR, NEW_FAST_FEE_BPS, NEW_FILL_AMOUNT_MAX, NEW_DESTINATION_POOL, addFillers, new address[](0)
     );
 
     s_pool.updateLaneConfig(laneConfigArgs);
@@ -84,7 +78,6 @@ contract BurnMintFastTransferTokenPool_updateLaneConfig is BurnMintFastTransferT
     FastTransferTokenPoolAbstract.LaneConfigArgs memory laneConfigArgs = FastTransferTokenPoolAbstract.LaneConfigArgs({
       remoteChainSelector: NEW_CHAIN_SELECTOR,
       bpsFastFee: 10_001, // > 10_000 (100%)
-
       fillerAllowlistEnabled: true,
       destinationPool: NEW_DESTINATION_POOL,
       fillAmountMaxPerRequest: NEW_FILL_AMOUNT_MAX,
@@ -100,7 +93,6 @@ contract BurnMintFastTransferTokenPool_updateLaneConfig is BurnMintFastTransferT
     FastTransferTokenPoolAbstract.LaneConfigArgs memory laneConfigArgs = FastTransferTokenPoolAbstract.LaneConfigArgs({
       remoteChainSelector: NEW_CHAIN_SELECTOR,
       bpsFastFee: NEW_FAST_FEE_BPS,
-
       fillerAllowlistEnabled: true,
       destinationPool: NEW_DESTINATION_POOL,
       fillAmountMaxPerRequest: NEW_FILL_AMOUNT_MAX,
@@ -145,7 +137,6 @@ contract BurnMintFastTransferTokenPool_updateLaneConfig is BurnMintFastTransferT
     FastTransferTokenPoolAbstract.LaneConfigArgs memory laneConfigArgs = FastTransferTokenPoolAbstract.LaneConfigArgs({
       remoteChainSelector: NEW_CHAIN_SELECTOR,
       bpsFastFee: 0, // No fast fee
-
       fillerAllowlistEnabled: true,
       destinationPool: NEW_DESTINATION_POOL,
       fillAmountMaxPerRequest: NEW_FILL_AMOUNT_MAX,
@@ -163,7 +154,6 @@ contract BurnMintFastTransferTokenPool_updateLaneConfig is BurnMintFastTransferT
     FastTransferTokenPoolAbstract.LaneConfigArgs memory laneConfigArgs = FastTransferTokenPoolAbstract.LaneConfigArgs({
       remoteChainSelector: NEW_CHAIN_SELECTOR,
       bpsFastFee: 10_000, // 100% fee
-
       fillerAllowlistEnabled: true,
       destinationPool: NEW_DESTINATION_POOL,
       fillAmountMaxPerRequest: NEW_FILL_AMOUNT_MAX,
