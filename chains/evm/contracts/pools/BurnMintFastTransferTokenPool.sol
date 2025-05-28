@@ -31,7 +31,7 @@ contract BurnMintFastTransferTokenPool is ITypeAndVersion, BurnMintTokenPoolAbst
     address router
   ) FastTransferTokenPoolAbstract(token, localTokenDecimals, allowlist, rmnProxy, router) {}
 
-  function _handleTokenToTransfer(uint64 destinationChainSelector, address sender, uint256 amount) internal override {
+  function _handleTokenToTransfer(uint64, address, uint256 amount) internal override {
     _burn(amount);
   }
 
@@ -46,21 +46,6 @@ contract BurnMintFastTransferTokenPool is ITypeAndVersion, BurnMintTokenPoolAbst
     _consumeInboundRateLimit(sourceChainSelector, localAmount);
     getToken().safeTransferFrom(filler, receiver, localAmount);
     return localAmount;
-  }
-
-  function _settle(
-    uint64 sourceChainSelector,
-    bytes32 fillRequestId,
-    bytes memory sourcePoolAddress,
-    uint256 srcAmount,
-    uint8 srcDecimal,
-    uint256 fastTransferFee,
-    address receiver
-  ) internal override {
-    // Call the common settlement logic from the abstract contract
-    super._settle(
-      sourceChainSelector, fillRequestId, sourcePoolAddress, srcAmount, srcDecimal, fastTransferFee, receiver
-    );
   }
 
   /// @notice Handles settlement when the request was not fast-filled
