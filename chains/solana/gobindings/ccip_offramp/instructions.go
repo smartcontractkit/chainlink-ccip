@@ -251,8 +251,10 @@ var (
 	// via multiple calls to this instruction.
 	//
 	// There's no need to pre-initialize the buffer: all chunks can be sent concurrently, and the
-	// first one to arrive will initialize the buffer. Once there's no further use for the buffer,
-	// it can be closed in order to retrieve the funds via `close_execution_report_buffer`.
+	// first one to arrive will initialize the buffer.
+	//
+	// To benefit from buffering, the eventual call to `execute` must include an additional `remaining_account`
+	// with the PDA derived from ["execution_report_buffer", <merkle_root>, <caller_pubkey>].
 	//
 	// # Arguments
 	//
@@ -265,6 +267,10 @@ var (
 	Instruction_BufferExecutionReport = ag_binary.TypeID([8]byte{35, 202, 252, 220, 2, 82, 189, 23})
 
 	// Closes the execution report buffer to reclaim funds.
+	//
+	// Note this is only necessary when aborting a buffered transaction, or when a mistake
+	// was made when buffering data. The buffer account will otherwise automatically close
+	// and return funds to the caller whenever buffered manual execution succeeds.
 	Instruction_CloseExecutionReportBuffer = ag_binary.TypeID([8]byte{0, 16, 4, 246, 238, 95, 223, 31})
 
 	Instruction_CloseCommitReportAccount = ag_binary.TypeID([8]byte{109, 145, 129, 64, 226, 172, 61, 106})

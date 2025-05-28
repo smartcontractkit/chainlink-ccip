@@ -542,8 +542,10 @@ pub mod ccip_offramp {
     /// via multiple calls to this instruction.
     ///
     /// There's no need to pre-initialize the buffer: all chunks can be sent concurrently, and the
-    /// first one to arrive will initialize the buffer. Once there's no further use for the buffer,
-    /// it can be closed in order to retrieve the funds via `close_execution_report_buffer`.
+    /// first one to arrive will initialize the buffer.
+    ///
+    /// To benefit from buffering, the eventual call to `execute` must include an additional `remaining_account`
+    /// with the PDA derived from ["execution_report_buffer", <merkle_root>, <caller_pubkey>].
     ///
     /// # Arguments
     ///
@@ -581,6 +583,10 @@ pub mod ccip_offramp {
     }
 
     /// Closes the execution report buffer to reclaim funds.
+    ///
+    /// Note this is only necessary when aborting a buffered transaction, or when a mistake
+    /// was made when buffering data. The buffer account will otherwise automatically close
+    /// and return funds to the caller whenever buffered manual execution succeeds.
     pub fn close_execution_report_buffer<'info>(
         _ctx: Context<'_, '_, 'info, 'info, CloseExecutionReportBufferContext<'info>>,
     ) -> Result<()> {
