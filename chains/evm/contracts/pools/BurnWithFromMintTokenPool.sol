@@ -19,7 +19,7 @@ import {SafeERC20} from
 contract BurnWithFromMintTokenPool is BurnMintTokenPoolAbstract, ITypeAndVersion {
   using SafeERC20 for IBurnMintERC20;
 
-  string public constant override typeAndVersion = "BurnWithFromMintTokenPool 1.5.1";
+  string public constant override typeAndVersion = "BurnWithFromMintTokenPool 1.6.1-dev";
 
   constructor(
     IBurnMintERC20 token,

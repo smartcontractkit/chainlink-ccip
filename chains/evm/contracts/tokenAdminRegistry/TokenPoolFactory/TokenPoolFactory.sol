@@ -115,8 +115,7 @@ contract TokenPoolFactory is ITypeAndVersion {
     address token = Create2.deploy(0, salt, tokenInitCode);
 
     // Deploy the token pool
-    address pool =
-      _createTokenPool(token, localTokenDecimals, remoteTokenPools, tokenPoolInitCode, salt, PoolType.BURN_MINT);
+    address pool = _createTokenPool(token, localTokenDecimals, remoteTokenPools, tokenPoolInitCode, salt);
 
     // Grant the mint and burn roles to the pool for the token
     FactoryBurnMintERC20(token).grantMintAndBurnRoles(pool);
@@ -147,15 +146,14 @@ contract TokenPoolFactory is ITypeAndVersion {
     uint8 localTokenDecimals,
     RemoteTokenPoolInfo[] calldata remoteTokenPools,
     bytes calldata tokenPoolInitCode,
-    bytes32 salt,
-    PoolType poolType
+    bytes32 salt
   ) external returns (address poolAddress) {
     // Ensure a unique deployment between senders even if the same input parameter is used to prevent
     // DOS/front running attacks
     salt = keccak256(abi.encodePacked(salt, msg.sender));
 
     // create the token pool and return the address
-    return _createTokenPool(token, localTokenDecimals, remoteTokenPools, tokenPoolInitCode, salt, poolType);
+    return _createTokenPool(token, localTokenDecimals, remoteTokenPools, tokenPoolInitCode, salt);
   }
 
   // ================================================================
@@ -173,8 +171,7 @@ contract TokenPoolFactory is ITypeAndVersion {
     uint8 localTokenDecimals,
     RemoteTokenPoolInfo[] calldata remoteTokenPools,
     bytes calldata tokenPoolInitCode,
-    bytes32 salt,
-    PoolType poolType
+    bytes32 salt
   ) private returns (address) {
     // Create an array of chain updates to apply to the token pool
     TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](remoteTokenPools.length);
@@ -203,8 +200,7 @@ contract TokenPoolFactory is ITypeAndVersion {
         bytes32 remotePoolInitcodeHash = _generatePoolInitcodeHash(
           remoteTokenPool.remotePoolInitCode,
           remoteTokenPool.remoteChainConfig,
-          abi.decode(remoteTokenPool.remoteTokenAddress, (address)),
-          remoteTokenPool.poolType
+          abi.decode(remoteTokenPool.remoteTokenAddress, (address))
         );
 
         // Abi encode the computed remote address so it can be used as bytes in the chain update
@@ -246,13 +242,11 @@ contract TokenPoolFactory is ITypeAndVersion {
   /// @param initCode The init code of the pool
   /// @param remoteChainConfig The remote chain config for the pool
   /// @param remoteTokenAddress The address of the remote token
-  /// @param poolType The type of pool to deploy
   /// @return bytes32 hash of the init code to be used in the deterministic address calculation
   function _generatePoolInitcodeHash(
     bytes memory initCode,
     RemoteChainConfig memory remoteChainConfig,
-    address remoteTokenAddress,
-    PoolType poolType
+    address remoteTokenAddress
   ) private pure returns (bytes32) {
     return keccak256(
       abi.encodePacked(

@@ -21,24 +21,6 @@ contract BurnMintWithLockReleaseFlagTokenPool is BurnMintTokenPool {
     address router
   ) BurnMintTokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) {}
 
-  /// @notice Mint tokens from the pool to the recipient
-  /// @dev The _validateReleaseOrMint check is an essential security check
-  function releaseOrMint(
-    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
-  ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
-    _validateReleaseOrMint(releaseOrMintIn);
-
-    // Since the remote token is always canonical USDC, the decimals should always be 6 for remote tokens,
-    // which enables potentially local non-canonical USDC with different decimals to be minted.
-    uint256 localAmount = _calculateLocalAmount(releaseOrMintIn.amount, 6);
-
-    IBurnMintERC20(address(i_token)).mint(releaseOrMintIn.receiver, localAmount);
-
-    emit ReleasedOrMinted(msg.sender, releaseOrMintIn.receiver, localAmount);
-
-    return Pool.ReleaseOrMintOutV1({destinationAmount: localAmount});
-  }
-
   /// @notice Burn the token in the pool
   /// @dev The _validateLockOrBurn check is an essential security check
   /// @dev Performs the exact same functionality as BurnMintTokenPool, but returns the LOCK_RELEASE_FLAG
@@ -57,5 +39,23 @@ contract BurnMintWithLockReleaseFlagTokenPool is BurnMintTokenPool {
       destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
       destPoolData: abi.encode(LOCK_RELEASE_FLAG)
     });
+  }
+
+  /// @notice Mint tokens from the pool to the recipient
+  /// @dev The _validateReleaseOrMint check is an essential security check
+  function releaseOrMint(
+    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
+  ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
+    _validateReleaseOrMint(releaseOrMintIn);
+
+    // Since the remote token is always canonical USDC, the decimals should always be 6 for remote tokens,
+    // which enables potentially local non-canonical USDC with different decimals to be minted.
+    uint256 localAmount = _calculateLocalAmount(releaseOrMintIn.amount, 6);
+
+    IBurnMintERC20(address(i_token)).mint(releaseOrMintIn.receiver, localAmount);
+
+    emit ReleasedOrMinted(msg.sender, releaseOrMintIn.receiver, localAmount);
+
+    return Pool.ReleaseOrMintOutV1({destinationAmount: localAmount});
   }
 }

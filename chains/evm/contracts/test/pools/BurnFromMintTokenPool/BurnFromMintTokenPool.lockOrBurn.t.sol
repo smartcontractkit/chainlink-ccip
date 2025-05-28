@@ -10,15 +10,14 @@ import {IERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
 contract BurnFromMintTokenPool_lockOrBurn is BurnFromMintTokenPoolSetup {
-  function test_setup() public view {
+  function test_constructor() public view {
     assertEq(address(s_burnMintERC20), address(s_pool.getToken()));
     assertEq(address(s_mockRMNRemote), s_pool.getRmnProxy());
     assertEq(false, s_pool.getAllowListEnabled());
     assertEq(type(uint256).max, s_burnMintERC20.allowance(address(s_pool), address(s_pool)));
-    assertEq("BurnFromMintTokenPool 1.5.1", s_pool.typeAndVersion());
   }
 
-  function test_PoolBurn() public {
+  function test_lockOrBurn() public {
     uint256 burnAmount = 20_000e18;
 
     deal(address(s_burnMintERC20), address(s_pool), burnAmount);
@@ -52,7 +51,7 @@ contract BurnFromMintTokenPool_lockOrBurn is BurnFromMintTokenPoolSetup {
   }
 
   // Should not burn tokens if cursed.
-  function test_RevertWhen_PoolBurnRevertNotHealthy() public {
+  function test_lockOrBurn_RevertWhen_PoolBurnRevertNotHealthy() public {
     vm.mockCall(address(s_mockRMNRemote), abi.encodeWithSignature("isCursed(bytes16)"), abi.encode(true));
 
     uint256 before = s_burnMintERC20.balanceOf(address(s_pool));
@@ -72,7 +71,7 @@ contract BurnFromMintTokenPool_lockOrBurn is BurnFromMintTokenPoolSetup {
     assertEq(s_burnMintERC20.balanceOf(address(s_pool)), before);
   }
 
-  function test_RevertWhen_ChainNotAllowed() public {
+  function test_lockOrBurn_RevertWhen_ChainNotAllowed() public {
     uint64 wrongChainSelector = 8838833;
     vm.expectRevert(abi.encodeWithSelector(TokenPool.ChainNotAllowed.selector, wrongChainSelector));
     s_pool.releaseOrMint(

@@ -24,7 +24,7 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
   event LiquidityRemoved(address indexed provider, uint256 indexed amount);
   event RebalancerSet(address oldRebalancer, address newRebalancer);
 
-  string public constant override typeAndVersion = "LockReleaseTokenPool 1.5.1";
+  string public constant override typeAndVersion = "LockReleaseTokenPool 1.6.1-dev";
 
   /// @notice The address of the rebalancer.
   address internal s_rebalancer;
