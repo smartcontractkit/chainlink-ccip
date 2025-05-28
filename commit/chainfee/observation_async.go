@@ -73,12 +73,42 @@ func (o *baseObserver) getChainFeePriceUpdates(
 	ctx context.Context,
 	lggr logger.Logger,
 ) map[cciptypes.ChainSelector]Update {
-	supportedChains, err := o.getSupportedChains(lggr, o.cs, o.oracleID, o.destChain)
+	enabledSourceChains, err := o.getEnabledSourceChains(ctx)
 	if err != nil {
-		lggr.Errorw("failed to get supported chains unable to get chain fee price updates", "err", err)
+		lggr.Errorw("failed to get enabled source chains unable to get chain fee price updates", "err", err)
 		return map[cciptypes.ChainSelector]Update{}
 	}
-	return feeUpdatesFromTimestampedBig(o.ccipReader.GetChainFeePriceUpdate(ctx, supportedChains))
+
+	if len(enabledSourceChains) == 0 {
+		lggr.Debugw("no enabled source chains found, returning empty chain fee price updates")
+		return map[cciptypes.ChainSelector]Update{}
+	}
+
+	return feeUpdatesFromTimestampedBig(
+		o.ccipReader.GetChainFeePriceUpdate(ctx, enabledSourceChains),
+	)
+}
+
+func (o *baseObserver) getEnabledSourceChains(ctx context.Context) ([]cciptypes.ChainSelector, error) {
+	allSourceChains, err := o.cs.KnownSourceChainsSlice()
+	if err != nil {
+		return nil, err
+	}
+
+	sourceChainsCfg, err := o.ccipReader.GetOffRampSourceChainsConfig(ctx, allSourceChains)
+	if err != nil {
+		return nil, err
+	}
+
+	enabledSourceChains := make([]cciptypes.ChainSelector, 0, len(sourceChainsCfg))
+	for chain, cfg := range sourceChainsCfg {
+		if cfg.IsEnabled && o.destChain != chain {
+			enabledSourceChains = append(enabledSourceChains, chain)
+		}
+	}
+
+	sort.Slice(enabledSourceChains, func(i, j int) bool { return enabledSourceChains[i] < enabledSourceChains[j] })
+	return enabledSourceChains, nil
 }
 
 func (o *baseObserver) invalidateCaches(_ context.Context, _ logger.Logger) {}

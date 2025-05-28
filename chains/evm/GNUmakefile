@@ -10,7 +10,7 @@ snapshot-diff: ## Make a snapshot for a specific product.
 
 .PHONY: foundry
 foundry: ## Install foundry.
-	foundryup --install v1.0.0
+	foundryup --install v1.2.0
 
 # it may be necessary to install libusb on your machine as a dependency for this script to work
 .PHONY: foundry-zksync
@@ -37,6 +37,11 @@ ccip-lcov:
 wrappers: pnpmdep mockery abigen
 	./scripts/compile_all
 	go generate ./gobindings
+
+wrappers-release: export metadata=true
+.PHONY: wrappers-release
+wrappers-release: ## Generate the gethwrappers for release which includes metadata.
+	 make wrappers
 
 .PHONY: wrappers-zksync
 wrappers-zksync: pnpmdep foundry-zksync

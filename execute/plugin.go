@@ -286,6 +286,7 @@ func getPendingReportsForExecution(
 	canExecute CanExecuteHandle,
 	fetchFrom time.Time,
 	cursedSourceChains map[cciptypes.ChainSelector]bool,
+	limit int,
 	lggr logger.Logger,
 ) (
 	groupedCommits exectypes.CommitObservations,
@@ -302,7 +303,7 @@ func getPendingReportsForExecution(
 
 	// Assuming each report can have minimum one message, max reports shouldn't exceed the max messages
 	unfinalizedIncrementReports, err := ccipReader.CommitReportsGTETimestamp(
-		ctx, queryFromTimestampForNewReports, primitives.Unconfirmed, maxCommitReportsToFetch,
+		ctx, queryFromTimestampForNewReports, primitives.Unconfirmed, limit,
 	)
 	if err != nil {
 		return nil, nil, nil, err
