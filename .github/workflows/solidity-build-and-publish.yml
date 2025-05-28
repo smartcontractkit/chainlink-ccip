@@ -83,7 +83,6 @@ jobs:
       - name: Run native compile and generate wrappers
         if: ${{ !(needs.tag-check.outputs.is-release-ccip == 'true' || needs.tag-check.outputs.is-pre-release-ccip == 'true') }}
         working-directory: chains/evm
-
         run: make wrappers
 
       - name: Run native compile and generate wrappers including metadata
