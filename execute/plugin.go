@@ -863,11 +863,15 @@ func (p *Plugin) supportedChains(id commontypes.OracleID) (mapset.Set[cciptypes.
 }
 
 func (p *Plugin) supportsDestChain() (bool, error) {
+	return p.supportsChain(p.destChain)
+}
+
+func (p *Plugin) supportsChain(chainSel cciptypes.ChainSelector) (bool, error) {
 	chains, err := p.supportedChains(p.reportingCfg.OracleID)
 	if err != nil {
 		return false, fmt.Errorf("error getting supported chains: %w", err)
 	}
-	return chains.Contains(p.destChain), nil
+	return chains.Contains(chainSel), nil
 }
 
 // Interface compatibility checks.

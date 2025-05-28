@@ -353,12 +353,22 @@ func (p *Plugin) getMessagesObservation(
 		return exectypes.LessThan(commitData[i], commitData[j])
 	})
 
+	supportedChains, err := p.supportedChains(p.reportingCfg.OracleID)
+	if err != nil {
+		return exectypes.Observation{}, fmt.Errorf("get supported chains: %w", err)
+	}
+
 	stop := false
 
 	totalMsgs := 0
 	encodedObsSize := 0
 	for _, report := range commitData {
 		srcChain := report.SourceChain
+
+		if !supportedChains.Contains(srcChain) {
+			lggr.Debugw("skipping report of unsupported source chain", "srcChain", srcChain)
+			continue
+		}
 
 		// Read messages for this report's sequence number range
 		msgs, err := p.readMessagesForReport(ctx, lggr, srcChain, report)
