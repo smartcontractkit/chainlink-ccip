@@ -47,7 +47,13 @@ contract FastTransferTokenPoolHelperSetup is BaseTest {
       removeFillers: new address[](0)
     });
 
-    s_tokenPool = new FastTransferTokenPoolHelper(s_token, address(s_sourceRouter));
+    s_tokenPool = new FastTransferTokenPoolHelper(
+      s_token,
+      18, // localTokenDecimals
+      new address[](0), // allowlist
+      address(s_mockRMNRemote), // rmnProxy
+      address(s_sourceRouter) // router
+    );
     s_tokenPool.updateLaneConfig(laneConfigArgs[0]);
 
     // Approve tokens

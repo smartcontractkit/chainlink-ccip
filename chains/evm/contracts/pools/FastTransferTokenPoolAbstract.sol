@@ -1,16 +1,21 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.10;
+pragma solidity ^0.8.24;
 
 // Local interfaces
+
+import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol";
 import {IFastTransferPool} from "../interfaces/IFastTransferPool.sol";
 import {IRouterClient} from "../interfaces/IRouterClient.sol";
 
 // Chainlink interfaces
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
+import {IERC165} from
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/IERC165.sol";
 
 // Local libraries and applications
 import {CCIPReceiver} from "../applications/CCIPReceiver.sol";
 import {Client} from "../libraries/Client.sol";
+import {TokenPool} from "./TokenPool.sol";
 
 // OpenZeppelin imports
 import {IERC20} from
@@ -21,7 +26,7 @@ import {SafeERC20} from
 /// @title Abstract Fast-Transfer Pool
 /// @notice Base contract for fast-transfer pools that provides common functionality
 /// for quoting, fill-tracking, and CCIP send helpers.
-abstract contract FastTransferTokenPoolAbstract is CCIPReceiver, ITypeAndVersion, IFastTransferPool {
+abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITypeAndVersion, IFastTransferPool {
   using SafeERC20 for IERC20;
 
   error WhitelistNotEnabled();
@@ -87,14 +92,18 @@ abstract contract FastTransferTokenPoolAbstract is CCIPReceiver, ITypeAndVersion
   mapping(bytes32 fillId => address filler) internal s_fills;
 
   /// @notice Initializes the fast transfer pool
+  /// @param token The token this pool manages
+  /// @param localTokenDecimals The decimals of the local token
+  /// @param allowlist The allowlist of addresses
+  /// @param rmnProxy The RMN proxy address
   /// @param router Address of the CCIP router
-
   constructor(
+    IERC20 token,
+    uint8 localTokenDecimals,
+    address[] memory allowlist,
+    address rmnProxy,
     address router
-  )
-    //LaneConfigArgs[] memory laneConfigArgs
-    CCIPReceiver(router)
-  {}
+  ) TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) CCIPReceiver(router) {}
 
   /// @notice Updates the lane configuration
   /// @param laneConfigArgs The lane configuration arguments
@@ -327,10 +336,72 @@ abstract contract FastTransferTokenPoolAbstract is CCIPReceiver, ITypeAndVersion
     uint8 srcDecimal,
     uint256 fastTransferFee,
     address receiver
+  ) internal virtual {
+    _validateSettlement(sourceChainSelector, sourcePoolAddress);
+
+    // Common calculations
+    uint256 localAmount = _calculateLocalAmount(srcAmount, srcDecimal);
+    uint256 settlementAmountLocal = localAmount + _calculateLocalAmount(fastTransferFee, srcDecimal);
+
+    // Common fill tracking logic
+    bytes32 fillId = keccak256(abi.encodePacked(fillRequestId, localAmount, receiver));
+    address filler = s_fills[fillId];
+
+    // Handle settlement based on fill state
+    if (filler == address(0)) {
+      // Not fast-filled - mint/release to receiver
+      _handleNotFastFilled(sourceChainSelector, settlementAmountLocal, receiver);
+    } else if (filler == address(1)) {
+      // Already settled
+      revert MessageAlreadySettled(fillRequestId);
+    } else {
+      // Fast-filled - reimburse filler
+      _handleFastFilledReimbursement(filler, settlementAmountLocal);
+    }
+
+    // Mark as settled
+    s_fills[fillId] = address(1);
+  }
+
+  /// @notice Validates settlement prerequisites
+  /// @param sourceChainSelector The source chain selector
+  /// @param sourcePoolAddress The source pool address
+  function _validateSettlement(uint64 sourceChainSelector, bytes memory sourcePoolAddress) internal view virtual {
+    // Default implementation - can be overridden by concrete contracts
+    // Most pools will want RMN curse check and source pool validation
+  }
+
+  /// @notice Handles settlement when the request was not fast-filled
+  /// @param sourceChainSelector The source chain selector
+  /// @param settlementAmountLocal The amount to settle in local token
+  /// @param receiver The receiver address
+  function _handleNotFastFilled(
+    uint64 sourceChainSelector,
+    uint256 settlementAmountLocal,
+    address receiver
   ) internal virtual;
+
+  /// @notice Handles reimbursement when the request was fast-filled
+  /// @param filler The filler address to reimburse
+  /// @param settlementAmountLocal The amount to reimburse in local token
+  function _handleFastFilledReimbursement(address filler, uint256 settlementAmountLocal) internal virtual;
 
   /// @notice Override this function in your implementation.
   /// @dev The check is dependent on the ownership implementation of the implementation contract of the pool
   /// we do not enforce the ownership implementation in this abstract contract
   function _checkAdmin() internal view virtual;
+
+  /// @notice Override getRouter to resolve diamond inheritance
+  function getRouter() public view virtual override(TokenPool, CCIPReceiver) returns (address) {
+    return TokenPool.getRouter();
+  }
+
+  /// @notice Override supportsInterface to resolve diamond inheritance
+  function supportsInterface(
+    bytes4 interfaceId
+  ) public pure virtual override(TokenPool, CCIPReceiver) returns (bool) {
+    return interfaceId == type(IFastTransferPool).interfaceId || interfaceId == type(ITypeAndVersion).interfaceId
+      || interfaceId == type(IAny2EVMMessageReceiver).interfaceId || interfaceId == type(IERC165).interfaceId
+      || super.supportsInterface(interfaceId);
+  }
 }

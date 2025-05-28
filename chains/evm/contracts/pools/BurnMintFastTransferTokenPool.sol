@@ -10,7 +10,6 @@ import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/I
 import {IERC165} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/IERC165.sol";
 
-import {CCIPReceiver} from "../applications/CCIPReceiver.sol";
 import {BurnMintTokenPoolAbstract} from "./BurnMintTokenPoolAbstract.sol";
 import {FastTransferTokenPoolAbstract} from "./FastTransferTokenPoolAbstract.sol";
 import {TokenPool} from "./TokenPool.sol";
@@ -34,8 +33,7 @@ contract BurnMintFastTransferTokenPool is ITypeAndVersion, BurnMintTokenPoolAbst
     address router
   )
     // FastTransferTokenPoolAbstract.LaneConfigArgs[] memory laneConfigArgs
-    TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router)
-    FastTransferTokenPoolAbstract(router)
+    FastTransferTokenPoolAbstract(token, localTokenDecimals, allowlist, rmnProxy, router)
   {}
 
   function _handleTokenToTransfer(uint64 destinationChainSelector, address sender, uint256 amount) internal override {
@@ -68,31 +66,35 @@ contract BurnMintFastTransferTokenPool is ITypeAndVersion, BurnMintTokenPoolAbst
     uint256 fastTransferFee,
     address receiver
   ) internal override {
+    // Call the common settlement logic from the abstract contract
+    super._settle(
+      sourceChainSelector, fillRequestId, sourcePoolAddress, srcAmount, srcDecimal, fastTransferFee, receiver
+    );
+  }
+
+  /// @notice Validates settlement prerequisites - overrides default implementation
+  function _validateSettlement(uint64 sourceChainSelector, bytes memory sourcePoolAddress) internal view override {
     if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(sourceChainSelector)))) revert CursedByRMN();
     //Validates that the source pool address is configured on this pool.
     if (!isRemotePool(sourceChainSelector, sourcePoolAddress)) {
       revert InvalidSourcePoolAddress(sourcePoolAddress);
     }
-    uint256 localAmount = _calculateLocalAmount(srcAmount, srcDecimal);
-    uint256 settlementAmountLocal = localAmount + _calculateLocalAmount(fastTransferFee, srcDecimal);
+  }
 
-    bytes32 fillId = keccak256(abi.encodePacked(fillRequestId, localAmount, receiver));
-    address filler = s_fills[fillId];
-    // not fast-filled
-    if (filler == address(0)) {
-      _consumeInboundRateLimit(sourceChainSelector, settlementAmountLocal);
-      IBurnMintERC20(address(i_token)).mint(receiver, settlementAmountLocal);
-    }
-    // already settled
-    else if (filler == address(1)) {
-      revert MessageAlreadySettled(fillRequestId);
-    }
-    // fast-filled; verify amount
-    else {
-      // Honest filler -> pay them back + fee
-      IBurnMintERC20(address(i_token)).mint(filler, settlementAmountLocal);
-    }
-    s_fills[fillId] = address(1); // Mark as settled
+  /// @notice Handles settlement when the request was not fast-filled
+  function _handleNotFastFilled(
+    uint64 sourceChainSelector,
+    uint256 settlementAmountLocal,
+    address receiver
+  ) internal override {
+    _consumeInboundRateLimit(sourceChainSelector, settlementAmountLocal);
+    IBurnMintERC20(address(i_token)).mint(receiver, settlementAmountLocal);
+  }
+
+  /// @notice Handles reimbursement when the request was fast-filled
+  function _handleFastFilledReimbursement(address filler, uint256 settlementAmountLocal) internal override {
+    // Honest filler -> pay them back + fee
+    IBurnMintERC20(address(i_token)).mint(filler, settlementAmountLocal);
   }
 
   function _checkAdmin() internal view override onlyOwner {}
@@ -100,9 +102,9 @@ contract BurnMintFastTransferTokenPool is ITypeAndVersion, BurnMintTokenPoolAbst
   /// @notice Signals which version of the pool interface is supported
   function supportsInterface(
     bytes4 interfaceId
-  ) public pure virtual override(TokenPool, CCIPReceiver) returns (bool) {
+  ) public pure virtual override(TokenPool, FastTransferTokenPoolAbstract) returns (bool) {
     return interfaceId == type(IFastTransferPool).interfaceId || interfaceId == type(IERC165).interfaceId
-      || interfaceId == type(IAny2EVMMessageReceiver).interfaceId;
+      || interfaceId == type(IAny2EVMMessageReceiver).interfaceId || super.supportsInterface(interfaceId);
   }
 
   function _burn(
@@ -111,7 +113,7 @@ contract BurnMintFastTransferTokenPool is ITypeAndVersion, BurnMintTokenPoolAbst
     IBurnMintERC20(address(i_token)).burnFrom(msg.sender, amount);
   }
 
-  function getRouter() public view override(TokenPool, CCIPReceiver) returns (address router) {
+  function getRouter() public view override(TokenPool, FastTransferTokenPoolAbstract) returns (address router) {
     return address(s_router);
   }
 }

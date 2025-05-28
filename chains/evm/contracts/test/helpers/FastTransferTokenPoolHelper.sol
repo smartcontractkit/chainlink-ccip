@@ -1,6 +1,7 @@
   // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {Pool} from "../../libraries/Pool.sol";
 import {FastTransferTokenPoolAbstract} from "../../pools/FastTransferTokenPoolAbstract.sol";
 import {IERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
@@ -14,18 +15,16 @@ contract FastTransferTokenPoolHelper is FastTransferTokenPoolAbstract {
 
   string public constant override typeAndVersion = "FastTransferTokenPoolHelper 1.6.1";
 
-  IERC20 internal immutable i_token;
   address internal immutable i_admin;
 
   constructor(
     IERC20 token,
-    address router //CCIPReceiver(router)
-  )
-    //FastTransferTokenPoolAbstract.LaneConfigArgs[] memory laneConfigArgs
-    FastTransferTokenPoolAbstract(router)
-  {
+    uint8 localTokenDecimals,
+    address[] memory allowlist,
+    address rmnProxy,
+    address router
+  ) FastTransferTokenPoolAbstract(token, localTokenDecimals, allowlist, rmnProxy, router) {
     i_admin = msg.sender;
-    i_token = token;
   }
 
   // Public wrappers for internal functions
@@ -46,7 +45,7 @@ contract FastTransferTokenPoolHelper is FastTransferTokenPoolAbstract {
   // Implementation of abstract functions
   function _handleTokenToTransfer(uint64, address sender, uint256 amount) internal override {
     // For testing, we'll just transfer tokens from sender to this contract
-    IERC20(i_token).safeTransferFrom(sender, address(this), amount);
+    getToken().safeTransferFrom(sender, address(this), amount);
   }
 
   function _transferFromFiller(
@@ -56,7 +55,7 @@ contract FastTransferTokenPoolHelper is FastTransferTokenPoolAbstract {
     uint256 srcAmount,
     uint8
   ) internal override returns (uint256) {
-    IERC20(i_token).safeTransferFrom(filler, receiver, srcAmount);
+    getToken().safeTransferFrom(filler, receiver, srcAmount);
     return srcAmount;
   }
 
@@ -68,9 +67,53 @@ contract FastTransferTokenPoolHelper is FastTransferTokenPoolAbstract {
     uint8 srcDecimal,
     uint256 fastTransferFee,
     address receiver
-  ) internal override {}
+  ) internal override {
+    // Call the common settlement logic from the abstract contract
+    super._settle(
+      sourceChainSelector, fillRequestId, sourcePoolAddress, srcAmount, srcDecimal, fastTransferFee, receiver
+    );
+  }
+
+  /// @notice Validates settlement prerequisites - simple implementation for testing
+  function _validateSettlement(uint64, bytes memory) internal view override {
+    // For testing, we'll do minimal validation
+    // Real implementations would check RMN curse and source pool validation
+  }
+
+  /// @notice Handles settlement when the request was not fast-filled
+  function _handleNotFastFilled(uint64, uint256 settlementAmountLocal, address receiver) internal override {
+    // For testing, just transfer tokens to receiver
+    getToken().safeTransfer(receiver, settlementAmountLocal);
+  }
+
+  /// @notice Handles reimbursement when the request was fast-filled
+  function _handleFastFilledReimbursement(address filler, uint256 settlementAmountLocal) internal override {
+    // For testing, just transfer tokens to filler
+    getToken().safeTransfer(filler, settlementAmountLocal);
+  }
 
   function _checkAdmin() internal view override {
     if (msg.sender != i_admin) revert NotAdmin();
+  }
+
+  // TokenPool function implementations
+  function lockOrBurn(
+    Pool.LockOrBurnInV1 calldata lockOrBurnIn
+  ) external override returns (Pool.LockOrBurnOutV1 memory) {
+    _validateLockOrBurn(lockOrBurnIn);
+    return Pool.LockOrBurnOutV1({
+      destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
+      destPoolData: _encodeLocalDecimals()
+    });
+  }
+
+  function releaseOrMint(
+    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
+  ) external override returns (Pool.ReleaseOrMintOutV1 memory) {
+    _validateReleaseOrMint(releaseOrMintIn);
+    uint256 localAmount =
+      _calculateLocalAmount(releaseOrMintIn.amount, _parseRemoteDecimals(releaseOrMintIn.sourcePoolData));
+    getToken().safeTransfer(releaseOrMintIn.receiver, localAmount);
+    return Pool.ReleaseOrMintOutV1({destinationAmount: localAmount});
   }
 }
