@@ -656,6 +656,10 @@ func (r *ccipChainReader) GetExpectedNextSequenceNumber(
 func (r *ccipChainReader) NextSeqNum(
 	ctx context.Context, chains []cciptypes.ChainSelector,
 ) (map[cciptypes.ChainSelector]cciptypes.SeqNum, error) {
+	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
+		return nil, err
+	}
+	
 	lggr := logutil.WithContextValues(ctx, r.lggr)
 
 	// Use our direct fetch method that doesn't affect the cache

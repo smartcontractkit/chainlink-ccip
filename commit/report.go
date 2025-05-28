@@ -202,7 +202,7 @@ func (p *Plugin) validateReport(
 	}
 
 	if !supports {
-		lggr.Warnw("dest chain not supported, can't run report acceptance procedures")
+		lggr.Errorw("dest chain not supported, can't run report acceptance procedures, transmission schedule is wrong")
 		return cciptypes.CommitPluginReport{}, plugincommon.NewErrInvalidReport("dest chain not supported")
 	}
 
