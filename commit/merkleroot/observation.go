@@ -156,6 +156,8 @@ func (p *Processor) verifyQuery(ctx context.Context, prevOutcome Outcome, q Quer
 		return fmt.Errorf("get chain by selector %d", p.destChain)
 	}
 
+	// TODO: this is a role-don inconsistency. If oracle does not support the destination chain the call below
+	// will fail. Meaning only oracles that support the destination chain will be able to verify the query.
 	offRampAddress, err := p.ccipReader.GetContractAddress(consts.ContractNameOffRamp, p.destChain)
 	if err != nil {
 		return fmt.Errorf("get offramp contract address: %w", err)
@@ -554,7 +556,7 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(ctx context.Context) []pluginty
 
 	supportedSourceChains := mapset.NewSet(allSourceChains...).
 		Intersect(supportedChains).ToSlice()
-	
+
 	sort.Slice(supportedSourceChains, func(i, j int) bool { return supportedSourceChains[i] < supportedSourceChains[j] })
 
 	mu := &sync.Mutex{}
