@@ -3,10 +3,11 @@ pragma solidity ^0.8.24;
 
 import {IAny2EVMMessageReceiver} from "../../../interfaces/IAny2EVMMessageReceiver.sol";
 import {IFastTransferPool} from "../../../interfaces/IFastTransferPool.sol";
+
+import {BurnMintFastTransferTokenPoolSetup} from "./BurnMintFastTransferTokenPoolSetup.t.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 import {IERC165} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/IERC165.sol";
-import {BurnMintFastTransferTokenPoolSetup} from "./BurnMintFastTransferTokenPoolSetup.t.sol";
 
 contract BurnMintFastTransferTokenPool_supportsInterface is BurnMintFastTransferTokenPoolSetup {
   function test_SupportsInterface() public view {
