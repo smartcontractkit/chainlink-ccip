@@ -3,7 +3,6 @@ pragma solidity ^0.8.24;
 
 import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol";
 import {IFastTransferPool} from "../interfaces/IFastTransferPool.sol";
-import {IRMN} from "../interfaces/IRMN.sol";
 
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
@@ -12,7 +11,6 @@ import {BurnMintTokenPoolAbstract} from "./BurnMintTokenPoolAbstract.sol";
 import {FastTransferTokenPoolAbstract} from "./FastTransferTokenPoolAbstract.sol";
 import {TokenPool} from "./TokenPool.sol";
 
-// OpenZeppelin imports
 import {IERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from
@@ -34,10 +32,6 @@ contract BurnMintFastTransferTokenPool is ITypeAndVersion, BurnMintTokenPoolAbst
   ) FastTransferTokenPoolAbstract(token, localTokenDecimals, allowlist, rmnProxy, router) {}
 
   function _handleTokenToTransfer(uint64 destinationChainSelector, address sender, uint256 amount) internal override {
-    if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(destinationChainSelector)))) revert CursedByRMN();
-    _checkAllowList(sender);
-    if (!isSupportedChain(destinationChainSelector)) revert ChainNotAllowed(destinationChainSelector);
-    _consumeOutboundRateLimit(destinationChainSelector, amount);
     _burn(amount);
   }
 
@@ -69,15 +63,6 @@ contract BurnMintFastTransferTokenPool is ITypeAndVersion, BurnMintTokenPoolAbst
     );
   }
 
-  /// @notice Validates settlement prerequisites - overrides default implementation
-  function _validateSettlement(uint64 sourceChainSelector, bytes memory sourcePoolAddress) internal view override {
-    if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(sourceChainSelector)))) revert CursedByRMN();
-    //Validates that the source pool address is configured on this pool.
-    if (!isRemotePool(sourceChainSelector, sourcePoolAddress)) {
-      revert InvalidSourcePoolAddress(sourcePoolAddress);
-    }
-  }
-
   /// @notice Handles settlement when the request was not fast-filled
   function _handleNotFastFilled(
     uint64 sourceChainSelector,
@@ -93,8 +78,6 @@ contract BurnMintFastTransferTokenPool is ITypeAndVersion, BurnMintTokenPoolAbst
     // Honest filler -> pay them back + fee
     IBurnMintERC20(address(i_token)).mint(filler, settlementAmountLocal);
   }
-
-  function _checkAdmin() internal view override onlyOwner {}
 
   /// @notice Signals which version of the pool interface is supported
   function supportsInterface(
