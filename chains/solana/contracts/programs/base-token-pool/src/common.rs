@@ -11,6 +11,7 @@ use crate::rate_limiter::{RateLimitConfig, RateLimitTokenBucket};
 pub const ANCHOR_DISCRIMINATOR: usize = 8; // 8-byte anchor discriminator length
 pub const POOL_CHAINCONFIG_SEED: &[u8] = b"ccip_tokenpool_chainconfig"; // seed used by CCIP to provide correct chain config to pool
 pub const POOL_STATE_SEED: &[u8] = b"ccip_tokenpool_config";
+pub const CONFIG_SEED: &[u8] = b"config";
 pub const POOL_SIGNER_SEED: &[u8] = b"ccip_tokenpool_signer";
 
 pub const EXTERNAL_TOKEN_POOLS_SIGNER: &[u8] = b"external_token_pools_signer";

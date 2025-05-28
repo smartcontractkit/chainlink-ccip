@@ -3,6 +3,72 @@ export type BurnmintTokenPool = {
   "name": "burnmint_token_pool",
   "instructions": [
     {
+      "name": "initGlobalConfig",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "config",
+          "type": {
+            "defined": "BnMConfig"
+          }
+        }
+      ]
+    },
+    {
+      "name": "updateGlobalConfig",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "config",
+          "type": {
+            "defined": "BnMConfig"
+          }
+        }
+      ]
+    },
+    {
       "name": "initialize",
       "accounts": [
         {
@@ -32,6 +98,11 @@ export type BurnmintTokenPool = {
         },
         {
           "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "config",
           "isMut": false,
           "isSigner": false
         }
@@ -593,6 +664,18 @@ export type BurnmintTokenPool = {
             "type": {
               "defined": "BaseConfig"
             }
+          }
+        ]
+      }
+    },
+    {
+      "name": "bnMConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "selfServedAllowed",
+            "type": "bool"
           }
         ]
       }
@@ -619,6 +702,72 @@ export const IDL: BurnmintTokenPool = {
   "name": "burnmint_token_pool",
   "instructions": [
     {
+      "name": "initGlobalConfig",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "config",
+          "type": {
+            "defined": "BnMConfig"
+          }
+        }
+      ]
+    },
+    {
+      "name": "updateGlobalConfig",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "config",
+          "type": {
+            "defined": "BnMConfig"
+          }
+        }
+      ]
+    },
+    {
       "name": "initialize",
       "accounts": [
         {
@@ -648,6 +797,11 @@ export const IDL: BurnmintTokenPool = {
         },
         {
           "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "config",
           "isMut": false,
           "isSigner": false
         }
@@ -1209,6 +1363,18 @@ export const IDL: BurnmintTokenPool = {
             "type": {
               "defined": "BaseConfig"
             }
+          }
+        ]
+      }
+    },
+    {
+      "name": "bnMConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "selfServedAllowed",
+            "type": "bool"
           }
         ]
       }

@@ -26,3 +26,7 @@
 .idea
 
 vendor/
+
+.vscode
+chains/solana/tsclient/src/staging.ts
+*node_modules

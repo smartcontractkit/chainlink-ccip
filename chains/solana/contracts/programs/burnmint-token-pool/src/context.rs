@@ -6,9 +6,47 @@ use anchor_spl::{
 use base_token_pool::common::*;
 use ccip_common::seed;
 
-use crate::{program::BurnmintTokenPool, ChainConfig, State};
+use crate::{program::BurnmintTokenPool, BnMConfig, ChainConfig, State};
 
 const MAX_POOL_STATE_V: u8 = 1;
+
+#[derive(Accounts)]
+pub struct InitGlobalConfig<'info> {
+    #[account(
+        init,
+        seeds = [CONFIG_SEED],
+        bump,
+        payer = authority,
+        space = ANCHOR_DISCRIMINATOR + BnMConfig::INIT_SPACE,
+    )]
+    pub config: Account<'info, BnMConfig>, // Global Config PDA of the Token Pool
+
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
+
+    // Global Config updates only allowed by program upgrade authority
+    #[account(constraint = program_data.upgrade_authority_address == Some(authority.key()) @ CcipTokenPoolError::Unauthorized)]
+    pub program_data: Account<'info, ProgramData>,
+}
+
+#[derive(Accounts)]
+pub struct UpdateGlobalConfig<'info> {
+    #[account(
+        mut,
+        seeds = [CONFIG_SEED],
+        bump,
+    )]
+    pub config: Account<'info, BnMConfig>, // Global Config PDA of the Token Pool
+
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
+
+    // Global Config updates only allowed by program upgrade authority
+    #[account(constraint = program_data.upgrade_authority_address == Some(authority.key()) @ CcipTokenPoolError::Unauthorized)]
+    pub program_data: Account<'info, ProgramData>,
+}
 
 #[derive(Accounts)]
 pub struct InitializeTokenPool<'info> {
@@ -31,8 +69,14 @@ pub struct InitializeTokenPool<'info> {
 
     // Token pool initialization only allowed by program upgrade authority. Initializing token pools managed
     // by the CLL deployment of this program is limited to CLL. Users must deploy their own instance of this program.
-    #[account(constraint = program_data.upgrade_authority_address == Some(authority.key()) @ CcipTokenPoolError::Unauthorized)]
+    #[account(constraint = allowed_to_initialize_token_pool(&program_data, &authority, &config, &mint) @ CcipTokenPoolError::Unauthorized)]
     pub program_data: Account<'info, ProgramData>,
+
+    #[account(
+        seeds = [CONFIG_SEED],
+        bump,
+    )]
+    pub config: Account<'info, BnMConfig>, // Global Config PDA of the Token Pool
 }
 
 #[derive(Accounts)]
@@ -366,4 +410,16 @@ pub struct DeleteChainConfig<'info> {
     pub chain_config: Account<'info, ChainConfig>,
     #[account(mut, address = state.config.owner)]
     pub authority: Signer<'info>,
+}
+
+/// Checks if the given authority is allowed to initialize the token pool.
+pub fn allowed_to_initialize_token_pool(
+    program_data: &Account<ProgramData>,
+    authority: &Signer,
+    config: &Account<BnMConfig>,
+    mint: &InterfaceAccount<Mint>,
+) -> bool {
+    program_data.upgrade_authority_address == Some(authority.key()) || // The upgrade authority of the token pool program can initialize a token pool
+    (config.self_served_allowed && Some(authority.key()) == mint.mint_authority.into() )
+    // or the mint authority of the token
 }
