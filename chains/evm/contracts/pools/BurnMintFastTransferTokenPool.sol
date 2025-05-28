@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.10;
+pragma solidity ^0.8.24;
 
 import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol";
 import {IFastTransferPool} from "../interfaces/IFastTransferPool.sol";
@@ -7,8 +7,6 @@ import {IRMN} from "../interfaces/IRMN.sol";
 
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
-import {IERC165} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/IERC165.sol";
 
 import {BurnMintTokenPoolAbstract} from "./BurnMintTokenPoolAbstract.sol";
 import {FastTransferTokenPoolAbstract} from "./FastTransferTokenPoolAbstract.sol";
@@ -19,6 +17,8 @@ import {IERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC165} from
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/IERC165.sol";
 
 contract BurnMintFastTransferTokenPool is ITypeAndVersion, BurnMintTokenPoolAbstract, FastTransferTokenPoolAbstract {
   using SafeERC20 for IERC20;
@@ -31,10 +31,7 @@ contract BurnMintFastTransferTokenPool is ITypeAndVersion, BurnMintTokenPoolAbst
     address[] memory allowlist,
     address rmnProxy,
     address router
-  )
-    // FastTransferTokenPoolAbstract.LaneConfigArgs[] memory laneConfigArgs
-    FastTransferTokenPoolAbstract(token, localTokenDecimals, allowlist, rmnProxy, router)
-  {}
+  ) FastTransferTokenPoolAbstract(token, localTokenDecimals, allowlist, rmnProxy, router) {}
 
   function _handleTokenToTransfer(uint64 destinationChainSelector, address sender, uint256 amount) internal override {
     if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(destinationChainSelector)))) revert CursedByRMN();

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.10;
+pragma solidity ^0.8.24;
 
 import {Router} from "../../../Router.sol";
 import {BurnMintFastTransferTokenPool} from "../../../pools/BurnMintFastTransferTokenPool.sol";
