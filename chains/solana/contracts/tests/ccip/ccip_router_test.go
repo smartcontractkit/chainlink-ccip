@@ -9660,9 +9660,6 @@ func TestCCIPRouter(t *testing.T) {
 					// PDA of the buffer account
 					solana.NewAccountMeta(bufferPDA, true, false),
 				)
-				instruction, err = raw2.ValidateAndBuild()
-				require.NoError(t, err)
-
 				bufferedExecutionIx, err := raw2.ValidateAndBuild()
 				require.NoError(t, err)
 				tx = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{bufferedExecutionIx}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(1000000))
