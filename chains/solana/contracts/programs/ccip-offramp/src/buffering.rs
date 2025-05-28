@@ -45,7 +45,7 @@ impl ExecutionReportBuffer {
             CcipOfframpError::ExecutionReportBufferInvalidLength
         );
         self.data.resize(report_length as usize, 0);
-        self.total_chunks = report_length.div_ceil(chunk_length);
+        self.total_chunks = (report_length + chunk_length - 1) / chunk_length;
         require_gt!(
             64,
             self.total_chunks,
