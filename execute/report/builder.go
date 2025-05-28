@@ -183,8 +183,8 @@ func (b *execReportBuilder) Add(
 ) (exectypes.CommitData, error) {
 	b.checkInitialize()
 
-	// Check if all messages have zero nonces - if not, we should only process the first report
 	if b.multipleReportsEnabled {
+		// Check if all messages have zero nonces - if not, we should only process the first report
 		for _, msg := range commitReport.Messages {
 			if msg.Header.Nonce > 0 {
 				b.lggr.Errorw("Found message with non-zero nonce when multiple reports are enabled",
@@ -193,14 +193,13 @@ func (b *execReportBuilder) Add(
 					"nonce", msg.Header.Nonce)
 				// If multiple reports are enabled, we can still process the report, but we need to limit it to a single report
 				// If we didn't even build the first report yet, then break and process the first report only.
-				if len(b.execReports) > 1 {
+				if len(b.execReports) >= 1 && len(b.execReports[0].ChainReports) != 0 {
 					b.execReports = []cciptypes.ExecutePluginReport{b.execReports[0]}
 					b.commitReports = [][]exectypes.CommitData{b.commitReports[0]}
 					b.accumulated = []validationMetadata{b.accumulated[0]}
 					return commitReport, fmt.Errorf("messages with non-zero nonces detected, limiting to single report")
 				}
 			}
-			break
 		}
 	}
 
@@ -302,34 +301,6 @@ func (b *execReportBuilder) Build() (
 			break
 		}
 	}
-
-	// this now happens when adding the reports, so we don't need to do it here
-	/*
-		// Check if limiting is required.
-		if b.maxSingleChainReports != 0 && uint64(len(b.execReports)) > b.maxSingleChainReports {
-			b.lggr.Infof(
-				"limiting number of reports to maxReports from %d to %d",
-				len(b.execReports),
-				b.maxSingleChainReports,
-			)
-
-			if b.multipleReportsEnabled {
-				for len(b.execReports) > int(b.maxSingleChainReports) {
-					results = append(results, b.execReports[:b.maxSingleChainReports])
-					b.execReports = b.execReports[b.maxSingleChainReports:]
-				}
-				if len(b.execReports) > 0 {
-					results = append(results, b.execReports)
-				}
-			} else {
-				// Otherwise, truncate
-				b.execReports = b.execReports[:b.maxSingleChainReports]
-				b.commitReports = b.commitReports[:b.maxSingleChainReports]
-				results = append(results, b.execReports)
-				numSingleChainReports = len(b.execReports)
-			}
-		}
-	*/
 
 	// TODO: Sort reports into a canonical form prior to returning.
 
