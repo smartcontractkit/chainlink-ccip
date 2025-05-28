@@ -102,6 +102,7 @@ jobs:
         run: make wrappers-release
 
       - name: Install and run forge --zksync, and generate wrappers
+        if: ${{ needs.tag-check.outputs.is-release-ccip == 'true' || needs.tag-check.outputs.is-pre-release-ccip == 'true' }}
         working-directory: chains/evm
         run: make wrappers-zksync
 
