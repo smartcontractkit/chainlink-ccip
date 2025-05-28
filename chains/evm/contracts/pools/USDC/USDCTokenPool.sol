@@ -56,9 +56,6 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
 
   string public constant override typeAndVersion = "USDCTokenPool 1.6.1-dev";
 
-  // We restrict to the first version. New pool may be required for subsequent versions.
-  uint32 public constant SUPPORTED_USDC_VERSION = 0;
-
   // The local USDC config
   ITokenMessenger public immutable i_tokenMessenger;
   CCTPMessageTransmitterProxy public immutable i_messageTransmitterProxy;
@@ -90,9 +87,9 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     if (address(tokenMessenger) == address(0)) revert InvalidConfig();
     IMessageTransmitter transmitter = IMessageTransmitter(tokenMessenger.localMessageTransmitter());
     uint32 transmitterVersion = transmitter.version();
-    if (transmitterVersion != SUPPORTED_USDC_VERSION) revert InvalidMessageVersion(transmitterVersion);
+    if (transmitterVersion != getSupportedUSDCVersion()) revert InvalidMessageVersion(transmitterVersion);
     uint32 tokenMessengerVersion = tokenMessenger.messageBodyVersion();
-    if (tokenMessengerVersion != SUPPORTED_USDC_VERSION) revert InvalidTokenMessengerVersion(tokenMessengerVersion);
+    if (tokenMessengerVersion != getSupportedUSDCVersion()) revert InvalidTokenMessengerVersion(tokenMessengerVersion);
     if (cctpMessageTransmitterProxy.i_cctpTransmitter() != transmitter) revert InvalidTransmitterInProxy();
 
     i_tokenMessenger = tokenMessenger;
@@ -190,7 +187,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     // This token pool only supports version 0 of the CCTP message format
     // We check the version prior to loading the rest of the message
     // to avoid unexpected reverts due to out-of-bounds reads.
-    if (version != SUPPORTED_USDC_VERSION) revert InvalidMessageVersion(version);
+    if (version != getSupportedUSDCVersion()) revert InvalidMessageVersion(version);
 
     uint32 sourceDomain;
     uint32 destinationDomain;
@@ -239,5 +236,11 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
       });
     }
     emit DomainsSet(domains);
+  }
+
+  // On incoming messages, supported version is checked against the message version. This contracts is restricted to the
+  // first version. Since constants cannot be overridden in solidity the version is defined in a virtual function instead. 
+  function getSupportedUSDCVersion() public pure virtual returns (uint256) {
+    return 0;
   }
 }

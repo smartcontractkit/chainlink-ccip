@@ -4,9 +4,9 @@ pragma solidity ^0.8.24;
 import {CCTPMessageTransmitterProxy} from "../../../../../pools/USDC/CCTPMessageTransmitterProxy.sol";
 import {USDCTokenPool} from "../../../../../pools/USDC/USDCTokenPool.sol";
 import {USDCTokenPoolCCTPV2Helper} from "../../../../helpers/USDCTokenPoolCCTPV2Helper.sol";
-import {USDCSetup} from "../../USDCSetup.t.sol";
+import {USDCCCTPV2Setup} from "./USDCCCTPV2Setup.t.sol";
 
-contract USDCTokenPoolCCTPV2Setup is USDCSetup {
+contract USDCTokenPoolCCTPV2Setup is USDCCCTPV2Setup {
   USDCTokenPoolCCTPV2Helper internal s_usdcTokenPool;
   USDCTokenPoolCCTPV2Helper internal s_usdcTokenPoolWithAllowList;
   address[] internal s_allowedList;

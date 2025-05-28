@@ -12,6 +12,8 @@ import {IERC20} from
 import {SafeERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 
+import {console2 as console} from "forge-std/console2.sol";
+
 /// @notice This pool mints and burns USDC tokens through the Cross Chain Transfer
 /// Protocol (CCTP) V2, which uses a different contract and message format as V1.
 /// @dev The code for the message transmitter proxy does NOT need to be modified since both CCTP V1 and V2 utilize the same
@@ -28,6 +30,7 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
 
   // CCTP V2 uses 2000 to indicate that attestations should not occur until finality is achieved on the source chain.
   uint32 public constant FINALITY_THRESHOLD = 2000;
+
 
   constructor(
     ITokenMessenger tokenMessenger,
@@ -138,10 +141,11 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
       // we will only be left with the first 4 bytes of the message.
       version := mload(add(usdcMessage, 4)) // 0 + 4 = 4
     }
-    // This token pool only supports version 0 of the CCTP message format
+
+    // This token pool only supports version 1 of the CCTP message format
     // We check the version prior to loading the rest of the message
     // to avoid unexpected reverts due to out-of-bounds reads.
-    if (version != SUPPORTED_USDC_VERSION) revert InvalidMessageVersion(version);
+    if (version != getSupportedUSDCVersion()) revert InvalidMessageVersion(version);
 
     uint32 messageSourceDomain;
     uint32 destinationDomain;
@@ -173,5 +177,14 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
     if (finalityThresholdExecuted != FINALITY_THRESHOLD) {
       revert InvalidExecutionFinalityThreshold(FINALITY_THRESHOLD, finalityThresholdExecuted);
     }
+
+    console.log("THIS IS A TEST");
+    console.log(finalityThresholdExecuted);
+    console.log(minFinalityThreshold);
+  }
+
+  // This contract implements support for CCTP V2 so the version number must be overriden
+  function getSupportedUSDCVersion() public pure virtual override returns (uint256) {
+    return 1;
   }
 }
