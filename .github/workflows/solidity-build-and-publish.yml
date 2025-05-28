@@ -25,7 +25,7 @@ jobs:
         with:
           list-files: 'csv'
           filters: |
-            src:
+            changes:
               - 'chains/evm/**/*'
               - '.github/workflows/solidity-build-and-publish.yml'
               - '.github/workflows/solidity-wrappers.yml'
