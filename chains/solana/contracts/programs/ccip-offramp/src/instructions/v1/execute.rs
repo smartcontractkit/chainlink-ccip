@@ -4,6 +4,7 @@ use ccip_common::v1::{validate_and_parse_token_accounts, TokenAccounts, MIN_TOKE
 use solana_program::instruction::Instruction;
 use solana_program::program::invoke_signed;
 
+use crate::buffering::ExecutionReportBuffer;
 use crate::context::{BufferExecutionReportContext, ExecuteReportContext, OcrPluginType};
 use crate::event::{ExecutionStateChanged, SkippedAlreadyExecutedMessage};
 use crate::instructions::interfaces::Execute;
@@ -29,8 +30,11 @@ impl Execute for Impl {
         report_context_byte_words: [[u8; 32]; 2],
         token_indexes: &[u8],
     ) -> Result<()> {
-        let execution_report = if !raw_execution_report.is_empty() {
-            ExecutionReportSingleChain::deserialize(&mut raw_execution_report.as_ref())?
+        let (execution_report, buffered_bytes) = if !raw_execution_report.is_empty() {
+            (
+                ExecutionReportSingleChain::deserialize(&mut raw_execution_report.as_ref())?,
+                0,
+            )
         } else {
             ExecutionReportSingleChain::deserialize_from_buffer_account(
                 ctx.remaining_accounts
@@ -49,7 +53,7 @@ impl Execute for Impl {
             execution_report.source_chain_selector,
         )?;
 
-        ocr3_transmit_report(&ctx, &execution_report, report_context)?;
+        ocr3_transmit_report(&ctx, &execution_report, report_context, buffered_bytes)?;
         internal_execute(
             ctx,
             execution_report,
@@ -87,6 +91,7 @@ impl Execute for Impl {
                 ctx.accounts.authority.key(),
                 &ctx.accounts.commit_report.merkle_root,
             )?
+            .0
         };
         verify_uncursed_cpi(
             ctx.accounts.rmn_remote.to_account_info(),
@@ -124,8 +129,10 @@ fn ocr3_transmit_report<'info>(
     ctx: &Context<'_, '_, 'info, 'info, ExecuteReportContext<'info>>,
     execution_report: &ExecutionReportSingleChain,
     report_context: ReportContext,
+    buffered_bytes: usize,
 ) -> Result<()> {
     let config = ctx.accounts.config.load()?;
+
     ocr3_transmit(
         &config.ocr3[OcrPluginType::Execution as usize],
         &ctx.accounts.sysvar_instructions,
@@ -138,6 +145,7 @@ fn ocr3_transmit_report<'info>(
             ss: vec![],
             raw_vs: [0u8; 32],
         },
+        buffered_bytes,
     )?;
     Ok(())
 }
@@ -405,6 +413,12 @@ fn internal_execute<'info>(
         message_hash: hashed_leaf,             // Hash of the message using SVM encoding
         state: new_state,
     });
+
+    if report_is_buffered {
+        let buffer =
+            Account::<ExecutionReportBuffer>::try_from(ctx.remaining_accounts.last().unwrap())?;
+        buffer.close(ctx.accounts.authority.to_account_info())?;
+    }
 
     Ok(())
 }

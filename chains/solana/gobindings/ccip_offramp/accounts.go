@@ -8,6 +8,92 @@ import (
 	ag_solanago "github.com/gagliardetto/solana-go"
 )
 
+type ExecutionReportBuffer struct {
+	Data         []byte
+	ChunkBitmap  uint64
+	TotalChunks  uint32
+	ChunkLength  uint32
+	ReportLength uint32
+}
+
+var ExecutionReportBufferDiscriminator = [8]byte{34, 31, 166, 249, 72, 98, 246, 232}
+
+func (obj ExecutionReportBuffer) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Write account discriminator:
+	err = encoder.WriteBytes(ExecutionReportBufferDiscriminator[:], false)
+	if err != nil {
+		return err
+	}
+	// Serialize `Data` param:
+	err = encoder.Encode(obj.Data)
+	if err != nil {
+		return err
+	}
+	// Serialize `ChunkBitmap` param:
+	err = encoder.Encode(obj.ChunkBitmap)
+	if err != nil {
+		return err
+	}
+	// Serialize `TotalChunks` param:
+	err = encoder.Encode(obj.TotalChunks)
+	if err != nil {
+		return err
+	}
+	// Serialize `ChunkLength` param:
+	err = encoder.Encode(obj.ChunkLength)
+	if err != nil {
+		return err
+	}
+	// Serialize `ReportLength` param:
+	err = encoder.Encode(obj.ReportLength)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *ExecutionReportBuffer) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Read and check account discriminator:
+	{
+		discriminator, err := decoder.ReadTypeID()
+		if err != nil {
+			return err
+		}
+		if !discriminator.Equal(ExecutionReportBufferDiscriminator[:]) {
+			return fmt.Errorf(
+				"wrong discriminator: wanted %s, got %s",
+				"[34 31 166 249 72 98 246 232]",
+				fmt.Sprint(discriminator[:]))
+		}
+	}
+	// Deserialize `Data`:
+	err = decoder.Decode(&obj.Data)
+	if err != nil {
+		return err
+	}
+	// Deserialize `ChunkBitmap`:
+	err = decoder.Decode(&obj.ChunkBitmap)
+	if err != nil {
+		return err
+	}
+	// Deserialize `TotalChunks`:
+	err = decoder.Decode(&obj.TotalChunks)
+	if err != nil {
+		return err
+	}
+	// Deserialize `ChunkLength`:
+	err = decoder.Decode(&obj.ChunkLength)
+	if err != nil {
+		return err
+	}
+	// Deserialize `ReportLength`:
+	err = decoder.Decode(&obj.ReportLength)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 type Config struct {
 	Version                    uint8
 	DefaultCodeVersion         uint8
@@ -229,81 +315,6 @@ func (obj *ReferenceAddresses) UnmarshalWithDecoder(decoder *ag_binary.Decoder) 
 	}
 	// Deserialize `RmnRemote`:
 	err = decoder.Decode(&obj.RmnRemote)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-type ExecutionReportBuffer struct {
-	Data        []byte
-	ChunkBitmap uint64
-	TotalChunks uint32
-	ChunkLength uint32
-}
-
-var ExecutionReportBufferDiscriminator = [8]byte{34, 31, 166, 249, 72, 98, 246, 232}
-
-func (obj ExecutionReportBuffer) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Write account discriminator:
-	err = encoder.WriteBytes(ExecutionReportBufferDiscriminator[:], false)
-	if err != nil {
-		return err
-	}
-	// Serialize `Data` param:
-	err = encoder.Encode(obj.Data)
-	if err != nil {
-		return err
-	}
-	// Serialize `ChunkBitmap` param:
-	err = encoder.Encode(obj.ChunkBitmap)
-	if err != nil {
-		return err
-	}
-	// Serialize `TotalChunks` param:
-	err = encoder.Encode(obj.TotalChunks)
-	if err != nil {
-		return err
-	}
-	// Serialize `ChunkLength` param:
-	err = encoder.Encode(obj.ChunkLength)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *ExecutionReportBuffer) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Read and check account discriminator:
-	{
-		discriminator, err := decoder.ReadTypeID()
-		if err != nil {
-			return err
-		}
-		if !discriminator.Equal(ExecutionReportBufferDiscriminator[:]) {
-			return fmt.Errorf(
-				"wrong discriminator: wanted %s, got %s",
-				"[34 31 166 249 72 98 246 232]",
-				fmt.Sprint(discriminator[:]))
-		}
-	}
-	// Deserialize `Data`:
-	err = decoder.Decode(&obj.Data)
-	if err != nil {
-		return err
-	}
-	// Deserialize `ChunkBitmap`:
-	err = decoder.Decode(&obj.ChunkBitmap)
-	if err != nil {
-		return err
-	}
-	// Deserialize `TotalChunks`:
-	err = decoder.Decode(&obj.TotalChunks)
-	if err != nil {
-		return err
-	}
-	// Deserialize `ChunkLength`:
-	err = decoder.Decode(&obj.ChunkLength)
 	if err != nil {
 		return err
 	}

@@ -21,12 +21,11 @@ impl ExecutionReportSingleChain {
         execution_report_buffer: &AccountInfo,
         authority: Pubkey,
         merkle_root: &[u8],
-    ) -> Result<Self> {
-        // Ensures the buffer is initialized, and owned by the executor.
-        // It must be the last entry in the remaining account list.
+    ) -> Result<(Self, usize)> {
+        // Ensures the buffer is initialized, and owned by the program.
         require_keys_eq!(
             *execution_report_buffer.owner,
-            authority,
+            crate::ID,
             CcipOfframpError::ExecutionReportUnavailable
         );
         let (expected_buffer_key, _) = Pubkey::find_program_address(
@@ -42,14 +41,14 @@ impl ExecutionReportSingleChain {
             execution_report_buffer.key(),
             CcipOfframpError::ExecutionReportUnavailable
         );
-
         let buffer = ExecutionReportBuffer::try_deserialize(
             &mut execution_report_buffer.data.borrow().as_ref(),
         )?;
 
-        Ok(ExecutionReportSingleChain::deserialize(
-            &mut buffer.bytes()?,
-        )?)
+        Ok((
+            ExecutionReportSingleChain::deserialize(&mut buffer.bytes()?)?,
+            buffer.bytes()?.len(),
+        ))
     }
 }
 

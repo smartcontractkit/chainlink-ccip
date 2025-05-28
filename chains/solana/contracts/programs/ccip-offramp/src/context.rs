@@ -631,14 +631,14 @@ pub struct CloseCommitReportAccount<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(root: Vec<u8>, report_length: usize, chunk: Vec<u8>, chunk_index: u8)]
+#[instruction(root: Vec<u8>, report_length: u32, chunk: Vec<u8>, chunk_index: u8)]
 pub struct BufferExecutionReportContext<'info> {
     #[account(
         init_if_needed,
         payer = authority,
         seeds = [seed::EXECUTION_REPORT_BUFFER, &root, authority.key().as_ref()],
         bump,
-        space = ANCHOR_DISCRIMINATOR + ExecutionReportBuffer::INIT_SPACE + report_length
+        space = ANCHOR_DISCRIMINATOR + ExecutionReportBuffer::INIT_SPACE + report_length as usize
     )]
     pub execution_report_buffer: Account<'info, ExecutionReportBuffer>,
 

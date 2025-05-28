@@ -1188,6 +1188,34 @@ export type CcipOfframp = {
   ],
   "accounts": [
     {
+      "name": "executionReportBuffer",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "data",
+            "type": "bytes"
+          },
+          {
+            "name": "chunkBitmap",
+            "type": "u64"
+          },
+          {
+            "name": "totalChunks",
+            "type": "u32"
+          },
+          {
+            "name": "chunkLength",
+            "type": "u32"
+          },
+          {
+            "name": "reportLength",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
       "name": "config",
       "type": {
         "kind": "struct",
@@ -1281,30 +1309,6 @@ export type CcipOfframp = {
           {
             "name": "rmnRemote",
             "type": "publicKey"
-          }
-        ]
-      }
-    },
-    {
-      "name": "executionReportBuffer",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "data",
-            "type": "bytes"
-          },
-          {
-            "name": "chunkBitmap",
-            "type": "u64"
-          },
-          {
-            "name": "totalChunks",
-            "type": "u32"
-          },
-          {
-            "name": "chunkLength",
-            "type": "u32"
           }
         ]
       }
@@ -3723,6 +3727,34 @@ export const IDL: CcipOfframp = {
   ],
   "accounts": [
     {
+      "name": "executionReportBuffer",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "data",
+            "type": "bytes"
+          },
+          {
+            "name": "chunkBitmap",
+            "type": "u64"
+          },
+          {
+            "name": "totalChunks",
+            "type": "u32"
+          },
+          {
+            "name": "chunkLength",
+            "type": "u32"
+          },
+          {
+            "name": "reportLength",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
       "name": "config",
       "type": {
         "kind": "struct",
@@ -3816,30 +3848,6 @@ export const IDL: CcipOfframp = {
           {
             "name": "rmnRemote",
             "type": "publicKey"
-          }
-        ]
-      }
-    },
-    {
-      "name": "executionReportBuffer",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "data",
-            "type": "bytes"
-          },
-          {
-            "name": "chunkBitmap",
-            "type": "u64"
-          },
-          {
-            "name": "totalChunks",
-            "type": "u32"
-          },
-          {
-            "name": "chunkLength",
-            "type": "u32"
           }
         ]
       }
