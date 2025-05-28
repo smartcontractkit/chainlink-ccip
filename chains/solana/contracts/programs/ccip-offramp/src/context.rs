@@ -583,27 +583,6 @@ pub struct ExecuteReportContext<'info> {
     // alongside an empty raw_execution_report parameter.
 }
 
-// #[account(
-//     seeds = [seed::EXECUTION_REPORT_BUFFER, commit_report.merkle_root.as_ref(), authority.key().as_ref()],
-//     bump,
-// )]
-// pub execution_report_buffer: AccountInfo<'info>,
-
-// pub struct ExecuteReportContextTokenTransferRemainingAccounts<'info> {
-//     ccip_offramp_pools_signer: &'info AccountInfo<'info>,
-//     sender_token_account: &'info AccountInfo<'info>,
-//     per_chain_per_token_config: &'info AccountInfo<'info>,
-//     pool_chain_config: &'info AccountInfo<'info>,
-//     token_pool_lookup_table: &'info AccountInfo<'info>,
-//     token_registry: &'info AccountInfo<'info>,
-//     pool_program: &'info AccountInfo<'info>,
-//     pool_config: &'info AccountInfo<'info>,
-//     pool_token_account: &'info AccountInfo<'info>,
-//     pool_signer: &'info AccountInfo<'info>,
-//     token_program: &'info AccountInfo<'info>,
-//     token_mint: &'info AccountInfo<'info>,
-// }
-
 #[derive(Accounts)]
 #[instruction(source_chain_selector: u64, root: Vec<u8>)]
 pub struct CloseCommitReportAccount<'info> {

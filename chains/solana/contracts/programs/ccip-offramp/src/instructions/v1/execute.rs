@@ -2,7 +2,6 @@ use anchor_lang::prelude::*;
 use ccip_common::seed;
 use ccip_common::v1::{validate_and_parse_token_accounts, TokenAccounts, MIN_TOKEN_POOL_ACCOUNTS};
 use solana_program::instruction::Instruction;
-use solana_program::log::sol_log;
 use solana_program::program::invoke_signed;
 
 use crate::context::{BufferExecutionReportContext, ExecuteReportContext, OcrPluginType};
@@ -31,10 +30,12 @@ impl Execute for Impl {
         token_indexes: &[u8],
     ) -> Result<()> {
         let execution_report = if !raw_execution_report.is_empty() {
-            ExecutionReportSingleChain::deserialize(&mut { &raw_execution_report })?
+            ExecutionReportSingleChain::deserialize(&mut raw_execution_report.as_ref())?
         } else {
             ExecutionReportSingleChain::deserialize_from_buffer_account(
-                ctx.remaining_accounts.last().unwrap(),
+                ctx.remaining_accounts
+                    .last()
+                    .ok_or(CcipOfframpError::ExecutionReportUnavailable)?,
                 ctx.accounts.authority.key(),
                 &ctx.accounts.commit_report.merkle_root,
             )?
@@ -77,10 +78,12 @@ impl Execute for Impl {
             );
         }
         let execution_report = if !raw_execution_report.is_empty() {
-            ExecutionReportSingleChain::deserialize(&mut { &raw_execution_report })?
+            ExecutionReportSingleChain::deserialize(&mut raw_execution_report.as_ref())?
         } else {
             ExecutionReportSingleChain::deserialize_from_buffer_account(
-                ctx.remaining_accounts.last().unwrap(),
+                ctx.remaining_accounts
+                    .last()
+                    .ok_or(CcipOfframpError::ExecutionReportUnavailable)?,
                 ctx.accounts.authority.key(),
                 &ctx.accounts.commit_report.merkle_root,
             )?
