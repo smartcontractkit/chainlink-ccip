@@ -9,7 +9,7 @@ import {USDCSetup} from "../USDCSetup.t.sol";
 contract USDCTokenPool_constructor is USDCSetup {
   function test_constructor() public {
     new USDCTokenPool(
-      s_mockUSDC, s_cctpMessageTransmitterProxy, s_token, new address[](0), address(s_mockRMNRemote), address(s_router)
+      s_mockUSDC, s_cctpMessageTransmitterProxy, s_supportedUSDCVersions, s_token, new address[](0), address(s_mockRMNRemote), address(s_router)
     );
   }
 
@@ -18,6 +18,7 @@ contract USDCTokenPool_constructor is USDCSetup {
     new USDCTokenPool(
       ITokenMessenger(address(0)),
       s_cctpMessageTransmitterProxy,
+      s_supportedUSDCVersions,
       s_token,
       new address[](0),
       address(s_mockRMNRemote),
@@ -32,7 +33,7 @@ contract USDCTokenPool_constructor is USDCSetup {
     );
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidMessageVersion.selector, transmitterVersion));
     new USDCTokenPool(
-      s_mockUSDC, s_cctpMessageTransmitterProxy, s_token, new address[](0), address(s_mockRMNRemote), address(s_router)
+      s_mockUSDC, s_cctpMessageTransmitterProxy, s_supportedUSDCVersions, s_token, new address[](0), address(s_mockRMNRemote), address(s_router)
     );
   }
 
@@ -43,7 +44,7 @@ contract USDCTokenPool_constructor is USDCSetup {
     );
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidTokenMessengerVersion.selector, tokenMessengerVersion));
     new USDCTokenPool(
-      s_mockUSDC, s_cctpMessageTransmitterProxy, s_token, new address[](0), address(s_mockRMNRemote), address(s_router)
+      s_mockUSDC, s_cctpMessageTransmitterProxy, s_supportedUSDCVersions, s_token, new address[](0), address(s_mockRMNRemote), address(s_router)
     );
   }
 
@@ -56,7 +57,7 @@ contract USDCTokenPool_constructor is USDCSetup {
     );
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidTransmitterInProxy.selector));
     new USDCTokenPool(
-      s_mockUSDC, s_cctpMessageTransmitterProxy, s_token, new address[](0), address(s_mockRMNRemote), address(s_router)
+      s_mockUSDC, s_cctpMessageTransmitterProxy, s_supportedUSDCVersions, s_token, new address[](0), address(s_mockRMNRemote), address(s_router)
     );
   }
 }

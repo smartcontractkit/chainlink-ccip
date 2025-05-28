@@ -39,7 +39,7 @@ contract USDCTokenPoolCCTPV2_releaseOrMint is USDCTokenPoolCCTPV2Setup {
     amount = bound(amount, 0, _getInboundRateLimiterConfig().capacity);
 
     USDCMessageCCTPV2 memory usdcMessage = USDCMessageCCTPV2({
-      version: 0,
+      version: 1,
       sourceDomain: SOURCE_DOMAIN_IDENTIFIER,
       destinationDomain: DEST_DOMAIN_IDENTIFIER,
       nonce: keccak256("0xCLL"),
@@ -108,7 +108,7 @@ contract USDCTokenPoolCCTPV2_releaseOrMint is USDCTokenPoolCCTPV2Setup {
     uint256 amount = 13255235235;
 
     USDCMessageCCTPV2 memory usdcMessage = USDCMessageCCTPV2({
-      version: 0,
+      version: 1,
       sourceDomain: SOURCE_DOMAIN_IDENTIFIER,
       destinationDomain: DEST_DOMAIN_IDENTIFIER,
       nonce: keccak256("0xCLL"),

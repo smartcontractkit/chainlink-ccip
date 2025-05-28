@@ -54,12 +54,18 @@ contract USDCSetup is BaseTest {
   address internal s_routerAllowedOffRamp = address(234);
   Router internal s_router;
 
+  uint256[] internal s_supportedUSDCVersions;
+
   IBurnMintERC20 internal s_token;
+  
 
   function setUp() public virtual override {
     super.setUp();
     BurnMintERC677 usdcToken = new BurnMintERC677("USD Coin", "USDC", 6, 0);
     s_token = usdcToken;
+
+    // Add support for USDC CCTP Version 1, which has a version #0, so no explicit setting is required.
+    s_supportedUSDCVersions = new uint256[](1);
 
     deal(address(s_token), OWNER, type(uint256).max);
     _setUpRamps();

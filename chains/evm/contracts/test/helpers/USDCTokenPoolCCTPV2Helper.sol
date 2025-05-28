@@ -11,11 +11,12 @@ contract USDCTokenPoolCCTPV2Helper is USDCTokenPoolCCTPV2 {
   constructor(
     ITokenMessenger tokenMessenger,
     CCTPMessageTransmitterProxy messageTransmitterProxy,
+    uint256[] memory supportedUSDCVersions,
     IBurnMintERC20 token,
     address[] memory allowlist,
     address rmnProxy,
     address router
-  ) USDCTokenPoolCCTPV2(tokenMessenger, messageTransmitterProxy, token, allowlist, rmnProxy, router) {}
+  ) USDCTokenPoolCCTPV2(tokenMessenger, messageTransmitterProxy, supportedUSDCVersions, token, allowlist, rmnProxy, router) {}
 
   function validateMessage(bytes memory usdcMessage, uint32 sourcePoolDomain) external view {
     return _validateMessage(usdcMessage, sourcePoolDomain);

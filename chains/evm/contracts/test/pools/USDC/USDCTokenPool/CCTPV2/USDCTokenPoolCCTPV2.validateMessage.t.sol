@@ -9,7 +9,7 @@ contract USDCTokenPoolCCTPV2__validateMessage is USDCTokenPoolCCTPV2Setup {
   function testFuzz_ValidateMessage_Success(uint32 sourceDomain, bytes32 nonce) public {
     vm.pauseGasMetering();
     USDCMessageCCTPV2 memory usdcMessage = USDCMessageCCTPV2({
-      version: 0,
+      version: 1,
       sourceDomain: sourceDomain,
       destinationDomain: DEST_DOMAIN_IDENTIFIER,
       nonce: nonce,
@@ -31,7 +31,7 @@ contract USDCTokenPoolCCTPV2__validateMessage is USDCTokenPoolCCTPV2Setup {
 
   function test_RevertWhen_ValidateInvalidMessage() public {
     USDCMessageCCTPV2 memory usdcMessage = USDCMessageCCTPV2({
-      version: 0,
+      version: 1,
       sourceDomain: 1553252,
       destinationDomain: DEST_DOMAIN_IDENTIFIER,
       nonce: keccak256("0xCLL"),
@@ -71,7 +71,7 @@ contract USDCTokenPoolCCTPV2__validateMessage is USDCTokenPoolCCTPV2Setup {
 
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidMessageVersion.selector, wrongVersion));
     s_usdcTokenPool.validateMessage(encodedUsdcMessage, usdcMessage.sourceDomain);
-    usdcMessage.version = 0;
+    usdcMessage.version = 1;
 
     // Change Finality threshold and finalityThresholdExecuted to 1000 to intentionally revert
     usdcMessage.minFinalityThreshold = 1000;

@@ -49,12 +49,13 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
   constructor(
     ITokenMessenger tokenMessenger,
     CCTPMessageTransmitterProxy cctpMessageTransmitterProxy,
+    uint256[] memory supportedUSDCVersions,
     IERC20 token,
     address[] memory allowlist,
     address rmnProxy,
     address router
   )
-    USDCTokenPool(tokenMessenger, cctpMessageTransmitterProxy, token, allowlist, rmnProxy, router)
+    USDCTokenPool(tokenMessenger, cctpMessageTransmitterProxy, supportedUSDCVersions, token, allowlist, rmnProxy, router)
     USDCBridgeMigrator(address(token))
   {}
 

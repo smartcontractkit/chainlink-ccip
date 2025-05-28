@@ -17,8 +17,11 @@ contract HybridLockReleaseUSDCTokenPoolSetup is USDCSetup {
   function setUp() public virtual override {
     super.setUp();
 
+    uint256[] memory supportedUSDCVersions = new uint256[](1);
+    supportedUSDCVersions[0] = 0;
+
     s_usdcTokenPool = new HybridLockReleaseUSDCTokenPool(
-      s_mockUSDC, s_cctpMessageTransmitterProxy, s_token, new address[](0), address(s_mockRMNRemote), address(s_router)
+      s_mockUSDC, s_cctpMessageTransmitterProxy, supportedUSDCVersions, s_token, new address[](0), address(s_mockRMNRemote), address(s_router)
     );
     CCTPMessageTransmitterProxy.AllowedCallerConfigArgs[] memory allowedCallerParams =
       new CCTPMessageTransmitterProxy.AllowedCallerConfigArgs[](1);
@@ -27,7 +30,7 @@ contract HybridLockReleaseUSDCTokenPoolSetup is USDCSetup {
     s_cctpMessageTransmitterProxy.configureAllowedCallers(allowedCallerParams);
     s_cctpMessageTransmitterProxyForTransferLiquidity = new CCTPMessageTransmitterProxy(s_mockUSDC);
     s_usdcTokenPoolTransferLiquidity = new HybridLockReleaseUSDCTokenPool(
-      s_mockUSDC, s_cctpMessageTransmitterProxy, s_token, new address[](0), address(s_mockRMNRemote), address(s_router)
+      s_mockUSDC, s_cctpMessageTransmitterProxy, supportedUSDCVersions, s_token, new address[](0), address(s_mockRMNRemote), address(s_router)
     );
     allowedCallerParams[0].caller = address(s_usdcTokenPoolTransferLiquidity);
     s_cctpMessageTransmitterProxyForTransferLiquidity.configureAllowedCallers(allowedCallerParams);

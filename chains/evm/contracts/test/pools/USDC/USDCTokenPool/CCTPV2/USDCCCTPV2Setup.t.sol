@@ -50,6 +50,8 @@ contract USDCCCTPV2Setup is BaseTest {
   MockE2EUSDCTransmitter internal s_mockUSDCTransmitter;
   CCTPMessageTransmitterProxy internal s_cctpMessageTransmitterProxy;
 
+  uint256[] internal s_supportedUSDCVersions;
+
   address internal s_routerAllowedOnRamp = address(3456);
   address internal s_routerAllowedOffRamp = address(234);
   Router internal s_router;
@@ -63,6 +65,10 @@ contract USDCCCTPV2Setup is BaseTest {
 
     deal(address(s_token), OWNER, type(uint256).max);
     _setUpRamps();
+
+    // Add support for USDC CCTP V2 which is identified with 1.
+    s_supportedUSDCVersions = new uint256[](1);
+    s_supportedUSDCVersions[0] = 1;
 
     // The Token transmitter in CCTP V2 needs to be set with version 1
     s_mockUSDCTransmitter = new MockE2EUSDCTransmitter(1, DEST_DOMAIN_IDENTIFIER, address(s_token));

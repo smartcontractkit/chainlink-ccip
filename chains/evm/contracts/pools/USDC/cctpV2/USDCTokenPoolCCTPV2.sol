@@ -12,6 +12,9 @@ import {IERC20} from
 import {SafeERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 
+import {EnumerableSet} from
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
+
 import {console2 as console} from "forge-std/console2.sol";
 
 /// @notice This pool mints and burns USDC tokens through the Cross Chain Transfer
@@ -21,6 +24,7 @@ import {console2 as console} from "forge-std/console2.sol";
 /// than its V1 predecessor
 contract USDCTokenPoolCCTPV2 is USDCTokenPool {
   using SafeERC20 for IERC20;
+  using EnumerableSet for EnumerableSet.UintSet;
 
   error InvalidMinFinalityThreshold(uint32 expected, uint32 actual);
   error InvalidExecutionFinalityThreshold(uint32 expected, uint32 actual);
@@ -31,15 +35,16 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
   // CCTP V2 uses 2000 to indicate that attestations should not occur until finality is achieved on the source chain.
   uint32 public constant FINALITY_THRESHOLD = 2000;
 
-
   constructor(
     ITokenMessenger tokenMessenger,
     CCTPMessageTransmitterProxy cctpMessageTransmitterProxy,
+    uint256[] memory supportedUSDCVersions,
     IERC20 token,
     address[] memory allowlist,
     address rmnProxy,
     address router
-  ) USDCTokenPool(tokenMessenger, cctpMessageTransmitterProxy, token, allowlist, rmnProxy, router) {}
+  ) USDCTokenPool(tokenMessenger, cctpMessageTransmitterProxy, supportedUSDCVersions, token, allowlist, rmnProxy, router) {
+  }
 
   /// @notice Burn tokens from the pool to initiate cross-chain transfer.
   /// @notice Outgoing messages (burn operations) are routed via `i_tokenMessenger.depositForBurnWithCaller`.
@@ -145,7 +150,7 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
     // This token pool only supports version 1 of the CCTP message format
     // We check the version prior to loading the rest of the message
     // to avoid unexpected reverts due to out-of-bounds reads.
-    if (version != getSupportedUSDCVersion()) revert InvalidMessageVersion(version);
+    if (!isSupportedUSDCVersion(version)) revert InvalidMessageVersion(version);
 
     uint32 messageSourceDomain;
     uint32 destinationDomain;
@@ -183,8 +188,4 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
     console.log(minFinalityThreshold);
   }
 
-  // This contract implements support for CCTP V2 so the version number must be overriden
-  function getSupportedUSDCVersion() public pure virtual override returns (uint256) {
-    return 1;
-  }
 }
