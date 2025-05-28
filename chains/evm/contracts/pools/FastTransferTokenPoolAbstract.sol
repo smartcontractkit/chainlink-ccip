@@ -79,9 +79,9 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
 
   /// @dev Mapping of fill request ID to filler address
   /// This is used to track which filler has filled a request
-  /// @dev The filler address is set to address(0) if the request has not been filled
-  /// @dev The filler address is set to address(1) if the request has been settled
-  /// @dev The filler address is set to the filler address if the request has been filled by that filler
+  /// @dev If the request has not been filled slot set to address(0) by default
+  /// @dev If the request has been settled slot is set to address(1)
+  /// @dev If the request has been filled, slot will be set to the address which filled it"
   mapping(bytes32 fillId => address filler) internal s_fills;
 
   /// @notice Initializes the fast transfer pool
