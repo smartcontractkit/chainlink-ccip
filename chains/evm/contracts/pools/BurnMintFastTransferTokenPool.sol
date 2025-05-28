@@ -75,7 +75,8 @@ contract BurnMintFastTransferTokenPool is ITypeAndVersion, BurnMintTokenPoolAbst
   function _burn(
     uint256 amount
   ) internal virtual override {
-    IBurnMintERC20(address(i_token)).burnFrom(msg.sender, amount);
+    i_token.safeTransferFrom(msg.sender, address(this), amount);
+    IBurnMintERC20(address(i_token)).burn(amount);
   }
 
   function getRouter() public view override(TokenPool, FastTransferTokenPoolAbstract) returns (address router) {
