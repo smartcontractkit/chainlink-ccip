@@ -2,10 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {FastTransferTokenPoolAbstract} from "../../pools/FastTransferTokenPoolAbstract.sol";
-import {TokenPool} from "../../pools/TokenPool.sol";
-import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
-
-import {CCIPReceiver} from "../../applications/CCIPReceiver.sol";
 import {WETH9} from "@chainlink/contracts/src/v0.8/vendor/canonical-weth/WETH9.sol";
 import {IERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
@@ -24,7 +20,6 @@ contract FastTransferTokenPoolHelper is FastTransferTokenPoolAbstract {
 
   constructor(
     IERC20 token,
-    WETH9 wrappedNative,
     address router //CCIPReceiver(router)
   )
     //FastTransferTokenPoolAbstract.LaneConfigArgs[] memory laneConfigArgs

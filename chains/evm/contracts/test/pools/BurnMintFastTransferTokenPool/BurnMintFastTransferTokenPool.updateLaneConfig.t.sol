@@ -100,7 +100,7 @@ contract BurnMintFastTransferTokenPool_updateLaneConfig is BurnMintFastTransferT
     s_pool.updateLaneConfig(laneConfigArgs);
   }
 
-  function test_RevertWhen_NotOwner() public {
+  function test_RevertWhen_NotOwners() public {
     FastTransferTokenPoolAbstract.LaneConfigArgs memory laneConfigArgs = FastTransferTokenPoolAbstract.LaneConfigArgs({
       remoteChainSelector: NEW_CHAIN_SELECTOR,
       bpsFastFee: NEW_FAST_FEE_BPS,
@@ -111,7 +111,7 @@ contract BurnMintFastTransferTokenPool_updateLaneConfig is BurnMintFastTransferT
       addFillers: new address[](0),
       removeFillers: new address[](0)
     });
-
+    vm.stopPrank();
     vm.expectRevert();
     vm.prank(makeAddr("notOwner"));
     s_pool.updateLaneConfig(laneConfigArgs);
@@ -126,7 +126,7 @@ contract BurnMintFastTransferTokenPool_updateLaneConfig is BurnMintFastTransferT
     removeFillers[0] = s_filler;
 
     vm.expectEmit();
-    emit FastTransferTokenPoolAbstract.fillerAllowListUpdated(DEST_CHAIN_SELECTOR, addFillers, removeFillers);
+    emit FastTransferTokenPoolAbstract.FillerAllowListUpdated(DEST_CHAIN_SELECTOR, addFillers, removeFillers);
 
     s_pool.updatefillerAllowList(DEST_CHAIN_SELECTOR, addFillers, removeFillers);
 
@@ -139,7 +139,7 @@ contract BurnMintFastTransferTokenPool_updateLaneConfig is BurnMintFastTransferT
   function test_RevertWhen_UpdateFillerAllowList_NotOwner() public {
     address[] memory addFillers = new address[](1);
     addFillers[0] = makeAddr("newFiller");
-
+    vm.stopPrank();
     vm.expectRevert();
     vm.prank(makeAddr("notOwner"));
     s_pool.updatefillerAllowList(DEST_CHAIN_SELECTOR, addFillers, new address[](0));

@@ -47,7 +47,7 @@ contract FastTransferTokenPoolHelperSetup is BaseTest {
       removeFillers: new address[](0)
     });
 
-    s_tokenPool = new FastTransferTokenPoolHelper(s_token, wrappedNative, address(s_sourceRouter));
+    s_tokenPool = new FastTransferTokenPoolHelper(s_token, address(s_sourceRouter));
     s_tokenPool.updateLaneConfig(laneConfigArgs[0]);
 
     // Approve tokens

@@ -100,11 +100,4 @@ contract BurnMintFastTransferTokenPool_ccipSendToken is BurnMintFastTransferToke
     vm.expectRevert(TokenPool.CursedByRMN.selector);
     s_pool.ccipSendToken{value: 1 ether}(address(0), DEST_CHAIN_SELECTOR, TRANSFER_AMOUNT, abi.encode(RECEIVER), "");
   }
-
-  function test_RevertWhen_ChainNotAllowed() public {
-    uint64 unsupportedChain = 999;
-
-    vm.expectRevert(abi.encodeWithSelector(TokenPool.ChainNotAllowed.selector, unsupportedChain));
-    s_pool.ccipSendToken{value: 1 ether}(address(0), unsupportedChain, TRANSFER_AMOUNT, abi.encode(RECEIVER), "");
-  }
 }

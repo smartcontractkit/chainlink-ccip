@@ -1,21 +1,16 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.10;
 
-// Local interfaces
 import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol";
 import {IFastTransferPool} from "../interfaces/IFastTransferPool.sol";
 import {IRMN} from "../interfaces/IRMN.sol";
-import {IRouterClient} from "../interfaces/IRouterClient.sol";
 
-// Chainlink interfaces
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
 import {IERC165} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/IERC165.sol";
 
-// Local libraries and applications
 import {CCIPReceiver} from "../applications/CCIPReceiver.sol";
-import {Client} from "../libraries/Client.sol";
 import {BurnMintTokenPoolAbstract} from "./BurnMintTokenPoolAbstract.sol";
 import {FastTransferTokenPoolAbstract} from "./FastTransferTokenPoolAbstract.sol";
 import {TokenPool} from "./TokenPool.sol";
@@ -97,6 +92,7 @@ contract BurnMintFastTransferTokenPool is ITypeAndVersion, BurnMintTokenPoolAbst
       // Honest filler -> pay them back + fee
       IBurnMintERC20(address(i_token)).mint(filler, settlementAmountLocal);
     }
+    s_fills[fillId] = address(1); // Mark as settled
   }
 
   function _checkAdmin() internal view override onlyOwner {}

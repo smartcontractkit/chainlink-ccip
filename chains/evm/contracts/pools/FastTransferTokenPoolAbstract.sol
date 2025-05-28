@@ -4,7 +4,6 @@ pragma solidity ^0.8.10;
 // Local interfaces
 import {IFastTransferPool} from "../interfaces/IFastTransferPool.sol";
 import {IRouterClient} from "../interfaces/IRouterClient.sol";
-import {IWrappedNative} from "../interfaces/IWrappedNative.sol";
 
 // Chainlink interfaces
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
@@ -38,7 +37,7 @@ abstract contract FastTransferTokenPoolAbstract is CCIPReceiver, ITypeAndVersion
     address[] addFillers,
     address[] removeFillers
   );
-  event fillerAllowListUpdated(uint64 indexed dst, address[] addFillers, address[] removeFillers);
+  event FillerAllowListUpdated(uint64 indexed dst, address[] addFillers, address[] removeFillers);
   event DestinationPoolUpdated(uint64 indexed dst, address destinationPool);
 
   struct LaneConfig {
@@ -152,7 +151,7 @@ abstract contract FastTransferTokenPoolAbstract is CCIPReceiver, ITypeAndVersion
     for (uint256 i; i < removeFillers.length; ++i) {
       laneConfig.fillerAllowList[removeFillers[i]] = false;
     }
-    emit fillerAllowListUpdated(destinationChainSelector, addFillers, removeFillers);
+    emit FillerAllowListUpdated(destinationChainSelector, addFillers, removeFillers);
   }
 
   /// @notice Gets the lane configuration for a given destination chain selector
@@ -210,6 +209,7 @@ abstract contract FastTransferTokenPoolAbstract is CCIPReceiver, ITypeAndVersion
     }
     fillRequestId = IRouterClient(getRouter()).ccipSend{value: msg.value}(destinationChainSelector, message);
     emit FastFillRequest(fillRequestId, destinationChainSelector, amount, quote.fastTransferFee, receiver);
+    return fillRequestId;
   }
 
   /// @notice Pulls out all of the fee‐quotation + message‐build logic
