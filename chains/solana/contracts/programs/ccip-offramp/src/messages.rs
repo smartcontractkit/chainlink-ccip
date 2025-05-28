@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use ccip_common::seed;
 
-use crate::{state::ExecutionReportBuffer, CcipOfframpError};
+use crate::{buffering::ExecutionReportBuffer, CcipOfframpError};
 
 pub const CCIP_RECEIVE_DISCRIMINATOR: [u8; 8] = [0x0b, 0xf4, 0x09, 0xf9, 0x2c, 0x53, 0x2f, 0xf5]; // ccip_receive
 pub const TOKENPOOL_RELEASE_OR_MINT_DISCRIMINATOR: [u8; 8] =

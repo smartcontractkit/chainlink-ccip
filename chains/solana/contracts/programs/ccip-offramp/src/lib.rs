@@ -16,6 +16,8 @@ use crate::instructions::router;
 mod state;
 use state::*;
 
+mod buffering;
+
 use crate::event::admin::{ConfigSet, ReferenceAddressesSet};
 
 #[program]

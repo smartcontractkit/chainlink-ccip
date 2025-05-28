@@ -110,14 +110,9 @@ impl Execute for Impl {
         chunk: Vec<u8>,
         chunk_index: u8,
     ) -> Result<()> {
-        if !ctx.accounts.execution_report_buffer.is_initialized() {
-            ctx.accounts
-                .execution_report_buffer
-                .initialize(report_length, chunk.len() as u32)?;
-        }
         ctx.accounts
             .execution_report_buffer
-            .add_chunk(chunk, chunk_index)
+            .add_chunk(report_length, &chunk, chunk_index)
     }
 }
 

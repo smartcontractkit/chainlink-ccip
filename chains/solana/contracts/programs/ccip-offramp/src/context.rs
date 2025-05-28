@@ -5,10 +5,10 @@ use bytemuck::{Pod, Zeroable};
 use ccip_common::seed;
 use solana_program::sysvar::instructions;
 
+use crate::buffering::ExecutionReportBuffer;
 use crate::program::CcipOfframp;
 use crate::state::{
-    CommitReport, Config, ExecutionReportBuffer, GlobalState, ReferenceAddresses, SourceChain,
-    SourceChainConfig,
+    CommitReport, Config, GlobalState, ReferenceAddresses, SourceChain, SourceChainConfig,
 };
 use crate::CcipOfframpError;
 
