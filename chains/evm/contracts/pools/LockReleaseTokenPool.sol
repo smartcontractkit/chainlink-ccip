@@ -22,6 +22,7 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
   event LiquidityTransferred(address indexed from, uint256 amount);
   event LiquidityAdded(address indexed provider, uint256 indexed amount);
   event LiquidityRemoved(address indexed provider, uint256 indexed amount);
+  event RebalancerSet(address oldRebalancer, address newRebalancer);
 
   string public constant override typeAndVersion = "LockReleaseTokenPool 1.5.1";
 
@@ -37,7 +38,7 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
   ) TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) {}
 
   function _releaseOrMint(address receiver, uint256 amount) internal virtual override {
-    getToken().safeTransfer(receiver, amount);
+    i_token.safeTransfer(receiver, amount);
   }
 
   /// @notice Gets rebalancer, can be address(0) if none is configured.
@@ -52,7 +53,11 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
   function setRebalancer(
     address rebalancer
   ) external onlyOwner {
+    address oldRebalancer = s_rebalancer;
+
     s_rebalancer = rebalancer;
+
+    emit RebalancerSet(oldRebalancer, rebalancer);
   }
 
   /// @notice Adds liquidity to the pool. The tokens should be approved first.
@@ -91,7 +96,7 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
   /// @param amount The amount of liquidity to transfer. If uint256.max is passed, all liquidity will be transferred.
   function transferLiquidity(address from, uint256 amount) external onlyOwner {
     if (amount == type(uint256).max) {
-      amount = IERC20(i_token).balanceOf(from);
+      amount = i_token.balanceOf(from);
     }
 
     LockReleaseTokenPool(from).withdrawLiquidity(amount);

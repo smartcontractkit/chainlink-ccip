@@ -108,7 +108,7 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     }
 
     // Release to the recipient
-    getToken().safeTransfer(releaseOrMintIn.receiver, localAmount);
+    i_token.safeTransfer(releaseOrMintIn.receiver, localAmount);
 
     emit ReleasedOrMinted(msg.sender, releaseOrMintIn.receiver, localAmount);
 

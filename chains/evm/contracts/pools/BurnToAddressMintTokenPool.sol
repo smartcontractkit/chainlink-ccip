@@ -45,7 +45,7 @@ contract BurnToAddressMintTokenPool is BurnMintTokenPoolAbstract, ITypeAndVersio
   function _lockOrBurn(
     uint256 amount
   ) internal virtual override {
-    getToken().safeTransfer(i_burnAddress, amount);
+    i_token.safeTransfer(i_burnAddress, amount);
   }
 
   /// @notice Returns the address where tokens are sent during a call to lockOrBurn

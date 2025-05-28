@@ -139,7 +139,7 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
       s_lockedTokensByChainSelector[releaseOrMintIn.remoteChainSelector] -= releaseOrMintIn.amount;
     }
 
-    getToken().safeTransfer(releaseOrMintIn.receiver, releaseOrMintIn.amount);
+    i_token.safeTransfer(releaseOrMintIn.receiver, releaseOrMintIn.amount);
 
     emit ReleasedOrMinted(msg.sender, releaseOrMintIn.receiver, releaseOrMintIn.amount);
 
