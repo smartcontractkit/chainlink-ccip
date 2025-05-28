@@ -1,0 +1,78 @@
+// SPDX-License-Identifier: BUSL-1.1
+pragma solidity ^0.8.10;
+
+import {Router} from "../../../Router.sol";
+import {BurnMintFastTransferTokenPool} from "../../../pools/BurnMintFastTransferTokenPool.sol";
+import {FastTransferTokenPoolAbstract} from "../../../pools/FastTransferTokenPoolAbstract.sol";
+import {TokenPool} from "../../../pools/TokenPool.sol";
+import {BaseTest} from "../../BaseTest.t.sol";
+import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
+
+contract BurnMintFastTransferTokenPoolSetup is BaseTest {
+  BurnMintFastTransferTokenPool internal s_pool;
+  BurnMintERC20 internal s_burnMintERC20;
+
+  address internal s_burnMintOffRamp = makeAddr("burn_mint_offRamp");
+  address internal s_burnMintOnRamp = makeAddr("burn_mint_onRamp");
+  address internal s_remoteBurnMintPool = makeAddr("remote_burn_mint_pool");
+  address internal s_remoteToken = makeAddr("remote_token");
+  address internal s_filler = makeAddr("filler");
+
+  uint16 internal constant FAST_FEE_BPS = 100; // 1%
+  uint256 internal constant FILL_AMOUNT_MAX = 1000 ether;
+
+  function setUp() public virtual override {
+    super.setUp();
+
+    s_burnMintERC20 = new BurnMintERC20("Chainlink Token", "LINK", 18, 0, 0);
+
+    s_pool = new BurnMintFastTransferTokenPool(
+      s_burnMintERC20, DEFAULT_TOKEN_DECIMALS, new address[](0), address(s_mockRMNRemote), address(s_sourceRouter)
+    );
+
+    s_burnMintERC20.grantMintAndBurnRoles(address(s_pool));
+
+    _applyChainUpdates();
+    _setupLaneConfig();
+  }
+
+  function _applyChainUpdates() internal {
+    bytes[] memory remotePoolAddresses = new bytes[](1);
+    remotePoolAddresses[0] = abi.encode(s_remoteBurnMintPool);
+
+    TokenPool.ChainUpdate[] memory chainsToAdd = new TokenPool.ChainUpdate[](1);
+    chainsToAdd[0] = TokenPool.ChainUpdate({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      remotePoolAddresses: remotePoolAddresses,
+      remoteTokenAddress: abi.encode(s_remoteToken),
+      outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: _getInboundRateLimiterConfig()
+    });
+
+    s_pool.applyChainUpdates(new uint64[](0), chainsToAdd);
+
+    Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](1);
+    onRampUpdates[0] = Router.OnRamp({destChainSelector: DEST_CHAIN_SELECTOR, onRamp: s_burnMintOnRamp});
+    Router.OffRamp[] memory offRampUpdates = new Router.OffRamp[](1);
+    offRampUpdates[0] = Router.OffRamp({sourceChainSelector: DEST_CHAIN_SELECTOR, offRamp: s_burnMintOffRamp});
+    s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), offRampUpdates);
+  }
+
+  function _setupLaneConfig() internal {
+    address[] memory addFillers = new address[](1);
+    addFillers[0] = s_filler;
+
+    FastTransferTokenPoolAbstract.LaneConfigArgs memory laneConfigArgs = FastTransferTokenPoolAbstract.LaneConfigArgs({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      bpsFastFee: FAST_FEE_BPS,
+      enabled: true,
+      fillerAllowlistEnabled: true,
+      destinationPool: s_remoteBurnMintPool,
+      fillAmountMaxPerRequest: FILL_AMOUNT_MAX,
+      addFillers: addFillers,
+      removeFillers: new address[](0)
+    });
+
+    s_pool.updateLaneConfig(laneConfigArgs);
+  }
+}
