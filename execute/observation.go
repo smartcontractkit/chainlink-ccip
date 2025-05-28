@@ -474,6 +474,7 @@ func (p *Plugin) getFilterObservation(
 	}
 	// No observation for non-dest readers.
 	if !supportsDest {
+		lggr.Debugw("destination chain not supported, skipping filter observation")
 		return observation, nil
 	}
 
