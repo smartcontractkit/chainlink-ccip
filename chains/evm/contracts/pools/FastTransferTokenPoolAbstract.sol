@@ -40,14 +40,13 @@ abstract contract FastTransferTokenPoolAbstract is CCIPReceiver, ITypeAndVersion
   );
   event fillerAllowListUpdated(uint64 indexed dst, address[] addFillers, address[] removeFillers);
   event DestinationPoolUpdated(uint64 indexed dst, address destinationPool);
-  event FastFillCompleted(bytes32 indexed fillRequestId);
 
   struct LaneConfig {
     uint256 fillAmountMaxPerRequest; //    max amount that can be filled per request
     address destinationPool; // ─────────╮
     uint16 bpsFastFee; //                │ 0-10_000
     bool enabled; //                     │ pause per lane
-    bool fillerAllowlistEnabled; // ───────────╯ whitelist for fillers
+    bool fillerAllowlistEnabled; //──────╯ whitelist for fillers
     mapping(address filler => bool isAllowed) fillerAllowList; // whitelist of fillers
   }
 
@@ -56,7 +55,7 @@ abstract contract FastTransferTokenPoolAbstract is CCIPReceiver, ITypeAndVersion
     address destinationPool; // ─────────╮
     uint16 bpsFastFee; //                │ 0-10_000
     bool enabled; //                     │ pause per lane
-    bool fillerAllowlistEnabled; // ───────────╯ whitelist for fillers
+    bool fillerAllowlistEnabled; //──────╯ whitelist for fillers
   }
 
   struct LaneConfigArgs {
@@ -67,7 +66,7 @@ abstract contract FastTransferTokenPoolAbstract is CCIPReceiver, ITypeAndVersion
     uint64 remoteChainSelector; //       │
     uint16 bpsFastFee; //                │ 0-10_000
     bool enabled; //                     │ pause per lane
-    bool fillerAllowlistEnabled; // ───────────╯
+    bool fillerAllowlistEnabled; //──────╯
   }
 
   struct MintMessage {
@@ -284,20 +283,19 @@ abstract contract FastTransferTokenPoolAbstract is CCIPReceiver, ITypeAndVersion
     Client.Any2EVMMessage memory message
   ) internal override onlyRouter {
     // Decode message data directly into variables
-    (uint256 srcAmountToTransfer, uint8 srcDecimals, uint256 fastTransferFee, bytes memory receiver) =
-      abi.decode(message.data, (uint256, uint8, uint256, bytes));
+    MintMessage memory mintMessage = abi.decode(message.data, (MintMessage));
     {
       _settle(
         message.sourceChainSelector,
         message.messageId,
         message.sender,
-        srcAmountToTransfer,
-        srcDecimals,
-        fastTransferFee,
-        address(uint160(uint256(bytes32(receiver))))
+        mintMessage.srcAmountToTransfer,
+        mintMessage.srcDecimals,
+        mintMessage.fastTransferFee,
+        address(uint160(uint256(bytes32(mintMessage.receiver))))
       );
     }
-    emit FastFillCompleted(message.messageId);
+    emit FastFillSettled(message.messageId);
   }
 
   /// @notice Handles the token to transfer on fast fill request at source chain

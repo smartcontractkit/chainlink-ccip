@@ -31,7 +31,14 @@ contract FastTransferTokenPoolHelper_ccipReceive_Test is FastTransferTokenPoolHe
 
   function test_CcipReceive() public {
     // Prepare CCIP message
-    bytes memory data = abi.encode(srcAmount, srcDecimals, fastTransferFee, abi.encodePacked(receiver));
+    bytes memory data = abi.encode(
+      FastTransferTokenPoolAbstract.MintMessage({
+        receiver: abi.encode(receiver),
+        srcAmountToTransfer: srcAmount,
+        srcDecimals: srcDecimals,
+        fastTransferFee: fastTransferFee
+      })
+    );
     Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
       messageId: messageId,
       sourceChainSelector: sourceChainSelector,
@@ -42,7 +49,7 @@ contract FastTransferTokenPoolHelper_ccipReceive_Test is FastTransferTokenPoolHe
 
     // Mock router call
     vm.expectEmit(true, false, false, true);
-    emit FastTransferTokenPoolAbstract.FastFillCompleted(messageId);
+    emit IFastTransferPool.FastFillSettled(messageId);
     vm.prank(address(s_sourceRouter));
     s_tokenPool.ccipReceive(message);
   }
