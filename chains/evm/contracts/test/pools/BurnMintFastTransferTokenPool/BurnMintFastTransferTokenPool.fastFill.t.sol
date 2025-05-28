@@ -5,8 +5,6 @@ import {IFastTransferPool} from "../../../interfaces/IFastTransferPool.sol";
 
 import {FastTransferTokenPoolAbstract} from "../../../pools/FastTransferTokenPoolAbstract.sol";
 import {BurnMintFastTransferTokenPoolSetup} from "./BurnMintFastTransferTokenPoolSetup.t.sol";
-import {IERC20} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
 contract BurnMintFastTransferTokenPool_fastFill is BurnMintFastTransferTokenPoolSetup {
   uint256 internal constant FILL_AMOUNT = 100 ether;
