@@ -26,13 +26,15 @@ type Initialize struct {
 	// [4] = [] program
 	//
 	// [5] = [] programData
+	//
+	// [6] = [] config
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewInitializeInstructionBuilder creates a new `Initialize` instruction builder.
 func NewInitializeInstructionBuilder() *Initialize {
 	nd := &Initialize{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 6),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 7),
 	}
 	return nd
 }
@@ -115,6 +117,17 @@ func (inst *Initialize) GetProgramDataAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[5]
 }
 
+// SetConfigAccount sets the "config" account.
+func (inst *Initialize) SetConfigAccount(config ag_solanago.PublicKey) *Initialize {
+	inst.AccountMetaSlice[6] = ag_solanago.Meta(config)
+	return inst
+}
+
+// GetConfigAccount gets the "config" account.
+func (inst *Initialize) GetConfigAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[6]
+}
+
 func (inst Initialize) Build() *Instruction {
 	return &Instruction{BaseVariant: ag_binary.BaseVariant{
 		Impl:   inst,
@@ -163,6 +176,9 @@ func (inst *Initialize) Validate() error {
 		if inst.AccountMetaSlice[5] == nil {
 			return errors.New("accounts.ProgramData is not set")
 		}
+		if inst.AccountMetaSlice[6] == nil {
+			return errors.New("accounts.Config is not set")
+		}
 	}
 	return nil
 }
@@ -182,13 +198,14 @@ func (inst *Initialize) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=6]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Accounts[len=7]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("        state", inst.AccountMetaSlice[0]))
 						accountsBranch.Child(ag_format.Meta("         mint", inst.AccountMetaSlice[1]))
 						accountsBranch.Child(ag_format.Meta("    authority", inst.AccountMetaSlice[2]))
 						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[3]))
 						accountsBranch.Child(ag_format.Meta("      program", inst.AccountMetaSlice[4]))
 						accountsBranch.Child(ag_format.Meta("  programData", inst.AccountMetaSlice[5]))
+						accountsBranch.Child(ag_format.Meta("       config", inst.AccountMetaSlice[6]))
 					})
 				})
 		})
@@ -232,7 +249,8 @@ func NewInitializeInstruction(
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey,
 	program ag_solanago.PublicKey,
-	programData ag_solanago.PublicKey) *Initialize {
+	programData ag_solanago.PublicKey,
+	config ag_solanago.PublicKey) *Initialize {
 	return NewInitializeInstructionBuilder().
 		SetRouter(router).
 		SetRmnRemote(rmnRemote).
@@ -241,5 +259,6 @@ func NewInitializeInstruction(
 		SetAuthorityAccount(authority).
 		SetSystemProgramAccount(systemProgram).
 		SetProgramAccount(program).
-		SetProgramDataAccount(programData)
+		SetProgramDataAccount(programData).
+		SetConfigAccount(config)
 }

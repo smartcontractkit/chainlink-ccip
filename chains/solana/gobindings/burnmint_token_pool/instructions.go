@@ -28,6 +28,10 @@ func init() {
 }
 
 var (
+	Instruction_InitGlobalConfig = ag_binary.TypeID([8]byte{140, 136, 214, 48, 87, 0, 120, 255})
+
+	Instruction_UpdateGlobalConfig = ag_binary.TypeID([8]byte{164, 84, 130, 189, 111, 58, 250, 200})
+
 	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
 
 	// Returns the program type (name) and version.
@@ -67,6 +71,10 @@ var (
 // InstructionIDToName returns the name of the instruction given its ID.
 func InstructionIDToName(id ag_binary.TypeID) string {
 	switch id {
+	case Instruction_InitGlobalConfig:
+		return "InitGlobalConfig"
+	case Instruction_UpdateGlobalConfig:
+		return "UpdateGlobalConfig"
 	case Instruction_Initialize:
 		return "Initialize"
 	case Instruction_TypeVersion:
@@ -117,6 +125,12 @@ func (inst *Instruction) EncodeToTree(parent ag_treeout.Branches) {
 var InstructionImplDef = ag_binary.NewVariantDefinition(
 	ag_binary.AnchorTypeIDEncoding,
 	[]ag_binary.VariantType{
+		{
+			"init_global_config", (*InitGlobalConfig)(nil),
+		},
+		{
+			"update_global_config", (*UpdateGlobalConfig)(nil),
+		},
 		{
 			"initialize", (*Initialize)(nil),
 		},
