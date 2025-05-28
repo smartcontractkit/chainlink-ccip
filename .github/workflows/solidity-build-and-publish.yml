@@ -64,17 +64,6 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Checkout diff-so-fancy
-        uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-          repository: so-fancy/diff-so-fancy
-          ref: a673cb4d2707f64d92b86498a2f5f71c8e2643d5 # v1.4.3
-          path: diff-so-fancy
-
-      - name: Install diff-so-fancy
-        run: echo "$GITHUB_WORKSPACE/diff-so-fancy" >> $GITHUB_PATH
-
       - name: Setup NodeJS
         uses: smartcontractkit/.github/actions/setup-nodejs@c094a1482049b2b9c0a7cde3f715bd76a60afd97
         with:
@@ -94,6 +83,7 @@ jobs:
       - name: Run native compile and generate wrappers
         if: ${{ !(needs.tag-check.outputs.is-release-ccip == 'true' || needs.tag-check.outputs.is-pre-release-ccip == 'true') }}
         working-directory: chains/evm
+
         run: make wrappers
 
       - name: Run native compile and generate wrappers including metadata
@@ -110,7 +100,7 @@ jobs:
         working-directory: chains/evm
         run: |
           git add --all
-          git diff --minimal --color --cached --exit-code | diff-so-fancy
+          git diff --minimal --color --cached --exit-code
 
   # The if statements for steps after checkout repo is a workaround for
   # passing required check for PRs that don't have filtered changes.
