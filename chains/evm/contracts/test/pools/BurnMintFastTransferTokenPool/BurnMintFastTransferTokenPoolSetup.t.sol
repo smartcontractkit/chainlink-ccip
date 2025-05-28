@@ -65,9 +65,8 @@ contract BurnMintFastTransferTokenPoolSetup is BaseTest {
     FastTransferTokenPoolAbstract.LaneConfigArgs memory laneConfigArgs = FastTransferTokenPoolAbstract.LaneConfigArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       bpsFastFee: FAST_FEE_BPS,
-      enabled: true,
       fillerAllowlistEnabled: true,
-      destinationPool: s_remoteBurnMintPool,
+      destinationPool: abi.encode(s_remoteBurnMintPool),
       fillAmountMaxPerRequest: FILL_AMOUNT_MAX,
       addFillers: addFillers,
       removeFillers: new address[](0)

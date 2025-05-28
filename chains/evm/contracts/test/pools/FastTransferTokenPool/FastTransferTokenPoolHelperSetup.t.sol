@@ -4,8 +4,8 @@ pragma solidity ^0.8.24;
 import {Router} from "../../../Router.sol";
 import {FastTransferTokenPoolAbstract} from "../../../pools/FastTransferTokenPoolAbstract.sol";
 import {FastTransferTokenPoolHelper} from "../../helpers/FastTransferTokenPoolHelper.sol";
-
 import {BaseTest} from "../../BaseTest.t.sol";
+import {TokenPool} from "../../../pools/TokenPool.sol";
 
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 import {WETH9} from "@chainlink/contracts/src/v0.8/vendor/canonical-weth/WETH9.sol";
@@ -17,7 +17,7 @@ contract FastTransferTokenPoolHelperSetup is BaseTest {
   IERC20 internal s_token;
   FastTransferTokenPoolHelper public s_tokenPool;
   WETH9 public wrappedNative;
-
+  bytes public constant destPoolAddress = abi.encode(address(0x4));
   address public s_filler;
   uint16 public constant FAST_FEE_BPS = 100; // 1%
 
@@ -39,9 +39,8 @@ contract FastTransferTokenPoolHelperSetup is BaseTest {
     laneConfigArgs[0] = FastTransferTokenPoolAbstract.LaneConfigArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       bpsFastFee: FAST_FEE_BPS, // 1%
-      enabled: true,
       fillerAllowlistEnabled: true,
-      destinationPool: address(0x4),
+      destinationPool: destPoolAddress,
       fillAmountMaxPerRequest: 1000 ether,
       addFillers: addFillers,
       removeFillers: new address[](0)
@@ -55,6 +54,19 @@ contract FastTransferTokenPoolHelperSetup is BaseTest {
       address(s_sourceRouter) // router
     );
     s_tokenPool.updateLaneConfig(laneConfigArgs[0]);
+    bytes[] memory remotePoolAddresses = new bytes[](1);
+    remotePoolAddresses[0] = destPoolAddress;
+
+    TokenPool.ChainUpdate[] memory chainUpdate = new TokenPool.ChainUpdate[](1);
+    chainUpdate[0] = TokenPool.ChainUpdate({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      remotePoolAddresses: remotePoolAddresses,
+      remoteTokenAddress: abi.encode(address(2)),
+      outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: _getInboundRateLimiterConfig()
+    });
+
+    s_tokenPool.applyChainUpdates(new uint64[](0), chainUpdate);
 
     // Approve tokens
     s_token.approve(address(s_tokenPool), type(uint256).max);

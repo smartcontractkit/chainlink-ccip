@@ -31,16 +31,15 @@ contract FastTransferTokenPoolHelper_getCcipSendTokenFee_Test is FastTransferTok
     // Fast fee should be 1% of amount (100 bps)
     assertEq(quote.fastTransferFee, fastFee);
     // CCIP fee should be non-zero
-    assertEq(quote.sendTokenFee, feeQuoterQuote);
+    assertEq(quote.ccipSettlementFee, feeQuoterQuote);
   }
 
   function test_GetCcipSendTokenFee_RevertWhen_LaneDisabled() public {
     FastTransferTokenPoolAbstract.LaneConfigArgs memory laneConfigArgs = FastTransferTokenPoolAbstract.LaneConfigArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       bpsFastFee: 100,
-      enabled: false,
       fillerAllowlistEnabled: true,
-      destinationPool: address(0x4),
+      destinationPool: destPoolAddress,
       fillAmountMaxPerRequest: 1000 ether,
       addFillers: new address[](0),
       removeFillers: new address[](0)

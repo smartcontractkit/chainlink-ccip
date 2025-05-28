@@ -27,9 +27,8 @@ contract BurnMintFastTransferTokenPool_constructor is BurnMintFastTransferTokenP
   function test_GetLaneConfig() public view {
     FastTransferTokenPoolAbstract.LaneConfigView memory config = s_pool.getLaneConfig(DEST_CHAIN_SELECTOR);
     assertEq(config.bpsFastFee, FAST_FEE_BPS);
-    assertTrue(config.enabled);
     assertTrue(config.fillerAllowlistEnabled);
-    assertEq(config.destinationPool, s_remoteBurnMintPool);
+    assertEq(config.destinationPool, abi.encode(s_remoteBurnMintPool));
     assertEq(config.fillAmountMaxPerRequest, FILL_AMOUNT_MAX);
   }
 

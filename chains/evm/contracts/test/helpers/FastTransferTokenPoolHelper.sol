@@ -59,21 +59,6 @@ contract FastTransferTokenPoolHelper is FastTransferTokenPoolAbstract {
     return srcAmount;
   }
 
-  function _settle(
-    uint64 sourceChainSelector,
-    bytes32 fillRequestId,
-    bytes memory sourcePoolAddress,
-    uint256 srcAmount,
-    uint8 srcDecimal,
-    uint256 fastTransferFee,
-    address receiver
-  ) internal override {
-    // Call the common settlement logic from the abstract contract
-    super._settle(
-      sourceChainSelector, fillRequestId, sourcePoolAddress, srcAmount, srcDecimal, fastTransferFee, receiver
-    );
-  }
-
   /// @notice Validates settlement prerequisites - simple implementation for testing
   function _validateSettlement(uint64, bytes memory) internal view override {
     // For testing, we'll do minimal validation
@@ -90,10 +75,6 @@ contract FastTransferTokenPoolHelper is FastTransferTokenPoolAbstract {
   function _handleFastFilledReimbursement(address filler, uint256 settlementAmountLocal) internal override {
     // For testing, just transfer tokens to filler
     getToken().safeTransfer(filler, settlementAmountLocal);
-  }
-
-  function _checkAdmin() internal view override {
-    if (msg.sender != i_admin) revert NotAdmin();
   }
 
   // TokenPool function implementations

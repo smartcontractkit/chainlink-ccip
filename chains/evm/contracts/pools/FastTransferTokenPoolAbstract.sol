@@ -7,21 +7,19 @@ import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol
 import {IFastTransferPool} from "../interfaces/IFastTransferPool.sol";
 import {IRouterClient} from "../interfaces/IRouterClient.sol";
 
-// Chainlink interfaces
+import {IRMN} from "../interfaces/IRMN.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
-import {IERC165} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/IERC165.sol";
 
-// Local libraries and applications
 import {CCIPReceiver} from "../applications/CCIPReceiver.sol";
 import {Client} from "../libraries/Client.sol";
 import {TokenPool} from "./TokenPool.sol";
 
-// OpenZeppelin imports
 import {IERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC165} from
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/IERC165.sol";
 
 /// @title Abstract Fast-Transfer Pool
 /// @notice Base contract for fast-transfer pools that provides common functionality
@@ -36,9 +34,8 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   event LaneUpdated(
     uint64 indexed dst,
     uint16 bps,
-    bool enabled,
     uint256 fillAmountMaxPerRequest,
-    address destinationPool,
+    bytes destinationPool,
     address[] addFillers,
     address[] removeFillers
   );
@@ -47,30 +44,27 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
 
   struct LaneConfig {
     uint256 fillAmountMaxPerRequest; //    max amount that can be filled per request
-    address destinationPool; // ─────────╮
-    uint16 bpsFastFee; //                │ 0-10_000
-    bool enabled; //                     │ pause per lane
-    bool fillerAllowlistEnabled; //──────╯ whitelist for fillers
+    uint16 bpsFastFee; // ─────────────╮ 0-10_000
+    bool fillerAllowlistEnabled; // ───╯ whitelist for fillers
+    bytes destinationPool; // destination pool address
     mapping(address filler => bool isAllowed) fillerAllowList; // whitelist of fillers
   }
 
   struct LaneConfigView {
     uint256 fillAmountMaxPerRequest; //    max amount that can be filled per request
-    address destinationPool; // ─────────╮
-    uint16 bpsFastFee; //                │ 0-10_000
-    bool enabled; //                     │ pause per lane
-    bool fillerAllowlistEnabled; //──────╯ whitelist for fillers
+    uint16 bpsFastFee; // ────────────╮ 0-10_000
+    bool fillerAllowlistEnabled; // ──╯ whitelist for fillers
+    bytes destinationPool; // destination pool address
   }
 
   struct LaneConfigArgs {
     uint256 fillAmountMaxPerRequest; //    max amount that can be filled per request
     address[] addFillers; //               address allowed to fill
     address[] removeFillers; //            addresses to remove from the whitelist
-    address destinationPool; // ─────────╮
-    uint64 remoteChainSelector; //       │
+    uint64 remoteChainSelector; // ──────╮
     uint16 bpsFastFee; //                │ 0-10_000
-    bool enabled; //                     │ pause per lane
-    bool fillerAllowlistEnabled; //──────╯
+    bool fillerAllowlistEnabled; // ─────╯
+    bytes destinationPool;
   }
 
   struct MintMessage {
@@ -79,7 +73,6 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     bytes receiver; // receiver address on the destination chain
     uint8 srcDecimals; // decimals of the source token
   }
-  //
 
   /// @dev Mapping of remote chain selector to lane configuration
   mapping(uint64 remoteChainSelector => LaneConfig laneConfig) private s_fastTransferLaneConfig;
@@ -109,8 +102,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   /// @param laneConfigArgs The lane configuration arguments
   function updateLaneConfig(
     LaneConfigArgs calldata laneConfigArgs
-  ) external virtual {
-    _checkAdmin();
+  ) external virtual onlyOwner {
     _updateLaneConfig(laneConfigArgs);
   }
 
@@ -123,7 +115,6 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     LaneConfig storage laneConfig = s_fastTransferLaneConfig[laneConfigArgs.remoteChainSelector];
     laneConfig.destinationPool = laneConfigArgs.destinationPool;
     laneConfig.bpsFastFee = laneConfigArgs.bpsFastFee;
-    laneConfig.enabled = laneConfigArgs.enabled;
     laneConfig.fillerAllowlistEnabled = laneConfigArgs.fillerAllowlistEnabled;
     laneConfig.fillAmountMaxPerRequest = laneConfigArgs.fillAmountMaxPerRequest;
     for (uint256 i; i < laneConfigArgs.addFillers.length; ++i) {
@@ -135,7 +126,6 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     emit LaneUpdated(
       laneConfigArgs.remoteChainSelector,
       laneConfigArgs.bpsFastFee,
-      laneConfigArgs.enabled,
       laneConfigArgs.fillAmountMaxPerRequest,
       laneConfigArgs.destinationPool,
       laneConfigArgs.addFillers,
@@ -151,8 +141,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     uint64 destinationChainSelector,
     address[] memory addFillers,
     address[] memory removeFillers
-  ) external virtual {
-    _checkAdmin();
+  ) external virtual onlyOwner {
     LaneConfig storage laneConfig = s_fastTransferLaneConfig[destinationChainSelector];
     for (uint256 i; i < addFillers.length; ++i) {
       laneConfig.fillerAllowList[addFillers[i]] = true;
@@ -172,7 +161,6 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     LaneConfig storage config = s_fastTransferLaneConfig[remoteChainSelector];
     return LaneConfigView({
       bpsFastFee: config.bpsFastFee,
-      enabled: config.enabled,
       fillerAllowlistEnabled: config.fillerAllowlistEnabled,
       destinationPool: config.destinationPool,
       fillAmountMaxPerRequest: config.fillAmountMaxPerRequest
@@ -210,11 +198,15 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     // burn/lock tokens + pay fastFee (in _handleTokenToTransfer)
     (Quote memory quote, Client.EVM2AnyMessage memory message) =
       _getFeeQuoteAndCCIPMessage(feeToken, destinationChainSelector, amount, receiver, extraArgs);
+    if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(destinationChainSelector)))) revert CursedByRMN();
+    _checkAllowList(msg.sender);
+    if (!isSupportedChain(destinationChainSelector)) revert ChainNotAllowed(destinationChainSelector);
+    _consumeOutboundRateLimit(destinationChainSelector, amount);
     _handleTokenToTransfer(destinationChainSelector, msg.sender, amount + quote.fastTransferFee);
 
     if (feeToken != address(0)) {
-      IERC20(feeToken).safeTransferFrom(msg.sender, address(this), quote.sendTokenFee);
-      IERC20(feeToken).safeApprove(i_ccipRouter, quote.sendTokenFee);
+      IERC20(feeToken).safeTransferFrom(msg.sender, address(this), quote.ccipSettlementFee);
+      IERC20(feeToken).safeApprove(i_ccipRouter, quote.ccipSettlementFee);
     }
     fillRequestId = IRouterClient(getRouter()).ccipSend{value: msg.value}(destinationChainSelector, message);
     emit FastFillRequest(fillRequestId, destinationChainSelector, amount, quote.fastTransferFee, receiver);
@@ -230,7 +222,6 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     bytes calldata
   ) internal view returns (IFastTransferPool.Quote memory quote, Client.EVM2AnyMessage memory message) {
     LaneConfig storage lane = s_fastTransferLaneConfig[destinationChainSelector];
-    if (!lane.enabled) revert IFastTransferPool.LaneDisabled();
 
     // compute fastFee
     // bool slow = extraArgs.length > 0 && (extraArgs[0] & bytes1(0x01)) == bytes1(0x01);
@@ -240,7 +231,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     bytes memory data = abi.encode(
       MintMessage({
         srcAmountToTransfer: amount,
-        srcDecimals: 18,
+        srcDecimals: i_tokenDecimals,
         fastTransferFee: quote.fastTransferFee,
         receiver: receiver
       })
@@ -254,7 +245,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
       extraArgs: ""
     });
 
-    quote.sendTokenFee = IRouterClient(getRouter()).getFee(destinationChainSelector, message);
+    quote.ccipSettlementFee = IRouterClient(getRouter()).getFee(destinationChainSelector, message);
     return (quote, message);
   }
 
@@ -367,8 +358,11 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   /// @param sourceChainSelector The source chain selector
   /// @param sourcePoolAddress The source pool address
   function _validateSettlement(uint64 sourceChainSelector, bytes memory sourcePoolAddress) internal view virtual {
-    // Default implementation - can be overridden by concrete contracts
-    // Most pools will want RMN curse check and source pool validation
+    if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(sourceChainSelector)))) revert CursedByRMN();
+    //Validates that the source pool address is configured on this pool.
+    if (!isRemotePool(sourceChainSelector, sourcePoolAddress)) {
+      revert InvalidSourcePoolAddress(sourcePoolAddress);
+    }
   }
 
   /// @notice Handles settlement when the request was not fast-filled
@@ -385,11 +379,6 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   /// @param filler The filler address to reimburse
   /// @param settlementAmountLocal The amount to reimburse in local token
   function _handleFastFilledReimbursement(address filler, uint256 settlementAmountLocal) internal virtual;
-
-  /// @notice Override this function in your implementation.
-  /// @dev The check is dependent on the ownership implementation of the implementation contract of the pool
-  /// we do not enforce the ownership implementation in this abstract contract
-  function _checkAdmin() internal view virtual;
 
   /// @notice Override getRouter to resolve diamond inheritance
   function getRouter() public view virtual override(TokenPool, CCIPReceiver) returns (address) {

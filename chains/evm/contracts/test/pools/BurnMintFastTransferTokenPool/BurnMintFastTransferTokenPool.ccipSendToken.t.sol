@@ -39,14 +39,14 @@ contract BurnMintFastTransferTokenPool_ccipSendToken is BurnMintFastTransferToke
 
     uint256 expectedFastFee = (TRANSFER_AMOUNT * FAST_FEE_BPS) / 10_000;
     assertEq(quote.fastTransferFee, expectedFastFee);
-    assertEq(quote.sendTokenFee, CCIP_SEND_FEE);
+    assertEq(quote.ccipSettlementFee, CCIP_SEND_FEE);
 
     vm.expectEmit();
     emit IFastTransferPool.FastFillRequest(
       MESSAGE_ID, DEST_CHAIN_SELECTOR, TRANSFER_AMOUNT, expectedFastFee, abi.encode(RECEIVER)
     );
 
-    bytes32 fillRequestId = s_pool.ccipSendToken{value: quote.sendTokenFee}(
+    bytes32 fillRequestId = s_pool.ccipSendToken{value: quote.ccipSettlementFee}(
       address(0), // native fee token
       DEST_CHAIN_SELECTOR,
       TRANSFER_AMOUNT,
@@ -71,7 +71,9 @@ contract BurnMintFastTransferTokenPool_ccipSendToken is BurnMintFastTransferToke
 
     assertTrue(fillRequestId != bytes32(0));
     uint256 expectedFastFee = (TRANSFER_AMOUNT * FAST_FEE_BPS) / 10_000;
-    assertEq(s_burnMintERC20.balanceOf(OWNER), balanceBefore - TRANSFER_AMOUNT - expectedFastFee - quote.sendTokenFee);
+    assertEq(
+      s_burnMintERC20.balanceOf(OWNER), balanceBefore - TRANSFER_AMOUNT - expectedFastFee - quote.ccipSettlementFee
+    );
   }
 
   function test_RevertWhen_LaneDisabled() public {
@@ -79,9 +81,8 @@ contract BurnMintFastTransferTokenPool_ccipSendToken is BurnMintFastTransferToke
     FastTransferTokenPoolAbstract.LaneConfigArgs memory laneConfigArgs = FastTransferTokenPoolAbstract.LaneConfigArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       bpsFastFee: FAST_FEE_BPS,
-      enabled: false, // disabled
       fillerAllowlistEnabled: true,
-      destinationPool: s_remoteBurnMintPool,
+      destinationPool: abi.encode(s_remoteBurnMintPool),
       fillAmountMaxPerRequest: FILL_AMOUNT_MAX,
       addFillers: new address[](0),
       removeFillers: new address[](0)
