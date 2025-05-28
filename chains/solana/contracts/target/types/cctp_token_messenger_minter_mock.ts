@@ -17,7 +17,7 @@ export type CctpTokenMessengerMinterMock = {
         },
         {
           "name": "authorityPda",
-          "isMut": true,
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -42,6 +42,16 @@ export type CctpTokenMessengerMinterMock = {
         },
         {
           "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "eventAuthority",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "program",
           "isMut": false,
           "isSigner": false
         }
@@ -1245,7 +1255,7 @@ export const IDL: CctpTokenMessengerMinterMock = {
         },
         {
           "name": "authorityPda",
-          "isMut": true,
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -1270,6 +1280,16 @@ export const IDL: CctpTokenMessengerMinterMock = {
         },
         {
           "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "eventAuthority",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "program",
           "isMut": false,
           "isSigner": false
         }
