@@ -212,9 +212,9 @@ pub mod burnmint_token_pool {
         let multisig = if mint_authority != ctx.accounts.pool_signer.key() {
             let multisig_account = ctx
                 .remaining_accounts
-                .get(0)
+                .iter()
+                .find(|acc| acc.key() == mint_authority)
                 .ok_or(CcipTokenPoolError::InvalidMultisig)?;
-            require_eq!(mint_authority, multisig_account.key());
 
             Some(multisig_account.clone())
         } else {

@@ -50,10 +50,6 @@
         {
           "name": "rmnRemote",
           "type": "publicKey"
-        },
-        {
-          "name": "multisig",
-          "type": "bool"
         }
       ]
     },
@@ -504,10 +500,6 @@
             "type": {
               "defined": "PoolType"
             }
-          },
-          {
-            "name": "multisig",
-            "type": "bool"
           },
           {
             "name": "config",

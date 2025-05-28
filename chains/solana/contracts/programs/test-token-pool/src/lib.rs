@@ -19,11 +19,9 @@ pub mod test_token_pool {
         pool_type: PoolType,
         router: Pubkey,
         rmn_remote: Pubkey,
-        multisig: bool,
     ) -> Result<()> {
         ctx.accounts.state.set_inner(State {
             pool_type,
-            multisig,
             config: BaseConfig::init(
                 &ctx.accounts.mint,
                 ctx.program_id.key(),
@@ -154,6 +152,8 @@ pub mod test_token_pool {
             ctx.accounts.rmn_remote_config.to_account_info(),
         )?;
 
+        let mint_authority = ctx.accounts.mint.mint_authority.unwrap_or_default();
+
         match ctx.accounts.state.pool_type {
             PoolType::LockAndRelease => release_tokens(
                 ctx.accounts.token_program.key(),
@@ -175,10 +175,11 @@ pub mod test_token_pool {
                     mint: ctx.accounts.mint.to_account_info(),
                     pool_signer: ctx.accounts.pool_signer.to_account_info(),
                     pool_signer_bump: ctx.bumps.pool_signer,
-                    multisig: if ctx.accounts.state.multisig {
+                    multisig: if mint_authority != ctx.accounts.pool_signer.key() {
                         Some(
                             ctx.remaining_accounts
-                                .get(0)
+                                .iter()
+                                .find(|acc| acc.key() == mint_authority)
                                 .ok_or(CcipTokenPoolError::InvalidInputs)?
                                 .clone(),
                         )
@@ -334,7 +335,6 @@ pub mod test_token_pool {
 #[derive(InitSpace)]
 pub struct State {
     pub pool_type: PoolType,
-    pub multisig: bool,
     pub config: BaseConfig,
 }
 
