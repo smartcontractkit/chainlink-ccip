@@ -44,17 +44,17 @@ contract FastTransferTokenPoolHelper is FastTransferTokenPoolAbstract {
   }
 
   // Implementation of abstract functions
-  function _handleTokenToTransfer(uint64 destinationChainSelector, address sender, uint256 amount) internal override {
+  function _handleTokenToTransfer(uint64, address sender, uint256 amount) internal override {
     // For testing, we'll just transfer tokens from sender to this contract
     IERC20(i_token).safeTransferFrom(sender, address(this), amount);
   }
 
   function _transferFromFiller(
-    uint64 sourceChainSelector,
+    uint64,
     address filler,
     address receiver,
     uint256 srcAmount,
-    uint8 srcDecimals
+    uint8
   ) internal override returns (uint256) {
     IERC20(i_token).safeTransferFrom(filler, receiver, srcAmount);
     return srcAmount;

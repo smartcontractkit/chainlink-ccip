@@ -218,7 +218,7 @@ abstract contract FastTransferTokenPoolAbstract is CCIPReceiver, ITypeAndVersion
     uint64 destinationChainSelector,
     uint256 amount,
     bytes calldata receiver,
-    bytes calldata extraArgs
+    bytes calldata
   ) internal view returns (IFastTransferPool.Quote memory quote, Client.EVM2AnyMessage memory message) {
     LaneConfig storage lane = s_fastTransferLaneConfig[destinationChainSelector];
     if (!lane.enabled) revert IFastTransferPool.LaneDisabled();
