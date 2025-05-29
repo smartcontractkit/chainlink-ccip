@@ -49,11 +49,17 @@ func (o *baseObserver) getChainsFeeComponents(
 	ctx context.Context,
 	lggr logger.Logger,
 ) map[cciptypes.ChainSelector]types.ChainFeeComponents {
-	supportedChains, err := o.getSupportedChains(lggr, o.cs, o.oracleID, o.destChain)
+	supportedChains, err := o.getSupportedSourceChains()
 	if err != nil {
 		lggr.Errorw("failed to get supported chains unable to get chains fee components", "err", err)
 		return map[cciptypes.ChainSelector]types.ChainFeeComponents{}
 	}
+
+	if len(supportedChains) == 0 {
+		lggr.Debugw("no supported source chains found, returning empty chains fee components")
+		return map[cciptypes.ChainSelector]types.ChainFeeComponents{}
+	}
+
 	return o.ccipReader.GetChainsFeeComponents(ctx, supportedChains)
 }
 
@@ -61,7 +67,7 @@ func (o *baseObserver) getNativeTokenPrices(
 	ctx context.Context,
 	lggr logger.Logger,
 ) map[cciptypes.ChainSelector]cciptypes.BigInt {
-	supportedChains, err := o.getSupportedChains(lggr, o.cs, o.oracleID, o.destChain)
+	supportedChains, err := o.getSupportedSourceChains()
 	if err != nil {
 		lggr.Errorw("failed to get supported chains unable to get native token prices", "err", err)
 		return map[cciptypes.ChainSelector]cciptypes.BigInt{}
@@ -116,20 +122,15 @@ func (o *baseObserver) invalidateCaches(_ context.Context, _ logger.Logger) {}
 func (o *baseObserver) close() {
 }
 
-func (o *baseObserver) getSupportedChains(
-	lggr logger.Logger,
-	cs plugincommon.ChainSupport,
-	oracleID commontypes.OracleID,
-	destChain cciptypes.ChainSelector,
-) ([]cciptypes.ChainSelector, error) {
-	supportedChains, err := cs.SupportedChains(oracleID)
+// getSupportedChains returns all the supported source chains for the given oracle ID.
+func (o *baseObserver) getSupportedSourceChains() ([]cciptypes.ChainSelector, error) {
+	supportedChains, err := o.cs.SupportedChains(o.oracleID)
 	if err != nil {
 		return nil, err
 	}
 
-	supportedChains.Remove(destChain)
+	supportedChains.Remove(o.destChain)
 	if supportedChains.Cardinality() == 0 {
-		lggr.Info("no supported chains other than dest chain to observe")
 		return nil, nil
 	}
 
