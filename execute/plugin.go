@@ -780,6 +780,17 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 ) (bool, error) {
 	ctx, lggr := logutil.WithOCRInfo(ctx, p.lggr, seqNr, logutil.PhaseShouldAccept)
 
+	supportsDest, err := p.supportsDestChain()
+	if err != nil {
+		lggr.Errorw("error checking if destination chain is supported", "err", err)
+		return false, fmt.Errorf("checking if destination chain is supported: %w", err)
+	}
+	if !supportsDest {
+		lggr.Errorw("destination chain not supported, wrong transmission schedule",
+			"destChain", p.destChain, "oracleID", p.reportingCfg.OracleID)
+		return false, plugincommon.NewErrInvalidReport("destination chain not supported")
+	}
+
 	decodedReport, err := p.validateReport(ctx, lggr, r)
 	if errors.Is(err, plugincommon.ErrInvalidReport) {
 		lggr.Infow("report not valid, not accepting", "err", err)

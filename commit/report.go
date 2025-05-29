@@ -313,6 +313,16 @@ func (p *Plugin) checkReportCursed(
 ) (bool, error) {
 	allRoots := append(decodedReport.BlessedMerkleRoots, decodedReport.UnblessedMerkleRoots...)
 
+	supportsDest, err := p.chainSupport.SupportsDestChain(p.oracleID)
+	if err != nil {
+		lggr.Errorw("error checking if destination chain is supported", "err", err)
+		return false, fmt.Errorf("checking if destination chain is supported: %w", err)
+	}
+	if !supportsDest {
+		lggr.Errorw("destination chain not supported, wrong transmission schedule", "oracleID", p.reportingCfg.OracleID)
+		return false, plugincommon.NewErrInvalidReport("destination chain not supported")
+	}
+
 	sourceChains := slicelib.Map(allRoots,
 		func(r cciptypes.MerkleRootChain) cciptypes.ChainSelector { return r.ChainSel })
 
