@@ -4,6 +4,7 @@ import (
 	"context"
 	crand "crypto/rand"
 	"fmt"
+	mapset "github.com/deckarep/golang-set/v2"
 	"math/rand"
 	"reflect"
 	"strings"
@@ -1613,7 +1614,9 @@ func Test_Builder_MultiReport(t *testing.T) {
 		args                        args
 		expectedExecReports         int
 		expectedChainReportsPerExec []int
-		wantErr                     string
+		// Map tracking which sequence numbers to skip per chain selector
+		expectedSkippedSeqsByChain map[cciptypes.ChainSelector]mapset.Set[cciptypes.SeqNum]
+		wantErr                    string
 	}{
 		{
 			name: "exactly one report",
@@ -1698,28 +1701,6 @@ func Test_Builder_MultiReport(t *testing.T) {
 			},
 			expectedExecReports:         1,
 			expectedChainReportsPerExec: []int{2},
-		},
-		{
-			name: "report and size limiting (skip over two large messages)",
-			args: args{
-				maxReportSize: 10000,
-				maxGasLimit:   10000000,
-				maxMessages:   3,
-				nonces:        defaultNonces,
-				reports: []exectypes.CommitData{
-					setMessageData(1, 90000,
-						setMessageData(3, 90000,
-							makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
-								sender,
-								cciptypes.Bytes32{},
-								nil,
-								true,
-							))),
-				},
-			},
-			expectedExecReports: 1,
-			// Should create 3 chain reports that includes all messages except the two large ones
-			expectedChainReportsPerExec: []int{3},
 		},
 		{
 			name: "break down one report into multiple reports - single message each",
@@ -1811,25 +1792,26 @@ func Test_Builder_MultiReport(t *testing.T) {
 			expectedChainReportsPerExec: []int{2, 1}, // 2 chains in first exec report, 1 in second
 		},
 		{
+			// TODO: Needs fixing. `checkMessages` function fails to get correct msgs when called more than once
 			name: "non-zero nonces limit to single report despite multipleReportsEnabled",
 			args: args{
 				maxReportSize: 2800,
 				maxGasLimit:   10000000,
 				nonces:        defaultNonces,
 				reports: []exectypes.CommitData{
-					makeTestCommitReport(hasher, 20, 2, 100, 999, 10101010101,
+					makeTestCommitReport(hasher, 7, 2, 100, 999, 10101010101,
 						sender,
 						cciptypes.Bytes32{},
 						nil,
 						false, // non-zero nonces
 					),
-					makeTestCommitReport(hasher, 20, 3, 100, 999, 10101010101,
+					makeTestCommitReport(hasher, 2, 3, 100, 999, 10101010101,
 						sender,
 						cciptypes.Bytes32{},
 						nil,
 						false, // non-zero nonces
 					),
-					makeTestCommitReport(hasher, 20, 4, 100, 999, 10101010101,
+					makeTestCommitReport(hasher, 2, 4, 100, 999, 10101010101,
 						sender,
 						cciptypes.Bytes32{},
 						nil,
@@ -1838,8 +1820,14 @@ func Test_Builder_MultiReport(t *testing.T) {
 				},
 			},
 			expectedExecReports:         1,
-			expectedChainReportsPerExec: []int{1}, // Only one chain report despite size
+			expectedChainReportsPerExec: []int{1},
 			wantErr:                     "messages with non-zero nonces detected, limiting to single report",
+			expectedSkippedSeqsByChain: map[cciptypes.ChainSelector]mapset.Set[cciptypes.SeqNum]{
+				// Shouldn't skip any of chain 2
+				//2: mapset.NewSet(cciptypes.SeqNum(105), cciptypes.SeqNum(106)),
+				3: mapset.NewSet(cciptypes.SeqNum(100), cciptypes.SeqNum(101)),
+				4: mapset.NewSet(cciptypes.SeqNum(100), cciptypes.SeqNum(101)),
+			},
 		},
 		{
 			name: "multiple input reports splitting across maxMessages - no maxSingleChainReports",
@@ -1857,6 +1845,32 @@ func Test_Builder_MultiReport(t *testing.T) {
 			},
 			expectedExecReports:         1,
 			expectedChainReportsPerExec: []int{4},
+		},
+		{
+			name: "report and size limiting (skip over two large messages)",
+			args: args{
+				maxReportSize: 10000,
+				maxGasLimit:   10000000,
+				maxMessages:   3,
+				nonces:        defaultNonces,
+				reports: []exectypes.CommitData{
+					setMessageData(1, 90000,
+						setMessageData(3, 90000,
+							makeTestCommitReport(hasher, 10, 2, 100, 999, 10101010101,
+								sender,
+								cciptypes.Bytes32{},
+								nil,
+								true,
+							))),
+				},
+			},
+			expectedExecReports: 1,
+			// Should create 3 chain reports that includes all messages except the two large ones
+			expectedChainReportsPerExec: []int{3},
+			expectedSkippedSeqsByChain: map[cciptypes.ChainSelector]mapset.Set[cciptypes.SeqNum]{
+				// Sequence numbers for indices 1 and 3 (the large messages)
+				2: mapset.NewSet(cciptypes.SeqNum(101), cciptypes.SeqNum(103)),
+			},
 		},
 	}
 
@@ -1914,6 +1928,72 @@ func Test_Builder_MultiReport(t *testing.T) {
 				require.Equal(t, len(execReport.ChainReports), len(commitReports[i]),
 					"Mismatch between exec reports and commit reports for report %d", i)
 			}
+
+			// Extract executed sequence numbers from each exec report
+			markedExecuted := make(map[cciptypes.ChainSelector]mapset.Set[cciptypes.SeqNum])
+			execReportExecuted := make(map[cciptypes.ChainSelector]mapset.Set[cciptypes.SeqNum])
+
+			// Add messages that are marked as executed in commit reports
+			for _, commitReport := range commitReports {
+				for _, chainReport := range commitReport {
+					for _, executedMsgSeqNum := range chainReport.ExecutedMessages {
+						if markedExecuted[chainReport.SourceChain] == nil {
+							markedExecuted[chainReport.SourceChain] = mapset.NewSet[cciptypes.SeqNum]()
+						}
+						markedExecuted[chainReport.SourceChain].Add(executedMsgSeqNum)
+					}
+				}
+			}
+
+			// Collect all sequence numbers that are reported to execute
+			for _, execReport := range execReports {
+				for _, chainReport := range execReport.ChainReports {
+					chainSelector := chainReport.SourceChainSelector
+
+					if execReportExecuted[chainSelector] == nil {
+						execReportExecuted[chainSelector] = mapset.NewSet[cciptypes.SeqNum]()
+					}
+					for _, msg := range chainReport.Messages {
+						execReportExecuted[chainSelector].Add(msg.Header.SequenceNumber)
+					}
+				}
+			}
+
+			totalSkipped := 0
+			// Check intersection
+			for chainSelector, skippedSeqs := range tt.expectedSkippedSeqsByChain {
+				if markedExecuted[chainSelector] == nil {
+					markedExecuted[chainSelector] = mapset.NewSet[cciptypes.SeqNum]()
+				}
+				if execReportExecuted[chainSelector] == nil {
+					execReportExecuted[chainSelector] = mapset.NewSet[cciptypes.SeqNum]()
+				}
+				intersection := skippedSeqs.Intersect(markedExecuted[chainSelector])
+				require.Truef(t, intersection.IsEmpty(), "Expected no intersection between skipped "+
+					"messages on chain %d and marked messages for exec, but found: %v", chainSelector, intersection)
+				intersection = skippedSeqs.Intersect(execReportExecuted[chainSelector])
+				require.Truef(t, intersection.IsEmpty(), "Expected no intersection between skipped "+
+					"messages on chain %d and reported messages to exec, but found: %v", chainSelector, intersection)
+				totalSkipped += skippedSeqs.Cardinality()
+			}
+
+			totalExecuted := 0
+			// Make sure all elements in markedExecuted are the same in execReportExecuted and vice versa
+			for chainSelector, seqNums := range markedExecuted {
+				require.True(t, seqNums.Difference(execReportExecuted[chainSelector]).IsEmpty())
+			}
+			for chainSelector, seqNums := range execReportExecuted {
+				require.True(t, seqNums.Difference(markedExecuted[chainSelector]).IsEmpty())
+				totalExecuted += seqNums.Cardinality()
+			}
+
+			totalMessages := 0
+			// count all messages across all reports
+			for _, cr := range tt.args.reports {
+				totalMessages += len(cr.Messages)
+			}
+
+			require.Equal(t, totalMessages-totalSkipped, totalExecuted)
 		})
 	}
 }

@@ -191,6 +191,7 @@ func (b *execReportBuilder) Add(
 					"sourceChain", msg.Header.SourceChainSelector,
 					"messageID", msg.Header.MessageID,
 					"nonce", msg.Header.Nonce)
+				// TODO: Check this logic again. What if we can still add to same report still?
 				// If multiple reports are enabled, we can still process the report, but we need to limit it to a single report
 				// If we didn't even build the first report yet, then break and process the first report only.
 				if len(b.execReports) >= 1 && len(b.execReports[0].ChainReports) != 0 {
