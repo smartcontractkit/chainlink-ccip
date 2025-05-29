@@ -1066,7 +1066,7 @@ export type CcipOfframp = {
         "# Arguments",
         "",
         "* `ctx` - The context containing the accounts required for buffering.",
-        "* `root` - The merkle root as per the commit report.",
+        "* `buffer_id` - An arbitrary buffer id defined by the caller (could be the message_id).",
         "* `report_length` - Total length in bytes of the execution report.",
         "* `chunk` - The specific chunk to add to the buffer. Chunk must have a consistent size, except",
         "the last one in the buffer, which may be smaller.",
@@ -1096,7 +1096,7 @@ export type CcipOfframp = {
       ],
       "args": [
         {
-          "name": "root",
+          "name": "bufferId",
           "type": "bytes"
         },
         {
@@ -1120,7 +1120,7 @@ export type CcipOfframp = {
         "",
         "Note this is only necessary when aborting a buffered transaction, or when a mistake",
         "was made when buffering data. The buffer account will otherwise automatically close",
-        "and return funds to the caller whenever buffered manual execution succeeds."
+        "and return funds to the caller whenever buffered execution succeeds."
       ],
       "accounts": [
         {
@@ -1193,34 +1193,6 @@ export type CcipOfframp = {
     }
   ],
   "accounts": [
-    {
-      "name": "executionReportBuffer",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "data",
-            "type": "bytes"
-          },
-          {
-            "name": "chunkBitmap",
-            "type": "u64"
-          },
-          {
-            "name": "totalChunks",
-            "type": "u32"
-          },
-          {
-            "name": "chunkLength",
-            "type": "u32"
-          },
-          {
-            "name": "reportLength",
-            "type": "u32"
-          }
-        ]
-      }
-    },
     {
       "name": "config",
       "type": {
@@ -1327,6 +1299,38 @@ export type CcipOfframp = {
           {
             "name": "latestPriceSequenceNumber",
             "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "executionReportBuffer",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "chunkBitmap",
+            "type": "u64"
+          },
+          {
+            "name": "totalChunks",
+            "type": "u32"
+          },
+          {
+            "name": "chunkLength",
+            "type": "u32"
+          },
+          {
+            "name": "reportLength",
+            "type": "u32"
+          },
+          {
+            "name": "data",
+            "type": "bytes"
           }
         ]
       }
@@ -3611,7 +3615,7 @@ export const IDL: CcipOfframp = {
         "# Arguments",
         "",
         "* `ctx` - The context containing the accounts required for buffering.",
-        "* `root` - The merkle root as per the commit report.",
+        "* `buffer_id` - An arbitrary buffer id defined by the caller (could be the message_id).",
         "* `report_length` - Total length in bytes of the execution report.",
         "* `chunk` - The specific chunk to add to the buffer. Chunk must have a consistent size, except",
         "the last one in the buffer, which may be smaller.",
@@ -3641,7 +3645,7 @@ export const IDL: CcipOfframp = {
       ],
       "args": [
         {
-          "name": "root",
+          "name": "bufferId",
           "type": "bytes"
         },
         {
@@ -3665,7 +3669,7 @@ export const IDL: CcipOfframp = {
         "",
         "Note this is only necessary when aborting a buffered transaction, or when a mistake",
         "was made when buffering data. The buffer account will otherwise automatically close",
-        "and return funds to the caller whenever buffered manual execution succeeds."
+        "and return funds to the caller whenever buffered execution succeeds."
       ],
       "accounts": [
         {
@@ -3738,34 +3742,6 @@ export const IDL: CcipOfframp = {
     }
   ],
   "accounts": [
-    {
-      "name": "executionReportBuffer",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "data",
-            "type": "bytes"
-          },
-          {
-            "name": "chunkBitmap",
-            "type": "u64"
-          },
-          {
-            "name": "totalChunks",
-            "type": "u32"
-          },
-          {
-            "name": "chunkLength",
-            "type": "u32"
-          },
-          {
-            "name": "reportLength",
-            "type": "u32"
-          }
-        ]
-      }
-    },
     {
       "name": "config",
       "type": {
@@ -3872,6 +3848,38 @@ export const IDL: CcipOfframp = {
           {
             "name": "latestPriceSequenceNumber",
             "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "executionReportBuffer",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "chunkBitmap",
+            "type": "u64"
+          },
+          {
+            "name": "totalChunks",
+            "type": "u32"
+          },
+          {
+            "name": "chunkLength",
+            "type": "u32"
+          },
+          {
+            "name": "reportLength",
+            "type": "u32"
+          },
+          {
+            "name": "data",
+            "type": "bytes"
           }
         ]
       }

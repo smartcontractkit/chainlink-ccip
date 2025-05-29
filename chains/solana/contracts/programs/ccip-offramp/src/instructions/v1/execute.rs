@@ -4,16 +4,18 @@ use ccip_common::v1::{validate_and_parse_token_accounts, TokenAccounts, MIN_TOKE
 use solana_program::instruction::Instruction;
 use solana_program::program::invoke_signed;
 
-use crate::buffering::ExecutionReportBuffer;
 use crate::context::{BufferExecutionReportContext, ExecuteReportContext, OcrPluginType};
 use crate::event::{ExecutionStateChanged, SkippedAlreadyExecutedMessage};
 use crate::instructions::interfaces::Execute;
 use crate::messages::{
     Any2SVMRampMessage, ExecutionReportSingleChain, RampMessageHeader, SVMTokenAmount,
 };
-use crate::state::{CommitReport, MessageExecutionState, OnRampAddress, SourceChain};
+use crate::state::{
+    CommitReport, ExecutionReportBuffer, MessageExecutionState, OnRampAddress, SourceChain,
+};
 use crate::CcipOfframpError;
 
+use super::buffering::{deserialize_from_buffer_account, Buffering};
 use super::merkle::{calculate_merkle_root, MerkleError, LEAF_DOMAIN_SEPARATOR};
 use super::messages::{is_writable, Any2SVMMessage, ReleaseOrMintInV1, ReleaseOrMintOutV1};
 use super::ocr3base::{ocr3_transmit, ReportContext, Signatures};
@@ -32,11 +34,12 @@ impl Execute for Impl {
     ) -> Result<()> {
         let (execution_report, buffered_bytes) = if !raw_execution_report.is_empty() {
             (
-                ExecutionReportSingleChain::deserialize(&mut raw_execution_report.as_ref())?,
+                ExecutionReportSingleChain::deserialize(&mut raw_execution_report.as_ref())
+                    .map_err(|_| CcipOfframpError::FailedToDeserializeReport)?,
                 0,
             )
         } else {
-            ExecutionReportSingleChain::deserialize_from_buffer_account(
+            deserialize_from_buffer_account(
                 ctx.remaining_accounts
                     .last()
                     .ok_or(CcipOfframpError::ExecutionReportUnavailable)?,
@@ -82,9 +85,10 @@ impl Execute for Impl {
             );
         }
         let execution_report = if !raw_execution_report.is_empty() {
-            ExecutionReportSingleChain::deserialize(&mut raw_execution_report.as_ref())?
+            ExecutionReportSingleChain::deserialize(&mut raw_execution_report.as_ref())
+                .map_err(|_| CcipOfframpError::FailedToDeserializeReport)?
         } else {
-            ExecutionReportSingleChain::deserialize_from_buffer_account(
+            deserialize_from_buffer_account(
                 ctx.remaining_accounts
                     .last()
                     .ok_or(CcipOfframpError::ExecutionReportUnavailable)?,
@@ -107,10 +111,10 @@ impl Execute for Impl {
         )
     }
 
-    fn buffer_execution_report<'info>(
+    fn buffer_execution_report(
         &self,
-        ctx: Context<'_, '_, 'info, 'info, BufferExecutionReportContext<'info>>,
-        _root: Vec<u8>,
+        ctx: Context<BufferExecutionReportContext>,
+        _buffer_id: Vec<u8>,
         report_length: u32,
         chunk: Vec<u8>,
         chunk_index: u8,
@@ -659,6 +663,8 @@ pub fn validate_execution_report<'info>(
         CcipOfframpError::RootNotCommitted
     );
     require!(
+        // This can't be easily done directly in the context, as the execution report
+        // may have been retrieved in different ways (via parameter or buffering account.)
         commit_report.chain_selector == execution_report.source_chain_selector,
         CcipOfframpError::RootNotCommitted
     );

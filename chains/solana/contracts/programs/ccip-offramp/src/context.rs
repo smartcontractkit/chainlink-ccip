@@ -5,10 +5,10 @@ use bytemuck::{Pod, Zeroable};
 use ccip_common::seed;
 use solana_program::sysvar::instructions;
 
-use crate::buffering::ExecutionReportBuffer;
 use crate::program::CcipOfframp;
 use crate::state::{
-    CommitReport, Config, GlobalState, ReferenceAddresses, SourceChain, SourceChainConfig,
+    CommitReport, Config, ExecutionReportBuffer, GlobalState, ReferenceAddresses, SourceChain,
+    SourceChainConfig,
 };
 use crate::CcipOfframpError;
 
@@ -584,8 +584,8 @@ pub struct ExecuteReportContext<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(source_chain_selector: u64, root: Vec<u8>)]
-pub struct CloseCommitReportAccount<'info> {
+#[instruction(source_chain_selector: u64, buffer_id: Vec<u8>)]
+pub struct CloseCommitReportAccountContext<'info> {
     #[account(
         seeds = [seed::CONFIG],
         bump,
@@ -595,7 +595,7 @@ pub struct CloseCommitReportAccount<'info> {
 
     #[account(
         mut,
-        seeds = [seed::COMMIT_REPORT, source_chain_selector.to_le_bytes().as_ref(), &root],
+        seeds = [seed::COMMIT_REPORT, source_chain_selector.to_le_bytes().as_ref(), &buffer_id],
         bump,
         constraint = valid_version(commit_report.version, MAX_COMMITREPORT_V) @ CcipOfframpError::InvalidVersion,
     )]
@@ -631,12 +631,12 @@ pub struct CloseCommitReportAccount<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(root: Vec<u8>, report_length: u32, chunk: Vec<u8>, chunk_index: u8)]
+#[instruction(buffer_id: Vec<u8>, report_length: u32, chunk: Vec<u8>, chunk_index: u8)]
 pub struct BufferExecutionReportContext<'info> {
     #[account(
         init_if_needed,
         payer = authority,
-        seeds = [seed::EXECUTION_REPORT_BUFFER, &root, authority.key().as_ref()],
+        seeds = [seed::EXECUTION_REPORT_BUFFER, &buffer_id, authority.key().as_ref()],
         bump,
         space = ANCHOR_DISCRIMINATOR + ExecutionReportBuffer::INIT_SPACE + report_length as usize
     )]
@@ -655,11 +655,11 @@ pub struct BufferExecutionReportContext<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(root: Vec<u8>)]
+#[instruction(buffer_id: Vec<u8>)]
 pub struct CloseExecutionReportBufferContext<'info> {
     #[account(
         mut,
-        seeds = [seed::EXECUTION_REPORT_BUFFER, &root, authority.key().as_ref()],
+        seeds = [seed::EXECUTION_REPORT_BUFFER, &buffer_id, authority.key().as_ref()],
         bump,
         close = authority
     )]

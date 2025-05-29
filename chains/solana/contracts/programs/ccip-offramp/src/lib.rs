@@ -16,8 +16,6 @@ use crate::instructions::router;
 mod state;
 use state::*;
 
-mod buffering;
-
 use crate::event::admin::{ConfigSet, ReferenceAddressesSet};
 
 #[program]
@@ -544,20 +542,21 @@ pub mod ccip_offramp {
     /// There's no need to pre-initialize the buffer: all chunks can be sent concurrently, and the
     /// first one to arrive will initialize the buffer.
     ///
-    /// To benefit from buffering, the eventual call to `execute` must include an additional `remaining_account`
-    /// with the PDA derived from ["execution_report_buffer", <merkle_root>, <caller_pubkey>].
+    /// To benefit from buffering, the eventual call to `execute` or `manually_execute` must
+    /// include an additional `remaining_account` with the PDA derived from
+    /// ["execution_report_buffer", <buffer_id>, <caller_pubkey>].
     ///
     /// # Arguments
     ///
     /// * `ctx` - The context containing the accounts required for buffering.
-    /// * `root` - The merkle root as per the commit report.
+    /// * `buffer_id` - An arbitrary buffer id defined by the caller (could be the message_id).
     /// * `report_length` - Total length in bytes of the execution report.
     /// * `chunk` - The specific chunk to add to the buffer. Chunk must have a consistent size, except
     ///    the last one in the buffer, which may be smaller.
     /// * `chunk_index` - The index of this chunk.
     pub fn buffer_execution_report<'info>(
         ctx: Context<'_, '_, 'info, 'info, BufferExecutionReportContext<'info>>,
-        root: Vec<u8>,
+        buffer_id: Vec<u8>,
         report_length: u32,
         chunk: Vec<u8>,
         chunk_index: u8,
@@ -575,7 +574,7 @@ pub mod ccip_offramp {
 
         router::execute(lane_code_version, default_code_version).buffer_execution_report(
             ctx,
-            root,
+            buffer_id,
             report_length,
             chunk,
             chunk_index,
@@ -586,15 +585,15 @@ pub mod ccip_offramp {
     ///
     /// Note this is only necessary when aborting a buffered transaction, or when a mistake
     /// was made when buffering data. The buffer account will otherwise automatically close
-    /// and return funds to the caller whenever buffered manual execution succeeds.
-    pub fn close_execution_report_buffer<'info>(
-        _ctx: Context<'_, '_, 'info, 'info, CloseExecutionReportBufferContext<'info>>,
+    /// and return funds to the caller whenever buffered execution succeeds.
+    pub fn close_execution_report_buffer(
+        _ctx: Context<CloseExecutionReportBufferContext>,
     ) -> Result<()> {
         Ok(())
     }
 
     pub fn close_commit_report_account(
-        ctx: Context<CloseCommitReportAccount>,
+        ctx: Context<CloseCommitReportAccountContext>,
         source_chain_selector: u64,
         root: Vec<u8>,
     ) -> Result<()> {

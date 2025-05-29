@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
 use crate::context::{
-    AcceptOwnership, AddSourceChain, BufferExecutionReportContext, CloseCommitReportAccount,
+    AcceptOwnership, AddSourceChain, BufferExecutionReportContext, CloseCommitReportAccountContext,
     CommitReportContext, ExecuteReportContext, PriceOnlyCommitReportContext, SetOcrConfig,
     TransferOwnership, UpdateConfig, UpdateReferenceAddresses, UpdateSourceChain,
 };
@@ -32,7 +32,7 @@ pub trait Commit {
 
     fn close_commit_report_account(
         &self,
-        ctx: Context<CloseCommitReportAccount>,
+        ctx: Context<CloseCommitReportAccountContext>,
         source_chain_selector: u64,
         root: Vec<u8>,
     ) -> Result<()>;
@@ -55,10 +55,10 @@ pub trait Execute {
         token_indexes: &[u8],
     ) -> Result<()>;
 
-    fn buffer_execution_report<'info>(
+    fn buffer_execution_report(
         &self,
-        ctx: Context<'_, '_, 'info, 'info, BufferExecutionReportContext<'info>>,
-        root: Vec<u8>,
+        ctx: Context<BufferExecutionReportContext>,
+        buffer_id: Vec<u8>,
         report_length: u32,
         chunk: Vec<u8>,
         chunk_index: u8,

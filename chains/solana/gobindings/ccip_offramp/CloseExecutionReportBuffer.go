@@ -14,7 +14,7 @@ import (
 //
 // Note this is only necessary when aborting a buffered transaction, or when a mistake
 // was made when buffering data. The buffer account will otherwise automatically close
-// and return funds to the caller whenever buffered manual execution succeeds.
+// and return funds to the caller whenever buffered execution succeeds.
 type CloseExecutionReportBuffer struct {
 
 	// [0] = [WRITE] executionReportBuffer

@@ -259,7 +259,7 @@ var (
 	// # Arguments
 	//
 	// * `ctx` - The context containing the accounts required for buffering.
-	// * `root` - The merkle root as per the commit report.
+	// * `buffer_id` - An arbitrary buffer id defined by the caller (could be the message_id).
 	// * `report_length` - Total length in bytes of the execution report.
 	// * `chunk` - The specific chunk to add to the buffer. Chunk must have a consistent size, except
 	// the last one in the buffer, which may be smaller.
@@ -270,7 +270,7 @@ var (
 	//
 	// Note this is only necessary when aborting a buffered transaction, or when a mistake
 	// was made when buffering data. The buffer account will otherwise automatically close
-	// and return funds to the caller whenever buffered manual execution succeeds.
+	// and return funds to the caller whenever buffered execution succeeds.
 	Instruction_CloseExecutionReportBuffer = ag_binary.TypeID([8]byte{0, 16, 4, 246, 238, 95, 223, 31})
 
 	Instruction_CloseCommitReportAccount = ag_binary.TypeID([8]byte{109, 145, 129, 64, 226, 172, 61, 106})

@@ -25,13 +25,13 @@ import (
 // # Arguments
 //
 // * `ctx` - The context containing the accounts required for buffering.
-// * `root` - The merkle root as per the commit report.
+// * `buffer_id` - An arbitrary buffer id defined by the caller (could be the message_id).
 // * `report_length` - Total length in bytes of the execution report.
 // * `chunk` - The specific chunk to add to the buffer. Chunk must have a consistent size, except
 // the last one in the buffer, which may be smaller.
 // * `chunk_index` - The index of this chunk.
 type BufferExecutionReport struct {
-	Root         *[]byte
+	BufferId     *[]byte
 	ReportLength *uint32
 	Chunk        *[]byte
 	ChunkIndex   *uint8
@@ -54,9 +54,9 @@ func NewBufferExecutionReportInstructionBuilder() *BufferExecutionReport {
 	return nd
 }
 
-// SetRoot sets the "root" parameter.
-func (inst *BufferExecutionReport) SetRoot(root []byte) *BufferExecutionReport {
-	inst.Root = &root
+// SetBufferId sets the "bufferId" parameter.
+func (inst *BufferExecutionReport) SetBufferId(bufferId []byte) *BufferExecutionReport {
+	inst.BufferId = &bufferId
 	return inst
 }
 
@@ -142,8 +142,8 @@ func (inst BufferExecutionReport) ValidateAndBuild() (*Instruction, error) {
 func (inst *BufferExecutionReport) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
-		if inst.Root == nil {
-			return errors.New("Root parameter is not set")
+		if inst.BufferId == nil {
+			return errors.New("BufferId parameter is not set")
 		}
 		if inst.ReportLength == nil {
 			return errors.New("ReportLength parameter is not set")
@@ -184,7 +184,7 @@ func (inst *BufferExecutionReport) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=4]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("        Root", *inst.Root))
+						paramsBranch.Child(ag_format.Param("    BufferId", *inst.BufferId))
 						paramsBranch.Child(ag_format.Param("ReportLength", *inst.ReportLength))
 						paramsBranch.Child(ag_format.Param("       Chunk", *inst.Chunk))
 						paramsBranch.Child(ag_format.Param("  ChunkIndex", *inst.ChunkIndex))
@@ -202,8 +202,8 @@ func (inst *BufferExecutionReport) EncodeToTree(parent ag_treeout.Branches) {
 }
 
 func (obj BufferExecutionReport) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `Root` param:
-	err = encoder.Encode(obj.Root)
+	// Serialize `BufferId` param:
+	err = encoder.Encode(obj.BufferId)
 	if err != nil {
 		return err
 	}
@@ -225,8 +225,8 @@ func (obj BufferExecutionReport) MarshalWithEncoder(encoder *ag_binary.Encoder) 
 	return nil
 }
 func (obj *BufferExecutionReport) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `Root`:
-	err = decoder.Decode(&obj.Root)
+	// Deserialize `BufferId`:
+	err = decoder.Decode(&obj.BufferId)
 	if err != nil {
 		return err
 	}
@@ -251,7 +251,7 @@ func (obj *BufferExecutionReport) UnmarshalWithDecoder(decoder *ag_binary.Decode
 // NewBufferExecutionReportInstruction declares a new BufferExecutionReport instruction with the provided parameters and accounts.
 func NewBufferExecutionReportInstruction(
 	// Parameters:
-	root []byte,
+	bufferId []byte,
 	reportLength uint32,
 	chunk []byte,
 	chunkIndex uint8,
@@ -261,7 +261,7 @@ func NewBufferExecutionReportInstruction(
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *BufferExecutionReport {
 	return NewBufferExecutionReportInstructionBuilder().
-		SetRoot(root).
+		SetBufferId(bufferId).
 		SetReportLength(reportLength).
 		SetChunk(chunk).
 		SetChunkIndex(chunkIndex).

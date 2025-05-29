@@ -1,20 +1,24 @@
 use anchor_lang::prelude::*;
+use ccip_common::seed;
 
-use crate::CcipOfframpError;
-
-#[account]
-#[derive(InitSpace, Debug)]
-pub struct ExecutionReportBuffer {
-    #[max_len(0)]
-    data: Vec<u8>,
-    chunk_bitmap: u64,
-    total_chunks: u32,
-    chunk_length: u32,
-    report_length: u32,
+use crate::{messages::ExecutionReportSingleChain, CcipOfframpError, ExecutionReportBuffer};
+pub trait Buffering {
+    fn is_initialized(&self) -> bool;
+    fn filled_chunks(&self) -> u32;
+    fn is_complete(&self) -> bool;
+    fn bytes(&self) -> Result<&[u8]>;
+    fn initialize(&mut self, report_length: u32, chunk_length: u32) -> Result<()>;
+    fn add_chunk(&mut self, report_length: u32, chunk: &[u8], chunk_index: u8) -> Result<()>;
+    fn recover_wrong_size(
+        &mut self,
+        report_length: u32,
+        new_chunk: &[u8],
+        chunk_index: u8,
+    ) -> Result<()>;
 }
 
-impl ExecutionReportBuffer {
-    pub fn is_initialized(&self) -> bool {
+impl Buffering for ExecutionReportBuffer {
+    fn is_initialized(&self) -> bool {
         self.total_chunks > 0
     }
 
@@ -22,11 +26,11 @@ impl ExecutionReportBuffer {
         self.chunk_bitmap.count_ones()
     }
 
-    pub fn is_complete(&self) -> bool {
+    fn is_complete(&self) -> bool {
         self.is_initialized() && self.filled_chunks() == self.total_chunks
     }
 
-    pub fn bytes(&self) -> Result<&[u8]> {
+    fn bytes(&self) -> Result<&[u8]> {
         require!(
             self.is_complete(),
             CcipOfframpError::ExecutionReportBufferIncomplete
@@ -56,7 +60,7 @@ impl ExecutionReportBuffer {
         Ok(())
     }
 
-    pub fn add_chunk(&mut self, report_length: u32, chunk: &[u8], chunk_index: u8) -> Result<()> {
+    fn add_chunk(&mut self, report_length: u32, chunk: &[u8], chunk_index: u8) -> Result<()> {
         if !self.is_initialized() {
             self.initialize(report_length, chunk.len() as u32)?;
         }
@@ -85,6 +89,16 @@ impl ExecutionReportBuffer {
             chunk.len() as u32,
             CcipOfframpError::ExecutionReportBufferInvalidChunkSize
         );
+
+        if chunk.len() < self.chunk_length as usize {
+            // Only the terminator (last chunk) can be smaller than the others.
+            require_eq!(
+                chunk_index as u32,
+                self.total_chunks - 1,
+                CcipOfframpError::ExecutionReportBufferInvalidChunkSize
+            );
+        }
+
         require_gt!(
             self.total_chunks,
             chunk_index as u32,
@@ -133,6 +147,41 @@ impl ExecutionReportBuffer {
     }
 }
 
+pub fn deserialize_from_buffer_account(
+    execution_report_buffer: &AccountInfo,
+    authority: Pubkey,
+    merkle_root: &[u8],
+) -> Result<(ExecutionReportSingleChain, usize)> {
+    // Ensures the buffer is initialized, and owned by the program.
+    require_keys_eq!(
+        *execution_report_buffer.owner,
+        crate::ID,
+        CcipOfframpError::ExecutionReportUnavailable
+    );
+    let (expected_buffer_key, _) = Pubkey::find_program_address(
+        &[
+            seed::EXECUTION_REPORT_BUFFER,
+            merkle_root,
+            authority.as_ref(),
+        ],
+        &crate::ID,
+    );
+    require_keys_eq!(
+        expected_buffer_key,
+        execution_report_buffer.key(),
+        CcipOfframpError::ExecutionReportUnavailable
+    );
+    let buffer = ExecutionReportBuffer::try_deserialize(
+        &mut execution_report_buffer.data.borrow().as_ref(),
+    )?;
+
+    Ok((
+        ExecutionReportSingleChain::deserialize(&mut buffer.bytes()?)
+            .map_err(|_| CcipOfframpError::FailedToDeserializeReport)?,
+        buffer.data.len(),
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -144,6 +193,7 @@ mod tests {
             total_chunks: 0,
             chunk_length: 0,
             report_length: 0,
+            version: 0,
         }
     }
 
@@ -250,12 +300,11 @@ mod tests {
     #[test]
     fn rejects_invalid_chunks() {
         let mut buffer = empty_buffer();
-
-        buffer.add_chunk(100, b"medium sized", 0).unwrap();
-        // This is OK as it could be the terminator.
-        buffer.add_chunk(100, b"small", 1).unwrap();
+        buffer.add_chunk(22, b"AAAAA", 0).unwrap();
+        // This is OK as it is the terminator.
+        buffer.add_chunk(22, b"BB", 4).unwrap();
         // This is not OK.
-        buffer.add_chunk(100, b"much much bigger", 2).unwrap_err();
+        buffer.add_chunk(22, b"CCCCCCCCCCC", 2).unwrap_err();
 
         let mut buffer = empty_buffer();
         buffer.add_chunk(100, b"small", 0).unwrap();
@@ -271,5 +320,11 @@ mod tests {
         buffer
             .add_chunk(10, b"Much bigger than ten characters", 0)
             .unwrap_err();
+
+        let mut buffer = empty_buffer();
+        buffer.add_chunk(29, b"Medium sized", 1).unwrap();
+        // Cannot be smaller: only the terminator can (must come at the end.)
+        buffer.add_chunk(29, b"small", 0).unwrap_err();
+        buffer.add_chunk(29, b"small", 2).unwrap();
     }
 }
