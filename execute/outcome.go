@@ -193,7 +193,7 @@ func (p *Plugin) getFilterOutcome(
 		report.WithMaxSingleChainReports(p.offchainCfg.MaxSingleChainReports),
 	)
 
-	execReports, selectedCommitReports, err := selectReport(
+	execReports, selectedCommitReports, err := selectReports(
 		ctx,
 		lggr,
 		commitReports,

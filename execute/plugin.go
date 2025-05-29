@@ -485,14 +485,14 @@ func (p *Plugin) ObservationQuorum(
 		quorumhelper.QuorumTwoFPlusOne, p.reportingCfg.N, p.reportingCfg.F, aos), nil
 }
 
-// selectReport takes a list of reports in execution order and selects the first reports that fit within the
+// selectReports takes a list of reports in execution order and selects the first reports that fit within the
 // maxReportSizeBytes. Individual messages in a commit report may be skipped for various reasons, for example if an
 // out-of-order execution is detected or the message requires additional off-chain metadata which is not yet available.
 // If there is not enough space in the final report, it may be partially executed by searching for a subset of messages
 // which can fit in the final report.
 //
 // The output of this function are canonical data structures which can be directly included in the final outcome.
-func selectReport(
+func selectReports(
 	ctx context.Context,
 	lggr logger.Logger,
 	commitReports []exectypes.CommitData,
