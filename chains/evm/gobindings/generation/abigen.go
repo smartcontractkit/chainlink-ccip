@@ -64,6 +64,8 @@ type buildInfo struct {
 //
 // Check whether native abigen is installed, and has correct version
 func Abigen(a AbigenArgs) {
+	includeMetadata := os.Getenv("metadata") == "true"
+
 	var versionResponse bytes.Buffer
 	abigenExecutablePath := filepath.Join(GetProjectRoot(), "chains/evm/scripts/abigen")
 	abigenVersionCheck := exec.Command(abigenExecutablePath, "--version")
@@ -96,8 +98,14 @@ func Abigen(a AbigenArgs) {
 
 	ImproveAbigenOutput(a.Out, a.ABI)
 
+	if includeMetadata {
+		genMetadata(a)
+	}
+}
+
+func genMetadata(abigenArgs AbigenArgs) {
 	// Add build info to exported package
-	info, err := os.ReadFile(a.BuildInfo)
+	info, err := os.ReadFile(abigenArgs.BuildInfo)
 	if err != nil {
 		Exit("Error while reading build info file", err)
 	}
@@ -109,7 +117,7 @@ func Abigen(a AbigenArgs) {
 		Exit("Error while unmarshalling build info JSON", err)
 	}
 	// Get version from metadata file, as it contains the commit hash required by etherscan
-	metadataBytes, err := os.ReadFile(a.Metadata)
+	metadataBytes, err := os.ReadFile(abigenArgs.Metadata)
 	if err != nil {
 		Exit("Error while reading metadata file", err)
 	}
@@ -128,7 +136,7 @@ func Abigen(a AbigenArgs) {
 	if err != nil {
 		Exit("Error while marshalling build info JSON", err)
 	}
-	// Export the metadata as a variable in the generated Go file
+	// Export the metadata as abigenArgs variable in the generated Go file
 	var buf bytes.Buffer
 	if err := json.Compact(&buf, refinedMeta); err != nil {
 		Exit("Error while compacting build info JSON", err)
@@ -136,10 +144,10 @@ func Abigen(a AbigenArgs) {
 	code := fmt.Sprintf(
 		"%s\npackage %s\n\nvar SolidityStandardInput = %s\n",
 		headerComment,
-		a.Pkg,
+		abigenArgs.Pkg,
 		strconv.Quote(buf.String()),
 	)
-	err = os.WriteFile(a.BuildInfoOut, []byte(code), 0600)
+	err = os.WriteFile(abigenArgs.BuildInfoOut, []byte(code), 0600)
 	if err != nil {
 		Exit("Error while writing build info file", err)
 	}

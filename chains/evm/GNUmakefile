@@ -38,6 +38,11 @@ wrappers: pnpmdep mockery abigen
 	./scripts/compile_all
 	go generate ./gobindings
 
+wrappers-release: export metadata=true
+.PHONY: wrappers-release
+wrappers-release: ## Generate the gethwrappers for release which includes metadata.
+	 make wrappers
+
 .PHONY: wrappers-zksync
 wrappers-zksync: pnpmdep foundry-zksync
 	ZKSYNC=true make wrappers
