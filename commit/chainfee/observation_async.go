@@ -79,6 +79,16 @@ func (o *baseObserver) getChainFeePriceUpdates(
 	ctx context.Context,
 	lggr logger.Logger,
 ) map[cciptypes.ChainSelector]Update {
+	supportsDest, err := o.cs.SupportsDestChain(o.oracleID)
+	if err != nil {
+		lggr.Errorw("get chain fee price updates: failed to check if oracle supports destination chain", "err", err)
+		return map[cciptypes.ChainSelector]Update{}
+	}
+	if !supportsDest {
+		lggr.Debugw("oracle does not support destination chain, returning empty chain fee price updates")
+		return map[cciptypes.ChainSelector]Update{}
+	}
+
 	enabledSourceChains, err := o.getEnabledSourceChains(ctx)
 	if err != nil {
 		lggr.Errorw("failed to get enabled source chains unable to get chain fee price updates", "err", err)

@@ -229,7 +229,8 @@ type CCIPReader interface {
 		selectors []cciptypes.ChainSelector,
 	) map[cciptypes.ChainSelector]cciptypes.BigInt
 
-	// GetChainFeePriceUpdate Gets latest chain fee price update for the provided chains.
+	// GetChainFeePriceUpdate Gets latest chain fee price update for the provided chains from the destination.
+	// If it encounters an issue (e.g. dest chain not supported) it logs the error and returns an empty result.
 	GetChainFeePriceUpdate(
 		ctx context.Context,
 		selectors []cciptypes.ChainSelector,

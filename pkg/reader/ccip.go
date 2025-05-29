@@ -933,7 +933,7 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 func (r *ccipChainReader) GetChainFeePriceUpdate(ctx context.Context, selectors []cciptypes.ChainSelector) map[cciptypes.ChainSelector]cciptypes.TimestampedBig {
 	lggr := logutil.WithContextValues(ctx, r.lggr)
 	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
-		lggr.Debugw("GetChainFeePriceUpdate dest chain extended reader not exist, dest chain not supported", "err", err)
+		lggr.Errorw("GetChainFeePriceUpdate dest chain extended reader not exist, dest chain not supported", "err", err)
 		return nil
 	}
 
