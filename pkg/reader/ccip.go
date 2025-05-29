@@ -879,7 +879,7 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 	for _, chain := range selectors {
 		reader, ok := r.contractReaders[chain]
 		if !ok {
-			lggr.Warnw("contract reader not found", "chain", chain)
+			lggr.Errorw("contract reader not found, chain native price skipped", "chain", chain)
 			continue
 		}
 

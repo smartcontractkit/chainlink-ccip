@@ -222,6 +222,8 @@ type CCIPReader interface {
 	GetDestChainFeeComponents(ctx context.Context) (types.ChainFeeComponents, error)
 
 	// GetWrappedNativeTokenPriceUSD Gets the wrapped native token price in USD for the provided chains.
+	// It reads the prices from the FeeQuoter contract on each chain.
+	// If it encounters an issue (e.g. chain not supported) it logs the error and skips the chain.
 	GetWrappedNativeTokenPriceUSD(
 		ctx context.Context,
 		selectors []cciptypes.ChainSelector,
