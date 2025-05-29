@@ -1392,6 +1392,88 @@ func TestPlugin_Outcome_MessagesMergeError(t *testing.T) {
 	require.Len(t, outcome, 0)
 }
 
+func TestPlugin_Reports_MultipleReports(t *testing.T) {
+	ctx := tests.Context(t)
+	lggr := logger.Test(t)
+
+	mockReportCodec := codec_mocks.NewMockExecutePluginCodec(t)
+	mockReportCodec.On("Encode", mock.Anything, mock.MatchedBy(func(report cciptypes.ExecutePluginReport) bool {
+		return len(report.ChainReports) > 0
+	})).Return([]byte("encoded_report_1"), nil).Once()
+	mockReportCodec.On("Encode", mock.Anything, mock.MatchedBy(func(report cciptypes.ExecutePluginReport) bool {
+		return len(report.ChainReports) > 0
+	})).Return([]byte("encoded_report_2"), nil).Once()
+
+	// Mock chain support for transmission schedule
+	mockChainSupport := plugincommon_mock.NewMockChainSupport(t)
+	mockChainSupport.EXPECT().SupportsDestChain(mock.Anything).Return(true, nil)
+
+	// Create plugin instance with necessary mocks
+	p := &Plugin{
+		lggr:         lggr,
+		reportCodec:  mockReportCodec,
+		ocrTypeCodec: ocrTypeCodec,
+		chainSupport: mockChainSupport,
+		oracleIDToP2pID: map[commontypes.OracleID]libocrtypes.PeerID{
+			1: {},
+		},
+	}
+
+	// Create test outcome with two reports
+	commitReports := []exectypes.CommitData{
+		{
+			SourceChain: 100,
+			MerkleRoot:  cciptypes.Bytes32{1, 2, 3},
+		},
+		{
+			SourceChain: 200,
+			MerkleRoot:  cciptypes.Bytes32{4, 5, 6},
+		},
+	}
+
+	reports := []cciptypes.ExecutePluginReport{
+		{
+			ChainReports: []cciptypes.ExecutePluginReportSingleChain{
+				{
+					SourceChainSelector: 100,
+					Messages: []cciptypes.Message{
+						{Header: cciptypes.RampMessageHeader{SequenceNumber: 1}},
+					},
+				},
+			},
+		},
+		{
+			ChainReports: []cciptypes.ExecutePluginReportSingleChain{
+				{
+					SourceChainSelector: 200,
+					Messages: []cciptypes.Message{
+						{Header: cciptypes.RampMessageHeader{SequenceNumber: 2}},
+					},
+				},
+			},
+		},
+	}
+
+	outcome := exectypes.NewOutcome(exectypes.Filter, commitReports, reports)
+	encodedOutcome, err := ocrTypeCodec.EncodeOutcome(outcome)
+	require.NoError(t, err)
+
+	reportPlus, err := p.Reports(ctx, 1, encodedOutcome)
+
+	require.NoError(t, err)
+	require.Len(t, reportPlus, 2, "Should return 2 reports")
+
+	// First report
+	assert.Equal(t, types.Report("encoded_report_1"), reportPlus[0].ReportWithInfo.Report)
+	assert.NotEmpty(t, reportPlus[0].ReportWithInfo.Info, "Report info should not be empty")
+	assert.NotEmpty(t, reportPlus[0].TransmissionScheduleOverride, "Transmission schedule should not be empty")
+
+	// Second report
+	assert.Equal(t, types.Report("encoded_report_2"), reportPlus[1].ReportWithInfo.Report)
+	assert.NotEmpty(t, reportPlus[1].ReportWithInfo.Info, "Report info should not be empty")
+	assert.NotEmpty(t, reportPlus[1].TransmissionScheduleOverride, "Transmission schedule should not be empty")
+}
+
 func TestPlugin_Reports_UnableToParse(t *testing.T) {
 	ctx := tests.Context(t)
 	p := &Plugin{
@@ -1408,6 +1490,7 @@ func TestPlugin_Reports_UnableToEncode(t *testing.T) {
 	codec := codec_mocks.NewMockExecutePluginCodec(t)
 	codec.On("Encode", mock.Anything, mock.Anything).
 		Return(nil, fmt.Errorf("test error"))
+	// Mock chain support for transmission schedule
 	chainSupport := plugincommon_mock.NewMockChainSupport(t)
 	chainSupport.EXPECT().SupportsDestChain(mock.Anything).Return(true, nil)
 	p := &Plugin{
