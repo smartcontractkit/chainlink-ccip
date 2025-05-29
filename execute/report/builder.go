@@ -191,10 +191,9 @@ func (b *execReportBuilder) Add(
 					"sourceChain", msg.Header.SourceChainSelector,
 					"messageID", msg.Header.MessageID,
 					"nonce", msg.Header.Nonce)
-				// TODO: Check this logic again. What if we can still add to same report still?
 				// If multiple reports are enabled, we can still process the report, but we need to limit it to a single report
 				// If we didn't even build the first report yet, then break and process the first report only.
-				if len(b.execReports) >= 1 && len(b.execReports[0].ChainReports) != 0 {
+				if len(b.execReports) > 1 {
 					b.execReports = []cciptypes.ExecutePluginReport{b.execReports[0]}
 					b.commitReports = [][]exectypes.CommitData{b.commitReports[0]}
 					b.accumulated = []validationMetadata{b.accumulated[0]}
@@ -215,10 +214,8 @@ func (b *execReportBuilder) Add(
 				return currentCommitReport, nil
 			}
 
-			// Start a new exec report
-			b.execReports = append(b.execReports, cciptypes.ExecutePluginReport{})
-			b.commitReports = append(b.commitReports, []exectypes.CommitData{})
-			b.accumulated = append(b.accumulated, validationMetadata{})
+			b.createNewExecReport()
+
 			index = len(b.execReports) - 1
 		}
 
@@ -242,17 +239,13 @@ func (b *execReportBuilder) Add(
 			}
 
 			// Try with a new exec report
-			b.execReports = append(b.execReports, cciptypes.ExecutePluginReport{})
-			b.commitReports = append(b.commitReports, []exectypes.CommitData{})
-			b.accumulated = append(b.accumulated, validationMetadata{})
+			b.createNewExecReport()
 			index = len(b.execReports) - 1
 
 			execReport, updatedReport, err = b.buildSingleChainReport(ctx, currentCommitReport, readyMessages)
 			if errors.Is(err, ErrEmptyReport) {
 				// Remove the empty report we just added
-				b.execReports = b.execReports[:len(b.execReports)-1]
-				b.commitReports = b.commitReports[:len(b.commitReports)-1]
-				b.accumulated = b.accumulated[:len(b.accumulated)-1]
+				b.removeLastExecReport()
 				return currentCommitReport, nil
 			}
 		}
@@ -279,6 +272,17 @@ func (b *execReportBuilder) Add(
 	}
 
 	return currentCommitReport, nil
+}
+func (b *execReportBuilder) createNewExecReport() {
+	b.execReports = append(b.execReports, cciptypes.ExecutePluginReport{})
+	b.commitReports = append(b.commitReports, []exectypes.CommitData{})
+	b.accumulated = append(b.accumulated, validationMetadata{})
+}
+
+func (b *execReportBuilder) removeLastExecReport() {
+	b.execReports = b.execReports[:len(b.execReports)-1]
+	b.commitReports = b.commitReports[:len(b.commitReports)-1]
+	b.accumulated = b.accumulated[:len(b.accumulated)-1]
 }
 
 func (b *execReportBuilder) Build() (

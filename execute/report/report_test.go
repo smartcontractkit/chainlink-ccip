@@ -1627,27 +1627,27 @@ func Test_Builder_MultiReport(t *testing.T) {
 				reports: []exectypes.CommitData{
 					makeTestCommitReport(hasher, 2, 1, 100, 999, 10101010101,
 						sender,
-						cciptypes.Bytes32{},
-						nil,
-						true,
+						cciptypes.Bytes32{}, // generate a correct root.
+						nil,                 // executed
+						true,                // zero nonces
 					),
 					makeTestCommitReport(hasher, 2, 2, 100, 999, 10101010101,
 						sender,
-						cciptypes.Bytes32{},
-						nil,
-						true,
+						cciptypes.Bytes32{}, // generate a correct root.
+						nil,                 // executed
+						true,                // zero nonces
 					),
 					makeTestCommitReport(hasher, 2, 2, 102, 999, 10101010101,
 						sender,
-						cciptypes.Bytes32{},
-						nil,
-						true,
+						cciptypes.Bytes32{}, // generate a correct root.
+						nil,                 // executed
+						true,                // zero nonces
 					),
 					makeTestCommitReport(hasher, 2, 2, 104, 999, 10101010101,
 						sender,
-						cciptypes.Bytes32{},
-						nil,
-						true,
+						cciptypes.Bytes32{}, // generate a correct root.
+						nil,                 // executed
+						true,                // zero nonces
 					),
 				},
 			},
@@ -1663,15 +1663,15 @@ func Test_Builder_MultiReport(t *testing.T) {
 				reports: []exectypes.CommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						sender,
-						cciptypes.Bytes32{},
-						nil,
-						true,
+						cciptypes.Bytes32{}, // generate a correct root.
+						nil,                 // executed
+						true,                // zero nonces
 					),
 					makeTestCommitReport(hasher, 20, 2, 100, 999, 10101010101,
 						sender,
-						cciptypes.Bytes32{},
-						nil,
-						true,
+						cciptypes.Bytes32{}, // generate a correct root.
+						nil,                 // executed
+						true,                // zero nonces
 					),
 				},
 			},
@@ -1688,14 +1688,14 @@ func Test_Builder_MultiReport(t *testing.T) {
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						sender,
 						cciptypes.Bytes32{},
-						nil,
-						true,
+						nil,  // executed
+						true, // zero nonces
 					),
 					makeTestCommitReport(hasher, 20, 2, 100, 999, 10101010101,
 						sender,
-						cciptypes.Bytes32{},
-						nil,
-						true,
+						cciptypes.Bytes32{}, // generate a correct root.
+						nil,                 // executed
+						true,                // zero nonces
 					),
 				},
 			},
@@ -1713,9 +1713,9 @@ func Test_Builder_MultiReport(t *testing.T) {
 				reports: []exectypes.CommitData{
 					makeTestCommitReport(hasher, 6, 2, 100, 999, 10101010101,
 						sender,
-						cciptypes.Bytes32{},
-						nil,
-						true,
+						cciptypes.Bytes32{}, // generate a correct root.
+						nil,                 // executed
+						true,                // zero nonces
 					),
 				},
 			},
@@ -1733,27 +1733,27 @@ func Test_Builder_MultiReport(t *testing.T) {
 				reports: []exectypes.CommitData{
 					makeTestCommitReport(hasher, 1, 2, 100, 999, 10101010101,
 						sender,
-						cciptypes.Bytes32{},
-						nil,
-						true,
+						cciptypes.Bytes32{}, // generate a correct root.
+						nil,                 // executed
+						true,                // zero nonces
 					),
 					makeTestCommitReport(hasher, 1, 2, 101, 999, 10101010101,
 						sender,
-						cciptypes.Bytes32{},
-						nil,
-						true,
+						cciptypes.Bytes32{}, // generate a correct root.
+						nil,                 // executed
+						true,                // zero nonces
 					),
 					makeTestCommitReport(hasher, 1, 2, 102, 999, 10101010101,
 						sender,
-						cciptypes.Bytes32{},
-						nil,
-						true,
+						cciptypes.Bytes32{}, // generate a correct root.
+						nil,                 // executed
+						true,                // zero nonces
 					),
 					makeTestCommitReport(hasher, 1, 2, 103, 999, 10101010101,
 						sender,
-						cciptypes.Bytes32{},
-						nil,
-						true,
+						cciptypes.Bytes32{}, // generate a correct root.
+						nil,                 // executed
+						true,                // zero nonces
 					),
 				},
 			},
@@ -1770,21 +1770,21 @@ func Test_Builder_MultiReport(t *testing.T) {
 				reports: []exectypes.CommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						sender,
-						cciptypes.Bytes32{},
-						nil,
-						true,
+						cciptypes.Bytes32{}, // generate a correct root.
+						nil,                 // executed
+						true,                // zero nonces
 					),
 					makeTestCommitReport(hasher, 10, 2, 100, 999, 10101010101,
 						sender,
 						cciptypes.Bytes32{},
-						nil,
-						true,
+						nil,  // executed
+						true, // zero nonces
 					),
 					makeTestCommitReport(hasher, 10, 3, 100, 999, 10101010101,
 						sender,
-						cciptypes.Bytes32{},
-						nil,
-						true,
+						cciptypes.Bytes32{}, // generate a correct root.
+						nil,                 // executed
+						true,                // zero nonces
 					),
 				},
 			},
@@ -1792,41 +1792,32 @@ func Test_Builder_MultiReport(t *testing.T) {
 			expectedChainReportsPerExec: []int{2, 1}, // 2 chains in first exec report, 1 in second
 		},
 		{
-			// TODO: Needs fixing. `checkMessages` function fails to get correct msgs when called more than once
-			name: "non-zero nonces limit to single report despite multipleReportsEnabled",
+			name: "non-zero nonces limit to single report despite multipleReportsEnabled - " +
+				"same inputs as one and half reports",
 			args: args{
-				maxReportSize: 2800,
+				maxReportSize: 9700,
 				maxGasLimit:   10000000,
 				nonces:        defaultNonces,
 				reports: []exectypes.CommitData{
-					makeTestCommitReport(hasher, 7, 2, 100, 999, 10101010101,
+					makeTestCommitReport(hasher, 10, 2, 100, 999, 10101010101,
 						sender,
-						cciptypes.Bytes32{},
-						nil,
-						false, // non-zero nonces
+						cciptypes.Bytes32{}, // generate a correct root.
+						nil,                 // executed
+						false,               // zero nonces
 					),
-					makeTestCommitReport(hasher, 2, 3, 100, 999, 10101010101,
+					makeTestCommitReport(hasher, 20, 3, 100, 999, 10101010101,
 						sender,
-						cciptypes.Bytes32{},
-						nil,
-						false, // non-zero nonces
-					),
-					makeTestCommitReport(hasher, 2, 4, 100, 999, 10101010101,
-						sender,
-						cciptypes.Bytes32{},
-						nil,
-						false, // non-zero nonces
+						cciptypes.Bytes32{}, // generate a correct root.
+						nil,                 // executed
+						false,               // zero nonces
 					),
 				},
 			},
 			expectedExecReports:         1,
-			expectedChainReportsPerExec: []int{1},
+			expectedChainReportsPerExec: []int{2},
 			wantErr:                     "messages with non-zero nonces detected, limiting to single report",
 			expectedSkippedSeqsByChain: map[cciptypes.ChainSelector]mapset.Set[cciptypes.SeqNum]{
-				// Shouldn't skip any of chain 2
-				//2: mapset.NewSet(cciptypes.SeqNum(105), cciptypes.SeqNum(106)),
-				3: mapset.NewSet(cciptypes.SeqNum(100), cciptypes.SeqNum(101)),
-				4: mapset.NewSet(cciptypes.SeqNum(100), cciptypes.SeqNum(101)),
+				3: createSeqSet(110, 119),
 			},
 		},
 		{
@@ -1858,9 +1849,9 @@ func Test_Builder_MultiReport(t *testing.T) {
 						setMessageData(3, 90000,
 							makeTestCommitReport(hasher, 10, 2, 100, 999, 10101010101,
 								sender,
-								cciptypes.Bytes32{},
-								nil,
-								true,
+								cciptypes.Bytes32{}, // generate a correct root.
+								nil,                 // executed
+								true,                // zero nonces
 							))),
 				},
 			},
@@ -1996,4 +1987,12 @@ func Test_Builder_MultiReport(t *testing.T) {
 			require.Equal(t, totalMessages-totalSkipped, totalExecuted)
 		})
 	}
+}
+
+func createSeqSet(start int, end int) mapset.Set[cciptypes.SeqNum] {
+	seqSet := mapset.NewSet[cciptypes.SeqNum]()
+	for i := start; i <= end; i++ {
+		seqSet.Add(cciptypes.SeqNum(i))
+	}
+	return seqSet
 }
