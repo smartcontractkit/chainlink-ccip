@@ -25,7 +25,7 @@ contract BurnMintFastTransferTokenPool_fastFill is BurnMintFastTransferTokenPool
     uint256 fillerBalanceBefore = s_burnMintERC20.balanceOf(s_filler);
     uint256 receiverBalanceBefore = s_burnMintERC20.balanceOf(RECEIVER);
 
-    bytes32 fillId = keccak256(abi.encodePacked(FILL_REQUEST_ID, FILL_AMOUNT, RECEIVER));
+    bytes32 fillId = s_pool.computeFillId(FILL_REQUEST_ID, FILL_AMOUNT, RECEIVER);
 
     vm.expectEmit();
     emit IFastTransferPool.FastFill(FILL_REQUEST_ID, fillId, s_filler, FILL_AMOUNT, RECEIVER);
@@ -35,6 +35,8 @@ contract BurnMintFastTransferTokenPool_fastFill is BurnMintFastTransferTokenPool
 
     assertEq(s_burnMintERC20.balanceOf(s_filler), fillerBalanceBefore - FILL_AMOUNT);
     assertEq(s_burnMintERC20.balanceOf(RECEIVER), receiverBalanceBefore + FILL_AMOUNT);
+
+    s_pool.getFillInfo(fillId);
   }
 
   function test_FastFill_WithDifferentDecimals() public {
@@ -50,6 +52,10 @@ contract BurnMintFastTransferTokenPool_fastFill is BurnMintFastTransferTokenPool
 
     assertEq(s_burnMintERC20.balanceOf(s_filler), fillerBalanceBefore - expectedLocalAmount);
     assertEq(s_burnMintERC20.balanceOf(RECEIVER), receiverBalanceBefore + expectedLocalAmount);
+    FastTransferTokenPoolAbstract.FillInfo memory fillInfo =
+      s_pool.getFillInfo(s_pool.computeFillId(FILL_REQUEST_ID, srcAmount, RECEIVER));
+    assertTrue(fillInfo.state == FastTransferTokenPoolAbstract.FillState.Filled);
+    assertEq(fillInfo.filler, s_filler);
   }
 
   function test_RevertWhen_AlreadyFilled() public {
@@ -103,6 +109,11 @@ contract BurnMintFastTransferTokenPool_fastFill is BurnMintFastTransferTokenPool
     s_pool.fastFill(FILL_REQUEST_ID, DEST_CHAIN_SELECTOR, FILL_AMOUNT, SRC_DECIMALS, RECEIVER);
 
     assertEq(s_burnMintERC20.balanceOf(RECEIVER), receiverBalanceBefore + FILL_AMOUNT);
+
+    FastTransferTokenPoolAbstract.FillInfo memory fillInfo =
+      s_pool.getFillInfo(s_pool.computeFillId(FILL_REQUEST_ID, FILL_AMOUNT, RECEIVER));
+    assertTrue(fillInfo.state == FastTransferTokenPoolAbstract.FillState.Filled);
+    assertEq(fillInfo.filler, anyFiller);
   }
 
   function test_FastFill_MultipleFillers() public {

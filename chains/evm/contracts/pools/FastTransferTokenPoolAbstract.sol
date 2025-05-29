@@ -200,7 +200,11 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   /// @param amount The amount being filled
   /// @param receiver The receiver address
   /// @return fillId The computed fill ID
-  function computeFillId(bytes32 fillRequestId, uint256 amount, address receiver) external pure returns (bytes32) {
+  function computeFillId(
+    bytes32 fillRequestId,
+    uint256 amount,
+    address receiver
+  ) public pure override returns (bytes32) {
     return keccak256(abi.encodePacked(fillRequestId, amount, receiver));
   }
 
@@ -358,7 +362,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     uint256 localAmount = _calculateLocalAmount(srcAmount, srcDecimal);
     uint256 settlementAmountLocal = localAmount + _calculateLocalAmount(fastTransferFee, srcDecimal);
 
-    bytes32 fillId = keccak256(abi.encodePacked(fillRequestId, localAmount, receiver));
+    bytes32 fillId = computeFillId(fillRequestId, srcAmount, receiver);
     FillInfo memory fillInfo = s_fills[fillId];
 
     // Handle settlement based on fill state
@@ -367,7 +371,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
       _handleNotFastFilled(sourceChainSelector, settlementAmountLocal, receiver);
     } else if (fillInfo.state == FillState.Settled) {
       // Already settled
-      revert MessageAlreadySettled(fillRequestId);
+      revert AlreadySettled(fillRequestId);
     } else {
       // Fast-filled - reimburse filler
       _handleFastFilledReimbursement(fillInfo.filler, settlementAmountLocal);

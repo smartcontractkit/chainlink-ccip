@@ -53,7 +53,7 @@ contract BurnMintFastTransferTokenPool_ccipSendToken is BurnMintFastTransferToke
       ""
     );
 
-    assertTrue(fillRequestId != bytes32(0));
+    assertEq(fillRequestId, MESSAGE_ID);
     assertEq(s_burnMintERC20.balanceOf(OWNER), balanceBefore - TRANSFER_AMOUNT - expectedFastFee);
   }
 

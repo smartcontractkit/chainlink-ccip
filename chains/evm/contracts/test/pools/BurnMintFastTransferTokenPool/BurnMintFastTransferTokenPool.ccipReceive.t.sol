@@ -69,14 +69,14 @@ contract BurnMintFastTransferTokenPool_ccipReceive is BurnMintFastTransferTokenP
     assertEq(s_burnMintERC20.balanceOf(RECEIVER), receiverBalanceBefore);
   }
 
-  function test_RevertWhen_MessageAlreadySettled() public {
+  function test_RevertWhen_AlreadySettled() public {
     // First settlement
     Client.Any2EVMMessage memory message = _createCcipMessage();
     vm.prank(address(s_sourceRouter));
     s_pool.ccipReceive(message);
 
     // Try to settle again
-    vm.expectRevert(abi.encodeWithSelector(IFastTransferPool.MessageAlreadySettled.selector, FILL_REQUEST_ID));
+    vm.expectRevert(abi.encodeWithSelector(IFastTransferPool.AlreadySettled.selector, FILL_REQUEST_ID));
     vm.prank(address(s_sourceRouter));
     s_pool.ccipReceive(message);
   }

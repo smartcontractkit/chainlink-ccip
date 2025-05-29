@@ -11,7 +11,7 @@ interface IFastTransferPool {
   }
 
   error AlreadyFilled(bytes32 fillRequestId);
-  error MessageAlreadySettled(bytes32 fillRequestId);
+  error AlreadySettled(bytes32 fillRequestId);
   error LaneDisabled();
 
   event FastFillRequest(
@@ -72,4 +72,6 @@ interface IFastTransferPool {
     uint8 srcDecimals,
     address receiver
   ) external;
+
+  function computeFillId(bytes32 fillRequestId, uint256 amount, address receiver) external pure returns (bytes32);
 }

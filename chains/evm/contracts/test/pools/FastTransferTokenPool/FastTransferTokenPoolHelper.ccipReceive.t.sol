@@ -165,7 +165,7 @@ contract FastTransferTokenPoolHelper_ccipReceive_Test is FastTransferTokenPoolHe
     assertEq(s_token.balanceOf(receiver), receiverBalanceBefore + srcAmount);
   }
 
-  function test_RevertWhen_MessageAlreadySettled() public {
+  function test_RevertWhen_AlreadySettled() public {
     // Prepare CCIP message
     bytes memory data = abi.encode(
       FastTransferTokenPoolAbstract.MintMessage({
@@ -188,7 +188,7 @@ contract FastTransferTokenPoolHelper_ccipReceive_Test is FastTransferTokenPoolHe
     s_tokenPool.ccipReceive(message);
 
     // Try to settle again - should revert
-    vm.expectRevert(abi.encodeWithSelector(IFastTransferPool.MessageAlreadySettled.selector, messageId));
+    vm.expectRevert(abi.encodeWithSelector(IFastTransferPool.AlreadySettled.selector, messageId));
     vm.prank(address(s_sourceRouter));
     s_tokenPool.ccipReceive(message);
   }
