@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"maps"
+	"math"
 	"math/big"
 	"sort"
 	"testing"
@@ -9506,6 +9507,104 @@ func TestCCIPRouter(t *testing.T) {
 				})
 			})
 
+			sendChunk := func(
+				t *testing.T,
+				i int,
+				chunkSize int,
+				rawReport []byte,
+				buffer_id [32]byte,
+				bufferPDA solana.PublicKey,
+				transmitter solana.PrivateKey,
+			) *ccip_offramp.Instruction {
+				start := i * chunkSize
+				end := min(((i + 1) * chunkSize), len(rawReport))
+
+				chunk := rawReport[start:end]
+
+				appendIx, appendErr := ccip_offramp.NewBufferExecutionReportInstruction(
+					buffer_id[:],
+					uint32(len(rawReport)),
+					chunk,
+					uint8(i),
+					bufferPDA,
+					config.OfframpConfigPDA,
+					transmitter.PublicKey(),
+					solana.SystemProgramID).ValidateAndBuild()
+
+				require.NoError(t, appendErr)
+
+				return appendIx
+			}
+
+			t.Run("Execution report pre-buffering", func(t *testing.T) {
+				getLamports := func(account solana.PublicKey) uint64 {
+					out, err := solanaGoClient.GetBalance(ctx, account, rpc.CommitmentConfirmed)
+					require.NoError(t, err)
+					return out.Value
+				}
+
+				transmitter := getTransmitter()
+				initialLamports := getLamports(transmitter.PublicKey())
+				bufferID := [32]byte{}
+				bufferPDA, _, _ := solana.FindProgramAddress([][]byte{[]byte("execution_report_buffer"), bufferID[:], transmitter.PublicKey().Bytes()}, config.CcipOfframpProgram)
+				// Deliberately chosen not a whole divider, to prove that a smaller terminator chunk is accepted.
+				const chunkSize = 300
+				const terminatorSize = 100
+				data := make([]byte, 1000)
+				for i := range data {
+					data[i] = byte(i % 256)
+				}
+
+				totalSolSpentInFees := uint64(0)
+
+				ix := sendChunk(t, 0, 0, data, bufferID, bufferPDA, transmitter)
+				result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, transmitter, config.DefaultCommitment, []string{"Error Code: ExecutionReportBufferInvalidLength"})
+				totalSolSpentInFees += result.Meta.Fee
+				ix = sendChunk(t, 3, terminatorSize, data, bufferID, bufferPDA, transmitter)
+				result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, transmitter, config.DefaultCommitment)
+				totalSolSpentInFees += result.Meta.Fee
+				ix = sendChunk(t, 3, terminatorSize, data, bufferID, bufferPDA, transmitter)
+				result = testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, transmitter, config.DefaultCommitment, []string{"Error Code: ExecutionReportBufferAlreadyContainsChunk"})
+				totalSolSpentInFees += result.Meta.Fee
+				ix = sendChunk(t, 0, chunkSize, data, bufferID, bufferPDA, transmitter)
+				result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, transmitter, config.DefaultCommitment)
+				totalSolSpentInFees += result.Meta.Fee
+				// Checking again after the terminator shuffling
+				ix = sendChunk(t, 3, terminatorSize, data, bufferID, bufferPDA, transmitter)
+				result = testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, transmitter, config.DefaultCommitment, []string{"Error Code: ExecutionReportBufferAlreadyContainsChunk"})
+				totalSolSpentInFees += result.Meta.Fee
+				ix = sendChunk(t, 1, terminatorSize, data, bufferID, bufferPDA, transmitter)
+				result = testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, transmitter, config.DefaultCommitment, []string{"Error Code: ExecutionReportBufferInvalidChunkSize"})
+				totalSolSpentInFees += result.Meta.Fee
+				ix = sendChunk(t, 0, chunkSize, data, bufferID, bufferPDA, transmitter)
+				result = testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, transmitter, config.DefaultCommitment, []string{"Error Code: ExecutionReportBufferAlreadyContainsChunk"})
+				totalSolSpentInFees += result.Meta.Fee
+				ix = sendChunk(t, 1, chunkSize, data, bufferID, bufferPDA, transmitter)
+				result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, transmitter, config.DefaultCommitment)
+				totalSolSpentInFees += result.Meta.Fee
+				ix = sendChunk(t, 2, chunkSize, data, bufferID, bufferPDA, transmitter)
+				result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, transmitter, config.DefaultCommitment)
+				totalSolSpentInFees += result.Meta.Fee
+
+				finalLamportsBeforeClose := getLamports(transmitter.PublicKey())
+				rent := (initialLamports - finalLamportsBeforeClose) - totalSolSpentInFees
+
+				// We now close the buffer to recover the rent
+				closeIx, err := ccip_offramp.NewCloseExecutionReportBufferInstruction(bufferID[:], bufferPDA, transmitter.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+				require.NoError(t, err)
+				result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{closeIx}, transmitter, config.DefaultCommitment)
+				finalLamportsAfterClose := getLamports(transmitter.PublicKey())
+				closeDiff := finalLamportsAfterClose - finalLamportsBeforeClose
+
+				within10PercentOf := func(a int, b int) bool {
+					diff := math.Abs(float64(a - b))
+					return diff <= 0.1*math.Max(float64(a), float64(b))
+				}
+
+				// TODO work out exact math: the rent is being recovered but there's some slight drift in the fees.
+				require.True(t, within10PercentOf(int(rent), int(closeDiff-result.Meta.Fee)))
+			})
+
 			t.Run("When executing a report with oversized data, it fails, but it succeeds when buffered", func(t *testing.T) {
 				transmitter := getTransmitter()
 
@@ -9513,7 +9612,12 @@ func TestCCIPRouter(t *testing.T) {
 
 				sourceChainSelector := config.EvmChainSelector
 				message, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t, msgAccounts)
-				message.Data = bytes.Repeat([]byte{42}, 1000)
+
+				buf := make([]byte, 1000)
+				for i := range buf {
+					buf[i] = byte(i % 256)
+				}
+				message.Data = buf
 				sequenceNumber := message.Header.SequenceNumber
 				executedSequenceNumber = sequenceNumber // persist this number as executed, for later tests
 
@@ -9599,38 +9703,10 @@ func TestCCIPRouter(t *testing.T) {
 
 				testutils.SendAndFailWithRPCError(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"VersionedTransaction too large"})
 
-				// We now build a buffer for the report.
+				// We failed to execute, so we will attempt buffering now. We first build the buffering execution instruction, which
+				// is identical except it includes an empty report, and an additional PDA.
 
 				bufferPDA, _, _ := solana.FindProgramAddress([][]byte{[]byte("execution_report_buffer"), root[:], transmitter.PublicKey().Bytes()}, config.CcipOfframpProgram)
-
-				// Deliberately chosen not a divider of 1000, to prove that a smaller terminator chunk is accepted.
-				const chunkSize = 300
-				// Arbitrary order starting on the buffer terminator, for maximum complexity.
-				order := []int{3, 1, 2, 0}
-
-				for _, i := range order {
-					start := i * chunkSize
-					end := min(((i + 1) * chunkSize), len(rawReport))
-
-					chunk := rawReport[start:end]
-
-					t.Log("Data: ")
-					t.Log(root[:])
-					t.Log(uint32(len(rawReport)))
-					appendIx, appendErr := ccip_offramp.NewBufferExecutionReportInstruction(
-						root[:],
-						uint32(len(rawReport)),
-						chunk,
-						uint8(i),
-						bufferPDA,
-						config.OfframpConfigPDA,
-						transmitter.PublicKey(),
-						solana.SystemProgramID).ValidateAndBuild()
-
-					require.NoError(t, appendErr)
-					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{appendIx}, transmitter, config.DefaultCommitment)
-				}
-
 				raw2 := ccip_offramp.NewExecuteInstruction(
 					// Empty report to execute from the buffer
 					[]byte{},
@@ -9662,6 +9738,31 @@ func TestCCIPRouter(t *testing.T) {
 				)
 				bufferedExecutionIx, err := raw2.ValidateAndBuild()
 				require.NoError(t, err)
+
+				// If we attempt to execute now, it will fail as we haven't yet buffered anything.
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{bufferedExecutionIx}, transmitter, config.DefaultCommitment, []string{"Error Code: ExecutionReportUnavailable"})
+
+				// Deliberately chosen not a divider of 1000, to prove that a smaller terminator chunk is accepted.
+				const chunkSize = 300
+
+				// Arbitrary, starting on the buffer terminator, for maximum complexity.
+				firstIndices := []int{3, 1}
+				lastIndices := []int{2, 0}
+
+				for _, i := range firstIndices {
+					appendIx := sendChunk(t, i, chunkSize, rawReport, root, bufferPDA, transmitter)
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{appendIx}, transmitter, config.DefaultCommitment)
+				}
+
+				// This will still fail as the buffer is not yet complete
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{bufferedExecutionIx}, transmitter, config.DefaultCommitment, []string{"Error Code: ExecutionReportBufferIncomplete"})
+
+				for _, i := range lastIndices {
+					appendIx := sendChunk(t, i, chunkSize, rawReport, root, bufferPDA, transmitter)
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{appendIx}, transmitter, config.DefaultCommitment)
+				}
+
+				// It now succeeds, since the buffer is complete.
 				tx = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{bufferedExecutionIx}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(1000000))
 
 				executionEvents, err2 := common.ParseMultipleEvents[ccip.EventExecutionStateChanged](tx.Meta.LogMessages, "ExecutionStateChanged", config.PrintEvents)

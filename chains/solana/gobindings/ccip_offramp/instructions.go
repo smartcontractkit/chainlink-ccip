@@ -253,8 +253,9 @@ var (
 	// There's no need to pre-initialize the buffer: all chunks can be sent concurrently, and the
 	// first one to arrive will initialize the buffer.
 	//
-	// To benefit from buffering, the eventual call to `execute` must include an additional `remaining_account`
-	// with the PDA derived from ["execution_report_buffer", <merkle_root>, <caller_pubkey>].
+	// To benefit from buffering, the eventual call to `execute` or `manually_execute` must
+	// include an additional `remaining_account` with the PDA derived from
+	// ["execution_report_buffer", <buffer_id>, <caller_pubkey>].
 	//
 	// # Arguments
 	//

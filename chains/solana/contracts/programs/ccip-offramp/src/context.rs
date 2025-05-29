@@ -584,8 +584,8 @@ pub struct ExecuteReportContext<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(source_chain_selector: u64, buffer_id: Vec<u8>)]
-pub struct CloseCommitReportAccountContext<'info> {
+#[instruction(source_chain_selector: u64, root: Vec<u8>)]
+pub struct CloseCommitReportAccount<'info> {
     #[account(
         seeds = [seed::CONFIG],
         bump,
@@ -595,7 +595,7 @@ pub struct CloseCommitReportAccountContext<'info> {
 
     #[account(
         mut,
-        seeds = [seed::COMMIT_REPORT, source_chain_selector.to_le_bytes().as_ref(), &buffer_id],
+        seeds = [seed::COMMIT_REPORT, source_chain_selector.to_le_bytes().as_ref(), &root],
         bump,
         constraint = valid_version(commit_report.version, MAX_COMMITREPORT_V) @ CcipOfframpError::InvalidVersion,
     )]

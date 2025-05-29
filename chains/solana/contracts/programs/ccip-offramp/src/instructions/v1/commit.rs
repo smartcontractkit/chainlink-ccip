@@ -5,9 +5,7 @@ use ccip_common::seed;
 use super::ocr3base::{ocr3_transmit, ReportContext, Signatures};
 use super::ocr3impl::Ocr3ReportForCommit;
 
-use crate::context::{
-    CloseCommitReportAccountContext, CommitInput, CommitReportContext, OcrPluginType,
-};
+use crate::context::{CloseCommitReportAccount, CommitInput, CommitReportContext, OcrPluginType};
 use crate::event::{CommitReportAccepted, CommitReportPDAClosed};
 use crate::instructions::interfaces::Commit;
 use crate::instructions::v1::rmn::verify_uncursed_cpi;
@@ -238,7 +236,7 @@ impl Commit for Impl {
 
     fn close_commit_report_account(
         &self,
-        ctx: Context<CloseCommitReportAccountContext>,
+        ctx: Context<CloseCommitReportAccount>,
         source_chain_selector: u64,
         root: Vec<u8>,
     ) -> Result<()> {

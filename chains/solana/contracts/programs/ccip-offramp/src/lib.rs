@@ -588,12 +588,13 @@ pub mod ccip_offramp {
     /// and return funds to the caller whenever buffered execution succeeds.
     pub fn close_execution_report_buffer(
         _ctx: Context<CloseExecutionReportBufferContext>,
+        _buffer_id: Vec<u8>,
     ) -> Result<()> {
         Ok(())
     }
 
     pub fn close_commit_report_account(
-        ctx: Context<CloseCommitReportAccountContext>,
+        ctx: Context<CloseCommitReportAccount>,
         source_chain_selector: u64,
         root: Vec<u8>,
     ) -> Result<()> {

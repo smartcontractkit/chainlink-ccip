@@ -16,6 +16,7 @@ import (
 // was made when buffering data. The buffer account will otherwise automatically close
 // and return funds to the caller whenever buffered execution succeeds.
 type CloseExecutionReportBuffer struct {
+	BufferId *[]byte
 
 	// [0] = [WRITE] executionReportBuffer
 	//
@@ -31,6 +32,12 @@ func NewCloseExecutionReportBufferInstructionBuilder() *CloseExecutionReportBuff
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 3),
 	}
 	return nd
+}
+
+// SetBufferId sets the "bufferId" parameter.
+func (inst *CloseExecutionReportBuffer) SetBufferId(bufferId []byte) *CloseExecutionReportBuffer {
+	inst.BufferId = &bufferId
+	return inst
 }
 
 // SetExecutionReportBufferAccount sets the "executionReportBuffer" account.
@@ -84,6 +91,13 @@ func (inst CloseExecutionReportBuffer) ValidateAndBuild() (*Instruction, error) 
 }
 
 func (inst *CloseExecutionReportBuffer) Validate() error {
+	// Check whether all (required) parameters are set:
+	{
+		if inst.BufferId == nil {
+			return errors.New("BufferId parameter is not set")
+		}
+	}
+
 	// Check whether all (required) accounts are set:
 	{
 		if inst.AccountMetaSlice[0] == nil {
@@ -108,7 +122,9 @@ func (inst *CloseExecutionReportBuffer) EncodeToTree(parent ag_treeout.Branches)
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=0]").ParentFunc(func(paramsBranch ag_treeout.Branches) {})
+					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+						paramsBranch.Child(ag_format.Param("BufferId", *inst.BufferId))
+					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
@@ -121,19 +137,32 @@ func (inst *CloseExecutionReportBuffer) EncodeToTree(parent ag_treeout.Branches)
 }
 
 func (obj CloseExecutionReportBuffer) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `BufferId` param:
+	err = encoder.Encode(obj.BufferId)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 func (obj *CloseExecutionReportBuffer) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `BufferId`:
+	err = decoder.Decode(&obj.BufferId)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
 // NewCloseExecutionReportBufferInstruction declares a new CloseExecutionReportBuffer instruction with the provided parameters and accounts.
 func NewCloseExecutionReportBufferInstruction(
+	// Parameters:
+	bufferId []byte,
 	// Accounts:
 	executionReportBuffer ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *CloseExecutionReportBuffer {
 	return NewCloseExecutionReportBufferInstructionBuilder().
+		SetBufferId(bufferId).
 		SetExecutionReportBufferAccount(executionReportBuffer).
 		SetAuthorityAccount(authority).
 		SetSystemProgramAccount(systemProgram)
