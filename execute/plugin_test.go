@@ -1408,9 +1408,19 @@ func TestPlugin_Reports_UnableToEncode(t *testing.T) {
 	codec := codec_mocks.NewMockExecutePluginCodec(t)
 	codec.On("Encode", mock.Anything, mock.Anything).
 		Return(nil, fmt.Errorf("test error"))
-	p := &Plugin{reportCodec: codec, lggr: logger.Test(t), ocrTypeCodec: ocrTypeCodec}
+	chainSupport := plugincommon_mock.NewMockChainSupport(t)
+	chainSupport.EXPECT().SupportsDestChain(mock.Anything).Return(true, nil)
+	p := &Plugin{
+		reportCodec:  codec,
+		lggr:         logger.Test(t),
+		ocrTypeCodec: ocrTypeCodec,
+		chainSupport: chainSupport,
+		oracleIDToP2pID: map[commontypes.OracleID]libocrtypes.PeerID{
+			0: {},
+		},
+	}
 	report, err := ocrTypeCodec.EncodeOutcome(exectypes.NewOutcome(
-		exectypes.Unknown, nil,
+		exectypes.Unknown, []exectypes.CommitData{{}, {}},
 		[]cciptypes.ExecutePluginReport{{ChainReports: []cciptypes.ExecutePluginReportSingleChain{
 			{},
 			{},
@@ -1419,7 +1429,7 @@ func TestPlugin_Reports_UnableToEncode(t *testing.T) {
 
 	_, err = p.Reports(ctx, 0, report)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "unable to encode report: test error")
+	assert.Contains(t, err.Error(), "unable to encode report 0: test error")
 }
 
 func TestPlugin_ShouldAcceptAttestedReport_DoesNotDecode(t *testing.T) {
