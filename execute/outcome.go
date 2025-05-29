@@ -121,7 +121,7 @@ func (p *Plugin) getCommitReportsOutcome(observation exectypes.Observation) exec
 
 	// Must use 'NewOutcome' rather than direct struct initialization to ensure the outcome is sorted.
 	// TODO: sort in the encoder.
-	return exectypes.NewOutcome(exectypes.GetCommitReports, commitReports, nil)
+	return exectypes.NewOutcomeWithSortedCommitReports(exectypes.GetCommitReports, commitReports)
 }
 
 func (p *Plugin) getMessagesOutcome(
@@ -163,7 +163,7 @@ func (p *Plugin) getMessagesOutcome(
 
 	// Must use 'NewOutcome' rather than direct struct initialization to ensure the outcome is sorted.
 	// TODO: sort in the encoder.
-	return exectypes.NewOutcome(exectypes.GetMessages, commitReports, nil)
+	return exectypes.NewOutcomeWithSortedCommitReports(exectypes.GetMessages, commitReports)
 }
 
 // getFilterOutcome is the final phase of the execution plugin. Filter refers to the Nonces

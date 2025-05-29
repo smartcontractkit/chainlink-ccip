@@ -2,6 +2,7 @@ package exectypes
 
 import (
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	"sort"
 )
 
 type PluginState string
@@ -119,5 +120,19 @@ func NewOutcome(
 		State:         state,
 		CommitReports: selectedCommits,
 		Reports:       reports,
+	}
+}
+
+func NewOutcomeWithSortedCommitReports(
+	state PluginState,
+	commitReports []CommitData,
+) Outcome {
+	sort.Slice(commitReports, func(i, j int) bool {
+		return LessThan(commitReports[i], commitReports[j])
+	})
+	return Outcome{
+		State:         state,
+		CommitReports: commitReports,
+		Reports:       nil,
 	}
 }
