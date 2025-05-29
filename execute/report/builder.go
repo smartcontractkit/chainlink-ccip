@@ -176,55 +176,113 @@ func (b *execReportBuilder) checkInitialize() {
 // The commit report with updated metadata is returned. It reflects which messages
 // were selected for the exec report.
 //
-// TODO: Finish this function to generate multiple reports..
+// TODO: Add support for multiple reports with ordered messages.
 func (b *execReportBuilder) Add(
 	ctx context.Context,
 	commitReport exectypes.CommitData,
 ) (exectypes.CommitData, error) {
 	b.checkInitialize()
-	index := len(b.execReports) - 1
 
-	// Check if max is reached.
-	if b.maxSingleChainReports != 0 && len(b.execReports[index].ChainReports) >= int(b.maxSingleChainReports) {
-		if !b.multipleReportsEnabled {
-			// TODO: this is the previous behavior. Should we return an empty report error?
-			return commitReport, nil
-		} /* else {
-			// TODO: start a new exec report.
-		}*/
-	}
-
-	// Check which messages are ready to execute and update the report with additional metadata needed for execution.
-	readyMessages, err := b.checkMessages(ctx, commitReport)
-	if err != nil {
-		return commitReport,
-			fmt.Errorf("unable to check message: %w", err)
-	}
-	if len(readyMessages) == 0 {
-		return commitReport, ErrEmptyReport
-	}
-
-	execReport, updatedReport, err := b.buildSingleChainReport(ctx, commitReport, readyMessages)
-
-	// No messages fit into the exec report
-	if errors.Is(err, ErrEmptyReport) {
-		if !b.multipleReportsEnabled {
-			return commitReport, nil
+	if b.multipleReportsEnabled {
+		// Check if all messages have zero nonces - if not, we should only process the first report
+		for _, msg := range commitReport.Messages {
+			if msg.Header.Nonce > 0 {
+				b.lggr.Errorw("Found message with non-zero nonce when multiple reports are enabled",
+					"sourceChain", msg.Header.SourceChainSelector,
+					"messageID", msg.Header.MessageID,
+					"nonce", msg.Header.Nonce)
+				// If multiple reports are enabled, we can still process the report, but we need to limit it to a single report
+				// If we didn't even build the first report yet, then break and process the first report only.
+				if len(b.execReports) > 1 {
+					b.execReports = []cciptypes.ExecutePluginReport{b.execReports[0]}
+					b.commitReports = [][]exectypes.CommitData{b.commitReports[0]}
+					b.accumulated = []validationMetadata{b.accumulated[0]}
+					return commitReport, fmt.Errorf("messages with non-zero nonces detected, limiting to single report")
+				}
+			}
 		}
-		// start a new exec report and try again.
-		// TODO: start a new exec report and try again.
-		panic("multiple reports enabled but not implemented")
-	}
-	if err != nil {
-		return commitReport, fmt.Errorf("unable to add a single chain report: %w", err)
 	}
 
-	b.execReports[index].ChainReports = append(b.execReports[index].ChainReports, execReport)
-	b.commitReports[index] = append(b.commitReports[index], updatedReport)
+	currentCommitReport := commitReport
+	// Main processing loop - continue until no more messages or reports can be created
+	for {
+		index := len(b.execReports) - 1
 
-	// TODO: Check if there are any remaining readyMessages and try to build the next report.
+		// Check if we've reached max reports for the current exec report
+		if b.maxSingleChainReports != 0 && len(b.execReports[index].ChainReports) >= int(b.maxSingleChainReports) {
+			if !b.multipleReportsEnabled {
+				return currentCommitReport, nil
+			}
 
-	return updatedReport, nil
+			b.createNewExecReport()
+
+			index = len(b.execReports) - 1
+		}
+
+		// Check which messages are ready to execute, excluding already processed ones
+		readyMessages, err := b.checkMessages(ctx, currentCommitReport)
+		if err != nil {
+			return currentCommitReport, fmt.Errorf("unable to check messages: %w", err)
+		}
+
+		if len(readyMessages) == 0 {
+			// No more messages to process
+			return currentCommitReport, nil
+		}
+
+		execReport, updatedReport, err := b.buildSingleChainReport(ctx, currentCommitReport, readyMessages)
+
+		if errors.Is(err, ErrEmptyReport) {
+			// No messages fit into the report
+			if !b.multipleReportsEnabled {
+				return currentCommitReport, nil
+			}
+
+			// Try with a new exec report
+			b.createNewExecReport()
+			index = len(b.execReports) - 1
+
+			execReport, updatedReport, err = b.buildSingleChainReport(ctx, currentCommitReport, readyMessages)
+			if errors.Is(err, ErrEmptyReport) {
+				// Remove the empty report we just added
+				b.removeLastExecReport()
+				return currentCommitReport, nil
+			}
+		}
+
+		if err != nil {
+			return currentCommitReport, fmt.Errorf("unable to add a single chain report: %w", err)
+		}
+
+		// Update our data structures
+		b.execReports[index].ChainReports = append(b.execReports[index].ChainReports, execReport)
+		b.commitReports[index] = append(b.commitReports[index], updatedReport)
+		currentCommitReport = updatedReport
+
+		// If multiple reports aren't enabled, we're done after the first report
+		if !b.multipleReportsEnabled {
+			break
+		}
+
+		// Check if we've processed all messages - if so, exit the loop
+		readyMessagesLeft, _ := b.checkMessages(ctx, currentCommitReport)
+		if len(readyMessagesLeft) == 0 {
+			return currentCommitReport, nil
+		}
+	}
+
+	return currentCommitReport, nil
+}
+func (b *execReportBuilder) createNewExecReport() {
+	b.execReports = append(b.execReports, cciptypes.ExecutePluginReport{})
+	b.commitReports = append(b.commitReports, []exectypes.CommitData{})
+	b.accumulated = append(b.accumulated, validationMetadata{})
+}
+
+func (b *execReportBuilder) removeLastExecReport() {
+	b.execReports = b.execReports[:len(b.execReports)-1]
+	b.commitReports = b.commitReports[:len(b.commitReports)-1]
+	b.accumulated = b.accumulated[:len(b.accumulated)-1]
 }
 
 func (b *execReportBuilder) Build() (
@@ -248,34 +306,6 @@ func (b *execReportBuilder) Build() (
 			break
 		}
 	}
-
-	// this now happens when adding the reports, so we don't need to do it here
-	/*
-		// Check if limiting is required.
-		if b.maxSingleChainReports != 0 && uint64(len(b.execReports)) > b.maxSingleChainReports {
-			b.lggr.Infof(
-				"limiting number of reports to maxReports from %d to %d",
-				len(b.execReports),
-				b.maxSingleChainReports,
-			)
-
-			if b.multipleReportsEnabled {
-				for len(b.execReports) > int(b.maxSingleChainReports) {
-					results = append(results, b.execReports[:b.maxSingleChainReports])
-					b.execReports = b.execReports[b.maxSingleChainReports:]
-				}
-				if len(b.execReports) > 0 {
-					results = append(results, b.execReports)
-				}
-			} else {
-				// Otherwise, truncate
-				b.execReports = b.execReports[:b.maxSingleChainReports]
-				b.commitReports = b.commitReports[:b.maxSingleChainReports]
-				results = append(results, b.execReports)
-				numSingleChainReports = len(b.execReports)
-			}
-		}
-	*/
 
 	// TODO: Sort reports into a canonical form prior to returning.
 
