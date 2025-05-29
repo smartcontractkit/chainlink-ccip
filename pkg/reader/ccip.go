@@ -1064,6 +1064,10 @@ func (r *ccipChainReader) buildSigners(signers []signer) []cciptypes.RemoteSigne
 func (r *ccipChainReader) GetRMNRemoteConfig(ctx context.Context) (cciptypes.RemoteConfig, error) {
 	lggr := logutil.WithContextValues(ctx, r.lggr)
 
+	if validateExtendedReaderExistence(r.contractReaders, r.destChain) != nil {
+		return cciptypes.RemoteConfig{}, fmt.Errorf("validate dest=%d extended reader existence", r.destChain)
+	}
+
 	config, err := r.configPoller.GetChainConfig(ctx, r.destChain)
 	if err != nil {
 		return cciptypes.RemoteConfig{}, fmt.Errorf("get chain config: %w", err)

@@ -738,6 +738,17 @@ func (o observerImpl) computeMerkleRoot(
 func (o observerImpl) ObserveRMNRemoteCfg(ctx context.Context) cciptypes.RemoteConfig {
 	lggr := logutil.WithContextValues(ctx, o.lggr)
 
+	supportsDestChain, err := o.chainSupport.SupportsDestChain(o.oracleID)
+	if err != nil {
+		lggr.Errorw("call to SupportsDestChain failed", "err", err)
+		return cciptypes.RemoteConfig{}
+	}
+
+	if !supportsDestChain {
+		lggr.Debugw("cannot observe RMN remote config since destination chain is not supported")
+		return cciptypes.RemoteConfig{}
+	}
+
 	rmnRemoteCfg, err := o.ccipReader.GetRMNRemoteConfig(ctx)
 	if err != nil {
 		if errors.Is(err, readerpkg.ErrContractReaderNotFound) {
