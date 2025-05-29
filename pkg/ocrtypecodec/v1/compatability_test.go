@@ -2,10 +2,12 @@ package v1_test
 
 import (
 	"encoding/base64"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1/ocrtypecodecpb"
-	"google.golang.org/protobuf/proto"
 	"testing"
 	"time"
+
+	"google.golang.org/protobuf/proto"
+
+	"github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1/ocrtypecodecpb"
 
 	"github.com/stretchr/testify/require"
 
