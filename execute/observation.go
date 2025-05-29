@@ -176,7 +176,7 @@ func (p *Plugin) getCommitReportsObservation(
 
 	// No observation for non-dest readers.
 	if !supportsDest {
-		lggr.Debugw("destination chain not supported, skipping commit reports observation")
+		lggr.Infow("destination chain not supported, skipping commit reports observation")
 		return observation, nil
 	}
 
@@ -357,7 +357,7 @@ func (p *Plugin) getMessagesObservation(
 		srcChain := report.SourceChain
 
 		if !supportedChains.Contains(srcChain) {
-			lggr.Debugw("skipping report of unsupported source chain", "srcChain", srcChain)
+			lggr.Infow("skipping report of unsupported source chain", "srcChain", srcChain)
 			continue
 		}
 
@@ -465,7 +465,7 @@ func (p *Plugin) getFilterObservation(
 	}
 	// No observation for non-dest readers.
 	if !supportsDest {
-		lggr.Debugw("destination chain not supported, skipping filter observation")
+		lggr.Infow("destination chain not supported, skipping filter observation")
 		return observation, nil
 	}
 

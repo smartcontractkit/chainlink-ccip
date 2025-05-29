@@ -202,7 +202,10 @@ func (p *Plugin) validateReport(
 	}
 
 	if !supports {
-		lggr.Errorw("dest chain not supported, can't run report acceptance procedures, transmission schedule is wrong")
+		lggr.Errorw("dest chain not supported by this oracle, can't run report acceptance procedures, " +
+			"transmission schedule is wrong - check CCIPHome chainConfigs and ensure that the right oracles are " +
+			"assigned as readers of the destination chain, or if " +
+			"this oracle should support the destination chain but isn't!")
 		return cciptypes.CommitPluginReport{}, plugincommon.NewErrInvalidReport("dest chain not supported")
 	}
 
@@ -319,7 +322,10 @@ func (p *Plugin) checkReportCursed(
 		return false, fmt.Errorf("checking if destination chain is supported: %w", err)
 	}
 	if !supportsDest {
-		lggr.Errorw("destination chain not supported, wrong transmission schedule", "oracleID", p.reportingCfg.OracleID)
+		lggr.Errorw("dest chain not supported by this oracle, can't run report acceptance procedures, " +
+			"transmission schedule is wrong - check CCIPHome chainConfigs and ensure that the right oracles are " +
+			"assigned as readers of the destination chain, or if " +
+			"this oracle should support the destination chain but isn't!")
 		return false, plugincommon.NewErrInvalidReport("destination chain not supported")
 	}
 

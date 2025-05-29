@@ -49,30 +49,30 @@ func (o *baseObserver) getChainsFeeComponents(
 	ctx context.Context,
 	lggr logger.Logger,
 ) map[cciptypes.ChainSelector]types.ChainFeeComponents {
-	supportedChains, err := o.getSupportedSourceChains()
+	supportedSourceChains, err := o.getSupportedSourceChains()
 	if err != nil {
 		lggr.Errorw("failed to get supported chains unable to get chains fee components", "err", err)
 		return map[cciptypes.ChainSelector]types.ChainFeeComponents{}
 	}
 
-	if len(supportedChains) == 0 {
+	if len(supportedSourceChains) == 0 {
 		lggr.Debugw("no supported source chains found, returning empty chains fee components")
 		return map[cciptypes.ChainSelector]types.ChainFeeComponents{}
 	}
 
-	return o.ccipReader.GetChainsFeeComponents(ctx, supportedChains)
+	return o.ccipReader.GetChainsFeeComponents(ctx, supportedSourceChains)
 }
 
 func (o *baseObserver) getNativeTokenPrices(
 	ctx context.Context,
 	lggr logger.Logger,
 ) map[cciptypes.ChainSelector]cciptypes.BigInt {
-	supportedChains, err := o.getSupportedSourceChains()
+	supportedSourceChains, err := o.getSupportedSourceChains()
 	if err != nil {
 		lggr.Errorw("failed to get supported chains unable to get native token prices", "err", err)
 		return map[cciptypes.ChainSelector]cciptypes.BigInt{}
 	}
-	return o.ccipReader.GetWrappedNativeTokenPriceUSD(ctx, supportedChains)
+	return o.ccipReader.GetWrappedNativeTokenPriceUSD(ctx, supportedSourceChains)
 }
 
 func (o *baseObserver) getChainFeePriceUpdates(
@@ -85,7 +85,7 @@ func (o *baseObserver) getChainFeePriceUpdates(
 		return map[cciptypes.ChainSelector]Update{}
 	}
 	if !supportsDest {
-		lggr.Debugw("oracle does not support destination chain, returning empty chain fee price updates")
+		lggr.Debugw("this oracle does not support destination chain, returning empty chain fee price updates")
 		return map[cciptypes.ChainSelector]Update{}
 	}
 
