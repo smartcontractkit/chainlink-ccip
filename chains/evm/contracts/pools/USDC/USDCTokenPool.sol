@@ -14,10 +14,14 @@ import {IERC20} from
 import {SafeERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 
+import {EnumerableSet} from
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
+
 /// @notice This pool mints and burns USDC tokens through the Cross Chain Transfer
 /// Protocol (CCTP).
 contract USDCTokenPool is TokenPool, ITypeAndVersion {
   using SafeERC20 for IERC20;
+  using EnumerableSet for EnumerableSet.UintSet;
 
   event DomainsSet(DomainUpdate[]);
   event ConfigSet(address tokenMessenger);
@@ -56,13 +60,11 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
 
   string public constant override typeAndVersion = "USDCTokenPool 1.6.1-dev";
 
-  // We restrict to the first version. New pool may be required for subsequent versions.
-  uint32 public constant SUPPORTED_USDC_VERSION = 0;
-
   // The local USDC config
   ITokenMessenger public immutable i_tokenMessenger;
   CCTPMessageTransmitterProxy public immutable i_messageTransmitterProxy;
   uint32 public immutable i_localDomainIdentifier;
+  uint256 public immutable i_usdcVersion;
 
   /// A domain is a USDC representation of a destination chain.
   /// @dev Zero is a valid domain identifier.
@@ -77,7 +79,11 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   }
 
   // A mapping of CCIP chain identifiers to destination domains
-  mapping(uint64 chainSelector => Domain CCTPDomain) private s_chainToDomain;
+  mapping(uint64 chainSelector => Domain CCTPDomain) internal s_chainToDomain;
+
+  // An enumerable list of USDC CCTP versions which allows future contracts to support multiple
+  // versions of CCTP.
+  EnumerableSet.UintSet internal s_supportedUSDCVersions;
 
   constructor(
     ITokenMessenger tokenMessenger,
@@ -85,19 +91,22 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     IERC20 token,
     address[] memory allowlist,
     address rmnProxy,
-    address router
+    address router,
+    uint256 usdcVersion
   ) TokenPool(token, 6, allowlist, rmnProxy, router) {
+    // TODO: Fix Message Versioning by adding additional constructor parameter
     if (address(tokenMessenger) == address(0)) revert InvalidConfig();
     IMessageTransmitter transmitter = IMessageTransmitter(tokenMessenger.localMessageTransmitter());
     uint32 transmitterVersion = transmitter.version();
-    if (transmitterVersion != SUPPORTED_USDC_VERSION) revert InvalidMessageVersion(transmitterVersion);
+    if (transmitterVersion != usdcVersion) revert InvalidMessageVersion(transmitterVersion);
     uint32 tokenMessengerVersion = tokenMessenger.messageBodyVersion();
-    if (tokenMessengerVersion != SUPPORTED_USDC_VERSION) revert InvalidTokenMessengerVersion(tokenMessengerVersion);
+    if (tokenMessengerVersion != usdcVersion) revert InvalidTokenMessengerVersion(tokenMessengerVersion);
     if (cctpMessageTransmitterProxy.i_cctpTransmitter() != transmitter) revert InvalidTransmitterInProxy();
 
     i_tokenMessenger = tokenMessenger;
     i_messageTransmitterProxy = cctpMessageTransmitterProxy;
     i_localDomainIdentifier = transmitter.localDomain();
+    i_usdcVersion = usdcVersion;
     i_token.safeIncreaseAllowance(address(i_tokenMessenger), type(uint256).max);
     emit ConfigSet(address(tokenMessenger));
   }
@@ -190,7 +199,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     // This token pool only supports version 0 of the CCTP message format
     // We check the version prior to loading the rest of the message
     // to avoid unexpected reverts due to out-of-bounds reads.
-    if (version != SUPPORTED_USDC_VERSION) revert InvalidMessageVersion(version);
+    if (version != i_usdcVersion) revert InvalidMessageVersion(version);
 
     uint32 sourceDomain;
     uint32 destinationDomain;
