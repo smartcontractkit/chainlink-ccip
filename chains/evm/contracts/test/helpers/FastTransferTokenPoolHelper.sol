@@ -37,9 +37,9 @@ contract FastTransferTokenPoolHelper is FastTransferTokenPoolAbstract {
     address filler,
     address receiver,
     uint256 srcAmount,
-    uint8 srcDecimals
+    uint8 sourceDecimals
   ) public returns (uint256) {
-    return _transferFromFiller(sourceChainSelector, filler, receiver, srcAmount, srcDecimals);
+    return _transferFromFiller(sourceChainSelector, filler, receiver, srcAmount, sourceDecimals);
   }
 
   // Implementation of abstract functions

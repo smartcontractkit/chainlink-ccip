@@ -13,7 +13,7 @@ contract FastTransferTokenPoolHelper_ccipReceive_Test is FastTransferTokenPoolHe
   address public sourcePool;
   uint64 public sourceChainSelector;
   uint256 public srcAmount;
-  uint8 public srcDecimals;
+  uint8 public sourceDecimals;
   uint256 public fastTransferFee;
   address public receiver;
 
@@ -24,7 +24,7 @@ contract FastTransferTokenPoolHelper_ccipReceive_Test is FastTransferTokenPoolHe
     sourcePool = address(0x123);
     sourceChainSelector = 1;
     srcAmount = 100 ether;
-    srcDecimals = 18;
+    sourceDecimals = 18;
     fastTransferFee = srcAmount * FAST_FEE_BPS / 10000; // 1% fast fee
     receiver = address(0x5);
     deal(address(s_token), address(s_tokenPool), srcAmount * 2); // Ensure pool has enough balance
@@ -41,8 +41,8 @@ contract FastTransferTokenPoolHelper_ccipReceive_Test is FastTransferTokenPoolHe
     bytes memory data = abi.encode(
       FastTransferTokenPoolAbstract.MintMessage({
         receiver: abi.encode(receiver),
-        srcAmountToTransfer: srcAmount,
-        srcDecimals: srcDecimals,
+        sourceAmountToTransfer: srcAmount,
+        sourceDecimals: sourceDecimals,
         fastTransferFee: fastTransferFee
       })
     );
@@ -67,7 +67,7 @@ contract FastTransferTokenPoolHelper_ccipReceive_Test is FastTransferTokenPoolHe
   function test_CcipReceive_FastFilled() public {
     // First, fast fill the request
     vm.prank(s_filler);
-    s_tokenPool.fastFill(messageId, sourceChainSelector, srcAmount, srcDecimals, receiver);
+    s_tokenPool.fastFill(messageId, sourceChainSelector, srcAmount, sourceDecimals, receiver);
 
     uint256 fillerBalanceBefore = s_token.balanceOf(s_filler);
     uint256 receiverBalanceBefore = s_token.balanceOf(receiver);
@@ -77,8 +77,8 @@ contract FastTransferTokenPoolHelper_ccipReceive_Test is FastTransferTokenPoolHe
     bytes memory data = abi.encode(
       FastTransferTokenPoolAbstract.MintMessage({
         receiver: abi.encode(receiver),
-        srcAmountToTransfer: srcAmount,
-        srcDecimals: srcDecimals,
+        sourceAmountToTransfer: srcAmount,
+        sourceDecimals: sourceDecimals,
         fastTransferFee: fastTransferFee
       })
     );
@@ -103,7 +103,7 @@ contract FastTransferTokenPoolHelper_ccipReceive_Test is FastTransferTokenPoolHe
   }
 
   function test_CcipReceive_WithDifferentDecimals() public {
-    srcDecimals = 6; // USDC-like decimals
+    sourceDecimals = 6; // USDC-like decimals
     srcAmount = 100e6; // 100 tokens with 6 decimals
     uint256 srcFee = srcAmount * FAST_FEE_BPS / 10000; // 1% fast fee
     uint256 expectedLocalAmount = 100 ether; // Should be scaled to 18 decimals
@@ -115,8 +115,8 @@ contract FastTransferTokenPoolHelper_ccipReceive_Test is FastTransferTokenPoolHe
     bytes memory data = abi.encode(
       FastTransferTokenPoolAbstract.MintMessage({
         receiver: abi.encode(receiver),
-        srcAmountToTransfer: srcAmount,
-        srcDecimals: srcDecimals,
+        sourceAmountToTransfer: srcAmount,
+        sourceDecimals: sourceDecimals,
         fastTransferFee: srcFee
       })
     );
@@ -143,8 +143,8 @@ contract FastTransferTokenPoolHelper_ccipReceive_Test is FastTransferTokenPoolHe
     bytes memory data = abi.encode(
       FastTransferTokenPoolAbstract.MintMessage({
         receiver: abi.encode(receiver),
-        srcAmountToTransfer: srcAmount,
-        srcDecimals: srcDecimals,
+        sourceAmountToTransfer: srcAmount,
+        sourceDecimals: sourceDecimals,
         fastTransferFee: zeroFee
       })
     );
@@ -170,8 +170,8 @@ contract FastTransferTokenPoolHelper_ccipReceive_Test is FastTransferTokenPoolHe
     bytes memory data = abi.encode(
       FastTransferTokenPoolAbstract.MintMessage({
         receiver: abi.encode(receiver),
-        srcAmountToTransfer: srcAmount,
-        srcDecimals: srcDecimals,
+        sourceAmountToTransfer: srcAmount,
+        sourceDecimals: sourceDecimals,
         fastTransferFee: fastTransferFee
       })
     );
@@ -195,7 +195,7 @@ contract FastTransferTokenPoolHelper_ccipReceive_Test is FastTransferTokenPoolHe
 
   function test_RevertWhen_InvalidData() public {
     // Prepare CCIP message with invalid data
-    bytes memory invalidData = abi.encode(srcAmount, srcDecimals); // Missing fastTransferFee and receiver
+    bytes memory invalidData = abi.encode(srcAmount, sourceDecimals); // Missing fastTransferFee and receiver
     Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
       messageId: messageId,
       sourceChainSelector: sourceChainSelector,
@@ -215,8 +215,8 @@ contract FastTransferTokenPoolHelper_ccipReceive_Test is FastTransferTokenPoolHe
     bytes memory data = abi.encode(
       FastTransferTokenPoolAbstract.MintMessage({
         receiver: abi.encode(receiver),
-        srcAmountToTransfer: srcAmount,
-        srcDecimals: srcDecimals,
+        sourceAmountToTransfer: srcAmount,
+        sourceDecimals: sourceDecimals,
         fastTransferFee: fastTransferFee
       })
     );
@@ -240,7 +240,7 @@ contract FastTransferTokenPoolHelper_ccipReceive_Test is FastTransferTokenPoolHe
     uint256 receiverBalanceBefore = s_token.balanceOf(receiver);
 
     vm.prank(s_filler);
-    s_tokenPool.fastFill(messageId, sourceChainSelector, srcAmount, srcDecimals, receiver);
+    s_tokenPool.fastFill(messageId, sourceChainSelector, srcAmount, sourceDecimals, receiver);
 
     // Verify fast fill worked
     assertEq(s_token.balanceOf(s_filler), fillerBalanceBefore - srcAmount);
@@ -253,8 +253,8 @@ contract FastTransferTokenPoolHelper_ccipReceive_Test is FastTransferTokenPoolHe
     bytes memory data = abi.encode(
       FastTransferTokenPoolAbstract.MintMessage({
         receiver: abi.encode(receiver),
-        srcAmountToTransfer: srcAmount,
-        srcDecimals: srcDecimals,
+        sourceAmountToTransfer: srcAmount,
+        sourceDecimals: sourceDecimals,
         fastTransferFee: fastTransferFee
       })
     );

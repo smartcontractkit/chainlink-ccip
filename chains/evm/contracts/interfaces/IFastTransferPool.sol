@@ -63,13 +63,13 @@ interface IFastTransferPool {
   /// @param fillRequestId The fill request ID
   /// @param sourceChainSelector The source chain selector
   /// @param srcAmount The amount to fill
-  /// @param srcDecimals The decimals of the source token
+  /// @param sourceDecimals The decimals of the source token
   /// @param receiver The receiver address
   function fastFill(
     bytes32 fillRequestId,
     uint64 sourceChainSelector,
     uint256 srcAmount,
-    uint8 srcDecimals,
+    uint8 sourceDecimals,
     address receiver
   ) external;
 

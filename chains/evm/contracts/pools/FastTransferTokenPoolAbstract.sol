@@ -3,7 +3,6 @@ pragma solidity ^0.8.24;
 
 import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol";
 import {IFastTransferPool} from "../interfaces/IFastTransferPool.sol";
-
 import {IRMN} from "../interfaces/IRMN.sol";
 import {IRouterClient} from "../interfaces/IRouterClient.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
@@ -25,8 +24,8 @@ import {EnumerableSet} from
 /// @notice Base contract for fast-transfer pools that provides common functionality
 /// for quoting, fill-tracking, and CCIP send helpers.
 abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITypeAndVersion, IFastTransferPool {
-  using SafeERC20 for IERC20;
   using EnumerableSet for EnumerableSet.AddressSet;
+  using SafeERC20 for IERC20;
 
   error WhitelistNotEnabled();
   error InvalidDestChainConfig();
@@ -45,42 +44,42 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   event DestinationPoolUpdated(uint64 indexed dst, address destinationPool);
 
   struct DestChainConfig {
-    uint256 maxFillAmountPerRequest; //    max amount that can be filled per request
-    uint16 fastTransferBpsFee; // ─────╮ 0-10_000
-    bool fillerAllowlistEnabled; // ───╯ whitelist for fillers
-    bytes destinationPool; // destination pool address
-    EnumerableSet.AddressSet fillerAllowList; // enumerable set of allowed fillers
+    uint256 maxFillAmountPerRequest; // Max amount that can be filled per request.
+    bytes destinationPool; //           Destination pool address.
+    uint16 fastTransferBpsFee; // ────╮ Allowed range of [0-10_000].
+    bool fillerAllowlistEnabled; // ──╯ Allowlist for fillers.
+    EnumerableSet.AddressSet fillerAllowList; // Enumerable set of allowed fillers.
   }
 
   struct DestChainConfigView {
-    uint256 maxFillAmountPerRequest; //    max amount that can be filled per request
-    uint16 fastTransferBpsFee; // ────╮ 0-10_000
-    bool fillerAllowlistEnabled; // ──╯ whitelist for fillers
-    bytes destinationPool; // destination pool address
+    uint256 maxFillAmountPerRequest; // Max amount that can be filled per request.
+    uint16 fastTransferBpsFee; // ────╮ Allowed range of [0-10_000].
+    bool fillerAllowlistEnabled; // ──╯ Allowlist for fillers.
+    bytes destinationPool; //           Address of the destination pool. ABI encoded in the case of an EVM pool.
   }
 
   struct DestChainConfigUpdateArgs {
-    uint256 maxFillAmountPerRequest; //    max amount that can be filled per request
-    address[] addFillers; //               address allowed to fill
-    address[] removeFillers; //            addresses to remove from the whitelist
-    uint64 remoteChainSelector; // ──────╮
-    uint16 fastTransferBpsFee; //        |       │ 0-10_000
-    bool fillerAllowlistEnabled; // ─────╯
-    bytes destinationPool;
+    uint256 maxFillAmountPerRequest; // Maximum amount that can be filled per request.
+    bytes destinationPool; //           Address of the destination pool. ABI encoded in the case of an EVM pool.
+    uint64 remoteChainSelector; // ───╮ Remote chain selector.
+    uint16 fastTransferBpsFee; //     | Allowed range of [0-10_000].
+    bool fillerAllowlistEnabled; // ──╯ True is filler allowlist is enabled.
+    address[] addFillers; //            Address allowed to fill.
+    address[] removeFillers; //         Addresses to remove from the allowlist.
   }
 
   struct MintMessage {
-    uint256 srcAmountToTransfer; // source amount from fill request
-    uint256 fastTransferFee; // fast transfer fee in the source token
-    bytes receiver; // receiver address on the destination chain
-    uint8 srcDecimals; // decimals of the source token
+    uint256 sourceAmountToTransfer; // Amount to fill in the source token denomination.
+    uint256 fastTransferFee; // Fast transfer fee in the source token.
+    bytes receiver; // Receiver address on the destination chain. ABI encoded in the case of an EVM address.
+    uint8 sourceDecimals; // Decimals of the source token.
   }
 
-  /// @notice Enum representing the state of a fill request
+  /// @notice Enum representing the state of a fill request.
   enum FillState {
-    NOT_FILLED, // Request has not been filled yet
-    FILLED, // Request has been filled by a filler
-    SETTLED // Request has been settled via CCIP
+    NOT_FILLED, // Request has not been filled yet.
+    FILLED, // Request has been filled by a filler.
+    SETTLED // Request has been settled via CCIP.
 
   }
 
@@ -272,8 +271,8 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     // pack the MintMessage
     bytes memory data = abi.encode(
       MintMessage({
-        srcAmountToTransfer: amount,
-        srcDecimals: i_tokenDecimals,
+        sourceAmountToTransfer: amount,
+        sourceDecimals: i_tokenDecimals,
         fastTransferFee: quote.fastTransferFee,
         receiver: receiver
       })
@@ -294,13 +293,13 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   /// @notice Fast fills a transfer using liquidity provider funds based on CCIP settlement
   /// @param fillRequestId The fill request ID
   /// @param srcAmount The amount to fill
-  /// @param srcDecimals The decimals of the source token
+  /// @param sourceDecimals The decimals of the source token
   /// @param receiver The receiver address
   function fastFill(
     bytes32 fillRequestId,
     uint64 sourceChainSelector,
     uint256 srcAmount,
-    uint8 srcDecimals,
+    uint8 sourceDecimals,
     address receiver
   ) public virtual {
     bytes32 fillId = computeFillId(fillRequestId, srcAmount, receiver);
@@ -316,7 +315,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
       }
     }
     // Transfer tokens from filler to receiver
-    uint256 destAmount = _transferFromFiller(sourceChainSelector, msg.sender, receiver, srcAmount, srcDecimals);
+    uint256 destAmount = _transferFromFiller(sourceChainSelector, msg.sender, receiver, srcAmount, sourceDecimals);
     // Record fill
     s_fills[fillId] = FillInfo({state: FillState.FILLED, filler: msg.sender});
     emit FastFill(fillRequestId, fillId, msg.sender, destAmount, receiver);
@@ -333,8 +332,8 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
         message.sourceChainSelector,
         message.messageId,
         message.sender,
-        mintMessage.srcAmountToTransfer,
-        mintMessage.srcDecimals,
+        mintMessage.sourceAmountToTransfer,
+        mintMessage.sourceDecimals,
         mintMessage.fastTransferFee,
         address(uint160(uint256(bytes32(mintMessage.receiver))))
       );
@@ -353,14 +352,14 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   /// @param filler The address of the filler
   /// @param receiver The address of the receiver
   /// @param srcAmount The amount to transfer
-  /// @param srcDecimals The decimals of the source token
+  /// @param sourceDecimals The decimals of the source token
   /// @return destAmount The amount transferred to the receiver on the destination chain
   function _transferFromFiller(
     uint64 sourceChainSelector,
     address filler,
     address receiver,
     uint256 srcAmount,
-    uint8 srcDecimals
+    uint8 sourceDecimals
   ) internal virtual returns (uint256 destAmount);
 
   function _settle(

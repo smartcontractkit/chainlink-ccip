@@ -40,7 +40,7 @@ contract BurnMintFastTransferTokenPool_fastFill is BurnMintFastTransferTokenPool
   }
 
   function test_FastFill_WithDifferentDecimals() public {
-    uint8 srcDecimals = 6; // USDC-like decimals
+    uint8 sourceDecimals = 6; // USDC-like decimals
     uint256 srcAmount = 100e6; // 100 tokens with 6 decimals
     uint256 expectedLocalAmount = 100 ether; // Should be scaled to 18 decimals
 
@@ -48,7 +48,7 @@ contract BurnMintFastTransferTokenPool_fastFill is BurnMintFastTransferTokenPool
     uint256 receiverBalanceBefore = s_burnMintERC20.balanceOf(RECEIVER);
 
     vm.prank(s_filler);
-    s_pool.fastFill(FILL_REQUEST_ID, DEST_CHAIN_SELECTOR, srcAmount, srcDecimals, RECEIVER);
+    s_pool.fastFill(FILL_REQUEST_ID, DEST_CHAIN_SELECTOR, srcAmount, sourceDecimals, RECEIVER);
 
     assertEq(s_burnMintERC20.balanceOf(s_filler), fillerBalanceBefore - expectedLocalAmount);
     assertEq(s_burnMintERC20.balanceOf(RECEIVER), receiverBalanceBefore + expectedLocalAmount);

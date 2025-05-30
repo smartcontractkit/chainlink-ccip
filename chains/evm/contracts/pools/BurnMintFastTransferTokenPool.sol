@@ -44,15 +44,15 @@ contract BurnMintFastTransferTokenPool is ITypeAndVersion, BurnMintTokenPoolAbst
   /// @param filler The address of the filler who filled the fast transfer
   /// @param receiver The address of the receiver who will receive the tokens
   /// @param srcAmount The amount of tokens being transferred from the source chain
-  /// @param srcDecimals The number of decimals of the source token
+  /// @param sourceDecimals The number of decimals of the source token
   function _transferFromFiller(
     uint64 sourceChainSelector,
     address filler,
     address receiver,
     uint256 srcAmount,
-    uint8 srcDecimals
+    uint8 sourceDecimals
   ) internal override returns (uint256 localAmount) {
-    localAmount = _calculateLocalAmount(srcAmount, srcDecimals);
+    localAmount = _calculateLocalAmount(srcAmount, sourceDecimals);
     _consumeInboundRateLimit(sourceChainSelector, localAmount);
     getToken().safeTransferFrom(filler, receiver, localAmount);
     return localAmount;
