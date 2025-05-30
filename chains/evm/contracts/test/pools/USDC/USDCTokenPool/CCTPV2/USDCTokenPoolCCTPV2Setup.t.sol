@@ -15,7 +15,7 @@ contract USDCTokenPoolCCTPV2Setup is USDCCCTPV2Setup {
     super.setUp();
 
     s_usdcTokenPool = new USDCTokenPoolCCTPV2Helper(
-      s_mockUSDC, s_cctpMessageTransmitterProxy, s_supportedUSDCVersions, s_token, new address[](0), address(s_mockRMNRemote), address(s_router)
+      s_mockUSDC, s_cctpMessageTransmitterProxy, s_token, new address[](0), address(s_mockRMNRemote), address(s_router)
     );
 
     CCTPMessageTransmitterProxy.AllowedCallerConfigArgs[] memory allowedCallerParams =
@@ -26,7 +26,7 @@ contract USDCTokenPoolCCTPV2Setup is USDCCCTPV2Setup {
 
     s_allowedList.push(vm.randomAddress());
     s_usdcTokenPoolWithAllowList = new USDCTokenPoolCCTPV2Helper(
-      s_mockUSDC, s_cctpMessageTransmitterProxy, s_supportedUSDCVersions, s_token, s_allowedList, address(s_mockRMNRemote), address(s_router)
+      s_mockUSDC, s_cctpMessageTransmitterProxy, s_token, s_allowedList, address(s_mockRMNRemote), address(s_router)
     );
 
     _poolApplyChainUpdates(address(s_usdcTokenPool));

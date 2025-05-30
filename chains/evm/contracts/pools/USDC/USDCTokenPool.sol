@@ -14,7 +14,8 @@ import {IERC20} from
 import {SafeERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {EnumerableSet} from "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
+import {EnumerableSet} from
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
 
 import {console2 as console} from "forge-std/console2.sol";
 
@@ -65,6 +66,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   ITokenMessenger public immutable i_tokenMessenger;
   CCTPMessageTransmitterProxy public immutable i_messageTransmitterProxy;
   uint32 public immutable i_localDomainIdentifier;
+  uint256 public immutable i_usdcVersion;
 
   /// A domain is a USDC representation of a destination chain.
   /// @dev Zero is a valid domain identifier.
@@ -88,28 +90,25 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   constructor(
     ITokenMessenger tokenMessenger,
     CCTPMessageTransmitterProxy cctpMessageTransmitterProxy,
-    uint256[] memory supportedUSDCVersions,
     IERC20 token,
     address[] memory allowlist,
     address rmnProxy,
-    address router
+    address router,
+    uint256 usdcVersion
   ) TokenPool(token, 6, allowlist, rmnProxy, router) {
-    for(uint256 i = 0; i < supportedUSDCVersions.length; ++i) {
-      console.log(supportedUSDCVersions[i]);
-      s_supportedUSDCVersions.add(supportedUSDCVersions[i]);
-    }
-
+    // TODO: Fix Message Versioning by adding additional constructor parameter
     if (address(tokenMessenger) == address(0)) revert InvalidConfig();
     IMessageTransmitter transmitter = IMessageTransmitter(tokenMessenger.localMessageTransmitter());
     uint32 transmitterVersion = transmitter.version();
-    if (!isSupportedUSDCVersion(transmitterVersion)) revert InvalidMessageVersion(transmitterVersion);
+    if (transmitterVersion != usdcVersion) revert InvalidMessageVersion(transmitterVersion);
     uint32 tokenMessengerVersion = tokenMessenger.messageBodyVersion();
-    if (!isSupportedUSDCVersion(tokenMessengerVersion)) revert InvalidTokenMessengerVersion(tokenMessengerVersion);
+    if (tokenMessengerVersion != usdcVersion) revert InvalidTokenMessengerVersion(tokenMessengerVersion);
     if (cctpMessageTransmitterProxy.i_cctpTransmitter() != transmitter) revert InvalidTransmitterInProxy();
 
     i_tokenMessenger = tokenMessenger;
     i_messageTransmitterProxy = cctpMessageTransmitterProxy;
     i_localDomainIdentifier = transmitter.localDomain();
+    i_usdcVersion = usdcVersion;
     i_token.safeIncreaseAllowance(address(i_tokenMessenger), type(uint256).max);
     emit ConfigSet(address(tokenMessenger));
   }
@@ -202,7 +201,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     // This token pool only supports version 0 of the CCTP message format
     // We check the version prior to loading the rest of the message
     // to avoid unexpected reverts due to out-of-bounds reads.
-    if (!isSupportedUSDCVersion(version)) revert InvalidMessageVersion(version);
+    if (version != i_usdcVersion) revert InvalidMessageVersion(version);
 
     uint32 sourceDomain;
     uint32 destinationDomain;
@@ -251,11 +250,5 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
       });
     }
     emit DomainsSet(domains);
-  }
-
-  // On incoming messages, the message version is checked for support. The version is checked against the enumerable set of 
-  // supported USDC/CCTP Versions.
-  function isSupportedUSDCVersion(uint256 version) public view virtual returns (bool) {
-    return s_supportedUSDCVersions.contains(version);
   }
 }

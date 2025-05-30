@@ -47,8 +47,14 @@ contract USDCSetup is BaseTest {
   address internal constant DEST_CHAIN_USDC_TOKEN = address(0x23598918358198766);
 
   MockUSDCTokenMessenger internal s_mockUSDC;
+  MockUSDCTokenMessenger internal s_mockUSDCV2;
+
   MockE2EUSDCTransmitter internal s_mockUSDCTransmitter;
+  MockE2EUSDCTransmitter internal s_mockUSDCTransmitterV2;
+
   CCTPMessageTransmitterProxy internal s_cctpMessageTransmitterProxy;
+  CCTPMessageTransmitterProxy internal s_cctpMessageTransmitterProxyV2;
+
 
   address internal s_routerAllowedOnRamp = address(3456);
   address internal s_routerAllowedOffRamp = address(234);
@@ -57,7 +63,6 @@ contract USDCSetup is BaseTest {
   uint256[] internal s_supportedUSDCVersions;
 
   IBurnMintERC20 internal s_token;
-  
 
   function setUp() public virtual override {
     super.setUp();
@@ -71,10 +76,19 @@ contract USDCSetup is BaseTest {
     _setUpRamps();
 
     s_mockUSDCTransmitter = new MockE2EUSDCTransmitter(0, DEST_DOMAIN_IDENTIFIER, address(s_token));
+    s_mockUSDCTransmitterV2 = new MockE2EUSDCTransmitter(1, DEST_DOMAIN_IDENTIFIER, address(s_token));
+
     s_mockUSDC = new MockUSDCTokenMessenger(0, address(s_mockUSDCTransmitter));
+    s_mockUSDCV2 = new MockUSDCTokenMessenger(1, address(s_mockUSDCTransmitterV2));
+
     s_cctpMessageTransmitterProxy = new CCTPMessageTransmitterProxy(s_mockUSDC);
+    s_cctpMessageTransmitterProxyV2 = new CCTPMessageTransmitterProxy(s_mockUSDCV2);
+
     usdcToken.grantMintAndBurnRoles(address(s_mockUSDCTransmitter));
+    usdcToken.grantMintAndBurnRoles(address(s_mockUSDCTransmitterV2));
+
     usdcToken.grantMintAndBurnRoles(address(s_mockUSDC));
+    usdcToken.grantMintAndBurnRoles(address(s_mockUSDCV2));
   }
 
   function _poolApplyChainUpdates(

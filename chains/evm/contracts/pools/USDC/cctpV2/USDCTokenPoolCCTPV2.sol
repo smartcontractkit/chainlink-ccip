@@ -15,8 +15,6 @@ import {SafeERC20} from
 import {EnumerableSet} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
 
-import {console2 as console} from "forge-std/console2.sol";
-
 /// @notice This pool mints and burns USDC tokens through the Cross Chain Transfer
 /// Protocol (CCTP) V2, which uses a different contract and message format as V1.
 /// @dev The code for the message transmitter proxy does NOT need to be modified since both CCTP V1 and V2 utilize the same
@@ -38,13 +36,11 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
   constructor(
     ITokenMessenger tokenMessenger,
     CCTPMessageTransmitterProxy cctpMessageTransmitterProxy,
-    uint256[] memory supportedUSDCVersions,
     IERC20 token,
     address[] memory allowlist,
     address rmnProxy,
     address router
-  ) USDCTokenPool(tokenMessenger, cctpMessageTransmitterProxy, supportedUSDCVersions, token, allowlist, rmnProxy, router) {
-  }
+  ) USDCTokenPool(tokenMessenger, cctpMessageTransmitterProxy, token, allowlist, rmnProxy, router, 1) {}
 
   /// @notice Burn tokens from the pool to initiate cross-chain transfer.
   /// @notice Outgoing messages (burn operations) are routed via `i_tokenMessenger.depositForBurnWithCaller`.
@@ -150,7 +146,7 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
     // This token pool only supports version 1 of the CCTP message format
     // We check the version prior to loading the rest of the message
     // to avoid unexpected reverts due to out-of-bounds reads.
-    if (!isSupportedUSDCVersion(version)) revert InvalidMessageVersion(version);
+    if (version != 1) revert InvalidMessageVersion(version);
 
     uint32 messageSourceDomain;
     uint32 destinationDomain;
@@ -182,10 +178,5 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
     if (finalityThresholdExecuted != FINALITY_THRESHOLD) {
       revert InvalidExecutionFinalityThreshold(FINALITY_THRESHOLD, finalityThresholdExecuted);
     }
-
-    console.log("THIS IS A TEST");
-    console.log(finalityThresholdExecuted);
-    console.log(minFinalityThreshold);
   }
-
 }
