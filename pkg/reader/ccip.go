@@ -55,13 +55,23 @@ func newCCIPChainReaderInternal(
 ) *ccipChainReader {
 	var crs = make(map[cciptypes.ChainSelector]contractreader.Extended)
 	var cas = make(map[cciptypes.ChainSelector]cciptypes.ChainAccessor)
+
+	if contractWriters[destChain] == nil || contractReaders[destChain] == nil {
+		panic(fmt.Sprintf("contract writer or contract reader not found for dest chain %d, cr: %v, cw: %v", destChain, contractReaders, contractWriters))
+	}
+
 	for chainSelector, cr := range contractReaders {
 		crs[chainSelector] = contractreader.NewExtendedContractReader(cr)
 
 		if contractWriters[chainSelector] == nil {
 			panic(fmt.Sprintf("contract writer not found for chain %d", chainSelector))
 		}
-		cas[chainSelector] = chain_accessor.NewLegacyAccessor(lggr, chainSelector, crs[chainSelector], contractWriters[chainSelector], addrCodec)
+
+		if contractWriters[chainSelector] == nil {
+			panic(fmt.Sprintf("contract writer not found for chain %d", chainSelector))
+		}
+
+		cas[chainSelector] = chain_accessor.NewLegacyAccessor(lggr, chainSelector, destChain, crs[chainSelector], contractWriters[chainSelector], crs[chainSelector], contractWriters[chainSelector], addrCodec)
 	}
 
 	offrampAddrStr, err := addrCodec.AddressBytesToString(offrampAddress, destChain)
