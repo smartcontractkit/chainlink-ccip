@@ -35,7 +35,7 @@ contract FastTransferTokenPoolHelper_ccipReceive_Test is FastTransferTokenPoolHe
 
   function test_CcipReceive_NotFastFilled() public {
     uint256 receiverBalanceBefore = s_token.balanceOf(receiver);
-    uint256 expectedAmount = srcAmount + fastTransferFee;
+    uint256 expectedAmount = srcAmount;
 
     // Prepare CCIP message
     bytes memory data = abi.encode(
@@ -67,11 +67,12 @@ contract FastTransferTokenPoolHelper_ccipReceive_Test is FastTransferTokenPoolHe
   function test_CcipReceive_FastFilled() public {
     // First, fast fill the request
     vm.prank(s_filler);
-    s_tokenPool.fastFill(messageId, sourceChainSelector, srcAmount, sourceDecimals, receiver);
+    s_tokenPool.fastFill(
+      messageId, sourceChainSelector, srcAmount - (srcAmount * FAST_FEE_BPS / 10_000), sourceDecimals, receiver
+    );
 
     uint256 fillerBalanceBefore = s_token.balanceOf(s_filler);
     uint256 receiverBalanceBefore = s_token.balanceOf(receiver);
-    uint256 expectedReimbursement = srcAmount + fastTransferFee;
 
     // Prepare CCIP message
     bytes memory data = abi.encode(
@@ -79,7 +80,7 @@ contract FastTransferTokenPoolHelper_ccipReceive_Test is FastTransferTokenPoolHe
         receiver: abi.encode(receiver),
         sourceAmountToTransfer: srcAmount,
         sourceDecimals: sourceDecimals,
-        fastTransferFee: fastTransferFee
+        fastTransferFee: srcAmount * FAST_FEE_BPS / 10_000
       })
     );
     Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
@@ -90,14 +91,13 @@ contract FastTransferTokenPoolHelper_ccipReceive_Test is FastTransferTokenPoolHe
       destTokenAmounts: new Client.EVMTokenAmount[](0)
     });
 
-    // Mock router call
-    vm.expectEmit(true, false, false, true);
+    vm.expectEmit();
     emit IFastTransferPool.FastTransferSettled(messageId);
     vm.prank(address(s_sourceRouter));
     s_tokenPool.ccipReceive(message);
 
     // Verify filler was reimbursed (transfer amount + fee)
-    assertEq(s_token.balanceOf(s_filler), fillerBalanceBefore + expectedReimbursement);
+    assertEq(s_token.balanceOf(s_filler), fillerBalanceBefore + srcAmount);
     // Verify receiver balance didn't change (already received from fast fill)
     assertEq(s_token.balanceOf(receiver), receiverBalanceBefore);
   }
@@ -105,9 +105,7 @@ contract FastTransferTokenPoolHelper_ccipReceive_Test is FastTransferTokenPoolHe
   function test_CcipReceive_WithDifferentDecimals() public {
     sourceDecimals = 6; // USDC-like decimals
     srcAmount = 100e6; // 100 tokens with 6 decimals
-    uint256 srcFee = srcAmount * FAST_FEE_BPS / 10000; // 1% fast fee
     uint256 expectedLocalAmount = 100 ether; // Should be scaled to 18 decimals
-    uint256 expectedLocalFee = 1 ether; // Should be scaled to 18 decimals
 
     uint256 receiverBalanceBefore = s_token.balanceOf(receiver);
 
@@ -117,7 +115,7 @@ contract FastTransferTokenPoolHelper_ccipReceive_Test is FastTransferTokenPoolHe
         receiver: abi.encode(receiver),
         sourceAmountToTransfer: srcAmount,
         sourceDecimals: sourceDecimals,
-        fastTransferFee: srcFee
+        fastTransferFee: srcAmount * FAST_FEE_BPS / 10_000
       })
     );
     Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
@@ -132,7 +130,7 @@ contract FastTransferTokenPoolHelper_ccipReceive_Test is FastTransferTokenPoolHe
     s_tokenPool.ccipReceive(message);
 
     // Verify receiver got the scaled amount
-    assertEq(s_token.balanceOf(receiver), receiverBalanceBefore + expectedLocalAmount + expectedLocalFee);
+    assertEq(s_token.balanceOf(receiver), receiverBalanceBefore + expectedLocalAmount);
   }
 
   function test_CcipReceive_ZeroFastTransferFee() public {
@@ -232,46 +230,5 @@ contract FastTransferTokenPoolHelper_ccipReceive_Test is FastTransferTokenPoolHe
     vm.expectRevert();
     vm.prank(makeAddr("notRouter"));
     s_tokenPool.ccipReceive(message);
-  }
-
-  function test_CcipReceive_FastFilledThenSettled_Integration() public {
-    // Step 1: Fast fill
-    uint256 fillerBalanceBefore = s_token.balanceOf(s_filler);
-    uint256 receiverBalanceBefore = s_token.balanceOf(receiver);
-
-    vm.prank(s_filler);
-    s_tokenPool.fastFill(messageId, sourceChainSelector, srcAmount, sourceDecimals, receiver);
-
-    // Verify fast fill worked
-    assertEq(s_token.balanceOf(s_filler), fillerBalanceBefore - srcAmount);
-    assertEq(s_token.balanceOf(receiver), receiverBalanceBefore + srcAmount);
-
-    // Step 2: Settlement
-    uint256 fillerBalanceAfterFill = s_token.balanceOf(s_filler);
-    uint256 receiverBalanceAfterFill = s_token.balanceOf(receiver);
-
-    bytes memory data = abi.encode(
-      FastTransferTokenPoolAbstract.MintMessage({
-        receiver: abi.encode(receiver),
-        sourceAmountToTransfer: srcAmount,
-        sourceDecimals: sourceDecimals,
-        fastTransferFee: fastTransferFee
-      })
-    );
-    Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
-      messageId: messageId,
-      sourceChainSelector: sourceChainSelector,
-      sender: abi.encode(sourcePool),
-      data: data,
-      destTokenAmounts: new Client.EVMTokenAmount[](0)
-    });
-
-    vm.prank(address(s_sourceRouter));
-    s_tokenPool.ccipReceive(message);
-
-    // Verify filler was reimbursed (original amount + fee)
-    assertEq(s_token.balanceOf(s_filler), fillerBalanceAfterFill + srcAmount + fastTransferFee);
-    // Verify receiver balance didn't change (already got tokens from fast fill)
-    assertEq(s_token.balanceOf(receiver), receiverBalanceAfterFill);
   }
 }

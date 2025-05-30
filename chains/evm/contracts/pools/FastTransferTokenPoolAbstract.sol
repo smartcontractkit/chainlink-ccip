@@ -267,7 +267,6 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     bytes calldata receiver,
     bytes calldata extraArgs
   ) external payable virtual override returns (bytes32 fillRequestId) {
-    // burn/lock tokens + pay fastFee (in _handleTokenToTransfer)
     (Quote memory quote, Client.EVM2AnyMessage memory message) =
       _getFeeQuoteAndCCIPMessage(feeToken, destinationChainSelector, amount, receiver, extraArgs);
     _consumeOutboundRateLimit(destinationChainSelector, amount);
@@ -421,8 +420,8 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     _validateSettlement(sourceChainSelector, sourcePoolAddress);
 
     uint256 localAmount = _calculateLocalAmount(srcAmount, srcDecimal);
-    uint256 localFeeAmount = _calculateLocalAmount(fastTransferFee, srcDecimal);
-    bytes32 fillId = computeFillId(fillRequestId, localAmount-localFeeAmount, receiver);
+    uint256 localFastTransferFeeAmount = _calculateLocalAmount(fastTransferFee, srcDecimal);
+    bytes32 fillId = _computeFillId(fillRequestId, localAmount - localFastTransferFeeAmount, receiver);
     FillInfo memory fillInfo = s_fills[fillId];
 
     if (fillInfo.state == FillState.NOT_FILLED) {

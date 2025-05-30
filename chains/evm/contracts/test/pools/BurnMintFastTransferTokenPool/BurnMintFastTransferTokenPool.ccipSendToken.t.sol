@@ -54,7 +54,7 @@ contract BurnMintFastTransferTokenPool_ccipSendToken is BurnMintFastTransferToke
     );
 
     assertEq(fillRequestId, MESSAGE_ID);
-    assertEq(s_burnMintERC20.balanceOf(OWNER), balanceBefore - TRANSFER_AMOUNT - expectedFastFee);
+    assertEq(s_burnMintERC20.balanceOf(OWNER), balanceBefore - TRANSFER_AMOUNT);
   }
 
   function test_CcipSendToken_WithERC20FeeToken() public {
@@ -70,9 +70,7 @@ contract BurnMintFastTransferTokenPool_ccipSendToken is BurnMintFastTransferToke
 
     assertTrue(fillRequestId != bytes32(0));
     uint256 expectedFastFee = (TRANSFER_AMOUNT * FAST_FEE_BPS) / 10_000;
-    assertEq(
-      s_burnMintERC20.balanceOf(OWNER), balanceBefore - TRANSFER_AMOUNT - expectedFastFee - quote.ccipSettlementFee
-    );
+    assertEq(s_burnMintERC20.balanceOf(OWNER), balanceBefore - TRANSFER_AMOUNT - quote.ccipSettlementFee);
   }
 
   function test_CcipSendToken_ToSVM() public {}

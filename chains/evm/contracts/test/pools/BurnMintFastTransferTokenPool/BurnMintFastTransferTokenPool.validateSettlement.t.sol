@@ -26,7 +26,7 @@ contract BurnMintFastTransferTokenPool_validateSettlement is BurnMintFastTransfe
     s_pool.ccipReceive(message);
 
     // Verify the message was processed successfully
-    assertEq(s_burnMintERC20.balanceOf(RECEIVER), TRANSFER_AMOUNT + TRANSFER_AMOUNT * FAST_FEE_BPS / 10_000);
+    assertEq(s_burnMintERC20.balanceOf(RECEIVER), TRANSFER_AMOUNT);
   }
 
   function test_ValidateSettlement_RevertWhen_CursedByRMN() public {

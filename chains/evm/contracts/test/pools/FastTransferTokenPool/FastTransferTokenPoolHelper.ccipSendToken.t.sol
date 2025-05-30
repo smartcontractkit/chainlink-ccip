@@ -5,8 +5,9 @@ import {IFastTransferPool} from "../../../interfaces/IFastTransferPool.sol";
 import {IRouterClient} from "../../../interfaces/IRouterClient.sol";
 import {Client} from "../../../libraries/Client.sol";
 import {Internal} from "../../../libraries/Internal.sol";
-import {TokenPool} from "../../../pools/TokenPool.sol";
+
 import {FastTransferTokenPoolAbstract} from "../../../pools/FastTransferTokenPoolAbstract.sol";
+import {TokenPool} from "../../../pools/TokenPool.sol";
 import {FastTransferTokenPoolHelperSetup} from "./FastTransferTokenPoolHelperSetup.t.sol";
 
 contract FastTransferTokenPoolHelper_ccipSendToken_Test is FastTransferTokenPoolHelperSetup {
@@ -22,7 +23,9 @@ contract FastTransferTokenPoolHelper_ccipSendToken_Test is FastTransferTokenPool
     super.setUp();
   }
 
-  function _setupTestParams(uint64 chainSelector) internal pure returns (TestParams memory) {
+  function _setupTestParams(
+    uint64 chainSelector
+  ) internal pure returns (TestParams memory) {
     uint256 amount = 100e18;
     return TestParams({
       chainSelector: chainSelector,
@@ -33,10 +36,15 @@ contract FastTransferTokenPoolHelper_ccipSendToken_Test is FastTransferTokenPool
     });
   }
 
-  function _setupChainConfig(uint64 chainSelector, bytes4 chainFamily, uint32 settlementGas, bytes memory extraArgs) internal {
+  function _setupChainConfig(
+    uint64 chainSelector,
+    bytes4 chainFamily,
+    uint32 settlementGas,
+    bytes memory extraArgs
+  ) internal {
     address[] memory addFillers = new address[](1);
     addFillers[0] = s_filler;
-    
+
     FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs memory laneConfigArgs = FastTransferTokenPoolAbstract
       .DestChainConfigUpdateArgs({
       remoteChainSelector: chainSelector,
@@ -55,7 +63,9 @@ contract FastTransferTokenPoolHelper_ccipSendToken_Test is FastTransferTokenPool
     _setupRateLimiter(chainSelector);
   }
 
-  function _setupRateLimiter(uint64 chainSelector) internal {
+  function _setupRateLimiter(
+    uint64 chainSelector
+  ) internal {
     bytes[] memory remotePoolAddresses = new bytes[](1);
     remotePoolAddresses[0] = destPoolAddress;
     TokenPool.ChainUpdate[] memory chainUpdate = new TokenPool.ChainUpdate[](1);
@@ -69,14 +79,19 @@ contract FastTransferTokenPoolHelper_ccipSendToken_Test is FastTransferTokenPool
     s_tokenPool.applyChainUpdates(new uint64[](0), chainUpdate);
   }
 
-  function _setupMocks(bytes32 mockMessageId) internal {
+  function _setupMocks(
+    bytes32 mockMessageId
+  ) internal {
     vm.mockCall(address(s_sourceRouter), abi.encodeWithSelector(IRouterClient.getFee.selector), abi.encode(1 ether));
     vm.mockCall(
       address(s_sourceRouter), abi.encodeWithSelector(IRouterClient.ccipSend.selector), abi.encode(mockMessageId)
     );
   }
 
-  function _createMessage(TestParams memory params, bytes memory extraArgs) internal view returns (Client.EVM2AnyMessage memory) {
+  function _createMessage(
+    TestParams memory params,
+    bytes memory extraArgs
+  ) internal view returns (Client.EVM2AnyMessage memory) {
     return Client.EVM2AnyMessage({
       receiver: destPoolAddress,
       data: abi.encode(
@@ -95,17 +110,20 @@ contract FastTransferTokenPoolHelper_ccipSendToken_Test is FastTransferTokenPool
 
   function _executeTest(TestParams memory params, bytes memory extraArgs) internal {
     _setupMocks(params.mockMessageId);
-    
+
     Client.EVM2AnyMessage memory message = _createMessage(params, extraArgs);
-    
+
     vm.expectCall(
       address(s_sourceRouter), abi.encodeWithSelector(IRouterClient.ccipSend.selector, params.chainSelector, message)
     );
     vm.expectEmit();
-    emit IFastTransferPool.FastTransferRequested(params.mockMessageId, params.chainSelector, params.amount, params.fastFeeExpected, params.receiver);
+    emit IFastTransferPool.FastTransferRequested(
+      params.mockMessageId, params.chainSelector, params.amount, params.fastFeeExpected, params.receiver
+    );
 
     uint256 balanceBefore = s_token.balanceOf(OWNER);
-    bytes32 fillRequestId = s_tokenPool.ccipSendToken{value: 1 ether}(address(0), params.chainSelector, params.amount, params.receiver, "");
+    bytes32 fillRequestId =
+      s_tokenPool.ccipSendToken{value: 1 ether}(address(0), params.chainSelector, params.amount, params.receiver, "");
 
     assertEq(fillRequestId, params.mockMessageId);
     assertEq(s_token.balanceOf(OWNER), balanceBefore - params.amount);
@@ -114,11 +132,11 @@ contract FastTransferTokenPoolHelper_ccipSendToken_Test is FastTransferTokenPool
 
   function test_CcipSendToken_NativeFee() public {
     TestParams memory params = _setupTestParams(DEST_CHAIN_SELECTOR);
-    
+
     bytes memory extraArgs = Client._argsToBytes(
       Client.GenericExtraArgsV2({gasLimit: SETTLEMENT_GAS_OVERHEAD, allowOutOfOrderExecution: true})
     );
-    
+
     _executeTest(params, extraArgs);
   }
 
@@ -130,20 +148,20 @@ contract FastTransferTokenPoolHelper_ccipSendToken_Test is FastTransferTokenPool
   function test_CcipSendToken_APTOS_WithSettlementGas() public {
     uint64 testChainSelector = uint64(uint256(keccak256("APTOS_WITH_GAS")));
     TestParams memory params = _setupTestParams(testChainSelector);
-    
+
     _setupChainConfig(testChainSelector, Internal.CHAIN_FAMILY_SELECTOR_APTOS, SETTLEMENT_GAS_OVERHEAD, "");
-    
+
     bytes memory extraArgs = Client._argsToBytes(
       Client.GenericExtraArgsV2({gasLimit: SETTLEMENT_GAS_OVERHEAD, allowOutOfOrderExecution: true})
     );
-    
+
     _executeTest(params, extraArgs);
   }
 
   function test_CcipSendToken_APTOS_WithZeroSettlementGas() public {
     uint64 testChainSelector = uint64(uint256(keccak256("APTOS_ZERO_GAS")));
     TestParams memory params = _setupTestParams(testChainSelector);
-    
+
     bytes memory customExtraArgs = abi.encode("aptosCustomExtraArgs");
     _setupChainConfig(testChainSelector, Internal.CHAIN_FAMILY_SELECTOR_APTOS, 0, customExtraArgs);
     _executeTest(params, customExtraArgs);
@@ -152,20 +170,20 @@ contract FastTransferTokenPoolHelper_ccipSendToken_Test is FastTransferTokenPool
   function test_CcipSendToken_SUI_WithSettlementGas() public {
     uint64 testChainSelector = uint64(uint256(keccak256("SUI_WITH_GAS")));
     TestParams memory params = _setupTestParams(testChainSelector);
-    
+
     _setupChainConfig(testChainSelector, Internal.CHAIN_FAMILY_SELECTOR_SUI, SETTLEMENT_GAS_OVERHEAD, "");
-    
+
     bytes memory extraArgs = Client._argsToBytes(
       Client.GenericExtraArgsV2({gasLimit: SETTLEMENT_GAS_OVERHEAD, allowOutOfOrderExecution: true})
     );
-    
+
     _executeTest(params, extraArgs);
   }
 
   function test_CcipSendToken_SUI_WithZeroSettlementGas() public {
     uint64 testChainSelector = uint64(uint256(keccak256("SUI_ZERO_GAS")));
     TestParams memory params = _setupTestParams(testChainSelector);
-    
+
     bytes memory customExtraArgs = abi.encode("suiCustomExtraArgs");
     _setupChainConfig(testChainSelector, Internal.CHAIN_FAMILY_SELECTOR_SUI, 0, customExtraArgs);
     _executeTest(params, customExtraArgs);
