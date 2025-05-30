@@ -13,7 +13,11 @@ contract LockReleaseTokenPool_lockOrBurn is LockReleaseTokenPoolSetup {
     vm.startPrank(s_allowedOnRamp);
 
     vm.expectEmit();
-    emit TokenPool.OutboundRateLimitConsumed(address(s_token), DEST_CHAIN_SELECTOR, amount);
+    emit TokenPool.OutboundRateLimitConsumed({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      token: address(s_token),
+      amount: amount
+    });
 
     vm.expectEmit();
     emit TokenPool.LockedOrBurned({
@@ -39,7 +43,11 @@ contract LockReleaseTokenPool_lockOrBurn is LockReleaseTokenPoolSetup {
     vm.startPrank(s_allowedOnRamp);
 
     vm.expectEmit();
-    emit TokenPool.OutboundRateLimitConsumed(address(s_token), DEST_CHAIN_SELECTOR, amount);
+    emit TokenPool.OutboundRateLimitConsumed({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      token: address(s_token),
+      amount: amount
+    });
 
     vm.expectEmit();
     emit TokenPool.LockedOrBurned({

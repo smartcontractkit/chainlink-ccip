@@ -81,8 +81,8 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   event AllowListRemove(address sender);
   event RouterUpdated(address oldRouter, address newRouter);
   event RateLimitAdminSet(address rateLimitAdmin);
-  event OutboundRateLimitConsumed(address token, uint64 indexed remoteChainSelector, uint256 amount);
-  event InboundRateLimitConsumed(address token, uint64 indexed remoteChainSelector, uint256 amount);
+  event OutboundRateLimitConsumed(uint64 indexed remoteChainSelector, address token, uint256 amount);
+  event InboundRateLimitConsumed(uint64 indexed remoteChainSelector, address token, uint256 amount);
 
   struct ChainUpdate {
     uint64 remoteChainSelector; // Remote chain selector

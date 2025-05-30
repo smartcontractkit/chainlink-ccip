@@ -20,7 +20,11 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
     USDCTokenPool.Domain memory expectedDomain = s_usdcTokenPool.getDomain(DEST_CHAIN_SELECTOR);
 
     vm.expectEmit();
-    emit TokenPool.OutboundRateLimitConsumed(address(s_token), DEST_CHAIN_SELECTOR, amount);
+    emit TokenPool.OutboundRateLimitConsumed({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      token: address(s_token),
+      amount: amount
+    });
 
     vm.expectEmit();
     emit ITokenMessenger.DepositForBurn(
@@ -65,7 +69,11 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
     USDCTokenPool.Domain memory expectedDomain = s_usdcTokenPool.getDomain(DEST_CHAIN_SELECTOR);
 
     vm.expectEmit();
-    emit TokenPool.OutboundRateLimitConsumed(address(s_token), DEST_CHAIN_SELECTOR, amount);
+    emit TokenPool.OutboundRateLimitConsumed({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      token: address(s_token),
+      amount: amount
+    });
 
     vm.expectEmit();
     emit ITokenMessenger.DepositForBurn(
@@ -111,7 +119,11 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
     USDCTokenPool.Domain memory expectedDomain = s_usdcTokenPoolWithAllowList.getDomain(DEST_CHAIN_SELECTOR);
 
     vm.expectEmit();
-    emit TokenPool.OutboundRateLimitConsumed(address(s_token), DEST_CHAIN_SELECTOR, amount);
+    emit TokenPool.OutboundRateLimitConsumed({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      token: address(s_token),
+      amount: amount
+    });
 
     vm.expectEmit();
     emit ITokenMessenger.DepositForBurn(

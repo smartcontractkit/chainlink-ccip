@@ -25,7 +25,11 @@ contract BurnFromMintTokenPool_lockOrBurn is BurnFromMintTokenPoolSetup {
     vm.startPrank(s_burnMintOnRamp);
 
     vm.expectEmit();
-    emit TokenPool.OutboundRateLimitConsumed(address(s_burnMintERC20), DEST_CHAIN_SELECTOR, burnAmount);
+    emit TokenPool.OutboundRateLimitConsumed({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      token: address(s_burnMintERC20),
+      amount: burnAmount
+    });
 
     vm.expectEmit();
     emit IERC20.Transfer(address(s_pool), address(0), burnAmount);
