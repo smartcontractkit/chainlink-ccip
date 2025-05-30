@@ -84,10 +84,8 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
     USDCTokenPool(tokenMessenger, cctpMessageTransmitterProxy, token, allowlist, rmnProxy, router, 0)
     USDCBridgeMigrator(address(token))
   {
-    // The following code has been duplicated exactly from USDC Token Pool but with the only difference being
-    // checks for version 1 and uses tokenMessengerV2 and cctpMessageTransmitterProxyV2 for CCTP V2.
-    // This is because of Solidity's limited inheritance capabilities makes it impossible to run the constructor
-    // for USDCTokenPool twice with different parameters, so it has been duplicated here.
+    // The following code has been duplicated exactly from USDC Token Pool but with the only difference being checks for version 1 and uses tokenMessengerV2 and cctpMessageTransmitterProxyV2 for CCTP V2.
+    // This is because of Solidity's limited inheritance capabilities makes it impossible to run the constructor for USDCTokenPool twice with different parameters, so it has been duplicated here.
     // NOTE: Even though it is officially referred to as Version 1, CCTP V1 contracts
     // use the version #0, and CCTP V2 contracts return a version number #1, so a contract
     // interacting with CCTPV2 will look for it to return the version number of 1.
@@ -305,7 +303,6 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
       abi.decode(releaseOrMintIn.offchainTokenData, (MessageAndAttestation));
 
     _validateMessageCCTPV2(msgAndAttestation.message, sourceDomainIdentifier);
-
 
     if (!i_cctpMessageTransmitterProxyCCTPV2.receiveMessage(msgAndAttestation.message, msgAndAttestation.attestation)) {
       revert UnlockingUSDCFailed();

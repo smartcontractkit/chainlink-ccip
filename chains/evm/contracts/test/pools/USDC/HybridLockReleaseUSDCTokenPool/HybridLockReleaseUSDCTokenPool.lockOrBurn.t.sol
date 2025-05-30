@@ -3,13 +3,13 @@ pragma solidity ^0.8.24;
 
 import {ITokenMessenger} from "../../../../pools/USDC/ITokenMessenger.sol";
 
+import {Router} from "../../../../Router.sol";
 import {Pool} from "../../../../libraries/Pool.sol";
 import {RateLimiter} from "../../../../libraries/RateLimiter.sol";
 import {TokenPool} from "../../../../pools/TokenPool.sol";
 import {HybridLockReleaseUSDCTokenPool} from "../../../../pools/USDC/HybridLockReleaseUSDCTokenPool.sol";
 import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
 import {HybridLockReleaseUSDCTokenPoolSetup} from "./HybridLockReleaseUSDCTokenPoolSetup.t.sol";
-import {Router} from "../../../../Router.sol";
 
 contract HybridLockReleaseUSDCTokenPool_lockOrBurn is HybridLockReleaseUSDCTokenPoolSetup {
   function test_onLockReleaseMechanism() public {
@@ -218,7 +218,6 @@ contract HybridLockReleaseUSDCTokenPool_lockOrBurn is HybridLockReleaseUSDCToken
     // Update the config of the pool to tell it to use CCTP V2 instead of V1
     s_usdcTokenPool.updateCCTPVersion(remoteChainSelectors, versions);
 
-
     vm.startPrank(s_routerAllowedOnRamp);
 
     // Generate a 33-byte long string to use as invalid receiver for CCTP V2
@@ -240,8 +239,10 @@ contract HybridLockReleaseUSDCTokenPool_lockOrBurn is HybridLockReleaseUSDCToken
   function test_RevertWhen_UnknownDomain() public {
     vm.startPrank(OWNER);
 
+    uint64 wrongDomain = DEST_CHAIN_SELECTOR + 1;
+
     uint64[] memory remoteChainSelectors = new uint64[](1);
-    remoteChainSelectors[0] = DEST_CHAIN_SELECTOR;
+    remoteChainSelectors[0] = wrongDomain;
 
     HybridLockReleaseUSDCTokenPool.CCTPVersion[] memory versions = new HybridLockReleaseUSDCTokenPool.CCTPVersion[](1);
     versions[0] = HybridLockReleaseUSDCTokenPool.CCTPVersion.VERSION_2;
@@ -249,7 +250,6 @@ contract HybridLockReleaseUSDCTokenPool_lockOrBurn is HybridLockReleaseUSDCToken
     // Update the config of the pool to tell it to use CCTP V2 instead of V1
     s_usdcTokenPool.updateCCTPVersion(remoteChainSelectors, versions);
 
-    uint64 wrongDomain = DEST_CHAIN_SELECTOR + 1;
     // We need to setup the wrong chainSelector so it reaches the domain check
     Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](1);
     onRampUpdates[0] = Router.OnRamp({destChainSelector: wrongDomain, onRamp: s_routerAllowedOnRamp});

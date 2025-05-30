@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {HybridLockReleaseUSDCTokenPool} from "../../../../pools/USDC/HybridLockReleaseUSDCTokenPool.sol";
 import {USDCSetup} from "../USDCSetup.t.sol";
 
-contract HybridLockReleaseUSDCTokenPoolSetup is USDCSetup {
+contract USDCBridgeMigratorSetup is USDCSetup {
   HybridLockReleaseUSDCTokenPool internal s_usdcTokenPool;
   HybridLockReleaseUSDCTokenPool internal s_usdcTokenPoolTransferLiquidity;
 
