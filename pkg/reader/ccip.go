@@ -23,6 +23,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/addressbook"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
@@ -42,6 +43,7 @@ type ccipChainReader struct {
 	offrampAddress  string
 	configPoller    ConfigPoller
 	addrCodec       cciptypes.AddressCodec
+	donAddressBook  addressbook.IBook
 }
 
 func newCCIPChainReaderInternal(
@@ -70,6 +72,7 @@ func newCCIPChainReaderInternal(
 		destChain:       destChain,
 		offrampAddress:  offrampAddrStr,
 		addrCodec:       addrCodec,
+		donAddressBook:  addressbook.NewBook(),
 	}
 
 	// Initialize cache with readers
@@ -1287,6 +1290,14 @@ func (r *ccipChainReader) DiscoverContracts(ctx context.Context,
 
 // Sync goes through the input contracts and binds them to the contract reader.
 func (r *ccipChainReader) Sync(ctx context.Context, contracts ContractAddresses) error {
+	newAddressBookState := make(addressbook.ContractAddresses)
+	for name, addrs := range contracts {
+		newAddressBookState[addressbook.ContractName(name)] = addrs
+	}
+	if err := r.donAddressBook.AppendState(newAddressBookState); err != nil {
+		return fmt.Errorf("set address book state: %w", err)
+	}
+
 	lggr := logutil.WithContextValues(ctx, r.lggr)
 	var errs []error
 	for contractName, chainSelToAddress := range contracts {
@@ -1319,22 +1330,7 @@ func (r *ccipChainReader) Sync(ctx context.Context, contracts ContractAddresses)
 }
 
 func (r *ccipChainReader) GetContractAddress(contractName string, chain cciptypes.ChainSelector) ([]byte, error) {
-	extendedReader, ok := r.contractReaders[chain]
-	if !ok {
-		return nil, fmt.Errorf("contract reader not found for chain %d", chain)
-	}
-
-	bindings := extendedReader.GetBindings(contractName)
-	if len(bindings) != 1 {
-		return nil, fmt.Errorf("expected one binding for the %s contract, got %d", contractName, len(bindings))
-	}
-
-	addressBytes, err := r.addrCodec.AddressStringToBytes(bindings[0].Binding.Address, chain)
-	if err != nil {
-		return nil, fmt.Errorf("convert address %s to bytes: %w", bindings[0].Binding.Address, err)
-	}
-
-	return addressBytes, nil
+	return r.donAddressBook.GetContractAddress(addressbook.ContractName(contractName), chain)
 }
 
 // LinkPriceUSD gets the LINK price in 1e-18 USDs from the FeeQuoter contract on the destination chain.

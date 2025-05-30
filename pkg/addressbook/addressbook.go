@@ -4,7 +4,6 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
@@ -18,50 +17,33 @@ var (
 type ContractName string
 type ContractAddresses map[ContractName]map[ccipocr3.ChainSelector]ccipocr3.UnknownAddress
 
-// DonRead represents an address book read operations for a Decentralized Oracle Network (DON),
-// either for commit or execute plugin. It ensures that all oracles within the network have a
+// IBook represents an address book operations for a Decentralized Oracle Network (DON),
+// can be used either for commit or execute plugin. It ensures that all oracles within the network have a
 // consistent and synchronized view of the address book.
-type DonRead interface {
-	GetOnRampAddress(sourceChain ccipocr3.ChainSelector) (ccipocr3.UnknownAddress, error)
-	GetOffRampAddress() (ccipocr3.UnknownAddress, error)
+type IBook interface {
+	GetContractAddress(name ContractName, chain ccipocr3.ChainSelector) (ccipocr3.UnknownAddress, error)
+	AppendState(addresses ContractAddresses) error
 }
 
-// DonWrite represents an address book write operations for a Decentralized Oracle Network (DON).
-// It allows the address book to be updated with new contract addresses, ensuring that all oracles
-// within the network can access the latest information.
-type DonWrite interface {
-	SetState(addresses ContractAddresses) error
+type Book struct {
+	mem ContractAddresses
+	mu  *sync.RWMutex
 }
 
-type DON struct {
-	mem       ContractAddresses
-	destChain ccipocr3.ChainSelector
-	mu        *sync.RWMutex
-}
-
-func NewDon(destChain ccipocr3.ChainSelector) *DON {
-	return &DON{
-		mem:       make(ContractAddresses),
-		destChain: destChain,
-		mu:        &sync.RWMutex{},
+func NewBook() *Book {
+	return &Book{
+		mem: make(ContractAddresses),
+		mu:  &sync.RWMutex{},
 	}
 }
 
-func (d *DON) GetOnRampAddress(sourceChain ccipocr3.ChainSelector) ([]byte, error) {
-	return d.getContractAddress(consts.ContractNameOnRamp, sourceChain)
-}
-
-func (d *DON) GetOffRampAddress() ([]byte, error) {
-	return d.getContractAddress(consts.ContractNameOffRamp, d.destChain)
-}
-
-func (d *DON) getContractAddress(contractName ContractName, chain ccipocr3.ChainSelector) (ccipocr3.UnknownAddress, error) {
-	d.mu.RLock()
-	if len(d.mem) == 0 {
+func (b *Book) GetContractAddress(name ContractName, chain ccipocr3.ChainSelector) (ccipocr3.UnknownAddress, error) {
+	b.mu.RLock()
+	if len(b.mem) == 0 {
 		return nil, ErrAddressBookNotInitialized
 	}
-	contractOnAllChains, ok := d.mem[contractName]
-	d.mu.RUnlock()
+	contractOnAllChains, ok := b.mem[name]
+	b.mu.RUnlock()
 
 	if !ok {
 		return nil, ErrContractNotRegistered
@@ -79,9 +61,20 @@ func (d *DON) getContractAddress(contractName ContractName, chain ccipocr3.Chain
 	return contractAddr, nil
 }
 
-func (d *DON) SetState(addresses ContractAddresses) error {
-	d.mu.Lock()
-	d.mem = addresses
-	d.mu.Unlock()
+func (b *Book) AppendState(addresses ContractAddresses) error {
+	b.mu.Lock()
+	for name, chains := range addresses {
+		if _, ok := b.mem[name]; !ok {
+			// if contract does not exist just set the state
+			b.mem[name] = chains
+			continue
+		}
+
+		// if contract exists, set or replace any existing address for each chain
+		for chain, addr := range chains {
+			b.mem[name][chain] = addr
+		}
+	}
+	b.mu.Unlock()
 	return nil
 }
