@@ -200,9 +200,12 @@ library Internal {
   /// - 32 bytes: account_id
   /// - 2 bytes: CRC16 checksum(computationally heavy, validation omitted for simplicity)
   /// @param encodedAddress The 36-byte TON address.
-  function _validateTVMAddress(bytes memory encodedAddress) internal pure {
-    if (encodedAddress.length != 36)
+  function _validateTVMAddress(
+    bytes memory encodedAddress
+  ) internal pure {
+    if (encodedAddress.length != 36) {
       revert InvalidTVMAddress(encodedAddress);
+    }
 
     // check if the address is in the basechain
     if (encodedAddress[1] != 0x00) {
