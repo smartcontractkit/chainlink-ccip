@@ -656,6 +656,10 @@ func (r *ccipChainReader) GetExpectedNextSequenceNumber(
 func (r *ccipChainReader) NextSeqNum(
 	ctx context.Context, chains []cciptypes.ChainSelector,
 ) (map[cciptypes.ChainSelector]cciptypes.SeqNum, error) {
+	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
+		return nil, err
+	}
+
 	lggr := logutil.WithContextValues(ctx, r.lggr)
 
 	// Use our direct fetch method that doesn't affect the cache
@@ -875,7 +879,7 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 	for _, chain := range selectors {
 		reader, ok := r.contractReaders[chain]
 		if !ok {
-			lggr.Warnw("contract reader not found", "chain", chain)
+			lggr.Errorw("contract reader not found, chain native price skipped", "chain", chain)
 			continue
 		}
 
@@ -929,7 +933,7 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 func (r *ccipChainReader) GetChainFeePriceUpdate(ctx context.Context, selectors []cciptypes.ChainSelector) map[cciptypes.ChainSelector]cciptypes.TimestampedBig {
 	lggr := logutil.WithContextValues(ctx, r.lggr)
 	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
-		lggr.Debugw("GetChainFeePriceUpdate dest chain extended reader not exist, dest chain not supported", "err", err)
+		lggr.Errorw("GetChainFeePriceUpdate dest chain extended reader not exist, dest chain not supported", "err", err)
 		return nil
 	}
 
@@ -1059,6 +1063,10 @@ func (r *ccipChainReader) buildSigners(signers []signer) []cciptypes.RemoteSigne
 
 func (r *ccipChainReader) GetRMNRemoteConfig(ctx context.Context) (cciptypes.RemoteConfig, error) {
 	lggr := logutil.WithContextValues(ctx, r.lggr)
+
+	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
+		return cciptypes.RemoteConfig{}, fmt.Errorf("validate dest=%d extended reader existence: %w", r.destChain, err)
+	}
 
 	config, err := r.configPoller.GetChainConfig(ctx, r.destChain)
 	if err != nil {
@@ -1681,6 +1689,10 @@ func (r *ccipChainReader) GetLatestPriceSeqNr(ctx context.Context) (uint64, erro
 }
 
 func (r *ccipChainReader) GetOffRampConfigDigest(ctx context.Context, pluginType uint8) ([32]byte, error) {
+	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
+		return [32]byte{}, fmt.Errorf("validate dest=%d extended reader existence: %w", r.destChain, err)
+	}
+
 	config, err := r.configPoller.GetChainConfig(ctx, r.destChain)
 	if err != nil {
 		return [32]byte{}, fmt.Errorf("get chain config: %w", err)

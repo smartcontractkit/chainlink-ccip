@@ -6,6 +6,9 @@ import (
 	"testing"
 	"time"
 
+	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/smartcontractkit/libocr/commontypes"
+	"github.com/smartcontractkit/libocr/ragep2p/types"
 	"github.com/stretchr/testify/mock"
 
 	"github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
@@ -637,6 +640,7 @@ func Test_getMessagesObservation(t *testing.T) {
 			estimateProvider := ccipocr3.NewMockEstimateProvider(t)
 			inflightCache := cache.NewInflightMessageCache(inflightCacheTTL)
 			codec := codec_mock.NewMockExecCodec(t)
+			homeChain := reader.NewMockHomeChain(t)
 			tokenDataObserver := observer.NoopTokenDataObserver{}
 
 			plugin := &Plugin{
@@ -647,10 +651,17 @@ func Test_getMessagesObservation(t *testing.T) {
 				estimateProvider:     estimateProvider,
 				inflightMessageCache: inflightCache,
 				tokenDataObserver:    &tokenDataObserver,
+				homeChain:            homeChain,
 				offchainCfg: pluginconfig.ExecuteOffchainConfig{
 					BatchGasLimit: uint64(batchGasLimit),
 				},
+				oracleIDToP2pID: map[commontypes.OracleID]types.PeerID{
+					commontypes.OracleID(0): {12},
+				},
 			}
+
+			homeChain.EXPECT().GetSupportedChainsForPeer(types.PeerID{12}).
+				Return(mapset.NewSet(src1, src2), nil).Maybe()
 
 			tt.setupMocks(ccipReader, estimateProvider, inflightCache, codec)
 
