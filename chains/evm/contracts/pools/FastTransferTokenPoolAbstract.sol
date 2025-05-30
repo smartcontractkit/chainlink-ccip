@@ -18,16 +18,20 @@ import {SafeERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC165} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/IERC165.sol";
+import {EnumerableSet} from
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableSet.sol";
 
 /// @title Abstract Fast-Transfer Pool
 /// @notice Base contract for fast-transfer pools that provides common functionality
 /// for quoting, fill-tracking, and CCIP send helpers.
 abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITypeAndVersion, IFastTransferPool {
   using SafeERC20 for IERC20;
+  using EnumerableSet for EnumerableSet.AddressSet;
 
   error WhitelistNotEnabled();
   error InvalidDestChainConfig();
   error FillerNotWhitelisted(uint64 remoteChainSelector, address filler);
+  error TransferAmountExceedsMaxFillAmount(uint64 remoteChainSelector, uint256 amount);
 
   event LaneUpdated(
     uint64 indexed destinationChainSelector,
@@ -45,7 +49,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     uint16 fastTransferBpsFee; // ─────╮ 0-10_000
     bool fillerAllowlistEnabled; // ───╯ whitelist for fillers
     bytes destinationPool; // destination pool address
-    mapping(address filler => bool isAllowed) fillerAllowList; // whitelist of fillers
+    EnumerableSet.AddressSet fillerAllowList; // enumerable set of allowed fillers
   }
 
   struct DestChainConfigView {
@@ -127,10 +131,10 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     laneConfig.fillerAllowlistEnabled = laneConfigArgs.fillerAllowlistEnabled;
     laneConfig.maxFillAmountPerRequest = laneConfigArgs.maxFillAmountPerRequest;
     for (uint256 i; i < laneConfigArgs.removeFillers.length; ++i) {
-      laneConfig.fillerAllowList[laneConfigArgs.removeFillers[i]] = false;
+      laneConfig.fillerAllowList.remove(laneConfigArgs.removeFillers[i]);
     }
     for (uint256 i; i < laneConfigArgs.addFillers.length; ++i) {
-      laneConfig.fillerAllowList[laneConfigArgs.addFillers[i]] = true;
+      laneConfig.fillerAllowList.add(laneConfigArgs.addFillers[i]);
     }
     emit LaneUpdated(
       laneConfigArgs.remoteChainSelector,
@@ -153,10 +157,10 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   ) external virtual onlyOwner {
     DestChainConfig storage laneConfig = s_fastTransferDestChainConfig[destinationChainSelector];
     for (uint256 i; i < addFillers.length; ++i) {
-      laneConfig.fillerAllowList[addFillers[i]] = true;
+      laneConfig.fillerAllowList.add(addFillers[i]);
     }
     for (uint256 i; i < removeFillers.length; ++i) {
-      laneConfig.fillerAllowList[removeFillers[i]] = false;
+      laneConfig.fillerAllowList.remove(removeFillers[i]);
     }
     emit FillerAllowListUpdated(destinationChainSelector, addFillers, removeFillers);
   }
@@ -181,7 +185,16 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   /// @param filler The filler address to check
   /// @return isWhitelisted Whether the filler is whitelisted
   function isfillerAllowListed(uint64 remoteChainSelector, address filler) external view returns (bool) {
-    return s_fastTransferDestChainConfig[remoteChainSelector].fillerAllowList[filler];
+    return s_fastTransferDestChainConfig[remoteChainSelector].fillerAllowList.contains(filler);
+  }
+
+  /// @notice Gets all allowlisted fillers for a given destination chain
+  /// @param remoteChainSelector The remote chain selector
+  /// @return fillers Array of allowlisted filler addresses
+  function getAllowListedFillers(
+    uint64 remoteChainSelector
+  ) external view returns (address[] memory) {
+    return s_fastTransferDestChainConfig[remoteChainSelector].fillerAllowList.values();
   }
 
   /// @notice Gets the fill information for a given fill ID
@@ -230,7 +243,6 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     // burn/lock tokens + pay fastFee (in _handleTokenToTransfer)
     (Quote memory quote, Client.EVM2AnyMessage memory message) =
       _getFeeQuoteAndCCIPMessage(feeToken, destinationChainSelector, amount, receiver, extraArgs);
-    _validateSendRequest(destinationChainSelector);
     _consumeOutboundRateLimit(destinationChainSelector, amount);
     _handleTokenToTransfer(destinationChainSelector, msg.sender, amount + quote.fastTransferFee);
 
@@ -251,8 +263,11 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     bytes calldata receiver,
     bytes calldata
   ) internal view returns (IFastTransferPool.Quote memory quote, Client.EVM2AnyMessage memory message) {
+    _validateSendRequest(destinationChainSelector);
     DestChainConfig storage lane = s_fastTransferDestChainConfig[destinationChainSelector];
-
+    if (amount > lane.maxFillAmountPerRequest) {
+      revert TransferAmountExceedsMaxFillAmount(destinationChainSelector, amount);
+    }
     quote.fastTransferFee = (amount * lane.fastTransferBpsFee) / 10_000;
     // pack the MintMessage
     bytes memory data = abi.encode(
@@ -295,7 +310,9 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     {
       DestChainConfig storage laneConfig = s_fastTransferDestChainConfig[sourceChainSelector];
       if (laneConfig.fillerAllowlistEnabled) {
-        if (!laneConfig.fillerAllowList[msg.sender]) revert FillerNotWhitelisted(sourceChainSelector, msg.sender);
+        if (!laneConfig.fillerAllowList.contains(msg.sender)) {
+          revert FillerNotWhitelisted(sourceChainSelector, msg.sender);
+        }
       }
     }
     // Transfer tokens from filler to receiver

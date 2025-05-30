@@ -172,4 +172,83 @@ contract BurnMintFastTransferTokenPool_updateDestChainConfig is BurnMintFastTran
     FastTransferTokenPoolAbstract.DestChainConfigView memory config = s_pool.getDestChainConfig(NEW_CHAIN_SELECTOR);
     assertEq(config.fastTransferBpsFee, 10_000);
   }
+
+  function test_GetAllowListedFillers() public {
+    // Add multiple fillers
+    address[] memory addFillers = new address[](3);
+    addFillers[0] = makeAddr("filler1");
+    addFillers[1] = makeAddr("filler2");
+    addFillers[2] = makeAddr("filler3");
+
+    FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs memory laneConfigArgs = FastTransferTokenPoolAbstract
+      .DestChainConfigUpdateArgs({
+      remoteChainSelector: NEW_CHAIN_SELECTOR,
+      fastTransferBpsFee: NEW_FAST_FEE_BPS,
+      fillerAllowlistEnabled: true,
+      destinationPool: NEW_DESTINATION_POOL,
+      maxFillAmountPerRequest: NEW_FILL_AMOUNT_MAX,
+      addFillers: addFillers,
+      removeFillers: new address[](0)
+    });
+
+    s_pool.updateDestChainConfig(laneConfigArgs);
+
+    // Get all allowlisted fillers
+    address[] memory allowlistedFillers = s_pool.getAllowListedFillers(NEW_CHAIN_SELECTOR);
+
+    // Verify all fillers are returned
+    assertEq(allowlistedFillers.length, 3);
+
+    // Verify each filler is in the list (order may vary due to EnumerableSet)
+    bool foundFiller1 = false;
+    bool foundFiller2 = false;
+    bool foundFiller3 = false;
+
+    for (uint256 i = 0; i < allowlistedFillers.length; i++) {
+      if (allowlistedFillers[i] == addFillers[0]) foundFiller1 = true;
+      if (allowlistedFillers[i] == addFillers[1]) foundFiller2 = true;
+      if (allowlistedFillers[i] == addFillers[2]) foundFiller3 = true;
+    }
+
+    assertTrue(foundFiller1);
+    assertTrue(foundFiller2);
+    assertTrue(foundFiller3);
+  }
+
+  function test_GetAllowListedFillers_EmptyList() public {
+    // Test with no fillers added
+    address[] memory allowlistedFillers = s_pool.getAllowListedFillers(NEW_CHAIN_SELECTOR);
+    assertEq(allowlistedFillers.length, 0);
+  }
+
+  function test_GetAllowListedFillers_AfterRemoval() public {
+    // First add fillers
+    address[] memory addFillers = new address[](2);
+    addFillers[0] = makeAddr("filler1");
+    addFillers[1] = makeAddr("filler2");
+
+    FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs memory laneConfigArgs = FastTransferTokenPoolAbstract
+      .DestChainConfigUpdateArgs({
+      remoteChainSelector: NEW_CHAIN_SELECTOR,
+      fastTransferBpsFee: NEW_FAST_FEE_BPS,
+      fillerAllowlistEnabled: true,
+      destinationPool: NEW_DESTINATION_POOL,
+      maxFillAmountPerRequest: NEW_FILL_AMOUNT_MAX,
+      addFillers: addFillers,
+      removeFillers: new address[](0)
+    });
+
+    s_pool.updateDestChainConfig(laneConfigArgs);
+
+    // Then remove one filler
+    address[] memory removeFillers = new address[](1);
+    removeFillers[0] = addFillers[0];
+
+    s_pool.updatefillerAllowList(NEW_CHAIN_SELECTOR, new address[](0), removeFillers);
+
+    // Verify only one filler remains
+    address[] memory allowlistedFillers = s_pool.getAllowListedFillers(NEW_CHAIN_SELECTOR);
+    assertEq(allowlistedFillers.length, 1);
+    assertEq(allowlistedFillers[0], addFillers[1]);
+  }
 }
