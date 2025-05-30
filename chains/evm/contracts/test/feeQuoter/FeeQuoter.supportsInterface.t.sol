@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {IReceiver} from "@chainlink/contracts/src/v0.8/keystone/interfaces/IReceiver.sol";
-import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {IFeeQuoter} from "../../interfaces/IFeeQuoter.sol";
 import {FeeQuoterSetup} from "./FeeQuoterSetup.t.sol";
