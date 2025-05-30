@@ -32,7 +32,12 @@ contract BurnMintWithLockReleaseFlagTokenPool is BurnMintTokenPool {
 
     _lockOrBurn(lockOrBurnIn.amount);
 
-    emit LockedOrBurned(msg.sender, lockOrBurnIn.amount);
+    emit LockedOrBurned({
+      remoteChainSelector: lockOrBurnIn.remoteChainSelector,
+      token: address(i_token),
+      sender: msg.sender,
+      amount: lockOrBurnIn.amount
+    });
 
     // LOCK_RELEASE_FLAG = bytes4(keccak256("NO_CCTP_USE_LOCK_RELEASE"))
     return Pool.LockOrBurnOutV1({
@@ -54,7 +59,13 @@ contract BurnMintWithLockReleaseFlagTokenPool is BurnMintTokenPool {
 
     IBurnMintERC20(address(i_token)).mint(releaseOrMintIn.receiver, localAmount);
 
-    emit ReleasedOrMinted(msg.sender, releaseOrMintIn.receiver, localAmount);
+    emit ReleasedOrMinted({
+      remoteChainSelector: releaseOrMintIn.remoteChainSelector,
+      token: address(i_token),
+      sender: msg.sender,
+      recipient: releaseOrMintIn.receiver,
+      amount: localAmount
+    });
 
     return Pool.ReleaseOrMintOutV1({destinationAmount: localAmount});
   }

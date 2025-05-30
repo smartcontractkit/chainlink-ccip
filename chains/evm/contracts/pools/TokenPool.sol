@@ -59,8 +59,10 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   error OverflowDetected(uint8 remoteDecimals, uint8 localDecimals, uint256 remoteAmount);
   error InvalidDecimalArgs(uint8 expected, uint8 actual);
 
-  event LockedOrBurned(address indexed sender, uint256 amount);
-  event ReleasedOrMinted(address indexed sender, address indexed recipient, uint256 amount);
+  event LockedOrBurned(uint64 indexed remoteChainSelector, address token, address sender, uint256 amount);
+  event ReleasedOrMinted(
+    uint64 indexed remoteChainSelector, address token, address sender, address indexed recipient, uint256 amount
+  );
   event ChainAdded(
     uint64 remoteChainSelector,
     bytes remoteToken,
@@ -206,7 +208,12 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
 
     _lockOrBurn(lockOrBurnIn.amount);
 
-    emit LockedOrBurned(msg.sender, lockOrBurnIn.amount);
+    emit LockedOrBurned({
+      remoteChainSelector: lockOrBurnIn.remoteChainSelector,
+      token: address(i_token),
+      sender: msg.sender,
+      amount: lockOrBurnIn.amount
+    });
 
     return Pool.LockOrBurnOutV1({
       destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
@@ -239,7 +246,13 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
     // Mint to the receiver
     _releaseOrMint(releaseOrMintIn.receiver, localAmount);
 
-    emit ReleasedOrMinted(msg.sender, releaseOrMintIn.receiver, localAmount);
+    emit ReleasedOrMinted({
+      remoteChainSelector: releaseOrMintIn.remoteChainSelector,
+      token: address(i_token),
+      sender: msg.sender,
+      recipient: releaseOrMintIn.receiver,
+      amount: localAmount
+    });
 
     return Pool.ReleaseOrMintOutV1({destinationAmount: localAmount});
   }

@@ -33,7 +33,12 @@ contract Router_ccipSend is OnRampSetup {
 
     // Assert that the tokens are burned
     vm.expectEmit();
-    emit TokenPool.LockedOrBurned(address(s_onRamp), message.tokenAmounts[0].amount);
+    emit TokenPool.LockedOrBurned({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      token: address(sourceToken1),
+      sender: address(s_onRamp),
+      amount: message.tokenAmounts[0].amount
+    });
 
     Internal.EVM2AnyRampMessage memory msgEvent = _messageToEvent(message, 1, 1, expectedFee, OWNER);
 
@@ -95,7 +100,12 @@ contract Router_ccipSend is OnRampSetup {
     message.feeToken = address(0);
     // Assert that the tokens are burned
     vm.expectEmit();
-    emit TokenPool.LockedOrBurned(address(s_onRamp), message.tokenAmounts[0].amount);
+    emit TokenPool.LockedOrBurned({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      token: address(sourceToken1),
+      sender: address(s_onRamp),
+      amount: message.tokenAmounts[0].amount
+    });
 
     vm.expectEmit();
     emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, msgEvent.header.sequenceNumber, msgEvent);

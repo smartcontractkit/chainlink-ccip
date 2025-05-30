@@ -110,7 +110,13 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     // Release to the recipient
     i_token.safeTransfer(releaseOrMintIn.receiver, localAmount);
 
-    emit ReleasedOrMinted(msg.sender, releaseOrMintIn.receiver, localAmount);
+    emit ReleasedOrMinted({
+      remoteChainSelector: releaseOrMintIn.remoteChainSelector,
+      token: address(i_token),
+      sender: msg.sender,
+      recipient: releaseOrMintIn.receiver,
+      amount: localAmount
+    });
 
     return Pool.ReleaseOrMintOutV1({destinationAmount: localAmount});
   }

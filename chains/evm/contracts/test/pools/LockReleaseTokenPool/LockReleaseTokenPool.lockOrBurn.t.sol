@@ -17,7 +17,12 @@ contract LockReleaseTokenPool_lockOrBurn is LockReleaseTokenPoolSetup {
     vm.expectEmit();
     emit RateLimiter.TokensConsumed(amount);
     vm.expectEmit();
-    emit TokenPool.LockedOrBurned(s_allowedOnRamp, amount);
+    emit TokenPool.LockedOrBurned({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      token: address(s_token),
+      sender: address(s_allowedOnRamp),
+      amount: amount
+    });
 
     s_lockReleaseTokenPool.lockOrBurn(
       Pool.LockOrBurnInV1({
@@ -37,7 +42,12 @@ contract LockReleaseTokenPool_lockOrBurn is LockReleaseTokenPoolSetup {
     vm.expectEmit();
     emit RateLimiter.TokensConsumed(amount);
     vm.expectEmit();
-    emit TokenPool.LockedOrBurned(s_allowedOnRamp, amount);
+    emit TokenPool.LockedOrBurned({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      token: address(s_token),
+      sender: address(s_allowedOnRamp),
+      amount: amount
+    });
 
     s_lockReleaseTokenPoolWithAllowList.lockOrBurn(
       Pool.LockOrBurnInV1({
@@ -50,7 +60,12 @@ contract LockReleaseTokenPool_lockOrBurn is LockReleaseTokenPoolSetup {
     );
 
     vm.expectEmit();
-    emit TokenPool.LockedOrBurned(s_allowedOnRamp, amount);
+    emit TokenPool.LockedOrBurned({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      token: address(s_token),
+      sender: address(s_allowedOnRamp),
+      amount: amount
+    });
 
     s_lockReleaseTokenPoolWithAllowList.lockOrBurn(
       Pool.LockOrBurnInV1({

@@ -96,9 +96,21 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     message.receiver = STRANGER;
 
     vm.expectEmit();
-    emit TokenPool.ReleasedOrMinted(address(s_offRamp), STRANGER, amounts[0]);
+    emit TokenPool.ReleasedOrMinted({
+      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+      token: message.tokenAmounts[0].destTokenAddress,
+      sender: address(s_offRamp),
+      recipient: STRANGER,
+      amount: amounts[0]
+    });
     vm.expectEmit();
-    emit TokenPool.ReleasedOrMinted(address(s_offRamp), STRANGER, amounts[1]);
+    emit TokenPool.ReleasedOrMinted({
+      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+      token: message.tokenAmounts[1].destTokenAddress,
+      sender: address(s_offRamp),
+      recipient: STRANGER,
+      amount: amounts[1]
+    });
 
     s_offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length), new uint32[](0));
   }

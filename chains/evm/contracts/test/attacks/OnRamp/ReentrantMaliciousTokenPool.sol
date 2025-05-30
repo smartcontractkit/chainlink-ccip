@@ -35,7 +35,7 @@ contract ReentrantMaliciousTokenPool is TokenPool {
 
     // solhint-disable-next-line check-send-result
     FacadeClient(i_facade).send(lockOrBurnIn.amount);
-    emit LockedOrBurned(msg.sender, lockOrBurnIn.amount);
+    emit LockedOrBurned(lockOrBurnIn.remoteChainSelector, address(i_token), msg.sender, lockOrBurnIn.amount);
     return Pool.LockOrBurnOutV1({destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector), destPoolData: ""});
   }
 

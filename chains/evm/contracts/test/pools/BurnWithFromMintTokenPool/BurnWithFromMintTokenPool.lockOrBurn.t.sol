@@ -34,30 +34,35 @@ contract BurnWithFromMintTokenPool_lockOrBurn is BurnWithFromMintTokenPoolSetup 
   }
 
   function test_lockOrBurn() public {
-    uint256 burnAmount = 20_000e18;
+    uint256 amount = 20_000e18;
 
-    deal(address(s_burnMintERC20), address(s_pool), burnAmount);
-    assertEq(s_burnMintERC20.balanceOf(address(s_pool)), burnAmount);
+    deal(address(s_burnMintERC20), address(s_pool), amount);
+    assertEq(s_burnMintERC20.balanceOf(address(s_pool)), amount);
 
     vm.startPrank(s_burnMintOnRamp);
 
     vm.expectEmit();
-    emit RateLimiter.TokensConsumed(burnAmount);
+    emit RateLimiter.TokensConsumed(amount);
 
     vm.expectEmit();
-    emit IERC20.Transfer(address(s_pool), address(0), burnAmount);
+    emit IERC20.Transfer(address(s_pool), address(0), amount);
 
     vm.expectEmit();
-    emit TokenPool.LockedOrBurned(address(s_burnMintOnRamp), burnAmount);
+    emit TokenPool.LockedOrBurned({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      token: address(s_burnMintERC20),
+      sender: address(s_burnMintOnRamp),
+      amount: amount
+    });
 
     bytes4 expectedSignature = bytes4(keccak256("burn(address,uint256)"));
-    vm.expectCall(address(s_burnMintERC20), abi.encodeWithSelector(expectedSignature, address(s_pool), burnAmount));
+    vm.expectCall(address(s_burnMintERC20), abi.encodeWithSelector(expectedSignature, address(s_pool), amount));
 
     s_pool.lockOrBurn(
       Pool.LockOrBurnInV1({
         originalSender: OWNER,
         receiver: bytes(""),
-        amount: burnAmount,
+        amount: amount,
         remoteChainSelector: DEST_CHAIN_SELECTOR,
         localToken: address(s_burnMintERC20)
       })

@@ -17,7 +17,12 @@ contract SiloedLockReleaseTokenPool_lockOrBurn is SiloedLockReleaseTokenPoolSetu
     vm.expectEmit();
     emit RateLimiter.TokensConsumed(AMOUNT);
     vm.expectEmit();
-    emit TokenPool.LockedOrBurned(s_allowedOnRamp, AMOUNT);
+    emit TokenPool.LockedOrBurned({
+      remoteChainSelector: SILOED_CHAIN_SELECTOR,
+      token: address(s_token),
+      sender: address(s_allowedOnRamp),
+      amount: AMOUNT
+    });
 
     s_siloedLockReleaseTokenPool.lockOrBurn(
       Pool.LockOrBurnInV1({
@@ -40,7 +45,12 @@ contract SiloedLockReleaseTokenPool_lockOrBurn is SiloedLockReleaseTokenPoolSetu
     vm.expectEmit();
     emit RateLimiter.TokensConsumed(AMOUNT);
     vm.expectEmit();
-    emit TokenPool.LockedOrBurned(s_allowedOnRamp, AMOUNT);
+    emit TokenPool.LockedOrBurned({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      token: address(s_token),
+      sender: address(s_allowedOnRamp),
+      amount: AMOUNT
+    });
 
     s_siloedLockReleaseTokenPool.lockOrBurn(
       Pool.LockOrBurnInV1({

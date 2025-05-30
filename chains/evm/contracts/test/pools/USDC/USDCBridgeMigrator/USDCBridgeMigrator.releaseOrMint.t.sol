@@ -33,7 +33,13 @@ contract USDCBridgeMigrator_releaseOrMint is HybridLockReleaseUSDCTokenPool_rele
     vm.startPrank(s_routerAllowedOffRamp);
 
     vm.expectEmit();
-    emit TokenPool.ReleasedOrMinted(s_routerAllowedOffRamp, recipient, amount);
+    emit TokenPool.ReleasedOrMinted({
+      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+      token: address(s_token),
+      sender: s_routerAllowedOffRamp,
+      recipient: recipient,
+      amount: amount
+    });
 
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
@@ -152,7 +158,13 @@ contract USDCBridgeMigrator_releaseOrMint is HybridLockReleaseUSDCTokenPool_rele
     vm.startPrank(s_routerAllowedOffRamp);
 
     vm.expectEmit();
-    emit TokenPool.ReleasedOrMinted(s_routerAllowedOffRamp, recipient, amount);
+    emit TokenPool.ReleasedOrMinted({
+      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+      token: address(s_token),
+      sender: s_routerAllowedOffRamp,
+      recipient: recipient,
+      amount: amount
+    });
 
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),

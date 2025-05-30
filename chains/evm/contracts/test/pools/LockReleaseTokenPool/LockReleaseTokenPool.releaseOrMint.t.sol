@@ -36,7 +36,13 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
     vm.expectEmit();
     emit RateLimiter.TokensConsumed(amount);
     vm.expectEmit();
-    emit TokenPool.ReleasedOrMinted(s_allowedOffRamp, OWNER, amount);
+    emit TokenPool.ReleasedOrMinted({
+      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+      token: address(s_token),
+      sender: s_allowedOffRamp,
+      recipient: OWNER,
+      amount: amount
+    });
 
     s_lockReleaseTokenPool.releaseOrMint(
       Pool.ReleaseOrMintInV1({
@@ -76,7 +82,13 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
       }
 
       vm.expectEmit();
-      emit TokenPool.ReleasedOrMinted(s_allowedOffRamp, recipient, amount);
+      emit TokenPool.ReleasedOrMinted({
+        remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+        token: address(s_token),
+        sender: s_allowedOffRamp,
+        recipient: recipient,
+        amount: amount
+      });
     }
 
     s_lockReleaseTokenPool.releaseOrMint(
