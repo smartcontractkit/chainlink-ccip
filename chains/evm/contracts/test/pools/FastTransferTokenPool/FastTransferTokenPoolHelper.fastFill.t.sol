@@ -51,8 +51,9 @@ contract FastTransferTokenPoolHelper_fastFill_Test is FastTransferTokenPoolHelpe
     uint256 srcAmount = 100 ether;
     uint8 sourceDecimals = 18;
     address nonWhitelistedFiller = address(0x6);
-    deal(nonWhitelistedFiller, 1000 ether);
+    deal(address(s_token), nonWhitelistedFiller, 1000 ether);
     vm.startPrank(nonWhitelistedFiller);
+    s_token.approve(address(s_tokenPool), type(uint256).max);
     vm.expectRevert(
       abi.encodeWithSelector(
         FastTransferTokenPoolAbstract.FillerNotAllowlisted.selector, DEST_CHAIN_SELECTOR, nonWhitelistedFiller

@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol";
-import {IFastTransferPool} from "../interfaces/IFastTransferPool.sol";
 import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
 
 import {BurnMintTokenPoolAbstract} from "./BurnMintTokenPoolAbstract.sol";
@@ -13,8 +11,6 @@ import {IERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IERC165} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/IERC165.sol";
 
 /// @title BurnMintFastTransferTokenPool
 /// @notice A token pool that supports burn-mint operations and fast transfers

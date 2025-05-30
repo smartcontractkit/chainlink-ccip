@@ -44,20 +44,27 @@ type ClientEVMTokenAmount struct {
 }
 
 type FastTransferTokenPoolAbstractDestChainConfigUpdateArgs struct {
-	MaxFillAmountPerRequest *big.Int
-	AddFillers              []common.Address
-	RemoveFillers           []common.Address
-	RemoteChainSelector     uint64
-	FastTransferBpsFee      uint16
-	FillerAllowlistEnabled  bool
-	DestinationPool         []byte
+	MaxFillAmountPerRequest       *big.Int
+	DestinationPool               []byte
+	RemoteChainSelector           uint64
+	ChainFamilySelector           [4]byte
+	FastTransferBpsFee            uint16
+	FillerAllowlistEnabled        bool
+	SettlementOverheadGas         uint32
+	EvmToAnyMessageExtraArgsBytes []byte
+	AddFillers                    []common.Address
+	RemoveFillers                 []common.Address
 }
 
 type FastTransferTokenPoolAbstractDestChainConfigView struct {
-	MaxFillAmountPerRequest *big.Int
-	FastTransferBpsFee      uint16
-	FillerAllowlistEnabled  bool
-	DestinationPool         []byte
+	MaxFillAmountPerRequest       *big.Int
+	DestinationPool               []byte
+	FastTransferBpsFee            uint16
+	ChainFamilySelector           [4]byte
+	FillerAllowlistEnabled        bool
+	SettlementOverheadGas         uint32
+	EvmToAnyMessageExtraArgsBytes []byte
+	AllowedFillers                []common.Address
 }
 
 type FastTransferTokenPoolAbstractFillInfo struct {
@@ -121,7 +128,7 @@ type TokenPoolChainUpdate struct {
 }
 
 var FastTransferTokenPoolAbstractMetaData = &bind.MetaData{
-	ABI: "[{\"type\":\"function\",\"name\":\"acceptOwnership\",\"inputs\":[],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"addRemotePool\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"remotePoolAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"applyAllowListUpdates\",\"inputs\":[{\"name\":\"removes\",\"type\":\"address[]\",\"internalType\":\"address[]\"},{\"name\":\"adds\",\"type\":\"address[]\",\"internalType\":\"address[]\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"applyChainUpdates\",\"inputs\":[{\"name\":\"remoteChainSelectorsToRemove\",\"type\":\"uint64[]\",\"internalType\":\"uint64[]\"},{\"name\":\"chainsToAdd\",\"type\":\"tuple[]\",\"internalType\":\"structTokenPool.ChainUpdate[]\",\"components\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"remotePoolAddresses\",\"type\":\"bytes[]\",\"internalType\":\"bytes[]\"},{\"name\":\"remoteTokenAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"outboundRateLimiterConfig\",\"type\":\"tuple\",\"internalType\":\"structRateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]},{\"name\":\"inboundRateLimiterConfig\",\"type\":\"tuple\",\"internalType\":\"structRateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"ccipReceive\",\"inputs\":[{\"name\":\"message\",\"type\":\"tuple\",\"internalType\":\"structClient.Any2EVMMessage\",\"components\":[{\"name\":\"messageId\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"sourceChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"sender\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"data\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"destTokenAmounts\",\"type\":\"tuple[]\",\"internalType\":\"structClient.EVMTokenAmount[]\",\"components\":[{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"ccipSendToken\",\"inputs\":[{\"name\":\"feeToken\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"destinationChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"receiver\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"extraArgs\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[{\"name\":\"fillRequestId\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"stateMutability\":\"payable\"},{\"type\":\"function\",\"name\":\"computeFillId\",\"inputs\":[{\"name\":\"fillRequestId\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"receiver\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"stateMutability\":\"pure\"},{\"type\":\"function\",\"name\":\"fastFill\",\"inputs\":[{\"name\":\"fillRequestId\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"sourceChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"srcAmount\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"sourceDecimals\",\"type\":\"uint8\",\"internalType\":\"uint8\"},{\"name\":\"receiver\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"getAllowList\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address[]\",\"internalType\":\"address[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getAllowListEnabled\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getCcipSendTokenFee\",\"inputs\":[{\"name\":\"settlementFeeToken\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"destinationChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"receiver\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"extraArgs\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"structIFastTransferPool.Quote\",\"components\":[{\"name\":\"ccipSettlementFee\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"fastTransferFee\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getCurrentInboundRateLimiterState\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"structRateLimiter.TokenBucket\",\"components\":[{\"name\":\"tokens\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"lastUpdated\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getCurrentOutboundRateLimiterState\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"structRateLimiter.TokenBucket\",\"components\":[{\"name\":\"tokens\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"lastUpdated\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getDestChainConfig\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"structFastTransferTokenPoolAbstract.DestChainConfigView\",\"components\":[{\"name\":\"maxFillAmountPerRequest\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"fastTransferBpsFee\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"fillerAllowlistEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"destinationPool\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getFillInfo\",\"inputs\":[{\"name\":\"fillId\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"structFastTransferTokenPoolAbstract.FillInfo\",\"components\":[{\"name\":\"state\",\"type\":\"uint8\",\"internalType\":\"enumFastTransferTokenPoolAbstract.FillState\"},{\"name\":\"filler\",\"type\":\"address\",\"internalType\":\"address\"}]}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getRateLimitAdmin\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getRemotePools\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bytes[]\",\"internalType\":\"bytes[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getRemoteToken\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getRmnProxy\",\"inputs\":[],\"outputs\":[{\"name\":\"rmnProxy\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getRouter\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getSupportedChains\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint64[]\",\"internalType\":\"uint64[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getToken\",\"inputs\":[],\"outputs\":[{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"contractIERC20\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getTokenDecimals\",\"inputs\":[],\"outputs\":[{\"name\":\"decimals\",\"type\":\"uint8\",\"internalType\":\"uint8\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"isRemotePool\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"remotePoolAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"isSupportedChain\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"isSupportedToken\",\"inputs\":[{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"isfillerAllowListed\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"filler\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"lockOrBurn\",\"inputs\":[{\"name\":\"lockOrBurnIn\",\"type\":\"tuple\",\"internalType\":\"structPool.LockOrBurnInV1\",\"components\":[{\"name\":\"receiver\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"originalSender\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"localToken\",\"type\":\"address\",\"internalType\":\"address\"}]}],\"outputs\":[{\"name\":\"lockOrBurnOut\",\"type\":\"tuple\",\"internalType\":\"structPool.LockOrBurnOutV1\",\"components\":[{\"name\":\"destTokenAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"destPoolData\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"owner\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"releaseOrMint\",\"inputs\":[{\"name\":\"releaseOrMintIn\",\"type\":\"tuple\",\"internalType\":\"structPool.ReleaseOrMintInV1\",\"components\":[{\"name\":\"originalSender\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"receiver\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"localToken\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"sourcePoolAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"sourcePoolData\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"offchainTokenData\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]}],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"structPool.ReleaseOrMintOutV1\",\"components\":[{\"name\":\"destinationAmount\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"removeRemotePool\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"remotePoolAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setChainRateLimiterConfig\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"outboundConfig\",\"type\":\"tuple\",\"internalType\":\"structRateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]},{\"name\":\"inboundConfig\",\"type\":\"tuple\",\"internalType\":\"structRateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setChainRateLimiterConfigs\",\"inputs\":[{\"name\":\"remoteChainSelectors\",\"type\":\"uint64[]\",\"internalType\":\"uint64[]\"},{\"name\":\"outboundConfigs\",\"type\":\"tuple[]\",\"internalType\":\"structRateLimiter.Config[]\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]},{\"name\":\"inboundConfigs\",\"type\":\"tuple[]\",\"internalType\":\"structRateLimiter.Config[]\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setRateLimitAdmin\",\"inputs\":[{\"name\":\"rateLimitAdmin\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setRouter\",\"inputs\":[{\"name\":\"newRouter\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"supportsInterface\",\"inputs\":[{\"name\":\"interfaceId\",\"type\":\"bytes4\",\"internalType\":\"bytes4\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"pure\"},{\"type\":\"function\",\"name\":\"transferOwnership\",\"inputs\":[{\"name\":\"to\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"typeAndVersion\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"string\",\"internalType\":\"string\"}],\"stateMutability\":\"pure\"},{\"type\":\"function\",\"name\":\"updateDestChainConfig\",\"inputs\":[{\"name\":\"laneConfigArgs\",\"type\":\"tuple\",\"internalType\":\"structFastTransferTokenPoolAbstract.DestChainConfigUpdateArgs\",\"components\":[{\"name\":\"maxFillAmountPerRequest\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"addFillers\",\"type\":\"address[]\",\"internalType\":\"address[]\"},{\"name\":\"removeFillers\",\"type\":\"address[]\",\"internalType\":\"address[]\"},{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"fastTransferBpsFee\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"fillerAllowlistEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"destinationPool\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"updatefillerAllowList\",\"inputs\":[{\"name\":\"destinationChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"addFillers\",\"type\":\"address[]\",\"internalType\":\"address[]\"},{\"name\":\"removeFillers\",\"type\":\"address[]\",\"internalType\":\"address[]\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"event\",\"name\":\"AllowListAdd\",\"inputs\":[{\"name\":\"sender\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"AllowListRemove\",\"inputs\":[{\"name\":\"sender\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"Burned\",\"inputs\":[{\"name\":\"sender\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"ChainAdded\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"indexed\":false,\"internalType\":\"uint64\"},{\"name\":\"remoteToken\",\"type\":\"bytes\",\"indexed\":false,\"internalType\":\"bytes\"},{\"name\":\"outboundRateLimiterConfig\",\"type\":\"tuple\",\"indexed\":false,\"internalType\":\"structRateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]},{\"name\":\"inboundRateLimiterConfig\",\"type\":\"tuple\",\"indexed\":false,\"internalType\":\"structRateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"ChainConfigured\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"indexed\":false,\"internalType\":\"uint64\"},{\"name\":\"outboundRateLimiterConfig\",\"type\":\"tuple\",\"indexed\":false,\"internalType\":\"structRateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]},{\"name\":\"inboundRateLimiterConfig\",\"type\":\"tuple\",\"indexed\":false,\"internalType\":\"structRateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"ChainRemoved\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"indexed\":false,\"internalType\":\"uint64\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"ConfigChanged\",\"inputs\":[{\"name\":\"config\",\"type\":\"tuple\",\"indexed\":false,\"internalType\":\"structRateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"DestinationPoolUpdated\",\"inputs\":[{\"name\":\"dst\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"destinationPool\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"FastFill\",\"inputs\":[{\"name\":\"fillRequestId\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"},{\"name\":\"fillId\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"},{\"name\":\"filler\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"destAmount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"},{\"name\":\"receiver\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"FastFillRequest\",\"inputs\":[{\"name\":\"fillRequestId\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"},{\"name\":\"dstChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"},{\"name\":\"fastTransferFee\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"},{\"name\":\"receiver\",\"type\":\"bytes\",\"indexed\":false,\"internalType\":\"bytes\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"FastFillSettled\",\"inputs\":[{\"name\":\"fillRequestId\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"FillerAllowListUpdated\",\"inputs\":[{\"name\":\"dst\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"addFillers\",\"type\":\"address[]\",\"indexed\":false,\"internalType\":\"address[]\"},{\"name\":\"removeFillers\",\"type\":\"address[]\",\"indexed\":false,\"internalType\":\"address[]\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"InvalidFill\",\"inputs\":[{\"name\":\"fillRequestId\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"},{\"name\":\"filler\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"filledAmount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"},{\"name\":\"expectedAmount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"LaneUpdated\",\"inputs\":[{\"name\":\"destinationChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"bps\",\"type\":\"uint16\",\"indexed\":false,\"internalType\":\"uint16\"},{\"name\":\"maxFillAmountPerRequest\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"},{\"name\":\"destinationPool\",\"type\":\"bytes\",\"indexed\":false,\"internalType\":\"bytes\"},{\"name\":\"addFillers\",\"type\":\"address[]\",\"indexed\":false,\"internalType\":\"address[]\"},{\"name\":\"removeFillers\",\"type\":\"address[]\",\"indexed\":false,\"internalType\":\"address[]\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"Locked\",\"inputs\":[{\"name\":\"sender\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"Minted\",\"inputs\":[{\"name\":\"sender\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"recipient\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"OwnershipTransferRequested\",\"inputs\":[{\"name\":\"from\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"to\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"OwnershipTransferred\",\"inputs\":[{\"name\":\"from\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"to\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"RateLimitAdminSet\",\"inputs\":[{\"name\":\"rateLimitAdmin\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"Released\",\"inputs\":[{\"name\":\"sender\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"recipient\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"RemotePoolAdded\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"remotePoolAddress\",\"type\":\"bytes\",\"indexed\":false,\"internalType\":\"bytes\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"RemotePoolRemoved\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"remotePoolAddress\",\"type\":\"bytes\",\"indexed\":false,\"internalType\":\"bytes\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"RouterUpdated\",\"inputs\":[{\"name\":\"oldRouter\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"},{\"name\":\"newRouter\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"TokensConsumed\",\"inputs\":[{\"name\":\"tokens\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"error\",\"name\":\"AggregateValueMaxCapacityExceeded\",\"inputs\":[{\"name\":\"capacity\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"requested\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"type\":\"error\",\"name\":\"AggregateValueRateLimitReached\",\"inputs\":[{\"name\":\"minWaitInSeconds\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"available\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"type\":\"error\",\"name\":\"AllowListNotEnabled\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"AlreadyFilled\",\"inputs\":[{\"name\":\"fillRequestId\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}]},{\"type\":\"error\",\"name\":\"AlreadySettled\",\"inputs\":[{\"name\":\"fillRequestId\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}]},{\"type\":\"error\",\"name\":\"BucketOverfilled\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"CallerIsNotARampOnRouter\",\"inputs\":[{\"name\":\"caller\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"CannotTransferToSelf\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"ChainAlreadyExists\",\"inputs\":[{\"name\":\"chainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"ChainNotAllowed\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"CursedByRMN\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"DisabledNonZeroRateLimit\",\"inputs\":[{\"name\":\"config\",\"type\":\"tuple\",\"internalType\":\"structRateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]}]},{\"type\":\"error\",\"name\":\"FillerNotWhitelisted\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"filler\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"InvalidDecimalArgs\",\"inputs\":[{\"name\":\"expected\",\"type\":\"uint8\",\"internalType\":\"uint8\"},{\"name\":\"actual\",\"type\":\"uint8\",\"internalType\":\"uint8\"}]},{\"type\":\"error\",\"name\":\"InvalidDestChainConfig\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"InvalidRateLimitRate\",\"inputs\":[{\"name\":\"rateLimiterConfig\",\"type\":\"tuple\",\"internalType\":\"structRateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]}]},{\"type\":\"error\",\"name\":\"InvalidRemoteChainDecimals\",\"inputs\":[{\"name\":\"sourcePoolData\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]},{\"type\":\"error\",\"name\":\"InvalidRemotePoolForChain\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"remotePoolAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]},{\"type\":\"error\",\"name\":\"InvalidRouter\",\"inputs\":[{\"name\":\"router\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"InvalidSourcePoolAddress\",\"inputs\":[{\"name\":\"sourcePoolAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]},{\"type\":\"error\",\"name\":\"InvalidToken\",\"inputs\":[{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"LaneDisabled\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"MismatchedArrayLengths\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"MustBeProposedOwner\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"NonExistentChain\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"OnlyCallableByOwner\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"OverflowDetected\",\"inputs\":[{\"name\":\"remoteDecimals\",\"type\":\"uint8\",\"internalType\":\"uint8\"},{\"name\":\"localDecimals\",\"type\":\"uint8\",\"internalType\":\"uint8\"},{\"name\":\"remoteAmount\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"type\":\"error\",\"name\":\"OwnerCannotBeZero\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"PoolAlreadyAdded\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"remotePoolAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]},{\"type\":\"error\",\"name\":\"RateLimitMustBeDisabled\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"SenderNotAllowed\",\"inputs\":[{\"name\":\"sender\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"TokenMaxCapacityExceeded\",\"inputs\":[{\"name\":\"capacity\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"requested\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"tokenAddress\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"TokenRateLimitReached\",\"inputs\":[{\"name\":\"minWaitInSeconds\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"available\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"tokenAddress\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"Unauthorized\",\"inputs\":[{\"name\":\"caller\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"WhitelistNotEnabled\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"ZeroAddressNotAllowed\",\"inputs\":[]}]",
+	ABI: "[{\"type\":\"function\",\"name\":\"acceptOwnership\",\"inputs\":[],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"addRemotePool\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"remotePoolAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"applyAllowListUpdates\",\"inputs\":[{\"name\":\"removes\",\"type\":\"address[]\",\"internalType\":\"address[]\"},{\"name\":\"adds\",\"type\":\"address[]\",\"internalType\":\"address[]\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"applyChainUpdates\",\"inputs\":[{\"name\":\"remoteChainSelectorsToRemove\",\"type\":\"uint64[]\",\"internalType\":\"uint64[]\"},{\"name\":\"chainsToAdd\",\"type\":\"tuple[]\",\"internalType\":\"structTokenPool.ChainUpdate[]\",\"components\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"remotePoolAddresses\",\"type\":\"bytes[]\",\"internalType\":\"bytes[]\"},{\"name\":\"remoteTokenAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"outboundRateLimiterConfig\",\"type\":\"tuple\",\"internalType\":\"structRateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]},{\"name\":\"inboundRateLimiterConfig\",\"type\":\"tuple\",\"internalType\":\"structRateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"ccipReceive\",\"inputs\":[{\"name\":\"message\",\"type\":\"tuple\",\"internalType\":\"structClient.Any2EVMMessage\",\"components\":[{\"name\":\"messageId\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"sourceChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"sender\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"data\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"destTokenAmounts\",\"type\":\"tuple[]\",\"internalType\":\"structClient.EVMTokenAmount[]\",\"components\":[{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"ccipSendToken\",\"inputs\":[{\"name\":\"feeToken\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"destinationChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"receiver\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"extraArgs\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[{\"name\":\"fillRequestId\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"stateMutability\":\"payable\"},{\"type\":\"function\",\"name\":\"computeFillId\",\"inputs\":[{\"name\":\"fillRequestId\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"receiver\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"stateMutability\":\"pure\"},{\"type\":\"function\",\"name\":\"fastFill\",\"inputs\":[{\"name\":\"fillRequestId\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"sourceChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"srcAmountToFill\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"sourceDecimals\",\"type\":\"uint8\",\"internalType\":\"uint8\"},{\"name\":\"receiver\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"getAllowList\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address[]\",\"internalType\":\"address[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getAllowListEnabled\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getAllowListedFillers\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[{\"name\":\"\",\"type\":\"address[]\",\"internalType\":\"address[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getCcipSendTokenFee\",\"inputs\":[{\"name\":\"settlementFeeToken\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"destinationChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"receiver\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"extraArgs\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"structIFastTransferPool.Quote\",\"components\":[{\"name\":\"ccipSettlementFee\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"fastTransferFee\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getCurrentInboundRateLimiterState\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"structRateLimiter.TokenBucket\",\"components\":[{\"name\":\"tokens\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"lastUpdated\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getCurrentOutboundRateLimiterState\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"structRateLimiter.TokenBucket\",\"components\":[{\"name\":\"tokens\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"lastUpdated\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getDestChainConfig\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"structFastTransferTokenPoolAbstract.DestChainConfigView\",\"components\":[{\"name\":\"maxFillAmountPerRequest\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"destinationPool\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"fastTransferBpsFee\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"chainFamilySelector\",\"type\":\"bytes4\",\"internalType\":\"bytes4\"},{\"name\":\"fillerAllowlistEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"settlementOverheadGas\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"evmToAnyMessageExtraArgsBytes\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"allowedFillers\",\"type\":\"address[]\",\"internalType\":\"address[]\"}]}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getFillInfo\",\"inputs\":[{\"name\":\"fillId\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"structFastTransferTokenPoolAbstract.FillInfo\",\"components\":[{\"name\":\"state\",\"type\":\"uint8\",\"internalType\":\"enumFastTransferTokenPoolAbstract.FillState\"},{\"name\":\"filler\",\"type\":\"address\",\"internalType\":\"address\"}]}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getRateLimitAdmin\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getRemotePools\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bytes[]\",\"internalType\":\"bytes[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getRemoteToken\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getRmnProxy\",\"inputs\":[],\"outputs\":[{\"name\":\"rmnProxy\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getRouter\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getSupportedChains\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint64[]\",\"internalType\":\"uint64[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getToken\",\"inputs\":[],\"outputs\":[{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"contractIERC20\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getTokenDecimals\",\"inputs\":[],\"outputs\":[{\"name\":\"decimals\",\"type\":\"uint8\",\"internalType\":\"uint8\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"isFillerAllowListed\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"filler\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"isRemotePool\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"remotePoolAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"isSupportedChain\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"isSupportedToken\",\"inputs\":[{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"lockOrBurn\",\"inputs\":[{\"name\":\"lockOrBurnIn\",\"type\":\"tuple\",\"internalType\":\"structPool.LockOrBurnInV1\",\"components\":[{\"name\":\"receiver\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"originalSender\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"localToken\",\"type\":\"address\",\"internalType\":\"address\"}]}],\"outputs\":[{\"name\":\"lockOrBurnOut\",\"type\":\"tuple\",\"internalType\":\"structPool.LockOrBurnOutV1\",\"components\":[{\"name\":\"destTokenAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"destPoolData\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"owner\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"releaseOrMint\",\"inputs\":[{\"name\":\"releaseOrMintIn\",\"type\":\"tuple\",\"internalType\":\"structPool.ReleaseOrMintInV1\",\"components\":[{\"name\":\"originalSender\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"receiver\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"localToken\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"sourcePoolAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"sourcePoolData\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"offchainTokenData\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]}],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"structPool.ReleaseOrMintOutV1\",\"components\":[{\"name\":\"destinationAmount\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"removeRemotePool\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"remotePoolAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setChainRateLimiterConfig\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"outboundConfig\",\"type\":\"tuple\",\"internalType\":\"structRateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]},{\"name\":\"inboundConfig\",\"type\":\"tuple\",\"internalType\":\"structRateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setChainRateLimiterConfigs\",\"inputs\":[{\"name\":\"remoteChainSelectors\",\"type\":\"uint64[]\",\"internalType\":\"uint64[]\"},{\"name\":\"outboundConfigs\",\"type\":\"tuple[]\",\"internalType\":\"structRateLimiter.Config[]\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]},{\"name\":\"inboundConfigs\",\"type\":\"tuple[]\",\"internalType\":\"structRateLimiter.Config[]\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setRateLimitAdmin\",\"inputs\":[{\"name\":\"rateLimitAdmin\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setRouter\",\"inputs\":[{\"name\":\"newRouter\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"supportsInterface\",\"inputs\":[{\"name\":\"interfaceId\",\"type\":\"bytes4\",\"internalType\":\"bytes4\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"pure\"},{\"type\":\"function\",\"name\":\"transferOwnership\",\"inputs\":[{\"name\":\"to\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"typeAndVersion\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"string\",\"internalType\":\"string\"}],\"stateMutability\":\"pure\"},{\"type\":\"function\",\"name\":\"updateDestChainConfig\",\"inputs\":[{\"name\":\"destChainConfigArgs\",\"type\":\"tuple\",\"internalType\":\"structFastTransferTokenPoolAbstract.DestChainConfigUpdateArgs\",\"components\":[{\"name\":\"maxFillAmountPerRequest\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"destinationPool\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"chainFamilySelector\",\"type\":\"bytes4\",\"internalType\":\"bytes4\"},{\"name\":\"fastTransferBpsFee\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"fillerAllowlistEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"settlementOverheadGas\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"evmToAnyMessageExtraArgsBytes\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"addFillers\",\"type\":\"address[]\",\"internalType\":\"address[]\"},{\"name\":\"removeFillers\",\"type\":\"address[]\",\"internalType\":\"address[]\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"updateFillerAllowList\",\"inputs\":[{\"name\":\"destinationChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"addFillers\",\"type\":\"address[]\",\"internalType\":\"address[]\"},{\"name\":\"removeFillers\",\"type\":\"address[]\",\"internalType\":\"address[]\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"event\",\"name\":\"AllowListAdd\",\"inputs\":[{\"name\":\"sender\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"AllowListRemove\",\"inputs\":[{\"name\":\"sender\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"Burned\",\"inputs\":[{\"name\":\"sender\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"ChainAdded\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"indexed\":false,\"internalType\":\"uint64\"},{\"name\":\"remoteToken\",\"type\":\"bytes\",\"indexed\":false,\"internalType\":\"bytes\"},{\"name\":\"outboundRateLimiterConfig\",\"type\":\"tuple\",\"indexed\":false,\"internalType\":\"structRateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]},{\"name\":\"inboundRateLimiterConfig\",\"type\":\"tuple\",\"indexed\":false,\"internalType\":\"structRateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"ChainConfigured\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"indexed\":false,\"internalType\":\"uint64\"},{\"name\":\"outboundRateLimiterConfig\",\"type\":\"tuple\",\"indexed\":false,\"internalType\":\"structRateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]},{\"name\":\"inboundRateLimiterConfig\",\"type\":\"tuple\",\"indexed\":false,\"internalType\":\"structRateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"ChainRemoved\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"indexed\":false,\"internalType\":\"uint64\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"ConfigChanged\",\"inputs\":[{\"name\":\"config\",\"type\":\"tuple\",\"indexed\":false,\"internalType\":\"structRateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"DestChainConfigUpdated\",\"inputs\":[{\"name\":\"destinationChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"bps\",\"type\":\"uint16\",\"indexed\":false,\"internalType\":\"uint16\"},{\"name\":\"maxFillAmountPerRequest\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"},{\"name\":\"destinationPool\",\"type\":\"bytes\",\"indexed\":false,\"internalType\":\"bytes\"},{\"name\":\"addFillers\",\"type\":\"address[]\",\"indexed\":false,\"internalType\":\"address[]\"},{\"name\":\"removeFillers\",\"type\":\"address[]\",\"indexed\":false,\"internalType\":\"address[]\"},{\"name\":\"chainFamilySelector\",\"type\":\"bytes4\",\"indexed\":false,\"internalType\":\"bytes4\"},{\"name\":\"settlementOverheadGas\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"},{\"name\":\"fillerAllowlistEnabled\",\"type\":\"bool\",\"indexed\":false,\"internalType\":\"bool\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"DestinationPoolUpdated\",\"inputs\":[{\"name\":\"dst\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"destinationPool\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"FastTransferFilled\",\"inputs\":[{\"name\":\"fillRequestId\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"},{\"name\":\"fillId\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"},{\"name\":\"filler\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"destAmount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"},{\"name\":\"receiver\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"FastTransferRequested\",\"inputs\":[{\"name\":\"fillRequestId\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"},{\"name\":\"dstChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"},{\"name\":\"fastTransferFee\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"},{\"name\":\"receiver\",\"type\":\"bytes\",\"indexed\":false,\"internalType\":\"bytes\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"FastTransferSettled\",\"inputs\":[{\"name\":\"fillRequestId\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"FillerAllowListUpdated\",\"inputs\":[{\"name\":\"dst\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"addFillers\",\"type\":\"address[]\",\"indexed\":false,\"internalType\":\"address[]\"},{\"name\":\"removeFillers\",\"type\":\"address[]\",\"indexed\":false,\"internalType\":\"address[]\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"InvalidFill\",\"inputs\":[{\"name\":\"fillRequestId\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"},{\"name\":\"filler\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"filledAmount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"},{\"name\":\"expectedAmount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"Locked\",\"inputs\":[{\"name\":\"sender\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"Minted\",\"inputs\":[{\"name\":\"sender\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"recipient\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"OwnershipTransferRequested\",\"inputs\":[{\"name\":\"from\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"to\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"OwnershipTransferred\",\"inputs\":[{\"name\":\"from\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"to\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"RateLimitAdminSet\",\"inputs\":[{\"name\":\"rateLimitAdmin\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"Released\",\"inputs\":[{\"name\":\"sender\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"recipient\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"RemotePoolAdded\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"remotePoolAddress\",\"type\":\"bytes\",\"indexed\":false,\"internalType\":\"bytes\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"RemotePoolRemoved\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"remotePoolAddress\",\"type\":\"bytes\",\"indexed\":false,\"internalType\":\"bytes\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"RouterUpdated\",\"inputs\":[{\"name\":\"oldRouter\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"},{\"name\":\"newRouter\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"TokensConsumed\",\"inputs\":[{\"name\":\"tokens\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"error\",\"name\":\"AggregateValueMaxCapacityExceeded\",\"inputs\":[{\"name\":\"capacity\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"requested\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"type\":\"error\",\"name\":\"AggregateValueRateLimitReached\",\"inputs\":[{\"name\":\"minWaitInSeconds\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"available\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"type\":\"error\",\"name\":\"AllowListNotEnabled\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"AlreadyFilled\",\"inputs\":[{\"name\":\"fillRequestId\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}]},{\"type\":\"error\",\"name\":\"AlreadySettled\",\"inputs\":[{\"name\":\"fillRequestId\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}]},{\"type\":\"error\",\"name\":\"BucketOverfilled\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"CallerIsNotARampOnRouter\",\"inputs\":[{\"name\":\"caller\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"CannotTransferToSelf\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"ChainAlreadyExists\",\"inputs\":[{\"name\":\"chainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"ChainNotAllowed\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"CursedByRMN\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"DisabledNonZeroRateLimit\",\"inputs\":[{\"name\":\"config\",\"type\":\"tuple\",\"internalType\":\"structRateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]}]},{\"type\":\"error\",\"name\":\"FillerNotAllowlisted\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"filler\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"InvalidDecimalArgs\",\"inputs\":[{\"name\":\"expected\",\"type\":\"uint8\",\"internalType\":\"uint8\"},{\"name\":\"actual\",\"type\":\"uint8\",\"internalType\":\"uint8\"}]},{\"type\":\"error\",\"name\":\"InvalidDestChainConfig\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"InvalidRateLimitRate\",\"inputs\":[{\"name\":\"rateLimiterConfig\",\"type\":\"tuple\",\"internalType\":\"structRateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]}]},{\"type\":\"error\",\"name\":\"InvalidRemoteChainDecimals\",\"inputs\":[{\"name\":\"sourcePoolData\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]},{\"type\":\"error\",\"name\":\"InvalidRemotePoolForChain\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"remotePoolAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]},{\"type\":\"error\",\"name\":\"InvalidRouter\",\"inputs\":[{\"name\":\"router\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"InvalidSourcePoolAddress\",\"inputs\":[{\"name\":\"sourcePoolAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]},{\"type\":\"error\",\"name\":\"InvalidToken\",\"inputs\":[{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"MismatchedArrayLengths\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"MustBeProposedOwner\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"NonExistentChain\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"OnlyCallableByOwner\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"OverflowDetected\",\"inputs\":[{\"name\":\"remoteDecimals\",\"type\":\"uint8\",\"internalType\":\"uint8\"},{\"name\":\"localDecimals\",\"type\":\"uint8\",\"internalType\":\"uint8\"},{\"name\":\"remoteAmount\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"type\":\"error\",\"name\":\"OwnerCannotBeZero\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"PoolAlreadyAdded\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"remotePoolAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]},{\"type\":\"error\",\"name\":\"RateLimitMustBeDisabled\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"SenderNotAllowed\",\"inputs\":[{\"name\":\"sender\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"TokenMaxCapacityExceeded\",\"inputs\":[{\"name\":\"capacity\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"requested\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"tokenAddress\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"TokenRateLimitReached\",\"inputs\":[{\"name\":\"minWaitInSeconds\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"available\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"tokenAddress\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"TransferAmountExceedsMaxFillAmount\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"type\":\"error\",\"name\":\"Unauthorized\",\"inputs\":[{\"name\":\"caller\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"ZeroAddressNotAllowed\",\"inputs\":[]}]",
 }
 
 var FastTransferTokenPoolAbstractABI = FastTransferTokenPoolAbstractMetaData.ABI
@@ -306,6 +313,28 @@ func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractSession) GetA
 
 func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractCallerSession) GetAllowListEnabled() (bool, error) {
 	return _FastTransferTokenPoolAbstract.Contract.GetAllowListEnabled(&_FastTransferTokenPoolAbstract.CallOpts)
+}
+
+func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractCaller) GetAllowListedFillers(opts *bind.CallOpts, remoteChainSelector uint64) ([]common.Address, error) {
+	var out []interface{}
+	err := _FastTransferTokenPoolAbstract.contract.Call(opts, &out, "getAllowListedFillers", remoteChainSelector)
+
+	if err != nil {
+		return *new([]common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new([]common.Address)).(*[]common.Address)
+
+	return out0, err
+
+}
+
+func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractSession) GetAllowListedFillers(remoteChainSelector uint64) ([]common.Address, error) {
+	return _FastTransferTokenPoolAbstract.Contract.GetAllowListedFillers(&_FastTransferTokenPoolAbstract.CallOpts, remoteChainSelector)
+}
+
+func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractCallerSession) GetAllowListedFillers(remoteChainSelector uint64) ([]common.Address, error) {
+	return _FastTransferTokenPoolAbstract.Contract.GetAllowListedFillers(&_FastTransferTokenPoolAbstract.CallOpts, remoteChainSelector)
 }
 
 func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractCaller) GetCcipSendTokenFee(opts *bind.CallOpts, settlementFeeToken common.Address, destinationChainSelector uint64, amount *big.Int, receiver []byte, extraArgs []byte) (IFastTransferPoolQuote, error) {
@@ -594,6 +623,28 @@ func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractCallerSession
 	return _FastTransferTokenPoolAbstract.Contract.GetTokenDecimals(&_FastTransferTokenPoolAbstract.CallOpts)
 }
 
+func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractCaller) IsFillerAllowListed(opts *bind.CallOpts, remoteChainSelector uint64, filler common.Address) (bool, error) {
+	var out []interface{}
+	err := _FastTransferTokenPoolAbstract.contract.Call(opts, &out, "isFillerAllowListed", remoteChainSelector, filler)
+
+	if err != nil {
+		return *new(bool), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
+
+	return out0, err
+
+}
+
+func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractSession) IsFillerAllowListed(remoteChainSelector uint64, filler common.Address) (bool, error) {
+	return _FastTransferTokenPoolAbstract.Contract.IsFillerAllowListed(&_FastTransferTokenPoolAbstract.CallOpts, remoteChainSelector, filler)
+}
+
+func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractCallerSession) IsFillerAllowListed(remoteChainSelector uint64, filler common.Address) (bool, error) {
+	return _FastTransferTokenPoolAbstract.Contract.IsFillerAllowListed(&_FastTransferTokenPoolAbstract.CallOpts, remoteChainSelector, filler)
+}
+
 func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractCaller) IsRemotePool(opts *bind.CallOpts, remoteChainSelector uint64, remotePoolAddress []byte) (bool, error) {
 	var out []interface{}
 	err := _FastTransferTokenPoolAbstract.contract.Call(opts, &out, "isRemotePool", remoteChainSelector, remotePoolAddress)
@@ -658,28 +709,6 @@ func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractSession) IsSu
 
 func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractCallerSession) IsSupportedToken(token common.Address) (bool, error) {
 	return _FastTransferTokenPoolAbstract.Contract.IsSupportedToken(&_FastTransferTokenPoolAbstract.CallOpts, token)
-}
-
-func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractCaller) IsfillerAllowListed(opts *bind.CallOpts, remoteChainSelector uint64, filler common.Address) (bool, error) {
-	var out []interface{}
-	err := _FastTransferTokenPoolAbstract.contract.Call(opts, &out, "isfillerAllowListed", remoteChainSelector, filler)
-
-	if err != nil {
-		return *new(bool), err
-	}
-
-	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
-
-	return out0, err
-
-}
-
-func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractSession) IsfillerAllowListed(remoteChainSelector uint64, filler common.Address) (bool, error) {
-	return _FastTransferTokenPoolAbstract.Contract.IsfillerAllowListed(&_FastTransferTokenPoolAbstract.CallOpts, remoteChainSelector, filler)
-}
-
-func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractCallerSession) IsfillerAllowListed(remoteChainSelector uint64, filler common.Address) (bool, error) {
-	return _FastTransferTokenPoolAbstract.Contract.IsfillerAllowListed(&_FastTransferTokenPoolAbstract.CallOpts, remoteChainSelector, filler)
 }
 
 func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractCaller) Owner(opts *bind.CallOpts) (common.Address, error) {
@@ -820,16 +849,16 @@ func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractTransactorSes
 	return _FastTransferTokenPoolAbstract.Contract.CcipSendToken(&_FastTransferTokenPoolAbstract.TransactOpts, feeToken, destinationChainSelector, amount, receiver, extraArgs)
 }
 
-func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractTransactor) FastFill(opts *bind.TransactOpts, fillRequestId [32]byte, sourceChainSelector uint64, srcAmount *big.Int, sourceDecimals uint8, receiver common.Address) (*types.Transaction, error) {
-	return _FastTransferTokenPoolAbstract.contract.Transact(opts, "fastFill", fillRequestId, sourceChainSelector, srcAmount, sourceDecimals, receiver)
+func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractTransactor) FastFill(opts *bind.TransactOpts, fillRequestId [32]byte, sourceChainSelector uint64, srcAmountToFill *big.Int, sourceDecimals uint8, receiver common.Address) (*types.Transaction, error) {
+	return _FastTransferTokenPoolAbstract.contract.Transact(opts, "fastFill", fillRequestId, sourceChainSelector, srcAmountToFill, sourceDecimals, receiver)
 }
 
-func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractSession) FastFill(fillRequestId [32]byte, sourceChainSelector uint64, srcAmount *big.Int, sourceDecimals uint8, receiver common.Address) (*types.Transaction, error) {
-	return _FastTransferTokenPoolAbstract.Contract.FastFill(&_FastTransferTokenPoolAbstract.TransactOpts, fillRequestId, sourceChainSelector, srcAmount, sourceDecimals, receiver)
+func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractSession) FastFill(fillRequestId [32]byte, sourceChainSelector uint64, srcAmountToFill *big.Int, sourceDecimals uint8, receiver common.Address) (*types.Transaction, error) {
+	return _FastTransferTokenPoolAbstract.Contract.FastFill(&_FastTransferTokenPoolAbstract.TransactOpts, fillRequestId, sourceChainSelector, srcAmountToFill, sourceDecimals, receiver)
 }
 
-func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractTransactorSession) FastFill(fillRequestId [32]byte, sourceChainSelector uint64, srcAmount *big.Int, sourceDecimals uint8, receiver common.Address) (*types.Transaction, error) {
-	return _FastTransferTokenPoolAbstract.Contract.FastFill(&_FastTransferTokenPoolAbstract.TransactOpts, fillRequestId, sourceChainSelector, srcAmount, sourceDecimals, receiver)
+func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractTransactorSession) FastFill(fillRequestId [32]byte, sourceChainSelector uint64, srcAmountToFill *big.Int, sourceDecimals uint8, receiver common.Address) (*types.Transaction, error) {
+	return _FastTransferTokenPoolAbstract.Contract.FastFill(&_FastTransferTokenPoolAbstract.TransactOpts, fillRequestId, sourceChainSelector, srcAmountToFill, sourceDecimals, receiver)
 }
 
 func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractTransactor) LockOrBurn(opts *bind.TransactOpts, lockOrBurnIn PoolLockOrBurnInV1) (*types.Transaction, error) {
@@ -928,28 +957,28 @@ func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractTransactorSes
 	return _FastTransferTokenPoolAbstract.Contract.TransferOwnership(&_FastTransferTokenPoolAbstract.TransactOpts, to)
 }
 
-func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractTransactor) UpdateDestChainConfig(opts *bind.TransactOpts, laneConfigArgs FastTransferTokenPoolAbstractDestChainConfigUpdateArgs) (*types.Transaction, error) {
-	return _FastTransferTokenPoolAbstract.contract.Transact(opts, "updateDestChainConfig", laneConfigArgs)
+func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractTransactor) UpdateDestChainConfig(opts *bind.TransactOpts, destChainConfigArgs FastTransferTokenPoolAbstractDestChainConfigUpdateArgs) (*types.Transaction, error) {
+	return _FastTransferTokenPoolAbstract.contract.Transact(opts, "updateDestChainConfig", destChainConfigArgs)
 }
 
-func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractSession) UpdateDestChainConfig(laneConfigArgs FastTransferTokenPoolAbstractDestChainConfigUpdateArgs) (*types.Transaction, error) {
-	return _FastTransferTokenPoolAbstract.Contract.UpdateDestChainConfig(&_FastTransferTokenPoolAbstract.TransactOpts, laneConfigArgs)
+func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractSession) UpdateDestChainConfig(destChainConfigArgs FastTransferTokenPoolAbstractDestChainConfigUpdateArgs) (*types.Transaction, error) {
+	return _FastTransferTokenPoolAbstract.Contract.UpdateDestChainConfig(&_FastTransferTokenPoolAbstract.TransactOpts, destChainConfigArgs)
 }
 
-func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractTransactorSession) UpdateDestChainConfig(laneConfigArgs FastTransferTokenPoolAbstractDestChainConfigUpdateArgs) (*types.Transaction, error) {
-	return _FastTransferTokenPoolAbstract.Contract.UpdateDestChainConfig(&_FastTransferTokenPoolAbstract.TransactOpts, laneConfigArgs)
+func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractTransactorSession) UpdateDestChainConfig(destChainConfigArgs FastTransferTokenPoolAbstractDestChainConfigUpdateArgs) (*types.Transaction, error) {
+	return _FastTransferTokenPoolAbstract.Contract.UpdateDestChainConfig(&_FastTransferTokenPoolAbstract.TransactOpts, destChainConfigArgs)
 }
 
-func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractTransactor) UpdatefillerAllowList(opts *bind.TransactOpts, destinationChainSelector uint64, addFillers []common.Address, removeFillers []common.Address) (*types.Transaction, error) {
-	return _FastTransferTokenPoolAbstract.contract.Transact(opts, "updatefillerAllowList", destinationChainSelector, addFillers, removeFillers)
+func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractTransactor) UpdateFillerAllowList(opts *bind.TransactOpts, destinationChainSelector uint64, addFillers []common.Address, removeFillers []common.Address) (*types.Transaction, error) {
+	return _FastTransferTokenPoolAbstract.contract.Transact(opts, "updateFillerAllowList", destinationChainSelector, addFillers, removeFillers)
 }
 
-func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractSession) UpdatefillerAllowList(destinationChainSelector uint64, addFillers []common.Address, removeFillers []common.Address) (*types.Transaction, error) {
-	return _FastTransferTokenPoolAbstract.Contract.UpdatefillerAllowList(&_FastTransferTokenPoolAbstract.TransactOpts, destinationChainSelector, addFillers, removeFillers)
+func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractSession) UpdateFillerAllowList(destinationChainSelector uint64, addFillers []common.Address, removeFillers []common.Address) (*types.Transaction, error) {
+	return _FastTransferTokenPoolAbstract.Contract.UpdateFillerAllowList(&_FastTransferTokenPoolAbstract.TransactOpts, destinationChainSelector, addFillers, removeFillers)
 }
 
-func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractTransactorSession) UpdatefillerAllowList(destinationChainSelector uint64, addFillers []common.Address, removeFillers []common.Address) (*types.Transaction, error) {
-	return _FastTransferTokenPoolAbstract.Contract.UpdatefillerAllowList(&_FastTransferTokenPoolAbstract.TransactOpts, destinationChainSelector, addFillers, removeFillers)
+func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractTransactorSession) UpdateFillerAllowList(destinationChainSelector uint64, addFillers []common.Address, removeFillers []common.Address) (*types.Transaction, error) {
+	return _FastTransferTokenPoolAbstract.Contract.UpdateFillerAllowList(&_FastTransferTokenPoolAbstract.TransactOpts, destinationChainSelector, addFillers, removeFillers)
 }
 
 type FastTransferTokenPoolAbstractAllowListAddIterator struct {
@@ -1787,6 +1816,141 @@ func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractFilterer) Par
 	return event, nil
 }
 
+type FastTransferTokenPoolAbstractDestChainConfigUpdatedIterator struct {
+	Event *FastTransferTokenPoolAbstractDestChainConfigUpdated
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *FastTransferTokenPoolAbstractDestChainConfigUpdatedIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(FastTransferTokenPoolAbstractDestChainConfigUpdated)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(FastTransferTokenPoolAbstractDestChainConfigUpdated)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *FastTransferTokenPoolAbstractDestChainConfigUpdatedIterator) Error() error {
+	return it.fail
+}
+
+func (it *FastTransferTokenPoolAbstractDestChainConfigUpdatedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type FastTransferTokenPoolAbstractDestChainConfigUpdated struct {
+	DestinationChainSelector uint64
+	Bps                      uint16
+	MaxFillAmountPerRequest  *big.Int
+	DestinationPool          []byte
+	AddFillers               []common.Address
+	RemoveFillers            []common.Address
+	ChainFamilySelector      [4]byte
+	SettlementOverheadGas    *big.Int
+	FillerAllowlistEnabled   bool
+	Raw                      types.Log
+}
+
+func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractFilterer) FilterDestChainConfigUpdated(opts *bind.FilterOpts, destinationChainSelector []uint64) (*FastTransferTokenPoolAbstractDestChainConfigUpdatedIterator, error) {
+
+	var destinationChainSelectorRule []interface{}
+	for _, destinationChainSelectorItem := range destinationChainSelector {
+		destinationChainSelectorRule = append(destinationChainSelectorRule, destinationChainSelectorItem)
+	}
+
+	logs, sub, err := _FastTransferTokenPoolAbstract.contract.FilterLogs(opts, "DestChainConfigUpdated", destinationChainSelectorRule)
+	if err != nil {
+		return nil, err
+	}
+	return &FastTransferTokenPoolAbstractDestChainConfigUpdatedIterator{contract: _FastTransferTokenPoolAbstract.contract, event: "DestChainConfigUpdated", logs: logs, sub: sub}, nil
+}
+
+func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractFilterer) WatchDestChainConfigUpdated(opts *bind.WatchOpts, sink chan<- *FastTransferTokenPoolAbstractDestChainConfigUpdated, destinationChainSelector []uint64) (event.Subscription, error) {
+
+	var destinationChainSelectorRule []interface{}
+	for _, destinationChainSelectorItem := range destinationChainSelector {
+		destinationChainSelectorRule = append(destinationChainSelectorRule, destinationChainSelectorItem)
+	}
+
+	logs, sub, err := _FastTransferTokenPoolAbstract.contract.WatchLogs(opts, "DestChainConfigUpdated", destinationChainSelectorRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(FastTransferTokenPoolAbstractDestChainConfigUpdated)
+				if err := _FastTransferTokenPoolAbstract.contract.UnpackLog(event, "DestChainConfigUpdated", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractFilterer) ParseDestChainConfigUpdated(log types.Log) (*FastTransferTokenPoolAbstractDestChainConfigUpdated, error) {
+	event := new(FastTransferTokenPoolAbstractDestChainConfigUpdated)
+	if err := _FastTransferTokenPoolAbstract.contract.UnpackLog(event, "DestChainConfigUpdated", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
 type FastTransferTokenPoolAbstractDestinationPoolUpdatedIterator struct {
 	Event *FastTransferTokenPoolAbstractDestinationPoolUpdated
 
@@ -1915,8 +2079,8 @@ func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractFilterer) Par
 	return event, nil
 }
 
-type FastTransferTokenPoolAbstractFastFillIterator struct {
-	Event *FastTransferTokenPoolAbstractFastFill
+type FastTransferTokenPoolAbstractFastTransferFilledIterator struct {
+	Event *FastTransferTokenPoolAbstractFastTransferFilled
 
 	contract *bind.BoundContract
 	event    string
@@ -1927,7 +2091,7 @@ type FastTransferTokenPoolAbstractFastFillIterator struct {
 	fail error
 }
 
-func (it *FastTransferTokenPoolAbstractFastFillIterator) Next() bool {
+func (it *FastTransferTokenPoolAbstractFastTransferFilledIterator) Next() bool {
 
 	if it.fail != nil {
 		return false
@@ -1936,7 +2100,7 @@ func (it *FastTransferTokenPoolAbstractFastFillIterator) Next() bool {
 	if it.done {
 		select {
 		case log := <-it.logs:
-			it.Event = new(FastTransferTokenPoolAbstractFastFill)
+			it.Event = new(FastTransferTokenPoolAbstractFastTransferFilled)
 			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 				it.fail = err
 				return false
@@ -1951,7 +2115,7 @@ func (it *FastTransferTokenPoolAbstractFastFillIterator) Next() bool {
 
 	select {
 	case log := <-it.logs:
-		it.Event = new(FastTransferTokenPoolAbstractFastFill)
+		it.Event = new(FastTransferTokenPoolAbstractFastTransferFilled)
 		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 			it.fail = err
 			return false
@@ -1966,16 +2130,16 @@ func (it *FastTransferTokenPoolAbstractFastFillIterator) Next() bool {
 	}
 }
 
-func (it *FastTransferTokenPoolAbstractFastFillIterator) Error() error {
+func (it *FastTransferTokenPoolAbstractFastTransferFilledIterator) Error() error {
 	return it.fail
 }
 
-func (it *FastTransferTokenPoolAbstractFastFillIterator) Close() error {
+func (it *FastTransferTokenPoolAbstractFastTransferFilledIterator) Close() error {
 	it.sub.Unsubscribe()
 	return nil
 }
 
-type FastTransferTokenPoolAbstractFastFill struct {
+type FastTransferTokenPoolAbstractFastTransferFilled struct {
 	FillRequestId [32]byte
 	FillId        [32]byte
 	Filler        common.Address
@@ -1984,7 +2148,7 @@ type FastTransferTokenPoolAbstractFastFill struct {
 	Raw           types.Log
 }
 
-func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractFilterer) FilterFastFill(opts *bind.FilterOpts, fillRequestId [][32]byte, fillId [][32]byte, filler []common.Address) (*FastTransferTokenPoolAbstractFastFillIterator, error) {
+func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractFilterer) FilterFastTransferFilled(opts *bind.FilterOpts, fillRequestId [][32]byte, fillId [][32]byte, filler []common.Address) (*FastTransferTokenPoolAbstractFastTransferFilledIterator, error) {
 
 	var fillRequestIdRule []interface{}
 	for _, fillRequestIdItem := range fillRequestId {
@@ -1999,14 +2163,14 @@ func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractFilterer) Fil
 		fillerRule = append(fillerRule, fillerItem)
 	}
 
-	logs, sub, err := _FastTransferTokenPoolAbstract.contract.FilterLogs(opts, "FastFill", fillRequestIdRule, fillIdRule, fillerRule)
+	logs, sub, err := _FastTransferTokenPoolAbstract.contract.FilterLogs(opts, "FastTransferFilled", fillRequestIdRule, fillIdRule, fillerRule)
 	if err != nil {
 		return nil, err
 	}
-	return &FastTransferTokenPoolAbstractFastFillIterator{contract: _FastTransferTokenPoolAbstract.contract, event: "FastFill", logs: logs, sub: sub}, nil
+	return &FastTransferTokenPoolAbstractFastTransferFilledIterator{contract: _FastTransferTokenPoolAbstract.contract, event: "FastTransferFilled", logs: logs, sub: sub}, nil
 }
 
-func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractFilterer) WatchFastFill(opts *bind.WatchOpts, sink chan<- *FastTransferTokenPoolAbstractFastFill, fillRequestId [][32]byte, fillId [][32]byte, filler []common.Address) (event.Subscription, error) {
+func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractFilterer) WatchFastTransferFilled(opts *bind.WatchOpts, sink chan<- *FastTransferTokenPoolAbstractFastTransferFilled, fillRequestId [][32]byte, fillId [][32]byte, filler []common.Address) (event.Subscription, error) {
 
 	var fillRequestIdRule []interface{}
 	for _, fillRequestIdItem := range fillRequestId {
@@ -2021,7 +2185,7 @@ func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractFilterer) Wat
 		fillerRule = append(fillerRule, fillerItem)
 	}
 
-	logs, sub, err := _FastTransferTokenPoolAbstract.contract.WatchLogs(opts, "FastFill", fillRequestIdRule, fillIdRule, fillerRule)
+	logs, sub, err := _FastTransferTokenPoolAbstract.contract.WatchLogs(opts, "FastTransferFilled", fillRequestIdRule, fillIdRule, fillerRule)
 	if err != nil {
 		return nil, err
 	}
@@ -2031,8 +2195,8 @@ func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractFilterer) Wat
 			select {
 			case log := <-logs:
 
-				event := new(FastTransferTokenPoolAbstractFastFill)
-				if err := _FastTransferTokenPoolAbstract.contract.UnpackLog(event, "FastFill", log); err != nil {
+				event := new(FastTransferTokenPoolAbstractFastTransferFilled)
+				if err := _FastTransferTokenPoolAbstract.contract.UnpackLog(event, "FastTransferFilled", log); err != nil {
 					return err
 				}
 				event.Raw = log
@@ -2053,17 +2217,17 @@ func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractFilterer) Wat
 	}), nil
 }
 
-func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractFilterer) ParseFastFill(log types.Log) (*FastTransferTokenPoolAbstractFastFill, error) {
-	event := new(FastTransferTokenPoolAbstractFastFill)
-	if err := _FastTransferTokenPoolAbstract.contract.UnpackLog(event, "FastFill", log); err != nil {
+func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractFilterer) ParseFastTransferFilled(log types.Log) (*FastTransferTokenPoolAbstractFastTransferFilled, error) {
+	event := new(FastTransferTokenPoolAbstractFastTransferFilled)
+	if err := _FastTransferTokenPoolAbstract.contract.UnpackLog(event, "FastTransferFilled", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
 	return event, nil
 }
 
-type FastTransferTokenPoolAbstractFastFillRequestIterator struct {
-	Event *FastTransferTokenPoolAbstractFastFillRequest
+type FastTransferTokenPoolAbstractFastTransferRequestedIterator struct {
+	Event *FastTransferTokenPoolAbstractFastTransferRequested
 
 	contract *bind.BoundContract
 	event    string
@@ -2074,7 +2238,7 @@ type FastTransferTokenPoolAbstractFastFillRequestIterator struct {
 	fail error
 }
 
-func (it *FastTransferTokenPoolAbstractFastFillRequestIterator) Next() bool {
+func (it *FastTransferTokenPoolAbstractFastTransferRequestedIterator) Next() bool {
 
 	if it.fail != nil {
 		return false
@@ -2083,7 +2247,7 @@ func (it *FastTransferTokenPoolAbstractFastFillRequestIterator) Next() bool {
 	if it.done {
 		select {
 		case log := <-it.logs:
-			it.Event = new(FastTransferTokenPoolAbstractFastFillRequest)
+			it.Event = new(FastTransferTokenPoolAbstractFastTransferRequested)
 			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 				it.fail = err
 				return false
@@ -2098,7 +2262,7 @@ func (it *FastTransferTokenPoolAbstractFastFillRequestIterator) Next() bool {
 
 	select {
 	case log := <-it.logs:
-		it.Event = new(FastTransferTokenPoolAbstractFastFillRequest)
+		it.Event = new(FastTransferTokenPoolAbstractFastTransferRequested)
 		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 			it.fail = err
 			return false
@@ -2113,16 +2277,16 @@ func (it *FastTransferTokenPoolAbstractFastFillRequestIterator) Next() bool {
 	}
 }
 
-func (it *FastTransferTokenPoolAbstractFastFillRequestIterator) Error() error {
+func (it *FastTransferTokenPoolAbstractFastTransferRequestedIterator) Error() error {
 	return it.fail
 }
 
-func (it *FastTransferTokenPoolAbstractFastFillRequestIterator) Close() error {
+func (it *FastTransferTokenPoolAbstractFastTransferRequestedIterator) Close() error {
 	it.sub.Unsubscribe()
 	return nil
 }
 
-type FastTransferTokenPoolAbstractFastFillRequest struct {
+type FastTransferTokenPoolAbstractFastTransferRequested struct {
 	FillRequestId    [32]byte
 	DstChainSelector uint64
 	Amount           *big.Int
@@ -2131,7 +2295,7 @@ type FastTransferTokenPoolAbstractFastFillRequest struct {
 	Raw              types.Log
 }
 
-func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractFilterer) FilterFastFillRequest(opts *bind.FilterOpts, fillRequestId [][32]byte, dstChainSelector []uint64) (*FastTransferTokenPoolAbstractFastFillRequestIterator, error) {
+func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractFilterer) FilterFastTransferRequested(opts *bind.FilterOpts, fillRequestId [][32]byte, dstChainSelector []uint64) (*FastTransferTokenPoolAbstractFastTransferRequestedIterator, error) {
 
 	var fillRequestIdRule []interface{}
 	for _, fillRequestIdItem := range fillRequestId {
@@ -2142,14 +2306,14 @@ func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractFilterer) Fil
 		dstChainSelectorRule = append(dstChainSelectorRule, dstChainSelectorItem)
 	}
 
-	logs, sub, err := _FastTransferTokenPoolAbstract.contract.FilterLogs(opts, "FastFillRequest", fillRequestIdRule, dstChainSelectorRule)
+	logs, sub, err := _FastTransferTokenPoolAbstract.contract.FilterLogs(opts, "FastTransferRequested", fillRequestIdRule, dstChainSelectorRule)
 	if err != nil {
 		return nil, err
 	}
-	return &FastTransferTokenPoolAbstractFastFillRequestIterator{contract: _FastTransferTokenPoolAbstract.contract, event: "FastFillRequest", logs: logs, sub: sub}, nil
+	return &FastTransferTokenPoolAbstractFastTransferRequestedIterator{contract: _FastTransferTokenPoolAbstract.contract, event: "FastTransferRequested", logs: logs, sub: sub}, nil
 }
 
-func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractFilterer) WatchFastFillRequest(opts *bind.WatchOpts, sink chan<- *FastTransferTokenPoolAbstractFastFillRequest, fillRequestId [][32]byte, dstChainSelector []uint64) (event.Subscription, error) {
+func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractFilterer) WatchFastTransferRequested(opts *bind.WatchOpts, sink chan<- *FastTransferTokenPoolAbstractFastTransferRequested, fillRequestId [][32]byte, dstChainSelector []uint64) (event.Subscription, error) {
 
 	var fillRequestIdRule []interface{}
 	for _, fillRequestIdItem := range fillRequestId {
@@ -2160,7 +2324,7 @@ func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractFilterer) Wat
 		dstChainSelectorRule = append(dstChainSelectorRule, dstChainSelectorItem)
 	}
 
-	logs, sub, err := _FastTransferTokenPoolAbstract.contract.WatchLogs(opts, "FastFillRequest", fillRequestIdRule, dstChainSelectorRule)
+	logs, sub, err := _FastTransferTokenPoolAbstract.contract.WatchLogs(opts, "FastTransferRequested", fillRequestIdRule, dstChainSelectorRule)
 	if err != nil {
 		return nil, err
 	}
@@ -2170,8 +2334,8 @@ func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractFilterer) Wat
 			select {
 			case log := <-logs:
 
-				event := new(FastTransferTokenPoolAbstractFastFillRequest)
-				if err := _FastTransferTokenPoolAbstract.contract.UnpackLog(event, "FastFillRequest", log); err != nil {
+				event := new(FastTransferTokenPoolAbstractFastTransferRequested)
+				if err := _FastTransferTokenPoolAbstract.contract.UnpackLog(event, "FastTransferRequested", log); err != nil {
 					return err
 				}
 				event.Raw = log
@@ -2192,17 +2356,17 @@ func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractFilterer) Wat
 	}), nil
 }
 
-func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractFilterer) ParseFastFillRequest(log types.Log) (*FastTransferTokenPoolAbstractFastFillRequest, error) {
-	event := new(FastTransferTokenPoolAbstractFastFillRequest)
-	if err := _FastTransferTokenPoolAbstract.contract.UnpackLog(event, "FastFillRequest", log); err != nil {
+func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractFilterer) ParseFastTransferRequested(log types.Log) (*FastTransferTokenPoolAbstractFastTransferRequested, error) {
+	event := new(FastTransferTokenPoolAbstractFastTransferRequested)
+	if err := _FastTransferTokenPoolAbstract.contract.UnpackLog(event, "FastTransferRequested", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
 	return event, nil
 }
 
-type FastTransferTokenPoolAbstractFastFillSettledIterator struct {
-	Event *FastTransferTokenPoolAbstractFastFillSettled
+type FastTransferTokenPoolAbstractFastTransferSettledIterator struct {
+	Event *FastTransferTokenPoolAbstractFastTransferSettled
 
 	contract *bind.BoundContract
 	event    string
@@ -2213,7 +2377,7 @@ type FastTransferTokenPoolAbstractFastFillSettledIterator struct {
 	fail error
 }
 
-func (it *FastTransferTokenPoolAbstractFastFillSettledIterator) Next() bool {
+func (it *FastTransferTokenPoolAbstractFastTransferSettledIterator) Next() bool {
 
 	if it.fail != nil {
 		return false
@@ -2222,7 +2386,7 @@ func (it *FastTransferTokenPoolAbstractFastFillSettledIterator) Next() bool {
 	if it.done {
 		select {
 		case log := <-it.logs:
-			it.Event = new(FastTransferTokenPoolAbstractFastFillSettled)
+			it.Event = new(FastTransferTokenPoolAbstractFastTransferSettled)
 			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 				it.fail = err
 				return false
@@ -2237,7 +2401,7 @@ func (it *FastTransferTokenPoolAbstractFastFillSettledIterator) Next() bool {
 
 	select {
 	case log := <-it.logs:
-		it.Event = new(FastTransferTokenPoolAbstractFastFillSettled)
+		it.Event = new(FastTransferTokenPoolAbstractFastTransferSettled)
 		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 			it.fail = err
 			return false
@@ -2252,42 +2416,42 @@ func (it *FastTransferTokenPoolAbstractFastFillSettledIterator) Next() bool {
 	}
 }
 
-func (it *FastTransferTokenPoolAbstractFastFillSettledIterator) Error() error {
+func (it *FastTransferTokenPoolAbstractFastTransferSettledIterator) Error() error {
 	return it.fail
 }
 
-func (it *FastTransferTokenPoolAbstractFastFillSettledIterator) Close() error {
+func (it *FastTransferTokenPoolAbstractFastTransferSettledIterator) Close() error {
 	it.sub.Unsubscribe()
 	return nil
 }
 
-type FastTransferTokenPoolAbstractFastFillSettled struct {
+type FastTransferTokenPoolAbstractFastTransferSettled struct {
 	FillRequestId [32]byte
 	Raw           types.Log
 }
 
-func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractFilterer) FilterFastFillSettled(opts *bind.FilterOpts, fillRequestId [][32]byte) (*FastTransferTokenPoolAbstractFastFillSettledIterator, error) {
+func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractFilterer) FilterFastTransferSettled(opts *bind.FilterOpts, fillRequestId [][32]byte) (*FastTransferTokenPoolAbstractFastTransferSettledIterator, error) {
 
 	var fillRequestIdRule []interface{}
 	for _, fillRequestIdItem := range fillRequestId {
 		fillRequestIdRule = append(fillRequestIdRule, fillRequestIdItem)
 	}
 
-	logs, sub, err := _FastTransferTokenPoolAbstract.contract.FilterLogs(opts, "FastFillSettled", fillRequestIdRule)
+	logs, sub, err := _FastTransferTokenPoolAbstract.contract.FilterLogs(opts, "FastTransferSettled", fillRequestIdRule)
 	if err != nil {
 		return nil, err
 	}
-	return &FastTransferTokenPoolAbstractFastFillSettledIterator{contract: _FastTransferTokenPoolAbstract.contract, event: "FastFillSettled", logs: logs, sub: sub}, nil
+	return &FastTransferTokenPoolAbstractFastTransferSettledIterator{contract: _FastTransferTokenPoolAbstract.contract, event: "FastTransferSettled", logs: logs, sub: sub}, nil
 }
 
-func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractFilterer) WatchFastFillSettled(opts *bind.WatchOpts, sink chan<- *FastTransferTokenPoolAbstractFastFillSettled, fillRequestId [][32]byte) (event.Subscription, error) {
+func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractFilterer) WatchFastTransferSettled(opts *bind.WatchOpts, sink chan<- *FastTransferTokenPoolAbstractFastTransferSettled, fillRequestId [][32]byte) (event.Subscription, error) {
 
 	var fillRequestIdRule []interface{}
 	for _, fillRequestIdItem := range fillRequestId {
 		fillRequestIdRule = append(fillRequestIdRule, fillRequestIdItem)
 	}
 
-	logs, sub, err := _FastTransferTokenPoolAbstract.contract.WatchLogs(opts, "FastFillSettled", fillRequestIdRule)
+	logs, sub, err := _FastTransferTokenPoolAbstract.contract.WatchLogs(opts, "FastTransferSettled", fillRequestIdRule)
 	if err != nil {
 		return nil, err
 	}
@@ -2297,8 +2461,8 @@ func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractFilterer) Wat
 			select {
 			case log := <-logs:
 
-				event := new(FastTransferTokenPoolAbstractFastFillSettled)
-				if err := _FastTransferTokenPoolAbstract.contract.UnpackLog(event, "FastFillSettled", log); err != nil {
+				event := new(FastTransferTokenPoolAbstractFastTransferSettled)
+				if err := _FastTransferTokenPoolAbstract.contract.UnpackLog(event, "FastTransferSettled", log); err != nil {
 					return err
 				}
 				event.Raw = log
@@ -2319,9 +2483,9 @@ func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractFilterer) Wat
 	}), nil
 }
 
-func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractFilterer) ParseFastFillSettled(log types.Log) (*FastTransferTokenPoolAbstractFastFillSettled, error) {
-	event := new(FastTransferTokenPoolAbstractFastFillSettled)
-	if err := _FastTransferTokenPoolAbstract.contract.UnpackLog(event, "FastFillSettled", log); err != nil {
+func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractFilterer) ParseFastTransferSettled(log types.Log) (*FastTransferTokenPoolAbstractFastTransferSettled, error) {
+	event := new(FastTransferTokenPoolAbstractFastTransferSettled)
+	if err := _FastTransferTokenPoolAbstract.contract.UnpackLog(event, "FastTransferSettled", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
@@ -2589,138 +2753,6 @@ func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractFilterer) Wat
 func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractFilterer) ParseInvalidFill(log types.Log) (*FastTransferTokenPoolAbstractInvalidFill, error) {
 	event := new(FastTransferTokenPoolAbstractInvalidFill)
 	if err := _FastTransferTokenPoolAbstract.contract.UnpackLog(event, "InvalidFill", log); err != nil {
-		return nil, err
-	}
-	event.Raw = log
-	return event, nil
-}
-
-type FastTransferTokenPoolAbstractLaneUpdatedIterator struct {
-	Event *FastTransferTokenPoolAbstractLaneUpdated
-
-	contract *bind.BoundContract
-	event    string
-
-	logs chan types.Log
-	sub  ethereum.Subscription
-	done bool
-	fail error
-}
-
-func (it *FastTransferTokenPoolAbstractLaneUpdatedIterator) Next() bool {
-
-	if it.fail != nil {
-		return false
-	}
-
-	if it.done {
-		select {
-		case log := <-it.logs:
-			it.Event = new(FastTransferTokenPoolAbstractLaneUpdated)
-			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-				it.fail = err
-				return false
-			}
-			it.Event.Raw = log
-			return true
-
-		default:
-			return false
-		}
-	}
-
-	select {
-	case log := <-it.logs:
-		it.Event = new(FastTransferTokenPoolAbstractLaneUpdated)
-		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-			it.fail = err
-			return false
-		}
-		it.Event.Raw = log
-		return true
-
-	case err := <-it.sub.Err():
-		it.done = true
-		it.fail = err
-		return it.Next()
-	}
-}
-
-func (it *FastTransferTokenPoolAbstractLaneUpdatedIterator) Error() error {
-	return it.fail
-}
-
-func (it *FastTransferTokenPoolAbstractLaneUpdatedIterator) Close() error {
-	it.sub.Unsubscribe()
-	return nil
-}
-
-type FastTransferTokenPoolAbstractLaneUpdated struct {
-	DestinationChainSelector uint64
-	Bps                      uint16
-	MaxFillAmountPerRequest  *big.Int
-	DestinationPool          []byte
-	AddFillers               []common.Address
-	RemoveFillers            []common.Address
-	Raw                      types.Log
-}
-
-func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractFilterer) FilterLaneUpdated(opts *bind.FilterOpts, destinationChainSelector []uint64) (*FastTransferTokenPoolAbstractLaneUpdatedIterator, error) {
-
-	var destinationChainSelectorRule []interface{}
-	for _, destinationChainSelectorItem := range destinationChainSelector {
-		destinationChainSelectorRule = append(destinationChainSelectorRule, destinationChainSelectorItem)
-	}
-
-	logs, sub, err := _FastTransferTokenPoolAbstract.contract.FilterLogs(opts, "LaneUpdated", destinationChainSelectorRule)
-	if err != nil {
-		return nil, err
-	}
-	return &FastTransferTokenPoolAbstractLaneUpdatedIterator{contract: _FastTransferTokenPoolAbstract.contract, event: "LaneUpdated", logs: logs, sub: sub}, nil
-}
-
-func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractFilterer) WatchLaneUpdated(opts *bind.WatchOpts, sink chan<- *FastTransferTokenPoolAbstractLaneUpdated, destinationChainSelector []uint64) (event.Subscription, error) {
-
-	var destinationChainSelectorRule []interface{}
-	for _, destinationChainSelectorItem := range destinationChainSelector {
-		destinationChainSelectorRule = append(destinationChainSelectorRule, destinationChainSelectorItem)
-	}
-
-	logs, sub, err := _FastTransferTokenPoolAbstract.contract.WatchLogs(opts, "LaneUpdated", destinationChainSelectorRule)
-	if err != nil {
-		return nil, err
-	}
-	return event.NewSubscription(func(quit <-chan struct{}) error {
-		defer sub.Unsubscribe()
-		for {
-			select {
-			case log := <-logs:
-
-				event := new(FastTransferTokenPoolAbstractLaneUpdated)
-				if err := _FastTransferTokenPoolAbstract.contract.UnpackLog(event, "LaneUpdated", log); err != nil {
-					return err
-				}
-				event.Raw = log
-
-				select {
-				case sink <- event:
-				case err := <-sub.Err():
-					return err
-				case <-quit:
-					return nil
-				}
-			case err := <-sub.Err():
-				return err
-			case <-quit:
-				return nil
-			}
-		}
-	}), nil
-}
-
-func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstractFilterer) ParseLaneUpdated(log types.Log) (*FastTransferTokenPoolAbstractLaneUpdated, error) {
-	event := new(FastTransferTokenPoolAbstractLaneUpdated)
-	if err := _FastTransferTokenPoolAbstract.contract.UnpackLog(event, "LaneUpdated", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
@@ -4025,20 +4057,20 @@ func (_FastTransferTokenPoolAbstract *FastTransferTokenPoolAbstract) ParseLog(lo
 		return _FastTransferTokenPoolAbstract.ParseChainRemoved(log)
 	case _FastTransferTokenPoolAbstract.abi.Events["ConfigChanged"].ID:
 		return _FastTransferTokenPoolAbstract.ParseConfigChanged(log)
+	case _FastTransferTokenPoolAbstract.abi.Events["DestChainConfigUpdated"].ID:
+		return _FastTransferTokenPoolAbstract.ParseDestChainConfigUpdated(log)
 	case _FastTransferTokenPoolAbstract.abi.Events["DestinationPoolUpdated"].ID:
 		return _FastTransferTokenPoolAbstract.ParseDestinationPoolUpdated(log)
-	case _FastTransferTokenPoolAbstract.abi.Events["FastFill"].ID:
-		return _FastTransferTokenPoolAbstract.ParseFastFill(log)
-	case _FastTransferTokenPoolAbstract.abi.Events["FastFillRequest"].ID:
-		return _FastTransferTokenPoolAbstract.ParseFastFillRequest(log)
-	case _FastTransferTokenPoolAbstract.abi.Events["FastFillSettled"].ID:
-		return _FastTransferTokenPoolAbstract.ParseFastFillSettled(log)
+	case _FastTransferTokenPoolAbstract.abi.Events["FastTransferFilled"].ID:
+		return _FastTransferTokenPoolAbstract.ParseFastTransferFilled(log)
+	case _FastTransferTokenPoolAbstract.abi.Events["FastTransferRequested"].ID:
+		return _FastTransferTokenPoolAbstract.ParseFastTransferRequested(log)
+	case _FastTransferTokenPoolAbstract.abi.Events["FastTransferSettled"].ID:
+		return _FastTransferTokenPoolAbstract.ParseFastTransferSettled(log)
 	case _FastTransferTokenPoolAbstract.abi.Events["FillerAllowListUpdated"].ID:
 		return _FastTransferTokenPoolAbstract.ParseFillerAllowListUpdated(log)
 	case _FastTransferTokenPoolAbstract.abi.Events["InvalidFill"].ID:
 		return _FastTransferTokenPoolAbstract.ParseInvalidFill(log)
-	case _FastTransferTokenPoolAbstract.abi.Events["LaneUpdated"].ID:
-		return _FastTransferTokenPoolAbstract.ParseLaneUpdated(log)
 	case _FastTransferTokenPoolAbstract.abi.Events["Locked"].ID:
 		return _FastTransferTokenPoolAbstract.ParseLocked(log)
 	case _FastTransferTokenPoolAbstract.abi.Events["Minted"].ID:
@@ -4093,20 +4125,24 @@ func (FastTransferTokenPoolAbstractConfigChanged) Topic() common.Hash {
 	return common.HexToHash("0x9ea3374b67bf275e6bb9c8ae68f9cae023e1c528b4b27e092f0bb209d3531c19")
 }
 
+func (FastTransferTokenPoolAbstractDestChainConfigUpdated) Topic() common.Hash {
+	return common.HexToHash("0x391233e9b9f2fa088f64269fb39c6cf49aeeaad3183e75aafb2e2fd906f770e7")
+}
+
 func (FastTransferTokenPoolAbstractDestinationPoolUpdated) Topic() common.Hash {
 	return common.HexToHash("0xb760e03fa04c0e86fcff6d0046cdcf22fb5d5b6a17d1e6f890b3456e81c40fd8")
 }
 
-func (FastTransferTokenPoolAbstractFastFill) Topic() common.Hash {
-	return common.HexToHash("0x05abb4c63204ac64d430895792b9a147e544fbb4591f7c1bd1b4436dbf63355f")
+func (FastTransferTokenPoolAbstractFastTransferFilled) Topic() common.Hash {
+	return common.HexToHash("0xd6f70fb263bfe7d01ec6802b3c07b6bd32579760fe9fcb4e248a036debb8cdf1")
 }
 
-func (FastTransferTokenPoolAbstractFastFillRequest) Topic() common.Hash {
-	return common.HexToHash("0xbe96da9e73004694b4d32649f81f31784bd7c37daf64113f0ce1ebdd49a99a93")
+func (FastTransferTokenPoolAbstractFastTransferRequested) Topic() common.Hash {
+	return common.HexToHash("0x1199f551568004635134aaf2ae681cd3c00d4baf32ee26dd8b2b8d583b051d9a")
 }
 
-func (FastTransferTokenPoolAbstractFastFillSettled) Topic() common.Hash {
-	return common.HexToHash("0x9a3acb7ef95f9a8a2384f156d99ec2f035807c667ae66326823feead6d08fdbd")
+func (FastTransferTokenPoolAbstractFastTransferSettled) Topic() common.Hash {
+	return common.HexToHash("0xd5d4e34f92d581a906fa8f24b4d8c5639f8931ede3f4ad88f6aaf2d634d653c9")
 }
 
 func (FastTransferTokenPoolAbstractFillerAllowListUpdated) Topic() common.Hash {
@@ -4115,10 +4151,6 @@ func (FastTransferTokenPoolAbstractFillerAllowListUpdated) Topic() common.Hash {
 
 func (FastTransferTokenPoolAbstractInvalidFill) Topic() common.Hash {
 	return common.HexToHash("0xad64960fe1d28c88faed204b509e08b3c9e07d9c1cb84991addc205e6bfca42f")
-}
-
-func (FastTransferTokenPoolAbstractLaneUpdated) Topic() common.Hash {
-	return common.HexToHash("0xbed278e7a8c5c763baafe3f3497295e65fd1dec8d51555c7b72c665e219d2deb")
 }
 
 func (FastTransferTokenPoolAbstractLocked) Topic() common.Hash {
@@ -4172,6 +4204,8 @@ type FastTransferTokenPoolAbstractInterface interface {
 
 	GetAllowListEnabled(opts *bind.CallOpts) (bool, error)
 
+	GetAllowListedFillers(opts *bind.CallOpts, remoteChainSelector uint64) ([]common.Address, error)
+
 	GetCcipSendTokenFee(opts *bind.CallOpts, settlementFeeToken common.Address, destinationChainSelector uint64, amount *big.Int, receiver []byte, extraArgs []byte) (IFastTransferPoolQuote, error)
 
 	GetCurrentInboundRateLimiterState(opts *bind.CallOpts, remoteChainSelector uint64) (RateLimiterTokenBucket, error)
@@ -4198,13 +4232,13 @@ type FastTransferTokenPoolAbstractInterface interface {
 
 	GetTokenDecimals(opts *bind.CallOpts) (uint8, error)
 
+	IsFillerAllowListed(opts *bind.CallOpts, remoteChainSelector uint64, filler common.Address) (bool, error)
+
 	IsRemotePool(opts *bind.CallOpts, remoteChainSelector uint64, remotePoolAddress []byte) (bool, error)
 
 	IsSupportedChain(opts *bind.CallOpts, remoteChainSelector uint64) (bool, error)
 
 	IsSupportedToken(opts *bind.CallOpts, token common.Address) (bool, error)
-
-	IsfillerAllowListed(opts *bind.CallOpts, remoteChainSelector uint64, filler common.Address) (bool, error)
 
 	Owner(opts *bind.CallOpts) (common.Address, error)
 
@@ -4224,7 +4258,7 @@ type FastTransferTokenPoolAbstractInterface interface {
 
 	CcipSendToken(opts *bind.TransactOpts, feeToken common.Address, destinationChainSelector uint64, amount *big.Int, receiver []byte, extraArgs []byte) (*types.Transaction, error)
 
-	FastFill(opts *bind.TransactOpts, fillRequestId [32]byte, sourceChainSelector uint64, srcAmount *big.Int, sourceDecimals uint8, receiver common.Address) (*types.Transaction, error)
+	FastFill(opts *bind.TransactOpts, fillRequestId [32]byte, sourceChainSelector uint64, srcAmountToFill *big.Int, sourceDecimals uint8, receiver common.Address) (*types.Transaction, error)
 
 	LockOrBurn(opts *bind.TransactOpts, lockOrBurnIn PoolLockOrBurnInV1) (*types.Transaction, error)
 
@@ -4242,9 +4276,9 @@ type FastTransferTokenPoolAbstractInterface interface {
 
 	TransferOwnership(opts *bind.TransactOpts, to common.Address) (*types.Transaction, error)
 
-	UpdateDestChainConfig(opts *bind.TransactOpts, laneConfigArgs FastTransferTokenPoolAbstractDestChainConfigUpdateArgs) (*types.Transaction, error)
+	UpdateDestChainConfig(opts *bind.TransactOpts, destChainConfigArgs FastTransferTokenPoolAbstractDestChainConfigUpdateArgs) (*types.Transaction, error)
 
-	UpdatefillerAllowList(opts *bind.TransactOpts, destinationChainSelector uint64, addFillers []common.Address, removeFillers []common.Address) (*types.Transaction, error)
+	UpdateFillerAllowList(opts *bind.TransactOpts, destinationChainSelector uint64, addFillers []common.Address, removeFillers []common.Address) (*types.Transaction, error)
 
 	FilterAllowListAdd(opts *bind.FilterOpts) (*FastTransferTokenPoolAbstractAllowListAddIterator, error)
 
@@ -4288,29 +4322,35 @@ type FastTransferTokenPoolAbstractInterface interface {
 
 	ParseConfigChanged(log types.Log) (*FastTransferTokenPoolAbstractConfigChanged, error)
 
+	FilterDestChainConfigUpdated(opts *bind.FilterOpts, destinationChainSelector []uint64) (*FastTransferTokenPoolAbstractDestChainConfigUpdatedIterator, error)
+
+	WatchDestChainConfigUpdated(opts *bind.WatchOpts, sink chan<- *FastTransferTokenPoolAbstractDestChainConfigUpdated, destinationChainSelector []uint64) (event.Subscription, error)
+
+	ParseDestChainConfigUpdated(log types.Log) (*FastTransferTokenPoolAbstractDestChainConfigUpdated, error)
+
 	FilterDestinationPoolUpdated(opts *bind.FilterOpts, dst []uint64) (*FastTransferTokenPoolAbstractDestinationPoolUpdatedIterator, error)
 
 	WatchDestinationPoolUpdated(opts *bind.WatchOpts, sink chan<- *FastTransferTokenPoolAbstractDestinationPoolUpdated, dst []uint64) (event.Subscription, error)
 
 	ParseDestinationPoolUpdated(log types.Log) (*FastTransferTokenPoolAbstractDestinationPoolUpdated, error)
 
-	FilterFastFill(opts *bind.FilterOpts, fillRequestId [][32]byte, fillId [][32]byte, filler []common.Address) (*FastTransferTokenPoolAbstractFastFillIterator, error)
+	FilterFastTransferFilled(opts *bind.FilterOpts, fillRequestId [][32]byte, fillId [][32]byte, filler []common.Address) (*FastTransferTokenPoolAbstractFastTransferFilledIterator, error)
 
-	WatchFastFill(opts *bind.WatchOpts, sink chan<- *FastTransferTokenPoolAbstractFastFill, fillRequestId [][32]byte, fillId [][32]byte, filler []common.Address) (event.Subscription, error)
+	WatchFastTransferFilled(opts *bind.WatchOpts, sink chan<- *FastTransferTokenPoolAbstractFastTransferFilled, fillRequestId [][32]byte, fillId [][32]byte, filler []common.Address) (event.Subscription, error)
 
-	ParseFastFill(log types.Log) (*FastTransferTokenPoolAbstractFastFill, error)
+	ParseFastTransferFilled(log types.Log) (*FastTransferTokenPoolAbstractFastTransferFilled, error)
 
-	FilterFastFillRequest(opts *bind.FilterOpts, fillRequestId [][32]byte, dstChainSelector []uint64) (*FastTransferTokenPoolAbstractFastFillRequestIterator, error)
+	FilterFastTransferRequested(opts *bind.FilterOpts, fillRequestId [][32]byte, dstChainSelector []uint64) (*FastTransferTokenPoolAbstractFastTransferRequestedIterator, error)
 
-	WatchFastFillRequest(opts *bind.WatchOpts, sink chan<- *FastTransferTokenPoolAbstractFastFillRequest, fillRequestId [][32]byte, dstChainSelector []uint64) (event.Subscription, error)
+	WatchFastTransferRequested(opts *bind.WatchOpts, sink chan<- *FastTransferTokenPoolAbstractFastTransferRequested, fillRequestId [][32]byte, dstChainSelector []uint64) (event.Subscription, error)
 
-	ParseFastFillRequest(log types.Log) (*FastTransferTokenPoolAbstractFastFillRequest, error)
+	ParseFastTransferRequested(log types.Log) (*FastTransferTokenPoolAbstractFastTransferRequested, error)
 
-	FilterFastFillSettled(opts *bind.FilterOpts, fillRequestId [][32]byte) (*FastTransferTokenPoolAbstractFastFillSettledIterator, error)
+	FilterFastTransferSettled(opts *bind.FilterOpts, fillRequestId [][32]byte) (*FastTransferTokenPoolAbstractFastTransferSettledIterator, error)
 
-	WatchFastFillSettled(opts *bind.WatchOpts, sink chan<- *FastTransferTokenPoolAbstractFastFillSettled, fillRequestId [][32]byte) (event.Subscription, error)
+	WatchFastTransferSettled(opts *bind.WatchOpts, sink chan<- *FastTransferTokenPoolAbstractFastTransferSettled, fillRequestId [][32]byte) (event.Subscription, error)
 
-	ParseFastFillSettled(log types.Log) (*FastTransferTokenPoolAbstractFastFillSettled, error)
+	ParseFastTransferSettled(log types.Log) (*FastTransferTokenPoolAbstractFastTransferSettled, error)
 
 	FilterFillerAllowListUpdated(opts *bind.FilterOpts, dst []uint64) (*FastTransferTokenPoolAbstractFillerAllowListUpdatedIterator, error)
 
@@ -4323,12 +4363,6 @@ type FastTransferTokenPoolAbstractInterface interface {
 	WatchInvalidFill(opts *bind.WatchOpts, sink chan<- *FastTransferTokenPoolAbstractInvalidFill, fillRequestId [][32]byte, filler []common.Address) (event.Subscription, error)
 
 	ParseInvalidFill(log types.Log) (*FastTransferTokenPoolAbstractInvalidFill, error)
-
-	FilterLaneUpdated(opts *bind.FilterOpts, destinationChainSelector []uint64) (*FastTransferTokenPoolAbstractLaneUpdatedIterator, error)
-
-	WatchLaneUpdated(opts *bind.WatchOpts, sink chan<- *FastTransferTokenPoolAbstractLaneUpdated, destinationChainSelector []uint64) (event.Subscription, error)
-
-	ParseLaneUpdated(log types.Log) (*FastTransferTokenPoolAbstractLaneUpdated, error)
 
 	FilterLocked(opts *bind.FilterOpts, sender []common.Address) (*FastTransferTokenPoolAbstractLockedIterator, error)
 
