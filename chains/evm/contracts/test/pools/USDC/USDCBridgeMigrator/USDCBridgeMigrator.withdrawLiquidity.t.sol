@@ -36,7 +36,7 @@ contract USDCBridgeMigrator_withdrawLiquidity is USDCBridgeMigratorSetup {
 
     s_usdcTokenPool.provideLiquidity(DEST_CHAIN_SELECTOR, LIQUIDITY_AMOUNT);
   }
-  
+
   function test_withdrawLiquidity_Success() public {
     vm.startPrank(OWNER);
 
@@ -54,7 +54,9 @@ contract USDCBridgeMigrator_withdrawLiquidity is USDCBridgeMigratorSetup {
 
     s_usdcTokenPool.proposeCCTPMigration(DEST_CHAIN_SELECTOR);
 
-    vm.expectRevert(abi.encodeWithSelector(HybridLockReleaseUSDCTokenPool.LanePausedForCCTPMigration.selector, DEST_CHAIN_SELECTOR));
+    vm.expectRevert(
+      abi.encodeWithSelector(HybridLockReleaseUSDCTokenPool.LanePausedForCCTPMigration.selector, DEST_CHAIN_SELECTOR)
+    );
 
     s_usdcTokenPool.withdrawLiquidity(DEST_CHAIN_SELECTOR, LIQUIDITY_AMOUNT);
   }

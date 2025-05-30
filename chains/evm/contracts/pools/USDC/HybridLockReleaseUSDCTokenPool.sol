@@ -19,8 +19,6 @@ import {SafeERC20} from
 import {EnumerableSet} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableSet.sol";
 
-import {console2 as console} from "forge-std/console2.sol";
-
 // bytes4(keccak256("NO_CCTP_USE_LOCK_RELEASE"))
 bytes4 constant LOCK_RELEASE_FLAG = 0xfa7c07de;
 
@@ -40,12 +38,15 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
 
   event LockReleaseEnabled(uint64 indexed remoteChainSelector);
   event LockReleaseDisabled(uint64 indexed remoteChainSelector);
+  event CCTPVersionSet(uint64 remoteChainSelector, CCTPVersion version);
 
   error LanePausedForCCTPMigration(uint64 remoteChainSelector);
   error TokenLockingNotAllowedAfterMigration(uint64 remoteChainSelector);
 
   error InvalidMinFinalityThreshold(uint32 expected, uint32 actual);
   error InvalidExecutionFinalityThreshold(uint32 expected, uint32 actual);
+
+  error ChainNotSupportedByCCTP(uint64 remoteChainSelector);
 
   /// @notice The address of the liquidity provider for a specific chain.
   /// External liquidity is not required when there is one canonical token deployed to a chain,
@@ -59,7 +60,7 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
   // CCTP V2 uses 2000 to indicate that attestations should not occur until finality is achieved on the source chain.
   uint32 public constant FINALITY_THRESHOLD = 2000;
 
-  // TODO: Think of better way to do this
+  // TODO: Figure out a better way to do this.
   enum CCTPVersion {
     VERSION_1,
     VERSION_2
@@ -69,6 +70,39 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
   CCTPMessageTransmitterProxy public immutable i_cctpMessageTransmitterProxyCCTPV2;
 
   mapping(uint64 remoteChainSelector => CCTPVersion version) internal s_cctpVersion;
+
+  /*
+  The Structure of calls made by this contract to the CCTP contracts can be explained as followed:
+    +------------------------------------------------------------+
+    |                    HybridUSDCTokenPool                     |
+    +------------------------------------------------------------+
+                     |                                |
+                     |                                |
+         depositForBurn()                    receiveMessage()
+                     |                                |
+                     v                                v
+    +-------------------------------+     +-------------------------------+
+    |         TokenMessenger        |     |  CCTPMessageTransmitterProxy  |
+    +-------------------------------+     +-------------------------------+
+                     |                                |
+             Subcall to:                    Forwards call to:
+                     v                                v
+    +------------------------------------------------------------+
+    |                    MessageTransmitter                      |
+    +------------------------------------------------------------+
+
+  Description:
+  ------------
+  - HybridUSDCTokenPool:
+    - When doing lockOrBurn(), it calls `depositForBurn()` on the `TokenMessenger`, which in turn calls `MessageTransmitter` (as a subcall).
+    - When doing releaseOrMint(), it calls `receiveMessage()` directly on the `MessageTransmitter`.
+  - MessageTransmitter:
+    - The two appearances of MessageTransmitter in this diagram represent the **same contract** owned by Circle.
+    - The address of the MessageTransmitter is obtained directly from the TokenMessenger and not passed as a constructor
+    parameter
+  - The CCTPMessageTransmitterProxy is used so that even if this contract is deprecated in favor of a newer version, 
+  the allowedCaller for a CCTP-enabled message will always remain as the proxy, allowing for easier upgrades.
+  */
 
   constructor(
     ITokenMessenger tokenMessenger,
@@ -86,16 +120,23 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
   {
     // The following code has been duplicated exactly from USDC Token Pool but with the only difference being checks for version 1 and uses tokenMessengerV2 and cctpMessageTransmitterProxyV2 for CCTP V2.
     // This is because of Solidity's limited inheritance capabilities makes it impossible to run the constructor for USDCTokenPool twice with different parameters, so it has been duplicated here.
+
     // NOTE: Even though it is officially referred to as Version 1, CCTP V1 contracts
     // use the version #0, and CCTP V2 contracts return a version number #1, so a contract
     // interacting with CCTPV2 will look for it to return the version number of 1.
 
     if (address(tokenMessengerV2) == address(0)) revert InvalidConfig();
+
+    // Get the Local Message Transmitter from the tokenMessenger
     IMessageTransmitter transmitter = IMessageTransmitter(tokenMessengerV2.localMessageTransmitter());
+
+    // Check that the two contracts are using the same expected version of USDC/CCTP.
     uint32 transmitterVersion = transmitter.version();
-    if (transmitterVersion != 1) revert InvalidMessageVersion(transmitterVersion);
     uint32 tokenMessengerVersion = tokenMessengerV2.messageBodyVersion();
+    if (transmitterVersion != 1) revert InvalidMessageVersion(transmitterVersion);
     if (tokenMessengerVersion != 1) revert InvalidTokenMessengerVersion(tokenMessengerVersion);
+
+    // Check that the transmitter called by the TransmitterProxy is the same as the one called by the TokenMessenger
     if (cctpMessageTransmitterProxyV2.i_cctpTransmitter() != transmitter) revert InvalidTransmitterInProxy();
 
     emit ConfigSet(address(tokenMessenger));
@@ -304,6 +345,8 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
 
     _validateMessageCCTPV2(msgAndAttestation.message, sourceDomainIdentifier);
 
+    // Forward the message to the transmitter proxy, which will then forward it to the actual transmitter,
+    // thus ensuring that the allowedCaller specified in the message is the one making the mint request.
     if (!i_cctpMessageTransmitterProxyCCTPV2.receiveMessage(msgAndAttestation.message, msgAndAttestation.attestation)) {
       revert UnlockingUSDCFailed();
     }
@@ -365,6 +408,7 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
       revert InvalidDestinationDomain(i_localDomainIdentifier, destinationDomain);
     }
 
+    // This pool only supports slow transfers on CCTP, so ensure that the message matches the same requirements.
     if (minFinalityThreshold != FINALITY_THRESHOLD) {
       revert InvalidMinFinalityThreshold(FINALITY_THRESHOLD, minFinalityThreshold);
     }
@@ -427,9 +471,17 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
     uint64[] calldata remoteChainSelectors,
     CCTPVersion[] calldata versions
   ) external onlyOwner {
+    if (remoteChainSelectors.length != versions.length) revert MismatchedArrayLengths();
     for (uint256 i = 0; i < remoteChainSelectors.length; ++i) {
-      s_cctpVersion[remoteChainSelectors[i]] = versions[i];
-      // TODO: Emit Event
+      // Cache array values in memory for gas savings
+      uint64 remoteChainSelector = remoteChainSelectors[i];
+      CCTPVersion version = versions[i];
+
+      // Do not allow setting the version for a chain which is not CCTP-Compatible
+      if (shouldUseLockRelease(remoteChainSelector)) revert ChainNotSupportedByCCTP(remoteChainSelector);
+
+      s_cctpVersion[remoteChainSelector] = version;
+      emit CCTPVersionSet(remoteChainSelector, version);
     }
   }
 

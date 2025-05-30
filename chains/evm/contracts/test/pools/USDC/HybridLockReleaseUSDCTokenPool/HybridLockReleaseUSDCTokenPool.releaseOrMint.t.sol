@@ -317,7 +317,11 @@ contract HybridLockReleaseUSDCTokenPool_releaseOrMint is HybridLockReleaseUSDCTo
     offchainTokenData = abi.encode(
       USDCTokenPool.MessageAndAttestation({message: _generateUSDCMessageCCTPV2(usdcMessage), attestation: bytes("")})
     );
-    vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidSourceDomain.selector, SOURCE_DOMAIN_IDENTIFIER, SOURCE_DOMAIN_IDENTIFIER + 1));
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        USDCTokenPool.InvalidSourceDomain.selector, SOURCE_DOMAIN_IDENTIFIER, SOURCE_DOMAIN_IDENTIFIER + 1
+      )
+    );
     s_usdcTokenPool.releaseOrMint(
       Pool.ReleaseOrMintInV1({
         originalSender: abi.encode(OWNER),
@@ -337,7 +341,11 @@ contract HybridLockReleaseUSDCTokenPool_releaseOrMint is HybridLockReleaseUSDCTo
     offchainTokenData = abi.encode(
       USDCTokenPool.MessageAndAttestation({message: _generateUSDCMessageCCTPV2(usdcMessage), attestation: bytes("")})
     );
-    vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidDestinationDomain.selector, DEST_DOMAIN_IDENTIFIER, DEST_DOMAIN_IDENTIFIER + 1));
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        USDCTokenPool.InvalidDestinationDomain.selector, DEST_DOMAIN_IDENTIFIER, DEST_DOMAIN_IDENTIFIER + 1
+      )
+    );
     s_usdcTokenPool.releaseOrMint(
       Pool.ReleaseOrMintInV1({
         originalSender: abi.encode(OWNER),
@@ -357,7 +365,9 @@ contract HybridLockReleaseUSDCTokenPool_releaseOrMint is HybridLockReleaseUSDCTo
     offchainTokenData = abi.encode(
       USDCTokenPool.MessageAndAttestation({message: _generateUSDCMessageCCTPV2(usdcMessage), attestation: bytes("")})
     );
-    vm.expectRevert(abi.encodeWithSelector(HybridLockReleaseUSDCTokenPool.InvalidMinFinalityThreshold.selector, 2000, 1000));
+    vm.expectRevert(
+      abi.encodeWithSelector(HybridLockReleaseUSDCTokenPool.InvalidMinFinalityThreshold.selector, 2000, 1000)
+    );
     s_usdcTokenPool.releaseOrMint(
       Pool.ReleaseOrMintInV1({
         originalSender: abi.encode(OWNER),
@@ -377,7 +387,9 @@ contract HybridLockReleaseUSDCTokenPool_releaseOrMint is HybridLockReleaseUSDCTo
     offchainTokenData = abi.encode(
       USDCTokenPool.MessageAndAttestation({message: _generateUSDCMessageCCTPV2(usdcMessage), attestation: bytes("")})
     );
-    vm.expectRevert(abi.encodeWithSelector(HybridLockReleaseUSDCTokenPool.InvalidExecutionFinalityThreshold.selector, 2000, 1000));
+    vm.expectRevert(
+      abi.encodeWithSelector(HybridLockReleaseUSDCTokenPool.InvalidExecutionFinalityThreshold.selector, 2000, 1000)
+    );
     s_usdcTokenPool.releaseOrMint(
       Pool.ReleaseOrMintInV1({
         originalSender: abi.encode(OWNER),
