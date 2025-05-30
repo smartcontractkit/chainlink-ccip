@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {IRouterClient} from "../../../interfaces/IRouterClient.sol";
 
+import {Internal} from "../../../libraries/Internal.sol";
 import {BurnMintFastTransferTokenPool} from "../../../pools/BurnMintFastTransferTokenPool.sol";
 import {FastTransferTokenPoolAbstract} from "../../../pools/FastTransferTokenPoolAbstract.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
@@ -144,6 +145,11 @@ contract BurnMintFastTransferTokenPool_validateSendRequest is BurnMintFastTransf
       fillerAllowlistEnabled: true,
       destinationPool: abi.encode(s_remoteBurnMintPool),
       maxFillAmountPerRequest: FILL_AMOUNT_MAX,
+      settlementOverheadGas: 200_000,
+      chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
+      accountIsWritableBitmap: 0,
+      tokenReceiver: bytes32(0),
+      accounts: new bytes32[](0),
       addFillers: new address[](0),
       removeFillers: new address[](0)
     });
@@ -201,6 +207,11 @@ contract BurnMintFastTransferTokenPool_validateSendRequest is BurnMintFastTransf
       fillerAllowlistEnabled: true,
       destinationPool: abi.encode(s_remoteBurnMintPool),
       maxFillAmountPerRequest: FILL_AMOUNT_MAX,
+      settlementOverheadGas: 200_000,
+      chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
+      accountIsWritableBitmap: 0,
+      tokenReceiver: bytes32(0),
+      accounts: new bytes32[](0),
       addFillers: addFillers,
       removeFillers: new address[](0)
     });

@@ -12,7 +12,6 @@ interface IFastTransferPool {
 
   error AlreadyFilled(bytes32 fillRequestId);
   error AlreadySettled(bytes32 fillRequestId);
-  error LaneDisabled();
 
   /// @notice Emitted when a fast transfer is requested
   event FastTransferRequested(

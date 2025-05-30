@@ -11,6 +11,7 @@ import {CCIPReceiver} from "../applications/CCIPReceiver.sol";
 import {Client} from "../libraries/Client.sol";
 import {TokenPool} from "./TokenPool.sol";
 
+import {Internal} from "../libraries/Internal.sol";
 import {IERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from
@@ -27,45 +28,65 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   using EnumerableSet for EnumerableSet.AddressSet;
   using SafeERC20 for IERC20;
 
-  error WhitelistNotEnabled();
   error InvalidDestChainConfig();
   error FillerNotAllowlisted(uint64 remoteChainSelector, address filler);
   error TransferAmountExceedsMaxFillAmount(uint64 remoteChainSelector, uint256 amount);
 
-  event LaneUpdated(
+  event DestChainConfigUpdated(
     uint64 indexed destinationChainSelector,
     uint16 bps,
     uint256 maxFillAmountPerRequest,
     bytes destinationPool,
     address[] addFillers,
-    address[] removeFillers
+    address[] removeFillers,
+    bytes4 chainFamilySelector,
+    uint256 settlementOverheadGas,
+    bool fillerAllowlistEnabled
   );
   event FillerAllowListUpdated(uint64 indexed dst, address[] addFillers, address[] removeFillers);
   event DestinationPoolUpdated(uint64 indexed dst, address destinationPool);
 
   struct DestChainConfig {
     uint256 maxFillAmountPerRequest; // Max amount that can be filled per request.
+    uint256 settlementOverheadGas; //   settlement overhead gas
     bytes destinationPool; //           Destination pool address.
-    uint16 fastTransferBpsFee; // ────╮ Allowed range of [0-10_000].
-    bool fillerAllowlistEnabled; // ──╯ Allowlist for fillers.
+    uint16 fastTransferBpsFee; // ──────╮ Allowed range of [0-10_000].
+    bytes4 chainFamilySelector; //      │ elector that identifies the destination chain's family. Used to determine the correct validations to perform for the dest chain.
+    bool fillerAllowlistEnabled; //     |Allowlist for fillers.
+    uint64 accountIsWritableBitmap; // ─╯ Bitmap of writable accounts SVM
     EnumerableSet.AddressSet fillerAllowList; // Enumerable set of allowed fillers.
+    bytes32 tokenReceiver; //            Token receiver address. (SVM specific config)
+    // Token transfer related accounts are specified in the token pool lookup table on SVM.
+    bytes32[] accounts;
   }
 
   struct DestChainConfigView {
     uint256 maxFillAmountPerRequest; // Max amount that can be filled per request.
+    uint256 settlementOverheadGas; //   settlement overhead gas
     uint16 fastTransferBpsFee; // ────╮ Allowed range of [0-10_000].
+    bytes4 chainFamilySelector; //    │ Selector that identifies the destination chain's family.
     bool fillerAllowlistEnabled; // ──╯ Allowlist for fillers.
+    uint64 accountIsWritableBitmap; // │ Bitmap of writable accounts.
     bytes destinationPool; //           Address of the destination pool. ABI encoded in the case of an EVM pool.
+    bytes32 tokenReceiver; //            Token receiver address.
+    // Token transfer related accounts are specified in the token pool lookup table on SVM.
+    bytes32[] accounts;
   }
 
   struct DestChainConfigUpdateArgs {
     uint256 maxFillAmountPerRequest; // Maximum amount that can be filled per request.
+    uint256 settlementOverheadGas; //   settlement overhead gas
     bytes destinationPool; //           Address of the destination pool. ABI encoded in the case of an EVM pool.
-    uint64 remoteChainSelector; // ───╮ Remote chain selector.
-    uint16 fastTransferBpsFee; //     | Allowed range of [0-10_000].
-    bool fillerAllowlistEnabled; // ──╯ True is filler allowlist is enabled.
+    uint64 remoteChainSelector; // ────╮ Remote chain selector.
+    bytes4 chainFamilySelector; //     │ Selector that identifies the destination chain's family.
+    uint16 fastTransferBpsFee; //      | Allowed range of [0-10_000].
+    uint64 accountIsWritableBitmap; // │ Bitmap of writable accounts SVM
+    bool fillerAllowlistEnabled; // ───╯ True is filler allowlist is enabled.
     address[] addFillers; //            Address allowed to fill.
     address[] removeFillers; //         Addresses to remove from the allowlist.
+    // Token transfer related accounts are specified in the token pool lookup table on SVM.
+    bytes32[] accounts;
+    bytes32 tokenReceiver; //            Token receiver address. (SVM specific config)
   }
 
   struct MintMessage {
@@ -89,8 +110,8 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     address filler; // Address of the filler (only relevant when state is Filled)
   }
 
-  /// @dev Mapping of remote chain selector to lane configuration
-  mapping(uint64 remoteChainSelector => DestChainConfig laneConfig) private s_fastTransferDestChainConfig;
+  /// @dev Mapping of remote chain selector to destinationChain configuration
+  mapping(uint64 remoteChainSelector => DestChainConfig destinationChainConfig) private s_fastTransferDestChainConfig;
 
   /// @dev Mapping of fill request ID to fill information
   /// This is used to track the state and filler of each fill request
@@ -110,39 +131,46 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     address router
   ) TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) CCIPReceiver(router) {}
 
-  /// @notice Updates the lane configuration
-  /// @param laneConfigArgs The lane configuration arguments
+  /// @notice Updates the destination chain configuration
+  /// @param destChainConfigArgs The destChain configuration arguments
   function updateDestChainConfig(
-    DestChainConfigUpdateArgs calldata laneConfigArgs
+    DestChainConfigUpdateArgs calldata destChainConfigArgs
   ) external virtual onlyOwner {
-    _updateDestChainConfig(laneConfigArgs);
+    _updateDestChainConfig(destChainConfigArgs);
   }
 
-  /// @notice Internal function to update the lane configuration
-  /// @param laneConfigArgs The lane configuration arguments
+  /// @notice Internal function to update the destChain configuration
+  /// @param destChainConfigArgs The destChain configuration arguments
   function _updateDestChainConfig(
-    DestChainConfigUpdateArgs memory laneConfigArgs
+    DestChainConfigUpdateArgs memory destChainConfigArgs
   ) internal virtual {
-    if (laneConfigArgs.fastTransferBpsFee > 10_000) revert InvalidDestChainConfig();
-    DestChainConfig storage laneConfig = s_fastTransferDestChainConfig[laneConfigArgs.remoteChainSelector];
-    laneConfig.destinationPool = laneConfigArgs.destinationPool;
-    laneConfig.fastTransferBpsFee = laneConfigArgs.fastTransferBpsFee;
-    laneConfig.fillerAllowlistEnabled = laneConfigArgs.fillerAllowlistEnabled;
-    laneConfig.maxFillAmountPerRequest = laneConfigArgs.maxFillAmountPerRequest;
-
-    for (uint256 i = 0; i < laneConfigArgs.removeFillers.length; ++i) {
-      laneConfig.fillerAllowList.remove(laneConfigArgs.removeFillers[i]);
+    if (destChainConfigArgs.fastTransferBpsFee > 10_000) revert InvalidDestChainConfig();
+    DestChainConfig storage destChainConfig = s_fastTransferDestChainConfig[destChainConfigArgs.remoteChainSelector];
+    destChainConfig.destinationPool = destChainConfigArgs.destinationPool;
+    destChainConfig.fastTransferBpsFee = destChainConfigArgs.fastTransferBpsFee;
+    destChainConfig.fillerAllowlistEnabled = destChainConfigArgs.fillerAllowlistEnabled;
+    destChainConfig.maxFillAmountPerRequest = destChainConfigArgs.maxFillAmountPerRequest;
+    destChainConfig.chainFamilySelector = destChainConfigArgs.chainFamilySelector;
+    destChainConfig.settlementOverheadGas = destChainConfigArgs.settlementOverheadGas;
+    destChainConfig.accountIsWritableBitmap = destChainConfigArgs.accountIsWritableBitmap;
+    destChainConfig.tokenReceiver = destChainConfigArgs.tokenReceiver;
+    destChainConfig.accounts = destChainConfigArgs.accounts;
+    for (uint256 i = 0; i < destChainConfigArgs.removeFillers.length; ++i) {
+      destChainConfig.fillerAllowList.remove(destChainConfigArgs.removeFillers[i]);
     }
-    for (uint256 i = 0; i < laneConfigArgs.addFillers.length; ++i) {
-      laneConfig.fillerAllowList.add(laneConfigArgs.addFillers[i]);
+    for (uint256 i = 0; i < destChainConfigArgs.addFillers.length; ++i) {
+      destChainConfig.fillerAllowList.add(destChainConfigArgs.addFillers[i]);
     }
-    emit LaneUpdated(
-      laneConfigArgs.remoteChainSelector,
-      laneConfigArgs.fastTransferBpsFee,
-      laneConfigArgs.maxFillAmountPerRequest,
-      laneConfigArgs.destinationPool,
-      laneConfigArgs.addFillers,
-      laneConfigArgs.removeFillers
+    emit DestChainConfigUpdated(
+      destChainConfigArgs.remoteChainSelector,
+      destChainConfigArgs.fastTransferBpsFee,
+      destChainConfigArgs.maxFillAmountPerRequest,
+      destChainConfigArgs.destinationPool,
+      destChainConfigArgs.addFillers,
+      destChainConfigArgs.removeFillers,
+      destChainConfigArgs.chainFamilySelector,
+      destChainConfigArgs.settlementOverheadGas,
+      destChainConfigArgs.fillerAllowlistEnabled
     );
   }
 
@@ -155,32 +183,37 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     address[] memory addFillers,
     address[] memory removeFillers
   ) external virtual onlyOwner {
-    DestChainConfig storage laneConfig = s_fastTransferDestChainConfig[destinationChainSelector];
+    DestChainConfig storage destChainConfig = s_fastTransferDestChainConfig[destinationChainSelector];
     for (uint256 i = 0; i < addFillers.length; ++i) {
-      laneConfig.fillerAllowList.add(addFillers[i]);
+      destChainConfig.fillerAllowList.add(addFillers[i]);
     }
     for (uint256 i = 0; i < removeFillers.length; ++i) {
-      laneConfig.fillerAllowList.remove(removeFillers[i]);
+      destChainConfig.fillerAllowList.remove(removeFillers[i]);
     }
     emit FillerAllowListUpdated(destinationChainSelector, addFillers, removeFillers);
   }
 
-  /// @notice Gets the lane configuration for a given destination chain selector
+  /// @notice Gets the destChain configuration for a given destination chain selector
   /// @param remoteChainSelector The remote chain selector
-  /// @return laneConfig The lane configuration for the given destination chain selector
+  /// @return destChainConfig The destChain configuration for the given destination chain selector
   function getDestChainConfig(
     uint64 remoteChainSelector
   ) external view returns (DestChainConfigView memory) {
     DestChainConfig storage config = s_fastTransferDestChainConfig[remoteChainSelector];
     return DestChainConfigView({
+      maxFillAmountPerRequest: config.maxFillAmountPerRequest,
+      settlementOverheadGas: config.settlementOverheadGas,
       fastTransferBpsFee: config.fastTransferBpsFee,
+      chainFamilySelector: config.chainFamilySelector,
       fillerAllowlistEnabled: config.fillerAllowlistEnabled,
+      accountIsWritableBitmap: config.accountIsWritableBitmap,
       destinationPool: config.destinationPool,
-      maxFillAmountPerRequest: config.maxFillAmountPerRequest
+      tokenReceiver: config.tokenReceiver,
+      accounts: config.accounts
     });
   }
 
-  /// @notice Checks if a filler is whitelisted for a given lane
+  /// @notice Checks if a filler is whitelisted for a given destChain
   /// @param remoteChainSelector The remote chain selector
   /// @param filler The filler address to check
   /// @return isWhitelisted Whether the filler is whitelisted
@@ -264,11 +297,11 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     bytes calldata
   ) internal view returns (IFastTransferPool.Quote memory quote, Client.EVM2AnyMessage memory message) {
     _validateSendRequest(destinationChainSelector);
-    DestChainConfig storage lane = s_fastTransferDestChainConfig[destinationChainSelector];
-    if (amount > lane.maxFillAmountPerRequest) {
+    DestChainConfig storage destChainConfig = s_fastTransferDestChainConfig[destinationChainSelector];
+    if (amount > destChainConfig.maxFillAmountPerRequest) {
       revert TransferAmountExceedsMaxFillAmount(destinationChainSelector, amount);
     }
-    quote.fastTransferFee = (amount * lane.fastTransferBpsFee) / 10_000;
+    quote.fastTransferFee = (amount * destChainConfig.fastTransferBpsFee) / 10_000;
     // pack the MintMessage
     bytes memory data = abi.encode(
       MintMessage({
@@ -279,12 +312,34 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
       })
     );
 
+    bytes memory extraArgs;
+    if (
+      destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_EVM
+        || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_APTOS
+    ) {
+      extraArgs = Client._argsToBytes(
+        Client.GenericExtraArgsV2({gasLimit: destChainConfig.settlementOverheadGas, allowOutOfOrderExecution: true})
+      );
+    } else if (destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SVM) {
+      extraArgs = Client._svmArgsToBytes(
+        Client.SVMExtraArgsV1({
+          computeUnits: uint32(destChainConfig.settlementOverheadGas),
+          accountIsWritableBitmap: destChainConfig.accountIsWritableBitmap,
+          allowOutOfOrderExecution: true,
+          tokenReceiver: destChainConfig.tokenReceiver,
+          accounts: destChainConfig.accounts
+        })
+      );
+    } else {
+      revert InvalidDestChainConfig();
+    }
+
     message = Client.EVM2AnyMessage({
-      receiver: lane.destinationPool,
+      receiver: destChainConfig.destinationPool,
       data: data,
       tokenAmounts: new Client.EVMTokenAmount[](0),
       feeToken: settlementFeeToken,
-      extraArgs: ""
+      extraArgs: extraArgs
     });
 
     quote.ccipSettlementFee = IRouterClient(getRouter()).getFee(destinationChainSelector, message);
@@ -308,9 +363,9 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     if (fillInfo.state != FillState.NOT_FILLED) revert AlreadyFilled(fillRequestId);
 
     {
-      DestChainConfig storage laneConfig = s_fastTransferDestChainConfig[sourceChainSelector];
-      if (laneConfig.fillerAllowlistEnabled) {
-        if (!laneConfig.fillerAllowList.contains(msg.sender)) {
+      DestChainConfig storage destChainConfig = s_fastTransferDestChainConfig[sourceChainSelector];
+      if (destChainConfig.fillerAllowlistEnabled) {
+        if (!destChainConfig.fillerAllowList.contains(msg.sender)) {
           revert FillerNotAllowlisted(sourceChainSelector, msg.sender);
         }
       }

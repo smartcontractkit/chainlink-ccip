@@ -11,6 +11,7 @@ import {FastTransferTokenPoolHelper} from "../../helpers/FastTransferTokenPoolHe
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 import {WETH9} from "@chainlink/contracts/src/v0.8/vendor/canonical-weth/WETH9.sol";
 
+import {Internal} from "../../../libraries/Internal.sol";
 import {IERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
@@ -44,6 +45,11 @@ contract FastTransferTokenPoolHelperSetup is BaseTest {
       fillerAllowlistEnabled: true,
       destinationPool: destPoolAddress,
       maxFillAmountPerRequest: 1000 ether,
+      settlementOverheadGas: 200_000,
+      chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
+      accountIsWritableBitmap: 0,
+      tokenReceiver: bytes32(0),
+      accounts: new bytes32[](0),
       addFillers: addFillers,
       removeFillers: new address[](0)
     });

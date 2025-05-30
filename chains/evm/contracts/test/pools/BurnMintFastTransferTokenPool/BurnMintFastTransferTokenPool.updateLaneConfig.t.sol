@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {Internal} from "../../../libraries/Internal.sol";
 import {FastTransferTokenPoolAbstract} from "../../../pools/FastTransferTokenPoolAbstract.sol";
 import {BurnMintFastTransferTokenPoolSetup} from "./BurnMintFastTransferTokenPoolSetup.t.sol";
 
@@ -22,13 +23,26 @@ contract BurnMintFastTransferTokenPool_updateDestChainConfig is BurnMintFastTran
       fillerAllowlistEnabled: false,
       destinationPool: NEW_DESTINATION_POOL,
       maxFillAmountPerRequest: NEW_FILL_AMOUNT_MAX,
+      settlementOverheadGas: 200_000,
+      chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
+      accountIsWritableBitmap: 0,
+      tokenReceiver: bytes32(0),
+      accounts: new bytes32[](0),
       addFillers: addFillers,
       removeFillers: new address[](0)
     });
 
     vm.expectEmit();
-    emit FastTransferTokenPoolAbstract.LaneUpdated(
-      NEW_CHAIN_SELECTOR, NEW_FAST_FEE_BPS, NEW_FILL_AMOUNT_MAX, NEW_DESTINATION_POOL, addFillers, new address[](0)
+    emit FastTransferTokenPoolAbstract.DestChainConfigUpdated(
+      NEW_CHAIN_SELECTOR,
+      NEW_FAST_FEE_BPS,
+      NEW_FILL_AMOUNT_MAX,
+      NEW_DESTINATION_POOL,
+      addFillers,
+      new address[](0),
+      Internal.CHAIN_FAMILY_SELECTOR_EVM,
+      200_000,
+      false
     );
 
     s_pool.updateDestChainConfig(laneConfigArgs);
@@ -59,6 +73,11 @@ contract BurnMintFastTransferTokenPool_updateDestChainConfig is BurnMintFastTran
       fillerAllowlistEnabled: false, // disable whitelist
       destinationPool: NEW_DESTINATION_POOL,
       maxFillAmountPerRequest: NEW_FILL_AMOUNT_MAX,
+      settlementOverheadGas: 200_000,
+      chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
+      accountIsWritableBitmap: 0,
+      tokenReceiver: bytes32(0),
+      accounts: new bytes32[](0),
       addFillers: addFillers,
       removeFillers: removeFillers
     });
@@ -84,6 +103,11 @@ contract BurnMintFastTransferTokenPool_updateDestChainConfig is BurnMintFastTran
       fillerAllowlistEnabled: true,
       destinationPool: NEW_DESTINATION_POOL,
       maxFillAmountPerRequest: NEW_FILL_AMOUNT_MAX,
+      settlementOverheadGas: 200_000,
+      chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
+      accountIsWritableBitmap: 0,
+      tokenReceiver: bytes32(0),
+      accounts: new bytes32[](0),
       addFillers: new address[](0),
       removeFillers: new address[](0)
     });
@@ -100,6 +124,11 @@ contract BurnMintFastTransferTokenPool_updateDestChainConfig is BurnMintFastTran
       fillerAllowlistEnabled: true,
       destinationPool: NEW_DESTINATION_POOL,
       maxFillAmountPerRequest: NEW_FILL_AMOUNT_MAX,
+      settlementOverheadGas: 200_000,
+      chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
+      accountIsWritableBitmap: 0,
+      tokenReceiver: bytes32(0),
+      accounts: new bytes32[](0),
       addFillers: new address[](0),
       removeFillers: new address[](0)
     });
@@ -145,6 +174,11 @@ contract BurnMintFastTransferTokenPool_updateDestChainConfig is BurnMintFastTran
       fillerAllowlistEnabled: true,
       destinationPool: NEW_DESTINATION_POOL,
       maxFillAmountPerRequest: NEW_FILL_AMOUNT_MAX,
+      settlementOverheadGas: 200_000,
+      chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
+      accountIsWritableBitmap: 0,
+      tokenReceiver: bytes32(0),
+      accounts: new bytes32[](0),
       addFillers: new address[](0),
       removeFillers: new address[](0)
     });
@@ -163,6 +197,11 @@ contract BurnMintFastTransferTokenPool_updateDestChainConfig is BurnMintFastTran
       fillerAllowlistEnabled: true,
       destinationPool: NEW_DESTINATION_POOL,
       maxFillAmountPerRequest: NEW_FILL_AMOUNT_MAX,
+      settlementOverheadGas: 200_000,
+      chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
+      accountIsWritableBitmap: 0,
+      tokenReceiver: bytes32(0),
+      accounts: new bytes32[](0),
       addFillers: new address[](0),
       removeFillers: new address[](0)
     });
@@ -187,6 +226,11 @@ contract BurnMintFastTransferTokenPool_updateDestChainConfig is BurnMintFastTran
       fillerAllowlistEnabled: true,
       destinationPool: NEW_DESTINATION_POOL,
       maxFillAmountPerRequest: NEW_FILL_AMOUNT_MAX,
+      settlementOverheadGas: 200_000,
+      chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
+      accountIsWritableBitmap: 0,
+      tokenReceiver: bytes32(0),
+      accounts: new bytes32[](0),
       addFillers: addFillers,
       removeFillers: new address[](0)
     });
@@ -234,6 +278,11 @@ contract BurnMintFastTransferTokenPool_updateDestChainConfig is BurnMintFastTran
       fillerAllowlistEnabled: true,
       destinationPool: NEW_DESTINATION_POOL,
       maxFillAmountPerRequest: NEW_FILL_AMOUNT_MAX,
+      settlementOverheadGas: 200_000,
+      chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
+      accountIsWritableBitmap: 0,
+      tokenReceiver: bytes32(0),
+      accounts: new bytes32[](0),
       addFillers: addFillers,
       removeFillers: new address[](0)
     });

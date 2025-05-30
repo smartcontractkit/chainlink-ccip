@@ -2,6 +2,8 @@
 pragma solidity ^0.8.24;
 
 import {Router} from "../../../Router.sol";
+
+import {Internal} from "../../../libraries/Internal.sol";
 import {BurnMintFastTransferTokenPool} from "../../../pools/BurnMintFastTransferTokenPool.sol";
 import {FastTransferTokenPoolAbstract} from "../../../pools/FastTransferTokenPoolAbstract.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
@@ -69,6 +71,11 @@ contract BurnMintFastTransferTokenPoolSetup is BaseTest {
       fillerAllowlistEnabled: true,
       destinationPool: abi.encode(s_remoteBurnMintPool),
       maxFillAmountPerRequest: FILL_AMOUNT_MAX,
+      settlementOverheadGas: 200_000,
+      chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
+      accountIsWritableBitmap: 0,
+      tokenReceiver: bytes32(0),
+      accounts: new bytes32[](0),
       addFillers: addFillers,
       removeFillers: new address[](0)
     });
