@@ -96,6 +96,7 @@ func TestCCIPRouter(t *testing.T) {
 	token0Decimals := uint8(9)
 	token1Decimals := uint8(18)
 	token2Decimals := uint8(9)
+	link22Decimals := uint8(9) // Solana Decimals for Link Token2022 token
 
 	// token addresses
 	// Create link22 token, managed by "legacyAdmin" (not "ccipAdmin" who manages CCIP).
@@ -279,7 +280,7 @@ func TestCCIPRouter(t *testing.T) {
 			// link22 //
 			///////////////
 			linkMint := linkMintPrivK.PublicKey()
-			ixToken, terr := tokens.CreateToken(ctx, config.Token2022Program, linkMint, legacyAdmin.PublicKey(), 9, solanaGoClient, config.DefaultCommitment)
+			ixToken, terr := tokens.CreateToken(ctx, config.Token2022Program, linkMint, legacyAdmin.PublicKey(), link22Decimals, solanaGoClient, config.DefaultCommitment)
 			require.NoError(t, terr)
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, ixToken, legacyAdmin, config.DefaultCommitment, common.AddSigners(linkMintPrivK))
 
@@ -729,7 +730,7 @@ func TestCCIPRouter(t *testing.T) {
 				invalidSVMChainSelector,
 				tempFeeAggregator,
 				config.FeeQuoterProgram,
-				link22.mint,
+				token0.Mint, // to be changed in the next tests
 				config.RMNRemoteProgram,
 				config.RouterConfigPDA,
 				legacyAdmin.PublicKey(),
@@ -747,7 +748,7 @@ func TestCCIPRouter(t *testing.T) {
 			require.Equal(t, invalidSVMChainSelector, configSetEvent.SvmChainSelector)
 			require.Equal(t, config.FeeQuoterProgram, configSetEvent.FeeQuoter)
 			require.Equal(t, config.RMNRemoteProgram, configSetEvent.RMNRemote)
-			require.Equal(t, link22.mint, configSetEvent.LinkTokenMint)
+			require.Equal(t, token0.Mint, configSetEvent.LinkTokenMint) // to be changed in the next tests
 			require.Equal(t, tempFeeAggregator, configSetEvent.FeeAggregator)
 
 			// Fetch account data
@@ -758,6 +759,46 @@ func TestCCIPRouter(t *testing.T) {
 			}
 			require.Equal(t, uint64(17), configAccount.SvmChainSelector)
 			require.Equal(t, config.FeeQuoterProgram, configAccount.FeeQuoter)
+		})
+
+		t.Run("Router: Update link mint", func(t *testing.T) {
+			t.Run("When a non-admin tries to make the update, it fails", func(t *testing.T) {
+				ix, err := ccip_router.NewSetLinkTokenMintInstruction(
+					link22.mint,
+					config.RouterConfigPDA,
+					user.PublicKey(),
+					solana.SystemProgramID,
+				).ValidateAndBuild()
+				require.NoError(t, err)
+
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment, []string{ccip.Unauthorized_CcipRouterError.String()})
+			})
+			t.Run("When an admin tries to make the update, it succeeds", func(t *testing.T) {
+				// Fetch account data
+				var configAccount ccip_router.Config
+				require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.RouterConfigPDA, config.DefaultCommitment, &configAccount))
+				require.Equal(t, token0.Mint, configAccount.LinkTokenMint) // initially set to token0 mint
+
+				ix, err := ccip_router.NewSetLinkTokenMintInstruction(
+					link22.mint,
+					config.RouterConfigPDA,
+					legacyAdmin.PublicKey(),
+					solana.SystemProgramID,
+				).ValidateAndBuild()
+				require.NoError(t, err)
+
+				result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, legacyAdmin, config.DefaultCommitment)
+				require.NotNil(t, result)
+
+				// Check that the event was emitted with the updated value
+				var configSetEvent ccip.EventRouterConfigSet
+				require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "ConfigSet", &configSetEvent, config.PrintEvents))
+				require.Equal(t, link22.mint, configSetEvent.LinkTokenMint)
+
+				// Check the onchain state
+				require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.RouterConfigPDA, config.DefaultCommitment, &configAccount))
+				require.Equal(t, link22.mint, configAccount.LinkTokenMint)
+			})
 		})
 
 		t.Run("FeeQuoter is initialized", func(t *testing.T) {
@@ -776,9 +817,8 @@ func TestCCIPRouter(t *testing.T) {
 			ix, err := fee_quoter.NewInitializeInstruction(
 				initialMaxFeeJuelsPerMsg,
 				config.CcipRouterProgram,
-				// config solana.PublicKey, authority solana.PublicKey, systemProgram solana.PublicKey, program solana.PublicKey, programData solana.PublicKey
 				config.FqConfigPDA,
-				link22.mint,
+				token0.Mint, // to be changed in the next tests
 				legacyAdmin.PublicKey(),
 				solana.SystemProgramID,
 				config.FeeQuoterProgram,
@@ -792,7 +832,7 @@ func TestCCIPRouter(t *testing.T) {
 			var configSetEvent ccip.EventFeeQuoterConfigSet
 			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "ConfigSet", &configSetEvent, config.PrintEvents))
 			require.Equal(t, initialMaxFeeJuelsPerMsg, configSetEvent.MaxFeeJuelsPerMsg)
-			require.Equal(t, link22.mint, configSetEvent.LinkTokenMint)
+			require.Equal(t, token0.Mint, configSetEvent.LinkTokenMint) // to be changed in the next tests
 			require.Equal(t, uint8(9), configSetEvent.LinkTokenDecimals)
 			require.Equal(t, config.CcipRouterProgram, configSetEvent.Onramp)
 			require.Equal(t, fee_quoter.V1_CodeVersion, configSetEvent.DefaultCodeVersion)
@@ -801,11 +841,53 @@ func TestCCIPRouter(t *testing.T) {
 			var fqConfig fee_quoter.Config
 			require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.FqConfigPDA, config.DefaultCommitment, &fqConfig))
 
-			require.Equal(t, link22.mint, fqConfig.LinkTokenMint)
+			require.Equal(t, token0.Mint, fqConfig.LinkTokenMint) // to be changed in the next tests
+			require.Equal(t, token0Decimals, fqConfig.LinkTokenLocalDecimals)
 			require.Equal(t, initialMaxFeeJuelsPerMsg, fqConfig.MaxFeeJuelsPerMsg)
 			require.Equal(t, legacyAdmin.PublicKey(), fqConfig.Owner)
 			require.True(t, fqConfig.ProposedOwner.IsZero())
 			require.Equal(t, config.CcipRouterProgram, fqConfig.Onramp)
+		})
+
+		t.Run("FeeQuoter: Update link mint", func(t *testing.T) {
+			t.Run("When a non-admin tries to make the update, it fails", func(t *testing.T) {
+				ix, err := fee_quoter.NewSetLinkTokenMintInstruction(
+					config.FqConfigPDA,
+					link22.mint,
+					user.PublicKey(),
+				).ValidateAndBuild()
+				require.NoError(t, err)
+
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment, []string{ccip.Unauthorized_CcipRouterError.String()})
+			})
+			t.Run("When an admin tries to make the update, it succeeds", func(t *testing.T) {
+				// Fetch account data
+				var configAccount fee_quoter.Config
+				require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.FqConfigPDA, config.DefaultCommitment, &configAccount))
+				require.Equal(t, token0.Mint, configAccount.LinkTokenMint)             // initially set to token0 mint
+				require.Equal(t, token0Decimals, configAccount.LinkTokenLocalDecimals) // initially set to token0 mint decimals
+
+				ix, err := fee_quoter.NewSetLinkTokenMintInstruction(
+					config.FqConfigPDA,
+					link22.mint,
+					legacyAdmin.PublicKey(),
+				).ValidateAndBuild()
+				require.NoError(t, err)
+
+				result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, legacyAdmin, config.DefaultCommitment)
+				require.NotNil(t, result)
+
+				// Check that the event was emitted with the updated value
+				var configSetEvent ccip.EventFeeQuoterConfigSet
+				require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "ConfigSet", &configSetEvent, config.PrintEvents))
+				require.Equal(t, link22.mint, configSetEvent.LinkTokenMint)
+				require.Equal(t, link22Decimals, configSetEvent.LinkTokenDecimals)
+
+				// Check the onchain state
+				require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.FqConfigPDA, config.DefaultCommitment, &configAccount))
+				require.Equal(t, link22.mint, configAccount.LinkTokenMint)
+				require.Equal(t, link22Decimals, configAccount.LinkTokenLocalDecimals)
+			})
 		})
 
 		t.Run("FeeQuoter: Update max fee juels per msg", func(t *testing.T) {

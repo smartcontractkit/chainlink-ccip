@@ -143,6 +143,17 @@ pub mod fee_quoter {
             .set_max_fee_juels_per_msg(ctx, max_fee_juels_per_msg)
     }
 
+    /// Sets the link_token_mint and updates the link_token_local_decimals.
+    ///
+    /// Only the admin may set this.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for updating the configuration.
+    pub fn set_link_token_mint(ctx: Context<UpdateConfigLinkMint>) -> Result<()> {
+        router::admin(ctx.accounts.config.default_code_version).set_link_token_mint(ctx)
+    }
+
     /// Adds a billing token configuration.
     /// Only CCIP Admin can add a billing token configuration.
     ///

@@ -23,23 +23,29 @@ compileContract() {
   contract=$(basename "$1")
   echo "Compiling" "$contract"
   dir=$CONTRACTS_DIR/solc/$PROJECT/$contract
+  
+  local args # base args for forge
+  args="build $CONTRACTS_DIR/contracts/"$1.sol" --root $CONTRACTS_DIR"
+  
+  if [ "$ZKSYNC" = "true" ]; then
+    $(dirname "$0")/forge_zksync $args --zksync
+  else
+    local command
+    command="forge $args \
+    $(getOptimizations "$contract") \
+    --extra-output-files bin abi metadata \
+    --build-info \
+    --build-info-path $dir/build \
+    -o $dir"
 
-  local command
-  command="forge build $CONTRACTS_DIR/contracts/"$1.sol" \
-   --root $CONTRACTS_DIR \
-   $(getOptimizations "$contract") \
-   --extra-output-files bin abi metadata \
-   --build-info \
-   --build-info-path $dir/build \
-   -o $dir"
+    $command
 
-  $command
+    # Move the build info to an expected file name
+    mv $(find $dir/build -type f -name '*.json' ! -name 'build.json') $dir/build/build.json
 
-  # Move the build info to an expected file name
-  mv $(find $dir/build -type f -name '*.json' ! -name 'build.json') $dir/build/build.json
-
-  # Copy the generated abi files to a single folder
-  cp "$CONTRACTS_DIR"/solc/$PROJECT/"$contract"/"$contract".sol/"$contract".abi.json "$ABI_DIR""$contract".abi
+    # Copy the generated abi files to a single folder
+    cp "$CONTRACTS_DIR"/solc/$PROJECT/"$contract"/"$contract".sol/"$contract".abi.json "$ABI_DIR""$contract".abi
+  fi
 }
 
 # Define optimization overrides in this function. Anything that is not an override will use the default value
@@ -64,7 +70,6 @@ compileContract FeeQuoter
 compileContract onRamp/OnRamp
 compileContract applications/PingPongDemo
 compileContract applications/EtherSenderReceiver
-compileContract MultiAggregateRateLimiter
 compileContract Router
 compileContract tokenAdminRegistry/TokenAdminRegistry
 compileContract tokenAdminRegistry/RegistryModuleOwnerCustom
@@ -104,5 +109,4 @@ compileContract test/helpers/EncodingUtils
 # Message Transformer On/OffRamps
 compileContract offRamp/OffRampWithMessageTransformer
 compileContract onRamp/OnRampWithMessageTransformer
-
 

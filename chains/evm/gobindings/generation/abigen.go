@@ -30,7 +30,17 @@ var GethVersion = fmt.Sprintf("%d.%d.%d", version.Major, version.Minor, version.
 // AbigenArgs is the arguments to the abigen executable. E.g., Bin is the -bin arg.
 // Metadata is the only exception, as it is not passed to abigen but rather used to create a separate metadata variable.
 type AbigenArgs struct {
-	Bin, ABI, Metadata, Out, MetadataOut, Type, Pkg string
+	Bin, ABI, BuildInfo, Metadata, Out, BuildInfoOut, Type, Pkg string
+}
+
+// compiler defines the compiler section of contract metadata.
+type compiler struct {
+	Version string `json:"version"`
+}
+
+// metadata defines the sections of the contract metadata required for verification.
+type metadata struct {
+	Compiler compiler `json:"compiler"`
 }
 
 // standardInput defines the sections of the Solidity standard input required for verification.
@@ -54,6 +64,8 @@ type buildInfo struct {
 //
 // Check whether native abigen is installed, and has correct version
 func Abigen(a AbigenArgs) {
+	includeMetadata := os.Getenv("metadata") == "true"
+
 	var versionResponse bytes.Buffer
 	abigenExecutablePath := filepath.Join(GetProjectRoot(), "chains/evm/scripts/abigen")
 	abigenVersionCheck := exec.Command(abigenExecutablePath, "--version")
@@ -86,36 +98,58 @@ func Abigen(a AbigenArgs) {
 
 	ImproveAbigenOutput(a.Out, a.ABI)
 
-	// Add metadata to exported package
-	allMeta, err := os.ReadFile(a.Metadata)
+	if includeMetadata {
+		genMetadata(a)
+	}
+}
+
+func genMetadata(abigenArgs AbigenArgs) {
+	// Add build info to exported package
+	info, err := os.ReadFile(abigenArgs.BuildInfo)
 	if err != nil {
-		Exit("Error while reading metadata file", err)
+		Exit("Error while reading build info file", err)
 	}
 	// Unmarshal into BuildInfo struct to filter out unnecessary fields
 	// and marshal back to JSON bytes afterwards
 	var build buildInfo
-	err = json.Unmarshal(allMeta, &build)
+	err = json.Unmarshal(info, &build)
+	if err != nil {
+		Exit("Error while unmarshalling build info JSON", err)
+	}
+	// Get version from metadata file, as it contains the commit hash required by etherscan
+	metadataBytes, err := os.ReadFile(abigenArgs.Metadata)
+	if err != nil {
+		Exit("Error while reading metadata file", err)
+	}
+	var metadata metadata
+	err = json.Unmarshal(metadataBytes, &metadata)
 	if err != nil {
 		Exit("Error while unmarshalling metadata JSON", err)
 	}
+	if !strings.HasPrefix(metadata.Compiler.Version, "v") {
+		// Verification requires the version to be prefixed with "v"
+		metadata.Compiler.Version = "v" + metadata.Compiler.Version
+	}
+	build.Input.Version = metadata.Compiler.Version
+
 	refinedMeta, err := json.Marshal(build.Input)
 	if err != nil {
-		Exit("Error while marshalling metadata JSON", err)
+		Exit("Error while marshalling build info JSON", err)
 	}
-	// Export the metadata as a variable in the generated Go file
+	// Export the metadata as abigenArgs variable in the generated Go file
 	var buf bytes.Buffer
 	if err := json.Compact(&buf, refinedMeta); err != nil {
-		Exit("Error while compacting metadata JSON", err)
+		Exit("Error while compacting build info JSON", err)
 	}
 	code := fmt.Sprintf(
 		"%s\npackage %s\n\nvar SolidityStandardInput = %s\n",
 		headerComment,
-		a.Pkg,
+		abigenArgs.Pkg,
 		strconv.Quote(buf.String()),
 	)
-	err = os.WriteFile(a.MetadataOut, []byte(code), 0600)
+	err = os.WriteFile(abigenArgs.BuildInfoOut, []byte(code), 0600)
 	if err != nil {
-		Exit("Error while writing metadata file", err)
+		Exit("Error while writing build info file", err)
 	}
 }
 
