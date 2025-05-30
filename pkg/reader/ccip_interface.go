@@ -187,7 +187,8 @@ type CCIPReader interface {
 	// LatestMsgSeqNum reads the source chain and returns the latest finalized message sequence number.
 	LatestMsgSeqNum(ctx context.Context, chain cciptypes.ChainSelector) (cciptypes.SeqNum, error)
 
-	// GetExpectedNextSequenceNumber reads the destination and returns the expected next onRamp sequence number.
+	// GetExpectedNextSequenceNumber reads the source chain and returns the expected next onRamp sequence number.
+	// DEPRECATED: Not used and should be removed.
 	GetExpectedNextSequenceNumber(
 		ctx context.Context,
 		sourceChainSelector cciptypes.ChainSelector,
@@ -210,27 +211,32 @@ type CCIPReader interface {
 	) (map[cciptypes.ChainSelector]map[string]uint64, error)
 
 	// GetChainsFeeComponents Returns all fee components for given chains if corresponding
-	// chain writer is available.
+	// chain writer is available. It will log errors and return a subset of the requested chains.
 	GetChainsFeeComponents(
 		ctx context.Context,
 		chains []cciptypes.ChainSelector,
 	) map[cciptypes.ChainSelector]types.ChainFeeComponents
 
 	// GetDestChainFeeComponents Reads the fee components for the destination chain.
+	// DEPRECATED: Not used and should be removed.
 	GetDestChainFeeComponents(ctx context.Context) (types.ChainFeeComponents, error)
 
 	// GetWrappedNativeTokenPriceUSD Gets the wrapped native token price in USD for the provided chains.
+	// It reads the prices from the FeeQuoter contract on each chain.
+	// If it encounters an issue (e.g. chain not supported) it logs the error and skips the chain.
 	GetWrappedNativeTokenPriceUSD(
 		ctx context.Context,
 		selectors []cciptypes.ChainSelector,
 	) map[cciptypes.ChainSelector]cciptypes.BigInt
 
-	// GetChainFeePriceUpdate Gets latest chain fee price update for the provided chains.
+	// GetChainFeePriceUpdate Gets latest chain fee price update for the provided chains from the destination.
+	// If it encounters an issue (e.g. dest chain not supported) it logs the error and returns an empty result.
 	GetChainFeePriceUpdate(
 		ctx context.Context,
 		selectors []cciptypes.ChainSelector,
 	) map[cciptypes.ChainSelector]cciptypes.TimestampedBig
 
+	// GetRMNRemoteConfig reads the RMN remote contract on the destination chain and returns the remote config.
 	GetRMNRemoteConfig(ctx context.Context) (cciptypes.RemoteConfig, error)
 
 	// GetRmnCurseInfo returns rmn curse/pausing information about the provided chains
@@ -247,6 +253,7 @@ type CCIPReader interface {
 	// For example, if the price is 1 LINK = 10 USD, this function will return 10e18 (10 * 1e18). You can think of this
 	// function returning the price of LINK not in USD, but in a small denomination of USD, similar to returning
 	// the price of ETH not in ETH but in wei (1e-18 ETH).
+	// DEPRECATED: Not used and should be removed.
 	LinkPriceUSD(ctx context.Context) (cciptypes.BigInt, error)
 
 	// Sync can be used to perform frequent syncing operations inside the reader implementation.

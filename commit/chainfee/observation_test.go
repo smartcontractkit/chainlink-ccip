@@ -166,6 +166,8 @@ func Test_processor_Observation(t *testing.T) {
 			ccipReader.EXPECT().GetChainFeePriceUpdate(mock.Anything, slicesWithoutDst).
 				Return(tc.existingChainFeePriceUpdates).Maybe()
 
+			cs.EXPECT().SupportsDestChain(oracleID).Return(true, nil).Maybe()
+
 			homeChain.EXPECT().GetFChain().Return(tc.fChain, nil).Maybe()
 
 			tStart := time.Now()
@@ -348,6 +350,7 @@ func Test_unique_chain_filter_in_Observation(t *testing.T) {
 			cs.EXPECT().DestChain().Return(tc.dstChain).Maybe()
 			cs.EXPECT().SupportedChains(oracleID).
 				Return(supportedSet, nil).Maybe()
+			cs.EXPECT().SupportsDestChain(oracleID).Return(true, nil).Maybe()
 
 			supportedSet.Remove(tc.dstChain)
 			slicesWithoutDst := supportedSet.ToSlice()
