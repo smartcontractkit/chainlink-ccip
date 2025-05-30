@@ -4,7 +4,6 @@ pragma solidity ^0.8.24;
 import {ITokenMessenger} from "../../../../pools/USDC/interfaces/ITokenMessenger.sol";
 
 import {Pool} from "../../../../libraries/Pool.sol";
-import {RateLimiter} from "../../../../libraries/RateLimiter.sol";
 import {TokenPool} from "../../../../pools/TokenPool.sol";
 import {HybridLockReleaseUSDCTokenPool} from "../../../../pools/USDC/HybridLockReleaseUSDCTokenPool.sol";
 import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
