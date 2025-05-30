@@ -151,6 +151,7 @@ impl Commit for Impl {
             report_context,
             &Ocr3ReportForCommit(&report),
             Signatures { rs, ss, raw_vs },
+            0,
         )?;
 
         Ok(())
@@ -227,6 +228,7 @@ impl Commit for Impl {
             report_context,
             &Ocr3ReportForCommit(&report),
             Signatures { rs, ss, raw_vs },
+            0,
         )?;
 
         Ok(())

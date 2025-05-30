@@ -12,6 +12,7 @@ pub const CURSES: &[u8] = b"curses";
 pub const DEST_CHAIN_STATE: &[u8] = b"dest_chain_state";
 pub const NONCE: &[u8] = b"nonce";
 pub const ALLOWED_OFFRAMP: &[u8] = b"allowed_offramp";
+pub const EXECUTION_REPORT_BUFFER: &[u8] = b"execution_report_buffer";
 
 // arbitrary messaging signer
 pub const EXTERNAL_EXECUTION_CONFIG: &[u8] = b"external_execution_config";
