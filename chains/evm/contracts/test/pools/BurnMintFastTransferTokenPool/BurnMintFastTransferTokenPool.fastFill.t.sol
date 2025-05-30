@@ -54,7 +54,7 @@ contract BurnMintFastTransferTokenPool_fastFill is BurnMintFastTransferTokenPool
     assertEq(s_burnMintERC20.balanceOf(RECEIVER), receiverBalanceBefore + expectedLocalAmount);
     FastTransferTokenPoolAbstract.FillInfo memory fillInfo =
       s_pool.getFillInfo(s_pool.computeFillId(FILL_REQUEST_ID, srcAmount, RECEIVER));
-    assertTrue(fillInfo.state == FastTransferTokenPoolAbstract.FillState.Filled);
+    assertTrue(fillInfo.state == FastTransferTokenPoolAbstract.FillState.FILLED);
     assertEq(fillInfo.filler, s_filler);
   }
 
@@ -86,17 +86,18 @@ contract BurnMintFastTransferTokenPool_fastFill is BurnMintFastTransferTokenPool
 
   function test_FastFill_WithWhitelistDisabled() public {
     // Disable whitelist
-    FastTransferTokenPoolAbstract.LaneConfigArgs memory laneConfigArgs = FastTransferTokenPoolAbstract.LaneConfigArgs({
+    FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs memory laneConfigArgs = FastTransferTokenPoolAbstract
+      .DestChainConfigUpdateArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
-      bpsFastFee: FAST_FEE_BPS,
+      fastTransferBpsFee: FAST_FEE_BPS,
       fillerAllowlistEnabled: false, // disabled
       destinationPool: abi.encode(s_remoteBurnMintPool),
-      fillAmountMaxPerRequest: FILL_AMOUNT_MAX,
+      maxFillAmountPerRequest: FILL_AMOUNT_MAX,
       addFillers: new address[](0),
       removeFillers: new address[](0)
     });
     vm.prank(OWNER);
-    s_pool.updateLaneConfig(laneConfigArgs);
+    s_pool.updateDestChainConfig(laneConfigArgs);
 
     address anyFiller = makeAddr("anyFiller");
     deal(address(s_burnMintERC20), anyFiller, type(uint256).max);
@@ -112,7 +113,7 @@ contract BurnMintFastTransferTokenPool_fastFill is BurnMintFastTransferTokenPool
 
     FastTransferTokenPoolAbstract.FillInfo memory fillInfo =
       s_pool.getFillInfo(s_pool.computeFillId(FILL_REQUEST_ID, FILL_AMOUNT, RECEIVER));
-    assertTrue(fillInfo.state == FastTransferTokenPoolAbstract.FillState.Filled);
+    assertTrue(fillInfo.state == FastTransferTokenPoolAbstract.FillState.FILLED);
     assertEq(fillInfo.filler, anyFiller);
   }
 

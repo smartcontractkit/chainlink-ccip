@@ -137,17 +137,18 @@ contract BurnMintFastTransferTokenPool_validateSendRequest is BurnMintFastTransf
     s_pool.applyChainUpdates(new uint64[](0), chainUpdate);
 
     // Add lane config for the new chain
-    FastTransferTokenPoolAbstract.LaneConfigArgs memory laneConfigArgs = FastTransferTokenPoolAbstract.LaneConfigArgs({
+    FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs memory laneConfigArgs = FastTransferTokenPoolAbstract
+      .DestChainConfigUpdateArgs({
       remoteChainSelector: anotherChainSelector,
-      bpsFastFee: FAST_FEE_BPS,
+      fastTransferBpsFee: FAST_FEE_BPS,
       fillerAllowlistEnabled: true,
       destinationPool: abi.encode(s_remoteBurnMintPool),
-      fillAmountMaxPerRequest: FILL_AMOUNT_MAX,
+      maxFillAmountPerRequest: FILL_AMOUNT_MAX,
       addFillers: new address[](0),
       removeFillers: new address[](0)
     });
     vm.prank(OWNER);
-    s_pool.updateLaneConfig(laneConfigArgs);
+    s_pool.updateDestChainConfig(laneConfigArgs);
 
     // Mock RMN to return cursed status only for the new chain
     vm.mockCall(
@@ -193,16 +194,17 @@ contract BurnMintFastTransferTokenPool_validateSendRequest is BurnMintFastTransf
     address[] memory addFillers = new address[](1);
     addFillers[0] = s_filler;
 
-    FastTransferTokenPoolAbstract.LaneConfigArgs memory laneConfigArgs = FastTransferTokenPoolAbstract.LaneConfigArgs({
+    FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs memory laneConfigArgs = FastTransferTokenPoolAbstract
+      .DestChainConfigUpdateArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
-      bpsFastFee: FAST_FEE_BPS,
+      fastTransferBpsFee: FAST_FEE_BPS,
       fillerAllowlistEnabled: true,
       destinationPool: abi.encode(s_remoteBurnMintPool),
-      fillAmountMaxPerRequest: FILL_AMOUNT_MAX,
+      maxFillAmountPerRequest: FILL_AMOUNT_MAX,
       addFillers: addFillers,
       removeFillers: new address[](0)
     });
 
-    pool.updateLaneConfig(laneConfigArgs);
+    pool.updateDestChainConfig(laneConfigArgs);
   }
 }

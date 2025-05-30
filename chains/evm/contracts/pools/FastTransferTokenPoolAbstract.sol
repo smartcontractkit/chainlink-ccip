@@ -1,13 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-// Local interfaces
-
 import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol";
 import {IFastTransferPool} from "../interfaces/IFastTransferPool.sol";
-import {IRouterClient} from "../interfaces/IRouterClient.sol";
 
 import {IRMN} from "../interfaces/IRMN.sol";
+import {IRouterClient} from "../interfaces/IRouterClient.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {CCIPReceiver} from "../applications/CCIPReceiver.sol";
@@ -28,13 +26,13 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   using SafeERC20 for IERC20;
 
   error WhitelistNotEnabled();
-  error InvalidLaneConfig();
+  error InvalidDestChainConfig();
   error FillerNotWhitelisted(uint64 remoteChainSelector, address filler);
 
   event LaneUpdated(
-    uint64 indexed dst,
+    uint64 indexed destinationChainSelector,
     uint16 bps,
-    uint256 fillAmountMaxPerRequest,
+    uint256 maxFillAmountPerRequest,
     bytes destinationPool,
     address[] addFillers,
     address[] removeFillers
@@ -42,27 +40,27 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   event FillerAllowListUpdated(uint64 indexed dst, address[] addFillers, address[] removeFillers);
   event DestinationPoolUpdated(uint64 indexed dst, address destinationPool);
 
-  struct LaneConfig {
-    uint256 fillAmountMaxPerRequest; //    max amount that can be filled per request
-    uint16 bpsFastFee; // ─────────────╮ 0-10_000
+  struct DestChainConfig {
+    uint256 maxFillAmountPerRequest; //    max amount that can be filled per request
+    uint16 fastTransferBpsFee; // ─────╮ 0-10_000
     bool fillerAllowlistEnabled; // ───╯ whitelist for fillers
     bytes destinationPool; // destination pool address
     mapping(address filler => bool isAllowed) fillerAllowList; // whitelist of fillers
   }
 
-  struct LaneConfigView {
-    uint256 fillAmountMaxPerRequest; //    max amount that can be filled per request
-    uint16 bpsFastFee; // ────────────╮ 0-10_000
+  struct DestChainConfigView {
+    uint256 maxFillAmountPerRequest; //    max amount that can be filled per request
+    uint16 fastTransferBpsFee; // ────╮ 0-10_000
     bool fillerAllowlistEnabled; // ──╯ whitelist for fillers
     bytes destinationPool; // destination pool address
   }
 
-  struct LaneConfigArgs {
-    uint256 fillAmountMaxPerRequest; //    max amount that can be filled per request
+  struct DestChainConfigUpdateArgs {
+    uint256 maxFillAmountPerRequest; //    max amount that can be filled per request
     address[] addFillers; //               address allowed to fill
     address[] removeFillers; //            addresses to remove from the whitelist
     uint64 remoteChainSelector; // ──────╮
-    uint16 bpsFastFee; //                │ 0-10_000
+    uint16 fastTransferBpsFee; //        |       │ 0-10_000
     bool fillerAllowlistEnabled; // ─────╯
     bytes destinationPool;
   }
@@ -76,9 +74,9 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
 
   /// @notice Enum representing the state of a fill request
   enum FillState {
-    NotFilled, // Request has not been filled yet
-    Filled, // Request has been filled by a filler
-    Settled // Request has been settled via CCIP
+    NOT_FILLED, // Request has not been filled yet
+    FILLED, // Request has been filled by a filler
+    SETTLED // Request has been settled via CCIP
 
   }
 
@@ -89,7 +87,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   }
 
   /// @dev Mapping of remote chain selector to lane configuration
-  mapping(uint64 remoteChainSelector => LaneConfig laneConfig) private s_fastTransferLaneConfig;
+  mapping(uint64 remoteChainSelector => DestChainConfig laneConfig) private s_fastTransferDestChainConfig;
 
   /// @dev Mapping of fill request ID to fill information
   /// This is used to track the state and filler of each fill request
@@ -111,33 +109,33 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
 
   /// @notice Updates the lane configuration
   /// @param laneConfigArgs The lane configuration arguments
-  function updateLaneConfig(
-    LaneConfigArgs calldata laneConfigArgs
+  function updateDestChainConfig(
+    DestChainConfigUpdateArgs calldata laneConfigArgs
   ) external virtual onlyOwner {
-    _updateLaneConfig(laneConfigArgs);
+    _updateDestChainConfig(laneConfigArgs);
   }
 
   /// @notice Internal function to update the lane configuration
   /// @param laneConfigArgs The lane configuration arguments
-  function _updateLaneConfig(
-    LaneConfigArgs memory laneConfigArgs
+  function _updateDestChainConfig(
+    DestChainConfigUpdateArgs memory laneConfigArgs
   ) internal virtual {
-    if (laneConfigArgs.bpsFastFee > 10_000) revert InvalidLaneConfig();
-    LaneConfig storage laneConfig = s_fastTransferLaneConfig[laneConfigArgs.remoteChainSelector];
+    if (laneConfigArgs.fastTransferBpsFee > 10_000) revert InvalidDestChainConfig();
+    DestChainConfig storage laneConfig = s_fastTransferDestChainConfig[laneConfigArgs.remoteChainSelector];
     laneConfig.destinationPool = laneConfigArgs.destinationPool;
-    laneConfig.bpsFastFee = laneConfigArgs.bpsFastFee;
+    laneConfig.fastTransferBpsFee = laneConfigArgs.fastTransferBpsFee;
     laneConfig.fillerAllowlistEnabled = laneConfigArgs.fillerAllowlistEnabled;
-    laneConfig.fillAmountMaxPerRequest = laneConfigArgs.fillAmountMaxPerRequest;
-    for (uint256 i; i < laneConfigArgs.addFillers.length; ++i) {
-      laneConfig.fillerAllowList[laneConfigArgs.addFillers[i]] = true;
-    }
+    laneConfig.maxFillAmountPerRequest = laneConfigArgs.maxFillAmountPerRequest;
     for (uint256 i; i < laneConfigArgs.removeFillers.length; ++i) {
       laneConfig.fillerAllowList[laneConfigArgs.removeFillers[i]] = false;
     }
+    for (uint256 i; i < laneConfigArgs.addFillers.length; ++i) {
+      laneConfig.fillerAllowList[laneConfigArgs.addFillers[i]] = true;
+    }
     emit LaneUpdated(
       laneConfigArgs.remoteChainSelector,
-      laneConfigArgs.bpsFastFee,
-      laneConfigArgs.fillAmountMaxPerRequest,
+      laneConfigArgs.fastTransferBpsFee,
+      laneConfigArgs.maxFillAmountPerRequest,
       laneConfigArgs.destinationPool,
       laneConfigArgs.addFillers,
       laneConfigArgs.removeFillers
@@ -153,7 +151,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     address[] memory addFillers,
     address[] memory removeFillers
   ) external virtual onlyOwner {
-    LaneConfig storage laneConfig = s_fastTransferLaneConfig[destinationChainSelector];
+    DestChainConfig storage laneConfig = s_fastTransferDestChainConfig[destinationChainSelector];
     for (uint256 i; i < addFillers.length; ++i) {
       laneConfig.fillerAllowList[addFillers[i]] = true;
     }
@@ -166,15 +164,15 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   /// @notice Gets the lane configuration for a given destination chain selector
   /// @param remoteChainSelector The remote chain selector
   /// @return laneConfig The lane configuration for the given destination chain selector
-  function getLaneConfig(
+  function getDestChainConfig(
     uint64 remoteChainSelector
-  ) external view returns (LaneConfigView memory) {
-    LaneConfig storage config = s_fastTransferLaneConfig[remoteChainSelector];
-    return LaneConfigView({
-      bpsFastFee: config.bpsFastFee,
+  ) external view returns (DestChainConfigView memory) {
+    DestChainConfig storage config = s_fastTransferDestChainConfig[remoteChainSelector];
+    return DestChainConfigView({
+      fastTransferBpsFee: config.fastTransferBpsFee,
       fillerAllowlistEnabled: config.fillerAllowlistEnabled,
       destinationPool: config.destinationPool,
-      fillAmountMaxPerRequest: config.fillAmountMaxPerRequest
+      maxFillAmountPerRequest: config.maxFillAmountPerRequest
     });
   }
 
@@ -183,7 +181,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   /// @param filler The filler address to check
   /// @return isWhitelisted Whether the filler is whitelisted
   function isfillerAllowListed(uint64 remoteChainSelector, address filler) external view returns (bool) {
-    return s_fastTransferLaneConfig[remoteChainSelector].fillerAllowList[filler];
+    return s_fastTransferDestChainConfig[remoteChainSelector].fillerAllowList[filler];
   }
 
   /// @notice Gets the fill information for a given fill ID
@@ -205,7 +203,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     uint256 amount,
     address receiver
   ) public pure override returns (bytes32) {
-    return keccak256(abi.encodePacked(fillRequestId, amount, receiver));
+    return _computeFillId(fillRequestId, amount, receiver);
   }
 
   /// @inheritdoc IFastTransferPool
@@ -253,9 +251,9 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     bytes calldata receiver,
     bytes calldata
   ) internal view returns (IFastTransferPool.Quote memory quote, Client.EVM2AnyMessage memory message) {
-    LaneConfig storage lane = s_fastTransferLaneConfig[destinationChainSelector];
+    DestChainConfig storage lane = s_fastTransferDestChainConfig[destinationChainSelector];
 
-    quote.fastTransferFee = (amount * lane.bpsFastFee) / 10_000;
+    quote.fastTransferFee = (amount * lane.fastTransferBpsFee) / 10_000;
     // pack the MintMessage
     bytes memory data = abi.encode(
       MintMessage({
@@ -267,7 +265,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     );
 
     message = Client.EVM2AnyMessage({
-      receiver: abi.encode(lane.destinationPool),
+      receiver: lane.destinationPool,
       data: data,
       tokenAmounts: new Client.EVMTokenAmount[](0),
       feeToken: settlementFeeToken,
@@ -290,12 +288,12 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     uint8 srcDecimals,
     address receiver
   ) public virtual {
-    bytes32 fillId = keccak256(abi.encodePacked(fillRequestId, srcAmount, receiver));
+    bytes32 fillId = computeFillId(fillRequestId, srcAmount, receiver);
     FillInfo memory fillInfo = s_fills[fillId];
-    if (fillInfo.state != FillState.NotFilled) revert AlreadyFilled(fillRequestId);
+    if (fillInfo.state != FillState.NOT_FILLED) revert AlreadyFilled(fillRequestId);
 
     {
-      LaneConfig storage laneConfig = s_fastTransferLaneConfig[sourceChainSelector];
+      DestChainConfig storage laneConfig = s_fastTransferDestChainConfig[sourceChainSelector];
       if (laneConfig.fillerAllowlistEnabled) {
         if (!laneConfig.fillerAllowList[msg.sender]) revert FillerNotWhitelisted(sourceChainSelector, msg.sender);
       }
@@ -303,7 +301,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     // Transfer tokens from filler to receiver
     uint256 destAmount = _transferFromFiller(sourceChainSelector, msg.sender, receiver, srcAmount, srcDecimals);
     // Record fill
-    s_fills[fillId] = FillInfo({state: FillState.Filled, filler: msg.sender});
+    s_fills[fillId] = FillInfo({state: FillState.FILLED, filler: msg.sender});
     emit FastFill(fillRequestId, fillId, msg.sender, destAmount, receiver);
   }
 
@@ -366,10 +364,10 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     FillInfo memory fillInfo = s_fills[fillId];
 
     // Handle settlement based on fill state
-    if (fillInfo.state == FillState.NotFilled) {
+    if (fillInfo.state == FillState.NOT_FILLED) {
       // Not fast-filled - mint/release to receiver
       _handleNotFastFilled(sourceChainSelector, settlementAmountLocal, receiver);
-    } else if (fillInfo.state == FillState.Settled) {
+    } else if (fillInfo.state == FillState.SETTLED) {
       // Already settled
       revert AlreadySettled(fillRequestId);
     } else {
@@ -378,7 +376,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     }
 
     // Mark as settled
-    s_fills[fillId] = FillInfo({state: FillState.Settled, filler: address(0)});
+    s_fills[fillId] = FillInfo({state: FillState.SETTLED, filler: address(0)});
   }
 
   /// @notice Validates settlement prerequisites
@@ -392,6 +390,9 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     }
   }
 
+  /// @notice Validates the send request parameters
+  /// @param destinationChainSelector The destination chain selector
+  /// @dev Checks if the destination chain is allowed, if the sender is whitelisted, and if the RMN curse applies
   function _validateSendRequest(
     uint64 destinationChainSelector
   ) internal view virtual {
@@ -427,5 +428,13 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     return interfaceId == type(IFastTransferPool).interfaceId || interfaceId == type(ITypeAndVersion).interfaceId
       || interfaceId == type(IAny2EVMMessageReceiver).interfaceId || interfaceId == type(IERC165).interfaceId
       || super.supportsInterface(interfaceId);
+  }
+
+  function _computeFillId(
+    bytes32 fillRequestId,
+    uint256 amount,
+    address receiver
+  ) internal pure virtual returns (bytes32) {
+    return keccak256(abi.encode(fillRequestId, amount, receiver));
   }
 }

@@ -33,7 +33,7 @@ contract BurnMintFastTransferTokenPoolSetup is BaseTest {
     s_burnMintERC20.grantMintAndBurnRoles(address(s_pool));
 
     _applyChainUpdates();
-    _setupLaneConfig();
+    _setupDestChainConfig();
   }
 
   function _applyChainUpdates() internal {
@@ -58,20 +58,21 @@ contract BurnMintFastTransferTokenPoolSetup is BaseTest {
     s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), offRampUpdates);
   }
 
-  function _setupLaneConfig() internal {
+  function _setupDestChainConfig() internal {
     address[] memory addFillers = new address[](1);
     addFillers[0] = s_filler;
 
-    FastTransferTokenPoolAbstract.LaneConfigArgs memory laneConfigArgs = FastTransferTokenPoolAbstract.LaneConfigArgs({
+    FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs memory laneConfigArgs = FastTransferTokenPoolAbstract
+      .DestChainConfigUpdateArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
-      bpsFastFee: FAST_FEE_BPS,
+      fastTransferBpsFee: FAST_FEE_BPS,
       fillerAllowlistEnabled: true,
       destinationPool: abi.encode(s_remoteBurnMintPool),
-      fillAmountMaxPerRequest: FILL_AMOUNT_MAX,
+      maxFillAmountPerRequest: FILL_AMOUNT_MAX,
       addFillers: addFillers,
       removeFillers: new address[](0)
     });
 
-    s_pool.updateLaneConfig(laneConfigArgs);
+    s_pool.updateDestChainConfig(laneConfigArgs);
   }
 }

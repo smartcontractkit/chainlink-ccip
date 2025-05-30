@@ -64,16 +64,17 @@ contract FastTransferTokenPoolHelper_fastFill_Test is FastTransferTokenPoolHelpe
   function test_FastFill_WhitelistDisabled() public {
     vm.prank(OWNER);
     // Disable whitelist
-    FastTransferTokenPoolAbstract.LaneConfigArgs memory laneConfigArgs = FastTransferTokenPoolAbstract.LaneConfigArgs({
+    FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs memory laneConfigArgs = FastTransferTokenPoolAbstract
+      .DestChainConfigUpdateArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
-      bpsFastFee: 100,
+      fastTransferBpsFee: 100,
       fillerAllowlistEnabled: false,
       destinationPool: destPoolAddress,
-      fillAmountMaxPerRequest: 1000 ether,
+      maxFillAmountPerRequest: 1000 ether,
       addFillers: new address[](0),
       removeFillers: new address[](0)
     });
-    s_tokenPool.updateLaneConfig(laneConfigArgs);
+    s_tokenPool.updateDestChainConfig(laneConfigArgs);
 
     uint256 srcAmount = 100 ether;
     uint8 srcDecimals = 18;

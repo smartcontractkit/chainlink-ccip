@@ -24,12 +24,12 @@ contract BurnMintFastTransferTokenPool_constructor is BurnMintFastTransferTokenP
     assertTrue(s_pool.supportsInterface(type(IAny2EVMMessageReceiver).interfaceId));
   }
 
-  function test_GetLaneConfig() public view {
-    FastTransferTokenPoolAbstract.LaneConfigView memory config = s_pool.getLaneConfig(DEST_CHAIN_SELECTOR);
-    assertEq(config.bpsFastFee, FAST_FEE_BPS);
+  function test_GetDestChainConfig() public view {
+    FastTransferTokenPoolAbstract.DestChainConfigView memory config = s_pool.getDestChainConfig(DEST_CHAIN_SELECTOR);
+    assertEq(config.fastTransferBpsFee, FAST_FEE_BPS);
     assertTrue(config.fillerAllowlistEnabled);
     assertEq(config.destinationPool, abi.encode(s_remoteBurnMintPool));
-    assertEq(config.fillAmountMaxPerRequest, FILL_AMOUNT_MAX);
+    assertEq(config.maxFillAmountPerRequest, FILL_AMOUNT_MAX);
   }
 
   function test_IsFillerAllowListed() public {

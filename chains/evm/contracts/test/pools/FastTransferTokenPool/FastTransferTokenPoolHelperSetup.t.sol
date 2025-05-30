@@ -36,14 +36,14 @@ contract FastTransferTokenPoolHelperSetup is BaseTest {
     address[] memory addFillers = new address[](1);
     addFillers[0] = s_filler;
     // Deploy pool
-    FastTransferTokenPoolAbstract.LaneConfigArgs[] memory laneConfigArgs =
-      new FastTransferTokenPoolAbstract.LaneConfigArgs[](1);
-    laneConfigArgs[0] = FastTransferTokenPoolAbstract.LaneConfigArgs({
+    FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs[] memory laneConfigArgs =
+      new FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs[](1);
+    laneConfigArgs[0] = FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
-      bpsFastFee: FAST_FEE_BPS, // 1%
+      fastTransferBpsFee: FAST_FEE_BPS, // 1%
       fillerAllowlistEnabled: true,
       destinationPool: destPoolAddress,
-      fillAmountMaxPerRequest: 1000 ether,
+      maxFillAmountPerRequest: 1000 ether,
       addFillers: addFillers,
       removeFillers: new address[](0)
     });
@@ -55,7 +55,7 @@ contract FastTransferTokenPoolHelperSetup is BaseTest {
       address(s_mockRMNRemote), // rmnProxy
       address(s_sourceRouter) // router
     );
-    s_tokenPool.updateLaneConfig(laneConfigArgs[0]);
+    s_tokenPool.updateDestChainConfig(laneConfigArgs[0]);
     bytes[] memory remotePoolAddresses = new bytes[](1);
     remotePoolAddresses[0] = destPoolAddress;
 
