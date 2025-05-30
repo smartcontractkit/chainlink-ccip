@@ -14,7 +14,6 @@ library RateLimiter {
   error InvalidRateLimitRate(Config rateLimiterConfig);
   error DisabledNonZeroRateLimit(Config config);
 
-  event TokensConsumed(uint256 tokens);
   event ConfigChanged(Config config);
 
   struct TokenBucket {
@@ -72,7 +71,6 @@ library RateLimiter {
 
     // Downcast is safe here, as tokens is not larger than capacity.
     s_bucket.tokens = uint128(tokens);
-    emit TokensConsumed(requestTokens);
   }
 
   /// @notice Gets the token bucket with its values for the block it was requested at.

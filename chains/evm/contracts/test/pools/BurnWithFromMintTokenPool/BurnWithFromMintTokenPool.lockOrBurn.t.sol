@@ -42,7 +42,7 @@ contract BurnWithFromMintTokenPool_lockOrBurn is BurnWithFromMintTokenPoolSetup 
     vm.startPrank(s_burnMintOnRamp);
 
     vm.expectEmit();
-    emit RateLimiter.TokensConsumed(amount);
+    emit TokenPool.OutboundRateLimitConsumed(address(s_burnMintERC20), DEST_CHAIN_SELECTOR, amount);
 
     vm.expectEmit();
     emit IERC20.Transfer(address(s_pool), address(0), amount);

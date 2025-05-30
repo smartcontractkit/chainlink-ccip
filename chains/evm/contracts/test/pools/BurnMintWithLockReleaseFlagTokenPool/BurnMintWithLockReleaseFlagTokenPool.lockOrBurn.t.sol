@@ -21,7 +21,7 @@ contract BurnMintWithLockReleaseFlagTokenPool_lockOrBurn is BurnMintWithLockRele
     vm.startPrank(s_burnMintOnRamp);
 
     vm.expectEmit();
-    emit RateLimiter.TokensConsumed(burnAmount);
+    emit TokenPool.OutboundRateLimitConsumed(address(s_burnMintERC20), DEST_CHAIN_SELECTOR, burnAmount);
 
     vm.expectEmit();
     emit IERC20.Transfer(address(s_pool), address(0), burnAmount);

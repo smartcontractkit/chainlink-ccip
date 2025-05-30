@@ -34,7 +34,8 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
     deal(address(s_token), address(s_lockReleaseTokenPool), amount);
 
     vm.expectEmit();
-    emit RateLimiter.TokensConsumed(amount);
+    emit TokenPool.InboundRateLimitConsumed(address(s_token), SOURCE_CHAIN_SELECTOR, amount);
+
     vm.expectEmit();
     emit TokenPool.ReleasedOrMinted({
       remoteChainSelector: SOURCE_CHAIN_SELECTOR,
@@ -78,7 +79,7 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
       // Only rate limit if the amount is >0
       if (amount > 0) {
         vm.expectEmit();
-        emit RateLimiter.TokensConsumed(amount);
+        emit TokenPool.InboundRateLimitConsumed(address(s_token), SOURCE_CHAIN_SELECTOR, amount);
       }
 
       vm.expectEmit();

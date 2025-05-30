@@ -119,9 +119,6 @@ contract RateLimiter_consume is RateLimiterSetup {
 
     uint256 requestTokens = 50;
 
-    vm.expectEmit();
-    emit RateLimiter.TokensConsumed(requestTokens);
-
     s_helper.consume(requestTokens, address(0));
 
     rateLimiter = s_helper.getRateLimiter();
@@ -135,9 +132,6 @@ contract RateLimiter_consume is RateLimiterSetup {
   function test_Refill() public {
     uint256 requestTokens = 50;
 
-    vm.expectEmit();
-    emit RateLimiter.TokensConsumed(requestTokens);
-
     s_helper.consume(requestTokens, address(0));
 
     RateLimiter.TokenBucket memory rateLimiter = s_helper.getRateLimiter();
@@ -149,9 +143,6 @@ contract RateLimiter_consume is RateLimiterSetup {
 
     uint256 warpTime = 4;
     vm.warp(BLOCK_TIME + warpTime);
-
-    vm.expectEmit();
-    emit RateLimiter.TokensConsumed(requestTokens);
 
     s_helper.consume(requestTokens, address(0));
 
@@ -260,9 +251,6 @@ contract RateLimiter_consume is RateLimiterSetup {
     vm.warp(initBlockTime);
 
     RateLimiter.TokenBucket memory rateLimiter = s_helper.getRateLimiter();
-
-    vm.expectEmit();
-    emit RateLimiter.TokensConsumed(rateLimiter.capacity);
 
     s_helper.consume(rateLimiter.capacity, address(0));
 
