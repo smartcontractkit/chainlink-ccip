@@ -57,11 +57,11 @@ contract BurnMintFastTransferTokenPool is BurnMintTokenPoolAbstract, FastTransfe
     return localAmount;
   }
 
-  /// @notice Handles settlement when the request was not fast-filled
-  /// @param sourceChainSelector The selector of the source chain
-  /// @param settlementAmountLocal The amount of tokens to settle in the local chain
-  /// @param receiver The address of the receiver who will receive the settled tokens
-  function _handleNotFastFilled(
+  /// @notice Handles settlement when the request was not fast-filled.
+  /// @param sourceChainSelector The selector of the source chain.
+  /// @param settlementAmountLocal The amount of tokens to settle in the local chain.
+  /// @param receiver The address of the receiver who will receive the settled tokens.
+  function _handleSlowFill(
     uint64 sourceChainSelector,
     uint256 settlementAmountLocal,
     address receiver
@@ -82,8 +82,7 @@ contract BurnMintFastTransferTokenPool is BurnMintTokenPoolAbstract, FastTransfe
   function supportsInterface(
     bytes4 interfaceId
   ) public pure virtual override(TokenPool, FastTransferTokenPoolAbstract) returns (bool) {
-    return interfaceId == type(IFastTransferPool).interfaceId || interfaceId == type(IERC165).interfaceId
-      || interfaceId == type(IAny2EVMMessageReceiver).interfaceId || super.supportsInterface(interfaceId);
+    return TokenPool.supportsInterface(interfaceId) || FastTransferTokenPoolAbstract.supportsInterface(interfaceId);
   }
 
   function _burn(

@@ -215,7 +215,7 @@ contract BurnMintFastTransferTokenPool_updateDestChainConfig is BurnMintFastTran
     assertTrue(foundFiller3);
   }
 
-  function test_GetAllowListedFillers_EmptyList() public {
+  function test_GetAllowListedFillers_EmptyList() public view {
     // Test with no fillers added
     address[] memory allowlistedFillers = s_pool.getAllowListedFillers(NEW_CHAIN_SELECTOR);
     assertEq(allowlistedFillers.length, 0);

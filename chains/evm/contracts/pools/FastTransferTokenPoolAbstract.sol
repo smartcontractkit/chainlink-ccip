@@ -251,7 +251,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
       IERC20(feeToken).safeApprove(i_ccipRouter, quote.ccipSettlementFee);
     }
     fillRequestId = IRouterClient(getRouter()).ccipSend{value: msg.value}(destinationChainSelector, message);
-    emit FastFillRequest(fillRequestId, destinationChainSelector, amount, quote.fastTransferFee, receiver);
+    emit FastTransferRequested(fillRequestId, destinationChainSelector, amount, quote.fastTransferFee, receiver);
     return fillRequestId;
   }
 
@@ -319,7 +319,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     uint256 destAmount = _transferFromFiller(sourceChainSelector, msg.sender, receiver, srcAmount, sourceDecimals);
     // Record fill
     s_fills[fillId] = FillInfo({state: FillState.FILLED, filler: msg.sender});
-    emit FastFill(fillRequestId, fillId, msg.sender, destAmount, receiver);
+    emit FastTransferFilled(fillRequestId, fillId, msg.sender, destAmount, receiver);
   }
 
   // @inheritdoc CCIPReceiver
@@ -339,7 +339,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
         address(uint160(uint256(bytes32(mintMessage.receiver))))
       );
     }
-    emit FastFillSettled(message.messageId);
+    emit FastTransferSettled(message.messageId);
   }
 
   /// @notice Handles the token to transfer on fast fill request at source chain
@@ -383,7 +383,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     // Handle settlement based on fill state
     if (fillInfo.state == FillState.NOT_FILLED) {
       // Not fast-filled - mint/release to receiver
-      _handleNotFastFilled(sourceChainSelector, settlementAmountLocal, receiver);
+      _handleSlowFill(sourceChainSelector, settlementAmountLocal, receiver);
     } else if (fillInfo.state == FillState.SETTLED) {
       // Already settled
       revert AlreadySettled(fillRequestId);
@@ -422,7 +422,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   /// @param sourceChainSelector The source chain selector
   /// @param settlementAmountLocal The amount to settle in local token
   /// @param receiver The receiver address
-  function _handleNotFastFilled(
+  function _handleSlowFill(
     uint64 sourceChainSelector,
     uint256 settlementAmountLocal,
     address receiver

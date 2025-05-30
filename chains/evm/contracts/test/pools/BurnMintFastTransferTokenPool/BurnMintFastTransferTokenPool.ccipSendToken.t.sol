@@ -41,7 +41,7 @@ contract BurnMintFastTransferTokenPool_ccipSendToken is BurnMintFastTransferToke
     assertEq(quote.ccipSettlementFee, CCIP_SEND_FEE);
 
     vm.expectEmit();
-    emit IFastTransferPool.FastFillRequest(
+    emit IFastTransferPool.FastTransferRequested(
       MESSAGE_ID, DEST_CHAIN_SELECTOR, TRANSFER_AMOUNT, expectedFastFee, abi.encode(RECEIVER)
     );
 

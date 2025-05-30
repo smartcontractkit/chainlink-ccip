@@ -6,25 +6,30 @@ pragma solidity ^0.8.0;
 interface IFastTransferPool {
   /// @notice Quote struct containing fee information
   struct Quote {
-    uint256 ccipSettlementFee; // Fee paid to for settlement contract in CCIP supported fee tokens
-    uint256 fastTransferFee; // paid to the fast transfer filler in the same asset as requested
+    uint256 ccipSettlementFee; // Fee paid to for CCIP settlement in CCIP supported fee tokens.
+    uint256 fastTransferFee; // Fee paid to the fast transfer filler in the same asset as requested.
   }
 
   error AlreadyFilled(bytes32 fillRequestId);
   error AlreadySettled(bytes32 fillRequestId);
   error LaneDisabled();
 
-  event FastFillRequest(
+  /// @notice Emitted when a fast transfer is requested
+  event FastTransferRequested(
     bytes32 indexed fillRequestId,
     uint64 indexed dstChainSelector,
     uint256 amount,
     uint256 fastTransferFee,
     bytes receiver
   );
-  event FastFillSettled(bytes32 indexed fillRequestId);
-  event FastFill(
+  /// @notice Emitted when a fast transfer is filled. This means the end user has received the tokens but the slow
+  /// transfer is still in progress.
+  event FastTransferFilled(
     bytes32 indexed fillRequestId, bytes32 indexed fillId, address indexed filler, uint256 destAmount, address receiver
   );
+  /// @notice Emitted when a fast transfer is settled. This means the slow transfer has completed and the filler has
+  /// received their fast transfer tokens and fee.
+  event FastTransferSettled(bytes32 indexed fillRequestId);
   event InvalidFill(
     bytes32 indexed fillRequestId, address indexed filler, uint256 filledAmount, uint256 expectedAmount
   );

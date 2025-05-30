@@ -28,7 +28,7 @@ contract BurnMintFastTransferTokenPool_fastFill is BurnMintFastTransferTokenPool
     bytes32 fillId = s_pool.computeFillId(FILL_REQUEST_ID, FILL_AMOUNT, RECEIVER);
 
     vm.expectEmit();
-    emit IFastTransferPool.FastFill(FILL_REQUEST_ID, fillId, s_filler, FILL_AMOUNT, RECEIVER);
+    emit IFastTransferPool.FastTransferFilled(FILL_REQUEST_ID, fillId, s_filler, FILL_AMOUNT, RECEIVER);
 
     vm.prank(s_filler);
     s_pool.fastFill(FILL_REQUEST_ID, DEST_CHAIN_SELECTOR, FILL_AMOUNT, SRC_DECIMALS, RECEIVER);

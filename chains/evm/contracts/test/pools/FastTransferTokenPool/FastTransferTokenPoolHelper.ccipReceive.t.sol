@@ -56,7 +56,7 @@ contract FastTransferTokenPoolHelper_ccipReceive_Test is FastTransferTokenPoolHe
 
     // Mock router call
     vm.expectEmit(true, false, false, true);
-    emit IFastTransferPool.FastFillSettled(messageId);
+    emit IFastTransferPool.FastTransferSettled(messageId);
     vm.prank(address(s_sourceRouter));
     s_tokenPool.ccipReceive(message);
 
@@ -92,7 +92,7 @@ contract FastTransferTokenPoolHelper_ccipReceive_Test is FastTransferTokenPoolHe
 
     // Mock router call
     vm.expectEmit(true, false, false, true);
-    emit IFastTransferPool.FastFillSettled(messageId);
+    emit IFastTransferPool.FastTransferSettled(messageId);
     vm.prank(address(s_sourceRouter));
     s_tokenPool.ccipReceive(message);
 
@@ -157,7 +157,7 @@ contract FastTransferTokenPoolHelper_ccipReceive_Test is FastTransferTokenPoolHe
     });
 
     vm.expectEmit(true, false, false, true);
-    emit IFastTransferPool.FastFillSettled(messageId);
+    emit IFastTransferPool.FastTransferSettled(messageId);
     vm.prank(address(s_sourceRouter));
     s_tokenPool.ccipReceive(message);
 

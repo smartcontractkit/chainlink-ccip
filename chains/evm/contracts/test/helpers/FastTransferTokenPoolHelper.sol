@@ -66,7 +66,7 @@ contract FastTransferTokenPoolHelper is FastTransferTokenPoolAbstract {
   }
 
   /// @notice Handles settlement when the request was not fast-filled
-  function _handleNotFastFilled(uint64, uint256 settlementAmountLocal, address receiver) internal override {
+  function _handleSlowFill(uint64, uint256 settlementAmountLocal, address receiver) internal override {
     // For testing, just transfer tokens to receiver
     getToken().safeTransfer(receiver, settlementAmountLocal);
   }

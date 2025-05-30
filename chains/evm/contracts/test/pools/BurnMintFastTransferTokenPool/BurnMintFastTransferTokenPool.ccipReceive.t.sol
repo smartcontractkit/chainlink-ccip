@@ -35,7 +35,7 @@ contract BurnMintFastTransferTokenPool_ccipReceive is BurnMintFastTransferTokenP
     emit IERC20.Transfer(address(0), RECEIVER, expectedMintAmount);
 
     vm.expectEmit();
-    emit IFastTransferPool.FastFillSettled(FILL_REQUEST_ID);
+    emit IFastTransferPool.FastTransferSettled(FILL_REQUEST_ID);
 
     vm.prank(address(s_sourceRouter));
     s_pool.ccipReceive(message);
@@ -58,7 +58,7 @@ contract BurnMintFastTransferTokenPool_ccipReceive is BurnMintFastTransferTokenP
     emit IERC20.Transfer(address(0), s_filler, expectedReimbursement);
 
     vm.expectEmit();
-    emit IFastTransferPool.FastFillSettled(FILL_REQUEST_ID);
+    emit IFastTransferPool.FastTransferSettled(FILL_REQUEST_ID);
 
     vm.prank(address(s_sourceRouter));
     s_pool.ccipReceive(message);

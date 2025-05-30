@@ -23,7 +23,7 @@ contract FastTransferTokenPoolHelper_ccipSendToken_Test is FastTransferTokenPool
       address(s_sourceRouter), abi.encodeWithSelector(IRouterClient.ccipSend.selector), abi.encode(mockMessageId)
     );
     vm.expectEmit();
-    emit IFastTransferPool.FastFillRequest(mockMessageId, DEST_CHAIN_SELECTOR, amount, fastFeeExpected, receiver);
+    emit IFastTransferPool.FastTransferRequested(mockMessageId, DEST_CHAIN_SELECTOR, amount, fastFeeExpected, receiver);
     bytes32 fillRequestId =
       s_tokenPool.ccipSendToken{value: 1 ether}(address(0), DEST_CHAIN_SELECTOR, amount, receiver, extraArgs);
 
