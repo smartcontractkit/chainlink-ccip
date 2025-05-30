@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {Pool} from "../../libraries/Pool.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
 
 import {IERC20} from
@@ -19,22 +18,6 @@ contract TokenPoolHelper is TokenPool {
     address rmnProxy,
     address router
   ) TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) {}
-
-  function lockOrBurn(
-    Pool.LockOrBurnInV1 calldata lockOrBurnIn
-  ) public override returns (Pool.LockOrBurnOutV1 memory) {
-    _validateLockOrBurn(lockOrBurnIn);
-
-    return Pool.LockOrBurnOutV1({destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector), destPoolData: ""});
-  }
-
-  function releaseOrMint(
-    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
-  ) public override returns (Pool.ReleaseOrMintOutV1 memory) {
-    _validateReleaseOrMint(releaseOrMintIn);
-
-    return Pool.ReleaseOrMintOutV1({destinationAmount: releaseOrMintIn.amount});
-  }
 
   function encodeLocalDecimals() external view returns (bytes memory) {
     return _encodeLocalDecimals();
