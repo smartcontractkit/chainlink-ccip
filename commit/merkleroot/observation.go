@@ -156,6 +156,8 @@ func (p *Processor) verifyQuery(ctx context.Context, prevOutcome Outcome, q Quer
 		return fmt.Errorf("get chain by selector %d", p.destChain)
 	}
 
+	// TODO: this is a role-don inconsistency. If oracle does not support the destination chain the call below
+	// will fail. Meaning only oracles that support the destination chain will be able to verify the query.
 	offRampAddress, err := p.ccipReader.GetContractAddress(consts.ContractNameOffRamp, p.destChain)
 	if err != nil {
 		return fmt.Errorf("get offramp contract address: %w", err)
@@ -552,14 +554,16 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(ctx context.Context) []pluginty
 		return nil
 	}
 
-	sourceChains := mapset.NewSet(allSourceChains...).Intersect(supportedChains).ToSlice()
-	sort.Slice(sourceChains, func(i, j int) bool { return sourceChains[i] < sourceChains[j] })
+	supportedSourceChains := mapset.NewSet(allSourceChains...).
+		Intersect(supportedChains).ToSlice()
+
+	sort.Slice(supportedSourceChains, func(i, j int) bool { return supportedSourceChains[i] < supportedSourceChains[j] })
 
 	mu := &sync.Mutex{}
-	latestOnRampSeqNums := make([]plugintypes.SeqNumChain, 0, len(sourceChains))
+	latestOnRampSeqNums := make([]plugintypes.SeqNumChain, 0, len(supportedSourceChains))
 
 	wg := &sync.WaitGroup{}
-	for _, sourceChain := range sourceChains {
+	for _, sourceChain := range supportedSourceChains {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -733,6 +737,17 @@ func (o observerImpl) computeMerkleRoot(
 // NOTE: At least two external calls are made.
 func (o observerImpl) ObserveRMNRemoteCfg(ctx context.Context) cciptypes.RemoteConfig {
 	lggr := logutil.WithContextValues(ctx, o.lggr)
+
+	supportsDestChain, err := o.chainSupport.SupportsDestChain(o.oracleID)
+	if err != nil {
+		lggr.Errorw("call to SupportsDestChain failed", "err", err)
+		return cciptypes.RemoteConfig{}
+	}
+
+	if !supportsDestChain {
+		lggr.Debugw("cannot observe RMN remote config since destination chain is not supported")
+		return cciptypes.RemoteConfig{}
+	}
 
 	rmnRemoteCfg, err := o.ccipReader.GetRMNRemoteConfig(ctx)
 	if err != nil {
