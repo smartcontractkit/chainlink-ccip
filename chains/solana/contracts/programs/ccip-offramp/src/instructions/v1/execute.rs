@@ -43,8 +43,6 @@ impl Execute for Impl {
                 ctx.remaining_accounts
                     .last()
                     .ok_or(CcipOfframpError::ExecutionReportUnavailable)?,
-                ctx.accounts.authority.key(),
-                &ctx.accounts.commit_report.merkle_root,
             )?
         };
 
@@ -92,8 +90,6 @@ impl Execute for Impl {
                 ctx.remaining_accounts
                     .last()
                     .ok_or(CcipOfframpError::ExecutionReportUnavailable)?,
-                ctx.accounts.authority.key(),
-                &ctx.accounts.commit_report.merkle_root,
             )?
             .0
         };

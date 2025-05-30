@@ -1,5 +1,4 @@
 use anchor_lang::prelude::*;
-use ccip_common::seed;
 
 use crate::{messages::ExecutionReportSingleChain, CcipOfframpError, ExecutionReportBuffer};
 pub trait Buffering {
@@ -149,26 +148,11 @@ impl Buffering for ExecutionReportBuffer {
 
 pub fn deserialize_from_buffer_account(
     execution_report_buffer: &AccountInfo,
-    authority: Pubkey,
-    merkle_root: &[u8],
 ) -> Result<(ExecutionReportSingleChain, usize)> {
     // Ensures the buffer is initialized, and owned by the program.
     require_keys_eq!(
         *execution_report_buffer.owner,
         crate::ID,
-        CcipOfframpError::ExecutionReportUnavailable
-    );
-    let (expected_buffer_key, _) = Pubkey::find_program_address(
-        &[
-            seed::EXECUTION_REPORT_BUFFER,
-            merkle_root,
-            authority.as_ref(),
-        ],
-        &crate::ID,
-    );
-    require_keys_eq!(
-        expected_buffer_key,
-        execution_report_buffer.key(),
         CcipOfframpError::ExecutionReportUnavailable
     );
     let buffer = ExecutionReportBuffer::try_deserialize(
