@@ -31,7 +31,12 @@ contract HybridLockReleaseUSDCTokenPoolSetup is USDCSetup {
       new CCTPMessageTransmitterProxy.AllowedCallerConfigArgs[](1);
     allowedCallerParams[0] =
       CCTPMessageTransmitterProxy.AllowedCallerConfigArgs({caller: address(s_usdcTokenPool), allowed: true});
+
+    // Set the token pool as an allowed caller on BOTH transmitter proxies
+    // one for CCTP v1 and one for V2
     s_cctpMessageTransmitterProxy.configureAllowedCallers(allowedCallerParams);
+    s_cctpMessageTransmitterProxyV2.configureAllowedCallers(allowedCallerParams);
+
     s_cctpMessageTransmitterProxyForTransferLiquidity = new CCTPMessageTransmitterProxy(s_mockUSDC);
     s_usdcTokenPoolTransferLiquidity = new HybridLockReleaseUSDCTokenPool(
       s_mockUSDC,

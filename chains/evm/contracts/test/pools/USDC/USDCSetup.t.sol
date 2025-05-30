@@ -55,7 +55,6 @@ contract USDCSetup is BaseTest {
   CCTPMessageTransmitterProxy internal s_cctpMessageTransmitterProxy;
   CCTPMessageTransmitterProxy internal s_cctpMessageTransmitterProxyV2;
 
-
   address internal s_routerAllowedOnRamp = address(3456);
   address internal s_routerAllowedOffRamp = address(234);
   Router internal s_router;

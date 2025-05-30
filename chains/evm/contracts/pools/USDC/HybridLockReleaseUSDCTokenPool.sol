@@ -19,6 +19,8 @@ import {SafeERC20} from
 import {EnumerableSet} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableSet.sol";
 
+import {console2 as console} from "forge-std/console2.sol";
+
 // bytes4(keccak256("NO_CCTP_USE_LOCK_RELEASE"))
 bytes4 constant LOCK_RELEASE_FLAG = 0xfa7c07de;
 
@@ -44,7 +46,6 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
 
   error InvalidMinFinalityThreshold(uint32 expected, uint32 actual);
   error InvalidExecutionFinalityThreshold(uint32 expected, uint32 actual);
-  error CCTPNotEnabledForRemoteChainSelector(uint64 remoteChainSelector);
 
   /// @notice The address of the liquidity provider for a specific chain.
   /// External liquidity is not required when there is one canonical token deployed to a chain,
@@ -52,20 +53,16 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
   /// balanceOf(pool) on home chain >= sum(totalSupply(mint/burn "wrapped" token) on all remote chains) should always hold
   mapping(uint64 remoteChainSelector => address liquidityProvider) internal s_liquidityProvider;
 
-  ITokenMessenger internal immutable i_tokenMessengerV2;
-  CCTPMessageTransmitterProxy internal immutable i_cctpMessageTransmitterProxyV2;
-
   // CCTP's max fee is based on the use of fast-burn. Since this pool does not utilize that feature, max fee should be 0.
   uint32 public constant MAX_FEE = 0;
 
   // CCTP V2 uses 2000 to indicate that attestations should not occur until finality is achieved on the source chain.
   uint32 public constant FINALITY_THRESHOLD = 2000;
 
-  // TODO: Change this and the tests to go with it.
+  // TODO: Think of better way to do this
   enum CCTPVersion {
-    // NOT_ENABLED,
-    VERSION_0,
-    VERSION_1
+    VERSION_1,
+    VERSION_2
   }
 
   ITokenMessenger public immutable i_tokenMessengerCCTPV2;
@@ -87,11 +84,13 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
     USDCTokenPool(tokenMessenger, cctpMessageTransmitterProxy, token, allowlist, rmnProxy, router, 0)
     USDCBridgeMigrator(address(token))
   {
-
     // The following code has been duplicated exactly from USDC Token Pool but with the only difference being
-    // checks for version 1 and uses tokenMessengerV2 and cctpMessageTransmitterProxyV2 for CCTP V2. 
+    // checks for version 1 and uses tokenMessengerV2 and cctpMessageTransmitterProxyV2 for CCTP V2.
     // This is because of Solidity's limited inheritance capabilities makes it impossible to run the constructor
     // for USDCTokenPool twice with different parameters, so it has been duplicated here.
+    // NOTE: Even though it is officially referred to as Version 1, CCTP V1 contracts
+    // use the version #0, and CCTP V2 contracts return a version number #1, so a contract
+    // interacting with CCTPV2 will look for it to return the version number of 1.
 
     if (address(tokenMessengerV2) == address(0)) revert InvalidConfig();
     IMessageTransmitter transmitter = IMessageTransmitter(tokenMessengerV2.localMessageTransmitter());
@@ -122,14 +121,10 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
     // // If the alternative mechanism (L/R) for chains which have it enabled
     if (!shouldUseLockRelease(lockOrBurnIn.remoteChainSelector)) {
       CCTPVersion cctpVersion = s_cctpVersion[lockOrBurnIn.remoteChainSelector];
-      if (cctpVersion == CCTPVersion.VERSION_0) {
+      if (cctpVersion == CCTPVersion.VERSION_1) {
         return super.lockOrBurn(lockOrBurnIn);
-      } else if (cctpVersion == CCTPVersion.VERSION_1) {
+      } else if (cctpVersion == CCTPVersion.VERSION_2) {
         return _lockOrBurnCCTPV2(lockOrBurnIn);
-      }
-      // Additional Safety Mechanism
-      else {
-        revert CCTPNotEnabledForRemoteChainSelector(lockOrBurnIn.remoteChainSelector);
       }
     }
 
@@ -155,14 +150,13 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
     // flag as well.
     if (bytes4(releaseOrMintIn.sourcePoolData) != LOCK_RELEASE_FLAG) {
       CCTPVersion cctpVersion = s_cctpVersion[releaseOrMintIn.remoteChainSelector];
-      if (cctpVersion == CCTPVersion.VERSION_0) {
+      // If the version is legacy, use the inherited CCTP Functionality
+      if (cctpVersion == CCTPVersion.VERSION_1) {
         return super.releaseOrMint(releaseOrMintIn);
-      } else if (cctpVersion == CCTPVersion.VERSION_1) {
+
+        // Otherwise use the V2 functionality defined explicitly below
+      } else if (cctpVersion == CCTPVersion.VERSION_2) {
         return _releaseOrMintCCTPV2(releaseOrMintIn);
-      }
-      // Additional Safety Mechanism
-      else {
-        revert CCTPNotEnabledForRemoteChainSelector(releaseOrMintIn.remoteChainSelector);
       }
     }
     return _lockReleaseIncomingMessage(releaseOrMintIn);
@@ -312,6 +306,7 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
 
     _validateMessageCCTPV2(msgAndAttestation.message, sourceDomainIdentifier);
 
+
     if (!i_cctpMessageTransmitterProxyCCTPV2.receiveMessage(msgAndAttestation.message, msgAndAttestation.attestation)) {
       revert UnlockingUSDCFailed();
     }
@@ -345,7 +340,7 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
       version := mload(add(usdcMessage, 4)) // 0 + 4 = 4
     }
 
-    // This token pool only supports version 1 of the CCTP message format
+    // This token pool only supports CCTP V2 with message format version being 1
     // We check the version prior to loading the rest of the message
     // to avoid unexpected reverts due to out-of-bounds reads.
     if (version != 1) revert InvalidMessageVersion(version);
@@ -409,7 +404,7 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
     // In CCTP V2, nonces are deterministic and not sequential. As a result the nonce is not returned to this contract
     // upon sending the message, and will therefore not be included in the destPoolData. It will instead be
     // acquired off-chain and included in the destination-message's offchainTokenData.
-    i_tokenMessengerV2.depositForBurn(
+    i_tokenMessengerCCTPV2.depositForBurn(
       lockOrBurnIn.amount, // amount
       domain.domainIdentifier, // destinationDomain
       decodedReceiver, // mintRecipient
@@ -427,7 +422,10 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
     });
   }
 
-  // TODO: Natspec.
+  /// @notice Updates the version of CCTP to use for a given lane which will route to the correct contracts
+  /// @param remoteChainSelectors the list of CCIP-Specific remote chains
+  /// @param versions the version for each chain selector to use.
+  /// @dev A lane will use CCTP with Version 1 by default unless overridden for V2.
   function updateCCTPVersion(
     uint64[] calldata remoteChainSelectors,
     CCTPVersion[] calldata versions
