@@ -1,500 +1,183 @@
-  // SPDX-License-Identifier: BUSL-1.1
+// SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
 import {IFastTransferPool} from "../../../interfaces/IFastTransferPool.sol";
 import {IRouterClient} from "../../../interfaces/IRouterClient.sol";
 import {Client} from "../../../libraries/Client.sol";
 import {Internal} from "../../../libraries/Internal.sol";
-  import {TokenPool} from "../../../pools/TokenPool.sol";
+import {TokenPool} from "../../../pools/TokenPool.sol";
 import {FastTransferTokenPoolAbstract} from "../../../pools/FastTransferTokenPoolAbstract.sol";
 import {FastTransferTokenPoolHelperSetup} from "./FastTransferTokenPoolHelperSetup.t.sol";
 
 contract FastTransferTokenPoolHelper_ccipSendToken_Test is FastTransferTokenPoolHelperSetup {
+  struct TestParams {
+    uint64 chainSelector;
+    uint256 amount;
+    bytes receiver;
+    bytes32 mockMessageId;
+    uint256 fastFeeExpected;
+  }
+
   function setUp() public override {
     super.setUp();
   }
 
-  function test_CcipSendToken_NativeFee() public {
-    uint256 amount = 100 ether;
-    uint256 balanceBefore = s_token.balanceOf(OWNER);
-    bytes memory receiver = abi.encodePacked(address(0x5));
-    bytes memory extraArgs = "";
-    bytes32 mockMessageId = keccak256("mockMessageId");
-    uint256 fastFeeExpected = amount * FAST_FEE_BPS / 10000;
-    vm.mockCall(address(s_sourceRouter), abi.encodeWithSelector(IRouterClient.getFee.selector), abi.encode(1 ether));
-    vm.mockCall(
-      address(s_sourceRouter), abi.encodeWithSelector(IRouterClient.ccipSend.selector), abi.encode(mockMessageId)
-    );
-    Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
-      receiver: destPoolAddress,
-      data: abi.encode(
-        FastTransferTokenPoolAbstract.MintMessage({
-          sourceAmountToTransfer: amount,
-          sourceDecimals: 18,
-          fastTransferFee: fastFeeExpected,
-          receiver: receiver
-        })
-      ),
-      feeToken: address(0),
-      tokenAmounts: new Client.EVMTokenAmount[](0),
-      extraArgs: Client._argsToBytes(
-        Client.GenericExtraArgsV2({gasLimit: SETTLEMENT_GAS_OVERHEAD, allowOutOfOrderExecution: true})
-      )
+  function _setupTestParams(uint64 chainSelector) internal pure returns (TestParams memory) {
+    uint256 amount = 100e18;
+    return TestParams({
+      chainSelector: chainSelector,
+      amount: amount,
+      receiver: abi.encodePacked(address(0x5)),
+      mockMessageId: keccak256("mockMessageId"),
+      fastFeeExpected: (amount * FAST_FEE_BPS) / 10_000
     });
-    vm.expectCall(
-      address(s_sourceRouter), abi.encodeWithSelector(IRouterClient.ccipSend.selector, DEST_CHAIN_SELECTOR, message)
-    );
-    vm.expectEmit();
-    emit IFastTransferPool.FastTransferRequested(mockMessageId, DEST_CHAIN_SELECTOR, amount, fastFeeExpected, receiver);
-    bytes32 fillRequestId =
-      s_tokenPool.ccipSendToken{value: 1 ether}(address(0), DEST_CHAIN_SELECTOR, amount, receiver, extraArgs);
-
-    // Verify fillRequestId is non-zero
-    assertEq(fillRequestId, mockMessageId);
-
-    // Verify token balances
-    assertEq(s_token.balanceOf(OWNER), balanceBefore - amount - fastFeeExpected);
-    assertEq(s_token.balanceOf(address(s_tokenPool)), amount + fastFeeExpected);
   }
 
-  function test_CcipSendToken_NativeFee_ToSVM() public {
-    uint256 amount = 100 ether;
-    uint256 balanceBefore = s_token.balanceOf(OWNER);
-    bytes memory receiver = abi.encodePacked(address(0x5));
-    bytes memory extraArgs = "";
-    bytes32 mockMessageId = keccak256("mockMessageId");
-    uint256 fastFeeExpected = amount * FAST_FEE_BPS / 10000;
-    vm.mockCall(address(s_sourceRouter), abi.encodeWithSelector(IRouterClient.getFee.selector), abi.encode(1 ether));
-    vm.mockCall(
-      address(s_sourceRouter), abi.encodeWithSelector(IRouterClient.ccipSend.selector), abi.encode(mockMessageId)
-    );
-    Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
-      receiver: destPoolAddress,
-      data: abi.encode(
-        FastTransferTokenPoolAbstract.MintMessage({
-          sourceAmountToTransfer: amount,
-          sourceDecimals: 18,
-          fastTransferFee: fastFeeExpected,
-          receiver: receiver
-        })
-      ),
-      feeToken: address(0),
-      tokenAmounts: new Client.EVMTokenAmount[](0),
-      extraArgs: svmExtraArgsBytesEncoded
-    });
-    vm.expectCall(
-      address(s_sourceRouter), abi.encodeWithSelector(IRouterClient.ccipSend.selector, SVM_CHAIN_SELECTOR, message)
-    );
-    vm.expectEmit();
-    emit IFastTransferPool.FastTransferRequested(mockMessageId, SVM_CHAIN_SELECTOR, amount, fastFeeExpected, receiver);
-    bytes32 fillRequestId =
-              s_tokenPool.ccipSendToken{value: 1 ether}(address(0), SVM_CHAIN_SELECTOR, amount, receiver, extraArgs);
-
-    // Verify fillRequestId is non-zero
-    assertEq(fillRequestId, mockMessageId);
-
-    // Verify token balances
-    assertEq(s_token.balanceOf(OWNER), balanceBefore - amount - fastFeeExpected);
-    assertEq(s_token.balanceOf(address(s_tokenPool)), amount + fastFeeExpected);
-  }
-
-  function test_CcipSendToken_EVM_WithZeroSettlementGas() public {
-    uint64 testChainSelector = uint64(uint256(keccak256("EVM_ZERO_GAS")));
-    uint256 amount = 100 ether;
-    bytes memory receiver = abi.encodePacked(address(0x5));
-    bytes32 mockMessageId = keccak256("mockMessageId");
-    uint256 fastFeeExpected = amount * FAST_FEE_BPS / 10000;
-    
-    // Setup EVM chain config with zero settlement gas
-    bytes memory customExtraArgs = abi.encode("customExtraArgs");
+  function _setupChainConfig(uint64 chainSelector, bytes4 chainFamily, uint32 settlementGas, bytes memory extraArgs) internal {
     address[] memory addFillers = new address[](1);
     addFillers[0] = s_filler;
     
     FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs memory laneConfigArgs = FastTransferTokenPoolAbstract
       .DestChainConfigUpdateArgs({
-      remoteChainSelector: testChainSelector,
+      remoteChainSelector: chainSelector,
       fastTransferBpsFee: FAST_FEE_BPS,
       fillerAllowlistEnabled: true,
       destinationPool: destPoolAddress,
       maxFillAmountPerRequest: MAX_FILL_AMOUNT_PER_REQUEST,
-      settlementOverheadGas: 0, // Zero settlement gas
-      chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
-      evmToAnyMessageExtraArgsBytes: customExtraArgs,
+      settlementOverheadGas: settlementGas,
+      chainFamilySelector: chainFamily,
+      evmToAnyMessageExtraArgsBytes: extraArgs,
       addFillers: addFillers,
       removeFillers: new address[](0)
     });
     s_tokenPool.updateDestChainConfig(laneConfigArgs);
 
-    // Add chain update for rate limiter
+    _setupRateLimiter(chainSelector);
+  }
+
+  function _setupRateLimiter(uint64 chainSelector) internal {
     bytes[] memory remotePoolAddresses = new bytes[](1);
     remotePoolAddresses[0] = destPoolAddress;
     TokenPool.ChainUpdate[] memory chainUpdate = new TokenPool.ChainUpdate[](1);
     chainUpdate[0] = TokenPool.ChainUpdate({
-      remoteChainSelector: testChainSelector,
+      remoteChainSelector: chainSelector,
       remotePoolAddresses: remotePoolAddresses,
       remoteTokenAddress: abi.encode(address(2)),
       outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: _getInboundRateLimiterConfig()
     });
     s_tokenPool.applyChainUpdates(new uint64[](0), chainUpdate);
+  }
 
+  function _setupMocks(bytes32 mockMessageId) internal {
     vm.mockCall(address(s_sourceRouter), abi.encodeWithSelector(IRouterClient.getFee.selector), abi.encode(1 ether));
     vm.mockCall(
       address(s_sourceRouter), abi.encodeWithSelector(IRouterClient.ccipSend.selector), abi.encode(mockMessageId)
     );
-    
-    Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
+  }
+
+  function _createMessage(TestParams memory params, bytes memory extraArgs) internal view returns (Client.EVM2AnyMessage memory) {
+    return Client.EVM2AnyMessage({
       receiver: destPoolAddress,
       data: abi.encode(
         FastTransferTokenPoolAbstract.MintMessage({
-          sourceAmountToTransfer: amount,
+          sourceAmountToTransfer: params.amount,
           sourceDecimals: 18,
-          fastTransferFee: fastFeeExpected,
-          receiver: receiver
+          fastTransferFee: params.fastFeeExpected,
+          receiver: params.receiver
         })
       ),
       feeToken: address(0),
       tokenAmounts: new Client.EVMTokenAmount[](0),
-      extraArgs: customExtraArgs // Should use custom extra args when settlementOverheadGas == 0
+      extraArgs: extraArgs
     });
+  }
+
+  function _executeTest(TestParams memory params, bytes memory extraArgs) internal {
+    _setupMocks(params.mockMessageId);
+    
+    Client.EVM2AnyMessage memory message = _createMessage(params, extraArgs);
+    
     vm.expectCall(
-      address(s_sourceRouter), abi.encodeWithSelector(IRouterClient.ccipSend.selector, testChainSelector, message)
+      address(s_sourceRouter), abi.encodeWithSelector(IRouterClient.ccipSend.selector, params.chainSelector, message)
     );
     vm.expectEmit();
-    emit IFastTransferPool.FastTransferRequested(mockMessageId, testChainSelector, amount, fastFeeExpected, receiver);
+    emit IFastTransferPool.FastTransferRequested(params.mockMessageId, params.chainSelector, params.amount, params.fastFeeExpected, params.receiver);
 
-    bytes32 fillRequestId =
-      s_tokenPool.ccipSendToken{value: 1 ether}(address(0), testChainSelector, amount, receiver, "");
+    uint256 balanceBefore = s_token.balanceOf(OWNER);
+    bytes32 fillRequestId = s_tokenPool.ccipSendToken{value: 1 ether}(address(0), params.chainSelector, params.amount, params.receiver, "");
 
-    assertEq(fillRequestId, mockMessageId);
+    assertEq(fillRequestId, params.mockMessageId);
+    assertEq(s_token.balanceOf(OWNER), balanceBefore - params.amount);
+    assertEq(s_token.balanceOf(address(s_tokenPool)), params.amount);
+  }
+
+  function test_CcipSendToken_NativeFee() public {
+    TestParams memory params = _setupTestParams(DEST_CHAIN_SELECTOR);
+    
+    bytes memory extraArgs = Client._argsToBytes(
+      Client.GenericExtraArgsV2({gasLimit: SETTLEMENT_GAS_OVERHEAD, allowOutOfOrderExecution: true})
+    );
+    
+    _executeTest(params, extraArgs);
+  }
+
+  function test_CcipSendToken_NativeFee_ToSVM() public {
+    TestParams memory params = _setupTestParams(SVM_CHAIN_SELECTOR);
+    _executeTest(params, svmExtraArgsBytesEncoded);
   }
 
   function test_CcipSendToken_APTOS_WithSettlementGas() public {
     uint64 testChainSelector = uint64(uint256(keccak256("APTOS_WITH_GAS")));
-    uint256 amount = 100 ether;
-    bytes memory receiver = abi.encodePacked(address(0x5));
-    bytes memory extraArgs = "";
-    bytes32 mockMessageId = keccak256("mockMessageId");
-    uint256 fastFeeExpected = amount * FAST_FEE_BPS / 10000;
+    TestParams memory params = _setupTestParams(testChainSelector);
     
-    // Setup APTOS chain config with settlement gas
-    address[] memory addFillers = new address[](1);
-    addFillers[0] = s_filler;
+    _setupChainConfig(testChainSelector, Internal.CHAIN_FAMILY_SELECTOR_APTOS, SETTLEMENT_GAS_OVERHEAD, "");
     
-    FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs memory laneConfigArgs = FastTransferTokenPoolAbstract
-      .DestChainConfigUpdateArgs({
-      remoteChainSelector: testChainSelector,
-      fastTransferBpsFee: FAST_FEE_BPS,
-      fillerAllowlistEnabled: true,
-      destinationPool: destPoolAddress,
-      maxFillAmountPerRequest: MAX_FILL_AMOUNT_PER_REQUEST,
-      settlementOverheadGas: SETTLEMENT_GAS_OVERHEAD,
-      chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_APTOS,
-      evmToAnyMessageExtraArgsBytes: "",
-      addFillers: addFillers,
-      removeFillers: new address[](0)
-    });
-    s_tokenPool.updateDestChainConfig(laneConfigArgs);
-
-    // Add chain update for rate limiter
-    bytes[] memory remotePoolAddresses = new bytes[](1);
-    remotePoolAddresses[0] = destPoolAddress;
-    TokenPool.ChainUpdate[] memory chainUpdate = new TokenPool.ChainUpdate[](1);
-    chainUpdate[0] = TokenPool.ChainUpdate({
-      remoteChainSelector: testChainSelector,
-      remotePoolAddresses: remotePoolAddresses,
-      remoteTokenAddress: abi.encode(address(2)),
-      outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
-      inboundRateLimiterConfig: _getInboundRateLimiterConfig()
-    });
-    s_tokenPool.applyChainUpdates(new uint64[](0), chainUpdate);
-
-    vm.mockCall(address(s_sourceRouter), abi.encodeWithSelector(IRouterClient.getFee.selector), abi.encode(1 ether));
-    vm.mockCall(
-      address(s_sourceRouter), abi.encodeWithSelector(IRouterClient.ccipSend.selector), abi.encode(mockMessageId)
+    bytes memory extraArgs = Client._argsToBytes(
+      Client.GenericExtraArgsV2({gasLimit: SETTLEMENT_GAS_OVERHEAD, allowOutOfOrderExecution: true})
     );
     
-    Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
-      receiver: destPoolAddress,
-      data: abi.encode(
-        FastTransferTokenPoolAbstract.MintMessage({
-          sourceAmountToTransfer: amount,
-          sourceDecimals: 18,
-          fastTransferFee: fastFeeExpected,
-          receiver: receiver
-        })
-      ),
-      feeToken: address(0),
-      tokenAmounts: new Client.EVMTokenAmount[](0),
-      extraArgs: Client._argsToBytes(
-        Client.GenericExtraArgsV2({gasLimit: SETTLEMENT_GAS_OVERHEAD, allowOutOfOrderExecution: true})
-      )
-    });
-    vm.expectCall(
-      address(s_sourceRouter), abi.encodeWithSelector(IRouterClient.ccipSend.selector, testChainSelector, message)
-    );
-    vm.expectEmit();
-    emit IFastTransferPool.FastTransferRequested(mockMessageId, testChainSelector, amount, fastFeeExpected, receiver);
-
-    bytes32 fillRequestId =
-      s_tokenPool.ccipSendToken{value: 1 ether}(address(0), testChainSelector, amount, receiver, extraArgs);
-
-    assertEq(fillRequestId, mockMessageId);
+    _executeTest(params, extraArgs);
   }
 
   function test_CcipSendToken_APTOS_WithZeroSettlementGas() public {
     uint64 testChainSelector = uint64(uint256(keccak256("APTOS_ZERO_GAS")));
-    uint256 amount = 100 ether;
-    bytes memory receiver = abi.encodePacked(address(0x5));
-    bytes32 mockMessageId = keccak256("mockMessageId");
-    uint256 fastFeeExpected = amount * FAST_FEE_BPS / 10000;
+    TestParams memory params = _setupTestParams(testChainSelector);
     
-    // Setup APTOS chain config with zero settlement gas
     bytes memory customExtraArgs = abi.encode("aptosCustomExtraArgs");
-    address[] memory addFillers = new address[](1);
-    addFillers[0] = s_filler;
-    
-    FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs memory laneConfigArgs = FastTransferTokenPoolAbstract
-      .DestChainConfigUpdateArgs({
-      remoteChainSelector: testChainSelector,
-      fastTransferBpsFee: FAST_FEE_BPS,
-      fillerAllowlistEnabled: true,
-      destinationPool: destPoolAddress,
-      maxFillAmountPerRequest: MAX_FILL_AMOUNT_PER_REQUEST,
-      settlementOverheadGas: 0, // Zero settlement gas
-      chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_APTOS,
-      evmToAnyMessageExtraArgsBytes: customExtraArgs,
-      addFillers: addFillers,
-      removeFillers: new address[](0)
-    });
-    s_tokenPool.updateDestChainConfig(laneConfigArgs);
-
-    // Add chain update for rate limiter
-    bytes[] memory remotePoolAddresses = new bytes[](1);
-    remotePoolAddresses[0] = destPoolAddress;
-    TokenPool.ChainUpdate[] memory chainUpdate = new TokenPool.ChainUpdate[](1);
-    chainUpdate[0] = TokenPool.ChainUpdate({
-      remoteChainSelector: testChainSelector,
-      remotePoolAddresses: remotePoolAddresses,
-      remoteTokenAddress: abi.encode(address(2)),
-      outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
-      inboundRateLimiterConfig: _getInboundRateLimiterConfig()
-    });
-    s_tokenPool.applyChainUpdates(new uint64[](0), chainUpdate);
-
-    vm.mockCall(address(s_sourceRouter), abi.encodeWithSelector(IRouterClient.getFee.selector), abi.encode(1 ether));
-    vm.mockCall(
-      address(s_sourceRouter), abi.encodeWithSelector(IRouterClient.ccipSend.selector), abi.encode(mockMessageId)
-    );
-    
-    Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
-      receiver: destPoolAddress,
-      data: abi.encode(
-        FastTransferTokenPoolAbstract.MintMessage({
-          sourceAmountToTransfer: amount,
-          sourceDecimals: 18,
-          fastTransferFee: fastFeeExpected,
-          receiver: receiver
-        })
-      ),
-      feeToken: address(0),
-      tokenAmounts: new Client.EVMTokenAmount[](0),
-      extraArgs: customExtraArgs // Should use custom extra args when settlementOverheadGas == 0
-    });
-    vm.expectCall(
-      address(s_sourceRouter), abi.encodeWithSelector(IRouterClient.ccipSend.selector, testChainSelector, message)
-    );
-    vm.expectEmit();
-    emit IFastTransferPool.FastTransferRequested(mockMessageId, testChainSelector, amount, fastFeeExpected, receiver);
-
-    bytes32 fillRequestId =
-      s_tokenPool.ccipSendToken{value: 1 ether}(address(0), testChainSelector, amount, receiver, "");
-
-    assertEq(fillRequestId, mockMessageId);
+    _setupChainConfig(testChainSelector, Internal.CHAIN_FAMILY_SELECTOR_APTOS, 0, customExtraArgs);
+    _executeTest(params, customExtraArgs);
   }
 
   function test_CcipSendToken_SUI_WithSettlementGas() public {
     uint64 testChainSelector = uint64(uint256(keccak256("SUI_WITH_GAS")));
-    uint256 amount = 100 ether;
-    bytes memory receiver = abi.encodePacked(address(0x5));
-    bytes memory extraArgs = "";
-    bytes32 mockMessageId = keccak256("mockMessageId");
-    uint256 fastFeeExpected = amount * FAST_FEE_BPS / 10000;
+    TestParams memory params = _setupTestParams(testChainSelector);
     
-    // Setup SUI chain config with settlement gas
-    address[] memory addFillers = new address[](1);
-    addFillers[0] = s_filler;
+    _setupChainConfig(testChainSelector, Internal.CHAIN_FAMILY_SELECTOR_SUI, SETTLEMENT_GAS_OVERHEAD, "");
     
-    FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs memory laneConfigArgs = FastTransferTokenPoolAbstract
-      .DestChainConfigUpdateArgs({
-      remoteChainSelector: testChainSelector,
-      fastTransferBpsFee: FAST_FEE_BPS,
-      fillerAllowlistEnabled: true,
-      destinationPool: destPoolAddress,
-      maxFillAmountPerRequest: MAX_FILL_AMOUNT_PER_REQUEST,
-      settlementOverheadGas: SETTLEMENT_GAS_OVERHEAD,
-      chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_SUI,
-      evmToAnyMessageExtraArgsBytes: "",
-      addFillers: addFillers,
-      removeFillers: new address[](0)
-    });
-    s_tokenPool.updateDestChainConfig(laneConfigArgs);
-
-    // Add chain update for rate limiter
-    bytes[] memory remotePoolAddresses = new bytes[](1);
-    remotePoolAddresses[0] = destPoolAddress;
-    TokenPool.ChainUpdate[] memory chainUpdate = new TokenPool.ChainUpdate[](1);
-    chainUpdate[0] = TokenPool.ChainUpdate({
-      remoteChainSelector: testChainSelector,
-      remotePoolAddresses: remotePoolAddresses,
-      remoteTokenAddress: abi.encode(address(2)),
-      outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
-      inboundRateLimiterConfig: _getInboundRateLimiterConfig()
-    });
-    s_tokenPool.applyChainUpdates(new uint64[](0), chainUpdate);
-
-    vm.mockCall(address(s_sourceRouter), abi.encodeWithSelector(IRouterClient.getFee.selector), abi.encode(1 ether));
-    vm.mockCall(
-      address(s_sourceRouter), abi.encodeWithSelector(IRouterClient.ccipSend.selector), abi.encode(mockMessageId)
+    bytes memory extraArgs = Client._argsToBytes(
+      Client.GenericExtraArgsV2({gasLimit: SETTLEMENT_GAS_OVERHEAD, allowOutOfOrderExecution: true})
     );
     
-    Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
-      receiver: destPoolAddress,
-      data: abi.encode(
-        FastTransferTokenPoolAbstract.MintMessage({
-          sourceAmountToTransfer: amount,
-          sourceDecimals: 18,
-          fastTransferFee: fastFeeExpected,
-          receiver: receiver
-        })
-      ),
-      feeToken: address(0),
-      tokenAmounts: new Client.EVMTokenAmount[](0),
-      extraArgs: Client._argsToBytes(
-        Client.GenericExtraArgsV2({gasLimit: SETTLEMENT_GAS_OVERHEAD, allowOutOfOrderExecution: true})
-      )
-    });
-    vm.expectCall(
-      address(s_sourceRouter), abi.encodeWithSelector(IRouterClient.ccipSend.selector, testChainSelector, message)
-    );
-    vm.expectEmit();
-    emit IFastTransferPool.FastTransferRequested(mockMessageId, testChainSelector, amount, fastFeeExpected, receiver);
-
-    bytes32 fillRequestId =
-      s_tokenPool.ccipSendToken{value: 1 ether}(address(0), testChainSelector, amount, receiver, extraArgs);
-
-    assertEq(fillRequestId, mockMessageId);
+    _executeTest(params, extraArgs);
   }
 
   function test_CcipSendToken_SUI_WithZeroSettlementGas() public {
     uint64 testChainSelector = uint64(uint256(keccak256("SUI_ZERO_GAS")));
-    uint256 amount = 100 ether;
-    bytes memory receiver = abi.encodePacked(address(0x5));
-    bytes32 mockMessageId = keccak256("mockMessageId");
-    uint256 fastFeeExpected = amount * FAST_FEE_BPS / 10000;
+    TestParams memory params = _setupTestParams(testChainSelector);
     
-    // Setup SUI chain config with zero settlement gas
     bytes memory customExtraArgs = abi.encode("suiCustomExtraArgs");
-    address[] memory addFillers = new address[](1);
-    addFillers[0] = s_filler;
-    
-    FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs memory laneConfigArgs = FastTransferTokenPoolAbstract
-      .DestChainConfigUpdateArgs({
-      remoteChainSelector: testChainSelector,
-      fastTransferBpsFee: FAST_FEE_BPS,
-      fillerAllowlistEnabled: true,
-      destinationPool: destPoolAddress,
-      maxFillAmountPerRequest: MAX_FILL_AMOUNT_PER_REQUEST,
-      settlementOverheadGas: 0, // Zero settlement gas
-      chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_SUI,
-      evmToAnyMessageExtraArgsBytes: customExtraArgs,
-      addFillers: addFillers,
-      removeFillers: new address[](0)
-    });
-    s_tokenPool.updateDestChainConfig(laneConfigArgs);
-
-    // Add chain update for rate limiter
-    bytes[] memory remotePoolAddresses = new bytes[](1);
-    remotePoolAddresses[0] = destPoolAddress;
-    TokenPool.ChainUpdate[] memory chainUpdate = new TokenPool.ChainUpdate[](1);
-    chainUpdate[0] = TokenPool.ChainUpdate({
-      remoteChainSelector: testChainSelector,
-      remotePoolAddresses: remotePoolAddresses,
-      remoteTokenAddress: abi.encode(address(2)),
-      outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
-      inboundRateLimiterConfig: _getInboundRateLimiterConfig()
-    });
-    s_tokenPool.applyChainUpdates(new uint64[](0), chainUpdate);
-
-    vm.mockCall(address(s_sourceRouter), abi.encodeWithSelector(IRouterClient.getFee.selector), abi.encode(1 ether));
-    vm.mockCall(
-      address(s_sourceRouter), abi.encodeWithSelector(IRouterClient.ccipSend.selector), abi.encode(mockMessageId)
-    );
-    
-    Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
-      receiver: destPoolAddress,
-      data: abi.encode(
-        FastTransferTokenPoolAbstract.MintMessage({
-          sourceAmountToTransfer: amount,
-          sourceDecimals: 18,
-          fastTransferFee: fastFeeExpected,
-          receiver: receiver
-        })
-      ),
-      feeToken: address(0),
-      tokenAmounts: new Client.EVMTokenAmount[](0),
-      extraArgs: customExtraArgs // Should use custom extra args when settlementOverheadGas == 0
-    });
-    vm.expectCall(
-      address(s_sourceRouter), abi.encodeWithSelector(IRouterClient.ccipSend.selector, testChainSelector, message)
-    );
-    vm.expectEmit();
-    emit IFastTransferPool.FastTransferRequested(mockMessageId, testChainSelector, amount, fastFeeExpected, receiver);
-
-    bytes32 fillRequestId =
-      s_tokenPool.ccipSendToken{value: 1 ether}(address(0), testChainSelector, amount, receiver, "");
-
-    assertEq(fillRequestId, mockMessageId);
+    _setupChainConfig(testChainSelector, Internal.CHAIN_FAMILY_SELECTOR_SUI, 0, customExtraArgs);
+    _executeTest(params, customExtraArgs);
   }
 
   function test_CcipSendToken_RevertWhen_InvalidChainFamilySelector() public {
     uint64 testChainSelector = uint64(uint256(keccak256("INVALID_CHAIN")));
-    uint256 amount = 100 ether;
-    bytes memory receiver = abi.encodePacked(address(0x5));
+    TestParams memory params = _setupTestParams(testChainSelector);
 
-    // Setup chain config with invalid chain family selector
-    address[] memory addFillers = new address[](1);
-    addFillers[0] = s_filler;
-    
-    FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs memory laneConfigArgs = FastTransferTokenPoolAbstract
-      .DestChainConfigUpdateArgs({
-      remoteChainSelector: testChainSelector,
-      fastTransferBpsFee: FAST_FEE_BPS,
-      fillerAllowlistEnabled: true,
-      destinationPool: destPoolAddress,
-      maxFillAmountPerRequest: MAX_FILL_AMOUNT_PER_REQUEST,
-      settlementOverheadGas: SETTLEMENT_GAS_OVERHEAD,
-      chainFamilySelector: bytes4(0xdeadbeef), // Invalid chain family selector
-      evmToAnyMessageExtraArgsBytes: "",
-      addFillers: addFillers,
-      removeFillers: new address[](0)
-    });
-    s_tokenPool.updateDestChainConfig(laneConfigArgs);
-
-    // Add chain update for rate limiter
-    bytes[] memory remotePoolAddresses = new bytes[](1);
-    remotePoolAddresses[0] = destPoolAddress;
-    TokenPool.ChainUpdate[] memory chainUpdate = new TokenPool.ChainUpdate[](1);
-    chainUpdate[0] = TokenPool.ChainUpdate({
-      remoteChainSelector: testChainSelector,
-      remotePoolAddresses: remotePoolAddresses,
-      remoteTokenAddress: abi.encode(address(2)),
-      outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
-      inboundRateLimiterConfig: _getInboundRateLimiterConfig()
-    });
-    s_tokenPool.applyChainUpdates(new uint64[](0), chainUpdate);
+    _setupChainConfig(testChainSelector, bytes4(0xdeadbeef), SETTLEMENT_GAS_OVERHEAD, "");
 
     vm.expectRevert(FastTransferTokenPoolAbstract.InvalidDestChainConfig.selector);
-    s_tokenPool.ccipSendToken{value: 1 ether}(address(0), testChainSelector, amount, receiver, "");
+    s_tokenPool.ccipSendToken{value: 1 ether}(address(0), testChainSelector, params.amount, params.receiver, "");
   }
 }

@@ -271,7 +271,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     (Quote memory quote, Client.EVM2AnyMessage memory message) =
       _getFeeQuoteAndCCIPMessage(feeToken, destinationChainSelector, amount, receiver, extraArgs);
     _consumeOutboundRateLimit(destinationChainSelector, amount);
-    _handleTokenToTransfer(destinationChainSelector, msg.sender, amount + quote.fastTransferFee);
+    _handleTokenToTransfer(destinationChainSelector, msg.sender, amount);
 
     if (feeToken != address(0)) {
       IERC20(feeToken).safeTransferFrom(msg.sender, address(this), quote.ccipSettlementFee);
@@ -339,17 +339,19 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
 
   /// @notice Fast fills a transfer using liquidity provider funds based on CCIP settlement
   /// @param fillRequestId The fill request ID
-  /// @param srcAmount The amount to fill
+  /// @param srcAmountToFill The amount to fill
   /// @param sourceDecimals The decimals of the source token
   /// @param receiver The receiver address
   function fastFill(
     bytes32 fillRequestId,
     uint64 sourceChainSelector,
-    uint256 srcAmount,
+    uint256 srcAmountToFill,
     uint8 sourceDecimals,
     address receiver
   ) public virtual {
-    bytes32 fillId = computeFillId(fillRequestId, srcAmount, receiver);
+    // Transfer tokens from filler to receiver
+    uint256 destAmount = _transferFromFiller(sourceChainSelector, msg.sender, receiver, srcAmountToFill, sourceDecimals);
+    bytes32 fillId = computeFillId(fillRequestId, destAmount, receiver);
     FillInfo memory fillInfo = s_fills[fillId];
     if (fillInfo.state != FillState.NOT_FILLED) revert AlreadyFilled(fillRequestId);
 
@@ -361,8 +363,6 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
         }
       }
     }
-    // Transfer tokens from filler to receiver
-    uint256 destAmount = _transferFromFiller(sourceChainSelector, msg.sender, receiver, srcAmount, sourceDecimals);
     // Record fill
     s_fills[fillId] = FillInfo({state: FillState.FILLED, filler: msg.sender});
     emit FastTransferFilled(fillRequestId, fillId, msg.sender, destAmount, receiver);
@@ -421,24 +421,18 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     _validateSettlement(sourceChainSelector, sourcePoolAddress);
 
     uint256 localAmount = _calculateLocalAmount(srcAmount, srcDecimal);
-    uint256 settlementAmountLocal = localAmount + _calculateLocalAmount(fastTransferFee, srcDecimal);
-
-    bytes32 fillId = computeFillId(fillRequestId, srcAmount, receiver);
+    uint256 localFeeAmount = _calculateLocalAmount(fastTransferFee, srcDecimal);
+    bytes32 fillId = computeFillId(fillRequestId, localAmount-localFeeAmount, receiver);
     FillInfo memory fillInfo = s_fills[fillId];
 
-    // Handle settlement based on fill state
     if (fillInfo.state == FillState.NOT_FILLED) {
-      // Not fast-filled - mint/release to receiver
-      _handleSlowFill(sourceChainSelector, settlementAmountLocal, receiver);
+      _handleSlowFill(sourceChainSelector, localAmount, receiver);
     } else if (fillInfo.state == FillState.SETTLED) {
-      // Already settled
       revert AlreadySettled(fillRequestId);
     } else {
-      // Fast-filled - reimburse filler
-      _handleFastFilledReimbursement(fillInfo.filler, settlementAmountLocal);
+      _handleFastFilledReimbursement(fillInfo.filler, localAmount);
     }
 
-    // Mark as settled
     s_fills[fillId] = FillInfo({state: FillState.SETTLED, filler: address(0)});
   }
 
