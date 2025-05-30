@@ -61,7 +61,7 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
 
   event LockedOrBurned(uint64 indexed remoteChainSelector, address token, address sender, uint256 amount);
   event ReleasedOrMinted(
-    uint64 indexed remoteChainSelector, address token, address sender, address indexed recipient, uint256 amount
+    uint64 indexed remoteChainSelector, address token, address sender, address recipient, uint256 amount
   );
   event ChainAdded(
     uint64 remoteChainSelector,
