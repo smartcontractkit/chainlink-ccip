@@ -9764,6 +9764,8 @@ func TestCCIPRouter(t *testing.T) {
 
 				// It now succeeds, since the buffer is complete.
 				tx = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{bufferedExecutionIx}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(1000000))
+				// Repeating it, however, will fail.
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{bufferedExecutionIx}, transmitter, config.DefaultCommitment, []string{"Error Code: ExecutionReportUnavailable"})
 
 				executionEvents, err2 := common.ParseMultipleEvents[ccip.EventExecutionStateChanged](tx.Meta.LogMessages, "ExecutionStateChanged", config.PrintEvents)
 				require.NoError(t, err2)
