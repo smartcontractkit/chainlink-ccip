@@ -73,9 +73,7 @@ contract BurnMintFastTransferTokenPoolSetup is BaseTest {
       maxFillAmountPerRequest: FILL_AMOUNT_MAX,
       settlementOverheadGas: 200_000,
       chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
-      accountIsWritableBitmap: 0,
-      tokenReceiver: bytes32(0),
-      accounts: new bytes32[](0),
+      evmToAnyMessageExtraArgsBytes: "",
       addFillers: addFillers,
       removeFillers: new address[](0)
     });

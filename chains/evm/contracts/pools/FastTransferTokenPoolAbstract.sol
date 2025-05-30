@@ -48,45 +48,37 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
 
   struct DestChainConfig {
     uint256 maxFillAmountPerRequest; // Max amount that can be filled per request.
-    uint256 settlementOverheadGas; //   settlement overhead gas
     bytes destinationPool; //           Destination pool address.
     uint16 fastTransferBpsFee; // ──────╮ Allowed range of [0-10_000].
     bytes4 chainFamilySelector; //      │ elector that identifies the destination chain's family. Used to determine the correct validations to perform for the dest chain.
-    bool fillerAllowlistEnabled; //     |Allowlist for fillers.
-    uint64 accountIsWritableBitmap; // ─╯ Bitmap of writable accounts SVM
+    bool fillerAllowlistEnabled; //     | Allowlist for fillers.
+    uint32 settlementOverheadGas; // ───╯ Settlement overhead gas for the destination chain.
     EnumerableSet.AddressSet fillerAllowList; // Enumerable set of allowed fillers.
-    bytes32 tokenReceiver; //            Token receiver address. (SVM specific config)
-    // Token transfer related accounts are specified in the token pool lookup table on SVM.
-    bytes32[] accounts;
+    bytes evmToAnyMessageExtraArgsBytes; // pre-encoded extra args for EVM to Any message.
   }
 
   struct DestChainConfigView {
     uint256 maxFillAmountPerRequest; // Max amount that can be filled per request.
-    uint256 settlementOverheadGas; //   settlement overhead gas
+    bytes destinationPool; //           Address of the destination pool. ABI encoded in the case of an EVM pool.
     uint16 fastTransferBpsFee; // ────╮ Allowed range of [0-10_000].
     bytes4 chainFamilySelector; //    │ Selector that identifies the destination chain's family.
-    bool fillerAllowlistEnabled; // ──╯ Allowlist for fillers.
-    uint64 accountIsWritableBitmap; // │ Bitmap of writable accounts.
-    bytes destinationPool; //           Address of the destination pool. ABI encoded in the case of an EVM pool.
-    bytes32 tokenReceiver; //            Token receiver address.
-    // Token transfer related accounts are specified in the token pool lookup table on SVM.
-    bytes32[] accounts;
+    bool fillerAllowlistEnabled; //   | Allowlist for fillers.
+    uint32 settlementOverheadGas; // ─╯ Settlement overhead gas for the destination chain.
+    bytes evmToAnyMessageExtraArgsBytes; // pre-encoded extra args for EVM to Any message.
+    address[] allowedFillers; //         List of allowed fillers for the destination chain.
   }
 
   struct DestChainConfigUpdateArgs {
     uint256 maxFillAmountPerRequest; // Maximum amount that can be filled per request.
-    uint256 settlementOverheadGas; //   settlement overhead gas
     bytes destinationPool; //           Address of the destination pool. ABI encoded in the case of an EVM pool.
     uint64 remoteChainSelector; // ────╮ Remote chain selector.
     bytes4 chainFamilySelector; //     │ Selector that identifies the destination chain's family.
     uint16 fastTransferBpsFee; //      | Allowed range of [0-10_000].
-    uint64 accountIsWritableBitmap; // │ Bitmap of writable accounts SVM
-    bool fillerAllowlistEnabled; // ───╯ True is filler allowlist is enabled.
+    bool fillerAllowlistEnabled; //    | True is filler allowlist is enabled.
+    uint32 settlementOverheadGas; // ──╯ Settlement overhead gas for the destination chain.
+    bytes evmToAnyMessageExtraArgsBytes; // pre-encoded extra args for EVM to Any message.
     address[] addFillers; //            Address allowed to fill.
-    address[] removeFillers; //         Addresses to remove from the allowlist.
-    // Token transfer related accounts are specified in the token pool lookup table on SVM.
-    bytes32[] accounts;
-    bytes32 tokenReceiver; //            Token receiver address. (SVM specific config)
+    address[] removeFillers; //         Addresses to remove from the allowlist
   }
 
   struct MintMessage {
@@ -152,9 +144,12 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     destChainConfig.maxFillAmountPerRequest = destChainConfigArgs.maxFillAmountPerRequest;
     destChainConfig.chainFamilySelector = destChainConfigArgs.chainFamilySelector;
     destChainConfig.settlementOverheadGas = destChainConfigArgs.settlementOverheadGas;
-    destChainConfig.accountIsWritableBitmap = destChainConfigArgs.accountIsWritableBitmap;
-    destChainConfig.tokenReceiver = destChainConfigArgs.tokenReceiver;
-    destChainConfig.accounts = destChainConfigArgs.accounts;
+    destChainConfig.evmToAnyMessageExtraArgsBytes = destChainConfigArgs.evmToAnyMessageExtraArgsBytes;
+    if (destChainConfigArgs.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SVM) {
+      if (destChainConfigArgs.evmToAnyMessageExtraArgsBytes.length == 0) {
+        revert InvalidDestChainConfig();
+      }
+    }
     for (uint256 i = 0; i < destChainConfigArgs.removeFillers.length; ++i) {
       destChainConfig.fillerAllowList.remove(destChainConfigArgs.removeFillers[i]);
     }
@@ -206,10 +201,9 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
       fastTransferBpsFee: config.fastTransferBpsFee,
       chainFamilySelector: config.chainFamilySelector,
       fillerAllowlistEnabled: config.fillerAllowlistEnabled,
-      accountIsWritableBitmap: config.accountIsWritableBitmap,
       destinationPool: config.destinationPool,
-      tokenReceiver: config.tokenReceiver,
-      accounts: config.accounts
+      evmToAnyMessageExtraArgsBytes: config.evmToAnyMessageExtraArgsBytes,
+      allowedFillers: config.fillerAllowList.values()
     });
   }
 
@@ -316,20 +310,17 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     if (
       destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_EVM
         || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_APTOS
+        || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SUI
     ) {
-      extraArgs = Client._argsToBytes(
-        Client.GenericExtraArgsV2({gasLimit: destChainConfig.settlementOverheadGas, allowOutOfOrderExecution: true})
-      );
+      if (destChainConfig.settlementOverheadGas == 0) {
+        extraArgs = destChainConfig.evmToAnyMessageExtraArgsBytes;
+      } else {
+        extraArgs = Client._argsToBytes(
+          Client.GenericExtraArgsV2({gasLimit: destChainConfig.settlementOverheadGas, allowOutOfOrderExecution: true})
+        );
+      }
     } else if (destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SVM) {
-      extraArgs = Client._svmArgsToBytes(
-        Client.SVMExtraArgsV1({
-          computeUnits: uint32(destChainConfig.settlementOverheadGas),
-          accountIsWritableBitmap: destChainConfig.accountIsWritableBitmap,
-          allowOutOfOrderExecution: true,
-          tokenReceiver: destChainConfig.tokenReceiver,
-          accounts: destChainConfig.accounts
-        })
-      );
+      extraArgs = destChainConfig.evmToAnyMessageExtraArgsBytes;
     } else {
       revert InvalidDestChainConfig();
     }

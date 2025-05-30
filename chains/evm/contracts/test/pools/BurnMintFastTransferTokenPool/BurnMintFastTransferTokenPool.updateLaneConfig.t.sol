@@ -25,9 +25,7 @@ contract BurnMintFastTransferTokenPool_updateDestChainConfig is BurnMintFastTran
       maxFillAmountPerRequest: NEW_FILL_AMOUNT_MAX,
       settlementOverheadGas: 200_000,
       chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
-      accountIsWritableBitmap: 0,
-      tokenReceiver: bytes32(0),
-      accounts: new bytes32[](0),
+      evmToAnyMessageExtraArgsBytes: "",
       addFillers: addFillers,
       removeFillers: new address[](0)
     });
@@ -75,9 +73,7 @@ contract BurnMintFastTransferTokenPool_updateDestChainConfig is BurnMintFastTran
       maxFillAmountPerRequest: NEW_FILL_AMOUNT_MAX,
       settlementOverheadGas: 200_000,
       chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
-      accountIsWritableBitmap: 0,
-      tokenReceiver: bytes32(0),
-      accounts: new bytes32[](0),
+      evmToAnyMessageExtraArgsBytes: "",
       addFillers: addFillers,
       removeFillers: removeFillers
     });
@@ -105,9 +101,7 @@ contract BurnMintFastTransferTokenPool_updateDestChainConfig is BurnMintFastTran
       maxFillAmountPerRequest: NEW_FILL_AMOUNT_MAX,
       settlementOverheadGas: 200_000,
       chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
-      accountIsWritableBitmap: 0,
-      tokenReceiver: bytes32(0),
-      accounts: new bytes32[](0),
+      evmToAnyMessageExtraArgsBytes: "",
       addFillers: new address[](0),
       removeFillers: new address[](0)
     });
@@ -126,9 +120,7 @@ contract BurnMintFastTransferTokenPool_updateDestChainConfig is BurnMintFastTran
       maxFillAmountPerRequest: NEW_FILL_AMOUNT_MAX,
       settlementOverheadGas: 200_000,
       chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
-      accountIsWritableBitmap: 0,
-      tokenReceiver: bytes32(0),
-      accounts: new bytes32[](0),
+      evmToAnyMessageExtraArgsBytes: "",
       addFillers: new address[](0),
       removeFillers: new address[](0)
     });
@@ -176,9 +168,7 @@ contract BurnMintFastTransferTokenPool_updateDestChainConfig is BurnMintFastTran
       maxFillAmountPerRequest: NEW_FILL_AMOUNT_MAX,
       settlementOverheadGas: 200_000,
       chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
-      accountIsWritableBitmap: 0,
-      tokenReceiver: bytes32(0),
-      accounts: new bytes32[](0),
+      evmToAnyMessageExtraArgsBytes: "",
       addFillers: new address[](0),
       removeFillers: new address[](0)
     });
@@ -199,9 +189,7 @@ contract BurnMintFastTransferTokenPool_updateDestChainConfig is BurnMintFastTran
       maxFillAmountPerRequest: NEW_FILL_AMOUNT_MAX,
       settlementOverheadGas: 200_000,
       chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
-      accountIsWritableBitmap: 0,
-      tokenReceiver: bytes32(0),
-      accounts: new bytes32[](0),
+      evmToAnyMessageExtraArgsBytes: "",
       addFillers: new address[](0),
       removeFillers: new address[](0)
     });
@@ -228,9 +216,7 @@ contract BurnMintFastTransferTokenPool_updateDestChainConfig is BurnMintFastTran
       maxFillAmountPerRequest: NEW_FILL_AMOUNT_MAX,
       settlementOverheadGas: 200_000,
       chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
-      accountIsWritableBitmap: 0,
-      tokenReceiver: bytes32(0),
-      accounts: new bytes32[](0),
+      evmToAnyMessageExtraArgsBytes: "",
       addFillers: addFillers,
       removeFillers: new address[](0)
     });
@@ -280,9 +266,7 @@ contract BurnMintFastTransferTokenPool_updateDestChainConfig is BurnMintFastTran
       maxFillAmountPerRequest: NEW_FILL_AMOUNT_MAX,
       settlementOverheadGas: 200_000,
       chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
-      accountIsWritableBitmap: 0,
-      tokenReceiver: bytes32(0),
-      accounts: new bytes32[](0),
+      evmToAnyMessageExtraArgsBytes: "",
       addFillers: addFillers,
       removeFillers: new address[](0)
     });

@@ -75,6 +75,8 @@ contract BurnMintFastTransferTokenPool_ccipSendToken is BurnMintFastTransferToke
     );
   }
 
+  function test_CcipSendToken_ToSVM() public {}
+
   function test_RevertWhen_CursedByRMN() public {
     vm.mockCall(address(s_mockRMNRemote), abi.encodeWithSignature("isCursed(bytes16)"), abi.encode(true));
 
