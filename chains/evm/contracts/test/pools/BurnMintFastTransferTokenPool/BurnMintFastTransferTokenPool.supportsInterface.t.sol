@@ -14,6 +14,5 @@ contract BurnMintFastTransferTokenPool_supportsInterface is BurnMintFastTransfer
     assertTrue(s_pool.supportsInterface(type(IFastTransferPool).interfaceId));
     assertTrue(s_pool.supportsInterface(type(IERC165).interfaceId));
     assertTrue(s_pool.supportsInterface(type(IAny2EVMMessageReceiver).interfaceId));
-    assertTrue(s_pool.supportsInterface(type(ITypeAndVersion).interfaceId));
   }
 }

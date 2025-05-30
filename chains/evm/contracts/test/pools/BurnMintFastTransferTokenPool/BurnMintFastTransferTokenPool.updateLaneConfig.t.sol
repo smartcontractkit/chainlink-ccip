@@ -40,8 +40,8 @@ contract BurnMintFastTransferTokenPool_updateDestChainConfig is BurnMintFastTran
     assertEq(config.maxFillAmountPerRequest, NEW_FILL_AMOUNT_MAX);
 
     // Check fillers are added
-    assertTrue(s_pool.isfillerAllowListed(NEW_CHAIN_SELECTOR, addFillers[0]));
-    assertTrue(s_pool.isfillerAllowListed(NEW_CHAIN_SELECTOR, addFillers[1]));
+    assertTrue(s_pool.isFillerAllowListed(NEW_CHAIN_SELECTOR, addFillers[0]));
+    assertTrue(s_pool.isFillerAllowListed(NEW_CHAIN_SELECTOR, addFillers[1]));
   }
 
   function test_UpdateDestChainConfig_ModifyExisting() public {
@@ -72,8 +72,8 @@ contract BurnMintFastTransferTokenPool_updateDestChainConfig is BurnMintFastTran
     assertEq(config.maxFillAmountPerRequest, NEW_FILL_AMOUNT_MAX);
 
     // Check filler changes
-    assertFalse(s_pool.isfillerAllowListed(DEST_CHAIN_SELECTOR, s_filler));
-    assertTrue(s_pool.isfillerAllowListed(DEST_CHAIN_SELECTOR, addFillers[0]));
+    assertFalse(s_pool.isFillerAllowListed(DEST_CHAIN_SELECTOR, s_filler));
+    assertTrue(s_pool.isFillerAllowListed(DEST_CHAIN_SELECTOR, addFillers[0]));
   }
 
   function test_RevertWhen_InvalidFastFeeBps() public {
@@ -120,12 +120,12 @@ contract BurnMintFastTransferTokenPool_updateDestChainConfig is BurnMintFastTran
     vm.expectEmit();
     emit FastTransferTokenPoolAbstract.FillerAllowListUpdated(DEST_CHAIN_SELECTOR, addFillers, removeFillers);
 
-    s_pool.updatefillerAllowList(DEST_CHAIN_SELECTOR, addFillers, removeFillers);
+    s_pool.updateFillerAllowList(DEST_CHAIN_SELECTOR, addFillers, removeFillers);
 
     // Check changes
-    assertFalse(s_pool.isfillerAllowListed(DEST_CHAIN_SELECTOR, s_filler));
-    assertTrue(s_pool.isfillerAllowListed(DEST_CHAIN_SELECTOR, addFillers[0]));
-    assertTrue(s_pool.isfillerAllowListed(DEST_CHAIN_SELECTOR, addFillers[1]));
+    assertFalse(s_pool.isFillerAllowListed(DEST_CHAIN_SELECTOR, s_filler));
+    assertTrue(s_pool.isFillerAllowListed(DEST_CHAIN_SELECTOR, addFillers[0]));
+    assertTrue(s_pool.isFillerAllowListed(DEST_CHAIN_SELECTOR, addFillers[1]));
   }
 
   function test_RevertWhen_UpdateFillerAllowList_NotOwner() public {
@@ -134,7 +134,7 @@ contract BurnMintFastTransferTokenPool_updateDestChainConfig is BurnMintFastTran
     vm.stopPrank();
     vm.expectRevert();
     vm.prank(makeAddr("notOwner"));
-    s_pool.updatefillerAllowList(DEST_CHAIN_SELECTOR, addFillers, new address[](0));
+    s_pool.updateFillerAllowList(DEST_CHAIN_SELECTOR, addFillers, new address[](0));
   }
 
   function test_UpdateDestChainConfig_ZeroFastFee() public {
@@ -244,7 +244,7 @@ contract BurnMintFastTransferTokenPool_updateDestChainConfig is BurnMintFastTran
     address[] memory removeFillers = new address[](1);
     removeFillers[0] = addFillers[0];
 
-    s_pool.updatefillerAllowList(NEW_CHAIN_SELECTOR, new address[](0), removeFillers);
+    s_pool.updateFillerAllowList(NEW_CHAIN_SELECTOR, new address[](0), removeFillers);
 
     // Verify only one filler remains
     address[] memory allowlistedFillers = s_pool.getAllowListedFillers(NEW_CHAIN_SELECTOR);

@@ -29,7 +29,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
 
   error WhitelistNotEnabled();
   error InvalidDestChainConfig();
-  error FillerNotWhitelisted(uint64 remoteChainSelector, address filler);
+  error FillerNotAllowlisted(uint64 remoteChainSelector, address filler);
   error TransferAmountExceedsMaxFillAmount(uint64 remoteChainSelector, uint256 amount);
 
   event LaneUpdated(
@@ -129,10 +129,11 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     laneConfig.fastTransferBpsFee = laneConfigArgs.fastTransferBpsFee;
     laneConfig.fillerAllowlistEnabled = laneConfigArgs.fillerAllowlistEnabled;
     laneConfig.maxFillAmountPerRequest = laneConfigArgs.maxFillAmountPerRequest;
-    for (uint256 i; i < laneConfigArgs.removeFillers.length; ++i) {
+
+    for (uint256 i = 0; i < laneConfigArgs.removeFillers.length; ++i) {
       laneConfig.fillerAllowList.remove(laneConfigArgs.removeFillers[i]);
     }
-    for (uint256 i; i < laneConfigArgs.addFillers.length; ++i) {
+    for (uint256 i = 0; i < laneConfigArgs.addFillers.length; ++i) {
       laneConfig.fillerAllowList.add(laneConfigArgs.addFillers[i]);
     }
     emit LaneUpdated(
@@ -145,20 +146,20 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     );
   }
 
-  /// @notice Updates the filler whitelist configuration for a given lane
-  /// @param destinationChainSelector The destination chain selector
-  /// @param addFillers The addresses to add to the whitelist
-  /// @param removeFillers The addresses to remove from the whitelist
-  function updatefillerAllowList(
+  /// @notice Updates the filler allowlist configuration for a given lane.
+  /// @param destinationChainSelector The destination chain selector.
+  /// @param addFillers The addresses to add to the allowlist.
+  /// @param removeFillers The addresses to remove from the allowlist.
+  function updateFillerAllowList(
     uint64 destinationChainSelector,
     address[] memory addFillers,
     address[] memory removeFillers
   ) external virtual onlyOwner {
     DestChainConfig storage laneConfig = s_fastTransferDestChainConfig[destinationChainSelector];
-    for (uint256 i; i < addFillers.length; ++i) {
+    for (uint256 i = 0; i < addFillers.length; ++i) {
       laneConfig.fillerAllowList.add(addFillers[i]);
     }
-    for (uint256 i; i < removeFillers.length; ++i) {
+    for (uint256 i = 0; i < removeFillers.length; ++i) {
       laneConfig.fillerAllowList.remove(removeFillers[i]);
     }
     emit FillerAllowListUpdated(destinationChainSelector, addFillers, removeFillers);
@@ -183,7 +184,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   /// @param remoteChainSelector The remote chain selector
   /// @param filler The filler address to check
   /// @return isWhitelisted Whether the filler is whitelisted
-  function isfillerAllowListed(uint64 remoteChainSelector, address filler) external view returns (bool) {
+  function isFillerAllowListed(uint64 remoteChainSelector, address filler) external view returns (bool) {
     return s_fastTransferDestChainConfig[remoteChainSelector].fillerAllowList.contains(filler);
   }
 
@@ -310,7 +311,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
       DestChainConfig storage laneConfig = s_fastTransferDestChainConfig[sourceChainSelector];
       if (laneConfig.fillerAllowlistEnabled) {
         if (!laneConfig.fillerAllowList.contains(msg.sender)) {
-          revert FillerNotWhitelisted(sourceChainSelector, msg.sender);
+          revert FillerNotAllowlisted(sourceChainSelector, msg.sender);
         }
       }
     }
@@ -441,7 +442,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   function supportsInterface(
     bytes4 interfaceId
   ) public pure virtual override(TokenPool, CCIPReceiver) returns (bool) {
-    return interfaceId == type(IFastTransferPool).interfaceId || interfaceId == type(ITypeAndVersion).interfaceId
+    return interfaceId == type(IFastTransferPool).interfaceId
       || interfaceId == type(IAny2EVMMessageReceiver).interfaceId || interfaceId == type(IERC165).interfaceId
       || super.supportsInterface(interfaceId);
   }

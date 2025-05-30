@@ -77,7 +77,7 @@ contract BurnMintFastTransferTokenPool_fastFill is BurnMintFastTransferTokenPool
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        FastTransferTokenPoolAbstract.FillerNotWhitelisted.selector, DEST_CHAIN_SELECTOR, unauthorizedFiller
+        FastTransferTokenPoolAbstract.FillerNotAllowlisted.selector, DEST_CHAIN_SELECTOR, unauthorizedFiller
       )
     );
     vm.prank(unauthorizedFiller);
@@ -124,7 +124,7 @@ contract BurnMintFastTransferTokenPool_fastFill is BurnMintFastTransferTokenPool
     address[] memory addFillers = new address[](1);
     addFillers[0] = filler2;
     vm.prank(OWNER);
-    s_pool.updatefillerAllowList(DEST_CHAIN_SELECTOR, addFillers, new address[](0));
+    s_pool.updateFillerAllowList(DEST_CHAIN_SELECTOR, addFillers, new address[](0));
 
     deal(address(s_burnMintERC20), filler2, type(uint256).max);
     vm.prank(filler2);

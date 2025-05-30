@@ -3,7 +3,6 @@ pragma solidity ^0.8.24;
 
 import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol";
 import {IFastTransferPool} from "../interfaces/IFastTransferPool.sol";
-import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
 
 import {BurnMintTokenPoolAbstract} from "./BurnMintTokenPoolAbstract.sol";
@@ -20,7 +19,7 @@ import {IERC165} from
 /// @title BurnMintFastTransferTokenPool
 /// @notice A token pool that supports burn-mint operations and fast transfers
 /// @dev Inherits from BurnMintTokenPoolAbstract and FastTransferTokenPoolAbstract
-contract BurnMintFastTransferTokenPool is ITypeAndVersion, BurnMintTokenPoolAbstract, FastTransferTokenPoolAbstract {
+contract BurnMintFastTransferTokenPool is BurnMintTokenPoolAbstract, FastTransferTokenPoolAbstract {
   using SafeERC20 for IERC20;
 
   string public constant override typeAndVersion = "BurnMintFastTransferTokenPool 1.6.1";

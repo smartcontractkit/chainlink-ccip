@@ -54,7 +54,7 @@ contract FastTransferTokenPoolHelper_fastFill_Test is FastTransferTokenPoolHelpe
     vm.startPrank(nonWhitelistedFiller);
     vm.expectRevert(
       abi.encodeWithSelector(
-        FastTransferTokenPoolAbstract.FillerNotWhitelisted.selector, DEST_CHAIN_SELECTOR, nonWhitelistedFiller
+        FastTransferTokenPoolAbstract.FillerNotAllowlisted.selector, DEST_CHAIN_SELECTOR, nonWhitelistedFiller
       )
     );
     s_tokenPool.fastFill(fillRequestId, DEST_CHAIN_SELECTOR, srcAmount, sourceDecimals, receiver);
