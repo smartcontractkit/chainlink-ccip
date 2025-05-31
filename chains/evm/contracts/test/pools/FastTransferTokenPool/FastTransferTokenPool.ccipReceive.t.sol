@@ -14,7 +14,6 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
   uint64 public sourceChainSelector;
   uint256 public srcAmount;
   uint8 public sourceDecimals;
-  uint256 public fastTransferFee;
   address public receiver;
 
   function setUp() public override {
@@ -25,7 +24,6 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
     sourceChainSelector = 1;
     srcAmount = 100 ether;
     sourceDecimals = 18;
-    fastTransferFee = srcAmount * FAST_FEE_BPS / 10000; // 1% fast fee
     receiver = address(0x5);
     deal(address(s_token), address(s_pool), srcAmount * 2); // Ensure pool has enough balance
     deal(address(s_token), s_filler, srcAmount * 2); // Ensure filler has enough balance
@@ -43,7 +41,7 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
         receiver: abi.encode(receiver),
         sourceAmount: srcAmount,
         sourceDecimals: sourceDecimals,
-        fastTransferFee: fastTransferFee
+        fastTransferFeeBps: FAST_FEE_BPS
       })
     );
     Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
@@ -80,7 +78,7 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
         receiver: abi.encode(receiver),
         sourceAmount: srcAmount,
         sourceDecimals: sourceDecimals,
-        fastTransferFee: srcAmount * FAST_FEE_BPS / 10_000
+        fastTransferFeeBps: FAST_FEE_BPS
       })
     );
     Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
@@ -115,7 +113,7 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
         receiver: abi.encode(receiver),
         sourceAmount: srcAmount,
         sourceDecimals: sourceDecimals,
-        fastTransferFee: srcAmount * FAST_FEE_BPS / 10_000
+        fastTransferFeeBps: FAST_FEE_BPS
       })
     );
     Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
@@ -134,7 +132,7 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
   }
 
   function test_CcipReceive_ZeroFastTransferFee() public {
-    uint256 zeroFee = 0;
+    uint16 zeroFee = 0;
     uint256 receiverBalanceBefore = s_token.balanceOf(receiver);
 
     // Prepare CCIP message with zero fast transfer fee
@@ -143,7 +141,7 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
         receiver: abi.encode(receiver),
         sourceAmount: srcAmount,
         sourceDecimals: sourceDecimals,
-        fastTransferFee: zeroFee
+        fastTransferFeeBps: zeroFee
       })
     );
     Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
@@ -170,7 +168,7 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
         receiver: abi.encode(receiver),
         sourceAmount: srcAmount,
         sourceDecimals: sourceDecimals,
-        fastTransferFee: fastTransferFee
+        fastTransferFeeBps: FAST_FEE_BPS
       })
     );
     Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
@@ -215,7 +213,7 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
         receiver: abi.encode(receiver),
         sourceAmount: srcAmount,
         sourceDecimals: sourceDecimals,
-        fastTransferFee: fastTransferFee
+        fastTransferFeeBps: FAST_FEE_BPS
       })
     );
     Client.Any2EVMMessage memory message = Client.Any2EVMMessage({

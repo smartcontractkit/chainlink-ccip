@@ -106,7 +106,6 @@ contract BurnMintFastTransferTokenPool_ccipReceive is BurnMintFastTransferTokenP
   function test_CcipReceive_WithDifferentDecimals() public {
     uint8 sourceDecimals = 6; // USDC-like decimals
     uint256 srcAmount = 100e6;
-    uint256 srcFee = srcAmount * FAST_FEE_BPS / 10_000; // 1% fast fee
     uint256 expectedLocalAmount = 100 ether; // Should be scaled to 18 decimals
 
     Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
@@ -117,7 +116,7 @@ contract BurnMintFastTransferTokenPool_ccipReceive is BurnMintFastTransferTokenP
         FastTransferTokenPoolAbstract.MintMessage({
           sourceAmount: srcAmount,
           sourceDecimals: sourceDecimals,
-          fastTransferFee: srcFee,
+          fastTransferFeeBps: FAST_FEE_BPS,
           receiver: abi.encode(RECEIVER)
         })
       ),
@@ -144,7 +143,7 @@ contract BurnMintFastTransferTokenPool_ccipReceive is BurnMintFastTransferTokenP
     FastTransferTokenPoolAbstract.MintMessage memory mintMessage = FastTransferTokenPoolAbstract.MintMessage({
       sourceAmount: TRANSFER_AMOUNT,
       sourceDecimals: SRC_DECIMALS,
-      fastTransferFee: TRANSFER_AMOUNT * FAST_FEE_BPS / 10_000, // 1% fast fee
+      fastTransferFeeBps: FAST_FEE_BPS,
       receiver: abi.encode(RECEIVER)
     });
     return Client.Any2EVMMessage({

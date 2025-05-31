@@ -16,11 +16,7 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
     uint256 amount;
     bytes receiver;
     bytes32 mockMessageId;
-    uint256 fastFeeExpected;
-  }
-
-  function setUp() public override {
-    super.setUp();
+    uint16 fastFeeBpsExpected;
   }
 
   function _setupTestParams(
@@ -32,7 +28,7 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
       amount: amount,
       receiver: abi.encodePacked(address(0x5)),
       mockMessageId: keccak256("mockMessageId"),
-      fastFeeExpected: (amount * FAST_FEE_BPS) / 10_000
+      fastFeeBpsExpected: FAST_FEE_BPS
     });
   }
 
@@ -97,7 +93,7 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
         FastTransferTokenPoolAbstract.MintMessage({
           sourceAmount: params.amount,
           sourceDecimals: 18,
-          fastTransferFee: params.fastFeeExpected,
+          fastTransferFeeBps: params.fastFeeBpsExpected,
           receiver: params.receiver
         })
       ),
@@ -111,13 +107,14 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
     _setupMocks(params.mockMessageId);
 
     Client.EVM2AnyMessage memory message = _createMessage(params, extraArgs);
+    uint256 expectedFee = params.amount * params.fastFeeBpsExpected / 10_000;
 
     vm.expectCall(
       address(s_sourceRouter), abi.encodeWithSelector(IRouterClient.ccipSend.selector, params.chainSelector, message)
     );
     vm.expectEmit();
     emit IFastTransferPool.FastTransferRequested(
-      params.mockMessageId, params.chainSelector, params.amount, params.fastFeeExpected, params.receiver
+      params.mockMessageId, params.chainSelector, params.amount, expectedFee, params.receiver
     );
 
     uint256 balanceBefore = s_token.balanceOf(OWNER);

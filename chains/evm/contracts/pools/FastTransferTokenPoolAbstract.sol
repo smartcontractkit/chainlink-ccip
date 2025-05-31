@@ -56,7 +56,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     uint16 fastTransferBpsFee; //     │ Allowed range of [0-10_000].
     uint32 settlementOverheadGas; //  │ Settlement overhead gas for the destination chain.
     uint64 remoteChainSelector; //    │ Remote chain selector. ABI encoded in the case of an EVM pool.
-    bytes4 chainFamilySelector; //────╯ Selector that identifies the destination chain's family.
+    bytes4 chainFamilySelector; // ───╯ Selector that identifies the destination chain's family.
     uint256 maxFillAmountPerRequest; // Maximum amount that can be filled per request.
     bytes destinationPool; // Address of the destination pool.
     bytes customExtraArgs; // Pre-encoded extra args for EVM to Any message. Only used if settlementOverheadGas is 0.
@@ -64,8 +64,8 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
 
   struct MintMessage {
     uint256 sourceAmount; // Amount to fill in the source token denomination.
-    uint256 fastTransferFee; // Fast transfer fee in the source token.
-    uint8 sourceDecimals; // Decimals of the source token.
+    uint16 fastTransferFeeBps; // ─╮ Fast transfer fee in the source token.
+    uint8 sourceDecimals; // ──────╯ Decimals of the source token.
     bytes receiver; // Receiver address on the destination chain. ABI encoded in the case of an EVM address.
   }
 
@@ -187,6 +187,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   ) internal view virtual returns (IFastTransferPool.Quote memory quote, Client.EVM2AnyMessage memory message) {
     _validateSendRequest(destinationChainSelector);
 
+    // TODO not use storage
     DestChainConfig storage destChainConfig = s_fastTransferDestChainConfig[destinationChainSelector];
     if (amount > destChainConfig.maxFillAmountPerRequest) {
       revert TransferAmountExceedsMaxFillAmount(destinationChainSelector, amount);
@@ -213,7 +214,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
         MintMessage({
           sourceAmount: amount,
           sourceDecimals: i_tokenDecimals,
-          fastTransferFee: quote.fastTransferFee,
+          fastTransferFeeBps: destChainConfig.fastTransferBpsFee,
           receiver: receiver
         })
       ),
@@ -287,7 +288,8 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
 
     // Inputs are in the source chain denomination, so we need to convert them to the local token denomination.
     uint256 localAmount = _calculateLocalAmount(mintMessage.sourceAmount, mintMessage.sourceDecimals);
-    uint256 localFastTransferFeeAmount = _calculateLocalAmount(mintMessage.fastTransferFee, mintMessage.sourceDecimals);
+    uint256 localFastTransferFeeAmount = (localAmount * mintMessage.fastTransferFeeBps) / BPS_DIVIDER;
+
     bytes32 fillId = computeFillId(fillRequestId, localAmount - localFastTransferFeeAmount, receiver);
     FillInfo memory fillInfo = s_fills[fillId];
 
