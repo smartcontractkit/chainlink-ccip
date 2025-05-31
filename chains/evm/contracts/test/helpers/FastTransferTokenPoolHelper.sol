@@ -28,35 +28,22 @@ contract FastTransferTokenPoolHelper is FastTransferTokenPoolAbstract {
   }
 
   // Public wrappers for internal functions
-  function handleTokenToTransfer(uint64 destinationChainSelector, address sender, uint256 amount) public {
-    _handleTokenToTransfer(destinationChainSelector, sender, amount);
+  function handleFastTransferLockOrBurn(uint64 destinationChainSelector, address sender, uint256 amount) public {
+    _handleFastTransferLockOrBurn(destinationChainSelector, sender, amount);
   }
 
-  function transferFromFiller(
-    uint64 sourceChainSelector,
-    address filler,
-    address receiver,
-    uint256 srcAmount,
-    uint8 sourceDecimals
-  ) public returns (uint256) {
-    return _transferFromFiller(sourceChainSelector, filler, receiver, srcAmount, sourceDecimals);
+  function transferFromFiller(address filler, address receiver, uint256 amount) public {
+    _transferFromFiller(filler, receiver, amount);
   }
 
   // Implementation of abstract functions
-  function _handleTokenToTransfer(uint64, address sender, uint256 amount) internal override {
+  function _handleFastTransferLockOrBurn(uint64, address sender, uint256 amount) internal override {
     // For testing, we'll just transfer tokens from sender to this contract
     getToken().safeTransferFrom(sender, address(this), amount);
   }
 
-  function _transferFromFiller(
-    uint64,
-    address filler,
-    address receiver,
-    uint256 srcAmount,
-    uint8
-  ) internal override returns (uint256) {
-    getToken().safeTransferFrom(filler, receiver, srcAmount);
-    return srcAmount;
+  function _transferFromFiller(address filler, address receiver, uint256 amount) internal override {
+    getToken().safeTransferFrom(filler, receiver, amount);
   }
 
   /// @notice Validates settlement prerequisites - simple implementation for testing
@@ -66,7 +53,7 @@ contract FastTransferTokenPoolHelper is FastTransferTokenPoolAbstract {
   }
 
   /// @notice Handles settlement when the request was not fast-filled
-  function _handleSlowFill(uint64, uint256 settlementAmountLocal, address receiver) internal override {
+  function _handleSlowFill(uint256 settlementAmountLocal, address receiver) internal override {
     // For testing, just transfer tokens to receiver
     getToken().safeTransfer(receiver, settlementAmountLocal);
   }

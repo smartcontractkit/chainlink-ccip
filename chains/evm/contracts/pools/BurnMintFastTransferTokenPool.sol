@@ -27,59 +27,42 @@ contract BurnMintFastTransferTokenPool is FastTransferTokenPoolAbstract {
   ) FastTransferTokenPoolAbstract(token, localTokenDecimals, allowlist, rmnProxy, router) {}
 
   /// @notice Handles the transfer of tokens when a fast transfer is initiated
-  function _handleTokenToTransfer(uint64, address, uint256 amount) internal override {
+  function _handleFastTransferLockOrBurn(uint64, address, uint256 amount) internal override {
+    // Since this is a fast transfer, the Router doesn't forward the tokens to the pool.
     i_token.safeTransferFrom(msg.sender, address(this), amount);
+    // Use the normal burn logic once the tokens are in the pool.
     _lockOrBurn(amount);
   }
 
-  /// @notice Handles the transfer of tokens when a fast transfer is filled
-  /// @dev This function is called when a fast transfer is filled by a filler
-  /// @param sourceChainSelector The selector of the source chain
-  /// @param filler The address of the filler who filled the fast transfer
-  /// @param receiver The address of the receiver who will receive the tokens
-  /// @param srcAmount The amount of tokens being transferred from the source chain
-  /// @param sourceDecimals The number of decimals of the source token
-  function _transferFromFiller(
-    uint64 sourceChainSelector,
-    address filler,
-    address receiver,
-    uint256 srcAmount,
-    uint8 sourceDecimals
-  ) internal override returns (uint256 localAmount) {
-    localAmount = _calculateLocalAmount(srcAmount, sourceDecimals);
-    _consumeInboundRateLimit(sourceChainSelector, localAmount);
-    getToken().safeTransferFrom(filler, receiver, localAmount);
-    return localAmount;
-  }
-
-  /// @notice Handles settlement when the request was not fast-filled.
-  /// @param sourceChainSelector The selector of the source chain.
-  /// @param settlementAmountLocal The amount of tokens to settle in the local chain.
-  /// @param receiver The address of the receiver who will receive the settled tokens.
-  function _handleSlowFill(
-    uint64 sourceChainSelector,
-    uint256 settlementAmountLocal,
-    address receiver
-  ) internal override {
-    _consumeInboundRateLimit(sourceChainSelector, settlementAmountLocal);
-    IBurnMintERC20(address(i_token)).mint(receiver, settlementAmountLocal);
-  }
-
-  /// @notice Handles reimbursement when the request was fast-filled
-  /// @param filler The address of the filler who filled the fast transfer
-  /// @param settlementAmountLocal The amount of tokens to reimburse in the local chain
-  function _handleFastFilledReimbursement(address filler, uint256 settlementAmountLocal) internal override {
-    // Honest filler -> pay them back + fee
-    IBurnMintERC20(address(i_token)).mint(filler, settlementAmountLocal);
-  }
-
+  /// @notice Handles the locking or burning of tokens for both fast and slow transfers.
   function _lockOrBurn(
     uint256 amount
   ) internal virtual override {
     IBurnMintERC20(address(i_token)).burn(amount);
   }
 
+  /// @notice Handles the release or minting of tokens for both fast and slow transfers.
+  /// @param receiver The address that will receive the tokens.
+  /// In the case of a fast transfer this will depend on the fill status.
+  /// - NOT_FILLED - the receiver is the end user
+  /// - FILLED - the receiver is the filler
   function _releaseOrMint(address receiver, uint256 amount) internal virtual override {
     IBurnMintERC20(address(i_token)).mint(receiver, amount);
+  }
+
+  /// @inheritdoc FastTransferTokenPoolAbstract
+  function _transferFromFiller(address filler, address receiver, uint256 amount) internal override {
+    getToken().safeTransferFrom(filler, receiver, amount);
+  }
+
+  /// @inheritdoc FastTransferTokenPoolAbstract
+  function _handleSlowFill(uint256 settlementAmountLocal, address receiver) internal override {
+    IBurnMintERC20(address(i_token)).mint(receiver, settlementAmountLocal);
+  }
+
+  /// @inheritdoc FastTransferTokenPoolAbstract
+  function _handleFastFilledReimbursement(address filler, uint256 settlementAmountLocal) internal override {
+    // Honest filler -> pay them back + fee
+    IBurnMintERC20(address(i_token)).mint(filler, settlementAmountLocal);
   }
 }

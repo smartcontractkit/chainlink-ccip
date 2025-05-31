@@ -156,14 +156,24 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     (Quote memory quote, Client.EVM2AnyMessage memory message) =
       _getFeeQuoteAndCCIPMessage(feeToken, destinationChainSelector, amount, receiver, extraArgs);
     _consumeOutboundRateLimit(destinationChainSelector, amount);
-    _handleTokenToTransfer(destinationChainSelector, msg.sender, amount);
+    _handleFastTransferLockOrBurn(destinationChainSelector, msg.sender, amount);
 
+    // If the user is not paying in native, we need to transfer the fee token to the contract.
     if (feeToken != address(0)) {
       IERC20(feeToken).safeTransferFrom(msg.sender, address(this), quote.ccipSettlementFee);
       IERC20(feeToken).safeApprove(i_ccipRouter, quote.ccipSettlementFee);
     }
+
     fillRequestId = IRouterClient(getRouter()).ccipSend{value: msg.value}(destinationChainSelector, message);
-    emit FastTransferRequested(fillRequestId, destinationChainSelector, amount, quote.fastTransferFee, receiver);
+
+    emit FastTransferRequested({
+      fillRequestId: fillRequestId,
+      destinationChainSelector: destinationChainSelector,
+      amount: amount,
+      fastTransferFee: quote.fastTransferFee,
+      receiver: receiver
+    });
+
     return fillRequestId;
   }
 
@@ -255,10 +265,14 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     uint8 sourceDecimals,
     address receiver
   ) public virtual {
+    // Calculate the local amount.
+    uint256 localAmount = _calculateLocalAmount(srcAmountToFill, sourceDecimals);
+    // We rate limit when there are funds going to an end user, not when they are going to a filler.
+    _consumeInboundRateLimit(sourceChainSelector, localAmount);
     // Transfer tokens from filler to receiver
-    uint256 destAmount = _transferFromFiller(sourceChainSelector, msg.sender, receiver, srcAmountToFill, sourceDecimals);
+    _transferFromFiller(msg.sender, receiver, localAmount);
 
-    bytes32 fillId = computeFillId(fillRequestId, destAmount, receiver);
+    bytes32 fillId = computeFillId(fillRequestId, localAmount, receiver);
     FillInfo memory fillInfo = s_fills[fillId];
     if (fillInfo.state != FillState.NOT_FILLED) revert AlreadyFilled(fillRequestId);
 
@@ -272,7 +286,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     }
     // Record fill
     s_fills[fillId] = FillInfo({state: FillState.FILLED, filler: msg.sender});
-    emit FastTransferFilled(fillRequestId, fillId, msg.sender, destAmount, receiver);
+    emit FastTransferFilled(fillRequestId, fillId, msg.sender, localAmount, receiver);
   }
 
   // @inheritdoc CCIPReceiver
@@ -306,20 +320,26 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   ) internal virtual {
     _validateSettlement(sourceChainSelector, sourcePoolAddress);
 
+    // Inputs are in the source chain denomination, so we need to convert them to the local token denomination.
     uint256 localAmount = _calculateLocalAmount(srcAmount, srcDecimal);
     uint256 localFastTransferFeeAmount = _calculateLocalAmount(fastTransferFee, srcDecimal);
     bytes32 fillId = computeFillId(fillRequestId, localAmount - localFastTransferFeeAmount, receiver);
     FillInfo memory fillInfo = s_fills[fillId];
 
     if (fillInfo.state == FillState.NOT_FILLED) {
-      _handleSlowFill(sourceChainSelector, localAmount, receiver);
-    } else if (fillInfo.state == FillState.SETTLED) {
-      revert AlreadySettled(fillRequestId);
-    } else {
+      // Rate limits should be consumed only when the request was not fast-filled. During fast fill, the rate limit is
+      // consumed by the filler.
+      _consumeInboundRateLimit(sourceChainSelector, localAmount);
+      // When no filler is involved, we send the entire amount to the receiver.
+      _handleSlowFill(localAmount, receiver);
+    } else if (fillInfo.state == FillState.FILLED) {
       _handleFastFilledReimbursement(fillInfo.filler, localAmount);
+    } else {
+      // The catch all assertion for already settled fills ensures that any wrong value will revert.
+      revert AlreadySettled(fillRequestId);
     }
 
-    s_fills[fillId] = FillInfo({state: FillState.SETTLED, filler: address(0)});
+    s_fills[fillId].state = FillState.SETTLED;
   }
 
   /// @notice Validates settlement prerequisites
@@ -352,32 +372,22 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   /// @param destinationChainSelector The destination chain selector
   /// @param sender The sender address
   /// @param amount The amount to transfer
-  function _handleTokenToTransfer(uint64 destinationChainSelector, address sender, uint256 amount) internal virtual;
+  function _handleFastTransferLockOrBurn(
+    uint64 destinationChainSelector,
+    address sender,
+    uint256 amount
+  ) internal virtual;
 
-  /// @notice Transfers tokens from the filler to the receiver
-  /// @param sourceChainSelector The source chain selector
-  /// @param filler The address of the filler
-  /// @param receiver The address of the receiver
-  /// @param srcAmount The amount to transfer
-  /// @param sourceDecimals The decimals of the source token
-  /// @return destAmount The amount transferred to the receiver on the destination chain
-  function _transferFromFiller(
-    uint64 sourceChainSelector,
-    address filler,
-    address receiver,
-    uint256 srcAmount,
-    uint8 sourceDecimals
-  ) internal virtual returns (uint256 destAmount);
+  /// @notice Transfers tokens from the filler to the receiver.
+  /// @param filler The address of the filler.
+  /// @param receiver The address of the receiver.
+  /// @param amount The amount to transfer in local denomination.
+  function _transferFromFiller(address filler, address receiver, uint256 amount) internal virtual;
 
   /// @notice Handles settlement when the request was not fast-filled
-  /// @param sourceChainSelector The source chain selector
   /// @param settlementAmountLocal The amount to settle in local token
   /// @param receiver The receiver address
-  function _handleSlowFill(
-    uint64 sourceChainSelector,
-    uint256 settlementAmountLocal,
-    address receiver
-  ) internal virtual;
+  function _handleSlowFill(uint256 settlementAmountLocal, address receiver) internal virtual;
 
   /// @notice Handles reimbursement when the request was fast-filled
   /// @param filler The filler address to reimburse
