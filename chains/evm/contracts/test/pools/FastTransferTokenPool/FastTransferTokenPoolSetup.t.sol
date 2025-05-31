@@ -22,7 +22,7 @@ contract FastTransferTokenPoolSetup is BaseTest {
   uint256 internal constant MAX_FILL_AMOUNT_PER_REQUEST = 1000 ether;
   bytes internal s_svmExtraArgsBytesEncoded;
   IERC20 internal s_token;
-  FastTransferTokenPoolHelper public s_tokenPool;
+  FastTransferTokenPoolHelper public s_pool;
   WETH9 public wrappedNative;
   bytes public destPoolAddress;
   address public s_filler;
@@ -72,7 +72,7 @@ contract FastTransferTokenPoolSetup is BaseTest {
       chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_SVM,
       evmToAnyMessageExtraArgsBytes: s_svmExtraArgsBytesEncoded
     });
-    s_tokenPool = new FastTransferTokenPoolHelper(
+    s_pool = new FastTransferTokenPoolHelper(
       s_token,
       18, // localTokenDecimals
       new address[](0), // allowlist
@@ -80,10 +80,10 @@ contract FastTransferTokenPoolSetup is BaseTest {
       address(s_sourceRouter) // router
     );
 
-    s_tokenPool.updateDestChainConfig(laneConfigArgs);
+    s_pool.updateDestChainConfig(laneConfigArgs);
 
-    s_tokenPool.updateFillerAllowList(DEST_CHAIN_SELECTOR, addFillers, new address[](0));
-    s_tokenPool.updateFillerAllowList(SVM_CHAIN_SELECTOR, addFillers, new address[](0));
+    s_pool.updateFillerAllowList(DEST_CHAIN_SELECTOR, addFillers, new address[](0));
+    s_pool.updateFillerAllowList(SVM_CHAIN_SELECTOR, addFillers, new address[](0));
 
     bytes[] memory remotePoolAddresses = new bytes[](1);
     remotePoolAddresses[0] = destPoolAddress;
@@ -104,10 +104,10 @@ contract FastTransferTokenPoolSetup is BaseTest {
       inboundRateLimiterConfig: _getInboundRateLimiterConfig()
     });
 
-    s_tokenPool.applyChainUpdates(new uint64[](0), chainUpdate);
+    s_pool.applyChainUpdates(new uint64[](0), chainUpdate);
 
     // Approve tokens
-    s_token.approve(address(s_tokenPool), type(uint256).max);
+    s_token.approve(address(s_pool), type(uint256).max);
   }
 
   function _singleConfigToList(

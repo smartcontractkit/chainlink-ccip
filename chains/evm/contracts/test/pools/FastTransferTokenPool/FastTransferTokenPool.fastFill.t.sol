@@ -17,7 +17,7 @@ contract FastTransferTokenPool_fastFill_Test is FastTransferTokenPoolSetup {
     vm.stopPrank();
     deal(address(s_token), s_filler, 1000 ether);
     vm.prank(s_filler);
-    s_token.approve(address(s_tokenPool), type(uint256).max);
+    s_token.approve(address(s_pool), type(uint256).max);
     receiver = address(0x5);
   }
 
@@ -26,7 +26,7 @@ contract FastTransferTokenPool_fastFill_Test is FastTransferTokenPoolSetup {
     uint8 sourceDecimals = 18;
 
     vm.prank(s_filler);
-    s_tokenPool.fastFill(fillRequestId, DEST_CHAIN_SELECTOR, srcAmount, sourceDecimals, receiver);
+    s_pool.fastFill(fillRequestId, DEST_CHAIN_SELECTOR, srcAmount, sourceDecimals, receiver);
 
     // Verify token balances
     assertEq(s_token.balanceOf(s_filler), 1000 ether - srcAmount);
@@ -39,12 +39,12 @@ contract FastTransferTokenPool_fastFill_Test is FastTransferTokenPoolSetup {
 
     // First fill
     vm.prank(s_filler);
-    s_tokenPool.fastFill(fillRequestId, DEST_CHAIN_SELECTOR, srcAmount, sourceDecimals, receiver);
+    s_pool.fastFill(fillRequestId, DEST_CHAIN_SELECTOR, srcAmount, sourceDecimals, receiver);
 
     // Attempt second fill
     vm.expectRevert(abi.encodeWithSelector(IFastTransferPool.AlreadyFilled.selector, fillRequestId));
     vm.prank(s_filler);
-    s_tokenPool.fastFill(fillRequestId, DEST_CHAIN_SELECTOR, srcAmount, sourceDecimals, receiver);
+    s_pool.fastFill(fillRequestId, DEST_CHAIN_SELECTOR, srcAmount, sourceDecimals, receiver);
   }
 
   function test_FastFill_RevertWhen_FillerNotWhitelisted() public {
@@ -53,13 +53,13 @@ contract FastTransferTokenPool_fastFill_Test is FastTransferTokenPoolSetup {
     address nonWhitelistedFiller = address(0x6);
     deal(address(s_token), nonWhitelistedFiller, 1000 ether);
     vm.startPrank(nonWhitelistedFiller);
-    s_token.approve(address(s_tokenPool), type(uint256).max);
+    s_token.approve(address(s_pool), type(uint256).max);
     vm.expectRevert(
       abi.encodeWithSelector(
         FastTransferTokenPoolAbstract.FillerNotAllowlisted.selector, DEST_CHAIN_SELECTOR, nonWhitelistedFiller
       )
     );
-    s_tokenPool.fastFill(fillRequestId, DEST_CHAIN_SELECTOR, srcAmount, sourceDecimals, receiver);
+    s_pool.fastFill(fillRequestId, DEST_CHAIN_SELECTOR, srcAmount, sourceDecimals, receiver);
     vm.stopPrank();
   }
 
@@ -77,7 +77,7 @@ contract FastTransferTokenPool_fastFill_Test is FastTransferTokenPoolSetup {
       chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
       evmToAnyMessageExtraArgsBytes: ""
     });
-    s_tokenPool.updateDestChainConfig(_singleConfigToList(laneConfigArgs));
+    s_pool.updateDestChainConfig(_singleConfigToList(laneConfigArgs));
 
     uint256 srcAmount = 100 ether;
     uint8 sourceDecimals = 18;
@@ -87,10 +87,10 @@ contract FastTransferTokenPool_fastFill_Test is FastTransferTokenPoolSetup {
     deal(nonWhitelistedFiller, 1000 ether);
     deal(address(s_token), nonWhitelistedFiller, 1000 ether);
     vm.startPrank(nonWhitelistedFiller);
-    s_token.approve(address(s_tokenPool), type(uint256).max);
+    s_token.approve(address(s_pool), type(uint256).max);
 
     // Should succeed even though filler is not whitelisted
-    s_tokenPool.fastFill(fillRequestId, SOURCE_CHAIN_SELECTOR, srcAmount, sourceDecimals, receiver);
+    s_pool.fastFill(fillRequestId, SOURCE_CHAIN_SELECTOR, srcAmount, sourceDecimals, receiver);
     vm.stopPrank();
 
     // Verify token balances

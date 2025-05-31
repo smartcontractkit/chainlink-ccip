@@ -56,8 +56,8 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
       chainFamilySelector: chainFamily,
       evmToAnyMessageExtraArgsBytes: extraArgs
     });
-    s_tokenPool.updateDestChainConfig(_singleConfigToList(laneConfigArgs));
-    s_tokenPool.updateFillerAllowList(chainSelector, addFillers, new address[](0));
+    s_pool.updateDestChainConfig(_singleConfigToList(laneConfigArgs));
+    s_pool.updateFillerAllowList(chainSelector, addFillers, new address[](0));
 
     _setupRateLimiter(chainSelector);
   }
@@ -75,7 +75,7 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
       outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: _getInboundRateLimiterConfig()
     });
-    s_tokenPool.applyChainUpdates(new uint64[](0), chainUpdate);
+    s_pool.applyChainUpdates(new uint64[](0), chainUpdate);
   }
 
   function _setupMocks(
@@ -122,11 +122,11 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
 
     uint256 balanceBefore = s_token.balanceOf(OWNER);
     bytes32 fillRequestId =
-      s_tokenPool.ccipSendToken{value: 1 ether}(address(0), params.chainSelector, params.amount, params.receiver, "");
+      s_pool.ccipSendToken{value: 1 ether}(address(0), params.chainSelector, params.amount, params.receiver, "");
 
     assertEq(fillRequestId, params.mockMessageId);
     assertEq(s_token.balanceOf(OWNER), balanceBefore - params.amount);
-    assertEq(s_token.balanceOf(address(s_tokenPool)), params.amount);
+    assertEq(s_token.balanceOf(address(s_pool)), params.amount);
   }
 
   function test_CcipSendToken_NativeFee() public {
@@ -195,6 +195,6 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
     _setupChainConfig(testChainSelector, bytes4(0xdeadbeef), SETTLEMENT_GAS_OVERHEAD, "");
 
     vm.expectRevert(FastTransferTokenPoolAbstract.InvalidDestChainConfig.selector);
-    s_tokenPool.ccipSendToken{value: 1 ether}(address(0), testChainSelector, params.amount, params.receiver, "");
+    s_pool.ccipSendToken{value: 1 ether}(address(0), testChainSelector, params.amount, params.receiver, "");
   }
 }

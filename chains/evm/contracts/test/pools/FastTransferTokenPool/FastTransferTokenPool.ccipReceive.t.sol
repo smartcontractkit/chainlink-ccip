@@ -27,10 +27,10 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
     sourceDecimals = 18;
     fastTransferFee = srcAmount * FAST_FEE_BPS / 10000; // 1% fast fee
     receiver = address(0x5);
-    deal(address(s_token), address(s_tokenPool), srcAmount * 2); // Ensure pool has enough balance
+    deal(address(s_token), address(s_pool), srcAmount * 2); // Ensure pool has enough balance
     deal(address(s_token), s_filler, srcAmount * 2); // Ensure filler has enough balance
     vm.prank(s_filler);
-    s_token.approve(address(s_tokenPool), type(uint256).max);
+    s_token.approve(address(s_pool), type(uint256).max);
   }
 
   function test_CcipReceive_NotFastFilled() public {
@@ -58,7 +58,7 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
     vm.expectEmit(true, false, false, true);
     emit IFastTransferPool.FastTransferSettled(messageId);
     vm.prank(address(s_sourceRouter));
-    s_tokenPool.ccipReceive(message);
+    s_pool.ccipReceive(message);
 
     // Verify receiver got the full amount (transfer + fee)
     assertEq(s_token.balanceOf(receiver), receiverBalanceBefore + expectedAmount);
@@ -67,7 +67,7 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
   function test_CcipReceive_FastFilled() public {
     // First, fast fill the request
     vm.prank(s_filler);
-    s_tokenPool.fastFill(
+    s_pool.fastFill(
       messageId, sourceChainSelector, srcAmount - (srcAmount * FAST_FEE_BPS / 10_000), sourceDecimals, receiver
     );
 
@@ -94,7 +94,7 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
     vm.expectEmit();
     emit IFastTransferPool.FastTransferSettled(messageId);
     vm.prank(address(s_sourceRouter));
-    s_tokenPool.ccipReceive(message);
+    s_pool.ccipReceive(message);
 
     // Verify filler was reimbursed (transfer amount + fee)
     assertEq(s_token.balanceOf(s_filler), fillerBalanceBefore + srcAmount);
@@ -127,7 +127,7 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
     });
 
     vm.prank(address(s_sourceRouter));
-    s_tokenPool.ccipReceive(message);
+    s_pool.ccipReceive(message);
 
     // Verify receiver got the scaled amount
     assertEq(s_token.balanceOf(receiver), receiverBalanceBefore + expectedLocalAmount);
@@ -157,7 +157,7 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
     vm.expectEmit(true, false, false, true);
     emit IFastTransferPool.FastTransferSettled(messageId);
     vm.prank(address(s_sourceRouter));
-    s_tokenPool.ccipReceive(message);
+    s_pool.ccipReceive(message);
 
     // Verify receiver got only the transfer amount (no fee)
     assertEq(s_token.balanceOf(receiver), receiverBalanceBefore + srcAmount);
@@ -183,12 +183,12 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
 
     // First settlement
     vm.prank(address(s_sourceRouter));
-    s_tokenPool.ccipReceive(message);
+    s_pool.ccipReceive(message);
 
     // Try to settle again - should revert
     vm.expectRevert(abi.encodeWithSelector(IFastTransferPool.AlreadySettled.selector, messageId));
     vm.prank(address(s_sourceRouter));
-    s_tokenPool.ccipReceive(message);
+    s_pool.ccipReceive(message);
   }
 
   function test_RevertWhen_InvalidData() public {
@@ -205,7 +205,7 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
     // Mock router call
     vm.prank(address(s_sourceRouter));
     vm.expectRevert(); // Should revert due to invalid data format
-    s_tokenPool.ccipReceive(message);
+    s_pool.ccipReceive(message);
   }
 
   function test_RevertWhen_NotRouter() public {
@@ -229,6 +229,6 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
     // Call from non-router address should revert
     vm.expectRevert();
     vm.prank(makeAddr("notRouter"));
-    s_tokenPool.ccipReceive(message);
+    s_pool.ccipReceive(message);
   }
 }
