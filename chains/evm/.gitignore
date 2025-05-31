@@ -11,3 +11,5 @@ scripts/forge_zksync
 abi
 solc
 zkout
+coverage
+cache
