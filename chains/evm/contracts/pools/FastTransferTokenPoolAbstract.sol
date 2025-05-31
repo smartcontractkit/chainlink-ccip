@@ -155,9 +155,10 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   function computeFillId(
     bytes32 fillRequestId,
     uint256 amount,
+    uint8 decimals,
     address receiver
   ) public pure override returns (bytes32) {
-    return keccak256(abi.encode(fillRequestId, amount, receiver));
+    return keccak256(abi.encode(fillRequestId, amount, decimals, receiver));
   }
 
   // ================================================================
@@ -250,7 +251,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     // Transfer tokens from filler to receiver
     _transferFromFiller(msg.sender, receiver, localAmount);
 
-    bytes32 fillId = computeFillId(fillRequestId, localAmount, receiver);
+    bytes32 fillId = computeFillId(fillRequestId, srcAmountToFill, sourceDecimals, receiver);
     FillInfo memory fillInfo = s_fills[fillId];
     if (fillInfo.state != FillState.NOT_FILLED) revert AlreadyFilled(fillRequestId);
 
@@ -288,9 +289,9 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
 
     // Inputs are in the source chain denomination, so we need to convert them to the local token denomination.
     uint256 localAmount = _calculateLocalAmount(mintMessage.sourceAmount, mintMessage.sourceDecimals);
-    uint256 localFastTransferFeeAmount = (localAmount * mintMessage.fastTransferFeeBps) / BPS_DIVIDER;
+    uint256 sourceAmountToFill = localAmount - (localAmount * mintMessage.fastTransferFeeBps) / BPS_DIVIDER;
 
-    bytes32 fillId = computeFillId(fillRequestId, localAmount - localFastTransferFeeAmount, receiver);
+    bytes32 fillId = computeFillId(fillRequestId, sourceAmountToFill, mintMessage.sourceDecimals, receiver);
     FillInfo memory fillInfo = s_fills[fillId];
 
     if (fillInfo.state == FillState.NOT_FILLED) {

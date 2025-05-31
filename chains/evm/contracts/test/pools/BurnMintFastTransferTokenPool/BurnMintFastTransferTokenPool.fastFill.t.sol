@@ -26,7 +26,7 @@ contract BurnMintFastTransferTokenPool_fastFill is BurnMintFastTransferTokenPool
     uint256 fillerBalanceBefore = s_burnMintERC20.balanceOf(s_filler);
     uint256 receiverBalanceBefore = s_burnMintERC20.balanceOf(RECEIVER);
 
-    bytes32 fillId = s_pool.computeFillId(FILL_REQUEST_ID, FILL_AMOUNT, RECEIVER);
+    bytes32 fillId = s_pool.computeFillId(FILL_REQUEST_ID, FILL_AMOUNT, SRC_DECIMALS, RECEIVER);
 
     vm.expectEmit();
     emit IFastTransferPool.FastTransferFilled(FILL_REQUEST_ID, fillId, s_filler, FILL_AMOUNT, RECEIVER);
@@ -54,7 +54,7 @@ contract BurnMintFastTransferTokenPool_fastFill is BurnMintFastTransferTokenPool
     assertEq(s_burnMintERC20.balanceOf(s_filler), fillerBalanceBefore - expectedLocalAmount);
     assertEq(s_burnMintERC20.balanceOf(RECEIVER), receiverBalanceBefore + expectedLocalAmount);
     FastTransferTokenPoolAbstract.FillInfo memory fillInfo =
-      s_pool.getFillInfo(s_pool.computeFillId(FILL_REQUEST_ID, expectedLocalAmount, RECEIVER));
+      s_pool.getFillInfo(s_pool.computeFillId(FILL_REQUEST_ID, srcAmountToFill, sourceDecimals, RECEIVER));
     assertTrue(fillInfo.state == FastTransferTokenPoolAbstract.FillState.FILLED);
     assertEq(fillInfo.filler, s_filler);
   }
@@ -114,7 +114,7 @@ contract BurnMintFastTransferTokenPool_fastFill is BurnMintFastTransferTokenPool
     assertEq(s_burnMintERC20.balanceOf(RECEIVER), receiverBalanceBefore + FILL_AMOUNT);
 
     FastTransferTokenPoolAbstract.FillInfo memory fillInfo =
-      s_pool.getFillInfo(s_pool.computeFillId(FILL_REQUEST_ID, FILL_AMOUNT, RECEIVER));
+      s_pool.getFillInfo(s_pool.computeFillId(FILL_REQUEST_ID, FILL_AMOUNT, SRC_DECIMALS, RECEIVER));
     assertTrue(fillInfo.state == FastTransferTokenPoolAbstract.FillState.FILLED);
     assertEq(fillInfo.filler, anyFiller);
   }
