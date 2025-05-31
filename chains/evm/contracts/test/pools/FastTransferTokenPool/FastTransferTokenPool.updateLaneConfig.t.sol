@@ -25,7 +25,7 @@ contract FastTransferTokenPool_updateDestChainConfig is FastTransferTokenPoolSet
       maxFillAmountPerRequest: NEW_FILL_AMOUNT_MAX,
       settlementOverheadGas: 200_000,
       chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
-      evmToAnyMessageExtraArgsBytes: ""
+      customExtraArgs: ""
     });
 
     vm.expectEmit();
@@ -60,7 +60,7 @@ contract FastTransferTokenPool_updateDestChainConfig is FastTransferTokenPoolSet
       maxFillAmountPerRequest: NEW_FILL_AMOUNT_MAX,
       settlementOverheadGas: 200_000,
       chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
-      evmToAnyMessageExtraArgsBytes: ""
+      customExtraArgs: ""
     });
 
     s_pool.updateDestChainConfig(_singleConfigToList(laneConfigArgs));
@@ -82,7 +82,7 @@ contract FastTransferTokenPool_updateDestChainConfig is FastTransferTokenPoolSet
       maxFillAmountPerRequest: NEW_FILL_AMOUNT_MAX,
       settlementOverheadGas: 200_000,
       chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
-      evmToAnyMessageExtraArgsBytes: ""
+      customExtraArgs: ""
     });
 
     vm.expectRevert(FastTransferTokenPoolAbstract.InvalidDestChainConfig.selector);
@@ -108,7 +108,7 @@ contract FastTransferTokenPool_updateDestChainConfig is FastTransferTokenPoolSet
       maxFillAmountPerRequest: NEW_FILL_AMOUNT_MAX,
       settlementOverheadGas: 200_000,
       chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
-      evmToAnyMessageExtraArgsBytes: ""
+      customExtraArgs: ""
     });
 
     s_pool.updateDestChainConfig(_singleConfigToList(laneConfigArgs));
@@ -127,7 +127,7 @@ contract FastTransferTokenPool_updateDestChainConfig is FastTransferTokenPoolSet
       maxFillAmountPerRequest: NEW_FILL_AMOUNT_MAX,
       settlementOverheadGas: 200_000,
       chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
-      evmToAnyMessageExtraArgsBytes: ""
+      customExtraArgs: ""
     });
 
     s_pool.updateDestChainConfig(_singleConfigToList(laneConfigArgs));

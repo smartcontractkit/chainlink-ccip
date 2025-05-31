@@ -73,7 +73,7 @@ contract BurnMintFastTransferTokenPoolSetup is BaseTest {
       maxFillAmountPerRequest: FILL_AMOUNT_MAX,
       settlementOverheadGas: 200_000,
       chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
-      evmToAnyMessageExtraArgsBytes: ""
+      customExtraArgs: ""
     });
 
     s_pool.updateDestChainConfig(_singleConfigToList(laneConfigArgs));

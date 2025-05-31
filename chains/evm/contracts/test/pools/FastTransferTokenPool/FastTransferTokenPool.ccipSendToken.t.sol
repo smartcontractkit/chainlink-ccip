@@ -54,7 +54,7 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
       maxFillAmountPerRequest: MAX_FILL_AMOUNT_PER_REQUEST,
       settlementOverheadGas: settlementGas,
       chainFamilySelector: chainFamily,
-      evmToAnyMessageExtraArgsBytes: extraArgs
+      customExtraArgs: extraArgs
     });
     s_pool.updateDestChainConfig(_singleConfigToList(laneConfigArgs));
     s_pool.updateFillerAllowList(chainSelector, addFillers, new address[](0));
@@ -186,15 +186,5 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
     bytes memory customExtraArgs = abi.encode("suiCustomExtraArgs");
     _setupChainConfig(testChainSelector, Internal.CHAIN_FAMILY_SELECTOR_SUI, 0, customExtraArgs);
     _executeTest(params, customExtraArgs);
-  }
-
-  function test_CcipSendToken_RevertWhen_InvalidChainFamilySelector() public {
-    uint64 testChainSelector = uint64(uint256(keccak256("INVALID_CHAIN")));
-    TestParams memory params = _setupTestParams(testChainSelector);
-
-    _setupChainConfig(testChainSelector, bytes4(0xdeadbeef), SETTLEMENT_GAS_OVERHEAD, "");
-
-    vm.expectRevert(FastTransferTokenPoolAbstract.InvalidDestChainConfig.selector);
-    s_pool.ccipSendToken{value: 1 ether}(address(0), testChainSelector, params.amount, params.receiver, "");
   }
 }

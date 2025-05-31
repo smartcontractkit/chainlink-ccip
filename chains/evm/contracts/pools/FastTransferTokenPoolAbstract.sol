@@ -42,24 +42,24 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   event DestinationPoolUpdated(uint64 indexed destChainSelector, address destinationPool);
 
   struct DestChainConfig {
-    uint256 maxFillAmountPerRequest; //          Max amount that can be filled per request.
-    bool fillerAllowlistEnabled; // ───────────╮ Allowlist for fillers.
-    uint16 fastTransferBpsFee; //              | Allowed range of [0-10_000].
-    uint32 settlementOverheadGas; //           | Settlement overhead gas for the destination chain.
-    bytes4 chainFamilySelector; // ────────────╯ Selector that identifies the destination chain's family.
-    bytes destinationPool; //                    Destination pool address.
-    bytes evmToAnyMessageExtraArgsBytes; //      Pre-encoded extra args for EVM to Any message.
+    uint256 maxFillAmountPerRequest; //  Max amount that can be filled per request.
+    bool fillerAllowlistEnabled; // ───╮ Allowlist for fillers.
+    uint16 fastTransferBpsFee; //      │ Allowed range of [0-10_000].
+    //                                 │ Settlement overhead gas for the destination chain. Used as a toggle for
+    uint32 settlementOverheadGas; // ──╯ either custom ExtraArgs or GenericExtraArgsV2.
+    bytes destinationPool; //            Destination pool address.
+    bytes customExtraArgs; //            Pre-encoded extra args for EVM to Any message.
   }
 
   struct DestChainConfigUpdateArgs {
-    bool fillerAllowlistEnabled; // ──────╮ Allowlist for fillers.
-    uint16 fastTransferBpsFee; //         | Allowed range of [0-10_000].
-    uint32 settlementOverheadGas; //      | Settlement overhead gas for the destination chain.
-    uint64 remoteChainSelector; //        │ Remote chain selector. ABI encoded in the case of an EVM pool.
-    bytes4 chainFamilySelector; //────────╯ Selector that identifies the destination chain's family.
-    uint256 maxFillAmountPerRequest; //     Maximum amount that can be filled per request.
-    bytes destinationPool; //               Address of the destination pool.
-    bytes evmToAnyMessageExtraArgsBytes; // Pre-encoded extra args for EVM to Any message.
+    bool fillerAllowlistEnabled; // ──╮ Allowlist for fillers.
+    uint16 fastTransferBpsFee; //     │ Allowed range of [0-10_000].
+    uint32 settlementOverheadGas; //  │ Settlement overhead gas for the destination chain.
+    uint64 remoteChainSelector; //    │ Remote chain selector. ABI encoded in the case of an EVM pool.
+    bytes4 chainFamilySelector; //────╯ Selector that identifies the destination chain's family.
+    uint256 maxFillAmountPerRequest; // Maximum amount that can be filled per request.
+    bytes destinationPool; //           Address of the destination pool.
+    bytes customExtraArgs; //           Pre-encoded extra args for EVM to Any message.
   }
 
   struct MintMessage {
@@ -89,6 +89,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   /// @dev Mapping of remote chain selector to destinationChain configuration
   mapping(uint64 remoteChainSelector => DestChainConfig destinationChainConfig) private s_fastTransferDestChainConfig;
 
+  /// @dev Mapping of remote chain selector to filler allowlist
   mapping(uint64 remoteChainSelector => EnumerableSet.AddressSet fillerAllowList) private s_fillerAllowLists;
 
   /// @dev Mapping of fill request ID to fill information
@@ -206,22 +207,16 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     );
 
     bytes memory extraArgs;
-    if (
-      destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_EVM
-        || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_APTOS
-        || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SUI
-    ) {
-      if (destChainConfig.settlementOverheadGas == 0) {
-        extraArgs = destChainConfig.evmToAnyMessageExtraArgsBytes;
-      } else {
-        extraArgs = Client._argsToBytes(
-          Client.GenericExtraArgsV2({gasLimit: destChainConfig.settlementOverheadGas, allowOutOfOrderExecution: true})
-        );
-      }
-    } else if (destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SVM) {
-      extraArgs = destChainConfig.evmToAnyMessageExtraArgsBytes;
+
+    // We use 0 as a toggle for whether the destination chain requires custom ExtraArgs. Zero would not be a sensible
+    // value for settlementOverheadGas, so we can use it as a toggle.
+    if (destChainConfig.settlementOverheadGas == 0) {
+      extraArgs = destChainConfig.customExtraArgs;
     } else {
-      revert InvalidDestChainConfig();
+      // If the value is not zero, we encode it as GenericExtraArgsV2.
+      extraArgs = Client._argsToBytes(
+        Client.GenericExtraArgsV2({gasLimit: destChainConfig.settlementOverheadGas, allowOutOfOrderExecution: true})
+      );
     }
 
     message = Client.EVM2AnyMessage({
@@ -421,7 +416,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   ) internal virtual {
     // We know Solana requires custom args, if they are not provided, we revert.
     if (destChainConfigArgs.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SVM) {
-      if (destChainConfigArgs.evmToAnyMessageExtraArgsBytes.length == 0) {
+      if (destChainConfigArgs.settlementOverheadGas != 0) {
         revert InvalidDestChainConfig();
       }
     }
@@ -433,9 +428,8 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     destChainConfig.fastTransferBpsFee = destChainConfigArgs.fastTransferBpsFee;
     destChainConfig.fillerAllowlistEnabled = destChainConfigArgs.fillerAllowlistEnabled;
     destChainConfig.maxFillAmountPerRequest = destChainConfigArgs.maxFillAmountPerRequest;
-    destChainConfig.chainFamilySelector = destChainConfigArgs.chainFamilySelector;
     destChainConfig.settlementOverheadGas = destChainConfigArgs.settlementOverheadGas;
-    destChainConfig.evmToAnyMessageExtraArgsBytes = destChainConfigArgs.evmToAnyMessageExtraArgsBytes;
+    destChainConfig.customExtraArgs = destChainConfigArgs.customExtraArgs;
 
     emit DestChainConfigUpdated(
       destChainConfigArgs.remoteChainSelector,

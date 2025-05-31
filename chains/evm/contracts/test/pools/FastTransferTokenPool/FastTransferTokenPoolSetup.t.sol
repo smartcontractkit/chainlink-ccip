@@ -43,12 +43,16 @@ contract FastTransferTokenPoolSetup is BaseTest {
     Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](1);
     onRampUpdates[0] = Router.OnRamp({destChainSelector: DEST_CHAIN_SELECTOR, onRamp: onRamp});
     s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), new Router.OffRamp[](0));
+
     s_filler = makeAddr("filler");
     s_token = new BurnMintERC20("LINK", "LNK", 18, 0, 0);
+
     deal(address(s_token), OWNER, type(uint256).max);
     wrappedNative = new WETH9();
-    address[] memory addFillers = new address[](1);
-    addFillers[0] = s_filler;
+
+    address[] memory fillersToAdd = new address[](1);
+    fillersToAdd[0] = s_filler;
+
     // Deploy pool
     FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs[] memory laneConfigArgs =
       new FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs[](2);
@@ -60,7 +64,7 @@ contract FastTransferTokenPoolSetup is BaseTest {
       maxFillAmountPerRequest: MAX_FILL_AMOUNT_PER_REQUEST,
       settlementOverheadGas: SETTLEMENT_GAS_OVERHEAD,
       chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
-      evmToAnyMessageExtraArgsBytes: ""
+      customExtraArgs: ""
     });
     laneConfigArgs[1] = FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs({
       remoteChainSelector: SVM_CHAIN_SELECTOR,
@@ -68,9 +72,9 @@ contract FastTransferTokenPoolSetup is BaseTest {
       fillerAllowlistEnabled: true,
       destinationPool: destPoolAddress,
       maxFillAmountPerRequest: MAX_FILL_AMOUNT_PER_REQUEST,
-      settlementOverheadGas: SETTLEMENT_GAS_OVERHEAD,
+      settlementOverheadGas: 0,
       chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_SVM,
-      evmToAnyMessageExtraArgsBytes: s_svmExtraArgsBytesEncoded
+      customExtraArgs: s_svmExtraArgsBytesEncoded
     });
     s_pool = new FastTransferTokenPoolHelper(
       s_token,
@@ -82,8 +86,8 @@ contract FastTransferTokenPoolSetup is BaseTest {
 
     s_pool.updateDestChainConfig(laneConfigArgs);
 
-    s_pool.updateFillerAllowList(DEST_CHAIN_SELECTOR, addFillers, new address[](0));
-    s_pool.updateFillerAllowList(SVM_CHAIN_SELECTOR, addFillers, new address[](0));
+    s_pool.updateFillerAllowList(DEST_CHAIN_SELECTOR, fillersToAdd, new address[](0));
+    s_pool.updateFillerAllowList(SVM_CHAIN_SELECTOR, fillersToAdd, new address[](0));
 
     bytes[] memory remotePoolAddresses = new bytes[](1);
     remotePoolAddresses[0] = destPoolAddress;

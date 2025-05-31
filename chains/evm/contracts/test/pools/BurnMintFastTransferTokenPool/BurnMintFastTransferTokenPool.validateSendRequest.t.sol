@@ -147,7 +147,7 @@ contract BurnMintFastTransferTokenPool_validateSendRequest is BurnMintFastTransf
       maxFillAmountPerRequest: FILL_AMOUNT_MAX,
       settlementOverheadGas: 200_000,
       chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
-      evmToAnyMessageExtraArgsBytes: ""
+      customExtraArgs: ""
     });
     vm.prank(OWNER);
     s_pool.updateDestChainConfig(_singleConfigToList(laneConfigArgs));
@@ -205,7 +205,7 @@ contract BurnMintFastTransferTokenPool_validateSendRequest is BurnMintFastTransf
       maxFillAmountPerRequest: FILL_AMOUNT_MAX,
       settlementOverheadGas: 200_000,
       chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
-      evmToAnyMessageExtraArgsBytes: ""
+      customExtraArgs: ""
     });
 
     pool.updateDestChainConfig(_singleConfigToList(laneConfigArgs));
