@@ -63,7 +63,7 @@ contract BurnMintFastTransferTokenPool_fastFill is BurnMintFastTransferTokenPool
 
   function test_RevertWhen_AlreadyFilled() public {
     bytes32 fillId = s_pool.computeFillId(FILL_REQUEST_ID, FILL_AMOUNT, SRC_DECIMALS, RECEIVER);
-    
+
     // First fill
     vm.prank(s_filler);
     s_pool.fastFill(FILL_REQUEST_ID, fillId, DEST_CHAIN_SELECTOR, FILL_AMOUNT, SRC_DECIMALS, RECEIVER);
@@ -78,7 +78,9 @@ contract BurnMintFastTransferTokenPool_fastFill is BurnMintFastTransferTokenPool
     // Use an incorrect fillId (different from what would be computed)
     bytes32 incorrectFillId = keccak256("incorrect_fill_id");
 
-    vm.expectRevert(abi.encodeWithSelector(FastTransferTokenPoolAbstract.InvalidFillRequestId.selector, FILL_REQUEST_ID));
+    vm.expectRevert(
+      abi.encodeWithSelector(FastTransferTokenPoolAbstract.InvalidFillRequestId.selector, FILL_REQUEST_ID)
+    );
     vm.prank(s_filler);
     s_pool.fastFill(FILL_REQUEST_ID, incorrectFillId, DEST_CHAIN_SELECTOR, FILL_AMOUNT, SRC_DECIMALS, RECEIVER);
   }
@@ -88,7 +90,9 @@ contract BurnMintFastTransferTokenPool_fastFill is BurnMintFastTransferTokenPool
     uint256 wrongAmount = FILL_AMOUNT + 1 ether;
     bytes32 fillIdWithWrongAmount = s_pool.computeFillId(FILL_REQUEST_ID, wrongAmount, SRC_DECIMALS, RECEIVER);
 
-    vm.expectRevert(abi.encodeWithSelector(FastTransferTokenPoolAbstract.InvalidFillRequestId.selector, FILL_REQUEST_ID));
+    vm.expectRevert(
+      abi.encodeWithSelector(FastTransferTokenPoolAbstract.InvalidFillRequestId.selector, FILL_REQUEST_ID)
+    );
     vm.prank(s_filler);
     s_pool.fastFill(FILL_REQUEST_ID, fillIdWithWrongAmount, DEST_CHAIN_SELECTOR, FILL_AMOUNT, SRC_DECIMALS, RECEIVER);
   }
@@ -98,7 +102,9 @@ contract BurnMintFastTransferTokenPool_fastFill is BurnMintFastTransferTokenPool
     uint8 wrongDecimals = 6;
     bytes32 fillIdWithWrongDecimals = s_pool.computeFillId(FILL_REQUEST_ID, FILL_AMOUNT, wrongDecimals, RECEIVER);
 
-    vm.expectRevert(abi.encodeWithSelector(FastTransferTokenPoolAbstract.InvalidFillRequestId.selector, FILL_REQUEST_ID));
+    vm.expectRevert(
+      abi.encodeWithSelector(FastTransferTokenPoolAbstract.InvalidFillRequestId.selector, FILL_REQUEST_ID)
+    );
     vm.prank(s_filler);
     s_pool.fastFill(FILL_REQUEST_ID, fillIdWithWrongDecimals, DEST_CHAIN_SELECTOR, FILL_AMOUNT, SRC_DECIMALS, RECEIVER);
   }
@@ -108,7 +114,9 @@ contract BurnMintFastTransferTokenPool_fastFill is BurnMintFastTransferTokenPool
     address wrongReceiver = address(0x5678);
     bytes32 fillIdWithWrongReceiver = s_pool.computeFillId(FILL_REQUEST_ID, FILL_AMOUNT, SRC_DECIMALS, wrongReceiver);
 
-    vm.expectRevert(abi.encodeWithSelector(FastTransferTokenPoolAbstract.InvalidFillRequestId.selector, FILL_REQUEST_ID));
+    vm.expectRevert(
+      abi.encodeWithSelector(FastTransferTokenPoolAbstract.InvalidFillRequestId.selector, FILL_REQUEST_ID)
+    );
     vm.prank(s_filler);
     s_pool.fastFill(FILL_REQUEST_ID, fillIdWithWrongReceiver, DEST_CHAIN_SELECTOR, FILL_AMOUNT, SRC_DECIMALS, RECEIVER);
   }

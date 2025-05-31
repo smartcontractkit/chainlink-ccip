@@ -23,6 +23,7 @@ contract BurnMintFastTransferTokenPool_ccipReceive is BurnMintFastTransferTokenP
     vm.stopPrank();
     vm.prank(s_filler);
     s_burnMintERC20.approve(address(s_pool), type(uint256).max);
+    vm.stopPrank();
   }
 
   function test_CcipReceive_NotFastFilled() public {
@@ -45,16 +46,11 @@ contract BurnMintFastTransferTokenPool_ccipReceive is BurnMintFastTransferTokenP
 
   function test_CcipReceive_FastFilled() public {
     // First, fast fill the request
-    uint256 amountToFill = TRANSFER_AMOUNT - TRANSFER_AMOUNT* FAST_FEE_BPS / 10000; // Amount after fee
+    uint256 amountToFill = TRANSFER_AMOUNT - (TRANSFER_AMOUNT * FAST_FEE_BPS / 10_000);
+    bytes32 fillId = s_pool.computeFillId(FILL_REQUEST_ID, amountToFill, SRC_DECIMALS, RECEIVER);
+
     vm.prank(s_filler);
-    s_pool.fastFill(
-      FILL_REQUEST_ID,
-      s_pool.computeFillId(FILL_REQUEST_ID, amountToFill, SRC_DECIMALS, RECEIVER),
-      DEST_CHAIN_SELECTOR,
-      amountToFill,
-      SRC_DECIMALS,
-      RECEIVER
-    );
+    s_pool.fastFill(FILL_REQUEST_ID, fillId, DEST_CHAIN_SELECTOR, amountToFill, SRC_DECIMALS, RECEIVER);
 
     uint256 fillerBalanceBefore = s_burnMintERC20.balanceOf(s_filler);
     uint256 receiverBalanceBefore = s_burnMintERC20.balanceOf(RECEIVER);

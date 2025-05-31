@@ -66,11 +66,9 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
     // First, fast fill the request
     uint256 amountToFill = srcAmount - (srcAmount * FAST_FEE_BPS / 10_000);
     bytes32 fillId = s_pool.computeFillId(messageId, amountToFill, sourceDecimals, receiver);
-    
+
     vm.prank(s_filler);
-    s_pool.fastFill(
-      messageId, fillId, sourceChainSelector, amountToFill, sourceDecimals, receiver
-    );
+    s_pool.fastFill(messageId, fillId, sourceChainSelector, amountToFill, sourceDecimals, receiver);
 
     uint256 fillerBalanceBefore = s_token.balanceOf(s_filler);
     uint256 receiverBalanceBefore = s_token.balanceOf(receiver);
