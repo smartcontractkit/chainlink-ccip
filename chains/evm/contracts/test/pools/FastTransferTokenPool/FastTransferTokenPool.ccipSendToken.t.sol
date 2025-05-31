@@ -13,10 +13,10 @@ import {FastTransferTokenPoolSetup} from "./FastTransferTokenPoolSetup.t.sol";
 contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup {
   struct TestParams {
     uint64 chainSelector;
-    uint256 amount;
-    bytes receiver;
-    bytes32 mockMessageId;
     uint16 fastFeeBpsExpected;
+    uint256 amount;
+    bytes32 mockMessageId;
+    bytes receiver;
   }
 
   function _setupTestParams(
