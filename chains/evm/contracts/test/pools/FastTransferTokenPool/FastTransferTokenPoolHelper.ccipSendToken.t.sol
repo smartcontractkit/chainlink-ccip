@@ -142,7 +142,7 @@ contract FastTransferTokenPoolHelper_ccipSendToken_Test is FastTransferTokenPool
 
   function test_CcipSendToken_NativeFee_ToSVM() public {
     TestParams memory params = _setupTestParams(SVM_CHAIN_SELECTOR);
-    _executeTest(params, svmExtraArgsBytesEncoded);
+    _executeTest(params, s_svmExtraArgsBytesEncoded);
   }
 
   function test_CcipSendToken_APTOS_WithSettlementGas() public {

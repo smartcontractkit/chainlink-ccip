@@ -108,7 +108,6 @@ contract BurnMintFastTransferTokenPool_ccipReceive is BurnMintFastTransferTokenP
     uint256 srcAmount = 100e6;
     uint256 srcFee = srcAmount * FAST_FEE_BPS / 10_000; // 1% fast fee
     uint256 expectedLocalAmount = 100 ether; // Should be scaled to 18 decimals
-    uint256 expectedLocalFee = 1 ether; // Should be scaled to 18 decimals
 
     Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
       messageId: FILL_REQUEST_ID,

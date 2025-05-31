@@ -20,7 +20,7 @@ contract FastTransferTokenPoolHelperSetup is BaseTest {
   uint32 internal constant SVM_CHAIN_SELECTOR = uint32(uint256(keccak256("SVM_SELECTOR")));
   uint32 internal constant SETTLEMENT_GAS_OVERHEAD = 200_000;
   uint256 internal constant MAX_FILL_AMOUNT_PER_REQUEST = 1000 ether;
-  bytes svmExtraArgsBytesEncoded;
+  bytes internal s_svmExtraArgsBytesEncoded;
   IERC20 internal s_token;
   FastTransferTokenPoolHelper public s_tokenPool;
   WETH9 public wrappedNative;
@@ -31,7 +31,7 @@ contract FastTransferTokenPoolHelperSetup is BaseTest {
     super.setUp();
     destPoolAddress = abi.encode(makeAddr("destPool"));
     address onRamp = makeAddr("onRamp");
-    svmExtraArgsBytesEncoded = Client._svmArgsToBytes(
+    s_svmExtraArgsBytesEncoded = Client._svmArgsToBytes(
       Client.SVMExtraArgsV1({
         computeUnits: SETTLEMENT_GAS_OVERHEAD,
         accounts: new bytes32[](0),
@@ -74,7 +74,7 @@ contract FastTransferTokenPoolHelperSetup is BaseTest {
       chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_SVM,
       addFillers: addFillers,
       removeFillers: new address[](0),
-      evmToAnyMessageExtraArgsBytes: svmExtraArgsBytesEncoded
+      evmToAnyMessageExtraArgsBytes: s_svmExtraArgsBytesEncoded
     });
     s_tokenPool = new FastTransferTokenPoolHelper(
       s_token,
