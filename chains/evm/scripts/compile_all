@@ -91,7 +91,6 @@ compileContract pools/BurnToAddressMintTokenPool
 compileContract pools/TokenPool
 compileContract pools/USDC/USDCTokenPool
 compileContract pools/SiloedLockReleaseTokenPool
-compileContract pools/FastTransferTokenPoolAbstract
 compileContract pools/BurnMintFastTransferTokenPool
 
 
