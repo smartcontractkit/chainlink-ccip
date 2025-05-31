@@ -156,7 +156,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     (Quote memory quote, Client.EVM2AnyMessage memory message) =
       _getFeeQuoteAndCCIPMessage(feeToken, destinationChainSelector, amount, receiver, extraArgs);
     _consumeOutboundRateLimit(destinationChainSelector, amount);
-    _handleFastTransferLockOrBurn(destinationChainSelector, msg.sender, amount);
+    _handleFastTransferLockOrBurn(msg.sender, amount);
 
     // If the user is not paying in native, we need to transfer the fee token to the contract.
     if (feeToken != address(0)) {
@@ -369,16 +369,11 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   // ================================================================
 
   /// @notice Handles the token to transfer on fast fill request at source chain
-  /// @param destinationChainSelector The destination chain selector
   /// @param sender The sender address
   /// @param amount The amount to transfer
-  function _handleFastTransferLockOrBurn(
-    uint64 destinationChainSelector,
-    address sender,
-    uint256 amount
-  ) internal virtual {
+  function _handleFastTransferLockOrBurn(address sender, uint256 amount) internal virtual {
     // Since this is a fast transfer, the Router doesn't forward the tokens to the pool.
-    i_token.safeTransferFrom(msg.sender, address(this), amount);
+    i_token.safeTransferFrom(sender, address(this), amount);
     // Use the normal burn logic once the tokens are in the pool.
     _lockOrBurn(amount);
   }
