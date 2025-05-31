@@ -376,23 +376,35 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     uint64 destinationChainSelector,
     address sender,
     uint256 amount
-  ) internal virtual;
+  ) internal virtual {
+    // Since this is a fast transfer, the Router doesn't forward the tokens to the pool.
+    i_token.safeTransferFrom(msg.sender, address(this), amount);
+    // Use the normal burn logic once the tokens are in the pool.
+    _lockOrBurn(amount);
+  }
 
   /// @notice Transfers tokens from the filler to the receiver.
   /// @param filler The address of the filler.
   /// @param receiver The address of the receiver.
   /// @param amount The amount to transfer in local denomination.
-  function _transferFromFiller(address filler, address receiver, uint256 amount) internal virtual;
+  function _transferFromFiller(address filler, address receiver, uint256 amount) internal virtual {
+    getToken().safeTransferFrom(filler, receiver, amount);
+  }
 
   /// @notice Handles settlement when the request was not fast-filled
   /// @param settlementAmountLocal The amount to settle in local token
   /// @param receiver The receiver address
-  function _handleSlowFill(uint256 settlementAmountLocal, address receiver) internal virtual;
+  function _handleSlowFill(uint256 settlementAmountLocal, address receiver) internal virtual {
+    _releaseOrMint(receiver, settlementAmountLocal);
+  }
 
   /// @notice Handles reimbursement when the request was fast-filled
   /// @param filler The filler address to reimburse
   /// @param settlementAmountLocal The amount to reimburse in local token
-  function _handleFastFilledReimbursement(address filler, uint256 settlementAmountLocal) internal virtual;
+  function _handleFastFilledReimbursement(address filler, uint256 settlementAmountLocal) internal virtual {
+    // Honest filler -> pay them back + fee
+    _releaseOrMint(filler, settlementAmountLocal);
+  }
 
   // ================================================================
   // │                          Config                              │

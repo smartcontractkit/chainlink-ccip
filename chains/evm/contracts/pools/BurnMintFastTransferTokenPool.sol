@@ -26,14 +26,6 @@ contract BurnMintFastTransferTokenPool is FastTransferTokenPoolAbstract {
     address router
   ) FastTransferTokenPoolAbstract(token, localTokenDecimals, allowlist, rmnProxy, router) {}
 
-  /// @notice Handles the transfer of tokens when a fast transfer is initiated
-  function _handleFastTransferLockOrBurn(uint64, address, uint256 amount) internal override {
-    // Since this is a fast transfer, the Router doesn't forward the tokens to the pool.
-    i_token.safeTransferFrom(msg.sender, address(this), amount);
-    // Use the normal burn logic once the tokens are in the pool.
-    _lockOrBurn(amount);
-  }
-
   /// @notice Handles the locking or burning of tokens for both fast and slow transfers.
   function _lockOrBurn(
     uint256 amount
@@ -48,21 +40,5 @@ contract BurnMintFastTransferTokenPool is FastTransferTokenPoolAbstract {
   /// - FILLED - the receiver is the filler
   function _releaseOrMint(address receiver, uint256 amount) internal virtual override {
     IBurnMintERC20(address(i_token)).mint(receiver, amount);
-  }
-
-  /// @inheritdoc FastTransferTokenPoolAbstract
-  function _transferFromFiller(address filler, address receiver, uint256 amount) internal override {
-    getToken().safeTransferFrom(filler, receiver, amount);
-  }
-
-  /// @inheritdoc FastTransferTokenPoolAbstract
-  function _handleSlowFill(uint256 settlementAmountLocal, address receiver) internal override {
-    IBurnMintERC20(address(i_token)).mint(receiver, settlementAmountLocal);
-  }
-
-  /// @inheritdoc FastTransferTokenPoolAbstract
-  function _handleFastFilledReimbursement(address filler, uint256 settlementAmountLocal) internal override {
-    // Honest filler -> pay them back + fee
-    IBurnMintERC20(address(i_token)).mint(filler, settlementAmountLocal);
   }
 }
