@@ -47,38 +47,38 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   event DestinationPoolUpdated(uint64 indexed dst, address destinationPool);
 
   struct DestChainConfig {
-    uint256 maxFillAmountPerRequest; // Max amount that can be filled per request.
-    bytes destinationPool; //           Destination pool address.
-    uint16 fastTransferBpsFee; // ──────╮ Allowed range of [0-10_000].
-    bytes4 chainFamilySelector; //      │ elector that identifies the destination chain's family. Used to determine the correct validations to perform for the dest chain.
-    bool fillerAllowlistEnabled; //     | Allowlist for fillers.
-    uint32 settlementOverheadGas; // ───╯ Settlement overhead gas for the destination chain.
+    uint256 maxFillAmountPerRequest; //          Max amount that can be filled per request.
+    bool fillerAllowlistEnabled; // ────────────╮ Allowlist for fillers.
+    uint16 fastTransferBpsFee; //               | Allowed range of [0-10_000].
+    uint32 settlementOverheadGas; //            | Settlement overhead gas for the destination chain.
+    bytes4 chainFamilySelector; // ─────────────╯ Selector that identifies the destination chain's family.
+    bytes destinationPool; //                    Destination pool address.
     EnumerableSet.AddressSet fillerAllowList; // Enumerable set of allowed fillers.
-    bytes evmToAnyMessageExtraArgsBytes; // pre-encoded extra args for EVM to Any message.
+    bytes evmToAnyMessageExtraArgsBytes; //      Pre-encoded extra args for EVM to Any message.
   }
 
   struct DestChainConfigView {
-    uint256 maxFillAmountPerRequest; // Max amount that can be filled per request.
-    bytes destinationPool; //           Address of the destination pool. ABI encoded in the case of an EVM pool.
-    uint16 fastTransferBpsFee; // ────╮ Allowed range of [0-10_000].
-    bytes4 chainFamilySelector; //    │ Selector that identifies the destination chain's family.
-    bool fillerAllowlistEnabled; //   | Allowlist for fillers.
-    uint32 settlementOverheadGas; // ─╯ Settlement overhead gas for the destination chain.
-    bytes evmToAnyMessageExtraArgsBytes; // pre-encoded extra args for EVM to Any message.
-    address[] allowedFillers; //         List of allowed fillers for the destination chain.
+    uint256 maxFillAmountPerRequest; //   Max amount that can be filled per request.
+    bool fillerAllowlistEnabled; //   ────╮ Allowlist for fillers.
+    uint16 fastTransferBpsFee; //         | Allowed range of [0-10_000].
+    uint32 settlementOverheadGas; //      | Settlement overhead gas for the destination chain.
+    bytes4 chainFamilySelector; // ───────╯ Selector that identifies the destination chain's family.
+    bytes destinationPool; //               Address of the destination pool.
+    bytes evmToAnyMessageExtraArgsBytes; // Pre-encoded extra args for EVM to Any message.
+    address[] allowedFillers; //            List of allowed fillers.
   }
 
   struct DestChainConfigUpdateArgs {
-    uint256 maxFillAmountPerRequest; // Maximum amount that can be filled per request.
-    uint64 remoteChainSelector; // ────╮ Remote chain selector.
-    bytes4 chainFamilySelector; //     │ Selector that identifies the destination chain's family.
-    uint16 fastTransferBpsFee; //      | Allowed range of [0-10_000].
-    bool fillerAllowlistEnabled; //    | True is filler allowlist is enabled.
-    uint32 settlementOverheadGas; // ──╯ Settlement overhead gas for the destination chain.
-    bytes destinationPool; //           Address of the destination pool. ABI encoded in the case of an EVM pool.
-    bytes evmToAnyMessageExtraArgsBytes; // pre-encoded extra args for EVM to Any message.
-    address[] addFillers; //            Address allowed to fill.
-    address[] removeFillers; //         Addresses to remove from the allowlist
+    bool fillerAllowlistEnabled; // ──────╮ Allowlist for fillers.
+    uint16 fastTransferBpsFee; //         | Allowed range of [0-10_000].
+    uint32 settlementOverheadGas; //      | Settlement overhead gas for the destination chain.
+    uint64 remoteChainSelector; //        │ Remote chain selector. ABI encoded in the case of an EVM pool.
+    bytes4 chainFamilySelector; //────────╯ Selector that identifies the destination chain's family.
+    uint256 maxFillAmountPerRequest; //     Maximum amount that can be filled per request.
+    bytes destinationPool; //               Address of the destination pool.
+    bytes evmToAnyMessageExtraArgsBytes; // Pre-encoded extra args for EVM to Any message.
+    address[] addFillers; //                Addresses to add to the allowlist.
+    address[] removeFillers; //             Addresses to remove from the allowlist.
   }
 
   struct MintMessage {
