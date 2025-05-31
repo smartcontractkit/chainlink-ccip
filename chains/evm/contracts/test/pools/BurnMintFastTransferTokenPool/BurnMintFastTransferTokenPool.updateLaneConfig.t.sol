@@ -45,7 +45,7 @@ contract BurnMintFastTransferTokenPool_updateDestChainConfig is BurnMintFastTran
 
     s_pool.updateDestChainConfig(laneConfigArgs);
 
-    FastTransferTokenPoolAbstract.DestChainConfigView memory config = s_pool.getDestChainConfig(NEW_CHAIN_SELECTOR);
+    (FastTransferTokenPoolAbstract.DestChainConfig memory config,) = s_pool.getDestChainConfig(NEW_CHAIN_SELECTOR);
     assertEq(config.fastTransferBpsFee, NEW_FAST_FEE_BPS);
     assertFalse(config.fillerAllowlistEnabled);
     assertEq(config.destinationPool, NEW_DESTINATION_POOL);
@@ -80,7 +80,7 @@ contract BurnMintFastTransferTokenPool_updateDestChainConfig is BurnMintFastTran
 
     s_pool.updateDestChainConfig(laneConfigArgs);
 
-    FastTransferTokenPoolAbstract.DestChainConfigView memory config = s_pool.getDestChainConfig(DEST_CHAIN_SELECTOR);
+    (FastTransferTokenPoolAbstract.DestChainConfig memory config,) = s_pool.getDestChainConfig(DEST_CHAIN_SELECTOR);
     assertEq(config.fastTransferBpsFee, NEW_FAST_FEE_BPS);
     assertFalse(config.fillerAllowlistEnabled);
     assertEq(config.destinationPool, NEW_DESTINATION_POOL);
@@ -175,7 +175,7 @@ contract BurnMintFastTransferTokenPool_updateDestChainConfig is BurnMintFastTran
 
     s_pool.updateDestChainConfig(laneConfigArgs);
 
-    FastTransferTokenPoolAbstract.DestChainConfigView memory config = s_pool.getDestChainConfig(NEW_CHAIN_SELECTOR);
+    (FastTransferTokenPoolAbstract.DestChainConfig memory config,) = s_pool.getDestChainConfig(NEW_CHAIN_SELECTOR);
     assertEq(config.fastTransferBpsFee, 0);
   }
 
@@ -196,7 +196,7 @@ contract BurnMintFastTransferTokenPool_updateDestChainConfig is BurnMintFastTran
 
     s_pool.updateDestChainConfig(laneConfigArgs);
 
-    FastTransferTokenPoolAbstract.DestChainConfigView memory config = s_pool.getDestChainConfig(NEW_CHAIN_SELECTOR);
+    (FastTransferTokenPoolAbstract.DestChainConfig memory config,) = s_pool.getDestChainConfig(NEW_CHAIN_SELECTOR);
     assertEq(config.fastTransferBpsFee, 10_000);
   }
 

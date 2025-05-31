@@ -25,7 +25,7 @@ contract BurnMintFastTransferTokenPool_constructor is BurnMintFastTransferTokenP
   }
 
   function test_GetDestChainConfig() public view {
-    FastTransferTokenPoolAbstract.DestChainConfigView memory config = s_pool.getDestChainConfig(DEST_CHAIN_SELECTOR);
+    (FastTransferTokenPoolAbstract.DestChainConfig memory config,) = s_pool.getDestChainConfig(DEST_CHAIN_SELECTOR);
     assertEq(config.fastTransferBpsFee, FAST_FEE_BPS);
     assertTrue(config.fillerAllowlistEnabled);
     assertEq(config.destinationPool, abi.encode(s_remoteBurnMintPool));
