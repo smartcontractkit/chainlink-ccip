@@ -29,9 +29,6 @@ interface IFastTransferPool {
   /// @notice Emitted when a fast transfer is settled. This means the slow transfer has completed and the filler has
   /// received their fast transfer tokens and fee.
   event FastTransferSettled(bytes32 indexed fillRequestId);
-  event InvalidFill(
-    bytes32 indexed fillRequestId, address indexed filler, uint256 filledAmount, uint256 expectedAmount
-  );
 
   /// @notice Gets the CCIP send token fee and fast transfer fee for a given transfer
   /// @param settlementFeeToken The token used to pay the CCIP settlement fee

@@ -33,12 +33,12 @@ contract BurnMintFastTransferTokenPool_constructor is BurnMintFastTransferTokenP
   }
 
   function test_IsFillerAllowListed() public {
-    assertTrue(s_pool.isFillerAllowListed(DEST_CHAIN_SELECTOR, s_filler));
-    assertFalse(s_pool.isFillerAllowListed(DEST_CHAIN_SELECTOR, makeAddr("notFiller")));
+    assertTrue(s_pool.isAllowedFiller(DEST_CHAIN_SELECTOR, s_filler));
+    assertFalse(s_pool.isAllowedFiller(DEST_CHAIN_SELECTOR, makeAddr("notFiller")));
   }
 
   function test_GetAllowListedFillers() public view {
-    address[] memory allowlistedFillers = s_pool.getAllowListedFillers(DEST_CHAIN_SELECTOR);
+    address[] memory allowlistedFillers = s_pool.getAllowedFillers(DEST_CHAIN_SELECTOR);
     assertEq(allowlistedFillers.length, 1);
     assertEq(allowlistedFillers[0], s_filler);
   }
