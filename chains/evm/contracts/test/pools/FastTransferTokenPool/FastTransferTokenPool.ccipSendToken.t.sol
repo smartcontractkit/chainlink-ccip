@@ -8,9 +8,9 @@ import {Internal} from "../../../libraries/Internal.sol";
 
 import {FastTransferTokenPoolAbstract} from "../../../pools/FastTransferTokenPoolAbstract.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
-import {FastTransferTokenPoolSetup} from "./FastTransferTokenPoolHelperSetup.t.sol";
+import {FastTransferTokenPoolSetup} from "./FastTransferTokenPoolSetup.t.sol";
 
-contract FastTransferTokenPoolHelper_ccipSendToken_Test is FastTransferTokenPoolSetup {
+contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup {
   struct TestParams {
     uint64 chainSelector;
     uint256 amount;

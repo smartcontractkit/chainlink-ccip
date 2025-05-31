@@ -6,9 +6,9 @@ import {IFastTransferPool} from "../../../interfaces/IFastTransferPool.sol";
 import {FastTransferTokenPoolAbstract} from "../../../pools/FastTransferTokenPoolAbstract.sol";
 
 import {Internal} from "../../../libraries/Internal.sol";
-import {FastTransferTokenPoolSetup} from "./FastTransferTokenPoolHelperSetup.t.sol";
+import {FastTransferTokenPoolSetup} from "./FastTransferTokenPoolSetup.t.sol";
 
-contract FastTransferTokenPoolHelper_fastFill_Test is FastTransferTokenPoolSetup {
+contract FastTransferTokenPool_fastFill_Test is FastTransferTokenPoolSetup {
   bytes32 public fillRequestId;
   address public receiver;
 
