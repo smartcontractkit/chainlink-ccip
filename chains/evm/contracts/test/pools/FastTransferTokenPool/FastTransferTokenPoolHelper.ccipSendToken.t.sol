@@ -8,9 +8,9 @@ import {Internal} from "../../../libraries/Internal.sol";
 
 import {FastTransferTokenPoolAbstract} from "../../../pools/FastTransferTokenPoolAbstract.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
-import {FastTransferTokenPoolHelperSetup} from "./FastTransferTokenPoolHelperSetup.t.sol";
+import {FastTransferTokenPoolSetup} from "./FastTransferTokenPoolHelperSetup.t.sol";
 
-contract FastTransferTokenPoolHelper_ccipSendToken_Test is FastTransferTokenPoolHelperSetup {
+contract FastTransferTokenPoolHelper_ccipSendToken_Test is FastTransferTokenPoolSetup {
   struct TestParams {
     uint64 chainSelector;
     uint256 amount;
@@ -56,7 +56,7 @@ contract FastTransferTokenPoolHelper_ccipSendToken_Test is FastTransferTokenPool
       chainFamilySelector: chainFamily,
       evmToAnyMessageExtraArgsBytes: extraArgs
     });
-    s_tokenPool.updateDestChainConfig(laneConfigArgs);
+    s_tokenPool.updateDestChainConfig(_singleConfigToList(laneConfigArgs));
     s_tokenPool.updateFillerAllowList(chainSelector, addFillers, new address[](0));
 
     _setupRateLimiter(chainSelector);

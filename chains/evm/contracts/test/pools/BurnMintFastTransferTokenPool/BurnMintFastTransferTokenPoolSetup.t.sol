@@ -76,7 +76,16 @@ contract BurnMintFastTransferTokenPoolSetup is BaseTest {
       evmToAnyMessageExtraArgsBytes: ""
     });
 
-    s_pool.updateDestChainConfig(laneConfigArgs);
+    s_pool.updateDestChainConfig(_singleConfigToList(laneConfigArgs));
     s_pool.updateFillerAllowList(DEST_CHAIN_SELECTOR, addFillers, new address[](0));
+  }
+
+  function _singleConfigToList(
+    FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs memory config
+  ) internal pure returns (FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs[] memory) {
+    FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs[] memory list =
+      new FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs[](1);
+    list[0] = config;
+    return list;
   }
 }

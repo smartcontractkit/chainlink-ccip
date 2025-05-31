@@ -150,7 +150,7 @@ contract BurnMintFastTransferTokenPool_validateSendRequest is BurnMintFastTransf
       evmToAnyMessageExtraArgsBytes: ""
     });
     vm.prank(OWNER);
-    s_pool.updateDestChainConfig(laneConfigArgs);
+    s_pool.updateDestChainConfig(_singleConfigToList(laneConfigArgs));
 
     // Mock RMN to return cursed status only for the new chain
     vm.mockCall(
@@ -208,7 +208,7 @@ contract BurnMintFastTransferTokenPool_validateSendRequest is BurnMintFastTransf
       evmToAnyMessageExtraArgsBytes: ""
     });
 
-    pool.updateDestChainConfig(laneConfigArgs);
+    pool.updateDestChainConfig(_singleConfigToList(laneConfigArgs));
     pool.updateFillerAllowList(DEST_CHAIN_SELECTOR, addFillers, new address[](0));
   }
 }

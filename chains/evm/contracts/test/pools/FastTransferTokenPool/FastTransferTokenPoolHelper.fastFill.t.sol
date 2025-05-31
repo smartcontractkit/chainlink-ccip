@@ -6,9 +6,9 @@ import {IFastTransferPool} from "../../../interfaces/IFastTransferPool.sol";
 import {FastTransferTokenPoolAbstract} from "../../../pools/FastTransferTokenPoolAbstract.sol";
 
 import {Internal} from "../../../libraries/Internal.sol";
-import {FastTransferTokenPoolHelperSetup} from "./FastTransferTokenPoolHelperSetup.t.sol";
+import {FastTransferTokenPoolSetup} from "./FastTransferTokenPoolHelperSetup.t.sol";
 
-contract FastTransferTokenPoolHelper_fastFill_Test is FastTransferTokenPoolHelperSetup {
+contract FastTransferTokenPoolHelper_fastFill_Test is FastTransferTokenPoolSetup {
   bytes32 public fillRequestId;
   address public receiver;
 
@@ -77,7 +77,7 @@ contract FastTransferTokenPoolHelper_fastFill_Test is FastTransferTokenPoolHelpe
       chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
       evmToAnyMessageExtraArgsBytes: ""
     });
-    s_tokenPool.updateDestChainConfig(laneConfigArgs);
+    s_tokenPool.updateDestChainConfig(_singleConfigToList(laneConfigArgs));
 
     uint256 srcAmount = 100 ether;
     uint8 sourceDecimals = 18;

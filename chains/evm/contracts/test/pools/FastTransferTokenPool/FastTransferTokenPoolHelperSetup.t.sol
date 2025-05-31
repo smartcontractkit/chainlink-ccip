@@ -15,7 +15,7 @@ import {Internal} from "../../../libraries/Internal.sol";
 import {IERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
-contract FastTransferTokenPoolHelperSetup is BaseTest {
+contract FastTransferTokenPoolSetup is BaseTest {
   uint16 public constant FAST_FEE_BPS = 100; // 1%
   uint32 internal constant SVM_CHAIN_SELECTOR = uint32(uint256(keccak256("SVM_SELECTOR")));
   uint32 internal constant SETTLEMENT_GAS_OVERHEAD = 200_000;
@@ -80,8 +80,7 @@ contract FastTransferTokenPoolHelperSetup is BaseTest {
       address(s_sourceRouter) // router
     );
 
-    s_tokenPool.updateDestChainConfig(laneConfigArgs[0]);
-    s_tokenPool.updateDestChainConfig(laneConfigArgs[1]);
+    s_tokenPool.updateDestChainConfig(laneConfigArgs);
 
     s_tokenPool.updateFillerAllowList(DEST_CHAIN_SELECTOR, addFillers, new address[](0));
     s_tokenPool.updateFillerAllowList(SVM_CHAIN_SELECTOR, addFillers, new address[](0));
@@ -109,5 +108,14 @@ contract FastTransferTokenPoolHelperSetup is BaseTest {
 
     // Approve tokens
     s_token.approve(address(s_tokenPool), type(uint256).max);
+  }
+
+  function _singleConfigToList(
+    FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs memory config
+  ) internal pure returns (FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs[] memory) {
+    FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs[] memory list =
+      new FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs[](1);
+    list[0] = config;
+    return list;
   }
 }

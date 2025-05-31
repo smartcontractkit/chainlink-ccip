@@ -39,7 +39,7 @@ contract BurnMintFastTransferTokenPool_updateDestChainConfig is BurnMintFastTran
       false
     );
 
-    s_pool.updateDestChainConfig(laneConfigArgs);
+    s_pool.updateDestChainConfig(_singleConfigToList(laneConfigArgs));
     s_pool.updateFillerAllowList(NEW_CHAIN_SELECTOR, addFillers, new address[](0));
 
     (FastTransferTokenPoolAbstract.DestChainConfig memory config,) = s_pool.getDestChainConfig(NEW_CHAIN_SELECTOR);
@@ -63,7 +63,7 @@ contract BurnMintFastTransferTokenPool_updateDestChainConfig is BurnMintFastTran
       evmToAnyMessageExtraArgsBytes: ""
     });
 
-    s_pool.updateDestChainConfig(laneConfigArgs);
+    s_pool.updateDestChainConfig(_singleConfigToList(laneConfigArgs));
 
     (FastTransferTokenPoolAbstract.DestChainConfig memory config,) = s_pool.getDestChainConfig(DEST_CHAIN_SELECTOR);
     assertEq(config.fastTransferBpsFee, NEW_FAST_FEE_BPS);
@@ -86,7 +86,7 @@ contract BurnMintFastTransferTokenPool_updateDestChainConfig is BurnMintFastTran
     });
 
     vm.expectRevert(FastTransferTokenPoolAbstract.InvalidDestChainConfig.selector);
-    s_pool.updateDestChainConfig(laneConfigArgs);
+    s_pool.updateDestChainConfig(_singleConfigToList(laneConfigArgs));
   }
 
   function test_RevertWhen_NotOwners() public {
@@ -95,7 +95,7 @@ contract BurnMintFastTransferTokenPool_updateDestChainConfig is BurnMintFastTran
     vm.stopPrank();
 
     vm.expectRevert(); // TODO specify revert reason
-    s_pool.updateDestChainConfig(laneConfigArgs);
+    s_pool.updateDestChainConfig(_singleConfigToList(laneConfigArgs));
   }
 
   function test_UpdateDestChainConfig_ZeroFastFee() public {
@@ -111,7 +111,7 @@ contract BurnMintFastTransferTokenPool_updateDestChainConfig is BurnMintFastTran
       evmToAnyMessageExtraArgsBytes: ""
     });
 
-    s_pool.updateDestChainConfig(laneConfigArgs);
+    s_pool.updateDestChainConfig(_singleConfigToList(laneConfigArgs));
 
     (FastTransferTokenPoolAbstract.DestChainConfig memory config,) = s_pool.getDestChainConfig(NEW_CHAIN_SELECTOR);
     assertEq(config.fastTransferBpsFee, 0);
@@ -130,7 +130,7 @@ contract BurnMintFastTransferTokenPool_updateDestChainConfig is BurnMintFastTran
       evmToAnyMessageExtraArgsBytes: ""
     });
 
-    s_pool.updateDestChainConfig(laneConfigArgs);
+    s_pool.updateDestChainConfig(_singleConfigToList(laneConfigArgs));
 
     (FastTransferTokenPoolAbstract.DestChainConfig memory config,) = s_pool.getDestChainConfig(NEW_CHAIN_SELECTOR);
     assertEq(config.fastTransferBpsFee, 10_000);

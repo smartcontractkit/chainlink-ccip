@@ -99,7 +99,7 @@ contract BurnMintFastTransferTokenPool_fastFill is BurnMintFastTransferTokenPool
       evmToAnyMessageExtraArgsBytes: ""
     });
     vm.prank(OWNER);
-    s_pool.updateDestChainConfig(laneConfigArgs);
+    s_pool.updateDestChainConfig(_singleConfigToList(laneConfigArgs));
 
     address anyFiller = makeAddr("anyFiller");
     deal(address(s_burnMintERC20), anyFiller, type(uint256).max);

@@ -6,9 +6,9 @@ import {Client} from "../../../libraries/Client.sol";
 
 import {FastTransferTokenPoolAbstract} from "../../../pools/FastTransferTokenPoolAbstract.sol";
 
-import {FastTransferTokenPoolHelperSetup} from "./FastTransferTokenPoolHelperSetup.t.sol";
+import {FastTransferTokenPoolSetup} from "./FastTransferTokenPoolHelperSetup.t.sol";
 
-contract FastTransferTokenPoolHelper_ccipReceive_Test is FastTransferTokenPoolHelperSetup {
+contract FastTransferTokenPoolHelper_ccipReceive_Test is FastTransferTokenPoolSetup {
   bytes32 public messageId;
   address public sourcePool;
   uint64 public sourceChainSelector;

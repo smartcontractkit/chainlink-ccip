@@ -409,8 +409,16 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   /// @notice Updates the destination chain configuration
   /// @param destChainConfigArgs The destChain configuration arguments
   function updateDestChainConfig(
-    DestChainConfigUpdateArgs calldata destChainConfigArgs
+    DestChainConfigUpdateArgs[] calldata destChainConfigArgs
   ) external virtual onlyOwner {
+    for (uint256 i = 0; i < destChainConfigArgs.length; ++i) {
+      _updateDestChainConfig(destChainConfigArgs[i]);
+    }
+  }
+
+  function _updateDestChainConfig(
+    DestChainConfigUpdateArgs calldata destChainConfigArgs
+  ) internal virtual {
     // We know Solana requires custom args, if they are not provided, we revert.
     if (destChainConfigArgs.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SVM) {
       if (destChainConfigArgs.evmToAnyMessageExtraArgsBytes.length == 0) {

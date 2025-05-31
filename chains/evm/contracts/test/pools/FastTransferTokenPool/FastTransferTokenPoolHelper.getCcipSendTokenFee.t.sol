@@ -4,9 +4,9 @@ pragma solidity ^0.8.24;
 import {IFastTransferPool} from "../../../interfaces/IFastTransferPool.sol";
 import {IRouterClient} from "../../../interfaces/IRouterClient.sol";
 
-import {FastTransferTokenPoolHelperSetup} from "./FastTransferTokenPoolHelperSetup.t.sol";
+import {FastTransferTokenPoolSetup} from "./FastTransferTokenPoolHelperSetup.t.sol";
 
-contract FastTransferTokenPoolHelper_getCcipSendTokenFee_Test is FastTransferTokenPoolHelperSetup {
+contract FastTransferTokenPoolHelper_getCcipSendTokenFee_Test is FastTransferTokenPoolSetup {
   address public s_receiver;
 
   function setUp() public override {
