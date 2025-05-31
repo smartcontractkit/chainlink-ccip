@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol";
 import {IFastTransferPool} from "../interfaces/IFastTransferPool.sol";
 import {IRMN} from "../interfaces/IRMN.sol";
 import {IRouterClient} from "../interfaces/IRouterClient.sol";
@@ -16,8 +15,6 @@ import {IERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IERC165} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/IERC165.sol";
 import {EnumerableSet} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableSet.sol";
 
@@ -171,8 +168,8 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
 
   /// @notice Updates the filler allowlist configuration for a given lane.
   /// @param destinationChainSelector The destination chain selector.
-  /// @param addFillers The addresses to add to the allowlist.
-  /// @param removeFillers The addresses to remove from the allowlist.
+  /// @param fillersToAdd The addresses to add to the allowlist.
+  /// @param fillersToRemove The addresses to remove from the allowlist.
   function updateFillerAllowList(
     uint64 destinationChainSelector,
     address[] memory fillersToAdd,

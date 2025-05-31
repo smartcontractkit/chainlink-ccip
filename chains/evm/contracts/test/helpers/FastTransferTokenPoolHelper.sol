@@ -80,7 +80,7 @@ contract FastTransferTokenPoolHelper is FastTransferTokenPoolAbstract {
   // TokenPool function implementations
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
-  ) external override returns (Pool.LockOrBurnOutV1 memory) {
+  ) public override returns (Pool.LockOrBurnOutV1 memory) {
     _validateLockOrBurn(lockOrBurnIn);
     return Pool.LockOrBurnOutV1({
       destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
@@ -90,7 +90,7 @@ contract FastTransferTokenPoolHelper is FastTransferTokenPoolAbstract {
 
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
-  ) external override returns (Pool.ReleaseOrMintOutV1 memory) {
+  ) public override returns (Pool.ReleaseOrMintOutV1 memory) {
     _validateReleaseOrMint(releaseOrMintIn);
     uint256 localAmount =
       _calculateLocalAmount(releaseOrMintIn.amount, _parseRemoteDecimals(releaseOrMintIn.sourcePoolData));

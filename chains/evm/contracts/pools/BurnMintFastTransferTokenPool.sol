@@ -3,9 +3,7 @@ pragma solidity ^0.8.24;
 
 import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
 
-import {BurnMintTokenPoolAbstract} from "./BurnMintTokenPoolAbstract.sol";
 import {FastTransferTokenPoolAbstract} from "./FastTransferTokenPoolAbstract.sol";
-import {TokenPool} from "./TokenPool.sol";
 
 import {IERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
@@ -15,7 +13,7 @@ import {SafeERC20} from
 /// @title BurnMintFastTransferTokenPool
 /// @notice A token pool that supports burn-mint operations and fast transfers
 /// @dev Inherits from BurnMintTokenPoolAbstract and FastTransferTokenPoolAbstract
-contract BurnMintFastTransferTokenPool is BurnMintTokenPoolAbstract, FastTransferTokenPoolAbstract {
+contract BurnMintFastTransferTokenPool is FastTransferTokenPoolAbstract {
   using SafeERC20 for IERC20;
 
   string public constant override typeAndVersion = "BurnMintFastTransferTokenPool 1.6.1";
@@ -30,7 +28,8 @@ contract BurnMintFastTransferTokenPool is BurnMintTokenPoolAbstract, FastTransfe
 
   /// @notice Handles the transfer of tokens when a fast transfer is initiated
   function _handleTokenToTransfer(uint64, address, uint256 amount) internal override {
-    _burn(amount);
+    i_token.safeTransferFrom(msg.sender, address(this), amount);
+    _lockOrBurn(amount);
   }
 
   /// @notice Handles the transfer of tokens when a fast transfer is filled
@@ -74,21 +73,9 @@ contract BurnMintFastTransferTokenPool is BurnMintTokenPoolAbstract, FastTransfe
     IBurnMintERC20(address(i_token)).mint(filler, settlementAmountLocal);
   }
 
-  /// @notice Signals which version of the pool interface is supported
-  function supportsInterface(
-    bytes4 interfaceId
-  ) public pure virtual override(TokenPool, FastTransferTokenPoolAbstract) returns (bool) {
-    return TokenPool.supportsInterface(interfaceId) || FastTransferTokenPoolAbstract.supportsInterface(interfaceId);
-  }
-
-  function _burn(
+  function _lockOrBurn(
     uint256 amount
   ) internal virtual override {
-    i_token.safeTransferFrom(msg.sender, address(this), amount);
     IBurnMintERC20(address(i_token)).burn(amount);
-  }
-
-  function getRouter() public view override(TokenPool, FastTransferTokenPoolAbstract) returns (address router) {
-    return address(s_router);
   }
 }
