@@ -2,12 +2,12 @@
 pragma solidity ^0.8.24;
 
 import {FastTransferTokenPoolAbstract} from "../../../pools/FastTransferTokenPoolAbstract.sol";
-import {BurnMintFastTransferTokenPoolSetup} from "./BurnMintFastTransferTokenPoolSetup.t.sol";
+import {FastTransferTokenPoolSetup} from "./FastTransferTokenPoolSetup.t.sol";
 
-contract BurnMintFastTransferTokenPool_updateFillerAllowlist is BurnMintFastTransferTokenPoolSetup {
+contract FastTransferTokenPool_updateFillerAllowlist is FastTransferTokenPoolSetup {
   uint64 internal constant NEW_CHAIN_SELECTOR = 12345;
 
-  function test_UpdateFillerAllowList_Success() public {
+  function test_updateFillerAllowList_Success() public {
     address[] memory addFillers = new address[](2);
     addFillers[0] = makeAddr("newFiller1");
     addFillers[1] = makeAddr("newFiller2");

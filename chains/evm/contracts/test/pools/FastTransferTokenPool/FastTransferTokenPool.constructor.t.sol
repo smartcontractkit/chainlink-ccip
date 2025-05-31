@@ -5,17 +5,16 @@ import {IAny2EVMMessageReceiver} from "../../../interfaces/IAny2EVMMessageReceiv
 import {IFastTransferPool} from "../../../interfaces/IFastTransferPool.sol";
 
 import {FastTransferTokenPoolAbstract} from "../../../pools/FastTransferTokenPoolAbstract.sol";
-import {BurnMintFastTransferTokenPoolSetup} from "./BurnMintFastTransferTokenPoolSetup.t.sol";
+import {FastTransferTokenPoolSetup} from "./FastTransferTokenPoolSetup.t.sol";
 import {IERC165} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/IERC165.sol";
 
-contract BurnMintFastTransferTokenPool_constructor is BurnMintFastTransferTokenPoolSetup {
+contract FastTransferTokenPool_constructor is FastTransferTokenPoolSetup {
   function test_Constructor() public view {
-    assertEq(address(s_burnMintERC20), address(s_pool.getToken()));
+    assertEq(address(s_token), address(s_pool.getToken()));
     assertEq(address(s_mockRMNRemote), s_pool.getRmnProxy());
     assertEq(address(s_sourceRouter), s_pool.getRouter());
     assertEq(false, s_pool.getAllowListEnabled());
-    assertEq("BurnMintFastTransferTokenPool 1.6.1", s_pool.typeAndVersion());
   }
 
   function test_SupportsInterface() public view {
@@ -28,8 +27,8 @@ contract BurnMintFastTransferTokenPool_constructor is BurnMintFastTransferTokenP
     (FastTransferTokenPoolAbstract.DestChainConfig memory config,) = s_pool.getDestChainConfig(DEST_CHAIN_SELECTOR);
     assertEq(config.fastTransferBpsFee, FAST_FEE_BPS);
     assertTrue(config.fillerAllowlistEnabled);
-    assertEq(config.destinationPool, abi.encode(s_remoteBurnMintPool));
-    assertEq(config.maxFillAmountPerRequest, FILL_AMOUNT_MAX);
+    assertEq(config.destinationPool, destPoolAddress);
+    assertEq(config.maxFillAmountPerRequest, MAX_FILL_AMOUNT_PER_REQUEST);
   }
 
   function test_IsFillerAllowListed() public {

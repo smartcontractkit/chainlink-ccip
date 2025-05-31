@@ -5,7 +5,7 @@ import {Internal} from "../../../libraries/Internal.sol";
 import {FastTransferTokenPoolAbstract} from "../../../pools/FastTransferTokenPoolAbstract.sol";
 import {FastTransferTokenPoolSetup} from "./FastTransferTokenPoolSetup.t.sol";
 
-contract BurnMintFastTransferTokenPool_updateDestChainConfig is FastTransferTokenPoolSetup {
+contract FastTransferTokenPool_updateDestChainConfig is FastTransferTokenPoolSetup {
   uint64 internal constant NEW_CHAIN_SELECTOR = 12345;
   bytes internal constant NEW_DESTINATION_POOL = abi.encode(address(0x5678));
   uint16 internal constant NEW_FAST_FEE_BPS = 200; // 2%
