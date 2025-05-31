@@ -54,11 +54,10 @@ contract FastTransferTokenPoolHelper_ccipSendToken_Test is FastTransferTokenPool
       maxFillAmountPerRequest: MAX_FILL_AMOUNT_PER_REQUEST,
       settlementOverheadGas: settlementGas,
       chainFamilySelector: chainFamily,
-      evmToAnyMessageExtraArgsBytes: extraArgs,
-      addFillers: addFillers,
-      removeFillers: new address[](0)
+      evmToAnyMessageExtraArgsBytes: extraArgs
     });
     s_tokenPool.updateDestChainConfig(laneConfigArgs);
+    s_tokenPool.updateFillerAllowList(chainSelector, addFillers, new address[](0));
 
     _setupRateLimiter(chainSelector);
   }

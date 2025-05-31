@@ -31,11 +31,9 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
 
   event DestChainConfigUpdated(
     uint64 indexed destinationChainSelector,
-    uint16 bps,
+    uint16 fastTransferBpsFee,
     uint256 maxFillAmountPerRequest,
     bytes destinationPool,
-    address[] addFillers,
-    address[] removeFillers,
     bytes4 chainFamilySelector,
     uint256 settlementOverheadGas,
     bool fillerAllowlistEnabled
@@ -62,8 +60,6 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     uint256 maxFillAmountPerRequest; //     Maximum amount that can be filled per request.
     bytes destinationPool; //               Address of the destination pool.
     bytes evmToAnyMessageExtraArgsBytes; // Pre-encoded extra args for EVM to Any message.
-    address[] addFillers; //                Addresses to add to the allowlist.
-    address[] removeFillers; //             Addresses to remove from the allowlist.
   }
 
   struct MintMessage {
@@ -433,20 +429,11 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     destChainConfig.settlementOverheadGas = destChainConfigArgs.settlementOverheadGas;
     destChainConfig.evmToAnyMessageExtraArgsBytes = destChainConfigArgs.evmToAnyMessageExtraArgsBytes;
 
-    for (uint256 i = 0; i < destChainConfigArgs.removeFillers.length; ++i) {
-      s_fillerAllowLists[destChainConfigArgs.remoteChainSelector].remove(destChainConfigArgs.removeFillers[i]);
-    }
-    for (uint256 i = 0; i < destChainConfigArgs.addFillers.length; ++i) {
-      s_fillerAllowLists[destChainConfigArgs.remoteChainSelector].add(destChainConfigArgs.addFillers[i]);
-    }
-
     emit DestChainConfigUpdated(
       destChainConfigArgs.remoteChainSelector,
       destChainConfigArgs.fastTransferBpsFee,
       destChainConfigArgs.maxFillAmountPerRequest,
       destChainConfigArgs.destinationPool,
-      destChainConfigArgs.addFillers,
-      destChainConfigArgs.removeFillers,
       destChainConfigArgs.chainFamilySelector,
       destChainConfigArgs.settlementOverheadGas,
       destChainConfigArgs.fillerAllowlistEnabled

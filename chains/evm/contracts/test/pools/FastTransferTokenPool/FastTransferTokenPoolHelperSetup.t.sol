@@ -60,9 +60,7 @@ contract FastTransferTokenPoolHelperSetup is BaseTest {
       maxFillAmountPerRequest: MAX_FILL_AMOUNT_PER_REQUEST,
       settlementOverheadGas: SETTLEMENT_GAS_OVERHEAD,
       chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
-      evmToAnyMessageExtraArgsBytes: "",
-      addFillers: addFillers,
-      removeFillers: new address[](0)
+      evmToAnyMessageExtraArgsBytes: ""
     });
     laneConfigArgs[1] = FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs({
       remoteChainSelector: SVM_CHAIN_SELECTOR,
@@ -72,8 +70,6 @@ contract FastTransferTokenPoolHelperSetup is BaseTest {
       maxFillAmountPerRequest: MAX_FILL_AMOUNT_PER_REQUEST,
       settlementOverheadGas: SETTLEMENT_GAS_OVERHEAD,
       chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_SVM,
-      addFillers: addFillers,
-      removeFillers: new address[](0),
       evmToAnyMessageExtraArgsBytes: s_svmExtraArgsBytesEncoded
     });
     s_tokenPool = new FastTransferTokenPoolHelper(
@@ -83,8 +79,13 @@ contract FastTransferTokenPoolHelperSetup is BaseTest {
       address(s_mockRMNRemote), // rmnProxy
       address(s_sourceRouter) // router
     );
+
     s_tokenPool.updateDestChainConfig(laneConfigArgs[0]);
     s_tokenPool.updateDestChainConfig(laneConfigArgs[1]);
+
+    s_tokenPool.updateFillerAllowList(DEST_CHAIN_SELECTOR, addFillers, new address[](0));
+    s_tokenPool.updateFillerAllowList(SVM_CHAIN_SELECTOR, addFillers, new address[](0));
+
     bytes[] memory remotePoolAddresses = new bytes[](1);
     remotePoolAddresses[0] = destPoolAddress;
 

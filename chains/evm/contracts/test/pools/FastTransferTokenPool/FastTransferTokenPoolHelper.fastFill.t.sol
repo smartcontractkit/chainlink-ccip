@@ -75,9 +75,7 @@ contract FastTransferTokenPoolHelper_fastFill_Test is FastTransferTokenPoolHelpe
       maxFillAmountPerRequest: 1000 ether,
       settlementOverheadGas: 200_000,
       chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
-      evmToAnyMessageExtraArgsBytes: "",
-      addFillers: new address[](0),
-      removeFillers: new address[](0)
+      evmToAnyMessageExtraArgsBytes: ""
     });
     s_tokenPool.updateDestChainConfig(laneConfigArgs);
 

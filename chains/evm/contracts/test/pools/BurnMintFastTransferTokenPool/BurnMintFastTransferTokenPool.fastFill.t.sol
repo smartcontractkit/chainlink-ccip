@@ -96,9 +96,7 @@ contract BurnMintFastTransferTokenPool_fastFill is BurnMintFastTransferTokenPool
       maxFillAmountPerRequest: FILL_AMOUNT_MAX,
       settlementOverheadGas: 200_000,
       chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
-      evmToAnyMessageExtraArgsBytes: "",
-      addFillers: new address[](0),
-      removeFillers: new address[](0)
+      evmToAnyMessageExtraArgsBytes: ""
     });
     vm.prank(OWNER);
     s_pool.updateDestChainConfig(laneConfigArgs);
