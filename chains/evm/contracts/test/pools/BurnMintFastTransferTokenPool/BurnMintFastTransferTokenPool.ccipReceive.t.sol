@@ -115,7 +115,7 @@ contract BurnMintFastTransferTokenPool_ccipReceive is BurnMintFastTransferTokenP
       sender: abi.encode(s_remoteBurnMintPool),
       data: abi.encode(
         FastTransferTokenPoolAbstract.MintMessage({
-          sourceAmountToTransfer: srcAmount,
+          sourceAmount: srcAmount,
           sourceDecimals: sourceDecimals,
           fastTransferFee: srcFee,
           receiver: abi.encode(RECEIVER)
@@ -142,7 +142,7 @@ contract BurnMintFastTransferTokenPool_ccipReceive is BurnMintFastTransferTokenP
 
   function _createCcipMessage() internal view returns (Client.Any2EVMMessage memory) {
     FastTransferTokenPoolAbstract.MintMessage memory mintMessage = FastTransferTokenPoolAbstract.MintMessage({
-      sourceAmountToTransfer: TRANSFER_AMOUNT,
+      sourceAmount: TRANSFER_AMOUNT,
       sourceDecimals: SRC_DECIMALS,
       fastTransferFee: TRANSFER_AMOUNT * FAST_FEE_BPS / 10_000, // 1% fast fee
       receiver: abi.encode(RECEIVER)

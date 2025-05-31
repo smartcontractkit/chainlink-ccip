@@ -47,8 +47,8 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     uint16 fastTransferBpsFee; //      │ Allowed range of [0-10_000].
     //                                 │ Settlement overhead gas for the destination chain. Used as a toggle for
     uint32 settlementOverheadGas; // ──╯ either custom ExtraArgs or GenericExtraArgsV2.
-    bytes destinationPool; //            Destination pool address.
-    bytes customExtraArgs; //            Pre-encoded extra args for EVM to Any message.
+    bytes destinationPool; // Address of the destination pool.
+    bytes customExtraArgs; // Pre-encoded extra args for EVM to Any message. Only used if settlementOverheadGas is 0.
   }
 
   struct DestChainConfigUpdateArgs {
@@ -58,12 +58,12 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     uint64 remoteChainSelector; //    │ Remote chain selector. ABI encoded in the case of an EVM pool.
     bytes4 chainFamilySelector; //────╯ Selector that identifies the destination chain's family.
     uint256 maxFillAmountPerRequest; // Maximum amount that can be filled per request.
-    bytes destinationPool; //           Address of the destination pool.
-    bytes customExtraArgs; //           Pre-encoded extra args for EVM to Any message.
+    bytes destinationPool; // Address of the destination pool.
+    bytes customExtraArgs; // Pre-encoded extra args for EVM to Any message. Only used if settlementOverheadGas is 0.
   }
 
   struct MintMessage {
-    uint256 sourceAmountToTransfer; // Amount to fill in the source token denomination.
+    uint256 sourceAmount; // Amount to fill in the source token denomination.
     uint256 fastTransferFee; // Fast transfer fee in the source token.
     uint8 sourceDecimals; // Decimals of the source token.
     bytes receiver; // Receiver address on the destination chain. ABI encoded in the case of an EVM address.
@@ -119,19 +119,6 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     return s_fills[fillId];
   }
 
-  /// @notice Helper function to generate fill ID from request parameters
-  /// @param fillRequestId The original fill request ID
-  /// @param amount The amount being filled
-  /// @param receiver The receiver address
-  /// @return fillId The computed fill ID
-  function computeFillId(
-    bytes32 fillRequestId,
-    uint256 amount,
-    address receiver
-  ) public pure override returns (bytes32) {
-    return keccak256(abi.encode(fillRequestId, amount, receiver));
-  }
-
   /// @inheritdoc IFastTransferPool
   function ccipSendToken(
     address feeToken,
@@ -164,6 +151,15 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     return fillRequestId;
   }
 
+  /// @inheritdoc IFastTransferPool
+  function computeFillId(
+    bytes32 fillRequestId,
+    uint256 amount,
+    address receiver
+  ) public pure override returns (bytes32) {
+    return keccak256(abi.encode(fillRequestId, amount, receiver));
+  }
+
   // ================================================================
   // │                      Fee calculation                         │
   // ================================================================
@@ -188,7 +184,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     uint256 amount,
     bytes calldata receiver,
     bytes calldata
-  ) internal view returns (IFastTransferPool.Quote memory quote, Client.EVM2AnyMessage memory message) {
+  ) internal view virtual returns (IFastTransferPool.Quote memory quote, Client.EVM2AnyMessage memory message) {
     _validateSendRequest(destinationChainSelector);
 
     DestChainConfig storage destChainConfig = s_fastTransferDestChainConfig[destinationChainSelector];
@@ -196,15 +192,6 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
       revert TransferAmountExceedsMaxFillAmount(destinationChainSelector, amount);
     }
     quote.fastTransferFee = (amount * destChainConfig.fastTransferBpsFee) / BPS_DIVIDER;
-    // pack the MintMessage
-    bytes memory data = abi.encode(
-      MintMessage({
-        sourceAmountToTransfer: amount,
-        sourceDecimals: i_tokenDecimals,
-        fastTransferFee: quote.fastTransferFee,
-        receiver: receiver
-      })
-    );
 
     bytes memory extraArgs;
 
@@ -221,7 +208,15 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
 
     message = Client.EVM2AnyMessage({
       receiver: destChainConfig.destinationPool,
-      data: data,
+      // pack the MintMessage
+      data: abi.encode(
+        MintMessage({
+          sourceAmount: amount,
+          sourceDecimals: i_tokenDecimals,
+          fastTransferFee: quote.fastTransferFee,
+          receiver: receiver
+        })
+      ),
       tokenAmounts: new Client.EVMTokenAmount[](0),
       feeToken: settlementFeeToken,
       extraArgs: extraArgs
@@ -274,20 +269,9 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   // @inheritdoc CCIPReceiver
   function _ccipReceive(
     Client.Any2EVMMessage memory message
-  ) internal override onlyRouter {
-    // Decode message data directly into variables
-    MintMessage memory mintMessage = abi.decode(message.data, (MintMessage));
-    {
-      _settle(
-        message.sourceChainSelector,
-        message.messageId,
-        message.sender,
-        mintMessage.sourceAmountToTransfer,
-        mintMessage.sourceDecimals,
-        mintMessage.fastTransferFee,
-        address(uint160(uint256(bytes32(mintMessage.receiver))))
-      );
-    }
+  ) internal virtual override onlyRouter {
+    _settle(message.sourceChainSelector, message.messageId, message.sender, abi.decode(message.data, (MintMessage)));
+
     emit FastTransferSettled(message.messageId);
   }
 
@@ -295,16 +279,15 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     uint64 sourceChainSelector,
     bytes32 fillRequestId,
     bytes memory sourcePoolAddress,
-    uint256 srcAmount,
-    uint8 srcDecimal,
-    uint256 fastTransferFee,
-    address receiver
+    MintMessage memory mintMessage
   ) internal virtual {
+    address receiver = address(uint160(uint256(bytes32(mintMessage.receiver))));
+
     _validateSettlement(sourceChainSelector, sourcePoolAddress);
 
     // Inputs are in the source chain denomination, so we need to convert them to the local token denomination.
-    uint256 localAmount = _calculateLocalAmount(srcAmount, srcDecimal);
-    uint256 localFastTransferFeeAmount = _calculateLocalAmount(fastTransferFee, srcDecimal);
+    uint256 localAmount = _calculateLocalAmount(mintMessage.sourceAmount, mintMessage.sourceDecimals);
+    uint256 localFastTransferFeeAmount = _calculateLocalAmount(mintMessage.fastTransferFee, mintMessage.sourceDecimals);
     bytes32 fillId = computeFillId(fillRequestId, localAmount - localFastTransferFeeAmount, receiver);
     FillInfo memory fillInfo = s_fills[fillId];
 
@@ -397,7 +380,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   /// @return destChainConfig The destChain configuration for the given destination chain selector
   function getDestChainConfig(
     uint64 remoteChainSelector
-  ) external view returns (DestChainConfig memory, address[] memory) {
+  ) external view virtual returns (DestChainConfig memory, address[] memory) {
     return (s_fastTransferDestChainConfig[remoteChainSelector], s_fillerAllowLists[remoteChainSelector].values());
   }
 
@@ -459,7 +442,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   /// @return fillers Array of allowlisted filler addresses
   function getAllowedFillers(
     uint64 remoteChainSelector
-  ) external view returns (address[] memory) {
+  ) external view virtual returns (address[] memory) {
     return s_fillerAllowLists[remoteChainSelector].values();
   }
 
@@ -467,7 +450,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   /// @param remoteChainSelector The remote chain selector.
   /// @param filler The filler address to check.
   /// @return True if the filler is allowed, false otherwise.
-  function isAllowedFiller(uint64 remoteChainSelector, address filler) external view returns (bool) {
+  function isAllowedFiller(uint64 remoteChainSelector, address filler) external view virtual returns (bool) {
     return s_fillerAllowLists[remoteChainSelector].contains(filler);
   }
 

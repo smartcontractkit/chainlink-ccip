@@ -74,5 +74,10 @@ interface IFastTransferPool {
     address receiver
   ) external;
 
+  /// @notice Helper function to generate fill ID from request parameters
+  /// @param fillRequestId The original fill request ID
+  /// @param amount The amount being filled
+  /// @param receiver The receiver address
+  /// @return fillId The computed fill ID
   function computeFillId(bytes32 fillRequestId, uint256 amount, address receiver) external pure returns (bytes32);
 }

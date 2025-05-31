@@ -41,7 +41,7 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
     bytes memory data = abi.encode(
       FastTransferTokenPoolAbstract.MintMessage({
         receiver: abi.encode(receiver),
-        sourceAmountToTransfer: srcAmount,
+        sourceAmount: srcAmount,
         sourceDecimals: sourceDecimals,
         fastTransferFee: fastTransferFee
       })
@@ -78,7 +78,7 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
     bytes memory data = abi.encode(
       FastTransferTokenPoolAbstract.MintMessage({
         receiver: abi.encode(receiver),
-        sourceAmountToTransfer: srcAmount,
+        sourceAmount: srcAmount,
         sourceDecimals: sourceDecimals,
         fastTransferFee: srcAmount * FAST_FEE_BPS / 10_000
       })
@@ -113,7 +113,7 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
     bytes memory data = abi.encode(
       FastTransferTokenPoolAbstract.MintMessage({
         receiver: abi.encode(receiver),
-        sourceAmountToTransfer: srcAmount,
+        sourceAmount: srcAmount,
         sourceDecimals: sourceDecimals,
         fastTransferFee: srcAmount * FAST_FEE_BPS / 10_000
       })
@@ -141,7 +141,7 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
     bytes memory data = abi.encode(
       FastTransferTokenPoolAbstract.MintMessage({
         receiver: abi.encode(receiver),
-        sourceAmountToTransfer: srcAmount,
+        sourceAmount: srcAmount,
         sourceDecimals: sourceDecimals,
         fastTransferFee: zeroFee
       })
@@ -168,7 +168,7 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
     bytes memory data = abi.encode(
       FastTransferTokenPoolAbstract.MintMessage({
         receiver: abi.encode(receiver),
-        sourceAmountToTransfer: srcAmount,
+        sourceAmount: srcAmount,
         sourceDecimals: sourceDecimals,
         fastTransferFee: fastTransferFee
       })
@@ -213,7 +213,7 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
     bytes memory data = abi.encode(
       FastTransferTokenPoolAbstract.MintMessage({
         receiver: abi.encode(receiver),
-        sourceAmountToTransfer: srcAmount,
+        sourceAmount: srcAmount,
         sourceDecimals: sourceDecimals,
         fastTransferFee: fastTransferFee
       })

@@ -73,7 +73,7 @@ contract BurnMintFastTransferTokenPool_validateSettlement is BurnMintFastTransfe
       sender: abi.encode(s_remoteBurnMintPool),
       data: abi.encode(
         FastTransferTokenPoolAbstract.MintMessage({
-          sourceAmountToTransfer: TRANSFER_AMOUNT,
+          sourceAmount: TRANSFER_AMOUNT,
           sourceDecimals: SRC_DECIMALS,
           fastTransferFee: TRANSFER_AMOUNT * FAST_FEE_BPS / 10_000,
           receiver: abi.encode(RECEIVER)
@@ -95,7 +95,7 @@ contract BurnMintFastTransferTokenPool_validateSettlement is BurnMintFastTransfe
       sender: abi.encode(s_remoteBurnMintPool),
       data: abi.encode(
         FastTransferTokenPoolAbstract.MintMessage({
-          sourceAmountToTransfer: TRANSFER_AMOUNT,
+          sourceAmount: TRANSFER_AMOUNT,
           sourceDecimals: SRC_DECIMALS,
           fastTransferFee: TRANSFER_AMOUNT * FAST_FEE_BPS / 10_000,
           receiver: abi.encode(RECEIVER)

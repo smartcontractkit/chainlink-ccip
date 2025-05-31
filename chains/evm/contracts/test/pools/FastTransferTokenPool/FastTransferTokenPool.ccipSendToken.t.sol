@@ -95,7 +95,7 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
       receiver: destPoolAddress,
       data: abi.encode(
         FastTransferTokenPoolAbstract.MintMessage({
-          sourceAmountToTransfer: params.amount,
+          sourceAmount: params.amount,
           sourceDecimals: 18,
           fastTransferFee: params.fastFeeExpected,
           receiver: params.receiver
