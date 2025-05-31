@@ -21,6 +21,31 @@ contract BurnMintWithLockReleaseFlagTokenPool is BurnMintTokenPool {
     address router
   ) BurnMintTokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) {}
 
+  /// @notice Burn the token in the pool
+  /// @dev The _validateLockOrBurn check is an essential security check
+  /// @dev Performs the exact same functionality as BurnMintTokenPool, but returns the LOCK_RELEASE_FLAG
+  /// as the destPoolData to signal to the remote pool to release tokens instead of minting them.
+  function lockOrBurn(
+    Pool.LockOrBurnInV1 calldata lockOrBurnIn
+  ) public override returns (Pool.LockOrBurnOutV1 memory) {
+    _validateLockOrBurn(lockOrBurnIn);
+
+    _lockOrBurn(lockOrBurnIn.amount);
+
+    emit LockedOrBurned({
+      remoteChainSelector: lockOrBurnIn.remoteChainSelector,
+      token: address(i_token),
+      sender: msg.sender,
+      amount: lockOrBurnIn.amount
+    });
+
+    // LOCK_RELEASE_FLAG = bytes4(keccak256("NO_CCTP_USE_LOCK_RELEASE"))
+    return Pool.LockOrBurnOutV1({
+      destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
+      destPoolData: abi.encode(LOCK_RELEASE_FLAG)
+    });
+  }
+
   /// @notice Mint tokens from the pool to the recipient
   /// @dev The _validateReleaseOrMint check is an essential security check
   function releaseOrMint(
@@ -34,28 +59,14 @@ contract BurnMintWithLockReleaseFlagTokenPool is BurnMintTokenPool {
 
     IBurnMintERC20(address(i_token)).mint(releaseOrMintIn.receiver, localAmount);
 
-    emit Minted(msg.sender, releaseOrMintIn.receiver, localAmount);
+    emit ReleasedOrMinted({
+      remoteChainSelector: releaseOrMintIn.remoteChainSelector,
+      token: address(i_token),
+      sender: msg.sender,
+      recipient: releaseOrMintIn.receiver,
+      amount: localAmount
+    });
 
     return Pool.ReleaseOrMintOutV1({destinationAmount: localAmount});
-  }
-
-  /// @notice Burn the token in the pool
-  /// @dev The _validateLockOrBurn check is an essential security check
-  /// @dev Performs the exact same functionality as BurnMintTokenPool, but returns the LOCK_RELEASE_FLAG
-  /// as the destPoolData to signal to the remote pool to release tokens instead of minting them.
-  function lockOrBurn(
-    Pool.LockOrBurnInV1 calldata lockOrBurnIn
-  ) external override returns (Pool.LockOrBurnOutV1 memory) {
-    _validateLockOrBurn(lockOrBurnIn);
-
-    _burn(lockOrBurnIn.amount);
-
-    emit Burned(msg.sender, lockOrBurnIn.amount);
-
-    // LOCK_RELEASE_FLAG = bytes4(keccak256("NO_CCTP_USE_LOCK_RELEASE"))
-    return Pool.LockOrBurnOutV1({
-      destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
-      destPoolData: abi.encode(LOCK_RELEASE_FLAG)
-    });
   }
 }

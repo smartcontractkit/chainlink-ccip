@@ -59,10 +59,10 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   error OverflowDetected(uint8 remoteDecimals, uint8 localDecimals, uint256 remoteAmount);
   error InvalidDecimalArgs(uint8 expected, uint8 actual);
 
-  event Locked(address indexed sender, uint256 amount);
-  event Burned(address indexed sender, uint256 amount);
-  event Released(address indexed sender, address indexed recipient, uint256 amount);
-  event Minted(address indexed sender, address indexed recipient, uint256 amount);
+  event LockedOrBurned(uint64 indexed remoteChainSelector, address token, address sender, uint256 amount);
+  event ReleasedOrMinted(
+    uint64 indexed remoteChainSelector, address token, address sender, address recipient, uint256 amount
+  );
   event ChainAdded(
     uint64 remoteChainSelector,
     bytes remoteToken,
@@ -81,6 +81,8 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   event AllowListRemove(address sender);
   event RouterUpdated(address oldRouter, address newRouter);
   event RateLimitAdminSet(address rateLimitAdmin);
+  event OutboundRateLimitConsumed(uint64 indexed remoteChainSelector, address token, uint256 amount);
+  event InboundRateLimitConsumed(uint64 indexed remoteChainSelector, address token, uint256 amount);
 
   struct ChainUpdate {
     uint64 remoteChainSelector; // Remote chain selector
@@ -192,6 +194,73 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
     return interfaceId == Pool.CCIP_POOL_V1 || interfaceId == type(IPoolV1).interfaceId
       || interfaceId == type(IERC165).interfaceId;
   }
+
+  // ================================================================
+  // │                        Lock or Burn                          │
+  // ================================================================
+
+  /// @notice Burn the token in the pool
+  /// @dev The _validateLockOrBurn check is an essential security check
+  function lockOrBurn(
+    Pool.LockOrBurnInV1 calldata lockOrBurnIn
+  ) public virtual override returns (Pool.LockOrBurnOutV1 memory) {
+    _validateLockOrBurn(lockOrBurnIn);
+
+    _lockOrBurn(lockOrBurnIn.amount);
+
+    emit LockedOrBurned({
+      remoteChainSelector: lockOrBurnIn.remoteChainSelector,
+      token: address(i_token),
+      sender: msg.sender,
+      amount: lockOrBurnIn.amount
+    });
+
+    return Pool.LockOrBurnOutV1({
+      destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
+      destPoolData: _encodeLocalDecimals()
+    });
+  }
+
+  /// @notice Contains the specific lock or burn token logic for a pool.
+  /// @dev overriding this method allows us to create pools with different lock/burn signatures
+  /// without duplicating the underlying logic.
+  function _lockOrBurn(
+    uint256 amount
+  ) internal virtual {}
+
+  // ================================================================
+  // │                      Release or Mint                         │
+  // ================================================================
+
+  /// @notice Mint tokens from the pool to the recipient
+  /// @dev The _validateReleaseOrMint check is an essential security check
+  function releaseOrMint(
+    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
+  ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
+    _validateReleaseOrMint(releaseOrMintIn);
+
+    // Calculate the local amount
+    uint256 localAmount =
+      _calculateLocalAmount(releaseOrMintIn.amount, _parseRemoteDecimals(releaseOrMintIn.sourcePoolData));
+
+    // Mint to the receiver
+    _releaseOrMint(releaseOrMintIn.receiver, localAmount);
+
+    emit ReleasedOrMinted({
+      remoteChainSelector: releaseOrMintIn.remoteChainSelector,
+      token: address(i_token),
+      sender: msg.sender,
+      recipient: releaseOrMintIn.receiver,
+      amount: localAmount
+    });
+
+    return Pool.ReleaseOrMintOutV1({destinationAmount: localAmount});
+  }
+
+  /// @notice Contains the specific release or mint token logic for a pool.
+  /// @dev overriding this method allows us to create pools with different release/mint signatures
+  /// without duplicating the underlying logic.
+  function _releaseOrMint(address receiver, uint256 amount) internal virtual {}
 
   // ================================================================
   // │                         Validation                           │
@@ -413,8 +482,8 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
 
     for (uint256 i = 0; i < chainsToAdd.length; ++i) {
       ChainUpdate memory newChain = chainsToAdd[i];
-      RateLimiter._validateTokenBucketConfig(newChain.outboundRateLimiterConfig, false);
-      RateLimiter._validateTokenBucketConfig(newChain.inboundRateLimiterConfig, false);
+      RateLimiter._validateTokenBucketConfig(newChain.outboundRateLimiterConfig);
+      RateLimiter._validateTokenBucketConfig(newChain.inboundRateLimiterConfig);
 
       if (newChain.remoteTokenAddress.length == 0) {
         revert ZeroAddressNotAllowed();
@@ -517,11 +586,15 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   /// @notice Consumes outbound rate limiting capacity in this pool
   function _consumeOutboundRateLimit(uint64 remoteChainSelector, uint256 amount) internal {
     s_remoteChainConfigs[remoteChainSelector].outboundRateLimiterConfig._consume(amount, address(i_token));
+
+    emit OutboundRateLimitConsumed({token: address(i_token), remoteChainSelector: remoteChainSelector, amount: amount});
   }
 
   /// @notice Consumes inbound rate limiting capacity in this pool
   function _consumeInboundRateLimit(uint64 remoteChainSelector, uint256 amount) internal {
     s_remoteChainConfigs[remoteChainSelector].inboundRateLimiterConfig._consume(amount, address(i_token));
+
+    emit InboundRateLimitConsumed({token: address(i_token), remoteChainSelector: remoteChainSelector, amount: amount});
   }
 
   /// @notice Gets the token bucket with its values for the block it was requested at.
@@ -579,9 +652,9 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
     RateLimiter.Config memory inboundConfig
   ) internal {
     if (!isSupportedChain(remoteChainSelector)) revert NonExistentChain(remoteChainSelector);
-    RateLimiter._validateTokenBucketConfig(outboundConfig, false);
+    RateLimiter._validateTokenBucketConfig(outboundConfig);
     s_remoteChainConfigs[remoteChainSelector].outboundRateLimiterConfig._setTokenBucketConfig(outboundConfig);
-    RateLimiter._validateTokenBucketConfig(inboundConfig, false);
+    RateLimiter._validateTokenBucketConfig(inboundConfig);
     s_remoteChainConfigs[remoteChainSelector].inboundRateLimiterConfig._setTokenBucketConfig(inboundConfig);
     emit ChainConfigured(remoteChainSelector, outboundConfig, inboundConfig);
   }
