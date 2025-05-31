@@ -123,106 +123,6 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     address router
   ) TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) CCIPReceiver(router) {}
 
-  /// @notice Updates the destination chain configuration
-  /// @param destChainConfigArgs The destChain configuration arguments
-  function updateDestChainConfig(
-    DestChainConfigUpdateArgs calldata destChainConfigArgs
-  ) external virtual onlyOwner {
-    // We know Solana requires custom args, if they are not provided, we revert.
-    if (destChainConfigArgs.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SVM) {
-      if (destChainConfigArgs.evmToAnyMessageExtraArgsBytes.length == 0) {
-        revert InvalidDestChainConfig();
-      }
-    }
-
-    if (destChainConfigArgs.fastTransferBpsFee > BPS_DIVIDER) revert InvalidDestChainConfig();
-
-    DestChainConfig storage destChainConfig = s_fastTransferDestChainConfig[destChainConfigArgs.remoteChainSelector];
-    destChainConfig.destinationPool = destChainConfigArgs.destinationPool;
-    destChainConfig.fastTransferBpsFee = destChainConfigArgs.fastTransferBpsFee;
-    destChainConfig.fillerAllowlistEnabled = destChainConfigArgs.fillerAllowlistEnabled;
-    destChainConfig.maxFillAmountPerRequest = destChainConfigArgs.maxFillAmountPerRequest;
-    destChainConfig.chainFamilySelector = destChainConfigArgs.chainFamilySelector;
-    destChainConfig.settlementOverheadGas = destChainConfigArgs.settlementOverheadGas;
-    destChainConfig.evmToAnyMessageExtraArgsBytes = destChainConfigArgs.evmToAnyMessageExtraArgsBytes;
-
-    for (uint256 i = 0; i < destChainConfigArgs.removeFillers.length; ++i) {
-      destChainConfig.fillerAllowList.remove(destChainConfigArgs.removeFillers[i]);
-    }
-    for (uint256 i = 0; i < destChainConfigArgs.addFillers.length; ++i) {
-      destChainConfig.fillerAllowList.add(destChainConfigArgs.addFillers[i]);
-    }
-
-    emit DestChainConfigUpdated(
-      destChainConfigArgs.remoteChainSelector,
-      destChainConfigArgs.fastTransferBpsFee,
-      destChainConfigArgs.maxFillAmountPerRequest,
-      destChainConfigArgs.destinationPool,
-      destChainConfigArgs.addFillers,
-      destChainConfigArgs.removeFillers,
-      destChainConfigArgs.chainFamilySelector,
-      destChainConfigArgs.settlementOverheadGas,
-      destChainConfigArgs.fillerAllowlistEnabled
-    );
-  }
-
-  /// @notice Updates the filler allowlist configuration for a given lane.
-  /// @param destinationChainSelector The destination chain selector.
-  /// @param fillersToAdd The addresses to add to the allowlist.
-  /// @param fillersToRemove The addresses to remove from the allowlist.
-  function updateFillerAllowList(
-    uint64 destinationChainSelector,
-    address[] memory fillersToAdd,
-    address[] memory fillersToRemove
-  ) external virtual onlyOwner {
-    DestChainConfig storage destChainConfig = s_fastTransferDestChainConfig[destinationChainSelector];
-
-    for (uint256 i = 0; i < fillersToAdd.length; ++i) {
-      destChainConfig.fillerAllowList.add(fillersToAdd[i]);
-    }
-    for (uint256 i = 0; i < fillersToRemove.length; ++i) {
-      destChainConfig.fillerAllowList.remove(fillersToRemove[i]);
-    }
-
-    emit FillerAllowListUpdated(destinationChainSelector, fillersToAdd, fillersToRemove);
-  }
-
-  /// @notice Gets the destChain configuration for a given destination chain selector
-  /// @param remoteChainSelector The remote chain selector
-  /// @return destChainConfig The destChain configuration for the given destination chain selector
-  function getDestChainConfig(
-    uint64 remoteChainSelector
-  ) external view returns (DestChainConfigView memory) {
-    DestChainConfig storage config = s_fastTransferDestChainConfig[remoteChainSelector];
-    return DestChainConfigView({
-      maxFillAmountPerRequest: config.maxFillAmountPerRequest,
-      settlementOverheadGas: config.settlementOverheadGas,
-      fastTransferBpsFee: config.fastTransferBpsFee,
-      chainFamilySelector: config.chainFamilySelector,
-      fillerAllowlistEnabled: config.fillerAllowlistEnabled,
-      destinationPool: config.destinationPool,
-      evmToAnyMessageExtraArgsBytes: config.evmToAnyMessageExtraArgsBytes,
-      allowedFillers: config.fillerAllowList.values()
-    });
-  }
-
-  /// @notice Checks if a filler is allowlisted for a given destChain.
-  /// @param remoteChainSelector The remote chain selector.
-  /// @param filler The filler address to check.
-  /// @return True if the filler is allowed, false otherwise.
-  function isAllowedFiller(uint64 remoteChainSelector, address filler) external view returns (bool) {
-    return s_fastTransferDestChainConfig[remoteChainSelector].fillerAllowList.contains(filler);
-  }
-
-  /// @notice Gets all allowlisted fillers for a given destination chain
-  /// @param remoteChainSelector The remote chain selector
-  /// @return fillers Array of allowlisted filler addresses
-  function getAllowedFillers(
-    uint64 remoteChainSelector
-  ) external view returns (address[] memory) {
-    return s_fastTransferDestChainConfig[remoteChainSelector].fillerAllowList.values();
-  }
-
   /// @notice Gets the fill information for a given fill ID
   /// @param fillId The fill ID to query
   /// @return fillInfo The fill information including state and filler address
@@ -242,20 +142,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     uint256 amount,
     address receiver
   ) public pure override returns (bytes32) {
-    return _computeFillId(fillRequestId, amount, receiver);
-  }
-
-  /// @inheritdoc IFastTransferPool
-  function getCcipSendTokenFee(
-    address settlementFeeToken,
-    uint64 destinationChainSelector,
-    uint256 amount,
-    bytes calldata receiver,
-    bytes calldata extraArgs
-  ) public view virtual override returns (Quote memory) {
-    (Quote memory quote,) =
-      _getFeeQuoteAndCCIPMessage(settlementFeeToken, destinationChainSelector, amount, receiver, extraArgs);
-    return quote;
+    return keccak256(abi.encode(fillRequestId, amount, receiver));
   }
 
   /// @inheritdoc IFastTransferPool
@@ -278,6 +165,23 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     fillRequestId = IRouterClient(getRouter()).ccipSend{value: msg.value}(destinationChainSelector, message);
     emit FastTransferRequested(fillRequestId, destinationChainSelector, amount, quote.fastTransferFee, receiver);
     return fillRequestId;
+  }
+
+  // ================================================================
+  // │                      Fee calculation                         │
+  // ================================================================
+
+  /// @inheritdoc IFastTransferPool
+  function getCcipSendTokenFee(
+    address settlementFeeToken,
+    uint64 destinationChainSelector,
+    uint256 amount,
+    bytes calldata receiver,
+    bytes calldata extraArgs
+  ) public view virtual override returns (Quote memory) {
+    (Quote memory quote,) =
+      _getFeeQuoteAndCCIPMessage(settlementFeeToken, destinationChainSelector, amount, receiver, extraArgs);
+    return quote;
   }
 
   /// @notice Pulls out all of the fee‐quotation + message‐build logic
@@ -335,6 +239,10 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     return (quote, message);
   }
 
+  // ================================================================
+  // │                           Filling                            │
+  // ================================================================
+
   /// @notice Fast fills a transfer using liquidity provider funds based on CCIP settlement
   /// @param fillRequestId The fill request ID
   /// @param srcAmountToFill The amount to fill
@@ -349,6 +257,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   ) public virtual {
     // Transfer tokens from filler to receiver
     uint256 destAmount = _transferFromFiller(sourceChainSelector, msg.sender, receiver, srcAmountToFill, sourceDecimals);
+
     bytes32 fillId = computeFillId(fillRequestId, destAmount, receiver);
     FillInfo memory fillInfo = s_fills[fillId];
     if (fillInfo.state != FillState.NOT_FILLED) revert AlreadyFilled(fillRequestId);
@@ -386,27 +295,6 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     emit FastTransferSettled(message.messageId);
   }
 
-  /// @notice Handles the token to transfer on fast fill request at source chain
-  /// @param destinationChainSelector The destination chain selector
-  /// @param sender The sender address
-  /// @param amount The amount to transfer
-  function _handleTokenToTransfer(uint64 destinationChainSelector, address sender, uint256 amount) internal virtual;
-
-  /// @notice Transfers tokens from the filler to the receiver
-  /// @param sourceChainSelector The source chain selector
-  /// @param filler The address of the filler
-  /// @param receiver The address of the receiver
-  /// @param srcAmount The amount to transfer
-  /// @param sourceDecimals The decimals of the source token
-  /// @return destAmount The amount transferred to the receiver on the destination chain
-  function _transferFromFiller(
-    uint64 sourceChainSelector,
-    address filler,
-    address receiver,
-    uint256 srcAmount,
-    uint8 sourceDecimals
-  ) internal virtual returns (uint256 destAmount);
-
   function _settle(
     uint64 sourceChainSelector,
     bytes32 fillRequestId,
@@ -420,7 +308,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
 
     uint256 localAmount = _calculateLocalAmount(srcAmount, srcDecimal);
     uint256 localFastTransferFeeAmount = _calculateLocalAmount(fastTransferFee, srcDecimal);
-    bytes32 fillId = _computeFillId(fillRequestId, localAmount - localFastTransferFeeAmount, receiver);
+    bytes32 fillId = computeFillId(fillRequestId, localAmount - localFastTransferFeeAmount, receiver);
     FillInfo memory fillInfo = s_fills[fillId];
 
     if (fillInfo.state == FillState.NOT_FILLED) {
@@ -456,6 +344,31 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     if (!isSupportedChain(destinationChainSelector)) revert ChainNotAllowed(destinationChainSelector);
   }
 
+  // ================================================================
+  // │                      Filling Hooks                           │
+  // ================================================================
+
+  /// @notice Handles the token to transfer on fast fill request at source chain
+  /// @param destinationChainSelector The destination chain selector
+  /// @param sender The sender address
+  /// @param amount The amount to transfer
+  function _handleTokenToTransfer(uint64 destinationChainSelector, address sender, uint256 amount) internal virtual;
+
+  /// @notice Transfers tokens from the filler to the receiver
+  /// @param sourceChainSelector The source chain selector
+  /// @param filler The address of the filler
+  /// @param receiver The address of the receiver
+  /// @param srcAmount The amount to transfer
+  /// @param sourceDecimals The decimals of the source token
+  /// @return destAmount The amount transferred to the receiver on the destination chain
+  function _transferFromFiller(
+    uint64 sourceChainSelector,
+    address filler,
+    address receiver,
+    uint256 srcAmount,
+    uint8 sourceDecimals
+  ) internal virtual returns (uint256 destAmount);
+
   /// @notice Handles settlement when the request was not fast-filled
   /// @param sourceChainSelector The source chain selector
   /// @param settlementAmountLocal The amount to settle in local token
@@ -471,9 +384,75 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   /// @param settlementAmountLocal The amount to reimburse in local token
   function _handleFastFilledReimbursement(address filler, uint256 settlementAmountLocal) internal virtual;
 
+  // ================================================================
+  // │                          Config                              │
+  // ================================================================
+
   /// @notice Override getRouter to resolve diamond inheritance
   function getRouter() public view virtual override(TokenPool, CCIPReceiver) returns (address) {
     return TokenPool.getRouter();
+  }
+
+  /// @notice Gets the destChain configuration for a given destination chain selector
+  /// @param remoteChainSelector The remote chain selector
+  /// @return destChainConfig The destChain configuration for the given destination chain selector
+  function getDestChainConfig(
+    uint64 remoteChainSelector
+  ) external view returns (DestChainConfigView memory) {
+    DestChainConfig storage config = s_fastTransferDestChainConfig[remoteChainSelector];
+    return DestChainConfigView({
+      maxFillAmountPerRequest: config.maxFillAmountPerRequest,
+      settlementOverheadGas: config.settlementOverheadGas,
+      fastTransferBpsFee: config.fastTransferBpsFee,
+      chainFamilySelector: config.chainFamilySelector,
+      fillerAllowlistEnabled: config.fillerAllowlistEnabled,
+      destinationPool: config.destinationPool,
+      evmToAnyMessageExtraArgsBytes: config.evmToAnyMessageExtraArgsBytes,
+      allowedFillers: config.fillerAllowList.values()
+    });
+  }
+
+  /// @notice Updates the destination chain configuration
+  /// @param destChainConfigArgs The destChain configuration arguments
+  function updateDestChainConfig(
+    DestChainConfigUpdateArgs calldata destChainConfigArgs
+  ) external virtual onlyOwner {
+    // We know Solana requires custom args, if they are not provided, we revert.
+    if (destChainConfigArgs.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SVM) {
+      if (destChainConfigArgs.evmToAnyMessageExtraArgsBytes.length == 0) {
+        revert InvalidDestChainConfig();
+      }
+    }
+
+    if (destChainConfigArgs.fastTransferBpsFee > BPS_DIVIDER) revert InvalidDestChainConfig();
+
+    DestChainConfig storage destChainConfig = s_fastTransferDestChainConfig[destChainConfigArgs.remoteChainSelector];
+    destChainConfig.destinationPool = destChainConfigArgs.destinationPool;
+    destChainConfig.fastTransferBpsFee = destChainConfigArgs.fastTransferBpsFee;
+    destChainConfig.fillerAllowlistEnabled = destChainConfigArgs.fillerAllowlistEnabled;
+    destChainConfig.maxFillAmountPerRequest = destChainConfigArgs.maxFillAmountPerRequest;
+    destChainConfig.chainFamilySelector = destChainConfigArgs.chainFamilySelector;
+    destChainConfig.settlementOverheadGas = destChainConfigArgs.settlementOverheadGas;
+    destChainConfig.evmToAnyMessageExtraArgsBytes = destChainConfigArgs.evmToAnyMessageExtraArgsBytes;
+
+    for (uint256 i = 0; i < destChainConfigArgs.removeFillers.length; ++i) {
+      destChainConfig.fillerAllowList.remove(destChainConfigArgs.removeFillers[i]);
+    }
+    for (uint256 i = 0; i < destChainConfigArgs.addFillers.length; ++i) {
+      destChainConfig.fillerAllowList.add(destChainConfigArgs.addFillers[i]);
+    }
+
+    emit DestChainConfigUpdated(
+      destChainConfigArgs.remoteChainSelector,
+      destChainConfigArgs.fastTransferBpsFee,
+      destChainConfigArgs.maxFillAmountPerRequest,
+      destChainConfigArgs.destinationPool,
+      destChainConfigArgs.addFillers,
+      destChainConfigArgs.removeFillers,
+      destChainConfigArgs.chainFamilySelector,
+      destChainConfigArgs.settlementOverheadGas,
+      destChainConfigArgs.fillerAllowlistEnabled
+    );
   }
 
   /// @notice Override supportsInterface to resolve diamond inheritance
@@ -484,11 +463,45 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
       || CCIPReceiver.supportsInterface(interfaceId);
   }
 
-  function _computeFillId(
-    bytes32 fillRequestId,
-    uint256 amount,
-    address receiver
-  ) internal pure virtual returns (bytes32) {
-    return keccak256(abi.encode(fillRequestId, amount, receiver));
+  // ================================================================
+  // │                      Filler allowlist                        │
+  // ================================================================
+
+  /// @notice Gets all allowlisted fillers for a given destination chain
+  /// @param remoteChainSelector The remote chain selector
+  /// @return fillers Array of allowlisted filler addresses
+  function getAllowedFillers(
+    uint64 remoteChainSelector
+  ) external view returns (address[] memory) {
+    return s_fastTransferDestChainConfig[remoteChainSelector].fillerAllowList.values();
+  }
+
+  /// @notice Checks if a filler is allowlisted for a given destChain.
+  /// @param remoteChainSelector The remote chain selector.
+  /// @param filler The filler address to check.
+  /// @return True if the filler is allowed, false otherwise.
+  function isAllowedFiller(uint64 remoteChainSelector, address filler) external view returns (bool) {
+    return s_fastTransferDestChainConfig[remoteChainSelector].fillerAllowList.contains(filler);
+  }
+
+  /// @notice Updates the filler allowlist configuration for a given lane.
+  /// @param destinationChainSelector The destination chain selector.
+  /// @param fillersToAdd The addresses to add to the allowlist.
+  /// @param fillersToRemove The addresses to remove from the allowlist.
+  function updateFillerAllowList(
+    uint64 destinationChainSelector,
+    address[] memory fillersToAdd,
+    address[] memory fillersToRemove
+  ) external virtual onlyOwner {
+    DestChainConfig storage destChainConfig = s_fastTransferDestChainConfig[destinationChainSelector];
+
+    for (uint256 i = 0; i < fillersToAdd.length; ++i) {
+      destChainConfig.fillerAllowList.add(fillersToAdd[i]);
+    }
+    for (uint256 i = 0; i < fillersToRemove.length; ++i) {
+      destChainConfig.fillerAllowList.remove(fillersToRemove[i]);
+    }
+
+    emit FillerAllowListUpdated(destinationChainSelector, fillersToAdd, fillersToRemove);
   }
 }
