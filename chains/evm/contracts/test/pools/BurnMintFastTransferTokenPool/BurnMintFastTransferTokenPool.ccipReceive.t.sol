@@ -45,11 +45,13 @@ contract BurnMintFastTransferTokenPool_ccipReceive is BurnMintFastTransferTokenP
 
   function test_CcipReceive_FastFilled() public {
     // First, fast fill the request
+    uint256 amountToFill = TRANSFER_AMOUNT - TRANSFER_AMOUNT* FAST_FEE_BPS / 10000; // Amount after fee
     vm.prank(s_filler);
     s_pool.fastFill(
       FILL_REQUEST_ID,
+      s_pool.computeFillId(FILL_REQUEST_ID, amountToFill, SRC_DECIMALS, RECEIVER),
       DEST_CHAIN_SELECTOR,
-      TRANSFER_AMOUNT - (TRANSFER_AMOUNT * FAST_FEE_BPS / 10_000),
+      amountToFill,
       SRC_DECIMALS,
       RECEIVER
     );

@@ -27,6 +27,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
 
   error InvalidDestChainConfig();
   error FillerNotAllowlisted(uint64 remoteChainSelector, address filler);
+  error InvalidFillRequestId(bytes32 fillRequestId);
   error TransferAmountExceedsMaxFillAmount(uint64 remoteChainSelector, uint256 amount);
 
   event DestChainConfigUpdated(
@@ -234,11 +235,13 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
 
   /// @notice Fast fills a transfer using liquidity provider funds based on CCIP settlement
   /// @param fillRequestId The fill request ID
+  /// @param fillId The fill ID, computed from the fill request parameters
   /// @param srcAmountToFill The amount to fill
   /// @param sourceDecimals The decimals of the source token
   /// @param receiver The receiver address
   function fastFill(
     bytes32 fillRequestId,
+    bytes32 fillId,
     uint64 sourceChainSelector,
     uint256 srcAmountToFill,
     uint8 sourceDecimals,
@@ -251,7 +254,9 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     // Transfer tokens from filler to receiver
     _transferFromFiller(msg.sender, receiver, localAmount);
 
-    bytes32 fillId = computeFillId(fillRequestId, srcAmountToFill, sourceDecimals, receiver);
+    if (fillId != computeFillId(fillRequestId, srcAmountToFill, sourceDecimals, receiver)) {
+      revert InvalidFillRequestId(fillRequestId);
+    }
     FillInfo memory fillInfo = s_fills[fillId];
     if (fillInfo.state != FillState.NOT_FILLED) revert AlreadyFilled(fillRequestId);
 
