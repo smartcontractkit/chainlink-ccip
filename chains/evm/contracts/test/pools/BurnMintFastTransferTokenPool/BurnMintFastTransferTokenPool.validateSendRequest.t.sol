@@ -28,10 +28,10 @@ contract BurnMintFastTransferTokenPool_validateSendRequest is BurnMintFastTransf
   function test_validateSendRequest_Success() public {
     // This should not revert - all validations pass
     bytes32 settlementId = s_pool.ccipSendToken{value: CCIP_SEND_FEE}(
-      address(0), // native fee token
       DEST_CHAIN_SELECTOR,
       TRANSFER_AMOUNT,
       abi.encode(RECEIVER),
+      address(0), // native fee token
       ""
     );
 
@@ -45,7 +45,7 @@ contract BurnMintFastTransferTokenPool_validateSendRequest is BurnMintFastTransf
     // Should revert with CursedByRMN error
     vm.expectRevert(TokenPool.CursedByRMN.selector);
     s_pool.ccipSendToken{value: CCIP_SEND_FEE}(
-      address(0), DEST_CHAIN_SELECTOR, TRANSFER_AMOUNT, abi.encode(RECEIVER), ""
+      DEST_CHAIN_SELECTOR, TRANSFER_AMOUNT, abi.encode(RECEIVER), address(0), ""
     );
   }
 
@@ -55,7 +55,7 @@ contract BurnMintFastTransferTokenPool_validateSendRequest is BurnMintFastTransf
     // Should revert with ChainNotAllowed error
     vm.expectRevert(abi.encodeWithSelector(TokenPool.ChainNotAllowed.selector, unsupportedChainSelector));
     s_pool.ccipSendToken{value: CCIP_SEND_FEE}(
-      address(0), unsupportedChainSelector, TRANSFER_AMOUNT, abi.encode(RECEIVER), ""
+      unsupportedChainSelector, TRANSFER_AMOUNT, abi.encode(RECEIVER), address(0), ""
     );
   }
 
@@ -81,7 +81,7 @@ contract BurnMintFastTransferTokenPool_validateSendRequest is BurnMintFastTransf
     // Should revert with SenderNotAllowed error (from _checkAllowList)
     vm.expectRevert(abi.encodeWithSelector(TokenPool.SenderNotAllowed.selector, unauthorizedSender));
     poolWithAllowlist.ccipSendToken{value: CCIP_SEND_FEE}(
-      address(0), DEST_CHAIN_SELECTOR, TRANSFER_AMOUNT, abi.encode(RECEIVER), ""
+      DEST_CHAIN_SELECTOR, TRANSFER_AMOUNT, abi.encode(RECEIVER), address(0), ""
     );
   }
 
@@ -107,7 +107,7 @@ contract BurnMintFastTransferTokenPool_validateSendRequest is BurnMintFastTransf
     deal(allowlistedSender, CCIP_SEND_FEE); // Ensure sender has enough ETH for the fee
     // Should succeed with allowlisted sender
     bytes32 settlementId = poolWithAllowlist.ccipSendToken{value: CCIP_SEND_FEE}(
-      address(0), DEST_CHAIN_SELECTOR, TRANSFER_AMOUNT, abi.encode(RECEIVER), ""
+      DEST_CHAIN_SELECTOR, TRANSFER_AMOUNT, abi.encode(RECEIVER), address(0), ""
     );
 
     assertTrue(settlementId != bytes32(0));
@@ -154,14 +154,14 @@ contract BurnMintFastTransferTokenPool_validateSendRequest is BurnMintFastTransf
 
     // Original chain should still work
     bytes32 settlementId1 = s_pool.ccipSendToken{value: CCIP_SEND_FEE}(
-      address(0), DEST_CHAIN_SELECTOR, TRANSFER_AMOUNT, abi.encode(RECEIVER), ""
+      DEST_CHAIN_SELECTOR, TRANSFER_AMOUNT, abi.encode(RECEIVER), address(0), ""
     );
     assertTrue(settlementId1 != bytes32(0));
 
     // New chain should revert due to curse
     vm.expectRevert(TokenPool.CursedByRMN.selector);
     s_pool.ccipSendToken{value: CCIP_SEND_FEE}(
-      address(0), anotherChainSelector, TRANSFER_AMOUNT, abi.encode(RECEIVER), ""
+      anotherChainSelector, TRANSFER_AMOUNT, abi.encode(RECEIVER), address(0), ""
     );
   }
 

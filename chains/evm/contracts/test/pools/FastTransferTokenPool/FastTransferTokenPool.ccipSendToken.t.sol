@@ -107,6 +107,7 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
 
     Client.EVM2AnyMessage memory message = _createMessage(params, extraArgs);
     uint256 expectedFee = params.amount * params.fastFeeBpsExpected / 10_000;
+    bytes32 fillId = s_pool.computeFillId(params.mockMessageId, params.amount - expectedFee, 18, params.receiver);
 
     vm.expectCall(
       address(s_sourceRouter), abi.encodeWithSelector(IRouterClient.ccipSend.selector, params.chainSelector, message)
@@ -114,15 +115,16 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
     vm.expectEmit();
     emit IFastTransferPool.FastTransferRequested({
       destinationChainSelector: params.chainSelector,
+      fillId: fillId,
       settlementId: params.mockMessageId,
-      amount: params.amount,
+      sourceAmountNetFee: params.amount - expectedFee,
       fastTransferFee: expectedFee,
       receiver: params.receiver
     });
 
     uint256 balanceBefore = s_token.balanceOf(OWNER);
     bytes32 settlementId =
-      s_pool.ccipSendToken{value: 1 ether}(address(0), params.chainSelector, params.amount, params.receiver, "");
+      s_pool.ccipSendToken{value: 1 ether}(params.chainSelector, params.amount, params.receiver, address(0), "");
 
     assertEq(settlementId, params.mockMessageId);
     assertEq(s_token.balanceOf(OWNER), balanceBefore - params.amount);
@@ -177,9 +179,9 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
     );
 
     IFastTransferPool.Quote memory quote =
-      s_pool.getCcipSendTokenFee(feeToken, DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, abi.encode(RECEIVER), "");
+      s_pool.getCcipSendTokenFee(DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, abi.encode(RECEIVER), feeToken, "");
 
-    bytes32 settlementId = s_pool.ccipSendToken(feeToken, DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, abi.encode(RECEIVER), "");
+    bytes32 settlementId = s_pool.ccipSendToken(DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, abi.encode(RECEIVER), feeToken, "");
 
     assertTrue(settlementId != bytes32(0));
     assertEq(s_token.balanceOf(OWNER), balanceBefore - SOURCE_AMOUNT - quote.ccipSettlementFee);
@@ -189,6 +191,6 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
     vm.mockCall(address(s_mockRMNRemote), abi.encodeWithSignature("isCursed(bytes16)"), abi.encode(true));
 
     vm.expectRevert(TokenPool.CursedByRMN.selector);
-    s_pool.ccipSendToken{value: 1 ether}(address(0), DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, abi.encode(RECEIVER), "");
+    s_pool.ccipSendToken{value: 1 ether}(DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, abi.encode(RECEIVER), address(0), "");
   }
 }

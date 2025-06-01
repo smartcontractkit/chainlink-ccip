@@ -35,9 +35,12 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
     uint256 expectedAmount = receiverBalanceBefore + SOURCE_AMOUNT;
 
     Client.Any2EVMMessage memory message = _generateMintMessage(RECEIVER, SOURCE_AMOUNT, SOURCE_DECIMALS, FAST_FEE_BPS);
+    uint256 fastTransferFee = (SOURCE_AMOUNT * FAST_FEE_BPS) / 10_000;
+    bytes32 fillId =
+      s_pool.computeFillId(message.messageId, SOURCE_AMOUNT - fastTransferFee, SOURCE_DECIMALS, abi.encode(RECEIVER));
 
     vm.expectEmit();
-    emit IFastTransferPool.FastTransferSettled(MESSAGE_ID);
+    emit IFastTransferPool.FastTransferSettled(fillId, MESSAGE_ID);
 
     s_pool.ccipReceive(message);
 
@@ -47,7 +50,7 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
 
   function test_ccipReceive_FastFill_Settlement() public {
     uint256 amountToFill = SOURCE_AMOUNT - (SOURCE_AMOUNT * FAST_FEE_BPS / 10_000);
-    bytes32 fillId = s_pool.computeFillId(MESSAGE_ID, amountToFill, SOURCE_DECIMALS, RECEIVER);
+    bytes32 fillId = s_pool.computeFillId(MESSAGE_ID, amountToFill, SOURCE_DECIMALS, abi.encode(RECEIVER));
 
     vm.stopPrank();
     vm.prank(s_filler);
@@ -60,7 +63,7 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
     Client.Any2EVMMessage memory message = _generateMintMessage(RECEIVER, SOURCE_AMOUNT, SOURCE_DECIMALS, FAST_FEE_BPS);
 
     vm.expectEmit();
-    emit IFastTransferPool.FastTransferSettled(MESSAGE_ID);
+    emit IFastTransferPool.FastTransferSettled(fillId, MESSAGE_ID);
 
     vm.prank(address(s_sourceRouter));
     s_pool.ccipReceive(message);
@@ -96,8 +99,10 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
     // Prepare CCIP message with zero fast transfer fee
     Client.Any2EVMMessage memory message = _generateMintMessage(RECEIVER, SOURCE_AMOUNT, SOURCE_DECIMALS, zeroFee);
 
+    bytes32 fillId = s_pool.computeFillId(message.messageId, SOURCE_AMOUNT - 0, SOURCE_DECIMALS, abi.encode(RECEIVER));
+
     vm.expectEmit();
-    emit IFastTransferPool.FastTransferSettled(MESSAGE_ID);
+    emit IFastTransferPool.FastTransferSettled(fillId, MESSAGE_ID);
 
     s_pool.ccipReceive(message);
 
@@ -112,7 +117,7 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
     s_pool.ccipReceive(message);
 
     uint256 amountToFill = SOURCE_AMOUNT - (SOURCE_AMOUNT * FAST_FEE_BPS / 10_000);
-    bytes32 fillId = s_pool.computeFillId(MESSAGE_ID, amountToFill, SOURCE_DECIMALS, RECEIVER);
+    bytes32 fillId = s_pool.computeFillId(MESSAGE_ID, amountToFill, SOURCE_DECIMALS, abi.encode(RECEIVER));
 
     // Try to settle again - should revert
     vm.expectRevert(abi.encodeWithSelector(IFastTransferPool.AlreadySettled.selector, fillId));

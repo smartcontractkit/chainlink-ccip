@@ -15,7 +15,7 @@ contract FastTransferTokenPool_getCcipSendTokenFee_Test is FastTransferTokenPool
       address(s_sourceRouter), abi.encodeWithSelector(IRouterClient.getFee.selector), abi.encode(settlementQuote)
     );
     IFastTransferPool.Quote memory quote =
-      s_pool.getCcipSendTokenFee(address(s_token), DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, abi.encodePacked(RECEIVER), "");
+      s_pool.getCcipSendTokenFee(DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, abi.encodePacked(RECEIVER), address(s_token), "");
 
     assertEq(quote.fastTransferFee, fastFee);
     assertEq(quote.ccipSettlementFee, settlementQuote);
