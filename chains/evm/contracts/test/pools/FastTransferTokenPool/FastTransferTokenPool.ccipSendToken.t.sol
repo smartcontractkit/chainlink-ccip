@@ -161,4 +161,30 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
     _setupChainConfig(testChainSelector, Internal.CHAIN_FAMILY_SELECTOR_APTOS, 0, customExtraArgs);
     _executeTest(params, customExtraArgs);
   }
+
+  function test_CcipSendToken_WithERC20FeeToken() public {
+    address feeToken = address(s_token);
+    uint256 balanceBefore = s_token.balanceOf(OWNER);
+    uint256 fakeFee = 1 ether;
+    bytes32 fakeMessageId = keccak256("mockMessageId");
+    vm.mockCall(address(s_sourceRouter), abi.encodeWithSelector(IRouterClient.getFee.selector), abi.encode(fakeFee));
+    vm.mockCall(
+      address(s_sourceRouter), abi.encodeWithSelector(IRouterClient.ccipSend.selector), abi.encode(fakeMessageId)
+    );
+
+    IFastTransferPool.Quote memory quote =
+      s_pool.getCcipSendTokenFee(feeToken, DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, abi.encode(RECEIVER), "");
+
+    bytes32 fillRequestId = s_pool.ccipSendToken(feeToken, DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, abi.encode(RECEIVER), "");
+
+    assertTrue(fillRequestId != bytes32(0));
+    assertEq(s_token.balanceOf(OWNER), balanceBefore - SOURCE_AMOUNT - quote.ccipSettlementFee);
+  }
+
+  function test_RevertWhen_CursedByRMN() public {
+    vm.mockCall(address(s_mockRMNRemote), abi.encodeWithSignature("isCursed(bytes16)"), abi.encode(true));
+
+    vm.expectRevert(TokenPool.CursedByRMN.selector);
+    s_pool.ccipSendToken{value: 1 ether}(address(0), DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, abi.encode(RECEIVER), "");
+  }
 }

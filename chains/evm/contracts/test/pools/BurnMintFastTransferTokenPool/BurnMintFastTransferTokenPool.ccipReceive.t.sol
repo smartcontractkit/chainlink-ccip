@@ -11,10 +11,7 @@ import {IERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
 contract BurnMintFastTransferTokenPool_ccipReceive is BurnMintFastTransferTokenPoolSetup {
-  uint256 internal constant TRANSFER_AMOUNT = 100 ether;
-  address internal constant RECEIVER = address(0x1234);
   bytes32 internal constant FILL_REQUEST_ID = keccak256("fillRequestId");
-  uint8 internal constant SRC_DECIMALS = 18;
 
   function setUp() public virtual override {
     super.setUp();
@@ -23,7 +20,6 @@ contract BurnMintFastTransferTokenPool_ccipReceive is BurnMintFastTransferTokenP
     vm.stopPrank();
     vm.prank(s_filler);
     s_token.approve(address(s_pool), type(uint256).max);
-    vm.stopPrank();
   }
 
   function test_CcipReceive_NotFastFilled() public {
@@ -47,10 +43,10 @@ contract BurnMintFastTransferTokenPool_ccipReceive is BurnMintFastTransferTokenP
   function test_CcipReceive_FastFilled() public {
     // First, fast fill the request
     uint256 amountToFill = TRANSFER_AMOUNT - (TRANSFER_AMOUNT * FAST_FEE_BPS / 10_000);
-    bytes32 fillId = s_pool.computeFillId(FILL_REQUEST_ID, amountToFill, SRC_DECIMALS, RECEIVER);
+    bytes32 fillId = s_pool.computeFillId(FILL_REQUEST_ID, amountToFill, SOURCE_DECIMALS, RECEIVER);
 
     vm.prank(s_filler);
-    s_pool.fastFill(FILL_REQUEST_ID, fillId, DEST_CHAIN_SELECTOR, amountToFill, SRC_DECIMALS, RECEIVER);
+    s_pool.fastFill(FILL_REQUEST_ID, fillId, DEST_CHAIN_SELECTOR, amountToFill, SOURCE_DECIMALS, RECEIVER);
 
     uint256 fillerBalanceBefore = s_token.balanceOf(s_filler);
     uint256 receiverBalanceBefore = s_token.balanceOf(RECEIVER);
@@ -73,12 +69,11 @@ contract BurnMintFastTransferTokenPool_ccipReceive is BurnMintFastTransferTokenP
   function test_RevertWhen_AlreadySettled() public {
     // First settlement
     Client.Any2EVMMessage memory message = _createCcipMessage();
-    vm.prank(address(s_sourceRouter));
+    vm.startPrank(address(s_sourceRouter));
     s_pool.ccipReceive(message);
 
     // Try to settle again
     vm.expectRevert(abi.encodeWithSelector(IFastTransferPool.AlreadySettled.selector, FILL_REQUEST_ID));
-    vm.prank(address(s_sourceRouter));
     s_pool.ccipReceive(message);
   }
 
@@ -102,26 +97,21 @@ contract BurnMintFastTransferTokenPool_ccipReceive is BurnMintFastTransferTokenP
   }
 
   function test_CcipReceive_WithDifferentDecimals() public {
+    uint256 receiverBalanceBefore = s_token.balanceOf(RECEIVER);
+
     uint8 sourceDecimals = 6; // USDC-like decimals
     uint256 srcAmount = 100e6;
     uint256 expectedLocalAmount = 100 ether; // Should be scaled to 18 decimals
 
-    Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
-      messageId: FILL_REQUEST_ID,
-      sourceChainSelector: DEST_CHAIN_SELECTOR,
-      sender: abi.encode(s_remoteBurnMintPool),
-      data: abi.encode(
-        FastTransferTokenPoolAbstract.MintMessage({
-          sourceAmount: srcAmount,
-          sourceDecimals: sourceDecimals,
-          fastTransferFeeBps: FAST_FEE_BPS,
-          receiver: abi.encode(RECEIVER)
-        })
-      ),
-      destTokenAmounts: new Client.EVMTokenAmount[](0)
-    });
-
-    uint256 receiverBalanceBefore = s_token.balanceOf(RECEIVER);
+    Client.Any2EVMMessage memory message = _createCcipMessage();
+    message.data = abi.encode(
+      FastTransferTokenPoolAbstract.MintMessage({
+        sourceAmount: srcAmount,
+        sourceDecimals: sourceDecimals,
+        fastTransferFeeBps: FAST_FEE_BPS,
+        receiver: abi.encode(RECEIVER)
+      })
+    );
 
     vm.prank(address(s_sourceRouter));
     s_pool.ccipReceive(message);
@@ -130,25 +120,27 @@ contract BurnMintFastTransferTokenPool_ccipReceive is BurnMintFastTransferTokenP
   }
 
   function test_CcipReceive_OnlyRouter() public {
+    vm.prank(makeAddr("notRouter"));
+
     Client.Any2EVMMessage memory message = _createCcipMessage();
 
-    vm.expectRevert();
-    vm.prank(makeAddr("notRouter"));
+    vm.expectRevert(); // TODO define specific revert reason
     s_pool.ccipReceive(message);
   }
 
   function _createCcipMessage() internal view returns (Client.Any2EVMMessage memory) {
-    FastTransferTokenPoolAbstract.MintMessage memory mintMessage = FastTransferTokenPoolAbstract.MintMessage({
-      sourceAmount: TRANSFER_AMOUNT,
-      sourceDecimals: SRC_DECIMALS,
-      fastTransferFeeBps: FAST_FEE_BPS,
-      receiver: abi.encode(RECEIVER)
-    });
     return Client.Any2EVMMessage({
       messageId: FILL_REQUEST_ID,
       sourceChainSelector: DEST_CHAIN_SELECTOR,
       sender: abi.encode(s_remoteBurnMintPool),
-      data: abi.encode(mintMessage),
+      data: abi.encode(
+        FastTransferTokenPoolAbstract.MintMessage({
+          sourceAmount: TRANSFER_AMOUNT,
+          sourceDecimals: SOURCE_DECIMALS,
+          fastTransferFeeBps: FAST_FEE_BPS,
+          receiver: abi.encode(RECEIVER)
+        })
+      ),
       destTokenAmounts: new Client.EVMTokenAmount[](0)
     });
   }

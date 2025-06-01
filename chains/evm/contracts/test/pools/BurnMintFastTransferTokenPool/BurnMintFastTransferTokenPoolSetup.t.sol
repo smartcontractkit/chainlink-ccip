@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {Router} from "../../../Router.sol";
-
 import {Internal} from "../../../libraries/Internal.sol";
 import {BurnMintFastTransferTokenPool} from "../../../pools/BurnMintFastTransferTokenPool.sol";
 import {FastTransferTokenPoolAbstract} from "../../../pools/FastTransferTokenPoolAbstract.sol";
@@ -19,6 +18,11 @@ contract BurnMintFastTransferTokenPoolSetup is BaseTest {
   address internal s_remoteBurnMintPool = makeAddr("remote_burn_mint_pool");
   address internal s_remoteToken = makeAddr("remote_token");
   address internal s_filler = makeAddr("filler");
+
+  uint256 internal constant TRANSFER_AMOUNT = 100 ether;
+  address internal constant RECEIVER = address(0x1234);
+  uint8 internal constant SOURCE_DECIMALS = 18;
+  uint256 internal constant FILL_AMOUNT = 100 ether;
 
   uint16 internal constant FAST_FEE_BPS = 100; // 1%
   uint256 internal constant FILL_AMOUNT_MAX = 1000 ether;

@@ -10,8 +10,6 @@ import {TokenPool} from "../../../pools/TokenPool.sol";
 import {BurnMintFastTransferTokenPoolSetup} from "./BurnMintFastTransferTokenPoolSetup.t.sol";
 
 contract BurnMintFastTransferTokenPool_validateSendRequest is BurnMintFastTransferTokenPoolSetup {
-  uint256 internal constant TRANSFER_AMOUNT = 100 ether;
-  address internal constant RECEIVER = address(0x1234);
   uint256 internal constant CCIP_SEND_FEE = 1 ether;
   bytes32 internal constant MESSAGE_ID = keccak256("messageId");
 
@@ -27,7 +25,7 @@ contract BurnMintFastTransferTokenPool_validateSendRequest is BurnMintFastTransf
     s_token.approve(address(s_pool), type(uint256).max);
   }
 
-  function test_ValidateSendRequest_Success() public {
+  function test_validateSendRequest_Success() public {
     // This should not revert - all validations pass
     bytes32 fillRequestId = s_pool.ccipSendToken{value: CCIP_SEND_FEE}(
       address(0), // native fee token
@@ -40,7 +38,7 @@ contract BurnMintFastTransferTokenPool_validateSendRequest is BurnMintFastTransf
     assertTrue(fillRequestId != bytes32(0));
   }
 
-  function test_ValidateSendRequest_RevertWhen_CursedByRMN() public {
+  function test_validateSendRequest_RevertWhen_CursedByRMN() public {
     // Mock RMN to return cursed status for destination chain
     vm.mockCall(address(s_mockRMNRemote), abi.encodeWithSignature("isCursed(bytes16)"), abi.encode(true));
 
@@ -51,7 +49,7 @@ contract BurnMintFastTransferTokenPool_validateSendRequest is BurnMintFastTransf
     );
   }
 
-  function test_ValidateSendRequest_RevertWhen_ChainNotAllowed() public {
+  function test_validateSendRequest_RevertWhen_ChainNotAllowed() public {
     uint64 unsupportedChainSelector = 999999;
 
     // Should revert with ChainNotAllowed error
@@ -61,7 +59,7 @@ contract BurnMintFastTransferTokenPool_validateSendRequest is BurnMintFastTransf
     );
   }
 
-  function test_ValidateSendRequest_RevertWhen_SenderNotAllowlisted() public {
+  function test_validateSendRequest_RevertWhen_SenderNotAllowlisted() public {
     vm.stopPrank();
     // Create a pool with allowlist enabled
     address[] memory allowlist = new address[](1);
@@ -77,19 +75,17 @@ contract BurnMintFastTransferTokenPool_validateSendRequest is BurnMintFastTransf
     address unauthorizedSender = makeAddr("unauthorizedSender");
     deal(address(s_token), unauthorizedSender, TRANSFER_AMOUNT * 2);
     deal(unauthorizedSender, CCIP_SEND_FEE); // Ensure sender has enough ETH for the fee
-    vm.prank(unauthorizedSender);
+    vm.startPrank(unauthorizedSender);
     s_token.approve(address(poolWithAllowlist), type(uint256).max);
 
     // Should revert with SenderNotAllowed error (from _checkAllowList)
     vm.expectRevert(abi.encodeWithSelector(TokenPool.SenderNotAllowed.selector, unauthorizedSender));
-    vm.prank(unauthorizedSender);
     poolWithAllowlist.ccipSendToken{value: CCIP_SEND_FEE}(
       address(0), DEST_CHAIN_SELECTOR, TRANSFER_AMOUNT, abi.encode(RECEIVER), ""
     );
   }
 
-  function test_ValidateSendRequest_WithAllowlistedSender() public {
-    vm.stopPrank();
+  function test_validateSendRequest_WithAllowlistedSender() public {
     address allowlistedSender = makeAddr("allowlistedSender");
 
     // Create a pool with allowlist enabled
@@ -99,17 +95,17 @@ contract BurnMintFastTransferTokenPool_validateSendRequest is BurnMintFastTransf
     BurnMintFastTransferTokenPool poolWithAllowlist = new BurnMintFastTransferTokenPool(
       s_token, DEFAULT_TOKEN_DECIMALS, allowlist, address(s_mockRMNRemote), address(s_sourceRouter)
     );
-    vm.prank(OWNER);
     s_token.grantMintAndBurnRoles(address(poolWithAllowlist));
     // Setup chain and lane config for the new pool
     _setupPoolConfiguration(poolWithAllowlist);
 
     deal(address(s_token), allowlistedSender, TRANSFER_AMOUNT * 2);
-    vm.prank(allowlistedSender);
+
+    vm.stopPrank();
+    vm.startPrank(allowlistedSender);
     s_token.approve(address(poolWithAllowlist), type(uint256).max);
     deal(allowlistedSender, CCIP_SEND_FEE); // Ensure sender has enough ETH for the fee
     // Should succeed with allowlisted sender
-    vm.prank(allowlistedSender);
     bytes32 fillRequestId = poolWithAllowlist.ccipSendToken{value: CCIP_SEND_FEE}(
       address(0), DEST_CHAIN_SELECTOR, TRANSFER_AMOUNT, abi.encode(RECEIVER), ""
     );
@@ -117,8 +113,7 @@ contract BurnMintFastTransferTokenPool_validateSendRequest is BurnMintFastTransf
     assertTrue(fillRequestId != bytes32(0));
   }
 
-  function test_ValidateSendRequest_RMNCurseSpecificChain() public {
-    vm.stopPrank();
+  function test_validateSendRequest_RMNCurseSpecificChain() public {
     uint64 anotherChainSelector = 54321;
 
     // Add configuration for another chain
@@ -134,7 +129,6 @@ contract BurnMintFastTransferTokenPool_validateSendRequest is BurnMintFastTransf
       inboundRateLimiterConfig: _getInboundRateLimiterConfig()
     });
 
-    vm.prank(OWNER);
     s_pool.applyChainUpdates(new uint64[](0), chainUpdate);
 
     // Add lane config for the new chain
@@ -149,7 +143,6 @@ contract BurnMintFastTransferTokenPool_validateSendRequest is BurnMintFastTransf
       chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
       customExtraArgs: ""
     });
-    vm.prank(OWNER);
     s_pool.updateDestChainConfig(_singleConfigToList(laneConfigArgs));
 
     // Mock RMN to return cursed status only for the new chain
@@ -160,7 +153,6 @@ contract BurnMintFastTransferTokenPool_validateSendRequest is BurnMintFastTransf
     );
 
     // Original chain should still work
-    vm.prank(OWNER);
     bytes32 fillRequestId1 = s_pool.ccipSendToken{value: CCIP_SEND_FEE}(
       address(0), DEST_CHAIN_SELECTOR, TRANSFER_AMOUNT, abi.encode(RECEIVER), ""
     );
@@ -168,7 +160,6 @@ contract BurnMintFastTransferTokenPool_validateSendRequest is BurnMintFastTransf
 
     // New chain should revert due to curse
     vm.expectRevert(TokenPool.CursedByRMN.selector);
-    vm.prank(OWNER);
     s_pool.ccipSendToken{value: CCIP_SEND_FEE}(
       address(0), anotherChainSelector, TRANSFER_AMOUNT, abi.encode(RECEIVER), ""
     );
@@ -193,9 +184,6 @@ contract BurnMintFastTransferTokenPool_validateSendRequest is BurnMintFastTransf
     pool.applyChainUpdates(new uint64[](0), chainsToAdd);
 
     // Setup lane configuration
-    address[] memory addFillers = new address[](1);
-    addFillers[0] = s_filler;
-
     FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs memory laneConfigArgs = FastTransferTokenPoolAbstract
       .DestChainConfigUpdateArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
@@ -209,6 +197,5 @@ contract BurnMintFastTransferTokenPool_validateSendRequest is BurnMintFastTransf
     });
 
     pool.updateDestChainConfig(_singleConfigToList(laneConfigArgs));
-    pool.updateFillerAllowList(DEST_CHAIN_SELECTOR, addFillers, new address[](0));
   }
 }
