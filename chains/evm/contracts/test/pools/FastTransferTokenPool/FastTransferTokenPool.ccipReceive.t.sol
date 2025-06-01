@@ -14,7 +14,6 @@ import {IERC20Metadata} from
 contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
   bytes32 public constant MESSAGE_ID = bytes32("messageId");
   address public constant SOURCE_POOL = address(0x123);
-  address public constant RECEIVER = address(0x5);
 
   function setUp() public override {
     super.setUp();

@@ -10,12 +10,9 @@ contract FastTransferTokenPool_updateDestChainConfig is FastTransferTokenPoolSet
   bytes internal constant NEW_DESTINATION_POOL = abi.encode(address(0x5678));
   uint16 internal constant NEW_FAST_FEE_BPS = 200; // 2%
   uint256 internal constant NEW_FILL_AMOUNT_MAX = 2000 ether;
+  uint32 internal constant NEW_SETTLEMENT_GAS_OVERHEAD = SETTLEMENT_GAS_OVERHEAD + 100_000; // Increase by 100k
 
   function test_UpdateDestChainConfig() public {
-    address[] memory addFillers = new address[](2);
-    addFillers[0] = makeAddr("newFiller1");
-    addFillers[1] = makeAddr("newFiller2");
-
     FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs memory laneConfigArgs = FastTransferTokenPoolAbstract
       .DestChainConfigUpdateArgs({
       remoteChainSelector: NEW_CHAIN_SELECTOR,
@@ -23,7 +20,7 @@ contract FastTransferTokenPool_updateDestChainConfig is FastTransferTokenPoolSet
       fillerAllowlistEnabled: false,
       destinationPool: NEW_DESTINATION_POOL,
       maxFillAmountPerRequest: NEW_FILL_AMOUNT_MAX,
-      settlementOverheadGas: 200_000,
+      settlementOverheadGas: NEW_SETTLEMENT_GAS_OVERHEAD,
       chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
       customExtraArgs: ""
     });
@@ -35,12 +32,11 @@ contract FastTransferTokenPool_updateDestChainConfig is FastTransferTokenPoolSet
       NEW_FILL_AMOUNT_MAX,
       NEW_DESTINATION_POOL,
       Internal.CHAIN_FAMILY_SELECTOR_EVM,
-      200_000,
+      NEW_SETTLEMENT_GAS_OVERHEAD,
       false
     );
 
     s_pool.updateDestChainConfig(_singleConfigToList(laneConfigArgs));
-    s_pool.updateFillerAllowList(NEW_CHAIN_SELECTOR, addFillers, new address[](0));
 
     (FastTransferTokenPoolAbstract.DestChainConfig memory config,) = s_pool.getDestChainConfig(NEW_CHAIN_SELECTOR);
     assertEq(config.fastTransferBpsFee, NEW_FAST_FEE_BPS);
@@ -50,15 +46,14 @@ contract FastTransferTokenPool_updateDestChainConfig is FastTransferTokenPoolSet
   }
 
   function test_UpdateDestChainConfig_ModifyExisting() public {
-    // Modify existing lane config
     FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs memory laneConfigArgs = FastTransferTokenPoolAbstract
       .DestChainConfigUpdateArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       fastTransferBpsFee: NEW_FAST_FEE_BPS,
-      fillerAllowlistEnabled: false, // disable whitelist
+      fillerAllowlistEnabled: false, // disable allowlist
       destinationPool: NEW_DESTINATION_POOL,
       maxFillAmountPerRequest: NEW_FILL_AMOUNT_MAX,
-      settlementOverheadGas: 200_000,
+      settlementOverheadGas: NEW_SETTLEMENT_GAS_OVERHEAD,
       chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
       customExtraArgs: ""
     });
@@ -80,7 +75,7 @@ contract FastTransferTokenPool_updateDestChainConfig is FastTransferTokenPoolSet
       fillerAllowlistEnabled: true,
       destinationPool: NEW_DESTINATION_POOL,
       maxFillAmountPerRequest: NEW_FILL_AMOUNT_MAX,
-      settlementOverheadGas: 200_000,
+      settlementOverheadGas: NEW_SETTLEMENT_GAS_OVERHEAD,
       chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
       customExtraArgs: ""
     });
@@ -106,7 +101,7 @@ contract FastTransferTokenPool_updateDestChainConfig is FastTransferTokenPoolSet
       fillerAllowlistEnabled: true,
       destinationPool: NEW_DESTINATION_POOL,
       maxFillAmountPerRequest: NEW_FILL_AMOUNT_MAX,
-      settlementOverheadGas: 200_000,
+      settlementOverheadGas: NEW_SETTLEMENT_GAS_OVERHEAD,
       chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
       customExtraArgs: ""
     });
@@ -125,7 +120,7 @@ contract FastTransferTokenPool_updateDestChainConfig is FastTransferTokenPoolSet
       fillerAllowlistEnabled: true,
       destinationPool: NEW_DESTINATION_POOL,
       maxFillAmountPerRequest: NEW_FILL_AMOUNT_MAX,
-      settlementOverheadGas: 200_000,
+      settlementOverheadGas: NEW_SETTLEMENT_GAS_OVERHEAD,
       chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
       customExtraArgs: ""
     });

@@ -20,6 +20,8 @@ contract FastTransferTokenPoolSetup is BaseTest {
   uint8 public constant SOURCE_DECIMALS = 18;
   uint16 public constant FAST_FEE_BPS = 100; // 1%
 
+  address public constant RECEIVER = address(0x5);
+
   uint32 internal constant SVM_CHAIN_SELECTOR = uint32(uint256(keccak256("SVM_SELECTOR")));
   uint32 internal constant SETTLEMENT_GAS_OVERHEAD = 200_000;
   uint256 internal constant MAX_FILL_AMOUNT_PER_REQUEST = 1000 ether;

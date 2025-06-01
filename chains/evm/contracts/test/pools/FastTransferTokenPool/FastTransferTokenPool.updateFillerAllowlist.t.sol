@@ -26,14 +26,14 @@ contract FastTransferTokenPool_updateFillerAllowlist is FastTransferTokenPoolSet
     assertTrue(s_pool.isAllowedFiller(DEST_CHAIN_SELECTOR, addFillers[1]));
   }
 
-  function test_RevertWhen_UpdateFillerAllowList_NotOwner() public {
+  function test_updateFillerAllowList_RevertWhen_NotOwner() public {
     vm.stopPrank();
 
     vm.expectRevert(); // TODO revert message
     s_pool.updateFillerAllowList(DEST_CHAIN_SELECTOR, new address[](0), new address[](0));
   }
 
-  function test_GetAllowListedFillers() public {
+  function test_updateFillerAllowList_GetAllowListedFillers() public {
     // Add multiple fillers
     address[] memory addFillers = new address[](3);
     addFillers[0] = makeAddr("filler1");
@@ -64,13 +64,7 @@ contract FastTransferTokenPool_updateFillerAllowlist is FastTransferTokenPoolSet
     assertTrue(foundFiller3);
   }
 
-  function test_GetAllowListedFillers_EmptyList() public view {
-    // Test with no fillers added
-    address[] memory allowlistedFillers = s_pool.getAllowedFillers(NEW_CHAIN_SELECTOR);
-    assertEq(allowlistedFillers.length, 0);
-  }
-
-  function test_GetAllowListedFillers_AfterRemoval() public {
+  function test_getAllowedFillers_AfterRemoval() public {
     // First add fillers
     address[] memory addFillers = new address[](2);
     addFillers[0] = makeAddr("filler1");

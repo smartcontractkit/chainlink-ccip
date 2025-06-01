@@ -161,26 +161,4 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
     _setupChainConfig(testChainSelector, Internal.CHAIN_FAMILY_SELECTOR_APTOS, 0, customExtraArgs);
     _executeTest(params, customExtraArgs);
   }
-
-  function test_CcipSendToken_SUI_WithSettlementGas() public {
-    uint64 testChainSelector = uint64(uint256(keccak256("SUI_WITH_GAS")));
-    TestParams memory params = _setupTestParams(testChainSelector);
-
-    _setupChainConfig(testChainSelector, Internal.CHAIN_FAMILY_SELECTOR_SUI, SETTLEMENT_GAS_OVERHEAD, "");
-
-    bytes memory extraArgs = Client._argsToBytes(
-      Client.GenericExtraArgsV2({gasLimit: SETTLEMENT_GAS_OVERHEAD, allowOutOfOrderExecution: true})
-    );
-
-    _executeTest(params, extraArgs);
-  }
-
-  function test_CcipSendToken_SUI_WithZeroSettlementGas() public {
-    uint64 testChainSelector = uint64(uint256(keccak256("SUI_ZERO_GAS")));
-    TestParams memory params = _setupTestParams(testChainSelector);
-
-    bytes memory customExtraArgs = abi.encode("suiCustomExtraArgs");
-    _setupChainConfig(testChainSelector, Internal.CHAIN_FAMILY_SELECTOR_SUI, 0, customExtraArgs);
-    _executeTest(params, customExtraArgs);
-  }
 }

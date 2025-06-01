@@ -9,7 +9,6 @@ import {FastTransferTokenPoolSetup} from "./FastTransferTokenPoolSetup.t.sol";
 
 contract FastTransferTokenPool_fastFill_Test is FastTransferTokenPoolSetup {
   bytes32 public constant FILL_REQUEST_ID = bytes32("fillRequestId");
-  address public constant RECEIVER = address(0x5);
 
   function setUp() public override {
     super.setUp();
@@ -31,10 +30,10 @@ contract FastTransferTokenPool_fastFill_Test is FastTransferTokenPoolSetup {
     assertEq(s_token.balanceOf(RECEIVER), SOURCE_AMOUNT);
   }
 
-  function test_FastFill_WhitelistDisabled() public {
+  function test_FastFill_AllowlistDisabled() public {
     vm.stopPrank();
     vm.prank(OWNER);
-    // Disable whitelist
+    // Disable allowlist
     FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs memory laneConfigArgs = FastTransferTokenPoolAbstract
       .DestChainConfigUpdateArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
@@ -42,27 +41,27 @@ contract FastTransferTokenPool_fastFill_Test is FastTransferTokenPoolSetup {
       fillerAllowlistEnabled: false,
       destinationPool: destPoolAddress,
       maxFillAmountPerRequest: 1000 ether,
-      settlementOverheadGas: 200_000,
+      settlementOverheadGas: SETTLEMENT_GAS_OVERHEAD,
       chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
       customExtraArgs: ""
     });
     s_pool.updateDestChainConfig(_singleConfigToList(laneConfigArgs));
 
-    address nonWhitelistedFiller = address(0x6);
+    address nonAllowlistedFiller = address(0x6);
 
     bytes32 fillId = s_pool.computeFillId(FILL_REQUEST_ID, SOURCE_AMOUNT, SOURCE_DECIMALS, RECEIVER);
 
-    // Mint tokens to non-whitelisted filler
-    deal(nonWhitelistedFiller, 1000 ether);
-    deal(address(s_token), nonWhitelistedFiller, 1000 ether);
-    vm.startPrank(nonWhitelistedFiller);
+    // Mint tokens to non-allowlisted filler
+    deal(nonAllowlistedFiller, 1000 ether);
+    deal(address(s_token), nonAllowlistedFiller, 1000 ether);
+    vm.startPrank(nonAllowlistedFiller);
     s_token.approve(address(s_pool), type(uint256).max);
 
-    // Should succeed even though filler is not whitelisted
+    // Should succeed even though filler is not allowlisted
     s_pool.fastFill(FILL_REQUEST_ID, fillId, SOURCE_CHAIN_SELECTOR, SOURCE_AMOUNT, SOURCE_DECIMALS, RECEIVER);
 
     // Verify token balances
-    assertEq(s_token.balanceOf(nonWhitelistedFiller), 1000 ether - SOURCE_AMOUNT);
+    assertEq(s_token.balanceOf(nonAllowlistedFiller), 1000 ether - SOURCE_AMOUNT);
     assertEq(s_token.balanceOf(RECEIVER), SOURCE_AMOUNT);
   }
 
@@ -77,15 +76,15 @@ contract FastTransferTokenPool_fastFill_Test is FastTransferTokenPoolSetup {
     s_pool.fastFill(FILL_REQUEST_ID, fillId, DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, SOURCE_DECIMALS, RECEIVER);
   }
 
-  function test_FastFill_RevertWhen_FillerNotWhitelisted() public {
+  function test_FastFill_RevertWhen_FillerNotAllowlisted() public {
     vm.stopPrank();
 
-    address nonWhitelistedFiller = address(0x6);
-    vm.startPrank(nonWhitelistedFiller);
+    address nonAllowlistedFiller = address(0x6);
+    vm.startPrank(nonAllowlistedFiller);
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        FastTransferTokenPoolAbstract.FillerNotAllowlisted.selector, DEST_CHAIN_SELECTOR, nonWhitelistedFiller
+        FastTransferTokenPoolAbstract.FillerNotAllowlisted.selector, DEST_CHAIN_SELECTOR, nonAllowlistedFiller
       )
     );
     s_pool.fastFill(FILL_REQUEST_ID, bytes32(0x0), DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, SOURCE_DECIMALS, RECEIVER);

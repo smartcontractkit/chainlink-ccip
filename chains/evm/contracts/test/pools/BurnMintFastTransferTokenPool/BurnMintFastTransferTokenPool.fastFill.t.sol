@@ -121,7 +121,7 @@ contract BurnMintFastTransferTokenPool_fastFill is BurnMintFastTransferTokenPool
     s_pool.fastFill(FILL_REQUEST_ID, fillIdWithWrongReceiver, DEST_CHAIN_SELECTOR, FILL_AMOUNT, SRC_DECIMALS, RECEIVER);
   }
 
-  function test_RevertWhen_FillerNotWhitelisted() public {
+  function test_RevertWhen_FillerNotAllowlisted() public {
     address unauthorizedFiller = makeAddr("unauthorizedFiller");
     deal(address(s_token), unauthorizedFiller, type(uint256).max);
     vm.prank(unauthorizedFiller);
@@ -138,8 +138,8 @@ contract BurnMintFastTransferTokenPool_fastFill is BurnMintFastTransferTokenPool
     s_pool.fastFill(FILL_REQUEST_ID, fillId, DEST_CHAIN_SELECTOR, FILL_AMOUNT, SRC_DECIMALS, RECEIVER);
   }
 
-  function test_FastFill_WithWhitelistDisabled() public {
-    // Disable whitelist
+  function test_FastFill_WithAllowlistDisabled() public {
+    // Disable allowlist
     FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs memory laneConfigArgs = FastTransferTokenPoolAbstract
       .DestChainConfigUpdateArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
@@ -147,7 +147,7 @@ contract BurnMintFastTransferTokenPool_fastFill is BurnMintFastTransferTokenPool
       fillerAllowlistEnabled: false, // disabled
       destinationPool: abi.encode(s_remoteBurnMintPool),
       maxFillAmountPerRequest: FILL_AMOUNT_MAX,
-      settlementOverheadGas: 200_000,
+      settlementOverheadGas: SETTLEMENT_GAS_OVERHEAD,
       chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
       customExtraArgs: ""
     });
@@ -177,7 +177,7 @@ contract BurnMintFastTransferTokenPool_fastFill is BurnMintFastTransferTokenPool
   function test_FastFill_MultipleFillers() public {
     address filler2 = makeAddr("filler2");
 
-    // Add second filler to whitelist
+    // Add second filler to allowlist
     address[] memory addFillers = new address[](1);
     addFillers[0] = filler2;
     vm.prank(OWNER);

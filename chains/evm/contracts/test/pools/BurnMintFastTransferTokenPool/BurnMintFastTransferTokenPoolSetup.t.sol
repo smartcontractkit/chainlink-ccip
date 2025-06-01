@@ -22,6 +22,7 @@ contract BurnMintFastTransferTokenPoolSetup is BaseTest {
 
   uint16 internal constant FAST_FEE_BPS = 100; // 1%
   uint256 internal constant FILL_AMOUNT_MAX = 1000 ether;
+  uint32 internal constant SETTLEMENT_GAS_OVERHEAD = 200_000;
 
   function setUp() public virtual override {
     super.setUp();
@@ -71,7 +72,7 @@ contract BurnMintFastTransferTokenPoolSetup is BaseTest {
       fillerAllowlistEnabled: true,
       destinationPool: abi.encode(s_remoteBurnMintPool),
       maxFillAmountPerRequest: FILL_AMOUNT_MAX,
-      settlementOverheadGas: 200_000,
+      settlementOverheadGas: SETTLEMENT_GAS_OVERHEAD,
       chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
       customExtraArgs: ""
     });

@@ -145,7 +145,7 @@ contract BurnMintFastTransferTokenPool_validateSendRequest is BurnMintFastTransf
       fillerAllowlistEnabled: true,
       destinationPool: abi.encode(s_remoteBurnMintPool),
       maxFillAmountPerRequest: FILL_AMOUNT_MAX,
-      settlementOverheadGas: 200_000,
+      settlementOverheadGas: SETTLEMENT_GAS_OVERHEAD,
       chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
       customExtraArgs: ""
     });
@@ -203,7 +203,7 @@ contract BurnMintFastTransferTokenPool_validateSendRequest is BurnMintFastTransf
       fillerAllowlistEnabled: true,
       destinationPool: abi.encode(s_remoteBurnMintPool),
       maxFillAmountPerRequest: FILL_AMOUNT_MAX,
-      settlementOverheadGas: 200_000,
+      settlementOverheadGas: SETTLEMENT_GAS_OVERHEAD,
       chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
       customExtraArgs: ""
     });
