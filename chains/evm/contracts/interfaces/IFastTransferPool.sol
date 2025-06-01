@@ -10,13 +10,13 @@ interface IFastTransferPool {
     uint256 fastTransferFee; // Fee paid to the fast transfer filler in the same asset as requested.
   }
 
-  error AlreadyFilled(bytes32 fillRequestId);
-  error AlreadySettled(bytes32 fillRequestId);
+  error AlreadyFilled(bytes32 fillId);
+  error AlreadySettled(bytes32 fillId);
 
   /// @notice Emitted when a fast transfer is requested
   event FastTransferRequested(
-    bytes32 indexed settlementId,
     uint64 indexed destinationChainSelector,
+    bytes32 indexed settlementId,
     uint256 amount,
     uint256 fastTransferFee,
     bytes receiver
@@ -51,25 +51,24 @@ interface IFastTransferPool {
   /// @param amount The amount to transfer
   /// @param receiver The receiver address
   /// @param extraArgs Extra arguments for the transfer
-  /// @return fillRequestId The fill request ID
+  /// @return settlementId The fill request ID.
   function ccipSendToken(
     address feeToken,
     uint64 destinationChainSelector,
     uint256 amount,
     bytes calldata receiver,
     bytes calldata extraArgs
-  ) external payable returns (bytes32 fillRequestId);
+  ) external payable returns (bytes32 settlementId);
 
   /// @notice Fast fills a transfer using liquidity provider funds
-  /// @param fillRequestId The fill request ID
-  /// @param fillId The fill ID, computed from the fill request parameters
-  /// @param sourceChainSelector The source chain selector
-  /// @param sourceAmountNetFee The amount to fill,
-  /// calculated as the amount sent in `ccipSendToken` minus the fast fill fee, expressed in source token decimals
-  /// @param sourceDecimals The decimals of the source token
-  /// @param receiver The receiver address
+  /// @param settlementId The settlement ID, which under normal circumstances is the same as the CCIP message ID.
+  /// @param fillId The fill ID, computed from the fill request parameters.
+  /// @param sourceChainSelector The source chain selector.
+  /// @param sourceAmountNetFee The amount being filled, excluding the fast fill fee, expressed in source token decimals.
+  /// @param sourceDecimals The decimals of the token on the source token.
+  /// @param receiver The receiver address on the destination chain.
   function fastFill(
-    bytes32 fillRequestId,
+    bytes32 settlementId,
     bytes32 fillId,
     uint64 sourceChainSelector,
     uint256 sourceAmountNetFee,
@@ -77,14 +76,14 @@ interface IFastTransferPool {
     address receiver
   ) external;
 
-  /// @notice Helper function to generate fill ID from request parameters
-  /// @param fillRequestId The original fill request ID
-  /// @param amount The amount being filled
-  /// @param receiver The receiver address
-  /// @return fillId The computed fill ID
+  /// @notice Helper function to generate fill ID from request parameters.
+  /// @param settlementId The settlement ID, which under normal circumstances is the same as the CCIP message ID.
+  /// @param sourceAmountNetFee The amount being filled, excluding the fast fill fee, expressed in source token decimals.
+  /// @param receiver The receiver address on the destination chain.
+  /// @return fillId The computed fill ID.
   function computeFillId(
-    bytes32 fillRequestId,
-    uint256 amount,
+    bytes32 settlementId,
+    uint256 sourceAmountNetFee,
     uint8 decimals,
     address receiver
   ) external pure returns (bytes32);

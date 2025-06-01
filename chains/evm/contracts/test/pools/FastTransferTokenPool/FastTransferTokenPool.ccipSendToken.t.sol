@@ -112,9 +112,13 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
       address(s_sourceRouter), abi.encodeWithSelector(IRouterClient.ccipSend.selector, params.chainSelector, message)
     );
     vm.expectEmit();
-    emit IFastTransferPool.FastTransferRequested(
-      params.mockMessageId, params.chainSelector, params.amount, expectedFee, params.receiver
-    );
+    emit IFastTransferPool.FastTransferRequested({
+      destinationChainSelector: params.chainSelector,
+      settlementId: params.mockMessageId,
+      amount: params.amount,
+      fastTransferFee: expectedFee,
+      receiver: params.receiver
+    });
 
     uint256 balanceBefore = s_token.balanceOf(OWNER);
     bytes32 settlementId =

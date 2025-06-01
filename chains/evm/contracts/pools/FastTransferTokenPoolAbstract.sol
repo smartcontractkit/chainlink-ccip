@@ -142,8 +142,8 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     settlementId = IRouterClient(getRouter()).ccipSend{value: msg.value}(destinationChainSelector, message);
 
     emit FastTransferRequested({
-      settlementId: settlementId,
       destinationChainSelector: destinationChainSelector,
+      settlementId: settlementId,
       amount: amount,
       fastTransferFee: quote.fastTransferFee,
       receiver: receiver
@@ -234,7 +234,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   // ================================================================
 
   /// @notice Fast fills a transfer using liquidity provider funds based on CCIP settlement
-  /// @param settlementId The fill request ID
+  /// @param settlementId The settlement ID, which under normal circumstances is the same as the CCIP message ID.
   /// @param fillId The fill ID, computed from the fill request parameters
   /// @param sourceAmountNetFee The amount to fill, calculated as the amount sent in
   /// `ccipSendToken` minus the fast fill fee, expressed in source token decimals
@@ -259,7 +259,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     }
 
     FillInfo memory fillInfo = s_fills[fillId];
-    if (fillInfo.state != FillState.NOT_FILLED) revert AlreadyFilled(settlementId);
+    if (fillInfo.state != FillState.NOT_FILLED) revert AlreadyFilled(fillId);
 
     // Calculate the local amount.
     uint256 localAmount = _calculateLocalAmount(sourceAmountNetFee, sourceDecimals);
@@ -310,7 +310,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
       _handleFastFillReimbursement(fillInfo.filler, localAmount);
     } else {
       // The catch all assertion for already settled fills ensures that any wrong value will revert.
-      revert AlreadySettled(settlementId);
+      revert AlreadySettled(fillId);
     }
 
     s_fills[fillId].state = FillState.SETTLED;

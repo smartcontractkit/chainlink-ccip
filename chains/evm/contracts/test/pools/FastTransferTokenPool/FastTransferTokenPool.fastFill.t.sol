@@ -129,7 +129,7 @@ contract FastTransferTokenPool_fastFill_Test is FastTransferTokenPoolSetup {
     s_pool.fastFill(FILL_REQUEST_ID, fillId, DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, SOURCE_DECIMALS, RECEIVER);
 
     // Attempt second fill
-    vm.expectRevert(abi.encodeWithSelector(IFastTransferPool.AlreadyFilled.selector, FILL_REQUEST_ID));
+    vm.expectRevert(abi.encodeWithSelector(IFastTransferPool.AlreadyFilled.selector, fillId));
     s_pool.fastFill(FILL_REQUEST_ID, fillId, DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, SOURCE_DECIMALS, RECEIVER);
   }
 

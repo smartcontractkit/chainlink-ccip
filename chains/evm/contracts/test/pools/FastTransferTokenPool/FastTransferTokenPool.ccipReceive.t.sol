@@ -111,8 +111,11 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
     // First settlement
     s_pool.ccipReceive(message);
 
+    uint256 amountToFill = SOURCE_AMOUNT - (SOURCE_AMOUNT * FAST_FEE_BPS / 10_000);
+    bytes32 fillId = s_pool.computeFillId(MESSAGE_ID, amountToFill, SOURCE_DECIMALS, RECEIVER);
+
     // Try to settle again - should revert
-    vm.expectRevert(abi.encodeWithSelector(IFastTransferPool.AlreadySettled.selector, MESSAGE_ID));
+    vm.expectRevert(abi.encodeWithSelector(IFastTransferPool.AlreadySettled.selector, fillId));
     s_pool.ccipReceive(message);
   }
 
