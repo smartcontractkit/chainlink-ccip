@@ -16,9 +16,6 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
   address public constant SOURCE_POOL = address(0x123);
   address public constant RECEIVER = address(0x5);
 
-  uint256 public SOURCE_AMOUNT = 100 ether;
-  uint8 public SOURCE_DECIMALS = 18;
-
   function setUp() public override {
     super.setUp();
 

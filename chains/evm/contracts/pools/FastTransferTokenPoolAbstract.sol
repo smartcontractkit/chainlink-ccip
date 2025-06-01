@@ -247,6 +247,14 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     uint8 sourceDecimals,
     address receiver
   ) public virtual {
+    {
+      DestChainConfig storage destChainConfig = s_fastTransferDestChainConfig[sourceChainSelector];
+      if (destChainConfig.fillerAllowlistEnabled) {
+        if (!s_fillerAllowLists[sourceChainSelector].contains(msg.sender)) {
+          revert FillerNotAllowlisted(sourceChainSelector, msg.sender);
+        }
+      }
+    }
     // Calculate the local amount.
     uint256 localAmount = _calculateLocalAmount(srcAmountToFill, sourceDecimals);
     // We rate limit when there are funds going to an end user, not when they are going to a filler.
@@ -260,14 +268,6 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     FillInfo memory fillInfo = s_fills[fillId];
     if (fillInfo.state != FillState.NOT_FILLED) revert AlreadyFilled(fillRequestId);
 
-    {
-      DestChainConfig storage destChainConfig = s_fastTransferDestChainConfig[sourceChainSelector];
-      if (destChainConfig.fillerAllowlistEnabled) {
-        if (!s_fillerAllowLists[sourceChainSelector].contains(msg.sender)) {
-          revert FillerNotAllowlisted(sourceChainSelector, msg.sender);
-        }
-      }
-    }
     // Record fill
     s_fills[fillId] = FillInfo({state: FillState.FILLED, filler: msg.sender});
     emit FastTransferFilled(fillRequestId, fillId, msg.sender, localAmount, receiver);

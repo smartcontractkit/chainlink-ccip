@@ -14,7 +14,7 @@ contract FastTransferTokenPool_constructor is FastTransferTokenPoolSetup {
     assertEq(address(s_token), address(s_pool.getToken()));
     assertEq(address(s_mockRMNRemote), s_pool.getRmnProxy());
     assertEq(address(s_sourceRouter), s_pool.getRouter());
-    assertEq(false, s_pool.getAllowListEnabled());
+    assertFalse(s_pool.getAllowListEnabled());
   }
 
   function test_SupportsInterface() public view {

@@ -22,10 +22,9 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
   function _setupTestParams(
     uint64 chainSelector
   ) internal pure returns (TestParams memory) {
-    uint256 amount = 100e18;
     return TestParams({
       chainSelector: chainSelector,
-      amount: amount,
+      amount: SOURCE_AMOUNT,
       receiver: abi.encodePacked(address(0x5)),
       mockMessageId: keccak256("mockMessageId"),
       fastFeeBpsExpected: FAST_FEE_BPS
