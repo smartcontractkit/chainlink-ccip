@@ -236,14 +236,15 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   /// @notice Fast fills a transfer using liquidity provider funds based on CCIP settlement
   /// @param fillRequestId The fill request ID
   /// @param fillId The fill ID, computed from the fill request parameters
-  /// @param srcAmountToFill The amount to fill
+  /// @param sourceAmountNetFee The amount to fill,
+  /// calculated as the amount sent in `ccipSendToken` minus the fast fill fee, expressed in source token decimals
   /// @param sourceDecimals The decimals of the source token
   /// @param receiver The receiver address
   function fastFill(
     bytes32 fillRequestId,
     bytes32 fillId,
     uint64 sourceChainSelector,
-    uint256 srcAmountToFill,
+    uint256 sourceAmountNetFee,
     uint8 sourceDecimals,
     address receiver
   ) public virtual {
@@ -256,13 +257,13 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
       }
     }
     // Calculate the local amount.
-    uint256 localAmount = _calculateLocalAmount(srcAmountToFill, sourceDecimals);
+    uint256 localAmount = _calculateLocalAmount(sourceAmountNetFee, sourceDecimals);
     // We rate limit when there are funds going to an end user, not when they are going to a filler.
     _consumeInboundRateLimit(sourceChainSelector, localAmount);
     // Transfer tokens from filler to receiver
     _transferFromFiller(msg.sender, receiver, localAmount);
 
-    if (fillId != computeFillId(fillRequestId, srcAmountToFill, sourceDecimals, receiver)) {
+    if (fillId != computeFillId(fillRequestId, sourceAmountNetFee, sourceDecimals, receiver)) {
       revert InvalidFillRequestId(fillRequestId);
     }
     FillInfo memory fillInfo = s_fills[fillId];

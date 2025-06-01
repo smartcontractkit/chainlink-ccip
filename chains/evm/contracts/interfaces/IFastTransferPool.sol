@@ -64,14 +64,15 @@ interface IFastTransferPool {
   /// @param fillRequestId The fill request ID
   /// @param fillId The fill ID, computed from the fill request parameters
   /// @param sourceChainSelector The source chain selector
-  /// @param srcAmount The amount to fill
+  /// @param sourceAmountNetFee The amount to fill,
+  /// calculated as the amount sent in `ccipSendToken` minus the fast fill fee, expressed in source token decimals
   /// @param sourceDecimals The decimals of the source token
   /// @param receiver The receiver address
   function fastFill(
     bytes32 fillRequestId,
     bytes32 fillId,
     uint64 sourceChainSelector,
-    uint256 srcAmount,
+    uint256 sourceAmountNetFee,
     uint8 sourceDecimals,
     address receiver
   ) external;
