@@ -21,12 +21,12 @@ contract BurnMintFastTransferTokenPool_ccipSendToken is BurnMintFastTransferToke
     vm.mockCall(
       address(s_sourceRouter), abi.encodeWithSelector(IRouterClient.ccipSend.selector), abi.encode(MESSAGE_ID)
     );
-    deal(address(s_burnMintERC20), OWNER, TRANSFER_AMOUNT * 10);
-    s_burnMintERC20.approve(address(s_pool), type(uint256).max);
+    deal(address(s_token), OWNER, TRANSFER_AMOUNT * 10);
+    s_token.approve(address(s_pool), type(uint256).max);
   }
 
   function test_CcipSendToken() public {
-    uint256 balanceBefore = s_burnMintERC20.balanceOf(OWNER);
+    uint256 balanceBefore = s_token.balanceOf(OWNER);
 
     IFastTransferPool.Quote memory quote = s_pool.getCcipSendTokenFee(
       address(0), // native fee token
@@ -54,13 +54,13 @@ contract BurnMintFastTransferTokenPool_ccipSendToken is BurnMintFastTransferToke
     );
 
     assertEq(fillRequestId, MESSAGE_ID);
-    assertEq(s_burnMintERC20.balanceOf(OWNER), balanceBefore - TRANSFER_AMOUNT);
+    assertEq(s_token.balanceOf(OWNER), balanceBefore - TRANSFER_AMOUNT);
   }
 
   function test_CcipSendToken_WithERC20FeeToken() public {
     // Setup fee token
-    address feeToken = address(s_burnMintERC20);
-    uint256 balanceBefore = s_burnMintERC20.balanceOf(OWNER);
+    address feeToken = address(s_token);
+    uint256 balanceBefore = s_token.balanceOf(OWNER);
 
     IFastTransferPool.Quote memory quote =
       s_pool.getCcipSendTokenFee(feeToken, DEST_CHAIN_SELECTOR, TRANSFER_AMOUNT, abi.encode(RECEIVER), "");
@@ -69,7 +69,7 @@ contract BurnMintFastTransferTokenPool_ccipSendToken is BurnMintFastTransferToke
       s_pool.ccipSendToken(feeToken, DEST_CHAIN_SELECTOR, TRANSFER_AMOUNT, abi.encode(RECEIVER), "");
 
     assertTrue(fillRequestId != bytes32(0));
-    assertEq(s_burnMintERC20.balanceOf(OWNER), balanceBefore - TRANSFER_AMOUNT - quote.ccipSettlementFee);
+    assertEq(s_token.balanceOf(OWNER), balanceBefore - TRANSFER_AMOUNT - quote.ccipSettlementFee);
   }
 
   function test_CcipSendToken_ToSVM() public {}

@@ -24,12 +24,11 @@ contract FastTransferTokenPoolSetup is BaseTest {
   IERC20 internal s_token;
   FastTransferTokenPoolHelper public s_pool;
   WETH9 public wrappedNative;
-  bytes public destPoolAddress;
-  address public s_filler;
+  bytes public destPoolAddress = abi.encode(makeAddr("destPool"));
+  address public s_filler = makeAddr("filler");
 
   function setUp() public virtual override {
     super.setUp();
-    destPoolAddress = abi.encode(makeAddr("destPool"));
     address onRamp = makeAddr("onRamp");
     s_svmExtraArgsBytesEncoded = Client._svmArgsToBytes(
       Client.SVMExtraArgsV1({
@@ -44,7 +43,6 @@ contract FastTransferTokenPoolSetup is BaseTest {
     onRampUpdates[0] = Router.OnRamp({destChainSelector: DEST_CHAIN_SELECTOR, onRamp: onRamp});
     s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), new Router.OffRamp[](0));
 
-    s_filler = makeAddr("filler");
     s_token = new BurnMintERC20("LINK", "LNK", 18, 0, 0);
 
     deal(address(s_token), OWNER, type(uint256).max);

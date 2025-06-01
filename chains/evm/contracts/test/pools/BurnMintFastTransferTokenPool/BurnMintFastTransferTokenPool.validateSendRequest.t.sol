@@ -23,8 +23,8 @@ contract BurnMintFastTransferTokenPool_validateSendRequest is BurnMintFastTransf
     vm.mockCall(
       address(s_sourceRouter), abi.encodeWithSelector(IRouterClient.ccipSend.selector), abi.encode(MESSAGE_ID)
     );
-    deal(address(s_burnMintERC20), OWNER, TRANSFER_AMOUNT * 10);
-    s_burnMintERC20.approve(address(s_pool), type(uint256).max);
+    deal(address(s_token), OWNER, TRANSFER_AMOUNT * 10);
+    s_token.approve(address(s_pool), type(uint256).max);
   }
 
   function test_ValidateSendRequest_Success() public {
@@ -68,17 +68,17 @@ contract BurnMintFastTransferTokenPool_validateSendRequest is BurnMintFastTransf
     allowlist[0] = OWNER; // Only OWNER is allowed
 
     BurnMintFastTransferTokenPool poolWithAllowlist = new BurnMintFastTransferTokenPool(
-      s_burnMintERC20, DEFAULT_TOKEN_DECIMALS, allowlist, address(s_mockRMNRemote), address(s_sourceRouter)
+      s_token, DEFAULT_TOKEN_DECIMALS, allowlist, address(s_mockRMNRemote), address(s_sourceRouter)
     );
 
     // Setup chain and lane config for the new pool
     _setupPoolConfiguration(poolWithAllowlist);
 
     address unauthorizedSender = makeAddr("unauthorizedSender");
-    deal(address(s_burnMintERC20), unauthorizedSender, TRANSFER_AMOUNT * 2);
+    deal(address(s_token), unauthorizedSender, TRANSFER_AMOUNT * 2);
     deal(unauthorizedSender, CCIP_SEND_FEE); // Ensure sender has enough ETH for the fee
     vm.prank(unauthorizedSender);
-    s_burnMintERC20.approve(address(poolWithAllowlist), type(uint256).max);
+    s_token.approve(address(poolWithAllowlist), type(uint256).max);
 
     // Should revert with SenderNotAllowed error (from _checkAllowList)
     vm.expectRevert(abi.encodeWithSelector(TokenPool.SenderNotAllowed.selector, unauthorizedSender));
@@ -97,16 +97,16 @@ contract BurnMintFastTransferTokenPool_validateSendRequest is BurnMintFastTransf
     allowlist[0] = allowlistedSender;
 
     BurnMintFastTransferTokenPool poolWithAllowlist = new BurnMintFastTransferTokenPool(
-      s_burnMintERC20, DEFAULT_TOKEN_DECIMALS, allowlist, address(s_mockRMNRemote), address(s_sourceRouter)
+      s_token, DEFAULT_TOKEN_DECIMALS, allowlist, address(s_mockRMNRemote), address(s_sourceRouter)
     );
     vm.prank(OWNER);
-    s_burnMintERC20.grantMintAndBurnRoles(address(poolWithAllowlist));
+    s_token.grantMintAndBurnRoles(address(poolWithAllowlist));
     // Setup chain and lane config for the new pool
     _setupPoolConfiguration(poolWithAllowlist);
 
-    deal(address(s_burnMintERC20), allowlistedSender, TRANSFER_AMOUNT * 2);
+    deal(address(s_token), allowlistedSender, TRANSFER_AMOUNT * 2);
     vm.prank(allowlistedSender);
-    s_burnMintERC20.approve(address(poolWithAllowlist), type(uint256).max);
+    s_token.approve(address(poolWithAllowlist), type(uint256).max);
     deal(allowlistedSender, CCIP_SEND_FEE); // Ensure sender has enough ETH for the fee
     // Should succeed with allowlisted sender
     vm.prank(allowlistedSender);

@@ -19,15 +19,15 @@ contract BurnMintFastTransferTokenPool_ccipReceive is BurnMintFastTransferTokenP
   function setUp() public virtual override {
     super.setUp();
     // Give filler tokens to fill with
-    deal(address(s_burnMintERC20), s_filler, 2 * TRANSFER_AMOUNT);
+    deal(address(s_token), s_filler, 2 * TRANSFER_AMOUNT);
     vm.stopPrank();
     vm.prank(s_filler);
-    s_burnMintERC20.approve(address(s_pool), type(uint256).max);
+    s_token.approve(address(s_pool), type(uint256).max);
     vm.stopPrank();
   }
 
   function test_CcipReceive_NotFastFilled() public {
-    uint256 receiverBalanceBefore = s_burnMintERC20.balanceOf(RECEIVER);
+    uint256 receiverBalanceBefore = s_token.balanceOf(RECEIVER);
     uint256 expectedMintAmount = TRANSFER_AMOUNT;
 
     Client.Any2EVMMessage memory message = _createCcipMessage();
@@ -41,7 +41,7 @@ contract BurnMintFastTransferTokenPool_ccipReceive is BurnMintFastTransferTokenP
     vm.prank(address(s_sourceRouter));
     s_pool.ccipReceive(message);
 
-    assertEq(s_burnMintERC20.balanceOf(RECEIVER), receiverBalanceBefore + expectedMintAmount);
+    assertEq(s_token.balanceOf(RECEIVER), receiverBalanceBefore + expectedMintAmount);
   }
 
   function test_CcipReceive_FastFilled() public {
@@ -52,8 +52,8 @@ contract BurnMintFastTransferTokenPool_ccipReceive is BurnMintFastTransferTokenP
     vm.prank(s_filler);
     s_pool.fastFill(FILL_REQUEST_ID, fillId, DEST_CHAIN_SELECTOR, amountToFill, SRC_DECIMALS, RECEIVER);
 
-    uint256 fillerBalanceBefore = s_burnMintERC20.balanceOf(s_filler);
-    uint256 receiverBalanceBefore = s_burnMintERC20.balanceOf(RECEIVER);
+    uint256 fillerBalanceBefore = s_token.balanceOf(s_filler);
+    uint256 receiverBalanceBefore = s_token.balanceOf(RECEIVER);
     uint256 expectedReimbursement = TRANSFER_AMOUNT;
 
     Client.Any2EVMMessage memory message = _createCcipMessage();
@@ -65,9 +65,9 @@ contract BurnMintFastTransferTokenPool_ccipReceive is BurnMintFastTransferTokenP
     s_pool.ccipReceive(message);
 
     // Filler should be reimbursed the transfer amount + fee
-    assertEq(s_burnMintERC20.balanceOf(s_filler), fillerBalanceBefore + expectedReimbursement);
+    assertEq(s_token.balanceOf(s_filler), fillerBalanceBefore + expectedReimbursement);
     // Receiver balance should not change (already received tokens from fast fill)
-    assertEq(s_burnMintERC20.balanceOf(RECEIVER), receiverBalanceBefore);
+    assertEq(s_token.balanceOf(RECEIVER), receiverBalanceBefore);
   }
 
   function test_RevertWhen_AlreadySettled() public {
@@ -121,12 +121,12 @@ contract BurnMintFastTransferTokenPool_ccipReceive is BurnMintFastTransferTokenP
       destTokenAmounts: new Client.EVMTokenAmount[](0)
     });
 
-    uint256 receiverBalanceBefore = s_burnMintERC20.balanceOf(RECEIVER);
+    uint256 receiverBalanceBefore = s_token.balanceOf(RECEIVER);
 
     vm.prank(address(s_sourceRouter));
     s_pool.ccipReceive(message);
 
-    assertEq(s_burnMintERC20.balanceOf(RECEIVER), receiverBalanceBefore + expectedLocalAmount);
+    assertEq(s_token.balanceOf(RECEIVER), receiverBalanceBefore + expectedLocalAmount);
   }
 
   function test_CcipReceive_OnlyRouter() public {

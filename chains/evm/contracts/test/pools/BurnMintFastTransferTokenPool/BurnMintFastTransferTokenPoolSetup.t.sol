@@ -12,7 +12,7 @@ import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/Bu
 
 contract BurnMintFastTransferTokenPoolSetup is BaseTest {
   BurnMintFastTransferTokenPool internal s_pool;
-  BurnMintERC20 internal s_burnMintERC20;
+  BurnMintERC20 internal s_token;
 
   address internal s_burnMintOffRamp = makeAddr("burn_mint_offRamp");
   address internal s_burnMintOnRamp = makeAddr("burn_mint_onRamp");
@@ -26,13 +26,13 @@ contract BurnMintFastTransferTokenPoolSetup is BaseTest {
   function setUp() public virtual override {
     super.setUp();
 
-    s_burnMintERC20 = new BurnMintERC20("Chainlink Token", "LINK", 18, 0, 0);
+    s_token = new BurnMintERC20("Chainlink Token", "LINK", 18, 0, 0);
 
     s_pool = new BurnMintFastTransferTokenPool(
-      s_burnMintERC20, DEFAULT_TOKEN_DECIMALS, new address[](0), address(s_mockRMNRemote), address(s_sourceRouter)
+      s_token, DEFAULT_TOKEN_DECIMALS, new address[](0), address(s_mockRMNRemote), address(s_sourceRouter)
     );
 
-    s_burnMintERC20.grantMintAndBurnRoles(address(s_pool));
+    s_token.grantMintAndBurnRoles(address(s_pool));
 
     _applyChainUpdates();
     _setupDestChainConfig();

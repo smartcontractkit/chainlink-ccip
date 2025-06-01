@@ -17,14 +17,14 @@ contract BurnMintFastTransferTokenPool_fastFill is BurnMintFastTransferTokenPool
     super.setUp();
     vm.stopPrank();
     // Give filler tokens to fill with
-    deal(address(s_burnMintERC20), s_filler, type(uint256).max);
+    deal(address(s_token), s_filler, type(uint256).max);
     vm.prank(s_filler);
-    s_burnMintERC20.approve(address(s_pool), type(uint256).max);
+    s_token.approve(address(s_pool), type(uint256).max);
   }
 
   function test_FastFill() public {
-    uint256 fillerBalanceBefore = s_burnMintERC20.balanceOf(s_filler);
-    uint256 receiverBalanceBefore = s_burnMintERC20.balanceOf(RECEIVER);
+    uint256 fillerBalanceBefore = s_token.balanceOf(s_filler);
+    uint256 receiverBalanceBefore = s_token.balanceOf(RECEIVER);
 
     bytes32 fillId = s_pool.computeFillId(FILL_REQUEST_ID, FILL_AMOUNT, SRC_DECIMALS, RECEIVER);
 
@@ -34,8 +34,8 @@ contract BurnMintFastTransferTokenPool_fastFill is BurnMintFastTransferTokenPool
     vm.prank(s_filler);
     s_pool.fastFill(FILL_REQUEST_ID, fillId, DEST_CHAIN_SELECTOR, FILL_AMOUNT, SRC_DECIMALS, RECEIVER);
 
-    assertEq(s_burnMintERC20.balanceOf(s_filler), fillerBalanceBefore - FILL_AMOUNT);
-    assertEq(s_burnMintERC20.balanceOf(RECEIVER), receiverBalanceBefore + FILL_AMOUNT);
+    assertEq(s_token.balanceOf(s_filler), fillerBalanceBefore - FILL_AMOUNT);
+    assertEq(s_token.balanceOf(RECEIVER), receiverBalanceBefore + FILL_AMOUNT);
 
     s_pool.getFillInfo(fillId);
   }
@@ -45,16 +45,16 @@ contract BurnMintFastTransferTokenPool_fastFill is BurnMintFastTransferTokenPool
     uint256 srcAmountToFill = 100e6; // 100 tokens with 6 decimals
     uint256 expectedLocalAmount = 100 ether; // Should be scaled to 18 decimals
 
-    uint256 fillerBalanceBefore = s_burnMintERC20.balanceOf(s_filler);
-    uint256 receiverBalanceBefore = s_burnMintERC20.balanceOf(RECEIVER);
+    uint256 fillerBalanceBefore = s_token.balanceOf(s_filler);
+    uint256 receiverBalanceBefore = s_token.balanceOf(RECEIVER);
 
     bytes32 fillId = s_pool.computeFillId(FILL_REQUEST_ID, srcAmountToFill, sourceDecimals, RECEIVER);
 
     vm.prank(s_filler);
     s_pool.fastFill(FILL_REQUEST_ID, fillId, DEST_CHAIN_SELECTOR, srcAmountToFill, sourceDecimals, RECEIVER);
 
-    assertEq(s_burnMintERC20.balanceOf(s_filler), fillerBalanceBefore - expectedLocalAmount);
-    assertEq(s_burnMintERC20.balanceOf(RECEIVER), receiverBalanceBefore + expectedLocalAmount);
+    assertEq(s_token.balanceOf(s_filler), fillerBalanceBefore - expectedLocalAmount);
+    assertEq(s_token.balanceOf(RECEIVER), receiverBalanceBefore + expectedLocalAmount);
     FastTransferTokenPoolAbstract.FillInfo memory fillInfo =
       s_pool.getFillInfo(s_pool.computeFillId(FILL_REQUEST_ID, srcAmountToFill, sourceDecimals, RECEIVER));
     assertTrue(fillInfo.state == FastTransferTokenPoolAbstract.FillState.FILLED);
@@ -123,9 +123,9 @@ contract BurnMintFastTransferTokenPool_fastFill is BurnMintFastTransferTokenPool
 
   function test_RevertWhen_FillerNotWhitelisted() public {
     address unauthorizedFiller = makeAddr("unauthorizedFiller");
-    deal(address(s_burnMintERC20), unauthorizedFiller, type(uint256).max);
+    deal(address(s_token), unauthorizedFiller, type(uint256).max);
     vm.prank(unauthorizedFiller);
-    s_burnMintERC20.approve(address(s_pool), type(uint256).max);
+    s_token.approve(address(s_pool), type(uint256).max);
 
     bytes32 fillId = s_pool.computeFillId(FILL_REQUEST_ID, FILL_AMOUNT, SRC_DECIMALS, RECEIVER);
 
@@ -155,18 +155,18 @@ contract BurnMintFastTransferTokenPool_fastFill is BurnMintFastTransferTokenPool
     s_pool.updateDestChainConfig(_singleConfigToList(laneConfigArgs));
 
     address anyFiller = makeAddr("anyFiller");
-    deal(address(s_burnMintERC20), anyFiller, type(uint256).max);
+    deal(address(s_token), anyFiller, type(uint256).max);
     vm.prank(anyFiller);
-    s_burnMintERC20.approve(address(s_pool), type(uint256).max);
+    s_token.approve(address(s_pool), type(uint256).max);
 
-    uint256 receiverBalanceBefore = s_burnMintERC20.balanceOf(RECEIVER);
+    uint256 receiverBalanceBefore = s_token.balanceOf(RECEIVER);
 
     bytes32 fillId = s_pool.computeFillId(FILL_REQUEST_ID, FILL_AMOUNT, SRC_DECIMALS, RECEIVER);
 
     vm.prank(anyFiller);
     s_pool.fastFill(FILL_REQUEST_ID, fillId, DEST_CHAIN_SELECTOR, FILL_AMOUNT, SRC_DECIMALS, RECEIVER);
 
-    assertEq(s_burnMintERC20.balanceOf(RECEIVER), receiverBalanceBefore + FILL_AMOUNT);
+    assertEq(s_token.balanceOf(RECEIVER), receiverBalanceBefore + FILL_AMOUNT);
 
     FastTransferTokenPoolAbstract.FillInfo memory fillInfo =
       s_pool.getFillInfo(s_pool.computeFillId(FILL_REQUEST_ID, FILL_AMOUNT, SRC_DECIMALS, RECEIVER));
@@ -183,9 +183,9 @@ contract BurnMintFastTransferTokenPool_fastFill is BurnMintFastTransferTokenPool
     vm.prank(OWNER);
     s_pool.updateFillerAllowList(DEST_CHAIN_SELECTOR, addFillers, new address[](0));
 
-    deal(address(s_burnMintERC20), filler2, type(uint256).max);
+    deal(address(s_token), filler2, type(uint256).max);
     vm.prank(filler2);
-    s_burnMintERC20.approve(address(s_pool), type(uint256).max);
+    s_token.approve(address(s_pool), type(uint256).max);
 
     bytes32 fillRequestId2 = keccak256("fillRequestId2");
 
@@ -199,6 +199,6 @@ contract BurnMintFastTransferTokenPool_fastFill is BurnMintFastTransferTokenPool
     vm.prank(filler2);
     s_pool.fastFill(fillRequestId2, fillId2, DEST_CHAIN_SELECTOR, FILL_AMOUNT, SRC_DECIMALS, RECEIVER);
 
-    assertEq(s_burnMintERC20.balanceOf(RECEIVER), FILL_AMOUNT * 2);
+    assertEq(s_token.balanceOf(RECEIVER), FILL_AMOUNT * 2);
   }
 }
