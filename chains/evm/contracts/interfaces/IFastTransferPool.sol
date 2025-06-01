@@ -15,7 +15,7 @@ interface IFastTransferPool {
 
   /// @notice Emitted when a fast transfer is requested
   event FastTransferRequested(
-    bytes32 indexed fillRequestId,
+    bytes32 indexed settlementId,
     uint64 indexed destinationChainSelector,
     uint256 amount,
     uint256 fastTransferFee,

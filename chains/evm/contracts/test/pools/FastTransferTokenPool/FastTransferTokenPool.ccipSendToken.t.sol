@@ -117,10 +117,10 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
     );
 
     uint256 balanceBefore = s_token.balanceOf(OWNER);
-    bytes32 fillRequestId =
+    bytes32 settlementId =
       s_pool.ccipSendToken{value: 1 ether}(address(0), params.chainSelector, params.amount, params.receiver, "");
 
-    assertEq(fillRequestId, params.mockMessageId);
+    assertEq(settlementId, params.mockMessageId);
     assertEq(s_token.balanceOf(OWNER), balanceBefore - params.amount);
     assertEq(s_token.balanceOf(address(s_pool)), params.amount);
   }
@@ -175,9 +175,9 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
     IFastTransferPool.Quote memory quote =
       s_pool.getCcipSendTokenFee(feeToken, DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, abi.encode(RECEIVER), "");
 
-    bytes32 fillRequestId = s_pool.ccipSendToken(feeToken, DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, abi.encode(RECEIVER), "");
+    bytes32 settlementId = s_pool.ccipSendToken(feeToken, DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, abi.encode(RECEIVER), "");
 
-    assertTrue(fillRequestId != bytes32(0));
+    assertTrue(settlementId != bytes32(0));
     assertEq(s_token.balanceOf(OWNER), balanceBefore - SOURCE_AMOUNT - quote.ccipSettlementFee);
   }
 

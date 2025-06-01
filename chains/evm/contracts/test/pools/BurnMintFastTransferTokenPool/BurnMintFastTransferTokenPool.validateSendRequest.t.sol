@@ -27,7 +27,7 @@ contract BurnMintFastTransferTokenPool_validateSendRequest is BurnMintFastTransf
 
   function test_validateSendRequest_Success() public {
     // This should not revert - all validations pass
-    bytes32 fillRequestId = s_pool.ccipSendToken{value: CCIP_SEND_FEE}(
+    bytes32 settlementId = s_pool.ccipSendToken{value: CCIP_SEND_FEE}(
       address(0), // native fee token
       DEST_CHAIN_SELECTOR,
       TRANSFER_AMOUNT,
@@ -35,7 +35,7 @@ contract BurnMintFastTransferTokenPool_validateSendRequest is BurnMintFastTransf
       ""
     );
 
-    assertTrue(fillRequestId != bytes32(0));
+    assertTrue(settlementId != bytes32(0));
   }
 
   function test_validateSendRequest_RevertWhen_CursedByRMN() public {
@@ -106,11 +106,11 @@ contract BurnMintFastTransferTokenPool_validateSendRequest is BurnMintFastTransf
     s_token.approve(address(poolWithAllowlist), type(uint256).max);
     deal(allowlistedSender, CCIP_SEND_FEE); // Ensure sender has enough ETH for the fee
     // Should succeed with allowlisted sender
-    bytes32 fillRequestId = poolWithAllowlist.ccipSendToken{value: CCIP_SEND_FEE}(
+    bytes32 settlementId = poolWithAllowlist.ccipSendToken{value: CCIP_SEND_FEE}(
       address(0), DEST_CHAIN_SELECTOR, TRANSFER_AMOUNT, abi.encode(RECEIVER), ""
     );
 
-    assertTrue(fillRequestId != bytes32(0));
+    assertTrue(settlementId != bytes32(0));
   }
 
   function test_validateSendRequest_RMNCurseSpecificChain() public {
@@ -153,10 +153,10 @@ contract BurnMintFastTransferTokenPool_validateSendRequest is BurnMintFastTransf
     );
 
     // Original chain should still work
-    bytes32 fillRequestId1 = s_pool.ccipSendToken{value: CCIP_SEND_FEE}(
+    bytes32 settlementId1 = s_pool.ccipSendToken{value: CCIP_SEND_FEE}(
       address(0), DEST_CHAIN_SELECTOR, TRANSFER_AMOUNT, abi.encode(RECEIVER), ""
     );
-    assertTrue(fillRequestId1 != bytes32(0));
+    assertTrue(settlementId1 != bytes32(0));
 
     // New chain should revert due to curse
     vm.expectRevert(TokenPool.CursedByRMN.selector);

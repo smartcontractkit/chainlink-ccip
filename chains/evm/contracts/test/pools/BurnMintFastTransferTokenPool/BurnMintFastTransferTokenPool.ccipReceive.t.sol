@@ -46,7 +46,7 @@ contract BurnMintFastTransferTokenPool_ccipReceive is BurnMintFastTransferTokenP
 
   function _createCcipMessage() internal view returns (Client.Any2EVMMessage memory) {
     return Client.Any2EVMMessage({
-      messageId: keccak256("fillRequestId"),
+      messageId: keccak256("settlementId"),
       sourceChainSelector: DEST_CHAIN_SELECTOR,
       sender: abi.encode(s_remoteBurnMintPool),
       data: abi.encode(

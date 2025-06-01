@@ -8,7 +8,7 @@ import {FastTransferTokenPoolAbstract} from "../../../pools/FastTransferTokenPoo
 import {FastTransferTokenPoolSetup} from "./FastTransferTokenPoolSetup.t.sol";
 
 contract FastTransferTokenPool_fastFill_Test is FastTransferTokenPoolSetup {
-  bytes32 public constant FILL_REQUEST_ID = bytes32("fillRequestId");
+  bytes32 public constant FILL_REQUEST_ID = bytes32("settlementId");
 
   function setUp() public override {
     super.setUp();
@@ -107,17 +107,17 @@ contract FastTransferTokenPool_fastFill_Test is FastTransferTokenPoolSetup {
     vm.prank(filler2);
     s_token.approve(address(s_pool), type(uint256).max);
 
-    bytes32 fillRequestId2 = keccak256("fillRequestId2");
+    bytes32 settlementId2 = keccak256("settlementId2");
 
     bytes32 fillId1 = s_pool.computeFillId(FILL_REQUEST_ID, SOURCE_AMOUNT, SOURCE_DECIMALS, RECEIVER);
-    bytes32 fillId2 = s_pool.computeFillId(fillRequestId2, SOURCE_AMOUNT, SOURCE_DECIMALS, RECEIVER);
+    bytes32 fillId2 = s_pool.computeFillId(settlementId2, SOURCE_AMOUNT, SOURCE_DECIMALS, RECEIVER);
 
     // Both fillers can fill different requests
     vm.prank(s_filler);
     s_pool.fastFill(FILL_REQUEST_ID, fillId1, DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, SOURCE_DECIMALS, RECEIVER);
 
     vm.prank(filler2);
-    s_pool.fastFill(fillRequestId2, fillId2, DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, SOURCE_DECIMALS, RECEIVER);
+    s_pool.fastFill(settlementId2, fillId2, DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, SOURCE_DECIMALS, RECEIVER);
 
     assertEq(s_token.balanceOf(RECEIVER), SOURCE_AMOUNT * 2);
   }
