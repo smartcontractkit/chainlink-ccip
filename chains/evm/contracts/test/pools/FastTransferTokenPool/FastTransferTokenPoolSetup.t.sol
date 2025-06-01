@@ -20,6 +20,7 @@ contract FastTransferTokenPoolSetup is BaseTest {
   uint32 internal constant SVM_CHAIN_SELECTOR = uint32(uint256(keccak256("SVM_SELECTOR")));
   uint32 internal constant SETTLEMENT_GAS_OVERHEAD = 200_000;
   uint256 internal constant MAX_FILL_AMOUNT_PER_REQUEST = 1000 ether;
+
   bytes internal s_svmExtraArgsBytesEncoded;
   IERC20 internal s_token;
   FastTransferTokenPoolHelper public s_pool;

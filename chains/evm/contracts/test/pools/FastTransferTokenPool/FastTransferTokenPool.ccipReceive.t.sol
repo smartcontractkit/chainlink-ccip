@@ -2,232 +2,168 @@
 pragma solidity ^0.8.24;
 
 import {IFastTransferPool} from "../../../interfaces/IFastTransferPool.sol";
+
+import {CCIPReceiver} from "../../../applications/CCIPReceiver.sol";
 import {Client} from "../../../libraries/Client.sol";
-
 import {FastTransferTokenPoolAbstract} from "../../../pools/FastTransferTokenPoolAbstract.sol";
-
 import {FastTransferTokenPoolSetup} from "./FastTransferTokenPoolSetup.t.sol";
 
+import {IERC20Metadata} from
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+
 contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
-  bytes32 public messageId;
-  address public sourcePool;
-  uint64 public sourceChainSelector;
-  uint256 public srcAmount;
-  uint8 public sourceDecimals;
-  address public receiver;
+  bytes32 public constant MESSAGE_ID = bytes32("messageId");
+  address public constant SOURCE_POOL = address(0x123);
+  address public constant RECEIVER = address(0x5);
+
+  uint256 public SOURCE_AMOUNT = 100 ether;
+  uint8 public SOURCE_DECIMALS = 18;
 
   function setUp() public override {
     super.setUp();
+
     vm.stopPrank();
-    messageId = bytes32("messageId");
-    sourcePool = address(0x123);
-    sourceChainSelector = 1;
-    srcAmount = 100 ether;
-    sourceDecimals = 18;
-    receiver = address(0x5);
-    deal(address(s_token), address(s_pool), srcAmount * 2); // Ensure pool has enough balance
-    deal(address(s_token), s_filler, srcAmount * 2); // Ensure filler has enough balance
+
+    deal(address(s_token), address(s_pool), SOURCE_AMOUNT * 2); // Ensure pool has enough balance
+    deal(address(s_token), s_filler, SOURCE_AMOUNT * 2); // Ensure filler has enough balance
+
+    // Approve the pool to transfer tokens on behalf of the filler
     vm.prank(s_filler);
     s_token.approve(address(s_pool), type(uint256).max);
+
+    vm.startPrank(address(s_sourceRouter));
   }
 
-  function test_CcipReceive_NotFastFilled() public {
-    uint256 receiverBalanceBefore = s_token.balanceOf(receiver);
-    uint256 expectedAmount = srcAmount;
+  function test_ccipReceive_SlowFill() public {
+    uint256 receiverBalanceBefore = s_token.balanceOf(RECEIVER);
+    uint256 expectedAmount = receiverBalanceBefore + SOURCE_AMOUNT;
 
-    // Prepare CCIP message
-    bytes memory data = abi.encode(
-      FastTransferTokenPoolAbstract.MintMessage({
-        receiver: abi.encode(receiver),
-        sourceAmount: srcAmount,
-        sourceDecimals: sourceDecimals,
-        fastTransferFeeBps: FAST_FEE_BPS
-      })
-    );
-    Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
-      messageId: messageId,
-      sourceChainSelector: sourceChainSelector,
-      sender: abi.encode(sourcePool),
-      data: data,
-      destTokenAmounts: new Client.EVMTokenAmount[](0)
-    });
+    Client.Any2EVMMessage memory message = _generateMintMessage(RECEIVER, SOURCE_AMOUNT, SOURCE_DECIMALS, FAST_FEE_BPS);
 
-    // Mock router call
-    vm.expectEmit(true, false, false, true);
-    emit IFastTransferPool.FastTransferSettled(messageId);
-    vm.prank(address(s_sourceRouter));
+    vm.expectEmit();
+    emit IFastTransferPool.FastTransferSettled(MESSAGE_ID);
+
     s_pool.ccipReceive(message);
 
     // Verify receiver got the full amount (transfer + fee)
-    assertEq(s_token.balanceOf(receiver), receiverBalanceBefore + expectedAmount);
+    assertEq(s_token.balanceOf(RECEIVER), expectedAmount);
   }
 
-  function test_CcipReceive_FastFilled() public {
-    // First, fast fill the request
-    uint256 amountToFill = srcAmount - (srcAmount * FAST_FEE_BPS / 10_000);
-    bytes32 fillId = s_pool.computeFillId(messageId, amountToFill, sourceDecimals, receiver);
+  function test_ccipReceive_FastFill_Settlement() public {
+    uint256 amountToFill = SOURCE_AMOUNT - (SOURCE_AMOUNT * FAST_FEE_BPS / 10_000);
+    bytes32 fillId = s_pool.computeFillId(MESSAGE_ID, amountToFill, SOURCE_DECIMALS, RECEIVER);
 
+    vm.stopPrank();
     vm.prank(s_filler);
-    s_pool.fastFill(messageId, fillId, sourceChainSelector, amountToFill, sourceDecimals, receiver);
+    s_pool.fastFill(MESSAGE_ID, fillId, SOURCE_CHAIN_SELECTOR, amountToFill, SOURCE_DECIMALS, RECEIVER);
 
     uint256 fillerBalanceBefore = s_token.balanceOf(s_filler);
-    uint256 receiverBalanceBefore = s_token.balanceOf(receiver);
+    uint256 receiverBalanceBefore = s_token.balanceOf(RECEIVER);
 
-    // Prepare CCIP message
-    bytes memory data = abi.encode(
-      FastTransferTokenPoolAbstract.MintMessage({
-        receiver: abi.encode(receiver),
-        sourceAmount: srcAmount,
-        sourceDecimals: sourceDecimals,
-        fastTransferFeeBps: FAST_FEE_BPS
-      })
-    );
-    Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
-      messageId: messageId,
-      sourceChainSelector: sourceChainSelector,
-      sender: abi.encode(sourcePool),
-      data: data,
-      destTokenAmounts: new Client.EVMTokenAmount[](0)
-    });
+    // Settlement
+    Client.Any2EVMMessage memory message = _generateMintMessage(RECEIVER, SOURCE_AMOUNT, SOURCE_DECIMALS, FAST_FEE_BPS);
 
     vm.expectEmit();
-    emit IFastTransferPool.FastTransferSettled(messageId);
+    emit IFastTransferPool.FastTransferSettled(MESSAGE_ID);
+
     vm.prank(address(s_sourceRouter));
     s_pool.ccipReceive(message);
 
     // Verify filler was reimbursed (transfer amount + fee)
-    assertEq(s_token.balanceOf(s_filler), fillerBalanceBefore + srcAmount);
+    assertEq(s_token.balanceOf(s_filler), fillerBalanceBefore + SOURCE_AMOUNT);
     // Verify receiver balance didn't change (already received from fast fill)
-    assertEq(s_token.balanceOf(receiver), receiverBalanceBefore);
+    assertEq(s_token.balanceOf(RECEIVER), receiverBalanceBefore);
   }
 
-  function test_CcipReceive_WithDifferentDecimals() public {
-    sourceDecimals = 6; // USDC-like decimals
-    srcAmount = 100e6; // 100 tokens with 6 decimals
-    uint256 expectedLocalAmount = 100 ether; // Should be scaled to 18 decimals
+  function test_ccipReceive_WithDifferentDecimals() public {
+    uint8 sourceDecimals = 6; // USDC-like decimals
+    uint8 destDecimals = IERC20Metadata(address(s_token)).decimals();
+    require(sourceDecimals != destDecimals, "Test requires different source and destination decimals");
 
-    uint256 receiverBalanceBefore = s_token.balanceOf(receiver);
+    uint256 sourceAmount = 100 * 10 ** sourceDecimals; // 100 tokens in source decimals
+    uint256 expectedLocalAmount = sourceAmount * 10 ** 18 / 10 ** sourceDecimals; // Should be scaled to 18 decimals
 
-    // Prepare CCIP message with different decimals
-    bytes memory data = abi.encode(
-      FastTransferTokenPoolAbstract.MintMessage({
-        receiver: abi.encode(receiver),
-        sourceAmount: srcAmount,
-        sourceDecimals: sourceDecimals,
-        fastTransferFeeBps: FAST_FEE_BPS
-      })
-    );
-    Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
-      messageId: messageId,
-      sourceChainSelector: sourceChainSelector,
-      sender: abi.encode(sourcePool),
-      data: data,
-      destTokenAmounts: new Client.EVMTokenAmount[](0)
-    });
+    uint256 receiverBalanceBefore = s_token.balanceOf(RECEIVER);
 
-    vm.prank(address(s_sourceRouter));
+    Client.Any2EVMMessage memory message = _generateMintMessage(RECEIVER, sourceAmount, sourceDecimals, FAST_FEE_BPS);
+
     s_pool.ccipReceive(message);
 
     // Verify receiver got the scaled amount
-    assertEq(s_token.balanceOf(receiver), receiverBalanceBefore + expectedLocalAmount);
+    assertEq(s_token.balanceOf(RECEIVER), receiverBalanceBefore + expectedLocalAmount);
   }
 
-  function test_CcipReceive_ZeroFastTransferFee() public {
+  function test_ccipReceive_ZeroFastTransferFeeBps() public {
     uint16 zeroFee = 0;
-    uint256 receiverBalanceBefore = s_token.balanceOf(receiver);
+    uint256 receiverBalanceBefore = s_token.balanceOf(RECEIVER);
 
     // Prepare CCIP message with zero fast transfer fee
-    bytes memory data = abi.encode(
-      FastTransferTokenPoolAbstract.MintMessage({
-        receiver: abi.encode(receiver),
-        sourceAmount: srcAmount,
-        sourceDecimals: sourceDecimals,
-        fastTransferFeeBps: zeroFee
-      })
-    );
-    Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
-      messageId: messageId,
-      sourceChainSelector: sourceChainSelector,
-      sender: abi.encode(sourcePool),
-      data: data,
-      destTokenAmounts: new Client.EVMTokenAmount[](0)
-    });
+    Client.Any2EVMMessage memory message = _generateMintMessage(RECEIVER, SOURCE_AMOUNT, SOURCE_DECIMALS, zeroFee);
 
-    vm.expectEmit(true, false, false, true);
-    emit IFastTransferPool.FastTransferSettled(messageId);
-    vm.prank(address(s_sourceRouter));
+    vm.expectEmit();
+    emit IFastTransferPool.FastTransferSettled(MESSAGE_ID);
+
     s_pool.ccipReceive(message);
 
     // Verify receiver got only the transfer amount (no fee)
-    assertEq(s_token.balanceOf(receiver), receiverBalanceBefore + srcAmount);
+    assertEq(s_token.balanceOf(RECEIVER), receiverBalanceBefore + SOURCE_AMOUNT);
   }
 
-  function test_RevertWhen_AlreadySettled() public {
-    // Prepare CCIP message
-    bytes memory data = abi.encode(
-      FastTransferTokenPoolAbstract.MintMessage({
-        receiver: abi.encode(receiver),
-        sourceAmount: srcAmount,
-        sourceDecimals: sourceDecimals,
-        fastTransferFeeBps: FAST_FEE_BPS
-      })
-    );
-    Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
-      messageId: messageId,
-      sourceChainSelector: sourceChainSelector,
-      sender: abi.encode(sourcePool),
-      data: data,
-      destTokenAmounts: new Client.EVMTokenAmount[](0)
-    });
+  function test_ccipReceive_RevertWhen_AlreadySettled() public {
+    Client.Any2EVMMessage memory message = _generateMintMessage(RECEIVER, SOURCE_AMOUNT, SOURCE_DECIMALS, FAST_FEE_BPS);
 
     // First settlement
-    vm.prank(address(s_sourceRouter));
     s_pool.ccipReceive(message);
 
     // Try to settle again - should revert
-    vm.expectRevert(abi.encodeWithSelector(IFastTransferPool.AlreadySettled.selector, messageId));
-    vm.prank(address(s_sourceRouter));
+    vm.expectRevert(abi.encodeWithSelector(IFastTransferPool.AlreadySettled.selector, MESSAGE_ID));
     s_pool.ccipReceive(message);
   }
 
-  function test_RevertWhen_InvalidData() public {
-    // Prepare CCIP message with invalid data
-    bytes memory invalidData = abi.encode(srcAmount, sourceDecimals); // Missing fastTransferFee and receiver
+  function test_ccipReceive_RevertWhen_InvalidData() public {
     Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
-      messageId: messageId,
-      sourceChainSelector: sourceChainSelector,
-      sender: abi.encode(sourcePool),
-      data: invalidData,
+      messageId: MESSAGE_ID,
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
+      sender: abi.encode(SOURCE_POOL),
+      data: abi.encode(SOURCE_AMOUNT, SOURCE_DECIMALS),
       destTokenAmounts: new Client.EVMTokenAmount[](0)
     });
 
-    // Mock router call
-    vm.prank(address(s_sourceRouter));
     vm.expectRevert(); // Should revert due to invalid data format
     s_pool.ccipReceive(message);
   }
 
-  function test_RevertWhen_NotRouter() public {
-    // Prepare CCIP message
-    bytes memory data = abi.encode(
-      FastTransferTokenPoolAbstract.MintMessage({
-        receiver: abi.encode(receiver),
-        sourceAmount: srcAmount,
-        sourceDecimals: sourceDecimals,
-        fastTransferFeeBps: FAST_FEE_BPS
-      })
-    );
-    Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
-      messageId: messageId,
-      sourceChainSelector: sourceChainSelector,
-      sender: abi.encode(sourcePool),
-      data: data,
+  function test_ccipReceive_RevertWhen_NotRouter() public {
+    Client.Any2EVMMessage memory message = _generateMintMessage(RECEIVER, SOURCE_AMOUNT, SOURCE_DECIMALS, FAST_FEE_BPS);
+
+    address notRouter = makeAddr("notRouter");
+    // Call from non-router address should revert
+    vm.stopPrank();
+    vm.prank(notRouter);
+
+    vm.expectRevert(abi.encodeWithSelector(CCIPReceiver.InvalidRouter.selector, notRouter));
+    s_pool.ccipReceive(message);
+  }
+
+  function _generateMintMessage(
+    address receiver,
+    uint256 sourceAmount,
+    uint8 sourceDecimals,
+    uint16 fastTransferFeeBps
+  ) internal pure returns (Client.Any2EVMMessage memory) {
+    return Client.Any2EVMMessage({
+      messageId: MESSAGE_ID,
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
+      sender: abi.encode(SOURCE_POOL),
+      data: abi.encode(
+        FastTransferTokenPoolAbstract.MintMessage({
+          receiver: abi.encode(receiver),
+          sourceAmount: sourceAmount,
+          sourceDecimals: sourceDecimals,
+          fastTransferFeeBps: fastTransferFeeBps
+        })
+      ),
       destTokenAmounts: new Client.EVMTokenAmount[](0)
     });
-
-    // Call from non-router address should revert
-    vm.expectRevert();
-    vm.prank(makeAddr("notRouter"));
-    s_pool.ccipReceive(message);
   }
 }
