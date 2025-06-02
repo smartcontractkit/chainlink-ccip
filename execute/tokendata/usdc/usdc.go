@@ -37,6 +37,7 @@ func NewUSDCTokenDataObserver(
 	readers map[cciptypes.ChainSelector]contractreader.ContractReaderFacade,
 	addrCodec cciptypes.AddressCodec,
 ) (*USDCTokenDataObserver, error) {
+	// TODO: Pass in a multi-family USDC message reader from the factory?
 	usdcReader, err := reader.NewUSDCMessageReader(
 		ctx,
 		lggr,
@@ -47,6 +48,17 @@ func NewUSDCTokenDataObserver(
 	if err != nil {
 		return nil, err
 	}
+
+	return newUSDCTokenDataObserver(lggr, destChainSelector, usdcConfig, attestationEncoder, usdcReader)
+}
+
+func newUSDCTokenDataObserver(
+	lggr logger.Logger,
+	destChainSelector cciptypes.ChainSelector,
+	usdcConfig pluginconfig.USDCCCTPObserverConfig,
+	attestationEncoder AttestationEncoder,
+	usdcReader reader.USDCMessageReader,
+) (*USDCTokenDataObserver, error) {
 	attestationClient, err := NewSequentialAttestationClient(lggr, usdcConfig)
 	if err != nil {
 		return nil, fmt.Errorf("create attestation client: %w", err)
