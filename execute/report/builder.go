@@ -183,24 +183,9 @@ func (b *execReportBuilder) Add(
 ) (exectypes.CommitData, error) {
 	b.checkInitialize()
 
-	if b.multipleReportsEnabled {
-		// Check if all messages have zero nonces - if not, we should only process the first report
-		for _, msg := range commitReport.Messages {
-			if msg.Header.Nonce > 0 {
-				b.lggr.Errorw("Found message with non-zero nonce when multiple reports are enabled",
-					"sourceChain", msg.Header.SourceChainSelector,
-					"messageID", msg.Header.MessageID,
-					"nonce", msg.Header.Nonce)
-				// If multiple reports are enabled, we can still process the report, but we need to limit it to a single report
-				// If we didn't even build the first report yet, then break and process the first report only.
-				if len(b.execReports) > 1 {
-					b.execReports = []cciptypes.ExecutePluginReport{b.execReports[0]}
-					b.commitReports = [][]exectypes.CommitData{b.commitReports[0]}
-					b.accumulated = []validationMetadata{b.accumulated[0]}
-					return commitReport, fmt.Errorf("messages with non-zero nonces detected, limiting to single report")
-				}
-			}
-		}
+	// Validate nonces for multiple reports mode
+	if err := b.validateNoncesForMultipleReports(commitReport); err != nil {
+		return commitReport, err
 	}
 
 	currentCommitReport := commitReport
@@ -208,14 +193,12 @@ func (b *execReportBuilder) Add(
 	for {
 		index := len(b.execReports) - 1
 
-		// Check if we've reached max reports for the current exec report
-		if b.maxSingleChainReports != 0 && len(b.execReports[index].ChainReports) >= int(b.maxSingleChainReports) {
+		// Check if we need to create a new exec report due to limits
+		if b.shouldCreateNewExecReport() {
 			if !b.multipleReportsEnabled {
 				return currentCommitReport, nil
 			}
-
 			b.createNewExecReport()
-
 			index = len(b.execReports) - 1
 		}
 
@@ -273,6 +256,46 @@ func (b *execReportBuilder) Add(
 
 	return currentCommitReport, nil
 }
+
+// shouldCreateNewExecReport checks if we need to create a new exec report due to chain report limits
+func (b *execReportBuilder) shouldCreateNewExecReport() bool {
+	if b.maxSingleChainReports == 0 {
+		return false
+	}
+
+	currentIndex := len(b.execReports) - 1
+	return len(b.execReports[currentIndex].ChainReports) >= int(b.maxSingleChainReports)
+}
+
+func (b *execReportBuilder) validateNoncesForMultipleReports(commitReport exectypes.CommitData) error {
+	if !b.multipleReportsEnabled {
+		return nil
+	}
+
+	for _, msg := range commitReport.Messages {
+		if msg.Header.Nonce > 0 {
+			b.lggr.Errorw("Found message with non-zero nonce when multiple reports are enabled",
+				"sourceChain", msg.Header.SourceChainSelector,
+				"messageID", msg.Header.MessageID,
+				"nonce", msg.Header.Nonce)
+
+			// Limit to single report if we already have multiple reports
+			if len(b.execReports) > 1 {
+				b.limitToSingleReport()
+				return fmt.Errorf("messages with non-zero nonces detected, limiting to single report")
+			}
+		}
+	}
+	return nil
+}
+
+// limitToSingleReport reduces the builder state to only the first report
+func (b *execReportBuilder) limitToSingleReport() {
+	b.execReports = []cciptypes.ExecutePluginReport{b.execReports[0]}
+	b.commitReports = [][]exectypes.CommitData{b.commitReports[0]}
+	b.accumulated = []validationMetadata{b.accumulated[0]}
+}
+
 func (b *execReportBuilder) createNewExecReport() {
 	b.execReports = append(b.execReports, cciptypes.ExecutePluginReport{})
 	b.commitReports = append(b.commitReports, []exectypes.CommitData{})

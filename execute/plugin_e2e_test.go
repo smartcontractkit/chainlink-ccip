@@ -183,8 +183,8 @@ func TestPluginMultipleReportsWithNonZeroNonces(t *testing.T) {
 
 	// Run through the state machine
 	outcome := runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner) // Contract Discovery
-	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)  // Get Commit Reports
-	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)  // Get Messages
+	_ = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)        // Get Commit Reports
+	_ = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)        // Get Messages
 	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)  // Filter
 
 	// Should fall back to single report mode when non-zero nonce is detected
@@ -228,8 +228,8 @@ func TestPluginMultipleReportsWithMultipleSourceChains(t *testing.T) {
 
 	// Run rounds
 	outcome := runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner) // Contract Discovery
-	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)  // Get Commit Reports
-	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)  // Get Messages
+	_ = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)        // Get Commit Reports
+	_ = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)        // Get Messages
 	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)  // Filter
 
 	require.GreaterOrEqual(t, len(outcome.Reports), 2, "Should create multiple reports")
@@ -297,8 +297,8 @@ func TestPluginMultipleReportsWithMultipleSourceChainsAndTimestamps(t *testing.T
 
 	// Run rounds
 	outcome := runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner) // Contract Discovery
-	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)  // Get Commit Reports
-	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)  // Get Messages
+	_ = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)        // Get Commit Reports
+	_ = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)        // Get Messages
 	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)  // Filter
 
 	require.GreaterOrEqual(t, len(outcome.Reports), 2, "Should create multiple reports")

@@ -1599,6 +1599,7 @@ func Test_checkSkippedNonces(t *testing.T) {
 	}
 }
 
+//nolint:gocyclo // This function is complex due to the nature of the tests.
 func Test_Builder_MultiReport(t *testing.T) {
 	hasher := mocks.NewMessageHasher()
 	codec := mocks.NewExecutePluginJSONReportCodec()
@@ -2012,7 +2013,6 @@ func Test_Builder_MultiReport(t *testing.T) {
 
 			// Extract executed sequence numbers from each exec report
 			markedExecuted := make(map[cciptypes.ChainSelector]mapset.Set[cciptypes.SeqNum])
-			execReportExecuted := make(map[cciptypes.ChainSelector]mapset.Set[cciptypes.SeqNum])
 
 			// Add messages that are marked as executed in commit reports
 			for _, commitReport := range commitReports {
@@ -2027,18 +2027,7 @@ func Test_Builder_MultiReport(t *testing.T) {
 			}
 
 			// Collect all sequence numbers that are reported to execute
-			for _, execReport := range execReports {
-				for _, chainReport := range execReport.ChainReports {
-					chainSelector := chainReport.SourceChainSelector
-
-					if execReportExecuted[chainSelector] == nil {
-						execReportExecuted[chainSelector] = mapset.NewSet[cciptypes.SeqNum]()
-					}
-					for _, msg := range chainReport.Messages {
-						execReportExecuted[chainSelector].Add(msg.Header.SequenceNumber)
-					}
-				}
-			}
+			execReportExecuted := extractSequenceNumbersFromReports(execReports)
 
 			totalSkipped := 0
 			// Check intersection
@@ -2077,6 +2066,26 @@ func Test_Builder_MultiReport(t *testing.T) {
 			require.Equal(t, totalMessages-totalSkipped, totalExecuted)
 		})
 	}
+}
+
+// extractSequenceNumbersFromReports extracts all sequence numbers from execution reports by chain selector
+func extractSequenceNumbersFromReports(execReports []cciptypes.ExecutePluginReport) map[cciptypes.ChainSelector]mapset.Set[cciptypes.SeqNum] {
+	seqNumsByChain := make(map[cciptypes.ChainSelector]mapset.Set[cciptypes.SeqNum])
+
+	for _, execReport := range execReports {
+		for _, chainReport := range execReport.ChainReports {
+			chainSelector := chainReport.SourceChainSelector
+
+			if seqNumsByChain[chainSelector] == nil {
+				seqNumsByChain[chainSelector] = mapset.NewSet[cciptypes.SeqNum]()
+			}
+			for _, msg := range chainReport.Messages {
+				seqNumsByChain[chainSelector].Add(msg.Header.SequenceNumber)
+			}
+		}
+	}
+
+	return seqNumsByChain
 }
 
 func createSeqSet(start int, end int) mapset.Set[cciptypes.SeqNum] {
