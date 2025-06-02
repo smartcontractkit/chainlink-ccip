@@ -29,6 +29,9 @@ type Extended interface {
 	// ContractReaderFacade is the base interface that this extended interface builds upon.
 	ContractReaderFacade
 
+	// GetBindings returns current bindings for a given contract reader.
+	GetBindings(contractName string) []ExtendedBoundContract
+
 	// ExtendedQueryKey performs automatic binding from contractName to the first bound contract.
 	// An error is generated if there are more than one bound contract for the contractName.
 	ExtendedQueryKey(

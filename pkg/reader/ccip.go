@@ -684,7 +684,7 @@ func (r *ccipChainReader) GetExpectedNextSequenceNumber(
 func (r *ccipChainReader) NextSeqNum(
 	ctx context.Context, chains []cciptypes.ChainSelector,
 ) (map[cciptypes.ChainSelector]cciptypes.SeqNum, error) {
-	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
+	if err := validateReaderExistence(r.contractReaders, r.destChain); err != nil {
 		return nil, err
 	}
 
@@ -1092,7 +1092,7 @@ func (r *ccipChainReader) buildSigners(signers []signer) []cciptypes.RemoteSigne
 func (r *ccipChainReader) GetRMNRemoteConfig(ctx context.Context) (cciptypes.RemoteConfig, error) {
 	lggr := logutil.WithContextValues(ctx, r.lggr)
 
-	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
+	if err := validateReaderExistence(r.contractReaders, r.destChain); err != nil {
 		return cciptypes.RemoteConfig{}, fmt.Errorf("validate dest=%d extended reader existence: %w", r.destChain, err)
 	}
 
@@ -1713,7 +1713,7 @@ func (r *ccipChainReader) GetLatestPriceSeqNr(ctx context.Context) (uint64, erro
 }
 
 func (r *ccipChainReader) GetOffRampConfigDigest(ctx context.Context, pluginType uint8) ([32]byte, error) {
-	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
+	if err := validateReaderExistence(r.contractReaders, r.destChain); err != nil {
 		return [32]byte{}, fmt.Errorf("validate dest=%d extended reader existence: %w", r.destChain, err)
 	}
 
