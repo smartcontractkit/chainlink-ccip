@@ -128,7 +128,7 @@ type DestinationAccessor interface {
 	// Confidence: Unconfirmed
 	Nonces(
 		ctx context.Context,
-		addresses map[ChainSelector][]UnknownEncodedAddress,
+		addresses map[ChainSelector][]string,
 	) (map[ChainSelector]map[string]uint64, error)
 
 	// GetChainFeePriceUpdate Gets latest chain fee price update for the provided chains.
