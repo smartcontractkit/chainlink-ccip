@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {ITokenMessenger} from "../ITokenMessenger.sol";
+import {ITokenMessenger} from "../interfaces/ITokenMessenger.sol";
 
 import {Pool} from "../../../libraries/Pool.sol";
 import {CCTPMessageTransmitterProxy} from "../CCTPMessageTransmitterProxy.sol";
@@ -79,7 +79,12 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
       FINALITY_THRESHOLD // minFinalityThreshold
     );
 
-    emit Burned(msg.sender, lockOrBurnIn.amount);
+    emit LockedOrBurned({
+      remoteChainSelector: lockOrBurnIn.remoteChainSelector,
+      token: address(i_token),
+      sender: msg.sender,
+      amount: lockOrBurnIn.amount
+    });
 
     return Pool.LockOrBurnOutV1({
       destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
@@ -114,7 +119,15 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
       revert UnlockingUSDCFailed();
     }
 
-    emit Minted(msg.sender, releaseOrMintIn.receiver, releaseOrMintIn.amount);
+    // emit Minted(msg.sender, releaseOrMintIn.receiver, releaseOrMintIn.amount);
+    emit ReleasedOrMinted({
+      remoteChainSelector: releaseOrMintIn.remoteChainSelector,
+      token: address(i_token),
+      sender: msg.sender,
+      recipient: releaseOrMintIn.receiver,
+      amount: releaseOrMintIn.amount
+    });
+
     return Pool.ReleaseOrMintOutV1({destinationAmount: releaseOrMintIn.amount});
   }
 

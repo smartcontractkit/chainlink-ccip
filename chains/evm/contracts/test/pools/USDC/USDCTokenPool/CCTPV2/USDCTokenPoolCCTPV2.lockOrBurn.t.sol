@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {ITokenMessenger} from "../../../../../pools/USDC/ITokenMessenger.sol";
+import {ITokenMessenger} from "../../../../../pools/USDC/interfaces/ITokenMessenger.sol";
 
 import {Router} from "../../../../../Router.sol";
 import {Pool} from "../../../../../libraries/Pool.sol";
@@ -23,9 +23,6 @@ contract USDCTokenPoolCCTPV2_lockOrBurn is USDCTokenPoolCCTPV2Setup {
     USDCTokenPool.Domain memory expectedDomain = s_usdcTokenPool.getDomain(DEST_CHAIN_SELECTOR);
 
     vm.expectEmit();
-    emit RateLimiter.TokensConsumed(amount);
-
-    vm.expectEmit();
     emit ITokenMessenger.DepositForBurn(
       address(s_token),
       amount,
@@ -40,7 +37,12 @@ contract USDCTokenPoolCCTPV2_lockOrBurn is USDCTokenPoolCCTPV2Setup {
     );
 
     vm.expectEmit();
-    emit TokenPool.Burned(s_routerAllowedOnRamp, amount);
+    emit TokenPool.LockedOrBurned({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      token: address(s_token),
+      sender: address(s_routerAllowedOnRamp), 
+      amount: amount
+  });
 
     Pool.LockOrBurnOutV1 memory poolReturnDataV1 = s_usdcTokenPool.lockOrBurn(
       Pool.LockOrBurnInV1({
@@ -65,9 +67,6 @@ contract USDCTokenPoolCCTPV2_lockOrBurn is USDCTokenPoolCCTPV2Setup {
     USDCTokenPool.Domain memory expectedDomain = s_usdcTokenPool.getDomain(DEST_CHAIN_SELECTOR);
 
     vm.expectEmit();
-    emit RateLimiter.TokensConsumed(amount);
-
-    vm.expectEmit();
     emit ITokenMessenger.DepositForBurn(
       address(s_token),
       amount,
@@ -82,7 +81,12 @@ contract USDCTokenPoolCCTPV2_lockOrBurn is USDCTokenPoolCCTPV2Setup {
     );
 
     vm.expectEmit();
-    emit TokenPool.Burned(s_routerAllowedOnRamp, amount);
+    emit TokenPool.LockedOrBurned({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      token: address(s_token),
+      sender: address(s_routerAllowedOnRamp),
+      amount: amount
+    });
 
     Pool.LockOrBurnOutV1 memory poolReturnDataV1 = s_usdcTokenPool.lockOrBurn(
       Pool.LockOrBurnInV1({
@@ -108,8 +112,6 @@ contract USDCTokenPoolCCTPV2_lockOrBurn is USDCTokenPoolCCTPV2Setup {
     USDCTokenPool.Domain memory expectedDomain = s_usdcTokenPoolWithAllowList.getDomain(DEST_CHAIN_SELECTOR);
 
     vm.expectEmit();
-    emit RateLimiter.TokensConsumed(amount);
-    vm.expectEmit();
     emit ITokenMessenger.DepositForBurn(
       address(s_token),
       amount,
@@ -124,7 +126,12 @@ contract USDCTokenPoolCCTPV2_lockOrBurn is USDCTokenPoolCCTPV2Setup {
     );
 
     vm.expectEmit();
-    emit TokenPool.Burned(s_routerAllowedOnRamp, amount);
+    emit TokenPool.LockedOrBurned({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      token: address(s_token),
+      sender: address(s_routerAllowedOnRamp),
+      amount: amount
+    });
 
     Pool.LockOrBurnOutV1 memory poolReturnDataV1 = s_usdcTokenPoolWithAllowList.lockOrBurn(
       Pool.LockOrBurnInV1({

@@ -1,11 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {ILiquidityContainer} from "../../../../interfaces/ILiquidityContainer.sol";
-
-import {TokenPool} from "../../../../pools/TokenPool.sol";
 import {HybridLockReleaseUSDCTokenPool} from "../../../../pools/USDC/HybridLockReleaseUSDCTokenPool.sol";
 import {USDCBridgeMigratorSetup} from "./USDCBridgeMigratorSetup.t.sol";
+import {LockReleaseTokenPool} from "../../../../pools/LockReleaseTokenPool.sol";
 
 contract USDCBridgeMigrator_withdrawLiquidity is USDCBridgeMigratorSetup {
   uint256 public constant LIQUIDITY_AMOUNT = 1e12;
@@ -41,7 +39,7 @@ contract USDCBridgeMigrator_withdrawLiquidity is USDCBridgeMigratorSetup {
     vm.startPrank(OWNER);
 
     vm.expectEmit();
-    emit ILiquidityContainer.LiquidityRemoved(OWNER, LIQUIDITY_AMOUNT);
+    emit LockReleaseTokenPool.LiquidityRemoved(OWNER, LIQUIDITY_AMOUNT);
 
     s_usdcTokenPool.withdrawLiquidity(DEST_CHAIN_SELECTOR, LIQUIDITY_AMOUNT);
 

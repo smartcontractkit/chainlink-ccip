@@ -23,6 +23,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/mocks/internal_/plugincommon"
 	reader2 "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	"github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
+	reader3 "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
@@ -136,8 +137,7 @@ func Test_processor_Observation(t *testing.T) {
 
 			supportedSet := mapset.NewSet(tc.supportedChains...)
 			cs.EXPECT().DestChain().Return(tc.dstChain).Maybe()
-			cs.EXPECT().SupportedChains(oracleID).
-				Return(supportedSet, nil).Maybe()
+			cs.EXPECT().SupportedChains(oracleID).Return(supportedSet, nil).Maybe()
 
 			supportedSet.Remove(tc.dstChain)
 			slicesWithoutDst := supportedSet.ToSlice()
@@ -147,6 +147,16 @@ func Test_processor_Observation(t *testing.T) {
 				slicesWithoutDst = []ccipocr3.ChainSelector(nil)
 			}
 
+			cs.EXPECT().KnownSourceChainsSlice().Return(slicesWithoutDst, nil).Maybe()
+			srcChainsCfg := make(map[ccipocr3.ChainSelector]reader3.StaticSourceChainConfig, len(slicesWithoutDst))
+			for _, chain := range slicesWithoutDst {
+				srcChainsCfg[chain] = reader3.StaticSourceChainConfig{
+					IsEnabled: true,
+				}
+			}
+			ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything, slicesWithoutDst).
+				Return(srcChainsCfg, nil).Maybe()
+
 			ccipReader.EXPECT().GetChainsFeeComponents(mock.Anything, slicesWithoutDst).
 				Return(tc.chainFeeComponents).Maybe()
 
@@ -155,6 +165,8 @@ func Test_processor_Observation(t *testing.T) {
 
 			ccipReader.EXPECT().GetChainFeePriceUpdate(mock.Anything, slicesWithoutDst).
 				Return(tc.existingChainFeePriceUpdates).Maybe()
+
+			cs.EXPECT().SupportsDestChain(oracleID).Return(true, nil).Maybe()
 
 			homeChain.EXPECT().GetFChain().Return(tc.fChain, nil).Maybe()
 
@@ -338,10 +350,21 @@ func Test_unique_chain_filter_in_Observation(t *testing.T) {
 			cs.EXPECT().DestChain().Return(tc.dstChain).Maybe()
 			cs.EXPECT().SupportedChains(oracleID).
 				Return(supportedSet, nil).Maybe()
+			cs.EXPECT().SupportsDestChain(oracleID).Return(true, nil).Maybe()
 
 			supportedSet.Remove(tc.dstChain)
 			slicesWithoutDst := supportedSet.ToSlice()
 			sort.Slice(slicesWithoutDst, func(i, j int) bool { return slicesWithoutDst[i] < slicesWithoutDst[j] })
+
+			cs.EXPECT().KnownSourceChainsSlice().Return(slicesWithoutDst, nil).Maybe()
+			srcChainsCfg := make(map[ccipocr3.ChainSelector]reader3.StaticSourceChainConfig, len(slicesWithoutDst))
+			for _, chain := range slicesWithoutDst {
+				srcChainsCfg[chain] = reader3.StaticSourceChainConfig{
+					IsEnabled: true,
+				}
+			}
+			ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything, slicesWithoutDst).
+				Return(srcChainsCfg, nil).Maybe()
 
 			ccipReader.EXPECT().GetChainsFeeComponents(mock.Anything, slicesWithoutDst).
 				Return(tc.chainFeeComponents).Maybe()

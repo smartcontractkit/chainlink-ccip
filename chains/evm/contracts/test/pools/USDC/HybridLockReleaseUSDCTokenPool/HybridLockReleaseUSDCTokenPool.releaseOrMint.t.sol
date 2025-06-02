@@ -52,7 +52,13 @@ contract HybridLockReleaseUSDCTokenPool_releaseOrMint is HybridLockReleaseUSDCTo
     vm.startPrank(s_routerAllowedOffRamp);
 
     vm.expectEmit();
-    emit TokenPool.Released(s_routerAllowedOffRamp, recipient, amount);
+    emit TokenPool.ReleasedOrMinted({
+      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+      token: address(s_token),
+      sender: s_routerAllowedOffRamp,
+      recipient: recipient,
+      amount: amount
+    });
 
     Pool.ReleaseOrMintOutV1 memory poolReturnDataV1 = s_usdcTokenPool.releaseOrMint(
       Pool.ReleaseOrMintInV1({
@@ -530,7 +536,13 @@ contract HybridLockReleaseUSDCTokenPool_releaseOrMint_E2ETest is
     vm.startPrank(s_routerAllowedOffRamp);
 
     vm.expectEmit();
-    emit TokenPool.Released(s_routerAllowedOffRamp, recipient, amount);
+    emit TokenPool.ReleasedOrMinted({
+      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+      token: address(s_token),
+      sender: s_routerAllowedOffRamp,
+      recipient: recipient,
+      amount: amount
+    });
 
     // Release the tokens that were previously locked on mainnet
     Pool.ReleaseOrMintOutV1 memory poolReturnDataV1 = s_usdcTokenPool.releaseOrMint(

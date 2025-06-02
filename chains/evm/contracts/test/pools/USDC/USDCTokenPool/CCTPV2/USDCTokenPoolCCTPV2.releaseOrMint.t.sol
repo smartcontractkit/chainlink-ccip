@@ -78,7 +78,13 @@ contract USDCTokenPoolCCTPV2_releaseOrMint is USDCTokenPoolCCTPV2Setup {
     deal(address(s_token), address(s_usdcTokenPool), amount);
 
     vm.expectEmit();
-    emit TokenPool.Minted(s_routerAllowedOffRamp, recipient, amount);
+    emit TokenPool.ReleasedOrMinted({
+      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+      token: address(s_token),
+      sender: s_routerAllowedOffRamp,
+      recipient: recipient,
+      amount: amount
+    });
 
     vm.expectCall(
       address(s_mockUSDCTransmitter),

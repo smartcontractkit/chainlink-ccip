@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {ITokenMessenger} from "../../../../pools/USDC/ITokenMessenger.sol";
+import {ITokenMessenger} from "../../../../pools/USDC/interfaces/ITokenMessenger.sol";
 
 import {Router} from "../../../../Router.sol";
 import {Pool} from "../../../../libraries/Pool.sol";
-import {RateLimiter} from "../../../../libraries/RateLimiter.sol";
 import {TokenPool} from "../../../../pools/TokenPool.sol";
 import {HybridLockReleaseUSDCTokenPool} from "../../../../pools/USDC/HybridLockReleaseUSDCTokenPool.sol";
 import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
 import {HybridLockReleaseUSDCTokenPoolSetup} from "./HybridLockReleaseUSDCTokenPoolSetup.t.sol";
+import {RateLimiter} from "../../../../libraries/RateLimiter.sol";
 
 contract HybridLockReleaseUSDCTokenPool_lockOrBurn is HybridLockReleaseUSDCTokenPoolSetup {
   function test_onLockReleaseMechanism() public {
@@ -33,7 +33,12 @@ contract HybridLockReleaseUSDCTokenPool_lockOrBurn is HybridLockReleaseUSDCToken
     vm.startPrank(s_routerAllowedOnRamp);
 
     vm.expectEmit();
-    emit TokenPool.Locked(s_routerAllowedOnRamp, amount);
+    emit TokenPool.LockedOrBurned({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      token: address(s_token),
+      sender: address(s_routerAllowedOnRamp),
+      amount: amount
+    });
 
     s_usdcTokenPool.lockOrBurn(
       Pool.LockOrBurnInV1({
@@ -61,7 +66,11 @@ contract HybridLockReleaseUSDCTokenPool_lockOrBurn is HybridLockReleaseUSDCToken
     USDCTokenPool.Domain memory expectedDomain = s_usdcTokenPool.getDomain(DEST_CHAIN_SELECTOR);
 
     vm.expectEmit();
-    emit RateLimiter.TokensConsumed(amount);
+    emit TokenPool.OutboundRateLimitConsumed({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      token: address(s_token),
+      amount: amount
+    });
 
     vm.expectEmit();
     emit ITokenMessenger.DepositForBurn(
@@ -76,7 +85,12 @@ contract HybridLockReleaseUSDCTokenPool_lockOrBurn is HybridLockReleaseUSDCToken
     );
 
     vm.expectEmit();
-    emit TokenPool.Burned(s_routerAllowedOnRamp, amount);
+    emit TokenPool.LockedOrBurned({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      token: address(s_token),
+      sender: address(s_routerAllowedOnRamp),
+      amount: amount
+    });
 
     Pool.LockOrBurnOutV1 memory poolReturnDataV1 = s_usdcTokenPool.lockOrBurn(
       Pool.LockOrBurnInV1({
@@ -113,9 +127,6 @@ contract HybridLockReleaseUSDCTokenPool_lockOrBurn is HybridLockReleaseUSDCToken
 
     USDCTokenPool.Domain memory expectedDomain = s_usdcTokenPool.getDomain(DEST_CHAIN_SELECTOR);
 
-    vm.expectEmit();
-    emit RateLimiter.TokensConsumed(amount);
-
     // The event signature for CCTP V2 is different from V1
     vm.expectEmit();
     emit ITokenMessenger.DepositForBurn(
@@ -132,7 +143,12 @@ contract HybridLockReleaseUSDCTokenPool_lockOrBurn is HybridLockReleaseUSDCToken
     );
 
     vm.expectEmit();
-    emit TokenPool.Burned(s_routerAllowedOnRamp, amount);
+    emit TokenPool.LockedOrBurned({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      token: address(s_token),
+      sender: address(s_routerAllowedOnRamp),
+      amount: amount
+    });
 
     s_usdcTokenPool.lockOrBurn(
       Pool.LockOrBurnInV1({

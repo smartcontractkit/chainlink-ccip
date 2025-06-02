@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IMessageTransmitter} from "../../../../pools/USDC/IMessageTransmitter.sol";
+import {IMessageTransmitter} from "../../../../pools/USDC/interfaces/IMessageTransmitter.sol";
 
 import {CCTPMessageTransmitterProxy} from "../../../../pools/USDC/CCTPMessageTransmitterProxy.sol";
 import {CCTPMessageTransmitterProxySetup} from "./CCTPMessageTransmitterProxySetup.t.sol";

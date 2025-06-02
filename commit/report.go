@@ -202,7 +202,10 @@ func (p *Plugin) validateReport(
 	}
 
 	if !supports {
-		lggr.Warnw("dest chain not supported, can't run report acceptance procedures")
+		lggr.Errorw("dest chain not supported by this oracle, can't run report acceptance procedures, " +
+			"transmission schedule is wrong - check CCIPHome chainConfigs and ensure that the right oracles are " +
+			"assigned as readers of the destination chain, or if " +
+			"this oracle should support the destination chain but isn't!")
 		return cciptypes.CommitPluginReport{}, plugincommon.NewErrInvalidReport("dest chain not supported")
 	}
 
@@ -312,6 +315,19 @@ func (p *Plugin) checkReportCursed(
 	decodedReport cciptypes.CommitPluginReport,
 ) (bool, error) {
 	allRoots := append(decodedReport.BlessedMerkleRoots, decodedReport.UnblessedMerkleRoots...)
+
+	supportsDest, err := p.chainSupport.SupportsDestChain(p.oracleID)
+	if err != nil {
+		lggr.Errorw("error checking if destination chain is supported", "err", err)
+		return false, fmt.Errorf("checking if destination chain is supported: %w", err)
+	}
+	if !supportsDest {
+		lggr.Errorw("dest chain not supported by this oracle, can't run report acceptance procedures, " +
+			"transmission schedule is wrong - check CCIPHome chainConfigs and ensure that the right oracles are " +
+			"assigned as readers of the destination chain, or if " +
+			"this oracle should support the destination chain but isn't!")
+		return false, plugincommon.NewErrInvalidReport("destination chain not supported")
+	}
 
 	sourceChains := slicelib.Map(allRoots,
 		func(r cciptypes.MerkleRootChain) cciptypes.ChainSelector { return r.ChainSel })
