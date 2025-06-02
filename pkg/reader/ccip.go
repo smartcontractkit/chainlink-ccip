@@ -23,6 +23,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/addressbook"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
@@ -42,6 +43,7 @@ type ccipChainReader struct {
 	offrampAddress  string
 	configPoller    ConfigPoller
 	addrCodec       cciptypes.AddressCodec
+	donAddressBook  *addressbook.Book
 }
 
 func newCCIPChainReaderInternal(
@@ -70,6 +72,7 @@ func newCCIPChainReaderInternal(
 		destChain:       destChain,
 		offrampAddress:  offrampAddrStr,
 		addrCodec:       addrCodec,
+		donAddressBook:  addressbook.NewBook(),
 	}
 
 	// Initialize cache with readers
@@ -99,6 +102,31 @@ func newCCIPChainReaderInternal(
 func (r *ccipChainReader) WithExtendedContractReader(
 	ch cciptypes.ChainSelector, cr contractreader.Extended) *ccipChainReader {
 	r.contractReaders[ch] = cr
+
+	// Register the bound addresses in the address book
+	for _, contractName := range consts.AllContractNames() {
+		bindings := cr.GetBindings(contractName)
+		if len(bindings) == 0 {
+			continue
+		}
+		lastBinding := bindings[len(bindings)-1]
+
+		addressBytes, err := r.addrCodec.AddressStringToBytes(lastBinding.Binding.Address, ch)
+		if err != nil {
+			r.lggr.Errorw("failed to convert address", "err", err)
+			continue
+		}
+
+		err = r.donAddressBook.InsertOrUpdate(
+			map[addressbook.ContractName]map[cciptypes.ChainSelector]cciptypes.UnknownAddress{
+				addressbook.ContractName(contractName): {ch: addressBytes},
+			})
+		if err != nil {
+			r.lggr.Errorw("failed to insert or update contract", "err", err)
+			continue
+		}
+	}
+
 	return r
 }
 
@@ -1286,7 +1314,18 @@ func (r *ccipChainReader) DiscoverContracts(ctx context.Context,
 }
 
 // Sync goes through the input contracts and binds them to the contract reader.
+// It also updates the addressbook with the new addresses.
+// NOTE: You should ensure that Sync is called deterministically for every oracle in the DON to guarantee
+// a consistent shared addressbook state.
 func (r *ccipChainReader) Sync(ctx context.Context, contracts ContractAddresses) error {
+	addressBookEntries := make(addressbook.ContractAddresses)
+	for name, addrs := range contracts {
+		addressBookEntries[addressbook.ContractName(name)] = addrs
+	}
+	if err := r.donAddressBook.InsertOrUpdate(addressBookEntries); err != nil {
+		return fmt.Errorf("set address book state: %w", err)
+	}
+
 	lggr := logutil.WithContextValues(ctx, r.lggr)
 	var errs []error
 	for contractName, chainSelToAddress := range contracts {
@@ -1319,22 +1358,7 @@ func (r *ccipChainReader) Sync(ctx context.Context, contracts ContractAddresses)
 }
 
 func (r *ccipChainReader) GetContractAddress(contractName string, chain cciptypes.ChainSelector) ([]byte, error) {
-	extendedReader, ok := r.contractReaders[chain]
-	if !ok {
-		return nil, fmt.Errorf("contract reader not found for chain %d", chain)
-	}
-
-	bindings := extendedReader.GetBindings(contractName)
-	if len(bindings) != 1 {
-		return nil, fmt.Errorf("expected one binding for the %s contract, got %d", contractName, len(bindings))
-	}
-
-	addressBytes, err := r.addrCodec.AddressStringToBytes(bindings[0].Binding.Address, chain)
-	if err != nil {
-		return nil, fmt.Errorf("convert address %s to bytes: %w", bindings[0].Binding.Address, err)
-	}
-
-	return addressBytes, nil
+	return r.donAddressBook.GetContractAddress(addressbook.ContractName(contractName), chain)
 }
 
 // LinkPriceUSD gets the LINK price in 1e-18 USDs from the FeeQuoter contract on the destination chain.

@@ -200,7 +200,6 @@ type CCIPReader interface {
 		seqNum map[cciptypes.ChainSelector]cciptypes.SeqNum, err error)
 
 	// GetContractAddress returns the contract address that is registered for the provided contract name and chain.
-	// WARNING: This function will fail if the oracle does not support the requested chain.
 	GetContractAddress(contractName string, chain cciptypes.ChainSelector) ([]byte, error)
 
 	// Nonces fetches all nonces for the provided selector/address pairs. Addresses are a string encoded raw address,
@@ -258,6 +257,8 @@ type CCIPReader interface {
 
 	// Sync can be used to perform frequent syncing operations inside the reader implementation.
 	// NOTE: this method may make network calls.
+	//
+	// NOTE: You should ensure that Sync is called deterministically for every oracle in the DON (e.g. in the Outcome).
 	Sync(ctx context.Context, contracts ContractAddresses) error
 
 	// GetLatestPriceSeqNr returns the latest price sequence number for the destination chain.
