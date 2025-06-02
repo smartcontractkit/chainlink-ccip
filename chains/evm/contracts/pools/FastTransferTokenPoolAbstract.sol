@@ -18,7 +18,6 @@ import {SafeERC20} from
 import {EnumerableSet} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableSet.sol";
 
-/// @title Abstract Fast-Transfer Pool
 /// @notice Base contract for fast-transfer pools that provides common functionality
 /// for quoting, fill-tracking, and CCIP send helpers.
 /// @dev To make this contract usable, it must be inherited by a concrete implementation that implements:
@@ -54,11 +53,11 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   event DestinationPoolUpdated(uint64 indexed destChainSelector, address destinationPool);
 
   struct DestChainConfig {
-    uint256 maxFillAmountPerRequest; //  Max amount that can be filled per request.
-    bool fillerAllowlistEnabled; // ───╮ Allowlist for fillers.
-    uint16 fastTransferBpsFee; //      │ Allowed range of [0-10_000].
-    //                                 │ Settlement overhead gas for the destination chain. Used as a toggle for
-    uint32 settlementOverheadGas; // ──╯ either custom ExtraArgs or GenericExtraArgsV2.
+    uint256 maxFillAmountPerRequest; // Maximum amount that can be filled per request.
+    bool fillerAllowlistEnabled; // ──╮ Allowlist for fillers.
+    uint16 fastTransferBpsFee; //     │ Allowed range of [0-10_000].
+    //                                │ Settlement overhead gas for the destination chain. Used as a toggle for
+    uint32 settlementOverheadGas; // ─╯ either custom ExtraArgs or GenericExtraArgsV2.
     bytes destinationPool; // Address of the destination pool.
     bytes customExtraArgs; // Pre-encoded extra args for EVM to Any message. Only used if settlementOverheadGas is 0.
   }
@@ -92,28 +91,28 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   /// @notice Struct to track fill request information.
   struct FillInfo {
     FillState state; // Current state of the fill request.
-    address filler; // Address of the filler, 0x0 until filled. If 0x0 after filled, it means the request was not fast-filled.
+    // Address of the filler, 0x0 until filled. If 0x0 after filled, it means the request was not fast-filled.
+    address filler;
   }
 
   /// @notice The division factor for basis points (BPS). This also represents the maximum BPS fee for fast transfer.
   uint256 internal constant BPS_DIVIDER = 10_000;
 
-  /// @dev Mapping of remote chain selector to destinationChain configuration
+  /// @dev Mapping of remote chain selector to destinationChain configuration.
   mapping(uint64 remoteChainSelector => DestChainConfig destinationChainConfig) private s_fastTransferDestChainConfig;
 
-  /// @dev Mapping of remote chain selector to filler allowlist
+  /// @dev Mapping of remote chain selector to filler allowlist.
   mapping(uint64 remoteChainSelector => EnumerableSet.AddressSet fillerAllowList) private s_fillerAllowLists;
 
-  /// @dev Mapping of fill request ID to fill information
-  /// This is used to track the state and filler of each fill request
+  /// @dev Mapping of fill request ID to fill information.
+  /// This is used to track the state and filler of each fill request.
   mapping(bytes32 fillId => FillInfo fillInfo) internal s_fills;
 
-  /// @notice Initializes the fast transfer pool
-  /// @param token The token this pool manages
-  /// @param localTokenDecimals The decimals of the local token
-  /// @param allowlist The allowlist of addresses
-  /// @param rmnProxy The RMN proxy address
-  /// @param router Address of the CCIP router
+  /// @param token The token this pool manages.
+  /// @param localTokenDecimals The decimals of the local token.
+  /// @param allowlist The allowlist of addresses.
+  /// @param rmnProxy The RMN proxy address.
+  /// @param router Address of the CCIP router.
   constructor(
     IERC20 token,
     uint8 localTokenDecimals,
@@ -122,9 +121,8 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     address router
   ) TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) CCIPReceiver(router) {}
 
-  /// @notice Gets the fill information for a given fill ID
-  /// @param fillId The fill ID to query
-  /// @return fillInfo The fill information including state and filler address
+  /// @notice Gets the fill information for a given fill ID.
+  /// @return fillInfo The fill information including state and filler address.
   function getFillInfo(
     bytes32 fillId
   ) external view returns (FillInfo memory) {
@@ -194,7 +192,6 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     return quote;
   }
 
-  /// @notice Pulls out all of the fee‐quotation + message‐build logic
   function _getFeeQuoteAndCCIPMessage(
     uint64 destinationChainSelector,
     uint256 amount,
@@ -248,13 +245,13 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   // │                           Filling                            │
   // ================================================================
 
-  /// @notice Fast fills a transfer using liquidity provider funds based on CCIP settlement
+  /// @notice Fast fills a transfer using liquidity provider funds based on CCIP settlement.
   /// @param settlementId The settlement ID, which under normal circumstances is the same as the CCIP message ID.
-  /// @param fillId The fill ID, computed from the fill request parameters
-  /// @param sourceAmountNetFee The amount to fill, calculated as the amount sent in
-  /// `ccipSendToken` minus the fast fill fee, expressed in source token decimals
-  /// @param sourceDecimals The decimals of the source token
-  /// @param receiver The receiver address
+  /// @param fillId The fill ID, computed from the fill request parameters.
+  /// @param sourceAmountNetFee The amount to fill, calculated as the amount sent in `ccipSendToken` minus
+  /// the fast fill fee, expressed in source token decimals.
+  /// @param sourceDecimals The decimals of the source token.
+  /// @param receiver The receiver address.
   function fastFill(
     bytes32 settlementId,
     bytes32 fillId,
@@ -343,8 +340,8 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   }
 
   /// @notice Validates settlement prerequisites. Can be overridden by derived contracts to add additional checks.
-  /// @param sourceChainSelector The source chain selector
-  /// @param sourcePoolAddress The source pool address
+  /// @param sourceChainSelector The source chain selector.
+  /// @param sourcePoolAddress The source pool address.
   function _validateSettlement(uint64 sourceChainSelector, bytes memory sourcePoolAddress) internal view virtual {
     if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(sourceChainSelector)))) revert CursedByRMN();
     //Validates that the source pool address is configured on this pool.
@@ -357,9 +354,9 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   // │                      Filling Hooks                           │
   // ================================================================
 
-  /// @notice Handles the token to transfer on fast fill request at source chain
-  /// @param sender The sender address
-  /// @param amount The amount to transfer
+  /// @notice Handles the token to transfer on fast fill request at source chain.
+  /// @param sender The sender address.
+  /// @param amount The amount to transfer.
   function _handleFastTransferLockOrBurn(address sender, uint256 amount) internal virtual {
     // Since this is a fast transfer, the Router doesn't forward the tokens to the pool.
     getToken().safeTransferFrom(sender, address(this), amount);
@@ -386,11 +383,11 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     _releaseOrMint(receiver, localSettlementAmount);
   }
 
-  /// @notice Handles reimbursement when the request was fast-filled
+  /// @notice Handles reimbursement when the request was fast-filled.
   /// @dev The first param is the fillId. It's unused in this implementation, but kept to allow overriding this function
   /// to handle the reimbursement in a different way.
-  /// @param filler The filler address to reimburse
-  /// @param settlementAmountLocal The amount to reimburse in local token
+  /// @param filler The filler address to reimburse.
+  /// @param settlementAmountLocal The amount to reimburse in local token.
   function _handleFastFillReimbursement(bytes32, address filler, uint256 settlementAmountLocal) internal virtual {
     _releaseOrMint(filler, settlementAmountLocal);
   }
@@ -404,17 +401,17 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     return TokenPool.getRouter();
   }
 
-  /// @notice Gets the destChain configuration for a given destination chain selector
-  /// @param remoteChainSelector The remote chain selector
-  /// @return destChainConfig The destChain configuration for the given destination chain selector
+  /// @notice Gets the destChain configuration for a given destination chain selector.
+  /// @param remoteChainSelector The remote chain selector.
+  /// @return destChainConfig The destChain configuration for the given destination chain selector.
   function getDestChainConfig(
     uint64 remoteChainSelector
   ) external view virtual returns (DestChainConfig memory, address[] memory) {
     return (s_fastTransferDestChainConfig[remoteChainSelector], s_fillerAllowLists[remoteChainSelector].values());
   }
 
-  /// @notice Updates the destination chain configuration
-  /// @param destChainConfigArgs The destChain configuration arguments
+  /// @notice Updates the destination chain configuration.
+  /// @param destChainConfigArgs The destChain configuration arguments.
   function updateDestChainConfig(
     DestChainConfigUpdateArgs[] calldata destChainConfigArgs
   ) external virtual onlyOwner {
@@ -454,7 +451,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     );
   }
 
-  /// @notice Override supportsInterface to resolve diamond inheritance
+  /// @notice Override supportsInterface to resolve the double inheritance.
   function supportsInterface(
     bytes4 interfaceId
   ) public pure virtual override(TokenPool, CCIPReceiver) returns (bool) {
@@ -466,9 +463,9 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   // │                      Filler allowlist                        │
   // ================================================================
 
-  /// @notice Gets all allowlisted fillers for a given destination chain
-  /// @param remoteChainSelector The remote chain selector
-  /// @return fillers Array of allowlisted filler addresses
+  /// @notice Gets all allowlisted fillers for a given destination chain.
+  /// @param remoteChainSelector The remote chain selector.
+  /// @return fillers Array of allowlisted filler addresses.
   function getAllowedFillers(
     uint64 remoteChainSelector
   ) external view virtual returns (address[] memory) {
