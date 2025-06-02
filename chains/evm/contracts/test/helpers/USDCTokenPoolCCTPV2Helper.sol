@@ -6,6 +6,7 @@ import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/I
 
 import {CCTPMessageTransmitterProxy} from "../../pools/USDC/CCTPMessageTransmitterProxy.sol";
 import {USDCTokenPoolCCTPV2} from "../../pools/USDC/CCTPV2/USDCTokenPoolCCTPV2.sol";
+import {USDCTokenPool} from "../../pools/USDC/USDCTokenPool.sol";
 
 contract USDCTokenPoolCCTPV2Helper is USDCTokenPoolCCTPV2 {
   constructor(
@@ -17,7 +18,10 @@ contract USDCTokenPoolCCTPV2Helper is USDCTokenPoolCCTPV2 {
     address router
   ) USDCTokenPoolCCTPV2(tokenMessenger, messageTransmitterProxy, token, allowlist, rmnProxy, router) {}
 
-  function validateMessage(bytes memory usdcMessage, uint32 sourcePoolDomain) external view {
-    return _validateMessage(usdcMessage, sourcePoolDomain);
+  function validateMessage(
+    bytes memory usdcMessage,
+    USDCTokenPool.SourceTokenDataPayload memory sourceTokenData
+  ) external view {
+    return _validateMessage(usdcMessage, sourceTokenData);
   }
 }

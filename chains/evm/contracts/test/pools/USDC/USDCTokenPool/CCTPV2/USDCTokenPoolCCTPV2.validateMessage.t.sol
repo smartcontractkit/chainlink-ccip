@@ -23,8 +23,15 @@ contract USDCTokenPoolCCTPV2__validateMessage is USDCTokenPoolCCTPV2Setup {
 
     bytes memory encodedUsdcMessage = _generateUSDCMessageCCTPV2(usdcMessage);
 
+    USDCTokenPool.SourceTokenDataPayload memory sourceTokenDataPayload = USDCTokenPool.SourceTokenDataPayload({
+      nonce: uint64(0),
+      sourceDomain: uint32(usdcMessage.sourceDomain),
+      cctpVersion: USDCTokenPool.CCTPVersion.VERSION_2
+    });
+
     vm.resumeGasMetering();
-    s_usdcTokenPool.validateMessage(encodedUsdcMessage, sourceDomain);
+
+    s_usdcTokenPool.validateMessage(encodedUsdcMessage, sourceTokenDataPayload);
   }
 
   // Reverts
@@ -45,14 +52,23 @@ contract USDCTokenPoolCCTPV2__validateMessage is USDCTokenPoolCCTPV2Setup {
 
     bytes memory encodedUsdcMessage = _generateUSDCMessageCCTPV2(usdcMessage);
 
-    s_usdcTokenPool.validateMessage(encodedUsdcMessage, usdcMessage.sourceDomain);
+    USDCTokenPool.SourceTokenDataPayload memory sourceTokenDataPayload = USDCTokenPool.SourceTokenDataPayload({
+      nonce: uint64(0),
+      sourceDomain: usdcMessage.sourceDomain + 1,
+      cctpVersion: USDCTokenPool.CCTPVersion.VERSION_2
+    });
 
-    uint32 expectedSourceDomain = usdcMessage.sourceDomain + 1;
-
+    // The usdcMessage should have the source domain present in sourceTokenData payload but it doesn't so revert
     vm.expectRevert(
-      abi.encodeWithSelector(USDCTokenPool.InvalidSourceDomain.selector, expectedSourceDomain, usdcMessage.sourceDomain)
+      abi.encodeWithSelector(
+        USDCTokenPool.InvalidSourceDomain.selector, usdcMessage.sourceDomain + 1, usdcMessage.sourceDomain
+      )
     );
-    s_usdcTokenPool.validateMessage(encodedUsdcMessage, expectedSourceDomain);
+    s_usdcTokenPool.validateMessage(encodedUsdcMessage, sourceTokenDataPayload);
+
+    // Since we had the sourceDomain be incorrect in the previous call, we fix it here before proceeding so that the
+    // correct revert error is invoked.
+    sourceTokenDataPayload.sourceDomain = usdcMessage.sourceDomain;
 
     usdcMessage.destinationDomain = DEST_DOMAIN_IDENTIFIER + 1;
     vm.expectRevert(
@@ -61,7 +77,7 @@ contract USDCTokenPoolCCTPV2__validateMessage is USDCTokenPoolCCTPV2Setup {
       )
     );
 
-    s_usdcTokenPool.validateMessage(_generateUSDCMessageCCTPV2(usdcMessage), usdcMessage.sourceDomain);
+    s_usdcTokenPool.validateMessage(_generateUSDCMessageCCTPV2(usdcMessage), sourceTokenDataPayload);
     usdcMessage.destinationDomain = DEST_DOMAIN_IDENTIFIER;
 
     uint32 wrongVersion = usdcMessage.version + 1;
@@ -70,7 +86,7 @@ contract USDCTokenPoolCCTPV2__validateMessage is USDCTokenPoolCCTPV2Setup {
     encodedUsdcMessage = _generateUSDCMessageCCTPV2(usdcMessage);
 
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidMessageVersion.selector, wrongVersion));
-    s_usdcTokenPool.validateMessage(encodedUsdcMessage, usdcMessage.sourceDomain);
+    s_usdcTokenPool.validateMessage(encodedUsdcMessage, sourceTokenDataPayload);
     usdcMessage.version = 1;
 
     // Change Finality threshold and finalityThresholdExecuted to 1000 to intentionally revert
@@ -79,7 +95,7 @@ contract USDCTokenPoolCCTPV2__validateMessage is USDCTokenPoolCCTPV2Setup {
 
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolCCTPV2.InvalidMinFinalityThreshold.selector, 2000, 1000));
 
-    s_usdcTokenPool.validateMessage(encodedUsdcMessage, usdcMessage.sourceDomain);
+    s_usdcTokenPool.validateMessage(encodedUsdcMessage, sourceTokenDataPayload);
 
     // Change the min threshold back to 2k and the finality threshold to 1k to trigger
     // the other short half of the short-circuit.
@@ -88,6 +104,6 @@ contract USDCTokenPoolCCTPV2__validateMessage is USDCTokenPoolCCTPV2Setup {
     encodedUsdcMessage = _generateUSDCMessageCCTPV2(usdcMessage);
 
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolCCTPV2.InvalidExecutionFinalityThreshold.selector, 2000, 1000));
-    s_usdcTokenPool.validateMessage(encodedUsdcMessage, usdcMessage.sourceDomain);
+    s_usdcTokenPool.validateMessage(encodedUsdcMessage, sourceTokenDataPayload);
   }
 }

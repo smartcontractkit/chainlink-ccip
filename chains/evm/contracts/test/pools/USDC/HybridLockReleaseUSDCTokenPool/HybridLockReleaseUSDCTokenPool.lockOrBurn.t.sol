@@ -60,6 +60,13 @@ contract HybridLockReleaseUSDCTokenPool_lockOrBurn is HybridLockReleaseUSDCToken
 
     vm.startPrank(OWNER);
 
+    // Mark outgoing messages as using CCTP V1 primary mechanism
+    USDCTokenPool.CCTPVersion[] memory versions = new USDCTokenPool.CCTPVersion[](1);
+    versions[0] = USDCTokenPool.CCTPVersion.VERSION_1;
+    uint64[] memory remoteChainSelectors = new uint64[](1);
+    remoteChainSelectors[0] = DEST_CHAIN_SELECTOR;
+    s_usdcTokenPool.updateCCTPVersion(remoteChainSelectors, versions);
+
     s_token.transfer(address(s_usdcTokenPool), amount);
 
     vm.startPrank(s_routerAllowedOnRamp);

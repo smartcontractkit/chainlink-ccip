@@ -111,12 +111,12 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
     _validateReleaseOrMint(releaseOrMintIn);
 
-    uint32 sourceDomainIdentifier = abi.decode(releaseOrMintIn.sourcePoolData, (uint32));
+    SourceTokenDataPayload memory sourceTokenData = abi.decode(releaseOrMintIn.sourcePoolData, (SourceTokenDataPayload));
 
     MessageAndAttestation memory msgAndAttestation =
       abi.decode(releaseOrMintIn.offchainTokenData, (MessageAndAttestation));
 
-    _validateMessage(msgAndAttestation.message, sourceDomainIdentifier);
+    _validateMessage(msgAndAttestation.message, sourceTokenData);
 
     if (!i_messageTransmitterProxy.receiveMessage(msgAndAttestation.message, msgAndAttestation.attestation)) {
       revert UnlockingUSDCFailed();
@@ -136,7 +136,7 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
 
   /// @notice Validates the USDC encoded message against the given parameters.
   /// @param usdcMessage The USDC encoded message
-  /// @param sourcePoolDomain The expected source chain CCTP identifier as provided by the CCIP-Source-Pool.
+  /// @param sourcePoolTokenData The expected source chain CCTP identifier as provided by the CCIP-Source-Pool.
   /// @dev Only supports version SUPPORTED_USDC_VERSION of the CCTP V2 message format
   /// @dev Message format for USDC:
   ///     * Field                      Bytes      Type       Index
@@ -150,7 +150,10 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
   ///     * minFinalityThreshold       32         uint32    140
   ///     * finalityThresholdExecuted  32         uint32    144
   ///     * messageBody                dynamic    bytes     148
-  function _validateMessage(bytes memory usdcMessage, uint32 sourcePoolDomain) internal view {
+  function _validateMessage(
+    bytes memory usdcMessage,
+    SourceTokenDataPayload memory sourcePoolTokenData
+  ) internal view override {
     uint32 version;
     // solhint-disable-next-line no-inline-assembly
     assembly {
@@ -178,8 +181,8 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
     }
 
     // Check that the source domain included in the CCTP Message matches the one forwarded by the source pool.
-    if (messageSourceDomain != sourcePoolDomain) {
-      revert InvalidSourceDomain(sourcePoolDomain, messageSourceDomain);
+    if (messageSourceDomain != sourcePoolTokenData.sourceDomain) {
+      revert InvalidSourceDomain(sourcePoolTokenData.sourceDomain, messageSourceDomain);
     }
 
     // Check that the destination domain in the CCTP message matches the immutable domain of this pool.
@@ -194,5 +197,7 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
     if (finalityThresholdExecuted != FINALITY_THRESHOLD) {
       revert InvalidExecutionFinalityThreshold(FINALITY_THRESHOLD, finalityThresholdExecuted);
     }
+
+    // TODO: Add check for valid version of sourcePool.cctpVersion is VERSION_2
   }
 }

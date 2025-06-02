@@ -216,7 +216,7 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
         // Otherwise use the V2 functionality defined explicitly below
       } else if (sourceTokenData.cctpVersion == CCTPVersion.VERSION_2) {
         return _releaseOrMintCCTPV2(releaseOrMintIn);
-      }
+      } else if (sourceTokenData.cctpVersion == CCTPVersion.UNKNOWN_VERSION) {}
     }
     return _lockReleaseIncomingMessage(releaseOrMintIn);
   }
@@ -352,7 +352,7 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
     MessageAndAttestation memory msgAndAttestation =
       abi.decode(releaseOrMintIn.offchainTokenData, (MessageAndAttestation));
 
-    _validateMessageCCTPV2(msgAndAttestation.message, sourceTokenData.sourceDomain);
+    _validateMessageCCTPV2(msgAndAttestation.message, sourceTokenData);
 
     // Forward the message to the transmitter proxy, which will then forward it to the actual transmitter,
     // thus ensuring that the allowedCaller specified in the message is the one making the mint request.
@@ -374,7 +374,7 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
 
   /// @notice Validates the USDC encoded message against the given parameters.
   /// @param usdcMessage The USDC encoded message
-  /// @param sourcePoolDomain The expected source chain CCTP identifier as provided by the CCIP-Source-Pool.
+  /// @param sourcetokenDataPayload The abi-decoded source pool data into SourceTokenDataPayload format.
   /// @dev Only supports version SUPPORTED_USDC_VERSION of the CCTP V2 message format
   /// @dev Message format for USDC:
   ///     * Field                      Bytes      Type       Index
@@ -388,7 +388,10 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
   ///     * minFinalityThreshold       32         uint32    140
   ///     * finalityThresholdExecuted  32         uint32    144
   ///     * messageBody                dynamic    bytes     148
-  function _validateMessageCCTPV2(bytes memory usdcMessage, uint32 sourcePoolDomain) internal view {
+  function _validateMessageCCTPV2(
+    bytes memory usdcMessage,
+    SourceTokenDataPayload memory sourcetokenDataPayload
+  ) internal view {
     uint32 version;
     // solhint-disable-next-line no-inline-assembly
     assembly {
@@ -416,8 +419,8 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
     }
 
     // Check that the source domain included in the CCTP Message matches the one forwarded by the source pool.
-    if (messageSourceDomain != sourcePoolDomain) {
-      revert InvalidSourceDomain(sourcePoolDomain, messageSourceDomain);
+    if (messageSourceDomain != sourcetokenDataPayload.sourceDomain) {
+      revert InvalidSourceDomain(sourcetokenDataPayload.sourceDomain, messageSourceDomain);
     }
 
     // Check that the destination domain in the CCTP message matches the immutable domain of this pool.

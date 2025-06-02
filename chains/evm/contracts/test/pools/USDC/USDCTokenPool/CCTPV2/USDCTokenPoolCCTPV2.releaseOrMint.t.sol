@@ -67,7 +67,13 @@ contract USDCTokenPoolCCTPV2_releaseOrMint is USDCTokenPoolCCTPV2Setup {
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: abi.encode(SOURCE_DOMAIN_IDENTIFIER),
+      extraData: abi.encode(
+        USDCTokenPool.SourceTokenDataPayload({
+          nonce: uint64(0),
+          sourceDomain: SOURCE_DOMAIN_IDENTIFIER,
+          cctpVersion: USDCTokenPool.CCTPVersion.VERSION_2
+        })
+      ),
       destGasAmount: USDC_DEST_TOKEN_GAS
     });
 
@@ -139,7 +145,13 @@ contract USDCTokenPoolCCTPV2_releaseOrMint is USDCTokenPoolCCTPV2Setup {
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: abi.encode(SOURCE_DOMAIN_IDENTIFIER),
+      extraData: abi.encode(
+        USDCTokenPool.SourceTokenDataPayload({
+          nonce: uint64(0),
+          sourceDomain: SOURCE_DOMAIN_IDENTIFIER,
+          cctpVersion: USDCTokenPool.CCTPVersion.VERSION_2
+        })
+      ),
       destGasAmount: USDC_DEST_TOKEN_GAS
     });
 
@@ -215,7 +227,13 @@ contract USDCTokenPoolCCTPV2_releaseOrMint is USDCTokenPoolCCTPV2Setup {
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: abi.encode(sourceDomain),
+      extraData: abi.encode(
+        USDCTokenPool.SourceTokenDataPayload({
+          nonce: uint64(0),
+          sourceDomain: sourceDomain,
+          cctpVersion: USDCTokenPool.CCTPVersion.VERSION_2
+        })
+      ),
       destGasAmount: USDC_DEST_TOKEN_GAS
     });
 

@@ -46,6 +46,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   }
 
   enum CCTPVersion {
+    UNKNOWN_VERSION,
     VERSION_1,
     VERSION_2
   }
@@ -208,7 +209,10 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   ///     * recipient             32         bytes32    52
   ///     * destinationCaller     32         bytes32    84
   ///     * messageBody           dynamic    bytes      116
-  function _validateMessage(bytes memory usdcMessage, SourceTokenDataPayload memory sourceTokenData) internal view {
+  function _validateMessage(
+    bytes memory usdcMessage,
+    SourceTokenDataPayload memory sourceTokenData
+  ) internal view virtual {
     uint32 version;
     // solhint-disable-next-line no-inline-assembly
     assembly {
@@ -239,6 +243,8 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
       revert InvalidDestinationDomain(i_localDomainIdentifier, destinationDomain);
     }
     if (nonce != sourceTokenData.nonce) revert InvalidNonce(sourceTokenData.nonce, nonce);
+
+    // TODO: Check that sourceTokenData.cctpVersion matches VERSION_1
   }
 
   // ================================================================
