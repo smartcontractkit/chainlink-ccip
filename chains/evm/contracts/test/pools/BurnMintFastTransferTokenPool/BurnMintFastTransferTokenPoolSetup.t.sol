@@ -82,7 +82,7 @@ contract BurnMintFastTransferTokenPoolSetup is BaseTest {
     });
 
     s_pool.updateDestChainConfig(_singleConfigToList(laneConfigArgs));
-    s_pool.updateFillerAllowList(DEST_CHAIN_SELECTOR, addFillers, new address[](0));
+    s_pool.updateFillerAllowList(addFillers, new address[](0));
   }
 
   function _singleConfigToList(

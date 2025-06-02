@@ -101,7 +101,7 @@ contract FastTransferTokenPool_fastFill_Test is FastTransferTokenPoolSetup {
     addFillers[0] = filler2;
     vm.stopPrank();
     vm.prank(OWNER);
-    s_pool.updateFillerAllowList(DEST_CHAIN_SELECTOR, addFillers, new address[](0));
+    s_pool.updateFillerAllowList(addFillers, new address[](0));
 
     deal(address(s_token), filler2, type(uint256).max);
     vm.prank(filler2);

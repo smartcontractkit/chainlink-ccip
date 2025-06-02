@@ -89,8 +89,7 @@ contract FastTransferTokenPoolSetup is BaseTest {
     address[] memory fillersToAdd = new address[](1);
     fillersToAdd[0] = s_filler;
 
-    s_pool.updateFillerAllowList(DEST_CHAIN_SELECTOR, fillersToAdd, new address[](0));
-    s_pool.updateFillerAllowList(SVM_CHAIN_SELECTOR, fillersToAdd, new address[](0));
+    s_pool.updateFillerAllowList(fillersToAdd, new address[](0));
 
     bytes[] memory remotePoolAddresses = new bytes[](1);
     remotePoolAddresses[0] = destPoolAddress;

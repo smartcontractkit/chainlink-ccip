@@ -32,12 +32,12 @@ contract FastTransferTokenPool_constructor is FastTransferTokenPoolSetup {
   }
 
   function test_IsFillerAllowListed() public {
-    assertTrue(s_pool.isAllowedFiller(DEST_CHAIN_SELECTOR, s_filler));
-    assertFalse(s_pool.isAllowedFiller(DEST_CHAIN_SELECTOR, makeAddr("notFiller")));
+    assertTrue(s_pool.isAllowedFiller(s_filler));
+    assertFalse(s_pool.isAllowedFiller(makeAddr("notFiller")));
   }
 
   function test_GetAllowListedFillers() public view {
-    address[] memory allowlistedFillers = s_pool.getAllowedFillers(DEST_CHAIN_SELECTOR);
+    address[] memory allowlistedFillers = s_pool.getAllowedFillers();
     assertEq(allowlistedFillers.length, 1);
     assertEq(allowlistedFillers[0], s_filler);
   }

@@ -49,7 +49,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     uint256 settlementOverheadGas,
     bool fillerAllowlistEnabled
   );
-  event FillerAllowListUpdated(uint64 indexed destChainSelector, address[] addFillers, address[] removeFillers);
+  event FillerAllowListUpdated(address[] addFillers, address[] removeFillers);
   event DestinationPoolUpdated(uint64 indexed destChainSelector, address destinationPool);
 
   struct DestChainConfig {
@@ -99,10 +99,10 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   uint256 internal constant BPS_DIVIDER = 10_000;
 
   /// @dev Mapping of remote chain selector to destinationChain configuration.
-  mapping(uint64 remoteChainSelector => DestChainConfig destinationChainConfig) private s_fastTransferDestChainConfig;
+  mapping(uint64 remoteChainSelector => DestChainConfig destinationChainConfig) internal s_fastTransferDestChainConfig;
 
-  /// @dev Mapping of remote chain selector to filler allowlist.
-  mapping(uint64 remoteChainSelector => EnumerableSet.AddressSet fillerAllowList) private s_fillerAllowLists;
+  /// @dev Only addresses present in this list are able to fill.
+  EnumerableSet.AddressSet internal s_fillerAllowLists;
 
   /// @dev Mapping of fill request ID to fill information.
   /// This is used to track the state and filler of each fill request.
@@ -261,7 +261,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     address receiver
   ) public virtual {
     if (s_fastTransferDestChainConfig[sourceChainSelector].fillerAllowlistEnabled) {
-      if (!s_fillerAllowLists[sourceChainSelector].contains(msg.sender)) {
+      if (!s_fillerAllowLists.contains(msg.sender)) {
         revert FillerNotAllowlisted(sourceChainSelector, msg.sender);
       }
     }
@@ -407,7 +407,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   function getDestChainConfig(
     uint64 remoteChainSelector
   ) external view virtual returns (DestChainConfig memory, address[] memory) {
-    return (s_fastTransferDestChainConfig[remoteChainSelector], s_fillerAllowLists[remoteChainSelector].values());
+    return (s_fastTransferDestChainConfig[remoteChainSelector], s_fillerAllowLists.values());
   }
 
   /// @notice Updates the destination chain configuration.
@@ -464,40 +464,34 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   // ================================================================
 
   /// @notice Gets all allowlisted fillers for a given destination chain.
-  /// @param remoteChainSelector The remote chain selector.
   /// @return fillers Array of allowlisted filler addresses.
-  function getAllowedFillers(
-    uint64 remoteChainSelector
-  ) external view virtual returns (address[] memory) {
-    return s_fillerAllowLists[remoteChainSelector].values();
+  function getAllowedFillers() external view virtual returns (address[] memory) {
+    return s_fillerAllowLists.values();
   }
 
   /// @notice Checks if a filler is allowlisted for a given destChain.
-  /// @param remoteChainSelector The remote chain selector.
   /// @param filler The filler address to check.
   /// @return True if the filler is allowed, false otherwise.
-  function isAllowedFiller(uint64 remoteChainSelector, address filler) external view virtual returns (bool) {
-    return s_fillerAllowLists[remoteChainSelector].contains(filler);
+  function isAllowedFiller(
+    address filler
+  ) external view virtual returns (bool) {
+    return s_fillerAllowLists.contains(filler);
   }
 
   /// @notice Updates the filler allowlist configuration for a given lane.
-  /// @param destinationChainSelector The destination chain selector.
   /// @param fillersToAdd The addresses to add to the allowlist.
   /// @param fillersToRemove The addresses to remove from the allowlist.
   function updateFillerAllowList(
-    uint64 destinationChainSelector,
     address[] memory fillersToAdd,
     address[] memory fillersToRemove
   ) external virtual onlyOwner {
-    EnumerableSet.AddressSet storage allowList = s_fillerAllowLists[destinationChainSelector];
-
     for (uint256 i = 0; i < fillersToAdd.length; ++i) {
-      allowList.add(fillersToAdd[i]);
+      s_fillerAllowLists.add(fillersToAdd[i]);
     }
     for (uint256 i = 0; i < fillersToRemove.length; ++i) {
-      allowList.remove(fillersToRemove[i]);
+      s_fillerAllowLists.remove(fillersToRemove[i]);
     }
 
-    emit FillerAllowListUpdated(destinationChainSelector, fillersToAdd, fillersToRemove);
+    emit FillerAllowListUpdated(fillersToAdd, fillersToRemove);
   }
 }

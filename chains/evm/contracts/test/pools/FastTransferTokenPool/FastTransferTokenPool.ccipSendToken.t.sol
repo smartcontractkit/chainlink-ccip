@@ -52,7 +52,7 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
       customExtraArgs: extraArgs
     });
     s_pool.updateDestChainConfig(_singleConfigToList(laneConfigArgs));
-    s_pool.updateFillerAllowList(chainSelector, addFillers, new address[](0));
+    s_pool.updateFillerAllowList(addFillers, new address[](0));
 
     _setupRateLimiter(chainSelector);
   }

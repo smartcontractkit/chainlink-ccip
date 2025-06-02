@@ -5,8 +5,6 @@ import {FastTransferTokenPoolAbstract} from "../../../pools/FastTransferTokenPoo
 import {FastTransferTokenPoolSetup} from "./FastTransferTokenPoolSetup.t.sol";
 
 contract FastTransferTokenPool_updateFillerAllowlist is FastTransferTokenPoolSetup {
-  uint64 internal constant NEW_CHAIN_SELECTOR = 12345;
-
   function test_updateFillerAllowList_Success() public {
     address[] memory addFillers = new address[](2);
     addFillers[0] = makeAddr("newFiller1");
@@ -16,37 +14,39 @@ contract FastTransferTokenPool_updateFillerAllowlist is FastTransferTokenPoolSet
     removeFillers[0] = s_filler;
 
     vm.expectEmit();
-    emit FastTransferTokenPoolAbstract.FillerAllowListUpdated(DEST_CHAIN_SELECTOR, addFillers, removeFillers);
+    emit FastTransferTokenPoolAbstract.FillerAllowListUpdated(addFillers, removeFillers);
 
-    s_pool.updateFillerAllowList(DEST_CHAIN_SELECTOR, addFillers, removeFillers);
+    s_pool.updateFillerAllowList(addFillers, removeFillers);
 
     // Check changes
-    assertFalse(s_pool.isAllowedFiller(DEST_CHAIN_SELECTOR, s_filler));
-    assertTrue(s_pool.isAllowedFiller(DEST_CHAIN_SELECTOR, addFillers[0]));
-    assertTrue(s_pool.isAllowedFiller(DEST_CHAIN_SELECTOR, addFillers[1]));
+    assertFalse(s_pool.isAllowedFiller(s_filler));
+    assertTrue(s_pool.isAllowedFiller(addFillers[0]));
+    assertTrue(s_pool.isAllowedFiller(addFillers[1]));
   }
 
   function test_updateFillerAllowList_RevertWhen_NotOwner() public {
     vm.stopPrank();
 
     vm.expectRevert(); // TODO revert message
-    s_pool.updateFillerAllowList(DEST_CHAIN_SELECTOR, new address[](0), new address[](0));
+    s_pool.updateFillerAllowList(new address[](0), new address[](0));
   }
 
   function test_updateFillerAllowList_GetAllowListedFillers() public {
+    uint256 initialFillerCount = s_pool.getAllowedFillers().length;
+
     // Add multiple fillers
     address[] memory addFillers = new address[](3);
     addFillers[0] = makeAddr("filler1");
     addFillers[1] = makeAddr("filler2");
     addFillers[2] = makeAddr("filler3");
 
-    s_pool.updateFillerAllowList(NEW_CHAIN_SELECTOR, addFillers, new address[](0));
+    s_pool.updateFillerAllowList(addFillers, new address[](0));
 
     // Get all allowlisted fillers
-    address[] memory allowlistedFillers = s_pool.getAllowedFillers(NEW_CHAIN_SELECTOR);
+    address[] memory allowlistedFillers = s_pool.getAllowedFillers();
 
     // Verify all fillers are returned
-    assertEq(allowlistedFillers.length, 3);
+    assertEq(allowlistedFillers.length, initialFillerCount + 3);
 
     // Verify each filler is in the list (order may vary due to EnumerableSet)
     bool foundFiller1 = false;
@@ -65,22 +65,30 @@ contract FastTransferTokenPool_updateFillerAllowlist is FastTransferTokenPoolSet
   }
 
   function test_getAllowedFillers_AfterRemoval() public {
+    uint256 initialFillerCount = s_pool.getAllowedFillers().length;
+
     // First add fillers
     address[] memory addFillers = new address[](2);
     addFillers[0] = makeAddr("filler1");
     addFillers[1] = makeAddr("filler2");
 
-    s_pool.updateFillerAllowList(NEW_CHAIN_SELECTOR, addFillers, new address[](0));
+    s_pool.updateFillerAllowList(addFillers, new address[](0));
+
+    // Verify both fillers are added
+    address[] memory allowlistedFillers = s_pool.getAllowedFillers();
+    assertEq(allowlistedFillers.length, initialFillerCount + 2);
+    assertTrue(s_pool.isAllowedFiller(addFillers[0]));
+    assertTrue(s_pool.isAllowedFiller(addFillers[1]));
 
     // Then remove one filler
     address[] memory removeFillers = new address[](1);
     removeFillers[0] = addFillers[0];
 
-    s_pool.updateFillerAllowList(NEW_CHAIN_SELECTOR, new address[](0), removeFillers);
+    s_pool.updateFillerAllowList(new address[](0), removeFillers);
 
     // Verify only one filler remains
-    address[] memory allowlistedFillers = s_pool.getAllowedFillers(NEW_CHAIN_SELECTOR);
-    assertEq(allowlistedFillers.length, 1);
-    assertEq(allowlistedFillers[0], addFillers[1]);
+    allowlistedFillers = s_pool.getAllowedFillers();
+    assertEq(allowlistedFillers.length, initialFillerCount + 1);
+    assertFalse(s_pool.isAllowedFiller(addFillers[0]));
   }
 }
