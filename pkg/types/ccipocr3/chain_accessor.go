@@ -72,14 +72,6 @@ type AllAccessors interface {
 		ctx context.Context,
 	) (ChainFeeComponents, error)
 
-	// GetDestChainFeeComponents seems redundant. If the error is needed lets
-	// add it to GetChainFeeComponents.
-	//
-	// Deprecated: use GetChainFeeComponents instead.
-	GetDestChainFeeComponents(
-		ctx context.Context,
-	) (types.ChainFeeComponents, error)
-
 	// Sync can be used to perform frequent syncing operations inside the reader implementation.
 	// Returns a bool indicating whether something was updated.
 	Sync(ctx context.Context, contracts ContractAddresses) error
@@ -136,7 +128,7 @@ type DestinationAccessor interface {
 	// Confidence: Unconfirmed
 	Nonces(
 		ctx context.Context,
-		addresses map[ChainSelector][]UnknownEncodedAddress,
+		addresses map[ChainSelector][]string,
 	) (map[ChainSelector]map[string]uint64, error)
 
 	// GetChainFeePriceUpdate Gets latest chain fee price update for the provided chains.
