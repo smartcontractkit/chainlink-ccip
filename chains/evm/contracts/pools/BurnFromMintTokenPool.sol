@@ -19,7 +19,7 @@ import {SafeERC20} from
 contract BurnFromMintTokenPool is BurnMintTokenPoolAbstract, ITypeAndVersion {
   using SafeERC20 for IBurnMintERC20;
 
-  string public constant override typeAndVersion = "BurnFromMintTokenPool 1.5.1";
+  string public constant override typeAndVersion = "BurnFromMintTokenPool 1.6.1-dev";
 
   constructor(
     IBurnMintERC20 token,
@@ -33,8 +33,8 @@ contract BurnFromMintTokenPool is BurnMintTokenPoolAbstract, ITypeAndVersion {
     token.safeIncreaseAllowance(address(this), type(uint256).max);
   }
 
-  /// @inheritdoc BurnMintTokenPoolAbstract
-  function _burn(
+  /// @inheritdoc TokenPool
+  function _lockOrBurn(
     uint256 amount
   ) internal virtual override {
     IBurnMintERC20(address(i_token)).burnFrom(address(this), amount);

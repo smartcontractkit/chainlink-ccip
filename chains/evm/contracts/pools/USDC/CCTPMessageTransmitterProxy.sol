@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IMessageTransmitter} from "./IMessageTransmitter.sol";
-import {ITokenMessenger} from "./ITokenMessenger.sol";
+import {IMessageTransmitter} from "./interfaces/IMessageTransmitter.sol";
+import {ITokenMessenger} from "./interfaces/ITokenMessenger.sol";
 
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 
 import {EnumerableSet} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableSet.sol";
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
 
 /// @title CCTP Message Transmitter Proxy
 /// @notice A proxy contract for handling messages transmitted via the Cross Chain Transfer Protocol (CCTP).

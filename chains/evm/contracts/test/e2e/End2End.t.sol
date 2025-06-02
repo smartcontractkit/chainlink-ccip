@@ -55,12 +55,7 @@ contract E2E is OnRampSetup, OffRampSetup {
       address token = s_sourceTokens[i];
       address pool = address(
         new LockReleaseTokenPool(
-          IERC20(token),
-          DEFAULT_TOKEN_DECIMALS,
-          new address[](0),
-          address(s_mockRMNRemote),
-          true,
-          address(s_sourceRouter2)
+          IERC20(token), DEFAULT_TOKEN_DECIMALS, new address[](0), address(s_mockRMNRemote), address(s_sourceRouter2)
         )
       );
 
