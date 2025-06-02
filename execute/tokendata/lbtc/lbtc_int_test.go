@@ -203,7 +203,7 @@ func Test_LBTC_Flow(t *testing.T) {
 	}
 
 	baseObserver, err := lbtc.NewLBTCTokenDataObserver(
-		logger.Test(t),
+		logger.Nop(),
 		cciptypes.ChainSelector(sel.ETHEREUM_MAINNET_BASE_1.Selector),
 		config,
 	)
