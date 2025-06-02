@@ -86,21 +86,30 @@ jobs:
       - name: Fetch latest pull request data
         id: fetch_pr_data
         uses: actions/github-script@v6
-        # only run this step if the event is a pull request
-        if: github.event_name == 'pull_request'
+        # only run this step if the event is a pull request or merge_group
+        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
         with:
           script: |
-            const pr = await github.rest.pulls.get({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: context.issue.number
-            });
-            return pr.data.body;
+            let pull_number;
+            if (context.eventName === 'pull_request') {
+              pull_number = context.issue.number;
+            } else if (context.eventName === 'merge_group') {
+              pull_number = context.payload.pull_request.number;
+            }
+            if (pull_number) {
+              const pr = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pull_number
+              });
+              return pr.data.body;
+            }
+            return '';
       - name: Get the chainlink commit sha from PR description, if applicable
         id: get_chainlink_sha
         run: |
           default="develop"
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
+          if [ "${{ github.event_name }}" == "pull_request" ] || [ "${{ github.event_name }}" == "merge_group" ]; then
           comment=$(cat <<'GREAT_PR_DESCRIPTION_HERE'
           ${{ steps.fetch_pr_data.outputs.result }}
           GREAT_PR_DESCRIPTION_HERE
