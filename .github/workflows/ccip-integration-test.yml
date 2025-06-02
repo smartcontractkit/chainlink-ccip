@@ -137,6 +137,8 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" == "pull_request" ]; then
             COMMIT_SHA=${{ github.event.pull_request.head.sha }}
+          elif [ "${{ github.event_name }}" == "merge_group" ]; then
+            COMMIT_SHA=${{ github.event.merge_group.head_sha }}
           else
             COMMIT_SHA=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
               "https://api.github.com/repos/${{ github.repository }}/commits/${{ github.ref }}" | jq -r .sha)
