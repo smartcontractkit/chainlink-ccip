@@ -91,20 +91,52 @@ jobs:
         with:
           script: |
             let pull_number;
+            console.log(`Current eventName: ${context.eventName}`);
             if (context.eventName === 'pull_request') {
               pull_number = context.issue.number;
+              console.log(`Event is pull_request, PR number: ${pull_number}`);
             } else if (context.eventName === 'merge_group') {
-              pull_number = context.payload.pull_request.number;
+              console.log('Event is merge_group. Attempting to get PR number.');
+              if (context.payload.pull_request && typeof context.payload.pull_request.number === 'number') {
+                pull_number = context.payload.pull_request.number;
+                console.log(`Found PR number via context.payload.pull_request.number: ${pull_number}`);
+              } else {
+                console.warn('context.payload.pull_request.number is not available or not a number.');
+                if (context.payload.merge_group && context.payload.merge_group.head_ref) {
+                  const headRef = context.payload.merge_group.head_ref;
+                  console.log(`Attempting to parse PR number from merge_group.head_ref: ${headRef}`);
+                  // Example head_ref: "gh-readonly-queue/main/pr-123-abcdef1234567890" or "pr-123-abcdef" part of a larger string
+                  const match = headRef.match(/pr-(\d+)-[a-fA-F0-9]+/);
+                  if (match && match[1]) {
+                    pull_number = parseInt(match[1], 10);
+                    console.log(`Successfully extracted PR number from head_ref: ${pull_number}`);
+                  } else {
+                    console.error(`Could not extract PR number from head_ref: ${headRef}. Regex match failed.`);
+                  }
+                } else {
+                  console.error('context.payload.merge_group.head_ref is not available for parsing.');
+                }
+              }
+
+              if (typeof pull_number !== 'number') {
+                 console.error(`Failed to determine PR number for merge_group event. pull_number is: ${pull_number}`);
+                 // Optionally, you could throw an error here to make the failure explicit:
+                 // throw new Error('Failed to determine PR number for merge_group event.');
+              }
             }
-            if (pull_number) {
+
+            if (typeof pull_number === 'number') {
+              console.log(`Fetching PR data for PR #${pull_number}`);
               const pr = await github.rest.pulls.get({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 pull_number: pull_number
               });
               return pr.data.body;
+            } else {
+              console.log('No valid pull request number determined. Skipping PR data fetch, returning empty string.');
+              return '';
             }
-            return '';
       - name: Get the chainlink commit sha from PR description, if applicable
         id: get_chainlink_sha
         run: |
