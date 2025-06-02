@@ -43,7 +43,7 @@ type ccipChainReader struct {
 	offrampAddress  string
 	configPoller    ConfigPoller
 	addrCodec       cciptypes.AddressCodec
-	donAddressBook  addressbook.IBook
+	donAddressBook  *addressbook.Book
 }
 
 func newCCIPChainReaderInternal(
@@ -1290,11 +1290,11 @@ func (r *ccipChainReader) DiscoverContracts(ctx context.Context,
 
 // Sync goes through the input contracts and binds them to the contract reader.
 func (r *ccipChainReader) Sync(ctx context.Context, contracts ContractAddresses) error {
-	newAddressBookState := make(addressbook.ContractAddresses)
+	addressBookEntries := make(addressbook.ContractAddresses)
 	for name, addrs := range contracts {
-		newAddressBookState[addressbook.ContractName(name)] = addrs
+		addressBookEntries[addressbook.ContractName(name)] = addrs
 	}
-	if err := r.donAddressBook.AppendState(newAddressBookState); err != nil {
+	if err := r.donAddressBook.InsertOrUpdate(addressBookEntries); err != nil {
 		return fmt.Errorf("set address book state: %w", err)
 	}
 
