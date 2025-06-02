@@ -19,7 +19,7 @@ import {SafeERC20} from
 contract BurnToAddressMintTokenPool is BurnMintTokenPoolAbstract, ITypeAndVersion {
   using SafeERC20 for IERC20;
 
-  string public constant override typeAndVersion = "BurnToAddressTokenPool 1.5.1";
+  string public constant override typeAndVersion = "BurnToAddressTokenPool 1.6.1-dev";
 
   /// @notice The address where tokens are sent during a call to lockOrBurn, functionally burning but without decreasing
   /// total supply. This address is expected to have no ability to recover the tokens sent to it, and will thus be locked forever.
@@ -39,13 +39,13 @@ contract BurnToAddressMintTokenPool is BurnMintTokenPoolAbstract, ITypeAndVersio
     i_burnAddress = burnAddress;
   }
 
-  /// @inheritdoc BurnMintTokenPoolAbstract
+  /// @inheritdoc TokenPool
   /// @notice Tokens are burned by sending to an address which can never transfer them,
   /// making the tokens unrecoverable without reducing the total supply.
-  function _burn(
+  function _lockOrBurn(
     uint256 amount
   ) internal virtual override {
-    getToken().safeTransfer(i_burnAddress, amount);
+    i_token.safeTransfer(i_burnAddress, amount);
   }
 
   /// @notice Returns the address where tokens are sent during a call to lockOrBurn
