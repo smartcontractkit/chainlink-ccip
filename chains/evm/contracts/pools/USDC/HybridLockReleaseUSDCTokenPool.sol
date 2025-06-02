@@ -61,10 +61,6 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
   uint32 public constant FINALITY_THRESHOLD = 2000;
 
   // TODO: Figure out a better way to do this.
-  enum CCTPVersion {
-    VERSION_1,
-    VERSION_2
-  }
 
   ITokenMessenger public immutable i_tokenMessengerCCTPV2;
   CCTPMessageTransmitterProxy public immutable i_cctpMessageTransmitterProxyCCTPV2;
@@ -210,13 +206,15 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
     // flag so it is safe to release the tokens. The source USDC pool is trusted to send messages with the correct
     // flag as well.
     if (bytes4(releaseOrMintIn.sourcePoolData) != LOCK_RELEASE_FLAG) {
-      CCTPVersion cctpVersion = s_cctpVersion[releaseOrMintIn.remoteChainSelector];
+      // CCTPVersion cctpVersion = s_cctpVersion[releaseOrMintIn.remoteChainSelector];
+      SourceTokenDataPayload memory sourceTokenData =
+        abi.decode(releaseOrMintIn.sourcePoolData, (SourceTokenDataPayload));
       // If the version is legacy, use the inherited CCTP Functionality
-      if (cctpVersion == CCTPVersion.VERSION_1) {
+      if (sourceTokenData.cctpVersion == CCTPVersion.VERSION_1) {
         return super.releaseOrMint(releaseOrMintIn);
 
         // Otherwise use the V2 functionality defined explicitly below
-      } else if (cctpVersion == CCTPVersion.VERSION_2) {
+      } else if (sourceTokenData.cctpVersion == CCTPVersion.VERSION_2) {
         return _releaseOrMintCCTPV2(releaseOrMintIn);
       }
     }
@@ -349,12 +347,12 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
   ) internal virtual returns (Pool.ReleaseOrMintOutV1 memory) {
     _validateReleaseOrMint(releaseOrMintIn);
 
-    uint32 sourceDomainIdentifier = abi.decode(releaseOrMintIn.sourcePoolData, (uint32));
+    SourceTokenDataPayload memory sourceTokenData = abi.decode(releaseOrMintIn.sourcePoolData, (SourceTokenDataPayload));
 
     MessageAndAttestation memory msgAndAttestation =
       abi.decode(releaseOrMintIn.offchainTokenData, (MessageAndAttestation));
 
-    _validateMessageCCTPV2(msgAndAttestation.message, sourceDomainIdentifier);
+    _validateMessageCCTPV2(msgAndAttestation.message, sourceTokenData.sourceDomain);
 
     // Forward the message to the transmitter proxy, which will then forward it to the actual transmitter,
     // thus ensuring that the allowedCaller specified in the message is the one making the mint request.
@@ -481,9 +479,16 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
       amount: lockOrBurnIn.amount
     });
 
+    // Since CCTP V2 does not return a nonce during the deposit call, we can just use zero to satisfy the struct field.
     return Pool.LockOrBurnOutV1({
       destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
-      destPoolData: abi.encode(i_localDomainIdentifier)
+      destPoolData: abi.encode(
+        USDCTokenPool.SourceTokenDataPayload({
+          nonce: 0,
+          sourceDomain: i_localDomainIdentifier,
+          cctpVersion: CCTPVersion.VERSION_2
+        })
+      )
     });
   }
 

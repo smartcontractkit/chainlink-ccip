@@ -45,6 +45,11 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     bytes attestation;
   }
 
+  enum CCTPVersion {
+    VERSION_1,
+    VERSION_2
+  }
+
   // A domain is a USDC representation of a chain.
   struct DomainUpdate {
     bytes32 allowedCaller; //       Address allowed to mint on the domain
@@ -56,6 +61,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   struct SourceTokenDataPayload {
     uint64 nonce;
     uint32 sourceDomain;
+    CCTPVersion cctpVersion;
   }
 
   string public constant override typeAndVersion = "USDCTokenPool 1.6.1-dev";
@@ -145,7 +151,9 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
 
     return Pool.LockOrBurnOutV1({
       destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
-      destPoolData: abi.encode(SourceTokenDataPayload({nonce: nonce, sourceDomain: i_localDomainIdentifier}))
+      destPoolData: abi.encode(
+        SourceTokenDataPayload({nonce: nonce, sourceDomain: i_localDomainIdentifier, cctpVersion: CCTPVersion.VERSION_1})
+      )
     });
   }
 

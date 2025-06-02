@@ -22,7 +22,12 @@ contract USDCTokenPool__validateMessage is USDCTokenPoolSetup {
 
     vm.resumeGasMetering();
     s_usdcTokenPool.validateMessage(
-      encodedUsdcMessage, USDCTokenPool.SourceTokenDataPayload({nonce: nonce, sourceDomain: sourceDomain})
+      encodedUsdcMessage,
+      USDCTokenPool.SourceTokenDataPayload({
+        nonce: nonce,
+        sourceDomain: sourceDomain,
+        cctpVersion: USDCTokenPool.CCTPVersion.VERSION_1
+      })
     );
   }
 
@@ -40,8 +45,11 @@ contract USDCTokenPool__validateMessage is USDCTokenPoolSetup {
       messageBody: bytes("")
     });
 
-    USDCTokenPool.SourceTokenDataPayload memory sourceTokenData =
-      USDCTokenPool.SourceTokenDataPayload({nonce: usdcMessage.nonce, sourceDomain: usdcMessage.sourceDomain});
+    USDCTokenPool.SourceTokenDataPayload memory sourceTokenData = USDCTokenPool.SourceTokenDataPayload({
+      nonce: usdcMessage.nonce,
+      sourceDomain: usdcMessage.sourceDomain,
+      cctpVersion: USDCTokenPool.CCTPVersion.VERSION_1
+    });
 
     bytes memory encodedUsdcMessage = _generateUSDCMessage(usdcMessage);
 
@@ -54,7 +62,11 @@ contract USDCTokenPool__validateMessage is USDCTokenPoolSetup {
     );
     s_usdcTokenPool.validateMessage(
       encodedUsdcMessage,
-      USDCTokenPool.SourceTokenDataPayload({nonce: usdcMessage.nonce, sourceDomain: expectedSourceDomain})
+      USDCTokenPool.SourceTokenDataPayload({
+        nonce: usdcMessage.nonce,
+        sourceDomain: expectedSourceDomain,
+        cctpVersion: USDCTokenPool.CCTPVersion.VERSION_1
+      })
     );
 
     uint64 expectedNonce = usdcMessage.nonce + 1;
@@ -62,7 +74,11 @@ contract USDCTokenPool__validateMessage is USDCTokenPoolSetup {
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidNonce.selector, expectedNonce, usdcMessage.nonce));
     s_usdcTokenPool.validateMessage(
       encodedUsdcMessage,
-      USDCTokenPool.SourceTokenDataPayload({nonce: expectedNonce, sourceDomain: usdcMessage.sourceDomain})
+      USDCTokenPool.SourceTokenDataPayload({
+        nonce: expectedNonce,
+        sourceDomain: usdcMessage.sourceDomain,
+        cctpVersion: USDCTokenPool.CCTPVersion.VERSION_1
+      })
     );
 
     usdcMessage.destinationDomain = DEST_DOMAIN_IDENTIFIER + 1;
@@ -74,7 +90,11 @@ contract USDCTokenPool__validateMessage is USDCTokenPoolSetup {
 
     s_usdcTokenPool.validateMessage(
       _generateUSDCMessage(usdcMessage),
-      USDCTokenPool.SourceTokenDataPayload({nonce: usdcMessage.nonce, sourceDomain: usdcMessage.sourceDomain})
+      USDCTokenPool.SourceTokenDataPayload({
+        nonce: usdcMessage.nonce,
+        sourceDomain: usdcMessage.sourceDomain,
+        cctpVersion: USDCTokenPool.CCTPVersion.VERSION_1
+      })
     );
     usdcMessage.destinationDomain = DEST_DOMAIN_IDENTIFIER;
 

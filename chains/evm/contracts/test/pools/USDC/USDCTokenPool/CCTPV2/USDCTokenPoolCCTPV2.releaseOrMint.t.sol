@@ -172,7 +172,13 @@ contract USDCTokenPoolCCTPV2_releaseOrMint is USDCTokenPoolCCTPV2Setup {
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: abi.encode(USDCTokenPool.SourceTokenDataPayload({nonce: 1, sourceDomain: SOURCE_DOMAIN_IDENTIFIER})),
+      extraData: abi.encode(
+        USDCTokenPool.SourceTokenDataPayload({
+          nonce: 1,
+          sourceDomain: SOURCE_DOMAIN_IDENTIFIER,
+          cctpVersion: USDCTokenPool.CCTPVersion.VERSION_2
+        })
+      ),
       destGasAmount: USDC_DEST_TOKEN_GAS
     });
 

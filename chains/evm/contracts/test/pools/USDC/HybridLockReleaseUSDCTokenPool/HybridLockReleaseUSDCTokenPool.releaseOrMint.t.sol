@@ -43,7 +43,13 @@ contract HybridLockReleaseUSDCTokenPool_releaseOrMint is HybridLockReleaseUSDCTo
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: abi.encode(USDCTokenPool.SourceTokenDataPayload({nonce: 1, sourceDomain: SOURCE_DOMAIN_IDENTIFIER})),
+      extraData: abi.encode(
+        USDCTokenPool.SourceTokenDataPayload({
+          nonce: 1,
+          sourceDomain: SOURCE_DOMAIN_IDENTIFIER,
+          cctpVersion: USDCTokenPool.CCTPVersion.VERSION_2
+        })
+      ),
       destGasAmount: USDC_DEST_TOKEN_GAS
     });
 
@@ -96,10 +102,17 @@ contract HybridLockReleaseUSDCTokenPool_releaseOrMint is HybridLockReleaseUSDCTo
     uint32 sourceDomain = 3;
     uint256 amount = 100;
 
+    // Since this is a CCTP V1 message the extra data should also be VERSION_1
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: abi.encode(USDCTokenPool.SourceTokenDataPayload({nonce: nonce, sourceDomain: sourceDomain})),
+      extraData: abi.encode(
+        USDCTokenPool.SourceTokenDataPayload({
+          nonce: nonce,
+          sourceDomain: sourceDomain,
+          cctpVersion: USDCTokenPool.CCTPVersion.VERSION_1
+        })
+      ),
       destGasAmount: USDC_DEST_TOKEN_GAS
     });
 
@@ -134,7 +147,7 @@ contract HybridLockReleaseUSDCTokenPool_releaseOrMint is HybridLockReleaseUSDCTo
     remoteChainSelectors[0] = SOURCE_CHAIN_SELECTOR;
 
     HybridLockReleaseUSDCTokenPool.CCTPVersion[] memory versions = new HybridLockReleaseUSDCTokenPool.CCTPVersion[](1);
-    versions[0] = HybridLockReleaseUSDCTokenPool.CCTPVersion.VERSION_2;
+    versions[0] = USDCTokenPool.CCTPVersion.VERSION_2;
 
     // Update the config of the pool to tell it to use CCTP V2 instead of V1
     s_usdcTokenPool.updateCCTPVersion(remoteChainSelectors, versions);
@@ -166,7 +179,13 @@ contract HybridLockReleaseUSDCTokenPool_releaseOrMint is HybridLockReleaseUSDCTo
         localToken: address(s_token),
         remoteChainSelector: SOURCE_CHAIN_SELECTOR,
         sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
-        sourcePoolData: abi.encode(sourceDomain),
+        sourcePoolData: abi.encode(
+          USDCTokenPool.SourceTokenDataPayload({
+            nonce: 0,
+            sourceDomain: sourceDomain,
+            cctpVersion: USDCTokenPool.CCTPVersion.VERSION_2
+          })
+        ),
         offchainTokenData: offchainTokenData
       })
     );
@@ -183,7 +202,7 @@ contract HybridLockReleaseUSDCTokenPool_releaseOrMint is HybridLockReleaseUSDCTo
     remoteChainSelectors[0] = SOURCE_CHAIN_SELECTOR;
 
     HybridLockReleaseUSDCTokenPool.CCTPVersion[] memory versions = new HybridLockReleaseUSDCTokenPool.CCTPVersion[](1);
-    versions[0] = HybridLockReleaseUSDCTokenPool.CCTPVersion.VERSION_2;
+    versions[0] = USDCTokenPool.CCTPVersion.VERSION_2;
 
     // Update the config of the pool to tell it to use CCTP V2 instead of V1
     s_usdcTokenPool.updateCCTPVersion(remoteChainSelectors, versions);
@@ -220,7 +239,13 @@ contract HybridLockReleaseUSDCTokenPool_releaseOrMint is HybridLockReleaseUSDCTo
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: abi.encode(SOURCE_DOMAIN_IDENTIFIER),
+      extraData: abi.encode(
+        USDCTokenPool.SourceTokenDataPayload({
+          nonce: 1,
+          sourceDomain: SOURCE_DOMAIN_IDENTIFIER,
+          cctpVersion: USDCTokenPool.CCTPVersion.VERSION_2
+        })
+      ),
       destGasAmount: USDC_DEST_TOKEN_GAS
     });
 
@@ -254,7 +279,7 @@ contract HybridLockReleaseUSDCTokenPool_releaseOrMint is HybridLockReleaseUSDCTo
     remoteChainSelectors[0] = SOURCE_CHAIN_SELECTOR;
 
     HybridLockReleaseUSDCTokenPool.CCTPVersion[] memory versions = new HybridLockReleaseUSDCTokenPool.CCTPVersion[](1);
-    versions[0] = HybridLockReleaseUSDCTokenPool.CCTPVersion.VERSION_2;
+    versions[0] = USDCTokenPool.CCTPVersion.VERSION_2;
 
     // Update the config of the pool to tell it to use CCTP V2 instead of V1
     s_usdcTokenPool.updateCCTPVersion(remoteChainSelectors, versions);
@@ -291,7 +316,13 @@ contract HybridLockReleaseUSDCTokenPool_releaseOrMint is HybridLockReleaseUSDCTo
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: abi.encode(SOURCE_DOMAIN_IDENTIFIER),
+      extraData: abi.encode(
+        USDCTokenPool.SourceTokenDataPayload({
+          nonce: 1,
+          sourceDomain: SOURCE_DOMAIN_IDENTIFIER,
+          cctpVersion: USDCTokenPool.CCTPVersion.VERSION_2
+        })
+      ),
       destGasAmount: USDC_DEST_TOKEN_GAS
     });
 
@@ -435,7 +466,13 @@ contract HybridLockReleaseUSDCTokenPool_releaseOrMint is HybridLockReleaseUSDCTo
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: abi.encode(USDCTokenPool.SourceTokenDataPayload({nonce: 1, sourceDomain: SOURCE_DOMAIN_IDENTIFIER})),
+      extraData: abi.encode(
+        USDCTokenPool.SourceTokenDataPayload({
+          nonce: 1,
+          sourceDomain: SOURCE_DOMAIN_IDENTIFIER,
+          cctpVersion: USDCTokenPool.CCTPVersion.VERSION_2
+        })
+      ),
       destGasAmount: USDC_DEST_TOKEN_GAS
     });
 
@@ -527,7 +564,13 @@ contract HybridLockReleaseUSDCTokenPool_releaseOrMint_E2ETest is
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: abi.encode(USDCTokenPool.SourceTokenDataPayload({nonce: 1, sourceDomain: SOURCE_DOMAIN_IDENTIFIER})),
+      extraData: abi.encode(
+        USDCTokenPool.SourceTokenDataPayload({
+          nonce: 1,
+          sourceDomain: SOURCE_DOMAIN_IDENTIFIER,
+          cctpVersion: USDCTokenPool.CCTPVersion.VERSION_2
+        })
+      ),
       destGasAmount: USDC_DEST_TOKEN_GAS
     });
 

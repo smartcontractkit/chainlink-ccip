@@ -86,9 +86,12 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
       amount: lockOrBurnIn.amount
     });
 
+    // Since CCTP V2 does not return a nonce during the deposit call, we can just use zero to satisfy the struct field.
     return Pool.LockOrBurnOutV1({
       destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
-      destPoolData: abi.encode(i_localDomainIdentifier)
+      destPoolData: abi.encode(
+        SourceTokenDataPayload({nonce: 0, sourceDomain: i_localDomainIdentifier, cctpVersion: CCTPVersion.VERSION_2})
+      )
     });
   }
 

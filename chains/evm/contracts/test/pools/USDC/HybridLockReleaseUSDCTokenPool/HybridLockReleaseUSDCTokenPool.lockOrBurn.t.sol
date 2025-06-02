@@ -117,7 +117,7 @@ contract HybridLockReleaseUSDCTokenPool_lockOrBurn is HybridLockReleaseUSDCToken
     remoteChainSelectors[0] = DEST_CHAIN_SELECTOR;
 
     HybridLockReleaseUSDCTokenPool.CCTPVersion[] memory versions = new HybridLockReleaseUSDCTokenPool.CCTPVersion[](1);
-    versions[0] = HybridLockReleaseUSDCTokenPool.CCTPVersion.VERSION_2;
+    versions[0] = USDCTokenPool.CCTPVersion.VERSION_2;
 
     // Update the config of the pool to tell it to use CCTP V2 instead of V1
     s_usdcTokenPool.updateCCTPVersion(remoteChainSelectors, versions);
@@ -230,7 +230,7 @@ contract HybridLockReleaseUSDCTokenPool_lockOrBurn is HybridLockReleaseUSDCToken
     remoteChainSelectors[0] = DEST_CHAIN_SELECTOR;
 
     HybridLockReleaseUSDCTokenPool.CCTPVersion[] memory versions = new HybridLockReleaseUSDCTokenPool.CCTPVersion[](1);
-    versions[0] = HybridLockReleaseUSDCTokenPool.CCTPVersion.VERSION_2;
+    versions[0] = USDCTokenPool.CCTPVersion.VERSION_2;
 
     // Update the config of the pool to tell it to use CCTP V2 instead of V1
     s_usdcTokenPool.updateCCTPVersion(remoteChainSelectors, versions);
@@ -262,7 +262,7 @@ contract HybridLockReleaseUSDCTokenPool_lockOrBurn is HybridLockReleaseUSDCToken
     remoteChainSelectors[0] = wrongDomain;
 
     HybridLockReleaseUSDCTokenPool.CCTPVersion[] memory versions = new HybridLockReleaseUSDCTokenPool.CCTPVersion[](1);
-    versions[0] = HybridLockReleaseUSDCTokenPool.CCTPVersion.VERSION_2;
+    versions[0] = USDCTokenPool.CCTPVersion.VERSION_2;
 
     // Update the config of the pool to tell it to use CCTP V2 instead of V1
     s_usdcTokenPool.updateCCTPVersion(remoteChainSelectors, versions);
