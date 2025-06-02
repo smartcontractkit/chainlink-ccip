@@ -60,7 +60,7 @@ type IntTest struct {
 	usdcServer          *ConfigurableAttestationServer
 	lbtcServer          *ConfigurableAttestationServer
 	tokenObserverConfig []pluginconfig.TokenDataObserverConfig
-	tokenChainReader    map[cciptypes.ChainSelector]contractreader.ContractReaderFacade
+	tokenChainReader    map[cciptypes.ChainSelector]contractreader.Extended
 }
 
 func SetupSimpleTest(t *testing.T,
@@ -92,7 +92,7 @@ func SetupSimpleTest(t *testing.T,
 		dstSelector:         dstSelector,
 		ccipReader:          &ccipReader,
 		tokenObserverConfig: []pluginconfig.TokenDataObserverConfig{},
-		tokenChainReader:    map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{},
+		tokenChainReader:    map[cciptypes.ChainSelector]contractreader.Extended{},
 	}
 }
 
@@ -191,7 +191,7 @@ func (it *IntTest) WithUSDC(
 		usdcEvents[i] = types.Sequence{Data: e}
 	}
 
-	r := readermock.NewMockContractReaderFacade(it.t)
+	r := readermock.NewMockExtended(it.t)
 	r.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil).Maybe()
 	r.EXPECT().QueryKey(
 		mock.Anything,
@@ -201,7 +201,7 @@ func (it *IntTest) WithUSDC(
 		mock.Anything,
 	).Return(usdcEvents, nil).Maybe()
 
-	it.tokenChainReader = map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
+	it.tokenChainReader = map[cciptypes.ChainSelector]contractreader.Extended{
 		srcSelector:    r,
 		it.dstSelector: r,
 	}

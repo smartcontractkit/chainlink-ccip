@@ -45,22 +45,6 @@ func bindExtendedReaderContract(
 	return bindReaderContract(ctx, lggr, casted, chainSel, contractName, address, addrCodec)
 }
 
-func bindFacadeReaderContract(
-	ctx context.Context,
-	lggr logger.Logger,
-	readers map[cciptypes.ChainSelector]contractreader.ContractReaderFacade,
-	chainSel cciptypes.ChainSelector,
-	contractName string,
-	address []byte,
-	addrCodec cciptypes.AddressCodec,
-) (types.BoundContract, error) {
-	casted := make(map[cciptypes.ChainSelector]bindable, len(readers))
-	for k, v := range readers {
-		casted[k] = v
-	}
-	return bindReaderContract(ctx, lggr, casted, chainSel, contractName, address, addrCodec)
-}
-
 // bindReaderContract is a generic helper for binding contracts to readers, the addresses input is the same object
 // returned by DiscoverContracts.
 //
