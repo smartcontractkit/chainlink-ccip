@@ -28,7 +28,7 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
   event SiloRebalancerSet(uint64 indexed remoteChainSelector, address oldRebalancer, address newRebalancer);
   event UnsiloedRebalancerSet(address oldRebalancer, address newRebalancer);
 
-  string public constant override typeAndVersion = "SiloedLockReleaseTokenPool 1.6.0";
+  string public constant override typeAndVersion = "SiloedLockReleaseTokenPool 1.6.1-dev";
 
   /// @notice The amount of tokens available for remote chains which are not siloed as an additional security precaution.
   uint256 internal s_unsiloedTokenBalance;
@@ -59,11 +59,11 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
   ) TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) {}
 
   /// @notice Locks the token in the pool
-  /// @dev The _validateLockOrBurn check is an essential security check
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
-  ) external virtual override returns (Pool.LockOrBurnOutV1 memory) {
-    _validateLockOrBurn(lockOrBurnIn);
+  ) public virtual override returns (Pool.LockOrBurnOutV1 memory out) {
+    // super.lockOrBurn will validate the lockOrBurnIn and revert if invalid.
+    out = super.lockOrBurn(lockOrBurnIn);
 
     // If funds need to be siloed, update internal accounting;
     if (s_chainConfigs[lockOrBurnIn.remoteChainSelector].isSiloed) {
@@ -74,12 +74,7 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
       s_unsiloedTokenBalance += lockOrBurnIn.amount;
     }
 
-    emit Locked(msg.sender, lockOrBurnIn.amount);
-
-    return Pool.LockOrBurnOutV1({
-      destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
-      destPoolData: _encodeLocalDecimals()
-    });
+    return out;
   }
 
   /// @notice Release tokens from the pool to the recipient
@@ -88,7 +83,7 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
   /// measure to prevent funds from a Silo being released by another chain.
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
-  ) external virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
+  ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
     _validateReleaseOrMint(releaseOrMintIn);
 
     // Calculate the local amount
@@ -113,9 +108,15 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     }
 
     // Release to the recipient
-    getToken().safeTransfer(releaseOrMintIn.receiver, localAmount);
+    i_token.safeTransfer(releaseOrMintIn.receiver, localAmount);
 
-    emit Released(msg.sender, releaseOrMintIn.receiver, localAmount);
+    emit ReleasedOrMinted({
+      remoteChainSelector: releaseOrMintIn.remoteChainSelector,
+      token: address(i_token),
+      sender: msg.sender,
+      recipient: releaseOrMintIn.receiver,
+      amount: localAmount
+    });
 
     return Pool.ReleaseOrMintOutV1({destinationAmount: localAmount});
   }
@@ -221,7 +222,6 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     SiloConfig storage remoteConfig = s_chainConfigs[remoteChainSelector];
 
     if (!remoteConfig.isSiloed) revert ChainNotSiloed(remoteChainSelector);
-    if (newRebalancer == address(0)) revert ZeroAddressNotAllowed();
 
     address oldRebalancer = remoteConfig.rebalancer;
 
@@ -236,8 +236,6 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
   function setRebalancer(
     address newRebalancer
   ) external onlyOwner {
-    if (newRebalancer == address(0)) revert ZeroAddressNotAllowed();
-
     address oldRebalancer = s_rebalancer;
 
     s_rebalancer = newRebalancer;
