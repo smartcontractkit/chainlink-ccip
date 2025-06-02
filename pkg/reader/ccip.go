@@ -102,6 +102,31 @@ func newCCIPChainReaderInternal(
 func (r *ccipChainReader) WithExtendedContractReader(
 	ch cciptypes.ChainSelector, cr contractreader.Extended) *ccipChainReader {
 	r.contractReaders[ch] = cr
+
+	// Register the bound addresses in the address book
+	for _, contractName := range consts.AllContractNames() {
+		bindings := cr.GetBindings(contractName)
+		if len(bindings) == 0 {
+			continue
+		}
+		lastBinding := bindings[len(bindings)-1]
+
+		addressBytes, err := r.addrCodec.AddressStringToBytes(lastBinding.Binding.Address, ch)
+		if err != nil {
+			r.lggr.Errorw("failed to convert address", "err", err)
+			continue
+		}
+
+		err = r.donAddressBook.InsertOrUpdate(
+			map[addressbook.ContractName]map[cciptypes.ChainSelector]cciptypes.UnknownAddress{
+				addressbook.ContractName(contractName): {ch: addressBytes},
+			})
+		if err != nil {
+			r.lggr.Errorw("failed to insert or update contract", "err", err)
+			continue
+		}
+	}
+
 	return r
 }
 
