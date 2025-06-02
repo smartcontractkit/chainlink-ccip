@@ -259,6 +259,68 @@ func TestPluginMultipleReportsWithMultipleSourceChains(t *testing.T) {
 
 }
 
+func TestPluginMultipleReportsWithMultipleSourceChainsAndTimestamps(t *testing.T) {
+	ctx := t.Context()
+
+	srcSelector1 := cciptypes.ChainSelector(1)
+	srcSelector2 := cciptypes.ChainSelector(2)
+	dstSelector := cciptypes.ChainSelector(3)
+
+	// Create messages from two source chains
+	messages1 := []inmem.MessagesWithMetadata{
+		makeMsgWithMetadata(100, srcSelector1, dstSelector, false),
+		makeMsgWithMetadata(101, srcSelector1, dstSelector, false),
+		makeMsgWithMetadata(102, srcSelector1, dstSelector, false),
+	}
+
+	messages2 := []inmem.MessagesWithMetadata{
+		makeMsgWithMetadata(200, srcSelector2, dstSelector, false),
+		makeMsgWithMetadata(201, srcSelector2, dstSelector, false),
+		makeMsgWithMetadata(202, srcSelector2, dstSelector, false),
+	}
+
+	intTest := SetupSimpleTest(t, logger.Test(t), []cciptypes.ChainSelector{srcSelector1, srcSelector2}, dstSelector)
+	intTest.WithMessages(messages1, 1000, time.Now().Add(-4*time.Hour), 1, srcSelector1)
+	// Report for srcSelector2 should come first in the outcome reports
+	intTest.WithMessages(messages2, 1000, time.Now().Add(-5*time.Hour), 1, srcSelector2)
+
+	intTest.WithOffChainConfig(pluginconfig.ExecuteOffchainConfig{
+		MessageVisibilityInterval: *commonconfig.MustNewDuration(8 * time.Hour),
+		BatchGasLimit:             100000000,
+		MaxCommitReportsToFetch:   10,
+		MultipleReportsEnabled:    true,
+		MaxSingleChainReports:     1,
+	})
+
+	runner := intTest.Start()
+	defer intTest.Close()
+
+	// Run rounds
+	outcome := runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner) // Contract Discovery
+	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)  // Get Commit Reports
+	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)  // Get Messages
+	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)  // Filter
+
+	require.GreaterOrEqual(t, len(outcome.Reports), 2, "Should create multiple reports")
+
+	require.Equal(t, srcSelector2, outcome.Reports[0].ChainReports[0].SourceChainSelector,
+		"First report should be from srcSelector2 as it has earlier timestamp")
+
+	// Check all messages are marked as executed
+	var allSequenceNumbers []cciptypes.SeqNum
+	for _, report := range outcome.Reports {
+		require.Len(t, report.ChainReports, 1, "Each report should have one chain report")
+		sequenceNumbers := extractSequenceNumbers(report.ChainReports[0].Messages)
+		allSequenceNumbers = append(allSequenceNumbers, sequenceNumbers...)
+	}
+
+	// Verify all expected messages are included across the reports
+	expectedSeqNumbers := []cciptypes.SeqNum{100, 101, 102, 200, 201, 202}
+	require.ElementsMatch(t, expectedSeqNumbers, allSequenceNumbers,
+		"All expected messages should be included across the reports")
+
+}
+
 func TestCommitReportCacheOptimization(t *testing.T) {
 	ctx := tests.Context(t)
 
