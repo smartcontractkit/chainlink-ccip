@@ -191,17 +191,6 @@ func (b *execReportBuilder) Add(
 	currentCommitReport := commitReport
 	// Main processing loop - continue until no more messages or reports can be created
 	for {
-		index := len(b.execReports) - 1
-
-		// Check if we need to create a new exec report due to limits
-		if b.shouldCreateNewExecReport() {
-			if !b.multipleReportsEnabled {
-				return currentCommitReport, nil
-			}
-			b.createNewExecReport()
-			index = len(b.execReports) - 1
-		}
-
 		// Check which messages are ready to execute, excluding already processed ones
 		readyMessages, err := b.checkMessages(ctx, currentCommitReport)
 		if err != nil {
@@ -213,48 +202,88 @@ func (b *execReportBuilder) Add(
 			return currentCommitReport, nil
 		}
 
-		execReport, updatedReport, err := b.buildSingleChainReport(ctx, currentCommitReport, readyMessages)
-
-		if errors.Is(err, ErrEmptyReport) {
-			// No messages fit into the report
+		// Check if we need to create a new exec report due to limits
+		if b.shouldCreateNewExecReport() {
 			if !b.multipleReportsEnabled {
 				return currentCommitReport, nil
 			}
-
-			// Try with a new exec report
 			b.createNewExecReport()
-			index = len(b.execReports) - 1
-
-			execReport, updatedReport, err = b.buildSingleChainReport(ctx, currentCommitReport, readyMessages)
-			if errors.Is(err, ErrEmptyReport) {
-				// Remove the empty report we just added
-				b.removeLastExecReport()
-				return currentCommitReport, nil
-			}
 		}
 
+		// Try to build a report with current messages
+		updatedReport, shouldContinue, err := b.tryBuildReport(ctx, currentCommitReport, readyMessages)
 		if err != nil {
-			return currentCommitReport, fmt.Errorf("unable to add a single chain report: %w", err)
+			return currentCommitReport, err
 		}
 
-		// Update our data structures
-		b.execReports[index].ChainReports = append(b.execReports[index].ChainReports, execReport)
-		b.commitReports[index] = append(b.commitReports[index], updatedReport)
 		currentCommitReport = updatedReport
 
-		// If multiple reports aren't enabled, we're done after the first report
-		if !b.multipleReportsEnabled {
+		if !shouldContinue {
 			break
-		}
-
-		// Check if we've processed all messages - if so, exit the loop
-		readyMessagesLeft, _ := b.checkMessages(ctx, currentCommitReport)
-		if len(readyMessagesLeft) == 0 {
-			return currentCommitReport, nil
 		}
 	}
 
 	return currentCommitReport, nil
+}
+
+// tryBuildReport attempts to build a single chain report and handle empty report cases
+func (b *execReportBuilder) tryBuildReport(
+	ctx context.Context,
+	commitReport exectypes.CommitData,
+	readyMessages map[int]struct{},
+) (exectypes.CommitData, bool, error) {
+	currentIndex := len(b.execReports) - 1
+
+	execReport, updatedReport, err := b.buildSingleChainReport(ctx, commitReport, readyMessages)
+
+	// If the report is empty, we handle it separately especially when multiple reports are enabled.
+	if errors.Is(err, ErrEmptyReport) {
+		return b.handleEmptyReport(ctx, commitReport, readyMessages)
+	}
+
+	if err != nil {
+		return commitReport, false, fmt.Errorf("unable to add a single chain report: %w", err)
+	}
+
+	// Successfully built a report - update our data structures
+	b.execReports[currentIndex].ChainReports = append(b.execReports[currentIndex].ChainReports, execReport)
+	b.commitReports[currentIndex] = append(b.commitReports[currentIndex], updatedReport)
+
+	// Determine if we should continue processing
+	shouldContinue := b.multipleReportsEnabled
+	return updatedReport, shouldContinue, nil
+}
+
+// handleEmptyReport deals with the case where no messages fit into the current report
+func (b *execReportBuilder) handleEmptyReport(
+	ctx context.Context,
+	commitReport exectypes.CommitData,
+	readyMessages map[int]struct{},
+) (exectypes.CommitData, bool, error) {
+	if !b.multipleReportsEnabled {
+		return commitReport, false, nil
+	}
+
+	// Try with a new exec report
+	b.createNewExecReport()
+	currentIndex := len(b.execReports) - 1
+
+	execReport, updatedReport, err := b.buildSingleChainReport(ctx, commitReport, readyMessages)
+	if errors.Is(err, ErrEmptyReport) {
+		// Remove the empty report we just added and stop processing
+		b.removeLastExecReport()
+		return commitReport, false, nil
+	}
+
+	if err != nil {
+		return commitReport, false, fmt.Errorf("unable to add a single chain report: %w", err)
+	}
+
+	// Successfully built a report with the new exec report
+	b.execReports[currentIndex].ChainReports = append(b.execReports[currentIndex].ChainReports, execReport)
+	b.commitReports[currentIndex] = append(b.commitReports[currentIndex], updatedReport)
+
+	return updatedReport, true, nil
 }
 
 // shouldCreateNewExecReport checks if we need to create a new exec report due to chain report limits
