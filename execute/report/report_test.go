@@ -2069,7 +2069,8 @@ func Test_Builder_MultiReport(t *testing.T) {
 }
 
 // extractSequenceNumbersFromReports extracts all sequence numbers from execution reports by chain selector
-func extractSequenceNumbersFromReports(execReports []cciptypes.ExecutePluginReport) map[cciptypes.ChainSelector]mapset.Set[cciptypes.SeqNum] {
+func extractSequenceNumbersFromReports(
+	execReports []cciptypes.ExecutePluginReport) map[cciptypes.ChainSelector]mapset.Set[cciptypes.SeqNum] {
 	seqNumsByChain := make(map[cciptypes.ChainSelector]mapset.Set[cciptypes.SeqNum])
 
 	for _, execReport := range execReports {

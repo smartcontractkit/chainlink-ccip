@@ -182,10 +182,10 @@ func TestPluginMultipleReportsWithNonZeroNonces(t *testing.T) {
 	defer intTest.Close()
 
 	// Run through the state machine
-	outcome := runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner) // Contract Discovery
+	_ = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)        // Contract Discovery
 	_ = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)        // Get Commit Reports
 	_ = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)        // Get Messages
-	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)  // Filter
+	outcome := runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner) // Filter
 
 	// Should fall back to single report mode when non-zero nonce is detected
 	require.Equal(t, 1, len(outcome.Reports), "Should fall back to single report when non-zero nonce present")
@@ -227,10 +227,10 @@ func TestPluginMultipleReportsWithMultipleSourceChains(t *testing.T) {
 	defer intTest.Close()
 
 	// Run rounds
-	outcome := runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner) // Contract Discovery
+	_ = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)        // Contract Discovery
 	_ = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)        // Get Commit Reports
 	_ = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)        // Get Messages
-	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)  // Filter
+	outcome := runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner) // Filter
 
 	require.GreaterOrEqual(t, len(outcome.Reports), 2, "Should create multiple reports")
 
@@ -296,10 +296,10 @@ func TestPluginMultipleReportsWithMultipleSourceChainsAndTimestamps(t *testing.T
 	defer intTest.Close()
 
 	// Run rounds
-	outcome := runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner) // Contract Discovery
+	_ = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)        // Contract Discovery
 	_ = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)        // Get Commit Reports
 	_ = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)        // Get Messages
-	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)  // Filter
+	outcome := runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner) // Filter
 
 	require.GreaterOrEqual(t, len(outcome.Reports), 2, "Should create multiple reports")
 
