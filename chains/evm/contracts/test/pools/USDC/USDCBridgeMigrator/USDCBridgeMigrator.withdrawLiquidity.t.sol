@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {LockReleaseTokenPool} from "../../../../pools/LockReleaseTokenPool.sol";
 import {HybridLockReleaseUSDCTokenPool} from "../../../../pools/USDC/HybridLockReleaseUSDCTokenPool.sol";
 import {USDCBridgeMigratorSetup} from "./USDCBridgeMigratorSetup.t.sol";
-import {LockReleaseTokenPool} from "../../../../pools/LockReleaseTokenPool.sol";
 
 contract USDCBridgeMigrator_withdrawLiquidity is USDCBridgeMigratorSetup {
   uint256 public constant LIQUIDITY_AMOUNT = 1e12;

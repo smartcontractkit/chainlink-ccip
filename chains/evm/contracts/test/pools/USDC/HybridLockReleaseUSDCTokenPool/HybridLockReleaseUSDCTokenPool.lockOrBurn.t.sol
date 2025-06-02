@@ -5,11 +5,12 @@ import {ITokenMessenger} from "../../../../pools/USDC/interfaces/ITokenMessenger
 
 import {Router} from "../../../../Router.sol";
 import {Pool} from "../../../../libraries/Pool.sol";
+
+import {RateLimiter} from "../../../../libraries/RateLimiter.sol";
 import {TokenPool} from "../../../../pools/TokenPool.sol";
 import {HybridLockReleaseUSDCTokenPool} from "../../../../pools/USDC/HybridLockReleaseUSDCTokenPool.sol";
 import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
 import {HybridLockReleaseUSDCTokenPoolSetup} from "./HybridLockReleaseUSDCTokenPoolSetup.t.sol";
-import {RateLimiter} from "../../../../libraries/RateLimiter.sol";
 
 contract HybridLockReleaseUSDCTokenPool_lockOrBurn is HybridLockReleaseUSDCTokenPoolSetup {
   function test_onLockReleaseMechanism() public {

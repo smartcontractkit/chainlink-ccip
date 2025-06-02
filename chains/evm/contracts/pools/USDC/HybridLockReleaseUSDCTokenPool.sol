@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {ITokenMessenger} from "./interfaces/ITokenMessenger.sol";
 import {IMessageTransmitter} from "./interfaces/IMessageTransmitter.sol";
+import {ITokenMessenger} from "./interfaces/ITokenMessenger.sol";
 
 import {Pool} from "../../libraries/Pool.sol";
 import {TokenPool} from "../TokenPool.sol";
@@ -363,7 +363,13 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
     }
 
     // emit ReleasedOrMinted(msg.sender, releaseOrMintIn.receiver, releaseOrMintIn.amount);
-    emit ReleasedOrMinted(releaseOrMintIn.remoteChainSelector, address(i_token), msg.sender, releaseOrMintIn.receiver, releaseOrMintIn.amount);
+    emit ReleasedOrMinted(
+      releaseOrMintIn.remoteChainSelector,
+      address(i_token),
+      msg.sender,
+      releaseOrMintIn.receiver,
+      releaseOrMintIn.amount
+    );
 
     return Pool.ReleaseOrMintOutV1({destinationAmount: releaseOrMintIn.amount});
   }
@@ -474,7 +480,6 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
       sender: msg.sender,
       amount: lockOrBurnIn.amount
     });
-
 
     return Pool.LockOrBurnOutV1({
       destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),

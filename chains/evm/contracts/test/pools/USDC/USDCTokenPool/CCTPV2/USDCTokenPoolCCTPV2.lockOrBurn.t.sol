@@ -40,9 +40,9 @@ contract USDCTokenPoolCCTPV2_lockOrBurn is USDCTokenPoolCCTPV2Setup {
     emit TokenPool.LockedOrBurned({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       token: address(s_token),
-      sender: address(s_routerAllowedOnRamp), 
+      sender: address(s_routerAllowedOnRamp),
       amount: amount
-  });
+    });
 
     Pool.LockOrBurnOutV1 memory poolReturnDataV1 = s_usdcTokenPool.lockOrBurn(
       Pool.LockOrBurnInV1({
