@@ -21,6 +21,17 @@ import {EnumerableSet} from
 /// @title Abstract Fast-Transfer Pool
 /// @notice Base contract for fast-transfer pools that provides common functionality
 /// for quoting, fill-tracking, and CCIP send helpers.
+/// @dev To make this contract usable, it must be inherited by a concrete implementation that implements:
+/// - `_lockOrBurn` - handles both the TokenPool lock/burn and the fast transfer lock/burn.
+/// - `_releaseOrMint` - handles both the TokenPool release/mint and the fast transfer release/mint.
+/// Additionally, there are some hooks that can optionally be overridden:
+/// - `_handleFastTransferLockOrBurn`
+/// - `_handleFastFill`
+/// - `_handleSlowFill`
+/// - `_handleFastFillReimbursement`
+/// There are also validation functions that can optionally be overridden:
+/// - `_validateSendRequest` - called before sending a fast transfer.
+/// - `_validateSettlement` - called before settling.
 abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITypeAndVersion, IFastTransferPool {
   using EnumerableSet for EnumerableSet.AddressSet;
   using SafeERC20 for IERC20;
@@ -131,6 +142,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     (Quote memory quote, Client.EVM2AnyMessage memory message) =
       _getFeeQuoteAndCCIPMessage(destinationChainSelector, amount, receiver, feeToken, extraArgs);
     _consumeOutboundRateLimit(destinationChainSelector, amount);
+
     _handleFastTransferLockOrBurn(msg.sender, amount);
 
     // If the user is not paying in native, we need to transfer the fee token to the contract.
@@ -270,7 +282,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     _consumeInboundRateLimit(sourceChainSelector, localAmount);
 
     // Transfer tokens from filler to receiver
-    _transferFromFiller(msg.sender, receiver, localAmount);
+    _handleFastFill(fillId, msg.sender, receiver, localAmount);
 
     s_fills[fillId] = FillInfo({state: FillState.FILLED, filler: msg.sender});
 
@@ -306,9 +318,9 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
       // consumed by the filler.
       _consumeInboundRateLimit(sourceChainSelector, localAmount);
       // When no filler is involved, we send the entire amount to the receiver.
-      _handleSlowFill(localAmount, receiver);
+      _handleSlowFill(fillId, localAmount, receiver);
     } else if (fillInfo.state == FillState.FILLED) {
-      _handleFastFillReimbursement(fillInfo.filler, localAmount);
+      _handleFastFillReimbursement(fillId, fillInfo.filler, localAmount);
     } else {
       // The catch all assertion for already settled fills ensures that any wrong value will revert.
       revert AlreadySettled(fillId);
@@ -317,17 +329,6 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     s_fills[fillId].state = FillState.SETTLED;
 
     emit FastTransferSettled(fillId, settlementId);
-  }
-
-  /// @notice Validates settlement prerequisites. Can be overridden by derived contracts to add additional checks.
-  /// @param sourceChainSelector The source chain selector
-  /// @param sourcePoolAddress The source pool address
-  function _validateSettlement(uint64 sourceChainSelector, bytes memory sourcePoolAddress) internal view virtual {
-    if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(sourceChainSelector)))) revert CursedByRMN();
-    //Validates that the source pool address is configured on this pool.
-    if (!isRemotePool(sourceChainSelector, sourcePoolAddress)) {
-      revert InvalidSourcePoolAddress(sourcePoolAddress);
-    }
   }
 
   /// @notice Validates the send request parameters. Can be overridden by derived contracts to add additional checks.
@@ -341,6 +342,17 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     if (!isSupportedChain(destinationChainSelector)) revert ChainNotAllowed(destinationChainSelector);
   }
 
+  /// @notice Validates settlement prerequisites. Can be overridden by derived contracts to add additional checks.
+  /// @param sourceChainSelector The source chain selector
+  /// @param sourcePoolAddress The source pool address
+  function _validateSettlement(uint64 sourceChainSelector, bytes memory sourcePoolAddress) internal view virtual {
+    if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(sourceChainSelector)))) revert CursedByRMN();
+    //Validates that the source pool address is configured on this pool.
+    if (!isRemotePool(sourceChainSelector, sourcePoolAddress)) {
+      revert InvalidSourcePoolAddress(sourcePoolAddress);
+    }
+  }
+
   // ================================================================
   // │                      Filling Hooks                           │
   // ================================================================
@@ -350,30 +362,36 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   /// @param amount The amount to transfer
   function _handleFastTransferLockOrBurn(address sender, uint256 amount) internal virtual {
     // Since this is a fast transfer, the Router doesn't forward the tokens to the pool.
-    i_token.safeTransferFrom(sender, address(this), amount);
+    getToken().safeTransferFrom(sender, address(this), amount);
     // Use the normal burn logic once the tokens are in the pool.
     _lockOrBurn(amount);
   }
 
   /// @notice Transfers tokens from the filler to the receiver.
+  /// @dev The first param is the fillId. It's unused in this implementation, but kept to allow overriding this function
+  /// to handle the transfer in a different way.
   /// @param filler The address of the filler.
   /// @param receiver The address of the receiver.
   /// @param amount The amount to transfer in local denomination.
-  function _transferFromFiller(address filler, address receiver, uint256 amount) internal virtual {
+  function _handleFastFill(bytes32, address filler, address receiver, uint256 amount) internal virtual {
     getToken().safeTransferFrom(filler, receiver, amount);
   }
 
   /// @notice Handles settlement when the request was not fast-filled
-  /// @param settlementAmountLocal The amount to settle in local token
+  /// @dev The first param is the fillId. It's unused in this implementation, but kept to allow overriding this function
+  /// to handle the slow fill in a different way.
+  /// @param localSettlementAmount The amount to settle in local token
   /// @param receiver The receiver address
-  function _handleSlowFill(uint256 settlementAmountLocal, address receiver) internal virtual {
-    _releaseOrMint(receiver, settlementAmountLocal);
+  function _handleSlowFill(bytes32, uint256 localSettlementAmount, address receiver) internal virtual {
+    _releaseOrMint(receiver, localSettlementAmount);
   }
 
   /// @notice Handles reimbursement when the request was fast-filled
+  /// @dev The first param is the fillId. It's unused in this implementation, but kept to allow overriding this function
+  /// to handle the reimbursement in a different way.
   /// @param filler The filler address to reimburse
   /// @param settlementAmountLocal The amount to reimburse in local token
-  function _handleFastFillReimbursement(address filler, uint256 settlementAmountLocal) internal virtual {
+  function _handleFastFillReimbursement(bytes32, address filler, uint256 settlementAmountLocal) internal virtual {
     _releaseOrMint(filler, settlementAmountLocal);
   }
 

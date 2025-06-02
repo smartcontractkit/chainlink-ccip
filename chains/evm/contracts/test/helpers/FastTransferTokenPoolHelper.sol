@@ -20,15 +20,6 @@ contract FastTransferTokenPoolHelper is FastTransferTokenPoolAbstract {
     address router
   ) FastTransferTokenPoolAbstract(token, localTokenDecimals, allowlist, rmnProxy, router) {}
 
-  // Public wrappers for internal functions
-  function handleFastTransferLockOrBurn(address sender, uint256 amount) public {
-    _handleFastTransferLockOrBurn(sender, amount);
-  }
-
-  function transferFromFiller(address filler, address receiver, uint256 amount) public {
-    _transferFromFiller(filler, receiver, amount);
-  }
-
   // Implementation of abstract functions
   function _handleFastTransferLockOrBurn(address sender, uint256 amount) internal override {
     // For testing, we'll just transfer tokens from sender to this contract
