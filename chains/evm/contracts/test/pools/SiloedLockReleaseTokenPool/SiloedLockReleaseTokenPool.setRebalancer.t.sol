@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {SiloedLockReleaseTokenPool} from "../../../pools/SiloedLockReleaseTokenPool.sol";
-import {TokenPool} from "../../../pools/TokenPool.sol";
 import {SiloedLockReleaseTokenPoolSetup} from "./SiloedLockReleaseTokenPoolSetup.t.sol";
 
 contract SiloedLockReleaseTokenPool_setRebalancer is SiloedLockReleaseTokenPoolSetup {
@@ -34,17 +33,5 @@ contract SiloedLockReleaseTokenPool_setRebalancer is SiloedLockReleaseTokenPoolS
     vm.expectRevert(abi.encodeWithSelector(SiloedLockReleaseTokenPool.ChainNotSiloed.selector, DEST_CHAIN_SELECTOR));
 
     s_siloedLockReleaseTokenPool.setSiloRebalancer(DEST_CHAIN_SELECTOR, REBALANCER_ADDRESS);
-  }
-
-  function test_SetSiloRebalancer_RevertWhen_InvalidZeroAddress() public {
-    vm.expectRevert(abi.encodeWithSelector(TokenPool.ZeroAddressNotAllowed.selector));
-
-    s_siloedLockReleaseTokenPool.setSiloRebalancer(SILOED_CHAIN_SELECTOR, address(0));
-  }
-
-  function test_SetRebalancer_RevertWhen_InvalidZeroAddress() public {
-    vm.expectRevert(abi.encodeWithSelector(TokenPool.ZeroAddressNotAllowed.selector));
-
-    s_siloedLockReleaseTokenPool.setRebalancer(address(0));
   }
 }

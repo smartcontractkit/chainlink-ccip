@@ -2,6 +2,7 @@ name: "Run CCIP OCR3 Integration Test"
 
 on:
   pull_request:
+  merge_group:
   push:
     branches:
       - 'main'
