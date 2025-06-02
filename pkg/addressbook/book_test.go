@@ -141,6 +141,26 @@ func TestBook_InsertOrUpdate(t *testing.T) {
 				"contractB": {1: []byte("addr1")},
 			},
 		},
+		{
+			name: "setting a nil state should be a no-op",
+			state: map[ContractName]map[ccipocr3.ChainSelector]ccipocr3.UnknownAddress{
+				"contractA": {
+					1: []byte("addr1"),
+					2: []byte("addr2"),
+				},
+				"contractB": {1: []byte("addr1")},
+			},
+			appendedState: map[ContractName]map[ccipocr3.ChainSelector]ccipocr3.UnknownAddress{
+				"contractA": nil, // <-- set contractA to nil should be a no-op
+			},
+			expState: map[ContractName]map[ccipocr3.ChainSelector]ccipocr3.UnknownAddress{
+				"contractA": {
+					1: []byte("addr1"),
+					2: []byte("addr2"),
+				},
+				"contractB": {1: []byte("addr1")},
+			},
+		},
 	}
 
 	for _, tc := range testCases {

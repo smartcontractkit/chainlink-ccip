@@ -32,7 +32,7 @@ func NewBook() *Book {
 	}
 }
 
-// GetContractAddress will return the contract address for the provider contract name and chain selector.
+// GetContractAddress will return the contract address for the provided contract name and chain selector.
 // Atomically safe.
 func (b *Book) GetContractAddress(name ContractName, chain ccipocr3.ChainSelector) (ccipocr3.UnknownAddress, error) {
 	b.mu.RLock()

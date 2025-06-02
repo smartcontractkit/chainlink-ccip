@@ -1289,6 +1289,9 @@ func (r *ccipChainReader) DiscoverContracts(ctx context.Context,
 }
 
 // Sync goes through the input contracts and binds them to the contract reader.
+// It also updates the addressbook with the new addresses.
+// NOTE: You should ensure that Sync is called deterministically for every oracle in the DON to guarantee
+// a consistent shared addressbook state.
 func (r *ccipChainReader) Sync(ctx context.Context, contracts ContractAddresses) error {
 	addressBookEntries := make(addressbook.ContractAddresses)
 	for name, addrs := range contracts {

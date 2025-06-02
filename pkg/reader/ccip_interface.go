@@ -257,6 +257,8 @@ type CCIPReader interface {
 
 	// Sync can be used to perform frequent syncing operations inside the reader implementation.
 	// NOTE: this method may make network calls.
+	//
+	// NOTE: You should ensure that Sync is called deterministically for every oracle in the DON (e.g. in the Outcome).
 	Sync(ctx context.Context, contracts ContractAddresses) error
 
 	// GetLatestPriceSeqNr returns the latest price sequence number for the destination chain.
