@@ -25,7 +25,6 @@ contract HybridLockReleaseUSDCTokenPool_constructor is USDCSetup {
       s_mockUSDC,
       ITokenMessenger(address(0)), // transmitter V2 that is checked for zero address
       s_cctpMessageTransmitterProxy,
-      s_cctpMessageTransmitterProxyV2,
       s_token,
       new address[](0),
       address(s_mockRMNRemote),
@@ -46,7 +45,6 @@ contract HybridLockReleaseUSDCTokenPool_constructor is USDCSetup {
       s_mockUSDC,
       invalidTokenMessenger, // transmitter V2 that is checked for zero address
       s_cctpMessageTransmitterProxy,
-      s_cctpMessageTransmitterProxyV2,
       s_token,
       new address[](0),
       address(s_mockRMNRemote),
@@ -64,7 +62,6 @@ contract HybridLockReleaseUSDCTokenPool_constructor is USDCSetup {
       s_mockUSDC,
       invalidTokenMessenger, // transmitter V2 that is checked for zero address
       s_cctpMessageTransmitterProxy,
-      s_cctpMessageTransmitterProxyV2,
       s_token,
       new address[](0),
       address(s_mockRMNRemote),
@@ -73,6 +70,10 @@ contract HybridLockReleaseUSDCTokenPool_constructor is USDCSetup {
   }
 
   function test_RevertWhen_InvalidTransmitterInProxy() public {
+    // Create a transmitter proxy where the V2 transmitter is the same as the V1 and so the hybrid contract
+    // will point to the wrong address.
+    CCTPMessageTransmitterProxy invalidProxy = new CCTPMessageTransmitterProxy(s_mockUSDC, s_mockUSDC);
+
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidTransmitterInProxy.selector));
     // Since the V1 proxy is valid we can re-use it here since we only want to use a
     // proxy that points to any other messenger contract than the V2 one, which in this
@@ -80,8 +81,7 @@ contract HybridLockReleaseUSDCTokenPool_constructor is USDCSetup {
     s_usdcTokenPool = new HybridLockReleaseUSDCTokenPool(
       s_mockUSDC,
       s_mockUSDCV2, // transmitter V2 that is checked for zero address
-      s_cctpMessageTransmitterProxy,
-      s_cctpMessageTransmitterProxy,
+      invalidProxy,
       s_token,
       new address[](0),
       address(s_mockRMNRemote),

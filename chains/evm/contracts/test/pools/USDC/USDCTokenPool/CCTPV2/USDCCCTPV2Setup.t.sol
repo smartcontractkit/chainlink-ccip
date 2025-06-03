@@ -73,7 +73,7 @@ contract USDCCCTPV2Setup is BaseTest {
     // The Token transmitter in CCTP V2 needs to be set with version 1
     s_mockUSDCTransmitter = new MockE2EUSDCTransmitter(1, DEST_DOMAIN_IDENTIFIER, address(s_token));
     s_mockUSDC = new MockUSDCTokenMessenger(1, address(s_mockUSDCTransmitter));
-    s_cctpMessageTransmitterProxy = new CCTPMessageTransmitterProxy(s_mockUSDC);
+    s_cctpMessageTransmitterProxy = new CCTPMessageTransmitterProxy(s_mockUSDC, s_mockUSDC);
     usdcToken.grantMintAndBurnRoles(address(s_mockUSDCTransmitter));
     usdcToken.grantMintAndBurnRoles(address(s_mockUSDC));
   }

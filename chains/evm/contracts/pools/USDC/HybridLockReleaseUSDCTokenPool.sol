@@ -60,10 +60,7 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
   // CCTP V2 uses 2000 to indicate that attestations should not occur until finality is achieved on the source chain.
   uint32 public constant FINALITY_THRESHOLD = 2000;
 
-  // TODO: Figure out a better way to do this.
-
   ITokenMessenger public immutable i_tokenMessengerCCTPV2;
-  CCTPMessageTransmitterProxy public immutable i_cctpMessageTransmitterProxyCCTPV2;
 
   mapping(uint64 remoteChainSelector => CCTPVersion version) internal s_cctpVersion;
 
@@ -104,7 +101,6 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
     ITokenMessenger tokenMessenger,
     ITokenMessenger tokenMessengerV2,
     CCTPMessageTransmitterProxy cctpMessageTransmitterProxy,
-    CCTPMessageTransmitterProxy cctpMessageTransmitterProxyV2,
     IERC20 token,
     address[] memory allowlist,
     address rmnProxy,
@@ -133,15 +129,16 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
     if (tokenMessengerVersion != 1) revert InvalidTokenMessengerVersion(tokenMessengerVersion);
 
     // Check that the transmitter called by the TransmitterProxy is the same as the one called by the TokenMessenger
-    if (cctpMessageTransmitterProxyV2.i_cctpTransmitter() != transmitter) revert InvalidTransmitterInProxy();
+    if (cctpMessageTransmitterProxy.i_cctpTransmitterV2() != transmitter) revert InvalidTransmitterInProxy();
 
     emit ConfigSet(address(tokenMessenger));
 
+    // Set the token Messenger V2 for outgoing CCTP-Messages.
+    i_tokenMessengerCCTPV2 = tokenMessengerV2;
+
     // Since CCTPV2 uses different messengers and transmitter addresses as CCTPV1, the addresses must be stored
     // as separate immutable variables from those inherited as part of USDCTokenPool.
-    i_tokenMessengerCCTPV2 = tokenMessengerV2;
-    i_cctpMessageTransmitterProxyCCTPV2 = cctpMessageTransmitterProxyV2;
-    i_token.safeIncreaseAllowance(address(i_tokenMessengerCCTPV2), type(uint256).max);
+    i_token.safeIncreaseAllowance(address(tokenMessengerV2), type(uint256).max);
   }
 
   // ================================================================
@@ -356,7 +353,11 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
 
     // Forward the message to the transmitter proxy, which will then forward it to the actual transmitter,
     // thus ensuring that the allowedCaller specified in the message is the one making the mint request.
-    if (!i_cctpMessageTransmitterProxyCCTPV2.receiveMessage(msgAndAttestation.message, msgAndAttestation.attestation)) {
+    if (
+      !i_messageTransmitterProxy.receiveMessage(
+        msgAndAttestation.message, msgAndAttestation.attestation, sourceTokenData.cctpVersion
+      )
+    ) {
       revert UnlockingUSDCFailed();
     }
 
@@ -455,6 +456,7 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
     if (lockOrBurnIn.receiver.length != 32) {
       revert InvalidReceiver(lockOrBurnIn.receiver);
     }
+
     bytes32 decodedReceiver = abi.decode(lockOrBurnIn.receiver, (bytes32));
 
     // Since this pool is the msg sender of the CCTP transaction, only this contract

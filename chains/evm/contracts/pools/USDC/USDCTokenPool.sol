@@ -108,7 +108,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     if (transmitterVersion != usdcVersion) revert InvalidMessageVersion(transmitterVersion);
     uint32 tokenMessengerVersion = tokenMessenger.messageBodyVersion();
     if (tokenMessengerVersion != usdcVersion) revert InvalidTokenMessengerVersion(tokenMessengerVersion);
-    if (cctpMessageTransmitterProxy.i_cctpTransmitter() != transmitter) revert InvalidTransmitterInProxy();
+    if (cctpMessageTransmitterProxy.i_cctpTransmitterV1() != transmitter) revert InvalidTransmitterInProxy();
 
     i_tokenMessenger = tokenMessenger;
     i_messageTransmitterProxy = cctpMessageTransmitterProxy;
@@ -180,7 +180,11 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
 
     _validateMessage(msgAndAttestation.message, sourceTokenDataPayload);
 
-    if (!i_messageTransmitterProxy.receiveMessage(msgAndAttestation.message, msgAndAttestation.attestation)) {
+    if (
+      !i_messageTransmitterProxy.receiveMessage(
+        msgAndAttestation.message, msgAndAttestation.attestation, sourceTokenDataPayload.cctpVersion
+      )
+    ) {
       revert UnlockingUSDCFailed();
     }
 

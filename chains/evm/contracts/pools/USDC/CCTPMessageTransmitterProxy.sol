@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {IMessageTransmitter} from "./interfaces/IMessageTransmitter.sol";
 import {ITokenMessenger} from "./interfaces/ITokenMessenger.sol";
 
+import {USDCTokenPool} from "./USDCTokenPool.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 
 import {EnumerableSet} from
@@ -17,6 +18,7 @@ contract CCTPMessageTransmitterProxy is Ownable2StepMsgSender {
 
   /// @notice Error thrown when a function is called by an unauthorized address.
   error Unauthorized(address caller);
+  error InvalidCCTPVersion();
 
   /// @notice Emitted when an allowed caller is added.
   event AllowedCallerAdded(address indexed caller);
@@ -29,28 +31,44 @@ contract CCTPMessageTransmitterProxy is Ownable2StepMsgSender {
   }
 
   /// @notice Immutable reference to the `IMessageTransmitter` contract.
-  IMessageTransmitter public immutable i_cctpTransmitter;
+  IMessageTransmitter public immutable i_cctpTransmitterV1;
+
+  IMessageTransmitter public immutable i_cctpTransmitterV2;
 
   /// @notice Enumerable set of addresses allowed to call `receiveMessage`.
   EnumerableSet.AddressSet private s_allowedCallers;
 
   /// @notice One-time cyclic dependency between TokenPool and MessageTransmitter.
-  constructor(
-    ITokenMessenger tokenMessenger
-  ) {
-    i_cctpTransmitter = IMessageTransmitter(tokenMessenger.localMessageTransmitter());
+  /// @dev In CCTP V1 and V2 the transmitter addresses are different, so we must pass in two different ones
+  /// to ensure that the message can be dispatched correctly on each version of a CCTP Message. This allows
+  /// the contract to interact with both versions while only having to maintain a single proxy contract.
+  constructor(ITokenMessenger cctpV1_tokenMessenger, ITokenMessenger cctpV2_tokenMessenger) {
+    i_cctpTransmitterV1 = IMessageTransmitter(cctpV1_tokenMessenger.localMessageTransmitter());
+    i_cctpTransmitterV2 = IMessageTransmitter(cctpV2_tokenMessenger.localMessageTransmitter());
   }
 
   /// @notice Receives a message from the `IMessageTransmitter` contract and validates it.
   /// @dev Can only be called by an allowed caller to process incoming messages.
   /// @param message The payload of the message being received.
   /// @param attestation The cryptographic proof validating the message.
+  /// @param cctpVersion The version of the CCTP Message transmitter to use, as an enum as defined in USDCTokenPool
+  /// and passed in by the corresponding token pool.
   /// @return success A boolean indicating if the message was successfully processed.
-  function receiveMessage(bytes calldata message, bytes calldata attestation) external returns (bool success) {
+  function receiveMessage(
+    bytes calldata message,
+    bytes calldata attestation,
+    USDCTokenPool.CCTPVersion cctpVersion
+  ) external returns (bool success) {
     if (!s_allowedCallers.contains(msg.sender)) {
       revert Unauthorized(msg.sender);
     }
-    return i_cctpTransmitter.receiveMessage(message, attestation);
+
+    // Get the correct transmitter address based on the CCTP Version
+    IMessageTransmitter transmitter =
+      cctpVersion == USDCTokenPool.CCTPVersion.VERSION_1 ? i_cctpTransmitterV1 : i_cctpTransmitterV2;
+
+    // Dispatch the message to the transmitter to mint tokens and return the result.
+    return transmitter.receiveMessage(message, attestation);
   }
 
   /// @notice Configures the allowed callers for the `receiveMessage` function.

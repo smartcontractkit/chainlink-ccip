@@ -53,7 +53,6 @@ contract USDCSetup is BaseTest {
   MockE2EUSDCTransmitter internal s_mockUSDCTransmitterV2;
 
   CCTPMessageTransmitterProxy internal s_cctpMessageTransmitterProxy;
-  CCTPMessageTransmitterProxy internal s_cctpMessageTransmitterProxyV2;
 
   address internal s_routerAllowedOnRamp = address(3456);
   address internal s_routerAllowedOffRamp = address(234);
@@ -80,8 +79,7 @@ contract USDCSetup is BaseTest {
     s_mockUSDC = new MockUSDCTokenMessenger(0, address(s_mockUSDCTransmitter));
     s_mockUSDCV2 = new MockUSDCTokenMessenger(1, address(s_mockUSDCTransmitterV2));
 
-    s_cctpMessageTransmitterProxy = new CCTPMessageTransmitterProxy(s_mockUSDC);
-    s_cctpMessageTransmitterProxyV2 = new CCTPMessageTransmitterProxy(s_mockUSDCV2);
+    s_cctpMessageTransmitterProxy = new CCTPMessageTransmitterProxy(s_mockUSDC, s_mockUSDCV2);
 
     usdcToken.grantMintAndBurnRoles(address(s_mockUSDCTransmitter));
     usdcToken.grantMintAndBurnRoles(address(s_mockUSDCTransmitterV2));

@@ -19,7 +19,8 @@ contract CCTPMessageTransmitterProxySetup is BaseTest {
       abi.encodeWithSelector(ITokenMessenger.localMessageTransmitter.selector),
       abi.encode(s_cctpMessageTransmitter)
     );
-    s_cctpMessageTransmitterProxy = new CCTPMessageTransmitterProxy(ITokenMessenger(s_tokenMessenger));
+    s_cctpMessageTransmitterProxy =
+      new CCTPMessageTransmitterProxy(ITokenMessenger(s_tokenMessenger), ITokenMessenger(s_tokenMessenger));
     CCTPMessageTransmitterProxy.AllowedCallerConfigArgs[] memory allowedCallerParams =
       new CCTPMessageTransmitterProxy.AllowedCallerConfigArgs[](1);
     allowedCallerParams[0] =

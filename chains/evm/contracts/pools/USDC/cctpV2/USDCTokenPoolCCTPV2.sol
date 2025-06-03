@@ -118,7 +118,11 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
 
     _validateMessage(msgAndAttestation.message, sourceTokenData);
 
-    if (!i_messageTransmitterProxy.receiveMessage(msgAndAttestation.message, msgAndAttestation.attestation)) {
+    if (
+      !i_messageTransmitterProxy.receiveMessage(
+        msgAndAttestation.message, msgAndAttestation.attestation, sourceTokenData.cctpVersion
+      )
+    ) {
       revert UnlockingUSDCFailed();
     }
 

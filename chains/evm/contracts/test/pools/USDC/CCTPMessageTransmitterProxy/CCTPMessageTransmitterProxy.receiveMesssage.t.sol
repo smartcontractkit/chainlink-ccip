@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {IMessageTransmitter} from "../../../../pools/USDC/interfaces/IMessageTransmitter.sol";
 
 import {CCTPMessageTransmitterProxy} from "../../../../pools/USDC/CCTPMessageTransmitterProxy.sol";
+import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
 import {CCTPMessageTransmitterProxySetup} from "./CCTPMessageTransmitterProxySetup.t.sol";
 
 contract CCTPMessageTransmitterProxy_receiveMesssage is CCTPMessageTransmitterProxySetup {
@@ -19,7 +20,7 @@ contract CCTPMessageTransmitterProxy_receiveMesssage is CCTPMessageTransmitterPr
     );
 
     changePrank(s_usdcTokenPool);
-    assertTrue(s_cctpMessageTransmitterProxy.receiveMessage(message, attestation));
+    assertTrue(s_cctpMessageTransmitterProxy.receiveMessage(message, attestation, USDCTokenPool.CCTPVersion.VERSION_1));
 
     // Mocking the call to the IMessageTransmitter to return false
     vm.mockCall(
@@ -29,7 +30,7 @@ contract CCTPMessageTransmitterProxy_receiveMesssage is CCTPMessageTransmitterPr
     );
 
     changePrank(s_usdcTokenPool);
-    assertFalse(s_cctpMessageTransmitterProxy.receiveMessage(message, attestation));
+    assertFalse(s_cctpMessageTransmitterProxy.receiveMessage(message, attestation, USDCTokenPool.CCTPVersion.VERSION_1));
   }
 
   // Revert cases
@@ -39,6 +40,6 @@ contract CCTPMessageTransmitterProxy_receiveMesssage is CCTPMessageTransmitterPr
 
     changePrank(makeAddr("RANDOM"));
     vm.expectRevert(abi.encodeWithSelector(CCTPMessageTransmitterProxy.Unauthorized.selector, makeAddr("RANDOM")));
-    s_cctpMessageTransmitterProxy.receiveMessage(message, attestation);
+    s_cctpMessageTransmitterProxy.receiveMessage(message, attestation, USDCTokenPool.CCTPVersion.VERSION_1);
   }
 }

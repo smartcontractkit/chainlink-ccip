@@ -70,7 +70,7 @@ contract USDCTokenPool_constructor is USDCSetup {
     address transmitterAddress = makeAddr("INVALID_TRANSMITTER");
     vm.mockCall(
       address(s_cctpMessageTransmitterProxy),
-      abi.encodeCall(s_cctpMessageTransmitterProxy.i_cctpTransmitter, ()),
+      abi.encodeCall(s_cctpMessageTransmitterProxy.i_cctpTransmitterV1, ()),
       abi.encode(transmitterAddress)
     );
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidTransmitterInProxy.selector));
