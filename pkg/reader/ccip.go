@@ -67,11 +67,7 @@ func newCCIPChainReaderInternal(
 			panic(fmt.Sprintf("contract writer not found for chain %d", chainSelector))
 		}
 
-		if contractWriters[chainSelector] == nil {
-			panic(fmt.Sprintf("contract writer not found for chain %d", chainSelector))
-		}
-
-		cas[chainSelector] = chain_accessor.NewLegacyAccessor(lggr, chainSelector, destChain, crs[chainSelector], contractWriters[chainSelector], crs[chainSelector], contractWriters[chainSelector], addrCodec)
+		cas[chainSelector] = chain_accessor.NewLegacyAccessor(lggr, chainSelector, destChain, crs[chainSelector], contractWriters[chainSelector], crs[destChain], contractWriters[destChain], addrCodec)
 	}
 
 	offrampAddrStr, err := addrCodec.AddressBytesToString(offrampAddress, destChain)
@@ -375,10 +371,10 @@ func (r *ccipChainReader) Nonces(
 	sortedChains := maps.Keys(addressesByChain)
 	slices.Sort(sortedChains)
 
-	castString := make(map[cciptypes.ChainSelector][]cciptypes.UnknownEncodedAddress)
+	castString := make(map[cciptypes.ChainSelector][]string)
 	for chain, addresses := range addressesByChain {
 		for _, address := range addresses {
-			castString[chain] = append(castString[chain], cciptypes.UnknownEncodedAddress(address))
+			castString[chain] = append(castString[chain], address)
 		}
 	}
 

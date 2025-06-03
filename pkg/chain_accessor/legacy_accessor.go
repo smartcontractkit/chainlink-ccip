@@ -24,9 +24,9 @@ import (
 
 type LegacyAccessor struct {
 	lggr               logger.Logger
-	srcChain           cciptypes.ChainSelector
-	srcContractReader  contractreader.Extended
-	srcContractWriter  types.ContractWriter
+	chainsel           cciptypes.ChainSelector
+	contractReader     contractreader.Extended
+	contractWriter     types.ContractWriter
 	destContractReader contractreader.Extended
 	destContractWriter types.ContractWriter
 	addrCodec          cciptypes.AddressCodec
@@ -39,17 +39,17 @@ type SendRequestedEvent struct {
 	Message           cciptypes.Message
 }
 
-func NewLegacyAccessor(lgger logger.Logger, srcChain cciptypes.ChainSelector, destChain cciptypes.ChainSelector,
+func NewLegacyAccessor(lgger logger.Logger, chainSelector cciptypes.ChainSelector, destChain cciptypes.ChainSelector,
 	srcContractReader contractreader.Extended, srcContractWriter types.ContractWriter, destContractReader contractreader.Extended,
 	destContractWriter types.ContractWriter, addrCodec cciptypes.AddressCodec,
 ) *LegacyAccessor {
 	// for now, all chains use the same cr/cw based legacy accessor
 	return &LegacyAccessor{
 		lggr:               lgger,
-		srcChain:           srcChain,
+		chainsel:           chainSelector,
 		destChain:          destChain,
-		srcContractReader:  srcContractReader,
-		srcContractWriter:  srcContractWriter,
+		contractReader:     srcContractReader,
+		contractWriter:     srcContractWriter,
 		destContractReader: destContractReader,
 		destContractWriter: destContractWriter,
 		addrCodec:          addrCodec,
@@ -57,11 +57,11 @@ func NewLegacyAccessor(lgger logger.Logger, srcChain cciptypes.ChainSelector, de
 }
 
 func (l LegacyAccessor) Metadata() cciptypes.AccessorMetadata {
-	// contracts map need to be filled, but right now the srcContractReader doesn't support fetch all bindings contract, only allow fetch by contract name
-	allBindings := l.srcContractReader.GetAllBindings()
+	// contracts map need to be filled, but right now the contractReader doesn't support fetch all bindings contract, only allow fetch by contract name
+	allBindings := l.contractReader.GetAllBindings()
 	contracts := make(map[string]cciptypes.UnknownAddress, len(allBindings))
 	for contractName, binding := range allBindings {
-		addressBytes, err := l.addrCodec.AddressStringToBytes(binding[0].Binding.Address, l.srcChain)
+		addressBytes, err := l.addrCodec.AddressStringToBytes(binding[0].Binding.Address, l.chainsel)
 		if err != nil {
 			l.lggr.Errorf("failed to convert address to bytes : %v", err)
 			continue
@@ -70,18 +70,18 @@ func (l LegacyAccessor) Metadata() cciptypes.AccessorMetadata {
 	}
 
 	return cciptypes.AccessorMetadata{
-		ChainSelector: l.srcChain,
+		ChainSelector: l.chainsel,
 		Contracts:     contracts,
 	}
 }
 
 func (l LegacyAccessor) GetContractAddress(contractName string) ([]byte, error) {
-	bindings := l.srcContractReader.GetBindings(contractName)
+	bindings := l.contractReader.GetBindings(contractName)
 	if len(bindings) != 1 {
 		return nil, fmt.Errorf("expected one binding for the %s contract, got %d", contractName, len(bindings))
 	}
 
-	addressBytes, err := l.addrCodec.AddressStringToBytes(bindings[0].Binding.Address, l.srcChain)
+	addressBytes, err := l.addrCodec.AddressStringToBytes(bindings[0].Binding.Address, l.chainsel)
 	if err != nil {
 		return nil, fmt.Errorf("convert address %s to bytes: %w", bindings[0].Binding.Address, err)
 	}
@@ -90,7 +90,7 @@ func (l LegacyAccessor) GetContractAddress(contractName string) ([]byte, error) 
 }
 
 func (l LegacyAccessor) GetChainFeeComponents(ctx context.Context) (cciptypes.ChainFeeComponents, error) {
-	fc, err := l.srcContractWriter.GetFeeComponents(ctx)
+	fc, err := l.contractWriter.GetFeeComponents(ctx)
 	if err != nil {
 		return cciptypes.ChainFeeComponents{}, fmt.Errorf("get fee components: %w", err)
 	}
@@ -104,14 +104,14 @@ func (l LegacyAccessor) Sync(ctx context.Context, contracts cciptypes.ContractAd
 }
 
 func (l LegacyAccessor) MsgsBetweenSeqNums(ctx context.Context, dest cciptypes.ChainSelector, seqNumRange cciptypes.SeqNumRange) ([]cciptypes.Message, error) {
-	seq, err := l.srcContractReader.ExtendedQueryKey(
+	seq, err := l.contractReader.ExtendedQueryKey(
 		ctx,
 		consts.ContractNameOnRamp,
 		query.KeyFilter{
 			Key: consts.EventNameCCIPMessageSent,
 			Expressions: []query.Expression{
 				query.Comparator(consts.EventAttributeSourceChain, primitives.ValueComparator{
-					Value:    l.srcChain,
+					Value:    l.chainsel,
 					Operator: primitives.Eq,
 				}),
 				query.Comparator(consts.EventAttributeDestChain, primitives.ValueComparator{
@@ -159,7 +159,7 @@ func (l LegacyAccessor) MsgsBetweenSeqNums(ctx context.Context, dest cciptypes.C
 
 	l.lggr.Infow("queried messages between sequence numbers",
 		"numMsgs", len(seq),
-		"sourceChainSelector", l.srcChain,
+		"sourceChainSelector", l.chainsel,
 		"seqNumRange", seqNumRange.String(),
 	)
 
@@ -170,7 +170,7 @@ func (l LegacyAccessor) MsgsBetweenSeqNums(ctx context.Context, dest cciptypes.C
 			return nil, fmt.Errorf("failed to cast %v to Message", item.Data)
 		}
 
-		if err := validateSendRequestedEvent(msg, l.srcChain, dest, seqNumRange); err != nil {
+		if err := validateSendRequestedEvent(msg, l.chainsel, dest, seqNumRange); err != nil {
 			l.lggr.Errorw("validate send requested event", "err", err, "message", msg)
 			continue
 		}
@@ -180,7 +180,7 @@ func (l LegacyAccessor) MsgsBetweenSeqNums(ctx context.Context, dest cciptypes.C
 	}
 
 	l.lggr.Infow("decoded messages between sequence numbers", "msgs", msgs,
-		"sourceChainSelector", l.srcChain,
+		"sourceChainSelector", l.chainsel,
 		"seqNumRange", seqNumRange.String())
 
 	return msgs, nil
@@ -188,14 +188,14 @@ func (l LegacyAccessor) MsgsBetweenSeqNums(ctx context.Context, dest cciptypes.C
 
 func (l LegacyAccessor) LatestMsgSeqNum(ctx context.Context, dest cciptypes.ChainSelector) (cciptypes.SeqNum, error) {
 	lggr := logutil.WithContextValues(ctx, l.lggr)
-	seq, err := l.srcContractReader.ExtendedQueryKey(
+	seq, err := l.contractReader.ExtendedQueryKey(
 		ctx,
 		consts.ContractNameOnRamp,
 		query.KeyFilter{
 			Key: consts.EventNameCCIPMessageSent,
 			Expressions: []query.Expression{
 				query.Comparator(consts.EventAttributeSourceChain, primitives.ValueComparator{
-					Value:    l.srcChain,
+					Value:    l.chainsel,
 					Operator: primitives.Eq,
 				}),
 				query.Comparator(consts.EventAttributeDestChain, primitives.ValueComparator{
@@ -232,13 +232,13 @@ func (l LegacyAccessor) LatestMsgSeqNum(ctx context.Context, dest cciptypes.Chai
 		return 0, fmt.Errorf("failed to cast %v to SendRequestedEvent", item.Data)
 	}
 
-	if err := validateSendRequestedEvent(msg, l.srcChain, dest,
+	if err := validateSendRequestedEvent(msg, l.chainsel, dest,
 		cciptypes.NewSeqNumRange(msg.Message.Header.SequenceNumber, msg.Message.Header.SequenceNumber)); err != nil {
 		return 0, fmt.Errorf("message invalid msg %v: %w", msg, err)
 	}
 
 	lggr.Infow("chain reader returning latest onramp sequence number",
-		"seqNum", msg.Message.Header.SequenceNumber, "sourceChainSelector", l.srcChain)
+		"seqNum", msg.Message.Header.SequenceNumber, "sourceChainSelector", l.chainsel)
 	return msg.SequenceNumber, nil
 }
 
@@ -246,7 +246,7 @@ func (l LegacyAccessor) GetExpectedNextSequenceNumber(ctx context.Context, dest 
 	lggr := logutil.WithContextValues(ctx, l.lggr)
 
 	var expectedNextSequenceNumber uint64
-	err := l.srcContractReader.ExtendedGetLatestValue(
+	err := l.contractReader.ExtendedGetLatestValue(
 		ctx,
 		consts.ContractNameOnRamp,
 		consts.MethodNameGetExpectedNextSequenceNumber,
@@ -258,16 +258,16 @@ func (l LegacyAccessor) GetExpectedNextSequenceNumber(ctx context.Context, dest 
 	)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get expected next sequence number from onramp, source chain: %d, dest chain: %d: %w",
-			l.srcChain, dest, err)
+			l.chainsel, dest, err)
 	}
 
 	if expectedNextSequenceNumber == 0 {
 		return 0, fmt.Errorf("the returned expected next sequence num is 0, source chain: %d, dest chain: %d",
-			l.srcChain, dest)
+			l.chainsel, dest)
 	}
 
 	lggr.Debugw("chain reader returning expected next sequence number",
-		"seqNum", expectedNextSequenceNumber, "sourceChainSelector", l.srcChain)
+		"seqNum", expectedNextSequenceNumber, "sourceChainSelector", l.chainsel)
 	return cciptypes.SeqNum(expectedNextSequenceNumber), nil
 }
 
