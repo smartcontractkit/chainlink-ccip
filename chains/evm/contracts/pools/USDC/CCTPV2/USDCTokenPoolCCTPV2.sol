@@ -67,7 +67,7 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
 
     // Since the CCTP message will use slow-burn, the maxFee is 0, and the finality threshold is standard (2000).
     // Using fast-burn would require a maxFee and a finality threshold of 1000, which may be added in the future.
-   
+
     // In CCTP V2, nonces are deterministic and not sequential. As a result the nonce is not returned to this contract
     // upon sending the message, and will therefore not be included in the destPoolData. It will instead be
     // acquired off-chain and included in the destination-message's offchainTokenData.
