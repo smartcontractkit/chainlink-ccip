@@ -64,8 +64,10 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
     // Since this pool is the msg sender of the CCTP transaction, only this contract
     // is able to call replaceDepositForBurn. Since this contract does not implement
     // replaceDepositForBurn, the tokens cannot be maliciously re-routed to another address.
+
     // Since the CCTP message will use slow-burn, the maxFee is 0, and the finality threshold is standard (2000).
     // Using fast-burn would require a maxFee and a finality threshold of 1000, which may be added in the future.
+   
     // In CCTP V2, nonces are deterministic and not sequential. As a result the nonce is not returned to this contract
     // upon sending the message, and will therefore not be included in the destPoolData. It will instead be
     // acquired off-chain and included in the destination-message's offchainTokenData.
@@ -101,7 +103,7 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
   /// source chain. It contains (nonce, sourceDomain) which is guaranteed by CCTP
   /// to be unique.
   /// * offchainTokenData is untrusted (can be supplied by manual execution), but we assert
-  /// that (nonce, sourceDomain) is equal to the message's (nonce, sourceDomain) and
+  /// that (sourceDomain) is equal to the message's (sourceDomain) and
   /// receiveMessage will assert that Attestation contains a valid attestation signature
   /// for that message, including its (nonce, sourceDomain). This way, the only
   /// non-reverting offchainTokenData that can be supplied is a valid attestation for the

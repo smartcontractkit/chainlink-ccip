@@ -5,10 +5,8 @@ import {ITokenMessenger} from "../../../../../pools/USDC/interfaces/ITokenMessen
 
 import {Router} from "../../../../../Router.sol";
 import {Pool} from "../../../../../libraries/Pool.sol";
-import {RateLimiter} from "../../../../../libraries/RateLimiter.sol";
 import {TokenPool} from "../../../../../pools/TokenPool.sol";
 
-import {USDCTokenPoolCCTPV2} from "../../../../../pools/USDC/CCTPV2/USDCTokenPoolCCTPV2.sol";
 import {USDCTokenPool} from "../../../../../pools/USDC/USDCTokenPool.sol";
 import {USDCTokenPoolCCTPV2Setup} from "./USDCTokenPoolCCTPV2Setup.t.sol";
 
