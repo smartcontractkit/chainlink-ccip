@@ -184,8 +184,10 @@ func (b *execReportBuilder) Add(
 	b.checkInitialize()
 
 	// Validate nonces for multiple reports mode
-	if err := b.validateNoncesForMultipleReports(commitReport); err != nil {
-		return commitReport, err
+	if b.multipleReportsEnabled {
+		if err := b.validateNoncesForMultipleReports(commitReport); err != nil {
+			return commitReport, err
+		}
 	}
 
 	currentCommitReport := commitReport
@@ -264,6 +266,8 @@ func (b *execReportBuilder) handleEmptyReport(
 		return commitReport, false, nil
 	}
 
+	// TODO: log adding messages to a new exec report
+
 	// Try with a new exec report
 	b.createNewExecReport()
 	currentIndex := len(b.execReports) - 1
@@ -308,11 +312,7 @@ func (b *execReportBuilder) validateNoncesForMultipleReports(commitReport execty
 				"messageID", msg.Header.MessageID,
 				"nonce", msg.Header.Nonce)
 
-			// Limit to single report if we already have multiple reports
-			if len(b.execReports) > 1 {
-				b.limitToSingleReport()
-				return fmt.Errorf("messages with non-zero nonces detected, limiting to single report")
-			}
+			return fmt.Errorf("messages with non-zero nonces detected, limiting to single report")
 		}
 	}
 	return nil

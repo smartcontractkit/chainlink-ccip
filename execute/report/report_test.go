@@ -1606,8 +1606,6 @@ func Test_Builder_MultiReport(t *testing.T) {
 	lggr := logger.Test(t)
 	sender, err := cciptypes.NewUnknownAddressFromHex(randomAddress())
 	require.NoError(t, err)
-	sender2, err := cciptypes.NewUnknownAddressFromHex(randomAddress())
-	require.NoError(t, err)
 	defaultNonces := map[cciptypes.ChainSelector]map[string]uint64{
 		1: {
 			sender.String(): 0,
@@ -1835,81 +1833,7 @@ func Test_Builder_MultiReport(t *testing.T) {
 					),
 				},
 			},
-			expectedExecReports:         1,
-			expectedChainReportsPerExec: []int{2},
-			wantErr:                     "messages with non-zero nonces detected, limiting to single report",
-			expectedSkippedSeqsByChain: map[cciptypes.ChainSelector]mapset.Set[cciptypes.SeqNum]{
-				3: createSeqSet(110, 119),
-			},
-		},
-		{
-			// once this oversized message is hit for a specific sender we can't continue because of nonces continuity
-			// so from first report we'll take until the oversized message, and then move to the next report.
-			name: "non-zero nonces with oversized message in first report",
-			args: args{
-				maxReportSize: 9700,
-				maxGasLimit:   10000000,
-				nonces:        defaultNonces,
-				reports: []exectypes.CommitData{
-					setMessageData(3, 20000, // Make message 3 oversized
-						makeTestCommitReport(hasher, 10, 2, 100, 999, 10101010101,
-							sender,
-							cciptypes.Bytes32{}, // generate a correct root.
-							nil,                 // executed
-							false,               // zero nonces
-						)),
-					makeTestCommitReport(hasher, 20, 3, 100, 999, 10101010101,
-						sender,
-						cciptypes.Bytes32{}, // generate a correct root.
-						nil,                 // executed
-						false,               // zero nonces
-					),
-				},
-			},
-			expectedExecReports:         1,
-			expectedChainReportsPerExec: []int{2},
-			wantErr:                     "messages with non-zero nonces detected, limiting to single report",
-			expectedSkippedSeqsByChain: map[cciptypes.ChainSelector]mapset.Set[cciptypes.SeqNum]{
-				// These messages should be skipped due to msg size block
-				2: createSeqSet(103, 109),
-				// These messages should be skipped due to single report limitation
-				3: createSeqSet(116, 119),
-			},
-		},
-		{
-			// once this oversized message is hit  another sender we can skip it and continue to other messages in same
-			// report, then take from second report until size limit
-			name: "non-zero nonces with oversized message in first report with another sender",
-			args: args{
-				maxReportSize: 9700,
-				maxGasLimit:   10000000,
-				nonces:        defaultNonces,
-				reports: []exectypes.CommitData{
-					changeSenderAndOtherNoncesAccordingly(3, sender2, 1,
-						setMessageData(3, 20000, // Make message 3 oversized
-							makeTestCommitReport(hasher, 10, 2, 100, 999, 10101010101,
-								sender,
-								cciptypes.Bytes32{}, // generate a correct root.
-								nil,                 // executed
-								false,               // zero nonces
-							))),
-					makeTestCommitReport(hasher, 20, 3, 100, 999, 10101010101,
-						sender,
-						cciptypes.Bytes32{}, // generate a correct root.
-						nil,                 // executed
-						false,               // zero nonces
-					),
-				},
-			},
-			expectedExecReports:         1,
-			expectedChainReportsPerExec: []int{2},
-			wantErr:                     "messages with non-zero nonces detected, limiting to single report",
-			expectedSkippedSeqsByChain: map[cciptypes.ChainSelector]mapset.Set[cciptypes.SeqNum]{
-				// These messages should be skipped due to size constraints
-				2: mapset.NewSet[cciptypes.SeqNum](103),
-				// These messages should be skipped due to single report limitation
-				3: createSeqSet(110, 119),
-			},
+			wantErr: "messages with non-zero nonces detected, limiting to single report",
 		},
 		{
 			name: "multiple input reports splitting across maxMessages - no maxSingleChainReports",
@@ -1981,14 +1905,20 @@ func Test_Builder_MultiReport(t *testing.T) {
 				WithMultipleReports(true), // all tests are for multi reports
 			)
 
+			foundError := false
 			for _, report := range tt.args.reports {
 				_, err := builder.Add(ctx, report)
 				if err != nil && tt.wantErr != "" {
 					require.Contains(t, err.Error(), tt.wantErr)
+					foundError = true
 					// Continue testing even with expected error
 				} else {
 					require.NoError(t, err)
 				}
+			}
+
+			if foundError {
+				return
 			}
 
 			execReports, commitReports, err := builder.Build()

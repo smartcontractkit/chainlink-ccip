@@ -525,6 +525,7 @@ func selectReports(
 		}
 	}
 
+	// TODO: Stop at MaxReportsPerRound in the builder
 	execReports, selectedReports, err := builder.Build()
 
 	// TODO: count pending reports during Build() when we select which reports can be returned.
@@ -578,8 +579,10 @@ func (p *Plugin) Reports(
 		return nil, nil
 	}
 
+	lggr.Debug("Decoding outcome in Reports function")
 	decodedOutcome, err := p.ocrTypeCodec.DecodeOutcome(outcome)
 	if err != nil {
+		lggr.Errorw("unable to decode outcome", "err", err)
 		return nil, fmt.Errorf("unable to decode outcome: %w", err)
 	}
 
@@ -588,12 +591,16 @@ func (p *Plugin) Reports(
 		return nil, nil
 	}
 
+	lggr.Debug("extracting report info")
 	reportInfos, err := extractReportInfo(decodedOutcome)
-	lggr.Debugw("report info in UnfinalizedReports()", "reportInfos", reportInfos)
+	lggr.Debugw("report infos", "reportInfos", reportInfos)
 	if err != nil {
+		lggr.Errorf("unable to extract report info: %w", err)
 		return nil, fmt.Errorf("extract report info: %w", err)
 	}
 	if len(reportInfos) != len(decodedOutcome.Reports) {
+		lggr.Errorw("report infos length mismatch", "expected", len(decodedOutcome.Reports),
+			"got", len(reportInfos))
 		return nil, fmt.Errorf("expected %d report infos that equals number of reports"+
 			", got %d", len(decodedOutcome.Reports), len(reportInfos))
 	}
@@ -607,16 +614,20 @@ func (p *Plugin) Reports(
 		return nil, fmt.Errorf("get transmission schedule: %w", err)
 	}
 
+	lggr.Debug("Encoding reports and adding them to final report")
 	// Handle all reports in the outcome
 	var reports []ocr3types.ReportPlus[[]byte]
 	for i, execReport := range decodedOutcome.Reports {
+		lggr.Debugw("Encoding Report: ", "report", execReport)
 		encodedReport, err := p.reportCodec.Encode(ctx, execReport)
 		if err != nil {
+			lggr.Errorw("unable to encode report", "report", execReport, "err", err)
 			return nil, fmt.Errorf("unable to encode report %d: %w", i, err)
 		}
 
 		encodedInfo, err := reportInfos[i].Encode()
 		if err != nil {
+			lggr.Errorw("unable to encode report info", "reportInfo", reportInfos[i], "err", err)
 			return nil, fmt.Errorf("unable to encode report info %d: %w", i, err)
 		}
 
@@ -627,7 +638,6 @@ func (p *Plugin) Reports(
 			},
 			TransmissionScheduleOverride: transmissionSchedule,
 		})
-
 	}
 
 	lggr.Debugw("transmission schedule override",

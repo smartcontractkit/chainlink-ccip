@@ -152,45 +152,6 @@ func TestPluginWithMultipleReports(t *testing.T) {
 		"All expected messages should be included across the reports")
 }
 
-func TestPluginMultipleReportsWithNonZeroNonces(t *testing.T) {
-	ctx := t.Context()
-
-	srcSelector := cciptypes.ChainSelector(1)
-	dstSelector := cciptypes.ChainSelector(2)
-
-	// Create messages with mix of zero and non-zero nonces
-	messages := []inmem.MessagesWithMetadata{
-		makeMsgWithMetadata(100, srcSelector, dstSelector, true),
-		makeMsgWithMetadata(101, srcSelector, dstSelector, true),
-		makeMsgWithMetadata(102, srcSelector, dstSelector, false),
-		makeMsgWithMetadata(103, srcSelector, dstSelector, false, withNonce(1)), // Non-zero nonce
-		makeMsgWithMetadata(104, srcSelector, dstSelector, false),
-		makeMsgWithMetadata(105, srcSelector, dstSelector, false),
-	}
-
-	intTest := SetupSimpleTest(t, logger.Test(t), []cciptypes.ChainSelector{srcSelector}, dstSelector)
-	intTest.WithMessages(messages, 1000, time.Now().Add(-4*time.Hour), 1, srcSelector)
-
-	intTest.WithOffChainConfig(pluginconfig.ExecuteOffchainConfig{
-		MessageVisibilityInterval: *commonconfig.MustNewDuration(8 * time.Hour),
-		BatchGasLimit:             100000000,
-		MaxCommitReportsToFetch:   10,
-		MultipleReportsEnabled:    true,
-	})
-
-	runner := intTest.Start()
-	defer intTest.Close()
-
-	// Run through the state machine
-	_ = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)        // Contract Discovery
-	_ = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)        // Get Commit Reports
-	_ = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)        // Get Messages
-	outcome := runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner) // Filter
-
-	// Should fall back to single report mode when non-zero nonce is detected
-	require.Equal(t, 1, len(outcome.Reports), "Should fall back to single report when non-zero nonce present")
-}
-
 func TestPluginMultipleReportsWithMultipleSourceChains(t *testing.T) {
 	ctx := t.Context()
 
