@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IMessageTransmitter} from "./IMessageTransmitter.sol";
-import {ITokenMessenger} from "./ITokenMessenger.sol";
+import {IMessageTransmitter} from "./interfaces/IMessageTransmitter.sol";
+import {ITokenMessenger} from "./interfaces/ITokenMessenger.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {Pool} from "../../libraries/Pool.sol";
@@ -127,7 +127,12 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
       lockOrBurnIn.amount, domain.domainIdentifier, decodedReceiver, address(i_token), domain.allowedCaller
     );
 
-    emit Burned(msg.sender, lockOrBurnIn.amount);
+    emit LockedOrBurned({
+      remoteChainSelector: lockOrBurnIn.remoteChainSelector,
+      token: address(i_token),
+      sender: msg.sender,
+      amount: lockOrBurnIn.amount
+    });
 
     return Pool.LockOrBurnOutV1({
       destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
@@ -161,7 +166,14 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
       revert UnlockingUSDCFailed();
     }
 
-    emit Minted(msg.sender, releaseOrMintIn.receiver, releaseOrMintIn.amount);
+    emit ReleasedOrMinted({
+      remoteChainSelector: releaseOrMintIn.remoteChainSelector,
+      token: address(i_token),
+      sender: msg.sender,
+      recipient: releaseOrMintIn.receiver,
+      amount: releaseOrMintIn.amount
+    });
+
     return Pool.ReleaseOrMintOutV1({destinationAmount: releaseOrMintIn.amount});
   }
 

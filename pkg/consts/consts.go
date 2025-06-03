@@ -18,6 +18,23 @@ const (
 	ContractNameCCTPMessageTransmitter = "MessageTransmitter"
 )
 
+func AllContractNames() []string {
+	return []string{
+		ContractNameOffRamp,
+		ContractNameOnRamp,
+		ContractNameFeeQuoter,
+		ContractNameCapabilitiesRegistry,
+		ContractNameCCIPConfig,
+		ContractNamePriceAggregator,
+		ContractNameNonceManager,
+		ContractNameRMNHome,
+		ContractNameRMNRemote,
+		ContractNameRMNProxy,
+		ContractNameRouter,
+		ContractNameCCTPMessageTransmitter,
+	}
+}
+
 // Method Names
 // TODO: these should be better organized, maybe separate packages.
 const (
