@@ -1093,6 +1093,17 @@ func TestTokenPool(t *testing.T) {
 					).ValidateAndBuild()
 					require.NoError(t, err)
 
+					ixCctpConfigure, err := cctp_token_pool.NewEditChainRemoteConfigCctpInstruction(
+						config.SvmChainSelector,
+						usdcMint,
+						cctp_token_pool.CctpChain{
+							DomainId: domain,
+						},
+						cctpPool.state,
+						cctpPool.svmChainConfig,
+						admin.PublicKey(),
+					).ValidateAndBuild()
+
 					ixAppend, err := cctp_token_pool.NewAppendRemotePoolAddressesInstruction(
 						config.SvmChainSelector,
 						usdcMint,
@@ -1110,7 +1121,7 @@ func TestTokenPool(t *testing.T) {
 					require.Equal(t, poolTokenAccount, cctpPool.tokenAccount)
 
 					// submit tx with all instructions
-					res := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{poolInitI, ixConfigure, ixAppend, createP}, admin, config.DefaultCommitment)
+					res := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{poolInitI, ixConfigure, ixCctpConfigure, ixAppend, createP}, admin, config.DefaultCommitment)
 					require.NotNil(t, res)
 
 					// validate state

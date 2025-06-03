@@ -97,6 +97,19 @@ pub mod cctp_token_pool {
             .set(remote_chain_selector, mint, cfg)
     }
 
+    pub fn edit_chain_remote_config_cctp(
+        ctx: Context<EditChainConfig>,
+        _remote_chain_selector: u64,
+        _mint: Pubkey,
+        cfg: CctpChain,
+    ) -> Result<()> {
+        ctx.accounts.chain_config.cctp = cfg;
+        emit!(RemoteChainCctpConfigChanged {
+            config: ctx.accounts.chain_config.cctp
+        });
+        Ok(())
+    }
+
     // Add remote pool addresses
     pub fn append_remote_pool_addresses(
         ctx: Context<AppendRemotePoolAddresses>,
@@ -113,7 +126,7 @@ pub mod cctp_token_pool {
 
     // set rate limit
     pub fn set_chain_rate_limit(
-        ctx: Context<SetChainRateLimit>,
+        ctx: Context<EditChainConfig>,
         remote_chain_selector: u64,
         mint: Pubkey,
         inbound: RateLimitConfig,
@@ -192,6 +205,7 @@ pub mod cctp_token_pool {
         let remaining = parse_remaining_release_accounts(
             ctx.remaining_accounts,
             &release_or_mint,
+            ctx.accounts.chain_config.cctp.domain_id,
             remote_token_address_bytes,
         )?;
 
@@ -309,15 +323,7 @@ pub mod cctp_token_pool {
         let mint_recipient =
             Pubkey::new_from_array(lock_or_burn.receiver[0..32].try_into().unwrap());
 
-        let destination_domain = match lock_or_burn.remote_chain_selector {
-            // TODO update this mapping to be from ChainSelector -> DomainID. Make it a PDA (or part of the per-chain config PDA)
-            1 => 0,  // Ethereum Mainnet
-            2 => 1,  // Optimism
-            3 => 2,  // Arbitrum
-            4 => 3,  // Avalanche
-            15 => 5, // Solana
-            _ => return Err(CctpTokenPoolError::InvalidDomain.into()),
-        };
+        let destination_domain = ctx.accounts.chain_config.cctp.domain_id;
 
         let deposit_for_burn_params = DepositForBurnWithCallerParams {
             amount: lock_or_burn.amount,
@@ -414,6 +420,7 @@ pub mod cctp_token_pool {
 fn parse_remaining_release_accounts<'info>(
     remaining: &'info [AccountInfo<'info>],
     release_or_mint: &ReleaseOrMintInV1,
+    cctp_domain_id: u32,
     remote_token_address: [u8; 32],
 ) -> Result<TokenOfframpRemainingAccounts<'info>> {
     let mut remaining_accounts = remaining.iter();
@@ -434,7 +441,7 @@ fn parse_remaining_release_accounts<'info>(
         cctp_used_nonces: next_account_info(&mut remaining_accounts)?,
     };
 
-    result.validate(release_or_mint, remote_token_address)?;
+    result.validate(release_or_mint, cctp_domain_id, remote_token_address)?;
 
     Ok(result)
 }
@@ -491,13 +498,23 @@ pub struct State {
     pub config: BaseConfig,
 }
 
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, InitSpace)]
+pub struct CctpChain {
+    // Domain ID for CCTP, used to identify the chain. This is a sequential number starting from 0.
+    // Using u32 here because it's what CCTP uses in its Params structs.
+    pub domain_id: u32,
+}
+
 #[account]
 #[derive(InitSpace)]
 pub struct ChainConfig {
     pub base: BaseChain,
+    pub cctp: CctpChain,
+}
 
-    // Domain ID for CCTP, used to identify the chain. This is a sequential number starting from 0. Using u64 here just because there's little value in sticking to u8/u16, and it allows for way more chains in the future than we should ever need.
-    pub cctp_domain_id: u64,
+#[event]
+pub struct RemoteChainCctpConfigChanged {
+    pub config: CctpChain,
 }
 
 #[error_code]

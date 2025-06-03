@@ -266,11 +266,13 @@ impl TokenOfframpRemainingAccounts<'_> {
     pub fn validate(
         &self,
         release_or_mint: &ReleaseOrMintInV1,
+        domain_id: u32,
         remote_token_address: [u8; 32],
     ) -> Result<()> {
         let mint = release_or_mint.local_token;
-        let remote_chain_selector = release_or_mint.remote_chain_selector;
         let nonce_seed = Self::first_nonce_seed(&release_or_mint.offchain_token_data)?;
+        let domain_str = domain_id.to_string();
+        let domain_seed = domain_str.as_bytes();
 
         require_keys_eq!(
             self.cctp_authority_pda.key(),
@@ -287,11 +289,7 @@ impl TokenOfframpRemainingAccounts<'_> {
 
         require_keys_eq!(
             self.cctp_used_nonces.key(),
-            Self::get_message_transmitter_pda(&[
-                b"used_nonces",
-                to_domain_seed(remote_chain_selector).as_ref(),
-                nonce_seed.as_ref()
-            ])
+            Self::get_message_transmitter_pda(&[b"used_nonces", domain_seed, nonce_seed.as_ref()])
         );
 
         require_keys_eq!(
@@ -325,17 +323,14 @@ impl TokenOfframpRemainingAccounts<'_> {
 
         require_keys_eq!(
             self.cctp_remote_token_messenger_key.key(),
-            Self::get_token_messenger_minter_pda(&[
-                b"remote_token_messenger",
-                &to_domain_seed(remote_chain_selector)
-            ])
+            Self::get_token_messenger_minter_pda(&[b"remote_token_messenger", domain_seed])
         );
 
         require_keys_eq!(
             self.cctp_token_pair.key(),
             Self::get_token_messenger_minter_pda(&[
                 b"token_pair",
-                &to_domain_seed(remote_chain_selector),
+                domain_seed,
                 remote_token_address.as_ref()
             ])
         );
@@ -373,20 +368,6 @@ impl TokenOfframpRemainingAccounts<'_> {
             .as_bytes()
             .to_vec())
     }
-}
-
-// TODO alternatively, remove this and store the corresponding DomainID in the ChainConfig
-pub fn to_domain_seed(remote_chain_selector: u64) -> Vec<u8> {
-    let bytes: &'static [u8] = match remote_chain_selector {
-        // TODO update, or better just change it to a PDA
-        15 => b"5",
-        1 => b"1",
-        2 => b"2",
-        3 => b"3",
-        // this should never happen, as we won't even configure unsupported chains for this pool
-        _ => panic!("Invalid chain selector for CCTP"),
-    };
-    bytes.to_vec()
 }
 
 #[derive(Accounts)]
@@ -531,7 +512,7 @@ pub struct TokenOnramp<'info> {
 
     /// CHECK this is not read by the pool, just forwarded to CCTP
     #[account(
-        seeds = [b"remote_token_messenger", &to_domain_seed(lock_or_burn.remote_chain_selector)],
+        seeds = [b"remote_token_messenger", chain_config.cctp.domain_id.to_string().as_bytes()],
         bump,
         seeds::program = cctp_token_messenger_minter,
     )]
@@ -586,7 +567,7 @@ pub struct InitializeChainConfig<'info> {
 
 #[derive(Accounts)]
 #[instruction(remote_chain_selector: u64, mint: Pubkey)]
-pub struct SetChainRateLimit<'info> {
+pub struct EditChainConfig<'info> {
     #[account(
         seeds = [
             POOL_STATE_SEED,

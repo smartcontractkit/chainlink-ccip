@@ -47,6 +47,8 @@ var (
 
 	Instruction_EditChainRemoteConfig = ag_binary.TypeID([8]byte{149, 112, 186, 72, 116, 217, 159, 175})
 
+	Instruction_EditChainRemoteConfigCctp = ag_binary.TypeID([8]byte{5, 215, 79, 193, 234, 35, 15, 87})
+
 	Instruction_AppendRemotePoolAddresses = ag_binary.TypeID([8]byte{172, 57, 83, 55, 70, 112, 26, 197})
 
 	Instruction_SetChainRateLimit = ag_binary.TypeID([8]byte{188, 188, 161, 37, 100, 249, 123, 170})
@@ -79,6 +81,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "InitChainRemoteConfig"
 	case Instruction_EditChainRemoteConfig:
 		return "EditChainRemoteConfig"
+	case Instruction_EditChainRemoteConfigCctp:
+		return "EditChainRemoteConfigCctp"
 	case Instruction_AppendRemotePoolAddresses:
 		return "AppendRemotePoolAddresses"
 	case Instruction_SetChainRateLimit:
@@ -133,6 +137,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"edit_chain_remote_config", (*EditChainRemoteConfig)(nil),
+		},
+		{
+			"edit_chain_remote_config_cctp", (*EditChainRemoteConfigCctp)(nil),
 		},
 		{
 			"append_remote_pool_addresses", (*AppendRemotePoolAddresses)(nil),

@@ -116,3 +116,25 @@ func (obj *DepositForBurnWithCallerParams) UnmarshalWithDecoder(decoder *ag_bina
 	}
 	return nil
 }
+
+type CctpChain struct {
+	DomainId uint32
+}
+
+func (obj CctpChain) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `DomainId` param:
+	err = encoder.Encode(obj.DomainId)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *CctpChain) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `DomainId`:
+	err = decoder.Decode(&obj.DomainId)
+	if err != nil {
+		return err
+	}
+	return nil
+}

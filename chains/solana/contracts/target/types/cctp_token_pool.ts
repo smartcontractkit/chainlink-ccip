@@ -222,6 +222,42 @@ export type CctpTokenPool = {
       ]
     },
     {
+      "name": "editChainRemoteConfigCctp",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "chainConfig",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "remoteChainSelector",
+          "type": "u64"
+        },
+        {
+          "name": "mint",
+          "type": "publicKey"
+        },
+        {
+          "name": "cfg",
+          "type": {
+            "defined": "CctpChain"
+          }
+        }
+      ]
+    },
+    {
       "name": "appendRemotePoolAddresses",
       "accounts": [
         {
@@ -684,8 +720,10 @@ export type CctpTokenPool = {
             }
           },
           {
-            "name": "cctpDomainId",
-            "type": "u64"
+            "name": "cctp",
+            "type": {
+              "defined": "CctpChain"
+            }
           }
         ]
       }
@@ -745,6 +783,32 @@ export type CctpTokenPool = {
           }
         ]
       }
+    },
+    {
+      "name": "CctpChain",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "domainId",
+            "type": "u32"
+          }
+        ]
+      }
+    }
+  ],
+  "events": [
+    {
+      "name": "RemoteChainCctpConfigChanged",
+      "fields": [
+        {
+          "name": "config",
+          "type": {
+            "defined": "CctpChain"
+          },
+          "index": false
+        }
+      ]
     }
   ],
   "errors": [
@@ -1000,6 +1064,42 @@ export const IDL: CctpTokenPool = {
       ]
     },
     {
+      "name": "editChainRemoteConfigCctp",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "chainConfig",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "remoteChainSelector",
+          "type": "u64"
+        },
+        {
+          "name": "mint",
+          "type": "publicKey"
+        },
+        {
+          "name": "cfg",
+          "type": {
+            "defined": "CctpChain"
+          }
+        }
+      ]
+    },
+    {
       "name": "appendRemotePoolAddresses",
       "accounts": [
         {
@@ -1462,8 +1562,10 @@ export const IDL: CctpTokenPool = {
             }
           },
           {
-            "name": "cctpDomainId",
-            "type": "u64"
+            "name": "cctp",
+            "type": {
+              "defined": "CctpChain"
+            }
           }
         ]
       }
@@ -1523,6 +1625,32 @@ export const IDL: CctpTokenPool = {
           }
         ]
       }
+    },
+    {
+      "name": "CctpChain",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "domainId",
+            "type": "u32"
+          }
+        ]
+      }
+    }
+  ],
+  "events": [
+    {
+      "name": "RemoteChainCctpConfigChanged",
+      "fields": [
+        {
+          "name": "config",
+          "type": {
+            "defined": "CctpChain"
+          },
+          "index": false
+        }
+      ]
     }
   ],
   "errors": [

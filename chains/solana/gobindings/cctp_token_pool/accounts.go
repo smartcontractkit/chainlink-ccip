@@ -61,8 +61,8 @@ func (obj *State) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 }
 
 type ChainConfig struct {
-	Base         BaseChain
-	CctpDomainId uint64
+	Base BaseChain
+	Cctp CctpChain
 }
 
 var ChainConfigDiscriminator = [8]byte{13, 177, 233, 141, 212, 29, 148, 56}
@@ -78,8 +78,8 @@ func (obj ChainConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error
 	if err != nil {
 		return err
 	}
-	// Serialize `CctpDomainId` param:
-	err = encoder.Encode(obj.CctpDomainId)
+	// Serialize `Cctp` param:
+	err = encoder.Encode(obj.Cctp)
 	if err != nil {
 		return err
 	}
@@ -105,8 +105,8 @@ func (obj *ChainConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err er
 	if err != nil {
 		return err
 	}
-	// Deserialize `CctpDomainId`:
-	err = decoder.Decode(&obj.CctpDomainId)
+	// Deserialize `Cctp`:
+	err = decoder.Decode(&obj.Cctp)
 	if err != nil {
 		return err
 	}
