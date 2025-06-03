@@ -207,7 +207,7 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 	confidence primitives.ConfidenceLevel,
 	limit int) ([]cciptypes.CommitPluginReportWithMeta, error) {
 
-	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
+	if err := validateReaderExistence(r.contractReaders, r.destChain); err != nil {
 		return []cciptypes.CommitPluginReportWithMeta{}, err
 	}
 
@@ -374,7 +374,7 @@ func (r *ccipChainReader) ExecutedMessages(
 ) (map[cciptypes.ChainSelector][]cciptypes.SeqNum, error) {
 	lggr := logutil.WithContextValues(ctx, r.lggr)
 
-	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
+	if err := validateReaderExistence(r.contractReaders, r.destChain); err != nil {
 		return nil, err
 	}
 
@@ -493,7 +493,7 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 	ctx context.Context, sourceChainSelector cciptypes.ChainSelector, seqNumRange cciptypes.SeqNumRange,
 ) ([]cciptypes.Message, error) {
 	lggr := logutil.WithContextValues(ctx, r.lggr)
-	if err := validateExtendedReaderExistence(r.contractReaders, sourceChainSelector); err != nil {
+	if err := validateReaderExistence(r.contractReaders, sourceChainSelector); err != nil {
 		return nil, err
 	}
 
@@ -583,7 +583,7 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 func (r *ccipChainReader) LatestMsgSeqNum(
 	ctx context.Context, chain cciptypes.ChainSelector) (cciptypes.SeqNum, error) {
 	lggr := logutil.WithContextValues(ctx, r.lggr)
-	if err := validateExtendedReaderExistence(r.contractReaders, chain); err != nil {
+	if err := validateReaderExistence(r.contractReaders, chain); err != nil {
 		return 0, err
 	}
 
@@ -648,7 +648,7 @@ func (r *ccipChainReader) GetExpectedNextSequenceNumber(
 ) (cciptypes.SeqNum, error) {
 	lggr := logutil.WithContextValues(ctx, r.lggr)
 
-	if err := validateExtendedReaderExistence(r.contractReaders, sourceChainSelector); err != nil {
+	if err := validateReaderExistence(r.contractReaders, sourceChainSelector); err != nil {
 		return 0, err
 	}
 
@@ -684,7 +684,7 @@ func (r *ccipChainReader) GetExpectedNextSequenceNumber(
 func (r *ccipChainReader) NextSeqNum(
 	ctx context.Context, chains []cciptypes.ChainSelector,
 ) (map[cciptypes.ChainSelector]cciptypes.SeqNum, error) {
-	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
+	if err := validateReaderExistence(r.contractReaders, r.destChain); err != nil {
 		return nil, err
 	}
 
@@ -741,7 +741,7 @@ func (r *ccipChainReader) Nonces(
 	addressesByChain map[cciptypes.ChainSelector][]string,
 ) (map[cciptypes.ChainSelector]map[string]uint64, error) {
 	lggr := logutil.WithContextValues(ctx, r.lggr)
-	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
+	if err := validateReaderExistence(r.contractReaders, r.destChain); err != nil {
 		return nil, err
 	}
 
@@ -960,7 +960,7 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 //nolint:lll
 func (r *ccipChainReader) GetChainFeePriceUpdate(ctx context.Context, selectors []cciptypes.ChainSelector) map[cciptypes.ChainSelector]cciptypes.TimestampedBig {
 	lggr := logutil.WithContextValues(ctx, r.lggr)
-	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
+	if err := validateReaderExistence(r.contractReaders, r.destChain); err != nil {
 		lggr.Errorw("GetChainFeePriceUpdate dest chain extended reader not exist, dest chain not supported", "err", err)
 		return nil
 	}
@@ -1092,7 +1092,7 @@ func (r *ccipChainReader) buildSigners(signers []signer) []cciptypes.RemoteSigne
 func (r *ccipChainReader) GetRMNRemoteConfig(ctx context.Context) (cciptypes.RemoteConfig, error) {
 	lggr := logutil.WithContextValues(ctx, r.lggr)
 
-	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
+	if err := validateReaderExistence(r.contractReaders, r.destChain); err != nil {
 		return cciptypes.RemoteConfig{}, fmt.Errorf("validate dest=%d extended reader existence: %w", r.destChain, err)
 	}
 
@@ -1126,7 +1126,7 @@ func (r *ccipChainReader) GetRMNRemoteConfig(ctx context.Context) (cciptypes.Rem
 // GetRmnCurseInfo returns rmn curse/pausing information about the provided chains
 // from the destination chain RMN remote contract.
 func (r *ccipChainReader) GetRmnCurseInfo(ctx context.Context) (CurseInfo, error) {
-	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
+	if err := validateReaderExistence(r.contractReaders, r.destChain); err != nil {
 		return CurseInfo{}, fmt.Errorf("validate dest=%d extended reader existence: %w", r.destChain, err)
 	}
 
@@ -1239,7 +1239,7 @@ func (r *ccipChainReader) DiscoverContracts(ctx context.Context,
 	lggr := logutil.WithContextValues(ctx, r.lggr)
 
 	// Discover destination contracts if the dest chain is supported.
-	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err == nil {
+	if err := validateReaderExistence(r.contractReaders, r.destChain); err == nil {
 		resp, err = r.discoverOffRampContracts(ctx, lggr, chains)
 		// Can't continue with discovery if the destination chain is not available.
 		// We read source chains OnRamps from there, and onRamps are essential for feeQuoter and Router discovery.
@@ -1341,7 +1341,7 @@ func (r *ccipChainReader) Sync(ctx context.Context, contracts ContractAddresses)
 			}
 
 			// try to bind
-			_, err := bindExtendedReaderContract(ctx, lggr, r.contractReaders, chainSel, contractName, address, r.addrCodec)
+			_, err := bindReaderContract(ctx, lggr, r.contractReaders, chainSel, contractName, address, r.addrCodec)
 			if err != nil {
 				if errors.Is(err, ErrContractReaderNotFound) {
 					// don't support this chain
@@ -1367,7 +1367,7 @@ func (r *ccipChainReader) GetContractAddress(contractName string, chain cciptype
 // the price of ETH not in ETH but in wei (1e-18 ETH).
 func (r *ccipChainReader) LinkPriceUSD(ctx context.Context) (cciptypes.BigInt, error) {
 	// Ensure we can read from the destination chain.
-	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
+	if err := validateReaderExistence(r.contractReaders, r.destChain); err != nil {
 		return cciptypes.BigInt{}, fmt.Errorf("failed to validate dest chain reader existence: %w", err)
 	}
 
@@ -1487,7 +1487,7 @@ func (r *ccipChainReader) getOffRampSourceChainsConfig(
 	chains []cciptypes.ChainSelector,
 	includeDisabled bool,
 ) (map[cciptypes.ChainSelector]StaticSourceChainConfig, error) {
-	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
+	if err := validateReaderExistence(r.contractReaders, r.destChain); err != nil {
 		return nil, fmt.Errorf("validate extended reader existence: %w", err)
 	}
 
@@ -1677,7 +1677,7 @@ func (r *ccipChainReader) getRMNRemoteAddress(
 	lggr logger.Logger,
 	chain cciptypes.ChainSelector,
 	rmnRemoteProxyAddress []byte) ([]byte, error) {
-	_, err := bindExtendedReaderContract(ctx, lggr, r.contractReaders, chain, consts.ContractNameRMNProxy, rmnRemoteProxyAddress, r.addrCodec)
+	_, err := bindReaderContract(ctx, lggr, r.contractReaders, chain, consts.ContractNameRMNProxy, rmnRemoteProxyAddress, r.addrCodec)
 	if err != nil {
 		return nil, fmt.Errorf("bind RMN proxy contract: %w", err)
 	}
@@ -1692,7 +1692,7 @@ func (r *ccipChainReader) getRMNRemoteAddress(
 }
 
 func (r *ccipChainReader) GetLatestPriceSeqNr(ctx context.Context) (uint64, error) {
-	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
+	if err := validateReaderExistence(r.contractReaders, r.destChain); err != nil {
 		return 0, fmt.Errorf("validate dest=%d extended reader existence: %w", r.destChain, err)
 	}
 
@@ -1713,7 +1713,7 @@ func (r *ccipChainReader) GetLatestPriceSeqNr(ctx context.Context) (uint64, erro
 }
 
 func (r *ccipChainReader) GetOffRampConfigDigest(ctx context.Context, pluginType uint8) ([32]byte, error) {
-	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
+	if err := validateReaderExistence(r.contractReaders, r.destChain); err != nil {
 		return [32]byte{}, fmt.Errorf("validate dest=%d extended reader existence: %w", r.destChain, err)
 	}
 
