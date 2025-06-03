@@ -3,9 +3,11 @@ use anchor_lang::prelude::*;
 use crate::context::{
     AcceptOwnership, AddSourceChain, BufferExecutionReportContext, CloseCommitReportAccount,
     CommitReportContext, ExecuteReportContext, PriceOnlyCommitReportContext, SetOcrConfig,
-    TransferOwnership, UpdateConfig, UpdateReferenceAddresses, UpdateSourceChain,
+    TransferOwnership, UpdateConfig, UpdateReferenceAddresses, UpdateSourceChain, ViewConfigOnly,
 };
-use crate::state::{CodeVersion, Ocr3ConfigInfo, SourceChainConfig};
+use crate::state::{
+    CcipAccountMeta, CodeVersion, DerivePdasResponse, Ocr3ConfigInfo, SourceChainConfig,
+};
 use crate::OcrPluginType;
 
 /// To be called for managing commit reports.
@@ -64,6 +66,15 @@ pub trait Execute {
         chunk_index: u8,
         num_chunks: u8,
     ) -> Result<()>;
+
+    fn derive_pdas_execute<'info>(
+        &self,
+        ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
+        raw_execution_report: Vec<u8>,
+        token_indexes: Vec<u8>,
+        execute_caller: Pubkey,
+        message_accounts: Vec<CcipAccountMeta>,
+    ) -> Result<DerivePdasResponse>;
 }
 
 /// To be called by the offramp administrator.

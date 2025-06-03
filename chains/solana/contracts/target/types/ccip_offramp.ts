@@ -1158,6 +1158,41 @@ export type CcipOfframp = {
       ]
     },
     {
+      "name": "derivePdasExecute",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "rawExecutionReport",
+          "type": "bytes"
+        },
+        {
+          "name": "tokenIndexes",
+          "type": "bytes"
+        },
+        {
+          "name": "executeCaller",
+          "type": "publicKey"
+        },
+        {
+          "name": "messageAccounts",
+          "type": {
+            "vec": {
+              "defined": "CcipAccountMeta"
+            }
+          }
+        }
+      ],
+      "returns": {
+        "defined": "DerivePdasResponse"
+      }
+    },
+    {
       "name": "closeCommitReportAccount",
       "accounts": [
         {
@@ -1762,6 +1797,46 @@ export type CcipOfframp = {
                 32
               ]
             }
+          }
+        ]
+      }
+    },
+    {
+      "name": "DerivePdasResponse",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "askAgain",
+            "type": "bool"
+          },
+          {
+            "name": "accountMetas",
+            "type": {
+              "vec": {
+                "defined": "CcipAccountMeta"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "CcipAccountMeta",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pubkey",
+            "type": "publicKey"
+          },
+          {
+            "name": "isSigner",
+            "type": "bool"
+          },
+          {
+            "name": "isWritable",
+            "type": "bool"
           }
         ]
       }
@@ -2560,6 +2635,11 @@ export type CcipOfframp = {
       "code": 9065,
       "name": "ExecutionReportUnavailable",
       "msg": "Execution report wasn't provided either directly or via buffer"
+    },
+    {
+      "code": 9066,
+      "name": "InvalidAccountListForPdaDerivation",
+      "msg": "Invalid account list for PDA derivation"
     }
   ]
 };
@@ -3724,6 +3804,41 @@ export const IDL: CcipOfframp = {
       ]
     },
     {
+      "name": "derivePdasExecute",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "rawExecutionReport",
+          "type": "bytes"
+        },
+        {
+          "name": "tokenIndexes",
+          "type": "bytes"
+        },
+        {
+          "name": "executeCaller",
+          "type": "publicKey"
+        },
+        {
+          "name": "messageAccounts",
+          "type": {
+            "vec": {
+              "defined": "CcipAccountMeta"
+            }
+          }
+        }
+      ],
+      "returns": {
+        "defined": "DerivePdasResponse"
+      }
+    },
+    {
       "name": "closeCommitReportAccount",
       "accounts": [
         {
@@ -4328,6 +4443,46 @@ export const IDL: CcipOfframp = {
                 32
               ]
             }
+          }
+        ]
+      }
+    },
+    {
+      "name": "DerivePdasResponse",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "askAgain",
+            "type": "bool"
+          },
+          {
+            "name": "accountMetas",
+            "type": {
+              "vec": {
+                "defined": "CcipAccountMeta"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "CcipAccountMeta",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pubkey",
+            "type": "publicKey"
+          },
+          {
+            "name": "isSigner",
+            "type": "bool"
+          },
+          {
+            "name": "isWritable",
+            "type": "bool"
           }
         ]
       }
@@ -5126,6 +5281,11 @@ export const IDL: CcipOfframp = {
       "code": 9065,
       "name": "ExecutionReportUnavailable",
       "msg": "Execution report wasn't provided either directly or via buffer"
+    },
+    {
+      "code": 9066,
+      "name": "InvalidAccountListForPdaDerivation",
+      "msg": "Invalid account list for PDA derivation"
     }
   ]
 };

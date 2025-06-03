@@ -3,7 +3,9 @@ use ccip_common::seed;
 use ccip_common::v1::{validate_and_parse_token_accounts, TokenAccounts, MIN_TOKEN_POOL_ACCOUNTS};
 use solana_program::instruction::Instruction;
 use solana_program::program::invoke_signed;
+use solana_program::sysvar::instructions;
 
+use crate::context::ViewConfigOnly;
 use crate::context::{BufferExecutionReportContext, ExecuteReportContext, OcrPluginType};
 use crate::event::{ExecutionStateChanged, SkippedAlreadyExecutedMessage};
 use crate::instructions::interfaces::Execute;
@@ -11,7 +13,8 @@ use crate::messages::{
     Any2SVMRampMessage, ExecutionReportSingleChain, RampMessageHeader, SVMTokenAmount,
 };
 use crate::state::{
-    CommitReport, ExecutionReportBuffer, MessageExecutionState, OnRampAddress, SourceChain,
+    CcipAccountMeta, CommitReport, DerivePdasResponse, ExecutionReportBuffer,
+    MessageExecutionState, OnRampAddress, ReferenceAddresses, SourceChain, ToMeta,
 };
 use crate::CcipOfframpError;
 
@@ -123,6 +126,29 @@ impl Execute for Impl {
             num_chunks,
         )
     }
+
+    fn derive_pdas_execute<'info>(
+        &self,
+        ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
+        raw_execution_report: Vec<u8>,
+        _token_indexes: Vec<u8>,
+        execute_caller: Pubkey,
+        message_accounts: Vec<CcipAccountMeta>,
+    ) -> Result<DerivePdasResponse> {
+        let state = DerivePdasExecuteStateMachine::from_remaining_accounts(ctx.remaining_accounts)?;
+
+        match state {
+            DerivePdasExecuteStateMachine::FirstStage => {
+                derive_pdas_execute_first_stage(raw_execution_report)
+            }
+            DerivePdasExecuteStateMachine::SecondStage => derive_pdas_execute_second_stage(
+                ctx,
+                raw_execution_report,
+                execute_caller,
+                message_accounts,
+            ),
+        }
+    }
 }
 
 /////////////
@@ -152,6 +178,102 @@ fn ocr3_transmit_report<'info>(
         buffered_bytes,
     )?;
     Ok(())
+}
+
+enum DerivePdasExecuteStateMachine {
+    FirstStage,
+    SecondStage,
+}
+
+impl DerivePdasExecuteStateMachine {
+    fn from_remaining_accounts(remaining_accounts: &[AccountInfo<'_>]) -> Result<Self> {
+        match remaining_accounts.len() {
+            0 => Ok(DerivePdasExecuteStateMachine::FirstStage),
+            2 => Ok(DerivePdasExecuteStateMachine::SecondStage),
+            _ => Err(CcipOfframpError::InvalidAccountListForPdaDerivation.into()),
+        }
+    }
+}
+
+fn derive_pdas_execute_first_stage(raw_execution_report: Vec<u8>) -> Result<DerivePdasResponse> {
+    let report = ExecutionReportSingleChain::deserialize(&mut raw_execution_report.as_ref())
+        .map_err(|_| CcipOfframpError::FailedToDeserializeReport)?;
+    let selector = report.source_chain_selector.to_le_bytes();
+
+    let find = |seeds, id| Pubkey::find_program_address(seeds, id).0.readonly();
+
+    Ok(DerivePdasResponse {
+        account_metas: vec![
+            // reference_addresses
+            find(&[seed::REFERENCE_ADDRESSES], &crate::ID),
+            // // source_chain
+            find(&[seed::SOURCE_CHAIN, &selector], &crate::ID),
+        ],
+        ask_again: true,
+    })
+}
+
+fn derive_pdas_execute_second_stage<'info>(
+    ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
+    raw_execution_report: Vec<u8>,
+    execute_caller: Pubkey,
+    message_accounts: Vec<CcipAccountMeta>,
+) -> Result<DerivePdasResponse> {
+    let ReferenceAddresses {
+        router, rmn_remote, ..
+    } = *AccountLoader::<'info, ReferenceAddresses>::try_from(&ctx.remaining_accounts[0])?
+        .load()?;
+
+    let source_chain = Account::<'info, SourceChain>::try_from(&ctx.remaining_accounts[1])?;
+
+    let report = ExecutionReportSingleChain::deserialize(&mut raw_execution_report.as_ref())
+        .map_err(|_| CcipOfframpError::FailedToDeserializeReport)?;
+    let find = |seeds, id| Pubkey::find_program_address(seeds, id).0.readonly();
+    let selector = report.source_chain_selector.to_le_bytes();
+
+    let hashed_leaf = hash(
+        &report.message,
+        message_accounts.iter().map(|a| a.pubkey),
+        &source_chain.config.on_ramp,
+    );
+    let merkle_root = calculate_merkle_root(hashed_leaf, &report.proofs)
+        .map_err(|_| CcipOfframpError::UnexpectedMerkleRoot)?;
+
+    let mut account_metas = vec![
+        find(&[seed::CONFIG], &crate::ID).readonly(),
+        find(&[seed::REFERENCE_ADDRESSES], &crate::ID),
+        find(&[seed::SOURCE_CHAIN, &selector], &crate::ID),
+        find(&[seed::COMMIT_REPORT, &selector, &merkle_root], &crate::ID).writable(),
+        crate::ID.readonly(),
+        find(
+            &[seed::ALLOWED_OFFRAMP, &selector, crate::ID.as_ref()],
+            &router,
+        ),
+        execute_caller.writable().signer(),
+        solana_program::system_program::ID.readonly(),
+        instructions::ID.readonly(),
+        rmn_remote.readonly(),
+        find(&[seed::CURSES], &rmn_remote),
+        find(&[seed::CONFIG], &rmn_remote),
+    ];
+
+    if !message_accounts.is_empty() {
+        let find = |seeds, id| Pubkey::find_program_address(seeds, id).0.readonly();
+        account_metas.push(message_accounts[0].clone());
+        account_metas.push(find(
+            &[
+                seed::EXTERNAL_EXECUTION_CONFIG,
+                message_accounts[0].pubkey.as_ref(),
+            ],
+            &crate::ID,
+        ));
+        account_metas.extend_from_slice(&message_accounts[1..]);
+    }
+    // TODO token accounts ()
+    Ok(DerivePdasResponse {
+        account_metas,
+        ask_again: false,
+    })
 }
 
 // internal_execute is the base execution logic without any additional validation

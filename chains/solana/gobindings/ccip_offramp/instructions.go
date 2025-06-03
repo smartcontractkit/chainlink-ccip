@@ -275,6 +275,8 @@ var (
 	// and return funds to the caller whenever buffered execution succeeds.
 	Instruction_CloseExecutionReportBuffer = ag_binary.TypeID([8]byte{0, 16, 4, 246, 238, 95, 223, 31})
 
+	Instruction_DerivePdasExecute = ag_binary.TypeID([8]byte{180, 16, 226, 16, 254, 73, 90, 176})
+
 	Instruction_CloseCommitReportAccount = ag_binary.TypeID([8]byte{109, 145, 129, 64, 226, 172, 61, 106})
 )
 
@@ -319,6 +321,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "BufferExecutionReport"
 	case Instruction_CloseExecutionReportBuffer:
 		return "CloseExecutionReportBuffer"
+	case Instruction_DerivePdasExecute:
+		return "DerivePdasExecute"
 	case Instruction_CloseCommitReportAccount:
 		return "CloseCommitReportAccount"
 	default:
@@ -397,6 +401,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"close_execution_report_buffer", (*CloseExecutionReportBuffer)(nil),
+		},
+		{
+			"derive_pdas_execute", (*DerivePdasExecute)(nil),
 		},
 		{
 			"close_commit_report_account", (*CloseCommitReportAccount)(nil),
