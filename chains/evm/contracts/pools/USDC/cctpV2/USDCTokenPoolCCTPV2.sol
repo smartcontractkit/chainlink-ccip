@@ -204,6 +204,8 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
       revert InvalidExecutionFinalityThreshold(FINALITY_THRESHOLD, finalityThresholdExecuted);
     }
 
-    // TODO: Add check for valid version of sourcePool.cctpVersion is VERSION_2
+    if (sourcePoolTokenData.cctpVersion != CCTPVersion.VERSION_2) {
+      revert USDCTokenPool.InvalidCCTPVersion(sourcePoolTokenData.sourceDomain, sourcePoolTokenData.cctpVersion);
+    }
   }
 }

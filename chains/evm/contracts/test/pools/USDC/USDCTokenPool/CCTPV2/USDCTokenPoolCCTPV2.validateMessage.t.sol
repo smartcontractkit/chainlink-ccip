@@ -105,5 +105,17 @@ contract USDCTokenPoolCCTPV2__validateMessage is USDCTokenPoolCCTPV2Setup {
 
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolCCTPV2.InvalidExecutionFinalityThreshold.selector, 2000, 1000));
     s_usdcTokenPool.validateMessage(encodedUsdcMessage, sourceTokenDataPayload);
+    usdcMessage.finalityThresholdExecuted = 2000; // change the threshold back to 2k to trigger the other short-circuit
+
+    // Change the cctp version to 0 to trigger the revert
+    sourceTokenDataPayload.cctpVersion = USDCTokenPool.CCTPVersion.UNKNOWN_VERSION;
+    encodedUsdcMessage = _generateUSDCMessageCCTPV2(usdcMessage);
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        USDCTokenPool.InvalidCCTPVersion.selector, usdcMessage.sourceDomain, USDCTokenPool.CCTPVersion.UNKNOWN_VERSION
+      )
+    );
+    s_usdcTokenPool.validateMessage(encodedUsdcMessage, sourceTokenDataPayload);
   }
 }

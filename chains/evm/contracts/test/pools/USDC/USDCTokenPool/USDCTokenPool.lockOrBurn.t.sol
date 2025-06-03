@@ -225,4 +225,22 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
       })
     );
   }
+
+  function test_RevertWhen_InvalidReceiver() public {
+    vm.startPrank(s_routerAllowedOnRamp);
+
+    bytes memory invalidReceiver = abi.encodePacked(keccak256("invalidReceiver"), "A");
+
+    vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidReceiver.selector, invalidReceiver));
+
+    s_usdcTokenPool.lockOrBurn(
+      Pool.LockOrBurnInV1({
+        originalSender: OWNER,
+        receiver: invalidReceiver,
+        amount: 0,
+        remoteChainSelector: DEST_CHAIN_SELECTOR,
+        localToken: address(s_token)
+      })
+    );
+  }
 }

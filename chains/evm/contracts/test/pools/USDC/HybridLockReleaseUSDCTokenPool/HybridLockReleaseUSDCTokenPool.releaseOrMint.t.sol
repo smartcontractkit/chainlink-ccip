@@ -500,6 +500,77 @@ contract HybridLockReleaseUSDCTokenPool_releaseOrMint is HybridLockReleaseUSDCTo
       })
     );
   }
+
+  function test_RevertWhen_InvalidCCTPVersion() public {
+    vm.startPrank(s_routerAllowedOffRamp);
+    s_mockUSDCTransmitter.setShouldSucceed(false);
+
+    uint256 amount = 13255235235;
+
+    // Format a USDC Message to sent to the transmitter
+    USDCMessageCCTPV2 memory usdcMessage = USDCMessageCCTPV2({
+      version: 1,
+      sourceDomain: SOURCE_DOMAIN_IDENTIFIER,
+      destinationDomain: DEST_DOMAIN_IDENTIFIER,
+      nonce: keccak256("0xCLL"),
+      sender: SOURCE_CHAIN_TOKEN_SENDER,
+      recipient: bytes32(uint256(uint160(address(s_mockUSDCV2)))),
+      destinationCaller: bytes32(uint256(uint160(address(s_usdcTokenPool)))),
+      minFinalityThreshold: s_usdcTokenPool.FINALITY_THRESHOLD(),
+      finalityThresholdExecuted: s_usdcTokenPool.FINALITY_THRESHOLD(),
+      messageBody: abi.encodePacked(
+        uint32(0), // version
+        bytes32(uint256(uint160(address(OWNER)))), // burnToken
+        bytes32(uint256(uint160(OWNER))), // mintRecipient
+        amount, // amount
+        bytes32(uint256(uint160(OWNER))), // messageSender
+        uint32(0), // maxFee
+        uint32(0), // feeExecuted
+        block.number + (1 days / 12), // expirationBlock 1-day in the future assuming a 12-second block time.
+        "" // hookData
+      )
+    });
+
+    // Create some source token data
+    Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
+      sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
+      destTokenAddress: abi.encode(address(s_usdcTokenPool)),
+      extraData: abi.encode(
+        USDCTokenPool.SourceTokenDataPayload({
+          nonce: 1,
+          sourceDomain: SOURCE_DOMAIN_IDENTIFIER,
+          cctpVersion: USDCTokenPool.CCTPVersion.UNKNOWN_VERSION
+        })
+      ),
+      destGasAmount: USDC_DEST_TOKEN_GAS
+    });
+
+    // Change the message version to be incorrect and encode
+    usdcMessage.version = 2;
+    bytes memory offchainTokenData = abi.encode(
+      USDCTokenPool.MessageAndAttestation({message: _generateUSDCMessageCCTPV2(usdcMessage), attestation: bytes("")})
+    );
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        USDCTokenPool.InvalidCCTPVersion.selector, SOURCE_DOMAIN_IDENTIFIER, USDCTokenPool.CCTPVersion.UNKNOWN_VERSION
+      )
+    );
+
+    // attempts releaseOrMint and revert
+    s_usdcTokenPool.releaseOrMint(
+      Pool.ReleaseOrMintInV1({
+        originalSender: abi.encode(OWNER),
+        receiver: OWNER,
+        amount: amount,
+        localToken: address(s_token),
+        remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+        sourcePoolAddress: sourceTokenData.sourcePoolAddress,
+        sourcePoolData: sourceTokenData.extraData,
+        offchainTokenData: offchainTokenData
+      })
+    );
+  }
 }
 
 contract HybridLockReleaseUSDCTokenPool_releaseOrMint_E2ETest is

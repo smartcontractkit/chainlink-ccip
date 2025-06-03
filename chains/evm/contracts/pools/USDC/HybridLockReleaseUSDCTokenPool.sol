@@ -213,7 +213,9 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
         // Otherwise use the V2 functionality defined explicitly below
       } else if (sourceTokenData.cctpVersion == CCTPVersion.VERSION_2) {
         return _releaseOrMintCCTPV2(releaseOrMintIn);
-      } else if (sourceTokenData.cctpVersion == CCTPVersion.UNKNOWN_VERSION) {}
+      } else if (sourceTokenData.cctpVersion == CCTPVersion.UNKNOWN_VERSION) {
+        revert USDCTokenPool.InvalidCCTPVersion(sourceTokenData.sourceDomain, sourceTokenData.cctpVersion);
+      }
     }
     return _lockReleaseIncomingMessage(releaseOrMintIn);
   }

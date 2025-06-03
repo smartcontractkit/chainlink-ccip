@@ -105,5 +105,17 @@ contract USDCTokenPool__validateMessage is USDCTokenPoolSetup {
 
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidMessageVersion.selector, wrongVersion));
     s_usdcTokenPool.validateMessage(encodedUsdcMessage, sourceTokenData);
+    usdcMessage.version = usdcMessage.version - 1; // change the version back to trigger the other short-circuit
+
+    // Change the cctp version to 0 to trigger the revert
+    sourceTokenData.cctpVersion = USDCTokenPool.CCTPVersion.UNKNOWN_VERSION;
+    encodedUsdcMessage = _generateUSDCMessage(usdcMessage);
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        USDCTokenPool.InvalidCCTPVersion.selector, usdcMessage.sourceDomain, USDCTokenPool.CCTPVersion.UNKNOWN_VERSION
+      )
+    );
+    s_usdcTokenPool.validateMessage(encodedUsdcMessage, sourceTokenData);
   }
 }

@@ -37,6 +37,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   error InvalidDestinationDomain(uint32 expected, uint32 got);
   error InvalidReceiver(bytes receiver);
   error InvalidTransmitterInProxy();
+  error InvalidCCTPVersion(uint64 remoteChainSelector, CCTPVersion version);
 
   // This data is supplied from offchain and contains everything needed
   // to receive the USDC tokens.
@@ -248,7 +249,9 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     }
     if (nonce != sourceTokenData.nonce) revert InvalidNonce(sourceTokenData.nonce, nonce);
 
-    // TODO: Check that sourceTokenData.cctpVersion matches VERSION_1
+    if (sourceTokenData.cctpVersion != CCTPVersion.VERSION_1) {
+      revert InvalidCCTPVersion(sourceTokenData.sourceDomain, sourceTokenData.cctpVersion);
+    }
   }
 
   // ================================================================
