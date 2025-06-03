@@ -24,6 +24,7 @@ contract USDCCCTPV2Setup is BaseTest {
     bytes messageBody;
   }
 
+  // solhint-disable-next-line gas-struct-packing
   struct USDCMessageCCTPV2 {
     uint32 version;
     uint32 sourceDomain;

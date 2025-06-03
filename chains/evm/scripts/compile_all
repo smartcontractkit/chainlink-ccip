@@ -90,6 +90,8 @@ compileContract pools/BurnWithFromMintTokenPool
 compileContract pools/BurnToAddressMintTokenPool
 compileContract pools/TokenPool
 compileContract pools/USDC/USDCTokenPool
+compileContract pools/USDC/CCTPV2/USDCTokenPoolCCTPV2
+compileContract pools/USDC/HybridLockReleaseUSDCTokenPool
 compileContract pools/SiloedLockReleaseTokenPool
 
 # Test helpers
