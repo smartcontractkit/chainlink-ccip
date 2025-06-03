@@ -126,19 +126,10 @@ func (p *Plugin) Observation(
 }
 
 func (p *Plugin) getCurseInfo(ctx context.Context, lggr logger.Logger) (reader.CurseInfo, error) {
-	allSourceChains, err := p.chainSupport.KnownSourceChainsSlice()
-	if err != nil {
-		lggr.Warnw("call to KnownSourceChainsSlice failed", "err", err)
-		return reader.CurseInfo{}, fmt.Errorf("call to KnownSourceChainsSlice failed: %w", err)
-	}
-
 	curseInfo, err := p.ccipReader.GetRmnCurseInfo(ctx)
 	if err != nil {
-		lggr.Errorw("nothing to observe: rmn read error",
-			"err", err,
-			"sourceChains", allSourceChains,
-		)
-		return reader.CurseInfo{}, fmt.Errorf("nothing to observe: rmn read error: %w", err)
+		lggr.Errorw("get rmn curse info: rmn read error", "err", err)
+		return reader.CurseInfo{}, fmt.Errorf("get rmn curse info: rmn read error: %w", err)
 	}
 
 	return curseInfo, nil
@@ -187,6 +178,7 @@ func (p *Plugin) getCommitReportsObservation(
 
 	// No observation for non-dest readers.
 	if !supportsDest {
+		lggr.Infow("destination chain not supported, skipping commit reports observation")
 		return observation, nil
 	}
 
@@ -354,12 +346,22 @@ func (p *Plugin) getMessagesObservation(
 		return exectypes.LessThan(commitData[i], commitData[j])
 	})
 
+	supportedChains, err := p.supportedChains(p.reportingCfg.OracleID)
+	if err != nil {
+		return exectypes.Observation{}, fmt.Errorf("get supported chains: %w", err)
+	}
+
 	stop := false
 
 	totalMsgs := 0
 	encodedObsSize := 0
 	for _, report := range commitData {
 		srcChain := report.SourceChain
+
+		if !supportedChains.Contains(srcChain) {
+			lggr.Infow("skipping report of unsupported source chain", "srcChain", srcChain)
+			continue
+		}
 
 		// Read messages for this report's sequence number range
 		msgs, err := p.readMessagesForReport(ctx, lggr, srcChain, report)
@@ -465,6 +467,7 @@ func (p *Plugin) getFilterObservation(
 	}
 	// No observation for non-dest readers.
 	if !supportsDest {
+		lggr.Infow("destination chain not supported, skipping filter observation")
 		return observation, nil
 	}
 

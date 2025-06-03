@@ -1427,9 +1427,19 @@ func TestPlugin_ShouldAcceptAttestedReport_DoesNotDecode(t *testing.T) {
 	codec.On("Decode", mock.Anything, mock.Anything).
 		Return(cciptypes.ExecutePluginReport{}, fmt.Errorf("test error"))
 
+	cs := plugincommon_mock.NewMockChainSupport(t)
+	cs.EXPECT().SupportsDestChain(1).Return(true, nil).Maybe()
+
+	homeChain := reader_mock.NewMockHomeChain(t)
+	homeChain.EXPECT().GetSupportedChainsForPeer(libocrtypes.PeerID{1}).
+		Return(mapset.NewSet[cciptypes.ChainSelector](0), nil).Maybe()
+
 	p := &Plugin{
-		reportCodec: codec,
-		lggr:        logger.Test(t),
+		reportCodec:     codec,
+		lggr:            logger.Test(t),
+		chainSupport:    cs,
+		oracleIDToP2pID: map[commontypes.OracleID]libocrtypes.PeerID{0: {1}},
+		homeChain:       homeChain,
 	}
 
 	_, err := p.ShouldAcceptAttestedReport(tests.Context(t), 0, ocr3types.ReportWithInfo[[]byte]{
@@ -1444,9 +1454,19 @@ func TestPlugin_ShouldAcceptAttestedReport_NoReports(t *testing.T) {
 	codec.EXPECT().Decode(mock.Anything, mock.Anything).
 		Return(cciptypes.ExecutePluginReport{}, nil)
 
+	cs := plugincommon_mock.NewMockChainSupport(t)
+	cs.EXPECT().SupportsDestChain(1).Return(true, nil).Maybe()
+
+	homeChain := reader_mock.NewMockHomeChain(t)
+	homeChain.EXPECT().GetSupportedChainsForPeer(libocrtypes.PeerID{1}).
+		Return(mapset.NewSet[cciptypes.ChainSelector](0), nil).Maybe()
+
 	p := &Plugin{
-		lggr:        logger.Test(t),
-		reportCodec: codec,
+		lggr:            logger.Test(t),
+		reportCodec:     codec,
+		chainSupport:    cs,
+		oracleIDToP2pID: map[commontypes.OracleID]libocrtypes.PeerID{0: {1}},
+		homeChain:       homeChain,
 	}
 	result, err := p.ShouldAcceptAttestedReport(tests.Context(t), 0, ocr3types.ReportWithInfo[[]byte]{
 		Report: []byte("empty report"), // faked out, see mock above
@@ -1673,20 +1693,26 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			codec, homeChain, ccipReader := tc.getDeps()
 			lggr, obs := logger.TestObserved(t, zapcore.DebugLevel)
+
+			cs := plugincommon.NewChainSupport(
+				logger.Test(t),
+				homeChain,
+				map[commontypes.OracleID]libocrtypes.PeerID{
+					1: [32]byte{1},
+				},
+				1,
+				cciptypes.ChainSelector(destChain),
+			)
+			homeChain.EXPECT().GetSupportedChainsForPeer(libocrtypes.PeerID{1}).
+				Return(mapset.NewSet[cciptypes.ChainSelector](0), nil).Maybe()
+
 			p := &Plugin{
-				lggr:        lggr,
-				reportCodec: codec,
-				homeChain:   homeChain,
-				ccipReader:  ccipReader,
-				chainSupport: plugincommon.NewChainSupport(
-					logger.Test(t),
-					homeChain,
-					map[commontypes.OracleID]libocrtypes.PeerID{
-						1: [32]byte{1},
-					},
-					1,
-					cciptypes.ChainSelector(destChain),
-				),
+				lggr:            lggr,
+				reportCodec:     codec,
+				homeChain:       homeChain,
+				ccipReader:      ccipReader,
+				chainSupport:    cs,
+				oracleIDToP2pID: map[commontypes.OracleID]libocrtypes.PeerID{1: {1}},
 				reportingCfg: ocr3types.ReportingPluginConfig{
 					OracleID:     1,
 					ConfigDigest: configDigest,

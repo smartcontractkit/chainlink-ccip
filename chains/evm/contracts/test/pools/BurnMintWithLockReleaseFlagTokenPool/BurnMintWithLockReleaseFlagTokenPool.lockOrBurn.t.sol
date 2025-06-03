@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {Pool} from "../../../libraries/Pool.sol";
-import {RateLimiter} from "../../../libraries/RateLimiter.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {BurnMintWithLockReleaseFlagTokenPoolSetup} from "./BurnMintWithLockReleaseFlagTokenPoolSetup.t.sol";
 
@@ -21,13 +20,22 @@ contract BurnMintWithLockReleaseFlagTokenPool_lockOrBurn is BurnMintWithLockRele
     vm.startPrank(s_burnMintOnRamp);
 
     vm.expectEmit();
-    emit RateLimiter.TokensConsumed(burnAmount);
+    emit TokenPool.OutboundRateLimitConsumed({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      token: address(s_burnMintERC20),
+      amount: burnAmount
+    });
 
     vm.expectEmit();
     emit IERC20.Transfer(address(s_pool), address(0), burnAmount);
 
     vm.expectEmit();
-    emit TokenPool.Burned(address(s_burnMintOnRamp), burnAmount);
+    emit TokenPool.LockedOrBurned({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      token: address(s_burnMintERC20),
+      sender: address(s_burnMintOnRamp),
+      amount: burnAmount
+    });
 
     bytes4 expectedSignature = bytes4(keccak256("burn(uint256)"));
     vm.expectCall(address(s_burnMintERC20), abi.encodeWithSelector(expectedSignature, burnAmount));

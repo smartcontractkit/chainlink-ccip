@@ -284,8 +284,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
       LOCAL_TOKEN_DECIMALS,
       new TokenPoolFactory.RemoteTokenPoolInfo[](0),
       s_poolInitCode,
-      FAKE_SALT,
-      TokenPoolFactory.PoolType.BURN_MINT
+      FAKE_SALT
     );
 
     assertEq(
@@ -394,12 +393,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
     // Since the remote chain information was provided, we should be able to get the information from the newly
     // deployed token pool using the available getter functions
     address poolAddress = s_tokenPoolFactory.deployTokenPoolWithExistingToken(
-      address(newLocalToken),
-      LOCAL_TOKEN_DECIMALS,
-      remoteTokenPools,
-      type(LockReleaseTokenPool).creationCode,
-      FAKE_SALT,
-      TokenPoolFactory.PoolType.LOCK_RELEASE
+      address(newLocalToken), LOCAL_TOKEN_DECIMALS, remoteTokenPools, type(LockReleaseTokenPool).creationCode, FAKE_SALT
     );
 
     // Check that the pool was correctly deployed on the local chain first
@@ -423,8 +417,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
       LOCAL_TOKEN_DECIMALS,
       new TokenPoolFactory.RemoteTokenPoolInfo[](0), // No existing remote pools
       type(LockReleaseTokenPool).creationCode, // Pool Init Code
-      FAKE_SALT, // Salt
-      TokenPoolFactory.PoolType.LOCK_RELEASE
+      FAKE_SALT // Salt
     );
 
     assertEq(
@@ -577,8 +570,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
       REMOTE_TOKEN_DECIMALS,
       new TokenPoolFactory.RemoteTokenPoolInfo[](0),
       s_poolInitCode,
-      FAKE_SALT,
-      TokenPoolFactory.PoolType.BURN_MINT
+      FAKE_SALT
     );
 
     assertEq(

@@ -74,6 +74,7 @@ type CommitReportCacheConfig struct {
 }
 
 // NewCommitReportCache creates a new CommitReportCache.
+// Should only be used for oracles supporting the remote/destination chain.
 func NewCommitReportCache(
 	lggr logger.Logger,
 	cfg CommitReportCacheConfig,

@@ -15,7 +15,7 @@
  */
 pragma solidity ^0.8.24;
 
-import {ITokenMessenger} from "../../pools/USDC/ITokenMessenger.sol";
+import {ITokenMessenger} from "../../pools/USDC/interfaces/ITokenMessenger.sol";
 import {IMessageTransmitterWithRelay} from "./interfaces/IMessageTransmitterWithRelay.sol";
 import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
 
