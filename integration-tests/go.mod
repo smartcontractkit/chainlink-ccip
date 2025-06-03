@@ -13,9 +13,9 @@ require (
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250520123946-6aaf88e0848a
 	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250528133621-89eb1ce3d76f
 	github.com/smartcontractkit/chainlink-deployments-framework v0.8.2
-	github.com/smartcontractkit/chainlink/deployment v0.0.0
+	github.com/smartcontractkit/chainlink/deployment v0.0.0-20250603150000-fbacccbe636a
 	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20250603150000-fbacccbe636a
-	github.com/smartcontractkit/chainlink/v2 v2.22.1-por-beta.5.0.20250430150202-611699e34308
+	github.com/smartcontractkit/chainlink/v2 v2.23.2-por-beta.1.0.20250603150000-fbacccbe636a
 	github.com/stretchr/testify v1.10.0
 	golang.org/x/exp v0.0.0-20250408133849-7e4ce0ab07d0
 )
@@ -357,7 +357,7 @@ require (
 	github.com/smartcontractkit/chainlink-aptos v0.0.0-20250502091650-484cfa7ccddf // indirect
 	github.com/smartcontractkit/chainlink-automation v0.8.1 // indirect
 	github.com/smartcontractkit/chainlink-data-streams v0.1.1-0.20250417193446-eeb0a7d1e049 // indirect
-	github.com/smartcontractkit/chainlink-evm v0.0.0-20250602121001-1a3c233e4019 // indirect
+	github.com/smartcontractkit/chainlink-evm v0.0.0-20250603153953-a9404b79d62f // indirect
 	github.com/smartcontractkit/chainlink-feeds v0.1.2-0.20250227211209-7cd000095135 // indirect
 	github.com/smartcontractkit/chainlink-framework/chains v0.0.0-20250522110034-65c54665034a // indirect
 	github.com/smartcontractkit/chainlink-framework/metrics v0.0.0-20250522110034-65c54665034a // indirect
@@ -494,10 +494,6 @@ require (
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
 
-replace github.com/smartcontractkit/chainlink/v2 => ../../chainlink
-
 replace github.com/smartcontractkit/chainlink-ccip => ..
-
-replace github.com/smartcontractkit/chainlink/deployment => ../../chainlink/deployment
 
 replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk v0.0.5-0.20250528121202-292529af39df
