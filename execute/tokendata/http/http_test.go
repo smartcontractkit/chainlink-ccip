@@ -50,7 +50,7 @@ func Test_NewHTTPClient_New(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(tc.api, func(t *testing.T) {
-			client, err := newHTTPClient(logger.Test(t), tc.api, 1*time.Millisecond, longTimeout, 0)
+			client, err := newHTTPClient(logger.Nop(), tc.api, 1*time.Millisecond, longTimeout, 0)
 			if tc.wantErr {
 				require.Error(t, err)
 			} else {
@@ -162,7 +162,7 @@ func Test_HTTPClient_Get_Post(t *testing.T) {
 				attestationURI, err := url.ParseRequestURI(ts.URL)
 				require.NoError(t, err)
 
-				client, err := newHTTPClient(logger.Test(t), attestationURI.String(), tc.interval, tc.timeout, 0)
+				client, err := newHTTPClient(logger.Nop(), attestationURI.String(), tc.interval, tc.timeout, 0)
 				require.NoError(t, err)
 
 				var response cciptypes.Bytes
@@ -204,7 +204,7 @@ func Test_HTTPClient_Cooldown(t *testing.T) {
 	attestationURI, err := url.ParseRequestURI(ts.URL)
 	require.NoError(t, err)
 
-	client, err := newHTTPClient(logger.Test(t), attestationURI.String(), time.Millisecond, longTimeout, time.Minute)
+	client, err := newHTTPClient(logger.Nop(), attestationURI.String(), time.Millisecond, longTimeout, time.Minute)
 	require.NoError(t, err)
 	_, _, err = client.Get(tests.Context(t), cciptypes.Bytes32{1, 2, 3}.String())
 	require.EqualError(t, err, tokendata.ErrUnknownResponse.Error())
@@ -224,13 +224,13 @@ func Test_HTTPClient_GetInstance(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	client1, err := GetHTTPClient(logger.Test(t), ts.URL, 1*time.Hour, longTimeout, 0)
+	client1, err := GetHTTPClient(logger.Nop(), ts.URL, 1*time.Hour, longTimeout, 0)
 	require.NoError(t, err)
 
-	client2, err := GetHTTPClient(logger.Test(t), ts.URL, 1*time.Hour, longTimeout, 0)
+	client2, err := GetHTTPClient(logger.Nop(), ts.URL, 1*time.Hour, longTimeout, 0)
 	require.NoError(t, err)
 
-	client3, err := newHTTPClient(logger.Test(t), ts.URL, 1*time.Hour, longTimeout, 0)
+	client3, err := newHTTPClient(logger.Nop(), ts.URL, 1*time.Hour, longTimeout, 0)
 	require.NoError(t, err)
 
 	assert.True(t, client1 == client2)
@@ -267,7 +267,7 @@ func Test_HTTPClient_CoolDownWithRetryHeader(t *testing.T) {
 	attestationURI, err := url.ParseRequestURI(ts.URL)
 	require.NoError(t, err)
 
-	client, err := newHTTPClient(logger.Test(t), attestationURI.String(), 1*time.Millisecond, time.Hour, 0)
+	client, err := newHTTPClient(logger.Nop(), attestationURI.String(), 1*time.Millisecond, time.Hour, 0)
 	require.NoError(t, err)
 	_, _, err = client.Get(tests.Context(t), cciptypes.Bytes32{1, 2, 3}.String())
 	require.EqualError(t, err, tokendata.ErrUnknownResponse.Error())
