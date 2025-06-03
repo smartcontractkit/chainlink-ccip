@@ -20,6 +20,7 @@ use crate::event::admin::{ConfigSet, ReferenceAddressesSet};
 
 #[program]
 pub mod ccip_offramp {
+
     use super::*;
 
     //////////////////////////
@@ -596,6 +597,29 @@ pub mod ccip_offramp {
         Ok(())
     }
 
+    pub fn derive_pdas_execute<'info>(
+        ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
+        raw_execution_report: Vec<u8>,
+        token_indexes: Vec<u8>,
+        execute_caller: Pubkey,
+        message_accounts: Vec<CcipAccountMeta>,
+    ) -> Result<DerivePdasResponse> {
+        let default_code_version: CodeVersion = ctx
+            .accounts
+            .config
+            .load()?
+            .default_code_version
+            .try_into()?;
+
+        router::execute(default_code_version, default_code_version).derive_pdas_execute(
+            ctx,
+            raw_execution_report,
+            token_indexes,
+            execute_caller,
+            message_accounts,
+        )
+    }
+
     pub fn close_commit_report_account(
         ctx: Context<CloseCommitReportAccount>,
         source_chain_selector: u64,
@@ -755,4 +779,6 @@ pub enum CcipOfframpError {
     ExecutionReportBufferIncomplete,
     #[msg("Execution report wasn't provided either directly or via buffer")]
     ExecutionReportUnavailable,
+    #[msg("Invalid account list for PDA derivation")]
+    InvalidAccountListForPdaDerivation,
 }
