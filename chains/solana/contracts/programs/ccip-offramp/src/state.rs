@@ -33,6 +33,89 @@ pub struct ReferenceAddresses {
     pub rmn_remote: Pubkey,
 }
 
+#[derive(Debug, Default, PartialEq, Eq, Clone, AnchorDeserialize, AnchorSerialize)]
+pub struct DerivePdasResponse {
+    pub ask_again: bool,
+    pub account_metas: Vec<CcipAccountMeta>,
+}
+
+// We can't use anchor's `AccountMeta` since it doesn't implement
+// AnchorSerialize/AnchorDeserialize, and it's too small to warrant wrapping.
+#[derive(Debug, Default, PartialEq, Eq, Clone, AnchorDeserialize, AnchorSerialize)]
+pub struct CcipAccountMeta {
+    pub pubkey: Pubkey,
+    pub is_signer: bool,
+    pub is_writable: bool,
+}
+
+pub trait ToMeta {
+    fn readonly(self) -> CcipAccountMeta;
+    fn writable(self) -> CcipAccountMeta;
+    fn signer(self) -> CcipAccountMeta;
+}
+
+impl From<AccountMeta> for CcipAccountMeta {
+    fn from(meta: AccountMeta) -> Self {
+        Self {
+            pubkey: meta.pubkey,
+            is_signer: meta.is_signer,
+            is_writable: meta.is_writable,
+        }
+    }
+}
+
+impl ToMeta for Pubkey {
+    fn readonly(self) -> CcipAccountMeta {
+        CcipAccountMeta {
+            pubkey: self,
+            is_signer: false,
+            is_writable: false,
+        }
+    }
+
+    fn writable(self) -> CcipAccountMeta {
+        CcipAccountMeta {
+            pubkey: self,
+            is_signer: false,
+            is_writable: true,
+        }
+    }
+
+    fn signer(self) -> CcipAccountMeta {
+        CcipAccountMeta {
+            pubkey: self,
+            is_signer: true,
+            is_writable: true,
+        }
+    }
+}
+
+impl ToMeta for CcipAccountMeta {
+    fn readonly(self) -> CcipAccountMeta {
+        CcipAccountMeta {
+            pubkey: self.pubkey,
+            is_signer: self.is_signer,
+            is_writable: false,
+        }
+    }
+
+    fn writable(self) -> CcipAccountMeta {
+        CcipAccountMeta {
+            pubkey: self.pubkey,
+            is_signer: self.is_signer,
+            is_writable: true,
+        }
+    }
+
+    fn signer(self) -> CcipAccountMeta {
+        CcipAccountMeta {
+            pubkey: self.pubkey,
+            is_signer: true,
+            is_writable: self.is_writable,
+        }
+    }
+}
+
 #[zero_copy]
 #[derive(AnchorSerialize, AnchorDeserialize, InitSpace, Default)]
 pub struct Ocr3ConfigInfo {

@@ -611,6 +611,83 @@ func (obj *CrossChainAmount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (e
 	return nil
 }
 
+type DerivePdasResponse struct {
+	AskAgain     bool
+	AccountMetas []CcipAccountMeta
+}
+
+func (obj DerivePdasResponse) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `AskAgain` param:
+	err = encoder.Encode(obj.AskAgain)
+	if err != nil {
+		return err
+	}
+	// Serialize `AccountMetas` param:
+	err = encoder.Encode(obj.AccountMetas)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *DerivePdasResponse) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `AskAgain`:
+	err = decoder.Decode(&obj.AskAgain)
+	if err != nil {
+		return err
+	}
+	// Deserialize `AccountMetas`:
+	err = decoder.Decode(&obj.AccountMetas)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type CcipAccountMeta struct {
+	Pubkey     ag_solanago.PublicKey
+	IsSigner   bool
+	IsWritable bool
+}
+
+func (obj CcipAccountMeta) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Pubkey` param:
+	err = encoder.Encode(obj.Pubkey)
+	if err != nil {
+		return err
+	}
+	// Serialize `IsSigner` param:
+	err = encoder.Encode(obj.IsSigner)
+	if err != nil {
+		return err
+	}
+	// Serialize `IsWritable` param:
+	err = encoder.Encode(obj.IsWritable)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *CcipAccountMeta) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Pubkey`:
+	err = decoder.Decode(&obj.Pubkey)
+	if err != nil {
+		return err
+	}
+	// Deserialize `IsSigner`:
+	err = decoder.Decode(&obj.IsSigner)
+	if err != nil {
+		return err
+	}
+	// Deserialize `IsWritable`:
+	err = decoder.Decode(&obj.IsWritable)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 type Ocr3ConfigInfo struct {
 	ConfigDigest                   [32]uint8
 	F                              uint8
