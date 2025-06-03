@@ -22,7 +22,7 @@ contract CCTPMessageTransmitterProxy_receiveMesssage is CCTPMessageTransmitterPr
     changePrank(s_usdcTokenPool);
     assertTrue(s_cctpMessageTransmitterProxy.receiveMessage(message, attestation, USDCTokenPool.CCTPVersion.VERSION_1));
 
-    // Mocking the call to the IMessageTransmitter to return false
+    // Mocking the call to the IMessageTransmitter to return false from invalid Version of CCTP
     vm.mockCall(
       s_cctpMessageTransmitter,
       abi.encodeWithSelector(IMessageTransmitter.receiveMessage.selector, message, attestation),
@@ -30,7 +30,9 @@ contract CCTPMessageTransmitterProxy_receiveMesssage is CCTPMessageTransmitterPr
     );
 
     changePrank(s_usdcTokenPool);
-    assertFalse(s_cctpMessageTransmitterProxy.receiveMessage(message, attestation, USDCTokenPool.CCTPVersion.VERSION_1));
+    assertFalse(
+      s_cctpMessageTransmitterProxy.receiveMessage(message, attestation, USDCTokenPool.CCTPVersion.UNKNOWN_VERSION)
+    );
   }
 
   // Revert cases
