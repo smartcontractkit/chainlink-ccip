@@ -437,7 +437,7 @@ export type CctpTokenPool = {
         },
         {
           "name": "mint",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         },
         {
@@ -474,117 +474,6 @@ export type CctpTokenPool = {
           "name": "receiverTokenAccount",
           "isMut": true,
           "isSigner": false
-        },
-        {
-          "name": "cctpAuthorityPda",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK this is not read by the pool, just forwarded to CCTP"
-          ]
-        },
-        {
-          "name": "cctpMessageTransmitterAccount",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK this is not read by the pool, just forwarded to CCTP"
-          ]
-        },
-        {
-          "name": "cctpUsedNonces",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK this is not read by the pool, just forwarded to CCTP"
-          ]
-        },
-        {
-          "name": "cctpTokenMessengerMinter",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK this is CCTP's TokenMessengerMinter program, which",
-            "is invoked by CCTP's MessageTransmitter as it is the receiver of the CCTP message."
-          ]
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "cctpEventAuthority",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK this is not read by the pool, just forwarded to CCTP"
-          ]
-        },
-        {
-          "name": "cctpMessageTransmitter",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK this is the CCTP Message Transmitter program, which",
-            "is invoked by this program."
-          ]
-        },
-        {
-          "name": "cctpTokenMessengerAccount",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK this is not read by the pool, just forwarded to CCTP"
-          ]
-        },
-        {
-          "name": "cctpTokenMinterAccount",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK this is not read by the pool, just forwarded to CCTP"
-          ]
-        },
-        {
-          "name": "cctpLocalToken",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK this is not read by the pool, just forwarded to CCTP"
-          ]
-        },
-        {
-          "name": "cctpRemoteTokenMessengerKey",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK this is not read by the pool, just forwarded to CCTP"
-          ]
-        },
-        {
-          "name": "cctpTokenPair",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK this is not read by the pool, just forwarded to CCTP"
-          ]
-        },
-        {
-          "name": "cctpCustodyTokenAccount",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK this is not read by the pool, just forwarded to CCTP"
-          ]
-        },
-        {
-          "name": "cctpTokenMessengerEventAuthority",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK this is not read by the pool, just forwarded to CCTP"
-          ]
         }
       ],
       "args": [
@@ -624,7 +513,7 @@ export type CctpTokenPool = {
         },
         {
           "name": "poolSigner",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false,
           "docs": [
             "hold a balance to pay for the rent of initializing the CCTP MessageSentEvent account"
@@ -665,7 +554,7 @@ export type CctpTokenPool = {
         },
         {
           "name": "cctpMessageTransmitterAccount",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false,
           "docs": [
             "CHECK this is not read by the pool, just forwarded to CCTP"
@@ -673,14 +562,6 @@ export type CctpTokenPool = {
         },
         {
           "name": "cctpTokenMessengerAccount",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK this is not read by the pool, just forwarded to CCTP"
-          ]
-        },
-        {
-          "name": "cctpRemoteTokenMessengerKey",
           "isMut": false,
           "isSigner": false,
           "docs": [
@@ -697,19 +578,10 @@ export type CctpTokenPool = {
         },
         {
           "name": "cctpLocalToken",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false,
           "docs": [
             "CHECK this is not read by the pool, just forwarded to CCTP"
-          ]
-        },
-        {
-          "name": "cctpMessageSentEvent",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK this is the account in which CCTP will store the event. It is not a PDA of CCTP,",
-            "but CCTP is the owner for it"
           ]
         },
         {
@@ -742,6 +614,23 @@ export type CctpTokenPool = {
           "docs": [
             "CHECK this is not read by the pool, just forwarded to CCTP"
           ]
+        },
+        {
+          "name": "cctpRemoteTokenMessengerKey",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK this is not read by the pool, just forwarded to CCTP"
+          ]
+        },
+        {
+          "name": "cctpMessageSentEvent",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "CHECK this is the account in which CCTP will store the event. It is not a PDA of CCTP,",
+            "but CCTP will initialize it and become the owner for it."
+          ]
         }
       ],
       "args": [
@@ -757,7 +646,53 @@ export type CctpTokenPool = {
       }
     }
   ],
+  "accounts": [
+    {
+      "name": "state",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "config",
+            "type": {
+              "defined": "BaseConfig"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "chainConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "base",
+            "type": {
+              "defined": "BaseChain"
+            }
+          }
+        ]
+      }
+    }
+  ],
   "types": [
+    {
+      "name": "CctpMessage",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "data",
+            "type": "bytes"
+          }
+        ]
+      }
+    },
     {
       "name": "MessageAndAttestation",
       "type": {
@@ -765,7 +700,9 @@ export type CctpTokenPool = {
         "fields": [
           {
             "name": "message",
-            "type": "bytes"
+            "type": {
+              "defined": "CctpMessage"
+            }
           },
           {
             "name": "attestation",
@@ -1267,7 +1204,7 @@ export const IDL: CctpTokenPool = {
         },
         {
           "name": "mint",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         },
         {
@@ -1304,117 +1241,6 @@ export const IDL: CctpTokenPool = {
           "name": "receiverTokenAccount",
           "isMut": true,
           "isSigner": false
-        },
-        {
-          "name": "cctpAuthorityPda",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK this is not read by the pool, just forwarded to CCTP"
-          ]
-        },
-        {
-          "name": "cctpMessageTransmitterAccount",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK this is not read by the pool, just forwarded to CCTP"
-          ]
-        },
-        {
-          "name": "cctpUsedNonces",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK this is not read by the pool, just forwarded to CCTP"
-          ]
-        },
-        {
-          "name": "cctpTokenMessengerMinter",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK this is CCTP's TokenMessengerMinter program, which",
-            "is invoked by CCTP's MessageTransmitter as it is the receiver of the CCTP message."
-          ]
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "cctpEventAuthority",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK this is not read by the pool, just forwarded to CCTP"
-          ]
-        },
-        {
-          "name": "cctpMessageTransmitter",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK this is the CCTP Message Transmitter program, which",
-            "is invoked by this program."
-          ]
-        },
-        {
-          "name": "cctpTokenMessengerAccount",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK this is not read by the pool, just forwarded to CCTP"
-          ]
-        },
-        {
-          "name": "cctpTokenMinterAccount",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK this is not read by the pool, just forwarded to CCTP"
-          ]
-        },
-        {
-          "name": "cctpLocalToken",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK this is not read by the pool, just forwarded to CCTP"
-          ]
-        },
-        {
-          "name": "cctpRemoteTokenMessengerKey",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK this is not read by the pool, just forwarded to CCTP"
-          ]
-        },
-        {
-          "name": "cctpTokenPair",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK this is not read by the pool, just forwarded to CCTP"
-          ]
-        },
-        {
-          "name": "cctpCustodyTokenAccount",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK this is not read by the pool, just forwarded to CCTP"
-          ]
-        },
-        {
-          "name": "cctpTokenMessengerEventAuthority",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK this is not read by the pool, just forwarded to CCTP"
-          ]
         }
       ],
       "args": [
@@ -1454,7 +1280,7 @@ export const IDL: CctpTokenPool = {
         },
         {
           "name": "poolSigner",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false,
           "docs": [
             "hold a balance to pay for the rent of initializing the CCTP MessageSentEvent account"
@@ -1495,7 +1321,7 @@ export const IDL: CctpTokenPool = {
         },
         {
           "name": "cctpMessageTransmitterAccount",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false,
           "docs": [
             "CHECK this is not read by the pool, just forwarded to CCTP"
@@ -1503,14 +1329,6 @@ export const IDL: CctpTokenPool = {
         },
         {
           "name": "cctpTokenMessengerAccount",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK this is not read by the pool, just forwarded to CCTP"
-          ]
-        },
-        {
-          "name": "cctpRemoteTokenMessengerKey",
           "isMut": false,
           "isSigner": false,
           "docs": [
@@ -1527,19 +1345,10 @@ export const IDL: CctpTokenPool = {
         },
         {
           "name": "cctpLocalToken",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false,
           "docs": [
             "CHECK this is not read by the pool, just forwarded to CCTP"
-          ]
-        },
-        {
-          "name": "cctpMessageSentEvent",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK this is the account in which CCTP will store the event. It is not a PDA of CCTP,",
-            "but CCTP is the owner for it"
           ]
         },
         {
@@ -1572,6 +1381,23 @@ export const IDL: CctpTokenPool = {
           "docs": [
             "CHECK this is not read by the pool, just forwarded to CCTP"
           ]
+        },
+        {
+          "name": "cctpRemoteTokenMessengerKey",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK this is not read by the pool, just forwarded to CCTP"
+          ]
+        },
+        {
+          "name": "cctpMessageSentEvent",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "CHECK this is the account in which CCTP will store the event. It is not a PDA of CCTP,",
+            "but CCTP will initialize it and become the owner for it."
+          ]
         }
       ],
       "args": [
@@ -1587,7 +1413,53 @@ export const IDL: CctpTokenPool = {
       }
     }
   ],
+  "accounts": [
+    {
+      "name": "state",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "config",
+            "type": {
+              "defined": "BaseConfig"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "chainConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "base",
+            "type": {
+              "defined": "BaseChain"
+            }
+          }
+        ]
+      }
+    }
+  ],
   "types": [
+    {
+      "name": "CctpMessage",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "data",
+            "type": "bytes"
+          }
+        ]
+      }
+    },
     {
       "name": "MessageAndAttestation",
       "type": {
@@ -1595,7 +1467,9 @@ export const IDL: CctpTokenPool = {
         "fields": [
           {
             "name": "message",
-            "type": "bytes"
+            "type": {
+              "defined": "CctpMessage"
+            }
           },
           {
             "name": "attestation",

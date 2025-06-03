@@ -435,6 +435,10 @@
           {
             "name": "localToken",
             "type": "publicKey"
+          },
+          {
+            "name": "msgNonce",
+            "type": "u64"
           }
         ]
       }

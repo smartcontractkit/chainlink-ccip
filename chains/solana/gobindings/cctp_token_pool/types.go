@@ -7,8 +7,30 @@ import (
 	ag_solanago "github.com/gagliardetto/solana-go"
 )
 
+type CctpMessage struct {
+	Data []byte
+}
+
+func (obj CctpMessage) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Data` param:
+	err = encoder.Encode(obj.Data)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *CctpMessage) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Data`:
+	err = decoder.Decode(&obj.Data)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 type MessageAndAttestation struct {
-	Message     []byte
+	Message     CctpMessage
 	Attestation []byte
 }
 

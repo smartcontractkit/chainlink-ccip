@@ -747,7 +747,6 @@ dependencies = [
  "anchor-spl",
  "base-token-pool",
  "build_commit",
- "burnmint-token-pool",
  "ccip_common",
  "solana-program",
 ]

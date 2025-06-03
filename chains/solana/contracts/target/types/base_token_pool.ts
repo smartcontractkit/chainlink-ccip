@@ -161,6 +161,10 @@ export type BaseTokenPool = {
           {
             "name": "localToken",
             "type": "publicKey"
+          },
+          {
+            "name": "msgNonce",
+            "type": "u64"
           }
         ]
       }
@@ -859,6 +863,10 @@ export const IDL: BaseTokenPool = {
           {
             "name": "localToken",
             "type": "publicKey"
+          },
+          {
+            "name": "msgNonce",
+            "type": "u64"
           }
         ]
       }

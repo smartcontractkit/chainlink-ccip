@@ -369,7 +369,7 @@ func TestCCIPRouter(t *testing.T) {
 
 					// fund user WSOL (transfer SOL + syncNative)
 					transferAmount := 1.0 * solana.LAMPORTS_PER_SOL
-					ixTransfer, terr := tokens.NativeTransfer(wsol.program, transferAmount, it.user.PublicKey(), it.getATA(&wsol))
+					ixTransfer, terr := tokens.NativeTransfer(transferAmount, it.user.PublicKey(), it.getATA(&wsol))
 					require.NoError(t, terr)
 					ixSync, serr := tokens.SyncNative(wsol.program, it.getATA(&wsol))
 					require.NoError(t, serr)

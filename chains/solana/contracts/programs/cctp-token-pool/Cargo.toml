@@ -19,7 +19,6 @@ default = []
 anchor-lang = { version = "0.29.0", features = ["init-if-needed"] }
 anchor-spl = "0.29.0"
 base-token-pool = { version = "0.1.0-dev", path = "../base-token-pool/", features = ["no-entrypoint"] }
-burnmint-token-pool = { version = "0.1.0-dev", path = "../burnmint-token-pool", features = ["no-entrypoint"] }
 ccip_common = {path = "../ccip-common"}
 solana-program = "1.17.25"
 

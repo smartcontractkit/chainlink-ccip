@@ -278,36 +278,36 @@ func (d *DepositForBurnPDAs) Print() {
 	fmt.Println("  - authorityPda:", d.authorityPda)
 }
 
-func getDepositForBurnPDAs(tokenMessageMinter, messageTransmitter, usdcAddress solana.PublicKey, domain uint32) (DepositForBurnPDAs, error) {
+func getDepositForBurnPDAs(tokenMessengerMinter, messageTransmitter, usdcAddress solana.PublicKey, domain uint32) (DepositForBurnPDAs, error) {
 	messageTransmitterAccount, _, err := solana.FindProgramAddress([][]byte{[]byte("message_transmitter")}, messageTransmitter)
 	if err != nil {
 		return DepositForBurnPDAs{}, err
 	}
-	tokenMessengerAccount, _, err := solana.FindProgramAddress([][]byte{[]byte("token_messenger")}, tokenMessageMinter)
+	tokenMessengerAccount, _, err := solana.FindProgramAddress([][]byte{[]byte("token_messenger")}, tokenMessengerMinter)
 	if err != nil {
 		return DepositForBurnPDAs{}, err
 	}
-	tokenMinterAccount, _, err := solana.FindProgramAddress([][]byte{[]byte("token_minter")}, tokenMessageMinter)
-	if err != nil {
-		return DepositForBurnPDAs{}, err
-	}
-
-	localToken, _, err := solana.FindProgramAddress([][]byte{[]byte("local_token"), usdcAddress.Bytes()}, tokenMessageMinter)
+	tokenMinterAccount, _, err := solana.FindProgramAddress([][]byte{[]byte("token_minter")}, tokenMessengerMinter)
 	if err != nil {
 		return DepositForBurnPDAs{}, err
 	}
 
-	remoteTokenMessengerKey, _, err := solana.FindProgramAddress([][]byte{[]byte("remote_token_messenger"), numToSeed(domain)}, tokenMessageMinter)
+	localToken, _, err := solana.FindProgramAddress([][]byte{[]byte("local_token"), usdcAddress.Bytes()}, tokenMessengerMinter)
 	if err != nil {
 		return DepositForBurnPDAs{}, err
 	}
 
-	authorityPda, _, err := solana.FindProgramAddress([][]byte{[]byte("sender_authority")}, tokenMessageMinter)
+	remoteTokenMessengerKey, _, err := solana.FindProgramAddress([][]byte{[]byte("remote_token_messenger"), numToSeed(domain)}, tokenMessengerMinter)
 	if err != nil {
 		return DepositForBurnPDAs{}, err
 	}
 
-	eventAuthority, _, err := solana.FindProgramAddress([][]byte{[]byte("__event_authority")}, tokenMessageMinter)
+	authorityPda, _, err := solana.FindProgramAddress([][]byte{[]byte("sender_authority")}, tokenMessengerMinter)
+	if err != nil {
+		return DepositForBurnPDAs{}, err
+	}
+
+	eventAuthority, _, err := solana.FindProgramAddress([][]byte{[]byte("__event_authority")}, tokenMessengerMinter)
 	if err != nil {
 		return DepositForBurnPDAs{}, err
 	}
@@ -320,7 +320,7 @@ func getDepositForBurnPDAs(tokenMessageMinter, messageTransmitter, usdcAddress s
 		remoteTokenMessengerKey:   remoteTokenMessengerKey,
 		authorityPda:              authorityPda,
 		eventAuthority:            eventAuthority,
-		program:                   tokenMessageMinter,
+		program:                   tokenMessengerMinter,
 	}, nil
 }
 

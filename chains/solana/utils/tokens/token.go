@@ -137,7 +137,7 @@ func TokenBalance(ctx context.Context, client *rpc.Client, acc solana.PublicKey,
 	return res.Value.Decimals, v, err
 }
 
-func NativeTransfer(program solana.PublicKey, lamports uint64, from solana.PublicKey, to solana.PublicKey) (solana.Instruction, error) {
+func NativeTransfer(lamports uint64, from solana.PublicKey, to solana.PublicKey) (solana.Instruction, error) {
 	return system.NewTransferInstruction(lamports, from, to).ValidateAndBuild()
 }
 
