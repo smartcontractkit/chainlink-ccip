@@ -611,6 +611,13 @@ export type BurnmintTokenPool = {
         ]
       }
     }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidMultisig",
+      "msg": "Invalid Multisig Mint"
+    }
   ]
 };
 
@@ -1226,6 +1233,13 @@ export const IDL: BurnmintTokenPool = {
           }
         ]
       }
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidMultisig",
+      "msg": "Invalid Multisig Mint"
     }
   ]
 };

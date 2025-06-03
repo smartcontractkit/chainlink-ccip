@@ -181,7 +181,7 @@ pub mod burnmint_token_pool {
     }
 
     pub fn release_or_mint_tokens<'info>(
-        ctx: Context<'_, '_, '_, 'info, TokenOfframp<'info>>,
+        ctx: Context<'_, '_, 'info, 'info, TokenOfframp<'info>>,
         release_or_mint: ReleaseOrMintInV1,
     ) -> Result<ReleaseOrMintOutV1> {
         let parsed_amount = to_svm_token_amount(
@@ -207,16 +207,23 @@ pub mod burnmint_token_pool {
             ctx.accounts.rmn_remote_config.to_account_info(),
         )?;
 
-        let mint_authority = ctx.accounts.mint.mint_authority.unwrap_or_default();
+        // For a burnmint pool, the mint authority should never be empty (that would mean a fixed supply and prevent minting)
+        // If not set, then the mint operation will fail
+        require!(
+            ctx.accounts.mint.mint_authority.is_some(),
+            CcipBnMTokenPoolError::InvalidMultisig
+        );
+
+        let mint_authority = ctx.accounts.mint.mint_authority.unwrap();
 
         let multisig = if mint_authority != ctx.accounts.pool_signer.key() {
             let multisig_account = ctx
                 .remaining_accounts
                 .iter()
                 .find(|acc| acc.key() == mint_authority)
-                .ok_or(CcipTokenPoolError::InvalidMultisig)?;
+                .ok_or(CcipBnMTokenPoolError::InvalidMultisig)?;
 
-            Some(multisig_account.clone())
+            Some(multisig_account)
         } else {
             None
         };
@@ -226,9 +233,9 @@ pub mod burnmint_token_pool {
             release_or_mint,
             parsed_amount,
             MintTokenAccountsInfo {
-                receiver_token_account: ctx.accounts.receiver_token_account.to_account_info(),
-                mint: ctx.accounts.mint.to_account_info(),
-                pool_signer: ctx.accounts.pool_signer.to_account_info(),
+                receiver_token_account: &ctx.accounts.receiver_token_account.to_account_info(),
+                mint: &ctx.accounts.mint.to_account_info(),
+                pool_signer: &ctx.accounts.pool_signer.to_account_info(),
                 pool_signer_bump: ctx.bumps.pool_signer,
                 multisig,
             },
@@ -332,12 +339,12 @@ pub fn burn_tokens<'a>(
     Ok(())
 }
 
-pub struct MintTokenAccountsInfo<'a> {
-    pub receiver_token_account: AccountInfo<'a>,
-    pub mint: AccountInfo<'a>,
-    pub pool_signer: AccountInfo<'a>,
+pub struct MintTokenAccountsInfo<'a, 'b> {
+    pub receiver_token_account: &'a AccountInfo<'b>,
+    pub mint: &'a AccountInfo<'b>,
+    pub pool_signer: &'a AccountInfo<'b>,
     pub pool_signer_bump: u8,
-    pub multisig: Option<AccountInfo<'a>>,
+    pub multisig: Option<&'a AccountInfo<'b>>,
 }
 
 pub fn mint_tokens(
@@ -352,11 +359,7 @@ pub fn mint_tokens(
         &spl_token_2022::ID, // use spl-token-2022 to compile instruction - change program later
         &accounts.mint.key(),
         &accounts.receiver_token_account.key(),
-        &accounts
-            .multisig
-            .clone()
-            .unwrap_or(accounts.pool_signer.clone())
-            .key(),
+        &(&accounts.multisig.unwrap_or(&accounts.pool_signer).key()),
         &[accounts.pool_signer.key],
         parsed_amount,
     )?;
@@ -370,14 +373,14 @@ pub fn mint_tokens(
 
     let account_infos: Vec<AccountInfo> = if accounts.multisig.is_some() {
         vec![
-            accounts.receiver_token_account,
+            accounts.receiver_token_account.clone(),
             accounts.mint.clone(),
-            accounts.multisig.unwrap(),
+            accounts.multisig.unwrap().clone(),
             accounts.pool_signer.clone(),
         ]
     } else {
         vec![
-            accounts.receiver_token_account,
+            accounts.receiver_token_account.clone(),
             accounts.mint.clone(),
             accounts.pool_signer.clone(),
         ]

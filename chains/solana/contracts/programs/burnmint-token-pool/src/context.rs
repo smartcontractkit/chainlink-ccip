@@ -367,3 +367,10 @@ pub struct DeleteChainConfig<'info> {
     #[account(mut, address = state.config.owner)]
     pub authority: Signer<'info>,
 }
+
+#[error_code]
+pub enum CcipBnMTokenPoolError {
+    // Other (add last to keep error numbers)
+    #[msg("Invalid Multisig Mint")]
+    InvalidMultisig,
+}

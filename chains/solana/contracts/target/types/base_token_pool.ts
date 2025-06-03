@@ -692,11 +692,6 @@ export type BaseTokenPool = {
       "code": 6019,
       "name": "LiquidityNotAccepted",
       "msg": "Liquidity not accepted"
-    },
-    {
-      "code": 6020,
-      "name": "InvalidMultisig",
-      "msg": "Invalid Multisig Mint"
     }
   ]
 };
@@ -1395,11 +1390,6 @@ export const IDL: BaseTokenPool = {
       "code": 6019,
       "name": "LiquidityNotAccepted",
       "msg": "Liquidity not accepted"
-    },
-    {
-      "code": 6020,
-      "name": "InvalidMultisig",
-      "msg": "Invalid Multisig Mint"
     }
   ]
 };

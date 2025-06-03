@@ -459,10 +459,6 @@ pub enum CcipTokenPoolError {
     // Lock/Release errors
     #[msg("Liquidity not accepted")]
     LiquidityNotAccepted,
-
-    // Other (add last to keep error numbers)
-    #[msg("Invalid Multisig Mint")]
-    InvalidMultisig,
 }
 
 // validate_lock_or_burn checks for correctness on inputs

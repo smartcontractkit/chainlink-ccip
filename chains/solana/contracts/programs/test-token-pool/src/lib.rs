@@ -171,17 +171,16 @@ pub mod test_token_pool {
                 release_or_mint,
                 parsed_amount,
                 MintTokenAccountsInfo {
-                    receiver_token_account: ctx.accounts.receiver_token_account.to_account_info(),
-                    mint: ctx.accounts.mint.to_account_info(),
-                    pool_signer: ctx.accounts.pool_signer.to_account_info(),
+                    receiver_token_account: &ctx.accounts.receiver_token_account.to_account_info(),
+                    mint: &ctx.accounts.mint.to_account_info(),
+                    pool_signer: &ctx.accounts.pool_signer.to_account_info(),
                     pool_signer_bump: ctx.bumps.pool_signer,
                     multisig: if mint_authority != ctx.accounts.pool_signer.key() {
                         Some(
                             ctx.remaining_accounts
                                 .iter()
                                 .find(|acc| acc.key() == mint_authority)
-                                .ok_or(CcipTokenPoolError::InvalidInputs)?
-                                .clone(),
+                                .ok_or(CcipTokenPoolError::InvalidInputs)?,
                         )
                     } else {
                         None
