@@ -33,12 +33,6 @@ type LegacyAccessor struct {
 	destChain          cciptypes.ChainSelector
 }
 
-type SendRequestedEvent struct {
-	DestChainSelector cciptypes.ChainSelector
-	SequenceNumber    cciptypes.SeqNum
-	Message           cciptypes.Message
-}
-
 func NewLegacyAccessor(lgger logger.Logger, chainSelector cciptypes.ChainSelector, destChain cciptypes.ChainSelector,
 	srcContractReader contractreader.Extended, srcContractWriter types.ContractWriter, destContractReader contractreader.Extended,
 	destContractWriter types.ContractWriter, addrCodec cciptypes.AddressCodec,
@@ -136,7 +130,7 @@ func (l LegacyAccessor) MsgsBetweenSeqNums(ctx context.Context, dest cciptypes.C
 				Count: uint64(seqNumRange.End() - seqNumRange.Start() + 1),
 			},
 		},
-		&SendRequestedEvent{},
+		&cciptypes.SendRequestedEvent{},
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query onRamp: %w", err)
@@ -165,12 +159,12 @@ func (l LegacyAccessor) MsgsBetweenSeqNums(ctx context.Context, dest cciptypes.C
 
 	msgs := make([]cciptypes.Message, 0)
 	for _, item := range seq {
-		msg, ok := item.Data.(*SendRequestedEvent)
+		msg, ok := item.Data.(*cciptypes.SendRequestedEvent)
 		if !ok {
 			return nil, fmt.Errorf("failed to cast %v to Message", item.Data)
 		}
 
-		if err := validateSendRequestedEvent(msg, l.chainsel, dest, seqNumRange); err != nil {
+		if err := l.ValidateSendRequestedEvent(msg, l.chainsel, dest, seqNumRange); err != nil {
 			l.lggr.Errorw("validate send requested event", "err", err, "message", msg)
 			continue
 		}
@@ -211,7 +205,7 @@ func (l LegacyAccessor) LatestMsgSeqNum(ctx context.Context, dest cciptypes.Chai
 			},
 			Limit: query.Limit{Count: 1},
 		},
-		&SendRequestedEvent{},
+		&cciptypes.SendRequestedEvent{},
 	)
 	if err != nil {
 		return 0, fmt.Errorf("failed to query onRamp: %w", err)
@@ -227,12 +221,12 @@ func (l LegacyAccessor) LatestMsgSeqNum(ctx context.Context, dest cciptypes.Chai
 	}
 
 	item := seq[0]
-	msg, ok := item.Data.(*SendRequestedEvent)
+	msg, ok := item.Data.(*cciptypes.SendRequestedEvent)
 	if !ok {
 		return 0, fmt.Errorf("failed to cast %v to SendRequestedEvent", item.Data)
 	}
 
-	if err := validateSendRequestedEvent(msg, l.chainsel, dest,
+	if err := l.ValidateSendRequestedEvent(msg, l.chainsel, dest,
 		cciptypes.NewSeqNumRange(msg.Message.Header.SequenceNumber, msg.Message.Header.SequenceNumber)); err != nil {
 		return 0, fmt.Errorf("message invalid msg %v: %w", msg, err)
 	}
@@ -546,7 +540,7 @@ func (l LegacyAccessor) GetChainFeePriceUpdate(ctx context.Context, selectors []
 
 // processFeePriceUpdateResults iterates through batch results, validates them,
 // and returns a new feeUpdates map.
-func (r LegacyAccessor) processFeePriceUpdateResults(
+func (l LegacyAccessor) processFeePriceUpdateResults(
 	lggr logger.Logger,
 	selectors []cciptypes.ChainSelector,
 	results []types.BatchReadResult,
@@ -634,8 +628,8 @@ func (l LegacyAccessor) GetRmnCurseInfo(ctx context.Context) (cciptypes.CurseInf
 	panic("implement me")
 }
 
-func validateSendRequestedEvent(
-	ev *SendRequestedEvent, source, dest cciptypes.ChainSelector, seqNumRange cciptypes.SeqNumRange) error {
+func (l LegacyAccessor) ValidateSendRequestedEvent(
+	ev *cciptypes.SendRequestedEvent, source, dest cciptypes.ChainSelector, seqNumRange cciptypes.SeqNumRange) error {
 	if ev == nil {
 		return fmt.Errorf("send requested event is nil")
 	}

@@ -130,3 +130,16 @@ func validateReaderExistence(
 	}
 	return nil
 }
+
+func validateChainAccessorExistence(
+	readers map[cciptypes.ChainSelector]cciptypes.ChainAccessor,
+	chains ...cciptypes.ChainSelector,
+) error {
+	for _, ch := range chains {
+		_, exists := readers[ch]
+		if !exists {
+			return fmt.Errorf("chain %d: %w", ch, ErrContractReaderNotFound)
+		}
+	}
+	return nil
+}

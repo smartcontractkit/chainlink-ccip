@@ -162,6 +162,9 @@ type DestinationAccessor interface {
 		ctx context.Context,
 		sourceChains []ChainSelector,
 	) (map[ChainSelector]SourceChainConfig, error)
+
+	ValidateSendRequestedEvent(
+		ev *SendRequestedEvent, source, dest ChainSelector, seqNumRange SeqNumRange) error
 }
 
 type SourceAccessor interface {

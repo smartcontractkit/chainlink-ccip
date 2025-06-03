@@ -215,13 +215,9 @@ func (r *ccipChainReader) ExecutedMessages(
 	rangesPerChain map[cciptypes.ChainSelector][]cciptypes.SeqNumRange,
 	confidence primitives.ConfidenceLevel,
 ) (map[cciptypes.ChainSelector][]cciptypes.SeqNum, error) {
-	//lggr := logutil.WithContextValues(ctx, r.lggr)
-
-	/*
-		if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
-			return nil, err
-		}
-	*/
+	if err := validateChainAccessorExistence(r.accessors, r.destChain); err != nil {
+		return nil, err
+	}
 
 	// trim empty ranges from rangesPerChain
 	// otherwise we may get SQL errors from the chainreader.
@@ -244,21 +240,22 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 	ctx context.Context, sourceChainSelector cciptypes.ChainSelector, seqNumRange cciptypes.SeqNumRange,
 ) ([]cciptypes.Message, error) {
 	lggr := logutil.WithContextValues(ctx, r.lggr)
-	if err := validateExtendedReaderExistence(r.contractReaders, sourceChainSelector); err != nil {
+	if err := validateChainAccessorExistence(r.accessors, sourceChainSelector); err != nil {
 		return nil, err
 	}
 
-	onRampAddress, err := r.accessors[sourceChainSelector].GetContractAddress(consts.ContractNameOnRamp)
+	sourceChainAccessor := r.accessors[sourceChainSelector]
+	onRampAddress, err := sourceChainAccessor.GetContractAddress(consts.ContractNameOnRamp)
 	if err != nil {
 		return nil, fmt.Errorf("get onRamp address: %w", err)
 	}
 
-	msgs, err := r.accessors[sourceChainSelector].MsgsBetweenSeqNums(ctx, r.destChain, seqNumRange)
+	msgs, err := sourceChainAccessor.MsgsBetweenSeqNums(ctx, r.destChain, seqNumRange)
 	if err != nil {
 		return nil, fmt.Errorf("err in MsgsBetweenSeqNums: %w", err)
 	}
 
-	onRampAddressAfterQuery, err := r.accessors[sourceChainSelector].GetContractAddress(consts.ContractNameOnRamp)
+	onRampAddressAfterQuery, err := sourceChainAccessor.GetContractAddress(consts.ContractNameOnRamp)
 	if err != nil {
 		return nil, fmt.Errorf("get onRamp address: %w", err)
 	}
@@ -274,15 +271,16 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 		"seqNumRange", seqNumRange.String(),
 	)
 
-	for i, _ := range msgs {
-		msg := msgs[i]
-
-		/*
-			if err := validateSendRequestedEvent(msg, sourceChainSelector, r.destChain, seqNumRange); err != nil {
-				lggr.Errorw("validate send requested event", "err", err, "message", msg)
-				continue
-			}
-		*/
+	for i, msg := range msgs {
+		event := cciptypes.SendRequestedEvent{
+			DestChainSelector: r.destChain,
+			Message:           msg,
+			SequenceNumber:    msg.Header.SequenceNumber,
+		}
+		if err = sourceChainAccessor.ValidateSendRequestedEvent(&event, sourceChainSelector, r.destChain, seqNumRange); err != nil {
+			lggr.Errorw("validate send requested event", "err", err, "message", msg)
+			continue
+		}
 
 		msg.Header.OnRamp = onRampAddress
 		msgs[i] = msg
@@ -298,13 +296,9 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 // LatestMsgSeqNum reads the source chain and returns the latest finalized message sequence number.
 func (r *ccipChainReader) LatestMsgSeqNum(
 	ctx context.Context, chain cciptypes.ChainSelector) (cciptypes.SeqNum, error) {
-	//lggr := logutil.WithContextValues(ctx, r.lggr)
-
-	/*
-		if err := validateExtendedReaderExistence(r.contractReaders, chain); err != nil {
-			return 0, err
-		}
-	*/
+	if err := validateChainAccessorExistence(r.accessors, chain); err != nil {
+		return 0, err
+	}
 
 	sn, err := r.accessors[chain].LatestMsgSeqNum(ctx, r.destChain)
 	if err != nil {
@@ -320,12 +314,10 @@ func (r *ccipChainReader) GetExpectedNextSequenceNumber(
 	sourceChainSelector cciptypes.ChainSelector,
 ) (cciptypes.SeqNum, error) {
 	lggr := logutil.WithContextValues(ctx, r.lggr)
+	if err := validateChainAccessorExistence(r.accessors, sourceChainSelector); err != nil {
+		return 0, err
+	}
 
-	/*
-		if err := validateExtendedReaderExistence(r.contractReaders, sourceChainSelector); err != nil {
-			return 0, err
-		}
-	*/
 	expectedNextSequenceNumber, err := r.accessors[sourceChainSelector].GetExpectedNextSequenceNumber(ctx, r.destChain)
 	if err != nil {
 		return 0, fmt.Errorf("err in GetExpectedNextSequenceNumber: %w", err)
@@ -347,8 +339,6 @@ func (r *ccipChainReader) GetExpectedNextSequenceNumber(
 func (r *ccipChainReader) NextSeqNum(
 	ctx context.Context, chains []cciptypes.ChainSelector,
 ) (map[cciptypes.ChainSelector]cciptypes.SeqNum, error) {
-	//lggr := logutil.WithContextValues(ctx, r.lggr)
-
 	nums, err := r.accessors[r.destChain].NextSeqNum(ctx, chains)
 	if err != nil {
 		return nil, fmt.Errorf("err in NextSeqNum: %w", err)
@@ -360,12 +350,9 @@ func (r *ccipChainReader) Nonces(
 	ctx context.Context,
 	addressesByChain map[cciptypes.ChainSelector][]string,
 ) (map[cciptypes.ChainSelector]map[string]uint64, error) {
-	/*
-		lggr := logutil.WithContextValues(ctx, r.lggr)
-		if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
-			return nil, err
-		}
-	*/
+	if err := validateChainAccessorExistence(r.accessors, r.destChain); err != nil {
+		return nil, err
+	}
 
 	// sort the input to ensure deterministic results
 	sortedChains := maps.Keys(addressesByChain)

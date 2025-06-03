@@ -260,3 +260,9 @@ type RampTokenAmount struct {
 	// or hashing it. See Internal._hash(Any2EVMRampMessage) for more details as an example.
 	DestExecData Bytes `json:"destExecData"`
 }
+
+type SendRequestedEvent struct {
+	DestChainSelector ChainSelector
+	SequenceNumber    SeqNum
+	Message           Message
+}
