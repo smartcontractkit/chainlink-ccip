@@ -671,7 +671,10 @@ func (p *Plugin) validateReport(
 	}
 
 	if !supports {
-		lggr.Warnw("dest chain not supported, can't run report acceptance procedures")
+		lggr.Errorw("dest chain not supported by this oracle, can't run report acceptance procedures, " +
+			"transmission schedule is wrong - check CCIPHome chainConfigs and ensure that the right oracles are " +
+			"assigned as readers of the destination chain, or if " +
+			"this oracle should support the destination chain but isn't!")
 		return cciptypes.ExecutePluginReport{},
 			plugincommon.NewErrInvalidReport("dest chain not supported")
 	}
@@ -809,6 +812,19 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 ) (bool, error) {
 	ctx, lggr := logutil.WithOCRInfo(ctx, p.lggr, seqNr, logutil.PhaseShouldAccept)
 
+	supportsDest, err := p.supportsDestChain()
+	if err != nil {
+		lggr.Errorw("error checking if destination chain is supported", "err", err)
+		return false, fmt.Errorf("checking if destination chain is supported: %w", err)
+	}
+	if !supportsDest {
+		lggr.Errorw("dest chain not supported by this oracle, can't run report acceptance procedures, " +
+			"transmission schedule is wrong - check CCIPHome chainConfigs and ensure that the right oracles are " +
+			"assigned as readers of the destination chain, or if " +
+			"this oracle should support the destination chain but isn't!")
+		return false, plugincommon.NewErrInvalidReport("destination chain not supported")
+	}
+
 	decodedReport, err := p.validateReport(ctx, lggr, r)
 	if errors.Is(err, plugincommon.ErrInvalidReport) {
 		lggr.Infow("report not valid, not accepting", "err", err)
@@ -892,11 +908,15 @@ func (p *Plugin) supportedChains(id commontypes.OracleID) (mapset.Set[cciptypes.
 }
 
 func (p *Plugin) supportsDestChain() (bool, error) {
+	return p.supportsChain(p.destChain)
+}
+
+func (p *Plugin) supportsChain(chainSel cciptypes.ChainSelector) (bool, error) {
 	chains, err := p.supportedChains(p.reportingCfg.OracleID)
 	if err != nil {
 		return false, fmt.Errorf("error getting supported chains: %w", err)
 	}
-	return chains.Contains(p.destChain), nil
+	return chains.Contains(chainSel), nil
 }
 
 // Interface compatibility checks.

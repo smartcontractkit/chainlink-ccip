@@ -2,12 +2,36 @@ name: "Run CCIP OCR3 Integration Test"
 
 on:
   pull_request:
+  merge_group:
   push:
     branches:
       - 'main'
 
 jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      e2e_should_run: ${{ steps.changes.outputs.e2e_should_run }}
+    steps:
+      - name: Checkout the repo
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Detect changes
+        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+        id: changes
+        with:
+          list-files: "shell"
+          # Run on all, except the chains/evm folder unless it's in a released version.
+          filters: |
+            e2e_should_run:
+              - '!(chains/evm/**)'
+              - 'chains/evm/gobindings/generated/!(latest/**)/**'
+
   integration-test-matrix:
+    needs: [changes]
+    if: ${{ needs.changes.outputs.e2e_should_run == 'true' }}
     env:
       # We explicitly have this env var not be "CL_DATABASE_URL" to avoid having it be used by core related tests
       # when they should not be using it, while still allowing us to DRY up the setup
@@ -65,7 +89,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout the chainlink-ccip repo
-        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+        uses: actions/checkout@v4
       - name: Determine Go version
         id: go_version
         run: echo "GO_VERSION=$(cat go.mod |grep "^go"|cut -d' ' -f 2)" >> $GITHUB_ENV
@@ -78,21 +102,62 @@ jobs:
       - name: Fetch latest pull request data
         id: fetch_pr_data
         uses: actions/github-script@v6
-        # only run this step if the event is a pull request
-        if: github.event_name == 'pull_request'
+        # only run this step if the event is a pull request or merge_group
+        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
         with:
           script: |
-            const pr = await github.rest.pulls.get({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: context.issue.number
-            });
-            return pr.data.body;
+            let pull_number;
+            console.log(`Current eventName: ${context.eventName}`);
+            if (context.eventName === 'pull_request') {
+              pull_number = context.issue.number;
+              console.log(`Event is pull_request, PR number: ${pull_number}`);
+            } else if (context.eventName === 'merge_group') {
+              console.log('Event is merge_group. Attempting to get PR number.');
+              if (context.payload.pull_request && typeof context.payload.pull_request.number === 'number') {
+                pull_number = context.payload.pull_request.number;
+                console.log(`Found PR number via context.payload.pull_request.number: ${pull_number}`);
+              } else {
+                console.warn('context.payload.pull_request.number is not available or not a number.');
+                if (context.payload.merge_group && context.payload.merge_group.head_ref) {
+                  const headRef = context.payload.merge_group.head_ref;
+                  console.log(`Attempting to parse PR number from merge_group.head_ref: ${headRef}`);
+                  // Example head_ref: "gh-readonly-queue/main/pr-123-abcdef1234567890" or "pr-123-abcdef" part of a larger string
+                  const match = headRef.match(/pr-(\d+)-[a-fA-F0-9]+/);
+                  if (match && match[1]) {
+                    pull_number = parseInt(match[1], 10);
+                    console.log(`Successfully extracted PR number from head_ref: ${pull_number}`);
+                  } else {
+                    console.error(`Could not extract PR number from head_ref: ${headRef}. Regex match failed.`);
+                  }
+                } else {
+                  console.error('context.payload.merge_group.head_ref is not available for parsing.');
+                }
+              }
+
+              if (typeof pull_number !== 'number') {
+                 console.error(`Failed to determine PR number for merge_group event. pull_number is: ${pull_number}`);
+                 // Optionally, you could throw an error here to make the failure explicit:
+                 // throw new Error('Failed to determine PR number for merge_group event.');
+              }
+            }
+
+            if (typeof pull_number === 'number') {
+              console.log(`Fetching PR data for PR #${pull_number}`);
+              const pr = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pull_number
+              });
+              return pr.data.body;
+            } else {
+              console.log('No valid pull request number determined. Skipping PR data fetch, returning empty string.');
+              return '';
+            }
       - name: Get the chainlink commit sha from PR description, if applicable
         id: get_chainlink_sha
         run: |
           default="develop"
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
+          if [ "${{ github.event_name }}" == "pull_request" ] || [ "${{ github.event_name }}" == "merge_group" ]; then
           comment=$(cat <<'GREAT_PR_DESCRIPTION_HERE'
           ${{ steps.fetch_pr_data.outputs.result }}
           GREAT_PR_DESCRIPTION_HERE
@@ -110,7 +175,7 @@ jobs:
             echo "::set-output name=ref::$default"
           fi
       - name: Clone Chainlink repo
-        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+        uses: actions/checkout@v4
         with:
           repository: smartcontractkit/chainlink
           ref: ${{ steps.get_chainlink_sha.outputs.ref }}
@@ -120,6 +185,8 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" == "pull_request" ]; then
             COMMIT_SHA=${{ github.event.pull_request.head.sha }}
+          elif [ "${{ github.event_name }}" == "merge_group" ]; then
+            COMMIT_SHA=${{ github.event.merge_group.head_sha }}
           else
             COMMIT_SHA=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
               "https://api.github.com/repos/${{ github.repository }}/commits/${{ github.ref }}" | jq -r .sha)

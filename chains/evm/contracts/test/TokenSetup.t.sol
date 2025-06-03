@@ -47,7 +47,7 @@ contract TokenSetup is BaseTest {
     }
 
     LockReleaseTokenPool pool = new LockReleaseTokenPool(
-      IERC20(token), DEFAULT_TOKEN_DECIMALS, new address[](0), address(s_mockRMNRemote), true, router
+      IERC20(token), DEFAULT_TOKEN_DECIMALS, new address[](0), address(s_mockRMNRemote), router
     );
 
     if (isSourcePool) {
