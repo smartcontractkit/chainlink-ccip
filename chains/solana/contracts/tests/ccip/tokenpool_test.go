@@ -138,9 +138,8 @@ func TestTokenPool(t *testing.T) {
 		{tokenName: "spl-token-2022", tokenProgram: config.Token2022Program},
 	} {
 		t.Run(v.tokenName, func(t *testing.T) {
-			t.Skip() // TODO
-
 			t.Parallel()
+
 			decimals := uint8(0)
 			amount := uint64(1000)
 
@@ -718,9 +717,8 @@ func TestTokenPool(t *testing.T) {
 
 	// test functionality with arbitrary wrapped program
 	t.Run("Wrapped", func(t *testing.T) {
-		t.Skip() // TODO
-
 		t.Parallel()
+
 		mintPriv := solana.MustPrivateKeyFromBase58("5PMQ49JibQPVBFneTzixstoS2z888CoUgej1PoYgvmKXZcKw4b3Zd8vhCjKQcUDSjLnR9M1tUrzCCXLrPBZoqjJm")
 		p, err := tokens.NewTokenPool(solana.TokenProgramID, config.CcipTokenPoolProgram, mintPriv.PublicKey())
 		require.NoError(t, err)
