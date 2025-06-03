@@ -49,6 +49,13 @@ export type CctpTokenPool = {
     },
     {
       "name": "typeVersion",
+      "docs": [
+        "Returns the program type (name) and version.",
+        "Used by offchain code to easily determine which program & version is being interacted with.",
+        "",
+        "# Arguments",
+        "* `ctx` - The context"
+      ],
       "accounts": [
         {
           "name": "clock",
@@ -675,6 +682,10 @@ export type CctpTokenPool = {
             "type": {
               "defined": "BaseChain"
             }
+          },
+          {
+            "name": "cctpDomainId",
+            "type": "u64"
           }
         ]
       }
@@ -816,6 +827,13 @@ export const IDL: CctpTokenPool = {
     },
     {
       "name": "typeVersion",
+      "docs": [
+        "Returns the program type (name) and version.",
+        "Used by offchain code to easily determine which program & version is being interacted with.",
+        "",
+        "# Arguments",
+        "* `ctx` - The context"
+      ],
       "accounts": [
         {
           "name": "clock",
@@ -1442,6 +1460,10 @@ export const IDL: CctpTokenPool = {
             "type": {
               "defined": "BaseChain"
             }
+          },
+          {
+            "name": "cctpDomainId",
+            "type": "u64"
           }
         ]
       }

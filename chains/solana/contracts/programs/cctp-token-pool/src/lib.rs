@@ -37,6 +37,11 @@ pub mod cctp_token_pool {
         Ok(())
     }
 
+    /// Returns the program type (name) and version.
+    /// Used by offchain code to easily determine which program & version is being interacted with.
+    ///
+    /// # Arguments
+    /// * `ctx` - The context
     pub fn type_version(_ctx: Context<Empty>) -> Result<String> {
         let response = env!("CCIP_BUILD_TYPE_VERSION").to_string();
         msg!("{}", response);
@@ -47,10 +52,13 @@ pub mod cctp_token_pool {
         ctx.accounts.state.config.transfer_ownership(proposed_owner)
     }
 
+    // shared func signature with other programs
     pub fn accept_ownership(ctx: Context<AcceptOwnership>) -> Result<()> {
         ctx.accounts.state.config.accept_ownership()
     }
 
+    // set_router changes the expected signers for mint/release + burn/lock method calls
+    // this is used to update the router address
     pub fn set_router(ctx: Context<SetConfig>, new_router: Pubkey) -> Result<()> {
         ctx.accounts
             .state
@@ -58,6 +66,7 @@ pub mod cctp_token_pool {
             .set_router(new_router, ctx.program_id)
     }
 
+    // initialize remote config (with no remote pools as it must be zero sized)
     pub fn init_chain_remote_config(
         ctx: Context<InitializeChainConfig>,
         remote_chain_selector: u64,
@@ -75,6 +84,7 @@ pub mod cctp_token_pool {
             .set(remote_chain_selector, mint, cfg)
     }
 
+    // edit remote config
     pub fn edit_chain_remote_config(
         ctx: Context<EditChainConfigDynamicSize>,
         remote_chain_selector: u64,
@@ -87,6 +97,7 @@ pub mod cctp_token_pool {
             .set(remote_chain_selector, mint, cfg)
     }
 
+    // Add remote pool addresses
     pub fn append_remote_pool_addresses(
         ctx: Context<AppendRemotePoolAddresses>,
         remote_chain_selector: u64,
@@ -100,6 +111,7 @@ pub mod cctp_token_pool {
         )
     }
 
+    // set rate limit
     pub fn set_chain_rate_limit(
         ctx: Context<SetChainRateLimit>,
         remote_chain_selector: u64,
@@ -115,6 +127,7 @@ pub mod cctp_token_pool {
         )
     }
 
+    // delete chain config
     pub fn delete_chain_config(
         _ctx: Context<DeleteChainConfig>,
         remote_chain_selector: u64,
@@ -482,6 +495,9 @@ pub struct State {
 #[derive(InitSpace)]
 pub struct ChainConfig {
     pub base: BaseChain,
+
+    // Domain ID for CCTP, used to identify the chain. This is a sequential number starting from 0. Using u64 here just because there's little value in sticking to u8/u16, and it allows for way more chains in the future than we should ever need.
+    pub cctp_domain_id: u64,
 }
 
 #[error_code]

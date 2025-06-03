@@ -21,14 +21,13 @@ pub const MESSAGE_SENT_EVENT_SEED: &[u8] = b"cctp_message_sent_event";
 pub struct InitializeTokenPool<'info> {
     #[account(
         init,
-        space = ANCHOR_DISCRIMINATOR + State::INIT_SPACE,
-        payer = authority,
         seeds = [
             POOL_STATE_SEED,
-            mint.key().as_ref()
+            mint.key().as_ref(),
         ],
         bump,
-        constraint = valid_version(1, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion
+        payer = authority,
+        space = ANCHOR_DISCRIMINATOR + State::INIT_SPACE,
     )]
     pub state: Account<'info, State>,
 
@@ -39,11 +38,19 @@ pub struct InitializeTokenPool<'info> {
 
     pub system_program: Program<'info, System>,
 
+    // Token pool initialization only allowed by program upgrade authority. Initializing token pools managed
+    // by the CLL deployment of this program is limited to CLL. Users must deploy their own instance of this program.
     #[account(constraint = program.programdata_address()? == Some(program_data.key()))]
     pub program: Program<'info, crate::program::CctpTokenPool>,
 
     #[account(constraint = program_data.upgrade_authority_address == Some(authority.key()))]
     pub program_data: Account<'info, ProgramData>,
+}
+
+#[derive(Accounts)]
+pub struct Empty<'info> {
+    // This is unused, but Anchor requires that there is at least one account in the context
+    pub clock: Sysvar<'info, Clock>,
 }
 
 #[derive(Accounts)]
@@ -55,14 +62,62 @@ pub struct SetConfig<'info> {
             mint.key().as_ref()
         ],
         bump,
-        constraint = state.config.owner == authority.key() @ CcipTokenPoolError::Unauthorized
+        constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub state: Account<'info, State>,
 
-    pub mint: InterfaceAccount<'info, Mint>,
+    pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
 
     #[account(constraint = state.config.owner == authority.key() @ CcipTokenPoolError::Unauthorized)]
     pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
+#[instruction(add: Vec<Pubkey>)]
+pub struct AddToAllowList<'info> {
+    #[account(
+        mut,
+        seeds = [
+            POOL_STATE_SEED,
+            mint.key().as_ref()
+        ],
+        bump,
+        realloc = ANCHOR_DISCRIMINATOR + State::INIT_SPACE + 32 * (state.config.allow_list.len() + add.len()),
+        realloc::payer = authority,
+        realloc::zero = false,
+    )]
+    pub state: Account<'info, State>,
+
+    pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
+
+    #[account(mut, address = state.config.owner @ CcipTokenPoolError::Unauthorized)]
+    pub authority: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(remove: Vec<Pubkey>)]
+pub struct RemoveFromAllowlist<'info> {
+    #[account(
+        mut,
+        seeds = [
+            POOL_STATE_SEED,
+            mint.key().as_ref()
+        ],
+        bump,
+        realloc = ANCHOR_DISCRIMINATOR + State::INIT_SPACE + 32 * (state.config.allow_list.len().saturating_sub(remove.len())),
+        realloc::payer = authority,
+        realloc::zero = false
+    )]
+    pub state: Account<'info, State>,
+
+    pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
+
+    #[account(mut, address = state.config.owner @ CcipTokenPoolError::Unauthorized)]
+    pub authority: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
@@ -74,12 +129,12 @@ pub struct AcceptOwnership<'info> {
             mint.key().as_ref()
         ],
         bump,
-        constraint = state.config.proposed_owner == authority.key() @ CcipTokenPoolError::Unauthorized
     )]
     pub state: Account<'info, State>,
 
-    pub mint: InterfaceAccount<'info, Mint>,
+    pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
 
+    #[account(address = state.config.proposed_owner @ CcipTokenPoolError::Unauthorized)]
     pub authority: Signer<'info>,
 }
 
@@ -507,90 +562,23 @@ pub struct InitializeChainConfig<'info> {
             mint.key().as_ref()
         ],
         bump,
-        constraint = state.config.owner == authority.key() @ CcipTokenPoolError::Unauthorized,
     )]
     pub state: Account<'info, State>,
 
     #[account(
         init,
+        seeds = [
+            POOL_CHAINCONFIG_SEED,
+            &remote_chain_selector.to_le_bytes(),
+            mint.key().as_ref(),
+        ],
+        bump,
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + ChainConfig::INIT_SPACE,
-        seeds = [
-            POOL_CHAINCONFIG_SEED,
-            &remote_chain_selector.to_le_bytes(),
-            mint.key().as_ref(),
-        ],
-        bump,
     )]
     pub chain_config: Account<'info, ChainConfig>,
 
-    #[account(mut)]
-    pub authority: Signer<'info>,
-
-    pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
-#[instruction(remote_chain_selector: u64, mint: Pubkey)]
-pub struct EditChainConfigDynamicSize<'info> {
-    #[account(
-        seeds = [
-            POOL_STATE_SEED,
-            mint.key().as_ref()
-        ],
-        bump,
-        constraint = state.config.owner == authority.key() @ CcipTokenPoolError::Unauthorized,
-    )]
-    pub state: Account<'info, State>,
-
-    #[account(
-        mut,
-        seeds = [
-            POOL_CHAINCONFIG_SEED,
-            state.key().as_ref(),
-            &remote_chain_selector.to_le_bytes(),
-        ],
-        bump,
-        realloc = ANCHOR_DISCRIMINATOR + ChainConfig::INIT_SPACE,
-        realloc::payer = authority,
-        realloc::zero = true,
-    )]
-    pub chain_config: Account<'info, ChainConfig>,
-
-    #[account(mut)]
-    pub authority: Signer<'info>,
-
-    pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
-#[instruction(remote_chain_selector: u64, mint: Pubkey, addresses: Vec<RemoteAddress>)]
-pub struct AppendRemotePoolAddresses<'info> {
-    #[account(
-        seeds = [
-            POOL_STATE_SEED,
-            mint.key().as_ref()
-        ],
-        bump,
-        constraint = state.config.owner == authority.key() @ CcipTokenPoolError::Unauthorized,
-    )]
-    pub state: Account<'info, State>,
-
-    #[account(
-        mut,
-        seeds = [
-            POOL_CHAINCONFIG_SEED,
-            &remote_chain_selector.to_le_bytes(),
-            mint.key().as_ref(),
-        ],
-        bump,
-        realloc = ANCHOR_DISCRIMINATOR + ChainConfig::INIT_SPACE + addresses.len() * RemoteAddress::INIT_SPACE,
-        realloc::payer = authority,
-        realloc::zero = true,
-    )]
-    pub chain_config: Account<'info, ChainConfig>,
-
-    #[account(mut)]
+    #[account(mut, address = state.config.owner)]
     pub authority: Signer<'info>,
 
     pub system_program: Program<'info, System>,
@@ -605,7 +593,6 @@ pub struct SetChainRateLimit<'info> {
             mint.key().as_ref()
         ],
         bump,
-        constraint = state.config.owner == authority.key() @ CcipTokenPoolError::Unauthorized,
     )]
     pub state: Account<'info, State>,
 
@@ -620,8 +607,74 @@ pub struct SetChainRateLimit<'info> {
     )]
     pub chain_config: Account<'info, ChainConfig>,
 
-    #[account(mut)]
+    #[account(mut, constraint = authority.key() == state.config.owner || authority.key() == state.config.rate_limit_admin)]
     pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
+#[instruction(remote_chain_selector: u64, mint: Pubkey, cfg: RemoteConfig)]
+pub struct EditChainConfigDynamicSize<'info> {
+    #[account(
+        seeds = [
+            POOL_STATE_SEED,
+            mint.key().as_ref()
+        ],
+        bump,
+    )]
+    pub state: Account<'info, State>,
+
+    #[account(
+        mut,
+        seeds = [
+            POOL_CHAINCONFIG_SEED,
+            &remote_chain_selector.to_le_bytes(),
+            mint.key().as_ref(),
+        ],
+        bump,
+        realloc = ANCHOR_DISCRIMINATOR + ChainConfig::INIT_SPACE + cfg.pool_addresses.iter().map(RemoteAddress::space).sum::<usize>(),
+        realloc::payer = authority,
+        realloc::zero = false
+    )]
+    pub chain_config: Account<'info, ChainConfig>,
+
+    #[account(mut, address = state.config.owner)]
+    pub authority: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(remote_chain_selector: u64, mint: Pubkey, addresses: Vec<RemoteAddress>)]
+pub struct AppendRemotePoolAddresses<'info> {
+    #[account(
+        seeds = [
+            POOL_STATE_SEED,
+            mint.key().as_ref()
+        ],
+        bump,
+    )]
+    pub state: Account<'info, State>,
+
+    #[account(
+        mut,
+        seeds = [
+            POOL_CHAINCONFIG_SEED,
+            &remote_chain_selector.to_le_bytes(),
+            mint.key().as_ref(),
+        ],
+        bump,
+        realloc = ANCHOR_DISCRIMINATOR + ChainConfig::INIT_SPACE
+            + chain_config.base.remote.pool_addresses.iter().map(RemoteAddress::space).sum::<usize>()
+            + addresses.iter().map(RemoteAddress::space).sum::<usize>(),
+        realloc::payer = authority,
+        realloc::zero = false
+    )]
+    pub chain_config: Account<'info, ChainConfig>,
+
+    #[account(mut, address = state.config.owner)]
+    pub authority: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
@@ -633,75 +686,21 @@ pub struct DeleteChainConfig<'info> {
             mint.key().as_ref()
         ],
         bump,
-        constraint = state.config.owner == authority.key() @ CcipTokenPoolError::Unauthorized,
     )]
     pub state: Account<'info, State>,
 
     #[account(
         mut,
-        close = authority,
         seeds = [
             POOL_CHAINCONFIG_SEED,
             &remote_chain_selector.to_le_bytes(),
             mint.key().as_ref(),
         ],
         bump,
+        close = authority,
     )]
     pub chain_config: Account<'info, ChainConfig>,
 
-    #[account(mut)]
+    #[account(mut, address = state.config.owner)]
     pub authority: Signer<'info>,
-}
-
-#[derive(Accounts)]
-#[instruction(add: Vec<Pubkey>)]
-pub struct AddToAllowList<'info> {
-    #[account(
-        mut,
-        seeds = [
-            POOL_STATE_SEED,
-            mint.key().as_ref()
-        ],
-        bump,
-        constraint = state.config.owner == authority.key() @ CcipTokenPoolError::Unauthorized,
-        realloc = ANCHOR_DISCRIMINATOR + State::INIT_SPACE + add.len() * 32,
-        realloc::payer = authority,
-        realloc::zero = true,
-    )]
-    pub state: Account<'info, State>,
-
-    pub mint: InterfaceAccount<'info, Mint>,
-
-    #[account(mut)]
-    pub authority: Signer<'info>,
-
-    pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
-#[instruction(remove: Vec<Pubkey>)]
-pub struct RemoveFromAllowlist<'info> {
-    #[account(
-        mut,
-        seeds = [
-            POOL_STATE_SEED,
-            mint.key().as_ref()
-        ],
-        bump,
-        constraint = state.config.owner == authority.key() @ CcipTokenPoolError::Unauthorized,
-    )]
-    pub state: Account<'info, State>,
-
-    pub mint: InterfaceAccount<'info, Mint>,
-
-    #[account(mut)]
-    pub authority: Signer<'info>,
-
-    pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
-pub struct Empty<'info> {
-    // This is unused, but Anchor requires that there is at least one account in the context
-    pub clock: Sysvar<'info, Clock>,
 }

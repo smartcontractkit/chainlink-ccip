@@ -10,7 +10,11 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// TypeVersion is the `typeVersion` instruction.
+// Returns the program type (name) and version.
+// Used by offchain code to easily determine which program & version is being interacted with.
+//
+// # Arguments
+// * `ctx` - The context
 type TypeVersion struct {
 
 	// [0] = [] clock
