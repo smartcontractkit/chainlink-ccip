@@ -152,6 +152,10 @@ type CommitOffchainConfig struct {
 	// NOTE: It is also used when the async observer is disabled, while making the sync calls.
 	TokenPriceAsyncObserverSyncTimeout commonconfig.Duration `json:"tokenPriceAsyncObserverSyncTimeout"`
 
+	// InflightPricingRoleDonFixEnabled enables new Observation and Outcome logic for the Role DON feature.
+	// Set to true after all nodes are upgraded.
+	InflightPricingRoleDonFixEnabled bool `json:"inflightPricingRoleDonFixEnabled"`
+
 	// MaxRootsPerReport is the maximum number of roots to include in a single report.
 	// Set this to 1 for destination chains that cannot process more than one commit root per report (e.g, Solana)
 	// Disable by setting to 0.
