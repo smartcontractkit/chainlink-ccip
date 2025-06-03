@@ -2,9 +2,6 @@ module integration-tests
 
 go 1.24.2
 
-// Update: declare required local modules and point them to the checked-out copies so imports resolve during development.
-// The exact versions don't matter for local development; they will be replaced by the paths below.
-
 require (
 	github.com/ethereum/go-ethereum v1.15.7
 	github.com/gagliardetto/solana-go v1.12.0
