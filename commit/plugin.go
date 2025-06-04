@@ -239,6 +239,12 @@ func (p *Plugin) ObservationQuorum(
 func (p *Plugin) Observation(
 	ctx context.Context, outCtx ocr3types.OutcomeContext, q types.Query,
 ) (types.Observation, error) {
+	// TODO: Replace Observation with ObservationNext
+	//       and remove the condition when every oracle upgraded.
+	if p.offchainCfg.EnableDonBreakingChanges {
+		return p.ObservationNext(ctx, outCtx, q)
+	}
+
 	// Ensure that sequence number is in the context for consumption by all
 	// downstream processors and the ccip reader.
 	ctx, lggr := logutil.WithOCRInfo(ctx, p.lggr, outCtx.SeqNr, logutil.PhaseObservation)
@@ -414,6 +420,12 @@ func (p *Plugin) ObserveFChain(lggr logger.Logger) map[cciptypes.ChainSelector]i
 func (p *Plugin) Outcome(
 	ctx context.Context, outCtx ocr3types.OutcomeContext, q types.Query, aos []types.AttributedObservation,
 ) (ocr3types.Outcome, error) {
+	// TODO: Replace Outcome with OutcomeNext
+	//       and remove the condition when every oracle upgraded.
+	if p.offchainCfg.EnableDonBreakingChanges {
+		return p.OutcomeNext(ctx, outCtx, q, aos)
+	}
+
 	ctx, lggr := logutil.WithOCRInfo(ctx, p.lggr, outCtx.SeqNr, logutil.PhaseOutcome)
 	lggr.Debugw("commit plugin performing outcome", "attributedObservations", aos)
 
