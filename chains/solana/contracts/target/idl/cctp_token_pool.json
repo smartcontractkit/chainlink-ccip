@@ -687,6 +687,68 @@
       "returns": {
         "defined": "LockOrBurnOutV1"
       }
+    },
+    {
+      "name": "reclaimEventAccount",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "poolSigner",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "messageSentEventAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "messageTransmitter",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "cctpMessageTransmitter",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "mint",
+          "type": "publicKey"
+        },
+        {
+          "name": "originalSender",
+          "type": "publicKey"
+        },
+        {
+          "name": "remoteChainSelector",
+          "type": "u64"
+        },
+        {
+          "name": "msgNonce",
+          "type": "u64"
+        },
+        {
+          "name": "attestation",
+          "type": "bytes"
+        }
+      ]
     }
   ],
   "accounts": [

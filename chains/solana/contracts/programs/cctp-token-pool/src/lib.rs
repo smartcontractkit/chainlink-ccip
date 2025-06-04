@@ -10,6 +10,7 @@ declare_id!("CCitPr8yZbN8zEBEdwju8bnGgKMYcz6XSTbU61CMedj");
 pub const RECEIVE_MESSAGE_DISCRIMINATOR: [u8; 8] = [38, 144, 127, 225, 31, 225, 238, 25]; // global:receive_message
 pub const DEPOSIT_FOR_BURN_WITH_CALLER_DISCRIMINATOR: [u8; 8] =
     [167, 222, 19, 114, 85, 21, 14, 118]; // global:deposit_for_burn_with_caller
+pub const RECLAIM_EVENT_ACCOUNT_DISCRIMINATOR: [u8; 8] = [94, 198, 180, 159, 131, 236, 15, 174]; // global:reclaim_event_account
 
 pub mod context;
 use crate::context::*;
@@ -414,6 +415,51 @@ pub mod cctp_token_pool {
                 abi_encoded_decimals
             },
         })
+    }
+
+    pub fn reclaim_event_account(
+        ctx: Context<ReclaimEventAccount>,
+        mint: Pubkey,
+        _original_sender: Pubkey,
+        _remote_chain_selector: u64,
+        _msg_nonce: u64,
+        attestation: Vec<u8>,
+    ) -> Result<()> {
+        let attestation_bytes = attestation.try_to_vec()?;
+        let mut instruction_data =
+            Vec::with_capacity(ANCHOR_DISCRIMINATOR + attestation_bytes.len());
+        instruction_data.extend_from_slice(&RECLAIM_EVENT_ACCOUNT_DISCRIMINATOR);
+        instruction_data.extend_from_slice(attestation_bytes.as_slice());
+
+        let acc_infos = vec![
+            ctx.accounts.pool_signer.to_account_info(),
+            ctx.accounts.message_transmitter.to_account_info(),
+            ctx.accounts.message_sent_event_account.to_account_info(),
+        ];
+
+        let acc_metas: Vec<AccountMeta> = acc_infos
+            .iter()
+            .flat_map(|acc_info| {
+                let is_signer = acc_info.key() == ctx.accounts.pool_signer.key();
+                acc_info.to_account_metas(Some(is_signer))
+            })
+            .collect();
+
+        let instruction = Instruction {
+            program_id: ctx.accounts.cctp_message_transmitter.key(),
+            accounts: acc_metas,
+            data: instruction_data,
+        };
+
+        let signer_seeds: &[&[u8]] = &[
+            POOL_SIGNER_SEED,
+            &mint.key().to_bytes(),
+            &[ctx.bumps.pool_signer],
+        ];
+
+        invoke_signed(&instruction, &acc_infos, &[signer_seeds])?;
+
+        Ok(())
     }
 }
 

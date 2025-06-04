@@ -685,3 +685,55 @@ pub struct DeleteChainConfig<'info> {
     #[account(mut, address = state.config.owner)]
     pub authority: Signer<'info>,
 }
+
+#[derive(Accounts)]
+#[instruction(mint: Pubkey, original_sender: Pubkey, remote_chain_selector: u64, msg_nonce: u64)]
+pub struct ReclaimEventAccount<'info> {
+    #[account(
+        seeds = [
+            POOL_STATE_SEED,
+            mint.key().as_ref()
+        ],
+        bump,
+    )]
+    pub state: Account<'info, State>,
+
+    /// CHECK: CPI signer for CCTP operations, validated by seeds constraint
+    #[account(
+        mut,
+        seeds = [POOL_SIGNER_SEED, mint.key().as_ref()],
+        bump,
+    )]
+    pub pool_signer: UncheckedAccount<'info>,
+
+    /// CHECK: MessageSent event account to reclaim rent from
+    #[account(
+        mut,
+        seeds = [
+            MESSAGE_SENT_EVENT_SEED,
+            &original_sender.to_bytes(),
+            &remote_chain_selector.to_le_bytes(),
+            &msg_nonce.to_le_bytes(),
+        ],
+        bump,
+    )]
+    pub message_sent_event_account: UncheckedAccount<'info>,
+
+    /// CHECK: CCTP Message Transmitter program, validated by address constraint
+    #[account(
+        mut,
+        seeds = [b"message_transmitter"],
+        bump,
+        seeds::program = cctp_message_transmitter,
+    )]
+    pub message_transmitter: UncheckedAccount<'info>,
+
+    /// CHECK: CCTP Message Transmitter program account
+    #[account(address = MESSAGE_TRANSMITTER)]
+    pub cctp_message_transmitter: UncheckedAccount<'info>,
+
+    #[account(mut, constraint = authority.key() == state.config.owner)]
+    pub authority: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+}

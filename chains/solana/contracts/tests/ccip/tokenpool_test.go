@@ -1316,10 +1316,12 @@ func TestTokenPool(t *testing.T) {
 			messageAmount := uint64(1123456) // 1.123456 USDC, as it uses 6 decimals
 
 			var messageSent message_transmitter.MessageSent
+			messageSentEventKeypair, err := solana.NewRandomPrivateKey()
+			require.NoError(t, err)
+
+			var attestation []byte
 
 			t.Run("DepositForBurnWithCaller", func(t *testing.T) {
-				messageSentEventKeypair, err := solana.NewRandomPrivateKey()
-
 				ix, err := cctp_token_messenger_minter.NewDepositForBurnWithCallerInstruction(
 					cctp_token_messenger_minter.DepositForBurnWithCallerParams{
 						Amount:            messageAmount,
@@ -1376,7 +1378,7 @@ func TestTokenPool(t *testing.T) {
 
 					usedNoncesPDA := getUsedNoncesPDA(t, messageSent)
 
-					attestation, err := ccip.AttestCCTP(messageSent.Message, attesters)
+					attestation, err = ccip.AttestCCTP(messageSent.Message, attesters)
 					fmt.Println("Attestation:", hex.EncodeToString(attestation))
 					require.NoError(t, err)
 
@@ -1420,6 +1422,32 @@ func TestTokenPool(t *testing.T) {
 					fmt.Println("Final balance of admin's USDC ATA:", final)
 				})
 			})
+
+			t.Run("Reclaim event account rent", func(t *testing.T) {
+				initial, err := solanaGoClient.GetAccountInfoWithOpts(ctx, user.PublicKey(), &rpc.GetAccountInfoOpts{Commitment: config.DefaultCommitment})
+				require.NoError(t, err)
+
+				messageEventAccount, err := solanaGoClient.GetAccountInfoWithOpts(ctx, messageSentEventKeypair.PublicKey(), &rpc.GetAccountInfoOpts{Commitment: config.DefaultCommitment})
+				require.NoError(t, err)
+
+				reclaimIx, err := cctp_message_transmitter.NewReclaimEventAccountInstruction(
+					cctp_message_transmitter.ReclaimEventAccountParams{
+						Attestation: attestation,
+					},
+					user.PublicKey(),
+					messageTransmitter.messageTransmitter,
+					messageSentEventKeypair.PublicKey(),
+				).ValidateAndBuild()
+				require.NoError(t, err)
+
+				result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{reclaimIx}, user, config.DefaultCommitment)
+				require.NotNil(t, result)
+
+				final, err := solanaGoClient.GetAccountInfoWithOpts(ctx, user.PublicKey(), &rpc.GetAccountInfoOpts{Commitment: config.DefaultCommitment})
+				require.NoError(t, err)
+
+				require.Equal(t, initial.Value.Lamports-result.Meta.Fee+messageEventAccount.Value.Lamports, final.Value.Lamports)
+			})
 		})
 
 		t.Run("TypeVersion", func(t *testing.T) {
@@ -1460,6 +1488,7 @@ func TestTokenPool(t *testing.T) {
 
 			messageAmount := uint64(1e5) // 0.1 USDC, as it uses 6 decimals
 			var messageSentEventData message_transmitter.MessageSent
+			var attestation []byte
 
 			t.Run("Basic onramp", func(t *testing.T) {
 				// fund pool signer with SOL so it can pay for the rent of the message sent event account
@@ -1533,7 +1562,7 @@ func TestTokenPool(t *testing.T) {
 
 				_, initial, err := tokens.TokenBalance(ctx, solanaGoClient, adminATA, config.DefaultCommitment)
 
-				attestation, err := ccip.AttestCCTP(messageSentEventData.Message, attesters)
+				attestation, err = ccip.AttestCCTP(messageSentEventData.Message, attesters)
 				offchainTokenData := cctp_token_pool.MessageAndAttestation{
 					Message:     cctp_token_pool.CctpMessage{Data: messageSentEventData.Message},
 					Attestation: attestation,
@@ -1596,6 +1625,42 @@ func TestTokenPool(t *testing.T) {
 				_, final, err := tokens.TokenBalance(ctx, solanaGoClient, adminATA, config.DefaultCommitment)
 
 				require.Equal(t, uint64(initial)+messageAmount, uint64(final), "Admin should have received the USDC after receiving the message")
+			})
+
+			t.Run("Reclaim event account rent", func(t *testing.T) {
+				poolSignerInfo, err := solanaGoClient.GetAccountInfoWithOpts(ctx, cctpPool.signer, &rpc.GetAccountInfoOpts{Commitment: config.DefaultCommitment})
+				require.NoError(t, err)
+				initialBalance := poolSignerInfo.Value.Lamports
+
+				messageSentAccount, err := solanaGoClient.GetAccountInfoWithOpts(ctx, messageSentEventAddress, &rpc.GetAccountInfoOpts{Commitment: config.DefaultCommitment})
+				require.NoError(t, err)
+				messageRent := messageSentAccount.Value.Lamports
+
+				reclaimIx := cctp_token_pool.NewReclaimEventAccountInstruction(
+					usdcMint,
+					user.PublicKey(),
+					remoteChainSelector,
+					fakeCcipNonce,
+					attestation,
+					cctpPool.state,
+					cctpPool.signer,
+					messageSentEventAddress,
+					messageTransmitter.messageTransmitter,
+					messageTransmitter.program,
+					admin.PublicKey(),
+					solana.SystemProgramID,
+				)
+
+				ix, err := reclaimIx.ValidateAndBuild()
+				require.NoError(t, err)
+
+				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+
+				poolSignerInfoAfter, err := solanaGoClient.GetAccountInfoWithOpts(ctx, cctpPool.signer, &rpc.GetAccountInfoOpts{Commitment: config.DefaultCommitment})
+				require.NoError(t, err)
+				finalBalance := poolSignerInfoAfter.Value.Lamports
+
+				require.Equal(t, finalBalance, initialBalance+messageRent)
 			})
 		})
 	})

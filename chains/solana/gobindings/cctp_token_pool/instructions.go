@@ -62,6 +62,8 @@ var (
 	Instruction_ReleaseOrMintTokens = ag_binary.TypeID([8]byte{92, 100, 150, 198, 252, 63, 164, 228})
 
 	Instruction_LockOrBurnTokens = ag_binary.TypeID([8]byte{114, 161, 94, 29, 147, 25, 232, 191})
+
+	Instruction_ReclaimEventAccount = ag_binary.TypeID([8]byte{94, 198, 180, 159, 131, 236, 15, 174})
 )
 
 // InstructionIDToName returns the name of the instruction given its ID.
@@ -97,6 +99,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "ReleaseOrMintTokens"
 	case Instruction_LockOrBurnTokens:
 		return "LockOrBurnTokens"
+	case Instruction_ReclaimEventAccount:
+		return "ReclaimEventAccount"
 	default:
 		return ""
 	}
@@ -161,6 +165,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"lock_or_burn_tokens", (*LockOrBurnTokens)(nil),
+		},
+		{
+			"reclaim_event_account", (*ReclaimEventAccount)(nil),
 		},
 	},
 )
