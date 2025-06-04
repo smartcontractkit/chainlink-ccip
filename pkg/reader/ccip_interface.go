@@ -10,6 +10,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
+	"github.com/smartcontractkit/chainlink-ccip/pkg/chainaccessor"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
@@ -149,7 +150,7 @@ func NewCCIPChainReader(
 func NewCCIPReaderWithExtendedContractReaders(
 	ctx context.Context,
 	lggr logger.Logger,
-	contractReaders map[cciptypes.ChainSelector]contractreader.Extended,
+	extendedContractReaders map[cciptypes.ChainSelector]contractreader.Extended,
 	contractWriters map[cciptypes.ChainSelector]types.ContractWriter,
 	destChain cciptypes.ChainSelector,
 	offrampAddress []byte,
@@ -160,9 +161,19 @@ func NewCCIPReaderWithExtendedContractReaders(
 		// Panic here since right now this is only called from tests in core
 		panic(fmt.Errorf("failed to create CCIP reader: %w", err))
 	}
-	for ch, extendedCr := range contractReaders {
+	var cas = make(map[cciptypes.ChainSelector]cciptypes.ChainAccessor)
+	for ch, extendedCr := range extendedContractReaders {
 		cr.WithExtendedContractReader(ch, extendedCr)
+		cas[ch] = chainaccessor.NewLegacyAccessor(
+			lggr,
+			ch,
+			extendedCr,
+			contractWriters[ch],
+			addrCodec,
+		)
 	}
+
+	cr.accessors = cas
 	return cr
 }
 
