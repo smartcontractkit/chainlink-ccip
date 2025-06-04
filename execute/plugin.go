@@ -595,7 +595,7 @@ func (p *Plugin) Reports(
 	reportInfos, err := extractReportInfo(decodedOutcome)
 	lggr.Debugw("report infos", "reportInfos", reportInfos)
 	if err != nil {
-		lggr.Errorf("unable to extract report info: %w", err)
+		lggr.Errorw("unable to extract report info: %w", err)
 		return nil, fmt.Errorf("extract report info: %w", err)
 	}
 	if len(reportInfos) != len(decodedOutcome.Reports) {
@@ -614,6 +614,9 @@ func (p *Plugin) Reports(
 		return nil, fmt.Errorf("get transmission schedule: %w", err)
 	}
 
+	lggr.Debugw("transmission schedule override",
+		"transmissionSchedule", transmissionSchedule, "oracleIDToP2PID", p.oracleIDToP2pID)
+
 	lggr.Debug("Encoding reports and adding them to final report")
 	// Handle all reports in the outcome
 	var reports []ocr3types.ReportPlus[[]byte]
@@ -622,13 +625,13 @@ func (p *Plugin) Reports(
 		encodedReport, err := p.reportCodec.Encode(ctx, execReport)
 		if err != nil {
 			lggr.Errorw("unable to encode report", "report", execReport, "err", err)
-			return nil, fmt.Errorf("unable to encode report %d: %w", i, err)
+			return nil, fmt.Errorf("unable to encode report %+v: %w", execReport, err)
 		}
 
 		encodedInfo, err := reportInfos[i].Encode()
 		if err != nil {
-			lggr.Errorw("unable to encode report info", "reportInfo", reportInfos[i], "err", err)
-			return nil, fmt.Errorf("unable to encode report info %d: %w", i, err)
+			lggr.Errorw("unable to encode report info", "err", err)
+			return nil, fmt.Errorf("unable to encode report info %w", err)
 		}
 
 		reports = append(reports, ocr3types.ReportPlus[[]byte]{
@@ -639,9 +642,6 @@ func (p *Plugin) Reports(
 			TransmissionScheduleOverride: transmissionSchedule,
 		})
 	}
-
-	lggr.Debugw("transmission schedule override",
-		"transmissionSchedule", transmissionSchedule, "oracleIDToP2PID", p.oracleIDToP2pID)
 
 	return reports, nil
 }

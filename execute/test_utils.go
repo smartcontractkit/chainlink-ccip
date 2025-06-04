@@ -476,12 +476,6 @@ func newMessageSentEvent(
 
 type msgOption func(*cciptypes.Message)
 
-func withNonce(nonce uint64) msgOption {
-	return func(m *cciptypes.Message) {
-		m.Header.Nonce = nonce
-	}
-}
-
 func withTokens(tokenAmounts ...cciptypes.RampTokenAmount) msgOption {
 	return func(m *cciptypes.Message) {
 		m.TokenAmounts = tokenAmounts

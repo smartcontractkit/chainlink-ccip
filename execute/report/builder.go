@@ -194,7 +194,7 @@ func (b *execReportBuilder) Add(
 	// Main processing loop - continue until no more messages or reports can be created
 	for {
 		// Check which messages are ready to execute, excluding already processed ones
-		readyMessages, err := b.checkMessages(ctx, currentCommitReport)
+		readyMessages, err := b.extractReadyMessages(ctx, currentCommitReport)
 		if err != nil {
 			return currentCommitReport, fmt.Errorf("unable to check messages: %w", err)
 		}
@@ -238,12 +238,11 @@ func (b *execReportBuilder) tryBuildReport(
 
 	execReport, updatedReport, err := b.buildSingleChainReport(ctx, commitReport, readyMessages)
 
-	// If the report is empty, we handle it separately especially when multiple reports are enabled.
-	if errors.Is(err, ErrEmptyReport) {
-		return b.handleEmptyReport(ctx, commitReport, readyMessages)
-	}
-
 	if err != nil {
+		// If the report is empty, we handle it separately especially when multiple reports are enabled.
+		if errors.Is(err, ErrEmptyReport) {
+			return b.handleEmptyReport(ctx, commitReport, readyMessages)
+		}
 		return commitReport, false, fmt.Errorf("unable to add a single chain report: %w", err)
 	}
 
@@ -318,13 +317,6 @@ func (b *execReportBuilder) validateNoncesForMultipleReports(commitReport execty
 	return nil
 }
 
-// limitToSingleReport reduces the builder state to only the first report
-func (b *execReportBuilder) limitToSingleReport() {
-	b.execReports = []cciptypes.ExecutePluginReport{b.execReports[0]}
-	b.commitReports = [][]exectypes.CommitData{b.commitReports[0]}
-	b.accumulated = []validationMetadata{b.accumulated[0]}
-}
-
 func (b *execReportBuilder) createNewExecReport() {
 	b.execReports = append(b.execReports, cciptypes.ExecutePluginReport{})
 	b.commitReports = append(b.commitReports, []exectypes.CommitData{})
@@ -332,6 +324,10 @@ func (b *execReportBuilder) createNewExecReport() {
 }
 
 func (b *execReportBuilder) removeLastExecReport() {
+	if len(b.execReports) == 0 {
+		b.lggr.Error("Attempted to remove last exec report, but no reports exist")
+		return
+	}
 	b.execReports = b.execReports[:len(b.execReports)-1]
 	b.commitReports = b.commitReports[:len(b.commitReports)-1]
 	b.accumulated = b.accumulated[:len(b.accumulated)-1]
