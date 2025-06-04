@@ -50,7 +50,7 @@ type evmUSDCMessageReader struct {
 	lggr           logger.Logger
 	contractReader contractreader.ContractReaderFacade
 	cctpDestDomain map[uint64]uint32
-	boundContracts map[cciptypes.ChainSelector]types.BoundContract
+	boundContract  types.BoundContract
 }
 
 type eventID [32]byte
@@ -81,8 +81,8 @@ func NewUSDCMessageReader(
 	contractReaders map[cciptypes.ChainSelector]contractreader.ContractReaderFacade,
 	addrCodec cciptypes.AddressCodec,
 ) (USDCMessageReader, error) {
-	boundContracts := make(map[cciptypes.ChainSelector]types.BoundContract)
 	readers := make(map[cciptypes.ChainSelector]USDCMessageReader)
+	domains := AllAvailableDomains()
 	for chainSelector, token := range tokensConfig {
 		family, err := sel.GetSelectorFamily(uint64(chainSelector))
 		if err != nil {
@@ -107,13 +107,11 @@ func NewUSDCMessageReader(
 			if err != nil {
 				return nil, err
 			}
-			boundContracts[chainSelector] = contract
 			readers[chainSelector] = evmUSDCMessageReader{
 				lggr:           lggr,
 				contractReader: contractReaders[chainSelector],
-				// TODO: set domain/bound correctly.
-				cctpDestDomain: CCTPDestDomains,
-				boundContracts: boundContracts,
+				cctpDestDomain: domains,
+				boundContract:  contract,
 			}
 		case sel.FamilySolana:
 			// TODO: Implement Solana USDC message reader
@@ -124,19 +122,15 @@ func NewUSDCMessageReader(
 	}
 
 	return compositeFamilyUSDCMessageReader{
-		lggr:           lggr,
-		readers:        readers,
-		cctpDestDomain: AllAvailableDomains(),
-		boundContracts: boundContracts,
+		lggr:    lggr,
+		readers: readers,
 	}, nil
 }
 
 // compositeFamilyUSDCMessageReader is a USDCMessageReader that can handle different chain families.
 type compositeFamilyUSDCMessageReader struct {
-	lggr           logger.Logger
-	readers        map[cciptypes.ChainSelector]USDCMessageReader
-	cctpDestDomain map[uint64]uint32
-	boundContracts map[cciptypes.ChainSelector]types.BoundContract
+	lggr    logger.Logger
+	readers map[cciptypes.ChainSelector]USDCMessageReader
 }
 
 func (m compositeFamilyUSDCMessageReader) MessagesByTokenID(
@@ -145,7 +139,7 @@ func (m compositeFamilyUSDCMessageReader) MessagesByTokenID(
 	tokens map[MessageTokenID]cciptypes.RampTokenAmount,
 ) (map[MessageTokenID]cciptypes.Bytes, error) {
 	if _, ok := m.readers[source]; !ok {
-		return nil, fmt.Errorf("no reader bound for chain %d", source)
+		return nil, fmt.Errorf("no reader for chain %d", source)
 	}
 	return m.readers[source].MessagesByTokenID(ctx, source, dest, tokens)
 }
@@ -190,11 +184,6 @@ func (u evmUSDCMessageReader) MessagesByTokenID(
 
 	// 2. Query the MessageTransmitter contract for the MessageSent events based on the 3rd words.
 	// We need entire MessageSent payload to use that with the Attestation API
-	cr, ok := u.boundContracts[source]
-	if !ok {
-		return nil, fmt.Errorf("no contract bound for chain %d", source)
-	}
-
 	expressions := []query.Expression{query.Confidence(primitives.Finalized)}
 	if len(eventIDsByMsgTokenID) > 0 {
 		eventIDs := make([]eventID, 0, len(eventIDsByMsgTokenID))
@@ -220,7 +209,7 @@ func (u evmUSDCMessageReader) MessagesByTokenID(
 
 	iter, err := u.contractReader.QueryKey(
 		ctx,
-		cr,
+		u.boundContract,
 		keyFilter,
 		query.NewLimitAndSort(
 			query.Limit{Count: uint64(len(eventIDsByMsgTokenID))},

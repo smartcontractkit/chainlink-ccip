@@ -230,7 +230,7 @@ func Test_USDCMessageReader_MessagesByTokenID(t *testing.T) {
 			name:           "should return error when CCTP domain is not supported",
 			sourceSelector: cciptypes.ChainSelector(sel.POLYGON_MAINNET.Selector),
 			destSelector:   emptyChain,
-			errorMessage:   fmt.Sprintf("no contract bound for chain %d", sel.POLYGON_MAINNET.Selector),
+			errorMessage:   fmt.Sprintf("no reader for chain %d", sel.POLYGON_MAINNET.Selector),
 		},
 		{
 			name:           "valid chain return events but nothing is matched",
