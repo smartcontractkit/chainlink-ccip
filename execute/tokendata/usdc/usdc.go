@@ -49,10 +49,10 @@ func NewUSDCTokenDataObserver(
 		return nil, err
 	}
 
-	return newUSDCTokenDataObserver(lggr, destChainSelector, usdcConfig, attestationEncoder, usdcReader)
+	return internalNewUSDCTokenDataObserver(lggr, destChainSelector, usdcConfig, attestationEncoder, usdcReader)
 }
 
-func newUSDCTokenDataObserver(
+func internalNewUSDCTokenDataObserver(
 	lggr logger.Logger,
 	destChainSelector cciptypes.ChainSelector,
 	usdcConfig pluginconfig.USDCCCTPObserverConfig,

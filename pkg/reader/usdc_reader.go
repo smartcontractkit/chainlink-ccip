@@ -46,11 +46,11 @@ var CCTPDestDomains = map[uint64]uint32{
 	sel.POLYGON_TESTNET_AMOY.Selector:                7,
 }
 
-type usdcMessageReader struct {
-	lggr            logger.Logger
-	contractReaders map[cciptypes.ChainSelector]contractreader.ContractReaderFacade
-	cctpDestDomain  map[uint64]uint32
-	boundContracts  map[cciptypes.ChainSelector]types.BoundContract
+type evmUSDCMessageReader struct {
+	lggr           logger.Logger
+	contractReader contractreader.ContractReaderFacade
+	cctpDestDomain map[uint64]uint32
+	boundContracts map[cciptypes.ChainSelector]types.BoundContract
 }
 
 type eventID [32]byte
@@ -82,34 +82,72 @@ func NewUSDCMessageReader(
 	addrCodec cciptypes.AddressCodec,
 ) (USDCMessageReader, error) {
 	boundContracts := make(map[cciptypes.ChainSelector]types.BoundContract)
+	readers := make(map[cciptypes.ChainSelector]USDCMessageReader)
 	for chainSelector, token := range tokensConfig {
-
-		bytesAddress, err := addrCodec.AddressStringToBytes(token.SourceMessageTransmitterAddr, chainSelector)
+		family, err := sel.GetSelectorFamily(uint64(chainSelector))
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to get selector family for chain %d: %w", chainSelector, err)
 		}
+		switch family {
+		case sel.FamilyEVM:
+			bytesAddress, err := addrCodec.AddressStringToBytes(token.SourceMessageTransmitterAddr, chainSelector)
+			if err != nil {
+				return nil, err
+			}
 
-		contract, err := bindReaderContract(
-			ctx,
-			lggr,
-			contractReaders,
-			chainSelector,
-			consts.ContractNameCCTPMessageTransmitter,
-			bytesAddress,
-			addrCodec,
-		)
-		if err != nil {
-			return nil, err
+			contract, err := bindReaderContract(
+				ctx,
+				lggr,
+				contractReaders,
+				chainSelector,
+				consts.ContractNameCCTPMessageTransmitter,
+				bytesAddress,
+				addrCodec,
+			)
+			if err != nil {
+				return nil, err
+			}
+			boundContracts[chainSelector] = contract
+			readers[chainSelector] = evmUSDCMessageReader{
+				lggr:           lggr,
+				contractReader: contractReaders[chainSelector],
+				// TODO: set domain/bound correctly.
+				cctpDestDomain: CCTPDestDomains,
+				boundContracts: boundContracts,
+			}
+		case sel.FamilySolana:
+			// TODO: Implement Solana USDC message reader
+			panic("not implemented yet")
+		default:
+			return nil, fmt.Errorf("unsupported chain selector family %s for chain %d", family, chainSelector)
 		}
-		boundContracts[chainSelector] = contract
 	}
 
-	return usdcMessageReader{
-		lggr:            lggr,
-		contractReaders: contractReaders,
-		cctpDestDomain:  AllAvailableDomains(),
-		boundContracts:  boundContracts,
+	return compositeFamilyUSDCMessageReader{
+		lggr:           lggr,
+		readers:        readers,
+		cctpDestDomain: AllAvailableDomains(),
+		boundContracts: boundContracts,
 	}, nil
+}
+
+// compositeFamilyUSDCMessageReader is a USDCMessageReader that can handle different chain families.
+type compositeFamilyUSDCMessageReader struct {
+	lggr           logger.Logger
+	readers        map[cciptypes.ChainSelector]USDCMessageReader
+	cctpDestDomain map[uint64]uint32
+	boundContracts map[cciptypes.ChainSelector]types.BoundContract
+}
+
+func (m compositeFamilyUSDCMessageReader) MessagesByTokenID(
+	ctx context.Context,
+	source, dest cciptypes.ChainSelector,
+	tokens map[MessageTokenID]cciptypes.RampTokenAmount,
+) (map[MessageTokenID]cciptypes.Bytes, error) {
+	if _, ok := m.readers[source]; !ok {
+		return nil, fmt.Errorf("no reader bound for chain %d", source)
+	}
+	return m.readers[source].MessagesByTokenID(ctx, source, dest, tokens)
 }
 
 // FIXME It adds test selectors to the domains
@@ -135,7 +173,7 @@ func AllAvailableDomains() map[uint64]uint32 {
 	return destDomains
 }
 
-func (u usdcMessageReader) MessagesByTokenID(
+func (u evmUSDCMessageReader) MessagesByTokenID(
 	ctx context.Context,
 	source, dest cciptypes.ChainSelector,
 	tokens map[MessageTokenID]cciptypes.RampTokenAmount,
@@ -180,7 +218,7 @@ func (u usdcMessageReader) MessagesByTokenID(
 		return nil, err
 	}
 
-	iter, err := u.contractReaders[source].QueryKey(
+	iter, err := u.contractReader.QueryKey(
 		ctx,
 		cr,
 		keyFilter,
@@ -226,7 +264,7 @@ func (u usdcMessageReader) MessagesByTokenID(
 	return out, nil
 }
 
-func (u usdcMessageReader) recreateMessageTransmitterEvents(
+func (u evmUSDCMessageReader) recreateMessageTransmitterEvents(
 	destChainSelector cciptypes.ChainSelector,
 	tokens map[MessageTokenID]cciptypes.RampTokenAmount,
 ) (map[MessageTokenID]eventID, error) {
