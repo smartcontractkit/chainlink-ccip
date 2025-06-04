@@ -2,6 +2,7 @@ package chainaccessor
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -40,13 +41,35 @@ func NewLegacyAccessor(
 }
 
 func (l *LegacyAccessor) Metadata() cciptypes.AccessorMetadata {
-	// TODO(NONEVM-1865): implement
-	panic("implement me")
+	allBindings := l.contractReader.GetAllBindings()
+	contracts := make(map[string]cciptypes.UnknownAddress, len(allBindings))
+	for contractName, binding := range allBindings {
+		addressBytes, err := l.addrCodec.AddressStringToBytes(binding[0].Binding.Address, l.chainSelector)
+		if err != nil {
+			l.lggr.Errorf("failed to convert address to bytes : %v", err)
+			continue
+		}
+		contracts[contractName] = addressBytes
+	}
+
+	return cciptypes.AccessorMetadata{
+		ChainSelector: l.chainSelector,
+		Contracts:     contracts,
+	}
 }
 
 func (l *LegacyAccessor) GetContractAddress(contractName string) ([]byte, error) {
-	// TODO(NONEVM-1865): implement
-	panic("implement me")
+	bindings := l.contractReader.GetBindings(contractName)
+	if len(bindings) != 1 {
+		return nil, fmt.Errorf("expected one binding for the %s contract, got %d", contractName, len(bindings))
+	}
+
+	addressBytes, err := l.addrCodec.AddressStringToBytes(bindings[0].Binding.Address, l.chainSelector)
+	if err != nil {
+		return nil, fmt.Errorf("convert address %s to bytes: %w", bindings[0].Binding.Address, err)
+	}
+
+	return addressBytes, nil
 }
 
 func (l *LegacyAccessor) GetChainFeeComponents(

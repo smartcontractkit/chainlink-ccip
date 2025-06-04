@@ -33,6 +33,9 @@ type Extended interface {
 	// GetBindings returns current bindings for a given contract reader.
 	GetBindings(contractName string) []ExtendedBoundContract
 
+	// GetAllBindings returns all bindings for all contracts associated with this reader.
+	GetAllBindings() map[string][]ExtendedBoundContract
+
 	// ExtendedQueryKey performs automatic binding from contractName to the first bound contract.
 	// An error is generated if there are more than one bound contract for the contractName.
 	ExtendedQueryKey(
@@ -296,6 +299,18 @@ func (e *extendedContractReader) GetBindings(contractName string) []ExtendedBoun
 		return []ExtendedBoundContract{}
 	}
 	return bindings
+}
+
+func (e *extendedContractReader) GetAllBindings() map[string][]ExtendedBoundContract {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	allBindings := make(map[string][]ExtendedBoundContract, len(e.contractBindingsByName))
+	for key, bindings := range e.contractBindingsByName {
+		allBindings[key] = bindings
+	}
+
+	return allBindings
 }
 
 func (e *extendedContractReader) bindingExists(b types.BoundContract) bool {

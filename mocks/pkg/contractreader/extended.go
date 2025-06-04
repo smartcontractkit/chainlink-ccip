@@ -316,6 +316,53 @@ func (_c *MockExtended_ExtendedQueryKey_Call) RunAndReturn(run func(context.Cont
 	return _c
 }
 
+// GetAllBindings provides a mock function with no fields
+func (_m *MockExtended) GetAllBindings() map[string][]contractreader.ExtendedBoundContract {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetAllBindings")
+	}
+
+	var r0 map[string][]contractreader.ExtendedBoundContract
+	if rf, ok := ret.Get(0).(func() map[string][]contractreader.ExtendedBoundContract); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[string][]contractreader.ExtendedBoundContract)
+		}
+	}
+
+	return r0
+}
+
+// MockExtended_GetAllBindings_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetAllBindings'
+type MockExtended_GetAllBindings_Call struct {
+	*mock.Call
+}
+
+// GetAllBindings is a helper method to define mock.On call
+func (_e *MockExtended_Expecter) GetAllBindings() *MockExtended_GetAllBindings_Call {
+	return &MockExtended_GetAllBindings_Call{Call: _e.mock.On("GetAllBindings")}
+}
+
+func (_c *MockExtended_GetAllBindings_Call) Run(run func()) *MockExtended_GetAllBindings_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockExtended_GetAllBindings_Call) Return(_a0 map[string][]contractreader.ExtendedBoundContract) *MockExtended_GetAllBindings_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockExtended_GetAllBindings_Call) RunAndReturn(run func() map[string][]contractreader.ExtendedBoundContract) *MockExtended_GetAllBindings_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetBindings provides a mock function with given fields: contractName
 func (_m *MockExtended) GetBindings(contractName string) []contractreader.ExtendedBoundContract {
 	ret := _m.Called(contractName)
