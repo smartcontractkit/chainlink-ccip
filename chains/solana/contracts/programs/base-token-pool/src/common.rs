@@ -16,6 +16,8 @@ pub const POOL_SIGNER_SEED: &[u8] = b"ccip_tokenpool_signer";
 pub const EXTERNAL_TOKEN_POOLS_SIGNER: &[u8] = b"external_token_pools_signer";
 pub const ALLOWED_OFFRAMP: &[u8] = b"allowed_offramp";
 
+pub const CONFIG_SEED: &[u8] = b"config";
+
 pub const fn valid_version(v: u8, max_version: u8) -> bool {
     !uninitialized(v) && v <= max_version
 }
@@ -327,6 +329,11 @@ pub struct ReleaseOrMintOutV1 {
     // This value is expected to be equal to the ReleaseOrMintInV1.amount in the case where the source and destination
     // chain have the same number of decimals.
     pub destination_amount: u64, // token amounts local to solana
+}
+
+#[event]
+pub struct GlobalConfigUpdated {
+    pub self_served_allowed: bool,
 }
 
 #[event]

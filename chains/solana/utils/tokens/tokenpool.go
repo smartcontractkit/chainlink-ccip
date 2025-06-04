@@ -153,6 +153,11 @@ func TokenPoolChainConfigPDA(chainSelector uint64, mint, programID solana.Public
 	return solana.FindProgramAddress([][]byte{[]byte("ccip_tokenpool_chainconfig"), chainSelectorLE, mint.Bytes()}, programID)
 }
 
+func TokenPoolGlobalConfigPDA(programID solana.PublicKey) (solana.PublicKey, error) {
+	addr, _, err := solana.FindProgramAddress([][]byte{[]byte("config")}, programID)
+	return addr, err
+}
+
 type EventBurnLock struct {
 	Discriminator [8]byte
 	Sender        solana.PublicKey

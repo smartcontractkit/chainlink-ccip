@@ -13,6 +13,19 @@ pub mod lockrelease_token_pool {
 
     use super::*;
 
+    pub fn init_global_config(ctx: Context<InitGlobalConfig>) -> Result<()> {
+        ctx.accounts.config.self_served_allowed = false;
+        Ok(())
+    }
+
+    pub fn update_global_config(
+        ctx: Context<UpdateGlobalConfig>,
+        self_served_allowed: bool,
+    ) -> Result<()> {
+        ctx.accounts.config.self_served_allowed = self_served_allowed;
+        Ok(())
+    }
+
     pub fn initialize(
         ctx: Context<InitializeTokenPool>,
         router: Pubkey,
