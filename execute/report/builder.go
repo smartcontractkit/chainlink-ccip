@@ -207,7 +207,7 @@ func (b *execReportBuilder) Add(
 		// Check which messages are ready to execute, excluding already processed ones
 		readyMessages, err := b.extractReadyMessages(ctx, currentCommitReport)
 		if err != nil {
-			return currentCommitReport, fmt.Errorf("unable to check messages: %w", err)
+			return currentCommitReport, fmt.Errorf("unable to extract ready messages: %w", err)
 		}
 
 		if len(readyMessages) == 0 {

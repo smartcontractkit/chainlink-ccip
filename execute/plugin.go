@@ -525,7 +525,6 @@ func selectReports(
 		}
 	}
 
-	// TODO: Stop at MaxReportsPerRound in the builder
 	execReports, selectedReports, err := builder.Build()
 
 	// TODO: count pending reports during Build() when we select which reports can be returned.
@@ -595,7 +594,6 @@ func (p *Plugin) Reports(
 	reportInfos, err := extractReportInfo(decodedOutcome)
 	lggr.Debugw("report infos", "reportInfos", reportInfos)
 	if err != nil {
-		lggr.Errorw("unable to extract report info: %w", err)
 		return nil, fmt.Errorf("extract report info: %w", err)
 	}
 	if len(reportInfos) != len(decodedOutcome.Reports) {
@@ -624,8 +622,7 @@ func (p *Plugin) Reports(
 		lggr.Debugw("Encoding Report: ", "report", execReport)
 		encodedReport, err := p.reportCodec.Encode(ctx, execReport)
 		if err != nil {
-			lggr.Errorw("unable to encode report", "report", execReport, "err", err)
-			return nil, fmt.Errorf("unable to encode report %+v: %w", execReport, err)
+			return nil, fmt.Errorf("unable to encode report %w", err)
 		}
 
 		encodedInfo, err := reportInfos[i].Encode()
