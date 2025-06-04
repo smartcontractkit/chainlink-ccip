@@ -11,6 +11,7 @@ import (
 	"slices"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -568,7 +569,13 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 			continue
 		}
 
+		txHash, err := ExtractTxHash(item.Cursor)
+		if err != nil {
+			lggr.Warnw("failed to extract transaction hash from cursor", "err", err, "cursor", item.Cursor)
+		}
+
 		msg.Message.Header.OnRamp = onRampAddress
+		msg.Message.Header.TxHash = txHash
 		msgs = append(msgs, msg.Message)
 	}
 
@@ -577,6 +584,24 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 		"seqNumRange", seqNumRange.String())
 
 	return msgs, nil
+}
+
+// ExtractTxHash extracts the transaction hash from a ContractReader cursor.
+// The expected format is "BlockNumber-LogIndex-TxHash".
+func ExtractTxHash(cursor string) (string, error) {
+	parts := strings.SplitN(cursor, "-", 3)
+
+	if len(parts) < 3 {
+		return "", fmt.Errorf("invalid cursor format: '%s'. Expected format 'BlockNumber-LogIndex-TxHash'", cursor)
+	}
+
+	txHash := parts[2]
+
+	if len(txHash) == 0 {
+		return "", fmt.Errorf("transaction hash is empty in cursor: '%s'", cursor)
+	}
+
+	return txHash, nil
 }
 
 // LatestMsgSeqNum reads the source chain and returns the latest finalized message sequence number.
