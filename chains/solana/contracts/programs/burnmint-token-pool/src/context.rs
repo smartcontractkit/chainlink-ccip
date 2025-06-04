@@ -410,3 +410,15 @@ pub struct DeleteChainConfig<'info> {
     #[account(mut, address = state.config.owner)]
     pub authority: Signer<'info>,
 }
+
+/// Checks if the given authority is allowed to initialize the token pool.
+pub fn allowed_to_initialize_token_pool(
+    program_data: &Account<ProgramData>,
+    authority: &Signer,
+    config: &Account<BnMConfig>,
+    mint: &InterfaceAccount<Mint>,
+) -> bool {
+    program_data.upgrade_authority_address == Some(authority.key()) || // The upgrade authority of the token pool program can initialize a token pool
+    (config.self_served_allowed && Some(authority.key()) == mint.mint_authority.into() )
+    // or the mint authority of the token, if self-serve is allowed
+}
