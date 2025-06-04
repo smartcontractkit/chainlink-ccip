@@ -500,64 +500,20 @@ func createExecutedMessagesKeyFilter(
 	return keyFilter, countSqNrs
 }
 
-type SendRequestedEvent struct {
-	DestChainSelector cciptypes.ChainSelector
-	SequenceNumber    cciptypes.SeqNum
-	Message           cciptypes.Message
-}
-
 func (r *ccipChainReader) MsgsBetweenSeqNums(
 	ctx context.Context, sourceChainSelector cciptypes.ChainSelector, seqNumRange cciptypes.SeqNumRange,
 ) ([]cciptypes.Message, error) {
-	lggr := logutil.WithContextValues(ctx, r.lggr)
-
 	if err := validateAccessorExistence(r.accessors, sourceChainSelector); err != nil {
 		return nil, err
 	}
-	onRampAddress, err := r.accessors[sourceChainSelector].GetContractAddress(consts.ContractNameOnRamp)
+	onRampAddressBeforeQuery, err := r.accessors[sourceChainSelector].GetContractAddress(consts.ContractNameOnRamp)
 	if err != nil {
 		return nil, fmt.Errorf("get onRamp address: %w", err)
 	}
 
-	if err := validateReaderExistence(r.contractReaders, sourceChainSelector); err != nil {
-		return nil, err
-	}
-	seq, err := r.contractReaders[sourceChainSelector].ExtendedQueryKey(
-		ctx,
-		consts.ContractNameOnRamp,
-		query.KeyFilter{
-			Key: consts.EventNameCCIPMessageSent,
-			Expressions: []query.Expression{
-				query.Comparator(consts.EventAttributeSourceChain, primitives.ValueComparator{
-					Value:    sourceChainSelector,
-					Operator: primitives.Eq,
-				}),
-				query.Comparator(consts.EventAttributeDestChain, primitives.ValueComparator{
-					Value:    r.destChain,
-					Operator: primitives.Eq,
-				}),
-				query.Comparator(consts.EventAttributeSequenceNumber, primitives.ValueComparator{
-					Value:    seqNumRange.Start(),
-					Operator: primitives.Gte,
-				}, primitives.ValueComparator{
-					Value:    seqNumRange.End(),
-					Operator: primitives.Lte,
-				}),
-				query.Confidence(primitives.Finalized),
-			},
-		},
-		query.LimitAndSort{
-			SortBy: []query.SortBy{
-				query.NewSortBySequence(query.Asc),
-			},
-			Limit: query.Limit{
-				Count: uint64(seqNumRange.End() - seqNumRange.Start() + 1),
-			},
-		},
-		&SendRequestedEvent{},
-	)
+	messages, err := r.accessors[sourceChainSelector].MsgsBetweenSeqNums(ctx, r.destChain, seqNumRange)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query onRamp: %w", err)
+		return nil, fmt.Errorf("failed to call MsgsBetweenSeqNums on accessor: %w", err)
 	}
 
 	onRampAddressAfterQuery, err := r.accessors[sourceChainSelector].GetContractAddress(consts.ContractNameOnRamp)
@@ -566,43 +522,11 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 	}
 
 	// Ensure the onRamp address hasn't changed during the query.
-	if !bytes.Equal(onRampAddress, onRampAddressAfterQuery) {
-		return nil, fmt.Errorf("onRamp address has changed from %s to %s", onRampAddress, onRampAddressAfterQuery)
+	if !bytes.Equal(onRampAddressBeforeQuery, onRampAddressAfterQuery) {
+		return nil, fmt.Errorf("onRamp address has changed from %s to %s", onRampAddressBeforeQuery, onRampAddressAfterQuery)
 	}
 
-	lggr.Infow("queried messages between sequence numbers",
-		"numMsgs", len(seq),
-		"sourceChainSelector", sourceChainSelector,
-		"seqNumRange", seqNumRange.String(),
-	)
-
-	msgs := make([]cciptypes.Message, 0)
-	for _, item := range seq {
-		msg, ok := item.Data.(*SendRequestedEvent)
-		if !ok {
-			return nil, fmt.Errorf("failed to cast %v to Message", item.Data)
-		}
-
-		if err := validateSendRequestedEvent(msg, sourceChainSelector, r.destChain, seqNumRange); err != nil {
-			lggr.Errorw("validate send requested event", "err", err, "message", msg)
-			continue
-		}
-
-		txHash, err := contractreader.ExtractTxHash(item.Cursor)
-		if err != nil {
-			lggr.Warnw("failed to extract transaction hash from cursor", "err", err, "cursor", item.Cursor)
-		}
-
-		msg.Message.Header.OnRamp = onRampAddress
-		msg.Message.Header.TxHash = txHash
-		msgs = append(msgs, msg.Message)
-	}
-
-	lggr.Infow("decoded messages between sequence numbers", "msgs", msgs,
-		"sourceChainSelector", sourceChainSelector,
-		"seqNumRange", seqNumRange.String())
-
-	return msgs, nil
+	return messages, nil
 }
 
 // LatestMsgSeqNum reads the source chain and returns the latest finalized message sequence number.
@@ -636,7 +560,7 @@ func (r *ccipChainReader) LatestMsgSeqNum(
 			},
 			Limit: query.Limit{Count: 1},
 		},
-		&SendRequestedEvent{},
+		&chainaccessor.SendRequestedEvent{},
 	)
 	if err != nil {
 		return 0, fmt.Errorf("failed to query onRamp: %w", err)
@@ -652,12 +576,12 @@ func (r *ccipChainReader) LatestMsgSeqNum(
 	}
 
 	item := seq[0]
-	msg, ok := item.Data.(*SendRequestedEvent)
+	msg, ok := item.Data.(*chainaccessor.SendRequestedEvent)
 	if !ok {
 		return 0, fmt.Errorf("failed to cast %v to SendRequestedEvent", item.Data)
 	}
 
-	if err := validateSendRequestedEvent(msg, chain, r.destChain,
+	if err := chainaccessor.ValidateSendRequestedEvent(msg, chain, r.destChain,
 		cciptypes.NewSeqNumRange(msg.Message.Header.SequenceNumber, msg.Message.Header.SequenceNumber)); err != nil {
 		return 0, fmt.Errorf("message invalid msg %v: %w", msg, err)
 	}
@@ -2222,55 +2146,6 @@ func validateExecutionStateChangedEvent(
 
 	if ev.State == 0 {
 		return fmt.Errorf("state is zero")
-	}
-
-	return nil
-}
-
-func validateSendRequestedEvent(
-	ev *SendRequestedEvent, source, dest cciptypes.ChainSelector, seqNumRange cciptypes.SeqNumRange) error {
-	if ev == nil {
-		return fmt.Errorf("send requested event is nil")
-	}
-
-	if ev.Message.Header.DestChainSelector != dest {
-		return fmt.Errorf("msg dest chain is not the expected queried one")
-	}
-	if ev.DestChainSelector != dest {
-		return fmt.Errorf("dest chain is not the expected queried one")
-	}
-
-	if ev.Message.Header.SourceChainSelector != source {
-		return fmt.Errorf("source chain is not the expected queried one")
-	}
-
-	if ev.SequenceNumber != ev.Message.Header.SequenceNumber {
-		return fmt.Errorf("event sequence number does not match the message sequence number %d != %d",
-			ev.SequenceNumber, ev.Message.Header.SequenceNumber)
-	}
-
-	if ev.SequenceNumber < seqNumRange.Start() || ev.SequenceNumber > seqNumRange.End() {
-		return fmt.Errorf("send requested event sequence number is not in the expected range")
-	}
-
-	if ev.Message.Header.MessageID.IsEmpty() {
-		return fmt.Errorf("message ID is zero")
-	}
-
-	if len(ev.Message.Receiver) == 0 {
-		return fmt.Errorf("empty receiver address: %s", ev.Message.Receiver.String())
-	}
-
-	if ev.Message.Sender.IsZeroOrEmpty() {
-		return fmt.Errorf("invalid sender address: %s", ev.Message.Sender.String())
-	}
-
-	if ev.Message.FeeTokenAmount.IsEmpty() {
-		return fmt.Errorf("fee token amount is zero")
-	}
-
-	if ev.Message.FeeToken.IsZeroOrEmpty() {
-		return fmt.Errorf("invalid fee token: %s", ev.Message.FeeToken.String())
 	}
 
 	return nil
