@@ -415,7 +415,7 @@ pub struct DeleteChainConfig<'info> {
 pub fn allowed_to_initialize_token_pool(
     program_data: &Account<ProgramData>,
     authority: &Signer,
-    config: &Account<BnMConfig>,
+    config: &Account<PoolConfig>,
     mint: &InterfaceAccount<Mint>,
 ) -> bool {
     program_data.upgrade_authority_address == Some(authority.key()) || // The upgrade authority of the token pool program can initialize a token pool
