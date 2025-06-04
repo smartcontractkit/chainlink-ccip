@@ -2,8 +2,8 @@ package commit
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
@@ -15,8 +15,12 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
 	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
+	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 // observationNext contains new Observation logic with breaking changes that should replace the existing
@@ -83,9 +87,7 @@ func (p *Plugin) observationNext(
 		OnChainPriceOcrSeqNum: 0,
 	}
 
-	inflightPricesExist := prevOutcome.MainOutcome.InflightPriceOcrSequenceNumber > 0 &&
-		prevOutcome.MainOutcome.RemainingPriceChecks > 0
-
+	inflightPricesExist := prevOutcome.MainOutcome.InflightPriceOcrSequenceNumber > 0
 	switch inflightPricesExist {
 	case true:
 		// If we have inflight prices destination chain supporting oracles only observe the onchain price ocr seq num.
@@ -172,8 +174,178 @@ func (p *Plugin) getPriceObservations(
 // Outcome in the next release.
 //
 // NOTE: If you are building a feature make sure to include your changes here.
+//
+//nolint:gocyclo
 func (p *Plugin) outcomeNext(
 	ctx context.Context, outCtx ocr3types.OutcomeContext, q types.Query, aos []types.AttributedObservation,
 ) (ocr3types.Outcome, error) {
-	return ocr3types.Outcome{}, errors.New("not implemented")
+	ctx, lggr := logutil.WithOCRInfo(ctx, p.lggr, outCtx.SeqNr, logutil.PhaseOutcome)
+	lggr.Debugw("commit plugin performing outcome", "attributedObservations", aos)
+
+	prevOutcome, err := p.ocrTypeCodec.DecodeOutcome(outCtx.PreviousOutcome)
+	if err != nil {
+		return nil, fmt.Errorf("decode previous outcome: %w", err)
+	}
+
+	decodedQ, err := p.ocrTypeCodec.DecodeQuery(q)
+	if err != nil {
+		return nil, fmt.Errorf("decode query: %w", err)
+	}
+
+	merkleRootObservations := make([]attributedMerkleRootObservation, 0, len(aos))
+	tokenPricesObservations := make([]attributedTokenPricesObservation, 0, len(aos))
+	chainFeeObservations := make([]attributedChainFeeObservation, 0, len(aos))
+	discoveryObservations := make([]plugincommon.AttributedObservation[dt.Observation], 0, len(aos))
+	observedOnChainOcrSeqNums := make([]uint64, 0, len(aos))
+	fChainObservations := make(map[cciptypes.ChainSelector][]int)
+
+	for _, ao := range aos {
+		obs, err := p.ocrTypeCodec.DecodeObservation(ao.Observation)
+		if err != nil {
+			lggr.Warnw("failed to decode observation, observation skipped",
+				"err", err, "observer", ao.Observer, "observation", ao.Observation)
+			continue
+		}
+
+		lggr.Debugw("Commit plugin outcome decoded observation", "observation", obs, "observer", ao.Observer)
+
+		merkleRootObservations = append(merkleRootObservations, attributedMerkleRootObservation{
+			OracleID: ao.Observer, Observation: obs.MerkleRootObs})
+
+		tokenPricesObservations = append(tokenPricesObservations, attributedTokenPricesObservation{
+			OracleID: ao.Observer, Observation: obs.TokenPriceObs})
+
+		chainFeeObservations = append(chainFeeObservations, attributedChainFeeObservation{
+			OracleID: ao.Observer, Observation: obs.ChainFeeObs})
+
+		discoveryObservations = append(discoveryObservations, plugincommon.AttributedObservation[dt.Observation]{
+			OracleID: ao.Observer, Observation: obs.DiscoveryObs})
+
+		if obs.OnChainPriceOcrSeqNum > 0 {
+			observedOnChainOcrSeqNums = append(observedOnChainOcrSeqNums, obs.OnChainPriceOcrSeqNum)
+		}
+
+		for chain, f := range obs.FChain {
+			if f > 0 {
+				if _, ok := fChainObservations[chain]; !ok {
+					fChainObservations[chain] = make([]int, 0, f)
+				}
+				fChainObservations[chain] = append(fChainObservations[chain], f)
+			}
+		}
+	}
+
+	if p.discoveryProcessor != nil {
+		lggr.Infow("Processing discovery observations", "discoveryObservations", discoveryObservations)
+
+		// The outcome phase of the discovery processor is binding contracts to the chain reader. This is the reason
+		// we ignore the outcome of the discovery processor.
+		_, err = p.discoveryProcessor.Outcome(ctx, dt.Outcome{}, dt.Query{}, discoveryObservations)
+		if err != nil {
+			lggr.Errorw("failed to get discovery processor outcome", "err", err)
+		} else {
+			p.contractsInitialized.Store(true)
+		}
+	}
+
+	merkleRootOutcome, err := p.merkleRootProcessor.Outcome(
+		ctx,
+		prevOutcome.MerkleRootOutcome,
+		decodedQ.MerkleRootQuery,
+		merkleRootObservations,
+	)
+	if err != nil {
+		lggr.Errorw("failed to get merkle roots outcome", "err", err)
+	}
+
+	mainOutcome, invalidatePriceCache, err := p.getMainOutcomeAndCacheInvalidation(
+		lggr, prevOutcome, observedOnChainOcrSeqNums, fChainObservations)
+	if err != nil {
+		lggr.Errorw("failed to get main outcome and cache invalidation", "err", err)
+	}
+	ctx = context.WithValue(ctx, consts.InvalidateCacheKey, invalidatePriceCache)
+
+	tokenPriceOutcome, err := p.tokenPriceProcessor.Outcome(
+		ctx,
+		prevOutcome.TokenPriceOutcome,
+		decodedQ.TokenPriceQuery,
+		tokenPricesObservations,
+	)
+	if err != nil {
+		lggr.Warnw("failed to get token prices outcome", "err", err)
+	}
+
+	chainFeeOutcome, err := p.chainFeeProcessor.Outcome(
+		ctx,
+		prevOutcome.ChainFeeOutcome,
+		decodedQ.ChainFeeQuery,
+		chainFeeObservations,
+	)
+	if err != nil {
+		lggr.Warnw("failed to get chain fee prices outcome", "err", err)
+	}
+
+	if len(tokenPriceOutcome.TokenPrices) > 0 || len(chainFeeOutcome.GasPrices) > 0 {
+		mainOutcome.InflightPriceOcrSequenceNumber = cciptypes.SeqNum(outCtx.SeqNr)
+		mainOutcome.RemainingPriceChecks = p.offchainCfg.InflightPriceCheckRetries
+	}
+
+	out := committypes.Outcome{
+		MerkleRootOutcome: merkleRootOutcome,
+		TokenPriceOutcome: tokenPriceOutcome,
+		ChainFeeOutcome:   chainFeeOutcome,
+		MainOutcome:       mainOutcome,
+	}
+	p.metricsReporter.TrackOutcome(out)
+
+	lggr.Infow("Commit plugin finished outcome", "outcome", out)
+	return p.ocrTypeCodec.EncodeOutcome(out)
+}
+
+func (p *Plugin) getMainOutcomeAndCacheInvalidation(
+	lggr logger.Logger,
+	prevOutcome committypes.Outcome,
+	observedOnChainOcrSeqNums []uint64,
+	fChainObservations map[cciptypes.ChainSelector][]int,
+) (committypes.MainOutcome, bool, error) {
+	mainOutcome := committypes.MainOutcome{}
+	invalidatePriceCache := false
+
+	if prevOutcome.MainOutcome.InflightPriceOcrSequenceNumber == 0 {
+		return mainOutcome, false, nil
+	}
+
+	for _, v := range observedOnChainOcrSeqNums {
+		if v == 0 {
+			return mainOutcome, false, fmt.Errorf("observed ocr seq num cannot be zero at this point")
+		}
+	}
+
+	donThresh := consensus.MakeConstantThreshold[cciptypes.ChainSelector](consensus.TwoFPlus1(p.reportingCfg.F))
+	fChainConsensus := consensus.GetConsensusMap(lggr, "mainFChain", fChainObservations, donThresh)
+	fDestChain, ok := fChainConsensus[p.destChain]
+	if !ok {
+		return mainOutcome, false, fmt.Errorf("destChain=%d no f consensus for %v", p.destChain, fChainObservations)
+	}
+
+	if len(observedOnChainOcrSeqNums) < 2*fDestChain+1 {
+		return mainOutcome, false, fmt.Errorf("onChainOcrSeqNums no consensus required=%d got=%d %v",
+			fDestChain, len(observedOnChainOcrSeqNums), observedOnChainOcrSeqNums)
+	}
+
+	sort.Slice(observedOnChainOcrSeqNums, func(i, j int) bool {
+		return observedOnChainOcrSeqNums[i] < observedOnChainOcrSeqNums[j]
+	})
+	consensusOnChainOcrSeqNum := observedOnChainOcrSeqNums[fDestChain]
+
+	pricesTransmitted := consensusOnChainOcrSeqNum >= uint64(prevOutcome.MainOutcome.InflightPriceOcrSequenceNumber)
+	if pricesTransmitted || prevOutcome.MainOutcome.RemainingPriceChecks == 0 {
+		invalidatePriceCache = true
+		mainOutcome.InflightPriceOcrSequenceNumber = 0
+		mainOutcome.RemainingPriceChecks = 0
+	} else if prevOutcome.MainOutcome.RemainingPriceChecks > 0 {
+		mainOutcome.RemainingPriceChecks--
+	}
+
+	return mainOutcome, invalidatePriceCache, nil
 }

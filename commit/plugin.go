@@ -57,6 +57,7 @@ type Plugin struct {
 	rmnHomeReader       readerpkg.RMNHome
 	reportingCfg        ocr3types.ReportingPluginConfig
 	chainSupport        plugincommon.ChainSupport
+	destChain           cciptypes.ChainSelector
 	merkleRootProcessor plugincommon.PluginProcessor[merkleroot.Query, merkleroot.Observation, merkleroot.Outcome]
 	tokenPriceProcessor plugincommon.PluginProcessor[tokenprice.Query, tokenprice.Observation, tokenprice.Outcome]
 	chainFeeProcessor   plugincommon.PluginProcessor[chainfee.Query, chainfee.Observation, chainfee.Outcome]
@@ -179,6 +180,7 @@ func NewPlugin(
 		reportCodec:         reportCodec,
 		reportingCfg:        reportingCfg,
 		chainSupport:        chainSupport,
+		destChain:           destChain,
 		merkleRootProcessor: merkleRootProcessor,
 		tokenPriceProcessor: tokenPriceProcessor,
 		chainFeeProcessor:   chainFeeProcessr,
