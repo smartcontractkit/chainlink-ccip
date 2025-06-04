@@ -1618,6 +1618,7 @@ func Test_Builder_MultiReport(t *testing.T) {
 		expectedChainReportsPerExec []int
 		// Map tracking which sequence numbers to skip per chain selector
 		expectedSkippedSeqsByChain map[cciptypes.ChainSelector]mapset.Set[cciptypes.SeqNum]
+		overrideMaxReportsCount    uint64
 		wantErr                    string
 	}{
 		{
@@ -1763,6 +1764,49 @@ func Test_Builder_MultiReport(t *testing.T) {
 			expectedChainReportsPerExec: []int{1, 1, 1, 1}, // Each report has one chain report
 		},
 		{
+			name: "Solana case with max report count: report multiple reports when input multiple" +
+				" reports with single message each",
+			args: args{
+				maxReportSize:         2800,
+				maxGasLimit:           10000000,
+				maxMessages:           1,
+				maxSingleChainReports: 1,
+				nonces:                defaultNonces,
+				reports: []exectypes.CommitData{
+					makeTestCommitReport(hasher, 1, 2, 100, 999, 10101010101,
+						sender,
+						cciptypes.Bytes32{}, // generate a correct root.
+						nil,                 // executed
+						true,                // zero nonces
+					),
+					makeTestCommitReport(hasher, 1, 2, 101, 999, 10101010101,
+						sender,
+						cciptypes.Bytes32{}, // generate a correct root.
+						nil,                 // executed
+						true,                // zero nonces
+					),
+					makeTestCommitReport(hasher, 1, 2, 102, 999, 10101010101,
+						sender,
+						cciptypes.Bytes32{}, // generate a correct root.
+						nil,                 // executed
+						true,                // zero nonces
+					),
+					makeTestCommitReport(hasher, 1, 2, 103, 999, 10101010101,
+						sender,
+						cciptypes.Bytes32{}, // generate a correct root.
+						nil,                 // executed
+						true,                // zero nonces
+					),
+				},
+			},
+			overrideMaxReportsCount:     2,
+			expectedExecReports:         2,
+			expectedChainReportsPerExec: []int{1, 1}, // Each report has one chain report
+			expectedSkippedSeqsByChain: map[cciptypes.ChainSelector]mapset.Set[cciptypes.SeqNum]{
+				2: mapset.NewSet(cciptypes.SeqNum(102), cciptypes.SeqNum(103)),
+			},
+		},
+		{
 			name: "multiple reports - max single chain reports",
 			args: args{
 				maxReportSize:         10000,
@@ -1860,6 +1904,30 @@ func Test_Builder_MultiReport(t *testing.T) {
 				2: mapset.NewSet(cciptypes.SeqNum(101), cciptypes.SeqNum(103)),
 			},
 		},
+		{
+			name: "report max count limit",
+			args: args{
+				maxReportSize:         2800,
+				maxGasLimit:           10000000,
+				maxMessages:           1,
+				maxSingleChainReports: 1,
+				nonces:                defaultNonces,
+				reports: []exectypes.CommitData{
+					makeTestCommitReport(hasher, 6, 2, 100, 999, 10101010101,
+						sender,
+						cciptypes.Bytes32{}, // generate a correct root.
+						nil,                 // executed
+						true,                // zero nonces
+					),
+				},
+			},
+			overrideMaxReportsCount:     4,
+			expectedExecReports:         4,
+			expectedChainReportsPerExec: []int{1, 1, 1, 1}, // Each report has one chain report
+			expectedSkippedSeqsByChain: map[cciptypes.ChainSelector]mapset.Set[cciptypes.SeqNum]{
+				2: mapset.NewSet[cciptypes.SeqNum](104, 105),
+			},
+		},
 	}
 
 	mockAddrCodec := internal.NewMockAddressCodecHex(t)
@@ -1871,6 +1939,11 @@ func Test_Builder_MultiReport(t *testing.T) {
 			ep := gasmock.NewMockEstimateProvider(t)
 			ep.EXPECT().CalculateMessageMaxGas(mock.Anything).Return(uint64(0)).Maybe()
 			ep.EXPECT().CalculateMerkleTreeGas(mock.Anything).Return(uint64(0)).Maybe()
+
+			maxReportCount := uint64(10)
+			if tt.overrideMaxReportsCount > 0 {
+				maxReportCount = tt.overrideMaxReportsCount
+			}
 
 			builder := NewBuilder(
 				lggr,
@@ -1885,7 +1958,7 @@ func Test_Builder_MultiReport(t *testing.T) {
 				WithMaxSingleChainReports(tt.args.maxSingleChainReports),
 				WithExtraMessageCheck(CheckNonces(tt.args.nonces, mockAddrCodec)),
 				WithMultipleReports(true), // all tests are for multi reports
-				WithMaxReportsCount(10),
+				WithMaxReportsCount(maxReportCount),
 			)
 
 			foundError := false

@@ -188,10 +188,6 @@ func (b *execReportBuilder) Add(
 	ctx context.Context,
 	commitReport exectypes.CommitData,
 ) (exectypes.CommitData, error) {
-	if uint64(len(b.execReports)) > b.maxReportCount {
-		return commitReport, nil
-	}
-
 	b.checkInitialize()
 
 	// Validate nonces for multiple reports mode
@@ -221,6 +217,13 @@ func (b *execReportBuilder) Add(
 				return currentCommitReport, nil
 			}
 			b.createNewExecReport()
+		}
+
+		if uint64(len(b.execReports)) > b.maxReportCount {
+			b.lggr.Debugw("Reached maximum report count, stopping further processing",
+				"maxReportCount", b.maxReportCount,
+				"currentCount", len(b.execReports))
+			return currentCommitReport, nil
 		}
 
 		// Try to build a report with current messages
@@ -276,8 +279,11 @@ func (b *execReportBuilder) handleEmptyReport(
 		return commitReport, false, nil
 	}
 
-	// TODO: log adding messages to a new exec report
-
+	// Don't create new reports if we've reached the max count
+	if uint64(len(b.execReports)) >= b.maxReportCount {
+		return commitReport, false, nil
+	}
+	b.lggr.Debugw("Creating new exec report due to empty report")
 	// Try with a new exec report
 	b.createNewExecReport()
 	currentIndex := len(b.execReports) - 1
