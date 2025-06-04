@@ -359,7 +359,7 @@ pub fn mint_tokens(
         &spl_token_2022::ID, // use spl-token-2022 to compile instruction - change program later
         &accounts.mint.key(),
         &accounts.receiver_token_account.key(),
-        &(&accounts.multisig.unwrap_or(&accounts.pool_signer).key()),
+        &accounts.multisig.unwrap_or(accounts.pool_signer).key(),
         &[accounts.pool_signer.key],
         parsed_amount,
     )?;
