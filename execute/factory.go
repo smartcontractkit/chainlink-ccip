@@ -57,7 +57,7 @@ const (
 	// maxReportCount controls how many OCR3 reports can be returned. Note that
 	// the actual exec report type (ExecutePluginReport) may contain multiple
 	// per-source-chain reports. These are not limited by this value.
-	maxReportCount = 1
+	maxReportCount = 50
 
 	// lenientMaxMsgsPerObs is set to the maximum number of messages that can be observed in one observation, this is a bit
 	// lenient and acts as an indicator other than a hard limit.

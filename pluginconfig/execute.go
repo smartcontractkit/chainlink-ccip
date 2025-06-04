@@ -52,6 +52,9 @@ type ExecuteOffchainConfig struct {
 
 	// MaxCommitReportsToFetch is the maximum number of commit reports that can be fetched in each round.
 	MaxCommitReportsToFetch uint64 `json:"maxCommitReportsToFetch"`
+
+	// MultipleReportsEnabled is a flag to enable/disable multiple reports per round.
+	MultipleReportsEnabled bool `json:"multipleReports"`
 }
 
 func (e *ExecuteOffchainConfig) ApplyDefaultsAndValidate() error {
