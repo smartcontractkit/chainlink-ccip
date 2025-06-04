@@ -68,17 +68,7 @@ type AllAccessors interface {
 	// Access Type: ChainWriter
 	// Contract: N/A
 	// Confidence: N/A
-	GetChainFeeComponents(
-		ctx context.Context,
-	) map[ChainSelector]ChainFeeComponents
-
-	// GetDestChainFeeComponents seems redundant. If the error is needed lets
-	// add it to GetChainFeeComponents.
-	//
-	// Deprecated: use GetChainFeeComponents instead.
-	GetDestChainFeeComponents(
-		ctx context.Context,
-	) (types.ChainFeeComponents, error)
+	GetChainFeeComponents(ctx context.Context) (ChainFeeComponents, error)
 
 	// Sync can be used to perform frequent syncing operations inside the reader implementation.
 	// Returns a bool indicating whether something was updated.

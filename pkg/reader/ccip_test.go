@@ -1085,9 +1085,6 @@ func TestCCIPChainReader_getFeeQuoterTokenPriceUSD(t *testing.T) {
 }
 
 func TestCCIPFeeComponents_HappyPath(t *testing.T) {
-	destCR := reader_mocks.NewMockContractReaderFacade(t)
-	destCR.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
-
 	cw := writer_mocks.NewMockContractWriter(t)
 	cw.EXPECT().GetFeeComponents(mock.Anything).Return(
 		&types.ChainFeeComponents{
@@ -1097,15 +1094,25 @@ func TestCCIPFeeComponents_HappyPath(t *testing.T) {
 	)
 
 	contractWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
-	// Missing writer for chainB
 	contractWriters[chainA] = cw
+	contractWriters[chainB] = cw
 	contractWriters[chainC] = cw
+
+	sourceCRs := make(map[cciptypes.ChainSelector]*reader_mocks.MockContractReaderFacade)
+	for _, chain := range []cciptypes.ChainSelector{chainA, chainB, chainC} {
+		sourceCRs[chain] = reader_mocks.NewMockContractReaderFacade(t)
+	}
+
+	destChain := chainC
+	sourceCRs[destChain].EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
 
 	ccipReader, err := newCCIPChainReaderInternal(
 		tests.Context(t),
 		logger.Test(t),
 		map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
-			chainC: destCR,
+			chainA: sourceCRs[chainA],
+			chainB: sourceCRs[chainB],
+			chainC: sourceCRs[chainC],
 		},
 		contractWriters,
 		chainC,
@@ -1124,10 +1131,12 @@ func TestCCIPFeeComponents_HappyPath(t *testing.T) {
 
 	ctx := context.Background()
 	feeComponents := ccipReader.GetChainsFeeComponents(ctx, []cciptypes.ChainSelector{chainA, chainB, chainC})
-	assert.Len(t, feeComponents, 2)
+	assert.Len(t, feeComponents, 3)
 	assert.Equal(t, big.NewInt(1), feeComponents[chainA].ExecutionFee)
-	assert.Equal(t, big.NewInt(2), feeComponents[chainA].DataAvailabilityFee)
+	assert.Equal(t, big.NewInt(1), feeComponents[chainB].ExecutionFee)
 	assert.Equal(t, big.NewInt(1), feeComponents[chainC].ExecutionFee)
+	assert.Equal(t, big.NewInt(2), feeComponents[chainA].DataAvailabilityFee)
+	assert.Equal(t, big.NewInt(2), feeComponents[chainB].DataAvailabilityFee)
 	assert.Equal(t, big.NewInt(2), feeComponents[chainC].DataAvailabilityFee)
 
 	destChainFeeComponent, err := ccipReader.GetDestChainFeeComponents(ctx)

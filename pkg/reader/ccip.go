@@ -881,12 +881,12 @@ func (r *ccipChainReader) GetChainsFeeComponents(
 	feeComponents := make(map[cciptypes.ChainSelector]types.ChainFeeComponents, len(r.contractWriters))
 
 	for _, chain := range chains {
-		chainWriter, ok := r.contractWriters[chain]
-		if !ok {
-			lggr.Errorw("contract writer not found", "chain", chain)
+		if err := validateAccessorExistence(r.accessors, chain); err != nil {
+			lggr.Errorw("accessor not found", "chain", chain, "err", err)
 			continue
 		}
-		feeComponent, err := chainWriter.GetFeeComponents(ctx)
+
+		feeComponent, err := r.accessors[chain].GetChainFeeComponents(ctx)
 		if err != nil {
 			lggr.Errorw("failed to get chain fee components", "chain", chain, "err", err)
 			continue
@@ -901,7 +901,7 @@ func (r *ccipChainReader) GetChainsFeeComponents(
 			continue
 		}
 
-		feeComponents[chain] = *feeComponent
+		feeComponents[chain] = feeComponent
 	}
 	return feeComponents
 }
