@@ -72,16 +72,13 @@ func (l *LegacyAccessor) GetContractAddress(contractName string) ([]byte, error)
 	return addressBytes, nil
 }
 
-func (l *LegacyAccessor) GetChainFeeComponents(
-	ctx context.Context,
-) map[cciptypes.ChainSelector]cciptypes.ChainFeeComponents {
-	// TODO(NONEVM-1865): implement
-	panic("implement me")
-}
+func (l *LegacyAccessor) GetChainFeeComponents(ctx context.Context) (cciptypes.ChainFeeComponents, error) {
+	fc, err := l.contractWriter.GetFeeComponents(ctx)
+	if err != nil {
+		return cciptypes.ChainFeeComponents{}, fmt.Errorf("get fee components: %w", err)
+	}
 
-func (l *LegacyAccessor) GetDestChainFeeComponents(ctx context.Context) (types.ChainFeeComponents, error) {
-	// TODO(NONEVM-1865): implement
-	panic("implement me")
+	return *fc, nil
 }
 
 func (l *LegacyAccessor) Sync(ctx context.Context, contracts cciptypes.ContractAddresses) error {
