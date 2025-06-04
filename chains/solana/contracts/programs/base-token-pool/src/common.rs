@@ -11,11 +11,12 @@ use crate::rate_limiter::{RateLimitConfig, RateLimitTokenBucket};
 pub const ANCHOR_DISCRIMINATOR: usize = 8; // 8-byte anchor discriminator length
 pub const POOL_CHAINCONFIG_SEED: &[u8] = b"ccip_tokenpool_chainconfig"; // seed used by CCIP to provide correct chain config to pool
 pub const POOL_STATE_SEED: &[u8] = b"ccip_tokenpool_config";
-pub const CONFIG_SEED: &[u8] = b"config";
 pub const POOL_SIGNER_SEED: &[u8] = b"ccip_tokenpool_signer";
 
 pub const EXTERNAL_TOKEN_POOLS_SIGNER: &[u8] = b"external_token_pools_signer";
 pub const ALLOWED_OFFRAMP: &[u8] = b"allowed_offramp";
+
+pub const CONFIG_SEED: &[u8] = b"config";
 
 pub const fn valid_version(v: u8, max_version: u8) -> bool {
     !uninitialized(v) && v <= max_version
@@ -30,6 +31,12 @@ pub const fn uninitialized(v: u8) -> bool {
 pub const RELEASE_MINT: [u8; 8] = [0x14, 0x94, 0x71, 0xc6, 0xe5, 0xaa, 0x47, 0x30];
 #[allow(dead_code)]
 pub const LOCK_BURN: [u8; 8] = [0xc8, 0x0e, 0x32, 0x09, 0x2c, 0x5b, 0x79, 0x25];
+
+#[account]
+#[derive(InitSpace)]
+pub struct PoolConfig {
+    pub self_served_allowed: bool,
+}
 
 #[derive(InitSpace, AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct BaseConfig {
@@ -641,4 +648,16 @@ mod tests {
         let res = to_svm_token_amount(u256_bytes, 0, 0);
         assert!(res.is_err());
     }
+}
+
+/// Checks if the given authority is allowed to initialize the token pool.
+pub fn allowed_to_initialize_token_pool(
+    program_data: &Account<ProgramData>,
+    authority: &Signer,
+    config: &Account<PoolConfig>,
+    mint: &InterfaceAccount<Mint>,
+) -> bool {
+    program_data.upgrade_authority_address == Some(authority.key()) || // The upgrade authority of the token pool program can initialize a token pool
+    (config.self_served_allowed && Some(authority.key()) == mint.mint_authority.into() )
+    // or the mint authority of the token
 }

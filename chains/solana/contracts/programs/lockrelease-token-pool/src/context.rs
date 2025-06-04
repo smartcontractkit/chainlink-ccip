@@ -3,16 +3,49 @@ use anchor_spl::{
     associated_token::get_associated_token_address_with_program_id,
     token_interface::{Mint, TokenAccount},
 };
-use base_token_pool::common::{
-    uninitialized, valid_version, CcipTokenPoolError, LockOrBurnInV1, ReleaseOrMintInV1,
-    RemoteAddress, RemoteConfig, ALLOWED_OFFRAMP, ANCHOR_DISCRIMINATOR,
-    EXTERNAL_TOKEN_POOLS_SIGNER, POOL_CHAINCONFIG_SEED, POOL_SIGNER_SEED, POOL_STATE_SEED,
-};
+use base_token_pool::common::*;
 use ccip_common::seed;
 
 use crate::{program::LockreleaseTokenPool, ChainConfig, State};
 
 const MAX_POOL_STATE_V: u8 = 1;
+
+#[derive(Accounts)]
+pub struct InitGlobalConfig<'info> {
+    #[account(
+        init,
+        seeds = [CONFIG_SEED],
+        bump,
+        payer = authority,
+        space = ANCHOR_DISCRIMINATOR + PoolConfig::INIT_SPACE,
+    )]
+    pub config: Account<'info, PoolConfig>, // Global Config PDA of the Token Pool
+
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
+
+    // Global Config updates only allowed by program upgrade authority
+    #[account(constraint = program_data.upgrade_authority_address == Some(authority.key()) @ CcipTokenPoolError::Unauthorized)]
+    pub program_data: Account<'info, ProgramData>,
+}
+
+#[derive(Accounts)]
+pub struct UpdateGlobalConfig<'info> {
+    #[account(
+        mut,
+        seeds = [CONFIG_SEED],
+        bump,
+    )]
+    pub config: Account<'info, PoolConfig>, // Global Config PDA of the Token Pool
+
+    pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
+
+    // Global Config updates only allowed by program upgrade authority
+    #[account(constraint = program_data.upgrade_authority_address == Some(authority.key()) @ CcipTokenPoolError::Unauthorized)]
+    pub program_data: Account<'info, ProgramData>,
+}
 
 #[derive(Accounts)]
 pub struct InitializeTokenPool<'info> {
@@ -25,6 +58,7 @@ pub struct InitializeTokenPool<'info> {
     )]
     pub state: Account<'info, State>, // config PDA for token pool
     pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
+
     #[account(mut)]
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
@@ -34,8 +68,14 @@ pub struct InitializeTokenPool<'info> {
 
     // Token pool initialization only allowed by program upgrade authority. Initializing token pools managed
     // by the CLL deployment of this program is limited to CLL. Users must deploy their own instance of this program.
-    #[account(constraint = program_data.upgrade_authority_address == Some(authority.key()) @ CcipTokenPoolError::Unauthorized)]
+    #[account(constraint = allowed_to_initialize_token_pool(&program_data, &authority, &config, &mint) @ CcipTokenPoolError::Unauthorized)]
     pub program_data: Account<'info, ProgramData>,
+
+    #[account(
+        seeds = [CONFIG_SEED],
+        bump,
+    )]
+    pub config: Account<'info, PoolConfig>, // Global Config PDA of the Token Pool
 }
 
 #[derive(Accounts)]

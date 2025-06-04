@@ -12,7 +12,7 @@ import (
 
 // InitGlobalConfig is the `initGlobalConfig` instruction.
 type InitGlobalConfig struct {
-	Config *BnMConfig
+	Config *PoolConfig
 
 	// [0] = [WRITE] config
 	//
@@ -33,7 +33,7 @@ func NewInitGlobalConfigInstructionBuilder() *InitGlobalConfig {
 }
 
 // SetConfig sets the "config" parameter.
-func (inst *InitGlobalConfig) SetConfig(config BnMConfig) *InitGlobalConfig {
+func (inst *InitGlobalConfig) SetConfig(config PoolConfig) *InitGlobalConfig {
 	inst.Config = &config
 	return inst
 }
@@ -169,7 +169,7 @@ func (obj *InitGlobalConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (e
 // NewInitGlobalConfigInstruction declares a new InitGlobalConfig instruction with the provided parameters and accounts.
 func NewInitGlobalConfigInstruction(
 	// Parameters:
-	config BnMConfig,
+	config PoolConfig,
 	// Accounts:
 	configAccount ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,

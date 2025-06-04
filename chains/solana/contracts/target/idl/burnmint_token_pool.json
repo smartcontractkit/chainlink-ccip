@@ -30,7 +30,7 @@
         {
           "name": "config",
           "type": {
-            "defined": "BnMConfig"
+            "defined": "PoolConfig"
           }
         }
       ]
@@ -45,7 +45,7 @@
         },
         {
           "name": "authority",
-          "isMut": true,
+          "isMut": false,
           "isSigner": true
         },
         {
@@ -63,7 +63,7 @@
         {
           "name": "config",
           "type": {
-            "defined": "BnMConfig"
+            "defined": "PoolConfig"
           }
         }
       ]
@@ -664,18 +664,6 @@
             "type": {
               "defined": "BaseConfig"
             }
-          }
-        ]
-      }
-    },
-    {
-      "name": "BnMConfig",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "selfServedAllowed",
-            "type": "bool"
           }
         ]
       }

@@ -15,12 +15,15 @@ use crate::context::*;
 pub mod burnmint_token_pool {
     use super::*;
 
-    pub fn init_global_config(ctx: Context<InitGlobalConfig>, config: BnMConfig) -> Result<()> {
+    pub fn init_global_config(ctx: Context<InitGlobalConfig>, config: PoolConfig) -> Result<()> {
         ctx.accounts.config.self_served_allowed = config.self_served_allowed;
         Ok(())
     }
 
-    pub fn update_global_config(ctx: Context<UpdateGlobalConfig>, config: BnMConfig) -> Result<()> {
+    pub fn update_global_config(
+        ctx: Context<UpdateGlobalConfig>,
+        config: PoolConfig,
+    ) -> Result<()> {
         ctx.accounts.config.self_served_allowed = config.self_served_allowed;
         Ok(())
     }
@@ -275,12 +278,6 @@ pub mod burnmint_token_pool {
 pub struct State {
     pub version: u8,
     pub config: BaseConfig,
-}
-
-#[account]
-#[derive(InitSpace)]
-pub struct BnMConfig {
-    pub self_served_allowed: bool,
 }
 
 #[account]

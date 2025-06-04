@@ -6,7 +6,7 @@ use anchor_spl::{
 use base_token_pool::common::*;
 use ccip_common::seed;
 
-use crate::{program::BurnmintTokenPool, BnMConfig, ChainConfig, State};
+use crate::{program::BurnmintTokenPool, ChainConfig, State};
 
 const MAX_POOL_STATE_V: u8 = 1;
 
@@ -17,9 +17,9 @@ pub struct InitGlobalConfig<'info> {
         seeds = [CONFIG_SEED],
         bump,
         payer = authority,
-        space = ANCHOR_DISCRIMINATOR + BnMConfig::INIT_SPACE,
+        space = ANCHOR_DISCRIMINATOR + PoolConfig::INIT_SPACE,
     )]
-    pub config: Account<'info, BnMConfig>, // Global Config PDA of the Token Pool
+    pub config: Account<'info, PoolConfig>, // Global Config PDA of the Token Pool
 
     #[account(mut)]
     pub authority: Signer<'info>,
@@ -37,9 +37,8 @@ pub struct UpdateGlobalConfig<'info> {
         seeds = [CONFIG_SEED],
         bump,
     )]
-    pub config: Account<'info, BnMConfig>, // Global Config PDA of the Token Pool
+    pub config: Account<'info, PoolConfig>, // Global Config PDA of the Token Pool
 
-    #[account(mut)]
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
 
@@ -76,7 +75,7 @@ pub struct InitializeTokenPool<'info> {
         seeds = [CONFIG_SEED],
         bump,
     )]
-    pub config: Account<'info, BnMConfig>, // Global Config PDA of the Token Pool
+    pub config: Account<'info, PoolConfig>, // Global Config PDA of the Token Pool
 }
 
 #[derive(Accounts)]
@@ -410,16 +409,4 @@ pub struct DeleteChainConfig<'info> {
     pub chain_config: Account<'info, ChainConfig>,
     #[account(mut, address = state.config.owner)]
     pub authority: Signer<'info>,
-}
-
-/// Checks if the given authority is allowed to initialize the token pool.
-pub fn allowed_to_initialize_token_pool(
-    program_data: &Account<ProgramData>,
-    authority: &Signer,
-    config: &Account<BnMConfig>,
-    mint: &InterfaceAccount<Mint>,
-) -> bool {
-    program_data.upgrade_authority_address == Some(authority.key()) || // The upgrade authority of the token pool program can initialize a token pool
-    (config.self_served_allowed && Some(authority.key()) == mint.mint_authority.into() )
-    // or the mint authority of the token
 }

@@ -30,7 +30,7 @@ export type BurnmintTokenPool = {
         {
           "name": "config",
           "type": {
-            "defined": "BnMConfig"
+            "defined": "PoolConfig"
           }
         }
       ]
@@ -45,7 +45,7 @@ export type BurnmintTokenPool = {
         },
         {
           "name": "authority",
-          "isMut": true,
+          "isMut": false,
           "isSigner": true
         },
         {
@@ -63,7 +63,7 @@ export type BurnmintTokenPool = {
         {
           "name": "config",
           "type": {
-            "defined": "BnMConfig"
+            "defined": "PoolConfig"
           }
         }
       ]
@@ -664,18 +664,6 @@ export type BurnmintTokenPool = {
             "type": {
               "defined": "BaseConfig"
             }
-          }
-        ]
-      }
-    },
-    {
-      "name": "bnMConfig",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "selfServedAllowed",
-            "type": "bool"
           }
         ]
       }
@@ -729,7 +717,7 @@ export const IDL: BurnmintTokenPool = {
         {
           "name": "config",
           "type": {
-            "defined": "BnMConfig"
+            "defined": "PoolConfig"
           }
         }
       ]
@@ -744,7 +732,7 @@ export const IDL: BurnmintTokenPool = {
         },
         {
           "name": "authority",
-          "isMut": true,
+          "isMut": false,
           "isSigner": true
         },
         {
@@ -762,7 +750,7 @@ export const IDL: BurnmintTokenPool = {
         {
           "name": "config",
           "type": {
-            "defined": "BnMConfig"
+            "defined": "PoolConfig"
           }
         }
       ]
@@ -1363,18 +1351,6 @@ export const IDL: BurnmintTokenPool = {
             "type": {
               "defined": "BaseConfig"
             }
-          }
-        ]
-      }
-    },
-    {
-      "name": "bnMConfig",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "selfServedAllowed",
-            "type": "bool"
           }
         ]
       }

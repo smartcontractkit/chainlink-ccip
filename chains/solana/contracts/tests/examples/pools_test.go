@@ -46,6 +46,7 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 	remotePool := tokenpool.RemoteAddress{Address: []byte{1, 2, 3}}
 	remoteToken := tokenpool.RemoteAddress{Address: []byte{4, 5, 6}}
 
+	configPDA := admin.PublicKey() // TODO
 	t.Run("setup", func(t *testing.T) {
 		t.Run("funding", func(t *testing.T) {
 			testutils.FundAccounts(ctx, []solana.PrivateKey{admin}, solanaGoClient, t)
@@ -171,7 +172,7 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 						var programData ProgramData
 						require.NoError(t, bin.UnmarshalBorsh(&programData, data.Bytes()))
 
-						poolInitI, err := tokenpool.NewInitializeInstruction(dumbRamp, config.RMNRemoteProgram, poolConfig, mint, admin.PublicKey(), solana.SystemProgramID, poolProgram, programData.Address).ValidateAndBuild()
+						poolInitI, err := tokenpool.NewInitializeInstruction(dumbRamp, config.RMNRemoteProgram, poolConfig, mint, admin.PublicKey(), solana.SystemProgramID, poolProgram, programData.Address, configPDA).ValidateAndBuild()
 						require.NoError(t, err)
 
 						// make pool mint_authority for token (required for burn/mint)

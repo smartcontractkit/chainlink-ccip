@@ -60,48 +60,6 @@ func (obj *State) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	return nil
 }
 
-type BnMConfig struct {
-	SelfServedAllowed bool
-}
-
-var BnMConfigDiscriminator = [8]byte{211, 100, 140, 98, 66, 94, 43, 216}
-
-func (obj BnMConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Write account discriminator:
-	err = encoder.WriteBytes(BnMConfigDiscriminator[:], false)
-	if err != nil {
-		return err
-	}
-	// Serialize `SelfServedAllowed` param:
-	err = encoder.Encode(obj.SelfServedAllowed)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *BnMConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Read and check account discriminator:
-	{
-		discriminator, err := decoder.ReadTypeID()
-		if err != nil {
-			return err
-		}
-		if !discriminator.Equal(BnMConfigDiscriminator[:]) {
-			return fmt.Errorf(
-				"wrong discriminator: wanted %s, got %s",
-				"[211 100 140 98 66 94 43 216]",
-				fmt.Sprint(discriminator[:]))
-		}
-	}
-	// Deserialize `SelfServedAllowed`:
-	err = decoder.Decode(&obj.SelfServedAllowed)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 type ChainConfig struct {
 	Base BaseChain
 }
