@@ -49,7 +49,7 @@ jobs:
             name: "USDC Test"
           - cmd: cd integration-tests/smoke/ccip && go test ccip_ooo_execution_test.go -timeout 12m -test.parallel=1 -count=1 -json
             name: "OOO Execution Test"
-          - cmd: cd integration-tests/smoke/ccip && go test -run "Test_CCIPMessaging_EVM2EVM" ccip_messaging_test.go -timeout 12m -test.parallel=2 -count=1 -json
+          - cmd: cd integration-tests/smoke/ccip && go test ccip_messaging_test.go -timeout 18m -test.parallel=2 -count=1 -json
             name: "Messaging Test"
           - cmd: cd integration-tests/smoke/ccip && go test -run "Test_CCIPBatching_MaxBatchSizeEVM" ccip_batching_test.go -timeout 12m -test.parallel=1 -count=1 -json
             name: "Batching Test Test_CCIPBatching_MaxBatchSizeEVM"
