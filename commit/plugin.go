@@ -241,8 +241,9 @@ func (p *Plugin) Observation(
 ) (types.Observation, error) {
 	// TODO: Replace Observation with ObservationNext
 	//       and remove the condition when every oracle upgraded.
+	// NOTE: If you are making changes to Observation make sure they are reflected in observationNext.
 	if p.offchainCfg.EnableDonBreakingChanges {
-		return p.ObservationNext(ctx, outCtx, q)
+		return p.observationNext(ctx, outCtx, q)
 	}
 
 	// Ensure that sequence number is in the context for consumption by all
@@ -422,8 +423,9 @@ func (p *Plugin) Outcome(
 ) (ocr3types.Outcome, error) {
 	// TODO: Replace Outcome with OutcomeNext
 	//       and remove the condition when every oracle upgraded.
+	// NOTE: If you are making changes to Outcome make sure they are reflected in outcomeNext.
 	if p.offchainCfg.EnableDonBreakingChanges {
-		return p.OutcomeNext(ctx, outCtx, q, aos)
+		return p.outcomeNext(ctx, outCtx, q, aos)
 	}
 
 	ctx, lggr := logutil.WithOCRInfo(ctx, p.lggr, outCtx.SeqNr, logutil.PhaseOutcome)
