@@ -2,6 +2,7 @@ package chainaccessor
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -40,13 +41,22 @@ func NewLegacyAccessor(
 }
 
 func (l *LegacyAccessor) Metadata() cciptypes.AccessorMetadata {
-	// TODO(NONEVM-1865): implement
+	// TODO(NONEVM-1865): implement or remove from CAL interface
 	panic("implement me")
 }
 
 func (l *LegacyAccessor) GetContractAddress(contractName string) ([]byte, error) {
-	// TODO(NONEVM-1865): implement
-	panic("implement me")
+	bindings := l.contractReader.GetBindings(contractName)
+	if len(bindings) != 1 {
+		return nil, fmt.Errorf("expected one binding for the %s contract, got %d", contractName, len(bindings))
+	}
+
+	addressBytes, err := l.addrCodec.AddressStringToBytes(bindings[0].Binding.Address, l.chainSelector)
+	if err != nil {
+		return nil, fmt.Errorf("convert address %s to bytes: %w", bindings[0].Binding.Address, err)
+	}
+
+	return addressBytes, nil
 }
 
 func (l *LegacyAccessor) GetChainFeeComponents(
