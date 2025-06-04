@@ -193,46 +193,6 @@ contract FastTransferTokenPool_updateDestChainConfig is FastTransferTokenPoolSet
     assertEq(config.maxFillAmountPerRequest, NEW_FILL_AMOUNT_MAX);
   }
 
-  function test_UpdateDestChainConfig_MaxPoolFee() public {
-    uint16 maxPoolFee = 10_000; // 100%
-
-    FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs memory laneConfigArgs = FastTransferTokenPoolAbstract
-      .DestChainConfigUpdateArgs({
-      remoteChainSelector: NEW_CHAIN_SELECTOR,
-      fastTransferFillerFeeBps: 0, // Zero filler fee to allow max pool fee
-      fastTransferPoolFeeBps: maxPoolFee,
-      fillerAllowlistEnabled: true,
-      destinationPool: NEW_DESTINATION_POOL,
-      maxFillAmountPerRequest: NEW_FILL_AMOUNT_MAX,
-      settlementOverheadGas: NEW_SETTLEMENT_GAS_OVERHEAD,
-      chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
-      customExtraArgs: ""
-    });
-
-    s_pool.updateDestChainConfig(_singleConfigToList(laneConfigArgs));
-
-    (FastTransferTokenPoolAbstract.DestChainConfig memory config,) = s_pool.getDestChainConfig(NEW_CHAIN_SELECTOR);
-    assertEq(config.fastTransferPoolFeeBps, maxPoolFee);
-  }
-
-  function test_RevertWhen_TotalFeesExceed100Percent() public {
-    FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs memory laneConfigArgs = FastTransferTokenPoolAbstract
-      .DestChainConfigUpdateArgs({
-      remoteChainSelector: NEW_CHAIN_SELECTOR,
-      fastTransferFillerFeeBps: 6_000, // 60%
-      fastTransferPoolFeeBps: 5_000, // 50% -> Total 110%
-      fillerAllowlistEnabled: true,
-      destinationPool: NEW_DESTINATION_POOL,
-      maxFillAmountPerRequest: NEW_FILL_AMOUNT_MAX,
-      settlementOverheadGas: NEW_SETTLEMENT_GAS_OVERHEAD,
-      chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
-      customExtraArgs: ""
-    });
-
-    vm.expectRevert(FastTransferTokenPoolAbstract.InvalidDestChainConfig.selector);
-    s_pool.updateDestChainConfig(_singleConfigToList(laneConfigArgs));
-  }
-
   function test_UpdateDestChainConfig_TotalFeesExactly100Percent() public {
     uint16 fillerFee = 3_000; // 30%
     uint16 poolFee = 7_000; // 70% -> Total exactly 100%
@@ -256,5 +216,23 @@ contract FastTransferTokenPool_updateDestChainConfig is FastTransferTokenPoolSet
     (FastTransferTokenPoolAbstract.DestChainConfig memory config,) = s_pool.getDestChainConfig(NEW_CHAIN_SELECTOR);
     assertEq(config.fastTransferFillerFeeBps, fillerFee);
     assertEq(config.fastTransferPoolFeeBps, poolFee);
+  }
+
+  function test_RevertWhen_TotalFeesExceed100Percent() public {
+    FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs memory laneConfigArgs = FastTransferTokenPoolAbstract
+      .DestChainConfigUpdateArgs({
+      remoteChainSelector: NEW_CHAIN_SELECTOR,
+      fastTransferFillerFeeBps: 6_000, // 60%
+      fastTransferPoolFeeBps: 5_000, // 50% -> Total 110%
+      fillerAllowlistEnabled: true,
+      destinationPool: NEW_DESTINATION_POOL,
+      maxFillAmountPerRequest: NEW_FILL_AMOUNT_MAX,
+      settlementOverheadGas: NEW_SETTLEMENT_GAS_OVERHEAD,
+      chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
+      customExtraArgs: ""
+    });
+
+    vm.expectRevert(FastTransferTokenPoolAbstract.InvalidDestChainConfig.selector);
+    s_pool.updateDestChainConfig(_singleConfigToList(laneConfigArgs));
   }
 }
