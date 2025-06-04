@@ -485,14 +485,14 @@ func (p *Plugin) ObservationQuorum(
 		quorumhelper.QuorumTwoFPlusOne, p.reportingCfg.N, p.reportingCfg.F, aos), nil
 }
 
-// selectReport takes a list of reports in execution order and selects the first reports that fit within the
+// selectReports takes a list of reports in execution order and selects the first reports that fit within the
 // maxReportSizeBytes. Individual messages in a commit report may be skipped for various reasons, for example if an
 // out-of-order execution is detected or the message requires additional off-chain metadata which is not yet available.
 // If there is not enough space in the final report, it may be partially executed by searching for a subset of messages
 // which can fit in the final report.
 //
 // The output of this function are canonical data structures which can be directly included in the final outcome.
-func selectReport(
+func selectReports(
 	ctx context.Context,
 	lggr logger.Logger,
 	commitReports []exectypes.CommitData,
@@ -537,7 +537,7 @@ func selectReport(
 	return execReports, selectedReports, err
 }
 
-func extractReportInfo(report exectypes.Outcome) []cciptypes.ExecuteReportInfo {
+func extractReportInfo(report exectypes.Outcome) ([]cciptypes.ExecuteReportInfo, error) {
 	var ri []cciptypes.ExecuteReportInfo
 	commitReportIdx := 0
 
@@ -545,6 +545,10 @@ func extractReportInfo(report exectypes.Outcome) []cciptypes.ExecuteReportInfo {
 		var merkleRoots []cciptypes.MerkleRootChain
 
 		for i := 0; i < len(execReport.ChainReports); i++ {
+			if commitReportIdx >= len(report.CommitReports) {
+				return nil, fmt.Errorf("not enough commit reports for the "+
+					"number of chain reports in exec report %d", i)
+			}
 			cr := report.CommitReports[commitReportIdx]
 			merkleRoots = append(merkleRoots, cciptypes.MerkleRootChain{
 				ChainSel:      cr.SourceChain,
@@ -561,7 +565,7 @@ func extractReportInfo(report exectypes.Outcome) []cciptypes.ExecuteReportInfo {
 		})
 	}
 
-	return ri
+	return ri, nil
 }
 
 func (p *Plugin) Reports(
@@ -574,8 +578,10 @@ func (p *Plugin) Reports(
 		return nil, nil
 	}
 
+	lggr.Debug("Decoding outcome in Reports function")
 	decodedOutcome, err := p.ocrTypeCodec.DecodeOutcome(outcome)
 	if err != nil {
+		lggr.Errorw("unable to decode outcome", "err", err)
 		return nil, fmt.Errorf("unable to decode outcome: %w", err)
 	}
 
@@ -584,18 +590,17 @@ func (p *Plugin) Reports(
 		return nil, nil
 	}
 
-	// TODO: Handle multiple reports.
-	encodedReport, err := p.reportCodec.Encode(ctx, decodedOutcome.Reports[0])
+	lggr.Debug("extracting report info")
+	reportInfos, err := extractReportInfo(decodedOutcome)
+	lggr.Debugw("report infos", "reportInfos", reportInfos)
 	if err != nil {
-		return nil, fmt.Errorf("unable to encode report: %w", err)
+		return nil, fmt.Errorf("extract report info: %w", err)
 	}
-
-	reportInfo := extractReportInfo(decodedOutcome)
-	lggr.Debugw("report info in UnfinalizedReports()", "reportInfo", reportInfo)
-	// TODO: Handle multiple reports.
-	encodedInfo, err := reportInfo[0].Encode()
-	if err != nil {
-		return nil, err
+	if len(reportInfos) != len(decodedOutcome.Reports) {
+		lggr.Errorw("report infos length mismatch", "expected", len(decodedOutcome.Reports),
+			"got", len(reportInfos))
+		return nil, fmt.Errorf("expected %d report infos that equals number of reports"+
+			", got %d", len(decodedOutcome.Reports), len(reportInfos))
 	}
 
 	transmissionSchedule, err := plugincommon.GetTransmissionSchedule(
@@ -606,20 +611,36 @@ func (p *Plugin) Reports(
 	if err != nil {
 		return nil, fmt.Errorf("get transmission schedule: %w", err)
 	}
+
 	lggr.Debugw("transmission schedule override",
 		"transmissionSchedule", transmissionSchedule, "oracleIDToP2PID", p.oracleIDToP2pID)
 
-	r := []ocr3types.ReportPlus[[]byte]{
-		{
+	lggr.Debug("Encoding reports and adding them to final report")
+	// Handle all reports in the outcome
+	var reports []ocr3types.ReportPlus[[]byte]
+	for i, execReport := range decodedOutcome.Reports {
+		lggr.Debugw("Encoding Report: ", "report", execReport)
+		encodedReport, err := p.reportCodec.Encode(ctx, execReport)
+		if err != nil {
+			return nil, fmt.Errorf("unable to encode report %w", err)
+		}
+
+		encodedInfo, err := reportInfos[i].Encode()
+		if err != nil {
+			lggr.Errorw("unable to encode report info", "err", err)
+			return nil, fmt.Errorf("unable to encode report info %w", err)
+		}
+
+		reports = append(reports, ocr3types.ReportPlus[[]byte]{
 			ReportWithInfo: ocr3types.ReportWithInfo[[]byte]{
 				Report: encodedReport,
 				Info:   encodedInfo,
 			},
 			TransmissionScheduleOverride: transmissionSchedule,
-		},
+		})
 	}
 
-	return r, nil
+	return reports, nil
 }
 
 // validateReport validates various aspects of the report.

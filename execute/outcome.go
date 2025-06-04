@@ -121,7 +121,7 @@ func (p *Plugin) getCommitReportsOutcome(observation exectypes.Observation) exec
 
 	// Must use 'NewOutcome' rather than direct struct initialization to ensure the outcome is sorted.
 	// TODO: sort in the encoder.
-	return exectypes.NewOutcome(exectypes.GetCommitReports, commitReports, nil)
+	return exectypes.NewOutcomeWithSortedCommitReports(exectypes.GetCommitReports, commitReports)
 }
 
 func (p *Plugin) getMessagesOutcome(
@@ -163,7 +163,7 @@ func (p *Plugin) getMessagesOutcome(
 
 	// Must use 'NewOutcome' rather than direct struct initialization to ensure the outcome is sorted.
 	// TODO: sort in the encoder.
-	return exectypes.NewOutcome(exectypes.GetMessages, commitReports, nil)
+	return exectypes.NewOutcomeWithSortedCommitReports(exectypes.GetMessages, commitReports)
 }
 
 // getFilterOutcome is the final phase of the execution plugin. Filter refers to the Nonces
@@ -184,6 +184,7 @@ func (p *Plugin) getFilterOutcome(
 		p.destChain,
 		p.addrCodec,
 		report.WithMultipleReports(p.offchainCfg.MultipleReportsEnabled),
+		report.WithMaxReportsCount(maxReportCount),
 		report.WithMaxReportSizeBytes(maxReportLength),
 		report.WithMaxGas(p.offchainCfg.BatchGasLimit),
 		report.WithExtraMessageCheck(report.CheckNonces(observation.Nonces, p.addrCodec)),
@@ -193,7 +194,7 @@ func (p *Plugin) getFilterOutcome(
 		report.WithMaxSingleChainReports(p.offchainCfg.MaxSingleChainReports),
 	)
 
-	execReports, selectedCommitReports, err := selectReport(
+	execReports, selectedCommitReports, err := selectReports(
 		ctx,
 		lggr,
 		commitReports,
