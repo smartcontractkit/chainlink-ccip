@@ -952,7 +952,7 @@ func Test_Builder_Build(t *testing.T) {
 				WithMaxMessages(tt.args.maxMessages),
 				WithMaxSingleChainReports(tt.args.maxReports),
 				WithExtraMessageCheck(CheckNonces(tt.args.nonces, mockAddrCodec)),
-				//WithMultipleReports(true),
+				WithMaxReportsCount(1),
 			)
 
 			var updatedMessages []exectypes.CommitData
@@ -1903,6 +1903,7 @@ func Test_Builder_MultiReport(t *testing.T) {
 				WithMaxSingleChainReports(tt.args.maxSingleChainReports),
 				WithExtraMessageCheck(CheckNonces(tt.args.nonces, mockAddrCodec)),
 				WithMultipleReports(true), // all tests are for multi reports
+				WithMaxReportsCount(10),
 			)
 
 			foundError := false

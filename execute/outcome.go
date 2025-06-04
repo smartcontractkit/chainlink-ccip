@@ -184,6 +184,7 @@ func (p *Plugin) getFilterOutcome(
 		p.destChain,
 		p.addrCodec,
 		report.WithMultipleReports(p.offchainCfg.MultipleReportsEnabled),
+		report.WithMaxReportsCount(maxReportCount),
 		report.WithMaxReportSizeBytes(maxReportLength),
 		report.WithMaxGas(p.offchainCfg.BatchGasLimit),
 		report.WithExtraMessageCheck(report.CheckNonces(observation.Nonces, p.addrCodec)),

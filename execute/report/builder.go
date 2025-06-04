@@ -42,6 +42,12 @@ func WithMaxMessages(maxMessages uint64) Option {
 	}
 }
 
+func WithMaxReportsCount(maxReportCount uint64) Option {
+	return func(erb *execReportBuilder) {
+		erb.maxReportCount = maxReportCount
+	}
+}
+
 // WithMaxSingleChainReports configures the number of reports when building the final result.
 func WithMaxSingleChainReports(maxSingleChainReports uint64) Option {
 	return func(erb *execReportBuilder) {
@@ -142,6 +148,7 @@ type execReportBuilder struct {
 	maxMessages            uint64
 	maxSingleChainReports  uint64
 	multipleReportsEnabled bool
+	maxReportCount         uint64
 
 	// State
 	// accumulated keeps track of per exec report metadata as commit reports are added
@@ -181,6 +188,10 @@ func (b *execReportBuilder) Add(
 	ctx context.Context,
 	commitReport exectypes.CommitData,
 ) (exectypes.CommitData, error) {
+	if uint64(len(b.execReports)) > b.maxReportCount {
+		return commitReport, nil
+	}
+
 	b.checkInitialize()
 
 	// Validate nonces for multiple reports mode
@@ -345,7 +356,7 @@ func (b *execReportBuilder) Build() (
 
 	for _, report := range b.execReports {
 		results = append(results, report)
-		if !b.multipleReportsEnabled {
+		if !b.multipleReportsEnabled || uint64(len(results)) >= b.maxReportCount {
 			// skip remaining reports if they aren't enabled.
 			break
 		}
