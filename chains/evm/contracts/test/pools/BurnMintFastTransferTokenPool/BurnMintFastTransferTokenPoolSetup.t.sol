@@ -24,7 +24,7 @@ contract BurnMintFastTransferTokenPoolSetup is BaseTest {
   uint8 internal constant SOURCE_DECIMALS = 18;
   uint256 internal constant FILL_AMOUNT = 100 ether;
 
-  uint16 internal constant FAST_FEE_BPS = 100; // 1%
+  uint16 internal constant FAST_FEE_FILLER_BPS = 100; // 1%
   uint256 internal constant FILL_AMOUNT_MAX = 1000 ether;
   uint32 internal constant SETTLEMENT_GAS_OVERHEAD = 200_000;
 
@@ -72,7 +72,8 @@ contract BurnMintFastTransferTokenPoolSetup is BaseTest {
     FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs memory laneConfigArgs = FastTransferTokenPoolAbstract
       .DestChainConfigUpdateArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
-      fastTransferBpsFee: FAST_FEE_BPS,
+      fastTransferFillerFeeBps: FAST_FEE_FILLER_BPS,
+      fastTransferPoolFeeBps: 0, // No pool fee for this test
       fillerAllowlistEnabled: true,
       destinationPool: abi.encode(s_remoteBurnMintPool),
       maxFillAmountPerRequest: FILL_AMOUNT_MAX,

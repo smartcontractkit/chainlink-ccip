@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {IFastTransferPool} from "../../../interfaces/IFastTransferPool.sol";
 
 import {Client} from "../../../libraries/Client.sol";
+import {Internal} from "../../../libraries/Internal.sol";
 import {FastTransferTokenPoolAbstract} from "../../../pools/FastTransferTokenPoolAbstract.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {BurnMintFastTransferTokenPoolSetup} from "./BurnMintFastTransferTokenPoolSetup.t.sol";
@@ -21,7 +22,7 @@ contract BurnMintFastTransferTokenPool_ccipReceive is BurnMintFastTransferTokenP
 
     Client.Any2EVMMessage memory message = _createCcipMessage();
 
-    uint256 fastTransferFee = (TRANSFER_AMOUNT * FAST_FEE_BPS) / 10_000;
+    uint256 fastTransferFee = (TRANSFER_AMOUNT * FAST_FEE_FILLER_BPS) / 10_000;
     bytes32 fillId =
       s_pool.computeFillId(message.messageId, TRANSFER_AMOUNT - fastTransferFee, SOURCE_DECIMALS, abi.encode(RECEIVER));
 
@@ -57,7 +58,8 @@ contract BurnMintFastTransferTokenPool_ccipReceive is BurnMintFastTransferTokenP
         FastTransferTokenPoolAbstract.MintMessage({
           sourceAmount: TRANSFER_AMOUNT,
           sourceDecimals: SOURCE_DECIMALS,
-          fastTransferFeeBps: FAST_FEE_BPS,
+          fastTransferFillerFeeBps: FAST_FEE_FILLER_BPS,
+          fastTransferPoolFeeBps: 0,
           receiver: abi.encode(RECEIVER)
         })
       ),

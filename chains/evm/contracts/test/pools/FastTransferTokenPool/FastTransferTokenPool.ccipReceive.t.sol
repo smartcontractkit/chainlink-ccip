@@ -4,7 +4,9 @@ pragma solidity ^0.8.24;
 import {IFastTransferPool} from "../../../interfaces/IFastTransferPool.sol";
 
 import {CCIPReceiver} from "../../../applications/CCIPReceiver.sol";
+
 import {Client} from "../../../libraries/Client.sol";
+import {Internal} from "../../../libraries/Internal.sol";
 import {FastTransferTokenPoolAbstract} from "../../../pools/FastTransferTokenPoolAbstract.sol";
 import {FastTransferTokenPoolSetup} from "./FastTransferTokenPoolSetup.t.sol";
 
@@ -34,8 +36,9 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
     uint256 receiverBalanceBefore = s_token.balanceOf(RECEIVER);
     uint256 expectedAmount = receiverBalanceBefore + SOURCE_AMOUNT;
 
-    Client.Any2EVMMessage memory message = _generateMintMessage(RECEIVER, SOURCE_AMOUNT, SOURCE_DECIMALS, FAST_FEE_BPS);
-    uint256 fastTransferFee = (SOURCE_AMOUNT * FAST_FEE_BPS) / 10_000;
+    Client.Any2EVMMessage memory message =
+      _generateMintMessage(RECEIVER, SOURCE_AMOUNT, SOURCE_DECIMALS, FAST_FEE_FILLER_BPS, 0);
+    uint256 fastTransferFee = (SOURCE_AMOUNT * FAST_FEE_FILLER_BPS) / 10_000;
     bytes32 fillId =
       s_pool.computeFillId(message.messageId, SOURCE_AMOUNT - fastTransferFee, SOURCE_DECIMALS, abi.encode(RECEIVER));
 
@@ -49,7 +52,7 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
   }
 
   function test_ccipReceive_FastFill_Settlement() public {
-    uint256 amountToFill = SOURCE_AMOUNT - (SOURCE_AMOUNT * FAST_FEE_BPS / 10_000);
+    uint256 amountToFill = SOURCE_AMOUNT - (SOURCE_AMOUNT * FAST_FEE_FILLER_BPS / 10_000);
     bytes32 fillId = s_pool.computeFillId(MESSAGE_ID, amountToFill, SOURCE_DECIMALS, abi.encode(RECEIVER));
 
     vm.stopPrank();
@@ -60,7 +63,8 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
     uint256 receiverBalanceBefore = s_token.balanceOf(RECEIVER);
 
     // Settlement
-    Client.Any2EVMMessage memory message = _generateMintMessage(RECEIVER, SOURCE_AMOUNT, SOURCE_DECIMALS, FAST_FEE_BPS);
+    Client.Any2EVMMessage memory message =
+      _generateMintMessage(RECEIVER, SOURCE_AMOUNT, SOURCE_DECIMALS, FAST_FEE_FILLER_BPS, 0);
 
     vm.expectEmit();
     emit IFastTransferPool.FastTransferSettled(fillId, MESSAGE_ID);
@@ -84,7 +88,8 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
 
     uint256 receiverBalanceBefore = s_token.balanceOf(RECEIVER);
 
-    Client.Any2EVMMessage memory message = _generateMintMessage(RECEIVER, sourceAmount, sourceDecimals, FAST_FEE_BPS);
+    Client.Any2EVMMessage memory message =
+      _generateMintMessage(RECEIVER, sourceAmount, sourceDecimals, FAST_FEE_FILLER_BPS, 0);
 
     s_pool.ccipReceive(message);
 
@@ -97,7 +102,8 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
     uint256 receiverBalanceBefore = s_token.balanceOf(RECEIVER);
 
     // Prepare CCIP message with zero fast transfer fee
-    Client.Any2EVMMessage memory message = _generateMintMessage(RECEIVER, SOURCE_AMOUNT, SOURCE_DECIMALS, zeroFee);
+    Client.Any2EVMMessage memory message =
+      _generateMintMessage(RECEIVER, SOURCE_AMOUNT, SOURCE_DECIMALS, zeroFee, zeroFee);
 
     bytes32 fillId = s_pool.computeFillId(message.messageId, SOURCE_AMOUNT - 0, SOURCE_DECIMALS, abi.encode(RECEIVER));
 
@@ -110,13 +116,84 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
     assertEq(s_token.balanceOf(RECEIVER), receiverBalanceBefore + SOURCE_AMOUNT);
   }
 
+  function test_ccipReceive_SlowFill_WithPoolFee() public {
+    uint16 fillerFeeBps = 50; // 0.5%
+    uint16 poolFeeBps = 50; // 0.5%
+
+    // Update config to include pool fee
+    _updateConfigWithPoolFee(fillerFeeBps, poolFeeBps);
+
+    uint256 receiverBalanceBefore = s_token.balanceOf(RECEIVER);
+    uint256 poolBalanceBefore = s_token.balanceOf(address(s_pool));
+    uint256 accumulatedFeesBefore = s_pool.getAccumulatedPoolFees();
+
+    uint256 expectedReceiverAmount = SOURCE_AMOUNT;
+
+    Client.Any2EVMMessage memory message =
+      _generateMintMessage(RECEIVER, SOURCE_AMOUNT, SOURCE_DECIMALS, fillerFeeBps, poolFeeBps);
+
+    s_pool.ccipReceive(message);
+
+    // Verify receiver gets the full amount (helper transfers, doesn't mint)
+    assertEq(s_token.balanceOf(RECEIVER), receiverBalanceBefore + expectedReceiverAmount, "t1");
+    // Pool balance should decrease by amount transferred to receiver (helper uses transfer)
+    assertEq(s_token.balanceOf(address(s_pool)), poolBalanceBefore - expectedReceiverAmount, "t2");
+    // Pool should NOT accumulate any fee for slow fills (no fast fill service provided)
+    assertEq(s_pool.getAccumulatedPoolFees(), accumulatedFeesBefore, "t3");
+  }
+
+  function test_ccipReceive_FastFill_Settlement_WithPoolFee() public {
+    uint16 fillerFeeBps = 75; // 0.75%
+    uint16 poolFeeBps = 25; // 0.25%
+
+    // Update config to include pool fee
+    _updateConfigWithPoolFee(fillerFeeBps, poolFeeBps);
+
+    // Amount filler provides (original amount minus filler fee)
+    uint256 fillerFeeAmount = (SOURCE_AMOUNT * fillerFeeBps) / 10_000;
+    uint256 poolFeeAmount = (SOURCE_AMOUNT * poolFeeBps) / 10_000;
+    uint256 amountToFill = SOURCE_AMOUNT - fillerFeeAmount - poolFeeAmount;
+
+    bytes32 fillId = s_pool.computeFillId(MESSAGE_ID, amountToFill, SOURCE_DECIMALS, abi.encode(RECEIVER));
+
+    // Fast fill first
+    vm.stopPrank();
+    vm.prank(s_filler);
+    s_pool.fastFill(MESSAGE_ID, fillId, SOURCE_CHAIN_SELECTOR, amountToFill, SOURCE_DECIMALS, RECEIVER);
+
+    uint256 fillerBalanceBefore = s_token.balanceOf(s_filler);
+    uint256 receiverBalanceBefore = s_token.balanceOf(RECEIVER);
+    uint256 poolBalanceBefore = s_token.balanceOf(address(s_pool));
+    uint256 accumulatedFeesBefore = s_pool.getAccumulatedPoolFees();
+
+    // Settlement
+    Client.Any2EVMMessage memory message =
+      _generateMintMessage(RECEIVER, SOURCE_AMOUNT, SOURCE_DECIMALS, fillerFeeBps, poolFeeBps);
+
+    vm.expectEmit();
+    emit IFastTransferPool.FastTransferSettled(fillId, MESSAGE_ID);
+
+    vm.prank(address(s_sourceRouter));
+    s_pool.ccipReceive(message);
+
+    // Verify filler gets reimbursed: what they provided + their fee
+    assertEq(s_token.balanceOf(s_filler), fillerBalanceBefore + amountToFill + fillerFeeAmount, "t1");
+    // Receiver balance shouldn't change (already got tokens from fast fill)
+    assertEq(s_token.balanceOf(RECEIVER), receiverBalanceBefore, "t2");
+    // Pool token balance should decrease by filler reimbursement (helper uses transfer, not mint)
+    assertEq(s_token.balanceOf(address(s_pool)), poolBalanceBefore - (amountToFill + fillerFeeAmount), "t3");
+    // Pool should have accumulated the pool fee
+    assertEq(s_pool.getAccumulatedPoolFees(), accumulatedFeesBefore + poolFeeAmount, "t4");
+  }
+
   function test_ccipReceive_RevertWhen_AlreadySettled() public {
-    Client.Any2EVMMessage memory message = _generateMintMessage(RECEIVER, SOURCE_AMOUNT, SOURCE_DECIMALS, FAST_FEE_BPS);
+    Client.Any2EVMMessage memory message =
+      _generateMintMessage(RECEIVER, SOURCE_AMOUNT, SOURCE_DECIMALS, FAST_FEE_FILLER_BPS, 0);
 
     // First settlement
     s_pool.ccipReceive(message);
 
-    uint256 amountToFill = SOURCE_AMOUNT - (SOURCE_AMOUNT * FAST_FEE_BPS / 10_000);
+    uint256 amountToFill = SOURCE_AMOUNT - (SOURCE_AMOUNT * FAST_FEE_FILLER_BPS / 10_000);
     bytes32 fillId = s_pool.computeFillId(MESSAGE_ID, amountToFill, SOURCE_DECIMALS, abi.encode(RECEIVER));
 
     // Try to settle again - should revert
@@ -138,7 +215,8 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
   }
 
   function test_ccipReceive_RevertWhen_NotRouter() public {
-    Client.Any2EVMMessage memory message = _generateMintMessage(RECEIVER, SOURCE_AMOUNT, SOURCE_DECIMALS, FAST_FEE_BPS);
+    Client.Any2EVMMessage memory message =
+      _generateMintMessage(RECEIVER, SOURCE_AMOUNT, SOURCE_DECIMALS, FAST_FEE_FILLER_BPS, 0);
 
     address notRouter = makeAddr("notRouter");
     // Call from non-router address should revert
@@ -149,11 +227,75 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
     s_pool.ccipReceive(message);
   }
 
+  function test_withdrawPoolFees() public {
+    uint16 fillerFeeBps = 75; // 0.75%
+    uint16 poolFeeBps = 25; // 0.25%
+
+    // Update config to include pool fee
+    _updateConfigWithPoolFee(fillerFeeBps, poolFeeBps);
+
+    uint256 poolFeeAmount = (SOURCE_AMOUNT * poolFeeBps) / 10_000;
+    uint256 amountToFill = SOURCE_AMOUNT - (SOURCE_AMOUNT * (fillerFeeBps + poolFeeBps)) / 10_000;
+
+    bytes32 fillId = s_pool.computeFillId(MESSAGE_ID, amountToFill, SOURCE_DECIMALS, abi.encode(RECEIVER));
+
+    // Fast fill and settlement to accumulate fees
+    vm.stopPrank();
+    vm.prank(s_filler);
+    s_pool.fastFill(MESSAGE_ID, fillId, SOURCE_CHAIN_SELECTOR, amountToFill, SOURCE_DECIMALS, RECEIVER);
+
+    Client.Any2EVMMessage memory message =
+      _generateMintMessage(RECEIVER, SOURCE_AMOUNT, SOURCE_DECIMALS, fillerFeeBps, poolFeeBps);
+    vm.prank(address(s_sourceRouter));
+    s_pool.ccipReceive(message);
+
+    // Verify fee accumulated
+    assertEq(s_pool.getAccumulatedPoolFees(), poolFeeAmount);
+
+    // Withdraw fees as pool owner
+    address feeRecipient = makeAddr("feeRecipient");
+    uint256 recipientBalanceBefore = s_token.balanceOf(feeRecipient);
+
+    vm.prank(OWNER);
+    s_pool.withdrawPoolFees(feeRecipient);
+
+    // Verify withdrawal
+    assertEq(s_token.balanceOf(feeRecipient), recipientBalanceBefore + poolFeeAmount);
+    assertEq(s_pool.getAccumulatedPoolFees(), 0);
+  }
+
+  function _updateConfigWithPoolFee(uint16 fillerFeeBps, uint16 poolFeeBps) internal {
+    vm.stopPrank();
+    vm.startPrank(OWNER);
+
+    FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs memory laneConfigArgs = FastTransferTokenPoolAbstract
+      .DestChainConfigUpdateArgs({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      fastTransferFillerFeeBps: fillerFeeBps,
+      fastTransferPoolFeeBps: poolFeeBps,
+      fillerAllowlistEnabled: true,
+      destinationPool: destPoolAddress,
+      maxFillAmountPerRequest: MAX_FILL_AMOUNT_PER_REQUEST,
+      settlementOverheadGas: SETTLEMENT_GAS_OVERHEAD,
+      chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
+      customExtraArgs: ""
+    });
+    s_pool.updateDestChainConfig(_singleConfigToList(laneConfigArgs));
+
+    address[] memory fillersToAdd = new address[](1);
+    fillersToAdd[0] = s_filler;
+    s_pool.updateFillerAllowList(fillersToAdd, new address[](0));
+
+    vm.stopPrank();
+    vm.startPrank(address(s_sourceRouter));
+  }
+
   function _generateMintMessage(
     address receiver,
     uint256 sourceAmount,
     uint8 sourceDecimals,
-    uint16 fastTransferFeeBps
+    uint16 fastTransferFillerFeeBps,
+    uint16 fastTransferPoolFeeBps
   ) internal pure returns (Client.Any2EVMMessage memory) {
     return Client.Any2EVMMessage({
       messageId: MESSAGE_ID,
@@ -163,8 +305,9 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
         FastTransferTokenPoolAbstract.MintMessage({
           receiver: abi.encode(receiver),
           sourceAmount: sourceAmount,
-          sourceDecimals: sourceDecimals,
-          fastTransferFeeBps: fastTransferFeeBps
+          fastTransferFillerFeeBps: fastTransferFillerFeeBps,
+          fastTransferPoolFeeBps: fastTransferPoolFeeBps,
+          sourceDecimals: sourceDecimals
         })
       ),
       destTokenAmounts: new Client.EVMTokenAmount[](0)

@@ -135,7 +135,8 @@ contract BurnMintFastTransferTokenPool_validateSendRequest is BurnMintFastTransf
     FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs memory laneConfigArgs = FastTransferTokenPoolAbstract
       .DestChainConfigUpdateArgs({
       remoteChainSelector: anotherChainSelector,
-      fastTransferBpsFee: FAST_FEE_BPS,
+      fastTransferFillerFeeBps: FAST_FEE_FILLER_BPS,
+      fastTransferPoolFeeBps: 0, // No pool fee for this test
       fillerAllowlistEnabled: true,
       destinationPool: abi.encode(s_remoteBurnMintPool),
       maxFillAmountPerRequest: FILL_AMOUNT_MAX,
@@ -187,7 +188,8 @@ contract BurnMintFastTransferTokenPool_validateSendRequest is BurnMintFastTransf
     FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs memory laneConfigArgs = FastTransferTokenPoolAbstract
       .DestChainConfigUpdateArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
-      fastTransferBpsFee: FAST_FEE_BPS,
+      fastTransferFillerFeeBps: FAST_FEE_FILLER_BPS,
+      fastTransferPoolFeeBps: 0, // No pool fee for this test
       fillerAllowlistEnabled: true,
       destinationPool: abi.encode(s_remoteBurnMintPool),
       maxFillAmountPerRequest: FILL_AMOUNT_MAX,

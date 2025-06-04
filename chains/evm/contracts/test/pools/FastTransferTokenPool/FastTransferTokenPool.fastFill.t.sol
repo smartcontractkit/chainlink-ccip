@@ -65,7 +65,8 @@ contract FastTransferTokenPool_fastFill_Test is FastTransferTokenPoolSetup {
     FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs memory laneConfigArgs = FastTransferTokenPoolAbstract
       .DestChainConfigUpdateArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
-      fastTransferBpsFee: 100,
+      fastTransferFillerFeeBps: 100,
+      fastTransferPoolFeeBps: 0, // No pool fee for this test
       fillerAllowlistEnabled: false,
       destinationPool: destPoolAddress,
       maxFillAmountPerRequest: 1000 ether,

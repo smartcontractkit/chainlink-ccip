@@ -8,7 +8,7 @@ import {FastTransferTokenPoolSetup} from "./FastTransferTokenPoolSetup.t.sol";
 
 contract FastTransferTokenPool_getCcipSendTokenFee_Test is FastTransferTokenPoolSetup {
   function test_GetCcipSendTokenFee() public {
-    uint256 fastFee = SOURCE_AMOUNT * FAST_FEE_BPS / 10000;
+    uint256 fastFee = SOURCE_AMOUNT * FAST_FEE_FILLER_BPS / 10000;
     uint256 settlementQuote = 1 ether;
 
     vm.mockCall(

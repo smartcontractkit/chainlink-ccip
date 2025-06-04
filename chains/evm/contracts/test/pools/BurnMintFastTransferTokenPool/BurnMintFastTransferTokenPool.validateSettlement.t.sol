@@ -75,8 +75,9 @@ contract BurnMintFastTransferTokenPool_validateSettlement is BurnMintFastTransfe
       data: abi.encode(
         FastTransferTokenPoolAbstract.MintMessage({
           sourceAmount: TRANSFER_AMOUNT,
+          fastTransferFillerFeeBps: FAST_FEE_FILLER_BPS,
+          fastTransferPoolFeeBps: 0, // No pool fee for this test
           sourceDecimals: SOURCE_DECIMALS,
-          fastTransferFeeBps: FAST_FEE_BPS,
           receiver: abi.encode(RECEIVER)
         })
       ),

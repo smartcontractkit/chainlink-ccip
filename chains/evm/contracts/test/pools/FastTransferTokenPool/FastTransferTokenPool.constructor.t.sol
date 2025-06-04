@@ -25,7 +25,7 @@ contract FastTransferTokenPool_constructor is FastTransferTokenPoolSetup {
 
   function test_GetDestChainConfig() public view {
     (FastTransferTokenPoolAbstract.DestChainConfig memory config,) = s_pool.getDestChainConfig(DEST_CHAIN_SELECTOR);
-    assertEq(config.fastTransferBpsFee, FAST_FEE_BPS);
+    assertEq(config.fastTransferFillerFeeBps, FAST_FEE_FILLER_BPS);
     assertTrue(config.fillerAllowlistEnabled);
     assertEq(config.destinationPool, destPoolAddress);
     assertEq(config.maxFillAmountPerRequest, MAX_FILL_AMOUNT_PER_REQUEST);
