@@ -296,6 +296,16 @@
   ],
   "events": [
     {
+      "name": "GlobalConfigUpdated",
+      "fields": [
+        {
+          "name": "selfServedAllowed",
+          "type": "bool",
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "Burned",
       "fields": [
         {

@@ -20,6 +20,31 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 )
 
+type PoolInfo struct {
+	poolName    string
+	poolProgram solana.PublicKey
+}
+
+var pools = []PoolInfo{
+	{poolName: "lockrelease", poolProgram: config.CcipBasePoolLockRelease},
+	{poolName: "burnmint", poolProgram: config.CcipBasePoolBurnMint},
+}
+
+type TokenInfo struct {
+	tokenName    string
+	tokenProgram solana.PublicKey
+}
+
+var tokenPrograms = []TokenInfo{
+	{tokenName: "spl-token", tokenProgram: solana.TokenProgramID},
+	{tokenName: "spl-token-2022", tokenProgram: config.Token2022Program},
+}
+
+type ProgramData struct {
+	DataType uint32
+	Address  solana.PublicKey
+}
+
 // TestBaseTokenPoolHappyPath does basic happy path checks on the lock/release and burn/mint example pools
 // more detailed token pool tests are handled by the test-token-pool which is used in the tokenpool_test.go and ccip_router_test.go
 func TestBaseTokenPoolHappyPath(t *testing.T) {
@@ -93,22 +118,38 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 		})
 	})
 
-	// test functionality with token & token-2022 standards
-	for _, v := range []struct {
-		tokenName    string
-		tokenProgram solana.PublicKey
-	}{
-		{tokenName: "spl-token", tokenProgram: solana.TokenProgramID},
-		{tokenName: "spl-token-2022", tokenProgram: config.Token2022Program},
-	} {
-		// test functionality with each pool type (burnmint & lockrelease)
-		for _, p := range []struct {
-			poolName    string
-			poolProgram solana.PublicKey
-		}{
-			{poolName: "burnmint", poolProgram: config.CcipBasePoolBurnMint},
-			{poolName: "lockrelease", poolProgram: config.CcipBasePoolLockRelease},
-		} {
+	// test functionality with each pool type (burnmint & lockrelease)
+	for _, p := range pools {
+
+		var programData ProgramData
+		var configPDA solana.PublicKey
+
+		t.Run("setup:tokenPool "+p.poolName, func(t *testing.T) {
+
+			// get program data account
+			data, err := solanaGoClient.GetAccountInfoWithOpts(ctx, p.poolProgram, &rpc.GetAccountInfoOpts{
+				Commitment: config.DefaultCommitment,
+			})
+			require.NoError(t, err)
+			// Decode program data
+			require.NoError(t, bin.UnmarshalBorsh(&programData, data.Bytes()))
+
+			// Global Configuration
+			configPDA, err = tokens.TokenPoolGlobalConfigPDA(p.poolProgram)
+			require.NoError(t, err)
+
+			ix, err := tokenpool.NewInitGlobalConfigInstruction(configPDA, admin.PublicKey(), solana.SystemProgramID, programData.Address).ValidateAndBuild()
+			require.NoError(t, err)
+
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{
+				&tokens.TokenInstruction{Instruction: ix, Program: p.poolProgram},
+			}, admin, config.DefaultCommitment)
+
+		})
+
+		// test functionality with token & token-2022 standards
+		for _, v := range tokenPrograms {
+
 			t.Run(p.poolName+" "+v.tokenName, func(t *testing.T) {
 				t.Parallel()
 
@@ -158,20 +199,8 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 					require.NoError(t, err)
 
 					t.Run("setup", func(t *testing.T) {
-						type ProgramData struct {
-							DataType uint32
-							Address  solana.PublicKey
-						}
-						// get program data account
-						data, err := solanaGoClient.GetAccountInfoWithOpts(ctx, poolProgram, &rpc.GetAccountInfoOpts{
-							Commitment: config.DefaultCommitment,
-						})
-						require.NoError(t, err)
-						// Decode program data
-						var programData ProgramData
-						require.NoError(t, bin.UnmarshalBorsh(&programData, data.Bytes()))
 
-						poolInitI, err := tokenpool.NewInitializeInstruction(dumbRamp, config.RMNRemoteProgram, poolConfig, mint, admin.PublicKey(), solana.SystemProgramID, poolProgram, programData.Address).ValidateAndBuild()
+						poolInitI, err := tokenpool.NewInitializeInstruction(dumbRamp, config.RMNRemoteProgram, poolConfig, mint, admin.PublicKey(), solana.SystemProgramID, poolProgram, programData.Address, configPDA).ValidateAndBuild()
 						require.NoError(t, err)
 
 						// make pool mint_authority for token (required for burn/mint)

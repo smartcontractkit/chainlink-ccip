@@ -7,6 +7,48 @@ import (
 	ag_binary "github.com/gagliardetto/binary"
 )
 
+type PoolConfig struct {
+	SelfServedAllowed bool
+}
+
+var PoolConfigDiscriminator = [8]byte{26, 108, 14, 123, 116, 230, 129, 43}
+
+func (obj PoolConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Write account discriminator:
+	err = encoder.WriteBytes(PoolConfigDiscriminator[:], false)
+	if err != nil {
+		return err
+	}
+	// Serialize `SelfServedAllowed` param:
+	err = encoder.Encode(obj.SelfServedAllowed)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *PoolConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Read and check account discriminator:
+	{
+		discriminator, err := decoder.ReadTypeID()
+		if err != nil {
+			return err
+		}
+		if !discriminator.Equal(PoolConfigDiscriminator[:]) {
+			return fmt.Errorf(
+				"wrong discriminator: wanted %s, got %s",
+				"[26 108 14 123 116 230 129 43]",
+				fmt.Sprint(discriminator[:]))
+		}
+	}
+	// Deserialize `SelfServedAllowed`:
+	err = decoder.Decode(&obj.SelfServedAllowed)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 type State struct {
 	Version uint8
 	Config  BaseConfig

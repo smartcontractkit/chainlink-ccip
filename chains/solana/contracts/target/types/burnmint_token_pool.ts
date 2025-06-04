@@ -3,6 +3,63 @@ export type BurnmintTokenPool = {
   "name": "burnmint_token_pool",
   "instructions": [
     {
+      "name": "initGlobalConfig",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "updateGlobalConfig",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "selfServedAllowed",
+          "type": "bool"
+        }
+      ]
+    },
+    {
       "name": "initialize",
       "accounts": [
         {
@@ -32,6 +89,11 @@ export type BurnmintTokenPool = {
         },
         {
           "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "config",
           "isMut": false,
           "isSigner": false
         }
@@ -579,6 +641,18 @@ export type BurnmintTokenPool = {
     }
   ],
   "accounts": [
+    {
+      "name": "poolConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "selfServedAllowed",
+            "type": "bool"
+          }
+        ]
+      }
+    },
     {
       "name": "state",
       "type": {
@@ -626,6 +700,63 @@ export const IDL: BurnmintTokenPool = {
   "name": "burnmint_token_pool",
   "instructions": [
     {
+      "name": "initGlobalConfig",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "updateGlobalConfig",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "selfServedAllowed",
+          "type": "bool"
+        }
+      ]
+    },
+    {
       "name": "initialize",
       "accounts": [
         {
@@ -655,6 +786,11 @@ export const IDL: BurnmintTokenPool = {
         },
         {
           "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "config",
           "isMut": false,
           "isSigner": false
         }
@@ -1202,6 +1338,18 @@ export const IDL: BurnmintTokenPool = {
     }
   ],
   "accounts": [
+    {
+      "name": "poolConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "selfServedAllowed",
+            "type": "bool"
+          }
+        ]
+      }
+    },
     {
       "name": "state",
       "type": {

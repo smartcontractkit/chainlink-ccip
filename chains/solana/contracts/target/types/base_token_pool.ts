@@ -296,6 +296,16 @@ export type BaseTokenPool = {
   ],
   "events": [
     {
+      "name": "GlobalConfigUpdated",
+      "fields": [
+        {
+          "name": "selfServedAllowed",
+          "type": "bool",
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "Burned",
       "fields": [
         {
@@ -993,6 +1003,16 @@ export const IDL: BaseTokenPool = {
     }
   ],
   "events": [
+    {
+      "name": "GlobalConfigUpdated",
+      "fields": [
+        {
+          "name": "selfServedAllowed",
+          "type": "bool",
+          "index": false
+        }
+      ]
+    },
     {
       "name": "Burned",
       "fields": [

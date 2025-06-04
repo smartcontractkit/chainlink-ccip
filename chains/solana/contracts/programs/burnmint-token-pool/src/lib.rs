@@ -15,6 +15,29 @@ use crate::context::*;
 pub mod burnmint_token_pool {
     use super::*;
 
+    pub fn init_global_config(ctx: Context<InitGlobalConfig>) -> Result<()> {
+        ctx.accounts.config.self_served_allowed = false;
+
+        emit!(GlobalConfigUpdated {
+            self_served_allowed: ctx.accounts.config.self_served_allowed,
+        });
+
+        Ok(())
+    }
+
+    pub fn update_global_config(
+        ctx: Context<UpdateGlobalConfig>,
+        self_served_allowed: bool,
+    ) -> Result<()> {
+        ctx.accounts.config.self_served_allowed = self_served_allowed;
+
+        emit!(GlobalConfigUpdated {
+            self_served_allowed: ctx.accounts.config.self_served_allowed,
+        });
+
+        Ok(())
+    }
+
     pub fn initialize(
         ctx: Context<InitializeTokenPool>,
         router: Pubkey,

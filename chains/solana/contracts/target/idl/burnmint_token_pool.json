@@ -3,6 +3,63 @@
   "name": "burnmint_token_pool",
   "instructions": [
     {
+      "name": "initGlobalConfig",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "updateGlobalConfig",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "selfServedAllowed",
+          "type": "bool"
+        }
+      ]
+    },
+    {
       "name": "initialize",
       "accounts": [
         {
@@ -32,6 +89,11 @@
         },
         {
           "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "config",
           "isMut": false,
           "isSigner": false
         }
@@ -579,6 +641,18 @@
     }
   ],
   "accounts": [
+    {
+      "name": "PoolConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "selfServedAllowed",
+            "type": "bool"
+          }
+        ]
+      }
+    },
     {
       "name": "State",
       "type": {
