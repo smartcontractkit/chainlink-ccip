@@ -38,6 +38,9 @@ contract BurnMintFastTransferTokenPool_withdrawPoolFees_Test is BurnMintFastTran
 
     bytes32 fillId = s_pool.computeFillId(MESSAGE_ID, amountToFill, SOURCE_DECIMALS, abi.encode(RECEIVER));
 
+    // Get initial pool balance
+    uint256 poolBalanceBefore = s_token.balanceOf(address(s_pool));
+
     // Fast fill and settlement to accumulate fees
     vm.prank(s_filler);
     s_pool.fastFill(MESSAGE_ID, fillId, DEST_CHAIN_SELECTOR, amountToFill, SOURCE_DECIMALS, RECEIVER);
@@ -47,22 +50,34 @@ contract BurnMintFastTransferTokenPool_withdrawPoolFees_Test is BurnMintFastTran
     vm.prank(address(s_sourceRouter));
     s_pool.ccipReceive(message);
 
-    // Verify fee accumulated
-    assertEq(s_pool.getAccumulatedPoolFees(), poolFeeAmount);
+    // For burn/mint pools: fees are minted directly to the pool, not tracked in s_accumulatedPoolFees
+    assertEq(s_pool.getAccumulatedPoolFees(), 0, "Burn/mint pools don't track fees in accounting");
 
-    // Withdraw fees as pool owner
+    // Verify pool fee was minted to the pool contract
+    uint256 poolBalanceAfter = s_token.balanceOf(address(s_pool));
+    assertEq(poolBalanceAfter, poolBalanceBefore + poolFeeAmount, "Pool fee should be minted to pool");
+
+    // For burn/mint pools, withdrawPoolFees should transfer the entire pool balance to recipient
     address feeRecipient = makeAddr("feeRecipient");
     uint256 recipientBalanceBefore = s_token.balanceOf(feeRecipient);
 
+    // Expect event for the pool balance withdrawal
     vm.expectEmit();
-    emit IFastTransferPool.PoolFeeWithdrawn(feeRecipient, poolFeeAmount);
+    emit IFastTransferPool.PoolFeeWithdrawn(feeRecipient, poolBalanceAfter);
 
     vm.prank(OWNER);
     s_pool.withdrawPoolFees(feeRecipient);
 
-    // Verify withdrawal - tokens should be minted to recipient
-    assertEq(s_token.balanceOf(feeRecipient), recipientBalanceBefore + poolFeeAmount);
-    assertEq(s_pool.getAccumulatedPoolFees(), 0);
+    // Verify recipient receives the entire pool balance (which includes the accumulated fees)
+    assertEq(
+      s_token.balanceOf(feeRecipient),
+      recipientBalanceBefore + poolBalanceAfter,
+      "Recipient should receive entire pool balance"
+    );
+    // Pool balance should be 0 after withdrawal
+    assertEq(s_token.balanceOf(address(s_pool)), 0, "Pool balance should be 0 after withdrawal");
+    // Accumulated fees should remain 0 (not used for burn/mint pools)
+    assertEq(s_pool.getAccumulatedPoolFees(), 0, "Accumulated fees should remain 0");
   }
 
   function test_withdrawPoolFees_ZeroFees() public {
@@ -90,6 +105,9 @@ contract BurnMintFastTransferTokenPool_withdrawPoolFees_Test is BurnMintFastTran
 
     uint256 poolFeeAmount = (TRANSFER_AMOUNT * poolFeeBps) / 10_000;
     uint256 amountToFill = TRANSFER_AMOUNT - (TRANSFER_AMOUNT * (fillerFeeBps + poolFeeBps)) / 10_000;
+
+    // Get initial pool balance
+    uint256 poolBalanceBefore = s_token.balanceOf(address(s_pool));
 
     // First fast fill round
     bytes32 fillId1 = s_pool.computeFillId(MESSAGE_ID, amountToFill, SOURCE_DECIMALS, abi.encode(RECEIVER));
@@ -125,22 +143,34 @@ contract BurnMintFastTransferTokenPool_withdrawPoolFees_Test is BurnMintFastTran
     vm.prank(address(s_sourceRouter));
     s_pool.ccipReceive(message2);
 
-    // Verify accumulated fees (should be 2x poolFeeAmount)
-    assertEq(s_pool.getAccumulatedPoolFees(), poolFeeAmount * 2);
+    // For burn/mint pools: fees are minted directly to pool, not accumulated
+    assertEq(s_pool.getAccumulatedPoolFees(), 0, "Burn/mint pools don't track fees in accounting");
 
-    // Withdraw all fees
+    // Verify both pool fees were minted to the pool contract
+    uint256 poolBalanceAfter = s_token.balanceOf(address(s_pool));
+    assertEq(poolBalanceAfter, poolBalanceBefore + (poolFeeAmount * 2), "Both pool fees should be minted to pool");
+
+    // For burn/mint pools, withdrawPoolFees should transfer the entire pool balance to recipient
     address feeRecipient = makeAddr("feeRecipient");
     uint256 recipientBalanceBefore = s_token.balanceOf(feeRecipient);
 
+    // Expect event for the pool balance withdrawal
     vm.expectEmit();
-    emit IFastTransferPool.PoolFeeWithdrawn(feeRecipient, poolFeeAmount * 2);
+    emit IFastTransferPool.PoolFeeWithdrawn(feeRecipient, poolBalanceAfter);
 
     vm.prank(OWNER);
     s_pool.withdrawPoolFees(feeRecipient);
 
-    // Verify withdrawal - tokens should be minted to recipient
-    assertEq(s_token.balanceOf(feeRecipient), recipientBalanceBefore + (poolFeeAmount * 2));
-    assertEq(s_pool.getAccumulatedPoolFees(), 0);
+    // Verify recipient receives the entire pool balance (which includes both accumulated fees)
+    assertEq(
+      s_token.balanceOf(feeRecipient),
+      recipientBalanceBefore + poolBalanceAfter,
+      "Recipient should receive entire pool balance"
+    );
+    // Pool balance should be 0 after withdrawal
+    assertEq(s_token.balanceOf(address(s_pool)), 0, "Pool balance should be 0 after withdrawal");
+    // Accumulated fees should remain 0 (not used for burn/mint pools)
+    assertEq(s_pool.getAccumulatedPoolFees(), 0, "Accumulated fees should remain 0");
   }
 
   function test_withdrawPoolFees_RevertWhen_NotOwner() public {

@@ -114,6 +114,9 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   mapping(bytes32 fillId => FillInfo fillInfo) internal s_fills;
 
   /// @dev Accumulated pool fees that can be withdrawn by the pool owner.
+  /// NOTE: This is primarily intended for LOCK/RELEASE token pools that cannot mint new tokens
+  /// and need to keep accounting for pool fees. BURN/MINT pools typically mint fees directly
+  /// to the pool itself and may not need this accounting mechanism.
   uint256 internal s_accumulatedPoolFees;
 
   /// @param token The token this pool manages.
@@ -401,6 +404,19 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   /// @notice Handles reimbursement when the request was fast-filled.
   /// @dev The first param is the fillId. It's unused in this implementation, but kept to allow overriding this function
   /// to handle the reimbursement in a different way.
+  ///
+  /// BURN/MINT TOKEN POOLS:
+  /// This default implementation mints pool fee rewards directly to the pool itself (address(this)).
+  /// Since burn/mint pools can mint tokens as needed, there's no need to keep accounting for pool fees.
+  /// The pool contract itself holds the reward tokens and they can be managed through standard token operations.
+  ///
+  /// LOCK/RELEASE TOKEN POOLS:
+  /// Lock/release pools should override this function to implement accounting-based fee management since they
+  /// cannot mint new tokens. They should:
+  /// 1. Keep track of accumulated pool fees in a storage variable (e.g., s_accumulatedPoolFees)
+  /// 2. Emit events for fee accumulation tracking
+  /// 3. Provide withdrawal mechanisms for pool owners to claim accumulated fees
+  /// 4. Only release tokens to the filler, not mint additional tokens for pool fees
   /// @param filler The filler address to reimburse.
   /// @param fillerReimbursementAmount The amount to reimburse (what they provided + their fee).
   /// @param poolReimbursementAmount The amount to reimburse to the pool (the pool fee).
@@ -410,10 +426,13 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     uint256 fillerReimbursementAmount,
     uint256 poolReimbursementAmount
   ) internal virtual {
+    // Reimburse the filler with their original amount plus their fee
     _releaseOrMint(filler, fillerReimbursementAmount);
+
     if (poolReimbursementAmount > 0) {
-      // Don't mint pool fees yet, just track them for later withdrawal
-      s_accumulatedPoolFees += poolReimbursementAmount;
+      // For burn/mint pools: mint pool fee rewards directly to the pool itself
+      // This eliminates the need for fee accounting since the pool can mint as needed
+      _releaseOrMint(address(this), poolReimbursementAmount);
       emit PoolFeeAccumulated(poolReimbursementAmount);
     }
   }
@@ -437,12 +456,17 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   }
 
   /// @notice Gets the accumulated pool fees that can be withdrawn.
+  /// @dev This function is primarily intended for LOCK/RELEASE token pools that use accounting
+  /// for fee management. BURN/MINT pools that mint fees directly to the pool may not use this.
   /// @return The amount of accumulated pool fees.
   function getAccumulatedPoolFees() external view virtual returns (uint256) {
     return s_accumulatedPoolFees;
   }
 
   /// @notice Withdraws all accumulated pool fees to the specified recipient.
+  /// @dev This function is primarily intended for LOCK/RELEASE token pools that use accounting
+  /// for fee management. BURN/MINT pools that mint fees directly to the pool may override
+  /// this function or implement alternative fee management mechanisms.
   /// @param recipient The address to receive the withdrawn fees.
   function withdrawPoolFees(
     address recipient
