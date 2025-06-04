@@ -24,6 +24,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/addressbook"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/chainaccessor"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
@@ -39,11 +40,13 @@ type ccipChainReader struct {
 	lggr            logger.Logger
 	contractReaders map[cciptypes.ChainSelector]contractreader.Extended
 	contractWriters map[cciptypes.ChainSelector]types.ContractWriter
-	destChain       cciptypes.ChainSelector
-	offrampAddress  string
-	configPoller    ConfigPoller
-	addrCodec       cciptypes.AddressCodec
-	donAddressBook  *addressbook.Book
+	accessors       map[cciptypes.ChainSelector]cciptypes.ChainAccessor
+
+	destChain      cciptypes.ChainSelector
+	offrampAddress string
+	configPoller   ConfigPoller
+	addrCodec      cciptypes.AddressCodec
+	donAddressBook *addressbook.Book
 }
 
 func newCCIPChainReaderInternal(
@@ -54,14 +57,27 @@ func newCCIPChainReaderInternal(
 	destChain cciptypes.ChainSelector,
 	offrampAddress []byte,
 	addrCodec cciptypes.AddressCodec,
-) *ccipChainReader {
+) (*ccipChainReader, error) {
 	var crs = make(map[cciptypes.ChainSelector]contractreader.Extended)
+	var cas = make(map[cciptypes.ChainSelector]cciptypes.ChainAccessor)
+
 	for chainSelector, cr := range contractReaders {
 		crs[chainSelector] = contractreader.NewExtendedContractReader(cr)
+		if contractWriters[chainSelector] == nil {
+			return nil, fmt.Errorf("contract writer for chain %s is not provided", chainSelector)
+		}
+		cas[chainSelector] = chainaccessor.NewLegacyAccessor(
+			lggr,
+			chainSelector,
+			crs[chainSelector],
+			contractWriters[chainSelector],
+			addrCodec,
+		)
 	}
 
 	offrampAddrStr, err := addrCodec.AddressBytesToString(offrampAddress, destChain)
 	if err != nil {
+		// Panic here since the entire discovery process relies on the offramp address being valid.
 		panic(fmt.Sprintf("failed to convert offramp address to string: %v", err))
 	}
 
@@ -69,6 +85,7 @@ func newCCIPChainReaderInternal(
 		lggr:            lggr,
 		contractReaders: crs,
 		contractWriters: contractWriters,
+		accessors:       cas,
 		destChain:       destChain,
 		offrampAddress:  offrampAddrStr,
 		addrCodec:       addrCodec,
@@ -95,7 +112,7 @@ func newCCIPChainReaderInternal(
 		lggr.Errorw("failed to start config background polling", "err", err)
 	}
 
-	return reader
+	return reader, nil
 }
 
 // WithExtendedContractReader sets the extended contract reader for the provided chain.

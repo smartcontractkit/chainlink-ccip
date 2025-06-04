@@ -1,9 +1,11 @@
 package commit
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math"
+	"math/big"
 	"strings"
 	"testing"
 	"time"
@@ -13,12 +15,12 @@ import (
 
 	rmnpb "github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
+
+	"github.com/smartcontractkit/chainlink-ccip/internal"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
 	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
@@ -305,6 +307,7 @@ func TestPluginFactory_NewReportingPlugin(t *testing.T) {
 		b, err := json.Marshal(offChainConfig)
 		require.NoError(t, err)
 
+		chainSel := ccipocr3.ChainSelector(12922642891491394802)
 		mockAddrCodec := internal.NewMockAddressCodecHex(t)
 		p := &PluginFactory{
 			baseLggr: lggr,
@@ -315,8 +318,14 @@ func TestPluginFactory_NewReportingPlugin(t *testing.T) {
 					OfframpAddress: []byte{1, 2, 3},
 					OffchainConfig: b,
 					// Real selector pointing to chain 2337
-					ChainSelector: 12922642891491394802,
+					ChainSelector: chainSel,
 				},
+			},
+			contractReaders: map[ccipocr3.ChainSelector]types.ContractReader{
+				chainSel: types.UnimplementedContractReader{},
+			},
+			chainWriters: map[ccipocr3.ChainSelector]types.ContractWriter{
+				chainSel: UnimplementedTestContractWriter{},
 			},
 			addrCodec: mockAddrCodec,
 		}
@@ -337,3 +346,43 @@ func TestPluginFactory_NewReportingPlugin(t *testing.T) {
 		require.Equal(t, maxQueryLength, pluginInfo.Limits.MaxQueryLength)
 	})
 }
+
+type UnimplementedTestContractWriter struct{}
+
+func (u UnimplementedTestContractWriter) Start(ctx context.Context) error {
+	return fmt.Errorf("ContractWriter.Start not implemented")
+}
+
+func (u UnimplementedTestContractWriter) Close() error {
+	return fmt.Errorf("ContractWriter.Start not implemented")
+}
+
+func (u UnimplementedTestContractWriter) Ready() error {
+	return fmt.Errorf("ContractWriter.Start not implemented")
+}
+
+func (u UnimplementedTestContractWriter) HealthReport() map[string]error {
+	return nil
+}
+
+func (u UnimplementedTestContractWriter) Name() string {
+	return "UnimplementedTestContractWriter"
+}
+
+func (u UnimplementedTestContractWriter) SubmitTransaction(
+	_ context.Context, _, _ string, _ any, _ string, _ string, _ *types.TxMeta, _ *big.Int,
+) error {
+	return fmt.Errorf("ContractWriter.SubmitTransaction not implemented")
+}
+
+func (u UnimplementedTestContractWriter) GetTransactionStatus(
+	ctx context.Context, transactionID string,
+) (types.TransactionStatus, error) {
+	return 0, fmt.Errorf("ContractWriter.GetTransactionStatus not implemented")
+}
+
+func (u UnimplementedTestContractWriter) GetFeeComponents(ctx context.Context) (*types.ChainFeeComponents, error) {
+	return nil, fmt.Errorf("ContractWriter.GetFeeComponents not implemented")
+}
+
+var _ types.ContractWriter = UnimplementedTestContractWriter{}
