@@ -186,7 +186,7 @@ func (b *execReportBuilder) Add(
 	// Validate nonces for multiple reports mode
 	if b.multipleReportsEnabled {
 		if err := b.validateNoncesForMultipleReports(commitReport); err != nil {
-			return commitReport, err
+			return commitReport, fmt.Errorf("multiple reports validate nonces: %w", err)
 		}
 	}
 
@@ -300,10 +300,6 @@ func (b *execReportBuilder) shouldCreateNewExecReport() bool {
 }
 
 func (b *execReportBuilder) validateNoncesForMultipleReports(commitReport exectypes.CommitData) error {
-	if !b.multipleReportsEnabled {
-		return nil
-	}
-
 	for _, msg := range commitReport.Messages {
 		if msg.Header.Nonce > 0 {
 			b.lggr.Errorw("Found message with non-zero nonce when multiple reports are enabled",
@@ -311,7 +307,7 @@ func (b *execReportBuilder) validateNoncesForMultipleReports(commitReport execty
 				"messageID", msg.Header.MessageID,
 				"nonce", msg.Header.Nonce)
 
-			return fmt.Errorf("messages with non-zero nonces detected, limiting to single report")
+			return fmt.Errorf("messages with non-zero nonces detected")
 		}
 	}
 	return nil

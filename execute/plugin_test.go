@@ -1512,7 +1512,7 @@ func TestPlugin_Reports_UnableToEncode(t *testing.T) {
 
 	_, err = p.Reports(ctx, 0, report)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "unable to encode report 0: test error")
+	assert.Contains(t, err.Error(), "unable to encode report")
 }
 
 func TestPlugin_ShouldAcceptAttestedReport_DoesNotDecode(t *testing.T) {

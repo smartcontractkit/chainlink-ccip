@@ -1833,7 +1833,7 @@ func Test_Builder_MultiReport(t *testing.T) {
 					),
 				},
 			},
-			wantErr: "messages with non-zero nonces detected, limiting to single report",
+			wantErr: "multiple reports validate nonces: messages with non-zero nonces detected",
 		},
 		{
 			name: "multiple input reports splitting across maxMessages - no maxSingleChainReports",
