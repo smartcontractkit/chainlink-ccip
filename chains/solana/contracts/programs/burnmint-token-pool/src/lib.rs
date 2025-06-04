@@ -17,6 +17,11 @@ pub mod burnmint_token_pool {
 
     pub fn init_global_config(ctx: Context<InitGlobalConfig>) -> Result<()> {
         ctx.accounts.config.self_served_allowed = false;
+
+        emit!(GlobalConfigUpdated {
+            self_served_allowed: ctx.accounts.config.self_served_allowed,
+        });
+
         Ok(())
     }
 
@@ -25,6 +30,11 @@ pub mod burnmint_token_pool {
         self_served_allowed: bool,
     ) -> Result<()> {
         ctx.accounts.config.self_served_allowed = self_served_allowed;
+
+        emit!(GlobalConfigUpdated {
+            self_served_allowed: ctx.accounts.config.self_served_allowed,
+        });
+
         Ok(())
     }
 

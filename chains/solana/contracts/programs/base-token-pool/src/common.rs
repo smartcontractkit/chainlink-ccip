@@ -332,6 +332,11 @@ pub struct ReleaseOrMintOutV1 {
 }
 
 #[event]
+pub struct GlobalConfigUpdated {
+    pub self_served_allowed: bool,
+}
+
+#[event]
 pub struct Burned {
     pub sender: Pubkey,
     pub amount: u64,
