@@ -324,24 +324,6 @@ func breakCommitReport(
 	return commitReport
 }
 
-// changeSenderAndOtherNoncesAccordingly changes the sender and nonce of the message at the given index.
-// If the sender is different, it will also change the nonces of all subsequent messages
-func changeSenderAndOtherNoncesAccordingly(
-	idx int, sender cciptypes.UnknownAddress, nonce uint64, commitReport exectypes.CommitData) exectypes.CommitData {
-	if len(commitReport.Messages) < idx {
-		panic("message index out of range")
-	}
-	if sender.String() != commitReport.Messages[idx].Sender.String() {
-		commitReport.Messages[idx].Sender = sender
-		commitReport.Messages[idx].Header.Nonce = nonce
-		// need to change other nonces accordingly
-		for i := idx + 1; i < len(commitReport.Messages); i++ {
-			commitReport.Messages[i].Header.Nonce = commitReport.Messages[i].Header.Nonce - 1
-		}
-	}
-	return commitReport
-}
-
 // setMessageData at the given index to the given size. This function will panic if the index is out of range.
 func setMessageData(
 	idx int, size uint64, commitReport exectypes.CommitData,
@@ -2018,12 +2000,4 @@ func extractSequenceNumbersFromReports(
 	}
 
 	return seqNumsByChain
-}
-
-func createSeqSet(start int, end int) mapset.Set[cciptypes.SeqNum] {
-	seqSet := mapset.NewSet[cciptypes.SeqNum]()
-	for i := start; i <= end; i++ {
-		seqSet.Add(cciptypes.SeqNum(i))
-	}
-	return seqSet
 }

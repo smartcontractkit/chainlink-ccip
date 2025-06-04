@@ -316,7 +316,9 @@ func CheckIfInflight(inflight IsInflight) Check {
 }
 
 // extractReadyMessages to get a set of which are ready to execute.
-func (b *execReportBuilder) extractReadyMessages(ctx context.Context, report exectypes.CommitData) (map[int]struct{}, error) {
+func (b *execReportBuilder) extractReadyMessages(
+	ctx context.Context,
+	report exectypes.CommitData) (map[int]struct{}, error) {
 	readyMessages := make(map[int]struct{})
 	for i := 0; i < len(report.Messages); i++ {
 		updatedReport, status, err := b.checkMessage(ctx, i, report)
