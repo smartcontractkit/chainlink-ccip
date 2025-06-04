@@ -271,7 +271,6 @@ contract HybridLockReleaseUSDCTokenPool_releaseOrMint is HybridLockReleaseUSDCTo
     );
   }
 
-  // TODO: Break into smaller tests for each individual and re-use the usdc message generator function
   function test_RevertWhen_InvalidMessageValues() public {
     vm.startPrank(OWNER);
 

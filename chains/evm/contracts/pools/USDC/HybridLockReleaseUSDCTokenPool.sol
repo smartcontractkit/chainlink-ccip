@@ -35,17 +35,14 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
   );
   event LiquidityAdded(address indexed provider, uint256 indexed amount);
   event LiquidityRemoved(address indexed provider, uint256 indexed amount);
-
   event LockReleaseEnabled(uint64 indexed remoteChainSelector);
   event LockReleaseDisabled(uint64 indexed remoteChainSelector);
   event CCTPVersionSet(uint64 remoteChainSelector, CCTPVersion version);
 
   error LanePausedForCCTPMigration(uint64 remoteChainSelector);
   error TokenLockingNotAllowedAfterMigration(uint64 remoteChainSelector);
-
   error InvalidMinFinalityThreshold(uint32 expected, uint32 actual);
   error InvalidExecutionFinalityThreshold(uint32 expected, uint32 actual);
-
   error ChainNotSupportedByCCTP(uint64 remoteChainSelector);
 
   /// @notice The address of the liquidity provider for a specific chain.
@@ -54,14 +51,17 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
   /// balanceOf(pool) on home chain >= sum(totalSupply(mint/burn "wrapped" token) on all remote chains) should always hold
   mapping(uint64 remoteChainSelector => address liquidityProvider) internal s_liquidityProvider;
 
-  // CCTP's max fee is based on the use of fast-burn. Since this pool does not utilize that feature, max fee should be 0.
+  /// @notice CCTP's max fee is based on the use of fast-burn. Since this pool does not utilize that feature, max fee should be 0.
   uint32 public constant MAX_FEE = 0;
 
-  // CCTP V2 uses 2000 to indicate that attestations should not occur until finality is achieved on the source chain.
+  /// @notice CCTP V2 uses 2000 to indicate that attestations should not occur until finality is achieved on the source chain.
   uint32 public constant FINALITY_THRESHOLD = 2000;
 
+  /// @notice The token messenger for CCTP V2, which must be explicitly redefined in this contract due to the inheritance from USDCTokenPool
+  /// only supports CCTP V1.
   ITokenMessenger public immutable i_tokenMessengerCCTPV2;
 
+  /// @notice A mapping of CCIP chain identifiers to CCTP versions
   mapping(uint64 remoteChainSelector => CCTPVersion version) internal s_cctpVersion;
 
   /*
@@ -97,6 +97,8 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
   the allowedCaller for a CCTP-enabled message will always remain as the proxy, allowing for easier upgrades.
   */
 
+  /// @dev Since this contract inherits from the CCTP-V1 supported contract, we use USDC-V1 in the parent and manually
+  /// check for V2 compatibility.
   constructor(
     ITokenMessenger tokenMessenger,
     ITokenMessenger tokenMessengerV2,
@@ -106,7 +108,6 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
     address rmnProxy,
     address router
   )
-    // Since this inherits from the CCTP-V1 supported contract, we use USDC-V1 in the parent and manually check for V2
     USDCTokenPool(tokenMessenger, cctpMessageTransmitterProxy, token, allowlist, rmnProxy, router, 0)
     USDCBridgeMigrator(address(token))
   {
@@ -150,7 +151,7 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
   ) public virtual override returns (Pool.LockOrBurnOutV1 memory) {
-    // // If the alternative mechanism (L/R) for chains which have it enabled
+    // If the alternative mechanism (L/R) is not enabled, use CCTP
     if (!shouldUseLockRelease(lockOrBurnIn.remoteChainSelector)) {
       CCTPVersion cctpVersion = s_cctpVersion[lockOrBurnIn.remoteChainSelector];
       if (cctpVersion == CCTPVersion.VERSION_1) {
@@ -197,7 +198,7 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
     // Use CCTP Burn/Mint mechanism for chains which have it enabled. The LOCK_RELEASE_FLAG is used in sourcePoolData to
-    // discern this, since the source-chain will not be a hybrid-pool but a standard burn-mint. In the event of a
+    // discern this, since the source-chain will not be a hybrid-pool but a burn-mint with a specific destPoolData. In the event of a
     // stuck message after a migration has occurred, and the message was not executed properly before the migration
     // began, and locked tokens were not released until now, the message will already have been committed to with this
     // flag so it is safe to release the tokens. The source USDC pool is trusted to send messages with the correct
@@ -330,17 +331,9 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
   // │                   CCTPV2 Logic
   // ================================================================
 
-  /// @notice Mint tokens from the pool to the recipient
-  /// * sourceTokenData is part of the verified message and passed directly from
-  /// the offRamp so it is guaranteed to be what the lockOrBurn pool released on the
-  /// source chain. It contains (nonce, sourceDomain) which is guaranteed by CCTP
-  /// to be unique.
-  /// * offchainTokenData is untrusted (can be supplied by manual execution), but we assert
-  /// that (nonce, sourceDomain) is equal to the message's (nonce, sourceDomain) and
-  /// receiveMessage will assert that Attestation contains a valid attestation signature
-  /// for that message, including its (nonce, sourceDomain). This way, the only
-  /// non-reverting offchainTokenData that can be supplied is a valid attestation for the
-  /// specific message that was sent on source.
+  /// @notice Mint tokens from the pool to the recipient using CCTP V2
+  /// @dev This function operates almost identically to the CCTP V1 releaseOrMint function, with the exception of
+  /// the message validation logic being replaced with CCTP V2 specific validation logic.
   function _releaseOrMintCCTPV2(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) internal virtual returns (Pool.ReleaseOrMintOutV1 memory) {
@@ -363,7 +356,6 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
       revert UnlockingUSDCFailed();
     }
 
-    // emit ReleasedOrMinted(msg.sender, releaseOrMintIn.receiver, releaseOrMintIn.amount);
     emit ReleasedOrMinted(
       releaseOrMintIn.remoteChainSelector,
       address(i_token),
@@ -439,6 +431,9 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
     if (finalityThresholdExecuted != FINALITY_THRESHOLD) {
       revert InvalidExecutionFinalityThreshold(FINALITY_THRESHOLD, finalityThresholdExecuted);
     }
+
+    // Note: sourcetokenDataPayload.cctpVersion is not checked here, as it is already checked in releaseOrMint()
+    // and thus it should not be possible to reach this function with a non-CCTP V2 message.
   }
 
   /// @notice Burn tokens from the pool to initiate cross-chain transfer.

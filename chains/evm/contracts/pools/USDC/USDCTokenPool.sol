@@ -102,19 +102,27 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     address router,
     uint256 usdcVersion
   ) TokenPool(token, 6, allowlist, rmnProxy, router) {
-    // TODO: Fix Message Versioning by adding additional constructor parameter
     if (address(tokenMessenger) == address(0)) revert InvalidConfig();
+
+    // The message transmitter is the contract that receives incoming mint messages, and called by the
+    // message transmitter proxy to verify the message and mint the tokens.
     IMessageTransmitter transmitter = IMessageTransmitter(tokenMessenger.localMessageTransmitter());
     uint32 transmitterVersion = transmitter.version();
+
     if (transmitterVersion != usdcVersion) revert InvalidMessageVersion(transmitterVersion);
     uint32 tokenMessengerVersion = tokenMessenger.messageBodyVersion();
+
     if (tokenMessengerVersion != usdcVersion) revert InvalidTokenMessengerVersion(tokenMessengerVersion);
+
+    // Check that the message transmitter proxy is configured to use the correct message transmitter associated with the token messenger
     if (cctpMessageTransmitterProxy.i_cctpTransmitterV1() != transmitter) revert InvalidTransmitterInProxy();
 
     i_tokenMessenger = tokenMessenger;
     i_messageTransmitterProxy = cctpMessageTransmitterProxy;
     i_localDomainIdentifier = transmitter.localDomain();
     i_usdcVersion = usdcVersion;
+
+    // The token messenger the contract that handles the CCTP messages/token transfers
     i_token.safeIncreaseAllowance(address(i_tokenMessenger), type(uint256).max);
     emit ConfigSet(address(tokenMessenger));
   }
