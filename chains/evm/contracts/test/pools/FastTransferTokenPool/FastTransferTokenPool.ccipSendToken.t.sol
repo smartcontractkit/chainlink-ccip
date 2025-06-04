@@ -206,10 +206,6 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
     // Update config to include pool fee
     _updateConfigWithPoolFee(fillerFeeBps, poolFeeBps);
 
-    bytes memory extraArgs = Client._argsToBytes(
-      Client.GenericExtraArgsV2({gasLimit: SETTLEMENT_GAS_OVERHEAD, allowOutOfOrderExecution: true})
-    );
-
     _setupMocks(params.mockMessageId);
 
     uint256 fillerFeeAmount = (SOURCE_AMOUNT * fillerFeeBps) / 10_000;

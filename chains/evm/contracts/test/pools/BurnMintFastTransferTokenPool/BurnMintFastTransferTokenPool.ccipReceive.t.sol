@@ -4,7 +4,6 @@ pragma solidity ^0.8.24;
 import {IFastTransferPool} from "../../../interfaces/IFastTransferPool.sol";
 
 import {Client} from "../../../libraries/Client.sol";
-import {Internal} from "../../../libraries/Internal.sol";
 import {FastTransferTokenPoolAbstract} from "../../../pools/FastTransferTokenPoolAbstract.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {BurnMintFastTransferTokenPoolSetup} from "./BurnMintFastTransferTokenPoolSetup.t.sol";

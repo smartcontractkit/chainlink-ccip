@@ -53,8 +53,6 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   );
   event FillerAllowListUpdated(address[] addFillers, address[] removeFillers);
   event DestinationPoolUpdated(uint64 indexed destChainSelector, address destinationPool);
-  event PoolFeeAccumulated(uint256 amount);
-  event PoolFeeWithdrawn(address indexed recipient, uint256 amount);
 
   struct DestChainConfig {
     uint256 maxFillAmountPerRequest; // Maximum amount that can be filled per request.
@@ -325,7 +323,6 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
 
     // Convert to local denomination for token operations
     uint256 localAmount = _calculateLocalAmount(mintMessage.sourceAmount, mintMessage.sourceDecimals);
-    uint256 localFillerFee = _calculateLocalAmount(sourceFillerFee, mintMessage.sourceDecimals);
     uint256 localPoolFee = _calculateLocalAmount(sourcePoolFee, mintMessage.sourceDecimals);
 
     if (fillInfo.state == FillState.NOT_FILLED) {
@@ -403,12 +400,12 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
 
   /// @notice Handles reimbursement when the request was fast-filled.
   /// @dev The first param is the fillId. It's unused in this implementation, but kept to allow overriding this function
-  /// to handle the reimbursement in a different way./// @param fillId The fill ID.
+  /// to handle the reimbursement in a different way.
   /// @param filler The filler address to reimburse.
   /// @param fillerReimbursementAmount The amount to reimburse (what they provided + their fee).
   /// @param poolReimbursementAmount The amount to reimburse to the pool (the pool fee).
   function _handleFastFillReimbursement(
-    bytes32 fillId,
+    bytes32, /* _fillId */
     address filler,
     uint256 fillerReimbursementAmount,
     uint256 poolReimbursementAmount

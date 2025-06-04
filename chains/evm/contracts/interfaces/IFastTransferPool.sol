@@ -32,6 +32,12 @@ interface IFastTransferPool {
   /// received their fast transfer tokens and fee.
   event FastTransferSettled(bytes32 indexed fillId, bytes32 indexed settlementId);
 
+  /// @notice Emitted when pool fees are accumulated.
+  event PoolFeeAccumulated(uint256 amount);
+
+  /// @notice Emitted when pool fees are withdrawn.
+  event PoolFeeWithdrawn(address indexed recipient, uint256 amount);
+
   /// @notice Gets the CCIP send token fee and fast transfer fee for a given transfer.
   /// @param destinationChainSelector The destination chain selector.
   /// @param amount The amount to transfer.
@@ -90,4 +96,14 @@ interface IFastTransferPool {
     uint8 sourceDecimals,
     bytes memory receiver
   ) external pure returns (bytes32);
+
+  /// @notice Gets the accumulated pool fees that can be withdrawn.
+  /// @return The amount of accumulated pool fees.
+  function getAccumulatedPoolFees() external view returns (uint256);
+
+  /// @notice Withdraws all accumulated pool fees to the specified recipient.
+  /// @param recipient The address to receive the withdrawn fees.
+  function withdrawPoolFees(
+    address recipient
+  ) external;
 }

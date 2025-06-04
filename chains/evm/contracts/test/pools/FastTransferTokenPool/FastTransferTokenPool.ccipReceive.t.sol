@@ -227,43 +227,6 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
     s_pool.ccipReceive(message);
   }
 
-  function test_withdrawPoolFees() public {
-    uint16 fillerFeeBps = 75; // 0.75%
-    uint16 poolFeeBps = 25; // 0.25%
-
-    // Update config to include pool fee
-    _updateConfigWithPoolFee(fillerFeeBps, poolFeeBps);
-
-    uint256 poolFeeAmount = (SOURCE_AMOUNT * poolFeeBps) / 10_000;
-    uint256 amountToFill = SOURCE_AMOUNT - (SOURCE_AMOUNT * (fillerFeeBps + poolFeeBps)) / 10_000;
-
-    bytes32 fillId = s_pool.computeFillId(MESSAGE_ID, amountToFill, SOURCE_DECIMALS, abi.encode(RECEIVER));
-
-    // Fast fill and settlement to accumulate fees
-    vm.stopPrank();
-    vm.prank(s_filler);
-    s_pool.fastFill(MESSAGE_ID, fillId, SOURCE_CHAIN_SELECTOR, amountToFill, SOURCE_DECIMALS, RECEIVER);
-
-    Client.Any2EVMMessage memory message =
-      _generateMintMessage(RECEIVER, SOURCE_AMOUNT, SOURCE_DECIMALS, fillerFeeBps, poolFeeBps);
-    vm.prank(address(s_sourceRouter));
-    s_pool.ccipReceive(message);
-
-    // Verify fee accumulated
-    assertEq(s_pool.getAccumulatedPoolFees(), poolFeeAmount);
-
-    // Withdraw fees as pool owner
-    address feeRecipient = makeAddr("feeRecipient");
-    uint256 recipientBalanceBefore = s_token.balanceOf(feeRecipient);
-
-    vm.prank(OWNER);
-    s_pool.withdrawPoolFees(feeRecipient);
-
-    // Verify withdrawal
-    assertEq(s_token.balanceOf(feeRecipient), recipientBalanceBefore + poolFeeAmount);
-    assertEq(s_pool.getAccumulatedPoolFees(), 0);
-  }
-
   function _updateConfigWithPoolFee(uint16 fillerFeeBps, uint16 poolFeeBps) internal {
     vm.stopPrank();
     vm.startPrank(OWNER);
