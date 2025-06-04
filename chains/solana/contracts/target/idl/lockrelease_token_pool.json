@@ -26,14 +26,7 @@
           "isSigner": false
         }
       ],
-      "args": [
-        {
-          "name": "config",
-          "type": {
-            "defined": "PoolConfig"
-          }
-        }
-      ]
+      "args": []
     },
     {
       "name": "updateGlobalConfig",
@@ -61,10 +54,8 @@
       ],
       "args": [
         {
-          "name": "config",
-          "type": {
-            "defined": "PoolConfig"
-          }
+          "name": "selfServedAllowed",
+          "type": "bool"
         }
       ]
     },
@@ -794,6 +785,18 @@
     }
   ],
   "accounts": [
+    {
+      "name": "PoolConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "selfServedAllowed",
+            "type": "bool"
+          }
+        ]
+      }
+    },
     {
       "name": "State",
       "type": {

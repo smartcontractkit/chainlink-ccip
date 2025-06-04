@@ -14,4 +14,3 @@ type ReleaseOrMintInV1 = base.ReleaseOrMintInV1
 type RateLimitConfig = base.RateLimitConfig
 type BaseConfig = base.BaseConfig
 type BaseChain = base.BaseChain
-type PoolConfig = base.PoolConfig

@@ -2,20 +2,6 @@
   "version": "0.1.0-dev",
   "name": "base_token_pool",
   "instructions": [],
-  "accounts": [
-    {
-      "name": "PoolConfig",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "selfServedAllowed",
-            "type": "bool"
-          }
-        ]
-      }
-    }
-  ],
   "types": [
     {
       "name": "BaseConfig",

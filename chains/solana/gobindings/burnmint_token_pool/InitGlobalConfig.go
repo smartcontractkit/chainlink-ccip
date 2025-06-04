@@ -12,7 +12,6 @@ import (
 
 // InitGlobalConfig is the `initGlobalConfig` instruction.
 type InitGlobalConfig struct {
-	Config *PoolConfig
 
 	// [0] = [WRITE] config
 	//
@@ -30,12 +29,6 @@ func NewInitGlobalConfigInstructionBuilder() *InitGlobalConfig {
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 4),
 	}
 	return nd
-}
-
-// SetConfig sets the "config" parameter.
-func (inst *InitGlobalConfig) SetConfig(config PoolConfig) *InitGlobalConfig {
-	inst.Config = &config
-	return inst
 }
 
 // SetConfigAccount sets the "config" account.
@@ -100,13 +93,6 @@ func (inst InitGlobalConfig) ValidateAndBuild() (*Instruction, error) {
 }
 
 func (inst *InitGlobalConfig) Validate() error {
-	// Check whether all (required) parameters are set:
-	{
-		if inst.Config == nil {
-			return errors.New("Config parameter is not set")
-		}
-	}
-
 	// Check whether all (required) accounts are set:
 	{
 		if inst.AccountMetaSlice[0] == nil {
@@ -134,9 +120,7 @@ func (inst *InitGlobalConfig) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("Config", *inst.Config))
-					})
+					instructionBranch.Child("Params[len=0]").ParentFunc(func(paramsBranch ag_treeout.Branches) {})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
@@ -150,34 +134,21 @@ func (inst *InitGlobalConfig) EncodeToTree(parent ag_treeout.Branches) {
 }
 
 func (obj InitGlobalConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `Config` param:
-	err = encoder.Encode(obj.Config)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 func (obj *InitGlobalConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `Config`:
-	err = decoder.Decode(&obj.Config)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
 // NewInitGlobalConfigInstruction declares a new InitGlobalConfig instruction with the provided parameters and accounts.
 func NewInitGlobalConfigInstruction(
-	// Parameters:
-	config PoolConfig,
 	// Accounts:
-	configAccount ag_solanago.PublicKey,
+	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey,
 	programData ag_solanago.PublicKey) *InitGlobalConfig {
 	return NewInitGlobalConfigInstructionBuilder().
-		SetConfig(config).
-		SetConfigAccount(configAccount).
+		SetConfigAccount(config).
 		SetAuthorityAccount(authority).
 		SetSystemProgramAccount(systemProgram).
 		SetProgramDataAccount(programData)

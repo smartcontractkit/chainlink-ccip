@@ -13,16 +13,16 @@ pub mod lockrelease_token_pool {
 
     use super::*;
 
-    pub fn init_global_config(ctx: Context<InitGlobalConfig>, config: PoolConfig) -> Result<()> {
-        ctx.accounts.config.self_served_allowed = config.self_served_allowed;
+    pub fn init_global_config(ctx: Context<InitGlobalConfig>) -> Result<()> {
+        ctx.accounts.config.self_served_allowed = false;
         Ok(())
     }
 
     pub fn update_global_config(
         ctx: Context<UpdateGlobalConfig>,
-        config: PoolConfig,
+        self_served_allowed: bool,
     ) -> Result<()> {
-        ctx.accounts.config.self_served_allowed = config.self_served_allowed;
+        ctx.accounts.config.self_served_allowed = self_served_allowed;
         Ok(())
     }
 

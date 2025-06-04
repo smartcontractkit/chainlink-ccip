@@ -26,14 +26,7 @@ export type LockreleaseTokenPool = {
           "isSigner": false
         }
       ],
-      "args": [
-        {
-          "name": "config",
-          "type": {
-            "defined": "PoolConfig"
-          }
-        }
-      ]
+      "args": []
     },
     {
       "name": "updateGlobalConfig",
@@ -61,10 +54,8 @@ export type LockreleaseTokenPool = {
       ],
       "args": [
         {
-          "name": "config",
-          "type": {
-            "defined": "PoolConfig"
-          }
+          "name": "selfServedAllowed",
+          "type": "bool"
         }
       ]
     },
@@ -794,6 +785,18 @@ export type LockreleaseTokenPool = {
     }
   ],
   "accounts": [
+    {
+      "name": "poolConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "selfServedAllowed",
+            "type": "bool"
+          }
+        ]
+      }
+    },
     {
       "name": "state",
       "type": {
@@ -857,14 +860,7 @@ export const IDL: LockreleaseTokenPool = {
           "isSigner": false
         }
       ],
-      "args": [
-        {
-          "name": "config",
-          "type": {
-            "defined": "PoolConfig"
-          }
-        }
-      ]
+      "args": []
     },
     {
       "name": "updateGlobalConfig",
@@ -892,10 +888,8 @@ export const IDL: LockreleaseTokenPool = {
       ],
       "args": [
         {
-          "name": "config",
-          "type": {
-            "defined": "PoolConfig"
-          }
+          "name": "selfServedAllowed",
+          "type": "bool"
         }
       ]
     },
@@ -1625,6 +1619,18 @@ export const IDL: LockreleaseTokenPool = {
     }
   ],
   "accounts": [
+    {
+      "name": "poolConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "selfServedAllowed",
+            "type": "bool"
+          }
+        ]
+      }
+    },
     {
       "name": "state",
       "type": {

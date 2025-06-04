@@ -411,6 +411,13 @@ pub struct DeleteChainConfig<'info> {
     pub authority: Signer<'info>,
 }
 
+// This account can not be declared in the common crate, the program ID for that Account would be incorrect.
+#[account]
+#[derive(InitSpace)]
+pub struct PoolConfig {
+    pub self_served_allowed: bool,
+}
+
 /// Checks if the given authority is allowed to initialize the token pool.
 pub fn allowed_to_initialize_token_pool(
     program_data: &Account<ProgramData>,
@@ -420,5 +427,5 @@ pub fn allowed_to_initialize_token_pool(
 ) -> bool {
     program_data.upgrade_authority_address == Some(authority.key()) || // The upgrade authority of the token pool program can initialize a token pool
     (config.self_served_allowed && Some(authority.key()) == mint.mint_authority.into() )
-    // or the mint authority of the token, if self-serve is allowed
+    // or the mint authority of the token
 }

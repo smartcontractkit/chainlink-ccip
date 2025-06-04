@@ -2,20 +2,6 @@ export type BaseTokenPool = {
   "version": "0.1.0-dev",
   "name": "base_token_pool",
   "instructions": [],
-  "accounts": [
-    {
-      "name": "poolConfig",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "selfServedAllowed",
-            "type": "bool"
-          }
-        ]
-      }
-    }
-  ],
   "types": [
     {
       "name": "BaseConfig",
@@ -714,20 +700,6 @@ export const IDL: BaseTokenPool = {
   "version": "0.1.0-dev",
   "name": "base_token_pool",
   "instructions": [],
-  "accounts": [
-    {
-      "name": "poolConfig",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "selfServedAllowed",
-            "type": "bool"
-          }
-        ]
-      }
-    }
-  ],
   "types": [
     {
       "name": "BaseConfig",

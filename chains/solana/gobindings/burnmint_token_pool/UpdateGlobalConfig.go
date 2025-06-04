@@ -12,7 +12,7 @@ import (
 
 // UpdateGlobalConfig is the `updateGlobalConfig` instruction.
 type UpdateGlobalConfig struct {
-	Config *PoolConfig
+	SelfServedAllowed *bool
 
 	// [0] = [WRITE] config
 	//
@@ -32,9 +32,9 @@ func NewUpdateGlobalConfigInstructionBuilder() *UpdateGlobalConfig {
 	return nd
 }
 
-// SetConfig sets the "config" parameter.
-func (inst *UpdateGlobalConfig) SetConfig(config PoolConfig) *UpdateGlobalConfig {
-	inst.Config = &config
+// SetSelfServedAllowed sets the "selfServedAllowed" parameter.
+func (inst *UpdateGlobalConfig) SetSelfServedAllowed(selfServedAllowed bool) *UpdateGlobalConfig {
+	inst.SelfServedAllowed = &selfServedAllowed
 	return inst
 }
 
@@ -102,8 +102,8 @@ func (inst UpdateGlobalConfig) ValidateAndBuild() (*Instruction, error) {
 func (inst *UpdateGlobalConfig) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
-		if inst.Config == nil {
-			return errors.New("Config parameter is not set")
+		if inst.SelfServedAllowed == nil {
+			return errors.New("SelfServedAllowed parameter is not set")
 		}
 	}
 
@@ -135,7 +135,7 @@ func (inst *UpdateGlobalConfig) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("Config", *inst.Config))
+						paramsBranch.Child(ag_format.Param("SelfServedAllowed", *inst.SelfServedAllowed))
 					})
 
 					// Accounts of the instruction:
@@ -150,16 +150,16 @@ func (inst *UpdateGlobalConfig) EncodeToTree(parent ag_treeout.Branches) {
 }
 
 func (obj UpdateGlobalConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `Config` param:
-	err = encoder.Encode(obj.Config)
+	// Serialize `SelfServedAllowed` param:
+	err = encoder.Encode(obj.SelfServedAllowed)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 func (obj *UpdateGlobalConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `Config`:
-	err = decoder.Decode(&obj.Config)
+	// Deserialize `SelfServedAllowed`:
+	err = decoder.Decode(&obj.SelfServedAllowed)
 	if err != nil {
 		return err
 	}
@@ -169,15 +169,15 @@ func (obj *UpdateGlobalConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) 
 // NewUpdateGlobalConfigInstruction declares a new UpdateGlobalConfig instruction with the provided parameters and accounts.
 func NewUpdateGlobalConfigInstruction(
 	// Parameters:
-	config PoolConfig,
+	selfServedAllowed bool,
 	// Accounts:
-	configAccount ag_solanago.PublicKey,
+	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey,
 	programData ag_solanago.PublicKey) *UpdateGlobalConfig {
 	return NewUpdateGlobalConfigInstructionBuilder().
-		SetConfig(config).
-		SetConfigAccount(configAccount).
+		SetSelfServedAllowed(selfServedAllowed).
+		SetConfigAccount(config).
 		SetAuthorityAccount(authority).
 		SetSystemProgramAccount(systemProgram).
 		SetProgramDataAccount(programData)
