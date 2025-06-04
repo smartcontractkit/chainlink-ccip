@@ -421,5 +421,5 @@ pub fn allowed_to_initialize_token_pool(
 ) -> bool {
     program_data.upgrade_authority_address == Some(authority.key()) || // The upgrade authority of the token pool program can initialize a token pool
     (config.self_served_allowed && Some(authority.key()) == mint.mint_authority.into() )
-    // or the mint authority of the token
+    // or the mint authority of the token, if self-serve is allowed
 }
