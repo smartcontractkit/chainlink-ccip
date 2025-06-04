@@ -245,6 +245,7 @@ func (p *Plugin) Observation(
 	//       and remove the condition when every oracle upgraded.
 	// NOTE: If you are making changes to Observation make sure they are reflected in observationNext.
 	if p.offchainCfg.EnableDonBreakingChanges {
+		p.lggr.Info("running observation next")
 		return p.observationNext(ctx, outCtx, q)
 	}
 
@@ -427,6 +428,7 @@ func (p *Plugin) Outcome(
 	//       and remove the condition when every oracle upgraded.
 	// NOTE: If you are making changes to Outcome make sure they are reflected in outcomeNext.
 	if p.offchainCfg.EnableDonBreakingChanges {
+		p.lggr.Info("running outcome next")
 		return p.outcomeNext(ctx, outCtx, q, aos)
 	}
 
