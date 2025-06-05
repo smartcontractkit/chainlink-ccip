@@ -42,18 +42,4 @@ contract BurnMintFastTransferTokenPool is FastTransferTokenPoolAbstract {
   function _releaseOrMint(address receiver, uint256 amount) internal virtual override {
     IBurnMintERC20(address(i_token)).mint(receiver, amount);
   }
-
-  /// @notice Withdraws pool fee tokens from the pool's balance to the specified recipient.
-  /// @dev For burn/mint pools, fees are minted directly to the pool contract address.
-  /// This function transfers those tokens from the pool to the recipient.
-  /// @param recipient The address to receive the withdrawn fees.
-  function withdrawPoolFees(
-    address recipient
-  ) external override onlyOwner {
-    uint256 poolBalance = getToken().balanceOf(address(this));
-    if (poolBalance > 0) {
-      getToken().safeTransfer(recipient, poolBalance);
-      emit PoolFeeWithdrawn(recipient, poolBalance);
-    }
-  }
 }

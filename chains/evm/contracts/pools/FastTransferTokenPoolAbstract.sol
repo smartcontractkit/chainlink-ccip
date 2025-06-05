@@ -406,7 +406,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   /// @param fillerReimbursementAmount The amount to reimburse (what they provided + their fee).
   /// @param poolReimbursementAmount The amount to reimburse to the pool (the pool fee).
   function _handleFastFillReimbursement(
-    bytes32, /* _fillId */
+    bytes32,
     address filler,
     uint256 fillerReimbursementAmount,
     uint256 poolReimbursementAmount
