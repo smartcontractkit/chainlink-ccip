@@ -50,8 +50,8 @@ contract BurnMintFastTransferTokenPool_withdrawPoolFees_Test is BurnMintFastTran
     vm.prank(address(s_sourceRouter));
     s_pool.ccipReceive(message);
 
-    // For burn/mint pools: fees are minted directly to the pool, not tracked in s_accumulatedPoolFees
-    assertEq(s_pool.getAccumulatedPoolFees(), 0, "Burn/mint pools don't track fees in accounting");
+    // For burn/mint pools: getAccumulatedPoolFees() returns the pool balance (which includes accumulated fees)
+    assertEq(s_pool.getAccumulatedPoolFees(), poolFeeAmount, "Burn/mint pools track fees via pool balance");
 
     // Verify pool fee was minted to the pool contract
     uint256 poolBalanceAfter = s_token.balanceOf(address(s_pool));
@@ -68,7 +68,7 @@ contract BurnMintFastTransferTokenPool_withdrawPoolFees_Test is BurnMintFastTran
     vm.prank(OWNER);
     s_pool.withdrawPoolFees(feeRecipient);
 
-    // Verify recipient receives the entire pool balance (which includes the accumulated fees)
+    // Verify recipient receives the entire pool balance (which includes both accumulated fees)
     assertEq(
       s_token.balanceOf(feeRecipient),
       recipientBalanceBefore + poolBalanceAfter,
@@ -76,8 +76,8 @@ contract BurnMintFastTransferTokenPool_withdrawPoolFees_Test is BurnMintFastTran
     );
     // Pool balance should be 0 after withdrawal
     assertEq(s_token.balanceOf(address(s_pool)), 0, "Pool balance should be 0 after withdrawal");
-    // Accumulated fees should remain 0 (not used for burn/mint pools)
-    assertEq(s_pool.getAccumulatedPoolFees(), 0, "Accumulated fees should remain 0");
+    // Accumulated fees should now be 0 after withdrawal
+    assertEq(s_pool.getAccumulatedPoolFees(), 0, "Accumulated fees should be 0 after withdrawal");
   }
 
   function test_withdrawPoolFees_ZeroFees() public {
@@ -143,8 +143,7 @@ contract BurnMintFastTransferTokenPool_withdrawPoolFees_Test is BurnMintFastTran
     vm.prank(address(s_sourceRouter));
     s_pool.ccipReceive(message2);
 
-    // For burn/mint pools: fees are minted directly to pool, not accumulated
-    assertEq(s_pool.getAccumulatedPoolFees(), 0, "Burn/mint pools don't track fees in accounting");
+    assertEq(s_pool.getAccumulatedPoolFees(), poolFeeAmount * 2, "Burn/mint pools track fees via pool balance");
 
     // Verify both pool fees were minted to the pool contract
     uint256 poolBalanceAfter = s_token.balanceOf(address(s_pool));
@@ -167,10 +166,10 @@ contract BurnMintFastTransferTokenPool_withdrawPoolFees_Test is BurnMintFastTran
       recipientBalanceBefore + poolBalanceAfter,
       "Recipient should receive entire pool balance"
     );
-    // Pool balance should be 0 after withdrawal
+
     assertEq(s_token.balanceOf(address(s_pool)), 0, "Pool balance should be 0 after withdrawal");
-    // Accumulated fees should remain 0 (not used for burn/mint pools)
-    assertEq(s_pool.getAccumulatedPoolFees(), 0, "Accumulated fees should remain 0");
+
+    assertEq(s_pool.getAccumulatedPoolFees(), 0, "Accumulated fees should be 0 after withdrawal");
   }
 
   function test_withdrawPoolFees_RevertWhen_NotOwner() public {

@@ -12,6 +12,9 @@ contract FastTransferTokenPoolHelper is FastTransferTokenPoolAbstract {
 
   string public constant override typeAndVersion = "FastTransferTokenPoolHelper 1.6.1";
 
+  /// @dev Accumulated pool fees for lock/release pool accounting
+  uint256 internal s_accumulatedPoolFees;
+
   constructor(
     IERC20 token,
     uint8 localTokenDecimals,
@@ -49,9 +52,23 @@ contract FastTransferTokenPoolHelper is FastTransferTokenPoolAbstract {
     _releaseOrMint(filler, fillerReimbursementAmount);
 
     if (poolReimbursementAmount > 0) {
-      // For lock/release pools: keep accounting for pool fees since we can't mint new tokens
+      // For lock/release pools: accumulate pool fees in storage since we can't mint new tokens
       s_accumulatedPoolFees += poolReimbursementAmount;
-      emit PoolFeeAccumulated(poolReimbursementAmount);
+    }
+  }
+
+  /// @notice Override to return accumulated pool fees from storage for lock/release pools
+  function _getAccumulatedPoolFees() internal view override returns (uint256) {
+    return s_accumulatedPoolFees;
+  }
+
+  /// @notice Override to withdraw accumulated pool fees from storage for lock/release pools
+  function withdrawPoolFees(address recipient) external override onlyOwner {
+    uint256 amount = s_accumulatedPoolFees;
+    if (amount > 0) {
+      s_accumulatedPoolFees = 0;
+      _releaseOrMint(recipient, amount);
+      emit PoolFeeWithdrawn(recipient, amount);
     }
   }
 }

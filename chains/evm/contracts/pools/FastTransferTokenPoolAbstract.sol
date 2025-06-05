@@ -113,12 +113,6 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   /// This is used to track the state and filler of each fill request.
   mapping(bytes32 fillId => FillInfo fillInfo) internal s_fills;
 
-  /// @dev Accumulated pool fees that can be withdrawn by the pool owner.
-  /// NOTE: This is primarily intended for LOCK/RELEASE token pools that cannot mint new tokens
-  /// and need to keep accounting for pool fees. BURN/MINT pools typically mint fees directly
-  /// to the pool itself and may not need this accounting mechanism.
-  uint256 internal s_accumulatedPoolFees;
-
   /// @param token The token this pool manages.
   /// @param localTokenDecimals The decimals of the local token.
   /// @param allowlist The allowlist of addresses.
@@ -336,6 +330,10 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
       _handleSlowFill(fillId, localAmount, receiver);
     } else if (fillInfo.state == FillState.FILLED) {
       _handleFastFillReimbursement(fillId, fillInfo.filler, localAmount - localPoolFee, localPoolFee);
+      
+      if (localPoolFee > 0) {
+        emit PoolFeeAccumulated(localPoolFee);
+      }
     } else {
       // The catch all assertion for already settled fills ensures that any wrong value will revert.
       revert AlreadySettled(fillId);
@@ -407,7 +405,6 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   ///
   /// BURN/MINT TOKEN POOLS:
   /// This default implementation mints pool fee rewards directly to the pool itself (address(this)).
-  /// Since burn/mint pools can mint tokens as needed, there's no need to keep accounting for pool fees.
   /// The pool contract itself holds the reward tokens and they can be managed through standard token operations.
   ///
   /// LOCK/RELEASE TOKEN POOLS:
@@ -426,14 +423,12 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     uint256 fillerReimbursementAmount,
     uint256 poolReimbursementAmount
   ) internal virtual {
-    // Reimburse the filler with their original amount plus their fee
-    _releaseOrMint(filler, fillerReimbursementAmount);
-
-    if (poolReimbursementAmount > 0) {
-      // For burn/mint pools: mint pool fee rewards directly to the pool itself
-      // This eliminates the need for fee accounting since the pool can mint as needed
-      _releaseOrMint(address(this), poolReimbursementAmount);
-      emit PoolFeeAccumulated(poolReimbursementAmount);
+    // Mint entire amount to pool first
+    _releaseOrMint(address(this), fillerReimbursementAmount + poolReimbursementAmount);
+    
+    // Then transfer filler's share to them
+    if (fillerReimbursementAmount > 0) {
+      getToken().safeTransfer(filler, fillerReimbursementAmount);
     }
   }
 
@@ -456,25 +451,32 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   }
 
   /// @notice Gets the accumulated pool fees that can be withdrawn.
-  /// @dev This function is primarily intended for LOCK/RELEASE token pools that use accounting
-  /// for fee management. BURN/MINT pools that mint fees directly to the pool may not use this.
   /// @return The amount of accumulated pool fees.
-  function getAccumulatedPoolFees() external view virtual returns (uint256) {
-    return s_accumulatedPoolFees;
+  function getAccumulatedPoolFees() external view returns (uint256) {
+    return _getAccumulatedPoolFees();
+  }
+
+  /// @notice Internal function to get accumulated pool fees.
+  /// @dev For BURN/MINT pools, this returns the contract's token balance since pool fees
+  /// are minted directly to the pool. LOCK/RELEASE token pools that cannot mint new tokens may choose to implement
+  /// their own accounting mechanism for pool fees by adding a storage variable such as: s_accumulatedPoolFees.
+  /// This allows them to track fees separately since they cannot mint additional tokens
+  /// for pool fee rewards like BURN/MINT pools can.
+  /// @return The amount of accumulated pool fees.
+  function _getAccumulatedPoolFees() internal view virtual returns (uint256) {
+    return getToken().balanceOf(address(this));
   }
 
   /// @notice Withdraws all accumulated pool fees to the specified recipient.
-  /// @dev This function is primarily intended for LOCK/RELEASE token pools that use accounting
-  /// for fee management. BURN/MINT pools that mint fees directly to the pool may override
-  /// this function or implement alternative fee management mechanisms.
+  /// @dev For BURN/MINT pools, this transfers the entire token balance of the pool contract.
+  /// LOCK/RELEASE pools should override this function if they implement their own accounting mechanism.
   /// @param recipient The address to receive the withdrawn fees.
   function withdrawPoolFees(
     address recipient
   ) external virtual onlyOwner {
-    uint256 amount = s_accumulatedPoolFees;
+    uint256 amount = _getAccumulatedPoolFees();
     if (amount > 0) {
-      s_accumulatedPoolFees = 0;
-      _releaseOrMint(recipient, amount);
+      getToken().safeTransfer(recipient, amount);
       emit PoolFeeWithdrawn(recipient, amount);
     }
   }
