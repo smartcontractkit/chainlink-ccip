@@ -281,6 +281,13 @@ func (p *Plugin) outcomeNext(
 	}
 
 	if len(tokenPriceOutcome.TokenPrices) > 0 || len(chainFeeOutcome.GasPrices) > 0 {
+		if prevOutcome.MainOutcome.InflightPriceOcrSequenceNumber > 0 {
+			lggr.Errorw("something is wrong since prices were observed and agreed while previous prices were inflight",
+				"prevMainOutcome", prevOutcome.MainOutcome,
+				"tokenPrices", tokenPriceOutcome.TokenPrices,
+				"gasPrices", chainFeeOutcome.GasPrices,
+			)
+		}
 		mainOutcome.InflightPriceOcrSequenceNumber = cciptypes.SeqNum(outCtx.SeqNr)
 		mainOutcome.RemainingPriceChecks = p.offchainCfg.InflightPriceCheckRetries
 	}
@@ -326,7 +333,7 @@ func (p *Plugin) getMainOutcomeAndCacheInvalidation(
 	}
 
 	if consensus.LtFPlusOne(fDestChain, len(observedOnChainOcrSeqNums)) {
-		return committypes.MainOutcome{}, false, fmt.Errorf("onChainOcrSeqNums no consensus required minimum=%d got=%d %v",
+		return committypes.MainOutcome{}, false, fmt.Errorf("onChainOcrSeqNums no consensus requiredMinimum=%d got=%d %v",
 			fDestChain+1, len(observedOnChainOcrSeqNums), observedOnChainOcrSeqNums)
 	}
 
