@@ -277,12 +277,11 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     // We rate limit when there are funds going to an end user, not when they are going to a filler.
     _consumeInboundRateLimit(sourceChainSelector, localAmount);
 
-    // Transfer tokens from filler to receiver
-    _handleFastFill(fillId, msg.sender, receiver, localAmount);
-
     s_fills[fillId] = FillInfo({state: IFastTransferPool.FillState.FILLED, filler: msg.sender});
 
     emit FastTransferFilled(fillId, settlementId, msg.sender, localAmount, receiver);
+
+    _handleFastFill(fillId, msg.sender, receiver, localAmount);
   }
 
   // @inheritdoc CCIPReceiver
