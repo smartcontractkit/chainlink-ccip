@@ -27,7 +27,7 @@ contract FastTransferTokenPool_fastFill_Test is FastTransferTokenPoolSetup {
     vm.expectEmit();
     emit IFastTransferPool.FastTransferFilled(fillId, SETTLEMENT_ID, s_filler, SOURCE_AMOUNT, RECEIVER);
 
-    s_pool.fastFill(SETTLEMENT_ID, fillId, DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, SOURCE_DECIMALS, RECEIVER);
+    s_pool.fastFill(fillId, SETTLEMENT_ID, DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, SOURCE_DECIMALS, RECEIVER);
 
     // Verify token balances
     assertEq(s_token.balanceOf(s_filler), balanceBefore - SOURCE_AMOUNT);
@@ -51,7 +51,7 @@ contract FastTransferTokenPool_fastFill_Test is FastTransferTokenPoolSetup {
     vm.expectEmit();
     emit IFastTransferPool.FastTransferFilled(fillId, SETTLEMENT_ID, s_filler, expectedLocalAmount, RECEIVER);
 
-    s_pool.fastFill(SETTLEMENT_ID, fillId, DEST_CHAIN_SELECTOR, srcAmountToFill, sourceDecimals, RECEIVER);
+    s_pool.fastFill(fillId, SETTLEMENT_ID, DEST_CHAIN_SELECTOR, srcAmountToFill, sourceDecimals, RECEIVER);
 
     assertEq(s_token.balanceOf(s_filler), fillerBalanceBefore - expectedLocalAmount);
     assertEq(s_token.balanceOf(RECEIVER), receiverBalanceBefore + expectedLocalAmount);
@@ -106,7 +106,7 @@ contract FastTransferTokenPool_fastFill_Test is FastTransferTokenPoolSetup {
     emit IFastTransferPool.FastTransferFilled(fillId, SETTLEMENT_ID, nonAllowlistedFiller, SOURCE_AMOUNT, RECEIVER);
 
     // Should succeed even though filler is not allowlisted
-    s_pool.fastFill(SETTLEMENT_ID, fillId, SOURCE_CHAIN_SELECTOR, SOURCE_AMOUNT, SOURCE_DECIMALS, RECEIVER);
+    s_pool.fastFill(fillId, SETTLEMENT_ID, SOURCE_CHAIN_SELECTOR, SOURCE_AMOUNT, SOURCE_DECIMALS, RECEIVER);
 
     // Verify token balances
     assertEq(s_token.balanceOf(nonAllowlistedFiller), 1000 ether - SOURCE_AMOUNT);
@@ -141,13 +141,13 @@ contract FastTransferTokenPool_fastFill_Test is FastTransferTokenPoolSetup {
 
     // Both fillers can fill different requests
     vm.prank(s_filler);
-    s_pool.fastFill(SETTLEMENT_ID, fillId1, DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, SOURCE_DECIMALS, RECEIVER);
+    s_pool.fastFill(fillId1, SETTLEMENT_ID, DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, SOURCE_DECIMALS, RECEIVER);
 
     vm.expectEmit();
     emit IFastTransferPool.FastTransferFilled(fillId2, settlementId2, filler2, SOURCE_AMOUNT, RECEIVER);
 
     vm.prank(filler2);
-    s_pool.fastFill(settlementId2, fillId2, DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, SOURCE_DECIMALS, RECEIVER);
+    s_pool.fastFill(fillId2, settlementId2, DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, SOURCE_DECIMALS, RECEIVER);
 
     assertEq(s_token.balanceOf(RECEIVER), SOURCE_AMOUNT * 2);
   }
@@ -156,11 +156,11 @@ contract FastTransferTokenPool_fastFill_Test is FastTransferTokenPoolSetup {
     bytes32 fillId = s_pool.computeFillId(SETTLEMENT_ID, SOURCE_AMOUNT, SOURCE_DECIMALS, abi.encode(RECEIVER));
 
     // First fill
-    s_pool.fastFill(SETTLEMENT_ID, fillId, DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, SOURCE_DECIMALS, RECEIVER);
+    s_pool.fastFill(fillId, SETTLEMENT_ID, DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, SOURCE_DECIMALS, RECEIVER);
 
     // Attempt second fill
     vm.expectRevert(abi.encodeWithSelector(IFastTransferPool.AlreadyFilled.selector, fillId));
-    s_pool.fastFill(SETTLEMENT_ID, fillId, DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, SOURCE_DECIMALS, RECEIVER);
+    s_pool.fastFill(fillId, SETTLEMENT_ID, DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, SOURCE_DECIMALS, RECEIVER);
   }
 
   function test_FastFill_RevertWhen_FillerNotAllowed() public {
@@ -201,7 +201,9 @@ contract FastTransferTokenPool_fastFill_Test is FastTransferTokenPoolSetup {
     bytes32 fillIdWithWrongDecimals =
       s_pool.computeFillId(SETTLEMENT_ID, SOURCE_AMOUNT, wrongDecimals, abi.encode(RECEIVER));
 
-    vm.expectRevert(abi.encodeWithSelector(FastTransferTokenPoolAbstract.InvalidFillId.selector, fillIdWithWrongDecimals));
+    vm.expectRevert(
+      abi.encodeWithSelector(FastTransferTokenPoolAbstract.InvalidFillId.selector, fillIdWithWrongDecimals)
+    );
     s_pool.fastFill(
       SETTLEMENT_ID, fillIdWithWrongDecimals, DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, SOURCE_DECIMALS, RECEIVER
     );
@@ -213,7 +215,9 @@ contract FastTransferTokenPool_fastFill_Test is FastTransferTokenPoolSetup {
     bytes32 fillIdWithWrongReceiver =
       s_pool.computeFillId(SETTLEMENT_ID, SOURCE_AMOUNT, SOURCE_DECIMALS, abi.encode(wrongReceiver));
 
-    vm.expectRevert(abi.encodeWithSelector(FastTransferTokenPoolAbstract.InvalidFillId.selector, fillIdWithWrongReceiver));
+    vm.expectRevert(
+      abi.encodeWithSelector(FastTransferTokenPoolAbstract.InvalidFillId.selector, fillIdWithWrongReceiver)
+    );
     s_pool.fastFill(
       SETTLEMENT_ID, fillIdWithWrongReceiver, DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, SOURCE_DECIMALS, RECEIVER
     );

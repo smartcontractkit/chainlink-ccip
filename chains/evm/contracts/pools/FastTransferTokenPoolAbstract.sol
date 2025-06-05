@@ -245,15 +245,15 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   // ================================================================
 
   /// @notice Fast fills a transfer using liquidity provider funds based on CCIP settlement.
-  /// @param settlementId The settlement ID, which under normal circumstances is the same as the CCIP message ID.
   /// @param fillId The fill ID, computed from the fill request parameters.
+  /// @param settlementId The settlement ID, which under normal circumstances is the same as the CCIP message ID.
   /// @param sourceAmountNetFee The amount to fill, calculated as the amount sent in `ccipSendToken` minus
   /// the fast fill fee, expressed in source token decimals.
   /// @param sourceDecimals The decimals of the source token.
   /// @param receiver The receiver address.
   function fastFill(
-    bytes32 settlementId,
     bytes32 fillId,
+    bytes32 settlementId,
     uint64 sourceChainSelector,
     uint256 sourceAmountNetFee,
     uint8 sourceDecimals,

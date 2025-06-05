@@ -43,7 +43,7 @@ contract BurnMintFastTransferTokenPool_withdrawPoolFees_Test is BurnMintFastTran
 
     // Fast fill and settlement to accumulate fees
     vm.prank(s_filler);
-    s_pool.fastFill(MESSAGE_ID, fillId, DEST_CHAIN_SELECTOR, amountToFill, SOURCE_DECIMALS, RECEIVER);
+    s_pool.fastFill(fillId, MESSAGE_ID, DEST_CHAIN_SELECTOR, amountToFill, SOURCE_DECIMALS, RECEIVER);
 
     Client.Any2EVMMessage memory message =
       _generateMintMessage(RECEIVER, TRANSFER_AMOUNT, SOURCE_DECIMALS, fillerFeeBps, poolFeeBps);
@@ -112,7 +112,7 @@ contract BurnMintFastTransferTokenPool_withdrawPoolFees_Test is BurnMintFastTran
     // First fast fill round
     bytes32 fillId1 = s_pool.computeFillId(MESSAGE_ID, amountToFill, SOURCE_DECIMALS, abi.encode(RECEIVER));
     vm.prank(s_filler);
-    s_pool.fastFill(MESSAGE_ID, fillId1, DEST_CHAIN_SELECTOR, amountToFill, SOURCE_DECIMALS, RECEIVER);
+    s_pool.fastFill(fillId1, MESSAGE_ID, DEST_CHAIN_SELECTOR, amountToFill, SOURCE_DECIMALS, RECEIVER);
 
     Client.Any2EVMMessage memory message1 =
       _generateMintMessage(RECEIVER, TRANSFER_AMOUNT, SOURCE_DECIMALS, fillerFeeBps, poolFeeBps);
@@ -123,7 +123,7 @@ contract BurnMintFastTransferTokenPool_withdrawPoolFees_Test is BurnMintFastTran
     bytes32 messageId2 = bytes32("messageId2");
     bytes32 fillId2 = s_pool.computeFillId(messageId2, amountToFill, SOURCE_DECIMALS, abi.encode(RECEIVER));
     vm.prank(s_filler);
-    s_pool.fastFill(messageId2, fillId2, DEST_CHAIN_SELECTOR, amountToFill, SOURCE_DECIMALS, RECEIVER);
+    s_pool.fastFill(fillId2, messageId2, DEST_CHAIN_SELECTOR, amountToFill, SOURCE_DECIMALS, RECEIVER);
 
     Client.Any2EVMMessage memory message2 = Client.Any2EVMMessage({
       messageId: messageId2,
@@ -209,7 +209,7 @@ contract BurnMintFastTransferTokenPool_withdrawPoolFees_Test is BurnMintFastTran
     bytes32 fillId = s_pool.computeFillId(MESSAGE_ID, amountToFill, SOURCE_DECIMALS, abi.encode(RECEIVER));
 
     vm.prank(s_filler);
-    s_pool.fastFill(MESSAGE_ID, fillId, DEST_CHAIN_SELECTOR, amountToFill, SOURCE_DECIMALS, RECEIVER);
+    s_pool.fastFill(fillId, MESSAGE_ID, DEST_CHAIN_SELECTOR, amountToFill, SOURCE_DECIMALS, RECEIVER);
 
     Client.Any2EVMMessage memory message =
       _generateMintMessage(RECEIVER, TRANSFER_AMOUNT, SOURCE_DECIMALS, fillerFeeBps, poolFeeBps);
