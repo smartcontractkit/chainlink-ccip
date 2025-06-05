@@ -215,9 +215,6 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
     uint256 fillerFeeAmount = (sourceAmount * FAST_FEE_FILLER_BPS) / 10_000;
     uint256 sourceAmountAfterFee = sourceAmount - fillerFeeAmount;
 
-    // Scale the amount to fill to destination decimals
-    uint256 amountToFill = sourceAmountAfterFee * 10 ** destDecimals / 10 ** sourceDecimals;
-
     bytes32 fillId = s_pool.computeFillId(MESSAGE_ID, sourceAmountAfterFee, sourceDecimals, abi.encode(RECEIVER));
 
     // Fast fill first
