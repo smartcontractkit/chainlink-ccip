@@ -33,11 +33,14 @@ var pools = []PoolInfo{
 type TokenInfo struct {
 	tokenName    string
 	tokenProgram solana.PublicKey
+	multisig     bool
 }
 
 var tokenPrograms = []TokenInfo{
-	{tokenName: "spl-token", tokenProgram: solana.TokenProgramID},
-	{tokenName: "spl-token-2022", tokenProgram: config.Token2022Program},
+	{tokenName: "spl-token", tokenProgram: solana.TokenProgramID, multisig: false},
+	{tokenName: "spl-token", tokenProgram: solana.TokenProgramID, multisig: true},
+	{tokenName: "spl-token-2022", tokenProgram: config.Token2022Program, multisig: false},
+	{tokenName: "spl-token-2022", tokenProgram: config.Token2022Program, multisig: true},
 }
 
 type ProgramData struct {
@@ -203,8 +206,22 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 						poolInitI, err := tokenpool.NewInitializeInstruction(dumbRamp, config.RMNRemoteProgram, poolConfig, mint, admin.PublicKey(), solana.SystemProgramID, poolProgram, programData.Address, configPDA).ValidateAndBuild()
 						require.NoError(t, err)
 
+						newMintAuthority := poolSigner
+
+						if v.multisig {
+							// create multisig
+							multisig, err := solana.NewRandomPrivateKey()
+							require.NoError(t, err)
+							ixMsig, ixErrMsig := tokens.CreateMultisig(ctx, admin.PublicKey(), v.tokenProgram, multisig.PublicKey(), []solana.PublicKey{admin.PublicKey(), poolSigner}, solanaGoClient, config.DefaultCommitment)
+							require.NoError(t, ixErrMsig)
+							testutils.SendAndConfirm(ctx, t, solanaGoClient, ixMsig, admin, config.DefaultCommitment, common.AddSigners(multisig, admin))
+
+							newMintAuthority = multisig.PublicKey()
+							p.MintAuthorityMultisig = multisig.PublicKey() // set multisig as mint authority
+						}
+
 						// make pool mint_authority for token (required for burn/mint)
-						authI, err := tokens.SetTokenMintAuthority(v.tokenProgram, poolSigner, mint, admin.PublicKey())
+						authI, err := tokens.SetTokenMintAuthority(v.tokenProgram, newMintAuthority, mint, admin.PublicKey())
 						require.NoError(t, err)
 
 						// set pool config
@@ -310,7 +327,7 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 					t.Run("releaseOrMint", func(t *testing.T) {
 						require.Equal(t, "0", getBalance(p.User[admin.PublicKey()]))
 
-						rmI, err := test_ccip_invalid_receiver.NewPoolProxyReleaseOrMintInstruction(
+						raw := test_ccip_invalid_receiver.NewPoolProxyReleaseOrMintInstruction(
 							test_ccip_invalid_receiver.ReleaseOrMintInV1{
 								LocalToken:          mint,
 								SourcePoolAddress:   remotePool.Address,
@@ -332,7 +349,13 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 							config.RMNRemoteCursesPDA,
 							config.RMNRemoteConfigPDA,
 							p.User[admin.PublicKey()],
-						).ValidateAndBuild()
+						)
+
+						if v.multisig {
+							raw.AccountMetaSlice.Append(solana.Meta(p.MintAuthorityMultisig))
+						}
+
+						rmI, err := raw.ValidateAndBuild()
 						require.NoError(t, err)
 
 						cu := testutils.GetRequiredCU(ctx, t, solanaGoClient, []solana.Instruction{rmI}, admin, config.DefaultCommitment)

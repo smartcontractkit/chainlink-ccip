@@ -685,5 +685,12 @@
         ]
       }
     }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidMultisig",
+      "msg": "Invalid Multisig Mint"
+    }
   ]
 }

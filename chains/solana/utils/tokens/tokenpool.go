@@ -17,9 +17,10 @@ import (
 
 type TokenPool struct {
 	// token details
-	Program        solana.PublicKey
-	Mint           solana.PublicKey
-	FeeTokenConfig solana.PublicKey
+	Program               solana.PublicKey
+	Mint                  solana.PublicKey
+	FeeTokenConfig        solana.PublicKey
+	MintAuthorityMultisig solana.PublicKey
 
 	// admin registry PDA
 	AdminRegistryPDA solana.PublicKey
@@ -98,18 +99,19 @@ func NewTokenPool(tokenProgram solana.PublicKey, poolProgram solana.PublicKey, m
 	}
 
 	p := TokenPool{
-		Program:          tokenProgram,
-		Mint:             mint,
-		FeeTokenConfig:   tokenConfigPda,
-		AdminRegistryPDA: tokenAdminRegistryPDA,
-		PoolProgram:      poolProgram,
-		PoolLookupTable:  solana.PublicKey{},
-		WritableIndexes:  []uint8{3, 4, 7}, // see ToTokenPoolEntries for writable indexes
-		User:             map[solana.PublicKey]solana.PublicKey{},
-		Chain:            map[uint64]solana.PublicKey{},
-		Billing:          map[uint64]solana.PublicKey{},
-		RouterSigner:     routerSignerPDA,
-		OfframpSigner:    offrampSignerPDA,
+		Program:               tokenProgram,
+		Mint:                  mint,
+		MintAuthorityMultisig: solana.PublicKey{}, // this will be set later, if needed
+		FeeTokenConfig:        tokenConfigPda,
+		AdminRegistryPDA:      tokenAdminRegistryPDA,
+		PoolProgram:           poolProgram,
+		PoolLookupTable:       solana.PublicKey{},
+		WritableIndexes:       []uint8{3, 4, 7}, // see ToTokenPoolEntries for writable indexes
+		User:                  map[solana.PublicKey]solana.PublicKey{},
+		Chain:                 map[uint64]solana.PublicKey{},
+		Billing:               map[uint64]solana.PublicKey{},
+		RouterSigner:          routerSignerPDA,
+		OfframpSigner:         offrampSignerPDA,
 	}
 	p.Chain[config.EvmChainSelector] = evmChainPDA
 	p.Chain[config.SvmChainSelector] = svmChainPDA

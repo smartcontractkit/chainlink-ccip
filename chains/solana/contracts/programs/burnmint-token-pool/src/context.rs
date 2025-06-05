@@ -411,6 +411,12 @@ pub struct DeleteChainConfig<'info> {
     pub authority: Signer<'info>,
 }
 
+#[error_code]
+pub enum CcipBnMTokenPoolError {
+    #[msg("Invalid Multisig Mint")]
+    InvalidMultisig,
+}
+
 // This account can not be declared in the common crate, the program ID for that Account would be incorrect.
 #[account]
 #[derive(InitSpace)]
