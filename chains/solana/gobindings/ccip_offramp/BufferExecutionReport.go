@@ -31,11 +31,13 @@ import (
 // * `chunk` - The specific chunk to add to the buffer. Chunk must have a consistent size, except
 // the last one in the buffer, which may be smaller.
 // * `chunk_index` - The index of this chunk.
+// * `num_chunks` - The total number of chunks in the report.
 type BufferExecutionReport struct {
 	BufferId     *[]byte
 	ReportLength *uint32
 	Chunk        *[]byte
 	ChunkIndex   *uint8
+	NumChunks    *uint8
 
 	// [0] = [WRITE] executionReportBuffer
 	//
@@ -76,6 +78,12 @@ func (inst *BufferExecutionReport) SetChunk(chunk []byte) *BufferExecutionReport
 // SetChunkIndex sets the "chunkIndex" parameter.
 func (inst *BufferExecutionReport) SetChunkIndex(chunkIndex uint8) *BufferExecutionReport {
 	inst.ChunkIndex = &chunkIndex
+	return inst
+}
+
+// SetNumChunks sets the "numChunks" parameter.
+func (inst *BufferExecutionReport) SetNumChunks(numChunks uint8) *BufferExecutionReport {
+	inst.NumChunks = &numChunks
 	return inst
 }
 
@@ -155,6 +163,9 @@ func (inst *BufferExecutionReport) Validate() error {
 		if inst.ChunkIndex == nil {
 			return errors.New("ChunkIndex parameter is not set")
 		}
+		if inst.NumChunks == nil {
+			return errors.New("NumChunks parameter is not set")
+		}
 	}
 
 	// Check whether all (required) accounts are set:
@@ -184,11 +195,12 @@ func (inst *BufferExecutionReport) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=4]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Params[len=5]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
 						paramsBranch.Child(ag_format.Param("    BufferId", *inst.BufferId))
 						paramsBranch.Child(ag_format.Param("ReportLength", *inst.ReportLength))
 						paramsBranch.Child(ag_format.Param("       Chunk", *inst.Chunk))
 						paramsBranch.Child(ag_format.Param("  ChunkIndex", *inst.ChunkIndex))
+						paramsBranch.Child(ag_format.Param("   NumChunks", *inst.NumChunks))
 					})
 
 					// Accounts of the instruction:
@@ -223,6 +235,11 @@ func (obj BufferExecutionReport) MarshalWithEncoder(encoder *ag_binary.Encoder) 
 	if err != nil {
 		return err
 	}
+	// Serialize `NumChunks` param:
+	err = encoder.Encode(obj.NumChunks)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 func (obj *BufferExecutionReport) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
@@ -246,6 +263,11 @@ func (obj *BufferExecutionReport) UnmarshalWithDecoder(decoder *ag_binary.Decode
 	if err != nil {
 		return err
 	}
+	// Deserialize `NumChunks`:
+	err = decoder.Decode(&obj.NumChunks)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -256,6 +278,7 @@ func NewBufferExecutionReportInstruction(
 	reportLength uint32,
 	chunk []byte,
 	chunkIndex uint8,
+	numChunks uint8,
 	// Accounts:
 	executionReportBuffer ag_solanago.PublicKey,
 	config ag_solanago.PublicKey,
@@ -266,6 +289,7 @@ func NewBufferExecutionReportInstruction(
 		SetReportLength(reportLength).
 		SetChunk(chunk).
 		SetChunkIndex(chunkIndex).
+		SetNumChunks(numChunks).
 		SetExecutionReportBufferAccount(executionReportBuffer).
 		SetConfigAccount(config).
 		SetAuthorityAccount(authority).

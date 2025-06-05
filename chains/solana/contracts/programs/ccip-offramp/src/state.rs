@@ -105,9 +105,8 @@ pub struct OnRampAddress {
 pub struct ExecutionReportBuffer {
     pub version: u8,
     pub chunk_bitmap: u64,
-    pub total_chunks: u32,
+    pub total_chunks: u8,
     pub chunk_length: u32,
-    pub report_length: u32,
     #[max_len(0)]
     pub data: Vec<u8>,
 }

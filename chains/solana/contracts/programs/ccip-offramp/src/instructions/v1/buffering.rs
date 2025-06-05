@@ -3,26 +3,25 @@ use anchor_lang::prelude::*;
 use crate::{messages::ExecutionReportSingleChain, CcipOfframpError, ExecutionReportBuffer};
 pub trait Buffering {
     fn is_initialized(&self) -> bool;
-    fn filled_chunks(&self) -> u32;
+    fn filled_chunks(&self) -> u8;
     fn is_complete(&self) -> bool;
     fn bytes(&self) -> Result<&[u8]>;
-    fn initialize(&mut self, report_length: u32, chunk_length: u32) -> Result<()>;
-    fn add_chunk(&mut self, report_length: u32, chunk: &[u8], chunk_index: u8) -> Result<()>;
-    fn recover_wrong_size(
+    fn add_chunk(
         &mut self,
         report_length: u32,
-        new_chunk: &[u8],
+        chunk: &[u8],
         chunk_index: u8,
+        num_chunks: u8,
     ) -> Result<()>;
 }
 
 impl Buffering for ExecutionReportBuffer {
     fn is_initialized(&self) -> bool {
-        self.total_chunks > 0
+        !self.data.is_empty()
     }
 
-    fn filled_chunks(&self) -> u32 {
-        self.chunk_bitmap.count_ones()
+    fn filled_chunks(&self) -> u8 {
+        self.chunk_bitmap.count_ones() as u8
     }
 
     fn is_complete(&self) -> bool {
@@ -38,35 +37,29 @@ impl Buffering for ExecutionReportBuffer {
         Ok(&self.data)
     }
 
-    fn initialize(&mut self, report_length: u32, chunk_length: u32) -> Result<()> {
+    fn add_chunk(
+        &mut self,
+        report_length: u32,
+        chunk: &[u8],
+        chunk_index: u8,
+        num_chunks: u8,
+    ) -> Result<()> {
         require!(
-            !self.is_initialized(),
-            CcipOfframpError::ExecutionReportBufferAlreadyInitialized
+            num_chunks > 0 && chunk_index < num_chunks,
+            CcipOfframpError::ExecutionReportBufferInvalidChunkIndex
         );
         require!(
-            chunk_length > 0 && report_length >= chunk_length,
-            CcipOfframpError::ExecutionReportBufferInvalidLength
+            !chunk.is_empty() && chunk.len() <= report_length as usize,
+            CcipOfframpError::ExecutionReportBufferInvalidChunkSize
         );
-        self.data.resize(report_length as usize, 0);
-        self.total_chunks = (report_length + chunk_length - 1) / chunk_length;
-        require_gt!(
-            64,
-            self.total_chunks,
-            CcipOfframpError::ExecutionReportBufferChunkSizeTooSmall
-        );
-        self.chunk_length = chunk_length;
-        self.report_length = report_length;
-        Ok(())
-    }
 
-    fn add_chunk(&mut self, report_length: u32, chunk: &[u8], chunk_index: u8) -> Result<()> {
         if !self.is_initialized() {
-            self.initialize(report_length, chunk.len() as u32)?;
+            self.initialize(report_length, chunk.len() as u32, num_chunks, chunk_index)?;
         }
 
         require_eq!(
-            self.report_length,
-            report_length,
+            self.data.len(),
+            report_length as usize,
             CcipOfframpError::ExecutionReportBufferInvalidLength
         );
 
@@ -75,13 +68,6 @@ impl Buffering for ExecutionReportBuffer {
             chunk_mask & self.chunk_bitmap == 0,
             CcipOfframpError::ExecutionReportBufferAlreadyContainsChunk
         );
-
-        if chunk.len() as u32 > self.chunk_length {
-            // We hit the special case where the first received chunk was the last one
-            // in the buffer (terminator), which may be smaller than all others. It's okay,
-            // we can recover in place.
-            return self.recover_wrong_size(report_length, chunk, chunk_index);
-        }
 
         require_gte!(
             self.chunk_length,
@@ -92,7 +78,7 @@ impl Buffering for ExecutionReportBuffer {
         if chunk.len() < self.chunk_length as usize {
             // Only the terminator (last chunk) can be smaller than the others.
             require_eq!(
-                chunk_index as u32,
+                chunk_index,
                 self.total_chunks - 1,
                 CcipOfframpError::ExecutionReportBufferInvalidChunkSize
             );
@@ -100,7 +86,7 @@ impl Buffering for ExecutionReportBuffer {
 
         require_gt!(
             self.total_chunks,
-            chunk_index as u32,
+            chunk_index,
             CcipOfframpError::ExecutionReportBufferInvalidChunkIndex
         );
 
@@ -111,37 +97,48 @@ impl Buffering for ExecutionReportBuffer {
 
         Ok(())
     }
+}
 
-    fn recover_wrong_size(
+impl ExecutionReportBuffer {
+    fn initialize(
         &mut self,
         report_length: u32,
-        new_chunk: &[u8],
+        chunk_length: u32,
+        total_chunks: u8,
         chunk_index: u8,
     ) -> Result<()> {
-        // Only makes sense to recover if we got the first chunk wrong (because it was the buffer
-        // terminator). Any size mismatch beyond that means the user is sending the chunks incorrectly.
-        require_eq!(
-            self.filled_chunks(),
-            1,
+        require!(
+            !self.is_initialized(),
+            CcipOfframpError::ExecutionReportBufferAlreadyInitialized
+        );
+        require!(
+            report_length > 0 && chunk_length <= report_length && chunk_length > 0,
+            CcipOfframpError::ExecutionReportBufferInvalidLength
+        );
+        require!(
+            total_chunks < 64 && total_chunks > 0,
             CcipOfframpError::ExecutionReportBufferInvalidChunkSize
         );
 
-        // We extract what we now know is the terminator
-        let terminator_index = self.chunk_bitmap.trailing_zeros() as u8;
-        let mut terminator = vec![0u8; self.chunk_length as usize];
-        let start = terminator_index as usize * self.chunk_length as usize;
-        let end = start + terminator.len();
-        terminator.copy_from_slice(&self.data[start..end]);
+        // If we're initializing with the last chunk, it could be smaller
+        // than the rest, so we calculate the chunk size based on the expected
+        // size of all the others.
+        let is_last = chunk_index == total_chunks - 1;
+        let global_chunk_length = if is_last && total_chunks > 1 {
+            (report_length - chunk_length) / (total_chunks as u32 - 1)
+        } else {
+            chunk_length
+        };
 
-        // We reset the buffer metadata. It's okay to leave the old data in, as it will be clobbered.
-        self.chunk_bitmap = 0;
-        self.total_chunks = 0;
-        self.chunk_length = 0;
+        require_eq!(
+            total_chunks as u32,
+            div_ceil(report_length, global_chunk_length),
+            CcipOfframpError::ExecutionReportBufferInvalidLength,
+        );
+        self.chunk_length = global_chunk_length;
+        self.total_chunks = total_chunks;
+        self.data.resize(report_length as usize, 0);
 
-        // We reinsert the new chunk and terminator, which will be accepted as it's smaller. From now
-        // on, we won't accept bigger chunks than this again.
-        self.add_chunk(report_length, new_chunk, chunk_index)?;
-        self.add_chunk(report_length, &terminator, terminator_index)?;
         Ok(())
     }
 }
@@ -166,6 +163,12 @@ pub fn deserialize_from_buffer_account(
     ))
 }
 
+fn div_ceil<T: Into<u32>>(a: T, b: T) -> u32 {
+    let (a, b) = (a.into(), b.into());
+    assert!(a + b - 1 > 0);
+    (a + b - 1) / b
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -176,7 +179,6 @@ mod tests {
             chunk_bitmap: 0,
             total_chunks: 0,
             chunk_length: 0,
-            report_length: 0,
             version: 0,
         }
     }
@@ -186,19 +188,27 @@ mod tests {
         let mut buffer = empty_buffer();
 
         assert_eq!(
-            buffer.initialize(10, 100).unwrap_err(),
+            buffer.initialize(10, 100, 1, 0).unwrap_err(),
             CcipOfframpError::ExecutionReportBufferInvalidLength.into()
         );
 
+        let mut buffer = empty_buffer();
         assert_eq!(
-            buffer.initialize(0, 1).unwrap_err(),
+            buffer.initialize(0, 1, 1, 0).unwrap_err(),
             CcipOfframpError::ExecutionReportBufferInvalidLength.into()
         );
 
+        let mut buffer = empty_buffer();
         // Too small buffer sizes aren't OK as they'd break the bitmap
         assert_eq!(
-            buffer.initialize(100000, 1).unwrap_err(),
-            CcipOfframpError::ExecutionReportBufferChunkSizeTooSmall.into()
+            buffer.initialize(100000, 1, 1, 0).unwrap_err(),
+            CcipOfframpError::ExecutionReportBufferInvalidLength.into()
+        );
+
+        let mut buffer = empty_buffer();
+        assert_eq!(
+            buffer.initialize(100, 10, 255, 0).unwrap_err(),
+            CcipOfframpError::ExecutionReportBufferInvalidChunkSize.into()
         );
     }
 
@@ -218,11 +228,13 @@ mod tests {
                     message.len() as u32,
                     &message[i * chunk_size..(i + 1) * chunk_size],
                     i as u8,
+                    3,
                 )
                 .unwrap();
             assert_eq!(buffer.filled_chunks() as usize, i + 1);
         }
 
+        dbg!(&buffer);
         assert!(buffer.is_complete());
         assert_eq!(buffer.bytes().unwrap(), message);
     }
@@ -243,6 +255,7 @@ mod tests {
                     message.len() as u32,
                     &message[i * chunk_size..message.len().min((i + 1) * chunk_size)],
                     i as u8,
+                    4,
                 )
                 .unwrap();
             assert_eq!(buffer.filled_chunks() as usize, i + 1);
@@ -270,6 +283,7 @@ mod tests {
                     message.len() as u32,
                     &message[i * chunk_size..message.len().min((i + 1) * chunk_size)],
                     i as u8,
+                    4,
                 )
                 .unwrap();
             assert_eq!(buffer.filled_chunks() as usize, 4 - i);
@@ -284,31 +298,31 @@ mod tests {
     #[test]
     fn rejects_invalid_chunks() {
         let mut buffer = empty_buffer();
-        buffer.add_chunk(22, b"AAAAA", 0).unwrap();
+        buffer.add_chunk(22, b"AAAAA", 0, 5).unwrap();
         // This is OK as it is the terminator.
-        buffer.add_chunk(22, b"BB", 4).unwrap();
+        buffer.add_chunk(22, b"BB", 4, 5).unwrap();
         // This is not OK.
-        buffer.add_chunk(22, b"CCCCCCCCCCC", 2).unwrap_err();
+        buffer.add_chunk(22, b"CCCCCCCCCCC", 2, 5).unwrap_err();
 
         let mut buffer = empty_buffer();
-        buffer.add_chunk(100, b"small", 0).unwrap();
+        buffer.add_chunk(100, b"small", 0, 20).unwrap();
         // Invalid due to inconsistent total report size.
-        buffer.add_chunk(50, b"small", 1).unwrap_err();
+        buffer.add_chunk(50, b"small", 1, 20).unwrap_err();
 
         let mut buffer = empty_buffer();
-        buffer.add_chunk(100, b"small", 0).unwrap();
+        buffer.add_chunk(100, b"small", 0, 20).unwrap();
         // Invalid due to repeated index.
-        buffer.add_chunk(100, b"small", 0).unwrap_err();
+        buffer.add_chunk(100, b"small", 0, 20).unwrap_err();
 
         let mut buffer = empty_buffer();
         buffer
-            .add_chunk(10, b"Much bigger than ten characters", 0)
+            .add_chunk(10, b"Much bigger than ten characters", 0, 1)
             .unwrap_err();
 
         let mut buffer = empty_buffer();
-        buffer.add_chunk(29, b"Medium sized", 1).unwrap();
+        buffer.add_chunk(29, b"Medium sized", 1, 3).unwrap();
         // Cannot be smaller: only the terminator can (must come at the end.)
-        buffer.add_chunk(29, b"small", 0).unwrap_err();
-        buffer.add_chunk(29, b"small", 2).unwrap();
+        buffer.add_chunk(29, b"small", 0, 3).unwrap_err();
+        buffer.add_chunk(29, b"small", 2, 3).unwrap();
     }
 }

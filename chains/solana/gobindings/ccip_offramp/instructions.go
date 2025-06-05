@@ -265,6 +265,7 @@ var (
 	// * `chunk` - The specific chunk to add to the buffer. Chunk must have a consistent size, except
 	// the last one in the buffer, which may be smaller.
 	// * `chunk_index` - The index of this chunk.
+	// * `num_chunks` - The total number of chunks in the report.
 	Instruction_BufferExecutionReport = ag_binary.TypeID([8]byte{35, 202, 252, 220, 2, 82, 189, 23})
 
 	// Closes the execution report buffer to reclaim funds.

@@ -554,12 +554,14 @@ pub mod ccip_offramp {
     /// * `chunk` - The specific chunk to add to the buffer. Chunk must have a consistent size, except
     ///    the last one in the buffer, which may be smaller.
     /// * `chunk_index` - The index of this chunk.
+    /// * `num_chunks` - The total number of chunks in the report.
     pub fn buffer_execution_report<'info>(
         ctx: Context<'_, '_, 'info, 'info, BufferExecutionReportContext<'info>>,
         buffer_id: Vec<u8>,
         report_length: u32,
         chunk: Vec<u8>,
         chunk_index: u8,
+        num_chunks: u8,
     ) -> Result<()> {
         // Execution report buffering doesn't need to be done differently per lane, so we
         // use the default code version here.
@@ -578,6 +580,7 @@ pub mod ccip_offramp {
             report_length,
             chunk,
             chunk_index,
+            num_chunks,
         )
     }
 
@@ -742,9 +745,9 @@ pub enum CcipOfframpError {
     ExecutionReportBufferInvalidLength,
     #[msg("Chunk lies outside the execution report buffer")]
     ExecutionReportBufferInvalidChunkIndex,
-    #[msg("Chunk size is too small.")]
+    #[msg("Chunk size is too small")]
     ExecutionReportBufferChunkSizeTooSmall,
-    #[msg("Invalid chunk size. Remember that the last chunk should be right-padded with zeros.")]
+    #[msg("Invalid chunk size")]
     ExecutionReportBufferInvalidChunkSize,
     #[msg("Execution report buffer is not complete: chunks are missing")]
     ExecutionReportBufferIncomplete,

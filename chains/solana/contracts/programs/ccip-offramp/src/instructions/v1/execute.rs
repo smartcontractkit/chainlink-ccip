@@ -114,10 +114,14 @@ impl Execute for Impl {
         report_length: u32,
         chunk: Vec<u8>,
         chunk_index: u8,
+        num_chunks: u8,
     ) -> Result<()> {
-        ctx.accounts
-            .execution_report_buffer
-            .add_chunk(report_length, &chunk, chunk_index)
+        ctx.accounts.execution_report_buffer.add_chunk(
+            report_length,
+            &chunk,
+            chunk_index,
+            num_chunks,
+        )
     }
 }
 

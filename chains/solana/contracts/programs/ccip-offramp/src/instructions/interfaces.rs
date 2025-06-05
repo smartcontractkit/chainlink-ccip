@@ -62,6 +62,7 @@ pub trait Execute {
         report_length: u32,
         chunk: Vec<u8>,
         chunk_index: u8,
+        num_chunks: u8,
     ) -> Result<()>;
 }
 

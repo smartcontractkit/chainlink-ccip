@@ -1071,7 +1071,8 @@ export type CcipOfframp = {
         "* `report_length` - Total length in bytes of the execution report.",
         "* `chunk` - The specific chunk to add to the buffer. Chunk must have a consistent size, except",
         "the last one in the buffer, which may be smaller.",
-        "* `chunk_index` - The index of this chunk."
+        "* `chunk_index` - The index of this chunk.",
+        "* `num_chunks` - The total number of chunks in the report."
       ],
       "accounts": [
         {
@@ -1110,6 +1111,10 @@ export type CcipOfframp = {
         },
         {
           "name": "chunkIndex",
+          "type": "u8"
+        },
+        {
+          "name": "numChunks",
           "type": "u8"
         }
       ]
@@ -1324,14 +1329,10 @@ export type CcipOfframp = {
           },
           {
             "name": "totalChunks",
-            "type": "u32"
+            "type": "u8"
           },
           {
             "name": "chunkLength",
-            "type": "u32"
-          },
-          {
-            "name": "reportLength",
             "type": "u32"
           },
           {
@@ -2533,12 +2534,12 @@ export type CcipOfframp = {
     {
       "code": 9061,
       "name": "ExecutionReportBufferChunkSizeTooSmall",
-      "msg": "Chunk size is too small."
+      "msg": "Chunk size is too small"
     },
     {
       "code": 9062,
       "name": "ExecutionReportBufferInvalidChunkSize",
-      "msg": "Invalid chunk size. Remember that the last chunk should be right-padded with zeros."
+      "msg": "Invalid chunk size"
     },
     {
       "code": 9063,
@@ -3626,7 +3627,8 @@ export const IDL: CcipOfframp = {
         "* `report_length` - Total length in bytes of the execution report.",
         "* `chunk` - The specific chunk to add to the buffer. Chunk must have a consistent size, except",
         "the last one in the buffer, which may be smaller.",
-        "* `chunk_index` - The index of this chunk."
+        "* `chunk_index` - The index of this chunk.",
+        "* `num_chunks` - The total number of chunks in the report."
       ],
       "accounts": [
         {
@@ -3665,6 +3667,10 @@ export const IDL: CcipOfframp = {
         },
         {
           "name": "chunkIndex",
+          "type": "u8"
+        },
+        {
+          "name": "numChunks",
           "type": "u8"
         }
       ]
@@ -3879,14 +3885,10 @@ export const IDL: CcipOfframp = {
           },
           {
             "name": "totalChunks",
-            "type": "u32"
+            "type": "u8"
           },
           {
             "name": "chunkLength",
-            "type": "u32"
-          },
-          {
-            "name": "reportLength",
             "type": "u32"
           },
           {
@@ -5088,12 +5090,12 @@ export const IDL: CcipOfframp = {
     {
       "code": 9061,
       "name": "ExecutionReportBufferChunkSizeTooSmall",
-      "msg": "Chunk size is too small."
+      "msg": "Chunk size is too small"
     },
     {
       "code": 9062,
       "name": "ExecutionReportBufferInvalidChunkSize",
-      "msg": "Invalid chunk size. Remember that the last chunk should be right-padded with zeros."
+      "msg": "Invalid chunk size"
     },
     {
       "code": 9063,
