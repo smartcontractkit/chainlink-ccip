@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {Pool} from "../../../libraries/Pool.sol";
-import {RateLimiter} from "../../../libraries/RateLimiter.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {SiloedLockReleaseTokenPoolSetup} from "./SiloedLockReleaseTokenPoolSetup.t.sol";
 
@@ -15,9 +14,19 @@ contract SiloedLockReleaseTokenPool_lockOrBurn is SiloedLockReleaseTokenPoolSetu
     vm.startPrank(s_allowedOnRamp);
 
     vm.expectEmit();
-    emit RateLimiter.TokensConsumed(AMOUNT);
+    emit TokenPool.OutboundRateLimitConsumed({
+      remoteChainSelector: SILOED_CHAIN_SELECTOR,
+      token: address(s_token),
+      amount: AMOUNT
+    });
+
     vm.expectEmit();
-    emit TokenPool.Locked(s_allowedOnRamp, AMOUNT);
+    emit TokenPool.LockedOrBurned({
+      remoteChainSelector: SILOED_CHAIN_SELECTOR,
+      token: address(s_token),
+      sender: address(s_allowedOnRamp),
+      amount: AMOUNT
+    });
 
     s_siloedLockReleaseTokenPool.lockOrBurn(
       Pool.LockOrBurnInV1({
@@ -38,9 +47,19 @@ contract SiloedLockReleaseTokenPool_lockOrBurn is SiloedLockReleaseTokenPoolSetu
     assertFalse(s_siloedLockReleaseTokenPool.isSiloed(DEST_CHAIN_SELECTOR));
 
     vm.expectEmit();
-    emit RateLimiter.TokensConsumed(AMOUNT);
+    emit TokenPool.OutboundRateLimitConsumed({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      token: address(s_token),
+      amount: AMOUNT
+    });
+
     vm.expectEmit();
-    emit TokenPool.Locked(s_allowedOnRamp, AMOUNT);
+    emit TokenPool.LockedOrBurned({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      token: address(s_token),
+      sender: address(s_allowedOnRamp),
+      amount: AMOUNT
+    });
 
     s_siloedLockReleaseTokenPool.lockOrBurn(
       Pool.LockOrBurnInV1({

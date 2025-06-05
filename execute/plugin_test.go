@@ -1392,6 +1392,88 @@ func TestPlugin_Outcome_MessagesMergeError(t *testing.T) {
 	require.Len(t, outcome, 0)
 }
 
+func TestPlugin_Reports_MultipleReports(t *testing.T) {
+	ctx := tests.Context(t)
+	lggr := logger.Test(t)
+
+	mockReportCodec := codec_mocks.NewMockExecutePluginCodec(t)
+	mockReportCodec.On("Encode", mock.Anything, mock.MatchedBy(func(report cciptypes.ExecutePluginReport) bool {
+		return len(report.ChainReports) > 0
+	})).Return([]byte("encoded_report_1"), nil).Once()
+	mockReportCodec.On("Encode", mock.Anything, mock.MatchedBy(func(report cciptypes.ExecutePluginReport) bool {
+		return len(report.ChainReports) > 0
+	})).Return([]byte("encoded_report_2"), nil).Once()
+
+	// Mock chain support for transmission schedule
+	mockChainSupport := plugincommon_mock.NewMockChainSupport(t)
+	mockChainSupport.EXPECT().SupportsDestChain(mock.Anything).Return(true, nil)
+
+	// Create plugin instance with necessary mocks
+	p := &Plugin{
+		lggr:         lggr,
+		reportCodec:  mockReportCodec,
+		ocrTypeCodec: ocrTypeCodec,
+		chainSupport: mockChainSupport,
+		oracleIDToP2pID: map[commontypes.OracleID]libocrtypes.PeerID{
+			1: {},
+		},
+	}
+
+	// Create test outcome with two reports
+	commitReports := []exectypes.CommitData{
+		{
+			SourceChain: 100,
+			MerkleRoot:  cciptypes.Bytes32{1, 2, 3},
+		},
+		{
+			SourceChain: 200,
+			MerkleRoot:  cciptypes.Bytes32{4, 5, 6},
+		},
+	}
+
+	reports := []cciptypes.ExecutePluginReport{
+		{
+			ChainReports: []cciptypes.ExecutePluginReportSingleChain{
+				{
+					SourceChainSelector: 100,
+					Messages: []cciptypes.Message{
+						{Header: cciptypes.RampMessageHeader{SequenceNumber: 1}},
+					},
+				},
+			},
+		},
+		{
+			ChainReports: []cciptypes.ExecutePluginReportSingleChain{
+				{
+					SourceChainSelector: 200,
+					Messages: []cciptypes.Message{
+						{Header: cciptypes.RampMessageHeader{SequenceNumber: 2}},
+					},
+				},
+			},
+		},
+	}
+
+	outcome := exectypes.NewOutcome(exectypes.Filter, commitReports, reports)
+	encodedOutcome, err := ocrTypeCodec.EncodeOutcome(outcome)
+	require.NoError(t, err)
+
+	reportPlus, err := p.Reports(ctx, 1, encodedOutcome)
+
+	require.NoError(t, err)
+	require.Len(t, reportPlus, 2, "Should return 2 reports")
+
+	// First report
+	assert.Equal(t, types.Report("encoded_report_1"), reportPlus[0].ReportWithInfo.Report)
+	assert.NotEmpty(t, reportPlus[0].ReportWithInfo.Info, "Report info should not be empty")
+	assert.NotEmpty(t, reportPlus[0].TransmissionScheduleOverride, "Transmission schedule should not be empty")
+
+	// Second report
+	assert.Equal(t, types.Report("encoded_report_2"), reportPlus[1].ReportWithInfo.Report)
+	assert.NotEmpty(t, reportPlus[1].ReportWithInfo.Info, "Report info should not be empty")
+	assert.NotEmpty(t, reportPlus[1].TransmissionScheduleOverride, "Transmission schedule should not be empty")
+}
+
 func TestPlugin_Reports_UnableToParse(t *testing.T) {
 	ctx := tests.Context(t)
 	p := &Plugin{
@@ -1408,18 +1490,29 @@ func TestPlugin_Reports_UnableToEncode(t *testing.T) {
 	codec := codec_mocks.NewMockExecutePluginCodec(t)
 	codec.On("Encode", mock.Anything, mock.Anything).
 		Return(nil, fmt.Errorf("test error"))
-	p := &Plugin{reportCodec: codec, lggr: logger.Test(t), ocrTypeCodec: ocrTypeCodec}
+	// Mock chain support for transmission schedule
+	chainSupport := plugincommon_mock.NewMockChainSupport(t)
+	chainSupport.EXPECT().SupportsDestChain(mock.Anything).Return(true, nil)
+	p := &Plugin{
+		reportCodec:  codec,
+		lggr:         logger.Test(t),
+		ocrTypeCodec: ocrTypeCodec,
+		chainSupport: chainSupport,
+		oracleIDToP2pID: map[commontypes.OracleID]libocrtypes.PeerID{
+			0: {},
+		},
+	}
 	report, err := ocrTypeCodec.EncodeOutcome(exectypes.NewOutcome(
-		exectypes.Unknown, nil,
-		cciptypes.ExecutePluginReport{ChainReports: []cciptypes.ExecutePluginReportSingleChain{
+		exectypes.Unknown, []exectypes.CommitData{{}, {}},
+		[]cciptypes.ExecutePluginReport{{ChainReports: []cciptypes.ExecutePluginReportSingleChain{
 			{},
 			{},
-		}}))
+		}}}))
 	require.NoError(t, err)
 
 	_, err = p.Reports(ctx, 0, report)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "unable to encode report: test error")
+	assert.Contains(t, err.Error(), "unable to encode report")
 }
 
 func TestPlugin_ShouldAcceptAttestedReport_DoesNotDecode(t *testing.T) {
@@ -1427,9 +1520,19 @@ func TestPlugin_ShouldAcceptAttestedReport_DoesNotDecode(t *testing.T) {
 	codec.On("Decode", mock.Anything, mock.Anything).
 		Return(cciptypes.ExecutePluginReport{}, fmt.Errorf("test error"))
 
+	cs := plugincommon_mock.NewMockChainSupport(t)
+	cs.EXPECT().SupportsDestChain(1).Return(true, nil).Maybe()
+
+	homeChain := reader_mock.NewMockHomeChain(t)
+	homeChain.EXPECT().GetSupportedChainsForPeer(libocrtypes.PeerID{1}).
+		Return(mapset.NewSet[cciptypes.ChainSelector](0), nil).Maybe()
+
 	p := &Plugin{
-		reportCodec: codec,
-		lggr:        logger.Test(t),
+		reportCodec:     codec,
+		lggr:            logger.Test(t),
+		chainSupport:    cs,
+		oracleIDToP2pID: map[commontypes.OracleID]libocrtypes.PeerID{0: {1}},
+		homeChain:       homeChain,
 	}
 
 	_, err := p.ShouldAcceptAttestedReport(tests.Context(t), 0, ocr3types.ReportWithInfo[[]byte]{
@@ -1444,9 +1547,19 @@ func TestPlugin_ShouldAcceptAttestedReport_NoReports(t *testing.T) {
 	codec.EXPECT().Decode(mock.Anything, mock.Anything).
 		Return(cciptypes.ExecutePluginReport{}, nil)
 
+	cs := plugincommon_mock.NewMockChainSupport(t)
+	cs.EXPECT().SupportsDestChain(1).Return(true, nil).Maybe()
+
+	homeChain := reader_mock.NewMockHomeChain(t)
+	homeChain.EXPECT().GetSupportedChainsForPeer(libocrtypes.PeerID{1}).
+		Return(mapset.NewSet[cciptypes.ChainSelector](0), nil).Maybe()
+
 	p := &Plugin{
-		lggr:        logger.Test(t),
-		reportCodec: codec,
+		lggr:            logger.Test(t),
+		reportCodec:     codec,
+		chainSupport:    cs,
+		oracleIDToP2pID: map[commontypes.OracleID]libocrtypes.PeerID{0: {1}},
+		homeChain:       homeChain,
 	}
 	result, err := p.ShouldAcceptAttestedReport(tests.Context(t), 0, ocr3types.ReportWithInfo[[]byte]{
 		Report: []byte("empty report"), // faked out, see mock above
@@ -1673,20 +1786,26 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			codec, homeChain, ccipReader := tc.getDeps()
 			lggr, obs := logger.TestObserved(t, zapcore.DebugLevel)
+
+			cs := plugincommon.NewChainSupport(
+				logger.Test(t),
+				homeChain,
+				map[commontypes.OracleID]libocrtypes.PeerID{
+					1: [32]byte{1},
+				},
+				1,
+				cciptypes.ChainSelector(destChain),
+			)
+			homeChain.EXPECT().GetSupportedChainsForPeer(libocrtypes.PeerID{1}).
+				Return(mapset.NewSet[cciptypes.ChainSelector](0), nil).Maybe()
+
 			p := &Plugin{
-				lggr:        lggr,
-				reportCodec: codec,
-				homeChain:   homeChain,
-				ccipReader:  ccipReader,
-				chainSupport: plugincommon.NewChainSupport(
-					logger.Test(t),
-					homeChain,
-					map[commontypes.OracleID]libocrtypes.PeerID{
-						1: [32]byte{1},
-					},
-					1,
-					cciptypes.ChainSelector(destChain),
-				),
+				lggr:            lggr,
+				reportCodec:     codec,
+				homeChain:       homeChain,
+				ccipReader:      ccipReader,
+				chainSupport:    cs,
+				oracleIDToP2pID: map[commontypes.OracleID]libocrtypes.PeerID{1: {1}},
 				reportingCfg: ocr3types.ReportingPluginConfig{
 					OracleID:     1,
 					ConfigDigest: configDigest,

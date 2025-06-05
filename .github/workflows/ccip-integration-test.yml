@@ -2,6 +2,7 @@ name: "Run CCIP OCR3 Integration Test"
 
 on:
   pull_request:
+  merge_group:
   push:
     branches:
       - 'main'
@@ -48,18 +49,24 @@ jobs:
             name: "USDC Test"
           - cmd: cd integration-tests/smoke/ccip && go test ccip_ooo_execution_test.go -timeout 12m -test.parallel=1 -count=1 -json
             name: "OOO Execution Test"
-          - cmd: cd integration-tests/smoke/ccip && go test -run "Test_CCIPMessaging_EVM2EVM" ccip_messaging_test.go -timeout 12m -test.parallel=2 -count=1 -json
-            name: "Messaging Test"
+          - cmd: cd integration-tests/smoke/ccip && go test -run "Test_CCIPMessaging_EVM2EVM" ccip_messaging_test.go -timeout 20m -test.parallel=1 -count=1 -json
+            name: "Messaging Test Test_CCIPMessaging_EVM2EVM"
+          - cmd: cd integration-tests/smoke/ccip && go test -run "^Test_CCIPMessaging_EVM2Solana$" ccip_messaging_test.go -timeout 30m -test.parallel=1 -count=1 -json
+            name: "Messaging Test Test_CCIPMessaging_EVM2Solana"
+          - cmd: cd integration-tests/smoke/ccip && go test -run "^Test_CCIPMessaging_Solana2EVM$" ccip_messaging_test.go -timeout 30m -test.parallel=1 -count=1 -json
+            name: "Messaging Test Test_CCIPMessaging_Solana2EVM"
+          - cmd: cd integration-tests/smoke/ccip && go test -run "^Test_CCIPMessaging_EVM2SolanaMultiExecReports$" ccip_messaging_test.go -timeout 35m -test.parallel=1 -count=1 -json
+            name: "Messaging Test Test_CCIPMessaging_EVM2SolanaMultiExecReports"
           - cmd: cd integration-tests/smoke/ccip && go test -run "Test_CCIPBatching_MaxBatchSizeEVM" ccip_batching_test.go -timeout 12m -test.parallel=1 -count=1 -json
             name: "Batching Test Test_CCIPBatching_MaxBatchSizeEVM"
           - cmd: cd integration-tests/smoke/ccip && go test -run "^Test_CCIPBatching_MultiSource$" ccip_batching_test.go -timeout 12m -test.parallel=1 -count=1 -json
             name: "Batching Test Test_CCIPBatching_MultiSource"
-          - cmd: cd integration-tests/smoke/ccip && go test -run "Test_CCIPBatching_MultiSource_MultiReports" ccip_batching_test.go -timeout 12m -test.parallel=1 -count=1 -json
-            name: "Batching Test Test_CCIPBatching_MultiSource_MultiReports"
+          - cmd: cd integration-tests/smoke/ccip && go test -run "Test_CCIPBatching_MultiSource_MultiRoot" ccip_batching_test.go -timeout 12m -test.parallel=1 -count=1 -json
+            name: "Batching Test Test_CCIPBatching_MultiSource_MultiRoot"
           - cmd: cd integration-tests/smoke/ccip && go test -run "^Test_CCIPBatching_SingleSource$" ccip_batching_test.go -timeout 12m -test.parallel=1 -count=1 -json
             name: "Batching Test Test_CCIPBatching_SingleSource"
-          - cmd: cd integration-tests/smoke/ccip && go test -run "Test_CCIPBatching_SingleSource_MultipleReports" ccip_batching_test.go -timeout 12m -test.parallel=1 -count=1 -json
-            name: "Batching Test Test_CCIPBatching_SingleSource_MultipleReports"
+          - cmd: cd integration-tests/smoke/ccip && go test -run "Test_CCIPBatching_SingleSource_MultiRoot" ccip_batching_test.go -timeout 12m -test.parallel=1 -count=1 -json
+            name: "Batching Test Test_CCIPBatching_SingleSource_MultiRoot"
           - cmd: cd integration-tests/smoke/ccip && go test ccip_gas_price_updates_test.go -timeout 12m -test.parallel=2 -count=1 -json
             name: "Gas Price Updates Test"
           # TODO: this can only run in docker for now, switch to in-memory and uncomment
@@ -85,21 +92,62 @@ jobs:
       - name: Fetch latest pull request data
         id: fetch_pr_data
         uses: actions/github-script@v6
-        # only run this step if the event is a pull request
-        if: github.event_name == 'pull_request'
+        # only run this step if the event is a pull request or merge_group
+        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
         with:
           script: |
-            const pr = await github.rest.pulls.get({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: context.issue.number
-            });
-            return pr.data.body;
+            let pull_number;
+            console.log(`Current eventName: ${context.eventName}`);
+            if (context.eventName === 'pull_request') {
+              pull_number = context.issue.number;
+              console.log(`Event is pull_request, PR number: ${pull_number}`);
+            } else if (context.eventName === 'merge_group') {
+              console.log('Event is merge_group. Attempting to get PR number.');
+              if (context.payload.pull_request && typeof context.payload.pull_request.number === 'number') {
+                pull_number = context.payload.pull_request.number;
+                console.log(`Found PR number via context.payload.pull_request.number: ${pull_number}`);
+              } else {
+                console.warn('context.payload.pull_request.number is not available or not a number.');
+                if (context.payload.merge_group && context.payload.merge_group.head_ref) {
+                  const headRef = context.payload.merge_group.head_ref;
+                  console.log(`Attempting to parse PR number from merge_group.head_ref: ${headRef}`);
+                  // Example head_ref: "gh-readonly-queue/main/pr-123-abcdef1234567890" or "pr-123-abcdef" part of a larger string
+                  const match = headRef.match(/pr-(\d+)-[a-fA-F0-9]+/);
+                  if (match && match[1]) {
+                    pull_number = parseInt(match[1], 10);
+                    console.log(`Successfully extracted PR number from head_ref: ${pull_number}`);
+                  } else {
+                    console.error(`Could not extract PR number from head_ref: ${headRef}. Regex match failed.`);
+                  }
+                } else {
+                  console.error('context.payload.merge_group.head_ref is not available for parsing.');
+                }
+              }
+
+              if (typeof pull_number !== 'number') {
+                 console.error(`Failed to determine PR number for merge_group event. pull_number is: ${pull_number}`);
+                 // Optionally, you could throw an error here to make the failure explicit:
+                 // throw new Error('Failed to determine PR number for merge_group event.');
+              }
+            }
+
+            if (typeof pull_number === 'number') {
+              console.log(`Fetching PR data for PR #${pull_number}`);
+              const pr = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pull_number
+              });
+              return pr.data.body;
+            } else {
+              console.log('No valid pull request number determined. Skipping PR data fetch, returning empty string.');
+              return '';
+            }
       - name: Get the chainlink commit sha from PR description, if applicable
         id: get_chainlink_sha
         run: |
           default="develop"
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
+          if [ "${{ github.event_name }}" == "pull_request" ] || [ "${{ github.event_name }}" == "merge_group" ]; then
           comment=$(cat <<'GREAT_PR_DESCRIPTION_HERE'
           ${{ steps.fetch_pr_data.outputs.result }}
           GREAT_PR_DESCRIPTION_HERE
@@ -127,6 +175,8 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" == "pull_request" ]; then
             COMMIT_SHA=${{ github.event.pull_request.head.sha }}
+          elif [ "${{ github.event_name }}" == "merge_group" ]; then
+            COMMIT_SHA=${{ github.event.merge_group.head_sha }}
           else
             COMMIT_SHA=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
               "https://api.github.com/repos/${{ github.repository }}/commits/${{ github.ref }}" | jq -r .sha)

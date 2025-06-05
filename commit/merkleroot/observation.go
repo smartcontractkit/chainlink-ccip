@@ -552,14 +552,16 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(ctx context.Context) []pluginty
 		return nil
 	}
 
-	sourceChains := mapset.NewSet(allSourceChains...).Intersect(supportedChains).ToSlice()
-	sort.Slice(sourceChains, func(i, j int) bool { return sourceChains[i] < sourceChains[j] })
+	supportedSourceChains := mapset.NewSet(allSourceChains...).
+		Intersect(supportedChains).ToSlice()
+
+	sort.Slice(supportedSourceChains, func(i, j int) bool { return supportedSourceChains[i] < supportedSourceChains[j] })
 
 	mu := &sync.Mutex{}
-	latestOnRampSeqNums := make([]plugintypes.SeqNumChain, 0, len(sourceChains))
+	latestOnRampSeqNums := make([]plugintypes.SeqNumChain, 0, len(supportedSourceChains))
 
 	wg := &sync.WaitGroup{}
-	for _, sourceChain := range sourceChains {
+	for _, sourceChain := range supportedSourceChains {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -733,6 +735,17 @@ func (o observerImpl) computeMerkleRoot(
 // NOTE: At least two external calls are made.
 func (o observerImpl) ObserveRMNRemoteCfg(ctx context.Context) cciptypes.RemoteConfig {
 	lggr := logutil.WithContextValues(ctx, o.lggr)
+
+	supportsDestChain, err := o.chainSupport.SupportsDestChain(o.oracleID)
+	if err != nil {
+		lggr.Errorw("call to SupportsDestChain failed", "err", err)
+		return cciptypes.RemoteConfig{}
+	}
+
+	if !supportsDestChain {
+		lggr.Debugw("cannot observe RMN remote config since destination chain is not supported")
+		return cciptypes.RemoteConfig{}
+	}
 
 	rmnRemoteCfg, err := o.ccipReader.GetRMNRemoteConfig(ctx)
 	if err != nil {

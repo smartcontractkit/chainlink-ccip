@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {IPoolV1} from "../../../interfaces/IPool.sol";
 import {ITokenAdminRegistry} from "../../../interfaces/ITokenAdminRegistry.sol";
 
 import {Internal} from "../../../libraries/Internal.sol";
 import {Pool} from "../../../libraries/Pool.sol";
 import {OffRamp} from "../../../offRamp/OffRamp.sol";
-import {LockReleaseTokenPool} from "../../../pools/LockReleaseTokenPool.sol";
 import {OffRampSetup} from "./OffRampSetup.t.sol";
 
 import {IERC20} from
@@ -38,7 +38,7 @@ contract OffRamp_releaseOrMintSingleToken is OffRampSetup {
     vm.expectCall(
       s_destPoolBySourceToken[token],
       abi.encodeWithSelector(
-        LockReleaseTokenPool.releaseOrMint.selector,
+        IPoolV1.releaseOrMint.selector,
         Pool.ReleaseOrMintInV1({
           originalSender: originalSender,
           receiver: OWNER,
