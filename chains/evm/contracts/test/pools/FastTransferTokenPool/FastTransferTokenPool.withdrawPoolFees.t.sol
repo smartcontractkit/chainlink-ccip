@@ -72,6 +72,9 @@ contract FastTransferTokenPool_withdrawPoolFees_Test is FastTransferTokenPoolSet
     // Verify no fees accumulated
     assertEq(s_pool.getAccumulatedPoolFees(), 0);
 
+    // No event should be emitted for zero fee withdrawals (gas optimization)
+    // vm.expectEmit(); // Removed - no event emitted for zero amounts
+
     // Withdraw fees (should be no-op)
     vm.prank(OWNER);
     s_pool.withdrawPoolFees(feeRecipient);

@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {FastTransferTokenPoolAbstract} from "../../../pools/FastTransferTokenPoolAbstract.sol";
 import {FastTransferTokenPoolSetup} from "./FastTransferTokenPoolSetup.t.sol";
+import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 
 contract FastTransferTokenPool_updateFillerAllowlist is FastTransferTokenPoolSetup {
   function test_updateFillerAllowList_Success() public {
@@ -27,7 +28,7 @@ contract FastTransferTokenPool_updateFillerAllowlist is FastTransferTokenPoolSet
   function test_updateFillerAllowList_RevertWhen_NotOwner() public {
     vm.stopPrank();
 
-    vm.expectRevert(); // TODO revert message
+    vm.expectRevert(Ownable2Step.OnlyCallableByOwner.selector);
     s_pool.updateFillerAllowList(new address[](0), new address[](0));
   }
 
@@ -72,6 +73,9 @@ contract FastTransferTokenPool_updateFillerAllowlist is FastTransferTokenPoolSet
     addFillers[0] = makeAddr("filler1");
     addFillers[1] = makeAddr("filler2");
 
+    vm.expectEmit();
+    emit FastTransferTokenPoolAbstract.FillerAllowListUpdated(addFillers, new address[](0));
+
     s_pool.updateFillerAllowList(addFillers, new address[](0));
 
     // Verify both fillers are added
@@ -83,6 +87,9 @@ contract FastTransferTokenPool_updateFillerAllowlist is FastTransferTokenPoolSet
     // Then remove one filler
     address[] memory removeFillers = new address[](1);
     removeFillers[0] = addFillers[0];
+
+    vm.expectEmit();
+    emit FastTransferTokenPoolAbstract.FillerAllowListUpdated(new address[](0), removeFillers);
 
     s_pool.updateFillerAllowList(new address[](0), removeFillers);
 

@@ -173,6 +173,7 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
   function test_CcipSendToken_WithERC20FeeToken() public {
     address feeToken = address(s_token);
     uint256 balanceBefore = s_token.balanceOf(OWNER);
+    uint256 poolBalanceBefore = s_token.balanceOf(address(s_pool));
     uint256 fakeFee = 1 ether;
     bytes32 fakeMessageId = keccak256("mockMessageId");
     vm.mockCall(address(s_sourceRouter), abi.encodeWithSelector(IRouterClient.getFee.selector), abi.encode(fakeFee));
@@ -183,10 +184,26 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
     IFastTransferPool.Quote memory quote =
       s_pool.getCcipSendTokenFee(DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, abi.encode(RECEIVER), feeToken, "");
 
+    uint256 expectedFastTransferFee = SOURCE_AMOUNT * FAST_FEE_FILLER_BPS / 10_000;
+    uint256 expectedAmountNetFee = SOURCE_AMOUNT - expectedFastTransferFee;
+    bytes32 expectedFillId = s_pool.computeFillId(fakeMessageId, expectedAmountNetFee, 18, abi.encode(RECEIVER));
+
+    vm.expectEmit();
+    emit IFastTransferPool.FastTransferRequested({
+      destinationChainSelector: DEST_CHAIN_SELECTOR,
+      fillId: expectedFillId,
+      settlementId: fakeMessageId,
+      sourceAmountNetFee: expectedAmountNetFee,
+      fastTransferFee: expectedFastTransferFee,
+      receiver: abi.encode(RECEIVER)
+    });
+
     bytes32 settlementId = s_pool.ccipSendToken(DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, abi.encode(RECEIVER), feeToken, "");
 
     assertTrue(settlementId != bytes32(0));
     assertEq(s_token.balanceOf(OWNER), balanceBefore - SOURCE_AMOUNT - quote.ccipSettlementFee);
+    // When using ERC20 fee token, both transfer amount and settlement fee go to the pool
+    assertEq(s_token.balanceOf(address(s_pool)), poolBalanceBefore + SOURCE_AMOUNT + quote.ccipSettlementFee);
   }
 
   function test_RevertWhen_CursedByRMN() public {

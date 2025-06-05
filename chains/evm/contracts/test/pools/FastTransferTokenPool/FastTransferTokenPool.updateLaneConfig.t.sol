@@ -111,7 +111,7 @@ contract FastTransferTokenPool_updateDestChainConfig is FastTransferTokenPoolSet
 
     vm.stopPrank();
 
-    vm.expectRevert(); // TODO specify revert reason
+    vm.expectRevert();
     s_pool.updateDestChainConfig(_singleConfigToList(laneConfigArgs));
   }
 

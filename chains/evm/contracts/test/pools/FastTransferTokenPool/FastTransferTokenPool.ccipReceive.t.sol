@@ -132,6 +132,14 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
     Client.Any2EVMMessage memory message =
       _generateMintMessage(RECEIVER, SOURCE_AMOUNT, SOURCE_DECIMALS, fillerFeeBps, poolFeeBps);
 
+    // Compute fillId for the slow fill scenario
+    uint256 fillerFeeAmount = (SOURCE_AMOUNT * fillerFeeBps) / 10_000;
+    uint256 poolFeeAmount = (SOURCE_AMOUNT * poolFeeBps) / 10_000;
+    uint256 amountAfterFees = SOURCE_AMOUNT - fillerFeeAmount - poolFeeAmount;
+    bytes32 fillId = s_pool.computeFillId(message.messageId, amountAfterFees, SOURCE_DECIMALS, abi.encode(RECEIVER));
+
+    vm.expectEmit();
+    emit IFastTransferPool.FastTransferSettled(fillId, MESSAGE_ID, 0, 0, IFastTransferPool.FillState.NOT_FILLED);
     s_pool.ccipReceive(message);
 
     // Verify receiver gets the full amount (helper transfers, doesn't mint)
@@ -140,6 +148,11 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
     assertEq(s_token.balanceOf(address(s_pool)), poolBalanceBefore - expectedReceiverAmount, "t2");
     // Pool should NOT accumulate any fee for slow fills (no fast fill service provided)
     assertEq(s_pool.getAccumulatedPoolFees(), accumulatedFeesBefore, "t3");
+
+    // For slow fills, ccipReceive should mark the fill as SETTLED directly
+    FastTransferTokenPoolAbstract.FillInfo memory fillInfo = s_pool.getFillInfo(fillId);
+    assertTrue(fillInfo.state == IFastTransferPool.FillState.SETTLED, "Fill state should be SETTLED after slow fill");
+    assertEq(fillInfo.filler, address(0), "Filler should be address(0) for slow fills");
   }
 
   function test_ccipReceive_FastFill_Settlement_WithPoolFee() public {
