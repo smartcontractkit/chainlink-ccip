@@ -89,7 +89,7 @@ func NewUSDCMessageReader(
 			return nil, err
 		}
 
-		contract, err := bindFacadeReaderContract(
+		contract, err := bindReaderContract(
 			ctx,
 			lggr,
 			contractReaders,
