@@ -58,7 +58,7 @@ contract FastTransferTokenPoolHelper is FastTransferTokenPoolAbstract {
   }
 
   /// @notice Override to return accumulated pool fees from storage for lock/release pools
-  function _getAccumulatedPoolFees() internal view override returns (uint256) {
+  function getAccumulatedPoolFees() public view override returns (uint256) {
     return s_accumulatedPoolFees;
   }
 
