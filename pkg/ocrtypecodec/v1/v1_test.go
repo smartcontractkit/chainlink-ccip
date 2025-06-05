@@ -590,9 +590,9 @@ func (d *dataGenerator) execOutcome() exectypes.Outcome {
 	return exectypes.Outcome{
 		State:         exectypes.PluginState(genRandomString(128)),
 		CommitReports: commitReports,
-		Report: cciptypes.ExecutePluginReport{
+		Reports: []cciptypes.ExecutePluginReport{{
 			ChainReports: chainReports,
-		},
+		}},
 	}
 }
 

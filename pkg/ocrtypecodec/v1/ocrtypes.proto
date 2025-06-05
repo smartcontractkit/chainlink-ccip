@@ -39,7 +39,8 @@ message ExecObservation {
 message ExecOutcome {
   string plugin_state = 1;
   repeated CommitData commit_reports = 2;
-  ExecutePluginReport execute_plugin_report = 3;
+  ExecutePluginReport execute_plugin_report = 3; // DEPRECATED: Use execute_plugin_reports instead
+  repeated ExecutePluginReport execute_plugin_reports = 4;
 }
 
 message MerkleRootQuery {
