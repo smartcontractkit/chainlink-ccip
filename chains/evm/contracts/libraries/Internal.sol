@@ -203,24 +203,12 @@ library Internal {
   function _validateTVMAddress(
     bytes memory encodedAddress
   ) internal pure {
-    if (encodedAddress.length != 36) {
-      revert InvalidTVMAddress(encodedAddress);
-    }
-
-    // check if the address is in the basechain
-    if (encodedAddress[1] != 0x00) {
-      revert InvalidTVMAddress(encodedAddress);
-    }
-
+    if (encodedAddress.length != 36) revert InvalidTVMAddress(encodedAddress);
     bytes32 accountId;
     assembly {
-      // 0x22 = 0x20 (data start) + 2 (offset for account_id)
-      accountId := mload(add(encodedAddress, 0x22))
+      accountId := mload(add(encodedAddress, 0x22)) // 0x22 = 0x20 (data start) + 2 (offset for account_id)
     }
-
-    if (accountId == bytes32(0)) {
-      revert InvalidTVMAddress(encodedAddress);
-    }
+    if (accountId == bytes32(0)) revert InvalidTVMAddress(encodedAddress);
   }
 
   /// @notice Enum listing the possible message execution states within the offRamp contract.
