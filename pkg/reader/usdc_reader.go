@@ -121,19 +121,19 @@ func NewUSDCMessageReader(
 		}
 	}
 
-	return compositeFamilyUSDCMessageReader{
+	return compositeUSDCMessageReader{
 		lggr:    lggr,
 		readers: readers,
 	}, nil
 }
 
-// compositeFamilyUSDCMessageReader is a USDCMessageReader that can handle different chain families.
-type compositeFamilyUSDCMessageReader struct {
+// compositeUSDCMessageReader is a USDCMessageReader that can handle different chain families.
+type compositeUSDCMessageReader struct {
 	lggr    logger.Logger
 	readers map[cciptypes.ChainSelector]USDCMessageReader
 }
 
-func (m compositeFamilyUSDCMessageReader) MessagesByTokenID(
+func (m compositeUSDCMessageReader) MessagesByTokenID(
 	ctx context.Context,
 	source, dest cciptypes.ChainSelector,
 	tokens map[MessageTokenID]cciptypes.RampTokenAmount,
