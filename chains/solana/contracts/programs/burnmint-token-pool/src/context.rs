@@ -87,7 +87,11 @@ pub struct TransferMintAuthority<'info> {
         constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub state: Account<'info, State>,
+    #[account(mut)]
     pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
+    #[account(address = *mint.to_account_info().owner)]
+    /// CHECK: CPI to token program
+    pub token_program: AccountInfo<'info>,
     #[account(
         seeds = [POOL_SIGNER_SEED, mint.key().as_ref()],
         bump,

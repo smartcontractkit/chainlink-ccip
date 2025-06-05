@@ -16,18 +16,20 @@ type TransferMintAuthority struct {
 
 	// [0] = [WRITE] state
 	//
-	// [1] = [] mint
+	// [1] = [WRITE] mint
 	//
-	// [2] = [] poolSigner
+	// [2] = [] tokenProgram
 	//
-	// [3] = [WRITE, SIGNER] authority
+	// [3] = [] poolSigner
+	//
+	// [4] = [WRITE, SIGNER] authority
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewTransferMintAuthorityInstructionBuilder creates a new `TransferMintAuthority` instruction builder.
 func NewTransferMintAuthorityInstructionBuilder() *TransferMintAuthority {
 	nd := &TransferMintAuthority{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 4),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 5),
 	}
 	return nd
 }
@@ -51,7 +53,7 @@ func (inst *TransferMintAuthority) GetStateAccount() *ag_solanago.AccountMeta {
 
 // SetMintAccount sets the "mint" account.
 func (inst *TransferMintAuthority) SetMintAccount(mint ag_solanago.PublicKey) *TransferMintAuthority {
-	inst.AccountMetaSlice[1] = ag_solanago.Meta(mint)
+	inst.AccountMetaSlice[1] = ag_solanago.Meta(mint).WRITE()
 	return inst
 }
 
@@ -60,26 +62,37 @@ func (inst *TransferMintAuthority) GetMintAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[1]
 }
 
+// SetTokenProgramAccount sets the "tokenProgram" account.
+func (inst *TransferMintAuthority) SetTokenProgramAccount(tokenProgram ag_solanago.PublicKey) *TransferMintAuthority {
+	inst.AccountMetaSlice[2] = ag_solanago.Meta(tokenProgram)
+	return inst
+}
+
+// GetTokenProgramAccount gets the "tokenProgram" account.
+func (inst *TransferMintAuthority) GetTokenProgramAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[2]
+}
+
 // SetPoolSignerAccount sets the "poolSigner" account.
 func (inst *TransferMintAuthority) SetPoolSignerAccount(poolSigner ag_solanago.PublicKey) *TransferMintAuthority {
-	inst.AccountMetaSlice[2] = ag_solanago.Meta(poolSigner)
+	inst.AccountMetaSlice[3] = ag_solanago.Meta(poolSigner)
 	return inst
 }
 
 // GetPoolSignerAccount gets the "poolSigner" account.
 func (inst *TransferMintAuthority) GetPoolSignerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice[3]
 }
 
 // SetAuthorityAccount sets the "authority" account.
 func (inst *TransferMintAuthority) SetAuthorityAccount(authority ag_solanago.PublicKey) *TransferMintAuthority {
-	inst.AccountMetaSlice[3] = ag_solanago.Meta(authority).WRITE().SIGNER()
+	inst.AccountMetaSlice[4] = ag_solanago.Meta(authority).WRITE().SIGNER()
 	return inst
 }
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *TransferMintAuthority) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice[4]
 }
 
 func (inst TransferMintAuthority) Build() *Instruction {
@@ -116,9 +129,12 @@ func (inst *TransferMintAuthority) Validate() error {
 			return errors.New("accounts.Mint is not set")
 		}
 		if inst.AccountMetaSlice[2] == nil {
-			return errors.New("accounts.PoolSigner is not set")
+			return errors.New("accounts.TokenProgram is not set")
 		}
 		if inst.AccountMetaSlice[3] == nil {
+			return errors.New("accounts.PoolSigner is not set")
+		}
+		if inst.AccountMetaSlice[4] == nil {
 			return errors.New("accounts.Authority is not set")
 		}
 	}
@@ -139,11 +155,12 @@ func (inst *TransferMintAuthority) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("     state", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("      mint", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("poolSigner", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta(" authority", inst.AccountMetaSlice[3]))
+					instructionBranch.Child("Accounts[len=5]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+						accountsBranch.Child(ag_format.Meta("       state", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("        mint", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("tokenProgram", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("  poolSigner", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("   authority", inst.AccountMetaSlice[4]))
 					})
 				})
 		})
@@ -173,12 +190,14 @@ func NewTransferMintAuthorityInstruction(
 	// Accounts:
 	state ag_solanago.PublicKey,
 	mint ag_solanago.PublicKey,
+	tokenProgram ag_solanago.PublicKey,
 	poolSigner ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *TransferMintAuthority {
 	return NewTransferMintAuthorityInstructionBuilder().
 		SetNewMintAuthority(newMintAuthority).
 		SetStateAccount(state).
 		SetMintAccount(mint).
+		SetTokenProgramAccount(tokenProgram).
 		SetPoolSignerAccount(poolSigner).
 		SetAuthorityAccount(authority)
 }

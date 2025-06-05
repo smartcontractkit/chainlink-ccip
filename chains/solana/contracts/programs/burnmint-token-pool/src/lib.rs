@@ -57,6 +57,7 @@ pub mod burnmint_token_pool {
     }
 
     // This method transfers the mint authority of the mint, so it does a CPI to the Token Program.
+    // It is only defined in the burn and mint program as the mint authority is only used for minting tokens.
     pub fn transfer_mint_authority<'info>(
         ctx: Context<'_, '_, 'info, 'info, TransferMintAuthority<'info>>,
         new_mint_authority: Pubkey,
