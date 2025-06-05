@@ -434,7 +434,7 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 			require.NoError(t, err)
 			testutils.FundAccounts(ctx, []solana.PrivateKey{newOwner}, solanaGoClient, t)
 
-			// Create a new Token and set up in the token admin registry
+			// Initialize a Token Pool in the CLL Token Pool Program for my own mint
 			for _, v := range tokenPrograms {
 				t.Run("self-onboard "+v.tokenName, func(t *testing.T) {
 					t.Parallel()
