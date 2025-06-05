@@ -393,11 +393,11 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   /// @dev The first param is the fillId. It's unused in this implementation, but kept to allow overriding this function
   /// to handle the reimbursement in a different way.
   ///
-  /// Burn/Mint TOKEN POOLS:
+  /// Burn/Mint token pools:
   /// This default implementation mints pool fee rewards directly to the pool itself (address(this)).
   /// The pool contract itself holds the reward tokens and they can be managed through standard token operations.
   ///
-  /// Lock/Release POOLS:
+  /// Lock/Release pools:
   /// Lock/Release pools should override this function to implement accounting-based fee management since they
   /// cannot mint new tokens. They should keep track of accumulated pool fees in a storage variable (e.g., s_accumulatedPoolFees)
   /// @param filler The filler address to reimburse.
@@ -441,7 +441,9 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   /// are minted directly to the pool. Lock/Release token pools that cannot mint new tokens may choose to implement
   /// their own accounting mechanism for pool fees by adding a storage variable such as: s_accumulatedPoolFees.
   /// This allows them to track fees separately since they cannot mint additional tokens
-  /// for pool fee rewards like BURN/MINT pools can.
+  /// for pool fee rewards like Burn/Mint pools can.
+  /// Note: We understand that fee accounting can be obscured by sending tokens directly to the pool.
+  /// This does not introduce security issues but will need to be handled operationally. We accept this risk.
   /// @return The amount of accumulated pool fees.
   function getAccumulatedPoolFees() public view virtual returns (uint256) {
     return getToken().balanceOf(address(this));
