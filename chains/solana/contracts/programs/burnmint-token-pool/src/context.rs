@@ -411,7 +411,6 @@ pub struct DeleteChainConfig<'info> {
     pub authority: Signer<'info>,
 }
 
-
 #[error_code]
 pub enum CcipBnMTokenPoolError {
     // Other (add last to keep error numbers)
