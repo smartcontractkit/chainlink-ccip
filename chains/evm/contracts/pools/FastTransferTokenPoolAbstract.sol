@@ -148,13 +148,13 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
 
     settlementId = IRouterClient(getRouter()).ccipSend{value: msg.value}(destinationChainSelector, message);
     uint256 amountNetFee = amount - quote.fastTransferFee;
-    bytes32 fillId = computeFillId(settlementId, amountNetFee, i_tokenDecimals, receiver);
 
     emit FastTransferRequested({
       destinationChainSelector: destinationChainSelector,
-      fillId: fillId,
+      fillId: computeFillId(settlementId, amountNetFee, i_tokenDecimals, receiver),
       settlementId: settlementId,
       sourceAmountNetFee: amountNetFee,
+      sourceDecimals: i_tokenDecimals,
       fastTransferFee: quote.fastTransferFee,
       receiver: receiver
     });

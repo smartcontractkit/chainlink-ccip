@@ -120,6 +120,7 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
       fillId: fillId,
       settlementId: params.mockMessageId,
       sourceAmountNetFee: params.amount - expectedFee,
+      sourceDecimals: SOURCE_DECIMALS,
       fastTransferFee: expectedFee,
       receiver: params.receiver
     });
@@ -194,6 +195,7 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
       fillId: expectedFillId,
       settlementId: fakeMessageId,
       sourceAmountNetFee: expectedAmountNetFee,
+      sourceDecimals: SOURCE_DECIMALS,
       fastTransferFee: expectedFastTransferFee,
       receiver: abi.encode(RECEIVER)
     });
@@ -238,6 +240,7 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
       fillId: fillId,
       settlementId: params.mockMessageId,
       sourceAmountNetFee: amountNetTotalFee,
+      sourceDecimals: SOURCE_DECIMALS,
       fastTransferFee: totalFee,
       receiver: params.receiver
     });

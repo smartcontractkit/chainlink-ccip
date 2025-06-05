@@ -28,6 +28,7 @@ interface IFastTransferPool {
     bytes32 indexed settlementId,
     /// @param sourceAmountNetFee The amount being transferred, excluding the fast fill fee, expressed in source token decimals.
     uint256 sourceAmountNetFee,
+    uint8 sourceDecimals,
     uint256 fastTransferFee,
     bytes receiver
   );
