@@ -420,6 +420,13 @@ pub struct OwnershipTransferred {
     pub mint: Pubkey,
 }
 
+#[event]
+pub struct MintAuthorityTransferred {
+    pub mint: Pubkey,
+    pub old_mint_authority: Pubkey,
+    pub new_mint_authority: Pubkey,
+}
+
 #[error_code]
 pub enum CcipTokenPoolError {
     #[msg("Pool authority does not match token mint owner")]

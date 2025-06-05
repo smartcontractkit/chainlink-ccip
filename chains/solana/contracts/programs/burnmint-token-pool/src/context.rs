@@ -1,4 +1,4 @@
-use anchor_lang::prelude::*;
+use anchor_lang::prelude::{borsh::de, *};
 use anchor_spl::{
     associated_token::get_associated_token_address_with_program_id,
     token_interface::{Mint, TokenAccount},
@@ -76,6 +76,27 @@ pub struct InitializeTokenPool<'info> {
         bump,
     )]
     pub config: Account<'info, PoolConfig>, // Global Config PDA of the Token Pool
+}
+
+#[derive(Accounts)]
+pub struct TransferMintAuthority<'info> {
+    #[account(
+        mut,
+        seeds = [POOL_STATE_SEED, mint.key().as_ref()],
+        bump,
+        constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
+    )]
+    pub state: Account<'info, State>,
+    pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
+    #[account(
+        seeds = [POOL_SIGNER_SEED, mint.key().as_ref()],
+        bump,
+        address = state.config.pool_signer,
+    )]
+    /// CHECK: unchecked CPI signer
+    pub pool_signer: UncheckedAccount<'info>,
+    #[account(mut, address = state.config.owner @ CcipTokenPoolError::Unauthorized)]
+    pub authority: Signer<'info>,
 }
 
 #[derive(Accounts)]
