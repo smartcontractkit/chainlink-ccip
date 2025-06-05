@@ -417,5 +417,52 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 				})
 			})
 		}
+
+		// Test self onboarding to the pool
+		t.Run("self-onboard", func(t *testing.T) {
+
+			// Enable self-served token pool onboarding
+			ix, err := tokenpool.NewUpdateGlobalConfigInstruction(true, configPDA, admin.PublicKey(), solana.SystemProgramID, programData.Address).ValidateAndBuild()
+			require.NoError(t, err)
+
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{
+				&tokens.TokenInstruction{Instruction: ix, Program: p.poolProgram},
+			}, admin, config.DefaultCommitment)
+
+			// Create a new token owner
+			newOwner, err := solana.NewRandomPrivateKey()
+			require.NoError(t, err)
+			testutils.FundAccounts(ctx, []solana.PrivateKey{newOwner}, solanaGoClient, t)
+
+			// Create a new Token and set up in the token admin registry
+			for _, v := range tokenPrograms {
+				t.Run("self-onboard "+v.tokenName, func(t *testing.T) {
+					t.Parallel()
+
+					mintPriv, err := solana.NewRandomPrivateKey()
+					require.NoError(t, err)
+					p, err := tokens.NewTokenPool(v.tokenProgram, p.poolProgram, mintPriv.PublicKey())
+					require.NoError(t, err)
+					mint := p.Mint
+
+					// create token
+					instructions, err := tokens.CreateToken(ctx, v.tokenProgram, mint, newOwner.PublicKey(), uint8(6), solanaGoClient, config.DefaultCommitment)
+					require.NoError(t, err)
+
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, instructions, newOwner, config.DefaultCommitment, common.AddSigners(mintPriv))
+
+					poolConfig, err := tokens.TokenPoolConfigAddress(mint, p.PoolProgram)
+					require.NoError(t, err)
+
+					poolInitI, err := tokenpool.NewInitializeInstruction(dumbRamp, config.RMNRemoteProgram, poolConfig, mint, newOwner.PublicKey(), solana.SystemProgramID, p.PoolProgram, programData.Address, configPDA).ValidateAndBuild()
+					require.NoError(t, err)
+
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{
+						&tokens.TokenInstruction{Instruction: poolInitI, Program: p.PoolProgram},
+					}, newOwner, config.DefaultCommitment)
+
+				})
+			}
+		})
 	}
 }
