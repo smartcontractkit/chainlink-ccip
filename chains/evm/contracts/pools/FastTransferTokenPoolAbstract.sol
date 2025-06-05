@@ -315,6 +315,8 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     uint256 fillerReimbursementAmount = 0;
 
     if (fillInfo.state == IFastTransferPool.FillState.NOT_FILLED) {
+      // Set the local pool fee to zero, as fees are only applied for fast-fill operations
+      localPoolFee = 0;
       // Rate limits should be consumed only when the request was not fast-filled. During fast fill, the rate limit is
       // consumed by the filler.
       _consumeInboundRateLimit(sourceChainSelector, localAmount);
