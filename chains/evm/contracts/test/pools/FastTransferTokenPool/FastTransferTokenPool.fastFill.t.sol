@@ -177,43 +177,43 @@ contract FastTransferTokenPool_fastFill_Test is FastTransferTokenPoolSetup {
     s_pool.fastFill(SETTLEMENT_ID, bytes32(0x0), DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, SOURCE_DECIMALS, RECEIVER);
   }
 
-  function test_RevertWhen_InvalidSettlementId() public {
+  function test_RevertWhen_InvalidFillId() public {
     // Use an incorrect fillId (different from what would be computed)
     bytes32 incorrectFillId = keccak256("incorrect_fill_id");
 
-    vm.expectRevert(abi.encodeWithSelector(FastTransferTokenPoolAbstract.InvalidSettlementId.selector, SETTLEMENT_ID));
+    vm.expectRevert(abi.encodeWithSelector(FastTransferTokenPoolAbstract.InvalidFillId.selector, SETTLEMENT_ID));
     s_pool.fastFill(SETTLEMENT_ID, incorrectFillId, DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, SOURCE_DECIMALS, RECEIVER);
   }
 
-  function test_RevertWhen_InvalidSettlementId_WrongAmount() public {
+  function test_RevertWhen_InvalidFillId_WrongAmount() public {
     // Create fillId with different amount
     uint256 wrongAmount = SOURCE_AMOUNT + 1 ether;
     bytes32 fillIdWithWrongAmount =
       s_pool.computeFillId(SETTLEMENT_ID, wrongAmount, SOURCE_DECIMALS, abi.encode(RECEIVER));
 
-    vm.expectRevert(abi.encodeWithSelector(FastTransferTokenPoolAbstract.InvalidSettlementId.selector, SETTLEMENT_ID));
+    vm.expectRevert(abi.encodeWithSelector(FastTransferTokenPoolAbstract.InvalidFillId.selector, SETTLEMENT_ID));
     s_pool.fastFill(SETTLEMENT_ID, fillIdWithWrongAmount, DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, SOURCE_DECIMALS, RECEIVER);
   }
 
-  function test_RevertWhen_InvalidSettlementId_WrongDecimals() public {
+  function test_RevertWhen_InvalidFillId_WrongDecimals() public {
     // Create fillId with different decimals
     uint8 wrongDecimals = 6;
     bytes32 fillIdWithWrongDecimals =
       s_pool.computeFillId(SETTLEMENT_ID, SOURCE_AMOUNT, wrongDecimals, abi.encode(RECEIVER));
 
-    vm.expectRevert(abi.encodeWithSelector(FastTransferTokenPoolAbstract.InvalidSettlementId.selector, SETTLEMENT_ID));
+    vm.expectRevert(abi.encodeWithSelector(FastTransferTokenPoolAbstract.InvalidFillId.selector, SETTLEMENT_ID));
     s_pool.fastFill(
       SETTLEMENT_ID, fillIdWithWrongDecimals, DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, SOURCE_DECIMALS, RECEIVER
     );
   }
 
-  function test_RevertWhen_InvalidSettlementId_WrongReceiver() public {
+  function test_RevertWhen_InvalidFillId_WrongReceiver() public {
     // Create fillId with different receiver
     address wrongReceiver = address(0x5678);
     bytes32 fillIdWithWrongReceiver =
       s_pool.computeFillId(SETTLEMENT_ID, SOURCE_AMOUNT, SOURCE_DECIMALS, abi.encode(wrongReceiver));
 
-    vm.expectRevert(abi.encodeWithSelector(FastTransferTokenPoolAbstract.InvalidSettlementId.selector, SETTLEMENT_ID));
+    vm.expectRevert(abi.encodeWithSelector(FastTransferTokenPoolAbstract.InvalidFillId.selector, SETTLEMENT_ID));
     s_pool.fastFill(
       SETTLEMENT_ID, fillIdWithWrongReceiver, DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, SOURCE_DECIMALS, RECEIVER
     );

@@ -37,7 +37,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
 
   error InvalidDestChainConfig();
   error FillerNotAllowlisted(uint64 remoteChainSelector, address filler);
-  error InvalidSettlementId(bytes32 settlementId);
+  error InvalidFillId(bytes32 fillId);
   error TransferAmountExceedsMaxFillAmount(uint64 remoteChainSelector, uint256 amount);
   error InsufficientPoolFees(uint256 requested, uint256 available);
 
@@ -266,7 +266,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     }
 
     if (fillId != computeFillId(settlementId, sourceAmountNetFee, sourceDecimals, abi.encode(receiver))) {
-      revert InvalidSettlementId(settlementId);
+      revert InvalidFillId(fillId);
     }
 
     FillInfo memory fillInfo = s_fills[fillId];
