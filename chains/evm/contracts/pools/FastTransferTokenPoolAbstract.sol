@@ -39,10 +39,12 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   error FillerNotAllowlisted(uint64 remoteChainSelector, address filler);
   error InvalidSettlementId(bytes32 settlementId);
   error TransferAmountExceedsMaxFillAmount(uint64 remoteChainSelector, uint256 amount);
+  error InsufficientPoolFees(uint256 requested, uint256 available);
 
   event DestChainConfigUpdated(
     uint64 indexed destinationChainSelector,
-    uint16 fastTransferBpsFee,
+    uint16 fastTransferFillerFeeBps,
+    uint16 fastTransferPoolFeeBps,
     uint256 maxFillAmountPerRequest,
     bytes destinationPool,
     bytes4 chainFamilySelector,
@@ -54,20 +56,22 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
 
   struct DestChainConfig {
     uint256 maxFillAmountPerRequest; // Maximum amount that can be filled per request.
-    bool fillerAllowlistEnabled; // ──╮ Allowlist for fillers.
-    uint16 fastTransferBpsFee; //     │ Allowed range of [0-10_000].
-    //                                │ Settlement overhead gas for the destination chain. Used as a toggle for
-    uint32 settlementOverheadGas; // ─╯ either custom ExtraArgs or GenericExtraArgsV2.
+    bool fillerAllowlistEnabled; // ────╮ Allowlist for fillers.
+    uint16 fastTransferFillerFeeBps; // │ Basis points fee going to filler [0-10_000].
+    uint16 fastTransferPoolFeeBps; //   │ Basis points fee going to pool [0-10_000].
+    //                                  │ Settlement overhead gas for the destination chain. Used as a toggle for
+    uint32 settlementOverheadGas; // ───╯ either custom ExtraArgs or GenericExtraArgsV2.
     bytes destinationPool; // Address of the destination pool.
     bytes customExtraArgs; // Pre-encoded extra args for EVM to Any message. Only used if settlementOverheadGas is 0.
   }
 
   struct DestChainConfigUpdateArgs {
-    bool fillerAllowlistEnabled; // ──╮ Allowlist for fillers.
-    uint16 fastTransferBpsFee; //     │ Allowed range of [0-10_000].
-    uint32 settlementOverheadGas; //  │ Settlement overhead gas for the destination chain.
-    uint64 remoteChainSelector; //    │ Remote chain selector. ABI encoded in the case of an EVM pool.
-    bytes4 chainFamilySelector; // ───╯ Selector that identifies the destination chain's family.
+    bool fillerAllowlistEnabled; // ────╮ Allowlist for fillers.
+    uint16 fastTransferFillerFeeBps; // │ Basis points fee going to filler [0-10_000].
+    uint16 fastTransferPoolFeeBps; //   │ Basis points fee going to pool [0-10_000].
+    uint32 settlementOverheadGas; //    │ Settlement overhead gas for the destination chain.
+    uint64 remoteChainSelector; //      │ Remote chain selector. ABI encoded in the case of an EVM pool.
+    bytes4 chainFamilySelector; // ─────╯ Selector that identifies the destination chain's family.
     uint256 maxFillAmountPerRequest; // Maximum amount that can be filled per request.
     bytes destinationPool; // Address of the destination pool.
     bytes customExtraArgs; // Pre-encoded extra args for EVM to Any message. Only used if settlementOverheadGas is 0.
@@ -75,22 +79,15 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
 
   struct MintMessage {
     uint256 sourceAmount; // Amount to fill in the source token denomination.
-    uint16 fastTransferFeeBps; // ─╮ Fast transfer fee in the source token.
-    uint8 sourceDecimals; // ──────╯ Decimals of the source token.
+    uint16 fastTransferFillerFeeBps; // ─╮ Basis points fee going to filler.
+    uint16 fastTransferPoolFeeBps; //    │ Basis points fee going to pool.
+    uint8 sourceDecimals; // ────────────╯ Decimals of the source token.
     bytes receiver; // Receiver address on the destination chain. ABI encoded in the case of an EVM address.
-  }
-
-  /// @notice Enum representing the state of a fill request.
-  enum FillState {
-    NOT_FILLED, // Request has not been filled yet.
-    FILLED, // Request has been filled by a filler.
-    SETTLED // Request has been settled via CCIP.
-
   }
 
   /// @notice Struct to track fill request information.
   struct FillInfo {
-    FillState state; // Current state of the fill request.
+    IFastTransferPool.FillState state; // Current state of the fill request.
     // Address of the filler, 0x0 until filled. If 0x0 after filled, it means the request was not fast-filled.
     address filler;
   }
@@ -206,7 +203,8 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     if (amount > destChainConfig.maxFillAmountPerRequest) {
       revert TransferAmountExceedsMaxFillAmount(destinationChainSelector, amount);
     }
-    quote.fastTransferFee = (amount * destChainConfig.fastTransferBpsFee) / BPS_DIVIDER;
+    quote.fastTransferFee =
+      amount * (destChainConfig.fastTransferFillerFeeBps + destChainConfig.fastTransferPoolFeeBps) / BPS_DIVIDER;
 
     bytes memory extraArgs;
 
@@ -228,7 +226,8 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
         MintMessage({
           sourceAmount: amount,
           sourceDecimals: i_tokenDecimals,
-          fastTransferFeeBps: destChainConfig.fastTransferBpsFee,
+          fastTransferFillerFeeBps: destChainConfig.fastTransferFillerFeeBps,
+          fastTransferPoolFeeBps: destChainConfig.fastTransferPoolFeeBps,
           receiver: receiver
         })
       ),
@@ -271,7 +270,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     }
 
     FillInfo memory fillInfo = s_fills[fillId];
-    if (fillInfo.state != FillState.NOT_FILLED) revert AlreadyFilled(fillId);
+    if (fillInfo.state != IFastTransferPool.FillState.NOT_FILLED) revert AlreadyFilled(fillId);
 
     // Calculate the local amount.
     uint256 localAmount = _calculateLocalAmount(sourceAmountNetFee, sourceDecimals);
@@ -281,7 +280,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     // Transfer tokens from filler to receiver
     _handleFastFill(fillId, msg.sender, receiver, localAmount);
 
-    s_fills[fillId] = FillInfo({state: FillState.FILLED, filler: msg.sender});
+    s_fills[fillId] = FillInfo({state: IFastTransferPool.FillState.FILLED, filler: msg.sender});
 
     emit FastTransferFilled(fillId, settlementId, msg.sender, localAmount, receiver);
   }
@@ -299,33 +298,40 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     bytes memory sourcePoolAddress,
     MintMessage memory mintMessage
   ) internal virtual {
-    address receiver = address(uint160(uint256(bytes32(mintMessage.receiver))));
-
     _validateSettlement(sourceChainSelector, sourcePoolAddress);
 
+    // Calculate the fast transfer inputs
+    address receiver = address(uint160(uint256(bytes32(mintMessage.receiver))));
+    uint256 sourceFillerFee = (mintMessage.sourceAmount * mintMessage.fastTransferFillerFeeBps) / BPS_DIVIDER;
+    uint256 sourcePoolFee = (mintMessage.sourceAmount * mintMessage.fastTransferPoolFeeBps) / BPS_DIVIDER;
+    uint256 sourceAmountToFill = mintMessage.sourceAmount - sourceFillerFee - sourcePoolFee;
     // Inputs are in the source chain denomination, so we need to convert them to the local token denomination.
     uint256 localAmount = _calculateLocalAmount(mintMessage.sourceAmount, mintMessage.sourceDecimals);
-    uint256 sourceAmountToFill = localAmount - (localAmount * mintMessage.fastTransferFeeBps) / BPS_DIVIDER;
-
+    uint256 localPoolFee = _calculateLocalAmount(sourcePoolFee, mintMessage.sourceDecimals);
     bytes32 fillId = computeFillId(settlementId, sourceAmountToFill, mintMessage.sourceDecimals, abi.encode(receiver));
-    FillInfo memory fillInfo = s_fills[fillId];
 
-    if (fillInfo.state == FillState.NOT_FILLED) {
+    FillInfo memory fillInfo = s_fills[fillId];
+    // The amount to reimburse to the filler in local denomination.
+    uint256 fillerReimbursementAmount = 0;
+
+    if (fillInfo.state == IFastTransferPool.FillState.NOT_FILLED) {
+      // Set the local pool fee to zero, as fees are only applied for fast-fill operations
+      localPoolFee = 0;
       // Rate limits should be consumed only when the request was not fast-filled. During fast fill, the rate limit is
       // consumed by the filler.
       _consumeInboundRateLimit(sourceChainSelector, localAmount);
       // When no filler is involved, we send the entire amount to the receiver.
       _handleSlowFill(fillId, localAmount, receiver);
-    } else if (fillInfo.state == FillState.FILLED) {
-      _handleFastFillReimbursement(fillId, fillInfo.filler, localAmount);
+    } else if (fillInfo.state == IFastTransferPool.FillState.FILLED) {
+      // The request was fast-filled, so we reimburse the filler and accumulate the pool.
+      fillerReimbursementAmount = localAmount - localPoolFee;
+      _handleFastFillReimbursement(fillId, fillInfo.filler, fillerReimbursementAmount, localPoolFee);
     } else {
       // The catch all assertion for already settled fills ensures that any wrong value will revert.
       revert AlreadySettled(fillId);
     }
-
-    s_fills[fillId].state = FillState.SETTLED;
-
-    emit FastTransferSettled(fillId, settlementId);
+    s_fills[fillId].state = IFastTransferPool.FillState.SETTLED;
+    emit FastTransferSettled(fillId, settlementId, fillerReimbursementAmount, localPoolFee, fillInfo.state);
   }
 
   /// @notice Validates the send request parameters. Can be overridden by derived contracts to add additional checks.
@@ -386,10 +392,30 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   /// @notice Handles reimbursement when the request was fast-filled.
   /// @dev The first param is the fillId. It's unused in this implementation, but kept to allow overriding this function
   /// to handle the reimbursement in a different way.
+  ///
+  /// Burn/Mint token pools:
+  /// This default implementation mints pool fee rewards directly to the pool itself (address(this)).
+  /// The pool contract itself holds the reward tokens and they can be managed through standard token operations.
+  ///
+  /// Lock/Release pools:
+  /// Lock/Release pools should override this function to implement accounting-based fee management since they
+  /// cannot mint new tokens. They should keep track of accumulated pool fees in a storage variable (e.g., s_accumulatedPoolFees)
   /// @param filler The filler address to reimburse.
-  /// @param settlementAmountLocal The amount to reimburse in local token.
-  function _handleFastFillReimbursement(bytes32, address filler, uint256 settlementAmountLocal) internal virtual {
-    _releaseOrMint(filler, settlementAmountLocal);
+  /// @param fillerReimbursementAmount The amount to reimburse (what they provided + their fee).
+  /// @param poolReimbursementAmount The amount to reimburse to the pool (the pool fee).
+  function _handleFastFillReimbursement(
+    bytes32,
+    address filler,
+    uint256 fillerReimbursementAmount,
+    uint256 poolReimbursementAmount
+  ) internal virtual {
+    // Mint entire amount to pool first
+    _releaseOrMint(address(this), fillerReimbursementAmount + poolReimbursementAmount);
+
+    // Then transfer filler's share to them
+    if (fillerReimbursementAmount > 0) {
+      getToken().safeTransfer(filler, fillerReimbursementAmount);
+    }
   }
 
   // ================================================================
@@ -408,6 +434,33 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     uint64 remoteChainSelector
   ) external view virtual returns (DestChainConfig memory, address[] memory) {
     return (s_fastTransferDestChainConfig[remoteChainSelector], s_fillerAllowLists.values());
+  }
+
+  /// @notice Gets the accumulated pool fees that can be withdrawn.
+  /// @dev For Burn/Mint pools, this returns the contract's token balance since pool fees
+  /// are minted directly to the pool. Lock/Release token pools that cannot mint new tokens may choose to implement
+  /// their own accounting mechanism for pool fees by adding a storage variable such as: s_accumulatedPoolFees.
+  /// This allows them to track fees separately since they cannot mint additional tokens
+  /// for pool fee rewards like Burn/Mint pools can.
+  /// Note: We understand that fee accounting can be obscured by sending tokens directly to the pool.
+  /// This does not introduce security issues but will need to be handled operationally. We accept this risk.
+  /// @return The amount of accumulated pool fees.
+  function getAccumulatedPoolFees() public view virtual returns (uint256) {
+    return getToken().balanceOf(address(this));
+  }
+
+  /// @notice Withdraws all accumulated pool fees to the specified recipient.
+  /// @dev For BURN/MINT pools, this transfers the entire token balance of the pool contract.
+  /// LOCK/RELEASE pools should override this function with their own accounting mechanism.
+  /// @param recipient The address to receive the withdrawn fees.
+  function withdrawPoolFees(
+    address recipient
+  ) external virtual onlyOwner {
+    uint256 amount = getAccumulatedPoolFees();
+    if (amount > 0) {
+      getToken().safeTransfer(recipient, amount);
+      emit PoolFeeWithdrawn(recipient, amount);
+    }
   }
 
   /// @notice Updates the destination chain configuration.
@@ -430,11 +483,15 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
       }
     }
 
-    if (destChainConfigArgs.fastTransferBpsFee > BPS_DIVIDER) revert InvalidDestChainConfig();
+    // Ensure total fees don't exceed 100%
+    if (destChainConfigArgs.fastTransferFillerFeeBps + destChainConfigArgs.fastTransferPoolFeeBps > BPS_DIVIDER) {
+      revert InvalidDestChainConfig();
+    }
 
     DestChainConfig storage destChainConfig = s_fastTransferDestChainConfig[destChainConfigArgs.remoteChainSelector];
     destChainConfig.destinationPool = destChainConfigArgs.destinationPool;
-    destChainConfig.fastTransferBpsFee = destChainConfigArgs.fastTransferBpsFee;
+    destChainConfig.fastTransferFillerFeeBps = destChainConfigArgs.fastTransferFillerFeeBps;
+    destChainConfig.fastTransferPoolFeeBps = destChainConfigArgs.fastTransferPoolFeeBps;
     destChainConfig.fillerAllowlistEnabled = destChainConfigArgs.fillerAllowlistEnabled;
     destChainConfig.maxFillAmountPerRequest = destChainConfigArgs.maxFillAmountPerRequest;
     destChainConfig.settlementOverheadGas = destChainConfigArgs.settlementOverheadGas;
@@ -442,7 +499,8 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
 
     emit DestChainConfigUpdated(
       destChainConfigArgs.remoteChainSelector,
-      destChainConfigArgs.fastTransferBpsFee,
+      destChainConfigArgs.fastTransferFillerFeeBps,
+      destChainConfigArgs.fastTransferPoolFeeBps,
       destChainConfigArgs.maxFillAmountPerRequest,
       destChainConfigArgs.destinationPool,
       destChainConfigArgs.chainFamilySelector,

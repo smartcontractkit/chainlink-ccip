@@ -27,7 +27,7 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
       amount: SOURCE_AMOUNT,
       receiver: abi.encodePacked(address(0x5)),
       mockMessageId: keccak256("mockMessageId"),
-      fastFeeBpsExpected: FAST_FEE_BPS
+      fastFeeBpsExpected: FAST_FEE_FILLER_BPS
     });
   }
 
@@ -43,7 +43,8 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
     FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs memory laneConfigArgs = FastTransferTokenPoolAbstract
       .DestChainConfigUpdateArgs({
       remoteChainSelector: chainSelector,
-      fastTransferBpsFee: FAST_FEE_BPS,
+      fastTransferFillerFeeBps: FAST_FEE_FILLER_BPS,
+      fastTransferPoolFeeBps: 0,
       fillerAllowlistEnabled: true,
       destinationPool: destPoolAddress,
       maxFillAmountPerRequest: MAX_FILL_AMOUNT_PER_REQUEST,
@@ -91,8 +92,9 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
       data: abi.encode(
         FastTransferTokenPoolAbstract.MintMessage({
           sourceAmount: params.amount,
+          fastTransferFillerFeeBps: params.fastFeeBpsExpected,
+          fastTransferPoolFeeBps: 0,
           sourceDecimals: 18,
-          fastTransferFeeBps: params.fastFeeBpsExpected,
           receiver: params.receiver
         })
       ),
@@ -171,6 +173,7 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
   function test_CcipSendToken_WithERC20FeeToken() public {
     address feeToken = address(s_token);
     uint256 balanceBefore = s_token.balanceOf(OWNER);
+    uint256 poolBalanceBefore = s_token.balanceOf(address(s_pool));
     uint256 fakeFee = 1 ether;
     bytes32 fakeMessageId = keccak256("mockMessageId");
     vm.mockCall(address(s_sourceRouter), abi.encodeWithSelector(IRouterClient.getFee.selector), abi.encode(fakeFee));
@@ -181,10 +184,26 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
     IFastTransferPool.Quote memory quote =
       s_pool.getCcipSendTokenFee(DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, abi.encode(RECEIVER), feeToken, "");
 
+    uint256 expectedFastTransferFee = SOURCE_AMOUNT * FAST_FEE_FILLER_BPS / 10_000;
+    uint256 expectedAmountNetFee = SOURCE_AMOUNT - expectedFastTransferFee;
+    bytes32 expectedFillId = s_pool.computeFillId(fakeMessageId, expectedAmountNetFee, 18, abi.encode(RECEIVER));
+
+    vm.expectEmit();
+    emit IFastTransferPool.FastTransferRequested({
+      destinationChainSelector: DEST_CHAIN_SELECTOR,
+      fillId: expectedFillId,
+      settlementId: fakeMessageId,
+      sourceAmountNetFee: expectedAmountNetFee,
+      fastTransferFee: expectedFastTransferFee,
+      receiver: abi.encode(RECEIVER)
+    });
+
     bytes32 settlementId = s_pool.ccipSendToken(DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, abi.encode(RECEIVER), feeToken, "");
 
     assertTrue(settlementId != bytes32(0));
     assertEq(s_token.balanceOf(OWNER), balanceBefore - SOURCE_AMOUNT - quote.ccipSettlementFee);
+    // When using ERC20 fee token, both transfer amount and settlement fee go to the pool
+    assertEq(s_token.balanceOf(address(s_pool)), poolBalanceBefore + SOURCE_AMOUNT + quote.ccipSettlementFee);
   }
 
   function test_RevertWhen_CursedByRMN() public {
@@ -192,5 +211,109 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
 
     vm.expectRevert(TokenPool.CursedByRMN.selector);
     s_pool.ccipSendToken{value: 1 ether}(DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, abi.encode(RECEIVER), address(0), "");
+  }
+
+  function test_CcipSendToken_WithPoolFee() public {
+    uint16 fillerFeeBps = 75; // 0.75%
+    uint16 poolFeeBps = 25; // 0.25%
+
+    TestParams memory params = _setupTestParams(DEST_CHAIN_SELECTOR);
+    params.fastFeeBpsExpected = fillerFeeBps + poolFeeBps; // Total fee
+
+    // Update config to include pool fee
+    _updateConfigWithPoolFee(fillerFeeBps, poolFeeBps);
+
+    _setupMocks(params.mockMessageId);
+
+    uint256 fillerFeeAmount = (SOURCE_AMOUNT * fillerFeeBps) / 10_000;
+    uint256 poolFeeAmount = (SOURCE_AMOUNT * poolFeeBps) / 10_000;
+    uint256 totalFee = fillerFeeAmount + poolFeeAmount;
+    uint256 amountNetTotalFee = SOURCE_AMOUNT - totalFee;
+
+    bytes32 fillId = s_pool.computeFillId(params.mockMessageId, amountNetTotalFee, 18, params.receiver);
+
+    vm.expectEmit();
+    emit IFastTransferPool.FastTransferRequested({
+      destinationChainSelector: params.chainSelector,
+      fillId: fillId,
+      settlementId: params.mockMessageId,
+      sourceAmountNetFee: amountNetTotalFee,
+      fastTransferFee: totalFee,
+      receiver: params.receiver
+    });
+
+    uint256 balanceBefore = s_token.balanceOf(OWNER);
+
+    bytes32 settlementId =
+      s_pool.ccipSendToken{value: 1 ether}(params.chainSelector, params.amount, params.receiver, address(0), "");
+
+    assertEq(settlementId, params.mockMessageId);
+    assertEq(s_token.balanceOf(OWNER), balanceBefore - params.amount);
+    assertEq(s_token.balanceOf(address(s_pool)), params.amount);
+  }
+
+  function test_CcipSendToken_FeeQuote_WithPoolFee() public {
+    uint16 fillerFeeBps = 50; // 0.5%
+    uint16 poolFeeBps = 150; // 1.5%
+
+    // Update config to include pool fee
+    _updateConfigWithPoolFee(fillerFeeBps, poolFeeBps);
+
+    // Setup mocks for router calls
+    vm.mockCall(address(s_sourceRouter), abi.encodeWithSelector(IRouterClient.getFee.selector), abi.encode(1 ether));
+
+    IFastTransferPool.Quote memory quote =
+      s_pool.getCcipSendTokenFee(DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, abi.encode(RECEIVER), address(0), "");
+
+    uint256 expectedFillerFee = (SOURCE_AMOUNT * fillerFeeBps) / 10_000;
+    uint256 expectedPoolFee = (SOURCE_AMOUNT * poolFeeBps) / 10_000;
+    uint256 expectedTotalFee = expectedFillerFee + expectedPoolFee;
+
+    assertEq(quote.fastTransferFee, expectedTotalFee);
+  }
+
+  function test_CcipSendToken_EqualFeeSplit() public {
+    uint16 equalFee = 100; // 1% each for filler and pool
+
+    TestParams memory params = _setupTestParams(DEST_CHAIN_SELECTOR);
+    params.fastFeeBpsExpected = equalFee * 2; // Total fee is 2%
+
+    // Update config to have equal fee split
+    _updateConfigWithPoolFee(equalFee, equalFee);
+
+    // Setup mocks for router calls
+    vm.mockCall(address(s_sourceRouter), abi.encodeWithSelector(IRouterClient.getFee.selector), abi.encode(1 ether));
+
+    IFastTransferPool.Quote memory quote =
+      s_pool.getCcipSendTokenFee(DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, abi.encode(RECEIVER), address(0), "");
+
+    uint256 expectedTotalFee = (SOURCE_AMOUNT * equalFee * 2) / 10_000;
+    assertEq(quote.fastTransferFee, expectedTotalFee);
+  }
+
+  function _updateConfigWithPoolFee(uint16 fillerFeeBps, uint16 poolFeeBps) internal {
+    vm.stopPrank();
+
+    FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs memory laneConfigArgs = FastTransferTokenPoolAbstract
+      .DestChainConfigUpdateArgs({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      fastTransferFillerFeeBps: fillerFeeBps,
+      fastTransferPoolFeeBps: poolFeeBps,
+      fillerAllowlistEnabled: true,
+      destinationPool: destPoolAddress,
+      maxFillAmountPerRequest: MAX_FILL_AMOUNT_PER_REQUEST,
+      settlementOverheadGas: SETTLEMENT_GAS_OVERHEAD,
+      chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
+      customExtraArgs: ""
+    });
+    vm.prank(OWNER);
+    s_pool.updateDestChainConfig(_singleConfigToList(laneConfigArgs));
+
+    address[] memory fillersToAdd = new address[](1);
+    fillersToAdd[0] = s_filler;
+    vm.prank(OWNER);
+    s_pool.updateFillerAllowList(fillersToAdd, new address[](0));
+
+    vm.startPrank(OWNER);
   }
 }

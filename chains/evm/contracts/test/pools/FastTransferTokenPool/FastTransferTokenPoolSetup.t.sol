@@ -17,8 +17,8 @@ import {IERC20} from
 contract FastTransferTokenPoolSetup is BaseTest {
   uint256 public constant SOURCE_AMOUNT = 100 ether;
   uint8 public constant SOURCE_DECIMALS = 18;
-  uint16 public constant FAST_FEE_BPS = 100; // 1%
-
+  uint16 public constant FAST_FEE_FILLER_BPS = 100; // 1%
+  uint16 public constant FAST_FEE_POOL_BPS = 100; // 1%
   address public constant RECEIVER = address(0x5);
 
   uint32 internal constant SVM_CHAIN_SELECTOR = uint32(uint256(keccak256("SVM_SELECTOR")));
@@ -57,7 +57,8 @@ contract FastTransferTokenPoolSetup is BaseTest {
       new FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs[](2);
     laneConfigArgs[0] = FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
-      fastTransferBpsFee: FAST_FEE_BPS, // 1%
+      fastTransferFillerFeeBps: FAST_FEE_FILLER_BPS, // 1%
+      fastTransferPoolFeeBps: 0, // No pool fee for this test
       fillerAllowlistEnabled: true,
       destinationPool: destPoolAddress,
       maxFillAmountPerRequest: MAX_FILL_AMOUNT_PER_REQUEST,
@@ -67,7 +68,8 @@ contract FastTransferTokenPoolSetup is BaseTest {
     });
     laneConfigArgs[1] = FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs({
       remoteChainSelector: SVM_CHAIN_SELECTOR,
-      fastTransferBpsFee: FAST_FEE_BPS, // 1%
+      fastTransferFillerFeeBps: FAST_FEE_FILLER_BPS, // 1%
+      fastTransferPoolFeeBps: 0, // No pool fee for this test
       fillerAllowlistEnabled: true,
       destinationPool: destPoolAddress,
       maxFillAmountPerRequest: MAX_FILL_AMOUNT_PER_REQUEST,

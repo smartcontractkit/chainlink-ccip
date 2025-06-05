@@ -34,7 +34,7 @@ contract FastTransferTokenPool_fastFill_Test is FastTransferTokenPoolSetup {
     assertEq(s_token.balanceOf(RECEIVER), receiverBalanceBefore + SOURCE_AMOUNT);
 
     FastTransferTokenPoolAbstract.FillInfo memory fillInfo = s_pool.getFillInfo(fillId);
-    assertTrue(fillInfo.state == FastTransferTokenPoolAbstract.FillState.FILLED);
+    assertTrue(fillInfo.state == IFastTransferPool.FillState.FILLED);
     assertEq(fillInfo.filler, s_filler);
   }
 
@@ -48,13 +48,16 @@ contract FastTransferTokenPool_fastFill_Test is FastTransferTokenPoolSetup {
 
     bytes32 fillId = s_pool.computeFillId(SETTLEMENT_ID, srcAmountToFill, sourceDecimals, abi.encode(RECEIVER));
 
+    vm.expectEmit();
+    emit IFastTransferPool.FastTransferFilled(fillId, SETTLEMENT_ID, s_filler, expectedLocalAmount, RECEIVER);
+
     s_pool.fastFill(SETTLEMENT_ID, fillId, DEST_CHAIN_SELECTOR, srcAmountToFill, sourceDecimals, RECEIVER);
 
     assertEq(s_token.balanceOf(s_filler), fillerBalanceBefore - expectedLocalAmount);
     assertEq(s_token.balanceOf(RECEIVER), receiverBalanceBefore + expectedLocalAmount);
     FastTransferTokenPoolAbstract.FillInfo memory fillInfo =
       s_pool.getFillInfo(s_pool.computeFillId(SETTLEMENT_ID, srcAmountToFill, sourceDecimals, abi.encode(RECEIVER)));
-    assertTrue(fillInfo.state == FastTransferTokenPoolAbstract.FillState.FILLED);
+    assertTrue(fillInfo.state == IFastTransferPool.FillState.FILLED);
     assertEq(fillInfo.filler, s_filler);
   }
 
@@ -65,7 +68,8 @@ contract FastTransferTokenPool_fastFill_Test is FastTransferTokenPoolSetup {
     FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs memory laneConfigArgs = FastTransferTokenPoolAbstract
       .DestChainConfigUpdateArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
-      fastTransferBpsFee: 100,
+      fastTransferFillerFeeBps: 100,
+      fastTransferPoolFeeBps: 0, // No pool fee for this test
       fillerAllowlistEnabled: false,
       destinationPool: destPoolAddress,
       maxFillAmountPerRequest: 1000 ether,
@@ -73,6 +77,19 @@ contract FastTransferTokenPool_fastFill_Test is FastTransferTokenPoolSetup {
       chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
       customExtraArgs: ""
     });
+
+    vm.expectEmit();
+    emit FastTransferTokenPoolAbstract.DestChainConfigUpdated(
+      DEST_CHAIN_SELECTOR,
+      100,
+      0,
+      1000 ether,
+      destPoolAddress,
+      Internal.CHAIN_FAMILY_SELECTOR_EVM,
+      SETTLEMENT_GAS_OVERHEAD,
+      false
+    );
+
     s_pool.updateDestChainConfig(_singleConfigToList(laneConfigArgs));
 
     address nonAllowlistedFiller = address(0x6);
@@ -84,6 +101,9 @@ contract FastTransferTokenPool_fastFill_Test is FastTransferTokenPoolSetup {
     deal(address(s_token), nonAllowlistedFiller, 1000 ether);
     vm.startPrank(nonAllowlistedFiller);
     s_token.approve(address(s_pool), type(uint256).max);
+
+    vm.expectEmit();
+    emit IFastTransferPool.FastTransferFilled(fillId, SETTLEMENT_ID, nonAllowlistedFiller, SOURCE_AMOUNT, RECEIVER);
 
     // Should succeed even though filler is not allowlisted
     s_pool.fastFill(SETTLEMENT_ID, fillId, SOURCE_CHAIN_SELECTOR, SOURCE_AMOUNT, SOURCE_DECIMALS, RECEIVER);
@@ -100,6 +120,10 @@ contract FastTransferTokenPool_fastFill_Test is FastTransferTokenPoolSetup {
     address[] memory addFillers = new address[](1);
     addFillers[0] = filler2;
     vm.stopPrank();
+
+    vm.expectEmit();
+    emit FastTransferTokenPoolAbstract.FillerAllowListUpdated(addFillers, new address[](0));
+
     vm.prank(OWNER);
     s_pool.updateFillerAllowList(addFillers, new address[](0));
 
@@ -112,9 +136,15 @@ contract FastTransferTokenPool_fastFill_Test is FastTransferTokenPoolSetup {
     bytes32 fillId1 = s_pool.computeFillId(SETTLEMENT_ID, SOURCE_AMOUNT, SOURCE_DECIMALS, abi.encode(RECEIVER));
     bytes32 fillId2 = s_pool.computeFillId(settlementId2, SOURCE_AMOUNT, SOURCE_DECIMALS, abi.encode(RECEIVER));
 
+    vm.expectEmit();
+    emit IFastTransferPool.FastTransferFilled(fillId1, SETTLEMENT_ID, s_filler, SOURCE_AMOUNT, RECEIVER);
+
     // Both fillers can fill different requests
     vm.prank(s_filler);
     s_pool.fastFill(SETTLEMENT_ID, fillId1, DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, SOURCE_DECIMALS, RECEIVER);
+
+    vm.expectEmit();
+    emit IFastTransferPool.FastTransferFilled(fillId2, settlementId2, filler2, SOURCE_AMOUNT, RECEIVER);
 
     vm.prank(filler2);
     s_pool.fastFill(settlementId2, fillId2, DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, SOURCE_DECIMALS, RECEIVER);

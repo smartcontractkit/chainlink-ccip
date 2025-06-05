@@ -4,6 +4,14 @@ pragma solidity ^0.8.4;
 /// @title IFastTransferPool
 /// @notice Interface for the CCIP Fast-Transfer Pool
 interface IFastTransferPool {
+  /// @notice Enum representing the state of a fill request.
+  enum FillState {
+    NOT_FILLED, // Request has not been filled yet.
+    FILLED, // Request has been filled by a filler.
+    SETTLED // Request has been settled via CCIP.
+
+  }
+
   /// @notice Quote struct containing fee information
   struct Quote {
     uint256 ccipSettlementFee; // Fee paid to for CCIP settlement in CCIP supported fee tokens.
@@ -30,7 +38,16 @@ interface IFastTransferPool {
   );
   /// @notice Emitted when a fast transfer is settled. This means the slow transfer has completed and the filler has
   /// received their fast transfer tokens and fee.
-  event FastTransferSettled(bytes32 indexed fillId, bytes32 indexed settlementId);
+  event FastTransferSettled(
+    bytes32 indexed fillId,
+    bytes32 indexed settlementId,
+    uint256 fillerReimbursementAmount,
+    uint256 poolFeeAccumulated,
+    FillState prevState
+  );
+
+  /// @notice Emitted when pool fees are withdrawn.
+  event PoolFeeWithdrawn(address indexed recipient, uint256 amount);
 
   /// @notice Gets the CCIP send token fee and fast transfer fee for a given transfer.
   /// @param destinationChainSelector The destination chain selector.
@@ -90,4 +107,14 @@ interface IFastTransferPool {
     uint8 sourceDecimals,
     bytes memory receiver
   ) external pure returns (bytes32);
+
+  /// @notice Gets the accumulated pool fees that can be withdrawn.
+  /// @return The amount of accumulated pool fees.
+  function getAccumulatedPoolFees() external view returns (uint256);
+
+  /// @notice Withdraws all accumulated pool fees to the specified recipient.
+  /// @param recipient The address to receive the withdrawn fees.
+  function withdrawPoolFees(
+    address recipient
+  ) external;
 }
