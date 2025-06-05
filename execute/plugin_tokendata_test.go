@@ -110,7 +110,7 @@ func Test_LBTC_USDC_Transfer(t *testing.T) {
 		}`,
 	}
 
-	intTest := SetupSimpleTest(t, logger2.Test(t), []cciptypes.ChainSelector{sourceChain}, destChain)
+	intTest := SetupSimpleTest(t, logger2.Nop(), []cciptypes.ChainSelector{sourceChain}, destChain)
 	intTest.WithMessages(messages, 1000, time.Now().Add(-4*time.Hour), 1, sourceChain)
 	intTest.WithUSDC(usdcAddress, usdcAttestation104_108, events, sourceChain)
 	intTest.WithLBTC(lbtcAddress, lbtcAttestation106_108, sourceChain)
@@ -123,28 +123,28 @@ func Test_LBTC_USDC_Transfer(t *testing.T) {
 
 	// Round 1 - Get Commit Reports
 	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
-	require.Len(t, outcome.Report.ChainReports, 0)
+	require.Len(t, outcome.Reports, 0)
 	require.Len(t, outcome.CommitReports, 1)
 
 	// Round 2 - Get Messages
 	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
-	require.Len(t, outcome.Report.ChainReports, 0)
+	require.Len(t, outcome.Reports, 0)
 	require.Len(t, outcome.CommitReports, 1)
 
 	// Round 3 - Filter
 	// Messages 102-104,106,108 are executed, 105 and 107 don't have token data ready
 	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
 	require.NoError(t, err)
-	require.Len(t, outcome.Report.ChainReports, 1)
-	sequenceNumbers := extractSequenceNumbers(outcome.Report.ChainReports[0].Messages)
+	require.Len(t, outcome.Reports[0].ChainReports, 1)
+	sequenceNumbers := extractSequenceNumbers(outcome.Reports[0].ChainReports[0].Messages)
 	assert.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{102, 103, 104, 106, 108})
 	//Attestation data added to the USDC
-	assert.Equal(t, internal.MustDecodeRaw("0x100001"), outcome.Report.ChainReports[0].OffchainTokenData[2][0])
+	assert.Equal(t, internal.MustDecodeRaw("0x100001"), outcome.Reports[0].ChainReports[0].OffchainTokenData[2][0])
 	//Attestation data added to the LBTC
-	assert.Equal(t, internal.MustDecodeRaw("0x200001"), outcome.Report.ChainReports[0].OffchainTokenData[3][0])
+	assert.Equal(t, internal.MustDecodeRaw("0x200001"), outcome.Reports[0].ChainReports[0].OffchainTokenData[3][0])
 	//Attestation data added to the USDC+LBTC
-	assert.Equal(t, internal.MustDecodeRaw("0x100003"), outcome.Report.ChainReports[0].OffchainTokenData[4][0])
-	assert.Equal(t, internal.MustDecodeRaw("0x200003"), outcome.Report.ChainReports[0].OffchainTokenData[4][1])
+	assert.Equal(t, internal.MustDecodeRaw("0x100003"), outcome.Reports[0].ChainReports[0].OffchainTokenData[4][0])
+	assert.Equal(t, internal.MustDecodeRaw("0x200003"), outcome.Reports[0].ChainReports[0].OffchainTokenData[4][1])
 
 	intTest.usdcServer.AddResponse(
 		"0x70ef528624085241badbff913575c0ab50241e7cb6db183a5614922ab0bcba5d",
@@ -166,12 +166,12 @@ func Test_LBTC_USDC_Transfer(t *testing.T) {
 		outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
 	}
 
-	require.Len(t, outcome.Report.ChainReports, 1)
-	sequenceNumbers = extractSequenceNumbers(outcome.Report.ChainReports[0].Messages)
+	require.Len(t, outcome.Reports, 1)
+	sequenceNumbers = extractSequenceNumbers(outcome.Reports[0].ChainReports[0].Messages)
 	// 102, 103 and 104 are in the inflight message cache.
 	assert.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{105, 107})
 	//Attestation data added to the remaining USDC messages
-	assert.Equal(t, internal.MustDecodeRaw("0x100002"), outcome.Report.ChainReports[0].OffchainTokenData[0][0])
+	assert.Equal(t, internal.MustDecodeRaw("0x100002"), outcome.Reports[0].ChainReports[0].OffchainTokenData[0][0])
 	//Attestation data added to the remaining LBTC messages
-	assert.Equal(t, internal.MustDecodeRaw("0x200002"), outcome.Report.ChainReports[0].OffchainTokenData[1][0])
+	assert.Equal(t, internal.MustDecodeRaw("0x200002"), outcome.Reports[0].ChainReports[0].OffchainTokenData[1][0])
 }

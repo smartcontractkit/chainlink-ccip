@@ -28,6 +28,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	writer_mocks "github.com/smartcontractkit/chainlink-ccip/mocks/chainlink_common"
 	reader_mocks "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/addressbook"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
@@ -386,64 +387,19 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 }
 
 func TestCCIPChainReader_GetContractAddress(t *testing.T) {
-	ecr := reader_mocks.NewMockExtended(t)
-
-	mockAddrCodec := internal.NewMockAddressCodecHex(t)
-	ccipReader := ccipChainReader{
-		lggr: logger.Test(t),
-		contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
-			chainA: ecr,
+	ab := addressbook.NewBook()
+	require.NoError(t, ab.InsertOrUpdate(addressbook.ContractAddresses{
+		"abc": map[cciptypes.ChainSelector]cciptypes.UnknownAddress{
+			123: []byte("0x123"),
 		},
-		addrCodec: mockAddrCodec,
-	}
+	}))
 
-	someAddr := "0x1234567890123456789012345678901234567890"
-	someAddrBytes, err := mockAddrCodec.AddressStringToBytes(someAddr, chainA)
+	r := &ccipChainReader{}
+	r.donAddressBook = ab
+
+	addr, err := r.GetContractAddress("abc", 123)
 	require.NoError(t, err)
-
-	t.Run("happy path", func(t *testing.T) {
-		ecr.EXPECT().GetBindings(consts.ContractNameOnRamp).Return([]contractreader.ExtendedBoundContract{
-			{
-				BoundAt: time.Now().UTC(),
-				Binding: types.BoundContract{Address: someAddr, Name: consts.ContractNameOnRamp},
-			},
-		}).Once()
-		addr, err := ccipReader.GetContractAddress(consts.ContractNameOnRamp, chainA)
-		assert.NoError(t, err)
-		assert.Equal(t, someAddrBytes, cciptypes.UnknownAddress(addr))
-	})
-
-	t.Run("multiple bindings leads to error", func(t *testing.T) {
-		ecr.EXPECT().GetBindings(consts.ContractNameOnRamp).Return([]contractreader.ExtendedBoundContract{
-			{
-				BoundAt: time.Now().UTC(),
-				Binding: types.BoundContract{Address: someAddr, Name: consts.ContractNameOnRamp},
-			},
-			{
-				BoundAt: time.Now().UTC(),
-				Binding: types.BoundContract{Address: someAddr, Name: consts.ContractNameOnRamp},
-			},
-		}).Once()
-		_, err := ccipReader.GetContractAddress(consts.ContractNameOnRamp, chainA)
-		assert.Error(t, err)
-	})
-
-	t.Run("no binding leads to error", func(t *testing.T) {
-		ecr.EXPECT().GetBindings(consts.ContractNameOnRamp).Return([]contractreader.ExtendedBoundContract{}).Once()
-		_, err := ccipReader.GetContractAddress(consts.ContractNameOnRamp, chainA)
-		assert.Error(t, err)
-	})
-
-	t.Run("invalid address leads to error", func(t *testing.T) {
-		ecr.EXPECT().GetBindings(consts.ContractNameOnRamp).Return([]contractreader.ExtendedBoundContract{
-			{
-				BoundAt: time.Now().UTC(),
-				Binding: types.BoundContract{Address: "some wrong address fmt", Name: consts.ContractNameOnRamp},
-			},
-		}).Once()
-		_, err := ccipReader.GetContractAddress(consts.ContractNameOnRamp, chainA)
-		assert.Error(t, err)
-	})
+	require.Equal(t, []byte("0x123"), addr)
 }
 
 func TestCCIPChainReader_Sync_HappyPath_BindsContractsSuccessfully(t *testing.T) {
@@ -496,9 +452,10 @@ func TestCCIPChainReader_Sync_HappyPath_BindsContractsSuccessfully(t *testing.T)
 			sourceChain1: source1Extended,
 			sourceChain2: source2Extended,
 		},
-		destChain: destChain,
-		lggr:      logger.Test(t),
-		addrCodec: mockAddrCodec,
+		donAddressBook: addressbook.NewBook(),
+		destChain:      destChain,
+		lggr:           logger.Test(t),
+		addrCodec:      mockAddrCodec,
 	}
 
 	contracts := ContractAddresses{
@@ -560,9 +517,10 @@ func TestCCIPChainReader_Sync_HappyPath_SkipsEmptyAddress(t *testing.T) {
 			sourceChain1: source1Extended,
 			sourceChain2: source2Extended,
 		},
-		destChain: destChain,
-		lggr:      logger.Test(t),
-		addrCodec: mockAddrCodec,
+		donAddressBook: addressbook.NewBook(),
+		destChain:      destChain,
+		lggr:           logger.Test(t),
+		addrCodec:      mockAddrCodec,
 	}
 
 	contracts := ContractAddresses{
@@ -618,9 +576,10 @@ func TestCCIPChainReader_Sync_HappyPath_DontSupportAllChains(t *testing.T) {
 			destChain:    destExtended,
 			sourceChain2: source2Extended,
 		},
-		destChain: destChain,
-		lggr:      logger.Test(t),
-		addrCodec: mockAddrCodec,
+		donAddressBook: addressbook.NewBook(),
+		destChain:      destChain,
+		lggr:           logger.Test(t),
+		addrCodec:      mockAddrCodec,
 	}
 
 	contracts := ContractAddresses{
@@ -688,9 +647,10 @@ func TestCCIPChainReader_Sync_BindError(t *testing.T) {
 			sourceChain1: source1Extended,
 			sourceChain2: source2Extended,
 		},
-		destChain: destChain,
-		lggr:      logger.Test(t),
-		addrCodec: mockAddrCodec,
+		donAddressBook: addressbook.NewBook(),
+		destChain:      destChain,
+		lggr:           logger.Test(t),
+		addrCodec:      mockAddrCodec,
 	}
 
 	contracts := ContractAddresses{
@@ -780,6 +740,7 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round1(t *testing.T) {
 	ccipChainReader := &ccipChainReader{
 		destChain:       destChain,
 		contractReaders: castToExtended,
+		donAddressBook:  addressbook.NewBook(),
 		lggr:            lggr,
 		configPoller:    mockCache,
 	}

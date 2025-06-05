@@ -34,8 +34,6 @@ func (p *Processor) Query(ctx context.Context, prevOutcome Outcome) (Query, erro
 		return Query{}, fmt.Errorf("initialize RMN controller: %w", err)
 	}
 
-	// TODO: this is a role-don inconsistency. If oracle/leader does not support the destination chain the call below
-	// will fail, progress will be made when a leader that supports the destination chain is elected.
 	offRampAddress, err := p.ccipReader.GetContractAddress(consts.ContractNameOffRamp, p.destChain)
 	if err != nil {
 		return Query{}, fmt.Errorf("get offRamp contract address: %w", err)
@@ -60,9 +58,6 @@ func (p *Processor) Query(ctx context.Context, prevOutcome Outcome) (Query, erro
 			continue
 		}
 
-		// TODO: this is a role-don inconsistency. If oracle/leader does not support the source chain the call below
-		// will fail, meaning that this leader will only be able to process the source chains it supports.
-		// The remaining ones will be processed by other leaders.
 		onRampAddress, err := p.ccipReader.GetContractAddress(consts.ContractNameOnRamp, sourceChainRange.ChainSel)
 		if err != nil {
 			lggr.Warnw("failed to get onRamp address", "chain", sourceChainRange.ChainSel, "err", err)
