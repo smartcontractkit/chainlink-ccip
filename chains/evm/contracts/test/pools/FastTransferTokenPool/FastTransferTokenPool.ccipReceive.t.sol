@@ -43,7 +43,7 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
       s_pool.computeFillId(message.messageId, SOURCE_AMOUNT - fastTransferFee, SOURCE_DECIMALS, abi.encode(RECEIVER));
 
     vm.expectEmit();
-    emit IFastTransferPool.FastTransferSettled(fillId, MESSAGE_ID);
+    emit IFastTransferPool.FastTransferSettled(fillId, MESSAGE_ID, 0, 0, IFastTransferPool.FillState.NOT_FILLED);
 
     s_pool.ccipReceive(message);
 
@@ -67,7 +67,7 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
       _generateMintMessage(RECEIVER, SOURCE_AMOUNT, SOURCE_DECIMALS, FAST_FEE_FILLER_BPS, 0);
 
     vm.expectEmit();
-    emit IFastTransferPool.FastTransferSettled(fillId, MESSAGE_ID);
+    emit IFastTransferPool.FastTransferSettled(fillId, MESSAGE_ID, SOURCE_AMOUNT, 0, IFastTransferPool.FillState.FILLED);
 
     vm.prank(address(s_sourceRouter));
     s_pool.ccipReceive(message);
@@ -108,7 +108,7 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
     bytes32 fillId = s_pool.computeFillId(message.messageId, SOURCE_AMOUNT - 0, SOURCE_DECIMALS, abi.encode(RECEIVER));
 
     vm.expectEmit();
-    emit IFastTransferPool.FastTransferSettled(fillId, MESSAGE_ID);
+    emit IFastTransferPool.FastTransferSettled(fillId, MESSAGE_ID, 0, 0, IFastTransferPool.FillState.NOT_FILLED);
 
     s_pool.ccipReceive(message);
 
@@ -170,8 +170,12 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
     Client.Any2EVMMessage memory message =
       _generateMintMessage(RECEIVER, SOURCE_AMOUNT, SOURCE_DECIMALS, fillerFeeBps, poolFeeBps);
 
+    // Expected filler reimbursement = SOURCE_AMOUNT - poolFeeAmount
+    uint256 expectedFillerReimbursement = SOURCE_AMOUNT - poolFeeAmount;
     vm.expectEmit();
-    emit IFastTransferPool.FastTransferSettled(fillId, MESSAGE_ID);
+    emit IFastTransferPool.FastTransferSettled(
+      fillId, MESSAGE_ID, expectedFillerReimbursement, poolFeeAmount, IFastTransferPool.FillState.FILLED
+    );
 
     vm.prank(address(s_sourceRouter));
     s_pool.ccipReceive(message);

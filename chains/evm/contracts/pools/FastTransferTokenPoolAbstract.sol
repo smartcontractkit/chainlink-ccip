@@ -85,17 +85,9 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     bytes receiver; // Receiver address on the destination chain. ABI encoded in the case of an EVM address.
   }
 
-  /// @notice Enum representing the state of a fill request.
-  enum FillState {
-    NOT_FILLED, // Request has not been filled yet.
-    FILLED, // Request has been filled by a filler.
-    SETTLED // Request has been settled via CCIP.
-
-  }
-
   /// @notice Struct to track fill request information.
   struct FillInfo {
-    FillState state; // Current state of the fill request.
+    IFastTransferPool.FillState state; // Current state of the fill request.
     // Address of the filler, 0x0 until filled. If 0x0 after filled, it means the request was not fast-filled.
     address filler;
   }
@@ -278,7 +270,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     }
 
     FillInfo memory fillInfo = s_fills[fillId];
-    if (fillInfo.state != FillState.NOT_FILLED) revert AlreadyFilled(fillId);
+    if (fillInfo.state != IFastTransferPool.FillState.NOT_FILLED) revert AlreadyFilled(fillId);
 
     // Calculate the local amount.
     uint256 localAmount = _calculateLocalAmount(sourceAmountNetFee, sourceDecimals);
@@ -288,7 +280,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     // Transfer tokens from filler to receiver
     _handleFastFill(fillId, msg.sender, receiver, localAmount);
 
-    s_fills[fillId] = FillInfo({state: FillState.FILLED, filler: msg.sender});
+    s_fills[fillId] = FillInfo({state: IFastTransferPool.FillState.FILLED, filler: msg.sender});
 
     emit FastTransferFilled(fillId, settlementId, msg.sender, localAmount, receiver);
   }
@@ -321,27 +313,23 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     // Convert to local denomination for token operations
     uint256 localAmount = _calculateLocalAmount(mintMessage.sourceAmount, mintMessage.sourceDecimals);
     uint256 localPoolFee = _calculateLocalAmount(sourcePoolFee, mintMessage.sourceDecimals);
+    uint256 fillerReimbursementAmount;
 
-    if (fillInfo.state == FillState.NOT_FILLED) {
+    if (fillInfo.state == IFastTransferPool.FillState.NOT_FILLED) {
       // Rate limits should be consumed only when the request was not fast-filled. During fast fill, the rate limit is
       // consumed by the filler.
       _consumeInboundRateLimit(sourceChainSelector, localAmount);
       // When no filler is involved, we send the entire amount to the receiver.
       _handleSlowFill(fillId, localAmount, receiver);
-    } else if (fillInfo.state == FillState.FILLED) {
-      _handleFastFillReimbursement(fillId, fillInfo.filler, localAmount - localPoolFee, localPoolFee);
-      
-      if (localPoolFee > 0) {
-        emit PoolFeeAccumulated(localPoolFee);
-      }
+    } else if (fillInfo.state == IFastTransferPool.FillState.FILLED) {
+      fillerReimbursementAmount = localAmount - localPoolFee;
+      _handleFastFillReimbursement(fillId, fillInfo.filler, fillerReimbursementAmount, localPoolFee);
     } else {
       // The catch all assertion for already settled fills ensures that any wrong value will revert.
       revert AlreadySettled(fillId);
     }
-
-    s_fills[fillId].state = FillState.SETTLED;
-
-    emit FastTransferSettled(fillId, settlementId);
+    s_fills[fillId].state = IFastTransferPool.FillState.SETTLED;
+    emit FastTransferSettled(fillId, settlementId, fillerReimbursementAmount, localPoolFee, fillInfo.state);
   }
 
   /// @notice Validates the send request parameters. Can be overridden by derived contracts to add additional checks.
@@ -425,7 +413,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   ) internal virtual {
     // Mint entire amount to pool first
     _releaseOrMint(address(this), fillerReimbursementAmount + poolReimbursementAmount);
-    
+
     // Then transfer filler's share to them
     if (fillerReimbursementAmount > 0) {
       getToken().safeTransfer(filler, fillerReimbursementAmount);

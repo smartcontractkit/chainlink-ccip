@@ -63,7 +63,9 @@ contract FastTransferTokenPoolHelper is FastTransferTokenPoolAbstract {
   }
 
   /// @notice Override to withdraw accumulated pool fees from storage for lock/release pools
-  function withdrawPoolFees(address recipient) external override onlyOwner {
+  function withdrawPoolFees(
+    address recipient
+  ) external override onlyOwner {
     uint256 amount = s_accumulatedPoolFees;
     if (amount > 0) {
       s_accumulatedPoolFees = 0;

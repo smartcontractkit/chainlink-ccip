@@ -4,6 +4,14 @@ pragma solidity ^0.8.4;
 /// @title IFastTransferPool
 /// @notice Interface for the CCIP Fast-Transfer Pool
 interface IFastTransferPool {
+  /// @notice Enum representing the state of a fill request.
+  enum FillState {
+    NOT_FILLED, // Request has not been filled yet.
+    FILLED, // Request has been filled by a filler.
+    SETTLED // Request has been settled via CCIP.
+
+  }
+
   /// @notice Quote struct containing fee information
   struct Quote {
     uint256 ccipSettlementFee; // Fee paid to for CCIP settlement in CCIP supported fee tokens.
@@ -30,10 +38,13 @@ interface IFastTransferPool {
   );
   /// @notice Emitted when a fast transfer is settled. This means the slow transfer has completed and the filler has
   /// received their fast transfer tokens and fee.
-  event FastTransferSettled(bytes32 indexed fillId, bytes32 indexed settlementId);
-
-  /// @notice Emitted when pool fees are accumulated.
-  event PoolFeeAccumulated(uint256 amount);
+  event FastTransferSettled(
+    bytes32 indexed fillId,
+    bytes32 indexed settlementId,
+    uint256 fillerReimbursementAmount,
+    uint256 poolFeeAccumulated,
+    FillState prevState
+  );
 
   /// @notice Emitted when pool fees are withdrawn.
   event PoolFeeWithdrawn(address indexed recipient, uint256 amount);

@@ -34,7 +34,7 @@ contract FastTransferTokenPool_fastFill_Test is FastTransferTokenPoolSetup {
     assertEq(s_token.balanceOf(RECEIVER), receiverBalanceBefore + SOURCE_AMOUNT);
 
     FastTransferTokenPoolAbstract.FillInfo memory fillInfo = s_pool.getFillInfo(fillId);
-    assertTrue(fillInfo.state == FastTransferTokenPoolAbstract.FillState.FILLED);
+    assertTrue(fillInfo.state == IFastTransferPool.FillState.FILLED);
     assertEq(fillInfo.filler, s_filler);
   }
 
@@ -54,7 +54,7 @@ contract FastTransferTokenPool_fastFill_Test is FastTransferTokenPoolSetup {
     assertEq(s_token.balanceOf(RECEIVER), receiverBalanceBefore + expectedLocalAmount);
     FastTransferTokenPoolAbstract.FillInfo memory fillInfo =
       s_pool.getFillInfo(s_pool.computeFillId(SETTLEMENT_ID, srcAmountToFill, sourceDecimals, abi.encode(RECEIVER)));
-    assertTrue(fillInfo.state == FastTransferTokenPoolAbstract.FillState.FILLED);
+    assertTrue(fillInfo.state == IFastTransferPool.FillState.FILLED);
     assertEq(fillInfo.filler, s_filler);
   }
 
