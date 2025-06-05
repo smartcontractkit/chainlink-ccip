@@ -113,9 +113,9 @@ func NewUSDCMessageReader(
 				cctpDestDomain: domains,
 				boundContract:  contract,
 			}
-		case sel.FamilySolana:
-			// TODO: Implement Solana USDC message reader
-			panic("not implemented yet")
+		// TODO: Implement Solana USDC message reader
+		//case sel.FamilySolana:
+		//	panic("not implemented yet")
 		default:
 			return nil, fmt.Errorf("unsupported chain selector family %s for chain %d", family, chainSelector)
 		}
