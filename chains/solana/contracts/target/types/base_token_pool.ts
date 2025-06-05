@@ -580,6 +580,26 @@ export type BaseTokenPool = {
       ]
     },
     {
+      "name": "MintAuthorityTransferred",
+      "fields": [
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "oldMintAuthority",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "newMintAuthority",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "TokensConsumed",
       "fields": [
         {
@@ -1282,6 +1302,26 @@ export const IDL: BaseTokenPool = {
         },
         {
           "name": "mint",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "MintAuthorityTransferred",
+      "fields": [
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "oldMintAuthority",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "newMintAuthority",
           "type": "publicKey",
           "index": false
         }

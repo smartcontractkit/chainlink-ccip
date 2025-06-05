@@ -34,6 +34,8 @@ var (
 
 	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
 
+	Instruction_TransferMintAuthority = ag_binary.TypeID([8]byte{87, 237, 187, 84, 168, 175, 241, 75})
+
 	// Returns the program type (name) and version.
 	// Used by offchain code to easily determine which program & version is being interacted with.
 	//
@@ -77,6 +79,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "UpdateGlobalConfig"
 	case Instruction_Initialize:
 		return "Initialize"
+	case Instruction_TransferMintAuthority:
+		return "TransferMintAuthority"
 	case Instruction_TypeVersion:
 		return "TypeVersion"
 	case Instruction_TransferOwnership:
@@ -133,6 +137,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"initialize", (*Initialize)(nil),
+		},
+		{
+			"transfer_mint_authority", (*TransferMintAuthority)(nil),
 		},
 		{
 			"type_version", (*TypeVersion)(nil),

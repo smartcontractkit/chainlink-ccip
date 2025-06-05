@@ -79,6 +79,31 @@ pub struct InitializeTokenPool<'info> {
 }
 
 #[derive(Accounts)]
+pub struct TransferMintAuthority<'info> {
+    #[account(
+        mut,
+        seeds = [POOL_STATE_SEED, mint.key().as_ref()],
+        bump,
+        constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
+    )]
+    pub state: Account<'info, State>,
+    #[account(mut)]
+    pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
+    #[account(address = *mint.to_account_info().owner)]
+    /// CHECK: CPI to token program
+    pub token_program: AccountInfo<'info>,
+    #[account(
+        seeds = [POOL_SIGNER_SEED, mint.key().as_ref()],
+        bump,
+        address = state.config.pool_signer,
+    )]
+    /// CHECK: unchecked CPI signer
+    pub pool_signer: UncheckedAccount<'info>,
+    #[account(mut, address = state.config.owner @ CcipTokenPoolError::Unauthorized)]
+    pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
 #[instruction(mint: Pubkey)]
 pub struct InitializeStateVersion<'info> {
     #[account(

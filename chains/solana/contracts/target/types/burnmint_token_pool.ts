@@ -110,6 +110,42 @@ export type BurnmintTokenPool = {
       ]
     },
     {
+      "name": "transferMintAuthority",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "poolSigner",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "newMintAuthority",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
       "name": "typeVersion",
       "docs": [
         "Returns the program type (name) and version.",
@@ -802,6 +838,42 @@ export const IDL: BurnmintTokenPool = {
         },
         {
           "name": "rmnRemote",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
+      "name": "transferMintAuthority",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "poolSigner",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "newMintAuthority",
           "type": "publicKey"
         }
       ]

@@ -580,6 +580,26 @@
       ]
     },
     {
+      "name": "MintAuthorityTransferred",
+      "fields": [
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "oldMintAuthority",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "newMintAuthority",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "TokensConsumed",
       "fields": [
         {
