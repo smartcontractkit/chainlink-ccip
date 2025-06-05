@@ -203,6 +203,52 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
     assertEq(s_pool.getAccumulatedPoolFees(), accumulatedFeesBefore + poolFeeAmount, "t4");
   }
 
+  function test_ccipReceive_FastFill_Settlement_WithDifferentDecimals() public {
+    uint8 sourceDecimals = 6; // USDC-like decimals
+    uint8 destDecimals = IERC20Metadata(address(s_token)).decimals();
+    require(sourceDecimals != destDecimals, "Test requires different source and destination decimals");
+
+    uint256 sourceAmount = 100 * 10 ** sourceDecimals; // 100 tokens in source decimals
+    uint256 expectedLocalAmount = sourceAmount * 10 ** destDecimals / 10 ** sourceDecimals; // Scale to dest decimals
+
+    // Calculate amounts with fee deduction in source decimals
+    uint256 fillerFeeAmount = (sourceAmount * FAST_FEE_FILLER_BPS) / 10_000;
+    uint256 sourceAmountAfterFee = sourceAmount - fillerFeeAmount;
+
+    // Scale the amount to fill to destination decimals
+    uint256 amountToFill = sourceAmountAfterFee * 10 ** destDecimals / 10 ** sourceDecimals;
+
+    bytes32 fillId = s_pool.computeFillId(MESSAGE_ID, sourceAmountAfterFee, sourceDecimals, abi.encode(RECEIVER));
+
+    // Fast fill first
+    vm.stopPrank();
+    vm.prank(s_filler);
+    s_pool.fastFill(MESSAGE_ID, fillId, SOURCE_CHAIN_SELECTOR, sourceAmountAfterFee, sourceDecimals, RECEIVER);
+
+    uint256 fillerBalanceBefore = s_token.balanceOf(s_filler);
+    uint256 receiverBalanceBefore = s_token.balanceOf(RECEIVER);
+
+    // Settlement with different source decimals
+    Client.Any2EVMMessage memory message =
+      _generateMintMessage(RECEIVER, sourceAmount, sourceDecimals, FAST_FEE_FILLER_BPS, 0);
+
+    // Expected scaled amounts for settlement
+    uint256 expectedFillerReimbursement = expectedLocalAmount; // Full amount scaled to dest decimals
+
+    vm.expectEmit();
+    emit IFastTransferPool.FastTransferSettled(
+      fillId, MESSAGE_ID, expectedFillerReimbursement, 0, IFastTransferPool.FillState.FILLED
+    );
+
+    vm.prank(address(s_sourceRouter));
+    s_pool.ccipReceive(message);
+
+    // Verify filler gets reimbursed with properly scaled amount (transfer amount + fee in dest decimals)
+    assertEq(s_token.balanceOf(s_filler), fillerBalanceBefore + expectedLocalAmount);
+    // Verify receiver balance didn't change (already received from fast fill)
+    assertEq(s_token.balanceOf(RECEIVER), receiverBalanceBefore);
+  }
+
   function test_ccipReceive_RevertWhen_AlreadySettled() public {
     Client.Any2EVMMessage memory message =
       _generateMintMessage(RECEIVER, SOURCE_AMOUNT, SOURCE_DECIMALS, FAST_FEE_FILLER_BPS, 0);
