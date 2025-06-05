@@ -397,11 +397,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   ///
   /// LOCK/RELEASE TOKEN POOLS:
   /// Lock/release pools should override this function to implement accounting-based fee management since they
-  /// cannot mint new tokens. They should:
-  /// 1. Keep track of accumulated pool fees in a storage variable (e.g., s_accumulatedPoolFees)
-  /// 2. Emit events for fee accumulation tracking
-  /// 3. Provide withdrawal mechanisms for pool owners to claim accumulated fees
-  /// 4. Only release tokens to the filler, not mint additional tokens for pool fees
+  /// cannot mint new tokens. They should keep track of accumulated pool fees in a storage variable (e.g., s_accumulatedPoolFees)
   /// @param filler The filler address to reimburse.
   /// @param fillerReimbursementAmount The amount to reimburse (what they provided + their fee).
   /// @param poolReimbursementAmount The amount to reimburse to the pool (the pool fee).
