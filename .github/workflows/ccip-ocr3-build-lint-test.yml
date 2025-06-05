@@ -1,7 +1,6 @@
 name: "Build lint and test CCIP-OCR3"
 
 on:
-  merge_group:
   pull_request:
   merge_group:
   push:
