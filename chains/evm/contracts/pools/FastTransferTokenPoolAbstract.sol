@@ -176,6 +176,27 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   // │                      Fee calculation                         │
   // ================================================================
 
+  /// @notice Calculates fast transfer fees using consistent logic for both emission and settlement
+  /// @dev This centralized function ensures fee calculation consistency across the entire system
+  /// @param amount The transfer amount
+  /// @param fillerFeeBps Filler fee in basis points
+  /// @param poolFeeBps Pool fee in basis points
+  /// @return fillerFee The calculated filler fee
+  /// @return poolFee The calculated pool fee
+  /// @return totalFee The sum of filler and pool fees
+  /// @return amountNetFee The amount minus total fees
+  function _calculateFastTransferFees(
+    uint256 amount,
+    uint16 fillerFeeBps,
+    uint16 poolFeeBps
+  ) internal pure returns (uint256 fillerFee, uint256 poolFee, uint256 totalFee, uint256 amountNetFee) {
+    // Calculate individual fees using separate divisions to ensure consistency
+    fillerFee = (amount * fillerFeeBps) / BPS_DIVIDER;
+    poolFee = (amount * poolFeeBps) / BPS_DIVIDER;
+    totalFee = fillerFee + poolFee;
+    amountNetFee = amount - totalFee;
+  }
+
   /// @inheritdoc IFastTransferPool
   function getCcipSendTokenFee(
     uint64 destinationChainSelector,
@@ -203,8 +224,10 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     if (amount > destChainConfig.maxFillAmountPerRequest) {
       revert TransferAmountExceedsMaxFillAmount(destinationChainSelector, amount);
     }
-    quote.fastTransferFee =
-      amount * (destChainConfig.fastTransferFillerFeeBps + destChainConfig.fastTransferPoolFeeBps) / BPS_DIVIDER;
+    // Calculate fees using centralized logic to ensure consistency
+    (,, quote.fastTransferFee,) = _calculateFastTransferFees(
+      amount, destChainConfig.fastTransferFillerFeeBps, destChainConfig.fastTransferPoolFeeBps
+    );
 
     bytes memory extraArgs;
 
@@ -301,9 +324,9 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
 
     // Calculate the fast transfer inputs
     address receiver = address(uint160(uint256(bytes32(mintMessage.receiver))));
-    uint256 sourceFillerFee = (mintMessage.sourceAmount * mintMessage.fastTransferFillerFeeBps) / BPS_DIVIDER;
-    uint256 sourcePoolFee = (mintMessage.sourceAmount * mintMessage.fastTransferPoolFeeBps) / BPS_DIVIDER;
-    uint256 sourceAmountToFill = mintMessage.sourceAmount - sourceFillerFee - sourcePoolFee;
+    (uint256 sourceFillerFee, uint256 sourcePoolFee,, uint256 sourceAmountToFill) = _calculateFastTransferFees(
+      mintMessage.sourceAmount, mintMessage.fastTransferFillerFeeBps, mintMessage.fastTransferPoolFeeBps
+    );
     // Inputs are in the source chain denomination, so we need to convert them to the local token denomination.
     uint256 localAmount = _calculateLocalAmount(mintMessage.sourceAmount, mintMessage.sourceDecimals);
     uint256 localPoolFee = _calculateLocalAmount(sourcePoolFee, mintMessage.sourceDecimals);
