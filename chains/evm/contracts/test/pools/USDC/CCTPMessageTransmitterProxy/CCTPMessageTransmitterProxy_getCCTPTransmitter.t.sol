@@ -5,6 +5,6 @@ import {CCTPMessageTransmitterProxySetup} from "./CCTPMessageTransmitterProxySet
 
 contract CCTPMessageTransmitterProxy_getCCTPTransmitter is CCTPMessageTransmitterProxySetup {
   function test_getCCTPTransmitter() public view {
-    assertEq(address(s_cctpMessageTransmitterProxy.i_cctpTransmitter()), address(s_cctpMessageTransmitter));
+    assertEq(address(s_cctpMessageTransmitterProxy.i_cctpTransmitterV1()), address(s_cctpMessageTransmitter));
   }
 }

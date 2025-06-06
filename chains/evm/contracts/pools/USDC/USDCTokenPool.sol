@@ -14,13 +14,18 @@ import {IERC20} from
 import {SafeERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 
+import {EnumerableSet} from
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
+
 /// @notice This pool mints and burns USDC tokens through the Cross Chain Transfer
 /// Protocol (CCTP).
 contract USDCTokenPool is TokenPool, ITypeAndVersion {
   using SafeERC20 for IERC20;
+  using EnumerableSet for EnumerableSet.UintSet;
 
   event DomainsSet(DomainUpdate[]);
   event ConfigSet(address tokenMessenger);
+  event MintRecipientOverrideSet(uint64 chainSelector, bytes32 mintRecipient);
 
   error UnknownDomain(uint64 domain);
   error UnlockingUSDCFailed();
@@ -33,6 +38,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   error InvalidDestinationDomain(uint32 expected, uint32 got);
   error InvalidReceiver(bytes receiver);
   error InvalidTransmitterInProxy();
+  error InvalidCCTPVersion(uint64 remoteChainSelector, CCTPVersion version);
 
   // This data is supplied from offchain and contains everything needed
   // to receive the USDC tokens.
@@ -41,9 +47,16 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     bytes attestation;
   }
 
+  enum CCTPVersion {
+    UNKNOWN_VERSION,
+    VERSION_1,
+    VERSION_2
+  }
+
   // A domain is a USDC representation of a chain.
   struct DomainUpdate {
     bytes32 allowedCaller; //       Address allowed to mint on the domain
+    bytes32 mintRecipient; //     Address of the mint recipient on the domain
     uint32 domainIdentifier; // ──╮ Unique domain ID
     uint64 destChainSelector; //  │ The destination chain for this domain
     bool enabled; // ─────────────╯ Whether the domain is enabled
@@ -52,32 +65,45 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   struct SourceTokenDataPayload {
     uint64 nonce;
     uint32 sourceDomain;
+    CCTPVersion cctpVersion;
   }
 
   string public constant override typeAndVersion = "USDCTokenPool 1.6.1-dev";
-
-  // We restrict to the first version. New pool may be required for subsequent versions.
-  uint32 public constant SUPPORTED_USDC_VERSION = 0;
 
   // The local USDC config
   ITokenMessenger public immutable i_tokenMessenger;
   CCTPMessageTransmitterProxy public immutable i_messageTransmitterProxy;
   uint32 public immutable i_localDomainIdentifier;
+  uint256 public immutable i_usdcVersion;
 
   /// A domain is a USDC representation of a destination chain.
   /// @dev Zero is a valid domain identifier.
   /// @dev The address to mint on the destination chain is the corresponding USDC pool.
   /// @dev The allowedCaller represents the contract authorized to call receiveMessage on the destination CCTP message transmitter.
+  /// @dev The mintRecipient is the address of the overriden mint recipient on the domain, which will receive the tokens
+  /// from CCTP and then be forwarded to the receiver on certain non-EVM chains.
   /// For dest pool version 1.6.1, this is the MessageTransmitterProxy of the destination chain.
   /// For dest pool version 1.5.1, this is the destination chain's token pool.
   struct Domain {
-    bytes32 allowedCaller; //      Address allowed to mint on the domain
+    bytes32 allowedCaller; //     Address allowed to mint on the domain
+    bytes32 mintRecipient; //     Address of the overriden mint recipient on the domain
     uint32 domainIdentifier; // ─╮ Unique domain ID
     bool enabled; // ────────────╯ Whether the domain is enabled
   }
 
   // A mapping of CCIP chain identifiers to destination domains
-  mapping(uint64 chainSelector => Domain CCTPDomain) private s_chainToDomain;
+  mapping(uint64 chainSelector => Domain CCTPDomain) internal s_chainToDomain;
+
+  // On certain Non-EVM chains (e.g. Solana), due to limitations in smart contract design, the recipient of newly minted
+  // tokens may not be the same as the message receiver. Instead, a special contract may be used to receive the newly minted tokens,
+  // and then forward to the receiver. This mapping is used to ensure that the CCTP deposit transaction includes the
+  // correct mintRecipient. The CCIP message itself will not be changed and the destination token pool will still receive
+  // the correct address of the final token receiver.
+  mapping(uint64 chainSelector => bytes32 mintRecipient) internal s_mintRecipientOverrides;
+
+  // An enumerable list of USDC CCTP versions which allows future contracts to support multiple
+  // versions of CCTP.
+  EnumerableSet.UintSet internal s_supportedUSDCVersions;
 
   constructor(
     ITokenMessenger tokenMessenger,
@@ -85,19 +111,30 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     IERC20 token,
     address[] memory allowlist,
     address rmnProxy,
-    address router
+    address router,
+    uint256 usdcVersion
   ) TokenPool(token, 6, allowlist, rmnProxy, router) {
     if (address(tokenMessenger) == address(0)) revert InvalidConfig();
+
+    // The message transmitter is the contract that receives incoming mint messages, and called by the
+    // message transmitter proxy to verify the message and mint the tokens.
     IMessageTransmitter transmitter = IMessageTransmitter(tokenMessenger.localMessageTransmitter());
     uint32 transmitterVersion = transmitter.version();
-    if (transmitterVersion != SUPPORTED_USDC_VERSION) revert InvalidMessageVersion(transmitterVersion);
+
+    if (transmitterVersion != usdcVersion) revert InvalidMessageVersion(transmitterVersion);
     uint32 tokenMessengerVersion = tokenMessenger.messageBodyVersion();
-    if (tokenMessengerVersion != SUPPORTED_USDC_VERSION) revert InvalidTokenMessengerVersion(tokenMessengerVersion);
-    if (cctpMessageTransmitterProxy.i_cctpTransmitter() != transmitter) revert InvalidTransmitterInProxy();
+
+    if (tokenMessengerVersion != usdcVersion) revert InvalidTokenMessengerVersion(tokenMessengerVersion);
+
+    // Check that the message transmitter proxy is configured to use the correct message transmitter associated with the token messenger
+    if (cctpMessageTransmitterProxy.i_cctpTransmitterV1() != transmitter) revert InvalidTransmitterInProxy();
 
     i_tokenMessenger = tokenMessenger;
     i_messageTransmitterProxy = cctpMessageTransmitterProxy;
     i_localDomainIdentifier = transmitter.localDomain();
+    i_usdcVersion = usdcVersion;
+
+    // The token messenger the contract that handles the CCTP messages/token transfers
     i_token.safeIncreaseAllowance(address(i_tokenMessenger), type(uint256).max);
     emit ConfigSet(address(tokenMessenger));
   }
@@ -118,7 +155,16 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     if (lockOrBurnIn.receiver.length != 32) {
       revert InvalidReceiver(lockOrBurnIn.receiver);
     }
-    bytes32 decodedReceiver = abi.decode(lockOrBurnIn.receiver, (bytes32));
+
+    // To support certain non-EVM chains, the mint recipient may be overridden to be a token pool which then
+    // forwards the tokens to the receiver. The message itself will not be changed and the destination token pool will
+    // still receive the correct address of the final token receiver.
+    bytes32 decodedReceiver;
+    if (domain.mintRecipient != bytes32(0)) {
+      decodedReceiver = domain.mintRecipient;
+    } else {
+      decodedReceiver = abi.decode(lockOrBurnIn.receiver, (bytes32));
+    }
 
     // Since this pool is the msg sender of the CCTP transaction, only this contract
     // is able to call replaceDepositForBurn. Since this contract does not implement
@@ -136,7 +182,9 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
 
     return Pool.LockOrBurnOutV1({
       destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
-      destPoolData: abi.encode(SourceTokenDataPayload({nonce: nonce, sourceDomain: i_localDomainIdentifier}))
+      destPoolData: abi.encode(
+        SourceTokenDataPayload({nonce: nonce, sourceDomain: i_localDomainIdentifier, cctpVersion: CCTPVersion.VERSION_1})
+      )
     });
   }
 
@@ -162,7 +210,11 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
 
     _validateMessage(msgAndAttestation.message, sourceTokenDataPayload);
 
-    if (!i_messageTransmitterProxy.receiveMessage(msgAndAttestation.message, msgAndAttestation.attestation)) {
+    if (
+      !i_messageTransmitterProxy.receiveMessage(
+        msgAndAttestation.message, msgAndAttestation.attestation, sourceTokenDataPayload.cctpVersion
+      )
+    ) {
       revert UnlockingUSDCFailed();
     }
 
@@ -191,7 +243,10 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   ///     * recipient             32         bytes32    52
   ///     * destinationCaller     32         bytes32    84
   ///     * messageBody           dynamic    bytes      116
-  function _validateMessage(bytes memory usdcMessage, SourceTokenDataPayload memory sourceTokenData) internal view {
+  function _validateMessage(
+    bytes memory usdcMessage,
+    SourceTokenDataPayload memory sourceTokenData
+  ) internal view virtual {
     uint32 version;
     // solhint-disable-next-line no-inline-assembly
     assembly {
@@ -202,7 +257,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     // This token pool only supports version 0 of the CCTP message format
     // We check the version prior to loading the rest of the message
     // to avoid unexpected reverts due to out-of-bounds reads.
-    if (version != SUPPORTED_USDC_VERSION) revert InvalidMessageVersion(version);
+    if (version != i_usdcVersion) revert InvalidMessageVersion(version);
 
     uint32 sourceDomain;
     uint32 destinationDomain;
@@ -222,6 +277,10 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
       revert InvalidDestinationDomain(i_localDomainIdentifier, destinationDomain);
     }
     if (nonce != sourceTokenData.nonce) revert InvalidNonce(sourceTokenData.nonce, nonce);
+
+    if (sourceTokenData.cctpVersion != CCTPVersion.VERSION_1) {
+      revert InvalidCCTPVersion(sourceTokenData.sourceDomain, sourceTokenData.cctpVersion);
+    }
   }
 
   // ================================================================
@@ -246,6 +305,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
 
       s_chainToDomain[domain.destChainSelector] = Domain({
         domainIdentifier: domain.domainIdentifier,
+        mintRecipient: domain.mintRecipient,
         allowedCaller: domain.allowedCaller,
         enabled: domain.enabled
       });

@@ -18,17 +18,36 @@ contract HybridLockReleaseUSDCTokenPoolSetup is USDCSetup {
     super.setUp();
 
     s_usdcTokenPool = new HybridLockReleaseUSDCTokenPool(
-      s_mockUSDC, s_cctpMessageTransmitterProxy, s_token, new address[](0), address(s_mockRMNRemote), address(s_router)
+      s_mockUSDC,
+      s_mockUSDCV2,
+      s_cctpMessageTransmitterProxy,
+      s_token,
+      new address[](0),
+      address(s_mockRMNRemote),
+      address(s_router)
     );
+
     CCTPMessageTransmitterProxy.AllowedCallerConfigArgs[] memory allowedCallerParams =
       new CCTPMessageTransmitterProxy.AllowedCallerConfigArgs[](1);
     allowedCallerParams[0] =
       CCTPMessageTransmitterProxy.AllowedCallerConfigArgs({caller: address(s_usdcTokenPool), allowed: true});
+
+    // Set the token pool as an allowed caller on BOTH transmitter proxies
+    // one for CCTP v1 and one for V2
     s_cctpMessageTransmitterProxy.configureAllowedCallers(allowedCallerParams);
-    s_cctpMessageTransmitterProxyForTransferLiquidity = new CCTPMessageTransmitterProxy(s_mockUSDC);
+
+    s_cctpMessageTransmitterProxyForTransferLiquidity = new CCTPMessageTransmitterProxy(s_mockUSDC, s_mockUSDCV2);
+
     s_usdcTokenPoolTransferLiquidity = new HybridLockReleaseUSDCTokenPool(
-      s_mockUSDC, s_cctpMessageTransmitterProxy, s_token, new address[](0), address(s_mockRMNRemote), address(s_router)
+      s_mockUSDC,
+      s_mockUSDCV2,
+      s_cctpMessageTransmitterProxy,
+      s_token,
+      new address[](0),
+      address(s_mockRMNRemote),
+      address(s_router)
     );
+
     allowedCallerParams[0].caller = address(s_usdcTokenPoolTransferLiquidity);
     s_cctpMessageTransmitterProxyForTransferLiquidity.configureAllowedCallers(allowedCallerParams);
 
@@ -39,6 +58,7 @@ contract HybridLockReleaseUSDCTokenPoolSetup is USDCSetup {
     USDCTokenPool.DomainUpdate[] memory domains = new USDCTokenPool.DomainUpdate[](1);
     domains[0] = USDCTokenPool.DomainUpdate({
       destChainSelector: DEST_CHAIN_SELECTOR,
+      mintRecipient: bytes32(0),
       domainIdentifier: 9999,
       allowedCaller: keccak256("allowedCaller"),
       enabled: true

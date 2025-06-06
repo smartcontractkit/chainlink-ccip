@@ -1,20 +1,20 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {CCTPMessageTransmitterProxy} from "../../../../pools/USDC/CCTPMessageTransmitterProxy.sol";
-import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
-import {USDCTokenPoolHelper} from "../../../helpers/USDCTokenPoolHelper.sol";
-import {USDCSetup} from "../USDCSetup.t.sol";
+import {CCTPMessageTransmitterProxy} from "../../../../../pools/USDC/CCTPMessageTransmitterProxy.sol";
+import {USDCTokenPool} from "../../../../../pools/USDC/USDCTokenPool.sol";
+import {USDCTokenPoolCCTPV2Helper} from "../../../../helpers/USDCTokenPoolCCTPV2Helper.sol";
+import {USDCCCTPV2Setup} from "./USDCCCTPV2Setup.t.sol";
 
-contract USDCTokenPoolSetup is USDCSetup {
-  USDCTokenPoolHelper internal s_usdcTokenPool;
-  USDCTokenPoolHelper internal s_usdcTokenPoolWithAllowList;
+contract USDCTokenPoolCCTPV2Setup is USDCCCTPV2Setup {
+  USDCTokenPoolCCTPV2Helper internal s_usdcTokenPool;
+  USDCTokenPoolCCTPV2Helper internal s_usdcTokenPoolWithAllowList;
   address[] internal s_allowedList;
 
   function setUp() public virtual override {
     super.setUp();
 
-    s_usdcTokenPool = new USDCTokenPoolHelper(
+    s_usdcTokenPool = new USDCTokenPoolCCTPV2Helper(
       s_mockUSDC, s_cctpMessageTransmitterProxy, s_token, new address[](0), address(s_mockRMNRemote), address(s_router)
     );
 
@@ -25,7 +25,7 @@ contract USDCTokenPoolSetup is USDCSetup {
     s_cctpMessageTransmitterProxy.configureAllowedCallers(allowedCallerParams);
 
     s_allowedList.push(vm.randomAddress());
-    s_usdcTokenPoolWithAllowList = new USDCTokenPoolHelper(
+    s_usdcTokenPoolWithAllowList = new USDCTokenPoolCCTPV2Helper(
       s_mockUSDC, s_cctpMessageTransmitterProxy, s_token, s_allowedList, address(s_mockRMNRemote), address(s_router)
     );
 
