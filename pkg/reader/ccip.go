@@ -555,34 +555,18 @@ func (r *ccipChainReader) GetExpectedNextSequenceNumber(
 ) (cciptypes.SeqNum, error) {
 	lggr := logutil.WithContextValues(ctx, r.lggr)
 
-	if err := validateReaderExistence(r.contractReaders, sourceChainSelector); err != nil {
+	if err := validateAccessorExistence(r.accessors, sourceChainSelector); err != nil {
 		return 0, err
 	}
-
-	var expectedNextSequenceNumber uint64
-	err := r.contractReaders[sourceChainSelector].ExtendedGetLatestValue(
-		ctx,
-		consts.ContractNameOnRamp,
-		consts.MethodNameGetExpectedNextSequenceNumber,
-		primitives.Unconfirmed,
-		map[string]any{
-			"destChainSelector": r.destChain,
-		},
-		&expectedNextSequenceNumber,
-	)
+	expectedNextSeqNum, err := r.accessors[sourceChainSelector].GetExpectedNextSequenceNumber(ctx, r.destChain)
 	if err != nil {
-		return 0, fmt.Errorf("failed to get expected next sequence number from onramp, source chain: %d, dest chain: %d: %w",
+		return 0, fmt.Errorf("failed to call accessor LatestMsgSeqNum, source chain: %d, dest chain: %d: %w",
 			sourceChainSelector, r.destChain, err)
 	}
 
-	if expectedNextSequenceNumber == 0 {
-		return 0, fmt.Errorf("the returned expected next sequence num is 0, source chain: %d, dest chain: %d",
-			sourceChainSelector, r.destChain)
-	}
-
-	lggr.Debugw("chain reader returning expected next sequence number",
-		"seqNum", expectedNextSequenceNumber, "sourceChainSelector", sourceChainSelector)
-	return cciptypes.SeqNum(expectedNextSequenceNumber), nil
+	lggr.Debugw("chain accessor returning expected next sequence number",
+		"seqNum", expectedNextSeqNum, "sourceChainSelector", sourceChainSelector)
+	return expectedNextSeqNum, nil
 }
 
 // NextSeqNum returns the current sequence numbers for chains.

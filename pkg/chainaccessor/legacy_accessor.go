@@ -232,10 +232,30 @@ func (l *LegacyAccessor) LatestMsgSeqNum(
 
 func (l *LegacyAccessor) GetExpectedNextSequenceNumber(
 	ctx context.Context,
-	dest cciptypes.ChainSelector,
+	destChainSelector cciptypes.ChainSelector,
 ) (cciptypes.SeqNum, error) {
-	// TODO(NONEVM-1865): implement
-	panic("implement me")
+	var expectedNextSequenceNumber uint64
+	err := l.contractReader.ExtendedGetLatestValue(
+		ctx,
+		consts.ContractNameOnRamp,
+		consts.MethodNameGetExpectedNextSequenceNumber,
+		primitives.Unconfirmed,
+		map[string]any{
+			"destChainSelector": destChainSelector,
+		},
+		&expectedNextSequenceNumber,
+	)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get expected next sequence number from onramp, source chain: %d, dest chain: %d: %w",
+			l.chainSelector, destChainSelector, err)
+	}
+
+	if expectedNextSequenceNumber == 0 {
+		return 0, fmt.Errorf("the returned expected next sequence num is 0, source chain: %d, dest chain: %d",
+			l.chainSelector, destChainSelector)
+	}
+
+	return cciptypes.SeqNum(expectedNextSequenceNumber), nil
 }
 
 func (l *LegacyAccessor) GetTokenPriceUSD(
