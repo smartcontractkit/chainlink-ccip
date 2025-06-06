@@ -176,6 +176,24 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   // │                      Fee calculation                         │
   // ================================================================
 
+  /// @notice Calculates the filler and pool fees for a fast transfer.
+  /// @dev Common function to ensure consistent fee calculation
+  /// @param amount The transfer amount
+  /// @param fillerFeeBps Filler fee in basis points
+  /// @param poolFeeBps Pool fee in basis points
+  /// @return fillerFee The calculated filler fee
+  /// @return poolFee The calculated pool fee
+  function _calculateFastTransferFees(
+    uint256 amount,
+    uint16 fillerFeeBps,
+    uint16 poolFeeBps
+  ) internal pure returns (uint256 fillerFee, uint256 poolFee) {
+    // Calculate individual fees using separate divisions to ensure consistency
+    fillerFee = (amount * fillerFeeBps) / BPS_DIVIDER;
+    poolFee = (amount * poolFeeBps) / BPS_DIVIDER;
+    return (fillerFee, poolFee);
+  }
+
   /// @inheritdoc IFastTransferPool
   function getCcipSendTokenFee(
     uint64 destinationChainSelector,
@@ -203,9 +221,11 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     if (amount > destChainConfig.maxFillAmountPerRequest) {
       revert TransferAmountExceedsMaxFillAmount(destinationChainSelector, amount);
     }
-    quote.fastTransferFee =
-      amount * (destChainConfig.fastTransferFillerFeeBps + destChainConfig.fastTransferPoolFeeBps) / BPS_DIVIDER;
 
+    (uint256 fillerFee, uint256 poolFee) = _calculateFastTransferFees(
+      amount, destChainConfig.fastTransferFillerFeeBps, destChainConfig.fastTransferPoolFeeBps
+    );
+    quote.fastTransferFee = fillerFee + poolFee;
     bytes memory extraArgs;
 
     // We use 0 as a toggle for whether the destination chain requires custom ExtraArgs. Zero would not be a sensible
@@ -301,13 +321,19 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
 
     // Calculate the fast transfer inputs
     address receiver = address(uint160(uint256(bytes32(mintMessage.receiver))));
-    uint256 sourceFillerFee = (mintMessage.sourceAmount * mintMessage.fastTransferFillerFeeBps) / BPS_DIVIDER;
-    uint256 sourcePoolFee = (mintMessage.sourceAmount * mintMessage.fastTransferPoolFeeBps) / BPS_DIVIDER;
-    uint256 sourceAmountToFill = mintMessage.sourceAmount - sourceFillerFee - sourcePoolFee;
+    (uint256 sourceFillerFee, uint256 sourcePoolFee) = _calculateFastTransferFees(
+      mintMessage.sourceAmount, mintMessage.fastTransferFillerFeeBps, mintMessage.fastTransferPoolFeeBps
+    );
     // Inputs are in the source chain denomination, so we need to convert them to the local token denomination.
     uint256 localAmount = _calculateLocalAmount(mintMessage.sourceAmount, mintMessage.sourceDecimals);
     uint256 localPoolFee = _calculateLocalAmount(sourcePoolFee, mintMessage.sourceDecimals);
-    bytes32 fillId = computeFillId(settlementId, sourceAmountToFill, mintMessage.sourceDecimals, abi.encode(receiver));
+    bytes32 fillId = computeFillId(
+      settlementId,
+      // sourceAmountNetFee is the amount minus the fast fill fee, so we need to subtract both fees.
+      mintMessage.sourceAmount - sourceFillerFee - sourcePoolFee,
+      mintMessage.sourceDecimals,
+      abi.encode(receiver)
+    );
 
     FillInfo memory fillInfo = s_fills[fillId];
     // The amount to reimburse to the filler in local denomination.
@@ -482,8 +508,8 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
       }
     }
 
-    // Ensure total fees don't exceed 100%
-    if (destChainConfigArgs.fastTransferFillerFeeBps + destChainConfigArgs.fastTransferPoolFeeBps > BPS_DIVIDER) {
+    // Ensure total fees is below 100%
+    if (destChainConfigArgs.fastTransferFillerFeeBps + destChainConfigArgs.fastTransferPoolFeeBps >= BPS_DIVIDER) {
       revert InvalidDestChainConfig();
     }
 
