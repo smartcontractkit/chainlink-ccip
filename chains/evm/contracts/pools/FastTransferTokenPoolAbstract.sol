@@ -508,8 +508,8 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
       }
     }
 
-    // Ensure total fees don't exceed 100%
-    if (destChainConfigArgs.fastTransferFillerFeeBps + destChainConfigArgs.fastTransferPoolFeeBps > BPS_DIVIDER) {
+    // Ensure total fees is below 100%
+    if (destChainConfigArgs.fastTransferFillerFeeBps + destChainConfigArgs.fastTransferPoolFeeBps >= BPS_DIVIDER) {
       revert InvalidDestChainConfig();
     }
 
