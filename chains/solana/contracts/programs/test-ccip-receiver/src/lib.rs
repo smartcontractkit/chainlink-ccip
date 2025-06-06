@@ -11,6 +11,7 @@ declare_id!("EvhgrPhTDt4LcSPS2kfJgH6T6XWZ6wT3X9ncDGLT1vui");
 #[program]
 pub mod test_ccip_receiver {
     use solana_program::instruction::Instruction;
+    use solana_program::keccak::hash;
     use solana_program::program::invoke_signed;
 
     use super::*;
@@ -18,16 +19,27 @@ pub mod test_ccip_receiver {
     /// The initialization is responsibility of the External User, CCIP is not handling initialization of Accounts
     pub fn initialize(ctx: Context<Initialize>, router: Pubkey) -> Result<()> {
         ctx.accounts.counter.value = 0;
-        ctx.accounts.counter.reject_all = false;
+        ctx.accounts.counter.behavior = Behavior::Normal;
         ctx.accounts
             .counter
             .state
             .init(ctx.accounts.authority.key(), router)
     }
 
-    pub fn set_reject_all(ctx: Context<SetRejectAll>, reject_all: bool) -> Result<()> {
-        ctx.accounts.counter.reject_all = reject_all;
+    pub fn set_behavior(ctx: Context<SetConfig>, behavior: Behavior) -> Result<()> {
+        ctx.accounts.counter.behavior = behavior;
         Ok(())
+    }
+
+    pub fn transfer_ownership(ctx: Context<SetConfig>, new_owner: Pubkey) -> Result<()> {
+        msg!("Transferring ownership to {:?}", new_owner);
+        ctx.accounts.counter.state.owner = new_owner;
+        Ok(())
+    }
+
+    pub fn echo(_ctx: Context<Empty>, msg: String) -> Result<String> {
+        msg!("Called `echo` with message {:?}", msg);
+        Ok(msg)
     }
 
     /// This function is called by the CCIP Router to execute the CCIP message.
@@ -39,10 +51,19 @@ pub mod test_ccip_receiver {
     pub fn ccip_receive(ctx: Context<CcipReceive>, message: Any2SVMMessage) -> Result<()> {
         msg!("Called `ccip_receive` with message {:?}", message);
 
-        require!(
-            !ctx.accounts.counter.reject_all,
+        require_neq!(
+            ctx.accounts.counter.behavior,
+            Behavior::RejectAll,
             CcipTestReceiverError::RejectAll
         );
+
+        if ctx.accounts.counter.behavior == Behavior::ExtraCUs {
+            // Extra CUs for testing
+            let mut h = hash(b"something!");
+            for _ in 1..5000 {
+                h = hash(&h.0);
+            }
+        }
 
         let counter = &mut ctx.accounts.counter;
         let (incremented, wrapped_around) = counter.value.overflowing_add(1);
@@ -138,7 +159,7 @@ pub struct Initialize<'info> {
 }
 
 #[derive(Accounts)]
-pub struct SetRejectAll<'info> {
+pub struct SetConfig<'info> {
     #[account(
         mut,
         seeds = [b"counter"],
@@ -212,11 +233,32 @@ pub struct TokenPool<'info> {
     // [...] extra passed accounts
 }
 
+#[derive(Accounts)]
+pub struct Empty {}
+
+#[repr(u8)]
+#[derive(InitSpace, AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Debug)]
+pub enum Behavior {
+    Normal = 0,
+    RejectAll = 1,
+    ExtraCUs = 2,
+}
+
+impl std::fmt::Display for Behavior {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Behavior::Normal => write!(f, "Normal"),
+            Behavior::RejectAll => write!(f, "RejectAll"),
+            Behavior::ExtraCUs => write!(f, "ExtraCUs"),
+        }
+    }
+}
+
 #[account]
 #[derive(InitSpace, Debug)]
 pub struct Counter {
     pub value: u64,
-    pub reject_all: bool,
+    pub behavior: Behavior,
     pub state: BaseState,
 }
 
