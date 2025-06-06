@@ -244,7 +244,7 @@ func (p *Plugin) Observation(
 	ctx context.Context, outCtx ocr3types.OutcomeContext, q types.Query,
 ) (types.Observation, error) {
 	if !p.offchainCfg.EnableDonBreakingChanges {
-		p.lggr.Info("running observation next")
+		p.lggr.Info("running old observation")
 		return p.observationOld(ctx, outCtx, q)
 	}
 
@@ -404,7 +404,7 @@ func (p *Plugin) Outcome(
 	ctx context.Context, outCtx ocr3types.OutcomeContext, q types.Query, aos []types.AttributedObservation,
 ) (ocr3types.Outcome, error) {
 	if !p.offchainCfg.EnableDonBreakingChanges {
-		p.lggr.Info("running outcome next")
+		p.lggr.Info("running old outcome")
 		return p.outcomeOld(ctx, outCtx, q, aos)
 	}
 
@@ -490,7 +490,7 @@ func (p *Plugin) Outcome(
 
 	// We invalidate the cache when we detect that inflight price updates appeared on-chain.
 	// This is because at this moment we know that prices are updated
-	// and want to instantly sync a potentially outdated cache.
+	// and want to instantly invalidate potentially old prices and trigger a sync operation.
 	// Otherwise, oracles might re-observe the old prices in the next round.
 	ctx = context.WithValue(ctx, consts.InvalidateCacheKey, invalidatePriceCache)
 
