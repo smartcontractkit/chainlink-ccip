@@ -18,7 +18,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 // Outcome collects the reports from the two phases and constructs the final outcome. Part of the outcome is a fully
@@ -103,7 +102,7 @@ func (p *Plugin) Outcome(
 	lggr.Infow("generated outcome",
 		"outcomeWithoutMsgData", outcome.ToLogFormat(),
 		"numCommitReports", len(outcome.CommitReports),
-		"numChainReports", len(outcome.Report.ChainReports),
+		"numExecReports", len(outcome.Reports),
 		"numMessages", observation.Messages.Count(),
 	)
 
@@ -122,7 +121,7 @@ func (p *Plugin) getCommitReportsOutcome(observation exectypes.Observation) exec
 
 	// Must use 'NewOutcome' rather than direct struct initialization to ensure the outcome is sorted.
 	// TODO: sort in the encoder.
-	return exectypes.NewOutcome(exectypes.GetCommitReports, commitReports, cciptypes.ExecutePluginReport{})
+	return exectypes.NewOutcomeWithSortedCommitReports(exectypes.GetCommitReports, commitReports)
 }
 
 func (p *Plugin) getMessagesOutcome(
@@ -164,9 +163,11 @@ func (p *Plugin) getMessagesOutcome(
 
 	// Must use 'NewOutcome' rather than direct struct initialization to ensure the outcome is sorted.
 	// TODO: sort in the encoder.
-	return exectypes.NewOutcome(exectypes.GetMessages, commitReports, cciptypes.ExecutePluginReport{})
+	return exectypes.NewOutcomeWithSortedCommitReports(exectypes.GetMessages, commitReports)
 }
 
+// getFilterOutcome is the final phase of the execution plugin. Filter refers to the Nonces
+// being passed along with message data to perform a final filtering of messages.
 func (p *Plugin) getFilterOutcome(
 	ctx context.Context,
 	lggr logger.Logger,
@@ -182,6 +183,8 @@ func (p *Plugin) getFilterOutcome(
 		p.estimateProvider,
 		p.destChain,
 		p.addrCodec,
+		report.WithMultipleReports(p.offchainCfg.MultipleReportsEnabled),
+		report.WithMaxReportsCount(maxReportCount),
 		report.WithMaxReportSizeBytes(maxReportLength),
 		report.WithMaxGas(p.offchainCfg.BatchGasLimit),
 		report.WithExtraMessageCheck(report.CheckNonces(observation.Nonces, p.addrCodec)),
@@ -191,7 +194,7 @@ func (p *Plugin) getFilterOutcome(
 		report.WithMaxSingleChainReports(p.offchainCfg.MaxSingleChainReports),
 	)
 
-	outcomeReports, selectedCommitReports, err := selectReport(
+	execReports, selectedCommitReports, err := selectReports(
 		ctx,
 		lggr,
 		commitReports,
@@ -200,11 +203,12 @@ func (p *Plugin) getFilterOutcome(
 		return exectypes.Outcome{}, fmt.Errorf("unable to select report: %w", err)
 	}
 
-	execReport := cciptypes.ExecutePluginReport{
-		ChainReports: outcomeReports,
+	// Collapse the commit reports.
+	var mergedData []exectypes.CommitData
+	for _, commitData := range selectedCommitReports {
+		mergedData = append(mergedData, commitData...)
 	}
 
 	// Must use 'NewOutcome' rather than direct struct initialization to ensure the outcome is sorted.
-	// TODO: sort in the encoder.
-	return exectypes.NewOutcome(exectypes.Filter, selectedCommitReports, execReport), nil
+	return exectypes.NewOutcome(exectypes.Filter, mergedData, execReports), nil
 }

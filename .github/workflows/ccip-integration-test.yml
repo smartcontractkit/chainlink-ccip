@@ -49,18 +49,24 @@ jobs:
             name: "USDC Test"
           - cmd: cd integration-tests/smoke/ccip && go test ccip_ooo_execution_test.go -timeout 12m -test.parallel=1 -count=1 -json
             name: "OOO Execution Test"
-          - cmd: cd integration-tests/smoke/ccip && go test -run "Test_CCIPMessaging_EVM2EVM" ccip_messaging_test.go -timeout 12m -test.parallel=2 -count=1 -json
-            name: "Messaging Test"
+          - cmd: cd integration-tests/smoke/ccip && go test -run "Test_CCIPMessaging_EVM2EVM" ccip_messaging_test.go -timeout 20m -test.parallel=1 -count=1 -json
+            name: "Messaging Test Test_CCIPMessaging_EVM2EVM"
+          - cmd: cd integration-tests/smoke/ccip && go test -run "^Test_CCIPMessaging_EVM2Solana$" ccip_messaging_test.go -timeout 30m -test.parallel=1 -count=1 -json
+            name: "Messaging Test Test_CCIPMessaging_EVM2Solana"
+          - cmd: cd integration-tests/smoke/ccip && go test -run "^Test_CCIPMessaging_Solana2EVM$" ccip_messaging_test.go -timeout 30m -test.parallel=1 -count=1 -json
+            name: "Messaging Test Test_CCIPMessaging_Solana2EVM"
+          - cmd: cd integration-tests/smoke/ccip && go test -run "^Test_CCIPMessaging_EVM2SolanaMultiExecReports$" ccip_messaging_test.go -timeout 35m -test.parallel=1 -count=1 -json
+            name: "Messaging Test Test_CCIPMessaging_EVM2SolanaMultiExecReports"
           - cmd: cd integration-tests/smoke/ccip && go test -run "Test_CCIPBatching_MaxBatchSizeEVM" ccip_batching_test.go -timeout 12m -test.parallel=1 -count=1 -json
             name: "Batching Test Test_CCIPBatching_MaxBatchSizeEVM"
           - cmd: cd integration-tests/smoke/ccip && go test -run "^Test_CCIPBatching_MultiSource$" ccip_batching_test.go -timeout 12m -test.parallel=1 -count=1 -json
             name: "Batching Test Test_CCIPBatching_MultiSource"
-          - cmd: cd integration-tests/smoke/ccip && go test -run "Test_CCIPBatching_MultiSource_MultiReports" ccip_batching_test.go -timeout 12m -test.parallel=1 -count=1 -json
-            name: "Batching Test Test_CCIPBatching_MultiSource_MultiReports"
+          - cmd: cd integration-tests/smoke/ccip && go test -run "Test_CCIPBatching_MultiSource_MultiRoot" ccip_batching_test.go -timeout 12m -test.parallel=1 -count=1 -json
+            name: "Batching Test Test_CCIPBatching_MultiSource_MultiRoot"
           - cmd: cd integration-tests/smoke/ccip && go test -run "^Test_CCIPBatching_SingleSource$" ccip_batching_test.go -timeout 12m -test.parallel=1 -count=1 -json
             name: "Batching Test Test_CCIPBatching_SingleSource"
-          - cmd: cd integration-tests/smoke/ccip && go test -run "Test_CCIPBatching_SingleSource_MultipleReports" ccip_batching_test.go -timeout 12m -test.parallel=1 -count=1 -json
-            name: "Batching Test Test_CCIPBatching_SingleSource_MultipleReports"
+          - cmd: cd integration-tests/smoke/ccip && go test -run "Test_CCIPBatching_SingleSource_MultiRoot" ccip_batching_test.go -timeout 12m -test.parallel=1 -count=1 -json
+            name: "Batching Test Test_CCIPBatching_SingleSource_MultiRoot"
           - cmd: cd integration-tests/smoke/ccip && go test ccip_gas_price_updates_test.go -timeout 12m -test.parallel=2 -count=1 -json
             name: "Gas Price Updates Test"
           # TODO: this can only run in docker for now, switch to in-memory and uncomment

@@ -10,18 +10,19 @@ import (
 	"testing"
 	"time"
 
+	mapset "github.com/deckarep/golang-set/v2"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
-
-	"github.com/smartcontractkit/chainlink-ccip/internal"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
+	"github.com/smartcontractkit/chainlink-ccip/internal"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	testhelpersrand "github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
@@ -573,7 +574,7 @@ func Test_Builder_Build(t *testing.T) {
 						nil,                 // executed
 						false,               // zeroNonces
 					),
-					makeTestCommitReport(hasher, 20, 2, 100, 999, 10101010101,
+					makeTestCommitReport(hasher, 20, 2, 200, 999, 10101010101,
 						sender,
 						cciptypes.Bytes32{}, // generate a correct root.
 						nil,                 // executed
@@ -584,7 +585,7 @@ func Test_Builder_Build(t *testing.T) {
 			expectedExecReports:   2,
 			expectedCommitReports: 1,
 			expectedExecThings:    []int{10, 10},
-			lastReportExecuted:    []cciptypes.SeqNum{100, 101, 102, 103, 104, 105, 106, 107, 108, 109},
+			lastReportExecuted:    []cciptypes.SeqNum{200, 201, 202, 203, 204, 205, 206, 207, 208, 209},
 		},
 		{
 			name: "exactly one report",
@@ -933,6 +934,7 @@ func Test_Builder_Build(t *testing.T) {
 				WithMaxMessages(tt.args.maxMessages),
 				WithMaxSingleChainReports(tt.args.maxReports),
 				WithExtraMessageCheck(CheckNonces(tt.args.nonces, mockAddrCodec)),
+				WithMaxReportsCount(1),
 			)
 
 			var updatedMessages []exectypes.CommitData
@@ -955,16 +957,23 @@ func Test_Builder_Build(t *testing.T) {
 				assert.Contains(t, err.Error(), tt.wantErr)
 				return
 			}
+
+			require.LessOrEqual(t, len(execReports), 1, "These tests should not enable multiple reports.")
+
 			require.NoError(t, err)
-			require.Len(t, execReports, tt.expectedExecReports)
-			require.Equal(t, len(execReports), len(commitReports))
-			for i, execReport := range execReports {
-				require.Lenf(t, execReport.Messages, tt.expectedExecThings[i],
-					"Unexpected number of messages, iter %d", i)
-				require.Lenf(t, execReport.OffchainTokenData, tt.expectedExecThings[i],
-					"Unexpected number of token data, iter %d", i)
-				require.NotEmptyf(t, execReport.Proofs, "Proof should not be empty.")
-				assertMerkleRoot(t, hasher, execReport, tt.args.reports[i])
+			if len(execReports) > 0 {
+				chainReports := execReports[0].ChainReports
+				require.Len(t, chainReports, tt.expectedExecReports)
+				require.Equal(t, len(chainReports), len(commitReports[0]))
+
+				for i, chainReport := range chainReports {
+					require.Lenf(t, chainReport.Messages, tt.expectedExecThings[i],
+						"Unexpected number of messages, iter %d", i)
+					require.Lenf(t, chainReport.OffchainTokenData, tt.expectedExecThings[i],
+						"Unexpected number of token data, iter %d", i)
+					require.NotEmptyf(t, chainReport.Proofs, "Proof should not be empty.")
+					assertMerkleRoot(t, hasher, chainReport, tt.args.reports[i])
+				}
 			}
 			// If the last report is partially executed, the executed messages can be checked.
 			if len(updatedMessages) > 0 && len(tt.lastReportExecuted) > 0 {
@@ -1136,7 +1145,7 @@ func Test_execReportBuilder_verifyReport(t *testing.T) {
 				WithMaxReportSizeBytes(tt.fields.maxReportSizeBytes),
 				WithMaxGas(tt.fields.maxGas),
 			)
-			b.accumulated = tt.fields.accumulated
+			b.accumulated = []validationMetadata{tt.fields.accumulated}
 
 			isValid, metadata, err := b.verifyReport(context.Background(), tt.args.execReport)
 			if tt.expectedError != "" {
@@ -1570,4 +1579,498 @@ func Test_checkSkippedNonces(t *testing.T) {
 			}
 		})
 	}
+}
+
+//nolint:gocyclo // This function is complex due to the nature of the tests.
+func Test_Builder_MultiReport(t *testing.T) {
+	hasher := mocks.NewMessageHasher()
+	codec := mocks.NewExecutePluginJSONReportCodec()
+	lggr := logger.Test(t)
+	sender, err := cciptypes.NewUnknownAddressFromHex(randomAddress())
+	require.NoError(t, err)
+	defaultNonces := map[cciptypes.ChainSelector]map[string]uint64{
+		1: {
+			sender.String(): 0,
+		},
+		2: {
+			sender.String(): 0,
+		},
+		3: {
+			sender.String(): 0,
+		},
+		4: {
+			sender.String(): 0,
+		},
+	}
+
+	type args struct {
+		reports               []exectypes.CommitData
+		nonces                map[cciptypes.ChainSelector]map[string]uint64
+		maxReportSize         uint64
+		maxGasLimit           uint64
+		maxMessages           uint64
+		maxSingleChainReports uint64
+	}
+	tests := []struct {
+		name                        string
+		args                        args
+		expectedExecReports         int
+		expectedChainReportsPerExec []int
+		// Map tracking which sequence numbers to skip per chain selector
+		expectedSkippedSeqsByChain map[cciptypes.ChainSelector]mapset.Set[cciptypes.SeqNum]
+		overrideMaxReportsCount    uint64
+		wantErr                    string
+	}{
+		{
+			name: "exactly one report",
+			args: args{
+				maxReportSize: 4800,
+				maxGasLimit:   10000000,
+				nonces:        defaultNonces,
+				reports: []exectypes.CommitData{
+					makeTestCommitReport(hasher, 2, 1, 100, 999, 10101010101,
+						sender,
+						cciptypes.Bytes32{}, // generate a correct root.
+						nil,                 // executed
+						true,                // zero nonces
+					),
+					makeTestCommitReport(hasher, 2, 2, 100, 999, 10101010101,
+						sender,
+						cciptypes.Bytes32{}, // generate a correct root.
+						nil,                 // executed
+						true,                // zero nonces
+					),
+					makeTestCommitReport(hasher, 2, 2, 102, 999, 10101010101,
+						sender,
+						cciptypes.Bytes32{}, // generate a correct root.
+						nil,                 // executed
+						true,                // zero nonces
+					),
+					makeTestCommitReport(hasher, 2, 2, 104, 999, 10101010101,
+						sender,
+						cciptypes.Bytes32{}, // generate a correct root.
+						nil,                 // executed
+						true,                // zero nonces
+					),
+				},
+			},
+			expectedExecReports:         1,
+			expectedChainReportsPerExec: []int{4},
+		},
+		{
+			name: "one and half chain reports fits into one exec report",
+			args: args{
+				maxReportSize: 9700,
+				maxGasLimit:   10000000,
+				nonces:        defaultNonces,
+				reports: []exectypes.CommitData{
+					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
+						sender,
+						cciptypes.Bytes32{}, // generate a correct root.
+						nil,                 // executed
+						true,                // zero nonces
+					),
+					makeTestCommitReport(hasher, 20, 2, 100, 999, 10101010101,
+						sender,
+						cciptypes.Bytes32{}, // generate a correct root.
+						nil,                 // executed
+						true,                // zero nonces
+					),
+				},
+			},
+			expectedExecReports:         2,
+			expectedChainReportsPerExec: []int{2, 1},
+		},
+		{
+			name: "two chain reports fits into 1 exec report",
+			args: args{
+				maxReportSize: 15000,
+				maxGasLimit:   10000000,
+				nonces:        defaultNonces,
+				reports: []exectypes.CommitData{
+					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
+						sender,
+						cciptypes.Bytes32{},
+						nil,  // executed
+						true, // zero nonces
+					),
+					makeTestCommitReport(hasher, 20, 2, 100, 999, 10101010101,
+						sender,
+						cciptypes.Bytes32{}, // generate a correct root.
+						nil,                 // executed
+						true,                // zero nonces
+					),
+				},
+			},
+			expectedExecReports:         1,
+			expectedChainReportsPerExec: []int{2},
+		},
+		{
+			name: "break down one report into multiple reports - single message each",
+			args: args{
+				maxReportSize:         2800,
+				maxGasLimit:           10000000,
+				maxMessages:           1,
+				maxSingleChainReports: 1,
+				nonces:                defaultNonces,
+				reports: []exectypes.CommitData{
+					makeTestCommitReport(hasher, 6, 2, 100, 999, 10101010101,
+						sender,
+						cciptypes.Bytes32{}, // generate a correct root.
+						nil,                 // executed
+						true,                // zero nonces
+					),
+				},
+			},
+			expectedExecReports:         6,
+			expectedChainReportsPerExec: []int{1, 1, 1, 1, 1, 1}, // Each report has one chain report
+		},
+		{
+			name: "Solana case: report multiple reports when input multiple reports with single message each",
+			args: args{
+				maxReportSize:         2800,
+				maxGasLimit:           10000000,
+				maxMessages:           1,
+				maxSingleChainReports: 1,
+				nonces:                defaultNonces,
+				reports: []exectypes.CommitData{
+					makeTestCommitReport(hasher, 1, 2, 100, 999, 10101010101,
+						sender,
+						cciptypes.Bytes32{}, // generate a correct root.
+						nil,                 // executed
+						true,                // zero nonces
+					),
+					makeTestCommitReport(hasher, 1, 2, 101, 999, 10101010101,
+						sender,
+						cciptypes.Bytes32{}, // generate a correct root.
+						nil,                 // executed
+						true,                // zero nonces
+					),
+					makeTestCommitReport(hasher, 1, 2, 102, 999, 10101010101,
+						sender,
+						cciptypes.Bytes32{}, // generate a correct root.
+						nil,                 // executed
+						true,                // zero nonces
+					),
+					makeTestCommitReport(hasher, 1, 2, 103, 999, 10101010101,
+						sender,
+						cciptypes.Bytes32{}, // generate a correct root.
+						nil,                 // executed
+						true,                // zero nonces
+					),
+				},
+			},
+			expectedExecReports:         4,
+			expectedChainReportsPerExec: []int{1, 1, 1, 1}, // Each report has one chain report
+		},
+		{
+			name: "Solana case with max report count: report multiple reports when input multiple" +
+				" reports with single message each",
+			args: args{
+				maxReportSize:         2800,
+				maxGasLimit:           10000000,
+				maxMessages:           1,
+				maxSingleChainReports: 1,
+				nonces:                defaultNonces,
+				reports: []exectypes.CommitData{
+					makeTestCommitReport(hasher, 1, 2, 100, 999, 10101010101,
+						sender,
+						cciptypes.Bytes32{}, // generate a correct root.
+						nil,                 // executed
+						true,                // zero nonces
+					),
+					makeTestCommitReport(hasher, 1, 2, 101, 999, 10101010101,
+						sender,
+						cciptypes.Bytes32{}, // generate a correct root.
+						nil,                 // executed
+						true,                // zero nonces
+					),
+					makeTestCommitReport(hasher, 1, 2, 102, 999, 10101010101,
+						sender,
+						cciptypes.Bytes32{}, // generate a correct root.
+						nil,                 // executed
+						true,                // zero nonces
+					),
+					makeTestCommitReport(hasher, 1, 2, 103, 999, 10101010101,
+						sender,
+						cciptypes.Bytes32{}, // generate a correct root.
+						nil,                 // executed
+						true,                // zero nonces
+					),
+				},
+			},
+			overrideMaxReportsCount:     2,
+			expectedExecReports:         2,
+			expectedChainReportsPerExec: []int{1, 1}, // Each report has one chain report
+			expectedSkippedSeqsByChain: map[cciptypes.ChainSelector]mapset.Set[cciptypes.SeqNum]{
+				2: mapset.NewSet(cciptypes.SeqNum(102), cciptypes.SeqNum(103)),
+			},
+		},
+		{
+			name: "multiple reports - max single chain reports",
+			args: args{
+				maxReportSize:         10000,
+				maxGasLimit:           10000000,
+				maxSingleChainReports: 2,
+				nonces:                defaultNonces,
+				reports: []exectypes.CommitData{
+					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
+						sender,
+						cciptypes.Bytes32{}, // generate a correct root.
+						nil,                 // executed
+						true,                // zero nonces
+					),
+					makeTestCommitReport(hasher, 10, 2, 100, 999, 10101010101,
+						sender,
+						cciptypes.Bytes32{},
+						nil,  // executed
+						true, // zero nonces
+					),
+					makeTestCommitReport(hasher, 10, 3, 100, 999, 10101010101,
+						sender,
+						cciptypes.Bytes32{}, // generate a correct root.
+						nil,                 // executed
+						true,                // zero nonces
+					),
+				},
+			},
+			expectedExecReports:         2,           // Should create 2 exec reports
+			expectedChainReportsPerExec: []int{2, 1}, // 2 chains in first exec report, 1 in second
+		},
+		{
+			name: "non-zero nonces limit to single report despite multipleReportsEnabled - " +
+				"same inputs as one and half reports",
+			args: args{
+				maxReportSize: 9700,
+				maxGasLimit:   10000000,
+				nonces:        defaultNonces,
+				reports: []exectypes.CommitData{
+					makeTestCommitReport(hasher, 10, 2, 100, 999, 10101010101,
+						sender,
+						cciptypes.Bytes32{}, // generate a correct root.
+						nil,                 // executed
+						false,               // zero nonces
+					),
+					makeTestCommitReport(hasher, 20, 3, 100, 999, 10101010101,
+						sender,
+						cciptypes.Bytes32{}, // generate a correct root.
+						nil,                 // executed
+						false,               // zero nonces
+					),
+				},
+			},
+			wantErr: "multiple reports validate nonces: messages with non-zero nonces detected",
+		},
+		{
+			name: "multiple input reports splitting across maxMessages - no maxSingleChainReports",
+			args: args{
+				maxReportSize: 10000000,
+				maxGasLimit:   10000000,
+				maxMessages:   1,
+				nonces:        defaultNonces,
+				reports: []exectypes.CommitData{
+					makeTestCommitReport(hasher, 2, 1, 100, 999, 10101010101,
+						sender, cciptypes.Bytes32{}, nil, true),
+					makeTestCommitReport(hasher, 2, 1, 200, 999, 10101010102,
+						sender, cciptypes.Bytes32{}, nil, true),
+				},
+			},
+			expectedExecReports:         1,
+			expectedChainReportsPerExec: []int{4},
+		},
+		{
+			name: "report and size limiting (skip over two large messages)",
+			args: args{
+				maxReportSize: 10000,
+				maxGasLimit:   10000000,
+				maxMessages:   3,
+				nonces:        defaultNonces,
+				reports: []exectypes.CommitData{
+					setMessageData(1, 90000,
+						setMessageData(3, 90000,
+							makeTestCommitReport(hasher, 10, 2, 100, 999, 10101010101,
+								sender,
+								cciptypes.Bytes32{}, // generate a correct root.
+								nil,                 // executed
+								true,                // zero nonces
+							))),
+				},
+			},
+			expectedExecReports: 1,
+			// Should create 3 chain reports that includes all messages except the two large ones
+			expectedChainReportsPerExec: []int{3},
+			expectedSkippedSeqsByChain: map[cciptypes.ChainSelector]mapset.Set[cciptypes.SeqNum]{
+				// Sequence numbers for indices 1 and 3 (the large messages)
+				2: mapset.NewSet(cciptypes.SeqNum(101), cciptypes.SeqNum(103)),
+			},
+		},
+		{
+			name: "report max count limit",
+			args: args{
+				maxReportSize:         2800,
+				maxGasLimit:           10000000,
+				maxMessages:           1,
+				maxSingleChainReports: 1,
+				nonces:                defaultNonces,
+				reports: []exectypes.CommitData{
+					makeTestCommitReport(hasher, 6, 2, 100, 999, 10101010101,
+						sender,
+						cciptypes.Bytes32{}, // generate a correct root.
+						nil,                 // executed
+						true,                // zero nonces
+					),
+				},
+			},
+			overrideMaxReportsCount:     4,
+			expectedExecReports:         4,
+			expectedChainReportsPerExec: []int{1, 1, 1, 1}, // Each report has one chain report
+			expectedSkippedSeqsByChain: map[cciptypes.ChainSelector]mapset.Set[cciptypes.SeqNum]{
+				2: mapset.NewSet[cciptypes.SeqNum](104, 105),
+			},
+		},
+	}
+
+	mockAddrCodec := internal.NewMockAddressCodecHex(t)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := context.Background()
+
+			ep := gasmock.NewMockEstimateProvider(t)
+			ep.EXPECT().CalculateMessageMaxGas(mock.Anything).Return(uint64(0)).Maybe()
+			ep.EXPECT().CalculateMerkleTreeGas(mock.Anything).Return(uint64(0)).Maybe()
+
+			maxReportCount := uint64(10)
+			if tt.overrideMaxReportsCount > 0 {
+				maxReportCount = tt.overrideMaxReportsCount
+			}
+
+			builder := NewBuilder(
+				lggr,
+				hasher,
+				codec,
+				ep,
+				1, // destChainSelector
+				mockAddrCodec,
+				WithMaxReportSizeBytes(tt.args.maxReportSize),
+				WithMaxGas(tt.args.maxGasLimit),
+				WithMaxMessages(tt.args.maxMessages),
+				WithMaxSingleChainReports(tt.args.maxSingleChainReports),
+				WithExtraMessageCheck(CheckNonces(tt.args.nonces, mockAddrCodec)),
+				WithMultipleReports(true), // all tests are for multi reports
+				WithMaxReportsCount(maxReportCount),
+			)
+
+			foundError := false
+			for _, report := range tt.args.reports {
+				_, err := builder.Add(ctx, report)
+				if err != nil && tt.wantErr != "" {
+					require.Contains(t, err.Error(), tt.wantErr)
+					foundError = true
+					// Continue testing even with expected error
+				} else {
+					require.NoError(t, err)
+				}
+			}
+
+			if foundError {
+				return
+			}
+
+			execReports, commitReports, err := builder.Build()
+			require.NoError(t, err)
+
+			// Verify expected number of exec reports
+			require.Equal(t, tt.expectedExecReports, len(execReports))
+
+			// Verify expected chain reports per exec report
+			for i := 0; i < tt.expectedExecReports; i++ {
+				if i < len(tt.expectedChainReportsPerExec) {
+					require.Equal(t, tt.expectedChainReportsPerExec[i], len(execReports[i].ChainReports),
+						"Unexpected number of chain reports in exec report %d", i)
+				}
+			}
+
+			// Check that commit reports match exec reports structure
+			for i, execReport := range execReports {
+				require.Equal(t, len(execReport.ChainReports), len(commitReports[i]),
+					"Mismatch between exec reports and commit reports for report %d", i)
+			}
+
+			// Extract executed sequence numbers from each exec report
+			markedExecuted := make(map[cciptypes.ChainSelector]mapset.Set[cciptypes.SeqNum])
+
+			// Add messages that are marked as executed in commit reports
+			for _, commitReport := range commitReports {
+				for _, chainReport := range commitReport {
+					for _, executedMsgSeqNum := range chainReport.ExecutedMessages {
+						if markedExecuted[chainReport.SourceChain] == nil {
+							markedExecuted[chainReport.SourceChain] = mapset.NewSet[cciptypes.SeqNum]()
+						}
+						markedExecuted[chainReport.SourceChain].Add(executedMsgSeqNum)
+					}
+				}
+			}
+
+			// Collect all sequence numbers that are reported to execute
+			execReportExecuted := extractSequenceNumbersFromReports(execReports)
+
+			totalSkipped := 0
+			// Check intersection
+			for chainSelector, skippedSeqs := range tt.expectedSkippedSeqsByChain {
+				if markedExecuted[chainSelector] == nil {
+					markedExecuted[chainSelector] = mapset.NewSet[cciptypes.SeqNum]()
+				}
+				if execReportExecuted[chainSelector] == nil {
+					execReportExecuted[chainSelector] = mapset.NewSet[cciptypes.SeqNum]()
+				}
+				intersection := skippedSeqs.Intersect(markedExecuted[chainSelector])
+				require.Truef(t, intersection.IsEmpty(), "Expected no intersection between skipped "+
+					"messages on chain %d and marked messages for exec, but found: %v", chainSelector, intersection)
+				intersection = skippedSeqs.Intersect(execReportExecuted[chainSelector])
+				require.Truef(t, intersection.IsEmpty(), "Expected no intersection between skipped "+
+					"messages on chain %d and reported messages to exec, but found: %v", chainSelector, intersection)
+				totalSkipped += skippedSeqs.Cardinality()
+			}
+
+			totalExecuted := 0
+			// Make sure all elements in markedExecuted are the same in execReportExecuted and vice versa
+			for chainSelector, seqNums := range markedExecuted {
+				require.True(t, seqNums.Difference(execReportExecuted[chainSelector]).IsEmpty())
+			}
+			for chainSelector, seqNums := range execReportExecuted {
+				require.True(t, seqNums.Difference(markedExecuted[chainSelector]).IsEmpty())
+				totalExecuted += seqNums.Cardinality()
+			}
+
+			totalMessages := 0
+			// count all messages across all reports
+			for _, cr := range tt.args.reports {
+				totalMessages += len(cr.Messages)
+			}
+
+			require.Equal(t, totalMessages-totalSkipped, totalExecuted)
+		})
+	}
+}
+
+// extractSequenceNumbersFromReports extracts all sequence numbers from execution reports by chain selector
+func extractSequenceNumbersFromReports(
+	execReports []cciptypes.ExecutePluginReport) map[cciptypes.ChainSelector]mapset.Set[cciptypes.SeqNum] {
+	seqNumsByChain := make(map[cciptypes.ChainSelector]mapset.Set[cciptypes.SeqNum])
+
+	for _, execReport := range execReports {
+		for _, chainReport := range execReport.ChainReports {
+			chainSelector := chainReport.SourceChainSelector
+
+			if seqNumsByChain[chainSelector] == nil {
+				seqNumsByChain[chainSelector] = mapset.NewSet[cciptypes.SeqNum]()
+			}
+			for _, msg := range chainReport.Messages {
+				seqNumsByChain[chainSelector].Add(msg.Header.SequenceNumber)
+			}
+		}
+	}
+
+	return seqNumsByChain
 }

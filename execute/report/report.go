@@ -19,8 +19,6 @@ import (
 // readyMessages is empty all messages will be included. This allows the caller to create smaller reports if needed.
 //
 // Before calling this function all messages should have been checked and processed by the checkMessage function.
-//
-// The hasher and encoding codec are provided as arguments to allow for chain-specific formats to be used.
 func buildSingleChainReportHelper(
 	lggr logger.Logger,
 	report exectypes.CommitData,
@@ -317,8 +315,10 @@ func CheckIfInflight(inflight IsInflight) Check {
 	}
 }
 
-// checkMessages to get a set of which are ready to execute.
-func (b *execReportBuilder) checkMessages(ctx context.Context, report exectypes.CommitData) (map[int]struct{}, error) {
+// extractReadyMessages to get a set of which are ready to execute.
+func (b *execReportBuilder) extractReadyMessages(
+	ctx context.Context,
+	report exectypes.CommitData) (map[int]struct{}, error) {
 	readyMessages := make(map[int]struct{})
 	for i := 0; i < len(report.Messages); i++ {
 		updatedReport, status, err := b.checkMessage(ctx, i, report)
@@ -446,7 +446,8 @@ func (b *execReportBuilder) verifyReport(
 		return false, validationMetadata{}, fmt.Errorf("unable to encode report: %w", err)
 	}
 
-	maxSizeBytes := int(b.maxReportSizeBytes - b.accumulated.encodedSizeBytes)
+	accumulated := b.accumulated[len(b.accumulated)-1]
+	maxSizeBytes := int(b.maxReportSizeBytes - accumulated.encodedSizeBytes)
 	if len(encoded) > maxSizeBytes {
 		b.lggr.Infow("invalid report, report size exceeds limit", "size", len(encoded), "maxSize", maxSizeBytes)
 		return false, validationMetadata{}, nil
@@ -463,7 +464,7 @@ func (b *execReportBuilder) verifyReport(
 	merkleTreeGas := b.estimateProvider.CalculateMerkleTreeGas(len(execReport.Messages))
 	totalGas := gasSum + merkleTreeGas
 
-	maxGas := b.maxGas - b.accumulated.gas
+	maxGas := b.maxGas - accumulated.gas
 	if totalGas > maxGas {
 		b.lggr.Infow("invalid report, report estimated gas usage exceeds limit", "gas", totalGas, "maxGas", maxGas)
 		return false, validationMetadata{}, nil
@@ -477,34 +478,45 @@ func (b *execReportBuilder) verifyReport(
 
 // buildSingleChainReport generates the largest report which fits into maxSizeBytes.
 // See buildSingleChainReport for more details about how a report is built.
+//
+// Limiting is done based on configuration, such as max messages and max report size.
+//
+// Messages flagged by readyMessages are considered for the report.
+//
 // returns
 // 1. exec report for the builder
 // 2. updated commit report after marking new messages from the exec report as executed
-//
-//nolint:gocyclo // todo
 func (b *execReportBuilder) buildSingleChainReport(
 	ctx context.Context,
 	commitData exectypes.CommitData,
+	readyMessages map[int]struct{},
 ) (ccipocr3.ExecutePluginReportSingleChain, exectypes.CommitData, error) {
 	finalize := func(
 		execReport ccipocr3.ExecutePluginReportSingleChain,
 		commitReport exectypes.CommitData,
 		meta validationMetadata,
 	) (ccipocr3.ExecutePluginReportSingleChain, exectypes.CommitData, error) {
-		b.accumulated = b.accumulated.accumulate(meta)
-		commitReport = markNewMessagesExecuted(execReport, commitReport)
-		return execReport, commitReport, nil
-	}
+		b.lggr.Infow("messages added to report",
+			"messageIDs", slicelib.Map(execReport.Messages, func(m ccipocr3.Message) ccipocr3.Bytes32 {
+				return m.Header.MessageID
+			}),
+			"seqNums", slicelib.Map(execReport.Messages, func(m ccipocr3.Message) ccipocr3.SeqNum {
+				return m.Header.SequenceNumber
+			}),
+			"senders", slicelib.Map(execReport.Messages, func(m ccipocr3.Message) ccipocr3.UnknownAddress {
+				return m.Sender
+			}),
+			"nonces", slicelib.Map(execReport.Messages, func(m ccipocr3.Message) uint64 {
+				return m.Header.Nonce
+			}),
+			"sourceChain", commitData.SourceChain,
+			"reportSizeBytes", meta.encodedSizeBytes,
+			"reportGas", meta.gas)
 
-	// Check which messages are ready to execute, and update report with any additional metadata needed for execution.
-	readyMessages, err := b.checkMessages(ctx, commitData)
-	if err != nil {
-		return ccipocr3.ExecutePluginReportSingleChain{},
-			exectypes.CommitData{},
-			fmt.Errorf("unable to check message: %w", err)
-	}
-	if len(readyMessages) == 0 {
-		return ccipocr3.ExecutePluginReportSingleChain{}, commitData, ErrEmptyReport
+		idx := len(b.accumulated) - 1
+		// Apply side effect.
+		b.accumulated[idx] = b.accumulated[idx].accumulate(meta)
+		return execReport, markNewMessagesExecuted(execReport, commitReport), nil
 	}
 
 	// Unless there is a message limit, attempt to build a report for executing all ready messages.
@@ -513,7 +525,7 @@ func (b *execReportBuilder) buildSingleChainReport(
 	// In that case, we will execute the loop below to iteratively build a report
 	// with fewer messages until we find a valid report.
 	if b.maxMessages == 0 {
-		finalReport, err :=
+		allMessagesReport, err :=
 			buildSingleChainReportHelper(b.lggr, commitData, readyMessages)
 		if err != nil {
 			return ccipocr3.ExecutePluginReportSingleChain{},
@@ -521,32 +533,18 @@ func (b *execReportBuilder) buildSingleChainReport(
 				fmt.Errorf("unable to build a single chain report (max): %w", err)
 		}
 
-		validReport, meta, err := b.verifyReport(ctx, finalReport)
+		validReport, meta, err := b.verifyReport(ctx, allMessagesReport)
 		if err != nil {
 			return ccipocr3.ExecutePluginReportSingleChain{},
 				exectypes.CommitData{},
 				fmt.Errorf("unable to verify report: %w", err)
 		} else if validReport {
-			b.lggr.Infow("messages added to report",
-				"messageIDs", slicelib.Map(finalReport.Messages, func(m ccipocr3.Message) ccipocr3.Bytes32 {
-					return m.Header.MessageID
-				}),
-				"seqNums", slicelib.Map(finalReport.Messages, func(m ccipocr3.Message) ccipocr3.SeqNum {
-					return m.Header.SequenceNumber
-				}),
-				"senders", slicelib.Map(finalReport.Messages, func(m ccipocr3.Message) ccipocr3.UnknownAddress {
-					return m.Sender
-				}),
-				"nonces", slicelib.Map(finalReport.Messages, func(m ccipocr3.Message) uint64 {
-					return m.Header.Nonce
-				}),
-				"sourceChain", commitData.SourceChain,
-				"reportSizeBytes", meta.encodedSizeBytes,
-				"reportGas", meta.gas)
-			return finalize(finalReport, commitData, meta)
+			return finalize(allMessagesReport, commitData, meta)
 		}
 	}
 
+	// This is a greedy loop. It attempts to add messages one at a time, if a message cannot be added
+	// the following message is attempted.
 	var finalReport ccipocr3.ExecutePluginReportSingleChain
 	var meta validationMetadata
 	msgs := make(map[int]struct{})
@@ -557,32 +555,22 @@ func (b *execReportBuilder) buildSingleChainReport(
 
 		msgs[i] = struct{}{}
 
-		finalReport2, err := buildSingleChainReportHelper(b.lggr, commitData, msgs)
+		candidateReport, err := buildSingleChainReportHelper(b.lggr, commitData, msgs)
 		if err != nil {
 			return ccipocr3.ExecutePluginReportSingleChain{},
 				exectypes.CommitData{},
 				fmt.Errorf("unable to build a single chain report (messages %d): %w", len(msgs), err)
 		}
 
-		validReport, meta2, err := b.verifyReport(ctx, finalReport2)
+		validReport, meta2, err := b.verifyReport(ctx, candidateReport)
 		if err != nil {
 			return ccipocr3.ExecutePluginReportSingleChain{},
 				exectypes.CommitData{},
 				fmt.Errorf("unable to verify report: %w", err)
 		} else if validReport {
-			finalReport = finalReport2
+			finalReport = candidateReport
 			meta = meta2
 
-			b.lggr.Infow(
-				"message added to report",
-				"sourceChain", commitData.Messages[i].Header.SourceChainSelector,
-				"seqNum", commitData.Messages[i].Header.SequenceNumber,
-				"messageID", commitData.Messages[i].Header.MessageID,
-				"nonce", commitData.Messages[i].Header.Nonce,
-				"sender", commitData.Messages[i].Sender.String(),
-				"reportSizeBytes", meta.encodedSizeBytes,
-				"reportGas", meta.gas,
-			)
 			// Stop searching if we reach the maximum number of messages.
 			if b.maxMessages > 0 && uint64(len(msgs)) >= b.maxMessages {
 				b.lggr.Infow(
