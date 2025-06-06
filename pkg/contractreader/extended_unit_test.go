@@ -5,8 +5,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
 )
 
 func TestGetOneBinding(t *testing.T) {
@@ -327,4 +328,118 @@ func (m *mockContractReader) BatchGetLatestValues(
 
 func (m *mockContractReader) HealthReport() map[string]error {
 	return nil
+}
+
+func TestExtractTxHash(t *testing.T) {
+	testCases := []struct {
+		name                 string // Name of the test case for t.Run
+		cursor               string // Input string for ExtractTxHash
+		expectedHash         string // Expected transaction hash if successful
+		expectError          bool   // True if an error is expected
+		expectedFullErrorMsg string // The exact error message string expected, if expectError is true
+	}{
+		// --- Valid Cases ---
+		{
+			name:         "Standard valid hash",
+			cursor:       "12345-1-0xabcdef1234567890",
+			expectedHash: "0xabcdef1234567890",
+			expectError:  false,
+		},
+		{
+			name:         "TxHash with internal hyphens",
+			cursor:       "123-0-my-tx-hash-with-hyphens",
+			expectedHash: "my-tx-hash-with-hyphens",
+			expectError:  false,
+		},
+		{
+			name:         "Conceptual empty BlockNumber part (first element of split)",
+			cursor:       "-0-0xabcdef", // strings.SplitN yields ["", "0", "0xabcdef"]
+			expectedHash: "0xabcdef",
+			expectError:  false,
+		},
+		{
+			name:         "Conceptual empty LogIndex part (second element of split)",
+			cursor:       "123--0xabcdef", // strings.SplitN yields ["123", "", "0xabcdef"]
+			expectedHash: "0xabcdef",
+			expectError:  false,
+		},
+		{
+			name:         "Zero values for BlockNumber and LogIndex parts",
+			cursor:       "0-0-validhash",
+			expectedHash: "validhash",
+			expectError:  false,
+		},
+
+		// --- Invalid Format Cases (triggered by len(parts) < 3) ---
+		{
+			name:                 "Too few parts - one hyphen",
+			cursor:               "12345-1",
+			expectError:          true,
+			expectedFullErrorMsg: "invalid cursor format: '12345-1'. Expected format 'BlockNumber-LogIndex-TxHash'",
+		},
+		{
+			name:                 "Too few parts - no hyphens",
+			cursor:               "1234510xabcdef",
+			expectError:          true,
+			expectedFullErrorMsg: "invalid cursor format: '1234510xabcdef'. Expected format 'BlockNumber-LogIndex-TxHash'",
+		},
+		{
+			name:                 "Empty string input",
+			cursor:               "",
+			expectError:          true,
+			expectedFullErrorMsg: "invalid cursor format: ''. Expected format 'BlockNumber-LogIndex-TxHash'",
+		},
+		{
+			name:                 "Only one part and a trailing hyphen",
+			cursor:               "123-", // strings.SplitN yields ["123", ""], len(parts) is 2
+			expectError:          true,
+			expectedFullErrorMsg: "invalid cursor format: '123-'. Expected format 'BlockNumber-LogIndex-TxHash'",
+		},
+		{
+			name:                 "Only a single hyphen",
+			cursor:               "-", // strings.SplitN yields ["", ""], len(parts) is 2
+			expectError:          true,
+			expectedFullErrorMsg: "invalid cursor format: '-'. Expected format 'BlockNumber-LogIndex-TxHash'",
+		},
+
+		// --- Empty Transaction Hash Case (triggered by len(txHash) == 0) ---
+		{
+			name:                 "Valid structure but empty TxHash part",
+			cursor:               "123-0-", // strings.SplitN yields ["123", "0", ""], txHash is ""
+			expectError:          true,
+			expectedFullErrorMsg: "transaction hash is empty in cursor: '123-0-'",
+		},
+		{
+			name:                 "Two hyphens, no content (results in empty TxHash part)",
+			cursor:               "--", // strings.SplitN yields ["", "", ""], txHash is ""
+			expectError:          true,
+			expectedFullErrorMsg: "transaction hash is empty in cursor: '--'",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			hash, err := ExtractTxHash(tc.cursor)
+
+			if tc.expectError {
+				// We expect an error
+				if err == nil {
+					t.Errorf("ExtractTxHash(%q) expected an error, but got nil", tc.cursor)
+				}
+				// Check if the error message is exactly as expected
+				if err.Error() != tc.expectedFullErrorMsg {
+					t.Errorf("ExtractTxHash(%q)\n   error: %q\nwant error: %q", tc.cursor, err.Error(), tc.expectedFullErrorMsg)
+				}
+			} else {
+				// We expect no error
+				if err != nil {
+					t.Errorf("ExtractTxHash(%q) expected no error, but got: %v", tc.cursor, err)
+				}
+				// Check if the returned hash matches the expected hash
+				if hash != tc.expectedHash {
+					t.Errorf("ExtractTxHash(%q) = %q, want %q", tc.cursor, hash, tc.expectedHash)
+				}
+			}
+		})
+	}
 }
