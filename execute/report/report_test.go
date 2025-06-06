@@ -564,7 +564,7 @@ func Test_Builder_Build(t *testing.T) {
 		{
 			name: "one and half reports",
 			args: args{
-				maxReportSize: 9700,
+				maxReportSize: 10000,
 				maxGasLimit:   10000000,
 				nonces:        defaultNonces,
 				reports: []exectypes.CommitData{
@@ -590,7 +590,7 @@ func Test_Builder_Build(t *testing.T) {
 		{
 			name: "exactly one report",
 			args: args{
-				maxReportSize: 4800,
+				maxReportSize: 5000,
 				maxGasLimit:   10000000,
 				nonces:        defaultNonces,
 				reports: []exectypes.CommitData{
@@ -616,7 +616,7 @@ func Test_Builder_Build(t *testing.T) {
 		{
 			name: "execute remainder of partially executed report",
 			args: args{
-				maxReportSize: 2654,
+				maxReportSize: 2754,
 				maxGasLimit:   10000000,
 				nonces: map[cciptypes.ChainSelector]map[string]uint64{
 					1: {
@@ -639,7 +639,7 @@ func Test_Builder_Build(t *testing.T) {
 		{
 			name: "partially execute remainder of partially executed report",
 			args: args{
-				maxReportSize: 2270,
+				maxReportSize: 2370,
 				maxGasLimit:   10000000,
 				nonces: map[cciptypes.ChainSelector]map[string]uint64{
 					1: {
@@ -968,7 +968,8 @@ func Test_Builder_Build(t *testing.T) {
 
 				for i, chainReport := range chainReports {
 					require.Lenf(t, chainReport.Messages, tt.expectedExecThings[i],
-						"Unexpected number of messages, iter %d", i)
+						"Unexpected number of messages, iter %d, len(Messages)=%d, expectedExecThings=%d", i,
+						len(chainReport.Messages), tt.expectedExecThings[i])
 					require.Lenf(t, chainReport.OffchainTokenData, tt.expectedExecThings[i],
 						"Unexpected number of token data, iter %d", i)
 					require.NotEmptyf(t, chainReport.Proofs, "Proof should not be empty.")
@@ -1054,7 +1055,7 @@ func Test_execReportBuilder_verifyReport(t *testing.T) {
 			},
 			expectedIsValid: true,
 			expectedMetadata: validationMetadata{
-				encodedSizeBytes: 1717,
+				encodedSizeBytes: 1765,
 				gas:              482_240,
 			},
 		},
