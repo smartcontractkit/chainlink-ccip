@@ -23,11 +23,11 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
-// observationNext contains new Observation logic with breaking changes that should replace the existing
-// Observation in the next release.
-func (p *Plugin) observationNext(
+// observationOld contains old Observation logic that is still used for backwards compatibility purposes.
+func (p *Plugin) observationOld(
 	ctx context.Context, outCtx ocr3types.OutcomeContext, q types.Query,
 ) (types.Observation, error) {
+
 	// Ensure that sequence number is in the context for consumption by all
 	// downstream processors and the ccip reader.
 	ctx, lggr := logutil.WithOCRInfo(ctx, p.lggr, outCtx.SeqNr, logutil.PhaseObservation)
@@ -78,27 +78,14 @@ func (p *Plugin) observationNext(
 		)
 	}
 
-	obs := committypes.Observation{
-		MerkleRootObs:         merkleRootObs,
-		TokenPriceObs:         tokenprice.Observation{},
-		DiscoveryObs:          discoveryObs,
-		ChainFeeObs:           chainfee.Observation{},
-		FChain:                p.ObserveFChain(lggr),
-		OnChainPriceOcrSeqNum: 0,
-	}
+	tokenPriceObs, chainFeeObs := p.getPriceRelatedObservations(ctx, lggr, prevOutcome, decodedQ)
 
-	inflightPricesExist := prevOutcome.MainOutcome.InflightPriceOcrSequenceNumber > 0
-	switch inflightPricesExist {
-	case true:
-		// If we have inflight prices destination chain supporting oracles only observe the onchain price ocr seq num.
-		// We use this observation to check if prices are still inflight within the Outcome.
-		obs.OnChainPriceOcrSeqNum, err = p.observeOnChainPriceOcrSeqNum(ctx)
-		if err != nil {
-			lggr.Errorw("failed to observe on-chain price seq number", "err", err)
-		}
-	default:
-		// If we don't have inflight prices we can proceed with new price observations.
-		obs.TokenPriceObs, obs.ChainFeeObs = p.getPriceObservations(ctx, lggr, prevOutcome, decodedQ)
+	obs := committypes.Observation{
+		MerkleRootObs: merkleRootObs,
+		TokenPriceObs: tokenPriceObs,
+		DiscoveryObs:  discoveryObs,
+		ChainFeeObs:   chainFeeObs,
+		FChain:        p.ObserveFChain(lggr),
 	}
 
 	p.metricsReporter.TrackObservation(obs)
@@ -112,35 +99,69 @@ func (p *Plugin) observationNext(
 	return encoded, nil
 }
 
-func (p *Plugin) observeOnChainPriceOcrSeqNum(ctx context.Context) (uint64, error) {
-	supportsDest, err := p.chainSupport.SupportsDestChain(p.oracleID)
-	if err != nil {
-		return 0, fmt.Errorf("check if oracle %d supports the destination chain: %w", p.oracleID, err)
-	}
-
-	if !supportsDest {
-		return 0, nil
-	}
-
-	onChainPriceOcrSeqNum, err := p.ccipReader.GetLatestPriceSeqNr(ctx)
-	if err != nil {
-		return 0, fmt.Errorf("get latest on-chain price seq number: %w", err)
-	}
-
-	return onChainPriceOcrSeqNum, nil
-}
-
-func (p *Plugin) getPriceObservations(
+func (p *Plugin) getPriceRelatedObservations(
 	ctx context.Context,
 	lggr logger.Logger,
 	prevOutcome committypes.Outcome,
 	decodedQ committypes.Query,
 ) (tokenprice.Observation, chainfee.Observation) {
+	invalidatePriceCache := false
+	waitingForPriceUpdatesToMakeItOnchain := prevOutcome.MainOutcome.InflightPriceOcrSequenceNumber > 0
+
+	// If we are waiting for price updates to make it onchain, but we have no more checks remaining, stop waiting.
+	if waitingForPriceUpdatesToMakeItOnchain && prevOutcome.MainOutcome.RemainingPriceChecks == 0 {
+		lggr.Warnw(
+			"no more price checks remaining, prices of previous outcome did not make it through",
+			"inflightPriceOcrSequenceNumber", prevOutcome.MainOutcome.InflightPriceOcrSequenceNumber,
+		)
+		waitingForPriceUpdatesToMakeItOnchain = false
+	}
+
+	// If we still wait for price updates to make it onchain, check if the latest price report made it through.
+	if waitingForPriceUpdatesToMakeItOnchain {
+		latestPriceOcrSeqNum, err := p.ccipReader.GetLatestPriceSeqNr(ctx)
+		if err != nil {
+			lggr.Errorw("get latest price sequence number", "err", err)
+			// Observe fChain so we don't get cryptic fChain errors in the outcome phase.
+			return tokenprice.Observation{
+					FChain:    p.ObserveFChain(lggr),
+					Timestamp: time.Now().UTC(),
+				}, chainfee.Observation{
+					FChain:       p.ObserveFChain(lggr),
+					TimestampNow: time.Now().UTC(),
+				}
+		}
+
+		if cciptypes.SeqNum(latestPriceOcrSeqNum) >= prevOutcome.MainOutcome.InflightPriceOcrSequenceNumber {
+			lggr.Infow("previous price report made it through", "ocrSeqNum", latestPriceOcrSeqNum)
+			invalidatePriceCache = true
+			waitingForPriceUpdatesToMakeItOnchain = false
+		}
+	}
+
+	// If we are still waiting for price updates to make it onchain, don't make any price observations.
+	if waitingForPriceUpdatesToMakeItOnchain {
+		lggr.Infow("waiting for price updates to make it onchain, no prices observed in this round",
+			"inflightPriceOcrSequenceNumber", prevOutcome.MainOutcome.InflightPriceOcrSequenceNumber,
+			"remainingPriceChecks", prevOutcome.MainOutcome.RemainingPriceChecks,
+		)
+		// Observe fChain so we don't get cryptic fChain errors in the outcome phase.
+		return tokenprice.Observation{
+				FChain:    p.ObserveFChain(lggr),
+				Timestamp: time.Now().UTC(),
+			}, chainfee.Observation{
+				FChain:       p.ObserveFChain(lggr),
+				TimestampNow: time.Now().UTC(),
+			}
+	}
+
 	var tokenPriceObs tokenprice.Observation
 	var chainFeeObs chainfee.Observation
 
 	wg := sync.WaitGroup{}
 	wg.Add(2)
+
+	ctx = context.WithValue(ctx, consts.InvalidateCacheKey, invalidatePriceCache)
 
 	go func() {
 		defer wg.Done()
