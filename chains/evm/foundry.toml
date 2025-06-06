@@ -4,6 +4,7 @@ evm_version = 'paris'
 
 src = 'contracts'
 test = 'contracts'
+script = 'contracts'
 out = 'foundry-artifacts'
 cache_path = 'foundry-cache'
 libs = ['node_modules']
