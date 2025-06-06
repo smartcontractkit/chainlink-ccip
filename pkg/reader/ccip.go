@@ -1369,18 +1369,6 @@ func (r *ccipChainReader) getFeeQuoterTokenPriceUSD(ctx context.Context, tokenAd
 	return cciptypes.NewBigInt(price), nil
 }
 
-// sourceChainConfig is used to parse the response from the offRamp contract's getSourceChainConfig method.
-// See: https://github.com/smartcontractkit/ccip/blob/a3f61f7458e4499c2c62eb38581c60b4942b1160/contracts/src/v0.8/ccip/offRamp/OffRamp.sol#L94
-//
-//nolint:lll // It's a URL.
-type SourceChainConfig struct {
-	Router                    []byte // local router
-	IsEnabled                 bool
-	IsRMNVerificationDisabled bool
-	MinSeqNr                  uint64
-	OnRamp                    cciptypes.UnknownAddress
-}
-
 // GetOffRampSourceChainsConfig returns the static source chain configs for all the provided source chains.
 // This method returns configurations without the MinSeqNr field, which should be fetched separately when needed.
 func (r *ccipChainReader) GetOffRampSourceChainsConfig(ctx context.Context, chains []cciptypes.ChainSelector,
@@ -1436,7 +1424,7 @@ func (r *ccipChainReader) fetchFreshSourceChainConfigs(
 	ctx context.Context,
 	destChain cciptypes.ChainSelector,
 	sourceChains []cciptypes.ChainSelector,
-) (map[cciptypes.ChainSelector]SourceChainConfig, error) {
+) (map[cciptypes.ChainSelector]cciptypes.SourceChainConfig, error) {
 	lggr := logutil.WithContextValues(ctx, r.lggr)
 
 	reader, exists := r.contractReaders[destChain]
@@ -1447,7 +1435,7 @@ func (r *ccipChainReader) fetchFreshSourceChainConfigs(
 	// Filter out destination chain
 	filteredSourceChains := filterOutChainSelector(sourceChains, destChain)
 	if len(filteredSourceChains) == 0 {
-		return make(map[cciptypes.ChainSelector]SourceChainConfig), nil
+		return make(map[cciptypes.ChainSelector]cciptypes.SourceChainConfig), nil
 	}
 
 	// Prepare batch requests for the sourceChains to fetch the latest Unfinalized config values.
@@ -1461,7 +1449,7 @@ func (r *ccipChainReader) fetchFreshSourceChainConfigs(
 			Params: map[string]any{
 				"sourceChainSelector": chain,
 			},
-			ReturnVal: new(SourceChainConfig),
+			ReturnVal: new(cciptypes.SourceChainConfig),
 		})
 	}
 
@@ -1483,7 +1471,7 @@ func (r *ccipChainReader) fetchFreshSourceChainConfigs(
 	}
 
 	// Process results
-	configs := make(map[cciptypes.ChainSelector]SourceChainConfig)
+	configs := make(map[cciptypes.ChainSelector]cciptypes.SourceChainConfig)
 
 	for _, readResult := range results {
 		if len(readResult) != len(validSourceChains) {
@@ -1500,7 +1488,7 @@ func (r *ccipChainReader) fetchFreshSourceChainConfigs(
 				return nil, fmt.Errorf("GetSourceChainConfig for chainSelector=%d failed: %w", chain, err)
 			}
 
-			cfg, ok := v.(*SourceChainConfig)
+			cfg, ok := v.(*cciptypes.SourceChainConfig)
 			if !ok {
 				lggr.Errorw("Invalid result type from GetSourceChainConfig",
 					"chain", chain,
@@ -2128,7 +2116,7 @@ type ccipReaderInternal interface {
 	// fetchFreshSourceChainConfigs fetches source chain configurations from the specified destination chain
 	fetchFreshSourceChainConfigs(
 		ctx context.Context, destChain cciptypes.ChainSelector,
-		sourceChains []cciptypes.ChainSelector) (map[cciptypes.ChainSelector]SourceChainConfig, error)
+		sourceChains []cciptypes.ChainSelector) (map[cciptypes.ChainSelector]cciptypes.SourceChainConfig, error)
 }
 
 // getDestChain returns the destination chain selector

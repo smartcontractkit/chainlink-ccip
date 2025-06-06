@@ -87,8 +87,8 @@ type StaticSourceChainConfig struct {
 
 // ToSourceChainConfig converts a CachedSourceChainConfig to a full SourceChainConfig
 // by adding the provided sequence number.
-func (s StaticSourceChainConfig) ToSourceChainConfig(minSeqNr uint64) SourceChainConfig {
-	return SourceChainConfig{
+func (s StaticSourceChainConfig) ToSourceChainConfig(minSeqNr uint64) cciptypes.SourceChainConfig {
+	return cciptypes.SourceChainConfig{
 		Router:                    s.Router,
 		IsEnabled:                 s.IsEnabled,
 		IsRMNVerificationDisabled: s.IsRMNVerificationDisabled,
