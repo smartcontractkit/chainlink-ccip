@@ -18,6 +18,7 @@
     "gas-struct-packing": "warn",
     "interface-starts-with-i": "warn",
     "import-path-check": "off",
+    "gas-custom-errors": "off",
     "func-visibility": [
       "error",
       {

@@ -91,6 +91,8 @@ compileContract pools/BurnToAddressMintTokenPool
 compileContract pools/TokenPool
 compileContract pools/USDC/USDCTokenPool
 compileContract pools/SiloedLockReleaseTokenPool
+compileContract pools/BurnMintFastTransferTokenPool
+
 
 # Test helpers
 compileContract test/helpers/BurnMintERC677Helper
