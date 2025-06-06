@@ -56,6 +56,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   // A domain is a USDC representation of a chain.
   struct DomainUpdate {
     bytes32 allowedCaller; //       Address allowed to mint on the domain
+    bytes32 mintRecipient; //     Address of the mint recipient on the domain
     uint32 domainIdentifier; // ──╮ Unique domain ID
     uint64 destChainSelector; //  │ The destination chain for this domain
     bool enabled; // ─────────────╯ Whether the domain is enabled
@@ -79,10 +80,13 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   /// @dev Zero is a valid domain identifier.
   /// @dev The address to mint on the destination chain is the corresponding USDC pool.
   /// @dev The allowedCaller represents the contract authorized to call receiveMessage on the destination CCTP message transmitter.
+  /// @dev The mintRecipient is the address of the overriden mint recipient on the domain, which will receive the tokens
+  /// from CCTP and then be forwarded to the receiver on certain non-EVM chains.
   /// For dest pool version 1.6.1, this is the MessageTransmitterProxy of the destination chain.
   /// For dest pool version 1.5.1, this is the destination chain's token pool.
   struct Domain {
-    bytes32 allowedCaller; //      Address allowed to mint on the domain
+    bytes32 allowedCaller; //     Address allowed to mint on the domain
+    bytes32 mintRecipient; //     Address of the overriden mint recipient on the domain
     uint32 domainIdentifier; // ─╮ Unique domain ID
     bool enabled; // ────────────╯ Whether the domain is enabled
   }
@@ -156,9 +160,8 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     // forwards the tokens to the receiver. The message itself will not be changed and the destination token pool will
     // still receive the correct address of the final token receiver.
     bytes32 decodedReceiver;
-    bytes32 overridedMintRecipient = s_mintRecipientOverrides[lockOrBurnIn.remoteChainSelector];
-    if (overridedMintRecipient != bytes32(0)) {
-      decodedReceiver = overridedMintRecipient;
+    if (domain.mintRecipient != bytes32(0)) {
+      decodedReceiver = domain.mintRecipient;
     } else {
       decodedReceiver = abi.decode(lockOrBurnIn.receiver, (bytes32));
     }
@@ -302,41 +305,11 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
 
       s_chainToDomain[domain.destChainSelector] = Domain({
         domainIdentifier: domain.domainIdentifier,
+        mintRecipient: domain.mintRecipient,
         allowedCaller: domain.allowedCaller,
         enabled: domain.enabled
       });
     }
     emit DomainsSet(domains);
-  }
-
-  /// @notice Sets the mint recipient override for a given chain selector.
-  /// @dev This is used to override the mint recipient on a CCTP Message.
-  /// @param chainSelectors The chain selectors to override the mint recipient for.
-  /// @param mintRecipients The mint recipients to override the mint recipient for. bytes32(0) is a valid mint recipient.
-  /// to indicate that an override is no longer needed.
-  function setMintRecipientOverrides(
-    uint64[] calldata chainSelectors,
-    bytes32[] calldata mintRecipients
-  ) external onlyOwner {
-    if (chainSelectors.length != mintRecipients.length) revert TokenPool.MismatchedArrayLengths();
-
-    for (uint256 i = 0; i < chainSelectors.length; ++i) {
-      if (!isSupportedChain(chainSelectors[i])) {
-        revert UnknownDomain(chainSelectors[i]);
-      }
-
-      s_mintRecipientOverrides[chainSelectors[i]] = mintRecipients[i];
-      emit MintRecipientOverrideSet(chainSelectors[i], mintRecipients[i]);
-    }
-  }
-
-  /// @notice Gets the mint recipient override for a given chain selector.
-  /// @dev This is used to get the mint recipient override for a given chain selector.
-  /// @param chainSelector The chain selector to get the mint recipient override for.
-  /// @return The mint recipient override for the given chain selector.
-  function getMintRecipientOverride(
-    uint64 chainSelector
-  ) external view returns (bytes32) {
-    return s_mintRecipientOverrides[chainSelector];
   }
 }

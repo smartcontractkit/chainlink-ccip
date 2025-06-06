@@ -64,8 +64,8 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
     // forwards the tokens to the receiver. The message itself will not be changed and the destination token pool will
     // still receive the correct address of the final token receiver.
     bytes32 decodedReceiver;
-    if (s_mintRecipientOverrides[lockOrBurnIn.remoteChainSelector] != bytes32(0)) {
-      decodedReceiver = s_mintRecipientOverrides[lockOrBurnIn.remoteChainSelector];
+    if (domain.mintRecipient != bytes32(0)) {
+      decodedReceiver = domain.mintRecipient;
     } else {
       decodedReceiver = abi.decode(lockOrBurnIn.receiver, (bytes32));
     }

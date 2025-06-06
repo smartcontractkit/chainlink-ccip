@@ -60,19 +60,22 @@ contract USDCTokenPoolCCTPV2_lockOrBurn is USDCTokenPoolCCTPV2Setup {
     bytes32 receiver = bytes32(uint256(uint160(STRANGER)));
     uint256 amount = 1;
     s_token.transfer(address(s_usdcTokenPool), amount);
-    vm.startPrank(s_routerAllowedOnRamp);
+    vm.startPrank(OWNER);
 
     USDCTokenPool.Domain memory expectedDomain = s_usdcTokenPool.getDomain(DEST_CHAIN_SELECTOR);
 
     bytes32 mintRecipient = keccak256(abi.encodePacked(address(this)));
-    uint64[] memory chainSelectors = new uint64[](1);
-    bytes32[] memory mintRecipients = new bytes32[](1);
 
-    chainSelectors[0] = DEST_CHAIN_SELECTOR;
-    mintRecipients[0] = mintRecipient;
+    USDCTokenPool.DomainUpdate[] memory domains = new USDCTokenPool.DomainUpdate[](1);
+    domains[0] = USDCTokenPool.DomainUpdate({
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      mintRecipient: mintRecipient,
+      domainIdentifier: expectedDomain.domainIdentifier,
+      allowedCaller: expectedDomain.allowedCaller,
+      enabled: true
+    });
 
-    vm.startPrank(OWNER);
-    s_usdcTokenPool.setMintRecipientOverrides(chainSelectors, mintRecipients);
+    s_usdcTokenPool.setDomains(domains);
 
     vm.startPrank(s_routerAllowedOnRamp);
 

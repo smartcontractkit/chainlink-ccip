@@ -58,6 +58,7 @@ contract HybridLockReleaseUSDCTokenPoolSetup is USDCSetup {
     USDCTokenPool.DomainUpdate[] memory domains = new USDCTokenPool.DomainUpdate[](1);
     domains[0] = USDCTokenPool.DomainUpdate({
       destChainSelector: DEST_CHAIN_SELECTOR,
+      mintRecipient: bytes32(0),
       domainIdentifier: 9999,
       allowedCaller: keccak256("allowedCaller"),
       enabled: true

@@ -176,15 +176,22 @@ contract HybridLockReleaseUSDCTokenPool_lockOrBurn is HybridLockReleaseUSDCToken
     USDCTokenPool.Domain memory expectedDomain = s_usdcTokenPool.getDomain(DEST_CHAIN_SELECTOR);
 
     bytes32 mintRecipient = keccak256(abi.encodePacked(address(this)));
-    uint64[] memory chainSelectors = new uint64[](1);
-    bytes32[] memory mintRecipients = new bytes32[](1);
-
-    chainSelectors[0] = DEST_CHAIN_SELECTOR;
-    mintRecipients[0] = mintRecipient;
 
     vm.startPrank(OWNER);
-    s_usdcTokenPool.setMintRecipientOverrides(chainSelectors, mintRecipients);
 
+    USDCTokenPool.DomainUpdate[] memory domains = new USDCTokenPool.DomainUpdate[](1);
+    domains[0] = USDCTokenPool.DomainUpdate({
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      mintRecipient: mintRecipient,
+      domainIdentifier: expectedDomain.domainIdentifier,
+      allowedCaller: expectedDomain.allowedCaller,
+      enabled: true
+    });
+
+    s_usdcTokenPool.setDomains(domains);
+
+    uint64[] memory chainSelectors = new uint64[](1);
+    chainSelectors[0] = DEST_CHAIN_SELECTOR;
     USDCTokenPool.CCTPVersion[] memory versions = new USDCTokenPool.CCTPVersion[](1);
     versions[0] = USDCTokenPool.CCTPVersion.VERSION_2;
     s_usdcTokenPool.updateCCTPVersion(chainSelectors, versions);
