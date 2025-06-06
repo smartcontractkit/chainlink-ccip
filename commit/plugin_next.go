@@ -3,7 +3,6 @@ package commit
 import (
 	"context"
 	"fmt"
-	"sort"
 	"sync"
 	"time"
 
@@ -16,7 +15,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
@@ -191,15 +189,11 @@ func (p *Plugin) getPriceRelatedObservations(
 	return tokenPriceObs, chainFeeObs
 }
 
-// outcomeNext contains new Outcome logic with breaking changes that should replace the existing
-// Outcome in the next release.
-//
-// NOTE: If you are building a feature make sure to include your changes here.
-//
-//nolint:gocyclo
-func (p *Plugin) outcomeNext(
+// outcomeOld contains old Outcome logic that is still used for backwards compatibility purposes.
+func (p *Plugin) outcomeOld(
 	ctx context.Context, outCtx ocr3types.OutcomeContext, q types.Query, aos []types.AttributedObservation,
 ) (ocr3types.Outcome, error) {
+
 	ctx, lggr := logutil.WithOCRInfo(ctx, p.lggr, outCtx.SeqNr, logutil.PhaseOutcome)
 	lggr.Debugw("commit plugin performing outcome", "attributedObservations", aos)
 
@@ -217,8 +211,6 @@ func (p *Plugin) outcomeNext(
 	tokenPricesObservations := make([]attributedTokenPricesObservation, 0, len(aos))
 	chainFeeObservations := make([]attributedChainFeeObservation, 0, len(aos))
 	discoveryObservations := make([]plugincommon.AttributedObservation[dt.Observation], 0, len(aos))
-	observedOnChainOcrSeqNums := make([]uint64, 0, len(aos))
-	fChainObservations := make(map[cciptypes.ChainSelector][]int)
 
 	for _, ao := range aos {
 		obs, err := p.ocrTypeCodec.DecodeObservation(ao.Observation)
@@ -241,14 +233,6 @@ func (p *Plugin) outcomeNext(
 
 		discoveryObservations = append(discoveryObservations, plugincommon.AttributedObservation[dt.Observation]{
 			OracleID: ao.Observer, Observation: obs.DiscoveryObs})
-
-		if obs.OnChainPriceOcrSeqNum > 0 {
-			observedOnChainOcrSeqNums = append(observedOnChainOcrSeqNums, obs.OnChainPriceOcrSeqNum)
-		}
-
-		for chainSel, f := range obs.FChain {
-			fChainObservations[chainSel] = append(fChainObservations[chainSel], f)
-		}
 	}
 
 	if p.discoveryProcessor != nil {
@@ -274,13 +258,6 @@ func (p *Plugin) outcomeNext(
 		lggr.Errorw("failed to get merkle roots outcome", "err", err)
 	}
 
-	mainOutcome, invalidatePriceCache, err := p.getMainOutcomeAndCacheInvalidation(
-		lggr, prevOutcome, observedOnChainOcrSeqNums, fChainObservations)
-	if err != nil {
-		lggr.Errorw("failed to get main outcome and cache invalidation", "err", err)
-	}
-	ctx = context.WithValue(ctx, consts.InvalidateCacheKey, invalidatePriceCache)
-
 	tokenPriceOutcome, err := p.tokenPriceProcessor.Outcome(
 		ctx,
 		prevOutcome.TokenPriceOutcome,
@@ -298,79 +275,54 @@ func (p *Plugin) outcomeNext(
 		chainFeeObservations,
 	)
 	if err != nil {
-		lggr.Warnw("failed to get chain fee prices outcome", "err", err)
-	}
-
-	if len(tokenPriceOutcome.TokenPrices) > 0 || len(chainFeeOutcome.GasPrices) > 0 {
-		if prevOutcome.MainOutcome.InflightPriceOcrSequenceNumber > 0 {
-			lggr.Errorw("something is wrong since prices were observed and agreed while previous prices were inflight",
-				"prevMainOutcome", prevOutcome.MainOutcome,
-				"tokenPrices", tokenPriceOutcome.TokenPrices,
-				"gasPrices", chainFeeOutcome.GasPrices,
-			)
-		}
-		mainOutcome.InflightPriceOcrSequenceNumber = cciptypes.SeqNum(outCtx.SeqNr)
-		mainOutcome.RemainingPriceChecks = p.offchainCfg.InflightPriceCheckRetries
+		lggr.Warnw("failed to get gas prices outcome", "err", err)
 	}
 
 	out := committypes.Outcome{
 		MerkleRootOutcome: merkleRootOutcome,
 		TokenPriceOutcome: tokenPriceOutcome,
 		ChainFeeOutcome:   chainFeeOutcome,
-		MainOutcome:       mainOutcome,
+		MainOutcome:       p.getMainOutcome(outCtx, prevOutcome, tokenPriceOutcome, chainFeeOutcome),
 	}
 	p.metricsReporter.TrackOutcome(out)
 
 	lggr.Infow("Commit plugin finished outcome", "outcome", out)
+
 	return p.ocrTypeCodec.EncodeOutcome(out)
 }
 
-func (p *Plugin) getMainOutcomeAndCacheInvalidation(
-	lggr logger.Logger,
+func (p *Plugin) getMainOutcome(
+	outCtx ocr3types.OutcomeContext,
 	prevOutcome committypes.Outcome,
-	observedOnChainOcrSeqNums []uint64,
-	fChainObservations map[cciptypes.ChainSelector][]int,
-) (committypes.MainOutcome, bool, error) {
-	// if we didn't have prices inflight or if the inflight prices did not make it on-chain
-	// return an empty outcome indicating that nothing is inflight now
-	if prevOutcome.MainOutcome.InflightPriceOcrSequenceNumber == 0 ||
-		prevOutcome.MainOutcome.RemainingPriceChecks == 0 {
-		return committypes.MainOutcome{}, false, nil
-	}
-
-	// check if the inflight prices made it on-chain
-	// first validate and agree on fDestChain and current onChainOcrSeqNum
-	for _, v := range observedOnChainOcrSeqNums {
-		if v == 0 {
-			return committypes.MainOutcome{}, false, fmt.Errorf("observed ocr seq num cannot be zero at this point")
+	tokenPriceOutcome tokenprice.Outcome,
+	chainFeeOutcome chainfee.Outcome,
+) committypes.MainOutcome {
+	pricesObservedInThisRound := len(tokenPriceOutcome.TokenPrices) > 0 || len(chainFeeOutcome.GasPrices) > 0
+	if pricesObservedInThisRound {
+		return committypes.MainOutcome{
+			InflightPriceOcrSequenceNumber: cciptypes.SeqNum(outCtx.SeqNr),
+			RemainingPriceChecks:           p.offchainCfg.InflightPriceCheckRetries,
 		}
 	}
 
-	donThresh := consensus.MakeConstantThreshold[cciptypes.ChainSelector](consensus.TwoFPlus1(p.reportingCfg.F))
-	fChainConsensus := consensus.GetConsensusMap(lggr, "mainFChain", fChainObservations, donThresh)
-	fDestChain, ok := fChainConsensus[p.destChain]
-	if !ok {
-		return committypes.MainOutcome{}, false, fmt.Errorf("no fDestChain for %d: %v", p.destChain, fChainObservations)
-	}
+	waitingForPriceUpdatesToMakeItOnchain := prevOutcome.MainOutcome.InflightPriceOcrSequenceNumber > 0
+	if waitingForPriceUpdatesToMakeItOnchain {
+		remainingPriceChecks := prevOutcome.MainOutcome.RemainingPriceChecks - 1
+		inflightOcrSeqNum := prevOutcome.MainOutcome.InflightPriceOcrSequenceNumber
 
-	if consensus.LtFPlusOne(fDestChain, len(observedOnChainOcrSeqNums)) {
-		return committypes.MainOutcome{}, false, fmt.Errorf("onChainOcrSeqNums no consensus requiredMinimum=%d got=%d %v",
-			fDestChain+1, len(observedOnChainOcrSeqNums), observedOnChainOcrSeqNums)
-	}
+		if remainingPriceChecks < 0 {
+			remainingPriceChecks = 0
+			inflightOcrSeqNum = 0
+		}
 
-	sort.Slice(observedOnChainOcrSeqNums, func(i, j int) bool {
-		return observedOnChainOcrSeqNums[i] < observedOnChainOcrSeqNums[j]
-	})
-	consensusOnChainOcrSeqNum := observedOnChainOcrSeqNums[fDestChain]
-
-	// make the actual checks and send the corresponding outcome
-	pricesTransmitted := consensusOnChainOcrSeqNum >= uint64(prevOutcome.MainOutcome.InflightPriceOcrSequenceNumber)
-	if pricesTransmitted {
-		return committypes.MainOutcome{}, true, nil
+		return committypes.MainOutcome{
+			InflightPriceOcrSequenceNumber: inflightOcrSeqNum,
+			RemainingPriceChecks:           remainingPriceChecks,
+		}
 	}
 
 	return committypes.MainOutcome{
-		InflightPriceOcrSequenceNumber: prevOutcome.MainOutcome.InflightPriceOcrSequenceNumber,
-		RemainingPriceChecks:           prevOutcome.MainOutcome.RemainingPriceChecks - 1,
-	}, false, nil
+		InflightPriceOcrSequenceNumber: 0,
+		RemainingPriceChecks:           0,
+	}
 }
