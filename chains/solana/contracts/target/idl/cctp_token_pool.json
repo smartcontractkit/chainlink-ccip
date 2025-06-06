@@ -898,6 +898,11 @@
       "code": 6004,
       "name": "InvalidMessageTransmitter",
       "msg": "Invalid Message Transmitter"
+    },
+    {
+      "code": 6005,
+      "name": "FailedCctpCpi",
+      "msg": "Failed CCTP CPI"
     }
   ]
 }

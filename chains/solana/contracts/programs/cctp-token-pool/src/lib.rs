@@ -234,60 +234,8 @@ pub mod cctp_token_pool {
         )?;
 
         let message_and_attestation_bytes = msg_att.try_to_vec().unwrap();
-        let mut instruction_data = Vec::with_capacity(
-            RECEIVE_MESSAGE_DISCRIMINATOR.len() + message_and_attestation_bytes.len(),
-        );
-        instruction_data.extend_from_slice(&RECEIVE_MESSAGE_DISCRIMINATOR);
-        instruction_data.extend_from_slice(&message_and_attestation_bytes);
-
-        let acc_infos = vec![
-            ctx.accounts.pool_signer.clone().to_account_info(),
-            ctx.accounts.pool_signer.clone().to_account_info(),
-            remaining.cctp_authority_pda.to_account_info(),
-            remaining.cctp_message_transmitter_account.to_account_info(),
-            remaining.cctp_used_nonces.to_account_info(),
-            remaining.cctp_token_messenger_minter.to_account_info(),
-            remaining.system_program.to_account_info(),
-            remaining.cctp_event_authority.to_account_info(),
-            remaining.cctp_message_transmitter.to_account_info(),
-            remaining.cctp_token_messenger_account.to_account_info(),
-            remaining.cctp_remote_token_messenger_key.to_account_info(),
-            remaining.cctp_token_minter_account.to_account_info(),
-            remaining.cctp_local_token.to_account_info(),
-            remaining.cctp_token_pair.to_account_info(),
-            ctx.accounts
-                .receiver_token_account
-                .clone()
-                .to_account_info(),
-            remaining.cctp_custody_token_account.to_account_info(),
-            ctx.accounts.token_program.clone().to_account_info(),
-            remaining
-                .cctp_token_messenger_event_authority
-                .to_account_info(),
-            remaining.cctp_token_messenger_minter.to_account_info(),
-        ];
-
-        let acc_metas: Vec<AccountMeta> = acc_infos
-            .iter()
-            .flat_map(|acc_info| {
-                let is_signer = acc_info.key() == ctx.accounts.pool_signer.key();
-                acc_info.to_account_metas(Some(is_signer))
-            })
-            .collect();
-
-        let instruction = Instruction {
-            program_id: remaining.cctp_message_transmitter.key(),
-            accounts: acc_metas,
-            data: instruction_data,
-        };
-
-        let signer_seeds: &[&[u8]] = &[
-            POOL_SIGNER_SEED,
-            &ctx.accounts.mint.key().to_bytes(),
-            &[ctx.bumps.pool_signer],
-        ];
-
-        invoke_signed(&instruction, &acc_infos, &[signer_seeds])?;
+        cctp_receive_message(&ctx, &remaining, &message_and_attestation_bytes)?;
+        transfer_cctp_tokens(&ctx, parsed_amount, ctx.accounts.state.config.decimals)?;
 
         emit!(Minted {
             sender: ctx.accounts.authority.key(),
@@ -321,85 +269,8 @@ pub mod cctp_token_pool {
             32,
             CctpTokenPoolError::InvalidReceiver
         );
-        let mint_recipient =
-            Pubkey::new_from_array(lock_or_burn.receiver[0..32].try_into().unwrap());
 
-        let destination_domain = ctx.accounts.chain_config.cctp.domain_id;
-
-        let deposit_for_burn_params = DepositForBurnWithCallerParams {
-            amount: lock_or_burn.amount,
-            destination_domain,
-            mint_recipient,
-            destination_caller: ctx.accounts.pool_signer.key(), // TODO: using pool signer as it is svm<->svm test, this should be the destination pool (signer or contract). Read it from remote chain configs
-        };
-
-        let deposit_for_burn_params_bytes = deposit_for_burn_params.try_to_vec().unwrap();
-        let mut instruction_data = Vec::with_capacity(8 + deposit_for_burn_params_bytes.len());
-        instruction_data.extend_from_slice(&DEPOSIT_FOR_BURN_WITH_CALLER_DISCRIMINATOR);
-        instruction_data.extend_from_slice(&deposit_for_burn_params_bytes);
-
-        let acc_infos = vec![
-            ctx.accounts.pool_signer.to_account_info(),
-            ctx.accounts.pool_signer.to_account_info(),
-            ctx.accounts.cctp_authority_pda.to_account_info(),
-            ctx.accounts.pool_token_account.to_account_info(),
-            ctx.accounts
-                .cctp_message_transmitter_account
-                .to_account_info(),
-            ctx.accounts.cctp_token_messenger_account.to_account_info(),
-            ctx.accounts
-                .cctp_remote_token_messenger_key
-                .to_account_info(),
-            ctx.accounts.cctp_token_minter_account.to_account_info(),
-            ctx.accounts.cctp_local_token.to_account_info(),
-            ctx.accounts.mint.to_account_info(),
-            ctx.accounts.cctp_message_sent_event.to_account_info(),
-            ctx.accounts.cctp_message_transmitter.to_account_info(),
-            ctx.accounts.cctp_token_messenger_minter.to_account_info(),
-            ctx.accounts.token_program.to_account_info(),
-            ctx.accounts.system_program.to_account_info(),
-            ctx.accounts.cctp_event_authority.to_account_info(),
-            ctx.accounts.cctp_token_messenger_minter.to_account_info(),
-        ];
-
-        let signer_keys = vec![
-            ctx.accounts.pool_signer.key(),
-            ctx.accounts.cctp_message_sent_event.key(),
-        ];
-
-        let acc_metas: Vec<AccountMeta> = acc_infos
-            .iter()
-            .flat_map(|acc_info| {
-                let is_signer = signer_keys.contains(acc_info.key);
-                acc_info.to_account_metas(Some(is_signer))
-            })
-            .collect();
-
-        let instruction = Instruction {
-            program_id: ctx.accounts.cctp_token_messenger_minter.key(),
-            accounts: acc_metas,
-            data: instruction_data,
-        };
-
-        let pool_signer_seeds: &[&[u8]] = &[
-            POOL_SIGNER_SEED,
-            &ctx.accounts.mint.key().to_bytes(),
-            &[ctx.bumps.pool_signer],
-        ];
-
-        let message_sent_event_seeds: &[&[u8]] = &[
-            MESSAGE_SENT_EVENT_SEED,
-            &lock_or_burn.original_sender.to_bytes(),
-            &lock_or_burn.remote_chain_selector.to_le_bytes(),
-            &lock_or_burn.msg_full_nonce.to_le_bytes(),
-            &[ctx.bumps.cctp_message_sent_event],
-        ];
-
-        invoke_signed(
-            &instruction,
-            &acc_infos,
-            &[&pool_signer_seeds, &message_sent_event_seeds],
-        )?;
+        cctp_deposit_for_burn_with_caller(&ctx, &lock_or_burn)?;
 
         emit!(Burned {
             sender: ctx.accounts.authority.key(),
@@ -499,6 +370,171 @@ fn to_solana_pubkey(address: &RemoteAddress) -> Pubkey {
     Pubkey::new_from_array(solana_address)
 }
 
+fn cctp_deposit_for_burn_with_caller(
+    ctx: &Context<TokenOnramp>,
+    lock_or_burn: &LockOrBurnInV1,
+) -> Result<()> {
+    let mint_recipient = Pubkey::new_from_array(lock_or_burn.receiver[0..32].try_into().unwrap());
+
+    let destination_domain = ctx.accounts.chain_config.cctp.domain_id;
+
+    let deposit_for_burn_params = DepositForBurnWithCallerParams {
+        amount: lock_or_burn.amount,
+        destination_domain,
+        mint_recipient,
+        destination_caller: ctx.accounts.pool_signer.key(), // TODO: using pool signer as it is svm<->svm test, this should be the destination pool (signer or contract). Read it from remote chain configs
+    };
+    let deposit_for_burn_params_bytes = deposit_for_burn_params.try_to_vec().unwrap();
+
+    let mut instruction_data = Vec::with_capacity(8 + deposit_for_burn_params_bytes.len());
+    instruction_data.extend_from_slice(&DEPOSIT_FOR_BURN_WITH_CALLER_DISCRIMINATOR);
+    instruction_data.extend_from_slice(&deposit_for_burn_params_bytes);
+
+    let acc_infos = vec![
+        ctx.accounts.pool_signer.to_account_info(),
+        ctx.accounts.pool_signer.to_account_info(),
+        ctx.accounts.cctp_authority_pda.to_account_info(),
+        ctx.accounts.pool_token_account.to_account_info(),
+        ctx.accounts
+            .cctp_message_transmitter_account
+            .to_account_info(),
+        ctx.accounts.cctp_token_messenger_account.to_account_info(),
+        ctx.accounts
+            .cctp_remote_token_messenger_key
+            .to_account_info(),
+        ctx.accounts.cctp_token_minter_account.to_account_info(),
+        ctx.accounts.cctp_local_token.to_account_info(),
+        ctx.accounts.mint.to_account_info(),
+        ctx.accounts.cctp_message_sent_event.to_account_info(),
+        ctx.accounts.cctp_message_transmitter.to_account_info(),
+        ctx.accounts.cctp_token_messenger_minter.to_account_info(),
+        ctx.accounts.token_program.to_account_info(),
+        ctx.accounts.system_program.to_account_info(),
+        ctx.accounts.cctp_event_authority.to_account_info(),
+        ctx.accounts.cctp_token_messenger_minter.to_account_info(),
+    ];
+
+    let signer_keys = vec![
+        ctx.accounts.pool_signer.key(),
+        ctx.accounts.cctp_message_sent_event.key(),
+    ];
+
+    let acc_metas: Vec<AccountMeta> = acc_infos
+        .iter()
+        .flat_map(|acc_info| {
+            let is_signer = signer_keys.contains(acc_info.key);
+            acc_info.to_account_metas(Some(is_signer))
+        })
+        .collect();
+
+    let instruction = Instruction {
+        program_id: ctx.accounts.cctp_token_messenger_minter.key(),
+        accounts: acc_metas,
+        data: instruction_data,
+    };
+
+    let pool_signer_seeds: &[&[u8]] = &[
+        POOL_SIGNER_SEED,
+        &ctx.accounts.mint.key().to_bytes(),
+        &[ctx.bumps.pool_signer],
+    ];
+
+    let message_sent_event_seeds: &[&[u8]] = &[
+        MESSAGE_SENT_EVENT_SEED,
+        &lock_or_burn.original_sender.to_bytes(),
+        &lock_or_burn.remote_chain_selector.to_le_bytes(),
+        &lock_or_burn.msg_full_nonce.to_le_bytes(),
+        &[ctx.bumps.cctp_message_sent_event],
+    ];
+
+    invoke_signed(
+        &instruction,
+        &acc_infos,
+        &[&pool_signer_seeds, &message_sent_event_seeds],
+    )
+    .map_err(|_| CctpTokenPoolError::FailedCctpCpi.into())
+}
+
+fn cctp_receive_message<'info>(
+    ctx: &Context<'_, '_, 'info, 'info, TokenOfframp<'info>>,
+    remaining: &TokenOfframpRemainingAccounts<'info>,
+    message_and_attestation_bytes: &Vec<u8>,
+) -> Result<()> {
+    let mut instruction_data = Vec::with_capacity(
+        RECEIVE_MESSAGE_DISCRIMINATOR.len() + message_and_attestation_bytes.len(),
+    );
+    instruction_data.extend_from_slice(&RECEIVE_MESSAGE_DISCRIMINATOR);
+    instruction_data.extend_from_slice(&message_and_attestation_bytes);
+
+    let acc_infos = vec![
+        ctx.accounts.pool_signer.clone().to_account_info(),
+        ctx.accounts.pool_signer.clone().to_account_info(),
+        remaining.cctp_authority_pda.to_account_info(),
+        remaining.cctp_message_transmitter_account.to_account_info(),
+        remaining.cctp_used_nonces.to_account_info(),
+        remaining.cctp_token_messenger_minter.to_account_info(),
+        remaining.system_program.to_account_info(),
+        remaining.cctp_event_authority.to_account_info(),
+        remaining.cctp_message_transmitter.to_account_info(),
+        remaining.cctp_token_messenger_account.to_account_info(),
+        remaining.cctp_remote_token_messenger_key.to_account_info(),
+        remaining.cctp_token_minter_account.to_account_info(),
+        remaining.cctp_local_token.to_account_info(),
+        remaining.cctp_token_pair.to_account_info(),
+        ctx.accounts.pool_token_account.clone().to_account_info(), // always mint to the tp ATA first
+        remaining.cctp_custody_token_account.to_account_info(),
+        ctx.accounts.token_program.clone().to_account_info(),
+        remaining
+            .cctp_token_messenger_event_authority
+            .to_account_info(),
+        remaining.cctp_token_messenger_minter.to_account_info(),
+    ];
+
+    let acc_metas: Vec<AccountMeta> = acc_infos
+        .iter()
+        .flat_map(|acc_info| {
+            let is_signer = acc_info.key() == ctx.accounts.pool_signer.key();
+            acc_info.to_account_metas(Some(is_signer))
+        })
+        .collect();
+
+    let instruction = Instruction {
+        program_id: remaining.cctp_message_transmitter.key(),
+        accounts: acc_metas,
+        data: instruction_data,
+    };
+
+    let signer_seeds: &[&[u8]] = &[
+        POOL_SIGNER_SEED,
+        &ctx.accounts.mint.key().to_bytes(),
+        &[ctx.bumps.pool_signer],
+    ];
+
+    invoke_signed(&instruction, &acc_infos, &[signer_seeds])
+        .map_err(|_| CctpTokenPoolError::FailedCctpCpi.into())
+}
+
+fn transfer_cctp_tokens(ctx: &Context<TokenOfframp>, amount: u64, decimals: u8) -> Result<()> {
+    let seeds = &[
+        POOL_SIGNER_SEED,
+        &ctx.accounts.mint.key().to_bytes(),
+        &[ctx.bumps.pool_signer],
+    ];
+    let signer_seeds: &[&[&[u8]]] = &[seeds];
+    let cpi_ctx = CpiContext::new_with_signer(
+        ctx.accounts.token_program.to_account_info(),
+        anchor_spl::token::TransferChecked {
+            from: ctx.accounts.pool_token_account.to_account_info(),
+            to: ctx.accounts.receiver_token_account.to_account_info(),
+            authority: ctx.accounts.pool_signer.to_account_info(),
+            mint: ctx.accounts.mint.to_account_info(),
+        },
+        signer_seeds,
+    );
+
+    anchor_spl::token::transfer_checked(cpi_ctx, amount, decimals)
+}
+
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct CctpMessage {
     pub data: Vec<u8>,
@@ -575,4 +611,6 @@ pub enum CctpTokenPoolError {
     InvalidTokenMessengerMinter,
     #[msg("Invalid Message Transmitter")]
     InvalidMessageTransmitter,
+    #[msg("Failed CCTP CPI")]
+    FailedCctpCpi,
 }

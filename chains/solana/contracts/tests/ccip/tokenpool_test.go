@@ -1504,7 +1504,7 @@ func TestTokenPool(t *testing.T) {
 						LocalToken:          usdcMint,
 						Amount:              messageAmount,
 						RemoteChainSelector: config.SvmChainSelector,
-						Receiver:            adminATA.Bytes(), // TODO currently pools expect a receiver here then used to derive an ATA, not the ATA directly. But CCTP requires the ATA (somewhere at least). On EVM->SVM, this will require a change in the EVM contracts...
+						Receiver:            cctpPool.tokenAccount.Bytes(),
 						OriginalSender:      user.PublicKey(),
 						MsgFullNonce:        fakeCcipFullNonce,
 					},

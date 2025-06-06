@@ -898,6 +898,11 @@ export type CctpTokenPool = {
       "code": 6004,
       "name": "InvalidMessageTransmitter",
       "msg": "Invalid Message Transmitter"
+    },
+    {
+      "code": 6005,
+      "name": "FailedCctpCpi",
+      "msg": "Failed CCTP CPI"
     }
   ]
 };
@@ -1802,6 +1807,11 @@ export const IDL: CctpTokenPool = {
       "code": 6004,
       "name": "InvalidMessageTransmitter",
       "msg": "Invalid Message Transmitter"
+    },
+    {
+      "code": 6005,
+      "name": "FailedCctpCpi",
+      "msg": "Failed CCTP CPI"
     }
   ]
 };
