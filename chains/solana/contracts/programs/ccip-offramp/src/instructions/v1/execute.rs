@@ -432,7 +432,7 @@ fn internal_execute<'info>(
 pub struct ExecuteReportContextRemainingAccountsLayout<'a> {
     pub messaging_accounts: Option<ExecuteContextRemainingMessagingAccounts<'a>>,
     pub token_accounts_per_token: Vec<ExecuteContextRemainingTokenAccounts<'a>>,
-    pub buffering_accounts: Option<ExecuteContextRemainingBufferingAccounts<'a>>,
+    pub buffering_account: Option<ExecuteContextRemainingBufferingAccount<'a>>,
 }
 
 pub struct ExecuteContextRemainingMessagingAccounts<'a> {
@@ -446,7 +446,7 @@ pub struct ExecuteContextRemainingTokenAccounts<'a> {
     pub accounts: &'a [AccountInfo<'a>],
 }
 
-pub struct ExecuteContextRemainingBufferingAccounts<'a> {
+pub struct ExecuteContextRemainingBufferingAccount<'a> {
     pub execution_buffer_account: &'a AccountInfo<'a>,
 }
 
@@ -505,10 +505,10 @@ impl<'a> ExecuteReportContextRemainingAccountsLayout<'a> {
 
         // First, if the report is buffered, it means the last account is the buffering account.
         // We can simply remove it from consideration from now on.
-        let (remaining_accounts_without_buffering, buffering_accounts) = if report_is_buffered {
+        let (remaining_accounts_without_buffering, buffering_account) = if report_is_buffered {
             (
                 &remaining_accounts[0..(remaining_accounts.len() - 1)],
-                Some(ExecuteContextRemainingBufferingAccounts {
+                Some(ExecuteContextRemainingBufferingAccount {
                     execution_buffer_account: remaining_accounts
                         .last()
                         .ok_or(CcipOfframpError::ExecutionReportUnavailable)?,
@@ -603,7 +603,7 @@ impl<'a> ExecuteReportContextRemainingAccountsLayout<'a> {
         Ok(Self {
             messaging_accounts,
             token_accounts_per_token,
-            buffering_accounts,
+            buffering_account,
         })
     }
 }

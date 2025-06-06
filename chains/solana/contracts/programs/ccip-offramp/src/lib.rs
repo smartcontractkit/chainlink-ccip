@@ -745,6 +745,8 @@ pub enum CcipOfframpError {
     ExecutionReportBufferInvalidLength,
     #[msg("Chunk lies outside the execution report buffer")]
     ExecutionReportBufferInvalidChunkIndex,
+    #[msg("Total number of chunks is not consistent")]
+    ExecutionReportBufferInvalidChunkNumber,
     #[msg("Chunk size is too small")]
     ExecutionReportBufferChunkSizeTooSmall,
     #[msg("Invalid chunk size")]

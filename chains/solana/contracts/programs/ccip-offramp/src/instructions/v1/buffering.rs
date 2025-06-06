@@ -25,7 +25,7 @@ impl Buffering for ExecutionReportBuffer {
     }
 
     fn is_complete(&self) -> bool {
-        self.is_initialized() && self.filled_chunks() == self.total_chunks
+        self.is_initialized() && self.filled_chunks() == self.num_chunks
     }
 
     fn bytes(&self) -> Result<&[u8]> {
@@ -62,6 +62,11 @@ impl Buffering for ExecutionReportBuffer {
             report_length as usize,
             CcipOfframpError::ExecutionReportBufferInvalidLength
         );
+        require_eq!(
+            self.num_chunks,
+            num_chunks,
+            CcipOfframpError::ExecutionReportBufferInvalidChunkNumber
+        );
 
         let chunk_mask = 1u64 << chunk_index;
         require!(
@@ -79,13 +84,13 @@ impl Buffering for ExecutionReportBuffer {
             // Only the terminator (last chunk) can be smaller than the others.
             require_eq!(
                 chunk_index,
-                self.total_chunks - 1,
+                self.num_chunks - 1,
                 CcipOfframpError::ExecutionReportBufferInvalidChunkSize
             );
         }
 
         require_gt!(
-            self.total_chunks,
+            self.num_chunks,
             chunk_index,
             CcipOfframpError::ExecutionReportBufferInvalidChunkIndex
         );
@@ -116,7 +121,7 @@ impl ExecutionReportBuffer {
             CcipOfframpError::ExecutionReportBufferInvalidLength
         );
         require!(
-            total_chunks < 64 && total_chunks > 0,
+            total_chunks <= 64 && total_chunks > 0,
             CcipOfframpError::ExecutionReportBufferInvalidChunkSize
         );
 
@@ -136,7 +141,7 @@ impl ExecutionReportBuffer {
             CcipOfframpError::ExecutionReportBufferInvalidLength,
         );
         self.chunk_length = global_chunk_length;
-        self.total_chunks = total_chunks;
+        self.num_chunks = total_chunks;
         self.data.resize(report_length as usize, 0);
 
         Ok(())
@@ -177,7 +182,7 @@ mod tests {
         ExecutionReportBuffer {
             data: vec![],
             chunk_bitmap: 0,
-            total_chunks: 0,
+            num_chunks: 0,
             chunk_length: 0,
             version: 0,
         }

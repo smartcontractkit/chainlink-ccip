@@ -665,6 +665,13 @@ pub struct CloseExecutionReportBufferContext<'info> {
     )]
     pub execution_report_buffer: Account<'info, ExecutionReportBuffer>,
 
+    #[account(
+        seeds = [seed::CONFIG],
+        bump,
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipOfframpError::InvalidVersion,
+    )]
+    pub config: AccountLoader<'info, Config>,
+
     #[account(mut)]
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,

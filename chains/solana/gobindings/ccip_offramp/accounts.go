@@ -280,7 +280,7 @@ func (obj *GlobalState) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err er
 type ExecutionReportBuffer struct {
 	Version     uint8
 	ChunkBitmap uint64
-	TotalChunks uint8
+	NumChunks   uint8
 	ChunkLength uint32
 	Data        []byte
 }
@@ -303,8 +303,8 @@ func (obj ExecutionReportBuffer) MarshalWithEncoder(encoder *ag_binary.Encoder) 
 	if err != nil {
 		return err
 	}
-	// Serialize `TotalChunks` param:
-	err = encoder.Encode(obj.TotalChunks)
+	// Serialize `NumChunks` param:
+	err = encoder.Encode(obj.NumChunks)
 	if err != nil {
 		return err
 	}
@@ -345,8 +345,8 @@ func (obj *ExecutionReportBuffer) UnmarshalWithDecoder(decoder *ag_binary.Decode
 	if err != nil {
 		return err
 	}
-	// Deserialize `TotalChunks`:
-	err = decoder.Decode(&obj.TotalChunks)
+	// Deserialize `NumChunks`:
+	err = decoder.Decode(&obj.NumChunks)
 	if err != nil {
 		return err
 	}

@@ -1135,6 +1135,11 @@ export type CcipOfframp = {
           "isSigner": false
         },
         {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "authority",
           "isMut": true,
           "isSigner": true
@@ -1328,7 +1333,7 @@ export type CcipOfframp = {
             "type": "u64"
           },
           {
-            "name": "totalChunks",
+            "name": "numChunks",
             "type": "u8"
           },
           {
@@ -2533,21 +2538,26 @@ export type CcipOfframp = {
     },
     {
       "code": 9061,
+      "name": "ExecutionReportBufferInvalidChunkNumber",
+      "msg": "Total number of chunks is not consistent"
+    },
+    {
+      "code": 9062,
       "name": "ExecutionReportBufferChunkSizeTooSmall",
       "msg": "Chunk size is too small"
     },
     {
-      "code": 9062,
+      "code": 9063,
       "name": "ExecutionReportBufferInvalidChunkSize",
       "msg": "Invalid chunk size"
     },
     {
-      "code": 9063,
+      "code": 9064,
       "name": "ExecutionReportBufferIncomplete",
       "msg": "Execution report buffer is not complete: chunks are missing"
     },
     {
-      "code": 9064,
+      "code": 9065,
       "name": "ExecutionReportUnavailable",
       "msg": "Execution report wasn't provided either directly or via buffer"
     }
@@ -3691,6 +3701,11 @@ export const IDL: CcipOfframp = {
           "isSigner": false
         },
         {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "authority",
           "isMut": true,
           "isSigner": true
@@ -3884,7 +3899,7 @@ export const IDL: CcipOfframp = {
             "type": "u64"
           },
           {
-            "name": "totalChunks",
+            "name": "numChunks",
             "type": "u8"
           },
           {
@@ -5089,21 +5104,26 @@ export const IDL: CcipOfframp = {
     },
     {
       "code": 9061,
+      "name": "ExecutionReportBufferInvalidChunkNumber",
+      "msg": "Total number of chunks is not consistent"
+    },
+    {
+      "code": 9062,
       "name": "ExecutionReportBufferChunkSizeTooSmall",
       "msg": "Chunk size is too small"
     },
     {
-      "code": 9062,
+      "code": 9063,
       "name": "ExecutionReportBufferInvalidChunkSize",
       "msg": "Invalid chunk size"
     },
     {
-      "code": 9063,
+      "code": 9064,
       "name": "ExecutionReportBufferIncomplete",
       "msg": "Execution report buffer is not complete: chunks are missing"
     },
     {
-      "code": 9064,
+      "code": 9065,
       "name": "ExecutionReportUnavailable",
       "msg": "Execution report wasn't provided either directly or via buffer"
     }

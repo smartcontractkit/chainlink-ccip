@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"maps"
-	"math"
 	"math/big"
 	"sort"
 	"testing"
@@ -9571,10 +9570,6 @@ func TestCCIPRouter(t *testing.T) {
 				ix = sendChunk(t, 0, chunkSize, 4, data, bufferID, bufferPDA, transmitter)
 				result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, transmitter, config.DefaultCommitment)
 				totalSolSpentInFees += result.Meta.Fee
-				// Checking again after the terminator shuffling
-				ix = sendChunk(t, 3, terminatorSize, 4, data, bufferID, bufferPDA, transmitter)
-				result = testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, transmitter, config.DefaultCommitment, []string{"Error Code: ExecutionReportBufferAlreadyContainsChunk"})
-				totalSolSpentInFees += result.Meta.Fee
 				ix = sendChunk(t, 1, terminatorSize, 4, data, bufferID, bufferPDA, transmitter)
 				result = testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, transmitter, config.DefaultCommitment, []string{"Error Code: ExecutionReportBufferInvalidChunkSize"})
 				totalSolSpentInFees += result.Meta.Fee
@@ -9592,19 +9587,12 @@ func TestCCIPRouter(t *testing.T) {
 				rent := (initialLamports - finalLamportsBeforeClose) - totalSolSpentInFees
 
 				// We now close the buffer to recover the rent
-				closeIx, err := ccip_offramp.NewCloseExecutionReportBufferInstruction(bufferID[:], bufferPDA, transmitter.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+				closeIx, err := ccip_offramp.NewCloseExecutionReportBufferInstruction(bufferID[:], bufferPDA, config.OfframpConfigPDA, transmitter.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 				require.NoError(t, err)
 				result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{closeIx}, transmitter, config.DefaultCommitment)
 				finalLamportsAfterClose := getLamports(transmitter.PublicKey())
 				closeDiff := finalLamportsAfterClose - finalLamportsBeforeClose
-
-				within10PercentOf := func(a int, b int) bool {
-					diff := math.Abs(float64(a - b))
-					return diff <= 0.1*math.Max(float64(a), float64(b))
-				}
-
-				// TODO work out exact math: the rent is being recovered but there's some slight drift in the fees.
-				require.True(t, within10PercentOf(int(rent), int(closeDiff-result.Meta.Fee)))
+				require.Equal(t, rent-result.Meta.Fee, closeDiff)
 			})
 
 			t.Run("When executing a report with oversized data, it fails, but it succeeds when buffered", func(t *testing.T) {
@@ -9794,7 +9782,7 @@ func TestCCIPRouter(t *testing.T) {
 				require.Equal(t, commitReport.MerkleRoot.MaxSeqNr, rootAccount.MaxMsgNr)
 			})
 
-			t.Run("Direct buffering execution, happy path", func(t *testing.T) {
+			t.Run("Buffered execution, happy path", func(t *testing.T) {
 				transmitter := getTransmitter()
 
 				msgAccounts := []solana.PublicKey{config.CcipLogicReceiver, config.ReceiverExternalExecutionConfigPDA, config.ReceiverTargetAccountPDA, solana.SystemProgramID}
