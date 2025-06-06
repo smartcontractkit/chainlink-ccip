@@ -533,62 +533,19 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 func (r *ccipChainReader) LatestMsgSeqNum(
 	ctx context.Context, chain cciptypes.ChainSelector) (cciptypes.SeqNum, error) {
 	lggr := logutil.WithContextValues(ctx, r.lggr)
-	if err := validateReaderExistence(r.contractReaders, chain); err != nil {
+	if err := validateAccessorExistence(r.accessors, chain); err != nil {
 		return 0, err
 	}
 
-	seq, err := r.contractReaders[chain].ExtendedQueryKey(
-		ctx,
-		consts.ContractNameOnRamp,
-		query.KeyFilter{
-			Key: consts.EventNameCCIPMessageSent,
-			Expressions: []query.Expression{
-				query.Comparator(consts.EventAttributeSourceChain, primitives.ValueComparator{
-					Value:    chain,
-					Operator: primitives.Eq,
-				}),
-				query.Comparator(consts.EventAttributeDestChain, primitives.ValueComparator{
-					Value:    r.destChain,
-					Operator: primitives.Eq,
-				}),
-				query.Confidence(primitives.Finalized),
-			},
-		},
-		query.LimitAndSort{
-			SortBy: []query.SortBy{
-				query.NewSortBySequence(query.Desc),
-			},
-			Limit: query.Limit{Count: 1},
-		},
-		&cciptypes.SendRequestedEvent{},
-	)
+	seqNum, err := r.accessors[chain].LatestMsgSeqNum(ctx, r.destChain)
 	if err != nil {
-		return 0, fmt.Errorf("failed to query onRamp: %w", err)
-	}
-
-	lggr.Debugw("queried latest message from source",
-		"numMsgs", len(seq), "sourceChainSelector", chain)
-	if len(seq) > 1 {
-		return 0, fmt.Errorf("more than one message found for the latest message query")
-	}
-	if len(seq) == 0 {
-		return 0, nil
-	}
-
-	item := seq[0]
-	msg, ok := item.Data.(*cciptypes.SendRequestedEvent)
-	if !ok {
-		return 0, fmt.Errorf("failed to cast %v to SendRequestedEvent", item.Data)
-	}
-
-	if err := chainaccessor.ValidateSendRequestedEvent(msg, chain, r.destChain,
-		cciptypes.NewSeqNumRange(msg.Message.Header.SequenceNumber, msg.Message.Header.SequenceNumber)); err != nil {
-		return 0, fmt.Errorf("message invalid msg %v: %w", msg, err)
+		return 0, fmt.Errorf("failed to call accessor LatestMsgSeqNum, source chain: %d, dest chain: %d: %w",
+			chain, r.destChain, err)
 	}
 
 	lggr.Infow("chain reader returning latest onramp sequence number",
-		"seqNum", msg.Message.Header.SequenceNumber, "sourceChainSelector", chain)
-	return msg.SequenceNumber, nil
+		"seqNum", seqNum, "sourceChainSelector", chain)
+	return seqNum, nil
 }
 
 // GetExpectedNextSequenceNumber implements CCIP.
