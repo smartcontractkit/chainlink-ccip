@@ -195,6 +195,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     poolFee = (amount * poolFeeBps) / BPS_DIVIDER;
     totalFee = fillerFee + poolFee;
     amountNetFee = amount - totalFee;
+    return (fillerFee, poolFee, totalFee, amountNetFee);
   }
 
   /// @inheritdoc IFastTransferPool
@@ -324,7 +325,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
 
     // Calculate the fast transfer inputs
     address receiver = address(uint160(uint256(bytes32(mintMessage.receiver))));
-    (uint256 sourceFillerFee, uint256 sourcePoolFee,, uint256 sourceAmountToFill) = _calculateFastTransferFees(
+    (, uint256 sourcePoolFee,, uint256 sourceAmountToFill) = _calculateFastTransferFees(
       mintMessage.sourceAmount, mintMessage.fastTransferFillerFeeBps, mintMessage.fastTransferPoolFeeBps
     );
     // Inputs are in the source chain denomination, so we need to convert them to the local token denomination.
