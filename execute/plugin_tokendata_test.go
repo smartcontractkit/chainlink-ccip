@@ -110,7 +110,7 @@ func Test_LBTC_USDC_Transfer(t *testing.T) {
 		}`,
 	}
 
-	intTest := SetupSimpleTest(t, logger2.Test(t), []cciptypes.ChainSelector{sourceChain}, destChain)
+	intTest := SetupSimpleTest(t, logger2.Nop(), []cciptypes.ChainSelector{sourceChain}, destChain)
 	intTest.WithMessages(messages, 1000, time.Now().Add(-4*time.Hour), 1, sourceChain)
 	intTest.WithUSDC(usdcAddress, usdcAttestation104_108, events, sourceChain)
 	intTest.WithLBTC(lbtcAddress, lbtcAttestation106_108, sourceChain)
