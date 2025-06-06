@@ -113,7 +113,8 @@ func (c *CommitCodecProto) EncodeObservation(observation committypes.Observation
 				Addresses: c.tr.discoveryAddressesToProto(observation.DiscoveryObs.Addresses),
 			},
 		},
-		FChain: c.tr.fChainToProto(observation.FChain),
+		FChain:                c.tr.fChainToProto(observation.FChain),
+		OnchainPriceOcrSeqNum: observation.OnChainPriceOcrSeqNum,
 	}
 	return proto.Marshal(pbObs)
 }
@@ -154,7 +155,8 @@ func (c *CommitCodecProto) DecodeObservation(data []byte) (committypes.Observati
 			FChain:    c.tr.fChainFromProto(pbObs.DiscoveryObs.FChain),
 			Addresses: c.tr.discoveryAddressesFromProto(pbObs.DiscoveryObs.ContractNames.Addresses),
 		},
-		FChain: c.tr.fChainFromProto(pbObs.FChain),
+		FChain:                c.tr.fChainFromProto(pbObs.FChain),
+		OnChainPriceOcrSeqNum: pbObs.OnchainPriceOcrSeqNum,
 	}, nil
 }
 

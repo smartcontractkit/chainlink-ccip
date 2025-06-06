@@ -11,6 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/mathslib"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
@@ -25,6 +26,10 @@ func (p *processor) Outcome(
 	aos []plugincommon.AttributedObservation[Observation],
 ) (Outcome, error) {
 	lggr := logutil.WithContextValues(ctx, p.lggr)
+
+	if invalidateCache, ok := ctx.Value(consts.InvalidateCacheKey).(bool); ok && invalidateCache {
+		p.obs.invalidateCaches(ctx, lggr)
+	}
 
 	consensusObs, err := p.getConsensusObservation(lggr, aos)
 	if err != nil {

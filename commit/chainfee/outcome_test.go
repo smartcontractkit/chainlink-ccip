@@ -1,11 +1,14 @@
 package chainfee
 
 import (
+	"context"
 	"math/big"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 
 	"github.com/stretchr/testify/mock"
 
@@ -430,4 +433,47 @@ func TestProcessor_Outcome(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestProcessor_Outcome_cacheInvalidation(t *testing.T) {
+	lggr := logger.Test(t)
+	ctx := tests.Context(t)
+
+	obs := &asyncObserver{
+		lggr:            lggr,
+		cancelFunc:      nil,
+		mu:              &sync.RWMutex{},
+		triggerSyncChan: make(chan time.Time),
+	}
+
+	p := &processor{
+		lggr: lggr,
+		obs:  obs,
+	}
+
+	obs.mu.Lock()
+	obs.chainFeePriceUpdates = map[cciptypes.ChainSelector]Update{1: {}}
+	obs.mu.Unlock()
+
+	// cache is not invalidated with a normal context
+	_, _ = p.Outcome(ctx, Outcome{}, Query{}, nil)
+	updates := obs.getChainFeePriceUpdates(ctx, lggr)
+	require.Len(t, updates, 1)
+
+	// cache is not invalidated with invalidation context set to false
+	ctx = context.WithValue(ctx, consts.InvalidateCacheKey, false)
+	_, _ = p.Outcome(ctx, Outcome{}, Query{}, nil)
+	updates = obs.getChainFeePriceUpdates(ctx, lggr)
+	require.Len(t, updates, 1)
+
+	// cache is invalidated with invalidation context set to true and a sync op is triggered
+	wg := sync.WaitGroup{}
+	go func() {
+		<-obs.triggerSyncChan
+	}()
+	ctx = context.WithValue(ctx, consts.InvalidateCacheKey, true)
+	_, _ = p.Outcome(ctx, Outcome{}, Query{}, nil)
+	updates = obs.getChainFeePriceUpdates(ctx, lggr)
+	require.Len(t, updates, 0)
+	wg.Wait() // wait until receiving the sync operation signal
 }
