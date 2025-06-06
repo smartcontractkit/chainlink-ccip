@@ -234,6 +234,9 @@ type RampMessageHeader struct {
 	// OnRamp is the address of the onramp that sent the message.
 	// NOTE: This is populated by the ccip reader. Not emitted explicitly onchain.
 	OnRamp UnknownAddress `json:"onRamp"`
+
+	// TxHash is the hash of the transaction that emitted this message.
+	TxHash string `json:"txHash"`
 }
 
 // RampTokenAmount represents the family-agnostic token amounts used for both OnRamp & OffRamp messages.
