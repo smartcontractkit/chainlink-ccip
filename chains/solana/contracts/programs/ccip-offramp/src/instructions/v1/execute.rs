@@ -1,6 +1,8 @@
 use anchor_lang::prelude::*;
-use ccip_common::seed;
+use ccip_common::router_accounts::TokenAdminRegistry;
 use ccip_common::v1::{validate_and_parse_token_accounts, TokenAccounts, MIN_TOKEN_POOL_ACCOUNTS};
+use ccip_common::{seed, CommonCcipError};
+use solana_program::address_lookup_table::state::AddressLookupTable;
 use solana_program::instruction::Instruction;
 use solana_program::program::invoke_signed;
 use solana_program::sysvar::instructions;
@@ -135,18 +137,17 @@ impl Execute for Impl {
         execute_caller: Pubkey,
         message_accounts: Vec<CcipAccountMeta>,
     ) -> Result<DerivePdasResponse> {
-        let state = DerivePdasExecuteStateMachine::from_remaining_accounts(ctx.remaining_accounts)?;
+        let report = ExecutionReportSingleChain::deserialize(&mut raw_execution_report.as_ref())
+            .map_err(|_| CcipOfframpError::FailedToDeserializeReport)?;
+        let stage = DerivePdasExecuteStage::infer_from(ctx.remaining_accounts, &report)?;
 
-        match state {
-            DerivePdasExecuteStateMachine::FirstStage => {
-                derive_pdas_execute_first_stage(raw_execution_report)
+        match stage {
+            DerivePdasExecuteStage::First => derive_pdas_execute_first_stage(&report),
+            DerivePdasExecuteStage::Second => derive_pdas_execute_second_stage(ctx, &report),
+            DerivePdasExecuteStage::Third => derive_pdas_execute_third_stage(ctx, &report),
+            DerivePdasExecuteStage::Fourth => {
+                derive_pdas_execute_fourth_stage(ctx, &report, execute_caller, message_accounts)
             }
-            DerivePdasExecuteStateMachine::SecondStage => derive_pdas_execute_second_stage(
-                ctx,
-                raw_execution_report,
-                execute_caller,
-                message_accounts,
-            ),
         }
     }
 }
@@ -154,6 +155,14 @@ impl Execute for Impl {
 /////////////
 // Helpers //
 /////////////
+
+// Local helper to find a readonly CCIP meta for a given seed + program_id combo.
+// Short name for compactness.
+fn find(seeds: &[&[u8]], program_id: Pubkey) -> CcipAccountMeta {
+    Pubkey::find_program_address(seeds, &program_id)
+        .0
+        .readonly()
+}
 
 fn ocr3_transmit_report<'info>(
     ctx: &Context<'_, '_, 'info, 'info, ExecuteReportContext<'info>>,
@@ -180,34 +189,49 @@ fn ocr3_transmit_report<'info>(
     Ok(())
 }
 
-enum DerivePdasExecuteStateMachine {
-    FirstStage,
-    SecondStage,
+enum DerivePdasExecuteStage {
+    // Retrieve necessary basic information (reference
+    // addresses and source chain accounts)
+    First,
+    // Retrieve token admin registries for all tokens
+    // (this stage is skipped if there are no tokens)
+    Second,
+    // Retrieve look up tables from the token admin registries.
+    // (this stage is skipped if there are no tokens)
+    Third,
+    // Assemble all information required to call `execute`.
+    Fourth,
 }
 
-impl DerivePdasExecuteStateMachine {
-    fn from_remaining_accounts(remaining_accounts: &[AccountInfo<'_>]) -> Result<Self> {
+impl DerivePdasExecuteStage {
+    fn infer_from(
+        remaining_accounts: &[AccountInfo<'_>],
+        report: &ExecutionReportSingleChain,
+    ) -> Result<Self> {
+        let num_tokens = report.message.token_amounts.len();
+        let skip_second_and_third = num_tokens == 0;
+
         match remaining_accounts.len() {
-            0 => Ok(DerivePdasExecuteStateMachine::FirstStage),
-            2 => Ok(DerivePdasExecuteStateMachine::SecondStage),
+            0 => Ok(DerivePdasExecuteStage::First),
+            2 if !skip_second_and_third => Ok(DerivePdasExecuteStage::Second),
+            n if !skip_second_and_third && n == 2 + num_tokens => Ok(DerivePdasExecuteStage::Third),
+            n if n == 2 + 2 * num_tokens => Ok(DerivePdasExecuteStage::Fourth),
             _ => Err(CcipOfframpError::InvalidAccountListForPdaDerivation.into()),
         }
     }
 }
 
-fn derive_pdas_execute_first_stage(raw_execution_report: Vec<u8>) -> Result<DerivePdasResponse> {
-    let report = ExecutionReportSingleChain::deserialize(&mut raw_execution_report.as_ref())
-        .map_err(|_| CcipOfframpError::FailedToDeserializeReport)?;
+fn derive_pdas_execute_first_stage(
+    report: &ExecutionReportSingleChain,
+) -> Result<DerivePdasResponse> {
     let selector = report.source_chain_selector.to_le_bytes();
-
-    let find = |seeds, id| Pubkey::find_program_address(seeds, id).0.readonly();
 
     Ok(DerivePdasResponse {
         account_metas: vec![
             // reference_addresses
-            find(&[seed::REFERENCE_ADDRESSES], &crate::ID),
+            find(&[seed::REFERENCE_ADDRESSES], crate::ID),
             // // source_chain
-            find(&[seed::SOURCE_CHAIN, &selector], &crate::ID),
+            find(&[seed::SOURCE_CHAIN, &selector], crate::ID),
         ],
         ask_again: true,
     })
@@ -215,20 +239,94 @@ fn derive_pdas_execute_first_stage(raw_execution_report: Vec<u8>) -> Result<Deri
 
 fn derive_pdas_execute_second_stage<'info>(
     ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
-    raw_execution_report: Vec<u8>,
+    report: &ExecutionReportSingleChain,
+) -> Result<DerivePdasResponse> {
+    let ReferenceAddresses { router, .. } =
+        *AccountLoader::<'info, ReferenceAddresses>::try_from(&ctx.remaining_accounts[0])?
+            .load()?;
+
+    let selector = report.source_chain_selector.to_le_bytes();
+
+    let token_admin_registries: Vec<CcipAccountMeta> = report
+        .message
+        .token_amounts
+        .iter()
+        .map(|ta| {
+            find(
+                &[seed::TOKEN_ADMIN_REGISTRY, ta.dest_token_address.as_ref()],
+                router,
+            )
+        })
+        .collect();
+
+    let mut account_metas = vec![
+        // reference_addresses
+        find(&[seed::REFERENCE_ADDRESSES], crate::ID),
+        // // source_chain
+        find(&[seed::SOURCE_CHAIN, &selector], crate::ID),
+    ];
+
+    account_metas.extend_from_slice(&token_admin_registries);
+
+    Ok(DerivePdasResponse {
+        account_metas,
+        ask_again: true,
+    })
+}
+
+fn derive_pdas_execute_third_stage<'info>(
+    ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
+    report: &ExecutionReportSingleChain,
+) -> Result<DerivePdasResponse> {
+    let selector = report.source_chain_selector.to_le_bytes();
+
+    let num_tokens = report.message.token_amounts.len();
+    let registries = &ctx.remaining_accounts[2..];
+    require_eq!(
+        registries.len(),
+        num_tokens,
+        CcipOfframpError::InvalidAccountListForPdaDerivation
+    );
+
+    let lookup_table_metas = registries.iter().map(|registry| {
+        let token_admin_registry_account: Account<TokenAdminRegistry> =
+            Account::try_from(registry).expect("parsing token admin registry account");
+        token_admin_registry_account.lookup_table.readonly()
+    });
+
+    let mut account_metas = vec![
+        // reference_addresses
+        find(&[seed::REFERENCE_ADDRESSES], crate::ID),
+        // // source_chain
+        find(&[seed::SOURCE_CHAIN, &selector], crate::ID),
+    ];
+
+    let registry_metas = registries.iter().map(|registry| registry.key.readonly());
+    account_metas.extend(registry_metas);
+    account_metas.extend(lookup_table_metas);
+
+    Ok(DerivePdasResponse {
+        account_metas,
+        ask_again: true,
+    })
+}
+
+fn derive_pdas_execute_fourth_stage<'info>(
+    ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
+    report: &ExecutionReportSingleChain,
     execute_caller: Pubkey,
     message_accounts: Vec<CcipAccountMeta>,
 ) -> Result<DerivePdasResponse> {
     let ReferenceAddresses {
-        router, rmn_remote, ..
+        router,
+        rmn_remote,
+        fee_quoter,
+        ..
     } = *AccountLoader::<'info, ReferenceAddresses>::try_from(&ctx.remaining_accounts[0])?
         .load()?;
 
     let source_chain = Account::<'info, SourceChain>::try_from(&ctx.remaining_accounts[1])?;
 
-    let report = ExecutionReportSingleChain::deserialize(&mut raw_execution_report.as_ref())
-        .map_err(|_| CcipOfframpError::FailedToDeserializeReport)?;
-    let find = |seeds, id| Pubkey::find_program_address(seeds, id).0.readonly();
     let selector = report.source_chain_selector.to_le_bytes();
 
     let hashed_leaf = hash(
@@ -240,21 +338,21 @@ fn derive_pdas_execute_second_stage<'info>(
         .map_err(|_| CcipOfframpError::UnexpectedMerkleRoot)?;
 
     let mut account_metas = vec![
-        find(&[seed::CONFIG], &crate::ID).readonly(),
-        find(&[seed::REFERENCE_ADDRESSES], &crate::ID),
-        find(&[seed::SOURCE_CHAIN, &selector], &crate::ID),
-        find(&[seed::COMMIT_REPORT, &selector, &merkle_root], &crate::ID).writable(),
+        find(&[seed::CONFIG], crate::ID).readonly(),
+        find(&[seed::REFERENCE_ADDRESSES], crate::ID),
+        find(&[seed::SOURCE_CHAIN, &selector], crate::ID),
+        find(&[seed::COMMIT_REPORT, &selector, &merkle_root], crate::ID).writable(),
         crate::ID.readonly(),
         find(
             &[seed::ALLOWED_OFFRAMP, &selector, crate::ID.as_ref()],
-            &router,
+            router,
         ),
         execute_caller.writable().signer(),
         solana_program::system_program::ID.readonly(),
         instructions::ID.readonly(),
         rmn_remote.readonly(),
-        find(&[seed::CURSES], &rmn_remote),
-        find(&[seed::CONFIG], &rmn_remote),
+        find(&[seed::CURSES], rmn_remote),
+        find(&[seed::CONFIG], rmn_remote),
     ];
 
     if !message_accounts.is_empty() {
@@ -269,7 +367,64 @@ fn derive_pdas_execute_second_stage<'info>(
         ));
         account_metas.extend_from_slice(&message_accounts[1..]);
     }
-    // TODO token accounts ()
+
+    let start_of_regiestries_index = 2;
+    let start_of_token_luts_index = 2 + report.message.token_amounts.len();
+    let token_registries =
+        &ctx.remaining_accounts[start_of_regiestries_index..start_of_token_luts_index];
+    let token_look_up_tables = &ctx.remaining_accounts[start_of_token_luts_index..];
+
+    for (i, token) in report.message.token_amounts.iter().enumerate() {
+        let token_admin_registry: Account<TokenAdminRegistry> =
+            Account::try_from(&token_registries[i]).expect("parsing token admin registry account");
+        token_admin_registry.lookup_table.readonly();
+
+        let lut = &token_look_up_tables[i];
+        let lookup_table_data = &mut &lut.data.borrow()[..];
+        let lookup_table_account: AddressLookupTable =
+            AddressLookupTable::deserialize(lookup_table_data)
+                .map_err(|_| CommonCcipError::InvalidInputsLookupTableAccounts)?;
+
+        let pool_program = lookup_table_account.addresses[2];
+        let token_mint = lookup_table_account.addresses[7];
+        let ccip_offramp_pool_signer = find(
+            &[seed::EXTERNAL_TOKEN_POOLS_SIGNER, pool_program.as_ref()],
+            crate::ID,
+        )
+        .readonly();
+
+        let user_token_account = token.dest_token_address.writable();
+        let token_billing_config = find(
+            &[
+                seed::PER_CHAIN_PER_TOKEN_CONFIG,
+                &selector,
+                token_mint.as_ref(),
+            ],
+            fee_quoter,
+        )
+        .readonly();
+
+        let pool_chain_config = find(
+            &[seed::CCIP_TOKENPOOL_CONFIG, &selector, token_mint.as_ref()],
+            pool_program,
+        )
+        .writable();
+
+        account_metas.extend_from_slice(&[
+            ccip_offramp_pool_signer,
+            user_token_account,
+            token_billing_config,
+            pool_chain_config,
+        ]);
+        account_metas.extend(lookup_table_account.addresses.iter().enumerate().map(
+            |(i, a)| match i {
+                // PoolConfig, PoolTokenAccount and Mint from the LUT are writable.
+                3 | 4 | 7 => a.writable(),
+                _ => a.readonly(),
+            },
+        ));
+    }
+
     Ok(DerivePdasResponse {
         account_metas,
         ask_again: false,
