@@ -329,6 +329,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     uint256 localPoolFee = _calculateLocalAmount(sourcePoolFee, mintMessage.sourceDecimals);
     bytes32 fillId = computeFillId(
       settlementId,
+      // sourceAmountNetFee is the amount minus the fast fill fee, so we need to subtract both fees.
       mintMessage.sourceAmount - sourceFillerFee - sourcePoolFee,
       mintMessage.sourceDecimals,
       abi.encode(receiver)
