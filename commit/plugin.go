@@ -487,6 +487,11 @@ func (p *Plugin) Outcome(
 	if err != nil {
 		lggr.Errorw("failed to get main outcome and cache invalidation", "err", err)
 	}
+
+	// We invalidate the cache when we detect that inflight price updates appeared on-chain.
+	// This is because at this moment we know that prices are updated
+	// and want to instantly sync a potentially outdated cache.
+	// Otherwise, oracles might re-observe the old prices in the next round.
 	ctx = context.WithValue(ctx, consts.InvalidateCacheKey, invalidatePriceCache)
 
 	tokenPriceOutcome, err := p.tokenPriceProcessor.Outcome(
