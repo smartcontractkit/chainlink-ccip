@@ -15,7 +15,7 @@ pub const ANCHOR_DISCRIMINATOR: usize = 8;
 /// version numbers than this will be rejected.
 pub const MAX_CONFIG_V: u8 = 1;
 const MAX_CHAINSTATE_V: u8 = 1;
-const MAX_NONCE_V: u8 = 1;
+const MAX_NONCE_V: u8 = 2;
 
 pub const fn valid_version(v: u8, max_version: u8) -> bool {
     !uninitialized(v) && v <= max_version
@@ -278,7 +278,7 @@ pub struct CcipSend<'info> {
         bump,
         constraint = valid_version(config.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
     )]
-    pub config: Account<'info, Config>,
+    pub config: Box<Account<'info, Config>>,
 
     #[account(
         mut,
@@ -286,7 +286,7 @@ pub struct CcipSend<'info> {
         bump,
         constraint = valid_version(dest_chain_state.version, MAX_CHAINSTATE_V) @ CcipRouterError::InvalidVersion,
     )]
-    pub dest_chain_state: Account<'info, DestChain>,
+    pub dest_chain_state: Box<Account<'info, DestChain>>,
 
     #[account(
         init_if_needed,

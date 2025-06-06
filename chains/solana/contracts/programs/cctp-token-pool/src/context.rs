@@ -526,7 +526,7 @@ pub struct TokenOnramp<'info> {
             MESSAGE_SENT_EVENT_SEED,
             &lock_or_burn.original_sender.to_bytes(),
             &lock_or_burn.remote_chain_selector.to_le_bytes(),
-            &lock_or_burn.msg_nonce.to_le_bytes(),
+            &lock_or_burn.msg_full_nonce.to_le_bytes(),
         ],
         bump,
         owner = System::id(), // this is not initialized yet, it will later be owned by CCTP

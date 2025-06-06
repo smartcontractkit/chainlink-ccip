@@ -391,7 +391,7 @@ pub mod cctp_token_pool {
             MESSAGE_SENT_EVENT_SEED,
             &lock_or_burn.original_sender.to_bytes(),
             &lock_or_burn.remote_chain_selector.to_le_bytes(),
-            &lock_or_burn.msg_nonce.to_le_bytes(),
+            &lock_or_burn.msg_full_nonce.to_le_bytes(),
             &[ctx.bumps.cctp_message_sent_event],
         ];
 

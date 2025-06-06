@@ -244,8 +244,9 @@ func (obj *DestChain) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err erro
 }
 
 type Nonce struct {
-	Version uint8
-	Counter uint64
+	Version        uint8
+	OrderedCounter uint64
+	FullCounter    uint64
 }
 
 var NonceDiscriminator = [8]byte{143, 197, 147, 95, 106, 165, 50, 43}
@@ -261,8 +262,13 @@ func (obj Nonce) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	if err != nil {
 		return err
 	}
-	// Serialize `Counter` param:
-	err = encoder.Encode(obj.Counter)
+	// Serialize `OrderedCounter` param:
+	err = encoder.Encode(obj.OrderedCounter)
+	if err != nil {
+		return err
+	}
+	// Serialize `FullCounter` param:
+	err = encoder.Encode(obj.FullCounter)
 	if err != nil {
 		return err
 	}
@@ -288,8 +294,13 @@ func (obj *Nonce) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	if err != nil {
 		return err
 	}
-	// Deserialize `Counter`:
-	err = decoder.Decode(&obj.Counter)
+	// Deserialize `OrderedCounter`:
+	err = decoder.Decode(&obj.OrderedCounter)
+	if err != nil {
+		return err
+	}
+	// Deserialize `FullCounter`:
+	err = decoder.Decode(&obj.FullCounter)
 	if err != nil {
 		return err
 	}

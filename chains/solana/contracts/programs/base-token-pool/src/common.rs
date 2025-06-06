@@ -290,7 +290,7 @@ impl Deref for RemoteAddress {
     }
 }
 
-#[derive(Clone, AnchorSerialize, AnchorDeserialize)]
+#[derive(Clone, AnchorSerialize, AnchorDeserialize, Debug)]
 pub struct LockOrBurnInV1 {
     pub receiver: Vec<u8>, //  The recipient of the tokens on the destination chain
     pub remote_chain_selector: u64, // The chain ID of the destination chain
@@ -298,8 +298,7 @@ pub struct LockOrBurnInV1 {
     pub amount: u64, // local solana amount to lock/burn,  The amount of tokens to lock or burn, denominated in the source token's decimals
     pub local_token: Pubkey, //  The address on this chain of the token to lock or burn
 
-    pub msg_nonce: u64, // The onramp nonce for the current message, given the original_sender and remote chain selector.
-                        // ! TODO define the upgrade process, as this is an extension to the router->pool interface
+    pub msg_full_nonce: u64, // The onramp full nonce for the current message, given the original_sender and remote chain selector.
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]

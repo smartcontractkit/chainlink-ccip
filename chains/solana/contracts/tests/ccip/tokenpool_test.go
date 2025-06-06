@@ -1476,13 +1476,13 @@ func TestTokenPool(t *testing.T) {
 			require.NoError(t, err)
 
 			remoteChainSelector := config.SvmChainSelector
-			fakeCcipNonce := uint64(1234567890)
+			fakeCcipFullNonce := uint64(1234567890)
 
 			messageSentEventAddress, _, err := solana.FindProgramAddress([][]byte{
 				[]byte("cctp_message_sent_event"),
 				user.PublicKey().Bytes(),
 				common.Uint64ToLE(remoteChainSelector),
-				common.Uint64ToLE(fakeCcipNonce),
+				common.Uint64ToLE(fakeCcipFullNonce),
 			}, cctpPool.program)
 			require.NoError(t, err)
 
@@ -1506,7 +1506,7 @@ func TestTokenPool(t *testing.T) {
 						RemoteChainSelector: config.SvmChainSelector,
 						Receiver:            adminATA.Bytes(), // TODO currently pools expect a receiver here then used to derive an ATA, not the ATA directly. But CCTP requires the ATA (somewhere at least). On EVM->SVM, this will require a change in the EVM contracts...
 						OriginalSender:      user.PublicKey(),
-						MsgNonce:            fakeCcipNonce,
+						MsgFullNonce:        fakeCcipFullNonce,
 					},
 					cctpPool.program,
 					dumbRampCctpSigner,
@@ -1640,7 +1640,7 @@ func TestTokenPool(t *testing.T) {
 					usdcMint,
 					user.PublicKey(),
 					remoteChainSelector,
-					fakeCcipNonce,
+					fakeCcipFullNonce,
 					attestation,
 					cctpPool.state,
 					cctpPool.signer,

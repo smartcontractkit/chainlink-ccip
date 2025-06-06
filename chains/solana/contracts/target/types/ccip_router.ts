@@ -1260,7 +1260,11 @@ export type CcipRouter = {
             "type": "u8"
           },
           {
-            "name": "counter",
+            "name": "orderedCounter",
+            "type": "u64"
+          },
+          {
+            "name": "fullCounter",
             "type": "u64"
           }
         ]
@@ -3232,7 +3236,11 @@ export const IDL: CcipRouter = {
             "type": "u8"
           },
           {
-            "name": "counter",
+            "name": "orderedCounter",
+            "type": "u64"
+          },
+          {
+            "name": "fullCounter",
             "type": "u64"
           }
         ]

@@ -163,7 +163,7 @@
             "type": "publicKey"
           },
           {
-            "name": "msgNonce",
+            "name": "msgFullNonce",
             "type": "u64"
           }
         ]

@@ -3787,6 +3787,27 @@ func TestCCIPRouter(t *testing.T) {
 	//////////////////////////
 
 	t.Run("OnRamp ccipSend", func(t *testing.T) {
+		type UserFullNonce struct {
+			user        uint64
+			admin       uint64
+			anotherUser uint64
+		}
+		NewUserFullNonces := func() UserFullNonce {
+			return UserFullNonce{
+				user:        0,
+				admin:       0,
+				anotherUser: 0,
+			}
+		}
+		type ChainUserFullNonce struct {
+			evm UserFullNonce
+			svm UserFullNonce
+		}
+		fullNonces := ChainUserFullNonce{
+			evm: NewUserFullNonces(),
+			svm: NewUserFullNonces(),
+		}
+
 		t.Run("When sending to an invalid destination chain selector it fails", func(t *testing.T) {
 			destinationChainSelector := uint64(189)
 			destinationChainStatePDA, err := state.FindDestChainStatePDA(destinationChainSelector, config.CcipRouterProgram)
@@ -3938,6 +3959,7 @@ func TestCCIPRouter(t *testing.T) {
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
 			instruction, err := raw.ValidateAndBuild()
 			require.NoError(t, err)
+
 			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment)
 			require.NotNil(t, result)
 
@@ -3950,7 +3972,10 @@ func TestCCIPRouter(t *testing.T) {
 			var nonceCounterAccount ccip_router.Nonce
 			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, nonceEvmPDA, config.DefaultCommitment, &nonceCounterAccount)
 			require.NoError(t, err, "failed to get account info")
-			require.Equal(t, uint64(1), nonceCounterAccount.Counter)
+			require.Equal(t, uint64(1), nonceCounterAccount.OrderedCounter)
+
+			fullNonces.evm.user += 1 // we just sent a successful message from the user to EVM
+			require.Equal(t, fullNonces.evm.user, nonceCounterAccount.FullCounter)
 
 			ccipMessageSentEvent := ccip.EventCCIPMessageSent{}
 			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "CCIPMessageSent", &ccipMessageSentEvent, config.PrintEvents))
@@ -4023,7 +4048,9 @@ func TestCCIPRouter(t *testing.T) {
 			var nonceCounterAccount ccip_router.Nonce
 			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, nonceEvmPDA, config.DefaultCommitment, &nonceCounterAccount)
 			require.NoError(t, err, "failed to get account info")
-			require.Equal(t, uint64(1), nonceCounterAccount.Counter)
+			require.Equal(t, uint64(1), nonceCounterAccount.OrderedCounter)
+			fullNonces.evm.user += 1 // we just sent a successful message from the user to EVM
+			require.Equal(t, fullNonces.evm.user, nonceCounterAccount.FullCounter)
 
 			ccipMessageSentEvent := ccip.EventCCIPMessageSent{}
 			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "CCIPMessageSent", &ccipMessageSentEvent, config.PrintEvents))
@@ -4091,7 +4118,9 @@ func TestCCIPRouter(t *testing.T) {
 			var nonceCounterAccount ccip_router.Nonce
 			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, nonceEvmPDA, config.DefaultCommitment, &nonceCounterAccount)
 			require.NoError(t, err, "failed to get account info")
-			require.Equal(t, uint64(2), nonceCounterAccount.Counter)
+			require.Equal(t, uint64(2), nonceCounterAccount.OrderedCounter)
+			fullNonces.evm.user += 1 // we just sent a successful message from the user to EVM
+			require.Equal(t, fullNonces.evm.user, nonceCounterAccount.FullCounter)
 
 			ccipMessageSentEvent := ccip.EventCCIPMessageSent{}
 			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "CCIPMessageSent", &ccipMessageSentEvent, config.PrintEvents))
@@ -4160,7 +4189,9 @@ func TestCCIPRouter(t *testing.T) {
 			var nonceCounterAccount ccip_router.Nonce
 			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, nonceEvmPDA, config.DefaultCommitment, &nonceCounterAccount)
 			require.NoError(t, err, "failed to get account info")
-			require.Equal(t, uint64(2), nonceCounterAccount.Counter)
+			require.Equal(t, uint64(2), nonceCounterAccount.OrderedCounter)
+			fullNonces.evm.user += 1
+			require.Equal(t, fullNonces.evm.user, nonceCounterAccount.FullCounter)
 
 			ccipMessageSentEvent := ccip.EventCCIPMessageSent{}
 			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "CCIPMessageSent", &ccipMessageSentEvent, config.PrintEvents))
@@ -4228,7 +4259,9 @@ func TestCCIPRouter(t *testing.T) {
 			var nonceCounterAccount ccip_router.Nonce
 			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, nonceEvmPDA, config.DefaultCommitment, &nonceCounterAccount)
 			require.NoError(t, err, "failed to get account info")
-			require.Equal(t, uint64(3), nonceCounterAccount.Counter)
+			require.Equal(t, uint64(3), nonceCounterAccount.OrderedCounter)
+			fullNonces.evm.user += 1 // we just sent a successful message from the user to EVM
+			require.Equal(t, fullNonces.evm.user, nonceCounterAccount.FullCounter)
 
 			ccipMessageSentEvent := ccip.EventCCIPMessageSent{}
 			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "CCIPMessageSent", &ccipMessageSentEvent, config.PrintEvents))
@@ -4522,7 +4555,9 @@ func TestCCIPRouter(t *testing.T) {
 			var nonceCounterAccount ccip_router.Nonce
 			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, anotherUserNonceEVMPDA, config.DefaultCommitment, &nonceCounterAccount)
 			require.NoError(t, err, "failed to get account info")
-			require.Equal(t, uint64(1), nonceCounterAccount.Counter)
+			require.Equal(t, uint64(1), nonceCounterAccount.OrderedCounter)
+			fullNonces.evm.anotherUser += 1 // we just sent a successful message from anotherUser to EVM
+			require.Equal(t, fullNonces.evm.anotherUser, nonceCounterAccount.FullCounter)
 
 			ccipMessageSentEvent := ccip.EventCCIPMessageSent{}
 			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "CCIPMessageSent", &ccipMessageSentEvent, config.PrintEvents))
@@ -4602,6 +4637,8 @@ func TestCCIPRouter(t *testing.T) {
 
 				result := testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{ixApprove, ix}, user, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(300_000))
 				require.NotNil(t, result)
+
+				fullNonces.evm.user += 1 // we just sent a successful message from the user to EVM
 
 				// check CCIP event
 				ccipMessageSentEvent := ccip.EventCCIPMessageSent{}
@@ -4728,6 +4765,8 @@ func TestCCIPRouter(t *testing.T) {
 				result := testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{ixApprove0, ixApprove1, ix}, user, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(800_000))
 				require.NotNil(t, result)
 
+				fullNonces.evm.user += 1 // we just sent a successful message from the user to EVM
+
 				// check balances
 				_, currBal0, err := tokens.TokenBalance(ctx, solanaGoClient, token0.User[user.PublicKey()], config.DefaultCommitment)
 				require.NoError(t, err)
@@ -4805,6 +4844,8 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, err)
 			result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment)
 			require.NotNil(t, result)
+
+			fullNonces.evm.user += 1 // we just sent a successful message from the user to EVM
 
 			// We now restore the config to keep the test state-neutral
 			updateDestChainIx, err = ccip_router.NewUpdateDestChainConfigInstruction(
@@ -5050,6 +5091,8 @@ func TestCCIPRouter(t *testing.T) {
 					result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment)
 					require.NotNil(t, result)
 
+					fullNonces.evm.user += 1 // we just sent a successful message from the user to EVM
+
 					finalBalance := getBalance(token.billingATA)
 
 					// Check that the billing receiver account balance has increased by the fee amount
@@ -5159,6 +5202,8 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, err)
 			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment)
 			require.NotNil(t, result)
+
+			fullNonces.evm.user += 1 // we just sent a successful message from the user to EVM
 
 			finalBalance := getBalance(wsol.billingATA)
 			finalLamports := getLamports(user.PublicKey())

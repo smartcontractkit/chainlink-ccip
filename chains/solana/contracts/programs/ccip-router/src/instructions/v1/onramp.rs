@@ -147,7 +147,12 @@ impl OnRamp for Impl {
         let source_chain_selector = ctx.accounts.config.svm_chain_selector;
 
         let nonce_counter_account: &mut Account<'info, Nonce> = &mut ctx.accounts.nonce;
-        let final_nonce = bump_nonce(
+        {
+            let authority = ctx.accounts.authority.to_account_info();
+            let system_program = ctx.accounts.system_program.to_account_info();
+            nonce_version_checks(nonce_counter_account, &authority, &system_program)?;
+        }
+        let (final_nonce, full_nonce) = bump_nonce(
             nonce_counter_account,
             get_fee_result
                 .processed_extra_args
@@ -216,7 +221,7 @@ impl OnRamp for Impl {
                     original_sender: ctx.accounts.authority.key(),
                     amount: token_amount.amount,
                     local_token: token_amount.token,
-                    msg_nonce: final_nonce,
+                    msg_full_nonce: full_nonce,
                 };
 
                 let mut acc_infos = current_token_accounts
@@ -372,23 +377,96 @@ mod helpers {
     pub(super) fn bump_nonce(
         nonce_counter_account: &mut Account<Nonce>,
         allow_out_of_order_execution: bool,
-    ) -> Result<u64> {
-        // Avoid Re-initialization attack as the account is init_if_needed
-        // https://solana.com/developers/courses/program-security/reinitialization-attacks#add-is-initialized-check
-        if nonce_counter_account.version == 0 {
-            // The authority must be the owner of the PDA, as it's their Public Key in the seed
-            // If the account is not initialized, initialize it
-            nonce_counter_account.version = 1;
-            nonce_counter_account.counter = 0;
-        }
+    ) -> Result<(u64, u64)> {
+        nonce_counter_account.full_counter =
+            nonce_counter_account.full_counter.checked_add(1).unwrap();
 
         // config.enforce_out_of_order checked in `validate_svm2any`
         let mut final_nonce = 0;
         if !allow_out_of_order_execution {
-            nonce_counter_account.counter = nonce_counter_account.counter.checked_add(1).unwrap();
-            final_nonce = nonce_counter_account.counter;
+            nonce_counter_account.ordered_counter = nonce_counter_account
+                .ordered_counter
+                .checked_add(1)
+                .unwrap();
+            final_nonce = nonce_counter_account.ordered_counter;
         }
-        Ok(final_nonce)
+        Ok((final_nonce, nonce_counter_account.full_counter))
+    }
+
+    pub fn nonce_version_checks<'info>(
+        nonce_counter_account: &mut Account<'info, Nonce>,
+        authority: &AccountInfo<'info>,
+        system_program: &AccountInfo<'info>,
+    ) -> Result<()> {
+        match nonce_counter_account.version {
+            // Avoid Re-initialization attack as the account is init_if_needed
+            // https://solana.com/developers/courses/program-security/reinitialization-attacks#add-is-initialized-check
+            0 => {
+                // The authority must be the owner of the PDA, as it's their Public Key in the seed
+                // If the account is not initialized, initialize it
+                nonce_counter_account.version = 2;
+                nonce_counter_account.ordered_counter = 0;
+                nonce_counter_account.full_counter = 0;
+            }
+            // Migrate from version 1 to version 2, which adds the full_counter field
+            1 => {
+                nonce_counter_account.version = 2;
+
+                let acc_info_extend: AccountInfo<'info> = nonce_counter_account.to_account_info();
+
+                extend_account(
+                    &acc_info_extend,
+                    Nonce::INIT_SPACE,
+                    authority,
+                    system_program,
+                    false,
+                )?;
+
+                // In general, the full_counter >= ordered_counter, so initialize it to the ordered_counter value
+                nonce_counter_account.full_counter = nonce_counter_account.ordered_counter;
+            }
+            // Version 2 is the latest version, no migration needed
+            2 => {}
+            // Should never happen, this is already checked in the context
+            _ => {
+                return Err(CcipRouterError::InvalidVersion.into());
+            }
+        }
+        Ok(())
+    }
+
+    fn extend_account<'info>(
+        account_to_extend: &AccountInfo<'info>,
+        new_len: usize,
+        payer: &AccountInfo<'info>,
+        system_program: &AccountInfo<'info>,
+        zero_init: bool,
+    ) -> Result<()> {
+        let current_len = account_to_extend.data_len();
+        if current_len >= new_len {
+            return Ok(()); // No need to extend the account
+        }
+
+        let anchor_rent = anchor_lang::prelude::Rent::get()?;
+        let new_rent_minimum = anchor_rent.minimum_balance(new_len);
+        let current_lamports = account_to_extend.lamports();
+
+        if current_lamports < new_rent_minimum {
+            anchor_lang::system_program::transfer(
+                anchor_lang::context::CpiContext::new(
+                    system_program.to_account_info(),
+                    anchor_lang::system_program::Transfer {
+                        from: payer.to_account_info(),
+                        to: account_to_extend.clone(),
+                    },
+                ),
+                new_rent_minimum.checked_sub(current_lamports).unwrap(),
+            )?;
+        }
+
+        account_to_extend.realloc(new_len, zero_init)?;
+
+        Ok(())
     }
 
     pub(super) fn hash(msg: &SVM2AnyRampMessage) -> [u8; 32] {
