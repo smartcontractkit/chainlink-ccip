@@ -25,6 +25,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
 
   event DomainsSet(DomainUpdate[]);
   event ConfigSet(address tokenMessenger);
+  event MintRecipientOverrideSet(uint64 chainSelector, bytes32 mintRecipient);
 
   error UnknownDomain(uint64 domain);
   error UnlockingUSDCFailed();
@@ -89,6 +90,13 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   // A mapping of CCIP chain identifiers to destination domains
   mapping(uint64 chainSelector => Domain CCTPDomain) internal s_chainToDomain;
 
+  // On certain Non-EVM chains (e.g. Solana), due to limitations in smart contract design, the recipient of newly minted
+  // tokens may not be the same as the message receiver. Instead, a special contract may be used to receive the newly minted tokens,
+  // and then forward to the receiver. This mapping is used to ensure that the CCTP deposit transaction includes the
+  // correct mintRecipient. The CCIP message itself will not be changed and the destination token pool will still receive
+  // the correct address of the final token receiver.
+  mapping(uint64 chainSelector => bytes32 mintRecipient) internal s_mintRecipientOverrides;
+
   // An enumerable list of USDC CCTP versions which allows future contracts to support multiple
   // versions of CCTP.
   EnumerableSet.UintSet internal s_supportedUSDCVersions;
@@ -143,7 +151,17 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     if (lockOrBurnIn.receiver.length != 32) {
       revert InvalidReceiver(lockOrBurnIn.receiver);
     }
-    bytes32 decodedReceiver = abi.decode(lockOrBurnIn.receiver, (bytes32));
+
+    // To support certain non-EVM chains, the mint recipient may be overridden to be a token pool which then
+    // forwards the tokens to the receiver. The message itself will not be changed and the destination token pool will
+    // still receive the correct address of the final token receiver.
+    bytes32 decodedReceiver;
+    bytes32 overridedMintRecipient = s_mintRecipientOverrides[lockOrBurnIn.remoteChainSelector];
+    if (overridedMintRecipient != bytes32(0)) {
+      decodedReceiver = overridedMintRecipient;
+    } else {
+      decodedReceiver = abi.decode(lockOrBurnIn.receiver, (bytes32));
+    }
 
     // Since this pool is the msg sender of the CCTP transaction, only this contract
     // is able to call replaceDepositForBurn. Since this contract does not implement
@@ -289,5 +307,36 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
       });
     }
     emit DomainsSet(domains);
+  }
+
+  /// @notice Sets the mint recipient override for a given chain selector.
+  /// @dev This is used to override the mint recipient on a CCTP Message.
+  /// @param chainSelectors The chain selectors to override the mint recipient for.
+  /// @param mintRecipients The mint recipients to override the mint recipient for. bytes32(0) is a valid mint recipient.
+  /// to indicate that an override is no longer needed.
+  function setMintRecipientOverrides(
+    uint64[] calldata chainSelectors,
+    bytes32[] calldata mintRecipients
+  ) external onlyOwner {
+    if (chainSelectors.length != mintRecipients.length) revert TokenPool.MismatchedArrayLengths();
+
+    for (uint256 i = 0; i < chainSelectors.length; ++i) {
+      if (!isSupportedChain(chainSelectors[i])) {
+        revert UnknownDomain(chainSelectors[i]);
+      }
+
+      s_mintRecipientOverrides[chainSelectors[i]] = mintRecipients[i];
+      emit MintRecipientOverrideSet(chainSelectors[i], mintRecipients[i]);
+    }
+  }
+
+  /// @notice Gets the mint recipient override for a given chain selector.
+  /// @dev This is used to get the mint recipient override for a given chain selector.
+  /// @param chainSelector The chain selector to get the mint recipient override for.
+  /// @return The mint recipient override for the given chain selector.
+  function getMintRecipientOverride(
+    uint64 chainSelector
+  ) external view returns (bytes32) {
+    return s_mintRecipientOverrides[chainSelector];
   }
 }

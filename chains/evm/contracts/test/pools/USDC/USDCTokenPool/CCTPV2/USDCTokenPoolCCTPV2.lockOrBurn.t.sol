@@ -56,6 +56,59 @@ contract USDCTokenPoolCCTPV2_lockOrBurn is USDCTokenPoolCCTPV2Setup {
     assertEq(s_mockUSDC.s_nonce() - 1, nonce);
   }
 
+  function test_LockOrBurn_WithMintRecipientOverride() public {
+    bytes32 receiver = bytes32(uint256(uint160(STRANGER)));
+    uint256 amount = 1;
+    s_token.transfer(address(s_usdcTokenPool), amount);
+    vm.startPrank(s_routerAllowedOnRamp);
+
+    USDCTokenPool.Domain memory expectedDomain = s_usdcTokenPool.getDomain(DEST_CHAIN_SELECTOR);
+
+    bytes32 mintRecipient = keccak256(abi.encodePacked(address(this)));
+    uint64[] memory chainSelectors = new uint64[](1);
+    bytes32[] memory mintRecipients = new bytes32[](1);
+
+    chainSelectors[0] = DEST_CHAIN_SELECTOR;
+    mintRecipients[0] = mintRecipient;
+
+    vm.startPrank(OWNER);
+    s_usdcTokenPool.setMintRecipientOverrides(chainSelectors, mintRecipients);
+
+    vm.startPrank(s_routerAllowedOnRamp);
+
+    vm.expectEmit();
+    emit ITokenMessenger.DepositForBurn(
+      address(s_token),
+      amount,
+      address(s_usdcTokenPool),
+      mintRecipient,
+      expectedDomain.domainIdentifier,
+      s_mockUSDC.DESTINATION_TOKEN_MESSENGER(),
+      expectedDomain.allowedCaller,
+      s_usdcTokenPool.MAX_FEE(),
+      s_usdcTokenPool.FINALITY_THRESHOLD(),
+      ""
+    );
+
+    vm.expectEmit();
+    emit TokenPool.LockedOrBurned({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      token: address(s_token),
+      sender: address(s_routerAllowedOnRamp),
+      amount: amount
+    });
+
+    Pool.LockOrBurnOutV1 memory poolReturnDataV1 = s_usdcTokenPool.lockOrBurn(
+      Pool.LockOrBurnInV1({
+        originalSender: OWNER,
+        receiver: abi.encodePacked(receiver),
+        amount: amount,
+        remoteChainSelector: DEST_CHAIN_SELECTOR,
+        localToken: address(s_token)
+      })
+    );
+  }
+
   function testFuzz_LockOrBurn_Success(bytes32 destinationReceiver, uint256 amount) public {
     vm.assume(destinationReceiver != bytes32(0));
     amount = bound(amount, 1, _getOutboundRateLimiterConfig().capacity);

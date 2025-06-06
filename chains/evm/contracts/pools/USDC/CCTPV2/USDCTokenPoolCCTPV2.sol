@@ -59,7 +59,16 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
     if (lockOrBurnIn.receiver.length != 32) {
       revert InvalidReceiver(lockOrBurnIn.receiver);
     }
-    bytes32 decodedReceiver = abi.decode(lockOrBurnIn.receiver, (bytes32));
+
+    // To support certain non-EVM chains, the mint recipient may be overridden to be a token pool which then
+    // forwards the tokens to the receiver. The message itself will not be changed and the destination token pool will
+    // still receive the correct address of the final token receiver.
+    bytes32 decodedReceiver;
+    if (s_mintRecipientOverrides[lockOrBurnIn.remoteChainSelector] != bytes32(0)) {
+      decodedReceiver = s_mintRecipientOverrides[lockOrBurnIn.remoteChainSelector];
+    } else {
+      decodedReceiver = abi.decode(lockOrBurnIn.receiver, (bytes32));
+    }
 
     // Since this pool is the msg sender of the CCTP transaction, only this contract
     // is able to call replaceDepositForBurn. Since this contract does not implement
