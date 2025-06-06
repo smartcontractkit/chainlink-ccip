@@ -9,6 +9,7 @@ use ccip_common::seed;
 use crate::{program::LockreleaseTokenPool, ChainConfig, State};
 
 const MAX_POOL_STATE_V: u8 = 1;
+const MAX_POOL_CONFIG_V: u8 = 1;
 
 #[derive(Accounts)]
 pub struct InitGlobalConfig<'info> {
@@ -25,6 +26,11 @@ pub struct InitGlobalConfig<'info> {
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
 
+    // Ensures that the provided program is the LockreleaseTokenPool program,
+    // and that its associated program data account matches the expected one.
+    // This guarantees that only the program's upgrade authority can modify the global config.
+    #[account(constraint = program.programdata_address()? == Some(program_data.key()))]
+    pub program: Program<'info, LockreleaseTokenPool>,
     // Global Config updates only allowed by program upgrade authority
     #[account(constraint = program_data.upgrade_authority_address == Some(authority.key()) @ CcipTokenPoolError::Unauthorized)]
     pub program_data: Account<'info, ProgramData>,
@@ -36,12 +42,18 @@ pub struct UpdateGlobalConfig<'info> {
         mut,
         seeds = [CONFIG_SEED],
         bump,
+        constraint = valid_version(config.version, MAX_POOL_CONFIG_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub config: Account<'info, PoolConfig>, // Global Config PDA of the Token Pool
 
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
 
+    // Ensures that the provided program is the LockreleaseTokenPool program,
+    // and that its associated program data account matches the expected one.
+    // This guarantees that only the program's upgrade authority can modify the global config.
+    #[account(constraint = program.programdata_address()? == Some(program_data.key()))]
+    pub program: Program<'info, LockreleaseTokenPool>,
     // Global Config updates only allowed by program upgrade authority
     #[account(constraint = program_data.upgrade_authority_address == Some(authority.key()) @ CcipTokenPoolError::Unauthorized)]
     pub program_data: Account<'info, ProgramData>,
@@ -74,6 +86,7 @@ pub struct InitializeTokenPool<'info> {
     #[account(
         seeds = [CONFIG_SEED],
         bump,
+        constraint = valid_version(config.version, MAX_POOL_CONFIG_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub config: Account<'info, PoolConfig>, // Global Config PDA of the Token Pool
 }
@@ -445,6 +458,7 @@ pub struct TokenTransfer<'info> {
 #[account]
 #[derive(InitSpace)]
 pub struct PoolConfig {
+    pub version: u8,
     pub self_served_allowed: bool,
 }
 
@@ -457,5 +471,5 @@ pub fn allowed_to_initialize_token_pool(
 ) -> bool {
     program_data.upgrade_authority_address == Some(authority.key()) || // The upgrade authority of the token pool program can initialize a token pool
     (config.self_served_allowed && Some(authority.key()) == mint.mint_authority.into() )
-    // or the mint authority of the token
+    // or the mint authority of the token (when self-serve is allowed)
 }

@@ -21,6 +21,11 @@ export type BurnmintTokenPool = {
           "isSigner": false
         },
         {
+          "name": "program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "programData",
           "isMut": false,
           "isSigner": false
@@ -43,6 +48,11 @@ export type BurnmintTokenPool = {
         },
         {
           "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "program",
           "isMut": false,
           "isSigner": false
         },
@@ -136,6 +146,16 @@ export type BurnmintTokenPool = {
           "name": "authority",
           "isMut": true,
           "isSigner": true
+        },
+        {
+          "name": "program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": [
@@ -682,6 +702,10 @@ export type BurnmintTokenPool = {
       "type": {
         "kind": "struct",
         "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
           {
             "name": "selfServedAllowed",
             "type": "bool"
@@ -754,6 +778,11 @@ export const IDL: BurnmintTokenPool = {
           "isSigner": false
         },
         {
+          "name": "program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "programData",
           "isMut": false,
           "isSigner": false
@@ -776,6 +805,11 @@ export const IDL: BurnmintTokenPool = {
         },
         {
           "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "program",
           "isMut": false,
           "isSigner": false
         },
@@ -869,6 +903,16 @@ export const IDL: BurnmintTokenPool = {
           "name": "authority",
           "isMut": true,
           "isSigner": true
+        },
+        {
+          "name": "program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": [
@@ -1415,6 +1459,10 @@ export const IDL: BurnmintTokenPool = {
       "type": {
         "kind": "struct",
         "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
           {
             "name": "selfServedAllowed",
             "type": "bool"

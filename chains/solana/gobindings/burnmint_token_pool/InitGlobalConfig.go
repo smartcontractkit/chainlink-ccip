@@ -19,14 +19,16 @@ type InitGlobalConfig struct {
 	//
 	// [2] = [] systemProgram
 	//
-	// [3] = [] programData
+	// [3] = [] program
+	//
+	// [4] = [] programData
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewInitGlobalConfigInstructionBuilder creates a new `InitGlobalConfig` instruction builder.
 func NewInitGlobalConfigInstructionBuilder() *InitGlobalConfig {
 	nd := &InitGlobalConfig{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 4),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 5),
 	}
 	return nd
 }
@@ -64,15 +66,26 @@ func (inst *InitGlobalConfig) GetSystemProgramAccount() *ag_solanago.AccountMeta
 	return inst.AccountMetaSlice[2]
 }
 
+// SetProgramAccount sets the "program" account.
+func (inst *InitGlobalConfig) SetProgramAccount(program ag_solanago.PublicKey) *InitGlobalConfig {
+	inst.AccountMetaSlice[3] = ag_solanago.Meta(program)
+	return inst
+}
+
+// GetProgramAccount gets the "program" account.
+func (inst *InitGlobalConfig) GetProgramAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[3]
+}
+
 // SetProgramDataAccount sets the "programData" account.
 func (inst *InitGlobalConfig) SetProgramDataAccount(programData ag_solanago.PublicKey) *InitGlobalConfig {
-	inst.AccountMetaSlice[3] = ag_solanago.Meta(programData)
+	inst.AccountMetaSlice[4] = ag_solanago.Meta(programData)
 	return inst
 }
 
 // GetProgramDataAccount gets the "programData" account.
 func (inst *InitGlobalConfig) GetProgramDataAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice[4]
 }
 
 func (inst InitGlobalConfig) Build() *Instruction {
@@ -105,6 +118,9 @@ func (inst *InitGlobalConfig) Validate() error {
 			return errors.New("accounts.SystemProgram is not set")
 		}
 		if inst.AccountMetaSlice[3] == nil {
+			return errors.New("accounts.Program is not set")
+		}
+		if inst.AccountMetaSlice[4] == nil {
 			return errors.New("accounts.ProgramData is not set")
 		}
 	}
@@ -123,11 +139,12 @@ func (inst *InitGlobalConfig) EncodeToTree(parent ag_treeout.Branches) {
 					instructionBranch.Child("Params[len=0]").ParentFunc(func(paramsBranch ag_treeout.Branches) {})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Accounts[len=5]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("       config", inst.AccountMetaSlice[0]))
 						accountsBranch.Child(ag_format.Meta("    authority", inst.AccountMetaSlice[1]))
 						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("  programData", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("      program", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("  programData", inst.AccountMetaSlice[4]))
 					})
 				})
 		})
@@ -146,10 +163,12 @@ func NewInitGlobalConfigInstruction(
 	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey,
+	program ag_solanago.PublicKey,
 	programData ag_solanago.PublicKey) *InitGlobalConfig {
 	return NewInitGlobalConfigInstructionBuilder().
 		SetConfigAccount(config).
 		SetAuthorityAccount(authority).
 		SetSystemProgramAccount(systemProgram).
+		SetProgramAccount(program).
 		SetProgramDataAccount(programData)
 }

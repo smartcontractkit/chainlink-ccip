@@ -21,6 +21,11 @@ export type LockreleaseTokenPool = {
           "isSigner": false
         },
         {
+          "name": "program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "programData",
           "isMut": false,
           "isSigner": false
@@ -43,6 +48,11 @@ export type LockreleaseTokenPool = {
         },
         {
           "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "program",
           "isMut": false,
           "isSigner": false
         },
@@ -790,6 +800,10 @@ export type LockreleaseTokenPool = {
       "type": {
         "kind": "struct",
         "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
           {
             "name": "selfServedAllowed",
             "type": "bool"
@@ -855,6 +869,11 @@ export const IDL: LockreleaseTokenPool = {
           "isSigner": false
         },
         {
+          "name": "program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "programData",
           "isMut": false,
           "isSigner": false
@@ -877,6 +896,11 @@ export const IDL: LockreleaseTokenPool = {
         },
         {
           "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "program",
           "isMut": false,
           "isSigner": false
         },
@@ -1624,6 +1648,10 @@ export const IDL: LockreleaseTokenPool = {
       "type": {
         "kind": "struct",
         "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
           {
             "name": "selfServedAllowed",
             "type": "bool"

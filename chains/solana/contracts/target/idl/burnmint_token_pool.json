@@ -21,6 +21,11 @@
           "isSigner": false
         },
         {
+          "name": "program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "programData",
           "isMut": false,
           "isSigner": false
@@ -43,6 +48,11 @@
         },
         {
           "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "program",
           "isMut": false,
           "isSigner": false
         },
@@ -136,6 +146,16 @@
           "name": "authority",
           "isMut": true,
           "isSigner": true
+        },
+        {
+          "name": "program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": [
@@ -682,6 +702,10 @@
       "type": {
         "kind": "struct",
         "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
           {
             "name": "selfServedAllowed",
             "type": "bool"

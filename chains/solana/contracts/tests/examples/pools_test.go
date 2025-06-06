@@ -94,10 +94,7 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 		})
 
 		t.Run("RMN Remote", func(t *testing.T) {
-			type ProgramData struct {
-				DataType uint32
-				Address  solana.PublicKey
-			}
+
 			// get program data account
 			data, err := solanaGoClient.GetAccountInfoWithOpts(ctx, config.RMNRemoteProgram, &rpc.GetAccountInfoOpts{
 				Commitment: config.DefaultCommitment,
@@ -144,7 +141,7 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 			configPDA, err = tokens.TokenPoolGlobalConfigPDA(p.poolProgram)
 			require.NoError(t, err)
 
-			ix, err := tokenpool.NewInitGlobalConfigInstruction(configPDA, admin.PublicKey(), solana.SystemProgramID, programData.Address).ValidateAndBuild()
+			ix, err := tokenpool.NewInitGlobalConfigInstruction(configPDA, admin.PublicKey(), solana.SystemProgramID, poolProgram, programData.Address).ValidateAndBuild()
 			require.NoError(t, err)
 
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{
@@ -446,6 +443,8 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 							v.tokenProgram,
 							poolSigner,
 							admin.PublicKey(),
+							p.poolProgram,
+							programData.Address,
 						).ValidateAndBuild()
 						require.NoError(t, err)
 
@@ -468,7 +467,7 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 		t.Run("self-onboard", func(t *testing.T) {
 
 			// Enable self-served token pool onboarding
-			ix, err := tokenpool.NewUpdateGlobalConfigInstruction(true, configPDA, admin.PublicKey(), solana.SystemProgramID, programData.Address).ValidateAndBuild()
+			ix, err := tokenpool.NewUpdateGlobalConfigInstruction(true, configPDA, admin.PublicKey(), solana.SystemProgramID, poolProgram, programData.Address).ValidateAndBuild()
 			require.NoError(t, err)
 
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{

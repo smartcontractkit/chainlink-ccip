@@ -17,6 +17,7 @@ pub mod burnmint_token_pool {
 
     pub fn init_global_config(ctx: Context<InitGlobalConfig>) -> Result<()> {
         ctx.accounts.config.self_served_allowed = false;
+        ctx.accounts.config.version = 1;
 
         emit!(GlobalConfigUpdated {
             self_served_allowed: ctx.accounts.config.self_served_allowed,
@@ -69,15 +70,14 @@ pub mod burnmint_token_pool {
             .unwrap_or(ctx.accounts.pool_signer.key());
 
         // Transfer the mint authority to the new mint authority using the corresponding Token Program. It can be token 22 or token spl
-        let mut ix = spl_token_2022::instruction::set_authority(
-            &spl_token_2022::ID, // use spl-token-2022 to compile instruction - change program later
+        let ix = spl_token_2022::instruction::set_authority(
+            &ctx.accounts.state.config.token_program.key(),
             &ctx.accounts.mint.key(),
             Some(&new_mint_authority),
             spl_token_2022::instruction::AuthorityType::MintTokens,
             &old_mint_authority,
             &[ctx.accounts.pool_signer.key],
         )?;
-        ix.program_id = ctx.accounts.state.config.token_program.key(); // set to user specified program
 
         let seeds = &[
             POOL_SIGNER_SEED,
@@ -94,14 +94,14 @@ pub mod burnmint_token_pool {
                     .find(|acc| acc.key() == old_mint_authority)
                     .ok_or(CcipBnMTokenPoolError::InvalidMultisig)?;
                 vec![
-                    ctx.accounts.mint.to_account_info().clone(),
-                    multisig_account.clone(),
-                    ctx.accounts.pool_signer.to_account_info().clone(),
+                    ctx.accounts.mint.to_account_info(),
+                    multisig_account.to_account_info(),
+                    ctx.accounts.pool_signer.to_account_info(),
                 ]
             } else {
                 vec![
-                    ctx.accounts.mint.to_account_info().clone(),
-                    ctx.accounts.pool_signer.to_account_info().clone(),
+                    ctx.accounts.mint.to_account_info(),
+                    ctx.accounts.pool_signer.to_account_info(),
                 ]
             };
 
