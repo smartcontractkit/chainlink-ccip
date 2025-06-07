@@ -177,7 +177,7 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("validate ocr config: %w", err)
 	}
 
-	ccipReader := readerpkg.NewCCIPChainReader(
+	ccipReader, err := readerpkg.NewCCIPChainReader(
 		ctx,
 		logutil.WithComponent(lggr, "CCIPReader"),
 		readers,
@@ -186,6 +186,9 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 		p.ocrConfig.Config.OfframpAddress,
 		p.addrCodec,
 	)
+	if err != nil {
+		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to create CCIP chain reader: %w", err)
+	}
 
 	// The node supports the chain that the token prices are on.
 	_, ok := readers[offchainConfig.PriceFeedChainSelector]
