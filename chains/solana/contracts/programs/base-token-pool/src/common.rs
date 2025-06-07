@@ -16,6 +16,8 @@ pub const POOL_SIGNER_SEED: &[u8] = b"ccip_tokenpool_signer";
 pub const EXTERNAL_TOKEN_POOLS_SIGNER: &[u8] = b"external_token_pools_signer";
 pub const ALLOWED_OFFRAMP: &[u8] = b"allowed_offramp";
 
+pub const CONFIG_SEED: &[u8] = b"config";
+
 pub const fn valid_version(v: u8, max_version: u8) -> bool {
     !uninitialized(v) && v <= max_version
 }
@@ -330,6 +332,11 @@ pub struct ReleaseOrMintOutV1 {
 }
 
 #[event]
+pub struct GlobalConfigUpdated {
+    pub self_served_allowed: bool,
+}
+
+#[event]
 pub struct Burned {
     pub sender: Pubkey,
     pub amount: u64,
@@ -411,6 +418,13 @@ pub struct OwnershipTransferred {
     pub from: Pubkey,
     pub to: Pubkey,
     pub mint: Pubkey,
+}
+
+#[event]
+pub struct MintAuthorityTransferred {
+    pub mint: Pubkey,
+    pub old_mint_authority: Pubkey,
+    pub new_mint_authority: Pubkey,
 }
 
 #[error_code]

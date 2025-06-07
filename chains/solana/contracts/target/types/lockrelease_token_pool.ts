@@ -3,6 +3,73 @@ export type LockreleaseTokenPool = {
   "name": "lockrelease_token_pool",
   "instructions": [
     {
+      "name": "initGlobalConfig",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "updateGlobalConfig",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "selfServedAllowed",
+          "type": "bool"
+        }
+      ]
+    },
+    {
       "name": "initialize",
       "accounts": [
         {
@@ -32,6 +99,11 @@ export type LockreleaseTokenPool = {
         },
         {
           "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "config",
           "isMut": false,
           "isSigner": false
         }
@@ -723,6 +795,22 @@ export type LockreleaseTokenPool = {
     }
   ],
   "accounts": [
+    {
+      "name": "poolConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "selfServedAllowed",
+            "type": "bool"
+          }
+        ]
+      }
+    },
     {
       "name": "state",
       "type": {
@@ -763,6 +851,73 @@ export const IDL: LockreleaseTokenPool = {
   "name": "lockrelease_token_pool",
   "instructions": [
     {
+      "name": "initGlobalConfig",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "updateGlobalConfig",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "selfServedAllowed",
+          "type": "bool"
+        }
+      ]
+    },
+    {
       "name": "initialize",
       "accounts": [
         {
@@ -792,6 +947,11 @@ export const IDL: LockreleaseTokenPool = {
         },
         {
           "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "config",
           "isMut": false,
           "isSigner": false
         }
@@ -1483,6 +1643,22 @@ export const IDL: LockreleaseTokenPool = {
     }
   ],
   "accounts": [
+    {
+      "name": "poolConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "selfServedAllowed",
+            "type": "bool"
+          }
+        ]
+      }
+    },
     {
       "name": "state",
       "type": {
