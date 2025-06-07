@@ -1,39 +1,11 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::TokenAccount;
-use ccip_common::v1::MIN_TOKEN_POOL_ACCOUNTS;
 use solana_program::program::get_return_data;
 use solana_program::{instruction::Instruction, program::invoke_signed};
 
 use super::messages::ReleaseOrMintInV1;
 
-use crate::CcipOfframpError;
-
 pub const CCIP_POOL_V1_RET_BYTES: usize = 8;
-
-pub fn calculate_token_pool_account_indices(
-    i: usize,
-    start_indices: &[u8],
-    remaining_accounts_count: usize,
-) -> Result<(usize, usize)> {
-    // account set = [start...end)
-    let start: usize = start_indices[i] as usize;
-    let end: usize = if i == start_indices.len() - 1 {
-        remaining_accounts_count
-    } else {
-        (start_indices[i + 1]) as usize
-    };
-
-    // validate indexes and account lengths
-    // start < end: prevent overflow
-    // end <= MAX, index not exceeded
-    // end - start >= MIN_TOKEN_POOL_ACCOUNTS, ensure there are enough accounts
-    require!(
-        start < end && end <= remaining_accounts_count && end - start >= MIN_TOKEN_POOL_ACCOUNTS,
-        CcipOfframpError::InvalidInputsTokenIndices
-    );
-
-    Ok((start, end))
-}
 
 pub(super) fn interact_with_pool(
     pool_program: Pubkey,

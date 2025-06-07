@@ -277,6 +277,92 @@ func (obj *GlobalState) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err er
 	return nil
 }
 
+type ExecutionReportBuffer struct {
+	Version     uint8
+	ChunkBitmap uint64
+	NumChunks   uint8
+	ChunkLength uint32
+	Data        []byte
+}
+
+var ExecutionReportBufferDiscriminator = [8]byte{34, 31, 166, 249, 72, 98, 246, 232}
+
+func (obj ExecutionReportBuffer) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Write account discriminator:
+	err = encoder.WriteBytes(ExecutionReportBufferDiscriminator[:], false)
+	if err != nil {
+		return err
+	}
+	// Serialize `Version` param:
+	err = encoder.Encode(obj.Version)
+	if err != nil {
+		return err
+	}
+	// Serialize `ChunkBitmap` param:
+	err = encoder.Encode(obj.ChunkBitmap)
+	if err != nil {
+		return err
+	}
+	// Serialize `NumChunks` param:
+	err = encoder.Encode(obj.NumChunks)
+	if err != nil {
+		return err
+	}
+	// Serialize `ChunkLength` param:
+	err = encoder.Encode(obj.ChunkLength)
+	if err != nil {
+		return err
+	}
+	// Serialize `Data` param:
+	err = encoder.Encode(obj.Data)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *ExecutionReportBuffer) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Read and check account discriminator:
+	{
+		discriminator, err := decoder.ReadTypeID()
+		if err != nil {
+			return err
+		}
+		if !discriminator.Equal(ExecutionReportBufferDiscriminator[:]) {
+			return fmt.Errorf(
+				"wrong discriminator: wanted %s, got %s",
+				"[34 31 166 249 72 98 246 232]",
+				fmt.Sprint(discriminator[:]))
+		}
+	}
+	// Deserialize `Version`:
+	err = decoder.Decode(&obj.Version)
+	if err != nil {
+		return err
+	}
+	// Deserialize `ChunkBitmap`:
+	err = decoder.Decode(&obj.ChunkBitmap)
+	if err != nil {
+		return err
+	}
+	// Deserialize `NumChunks`:
+	err = decoder.Decode(&obj.NumChunks)
+	if err != nil {
+		return err
+	}
+	// Deserialize `ChunkLength`:
+	err = decoder.Decode(&obj.ChunkLength)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Data`:
+	err = decoder.Decode(&obj.Data)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 type SourceChain struct {
 	Version       uint8
 	ChainSelector uint64

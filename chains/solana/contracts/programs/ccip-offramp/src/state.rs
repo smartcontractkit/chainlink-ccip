@@ -100,6 +100,17 @@ pub struct OnRampAddress {
     len: u32,
 }
 
+#[account]
+#[derive(InitSpace, Debug)]
+pub struct ExecutionReportBuffer {
+    pub version: u8,
+    pub chunk_bitmap: u64,
+    pub num_chunks: u8,
+    pub chunk_length: u32,
+    #[max_len(0)]
+    pub data: Vec<u8>,
+}
+
 impl OnRampAddress {
     pub fn bytes(&self) -> &[u8] {
         &self.bytes[0..self.len as usize]
