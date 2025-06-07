@@ -1049,6 +1049,150 @@ export type CcipOfframp = {
       ]
     },
     {
+      "name": "bufferExecutionReport",
+      "docs": [
+        "Initializes and/or inserts a chunk of report data to an execution report buffer.",
+        "",
+        "When execution reports are too large to fit in a single transaction, they can be chopped",
+        "up in chunks first (as a special case, one chunk is also acceptable), and pre-buffered",
+        "via multiple calls to this instruction.",
+        "",
+        "There's no need to pre-initialize the buffer: all chunks can be sent concurrently, and the",
+        "first one to arrive will initialize the buffer.",
+        "",
+        "To benefit from buffering, the eventual call to `execute` or `manually_execute` must",
+        "include an additional `remaining_account` with the PDA derived from",
+        "[\"execution_report_buffer\", <buffer_id>, <caller_pubkey>].",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for buffering.",
+        "* `buffer_id` - An arbitrary buffer id defined by the caller (could be the message_id).",
+        "* `report_length` - Total length in bytes of the execution report.",
+        "* `chunk` - The specific chunk to add to the buffer. Chunk must have a consistent size, except",
+        "the last one in the buffer, which may be smaller.",
+        "* `chunk_index` - The index of this chunk.",
+        "* `num_chunks` - The total number of chunks in the report."
+      ],
+      "accounts": [
+        {
+          "name": "executionReportBuffer",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "bufferId",
+          "type": "bytes"
+        },
+        {
+          "name": "reportLength",
+          "type": "u32"
+        },
+        {
+          "name": "chunk",
+          "type": "bytes"
+        },
+        {
+          "name": "chunkIndex",
+          "type": "u8"
+        },
+        {
+          "name": "numChunks",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "closeExecutionReportBuffer",
+      "docs": [
+        "Closes the execution report buffer to reclaim funds.",
+        "",
+        "Note this is only necessary when aborting a buffered transaction, or when a mistake",
+        "was made when buffering data. The buffer account will otherwise automatically close",
+        "and return funds to the caller whenever buffered execution succeeds."
+      ],
+      "accounts": [
+        {
+          "name": "executionReportBuffer",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "bufferId",
+          "type": "bytes"
+        }
+      ]
+    },
+    {
+      "name": "derivePdasExecute",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "rawExecutionReport",
+          "type": "bytes"
+        },
+        {
+          "name": "tokenIndexes",
+          "type": "bytes"
+        },
+        {
+          "name": "executeCaller",
+          "type": "publicKey"
+        },
+        {
+          "name": "messageAccounts",
+          "type": {
+            "vec": {
+              "defined": "CcipAccountMeta"
+            }
+          }
+        }
+      ],
+      "returns": {
+        "defined": "DerivePdasResponse"
+      }
+    },
+    {
       "name": "closeCommitReportAccount",
       "accounts": [
         {
@@ -1206,6 +1350,34 @@ export type CcipOfframp = {
           {
             "name": "latestPriceSequenceNumber",
             "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "executionReportBuffer",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "chunkBitmap",
+            "type": "u64"
+          },
+          {
+            "name": "numChunks",
+            "type": "u8"
+          },
+          {
+            "name": "chunkLength",
+            "type": "u32"
+          },
+          {
+            "name": "data",
+            "type": "bytes"
           }
         ]
       }
@@ -1625,6 +1797,46 @@ export type CcipOfframp = {
                 32
               ]
             }
+          }
+        ]
+      }
+    },
+    {
+      "name": "DerivePdasResponse",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "askAgain",
+            "type": "bool"
+          },
+          {
+            "name": "accountMetas",
+            "type": {
+              "vec": {
+                "defined": "CcipAccountMeta"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "CcipAccountMeta",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pubkey",
+            "type": "publicKey"
+          },
+          {
+            "name": "isSigner",
+            "type": "bool"
+          },
+          {
+            "name": "isWritable",
+            "type": "bool"
           }
         ]
       }
@@ -2378,6 +2590,56 @@ export type CcipOfframp = {
       "code": 9056,
       "name": "CommitReportHasPendingMessages",
       "msg": "Commit report has pending messages"
+    },
+    {
+      "code": 9057,
+      "name": "ExecutionReportBufferAlreadyContainsChunk",
+      "msg": "The execution report buffer already contains that chunk"
+    },
+    {
+      "code": 9058,
+      "name": "ExecutionReportBufferAlreadyInitialized",
+      "msg": "The execution report buffer is already initialized"
+    },
+    {
+      "code": 9059,
+      "name": "ExecutionReportBufferInvalidLength",
+      "msg": "Invalid length for execution report buffer"
+    },
+    {
+      "code": 9060,
+      "name": "ExecutionReportBufferInvalidChunkIndex",
+      "msg": "Chunk lies outside the execution report buffer"
+    },
+    {
+      "code": 9061,
+      "name": "ExecutionReportBufferInvalidChunkNumber",
+      "msg": "Total number of chunks is not consistent"
+    },
+    {
+      "code": 9062,
+      "name": "ExecutionReportBufferChunkSizeTooSmall",
+      "msg": "Chunk size is too small"
+    },
+    {
+      "code": 9063,
+      "name": "ExecutionReportBufferInvalidChunkSize",
+      "msg": "Invalid chunk size"
+    },
+    {
+      "code": 9064,
+      "name": "ExecutionReportBufferIncomplete",
+      "msg": "Execution report buffer is not complete: chunks are missing"
+    },
+    {
+      "code": 9065,
+      "name": "ExecutionReportUnavailable",
+      "msg": "Execution report wasn't provided either directly or via buffer"
+    },
+    {
+      "code": 9066,
+      "name": "InvalidAccountListForPdaDerivation",
+      "msg": "Invalid account list for PDA derivation"
     }
   ]
 };
@@ -3433,6 +3695,150 @@ export const IDL: CcipOfframp = {
       ]
     },
     {
+      "name": "bufferExecutionReport",
+      "docs": [
+        "Initializes and/or inserts a chunk of report data to an execution report buffer.",
+        "",
+        "When execution reports are too large to fit in a single transaction, they can be chopped",
+        "up in chunks first (as a special case, one chunk is also acceptable), and pre-buffered",
+        "via multiple calls to this instruction.",
+        "",
+        "There's no need to pre-initialize the buffer: all chunks can be sent concurrently, and the",
+        "first one to arrive will initialize the buffer.",
+        "",
+        "To benefit from buffering, the eventual call to `execute` or `manually_execute` must",
+        "include an additional `remaining_account` with the PDA derived from",
+        "[\"execution_report_buffer\", <buffer_id>, <caller_pubkey>].",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for buffering.",
+        "* `buffer_id` - An arbitrary buffer id defined by the caller (could be the message_id).",
+        "* `report_length` - Total length in bytes of the execution report.",
+        "* `chunk` - The specific chunk to add to the buffer. Chunk must have a consistent size, except",
+        "the last one in the buffer, which may be smaller.",
+        "* `chunk_index` - The index of this chunk.",
+        "* `num_chunks` - The total number of chunks in the report."
+      ],
+      "accounts": [
+        {
+          "name": "executionReportBuffer",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "bufferId",
+          "type": "bytes"
+        },
+        {
+          "name": "reportLength",
+          "type": "u32"
+        },
+        {
+          "name": "chunk",
+          "type": "bytes"
+        },
+        {
+          "name": "chunkIndex",
+          "type": "u8"
+        },
+        {
+          "name": "numChunks",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "closeExecutionReportBuffer",
+      "docs": [
+        "Closes the execution report buffer to reclaim funds.",
+        "",
+        "Note this is only necessary when aborting a buffered transaction, or when a mistake",
+        "was made when buffering data. The buffer account will otherwise automatically close",
+        "and return funds to the caller whenever buffered execution succeeds."
+      ],
+      "accounts": [
+        {
+          "name": "executionReportBuffer",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "bufferId",
+          "type": "bytes"
+        }
+      ]
+    },
+    {
+      "name": "derivePdasExecute",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "rawExecutionReport",
+          "type": "bytes"
+        },
+        {
+          "name": "tokenIndexes",
+          "type": "bytes"
+        },
+        {
+          "name": "executeCaller",
+          "type": "publicKey"
+        },
+        {
+          "name": "messageAccounts",
+          "type": {
+            "vec": {
+              "defined": "CcipAccountMeta"
+            }
+          }
+        }
+      ],
+      "returns": {
+        "defined": "DerivePdasResponse"
+      }
+    },
+    {
       "name": "closeCommitReportAccount",
       "accounts": [
         {
@@ -3590,6 +3996,34 @@ export const IDL: CcipOfframp = {
           {
             "name": "latestPriceSequenceNumber",
             "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "executionReportBuffer",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "chunkBitmap",
+            "type": "u64"
+          },
+          {
+            "name": "numChunks",
+            "type": "u8"
+          },
+          {
+            "name": "chunkLength",
+            "type": "u32"
+          },
+          {
+            "name": "data",
+            "type": "bytes"
           }
         ]
       }
@@ -4009,6 +4443,46 @@ export const IDL: CcipOfframp = {
                 32
               ]
             }
+          }
+        ]
+      }
+    },
+    {
+      "name": "DerivePdasResponse",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "askAgain",
+            "type": "bool"
+          },
+          {
+            "name": "accountMetas",
+            "type": {
+              "vec": {
+                "defined": "CcipAccountMeta"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "CcipAccountMeta",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pubkey",
+            "type": "publicKey"
+          },
+          {
+            "name": "isSigner",
+            "type": "bool"
+          },
+          {
+            "name": "isWritable",
+            "type": "bool"
           }
         ]
       }
@@ -4762,6 +5236,56 @@ export const IDL: CcipOfframp = {
       "code": 9056,
       "name": "CommitReportHasPendingMessages",
       "msg": "Commit report has pending messages"
+    },
+    {
+      "code": 9057,
+      "name": "ExecutionReportBufferAlreadyContainsChunk",
+      "msg": "The execution report buffer already contains that chunk"
+    },
+    {
+      "code": 9058,
+      "name": "ExecutionReportBufferAlreadyInitialized",
+      "msg": "The execution report buffer is already initialized"
+    },
+    {
+      "code": 9059,
+      "name": "ExecutionReportBufferInvalidLength",
+      "msg": "Invalid length for execution report buffer"
+    },
+    {
+      "code": 9060,
+      "name": "ExecutionReportBufferInvalidChunkIndex",
+      "msg": "Chunk lies outside the execution report buffer"
+    },
+    {
+      "code": 9061,
+      "name": "ExecutionReportBufferInvalidChunkNumber",
+      "msg": "Total number of chunks is not consistent"
+    },
+    {
+      "code": 9062,
+      "name": "ExecutionReportBufferChunkSizeTooSmall",
+      "msg": "Chunk size is too small"
+    },
+    {
+      "code": 9063,
+      "name": "ExecutionReportBufferInvalidChunkSize",
+      "msg": "Invalid chunk size"
+    },
+    {
+      "code": 9064,
+      "name": "ExecutionReportBufferIncomplete",
+      "msg": "Execution report buffer is not complete: chunks are missing"
+    },
+    {
+      "code": 9065,
+      "name": "ExecutionReportUnavailable",
+      "msg": "Execution report wasn't provided either directly or via buffer"
+    },
+    {
+      "code": 9066,
+      "name": "InvalidAccountListForPdaDerivation",
+      "msg": "Invalid account list for PDA derivation"
     }
   ]
 };
