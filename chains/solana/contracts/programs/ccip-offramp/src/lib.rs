@@ -606,7 +606,7 @@ pub mod ccip_offramp {
     /// The return type contains two fields:
     ///
     /// * `accounts_to_save`: The caller must append these accounts to a list they maintain.
-    ///   When complete, this list will contain all accounts needed to call `ccip_execute`
+    ///   When complete, this list will contain all accounts needed to call `ccip_execute`.
     /// * `ask_again_with`: When this list is not empty, the caller must call `derive_pdas_execute`
     ///   again, including exactly these accounts as the `remaining_accounts`.
     ///
@@ -616,8 +616,8 @@ pub mod ccip_offramp {
     /// # Arguments
     ///
     /// * `ctx`: Context containing only the offramp config.
-    /// * `report_or_buffer_id`: Either the serialized execution report, or the buffer id where it was
-    ///    buffered by the `execute_caller`.
+    /// * `report_or_buffer_id`: Either the serialized execution report, or the buffer id where the
+    ///    execution report was previously buffered by the `execute_caller`.
     /// * `execute_caller`: Public key of the account that will sign the call to `ccip_execute`.
     /// * `message_accounts`: If the transaction involves messaging, the message accounts.
     /// * `source_chain_selector`: CCIP chain selector for the source chain.
@@ -799,6 +799,8 @@ pub enum CcipOfframpError {
     ExecutionReportBufferChunkSizeTooSmall,
     #[msg("Invalid chunk size")]
     ExecutionReportBufferInvalidChunkSize,
+    #[msg("Invalid ID size for buffer")]
+    ExecutionReportBufferInvalidIdSize,
     #[msg("Execution report buffer is not complete: chunks are missing")]
     ExecutionReportBufferIncomplete,
     #[msg("Execution report wasn't provided either directly or via buffer")]
