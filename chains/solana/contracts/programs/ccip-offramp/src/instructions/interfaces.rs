@@ -71,7 +71,6 @@ pub trait Execute {
         &self,
         ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
         raw_execution_report: Vec<u8>,
-        token_indexes: Vec<u8>,
         execute_caller: Pubkey,
         message_accounts: Vec<CcipAccountMeta>,
     ) -> Result<DerivePdasResponse>;

@@ -13,7 +13,6 @@ import (
 // DerivePdasExecute is the `derivePdasExecute` instruction.
 type DerivePdasExecute struct {
 	RawExecutionReport *[]byte
-	TokenIndexes       *[]byte
 	ExecuteCaller      *ag_solanago.PublicKey
 	MessageAccounts    *[]CcipAccountMeta
 
@@ -32,12 +31,6 @@ func NewDerivePdasExecuteInstructionBuilder() *DerivePdasExecute {
 // SetRawExecutionReport sets the "rawExecutionReport" parameter.
 func (inst *DerivePdasExecute) SetRawExecutionReport(rawExecutionReport []byte) *DerivePdasExecute {
 	inst.RawExecutionReport = &rawExecutionReport
-	return inst
-}
-
-// SetTokenIndexes sets the "tokenIndexes" parameter.
-func (inst *DerivePdasExecute) SetTokenIndexes(tokenIndexes []byte) *DerivePdasExecute {
-	inst.TokenIndexes = &tokenIndexes
 	return inst
 }
 
@@ -87,9 +80,6 @@ func (inst *DerivePdasExecute) Validate() error {
 		if inst.RawExecutionReport == nil {
 			return errors.New("RawExecutionReport parameter is not set")
 		}
-		if inst.TokenIndexes == nil {
-			return errors.New("TokenIndexes parameter is not set")
-		}
 		if inst.ExecuteCaller == nil {
 			return errors.New("ExecuteCaller parameter is not set")
 		}
@@ -116,9 +106,8 @@ func (inst *DerivePdasExecute) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=4]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Params[len=3]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
 						paramsBranch.Child(ag_format.Param("RawExecutionReport", *inst.RawExecutionReport))
-						paramsBranch.Child(ag_format.Param("      TokenIndexes", *inst.TokenIndexes))
 						paramsBranch.Child(ag_format.Param("     ExecuteCaller", *inst.ExecuteCaller))
 						paramsBranch.Child(ag_format.Param("   MessageAccounts", *inst.MessageAccounts))
 					})
@@ -134,11 +123,6 @@ func (inst *DerivePdasExecute) EncodeToTree(parent ag_treeout.Branches) {
 func (obj DerivePdasExecute) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `RawExecutionReport` param:
 	err = encoder.Encode(obj.RawExecutionReport)
-	if err != nil {
-		return err
-	}
-	// Serialize `TokenIndexes` param:
-	err = encoder.Encode(obj.TokenIndexes)
 	if err != nil {
 		return err
 	}
@@ -160,11 +144,6 @@ func (obj *DerivePdasExecute) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (
 	if err != nil {
 		return err
 	}
-	// Deserialize `TokenIndexes`:
-	err = decoder.Decode(&obj.TokenIndexes)
-	if err != nil {
-		return err
-	}
 	// Deserialize `ExecuteCaller`:
 	err = decoder.Decode(&obj.ExecuteCaller)
 	if err != nil {
@@ -182,14 +161,12 @@ func (obj *DerivePdasExecute) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (
 func NewDerivePdasExecuteInstruction(
 	// Parameters:
 	rawExecutionReport []byte,
-	tokenIndexes []byte,
 	executeCaller ag_solanago.PublicKey,
 	messageAccounts []CcipAccountMeta,
 	// Accounts:
 	config ag_solanago.PublicKey) *DerivePdasExecute {
 	return NewDerivePdasExecuteInstructionBuilder().
 		SetRawExecutionReport(rawExecutionReport).
-		SetTokenIndexes(tokenIndexes).
 		SetExecuteCaller(executeCaller).
 		SetMessageAccounts(messageAccounts).
 		SetConfigAccount(config)

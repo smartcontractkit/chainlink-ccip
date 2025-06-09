@@ -612,18 +612,18 @@ func (obj *CrossChainAmount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (e
 }
 
 type DerivePdasResponse struct {
-	AskAgain     bool
-	AccountMetas []CcipAccountMeta
+	AskAgainWith   []CcipAccountMeta
+	AccountsToSave []CcipAccountMeta
 }
 
 func (obj DerivePdasResponse) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `AskAgain` param:
-	err = encoder.Encode(obj.AskAgain)
+	// Serialize `AskAgainWith` param:
+	err = encoder.Encode(obj.AskAgainWith)
 	if err != nil {
 		return err
 	}
-	// Serialize `AccountMetas` param:
-	err = encoder.Encode(obj.AccountMetas)
+	// Serialize `AccountsToSave` param:
+	err = encoder.Encode(obj.AccountsToSave)
 	if err != nil {
 		return err
 	}
@@ -631,13 +631,13 @@ func (obj DerivePdasResponse) MarshalWithEncoder(encoder *ag_binary.Encoder) (er
 }
 
 func (obj *DerivePdasResponse) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `AskAgain`:
-	err = decoder.Decode(&obj.AskAgain)
+	// Deserialize `AskAgainWith`:
+	err = decoder.Decode(&obj.AskAgainWith)
 	if err != nil {
 		return err
 	}
-	// Deserialize `AccountMetas`:
-	err = decoder.Decode(&obj.AccountMetas)
+	// Deserialize `AccountsToSave`:
+	err = decoder.Decode(&obj.AccountsToSave)
 	if err != nil {
 		return err
 	}

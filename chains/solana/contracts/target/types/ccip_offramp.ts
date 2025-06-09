@@ -1172,10 +1172,6 @@ export type CcipOfframp = {
           "type": "bytes"
         },
         {
-          "name": "tokenIndexes",
-          "type": "bytes"
-        },
-        {
           "name": "executeCaller",
           "type": "publicKey"
         },
@@ -1807,11 +1803,15 @@ export type CcipOfframp = {
         "kind": "struct",
         "fields": [
           {
-            "name": "askAgain",
-            "type": "bool"
+            "name": "askAgainWith",
+            "type": {
+              "vec": {
+                "defined": "CcipAccountMeta"
+              }
+            }
           },
           {
-            "name": "accountMetas",
+            "name": "accountsToSave",
             "type": {
               "vec": {
                 "defined": "CcipAccountMeta"
@@ -3818,10 +3818,6 @@ export const IDL: CcipOfframp = {
           "type": "bytes"
         },
         {
-          "name": "tokenIndexes",
-          "type": "bytes"
-        },
-        {
           "name": "executeCaller",
           "type": "publicKey"
         },
@@ -4453,11 +4449,15 @@ export const IDL: CcipOfframp = {
         "kind": "struct",
         "fields": [
           {
-            "name": "askAgain",
-            "type": "bool"
+            "name": "askAgainWith",
+            "type": {
+              "vec": {
+                "defined": "CcipAccountMeta"
+              }
+            }
           },
           {
-            "name": "accountMetas",
+            "name": "accountsToSave",
             "type": {
               "vec": {
                 "defined": "CcipAccountMeta"
