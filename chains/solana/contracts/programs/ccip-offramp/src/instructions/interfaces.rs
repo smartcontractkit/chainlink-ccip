@@ -70,9 +70,10 @@ pub trait Execute {
     fn derive_pdas_execute<'info>(
         &self,
         ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
-        raw_execution_report: Vec<u8>,
+        report_or_buffer_id: Vec<u8>,
         execute_caller: Pubkey,
         message_accounts: Vec<CcipAccountMeta>,
+        source_chain_selector: u64,
     ) -> Result<DerivePdasResponse>;
 }
 

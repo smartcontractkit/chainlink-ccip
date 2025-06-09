@@ -7295,7 +7295,7 @@ func TestCCIPRouter(t *testing.T) {
 					ccip_offramp.CcipAccountMeta{Pubkey: solana.SystemProgramID, IsSigner: false, IsWritable: false},
 				)
 
-				derivedAccounts := deriveExecutionAccounts(ctx, t, rawExecutionReport, transmitter, messagingAccounts, solanaGoClient)
+				derivedAccounts := deriveExecutionAccounts(ctx, t, rawExecutionReport, transmitter, messagingAccounts, sourceChainSelector, solanaGoClient)
 				builder := ccip_offramp.NewExecuteInstructionBuilder().
 					SetRawExecutionReport(rawExecutionReport).
 					SetReportContextByteWords(reportContext).
@@ -8717,7 +8717,7 @@ func TestCCIPRouter(t *testing.T) {
 						ccip_offramp.CcipAccountMeta{Pubkey: config.ReceiverTargetAccountPDA, IsSigner: false, IsWritable: true},
 						ccip_offramp.CcipAccountMeta{Pubkey: solana.SystemProgramID, IsSigner: false, IsWritable: false},
 					)
-					derivedAccounts := deriveExecutionAccounts(ctx, t, rawExecutionReport, transmitter, messagingAccounts, solanaGoClient)
+					derivedAccounts := deriveExecutionAccounts(ctx, t, rawExecutionReport, transmitter, messagingAccounts, sourceChainSelector, solanaGoClient)
 					builder := ccip_offramp.NewExecuteInstructionBuilder().
 						SetRawExecutionReport(rawExecutionReport).
 						SetReportContextByteWords(reportContext).
@@ -10286,11 +10286,12 @@ func deriveExecutionAccounts(ctx context.Context,
 	rawExecutionReport []byte,
 	transmitter solana.PrivateKey,
 	messagingAccounts []ccip_offramp.CcipAccountMeta,
+	source_chain_selector uint64,
 	solanaGoClient *rpc.Client) []*solana.AccountMeta {
 	derivedAccounts := []*solana.AccountMeta{}
 	askWith := []*solana.AccountMeta{}
 	for {
-		deriveRaw := ccip_offramp.NewDerivePdasExecuteInstruction(rawExecutionReport, transmitter.PublicKey(), messagingAccounts, config.OfframpConfigPDA)
+		deriveRaw := ccip_offramp.NewDerivePdasExecuteInstruction(rawExecutionReport, transmitter.PublicKey(), messagingAccounts, source_chain_selector, config.OfframpConfigPDA)
 		deriveRaw.AccountMetaSlice = append(deriveRaw.AccountMetaSlice, askWith...)
 		derive, err := deriveRaw.ValidateAndBuild()
 		require.NoError(t, err)

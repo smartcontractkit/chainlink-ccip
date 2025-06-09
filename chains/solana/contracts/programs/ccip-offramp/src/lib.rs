@@ -550,7 +550,7 @@ pub mod ccip_offramp {
     /// # Arguments
     ///
     /// * `ctx` - The context containing the accounts required for buffering.
-    /// * `buffer_id` - An arbitrary buffer id defined by the caller (could be the message_id).
+    /// * `buffer_id` - An arbitrary buffer id defined by the caller (could be the message_id). Max 32 bytes.
     /// * `report_length` - Total length in bytes of the execution report.
     /// * `chunk` - The specific chunk to add to the buffer. Chunk must have a consistent size, except
     ///    the last one in the buffer, which may be smaller.
@@ -616,14 +616,17 @@ pub mod ccip_offramp {
     /// # Arguments
     ///
     /// * `ctx`: Context containing only the offramp config.
-    /// * `raw_execution_report`: Serialized execution report.
+    /// * `report_or_buffer_id`: Either the serialized execution report, or the buffer id where it was
+    ///    buffered by the `execute_caller`.
     /// * `execute_caller`: Public key of the account that will sign the call to `ccip_execute`.
     /// * `message_accounts`: If the transaction involves messaging, the message accounts.
+    /// * `source_chain_selector`: CCIP chain selector for the source chain.
     pub fn derive_pdas_execute<'info>(
         ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
-        raw_execution_report: Vec<u8>,
+        report_or_buffer_id: Vec<u8>,
         execute_caller: Pubkey,
         message_accounts: Vec<CcipAccountMeta>,
+        source_chain_selector: u64,
     ) -> Result<DerivePdasResponse> {
         let default_code_version: CodeVersion = ctx
             .accounts
@@ -634,9 +637,10 @@ pub mod ccip_offramp {
 
         router::execute(default_code_version, default_code_version).derive_pdas_execute(
             ctx,
-            raw_execution_report,
+            report_or_buffer_id,
             execute_caller,
             message_accounts,
+            source_chain_selector,
         )
     }
 

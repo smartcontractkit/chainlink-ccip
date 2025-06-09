@@ -1067,7 +1067,7 @@ export type CcipOfframp = {
         "# Arguments",
         "",
         "* `ctx` - The context containing the accounts required for buffering.",
-        "* `buffer_id` - An arbitrary buffer id defined by the caller (could be the message_id).",
+        "* `buffer_id` - An arbitrary buffer id defined by the caller (could be the message_id). Max 32 bytes.",
         "* `report_length` - Total length in bytes of the execution report.",
         "* `chunk` - The specific chunk to add to the buffer. Chunk must have a consistent size, except",
         "the last one in the buffer, which may be smaller.",
@@ -1159,6 +1159,32 @@ export type CcipOfframp = {
     },
     {
       "name": "derivePdasExecute",
+      "docs": [
+        "Automatically derives all acounts required to call `ccip_execute`.",
+        "",
+        "This methods receives the bare minimum amount of information needed to construct",
+        "the entire account list to execute a transaction, and builds it iteratively",
+        "over the course of multiple calls.",
+        "",
+        "The return type contains two fields:",
+        "",
+        "* `accounts_to_save`: The caller must append these accounts to a list they maintain.",
+        "When complete, this list will contain all accounts needed to call `ccip_execute`",
+        "* `ask_again_with`: When this list is not empty, the caller must call `derive_pdas_execute`",
+        "again, including exactly these accounts as the `remaining_accounts`.",
+        "",
+        "Therefore, and starting with an empty `remaining_accounts` list, the caller must repeteadly",
+        "call `derive_pdas_execute` until `ask_again_with` is returned empty.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx`: Context containing only the offramp config.",
+        "* `report_or_buffer_id`: Either the serialized execution report, or the buffer id where it was",
+        "buffered by the `execute_caller`.",
+        "* `execute_caller`: Public key of the account that will sign the call to `ccip_execute`.",
+        "* `message_accounts`: If the transaction involves messaging, the message accounts.",
+        "* `source_chain_selector`: CCIP chain selector for the source chain."
+      ],
       "accounts": [
         {
           "name": "config",
@@ -1168,7 +1194,7 @@ export type CcipOfframp = {
       ],
       "args": [
         {
-          "name": "rawExecutionReport",
+          "name": "reportOrBufferId",
           "type": "bytes"
         },
         {
@@ -1182,6 +1208,10 @@ export type CcipOfframp = {
               "defined": "CcipAccountMeta"
             }
           }
+        },
+        {
+          "name": "sourceChainSelector",
+          "type": "u64"
         }
       ],
       "returns": {
@@ -1804,6 +1834,10 @@ export type CcipOfframp = {
         "fields": [
           {
             "name": "askAgainWith",
+            "docs": [
+              "If this vector is not empty, you must call the `derive_` method again including",
+              "exactly these accounts as the `remaining_accounts` field."
+            ],
             "type": {
               "vec": {
                 "defined": "CcipAccountMeta"
@@ -1812,6 +1846,11 @@ export type CcipOfframp = {
           },
           {
             "name": "accountsToSave",
+            "docs": [
+              "You must append these accounts at the end of a separate list. When `ask_again_with`",
+              "is finally empty, this separate list will contain all the accounts to use for the",
+              "instruction of interest."
+            ],
             "type": {
               "vec": {
                 "defined": "CcipAccountMeta"
@@ -3713,7 +3752,7 @@ export const IDL: CcipOfframp = {
         "# Arguments",
         "",
         "* `ctx` - The context containing the accounts required for buffering.",
-        "* `buffer_id` - An arbitrary buffer id defined by the caller (could be the message_id).",
+        "* `buffer_id` - An arbitrary buffer id defined by the caller (could be the message_id). Max 32 bytes.",
         "* `report_length` - Total length in bytes of the execution report.",
         "* `chunk` - The specific chunk to add to the buffer. Chunk must have a consistent size, except",
         "the last one in the buffer, which may be smaller.",
@@ -3805,6 +3844,32 @@ export const IDL: CcipOfframp = {
     },
     {
       "name": "derivePdasExecute",
+      "docs": [
+        "Automatically derives all acounts required to call `ccip_execute`.",
+        "",
+        "This methods receives the bare minimum amount of information needed to construct",
+        "the entire account list to execute a transaction, and builds it iteratively",
+        "over the course of multiple calls.",
+        "",
+        "The return type contains two fields:",
+        "",
+        "* `accounts_to_save`: The caller must append these accounts to a list they maintain.",
+        "When complete, this list will contain all accounts needed to call `ccip_execute`",
+        "* `ask_again_with`: When this list is not empty, the caller must call `derive_pdas_execute`",
+        "again, including exactly these accounts as the `remaining_accounts`.",
+        "",
+        "Therefore, and starting with an empty `remaining_accounts` list, the caller must repeteadly",
+        "call `derive_pdas_execute` until `ask_again_with` is returned empty.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx`: Context containing only the offramp config.",
+        "* `report_or_buffer_id`: Either the serialized execution report, or the buffer id where it was",
+        "buffered by the `execute_caller`.",
+        "* `execute_caller`: Public key of the account that will sign the call to `ccip_execute`.",
+        "* `message_accounts`: If the transaction involves messaging, the message accounts.",
+        "* `source_chain_selector`: CCIP chain selector for the source chain."
+      ],
       "accounts": [
         {
           "name": "config",
@@ -3814,7 +3879,7 @@ export const IDL: CcipOfframp = {
       ],
       "args": [
         {
-          "name": "rawExecutionReport",
+          "name": "reportOrBufferId",
           "type": "bytes"
         },
         {
@@ -3828,6 +3893,10 @@ export const IDL: CcipOfframp = {
               "defined": "CcipAccountMeta"
             }
           }
+        },
+        {
+          "name": "sourceChainSelector",
+          "type": "u64"
         }
       ],
       "returns": {
@@ -4450,6 +4519,10 @@ export const IDL: CcipOfframp = {
         "fields": [
           {
             "name": "askAgainWith",
+            "docs": [
+              "If this vector is not empty, you must call the `derive_` method again including",
+              "exactly these accounts as the `remaining_accounts` field."
+            ],
             "type": {
               "vec": {
                 "defined": "CcipAccountMeta"
@@ -4458,6 +4531,11 @@ export const IDL: CcipOfframp = {
           },
           {
             "name": "accountsToSave",
+            "docs": [
+              "You must append these accounts at the end of a separate list. When `ask_again_with`",
+              "is finally empty, this separate list will contain all the accounts to use for the",
+              "instruction of interest."
+            ],
             "type": {
               "vec": {
                 "defined": "CcipAccountMeta"

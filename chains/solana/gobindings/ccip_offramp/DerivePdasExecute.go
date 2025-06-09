@@ -10,11 +10,35 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// DerivePdasExecute is the `derivePdasExecute` instruction.
+// Automatically derives all acounts required to call `ccip_execute`.
+//
+// This methods receives the bare minimum amount of information needed to construct
+// the entire account list to execute a transaction, and builds it iteratively
+// over the course of multiple calls.
+//
+// The return type contains two fields:
+//
+// * `accounts_to_save`: The caller must append these accounts to a list they maintain.
+// When complete, this list will contain all accounts needed to call `ccip_execute`
+// * `ask_again_with`: When this list is not empty, the caller must call `derive_pdas_execute`
+// again, including exactly these accounts as the `remaining_accounts`.
+//
+// Therefore, and starting with an empty `remaining_accounts` list, the caller must repeteadly
+// call `derive_pdas_execute` until `ask_again_with` is returned empty.
+//
+// # Arguments
+//
+// * `ctx`: Context containing only the offramp config.
+// * `report_or_buffer_id`: Either the serialized execution report, or the buffer id where it was
+// buffered by the `execute_caller`.
+// * `execute_caller`: Public key of the account that will sign the call to `ccip_execute`.
+// * `message_accounts`: If the transaction involves messaging, the message accounts.
+// * `source_chain_selector`: CCIP chain selector for the source chain.
 type DerivePdasExecute struct {
-	RawExecutionReport *[]byte
-	ExecuteCaller      *ag_solanago.PublicKey
-	MessageAccounts    *[]CcipAccountMeta
+	ReportOrBufferId    *[]byte
+	ExecuteCaller       *ag_solanago.PublicKey
+	MessageAccounts     *[]CcipAccountMeta
+	SourceChainSelector *uint64
 
 	// [0] = [] config
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
@@ -28,9 +52,9 @@ func NewDerivePdasExecuteInstructionBuilder() *DerivePdasExecute {
 	return nd
 }
 
-// SetRawExecutionReport sets the "rawExecutionReport" parameter.
-func (inst *DerivePdasExecute) SetRawExecutionReport(rawExecutionReport []byte) *DerivePdasExecute {
-	inst.RawExecutionReport = &rawExecutionReport
+// SetReportOrBufferId sets the "reportOrBufferId" parameter.
+func (inst *DerivePdasExecute) SetReportOrBufferId(reportOrBufferId []byte) *DerivePdasExecute {
+	inst.ReportOrBufferId = &reportOrBufferId
 	return inst
 }
 
@@ -43,6 +67,12 @@ func (inst *DerivePdasExecute) SetExecuteCaller(executeCaller ag_solanago.Public
 // SetMessageAccounts sets the "messageAccounts" parameter.
 func (inst *DerivePdasExecute) SetMessageAccounts(messageAccounts []CcipAccountMeta) *DerivePdasExecute {
 	inst.MessageAccounts = &messageAccounts
+	return inst
+}
+
+// SetSourceChainSelector sets the "sourceChainSelector" parameter.
+func (inst *DerivePdasExecute) SetSourceChainSelector(sourceChainSelector uint64) *DerivePdasExecute {
+	inst.SourceChainSelector = &sourceChainSelector
 	return inst
 }
 
@@ -77,14 +107,17 @@ func (inst DerivePdasExecute) ValidateAndBuild() (*Instruction, error) {
 func (inst *DerivePdasExecute) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
-		if inst.RawExecutionReport == nil {
-			return errors.New("RawExecutionReport parameter is not set")
+		if inst.ReportOrBufferId == nil {
+			return errors.New("ReportOrBufferId parameter is not set")
 		}
 		if inst.ExecuteCaller == nil {
 			return errors.New("ExecuteCaller parameter is not set")
 		}
 		if inst.MessageAccounts == nil {
 			return errors.New("MessageAccounts parameter is not set")
+		}
+		if inst.SourceChainSelector == nil {
+			return errors.New("SourceChainSelector parameter is not set")
 		}
 	}
 
@@ -106,10 +139,11 @@ func (inst *DerivePdasExecute) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=3]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("RawExecutionReport", *inst.RawExecutionReport))
-						paramsBranch.Child(ag_format.Param("     ExecuteCaller", *inst.ExecuteCaller))
-						paramsBranch.Child(ag_format.Param("   MessageAccounts", *inst.MessageAccounts))
+					instructionBranch.Child("Params[len=4]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+						paramsBranch.Child(ag_format.Param("   ReportOrBufferId", *inst.ReportOrBufferId))
+						paramsBranch.Child(ag_format.Param("      ExecuteCaller", *inst.ExecuteCaller))
+						paramsBranch.Child(ag_format.Param("    MessageAccounts", *inst.MessageAccounts))
+						paramsBranch.Child(ag_format.Param("SourceChainSelector", *inst.SourceChainSelector))
 					})
 
 					// Accounts of the instruction:
@@ -121,8 +155,8 @@ func (inst *DerivePdasExecute) EncodeToTree(parent ag_treeout.Branches) {
 }
 
 func (obj DerivePdasExecute) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `RawExecutionReport` param:
-	err = encoder.Encode(obj.RawExecutionReport)
+	// Serialize `ReportOrBufferId` param:
+	err = encoder.Encode(obj.ReportOrBufferId)
 	if err != nil {
 		return err
 	}
@@ -136,11 +170,16 @@ func (obj DerivePdasExecute) MarshalWithEncoder(encoder *ag_binary.Encoder) (err
 	if err != nil {
 		return err
 	}
+	// Serialize `SourceChainSelector` param:
+	err = encoder.Encode(obj.SourceChainSelector)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 func (obj *DerivePdasExecute) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `RawExecutionReport`:
-	err = decoder.Decode(&obj.RawExecutionReport)
+	// Deserialize `ReportOrBufferId`:
+	err = decoder.Decode(&obj.ReportOrBufferId)
 	if err != nil {
 		return err
 	}
@@ -154,20 +193,27 @@ func (obj *DerivePdasExecute) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (
 	if err != nil {
 		return err
 	}
+	// Deserialize `SourceChainSelector`:
+	err = decoder.Decode(&obj.SourceChainSelector)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
 // NewDerivePdasExecuteInstruction declares a new DerivePdasExecute instruction with the provided parameters and accounts.
 func NewDerivePdasExecuteInstruction(
 	// Parameters:
-	rawExecutionReport []byte,
+	reportOrBufferId []byte,
 	executeCaller ag_solanago.PublicKey,
 	messageAccounts []CcipAccountMeta,
+	sourceChainSelector uint64,
 	// Accounts:
 	config ag_solanago.PublicKey) *DerivePdasExecute {
 	return NewDerivePdasExecuteInstructionBuilder().
-		SetRawExecutionReport(rawExecutionReport).
+		SetReportOrBufferId(reportOrBufferId).
 		SetExecuteCaller(executeCaller).
 		SetMessageAccounts(messageAccounts).
+		SetSourceChainSelector(sourceChainSelector).
 		SetConfigAccount(config)
 }
