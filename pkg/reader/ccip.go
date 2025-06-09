@@ -568,7 +568,13 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 			continue
 		}
 
+		txHash, err := contractreader.ExtractTxHash(item.Cursor)
+		if err != nil {
+			lggr.Warnw("failed to extract transaction hash from cursor", "err", err, "cursor", item.Cursor)
+		}
+
 		msg.Message.Header.OnRamp = onRampAddress
+		msg.Message.Header.TxHash = txHash
 		msgs = append(msgs, msg.Message)
 	}
 

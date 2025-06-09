@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -331,3 +332,21 @@ func (e *extendedContractReader) HealthReport() map[string]error {
 
 // Interface compliance check
 var _ Extended = (*extendedContractReader)(nil)
+
+// ExtractTxHash extracts the transaction hash from a ContractReader cursor.
+// The expected format is "BlockNumber-LogIndex-TxHash".
+func ExtractTxHash(cursor string) (string, error) {
+	parts := strings.SplitN(cursor, "-", 3)
+
+	if len(parts) < 3 {
+		return "", fmt.Errorf("invalid cursor format: '%s'. Expected format 'BlockNumber-LogIndex-TxHash'", cursor)
+	}
+
+	txHash := parts[2]
+
+	if len(txHash) == 0 {
+		return "", fmt.Errorf("transaction hash is empty in cursor: '%s'", cursor)
+	}
+
+	return txHash, nil
+}
