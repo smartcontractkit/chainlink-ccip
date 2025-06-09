@@ -260,7 +260,7 @@ var (
 	// # Arguments
 	//
 	// * `ctx` - The context containing the accounts required for buffering.
-	// * `buffer_id` - An arbitrary buffer id defined by the caller (could be the message_id).
+	// * `buffer_id` - An arbitrary buffer id defined by the caller (could be the message_id). Max 32 bytes.
 	// * `report_length` - Total length in bytes of the execution report.
 	// * `chunk` - The specific chunk to add to the buffer. Chunk must have a consistent size, except
 	// the last one in the buffer, which may be smaller.
@@ -275,6 +275,30 @@ var (
 	// and return funds to the caller whenever buffered execution succeeds.
 	Instruction_CloseExecutionReportBuffer = ag_binary.TypeID([8]byte{0, 16, 4, 246, 238, 95, 223, 31})
 
+	// Automatically derives all acounts required to call `ccip_execute`.
+	//
+	// This methods receives the bare minimum amount of information needed to construct
+	// the entire account list to execute a transaction, and builds it iteratively
+	// over the course of multiple calls.
+	//
+	// The return type contains two fields:
+	//
+	// * `accounts_to_save`: The caller must append these accounts to a list they maintain.
+	// When complete, this list will contain all accounts needed to call `ccip_execute`
+	// * `ask_again_with`: When this list is not empty, the caller must call `derive_pdas_execute`
+	// again, including exactly these accounts as the `remaining_accounts`.
+	//
+	// Therefore, and starting with an empty `remaining_accounts` list, the caller must repeteadly
+	// call `derive_pdas_execute` until `ask_again_with` is returned empty.
+	//
+	// # Arguments
+	//
+	// * `ctx`: Context containing only the offramp config.
+	// * `report_or_buffer_id`: Either the serialized execution report, or the buffer id where it was
+	// buffered by the `execute_caller`.
+	// * `execute_caller`: Public key of the account that will sign the call to `ccip_execute`.
+	// * `message_accounts`: If the transaction involves messaging, the message accounts.
+	// * `source_chain_selector`: CCIP chain selector for the source chain.
 	Instruction_DerivePdasExecute = ag_binary.TypeID([8]byte{180, 16, 226, 16, 254, 73, 90, 176})
 
 	Instruction_CloseCommitReportAccount = ag_binary.TypeID([8]byte{109, 145, 129, 64, 226, 172, 61, 106})

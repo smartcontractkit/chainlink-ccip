@@ -612,7 +612,13 @@ func (obj *CrossChainAmount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (e
 }
 
 type DerivePdasResponse struct {
-	AskAgainWith   []CcipAccountMeta
+	// If this vector is not empty, you must call the `derive_` method again including
+	// exactly these accounts as the `remaining_accounts` field.
+	AskAgainWith []CcipAccountMeta
+
+	// You must append these accounts at the end of a separate list. When `ask_again_with`
+	// is finally empty, this separate list will contain all the accounts to use for the
+	// instruction of interest.
 	AccountsToSave []CcipAccountMeta
 }
 

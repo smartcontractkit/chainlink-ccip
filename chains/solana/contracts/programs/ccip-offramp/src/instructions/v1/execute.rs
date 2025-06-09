@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::get_associated_token_address_with_program_id;
 use ccip_common::router_accounts::TokenAdminRegistry;
+use ccip_common::seed::EXECUTION_REPORT_BUFFER;
 use ccip_common::v1::{validate_and_parse_token_accounts, TokenAccounts, MIN_TOKEN_POOL_ACCOUNTS};
 use ccip_common::{seed, CommonCcipError};
 use solana_program::address_lookup_table::state::AddressLookupTable;
@@ -133,29 +134,33 @@ impl Execute for Impl {
     fn derive_pdas_execute<'info>(
         &self,
         ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
-        raw_execution_report: Vec<u8>,
+        report_or_buffer_id: Vec<u8>,
         execute_caller: Pubkey,
         message_accounts: Vec<CcipAccountMeta>,
+        source_chain_selector: u64,
     ) -> Result<DerivePdasResponse> {
-        let report = ExecutionReportSingleChain::deserialize(&mut raw_execution_report.as_ref())
-            .map_err(|_| CcipOfframpError::FailedToDeserializeReport)?;
-        let stage = DeriveExecutePdasStage::infer_from(ctx.remaining_accounts, &report);
+        let stage =
+            DeriveExecutePdasStage::infer_from(ctx.remaining_accounts, source_chain_selector);
 
         match stage {
-            DeriveExecutePdasStage::GatherBasicInfo => {
-                derive_execute_pdas_gather_basic_info(&report)
-            }
+            DeriveExecutePdasStage::GatherBasicInfo => derive_execute_pdas_gather_basic_info(
+                &report_or_buffer_id,
+                execute_caller,
+                source_chain_selector,
+            ),
             DeriveExecutePdasStage::BuildMainAccountList => {
                 derive_execute_pdas_build_main_account_list(
                     ctx,
-                    &report,
+                    &report_or_buffer_id,
                     execute_caller,
                     message_accounts,
                 )
             }
-            DeriveExecutePdasStage::RetrieveTokenLUTs => derive_execute_pdas_retrieve_luts(ctx),
+            DeriveExecutePdasStage::RetrieveTokenLUTs => {
+                derive_execute_pdas_retrieve_luts(ctx, &report_or_buffer_id, execute_caller)
+            }
             DeriveExecutePdasStage::TokenTransferAccounts => {
-                derive_execute_pdas_additional_tokens(ctx, &report)
+                derive_execute_pdas_additional_tokens(ctx, &report_or_buffer_id, execute_caller)
             }
         }
     }
@@ -207,12 +212,15 @@ enum DeriveExecutePdasStage {
 }
 
 impl DeriveExecutePdasStage {
-    fn infer_from(
-        remaining_accounts: &[AccountInfo<'_>],
-        report: &ExecutionReportSingleChain,
-    ) -> Self {
-        let selector = report.source_chain_selector.to_le_bytes();
-        let source_chain = find(&[seed::SOURCE_CHAIN, &selector], crate::ID).pubkey;
+    fn infer_from(remaining_accounts: &[AccountInfo<'_>], source_chain_selector: u64) -> Self {
+        let source_chain = find(
+            &[
+                seed::SOURCE_CHAIN,
+                source_chain_selector.to_le_bytes().as_slice(),
+            ],
+            crate::ID,
+        )
+        .pubkey;
         let reference_addresses = find(&[seed::REFERENCE_ADDRESSES], crate::ID).pubkey;
 
         // Each stage receives a different first account, so we use that information to infer
@@ -229,20 +237,38 @@ impl DeriveExecutePdasStage {
 }
 
 fn derive_execute_pdas_gather_basic_info(
-    report: &ExecutionReportSingleChain,
+    report_or_buffer_id: &[u8],
+    execute_caller: Pubkey,
+    source_chain_selector: u64,
 ) -> Result<DerivePdasResponse> {
-    let selector = report.source_chain_selector.to_le_bytes();
-
     let accounts_to_save = vec![
         find(&[seed::CONFIG], crate::ID),
         find(&[seed::REFERENCE_ADDRESSES], crate::ID),
-        find(&[seed::SOURCE_CHAIN, &selector], crate::ID),
+        find(
+            &[seed::SOURCE_CHAIN, &source_chain_selector.to_le_bytes()],
+            crate::ID,
+        ),
     ];
 
-    let ask_again_with = vec![
-        find(&[seed::SOURCE_CHAIN, &selector], crate::ID),
+    let mut ask_again_with = vec![
+        find(
+            &[seed::SOURCE_CHAIN, &source_chain_selector.to_le_bytes()],
+            crate::ID,
+        ),
         find(&[seed::REFERENCE_ADDRESSES], crate::ID),
     ];
+
+    if report_or_buffer_id.len() <= 32 {
+        // It's a buffer ID, so we must ask the user for the buffer PDA as well.
+        ask_again_with.push(find(
+            &[
+                seed::EXECUTION_REPORT_BUFFER,
+                report_or_buffer_id,
+                execute_caller.as_ref(),
+            ],
+            crate::ID,
+        ));
+    }
 
     Ok(DerivePdasResponse {
         accounts_to_save,
@@ -252,10 +278,23 @@ fn derive_execute_pdas_gather_basic_info(
 
 fn derive_execute_pdas_build_main_account_list<'info>(
     ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
-    report: &ExecutionReportSingleChain,
+    report_or_buffer_id: &[u8],
     execute_caller: Pubkey,
     message_accounts: Vec<CcipAccountMeta>,
 ) -> Result<DerivePdasResponse> {
+    let report = if report_or_buffer_id.len() <= 32 {
+        deserialize_from_buffer_account(
+            ctx.remaining_accounts
+                .last()
+                .ok_or(CcipOfframpError::ExecutionReportUnavailable)?,
+        )?
+        .0
+    } else {
+        #[allow(clippy::useless_asref)] // clippy is wrong here
+        ExecutionReportSingleChain::deserialize(&mut report_or_buffer_id.as_ref())
+            .map_err(|_| CcipOfframpError::FailedToDeserializeReport)?
+    };
+
     let source_chain = Account::<'info, SourceChain>::try_from(&ctx.remaining_accounts[0])?;
     let ReferenceAddresses {
         router, rmn_remote, ..
@@ -302,7 +341,7 @@ fn derive_execute_pdas_build_main_account_list<'info>(
 
     // If there are no tokens, we're done. If there are tokens, we
     // start by reading the registries on next stage.
-    let ask_again_with = report
+    let mut ask_again_with: Vec<_> = report
         .message
         .token_amounts
         .iter()
@@ -314,6 +353,25 @@ fn derive_execute_pdas_build_main_account_list<'info>(
         })
         .collect();
 
+    if report_or_buffer_id.len() <= 32 {
+        // We're in the buffered case, so we need the buffer PDA either on the derived account list
+        // or on the next stage
+        let buffer_pda = find(
+            &[
+                EXECUTION_REPORT_BUFFER,
+                report_or_buffer_id,
+                execute_caller.as_ref(),
+            ],
+            crate::ID,
+        )
+        .readonly();
+        if ask_again_with.is_empty() {
+            accounts_to_save.push(buffer_pda);
+        } else {
+            ask_again_with.push(buffer_pda);
+        }
+    }
+
     Ok(DerivePdasResponse {
         accounts_to_save,
         ask_again_with,
@@ -322,6 +380,8 @@ fn derive_execute_pdas_build_main_account_list<'info>(
 
 fn derive_execute_pdas_retrieve_luts<'info>(
     ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
+    report_or_buffer_id: &[u8],
+    execute_caller: Pubkey,
 ) -> Result<DerivePdasResponse> {
     let lookup_table_metas = ctx.remaining_accounts.iter().map(|registry| {
         let token_admin_registry_account: Account<TokenAdminRegistry> =
@@ -332,6 +392,21 @@ fn derive_execute_pdas_retrieve_luts<'info>(
     let mut ask_again_with = vec![find(&[seed::REFERENCE_ADDRESSES], crate::ID)];
     ask_again_with.extend(lookup_table_metas);
 
+    if report_or_buffer_id.len() <= 32 {
+        // We're in the buffered case, so we need the buffer PDA either on the derived account list
+        // or on the next stage
+        let buffer_pda = find(
+            &[
+                EXECUTION_REPORT_BUFFER,
+                report_or_buffer_id,
+                execute_caller.as_ref(),
+            ],
+            crate::ID,
+        )
+        .readonly();
+        ask_again_with.push(buffer_pda);
+    }
+
     Ok(DerivePdasResponse {
         accounts_to_save: vec![],
         ask_again_with,
@@ -341,21 +416,40 @@ fn derive_execute_pdas_retrieve_luts<'info>(
 // We derive accounts for each token in a separate step, to ensure we don't blow up the response size.
 fn derive_execute_pdas_additional_tokens<'info>(
     ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
-    report: &ExecutionReportSingleChain,
+    report_or_buffer_id: &[u8],
+    execute_caller: Pubkey,
 ) -> Result<DerivePdasResponse> {
+    let (report, remaining_accounts) = if report_or_buffer_id.len() <= 32 {
+        (
+            deserialize_from_buffer_account(
+                ctx.remaining_accounts
+                    .last()
+                    .ok_or(CcipOfframpError::ExecutionReportUnavailable)?,
+            )?
+            .0,
+            &ctx.remaining_accounts[0..ctx.remaining_accounts.len() - 1],
+        )
+    } else {
+        (
+            #[allow(clippy::useless_asref)] // clippy is wrong here
+            ExecutionReportSingleChain::deserialize(&mut report_or_buffer_id.as_ref())
+                .map_err(|_| CcipOfframpError::FailedToDeserializeReport)?,
+            ctx.remaining_accounts,
+        )
+    };
+
     // The reference addresses account and at least one LUT.
     require_gte!(
         2,
-        ctx.remaining_accounts.len(),
+        remaining_accounts.len(),
         CcipOfframpError::InvalidAccountListForPdaDerivation
     );
 
     let selector = report.source_chain_selector.to_le_bytes();
     let ReferenceAddresses { fee_quoter, .. } =
-        *AccountLoader::<'info, ReferenceAddresses>::try_from(&ctx.remaining_accounts[0])?
-            .load()?;
+        *AccountLoader::<'info, ReferenceAddresses>::try_from(&remaining_accounts[0])?.load()?;
 
-    let lut = &ctx.remaining_accounts[1];
+    let lut = &remaining_accounts[1];
     let lookup_table_data = &mut &lut.data.borrow()[..];
     let lookup_table_account: AddressLookupTable =
         AddressLookupTable::deserialize(lookup_table_data)
@@ -412,11 +506,21 @@ fn derive_execute_pdas_additional_tokens<'info>(
     ));
 
     let mut ask_again_with = vec![];
-    if ctx.remaining_accounts.len() > 2 {
+    if remaining_accounts.len() > 2 {
         // We aren't done yet, we need to derive more tokens, so we tell the user
         // to ask again with one fewer token.
         ask_again_with.push(find(&[seed::REFERENCE_ADDRESSES], crate::ID));
-        ask_again_with.extend(ctx.remaining_accounts[2..].iter().map(|a| a.key.readonly()));
+        ask_again_with.extend(remaining_accounts[2..].iter().map(|a| a.key.readonly()));
+    } else if report_or_buffer_id.len() <= 32 {
+        // We're done and it's the buffered case, so we append the buffer PDA
+        ask_again_with.push(find(
+            &[
+                seed::EXECUTION_REPORT_BUFFER,
+                report_or_buffer_id,
+                execute_caller.as_ref(),
+            ],
+            crate::ID,
+        ));
     }
 
     Ok(DerivePdasResponse {
