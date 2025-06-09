@@ -164,7 +164,7 @@ func NewCCIPReaderWithExtendedContractReaders(
 	var cas = make(map[cciptypes.ChainSelector]cciptypes.ChainAccessor)
 	for ch, extendedCr := range extendedContractReaders {
 		cr.WithExtendedContractReader(ch, extendedCr)
-		cas[ch] = chainaccessor.NewLegacyAccessor(
+		cas[ch] = chainaccessor.NewCRCWAccessor(
 			lggr,
 			ch,
 			extendedCr,

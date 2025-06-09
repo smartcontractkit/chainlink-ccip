@@ -21,6 +21,7 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal"
+	writer_mocks "github.com/smartcontractkit/chainlink-ccip/mocks/chainlink_common"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
 	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
@@ -307,6 +308,7 @@ func TestPluginFactory_NewReportingPlugin(t *testing.T) {
 		b, err := json.Marshal(offChainConfig)
 		require.NoError(t, err)
 
+		cw := writer_mocks.NewMockContractWriter(t)
 		chainSel := ccipocr3.ChainSelector(12922642891491394802)
 		mockAddrCodec := internal.NewMockAddressCodecHex(t)
 		p := &PluginFactory{
@@ -325,7 +327,7 @@ func TestPluginFactory_NewReportingPlugin(t *testing.T) {
 				chainSel: types.UnimplementedContractReader{},
 			},
 			chainWriters: map[ccipocr3.ChainSelector]types.ContractWriter{
-				chainSel: UnimplementedTestContractWriter{},
+				chainSel: cw,
 			},
 			addrCodec: mockAddrCodec,
 		}

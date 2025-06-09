@@ -66,7 +66,7 @@ func newCCIPChainReaderInternal(
 		if contractWriters[chainSelector] == nil {
 			return nil, fmt.Errorf("contract writer for chain %s is not provided", chainSelector)
 		}
-		cas[chainSelector] = chainaccessor.NewLegacyAccessor(
+		cas[chainSelector] = chainaccessor.NewCRCWAccessor(
 			lggr,
 			chainSelector,
 			crs[chainSelector],

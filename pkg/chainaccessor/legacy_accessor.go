@@ -16,9 +16,9 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
-// LegacyAccessor is an implementation of cciptypes.ChainAccessor that allows the CCIPReader
+// CRCWAccessor is an implementation of cciptypes.ChainAccessor that allows the CCIPReader
 // to cutover and migrate away from depending directly on contract reader and contract writer.
-type LegacyAccessor struct {
+type CRCWAccessor struct {
 	lggr           logger.Logger
 	chainSelector  cciptypes.ChainSelector
 	contractReader contractreader.Extended
@@ -26,16 +26,16 @@ type LegacyAccessor struct {
 	addrCodec      cciptypes.AddressCodec
 }
 
-var _ cciptypes.ChainAccessor = (*LegacyAccessor)(nil)
+var _ cciptypes.ChainAccessor = (*CRCWAccessor)(nil)
 
-func NewLegacyAccessor(
+func NewCRCWAccessor(
 	lggr logger.Logger,
 	chainSelector cciptypes.ChainSelector,
 	contractReader contractreader.Extended,
 	contractWriter types.ContractWriter,
 	addrCodec cciptypes.AddressCodec,
 ) cciptypes.ChainAccessor {
-	return &LegacyAccessor{
+	return &CRCWAccessor{
 		lggr:           lggr,
 		chainSelector:  chainSelector,
 		contractReader: contractReader,
@@ -44,7 +44,7 @@ func NewLegacyAccessor(
 	}
 }
 
-func (l *LegacyAccessor) Metadata() cciptypes.AccessorMetadata {
+func (l *CRCWAccessor) Metadata() cciptypes.AccessorMetadata {
 	allBindings := l.contractReader.GetAllBindings()
 	contracts := make(map[string]cciptypes.UnknownAddress, len(allBindings))
 	for contractName, binding := range allBindings {
@@ -62,7 +62,7 @@ func (l *LegacyAccessor) Metadata() cciptypes.AccessorMetadata {
 	}
 }
 
-func (l *LegacyAccessor) GetContractAddress(contractName string) ([]byte, error) {
+func (l *CRCWAccessor) GetContractAddress(contractName string) ([]byte, error) {
 	bindings := l.contractReader.GetBindings(contractName)
 	if len(bindings) != 1 {
 		return nil, fmt.Errorf("expected one binding for the %s contract, got %d", contractName, len(bindings))
@@ -76,7 +76,7 @@ func (l *LegacyAccessor) GetContractAddress(contractName string) ([]byte, error)
 	return addressBytes, nil
 }
 
-func (l *LegacyAccessor) GetChainFeeComponents(ctx context.Context) (cciptypes.ChainFeeComponents, error) {
+func (l *CRCWAccessor) GetChainFeeComponents(ctx context.Context) (cciptypes.ChainFeeComponents, error) {
 	fc, err := l.contractWriter.GetFeeComponents(ctx)
 	if err != nil {
 		return cciptypes.ChainFeeComponents{}, fmt.Errorf("get fee components: %w", err)
@@ -85,12 +85,12 @@ func (l *LegacyAccessor) GetChainFeeComponents(ctx context.Context) (cciptypes.C
 	return *fc, nil
 }
 
-func (l *LegacyAccessor) Sync(ctx context.Context, contracts cciptypes.ContractAddresses) error {
+func (l *CRCWAccessor) Sync(ctx context.Context, contracts cciptypes.ContractAddresses) error {
 	// TODO(NONEVM-1865): implement
 	panic("implement me")
 }
 
-func (l *LegacyAccessor) MsgsBetweenSeqNums(
+func (l *CRCWAccessor) MsgsBetweenSeqNums(
 	ctx context.Context,
 	destChainSelector cciptypes.ChainSelector,
 	seqNumRange cciptypes.SeqNumRange,
@@ -170,7 +170,7 @@ func (l *LegacyAccessor) MsgsBetweenSeqNums(
 	return msgs, nil
 }
 
-func (l *LegacyAccessor) LatestMsgSeqNum(
+func (l *CRCWAccessor) LatestMsgSeqNum(
 	ctx context.Context,
 	destChainSelector cciptypes.ChainSelector,
 ) (cciptypes.SeqNum, error) {
@@ -230,7 +230,7 @@ func (l *LegacyAccessor) LatestMsgSeqNum(
 	return msg.SequenceNumber, nil
 }
 
-func (l *LegacyAccessor) GetExpectedNextSequenceNumber(
+func (l *CRCWAccessor) GetExpectedNextSequenceNumber(
 	ctx context.Context,
 	destChainSelector cciptypes.ChainSelector,
 ) (cciptypes.SeqNum, error) {
@@ -258,7 +258,7 @@ func (l *LegacyAccessor) GetExpectedNextSequenceNumber(
 	return cciptypes.SeqNum(expectedNextSequenceNumber), nil
 }
 
-func (l *LegacyAccessor) GetTokenPriceUSD(
+func (l *CRCWAccessor) GetTokenPriceUSD(
 	ctx context.Context,
 	address cciptypes.UnknownAddress,
 ) (cciptypes.BigInt, error) {
@@ -266,7 +266,7 @@ func (l *LegacyAccessor) GetTokenPriceUSD(
 	panic("implement me")
 }
 
-func (l *LegacyAccessor) GetFeeQuoterDestChainConfig(
+func (l *CRCWAccessor) GetFeeQuoterDestChainConfig(
 	ctx context.Context,
 	dest cciptypes.ChainSelector,
 ) (cciptypes.FeeQuoterDestChainConfig, error) {
@@ -274,7 +274,7 @@ func (l *LegacyAccessor) GetFeeQuoterDestChainConfig(
 	panic("implement me")
 }
 
-func (l *LegacyAccessor) CommitReportsGTETimestamp(
+func (l *CRCWAccessor) CommitReportsGTETimestamp(
 	ctx context.Context,
 	ts time.Time,
 	limit int,
@@ -283,7 +283,7 @@ func (l *LegacyAccessor) CommitReportsGTETimestamp(
 	panic("implement me")
 }
 
-func (l *LegacyAccessor) ExecutedMessages(
+func (l *CRCWAccessor) ExecutedMessages(
 	ctx context.Context,
 	ranges map[cciptypes.ChainSelector]cciptypes.SeqNumRange,
 	confidence cciptypes.ConfidenceLevel,
@@ -292,7 +292,7 @@ func (l *LegacyAccessor) ExecutedMessages(
 	panic("implement me")
 }
 
-func (l *LegacyAccessor) NextSeqNum(
+func (l *CRCWAccessor) NextSeqNum(
 	ctx context.Context,
 	sources []cciptypes.ChainSelector,
 ) (seqNum map[cciptypes.ChainSelector]cciptypes.SeqNum, err error) {
@@ -300,7 +300,7 @@ func (l *LegacyAccessor) NextSeqNum(
 	panic("implement me")
 }
 
-func (l *LegacyAccessor) Nonces(
+func (l *CRCWAccessor) Nonces(
 	ctx context.Context,
 	addresses map[cciptypes.ChainSelector][]cciptypes.UnknownEncodedAddress,
 ) (map[cciptypes.ChainSelector]map[string]uint64, error) {
@@ -308,7 +308,7 @@ func (l *LegacyAccessor) Nonces(
 	panic("implement me")
 }
 
-func (l *LegacyAccessor) GetChainFeePriceUpdate(
+func (l *CRCWAccessor) GetChainFeePriceUpdate(
 	ctx context.Context,
 	selectors []cciptypes.ChainSelector,
 ) map[cciptypes.ChainSelector]cciptypes.TimestampedBig {
@@ -316,17 +316,17 @@ func (l *LegacyAccessor) GetChainFeePriceUpdate(
 	panic("implement me")
 }
 
-func (l *LegacyAccessor) GetLatestPriceSeqNr(ctx context.Context) (uint64, error) {
+func (l *CRCWAccessor) GetLatestPriceSeqNr(ctx context.Context) (uint64, error) {
 	// TODO(NONEVM-1865): implement
 	panic("implement me")
 }
 
-func (l *LegacyAccessor) GetOffRampConfigDigest(ctx context.Context, pluginType uint8) ([32]byte, error) {
+func (l *CRCWAccessor) GetOffRampConfigDigest(ctx context.Context, pluginType uint8) ([32]byte, error) {
 	// TODO(NONEVM-1865): implement
 	panic("implement me")
 }
 
-func (l *LegacyAccessor) GetOffRampSourceChainsConfig(
+func (l *CRCWAccessor) GetOffRampSourceChainsConfig(
 	ctx context.Context,
 	sourceChains []cciptypes.ChainSelector,
 ) (map[cciptypes.ChainSelector]cciptypes.SourceChainConfig, error) {
@@ -334,12 +334,12 @@ func (l *LegacyAccessor) GetOffRampSourceChainsConfig(
 	panic("implement me")
 }
 
-func (l *LegacyAccessor) GetRMNRemoteConfig(ctx context.Context) (cciptypes.RemoteConfig, error) {
+func (l *CRCWAccessor) GetRMNRemoteConfig(ctx context.Context) (cciptypes.RemoteConfig, error) {
 	// TODO(NONEVM-1865): implement
 	panic("implement me")
 }
 
-func (l *LegacyAccessor) GetRmnCurseInfo(ctx context.Context) (cciptypes.CurseInfo, error) {
+func (l *CRCWAccessor) GetRmnCurseInfo(ctx context.Context) (cciptypes.CurseInfo, error) {
 	// TODO(NONEVM-1865): implement
 	panic("implement me")
 }
