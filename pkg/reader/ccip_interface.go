@@ -125,20 +125,24 @@ func NewCCIPChainReader(
 	destChain cciptypes.ChainSelector,
 	offrampAddress []byte,
 	addrCodec cciptypes.AddressCodec,
-) CCIPReader {
+) (CCIPReader, error) {
+	reader, err := newCCIPChainReaderInternal(
+		ctx,
+		lggr,
+		contractReaders,
+		contractWriters,
+		destChain,
+		offrampAddress,
+		addrCodec,
+	)
+	if err != nil {
+		return nil, err
+	}
 	return NewObservedCCIPReader(
-		newCCIPChainReaderInternal(
-			ctx,
-			lggr,
-			contractReaders,
-			contractWriters,
-			destChain,
-			offrampAddress,
-			addrCodec,
-		),
+		reader,
 		lggr,
 		destChain,
-	)
+	), nil
 }
 
 // NewCCIPReaderWithExtendedContractReaders can be used when you want to directly provide contractreader.Extended
@@ -151,7 +155,11 @@ func NewCCIPReaderWithExtendedContractReaders(
 	offrampAddress []byte,
 	addrCodec cciptypes.AddressCodec,
 ) CCIPReader {
-	cr := newCCIPChainReaderInternal(ctx, lggr, nil, contractWriters, destChain, offrampAddress, addrCodec)
+	cr, err := newCCIPChainReaderInternal(ctx, lggr, nil, contractWriters, destChain, offrampAddress, addrCodec)
+	if err != nil {
+		// Panic here since right now this is only called from tests in core
+		panic(fmt.Errorf("failed to create CCIP reader: %w", err))
+	}
 	for ch, extendedCr := range contractReaders {
 		cr.WithExtendedContractReader(ch, extendedCr)
 	}
