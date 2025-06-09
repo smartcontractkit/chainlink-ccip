@@ -510,15 +510,18 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 	ctx context.Context, sourceChainSelector cciptypes.ChainSelector, seqNumRange cciptypes.SeqNumRange,
 ) ([]cciptypes.Message, error) {
 	lggr := logutil.WithContextValues(ctx, r.lggr)
-	if err := validateReaderExistence(r.contractReaders, sourceChainSelector); err != nil {
+
+	if err := validateAccessorExistence(r.accessors, sourceChainSelector); err != nil {
 		return nil, err
 	}
-
-	onRampAddress, err := r.GetContractAddress(consts.ContractNameOnRamp, sourceChainSelector)
+	onRampAddress, err := r.accessors[sourceChainSelector].GetContractAddress(consts.ContractNameOnRamp)
 	if err != nil {
 		return nil, fmt.Errorf("get onRamp address: %w", err)
 	}
 
+	if err := validateReaderExistence(r.contractReaders, sourceChainSelector); err != nil {
+		return nil, err
+	}
 	seq, err := r.contractReaders[sourceChainSelector].ExtendedQueryKey(
 		ctx,
 		consts.ContractNameOnRamp,
@@ -557,7 +560,7 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 		return nil, fmt.Errorf("failed to query onRamp: %w", err)
 	}
 
-	onRampAddressAfterQuery, err := r.GetContractAddress(consts.ContractNameOnRamp, sourceChainSelector)
+	onRampAddressAfterQuery, err := r.accessors[sourceChainSelector].GetContractAddress(consts.ContractNameOnRamp)
 	if err != nil {
 		return nil, fmt.Errorf("get onRamp address after query: %w", err)
 	}
@@ -1126,7 +1129,11 @@ func (r *ccipChainReader) GetRMNRemoteConfig(ctx context.Context) (cciptypes.Rem
 
 	// RMNRemote address stored in the offramp static config is actually the proxy contract address.
 	// Here we will get the RMNRemote address from the proxy contract by calling the RMNProxy contract.
-	proxyContractAddress, err := r.GetContractAddress(consts.ContractNameRMNRemote, r.destChain)
+	destChainAccessor := r.accessors[r.destChain]
+	if destChainAccessor == nil {
+		return cciptypes.RemoteConfig{}, fmt.Errorf("chain accessor not found for dest chain %d", r.destChain)
+	}
+	proxyContractAddress, err := destChainAccessor.GetContractAddress(consts.ContractNameRMNRemote)
 	if err != nil {
 		return cciptypes.RemoteConfig{}, fmt.Errorf("get RMNRemote proxy contract address: %w", err)
 	}
@@ -1380,6 +1387,7 @@ func (r *ccipChainReader) Sync(ctx context.Context, contracts ContractAddresses)
 	return errors.Join(errs...)
 }
 
+// TODO(NONEVM-1865): remove this function once from CCIPReader interface once CAL migration is complete.
 func (r *ccipChainReader) GetContractAddress(contractName string, chain cciptypes.ChainSelector) ([]byte, error) {
 	return r.donAddressBook.GetContractAddress(addressbook.ContractName(contractName), chain)
 }
