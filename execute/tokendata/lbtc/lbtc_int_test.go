@@ -1,7 +1,6 @@
 package lbtc_test
 
 import (
-	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -204,7 +203,7 @@ func Test_LBTC_Flow(t *testing.T) {
 	}
 
 	baseObserver, err := lbtc.NewLBTCTokenDataObserver(
-		logger.Test(t),
+		logger.Nop(),
 		cciptypes.ChainSelector(sel.ETHEREUM_MAINNET_BASE_1.Selector),
 		config,
 	)
@@ -421,7 +420,7 @@ func Test_LBTC_Flow(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err1 := baseObserver.Observe(context.Background(), tc.messages)
+			got, err1 := baseObserver.Observe(t.Context(), tc.messages)
 			require.NoError(t, err1)
 			require.Equal(t, tc.want, got)
 		})

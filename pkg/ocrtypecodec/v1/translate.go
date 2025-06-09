@@ -627,6 +627,7 @@ func (t *protoTranslator) encodeMessage(msg cciptypes.Message) *ocrtypecodecpb.M
 			Nonce:               msg.Header.Nonce,
 			MsgHash:             msg.Header.MsgHash[:],
 			OnRamp:              msg.Header.OnRamp,
+			TxHash:              msg.Header.TxHash,
 		},
 		Sender:         msg.Sender,
 		Data:           msg.Data,
@@ -994,6 +995,7 @@ func (t *protoTranslator) decodeMessageHeader(header *ocrtypecodecpb.RampMessage
 		Nonce:               header.Nonce,
 		MsgHash:             cciptypes.Bytes32(header.MsgHash),
 		OnRamp:              header.OnRamp,
+		TxHash:              header.TxHash,
 	}
 }
 
