@@ -67,7 +67,7 @@ pub trait Execute {
         num_chunks: u8,
     ) -> Result<()>;
 
-    fn derive_pdas_execute<'info>(
+    fn derive_accounts_execute<'info>(
         &self,
         ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
         report_or_buffer_id: Vec<u8>,

@@ -136,7 +136,7 @@ impl Execute for Impl {
         )
     }
 
-    fn derive_pdas_execute<'info>(
+    fn derive_accounts_execute<'info>(
         &self,
         ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
         report_or_buffer_id: Vec<u8>,
@@ -145,27 +145,29 @@ impl Execute for Impl {
         source_chain_selector: u64,
     ) -> Result<DerivePdasResponse> {
         let stage =
-            DeriveExecutePdasStage::infer_from(ctx.remaining_accounts, source_chain_selector);
+            DeriveExecuteAccountsStage::infer_from(ctx.remaining_accounts, source_chain_selector);
 
         match stage {
-            DeriveExecutePdasStage::GatherBasicInfo => derive_execute_pdas_gather_basic_info(
-                &report_or_buffer_id,
-                execute_caller,
-                source_chain_selector,
-            ),
-            DeriveExecutePdasStage::BuildMainAccountList => {
-                derive_execute_pdas_build_main_account_list(
+            DeriveExecuteAccountsStage::GatherBasicInfo => {
+                derive_execute_accounts_gather_basic_info(
+                    &report_or_buffer_id,
+                    execute_caller,
+                    source_chain_selector,
+                )
+            }
+            DeriveExecuteAccountsStage::BuildMainAccountList => {
+                derive_execute_accounts_build_main_account_list(
                     ctx,
                     &report_or_buffer_id,
                     execute_caller,
                     message_accounts,
                 )
             }
-            DeriveExecutePdasStage::RetrieveTokenLUTs => {
-                derive_execute_pdas_retrieve_luts(ctx, &report_or_buffer_id, execute_caller)
+            DeriveExecuteAccountsStage::RetrieveTokenLUTs => {
+                derive_execute_accounts_retrieve_luts(ctx, &report_or_buffer_id, execute_caller)
             }
-            DeriveExecutePdasStage::TokenTransferAccounts => {
-                derive_execute_pdas_additional_tokens(ctx, &report_or_buffer_id, execute_caller)
+            DeriveExecuteAccountsStage::TokenTransferAccounts => {
+                derive_execute_accounts_additional_tokens(ctx, &report_or_buffer_id, execute_caller)
             }
         }
     }
@@ -208,7 +210,7 @@ fn ocr3_transmit_report<'info>(
     Ok(())
 }
 
-enum DeriveExecutePdasStage {
+enum DeriveExecuteAccountsStage {
     GatherBasicInfo,
     BuildMainAccountList,
     RetrieveTokenLUTs,
@@ -216,7 +218,7 @@ enum DeriveExecutePdasStage {
     TokenTransferAccounts,
 }
 
-impl DeriveExecutePdasStage {
+impl DeriveExecuteAccountsStage {
     fn infer_from(remaining_accounts: &[AccountInfo<'_>], source_chain_selector: u64) -> Self {
         let source_chain = find(
             &[
@@ -231,17 +233,17 @@ impl DeriveExecutePdasStage {
         // Each stage receives a different first account, so we use that information to infer
         // what stage we're in, without requiring the user to declare that explicitly.
         match remaining_accounts.first() {
-            None => DeriveExecutePdasStage::GatherBasicInfo,
-            Some(a) if a.key == &source_chain => DeriveExecutePdasStage::BuildMainAccountList,
+            None => DeriveExecuteAccountsStage::GatherBasicInfo,
+            Some(a) if a.key == &source_chain => DeriveExecuteAccountsStage::BuildMainAccountList,
             Some(a) if a.key == &reference_addresses => {
-                DeriveExecutePdasStage::TokenTransferAccounts
+                DeriveExecuteAccountsStage::TokenTransferAccounts
             }
-            Some(_) => DeriveExecutePdasStage::RetrieveTokenLUTs,
+            Some(_) => DeriveExecuteAccountsStage::RetrieveTokenLUTs,
         }
     }
 }
 
-fn derive_execute_pdas_gather_basic_info(
+fn derive_execute_accounts_gather_basic_info(
     report_or_buffer_id: &[u8],
     execute_caller: Pubkey,
     source_chain_selector: u64,
@@ -281,7 +283,7 @@ fn derive_execute_pdas_gather_basic_info(
     })
 }
 
-fn derive_execute_pdas_build_main_account_list<'info>(
+fn derive_execute_accounts_build_main_account_list<'info>(
     ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
     report_or_buffer_id: &[u8],
     execute_caller: Pubkey,
@@ -382,7 +384,7 @@ fn derive_execute_pdas_build_main_account_list<'info>(
     })
 }
 
-fn derive_execute_pdas_retrieve_luts<'info>(
+fn derive_execute_accounts_retrieve_luts<'info>(
     ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
     report_or_buffer_id: &[u8],
     execute_caller: Pubkey,
@@ -418,7 +420,7 @@ fn derive_execute_pdas_retrieve_luts<'info>(
 }
 
 // We derive accounts for each token in a separate step, to ensure we don't blow up the response size.
-fn derive_execute_pdas_additional_tokens<'info>(
+fn derive_execute_accounts_additional_tokens<'info>(
     ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
     report_or_buffer_id: &[u8],
     execute_caller: Pubkey,

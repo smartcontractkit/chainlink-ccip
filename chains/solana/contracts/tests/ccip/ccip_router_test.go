@@ -10419,7 +10419,7 @@ func deriveExecutionAccounts(ctx context.Context,
 	derivedAccounts := []*solana.AccountMeta{}
 	askWith := []*solana.AccountMeta{}
 	for {
-		deriveRaw := ccip_offramp.NewDerivePdasExecuteInstruction(reportOrBufferID, transmitter.PublicKey(), messagingAccounts, sourceChainSelector, config.OfframpConfigPDA)
+		deriveRaw := ccip_offramp.NewDeriveAccountsExecuteInstruction(reportOrBufferID, transmitter.PublicKey(), messagingAccounts, sourceChainSelector, config.OfframpConfigPDA)
 		deriveRaw.AccountMetaSlice = append(deriveRaw.AccountMetaSlice, askWith...)
 		derive, err := deriveRaw.ValidateAndBuild()
 		require.NoError(t, err)

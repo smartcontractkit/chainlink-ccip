@@ -1158,7 +1158,7 @@ export type CcipOfframp = {
       ]
     },
     {
-      "name": "derivePdasExecute",
+      "name": "deriveAccountsExecute",
       "docs": [
         "Automatically derives all acounts required to call `ccip_execute`.",
         "",
@@ -1170,11 +1170,11 @@ export type CcipOfframp = {
         "",
         "* `accounts_to_save`: The caller must append these accounts to a list they maintain.",
         "When complete, this list will contain all accounts needed to call `ccip_execute`.",
-        "* `ask_again_with`: When this list is not empty, the caller must call `derive_pdas_execute`",
+        "* `ask_again_with`: When this list is not empty, the caller must call `derive_accounts_execute`",
         "again, including exactly these accounts as the `remaining_accounts`.",
         "",
         "Therefore, and starting with an empty `remaining_accounts` list, the caller must repeteadly",
-        "call `derive_pdas_execute` until `ask_again_with` is returned empty.",
+        "call `derive_accounts_execute` until `ask_again_with` is returned empty.",
         "",
         "# Arguments",
         "",
@@ -3848,7 +3848,7 @@ export const IDL: CcipOfframp = {
       ]
     },
     {
-      "name": "derivePdasExecute",
+      "name": "deriveAccountsExecute",
       "docs": [
         "Automatically derives all acounts required to call `ccip_execute`.",
         "",
@@ -3860,11 +3860,11 @@ export const IDL: CcipOfframp = {
         "",
         "* `accounts_to_save`: The caller must append these accounts to a list they maintain.",
         "When complete, this list will contain all accounts needed to call `ccip_execute`.",
-        "* `ask_again_with`: When this list is not empty, the caller must call `derive_pdas_execute`",
+        "* `ask_again_with`: When this list is not empty, the caller must call `derive_accounts_execute`",
         "again, including exactly these accounts as the `remaining_accounts`.",
         "",
         "Therefore, and starting with an empty `remaining_accounts` list, the caller must repeteadly",
-        "call `derive_pdas_execute` until `ask_again_with` is returned empty.",
+        "call `derive_accounts_execute` until `ask_again_with` is returned empty.",
         "",
         "# Arguments",
         "",
