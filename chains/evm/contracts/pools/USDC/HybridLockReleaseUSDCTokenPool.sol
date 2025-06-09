@@ -204,9 +204,9 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
     // flag so it is safe to release the tokens. The source USDC pool is trusted to send messages with the correct
     // flag as well.
     if (bytes4(releaseOrMintIn.sourcePoolData) != LOCK_RELEASE_FLAG) {
-      // CCTPVersion cctpVersion = s_cctpVersion[releaseOrMintIn.remoteChainSelector];
       SourceTokenDataPayload memory sourceTokenData =
         abi.decode(releaseOrMintIn.sourcePoolData, (SourceTokenDataPayload));
+
       // If the version is legacy, use the inherited CCTP Functionality
       if (sourceTokenData.cctpVersion == CCTPVersion.VERSION_1) {
         return super.releaseOrMint(releaseOrMintIn);
@@ -328,7 +328,7 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
   }
 
   // ================================================================
-  // │                   CCTPV2 Logic
+  // │                   CCTPV2 Logic                               |
   // ================================================================
 
   /// @notice Mint tokens from the pool to the recipient using CCTP V2

@@ -94,13 +94,6 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   // A mapping of CCIP chain identifiers to destination domains
   mapping(uint64 chainSelector => Domain CCTPDomain) internal s_chainToDomain;
 
-  // On certain Non-EVM chains (e.g. Solana), due to limitations in smart contract design, the recipient of newly minted
-  // tokens may not be the same as the message receiver. Instead, a special contract may be used to receive the newly minted tokens,
-  // and then forward to the receiver. This mapping is used to ensure that the CCTP deposit transaction includes the
-  // correct mintRecipient. The CCIP message itself will not be changed and the destination token pool will still receive
-  // the correct address of the final token receiver.
-  mapping(uint64 chainSelector => bytes32 mintRecipient) internal s_mintRecipientOverrides;
-
   // An enumerable list of USDC CCTP versions which allows future contracts to support multiple
   // versions of CCTP.
   EnumerableSet.UintSet internal s_supportedUSDCVersions;
