@@ -7,8 +7,12 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
@@ -59,16 +63,13 @@ func (l *LegacyAccessor) GetContractAddress(contractName string) ([]byte, error)
 	return addressBytes, nil
 }
 
-func (l *LegacyAccessor) GetChainFeeComponents(
-	ctx context.Context,
-) map[cciptypes.ChainSelector]cciptypes.ChainFeeComponents {
-	// TODO(NONEVM-1865): implement
-	panic("implement me")
-}
+func (l *LegacyAccessor) GetChainFeeComponents(ctx context.Context) (cciptypes.ChainFeeComponents, error) {
+	fc, err := l.contractWriter.GetFeeComponents(ctx)
+	if err != nil {
+		return cciptypes.ChainFeeComponents{}, fmt.Errorf("get fee components: %w", err)
+	}
 
-func (l *LegacyAccessor) GetDestChainFeeComponents(ctx context.Context) (types.ChainFeeComponents, error) {
-	// TODO(NONEVM-1865): implement
-	panic("implement me")
+	return *fc, nil
 }
 
 func (l *LegacyAccessor) Sync(ctx context.Context, contracts cciptypes.ContractAddresses) error {
@@ -78,11 +79,82 @@ func (l *LegacyAccessor) Sync(ctx context.Context, contracts cciptypes.ContractA
 
 func (l *LegacyAccessor) MsgsBetweenSeqNums(
 	ctx context.Context,
-	dest cciptypes.ChainSelector,
+	destChainSelector cciptypes.ChainSelector,
 	seqNumRange cciptypes.SeqNumRange,
 ) ([]cciptypes.Message, error) {
-	// TODO(NONEVM-1865): implement
-	panic("implement me")
+	lggr := logutil.WithContextValues(ctx, l.lggr)
+	seq, err := l.contractReader.ExtendedQueryKey(
+		ctx,
+		consts.ContractNameOnRamp,
+		query.KeyFilter{
+			Key: consts.EventNameCCIPMessageSent,
+			Expressions: []query.Expression{
+				query.Comparator(consts.EventAttributeSourceChain, primitives.ValueComparator{
+					Value:    l.chainSelector,
+					Operator: primitives.Eq,
+				}),
+				query.Comparator(consts.EventAttributeDestChain, primitives.ValueComparator{
+					Value:    destChainSelector,
+					Operator: primitives.Eq,
+				}),
+				query.Comparator(consts.EventAttributeSequenceNumber, primitives.ValueComparator{
+					Value:    seqNumRange.Start(),
+					Operator: primitives.Gte,
+				}, primitives.ValueComparator{
+					Value:    seqNumRange.End(),
+					Operator: primitives.Lte,
+				}),
+				query.Confidence(primitives.Finalized),
+			},
+		},
+		query.LimitAndSort{
+			SortBy: []query.SortBy{
+				query.NewSortBySequence(query.Asc),
+			},
+			Limit: query.Limit{
+				Count: uint64(seqNumRange.End() - seqNumRange.Start() + 1),
+			},
+		},
+		&SendRequestedEvent{},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query onRamp: %w", err)
+	}
+
+	lggr.Infow("queried messages between sequence numbers",
+		"numMsgs", len(seq),
+		"sourceChainSelector", l.chainSelector,
+		"seqNumRange", seqNumRange.String(),
+	)
+
+	onRampAddress, err := l.GetContractAddress(consts.ContractNameOnRamp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get onRamp contract address: %w", err)
+	}
+
+	msgs := make([]cciptypes.Message, 0)
+	for _, item := range seq {
+		msg, ok := item.Data.(*SendRequestedEvent)
+		if !ok {
+			return nil, fmt.Errorf("failed to cast %v to Message", item.Data)
+		}
+
+		if err := ValidateSendRequestedEvent(msg, l.chainSelector, destChainSelector, seqNumRange); err != nil {
+			lggr.Errorw("validate send requested event", "err", err, "message", msg)
+			continue
+		}
+
+		msg.Message.Header.OnRamp = onRampAddress
+		msgs = append(msgs, msg.Message)
+	}
+
+	lggr.Infow("decoded messages between sequence numbers",
+		"msgs", msgs,
+		"sourceChainSelector", l.chainSelector,
+		"seqNumRange", seqNumRange.String(),
+	)
+
+	return msgs, nil
 }
 
 func (l *LegacyAccessor) LatestMsgSeqNum(ctx context.Context, dest cciptypes.ChainSelector) (cciptypes.SeqNum, error) {
