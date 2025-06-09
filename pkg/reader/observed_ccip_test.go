@@ -221,22 +221,6 @@ func Test_CommitReportsGTETimestamp(t *testing.T) {
 			require.Equal(t, 1, count)
 		})
 	}
-
-	//
-	//origin.EXPECT().
-	//	CommitReportsGTETimestamp(ctx, mock.Anything, mock.Anything, 2).
-	//	Return([]plugintypes.CommitPluginReportWithMeta{}, nil)
-	//
-	//origin.EXPECT().
-	//	CommitReportsGTETimestamp(ctx, mock.Anything, mock.Anything, 3).
-	//	Return([]plugintypes.CommitPluginReportWithMeta{}, nil)
-	//
-	//origin.EXPECT().
-	//	CommitReportsGTETimestamp(ctx, mock.Anything, mock.Anything, 4).
-	//	Return(nil, fmt.Errorf("error"))
-
-	//
-	//reports2, err := r.CommitReportsGTETimestamp(ctx, time.Now(), primitives.Unconfirmed, 2)
 }
 
 func cleanupMetrics() func() {
