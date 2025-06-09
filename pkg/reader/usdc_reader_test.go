@@ -45,20 +45,29 @@ func Test_USDCMessageReader_New(t *testing.T) {
 			readers:      emptyReaders,
 		},
 		{
+			name: "unknown chain family",
+			tokensConfig: map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig{
+				cciptypes.ChainSelector(1): {},
+			},
+			readers:      emptyReaders,
+			errorMessage: "failed to get selector family for chain 1: unknown chain selector 1",
+		},
+		{
 			name: "missing readers",
 			tokensConfig: map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig{
-				cciptypes.ChainSelector(1): {
+				cciptypes.ChainSelector(sel.ETHEREUM_TESTNET_SEPOLIA.Selector): {
 					SourcePoolAddress:            address1,
 					SourceMessageTransmitterAddr: address2,
 				},
 			},
-			readers:      emptyReaders,
-			errorMessage: "validate reader existence: chain 1: contract reader not found",
+			readers: emptyReaders,
+			errorMessage: fmt.Sprintf("validate reader existence: chain %d: contract reader not found",
+				sel.ETHEREUM_TESTNET_SEPOLIA.Selector),
 		},
 		{
 			name: "binding errors",
 			tokensConfig: map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig{
-				cciptypes.ChainSelector(1): {
+				cciptypes.ChainSelector(sel.ETHEREUM_TESTNET_SEPOLIA.Selector): {
 					SourcePoolAddress:            address1,
 					SourceMessageTransmitterAddr: address2,
 				},
@@ -67,7 +76,8 @@ func Test_USDCMessageReader_New(t *testing.T) {
 				readers := make(map[cciptypes.ChainSelector]*reader.MockContractReaderFacade)
 				m := reader.NewMockContractReaderFacade(t)
 				m.EXPECT().Bind(mock.Anything, mock.Anything).Return(errors.New("error"))
-				readers[cciptypes.ChainSelector(1)] = m
+				cs := cciptypes.ChainSelector(sel.ETHEREUM_TESTNET_SEPOLIA.Selector)
+				readers[cs] = m
 				return readers
 			},
 			errorMessage: "unable to bind MessageTransmitter 0x0000000000000000000000000000000000000002 for chain 1",
@@ -75,7 +85,7 @@ func Test_USDCMessageReader_New(t *testing.T) {
 		{
 			name: "happy path",
 			tokensConfig: map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig{
-				cciptypes.ChainSelector(2): {
+				cciptypes.ChainSelector(sel.ETHEREUM_TESTNET_SEPOLIA.Selector): {
 					SourcePoolAddress:            address1,
 					SourceMessageTransmitterAddr: address2,
 				},
@@ -90,7 +100,8 @@ func Test_USDCMessageReader_New(t *testing.T) {
 					},
 				}).Return(nil)
 
-				readers[cciptypes.ChainSelector(2)] = m
+				cs := cciptypes.ChainSelector(sel.ETHEREUM_TESTNET_SEPOLIA.Selector)
+				readers[cs] = m
 				return readers
 			},
 		},
@@ -219,7 +230,7 @@ func Test_USDCMessageReader_MessagesByTokenID(t *testing.T) {
 			name:           "should return error when CCTP domain is not supported",
 			sourceSelector: cciptypes.ChainSelector(sel.POLYGON_MAINNET.Selector),
 			destSelector:   emptyChain,
-			errorMessage:   fmt.Sprintf("no contract bound for chain %d", sel.POLYGON_MAINNET.Selector),
+			errorMessage:   fmt.Sprintf("no reader for chain %d", sel.POLYGON_MAINNET.Selector),
 		},
 		{
 			name:           "valid chain return events but nothing is matched",
