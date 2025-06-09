@@ -18,7 +18,6 @@ import (
 	mock_reader "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
-	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
 func Test_GetChainsFeeComponents(t *testing.T) {
@@ -160,7 +159,7 @@ func Test_CommitReportsGTETimestamp(t *testing.T) {
 
 	tt := []struct {
 		name          string
-		result        []plugintypes.CommitPluginReportWithMeta
+		result        []cciptypes.CommitPluginReportWithMeta
 		err           error
 		expectedCount int
 	}{
@@ -172,13 +171,13 @@ func Test_CommitReportsGTETimestamp(t *testing.T) {
 		},
 		{
 			name:          "empty reports",
-			result:        []plugintypes.CommitPluginReportWithMeta{},
+			result:        []cciptypes.CommitPluginReportWithMeta{},
 			err:           nil,
 			expectedCount: 0,
 		},
 		{
 			name: "reports with some items",
-			result: []plugintypes.CommitPluginReportWithMeta{
+			result: []cciptypes.CommitPluginReportWithMeta{
 				{
 					Timestamp: time.Now(),
 				},
@@ -221,22 +220,6 @@ func Test_CommitReportsGTETimestamp(t *testing.T) {
 			require.Equal(t, 1, count)
 		})
 	}
-
-	//
-	//origin.EXPECT().
-	//	CommitReportsGTETimestamp(ctx, mock.Anything, mock.Anything, 2).
-	//	Return([]plugintypes.CommitPluginReportWithMeta{}, nil)
-	//
-	//origin.EXPECT().
-	//	CommitReportsGTETimestamp(ctx, mock.Anything, mock.Anything, 3).
-	//	Return([]plugintypes.CommitPluginReportWithMeta{}, nil)
-	//
-	//origin.EXPECT().
-	//	CommitReportsGTETimestamp(ctx, mock.Anything, mock.Anything, 4).
-	//	Return(nil, fmt.Errorf("error"))
-
-	//
-	//reports2, err := r.CommitReportsGTETimestamp(ctx, time.Now(), primitives.Unconfirmed, 2)
 }
 
 func cleanupMetrics() func() {

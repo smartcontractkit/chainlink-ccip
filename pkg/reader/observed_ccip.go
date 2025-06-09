@@ -10,9 +10,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
-	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
-	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
 const (
@@ -104,11 +102,11 @@ func (o *observedCCIPReader) CommitReportsGTETimestamp(
 	ts time.Time,
 	confidence primitives.ConfidenceLevel,
 	limit int,
-) ([]plugintypes.CommitPluginReportWithMeta, error) {
+) ([]cciptypes.CommitPluginReportWithMeta, error) {
 	return withObservedQueryAndResult(
 		o,
 		"CommitReportsGTETimestamp",
-		func() ([]plugintypes.CommitPluginReportWithMeta, error) {
+		func() ([]cciptypes.CommitPluginReportWithMeta, error) {
 			return o.CCIPReader.CommitReportsGTETimestamp(ctx, ts, confidence, limit)
 		},
 		sliceLength,
@@ -257,11 +255,11 @@ func (o *observedCCIPReader) GetChainFeePriceUpdate(
 	return res
 }
 
-func (o *observedCCIPReader) GetRMNRemoteConfig(ctx context.Context) (rmntypes.RemoteConfig, error) {
+func (o *observedCCIPReader) GetRMNRemoteConfig(ctx context.Context) (cciptypes.RemoteConfig, error) {
 	return withObservedQueryAndResult(
 		o,
 		"GetRMNRemoteConfig",
-		func() (rmntypes.RemoteConfig, error) {
+		func() (cciptypes.RemoteConfig, error) {
 			return o.CCIPReader.GetRMNRemoteConfig(ctx)
 		},
 		nil,
