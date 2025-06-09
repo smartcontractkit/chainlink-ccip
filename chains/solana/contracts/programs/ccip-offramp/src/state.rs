@@ -35,7 +35,12 @@ pub struct ReferenceAddresses {
 
 #[derive(Debug, Default, PartialEq, Eq, Clone, AnchorDeserialize, AnchorSerialize)]
 pub struct DerivePdasResponse {
+    /// If this vector is not empty, you must call the `derive_` method again including
+    /// exactly these accounts as the `remaining_accounts` field.
     pub ask_again_with: Vec<CcipAccountMeta>,
+    /// You must append these accounts at the end of a separate list. When `ask_again_with`
+    /// is finally empty, this separate list will contain all the accounts to use for the
+    /// instruction of interest.
     pub accounts_to_save: Vec<CcipAccountMeta>,
 }
 

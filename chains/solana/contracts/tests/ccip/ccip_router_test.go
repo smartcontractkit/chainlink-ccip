@@ -7206,9 +7206,6 @@ func TestCCIPRouter(t *testing.T) {
 					solana.NewAccountMeta(solana.SystemProgramID, false, false),
 				)
 
-				for i, m := range raw.AccountMetaSlice {
-					fmt.Printf("[%d] %+v\n", i, *m)
-				}
 				instruction, err = raw.ValidateAndBuild()
 				require.NoError(t, err)
 
@@ -7310,10 +7307,6 @@ func TestCCIPRouter(t *testing.T) {
 					SetReportContextByteWords(reportContext).
 					SetTokenIndexes([]byte{})
 				builder.AccountMetaSlice = derivedAccounts
-				t.Log("Derived accounts:")
-				for i, m := range builder.AccountMetaSlice {
-					fmt.Printf("[%d] %+v\n", i, *m)
-				}
 				instruction, err = builder.ValidateAndBuild()
 				tx = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment)
 
@@ -8622,9 +8615,6 @@ func TestCCIPRouter(t *testing.T) {
 					raw.AccountMetaSlice = append(raw.AccountMetaSlice, solana.Meta(token0.OfframpSigner))
 					raw.AccountMetaSlice = append(raw.AccountMetaSlice, tokenMetas...)
 
-					for i, m := range raw.AccountMetaSlice {
-						fmt.Printf("[%d] %+v\n", i, *m)
-					}
 					instruction, err = raw.ValidateAndBuild()
 					require.NoError(t, err)
 
@@ -8738,9 +8728,6 @@ func TestCCIPRouter(t *testing.T) {
 						SetReportContextByteWords(reportContext).
 						SetTokenIndexes([]byte{5})
 					builder.AccountMetaSlice = derivedAccounts
-					for i, m := range builder.AccountMetaSlice {
-						fmt.Printf("[%d] %+v\n", i, *m)
-					}
 					instruction, err = builder.ValidateAndBuild()
 					_, addressTables, err := tokens.ParseTokenLookupTable(ctx, solanaGoClient, token0, token0.User[config.ReceiverExternalExecutionConfigPDA])
 
@@ -10307,19 +10294,14 @@ func deriveExecutionAccounts(ctx context.Context,
 	derivedAccounts := []*solana.AccountMeta{}
 	askWith := []*solana.AccountMeta{}
 	for {
-		fmt.Printf("New derive stage:\n")
 		deriveRaw := ccip_offramp.NewDerivePdasExecuteInstruction(rawExecutionReport, transmitter.PublicKey(), messagingAccounts, config.OfframpConfigPDA)
 		deriveRaw.AccountMetaSlice = append(deriveRaw.AccountMetaSlice, askWith...)
-		for i, meta := range deriveRaw.AccountMetaSlice {
-			fmt.Printf("Now asking with: [%d] %+v\n", i, meta.PublicKey)
-		}
 		derive, err := deriveRaw.ValidateAndBuild()
 		require.NoError(t, err)
 		tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{derive}, transmitter, config.DefaultCommitment)
 		derivation, err := common.ExtractAnchorTypedReturnValue[ccip_offramp.DerivePdasResponse](ctx, tx.Meta.LogMessages, config.CcipOfframpProgram.String())
 		require.NoError(t, err)
-		for i, meta := range derivation.AccountsToSave {
-			fmt.Printf("Save: [%d] %+v\n", i, meta.Pubkey)
+		for _, meta := range derivation.AccountsToSave {
 			derivedAccounts = append(derivedAccounts, &solana.AccountMeta{
 				PublicKey:  meta.Pubkey,
 				IsWritable: meta.IsWritable,
@@ -10327,8 +10309,7 @@ func deriveExecutionAccounts(ctx context.Context,
 			})
 		}
 		askWith = []*solana.AccountMeta{}
-		for i, meta := range derivation.AskAgainWith {
-			fmt.Printf("Ask with: [%d] %+v\n", i, meta.Pubkey)
+		for _, meta := range derivation.AskAgainWith {
 			askWith = append(askWith, &solana.AccountMeta{
 				PublicKey:  meta.Pubkey,
 				IsWritable: meta.IsWritable,
