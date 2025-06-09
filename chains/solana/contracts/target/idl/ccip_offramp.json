@@ -1172,10 +1172,6 @@
           "type": "bytes"
         },
         {
-          "name": "tokenIndexes",
-          "type": "bytes"
-        },
-        {
           "name": "executeCaller",
           "type": "publicKey"
         },
@@ -1807,11 +1803,15 @@
         "kind": "struct",
         "fields": [
           {
-            "name": "askAgain",
-            "type": "bool"
+            "name": "askAgainWith",
+            "type": {
+              "vec": {
+                "defined": "CcipAccountMeta"
+              }
+            }
           },
           {
-            "name": "accountMetas",
+            "name": "accountsToSave",
             "type": {
               "vec": {
                 "defined": "CcipAccountMeta"

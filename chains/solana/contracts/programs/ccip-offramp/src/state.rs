@@ -35,8 +35,8 @@ pub struct ReferenceAddresses {
 
 #[derive(Debug, Default, PartialEq, Eq, Clone, AnchorDeserialize, AnchorSerialize)]
 pub struct DerivePdasResponse {
-    pub ask_again: bool,
-    pub account_metas: Vec<CcipAccountMeta>,
+    pub ask_again_with: Vec<CcipAccountMeta>,
+    pub accounts_to_save: Vec<CcipAccountMeta>,
 }
 
 // We can't use anchor's `AccountMeta` since it doesn't implement

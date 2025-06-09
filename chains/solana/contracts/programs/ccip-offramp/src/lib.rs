@@ -600,7 +600,6 @@ pub mod ccip_offramp {
     pub fn derive_pdas_execute<'info>(
         ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
         raw_execution_report: Vec<u8>,
-        token_indexes: Vec<u8>,
         execute_caller: Pubkey,
         message_accounts: Vec<CcipAccountMeta>,
     ) -> Result<DerivePdasResponse> {
@@ -614,7 +613,6 @@ pub mod ccip_offramp {
         router::execute(default_code_version, default_code_version).derive_pdas_execute(
             ctx,
             raw_execution_report,
-            token_indexes,
             execute_caller,
             message_accounts,
         )
