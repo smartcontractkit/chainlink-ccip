@@ -23,7 +23,7 @@ const (
 var (
 	PromChainFeeGauge = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "ccip_chain_fee_components",
+			Name: "ccip_reader_chain_fee_components",
 			Help: "This metric tracks the chain fee components for a given chain",
 		},
 		[]string{"chainID", "feeType"},
@@ -60,7 +60,8 @@ var (
 // observedCCIPReader is a wrapper around CCIPReader that tracks the duration of queries and the size of the data returned.
 // It implements the CCIPReader interface and is used to observe the performance of the CCIPReader implementation.
 // Every CCIPReader (and Chain Accessor Layer in the future) should be decorated with the observedCCIPReader to track the
-// performance of the queries made by the reader
+// performance of the queries made by the underlying reader. Overhead is minimal, as it only measures performance of queries
+// without adding any additional logic or complexity to the reader itself.
 type observedCCIPReader struct {
 	CCIPReader
 	lggr              logger.Logger
@@ -80,8 +81,8 @@ func NewObservedCCIPReader(
 	chainId, err := sel.GetChainIDFromSelector(uint64(destChainSelector))
 	if err != nil {
 		// This should never happen
-		lggr.Panicw("failed to get chain ID from selector", "selector", destChainSelector, "err", err)
-		chainId = "unknown-chain-id"
+		lggr.Errorw("failed to get chain ID from selector", "selector", destChainSelector, "err", err)
+		chainId = "unknown"
 	}
 
 	return &observedCCIPReader{
@@ -334,7 +335,8 @@ func (o *observedCCIPReader) trackChainFeeComponents(
 }
 
 // withObservedQueryAndResult is a helper function that wraps a query function and tracks its duration and data size
-// if dataSizeFn is not provided, it will not track the data size.
+// if dataSizeFn is not provided, it will not track the data size. Data set is also not tracked when error is returned.
+// Latency of the query is always tracked, regardless of the error.
 func withObservedQueryAndResult[T any](
 	o *observedCCIPReader,
 	queryName string,

@@ -4,17 +4,21 @@ import (
 	"errors"
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal"
 	mock_reader "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
 func Test_GetChainsFeeComponents(t *testing.T) {
@@ -144,5 +148,101 @@ func Test_GetDestChainFeeComponents(t *testing.T) {
 				testutil.ToFloat64(reader.PromChainFeeGauge.WithLabelValues(chainID, "daCost")),
 			)
 		})
+	}
+}
+
+func Test_CommitReportsGTETimestamp(t *testing.T) {
+	ctx := tests.Context(t)
+	chainID := "2337"
+	chainSelector := cciptypes.ChainSelector(12922642891491394802)
+
+	t.Cleanup(cleanupMetrics())
+
+	tt := []struct {
+		name          string
+		result        []plugintypes.CommitPluginReportWithMeta
+		err           error
+		expectedCount int
+	}{
+		{
+			name:          "nil reports",
+			result:        nil,
+			err:           nil,
+			expectedCount: 0,
+		},
+		{
+			name:          "empty reports",
+			result:        []plugintypes.CommitPluginReportWithMeta{},
+			err:           nil,
+			expectedCount: 0,
+		},
+		{
+			name: "reports with some items",
+			result: []plugintypes.CommitPluginReportWithMeta{
+				{
+					Timestamp: time.Now(),
+				},
+				{
+					Timestamp: time.Now(),
+				},
+			},
+			err:           nil,
+			expectedCount: 2,
+		},
+		{
+			name:          "error case",
+			result:        nil,
+			err:           errors.New("some error occurred"),
+			expectedCount: 0,
+		},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			cleanupMetrics()()
+
+			origin := mock_reader.NewMockCCIPReader(t)
+			r := reader.NewObservedCCIPReader(origin, logger.Test(t), chainSelector)
+
+			origin.EXPECT().
+				CommitReportsGTETimestamp(ctx, mock.Anything, mock.Anything, mock.Anything).
+				Return(tc.result, tc.err)
+
+			result, err := r.CommitReportsGTETimestamp(ctx, time.Now(), primitives.Unconfirmed, 1)
+			require.Equal(t, tc.err, err)
+			require.Equal(t, tc.result, result)
+			require.Equal(
+				t,
+				float64(tc.expectedCount),
+				testutil.ToFloat64(reader.PromDataSetSizeGauge.WithLabelValues(chainID, "CommitReportsGTETimestamp")),
+			)
+
+			count := internal.CounterFromHistogramByLabels(t, reader.PromQueryHistogram, chainID, "CommitReportsGTETimestamp")
+			require.Equal(t, 1, count)
+		})
+	}
+
+	//
+	//origin.EXPECT().
+	//	CommitReportsGTETimestamp(ctx, mock.Anything, mock.Anything, 2).
+	//	Return([]plugintypes.CommitPluginReportWithMeta{}, nil)
+	//
+	//origin.EXPECT().
+	//	CommitReportsGTETimestamp(ctx, mock.Anything, mock.Anything, 3).
+	//	Return([]plugintypes.CommitPluginReportWithMeta{}, nil)
+	//
+	//origin.EXPECT().
+	//	CommitReportsGTETimestamp(ctx, mock.Anything, mock.Anything, 4).
+	//	Return(nil, fmt.Errorf("error"))
+
+	//
+	//reports2, err := r.CommitReportsGTETimestamp(ctx, time.Now(), primitives.Unconfirmed, 2)
+}
+
+func cleanupMetrics() func() {
+	return func() {
+		reader.PromChainFeeGauge.Reset()
+		reader.PromDataSetSizeGauge.Reset()
+		reader.PromQueryHistogram.Reset()
 	}
 }
