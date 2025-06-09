@@ -187,10 +187,11 @@ func TestCCIPMsg_String(t *testing.T) {
 
 					MsgHash: mustNewBytes32(t, "0x23"),
 					OnRamp:  mustNewUnknownAddress(t, "0x04D4cC5972ad487F71b85654d48b27D32b13a22F"),
+					TxHash:  "0x1234",
 				},
 			},
 			//nolint:lll // test input
-			`{"header":{"messageId":"0x0100000000000000000000000000000000000000000000000000000000000000","sourceChainSelector":"1","destChainSelector":"2","seqNum":"2","nonce":1,"msgHash":"0x2300000000000000000000000000000000000000000000000000000000000000","onRamp":"0x04d4cc5972ad487f71b85654d48b27d32b13a22f"},"sender":"0x","data":"0x","receiver":"0x","extraArgs":"0x","feeToken":"0x","feeTokenAmount":null,"feeValueJuels":null,"tokenAmounts":null}`,
+			`{"header":{"messageId":"0x0100000000000000000000000000000000000000000000000000000000000000","sourceChainSelector":"1","destChainSelector":"2","seqNum":"2","nonce":1,"msgHash":"0x2300000000000000000000000000000000000000000000000000000000000000","onRamp":"0x04d4cc5972ad487f71b85654d48b27d32b13a22f","txHash":"0x1234"},"sender":"0x","data":"0x","receiver":"0x","extraArgs":"0x","feeToken":"0x","feeTokenAmount":null,"feeValueJuels":null,"tokenAmounts":null}`,
 		},
 		{
 			"with evm ramp message",
@@ -204,6 +205,7 @@ func TestCCIPMsg_String(t *testing.T) {
 
 					MsgHash: mustNewBytes32(t, "0x23"),
 					OnRamp:  mustNewUnknownAddress(t, "0x04D4cC5972ad487F71b85654d48b27D32b13a22F"),
+					TxHash:  "0x1234",
 				},
 				Sender:         mustNewUnknownAddress(t, "0x04D4cC5972ad487F71b85654d48b27D32b13a22F"),
 				Receiver:       mustNewUnknownAddress(t, "0x101112131415"), // simulate a non-evm receiver
@@ -223,7 +225,7 @@ func TestCCIPMsg_String(t *testing.T) {
 				},
 			},
 			//nolint:lll // test input
-			`{"header":{"messageId":"0x0100000000000000000000000000000000000000000000000000000000000000","sourceChainSelector":"1","destChainSelector":"2","seqNum":"2","nonce":1,"msgHash":"0x2300000000000000000000000000000000000000000000000000000000000000","onRamp":"0x04d4cc5972ad487f71b85654d48b27d32b13a22f"},"sender":"0x04d4cc5972ad487f71b85654d48b27d32b13a22f","data":"0x736f6d652064617461","receiver":"0x101112131415","extraArgs":"0x65787472612061726773","feeToken":"0xb5fcc870d2ac8745054b4ba99b1f176b93382162","feeTokenAmount":"1000","feeValueJuels":"287","tokenAmounts":[{"sourcePoolAddress":"0x3e8456720b88a1dadce8e2808c9bf73dfffd807c","destTokenAddress":"0x0102030405060708090a","extraData":"0x657874726120746f6b656e2064617461","amount":"2000","destExecData":"0x657874726120746f6b656e2064617461"}]}`,
+			`{"header":{"messageId":"0x0100000000000000000000000000000000000000000000000000000000000000","sourceChainSelector":"1","destChainSelector":"2","seqNum":"2","nonce":1,"msgHash":"0x2300000000000000000000000000000000000000000000000000000000000000","onRamp":"0x04d4cc5972ad487f71b85654d48b27d32b13a22f","txHash":"0x1234"},"sender":"0x04d4cc5972ad487f71b85654d48b27d32b13a22f","data":"0x736f6d652064617461","receiver":"0x101112131415","extraArgs":"0x65787472612061726773","feeToken":"0xb5fcc870d2ac8745054b4ba99b1f176b93382162","feeTokenAmount":"1000","feeValueJuels":"287","tokenAmounts":[{"sourcePoolAddress":"0x3e8456720b88a1dadce8e2808c9bf73dfffd807c","destTokenAddress":"0x0102030405060708090a","extraData":"0x657874726120746f6b656e2064617461","amount":"2000","destExecData":"0x657874726120746f6b656e2064617461"}]}`,
 		},
 	}
 

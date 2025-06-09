@@ -40,12 +40,12 @@ Add the following remappings
 
 ```sh
 # pnpm
-$ pnpm add @chainlink/contracts-evm
+$ pnpm add @chainlink/contracts
 $ pnpm add @chainlink/contracts-ccip
 ```
 ```sh
 # npm
-$ npm install @chainlink/contracts-evm --save
+$ npm install @chainlink/contracts --save
 $ npm install @chainlink/contracts-ccip --save
 ```
 
