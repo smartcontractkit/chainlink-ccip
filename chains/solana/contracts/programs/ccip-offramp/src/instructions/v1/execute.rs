@@ -117,12 +117,17 @@ impl Execute for Impl {
     fn buffer_execution_report(
         &self,
         ctx: Context<BufferExecutionReportContext>,
-        _buffer_id: Vec<u8>,
+        buffer_id: Vec<u8>,
         report_length: u32,
         chunk: Vec<u8>,
         chunk_index: u8,
         num_chunks: u8,
     ) -> Result<()> {
+        require_gte!(
+            32,
+            buffer_id.len(),
+            CcipOfframpError::ExecutionReportBufferInvalidIdSize
+        );
         ctx.accounts.execution_report_buffer.add_chunk(
             report_length,
             &chunk,
@@ -363,12 +368,11 @@ fn derive_execute_pdas_build_main_account_list<'info>(
                 execute_caller.as_ref(),
             ],
             crate::ID,
-        )
-        .readonly();
+        );
         if ask_again_with.is_empty() {
-            accounts_to_save.push(buffer_pda);
+            accounts_to_save.push(buffer_pda.writable());
         } else {
-            ask_again_with.push(buffer_pda);
+            ask_again_with.push(buffer_pda.readonly());
         }
     }
 
@@ -404,7 +408,7 @@ fn derive_execute_pdas_retrieve_luts<'info>(
             crate::ID,
         )
         .readonly();
-        ask_again_with.push(buffer_pda);
+        ask_again_with.push(buffer_pda.readonly());
     }
 
     Ok(DerivePdasResponse {
@@ -506,6 +510,7 @@ fn derive_execute_pdas_additional_tokens<'info>(
     ));
 
     let mut ask_again_with = vec![];
+
     if remaining_accounts.len() > 2 {
         // We aren't done yet, we need to derive more tokens, so we tell the user
         // to ask again with one fewer token.
@@ -513,14 +518,15 @@ fn derive_execute_pdas_additional_tokens<'info>(
         ask_again_with.extend(remaining_accounts[2..].iter().map(|a| a.key.readonly()));
     } else if report_or_buffer_id.len() <= 32 {
         // We're done and it's the buffered case, so we append the buffer PDA
-        ask_again_with.push(find(
+        let buffer_pda = find(
             &[
                 seed::EXECUTION_REPORT_BUFFER,
                 report_or_buffer_id,
                 execute_caller.as_ref(),
             ],
             crate::ID,
-        ));
+        );
+        ask_again_with.push(buffer_pda.writable());
     }
 
     Ok(DerivePdasResponse {

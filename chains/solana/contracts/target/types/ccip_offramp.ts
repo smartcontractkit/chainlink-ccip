@@ -2667,16 +2667,21 @@ export type CcipOfframp = {
     },
     {
       "code": 9064,
+      "name": "ExecutionReportBufferInvalidIdSize",
+      "msg": "Invalid ID size for buffer"
+    },
+    {
+      "code": 9065,
       "name": "ExecutionReportBufferIncomplete",
       "msg": "Execution report buffer is not complete: chunks are missing"
     },
     {
-      "code": 9065,
+      "code": 9066,
       "name": "ExecutionReportUnavailable",
       "msg": "Execution report wasn't provided either directly or via buffer"
     },
     {
-      "code": 9066,
+      "code": 9067,
       "name": "InvalidAccountListForPdaDerivation",
       "msg": "Invalid account list for PDA derivation"
     }
@@ -5352,16 +5357,21 @@ export const IDL: CcipOfframp = {
     },
     {
       "code": 9064,
+      "name": "ExecutionReportBufferInvalidIdSize",
+      "msg": "Invalid ID size for buffer"
+    },
+    {
+      "code": 9065,
       "name": "ExecutionReportBufferIncomplete",
       "msg": "Execution report buffer is not complete: chunks are missing"
     },
     {
-      "code": 9065,
+      "code": 9066,
       "name": "ExecutionReportUnavailable",
       "msg": "Execution report wasn't provided either directly or via buffer"
     },
     {
-      "code": 9066,
+      "code": 9067,
       "name": "InvalidAccountListForPdaDerivation",
       "msg": "Invalid account list for PDA derivation"
     }
