@@ -7308,6 +7308,7 @@ func TestCCIPRouter(t *testing.T) {
 					SetTokenIndexes([]byte{})
 				builder.AccountMetaSlice = derivedAccounts
 				instruction, err = builder.ValidateAndBuild()
+				require.NoError(t, err)
 				tx = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment)
 
 				executionEvents, err := common.ParseMultipleEvents[ccip.EventExecutionStateChanged](tx.Meta.LogMessages, "ExecutionStateChanged", config.PrintEvents)
@@ -8729,7 +8730,9 @@ func TestCCIPRouter(t *testing.T) {
 						SetTokenIndexes([]byte{5})
 					builder.AccountMetaSlice = derivedAccounts
 					instruction, err = builder.ValidateAndBuild()
+					require.NoError(t, err)
 					_, addressTables, err := tokens.ParseTokenLookupTable(ctx, solanaGoClient, token0, token0.User[config.ReceiverExternalExecutionConfigPDA])
+					require.NoError(t, err)
 
 					tx = testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(400_000))
 
@@ -10290,7 +10293,6 @@ func deriveExecutionAccounts(ctx context.Context,
 	transmitter solana.PrivateKey,
 	messagingAccounts []ccip_offramp.CcipAccountMeta,
 	solanaGoClient *rpc.Client) []*solana.AccountMeta {
-
 	derivedAccounts := []*solana.AccountMeta{}
 	askWith := []*solana.AccountMeta{}
 	for {
