@@ -599,7 +599,7 @@ pub mod ccip_offramp {
 
     /// Automatically derives all acounts required to call `ccip_execute`.
     ///
-    /// This methods receives the bare minimum amount of information needed to construct
+    /// This method receives the bare minimum amount of information needed to construct
     /// the entire account list to execute a transaction, and builds it iteratively
     /// over the course of multiple calls.
     ///
