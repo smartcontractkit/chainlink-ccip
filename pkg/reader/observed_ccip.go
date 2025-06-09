@@ -57,11 +57,12 @@ var (
 	)
 )
 
-// observedCCIPReader is a wrapper around CCIPReader that tracks the duration of queries and the size of the data returned.
-// It implements the CCIPReader interface and is used to observe the performance of the CCIPReader implementation.
-// Every CCIPReader (and Chain Accessor Layer in the future) should be decorated with the observedCCIPReader to track the
-// performance of the queries made by the underlying reader. Overhead is minimal, as it only measures performance of queries
-// without adding any additional logic or complexity to the reader itself.
+// observedCCIPReader is a wrapper around CCIPReader that tracks the duration of queries and the
+// size of the data returned. It implements the CCIPReader interface and is used to observe the performance
+// of the CCIPReader implementation. Every CCIPReader (and Chain Accessor Layer in the future) should be
+// decorated with the observedCCIPReader to track the performance of the queries made by the underlying reader.
+// Overhead is minimal, as it only measures performance of queries without adding any additional logic or
+// complexity to the reader itself.
 type observedCCIPReader struct {
 	CCIPReader
 	lggr              logger.Logger
@@ -78,18 +79,18 @@ func NewObservedCCIPReader(
 	lggr logger.Logger,
 	destChainSelector cciptypes.ChainSelector,
 ) CCIPReader {
-	chainId, err := sel.GetChainIDFromSelector(uint64(destChainSelector))
+	chainID, err := sel.GetChainIDFromSelector(uint64(destChainSelector))
 	if err != nil {
 		// This should never happen
 		lggr.Errorw("failed to get chain ID from selector", "selector", destChainSelector, "err", err)
-		chainId = "unknown"
+		chainID = "unknown"
 	}
 
 	return &observedCCIPReader{
 		CCIPReader: reader,
 		lggr:       lggr,
 
-		destChain:         chainId,
+		destChain:         chainID,
 		destChainSelector: destChainSelector,
 
 		queryHistogram:   PromQueryHistogram,
@@ -278,7 +279,10 @@ func (o *observedCCIPReader) GetRmnCurseInfo(ctx context.Context) (CurseInfo, er
 	)
 }
 
-func (o *observedCCIPReader) DiscoverContracts(ctx context.Context, allChains []cciptypes.ChainSelector) (ContractAddresses, error) {
+func (o *observedCCIPReader) DiscoverContracts(
+	ctx context.Context,
+	allChains []cciptypes.ChainSelector,
+) (ContractAddresses, error) {
 	contractAddressesLength := func(addresses ContractAddresses) float64 {
 		return mapOfMapLength(addresses)
 	}
@@ -293,7 +297,10 @@ func (o *observedCCIPReader) DiscoverContracts(ctx context.Context, allChains []
 	)
 }
 
-func (o *observedCCIPReader) GetOffRampSourceChainsConfig(ctx context.Context, sourceChains []cciptypes.ChainSelector) (map[cciptypes.ChainSelector]StaticSourceChainConfig, error) {
+func (o *observedCCIPReader) GetOffRampSourceChainsConfig(
+	ctx context.Context,
+	sourceChains []cciptypes.ChainSelector,
+) (map[cciptypes.ChainSelector]StaticSourceChainConfig, error) {
 	return withObservedQueryAndResult(
 		o,
 		"GetOffRampSourceChainsConfig",
