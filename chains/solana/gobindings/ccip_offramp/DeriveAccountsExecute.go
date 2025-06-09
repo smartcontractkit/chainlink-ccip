@@ -20,11 +20,11 @@ import (
 //
 // * `accounts_to_save`: The caller must append these accounts to a list they maintain.
 // When complete, this list will contain all accounts needed to call `ccip_execute`.
-// * `ask_again_with`: When this list is not empty, the caller must call `derive_pdas_execute`
+// * `ask_again_with`: When this list is not empty, the caller must call `derive_accounts_execute`
 // again, including exactly these accounts as the `remaining_accounts`.
 //
 // Therefore, and starting with an empty `remaining_accounts` list, the caller must repeteadly
-// call `derive_pdas_execute` until `ask_again_with` is returned empty.
+// call `derive_accounts_execute` until `ask_again_with` is returned empty.
 //
 // # Arguments
 //
@@ -34,7 +34,7 @@ import (
 // * `execute_caller`: Public key of the account that will sign the call to `ccip_execute`.
 // * `message_accounts`: If the transaction involves messaging, the message accounts.
 // * `source_chain_selector`: CCIP chain selector for the source chain.
-type DerivePdasExecute struct {
+type DeriveAccountsExecute struct {
 	ReportOrBufferId    *[]byte
 	ExecuteCaller       *ag_solanago.PublicKey
 	MessageAccounts     *[]CcipAccountMeta
@@ -44,67 +44,67 @@ type DerivePdasExecute struct {
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
-// NewDerivePdasExecuteInstructionBuilder creates a new `DerivePdasExecute` instruction builder.
-func NewDerivePdasExecuteInstructionBuilder() *DerivePdasExecute {
-	nd := &DerivePdasExecute{
+// NewDeriveAccountsExecuteInstructionBuilder creates a new `DeriveAccountsExecute` instruction builder.
+func NewDeriveAccountsExecuteInstructionBuilder() *DeriveAccountsExecute {
+	nd := &DeriveAccountsExecute{
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 1),
 	}
 	return nd
 }
 
 // SetReportOrBufferId sets the "reportOrBufferId" parameter.
-func (inst *DerivePdasExecute) SetReportOrBufferId(reportOrBufferId []byte) *DerivePdasExecute {
+func (inst *DeriveAccountsExecute) SetReportOrBufferId(reportOrBufferId []byte) *DeriveAccountsExecute {
 	inst.ReportOrBufferId = &reportOrBufferId
 	return inst
 }
 
 // SetExecuteCaller sets the "executeCaller" parameter.
-func (inst *DerivePdasExecute) SetExecuteCaller(executeCaller ag_solanago.PublicKey) *DerivePdasExecute {
+func (inst *DeriveAccountsExecute) SetExecuteCaller(executeCaller ag_solanago.PublicKey) *DeriveAccountsExecute {
 	inst.ExecuteCaller = &executeCaller
 	return inst
 }
 
 // SetMessageAccounts sets the "messageAccounts" parameter.
-func (inst *DerivePdasExecute) SetMessageAccounts(messageAccounts []CcipAccountMeta) *DerivePdasExecute {
+func (inst *DeriveAccountsExecute) SetMessageAccounts(messageAccounts []CcipAccountMeta) *DeriveAccountsExecute {
 	inst.MessageAccounts = &messageAccounts
 	return inst
 }
 
 // SetSourceChainSelector sets the "sourceChainSelector" parameter.
-func (inst *DerivePdasExecute) SetSourceChainSelector(sourceChainSelector uint64) *DerivePdasExecute {
+func (inst *DeriveAccountsExecute) SetSourceChainSelector(sourceChainSelector uint64) *DeriveAccountsExecute {
 	inst.SourceChainSelector = &sourceChainSelector
 	return inst
 }
 
 // SetConfigAccount sets the "config" account.
-func (inst *DerivePdasExecute) SetConfigAccount(config ag_solanago.PublicKey) *DerivePdasExecute {
+func (inst *DeriveAccountsExecute) SetConfigAccount(config ag_solanago.PublicKey) *DeriveAccountsExecute {
 	inst.AccountMetaSlice[0] = ag_solanago.Meta(config)
 	return inst
 }
 
 // GetConfigAccount gets the "config" account.
-func (inst *DerivePdasExecute) GetConfigAccount() *ag_solanago.AccountMeta {
+func (inst *DeriveAccountsExecute) GetConfigAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
-func (inst DerivePdasExecute) Build() *Instruction {
+func (inst DeriveAccountsExecute) Build() *Instruction {
 	return &Instruction{BaseVariant: ag_binary.BaseVariant{
 		Impl:   inst,
-		TypeID: Instruction_DerivePdasExecute,
+		TypeID: Instruction_DeriveAccountsExecute,
 	}}
 }
 
 // ValidateAndBuild validates the instruction parameters and accounts;
 // if there is a validation error, it returns the error.
 // Otherwise, it builds and returns the instruction.
-func (inst DerivePdasExecute) ValidateAndBuild() (*Instruction, error) {
+func (inst DeriveAccountsExecute) ValidateAndBuild() (*Instruction, error) {
 	if err := inst.Validate(); err != nil {
 		return nil, err
 	}
 	return inst.Build(), nil
 }
 
-func (inst *DerivePdasExecute) Validate() error {
+func (inst *DeriveAccountsExecute) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
 		if inst.ReportOrBufferId == nil {
@@ -130,11 +130,11 @@ func (inst *DerivePdasExecute) Validate() error {
 	return nil
 }
 
-func (inst *DerivePdasExecute) EncodeToTree(parent ag_treeout.Branches) {
+func (inst *DeriveAccountsExecute) EncodeToTree(parent ag_treeout.Branches) {
 	parent.Child(ag_format.Program(ProgramName, ProgramID)).
 		//
 		ParentFunc(func(programBranch ag_treeout.Branches) {
-			programBranch.Child(ag_format.Instruction("DerivePdasExecute")).
+			programBranch.Child(ag_format.Instruction("DeriveAccountsExecute")).
 				//
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
@@ -154,7 +154,7 @@ func (inst *DerivePdasExecute) EncodeToTree(parent ag_treeout.Branches) {
 		})
 }
 
-func (obj DerivePdasExecute) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj DeriveAccountsExecute) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `ReportOrBufferId` param:
 	err = encoder.Encode(obj.ReportOrBufferId)
 	if err != nil {
@@ -177,7 +177,7 @@ func (obj DerivePdasExecute) MarshalWithEncoder(encoder *ag_binary.Encoder) (err
 	}
 	return nil
 }
-func (obj *DerivePdasExecute) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *DeriveAccountsExecute) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `ReportOrBufferId`:
 	err = decoder.Decode(&obj.ReportOrBufferId)
 	if err != nil {
@@ -201,16 +201,16 @@ func (obj *DerivePdasExecute) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (
 	return nil
 }
 
-// NewDerivePdasExecuteInstruction declares a new DerivePdasExecute instruction with the provided parameters and accounts.
-func NewDerivePdasExecuteInstruction(
+// NewDeriveAccountsExecuteInstruction declares a new DeriveAccountsExecute instruction with the provided parameters and accounts.
+func NewDeriveAccountsExecuteInstruction(
 	// Parameters:
 	reportOrBufferId []byte,
 	executeCaller ag_solanago.PublicKey,
 	messageAccounts []CcipAccountMeta,
 	sourceChainSelector uint64,
 	// Accounts:
-	config ag_solanago.PublicKey) *DerivePdasExecute {
-	return NewDerivePdasExecuteInstructionBuilder().
+	config ag_solanago.PublicKey) *DeriveAccountsExecute {
+	return NewDeriveAccountsExecuteInstructionBuilder().
 		SetReportOrBufferId(reportOrBufferId).
 		SetExecuteCaller(executeCaller).
 		SetMessageAccounts(messageAccounts).

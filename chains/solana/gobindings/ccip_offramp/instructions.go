@@ -285,11 +285,11 @@ var (
 	//
 	// * `accounts_to_save`: The caller must append these accounts to a list they maintain.
 	// When complete, this list will contain all accounts needed to call `ccip_execute`.
-	// * `ask_again_with`: When this list is not empty, the caller must call `derive_pdas_execute`
+	// * `ask_again_with`: When this list is not empty, the caller must call `derive_accounts_execute`
 	// again, including exactly these accounts as the `remaining_accounts`.
 	//
 	// Therefore, and starting with an empty `remaining_accounts` list, the caller must repeteadly
-	// call `derive_pdas_execute` until `ask_again_with` is returned empty.
+	// call `derive_accounts_execute` until `ask_again_with` is returned empty.
 	//
 	// # Arguments
 	//
@@ -299,7 +299,7 @@ var (
 	// * `execute_caller`: Public key of the account that will sign the call to `ccip_execute`.
 	// * `message_accounts`: If the transaction involves messaging, the message accounts.
 	// * `source_chain_selector`: CCIP chain selector for the source chain.
-	Instruction_DerivePdasExecute = ag_binary.TypeID([8]byte{180, 16, 226, 16, 254, 73, 90, 176})
+	Instruction_DeriveAccountsExecute = ag_binary.TypeID([8]byte{119, 242, 51, 244, 183, 138, 179, 159})
 
 	Instruction_CloseCommitReportAccount = ag_binary.TypeID([8]byte{109, 145, 129, 64, 226, 172, 61, 106})
 )
@@ -345,8 +345,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "BufferExecutionReport"
 	case Instruction_CloseExecutionReportBuffer:
 		return "CloseExecutionReportBuffer"
-	case Instruction_DerivePdasExecute:
-		return "DerivePdasExecute"
+	case Instruction_DeriveAccountsExecute:
+		return "DeriveAccountsExecute"
 	case Instruction_CloseCommitReportAccount:
 		return "CloseCommitReportAccount"
 	default:
@@ -427,7 +427,7 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 			"close_execution_report_buffer", (*CloseExecutionReportBuffer)(nil),
 		},
 		{
-			"derive_pdas_execute", (*DerivePdasExecute)(nil),
+			"derive_accounts_execute", (*DeriveAccountsExecute)(nil),
 		},
 		{
 			"close_commit_report_account", (*CloseCommitReportAccount)(nil),
