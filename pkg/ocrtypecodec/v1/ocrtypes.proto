@@ -15,6 +15,7 @@ message CommitObservation {
   ChainFeeObservation chain_fee_obs = 3;
   DiscoveryObservation discovery_obs = 4;
   map<uint64, int32> f_chain = 5; // chainSelector to f
+  uint64 onchain_price_ocr_seq_num = 6; // the ocr sequence number of the last report with prices seen onchain
 }
 
 message CommitOutcome {
