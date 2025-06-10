@@ -18,7 +18,8 @@ contract USDCBridgeMigratorSetup is USDCSetup {
       s_token,
       new address[](0),
       address(s_mockRMNRemote),
-      address(s_router)
+      address(s_router),
+      address(1) // previousPool
     );
 
     s_usdcTokenPoolTransferLiquidity = new HybridLockReleaseUSDCTokenPool(
@@ -28,7 +29,8 @@ contract USDCBridgeMigratorSetup is USDCSetup {
       s_token,
       new address[](0),
       address(s_mockRMNRemote),
-      address(s_router)
+      address(s_router),
+      address(1) // previousPool
     );
   }
 }

@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {BurnMintERC677} from "@chainlink/contracts/src/v0.8/shared/token/ERC677/BurnMintERC677.sol";
 
+import {Pool} from "../../../../libraries/Pool.sol";
 import {CCTPMessageTransmitterProxy} from "../../../../pools/USDC/CCTPMessageTransmitterProxy.sol";
 import {HybridLockReleaseUSDCTokenPool} from "../../../../pools/USDC/HybridLockReleaseUSDCTokenPool.sol";
 import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
@@ -14,8 +15,16 @@ contract HybridLockReleaseUSDCTokenPoolSetup is USDCSetup {
   CCTPMessageTransmitterProxy internal s_cctpMessageTransmitterProxyForTransferLiquidity;
   address[] internal s_allowedList;
 
+  address internal s_previousPool = makeAddr("previousPool");
+
   function setUp() public virtual override {
     super.setUp();
+
+    vm.mockCall(
+      s_previousPool,
+      abi.encodeWithSelector(USDCTokenPool.releaseOrMint.selector),
+      abi.encode(Pool.ReleaseOrMintOutV1({destinationAmount: 1}))
+    );
 
     s_usdcTokenPool = new HybridLockReleaseUSDCTokenPool(
       s_mockUSDC,
@@ -24,7 +33,8 @@ contract HybridLockReleaseUSDCTokenPoolSetup is USDCSetup {
       s_token,
       new address[](0),
       address(s_mockRMNRemote),
-      address(s_router)
+      address(s_router),
+      s_previousPool // previousPool
     );
 
     CCTPMessageTransmitterProxy.AllowedCallerConfigArgs[] memory allowedCallerParams =
@@ -45,7 +55,8 @@ contract HybridLockReleaseUSDCTokenPoolSetup is USDCSetup {
       s_token,
       new address[](0),
       address(s_mockRMNRemote),
-      address(s_router)
+      address(s_router),
+      s_previousPool // previousPool
     );
 
     allowedCallerParams[0].caller = address(s_usdcTokenPoolTransferLiquidity);

@@ -17,6 +17,8 @@ contract HybridLockReleaseUSDCTokenPool_constructor is USDCSetup {
   CCTPMessageTransmitterProxy internal s_cctpMessageTransmitterProxyForTransferLiquidity;
   address[] internal s_allowedList;
 
+  address internal s_previousPool = makeAddr("previousPool");
+
   // Reverts
   function test_RevertWhen_InvalidConfig() public {
     vm.expectRevert(USDCTokenPool.InvalidConfig.selector);
@@ -28,7 +30,21 @@ contract HybridLockReleaseUSDCTokenPool_constructor is USDCSetup {
       s_token,
       new address[](0),
       address(s_mockRMNRemote),
-      address(s_router)
+      address(s_router),
+      address(1) // previousPool
+    );
+
+    vm.expectRevert(USDCTokenPool.InvalidConfig.selector);
+
+    s_usdcTokenPool = new HybridLockReleaseUSDCTokenPool(
+      s_mockUSDC,
+      ITokenMessenger(address(0)), // transmitter V2 that is checked for zero address
+      s_cctpMessageTransmitterProxy,
+      s_token,
+      new address[](0),
+      address(s_mockRMNRemote),
+      address(s_router),
+      address(0) // previousPool
     );
   }
 
@@ -48,7 +64,8 @@ contract HybridLockReleaseUSDCTokenPool_constructor is USDCSetup {
       s_token,
       new address[](0),
       address(s_mockRMNRemote),
-      address(s_router)
+      address(s_router),
+      s_previousPool // previousPool
     );
   }
 
@@ -65,7 +82,8 @@ contract HybridLockReleaseUSDCTokenPool_constructor is USDCSetup {
       s_token,
       new address[](0),
       address(s_mockRMNRemote),
-      address(s_router)
+      address(s_router),
+      s_previousPool // previousPool
     );
   }
 
@@ -85,7 +103,8 @@ contract HybridLockReleaseUSDCTokenPool_constructor is USDCSetup {
       s_token,
       new address[](0),
       address(s_mockRMNRemote),
-      address(s_router)
+      address(s_router),
+      s_previousPool // previousPool
     );
   }
 }

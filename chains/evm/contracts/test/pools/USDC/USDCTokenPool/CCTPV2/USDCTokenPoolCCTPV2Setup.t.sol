@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {Pool} from "../../../../../libraries/Pool.sol";
 import {CCTPMessageTransmitterProxy} from "../../../../../pools/USDC/CCTPMessageTransmitterProxy.sol";
 import {USDCTokenPool} from "../../../../../pools/USDC/USDCTokenPool.sol";
 import {USDCTokenPoolCCTPV2Helper} from "../../../../helpers/USDCTokenPoolCCTPV2Helper.sol";
@@ -11,11 +12,25 @@ contract USDCTokenPoolCCTPV2Setup is USDCCCTPV2Setup {
   USDCTokenPoolCCTPV2Helper internal s_usdcTokenPoolWithAllowList;
   address[] internal s_allowedList;
 
+  address internal s_previousPool = makeAddr("previousPool");
+
   function setUp() public virtual override {
     super.setUp();
 
+    vm.mockCall(
+      s_previousPool,
+      abi.encodeWithSelector(USDCTokenPool.releaseOrMint.selector),
+      abi.encode(Pool.ReleaseOrMintOutV1({destinationAmount: 1}))
+    );
+
     s_usdcTokenPool = new USDCTokenPoolCCTPV2Helper(
-      s_mockUSDC, s_cctpMessageTransmitterProxy, s_token, new address[](0), address(s_mockRMNRemote), address(s_router)
+      s_mockUSDC,
+      s_cctpMessageTransmitterProxy,
+      s_token,
+      new address[](0),
+      address(s_mockRMNRemote),
+      address(s_router),
+      s_previousPool
     );
 
     CCTPMessageTransmitterProxy.AllowedCallerConfigArgs[] memory allowedCallerParams =
@@ -26,7 +41,13 @@ contract USDCTokenPoolCCTPV2Setup is USDCCCTPV2Setup {
 
     s_allowedList.push(vm.randomAddress());
     s_usdcTokenPoolWithAllowList = new USDCTokenPoolCCTPV2Helper(
-      s_mockUSDC, s_cctpMessageTransmitterProxy, s_token, s_allowedList, address(s_mockRMNRemote), address(s_router)
+      s_mockUSDC,
+      s_cctpMessageTransmitterProxy,
+      s_token,
+      s_allowedList,
+      address(s_mockRMNRemote),
+      address(s_router),
+      s_previousPool
     );
 
     _poolApplyChainUpdates(address(s_usdcTokenPool));

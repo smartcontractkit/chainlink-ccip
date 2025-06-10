@@ -15,8 +15,9 @@ contract USDCTokenPoolCCTPV2Helper is USDCTokenPoolCCTPV2 {
     IBurnMintERC20 token,
     address[] memory allowlist,
     address rmnProxy,
-    address router
-  ) USDCTokenPoolCCTPV2(tokenMessenger, messageTransmitterProxy, token, allowlist, rmnProxy, router) {}
+    address router,
+    address previousPool
+  ) USDCTokenPoolCCTPV2(tokenMessenger, messageTransmitterProxy, token, allowlist, rmnProxy, router, previousPool) {}
 
   function validateMessage(
     bytes memory usdcMessage,

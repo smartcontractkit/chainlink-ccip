@@ -64,10 +64,12 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
   /// @notice A mapping of CCIP chain identifiers to CCTP versions
   mapping(uint64 remoteChainSelector => CCTPVersion version) internal s_cctpVersion;
 
+  address public immutable i_previousPool;
+
   /*
   The Structure of calls made by this contract to the CCTP contracts can be explained as followed:
     +------------------------------------------------------------+
-    |                    HybridUSDCTokenPool                     |
+  |                    HybridUSDCTokenPool                     |
     +------------------------------------------------------------+
                      |                                |
                      |                                |
@@ -106,7 +108,8 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
     IERC20 token,
     address[] memory allowlist,
     address rmnProxy,
-    address router
+    address router,
+    address previousPool
   )
     USDCTokenPool(tokenMessenger, cctpMessageTransmitterProxy, token, allowlist, rmnProxy, router, 0)
     USDCBridgeMigrator(address(token))
@@ -118,7 +121,7 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
     // use the version #0, and CCTP V2 contracts return a version number #1, so a contract
     // interacting with CCTPV2 will look for it to return the version number of 1.
 
-    if (address(tokenMessengerV2) == address(0)) revert InvalidConfig();
+    if (address(tokenMessengerV2) == address(0) || previousPool == address(0)) revert InvalidConfig();
 
     // Get the Local Message Transmitter from the tokenMessenger
     IMessageTransmitter transmitter = IMessageTransmitter(tokenMessengerV2.localMessageTransmitter());
@@ -136,6 +139,7 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
 
     // Set the token Messenger V2 for outgoing CCTP-Messages.
     i_tokenMessengerCCTPV2 = tokenMessengerV2;
+    i_previousPool = previousPool;
 
     // Since CCTPV2 uses different messengers and transmitter addresses as CCTPV1, the addresses must be stored
     // as separate immutable variables from those inherited as part of USDCTokenPool.
@@ -204,18 +208,27 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
     // flag so it is safe to release the tokens. The source USDC pool is trusted to send messages with the correct
     // flag as well.
     if (bytes4(releaseOrMintIn.sourcePoolData) != LOCK_RELEASE_FLAG) {
-      SourceTokenDataPayload memory sourceTokenData =
-        abi.decode(releaseOrMintIn.sourcePoolData, (SourceTokenDataPayload));
+      // This checks for legacy messages, in which the source pool data did not have a cctpVersion field. The explicit
+      // branch prevents an ABI-decoding error and ensures that the message is not a CCTP V2 message.
+      if (releaseOrMintIn.sourcePoolData.length == 64) {
+        // Since legacy messages did not support a messageTransmitterProxy, the destination caller is the previous pool,
+        // and CCTP will not allow the message to be executed by any other caller. Therefore, the message must be proxied
+        // to the previous pool to satisfy the allowedCaller.
+        return HybridLockReleaseUSDCTokenPool(i_previousPool).releaseOrMint(releaseOrMintIn);
+      } else {
+        SourceTokenDataPayload memory sourceTokenData =
+          abi.decode(releaseOrMintIn.sourcePoolData, (SourceTokenDataPayload));
 
-      // If the version is legacy, use the inherited CCTP Functionality
-      if (sourceTokenData.cctpVersion == CCTPVersion.VERSION_1) {
-        return super.releaseOrMint(releaseOrMintIn);
-
-        // Otherwise use the V2 functionality defined explicitly below
-      } else if (sourceTokenData.cctpVersion == CCTPVersion.VERSION_2) {
-        return _releaseOrMintCCTPV2(releaseOrMintIn);
-      } else if (sourceTokenData.cctpVersion == CCTPVersion.UNKNOWN_VERSION) {
-        revert USDCTokenPool.InvalidCCTPVersion(sourceTokenData.sourceDomain, sourceTokenData.cctpVersion);
+        // If the version is V1, but on a lane from before the migration, use the inherited CCTP Functionality
+        if (sourceTokenData.cctpVersion == CCTPVersion.VERSION_1) {
+          return super.releaseOrMint(releaseOrMintIn);
+          // Otherwise use the V2 functionality defined explicitly below
+        } else if (sourceTokenData.cctpVersion == CCTPVersion.VERSION_2) {
+          return _releaseOrMintCCTPV2(releaseOrMintIn);
+          // Additional Safeguard to prevent invalid CCTP versions from being used
+        } else if (sourceTokenData.cctpVersion == CCTPVersion.UNKNOWN_VERSION) {
+          revert USDCTokenPool.InvalidCCTPVersion(sourceTokenData.sourceDomain, sourceTokenData.cctpVersion);
+        }
       }
     }
     return _lockReleaseIncomingMessage(releaseOrMintIn);

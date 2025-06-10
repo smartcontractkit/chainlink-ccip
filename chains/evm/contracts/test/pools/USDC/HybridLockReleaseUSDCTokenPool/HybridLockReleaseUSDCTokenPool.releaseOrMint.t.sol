@@ -191,6 +191,44 @@ contract HybridLockReleaseUSDCTokenPool_releaseOrMint is HybridLockReleaseUSDCTo
     );
   }
 
+  function test_ReleaseOrMint_Success_LegacyMessage() public {
+    vm.startPrank(s_routerAllowedOffRamp);
+
+    uint256 amount = 100;
+    address recipient = address(1);
+
+    // Create a 64-byte sourcePoolData (legacy format)
+    bytes32 random1 = keccak256("random1");
+    bytes32 random2 = keccak256("random2");
+    bytes memory sourcePoolData = abi.encodePacked(random1, random2);
+
+    bytes memory offchainTokenData =
+      abi.encode(USDCTokenPool.MessageAndAttestation({message: bytes(""), attestation: bytes("")}));
+
+    // The mocked receiver does not release the token to the pool, so we manually do it here
+    deal(address(s_token), address(s_usdcTokenPool), amount);
+
+    Pool.ReleaseOrMintInV1 memory releaseOrMintIn = Pool.ReleaseOrMintInV1({
+      originalSender: abi.encode(OWNER),
+      receiver: recipient,
+      amount: amount,
+      localToken: address(s_token),
+      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+      sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
+      sourcePoolData: sourcePoolData,
+      offchainTokenData: offchainTokenData
+    });
+
+    // Expect the previous pool to be called with the releaseOrMintIn data. Since the previous pool is mocked, it will
+    // not emit an event, so we do not need to expectEmit.
+    vm.expectCall(s_previousPool, abi.encodeWithSelector(USDCTokenPool.releaseOrMint.selector, releaseOrMintIn));
+
+    Pool.ReleaseOrMintOutV1 memory releaseOrMintOut = s_usdcTokenPool.releaseOrMint(releaseOrMintIn);
+
+    // the previous pool will return 1, as it is mocked to do so
+    assertEq(releaseOrMintOut.destinationAmount, 1);
+  }
+
   // Reverts
   function test_RevertWhen_UnlockingUSDCFailed() public {
     vm.startPrank(OWNER);

@@ -33,14 +33,19 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
   // CCTP V2 uses 2000 to indicate that attestations should not occur until finality is achieved on the source chain.
   uint32 public constant FINALITY_THRESHOLD = 2000;
 
+  address public immutable i_previousPool;
+
   constructor(
     ITokenMessenger tokenMessenger,
     CCTPMessageTransmitterProxy cctpMessageTransmitterProxy,
     IERC20 token,
     address[] memory allowlist,
     address rmnProxy,
-    address router
-  ) USDCTokenPool(tokenMessenger, cctpMessageTransmitterProxy, token, allowlist, rmnProxy, router, 1) {}
+    address router,
+    address previousPool
+  ) USDCTokenPool(tokenMessenger, cctpMessageTransmitterProxy, token, allowlist, rmnProxy, router, 1) {
+    i_previousPool = previousPool;
+  }
 
   /// @notice Burn tokens from the pool to initiate cross-chain transfer.
   /// @notice Outgoing messages (burn operations) are routed via `i_tokenMessenger.depositForBurnWithCaller`.
@@ -122,6 +127,15 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
     _validateReleaseOrMint(releaseOrMintIn);
 
+    // This supports legacy inflight messages which were sent using CCTP V1. The sourcePoolData will be 64 bytes long, as the
+    // cctpVersion field will not be present. The message must be proxied to the previous pool to satisfy the allowedCaller.
+    // Any messages sent after the migration will have the cctpVersion field, and will be handled by the CCTP V2 functionality.
+    // There should not be any messages sent on V1 that include the cctpVersion field, as it was not supported initially,
+    // and the field was added after the migration, therefore the only messages that should be sent on V1 are legacy messages.
+    if (releaseOrMintIn.sourcePoolData.length == 64) {
+      return USDCTokenPool(i_previousPool).releaseOrMint(releaseOrMintIn);
+    }
+
     SourceTokenDataPayload memory sourceTokenData = abi.decode(releaseOrMintIn.sourcePoolData, (SourceTokenDataPayload));
 
     MessageAndAttestation memory msgAndAttestation =
@@ -137,7 +151,6 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
       revert UnlockingUSDCFailed();
     }
 
-    // emit Minted(msg.sender, releaseOrMintIn.receiver, releaseOrMintIn.amount);
     emit ReleasedOrMinted({
       remoteChainSelector: releaseOrMintIn.remoteChainSelector,
       token: address(i_token),
