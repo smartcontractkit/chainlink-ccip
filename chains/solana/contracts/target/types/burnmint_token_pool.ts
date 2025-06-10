@@ -144,7 +144,7 @@ export type BurnmintTokenPool = {
         },
         {
           "name": "authority",
-          "isMut": true,
+          "isMut": false,
           "isSigner": true
         },
         {
@@ -901,7 +901,7 @@ export const IDL: BurnmintTokenPool = {
         },
         {
           "name": "authority",
-          "isMut": true,
+          "isMut": false,
           "isSigner": true
         },
         {

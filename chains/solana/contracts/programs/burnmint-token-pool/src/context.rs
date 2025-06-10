@@ -112,7 +112,6 @@ pub struct TransferMintAuthority<'info> {
     )]
     /// CHECK: unchecked CPI signer
     pub pool_signer: UncheckedAccount<'info>,
-    #[account(mut, address = state.config.owner @ CcipTokenPoolError::Unauthorized)]
     pub authority: Signer<'info>,
 
     // Ensures that the provided program is the BurnmintTokenPool program,

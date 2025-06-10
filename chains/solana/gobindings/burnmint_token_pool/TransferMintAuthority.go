@@ -22,7 +22,7 @@ type TransferMintAuthority struct {
 	//
 	// [3] = [] poolSigner
 	//
-	// [4] = [WRITE, SIGNER] authority
+	// [4] = [SIGNER] authority
 	//
 	// [5] = [] program
 	//
@@ -90,7 +90,7 @@ func (inst *TransferMintAuthority) GetPoolSignerAccount() *ag_solanago.AccountMe
 
 // SetAuthorityAccount sets the "authority" account.
 func (inst *TransferMintAuthority) SetAuthorityAccount(authority ag_solanago.PublicKey) *TransferMintAuthority {
-	inst.AccountMetaSlice[4] = ag_solanago.Meta(authority).WRITE().SIGNER()
+	inst.AccountMetaSlice[4] = ag_solanago.Meta(authority).SIGNER()
 	return inst
 }
 
