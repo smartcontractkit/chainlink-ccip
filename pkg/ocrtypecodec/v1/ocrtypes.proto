@@ -222,6 +222,7 @@ message RampMessageHeader {
   uint64 nonce = 5;
   bytes msg_hash = 6;
   bytes on_ramp = 7; // address
+  string tx_hash = 8;
 }
 
 message RampTokenAmount {
