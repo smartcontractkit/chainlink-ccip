@@ -223,18 +223,18 @@ func (c *CommitOffchainConfig) applyDefaults() {
 		if c.ChainFeeAsyncObserverSyncFreq == 0 {
 			c.ChainFeeAsyncObserverSyncFreq = defaultAsyncObserverSyncFreq
 		}
-		if c.ChainFeeAsyncObserverSyncTimeout == 0 {
-			c.ChainFeeAsyncObserverSyncTimeout = defaultAsyncObserverSyncTimeout
-		}
+	}
+	if c.ChainFeeAsyncObserverSyncTimeout == 0 {
+		c.ChainFeeAsyncObserverSyncTimeout = defaultAsyncObserverSyncTimeout
 	}
 
 	if !c.TokenPriceAsyncObserverDisabled {
 		if c.TokenPriceAsyncObserverSyncFreq.Duration() == 0 {
 			c.TokenPriceAsyncObserverSyncFreq = *commonconfig.MustNewDuration(defaultAsyncObserverSyncFreq)
 		}
-		if c.TokenPriceAsyncObserverSyncTimeout.Duration() == 0 {
-			c.TokenPriceAsyncObserverSyncTimeout = *commonconfig.MustNewDuration(defaultAsyncObserverSyncTimeout)
-		}
+	}
+	if c.TokenPriceAsyncObserverSyncTimeout.Duration() == 0 {
+		c.TokenPriceAsyncObserverSyncTimeout = *commonconfig.MustNewDuration(defaultAsyncObserverSyncTimeout)
 	}
 }
 
