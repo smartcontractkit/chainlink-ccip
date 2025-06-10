@@ -66,7 +66,7 @@ func newCCIPChainReaderInternal(
 		if contractWriters[chainSelector] == nil {
 			return nil, fmt.Errorf("contract writer for chain %s is not provided", chainSelector)
 		}
-		cas[chainSelector] = chainaccessor.NewLegacyAccessor(
+		cas[chainSelector] = chainaccessor.NewDefaultAccessor(
 			lggr,
 			chainSelector,
 			crs[chainSelector],
@@ -503,20 +503,22 @@ func createExecutedMessagesKeyFilter(
 func (r *ccipChainReader) MsgsBetweenSeqNums(
 	ctx context.Context, sourceChainSelector cciptypes.ChainSelector, seqNumRange cciptypes.SeqNumRange,
 ) ([]cciptypes.Message, error) {
-	if err := validateAccessorExistence(r.accessors, sourceChainSelector); err != nil {
+	sourceChainAccessor, err := getChainAccessor(r.accessors, sourceChainSelector)
+	if err != nil {
 		return nil, err
 	}
-	onRampAddressBeforeQuery, err := r.accessors[sourceChainSelector].GetContractAddress(consts.ContractNameOnRamp)
+
+	onRampAddressBeforeQuery, err := sourceChainAccessor.GetContractAddress(consts.ContractNameOnRamp)
 	if err != nil {
 		return nil, fmt.Errorf("get onRamp address: %w", err)
 	}
 
-	messages, err := r.accessors[sourceChainSelector].MsgsBetweenSeqNums(ctx, r.destChain, seqNumRange)
+	messages, err := sourceChainAccessor.MsgsBetweenSeqNums(ctx, r.destChain, seqNumRange)
 	if err != nil {
-		return nil, fmt.Errorf("failed to call MsgsBetweenSeqNums on accessor: %w", err)
+		return nil, fmt.Errorf("failed to call MsgsBetweenSeqNums on sourceChainAccessor: %w", err)
 	}
 
-	onRampAddressAfterQuery, err := r.accessors[sourceChainSelector].GetContractAddress(consts.ContractNameOnRamp)
+	onRampAddressAfterQuery, err := sourceChainAccessor.GetContractAddress(consts.ContractNameOnRamp)
 	if err != nil {
 		return nil, fmt.Errorf("get onRamp address after query: %w", err)
 	}
@@ -533,11 +535,12 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 func (r *ccipChainReader) LatestMsgSeqNum(
 	ctx context.Context, chain cciptypes.ChainSelector) (cciptypes.SeqNum, error) {
 	lggr := logutil.WithContextValues(ctx, r.lggr)
-	if err := validateAccessorExistence(r.accessors, chain); err != nil {
+	chainAccessor, err := getChainAccessor(r.accessors, chain)
+	if err != nil {
 		return 0, err
 	}
 
-	seqNum, err := r.accessors[chain].LatestMsgSeqNum(ctx, r.destChain)
+	seqNum, err := chainAccessor.LatestMsgSeqNum(ctx, r.destChain)
 	if err != nil {
 		return 0, fmt.Errorf("failed to call accessor LatestMsgSeqNum, source chain: %d, dest chain: %d: %w",
 			chain, r.destChain, err)
@@ -555,10 +558,11 @@ func (r *ccipChainReader) GetExpectedNextSequenceNumber(
 ) (cciptypes.SeqNum, error) {
 	lggr := logutil.WithContextValues(ctx, r.lggr)
 
-	if err := validateAccessorExistence(r.accessors, sourceChainSelector); err != nil {
+	sourceChainAccessor, err := getChainAccessor(r.accessors, sourceChainSelector)
+	if err != nil {
 		return 0, err
 	}
-	expectedNextSeqNum, err := r.accessors[sourceChainSelector].GetExpectedNextSequenceNumber(ctx, r.destChain)
+	expectedNextSeqNum, err := sourceChainAccessor.GetExpectedNextSequenceNumber(ctx, r.destChain)
 	if err != nil {
 		return 0, fmt.Errorf("failed to call accessor LatestMsgSeqNum, source chain: %d, dest chain: %d: %w",
 			sourceChainSelector, r.destChain, err)
@@ -746,12 +750,13 @@ func (r *ccipChainReader) GetChainsFeeComponents(
 	feeComponents := make(map[cciptypes.ChainSelector]types.ChainFeeComponents, len(r.contractWriters))
 
 	for _, chain := range chains {
-		if err := validateAccessorExistence(r.accessors, chain); err != nil {
-			lggr.Errorw("accessor not found", "chain", chain, "err", err)
+		chainAccessor, err := getChainAccessor(r.accessors, chain)
+		if err != nil {
+			lggr.Errorw("failed to get chain accessor", "chain", chain, "err", err)
 			continue
 		}
 
-		feeComponent, err := r.accessors[chain].GetChainFeeComponents(ctx)
+		feeComponent, err := chainAccessor.GetChainFeeComponents(ctx)
 		if err != nil {
 			lggr.Errorw("failed to get chain fee components", "chain", chain, "err", err)
 			continue
@@ -994,9 +999,9 @@ func (r *ccipChainReader) GetRMNRemoteConfig(ctx context.Context) (cciptypes.Rem
 
 	// RMNRemote address stored in the offramp static config is actually the proxy contract address.
 	// Here we will get the RMNRemote address from the proxy contract by calling the RMNProxy contract.
-	destChainAccessor := r.accessors[r.destChain]
-	if destChainAccessor == nil {
-		return cciptypes.RemoteConfig{}, fmt.Errorf("chain accessor not found for dest chain %d", r.destChain)
+	destChainAccessor, err := getChainAccessor(r.accessors, r.destChain)
+	if err != nil {
+		return cciptypes.RemoteConfig{}, err
 	}
 	proxyContractAddress, err := destChainAccessor.GetContractAddress(consts.ContractNameRMNRemote)
 	if err != nil {
