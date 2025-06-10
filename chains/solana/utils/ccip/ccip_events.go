@@ -148,3 +148,12 @@ type EventReferenceAddressesSet struct {
 	FeeQuoter          solana.PublicKey
 	OfframpLookupTable solana.PublicKey
 }
+
+type CctpTokenPoolMessageSent struct {
+	Discriminator       [8]byte
+	OriginalSender      solana.PublicKey
+	RemoteChainSelector uint64
+	MsgFullNonce        uint64
+	EventAddress        solana.PublicKey
+	MessageSentBytes    []byte
+}

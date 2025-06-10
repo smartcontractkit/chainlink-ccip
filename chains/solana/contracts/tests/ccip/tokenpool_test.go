@@ -848,7 +848,7 @@ func TestTokenPool(t *testing.T) {
 	})
 
 	t.Run("CCTP token pool", func(t *testing.T) {
-		t.Parallel()
+		// do not run in parallel, as it checks the balances of the same users that are also used in the other suites
 
 		type MessageTransmitterPDAs struct {
 			program,
@@ -1548,6 +1548,14 @@ func TestTokenPool(t *testing.T) {
 				messageSentEventAccInfo, err := solanaGoClient.GetAccountInfoWithOpts(ctx, messageSentEventAddress, &rpc.GetAccountInfoOpts{Commitment: config.DefaultCommitment})
 				fmt.Println("Message Sent Event Account Info:", messageSentEventAccInfo)
 				fmt.Println("Message Sent Event Account Info (Owner):", messageSentEventAccInfo.Value.Owner)
+
+				var tpMessageSentEvent ccip.CctpTokenPoolMessageSent
+				require.NoError(t, common.ParseEvent(res.Meta.LogMessages, "CctpMessageSentEvent", &tpMessageSentEvent, config.PrintEvents))
+				require.Equal(t, user.PublicKey(), tpMessageSentEvent.OriginalSender)
+				require.Equal(t, config.SvmChainSelector, tpMessageSentEvent.RemoteChainSelector)
+				require.Equal(t, fakeCcipFullNonce, tpMessageSentEvent.MsgFullNonce)
+				require.Equal(t, messageSentEventAddress, tpMessageSentEvent.EventAddress)
+				require.Equal(t, messageSentEventData.Message, tpMessageSentEvent.MessageSentBytes)
 			})
 
 			t.Run("Basic offramp", func(t *testing.T) {

@@ -272,6 +272,25 @@ pub mod cctp_token_pool {
 
         cctp_deposit_for_burn_with_caller(&ctx, &lock_or_burn)?;
 
+        let cctp_event_data = ctx.accounts.cctp_message_sent_event.try_borrow_data()?;
+        // The first 8 bytes are the discriminator, so we skip them
+        // Then, the next 32 bytes are the rent payer, which we also skip
+        let cctp_message_bytes_len = &cctp_event_data[40..44]; // the next 4 bytes encode the message length
+        let cctp_message_bytes = &cctp_event_data[44..]; // then, the rest is the message bytes
+        require_eq!(
+            cctp_message_bytes.len(),
+            u32::from_le_bytes(cctp_message_bytes_len.try_into().unwrap()) as usize,
+            CctpTokenPoolError::InvalidMessageSentEventAccount
+        );
+
+        emit!(CctpMessageSentEvent {
+            original_sender: lock_or_burn.original_sender,
+            remote_chain_selector: lock_or_burn.remote_chain_selector,
+            msg_full_nonce: lock_or_burn.msg_full_nonce,
+            event_address: ctx.accounts.cctp_message_sent_event.key(),
+            message_sent_bytes: cctp_message_bytes.to_vec(),
+        });
+
         emit!(Burned {
             sender: ctx.accounts.authority.key(),
             amount: lock_or_burn.amount,
@@ -599,10 +618,19 @@ pub struct RemoteChainCctpConfigChanged {
     pub config: CctpChain,
 }
 
+#[event]
+pub struct CctpMessageSentEvent {
+    pub original_sender: Pubkey,
+    pub remote_chain_selector: u64,
+    pub msg_full_nonce: u64,
+    pub event_address: Pubkey,
+    pub message_sent_bytes: Vec<u8>,
+}
+
 #[error_code]
 pub enum CctpTokenPoolError {
     #[msg("Invalid token data")]
-    InvalidTokenData,
+    InvalidTokenData = 6000, // offset for CctpTokenPoolErrors, so they don't overlap with errors of other CCIP programs
     #[msg("Invalid receiver")]
     InvalidReceiver,
     #[msg("Invalid domain")]
@@ -611,6 +639,8 @@ pub enum CctpTokenPoolError {
     InvalidTokenMessengerMinter,
     #[msg("Invalid Message Transmitter")]
     InvalidMessageTransmitter,
+    #[msg("Invalid Message Sent Event Account")]
+    InvalidMessageSentEventAccount,
     #[msg("Failed CCTP CPI")]
     FailedCctpCpi,
 }

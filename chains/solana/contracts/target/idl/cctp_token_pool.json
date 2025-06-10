@@ -871,36 +871,71 @@
           "index": false
         }
       ]
+    },
+    {
+      "name": "CctpMessageSentEvent",
+      "fields": [
+        {
+          "name": "originalSender",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "remoteChainSelector",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "msgFullNonce",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "eventAddress",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "messageSentBytes",
+          "type": "bytes",
+          "index": false
+        }
+      ]
     }
   ],
   "errors": [
     {
-      "code": 6000,
+      "code": 12000,
       "name": "InvalidTokenData",
       "msg": "Invalid token data"
     },
     {
-      "code": 6001,
+      "code": 12001,
       "name": "InvalidReceiver",
       "msg": "Invalid receiver"
     },
     {
-      "code": 6002,
+      "code": 12002,
       "name": "InvalidDomain",
       "msg": "Invalid domain"
     },
     {
-      "code": 6003,
+      "code": 12003,
       "name": "InvalidTokenMessengerMinter",
       "msg": "Invalid Token Messenger Minter"
     },
     {
-      "code": 6004,
+      "code": 12004,
       "name": "InvalidMessageTransmitter",
       "msg": "Invalid Message Transmitter"
     },
     {
-      "code": 6005,
+      "code": 12005,
+      "name": "InvalidMessageSentEventAccount",
+      "msg": "Invalid Message Sent Event Account"
+    },
+    {
+      "code": 12006,
       "name": "FailedCctpCpi",
       "msg": "Failed CCTP CPI"
     }
