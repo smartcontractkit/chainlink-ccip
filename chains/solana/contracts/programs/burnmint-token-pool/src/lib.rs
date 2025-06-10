@@ -32,10 +32,7 @@ pub mod burnmint_token_pool {
         ctx: Context<UpdateGlobalConfig>,
         self_served_allowed: bool,
     ) -> Result<()> {
-        ctx.accounts.config.set_inner(PoolConfig {
-            self_served_allowed,
-            version: 1,
-        });
+        ctx.accounts.config.self_served_allowed = self_served_allowed;
 
         emit!(GlobalConfigUpdated {
             self_served_allowed: ctx.accounts.config.self_served_allowed,
