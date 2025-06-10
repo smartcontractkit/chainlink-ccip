@@ -346,17 +346,24 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 		return results, nil
 	})
 
+	cw := writer_mocks.NewMockContractWriter(t)
+	contractWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
+	contractWriters[chainA] = cw
+	contractWriters[chainB] = cw
+	contractWriters[chainC] = cw
+
 	mockAddrCodec := internal.NewMockAddressCodecHex(t)
 	offrampAddress := []byte{0x3}
-	ccipReader := newCCIPChainReaderInternal(
+	ccipReader, err := newCCIPChainReaderInternal(
 		tests.Context(t),
 		logger.Test(t),
 		map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
 			chainA: sourceCRs[chainA],
 			chainB: sourceCRs[chainB],
 			chainC: destCR,
-		}, nil, chainC, offrampAddress, mockAddrCodec,
+		}, contractWriters, chainC, offrampAddress, mockAddrCodec,
 	)
+	require.NoError(t, err)
 
 	// Add cleanup to ensure resources are released
 	t.Cleanup(func() {
@@ -1042,13 +1049,20 @@ func TestCCIPChainReader_getFeeQuoterTokenPriceUSD(t *testing.T) {
 
 	mockAddrCodec := internal.NewMockAddressCodecHex(t)
 
-	ccipReader := newCCIPChainReaderInternal(
+	cw := writer_mocks.NewMockContractWriter(t)
+	contractWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
+	contractWriters[chainA] = cw
+	contractWriters[chainB] = cw
+	contractWriters[chainC] = cw
+
+	ccipReader, err := newCCIPChainReaderInternal(
 		tests.Context(t),
 		logger.Test(t),
 		map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
 			chainC: destCR,
-		}, nil, chainC, offrampAddress, mockAddrCodec,
+		}, contractWriters, chainC, offrampAddress, mockAddrCodec,
 	)
+	require.NoError(t, err)
 
 	// Add cleanup to properly shut down the background polling
 	t.Cleanup(func() {
@@ -1080,19 +1094,32 @@ func TestCCIPFeeComponents_HappyPath(t *testing.T) {
 	)
 
 	contractWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
-	// Missing writer for chainB
 	contractWriters[chainA] = cw
+	contractWriters[chainB] = cw
 	contractWriters[chainC] = cw
 
-	ccipReader := newCCIPChainReaderInternal(
+	sourceCRs := make(map[cciptypes.ChainSelector]*reader_mocks.MockContractReaderFacade)
+	for _, chain := range []cciptypes.ChainSelector{chainA, chainB, chainC} {
+		sourceCRs[chain] = reader_mocks.NewMockContractReaderFacade(t)
+	}
+
+	destChain := chainC
+	sourceCRs[destChain].EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
+
+	ccipReader, err := newCCIPChainReaderInternal(
 		tests.Context(t),
 		logger.Test(t),
-		nil,
+		map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
+			chainA: sourceCRs[chainA],
+			chainB: sourceCRs[chainB],
+			chainC: sourceCRs[chainC],
+		},
 		contractWriters,
 		chainC,
 		[]byte{0x3},
 		internal.NewMockAddressCodecHex(t),
 	)
+	require.NoError(t, err)
 
 	// Add cleanup to ensure resources are released
 	t.Cleanup(func() {
@@ -1104,44 +1131,18 @@ func TestCCIPFeeComponents_HappyPath(t *testing.T) {
 
 	ctx := context.Background()
 	feeComponents := ccipReader.GetChainsFeeComponents(ctx, []cciptypes.ChainSelector{chainA, chainB, chainC})
-	assert.Len(t, feeComponents, 2)
+	assert.Len(t, feeComponents, 3)
 	assert.Equal(t, big.NewInt(1), feeComponents[chainA].ExecutionFee)
-	assert.Equal(t, big.NewInt(2), feeComponents[chainA].DataAvailabilityFee)
+	assert.Equal(t, big.NewInt(1), feeComponents[chainB].ExecutionFee)
 	assert.Equal(t, big.NewInt(1), feeComponents[chainC].ExecutionFee)
+	assert.Equal(t, big.NewInt(2), feeComponents[chainA].DataAvailabilityFee)
+	assert.Equal(t, big.NewInt(2), feeComponents[chainB].DataAvailabilityFee)
 	assert.Equal(t, big.NewInt(2), feeComponents[chainC].DataAvailabilityFee)
 
 	destChainFeeComponent, err := ccipReader.GetDestChainFeeComponents(ctx)
 	require.NoError(t, err)
 	assert.Equal(t, big.NewInt(1), destChainFeeComponent.ExecutionFee)
 	assert.Equal(t, big.NewInt(2), destChainFeeComponent.DataAvailabilityFee)
-}
-
-func TestCCIPFeeComponents_NotFoundErrors(t *testing.T) {
-	cw := writer_mocks.NewMockContractWriter(t)
-	contractWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
-	// Missing writer for dest chain chainC
-	contractWriters[chainA] = cw
-	ccipReader := newCCIPChainReaderInternal(
-		tests.Context(t),
-		logger.Test(t),
-		nil,
-		contractWriters,
-		chainC,
-		[]byte{0x3},
-		internal.NewMockAddressCodecHex(t),
-	)
-
-	// Add cleanup to ensure resources are released
-	t.Cleanup(func() {
-		err := ccipReader.Close()
-		if err != nil {
-			t.Logf("Error closing ccipReader: %v", err)
-		}
-	})
-
-	ctx := context.Background()
-	_, err := ccipReader.GetDestChainFeeComponents(ctx)
-	require.Error(t, err)
 }
 
 func TestCCIPChainReader_LinkPriceUSD(t *testing.T) {

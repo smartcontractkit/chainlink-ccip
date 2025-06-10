@@ -36,7 +36,7 @@ type AllAccessors interface {
 	// GetContractAddress returns the contract address that is registered for the provided contract name and chain.
 	// WARNING: This function will fail if the oracle does not support the requested chain.
 	//
-	// Deprecated: use Metadata() instead.
+	// TODO(NONEVM-1865): do we want to mark this as deprecated in favor of Metadata()?
 	GetContractAddress(contractName string) ([]byte, error)
 
 	// GetAllConfig looks up all configurations available to the accessor. This
@@ -68,17 +68,7 @@ type AllAccessors interface {
 	// Access Type: ChainWriter
 	// Contract: N/A
 	// Confidence: N/A
-	GetChainFeeComponents(
-		ctx context.Context,
-	) map[ChainSelector]ChainFeeComponents
-
-	// GetDestChainFeeComponents seems redundant. If the error is needed lets
-	// add it to GetChainFeeComponents.
-	//
-	// Deprecated: use GetChainFeeComponents instead.
-	GetDestChainFeeComponents(
-		ctx context.Context,
-	) (types.ChainFeeComponents, error)
+	GetChainFeeComponents(ctx context.Context) (ChainFeeComponents, error)
 
 	// Sync can be used to perform frequent syncing operations inside the reader implementation.
 	// Returns a bool indicating whether something was updated.

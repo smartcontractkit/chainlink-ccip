@@ -143,7 +143,7 @@ func (p PluginFactory) NewReportingPlugin(
 			contractreader.NewObserverReader(cr, lggr, chainID))
 	}
 
-	ccipReader := readerpkg.NewCCIPChainReader(
+	ccipReader, err := readerpkg.NewCCIPChainReader(
 		ctx,
 		logutil.WithComponent(lggr, "CCIPReader"),
 		readers,
@@ -152,6 +152,9 @@ func (p PluginFactory) NewReportingPlugin(
 		p.ocrConfig.Config.OfframpAddress,
 		p.addrCodec,
 	)
+	if err != nil {
+		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to create ccip reader: %w", err)
+	}
 
 	tokenDataObserver, err := observer.NewConfigBasedCompositeObservers(
 		ctx,
