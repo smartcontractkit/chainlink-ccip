@@ -401,7 +401,7 @@ fn cctp_deposit_for_burn_with_caller(
         amount: lock_or_burn.amount,
         destination_domain,
         mint_recipient,
-        destination_caller: ctx.accounts.pool_signer.key(), // TODO: using pool signer as it is svm<->svm test, this should be the destination pool (signer or contract). Read it from remote chain configs
+        destination_caller: ctx.accounts.chain_config.cctp.destination_caller,
     };
     let deposit_for_burn_params_bytes = deposit_for_burn_params.try_to_vec().unwrap();
 
@@ -604,6 +604,7 @@ pub struct CctpChain {
     // Domain ID for CCTP, used to identify the chain. This is a sequential number starting from 0.
     // Using u32 here because it's what CCTP uses in its Params structs.
     pub domain_id: u32,
+    pub destination_caller: Pubkey, // The allowed caller to invoke CCTP's receive_message on the dest chain
 }
 
 #[account]

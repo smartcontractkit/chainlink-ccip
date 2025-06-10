@@ -118,12 +118,18 @@ func (obj *DepositForBurnWithCallerParams) UnmarshalWithDecoder(decoder *ag_bina
 }
 
 type CctpChain struct {
-	DomainId uint32
+	DomainId          uint32
+	DestinationCaller ag_solanago.PublicKey
 }
 
 func (obj CctpChain) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `DomainId` param:
 	err = encoder.Encode(obj.DomainId)
+	if err != nil {
+		return err
+	}
+	// Serialize `DestinationCaller` param:
+	err = encoder.Encode(obj.DestinationCaller)
 	if err != nil {
 		return err
 	}
@@ -133,6 +139,11 @@ func (obj CctpChain) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) 
 func (obj *CctpChain) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `DomainId`:
 	err = decoder.Decode(&obj.DomainId)
+	if err != nil {
+		return err
+	}
+	// Deserialize `DestinationCaller`:
+	err = decoder.Decode(&obj.DestinationCaller)
 	if err != nil {
 		return err
 	}

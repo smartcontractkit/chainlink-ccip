@@ -10,6 +10,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_common"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/cctp_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
@@ -184,6 +185,11 @@ type EventRemotePoolsAppended struct {
 	PoolAddresses         []test_token_pool.RemoteAddress
 	PreviousPoolAddresses []test_token_pool.RemoteAddress
 	Mint                  solana.PublicKey
+}
+
+type EventRemoteChainCctpConfigEdited struct {
+	Discriminator [8]byte
+	Config        cctp_token_pool.CctpChain
 }
 
 type EventRateLimitConfigured struct {

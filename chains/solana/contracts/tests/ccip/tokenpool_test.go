@@ -1097,7 +1097,8 @@ func TestTokenPool(t *testing.T) {
 						config.SvmChainSelector,
 						usdcMint,
 						cctp_token_pool.CctpChain{
-							DomainId: domain,
+							DomainId:          domain,
+							DestinationCaller: cctpPool.signer, // as it is svm<->svm, the caller is the pool signer
 						},
 						cctpPool.state,
 						cctpPool.svmChainConfig,
@@ -1130,8 +1131,7 @@ func TestTokenPool(t *testing.T) {
 					require.Equal(t, cctpPool.tokenAccount, configAccount.Config.PoolTokenAccount)
 
 					// validate events
-					// TODO check this is correct
-					eventConfigured := tokens.EventChainConfigured{}
+					var eventConfigured tokens.EventChainConfigured
 					require.NoError(t, common.ParseEvent(res.Meta.LogMessages, "RemoteChainConfigured", &eventConfigured, config.PrintEvents))
 					require.Equal(t, config.SvmChainSelector, eventConfigured.ChainSelector)
 					require.Equal(t, 0, len(eventConfigured.PoolAddresses))
@@ -1140,12 +1140,17 @@ func TestTokenPool(t *testing.T) {
 					require.Equal(t, 0, len(eventConfigured.PreviousToken.Address))
 					require.Equal(t, usdcMint, eventConfigured.Mint)
 
-					eventAppended := tokens.EventRemotePoolsAppended{}
+					var eventAppended tokens.EventRemotePoolsAppended
 					require.NoError(t, common.ParseEvent(res.Meta.LogMessages, "RemotePoolsAppended", &eventAppended, config.PrintEvents))
 					require.Equal(t, config.SvmChainSelector, eventAppended.ChainSelector)
 					require.Equal(t, []cctp_token_pool.RemoteAddress{{Address: cctpPool.program.Bytes()}}, eventAppended.PoolAddresses)
 					require.Equal(t, 0, len(eventAppended.PreviousPoolAddresses))
 					require.Equal(t, usdcMint, eventAppended.Mint)
+
+					var eventCctpEdit tokens.EventRemoteChainCctpConfigEdited
+					require.NoError(t, common.ParseEvent(res.Meta.LogMessages, "RemoteChainCctpConfigChanged", &eventCctpEdit, config.PrintEvents))
+					require.Equal(t, domain, eventCctpEdit.Config.DomainId)
+					require.Equal(t, cctpPool.signer, eventCctpEdit.Config.DestinationCaller)
 				})
 			})
 

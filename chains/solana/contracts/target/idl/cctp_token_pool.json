@@ -854,6 +854,10 @@
           {
             "name": "domainId",
             "type": "u32"
+          },
+          {
+            "name": "destinationCaller",
+            "type": "publicKey"
           }
         ]
       }

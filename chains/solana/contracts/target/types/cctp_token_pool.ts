@@ -854,6 +854,10 @@ export type CctpTokenPool = {
           {
             "name": "domainId",
             "type": "u32"
+          },
+          {
+            "name": "destinationCaller",
+            "type": "publicKey"
           }
         ]
       }
@@ -1798,6 +1802,10 @@ export const IDL: CctpTokenPool = {
           {
             "name": "domainId",
             "type": "u32"
+          },
+          {
+            "name": "destinationCaller",
+            "type": "publicKey"
           }
         ]
       }
