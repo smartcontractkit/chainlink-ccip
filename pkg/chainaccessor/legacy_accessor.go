@@ -157,9 +157,64 @@ func (l *LegacyAccessor) MsgsBetweenSeqNums(
 	return msgs, nil
 }
 
-func (l *LegacyAccessor) LatestMsgSeqNum(ctx context.Context, dest cciptypes.ChainSelector) (cciptypes.SeqNum, error) {
-	// TODO(NONEVM-1865): implement
-	panic("implement me")
+func (l *LegacyAccessor) LatestMsgSeqNum(
+	ctx context.Context,
+	destChainSelector cciptypes.ChainSelector,
+) (cciptypes.SeqNum, error) {
+	lggr := logutil.WithContextValues(ctx, l.lggr)
+
+	seq, err := l.contractReader.ExtendedQueryKey(
+		ctx,
+		consts.ContractNameOnRamp,
+		query.KeyFilter{
+			Key: consts.EventNameCCIPMessageSent,
+			Expressions: []query.Expression{
+				query.Comparator(consts.EventAttributeSourceChain, primitives.ValueComparator{
+					Value:    l.chainSelector,
+					Operator: primitives.Eq,
+				}),
+				query.Comparator(consts.EventAttributeDestChain, primitives.ValueComparator{
+					Value:    destChainSelector,
+					Operator: primitives.Eq,
+				}),
+				query.Confidence(primitives.Finalized),
+			},
+		},
+		query.LimitAndSort{
+			SortBy: []query.SortBy{
+				query.NewSortBySequence(query.Desc),
+			},
+			Limit: query.Limit{Count: 1},
+		},
+		&SendRequestedEvent{},
+	)
+	if err != nil {
+		return 0, fmt.Errorf("failed to query onRamp: %w", err)
+	}
+
+	lggr.Debugw("queried latest message from source",
+		"numMsgs", len(seq),
+		"sourceChainSelector", l.chainSelector,
+	)
+	if len(seq) > 1 {
+		return 0, fmt.Errorf("more than one message found for the latest message query")
+	}
+	if len(seq) == 0 {
+		return 0, nil
+	}
+
+	item := seq[0]
+	msg, ok := item.Data.(*SendRequestedEvent)
+	if !ok {
+		return 0, fmt.Errorf("failed to cast %v to SendRequestedEvent", item.Data)
+	}
+
+	if err := ValidateSendRequestedEvent(msg, l.chainSelector, destChainSelector,
+		cciptypes.NewSeqNumRange(msg.Message.Header.SequenceNumber, msg.Message.Header.SequenceNumber)); err != nil {
+		return 0, fmt.Errorf("message invalid msg %v: %w", msg, err)
+	}
+
+	return msg.SequenceNumber, nil
 }
 
 func (l *LegacyAccessor) GetExpectedNextSequenceNumber(
