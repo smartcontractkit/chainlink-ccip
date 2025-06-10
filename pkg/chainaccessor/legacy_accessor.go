@@ -89,10 +89,6 @@ func (l *LegacyAccessor) MsgsBetweenSeqNums(
 		query.KeyFilter{
 			Key: consts.EventNameCCIPMessageSent,
 			Expressions: []query.Expression{
-				query.Comparator(consts.EventAttributeSourceChain, primitives.ValueComparator{
-					Value:    l.chainSelector,
-					Operator: primitives.Eq,
-				}),
 				query.Comparator(consts.EventAttributeDestChain, primitives.ValueComparator{
 					Value:    destChainSelector,
 					Operator: primitives.Eq,
