@@ -1108,7 +1108,7 @@ func TestTokenPool(t *testing.T) {
 					ixAppend, err := cctp_token_pool.NewAppendRemotePoolAddressesInstruction(
 						config.SvmChainSelector,
 						usdcMint,
-						[]cctp_token_pool.RemoteAddress{{Address: cctpPool.program.Bytes()}}, // TODO check if this should be program address or pool state PDA
+						[]cctp_token_pool.RemoteAddress{{Address: cctpPool.signer.Bytes()}}, // when the source is Solana, the pool is identified by its signer
 						cctpPool.state,
 						cctpPool.svmChainConfig,
 						admin.PublicKey(),
@@ -1143,7 +1143,7 @@ func TestTokenPool(t *testing.T) {
 					var eventAppended tokens.EventRemotePoolsAppended
 					require.NoError(t, common.ParseEvent(res.Meta.LogMessages, "RemotePoolsAppended", &eventAppended, config.PrintEvents))
 					require.Equal(t, config.SvmChainSelector, eventAppended.ChainSelector)
-					require.Equal(t, []cctp_token_pool.RemoteAddress{{Address: cctpPool.program.Bytes()}}, eventAppended.PoolAddresses)
+					require.Equal(t, []cctp_token_pool.RemoteAddress{{Address: cctpPool.signer.Bytes()}}, eventAppended.PoolAddresses)
 					require.Equal(t, 0, len(eventAppended.PreviousPoolAddresses))
 					require.Equal(t, usdcMint, eventAppended.Mint)
 
@@ -1590,7 +1590,7 @@ func TestTokenPool(t *testing.T) {
 						Receiver:            admin.PublicKey(),
 						Amount:              tokens.ToLittleEndianU256(messageAmount),
 						LocalToken:          usdcMint,
-						SourcePoolAddress:   cctpPool.program.Bytes(), // TODO should be the state PDA?
+						SourcePoolAddress:   cctpPool.signer.Bytes(), // when the source is Solana, the pool is identified by its signer
 						SourcePoolData:      []byte{},
 						OffchainTokenData:   offchainTokenDataBuffer.Bytes(),
 					},
