@@ -146,19 +146,27 @@ impl OnRamp for Impl {
         let receiver = message.receiver.clone();
         let source_chain_selector = ctx.accounts.config.svm_chain_selector;
 
-        let nonce_counter_account: &mut Account<'info, Nonce> = &mut ctx.accounts.nonce;
+        let ordered_nonce: u64;
+        let total_nonce: u64;
         {
-            let authority = ctx.accounts.authority.to_account_info();
-            let system_program = ctx.accounts.system_program.to_account_info();
-            nonce_version_checks(nonce_counter_account, &authority, &system_program)?;
+            // Manually handle the nonce. As it may be initialized, realloc'd or just loaded depending
+            // on the case, Anchor can't handle all the cases so we do it manually
+            let mut nonces: Nonce = load_migrate_nonce(
+                &ctx.accounts.nonce,
+                &ctx.accounts.system_program.to_account_info(),
+                &ctx.accounts.authority.to_account_info(),
+                dest_chain_selector,
+                ctx.bumps.nonce,
+            )?;
+            (ordered_nonce, total_nonce) = bump_nonces(
+                &mut nonces,
+                get_fee_result
+                    .processed_extra_args
+                    .allow_out_of_order_execution,
+            )?;
+            // as it was manually loaded, we need to manually write it back
+            nonces.try_serialize(&mut &mut ctx.accounts.nonce.try_borrow_mut_data()?[..])?;
         }
-        let (final_nonce, full_nonce) = bump_nonce(
-            nonce_counter_account,
-            get_fee_result
-                .processed_extra_args
-                .allow_out_of_order_execution,
-        )
-        .unwrap();
 
         let token_count = message.token_amounts.len();
         require!(
@@ -175,7 +183,7 @@ impl OnRamp for Impl {
                 source_chain_selector,
                 dest_chain_selector,
                 sequence_number: dest_chain.state.sequence_number,
-                nonce: final_nonce,
+                nonce: ordered_nonce,
             },
             extra_args: get_fee_result.processed_extra_args.bytes,
             fee_token: message.fee_token,
@@ -221,7 +229,7 @@ impl OnRamp for Impl {
                     original_sender: ctx.accounts.authority.key(),
                     amount: token_amount.amount,
                     local_token: token_amount.token,
-                    msg_full_nonce: full_nonce,
+                    msg_full_nonce: total_nonce,
                 };
 
                 let mut acc_infos = current_token_accounts
@@ -320,6 +328,7 @@ impl OnRamp for Impl {
 }
 
 mod helpers {
+    use anchor_lang::system_program;
     use ccip_common::{
         v1::{validate_evm_address, validate_svm_address},
         CommonCcipError, CHAIN_FAMILY_SELECTOR_EVM, CHAIN_FAMILY_SELECTOR_SVM,
@@ -328,9 +337,9 @@ mod helpers {
 
     use super::*;
 
-    pub const LEAF_DOMAIN_SEPARATOR: [u8; 32] = [0; 32];
+    const LEAF_DOMAIN_SEPARATOR: [u8; 32] = [0; 32];
 
-    pub fn verify_uncursed_cpi<'info>(
+    pub(super) fn verify_uncursed_cpi<'info>(
         ctx: &Context<'_, '_, 'info, 'info, CcipSend<'_>>,
         dest_chain_selector: u64,
     ) -> Result<()> {
@@ -374,99 +383,99 @@ mod helpers {
         })
     }
 
-    pub(super) fn bump_nonce(
-        nonce_counter_account: &mut Account<Nonce>,
+    pub(super) fn bump_nonces(
+        nonces: &mut Nonce,
         allow_out_of_order_execution: bool,
     ) -> Result<(u64, u64)> {
-        nonce_counter_account.full_counter =
-            nonce_counter_account.full_counter.checked_add(1).unwrap();
+        nonces.total_nonce = nonces.total_nonce.checked_add(1).unwrap();
 
         // config.enforce_out_of_order checked in `validate_svm2any`
-        let mut final_nonce = 0;
+        let mut ordered_nonce = 0;
         if !allow_out_of_order_execution {
-            nonce_counter_account.ordered_counter = nonce_counter_account
-                .ordered_counter
-                .checked_add(1)
-                .unwrap();
-            final_nonce = nonce_counter_account.ordered_counter;
+            nonces.ordered_nonce = nonces.ordered_nonce.checked_add(1).unwrap();
+            ordered_nonce = nonces.ordered_nonce;
         }
-        Ok((final_nonce, nonce_counter_account.full_counter))
+        Ok((ordered_nonce, nonces.total_nonce))
     }
 
-    pub fn nonce_version_checks<'info>(
-        nonce_counter_account: &mut Account<'info, Nonce>,
-        authority: &AccountInfo<'info>,
-        system_program: &AccountInfo<'info>,
-    ) -> Result<()> {
-        match nonce_counter_account.version {
-            // Avoid Re-initialization attack as the account is init_if_needed
-            // https://solana.com/developers/courses/program-security/reinitialization-attacks#add-is-initialized-check
-            0 => {
-                // The authority must be the owner of the PDA, as it's their Public Key in the seed
-                // If the account is not initialized, initialize it
-                nonce_counter_account.version = 2;
-                nonce_counter_account.ordered_counter = 0;
-                nonce_counter_account.full_counter = 0;
-            }
-            // Migrate from version 1 to version 2, which adds the full_counter field
-            1 => {
-                nonce_counter_account.version = 2;
+    pub(super) fn load_migrate_nonce<'a, 'info>(
+        account_info: &'a AccountInfo<'info>,
+        system_program: &'a AccountInfo<'info>,
+        authority: &'a AccountInfo<'info>,
+        dest_chain_selector: u64,
+        nonce_bump: u8,
+    ) -> Result<Nonce> {
+        let required_space = ANCHOR_DISCRIMINATOR + Nonce::INIT_SPACE;
+        let minimum_balance = Rent::get()?.minimum_balance(required_space);
 
-                let acc_info_extend: AccountInfo<'info> = nonce_counter_account.to_account_info();
-
-                extend_account(
-                    &acc_info_extend,
-                    Nonce::INIT_SPACE,
-                    authority,
-                    system_program,
-                    false,
-                )?;
-
-                // In general, the full_counter >= ordered_counter, so initialize it to the ordered_counter value
-                nonce_counter_account.full_counter = nonce_counter_account.ordered_counter;
-            }
-            // Version 2 is the latest version, no migration needed
-            2 => {}
-            // Should never happen, this is already checked in the context
-            _ => {
-                return Err(CcipRouterError::InvalidVersion.into());
-            }
-        }
-        Ok(())
-    }
-
-    fn extend_account<'info>(
-        account_to_extend: &AccountInfo<'info>,
-        new_len: usize,
-        payer: &AccountInfo<'info>,
-        system_program: &AccountInfo<'info>,
-        zero_init: bool,
-    ) -> Result<()> {
-        let current_len = account_to_extend.data_len();
-        if current_len >= new_len {
-            return Ok(()); // No need to extend the account
-        }
-
-        let anchor_rent = anchor_lang::prelude::Rent::get()?;
-        let new_rent_minimum = anchor_rent.minimum_balance(new_len);
-        let current_lamports = account_to_extend.lamports();
-
-        if current_lamports < new_rent_minimum {
-            anchor_lang::system_program::transfer(
-                anchor_lang::context::CpiContext::new(
-                    system_program.to_account_info(),
-                    anchor_lang::system_program::Transfer {
-                        from: payer.to_account_info(),
-                        to: account_to_extend.clone(),
-                    },
-                ),
-                new_rent_minimum.checked_sub(current_lamports).unwrap(),
+        if account_info.owner.key() == system_program::ID && account_info.lamports() == 0 {
+            // account not initialized, just initialize it to the new version
+            let init_accs = system_program::CreateAccount {
+                from: authority.to_account_info(),
+                to: account_info.clone(),
+            };
+            let nonce_seeds: &[&[u8]] = &[
+                seed::NONCE,
+                &dest_chain_selector.to_le_bytes(),
+                authority.key.as_ref(),
+                &[nonce_bump],
+            ];
+            let signer_seeds = &[&nonce_seeds[..]];
+            let cpi_ctx = CpiContext::new_with_signer(
+                system_program.to_account_info(),
+                init_accs,
+                signer_seeds,
+            );
+            system_program::create_account(
+                cpi_ctx,
+                minimum_balance,
+                required_space as u64,
+                &crate::ID,
             )?;
+
+            return Ok(Nonce {
+                version: 2, // initialize to version 2
+                ordered_nonce: 0,
+                total_nonce: 0, // initialize full_counter to 0
+            });
         }
 
-        account_to_extend.realloc(new_len, zero_init)?;
+        if account_info.data_len() < required_space {
+            // account is initialized, but is the old shorter version, so extend it
+            let current_lamports = account_info.lamports();
+            if current_lamports < minimum_balance {
+                system_program::transfer(
+                    CpiContext::new(
+                        system_program.to_account_info(),
+                        system_program::Transfer {
+                            from: authority.to_account_info(),
+                            to: account_info.clone(),
+                        },
+                    ),
+                    minimum_balance.checked_sub(current_lamports).unwrap(),
+                )?;
+            }
+            account_info.realloc(required_space, false)?;
 
-        Ok(())
+            let mut nonce = load_nonce(account_info)?;
+            require_eq!(nonce.version, 1, CcipRouterError::InvalidNonceVersion);
+
+            nonce.version = 2; // migrate to version 2
+            nonce.total_nonce = nonce.ordered_nonce; // we need an initial value for the new total_nonce, and this way
+                                                     // we maintain the invariant that total_nonce >= ordered_nonce
+            return Ok(nonce);
+        }
+
+        // account is already initialized to the right size and version, so just load it
+        let nonce = load_nonce(account_info)?;
+        require_eq!(nonce.version, 2, CcipRouterError::InvalidNonceVersion);
+        Ok(nonce)
+    }
+
+    fn load_nonce(account_info: &AccountInfo) -> Result<Nonce> {
+        let data = account_info.try_borrow_data()?;
+        let mut data: &[u8] = &data;
+        Nonce::try_deserialize(&mut data)
     }
 
     pub(super) fn hash(msg: &SVM2AnyRampMessage) -> [u8; 32] {

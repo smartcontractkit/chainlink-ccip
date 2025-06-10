@@ -19,14 +19,18 @@ type DevnetInfo struct {
 	Offramp       string `yaml:"offramp"`
 	TestReceiver  string `yaml:"test_receiver"`
 	ExampleSender string `yaml:"example_sender"`
+	LinkMint      string `yaml:"link_mint"`
 	PrivateKeys   struct {
-		Admin []byte `yaml:"admin"`
+		Admin    []byte `yaml:"admin"`
+		Deployer []byte `yaml:"deployer"`
 	} `yaml:"private_keys"`
 	ChainSelectors struct {
 		Sepolia uint64 `yaml:"sepolia"`
 		Svm     uint64 `yaml:"svm"`
 	} `yaml:"chain_selectors"`
 	CCTP struct {
+		TokenPool            string `yaml:"token_pool"`
+		UsdcMint             string `yaml:"usdc_mint"`
 		MessageTransmitter   string `yaml:"message_transmitter"`
 		TokenMessengerMinter string `yaml:"token_messenger_minter"`
 		Message              struct {

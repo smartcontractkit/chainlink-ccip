@@ -102,7 +102,7 @@ pub struct DestChain {
 #[account]
 #[derive(InitSpace)]
 pub struct Nonce {
-    pub version: u8,          // version to check if nonce account is already initialized
-    pub ordered_counter: u64, // Counter per user and per lane to use as nonce for all the messages to be executed in order
-    pub full_counter: u64, // Counter per user per lane, regardless of whether they are executed in order or not
+    pub version: u8,        // version to check if nonce account is already initialized
+    pub ordered_nonce: u64, // Counter per user and per lane to use as nonce for all the messages to be executed in order
+    pub total_nonce: u64, // Counter per user per lane, regardless of whether they are executed in order or not
 }

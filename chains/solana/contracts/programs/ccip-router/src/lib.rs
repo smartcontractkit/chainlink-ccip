@@ -569,4 +569,6 @@ pub enum CcipRouterError {
     InvalidCodeVersion,
     #[msg("Invalid rollback attempt on the CCIP version of the onramp to the destination chain")]
     InvalidCcipVersionRollback,
+    #[msg("Invalid version of the Nonce account")]
+    InvalidNonceVersion,
 }
