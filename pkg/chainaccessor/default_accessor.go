@@ -3,6 +3,7 @@ package chainaccessor
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -239,10 +240,23 @@ func (l *DefaultAccessor) GetExpectedNextSequenceNumber(
 
 func (l *DefaultAccessor) GetTokenPriceUSD(
 	ctx context.Context,
-	address cciptypes.UnknownAddress,
-) (cciptypes.BigInt, error) {
-	// TODO(NONEVM-1865): implement
-	panic("implement me")
+	tokenAddress cciptypes.UnknownAddress,
+) (cciptypes.TimestampedUnixBig, error) {
+	var update cciptypes.TimestampedUnixBig
+	err := l.contractReader.ExtendedGetLatestValue(
+		ctx,
+		consts.ContractNameFeeQuoter,
+		consts.MethodNameFeeQuoterGetTokenPrice,
+		primitives.Unconfirmed,
+		map[string]any{
+			"token": tokenAddress,
+		},
+		&update,
+	)
+	if err != nil {
+		return cciptypes.TimestampedUnixBig{}, fmt.Errorf("failed to get token price from fee quoter: %w", err)
+	}
+	return update, nil
 }
 
 func (l *DefaultAccessor) GetFeeQuoterDestChainConfig(
@@ -256,10 +270,43 @@ func (l *DefaultAccessor) GetFeeQuoterDestChainConfig(
 func (l *DefaultAccessor) CommitReportsGTETimestamp(
 	ctx context.Context,
 	ts time.Time,
+	confidence primitives.ConfidenceLevel,
 	limit int,
 ) ([]cciptypes.CommitPluginReportWithMeta, error) {
-	// TODO(NONEVM-1865): implement
-	panic("implement me")
+	lggr := logutil.WithContextValues(ctx, l.lggr)
+
+	internalLimit := limit * 2
+	iter, err := l.contractReader.ExtendedQueryKey(
+		ctx,
+		consts.ContractNameOffRamp,
+		query.KeyFilter{
+			Key: consts.EventNameCommitReportAccepted,
+			Expressions: []query.Expression{
+				query.Timestamp(uint64(ts.Unix()), primitives.Gte),
+				// We don't need to wait for the commit report accepted event to be finalized
+				// before we can start optimistically processing it.
+				query.Confidence(confidence),
+			},
+		},
+		query.LimitAndSort{
+			SortBy: []query.SortBy{query.NewSortBySequence(query.Asc)},
+			Limit: query.Limit{
+				Count: uint64(internalLimit),
+			},
+		},
+		&CommitReportAcceptedEvent{},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query offRamp: %w", err)
+	}
+
+	lggr.Debugw("queried commit reports", "numReports", len(iter),
+		"destChain", l.chainSelector,
+		"ts", ts,
+		"limit", internalLimit)
+
+	reports := l.processCommitReports(lggr, iter, ts, limit)
+	return reports, nil
 }
 
 func (l *DefaultAccessor) ExecutedMessages(
@@ -296,8 +343,19 @@ func (l *DefaultAccessor) GetChainFeePriceUpdate(
 }
 
 func (l *DefaultAccessor) GetLatestPriceSeqNr(ctx context.Context) (uint64, error) {
-	// TODO(NONEVM-1865): implement
-	panic("implement me")
+	var latestSeqNr uint64
+	err := l.contractReader.ExtendedGetLatestValue(
+		ctx,
+		consts.ContractNameOffRamp,
+		consts.MethodNameGetLatestPriceSequenceNumber,
+		primitives.Unconfirmed,
+		map[string]any{},
+		&latestSeqNr,
+	)
+	if err != nil {
+		return 0, fmt.Errorf("get latest price sequence number: %w", err)
+	}
+	return latestSeqNr, nil
 }
 
 func (l *DefaultAccessor) GetOffRampConfigDigest(ctx context.Context, pluginType uint8) ([32]byte, error) {
@@ -321,4 +379,110 @@ func (l *DefaultAccessor) GetRMNRemoteConfig(ctx context.Context) (cciptypes.Rem
 func (l *DefaultAccessor) GetRmnCurseInfo(ctx context.Context) (cciptypes.CurseInfo, error) {
 	// TODO(NONEVM-1865): implement
 	panic("implement me")
+}
+
+// processCommitReports decodes the commit reports from the query results
+// and returns the ones that can be properly parsed and validated.
+func (l *DefaultAccessor) processCommitReports(
+	lggr logger.Logger, iter []types.Sequence, ts time.Time, limit int,
+) []cciptypes.CommitPluginReportWithMeta {
+	reports := make([]cciptypes.CommitPluginReportWithMeta, 0)
+	for _, item := range iter {
+		ev, err := validateCommitReportAcceptedEvent(item, ts)
+		if err != nil {
+			lggr.Errorw("validate commit report accepted event", "err", err, "ev", item.Data)
+			continue
+		}
+
+		lggr.Debugw("processing commit report", "report", ev, "item", item)
+
+		isBlessed := make(map[cciptypes.Bytes32]bool, len(ev.BlessedMerkleRoots))
+		for _, mr := range ev.BlessedMerkleRoots {
+			isBlessed[mr.MerkleRoot] = true
+		}
+		allMerkleRoots := append(ev.BlessedMerkleRoots, ev.UnblessedMerkleRoots...)
+		blessedMerkleRoots, unblessedMerkleRoots := l.processMerkleRoots(allMerkleRoots, isBlessed)
+
+		priceUpdates, err := l.processPriceUpdates(ev.PriceUpdates)
+		if err != nil {
+			lggr.Errorw("failed to process price updates", "err", err, "priceUpdates", ev.PriceUpdates)
+			continue
+		}
+
+		blockNum, err := strconv.ParseUint(item.Head.Height, 10, 64)
+		if err != nil {
+			lggr.Errorw("failed to parse block number", "blockNum", item.Head.Height, "err", err)
+			continue
+		}
+
+		reports = append(reports, cciptypes.CommitPluginReportWithMeta{
+			Report: cciptypes.CommitPluginReport{
+				BlessedMerkleRoots:   blessedMerkleRoots,
+				UnblessedMerkleRoots: unblessedMerkleRoots,
+				PriceUpdates:         priceUpdates,
+			},
+			Timestamp: time.Unix(int64(item.Timestamp), 0),
+			BlockNum:  blockNum,
+		})
+	}
+
+	lggr.Debugw("decoded commit reports", "reports", reports)
+
+	if len(reports) < limit {
+		return reports
+	}
+	return reports[:limit]
+}
+
+func (l *DefaultAccessor) processMerkleRoots(
+	allMerkleRoots []MerkleRoot, isBlessed map[cciptypes.Bytes32]bool,
+) (blessedMerkleRoots []cciptypes.MerkleRootChain, unblessedMerkleRoots []cciptypes.MerkleRootChain) {
+	blessedMerkleRoots = make([]cciptypes.MerkleRootChain, 0, len(isBlessed))
+	unblessedMerkleRoots = make([]cciptypes.MerkleRootChain, 0, len(allMerkleRoots)-len(isBlessed))
+	for _, mr := range allMerkleRoots {
+		mrc := cciptypes.MerkleRootChain{
+			ChainSel:      cciptypes.ChainSelector(mr.SourceChainSelector),
+			OnRampAddress: mr.OnRampAddress,
+			SeqNumsRange: cciptypes.NewSeqNumRange(
+				cciptypes.SeqNum(mr.MinSeqNr),
+				cciptypes.SeqNum(mr.MaxSeqNr),
+			),
+			MerkleRoot: mr.MerkleRoot,
+		}
+		if isBlessed[mr.MerkleRoot] {
+			blessedMerkleRoots = append(blessedMerkleRoots, mrc)
+		} else {
+			unblessedMerkleRoots = append(unblessedMerkleRoots, mrc)
+		}
+	}
+	return blessedMerkleRoots, unblessedMerkleRoots
+}
+
+func (l *DefaultAccessor) processPriceUpdates(priceUpdates PriceUpdates) (cciptypes.PriceUpdates, error) {
+	lggr := l.lggr
+	updates := cciptypes.PriceUpdates{
+		TokenPriceUpdates: make([]cciptypes.TokenPrice, 0),
+		GasPriceUpdates:   make([]cciptypes.GasPriceChain, 0),
+	}
+
+	for _, tokenPriceUpdate := range priceUpdates.TokenPriceUpdates {
+		sourceTokenAddrStr, err := l.addrCodec.AddressBytesToString(tokenPriceUpdate.SourceToken, l.chainSelector)
+		if err != nil {
+			lggr.Errorw("failed to convert source token address to string", "err", err)
+			return updates, err
+		}
+		updates.TokenPriceUpdates = append(updates.TokenPriceUpdates, cciptypes.TokenPrice{
+			TokenID: cciptypes.UnknownEncodedAddress(sourceTokenAddrStr),
+			Price:   cciptypes.NewBigInt(tokenPriceUpdate.UsdPerToken),
+		})
+	}
+
+	for _, gasPriceUpdate := range priceUpdates.GasPriceUpdates {
+		updates.GasPriceUpdates = append(updates.GasPriceUpdates, cciptypes.GasPriceChain{
+			ChainSel: cciptypes.ChainSelector(gasPriceUpdate.DestChainSelector),
+			GasPrice: cciptypes.NewBigInt(gasPriceUpdate.UsdPerUnitGas),
+		})
+	}
+
+	return updates, nil
 }
