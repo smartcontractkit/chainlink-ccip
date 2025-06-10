@@ -126,7 +126,7 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
   function _lockReleaseIncomingMessage(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) internal virtual returns (Pool.ReleaseOrMintOutV1 memory) {
-    _validateReleaseOrMint(releaseOrMintIn);
+    _validateReleaseOrMint(releaseOrMintIn, releaseOrMintIn.amount);
 
     // Circle requires a supply-lock to prevent incoming messages once the migration process begins.
     // This prevents new incoming messages once the migration has begun to ensure any the procedure runs as expected

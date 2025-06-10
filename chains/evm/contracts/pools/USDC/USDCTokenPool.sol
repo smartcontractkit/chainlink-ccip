@@ -154,7 +154,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
-    _validateReleaseOrMint(releaseOrMintIn);
+    _validateReleaseOrMint(releaseOrMintIn, releaseOrMintIn.amount);
     SourceTokenDataPayload memory sourceTokenDataPayload =
       abi.decode(releaseOrMintIn.sourcePoolData, (SourceTokenDataPayload));
     MessageAndAttestation memory msgAndAttestation =
