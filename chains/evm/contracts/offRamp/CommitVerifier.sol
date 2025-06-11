@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IFeeQuoter} from "../interfaces/IFeeQuoter.sol";
 import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
@@ -198,7 +197,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @inheritdoc MultiOCR3Base
   function _afterOCR3ConfigSet(
     uint8 ocrPluginType
-  ) internal override {
+  ) internal view override {
     bool isSignatureVerificationEnabled = s_ocrConfigs[ocrPluginType].configInfo.isSignatureVerificationEnabled;
 
     if (ocrPluginType == uint8(Internal.OCRPluginType.Commit)) {
