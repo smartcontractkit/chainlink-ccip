@@ -12,8 +12,6 @@ overflow-checks = true
 overflow-checks = true
 lto = "fat"
 codegen-units = 1
-# -Znew-llvm-pass-manager
-# -Znext-lockfile-bump
 
 [profile.test]
 overflow-checks = true
