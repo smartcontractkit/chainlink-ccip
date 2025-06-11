@@ -627,7 +627,7 @@ pub mod ccip_offramp {
         execute_caller: Pubkey,
         message_accounts: Vec<CcipAccountMeta>,
         source_chain_selector: u64,
-    ) -> Result<DerivePdasResponse> {
+    ) -> Result<DeriveAccountsResponse> {
         let default_code_version: CodeVersion = ctx
             .accounts
             .config

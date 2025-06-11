@@ -6,7 +6,7 @@ use crate::context::{
     TransferOwnership, UpdateConfig, UpdateReferenceAddresses, UpdateSourceChain, ViewConfigOnly,
 };
 use crate::state::{
-    CcipAccountMeta, CodeVersion, DerivePdasResponse, Ocr3ConfigInfo, SourceChainConfig,
+    CcipAccountMeta, CodeVersion, DeriveAccountsResponse, Ocr3ConfigInfo, SourceChainConfig,
 };
 use crate::OcrPluginType;
 
@@ -74,7 +74,7 @@ pub trait Execute {
         execute_caller: Pubkey,
         message_accounts: Vec<CcipAccountMeta>,
         source_chain_selector: u64,
-    ) -> Result<DerivePdasResponse>;
+    ) -> Result<DeriveAccountsResponse>;
 }
 
 /// To be called by the offramp administrator.

@@ -611,7 +611,7 @@ func (obj *CrossChainAmount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (e
 	return nil
 }
 
-type DerivePdasResponse struct {
+type DeriveAccountsResponse struct {
 	// If this vector is not empty, you must call the `derive_` method again including
 	// exactly these accounts as the `remaining_accounts` field.
 	AskAgainWith []CcipAccountMeta
@@ -620,9 +620,17 @@ type DerivePdasResponse struct {
 	// is finally empty, this separate list will contain all the accounts to use for the
 	// instruction of interest.
 	AccountsToSave []CcipAccountMeta
+
+	// Append these look up tables at the end of a list. It will contain all LUTs
+	// that the instruction of interest can use.
+	LookUpTablesToSave []DerivedLookupTable
+
+	// Identifies the derivation stage. `derive_` functions may sometimes require providing
+	// the name of the last complete stage as an argument.
+	CurrentStage string
 }
 
-func (obj DerivePdasResponse) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj DeriveAccountsResponse) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `AskAgainWith` param:
 	err = encoder.Encode(obj.AskAgainWith)
 	if err != nil {
@@ -633,10 +641,20 @@ func (obj DerivePdasResponse) MarshalWithEncoder(encoder *ag_binary.Encoder) (er
 	if err != nil {
 		return err
 	}
+	// Serialize `LookUpTablesToSave` param:
+	err = encoder.Encode(obj.LookUpTablesToSave)
+	if err != nil {
+		return err
+	}
+	// Serialize `CurrentStage` param:
+	err = encoder.Encode(obj.CurrentStage)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
-func (obj *DerivePdasResponse) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *DeriveAccountsResponse) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `AskAgainWith`:
 	err = decoder.Decode(&obj.AskAgainWith)
 	if err != nil {
@@ -644,6 +662,49 @@ func (obj *DerivePdasResponse) UnmarshalWithDecoder(decoder *ag_binary.Decoder) 
 	}
 	// Deserialize `AccountsToSave`:
 	err = decoder.Decode(&obj.AccountsToSave)
+	if err != nil {
+		return err
+	}
+	// Deserialize `LookUpTablesToSave`:
+	err = decoder.Decode(&obj.LookUpTablesToSave)
+	if err != nil {
+		return err
+	}
+	// Deserialize `CurrentStage`:
+	err = decoder.Decode(&obj.CurrentStage)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type DerivedLookupTable struct {
+	Address  ag_solanago.PublicKey
+	Accounts []ag_solanago.PublicKey
+}
+
+func (obj DerivedLookupTable) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Address` param:
+	err = encoder.Encode(obj.Address)
+	if err != nil {
+		return err
+	}
+	// Serialize `Accounts` param:
+	err = encoder.Encode(obj.Accounts)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *DerivedLookupTable) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Address`:
+	err = decoder.Decode(&obj.Address)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Accounts`:
+	err = decoder.Decode(&obj.Accounts)
 	if err != nil {
 		return err
 	}
