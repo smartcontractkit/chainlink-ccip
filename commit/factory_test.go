@@ -13,12 +13,12 @@ import (
 
 	rmnpb "github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
+
+	"github.com/smartcontractkit/chainlink-ccip/internal"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
 	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
@@ -29,6 +29,7 @@ import (
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	reader2 "github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	writer_mocks "github.com/smartcontractkit/chainlink-ccip/mocks/chainlink_common"
 	ocrtypecodec "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
@@ -305,6 +306,8 @@ func TestPluginFactory_NewReportingPlugin(t *testing.T) {
 		b, err := json.Marshal(offChainConfig)
 		require.NoError(t, err)
 
+		cw := writer_mocks.NewMockContractWriter(t)
+		chainSel := ccipocr3.ChainSelector(12922642891491394802)
 		mockAddrCodec := internal.NewMockAddressCodecHex(t)
 		p := &PluginFactory{
 			baseLggr: lggr,
@@ -315,10 +318,14 @@ func TestPluginFactory_NewReportingPlugin(t *testing.T) {
 					OfframpAddress: []byte{1, 2, 3},
 					OffchainConfig: b,
 					// Real selector pointing to chain 2337
-					ChainSelector: 12922642891491394802,
+					ChainSelector: chainSel,
 				},
 			},
-			addrCodec: mockAddrCodec,
+			contractReaders: map[ccipocr3.ChainSelector]types.ContractReader{
+				chainSel: types.UnimplementedContractReader{},
+			},
+			chainWriters: map[ccipocr3.ChainSelector]types.ContractWriter{chainSel: cw},
+			addrCodec:    mockAddrCodec,
 		}
 
 		plugin, pluginInfo, err := p.NewReportingPlugin(ctx, ocr3types.ReportingPluginConfig{

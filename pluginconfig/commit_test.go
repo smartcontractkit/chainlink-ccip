@@ -420,7 +420,9 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				InflightPriceCheckRetries:          defaultInflightPriceCheckRetries,
 				MerkleRootAsyncObserverDisabled:    true,
 				ChainFeeAsyncObserverDisabled:      true,
+				ChainFeeAsyncObserverSyncTimeout:   defaultAsyncObserverSyncTimeout,
 				TokenPriceAsyncObserverDisabled:    true,
+				TokenPriceAsyncObserverSyncTimeout: *commonconfig.MustNewDuration(defaultAsyncObserverSyncTimeout),
 			},
 		},
 		{
