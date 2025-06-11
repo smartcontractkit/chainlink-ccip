@@ -320,7 +320,6 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     _validateSettlement(sourceChainSelector, sourcePoolAddress);
 
     // Calculate the fast transfer inputs
-    address receiver = address(uint160(uint256(bytes32(mintMessage.receiver))));
     (uint256 sourceFillerFee, uint256 sourcePoolFee) = _calculateFastTransferFees(
       mintMessage.sourceAmount, mintMessage.fastTransferFillerFeeBps, mintMessage.fastTransferPoolFeeBps
     );
@@ -332,7 +331,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
       // sourceAmountNetFee is the amount minus the fast fill fee, so we need to subtract both fees.
       mintMessage.sourceAmount - sourceFillerFee - sourcePoolFee,
       mintMessage.sourceDecimals,
-      abi.encode(receiver)
+      mintMessage.receiver
     );
 
     FillInfo memory fillInfo = s_fills[fillId];
@@ -346,7 +345,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
       // consumed by the filler.
       _consumeInboundRateLimit(sourceChainSelector, localAmount);
       // When no filler is involved, we send the entire amount to the receiver.
-      _handleSlowFill(fillId, localAmount, receiver);
+      _handleSlowFill(fillId, localAmount, abi.decode(mintMessage.receiver, (address)));
     } else if (fillInfo.state == IFastTransferPool.FillState.FILLED) {
       // The request was fast-filled, so we reimburse the filler and accumulate the pool.
       fillerReimbursementAmount = localAmount - localPoolFee;
