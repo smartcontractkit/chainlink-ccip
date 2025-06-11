@@ -15,7 +15,7 @@ contract BurnMintWithLockReleaseFlagTokenPool_releaseOrMint is BurnMintWithLockR
     uint256 amount = 1e19;
     address receiver = makeAddr("receiver_address");
 
-    vm.startPrank(s_burnMintOffRamp);
+    vm.startPrank(s_allowedOffRamp);
 
     vm.expectEmit();
     emit IERC20.Transfer(address(0), receiver, amount);
@@ -25,22 +25,22 @@ contract BurnMintWithLockReleaseFlagTokenPool_releaseOrMint is BurnMintWithLockR
         originalSender: bytes(""),
         receiver: receiver,
         sourceDenominatedAmount: amount,
-        localToken: address(s_burnMintERC20),
+        localToken: address(s_token),
         remoteChainSelector: DEST_CHAIN_SELECTOR,
-        sourcePoolAddress: abi.encode(s_remoteBurnMintPool),
+        sourcePoolAddress: abi.encode(s_initialRemotePool),
         sourcePoolData: abi.encode(LOCK_RELEASE_FLAG),
         offchainTokenData: ""
       })
     );
 
-    assertEq(s_burnMintERC20.balanceOf(receiver), amount);
+    assertEq(s_token.balanceOf(receiver), amount);
   }
 
   function test_releaseOrMint_EmptySourcePoolData() public {
     uint256 amount = 1e19;
     address receiver = makeAddr("receiver_address");
 
-    vm.startPrank(s_burnMintOffRamp);
+    vm.startPrank(s_allowedOffRamp);
 
     vm.expectEmit();
     emit IERC20.Transfer(address(0), receiver, amount);
@@ -50,15 +50,15 @@ contract BurnMintWithLockReleaseFlagTokenPool_releaseOrMint is BurnMintWithLockR
         originalSender: bytes(""),
         receiver: receiver,
         sourceDenominatedAmount: amount,
-        localToken: address(s_burnMintERC20),
+        localToken: address(s_token),
         remoteChainSelector: DEST_CHAIN_SELECTOR,
-        sourcePoolAddress: abi.encode(s_remoteBurnMintPool),
+        sourcePoolAddress: abi.encode(s_initialRemotePool),
         sourcePoolData: "",
         offchainTokenData: ""
       })
     );
 
-    assertEq(s_burnMintERC20.balanceOf(receiver), amount);
+    assertEq(s_token.balanceOf(receiver), amount);
   }
 }
 
@@ -68,8 +68,8 @@ contract BurnMintWithLockReleaseFlagTokenPool_releaseOrMint_e2eTest is
 {
   function setUp() public override(BurnMintWithLockReleaseFlagTokenPoolSetup, HybridLockReleaseUSDCTokenPoolSetup) {
     // Set up the BurnMintWithLockReleaseFlagTokenPool and source chain hybrid Pool
-    BurnMintWithLockReleaseFlagTokenPoolSetup.setUp();
     HybridLockReleaseUSDCTokenPoolSetup.setUp();
+    BurnMintWithLockReleaseFlagTokenPoolSetup.setUp();
   }
 
   function test_releaseOrMint_SourcePoolDataFromHybridUSDCPool() public {
@@ -86,8 +86,6 @@ contract BurnMintWithLockReleaseFlagTokenPool_releaseOrMint_e2eTest is
       "Lock/Release mech not configured for outgoing message to DEST_CHAIN_SELECTOR"
     );
 
-    s_token.transfer(address(s_usdcTokenPool), amount);
-
     vm.startPrank(s_routerAllowedOnRamp);
 
     // Get the output value from the hybrid pool which will be passed to the destination pool
@@ -97,13 +95,11 @@ contract BurnMintWithLockReleaseFlagTokenPool_releaseOrMint_e2eTest is
         receiver: abi.encodePacked(receiver),
         amount: amount,
         remoteChainSelector: DEST_CHAIN_SELECTOR,
-        localToken: address(s_token)
+        localToken: address(s_USDCToken)
       })
     );
 
-    assertEq(s_token.balanceOf(address(s_usdcTokenPool)), amount, "Incorrect token amount in the tokenPool");
-
-    vm.startPrank(s_burnMintOffRamp);
+    vm.startPrank(s_allowedOffRamp);
 
     // Call the releaseOrMint function on the destination pool with the output value from the source pool
     s_pool.releaseOrMint(
@@ -111,14 +107,14 @@ contract BurnMintWithLockReleaseFlagTokenPool_releaseOrMint_e2eTest is
         originalSender: bytes(""),
         receiver: STRANGER,
         sourceDenominatedAmount: amount,
-        localToken: address(s_burnMintERC20),
+        localToken: address(s_token),
         remoteChainSelector: DEST_CHAIN_SELECTOR,
-        sourcePoolAddress: abi.encode(s_remoteBurnMintPool),
+        sourcePoolAddress: abi.encode(s_initialRemotePool),
         sourcePoolData: lockOrBurnOut.destPoolData, // Use the output value from the source pool destData
         offchainTokenData: ""
       })
     );
 
-    assertEq(s_burnMintERC20.balanceOf(STRANGER), amount);
+    assertEq(s_token.balanceOf(STRANGER), amount);
   }
 }

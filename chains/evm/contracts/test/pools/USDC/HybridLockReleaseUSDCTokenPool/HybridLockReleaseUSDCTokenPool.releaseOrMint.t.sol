@@ -35,7 +35,7 @@ contract HybridLockReleaseUSDCTokenPool_releaseOrMint is HybridLockReleaseUSDCTo
     // Add 1e12 liquidity so that there's enough to release
     vm.startPrank(s_usdcTokenPool.getLiquidityProvider(SOURCE_CHAIN_SELECTOR));
 
-    s_token.approve(address(s_usdcTokenPool), type(uint256).max);
+    s_USDCToken.approve(address(s_usdcTokenPool), type(uint256).max);
 
     uint256 liquidityAmount = 1e12;
     s_usdcTokenPool.provideLiquidity(SOURCE_CHAIN_SELECTOR, liquidityAmount);
@@ -54,7 +54,7 @@ contract HybridLockReleaseUSDCTokenPool_releaseOrMint is HybridLockReleaseUSDCTo
     vm.expectEmit();
     emit TokenPool.ReleasedOrMinted({
       remoteChainSelector: SOURCE_CHAIN_SELECTOR,
-      token: address(s_token),
+      token: address(s_USDCToken),
       sender: s_routerAllowedOffRamp,
       recipient: recipient,
       amount: amount
@@ -65,7 +65,7 @@ contract HybridLockReleaseUSDCTokenPool_releaseOrMint is HybridLockReleaseUSDCTo
         originalSender: abi.encode(OWNER),
         receiver: recipient,
         sourceDenominatedAmount: amount,
-        localToken: address(s_token),
+        localToken: address(s_USDCToken),
         remoteChainSelector: SOURCE_CHAIN_SELECTOR,
         sourcePoolAddress: sourceTokenData.sourcePoolAddress,
         sourcePoolData: abi.encode(LOCK_RELEASE_FLAG),
@@ -79,11 +79,11 @@ contract HybridLockReleaseUSDCTokenPool_releaseOrMint is HybridLockReleaseUSDCTo
     // s_token.transfer(recipient, amount);
 
     assertEq(
-      s_token.balanceOf(address(s_usdcTokenPool)),
+      s_USDCToken.balanceOf(address(s_usdcTokenPool)),
       liquidityAmount - amount,
       "Incorrect remaining liquidity in TokenPool"
     );
-    assertEq(s_token.balanceOf(recipient), amount, "Tokens not transferred to recipient");
+    assertEq(s_USDCToken.balanceOf(recipient), amount, "Tokens not transferred to recipient");
   }
 
   // https://etherscan.io/tx/0xac9f501fe0b76df1f07a22e1db30929fd12524bc7068d74012dff948632f0883
@@ -104,7 +104,7 @@ contract HybridLockReleaseUSDCTokenPool_releaseOrMint is HybridLockReleaseUSDCTo
     });
 
     // The mocked receiver does not release the token to the pool, so we manually do it here
-    deal(address(s_token), address(s_usdcTokenPool), amount);
+    deal(address(s_USDCToken), address(s_usdcTokenPool), amount);
 
     bytes memory offchainTokenData =
       abi.encode(USDCTokenPool.MessageAndAttestation({message: encodedUsdcMessage, attestation: attestation}));
@@ -120,7 +120,7 @@ contract HybridLockReleaseUSDCTokenPool_releaseOrMint is HybridLockReleaseUSDCTo
         originalSender: abi.encode(OWNER),
         receiver: OWNER,
         sourceDenominatedAmount: amount,
-        localToken: address(s_token),
+        localToken: address(s_USDCToken),
         remoteChainSelector: SOURCE_CHAIN_SELECTOR,
         sourcePoolAddress: sourceTokenData.sourcePoolAddress,
         sourcePoolData: sourceTokenData.extraData,
@@ -174,7 +174,7 @@ contract HybridLockReleaseUSDCTokenPool_releaseOrMint is HybridLockReleaseUSDCTo
         originalSender: abi.encode(OWNER),
         receiver: recipient,
         sourceDenominatedAmount: amount,
-        localToken: address(s_token),
+        localToken: address(s_USDCToken),
         remoteChainSelector: SOURCE_CHAIN_SELECTOR,
         sourcePoolAddress: sourceTokenData.sourcePoolAddress,
         sourcePoolData: sourcePoolDataLockRelease,
@@ -201,10 +201,10 @@ contract HybridLockReleaseUSDCTokenPool_releaseOrMint_E2ETest is
   function test_releaseOrMint_E2E() public {
     uint256 burnAmount = 20_000e18;
 
-    deal(address(s_burnMintERC20), address(s_pool), burnAmount);
-    assertEq(s_burnMintERC20.balanceOf(address(s_pool)), burnAmount);
+    deal(address(s_token), address(s_pool), burnAmount);
+    assertEq(s_token.balanceOf(address(s_pool)), burnAmount);
 
-    vm.startPrank(s_burnMintOnRamp);
+    vm.startPrank(s_allowedOnRamp);
 
     // Burn on the source chain and use the Lock-Release Flag
     Pool.LockOrBurnOutV1 memory lockOrBurnOut = s_pool.lockOrBurn(
@@ -213,7 +213,7 @@ contract HybridLockReleaseUSDCTokenPool_releaseOrMint_E2ETest is
         receiver: bytes(""),
         amount: burnAmount,
         remoteChainSelector: DEST_CHAIN_SELECTOR,
-        localToken: address(s_burnMintERC20)
+        localToken: address(s_token)
       })
     );
 
@@ -222,7 +222,7 @@ contract HybridLockReleaseUSDCTokenPool_releaseOrMint_E2ETest is
     );
 
     // Assert Burning
-    assertEq(s_burnMintERC20.balanceOf(address(s_pool)), 0);
+    assertEq(s_token.balanceOf(address(s_pool)), 0);
     assertEq(bytes4(lockOrBurnOut.destPoolData), LOCK_RELEASE_FLAG);
 
     address recipient = address(1234);
@@ -239,7 +239,7 @@ contract HybridLockReleaseUSDCTokenPool_releaseOrMint_E2ETest is
 
     // Add 1e12 liquidity so that there's enough to release
     vm.startPrank(s_usdcTokenPool.getLiquidityProvider(SOURCE_CHAIN_SELECTOR));
-    s_token.approve(address(s_usdcTokenPool), type(uint256).max);
+    s_USDCToken.approve(address(s_usdcTokenPool), type(uint256).max);
     uint256 liquidityAmount = 1e12;
     s_usdcTokenPool.provideLiquidity(SOURCE_CHAIN_SELECTOR, liquidityAmount);
 
@@ -257,7 +257,7 @@ contract HybridLockReleaseUSDCTokenPool_releaseOrMint_E2ETest is
     vm.expectEmit();
     emit TokenPool.ReleasedOrMinted({
       remoteChainSelector: SOURCE_CHAIN_SELECTOR,
-      token: address(s_token),
+      token: address(s_USDCToken),
       sender: s_routerAllowedOffRamp,
       recipient: recipient,
       amount: amount
@@ -269,7 +269,7 @@ contract HybridLockReleaseUSDCTokenPool_releaseOrMint_E2ETest is
         originalSender: abi.encode(OWNER),
         receiver: recipient,
         sourceDenominatedAmount: amount,
-        localToken: address(s_token),
+        localToken: address(s_USDCToken),
         remoteChainSelector: SOURCE_CHAIN_SELECTOR,
         sourcePoolAddress: sourceTokenData.sourcePoolAddress,
         sourcePoolData: lockOrBurnOut.destPoolData,
@@ -280,10 +280,10 @@ contract HybridLockReleaseUSDCTokenPool_releaseOrMint_E2ETest is
     // Assert the tokens were delivered to the recipient
     assertEq(poolReturnDataV1.destinationAmount, amount, "destinationAmount and actual amount transferred differ");
     assertEq(
-      s_token.balanceOf(address(s_usdcTokenPool)),
+      s_USDCToken.balanceOf(address(s_usdcTokenPool)),
       liquidityAmount - amount,
       "Incorrect remaining liquidity in TokenPool"
     );
-    assertEq(s_token.balanceOf(recipient), amount, "Tokens not transferred to recipient");
+    assertEq(s_USDCToken.balanceOf(recipient), amount, "Tokens not transferred to recipient");
   }
 }

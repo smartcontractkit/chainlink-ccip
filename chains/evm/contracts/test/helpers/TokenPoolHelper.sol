@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {Pool} from "../../libraries/Pool.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
 
 import {IERC20} from
@@ -31,6 +32,16 @@ contract TokenPoolHelper is TokenPool {
 
   function calculateLocalAmount(uint256 remoteAmount, uint8 remoteDecimals) external view returns (uint256) {
     return _calculateLocalAmount(remoteAmount, remoteDecimals);
+  }
+
+  function validateLockOrBurn(
+    Pool.LockOrBurnInV1 calldata lockOrBurnIn
+  ) external {
+    _validateLockOrBurn(lockOrBurnIn);
+  }
+
+  function validateReleaseOrMint(Pool.ReleaseOrMintInV1 calldata releaseOrMintIn, uint256 localAmount) external {
+    _validateReleaseOrMint(releaseOrMintIn, localAmount);
   }
 
   function onlyOnRampModifier(

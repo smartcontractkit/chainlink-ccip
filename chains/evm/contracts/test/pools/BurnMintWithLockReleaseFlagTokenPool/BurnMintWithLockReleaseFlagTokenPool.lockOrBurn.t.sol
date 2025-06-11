@@ -14,15 +14,15 @@ contract BurnMintWithLockReleaseFlagTokenPool_lockOrBurn is BurnMintWithLockRele
   function test_LockOrBurn_CorrectReturnData() public {
     uint256 burnAmount = 20_000e18;
 
-    deal(address(s_burnMintERC20), address(s_pool), burnAmount);
-    assertEq(s_burnMintERC20.balanceOf(address(s_pool)), burnAmount);
+    deal(address(s_token), address(s_pool), burnAmount);
+    assertEq(s_token.balanceOf(address(s_pool)), burnAmount);
 
-    vm.startPrank(s_burnMintOnRamp);
+    vm.startPrank(s_allowedOnRamp);
 
     vm.expectEmit();
     emit TokenPool.OutboundRateLimitConsumed({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
-      token: address(s_burnMintERC20),
+      token: address(s_token),
       amount: burnAmount
     });
 
@@ -32,13 +32,13 @@ contract BurnMintWithLockReleaseFlagTokenPool_lockOrBurn is BurnMintWithLockRele
     vm.expectEmit();
     emit TokenPool.LockedOrBurned({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
-      token: address(s_burnMintERC20),
-      sender: address(s_burnMintOnRamp),
+      token: address(s_token),
+      sender: address(s_allowedOnRamp),
       amount: burnAmount
     });
 
     bytes4 expectedSignature = bytes4(keccak256("burn(uint256)"));
-    vm.expectCall(address(s_burnMintERC20), abi.encodeWithSelector(expectedSignature, burnAmount));
+    vm.expectCall(address(s_token), abi.encodeWithSelector(expectedSignature, burnAmount));
 
     Pool.LockOrBurnOutV1 memory lockOrBurnOut = s_pool.lockOrBurn(
       Pool.LockOrBurnInV1({
@@ -46,11 +46,11 @@ contract BurnMintWithLockReleaseFlagTokenPool_lockOrBurn is BurnMintWithLockRele
         receiver: bytes(""),
         amount: burnAmount,
         remoteChainSelector: DEST_CHAIN_SELECTOR,
-        localToken: address(s_burnMintERC20)
+        localToken: address(s_token)
       })
     );
 
-    assertEq(s_burnMintERC20.balanceOf(address(s_pool)), 0);
+    assertEq(s_token.balanceOf(address(s_pool)), 0);
 
     assertEq(bytes4(lockOrBurnOut.destPoolData), LOCK_RELEASE_FLAG);
   }
