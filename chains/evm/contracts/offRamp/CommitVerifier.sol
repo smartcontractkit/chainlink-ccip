@@ -7,7 +7,7 @@ import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/I
 import {Client} from "../libraries/Client.sol";
 import {Internal} from "../libraries/Internal.sol";
 import {MerkleMultiProof} from "../libraries/MerkleMultiProof.sol";
-import {MultiOCR3Base} from "../ocr/MultiOCR3Base.sol";
+import {OCRVerifier} from "../ocr/OCRVerifier.sol";
 
 import {EnumerableSet} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
@@ -17,7 +17,7 @@ import {EnumerableSet} from
 /// onchain upgrade of both contracts.
 /// @dev MultiOCR3Base is used to store multiple OCR configs for the OffRamp. The execution plugin type has to be
 /// configured without signature verification, and the commit plugin type with verification.
-contract OffRamp is ITypeAndVersion, MultiOCR3Base {
+contract OffRamp is ITypeAndVersion, OCRVerifier {
   using EnumerableSet for EnumerableSet.UintSet;
 
   error ZeroChainSelectorNotAllowed();
@@ -109,7 +109,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     StaticConfig memory staticConfig,
     DynamicConfig memory dynamicConfig,
     SourceChainConfigArgs[] memory sourceChainConfigs
-  ) MultiOCR3Base() {
+  ) OCRVerifier() {
     if (address(staticConfig.rmnRemote) == address(0)) {
       revert ZeroAddressNotAllowed();
     }
@@ -194,24 +194,8 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     return s_roots[sourceChainSelector][root];
   }
 
-  /// @inheritdoc MultiOCR3Base
-  function _afterOCR3ConfigSet(
-    uint8 ocrPluginType
-  ) internal view override {
-    bool isSignatureVerificationEnabled = s_ocrConfigs[ocrPluginType].configInfo.isSignatureVerificationEnabled;
-
-    if (ocrPluginType == uint8(Internal.OCRPluginType.Commit)) {
-      // Signature verification must be enabled for commit plugin.
-      if (!isSignatureVerificationEnabled) {
-        revert SignatureVerificationRequiredInCommitPlugin();
-      }
-    } else if (ocrPluginType == uint8(Internal.OCRPluginType.Execution)) {
-      // Signature verification must be disabled for execution plugin.
-      if (isSignatureVerificationEnabled) {
-        revert SignatureVerificationNotAllowedInExecutionPlugin();
-      }
-    }
-  }
+  /// @inheritdoc OCRVerifier
+  function _afterOCR3ConfigSet() internal view override {}
 
   // ================================================================
   // │                           Config                             │
