@@ -1,3 +1,5 @@
+use std::fmt::{self, Display, Formatter};
+
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::get_associated_token_address_with_program_id;
 use ccip_common::router_accounts::TokenAdminRegistry;
@@ -17,8 +19,9 @@ use crate::messages::{
     Any2SVMRampMessage, ExecutionReportSingleChain, RampMessageHeader, SVMTokenAmount,
 };
 use crate::state::{
-    CcipAccountMeta, CommitReport, DerivePdasResponse, ExecutionReportBuffer,
-    MessageExecutionState, OnRampAddress, ReferenceAddresses, SourceChain, ToMeta,
+    CcipAccountMeta, CommitReport, DeriveAccountsResponse, DerivedLookupTable,
+    ExecutionReportBuffer, MessageExecutionState, OnRampAddress, ReferenceAddresses, SourceChain,
+    ToMeta,
 };
 use crate::CcipOfframpError;
 
@@ -143,7 +146,7 @@ impl Execute for Impl {
         execute_caller: Pubkey,
         message_accounts: Vec<CcipAccountMeta>,
         source_chain_selector: u64,
-    ) -> Result<DerivePdasResponse> {
+    ) -> Result<DeriveAccountsResponse> {
         let stage =
             DeriveExecuteAccountsStage::infer_from(ctx.remaining_accounts, source_chain_selector);
 
@@ -210,12 +213,24 @@ fn ocr3_transmit_report<'info>(
     Ok(())
 }
 
+#[derive(Copy, Clone, Debug)]
 enum DeriveExecuteAccountsStage {
     GatherBasicInfo,
     BuildMainAccountList,
     RetrieveTokenLUTs,
     // N stages, one per token.
     TokenTransferAccounts,
+}
+
+impl Display for DeriveExecuteAccountsStage {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        f.write_str(match self {
+            DeriveExecuteAccountsStage::GatherBasicInfo => "GatherBasicInfo",
+            DeriveExecuteAccountsStage::BuildMainAccountList => "BuildMainAccountList",
+            DeriveExecuteAccountsStage::RetrieveTokenLUTs => "RetrieveTokenLookupTables",
+            DeriveExecuteAccountsStage::TokenTransferAccounts => "TokenTransferAccounts",
+        })
+    }
 }
 
 impl DeriveExecuteAccountsStage {
@@ -247,7 +262,7 @@ fn derive_execute_accounts_gather_basic_info(
     report_or_buffer_id: &[u8],
     execute_caller: Pubkey,
     source_chain_selector: u64,
-) -> Result<DerivePdasResponse> {
+) -> Result<DeriveAccountsResponse> {
     let accounts_to_save = vec![
         find(&[seed::CONFIG], crate::ID),
         find(&[seed::REFERENCE_ADDRESSES], crate::ID),
@@ -277,9 +292,11 @@ fn derive_execute_accounts_gather_basic_info(
         ));
     }
 
-    Ok(DerivePdasResponse {
+    Ok(DeriveAccountsResponse {
         accounts_to_save,
         ask_again_with,
+        look_up_tables_to_save: vec![],
+        current_stage: DeriveExecuteAccountsStage::GatherBasicInfo.to_string(),
     })
 }
 
@@ -288,7 +305,7 @@ fn derive_execute_accounts_build_main_account_list<'info>(
     report_or_buffer_id: &[u8],
     execute_caller: Pubkey,
     message_accounts: Vec<CcipAccountMeta>,
-) -> Result<DerivePdasResponse> {
+) -> Result<DeriveAccountsResponse> {
     let report = if report_or_buffer_id.len() <= 32 {
         deserialize_from_buffer_account(
             ctx.remaining_accounts
@@ -378,9 +395,11 @@ fn derive_execute_accounts_build_main_account_list<'info>(
         }
     }
 
-    Ok(DerivePdasResponse {
+    Ok(DeriveAccountsResponse {
         accounts_to_save,
         ask_again_with,
+        look_up_tables_to_save: vec![],
+        current_stage: DeriveExecuteAccountsStage::BuildMainAccountList.to_string(),
     })
 }
 
@@ -388,7 +407,7 @@ fn derive_execute_accounts_retrieve_luts<'info>(
     ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
     report_or_buffer_id: &[u8],
     execute_caller: Pubkey,
-) -> Result<DerivePdasResponse> {
+) -> Result<DeriveAccountsResponse> {
     let lookup_table_metas = ctx.remaining_accounts.iter().map(|registry| {
         let token_admin_registry_account: Account<TokenAdminRegistry> =
             Account::try_from(registry).expect("parsing token admin registry account");
@@ -396,7 +415,7 @@ fn derive_execute_accounts_retrieve_luts<'info>(
     });
 
     let mut ask_again_with = vec![find(&[seed::REFERENCE_ADDRESSES], crate::ID)];
-    ask_again_with.extend(lookup_table_metas);
+    ask_again_with.extend(lookup_table_metas.clone());
 
     if report_or_buffer_id.len() <= 32 {
         // We're in the buffered case, so we need the buffer PDA either on the derived account list
@@ -413,9 +432,11 @@ fn derive_execute_accounts_retrieve_luts<'info>(
         ask_again_with.push(buffer_pda.readonly());
     }
 
-    Ok(DerivePdasResponse {
+    Ok(DeriveAccountsResponse {
         accounts_to_save: vec![],
         ask_again_with,
+        look_up_tables_to_save: vec![],
+        current_stage: DeriveExecuteAccountsStage::RetrieveTokenLUTs.to_string(),
     })
 }
 
@@ -424,7 +445,7 @@ fn derive_execute_accounts_additional_tokens<'info>(
     ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
     report_or_buffer_id: &[u8],
     execute_caller: Pubkey,
-) -> Result<DerivePdasResponse> {
+) -> Result<DeriveAccountsResponse> {
     let (report, remaining_accounts) = if report_or_buffer_id.len() <= 32 {
         (
             deserialize_from_buffer_account(
@@ -531,9 +552,14 @@ fn derive_execute_accounts_additional_tokens<'info>(
         ask_again_with.push(buffer_pda.writable());
     }
 
-    Ok(DerivePdasResponse {
+    Ok(DeriveAccountsResponse {
         ask_again_with,
         accounts_to_save,
+        look_up_tables_to_save: vec![DerivedLookupTable {
+            address: *lut.key,
+            accounts: lookup_table_account.addresses.iter().cloned().collect(),
+        }],
+        current_stage: DeriveExecuteAccountsStage::TokenTransferAccounts.to_string(),
     })
 }
 

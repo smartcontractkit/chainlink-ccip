@@ -34,7 +34,7 @@ pub struct ReferenceAddresses {
 }
 
 #[derive(Debug, Default, PartialEq, Eq, Clone, AnchorDeserialize, AnchorSerialize)]
-pub struct DerivePdasResponse {
+pub struct DeriveAccountsResponse {
     /// If this vector is not empty, you must call the `derive_` method again including
     /// exactly these accounts as the `remaining_accounts` field.
     pub ask_again_with: Vec<CcipAccountMeta>,
@@ -42,6 +42,18 @@ pub struct DerivePdasResponse {
     /// is finally empty, this separate list will contain all the accounts to use for the
     /// instruction of interest.
     pub accounts_to_save: Vec<CcipAccountMeta>,
+    /// Append these look up tables at the end of a list. It will contain all LUTs
+    /// that the instruction of interest can use.
+    pub look_up_tables_to_save: Vec<DerivedLookupTable>,
+    /// Identifies the derivation stage. `derive_` functions may sometimes require providing
+    /// the name of the last complete stage as an argument.
+    pub current_stage: String,
+}
+
+#[derive(Debug, Default, PartialEq, Eq, Clone, AnchorDeserialize, AnchorSerialize)]
+pub struct DerivedLookupTable {
+    pub address: Pubkey,
+    pub accounts: Vec<Pubkey>,
 }
 
 // We can't use anchor's `AccountMeta` since it doesn't implement

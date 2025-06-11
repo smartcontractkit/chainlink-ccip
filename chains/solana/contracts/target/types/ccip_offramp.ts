@@ -1215,7 +1215,7 @@ export type CcipOfframp = {
         }
       ],
       "returns": {
-        "defined": "DerivePdasResponse"
+        "defined": "DeriveAccountsResponse"
       }
     },
     {
@@ -1828,7 +1828,7 @@ export type CcipOfframp = {
       }
     },
     {
-      "name": "DerivePdasResponse",
+      "name": "DeriveAccountsResponse",
       "type": {
         "kind": "struct",
         "fields": [
@@ -1855,6 +1855,44 @@ export type CcipOfframp = {
               "vec": {
                 "defined": "CcipAccountMeta"
               }
+            }
+          },
+          {
+            "name": "lookUpTablesToSave",
+            "docs": [
+              "Append these look up tables at the end of a list. It will contain all LUTs",
+              "that the instruction of interest can use."
+            ],
+            "type": {
+              "vec": {
+                "defined": "DerivedLookupTable"
+              }
+            }
+          },
+          {
+            "name": "currentStage",
+            "docs": [
+              "Identifies the derivation stage. `derive_` functions may sometimes require providing",
+              "the name of the last complete stage as an argument."
+            ],
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DerivedLookupTable",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "address",
+            "type": "publicKey"
+          },
+          {
+            "name": "accounts",
+            "type": {
+              "vec": "publicKey"
             }
           }
         ]
@@ -3905,7 +3943,7 @@ export const IDL: CcipOfframp = {
         }
       ],
       "returns": {
-        "defined": "DerivePdasResponse"
+        "defined": "DeriveAccountsResponse"
       }
     },
     {
@@ -4518,7 +4556,7 @@ export const IDL: CcipOfframp = {
       }
     },
     {
-      "name": "DerivePdasResponse",
+      "name": "DeriveAccountsResponse",
       "type": {
         "kind": "struct",
         "fields": [
@@ -4545,6 +4583,44 @@ export const IDL: CcipOfframp = {
               "vec": {
                 "defined": "CcipAccountMeta"
               }
+            }
+          },
+          {
+            "name": "lookUpTablesToSave",
+            "docs": [
+              "Append these look up tables at the end of a list. It will contain all LUTs",
+              "that the instruction of interest can use."
+            ],
+            "type": {
+              "vec": {
+                "defined": "DerivedLookupTable"
+              }
+            }
+          },
+          {
+            "name": "currentStage",
+            "docs": [
+              "Identifies the derivation stage. `derive_` functions may sometimes require providing",
+              "the name of the last complete stage as an argument."
+            ],
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DerivedLookupTable",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "address",
+            "type": "publicKey"
+          },
+          {
+            "name": "accounts",
+            "type": {
+              "vec": "publicKey"
             }
           }
         ]

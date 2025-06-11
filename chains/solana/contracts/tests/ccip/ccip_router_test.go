@@ -7301,7 +7301,7 @@ func TestCCIPRouter(t *testing.T) {
 					ccip_offramp.CcipAccountMeta{Pubkey: solana.SystemProgramID, IsSigner: false, IsWritable: false},
 				)
 
-				derivedAccounts := deriveExecutionAccounts(ctx, t, rawExecutionReport, transmitter, messagingAccounts, sourceChainSelector, solanaGoClient)
+				derivedAccounts, derivedLookUpTables := deriveExecutionAccounts(ctx, t, rawExecutionReport, transmitter, messagingAccounts, sourceChainSelector, solanaGoClient)
 				builder := ccip_offramp.NewExecuteInstructionBuilder().
 					SetRawExecutionReport(rawExecutionReport).
 					SetReportContextByteWords(reportContext).
@@ -7309,7 +7309,7 @@ func TestCCIPRouter(t *testing.T) {
 				builder.AccountMetaSlice = derivedAccounts
 				instruction, err = builder.ValidateAndBuild()
 				require.NoError(t, err)
-				tx = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment)
+				tx = testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, derivedLookUpTables)
 
 				executionEvents, err := common.ParseMultipleEvents[ccip.EventExecutionStateChanged](tx.Meta.LogMessages, "ExecutionStateChanged", config.PrintEvents)
 				require.NoError(t, err)
@@ -8723,7 +8723,7 @@ func TestCCIPRouter(t *testing.T) {
 						ccip_offramp.CcipAccountMeta{Pubkey: config.ReceiverTargetAccountPDA, IsSigner: false, IsWritable: true},
 						ccip_offramp.CcipAccountMeta{Pubkey: solana.SystemProgramID, IsSigner: false, IsWritable: false},
 					)
-					derivedAccounts := deriveExecutionAccounts(ctx, t, rawExecutionReport, transmitter, messagingAccounts, sourceChainSelector, solanaGoClient)
+					derivedAccounts, derivedLookUpTables := deriveExecutionAccounts(ctx, t, rawExecutionReport, transmitter, messagingAccounts, sourceChainSelector, solanaGoClient)
 					builder := ccip_offramp.NewExecuteInstructionBuilder().
 						SetRawExecutionReport(rawExecutionReport).
 						SetReportContextByteWords(reportContext).
@@ -8731,10 +8731,8 @@ func TestCCIPRouter(t *testing.T) {
 					builder.AccountMetaSlice = derivedAccounts
 					instruction, err = builder.ValidateAndBuild()
 					require.NoError(t, err)
-					_, addressTables, err := tokens.ParseTokenLookupTable(ctx, solanaGoClient, token0, token0.User[config.ReceiverExternalExecutionConfigPDA])
-					require.NoError(t, err)
 
-					tx = testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(400_000))
+					tx = testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, derivedLookUpTables, common.AddComputeUnitLimit(400_000))
 
 					executionEvents, err := common.ParseMultipleEvents[ccip.EventExecutionStateChanged](tx.Meta.LogMessages, "ExecutionStateChanged", config.PrintEvents)
 					require.NoError(t, err)
@@ -10230,7 +10228,7 @@ func TestCCIPRouter(t *testing.T) {
 					ccip_offramp.CcipAccountMeta{Pubkey: config.ReceiverTargetAccountPDA, IsSigner: false, IsWritable: true},
 					ccip_offramp.CcipAccountMeta{Pubkey: solana.SystemProgramID, IsSigner: false, IsWritable: false},
 				)
-				derivedAccounts := deriveExecutionAccounts(ctx, t, root[:], transmitter, messagingAccounts, sourceChainSelector, solanaGoClient)
+				derivedAccounts, derivedLookUpTables := deriveExecutionAccounts(ctx, t, root[:], transmitter, messagingAccounts, sourceChainSelector, solanaGoClient)
 				builder := ccip_offramp.NewExecuteInstructionBuilder().
 					SetRawExecutionReport([]byte{}).
 					SetReportContextByteWords(reportContext).
@@ -10238,7 +10236,7 @@ func TestCCIPRouter(t *testing.T) {
 				builder.AccountMetaSlice = derivedAccounts
 				instruction, err = builder.ValidateAndBuild()
 				require.NoError(t, err)
-				tx = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(1000000))
+				tx = testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, derivedLookUpTables, common.AddComputeUnitLimit(1000000))
 
 				executionEvents, err2 := common.ParseMultipleEvents[ccip.EventExecutionStateChanged](tx.Meta.LogMessages, "ExecutionStateChanged", config.PrintEvents)
 				require.NoError(t, err2)
@@ -10415,16 +10413,17 @@ func deriveExecutionAccounts(ctx context.Context,
 	transmitter solana.PrivateKey,
 	messagingAccounts []ccip_offramp.CcipAccountMeta,
 	sourceChainSelector uint64,
-	solanaGoClient *rpc.Client) []*solana.AccountMeta {
+	solanaGoClient *rpc.Client) (accounts []*solana.AccountMeta, lookUpTables map[solana.PublicKey]solana.PublicKeySlice) {
 	derivedAccounts := []*solana.AccountMeta{}
 	askWith := []*solana.AccountMeta{}
+	lookUpTables = make(map[solana.PublicKey]solana.PublicKeySlice)
 	for {
 		deriveRaw := ccip_offramp.NewDeriveAccountsExecuteInstruction(reportOrBufferID, transmitter.PublicKey(), messagingAccounts, sourceChainSelector, config.OfframpConfigPDA)
 		deriveRaw.AccountMetaSlice = append(deriveRaw.AccountMetaSlice, askWith...)
 		derive, err := deriveRaw.ValidateAndBuild()
 		require.NoError(t, err)
 		tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{derive}, transmitter, config.DefaultCommitment)
-		derivation, err := common.ExtractAnchorTypedReturnValue[ccip_offramp.DerivePdasResponse](ctx, tx.Meta.LogMessages, config.CcipOfframpProgram.String())
+		derivation, err := common.ExtractAnchorTypedReturnValue[ccip_offramp.DeriveAccountsResponse](ctx, tx.Meta.LogMessages, config.CcipOfframpProgram.String())
 		require.NoError(t, err)
 		for _, meta := range derivation.AccountsToSave {
 			derivedAccounts = append(derivedAccounts, &solana.AccountMeta{
@@ -10441,9 +10440,12 @@ func deriveExecutionAccounts(ctx context.Context,
 				IsSigner:   meta.IsSigner,
 			})
 		}
+		for _, table := range derivation.LookUpTablesToSave {
+			lookUpTables[table.Address] = table.Accounts
+		}
 
 		if len(askWith) == 0 {
-			return derivedAccounts
+			return derivedAccounts, lookUpTables
 		}
 	}
 }
