@@ -41,7 +41,6 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     bytes32 messageId, uint256 tokenIndex, uint256 oldLimit, uint256 tokenGasOverride
   );
   error ManualExecutionGasAmountCountMismatch(bytes32 messageId, uint64 sequenceNumber);
-  error InvalidRoot();
   error CanOnlySelfCall();
   error ReceiverError(bytes err);
   error TokenHandlingError(address target, bytes err);
@@ -58,7 +57,6 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   error SourceChainSelectorMismatch(uint64 reportSourceChainSelector, uint64 messageSourceChainSelector);
   error SignatureVerificationNotAllowedInExecutionPlugin();
   error InvalidOnRampUpdate(uint64 sourceChainSelector);
-  error RootBlessingMismatch(uint64 sourceChainSelector, bytes32 merkleRoot, bool isBlessed);
   error InsufficientGasToCompleteTx(bytes4 err);
 
   /// @dev Atlas depends on various events, if changing, please notify Atlas.
@@ -155,9 +153,6 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// Message state is tracked to ensure message can only be executed successfully once.
   mapping(uint64 sourceChainSelector => mapping(uint64 seqNum => uint256 executionStateBitmap)) internal
     s_executionStates;
-
-  /// @dev The sequence number of the last price update.
-  uint64 private s_latestPriceSequenceNumber;
 
   constructor(
     StaticConfig memory staticConfig,
