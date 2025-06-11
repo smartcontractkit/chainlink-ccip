@@ -29,14 +29,14 @@ func Test_USDCMessageReader_New(t *testing.T) {
 	address1 := "0x0000000000000000000000000000000000000001"
 	address2 := "0x0000000000000000000000000000000000000002"
 
-	emptyReaders := func() map[cciptypes.ChainSelector]*reader.MockContractReaderFacade {
-		return map[cciptypes.ChainSelector]*reader.MockContractReaderFacade{}
+	emptyReaders := func() map[cciptypes.ChainSelector]*reader.MockExtended {
+		return map[cciptypes.ChainSelector]*reader.MockExtended{}
 	}
 
 	tt := []struct {
 		name         string
 		tokensConfig map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig
-		readers      func() map[cciptypes.ChainSelector]*reader.MockContractReaderFacade
+		readers      func() map[cciptypes.ChainSelector]*reader.MockExtended
 		errorMessage string
 	}{
 		{
@@ -72,9 +72,9 @@ func Test_USDCMessageReader_New(t *testing.T) {
 					SourceMessageTransmitterAddr: address2,
 				},
 			},
-			readers: func() map[cciptypes.ChainSelector]*reader.MockContractReaderFacade {
-				readers := make(map[cciptypes.ChainSelector]*reader.MockContractReaderFacade)
-				m := reader.NewMockContractReaderFacade(t)
+			readers: func() map[cciptypes.ChainSelector]*reader.MockExtended {
+				readers := make(map[cciptypes.ChainSelector]*reader.MockExtended)
+				m := reader.NewMockExtended(t)
 				m.EXPECT().Bind(mock.Anything, mock.Anything).Return(errors.New("error"))
 				cs := cciptypes.ChainSelector(sel.ETHEREUM_TESTNET_SEPOLIA.Selector)
 				readers[cs] = m
@@ -90,9 +90,9 @@ func Test_USDCMessageReader_New(t *testing.T) {
 					SourceMessageTransmitterAddr: address2,
 				},
 			},
-			readers: func() map[cciptypes.ChainSelector]*reader.MockContractReaderFacade {
-				readers := make(map[cciptypes.ChainSelector]*reader.MockContractReaderFacade)
-				m := reader.NewMockContractReaderFacade(t)
+			readers: func() map[cciptypes.ChainSelector]*reader.MockExtended {
+				readers := make(map[cciptypes.ChainSelector]*reader.MockExtended)
+				m := reader.NewMockExtended(t)
 				m.EXPECT().Bind(mock.Anything, []types.BoundContract{
 					{
 						Address: address2,
@@ -111,7 +111,7 @@ func Test_USDCMessageReader_New(t *testing.T) {
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := tests.Context(t)
-			readers := make(map[cciptypes.ChainSelector]contractreader.ContractReaderFacade)
+			readers := make(map[cciptypes.ChainSelector]contractreader.Extended)
 			for k, v := range tc.readers() {
 				readers[k] = v
 			}
@@ -131,7 +131,7 @@ func Test_USDCMessageReader_New(t *testing.T) {
 func Test_USDCMessageReader_MessagesByTokenID(t *testing.T) {
 	ctx := tests.Context(t)
 	emptyChain := cciptypes.ChainSelector(sel.ETHEREUM_MAINNET.Selector)
-	emptyReader := reader.NewMockContractReaderFacade(t)
+	emptyReader := reader.NewMockExtended(t)
 	emptyReader.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
 	emptyReader.EXPECT().QueryKey(
 		mock.Anything,
@@ -142,7 +142,7 @@ func Test_USDCMessageReader_MessagesByTokenID(t *testing.T) {
 	).Return([]types.Sequence{}, nil).Maybe()
 
 	faultyChain := cciptypes.ChainSelector(sel.AVALANCHE_MAINNET.Selector)
-	faultyReader := reader.NewMockContractReaderFacade(t)
+	faultyReader := reader.NewMockExtended(t)
 	faultyReader.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
 	faultyReader.EXPECT().QueryKey(
 		mock.Anything,
@@ -159,8 +159,8 @@ func Test_USDCMessageReader_MessagesByTokenID(t *testing.T) {
 	}
 
 	validChain := cciptypes.ChainSelector(sel.ETHEREUM_MAINNET_ARBITRUM_1.Selector)
-	validChainCCTP := CCTPDestDomains[uint64(validChain)]
-	validReader := reader.NewMockContractReaderFacade(t)
+	validChainCCTP := cctpDestDomains[uint64(validChain)]
+	validReader := reader.NewMockExtended(t)
 	validReader.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
 	validReader.EXPECT().QueryKey(
 		mock.Anything,
@@ -185,7 +185,7 @@ func Test_USDCMessageReader_MessagesByTokenID(t *testing.T) {
 		},
 	}
 
-	contactReaders := map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
+	contactReaders := map[cciptypes.ChainSelector]contractreader.Extended{
 		faultyChain: faultyReader,
 		emptyChain:  emptyReader,
 		validChain:  validReader,

@@ -30,8 +30,8 @@ const (
 	CCTPMessageVersion = uint32(0)
 )
 
-// TODO, this should be fetched from USDC Token Pool and cached
-var CCTPDestDomains = map[uint64]uint32{
+// this could be fetched from USDC Token Pool
+var cctpDestDomains = map[uint64]uint32{
 	sel.ETHEREUM_MAINNET.Selector:                    0,
 	sel.AVALANCHE_MAINNET.Selector:                   1,
 	sel.ETHEREUM_MAINNET_OPTIMISM_1.Selector:         2,
@@ -78,7 +78,7 @@ func NewUSDCMessageReader(
 	ctx context.Context,
 	lggr logger.Logger,
 	tokensConfig map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig,
-	contractReaders map[cciptypes.ChainSelector]contractreader.ContractReaderFacade,
+	contractReaders map[cciptypes.ChainSelector]contractreader.Extended,
 	addrCodec cciptypes.AddressCodec,
 ) (USDCMessageReader, error) {
 	readers := make(map[cciptypes.ChainSelector]USDCMessageReader)
@@ -95,6 +95,7 @@ func NewUSDCMessageReader(
 				return nil, err
 			}
 
+			// Bind the 3rd party MessageTransmitter contract, this is where CCTP MessageSent events are emitted.
 			contract, err := bindReaderContract(
 				ctx,
 				lggr,
@@ -111,8 +112,9 @@ func NewUSDCMessageReader(
 				lggr:           lggr,
 				contractReader: contractReaders[chainSelector],
 				cctpDestDomain: domains,
-				boundContract:  contract,
+				boundContract:  contract, // TODO: this is not needed if we switch to the Extended contract reader.
 			}
+
 		// TODO: Implement Solana USDC message reader
 		//case sel.FamilySolana:
 		//	panic("not implemented yet")
@@ -155,7 +157,7 @@ func AllAvailableDomains() map[uint64]uint32 {
 	}
 
 	destDomains := make(map[uint64]uint32)
-	for k, v := range CCTPDestDomains {
+	for k, v := range cctpDestDomains {
 		destDomains[k] = v
 	}
 
