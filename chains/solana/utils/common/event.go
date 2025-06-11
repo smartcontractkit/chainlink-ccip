@@ -61,24 +61,29 @@ func ParseMultipleEvents[T any](logs []string, event string, shouldPrint bool) (
 			}
 			if IsEvent(event, data) {
 				// if the event is `EventCommitReportAccepted`, we need to handle it separately
-				if event == consts.EventNameCommitReportAccepted {
+				switch event {
+				case consts.EventNameCommitReportAccepted:
 					decodedEvent, err := decodeCommitReportAcceptedEvent(data)
 					if err != nil {
 						return nil, err
 					}
+					if shouldPrint {
+						fmt.Printf("%s: %+v\n", event, decodedEvent)
+					}
 					results = append(results, any(decodedEvent).(T))
-				}
 
-				var obj T
-				if err := bin.UnmarshalBorsh(&obj, data); err != nil {
-					return nil, err
-				}
+				default:
+					var obj T
+					if err = bin.UnmarshalBorsh(&obj, data); err != nil {
+						return nil, err
+					}
 
-				if shouldPrint {
-					fmt.Printf("%s: %+v\n", event, obj)
-				}
+					if shouldPrint {
+						fmt.Printf("%s: %+v\n", event, obj)
+					}
 
-				results = append(results, obj)
+					results = append(results, obj)
+				}
 			}
 		}
 	}
