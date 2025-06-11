@@ -194,9 +194,6 @@ contract OffRamp is ITypeAndVersion, OCRVerifier {
     return s_roots[sourceChainSelector][root];
   }
 
-  /// @inheritdoc OCRVerifier
-  function _afterOCR3ConfigSet() internal view override {}
-
   // ================================================================
   // │                           Config                             │
   // ================================================================
