@@ -40,6 +40,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   error InvalidFillId(bytes32 fillId);
   error TransferAmountExceedsMaxFillAmount(uint64 remoteChainSelector, uint256 amount);
   error InsufficientPoolFees(uint256 requested, uint256 available);
+  error QuoteFeeExceedsUserMaxLimit(uint256 quoteFee, uint256 maxFastTransferFee);
 
   event DestChainConfigUpdated(
     uint64 indexed destinationChainSelector,
@@ -130,6 +131,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   function ccipSendToken(
     uint64 destinationChainSelector,
     uint256 amount,
+    uint256 maxFastTransferFee,
     bytes calldata receiver,
     address feeToken,
     bytes calldata extraArgs
@@ -137,7 +139,9 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     (Quote memory quote, Client.EVM2AnyMessage memory message) =
       _getFeeQuoteAndCCIPMessage(destinationChainSelector, amount, receiver, feeToken, extraArgs);
     _consumeOutboundRateLimit(destinationChainSelector, amount);
-
+    if (quote.fastTransferFee > maxFastTransferFee) {
+      revert QuoteFeeExceedsUserMaxLimit(quote.fastTransferFee, maxFastTransferFee);
+    }
     _handleFastTransferLockOrBurn(msg.sender, amount);
 
     // If the user is not paying in native, we need to transfer the fee token to the contract.

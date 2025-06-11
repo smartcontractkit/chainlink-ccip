@@ -68,6 +68,8 @@ interface IFastTransferPool {
   /// @notice Sends tokens via CCIP with optional fast transfer.
   /// @param destinationChainSelector The destination chain selector.
   /// @param amount The amount to transfer.
+  /// @param maxFastTransferFee The maximum allowable fee deducted when computing
+  /// the sourceAmountNetFee, expressed in lock/burn token units.
   /// @param receiver The receiver address.
   /// @param settlementFeeToken The token used to pay the settlement fee.
   /// @param extraArgs Extra arguments for the transfer.
@@ -75,6 +77,7 @@ interface IFastTransferPool {
   function ccipSendToken(
     uint64 destinationChainSelector,
     uint256 amount,
+    uint256 maxFastTransferFee,
     bytes calldata receiver,
     address settlementFeeToken,
     bytes calldata extraArgs

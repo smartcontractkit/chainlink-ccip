@@ -26,62 +26,42 @@ contract BurnMintFastTransferTokenPool_validateSendRequest is BurnMintFastTransf
   }
 
   function test_validateSendRequest_Success() public {
+    // From the setup, we have a pool with the default chain config and no allowlist.
     // This should not revert - all validations pass
-    bytes32 settlementId = s_pool.ccipSendToken{value: CCIP_SEND_FEE}(
+    s_pool.getCcipSendTokenFee(
       DEST_CHAIN_SELECTOR,
       TRANSFER_AMOUNT,
       abi.encode(RECEIVER),
       address(0), // native fee token
       ""
     );
-
-    assertTrue(settlementId != bytes32(0));
   }
 
   function test_validateSendRequest_RevertWhen_CursedByRMN() public {
     // Mock RMN to return cursed status for destination chain
     vm.mockCall(address(s_mockRMNRemote), abi.encodeWithSignature("isCursed(bytes16)"), abi.encode(true));
-
     // Should revert with CursedByRMN error
     vm.expectRevert(TokenPool.CursedByRMN.selector);
-    s_pool.ccipSendToken{value: CCIP_SEND_FEE}(
-      DEST_CHAIN_SELECTOR, TRANSFER_AMOUNT, abi.encode(RECEIVER), address(0), ""
+    s_pool.getCcipSendTokenFee(
+      DEST_CHAIN_SELECTOR,
+      TRANSFER_AMOUNT,
+      abi.encode(RECEIVER),
+      address(0), // native fee token
+      ""
     );
   }
 
   function test_validateSendRequest_RevertWhen_ChainNotAllowed() public {
+    // Unregistered chain selector
     uint64 unsupportedChainSelector = 999999;
-
     // Should revert with ChainNotAllowed error
     vm.expectRevert(abi.encodeWithSelector(TokenPool.ChainNotAllowed.selector, unsupportedChainSelector));
-    s_pool.ccipSendToken{value: CCIP_SEND_FEE}(
-      unsupportedChainSelector, TRANSFER_AMOUNT, abi.encode(RECEIVER), address(0), ""
-    );
-  }
-
-  function test_validateSendRequest_RevertWhen_SenderNotAllowlisted() public {
-    vm.stopPrank();
-    // Create a pool with allowlist enabled
-    address[] memory allowlist = new address[](1);
-    allowlist[0] = OWNER; // Only OWNER is allowed
-
-    BurnMintFastTransferTokenPool poolWithAllowlist = new BurnMintFastTransferTokenPool(
-      s_token, DEFAULT_TOKEN_DECIMALS, allowlist, address(s_mockRMNRemote), address(s_sourceRouter)
-    );
-
-    // Setup chain and lane config for the new pool
-    _setupPoolConfiguration(poolWithAllowlist);
-
-    address unauthorizedSender = makeAddr("unauthorizedSender");
-    deal(address(s_token), unauthorizedSender, TRANSFER_AMOUNT * 2);
-    deal(unauthorizedSender, CCIP_SEND_FEE); // Ensure sender has enough ETH for the fee
-    vm.startPrank(unauthorizedSender);
-    s_token.approve(address(poolWithAllowlist), type(uint256).max);
-
-    // Should revert with SenderNotAllowed error (from _checkAllowList)
-    vm.expectRevert(abi.encodeWithSelector(TokenPool.SenderNotAllowed.selector, unauthorizedSender));
-    poolWithAllowlist.ccipSendToken{value: CCIP_SEND_FEE}(
-      DEST_CHAIN_SELECTOR, TRANSFER_AMOUNT, abi.encode(RECEIVER), address(0), ""
+    s_pool.getCcipSendTokenFee(
+      unsupportedChainSelector,
+      TRANSFER_AMOUNT,
+      abi.encode(RECEIVER),
+      address(0), // native fee token
+      ""
     );
   }
 
@@ -106,14 +86,42 @@ contract BurnMintFastTransferTokenPool_validateSendRequest is BurnMintFastTransf
     s_token.approve(address(poolWithAllowlist), type(uint256).max);
     deal(allowlistedSender, CCIP_SEND_FEE); // Ensure sender has enough ETH for the fee
     // Should succeed with allowlisted sender
-    bytes32 settlementId = poolWithAllowlist.ccipSendToken{value: CCIP_SEND_FEE}(
-      DEST_CHAIN_SELECTOR, TRANSFER_AMOUNT, abi.encode(RECEIVER), address(0), ""
+    poolWithAllowlist.getCcipSendTokenFee(
+      DEST_CHAIN_SELECTOR,
+      TRANSFER_AMOUNT,
+      abi.encode(RECEIVER),
+      address(0), // native fee token
+      ""
     );
-
-    assertTrue(settlementId != bytes32(0));
   }
 
-  function test_validateSendRequest_RMNCurseSpecificChain() public {
+  function test_validateSendRequest_RevertWhen_SenderNotAllowlisted() public {
+    vm.stopPrank();
+    // Create a pool with allowlist enabled
+    address[] memory allowlist = new address[](1);
+    allowlist[0] = OWNER; // Only OWNER is allowed
+
+    BurnMintFastTransferTokenPool poolWithAllowlist = new BurnMintFastTransferTokenPool(
+      s_token, DEFAULT_TOKEN_DECIMALS, allowlist, address(s_mockRMNRemote), address(s_sourceRouter)
+    );
+
+    // Setup chain and lane config for the new pool
+    _setupPoolConfiguration(poolWithAllowlist);
+
+    address unauthorizedSender = makeAddr("unauthorizedSender");
+    vm.prank(unauthorizedSender);
+    // Should revert with SenderNotAllowed error (from _checkAllowList)
+    vm.expectRevert(abi.encodeWithSelector(TokenPool.SenderNotAllowed.selector, unauthorizedSender));
+    poolWithAllowlist.getCcipSendTokenFee(
+      DEST_CHAIN_SELECTOR,
+      TRANSFER_AMOUNT,
+      abi.encode(RECEIVER),
+      address(0), // native fee token
+      ""
+    );
+  }
+
+  function test_validateSendRequest_RevertWhen_RMNCurseSpecificChain() public {
     uint64 anotherChainSelector = 54321;
 
     // Add configuration for another chain
@@ -154,15 +162,22 @@ contract BurnMintFastTransferTokenPool_validateSendRequest is BurnMintFastTransf
     );
 
     // Original chain should still work
-    bytes32 settlementId1 = s_pool.ccipSendToken{value: CCIP_SEND_FEE}(
-      DEST_CHAIN_SELECTOR, TRANSFER_AMOUNT, abi.encode(RECEIVER), address(0), ""
+    s_pool.getCcipSendTokenFee(
+      DEST_CHAIN_SELECTOR,
+      TRANSFER_AMOUNT,
+      abi.encode(RECEIVER),
+      address(0), // native fee token
+      ""
     );
-    assertTrue(settlementId1 != bytes32(0));
 
     // New chain should revert due to curse
     vm.expectRevert(TokenPool.CursedByRMN.selector);
-    s_pool.ccipSendToken{value: CCIP_SEND_FEE}(
-      anotherChainSelector, TRANSFER_AMOUNT, abi.encode(RECEIVER), address(0), ""
+    s_pool.getCcipSendTokenFee(
+      anotherChainSelector,
+      TRANSFER_AMOUNT,
+      abi.encode(RECEIVER),
+      address(0), // native fee token
+      ""
     );
   }
 
