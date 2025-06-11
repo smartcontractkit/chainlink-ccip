@@ -1,6 +1,8 @@
 BurnFromMintTokenPool_lockOrBurn:test_constructor() (gas: 23404)
 BurnFromMintTokenPool_lockOrBurn:test_lockOrBurn() (gas: 245510)
 BurnMintFastTransferTokenPool_ccipReceive:test_CcipReceive_SlowFilled() (gas: 129736)
+BurnMintFastTransferTokenPool_ccipSendToken:test_ccipSendToken_Success() (gas: 129436)
+BurnMintFastTransferTokenPool_ccipSendToken:test_ccipSendToken_WithERC20FeeToken() (gas: 174067)
 BurnMintFastTransferTokenPool_validateSendRequest:test_validateSendRequest_Success() (gas: 31397)
 BurnMintFastTransferTokenPool_validateSendRequest:test_validateSendRequest_WithAllowlistedSender() (gas: 5669020)
 BurnMintFastTransferTokenPool_validateSettlement:test_validateSettlement_Success() (gas: 116843)
