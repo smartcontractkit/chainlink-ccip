@@ -81,12 +81,12 @@ func validateReaderExistence[T contractreader.ContractReaderFacade](
 	return nil
 }
 
-func validateAccessorExistence(
+func getChainAccessor(
 	accessors map[cciptypes.ChainSelector]cciptypes.ChainAccessor,
 	chainSelector cciptypes.ChainSelector,
-) error {
-	if _, exists := accessors[chainSelector]; !exists {
-		return fmt.Errorf("chain accessor not found for chain %d", chainSelector)
+) (cciptypes.ChainAccessor, error) {
+	if accessor, exists := accessors[chainSelector]; exists {
+		return accessor, nil
 	}
-	return nil
+	return nil, fmt.Errorf("chain accessor not found for chain %d", chainSelector)
 }
