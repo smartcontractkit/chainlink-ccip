@@ -11,7 +11,7 @@ import {EnumerableSet} from
 contract OCRVerifier is ITypeAndVersion, Ownable2StepMsgSender {
   using EnumerableSet for EnumerableSet.AddressSet;
 
-  string public constant override typeAndVersion = "CommitVerifier 1.7.0-dev";
+  string public constant override typeAndVersion = "OCRVerifier 1.7.0-dev";
 
   // Maximum number of oracles the offchain reporting protocol is designed for
   uint256 internal constant MAX_NUM_ORACLES = 32;
@@ -56,6 +56,14 @@ contract OCRVerifier is ITypeAndVersion, Ownable2StepMsgSender {
     address[] signers; // signing address of each oracle.
   }
 
+  struct OCRReport {
+    bytes32 configDigest; // The config digest of the report.
+    uint64 sequenceNumber; // The sequence number of the report.
+    bytes reportBytes; // The serialized report.
+    bytes32[] rs; // R components of the signatures.
+    bytes32[] ss; // S components of the signatures.
+  }
+
   OCRConfig internal s_ocrConfig;
 
   EnumerableSet.AddressSet internal s_signers;
@@ -65,6 +73,56 @@ contract OCRVerifier is ITypeAndVersion, Ownable2StepMsgSender {
   constructor() {
     i_chainID = block.chainid;
   }
+
+  function validateReport(
+    bytes calldata rawOCRReport
+  ) external {
+    OCRReport memory report = abi.decode(rawOCRReport, (OCRReport));
+
+    if (s_ocrConfig.configDigest != report.configDigest) {
+      revert ConfigDigestMismatch(s_ocrConfig.configDigest, report.configDigest);
+    }
+    // If the cached chainID at time of deployment doesn't match the current chainID, we reject all signed reports.
+    // This avoids a (rare) scenario where chain A forks into chain A and A', A' still has configDigest calculated
+    // from chain A and so OCR reports will be valid on both forks.
+    if (i_chainID != block.chainid) revert ForkedChain(i_chainID, block.chainid);
+
+    if (report.rs.length != s_ocrConfig.F + 1) revert WrongNumberOfSignatures();
+    if (report.rs.length != report.ss.length) revert SignaturesOutOfRegistration();
+
+    _verifySignatures(
+      keccak256(abi.encode(keccak256(report.reportBytes), report.configDigest, report.sequenceNumber)),
+      report.rs,
+      report.ss
+    );
+
+    emit Transmitted(report.configDigest, uint64(uint256(report.sequenceNumber)));
+  }
+
+  /// @notice Verifies the signatures of a hashed report value for one OCR plugin type.
+  /// @param hashedReport hashed encoded packing of report + reportContext.
+  /// @param rs ith element is the R components of the ith signature on report. Must have at most MAX_NUM_ORACLES entries.
+  /// @param ss ith element is the S components of the ith signature on report. Must have at most MAX_NUM_ORACLES entries.
+  /// @dev we assume all signatures use a `v` value of 27.
+  function _verifySignatures(bytes32 hashedReport, bytes32[] memory rs, bytes32[] memory ss) internal view {
+    // Verify signatures attached to report. Using a uint256 means we can only verify up to 256 oracles.
+    uint160 lastSigner = 0;
+
+    uint256 numberOfSignatures = rs.length;
+    for (uint256 i; i < numberOfSignatures; ++i) {
+      // Safe from ECDSA malleability here since we check for duplicate signers.
+      address signer = ecrecover(hashedReport, 27, rs[i], ss[i]);
+
+      // Check that the signer is registered as an oracle.
+      if (!s_signers.contains(signer)) revert UnauthorizedSigner();
+      // This requires ordered signatures to check for duplicates. This also disallows the zero address.
+      if (uint160(signer) <= lastSigner) revert NonUniqueSignatures();
+    }
+  }
+
+  // ================================================================
+  // │                           Config                             │
+  // ================================================================
 
   /// @notice Sets offchain reporting protocol configuration incl. participating oracles for a single OCR plugin type.
   /// @param ocrConfigArgs OCR config update args.
@@ -99,69 +157,6 @@ contract OCRVerifier is ITypeAndVersion, Ownable2StepMsgSender {
     for (uint256 i = 0; i < signers.length; ++i) {
       s_signers.remove(signers[i]);
     }
-  }
-
-  /// @param report serialized report, which the signatures are signing.
-  /// @param rs ith element is the R components of the ith signature on report. Must have at most MAX_NUM_ORACLES entries.
-  /// @param ss ith element is the S components of the ith signature on report. Must have at most MAX_NUM_ORACLES entries.
-  function validateReport(
-    // NOTE: If these parameters are changed, expectedMsgDataLength and/or TRANSMIT_MSGDATA_CONSTANT_LENGTH_COMPONENT
-    // need to be changed accordingly.
-    bytes32[2] calldata reportContext,
-    bytes calldata report,
-    bytes32[] memory rs,
-    bytes32[] memory ss
-  ) external {
-    // reportContext consists of:
-    // reportContext[0]: ConfigDigest.
-    // reportContext[1]: 24 byte padding, 8 byte sequence number.
-    bytes32 configDigest = reportContext[0];
-
-    OCRConfig memory configInfo = s_ocrConfig;
-    if (configInfo.configDigest != configDigest) {
-      revert ConfigDigestMismatch(configInfo.configDigest, configDigest);
-    }
-    // If the cached chainID at time of deployment doesn't match the current chainID, we reject all signed reports.
-    // This avoids a (rare) scenario where chain A forks into chain A and A', A' still has configDigest calculated
-    // from chain A and so OCR reports will be valid on both forks.
-    _whenChainNotForked();
-
-    // Scoping to reduce stack pressure.
-    {
-      if (rs.length != configInfo.F + 1) revert WrongNumberOfSignatures();
-      if (rs.length != ss.length) revert SignaturesOutOfRegistration();
-    }
-
-    bytes32 h = keccak256(abi.encodePacked(keccak256(report), reportContext));
-    _verifySignatures(h, rs, ss);
-
-    emit Transmitted(configDigest, uint64(uint256(reportContext[1])));
-  }
-
-  /// @notice Verifies the signatures of a hashed report value for one OCR plugin type.
-  /// @param hashedReport hashed encoded packing of report + reportContext.
-  /// @param rs ith element is the R components of the ith signature on report. Must have at most MAX_NUM_ORACLES entries.
-  /// @param ss ith element is the S components of the ith signature on report. Must have at most MAX_NUM_ORACLES entries.
-  /// @dev we assume all signatures use a `v` value of 27.
-  function _verifySignatures(bytes32 hashedReport, bytes32[] memory rs, bytes32[] memory ss) internal view {
-    // Verify signatures attached to report. Using a uint256 means we can only verify up to 256 oracles.
-    uint160 lastSigner = 0;
-
-    uint256 numberOfSignatures = rs.length;
-    for (uint256 i; i < numberOfSignatures; ++i) {
-      // Safe from ECDSA malleability here since we check for duplicate signers.
-      address signer = ecrecover(hashedReport, 27, rs[i], ss[i]);
-
-      // Check that the signer is registered as an oracle.
-      if (!s_signers.contains(signer)) revert UnauthorizedSigner();
-      // This requires ordered signatures, so we can check for duplicates. This also disallows the zero address.
-      if (uint160(signer) <= lastSigner) revert NonUniqueSignatures();
-    }
-  }
-
-  /// @notice Validates that the chain ID has not diverged after deployment. Reverts if the chain IDs do not match.
-  function _whenChainNotForked() internal view {
-    if (i_chainID != block.chainid) revert ForkedChain(i_chainID, block.chainid);
   }
 
   /// @notice Information about current offchain reporting protocol configuration.
