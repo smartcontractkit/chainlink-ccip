@@ -14,6 +14,7 @@ import {Client} from "../libraries/Client.sol";
 import {ERC165CheckerReverting} from "../libraries/ERC165CheckerReverting.sol";
 import {Internal} from "../libraries/Internal.sol";
 import {Pool} from "../libraries/Pool.sol";
+import {OCRVerifier} from "../ocr/OCRVerifier.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 import {CallWithExactGas} from "@chainlink/contracts/src/v0.8/shared/call/CallWithExactGas.sol";
 
@@ -58,6 +59,9 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   error SignatureVerificationNotAllowedInExecutionPlugin();
   error InvalidOnRampUpdate(uint64 sourceChainSelector);
   error InsufficientGasToCompleteTx(bytes4 err);
+  error SkippedAlreadyExecutedMessage(uint64 sourceChainSelector, uint64 sequenceNumber);
+
+  error InvalidVerifierSelector(bytes4 selector);
 
   /// @dev Atlas depends on various events, if changing, please notify Atlas.
   event StaticConfigSet(StaticConfig staticConfig);
@@ -71,7 +75,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   );
   event SourceChainSelectorAdded(uint64 sourceChainSelector);
   event SourceChainConfigSet(uint64 indexed sourceChainSelector, SourceChainConfig sourceConfig);
-  event SkippedAlreadyExecutedMessage(uint64 sourceChainSelector, uint64 sequenceNumber);
+
   event AlreadyAttempted(uint64 sourceChainSelector, uint64 sequenceNumber);
   event SkippedReportExecution(uint64 sourceChainSelector);
 
@@ -150,6 +154,8 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
 
   /// @notice SourceChainConfig per source chain selector.
   mapping(uint64 sourceChainSelector => SourceChainConfig sourceChainConfig) private s_sourceChainConfigs;
+
+  mapping(bytes4 verifierSelector => address verifier) internal s_verifiers;
 
   // STATE
   /// @dev A mapping of sequence numbers (per source chain) to execution state using a bitmap with each execution
@@ -243,15 +249,6 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     return s_executionStates[sourceChainSelector][sequenceNumber / 128];
   }
 
-  /// @notice Transmit function for execution reports. The function takes no signatures, and expects the exec plugin
-  /// type to be configured with no signatures.
-  /// @param report serialized execution report.
-  function execute(
-    AggregatedReport calldata report
-  ) external {
-    _executeSingleReport(report);
-  }
-
   function verifyAll(
     AggregatedReport calldata report
   ) external {}
@@ -262,42 +259,27 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// @dev If called from manual execution, this array is always same length as messages.
   /// @dev This function can fully revert in some cases, reverting potentially valid other reports with it. The reasons
   /// for these reverts are so severe that we prefer to revert the entire batch instead of silently failing.
-  function _executeSingleReport(
+  function execute(
     AggregatedReport calldata report
-  ) internal {
+  ) external {
     uint64 sourceChainSelector = report.message.header.sourceChainSelector;
 
     if (i_rmnRemote.isCursed(bytes16(uint128(sourceChainSelector)))) {
       revert CursedByRMN(sourceChainSelector);
     }
 
-    {
-      // We do this hash here instead of in _verify to avoid two separate loops over the same data. Hashing all of the
-      // message fields ensures that the message being executed is correct and not tampered with. Including the known
-      // OnRamp ensures that the message originates from the correct on ramp version. We know the sourceChainSelector
-      // and i_destChainSelector are correct because we revert below when they are not.
-      bytes32 metaDataHash = keccak256(
-        abi.encode(
-          Internal.ANY_2_EVM_MESSAGE_HASH,
-          sourceChainSelector,
-          i_chainSelector,
-          keccak256(_getEnabledSourceChainConfig(sourceChainSelector).onRamp)
-        )
-      );
+    if (report.message.header.destChainSelector != i_chainSelector) {
+      revert InvalidMessageDestChainSelector(report.message.header.destChainSelector);
+    }
 
-      // Commits do not verify the destChainSelector in the message since only the root is committed, so we
-      // have to check it explicitly. This check is also important as we have assumed the metaDataHash above uses
-      // the i_chainSelector as the destChainSelector.
-      if (report.message.header.destChainSelector != i_chainSelector) {
-        revert InvalidMessageDestChainSelector(report.message.header.destChainSelector);
-      }
+    // We expect only valid messages will be committed but we check when executing as a defense in depth measure.
+    if (report.message.tokenAmounts.length != report.tokenProofs.length) {
+      revert TokenDataMismatch(sourceChainSelector, report.message.header.sequenceNumber);
     }
 
     // SECURITY CRITICAL CHECK.
+    _verifyMessage(report.message, report.proofs);
 
-    // TODO all the hooooks
-
-    // Execute messages.
     Internal.Any2EVMMultiProofMessage memory message = _beforeExecuteSingleMessage(report.message);
 
     Internal.MessageExecutionState originalState = getExecutionState(sourceChainSelector, message.header.sequenceNumber);
@@ -310,11 +292,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
           || originalState == Internal.MessageExecutionState.FAILURE
       )
     ) {
-      // If the message has already been executed, we skip it. We want to not revert on race conditions between
-      // executing parties. This will allow us to open up manual exec while also attempting with the DON, without
-      // reverting an entire DON batch when a user manually executes while the tx is inflight.
-      emit SkippedAlreadyExecutedMessage(sourceChainSelector, message.header.sequenceNumber);
-      revert();
+      revert SkippedAlreadyExecutedMessage(sourceChainSelector, message.header.sequenceNumber);
     }
 
     // Nonce changes per state transition (these only apply for ordered messages):
@@ -330,11 +308,6 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
           !INonceManager(i_nonceManager).incrementInboundNonce(sourceChainSelector, message.header.nonce, message.sender)
         ) revert();
       }
-    }
-
-    // We expect only valid messages will be committed but we check when executing as a defense in depth measure.
-    if (message.tokenAmounts.length != report.tokenProofs.length) {
-      revert TokenDataMismatch(sourceChainSelector, message.header.sequenceNumber);
     }
 
     uint32 gasLimitOverride = report.gasOverride == 0 ? report.message.gasLimit : report.gasOverride;
@@ -367,6 +340,18 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     emit ExecutionStateChanged(
       sourceChainSelector, message.header.sequenceNumber, message.header.messageId, newState, returnData
     );
+  }
+
+  function _verifyMessage(Internal.Any2EVMMultiProofMessage calldata message, bytes[] calldata proofs) internal {
+    for (uint256 i = 0; i < message.securityModuleSelectors.length; ++i) {
+      bytes4 selector = bytes4(message.securityModuleSelectors[i]);
+
+      address verifier = s_verifiers[selector];
+      if (verifier == address(0)) {
+        revert InvalidVerifierSelector(selector);
+      }
+      OCRVerifier(verifier).validateReport(abi.encode(message), proofs[i]);
+    }
   }
 
   /// @notice Try executing a message.
@@ -550,7 +535,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// @param receiver The address to check the balance of.
   /// @param token The token address.
   /// @return balance The balance of the receiver.
-  function _getBalanceOfReceiver(address receiver, address token) internal view returns (uint256 balance) {
+  function _getBalanceOfReceiver(address receiver, address token) internal view returns (uint256) {
     try IERC20(token).balanceOf(receiver) returns (uint256 balance_) {
       // If the call succeeds, we return the balance and the gas left.
       return (balance_);
