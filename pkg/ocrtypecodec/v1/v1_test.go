@@ -405,8 +405,9 @@ func (d *dataGenerator) commitObservation() committypes.Observation {
 			FChain:            fChain,
 			TimestampNow:      time.Now().UTC(),
 		},
-		DiscoveryObs: genDiscoveryObservation(d.numSourceChains, d.numContractsPerChain),
-		FChain:       fChain,
+		DiscoveryObs:          genDiscoveryObservation(d.numSourceChains, d.numContractsPerChain),
+		FChain:                fChain,
+		OnChainPriceOcrSeqNum: rand.Uint64(),
 	}
 }
 

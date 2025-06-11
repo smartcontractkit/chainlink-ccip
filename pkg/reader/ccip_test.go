@@ -330,7 +330,7 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 				}
 				params := readReq.Params.(map[string]any)
 				sourceChain := params["sourceChainSelector"].(cciptypes.ChainSelector)
-				v := readReq.ReturnVal.(*SourceChainConfig)
+				v := readReq.ReturnVal.(*cciptypes.SourceChainConfig)
 
 				fromString, err := cciptypes.NewBytesFromString(fmt.Sprintf(
 					"0x%d000000000000000000000000000000000000000", sourceChain),

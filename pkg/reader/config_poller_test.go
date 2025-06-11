@@ -88,9 +88,9 @@ func setupBatchMockResponse(reader *reader_mocks.MockExtended) {
 
 	// Source chain config part
 	resultB := &types.BatchReadResult{ReadName: consts.MethodNameGetSourceChainConfig}
-	resultB.SetResult(&SourceChainConfig{IsEnabled: true, OnRamp: cciptypes.UnknownAddress{1, 2, 3}}, nil)
+	resultB.SetResult(&cciptypes.SourceChainConfig{IsEnabled: true, OnRamp: cciptypes.UnknownAddress{1, 2, 3}}, nil)
 	resultC := &types.BatchReadResult{ReadName: consts.MethodNameGetSourceChainConfig}
-	resultC.SetResult(&SourceChainConfig{IsEnabled: true, OnRamp: cciptypes.UnknownAddress{4, 5, 6}}, nil)
+	resultC.SetResult(&cciptypes.SourceChainConfig{IsEnabled: true, OnRamp: cciptypes.UnknownAddress{4, 5, 6}}, nil)
 
 	// Combined response
 	responses := types.BatchGetLatestValuesResult{
@@ -123,9 +123,9 @@ func setupInitialData(ctx context.Context, cache *configPoller, reader *reader_m
 	sourceChains := []cciptypes.ChainSelector{chainB, chainC}
 
 	result1 := &types.BatchReadResult{ReadName: consts.MethodNameGetSourceChainConfig}
-	result1.SetResult(&SourceChainConfig{IsEnabled: true, OnRamp: cciptypes.UnknownAddress{1, 2, 3}}, nil)
+	result1.SetResult(&cciptypes.SourceChainConfig{IsEnabled: true, OnRamp: cciptypes.UnknownAddress{1, 2, 3}}, nil)
 	result2 := &types.BatchReadResult{ReadName: consts.MethodNameGetSourceChainConfig}
-	result2.SetResult(&SourceChainConfig{IsEnabled: true, OnRamp: cciptypes.UnknownAddress{4, 5, 6}}, nil)
+	result2.SetResult(&cciptypes.SourceChainConfig{IsEnabled: true, OnRamp: cciptypes.UnknownAddress{4, 5, 6}}, nil)
 
 	response := types.BatchGetLatestValuesResult{
 		types.BoundContract{Name: consts.ContractNameOffRamp}: {
@@ -1107,9 +1107,9 @@ func TestConfigCache_GetOfframpSourceChainConfigs_CacheHit(t *testing.T) {
 
 	// Create batch read results for source chains
 	result1 := &types.BatchReadResult{ReadName: consts.MethodNameGetSourceChainConfig}
-	result1.SetResult(&SourceChainConfig{IsEnabled: true, OnRamp: cciptypes.UnknownAddress{1, 2, 3}}, nil)
+	result1.SetResult(&cciptypes.SourceChainConfig{IsEnabled: true, OnRamp: cciptypes.UnknownAddress{1, 2, 3}}, nil)
 	result2 := &types.BatchReadResult{ReadName: consts.MethodNameGetSourceChainConfig}
-	result2.SetResult(&SourceChainConfig{IsEnabled: true, OnRamp: cciptypes.UnknownAddress{4, 5, 6}}, nil)
+	result2.SetResult(&cciptypes.SourceChainConfig{IsEnabled: true, OnRamp: cciptypes.UnknownAddress{4, 5, 6}}, nil)
 
 	responses := types.BatchGetLatestValuesResult{
 		types.BoundContract{Name: consts.ContractNameOffRamp}: {
@@ -1150,9 +1150,9 @@ func TestConfigCache_GetOfframpSourceChainConfigs_Update(t *testing.T) {
 
 	// Setup mock response for first fetch
 	result1 := &types.BatchReadResult{ReadName: consts.MethodNameGetSourceChainConfig}
-	result1.SetResult(&SourceChainConfig{IsEnabled: true, OnRamp: cciptypes.UnknownAddress{1, 2, 3}}, nil)
+	result1.SetResult(&cciptypes.SourceChainConfig{IsEnabled: true, OnRamp: cciptypes.UnknownAddress{1, 2, 3}}, nil)
 	result2 := &types.BatchReadResult{ReadName: consts.MethodNameGetSourceChainConfig}
-	result2.SetResult(&SourceChainConfig{IsEnabled: true, OnRamp: cciptypes.UnknownAddress{4, 5, 6}}, nil)
+	result2.SetResult(&cciptypes.SourceChainConfig{IsEnabled: true, OnRamp: cciptypes.UnknownAddress{4, 5, 6}}, nil)
 
 	firstResponse := types.BatchGetLatestValuesResult{
 		types.BoundContract{Name: consts.ContractNameOffRamp}: {
@@ -1177,9 +1177,9 @@ func TestConfigCache_GetOfframpSourceChainConfigs_Update(t *testing.T) {
 
 	// Setup mock response for second fetch with different data
 	result3 := &types.BatchReadResult{ReadName: consts.MethodNameGetSourceChainConfig}
-	result3.SetResult(&SourceChainConfig{IsEnabled: false, OnRamp: cciptypes.UnknownAddress{7, 8, 9}}, nil)
+	result3.SetResult(&cciptypes.SourceChainConfig{IsEnabled: false, OnRamp: cciptypes.UnknownAddress{7, 8, 9}}, nil)
 	result4 := &types.BatchReadResult{ReadName: consts.MethodNameGetSourceChainConfig}
-	result4.SetResult(&SourceChainConfig{IsEnabled: false, OnRamp: cciptypes.UnknownAddress{10, 11, 12}}, nil)
+	result4.SetResult(&cciptypes.SourceChainConfig{IsEnabled: false, OnRamp: cciptypes.UnknownAddress{10, 11, 12}}, nil)
 
 	secondResponse := types.BatchGetLatestValuesResult{
 		types.BoundContract{Name: consts.ContractNameOffRamp}: {
@@ -1228,9 +1228,9 @@ func TestConfigCache_GetOfframpSourceChainConfigs_MixedSet(t *testing.T) {
 
 	// Setup mock response for first fetch
 	result1 := &types.BatchReadResult{ReadName: consts.MethodNameGetSourceChainConfig}
-	result1.SetResult(&SourceChainConfig{IsEnabled: true, OnRamp: cciptypes.UnknownAddress{1, 2, 3}}, nil)
+	result1.SetResult(&cciptypes.SourceChainConfig{IsEnabled: true, OnRamp: cciptypes.UnknownAddress{1, 2, 3}}, nil)
 	result2 := &types.BatchReadResult{ReadName: consts.MethodNameGetSourceChainConfig}
-	result2.SetResult(&SourceChainConfig{IsEnabled: true, OnRamp: cciptypes.UnknownAddress{4, 5, 6}}, nil)
+	result2.SetResult(&cciptypes.SourceChainConfig{IsEnabled: true, OnRamp: cciptypes.UnknownAddress{4, 5, 6}}, nil)
 
 	firstResponse := types.BatchGetLatestValuesResult{
 		types.BoundContract{Name: consts.ContractNameOffRamp}: {
@@ -1254,7 +1254,7 @@ func TestConfigCache_GetOfframpSourceChainConfigs_MixedSet(t *testing.T) {
 
 	// Setup mock response for second fetch (only D should be fetched)
 	result3 := &types.BatchReadResult{ReadName: consts.MethodNameGetSourceChainConfig}
-	result3.SetResult(&SourceChainConfig{IsEnabled: true, OnRamp: cciptypes.UnknownAddress{7, 8, 9}}, nil)
+	result3.SetResult(&cciptypes.SourceChainConfig{IsEnabled: true, OnRamp: cciptypes.UnknownAddress{7, 8, 9}}, nil)
 
 	secondResponse := types.BatchGetLatestValuesResult{
 		types.BoundContract{Name: consts.ContractNameOffRamp}: {
@@ -1291,9 +1291,9 @@ func TestConfigCache_RefreshSourceChainConfigs(t *testing.T) {
 
 	// Setup mock response
 	result1 := &types.BatchReadResult{ReadName: consts.MethodNameGetSourceChainConfig}
-	result1.SetResult(&SourceChainConfig{IsEnabled: true, OnRamp: cciptypes.UnknownAddress{1, 2, 3}}, nil)
+	result1.SetResult(&cciptypes.SourceChainConfig{IsEnabled: true, OnRamp: cciptypes.UnknownAddress{1, 2, 3}}, nil)
 	result2 := &types.BatchReadResult{ReadName: consts.MethodNameGetSourceChainConfig}
-	result2.SetResult(&SourceChainConfig{IsEnabled: true, OnRamp: cciptypes.UnknownAddress{4, 5, 6}}, nil)
+	result2.SetResult(&cciptypes.SourceChainConfig{IsEnabled: true, OnRamp: cciptypes.UnknownAddress{4, 5, 6}}, nil)
 
 	response := types.BatchGetLatestValuesResult{
 		types.BoundContract{Name: consts.ContractNameOffRamp}: {
@@ -1316,9 +1316,9 @@ func TestConfigCache_RefreshSourceChainConfigs(t *testing.T) {
 
 	// Setup mock for a second call with different data
 	result3 := &types.BatchReadResult{ReadName: consts.MethodNameGetSourceChainConfig}
-	result3.SetResult(&SourceChainConfig{IsEnabled: false, OnRamp: cciptypes.UnknownAddress{7, 8, 9}}, nil)
+	result3.SetResult(&cciptypes.SourceChainConfig{IsEnabled: false, OnRamp: cciptypes.UnknownAddress{7, 8, 9}}, nil)
 	result4 := &types.BatchReadResult{ReadName: consts.MethodNameGetSourceChainConfig}
-	result4.SetResult(&SourceChainConfig{IsEnabled: false, OnRamp: cciptypes.UnknownAddress{10, 11, 12}}, nil)
+	result4.SetResult(&cciptypes.SourceChainConfig{IsEnabled: false, OnRamp: cciptypes.UnknownAddress{10, 11, 12}}, nil)
 
 	response2 := types.BatchGetLatestValuesResult{
 		types.BoundContract{Name: consts.ContractNameOffRamp}: {
@@ -1356,7 +1356,7 @@ func TestConfigCache_GetOfframpSourceChainConfigs_Error(t *testing.T) {
 
 	// First fetch - one chain succeeds, one fails with error
 	result1 := &types.BatchReadResult{ReadName: consts.MethodNameGetSourceChainConfig}
-	result1.SetResult(&SourceChainConfig{IsEnabled: true, OnRamp: cciptypes.UnknownAddress{1, 2, 3}}, nil)
+	result1.SetResult(&cciptypes.SourceChainConfig{IsEnabled: true, OnRamp: cciptypes.UnknownAddress{1, 2, 3}}, nil)
 
 	result2 := &types.BatchReadResult{ReadName: consts.MethodNameGetSourceChainConfig}
 	result2.SetResult(nil, errors.New("read error"))
@@ -1393,9 +1393,9 @@ func TestConfigCache_GlobalSourceChainRefreshTime(t *testing.T) {
 
 	// Setup mock response for first fetch
 	result1 := &types.BatchReadResult{ReadName: consts.MethodNameGetSourceChainConfig}
-	result1.SetResult(&SourceChainConfig{IsEnabled: true, OnRamp: cciptypes.UnknownAddress{1, 2, 3}}, nil)
+	result1.SetResult(&cciptypes.SourceChainConfig{IsEnabled: true, OnRamp: cciptypes.UnknownAddress{1, 2, 3}}, nil)
 	result2 := &types.BatchReadResult{ReadName: consts.MethodNameGetSourceChainConfig}
-	result2.SetResult(&SourceChainConfig{IsEnabled: true, OnRamp: cciptypes.UnknownAddress{4, 5, 6}}, nil)
+	result2.SetResult(&cciptypes.SourceChainConfig{IsEnabled: true, OnRamp: cciptypes.UnknownAddress{4, 5, 6}}, nil)
 
 	firstResponse := types.BatchGetLatestValuesResult{
 		types.BoundContract{Name: consts.ContractNameOffRamp}: {
@@ -1422,7 +1422,7 @@ func TestConfigCache_GlobalSourceChainRefreshTime(t *testing.T) {
 
 	// Setup mock for D fetch only
 	resultD := &types.BatchReadResult{ReadName: consts.MethodNameGetSourceChainConfig}
-	resultD.SetResult(&SourceChainConfig{IsEnabled: true, OnRamp: cciptypes.UnknownAddress{7, 8, 9}}, nil)
+	resultD.SetResult(&cciptypes.SourceChainConfig{IsEnabled: true, OnRamp: cciptypes.UnknownAddress{7, 8, 9}}, nil)
 
 	secondResponse := types.BatchGetLatestValuesResult{
 		types.BoundContract{Name: consts.ContractNameOffRamp}: {
@@ -1452,11 +1452,11 @@ func TestConfigCache_GlobalSourceChainRefreshTime(t *testing.T) {
 
 	// Setup mock for manual refresh of all chains
 	resultB2 := &types.BatchReadResult{ReadName: consts.MethodNameGetSourceChainConfig}
-	resultB2.SetResult(&SourceChainConfig{IsEnabled: false, OnRamp: cciptypes.UnknownAddress{10, 11, 12}}, nil)
+	resultB2.SetResult(&cciptypes.SourceChainConfig{IsEnabled: false, OnRamp: cciptypes.UnknownAddress{10, 11, 12}}, nil)
 	resultC2 := &types.BatchReadResult{ReadName: consts.MethodNameGetSourceChainConfig}
-	resultC2.SetResult(&SourceChainConfig{IsEnabled: false, OnRamp: cciptypes.UnknownAddress{13, 14, 15}}, nil)
+	resultC2.SetResult(&cciptypes.SourceChainConfig{IsEnabled: false, OnRamp: cciptypes.UnknownAddress{13, 14, 15}}, nil)
 	resultD2 := &types.BatchReadResult{ReadName: consts.MethodNameGetSourceChainConfig}
-	resultD2.SetResult(&SourceChainConfig{IsEnabled: false, OnRamp: cciptypes.UnknownAddress{16, 17, 18}}, nil)
+	resultD2.SetResult(&cciptypes.SourceChainConfig{IsEnabled: false, OnRamp: cciptypes.UnknownAddress{16, 17, 18}}, nil)
 
 	thirdResponse := types.BatchGetLatestValuesResult{
 		types.BoundContract{Name: consts.ContractNameOffRamp}: {
@@ -1522,7 +1522,7 @@ func TestConfigCache_RefreshSourceChainConfigs_SetsGlobalTimestamp(t *testing.T)
 
 	// Setup mock response
 	result := &types.BatchReadResult{ReadName: consts.MethodNameGetSourceChainConfig}
-	result.SetResult(&SourceChainConfig{IsEnabled: true, OnRamp: cciptypes.UnknownAddress{1, 2, 3}}, nil)
+	result.SetResult(&cciptypes.SourceChainConfig{IsEnabled: true, OnRamp: cciptypes.UnknownAddress{1, 2, 3}}, nil)
 
 	response := types.BatchGetLatestValuesResult{
 		types.BoundContract{Name: consts.ContractNameOffRamp}: {
