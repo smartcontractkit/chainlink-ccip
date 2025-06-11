@@ -66,10 +66,8 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     uint64 indexed sourceChainSelector,
     uint64 indexed sequenceNumber,
     bytes32 indexed messageId,
-    bytes32 messageHash,
     Internal.MessageExecutionState state,
-    bytes returnData,
-    uint256 gasUsed
+    bytes returnData
   );
   event SourceChainSelectorAdded(uint64 sourceChainSelector);
   event SourceChainConfigSet(uint64 indexed sourceChainSelector, SourceChainConfig sourceConfig);
@@ -118,11 +116,17 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// to 0. The length of tokenGasOverrides must match the length of tokenAmounts, even if it only contains zeros.
   struct GasLimitOverride {
     uint256 receiverExecutionGasLimit; // Overrides EVM2EVMMessage.gasLimit.
-    uint32[] tokenGasOverrides; // Overrides EVM2EVMMessage.sourceTokenData.destGasAmount, length must be same as tokenAmounts.
+  }
+
+  struct AggregatedReport {
+    Internal.Any2EVMMultiProofMessage message;
+    bytes[] proofs;
+    bytes[][] tokenProofs;
+    uint32 gasOverride; // Gas override for the entire report.
   }
 
   // STATIC CONFIG
-  string public constant override typeAndVersion = "OffRamp 1.6.0";
+  string public constant override typeAndVersion = "VerifierAggregator 1.7.0-dev";
   /// @dev Hash of encoded address(0) used for empty address checks.
   bytes32 internal constant EMPTY_ENCODED_ADDRESS_HASH = keccak256(abi.encode(address(0)));
   /// @dev ChainSelector of this chain.
@@ -239,128 +243,33 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     return s_executionStates[sourceChainSelector][sequenceNumber / 128];
   }
 
-  /// @notice Manually executes a set of reports.
-  /// @param reports Internal.ExecutionReportSingleChain[] - list of reports to execute.
-  /// @param gasLimitOverrides New gasLimit for each message per report. The outer array represents each report, the
-  //  inner array represents each message in the report.
-  //  i.e. gasLimitOverrides[report1][report1Message1] -> access message1 from report1
-  /// @dev We permit gas limit overrides so that users may manually execute messages which failed due to insufficient
-  /// gas provided. The reports do not have to contain all the messages (they can be omitted). Multiple reports can be
-  /// passed in simultaneously.
-  function manuallyExecute(
-    Internal.ExecutionReport[] memory reports,
-    GasLimitOverride[][] memory gasLimitOverrides
-  ) external {
-    // We do this here because the other _execute path is already covered by MultiOCR3Base.
-    // TODO ??
-    //    _whenChainNotForked();
-
-    uint256 numReports = reports.length;
-    if (numReports != gasLimitOverrides.length) revert ManualExecutionGasLimitMismatch();
-
-    for (uint256 reportIndex = 0; reportIndex < numReports; ++reportIndex) {
-      Internal.ExecutionReport memory report = reports[reportIndex];
-
-      uint256 numMsgs = report.messages.length;
-      GasLimitOverride[] memory msgGasLimitOverrides = gasLimitOverrides[reportIndex];
-
-      // Gas override values need to be provided, even when no override is desired. We expect an array of the correct
-      // size with all `0` values if no override is desired.
-      if (numMsgs != msgGasLimitOverrides.length) revert ManualExecutionGasLimitMismatch();
-
-      for (uint256 msgIndex = 0; msgIndex < numMsgs; ++msgIndex) {
-        uint256 newLimit = msgGasLimitOverrides[msgIndex].receiverExecutionGasLimit;
-        Internal.Any2EVMRampMessage memory message = report.messages[msgIndex];
-        if (newLimit != 0) {
-          // Checks to ensure messages will not be executed with less gas than specified.
-          if (newLimit < message.gasLimit) {
-            revert InvalidManualExecutionGasLimit(report.sourceChainSelector, message.header.messageId, newLimit);
-          }
-        }
-        if (message.tokenAmounts.length != msgGasLimitOverrides[msgIndex].tokenGasOverrides.length) {
-          revert ManualExecutionGasAmountCountMismatch(message.header.messageId, message.header.sequenceNumber);
-        }
-
-        // The gas limit can not be lowered as that could cause the message to fail. If manual execution is done
-        // from an UNTOUCHED state and we would allow lower gas limit, anyone could grief by executing the message with
-        // lower gas limit than the DON would have used. This results in the message being marked FAILURE and the DON
-        // would not attempt it with the correct gas limit.
-        for (uint256 tokenIndex = 0; tokenIndex < message.tokenAmounts.length; ++tokenIndex) {
-          uint256 tokenGasOverride = msgGasLimitOverrides[msgIndex].tokenGasOverrides[tokenIndex];
-          if (tokenGasOverride != 0) {
-            uint256 destGasAmount = message.tokenAmounts[tokenIndex].destGasAmount;
-            if (tokenGasOverride < destGasAmount) {
-              revert InvalidManualExecutionTokenGasOverride(
-                message.header.messageId, tokenIndex, destGasAmount, tokenGasOverride
-              );
-            }
-          }
-        }
-      }
-    }
-
-    _batchExecute(reports, gasLimitOverrides);
-  }
-
   /// @notice Transmit function for execution reports. The function takes no signatures, and expects the exec plugin
   /// type to be configured with no signatures.
   /// @param report serialized execution report.
   function execute(
-    bytes calldata report
+    AggregatedReport calldata report
   ) external {
-    _batchExecute(abi.decode(report, (Internal.ExecutionReport[])), new GasLimitOverride[][](0));
+    _executeSingleReport(report);
   }
 
-  /// @notice Batch executes a set of reports, each report matching one single source chain.
-  /// @param reports Set of execution reports (one per chain) containing the messages and proofs.
-  /// @param manualExecGasLimits An array of gas limits to use for manual execution The outer array represents each
-  //  report, the inner array represents each message in the report.
-  //  i.e. gasLimitOverrides[report1][report1Message1] -> access message1 from report1.
-  /// @dev The manualExecGasLimits array should either be empty, or match the length of the reports array.
-  /// @dev If called from manual execution, each inner array's length has to match the number of messages.
-  function _batchExecute(
-    Internal.ExecutionReport[] memory reports,
-    GasLimitOverride[][] memory manualExecGasOverrides
-  ) internal {
-    if (reports.length == 0) revert EmptyBatch();
-
-    bool areManualGasLimitsEmpty = manualExecGasOverrides.length == 0;
-    // Cache array for gas savings in the loop's condition.
-    GasLimitOverride[] memory emptyGasLimits = new GasLimitOverride[](0);
-
-    for (uint256 i = 0; i < reports.length; ++i) {
-      _executeSingleReport(reports[i], areManualGasLimitsEmpty ? emptyGasLimits : manualExecGasOverrides[i]);
-    }
-  }
+  function verifyAll(
+    AggregatedReport calldata report
+  ) external {}
 
   /// @notice Executes a report, executing each message in order.
   /// @param report The execution report containing the messages and proofs.
-  /// @param manualExecGasExecOverrides An array of gas limits to use for manual execution.
   /// @dev If called from the DON, this array is always empty.
   /// @dev If called from manual execution, this array is always same length as messages.
   /// @dev This function can fully revert in some cases, reverting potentially valid other reports with it. The reasons
   /// for these reverts are so severe that we prefer to revert the entire batch instead of silently failing.
   function _executeSingleReport(
-    Internal.ExecutionReport memory report,
-    GasLimitOverride[] memory manualExecGasExecOverrides
+    AggregatedReport calldata report
   ) internal {
-    uint64 sourceChainSelector = report.sourceChainSelector;
-    bool manualExecution = manualExecGasExecOverrides.length != 0;
+    uint64 sourceChainSelector = report.message.header.sourceChainSelector;
+
     if (i_rmnRemote.isCursed(bytes16(uint128(sourceChainSelector)))) {
-      if (manualExecution) {
-        // For manual execution we don't want to silently fail so we revert.
-        revert CursedByRMN(sourceChainSelector);
-      }
-      // For DON execution we do not revert as a single lane curse can revert the entire batch.
-      emit SkippedReportExecution(sourceChainSelector);
-      return;
+      revert CursedByRMN(sourceChainSelector);
     }
-
-    uint256 numMsgs = report.messages.length;
-    if (numMsgs == 0) revert EmptyReport(report.sourceChainSelector);
-    if (numMsgs != report.offchainTokenData.length) revert UnexpectedTokenData();
-
-    bytes32[] memory hashedLeaves = new bytes32[](numMsgs);
 
     {
       // We do this hash here instead of in _verify to avoid two separate loops over the same data. Hashing all of the
@@ -376,165 +285,123 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
         )
       );
 
-      for (uint256 i = 0; i < numMsgs; ++i) {
-        Internal.Any2EVMRampMessage memory message = report.messages[i];
-
-        // Commits do not verify the destChainSelector in the message since only the root is committed, so we
-        // have to check it explicitly. This check is also important as we have assumed the metaDataHash above uses
-        // the i_chainSelector as the destChainSelector.
-        if (message.header.destChainSelector != i_chainSelector) {
-          revert InvalidMessageDestChainSelector(message.header.destChainSelector);
-        }
-        // If the message source chain selector does not match the report's source chain selector and the root has not
-        // been committed for the report source chain selector this will be caught by the root verification.
-        // This acts as an extra check to ensure the message source chain selector matches the report's source chain.
-        if (message.header.sourceChainSelector != sourceChainSelector) {
-          revert SourceChainSelectorMismatch(sourceChainSelector, message.header.sourceChainSelector);
-        }
-
-        hashedLeaves[i] = Internal._hash(message, metaDataHash);
+      // Commits do not verify the destChainSelector in the message since only the root is committed, so we
+      // have to check it explicitly. This check is also important as we have assumed the metaDataHash above uses
+      // the i_chainSelector as the destChainSelector.
+      if (report.message.header.destChainSelector != i_chainSelector) {
+        revert InvalidMessageDestChainSelector(report.message.header.destChainSelector);
       }
     }
 
     // SECURITY CRITICAL CHECK.
 
     // TODO all the hooooks
-    uint256 timestampCommitted = 5; // _verify(sourceChainSelector, hashedLeaves, report.proofs, report.proofFlagBits);
 
     // Execute messages.
-    for (uint256 i = 0; i < numMsgs; ++i) {
-      uint256 gasStart = gasleft();
-      Internal.Any2EVMRampMessage memory message = report.messages[i];
-      message = _beforeExecuteSingleMessage(message);
+    Internal.Any2EVMMultiProofMessage memory message = _beforeExecuteSingleMessage(report.message);
 
-      Internal.MessageExecutionState originalState =
-        getExecutionState(sourceChainSelector, message.header.sequenceNumber);
-      // Two valid cases here, we either have never touched this message before, or we tried to execute and failed. This
-      // check protects against reentry and re-execution because the other state is IN_PROGRESS which should not be
-      // allowed to execute.
-      if (
-        !(
-          originalState == Internal.MessageExecutionState.UNTOUCHED
-            || originalState == Internal.MessageExecutionState.FAILURE
-        )
-      ) {
-        // If the message has already been executed, we skip it. We want to not revert on race conditions between
-        // executing parties. This will allow us to open up manual exec while also attempting with the DON, without
-        // reverting an entire DON batch when a user manually executes while the tx is inflight.
-        emit SkippedAlreadyExecutedMessage(sourceChainSelector, message.header.sequenceNumber);
-        continue;
-      }
-      uint32[] memory tokenGasOverrides;
-      if (manualExecution) {
-        tokenGasOverrides = manualExecGasExecOverrides[i].tokenGasOverrides;
-        bool isOldCommitReport =
-          (block.timestamp - timestampCommitted) > s_dynamicConfig.permissionLessExecutionThresholdSeconds;
-        // Manually execution is fine if we previously failed or if the commit report is just too old.
-        // Acceptable state transitions: UNTOUCHED->SUCCESS, UNTOUCHED->FAILURE, FAILURE->SUCCESS.
-        if (!(isOldCommitReport || originalState == Internal.MessageExecutionState.FAILURE)) {
-          revert ManualExecutionNotYetEnabled(sourceChainSelector);
-        }
-
-        // Manual execution gas limit can override gas limit specified in the message. Value of 0 indicates no override.
-        if (manualExecGasExecOverrides[i].receiverExecutionGasLimit != 0) {
-          message.gasLimit = manualExecGasExecOverrides[i].receiverExecutionGasLimit;
-        }
-      } else {
-        // DON can only execute a message once.
-        // Acceptable state transitions: UNTOUCHED->SUCCESS, UNTOUCHED->FAILURE.
-        if (originalState != Internal.MessageExecutionState.UNTOUCHED) {
-          emit AlreadyAttempted(sourceChainSelector, message.header.sequenceNumber);
-          continue;
-        }
-      }
-
-      // Nonce changes per state transition (these only apply for ordered messages):
-      // UNTOUCHED -> FAILURE  nonce bump.
-      // UNTOUCHED -> SUCCESS  nonce bump.
-      // FAILURE   -> SUCCESS  no nonce bump.
-      // UNTOUCHED messages MUST be executed in order always.
-      // If nonce == 0 then out of order execution is allowed.
-      if (message.header.nonce != 0) {
-        if (originalState == Internal.MessageExecutionState.UNTOUCHED) {
-          // If a nonce is not incremented, that means it was skipped, and we can ignore the message.
-          if (
-            !INonceManager(i_nonceManager).incrementInboundNonce(
-              sourceChainSelector, message.header.nonce, message.sender
-            )
-          ) continue;
-        }
-      }
-
-      // We expect only valid messages will be committed but we check when executing as a defense in depth measure.
-      bytes[] memory offchainTokenData = report.offchainTokenData[i];
-      if (message.tokenAmounts.length != offchainTokenData.length) {
-        revert TokenDataMismatch(sourceChainSelector, message.header.sequenceNumber);
-      }
-
-      _setExecutionState(sourceChainSelector, message.header.sequenceNumber, Internal.MessageExecutionState.IN_PROGRESS);
-      (Internal.MessageExecutionState newState, bytes memory returnData) =
-        _trialExecute(message, offchainTokenData, tokenGasOverrides);
-      _setExecutionState(sourceChainSelector, message.header.sequenceNumber, newState);
-
-      // Since it's hard to estimate whether manual execution will succeed, we revert the entire transaction if it
-      // fails. This will show the user if their manual exec will fail before they submit it.
-      if (manualExecution) {
-        if (newState == Internal.MessageExecutionState.FAILURE) {
-          if (originalState != Internal.MessageExecutionState.UNTOUCHED) {
-            // If manual execution fails, we revert the entire transaction, unless the originalState is UNTOUCHED as we
-            // would still be making progress by changing the state from UNTOUCHED to FAILURE.
-            revert ExecutionError(message.header.messageId, returnData);
-          }
-        }
-      }
-
-      // The only valid prior states are UNTOUCHED and FAILURE (checked above).
-      // The only valid post states are FAILURE and SUCCESS (checked below).
-      if (newState != Internal.MessageExecutionState.SUCCESS) {
-        if (newState != Internal.MessageExecutionState.FAILURE) {
-          revert InvalidNewState(sourceChainSelector, message.header.sequenceNumber, newState);
-        }
-      }
-
-      emit ExecutionStateChanged(
-        sourceChainSelector,
-        message.header.sequenceNumber,
-        message.header.messageId,
-        hashedLeaves[i],
-        newState,
-        returnData,
-        // This emit covers not only the execution through the router, but also all of the overhead in executing the
-        // message. This gives the most accurate representation of the gas used in the execution.
-        gasStart - gasleft()
-      );
+    Internal.MessageExecutionState originalState = getExecutionState(sourceChainSelector, message.header.sequenceNumber);
+    // Two valid cases here, we either have never touched this message before, or we tried to execute and failed. This
+    // check protects against reentry and re-execution because the other state is IN_PROGRESS which should not be
+    // allowed to execute.
+    if (
+      !(
+        originalState == Internal.MessageExecutionState.UNTOUCHED
+          || originalState == Internal.MessageExecutionState.FAILURE
+      )
+    ) {
+      // If the message has already been executed, we skip it. We want to not revert on race conditions between
+      // executing parties. This will allow us to open up manual exec while also attempting with the DON, without
+      // reverting an entire DON batch when a user manually executes while the tx is inflight.
+      emit SkippedAlreadyExecutedMessage(sourceChainSelector, message.header.sequenceNumber);
+      revert();
     }
+
+    // Nonce changes per state transition (these only apply for ordered messages):
+    // UNTOUCHED -> FAILURE  nonce bump.
+    // UNTOUCHED -> SUCCESS  nonce bump.
+    // FAILURE   -> SUCCESS  no nonce bump.
+    // UNTOUCHED messages MUST be executed in order always.
+    // If nonce == 0 then out of order execution is allowed.
+    if (message.header.nonce != 0) {
+      if (originalState == Internal.MessageExecutionState.UNTOUCHED) {
+        // If a nonce is not incremented, that means it was skipped, and we can ignore the message.
+        if (
+          !INonceManager(i_nonceManager).incrementInboundNonce(sourceChainSelector, message.header.nonce, message.sender)
+        ) revert();
+      }
+    }
+
+    // We expect only valid messages will be committed but we check when executing as a defense in depth measure.
+    if (message.tokenAmounts.length != report.tokenProofs.length) {
+      revert TokenDataMismatch(sourceChainSelector, message.header.sequenceNumber);
+    }
+
+    uint32 gasLimitOverride = report.gasOverride == 0 ? report.message.gasLimit : report.gasOverride;
+
+    _setExecutionState(sourceChainSelector, message.header.sequenceNumber, Internal.MessageExecutionState.IN_PROGRESS);
+    (Internal.MessageExecutionState newState, bytes memory returnData) =
+      _trialExecute(message, report.tokenProofs, gasLimitOverride);
+    _setExecutionState(sourceChainSelector, message.header.sequenceNumber, newState);
+
+    // Since it's hard to estimate whether manual execution will succeed, we revert the entire transaction if it
+    // fails. This will show the user if their manual exec will fail before they submit it.
+    if (report.gasOverride != 0) {
+      if (newState == Internal.MessageExecutionState.FAILURE) {
+        if (originalState != Internal.MessageExecutionState.UNTOUCHED) {
+          // If manual execution fails, we revert the entire transaction, unless the originalState is UNTOUCHED as we
+          // would still be making progress by changing the state from UNTOUCHED to FAILURE.
+          revert ExecutionError(message.header.messageId, returnData);
+        }
+      }
+    }
+
+    // The only valid prior states are UNTOUCHED and FAILURE (checked above).
+    // The only valid post states are FAILURE and SUCCESS (checked below).
+    if (newState != Internal.MessageExecutionState.SUCCESS) {
+      if (newState != Internal.MessageExecutionState.FAILURE) {
+        revert InvalidNewState(sourceChainSelector, message.header.sequenceNumber, newState);
+      }
+    }
+
+    emit ExecutionStateChanged(
+      sourceChainSelector, message.header.sequenceNumber, message.header.messageId, newState, returnData
+    );
   }
 
   /// @notice Try executing a message.
-  /// @param message Internal.Any2EVMRampMessage memory message.
+  /// @param message Internal.Any2EVMMultiProofMessage memory message.
   /// @param offchainTokenData Data provided by the DON for token transfers.
   /// @return executionState The new state of the message, being either SUCCESS or FAILURE.
   /// @return errData Revert data in bytes if CCIP receiver reverted during execution.
   function _trialExecute(
-    Internal.Any2EVMRampMessage memory message,
-    bytes[] memory offchainTokenData,
-    uint32[] memory tokenGasOverrides
+    Internal.Any2EVMMultiProofMessage memory message,
+    bytes[][] memory offchainTokenData,
+    uint32 gasLimitOverride
   ) internal returns (Internal.MessageExecutionState executionState, bytes memory) {
-    try this.executeSingleMessage(message, offchainTokenData, tokenGasOverrides) {}
-    catch (bytes memory err) {
+    (bool success, bytes memory returnData,) = CallWithExactGas._callWithExactGasSafeReturnData(
+      abi.encodeCall(this.executeSingleMessage, (message, offchainTokenData)),
+      address(this),
+      gasLimitOverride,
+      i_gasForCallExactCheck,
+      Internal.MAX_RET_BYTES
+    );
+
+    if (!success) {
       if (msg.sender == Internal.GAS_ESTIMATION_SENDER) {
         if (
-          CallWithExactGas.NOT_ENOUGH_GAS_FOR_CALL_SIG == bytes4(err)
-            || CallWithExactGas.NO_GAS_FOR_CALL_EXACT_CHECK_SIG == bytes4(err)
-            || ERC165CheckerReverting.InsufficientGasForStaticCall.selector == bytes4(err)
+          CallWithExactGas.NOT_ENOUGH_GAS_FOR_CALL_SIG == bytes4(returnData)
+            || CallWithExactGas.NO_GAS_FOR_CALL_EXACT_CHECK_SIG == bytes4(returnData)
+            || ERC165CheckerReverting.InsufficientGasForStaticCall.selector == bytes4(returnData)
         ) {
-          revert InsufficientGasToCompleteTx(bytes4(err));
+          revert InsufficientGasToCompleteTx(bytes4(returnData));
         }
       }
       // return the message execution state as FAILURE and the revert data.
       // Max length of revert data is Router.MAX_RET_BYTES, max length of err is 4 + Router.MAX_RET_BYTES.
-      return (Internal.MessageExecutionState.FAILURE, err);
+      return (Internal.MessageExecutionState.FAILURE, returnData);
     }
+
     // If message execution succeeded, no CCIP receiver return data is expected, return with empty bytes.
     return (Internal.MessageExecutionState.SUCCESS, "");
   }
@@ -543,8 +410,8 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// @param message initial message
   /// @return transformedMessage modified message
   function _beforeExecuteSingleMessage(
-    Internal.Any2EVMRampMessage memory message
-  ) internal virtual returns (Internal.Any2EVMRampMessage memory transformedMessage) {
+    Internal.Any2EVMMultiProofMessage memory message
+  ) internal virtual returns (Internal.Any2EVMMultiProofMessage memory transformedMessage) {
     return message;
   }
 
@@ -556,21 +423,15 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// @dev We use ERC-165 to check for the ccipReceive interface to permit sending tokens to contracts, for example
   /// smart contract wallets, without an associated message.
   function executeSingleMessage(
-    Internal.Any2EVMRampMessage memory message,
-    bytes[] calldata offchainTokenData,
-    uint32[] calldata tokenGasOverrides
+    Internal.Any2EVMMultiProofMessage memory message,
+    bytes[][] calldata offchainTokenData
   ) external {
     if (msg.sender != address(this)) revert CanOnlySelfCall();
 
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
     if (message.tokenAmounts.length > 0) {
       destTokenAmounts = _releaseOrMintTokens(
-        message.tokenAmounts,
-        message.sender,
-        message.receiver,
-        message.header.sourceChainSelector,
-        offchainTokenData,
-        tokenGasOverrides
+        message.tokenAmounts, message.sender, message.receiver, message.header.sourceChainSelector, offchainTokenData
       );
     }
 
@@ -632,14 +493,12 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// @param offchainTokenData Data fetched offchain by the DON.
   /// @return destTokenAmount local token address with amount.
   function _releaseOrMintSingleToken(
-    Internal.Any2EVMTokenTransfer memory sourceTokenAmount,
+    Internal.Any2EVMMultiProofTokenTransfer memory sourceTokenAmount,
     bytes memory originalSender,
     address receiver,
     uint64 sourceChainSelector,
-    bytes memory offchainTokenData
+    bytes[] memory offchainTokenData
   ) internal returns (Client.EVMTokenAmount memory destTokenAmount) {
-    // We need to safely decode the token address from the sourceTokenData as it could be wrong, in which case it
-    // doesn't have to be a valid EVM address.
     address localToken = sourceTokenAmount.destTokenAddress;
     // We check with the token admin registry if the token has a pool on this chain.
     address localPoolAddress = ITokenAdminRegistry(i_tokenAdminRegistry).getPool(localToken);
@@ -652,81 +511,53 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     }
 
     // We retrieve the local token balance of the receiver before the pool call.
-    (uint256 balancePre, uint256 gasLeft) = _getBalanceOfReceiver(receiver, localToken, sourceTokenAmount.destGasAmount);
+    uint256 balancePre = _getBalanceOfReceiver(receiver, localToken);
 
-    // We determined that the pool address is a valid EVM address, but that does not mean the code at this address is a
-    // (compatible) pool contract. _callWithExactGasSafeReturnData will check if the location contains a contract. If it
-    // doesn't it reverts with a known error. We call the pool with exact gas  to increase resistance against malicious
-    // tokens or token pools. We protect against return data bombs by capping the return data size at MAX_RET_BYTES.
-    (bool success, bytes memory returnData, uint256 gasUsedReleaseOrMint) = CallWithExactGas
-      ._callWithExactGasSafeReturnData(
-      abi.encodeCall(
-        IPoolV1.releaseOrMint,
-        Pool.ReleaseOrMintInV1({
-          originalSender: originalSender,
-          receiver: receiver,
-          amount: sourceTokenAmount.amount,
-          localToken: localToken,
-          remoteChainSelector: sourceChainSelector,
-          sourcePoolAddress: sourceTokenAmount.sourcePoolAddress,
-          sourcePoolData: sourceTokenAmount.extraData,
-          offchainTokenData: offchainTokenData
-        })
-      ),
-      localPoolAddress,
-      gasLeft,
-      i_gasForCallExactCheck,
-      Internal.MAX_RET_BYTES
-    );
-
-    // Wrap and rethrow the error so we can catch it lower in the stack.
-    if (!success) revert TokenHandlingError(localPoolAddress, returnData);
-
-    // If the call was successful, the returnData should be the amount released or minted denominated in the local
-    // token's decimals.
-    if (returnData.length != Pool.CCIP_POOL_V1_RET_BYTES) {
-      revert InvalidDataLength(Pool.CCIP_POOL_V1_RET_BYTES, returnData.length);
+    Pool.ReleaseOrMintOutV1 memory returnData;
+    try IPoolV1(localPoolAddress).releaseOrMint(
+      Pool.ReleaseOrMintInV1({
+        originalSender: originalSender,
+        receiver: receiver,
+        amount: sourceTokenAmount.amount,
+        localToken: localToken,
+        remoteChainSelector: sourceChainSelector,
+        sourcePoolAddress: sourceTokenAmount.sourcePoolAddress,
+        sourcePoolData: sourceTokenAmount.extraData,
+        // TODO write IPoolV2
+        offchainTokenData: offchainTokenData[0]
+      })
+    ) returns (Pool.ReleaseOrMintOutV1 memory result) {
+      returnData = result;
+    } catch (bytes memory err) {
+      revert TokenHandlingError(localToken, err);
     }
-    uint256 localAmount = abi.decode(returnData, (uint256));
 
     // We don't need to do balance checks if the pool is the receiver, as they would always fail in the case
     // of a lockRelease pool.
     if (receiver != localPoolAddress) {
-      (uint256 balancePost,) = _getBalanceOfReceiver(receiver, localToken, gasLeft - gasUsedReleaseOrMint);
+      uint256 balancePost = _getBalanceOfReceiver(receiver, localToken);
 
       // First we check if the subtraction would result in an underflow to ensure we revert with a clear error.
-      if (balancePost < balancePre || balancePost - balancePre != localAmount) {
-        revert ReleaseOrMintBalanceMismatch(localAmount, balancePre, balancePost);
+      if (balancePost < balancePre || balancePost - balancePre != returnData.destinationAmount) {
+        revert ReleaseOrMintBalanceMismatch(returnData.destinationAmount, balancePre, balancePost);
       }
     }
 
-    return Client.EVMTokenAmount({token: localToken, amount: localAmount});
+    return Client.EVMTokenAmount({token: localToken, amount: returnData.destinationAmount});
   }
 
   /// @notice Retrieves the balance of a receiver address for a given token.
   /// @param receiver The address to check the balance of.
   /// @param token The token address.
-  /// @param gasLimit The gas limit to use for the call.
   /// @return balance The balance of the receiver.
-  /// @return gasLeft The gas left after the call.
-  function _getBalanceOfReceiver(
-    address receiver,
-    address token,
-    uint256 gasLimit
-  ) internal returns (uint256 balance, uint256 gasLeft) {
-    (bool success, bytes memory returnData, uint256 gasUsed) = CallWithExactGas._callWithExactGasSafeReturnData(
-      abi.encodeCall(IERC20.balanceOf, (receiver)), token, gasLimit, i_gasForCallExactCheck, Internal.MAX_RET_BYTES
-    );
-    if (!success) revert TokenHandlingError(token, returnData);
-
-    // If the call was successful, the returnData should contain only the balance.
-    if (returnData.length != Internal.MAX_BALANCE_OF_RET_BYTES) {
-      revert InvalidDataLength(Internal.MAX_BALANCE_OF_RET_BYTES, returnData.length);
+  function _getBalanceOfReceiver(address receiver, address token) internal view returns (uint256 balance) {
+    try IERC20(token).balanceOf(receiver) returns (uint256 balance_) {
+      // If the call succeeds, we return the balance and the gas left.
+      return (balance_);
+    } catch (bytes memory err) {
+      // If the call fails, we revert with a known error.
+      revert TokenHandlingError(token, err);
     }
-
-    // Return the decoded balance, which cannot fail as we checked the length, and the gas that is left
-    // after this call.
-    return (abi.decode(returnData, (uint256)), gasLimit - gasUsed);
   }
 
   /// @notice Uses pools to release or mint a number of different tokens to a receiver address.
@@ -735,25 +566,16 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// @param receiver The address that will receive the tokens.
   /// @param sourceChainSelector The remote source chain selector.
   /// @param offchainTokenData Array of token data fetched offchain by the DON.
-  /// @param tokenGasOverrides Array of override gas limits to use for token transfers. If empty, the normal gas limit
-  /// as defined on the source chain is used.
   /// @return destTokenAmounts local token addresses with amounts.
   function _releaseOrMintTokens(
-    Internal.Any2EVMTokenTransfer[] memory sourceTokenAmounts,
+    Internal.Any2EVMMultiProofTokenTransfer[] memory sourceTokenAmounts,
     bytes memory originalSender,
     address receiver,
     uint64 sourceChainSelector,
-    bytes[] calldata offchainTokenData,
-    uint32[] calldata tokenGasOverrides
+    bytes[][] calldata offchainTokenData
   ) internal returns (Client.EVMTokenAmount[] memory destTokenAmounts) {
     destTokenAmounts = new Client.EVMTokenAmount[](sourceTokenAmounts.length);
-    bool isTokenGasOverridesEmpty = tokenGasOverrides.length == 0;
     for (uint256 i = 0; i < sourceTokenAmounts.length; ++i) {
-      if (!isTokenGasOverridesEmpty) {
-        if (tokenGasOverrides[i] != 0) {
-          sourceTokenAmounts[i].destGasAmount = tokenGasOverrides[i];
-        }
-      }
       destTokenAmounts[i] = _releaseOrMintSingleToken(
         sourceTokenAmounts[i], originalSender, receiver, sourceChainSelector, offchainTokenData[i]
       );

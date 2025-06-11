@@ -323,4 +323,31 @@ library Internal {
     uint64 maxSeqNr; // ─────────╯ Maximum sequence number, inclusive
     bytes32 merkleRoot; //         Merkle root covering the interval & source chain messages
   }
+
+  // ================================================================
+  // │                            1.7                               │
+  // ================================================================
+
+  struct Any2EVMMultiProofMessage {
+    RampMessageHeader header; // Message header.
+    bytes sender; // sender address on the source chain.
+    bytes data; // arbitrary data payload supplied by the message sender.
+    address receiver; // receiver address on the destination chain.
+    uint32 gasLimit; // user supplied maximum gas amount available for dest chain execution & token pool ops.
+    Any2EVMMultiProofTokenTransfer[] tokenAmounts; // array of tokens and amounts to transfer.
+    bytes4[] securityModuleSelectors; //
+  }
+
+  struct Any2EVMMultiProofTokenTransfer {
+    // The source pool EVM address encoded to bytes. This value is trusted as it is obtained through the onRamp. It can
+    // be relied upon by the destination pool to validate the source pool.
+    bytes sourcePoolAddress;
+    address destTokenAddress; // ─╮ Address of destination token
+    // Optional pool data to be transferred to the destination chain. Be default this is capped at
+    // CCIP_LOCK_OR_BURN_V1_RET_BYTES bytes. If more data is required, the TokenTransferFeeConfig.destBytesOverhead
+    // has to be set for the specific token.
+    bytes extraData;
+    uint256 amount; // Amount of tokens.
+    bytes4[] securityModuleSelectors; //
+  }
 }
