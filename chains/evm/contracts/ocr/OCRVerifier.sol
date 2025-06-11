@@ -4,8 +4,13 @@ pragma solidity ^0.8.4;
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
+import {EnumerableSet} from
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
+
 /// @notice Onchain verification of reports from the offchain reporting protocol with multiple OCR plugin support.
-abstract contract MultiOCR3Base is ITypeAndVersion, Ownable2StepMsgSender {
+abstract contract OCRVerifier is ITypeAndVersion, Ownable2StepMsgSender {
+  using EnumerableSet for EnumerableSet.AddressSet;
+
   // Maximum number of oracles the offchain reporting protocol is designed for
   uint256 internal constant MAX_NUM_ORACLES = 32;
 
@@ -23,8 +28,7 @@ abstract contract MultiOCR3Base is ITypeAndVersion, Ownable2StepMsgSender {
   enum InvalidConfigErrorType {
     F_MUST_BE_POSITIVE,
     TOO_MANY_SIGNERS,
-    F_TOO_HIGH,
-    REPEATED_ORACLE_ADDRESS
+    F_TOO_HIGH
   }
 
   error InvalidConfig(InvalidConfigErrorType errorType);
@@ -36,36 +40,12 @@ abstract contract MultiOCR3Base is ITypeAndVersion, Ownable2StepMsgSender {
   error UnauthorizedSigner();
   error NonUniqueSignatures();
   error OracleCannotBeZeroAddress();
-  error StaticConfigCannotBeChanged();
-
-  /// @dev Packing these fields used on the hot path in a ConfigInfo variable reduces the retrieval of all
-  /// of them to a minimum number of SLOADs.
-  struct ConfigInfo {
-    bytes32 configDigest;
-    uint8 F; // ─────────────────────────────╮ maximum number of faulty/dishonest oracles the system can tolerate.
-    uint8 n; //                              │ number of configured signers.
-    bool isSignatureVerificationEnabled; // ─╯ if true, requires signers and verifies signatures on transmission.
-  }
-
-  /// @notice Used for s_oracles[a].role, where a is an address, to track the purpose of the address, or to indicate
-  /// that the address is unset.
-  enum Role {
-    // No oracle role has been set for the address `a`
-    Unset,
-    // Signing address for the s_oracles[a].index'th oracle. I.e., report signatures from this oracle should ecrecover
-    // back to address `a`.
-    Signer
-  }
-
-  struct Oracle {
-    uint8 index; // ─╮ Index of oracle in s_signers.
-    Role role; // ───╯ Role of the address which mapped to this struct.
-  }
 
   /// @notice OCR configuration for a single OCR plugin within a DON.
   struct OCRConfig {
-    ConfigInfo configInfo; //  latest OCR config.
-    address[] signers; //      addresses oracles use to sign the reports.
+    bytes32 configDigest;
+    uint8 F; //  maximum number of faulty/dishonest oracles the system can tolerate.
+    uint8 n; //  number of configured signers.
   }
 
   /// @notice Args to update an OCR Config.
@@ -75,11 +55,9 @@ abstract contract MultiOCR3Base is ITypeAndVersion, Ownable2StepMsgSender {
     address[] signers; // signing address of each oracle.
   }
 
-  /// @notice mapping of OCR plugin type -> DON config.
   OCRConfig internal s_ocrConfig;
 
-  /// @notice OCR plugin type => signer address mapping.
-  mapping(address signerOrTransmiter => Oracle oracle) internal s_oracles;
+  EnumerableSet.AddressSet internal s_signers;
 
   // Constant-length components of the msg.data sent to transmit.
   // See the "If we wanted to call sam" example on for example reasoning.
@@ -106,71 +84,48 @@ abstract contract MultiOCR3Base is ITypeAndVersion, Ownable2StepMsgSender {
     i_chainID = block.chainid;
   }
 
-  /// @notice Sets offchain reporting protocol configuration incl. participating oracles.
-  /// NOTE: The OCR3 config must be sanity-checked against the home-chain registry configuration, to ensure home-chain
-  /// and remote-chain parity!
-  /// @param ocrConfigArgs OCR config update args.
-  function setOCR3Configs(
-    OCRConfigArgs[] memory ocrConfigArgs
-  ) external onlyOwner {
-    for (uint256 i; i < ocrConfigArgs.length; ++i) {
-      _setOCR3Config(ocrConfigArgs[i]);
-    }
-  }
-
   /// @notice Sets offchain reporting protocol configuration incl. participating oracles for a single OCR plugin type.
   /// @param ocrConfigArgs OCR config update args.
-  function _setOCR3Config(
+  function setOCR3Config(
     OCRConfigArgs memory ocrConfigArgs
-  ) internal {
+  ) external onlyOwner {
     if (ocrConfigArgs.F == 0) revert InvalidConfig(InvalidConfigErrorType.F_MUST_BE_POSITIVE);
 
-    OCRConfig storage ocrConfig = s_ocrConfig;
-    ConfigInfo storage configInfo = ocrConfig.configInfo;
+    address[] memory newSigners = ocrConfigArgs.signers;
 
-    _clearOracleRoles(ocrConfig.signers);
+    if (newSigners.length > MAX_NUM_ORACLES) revert InvalidConfig(InvalidConfigErrorType.TOO_MANY_SIGNERS);
+    if (newSigners.length <= 3 * ocrConfigArgs.F) revert InvalidConfig(InvalidConfigErrorType.F_TOO_HIGH);
 
-    address[] memory signers = ocrConfigArgs.signers;
+    _clearAllSigners();
+    _assignOracleRoles(newSigners);
 
-    if (signers.length > MAX_NUM_ORACLES) revert InvalidConfig(InvalidConfigErrorType.TOO_MANY_SIGNERS);
-    if (signers.length <= 3 * ocrConfigArgs.F) revert InvalidConfig(InvalidConfigErrorType.F_TOO_HIGH);
+    s_ocrConfig = OCRConfig({configDigest: ocrConfigArgs.configDigest, F: ocrConfigArgs.F, n: uint8(newSigners.length)});
 
-    configInfo.n = uint8(signers.length);
-    ocrConfig.signers = signers;
-
-    _assignOracleRoles(signers, Role.Signer);
-
-    configInfo.F = ocrConfigArgs.F;
-    configInfo.configDigest = ocrConfigArgs.configDigest;
-
-    emit ConfigSet(ocrConfigArgs.configDigest, ocrConfig.signers, ocrConfigArgs.F);
+    emit ConfigSet(ocrConfigArgs.configDigest, newSigners, ocrConfigArgs.F);
     _afterOCR3ConfigSet();
   }
 
   /// @notice Hook that is called after a plugin's OCR3 config changes.
   function _afterOCR3ConfigSet() internal virtual;
 
-  /// @notice Clears oracle roles for the provided oracle addresses.
-  /// @param oracleAddresses Oracle addresses to clear roles for.
-  function _clearOracleRoles(
-    address[] memory oracleAddresses
-  ) internal {
-    for (uint256 i = 0; i < oracleAddresses.length; ++i) {
-      delete s_oracles[oracleAddresses[i]];
+  /// @notice Clears all the signers.
+  function _clearAllSigners() internal {
+    address[] memory signers = s_signers.values();
+
+    for (uint256 i = 0; i < signers.length; ++i) {
+      s_signers.remove(signers[i]);
     }
   }
 
   /// @notice Assigns oracles roles for the provided oracle addresses with uniqueness verification.
   /// @param oracleAddresses Oracle addresses to assign roles to.
-  /// @param role Role to assign.
-  function _assignOracleRoles(address[] memory oracleAddresses, Role role) internal {
+  function _assignOracleRoles(
+    address[] memory oracleAddresses
+  ) internal {
     for (uint256 i = 0; i < oracleAddresses.length; ++i) {
-      address oracle = oracleAddresses[i];
-      if (s_oracles[oracle].role != Role.Unset) {
-        revert InvalidConfig(InvalidConfigErrorType.REPEATED_ORACLE_ADDRESS);
-      }
-      if (oracle == address(0)) revert OracleCannotBeZeroAddress();
-      s_oracles[oracle] = Oracle(uint8(i), role);
+      if (oracleAddresses[i] == address(0)) revert OracleCannotBeZeroAddress();
+
+      s_signers.add(oracleAddresses[i]);
     }
   }
 
@@ -179,20 +134,18 @@ abstract contract MultiOCR3Base is ITypeAndVersion, Ownable2StepMsgSender {
   /// @param report serialized report, which the signatures are signing.
   /// @param rs ith element is the R components of the ith signature on report. Must have at most MAX_NUM_ORACLES entries.
   /// @param ss ith element is the S components of the ith signature on report. Must have at most MAX_NUM_ORACLES entries.
-  /// @param rawVs ith element is the the V component of the ith signature.
   function _transmit(
     // NOTE: If these parameters are changed, expectedMsgDataLength and/or TRANSMIT_MSGDATA_CONSTANT_LENGTH_COMPONENT
     // need to be changed accordingly.
     bytes32[2] calldata reportContext,
     bytes calldata report,
     bytes32[] memory rs,
-    bytes32[] memory ss,
-    bytes32 rawVs
+    bytes32[] memory ss
   ) internal {
     // reportContext consists of:
     // reportContext[0]: ConfigDigest.
     // reportContext[1]: 24 byte padding, 8 byte sequence number.
-    ConfigInfo memory configInfo = s_ocrConfig.configInfo;
+    OCRConfig memory configInfo = s_ocrConfig;
     bytes32 configDigest = reportContext[0];
 
     // Scoping this reduces stack pressure and gas usage.
@@ -200,11 +153,9 @@ abstract contract MultiOCR3Base is ITypeAndVersion, Ownable2StepMsgSender {
       // one byte per entry in _report
       uint256 expectedDataLength = uint256(TRANSMIT_MSGDATA_CONSTANT_LENGTH_COMPONENT_NO_SIGNATURES) + report.length;
 
-      if (configInfo.isSignatureVerificationEnabled) {
-        // 32 bytes per entry in _rs, _ss
-        expectedDataLength +=
-          TRANSMIT_MSGDATA_EXTRA_CONSTANT_LENGTH_COMPONENT_FOR_SIGNATURES + rs.length * 32 + ss.length * 32;
-      }
+      // 32 bytes per entry in _rs, _ss
+      expectedDataLength +=
+        TRANSMIT_MSGDATA_EXTRA_CONSTANT_LENGTH_COMPONENT_FOR_SIGNATURES + rs.length * 32 + ss.length * 32;
 
       if (msg.data.length != expectedDataLength) revert WrongMessageLength(expectedDataLength, msg.data.length);
     }
@@ -217,16 +168,14 @@ abstract contract MultiOCR3Base is ITypeAndVersion, Ownable2StepMsgSender {
     // from chain A and so OCR reports will be valid on both forks.
     _whenChainNotForked();
 
-    if (configInfo.isSignatureVerificationEnabled) {
-      // Scoping to reduce stack pressure.
-      {
-        if (rs.length != configInfo.F + 1) revert WrongNumberOfSignatures();
-        if (rs.length != ss.length) revert SignaturesOutOfRegistration();
-      }
-
-      bytes32 h = keccak256(abi.encodePacked(keccak256(report), reportContext));
-      _verifySignatures(h, rs, ss, rawVs);
+    // Scoping to reduce stack pressure.
+    {
+      if (rs.length != configInfo.F + 1) revert WrongNumberOfSignatures();
+      if (rs.length != ss.length) revert SignaturesOutOfRegistration();
     }
+
+    bytes32 h = keccak256(abi.encodePacked(keccak256(report), reportContext));
+    _verifySignatures(h, rs, ss);
 
     emit Transmitted(configDigest, uint64(uint256(reportContext[1])));
   }
@@ -235,25 +184,20 @@ abstract contract MultiOCR3Base is ITypeAndVersion, Ownable2StepMsgSender {
   /// @param hashedReport hashed encoded packing of report + reportContext.
   /// @param rs ith element is the R components of the ith signature on report. Must have at most MAX_NUM_ORACLES entries.
   /// @param ss ith element is the S components of the ith signature on report. Must have at most MAX_NUM_ORACLES entries.
-  /// @param rawVs ith element is the the V component of the ith signature.
-  function _verifySignatures(
-    bytes32 hashedReport,
-    bytes32[] memory rs,
-    bytes32[] memory ss,
-    bytes32 rawVs
-  ) internal view {
+  /// @dev we assume all signatures use a `v` value of 27.
+  function _verifySignatures(bytes32 hashedReport, bytes32[] memory rs, bytes32[] memory ss) internal view {
     // Verify signatures attached to report. Using a uint256 means we can only verify up to 256 oracles.
-    uint256 signed = 0;
+    uint160 lastSigner = 0;
 
     uint256 numberOfSignatures = rs.length;
     for (uint256 i; i < numberOfSignatures; ++i) {
       // Safe from ECDSA malleability here since we check for duplicate signers.
-      address signer = ecrecover(hashedReport, uint8(rawVs[i]) + 27, rs[i], ss[i]);
-      // Since we disallow address(0) as a valid signer address, it can never have a signer role.
-      Oracle memory oracle = s_oracles[signer];
-      if (oracle.role != Role.Signer) revert UnauthorizedSigner();
-      if (signed & (0x1 << oracle.index) != 0) revert NonUniqueSignatures();
-      signed |= 0x1 << oracle.index;
+      address signer = ecrecover(hashedReport, 27, rs[i], ss[i]);
+
+      // Check that the signer is registered as an oracle.
+      if (!s_signers.contains(signer)) revert UnauthorizedSigner();
+      // This requires ordered signatures, so we can check for duplicates. This also disallows the zero address.
+      if (uint160(signer) <= lastSigner) revert NonUniqueSignatures();
     }
   }
 
