@@ -10,6 +10,7 @@ echo " └───────────────────────�
 # as specified in the foundry.toml.
 OPTIMIZE_RUNS_OFFRAMP=800
 OPTIMIZE_RUNS_FEE_QUOTER=8000
+OPTIMIZE_RUNS_BURN_MINT_FAST_TRASNFER_TOKEN_POOL=8300
 PROJECT="ccip"
 FOUNDRY_PROJECT_SUFFIX="-compile"
 export FOUNDRY_PROFILE="$PROJECT"$FOUNDRY_PROJECT_SUFFIX
@@ -59,6 +60,9 @@ function getOptimizations() {
         ;;
       "FeeQuoter")
         optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_FEE_QUOTER"
+        ;;
+      "BurnMintFastTransferTokenPool")
+        optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_BURN_MINT_FAST_TRASNFER_TOKEN_POOL"
         ;;
     esac
 
