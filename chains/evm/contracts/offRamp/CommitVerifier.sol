@@ -3,11 +3,9 @@ pragma solidity ^0.8.24;
 
 import {IFeeQuoter} from "../interfaces/IFeeQuoter.sol";
 import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
-import {IRouter} from "../interfaces/IRouter.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {Client} from "../libraries/Client.sol";
-import {ERC165CheckerReverting} from "../libraries/ERC165CheckerReverting.sol";
 import {Internal} from "../libraries/Internal.sol";
 import {MerkleMultiProof} from "../libraries/MerkleMultiProof.sol";
 import {MultiOCR3Base} from "../ocr/MultiOCR3Base.sol";
@@ -21,39 +19,16 @@ import {EnumerableSet} from
 /// @dev MultiOCR3Base is used to store multiple OCR configs for the OffRamp. The execution plugin type has to be
 /// configured without signature verification, and the commit plugin type with verification.
 contract OffRamp is ITypeAndVersion, MultiOCR3Base {
-  using ERC165CheckerReverting for address;
   using EnumerableSet for EnumerableSet.UintSet;
 
   error ZeroChainSelectorNotAllowed();
-  error ExecutionError(bytes32 messageId, bytes err);
   error SourceChainNotEnabled(uint64 sourceChainSelector);
-  error TokenDataMismatch(uint64 sourceChainSelector, uint64 sequenceNumber);
-  error UnexpectedTokenData();
-  error ManualExecutionNotYetEnabled(uint64 sourceChainSelector);
-  error ManualExecutionGasLimitMismatch();
-  error InvalidManualExecutionGasLimit(uint64 sourceChainSelector, bytes32 messageId, uint256 newLimit);
-  error InvalidManualExecutionTokenGasOverride(
-    bytes32 messageId, uint256 tokenIndex, uint256 oldLimit, uint256 tokenGasOverride
-  );
-  error ManualExecutionGasAmountCountMismatch(bytes32 messageId, uint64 sequenceNumber);
-  error RootNotCommitted(uint64 sourceChainSelector);
   error RootAlreadyCommitted(uint64 sourceChainSelector, bytes32 merkleRoot);
   error InvalidRoot();
-  error CanOnlySelfCall();
-  error ReceiverError(bytes err);
-  error TokenHandlingError(address target, bytes err);
-  error ReleaseOrMintBalanceMismatch(uint256 amountReleased, uint256 balancePre, uint256 balancePost);
-  error EmptyReport(uint64 sourceChainSelector);
-  error EmptyBatch();
   error CursedByRMN(uint64 sourceChainSelector);
-  error NotACompatiblePool(address notPool);
-  error InvalidDataLength(uint256 expected, uint256 got);
-  error InvalidNewState(uint64 sourceChainSelector, uint64 sequenceNumber, Internal.MessageExecutionState newState);
   error StaleCommitReport();
   error InvalidInterval(uint64 sourceChainSelector, uint64 min, uint64 max);
   error ZeroAddressNotAllowed();
-  error InvalidMessageDestChainSelector(uint64 messageDestChainSelector);
-  error SourceChainSelectorMismatch(uint64 reportSourceChainSelector, uint64 messageSourceChainSelector);
   error SignatureVerificationRequiredInCommitPlugin();
   error SignatureVerificationNotAllowedInExecutionPlugin();
   error CommitOnRampMismatch(bytes reportOnRamp, bytes configOnRamp);
@@ -63,40 +38,23 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @dev Atlas depends on various events, if changing, please notify Atlas.
   event StaticConfigSet(StaticConfig staticConfig);
   event DynamicConfigSet(DynamicConfig dynamicConfig);
-  event ExecutionStateChanged(
-    uint64 indexed sourceChainSelector,
-    uint64 indexed sequenceNumber,
-    bytes32 indexed messageId,
-    bytes32 messageHash,
-    Internal.MessageExecutionState state,
-    bytes returnData,
-    uint256 gasUsed
-  );
   event SourceChainSelectorAdded(uint64 sourceChainSelector);
   event SourceChainConfigSet(uint64 indexed sourceChainSelector, SourceChainConfig sourceConfig);
-  event SkippedAlreadyExecutedMessage(uint64 sourceChainSelector, uint64 sequenceNumber);
-  event AlreadyAttempted(uint64 sourceChainSelector, uint64 sequenceNumber);
   event CommitReportAccepted(
     Internal.MerkleRoot[] blessedMerkleRoots,
     Internal.MerkleRoot[] unblessedMerkleRoots,
     Internal.PriceUpdates priceUpdates
   );
-  event RootRemoved(bytes32 root);
-  event SkippedReportExecution(uint64 sourceChainSelector);
 
   /// @dev Struct that contains the static configuration. The individual components are stored as immutable variables.
   // solhint-disable-next-line gas-struct-packing
   struct StaticConfig {
-    uint64 chainSelector; // ───────╮ Destination chainSelector
-    uint16 gasForCallExactCheck; // | Gas for call exact check
-    IRMNRemote rmnRemote; // ───────╯ RMN Verification Contract
-    address tokenAdminRegistry; // Token admin registry address
-    address nonceManager; // Nonce manager address
+    uint64 chainSelector; // ─╮ Destination chainSelector
+    IRMNRemote rmnRemote; // ─╯ RMN Verification Contract
   }
 
   /// @dev Per-chain source config (defining a lane from a Source Chain -> Dest OffRamp).
   struct SourceChainConfig {
-    IRouter router; // ─────────────────╮ Local router to use for messages coming from this source chain.
     bool isEnabled; //                  │ Flag whether the source chain is enabled or not.
     uint64 minSeqNr; //                 │ The min sequence number expected for future messages.
     bool isRMNVerificationDisabled; // ─╯ Flag whether the RMN verification is disabled or not.
@@ -106,7 +64,6 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @dev Same as SourceChainConfig but with source chain selector so that an array of these
   /// can be passed in the constructor and the applySourceChainConfigUpdates function.
   struct SourceChainConfigArgs {
-    IRouter router; // ─────────────────╮  Local router to use for messages coming from this source chain.
     uint64 sourceChainSelector; //      │  Source chain selector of the config to update.
     bool isEnabled; //                  │  Flag whether the source chain is enabled or not.
     bool isRMNVerificationDisabled; // ─╯ Flag whether the RMN verification is disabled or not.
@@ -116,24 +73,13 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @dev Dynamic offRamp config.
   /// @dev Since DynamicConfig is part of DynamicConfigSet event, if changing it, we should update the ABI on Atlas.
   struct DynamicConfig {
-    address feeQuoter; // ──────────────────────────────╮ FeeQuoter address on the local chain.
-    uint32 permissionLessExecutionThresholdSeconds; // ─╯ Waiting time before manual execution is enabled.
-    address messageInterceptor; // Optional, validates incoming messages (zero address = no interceptor).
+    address feeQuoter; // FeeQuoter address on the local chain.
   }
 
   /// @dev Report that is committed by the observing DON at the committing phase.
   struct CommitReport {
     Internal.PriceUpdates priceUpdates; // List of gas and price updates to commit.
-    Internal.MerkleRoot[] blessedMerkleRoots; // List of merkle roots from source chains for which RMN is enabled.
-    Internal.MerkleRoot[] unblessedMerkleRoots; // List of merkle roots from source chains for which RMN is disabled.
-    IRMNRemote.Signature[] rmnSignatures; // RMN signatures on the merkle roots.
-  }
-
-  /// @dev Both receiverExecutionGasLimit and tokenGasOverrides are optional. To indicate no override, set the value
-  /// to 0. The length of tokenGasOverrides must match the length of tokenAmounts, even if it only contains zeros.
-  struct GasLimitOverride {
-    uint256 receiverExecutionGasLimit; // Overrides EVM2EVMMessage.gasLimit.
-    uint32[] tokenGasOverrides; // Overrides EVM2EVMMessage.sourceTokenData.destGasAmount, length must be same as tokenAmounts.
+    Internal.MerkleRoot[] merkleRoots; // List of merkle roots from source chains for which RMN is enabled.
   }
 
   // STATIC CONFIG
@@ -144,14 +90,6 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   uint64 internal immutable i_chainSelector;
   /// @dev The RMN verification contract.
   IRMNRemote internal immutable i_rmnRemote;
-  /// @dev The address of the token admin registry.
-  address internal immutable i_tokenAdminRegistry;
-  /// @dev The address of the nonce manager.
-  address internal immutable i_nonceManager;
-  /// @dev The minimum amount of gas to perform the call with exact gas.
-  /// We include this in the offRamp so that we can redeploy to adjust it should a hardfork change the gas costs of
-  /// relevant opcodes in callWithExactGas.
-  uint16 internal immutable i_gasForCallExactCheck;
 
   // DYNAMIC CONFIG
   DynamicConfig internal s_dynamicConfig;
@@ -163,12 +101,6 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   mapping(uint64 sourceChainSelector => SourceChainConfig sourceChainConfig) private s_sourceChainConfigs;
 
   // STATE
-  /// @dev A mapping of sequence numbers (per source chain) to execution state using a bitmap with each execution
-  /// state only taking up 2 bits of the uint256, packing 128 states into a single slot.
-  /// Message state is tracked to ensure message can only be executed successfully once.
-  mapping(uint64 sourceChainSelector => mapping(uint64 seqNum => uint256 executionStateBitmap)) internal
-    s_executionStates;
-
   /// @notice Commit timestamp of merkle roots per source chain.
   mapping(uint64 sourceChainSelector => mapping(bytes32 merkleRoot => uint256 timestamp)) internal s_roots;
   /// @dev The sequence number of the last price update.
@@ -179,10 +111,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     DynamicConfig memory dynamicConfig,
     SourceChainConfigArgs[] memory sourceChainConfigs
   ) MultiOCR3Base() {
-    if (
-      address(staticConfig.rmnRemote) == address(0) || staticConfig.tokenAdminRegistry == address(0)
-        || staticConfig.nonceManager == address(0)
-    ) {
+    if (address(staticConfig.rmnRemote) == address(0)) {
       revert ZeroAddressNotAllowed();
     }
 
@@ -192,9 +121,6 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
 
     i_chainSelector = staticConfig.chainSelector;
     i_rmnRemote = staticConfig.rmnRemote;
-    i_tokenAdminRegistry = staticConfig.tokenAdminRegistry;
-    i_nonceManager = staticConfig.nonceManager;
-    i_gasForCallExactCheck = staticConfig.gasForCallExactCheck;
     emit StaticConfigSet(staticConfig);
 
     _setDynamicConfig(dynamicConfig);
@@ -204,68 +130,6 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   // ================================================================
   // │                           Commit                             │
   // ================================================================
-
-  /// @notice Transmit function for commit reports. The function requires signatures,
-  /// and expects the commit plugin type to be configured with signatures.
-  /// @param report serialized commit report.
-  /// @dev A commitReport can have two distinct parts (batched together to amortize the cost of checking sigs):
-  /// 1. Price updates
-  /// 2. A batch of merkle root and sequence number intervals (per-source)
-  /// Both have their own, separate, staleness checks, with price updates using the epoch and round number of the latest
-  /// price update. The merkle root checks for staleness are based on the seqNums.  They need to be separate because
-  /// a price report for round t+2 might be included before a report containing a merkle root for round t+1. This merkle
-  /// root report for round t+1 is still valid and should not be rejected. When a report with a stale root but valid
-  /// price updates is submitted, we are OK to revert to preserve the invariant that we always revert on invalid
-  /// sequence number ranges. If that happens, prices will be updated in later rounds.
-  function commit(
-    bytes32[2] calldata reportContext,
-    bytes calldata report,
-    bytes32[] calldata rs,
-    bytes32[] calldata ss,
-    bytes32 rawVs
-  ) external {
-    CommitReport memory commitReport = abi.decode(report, (CommitReport));
-    DynamicConfig storage dynamicConfig = s_dynamicConfig;
-
-    // Verify RMN signatures
-    if (commitReport.blessedMerkleRoots.length > 0) {
-      i_rmnRemote.verify(address(this), commitReport.blessedMerkleRoots, commitReport.rmnSignatures);
-    }
-
-    // Check if the report contains price updates.
-    if (commitReport.priceUpdates.tokenPriceUpdates.length > 0 || commitReport.priceUpdates.gasPriceUpdates.length > 0)
-    {
-      uint64 ocrSequenceNumber = uint64(uint256(reportContext[1]));
-
-      // Check for price staleness based on the epoch and round.
-      if (s_latestPriceSequenceNumber < ocrSequenceNumber) {
-        // If prices are not stale, update the latest epoch and round.
-        s_latestPriceSequenceNumber = ocrSequenceNumber;
-        // And update the prices in the fee quoter.
-        IFeeQuoter(dynamicConfig.feeQuoter).updatePrices(commitReport.priceUpdates);
-      } else {
-        // If prices are stale and the report doesn't contain a root, this report does not have any valid information
-        // and we revert. If it does contain a merkle root, continue to the root checking section.
-        if (commitReport.blessedMerkleRoots.length + commitReport.unblessedMerkleRoots.length == 0) {
-          revert StaleCommitReport();
-        }
-      }
-    }
-
-    for (uint256 i = 0; i < commitReport.blessedMerkleRoots.length; ++i) {
-      _commitRoot(commitReport.blessedMerkleRoots[i], true);
-    }
-
-    for (uint256 i = 0; i < commitReport.unblessedMerkleRoots.length; ++i) {
-      _commitRoot(commitReport.unblessedMerkleRoots[i], false);
-    }
-
-    emit CommitReportAccepted(
-      commitReport.blessedMerkleRoots, commitReport.unblessedMerkleRoots, commitReport.priceUpdates
-    );
-
-    _transmit(uint8(Internal.OCRPluginType.Commit), reportContext, report, rs, ss, rawVs);
-  }
 
   /// @notice Commits a single merkle root. The blessing status has to match the source chain config.
   /// @dev An unblessed root means that RMN verification is disabled for the source chain. It does not mean there is
@@ -307,12 +171,6 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     s_roots[sourceChainSelector][merkleRoot] = block.timestamp;
   }
 
-  /// @notice Returns the sequence number of the last price update.
-  /// @return sequenceNumber The latest price update sequence number.
-  function getLatestPriceSequenceNumber() external view returns (uint64) {
-    return s_latestPriceSequenceNumber;
-  }
-
   /// @notice Returns the timestamp of a potentially previously committed merkle root.
   /// If the root was never committed 0 will be returned.
   /// @param sourceChainSelector The source chain selector.
@@ -348,10 +206,6 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
       if (!isSignatureVerificationEnabled) {
         revert SignatureVerificationRequiredInCommitPlugin();
       }
-      // When the OCR config changes, we reset the sequence number  since it is scoped per config digest.
-      // Note that s_minSeqNr/roots do not need to be reset as the roots persist across reconfigurations
-      // and are de-duplicated separately.
-      s_latestPriceSequenceNumber = 0;
     } else if (ocrPluginType == uint8(Internal.OCRPluginType.Execution)) {
       // Signature verification must be disabled for execution plugin.
       if (isSignatureVerificationEnabled) {
@@ -368,13 +222,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @dev This function will always return the same struct as the contents is static and can never change.
   /// @return staticConfig The static config.
   function getStaticConfig() external view returns (StaticConfig memory) {
-    return StaticConfig({
-      chainSelector: i_chainSelector,
-      gasForCallExactCheck: i_gasForCallExactCheck,
-      rmnRemote: i_rmnRemote,
-      tokenAdminRegistry: i_tokenAdminRegistry,
-      nonceManager: i_nonceManager
-    });
+    return StaticConfig({chainSelector: i_chainSelector, rmnRemote: i_rmnRemote});
   }
 
   /// @notice Returns the current dynamic config.
@@ -425,10 +273,6 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
         revert ZeroChainSelectorNotAllowed();
       }
 
-      if (address(sourceConfigUpdate.router) == address(0)) {
-        revert ZeroAddressNotAllowed();
-      }
-
       SourceChainConfig storage currentConfig = s_sourceChainConfigs[sourceChainSelector];
       bytes memory newOnRamp = sourceConfigUpdate.onRamp;
 
@@ -451,7 +295,6 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
 
       currentConfig.onRamp = newOnRamp;
       currentConfig.isEnabled = sourceConfigUpdate.isEnabled;
-      currentConfig.router = sourceConfigUpdate.router;
       currentConfig.isRMNVerificationDisabled = sourceConfigUpdate.isRMNVerificationDisabled;
 
       // We don't need to check the return value, as inserting the item twice has no effect.
