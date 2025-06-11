@@ -10,7 +10,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
@@ -44,13 +43,6 @@ var CCTPDestDomains = map[uint64]uint32{
 	sel.ETHEREUM_TESTNET_SEPOLIA_ARBITRUM_1.Selector: 3,
 	sel.ETHEREUM_TESTNET_SEPOLIA_BASE_1.Selector:     6,
 	sel.POLYGON_TESTNET_AMOY.Selector:                7,
-}
-
-type evmUSDCMessageReader struct {
-	lggr           logger.Logger
-	contractReader contractreader.ContractReaderFacade
-	cctpDestDomain map[uint64]uint32
-	boundContract  types.BoundContract
 }
 
 type eventID [32]byte
@@ -96,7 +88,7 @@ func NewUSDCMessageReader(
 			}
 
 			// Bind the 3rd party MessageTransmitter contract, this is where CCTP MessageSent events are emitted.
-			contract, err := bindReaderContract(
+			_, err = bindReaderContract(
 				ctx,
 				lggr,
 				contractReaders,
@@ -112,12 +104,33 @@ func NewUSDCMessageReader(
 				lggr:           lggr,
 				contractReader: contractReaders[chainSelector],
 				cctpDestDomain: domains,
-				boundContract:  contract, // TODO: this is not needed if we switch to the Extended contract reader.
+			}
+		case sel.FamilySolana:
+			// Bind the TokenPool contract, the contract re-emits the USDC MessageSent event along with other metadata.
+			bytesAddress, err := addrCodec.AddressStringToBytes(token.SourcePoolAddress, chainSelector)
+			if err != nil {
+				return nil, err
 			}
 
-		// TODO: Implement Solana USDC message reader
-		//case sel.FamilySolana:
-		//	panic("not implemented yet")
+			// Bind the 3rd party MessageTransmitter contract, this is where CCTP MessageSent events are emitted.
+			_, err = bindReaderContract(
+				ctx,
+				lggr,
+				contractReaders,
+				chainSelector,
+				consts.ContractNameCCTPMessageTransmitter,
+				bytesAddress,
+				addrCodec,
+			)
+			if err != nil {
+				return nil, err
+			}
+
+			readers[chainSelector] = solanaUSDCMessageReader{
+				lggr:           lggr,
+				contractReader: contractReaders[chainSelector],
+				cctpDestDomain: domains,
+			}
 		default:
 			return nil, fmt.Errorf("unsupported chain selector family %s for chain %d", family, chainSelector)
 		}
@@ -211,6 +224,12 @@ func AllAvailableDomains() map[uint64]uint32 {
 	return destDomains
 }
 
+type evmUSDCMessageReader struct {
+	lggr           logger.Logger
+	contractReader contractreader.Extended
+	cctpDestDomain map[uint64]uint32
+}
+
 func (u evmUSDCMessageReader) MessagesByTokenID(
 	ctx context.Context,
 	source, dest cciptypes.ChainSelector,
@@ -251,9 +270,9 @@ func (u evmUSDCMessageReader) MessagesByTokenID(
 		return nil, err
 	}
 
-	iter, err := u.contractReader.QueryKey(
+	iter, err := u.contractReader.ExtendedQueryKey(
 		ctx,
-		u.boundContract,
+		consts.ContractNameCCTPMessageTransmitter,
 		keyFilter,
 		query.NewLimitAndSort(
 			query.Limit{Count: uint64(len(eventIDsByMsgTokenID))},
@@ -336,6 +355,21 @@ func (u evmUSDCMessageReader) recreateMessageTransmitterEvents(
 		messageTransmitterEvents[id] = [32]byte(buf[:32])
 	}
 	return messageTransmitterEvents, nil
+}
+
+type solanaUSDCMessageReader struct {
+	lggr           logger.Logger
+	contractReader contractreader.Extended
+	cctpDestDomain map[uint64]uint32
+}
+
+func (u solanaUSDCMessageReader) MessagesByTokenID(
+	ctx context.Context,
+	source, dest cciptypes.ChainSelector,
+	tokens map[MessageTokenID]cciptypes.RampTokenAmount,
+) (map[MessageTokenID]cciptypes.Bytes, error) {
+	// TODO: Implement Solana USDC message reading logic
+	return nil, nil
 }
 
 // SourceTokenDataPayload extracts the nonce and source domain from the USDC message.
