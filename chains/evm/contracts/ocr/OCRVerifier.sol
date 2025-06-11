@@ -32,7 +32,6 @@ abstract contract OCRVerifier is ITypeAndVersion, Ownable2StepMsgSender {
   }
 
   error InvalidConfig(InvalidConfigErrorType errorType);
-  error WrongMessageLength(uint256 expected, uint256 actual);
   error ConfigDigestMismatch(bytes32 expected, bytes32 actual);
   error ForkedChain(uint256 expected, uint256 actual);
   error WrongNumberOfSignatures();
@@ -59,25 +58,6 @@ abstract contract OCRVerifier is ITypeAndVersion, Ownable2StepMsgSender {
 
   EnumerableSet.AddressSet internal s_signers;
 
-  // Constant-length components of the msg.data sent to transmit.
-  // See the "If we wanted to call sam" example on for example reasoning.
-  // https://solidity.readthedocs.io/en/v0.7.2/abi-spec.html
-
-  /// @notice Constant length component for transmit functions with no signatures.
-  /// The signatures are expected to match transmitPlugin(reportContext, report).
-  uint16 private constant TRANSMIT_MSGDATA_CONSTANT_LENGTH_COMPONENT_NO_SIGNATURES = 4 // function selector.
-    + 2 * 32 // 2 words containing reportContext.
-    + 32 // word containing start location of abiencoded report value.
-    + 32; // word containing length of report.
-
-  /// @notice Extra constant length component for transmit functions with signatures (relative to no signatures).
-  /// The signatures are expected to match transmitPlugin(reportContext, report, rs, ss, rawVs).
-  uint16 private constant TRANSMIT_MSGDATA_EXTRA_CONSTANT_LENGTH_COMPONENT_FOR_SIGNATURES = 32 // word containing location start of abiencoded rs value.
-    + 32 // word containing start location of abiencoded ss value.
-    + 32 // rawVs value.
-    + 32 // word containing length rs.
-    + 32; // word containing length of ss.
-
   uint256 internal immutable i_chainID;
 
   constructor() {
@@ -97,16 +77,18 @@ abstract contract OCRVerifier is ITypeAndVersion, Ownable2StepMsgSender {
     if (newSigners.length <= 3 * ocrConfigArgs.F) revert InvalidConfig(InvalidConfigErrorType.F_TOO_HIGH);
 
     _clearAllSigners();
-    _assignOracleRoles(newSigners);
+
+    // Add new signers to the set of oracles.
+    for (uint256 i = 0; i < newSigners.length; ++i) {
+      if (newSigners[i] == address(0)) revert OracleCannotBeZeroAddress();
+
+      s_signers.add(newSigners[i]);
+    }
 
     s_ocrConfig = OCRConfig({configDigest: ocrConfigArgs.configDigest, F: ocrConfigArgs.F, n: uint8(newSigners.length)});
 
     emit ConfigSet(ocrConfigArgs.configDigest, newSigners, ocrConfigArgs.F);
-    _afterOCR3ConfigSet();
   }
-
-  /// @notice Hook that is called after a plugin's OCR3 config changes.
-  function _afterOCR3ConfigSet() internal virtual;
 
   /// @notice Clears all the signers.
   function _clearAllSigners() internal {
@@ -114,18 +96,6 @@ abstract contract OCRVerifier is ITypeAndVersion, Ownable2StepMsgSender {
 
     for (uint256 i = 0; i < signers.length; ++i) {
       s_signers.remove(signers[i]);
-    }
-  }
-
-  /// @notice Assigns oracles roles for the provided oracle addresses with uniqueness verification.
-  /// @param oracleAddresses Oracle addresses to assign roles to.
-  function _assignOracleRoles(
-    address[] memory oracleAddresses
-  ) internal {
-    for (uint256 i = 0; i < oracleAddresses.length; ++i) {
-      if (oracleAddresses[i] == address(0)) revert OracleCannotBeZeroAddress();
-
-      s_signers.add(oracleAddresses[i]);
     }
   }
 
@@ -145,21 +115,9 @@ abstract contract OCRVerifier is ITypeAndVersion, Ownable2StepMsgSender {
     // reportContext consists of:
     // reportContext[0]: ConfigDigest.
     // reportContext[1]: 24 byte padding, 8 byte sequence number.
-    OCRConfig memory configInfo = s_ocrConfig;
     bytes32 configDigest = reportContext[0];
 
-    // Scoping this reduces stack pressure and gas usage.
-    {
-      // one byte per entry in _report
-      uint256 expectedDataLength = uint256(TRANSMIT_MSGDATA_CONSTANT_LENGTH_COMPONENT_NO_SIGNATURES) + report.length;
-
-      // 32 bytes per entry in _rs, _ss
-      expectedDataLength +=
-        TRANSMIT_MSGDATA_EXTRA_CONSTANT_LENGTH_COMPONENT_FOR_SIGNATURES + rs.length * 32 + ss.length * 32;
-
-      if (msg.data.length != expectedDataLength) revert WrongMessageLength(expectedDataLength, msg.data.length);
-    }
-
+    OCRConfig memory configInfo = s_ocrConfig;
     if (configInfo.configDigest != configDigest) {
       revert ConfigDigestMismatch(configInfo.configDigest, configDigest);
     }
