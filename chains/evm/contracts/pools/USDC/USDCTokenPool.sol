@@ -107,7 +107,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     i_messageTransmitterProxy = cctpMessageTransmitterProxy;
     i_localDomainIdentifier = transmitter.localDomain();
     i_token.safeIncreaseAllowance(address(i_tokenMessenger), type(uint256).max);
-    
+
     // For new token pools, no previous pool exists, and so the previousPool is not needed, and thus
     // the zero address is a valid value.
     i_previousPool = previousPool;
