@@ -112,10 +112,7 @@ func ParseEventCommitReportAccepted(logs []string, event string, obj *EventCommi
 				return err
 			}
 			if IsEvent(event, data) {
-				err = decodeCommitReportAcceptedEvent(data, obj)
-				if err != nil {
-					return err
-				}
+				return decodeCommitReportAcceptedEvent(data, obj)
 			}
 		}
 	}
