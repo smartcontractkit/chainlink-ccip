@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"fmt"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"strings"
 
 	bin "github.com/gagliardetto/binary"
@@ -59,6 +60,15 @@ func ParseMultipleEvents[T any](logs []string, event string, shouldPrint bool) (
 				return nil, err
 			}
 			if IsEvent(event, data) {
+				// if the event is `EventCommitReportAccepted`, we need to handle it separately
+				if event == consts.EventNameCommitReportAccepted {
+					decodedEvent, err := decodeCommitReportAcceptedEvent(data)
+					if err != nil {
+						return nil, err
+					}
+					results = append(results, any(decodedEvent).(T))
+				}
+
 				var obj T
 				if err := bin.UnmarshalBorsh(&obj, data); err != nil {
 					return nil, err
@@ -96,36 +106,44 @@ func ParseEventCommitReportAccepted(logs []string, event string, obj *EventCommi
 				return err
 			}
 			if IsEvent(event, data) {
-				decoder := bin.NewBorshDecoder(data)
-
-				// Deserialize `Discriminator`:
-				err = decoder.Decode(&obj.Discriminator)
+				decodedEvent, err := decodeCommitReportAcceptedEvent(data)
 				if err != nil {
 					return err
 				}
-
-				// Deserialize `Report` (optional):
-				{
-					ok, dErr := decoder.ReadBool()
-					if dErr != nil {
-						return dErr
-					}
-					if ok {
-						dErr = decoder.Decode(&obj.Report)
-						if dErr != nil {
-							return dErr
-						}
-					}
-				}
-				// Deserialize `PriceUpdates`:
-				err = decoder.Decode(&obj.PriceUpdates)
-				if err != nil {
-					return err
-				}
-
-				return nil
+				obj = &decodedEvent
 			}
 		}
 	}
 	return NewEventNotFoundError(event)
+}
+
+func decodeCommitReportAcceptedEvent(data []byte) (EventCommitReportAccepted, error) {
+	obj := EventCommitReportAccepted{}
+	decoder := bin.NewBorshDecoder(data)
+
+	// Deserialize `Discriminator`:
+	err := decoder.Decode(&obj.Discriminator)
+	if err != nil {
+		return EventCommitReportAccepted{}, err
+	}
+
+	// Deserialize `Report` (optional):
+	{
+		ok, dErr := decoder.ReadBool()
+		if dErr != nil {
+			return EventCommitReportAccepted{}, dErr
+		}
+		if ok {
+			dErr = decoder.Decode(&obj.Report)
+			if dErr != nil {
+				return EventCommitReportAccepted{}, dErr
+			}
+		}
+	}
+	// Deserialize `PriceUpdates`:
+	err = decoder.Decode(&obj.PriceUpdates)
+	if err != nil {
+		return EventCommitReportAccepted{}, err
+	}
+	return obj, nil
 }
