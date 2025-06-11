@@ -65,6 +65,25 @@ contract BurnMintFastTransferTokenPool_validateSendRequest is BurnMintFastTransf
     );
   }
 
+  function test_validateSendRequest_RevertWhen_TransferAmountExceedsMaxFillAmount() public {
+    // Amount exceeding the max fill amount per request (FILL_AMOUNT_MAX = 1000 ether)
+    uint256 excessiveAmount = FILL_AMOUNT_MAX + 1;
+
+    // Should revert with TransferAmountExceedsMaxFillAmount error
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        FastTransferTokenPoolAbstract.TransferAmountExceedsMaxFillAmount.selector, DEST_CHAIN_SELECTOR, excessiveAmount
+      )
+    );
+    s_pool.getCcipSendTokenFee(
+      DEST_CHAIN_SELECTOR,
+      excessiveAmount,
+      abi.encode(RECEIVER),
+      address(0), // native fee token
+      ""
+    );
+  }
+
   function test_validateSendRequest_WithAllowlistedSender() public {
     address allowlistedSender = makeAddr("allowlistedSender");
 
