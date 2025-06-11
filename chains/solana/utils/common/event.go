@@ -8,8 +8,9 @@ import (
 
 	bin "github.com/gagliardetto/binary"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 )
 
 func IsEvent(event string, data []byte) bool {
