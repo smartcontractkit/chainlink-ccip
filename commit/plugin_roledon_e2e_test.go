@@ -17,6 +17,9 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	"github.com/smartcontractkit/chainlink-ccip/commit/internal/builder"
 	"github.com/smartcontractkit/chainlink-ccip/commit/metrics"
@@ -31,8 +34,6 @@ import (
 	ccipreader "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 )
 
 func TestPlugin_RoleDonE2E_NoPrevOutcome(t *testing.T) {
@@ -227,8 +228,8 @@ type oracleMockDependencySet struct {
 //	   Dest Chain   : ChainSelector(16244020411108056671)
 //	   Oracles      : [5 3 7 2 4 1 6]
 //	   F Role DON   : 3
-//	   F Chain      : map[ChainSelector(3577778157919314504):1 ChainSelector(16235373811196386733):1 ChainSelector(16244020411108056671):1]
-//	   Chain Oracles: map[ChainSelector(3577778157919314504):[1 2 3] ChainSelector(16235373811196386733):[7 6 4] ChainSelector(16244020411108056671):[5 4 1]]
+//	   F Chain      : map[3577778157919314504:1 16235373811196386733:1 16244020411108056671:1]
+//	   Chain Oracles: map[3577778157919314504:[1 2 3] 16235373811196386733:[7 6 4] 16244020411108056671:[5 4 1]]
 func newRoleDonTestSetup(t *testing.T, numSourceChains, numOracles, fChain int) roleDonTestSetup {
 	s := roleDonTestSetup{}
 
@@ -278,7 +279,7 @@ func newRoleDonTestSetup(t *testing.T, numSourceChains, numOracles, fChain int) 
 	s.chainOracles = map[cciptypes.ChainSelector][]commontypes.OracleID{}
 	for chainSel, f := range s.fChain {
 		numRequiredOracles := 2*f + 1
-		s.chainOracles[chainSel] = getRandomPermutation(s.oracles, numRequiredOracles+rand.Intn(1))
+		s.chainOracles[chainSel] = getRandomPermutation(s.oracles, numRequiredOracles+rand.Intn(2))
 	}
 
 	return s
