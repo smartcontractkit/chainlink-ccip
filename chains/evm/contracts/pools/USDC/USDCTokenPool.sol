@@ -81,6 +81,9 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   // A mapping of CCIP chain identifiers to destination domains
   mapping(uint64 chainSelector => Domain CCTPDomain) private s_chainToDomain;
 
+  // In the event of an inflight message during a token pool migration, we need to route the message to the
+  // previous pool to satisfy the allowedCaller. The currently in-use token pool must be set as an offRamp
+  // in the router in order for the previous pool to accept the incoming call.
   address public immutable i_previousPool;
 
   constructor(
@@ -104,6 +107,9 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     i_messageTransmitterProxy = cctpMessageTransmitterProxy;
     i_localDomainIdentifier = transmitter.localDomain();
     i_token.safeIncreaseAllowance(address(i_tokenMessenger), type(uint256).max);
+    
+    // For new token pools, no previous pool exists, and so the previousPool is not needed, and thus
+    // the zero address is a valid value.
     i_previousPool = previousPool;
     emit ConfigSet(address(tokenMessenger));
   }
