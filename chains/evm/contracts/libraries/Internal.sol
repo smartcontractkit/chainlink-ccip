@@ -335,7 +335,7 @@ library Internal {
     address receiver; // receiver address on the destination chain.
     uint32 gasLimit; // user supplied maximum gas amount available for dest chain execution & token pool ops.
     Any2EVMMultiProofTokenTransfer[] tokenAmounts; // array of tokens and amounts to transfer.
-    bytes4[] securityModuleSelectors; //
+    bytes32[] securityModuleSelectors; //
   }
 
   struct Any2EVMMultiProofTokenTransfer {
