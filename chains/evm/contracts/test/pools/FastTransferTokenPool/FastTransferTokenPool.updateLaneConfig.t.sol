@@ -193,7 +193,7 @@ contract FastTransferTokenPool_updateDestChainConfig is FastTransferTokenPoolSet
     assertEq(config.maxFillAmountPerRequest, NEW_FILL_AMOUNT_MAX);
   }
 
-  function test_UpdateDestChainConfig_TotalFeesExactly100Percent() public {
+  function test_UpdateDestChainConfig_RevertWhen_TotalFeesExactly100Percent() public {
     uint16 fillerFee = 3_000; // 30%
     uint16 poolFee = 7_000; // 70% -> Total exactly 100%
 
