@@ -8,8 +8,10 @@ import {EnumerableSet} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
 
 /// @notice Onchain verification of reports from the offchain reporting protocol with multiple OCR plugin support.
-abstract contract OCRVerifier is ITypeAndVersion, Ownable2StepMsgSender {
+contract OCRVerifier is ITypeAndVersion, Ownable2StepMsgSender {
   using EnumerableSet for EnumerableSet.AddressSet;
+
+  string public constant override typeAndVersion = "CommitVerifier 1.7.0-dev";
 
   // Maximum number of oracles the offchain reporting protocol is designed for
   uint256 internal constant MAX_NUM_ORACLES = 32;
@@ -99,19 +101,17 @@ abstract contract OCRVerifier is ITypeAndVersion, Ownable2StepMsgSender {
     }
   }
 
-  /// @notice _transmit is called to post a new report to the contract. The function should be called after the per-DON
-  /// reporting logic is completed.
   /// @param report serialized report, which the signatures are signing.
   /// @param rs ith element is the R components of the ith signature on report. Must have at most MAX_NUM_ORACLES entries.
   /// @param ss ith element is the S components of the ith signature on report. Must have at most MAX_NUM_ORACLES entries.
-  function _transmit(
+  function validateReport(
     // NOTE: If these parameters are changed, expectedMsgDataLength and/or TRANSMIT_MSGDATA_CONSTANT_LENGTH_COMPONENT
     // need to be changed accordingly.
     bytes32[2] calldata reportContext,
     bytes calldata report,
     bytes32[] memory rs,
     bytes32[] memory ss
-  ) internal {
+  ) external {
     // reportContext consists of:
     // reportContext[0]: ConfigDigest.
     // reportContext[1]: 24 byte padding, 8 byte sequence number.
