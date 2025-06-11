@@ -263,8 +263,8 @@ func (c *configPoller) processSourceChainResults(
 	batchResult types.BatchGetLatestValuesResult,
 	standardOffRampRequestCount int,
 	filteredSourceChains []cciptypes.ChainSelector,
-) map[cciptypes.ChainSelector]SourceChainConfig {
-	sourceConfigs := make(map[cciptypes.ChainSelector]SourceChainConfig)
+) map[cciptypes.ChainSelector]cciptypes.SourceChainConfig {
+	sourceConfigs := make(map[cciptypes.ChainSelector]cciptypes.SourceChainConfig)
 
 	// Find the OffRamp results
 	for contract, results := range batchResult {
@@ -291,7 +291,7 @@ func (c *configPoller) processSourceChainResults(
 						continue
 					}
 
-					cfg, ok := v.(*SourceChainConfig)
+					cfg, ok := v.(*cciptypes.SourceChainConfig)
 					if !ok {
 						c.lggr.Errorw("Invalid result type from GetSourceChainConfig",
 							"chain", chain,
@@ -320,7 +320,7 @@ func (c *configPoller) prepareSourceChainQueries(sourceChains []cciptypes.ChainS
 			Params: map[string]any{
 				"sourceChainSelector": chain,
 			},
-			ReturnVal: new(SourceChainConfig),
+			ReturnVal: new(cciptypes.SourceChainConfig),
 		})
 	}
 	return sourceConfigQueries
@@ -760,7 +760,7 @@ func filterOutChainSelector(
 
 // StaticSourceChainConfigFromSourceChainConfig creates a StaticSourceChainConfig from a SourceChainConfig,
 // omitting the MinSeqNr field.
-func staticSourceChainConfigFromSourceChainConfig(sc SourceChainConfig) StaticSourceChainConfig {
+func staticSourceChainConfigFromSourceChainConfig(sc cciptypes.SourceChainConfig) StaticSourceChainConfig {
 	return StaticSourceChainConfig{
 		Router:                    sc.Router,
 		IsEnabled:                 sc.IsEnabled,
