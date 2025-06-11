@@ -136,7 +136,7 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
     assertEq(s_token.balanceOf(address(s_pool)), params.amount);
   }
 
-  function test_CcipSendToken_NativeFee() public {
+  function test_ccipSendToken_NativeFee() public {
     TestParams memory params = _setupTestParams(DEST_CHAIN_SELECTOR);
 
     bytes memory extraArgs = Client._argsToBytes(
@@ -146,12 +146,12 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
     _executeTest(params, extraArgs);
   }
 
-  function test_CcipSendToken_NativeFee_ToSVM() public {
+  function test_ccipSendToken_NativeFee_ToSVM() public {
     TestParams memory params = _setupTestParams(SVM_CHAIN_SELECTOR);
     _executeTest(params, s_svmExtraArgsBytesEncoded);
   }
 
-  function test_CcipSendToken_APTOS_WithSettlementGas() public {
+  function test_ccipSendToken_APTOS_WithSettlementGas() public {
     uint64 testChainSelector = uint64(uint256(keccak256("APTOS_WITH_GAS")));
     TestParams memory params = _setupTestParams(testChainSelector);
 
@@ -164,7 +164,7 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
     _executeTest(params, extraArgs);
   }
 
-  function test_CcipSendToken_APTOS_WithZeroSettlementGas() public {
+  function test_ccipSendToken_APTOS_WithZeroSettlementGas() public {
     uint64 testChainSelector = uint64(uint256(keccak256("APTOS_ZERO_GAS")));
     TestParams memory params = _setupTestParams(testChainSelector);
 
@@ -173,7 +173,7 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
     _executeTest(params, customExtraArgs);
   }
 
-  function test_CcipSendToken_WithERC20FeeToken() public {
+  function test_ccipSendToken_WithERC20FeeToken() public {
     address feeToken = address(s_token);
     uint256 balanceBefore = s_token.balanceOf(OWNER);
     uint256 poolBalanceBefore = s_token.balanceOf(address(s_pool));
@@ -212,16 +212,7 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
     assertEq(s_token.balanceOf(address(s_pool)), poolBalanceBefore + SOURCE_AMOUNT + quote.ccipSettlementFee);
   }
 
-  function test_RevertWhen_CursedByRMN() public {
-    vm.mockCall(address(s_mockRMNRemote), abi.encodeWithSignature("isCursed(bytes16)"), abi.encode(true));
-
-    vm.expectRevert(TokenPool.CursedByRMN.selector);
-    s_pool.ccipSendToken{value: 1 ether}(
-      DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, 1 ether, abi.encode(RECEIVER), address(0), ""
-    );
-  }
-
-  function test_CcipSendToken_WithPoolFee() public {
+  function test_ccipSendToken_WithPoolFee() public {
     uint16 fillerFeeBps = 75; // 0.75%
     uint16 poolFeeBps = 25; // 0.25%
 
@@ -262,7 +253,7 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
     assertEq(s_token.balanceOf(address(s_pool)), params.amount);
   }
 
-  function test_CcipSendToken_FeeQuote_WithPoolFee() public {
+  function test_ccipSendToken_FeeQuote_WithPoolFee() public {
     uint16 fillerFeeBps = 50; // 0.5%
     uint16 poolFeeBps = 150; // 1.5%
 
@@ -282,7 +273,7 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
     assertEq(quote.fastTransferFee, expectedTotalFee);
   }
 
-  function test_CcipSendToken_EqualFeeSplit() public {
+  function test_ccipSendToken_EqualFeeSplit() public {
     uint16 equalFee = 100; // 1% each for filler and pool
 
     TestParams memory params = _setupTestParams(DEST_CHAIN_SELECTOR);
@@ -301,7 +292,7 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
     assertEq(quote.fastTransferFee, expectedTotalFee);
   }
 
-  function test_CcipSendToken_FeeValidation_Success_WhenFeeWithinLimit() public {
+  function test_ccipSendToken_FeeValidation_Success_WhenFeeWithinLimit() public {
     // Setup: Calculate expected fee and set max limit higher
     uint256 expectedFee = (SOURCE_AMOUNT * FAST_FEE_FILLER_BPS) / 10_000; // 1% of 100 ether = 1 ether
     uint256 maxFeeLimit = expectedFee + 0.5 ether; // Set limit higher than expected fee
@@ -322,7 +313,7 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
     assertEq(s_token.balanceOf(OWNER), balanceBefore - SOURCE_AMOUNT);
   }
 
-  function test_CcipSendToken_FeeValidation_Success_WhenFeeEqualsLimit() public {
+  function test_ccipSendToken_FeeValidation_Success_WhenFeeEqualsLimit() public {
     // Setup: Calculate expected fee and set max limit equal to it
     uint256 expectedFee = (SOURCE_AMOUNT * FAST_FEE_FILLER_BPS) / 10_000; // 1% of 100 ether = 1 ether
     uint256 maxFeeLimit = expectedFee; // Set limit exactly equal to expected fee
@@ -343,7 +334,7 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
     assertEq(s_token.balanceOf(OWNER), balanceBefore - SOURCE_AMOUNT);
   }
 
-  function test_CcipSendToken_RevertWhen_FeeExceedsUserMaxLimit() public {
+  function test_ccipSendToken_RevertWhen_FeeExceedsUserMaxLimit() public {
     // Setup: Calculate expected fee and set max limit lower
     uint256 expectedFee = (SOURCE_AMOUNT * FAST_FEE_FILLER_BPS) / 10_000; // 1% of 100 ether = 1 ether
     uint256 maxFeeLimit = expectedFee - 0.1 ether; // Set limit lower than expected fee
@@ -364,7 +355,7 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
     s_pool.ccipSendToken{value: 1 ether}(DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, maxFeeLimit, receiver, address(0), "");
   }
 
-  function test_CcipSendToken_RevertWhen_FeeExceedsUserMaxLimit_WithPoolFee() public {
+  function test_ccipSendToken_RevertWhen_FeeExceedsUserMaxLimit_WithPoolFee() public {
     // Setup: Configure both filler and pool fees
     uint16 fillerFeeBps = 75; // 0.75%
     uint16 poolFeeBps = 50; // 0.5%
@@ -390,7 +381,7 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
     s_pool.ccipSendToken{value: 1 ether}(DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, maxFeeLimit, receiver, address(0), "");
   }
 
-  function test_CcipSendToken_RevertWhen_FeeIncreasedAfterQuote_FrontRun() public {
+  function test_ccipSendToken_RevertWhen_FeeIncreasedAfterQuote_FrontRun() public {
     // Setup: Start with low fee configuration
     uint16 initialFillerFeeBps = 50; // 0.5%
     uint16 initialPoolFeeBps = 25; // 0.25%
@@ -437,7 +428,16 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
     s_pool.ccipSendToken{value: 1 ether}(DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, userMaxFeeLimit, receiver, address(0), "");
   }
 
-  function test_CcipSendToken_RevertWhen_ConfigUpdatedBetweenQuoteAndSend_EdgeCase() public {
+  function test_ccipSendToken_RevertWhen_CursedByRMN() public {
+    vm.mockCall(address(s_mockRMNRemote), abi.encodeWithSignature("isCursed(bytes16)"), abi.encode(true));
+
+    vm.expectRevert(TokenPool.CursedByRMN.selector);
+    s_pool.ccipSendToken{value: 1 ether}(
+      DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, 1 ether, abi.encode(RECEIVER), address(0), ""
+    );
+  }
+
+  function test_ccipSendToken_RevertWhen_ConfigUpdatedBetweenQuoteAndSend_EdgeCase() public {
     // Setup: Start with zero pool fee, only filler fee
     uint16 initialFillerFeeBps = 100; // 1%
     uint16 initialPoolFeeBps = 0; // 0%
