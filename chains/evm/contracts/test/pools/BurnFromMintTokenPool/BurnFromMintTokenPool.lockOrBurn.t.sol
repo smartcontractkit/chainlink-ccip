@@ -86,7 +86,7 @@ contract BurnFromMintTokenPool_lockOrBurn is BurnFromMintTokenPoolSetup {
       Pool.ReleaseOrMintInV1({
         originalSender: bytes(""),
         receiver: OWNER,
-        amount: 1,
+        sourceDenominatedAmount: 1,
         localToken: address(s_burnMintERC20),
         remoteChainSelector: wrongChainSelector,
         sourcePoolAddress: _generateSourceTokenData().sourcePoolAddress,

@@ -238,8 +238,9 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
     // Calculate the local amount
-    uint256 localAmount =
-      _calculateLocalAmount(releaseOrMintIn.amount, _parseRemoteDecimals(releaseOrMintIn.sourcePoolData));
+    uint256 localAmount = _calculateLocalAmount(
+      releaseOrMintIn.sourceDenominatedAmount, _parseRemoteDecimals(releaseOrMintIn.sourcePoolData)
+    );
 
     _validateReleaseOrMint(releaseOrMintIn, localAmount);
 

@@ -52,7 +52,7 @@ contract USDCBridgeMigrator_releaseOrMint is HybridLockReleaseUSDCTokenPool_rele
       Pool.ReleaseOrMintInV1({
         originalSender: abi.encode(OWNER),
         receiver: recipient,
-        amount: amount,
+        sourceDenominatedAmount: amount,
         localToken: address(s_token),
         remoteChainSelector: SOURCE_CHAIN_SELECTOR,
         sourcePoolAddress: sourceTokenData.sourcePoolAddress,
@@ -79,7 +79,7 @@ contract USDCBridgeMigrator_releaseOrMint is HybridLockReleaseUSDCTokenPool_rele
       Pool.ReleaseOrMintInV1({
         originalSender: abi.encode(OWNER),
         receiver: recipient,
-        amount: amount,
+        sourceDenominatedAmount: amount,
         localToken: address(s_token),
         remoteChainSelector: SOURCE_CHAIN_SELECTOR,
         sourcePoolAddress: sourceTokenData.sourcePoolAddress,
@@ -177,7 +177,7 @@ contract USDCBridgeMigrator_releaseOrMint is HybridLockReleaseUSDCTokenPool_rele
       Pool.ReleaseOrMintInV1({
         originalSender: abi.encode(OWNER),
         receiver: recipient,
-        amount: amount,
+        sourceDenominatedAmount: amount,
         localToken: address(s_token),
         remoteChainSelector: SOURCE_CHAIN_SELECTOR,
         sourcePoolAddress: sourceTokenData.sourcePoolAddress,

@@ -47,6 +47,6 @@ contract ReentrantMaliciousTokenPool is TokenPool {
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) public pure override returns (Pool.ReleaseOrMintOutV1 memory) {
-    return Pool.ReleaseOrMintOutV1({destinationAmount: releaseOrMintIn.amount});
+    return Pool.ReleaseOrMintOutV1({destinationAmount: releaseOrMintIn.sourceDenominatedAmount});
   }
 }

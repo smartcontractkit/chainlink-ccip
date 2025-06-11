@@ -201,7 +201,9 @@ abstract contract MultiTokenPool is IPoolV1, Ownable2StepMsgSender {
     ) {
       revert InvalidSourcePoolAddress(releaseOrMintIn.sourcePoolAddress);
     }
-    _consumeInboundRateLimit(releaseOrMintIn.localToken, releaseOrMintIn.remoteChainSelector, releaseOrMintIn.amount);
+    _consumeInboundRateLimit(
+      releaseOrMintIn.localToken, releaseOrMintIn.remoteChainSelector, releaseOrMintIn.sourceDenominatedAmount
+    );
   }
 
   // ================================================================

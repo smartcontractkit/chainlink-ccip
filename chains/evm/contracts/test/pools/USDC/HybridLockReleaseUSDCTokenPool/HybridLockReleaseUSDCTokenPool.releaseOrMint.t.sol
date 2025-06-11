@@ -64,7 +64,7 @@ contract HybridLockReleaseUSDCTokenPool_releaseOrMint is HybridLockReleaseUSDCTo
       Pool.ReleaseOrMintInV1({
         originalSender: abi.encode(OWNER),
         receiver: recipient,
-        amount: amount,
+        sourceDenominatedAmount: amount,
         localToken: address(s_token),
         remoteChainSelector: SOURCE_CHAIN_SELECTOR,
         sourcePoolAddress: sourceTokenData.sourcePoolAddress,
@@ -119,7 +119,7 @@ contract HybridLockReleaseUSDCTokenPool_releaseOrMint is HybridLockReleaseUSDCTo
       Pool.ReleaseOrMintInV1({
         originalSender: abi.encode(OWNER),
         receiver: OWNER,
-        amount: amount,
+        sourceDenominatedAmount: amount,
         localToken: address(s_token),
         remoteChainSelector: SOURCE_CHAIN_SELECTOR,
         sourcePoolAddress: sourceTokenData.sourcePoolAddress,
@@ -173,7 +173,7 @@ contract HybridLockReleaseUSDCTokenPool_releaseOrMint is HybridLockReleaseUSDCTo
       Pool.ReleaseOrMintInV1({
         originalSender: abi.encode(OWNER),
         receiver: recipient,
-        amount: amount,
+        sourceDenominatedAmount: amount,
         localToken: address(s_token),
         remoteChainSelector: SOURCE_CHAIN_SELECTOR,
         sourcePoolAddress: sourceTokenData.sourcePoolAddress,
@@ -268,7 +268,7 @@ contract HybridLockReleaseUSDCTokenPool_releaseOrMint_E2ETest is
       Pool.ReleaseOrMintInV1({
         originalSender: abi.encode(OWNER),
         receiver: recipient,
-        amount: amount,
+        sourceDenominatedAmount: amount,
         localToken: address(s_token),
         remoteChainSelector: SOURCE_CHAIN_SELECTOR,
         sourcePoolAddress: sourceTokenData.sourcePoolAddress,

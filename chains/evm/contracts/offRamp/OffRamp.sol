@@ -693,7 +693,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
         Pool.ReleaseOrMintInV1({
           originalSender: originalSender,
           receiver: receiver,
-          amount: sourceTokenAmount.amount,
+          sourceDenominatedAmount: sourceTokenAmount.amount,
           localToken: localToken,
           remoteChainSelector: sourceChainSelector,
           sourcePoolAddress: sourceTokenAmount.sourcePoolAddress,

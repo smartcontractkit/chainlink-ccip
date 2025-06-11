@@ -79,7 +79,7 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
       Pool.ReleaseOrMintInV1({
         originalSender: abi.encode(OWNER),
         receiver: recipient,
-        amount: amount,
+        sourceDenominatedAmount: amount,
         localToken: address(s_token),
         remoteChainSelector: SOURCE_CHAIN_SELECTOR,
         sourcePoolAddress: sourceTokenData.sourcePoolAddress,
@@ -122,7 +122,7 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
       Pool.ReleaseOrMintInV1({
         originalSender: abi.encode(OWNER),
         receiver: OWNER,
-        amount: amount,
+        sourceDenominatedAmount: amount,
         localToken: address(s_token),
         remoteChainSelector: SOURCE_CHAIN_SELECTOR,
         sourcePoolAddress: sourceTokenData.sourcePoolAddress,
@@ -175,7 +175,7 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
       Pool.ReleaseOrMintInV1({
         originalSender: abi.encode(OWNER),
         receiver: OWNER,
-        amount: amount,
+        sourceDenominatedAmount: amount,
         localToken: address(s_token),
         remoteChainSelector: SOURCE_CHAIN_SELECTOR,
         sourcePoolAddress: sourceTokenData.sourcePoolAddress,
@@ -209,7 +209,7 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
       Pool.ReleaseOrMintInV1({
         originalSender: abi.encode(OWNER),
         receiver: recipient,
-        amount: amount,
+        sourceDenominatedAmount: amount,
         localToken: address(s_token),
         remoteChainSelector: SOURCE_CHAIN_SELECTOR,
         sourcePoolAddress: sourceTokenData.sourcePoolAddress,

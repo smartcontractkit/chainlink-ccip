@@ -39,7 +39,7 @@ contract OffRamp_releaseOrMintTokens is OffRampSetup {
         Pool.ReleaseOrMintInV1({
           originalSender: abi.encode(OWNER),
           receiver: OWNER,
-          amount: srcTokenAmounts[0].amount,
+          sourceDenominatedAmount: srcTokenAmounts[0].amount,
           localToken: s_destTokenBySourceToken[srcTokenAmounts[0].token],
           remoteChainSelector: SOURCE_CHAIN_SELECTOR_1,
           sourcePoolAddress: sourceTokenAmounts[0].sourcePoolAddress,
@@ -75,7 +75,7 @@ contract OffRamp_releaseOrMintTokens is OffRampSetup {
         Pool.ReleaseOrMintInV1({
           originalSender: abi.encode(OWNER),
           receiver: OWNER,
-          amount: srcTokenAmounts[0].amount,
+          sourceDenominatedAmount: srcTokenAmounts[0].amount,
           localToken: s_destTokenBySourceToken[srcTokenAmounts[0].token],
           remoteChainSelector: SOURCE_CHAIN_SELECTOR_1,
           sourcePoolAddress: sourceTokenAmounts[0].sourcePoolAddress,
@@ -155,7 +155,7 @@ contract OffRamp_releaseOrMintTokens is OffRampSetup {
         Pool.ReleaseOrMintInV1({
           originalSender: abi.encode(OWNER),
           receiver: OWNER,
-          amount: amount,
+          sourceDenominatedAmount: amount,
           localToken: s_destTokenBySourceToken[srcTokenAmounts[0].token],
           remoteChainSelector: SOURCE_CHAIN_SELECTOR_1,
           sourcePoolAddress: sourceTokenAmounts[0].sourcePoolAddress,
@@ -210,7 +210,7 @@ contract OffRamp_releaseOrMintTokens is OffRampSetup {
         Pool.ReleaseOrMintInV1({
           originalSender: abi.encode(OWNER),
           receiver: OWNER,
-          amount: srcTokenAmounts[0].amount,
+          sourceDenominatedAmount: srcTokenAmounts[0].amount,
           localToken: s_destTokenBySourceToken[srcTokenAmounts[0].token],
           remoteChainSelector: SOURCE_CHAIN_SELECTOR_3,
           sourcePoolAddress: sourceTokenAmounts[0].sourcePoolAddress,

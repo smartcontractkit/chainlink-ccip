@@ -38,7 +38,7 @@ contract BurnMintTokenPool_releaseOrMint is BurnMintTokenPoolSetup {
       Pool.ReleaseOrMintInV1({
         originalSender: bytes(""),
         receiver: receiver,
-        amount: amount,
+        sourceDenominatedAmount: amount,
         localToken: address(s_burnMintERC20),
         remoteChainSelector: DEST_CHAIN_SELECTOR,
         sourcePoolAddress: abi.encode(s_remoteBurnMintPool),
@@ -61,7 +61,7 @@ contract BurnMintTokenPool_releaseOrMint is BurnMintTokenPoolSetup {
       Pool.ReleaseOrMintInV1({
         originalSender: bytes(""),
         receiver: OWNER,
-        amount: 1e5,
+        sourceDenominatedAmount: 1e5,
         localToken: address(s_burnMintERC20),
         remoteChainSelector: DEST_CHAIN_SELECTOR,
         sourcePoolAddress: _generateSourceTokenData().sourcePoolAddress,
@@ -81,7 +81,7 @@ contract BurnMintTokenPool_releaseOrMint is BurnMintTokenPoolSetup {
       Pool.ReleaseOrMintInV1({
         originalSender: bytes(""),
         receiver: OWNER,
-        amount: 1,
+        sourceDenominatedAmount: 1,
         localToken: address(s_burnMintERC20),
         remoteChainSelector: wrongChainSelector,
         sourcePoolAddress: _generateSourceTokenData().sourcePoolAddress,

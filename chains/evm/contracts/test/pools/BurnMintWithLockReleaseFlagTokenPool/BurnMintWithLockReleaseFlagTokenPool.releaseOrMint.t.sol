@@ -24,7 +24,7 @@ contract BurnMintWithLockReleaseFlagTokenPool_releaseOrMint is BurnMintWithLockR
       Pool.ReleaseOrMintInV1({
         originalSender: bytes(""),
         receiver: receiver,
-        amount: amount,
+        sourceDenominatedAmount: amount,
         localToken: address(s_burnMintERC20),
         remoteChainSelector: DEST_CHAIN_SELECTOR,
         sourcePoolAddress: abi.encode(s_remoteBurnMintPool),
@@ -49,7 +49,7 @@ contract BurnMintWithLockReleaseFlagTokenPool_releaseOrMint is BurnMintWithLockR
       Pool.ReleaseOrMintInV1({
         originalSender: bytes(""),
         receiver: receiver,
-        amount: amount,
+        sourceDenominatedAmount: amount,
         localToken: address(s_burnMintERC20),
         remoteChainSelector: DEST_CHAIN_SELECTOR,
         sourcePoolAddress: abi.encode(s_remoteBurnMintPool),
@@ -110,7 +110,7 @@ contract BurnMintWithLockReleaseFlagTokenPool_releaseOrMint_e2eTest is
       Pool.ReleaseOrMintInV1({
         originalSender: bytes(""),
         receiver: STRANGER,
-        amount: amount,
+        sourceDenominatedAmount: amount,
         localToken: address(s_burnMintERC20),
         remoteChainSelector: DEST_CHAIN_SELECTOR,
         sourcePoolAddress: abi.encode(s_remoteBurnMintPool),
