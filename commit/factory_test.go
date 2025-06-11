@@ -1,11 +1,9 @@
 package commit
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"math"
-	"math/big"
 	"strings"
 	"testing"
 	"time"
@@ -31,6 +29,7 @@ import (
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	reader2 "github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	writer_mocks "github.com/smartcontractkit/chainlink-ccip/mocks/chainlink_common"
 	ocrtypecodec "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
@@ -307,6 +306,7 @@ func TestPluginFactory_NewReportingPlugin(t *testing.T) {
 		b, err := json.Marshal(offChainConfig)
 		require.NoError(t, err)
 
+		cw := writer_mocks.NewMockContractWriter(t)
 		chainSel := ccipocr3.ChainSelector(12922642891491394802)
 		mockAddrCodec := internal.NewMockAddressCodecHex(t)
 		p := &PluginFactory{
@@ -324,10 +324,8 @@ func TestPluginFactory_NewReportingPlugin(t *testing.T) {
 			contractReaders: map[ccipocr3.ChainSelector]types.ContractReader{
 				chainSel: types.UnimplementedContractReader{},
 			},
-			chainWriters: map[ccipocr3.ChainSelector]types.ContractWriter{
-				chainSel: UnimplementedTestContractWriter{},
-			},
-			addrCodec: mockAddrCodec,
+			chainWriters: map[ccipocr3.ChainSelector]types.ContractWriter{chainSel: cw},
+			addrCodec:    mockAddrCodec,
 		}
 
 		plugin, pluginInfo, err := p.NewReportingPlugin(ctx, ocr3types.ReportingPluginConfig{
@@ -346,43 +344,3 @@ func TestPluginFactory_NewReportingPlugin(t *testing.T) {
 		require.Equal(t, maxQueryLength, pluginInfo.Limits.MaxQueryLength)
 	})
 }
-
-type UnimplementedTestContractWriter struct{}
-
-func (u UnimplementedTestContractWriter) Start(ctx context.Context) error {
-	return fmt.Errorf("ContractWriter.Start not implemented")
-}
-
-func (u UnimplementedTestContractWriter) Close() error {
-	return fmt.Errorf("ContractWriter.Start not implemented")
-}
-
-func (u UnimplementedTestContractWriter) Ready() error {
-	return fmt.Errorf("ContractWriter.Start not implemented")
-}
-
-func (u UnimplementedTestContractWriter) HealthReport() map[string]error {
-	return nil
-}
-
-func (u UnimplementedTestContractWriter) Name() string {
-	return "UnimplementedTestContractWriter"
-}
-
-func (u UnimplementedTestContractWriter) SubmitTransaction(
-	_ context.Context, _, _ string, _ any, _ string, _ string, _ *types.TxMeta, _ *big.Int,
-) error {
-	return fmt.Errorf("ContractWriter.SubmitTransaction not implemented")
-}
-
-func (u UnimplementedTestContractWriter) GetTransactionStatus(
-	ctx context.Context, transactionID string,
-) (types.TransactionStatus, error) {
-	return 0, fmt.Errorf("ContractWriter.GetTransactionStatus not implemented")
-}
-
-func (u UnimplementedTestContractWriter) GetFeeComponents(ctx context.Context) (*types.ChainFeeComponents, error) {
-	return nil, fmt.Errorf("ContractWriter.GetFeeComponents not implemented")
-}
-
-var _ types.ContractWriter = UnimplementedTestContractWriter{}

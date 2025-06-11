@@ -15,11 +15,12 @@ type Query struct {
 }
 
 type Observation struct {
-	MerkleRootObs merkleroot.Observation          `json:"merkleObs"`
-	TokenPriceObs tokenprice.Observation          `json:"tokenObs"`
-	ChainFeeObs   chainfee.Observation            `json:"chainFeeObs"`
-	DiscoveryObs  dt.Observation                  `json:"discoveryObs"`
-	FChain        map[cciptypes.ChainSelector]int `json:"fChain"`
+	MerkleRootObs         merkleroot.Observation          `json:"merkleObs"`
+	TokenPriceObs         tokenprice.Observation          `json:"tokenObs"`
+	ChainFeeObs           chainfee.Observation            `json:"chainFeeObs"`
+	DiscoveryObs          dt.Observation                  `json:"discoveryObs"`
+	FChain                map[cciptypes.ChainSelector]int `json:"fChain"`
+	OnChainPriceOcrSeqNum uint64                          `json:"onChainPriceOcrSeqNum"`
 }
 
 type Outcome struct {
