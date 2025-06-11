@@ -7295,7 +7295,7 @@ func TestCCIPRouter(t *testing.T) {
 				)
 
 				mintsOfTransferredTokens := []solana.PublicKey{}
-				bufferId := []byte{}
+				bufferID := []byte{}
 
 				derivedAccounts, derivedLookUpTables := deriveExecutionAccounts(ctx,
 					t,
@@ -7304,7 +7304,7 @@ func TestCCIPRouter(t *testing.T) {
 					sourceChainSelector,
 					mintsOfTransferredTokens,
 					root,
-					bufferId,
+					bufferID,
 					executionReport.Message.TokenReceiver,
 					solanaGoClient,
 				)
@@ -8732,7 +8732,7 @@ func TestCCIPRouter(t *testing.T) {
 						ccip_offramp.CcipAccountMeta{Pubkey: solana.SystemProgramID, IsSigner: false, IsWritable: false},
 					)
 					mintsOfTransferredTokens := []solana.PublicKey{message.TokenAmounts[0].DestTokenAddress}
-					bufferId := []byte{}
+					bufferID := []byte{}
 
 					derivedAccounts, derivedLookUpTables := deriveExecutionAccounts(ctx,
 						t,
@@ -8741,7 +8741,7 @@ func TestCCIPRouter(t *testing.T) {
 						sourceChainSelector,
 						mintsOfTransferredTokens,
 						root,
-						bufferId,
+						bufferID,
 						executionReport.Message.TokenReceiver,
 						solanaGoClient,
 					)
@@ -10446,7 +10446,7 @@ func deriveExecutionAccounts(ctx context.Context,
 	sourceChainSelector uint64,
 	mintsOfTransferredTokens []solana.PublicKey,
 	merkleRoot [32]uint8,
-	bufferId []byte,
+	bufferID []byte,
 	tokenReceiver solana.PublicKey,
 	solanaGoClient *rpc.Client) (accounts []*solana.AccountMeta, lookUpTables map[solana.PublicKey]solana.PublicKeySlice) {
 	derivedAccounts := []*solana.AccountMeta{}
@@ -10459,7 +10459,7 @@ func deriveExecutionAccounts(ctx context.Context,
 			sourceChainSelector,
 			mintsOfTransferredTokens,
 			merkleRoot,
-			bufferId,
+			bufferID,
 			tokenReceiver,
 			config.OfframpConfigPDA,
 		)
