@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol";
-import {IFeeQuoter} from "../interfaces/IFeeQuoter.sol";
 import {IMessageInterceptor} from "../interfaces/IMessageInterceptor.sol";
 import {INonceManager} from "../interfaces/INonceManager.sol";
 import {IPoolV1} from "../interfaces/IPool.sol";
@@ -14,9 +13,8 @@ import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/I
 import {Client} from "../libraries/Client.sol";
 import {ERC165CheckerReverting} from "../libraries/ERC165CheckerReverting.sol";
 import {Internal} from "../libraries/Internal.sol";
-import {MerkleMultiProof} from "../libraries/MerkleMultiProof.sol";
 import {Pool} from "../libraries/Pool.sol";
-import {MultiOCR3Base} from "../ocr/MultiOCR3Base.sol";
+import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 import {CallWithExactGas} from "@chainlink/contracts/src/v0.8/shared/call/CallWithExactGas.sol";
 
 import {IERC20} from
@@ -27,9 +25,7 @@ import {EnumerableSet} from
 /// @notice OffRamp enables OCR networks to execute multiple messages in an OffRamp in a single transaction.
 /// @dev The OnRamp and OffRamp form a cross chain upgradeable unit. Any change to one of them results an
 /// onchain upgrade of both contracts.
-/// @dev MultiOCR3Base is used to store multiple OCR configs for the OffRamp. The execution plugin type has to be
-/// configured without signature verification, and the commit plugin type with verification.
-contract OffRamp is ITypeAndVersion, MultiOCR3Base {
+contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   using ERC165CheckerReverting for address;
   using EnumerableSet for EnumerableSet.UintSet;
 
@@ -45,8 +41,6 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     bytes32 messageId, uint256 tokenIndex, uint256 oldLimit, uint256 tokenGasOverride
   );
   error ManualExecutionGasAmountCountMismatch(bytes32 messageId, uint64 sequenceNumber);
-  error RootNotCommitted(uint64 sourceChainSelector);
-  error RootAlreadyCommitted(uint64 sourceChainSelector, bytes32 merkleRoot);
   error InvalidRoot();
   error CanOnlySelfCall();
   error ReceiverError(bytes err);
@@ -58,14 +52,11 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   error NotACompatiblePool(address notPool);
   error InvalidDataLength(uint256 expected, uint256 got);
   error InvalidNewState(uint64 sourceChainSelector, uint64 sequenceNumber, Internal.MessageExecutionState newState);
-  error StaleCommitReport();
   error InvalidInterval(uint64 sourceChainSelector, uint64 min, uint64 max);
   error ZeroAddressNotAllowed();
   error InvalidMessageDestChainSelector(uint64 messageDestChainSelector);
   error SourceChainSelectorMismatch(uint64 reportSourceChainSelector, uint64 messageSourceChainSelector);
-  error SignatureVerificationRequiredInCommitPlugin();
   error SignatureVerificationNotAllowedInExecutionPlugin();
-  error CommitOnRampMismatch(bytes reportOnRamp, bytes configOnRamp);
   error InvalidOnRampUpdate(uint64 sourceChainSelector);
   error RootBlessingMismatch(uint64 sourceChainSelector, bytes32 merkleRoot, bool isBlessed);
   error InsufficientGasToCompleteTx(bytes4 err);
@@ -86,12 +77,6 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   event SourceChainConfigSet(uint64 indexed sourceChainSelector, SourceChainConfig sourceConfig);
   event SkippedAlreadyExecutedMessage(uint64 sourceChainSelector, uint64 sequenceNumber);
   event AlreadyAttempted(uint64 sourceChainSelector, uint64 sequenceNumber);
-  event CommitReportAccepted(
-    Internal.MerkleRoot[] blessedMerkleRoots,
-    Internal.MerkleRoot[] unblessedMerkleRoots,
-    Internal.PriceUpdates priceUpdates
-  );
-  event RootRemoved(bytes32 root);
   event SkippedReportExecution(uint64 sourceChainSelector);
 
   /// @dev Struct that contains the static configuration. The individual components are stored as immutable variables.
@@ -131,14 +116,6 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     address messageInterceptor; // Optional, validates incoming messages (zero address = no interceptor).
   }
 
-  /// @dev Report that is committed by the observing DON at the committing phase.
-  struct CommitReport {
-    Internal.PriceUpdates priceUpdates; // List of gas and price updates to commit.
-    Internal.MerkleRoot[] blessedMerkleRoots; // List of merkle roots from source chains for which RMN is enabled.
-    Internal.MerkleRoot[] unblessedMerkleRoots; // List of merkle roots from source chains for which RMN is disabled.
-    IRMNRemote.Signature[] rmnSignatures; // RMN signatures on the merkle roots.
-  }
-
   /// @dev Both receiverExecutionGasLimit and tokenGasOverrides are optional. To indicate no override, set the value
   /// to 0. The length of tokenGasOverrides must match the length of tokenAmounts, even if it only contains zeros.
   struct GasLimitOverride {
@@ -147,6 +124,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   }
 
   // STATIC CONFIG
+  string public constant override typeAndVersion = "OffRamp 1.6.0";
   /// @dev Hash of encoded address(0) used for empty address checks.
   bytes32 internal constant EMPTY_ENCODED_ADDRESS_HASH = keccak256(abi.encode(address(0)));
   /// @dev ChainSelector of this chain.
@@ -178,8 +156,6 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   mapping(uint64 sourceChainSelector => mapping(uint64 seqNum => uint256 executionStateBitmap)) internal
     s_executionStates;
 
-  /// @notice Commit timestamp of merkle roots per source chain.
-  mapping(uint64 sourceChainSelector => mapping(bytes32 merkleRoot => uint256 timestamp)) internal s_roots;
   /// @dev The sequence number of the last price update.
   uint64 private s_latestPriceSequenceNumber;
 
@@ -187,7 +163,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     StaticConfig memory staticConfig,
     DynamicConfig memory dynamicConfig,
     SourceChainConfigArgs[] memory sourceChainConfigs
-  ) MultiOCR3Base() {
+  ) {
     if (
       address(staticConfig.rmnRemote) == address(0) || staticConfig.tokenAdminRegistry == address(0)
         || staticConfig.nonceManager == address(0)
@@ -208,11 +184,6 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
 
     _setDynamicConfig(dynamicConfig);
     _applySourceChainConfigUpdates(sourceChainConfigs);
-  }
-
-  /// @notice Using a function because constant state variables cannot be overridden by child contracts.
-  function typeAndVersion() external pure virtual override returns (string memory) {
-    return "OffRamp 1.6.2-dev";
   }
 
   // ================================================================
@@ -286,7 +257,8 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     GasLimitOverride[][] memory gasLimitOverrides
   ) external {
     // We do this here because the other _execute path is already covered by MultiOCR3Base.
-    _whenChainNotForked();
+    // TODO ??
+    //    _whenChainNotForked();
 
     uint256 numReports = reports.length;
     if (numReports != gasLimitOverrides.length) revert ManualExecutionGasLimitMismatch();
@@ -338,11 +310,10 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @notice Transmit function for execution reports. The function takes no signatures, and expects the exec plugin
   /// type to be configured with no signatures.
   /// @param report serialized execution report.
-  function execute(bytes32[2] calldata reportContext, bytes calldata report) external {
+  function execute(
+    bytes calldata report
+  ) external {
     _batchExecute(abi.decode(report, (Internal.ExecutionReport[])), new GasLimitOverride[][](0));
-
-    bytes32[] memory emptySigs = new bytes32[](0);
-    _transmit(uint8(Internal.OCRPluginType.Execution), reportContext, report, emptySigs, emptySigs, bytes32(""));
   }
 
   /// @notice Batch executes a set of reports, each report matching one single source chain.
@@ -394,7 +365,46 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     if (numMsgs == 0) revert EmptyReport(report.sourceChainSelector);
     if (numMsgs != report.offchainTokenData.length) revert UnexpectedTokenData();
 
-    (uint256 timestampCommitted, bytes32[] memory hashedLeaves) = _verifyReport(sourceChainSelector, report);
+    bytes32[] memory hashedLeaves = new bytes32[](numMsgs);
+
+    {
+      // We do this hash here instead of in _verify to avoid two separate loops over the same data. Hashing all of the
+      // message fields ensures that the message being executed is correct and not tampered with. Including the known
+      // OnRamp ensures that the message originates from the correct on ramp version. We know the sourceChainSelector
+      // and i_destChainSelector are correct because we revert below when they are not.
+      bytes32 metaDataHash = keccak256(
+        abi.encode(
+          Internal.ANY_2_EVM_MESSAGE_HASH,
+          sourceChainSelector,
+          i_chainSelector,
+          keccak256(_getEnabledSourceChainConfig(sourceChainSelector).onRamp)
+        )
+      );
+
+      for (uint256 i = 0; i < numMsgs; ++i) {
+        Internal.Any2EVMRampMessage memory message = report.messages[i];
+
+        // Commits do not verify the destChainSelector in the message since only the root is committed, so we
+        // have to check it explicitly. This check is also important as we have assumed the metaDataHash above uses
+        // the i_chainSelector as the destChainSelector.
+        if (message.header.destChainSelector != i_chainSelector) {
+          revert InvalidMessageDestChainSelector(message.header.destChainSelector);
+        }
+        // If the message source chain selector does not match the report's source chain selector and the root has not
+        // been committed for the report source chain selector this will be caught by the root verification.
+        // This acts as an extra check to ensure the message source chain selector matches the report's source chain.
+        if (message.header.sourceChainSelector != sourceChainSelector) {
+          revert SourceChainSelectorMismatch(sourceChainSelector, message.header.sourceChainSelector);
+        }
+
+        hashedLeaves[i] = Internal._hash(message, metaDataHash);
+      }
+    }
+
+    // SECURITY CRITICAL CHECK.
+
+    // TODO all the hooooks
+    uint256 timestampCommitted = 5; // _verify(sourceChainSelector, hashedLeaves, report.proofs, report.proofFlagBits);
 
     // Execute messages.
     for (uint256 i = 0; i < numMsgs; ++i) {
@@ -660,7 +670,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
         Pool.ReleaseOrMintInV1({
           originalSender: originalSender,
           receiver: receiver,
-          sourceDenominatedAmount: sourceTokenAmount.amount,
+          amount: sourceTokenAmount.amount,
           localToken: localToken,
           remoteChainSelector: sourceChainSelector,
           sourcePoolAddress: sourceTokenAmount.sourcePoolAddress,
@@ -755,217 +765,6 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     }
 
     return destTokenAmounts;
-  }
-
-  // ================================================================
-  // │                           Commit                             │
-  // ================================================================
-
-  /// @notice Transmit function for commit reports. The function requires signatures,
-  /// and expects the commit plugin type to be configured with signatures.
-  /// @param report serialized commit report.
-  /// @dev A commitReport can have two distinct parts (batched together to amortize the cost of checking sigs):
-  /// 1. Price updates
-  /// 2. A batch of merkle root and sequence number intervals (per-source)
-  /// Both have their own, separate, staleness checks, with price updates using the epoch and round number of the latest
-  /// price update. The merkle root checks for staleness are based on the seqNums.  They need to be separate because
-  /// a price report for round t+2 might be included before a report containing a merkle root for round t+1. This merkle
-  /// root report for round t+1 is still valid and should not be rejected. When a report with a stale root but valid
-  /// price updates is submitted, we are OK to revert to preserve the invariant that we always revert on invalid
-  /// sequence number ranges. If that happens, prices will be updated in later rounds.
-  function commit(
-    bytes32[2] calldata reportContext,
-    bytes calldata report,
-    bytes32[] calldata rs,
-    bytes32[] calldata ss,
-    bytes32 rawVs
-  ) external virtual {
-    CommitReport memory commitReport = abi.decode(report, (CommitReport));
-    DynamicConfig storage dynamicConfig = s_dynamicConfig;
-
-    // Verify RMN signatures
-    if (commitReport.blessedMerkleRoots.length > 0) {
-      i_rmnRemote.verify(address(this), commitReport.blessedMerkleRoots, commitReport.rmnSignatures);
-    }
-
-    // Check if the report contains price updates.
-    if (commitReport.priceUpdates.tokenPriceUpdates.length > 0 || commitReport.priceUpdates.gasPriceUpdates.length > 0)
-    {
-      uint64 ocrSequenceNumber = uint64(uint256(reportContext[1]));
-
-      // Check for price staleness based on the epoch and round.
-      if (s_latestPriceSequenceNumber < ocrSequenceNumber) {
-        // If prices are not stale, update the latest epoch and round.
-        s_latestPriceSequenceNumber = ocrSequenceNumber;
-        // And update the prices in the fee quoter.
-        IFeeQuoter(dynamicConfig.feeQuoter).updatePrices(commitReport.priceUpdates);
-      } else {
-        // If prices are stale and the report doesn't contain a root, this report does not have any valid information
-        // and we revert. If it does contain a merkle root, continue to the root checking section.
-        if (commitReport.blessedMerkleRoots.length + commitReport.unblessedMerkleRoots.length == 0) {
-          revert StaleCommitReport();
-        }
-      }
-    }
-
-    for (uint256 i = 0; i < commitReport.blessedMerkleRoots.length; ++i) {
-      _commitRoot(commitReport.blessedMerkleRoots[i], true);
-    }
-
-    for (uint256 i = 0; i < commitReport.unblessedMerkleRoots.length; ++i) {
-      _commitRoot(commitReport.unblessedMerkleRoots[i], false);
-    }
-
-    emit CommitReportAccepted(
-      commitReport.blessedMerkleRoots, commitReport.unblessedMerkleRoots, commitReport.priceUpdates
-    );
-
-    _transmit(uint8(Internal.OCRPluginType.Commit), reportContext, report, rs, ss, rawVs);
-  }
-
-  /// @notice Commits a single merkle root. The blessing status has to match the source chain config.
-  /// @dev An unblessed root means that RMN verification is disabled for the source chain. It does not mean there is
-  /// some future point where the root will be blessed.
-  /// @param root The merkle root to commit.
-  /// @param isBlessed The blessing status of the root.
-  function _commitRoot(Internal.MerkleRoot memory root, bool isBlessed) internal {
-    uint64 sourceChainSelector = root.sourceChainSelector;
-
-    if (i_rmnRemote.isCursed(bytes16(uint128(sourceChainSelector)))) {
-      revert CursedByRMN(sourceChainSelector);
-    }
-
-    SourceChainConfig storage sourceChainConfig = _getEnabledSourceChainConfig(sourceChainSelector);
-
-    // If the root is blessed but RMN blessing is disabled for the source chain, or if the root is not blessed but RMN
-    // blessing is enabled, we revert.
-    if (isBlessed == sourceChainConfig.isRMNVerificationDisabled) {
-      revert RootBlessingMismatch(sourceChainSelector, root.merkleRoot, isBlessed);
-    }
-
-    if (keccak256(root.onRampAddress) != keccak256(sourceChainConfig.onRamp)) {
-      revert CommitOnRampMismatch(root.onRampAddress, sourceChainConfig.onRamp);
-    }
-
-    if (sourceChainConfig.minSeqNr != root.minSeqNr || root.minSeqNr > root.maxSeqNr) {
-      revert InvalidInterval(sourceChainSelector, root.minSeqNr, root.maxSeqNr);
-    }
-
-    bytes32 merkleRoot = root.merkleRoot;
-    if (merkleRoot == bytes32(0)) revert InvalidRoot();
-    // If we reached this section, the report should contain a valid root.
-    // We disallow duplicate roots as that would reset the timestamp and delay potential manual execution.
-    if (s_roots[sourceChainSelector][merkleRoot] != 0) {
-      revert RootAlreadyCommitted(sourceChainSelector, merkleRoot);
-    }
-
-    sourceChainConfig.minSeqNr = root.maxSeqNr + 1;
-    s_roots[sourceChainSelector][merkleRoot] = block.timestamp;
-  }
-
-  /// @notice Returns the sequence number of the last price update.
-  /// @return sequenceNumber The latest price update sequence number.
-  function getLatestPriceSequenceNumber() external view returns (uint64) {
-    return s_latestPriceSequenceNumber;
-  }
-
-  /// @notice Returns the timestamp of a potentially previously committed merkle root.
-  /// If the root was never committed 0 will be returned.
-  /// @param sourceChainSelector The source chain selector.
-  /// @param root The merkle root to check the commit status for.
-  /// @return timestamp The timestamp of the committed root or zero in the case that it was never committed.
-  function getMerkleRoot(uint64 sourceChainSelector, bytes32 root) external view returns (uint256) {
-    return s_roots[sourceChainSelector][root];
-  }
-
-  /// @notice Security check on the report, verifies that it has been signed by the Commit DON.
-  /// @dev This function is virtual. Inheriting contracts can override how message security is guaranteed.
-  /// @param sourceChainSelector The source chain selector.
-  /// @param report The report to verify.
-  /// @return timestampCommitted The timestamp of the committed root.
-  /// @return hashedLeaves The hash for every message in the report.
-  function _verifyReport(
-    uint64 sourceChainSelector,
-    Internal.ExecutionReport memory report
-  ) internal virtual returns (uint256 timestampCommitted, bytes32[] memory hashedLeaves) {
-    uint256 numMsgs = report.messages.length;
-    hashedLeaves = new bytes32[](numMsgs);
-
-    // We do this hash here instead of in _verify to avoid two separate loops over the same data. Hashing all of the
-    // message fields ensures that the message being executed is correct and not tampered with. Including the known
-    // OnRamp ensures that the message originates from the correct OnRamp version. We know the sourceChainSelector
-    // and i_destChainSelector are correct because we revert below when they are not.
-    bytes32 metaDataHash = keccak256(
-      abi.encode(
-        Internal.ANY_2_EVM_MESSAGE_HASH,
-        sourceChainSelector,
-        i_chainSelector,
-        keccak256(_getEnabledSourceChainConfig(sourceChainSelector).onRamp)
-      )
-    );
-
-    for (uint256 i = 0; i < numMsgs; ++i) {
-      Internal.Any2EVMRampMessage memory message = report.messages[i];
-
-      // Commits do not verify the destChainSelector in the message since only the root is committed, so we
-      // have to check it explicitly. This check is also important as we have assumed the metaDataHash above uses
-      // the i_chainSelector as the destChainSelector.
-      if (message.header.destChainSelector != i_chainSelector) {
-        revert InvalidMessageDestChainSelector(message.header.destChainSelector);
-      }
-      // If the message source chain selector does not match the report's source chain selector and the root has not
-      // been committed for the report source chain selector this will be caught by the root verification.
-      // This acts as an extra check to ensure the message source chain selector matches the report's source chain.
-      if (message.header.sourceChainSelector != sourceChainSelector) {
-        revert SourceChainSelectorMismatch(sourceChainSelector, message.header.sourceChainSelector);
-      }
-
-      hashedLeaves[i] = Internal._hash(message, metaDataHash);
-    }
-
-    // SECURITY CRITICAL CHECK.
-    timestampCommitted = _verify(sourceChainSelector, hashedLeaves, report.proofs, report.proofFlagBits);
-    if (timestampCommitted == 0) revert RootNotCommitted(sourceChainSelector);
-
-    return (timestampCommitted, hashedLeaves);
-  }
-
-  /// @notice Returns timestamp of when root was accepted or 0 if verification fails.
-  /// @dev This method uses a merkle tree within a merkle tree, with the hashedLeaves,
-  /// proofs and proofFlagBits being used to get the root of the inner tree.
-  /// This root is then used as the singular leaf of the outer tree.
-  /// @return timestamp The commit timestamp of the root.
-  function _verify(
-    uint64 sourceChainSelector,
-    bytes32[] memory hashedLeaves,
-    bytes32[] memory proofs,
-    uint256 proofFlagBits
-  ) internal view virtual returns (uint256 timestamp) {
-    bytes32 root = MerkleMultiProof._merkleRoot(hashedLeaves, proofs, proofFlagBits);
-    return s_roots[sourceChainSelector][root];
-  }
-
-  /// @inheritdoc MultiOCR3Base
-  function _afterOCR3ConfigSet(
-    uint8 ocrPluginType
-  ) internal override {
-    bool isSignatureVerificationEnabled = s_ocrConfigs[ocrPluginType].configInfo.isSignatureVerificationEnabled;
-
-    if (ocrPluginType == uint8(Internal.OCRPluginType.Commit)) {
-      // Signature verification must be enabled for commit plugin.
-      if (!isSignatureVerificationEnabled) {
-        revert SignatureVerificationRequiredInCommitPlugin();
-      }
-      // When the OCR config changes, we reset the sequence number  since it is scoped per config digest.
-      // Note that s_minSeqNr/roots do not need to be reset as the roots persist across reconfigurations
-      // and are de-duplicated separately.
-      s_latestPriceSequenceNumber = 0;
-    } else if (ocrPluginType == uint8(Internal.OCRPluginType.Execution)) {
-      // Signature verification must be disabled for execution plugin.
-      if (isSignatureVerificationEnabled) {
-        revert SignatureVerificationNotAllowedInExecutionPlugin();
-      }
-    }
   }
 
   // ================================================================
