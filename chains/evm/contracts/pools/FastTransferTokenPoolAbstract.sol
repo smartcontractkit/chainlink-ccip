@@ -449,9 +449,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   /// Note: Fee accounting can be obscured by sending tokens directly to the pool.
   /// This does not introduce security issues but will need to be handled operationally.
   /// @return The amount of accumulated pool fees available for withdrawal.
-  function getAccumulatedPoolFees() public view virtual returns (uint256) {
-    return getToken().balanceOf(address(this));
-  }
+  function getAccumulatedPoolFees() public view virtual returns (uint256);
 
   /// @notice Withdraws all accumulated pool fees to the specified recipient.
   /// @dev For BURN/MINT pools, this transfers the entire token balance of the pool contract.
