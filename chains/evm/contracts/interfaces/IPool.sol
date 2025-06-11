@@ -20,7 +20,7 @@ interface IPoolV1 is IERC165 {
   /// @param releaseOrMintIn All data required to release or mint tokens.
   /// @return releaseOrMintOut The amount of tokens released or minted on the local chain, denominated
   /// in the local token's decimals.
-  /// @dev The offramp asserts that the balanceOf of the receiver has been incremented by exactly the number
+  /// @dev The offRamp asserts that the balanceOf of the receiver has been incremented by exactly the number
   /// of tokens that is returned in ReleaseOrMintOutV1.destinationAmount. If the amounts do not match, the tx reverts.
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn

@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {IFeeQuoter} from "./interfaces/IFeeQuoter.sol";
-import {IPriceRegistry} from "./interfaces/IPriceRegistry.sol";
 import {IReceiver} from "@chainlink/contracts/src/v0.8/keystone/interfaces/IReceiver.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
@@ -247,7 +246,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   // │                     Price calculations                       │
   // ================================================================
 
-  /// @inheritdoc IPriceRegistry
+  /// @inheritdoc IFeeQuoter
   function getTokenPrice(
     address token
   ) public view override returns (Internal.TimestampedPackedUint224 memory) {
@@ -419,7 +418,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   // │                         Fee tokens                           │
   // ================================================================
 
-  /// @inheritdoc IPriceRegistry
+  /// @inheritdoc IFeeQuoter
   function getFeeTokens() external view returns (address[] memory) {
     return s_feeTokens.values();
   }
@@ -456,7 +455,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   // │                       Price updates                          │
   // ================================================================
 
-  /// @inheritdoc IPriceRegistry
+  /// @inheritdoc IFeeQuoter
   function updatePrices(
     Internal.PriceUpdates calldata priceUpdates
   ) external override {

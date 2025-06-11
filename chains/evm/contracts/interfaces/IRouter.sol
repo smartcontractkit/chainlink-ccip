@@ -23,7 +23,7 @@ interface IRouter {
     address receiver
   ) external returns (bool success, bytes memory retBytes, uint256 gasUsed);
 
-  /// @notice Returns the configured onramp for a specific destination chain.
+  /// @notice Returns the configured onRamp for a specific destination chain.
   /// @param destChainSelector The destination chain Id to get the onRamp for.
   /// @return onRampAddress The address of the onRamp.
   function getOnRamp(
