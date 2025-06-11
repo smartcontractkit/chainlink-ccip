@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {ITokenMessenger} from "../../pools/USDC/interfaces/ITokenMessenger.sol";
 import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
 
+import {CCTPV2} from "../../libraries/CCTPV2.sol";
 import {CCTPMessageTransmitterProxy} from "../../pools/USDC/CCTPMessageTransmitterProxy.sol";
 import {USDCTokenPoolCCTPV2} from "../../pools/USDC/CCTPV2/USDCTokenPoolCCTPV2.sol";
 import {USDCTokenPool} from "../../pools/USDC/USDCTokenPool.sol";
@@ -23,6 +24,6 @@ contract USDCTokenPoolCCTPV2Helper is USDCTokenPoolCCTPV2 {
     bytes memory usdcMessage,
     USDCTokenPool.SourceTokenDataPayload memory sourceTokenData
   ) external view {
-    return _validateMessage(usdcMessage, sourceTokenData);
+    return CCTPV2._validateMessage(usdcMessage, sourceTokenData, i_localDomainIdentifier);
   }
 }

@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {ITokenMessenger} from "../interfaces/ITokenMessenger.sol";
 
+import {CCTPV2} from "../../../libraries/CCTPV2.sol";
 import {Pool} from "../../../libraries/Pool.sol";
 import {CCTPMessageTransmitterProxy} from "../CCTPMessageTransmitterProxy.sol";
 import {USDCTokenPool} from "../USDCTokenPool.sol";
@@ -27,12 +28,8 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
   error InvalidMinFinalityThreshold(uint32 expected, uint32 actual);
   error InvalidExecutionFinalityThreshold(uint32 expected, uint32 actual);
 
-  // CCTP's max fee is based on the use of fast-burn. Since this pool does not utilize that feature, max fee should be 0.
-  uint32 public constant MAX_FEE = 0;
-
-  // CCTP V2 uses 2000 to indicate that attestations should not occur until finality is achieved on the source chain.
-  uint32 public constant FINALITY_THRESHOLD = 2000;
-
+  // Value: 2000 indicates "slow burn" mode where attestation waits for source chain finality
+  // Alternative: 1000 would indicate "fast burn" mode (not used by this pool)  uint32 public constant FINALITY_THRESHOLD = 2000;
   address public immutable i_previousPool;
 
   constructor(
@@ -45,6 +42,8 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
     address previousPool
   ) USDCTokenPool(tokenMessenger, cctpMessageTransmitterProxy, token, allowlist, rmnProxy, router, 1) {
     i_previousPool = previousPool;
+
+    CCTPV2._validateConfig(tokenMessenger, cctpMessageTransmitterProxy);
   }
 
   /// @notice Burn tokens from the pool to initiate cross-chain transfer.
@@ -57,7 +56,7 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
   ) public virtual override returns (Pool.LockOrBurnOutV1 memory) {
     _validateLockOrBurn(lockOrBurnIn);
 
-    USDCTokenPool.Domain memory domain = s_chainToDomain[lockOrBurnIn.remoteChainSelector];
+    USDCTokenPool.Domain storage domain = s_chainToDomain[lockOrBurnIn.remoteChainSelector];
 
     if (!domain.enabled) revert UnknownDomain(lockOrBurnIn.remoteChainSelector);
 
@@ -91,8 +90,8 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
       decodedReceiver, // mintRecipient
       address(i_token), // burnToken
       domain.allowedCaller, // destinationCaller
-      MAX_FEE, // maxFee
-      FINALITY_THRESHOLD // minFinalityThreshold
+      CCTPV2.MAX_FEE, // maxFee
+      CCTPV2.FINALITY_THRESHOLD // minFinalityThreshold
     );
 
     emit LockedOrBurned({
@@ -141,7 +140,7 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
     MessageAndAttestation memory msgAndAttestation =
       abi.decode(releaseOrMintIn.offchainTokenData, (MessageAndAttestation));
 
-    _validateMessage(msgAndAttestation.message, sourceTokenData);
+    CCTPV2._validateMessage(msgAndAttestation.message, sourceTokenData, i_localDomainIdentifier);
 
     if (
       !i_messageTransmitterProxy.receiveMessage(
@@ -160,74 +159,5 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
     });
 
     return Pool.ReleaseOrMintOutV1({destinationAmount: releaseOrMintIn.amount});
-  }
-
-  /// @notice Validates the USDC encoded message against the given parameters.
-  /// @param usdcMessage The USDC encoded message
-  /// @param sourcePoolTokenData The expected source chain CCTP identifier as provided by the CCIP-Source-Pool.
-  /// @dev Only supports version SUPPORTED_USDC_VERSION of the CCTP V2 message format
-  /// @dev Message format for USDC:
-  ///     * Field                      Bytes      Type       Index
-  ///     * version                    4          uint32     0
-  ///     * sourceDomain               4          uint32     4
-  ///     * destinationDomain          4          uint32     8
-  ///     * nonce                      32         bytes32   12
-  ///     * sender                     32         bytes32   44
-  ///     * recipient                  32         bytes32   76
-  ///     * destinationCaller          32         bytes32   108
-  ///     * minFinalityThreshold       32         uint32    140
-  ///     * finalityThresholdExecuted  32         uint32    144
-  ///     * messageBody                dynamic    bytes     148
-  function _validateMessage(
-    bytes memory usdcMessage,
-    SourceTokenDataPayload memory sourcePoolTokenData
-  ) internal view override {
-    uint32 version;
-    // solhint-disable-next-line no-inline-assembly
-    assembly {
-      // We truncate using the datatype of the version variable, meaning
-      // we will only be left with the first 4 bytes of the message.
-      version := mload(add(usdcMessage, 4)) // 0 + 4 = 4
-    }
-
-    // This token pool only supports version 1 of the CCTP message format
-    // We check the version prior to loading the rest of the message
-    // to avoid unexpected reverts due to out-of-bounds reads.
-    if (version != 1) revert InvalidMessageVersion(version);
-
-    uint32 messageSourceDomain;
-    uint32 destinationDomain;
-    uint32 minFinalityThreshold;
-    uint32 finalityThresholdExecuted;
-
-    // solhint-disable-next-line no-inline-assembly
-    assembly {
-      messageSourceDomain := mload(add(usdcMessage, 8)) // 4 + 4 = 8
-      destinationDomain := mload(add(usdcMessage, 12)) // 8 + 4 = 12
-      minFinalityThreshold := mload(add(usdcMessage, 144)) // 140 + 4 = 144
-      finalityThresholdExecuted := mload(add(usdcMessage, 148)) // 144 + 4 = 148
-    }
-
-    // Check that the source domain included in the CCTP Message matches the one forwarded by the source pool.
-    if (messageSourceDomain != sourcePoolTokenData.sourceDomain) {
-      revert InvalidSourceDomain(sourcePoolTokenData.sourceDomain, messageSourceDomain);
-    }
-
-    // Check that the destination domain in the CCTP message matches the immutable domain of this pool.
-    if (destinationDomain != i_localDomainIdentifier) {
-      revert InvalidDestinationDomain(i_localDomainIdentifier, destinationDomain);
-    }
-
-    if (minFinalityThreshold != FINALITY_THRESHOLD) {
-      revert InvalidMinFinalityThreshold(FINALITY_THRESHOLD, minFinalityThreshold);
-    }
-
-    if (finalityThresholdExecuted != FINALITY_THRESHOLD) {
-      revert InvalidExecutionFinalityThreshold(FINALITY_THRESHOLD, finalityThresholdExecuted);
-    }
-
-    if (sourcePoolTokenData.cctpVersion != CCTPVersion.VERSION_2) {
-      revert USDCTokenPool.InvalidCCTPVersion(sourcePoolTokenData.sourceDomain, sourcePoolTokenData.cctpVersion);
-    }
   }
 }

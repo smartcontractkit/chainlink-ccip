@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IMessageTransmitter} from "./interfaces/IMessageTransmitter.sol";
 import {ITokenMessenger} from "./interfaces/ITokenMessenger.sol";
 
+import {CCTPV2} from "../../libraries/CCTPV2.sol";
 import {Pool} from "../../libraries/Pool.sol";
 import {TokenPool} from "../TokenPool.sol";
 import {CCTPMessageTransmitterProxy} from "../USDC/CCTPMessageTransmitterProxy.sol";
@@ -114,28 +114,7 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
     USDCTokenPool(tokenMessenger, cctpMessageTransmitterProxy, token, allowlist, rmnProxy, router, 0)
     USDCBridgeMigrator(address(token))
   {
-    // The following code has been duplicated exactly from USDC Token Pool but with the only difference being checks for version 1 and uses tokenMessengerV2 and cctpMessageTransmitterProxyV2 for CCTP V2.
-    // This is because of Solidity's limited inheritance capabilities makes it impossible to run the constructor for USDCTokenPool twice with different parameters, so it has been duplicated here.
-
-    // NOTE: Even though it is officially referred to as Version 1, CCTP V1 contracts
-    // use the version #0, and CCTP V2 contracts return a version number #1, so a contract
-    // interacting with CCTPV2 will look for it to return the version number of 1.
-
-    if (address(tokenMessengerV2) == address(0) || previousPool == address(0)) revert InvalidConfig();
-
-    // Get the Local Message Transmitter from the tokenMessenger
-    IMessageTransmitter transmitter = IMessageTransmitter(tokenMessengerV2.localMessageTransmitter());
-
-    // Check that the two contracts are using the same expected version of USDC/CCTP.
-    uint32 transmitterVersion = transmitter.version();
-    uint32 tokenMessengerVersion = tokenMessengerV2.messageBodyVersion();
-    if (transmitterVersion != 1) revert InvalidMessageVersion(transmitterVersion);
-    if (tokenMessengerVersion != 1) revert InvalidTokenMessengerVersion(tokenMessengerVersion);
-
-    // Check that the transmitter called by the TransmitterProxy is the same as the one called by the TokenMessenger
-    if (cctpMessageTransmitterProxy.i_cctpTransmitterV2() != transmitter) revert InvalidTransmitterInProxy();
-
-    emit ConfigSet(address(tokenMessenger));
+    CCTPV2._validateConfig(tokenMessengerV2, cctpMessageTransmitterProxy);
 
     // Set the token Messenger V2 for outgoing CCTP-Messages.
     i_tokenMessengerCCTPV2 = tokenMessengerV2;
@@ -207,31 +186,33 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
     // began, and locked tokens were not released until now, the message will already have been committed to with this
     // flag so it is safe to release the tokens. The source USDC pool is trusted to send messages with the correct
     // flag as well.
-    if (bytes4(releaseOrMintIn.sourcePoolData) != LOCK_RELEASE_FLAG) {
-      // This checks for legacy messages, in which the source pool data did not have a cctpVersion field. The explicit
-      // branch prevents an ABI-decoding error and ensures that the message is not a CCTP V2 message.
-      if (releaseOrMintIn.sourcePoolData.length == 64) {
-        // Since legacy messages did not support a messageTransmitterProxy, the destination caller is the previous pool,
-        // and CCTP will not allow the message to be executed by any other caller. Therefore, the message must be proxied
-        // to the previous pool to satisfy the allowedCaller.
-        return HybridLockReleaseUSDCTokenPool(i_previousPool).releaseOrMint(releaseOrMintIn);
-      } else {
-        SourceTokenDataPayload memory sourceTokenData =
-          abi.decode(releaseOrMintIn.sourcePoolData, (SourceTokenDataPayload));
-
-        // If the version is V1, but on a lane from before the migration, use the inherited CCTP Functionality
-        if (sourceTokenData.cctpVersion == CCTPVersion.VERSION_1) {
-          return super.releaseOrMint(releaseOrMintIn);
-          // Otherwise use the V2 functionality defined explicitly below
-        } else if (sourceTokenData.cctpVersion == CCTPVersion.VERSION_2) {
-          return _releaseOrMintCCTPV2(releaseOrMintIn);
-          // Additional Safeguard to prevent invalid CCTP versions from being used
-        } else if (sourceTokenData.cctpVersion == CCTPVersion.UNKNOWN_VERSION) {
-          revert USDCTokenPool.InvalidCCTPVersion(sourceTokenData.sourceDomain, sourceTokenData.cctpVersion);
-        }
-      }
+    if (bytes4(releaseOrMintIn.sourcePoolData) == LOCK_RELEASE_FLAG) {
+      return _lockReleaseIncomingMessage(releaseOrMintIn);
     }
-    return _lockReleaseIncomingMessage(releaseOrMintIn);
+
+    // This checks for legacy messages, in which the source pool data did not have a cctpVersion field. The explicit
+    // branch prevents an ABI-decoding error and ensures that the message is not a CCTP V2 message.
+    if (releaseOrMintIn.sourcePoolData.length == 64) {
+      // Since legacy messages did not support a messageTransmitterProxy, the destination caller is the previous pool,
+      // and CCTP will not allow the message to be executed by any other caller. Therefore, the message must be proxied
+      // to the previous pool to satisfy the allowedCaller.
+      return HybridLockReleaseUSDCTokenPool(i_previousPool).releaseOrMint(releaseOrMintIn);
+    }
+
+    SourceTokenDataPayload memory sourceTokenData = abi.decode(releaseOrMintIn.sourcePoolData, (SourceTokenDataPayload));
+
+    // Additional Safeguard to prevent invalid CCTP versions from being used
+    if (sourceTokenData.cctpVersion == CCTPVersion.UNKNOWN_VERSION) {
+      revert USDCTokenPool.InvalidCCTPVersion(sourceTokenData.sourceDomain, sourceTokenData.cctpVersion);
+    }
+
+    // If the version is V1, but on a lane from before the migration, use the inherited CCTP Functionality
+    if (sourceTokenData.cctpVersion == CCTPVersion.VERSION_1) {
+      return super.releaseOrMint(releaseOrMintIn);
+    }
+
+    // Otherwise use the V2 functionality defined explicitly below
+    return _releaseOrMintCCTPV2(releaseOrMintIn);
   }
 
   /// @notice Contains the alternative mechanism for incoming tokens, in this implementation is "Release" incoming tokens
@@ -357,7 +338,7 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
     MessageAndAttestation memory msgAndAttestation =
       abi.decode(releaseOrMintIn.offchainTokenData, (MessageAndAttestation));
 
-    _validateMessageCCTPV2(msgAndAttestation.message, sourceTokenData);
+    CCTPV2._validateMessage(msgAndAttestation.message, sourceTokenData, i_localDomainIdentifier);
 
     // Forward the message to the transmitter proxy, which will then forward it to the actual transmitter,
     // thus ensuring that the allowedCaller specified in the message is the one making the mint request.
@@ -378,75 +359,6 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
     );
 
     return Pool.ReleaseOrMintOutV1({destinationAmount: releaseOrMintIn.amount});
-  }
-
-  /// @notice Validates the USDC encoded message against the given parameters.
-  /// @param usdcMessage The USDC encoded message
-  /// @param sourcetokenDataPayload The abi-decoded source pool data into SourceTokenDataPayload format.
-  /// @dev Only supports version SUPPORTED_USDC_VERSION of the CCTP V2 message format
-  /// @dev Message format for USDC:
-  ///     * Field                      Bytes      Type       Index
-  ///     * version                    4          uint32     0
-  ///     * sourceDomain               4          uint32     4
-  ///     * destinationDomain          4          uint32     8
-  ///     * nonce                      32         bytes32   12
-  ///     * sender                     32         bytes32   44
-  ///     * recipient                  32         bytes32   76
-  ///     * destinationCaller          32         bytes32   108
-  ///     * minFinalityThreshold       32         uint32    140
-  ///     * finalityThresholdExecuted  32         uint32    144
-  ///     * messageBody                dynamic    bytes     148
-  function _validateMessageCCTPV2(
-    bytes memory usdcMessage,
-    SourceTokenDataPayload memory sourcetokenDataPayload
-  ) internal view {
-    uint32 version;
-    // solhint-disable-next-line no-inline-assembly
-    assembly {
-      // We truncate using the datatype of the version variable, meaning
-      // we will only be left with the first 4 bytes of the message.
-      version := mload(add(usdcMessage, 4)) // 0 + 4 = 4
-    }
-
-    // This token pool only supports CCTP V2 with message format version being 1
-    // We check the version prior to loading the rest of the message
-    // to avoid unexpected reverts due to out-of-bounds reads.
-    if (version != 1) revert InvalidMessageVersion(version);
-
-    uint32 messageSourceDomain;
-    uint32 destinationDomain;
-    uint32 minFinalityThreshold;
-    uint32 finalityThresholdExecuted;
-
-    // solhint-disable-next-line no-inline-assembly
-    assembly {
-      messageSourceDomain := mload(add(usdcMessage, 8)) // 4 + 4 = 8
-      destinationDomain := mload(add(usdcMessage, 12)) // 8 + 4 = 12
-      minFinalityThreshold := mload(add(usdcMessage, 144)) // 140 + 4 = 144
-      finalityThresholdExecuted := mload(add(usdcMessage, 148)) // 144 + 4 = 148
-    }
-
-    // Check that the source domain included in the CCTP Message matches the one forwarded by the source pool.
-    if (messageSourceDomain != sourcetokenDataPayload.sourceDomain) {
-      revert InvalidSourceDomain(sourcetokenDataPayload.sourceDomain, messageSourceDomain);
-    }
-
-    // Check that the destination domain in the CCTP message matches the immutable domain of this pool.
-    if (destinationDomain != i_localDomainIdentifier) {
-      revert InvalidDestinationDomain(i_localDomainIdentifier, destinationDomain);
-    }
-
-    // This pool only supports slow transfers on CCTP, so ensure that the message matches the same requirements.
-    if (minFinalityThreshold != FINALITY_THRESHOLD) {
-      revert InvalidMinFinalityThreshold(FINALITY_THRESHOLD, minFinalityThreshold);
-    }
-
-    if (finalityThresholdExecuted != FINALITY_THRESHOLD) {
-      revert InvalidExecutionFinalityThreshold(FINALITY_THRESHOLD, finalityThresholdExecuted);
-    }
-
-    // Note: sourcetokenDataPayload.cctpVersion is not checked here, as it is already checked in releaseOrMint()
-    // and thus it should not be possible to reach this function with a non-CCTP V2 message.
   }
 
   /// @notice Burn tokens from the pool to initiate cross-chain transfer.

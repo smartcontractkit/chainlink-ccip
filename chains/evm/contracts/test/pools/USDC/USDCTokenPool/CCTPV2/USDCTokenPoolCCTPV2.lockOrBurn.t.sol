@@ -4,6 +4,8 @@ pragma solidity ^0.8.24;
 import {ITokenMessenger} from "../../../../../pools/USDC/interfaces/ITokenMessenger.sol";
 
 import {Router} from "../../../../../Router.sol";
+
+import {CCTPV2} from "../../../../../libraries/CCTPV2.sol";
 import {Pool} from "../../../../../libraries/Pool.sol";
 import {TokenPool} from "../../../../../pools/TokenPool.sol";
 
@@ -29,8 +31,8 @@ contract USDCTokenPoolCCTPV2_lockOrBurn is USDCTokenPoolCCTPV2Setup {
       expectedDomain.domainIdentifier,
       s_mockUSDC.DESTINATION_TOKEN_MESSENGER(),
       expectedDomain.allowedCaller,
-      s_usdcTokenPool.MAX_FEE(),
-      s_usdcTokenPool.FINALITY_THRESHOLD(),
+      CCTPV2.MAX_FEE,
+      CCTPV2.FINALITY_THRESHOLD,
       ""
     );
 
@@ -88,8 +90,8 @@ contract USDCTokenPoolCCTPV2_lockOrBurn is USDCTokenPoolCCTPV2Setup {
       expectedDomain.domainIdentifier,
       s_mockUSDC.DESTINATION_TOKEN_MESSENGER(),
       expectedDomain.allowedCaller,
-      s_usdcTokenPool.MAX_FEE(),
-      s_usdcTokenPool.FINALITY_THRESHOLD(),
+      CCTPV2.MAX_FEE,
+      CCTPV2.FINALITY_THRESHOLD,
       ""
     );
 
@@ -129,8 +131,8 @@ contract USDCTokenPoolCCTPV2_lockOrBurn is USDCTokenPoolCCTPV2Setup {
       expectedDomain.domainIdentifier,
       s_mockUSDC.DESTINATION_TOKEN_MESSENGER(),
       expectedDomain.allowedCaller,
-      s_usdcTokenPool.MAX_FEE(),
-      s_usdcTokenPool.FINALITY_THRESHOLD(),
+      CCTPV2.MAX_FEE,
+      CCTPV2.FINALITY_THRESHOLD,
       ""
     );
 
@@ -174,8 +176,8 @@ contract USDCTokenPoolCCTPV2_lockOrBurn is USDCTokenPoolCCTPV2Setup {
       expectedDomain.domainIdentifier,
       s_mockUSDC.DESTINATION_TOKEN_MESSENGER(),
       expectedDomain.allowedCaller,
-      s_usdcTokenPoolWithAllowList.MAX_FEE(),
-      s_usdcTokenPoolWithAllowList.FINALITY_THRESHOLD(),
+      CCTPV2.MAX_FEE,
+      CCTPV2.FINALITY_THRESHOLD,
       ""
     );
 

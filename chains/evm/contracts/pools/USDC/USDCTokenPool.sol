@@ -94,10 +94,6 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   // A mapping of CCIP chain identifiers to destination domains
   mapping(uint64 chainSelector => Domain CCTPDomain) internal s_chainToDomain;
 
-  // An enumerable list of USDC CCTP versions which allows future contracts to support multiple
-  // versions of CCTP.
-  EnumerableSet.UintSet internal s_supportedUSDCVersions;
-
   constructor(
     ITokenMessenger tokenMessenger,
     CCTPMessageTransmitterProxy cctpMessageTransmitterProxy,

@@ -18,7 +18,6 @@ contract CCTPMessageTransmitterProxy is Ownable2StepMsgSender {
 
   /// @notice Error thrown when a function is called by an unauthorized address.
   error Unauthorized(address caller);
-  error InvalidCCTPVersion();
 
   /// @notice Emitted when an allowed caller is added.
   event AllowedCallerAdded(address indexed caller);
