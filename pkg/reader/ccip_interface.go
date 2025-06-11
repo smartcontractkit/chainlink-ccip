@@ -10,6 +10,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
+	"github.com/smartcontractkit/chainlink-ccip/pkg/chainaccessor"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
@@ -86,8 +87,8 @@ type StaticSourceChainConfig struct {
 
 // ToSourceChainConfig converts a CachedSourceChainConfig to a full SourceChainConfig
 // by adding the provided sequence number.
-func (s StaticSourceChainConfig) ToSourceChainConfig(minSeqNr uint64) SourceChainConfig {
-	return SourceChainConfig{
+func (s StaticSourceChainConfig) ToSourceChainConfig(minSeqNr uint64) cciptypes.SourceChainConfig {
+	return cciptypes.SourceChainConfig{
 		Router:                    s.Router,
 		IsEnabled:                 s.IsEnabled,
 		IsRMNVerificationDisabled: s.IsRMNVerificationDisabled,
@@ -125,36 +126,54 @@ func NewCCIPChainReader(
 	destChain cciptypes.ChainSelector,
 	offrampAddress []byte,
 	addrCodec cciptypes.AddressCodec,
-) CCIPReader {
+) (CCIPReader, error) {
+	reader, err := newCCIPChainReaderInternal(
+		ctx,
+		lggr,
+		contractReaders,
+		contractWriters,
+		destChain,
+		offrampAddress,
+		addrCodec,
+	)
+	if err != nil {
+		return nil, err
+	}
 	return NewObservedCCIPReader(
-		newCCIPChainReaderInternal(
-			ctx,
-			lggr,
-			contractReaders,
-			contractWriters,
-			destChain,
-			offrampAddress,
-			addrCodec,
-		),
+		reader,
 		lggr,
 		destChain,
-	)
+	), nil
 }
 
 // NewCCIPReaderWithExtendedContractReaders can be used when you want to directly provide contractreader.Extended
 func NewCCIPReaderWithExtendedContractReaders(
 	ctx context.Context,
 	lggr logger.Logger,
-	contractReaders map[cciptypes.ChainSelector]contractreader.Extended,
+	extendedContractReaders map[cciptypes.ChainSelector]contractreader.Extended,
 	contractWriters map[cciptypes.ChainSelector]types.ContractWriter,
 	destChain cciptypes.ChainSelector,
 	offrampAddress []byte,
 	addrCodec cciptypes.AddressCodec,
 ) CCIPReader {
-	cr := newCCIPChainReaderInternal(ctx, lggr, nil, contractWriters, destChain, offrampAddress, addrCodec)
-	for ch, extendedCr := range contractReaders {
-		cr.WithExtendedContractReader(ch, extendedCr)
+	cr, err := newCCIPChainReaderInternal(ctx, lggr, nil, contractWriters, destChain, offrampAddress, addrCodec)
+	if err != nil {
+		// Panic here since right now this is only called from tests in core
+		panic(fmt.Errorf("failed to create CCIP reader: %w", err))
 	}
+	var cas = make(map[cciptypes.ChainSelector]cciptypes.ChainAccessor)
+	for ch, extendedCr := range extendedContractReaders {
+		cr.WithExtendedContractReader(ch, extendedCr)
+		cas[ch] = chainaccessor.NewDefaultAccessor(
+			lggr,
+			ch,
+			extendedCr,
+			contractWriters[ch],
+			addrCodec,
+		)
+	}
+
+	cr.accessors = cas
 	return cr
 }
 

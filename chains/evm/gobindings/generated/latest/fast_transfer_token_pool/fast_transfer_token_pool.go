@@ -877,16 +877,16 @@ func (_BurnMintFastTransferTokenPool *BurnMintFastTransferTokenPoolTransactorSes
 	return _BurnMintFastTransferTokenPool.Contract.CcipReceive(&_BurnMintFastTransferTokenPool.TransactOpts, message)
 }
 
-func (_BurnMintFastTransferTokenPool *BurnMintFastTransferTokenPoolTransactor) CcipSendToken(opts *bind.TransactOpts, destinationChainSelector uint64, amount *big.Int, receiver []byte, feeToken common.Address, extraArgs []byte) (*types.Transaction, error) {
-	return _BurnMintFastTransferTokenPool.contract.Transact(opts, "ccipSendToken", destinationChainSelector, amount, receiver, feeToken, extraArgs)
+func (_BurnMintFastTransferTokenPool *BurnMintFastTransferTokenPoolTransactor) CcipSendToken(opts *bind.TransactOpts, destinationChainSelector uint64, amount *big.Int, maxFastTransferFee *big.Int, receiver []byte, feeToken common.Address, extraArgs []byte) (*types.Transaction, error) {
+	return _BurnMintFastTransferTokenPool.contract.Transact(opts, "ccipSendToken", destinationChainSelector, amount, maxFastTransferFee, receiver, feeToken, extraArgs)
 }
 
-func (_BurnMintFastTransferTokenPool *BurnMintFastTransferTokenPoolSession) CcipSendToken(destinationChainSelector uint64, amount *big.Int, receiver []byte, feeToken common.Address, extraArgs []byte) (*types.Transaction, error) {
-	return _BurnMintFastTransferTokenPool.Contract.CcipSendToken(&_BurnMintFastTransferTokenPool.TransactOpts, destinationChainSelector, amount, receiver, feeToken, extraArgs)
+func (_BurnMintFastTransferTokenPool *BurnMintFastTransferTokenPoolSession) CcipSendToken(destinationChainSelector uint64, amount *big.Int, maxFastTransferFee *big.Int, receiver []byte, feeToken common.Address, extraArgs []byte) (*types.Transaction, error) {
+	return _BurnMintFastTransferTokenPool.Contract.CcipSendToken(&_BurnMintFastTransferTokenPool.TransactOpts, destinationChainSelector, amount, maxFastTransferFee, receiver, feeToken, extraArgs)
 }
 
-func (_BurnMintFastTransferTokenPool *BurnMintFastTransferTokenPoolTransactorSession) CcipSendToken(destinationChainSelector uint64, amount *big.Int, receiver []byte, feeToken common.Address, extraArgs []byte) (*types.Transaction, error) {
-	return _BurnMintFastTransferTokenPool.Contract.CcipSendToken(&_BurnMintFastTransferTokenPool.TransactOpts, destinationChainSelector, amount, receiver, feeToken, extraArgs)
+func (_BurnMintFastTransferTokenPool *BurnMintFastTransferTokenPoolTransactorSession) CcipSendToken(destinationChainSelector uint64, amount *big.Int, maxFastTransferFee *big.Int, receiver []byte, feeToken common.Address, extraArgs []byte) (*types.Transaction, error) {
+	return _BurnMintFastTransferTokenPool.Contract.CcipSendToken(&_BurnMintFastTransferTokenPool.TransactOpts, destinationChainSelector, amount, maxFastTransferFee, receiver, feeToken, extraArgs)
 }
 
 func (_BurnMintFastTransferTokenPool *BurnMintFastTransferTokenPoolTransactor) FastFill(opts *bind.TransactOpts, fillId [32]byte, settlementId [32]byte, sourceChainSelector uint64, sourceAmountNetFee *big.Int, sourceDecimals uint8, receiver common.Address) (*types.Transaction, error) {
@@ -4176,7 +4176,7 @@ type BurnMintFastTransferTokenPoolInterface interface {
 
 	CcipReceive(opts *bind.TransactOpts, message ClientAny2EVMMessage) (*types.Transaction, error)
 
-	CcipSendToken(opts *bind.TransactOpts, destinationChainSelector uint64, amount *big.Int, receiver []byte, feeToken common.Address, extraArgs []byte) (*types.Transaction, error)
+	CcipSendToken(opts *bind.TransactOpts, destinationChainSelector uint64, amount *big.Int, maxFastTransferFee *big.Int, receiver []byte, feeToken common.Address, extraArgs []byte) (*types.Transaction, error)
 
 	FastFill(opts *bind.TransactOpts, fillId [32]byte, settlementId [32]byte, sourceChainSelector uint64, sourceAmountNetFee *big.Int, sourceDecimals uint8, receiver common.Address) (*types.Transaction, error)
 
