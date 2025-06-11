@@ -15,7 +15,13 @@ contract USDCTokenPoolSetup is USDCSetup {
     super.setUp();
 
     s_usdcTokenPool = new USDCTokenPoolHelper(
-      s_mockUSDC, s_cctpMessageTransmitterProxy, s_token, new address[](0), address(s_mockRMNRemote), address(s_router)
+      s_mockUSDC,
+      s_cctpMessageTransmitterProxy,
+      s_token,
+      new address[](0),
+      address(s_mockRMNRemote),
+      address(s_router),
+      s_previousPool
     );
 
     CCTPMessageTransmitterProxy.AllowedCallerConfigArgs[] memory allowedCallerParams =
@@ -26,7 +32,13 @@ contract USDCTokenPoolSetup is USDCSetup {
 
     s_allowedList.push(vm.randomAddress());
     s_usdcTokenPoolWithAllowList = new USDCTokenPoolHelper(
-      s_mockUSDC, s_cctpMessageTransmitterProxy, s_token, s_allowedList, address(s_mockRMNRemote), address(s_router)
+      s_mockUSDC,
+      s_cctpMessageTransmitterProxy,
+      s_token,
+      s_allowedList,
+      address(s_mockRMNRemote),
+      address(s_router),
+      s_previousPool
     );
 
     _poolApplyChainUpdates(address(s_usdcTokenPool));
@@ -35,6 +47,7 @@ contract USDCTokenPoolSetup is USDCSetup {
     USDCTokenPool.DomainUpdate[] memory domains = new USDCTokenPool.DomainUpdate[](1);
     domains[0] = USDCTokenPool.DomainUpdate({
       destChainSelector: DEST_CHAIN_SELECTOR,
+      mintRecipient: bytes32(0),
       domainIdentifier: 9999,
       allowedCaller: keccak256("allowedCallerDestChain"),
       enabled: true

@@ -12,11 +12,23 @@ contract HybridLockReleaseUSDCTokenPoolSetup is USDCSetup {
     super.setUp();
 
     s_usdcTokenPool = new HybridLockReleaseUSDCTokenPool(
-      s_mockUSDC, s_cctpMessageTransmitterProxy, s_token, new address[](0), address(s_mockRMNRemote), address(s_router)
+      s_mockUSDC,
+      s_cctpMessageTransmitterProxy,
+      s_token,
+      new address[](0),
+      address(s_mockRMNRemote),
+      address(s_router),
+      s_previousPool
     );
 
     s_usdcTokenPoolTransferLiquidity = new HybridLockReleaseUSDCTokenPool(
-      s_mockUSDC, s_cctpMessageTransmitterProxy, s_token, new address[](0), address(s_mockRMNRemote), address(s_router)
+      s_mockUSDC,
+      s_cctpMessageTransmitterProxy,
+      s_token,
+      new address[](0),
+      address(s_mockRMNRemote),
+      address(s_router),
+      s_previousPool
     );
   }
 }

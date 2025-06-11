@@ -4,6 +4,8 @@ pragma solidity ^0.8.24;
 import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
 
 import {Router} from "../../../Router.sol";
+
+import {Pool} from "../../../libraries/Pool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {CCTPMessageTransmitterProxy} from "../../../pools/USDC/CCTPMessageTransmitterProxy.sol";
 import {BurnMintERC677} from "@chainlink/contracts/src/v0.8/shared/token/ERC677/BurnMintERC677.sol";
@@ -39,6 +41,7 @@ contract USDCSetup is BaseTest {
 
   address internal s_routerAllowedOnRamp = address(3456);
   address internal s_routerAllowedOffRamp = address(234);
+  address internal s_previousPool = makeAddr("previousPool");
   Router internal s_router;
 
   IBurnMintERC20 internal s_token;
@@ -56,6 +59,13 @@ contract USDCSetup is BaseTest {
     s_cctpMessageTransmitterProxy = new CCTPMessageTransmitterProxy(s_mockUSDC);
     usdcToken.grantMintAndBurnRoles(address(s_mockUSDCTransmitter));
     usdcToken.grantMintAndBurnRoles(address(s_mockUSDC));
+
+    // Mock the previous pool's releaseOrMint function to return the input amount
+    vm.mockCall(
+      s_previousPool,
+      abi.encodeWithSelector(TokenPool.releaseOrMint.selector),
+      abi.encode(Pool.ReleaseOrMintOutV1({destinationAmount: 1}))
+    );
   }
 
   function _poolApplyChainUpdates(

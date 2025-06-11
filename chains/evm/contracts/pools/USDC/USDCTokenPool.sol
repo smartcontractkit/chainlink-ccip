@@ -44,6 +44,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   // A domain is a USDC representation of a chain.
   struct DomainUpdate {
     bytes32 allowedCaller; //       Address allowed to mint on the domain
+    bytes32 mintRecipient; // Address to mint to on the destination chain
     uint32 domainIdentifier; // ──╮ Unique domain ID
     uint64 destChainSelector; //  │ The destination chain for this domain
     bool enabled; // ─────────────╯ Whether the domain is enabled
@@ -72,6 +73,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   /// For dest pool version 1.5.1, this is the destination chain's token pool.
   struct Domain {
     bytes32 allowedCaller; //      Address allowed to mint on the domain
+    bytes32 mintRecipient; // Address to mint to on the destination chain
     uint32 domainIdentifier; // ─╮ Unique domain ID
     bool enabled; // ────────────╯ Whether the domain is enabled
   }
@@ -79,13 +81,16 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   // A mapping of CCIP chain identifiers to destination domains
   mapping(uint64 chainSelector => Domain CCTPDomain) private s_chainToDomain;
 
+  address public immutable i_previousPool;
+
   constructor(
     ITokenMessenger tokenMessenger,
     CCTPMessageTransmitterProxy cctpMessageTransmitterProxy,
     IERC20 token,
     address[] memory allowlist,
     address rmnProxy,
-    address router
+    address router,
+    address previousPool
   ) TokenPool(token, 6, allowlist, rmnProxy, router) {
     if (address(tokenMessenger) == address(0)) revert InvalidConfig();
     IMessageTransmitter transmitter = IMessageTransmitter(tokenMessenger.localMessageTransmitter());
@@ -99,6 +104,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     i_messageTransmitterProxy = cctpMessageTransmitterProxy;
     i_localDomainIdentifier = transmitter.localDomain();
     i_token.safeIncreaseAllowance(address(i_tokenMessenger), type(uint256).max);
+    i_previousPool = previousPool;
     emit ConfigSet(address(tokenMessenger));
   }
 
@@ -118,7 +124,13 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     if (lockOrBurnIn.receiver.length != 32) {
       revert InvalidReceiver(lockOrBurnIn.receiver);
     }
-    bytes32 decodedReceiver = abi.decode(lockOrBurnIn.receiver, (bytes32));
+
+    bytes32 decodedReceiver;
+    if (domain.mintRecipient != bytes32(0)) {
+      decodedReceiver = domain.mintRecipient;
+    } else {
+      decodedReceiver = abi.decode(lockOrBurnIn.receiver, (bytes32));
+    }
 
     // Since this pool is the msg sender of the CCTP transaction, only this contract
     // is able to call replaceDepositForBurn. Since this contract does not implement
@@ -157,10 +169,25 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     _validateReleaseOrMint(releaseOrMintIn);
     SourceTokenDataPayload memory sourceTokenDataPayload =
       abi.decode(releaseOrMintIn.sourcePoolData, (SourceTokenDataPayload));
+
     MessageAndAttestation memory msgAndAttestation =
       abi.decode(releaseOrMintIn.offchainTokenData, (MessageAndAttestation));
 
     _validateMessage(msgAndAttestation.message, sourceTokenDataPayload);
+
+    // If the destinationCaller is the previous pool, indicating an inflight message during the migration, we need to
+    // route the message to the previous pool to satisfy the allowedCaller.
+    bytes32 destinationCallerBytes32;
+    bytes memory messageBytes = msgAndAttestation.message;
+    assembly {
+      // Parse out the bytes32 destinationCaller from messageBytes
+      destinationCallerBytes32 := mload(add(messageBytes, 116)) // 84 + 32 = 116
+    }
+    address destinationCaller = address(uint160(uint256(destinationCallerBytes32)));
+
+    if (destinationCaller == i_previousPool) {
+      return USDCTokenPool(i_previousPool).releaseOrMint(releaseOrMintIn);
+    }
 
     if (!i_messageTransmitterProxy.receiveMessage(msgAndAttestation.message, msgAndAttestation.attestation)) {
       revert UnlockingUSDCFailed();
@@ -246,6 +273,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
 
       s_chainToDomain[domain.destChainSelector] = Domain({
         domainIdentifier: domain.domainIdentifier,
+        mintRecipient: domain.mintRecipient,
         allowedCaller: domain.allowedCaller,
         enabled: domain.enabled
       });
