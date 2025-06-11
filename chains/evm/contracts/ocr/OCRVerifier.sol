@@ -56,10 +56,9 @@ contract OCRVerifier is ITypeAndVersion, Ownable2StepMsgSender {
     address[] signers; // signing address of each oracle.
   }
 
-  struct OCRReport {
+  struct OCRProof {
     bytes32 configDigest; // The config digest of the report.
     uint64 sequenceNumber; // The sequence number of the report.
-    bytes reportBytes; // The serialized report.
     bytes32[] rs; // R components of the signatures.
     bytes32[] ss; // S components of the signatures.
   }
@@ -74,10 +73,8 @@ contract OCRVerifier is ITypeAndVersion, Ownable2StepMsgSender {
     i_chainID = block.chainid;
   }
 
-  function validateReport(
-    bytes calldata rawOCRReport
-  ) external {
-    OCRReport memory report = abi.decode(rawOCRReport, (OCRReport));
+  function validateReport(bytes memory rawReport, bytes calldata ocrProof) external {
+    OCRProof memory report = abi.decode(ocrProof, (OCRProof));
 
     if (s_ocrConfig.configDigest != report.configDigest) {
       revert ConfigDigestMismatch(s_ocrConfig.configDigest, report.configDigest);
@@ -91,9 +88,7 @@ contract OCRVerifier is ITypeAndVersion, Ownable2StepMsgSender {
     if (report.rs.length != report.ss.length) revert SignaturesOutOfRegistration();
 
     _verifySignatures(
-      keccak256(abi.encode(keccak256(report.reportBytes), report.configDigest, report.sequenceNumber)),
-      report.rs,
-      report.ss
+      keccak256(abi.encode(keccak256(rawReport), report.configDigest, report.sequenceNumber)), report.rs, report.ss
     );
 
     emit Transmitted(report.configDigest, uint64(uint256(report.sequenceNumber)));
