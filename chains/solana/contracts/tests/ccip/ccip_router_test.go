@@ -7208,7 +7208,6 @@ func TestCCIPRouter(t *testing.T) {
 
 				instruction, err = raw.ValidateAndBuild()
 				require.NoError(t, err)
-
 				tx = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment)
 
 				executionEvents, err := common.ParseMultipleEvents[ccip.EventExecutionStateChanged](tx.Meta.LogMessages, "ExecutionStateChanged", config.PrintEvents)
@@ -7301,12 +7300,27 @@ func TestCCIPRouter(t *testing.T) {
 					ccip_offramp.CcipAccountMeta{Pubkey: solana.SystemProgramID, IsSigner: false, IsWritable: false},
 				)
 
-				derivedAccounts, derivedLookUpTables := deriveExecutionAccounts(ctx, t, rawExecutionReport, transmitter, messagingAccounts, sourceChainSelector, solanaGoClient)
+				mintsOfTransferredTokens := []solana.PublicKey{}
+				bufferId := []byte{}
+
+				derivedAccounts, derivedLookUpTables := deriveExecutionAccounts(ctx,
+					t,
+					transmitter,
+					messagingAccounts,
+					sourceChainSelector,
+					mintsOfTransferredTokens,
+					root,
+					bufferId,
+					executionReport.Message.TokenReceiver,
+					solanaGoClient,
+				)
+
 				builder := ccip_offramp.NewExecuteInstructionBuilder().
 					SetRawExecutionReport(rawExecutionReport).
 					SetReportContextByteWords(reportContext).
 					SetTokenIndexes([]byte{})
 				builder.AccountMetaSlice = derivedAccounts
+
 				instruction, err = builder.ValidateAndBuild()
 				require.NoError(t, err)
 				tx = testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, derivedLookUpTables)
@@ -8723,7 +8737,20 @@ func TestCCIPRouter(t *testing.T) {
 						ccip_offramp.CcipAccountMeta{Pubkey: config.ReceiverTargetAccountPDA, IsSigner: false, IsWritable: true},
 						ccip_offramp.CcipAccountMeta{Pubkey: solana.SystemProgramID, IsSigner: false, IsWritable: false},
 					)
-					derivedAccounts, derivedLookUpTables := deriveExecutionAccounts(ctx, t, rawExecutionReport, transmitter, messagingAccounts, sourceChainSelector, solanaGoClient)
+					mintsOfTransferredTokens := []solana.PublicKey{message.TokenAmounts[0].DestTokenAddress}
+					bufferId := []byte{}
+
+					derivedAccounts, derivedLookUpTables := deriveExecutionAccounts(ctx,
+						t,
+						transmitter,
+						messagingAccounts,
+						sourceChainSelector,
+						mintsOfTransferredTokens,
+						root,
+						bufferId,
+						executionReport.Message.TokenReceiver,
+						solanaGoClient,
+					)
 					builder := ccip_offramp.NewExecuteInstructionBuilder().
 						SetRawExecutionReport(rawExecutionReport).
 						SetReportContextByteWords(reportContext).
@@ -10228,7 +10255,18 @@ func TestCCIPRouter(t *testing.T) {
 					ccip_offramp.CcipAccountMeta{Pubkey: config.ReceiverTargetAccountPDA, IsSigner: false, IsWritable: true},
 					ccip_offramp.CcipAccountMeta{Pubkey: solana.SystemProgramID, IsSigner: false, IsWritable: false},
 				)
-				derivedAccounts, derivedLookUpTables := deriveExecutionAccounts(ctx, t, root[:], transmitter, messagingAccounts, sourceChainSelector, solanaGoClient)
+				mintsOfTransferredTokens := []solana.PublicKey{}
+				derivedAccounts, derivedLookUpTables := deriveExecutionAccounts(ctx,
+					t,
+					transmitter,
+					messagingAccounts,
+					sourceChainSelector,
+					mintsOfTransferredTokens,
+					root,
+					root[:],
+					executionReport.Message.TokenReceiver,
+					solanaGoClient,
+				)
 				builder := ccip_offramp.NewExecuteInstructionBuilder().
 					SetRawExecutionReport([]byte{}).
 					SetReportContextByteWords(reportContext).
@@ -10409,16 +10447,28 @@ func TestCCIPRouter(t *testing.T) {
 
 func deriveExecutionAccounts(ctx context.Context,
 	t *testing.T,
-	reportOrBufferID []byte,
 	transmitter solana.PrivateKey,
 	messagingAccounts []ccip_offramp.CcipAccountMeta,
 	sourceChainSelector uint64,
+	mintsOfTransferredTokens []solana.PublicKey,
+	merkleRoot [32]uint8,
+	bufferId []byte,
+	tokenReceiver solana.PublicKey,
 	solanaGoClient *rpc.Client) (accounts []*solana.AccountMeta, lookUpTables map[solana.PublicKey]solana.PublicKeySlice) {
 	derivedAccounts := []*solana.AccountMeta{}
 	askWith := []*solana.AccountMeta{}
 	lookUpTables = make(map[solana.PublicKey]solana.PublicKeySlice)
 	for {
-		deriveRaw := ccip_offramp.NewDeriveAccountsExecuteInstruction(reportOrBufferID, transmitter.PublicKey(), messagingAccounts, sourceChainSelector, config.OfframpConfigPDA)
+		deriveRaw := ccip_offramp.NewDeriveAccountsExecuteInstruction(
+			transmitter.PublicKey(),
+			messagingAccounts,
+			sourceChainSelector,
+			mintsOfTransferredTokens,
+			merkleRoot,
+			bufferId,
+			tokenReceiver,
+			config.OfframpConfigPDA,
+		)
 		deriveRaw.AccountMetaSlice = append(deriveRaw.AccountMetaSlice, askWith...)
 		derive, err := deriveRaw.ValidateAndBuild()
 		require.NoError(t, err)

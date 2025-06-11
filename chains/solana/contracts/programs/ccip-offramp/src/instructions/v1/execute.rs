@@ -126,9 +126,8 @@ impl Execute for Impl {
         chunk_index: u8,
         num_chunks: u8,
     ) -> Result<()> {
-        require_gte!(
-            32,
-            buffer_id.len(),
+        require!(
+            buffer_id.len() <= 32 && !buffer_id.is_empty(),
             CcipOfframpError::ExecutionReportBufferInvalidIdSize
         );
         ctx.accounts.execution_report_buffer.add_chunk(
@@ -142,35 +141,43 @@ impl Execute for Impl {
     fn derive_accounts_execute<'info>(
         &self,
         ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
-        report_or_buffer_id: Vec<u8>,
         execute_caller: Pubkey,
         message_accounts: Vec<CcipAccountMeta>,
         source_chain_selector: u64,
+        mints_of_transferred_tokens: Vec<Pubkey>,
+        merkle_root: [u8; 32],
+        buffer_id: Vec<u8>,
+        token_receiver: Pubkey,
     ) -> Result<DeriveAccountsResponse> {
         let stage =
             DeriveExecuteAccountsStage::infer_from(ctx.remaining_accounts, source_chain_selector);
 
         match stage {
             DeriveExecuteAccountsStage::GatherBasicInfo => {
-                derive_execute_accounts_gather_basic_info(
-                    &report_or_buffer_id,
-                    execute_caller,
-                    source_chain_selector,
-                )
+                derive_execute_accounts_gather_basic_info(source_chain_selector)
             }
             DeriveExecuteAccountsStage::BuildMainAccountList => {
                 derive_execute_accounts_build_main_account_list(
                     ctx,
-                    &report_or_buffer_id,
+                    source_chain_selector,
+                    &merkle_root,
                     execute_caller,
-                    message_accounts,
+                    &mints_of_transferred_tokens,
+                    &message_accounts,
+                    &buffer_id,
                 )
             }
             DeriveExecuteAccountsStage::RetrieveTokenLUTs => {
-                derive_execute_accounts_retrieve_luts(ctx, &report_or_buffer_id, execute_caller)
+                derive_execute_accounts_retrieve_luts(ctx)
             }
             DeriveExecuteAccountsStage::TokenTransferAccounts => {
-                derive_execute_accounts_additional_tokens(ctx, &report_or_buffer_id, execute_caller)
+                derive_execute_accounts_additional_tokens(
+                    ctx,
+                    execute_caller,
+                    token_receiver,
+                    source_chain_selector,
+                    &buffer_id,
+                )
             }
         }
     }
@@ -259,8 +266,6 @@ impl DeriveExecuteAccountsStage {
 }
 
 fn derive_execute_accounts_gather_basic_info(
-    report_or_buffer_id: &[u8],
-    execute_caller: Pubkey,
     source_chain_selector: u64,
 ) -> Result<DeriveAccountsResponse> {
     let accounts_to_save = vec![
@@ -272,25 +277,13 @@ fn derive_execute_accounts_gather_basic_info(
         ),
     ];
 
-    let mut ask_again_with = vec![
+    let ask_again_with = vec![
         find(
             &[seed::SOURCE_CHAIN, &source_chain_selector.to_le_bytes()],
             crate::ID,
         ),
         find(&[seed::REFERENCE_ADDRESSES], crate::ID),
     ];
-
-    if report_or_buffer_id.len() <= 32 {
-        // It's a buffer ID, so we must ask the user for the buffer PDA as well.
-        ask_again_with.push(find(
-            &[
-                seed::EXECUTION_REPORT_BUFFER,
-                report_or_buffer_id,
-                execute_caller.as_ref(),
-            ],
-            crate::ID,
-        ));
-    }
 
     Ok(DeriveAccountsResponse {
         accounts_to_save,
@@ -302,41 +295,22 @@ fn derive_execute_accounts_gather_basic_info(
 
 fn derive_execute_accounts_build_main_account_list<'info>(
     ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
-    report_or_buffer_id: &[u8],
+    source_chain_selector: u64,
+    merkle_root: &[u8; 32],
     execute_caller: Pubkey,
-    message_accounts: Vec<CcipAccountMeta>,
+    mints_of_transferred_tokens: &[Pubkey],
+    message_accounts: &[CcipAccountMeta],
+    buffer_id: &[u8],
 ) -> Result<DeriveAccountsResponse> {
-    let report = if report_or_buffer_id.len() <= 32 {
-        deserialize_from_buffer_account(
-            ctx.remaining_accounts
-                .last()
-                .ok_or(CcipOfframpError::ExecutionReportUnavailable)?,
-        )?
-        .0
-    } else {
-        #[allow(clippy::useless_asref)] // clippy is wrong here
-        ExecutionReportSingleChain::deserialize(&mut report_or_buffer_id.as_ref())
-            .map_err(|_| CcipOfframpError::FailedToDeserializeReport)?
-    };
-
-    let source_chain = Account::<'info, SourceChain>::try_from(&ctx.remaining_accounts[0])?;
     let ReferenceAddresses {
         router, rmn_remote, ..
     } = *AccountLoader::<'info, ReferenceAddresses>::try_from(&ctx.remaining_accounts[1])?
         .load()?;
 
-    let selector = report.source_chain_selector.to_le_bytes();
-
-    let hashed_leaf = hash(
-        &report.message,
-        message_accounts.iter().map(|a| a.pubkey),
-        &source_chain.config.on_ramp,
-    );
-    let merkle_root = calculate_merkle_root(hashed_leaf, &report.proofs)
-        .map_err(|_| CcipOfframpError::UnexpectedMerkleRoot)?;
+    let selector = source_chain_selector.to_le_bytes();
 
     let mut accounts_to_save = vec![
-        find(&[seed::COMMIT_REPORT, &selector, &merkle_root], crate::ID).writable(),
+        find(&[seed::COMMIT_REPORT, &selector, merkle_root], crate::ID).writable(),
         crate::ID.readonly(),
         find(
             &[seed::ALLOWED_OFFRAMP, &selector, crate::ID.as_ref()],
@@ -365,27 +339,16 @@ fn derive_execute_accounts_build_main_account_list<'info>(
 
     // If there are no tokens, we're done. If there are tokens, we
     // start by reading the registries on next stage.
-    let mut ask_again_with: Vec<_> = report
-        .message
-        .token_amounts
+    let mut ask_again_with: Vec<_> = mints_of_transferred_tokens
         .iter()
-        .map(|ta| {
-            find(
-                &[seed::TOKEN_ADMIN_REGISTRY, ta.dest_token_address.as_ref()],
-                router,
-            )
-        })
+        .map(|mint| find(&[seed::TOKEN_ADMIN_REGISTRY, mint.as_ref()], router))
         .collect();
 
-    if report_or_buffer_id.len() <= 32 {
+    if !buffer_id.is_empty() {
         // We're in the buffered case, so we need the buffer PDA either on the derived account list
         // or on the next stage
         let buffer_pda = find(
-            &[
-                EXECUTION_REPORT_BUFFER,
-                report_or_buffer_id,
-                execute_caller.as_ref(),
-            ],
+            &[EXECUTION_REPORT_BUFFER, buffer_id, execute_caller.as_ref()],
             crate::ID,
         );
         if ask_again_with.is_empty() {
@@ -405,8 +368,6 @@ fn derive_execute_accounts_build_main_account_list<'info>(
 
 fn derive_execute_accounts_retrieve_luts<'info>(
     ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
-    report_or_buffer_id: &[u8],
-    execute_caller: Pubkey,
 ) -> Result<DeriveAccountsResponse> {
     let lookup_table_metas = ctx.remaining_accounts.iter().map(|registry| {
         let token_admin_registry_account: Account<TokenAdminRegistry> =
@@ -416,21 +377,6 @@ fn derive_execute_accounts_retrieve_luts<'info>(
 
     let mut ask_again_with = vec![find(&[seed::REFERENCE_ADDRESSES], crate::ID)];
     ask_again_with.extend(lookup_table_metas.clone());
-
-    if report_or_buffer_id.len() <= 32 {
-        // We're in the buffered case, so we need the buffer PDA either on the derived account list
-        // or on the next stage
-        let buffer_pda = find(
-            &[
-                EXECUTION_REPORT_BUFFER,
-                report_or_buffer_id,
-                execute_caller.as_ref(),
-            ],
-            crate::ID,
-        )
-        .readonly();
-        ask_again_with.push(buffer_pda.readonly());
-    }
 
     Ok(DeriveAccountsResponse {
         accounts_to_save: vec![],
@@ -443,40 +389,24 @@ fn derive_execute_accounts_retrieve_luts<'info>(
 // We derive accounts for each token in a separate step, to ensure we don't blow up the response size.
 fn derive_execute_accounts_additional_tokens<'info>(
     ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
-    report_or_buffer_id: &[u8],
     execute_caller: Pubkey,
+    token_receiver: Pubkey,
+    source_chain_selector: u64,
+    buffer_id: &[u8],
 ) -> Result<DeriveAccountsResponse> {
-    let (report, remaining_accounts) = if report_or_buffer_id.len() <= 32 {
-        (
-            deserialize_from_buffer_account(
-                ctx.remaining_accounts
-                    .last()
-                    .ok_or(CcipOfframpError::ExecutionReportUnavailable)?,
-            )?
-            .0,
-            &ctx.remaining_accounts[0..ctx.remaining_accounts.len() - 1],
-        )
-    } else {
-        (
-            #[allow(clippy::useless_asref)] // clippy is wrong here
-            ExecutionReportSingleChain::deserialize(&mut report_or_buffer_id.as_ref())
-                .map_err(|_| CcipOfframpError::FailedToDeserializeReport)?,
-            ctx.remaining_accounts,
-        )
-    };
-
     // The reference addresses account and at least one LUT.
     require_gte!(
         2,
-        remaining_accounts.len(),
+        ctx.remaining_accounts.len(),
         CcipOfframpError::InvalidAccountListForPdaDerivation
     );
 
-    let selector = report.source_chain_selector.to_le_bytes();
+    let selector = source_chain_selector.to_le_bytes();
     let ReferenceAddresses { fee_quoter, .. } =
-        *AccountLoader::<'info, ReferenceAddresses>::try_from(&remaining_accounts[0])?.load()?;
+        *AccountLoader::<'info, ReferenceAddresses>::try_from(&ctx.remaining_accounts[0])?
+            .load()?;
 
-    let lut = &remaining_accounts[1];
+    let lut = &ctx.remaining_accounts[1];
     let lookup_table_data = &mut &lut.data.borrow()[..];
     let lookup_table_account: AddressLookupTable =
         AddressLookupTable::deserialize(lookup_table_data)
@@ -492,7 +422,7 @@ fn derive_execute_accounts_additional_tokens<'info>(
     .readonly();
 
     let user_token_account = get_associated_token_address_with_program_id(
-        &report.message.token_receiver.key(),
+        &token_receiver,
         &token_mint.key(),
         &token_program.key(),
     )
@@ -534,17 +464,17 @@ fn derive_execute_accounts_additional_tokens<'info>(
 
     let mut ask_again_with = vec![];
 
-    if remaining_accounts.len() > 2 {
+    if ctx.remaining_accounts.len() > 2 {
         // We aren't done yet, we need to derive more tokens, so we tell the user
         // to ask again with one fewer token.
         ask_again_with.push(find(&[seed::REFERENCE_ADDRESSES], crate::ID));
-        ask_again_with.extend(remaining_accounts[2..].iter().map(|a| a.key.readonly()));
-    } else if report_or_buffer_id.len() <= 32 {
+        ask_again_with.extend(ctx.remaining_accounts[2..].iter().map(|a| a.key.readonly()));
+    } else if !buffer_id.is_empty() {
         // We're done and it's the buffered case, so we append the buffer PDA
         let buffer_pda = find(
             &[
                 seed::EXECUTION_REPORT_BUFFER,
-                report_or_buffer_id,
+                buffer_id,
                 execute_caller.as_ref(),
             ],
             crate::ID,

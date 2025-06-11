@@ -67,13 +67,17 @@ pub trait Execute {
         num_chunks: u8,
     ) -> Result<()>;
 
+    #[allow(clippy::too_many_arguments)]
     fn derive_accounts_execute<'info>(
         &self,
         ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
-        report_or_buffer_id: Vec<u8>,
         execute_caller: Pubkey,
         message_accounts: Vec<CcipAccountMeta>,
         source_chain_selector: u64,
+        mints_of_transferred_tokens: Vec<Pubkey>,
+        merkle_root: [u8; 32],
+        buffer_id: Vec<u8>,
+        token_receiver: Pubkey,
     ) -> Result<DeriveAccountsResponse>;
 }
 

@@ -1166,12 +1166,17 @@ export type CcipOfframp = {
         "the entire account list to execute a transaction, and builds it iteratively",
         "over the course of multiple calls.",
         "",
-        "The return type contains two fields:",
+        "The return type contains:",
         "",
         "* `accounts_to_save`: The caller must append these accounts to a list they maintain.",
         "When complete, this list will contain all accounts needed to call `ccip_execute`.",
         "* `ask_again_with`: When this list is not empty, the caller must call `derive_accounts_execute`",
         "again, including exactly these accounts as the `remaining_accounts`.",
+        "* `lookup_tables_to_save`: The caller must save those LUTs. They can be used for `ccip_execute`.",
+        "* `current_stage`: A string describing the current stage of the derivation process. When the stage",
+        "is \"TokenTransferAccounts\", it means the `accounts_to_save` block in this response contains",
+        "all accounts relating to a single token being transferred. Use this information to construct",
+        "the `token_indexes` vector that `execute` requires.",
         "",
         "Therefore, and starting with an empty `remaining_accounts` list, the caller must repeteadly",
         "call `derive_accounts_execute` until `ask_again_with` is returned empty.",
@@ -1179,11 +1184,15 @@ export type CcipOfframp = {
         "# Arguments",
         "",
         "* `ctx`: Context containing only the offramp config.",
-        "* `report_or_buffer_id`: Either the serialized execution report, or the buffer id where the",
-        "execution report was previously buffered by the `execute_caller`.",
         "* `execute_caller`: Public key of the account that will sign the call to `ccip_execute`.",
         "* `message_accounts`: If the transaction involves messaging, the message accounts.",
-        "* `source_chain_selector`: CCIP chain selector for the source chain."
+        "* `source_chain_selector`: CCIP chain selector for the source chain.",
+        "* `mints_of_transferred_token`: List of all token mints for tokens being transferred (i.e.",
+        "the entries in `report.message.token_amounts.destination_address`.)",
+        "* `merkle_root`: Merkle root as per the commit report.",
+        "* `buffer_id`: If the execution will be buffered, the buffer id that will be used by the",
+        "`execute_caller`: If the execution will not be buffered, this should be empty.",
+        "* `token_receiver`: Receiver of token transfers, if any (i.e. report.message.token_receiver.)"
       ],
       "accounts": [
         {
@@ -1193,10 +1202,6 @@ export type CcipOfframp = {
         }
       ],
       "args": [
-        {
-          "name": "reportOrBufferId",
-          "type": "bytes"
-        },
         {
           "name": "executeCaller",
           "type": "publicKey"
@@ -1212,6 +1217,29 @@ export type CcipOfframp = {
         {
           "name": "sourceChainSelector",
           "type": "u64"
+        },
+        {
+          "name": "mintsOfTransferredTokens",
+          "type": {
+            "vec": "publicKey"
+          }
+        },
+        {
+          "name": "merkleRoot",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "bufferId",
+          "type": "bytes"
+        },
+        {
+          "name": "tokenReceiver",
+          "type": "publicKey"
         }
       ],
       "returns": {
@@ -3894,12 +3922,17 @@ export const IDL: CcipOfframp = {
         "the entire account list to execute a transaction, and builds it iteratively",
         "over the course of multiple calls.",
         "",
-        "The return type contains two fields:",
+        "The return type contains:",
         "",
         "* `accounts_to_save`: The caller must append these accounts to a list they maintain.",
         "When complete, this list will contain all accounts needed to call `ccip_execute`.",
         "* `ask_again_with`: When this list is not empty, the caller must call `derive_accounts_execute`",
         "again, including exactly these accounts as the `remaining_accounts`.",
+        "* `lookup_tables_to_save`: The caller must save those LUTs. They can be used for `ccip_execute`.",
+        "* `current_stage`: A string describing the current stage of the derivation process. When the stage",
+        "is \"TokenTransferAccounts\", it means the `accounts_to_save` block in this response contains",
+        "all accounts relating to a single token being transferred. Use this information to construct",
+        "the `token_indexes` vector that `execute` requires.",
         "",
         "Therefore, and starting with an empty `remaining_accounts` list, the caller must repeteadly",
         "call `derive_accounts_execute` until `ask_again_with` is returned empty.",
@@ -3907,11 +3940,15 @@ export const IDL: CcipOfframp = {
         "# Arguments",
         "",
         "* `ctx`: Context containing only the offramp config.",
-        "* `report_or_buffer_id`: Either the serialized execution report, or the buffer id where the",
-        "execution report was previously buffered by the `execute_caller`.",
         "* `execute_caller`: Public key of the account that will sign the call to `ccip_execute`.",
         "* `message_accounts`: If the transaction involves messaging, the message accounts.",
-        "* `source_chain_selector`: CCIP chain selector for the source chain."
+        "* `source_chain_selector`: CCIP chain selector for the source chain.",
+        "* `mints_of_transferred_token`: List of all token mints for tokens being transferred (i.e.",
+        "the entries in `report.message.token_amounts.destination_address`.)",
+        "* `merkle_root`: Merkle root as per the commit report.",
+        "* `buffer_id`: If the execution will be buffered, the buffer id that will be used by the",
+        "`execute_caller`: If the execution will not be buffered, this should be empty.",
+        "* `token_receiver`: Receiver of token transfers, if any (i.e. report.message.token_receiver.)"
       ],
       "accounts": [
         {
@@ -3921,10 +3958,6 @@ export const IDL: CcipOfframp = {
         }
       ],
       "args": [
-        {
-          "name": "reportOrBufferId",
-          "type": "bytes"
-        },
         {
           "name": "executeCaller",
           "type": "publicKey"
@@ -3940,6 +3973,29 @@ export const IDL: CcipOfframp = {
         {
           "name": "sourceChainSelector",
           "type": "u64"
+        },
+        {
+          "name": "mintsOfTransferredTokens",
+          "type": {
+            "vec": "publicKey"
+          }
+        },
+        {
+          "name": "merkleRoot",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "bufferId",
+          "type": "bytes"
+        },
+        {
+          "name": "tokenReceiver",
+          "type": "publicKey"
         }
       ],
       "returns": {
