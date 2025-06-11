@@ -134,13 +134,16 @@ func (p PluginFactory) NewReportingPlugin(
 	// - Extended reader adds finality violation and contract binding management.
 	// - Observed reader adds metric reporting.
 	readers := make(map[cciptypes.ChainSelector]contractreader.ContractReaderFacade)
+	extended := make(map[cciptypes.ChainSelector]contractreader.Extended)
 	for chain, cr := range p.contractReaders {
 		chainID, err1 := sel.GetChainIDFromSelector(uint64(chain))
 		if err1 != nil {
 			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to get chain id from selector: %w", err1)
 		}
-		readers[chain] = contractreader.NewExtendedContractReader(
+		reader := contractreader.NewExtendedContractReader(
 			contractreader.NewObserverReader(cr, lggr, chainID))
+		readers[chain] = reader
+		extended[chain] = reader
 	}
 
 	ccipReader, err := readerpkg.NewCCIPChainReader(
@@ -162,7 +165,7 @@ func (p PluginFactory) NewReportingPlugin(
 		p.ocrConfig.Config.ChainSelector,
 		offchainConfig.TokenDataObservers,
 		p.tokenDataEncoder,
-		readers,
+		extended,
 		p.addrCodec,
 	)
 	if err != nil {

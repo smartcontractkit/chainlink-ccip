@@ -66,7 +66,7 @@ func newCCIPChainReaderInternal(
 		if contractWriters[chainSelector] == nil {
 			return nil, fmt.Errorf("contract writer for chain %s is not provided", chainSelector)
 		}
-		cas[chainSelector] = chainaccessor.NewLegacyAccessor(
+		cas[chainSelector] = chainaccessor.NewDefaultAccessor(
 			lggr,
 			chainSelector,
 			crs[chainSelector],
@@ -503,20 +503,22 @@ func createExecutedMessagesKeyFilter(
 func (r *ccipChainReader) MsgsBetweenSeqNums(
 	ctx context.Context, sourceChainSelector cciptypes.ChainSelector, seqNumRange cciptypes.SeqNumRange,
 ) ([]cciptypes.Message, error) {
-	if err := validateAccessorExistence(r.accessors, sourceChainSelector); err != nil {
+	sourceChainAccessor, err := getChainAccessor(r.accessors, sourceChainSelector)
+	if err != nil {
 		return nil, err
 	}
-	onRampAddressBeforeQuery, err := r.accessors[sourceChainSelector].GetContractAddress(consts.ContractNameOnRamp)
+
+	onRampAddressBeforeQuery, err := sourceChainAccessor.GetContractAddress(consts.ContractNameOnRamp)
 	if err != nil {
 		return nil, fmt.Errorf("get onRamp address: %w", err)
 	}
 
-	messages, err := r.accessors[sourceChainSelector].MsgsBetweenSeqNums(ctx, r.destChain, seqNumRange)
+	messages, err := sourceChainAccessor.MsgsBetweenSeqNums(ctx, r.destChain, seqNumRange)
 	if err != nil {
-		return nil, fmt.Errorf("failed to call MsgsBetweenSeqNums on accessor: %w", err)
+		return nil, fmt.Errorf("failed to call MsgsBetweenSeqNums on sourceChainAccessor: %w", err)
 	}
 
-	onRampAddressAfterQuery, err := r.accessors[sourceChainSelector].GetContractAddress(consts.ContractNameOnRamp)
+	onRampAddressAfterQuery, err := sourceChainAccessor.GetContractAddress(consts.ContractNameOnRamp)
 	if err != nil {
 		return nil, fmt.Errorf("get onRamp address after query: %w", err)
 	}
@@ -533,62 +535,20 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 func (r *ccipChainReader) LatestMsgSeqNum(
 	ctx context.Context, chain cciptypes.ChainSelector) (cciptypes.SeqNum, error) {
 	lggr := logutil.WithContextValues(ctx, r.lggr)
-	if err := validateReaderExistence(r.contractReaders, chain); err != nil {
+	chainAccessor, err := getChainAccessor(r.accessors, chain)
+	if err != nil {
 		return 0, err
 	}
 
-	seq, err := r.contractReaders[chain].ExtendedQueryKey(
-		ctx,
-		consts.ContractNameOnRamp,
-		query.KeyFilter{
-			Key: consts.EventNameCCIPMessageSent,
-			Expressions: []query.Expression{
-				query.Comparator(consts.EventAttributeSourceChain, primitives.ValueComparator{
-					Value:    chain,
-					Operator: primitives.Eq,
-				}),
-				query.Comparator(consts.EventAttributeDestChain, primitives.ValueComparator{
-					Value:    r.destChain,
-					Operator: primitives.Eq,
-				}),
-				query.Confidence(primitives.Finalized),
-			},
-		},
-		query.LimitAndSort{
-			SortBy: []query.SortBy{
-				query.NewSortBySequence(query.Desc),
-			},
-			Limit: query.Limit{Count: 1},
-		},
-		&chainaccessor.SendRequestedEvent{},
-	)
+	seqNum, err := chainAccessor.LatestMsgSeqNum(ctx, r.destChain)
 	if err != nil {
-		return 0, fmt.Errorf("failed to query onRamp: %w", err)
-	}
-
-	lggr.Debugw("queried latest message from source",
-		"numMsgs", len(seq), "sourceChainSelector", chain)
-	if len(seq) > 1 {
-		return 0, fmt.Errorf("more than one message found for the latest message query")
-	}
-	if len(seq) == 0 {
-		return 0, nil
-	}
-
-	item := seq[0]
-	msg, ok := item.Data.(*chainaccessor.SendRequestedEvent)
-	if !ok {
-		return 0, fmt.Errorf("failed to cast %v to SendRequestedEvent", item.Data)
-	}
-
-	if err := chainaccessor.ValidateSendRequestedEvent(msg, chain, r.destChain,
-		cciptypes.NewSeqNumRange(msg.Message.Header.SequenceNumber, msg.Message.Header.SequenceNumber)); err != nil {
-		return 0, fmt.Errorf("message invalid msg %v: %w", msg, err)
+		return 0, fmt.Errorf("failed to call accessor LatestMsgSeqNum, source chain: %d, dest chain: %d: %w",
+			chain, r.destChain, err)
 	}
 
 	lggr.Infow("chain reader returning latest onramp sequence number",
-		"seqNum", msg.Message.Header.SequenceNumber, "sourceChainSelector", chain)
-	return msg.SequenceNumber, nil
+		"seqNum", seqNum, "sourceChainSelector", chain)
+	return seqNum, nil
 }
 
 // GetExpectedNextSequenceNumber implements CCIP.
@@ -598,34 +558,19 @@ func (r *ccipChainReader) GetExpectedNextSequenceNumber(
 ) (cciptypes.SeqNum, error) {
 	lggr := logutil.WithContextValues(ctx, r.lggr)
 
-	if err := validateReaderExistence(r.contractReaders, sourceChainSelector); err != nil {
+	sourceChainAccessor, err := getChainAccessor(r.accessors, sourceChainSelector)
+	if err != nil {
 		return 0, err
 	}
-
-	var expectedNextSequenceNumber uint64
-	err := r.contractReaders[sourceChainSelector].ExtendedGetLatestValue(
-		ctx,
-		consts.ContractNameOnRamp,
-		consts.MethodNameGetExpectedNextSequenceNumber,
-		primitives.Unconfirmed,
-		map[string]any{
-			"destChainSelector": r.destChain,
-		},
-		&expectedNextSequenceNumber,
-	)
+	expectedNextSeqNum, err := sourceChainAccessor.GetExpectedNextSequenceNumber(ctx, r.destChain)
 	if err != nil {
-		return 0, fmt.Errorf("failed to get expected next sequence number from onramp, source chain: %d, dest chain: %d: %w",
+		return 0, fmt.Errorf("failed to call accessor LatestMsgSeqNum, source chain: %d, dest chain: %d: %w",
 			sourceChainSelector, r.destChain, err)
 	}
 
-	if expectedNextSequenceNumber == 0 {
-		return 0, fmt.Errorf("the returned expected next sequence num is 0, source chain: %d, dest chain: %d",
-			sourceChainSelector, r.destChain)
-	}
-
-	lggr.Debugw("chain reader returning expected next sequence number",
-		"seqNum", expectedNextSequenceNumber, "sourceChainSelector", sourceChainSelector)
-	return cciptypes.SeqNum(expectedNextSequenceNumber), nil
+	lggr.Debugw("chain accessor returning expected next sequence number",
+		"seqNum", expectedNextSeqNum, "sourceChainSelector", sourceChainSelector)
+	return expectedNextSeqNum, nil
 }
 
 // NextSeqNum returns the current sequence numbers for chains.
@@ -805,12 +750,13 @@ func (r *ccipChainReader) GetChainsFeeComponents(
 	feeComponents := make(map[cciptypes.ChainSelector]types.ChainFeeComponents, len(r.contractWriters))
 
 	for _, chain := range chains {
-		if err := validateAccessorExistence(r.accessors, chain); err != nil {
-			lggr.Errorw("accessor not found", "chain", chain, "err", err)
+		chainAccessor, err := getChainAccessor(r.accessors, chain)
+		if err != nil {
+			lggr.Errorw("failed to get chain accessor", "chain", chain, "err", err)
 			continue
 		}
 
-		feeComponent, err := r.accessors[chain].GetChainFeeComponents(ctx)
+		feeComponent, err := chainAccessor.GetChainFeeComponents(ctx)
 		if err != nil {
 			lggr.Errorw("failed to get chain fee components", "chain", chain, "err", err)
 			continue
@@ -1053,9 +999,9 @@ func (r *ccipChainReader) GetRMNRemoteConfig(ctx context.Context) (cciptypes.Rem
 
 	// RMNRemote address stored in the offramp static config is actually the proxy contract address.
 	// Here we will get the RMNRemote address from the proxy contract by calling the RMNProxy contract.
-	destChainAccessor := r.accessors[r.destChain]
-	if destChainAccessor == nil {
-		return cciptypes.RemoteConfig{}, fmt.Errorf("chain accessor not found for dest chain %d", r.destChain)
+	destChainAccessor, err := getChainAccessor(r.accessors, r.destChain)
+	if err != nil {
+		return cciptypes.RemoteConfig{}, err
 	}
 	proxyContractAddress, err := destChainAccessor.GetContractAddress(consts.ContractNameRMNRemote)
 	if err != nil {
@@ -1412,18 +1358,6 @@ func (r *ccipChainReader) getFeeQuoterTokenPriceUSD(ctx context.Context, tokenAd
 	return cciptypes.NewBigInt(price), nil
 }
 
-// sourceChainConfig is used to parse the response from the offRamp contract's getSourceChainConfig method.
-// See: https://github.com/smartcontractkit/ccip/blob/a3f61f7458e4499c2c62eb38581c60b4942b1160/contracts/src/v0.8/ccip/offRamp/OffRamp.sol#L94
-//
-//nolint:lll // It's a URL.
-type SourceChainConfig struct {
-	Router                    []byte // local router
-	IsEnabled                 bool
-	IsRMNVerificationDisabled bool
-	MinSeqNr                  uint64
-	OnRamp                    cciptypes.UnknownAddress
-}
-
 // GetOffRampSourceChainsConfig returns the static source chain configs for all the provided source chains.
 // This method returns configurations without the MinSeqNr field, which should be fetched separately when needed.
 func (r *ccipChainReader) GetOffRampSourceChainsConfig(ctx context.Context, chains []cciptypes.ChainSelector,
@@ -1479,7 +1413,7 @@ func (r *ccipChainReader) fetchFreshSourceChainConfigs(
 	ctx context.Context,
 	destChain cciptypes.ChainSelector,
 	sourceChains []cciptypes.ChainSelector,
-) (map[cciptypes.ChainSelector]SourceChainConfig, error) {
+) (map[cciptypes.ChainSelector]cciptypes.SourceChainConfig, error) {
 	lggr := logutil.WithContextValues(ctx, r.lggr)
 
 	reader, exists := r.contractReaders[destChain]
@@ -1490,7 +1424,7 @@ func (r *ccipChainReader) fetchFreshSourceChainConfigs(
 	// Filter out destination chain
 	filteredSourceChains := filterOutChainSelector(sourceChains, destChain)
 	if len(filteredSourceChains) == 0 {
-		return make(map[cciptypes.ChainSelector]SourceChainConfig), nil
+		return make(map[cciptypes.ChainSelector]cciptypes.SourceChainConfig), nil
 	}
 
 	// Prepare batch requests for the sourceChains to fetch the latest Unfinalized config values.
@@ -1504,7 +1438,7 @@ func (r *ccipChainReader) fetchFreshSourceChainConfigs(
 			Params: map[string]any{
 				"sourceChainSelector": chain,
 			},
-			ReturnVal: new(SourceChainConfig),
+			ReturnVal: new(cciptypes.SourceChainConfig),
 		})
 	}
 
@@ -1526,7 +1460,7 @@ func (r *ccipChainReader) fetchFreshSourceChainConfigs(
 	}
 
 	// Process results
-	configs := make(map[cciptypes.ChainSelector]SourceChainConfig)
+	configs := make(map[cciptypes.ChainSelector]cciptypes.SourceChainConfig)
 
 	for _, readResult := range results {
 		if len(readResult) != len(validSourceChains) {
@@ -1543,7 +1477,7 @@ func (r *ccipChainReader) fetchFreshSourceChainConfigs(
 				return nil, fmt.Errorf("GetSourceChainConfig for chainSelector=%d failed: %w", chain, err)
 			}
 
-			cfg, ok := v.(*SourceChainConfig)
+			cfg, ok := v.(*cciptypes.SourceChainConfig)
 			if !ok {
 				lggr.Errorw("Invalid result type from GetSourceChainConfig",
 					"chain", chain,
@@ -2171,7 +2105,7 @@ type ccipReaderInternal interface {
 	// fetchFreshSourceChainConfigs fetches source chain configurations from the specified destination chain
 	fetchFreshSourceChainConfigs(
 		ctx context.Context, destChain cciptypes.ChainSelector,
-		sourceChains []cciptypes.ChainSelector) (map[cciptypes.ChainSelector]SourceChainConfig, error)
+		sourceChains []cciptypes.ChainSelector) (map[cciptypes.ChainSelector]cciptypes.SourceChainConfig, error)
 }
 
 // getDestChain returns the destination chain selector
