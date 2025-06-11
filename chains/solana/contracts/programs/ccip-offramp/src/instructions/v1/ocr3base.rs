@@ -142,6 +142,7 @@ pub(super) trait Ocr3Report {
     fn len(&self) -> usize;
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn ocr3_transmit<R: Ocr3Report>(
     ocr3_config: &Ocr3Config,
     instruction_sysvar: &AccountInfo<'_>,
@@ -150,6 +151,7 @@ pub(super) fn ocr3_transmit<R: Ocr3Report>(
     report_context: ReportContext,
     report: &R,
     signatures: Signatures,
+    buffered_bytes: usize,
 ) -> Result<()> {
     require!(
         plugin_type == ocr3_config.plugin_type.try_into()?,
@@ -173,7 +175,9 @@ pub(super) fn ocr3_transmit<R: Ocr3Report>(
     )?;
 
     require_eq!(
-        tx.data.len() as u128,
+        // `buffered_bytes` is the amount of bytes from the instruction that were pre-buffered
+        // as opposed to passed alongside the instruction data.
+        (buffered_bytes + tx.data.len()) as u128,
         expected_data_len,
         CcipOfframpError::Ocr3WrongMessageLength
     );

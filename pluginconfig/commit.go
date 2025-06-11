@@ -152,6 +152,16 @@ type CommitOffchainConfig struct {
 	// NOTE: It is also used when the async observer is disabled, while making the sync calls.
 	TokenPriceAsyncObserverSyncTimeout commonconfig.Duration `json:"tokenPriceAsyncObserverSyncTimeout"`
 
+	// EnableDonBreakingChanges is a generic feature flag for releases that contain breaking changes for the DON.
+	// Set this to True iff every oracle has upgraded to the new/current release.
+	// Example Usage:
+	//    - You are adding a new Observed field, oracles running old version cannot parse it.
+	//    - The new logic is used only if EnableDonBreakingChanges is set to True.
+	//    - Release with EnableDonBreakingChanges=False and wait until every oracle upgrades.
+	//    - Now you can set it to True and enable your new feature.
+	//    - In the next release EnableDonBreakingChanges should be set back to False and deprecated code should be removed.
+	EnableDonBreakingChanges bool `json:"enableDonBreakingChanges"`
+
 	// MaxRootsPerReport is the maximum number of roots to include in a single report.
 	// Set this to 1 for destination chains that cannot process more than one commit root per report (e.g, Solana)
 	// Disable by setting to 0.
@@ -223,18 +233,18 @@ func (c *CommitOffchainConfig) applyDefaults() {
 		if c.ChainFeeAsyncObserverSyncFreq == 0 {
 			c.ChainFeeAsyncObserverSyncFreq = defaultAsyncObserverSyncFreq
 		}
-		if c.ChainFeeAsyncObserverSyncTimeout == 0 {
-			c.ChainFeeAsyncObserverSyncTimeout = defaultAsyncObserverSyncTimeout
-		}
+	}
+	if c.ChainFeeAsyncObserverSyncTimeout == 0 {
+		c.ChainFeeAsyncObserverSyncTimeout = defaultAsyncObserverSyncTimeout
 	}
 
 	if !c.TokenPriceAsyncObserverDisabled {
 		if c.TokenPriceAsyncObserverSyncFreq.Duration() == 0 {
 			c.TokenPriceAsyncObserverSyncFreq = *commonconfig.MustNewDuration(defaultAsyncObserverSyncFreq)
 		}
-		if c.TokenPriceAsyncObserverSyncTimeout.Duration() == 0 {
-			c.TokenPriceAsyncObserverSyncTimeout = *commonconfig.MustNewDuration(defaultAsyncObserverSyncTimeout)
-		}
+	}
+	if c.TokenPriceAsyncObserverSyncTimeout.Duration() == 0 {
+		c.TokenPriceAsyncObserverSyncTimeout = *commonconfig.MustNewDuration(defaultAsyncObserverSyncTimeout)
 	}
 }
 

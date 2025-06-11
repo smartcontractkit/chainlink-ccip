@@ -45,7 +45,7 @@ compileContract() {
     mv $(find $dir/build -type f -name '*.json' ! -name 'build.json') $dir/build/build.json
 
     # Copy the generated abi files to a single folder
-    cp "$CONTRACTS_DIR"/solc/$PROJECT/"$contract"/"$contract".sol/"$contract".abi.json "$ABI_DIR""$contract".abi
+    cp "$CONTRACTS_DIR"/solc/$PROJECT/"$contract"/"$contract".sol/"$contract".abi.json "$ABI_DIR""$contract".abi.json
   fi
 }
 
