@@ -15,96 +15,96 @@ contract InternalSetup is Test {
   bytes internal constant INVALID_TVM_ADDRESS_ZERO_ACCOUNT =
     hex"11ff000000000000000000000000000000000000000000000000000000000000000012ab";
 
-  InternalTestHelper internal helper;
+  InternalTestHelper internal s_helper;
 
   function setUp() public virtual {
-    helper = new InternalTestHelper();
+    s_helper = new InternalTestHelper();
   }
 }
 
 contract Internal_validateEVMAddress is InternalSetup {
   function test_validateEVMAddress_succeeds_onValidAddress() public {
     bytes memory validAddress = abi.encode(VALID_EVM_ADDRESS);
-    helper.validateEVMAddress(validAddress);
+    s_helper.validateEVMAddress(validAddress);
   }
 
   function test_validateEVMAddress_reverts_onInvalidLength() public {
     bytes memory invalidAddress = new bytes(31);
     vm.expectRevert(abi.encodeWithSelector(Internal.InvalidEVMAddress.selector, invalidAddress));
-    helper.validateEVMAddress(invalidAddress);
+    s_helper.validateEVMAddress(invalidAddress);
   }
 
   function test_validateEVMAddress_reverts_onPrecompileAddress() public {
     bytes memory precompileAddress = abi.encode(PRECOMPILE_ADDRESS);
     vm.expectRevert(abi.encodeWithSelector(Internal.InvalidEVMAddress.selector, precompileAddress));
-    helper.validateEVMAddress(precompileAddress);
+    s_helper.validateEVMAddress(precompileAddress);
   }
 
   function test_validateEVMAddress_reverts_onOversizedAddress() public {
     bytes memory invalidAddress = abi.encode(uint256(type(uint160).max) + 1);
     vm.expectRevert(abi.encodeWithSelector(Internal.InvalidEVMAddress.selector, invalidAddress));
-    helper.validateEVMAddress(invalidAddress);
+    s_helper.validateEVMAddress(invalidAddress);
   }
 
   function test_validateEVMAddress_succeeds_onBoundaryAddresses() public {
     bytes memory lowerBoundary = abi.encode(uint256(Internal.EVM_PRECOMPILE_SPACE));
-    helper.validateEVMAddress(lowerBoundary);
+    s_helper.validateEVMAddress(lowerBoundary);
 
     bytes memory upperBoundary = abi.encode(uint256(type(uint160).max));
-    helper.validateEVMAddress(upperBoundary);
+    s_helper.validateEVMAddress(upperBoundary);
   }
 }
 
 contract Internal_validate32ByteAddress is InternalSetup {
   function test_validate32ByteAddress_succeeds_onValidAddress() public {
-    helper.validate32ByteAddress(VALID_32_BYTE_ADDRESS, 0);
+    s_helper.validate32ByteAddress(VALID_32_BYTE_ADDRESS, 0);
   }
 
   function test_validate32ByteAddress_reverts_onInvalidLength() public {
     bytes memory invalidAddress = new bytes(31);
     vm.expectRevert(abi.encodeWithSelector(Internal.Invalid32ByteAddress.selector, invalidAddress));
-    helper.validate32ByteAddress(invalidAddress, 0);
+    s_helper.validate32ByteAddress(invalidAddress, 0);
   }
 
   function test_validate32ByteAddress_reverts_onAddressBelowMinValue() public {
     bytes memory belowMinAddress = abi.encode(uint256(500));
     vm.expectRevert(abi.encodeWithSelector(Internal.Invalid32ByteAddress.selector, belowMinAddress));
-    helper.validate32ByteAddress(belowMinAddress, 1000);
+    s_helper.validate32ByteAddress(belowMinAddress, 1000);
   }
 
   function test_validate32ByteAddress_succeeds_onBoundaryMinValue() public {
     uint256 minValue = 1000;
     bytes memory exactMinAddress = abi.encode(minValue);
-    helper.validate32ByteAddress(exactMinAddress, minValue);
+    s_helper.validate32ByteAddress(exactMinAddress, minValue);
   }
 
   function test_validate32ByteAddress_reverts_onAptosPrecompileAddress() public {
     bytes memory precompileAddress = abi.encode(Internal.APTOS_PRECOMPILE_SPACE - 1);
     vm.expectRevert(abi.encodeWithSelector(Internal.Invalid32ByteAddress.selector, precompileAddress));
-    helper.validate32ByteAddress(precompileAddress, Internal.APTOS_PRECOMPILE_SPACE);
+    s_helper.validate32ByteAddress(precompileAddress, Internal.APTOS_PRECOMPILE_SPACE);
   }
 }
 
 contract Internal_validateTVMAddress is InternalSetup {
   function test_validateTVMAddress_succeeds_onValidAddress() public {
-    helper.validateTVMAddress(VALID_TVM_ADDRESS);
+    s_helper.validateTVMAddress(VALID_TVM_ADDRESS);
   }
 
   function test_validateTVMAddress_reverts_onShortLength() public {
     bytes memory shortAddress = new bytes(35);
     vm.expectRevert(abi.encodeWithSelector(Internal.InvalidTVMAddress.selector, shortAddress));
-    helper.validateTVMAddress(shortAddress);
+    s_helper.validateTVMAddress(shortAddress);
   }
 
   function test_validateTVMAddress_reverts_onLongLength() public {
     bytes memory longAddress = new bytes(37);
     vm.expectRevert(abi.encodeWithSelector(Internal.InvalidTVMAddress.selector, longAddress));
-    helper.validateTVMAddress(longAddress);
+    s_helper.validateTVMAddress(longAddress);
   }
 
   function test_validateTVMAddress_reverts_onZeroAccountId() public {
     vm.expectRevert(abi.encodeWithSelector(Internal.InvalidTVMAddress.selector, INVALID_TVM_ADDRESS_ZERO_ACCOUNT));
-    helper.validateTVMAddress(INVALID_TVM_ADDRESS_ZERO_ACCOUNT);
+    s_helper.validateTVMAddress(INVALID_TVM_ADDRESS_ZERO_ACCOUNT);
   }
 }
 
