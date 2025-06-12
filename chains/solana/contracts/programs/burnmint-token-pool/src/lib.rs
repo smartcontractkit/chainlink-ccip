@@ -86,21 +86,19 @@ pub mod burnmint_token_pool {
         let token_program_id = &ctx.accounts.state.config.token_program.key();
 
         let multisig_data = &mut &ctx.accounts.new_multisig_mint_authority.data.borrow()[..];
-        let multisig_account: MultisigAccount;
-
         // then check that the multisig account is a valid multisig account
-        if token_program_id == &spl_token_2022::ID {
-            let multisig_data = spl_token_2022::state::Multisig::unpack_from_slice(multisig_data)
-                .map_err(|_| CcipBnMTokenPoolError::InvalidToken2022Multisig)?;
-            multisig_account = multisig_data.into();
+        let multisig_account: MultisigAccount = if token_program_id == &spl_token_2022::ID {
+            spl_token_2022::state::Multisig::unpack_from_slice(multisig_data)
+                .map_err(|_| CcipBnMTokenPoolError::InvalidToken2022Multisig)?
+                .into()
         } else {
             // If the token program is not spl-token-2022, we assume it is the original SPL Token Program
-            let multisig_data = spl_token::state::Multisig::unpack_from_slice(multisig_data)
-                .map_err(|_| CcipBnMTokenPoolError::InvalidSPLTokenMultisig)?;
-            multisig_account = multisig_data.into();
-        }
+            spl_token::state::Multisig::unpack_from_slice(multisig_data)
+                .map_err(|_| CcipBnMTokenPoolError::InvalidSPLTokenMultisig)?
+                .into()
+        }        
 
-        // If using a multisig, it must have more than one signer and the threshold must be valid
+        // If using a multisig, it must have more than one valid signer
         let n = multisig_account.n as usize;
         require_gt!(
             n,
@@ -108,14 +106,14 @@ pub mod burnmint_token_pool {
             CcipBnMTokenPoolError::MultisigMustHaveMoreThanOneSigner
         );
         let m = multisig_account.m as usize;
-        // The Pool signer must be m times a signer
-        require!(
+        // The Pool signer must be at least m times a signer, so it can mint by itself
+        require_gte!(
             multisig_account
                 .signers
                 .iter()
                 .filter(|s| *s == &ctx.accounts.pool_signer.key())
-                .count()
-                >= m,
+                .count(),
+            m,
             CcipBnMTokenPoolError::PoolSignerNotInMultisig
         );
 
