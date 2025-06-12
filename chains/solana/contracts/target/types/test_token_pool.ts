@@ -1,5 +1,5 @@
 export type TestTokenPool = {
-  "version": "0.1.0-dev",
+  "version": "0.1.1-dev",
   "name": "test_token_pool",
   "instructions": [
     {
@@ -547,7 +547,7 @@ export type TestTokenPool = {
 };
 
 export const IDL: TestTokenPool = {
-  "version": "0.1.0-dev",
+  "version": "0.1.1-dev",
   "name": "test_token_pool",
   "instructions": [
     {
