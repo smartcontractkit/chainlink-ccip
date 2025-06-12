@@ -12,7 +12,7 @@ contract FastTransferTokenPool_updateDestChainConfig is FastTransferTokenPoolSet
   uint256 internal constant NEW_FILL_AMOUNT_MAX = 2000 ether;
   uint32 internal constant NEW_SETTLEMENT_GAS_OVERHEAD = SETTLEMENT_GAS_OVERHEAD + 100_000; // Increase by 100k
 
-  function test_UpdateDestChainConfig() public {
+  function test_updateDestChainConfig() public {
     FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs memory laneConfigArgs = FastTransferTokenPoolAbstract
       .DestChainConfigUpdateArgs({
       remoteChainSelector: NEW_CHAIN_SELECTOR,
@@ -47,7 +47,7 @@ contract FastTransferTokenPool_updateDestChainConfig is FastTransferTokenPoolSet
     assertEq(config.maxFillAmountPerRequest, NEW_FILL_AMOUNT_MAX);
   }
 
-  function test_UpdateDestChainConfig_ModifyExisting() public {
+  function test_updateDestChainConfig_ModifyExisting() public {
     FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs memory laneConfigArgs = FastTransferTokenPoolAbstract
       .DestChainConfigUpdateArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
@@ -115,7 +115,7 @@ contract FastTransferTokenPool_updateDestChainConfig is FastTransferTokenPoolSet
     s_pool.updateDestChainConfig(_singleConfigToList(laneConfigArgs));
   }
 
-  function test_UpdateDestChainConfig_ZeroFastFee() public {
+  function test_updateDestChainConfig_ZeroFastFee() public {
     FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs memory laneConfigArgs = FastTransferTokenPoolAbstract
       .DestChainConfigUpdateArgs({
       remoteChainSelector: NEW_CHAIN_SELECTOR,
@@ -135,11 +135,11 @@ contract FastTransferTokenPool_updateDestChainConfig is FastTransferTokenPoolSet
     assertEq(config.fastTransferFillerFeeBps, 0);
   }
 
-  function test_UpdateDestChainConfig_MaxFastFee() public {
+  function test_updateDestChainConfig_MaxFastFee() public {
     FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs memory laneConfigArgs = FastTransferTokenPoolAbstract
       .DestChainConfigUpdateArgs({
       remoteChainSelector: NEW_CHAIN_SELECTOR,
-      fastTransferFillerFeeBps: 10_000, // 100% fee
+      fastTransferFillerFeeBps: 9_999, // 99.99% fee
       fastTransferPoolFeeBps: 0, // No pool fee for this test
       fillerAllowlistEnabled: true,
       destinationPool: NEW_DESTINATION_POOL,
@@ -152,10 +152,10 @@ contract FastTransferTokenPool_updateDestChainConfig is FastTransferTokenPoolSet
     s_pool.updateDestChainConfig(_singleConfigToList(laneConfigArgs));
 
     (FastTransferTokenPoolAbstract.DestChainConfig memory config,) = s_pool.getDestChainConfig(NEW_CHAIN_SELECTOR);
-    assertEq(config.fastTransferFillerFeeBps, 10_000);
+    assertEq(config.fastTransferFillerFeeBps, 9_999);
   }
 
-  function test_UpdateDestChainConfig_WithPoolFee() public {
+  function test_updateDestChainConfig_WithPoolFee() public {
     uint16 poolFeeBps = 150; // 1.5%
 
     FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs memory laneConfigArgs = FastTransferTokenPoolAbstract
@@ -193,7 +193,7 @@ contract FastTransferTokenPool_updateDestChainConfig is FastTransferTokenPoolSet
     assertEq(config.maxFillAmountPerRequest, NEW_FILL_AMOUNT_MAX);
   }
 
-  function test_UpdateDestChainConfig_TotalFeesExactly100Percent() public {
+  function test_updateDestChainConfig_RevertWhen_TotalFeesExactly100Percent() public {
     uint16 fillerFee = 3_000; // 30%
     uint16 poolFee = 7_000; // 70% -> Total exactly 100%
 
@@ -210,12 +210,8 @@ contract FastTransferTokenPool_updateDestChainConfig is FastTransferTokenPoolSet
       customExtraArgs: ""
     });
 
-    // Should succeed - exactly 100% is allowed
+    vm.expectRevert(FastTransferTokenPoolAbstract.InvalidDestChainConfig.selector);
     s_pool.updateDestChainConfig(_singleConfigToList(laneConfigArgs));
-
-    (FastTransferTokenPoolAbstract.DestChainConfig memory config,) = s_pool.getDestChainConfig(NEW_CHAIN_SELECTOR);
-    assertEq(config.fastTransferFillerFeeBps, fillerFee);
-    assertEq(config.fastTransferPoolFeeBps, poolFee);
   }
 
   function test_RevertWhen_TotalFeesExceed100Percent() public {
