@@ -465,17 +465,16 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   }
 
   /// @notice Gets the accumulated pool fees that can be withdrawn.
-  /// @dev For Burn/Mint pools, this returns the contract's token balance since pool fees
-  /// are minted directly to the pool. Lock/Release token pools that cannot mint new tokens may choose to implement
-  /// their own accounting mechanism for pool fees by adding a storage variable such as: s_accumulatedPoolFees.
-  /// This allows them to track fees separately since they cannot mint additional tokens
-  /// for pool fee rewards like Burn/Mint pools can.
-  /// Note: We understand that fee accounting can be obscured by sending tokens directly to the pool.
-  /// This does not introduce security issues but will need to be handled operationally. We accept this risk.
-  /// @return The amount of accumulated pool fees.
-  function getAccumulatedPoolFees() public view virtual returns (uint256) {
-    return getToken().balanceOf(address(this));
-  }
+  /// @dev This is an abstract function that must be implemented by derived contracts.
+  /// Burn/Mint pools : Should return the contract's token balance since pool fees
+  /// are minted directly to the pool contract (e.g., `return getToken().balanceOf(address(this))`).
+  /// Lock/Release pools : Should implement their own accounting mechanism for pool fees
+  /// by adding a storage variable (e.g., `s_accumulatedPoolFees`) since they cannot mint
+  /// additional tokens for pool fee rewards.
+  /// Note: Fee accounting can be obscured by sending tokens directly to the pool.
+  /// This does not introduce security issues but will need to be handled operationally.
+  /// @return The amount of accumulated pool fees available for withdrawal.
+  function getAccumulatedPoolFees() public view virtual returns (uint256);
 
   /// @notice Withdraws all accumulated pool fees to the specified recipient.
   /// @dev For BURN/MINT pools, this transfers the entire token balance of the pool contract.

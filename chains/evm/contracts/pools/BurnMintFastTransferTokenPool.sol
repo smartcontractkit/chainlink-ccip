@@ -42,4 +42,8 @@ contract BurnMintFastTransferTokenPool is FastTransferTokenPoolAbstract {
   function _releaseOrMint(address receiver, uint256 amount) internal virtual override {
     IBurnMintERC20(address(i_token)).mint(receiver, amount);
   }
+
+  function getAccumulatedPoolFees() public view override returns (uint256) {
+    return getToken().balanceOf(address(this));
+  }
 }
