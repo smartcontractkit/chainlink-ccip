@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.4;
 
+import {IVerifier} from "../interfaces/IVerifier.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
@@ -8,7 +9,7 @@ import {EnumerableSet} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
 
 /// @notice Onchain verification of reports from the offchain reporting protocol with multiple OCR plugin support.
-contract OCRVerifier is ITypeAndVersion, Ownable2StepMsgSender {
+contract OCRVerifier is IVerifier, ITypeAndVersion, Ownable2StepMsgSender {
   using EnumerableSet for EnumerableSet.AddressSet;
 
   string public constant override typeAndVersion = "OCRVerifier 1.7.0-dev";
@@ -73,7 +74,7 @@ contract OCRVerifier is ITypeAndVersion, Ownable2StepMsgSender {
     i_chainID = block.chainid;
   }
 
-  function validateReport(bytes memory rawReport, bytes calldata ocrProof) external {
+  function validateReport(bytes calldata rawReport, bytes calldata ocrProof, uint256) external {
     OCRProof memory report = abi.decode(ocrProof, (OCRProof));
 
     if (s_ocrConfig.configDigest != report.configDigest) {

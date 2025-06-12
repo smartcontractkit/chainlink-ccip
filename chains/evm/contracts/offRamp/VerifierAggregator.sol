@@ -10,11 +10,11 @@ import {IRouter} from "../interfaces/IRouter.sol";
 import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
+import {IVerifier} from "../interfaces/IVerifier.sol";
 import {Client} from "../libraries/Client.sol";
 import {ERC165CheckerReverting} from "../libraries/ERC165CheckerReverting.sol";
 import {Internal} from "../libraries/Internal.sol";
 import {Pool} from "../libraries/Pool.sol";
-import {OCRVerifier} from "../ocr/OCRVerifier.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 import {CallWithExactGas} from "@chainlink/contracts/src/v0.8/shared/call/CallWithExactGas.sol";
 
@@ -50,7 +50,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   error EmptyBatch();
   error CursedByRMN(uint64 sourceChainSelector);
   error NotACompatiblePool(address notPool);
-  error InvalidDataLength(uint256 expected, uint256 got);
+  error InvalidProofLength(uint256 expected, uint256 got);
   error InvalidNewState(uint64 sourceChainSelector, uint64 sequenceNumber, Internal.MessageExecutionState newState);
   error InvalidInterval(uint64 sourceChainSelector, uint64 min, uint64 max);
   error ZeroAddressNotAllowed();
@@ -82,8 +82,8 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// @dev Struct that contains the static configuration. The individual components are stored as immutable variables.
   // solhint-disable-next-line gas-struct-packing
   struct StaticConfig {
-    uint64 chainSelector; // ───────╮ Destination chainSelector
-    uint16 gasForCallExactCheck; // | Gas for call exact check
+    uint64 localChainSelector; // ──╮ Local chainSelector
+    uint16 gasForCallExactCheck; // │ Gas for call exact check
     IRMNRemote rmnRemote; // ───────╯ RMN Verification Contract
     address tokenAdminRegistry; // Token admin registry address
     address nonceManager; // Nonce manager address
@@ -91,35 +91,24 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
 
   /// @dev Per-chain source config (defining a lane from a Source Chain -> Dest OffRamp).
   struct SourceChainConfig {
-    IRouter router; // ─────────────────╮ Local router to use for messages coming from this source chain.
-    bool isEnabled; //                  │ Flag whether the source chain is enabled or not.
-    uint64 minSeqNr; //                 │ The min sequence number expected for future messages.
-    bool isRMNVerificationDisabled; // ─╯ Flag whether the RMN verification is disabled or not.
+    IRouter router; // ─╮ Local router to use for messages coming from this source chain.
+    bool isEnabled; // ─╯ Flag whether the source chain is enabled or not.
     bytes onRamp; // OnRamp address on the source chain.
   }
 
   /// @dev Same as SourceChainConfig but with source chain selector so that an array of these
   /// can be passed in the constructor and the applySourceChainConfigUpdates function.
   struct SourceChainConfigArgs {
-    IRouter router; // ─────────────────╮  Local router to use for messages coming from this source chain.
-    uint64 sourceChainSelector; //      │  Source chain selector of the config to update.
-    bool isEnabled; //                  │  Flag whether the source chain is enabled or not.
-    bool isRMNVerificationDisabled; // ─╯ Flag whether the RMN verification is disabled or not.
+    IRouter router; // ────────────╮  Local router to use for messages coming from this source chain.
+    uint64 sourceChainSelector; // │  Source chain selector of the config to update.
+    bool isEnabled; // ────────────╯  Flag whether the source chain is enabled or not.
     bytes onRamp; // OnRamp address on the source chain.
   }
 
   /// @dev Dynamic offRamp config.
   /// @dev Since DynamicConfig is part of DynamicConfigSet event, if changing it, we should update the ABI on Atlas.
   struct DynamicConfig {
-    address feeQuoter; // ──────────────────────────────╮ FeeQuoter address on the local chain.
-    uint32 permissionLessExecutionThresholdSeconds; // ─╯ Waiting time before manual execution is enabled.
     address messageInterceptor; // Optional, validates incoming messages (zero address = no interceptor).
-  }
-
-  /// @dev Both receiverExecutionGasLimit and tokenGasOverrides are optional. To indicate no override, set the value
-  /// to 0. The length of tokenGasOverrides must match the length of tokenAmounts, even if it only contains zeros.
-  struct GasLimitOverride {
-    uint256 receiverExecutionGasLimit; // Overrides EVM2EVMMessage.gasLimit.
   }
 
   struct AggregatedReport {
@@ -176,11 +165,11 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       revert ZeroAddressNotAllowed();
     }
 
-    if (staticConfig.chainSelector == 0) {
+    if (staticConfig.localChainSelector == 0) {
       revert ZeroChainSelectorNotAllowed();
     }
 
-    i_chainSelector = staticConfig.chainSelector;
+    i_chainSelector = staticConfig.localChainSelector;
     i_rmnRemote = staticConfig.rmnRemote;
     i_tokenAdminRegistry = staticConfig.tokenAdminRegistry;
     i_nonceManager = staticConfig.nonceManager;
@@ -248,10 +237,6 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   ) internal view returns (uint256 bitmap) {
     return s_executionStates[sourceChainSelector][sequenceNumber / 128];
   }
-
-  function verifyAll(
-    AggregatedReport calldata report
-  ) external {}
 
   /// @notice Executes a report, executing each message in order.
   /// @param report The execution report containing the messages and proofs.
@@ -343,6 +328,10 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   }
 
   function _verifyMessage(Internal.Any2EVMMultiProofMessage calldata message, bytes[] calldata proofs) internal {
+    if (message.securityModuleSelectors.length != proofs.length) {
+      revert InvalidProofLength(message.securityModuleSelectors.length, proofs.length);
+    }
+
     for (uint256 i = 0; i < message.securityModuleSelectors.length; ++i) {
       bytes4 selector = bytes4(message.securityModuleSelectors[i]);
 
@@ -350,7 +339,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       if (verifier == address(0)) {
         revert InvalidVerifierSelector(selector);
       }
-      OCRVerifier(verifier).validateReport(abi.encode(message), proofs[i]);
+      IVerifier(verifier).validateReport(abi.encode(message), proofs[i], i);
     }
   }
 
@@ -578,18 +567,12 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// @return staticConfig The static config.
   function getStaticConfig() external view returns (StaticConfig memory) {
     return StaticConfig({
-      chainSelector: i_chainSelector,
+      localChainSelector: i_chainSelector,
       gasForCallExactCheck: i_gasForCallExactCheck,
       rmnRemote: i_rmnRemote,
       tokenAdminRegistry: i_tokenAdminRegistry,
       nonceManager: i_nonceManager
     });
-  }
-
-  /// @notice Returns the current dynamic config.
-  /// @return dynamicConfig The current dynamic config.
-  function getDynamicConfig() external view returns (DynamicConfig memory) {
-    return s_dynamicConfig;
   }
 
   /// @notice Returns the source chain config for the provided source chain selector.
@@ -641,18 +624,6 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       SourceChainConfig storage currentConfig = s_sourceChainConfigs[sourceChainSelector];
       bytes memory newOnRamp = sourceConfigUpdate.onRamp;
 
-      if (currentConfig.onRamp.length == 0) {
-        currentConfig.minSeqNr = 1;
-        emit SourceChainSelectorAdded(sourceChainSelector);
-      } else {
-        if (currentConfig.minSeqNr != 1 && keccak256(currentConfig.onRamp) != keccak256(newOnRamp)) {
-          // OnRamp updates should only happens due to a misconfiguration.
-          // If an OnRamp is misconfigured, no reports should have been committed and no messages should have been
-          // executed. This is enforced by the onRamp address check in the commit function.
-          revert InvalidOnRampUpdate(sourceChainSelector);
-        }
-      }
-
       // OnRamp can never be zero - if it is, then the source chain has been added for the first time.
       if (newOnRamp.length == 0 || keccak256(newOnRamp) == EMPTY_ENCODED_ADDRESS_HASH) {
         revert ZeroAddressNotAllowed();
@@ -661,13 +632,22 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       currentConfig.onRamp = newOnRamp;
       currentConfig.isEnabled = sourceConfigUpdate.isEnabled;
       currentConfig.router = sourceConfigUpdate.router;
-      currentConfig.isRMNVerificationDisabled = sourceConfigUpdate.isRMNVerificationDisabled;
 
       // We don't need to check the return value, as inserting the item twice has no effect.
       s_sourceChainSelectors.add(sourceChainSelector);
 
       emit SourceChainConfigSet(sourceChainSelector, currentConfig);
     }
+  }
+
+  // ================================================================
+  // │                       Dynamic config                         │
+  // ================================================================
+
+  /// @notice Returns the current dynamic config.
+  /// @return dynamicConfig The current dynamic config.
+  function getDynamicConfig() external view returns (DynamicConfig memory) {
+    return s_dynamicConfig;
   }
 
   /// @notice Sets the dynamic config.
@@ -683,27 +663,9 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   function _setDynamicConfig(
     DynamicConfig memory dynamicConfig
   ) internal {
-    if (dynamicConfig.feeQuoter == address(0)) {
-      revert ZeroAddressNotAllowed();
-    }
-
     s_dynamicConfig = dynamicConfig;
 
     emit DynamicConfigSet(dynamicConfig);
-  }
-
-  /// @notice Returns a source chain config with a check that the config is enabled.
-  /// @param sourceChainSelector Source chain selector to check for cursing.
-  /// @return sourceChainConfig The source chain config storage pointer.
-  function _getEnabledSourceChainConfig(
-    uint64 sourceChainSelector
-  ) internal view returns (SourceChainConfig storage) {
-    SourceChainConfig storage sourceChainConfig = s_sourceChainConfigs[sourceChainSelector];
-    if (!sourceChainConfig.isEnabled) {
-      revert SourceChainNotEnabled(sourceChainSelector);
-    }
-
-    return sourceChainConfig;
   }
 
   // ================================================================
