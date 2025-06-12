@@ -189,7 +189,7 @@ func TestObservation_prices(t *testing.T) {
 				homeChain:           home,
 				oracleID:            commontypes.OracleID(9),
 				offchainCfg: pluginconfig.CommitOffchainConfig{
-					EnableDonBreakingChanges: true,
+					DonBreakingChangesVersion: pluginconfig.DonBreakingChangesVersion1RoleDonSupport,
 				},
 			}
 
@@ -430,7 +430,7 @@ func Test_Outcome_prices(t *testing.T) {
 				reportingCfg:        ocr3types.ReportingPluginConfig{F: tc.fRoleDon},
 				offchainCfg: pluginconfig.CommitOffchainConfig{
 					InflightPriceCheckRetries: priceInflightChecks,
-					EnableDonBreakingChanges:  true,
+					DonBreakingChangesVersion: pluginconfig.DonBreakingChangesVersion1RoleDonSupport,
 				},
 			}
 
