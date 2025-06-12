@@ -2,6 +2,7 @@ use std::fmt::Display;
 
 use anchor_lang::prelude::borsh::{BorshDeserialize, BorshSerialize};
 use anchor_lang::prelude::*;
+use ccip_common::auto_derive::CcipAccountMeta;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, InitSpace, BorshSerialize, BorshDeserialize)]
 #[repr(u8)]

@@ -1,9 +1,10 @@
 use anchor_lang::prelude::*;
+use ccip_common::auto_derive::{DeriveAccountsCcipSendParams, DeriveAccountsResponse};
 
 use crate::context::{
     AcceptOwnership, AddChainSelector, AddOfframp, CcipSend, RemoveOfframp, TransferOwnership,
     UpdateConfigCCIPRouter, UpdateDestChainSelectorConfig, UpdateDestChainSelectorConfigNoRealloc,
-    WithdrawBilledFunds,
+    ViewConfigOnly, WithdrawBilledFunds,
 };
 use crate::messages::{GetFeeResult, SVM2AnyMessage};
 use crate::state::{CodeVersion, DestChainConfig};
@@ -117,6 +118,12 @@ pub trait OnRamp {
         dest_chain_selector: u64,
         message: SVM2AnyMessage,
     ) -> Result<GetFeeResult>;
+
+    fn derive_accounts_ccip_send<'info>(
+        &self,
+        ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
+        params: DeriveAccountsCcipSendParams,
+    ) -> Result<DeriveAccountsResponse>;
 }
 
 pub trait TokenAdminRegistry {
