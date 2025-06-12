@@ -34,6 +34,7 @@ import (
 // # Arguments
 //
 // * `ctx`: Context containing only the offramp config.
+// * params:
 // * `execute_caller`: Public key of the account that will sign the call to `ccip_execute`.
 // * `message_accounts`: If the transaction involves messaging, the message accounts.
 // * `source_chain_selector`: CCIP chain selector for the source chain.
@@ -44,13 +45,7 @@ import (
 // `execute_caller`: If the execution will not be buffered, this should be empty.
 // * `token_receiver`: Receiver of token transfers, if any (i.e. report.message.token_receiver.)
 type DeriveAccountsExecute struct {
-	ExecuteCaller            *ag_solanago.PublicKey
-	MessageAccounts          *[]CcipAccountMeta
-	SourceChainSelector      *uint64
-	MintsOfTransferredTokens *[]ag_solanago.PublicKey
-	MerkleRoot               *[32]uint8
-	BufferId                 *[]byte
-	TokenReceiver            *ag_solanago.PublicKey
+	Params *DeriveAccountsExecuteParams
 
 	// [0] = [] config
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
@@ -64,45 +59,9 @@ func NewDeriveAccountsExecuteInstructionBuilder() *DeriveAccountsExecute {
 	return nd
 }
 
-// SetExecuteCaller sets the "executeCaller" parameter.
-func (inst *DeriveAccountsExecute) SetExecuteCaller(executeCaller ag_solanago.PublicKey) *DeriveAccountsExecute {
-	inst.ExecuteCaller = &executeCaller
-	return inst
-}
-
-// SetMessageAccounts sets the "messageAccounts" parameter.
-func (inst *DeriveAccountsExecute) SetMessageAccounts(messageAccounts []CcipAccountMeta) *DeriveAccountsExecute {
-	inst.MessageAccounts = &messageAccounts
-	return inst
-}
-
-// SetSourceChainSelector sets the "sourceChainSelector" parameter.
-func (inst *DeriveAccountsExecute) SetSourceChainSelector(sourceChainSelector uint64) *DeriveAccountsExecute {
-	inst.SourceChainSelector = &sourceChainSelector
-	return inst
-}
-
-// SetMintsOfTransferredTokens sets the "mintsOfTransferredTokens" parameter.
-func (inst *DeriveAccountsExecute) SetMintsOfTransferredTokens(mintsOfTransferredTokens []ag_solanago.PublicKey) *DeriveAccountsExecute {
-	inst.MintsOfTransferredTokens = &mintsOfTransferredTokens
-	return inst
-}
-
-// SetMerkleRoot sets the "merkleRoot" parameter.
-func (inst *DeriveAccountsExecute) SetMerkleRoot(merkleRoot [32]uint8) *DeriveAccountsExecute {
-	inst.MerkleRoot = &merkleRoot
-	return inst
-}
-
-// SetBufferId sets the "bufferId" parameter.
-func (inst *DeriveAccountsExecute) SetBufferId(bufferId []byte) *DeriveAccountsExecute {
-	inst.BufferId = &bufferId
-	return inst
-}
-
-// SetTokenReceiver sets the "tokenReceiver" parameter.
-func (inst *DeriveAccountsExecute) SetTokenReceiver(tokenReceiver ag_solanago.PublicKey) *DeriveAccountsExecute {
-	inst.TokenReceiver = &tokenReceiver
+// SetParams sets the "params" parameter.
+func (inst *DeriveAccountsExecute) SetParams(params DeriveAccountsExecuteParams) *DeriveAccountsExecute {
+	inst.Params = &params
 	return inst
 }
 
@@ -137,26 +96,8 @@ func (inst DeriveAccountsExecute) ValidateAndBuild() (*Instruction, error) {
 func (inst *DeriveAccountsExecute) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
-		if inst.ExecuteCaller == nil {
-			return errors.New("ExecuteCaller parameter is not set")
-		}
-		if inst.MessageAccounts == nil {
-			return errors.New("MessageAccounts parameter is not set")
-		}
-		if inst.SourceChainSelector == nil {
-			return errors.New("SourceChainSelector parameter is not set")
-		}
-		if inst.MintsOfTransferredTokens == nil {
-			return errors.New("MintsOfTransferredTokens parameter is not set")
-		}
-		if inst.MerkleRoot == nil {
-			return errors.New("MerkleRoot parameter is not set")
-		}
-		if inst.BufferId == nil {
-			return errors.New("BufferId parameter is not set")
-		}
-		if inst.TokenReceiver == nil {
-			return errors.New("TokenReceiver parameter is not set")
+		if inst.Params == nil {
+			return errors.New("Params parameter is not set")
 		}
 	}
 
@@ -178,14 +119,8 @@ func (inst *DeriveAccountsExecute) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=7]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("           ExecuteCaller", *inst.ExecuteCaller))
-						paramsBranch.Child(ag_format.Param("         MessageAccounts", *inst.MessageAccounts))
-						paramsBranch.Child(ag_format.Param("     SourceChainSelector", *inst.SourceChainSelector))
-						paramsBranch.Child(ag_format.Param("MintsOfTransferredTokens", *inst.MintsOfTransferredTokens))
-						paramsBranch.Child(ag_format.Param("              MerkleRoot", *inst.MerkleRoot))
-						paramsBranch.Child(ag_format.Param("                BufferId", *inst.BufferId))
-						paramsBranch.Child(ag_format.Param("           TokenReceiver", *inst.TokenReceiver))
+					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+						paramsBranch.Child(ag_format.Param("Params", *inst.Params))
 					})
 
 					// Accounts of the instruction:
@@ -197,76 +132,16 @@ func (inst *DeriveAccountsExecute) EncodeToTree(parent ag_treeout.Branches) {
 }
 
 func (obj DeriveAccountsExecute) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `ExecuteCaller` param:
-	err = encoder.Encode(obj.ExecuteCaller)
-	if err != nil {
-		return err
-	}
-	// Serialize `MessageAccounts` param:
-	err = encoder.Encode(obj.MessageAccounts)
-	if err != nil {
-		return err
-	}
-	// Serialize `SourceChainSelector` param:
-	err = encoder.Encode(obj.SourceChainSelector)
-	if err != nil {
-		return err
-	}
-	// Serialize `MintsOfTransferredTokens` param:
-	err = encoder.Encode(obj.MintsOfTransferredTokens)
-	if err != nil {
-		return err
-	}
-	// Serialize `MerkleRoot` param:
-	err = encoder.Encode(obj.MerkleRoot)
-	if err != nil {
-		return err
-	}
-	// Serialize `BufferId` param:
-	err = encoder.Encode(obj.BufferId)
-	if err != nil {
-		return err
-	}
-	// Serialize `TokenReceiver` param:
-	err = encoder.Encode(obj.TokenReceiver)
+	// Serialize `Params` param:
+	err = encoder.Encode(obj.Params)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 func (obj *DeriveAccountsExecute) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `ExecuteCaller`:
-	err = decoder.Decode(&obj.ExecuteCaller)
-	if err != nil {
-		return err
-	}
-	// Deserialize `MessageAccounts`:
-	err = decoder.Decode(&obj.MessageAccounts)
-	if err != nil {
-		return err
-	}
-	// Deserialize `SourceChainSelector`:
-	err = decoder.Decode(&obj.SourceChainSelector)
-	if err != nil {
-		return err
-	}
-	// Deserialize `MintsOfTransferredTokens`:
-	err = decoder.Decode(&obj.MintsOfTransferredTokens)
-	if err != nil {
-		return err
-	}
-	// Deserialize `MerkleRoot`:
-	err = decoder.Decode(&obj.MerkleRoot)
-	if err != nil {
-		return err
-	}
-	// Deserialize `BufferId`:
-	err = decoder.Decode(&obj.BufferId)
-	if err != nil {
-		return err
-	}
-	// Deserialize `TokenReceiver`:
-	err = decoder.Decode(&obj.TokenReceiver)
+	// Deserialize `Params`:
+	err = decoder.Decode(&obj.Params)
 	if err != nil {
 		return err
 	}
@@ -276,22 +151,10 @@ func (obj *DeriveAccountsExecute) UnmarshalWithDecoder(decoder *ag_binary.Decode
 // NewDeriveAccountsExecuteInstruction declares a new DeriveAccountsExecute instruction with the provided parameters and accounts.
 func NewDeriveAccountsExecuteInstruction(
 	// Parameters:
-	executeCaller ag_solanago.PublicKey,
-	messageAccounts []CcipAccountMeta,
-	sourceChainSelector uint64,
-	mintsOfTransferredTokens []ag_solanago.PublicKey,
-	merkleRoot [32]uint8,
-	bufferId []byte,
-	tokenReceiver ag_solanago.PublicKey,
+	params DeriveAccountsExecuteParams,
 	// Accounts:
 	config ag_solanago.PublicKey) *DeriveAccountsExecute {
 	return NewDeriveAccountsExecuteInstructionBuilder().
-		SetExecuteCaller(executeCaller).
-		SetMessageAccounts(messageAccounts).
-		SetSourceChainSelector(sourceChainSelector).
-		SetMintsOfTransferredTokens(mintsOfTransferredTokens).
-		SetMerkleRoot(merkleRoot).
-		SetBufferId(bufferId).
-		SetTokenReceiver(tokenReceiver).
+		SetParams(params).
 		SetConfigAccount(config)
 }

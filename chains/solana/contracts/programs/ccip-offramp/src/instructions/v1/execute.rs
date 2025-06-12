@@ -1,15 +1,8 @@
-use std::fmt::{self, Display, Formatter};
-
 use anchor_lang::prelude::*;
-use anchor_spl::associated_token::get_associated_token_address_with_program_id;
-use ccip_common::router_accounts::TokenAdminRegistry;
-use ccip_common::seed::EXECUTION_REPORT_BUFFER;
+use ccip_common::seed;
 use ccip_common::v1::{validate_and_parse_token_accounts, TokenAccounts, MIN_TOKEN_POOL_ACCOUNTS};
-use ccip_common::{seed, CommonCcipError};
-use solana_program::address_lookup_table::state::AddressLookupTable;
 use solana_program::instruction::Instruction;
 use solana_program::program::invoke_signed;
-use solana_program::sysvar::instructions;
 
 use crate::context::ViewConfigOnly;
 use crate::context::{BufferExecutionReportContext, ExecuteReportContext, OcrPluginType};
@@ -19,9 +12,8 @@ use crate::messages::{
     Any2SVMRampMessage, ExecutionReportSingleChain, RampMessageHeader, SVMTokenAmount,
 };
 use crate::state::{
-    CcipAccountMeta, CommitReport, DeriveAccountsResponse, DerivedLookupTable,
-    ExecutionReportBuffer, MessageExecutionState, OnRampAddress, ReferenceAddresses, SourceChain,
-    ToMeta,
+    CcipAccountMeta, CommitReport, DeriveAccountsExecuteParams, DeriveAccountsResponse,
+    ExecutionReportBuffer, MessageExecutionState, OnRampAddress, SourceChain, ToMeta,
 };
 use crate::CcipOfframpError;
 
@@ -32,6 +24,7 @@ use super::ocr3base::{ocr3_transmit, ReportContext, Signatures};
 use super::ocr3impl::Ocr3ReportForExecutionReportSingleChain;
 use super::pools::{get_balance, interact_with_pool, CCIP_POOL_V1_RET_BYTES};
 use super::rmn::verify_uncursed_cpi;
+mod derive;
 
 pub struct Impl;
 impl Execute for Impl {
@@ -141,23 +134,27 @@ impl Execute for Impl {
     fn derive_accounts_execute<'info>(
         &self,
         ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
-        execute_caller: Pubkey,
-        message_accounts: Vec<CcipAccountMeta>,
-        source_chain_selector: u64,
-        mints_of_transferred_tokens: Vec<Pubkey>,
-        merkle_root: [u8; 32],
-        buffer_id: Vec<u8>,
-        token_receiver: Pubkey,
+        DeriveAccountsExecuteParams {
+            execute_caller,
+            message_accounts,
+            source_chain_selector,
+            mints_of_transferred_tokens,
+            merkle_root,
+            buffer_id,
+            token_receiver,
+        }: DeriveAccountsExecuteParams,
     ) -> Result<DeriveAccountsResponse> {
-        let stage =
-            DeriveExecuteAccountsStage::infer_from(ctx.remaining_accounts, source_chain_selector);
+        let stage = derive::DeriveExecuteAccountsStage::infer_from(
+            ctx.remaining_accounts,
+            source_chain_selector,
+        );
 
         match stage {
-            DeriveExecuteAccountsStage::GatherBasicInfo => {
-                derive_execute_accounts_gather_basic_info(source_chain_selector)
+            derive::DeriveExecuteAccountsStage::GatherBasicInfo => {
+                derive::derive_execute_accounts_gather_basic_info(source_chain_selector)
             }
-            DeriveExecuteAccountsStage::BuildMainAccountList => {
-                derive_execute_accounts_build_main_account_list(
+            derive::DeriveExecuteAccountsStage::BuildMainAccountList => {
+                derive::derive_execute_accounts_build_main_account_list(
                     ctx,
                     source_chain_selector,
                     &merkle_root,
@@ -167,11 +164,11 @@ impl Execute for Impl {
                     &buffer_id,
                 )
             }
-            DeriveExecuteAccountsStage::RetrieveTokenLUTs => {
-                derive_execute_accounts_retrieve_luts(ctx)
+            derive::DeriveExecuteAccountsStage::RetrieveTokenLUTs => {
+                derive::derive_execute_accounts_retrieve_luts(ctx)
             }
-            DeriveExecuteAccountsStage::TokenTransferAccounts => {
-                derive_execute_accounts_additional_tokens(
+            derive::DeriveExecuteAccountsStage::TokenTransferAccounts => {
+                derive::derive_execute_accounts_additional_tokens(
                     ctx,
                     execute_caller,
                     token_receiver,
@@ -218,279 +215,6 @@ fn ocr3_transmit_report<'info>(
         buffered_bytes,
     )?;
     Ok(())
-}
-
-#[derive(Copy, Clone, Debug)]
-enum DeriveExecuteAccountsStage {
-    GatherBasicInfo,
-    BuildMainAccountList,
-    RetrieveTokenLUTs,
-    // N stages, one per token.
-    TokenTransferAccounts,
-}
-
-impl Display for DeriveExecuteAccountsStage {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        f.write_str(match self {
-            DeriveExecuteAccountsStage::GatherBasicInfo => "GatherBasicInfo",
-            DeriveExecuteAccountsStage::BuildMainAccountList => "BuildMainAccountList",
-            DeriveExecuteAccountsStage::RetrieveTokenLUTs => "RetrieveTokenLookupTables",
-            DeriveExecuteAccountsStage::TokenTransferAccounts => "TokenTransferAccounts",
-        })
-    }
-}
-
-impl DeriveExecuteAccountsStage {
-    fn infer_from(remaining_accounts: &[AccountInfo<'_>], source_chain_selector: u64) -> Self {
-        let source_chain = find(
-            &[
-                seed::SOURCE_CHAIN,
-                source_chain_selector.to_le_bytes().as_slice(),
-            ],
-            crate::ID,
-        )
-        .pubkey;
-        let reference_addresses = find(&[seed::REFERENCE_ADDRESSES], crate::ID).pubkey;
-
-        // Each stage receives a different first account, so we use that information to infer
-        // what stage we're in, without requiring the user to declare that explicitly.
-        match remaining_accounts.first() {
-            None => DeriveExecuteAccountsStage::GatherBasicInfo,
-            Some(a) if a.key == &source_chain => DeriveExecuteAccountsStage::BuildMainAccountList,
-            Some(a) if a.key == &reference_addresses => {
-                DeriveExecuteAccountsStage::TokenTransferAccounts
-            }
-            Some(_) => DeriveExecuteAccountsStage::RetrieveTokenLUTs,
-        }
-    }
-}
-
-fn derive_execute_accounts_gather_basic_info(
-    source_chain_selector: u64,
-) -> Result<DeriveAccountsResponse> {
-    let accounts_to_save = vec![
-        find(&[seed::CONFIG], crate::ID),
-        find(&[seed::REFERENCE_ADDRESSES], crate::ID),
-        find(
-            &[seed::SOURCE_CHAIN, &source_chain_selector.to_le_bytes()],
-            crate::ID,
-        ),
-    ];
-
-    let ask_again_with = vec![
-        find(
-            &[seed::SOURCE_CHAIN, &source_chain_selector.to_le_bytes()],
-            crate::ID,
-        ),
-        find(&[seed::REFERENCE_ADDRESSES], crate::ID),
-    ];
-
-    Ok(DeriveAccountsResponse {
-        accounts_to_save,
-        ask_again_with,
-        look_up_tables_to_save: vec![],
-        current_stage: DeriveExecuteAccountsStage::GatherBasicInfo.to_string(),
-    })
-}
-
-fn derive_execute_accounts_build_main_account_list<'info>(
-    ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
-    source_chain_selector: u64,
-    merkle_root: &[u8; 32],
-    execute_caller: Pubkey,
-    mints_of_transferred_tokens: &[Pubkey],
-    message_accounts: &[CcipAccountMeta],
-    buffer_id: &[u8],
-) -> Result<DeriveAccountsResponse> {
-    let ReferenceAddresses {
-        router, rmn_remote, ..
-    } = *AccountLoader::<'info, ReferenceAddresses>::try_from(&ctx.remaining_accounts[1])?
-        .load()?;
-
-    let selector = source_chain_selector.to_le_bytes();
-
-    let mut accounts_to_save = vec![
-        find(&[seed::COMMIT_REPORT, &selector, merkle_root], crate::ID).writable(),
-        crate::ID.readonly(),
-        find(
-            &[seed::ALLOWED_OFFRAMP, &selector, crate::ID.as_ref()],
-            router,
-        ),
-        execute_caller.writable().signer(),
-        solana_program::system_program::ID.readonly(),
-        instructions::ID.readonly(),
-        rmn_remote.readonly(),
-        find(&[seed::CURSES], rmn_remote),
-        find(&[seed::CONFIG], rmn_remote),
-    ];
-
-    if !message_accounts.is_empty() {
-        let find = |seeds, id| Pubkey::find_program_address(seeds, id).0.readonly();
-        accounts_to_save.push(message_accounts[0].clone());
-        accounts_to_save.push(find(
-            &[
-                seed::EXTERNAL_EXECUTION_CONFIG,
-                message_accounts[0].pubkey.as_ref(),
-            ],
-            &crate::ID,
-        ));
-        accounts_to_save.extend_from_slice(&message_accounts[1..]);
-    }
-
-    // If there are no tokens, we're done. If there are tokens, we
-    // start by reading the registries on next stage.
-    let mut ask_again_with: Vec<_> = mints_of_transferred_tokens
-        .iter()
-        .map(|mint| find(&[seed::TOKEN_ADMIN_REGISTRY, mint.as_ref()], router))
-        .collect();
-
-    if !buffer_id.is_empty() {
-        // We're in the buffered case, so we need the buffer PDA either on the derived account list
-        // or on the next stage
-        let buffer_pda = find(
-            &[EXECUTION_REPORT_BUFFER, buffer_id, execute_caller.as_ref()],
-            crate::ID,
-        );
-        if ask_again_with.is_empty() {
-            accounts_to_save.push(buffer_pda.writable());
-        } else {
-            ask_again_with.push(buffer_pda.readonly());
-        }
-    }
-
-    Ok(DeriveAccountsResponse {
-        accounts_to_save,
-        ask_again_with,
-        look_up_tables_to_save: vec![],
-        current_stage: DeriveExecuteAccountsStage::BuildMainAccountList.to_string(),
-    })
-}
-
-fn derive_execute_accounts_retrieve_luts<'info>(
-    ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
-) -> Result<DeriveAccountsResponse> {
-    let lookup_table_metas = ctx.remaining_accounts.iter().map(|registry| {
-        let token_admin_registry_account: Account<TokenAdminRegistry> =
-            Account::try_from(registry).expect("parsing token admin registry account");
-        token_admin_registry_account.lookup_table.readonly()
-    });
-
-    let mut ask_again_with = vec![find(&[seed::REFERENCE_ADDRESSES], crate::ID)];
-    ask_again_with.extend(lookup_table_metas.clone());
-
-    Ok(DeriveAccountsResponse {
-        accounts_to_save: vec![],
-        ask_again_with,
-        look_up_tables_to_save: vec![],
-        current_stage: DeriveExecuteAccountsStage::RetrieveTokenLUTs.to_string(),
-    })
-}
-
-// We derive accounts for each token in a separate step, to ensure we don't blow up the response size.
-fn derive_execute_accounts_additional_tokens<'info>(
-    ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
-    execute_caller: Pubkey,
-    token_receiver: Pubkey,
-    source_chain_selector: u64,
-    buffer_id: &[u8],
-) -> Result<DeriveAccountsResponse> {
-    // The reference addresses account and at least one LUT.
-    require_gte!(
-        2,
-        ctx.remaining_accounts.len(),
-        CcipOfframpError::InvalidAccountListForPdaDerivation
-    );
-
-    let selector = source_chain_selector.to_le_bytes();
-    let ReferenceAddresses { fee_quoter, .. } =
-        *AccountLoader::<'info, ReferenceAddresses>::try_from(&ctx.remaining_accounts[0])?
-            .load()?;
-
-    let lut = &ctx.remaining_accounts[1];
-    let lookup_table_data = &mut &lut.data.borrow()[..];
-    let lookup_table_account: AddressLookupTable =
-        AddressLookupTable::deserialize(lookup_table_data)
-            .map_err(|_| CommonCcipError::InvalidInputsLookupTableAccounts)?;
-
-    let pool_program = lookup_table_account.addresses[2];
-    let token_program = lookup_table_account.addresses[6];
-    let token_mint = lookup_table_account.addresses[7];
-    let ccip_offramp_pool_signer = find(
-        &[seed::EXTERNAL_TOKEN_POOLS_SIGNER, pool_program.as_ref()],
-        crate::ID,
-    )
-    .readonly();
-
-    let user_token_account = get_associated_token_address_with_program_id(
-        &token_receiver,
-        &token_mint.key(),
-        &token_program.key(),
-    )
-    .writable();
-
-    let token_billing_config = find(
-        &[
-            seed::PER_CHAIN_PER_TOKEN_CONFIG,
-            &selector,
-            token_mint.as_ref(),
-        ],
-        fee_quoter,
-    )
-    .readonly();
-
-    let pool_chain_config = find(
-        &[
-            seed::TOKEN_POOL_CHAIN_CONFIG,
-            &selector,
-            token_mint.as_ref(),
-        ],
-        pool_program,
-    )
-    .writable();
-
-    let mut accounts_to_save = vec![
-        ccip_offramp_pool_signer,
-        user_token_account,
-        token_billing_config,
-        pool_chain_config,
-    ];
-    accounts_to_save.extend(lookup_table_account.addresses.iter().enumerate().map(
-        |(i, a)| match i {
-            // PoolConfig, PoolTokenAccount and Mint from the LUT are writable.
-            3 | 4 | 7 => a.writable(),
-            _ => a.readonly(),
-        },
-    ));
-
-    let mut ask_again_with = vec![];
-
-    if ctx.remaining_accounts.len() > 2 {
-        // We aren't done yet, we need to derive more tokens, so we tell the user
-        // to ask again with one fewer token.
-        ask_again_with.push(find(&[seed::REFERENCE_ADDRESSES], crate::ID));
-        ask_again_with.extend(ctx.remaining_accounts[2..].iter().map(|a| a.key.readonly()));
-    } else if !buffer_id.is_empty() {
-        // We're done and it's the buffered case, so we append the buffer PDA
-        let buffer_pda = find(
-            &[
-                seed::EXECUTION_REPORT_BUFFER,
-                buffer_id,
-                execute_caller.as_ref(),
-            ],
-            crate::ID,
-        );
-        ask_again_with.push(buffer_pda.writable());
-    }
-
-    Ok(DeriveAccountsResponse {
-        ask_again_with,
-        accounts_to_save,
-        look_up_tables_to_save: vec![DerivedLookupTable {
-            address: *lut.key,
-            accounts: lookup_table_account.addresses.iter().cloned().collect(),
-        }],
-        current_stage: DeriveExecuteAccountsStage::TokenTransferAccounts.to_string(),
-    })
 }
 
 // internal_execute is the base execution logic without any additional validation

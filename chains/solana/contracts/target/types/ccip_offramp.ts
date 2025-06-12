@@ -1184,6 +1184,7 @@ export type CcipOfframp = {
         "# Arguments",
         "",
         "* `ctx`: Context containing only the offramp config.",
+        "* params:",
         "* `execute_caller`: Public key of the account that will sign the call to `ccip_execute`.",
         "* `message_accounts`: If the transaction involves messaging, the message accounts.",
         "* `source_chain_selector`: CCIP chain selector for the source chain.",
@@ -1203,43 +1204,10 @@ export type CcipOfframp = {
       ],
       "args": [
         {
-          "name": "executeCaller",
-          "type": "publicKey"
-        },
-        {
-          "name": "messageAccounts",
+          "name": "params",
           "type": {
-            "vec": {
-              "defined": "CcipAccountMeta"
-            }
+            "defined": "DeriveAccountsExecuteParams"
           }
-        },
-        {
-          "name": "sourceChainSelector",
-          "type": "u64"
-        },
-        {
-          "name": "mintsOfTransferredTokens",
-          "type": {
-            "vec": "publicKey"
-          }
-        },
-        {
-          "name": "merkleRoot",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        },
-        {
-          "name": "bufferId",
-          "type": "bytes"
-        },
-        {
-          "name": "tokenReceiver",
-          "type": "publicKey"
         }
       ],
       "returns": {
@@ -1856,6 +1824,53 @@ export type CcipOfframp = {
       }
     },
     {
+      "name": "DeriveAccountsExecuteParams",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "executeCaller",
+            "type": "publicKey"
+          },
+          {
+            "name": "messageAccounts",
+            "type": {
+              "vec": {
+                "defined": "CcipAccountMeta"
+              }
+            }
+          },
+          {
+            "name": "sourceChainSelector",
+            "type": "u64"
+          },
+          {
+            "name": "mintsOfTransferredTokens",
+            "type": {
+              "vec": "publicKey"
+            }
+          },
+          {
+            "name": "merkleRoot",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "bufferId",
+            "type": "bytes"
+          },
+          {
+            "name": "tokenReceiver",
+            "type": "publicKey"
+          }
+        ]
+      }
+    },
+    {
       "name": "DeriveAccountsResponse",
       "type": {
         "kind": "struct",
@@ -1875,7 +1890,7 @@ export type CcipOfframp = {
           {
             "name": "accountsToSave",
             "docs": [
-              "You must append these accounts at the end of a separate list. When `ask_again_with`",
+              "You must append these accounts at the end of a separate list. When `next_stage`",
               "is finally empty, this separate list will contain all the accounts to use for the",
               "instruction of interest."
             ],
@@ -1900,8 +1915,14 @@ export type CcipOfframp = {
           {
             "name": "currentStage",
             "docs": [
-              "Identifies the derivation stage. `derive_` functions may sometimes require providing",
-              "the name of the last complete stage as an argument."
+              "Identifies the derivation stage."
+            ],
+            "type": "string"
+          },
+          {
+            "name": "nextStage",
+            "docs": [
+              "Identifies the next derivation stage. If empty, the derivation is complete."
             ],
             "type": "string"
           }
@@ -2094,6 +2115,26 @@ export type CcipOfframp = {
           },
           {
             "name": "Execution"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DeriveExecuteAccountsStage",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "GatherBasicInfo"
+          },
+          {
+            "name": "BuildMainAccountList"
+          },
+          {
+            "name": "RetrieveTokenLUTs"
+          },
+          {
+            "name": "TokenTransferAccounts"
           }
         ]
       }
@@ -3940,6 +3981,7 @@ export const IDL: CcipOfframp = {
         "# Arguments",
         "",
         "* `ctx`: Context containing only the offramp config.",
+        "* params:",
         "* `execute_caller`: Public key of the account that will sign the call to `ccip_execute`.",
         "* `message_accounts`: If the transaction involves messaging, the message accounts.",
         "* `source_chain_selector`: CCIP chain selector for the source chain.",
@@ -3959,43 +4001,10 @@ export const IDL: CcipOfframp = {
       ],
       "args": [
         {
-          "name": "executeCaller",
-          "type": "publicKey"
-        },
-        {
-          "name": "messageAccounts",
+          "name": "params",
           "type": {
-            "vec": {
-              "defined": "CcipAccountMeta"
-            }
+            "defined": "DeriveAccountsExecuteParams"
           }
-        },
-        {
-          "name": "sourceChainSelector",
-          "type": "u64"
-        },
-        {
-          "name": "mintsOfTransferredTokens",
-          "type": {
-            "vec": "publicKey"
-          }
-        },
-        {
-          "name": "merkleRoot",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        },
-        {
-          "name": "bufferId",
-          "type": "bytes"
-        },
-        {
-          "name": "tokenReceiver",
-          "type": "publicKey"
         }
       ],
       "returns": {
@@ -4612,6 +4621,53 @@ export const IDL: CcipOfframp = {
       }
     },
     {
+      "name": "DeriveAccountsExecuteParams",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "executeCaller",
+            "type": "publicKey"
+          },
+          {
+            "name": "messageAccounts",
+            "type": {
+              "vec": {
+                "defined": "CcipAccountMeta"
+              }
+            }
+          },
+          {
+            "name": "sourceChainSelector",
+            "type": "u64"
+          },
+          {
+            "name": "mintsOfTransferredTokens",
+            "type": {
+              "vec": "publicKey"
+            }
+          },
+          {
+            "name": "merkleRoot",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "bufferId",
+            "type": "bytes"
+          },
+          {
+            "name": "tokenReceiver",
+            "type": "publicKey"
+          }
+        ]
+      }
+    },
+    {
       "name": "DeriveAccountsResponse",
       "type": {
         "kind": "struct",
@@ -4631,7 +4687,7 @@ export const IDL: CcipOfframp = {
           {
             "name": "accountsToSave",
             "docs": [
-              "You must append these accounts at the end of a separate list. When `ask_again_with`",
+              "You must append these accounts at the end of a separate list. When `next_stage`",
               "is finally empty, this separate list will contain all the accounts to use for the",
               "instruction of interest."
             ],
@@ -4656,8 +4712,14 @@ export const IDL: CcipOfframp = {
           {
             "name": "currentStage",
             "docs": [
-              "Identifies the derivation stage. `derive_` functions may sometimes require providing",
-              "the name of the last complete stage as an argument."
+              "Identifies the derivation stage."
+            ],
+            "type": "string"
+          },
+          {
+            "name": "nextStage",
+            "docs": [
+              "Identifies the next derivation stage. If empty, the derivation is complete."
             ],
             "type": "string"
           }
@@ -4850,6 +4912,26 @@ export const IDL: CcipOfframp = {
           },
           {
             "name": "Execution"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DeriveExecuteAccountsStage",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "GatherBasicInfo"
+          },
+          {
+            "name": "BuildMainAccountList"
+          },
+          {
+            "name": "RetrieveTokenLUTs"
+          },
+          {
+            "name": "TokenTransferAccounts"
           }
         ]
       }

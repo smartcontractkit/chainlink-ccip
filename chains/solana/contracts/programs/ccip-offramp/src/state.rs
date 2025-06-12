@@ -33,21 +33,33 @@ pub struct ReferenceAddresses {
     pub rmn_remote: Pubkey,
 }
 
+#[derive(Clone, Debug, AnchorDeserialize, AnchorSerialize)]
+pub struct DeriveAccountsExecuteParams {
+    pub execute_caller: Pubkey,
+    pub message_accounts: Vec<CcipAccountMeta>,
+    pub source_chain_selector: u64,
+    pub mints_of_transferred_tokens: Vec<Pubkey>,
+    pub merkle_root: [u8; 32],
+    pub buffer_id: Vec<u8>,
+    pub token_receiver: Pubkey,
+}
+
 #[derive(Debug, Default, PartialEq, Eq, Clone, AnchorDeserialize, AnchorSerialize)]
 pub struct DeriveAccountsResponse {
     /// If this vector is not empty, you must call the `derive_` method again including
     /// exactly these accounts as the `remaining_accounts` field.
     pub ask_again_with: Vec<CcipAccountMeta>,
-    /// You must append these accounts at the end of a separate list. When `ask_again_with`
+    /// You must append these accounts at the end of a separate list. When `next_stage`
     /// is finally empty, this separate list will contain all the accounts to use for the
     /// instruction of interest.
     pub accounts_to_save: Vec<CcipAccountMeta>,
     /// Append these look up tables at the end of a list. It will contain all LUTs
     /// that the instruction of interest can use.
     pub look_up_tables_to_save: Vec<DerivedLookupTable>,
-    /// Identifies the derivation stage. `derive_` functions may sometimes require providing
-    /// the name of the last complete stage as an argument.
+    /// Identifies the derivation stage.
     pub current_stage: String,
+    /// Identifies the next derivation stage. If empty, the derivation is complete.
+    pub next_stage: String,
 }
 
 #[derive(Debug, Default, PartialEq, Eq, Clone, AnchorDeserialize, AnchorSerialize)]

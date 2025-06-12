@@ -10453,14 +10453,18 @@ func deriveExecutionAccounts(ctx context.Context,
 	askWith := []*solana.AccountMeta{}
 	lookUpTables = make(map[solana.PublicKey]solana.PublicKeySlice)
 	for {
+		params := ccip_offramp.DeriveAccountsExecuteParams{
+			ExecuteCaller:            transmitter.PublicKey(),
+			MessageAccounts:          messagingAccounts,
+			SourceChainSelector:      sourceChainSelector,
+			MintsOfTransferredTokens: mintsOfTransferredTokens,
+			MerkleRoot:               merkleRoot,
+			BufferId:                 bufferID,
+			TokenReceiver:            tokenReceiver,
+		}
+
 		deriveRaw := ccip_offramp.NewDeriveAccountsExecuteInstruction(
-			transmitter.PublicKey(),
-			messagingAccounts,
-			sourceChainSelector,
-			mintsOfTransferredTokens,
-			merkleRoot,
-			bufferID,
-			tokenReceiver,
+			params,
 			config.OfframpConfigPDA,
 		)
 		deriveRaw.AccountMetaSlice = append(deriveRaw.AccountMetaSlice, askWith...)
@@ -10488,7 +10492,7 @@ func deriveExecutionAccounts(ctx context.Context,
 			lookUpTables[table.Address] = table.Accounts
 		}
 
-		if len(askWith) == 0 {
+		if len(derivation.NextStage) == 0 {
 			return derivedAccounts, lookUpTables
 		}
 	}
