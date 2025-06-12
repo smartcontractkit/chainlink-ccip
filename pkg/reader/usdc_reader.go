@@ -30,8 +30,8 @@ const (
 	CCTPMessageVersion = uint32(0)
 )
 
-// this could be fetched from USDC Token Pool
-var cctpDestDomains = map[uint64]uint32{
+// CCTPDestDomains could be fetched from USDC Token Pool
+var CCTPDestDomains = map[uint64]uint32{
 	sel.ETHEREUM_MAINNET.Selector:                    0,
 	sel.AVALANCHE_MAINNET.Selector:                   1,
 	sel.ETHEREUM_MAINNET_OPTIMISM_1.Selector:         2,
@@ -157,7 +157,7 @@ func AllAvailableDomains() map[uint64]uint32 {
 	}
 
 	destDomains := make(map[uint64]uint32)
-	for k, v := range cctpDestDomains {
+	for k, v := range CCTPDestDomains {
 		destDomains[k] = v
 	}
 
