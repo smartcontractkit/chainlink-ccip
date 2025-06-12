@@ -33,34 +33,18 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   error ZeroChainSelectorNotAllowed();
   error ExecutionError(bytes32 messageId, bytes err);
   error SourceChainNotEnabled(uint64 sourceChainSelector);
-  error TokenDataMismatch(uint64 sourceChainSelector, uint64 sequenceNumber);
-  error UnexpectedTokenData();
-  error ManualExecutionNotYetEnabled(uint64 sourceChainSelector);
-  error ManualExecutionGasLimitMismatch();
-  error InvalidManualExecutionGasLimit(uint64 sourceChainSelector, bytes32 messageId, uint256 newLimit);
-  error InvalidManualExecutionTokenGasOverride(
-    bytes32 messageId, uint256 tokenIndex, uint256 oldLimit, uint256 tokenGasOverride
-  );
-  error ManualExecutionGasAmountCountMismatch(bytes32 messageId, uint64 sequenceNumber);
   error CanOnlySelfCall();
   error ReceiverError(bytes err);
   error TokenHandlingError(address target, bytes err);
   error ReleaseOrMintBalanceMismatch(uint256 amountReleased, uint256 balancePre, uint256 balancePost);
-  error EmptyReport(uint64 sourceChainSelector);
-  error EmptyBatch();
   error CursedByRMN(uint64 sourceChainSelector);
   error NotACompatiblePool(address notPool);
   error InvalidProofLength(uint256 expected, uint256 got);
   error InvalidNewState(uint64 sourceChainSelector, uint64 sequenceNumber, Internal.MessageExecutionState newState);
-  error InvalidInterval(uint64 sourceChainSelector, uint64 min, uint64 max);
   error ZeroAddressNotAllowed();
   error InvalidMessageDestChainSelector(uint64 messageDestChainSelector);
-  error SourceChainSelectorMismatch(uint64 reportSourceChainSelector, uint64 messageSourceChainSelector);
-  error SignatureVerificationNotAllowedInExecutionPlugin();
-  error InvalidOnRampUpdate(uint64 sourceChainSelector);
   error InsufficientGasToCompleteTx(bytes4 err);
   error SkippedAlreadyExecutedMessage(uint64 sourceChainSelector, uint64 sequenceNumber);
-
   error InvalidVerifierSelector(bytes4 selector);
 
   /// @dev Atlas depends on various events, if changing, please notify Atlas.
@@ -73,11 +57,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     Internal.MessageExecutionState state,
     bytes returnData
   );
-  event SourceChainSelectorAdded(uint64 sourceChainSelector);
   event SourceChainConfigSet(uint64 indexed sourceChainSelector, SourceChainConfig sourceConfig);
-
-  event AlreadyAttempted(uint64 sourceChainSelector, uint64 sequenceNumber);
-  event SkippedReportExecution(uint64 sourceChainSelector);
 
   /// @dev Struct that contains the static configuration. The individual components are stored as immutable variables.
   // solhint-disable-next-line gas-struct-packing
@@ -114,8 +94,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   struct AggregatedReport {
     Internal.Any2EVMMultiProofMessage message;
     bytes[] proofs;
-    bytes[][] tokenProofs;
-    uint32 gasOverride; // Gas override for the entire report.
+    uint32 gasOverride; // Gas override for the entire report, including receiver call and token transfers.
   }
 
   // STATIC CONFIG
@@ -252,14 +231,12 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     if (i_rmnRemote.isCursed(bytes16(uint128(sourceChainSelector)))) {
       revert CursedByRMN(sourceChainSelector);
     }
+    if (!s_sourceChainConfigs[sourceChainSelector].isEnabled) {
+      revert SourceChainNotEnabled(sourceChainSelector);
+    }
 
     if (report.message.header.destChainSelector != i_chainSelector) {
       revert InvalidMessageDestChainSelector(report.message.header.destChainSelector);
-    }
-
-    // We expect only valid messages will be committed but we check when executing as a defense in depth measure.
-    if (report.message.tokenAmounts.length != report.tokenProofs.length) {
-      revert TokenDataMismatch(sourceChainSelector, report.message.header.sequenceNumber);
     }
 
     // SECURITY CRITICAL CHECK.
