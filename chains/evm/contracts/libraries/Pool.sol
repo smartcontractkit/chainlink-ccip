@@ -7,6 +7,10 @@ library Pool {
   // bytes4(keccak256("CCIP_POOL_V1"))
   bytes4 public constant CCIP_POOL_V1 = 0xaff2afbf;
 
+  // The tag used to signal support for the pool v1 standard.
+  // bytes4(keccak256("CCIP_POOL_V2"))
+  bytes4 public constant CCIP_POOL_V2 = 0xf208a58f;
+
   // The number of bytes in the return data for a pool v1 releaseOrMint call.
   // This should match the size of the ReleaseOrMintOutV1 struct.
   uint16 public constant CCIP_POOL_V1_RET_BYTES = 32;
