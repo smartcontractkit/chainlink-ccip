@@ -21,8 +21,12 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
+	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
+	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"github.com/smartcontractkit/chainlink-ccip/commit/internal/builder"
+	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
 	"github.com/smartcontractkit/chainlink-ccip/commit/metrics"
+	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
 	clrand "github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
@@ -39,7 +43,12 @@ import (
 func TestPlugin_RoleDonE2E_NoPrevOutcome(t *testing.T) {
 	ctx := tests.Context(t)
 
-	s := newRoleDonTestSetup(t, 2, 7, 1)
+	s := newRoleDonTestSetup(t, 3, 7, 1)
+	const numUnderstaffedChains = 1
+	for i := 0; i < numUnderstaffedChains; i++ {
+		s.fChain[s.sourceChains[i]] = 2 // <--- we set fChain to 2, that requires at least 2f+1=5 oracles for this chain
+		// we set a maximum of 2*fChain+2=4 originally within newRoleDonTestSetup, we expect no results for the chain
+	}
 	t.Logf("Running test with Role DON Setup:\n%s", s)
 
 	allChainsConfig := make(map[cciptypes.ChainSelector]readerinternal.ChainConfig)
@@ -93,7 +102,7 @@ func TestPlugin_RoleDonE2E_NoPrevOutcome(t *testing.T) {
 					RunAndReturn(func(ctx context.Context, ch cciptypes.ChainSelector) (cciptypes.SeqNum, error) {
 						// should only be called if oracle supports the target source chain
 						require.True(t, oracleChains.Contains(ch))
-						return cciptypes.SeqNum(55), nil
+						return cciptypes.SeqNum(66), nil // <--- new msgs
 					})
 			}
 		}
@@ -136,52 +145,182 @@ func TestPlugin_RoleDonE2E_NoPrevOutcome(t *testing.T) {
 			}
 		}
 
-		p := NewPlugin(
-			plugintypes.DonID(999),
-			s.oracleIDToPeerID,
-			pluginconfig.CommitOffchainConfig{
-				TokenInfo: map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo{
-					"0x01": {
-						AggregatorAddress: "0x02",
-						DeviationPPB:      cciptypes.NewBigIntFromInt64(123),
-						Decimals:          12,
-					},
-				},
-				PriceFeedChainSelector:          145,
-				NewMsgScanBatchSize:             50,
-				MaxMerkleTreeSize:               256,
-				InflightPriceCheckRetries:       1,
-				MerkleRootAsyncObserverDisabled: true,
-				ChainFeeAsyncObserverDisabled:   true,
-				TokenPriceAsyncObserverDisabled: true,
-			},
-			s.destChain,
-			deps.ccipReader,
-			deps.priceReader,
-			deps.reportCodec,
-			deps.msgHasher,
-			deps.lggr,
-			deps.homeChainReader,
-			deps.rmnHomeReader,
-			nil,
-			nil,
-			ocr3types.ReportingPluginConfig{
-				OracleID: oracleID,
-				N:        len(s.oracles),
-				F:        s.fRoleDon,
-			},
-			&metrics.Noop{},
-			deps.addressCodec,
-			deps.reportBuilder,
-		)
-		p.contractsInitialized.Store(true)
-
+		p := s.newRoleDonTestPlugin(oracleID)
 		plugins = append(plugins, p)
 	}
 
 	runner := testhelpers.NewOCR3Runner(plugins, s.oracles, ocr3types.Outcome{})
 	res, err := runner.RunRound(ctx)
 	t.Log(res, err)
+
+	o, err := ocrTypCodec.DecodeOutcome(res.Outcome)
+	require.NoError(t, err)
+	require.Equal(t, len(s.sourceChains)-numUnderstaffedChains, len(o.MerkleRootOutcome.RangesSelectedForReport))
+}
+
+func TestPlugin_RoleDonE2E_RangesAndPricesSelectedPreviously(t *testing.T) {
+	ctx := tests.Context(t)
+
+	s := newRoleDonTestSetup(t, 4, 7, 1)
+	chainsWithMsgs := []cciptypes.ChainSelector{s.sourceChains[0], s.sourceChains[1]}
+	t.Logf("Running test with Role DON Setup:\n%s", s)
+
+	allChainsConfig := make(map[cciptypes.ChainSelector]readerinternal.ChainConfig)
+	for _, ch := range append(s.sourceChains, s.destChain) {
+		allChainsConfig[ch] = readerinternal.ChainConfig{
+			FChain:         s.fChain[ch],
+			SupportedNodes: s.oracleIDsToPeerIDsSet(s.chainOracles[ch]),
+			Config:         chainconfig.ChainConfig{},
+		}
+	}
+
+	plugins := make([]ocr3types.ReportingPlugin[[]byte], 0, len(s.oracles))
+	for _, oracleID := range s.oracles {
+		deps := s.oracleDependencies[oracleID]
+
+		oracleChains := s.getChainsOfOracle(oracleID)
+		oracleSourceChainsSet := oracleChains.Clone()
+		oracleSourceChainsSet.Remove(s.destChain)
+		var oracleSourceChains []cciptypes.ChainSelector
+		if oracleSourceChainsSet.Cardinality() > 0 {
+			oracleSourceChains = oracleSourceChainsSet.ToSlice()
+			sort.Slice(oracleSourceChains, func(i, j int) bool { return oracleSourceChains[i] < oracleSourceChains[j] })
+		}
+
+		// Home Chain Expectations - Every oracle should be able to read
+		{
+			deps.homeChainReader.EXPECT().GetFChain().Return(s.fChain, nil)
+			deps.homeChainReader.EXPECT().GetAllChainConfigs().Return(allChainsConfig, nil)
+			deps.homeChainReader.EXPECT().GetSupportedChainsForPeer(mock.Anything).
+				RunAndReturn(func(id libocrtypes.PeerID) (mapset.Set[cciptypes.ChainSelector], error) {
+					supportedChainsOfOracle := s.getChainsOfOracle(s.peerIDToOracleID[id])
+					return supportedChainsOfOracle, nil
+				})
+			deps.homeChainReader.EXPECT().GetChainConfig(mock.Anything).
+				RunAndReturn(func(ch cciptypes.ChainSelector) (readerinternal.ChainConfig, error) {
+					return allChainsConfig[ch], nil
+				})
+		}
+
+		// Discovery and Sync - Out of scope of this test case
+		{
+			deps.ccipReader.EXPECT().DiscoverContracts(mock.Anything, mock.Anything).Return(nil, nil)
+			deps.ccipReader.EXPECT().Sync(mock.Anything, mock.Anything).Return(nil)
+		}
+
+		// Source Chain Expectations - Makes sure only oracles that support specific source chains are reading them.
+		{
+			if len(oracleSourceChains) > 0 && mapset.NewSet(oracleSourceChains...).ContainsAny(chainsWithMsgs...) {
+				deps.ccipReader.EXPECT().MsgsBetweenSeqNums(mock.Anything, mock.Anything, mock.Anything).
+					RunAndReturn(
+						func(ctx context.Context, selector cciptypes.ChainSelector, numRange cciptypes.SeqNumRange,
+						) ([]cciptypes.Message, error) {
+							require.True(t, oracleChains.Contains(selector))
+							// merkle roots consensus and computation is out of scope for this test
+							return []cciptypes.Message{}, nil
+						})
+			}
+		}
+
+		// Dest Chain Expectations - Makes sure only oracles that support the destination chain are reading it.
+		{
+			if oracleChains.Contains(s.destChain) {
+				deps.ccipReader.EXPECT().GetLatestPriceSeqNr(mock.Anything).Return(53, nil) // <-- still inflight (less than 54)
+			}
+		}
+
+		p := s.newRoleDonTestPlugin(oracleID)
+		plugins = append(plugins, p)
+	}
+
+	require.True(t, len(s.sourceChains) >= 2, "this test requires at least two chains")
+	prevOutcome := committypes.Outcome{
+		MerkleRootOutcome: merkleroot.Outcome{
+			OutcomeType:             merkleroot.ReportIntervalsSelected,
+			RangesSelectedForReport: []plugintypes.ChainRange{},
+		},
+		TokenPriceOutcome: tokenprice.Outcome{
+			TokenPrices: map[cciptypes.UnknownEncodedAddress]cciptypes.BigInt{
+				"0x123": cciptypes.NewBigIntFromInt64(9999),
+			},
+		},
+		ChainFeeOutcome: chainfee.Outcome{
+			GasPrices: []cciptypes.GasPriceChain{
+				{
+					ChainSel: s.sourceChains[0],
+					GasPrice: cciptypes.NewBigIntFromInt64(1999),
+				},
+				{
+					ChainSel: s.sourceChains[1],
+					GasPrice: cciptypes.NewBigIntFromInt64(2999),
+				},
+			},
+		},
+		MainOutcome: committypes.MainOutcome{InflightPriceOcrSequenceNumber: 54, RemainingPriceChecks: 10},
+	}
+	for i, ch := range chainsWithMsgs {
+		prevOutcome.MerkleRootOutcome.RangesSelectedForReport = append(
+			prevOutcome.MerkleRootOutcome.RangesSelectedForReport,
+			plugintypes.ChainRange{
+				ChainSel:    ch,
+				SeqNumRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(10+i), cciptypes.SeqNum(11+i)),
+			})
+	}
+
+	b, err := ocrTypCodec.EncodeOutcome(prevOutcome)
+	require.NoError(t, err)
+	runner := testhelpers.NewOCR3Runner(plugins, s.oracles, b)
+	res, err := runner.RunRound(ctx)
+	t.Log(res, err)
+
+	o, err := ocrTypCodec.DecodeOutcome(res.Outcome)
+	require.NoError(t, err)
+	require.Equal(t, committypes.MainOutcome{InflightPriceOcrSequenceNumber: 54, RemainingPriceChecks: 9}, o.MainOutcome)
+}
+
+func (s roleDonTestSetup) newRoleDonTestPlugin(oracleID commontypes.OracleID) *Plugin {
+	deps := s.oracleDependencies[oracleID]
+	p := NewPlugin(
+		plugintypes.DonID(999),
+		s.oracleIDToPeerID,
+		pluginconfig.CommitOffchainConfig{
+			TokenInfo: map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo{
+				"0x01": {
+					AggregatorAddress: "0x02",
+					DeviationPPB:      cciptypes.NewBigIntFromInt64(123),
+					Decimals:          12,
+				},
+			},
+			PriceFeedChainSelector:          145,
+			NewMsgScanBatchSize:             50,
+			MaxMerkleTreeSize:               256,
+			InflightPriceCheckRetries:       1,
+			MerkleRootAsyncObserverDisabled: true,
+			ChainFeeAsyncObserverDisabled:   true,
+			TokenPriceAsyncObserverDisabled: true,
+			DonBreakingChangesVersion:       pluginconfig.DonBreakingChangesVersion1RoleDonSupport,
+		},
+		s.destChain,
+		deps.ccipReader,
+		deps.priceReader,
+		deps.reportCodec,
+		deps.msgHasher,
+		deps.lggr,
+		deps.homeChainReader,
+		deps.rmnHomeReader,
+		nil,
+		nil,
+		ocr3types.ReportingPluginConfig{
+			OracleID: oracleID,
+			N:        len(s.oracles),
+			F:        s.fRoleDon,
+		},
+		&metrics.Noop{},
+		deps.addressCodec,
+		deps.reportBuilder,
+	)
+	p.contractsInitialized.Store(true)
+	return p
 }
 
 type roleDonTestSetup struct {

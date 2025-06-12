@@ -171,7 +171,7 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
 
   /// @notice Gets the pool's Router
   /// @return router The pool's Router
-  function getRouter() public view returns (address router) {
+  function getRouter() public view virtual returns (address router) {
     return address(s_router);
   }
 
@@ -237,11 +237,12 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
-    _validateReleaseOrMint(releaseOrMintIn);
-
     // Calculate the local amount
-    uint256 localAmount =
-      _calculateLocalAmount(releaseOrMintIn.amount, _parseRemoteDecimals(releaseOrMintIn.sourcePoolData));
+    uint256 localAmount = _calculateLocalAmount(
+      releaseOrMintIn.sourceDenominatedAmount, _parseRemoteDecimals(releaseOrMintIn.sourcePoolData)
+    );
+
+    _validateReleaseOrMint(releaseOrMintIn, localAmount);
 
     // Mint to the receiver
     _releaseOrMint(releaseOrMintIn.receiver, localAmount);
@@ -293,11 +294,10 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   /// - if the source pool is valid
   /// - rate limit status
   /// @param releaseOrMintIn The input to validate.
+  /// @param localAmount The local amount to be released or minted.
   /// @dev This function should always be called before executing a release or mint. Not doing so would allow
   /// for various exploits.
-  function _validateReleaseOrMint(
-    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
-  ) internal {
+  function _validateReleaseOrMint(Pool.ReleaseOrMintInV1 calldata releaseOrMintIn, uint256 localAmount) internal {
     if (!isSupportedToken(releaseOrMintIn.localToken)) revert InvalidToken(releaseOrMintIn.localToken);
     if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(releaseOrMintIn.remoteChainSelector)))) revert CursedByRMN();
     _onlyOffRamp(releaseOrMintIn.remoteChainSelector);
@@ -307,7 +307,7 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
       revert InvalidSourcePoolAddress(releaseOrMintIn.sourcePoolAddress);
     }
 
-    _consumeInboundRateLimit(releaseOrMintIn.remoteChainSelector, releaseOrMintIn.amount);
+    _consumeInboundRateLimit(releaseOrMintIn.remoteChainSelector, localAmount);
   }
 
   // ================================================================
@@ -396,7 +396,7 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   /// @notice Checks if the pool address is configured on the remote chain.
   /// @param remoteChainSelector Remote chain selector.
   /// @param remotePoolAddress The address of the remote pool.
-  function isRemotePool(uint64 remoteChainSelector, bytes calldata remotePoolAddress) public view returns (bool) {
+  function isRemotePool(uint64 remoteChainSelector, bytes memory remotePoolAddress) public view returns (bool) {
     return s_remoteChainConfigs[remoteChainSelector].remotePools.contains(keccak256(remotePoolAddress));
   }
 
