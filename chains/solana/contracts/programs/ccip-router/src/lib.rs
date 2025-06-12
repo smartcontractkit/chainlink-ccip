@@ -19,8 +19,6 @@ use crate::messages::*;
 mod instructions;
 use crate::instructions::router;
 
-use ccip_common::auto_derive::{DeriveAccountsCcipSendParams, DeriveAccountsResponse};
-
 // Anchor discriminators for CPI calls
 const TOKENPOOL_LOCK_OR_BURN_DISCRIMINATOR: [u8; 8] =
     [0x72, 0xa1, 0x5e, 0x1d, 0x93, 0x19, 0xe8, 0xbf]; // lock_or_burn_tokens
@@ -516,11 +514,12 @@ pub mod ccip_router {
     pub fn derive_accounts_ccip_send<'info>(
         ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
         params: DeriveAccountsCcipSendParams,
+        stage: String,
     ) -> Result<DeriveAccountsResponse> {
         let default_code_version: CodeVersion = ctx.accounts.config.default_code_version;
 
         router::onramp(default_code_version, default_code_version)
-            .derive_accounts_ccip_send(ctx, params)
+            .derive_accounts_ccip_send(ctx, params, stage)
     }
 }
 
@@ -580,4 +579,8 @@ pub enum CcipRouterError {
     InvalidCodeVersion,
     #[msg("Invalid rollback attempt on the CCIP version of the onramp to the destination chain")]
     InvalidCcipVersionRollback,
+    #[msg("Invalid account list for PDA derivation")]
+    InvalidAccountListForPdaDerivation,
+    #[msg("Unexpected account derivation stage")]
+    InvalidDerivationStage,
 }

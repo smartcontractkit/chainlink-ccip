@@ -1,11 +1,14 @@
+use std::str::FromStr;
+
 use anchor_lang::prelude::*;
 use anchor_spl::token::spl_token;
 use anchor_spl::token_interface;
-use ccip_common::auto_derive::{DeriveAccountsCcipSendParams, DeriveAccountsResponse};
+use derive::DeriveAccountsCcipSendStage;
 
 use crate::context::{ViewConfigOnly, ANCHOR_DISCRIMINATOR};
 use crate::events::on_ramp as events;
 use crate::messages::GetFeeResult;
+use crate::state::{DeriveAccountsCcipSendParams, DeriveAccountsResponse};
 
 use ccip_common::seed;
 use ccip_common::v1::{validate_and_parse_token_accounts, TokenAccounts};
@@ -27,6 +30,8 @@ use crate::{
 };
 
 use helpers::*;
+
+mod derive;
 
 pub struct Impl;
 impl OnRamp for Impl {
@@ -317,8 +322,20 @@ impl OnRamp for Impl {
         &self,
         ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
         params: DeriveAccountsCcipSendParams,
+        stage: String,
     ) -> Result<DeriveAccountsResponse> {
-        todo!()
+        match DeriveAccountsCcipSendStage::from_str(stage.as_str())? {
+            DeriveAccountsCcipSendStage::Start => derive::derive_ccip_send_accounts_start(params),
+            DeriveAccountsCcipSendStage::FinishMainAccountList => {
+                derive::derive_ccip_send_accounts_finish_main_account_list(ctx, params)
+            }
+            DeriveAccountsCcipSendStage::RetrieveTokenLUTs => {
+                derive::derive_ccip_send_accounts_retrieve_luts(ctx)
+            }
+            DeriveAccountsCcipSendStage::TokenTransferAccounts => {
+                derive::derive_execute_accounts_additional_tokens(ctx, params)
+            }
+        }
     }
 }
 

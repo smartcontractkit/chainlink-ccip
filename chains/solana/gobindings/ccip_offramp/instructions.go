@@ -299,7 +299,9 @@ var (
 	// # Arguments
 	//
 	// * `ctx`: Context containing only the offramp config.
-	// * params:
+	// * `stage`: Requested derivation stage. Pass "Start" the first time, then for each subsequent
+	// call, pass the value returned in `response.next_stage` until empty.
+	// * `params`:
 	// * `execute_caller`: Public key of the account that will sign the call to `ccip_execute`.
 	// * `message_accounts`: If the transaction involves messaging, the message accounts.
 	// * `source_chain_selector`: CCIP chain selector for the source chain.

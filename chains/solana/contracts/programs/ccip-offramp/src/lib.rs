@@ -621,7 +621,9 @@ pub mod ccip_offramp {
     /// # Arguments
     ///
     /// * `ctx`: Context containing only the offramp config.
-    /// * params:
+    /// * `stage`: Requested derivation stage. Pass "Start" the first time, then for each subsequent
+    ///   call, pass the value returned in `response.next_stage` until empty.
+    /// * `params`:
     ///    * `execute_caller`: Public key of the account that will sign the call to `ccip_execute`.
     ///    * `message_accounts`: If the transaction involves messaging, the message accounts.
     ///    * `source_chain_selector`: CCIP chain selector for the source chain.
@@ -634,6 +636,7 @@ pub mod ccip_offramp {
     pub fn derive_accounts_execute<'info>(
         ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
         params: DeriveAccountsExecuteParams,
+        stage: String,
     ) -> Result<DeriveAccountsResponse> {
         let default_code_version: CodeVersion = ctx
             .accounts
@@ -643,7 +646,7 @@ pub mod ccip_offramp {
             .try_into()?;
 
         router::execute(default_code_version, default_code_version)
-            .derive_accounts_execute(ctx, params)
+            .derive_accounts_execute(ctx, params, stage)
     }
 
     pub fn close_commit_report_account(
@@ -809,4 +812,6 @@ pub enum CcipOfframpError {
     ExecutionReportUnavailable,
     #[msg("Invalid account list for PDA derivation")]
     InvalidAccountListForPdaDerivation,
+    #[msg("Unexpected account derivation stage")]
+    InvalidDerivationStage,
 }

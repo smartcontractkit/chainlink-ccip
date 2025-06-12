@@ -6,8 +6,8 @@ use crate::context::{
     TransferOwnership, UpdateConfig, UpdateReferenceAddresses, UpdateSourceChain, ViewConfigOnly,
 };
 use crate::state::{
-    CcipAccountMeta, CodeVersion, DeriveAccountsExecuteParams, DeriveAccountsResponse,
-    Ocr3ConfigInfo, SourceChainConfig,
+    CodeVersion, DeriveAccountsExecuteParams, DeriveAccountsResponse, Ocr3ConfigInfo,
+    SourceChainConfig,
 };
 use crate::OcrPluginType;
 
@@ -72,6 +72,7 @@ pub trait Execute {
         &self,
         ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
         params: DeriveAccountsExecuteParams,
+        stage: String,
     ) -> Result<DeriveAccountsResponse>;
 }
 

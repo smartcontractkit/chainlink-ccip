@@ -1,5 +1,4 @@
 use anchor_lang::prelude::*;
-use ccip_common::auto_derive::{DeriveAccountsCcipSendParams, DeriveAccountsResponse};
 
 use crate::context::{
     AcceptOwnership, AddChainSelector, AddOfframp, CcipSend, RemoveOfframp, TransferOwnership,
@@ -7,7 +6,9 @@ use crate::context::{
     ViewConfigOnly, WithdrawBilledFunds,
 };
 use crate::messages::{GetFeeResult, SVM2AnyMessage};
-use crate::state::{CodeVersion, DestChainConfig};
+use crate::state::{
+    CodeVersion, DeriveAccountsCcipSendParams, DeriveAccountsResponse, DestChainConfig,
+};
 use crate::token_context::{
     AcceptAdminRoleTokenAdminRegistry, ModifyTokenAdminRegistry,
     OverridePendingTokenAdminRegistryByCCIPAdmin, OverridePendingTokenAdminRegistryByOwner,
@@ -123,6 +124,7 @@ pub trait OnRamp {
         &self,
         ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
         params: DeriveAccountsCcipSendParams,
+        stage: String,
     ) -> Result<DeriveAccountsResponse>;
 }
 
