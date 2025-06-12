@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {IOwner} from "../../interfaces/IOwner.sol";
 import {Router} from "../../Router.sol";
 import {TokenAdminRegistry} from "../../tokenAdminRegistry/TokenAdminRegistry.sol";
+import {SiloedLockReleaseTokenPool} from "../../pools/SiloedLockReleaseTokenPool.sol";
 import {LockReleaseTokenPool} from "../../pools/LockReleaseTokenPool.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
 import {OnRamp} from "../../onRamp/OnRamp.sol";
@@ -47,6 +48,7 @@ interface IEVM2EVMOnRamp {
     function getStaticConfig() external view returns (StaticConfig memory);
 }
 
+
 contract LinkMigrationViaMCMSTest is Test {
     struct ChainConfig {
         uint256 forkId;
@@ -81,8 +83,10 @@ contract LinkMigrationViaMCMSTest is Test {
         uint256 preBalance = IERC20(USDT).balanceOf(expectedNewPool);
 
         address to = 0x44835bBBA9D40DEDa9b64858095EcFB2693c9449;
-        address multisig = 0xE53289F32c8E690b7173aA33affE9B6B0CB0012F;
+        address multisig = 0x117ec8aD107976e1dBCc21717ff78407Bc36aADc;
         uint256 amount = 1000000000000;
+        uint64 remoteChainSelector = 7937294810946806131;
+        address expectedRebalancer = 0x2728df4D22253004C017675bd609962cD641D797; 
         
         vm.startPrank(multisig);
 
@@ -101,6 +105,8 @@ contract LinkMigrationViaMCMSTest is Test {
         uint256 postBalance = IERC20(USDT).balanceOf(expectedNewPool);
         
         assertEq(postBalance, preBalance + amount, "USDT balance should be greater than pre-balance by 1M USDT");
+
+        assertEq(SiloedLockReleaseTokenPool(mainnetCfg.tokenPool).getChainRebalancer(remoteChainSelector), expectedRebalancer, "Rebalancer should be the expected rebalancer");
     }
        
 }
