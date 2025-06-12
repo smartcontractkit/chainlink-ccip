@@ -631,7 +631,6 @@ pub mod ccip_offramp {
     ///    * `buffer_id`: If the execution will be buffered, the buffer id that will be used by the
     ///      `execute_caller`: If the execution will not be buffered, this should be empty.
     ///    * `token_receiver`: Receiver of token transfers, if any (i.e. report.message.token_receiver.)
-    #[allow(clippy::too_many_arguments)]
     pub fn derive_accounts_execute<'info>(
         ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
         params: DeriveAccountsExecuteParams,

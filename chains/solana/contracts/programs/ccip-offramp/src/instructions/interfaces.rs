@@ -68,7 +68,6 @@ pub trait Execute {
         num_chunks: u8,
     ) -> Result<()>;
 
-    #[allow(clippy::too_many_arguments)]
     fn derive_accounts_execute<'info>(
         &self,
         ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
