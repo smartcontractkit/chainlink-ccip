@@ -96,7 +96,7 @@ pub mod burnmint_token_pool {
             spl_token::state::Multisig::unpack_from_slice(multisig_data)
                 .map_err(|_| CcipBnMTokenPoolError::InvalidSPLTokenMultisig)?
                 .into()
-        }        
+        };
 
         // If using a multisig, it must have more than one valid signer
         let n = multisig_account.n as usize;
