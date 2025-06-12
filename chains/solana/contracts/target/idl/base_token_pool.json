@@ -1,5 +1,5 @@
 {
-  "version": "0.1.0-dev",
+  "version": "0.1.1-dev",
   "name": "base_token_pool",
   "instructions": [],
   "types": [
@@ -296,6 +296,16 @@
   ],
   "events": [
     {
+      "name": "GlobalConfigUpdated",
+      "fields": [
+        {
+          "name": "selfServedAllowed",
+          "type": "bool",
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "Burned",
       "fields": [
         {
@@ -564,6 +574,26 @@
         },
         {
           "name": "mint",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "MintAuthorityTransferred",
+      "fields": [
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "oldMintAuthority",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "newMintAuthority",
           "type": "publicKey",
           "index": false
         }

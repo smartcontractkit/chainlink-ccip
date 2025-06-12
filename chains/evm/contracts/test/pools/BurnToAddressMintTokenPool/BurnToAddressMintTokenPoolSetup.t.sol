@@ -10,18 +10,13 @@ contract BurnToAddressMintTokenPoolSetup is BurnMintSetup {
   address public constant BURN_ADDRESS = address(0xdead);
 
   function setUp() public virtual override {
-    BurnMintSetup.setUp();
+    super.setUp();
 
     s_pool = new BurnToAddressMintTokenPool(
-      s_burnMintERC20,
-      DEFAULT_TOKEN_DECIMALS,
-      new address[](0),
-      address(s_mockRMNRemote),
-      address(s_sourceRouter),
-      BURN_ADDRESS
+      s_token, DEFAULT_TOKEN_DECIMALS, new address[](0), address(s_mockRMNRemote), address(s_sourceRouter), BURN_ADDRESS
     );
 
-    s_burnMintERC20.grantMintAndBurnRoles(address(s_pool));
+    s_token.grantMintAndBurnRoles(address(s_pool));
 
     _applyChainUpdates(address(s_pool));
   }

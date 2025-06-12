@@ -17,9 +17,10 @@ import (
 
 type TokenPool struct {
 	// token details
-	Program        solana.PublicKey
-	Mint           solana.PublicKey
-	FeeTokenConfig solana.PublicKey
+	Program               solana.PublicKey
+	Mint                  solana.PublicKey
+	FeeTokenConfig        solana.PublicKey
+	MintAuthorityMultisig solana.PublicKey
 
 	// admin registry PDA
 	AdminRegistryPDA solana.PublicKey
@@ -98,18 +99,19 @@ func NewTokenPool(tokenProgram solana.PublicKey, poolProgram solana.PublicKey, m
 	}
 
 	p := TokenPool{
-		Program:          tokenProgram,
-		Mint:             mint,
-		FeeTokenConfig:   tokenConfigPda,
-		AdminRegistryPDA: tokenAdminRegistryPDA,
-		PoolProgram:      poolProgram,
-		PoolLookupTable:  solana.PublicKey{},
-		WritableIndexes:  []uint8{3, 4, 7}, // see ToTokenPoolEntries for writable indexes
-		User:             map[solana.PublicKey]solana.PublicKey{},
-		Chain:            map[uint64]solana.PublicKey{},
-		Billing:          map[uint64]solana.PublicKey{},
-		RouterSigner:     routerSignerPDA,
-		OfframpSigner:    offrampSignerPDA,
+		Program:               tokenProgram,
+		Mint:                  mint,
+		MintAuthorityMultisig: solana.PublicKey{}, // this will be set later, if needed
+		FeeTokenConfig:        tokenConfigPda,
+		AdminRegistryPDA:      tokenAdminRegistryPDA,
+		PoolProgram:           poolProgram,
+		PoolLookupTable:       solana.PublicKey{},
+		WritableIndexes:       []uint8{3, 4, 7}, // see ToTokenPoolEntries for writable indexes
+		User:                  map[solana.PublicKey]solana.PublicKey{},
+		Chain:                 map[uint64]solana.PublicKey{},
+		Billing:               map[uint64]solana.PublicKey{},
+		RouterSigner:          routerSignerPDA,
+		OfframpSigner:         offrampSignerPDA,
 	}
 	p.Chain[config.EvmChainSelector] = evmChainPDA
 	p.Chain[config.SvmChainSelector] = svmChainPDA
@@ -151,6 +153,11 @@ func TokenPoolSignerAddress(token, programID solana.PublicKey) (solana.PublicKey
 func TokenPoolChainConfigPDA(chainSelector uint64, mint, programID solana.PublicKey) (solana.PublicKey, uint8, error) {
 	chainSelectorLE := common.Uint64ToLE(chainSelector)
 	return solana.FindProgramAddress([][]byte{[]byte("ccip_tokenpool_chainconfig"), chainSelectorLE, mint.Bytes()}, programID)
+}
+
+func TokenPoolGlobalConfigPDA(programID solana.PublicKey) (solana.PublicKey, error) {
+	addr, _, err := solana.FindProgramAddress([][]byte{[]byte("config")}, programID)
+	return addr, err
 }
 
 type EventBurnLock struct {
