@@ -12,7 +12,7 @@ use crate::context::*;
 
 #[program]
 pub mod burnmint_token_pool {
-    use anchor_spl::{token::spl_token, token_2022::spl_token_2022::state::Multisig};
+    use anchor_spl::token_2022::spl_token_2022::state::Multisig;
     use solana_program::program_pack::Pack;
 
     use super::*;
