@@ -120,7 +120,7 @@ export type BurnmintTokenPool = {
       ]
     },
     {
-      "name": "transferMintAuthority",
+      "name": "transferMintAuthorityToMultisig",
       "accounts": [
         {
           "name": "state",
@@ -148,6 +148,11 @@ export type BurnmintTokenPool = {
           "isSigner": true
         },
         {
+          "name": "newMintAuthority",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "program",
           "isMut": false,
           "isSigner": false
@@ -158,12 +163,7 @@ export type BurnmintTokenPool = {
           "isSigner": false
         }
       ],
-      "args": [
-        {
-          "name": "newMintAuthority",
-          "type": "publicKey"
-        }
-      ]
+      "args": []
     },
     {
       "name": "typeVersion",
@@ -751,6 +751,36 @@ export type BurnmintTokenPool = {
       "code": 6000,
       "name": "InvalidMultisig",
       "msg": "Invalid Multisig Mint"
+    },
+    {
+      "code": 6001,
+      "name": "MintAuthorityAlreadySet",
+      "msg": "Mint Authority already set"
+    },
+    {
+      "code": 6002,
+      "name": "FixedMintToken",
+      "msg": "Token with no Mint Authority"
+    },
+    {
+      "code": 6003,
+      "name": "InvalidToken2022Multisig",
+      "msg": "Invalid Multisig Account Data for Token 2022"
+    },
+    {
+      "code": 6004,
+      "name": "InvalidSPLTokenMultisig",
+      "msg": "Invalid Multisig Account Data for SPL Token"
+    },
+    {
+      "code": 6005,
+      "name": "PoolSignerNotInMultisig",
+      "msg": "Token Pool Signer PDA must be signer of the Multisig"
+    },
+    {
+      "code": 6006,
+      "name": "MultisigMustHaveMoreThanOneSigner",
+      "msg": "Multisig must have more than one signer"
     }
   ]
 };
@@ -877,7 +907,7 @@ export const IDL: BurnmintTokenPool = {
       ]
     },
     {
-      "name": "transferMintAuthority",
+      "name": "transferMintAuthorityToMultisig",
       "accounts": [
         {
           "name": "state",
@@ -905,6 +935,11 @@ export const IDL: BurnmintTokenPool = {
           "isSigner": true
         },
         {
+          "name": "newMintAuthority",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "program",
           "isMut": false,
           "isSigner": false
@@ -915,12 +950,7 @@ export const IDL: BurnmintTokenPool = {
           "isSigner": false
         }
       ],
-      "args": [
-        {
-          "name": "newMintAuthority",
-          "type": "publicKey"
-        }
-      ]
+      "args": []
     },
     {
       "name": "typeVersion",
@@ -1508,6 +1538,36 @@ export const IDL: BurnmintTokenPool = {
       "code": 6000,
       "name": "InvalidMultisig",
       "msg": "Invalid Multisig Mint"
+    },
+    {
+      "code": 6001,
+      "name": "MintAuthorityAlreadySet",
+      "msg": "Mint Authority already set"
+    },
+    {
+      "code": 6002,
+      "name": "FixedMintToken",
+      "msg": "Token with no Mint Authority"
+    },
+    {
+      "code": 6003,
+      "name": "InvalidToken2022Multisig",
+      "msg": "Invalid Multisig Account Data for Token 2022"
+    },
+    {
+      "code": 6004,
+      "name": "InvalidSPLTokenMultisig",
+      "msg": "Invalid Multisig Account Data for SPL Token"
+    },
+    {
+      "code": 6005,
+      "name": "PoolSignerNotInMultisig",
+      "msg": "Token Pool Signer PDA must be signer of the Multisig"
+    },
+    {
+      "code": 6006,
+      "name": "MultisigMustHaveMoreThanOneSigner",
+      "msg": "Multisig must have more than one signer"
     }
   ]
 };

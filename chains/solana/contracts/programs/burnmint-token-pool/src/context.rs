@@ -114,6 +114,9 @@ pub struct TransferMintAuthority<'info> {
     pub pool_signer: UncheckedAccount<'info>,
     pub authority: Signer<'info>,
 
+    /// CHECK: The Multisig can be a Token 2022 Multisig or a SPL Token Multisig and there is no interface for it.
+    pub new_mint_authority: UncheckedAccount<'info>, // new mint authority for the underlying token
+
     // Ensures that the provided program is the BurnmintTokenPool program,
     // and that its associated program data account matches the expected one.
     // This guarantees that only the program's upgrade authority can modify the global config.
@@ -461,6 +464,18 @@ pub struct DeleteChainConfig<'info> {
 pub enum CcipBnMTokenPoolError {
     #[msg("Invalid Multisig Mint")]
     InvalidMultisig,
+    #[msg("Mint Authority already set")]
+    MintAuthorityAlreadySet,
+    #[msg("Token with no Mint Authority")]
+    FixedMintToken,
+    #[msg("Invalid Multisig Account Data for Token 2022")]
+    InvalidToken2022Multisig,
+    #[msg("Invalid Multisig Account Data for SPL Token")]
+    InvalidSPLTokenMultisig,
+    #[msg("Token Pool Signer PDA must be signer of the Multisig")]
+    PoolSignerNotInMultisig,
+    #[msg("Multisig must have more than one signer")]
+    MultisigMustHaveMoreThanOneSigner,
 }
 
 // This account can not be declared in the common crate, the program ID for that Account would be incorrect.
