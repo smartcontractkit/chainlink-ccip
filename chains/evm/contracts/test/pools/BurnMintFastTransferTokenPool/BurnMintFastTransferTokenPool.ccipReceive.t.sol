@@ -12,7 +12,7 @@ import {IERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
 contract BurnMintFastTransferTokenPool_ccipReceive is BurnMintFastTransferTokenPoolSetup {
-  function test_CcipReceive_SlowFilled() public {
+  function test_ccipReceive_SlowFilled() public {
     vm.stopPrank();
     vm.startPrank(address(s_sourceRouter));
 
@@ -37,7 +37,7 @@ contract BurnMintFastTransferTokenPool_ccipReceive is BurnMintFastTransferTokenP
     assertEq(s_token.balanceOf(RECEIVER), receiverBalanceBefore + expectedMintAmount);
   }
 
-  function test_RevertWhen_InvalidSourcePoolAddress() public {
+  function test_ccipReceive_RevertWhen_InvalidSourcePoolAddress() public {
     vm.stopPrank();
     vm.startPrank(address(s_sourceRouter));
 
