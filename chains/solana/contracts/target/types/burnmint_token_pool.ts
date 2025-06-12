@@ -148,7 +148,7 @@ export type BurnmintTokenPool = {
           "isSigner": true
         },
         {
-          "name": "newMintAuthority",
+          "name": "newMultisigMintAuthority",
           "isMut": false,
           "isSigner": false
         },
@@ -781,6 +781,11 @@ export type BurnmintTokenPool = {
       "code": 6006,
       "name": "MultisigMustHaveMoreThanOneSigner",
       "msg": "Multisig must have more than one signer"
+    },
+    {
+      "code": 6007,
+      "name": "InvalidMultisigOwner",
+      "msg": "Invalid Multisig Owner"
     }
   ]
 };
@@ -935,7 +940,7 @@ export const IDL: BurnmintTokenPool = {
           "isSigner": true
         },
         {
-          "name": "newMintAuthority",
+          "name": "newMultisigMintAuthority",
           "isMut": false,
           "isSigner": false
         },
@@ -1568,6 +1573,11 @@ export const IDL: BurnmintTokenPool = {
       "code": 6006,
       "name": "MultisigMustHaveMoreThanOneSigner",
       "msg": "Multisig must have more than one signer"
+    },
+    {
+      "code": 6007,
+      "name": "InvalidMultisigOwner",
+      "msg": "Invalid Multisig Owner"
     }
   ]
 };

@@ -23,7 +23,7 @@ type TransferMintAuthorityToMultisig struct {
 	//
 	// [4] = [SIGNER] authority
 	//
-	// [5] = [] newMintAuthority
+	// [5] = [] newMultisigMintAuthority
 	//
 	// [6] = [] program
 	//
@@ -94,14 +94,14 @@ func (inst *TransferMintAuthorityToMultisig) GetAuthorityAccount() *ag_solanago.
 	return inst.AccountMetaSlice[4]
 }
 
-// SetNewMintAuthorityAccount sets the "newMintAuthority" account.
-func (inst *TransferMintAuthorityToMultisig) SetNewMintAuthorityAccount(newMintAuthority ag_solanago.PublicKey) *TransferMintAuthorityToMultisig {
-	inst.AccountMetaSlice[5] = ag_solanago.Meta(newMintAuthority)
+// SetNewMultisigMintAuthorityAccount sets the "newMultisigMintAuthority" account.
+func (inst *TransferMintAuthorityToMultisig) SetNewMultisigMintAuthorityAccount(newMultisigMintAuthority ag_solanago.PublicKey) *TransferMintAuthorityToMultisig {
+	inst.AccountMetaSlice[5] = ag_solanago.Meta(newMultisigMintAuthority)
 	return inst
 }
 
-// GetNewMintAuthorityAccount gets the "newMintAuthority" account.
-func (inst *TransferMintAuthorityToMultisig) GetNewMintAuthorityAccount() *ag_solanago.AccountMeta {
+// GetNewMultisigMintAuthorityAccount gets the "newMultisigMintAuthority" account.
+func (inst *TransferMintAuthorityToMultisig) GetNewMultisigMintAuthorityAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[5]
 }
 
@@ -163,7 +163,7 @@ func (inst *TransferMintAuthorityToMultisig) Validate() error {
 			return errors.New("accounts.Authority is not set")
 		}
 		if inst.AccountMetaSlice[5] == nil {
-			return errors.New("accounts.NewMintAuthority is not set")
+			return errors.New("accounts.NewMultisigMintAuthority is not set")
 		}
 		if inst.AccountMetaSlice[6] == nil {
 			return errors.New("accounts.Program is not set")
@@ -188,14 +188,14 @@ func (inst *TransferMintAuthorityToMultisig) EncodeToTree(parent ag_treeout.Bran
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=8]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("           state", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("            mint", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("    tokenProgram", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("      poolSigner", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("       authority", inst.AccountMetaSlice[4]))
-						accountsBranch.Child(ag_format.Meta("newMintAuthority", inst.AccountMetaSlice[5]))
-						accountsBranch.Child(ag_format.Meta("         program", inst.AccountMetaSlice[6]))
-						accountsBranch.Child(ag_format.Meta("     programData", inst.AccountMetaSlice[7]))
+						accountsBranch.Child(ag_format.Meta("                   state", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("                    mint", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("            tokenProgram", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("              poolSigner", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("               authority", inst.AccountMetaSlice[4]))
+						accountsBranch.Child(ag_format.Meta("newMultisigMintAuthority", inst.AccountMetaSlice[5]))
+						accountsBranch.Child(ag_format.Meta("                 program", inst.AccountMetaSlice[6]))
+						accountsBranch.Child(ag_format.Meta("             programData", inst.AccountMetaSlice[7]))
 					})
 				})
 		})
@@ -216,7 +216,7 @@ func NewTransferMintAuthorityToMultisigInstruction(
 	tokenProgram ag_solanago.PublicKey,
 	poolSigner ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
-	newMintAuthority ag_solanago.PublicKey,
+	newMultisigMintAuthority ag_solanago.PublicKey,
 	program ag_solanago.PublicKey,
 	programData ag_solanago.PublicKey) *TransferMintAuthorityToMultisig {
 	return NewTransferMintAuthorityToMultisigInstructionBuilder().
@@ -225,7 +225,7 @@ func NewTransferMintAuthorityToMultisigInstruction(
 		SetTokenProgramAccount(tokenProgram).
 		SetPoolSignerAccount(poolSigner).
 		SetAuthorityAccount(authority).
-		SetNewMintAuthorityAccount(newMintAuthority).
+		SetNewMultisigMintAuthorityAccount(newMultisigMintAuthority).
 		SetProgramAccount(program).
 		SetProgramDataAccount(programData)
 }

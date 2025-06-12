@@ -148,7 +148,7 @@
           "isSigner": true
         },
         {
-          "name": "newMintAuthority",
+          "name": "newMultisigMintAuthority",
           "isMut": false,
           "isSigner": false
         },
@@ -781,6 +781,11 @@
       "code": 6006,
       "name": "MultisigMustHaveMoreThanOneSigner",
       "msg": "Multisig must have more than one signer"
+    },
+    {
+      "code": 6007,
+      "name": "InvalidMultisigOwner",
+      "msg": "Invalid Multisig Owner"
     }
   ]
 }

@@ -74,10 +74,11 @@ pub mod burnmint_token_pool {
             .mint_authority
             .ok_or(CcipBnMTokenPoolError::FixedMintToken)?;
 
-        let new_mint_authority = ctx.accounts.new_mint_authority.key();
+        let new_mint_authority = ctx.accounts.new_multisig_mint_authority.key();
 
-        require!(
-            old_mint_authority != new_mint_authority,
+        require_keys_neq!(
+            old_mint_authority,
+            new_mint_authority,
             CcipBnMTokenPoolError::MintAuthorityAlreadySet
         );
 
@@ -85,21 +86,17 @@ pub mod burnmint_token_pool {
         let token_program_id = &ctx.accounts.state.config.token_program.key();
 
         if token_program_id == &spl_token_2022::ID {
-            // first check that the multisig account is owned by the correct token program
-            require!(
-                ctx.accounts.new_mint_authority.owner == &spl_token_2022::ID,
-                CcipBnMTokenPoolError::InvalidToken2022Multisig
-            );
-
             // then check that the multisig account is a valid multisig account
-            let multisig_data = &mut &ctx.accounts.new_mint_authority.data.borrow()[..];
+            let multisig_data = &mut &ctx.accounts.new_multisig_mint_authority.data.borrow()[..];
             let multisig_account: spl_token_2022::state::Multisig =
                 spl_token_2022::state::Multisig::unpack_from_slice(multisig_data)
                     .map_err(|_| CcipBnMTokenPoolError::InvalidToken2022Multisig)?;
 
             // If using a multisig, it must have more than one signer and the threshold must be valid
-            require!(
-                multisig_account.signers.len() > 1,
+            let n = multisig_account.n as usize;
+            require_gt!(
+                n,
+                1,
                 CcipBnMTokenPoolError::MultisigMustHaveMoreThanOneSigner
             );
             let m = multisig_account.m as usize;
@@ -115,21 +112,18 @@ pub mod burnmint_token_pool {
             );
         } else {
             // If the token program is not spl-token-2022, we assume it is the original SPL Token Program
-            // first check that the multisig account is owned by the correct token program
-            require!(
-                ctx.accounts.new_mint_authority.owner == &spl_token::ID,
-                CcipBnMTokenPoolError::InvalidSPLTokenMultisig
-            );
 
             // then check that the multisig account is a valid multisig account
-            let multisig_data = &mut &ctx.accounts.new_mint_authority.data.borrow()[..];
+            let multisig_data = &mut &ctx.accounts.new_multisig_mint_authority.data.borrow()[..];
             let multisig_account: spl_token::state::Multisig =
                 spl_token::state::Multisig::unpack_from_slice(multisig_data)
                     .map_err(|_| CcipBnMTokenPoolError::InvalidSPLTokenMultisig)?;
 
             // If using a multisig, it must have more than one signer and the threshold must be valid
-            require!(
-                multisig_account.signers.len() > 1,
+            let n = multisig_account.n as usize;
+            require_gt!(
+                n,
+                1,
                 CcipBnMTokenPoolError::MultisigMustHaveMoreThanOneSigner
             );
             let m = multisig_account.m as usize;

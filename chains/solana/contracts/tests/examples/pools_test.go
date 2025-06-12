@@ -439,13 +439,10 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 						require.NoError(t, err)
 
 						var invalidTokenProgram solana.PublicKey
-						var errorMessageExpected string
 						if v.tokenProgram == solana.TokenProgramID {
 							invalidTokenProgram = solana.Token2022ProgramID
-							errorMessageExpected = "InvalidSPLTokenMultisig"
 						} else {
 							invalidTokenProgram = solana.TokenProgramID
-							errorMessageExpected = "InvalidToken2022Multisig"
 						}
 						ixMsig, ixErrMsig := tokens.CreateMultisig(ctx, admin.PublicKey(), invalidTokenProgram, invalidMultisig.PublicKey(), 1, []solana.PublicKey{admin.PublicKey(), poolSigner}, solanaGoClient, config.DefaultCommitment)
 						require.NoError(t, ixErrMsig)
@@ -469,7 +466,7 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 
 						testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{
 							&tokens.TokenInstruction{Instruction: ixTransferMint, Program: poolProgram},
-						}, admin, config.DefaultCommitment, []string{errorMessageExpected})
+						}, admin, config.DefaultCommitment, []string{"InvalidMultisigOwner."})
 
 						// Check that the mint authority was not changed in the Mint Account
 						mintAccount := token.Mint{}
@@ -594,13 +591,6 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 						poolConfig, err := tokens.TokenPoolConfigAddress(mint, poolProgram)
 						require.NoError(t, err)
 
-						var errorMessageExpected string
-						if v.tokenProgram == solana.TokenProgramID {
-							errorMessageExpected = "InvalidSPLTokenMultisig"
-						} else {
-							errorMessageExpected = "InvalidToken2022Multisig"
-						}
-
 						// rolling back the change needs to be done manually, as the pool program does not support it
 						ixTransferMint, err := burnmint_tokenpool.NewTransferMintAuthorityToMultisigInstruction(
 							poolConfig,
@@ -616,7 +606,7 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 
 						testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{
 							&tokens.TokenInstruction{Instruction: ixTransferMint, Program: poolProgram},
-						}, admin, config.DefaultCommitment, []string{errorMessageExpected})
+						}, admin, config.DefaultCommitment, []string{"InvalidMultisigOwner"})
 
 						// Check that the mint authority was changed in the Mint Account
 						mintAccount := token.Mint{}
