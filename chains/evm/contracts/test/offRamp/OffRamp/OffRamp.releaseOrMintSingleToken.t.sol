@@ -42,7 +42,7 @@ contract OffRamp_releaseOrMintSingleToken is OffRampSetup {
         Pool.ReleaseOrMintInV1({
           originalSender: originalSender,
           receiver: OWNER,
-          amount: amount,
+          sourceDenominatedAmount: amount,
           localToken: s_destTokenBySourceToken[token],
           remoteChainSelector: SOURCE_CHAIN_SELECTOR_1,
           sourcePoolAddress: tokenAmount.sourcePoolAddress,
