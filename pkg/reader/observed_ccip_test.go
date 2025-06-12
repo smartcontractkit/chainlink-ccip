@@ -2,6 +2,7 @@ package reader_test
 
 import (
 	"errors"
+	"fmt"
 	"math/big"
 	"testing"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal"
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
 	mock_reader "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
@@ -220,6 +222,57 @@ func Test_CommitReportsGTETimestamp(t *testing.T) {
 			require.Equal(t, 1, count)
 		})
 	}
+}
+
+func Test_LatestMsgSeqNum(t *testing.T) {
+	ctx := tests.Context(t)
+	chainID := "2337"
+	chainSelector := cciptypes.ChainSelector(12922642891491394802)
+
+	t.Cleanup(cleanupMetrics())
+
+	origin := mock_reader.NewMockCCIPReader(t)
+	r := reader.NewObservedCCIPReader(origin, logger.Test(t), chainSelector)
+
+	seqNr := cciptypes.SeqNum(1234)
+	success := cciptypes.ChainSelector(rand.RandomInt64())
+	failure := cciptypes.ChainSelector(rand.RandomInt64())
+
+	origin.EXPECT().
+		LatestMsgSeqNum(ctx, success).
+		Return(seqNr, nil)
+
+	origin.EXPECT().
+		LatestMsgSeqNum(ctx, failure).
+		Return(seqNr, fmt.Errorf("erro"))
+
+	result, err := r.LatestMsgSeqNum(ctx, success)
+	require.NoError(t, err)
+	require.Equal(t, seqNr, result)
+
+	require.Equal(
+		t,
+		1,
+		internal.CounterFromHistogramByLabels(t, reader.PromQueryHistogram, chainID, "LatestMsgSeqNum"),
+	)
+	require.Equal(
+		t,
+		0.0,
+		testutil.ToFloat64(reader.PromDataSetSizeGauge.WithLabelValues(chainID, "CommitReportsGTETimestamp")),
+	)
+
+	_, err = r.LatestMsgSeqNum(ctx, failure)
+	require.Error(t, err)
+	require.Equal(
+		t,
+		2,
+		internal.CounterFromHistogramByLabels(t, reader.PromQueryHistogram, chainID, "LatestMsgSeqNum"),
+	)
+	require.Equal(
+		t,
+		0.0,
+		testutil.ToFloat64(reader.PromDataSetSizeGauge.WithLabelValues(chainID, "CommitReportsGTETimestamp")),
+	)
 }
 
 func cleanupMetrics() func() {
