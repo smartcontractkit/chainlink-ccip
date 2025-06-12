@@ -1,9 +1,13 @@
-use anchor_lang::prelude::*;
-use anchor_lang::solana_program::program::invoke_signed;
-use anchor_spl::token_2022::spl_token_2022::{
-    self,
-    instruction::{burn, mint_to},
+use anchor_lang::{prelude::*, solana_program::program::invoke_signed};
+use anchor_spl::{
+    token::spl_token,
+    token_2022::spl_token_2022::{
+        self,
+        instruction::{burn, mint_to},
+    },
 };
+use solana_program::program_pack::Pack;
+
 use base_token_pool::{common::*, rate_limiter::*};
 declare_id!("41FGToCmdaWa1dgZLKFAjvmx6e6AjVTX7SVRibvsMGVB");
 
@@ -12,8 +16,6 @@ use crate::context::*;
 
 #[program]
 pub mod burnmint_token_pool {
-    use anchor_spl::token_2022::spl_token_2022::state::Multisig;
-    use solana_program::program_pack::Pack;
 
     use super::*;
 
