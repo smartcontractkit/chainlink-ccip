@@ -1184,7 +1184,9 @@ export type CcipOfframp = {
         "# Arguments",
         "",
         "* `ctx`: Context containing only the offramp config.",
-        "* params:",
+        "* `stage`: Requested derivation stage. Pass \"Start\" the first time, then for each subsequent",
+        "call, pass the value returned in `response.next_stage` until empty.",
+        "* `params`:",
         "* `execute_caller`: Public key of the account that will sign the call to `ccip_execute`.",
         "* `message_accounts`: If the transaction involves messaging, the message accounts.",
         "* `source_chain_selector`: CCIP chain selector for the source chain.",
@@ -1208,6 +1210,10 @@ export type CcipOfframp = {
           "type": {
             "defined": "DeriveAccountsExecuteParams"
           }
+        },
+        {
+          "name": "stage",
+          "type": "string"
         }
       ],
       "returns": {
@@ -2791,6 +2797,11 @@ export type CcipOfframp = {
       "code": 9067,
       "name": "InvalidAccountListForPdaDerivation",
       "msg": "Invalid account list for PDA derivation"
+    },
+    {
+      "code": 9068,
+      "name": "InvalidDerivationStage",
+      "msg": "Unexpected account derivation stage"
     }
   ]
 };
@@ -3981,7 +3992,9 @@ export const IDL: CcipOfframp = {
         "# Arguments",
         "",
         "* `ctx`: Context containing only the offramp config.",
-        "* params:",
+        "* `stage`: Requested derivation stage. Pass \"Start\" the first time, then for each subsequent",
+        "call, pass the value returned in `response.next_stage` until empty.",
+        "* `params`:",
         "* `execute_caller`: Public key of the account that will sign the call to `ccip_execute`.",
         "* `message_accounts`: If the transaction involves messaging, the message accounts.",
         "* `source_chain_selector`: CCIP chain selector for the source chain.",
@@ -4005,6 +4018,10 @@ export const IDL: CcipOfframp = {
           "type": {
             "defined": "DeriveAccountsExecuteParams"
           }
+        },
+        {
+          "name": "stage",
+          "type": "string"
         }
       ],
       "returns": {
@@ -5588,6 +5605,11 @@ export const IDL: CcipOfframp = {
       "code": 9067,
       "name": "InvalidAccountListForPdaDerivation",
       "msg": "Invalid account list for PDA derivation"
+    },
+    {
+      "code": 9068,
+      "name": "InvalidDerivationStage",
+      "msg": "Unexpected account derivation stage"
     }
   ]
 };

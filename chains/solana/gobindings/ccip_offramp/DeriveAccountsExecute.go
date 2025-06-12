@@ -34,7 +34,9 @@ import (
 // # Arguments
 //
 // * `ctx`: Context containing only the offramp config.
-// * params:
+// * `stage`: Requested derivation stage. Pass "Start" the first time, then for each subsequent
+// call, pass the value returned in `response.next_stage` until empty.
+// * `params`:
 // * `execute_caller`: Public key of the account that will sign the call to `ccip_execute`.
 // * `message_accounts`: If the transaction involves messaging, the message accounts.
 // * `source_chain_selector`: CCIP chain selector for the source chain.
@@ -46,6 +48,7 @@ import (
 // * `token_receiver`: Receiver of token transfers, if any (i.e. report.message.token_receiver.)
 type DeriveAccountsExecute struct {
 	Params *DeriveAccountsExecuteParams
+	Stage  *string
 
 	// [0] = [] config
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
@@ -62,6 +65,12 @@ func NewDeriveAccountsExecuteInstructionBuilder() *DeriveAccountsExecute {
 // SetParams sets the "params" parameter.
 func (inst *DeriveAccountsExecute) SetParams(params DeriveAccountsExecuteParams) *DeriveAccountsExecute {
 	inst.Params = &params
+	return inst
+}
+
+// SetStage sets the "stage" parameter.
+func (inst *DeriveAccountsExecute) SetStage(stage string) *DeriveAccountsExecute {
+	inst.Stage = &stage
 	return inst
 }
 
@@ -99,6 +108,9 @@ func (inst *DeriveAccountsExecute) Validate() error {
 		if inst.Params == nil {
 			return errors.New("Params parameter is not set")
 		}
+		if inst.Stage == nil {
+			return errors.New("Stage parameter is not set")
+		}
 	}
 
 	// Check whether all (required) accounts are set:
@@ -119,8 +131,9 @@ func (inst *DeriveAccountsExecute) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
 						paramsBranch.Child(ag_format.Param("Params", *inst.Params))
+						paramsBranch.Child(ag_format.Param(" Stage", *inst.Stage))
 					})
 
 					// Accounts of the instruction:
@@ -137,11 +150,21 @@ func (obj DeriveAccountsExecute) MarshalWithEncoder(encoder *ag_binary.Encoder) 
 	if err != nil {
 		return err
 	}
+	// Serialize `Stage` param:
+	err = encoder.Encode(obj.Stage)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 func (obj *DeriveAccountsExecute) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `Params`:
 	err = decoder.Decode(&obj.Params)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Stage`:
+	err = decoder.Decode(&obj.Stage)
 	if err != nil {
 		return err
 	}
@@ -152,9 +175,11 @@ func (obj *DeriveAccountsExecute) UnmarshalWithDecoder(decoder *ag_binary.Decode
 func NewDeriveAccountsExecuteInstruction(
 	// Parameters:
 	params DeriveAccountsExecuteParams,
+	stage string,
 	// Accounts:
 	config ag_solanago.PublicKey) *DeriveAccountsExecute {
 	return NewDeriveAccountsExecuteInstructionBuilder().
 		SetParams(params).
+		SetStage(stage).
 		SetConfigAccount(config)
 }

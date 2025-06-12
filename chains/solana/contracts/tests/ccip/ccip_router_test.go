@@ -5182,6 +5182,112 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "CCIPMessageSent", &event, config.PrintEvents))
 			require.Equal(t, wsol.mint, event.Message.FeeToken)
 		})
+
+		t.Run("Sending a Valid CCIP Message with derived accounts emits CCIPMessageSent", func(t *testing.T) {
+			destinationChainSelector := config.EvmChainSelector
+			message := ccip_router.SVM2AnyMessage{
+				FeeToken:  wsol.mint,
+				Receiver:  validReceiverAddress[:],
+				Data:      []byte{4, 5, 6},
+				ExtraArgs: emptyGenericExtraArgsV2,
+			}
+
+			derivedAccounts, derivedLookUpTables, tokenIndices := deriveSendAccounts(ctx,
+				t,
+				user,
+				destinationChainSelector,
+				message.FeeToken,
+				[]solana.PublicKey{},
+				solanaGoClient)
+
+			builder := ccip_router.NewCcipSendInstructionBuilder().
+				SetDestChainSelector(destinationChainSelector).
+				SetMessage(message).
+				SetTokenIndexes(tokenIndices)
+			builder.AccountMetaSlice = derivedAccounts
+			instruction, err := builder.ValidateAndBuild()
+			require.NoError(t, err)
+			result := testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, derivedLookUpTables)
+			require.NotNil(t, result)
+
+			ccipMessageSentEvent := ccip.EventCCIPMessageSent{}
+			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "CCIPMessageSent", &ccipMessageSentEvent, config.PrintEvents))
+			require.Equal(t, uint64(21), ccipMessageSentEvent.DestinationChainSelector)
+			require.Equal(t, user.PublicKey(), ccipMessageSentEvent.Message.Sender)
+			require.Equal(t, validReceiverAddress[:], ccipMessageSentEvent.Message.Receiver)
+			data := [3]uint8{4, 5, 6}
+			require.Equal(t, data[:], ccipMessageSentEvent.Message.Data)
+			require.Equal(t, bin.Uint128{Lo: uint64(validFqDestChainConfig.DefaultTxGasLimit), Hi: 0}, testutils.MustDeserializeExtraArgs(t, &fee_quoter.GenericExtraArgsV2{}, ccipMessageSentEvent.Message.ExtraArgs, ccip.GenericExtraArgsV2Tag).GasLimit) // default gas limit
+			require.Equal(t, false, testutils.MustDeserializeExtraArgs(t, &fee_quoter.GenericExtraArgsV2{}, ccipMessageSentEvent.Message.ExtraArgs, ccip.GenericExtraArgsV2Tag).AllowOutOfOrderExecution)                                                    // default OOO Execution
+			require.Equal(t, uint64(15), ccipMessageSentEvent.Message.Header.SourceChainSelector)
+			require.Equal(t, uint64(21), ccipMessageSentEvent.Message.Header.DestChainSelector)
+			hash, err := ccip.HashSVMToAnyMessage(ccipMessageSentEvent.Message)
+			require.NoError(t, err)
+			require.Equal(t, hash, ccipMessageSentEvent.Message.Header.MessageId[:])
+		})
+
+		t.Run("Two tokens transferred with derived accounts", func(t *testing.T) {
+			_, initBal0, err := tokens.TokenBalance(ctx, solanaGoClient, token0.User[user.PublicKey()], config.DefaultCommitment)
+			require.NoError(t, err)
+			_, initBal1, err := tokens.TokenBalance(ctx, solanaGoClient, token1.User[user.PublicKey()], config.DefaultCommitment)
+			require.NoError(t, err)
+
+			destinationChainSelector := config.EvmChainSelector
+			message := ccip_router.SVM2AnyMessage{
+				FeeToken: wsol.mint,
+				Receiver: validReceiverAddress[:],
+				Data:     []byte{4, 5, 6},
+				TokenAmounts: []ccip_router.SVMTokenAmount{
+					{
+						Token:  token0.Mint,
+						Amount: 1,
+					},
+					{
+						Token:  token1.Mint,
+						Amount: 2,
+					},
+				},
+				ExtraArgs: emptyGenericExtraArgsV2,
+			}
+
+			userTokenAccount0, ok := token0.User[user.PublicKey()]
+			require.True(t, ok)
+			userTokenAccount1, ok := token1.User[user.PublicKey()]
+			require.True(t, ok)
+			ixApprove0, err := tokens.TokenApproveChecked(1, token0Decimals, token0.Program, userTokenAccount0, token0.Mint, config.BillingSignerPDA, user.PublicKey(), nil)
+			require.NoError(t, err)
+			ixApprove1, err := tokens.TokenApproveChecked(2, token1Decimals, token1.Program, userTokenAccount1, token1.Mint, config.BillingSignerPDA, user.PublicKey(), nil)
+			require.NoError(t, err)
+
+			derivedAccounts, derivedLookUpTables, tokenIndices := deriveSendAccounts(ctx,
+				t,
+				user,
+				destinationChainSelector,
+				message.FeeToken,
+				[]solana.PublicKey{token0.Mint, token1.Mint},
+				solanaGoClient)
+
+			lookupTables := mergeLUTs(derivedLookUpTables, ccipSendLookupTable)
+
+			builder := ccip_router.NewCcipSendInstructionBuilder().
+				SetDestChainSelector(destinationChainSelector).
+				SetMessage(message).
+				SetTokenIndexes(tokenIndices)
+			builder.AccountMetaSlice = derivedAccounts
+			instruction, err := builder.ValidateAndBuild()
+			require.NoError(t, err)
+			result := testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{ixApprove0, ixApprove1, instruction}, user, config.DefaultCommitment, lookupTables, common.AddComputeUnitLimit(800_000))
+			require.NotNil(t, result)
+
+			// check balances
+			_, currBal0, err := tokens.TokenBalance(ctx, solanaGoClient, token0.User[user.PublicKey()], config.DefaultCommitment)
+			require.NoError(t, err)
+			require.Equal(t, 1, initBal0-currBal0) // burned amount
+			_, currBal1, err := tokens.TokenBalance(ctx, solanaGoClient, token1.User[user.PublicKey()], config.DefaultCommitment)
+			require.NoError(t, err)
+			require.Equal(t, 2, initBal1-currBal1) // burned amount
+		})
+
 	})
 
 	///////////////////////////
@@ -10457,6 +10563,7 @@ func deriveExecutionAccounts(ctx context.Context,
 	solanaGoClient *rpc.Client) (accounts []*solana.AccountMeta, lookUpTables map[solana.PublicKey]solana.PublicKeySlice) {
 	derivedAccounts := []*solana.AccountMeta{}
 	askWith := []*solana.AccountMeta{}
+	stage := "Start"
 	lookUpTables = make(map[solana.PublicKey]solana.PublicKeySlice)
 	for {
 		params := ccip_offramp.DeriveAccountsExecuteParams{
@@ -10471,6 +10578,7 @@ func deriveExecutionAccounts(ctx context.Context,
 
 		deriveRaw := ccip_offramp.NewDeriveAccountsExecuteInstruction(
 			params,
+			stage,
 			config.OfframpConfigPDA,
 		)
 		deriveRaw.AccountMetaSlice = append(deriveRaw.AccountMetaSlice, askWith...)
@@ -10500,6 +10608,91 @@ func deriveExecutionAccounts(ctx context.Context,
 
 		if len(derivation.NextStage) == 0 {
 			return derivedAccounts, lookUpTables
+		} else {
+			stage = derivation.NextStage
 		}
 	}
+}
+
+func deriveSendAccounts(ctx context.Context,
+	t *testing.T,
+	transmitter solana.PrivateKey,
+	destChainSelector uint64,
+	feeTokenMint solana.PublicKey,
+	mintsOfTransferredTokens []solana.PublicKey,
+	solanaGoClient *rpc.Client) (accounts []*solana.AccountMeta, lookUpTables map[solana.PublicKey]solana.PublicKeySlice, tokenIndices []byte) {
+	derivedAccounts := []*solana.AccountMeta{}
+	askWith := []*solana.AccountMeta{}
+	stage := "Start"
+	tokenIndex := byte(0)
+	lookUpTables = make(map[solana.PublicKey]solana.PublicKeySlice)
+	for {
+		params := ccip_router.DeriveAccountsCcipSendParams{
+			DestChainSelector:        destChainSelector,
+			CcipSendCaller:           transmitter.PublicKey(),
+			FeeTokenMint:             feeTokenMint,
+			MintsOfTransferredTokens: mintsOfTransferredTokens,
+		}
+
+		fmt.Printf("Stage: %s\n", stage)
+		deriveRaw := ccip_router.NewDeriveAccountsCcipSendInstruction(
+			params,
+			stage,
+			config.RouterConfigPDA,
+		)
+		deriveRaw.AccountMetaSlice = append(deriveRaw.AccountMetaSlice, askWith...)
+		derive, err := deriveRaw.ValidateAndBuild()
+		require.NoError(t, err)
+		tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{derive}, transmitter, config.DefaultCommitment)
+		derivation, err := common.ExtractAnchorTypedReturnValue[ccip_router.DeriveAccountsResponse](ctx, tx.Meta.LogMessages, config.CcipRouterProgram.String())
+		require.NoError(t, err)
+
+		if derivation.CurrentStage == "TokenTransferAccounts" {
+			tokenIndices = append(tokenIndices, tokenIndex)
+			tokenIndex += byte(len(derivation.AccountsToSave))
+		}
+
+		for _, meta := range derivation.AccountsToSave {
+			derivedAccounts = append(derivedAccounts, &solana.AccountMeta{
+				PublicKey:  meta.Pubkey,
+				IsWritable: meta.IsWritable,
+				IsSigner:   meta.IsSigner,
+			})
+		}
+		askWith = []*solana.AccountMeta{}
+		for _, meta := range derivation.AskAgainWith {
+			askWith = append(askWith, &solana.AccountMeta{
+				PublicKey:  meta.Pubkey,
+				IsWritable: meta.IsWritable,
+				IsSigner:   meta.IsSigner,
+			})
+		}
+		for _, table := range derivation.LookUpTablesToSave {
+			lookUpTables[table.Address] = table.Accounts
+		}
+
+		if len(derivation.NextStage) == 0 {
+			return derivedAccounts, lookUpTables, tokenIndices
+		} else {
+			stage = derivation.NextStage
+		}
+	}
+}
+
+func mergeLUTs(a, b map[solana.PublicKey]solana.PublicKeySlice) map[solana.PublicKey]solana.PublicKeySlice {
+	result := make(map[solana.PublicKey]solana.PublicKeySlice)
+
+	for k, v := range a {
+		result[k] = append(solana.PublicKeySlice(nil), v...)
+	}
+
+	for k, v := range b {
+		if existing, ok := result[k]; ok {
+			result[k] = append(existing, v...)
+		} else {
+			result[k] = append(solana.PublicKeySlice(nil), v...)
+		}
+	}
+
+	return result
 }

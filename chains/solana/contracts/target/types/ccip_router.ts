@@ -1166,6 +1166,31 @@ export type CcipRouter = {
       "returns": {
         "defined": "GetFeeResult"
       }
+    },
+    {
+      "name": "deriveAccountsCcipSend",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "params",
+          "type": {
+            "defined": "DeriveAccountsCcipSendParams"
+          }
+        },
+        {
+          "name": "stage",
+          "type": "string"
+        }
+      ],
+      "returns": {
+        "defined": "DeriveAccountsResponse"
+      }
     }
   ],
   "accounts": [
@@ -1512,6 +1537,149 @@ export type CcipRouter = {
           {
             "name": "allowListEnabled",
             "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DeriveAccountsResponse",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "askAgainWith",
+            "docs": [
+              "If this vector is not empty, you must call the `derive_` method again including",
+              "exactly these accounts as the `remaining_accounts` field."
+            ],
+            "type": {
+              "vec": {
+                "defined": "CcipAccountMeta"
+              }
+            }
+          },
+          {
+            "name": "accountsToSave",
+            "docs": [
+              "You must append these accounts at the end of a separate list. When `next_stage`",
+              "is finally empty, this separate list will contain all the accounts to use for the",
+              "instruction of interest."
+            ],
+            "type": {
+              "vec": {
+                "defined": "CcipAccountMeta"
+              }
+            }
+          },
+          {
+            "name": "lookUpTablesToSave",
+            "docs": [
+              "Append these look up tables at the end of a list. It will contain all LUTs",
+              "that the instruction of interest can use."
+            ],
+            "type": {
+              "vec": {
+                "defined": "DerivedLookupTable"
+              }
+            }
+          },
+          {
+            "name": "currentStage",
+            "docs": [
+              "Identifies the derivation stage."
+            ],
+            "type": "string"
+          },
+          {
+            "name": "nextStage",
+            "docs": [
+              "Identifies the next derivation stage. If empty, the derivation is complete."
+            ],
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DerivedLookupTable",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "address",
+            "type": "publicKey"
+          },
+          {
+            "name": "accounts",
+            "type": {
+              "vec": "publicKey"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "CcipAccountMeta",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pubkey",
+            "type": "publicKey"
+          },
+          {
+            "name": "isSigner",
+            "type": "bool"
+          },
+          {
+            "name": "isWritable",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DeriveAccountsCcipSendParams",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "destChainSelector",
+            "type": "u64"
+          },
+          {
+            "name": "ccipSendCaller",
+            "type": "publicKey"
+          },
+          {
+            "name": "feeTokenMint",
+            "type": "publicKey"
+          },
+          {
+            "name": "mintsOfTransferredTokens",
+            "type": {
+              "vec": "publicKey"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "DeriveAccountsCcipSendStage",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Start"
+          },
+          {
+            "name": "FinishMainAccountList"
+          },
+          {
+            "name": "RetrieveTokenLUTs"
+          },
+          {
+            "name": "TokenTransferAccounts"
           }
         ]
       }
@@ -1966,6 +2134,16 @@ export type CcipRouter = {
       "code": 7025,
       "name": "InvalidCcipVersionRollback",
       "msg": "Invalid rollback attempt on the CCIP version of the onramp to the destination chain"
+    },
+    {
+      "code": 7026,
+      "name": "InvalidAccountListForPdaDerivation",
+      "msg": "Invalid account list for PDA derivation"
+    },
+    {
+      "code": 7027,
+      "name": "InvalidDerivationStage",
+      "msg": "Unexpected account derivation stage"
     }
   ]
 };
@@ -3138,6 +3316,31 @@ export const IDL: CcipRouter = {
       "returns": {
         "defined": "GetFeeResult"
       }
+    },
+    {
+      "name": "deriveAccountsCcipSend",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "params",
+          "type": {
+            "defined": "DeriveAccountsCcipSendParams"
+          }
+        },
+        {
+          "name": "stage",
+          "type": "string"
+        }
+      ],
+      "returns": {
+        "defined": "DeriveAccountsResponse"
+      }
     }
   ],
   "accounts": [
@@ -3484,6 +3687,149 @@ export const IDL: CcipRouter = {
           {
             "name": "allowListEnabled",
             "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DeriveAccountsResponse",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "askAgainWith",
+            "docs": [
+              "If this vector is not empty, you must call the `derive_` method again including",
+              "exactly these accounts as the `remaining_accounts` field."
+            ],
+            "type": {
+              "vec": {
+                "defined": "CcipAccountMeta"
+              }
+            }
+          },
+          {
+            "name": "accountsToSave",
+            "docs": [
+              "You must append these accounts at the end of a separate list. When `next_stage`",
+              "is finally empty, this separate list will contain all the accounts to use for the",
+              "instruction of interest."
+            ],
+            "type": {
+              "vec": {
+                "defined": "CcipAccountMeta"
+              }
+            }
+          },
+          {
+            "name": "lookUpTablesToSave",
+            "docs": [
+              "Append these look up tables at the end of a list. It will contain all LUTs",
+              "that the instruction of interest can use."
+            ],
+            "type": {
+              "vec": {
+                "defined": "DerivedLookupTable"
+              }
+            }
+          },
+          {
+            "name": "currentStage",
+            "docs": [
+              "Identifies the derivation stage."
+            ],
+            "type": "string"
+          },
+          {
+            "name": "nextStage",
+            "docs": [
+              "Identifies the next derivation stage. If empty, the derivation is complete."
+            ],
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DerivedLookupTable",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "address",
+            "type": "publicKey"
+          },
+          {
+            "name": "accounts",
+            "type": {
+              "vec": "publicKey"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "CcipAccountMeta",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pubkey",
+            "type": "publicKey"
+          },
+          {
+            "name": "isSigner",
+            "type": "bool"
+          },
+          {
+            "name": "isWritable",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DeriveAccountsCcipSendParams",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "destChainSelector",
+            "type": "u64"
+          },
+          {
+            "name": "ccipSendCaller",
+            "type": "publicKey"
+          },
+          {
+            "name": "feeTokenMint",
+            "type": "publicKey"
+          },
+          {
+            "name": "mintsOfTransferredTokens",
+            "type": {
+              "vec": "publicKey"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "DeriveAccountsCcipSendStage",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Start"
+          },
+          {
+            "name": "FinishMainAccountList"
+          },
+          {
+            "name": "RetrieveTokenLUTs"
+          },
+          {
+            "name": "TokenTransferAccounts"
           }
         ]
       }
@@ -3938,6 +4284,16 @@ export const IDL: CcipRouter = {
       "code": 7025,
       "name": "InvalidCcipVersionRollback",
       "msg": "Invalid rollback attempt on the CCIP version of the onramp to the destination chain"
+    },
+    {
+      "code": 7026,
+      "name": "InvalidAccountListForPdaDerivation",
+      "msg": "Invalid account list for PDA derivation"
+    },
+    {
+      "code": 7027,
+      "name": "InvalidDerivationStage",
+      "msg": "Unexpected account derivation stage"
     }
   ]
 };

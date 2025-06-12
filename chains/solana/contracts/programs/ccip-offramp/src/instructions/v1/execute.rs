@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use anchor_lang::prelude::*;
 use ccip_common::seed;
 use ccip_common::v1::{validate_and_parse_token_accounts, TokenAccounts, MIN_TOKEN_POOL_ACCOUNTS};
@@ -12,8 +14,8 @@ use crate::messages::{
     Any2SVMRampMessage, ExecutionReportSingleChain, RampMessageHeader, SVMTokenAmount,
 };
 use crate::state::{
-    CcipAccountMeta, CommitReport, DeriveAccountsExecuteParams, DeriveAccountsResponse,
-    ExecutionReportBuffer, MessageExecutionState, OnRampAddress, SourceChain, ToMeta,
+    CommitReport, DeriveAccountsExecuteParams, DeriveAccountsResponse, ExecutionReportBuffer,
+    MessageExecutionState, OnRampAddress, SourceChain,
 };
 use crate::CcipOfframpError;
 
@@ -143,11 +145,9 @@ impl Execute for Impl {
             buffer_id,
             token_receiver,
         }: DeriveAccountsExecuteParams,
+        stage: String,
     ) -> Result<DeriveAccountsResponse> {
-        let stage = derive::DeriveExecuteAccountsStage::infer_from(
-            ctx.remaining_accounts,
-            source_chain_selector,
-        );
+        let stage = derive::DeriveExecuteAccountsStage::from_str(stage.as_str())?;
 
         match stage {
             derive::DeriveExecuteAccountsStage::GatherBasicInfo => {
@@ -183,15 +183,6 @@ impl Execute for Impl {
 /////////////
 // Helpers //
 /////////////
-
-// Local helper to find a readonly CCIP meta for a given seed + program_id combo.
-// Short name for compactness.
-fn find(seeds: &[&[u8]], program_id: Pubkey) -> CcipAccountMeta {
-    Pubkey::find_program_address(seeds, &program_id)
-        .0
-        .readonly()
-}
-
 fn ocr3_transmit_report<'info>(
     ctx: &Context<'_, '_, 'info, 'info, ExecuteReportContext<'info>>,
     execution_report: &ExecutionReportSingleChain,

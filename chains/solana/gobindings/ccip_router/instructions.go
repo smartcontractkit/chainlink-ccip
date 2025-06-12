@@ -299,6 +299,8 @@ var (
 	// * `dest_chain_selector` - The chain selector for the destination chain.
 	// * `message` - The message to be sent. The size limit of data is 256 bytes.
 	Instruction_GetFee = ag_binary.TypeID([8]byte{115, 195, 235, 161, 25, 219, 60, 29})
+
+	Instruction_DeriveAccountsCcipSend = ag_binary.TypeID([8]byte{251, 176, 50, 26, 193, 231, 156, 242})
 )
 
 // InstructionIDToName returns the name of the instruction given its ID.
@@ -354,6 +356,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "CcipSend"
 	case Instruction_GetFee:
 		return "GetFee"
+	case Instruction_DeriveAccountsCcipSend:
+		return "DeriveAccountsCcipSend"
 	default:
 		return ""
 	}
@@ -448,6 +452,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"get_fee", (*GetFee)(nil),
+		},
+		{
+			"derive_accounts_ccip_send", (*DeriveAccountsCcipSend)(nil),
 		},
 	},
 )

@@ -72,6 +72,7 @@ pub trait Execute {
         &self,
         ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
         params: DeriveAccountsExecuteParams,
+        stage: String,
     ) -> Result<DeriveAccountsResponse>;
 }
 

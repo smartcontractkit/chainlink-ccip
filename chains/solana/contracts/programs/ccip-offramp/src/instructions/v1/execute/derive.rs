@@ -1,4 +1,3 @@
-use super::find;
 use crate::{
     context::ViewConfigOnly,
     state::{
@@ -14,7 +13,18 @@ use ccip_common::{
     CommonCcipError,
 };
 use solana_program::{address_lookup_table::state::AddressLookupTable, sysvar::instructions};
-use std::fmt::{self, Display, Formatter};
+use std::{
+    fmt::{self, Display, Formatter},
+    str::FromStr,
+};
+
+// Local helper to find a readonly CCIP meta for a given seed + program_id combo.
+// Short name for compactness.
+fn find(seeds: &[&[u8]], program_id: Pubkey) -> CcipAccountMeta {
+    Pubkey::find_program_address(seeds, &program_id)
+        .0
+        .readonly()
+}
 
 #[derive(Copy, Clone, Debug)]
 pub enum DeriveExecuteAccountsStage {
@@ -36,27 +46,16 @@ impl Display for DeriveExecuteAccountsStage {
     }
 }
 
-impl DeriveExecuteAccountsStage {
-    pub fn infer_from(remaining_accounts: &[AccountInfo<'_>], source_chain_selector: u64) -> Self {
-        let source_chain = find(
-            &[
-                seed::SOURCE_CHAIN,
-                source_chain_selector.to_le_bytes().as_slice(),
-            ],
-            crate::ID,
-        )
-        .pubkey;
-        let reference_addresses = find(&[seed::REFERENCE_ADDRESSES], crate::ID).pubkey;
+impl FromStr for DeriveExecuteAccountsStage {
+    type Err = CcipOfframpError;
 
-        // Each stage receives a different first account, so we use that information to infer
-        // what stage we're in, without requiring the user to declare that explicitly.
-        match remaining_accounts.first() {
-            None => DeriveExecuteAccountsStage::GatherBasicInfo,
-            Some(a) if a.key == &source_chain => DeriveExecuteAccountsStage::BuildMainAccountList,
-            Some(a) if a.key == &reference_addresses => {
-                DeriveExecuteAccountsStage::TokenTransferAccounts
-            }
-            Some(_) => DeriveExecuteAccountsStage::RetrieveTokenLUTs,
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "start" | "gatherbasicinfo" => Ok(Self::GatherBasicInfo),
+            "buildmainaccountlist" => Ok(Self::BuildMainAccountList),
+            "retrievetokenlookuptables" => Ok(Self::RetrieveTokenLUTs),
+            "tokentransferaccounts" => Ok(Self::TokenTransferAccounts),
+            _ => Err(CcipOfframpError::InvalidDerivationStage),
         }
     }
 }
@@ -201,8 +200,8 @@ pub fn derive_execute_accounts_additional_tokens<'info>(
 ) -> Result<DeriveAccountsResponse> {
     // The reference addresses account and at least one LUT.
     require_gte!(
-        2,
         ctx.remaining_accounts.len(),
+        2,
         CcipOfframpError::InvalidAccountListForPdaDerivation
     );
 
