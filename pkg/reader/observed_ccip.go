@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+
 	sel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -19,14 +21,14 @@ const (
 )
 
 var (
-	PromChainFeeGauge = prometheus.NewGaugeVec(
+	PromChainFeeGauge = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "ccip_reader_chain_fee_components",
 			Help: "This metric tracks the chain fee components for a given chain",
 		},
 		[]string{"chainID", "feeType"},
 	)
-	PromQueryHistogram = prometheus.NewHistogramVec(
+	PromQueryHistogram = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name: "ccip_reader_query_duration",
 			Help: "This metric tracks the duration of queries made by the CCIP reader",
@@ -46,7 +48,7 @@ var (
 		},
 		[]string{"chainID", "query"},
 	)
-	PromDataSetSizeGauge = prometheus.NewGaugeVec(
+	PromDataSetSizeGauge = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "ccip_reader_data_set_size",
 			Help: "This metric tracks the size of the data returned by the CCIP reader queries",
