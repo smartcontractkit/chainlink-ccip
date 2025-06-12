@@ -108,6 +108,7 @@ compileContract test/helpers/receivers/LogMessageDataReceiver
 compileContract test/helpers/MultiOCR3Helper
 compileContract test/mocks/MockE2EUSDCTokenMessenger
 compileContract test/mocks/MockE2EUSDCTransmitter
+compileContract test/mocks/MockE2ELBTCTokenPool
 compileContract test/helpers/CCIPReaderTester
 # Offchain test encoding utils
 compileContract test/helpers/EncodingUtils
