@@ -1,6 +1,6 @@
 use anchor_lang::{prelude::*, solana_program::program::invoke_signed};
 use anchor_spl::{
-    token::spl_token,
+    token::spl_token::{self, instruction::MAX_SIGNERS},
     token_2022::spl_token_2022::{
         self,
         instruction::{burn, mint_to},
@@ -85,59 +85,39 @@ pub mod burnmint_token_pool {
         // The new Mint Authority must be a multisig account that contains the pool signer as one of its signers.
         let token_program_id = &ctx.accounts.state.config.token_program.key();
 
-        if token_program_id == &spl_token_2022::ID {
-            // then check that the multisig account is a valid multisig account
-            let multisig_data = &mut &ctx.accounts.new_multisig_mint_authority.data.borrow()[..];
-            let multisig_account: spl_token_2022::state::Multisig =
-                spl_token_2022::state::Multisig::unpack_from_slice(multisig_data)
-                    .map_err(|_| CcipBnMTokenPoolError::InvalidToken2022Multisig)?;
+        let multisig_data = &mut &ctx.accounts.new_multisig_mint_authority.data.borrow()[..];
+        let multisig_account: MultisigAccount;
 
-            // If using a multisig, it must have more than one signer and the threshold must be valid
-            let n = multisig_account.n as usize;
-            require_gt!(
-                n,
-                1,
-                CcipBnMTokenPoolError::MultisigMustHaveMoreThanOneSigner
-            );
-            let m = multisig_account.m as usize;
-            // The Pool signer must be m times a signer
-            require!(
-                multisig_account
-                    .signers
-                    .iter()
-                    .filter(|s| *s == &ctx.accounts.pool_signer.key())
-                    .count()
-                    == m,
-                CcipBnMTokenPoolError::PoolSignerNotInMultisig
-            );
+        // then check that the multisig account is a valid multisig account
+        if token_program_id == &spl_token_2022::ID {
+            let multisig_data = spl_token_2022::state::Multisig::unpack_from_slice(multisig_data)
+                .map_err(|_| CcipBnMTokenPoolError::InvalidToken2022Multisig)?;
+            multisig_account = multisig_data.into();
         } else {
             // If the token program is not spl-token-2022, we assume it is the original SPL Token Program
-
-            // then check that the multisig account is a valid multisig account
-            let multisig_data = &mut &ctx.accounts.new_multisig_mint_authority.data.borrow()[..];
-            let multisig_account: spl_token::state::Multisig =
-                spl_token::state::Multisig::unpack_from_slice(multisig_data)
-                    .map_err(|_| CcipBnMTokenPoolError::InvalidSPLTokenMultisig)?;
-
-            // If using a multisig, it must have more than one signer and the threshold must be valid
-            let n = multisig_account.n as usize;
-            require_gt!(
-                n,
-                1,
-                CcipBnMTokenPoolError::MultisigMustHaveMoreThanOneSigner
-            );
-            let m = multisig_account.m as usize;
-            // The Pool signer must be m times a signer
-            require!(
-                multisig_account
-                    .signers
-                    .iter()
-                    .filter(|s| *s == &ctx.accounts.pool_signer.key())
-                    .count()
-                    >= m,
-                CcipBnMTokenPoolError::PoolSignerNotInMultisig
-            );
+            let multisig_data = spl_token::state::Multisig::unpack_from_slice(multisig_data)
+                .map_err(|_| CcipBnMTokenPoolError::InvalidSPLTokenMultisig)?;
+            multisig_account = multisig_data.into();
         }
+
+        // If using a multisig, it must have more than one signer and the threshold must be valid
+        let n = multisig_account.n as usize;
+        require_gt!(
+            n,
+            1,
+            CcipBnMTokenPoolError::MultisigMustHaveMoreThanOneSigner
+        );
+        let m = multisig_account.m as usize;
+        // The Pool signer must be m times a signer
+        require!(
+            multisig_account
+                .signers
+                .iter()
+                .filter(|s| *s == &ctx.accounts.pool_signer.key())
+                .count()
+                >= m,
+            CcipBnMTokenPoolError::PoolSignerNotInMultisig
+        );
 
         // Transfer the mint authority to the new mint authority using the corresponding Token Program. It can be token 22 or token SPL
         let ix = spl_token_2022::instruction::set_authority(
@@ -432,6 +412,40 @@ pub mod burnmint_token_pool {
                 abi_encoded_decimals
             },
         })
+    }
+}
+
+// Same interface for Multisig for both the Token SPL and Token 2022 programs.
+pub struct MultisigAccount {
+    /// Number of signers required
+    pub m: u8,
+    /// Number of valid signers
+    pub n: u8,
+    /// Is `true` if this structure has been initialized
+    pub is_initialized: bool,
+    /// Signer public keys
+    pub signers: [Pubkey; MAX_SIGNERS],
+}
+
+impl From<spl_token_2022::state::Multisig> for MultisigAccount {
+    fn from(multisig: spl_token_2022::state::Multisig) -> Self {
+        Self {
+            m: multisig.m,
+            n: multisig.n,
+            is_initialized: multisig.is_initialized,
+            signers: multisig.signers,
+        }
+    }
+}
+
+impl From<spl_token::state::Multisig> for MultisigAccount {
+    fn from(multisig: spl_token::state::Multisig) -> Self {
+        Self {
+            m: multisig.m,
+            n: multisig.n,
+            is_initialized: multisig.is_initialized,
+            signers: multisig.signers,
+        }
     }
 }
 

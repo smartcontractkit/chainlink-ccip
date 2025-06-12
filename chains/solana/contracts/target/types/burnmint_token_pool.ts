@@ -785,7 +785,7 @@ export type BurnmintTokenPool = {
     {
       "code": 6007,
       "name": "InvalidMultisigOwner",
-      "msg": "Invalid Multisig Owner"
+      "msg": "Multisig Owner must match Token Program ID"
     }
   ]
 };
@@ -1577,7 +1577,7 @@ export const IDL: BurnmintTokenPool = {
     {
       "code": 6007,
       "name": "InvalidMultisigOwner",
-      "msg": "Invalid Multisig Owner"
+      "msg": "Multisig Owner must match Token Program ID"
     }
   ]
 };
