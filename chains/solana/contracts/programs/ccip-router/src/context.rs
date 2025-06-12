@@ -509,3 +509,13 @@ pub struct GetFee<'info> {
     // - First all BillingTokenConfigWrapper accounts (one per token transferred)
     // - Then all PerChainPerTokenConfig accounts (one per token transferred)
 }
+
+#[derive(Accounts)]
+pub struct ViewConfigOnly<'info> {
+    #[account(
+        seeds = [seed::CONFIG],
+        bump,
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
+    )]
+    pub config: Account<'info, Config>,
+}

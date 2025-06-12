@@ -1,8 +1,9 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::spl_token;
 use anchor_spl::token_interface;
+use ccip_common::auto_derive::{DeriveAccountsCcipSendParams, DeriveAccountsResponse};
 
-use crate::context::ANCHOR_DISCRIMINATOR;
+use crate::context::{ViewConfigOnly, ANCHOR_DISCRIMINATOR};
 use crate::events::on_ramp as events;
 use crate::messages::GetFeeResult;
 
@@ -310,6 +311,14 @@ impl OnRamp for Impl {
             juels: fq_result.juels,
             token: fq_result.token,
         })
+    }
+
+    fn derive_accounts_ccip_send<'info>(
+        &self,
+        ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
+        params: DeriveAccountsCcipSendParams,
+    ) -> Result<DeriveAccountsResponse> {
+        todo!()
     }
 }
 
