@@ -298,8 +298,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     uint32 gasLimitOverride = report.gasOverride == 0 ? report.message.gasLimit : report.gasOverride;
 
     _setExecutionState(sourceChainSelector, message.header.sequenceNumber, Internal.MessageExecutionState.IN_PROGRESS);
-    (Internal.MessageExecutionState newState, bytes memory returnData) =
-      _trialExecute(message, report.tokenProofs, gasLimitOverride);
+    (Internal.MessageExecutionState newState, bytes memory returnData) = _trialExecute(message, gasLimitOverride);
     _setExecutionState(sourceChainSelector, message.header.sequenceNumber, newState);
 
     // Since it's hard to estimate whether manual execution will succeed, we revert the entire transaction if it
@@ -345,16 +344,14 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
 
   /// @notice Try executing a message.
   /// @param message Internal.Any2EVMMultiProofMessage memory message.
-  /// @param offchainTokenData Data provided by the DON for token transfers.
   /// @return executionState The new state of the message, being either SUCCESS or FAILURE.
   /// @return errData Revert data in bytes if CCIP receiver reverted during execution.
   function _trialExecute(
     Internal.Any2EVMMultiProofMessage memory message,
-    bytes[][] memory offchainTokenData,
     uint32 gasLimitOverride
   ) internal returns (Internal.MessageExecutionState executionState, bytes memory) {
     (bool success, bytes memory returnData,) = CallWithExactGas._callWithExactGasSafeReturnData(
-      abi.encodeCall(this.executeSingleMessage, (message, offchainTokenData)),
+      abi.encodeCall(this.executeSingleMessage, (message)),
       address(this),
       gasLimitOverride,
       i_gasForCallExactCheck,
@@ -391,22 +388,19 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
 
   /// @notice Executes a single message.
   /// @param message The message that will be executed.
-  /// @param offchainTokenData Token transfer data to be passed to TokenPool.
   /// @dev We make this external and callable by the contract itself, in order to try/catch
   /// its execution and enforce atomicity among successful message processing and token transfer.
   /// @dev We use ERC-165 to check for the ccipReceive interface to permit sending tokens to contracts, for example
   /// smart contract wallets, without an associated message.
   function executeSingleMessage(
-    Internal.Any2EVMMultiProofMessage memory message,
-    bytes[][] calldata offchainTokenData
+    Internal.Any2EVMMultiProofMessage memory message
   ) external {
     if (msg.sender != address(this)) revert CanOnlySelfCall();
 
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
     if (message.tokenAmounts.length > 0) {
-      destTokenAmounts = _releaseOrMintTokens(
-        message.tokenAmounts, message.sender, message.receiver, message.header.sourceChainSelector, offchainTokenData
-      );
+      destTokenAmounts =
+        _releaseOrMintTokens(message.tokenAmounts, message.sender, message.receiver, message.header.sourceChainSelector);
     }
 
     Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
@@ -464,14 +458,12 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// @param originalSender The message sender on the source chain.
   /// @param receiver The address that will receive the tokens.
   /// @param sourceChainSelector The remote source chain selector
-  /// @param offchainTokenData Data fetched offchain by the DON.
   /// @return destTokenAmount local token address with amount.
   function _releaseOrMintSingleToken(
     Internal.Any2EVMMultiProofTokenTransfer memory sourceTokenAmount,
     bytes memory originalSender,
     address receiver,
-    uint64 sourceChainSelector,
-    bytes[] memory offchainTokenData
+    uint64 sourceChainSelector
   ) internal returns (Client.EVMTokenAmount memory destTokenAmount) {
     address localToken = sourceTokenAmount.destTokenAddress;
     // We check with the token admin registry if the token has a pool on this chain.
@@ -480,44 +472,54 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     // This is done to prevent a pool from reverting the entire transaction if it doesn't support the interface.
     // The call gets a max or 30k gas per instance, of which there are three. This means offchain gas estimations should
     // account for 90k gas overhead due to the interface check.
-    if (localPoolAddress == address(0) || !localPoolAddress._supportsInterfaceReverting(Pool.CCIP_POOL_V1)) {
+    if (localPoolAddress == address(0)) {
       revert NotACompatiblePool(localPoolAddress);
     }
 
-    // We retrieve the local token balance of the receiver before the pool call.
-    uint256 balancePre = _getBalanceOfReceiver(receiver, localToken);
-
-    Pool.ReleaseOrMintOutV1 memory returnData;
-    try IPoolV1(localPoolAddress).releaseOrMint(
-      Pool.ReleaseOrMintInV1({
-        originalSender: originalSender,
-        receiver: receiver,
-        amount: sourceTokenAmount.amount,
-        localToken: localToken,
-        remoteChainSelector: sourceChainSelector,
-        sourcePoolAddress: sourceTokenAmount.sourcePoolAddress,
-        sourcePoolData: sourceTokenAmount.extraData,
-        // TODO write IPoolV2
-        offchainTokenData: offchainTokenData[0]
-      })
-    ) returns (Pool.ReleaseOrMintOutV1 memory result) {
-      returnData = result;
-    } catch (bytes memory err) {
-      revert TokenHandlingError(localToken, err);
+    if (localPoolAddress._supportsInterfaceReverting(Pool.CCIP_POOL_V2)) {
+      // Revert for now
+      // TODO write IPoolV2
+      revert NotACompatiblePool(localPoolAddress);
     }
+    if (localPoolAddress._supportsInterfaceReverting(Pool.CCIP_POOL_V1)) {
+      // We retrieve the local token balance of the receiver before the pool call.
+      uint256 balancePre = _getBalanceOfReceiver(receiver, localToken);
 
-    // We don't need to do balance checks if the pool is the receiver, as they would always fail in the case
-    // of a lockRelease pool.
-    if (receiver != localPoolAddress) {
-      uint256 balancePost = _getBalanceOfReceiver(receiver, localToken);
-
-      // First we check if the subtraction would result in an underflow to ensure we revert with a clear error.
-      if (balancePost < balancePre || balancePost - balancePre != returnData.destinationAmount) {
-        revert ReleaseOrMintBalanceMismatch(returnData.destinationAmount, balancePre, balancePost);
+      Pool.ReleaseOrMintOutV1 memory returnData;
+      try IPoolV1(localPoolAddress).releaseOrMint(
+        Pool.ReleaseOrMintInV1({
+          originalSender: originalSender,
+          receiver: receiver,
+          amount: sourceTokenAmount.amount,
+          localToken: localToken,
+          remoteChainSelector: sourceChainSelector,
+          sourcePoolAddress: sourceTokenAmount.sourcePoolAddress,
+          sourcePoolData: sourceTokenAmount.extraData,
+          // All use cases that use offchain token data in IPoolV1 have to upgrade to the modular security interface.
+          offchainTokenData: ""
+        })
+      ) returns (Pool.ReleaseOrMintOutV1 memory result) {
+        returnData = result;
+      } catch (bytes memory err) {
+        revert TokenHandlingError(localToken, err);
       }
+
+      // We don't need to do balance checks if the pool is the receiver, as they would always fail in the case
+      // of a lockRelease pool.
+      if (receiver != localPoolAddress) {
+        uint256 balancePost = _getBalanceOfReceiver(receiver, localToken);
+
+        // First we check if the subtraction would result in an underflow to ensure we revert with a clear error.
+        if (balancePost < balancePre || balancePost - balancePre != returnData.destinationAmount) {
+          revert ReleaseOrMintBalanceMismatch(returnData.destinationAmount, balancePre, balancePost);
+        }
+      }
+
+      return Client.EVMTokenAmount({token: localToken, amount: returnData.destinationAmount});
     }
 
-    return Client.EVMTokenAmount({token: localToken, amount: returnData.destinationAmount});
+    // If the pool does not support the v1 interface, we revert.
+    revert NotACompatiblePool(localPoolAddress);
   }
 
   /// @notice Retrieves the balance of a receiver address for a given token.
@@ -539,20 +541,17 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// @param originalSender The message sender on the source chain.
   /// @param receiver The address that will receive the tokens.
   /// @param sourceChainSelector The remote source chain selector.
-  /// @param offchainTokenData Array of token data fetched offchain by the DON.
   /// @return destTokenAmounts local token addresses with amounts.
   function _releaseOrMintTokens(
     Internal.Any2EVMMultiProofTokenTransfer[] memory sourceTokenAmounts,
     bytes memory originalSender,
     address receiver,
-    uint64 sourceChainSelector,
-    bytes[][] calldata offchainTokenData
+    uint64 sourceChainSelector
   ) internal returns (Client.EVMTokenAmount[] memory destTokenAmounts) {
     destTokenAmounts = new Client.EVMTokenAmount[](sourceTokenAmounts.length);
     for (uint256 i = 0; i < sourceTokenAmounts.length; ++i) {
-      destTokenAmounts[i] = _releaseOrMintSingleToken(
-        sourceTokenAmounts[i], originalSender, receiver, sourceChainSelector, offchainTokenData[i]
-      );
+      destTokenAmounts[i] =
+        _releaseOrMintSingleToken(sourceTokenAmounts[i], originalSender, receiver, sourceChainSelector);
     }
 
     return destTokenAmounts;
