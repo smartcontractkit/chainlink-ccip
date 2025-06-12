@@ -1654,6 +1654,7 @@ func TestCCIPChainReader_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 
 		mockCache.On("GetChainConfig", mock.Anything, sourceChain1).Return(sourceChain1Config, nil)
 		mockCache.On("GetChainConfig", mock.Anything, sourceChain2).Return(sourceChain2Config, nil)
+		mockCache.On("Start", mock.Anything).Return(nil)
 
 		// Setup readers with price responses
 		sourceReader1 := reader_mocks.NewMockExtended(t)
@@ -1666,7 +1667,7 @@ func TestCCIPChainReader_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 			consts.ContractNameFeeQuoter,
 			consts.MethodNameFeeQuoterGetTokenPrice,
 			primitives.Unconfirmed,
-			map[string]interface{}{"token": wrappedNative1},
+			map[string]interface{}{"token": cciptypes.UnknownAddress(wrappedNative1)},
 			mock.Anything,
 		).Run(
 			func(
@@ -1689,7 +1690,7 @@ func TestCCIPChainReader_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 			consts.ContractNameFeeQuoter,
 			consts.MethodNameFeeQuoterGetTokenPrice,
 			primitives.Unconfirmed,
-			map[string]interface{}{"token": wrappedNative2},
+			map[string]interface{}{"token": cciptypes.UnknownAddress(wrappedNative2)},
 			mock.Anything,
 		).Run(
 			func(
@@ -1702,14 +1703,29 @@ func TestCCIPChainReader_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 				*pricePtr = price2
 			}).Return(nil)
 
-		ccipReader := &ccipChainReader{
-			destChain: destChain,
-			contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
+		cw := writer_mocks.NewMockContractWriter(t)
+		contractWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
+		contractWriters[sourceChain1] = cw
+		contractWriters[sourceChain2] = cw
+
+		ccipReader, err := newCCIPChainReaderWithConfigPollerInternal(
+			tests.Context(t),
+			logger.Test(t),
+			map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
 				sourceChain1: sourceReader1,
 				sourceChain2: sourceReader2,
 			},
-			configPoller: mockCache,
-			lggr:         logger.Test(t),
+			contractWriters,
+			destChain,
+			[]byte{0x3}, // Mock offramp address
+			internal.NewMockAddressCodecHex(t),
+			mockCache,
+		)
+		require.NoError(t, err)
+
+		ccipReader.contractReaders = map[cciptypes.ChainSelector]contractreader.Extended{
+			sourceChain1: sourceReader1,
+			sourceChain2: sourceReader2,
 		}
 
 		prices := ccipReader.GetWrappedNativeTokenPriceUSD(ctx, []cciptypes.ChainSelector{sourceChain1, sourceChain2})
@@ -1728,6 +1744,7 @@ func TestCCIPChainReader_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 				WrappedNativeAddress: wrappedNative2,
 			},
 		}, nil)
+		mockCache.On("Start", mock.Anything).Return(nil)
 
 		sourceReader2 := reader_mocks.NewMockExtended(t)
 		price2 := cciptypes.TimestampedUnixBig{
@@ -1739,7 +1756,7 @@ func TestCCIPChainReader_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 			consts.ContractNameFeeQuoter,
 			consts.MethodNameFeeQuoterGetTokenPrice,
 			primitives.Unconfirmed,
-			map[string]interface{}{"token": wrappedNative2},
+			map[string]interface{}{"token": cciptypes.UnknownAddress(wrappedNative2)},
 			mock.Anything,
 		).Run(func(
 			ctx context.Context,
@@ -1751,14 +1768,29 @@ func TestCCIPChainReader_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 			*pricePtr = price2
 		}).Return(nil)
 
-		ccipReader := &ccipChainReader{
-			destChain: destChain,
-			contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
-				sourceChain1: reader_mocks.NewMockExtended(t),
+		cw := writer_mocks.NewMockContractWriter(t)
+		contractWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
+		contractWriters[sourceChain1] = cw
+		contractWriters[sourceChain2] = cw
+
+		ccipReader, err := newCCIPChainReaderWithConfigPollerInternal(
+			tests.Context(t),
+			logger.Test(t),
+			map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
+				sourceChain1: reader_mocks.NewMockContractReaderFacade(t),
 				sourceChain2: sourceReader2,
 			},
-			configPoller: mockCache,
-			lggr:         logger.Test(t),
+			contractWriters,
+			destChain,
+			[]byte{0x3}, // Mock offramp address
+			internal.NewMockAddressCodecHex(t),
+			mockCache,
+		)
+		require.NoError(t, err)
+
+		ccipReader.contractReaders = map[cciptypes.ChainSelector]contractreader.Extended{
+			sourceChain1: reader_mocks.NewMockExtended(t),
+			sourceChain2: sourceReader2,
 		}
 
 		prices := ccipReader.GetWrappedNativeTokenPriceUSD(ctx, []cciptypes.ChainSelector{sourceChain1, sourceChain2})
@@ -1776,6 +1808,7 @@ func TestCCIPChainReader_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 			},
 		}
 		mockCache.On("GetChainConfig", mock.Anything, sourceChain1).Return(sourceConfig, nil)
+		mockCache.On("Start", mock.Anything).Return(nil)
 
 		sourceReader := reader_mocks.NewMockExtended(t)
 		sourceReader.EXPECT().ExtendedGetLatestValue(
@@ -1783,17 +1816,30 @@ func TestCCIPChainReader_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 			consts.ContractNameFeeQuoter,
 			consts.MethodNameFeeQuoterGetTokenPrice,
 			primitives.Unconfirmed,
-			map[string]interface{}{"token": wrappedNative1},
+			map[string]interface{}{"token": cciptypes.UnknownAddress(wrappedNative1)},
 			mock.Anything,
 		).Return(fmt.Errorf("price fetch failed"))
 
-		ccipReader := &ccipChainReader{
-			destChain: destChain,
-			contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
+		cw := writer_mocks.NewMockContractWriter(t)
+		contractWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
+		contractWriters[sourceChain1] = cw
+
+		ccipReader, err := newCCIPChainReaderWithConfigPollerInternal(
+			tests.Context(t),
+			logger.Test(t),
+			map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
 				sourceChain1: sourceReader,
 			},
-			configPoller: mockCache,
-			lggr:         logger.Test(t),
+			contractWriters,
+			destChain,
+			[]byte{0x3}, // Mock offramp address
+			internal.NewMockAddressCodecHex(t),
+			mockCache,
+		)
+		require.NoError(t, err)
+
+		ccipReader.contractReaders = map[cciptypes.ChainSelector]contractreader.Extended{
+			sourceChain1: sourceReader,
 		}
 
 		prices := ccipReader.GetWrappedNativeTokenPriceUSD(ctx, []cciptypes.ChainSelector{sourceChain1})
