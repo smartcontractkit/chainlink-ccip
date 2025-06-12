@@ -23,13 +23,18 @@ contract USDCTokenPool_setDomains is USDCTokenPoolSetup {
 
       domainUpdates[i] = USDCTokenPool.DomainUpdate({
         allowedCaller: allowedCallers[i],
+        mintRecipient: bytes32(0),
         domainIdentifier: domainIdentifiers[i],
         destChainSelector: destChainSelectors[i],
         enabled: true
       });
 
-      s_chainToDomain[destChainSelectors[i]] =
-        USDCTokenPool.Domain({domainIdentifier: domainIdentifiers[i], allowedCaller: allowedCallers[i], enabled: true});
+      s_chainToDomain[destChainSelectors[i]] = USDCTokenPool.Domain({
+        domainIdentifier: domainIdentifiers[i],
+        mintRecipient: bytes32(0),
+        allowedCaller: allowedCallers[i],
+        enabled: true
+      });
     }
 
     vm.expectEmit();
@@ -62,6 +67,7 @@ contract USDCTokenPool_setDomains is USDCTokenPoolSetup {
     USDCTokenPool.DomainUpdate[] memory domainUpdates = new USDCTokenPool.DomainUpdate[](1);
     domainUpdates[0] = USDCTokenPool.DomainUpdate({
       allowedCaller: validCaller,
+      mintRecipient: bytes32(0),
       domainIdentifier: 0, // ensures 0 is valid, as this is eth mainnet
       destChainSelector: 45690,
       enabled: true

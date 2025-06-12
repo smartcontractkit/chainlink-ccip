@@ -3,16 +3,16 @@ pragma solidity ^0.8.24;
 
 import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
 
-import {Router} from "../../../Router.sol";
-import {TokenPool} from "../../../pools/TokenPool.sol";
-import {CCTPMessageTransmitterProxy} from "../../../pools/USDC/CCTPMessageTransmitterProxy.sol";
+import {Router} from "../../../../../Router.sol";
+import {TokenPool} from "../../../../../pools/TokenPool.sol";
+import {CCTPMessageTransmitterProxy} from "../../../../../pools/USDC/CCTPMessageTransmitterProxy.sol";
 import {BurnMintERC677} from "@chainlink/contracts/src/v0.8/shared/token/ERC677/BurnMintERC677.sol";
 
-import {BaseTest} from "../../BaseTest.t.sol";
-import {MockE2EUSDCTransmitter} from "../../mocks/MockE2EUSDCTransmitter.sol";
-import {MockUSDCTokenMessenger} from "../../mocks/MockUSDCTokenMessenger.sol";
+import {BaseTest} from "../../../../BaseTest.t.sol";
+import {MockE2EUSDCTransmitter} from "../../../../mocks/MockE2EUSDCTransmitter.sol";
+import {MockUSDCTokenMessenger} from "../../../../mocks/MockUSDCTokenMessenger.sol";
 
-contract USDCSetup is BaseTest {
+contract USDCCCTPV2Setup is BaseTest {
   struct USDCMessage {
     uint32 version;
     uint32 sourceDomain;
@@ -48,18 +48,14 @@ contract USDCSetup is BaseTest {
   address internal constant DEST_CHAIN_USDC_TOKEN = address(0x23598918358198766);
 
   MockUSDCTokenMessenger internal s_mockUSDC;
-  MockUSDCTokenMessenger internal s_mockUSDCV2;
-
   MockE2EUSDCTransmitter internal s_mockUSDCTransmitter;
-  MockE2EUSDCTransmitter internal s_mockUSDCTransmitterV2;
-
   CCTPMessageTransmitterProxy internal s_cctpMessageTransmitterProxy;
+
+  uint256[] internal s_supportedUSDCVersions;
 
   address internal s_routerAllowedOnRamp = address(3456);
   address internal s_routerAllowedOffRamp = address(234);
   Router internal s_router;
-
-  uint256[] internal s_supportedUSDCVersions;
 
   IBurnMintERC20 internal s_token;
 
@@ -68,25 +64,19 @@ contract USDCSetup is BaseTest {
     BurnMintERC677 usdcToken = new BurnMintERC677("USD Coin", "USDC", 6, 0);
     s_token = usdcToken;
 
-    // Add support for USDC CCTP Version 1, which has a version #0, so no explicit setting is required.
-    s_supportedUSDCVersions = new uint256[](1);
-
     deal(address(s_token), OWNER, type(uint256).max);
     _setUpRamps();
 
-    s_mockUSDCTransmitter = new MockE2EUSDCTransmitter(0, DEST_DOMAIN_IDENTIFIER, address(s_token));
-    s_mockUSDCTransmitterV2 = new MockE2EUSDCTransmitter(1, DEST_DOMAIN_IDENTIFIER, address(s_token));
+    // Add support for USDC CCTP V2 which is identified with 1.
+    s_supportedUSDCVersions = new uint256[](1);
+    s_supportedUSDCVersions[0] = 1;
 
-    s_mockUSDC = new MockUSDCTokenMessenger(0, address(s_mockUSDCTransmitter));
-    s_mockUSDCV2 = new MockUSDCTokenMessenger(1, address(s_mockUSDCTransmitterV2));
-
-    s_cctpMessageTransmitterProxy = new CCTPMessageTransmitterProxy(s_mockUSDC, s_mockUSDCV2);
-
+    // The Token transmitter in CCTP V2 needs to be set with version 1
+    s_mockUSDCTransmitter = new MockE2EUSDCTransmitter(1, DEST_DOMAIN_IDENTIFIER, address(s_token));
+    s_mockUSDC = new MockUSDCTokenMessenger(1, address(s_mockUSDCTransmitter));
+    s_cctpMessageTransmitterProxy = new CCTPMessageTransmitterProxy(s_mockUSDC, s_mockUSDC);
     usdcToken.grantMintAndBurnRoles(address(s_mockUSDCTransmitter));
-    usdcToken.grantMintAndBurnRoles(address(s_mockUSDCTransmitterV2));
-
     usdcToken.grantMintAndBurnRoles(address(s_mockUSDC));
-    usdcToken.grantMintAndBurnRoles(address(s_mockUSDCV2));
   }
 
   function _poolApplyChainUpdates(
@@ -128,21 +118,6 @@ contract USDCSetup is BaseTest {
     offRampUpdates[0] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_SELECTOR, offRamp: offRamps[0]});
 
     s_router.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), offRampUpdates);
-  }
-
-  function _generateUSDCMessage(
-    USDCMessage memory usdcMessage
-  ) internal pure returns (bytes memory) {
-    return abi.encodePacked(
-      usdcMessage.version,
-      usdcMessage.sourceDomain,
-      usdcMessage.destinationDomain,
-      usdcMessage.nonce,
-      usdcMessage.sender,
-      usdcMessage.recipient,
-      usdcMessage.destinationCaller,
-      usdcMessage.messageBody
-    );
   }
 
   function _generateUSDCMessageCCTPV2(

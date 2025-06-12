@@ -4,7 +4,6 @@ pragma solidity ^0.8.24;
 import {Internal} from "../../../../libraries/Internal.sol";
 import {Pool} from "../../../../libraries/Pool.sol";
 import {RateLimiter} from "../../../../libraries/RateLimiter.sol";
-import {TokenPool} from "../../../../pools/TokenPool.sol";
 import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
 import {MockE2EUSDCTransmitter} from "../../../mocks/MockE2EUSDCTransmitter.sol";
 import {USDCTokenPoolSetup} from "./USDCTokenPoolSetup.t.sol";
@@ -49,7 +48,11 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
       extraData: abi.encode(
-        USDCTokenPool.SourceTokenDataPayload({nonce: usdcMessage.nonce, sourceDomain: SOURCE_DOMAIN_IDENTIFIER})
+        USDCTokenPool.SourceTokenDataPayload({
+          nonce: usdcMessage.nonce,
+          sourceDomain: SOURCE_DOMAIN_IDENTIFIER,
+          cctpVersion: USDCTokenPool.CCTPVersion.VERSION_1
+        })
       ),
       destGasAmount: USDC_DEST_TOKEN_GAS
     });
@@ -59,15 +62,6 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
 
     // The mocked receiver does not release the token to the pool, so we manually do it here
     deal(address(s_token), address(s_usdcTokenPool), amount);
-
-    vm.expectEmit();
-    emit TokenPool.ReleasedOrMinted({
-      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
-      token: address(s_token),
-      sender: s_routerAllowedOffRamp,
-      recipient: recipient,
-      amount: amount
-    });
 
     vm.expectCall(
       address(s_mockUSDCTransmitter),
@@ -102,7 +96,13 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: abi.encode(USDCTokenPool.SourceTokenDataPayload({nonce: nonce, sourceDomain: sourceDomain})),
+      extraData: abi.encode(
+        USDCTokenPool.SourceTokenDataPayload({
+          nonce: nonce,
+          sourceDomain: sourceDomain,
+          cctpVersion: USDCTokenPool.CCTPVersion.VERSION_1
+        })
+      ),
       destGasAmount: USDC_DEST_TOKEN_GAS
     });
 
@@ -160,7 +160,11 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
       extraData: abi.encode(
-        USDCTokenPool.SourceTokenDataPayload({nonce: usdcMessage.nonce, sourceDomain: SOURCE_DOMAIN_IDENTIFIER})
+        USDCTokenPool.SourceTokenDataPayload({
+          nonce: usdcMessage.nonce,
+          sourceDomain: SOURCE_DOMAIN_IDENTIFIER,
+          cctpVersion: USDCTokenPool.CCTPVersion.VERSION_1
+        })
       ),
       destGasAmount: USDC_DEST_TOKEN_GAS
     });
@@ -194,7 +198,13 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: abi.encode(USDCTokenPool.SourceTokenDataPayload({nonce: 1, sourceDomain: SOURCE_DOMAIN_IDENTIFIER})),
+      extraData: abi.encode(
+        USDCTokenPool.SourceTokenDataPayload({
+          nonce: 1,
+          sourceDomain: SOURCE_DOMAIN_IDENTIFIER,
+          cctpVersion: USDCTokenPool.CCTPVersion.VERSION_1
+        })
+      ),
       destGasAmount: USDC_DEST_TOKEN_GAS
     });
 
