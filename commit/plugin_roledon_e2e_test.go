@@ -145,47 +145,7 @@ func TestPlugin_RoleDonE2E_NoPrevOutcome(t *testing.T) {
 			}
 		}
 
-		p := NewPlugin(
-			plugintypes.DonID(999),
-			s.oracleIDToPeerID,
-			pluginconfig.CommitOffchainConfig{
-				TokenInfo: map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo{
-					"0x01": {
-						AggregatorAddress: "0x02",
-						DeviationPPB:      cciptypes.NewBigIntFromInt64(123),
-						Decimals:          12,
-					},
-				},
-				PriceFeedChainSelector:          145,
-				NewMsgScanBatchSize:             50,
-				MaxMerkleTreeSize:               256,
-				InflightPriceCheckRetries:       1,
-				MerkleRootAsyncObserverDisabled: true,
-				ChainFeeAsyncObserverDisabled:   true,
-				TokenPriceAsyncObserverDisabled: true,
-				EnableDonBreakingChanges:        true,
-			},
-			s.destChain,
-			deps.ccipReader,
-			deps.priceReader,
-			deps.reportCodec,
-			deps.msgHasher,
-			deps.lggr,
-			deps.homeChainReader,
-			deps.rmnHomeReader,
-			nil,
-			nil,
-			ocr3types.ReportingPluginConfig{
-				OracleID: oracleID,
-				N:        len(s.oracles),
-				F:        s.fRoleDon,
-			},
-			&metrics.Noop{},
-			deps.addressCodec,
-			deps.reportBuilder,
-		)
-		p.contractsInitialized.Store(true)
-
+		p := s.newRoleDonTestPlugin(oracleID)
 		plugins = append(plugins, p)
 	}
 
@@ -252,10 +212,13 @@ func TestPlugin_RoleDonE2E_RangesAndPricesSelectedPreviously(t *testing.T) {
 		{
 			if len(oracleSourceChains) > 0 && mapset.NewSet(oracleSourceChains...).ContainsAny(chainsWithMsgs...) {
 				deps.ccipReader.EXPECT().MsgsBetweenSeqNums(mock.Anything, mock.Anything, mock.Anything).
-					RunAndReturn(func(ctx context.Context, selector cciptypes.ChainSelector, numRange cciptypes.SeqNumRange) ([]cciptypes.Message, error) {
-						require.True(t, oracleChains.Contains(selector))
-						return []cciptypes.Message{}, nil // merkle roots consensus and computation is out of scope for this test
-					})
+					RunAndReturn(
+						func(ctx context.Context, selector cciptypes.ChainSelector, numRange cciptypes.SeqNumRange,
+						) ([]cciptypes.Message, error) {
+							require.True(t, oracleChains.Contains(selector))
+							// merkle roots consensus and computation is out of scope for this test
+							return []cciptypes.Message{}, nil
+						})
 			}
 		}
 
@@ -266,47 +229,7 @@ func TestPlugin_RoleDonE2E_RangesAndPricesSelectedPreviously(t *testing.T) {
 			}
 		}
 
-		p := NewPlugin(
-			plugintypes.DonID(999),
-			s.oracleIDToPeerID,
-			pluginconfig.CommitOffchainConfig{
-				TokenInfo: map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo{
-					"0x01": {
-						AggregatorAddress: "0x02",
-						DeviationPPB:      cciptypes.NewBigIntFromInt64(123),
-						Decimals:          12,
-					},
-				},
-				PriceFeedChainSelector:          145,
-				NewMsgScanBatchSize:             50,
-				MaxMerkleTreeSize:               256,
-				InflightPriceCheckRetries:       1,
-				MerkleRootAsyncObserverDisabled: true,
-				ChainFeeAsyncObserverDisabled:   true,
-				TokenPriceAsyncObserverDisabled: true,
-				EnableDonBreakingChanges:        true,
-			},
-			s.destChain,
-			deps.ccipReader,
-			deps.priceReader,
-			deps.reportCodec,
-			deps.msgHasher,
-			deps.lggr,
-			deps.homeChainReader,
-			deps.rmnHomeReader,
-			nil,
-			nil,
-			ocr3types.ReportingPluginConfig{
-				OracleID: oracleID,
-				N:        len(s.oracles),
-				F:        s.fRoleDon,
-			},
-			&metrics.Noop{},
-			deps.addressCodec,
-			deps.reportBuilder,
-		)
-		p.contractsInitialized.Store(true)
-
+		p := s.newRoleDonTestPlugin(oracleID)
 		plugins = append(plugins, p)
 	}
 
@@ -353,6 +276,51 @@ func TestPlugin_RoleDonE2E_RangesAndPricesSelectedPreviously(t *testing.T) {
 	o, err := ocrTypCodec.DecodeOutcome(res.Outcome)
 	require.NoError(t, err)
 	require.Equal(t, committypes.MainOutcome{InflightPriceOcrSequenceNumber: 54, RemainingPriceChecks: 9}, o.MainOutcome)
+}
+
+func (s roleDonTestSetup) newRoleDonTestPlugin(oracleID commontypes.OracleID) *Plugin {
+	deps := s.oracleDependencies[oracleID]
+	p := NewPlugin(
+		plugintypes.DonID(999),
+		s.oracleIDToPeerID,
+		pluginconfig.CommitOffchainConfig{
+			TokenInfo: map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo{
+				"0x01": {
+					AggregatorAddress: "0x02",
+					DeviationPPB:      cciptypes.NewBigIntFromInt64(123),
+					Decimals:          12,
+				},
+			},
+			PriceFeedChainSelector:          145,
+			NewMsgScanBatchSize:             50,
+			MaxMerkleTreeSize:               256,
+			InflightPriceCheckRetries:       1,
+			MerkleRootAsyncObserverDisabled: true,
+			ChainFeeAsyncObserverDisabled:   true,
+			TokenPriceAsyncObserverDisabled: true,
+			EnableDonBreakingChanges:        true,
+		},
+		s.destChain,
+		deps.ccipReader,
+		deps.priceReader,
+		deps.reportCodec,
+		deps.msgHasher,
+		deps.lggr,
+		deps.homeChainReader,
+		deps.rmnHomeReader,
+		nil,
+		nil,
+		ocr3types.ReportingPluginConfig{
+			OracleID: oracleID,
+			N:        len(s.oracles),
+			F:        s.fRoleDon,
+		},
+		&metrics.Noop{},
+		deps.addressCodec,
+		deps.reportBuilder,
+	)
+	p.contractsInitialized.Store(true)
+	return p
 }
 
 type roleDonTestSetup struct {
