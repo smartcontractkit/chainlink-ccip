@@ -368,8 +368,85 @@ func (u solanaUSDCMessageReader) MessagesByTokenID(
 	source, dest cciptypes.ChainSelector,
 	tokens map[MessageTokenID]cciptypes.RampTokenAmount,
 ) (map[MessageTokenID]cciptypes.Bytes, error) {
-	// TODO: Implement Solana USDC message reading logic
-	return nil, nil
+	if len(tokens) == 0 {
+		return map[MessageTokenID]cciptypes.Bytes{}, nil
+	}
+
+	// 1. Extract 3rd word from the MessageSent(bytes) - it's going to be our identifier
+	eventIDsByMsgTokenID, err := u.recreateMessageTransmitterEvents(dest, tokens)
+	if err != nil {
+		return nil, err
+	}
+
+	// 2. Query the MessageTransmitter contract for the MessageSent events based on the 3rd words.
+	// We need entire MessageSent payload to use that with the Attestation API
+	expressions := []query.Expression{query.Confidence(primitives.Finalized)}
+	if len(eventIDsByMsgTokenID) > 0 {
+		eventIDs := make([]eventID, 0, len(eventIDsByMsgTokenID))
+		for _, id := range eventIDsByMsgTokenID {
+			eventIDs = append(eventIDs, id)
+		}
+
+		expressions = append(expressions, query.Comparator(
+			consts.CCTPMessageSentValue,
+			primitives.ValueComparator{
+				Value:    primitives.Any(eventIDs),
+				Operator: primitives.Eq,
+			}))
+	}
+
+	keyFilter, err := query.Where(
+		consts.EventNameCCTPMessageSent,
+		expressions...,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	iter, err := u.contractReader.ExtendedQueryKey(
+		ctx,
+		consts.ContractNameCCTPMessageTransmitter,
+		keyFilter,
+		query.NewLimitAndSort(
+			query.Limit{Count: uint64(len(eventIDsByMsgTokenID))},
+			query.NewSortBySequence(query.Asc),
+		),
+		&MessageSentEvent{},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error querying contract reader for chain %d: %w", source, err)
+	}
+
+	messageSentEvents := make(map[eventID]cciptypes.Bytes)
+	for _, item := range iter {
+		event, ok1 := item.Data.(*MessageSentEvent)
+		if !ok1 {
+			return nil, fmt.Errorf("failed to cast %v to Message", item.Data)
+		}
+		e, err1 := event.unpackID()
+		if err1 != nil {
+			return nil, err1
+		}
+		messageSentEvents[e] = event.Arg0
+	}
+
+	// 3. Remapping database events to the proper MessageTokenID
+	out := make(map[MessageTokenID]cciptypes.Bytes)
+	for tokenID, messageID := range eventIDsByMsgTokenID {
+		message, ok1 := messageSentEvents[messageID]
+		if !ok1 {
+			// Token not available in the source chain, it should never happen at this stage
+			u.lggr.Warnw("Message not found in the source chain",
+				"seqNr", tokenID.SeqNr,
+				"tokenIndex", tokenID.Index,
+				"chainSelector", source,
+			)
+			continue
+		}
+		out[tokenID] = message
+	}
+
+	return out, nil
 }
 
 // SourceTokenDataPayload extracts the nonce and source domain from the USDC message.
