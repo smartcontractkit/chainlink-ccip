@@ -621,25 +621,20 @@ pub mod ccip_offramp {
     /// # Arguments
     ///
     /// * `ctx`: Context containing only the offramp config.
-    /// * `execute_caller`: Public key of the account that will sign the call to `ccip_execute`.
-    /// * `message_accounts`: If the transaction involves messaging, the message accounts.
-    /// * `source_chain_selector`: CCIP chain selector for the source chain.
-    /// * `mints_of_transferred_token`: List of all token mints for tokens being transferred (i.e.
-    ///   the entries in `report.message.token_amounts.destination_address`.)
-    /// * `merkle_root`: Merkle root as per the commit report.
-    /// * `buffer_id`: If the execution will be buffered, the buffer id that will be used by the
-    ///   `execute_caller`: If the execution will not be buffered, this should be empty.
-    /// * `token_receiver`: Receiver of token transfers, if any (i.e. report.message.token_receiver.)
+    /// * params:
+    ///    * `execute_caller`: Public key of the account that will sign the call to `ccip_execute`.
+    ///    * `message_accounts`: If the transaction involves messaging, the message accounts.
+    ///    * `source_chain_selector`: CCIP chain selector for the source chain.
+    ///    * `mints_of_transferred_token`: List of all token mints for tokens being transferred (i.e.
+    ///      the entries in `report.message.token_amounts.destination_address`.)
+    ///    * `merkle_root`: Merkle root as per the commit report.
+    ///    * `buffer_id`: If the execution will be buffered, the buffer id that will be used by the
+    ///      `execute_caller`: If the execution will not be buffered, this should be empty.
+    ///    * `token_receiver`: Receiver of token transfers, if any (i.e. report.message.token_receiver.)
     #[allow(clippy::too_many_arguments)]
     pub fn derive_accounts_execute<'info>(
         ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
-        execute_caller: Pubkey,
-        message_accounts: Vec<CcipAccountMeta>,
-        source_chain_selector: u64,
-        mints_of_transferred_tokens: Vec<Pubkey>,
-        merkle_root: [u8; 32],
-        buffer_id: Vec<u8>,
-        token_receiver: Pubkey,
+        params: DeriveAccountsExecuteParams,
     ) -> Result<DeriveAccountsResponse> {
         let default_code_version: CodeVersion = ctx
             .accounts
@@ -648,16 +643,8 @@ pub mod ccip_offramp {
             .default_code_version
             .try_into()?;
 
-        router::execute(default_code_version, default_code_version).derive_accounts_execute(
-            ctx,
-            execute_caller,
-            message_accounts,
-            source_chain_selector,
-            mints_of_transferred_tokens,
-            merkle_root,
-            buffer_id,
-            token_receiver,
-        )
+        router::execute(default_code_version, default_code_version)
+            .derive_accounts_execute(ctx, params)
     }
 
     pub fn close_commit_report_account(

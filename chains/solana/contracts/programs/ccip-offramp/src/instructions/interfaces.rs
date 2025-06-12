@@ -6,7 +6,8 @@ use crate::context::{
     TransferOwnership, UpdateConfig, UpdateReferenceAddresses, UpdateSourceChain, ViewConfigOnly,
 };
 use crate::state::{
-    CcipAccountMeta, CodeVersion, DeriveAccountsResponse, Ocr3ConfigInfo, SourceChainConfig,
+    CcipAccountMeta, CodeVersion, DeriveAccountsExecuteParams, DeriveAccountsResponse,
+    Ocr3ConfigInfo, SourceChainConfig,
 };
 use crate::OcrPluginType;
 
@@ -71,13 +72,7 @@ pub trait Execute {
     fn derive_accounts_execute<'info>(
         &self,
         ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
-        execute_caller: Pubkey,
-        message_accounts: Vec<CcipAccountMeta>,
-        source_chain_selector: u64,
-        mints_of_transferred_tokens: Vec<Pubkey>,
-        merkle_root: [u8; 32],
-        buffer_id: Vec<u8>,
-        token_receiver: Pubkey,
+        params: DeriveAccountsExecuteParams,
     ) -> Result<DeriveAccountsResponse>;
 }
 

@@ -611,12 +611,100 @@ func (obj *CrossChainAmount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (e
 	return nil
 }
 
+type DeriveAccountsExecuteParams struct {
+	ExecuteCaller            ag_solanago.PublicKey
+	MessageAccounts          []CcipAccountMeta
+	SourceChainSelector      uint64
+	MintsOfTransferredTokens []ag_solanago.PublicKey
+	MerkleRoot               [32]uint8
+	BufferId                 []byte
+	TokenReceiver            ag_solanago.PublicKey
+}
+
+func (obj DeriveAccountsExecuteParams) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `ExecuteCaller` param:
+	err = encoder.Encode(obj.ExecuteCaller)
+	if err != nil {
+		return err
+	}
+	// Serialize `MessageAccounts` param:
+	err = encoder.Encode(obj.MessageAccounts)
+	if err != nil {
+		return err
+	}
+	// Serialize `SourceChainSelector` param:
+	err = encoder.Encode(obj.SourceChainSelector)
+	if err != nil {
+		return err
+	}
+	// Serialize `MintsOfTransferredTokens` param:
+	err = encoder.Encode(obj.MintsOfTransferredTokens)
+	if err != nil {
+		return err
+	}
+	// Serialize `MerkleRoot` param:
+	err = encoder.Encode(obj.MerkleRoot)
+	if err != nil {
+		return err
+	}
+	// Serialize `BufferId` param:
+	err = encoder.Encode(obj.BufferId)
+	if err != nil {
+		return err
+	}
+	// Serialize `TokenReceiver` param:
+	err = encoder.Encode(obj.TokenReceiver)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *DeriveAccountsExecuteParams) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `ExecuteCaller`:
+	err = decoder.Decode(&obj.ExecuteCaller)
+	if err != nil {
+		return err
+	}
+	// Deserialize `MessageAccounts`:
+	err = decoder.Decode(&obj.MessageAccounts)
+	if err != nil {
+		return err
+	}
+	// Deserialize `SourceChainSelector`:
+	err = decoder.Decode(&obj.SourceChainSelector)
+	if err != nil {
+		return err
+	}
+	// Deserialize `MintsOfTransferredTokens`:
+	err = decoder.Decode(&obj.MintsOfTransferredTokens)
+	if err != nil {
+		return err
+	}
+	// Deserialize `MerkleRoot`:
+	err = decoder.Decode(&obj.MerkleRoot)
+	if err != nil {
+		return err
+	}
+	// Deserialize `BufferId`:
+	err = decoder.Decode(&obj.BufferId)
+	if err != nil {
+		return err
+	}
+	// Deserialize `TokenReceiver`:
+	err = decoder.Decode(&obj.TokenReceiver)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 type DeriveAccountsResponse struct {
 	// If this vector is not empty, you must call the `derive_` method again including
 	// exactly these accounts as the `remaining_accounts` field.
 	AskAgainWith []CcipAccountMeta
 
-	// You must append these accounts at the end of a separate list. When `ask_again_with`
+	// You must append these accounts at the end of a separate list. When `next_stage`
 	// is finally empty, this separate list will contain all the accounts to use for the
 	// instruction of interest.
 	AccountsToSave []CcipAccountMeta
@@ -625,9 +713,11 @@ type DeriveAccountsResponse struct {
 	// that the instruction of interest can use.
 	LookUpTablesToSave []DerivedLookupTable
 
-	// Identifies the derivation stage. `derive_` functions may sometimes require providing
-	// the name of the last complete stage as an argument.
+	// Identifies the derivation stage.
 	CurrentStage string
+
+	// Identifies the next derivation stage. If empty, the derivation is complete.
+	NextStage string
 }
 
 func (obj DeriveAccountsResponse) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
@@ -648,6 +738,11 @@ func (obj DeriveAccountsResponse) MarshalWithEncoder(encoder *ag_binary.Encoder)
 	}
 	// Serialize `CurrentStage` param:
 	err = encoder.Encode(obj.CurrentStage)
+	if err != nil {
+		return err
+	}
+	// Serialize `NextStage` param:
+	err = encoder.Encode(obj.NextStage)
 	if err != nil {
 		return err
 	}
@@ -672,6 +767,11 @@ func (obj *DeriveAccountsResponse) UnmarshalWithDecoder(decoder *ag_binary.Decod
 	}
 	// Deserialize `CurrentStage`:
 	err = decoder.Decode(&obj.CurrentStage)
+	if err != nil {
+		return err
+	}
+	// Deserialize `NextStage`:
+	err = decoder.Decode(&obj.NextStage)
 	if err != nil {
 		return err
 	}
@@ -988,6 +1088,30 @@ func (value OcrPluginType) String() string {
 		return "Commit"
 	case Execution_OcrPluginType:
 		return "Execution"
+	default:
+		return ""
+	}
+}
+
+type DeriveExecuteAccountsStage ag_binary.BorshEnum
+
+const (
+	GatherBasicInfo_DeriveExecuteAccountsStage DeriveExecuteAccountsStage = iota
+	BuildMainAccountList_DeriveExecuteAccountsStage
+	RetrieveTokenLUTs_DeriveExecuteAccountsStage
+	TokenTransferAccounts_DeriveExecuteAccountsStage
+)
+
+func (value DeriveExecuteAccountsStage) String() string {
+	switch value {
+	case GatherBasicInfo_DeriveExecuteAccountsStage:
+		return "GatherBasicInfo"
+	case BuildMainAccountList_DeriveExecuteAccountsStage:
+		return "BuildMainAccountList"
+	case RetrieveTokenLUTs_DeriveExecuteAccountsStage:
+		return "RetrieveTokenLUTs"
+	case TokenTransferAccounts_DeriveExecuteAccountsStage:
+		return "TokenTransferAccounts"
 	default:
 		return ""
 	}
