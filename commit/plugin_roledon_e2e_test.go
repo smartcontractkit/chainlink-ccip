@@ -298,7 +298,7 @@ func (s roleDonTestSetup) newRoleDonTestPlugin(oracleID commontypes.OracleID) *P
 			MerkleRootAsyncObserverDisabled: true,
 			ChainFeeAsyncObserverDisabled:   true,
 			TokenPriceAsyncObserverDisabled: true,
-			EnableDonBreakingChanges:        true,
+			DonBreakingChangesVersion:       pluginconfig.DonBreakingChangesVersion1RoleDonSupport,
 		},
 		s.destChain,
 		deps.ccipReader,
