@@ -46,6 +46,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   error InsufficientGasToCompleteTx(bytes4 err);
   error SkippedAlreadyExecutedMessage(uint64 sourceChainSelector, uint64 sequenceNumber);
   error InvalidVerifierSelector(bytes4 selector);
+  error InvalidNonce(uint64 nonce);
 
   /// @dev Atlas depends on various events, if changing, please notify Atlas.
   event StaticConfigSet(StaticConfig staticConfig);
@@ -268,7 +269,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
         // If a nonce is not incremented, that means it was skipped, and we can ignore the message.
         if (
           !INonceManager(i_nonceManager).incrementInboundNonce(sourceChainSelector, message.header.nonce, message.sender)
-        ) revert();
+        ) revert InvalidNonce(message.header.nonce);
       }
     }
 
@@ -453,50 +454,51 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       revert NotACompatiblePool(localPoolAddress);
     }
 
+    // Check V2 first, as it is the most recent version of the pool interface.
     if (localPoolAddress._supportsInterfaceReverting(Pool.CCIP_POOL_V2)) {
       // Revert for now
       // TODO write IPoolV2
       revert NotACompatiblePool(localPoolAddress);
     }
-    if (localPoolAddress._supportsInterfaceReverting(Pool.CCIP_POOL_V1)) {
-      // We retrieve the local token balance of the receiver before the pool call.
-      uint256 balancePre = _getBalanceOfReceiver(receiver, localToken);
 
-      Pool.ReleaseOrMintOutV1 memory returnData;
-      try IPoolV1(localPoolAddress).releaseOrMint(
-        Pool.ReleaseOrMintInV1({
-          originalSender: originalSender,
-          receiver: receiver,
-          amount: sourceTokenAmount.amount,
-          localToken: localToken,
-          remoteChainSelector: sourceChainSelector,
-          sourcePoolAddress: sourceTokenAmount.sourcePoolAddress,
-          sourcePoolData: sourceTokenAmount.extraData,
-          // All use cases that use offchain token data in IPoolV1 have to upgrade to the modular security interface.
-          offchainTokenData: ""
-        })
-      ) returns (Pool.ReleaseOrMintOutV1 memory result) {
-        returnData = result;
-      } catch (bytes memory err) {
-        revert TokenHandlingError(localToken, err);
-      }
+    if (!localPoolAddress._supportsInterfaceReverting(Pool.CCIP_POOL_V1)) {
+      // If the pool does not support the v1 interface, we revert.
+      revert NotACompatiblePool(localPoolAddress);
+    }
+    // We retrieve the local token balance of the receiver before the pool call.
+    uint256 balancePre = _getBalanceOfReceiver(receiver, localToken);
 
-      // We don't need to do balance checks if the pool is the receiver, as they would always fail in the case
-      // of a lockRelease pool.
-      if (receiver != localPoolAddress) {
-        uint256 balancePost = _getBalanceOfReceiver(receiver, localToken);
-
-        // First we check if the subtraction would result in an underflow to ensure we revert with a clear error.
-        if (balancePost < balancePre || balancePost - balancePre != returnData.destinationAmount) {
-          revert ReleaseOrMintBalanceMismatch(returnData.destinationAmount, balancePre, balancePost);
-        }
-      }
-
-      return Client.EVMTokenAmount({token: localToken, amount: returnData.destinationAmount});
+    Pool.ReleaseOrMintOutV1 memory returnData;
+    try IPoolV1(localPoolAddress).releaseOrMint(
+      Pool.ReleaseOrMintInV1({
+        originalSender: originalSender,
+        receiver: receiver,
+        amount: sourceTokenAmount.amount,
+        localToken: localToken,
+        remoteChainSelector: sourceChainSelector,
+        sourcePoolAddress: sourceTokenAmount.sourcePoolAddress,
+        sourcePoolData: sourceTokenAmount.extraData,
+        // All use cases that use offchain token data in IPoolV1 have to upgrade to the modular security interface.
+        offchainTokenData: ""
+      })
+    ) returns (Pool.ReleaseOrMintOutV1 memory result) {
+      returnData = result;
+    } catch (bytes memory err) {
+      revert TokenHandlingError(localToken, err);
     }
 
-    // If the pool does not support the v1 interface, we revert.
-    revert NotACompatiblePool(localPoolAddress);
+    // We don't need to do balance checks if the pool is the receiver, as they would always fail in the case
+    // of a lockRelease pool.
+    if (receiver != localPoolAddress) {
+      uint256 balancePost = _getBalanceOfReceiver(receiver, localToken);
+
+      // First we check if the subtraction would result in an underflow to ensure we revert with a clear error.
+      if (balancePost < balancePre || balancePost - balancePre != returnData.destinationAmount) {
+        revert ReleaseOrMintBalanceMismatch(returnData.destinationAmount, balancePre, balancePost);
+      }
+    }
+
+    return Client.EVMTokenAmount({token: localToken, amount: returnData.destinationAmount});
   }
 
   /// @notice Retrieves the balance of a receiver address for a given token.
@@ -597,6 +599,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
         revert ZeroAddressNotAllowed();
       }
 
+      // TODO check replay protection if onRamp changes
       SourceChainConfig storage currentConfig = s_sourceChainConfigs[sourceChainSelector];
       bytes memory newOnRamp = sourceConfigUpdate.onRamp;
 
