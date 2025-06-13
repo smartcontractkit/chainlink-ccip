@@ -2,7 +2,6 @@ package commit
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"math"
 	"math/rand"
@@ -18,9 +17,10 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
@@ -333,47 +333,50 @@ func TestPlugin_RoleDonE2E_Discovery(t *testing.T) {
 
 		// Discovery and Sync
 		{
-			deps.ccipReader.EXPECT().DiscoverContracts(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, selectors []cciptypes.ChainSelector) (ccipreader.ContractAddresses, error) {
-				addrs := ccipreader.ContractAddresses{}
+			deps.ccipReader.EXPECT().DiscoverContracts(mock.Anything, mock.Anything).
+				RunAndReturn(func(ctx context.Context, selectors []cciptypes.ChainSelector,
+				) (ccipreader.ContractAddresses, error) {
+					addrs := ccipreader.ContractAddresses{}
 
-				// the following contracts can only be discovered by dest supporting oracles
-				if oracleChains.Contains(s.destChain) {
-					addrs = map[string]map[cciptypes.ChainSelector]cciptypes.UnknownAddress{
-						consts.ContractNameOffRamp:      {s.destChain: []byte("offramp")},
-						consts.ContractNameNonceManager: {s.destChain: []byte("nonceManager")},
-						consts.ContractNameRMNRemote:    {s.destChain: []byte("rmnRemote")},
-						consts.ContractNameRouter:       {s.destChain: []byte("router")},
-						consts.ContractNameFeeQuoter:    {s.destChain: []byte("feeQuoter")},
-						consts.ContractNameOnRamp:       {s.sourceChains[0]: []byte("onramp")},
-					}
-				}
-
-				if oracleChains.Contains(s.sourceChains[0]) {
-					if len(addrs) == 0 {
+					// the following contracts can only be discovered by dest supporting oracles
+					if oracleChains.Contains(s.destChain) {
 						addrs = map[string]map[cciptypes.ChainSelector]cciptypes.UnknownAddress{
-							consts.ContractNameFeeQuoter: {},
-							consts.ContractNameRouter:    {},
+							consts.ContractNameOffRamp:      {s.destChain: []byte("offramp")},
+							consts.ContractNameNonceManager: {s.destChain: []byte("nonceManager")},
+							consts.ContractNameRMNRemote:    {s.destChain: []byte("rmnRemote")},
+							consts.ContractNameRouter:       {s.destChain: []byte("router")},
+							consts.ContractNameFeeQuoter:    {s.destChain: []byte("feeQuoter")},
+							consts.ContractNameOnRamp:       {s.sourceChains[0]: []byte("onramp")},
 						}
 					}
-					addrs[consts.ContractNameFeeQuoter][s.sourceChains[0]] = cciptypes.UnknownAddress("feeQuoter")
-					addrs[consts.ContractNameRouter][s.sourceChains[0]] = cciptypes.UnknownAddress("router")
-				}
 
-				return addrs, nil
-			})
+					if oracleChains.Contains(s.sourceChains[0]) {
+						if len(addrs) == 0 {
+							addrs = map[string]map[cciptypes.ChainSelector]cciptypes.UnknownAddress{
+								consts.ContractNameFeeQuoter: {},
+								consts.ContractNameRouter:    {},
+							}
+						}
+						addrs[consts.ContractNameFeeQuoter][s.sourceChains[0]] = cciptypes.UnknownAddress("feeQuoter")
+						addrs[consts.ContractNameRouter][s.sourceChains[0]] = cciptypes.UnknownAddress("router")
+					}
 
-			deps.ccipReader.EXPECT().Sync(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, addresses ccipreader.ContractAddresses) error {
-				require.Equal(t, ccipreader.ContractAddresses{
-					// offramp is synced once and cannot change afterwards
-					//consts.ContractNameOffRamp:      {s.destChain: []byte("offramp")},
-					consts.ContractNameOnRamp:       {s.sourceChains[0]: []byte("onramp")},
-					consts.ContractNameNonceManager: {s.destChain: []byte("nonceManager")},
-					consts.ContractNameRMNRemote:    {s.destChain: []byte("rmnRemote")},
-					consts.ContractNameRouter:       {s.sourceChains[0]: []byte("router"), s.destChain: []byte("router")},
-					consts.ContractNameFeeQuoter:    {s.sourceChains[0]: []byte("feeQuoter"), s.destChain: []byte("feeQuoter")},
-				}, addresses)
-				return nil
-			})
+					return addrs, nil
+				})
+
+			deps.ccipReader.EXPECT().Sync(mock.Anything, mock.Anything).
+				RunAndReturn(func(ctx context.Context, addresses ccipreader.ContractAddresses) error {
+					require.Equal(t, ccipreader.ContractAddresses{
+						// offramp is synced once and cannot change afterwards
+						//consts.ContractNameOffRamp:      {s.destChain: []byte("offramp")},
+						consts.ContractNameOnRamp:       {s.sourceChains[0]: []byte("onramp")},
+						consts.ContractNameNonceManager: {s.destChain: []byte("nonceManager")},
+						consts.ContractNameRMNRemote:    {s.destChain: []byte("rmnRemote")},
+						consts.ContractNameRouter:       {s.sourceChains[0]: []byte("router"), s.destChain: []byte("router")},
+						consts.ContractNameFeeQuoter:    {s.sourceChains[0]: []byte("feeQuoter"), s.destChain: []byte("feeQuoter")},
+					}, addresses)
+					return nil
+				})
 		}
 
 		p := s.newRoleDonTestPlugin(oracleID, true)
