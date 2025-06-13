@@ -10,8 +10,7 @@ import {TokenPool} from "../../pools/TokenPool.sol";
 import {OnRamp} from "../../onRamp/OnRamp.sol";
 import {Pool} from "../../libraries/Pool.sol";
 
-import {IERC20} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";import {Client} from "../../libraries/Client.sol";
+import {IERC20} from "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
 import {Test} from "forge-std/Test.sol";
 import {console2 as console} from "forge-std/console2.sol";
@@ -87,6 +86,9 @@ contract LinkMigrationViaMCMSTest is Test {
         uint256 amount = 1000000000000;
         uint64 remoteChainSelector = 7937294810946806131;
         address expectedRebalancer = 0x2728df4D22253004C017675bd609962cD641D797; 
+
+        address onRamp = 0x4FB5407d6911DaA0B8bde58A754E7D01CB8b05c5;
+        address offRamp = 0x3B45dd27E0cF84F1af98DEaBDc8f96303475ef58;
         
         vm.startPrank(multisig);
 
@@ -107,6 +109,35 @@ contract LinkMigrationViaMCMSTest is Test {
         assertEq(postBalance, preBalance + amount, "USDT balance should be greater than pre-balance by 1M USDT");
 
         assertEq(SiloedLockReleaseTokenPool(mainnetCfg.tokenPool).getChainRebalancer(remoteChainSelector), expectedRebalancer, "Rebalancer should be the expected rebalancer");
+
+        vm.startPrank(onRamp);
+
+        // Check outgoing message
+        TokenPool(mainnetCfg.tokenPool).lockOrBurn(
+            Pool.LockOrBurnInV1({
+                receiver: abi.encode(to),
+                remoteChainSelector: remoteChainSelector,
+                originalSender: multisig,
+                amount: 1e6,
+                localToken: USDT
+            })
+        );
+
+        bytes memory remotePool = TokenPool(mainnetCfg.tokenPool).getRemotePools(remoteChainSelector)[0];
+
+        vm.startPrank(offRamp);
+
+        // Check incoming message
+        TokenPool(mainnetCfg.tokenPool).releaseOrMint(Pool.ReleaseOrMintInV1({
+            originalSender: abi.encode(multisig),
+            remoteChainSelector: remoteChainSelector,
+            receiver: to,
+            amount: 1e6,
+            localToken: USDT,
+            sourcePoolAddress: remotePool,
+            sourcePoolData: abi.encode(6),
+            offchainTokenData: ""
+        }));
     }
        
 }
