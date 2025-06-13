@@ -469,23 +469,8 @@
   "errors": [
     {
       "code": 6000,
-      "name": "InvalidRouter",
-      "msg": "Invalid router address"
-    },
-    {
-      "code": 6001,
-      "name": "OnlyOwner",
-      "msg": "Address is not owner"
-    },
-    {
-      "code": 6002,
-      "name": "OnlyProposedOwner",
-      "msg": "Address is not proposed_owner"
-    },
-    {
-      "code": 6003,
-      "name": "InvalidProposedOwner",
-      "msg": "Proposed owner is invalid"
+      "name": "TransferTokenDuplicated",
+      "msg": "The same token is being transferred more than once"
     }
   ],
   "types": [
