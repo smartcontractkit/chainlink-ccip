@@ -1463,15 +1463,23 @@ func TestCCIPChainReader_Nonces(t *testing.T) {
 				mock.MatchedBy(tc.matchedBy),
 				false,
 			).Return(responses, []string{}, nil)
+			destReader.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
 
-			ccipReader := &ccipChainReader{
-				lggr: logger.Test(t),
-				contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
+			cw := writer_mocks.NewMockContractWriter(t)
+			contractWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
+			contractWriters[chainB] = cw
+			ccipReader, err := newCCIPChainReaderInternal(
+				tests.Context(t),
+				logger.Test(t),
+				map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
 					chainB: destReader,
 				},
-				destChain: chainB,
-				addrCodec: internal.NewMockAddressCodecHex(t),
-			}
+				contractWriters,
+				chainB,
+				[]byte("0x3"),
+				internal.NewMockAddressCodecHex(t),
+			)
+			require.NoError(t, err)
 
 			// Call Nonces
 			nonces, err := ccipReader.Nonces(
@@ -1481,6 +1489,9 @@ func TestCCIPChainReader_Nonces(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.Equal(t, tc.expectedNonces, nonces)
+
+			err = ccipReader.Close()
+			require.NoError(t, err)
 		})
 	}
 }
@@ -1990,13 +2001,23 @@ func TestCCIPChainReader_GetChainFeePriceUpdate(t *testing.T) {
 				nil,
 			).Once()
 
-		ccipReader := &ccipChainReader{
-			lggr:      lggr,
-			destChain: destChain,
-			contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
-				destChain: mockReader,
+		mockReader.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
+
+		cw := writer_mocks.NewMockContractWriter(t)
+		contractWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
+		contractWriters[chainB] = cw
+		ccipReader, err := newCCIPChainReaderInternal(
+			tests.Context(t),
+			logger.Test(t),
+			map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
+				chainB: mockReader,
 			},
-		}
+			contractWriters,
+			chainB,
+			[]byte("0x3"),
+			internal.NewMockAddressCodecHex(t),
+		)
+		require.NoError(t, err)
 
 		feeUpdates := ccipReader.GetChainFeePriceUpdate(ctx, selectors)
 
@@ -2009,6 +2030,9 @@ func TestCCIPChainReader_GetChainFeePriceUpdate(t *testing.T) {
 		assert.NotZero(t, feeUpdates[sourceChain2].Timestamp)
 
 		mockReader.AssertExpectations(t)
+
+		err = ccipReader.Close()
+		require.NoError(t, err)
 	})
 
 	t.Run("empty selectors", func(t *testing.T) {
@@ -2033,18 +2057,29 @@ func TestCCIPChainReader_GetChainFeePriceUpdate(t *testing.T) {
 		expectedErr := errors.New("batch failed")
 
 		mockReader.EXPECT().ExtendedBatchGetLatestValues(ctx, mock.Anything, false).Return(nil, nil, expectedErr).Once()
+		mockReader.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
 
-		ccipReader := &ccipChainReader{
-			lggr:      lggr,
-			destChain: destChain,
-			contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
+		cw := writer_mocks.NewMockContractWriter(t)
+		contractWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
+		contractWriters[destChain] = cw
+		ccipReader, err := newCCIPChainReaderInternal(
+			tests.Context(t),
+			logger.Test(t),
+			map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
 				destChain: mockReader,
 			},
-		}
+			contractWriters,
+			destChain,
+			[]byte("0x3"),
+			internal.NewMockAddressCodecHex(t),
+		)
+		require.NoError(t, err)
 
 		feeUpdates := ccipReader.GetChainFeePriceUpdate(ctx, selectors)
 		require.Empty(t, feeUpdates)
-		mockReader.AssertExpectations(t)
+
+		err = ccipReader.Close()
+		require.NoError(t, err)
 	})
 
 	t.Run("partial success - one result empty", func(t *testing.T) {
@@ -2060,14 +2095,23 @@ func TestCCIPChainReader_GetChainFeePriceUpdate(t *testing.T) {
 		}
 
 		mockReader.EXPECT().ExtendedBatchGetLatestValues(ctx, mock.Anything, false).Return(mockResults, nil, nil).Once()
+		mockReader.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
 
-		ccipReader := &ccipChainReader{
-			lggr:      lggr,
-			destChain: destChain,
-			contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
+		cw := writer_mocks.NewMockContractWriter(t)
+		contractWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
+		contractWriters[destChain] = cw
+		ccipReader, err := newCCIPChainReaderInternal(
+			tests.Context(t),
+			logger.Test(t),
+			map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
 				destChain: mockReader,
 			},
-		}
+			contractWriters,
+			destChain,
+			[]byte("0x3"),
+			internal.NewMockAddressCodecHex(t),
+		)
+		require.NoError(t, err)
 
 		feeUpdates := ccipReader.GetChainFeePriceUpdate(ctx, selectors)
 
@@ -2078,6 +2122,9 @@ func TestCCIPChainReader_GetChainFeePriceUpdate(t *testing.T) {
 		assert.Contains(t, feeUpdates, sourceChain3)
 
 		mockReader.AssertExpectations(t)
+
+		err = ccipReader.Close()
+		require.NoError(t, err)
 	})
 
 	t.Run("partial success - one result error", func(t *testing.T) {
@@ -2094,14 +2141,23 @@ func TestCCIPChainReader_GetChainFeePriceUpdate(t *testing.T) {
 		}
 
 		mockReader.EXPECT().ExtendedBatchGetLatestValues(ctx, mock.Anything, false).Return(mockResults, nil, nil).Once()
+		mockReader.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
 
-		ccipReader := &ccipChainReader{
-			lggr:      lggr,
-			destChain: destChain,
-			contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
+		cw := writer_mocks.NewMockContractWriter(t)
+		contractWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
+		contractWriters[destChain] = cw
+		ccipReader, err := newCCIPChainReaderInternal(
+			tests.Context(t),
+			logger.Test(t),
+			map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
 				destChain: mockReader,
 			},
-		}
+			contractWriters,
+			destChain,
+			[]byte("0x3"),
+			internal.NewMockAddressCodecHex(t),
+		)
+		require.NoError(t, err)
 
 		feeUpdates := ccipReader.GetChainFeePriceUpdate(ctx, selectors)
 
@@ -2112,6 +2168,9 @@ func TestCCIPChainReader_GetChainFeePriceUpdate(t *testing.T) {
 		assert.NotContains(t, feeUpdates, sourceChain3)
 
 		mockReader.AssertExpectations(t)
+
+		err = ccipReader.Close()
+		require.NoError(t, err)
 	})
 
 	t.Run("result count mismatch", func(t *testing.T) {
@@ -2127,14 +2186,23 @@ func TestCCIPChainReader_GetChainFeePriceUpdate(t *testing.T) {
 		}
 
 		mockReader.EXPECT().ExtendedBatchGetLatestValues(ctx, mock.Anything, false).Return(mockResults, nil, nil).Once()
+		mockReader.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
 
-		ccipReader := &ccipChainReader{
-			lggr:      lggr,
-			destChain: destChain,
-			contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
+		cw := writer_mocks.NewMockContractWriter(t)
+		contractWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
+		contractWriters[destChain] = cw
+		ccipReader, err := newCCIPChainReaderInternal(
+			tests.Context(t),
+			logger.Test(t),
+			map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
 				destChain: mockReader,
 			},
-		}
+			contractWriters,
+			destChain,
+			[]byte("0x3"),
+			internal.NewMockAddressCodecHex(t),
+		)
+		require.NoError(t, err)
 
 		feeUpdates := ccipReader.GetChainFeePriceUpdate(ctx, selectors)
 
@@ -2146,6 +2214,9 @@ func TestCCIPChainReader_GetChainFeePriceUpdate(t *testing.T) {
 		assert.NotContains(t, feeUpdates, sourceChain2)
 
 		mockReader.AssertExpectations(t)
+
+		err = ccipReader.Close()
+		require.NoError(t, err)
 	})
 
 	t.Run("missing fee quoter result in batch response", func(t *testing.T) {
@@ -2158,30 +2229,50 @@ func TestCCIPChainReader_GetChainFeePriceUpdate(t *testing.T) {
 		}
 
 		mockReader.EXPECT().ExtendedBatchGetLatestValues(ctx, mock.Anything, false).Return(mockResults, nil, nil).Once()
+		mockReader.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
 
-		ccipReader := &ccipChainReader{
-			lggr:      lggr,
-			destChain: destChain,
-			contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
+		cw := writer_mocks.NewMockContractWriter(t)
+		contractWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
+		contractWriters[destChain] = cw
+		ccipReader, err := newCCIPChainReaderInternal(
+			tests.Context(t),
+			logger.Test(t),
+			map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
 				destChain: mockReader,
 			},
-		}
+			contractWriters,
+			destChain,
+			[]byte("0x3"),
+			internal.NewMockAddressCodecHex(t),
+		)
+		require.NoError(t, err)
 
 		feeUpdates := ccipReader.GetChainFeePriceUpdate(ctx, selectors)
 		require.Empty(t, feeUpdates)
 		mockReader.AssertExpectations(t)
+
+		err = ccipReader.Close()
+		require.NoError(t, err)
 	})
 
-	t.Run("reader does not exist for dest chain", func(t *testing.T) {
-		ccipReader := &ccipChainReader{
-			lggr:            lggr,
-			destChain:       destChain,
-			contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{ /* destChain missing */ },
-		}
+	t.Run("accessor does not exist for dest chain", func(t *testing.T) {
+		ccipReader, err := newCCIPChainReaderInternal(
+			tests.Context(t),
+			logger.Test(t),
+			nil,
+			nil,
+			destChain,
+			[]byte("0x3"),
+			internal.NewMockAddressCodecHex(t),
+		)
+		require.NoError(t, err)
 
 		feeUpdates := ccipReader.GetChainFeePriceUpdate(ctx, []cciptypes.ChainSelector{sourceChain1})
 		// Original logic returned nil in this case
 		assert.Nil(t, feeUpdates)
+
+		err = ccipReader.Close()
+		require.NoError(t, err)
 	})
 }
 

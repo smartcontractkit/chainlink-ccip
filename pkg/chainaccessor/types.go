@@ -51,3 +51,9 @@ type PriceUpdates struct {
 	TokenPriceUpdates []TokenPriceUpdate
 	GasPriceUpdates   []GasPriceUpdate
 }
+
+type chainAddressNonce struct {
+	chain    cciptypes.ChainSelector
+	address  string
+	response uint64
+}

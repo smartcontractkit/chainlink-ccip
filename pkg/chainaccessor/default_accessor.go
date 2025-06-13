@@ -3,6 +3,7 @@ package chainaccessor
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
 	"time"
 
@@ -10,7 +11,9 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
+	"golang.org/x/exp/maps"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
@@ -328,18 +331,230 @@ func (l *DefaultAccessor) NextSeqNum(
 
 func (l *DefaultAccessor) Nonces(
 	ctx context.Context,
-	addresses map[cciptypes.ChainSelector][]cciptypes.UnknownEncodedAddress,
+	addressesByChain map[cciptypes.ChainSelector][]cciptypes.UnknownEncodedAddress,
 ) (map[cciptypes.ChainSelector]map[string]uint64, error) {
-	// TODO(NONEVM-1865): implement
-	panic("implement me")
+	lggr := logutil.WithContextValues(ctx, l.lggr)
+
+	// sort the input to ensure deterministic results
+	sortedChains := maps.Keys(addressesByChain)
+	slices.Sort(sortedChains)
+
+	// create the structure that will contain our result
+	res := make(map[cciptypes.ChainSelector]map[string]uint64)
+	var addressCount int
+	for _, addresses := range addressesByChain {
+		addressCount += len(addresses)
+	}
+
+	contractInput, responses, err := prepareNoncesInput(
+		lggr,
+		addressesByChain,
+		addressCount,
+		sortedChains,
+		l.addrCodec,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	request := contractreader.ExtendedBatchGetLatestValuesRequest{
+		consts.ContractNameNonceManager: contractInput,
+	}
+
+	batchResult, _, err := l.contractReader.ExtendedBatchGetLatestValues(
+		ctx,
+		request,
+		false,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("batch get nonces failed: %w", err)
+	}
+
+	// Process results, we range over batchResults, but there should only be result for nonce manager
+	for _, results := range batchResult {
+		if len(results) != len(responses) {
+			lggr.Errorw("unexpected number of nonces",
+				"expected", len(responses), "got", len(results))
+			continue
+		}
+		for i, readResult := range results {
+			key := responses[i]
+
+			returnVal, err := readResult.GetResult()
+			if err != nil {
+				lggr.Errorw("failed to get nonce for address", "address", key.address, "err", err)
+				continue
+			}
+
+			val, ok := returnVal.(*uint64)
+			if !ok || val == nil {
+				lggr.Errorw("invalid nonce value returned", "address", key.address)
+				continue
+			}
+			if _, ok := res[key.chain]; !ok {
+				res[key.chain] = make(map[string]uint64)
+			}
+			res[key.chain][key.address] = *val
+		}
+	}
+
+	return res, nil
+}
+
+func prepareNoncesInput(
+	lggr logger.Logger,
+	addressesByChain map[cciptypes.ChainSelector][]cciptypes.UnknownEncodedAddress,
+	addressCount int,
+	sortedChains []cciptypes.ChainSelector,
+	addrCodec cciptypes.AddressCodec,
+) ([]types.BatchRead, []chainAddressNonce, error) {
+	contractInput := make([]types.BatchRead, addressCount)
+	responses := make([]chainAddressNonce, addressCount)
+	var counter int
+	for _, chain := range sortedChains {
+		addresses := addressesByChain[chain]
+		// no addresses on this chain, no need to make requests
+		if len(addresses) == 0 {
+			continue
+		}
+		for _, address := range addresses {
+			lggr.Infow("getting nonce for address",
+				"address", address, "chain", chain)
+
+			sender, err := addrCodec.AddressStringToBytes(string(address), chain)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to convert address %s to bytes: %w", address, err)
+			}
+			// TODO: evm only, need to make chain agnostic.
+			// pad the sender slice to 32 bytes from the left
+			sender = slicelib.LeftPadBytes(sender, 32)
+			contractInput[counter] = types.BatchRead{
+				ReadName: consts.MethodNameGetInboundNonce,
+				Params: map[string]any{
+					"sourceChainSelector": chain,
+					"sender":              sender,
+				},
+				ReturnVal: &responses[counter].response,
+			}
+			responses[counter] = chainAddressNonce{chain: chain, address: string(address)}
+			counter++
+		}
+	}
+	return contractInput, responses, nil
 }
 
 func (l *DefaultAccessor) GetChainFeePriceUpdate(
 	ctx context.Context,
 	selectors []cciptypes.ChainSelector,
 ) map[cciptypes.ChainSelector]cciptypes.TimestampedBig {
-	// TODO(NONEVM-1865): implement
-	panic("implement me")
+	lggr := logutil.WithContextValues(ctx, l.lggr)
+
+	// 1. Build Batch Request
+	contractBatch := make([]types.BatchRead, 0, len(selectors))
+	for _, chain := range selectors {
+		contractBatch = append(contractBatch, types.BatchRead{
+			ReadName: consts.MethodNameGetFeePriceUpdate,
+			Params: map[string]any{
+				// That actually means that this selector is a source chain for the destChain
+				"destChainSelector": chain,
+			},
+			// Pass a new pointer directly for type inference by the reader
+			ReturnVal: new(cciptypes.TimestampedUnixBig),
+		})
+	}
+
+	// 2. Execute Batch Request
+	batchResult, _, err := l.contractReader.ExtendedBatchGetLatestValues(
+		ctx,
+		contractreader.ExtendedBatchGetLatestValuesRequest{
+			consts.ContractNameFeeQuoter: contractBatch,
+		},
+		false, // Don't allow stale reads for fee updates
+	)
+
+	if err != nil {
+		lggr.Errorw("failed to batch get chain fee price updates", "err", err)
+		return make(map[cciptypes.ChainSelector]cciptypes.TimestampedBig) // Return a new empty map
+	}
+
+	// 3. Find FeeQuoter Results
+	var feeQuoterResults []types.BatchReadResult
+	found := false
+	for contract, results := range batchResult {
+		if contract.Name == consts.ContractNameFeeQuoter {
+			feeQuoterResults = results
+			found = true
+			break // Found the results, exit loop
+		}
+	}
+
+	if !found {
+		lggr.Errorw("FeeQuoter results missing from batch response")
+		return make(map[cciptypes.ChainSelector]cciptypes.TimestampedBig) // Return a new empty map
+	}
+
+	if len(feeQuoterResults) != len(selectors) {
+		lggr.Errorw("Mismatch between requested selectors and results count",
+			"selectors", len(selectors),
+			"results", len(feeQuoterResults))
+		// Continue processing the results we did get, but this might indicate an issue
+	}
+
+	// 4. Process Results using helper
+	return l.processFeePriceUpdateResults(lggr, selectors, feeQuoterResults)
+}
+
+// processFeePriceUpdateResults iterates through batch results, validates them,
+// and returns a new feeUpdates map.
+func (l *DefaultAccessor) processFeePriceUpdateResults(
+	lggr logger.Logger,
+	selectors []cciptypes.ChainSelector,
+	results []types.BatchReadResult,
+) map[cciptypes.ChainSelector]cciptypes.TimestampedBig {
+	feeUpdates := make(map[cciptypes.ChainSelector]cciptypes.TimestampedBig)
+
+	for i, chain := range selectors {
+		if i >= len(results) {
+			// Log error if we have fewer results than requested selectors
+			lggr.Errorw("Skipping selector due to missing result",
+				"selectorIndex", i,
+				"chain", chain,
+				"lenFeeQuoterResults", len(results))
+			continue
+		}
+
+		readResult := results[i]
+		val, err := readResult.GetResult()
+		if err != nil {
+			lggr.Warnw("failed to get chain fee price update from batch result",
+				"chain", chain,
+				"err", err)
+			continue
+		}
+
+		// Type assert the result
+		update, ok := val.(*cciptypes.TimestampedUnixBig)
+		if !ok || update == nil {
+			lggr.Warnw("Invalid type or nil value received for chain fee price update",
+				"chain", chain,
+				"type", fmt.Sprintf("%T", val),
+				"ok", ok)
+			continue
+		}
+
+		// Check if the update is empty
+		if update.Timestamp == 0 || update.Value == nil {
+			lggr.Debugw("chain fee price update is empty",
+				"chain", chain,
+				"update", update)
+			continue
+		}
+
+		// Add valid update to the map
+		feeUpdates[chain] = cciptypes.TimeStampedBigFromUnix(*update)
+	}
+
+	return feeUpdates
 }
 
 func (l *DefaultAccessor) GetLatestPriceSeqNr(ctx context.Context) (uint64, error) {
