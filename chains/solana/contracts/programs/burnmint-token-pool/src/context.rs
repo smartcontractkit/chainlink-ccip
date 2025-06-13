@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::{
     associated_token::get_associated_token_address_with_program_id,
-    token_interface::{Mint, TokenAccount},
+    token_interface::{Mint, TokenAccount, TokenInterface},
 };
 use base_token_pool::common::*;
 use ccip_common::seed;
@@ -103,8 +103,7 @@ pub struct TransferMintAuthority<'info> {
     #[account(mut)]
     pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
     #[account(address = *mint.to_account_info().owner)]
-    /// CHECK: CPI to token program
-    pub token_program: AccountInfo<'info>,
+    pub token_program: Interface<'info, TokenInterface>,
     #[account(
         seeds = [POOL_SIGNER_SEED, mint.key().as_ref()],
         bump,
@@ -113,6 +112,10 @@ pub struct TransferMintAuthority<'info> {
     /// CHECK: unchecked CPI signer
     pub pool_signer: UncheckedAccount<'info>,
     pub authority: Signer<'info>,
+
+    /// CHECK: The Multisig can be a Token 2022 Multisig or a SPL Token Multisig and there is no interface for it.
+    #[account(owner = *mint.to_account_info().owner @ CcipBnMTokenPoolError::InvalidMultisigOwner)]
+    pub new_multisig_mint_authority: UncheckedAccount<'info>, // new mint authority for the underlying token
 
     // Ensures that the provided program is the BurnmintTokenPool program,
     // and that its associated program data account matches the expected one.
@@ -242,8 +245,7 @@ pub struct TokenOfframp<'info> {
     )]
     pub state: Account<'info, State>,
     #[account(address = *mint.to_account_info().owner)]
-    /// CHECK: CPI to token program
-    pub token_program: AccountInfo<'info>,
+    pub token_program: Interface<'info, TokenInterface>,
     #[account(mut)]
     pub mint: InterfaceAccount<'info, Mint>,
     #[account(
@@ -461,6 +463,20 @@ pub struct DeleteChainConfig<'info> {
 pub enum CcipBnMTokenPoolError {
     #[msg("Invalid Multisig Mint")]
     InvalidMultisig,
+    #[msg("Mint Authority already set")]
+    MintAuthorityAlreadySet,
+    #[msg("Token with no Mint Authority")]
+    FixedMintToken,
+    #[msg("Invalid Multisig Account Data for Token 2022")]
+    InvalidToken2022Multisig,
+    #[msg("Invalid Multisig Account Data for SPL Token")]
+    InvalidSPLTokenMultisig,
+    #[msg("Token Pool Signer PDA must be signer of the Multisig")]
+    PoolSignerNotInMultisig,
+    #[msg("Multisig must have more than one signer")]
+    MultisigMustHaveMoreThanOneSigner,
+    #[msg("Multisig Owner must match Token Program ID")]
+    InvalidMultisigOwner,
 }
 
 // This account can not be declared in the common crate, the program ID for that Account would be incorrect.
