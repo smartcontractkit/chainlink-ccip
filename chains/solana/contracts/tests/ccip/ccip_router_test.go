@@ -105,7 +105,7 @@ func TestCCIPRouter(t *testing.T) {
 	token0Multisig := solana.MustPrivateKeyFromBase58("5BayUa1C1nfiSptuV521hYPKZZsjHJM5YDfWZJkyrDgnEhzvZS4x5Nuqn6n4E6anuqAc7dJpAr1faNUwyK99cf3C") // EkopXthh6nbLKkgEnACc94mygKsSfcaX4EjXLgt1LiR4
 
 	token0Mint := solana.MustPrivateKeyFromBase58("42uJJqZk4gFz6Q6ghMiaYrFdDapXhbufQdTCGJDMeyv2wN6wNBbXkBBPibF7xQQZemzRaDH66ouJmjfvWhPJKtQC")
-	token0, gerr := tokens.NewTokenPool(config.Token2022Program, config.CcipTokenPoolProgram, token0Mint.PublicKey())
+	token0, gerr := tokens.NewTokenPool(config.SPLTokenProgram, config.CcipTokenPoolProgram, token0Mint.PublicKey())
 	require.NoError(t, gerr)
 	token1Mint := solana.MustPrivateKeyFromBase58("5uBhsiup2KiXPNznVSZaFeuegvLXCtmVmuW4u7kfBbP3xSmT1BZgmapKYiCCwi8GUgwdSQniAah3rJaUJdhPprcB")
 	token1, gerr := tokens.NewTokenPool(config.Token2022Program, config.CcipTokenPoolProgram, token1Mint.PublicKey())
@@ -253,21 +253,21 @@ func TestCCIPRouter(t *testing.T) {
 
 			wsolPDA, _, aerr := state.FindFqBillingTokenConfigPDA(solana.SolMint, config.FeeQuoterProgram)
 			require.NoError(t, aerr)
-			wsolReceiver, _, rerr := tokens.FindAssociatedTokenAddress(solana.TokenProgramID, solana.SolMint, config.BillingSignerPDA)
+			wsolReceiver, _, rerr := tokens.FindAssociatedTokenAddress(config.SPLTokenProgram, solana.SolMint, config.BillingSignerPDA)
 			require.NoError(t, rerr)
 			wsolEvmConfigPDA, _, perr := state.FindFqPerChainPerTokenConfigPDA(config.EvmChainSelector, solana.SolMint, config.FeeQuoterProgram)
 			require.NoError(t, perr)
-			wsolUserATA, _, uerr := tokens.FindAssociatedTokenAddress(solana.TokenProgramID, solana.SolMint, user.PublicKey())
+			wsolUserATA, _, uerr := tokens.FindAssociatedTokenAddress(config.SPLTokenProgram, solana.SolMint, user.PublicKey())
 			require.NoError(t, uerr)
-			wsolAnotherUserATA, _, auerr := tokens.FindAssociatedTokenAddress(solana.TokenProgramID, solana.SolMint, anotherUser.PublicKey())
+			wsolAnotherUserATA, _, auerr := tokens.FindAssociatedTokenAddress(config.SPLTokenProgram, solana.SolMint, anotherUser.PublicKey())
 			require.NoError(t, auerr)
-			wsolTokenlessUserATA, _, tuerr := tokens.FindAssociatedTokenAddress(solana.TokenProgramID, solana.SolMint, tokenlessUser.PublicKey())
+			wsolTokenlessUserATA, _, tuerr := tokens.FindAssociatedTokenAddress(config.SPLTokenProgram, solana.SolMint, tokenlessUser.PublicKey())
 			require.NoError(t, tuerr)
-			wsolFeeAggregatorATA, _, fuerr := tokens.FindAssociatedTokenAddress(solana.TokenProgramID, solana.SolMint, feeAggregator.PublicKey())
+			wsolFeeAggregatorATA, _, fuerr := tokens.FindAssociatedTokenAddress(config.SPLTokenProgram, solana.SolMint, feeAggregator.PublicKey())
 			require.NoError(t, fuerr)
 
 			// persist the WSOL config for later use
-			wsol.program = solana.TokenProgramID
+			wsol.program = config.SPLTokenProgram
 			wsol.mint = solana.SolMint
 			wsol.fqBillingConfigPDA = wsolPDA
 			wsol.userATA = wsolUserATA
@@ -385,7 +385,7 @@ func TestCCIPRouter(t *testing.T) {
 			ix0, ixErr0 := tokens.CreateToken(ctx, token0.Program, token0.Mint, token0PoolAdmin.PublicKey(), token0Decimals, solanaGoClient, config.DefaultCommitment)
 			require.NoError(t, ixErr0)
 
-			ixMsig, ixErrMsig := tokens.CreateMultisig(ctx, user.PublicKey(), token0.Program, token0Multisig.PublicKey(), []solana.PublicKey{token0PoolAdmin.PublicKey(), token0.PoolSigner}, solanaGoClient, config.DefaultCommitment)
+			ixMsig, ixErrMsig := tokens.CreateMultisig(ctx, user.PublicKey(), config.SPLTokenProgram, token0Multisig.PublicKey(), 1, []solana.PublicKey{token0PoolAdmin.PublicKey(), token0.PoolSigner}, solanaGoClient, config.DefaultCommitment)
 			require.NoError(t, ixErrMsig)
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, ixMsig, token0PoolAdmin, config.DefaultCommitment, common.AddSigners(token0Multisig, user))
 
@@ -618,8 +618,8 @@ func TestCCIPRouter(t *testing.T) {
 				config.EvmDestChainStatePDA,
 				config.SvmDestChainStatePDA,
 				solana.SystemProgramID,
-				solana.TokenProgramID,
-				solana.Token2022ProgramID,
+				config.SPLTokenProgram,
+				config.Token2022Program,
 				config.FeeQuoterProgram,
 				config.FqConfigPDA,
 				config.FqEvmDestChainPDA,
@@ -5315,7 +5315,7 @@ func TestCCIPRouter(t *testing.T) {
 		require.NoError(t, err)
 		senderSvmDestChainConfigPDA, _, err := solana.FindProgramAddress([][]byte{[]byte("remote_chain_config"), common.Uint64ToLE(config.SvmChainSelector)}, config.CcipBaseSender)
 		require.NoError(t, err)
-		wsolATAIx, wsolSenderATA, err := tokens.CreateAssociatedTokenAccount(solana.TokenProgramID, solana.SolMint, senderPDA, user.PublicKey())
+		wsolATAIx, wsolSenderATA, err := tokens.CreateAssociatedTokenAccount(config.SPLTokenProgram, solana.SolMint, senderPDA, user.PublicKey())
 		require.NoError(t, err)
 		link22ATAIx, link22SenderATA, err := tokens.CreateAssociatedTokenAccount(config.Token2022Program, link22.mint, senderPDA, user.PublicKey())
 		require.NoError(t, err)
@@ -5624,7 +5624,7 @@ func TestCCIPRouter(t *testing.T) {
 				config.RouterConfigPDA,
 				config.EvmDestChainStatePDA,
 				senderEvmNoncePDA,
-				solana.TokenProgramID,
+				config.SPLTokenProgram,
 				wsol.mint,
 				wsolSenderATA,
 				wsol.billingATA,

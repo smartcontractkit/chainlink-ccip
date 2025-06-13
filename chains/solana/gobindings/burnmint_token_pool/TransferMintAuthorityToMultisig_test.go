@@ -10,18 +10,18 @@ import (
 	"testing"
 )
 
-func TestEncodeDecode_TransferMintAuthority(t *testing.T) {
+func TestEncodeDecode_TransferMintAuthorityToMultisig(t *testing.T) {
 	fu := ag_gofuzz.New().NilChance(0)
 	for i := 0; i < 1; i++ {
-		t.Run("TransferMintAuthority"+strconv.Itoa(i), func(t *testing.T) {
+		t.Run("TransferMintAuthorityToMultisig"+strconv.Itoa(i), func(t *testing.T) {
 			{
-				params := new(TransferMintAuthority)
+				params := new(TransferMintAuthorityToMultisig)
 				fu.Fuzz(params)
 				params.AccountMetaSlice = nil
 				buf := new(bytes.Buffer)
 				err := encodeT(*params, buf)
 				ag_require.NoError(t, err)
-				got := new(TransferMintAuthority)
+				got := new(TransferMintAuthorityToMultisig)
 				err = decodeT(got, buf.Bytes())
 				got.AccountMetaSlice = nil
 				ag_require.NoError(t, err)

@@ -55,7 +55,7 @@ func CreateToken(ctx context.Context, program, mint, admin solana.PublicKey, dec
 	return []solana.Instruction{initI, mintWrap}, nil
 }
 
-func CreateMultisig(ctx context.Context, payer, program, multisig solana.PublicKey, signers []solana.PublicKey, client *rpc.Client, commitment rpc.CommitmentType) ([]solana.Instruction, error) {
+func CreateMultisig(ctx context.Context, payer, program, multisig solana.PublicKey, m uint8, signers []solana.PublicKey, client *rpc.Client, commitment rpc.CommitmentType) ([]solana.Instruction, error) {
 	// get stake amount for init
 	lamports, err := client.GetMinimumBalanceForRentExemption(ctx, 355, commitment)
 	if err != nil {
@@ -70,7 +70,7 @@ func CreateMultisig(ctx context.Context, payer, program, multisig solana.PublicK
 
 	// Manually add the signer metas, as the SDK wrongly tries to set them as transaction signers
 	// when they are just meant to be registered as part of the multisig
-	raw := token.NewInitializeMultisig2Instruction(1, multisig, []solana.PublicKey{})
+	raw := token.NewInitializeMultisig2Instruction(m, multisig, []solana.PublicKey{})
 	for _, signer := range signers {
 		raw.Signers = append(raw.Signers, solana.Meta(signer))
 	}
