@@ -36,7 +36,6 @@ declare_id!("Ccip842gzYHhvdDkSyi2YVCoAWPbYJoApMFzSxQroE9C");
 /// thus making it easier to ensure later on that logic can be changed during upgrades without affecting the interface.
 pub mod ccip_router {
     #![warn(missing_docs)]
-
     use super::*;
 
     //////////////////////////
@@ -511,6 +510,50 @@ pub mod ccip_router {
         )
         .get_fee(ctx, dest_chain_selector, message)
     }
+
+    /// Automatically derives all acounts required to call `ccip_send`.
+    ///
+    /// This method receives the bare minimum amount of information needed to construct
+    /// the entire account list to send a transaction, and builds it iteratively
+    /// over the course of multiple calls.
+    ///
+    /// The return type contains:
+    ///
+    /// * `accounts_to_save`: The caller must append these accounts to a list they maintain.
+    ///   When complete, this list will contain all accounts needed to call `ccip_send`.
+    /// * `ask_again_with`: When this list is not empty, the caller must call `derive_accounts_ccip_send`
+    ///   again, including exactly these accounts as the `remaining_accounts`.
+    /// * `lookup_tables_to_save`: The caller must save those LUTs. They can be used for `ccip_send`.
+    /// * `current_stage`: A string describing the current stage of the derivation process. When the stage
+    ///   is "TokenTransferAccounts", it means the `accounts_to_save` block in this response contains
+    ///   all accounts relating to a single token being transferred. Use this information to construct
+    ///   the `token_indexes` vector that `ccip_send` requires.
+    /// * `next_stage`: If nonempty, this means the instruction must get called again with this value
+    ///   as the `stage` argument.
+    ///
+    /// Therefore, and starting with an empty `remaining_accounts` list, the caller must repeteadly
+    /// call `derive_accounts_ccip_send` until `next_stage` is returned empty.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx`: Context containing only the config.
+    /// * `stage`: Requested derivation stage. Pass "Start" the first time, then for each subsequent
+    ///   call, pass the value returned in `response.next_stage` until empty.
+    /// * `params`:
+    ///    * `ccip_send_caller`: Public key of the account that will sign the call to `ccip_send`.
+    ///    * `dest_chain_selector`: CCIP chain selector for the dest chain.
+    ///    * `fee_token_mint`: The mint address for the token used for fees. Pubkey::default() if native SOL.
+    ///    * `mints_of_transferred_token`: List of all token mints for tokens being transferred.
+    pub fn derive_accounts_ccip_send<'info>(
+        ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
+        params: DeriveAccountsCcipSendParams,
+        stage: String,
+    ) -> Result<DeriveAccountsResponse> {
+        let default_code_version: CodeVersion = ctx.accounts.config.default_code_version;
+
+        router::onramp(default_code_version, default_code_version)
+            .derive_accounts_ccip_send(ctx, params, stage)
+    }
 }
 
 #[error_code]
@@ -569,4 +612,8 @@ pub enum CcipRouterError {
     InvalidCodeVersion,
     #[msg("Invalid rollback attempt on the CCIP version of the onramp to the destination chain")]
     InvalidCcipVersionRollback,
+    #[msg("Invalid account list for PDA derivation")]
+    InvalidAccountListForPdaDerivation,
+    #[msg("Unexpected account derivation stage")]
+    InvalidDerivationStage,
 }

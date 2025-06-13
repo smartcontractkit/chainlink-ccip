@@ -1166,6 +1166,66 @@ export type CcipRouter = {
       "returns": {
         "defined": "GetFeeResult"
       }
+    },
+    {
+      "name": "deriveAccountsCcipSend",
+      "docs": [
+        "Automatically derives all acounts required to call `ccip_send`.",
+        "",
+        "This method receives the bare minimum amount of information needed to construct",
+        "the entire account list to send a transaction, and builds it iteratively",
+        "over the course of multiple calls.",
+        "",
+        "The return type contains:",
+        "",
+        "* `accounts_to_save`: The caller must append these accounts to a list they maintain.",
+        "When complete, this list will contain all accounts needed to call `ccip_send`.",
+        "* `ask_again_with`: When this list is not empty, the caller must call `derive_accounts_ccip_send`",
+        "again, including exactly these accounts as the `remaining_accounts`.",
+        "* `lookup_tables_to_save`: The caller must save those LUTs. They can be used for `ccip_send`.",
+        "* `current_stage`: A string describing the current stage of the derivation process. When the stage",
+        "is \"TokenTransferAccounts\", it means the `accounts_to_save` block in this response contains",
+        "all accounts relating to a single token being transferred. Use this information to construct",
+        "the `token_indexes` vector that `ccip_send` requires.",
+        "* `next_stage`: If nonempty, this means the instruction must get called again with this value",
+        "as the `stage` argument.",
+        "",
+        "Therefore, and starting with an empty `remaining_accounts` list, the caller must repeteadly",
+        "call `derive_accounts_ccip_send` until `next_stage` is returned empty.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx`: Context containing only the config.",
+        "* `stage`: Requested derivation stage. Pass \"Start\" the first time, then for each subsequent",
+        "call, pass the value returned in `response.next_stage` until empty.",
+        "* `params`:",
+        "* `ccip_send_caller`: Public key of the account that will sign the call to `ccip_send`.",
+        "* `dest_chain_selector`: CCIP chain selector for the dest chain.",
+        "* `fee_token_mint`: The mint address for the token used for fees. Pubkey::default() if native SOL.",
+        "* `mints_of_transferred_token`: List of all token mints for tokens being transferred."
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "params",
+          "type": {
+            "defined": "DeriveAccountsCcipSendParams"
+          }
+        },
+        {
+          "name": "stage",
+          "type": "string"
+        }
+      ],
+      "returns": {
+        "defined": "DeriveAccountsResponse"
+      }
     }
   ],
   "accounts": [
@@ -1512,6 +1572,129 @@ export type CcipRouter = {
           {
             "name": "allowListEnabled",
             "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DeriveAccountsResponse",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "askAgainWith",
+            "docs": [
+              "If this vector is not empty, you must call the `derive_` method again including",
+              "exactly these accounts as the `remaining_accounts` field."
+            ],
+            "type": {
+              "vec": {
+                "defined": "CcipAccountMeta"
+              }
+            }
+          },
+          {
+            "name": "accountsToSave",
+            "docs": [
+              "You must append these accounts at the end of a separate list. When `next_stage`",
+              "is finally empty, this separate list will contain all the accounts to use for the",
+              "instruction of interest."
+            ],
+            "type": {
+              "vec": {
+                "defined": "CcipAccountMeta"
+              }
+            }
+          },
+          {
+            "name": "lookUpTablesToSave",
+            "docs": [
+              "Append these look up tables at the end of a list. It will contain all LUTs",
+              "that the instruction of interest can use."
+            ],
+            "type": {
+              "vec": "publicKey"
+            }
+          },
+          {
+            "name": "currentStage",
+            "docs": [
+              "Identifies the derivation stage."
+            ],
+            "type": "string"
+          },
+          {
+            "name": "nextStage",
+            "docs": [
+              "Identifies the next derivation stage. If empty, the derivation is complete."
+            ],
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CcipAccountMeta",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pubkey",
+            "type": "publicKey"
+          },
+          {
+            "name": "isSigner",
+            "type": "bool"
+          },
+          {
+            "name": "isWritable",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DeriveAccountsCcipSendParams",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "destChainSelector",
+            "type": "u64"
+          },
+          {
+            "name": "ccipSendCaller",
+            "type": "publicKey"
+          },
+          {
+            "name": "feeTokenMint",
+            "type": "publicKey"
+          },
+          {
+            "name": "mintsOfTransferredTokens",
+            "type": {
+              "vec": "publicKey"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "DeriveAccountsCcipSendStage",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Start"
+          },
+          {
+            "name": "FinishMainAccountList"
+          },
+          {
+            "name": "RetrieveTokenLUTs"
+          },
+          {
+            "name": "TokenTransferAccounts"
           }
         ]
       }
@@ -1966,6 +2149,16 @@ export type CcipRouter = {
       "code": 7025,
       "name": "InvalidCcipVersionRollback",
       "msg": "Invalid rollback attempt on the CCIP version of the onramp to the destination chain"
+    },
+    {
+      "code": 7026,
+      "name": "InvalidAccountListForPdaDerivation",
+      "msg": "Invalid account list for PDA derivation"
+    },
+    {
+      "code": 7027,
+      "name": "InvalidDerivationStage",
+      "msg": "Unexpected account derivation stage"
     }
   ]
 };
@@ -3138,6 +3331,66 @@ export const IDL: CcipRouter = {
       "returns": {
         "defined": "GetFeeResult"
       }
+    },
+    {
+      "name": "deriveAccountsCcipSend",
+      "docs": [
+        "Automatically derives all acounts required to call `ccip_send`.",
+        "",
+        "This method receives the bare minimum amount of information needed to construct",
+        "the entire account list to send a transaction, and builds it iteratively",
+        "over the course of multiple calls.",
+        "",
+        "The return type contains:",
+        "",
+        "* `accounts_to_save`: The caller must append these accounts to a list they maintain.",
+        "When complete, this list will contain all accounts needed to call `ccip_send`.",
+        "* `ask_again_with`: When this list is not empty, the caller must call `derive_accounts_ccip_send`",
+        "again, including exactly these accounts as the `remaining_accounts`.",
+        "* `lookup_tables_to_save`: The caller must save those LUTs. They can be used for `ccip_send`.",
+        "* `current_stage`: A string describing the current stage of the derivation process. When the stage",
+        "is \"TokenTransferAccounts\", it means the `accounts_to_save` block in this response contains",
+        "all accounts relating to a single token being transferred. Use this information to construct",
+        "the `token_indexes` vector that `ccip_send` requires.",
+        "* `next_stage`: If nonempty, this means the instruction must get called again with this value",
+        "as the `stage` argument.",
+        "",
+        "Therefore, and starting with an empty `remaining_accounts` list, the caller must repeteadly",
+        "call `derive_accounts_ccip_send` until `next_stage` is returned empty.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx`: Context containing only the config.",
+        "* `stage`: Requested derivation stage. Pass \"Start\" the first time, then for each subsequent",
+        "call, pass the value returned in `response.next_stage` until empty.",
+        "* `params`:",
+        "* `ccip_send_caller`: Public key of the account that will sign the call to `ccip_send`.",
+        "* `dest_chain_selector`: CCIP chain selector for the dest chain.",
+        "* `fee_token_mint`: The mint address for the token used for fees. Pubkey::default() if native SOL.",
+        "* `mints_of_transferred_token`: List of all token mints for tokens being transferred."
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "params",
+          "type": {
+            "defined": "DeriveAccountsCcipSendParams"
+          }
+        },
+        {
+          "name": "stage",
+          "type": "string"
+        }
+      ],
+      "returns": {
+        "defined": "DeriveAccountsResponse"
+      }
     }
   ],
   "accounts": [
@@ -3484,6 +3737,129 @@ export const IDL: CcipRouter = {
           {
             "name": "allowListEnabled",
             "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DeriveAccountsResponse",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "askAgainWith",
+            "docs": [
+              "If this vector is not empty, you must call the `derive_` method again including",
+              "exactly these accounts as the `remaining_accounts` field."
+            ],
+            "type": {
+              "vec": {
+                "defined": "CcipAccountMeta"
+              }
+            }
+          },
+          {
+            "name": "accountsToSave",
+            "docs": [
+              "You must append these accounts at the end of a separate list. When `next_stage`",
+              "is finally empty, this separate list will contain all the accounts to use for the",
+              "instruction of interest."
+            ],
+            "type": {
+              "vec": {
+                "defined": "CcipAccountMeta"
+              }
+            }
+          },
+          {
+            "name": "lookUpTablesToSave",
+            "docs": [
+              "Append these look up tables at the end of a list. It will contain all LUTs",
+              "that the instruction of interest can use."
+            ],
+            "type": {
+              "vec": "publicKey"
+            }
+          },
+          {
+            "name": "currentStage",
+            "docs": [
+              "Identifies the derivation stage."
+            ],
+            "type": "string"
+          },
+          {
+            "name": "nextStage",
+            "docs": [
+              "Identifies the next derivation stage. If empty, the derivation is complete."
+            ],
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CcipAccountMeta",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pubkey",
+            "type": "publicKey"
+          },
+          {
+            "name": "isSigner",
+            "type": "bool"
+          },
+          {
+            "name": "isWritable",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DeriveAccountsCcipSendParams",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "destChainSelector",
+            "type": "u64"
+          },
+          {
+            "name": "ccipSendCaller",
+            "type": "publicKey"
+          },
+          {
+            "name": "feeTokenMint",
+            "type": "publicKey"
+          },
+          {
+            "name": "mintsOfTransferredTokens",
+            "type": {
+              "vec": "publicKey"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "DeriveAccountsCcipSendStage",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Start"
+          },
+          {
+            "name": "FinishMainAccountList"
+          },
+          {
+            "name": "RetrieveTokenLUTs"
+          },
+          {
+            "name": "TokenTransferAccounts"
           }
         ]
       }
@@ -3938,6 +4314,16 @@ export const IDL: CcipRouter = {
       "code": 7025,
       "name": "InvalidCcipVersionRollback",
       "msg": "Invalid rollback attempt on the CCIP version of the onramp to the destination chain"
+    },
+    {
+      "code": 7026,
+      "name": "InvalidAccountListForPdaDerivation",
+      "msg": "Invalid account list for PDA derivation"
+    },
+    {
+      "code": 7027,
+      "name": "InvalidDerivationStage",
+      "msg": "Unexpected account derivation stage"
     }
   ]
 };
