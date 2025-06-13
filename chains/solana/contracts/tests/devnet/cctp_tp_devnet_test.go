@@ -1,3 +1,6 @@
+//go:build devnet
+// +build devnet
+
 package contracts
 
 import (

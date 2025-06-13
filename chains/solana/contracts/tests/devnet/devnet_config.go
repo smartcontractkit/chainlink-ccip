@@ -1,3 +1,6 @@
+//go:build devnet
+// +build devnet
+
 package contracts
 
 import (
@@ -99,16 +102,4 @@ func (s *senderPDAs) FindChainConfig(t *testing.T, chainSelector uint64) solana.
 	pda, _, err := solana.FindProgramAddress([][]byte{[]byte("remote_chain_config"), chainSelectorLE}, s.program)
 	require.NoError(t, err)
 	return pda
-}
-
-func getSenderPDAs(senderProgram solana.PublicKey) (senderPDAs, error) {
-	senderStatePDA, _, err := solana.FindProgramAddress([][]byte{[]byte("state")}, senderProgram)
-	if err != nil {
-		return senderPDAs{}, err
-	}
-
-	return senderPDAs{
-		program: senderProgram,
-		state:   senderStatePDA,
-	}, nil
 }

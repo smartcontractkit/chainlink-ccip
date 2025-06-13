@@ -33,7 +33,7 @@ rust-tests:
 
 .PHONY: lint-go
 lint-go:
-	golangci-lint --max-issues-per-linter 0 --max-same-issues 0 --color=always --exclude=dot-imports --timeout 15m --out-format checkstyle:golangci-lint-report.xml --exclude-dirs devnet run
+	golangci-lint --max-issues-per-linter 0 --max-same-issues 0 --color=always --exclude=dot-imports --timeout 15m --out-format checkstyle:golangci-lint-report.xml run
 
 .PHONY: lint-go-fix
 lint-go-fix:
@@ -49,7 +49,7 @@ format:
 
 .PHONY: go-tests
 go-tests:
-	go test -v ./... -skip 'Devnet' -json -covermode=atomic -coverpkg=./... -coverprofile=integration_coverage.txt 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci=true -singlepackage=true -hidepassingtests=false -hidepassinglogs=false
+	go test -v ./... -json -covermode=atomic -coverpkg=./... -coverprofile=integration_coverage.txt 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci=true -singlepackage=true -hidepassingtests=false -hidepassinglogs=false
 
 .PHONY: ccip-router-contracts-go-tests
 ccip-router-contracts-go-tests:
