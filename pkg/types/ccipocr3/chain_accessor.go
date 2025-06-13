@@ -101,7 +101,7 @@ type DestinationAccessor interface {
 	// Confidence: Unconfirmed, Finalized
 	ExecutedMessages(
 		ctx context.Context,
-		ranges map[ChainSelector]SeqNumRange,
+		ranges map[ChainSelector][]SeqNumRange,
 		confidence ConfidenceLevel,
 	) (map[ChainSelector][]SeqNum, error)
 
