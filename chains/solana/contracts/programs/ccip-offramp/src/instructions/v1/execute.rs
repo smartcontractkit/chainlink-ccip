@@ -1,9 +1,12 @@
+use std::str::FromStr;
+
 use anchor_lang::prelude::*;
 use ccip_common::seed;
 use ccip_common::v1::{validate_and_parse_token_accounts, TokenAccounts, MIN_TOKEN_POOL_ACCOUNTS};
 use solana_program::instruction::Instruction;
 use solana_program::program::invoke_signed;
 
+use crate::context::ViewConfigOnly;
 use crate::context::{BufferExecutionReportContext, ExecuteReportContext, OcrPluginType};
 use crate::event::{ExecutionStateChanged, SkippedAlreadyExecutedMessage};
 use crate::instructions::interfaces::Execute;
@@ -11,7 +14,8 @@ use crate::messages::{
     Any2SVMRampMessage, ExecutionReportSingleChain, RampMessageHeader, SVMTokenAmount,
 };
 use crate::state::{
-    CommitReport, ExecutionReportBuffer, MessageExecutionState, OnRampAddress, SourceChain,
+    CommitReport, DeriveAccountsExecuteParams, DeriveAccountsResponse, ExecutionReportBuffer,
+    MessageExecutionState, OnRampAddress, SourceChain,
 };
 use crate::CcipOfframpError;
 
@@ -22,6 +26,7 @@ use super::ocr3base::{ocr3_transmit, ReportContext, Signatures};
 use super::ocr3impl::Ocr3ReportForExecutionReportSingleChain;
 use super::pools::{get_balance, interact_with_pool, CCIP_POOL_V1_RET_BYTES};
 use super::rmn::verify_uncursed_cpi;
+mod derive;
 
 pub struct Impl;
 impl Execute for Impl {
@@ -110,12 +115,16 @@ impl Execute for Impl {
     fn buffer_execution_report(
         &self,
         ctx: Context<BufferExecutionReportContext>,
-        _buffer_id: Vec<u8>,
+        buffer_id: Vec<u8>,
         report_length: u32,
         chunk: Vec<u8>,
         chunk_index: u8,
         num_chunks: u8,
     ) -> Result<()> {
+        require!(
+            buffer_id.len() <= 32 && !buffer_id.is_empty(),
+            CcipOfframpError::ExecutionReportBufferInvalidIdSize
+        );
         ctx.accounts.execution_report_buffer.add_chunk(
             report_length,
             &chunk,
@@ -123,12 +132,57 @@ impl Execute for Impl {
             num_chunks,
         )
     }
+
+    fn derive_accounts_execute<'info>(
+        &self,
+        ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
+        DeriveAccountsExecuteParams {
+            execute_caller,
+            message_accounts,
+            source_chain_selector,
+            mints_of_transferred_tokens,
+            merkle_root,
+            buffer_id,
+            token_receiver,
+        }: DeriveAccountsExecuteParams,
+        stage: String,
+    ) -> Result<DeriveAccountsResponse> {
+        let stage = derive::DeriveExecuteAccountsStage::from_str(stage.as_str())?;
+
+        match stage {
+            derive::DeriveExecuteAccountsStage::GatherBasicInfo => {
+                derive::derive_execute_accounts_gather_basic_info(source_chain_selector)
+            }
+            derive::DeriveExecuteAccountsStage::BuildMainAccountList => {
+                derive::derive_execute_accounts_build_main_account_list(
+                    ctx,
+                    source_chain_selector,
+                    &merkle_root,
+                    execute_caller,
+                    &mints_of_transferred_tokens,
+                    &message_accounts,
+                    &buffer_id,
+                )
+            }
+            derive::DeriveExecuteAccountsStage::RetrieveTokenLUTs => {
+                derive::derive_execute_accounts_retrieve_luts(ctx)
+            }
+            derive::DeriveExecuteAccountsStage::TokenTransferAccounts => {
+                derive::derive_execute_accounts_additional_tokens(
+                    ctx,
+                    execute_caller,
+                    token_receiver,
+                    source_chain_selector,
+                    &buffer_id,
+                )
+            }
+        }
+    }
 }
 
 /////////////
 // Helpers //
 /////////////
-
 fn ocr3_transmit_report<'info>(
     ctx: &Context<'_, '_, 'info, 'info, ExecuteReportContext<'info>>,
     execution_report: &ExecutionReportSingleChain,
