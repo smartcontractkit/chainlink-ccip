@@ -310,12 +310,12 @@ func TestCctpTpDevnet(t *testing.T) {
 		var nonces ccip_router.Nonce
 		err = common.GetAccountDataBorshInto(ctx, client, routerNoncesPDA, rpc.CommitmentConfirmed, &nonces)
 		if err != nil {
-			fmt.Println("WARNING: Nonce account error, initializing to 1 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+			fmt.Println("WARNING: Nonce account error, initializing it !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
 			fmt.Println(err)
 			nonces = ccip_router.Nonce{
-				Version:        0,
-				OrderedCounter: 0,
-				FullCounter:    0,
+				Version:      0,
+				OrderedNonce: 0,
+				TotalNonce:   0,
 			}
 		}
 		fmt.Printf("Nonces: %v\n", nonces)
@@ -326,7 +326,7 @@ func TestCctpTpDevnet(t *testing.T) {
 				[]byte("cctp_message_sent_event"),
 				admin.PublicKey().Bytes(), // original sender
 				common.Uint64ToLE(chainSelector),
-				common.Uint64ToLE(nonces.FullCounter + 1), // next counter, as it will be incremented for the new msg
+				common.Uint64ToLE(nonces.TotalNonce + 1), // next counter, as it will be incremented for the new msg
 			},
 			cctpTpProgram,
 		)

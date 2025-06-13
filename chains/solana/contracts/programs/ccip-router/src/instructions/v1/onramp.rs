@@ -229,7 +229,7 @@ impl OnRamp for Impl {
                     original_sender: ctx.accounts.authority.key(),
                     amount: token_amount.amount,
                     local_token: token_amount.token,
-                    msg_full_nonce: total_nonce,
+                    msg_total_nonce: total_nonce,
                 };
 
                 let mut acc_infos = current_token_accounts

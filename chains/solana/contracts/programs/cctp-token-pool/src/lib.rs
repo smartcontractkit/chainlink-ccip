@@ -286,7 +286,7 @@ pub mod cctp_token_pool {
         emit!(CctpMessageSentEvent {
             original_sender: lock_or_burn.original_sender,
             remote_chain_selector: lock_or_burn.remote_chain_selector,
-            msg_full_nonce: lock_or_burn.msg_full_nonce,
+            msg_full_nonce: lock_or_burn.msg_total_nonce,
             event_address: ctx.accounts.cctp_message_sent_event.key(),
             message_sent_bytes: cctp_message_bytes.to_vec(),
         });
@@ -462,7 +462,7 @@ fn cctp_deposit_for_burn_with_caller(
         MESSAGE_SENT_EVENT_SEED,
         &lock_or_burn.original_sender.to_bytes(),
         &lock_or_burn.remote_chain_selector.to_le_bytes(),
-        &lock_or_burn.msg_full_nonce.to_le_bytes(),
+        &lock_or_burn.msg_total_nonce.to_le_bytes(),
         &[ctx.bumps.cctp_message_sent_event],
     ];
 

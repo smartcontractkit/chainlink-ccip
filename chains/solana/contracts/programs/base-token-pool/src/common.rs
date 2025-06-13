@@ -298,7 +298,7 @@ pub struct LockOrBurnInV1 {
     pub amount: u64, // local solana amount to lock/burn,  The amount of tokens to lock or burn, denominated in the source token's decimals
     pub local_token: Pubkey, //  The address on this chain of the token to lock or burn
 
-    pub msg_full_nonce: u64, // The onramp full nonce for the current message, given the original_sender and remote chain selector.
+    pub msg_total_nonce: u64, // The onramp full nonce for the current message, given the original_sender and remote chain selector.
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
