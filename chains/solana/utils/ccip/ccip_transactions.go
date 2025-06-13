@@ -72,7 +72,7 @@ func AttestCCTP(message []byte, attesters []eth.Signer) ([]byte, error) {
 		copy(attestation[writeOffset:], rs)
 		writeOffset += signatureLength - 1 // 64 bytes for R and S
 		attestation[writeOffset] = v
-		writeOffset += 1
+		writeOffset++
 	}
 	return attestation, nil
 }
