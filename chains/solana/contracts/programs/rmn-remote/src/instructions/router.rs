@@ -16,7 +16,6 @@ use super::v1;
  * As we currently have a single version, all branches lead to the same outcome, but the code is structured in a way
  * that is easy to extend to multiple versions.
  */
-
 pub fn public(default_code_version: CodeVersion) -> &'static dyn Public {
     match default_code_version {
         CodeVersion::Default => &v1::public::Impl,
