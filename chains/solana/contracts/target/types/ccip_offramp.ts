@@ -1915,9 +1915,7 @@ export type CcipOfframp = {
               "that the instruction of interest can use."
             ],
             "type": {
-              "vec": {
-                "defined": "DerivedLookupTable"
-              }
+              "vec": "publicKey"
             }
           },
           {
@@ -1933,24 +1931,6 @@ export type CcipOfframp = {
               "Identifies the next derivation stage. If empty, the derivation is complete."
             ],
             "type": "string"
-          }
-        ]
-      }
-    },
-    {
-      "name": "DerivedLookupTable",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "address",
-            "type": "publicKey"
-          },
-          {
-            "name": "accounts",
-            "type": {
-              "vec": "publicKey"
-            }
           }
         ]
       }
@@ -4725,9 +4705,7 @@ export const IDL: CcipOfframp = {
               "that the instruction of interest can use."
             ],
             "type": {
-              "vec": {
-                "defined": "DerivedLookupTable"
-              }
+              "vec": "publicKey"
             }
           },
           {
@@ -4743,24 +4721,6 @@ export const IDL: CcipOfframp = {
               "Identifies the next derivation stage. If empty, the derivation is complete."
             ],
             "type": "string"
-          }
-        ]
-      }
-    },
-    {
-      "name": "DerivedLookupTable",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "address",
-            "type": "publicKey"
-          },
-          {
-            "name": "accounts",
-            "type": {
-              "vec": "publicKey"
-            }
           }
         ]
       }

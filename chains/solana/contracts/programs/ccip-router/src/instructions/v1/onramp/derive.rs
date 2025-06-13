@@ -12,10 +12,7 @@ use solana_program::address_lookup_table::state::AddressLookupTable;
 
 use crate::{
     context::ViewConfigOnly,
-    state::{
-        CcipAccountMeta, DeriveAccountsCcipSendParams, DeriveAccountsResponse, DerivedLookupTable,
-        ToMeta,
-    },
+    state::{CcipAccountMeta, DeriveAccountsCcipSendParams, DeriveAccountsResponse, ToMeta},
     CcipRouterError,
 };
 
@@ -285,10 +282,7 @@ pub fn derive_execute_accounts_additional_tokens<'info>(
     Ok(DeriveAccountsResponse {
         ask_again_with,
         accounts_to_save,
-        look_up_tables_to_save: vec![DerivedLookupTable {
-            address: *lut.key,
-            accounts: lookup_table_account.addresses.iter().cloned().collect(),
-        }],
+        look_up_tables_to_save: vec![*lut.key],
         current_stage: DeriveAccountsCcipSendStage::TokenTransferAccounts.to_string(),
         next_stage,
     })

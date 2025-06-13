@@ -5207,7 +5207,15 @@ func TestCCIPRouter(t *testing.T) {
 			builder.AccountMetaSlice = derivedAccounts
 			instruction, err := builder.ValidateAndBuild()
 			require.NoError(t, err)
-			result := testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, derivedLookUpTables)
+
+			lookupTables := ccipSendLookupTable
+			for _, table := range derivedLookUpTables {
+				entries, lutErr := common.GetAddressLookupTable(ctx, solanaGoClient, table)
+				require.NoError(t, lutErr)
+				lookupTables[table] = entries
+			}
+
+			result := testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, lookupTables)
 			require.NotNil(t, result)
 
 			ccipMessageSentEvent := ccip.EventCCIPMessageSent{}
@@ -5267,7 +5275,12 @@ func TestCCIPRouter(t *testing.T) {
 				[]solana.PublicKey{token0.Mint, token1.Mint},
 				solanaGoClient)
 
-			lookupTables := mergeLUTs(derivedLookUpTables, ccipSendLookupTable)
+			lookupTables := ccipSendLookupTable
+			for _, table := range derivedLookUpTables {
+				entries, lutErr := common.GetAddressLookupTable(ctx, solanaGoClient, table)
+				require.NoError(t, lutErr)
+				lookupTables[table] = entries
+			}
 
 			builder := ccip_router.NewCcipSendInstructionBuilder().
 				SetDestChainSelector(destinationChainSelector).
@@ -7408,7 +7421,7 @@ func TestCCIPRouter(t *testing.T) {
 				mintsOfTransferredTokens := []solana.PublicKey{}
 				bufferID := []byte{}
 
-				derivedAccounts, derivedLookUpTables := deriveExecutionAccounts(ctx,
+				derivedAccounts, derivedLookUpTables, tokenIndices := deriveExecutionAccounts(ctx,
 					t,
 					transmitter,
 					messagingAccounts,
@@ -7423,12 +7436,20 @@ func TestCCIPRouter(t *testing.T) {
 				builder := ccip_offramp.NewExecuteInstructionBuilder().
 					SetRawExecutionReport(rawExecutionReport).
 					SetReportContextByteWords(reportContext).
-					SetTokenIndexes([]byte{})
+					SetTokenIndexes(tokenIndices)
 				builder.AccountMetaSlice = derivedAccounts
 
 				instruction, err = builder.ValidateAndBuild()
 				require.NoError(t, err)
-				tx = testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, derivedLookUpTables)
+
+				lookupTables := offrampLookupTable
+				for _, table := range derivedLookUpTables {
+					entries, lutErr := common.GetAddressLookupTable(ctx, solanaGoClient, table)
+					require.NoError(t, lutErr)
+					lookupTables[table] = entries
+				}
+
+				tx = testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, lookupTables)
 
 				executionEvents, err := common.ParseMultipleEvents[ccip.EventExecutionStateChanged](tx.Meta.LogMessages, "ExecutionStateChanged", config.PrintEvents)
 				require.NoError(t, err)
@@ -8845,7 +8866,7 @@ func TestCCIPRouter(t *testing.T) {
 					mintsOfTransferredTokens := []solana.PublicKey{message.TokenAmounts[0].DestTokenAddress}
 					bufferID := []byte{}
 
-					derivedAccounts, derivedLookUpTables := deriveExecutionAccounts(ctx,
+					derivedAccounts, derivedLookUpTables, tokenIndices := deriveExecutionAccounts(ctx,
 						t,
 						transmitter,
 						messagingAccounts,
@@ -8859,12 +8880,18 @@ func TestCCIPRouter(t *testing.T) {
 					builder := ccip_offramp.NewExecuteInstructionBuilder().
 						SetRawExecutionReport(rawExecutionReport).
 						SetReportContextByteWords(reportContext).
-						SetTokenIndexes([]byte{5})
+						SetTokenIndexes(tokenIndices)
 					builder.AccountMetaSlice = derivedAccounts
 					instruction, err = builder.ValidateAndBuild()
 					require.NoError(t, err)
 
-					tx = testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, derivedLookUpTables, common.AddComputeUnitLimit(400_000))
+					lookupTables := offrampLookupTable
+					for _, table := range derivedLookUpTables {
+						entries, lutErr := common.GetAddressLookupTable(ctx, solanaGoClient, table)
+						require.NoError(t, lutErr)
+						lookupTables[table] = entries
+					}
+					tx = testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, lookupTables, common.AddComputeUnitLimit(400_000))
 
 					executionEvents, err := common.ParseMultipleEvents[ccip.EventExecutionStateChanged](tx.Meta.LogMessages, "ExecutionStateChanged", config.PrintEvents)
 					require.NoError(t, err)
@@ -10361,7 +10388,7 @@ func TestCCIPRouter(t *testing.T) {
 					ccip_offramp.CcipAccountMeta{Pubkey: solana.SystemProgramID, IsSigner: false, IsWritable: false},
 				)
 				mintsOfTransferredTokens := []solana.PublicKey{}
-				derivedAccounts, derivedLookUpTables := deriveExecutionAccounts(ctx,
+				derivedAccounts, derivedLookUpTables, tokenIndices := deriveExecutionAccounts(ctx,
 					t,
 					transmitter,
 					messagingAccounts,
@@ -10375,11 +10402,18 @@ func TestCCIPRouter(t *testing.T) {
 				builder := ccip_offramp.NewExecuteInstructionBuilder().
 					SetRawExecutionReport([]byte{}).
 					SetReportContextByteWords(reportContext).
-					SetTokenIndexes([]byte{})
+					SetTokenIndexes(tokenIndices)
 				builder.AccountMetaSlice = derivedAccounts
 				instruction, err = builder.ValidateAndBuild()
 				require.NoError(t, err)
-				tx = testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, derivedLookUpTables, common.AddComputeUnitLimit(1000000))
+
+				lookupTables := offrampLookupTable
+				for _, table := range derivedLookUpTables {
+					entries, lutErr := common.GetAddressLookupTable(ctx, solanaGoClient, table)
+					require.NoError(t, lutErr)
+					lookupTables[table] = entries
+				}
+				tx = testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, lookupTables, common.AddComputeUnitLimit(1000000))
 
 				executionEvents, err2 := common.ParseMultipleEvents[ccip.EventExecutionStateChanged](tx.Meta.LogMessages, "ExecutionStateChanged", config.PrintEvents)
 				require.NoError(t, err2)
@@ -10559,11 +10593,10 @@ func deriveExecutionAccounts(ctx context.Context,
 	merkleRoot [32]uint8,
 	bufferID []byte,
 	tokenReceiver solana.PublicKey,
-	solanaGoClient *rpc.Client) (accounts []*solana.AccountMeta, lookUpTables map[solana.PublicKey]solana.PublicKeySlice) {
+	solanaGoClient *rpc.Client) (accounts []*solana.AccountMeta, lookUpTables []solana.PublicKey, tokenIndices []byte) {
 	derivedAccounts := []*solana.AccountMeta{}
 	askWith := []*solana.AccountMeta{}
 	stage := "Start"
-	lookUpTables = make(map[solana.PublicKey]solana.PublicKeySlice)
 	for {
 		params := ccip_offramp.DeriveAccountsExecuteParams{
 			ExecuteCaller:            transmitter.PublicKey(),
@@ -10586,6 +10619,13 @@ func deriveExecutionAccounts(ctx context.Context,
 		tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{derive}, transmitter, config.DefaultCommitment)
 		derivation, err := common.ExtractAnchorTypedReturnValue[ccip_offramp.DeriveAccountsResponse](ctx, tx.Meta.LogMessages, config.CcipOfframpProgram.String())
 		require.NoError(t, err)
+
+		if derivation.CurrentStage == "TokenTransferAccounts" {
+			// We offset the current index from the capacity of the default meta slice (the fixed accounts)
+			tokenIndex := len(derivedAccounts) - cap(ccip_offramp.NewExecuteInstructionBuilder().AccountMetaSlice)
+			tokenIndices = append(tokenIndices, byte(tokenIndex))
+		}
+
 		for _, meta := range derivation.AccountsToSave {
 			derivedAccounts = append(derivedAccounts, &solana.AccountMeta{
 				PublicKey:  meta.Pubkey,
@@ -10593,6 +10633,7 @@ func deriveExecutionAccounts(ctx context.Context,
 				IsSigner:   meta.IsSigner,
 			})
 		}
+
 		askWith = []*solana.AccountMeta{}
 		for _, meta := range derivation.AskAgainWith {
 			askWith = append(askWith, &solana.AccountMeta{
@@ -10601,12 +10642,11 @@ func deriveExecutionAccounts(ctx context.Context,
 				IsSigner:   meta.IsSigner,
 			})
 		}
-		for _, table := range derivation.LookUpTablesToSave {
-			lookUpTables[table.Address] = table.Accounts
-		}
+
+		lookUpTables = append(lookUpTables, derivation.LookUpTablesToSave...)
 
 		if len(derivation.NextStage) == 0 {
-			return derivedAccounts, lookUpTables
+			return derivedAccounts, lookUpTables, tokenIndices
 		}
 		stage = derivation.NextStage
 	}
@@ -10618,12 +10658,11 @@ func deriveSendAccounts(ctx context.Context,
 	destChainSelector uint64,
 	feeTokenMint solana.PublicKey,
 	mintsOfTransferredTokens []solana.PublicKey,
-	solanaGoClient *rpc.Client) (accounts []*solana.AccountMeta, lookUpTables map[solana.PublicKey]solana.PublicKeySlice, tokenIndices []byte) {
+	solanaGoClient *rpc.Client) (accounts []*solana.AccountMeta, lookUpTables []solana.PublicKey, tokenIndices []byte) {
 	derivedAccounts := []*solana.AccountMeta{}
 	askWith := []*solana.AccountMeta{}
 	stage := "Start"
 	tokenIndex := byte(0)
-	lookUpTables = make(map[solana.PublicKey]solana.PublicKeySlice)
 	for {
 		params := ccip_router.DeriveAccountsCcipSendParams{
 			DestChainSelector:        destChainSelector,
@@ -10665,31 +10704,11 @@ func deriveSendAccounts(ctx context.Context,
 				IsSigner:   meta.IsSigner,
 			})
 		}
-		for _, table := range derivation.LookUpTablesToSave {
-			lookUpTables[table.Address] = table.Accounts
-		}
+		lookUpTables = append(lookUpTables, derivation.LookUpTablesToSave...)
 
 		if len(derivation.NextStage) == 0 {
 			return derivedAccounts, lookUpTables, tokenIndices
 		}
 		stage = derivation.NextStage
 	}
-}
-
-func mergeLUTs(a, b map[solana.PublicKey]solana.PublicKeySlice) map[solana.PublicKey]solana.PublicKeySlice {
-	result := make(map[solana.PublicKey]solana.PublicKeySlice)
-
-	for k, v := range a {
-		result[k] = append(solana.PublicKeySlice(nil), v...)
-	}
-
-	for k, v := range b {
-		if existing, ok := result[k]; ok {
-			result[k] = append(existing, v...)
-		} else {
-			result[k] = append(solana.PublicKeySlice(nil), v...)
-		}
-	}
-
-	return result
 }

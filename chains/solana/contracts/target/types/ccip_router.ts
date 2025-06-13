@@ -1613,9 +1613,7 @@ export type CcipRouter = {
               "that the instruction of interest can use."
             ],
             "type": {
-              "vec": {
-                "defined": "DerivedLookupTable"
-              }
+              "vec": "publicKey"
             }
           },
           {
@@ -1631,24 +1629,6 @@ export type CcipRouter = {
               "Identifies the next derivation stage. If empty, the derivation is complete."
             ],
             "type": "string"
-          }
-        ]
-      }
-    },
-    {
-      "name": "DerivedLookupTable",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "address",
-            "type": "publicKey"
-          },
-          {
-            "name": "accounts",
-            "type": {
-              "vec": "publicKey"
-            }
           }
         ]
       }
@@ -3798,9 +3778,7 @@ export const IDL: CcipRouter = {
               "that the instruction of interest can use."
             ],
             "type": {
-              "vec": {
-                "defined": "DerivedLookupTable"
-              }
+              "vec": "publicKey"
             }
           },
           {
@@ -3816,24 +3794,6 @@ export const IDL: CcipRouter = {
               "Identifies the next derivation stage. If empty, the derivation is complete."
             ],
             "type": "string"
-          }
-        ]
-      }
-    },
-    {
-      "name": "DerivedLookupTable",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "address",
-            "type": "publicKey"
-          },
-          {
-            "name": "accounts",
-            "type": {
-              "vec": "publicKey"
-            }
           }
         ]
       }

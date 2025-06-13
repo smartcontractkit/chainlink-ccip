@@ -1613,9 +1613,7 @@
               "that the instruction of interest can use."
             ],
             "type": {
-              "vec": {
-                "defined": "DerivedLookupTable"
-              }
+              "vec": "publicKey"
             }
           },
           {
@@ -1631,24 +1629,6 @@
               "Identifies the next derivation stage. If empty, the derivation is complete."
             ],
             "type": "string"
-          }
-        ]
-      }
-    },
-    {
-      "name": "DerivedLookupTable",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "address",
-            "type": "publicKey"
-          },
-          {
-            "name": "accounts",
-            "type": {
-              "vec": "publicKey"
-            }
           }
         ]
       }

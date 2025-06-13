@@ -711,7 +711,7 @@ type DeriveAccountsResponse struct {
 
 	// Append these look up tables at the end of a list. It will contain all LUTs
 	// that the instruction of interest can use.
-	LookUpTablesToSave []DerivedLookupTable
+	LookUpTablesToSave []ag_solanago.PublicKey
 
 	// Identifies the derivation stage.
 	CurrentStage string
@@ -772,39 +772,6 @@ func (obj *DeriveAccountsResponse) UnmarshalWithDecoder(decoder *ag_binary.Decod
 	}
 	// Deserialize `NextStage`:
 	err = decoder.Decode(&obj.NextStage)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-type DerivedLookupTable struct {
-	Address  ag_solanago.PublicKey
-	Accounts []ag_solanago.PublicKey
-}
-
-func (obj DerivedLookupTable) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `Address` param:
-	err = encoder.Encode(obj.Address)
-	if err != nil {
-		return err
-	}
-	// Serialize `Accounts` param:
-	err = encoder.Encode(obj.Accounts)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *DerivedLookupTable) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `Address`:
-	err = decoder.Decode(&obj.Address)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Accounts`:
-	err = decoder.Decode(&obj.Accounts)
 	if err != nil {
 		return err
 	}
