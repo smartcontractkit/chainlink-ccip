@@ -97,6 +97,82 @@
       ]
     },
     {
+      "name": "buffer_execution_report",
+      "docs": [
+        "Initializes and/or inserts a chunk of report data to an execution report buffer.",
+        "",
+        "When execution reports are too large to fit in a single transaction, they can be chopped",
+        "up in chunks first (as a special case, one chunk is also acceptable), and pre-buffered",
+        "via multiple calls to this instruction.",
+        "",
+        "There's no need to pre-initialize the buffer: all chunks can be sent concurrently, and the",
+        "first one to arrive will initialize the buffer.",
+        "",
+        "To benefit from buffering, the eventual call to `execute` or `manually_execute` must",
+        "include an additional `remaining_account` with the PDA derived from",
+        "[\"execution_report_buffer\", <buffer_id>, <caller_pubkey>].",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for buffering.",
+        "* `buffer_id` - An arbitrary buffer id defined by the caller (could be the message_id).",
+        "* `report_length` - Total length in bytes of the execution report.",
+        "* `chunk` - The specific chunk to add to the buffer. Chunk must have a consistent size, except",
+        "the last one in the buffer, which may be smaller.",
+        "* `chunk_index` - The index of this chunk.",
+        "* `num_chunks` - The total number of chunks in the report."
+      ],
+      "discriminator": [
+        35,
+        202,
+        252,
+        220,
+        2,
+        82,
+        189,
+        23
+      ],
+      "accounts": [
+        {
+          "name": "execution_report_buffer",
+          "writable": true
+        },
+        {
+          "name": "config"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "buffer_id",
+          "type": "bytes"
+        },
+        {
+          "name": "report_length",
+          "type": "u32"
+        },
+        {
+          "name": "chunk",
+          "type": "bytes"
+        },
+        {
+          "name": "chunk_index",
+          "type": "u8"
+        },
+        {
+          "name": "num_chunks",
+          "type": "u8"
+        }
+      ]
+    },
+    {
       "name": "close_commit_report_account",
       "discriminator": [
         109,
@@ -140,6 +216,49 @@
         },
         {
           "name": "root",
+          "type": "bytes"
+        }
+      ]
+    },
+    {
+      "name": "close_execution_report_buffer",
+      "docs": [
+        "Closes the execution report buffer to reclaim funds.",
+        "",
+        "Note this is only necessary when aborting a buffered transaction, or when a mistake",
+        "was made when buffering data. The buffer account will otherwise automatically close",
+        "and return funds to the caller whenever buffered execution succeeds."
+      ],
+      "discriminator": [
+        0,
+        16,
+        4,
+        246,
+        238,
+        95,
+        223,
+        31
+      ],
+      "accounts": [
+        {
+          "name": "execution_report_buffer",
+          "writable": true
+        },
+        {
+          "name": "config"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "_buffer_id",
           "type": "bytes"
         }
       ]
@@ -760,7 +879,6 @@
       ]
     },
     {
-<<<<<<< HEAD
       "name": "set_default_code_version",
       "docs": [
         "Sets the default code version to be used. This is then used by the slim routing layer to determine",
@@ -783,118 +901,6 @@
         206,
         152
       ],
-=======
-      "name": "bufferExecutionReport",
-      "docs": [
-        "Initializes and/or inserts a chunk of report data to an execution report buffer.",
-        "",
-        "When execution reports are too large to fit in a single transaction, they can be chopped",
-        "up in chunks first (as a special case, one chunk is also acceptable), and pre-buffered",
-        "via multiple calls to this instruction.",
-        "",
-        "There's no need to pre-initialize the buffer: all chunks can be sent concurrently, and the",
-        "first one to arrive will initialize the buffer.",
-        "",
-        "To benefit from buffering, the eventual call to `execute` or `manually_execute` must",
-        "include an additional `remaining_account` with the PDA derived from",
-        "[\"execution_report_buffer\", <buffer_id>, <caller_pubkey>].",
-        "",
-        "# Arguments",
-        "",
-        "* `ctx` - The context containing the accounts required for buffering.",
-        "* `buffer_id` - An arbitrary buffer id defined by the caller (could be the message_id).",
-        "* `report_length` - Total length in bytes of the execution report.",
-        "* `chunk` - The specific chunk to add to the buffer. Chunk must have a consistent size, except",
-        "the last one in the buffer, which may be smaller.",
-        "* `chunk_index` - The index of this chunk.",
-        "* `num_chunks` - The total number of chunks in the report."
-      ],
-      "accounts": [
-        {
-          "name": "executionReportBuffer",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "bufferId",
-          "type": "bytes"
-        },
-        {
-          "name": "reportLength",
-          "type": "u32"
-        },
-        {
-          "name": "chunk",
-          "type": "bytes"
-        },
-        {
-          "name": "chunkIndex",
-          "type": "u8"
-        },
-        {
-          "name": "numChunks",
-          "type": "u8"
-        }
-      ]
-    },
-    {
-      "name": "closeExecutionReportBuffer",
-      "docs": [
-        "Closes the execution report buffer to reclaim funds.",
-        "",
-        "Note this is only necessary when aborting a buffered transaction, or when a mistake",
-        "was made when buffering data. The buffer account will otherwise automatically close",
-        "and return funds to the caller whenever buffered execution succeeds."
-      ],
-      "accounts": [
-        {
-          "name": "executionReportBuffer",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "bufferId",
-          "type": "bytes"
-        }
-      ]
-    },
-    {
-      "name": "closeCommitReportAccount",
->>>>>>> main
       "accounts": [
         {
           "name": "config",
@@ -917,150 +923,7 @@
       ]
     },
     {
-<<<<<<< HEAD
       "name": "set_ocr_config",
-=======
-      "name": "ReferenceAddresses",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "version",
-            "type": "u8"
-          },
-          {
-            "name": "router",
-            "type": "publicKey"
-          },
-          {
-            "name": "feeQuoter",
-            "type": "publicKey"
-          },
-          {
-            "name": "offrampLookupTable",
-            "type": "publicKey"
-          },
-          {
-            "name": "rmnRemote",
-            "type": "publicKey"
-          }
-        ]
-      }
-    },
-    {
-      "name": "GlobalState",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "latestPriceSequenceNumber",
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "ExecutionReportBuffer",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "version",
-            "type": "u8"
-          },
-          {
-            "name": "chunkBitmap",
-            "type": "u64"
-          },
-          {
-            "name": "numChunks",
-            "type": "u8"
-          },
-          {
-            "name": "chunkLength",
-            "type": "u32"
-          },
-          {
-            "name": "data",
-            "type": "bytes"
-          }
-        ]
-      }
-    },
-    {
-      "name": "SourceChain",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "version",
-            "type": "u8"
-          },
-          {
-            "name": "chainSelector",
-            "type": "u64"
-          },
-          {
-            "name": "state",
-            "type": {
-              "defined": "SourceChainState"
-            }
-          },
-          {
-            "name": "config",
-            "type": {
-              "defined": "SourceChainConfig"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "CommitReport",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "version",
-            "type": "u8"
-          },
-          {
-            "name": "chainSelector",
-            "type": "u64"
-          },
-          {
-            "name": "merkleRoot",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
-            "name": "timestamp",
-            "type": "i64"
-          },
-          {
-            "name": "minMsgNr",
-            "type": "u64"
-          },
-          {
-            "name": "maxMsgNr",
-            "type": "u64"
-          },
-          {
-            "name": "executionStates",
-            "type": "u128"
-          }
-        ]
-      }
-    }
-  ],
-  "types": [
-    {
-      "name": "CommitInput",
->>>>>>> main
       "docs": [
         "Sets the OCR configuration.",
         "Only CCIP Admin can set the OCR configuration.",
@@ -1413,6 +1276,19 @@
         250,
         204,
         130
+      ]
+    },
+    {
+      "name": "ExecutionReportBuffer",
+      "discriminator": [
+        34,
+        31,
+        166,
+        249,
+        72,
+        98,
+        246,
+        232
       ]
     },
     {
@@ -2141,6 +2017,34 @@
           {
             "name": "enable_manual_execution_after",
             "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ExecutionReportBuffer",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "chunk_bitmap",
+            "type": "u64"
+          },
+          {
+            "name": "num_chunks",
+            "type": "u8"
+          },
+          {
+            "name": "chunk_length",
+            "type": "u32"
+          },
+          {
+            "name": "data",
+            "type": "bytes"
           }
         ]
       }

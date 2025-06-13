@@ -1,31 +1,15 @@
 {
-<<<<<<< HEAD
   "address": "9vMcoeKAhpSZw1F8PQx8fhiQy1cmLyehomrZFPniPLc1",
   "metadata": {
     "name": "base_token_pool",
-    "version": "0.1.0-dev",
+    "version": "0.1.1-dev",
     "spec": "0.1.0",
     "description": "Created with Anchor"
   },
-=======
-  "version": "0.1.1-dev",
-  "name": "base_token_pool",
->>>>>>> main
   "instructions": [],
   "events": [
     {
-      "name": "GlobalConfigUpdated",
-      "fields": [
-        {
-          "name": "selfServedAllowed",
-          "type": "bool",
-          "index": false
-        }
-      ]
-    },
-    {
       "name": "Burned",
-<<<<<<< HEAD
       "discriminator": [
         207,
         37,
@@ -35,308 +19,6 @@
         229,
         14,
         67
-=======
-      "fields": [
-        {
-          "name": "sender",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "amount",
-          "type": "u64",
-          "index": false
-        },
-        {
-          "name": "mint",
-          "type": "publicKey",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "Minted",
-      "fields": [
-        {
-          "name": "sender",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "recipient",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "amount",
-          "type": "u64",
-          "index": false
-        },
-        {
-          "name": "mint",
-          "type": "publicKey",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "Locked",
-      "fields": [
-        {
-          "name": "sender",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "amount",
-          "type": "u64",
-          "index": false
-        },
-        {
-          "name": "mint",
-          "type": "publicKey",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "Released",
-      "fields": [
-        {
-          "name": "sender",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "recipient",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "amount",
-          "type": "u64",
-          "index": false
-        },
-        {
-          "name": "mint",
-          "type": "publicKey",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "RemoteChainConfigured",
-      "fields": [
-        {
-          "name": "chainSelector",
-          "type": "u64",
-          "index": false
-        },
-        {
-          "name": "token",
-          "type": {
-            "defined": "RemoteAddress"
-          },
-          "index": false
-        },
-        {
-          "name": "previousToken",
-          "type": {
-            "defined": "RemoteAddress"
-          },
-          "index": false
-        },
-        {
-          "name": "poolAddresses",
-          "type": {
-            "vec": {
-              "defined": "RemoteAddress"
-            }
-          },
-          "index": false
-        },
-        {
-          "name": "previousPoolAddresses",
-          "type": {
-            "vec": {
-              "defined": "RemoteAddress"
-            }
-          },
-          "index": false
-        },
-        {
-          "name": "mint",
-          "type": "publicKey",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "RateLimitConfigured",
-      "fields": [
-        {
-          "name": "chainSelector",
-          "type": "u64",
-          "index": false
-        },
-        {
-          "name": "outboundRateLimit",
-          "type": {
-            "defined": "RateLimitConfig"
-          },
-          "index": false
-        },
-        {
-          "name": "inboundRateLimit",
-          "type": {
-            "defined": "RateLimitConfig"
-          },
-          "index": false
-        },
-        {
-          "name": "mint",
-          "type": "publicKey",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "RemotePoolsAppended",
-      "fields": [
-        {
-          "name": "chainSelector",
-          "type": "u64",
-          "index": false
-        },
-        {
-          "name": "poolAddresses",
-          "type": {
-            "vec": {
-              "defined": "RemoteAddress"
-            }
-          },
-          "index": false
-        },
-        {
-          "name": "previousPoolAddresses",
-          "type": {
-            "vec": {
-              "defined": "RemoteAddress"
-            }
-          },
-          "index": false
-        },
-        {
-          "name": "mint",
-          "type": "publicKey",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "RemoteChainRemoved",
-      "fields": [
-        {
-          "name": "chainSelector",
-          "type": "u64",
-          "index": false
-        },
-        {
-          "name": "mint",
-          "type": "publicKey",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "RouterUpdated",
-      "fields": [
-        {
-          "name": "oldRouter",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "newRouter",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "mint",
-          "type": "publicKey",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "OwnershipTransferRequested",
-      "fields": [
-        {
-          "name": "from",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "to",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "mint",
-          "type": "publicKey",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "OwnershipTransferred",
-      "fields": [
-        {
-          "name": "from",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "to",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "mint",
-          "type": "publicKey",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "MintAuthorityTransferred",
-      "fields": [
-        {
-          "name": "mint",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "oldMintAuthority",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "newMintAuthority",
-          "type": "publicKey",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "TokensConsumed",
-      "fields": [
-        {
-          "name": "tokens",
-          "type": "u64",
-          "index": false
-        }
->>>>>>> main
       ]
     },
     {
@@ -353,6 +35,19 @@
       ]
     },
     {
+      "name": "GlobalConfigUpdated",
+      "discriminator": [
+        232,
+        238,
+        158,
+        123,
+        210,
+        172,
+        159,
+        46
+      ]
+    },
+    {
       "name": "Locked",
       "discriminator": [
         188,
@@ -363,6 +58,19 @@
         12,
         198,
         84
+      ]
+    },
+    {
+      "name": "MintAuthorityTransferred",
+      "discriminator": [
+        23,
+        136,
+        155,
+        223,
+        27,
+        166,
+        51,
+        85
       ]
     },
     {
@@ -636,6 +344,18 @@
       }
     },
     {
+      "name": "GlobalConfigUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "self_served_allowed",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
       "name": "Locked",
       "type": {
         "kind": "struct",
@@ -650,6 +370,26 @@
           },
           {
             "name": "mint",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MintAuthorityTransferred",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "old_mint_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_mint_authority",
             "type": "pubkey"
           }
         ]

@@ -5,11 +5,10 @@
  * IDL can be found at `target/idl/lockrelease_token_pool.json`.
  */
 export type LockreleaseTokenPool = {
-<<<<<<< HEAD
   "address": "8eqh8wppT9c5rw4ERqNCffvU6cNFJWff9WmkcYtmGiqC",
   "metadata": {
     "name": "lockreleaseTokenPool",
-    "version": "0.1.0-dev",
+    "version": "0.1.1-dev",
     "spec": "0.1.0",
     "description": "Created with Anchor"
   },
@@ -26,80 +25,6 @@ export type LockreleaseTokenPool = {
         85,
         150
       ],
-=======
-  "version": "0.1.1-dev",
-  "name": "lockrelease_token_pool",
-  "instructions": [
-    {
-      "name": "initGlobalConfig",
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "programData",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "updateGlobalConfig",
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "programData",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "selfServedAllowed",
-          "type": "bool"
-        }
-      ]
-    },
-    {
-      "name": "initialize",
->>>>>>> main
       "accounts": [
         {
           "name": "state",
@@ -141,7 +66,6 @@ export type LockreleaseTokenPool = {
           "signer": true
         },
         {
-<<<<<<< HEAD
           "name": "systemProgram"
         }
       ],
@@ -342,6 +266,40 @@ export type LockreleaseTokenPool = {
       ]
     },
     {
+      "name": "initGlobalConfig",
+      "discriminator": [
+        140,
+        136,
+        214,
+        48,
+        87,
+        0,
+        120,
+        255
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "systemProgram"
+        },
+        {
+          "name": "program"
+        },
+        {
+          "name": "programData"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "initialize",
       "discriminator": [
         175,
@@ -374,16 +332,9 @@ export type LockreleaseTokenPool = {
         },
         {
           "name": "programData"
-=======
-          "name": "programData",
-          "isMut": false,
-          "isSigner": false
         },
         {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
->>>>>>> main
+          "name": "config"
         }
       ],
       "args": [
@@ -861,6 +812,44 @@ export type LockreleaseTokenPool = {
       "returns": "string"
     },
     {
+      "name": "updateGlobalConfig",
+      "discriminator": [
+        164,
+        84,
+        130,
+        189,
+        111,
+        58,
+        250,
+        200
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "systemProgram"
+        },
+        {
+          "name": "program"
+        },
+        {
+          "name": "programData"
+        }
+      ],
+      "args": [
+        {
+          "name": "selfServedAllowed",
+          "type": "bool"
+        }
+      ]
+    },
+    {
       "name": "withdrawLiquidity",
       "discriminator": [
         149,
@@ -909,7 +898,6 @@ export type LockreleaseTokenPool = {
   ],
   "accounts": [
     {
-<<<<<<< HEAD
       "name": "chainConfig",
       "discriminator": [
         13,
@@ -920,177 +908,19 @@ export type LockreleaseTokenPool = {
         29,
         148,
         56
-=======
-      "name": "poolConfig",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "version",
-            "type": "u8"
-          },
-          {
-            "name": "selfServedAllowed",
-            "type": "bool"
-          }
-        ]
-      }
-    },
-    {
-      "name": "state",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "version",
-            "type": "u8"
-          },
-          {
-            "name": "config",
-            "type": {
-              "defined": "BaseConfig"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "chainConfig",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "base",
-            "type": {
-              "defined": "BaseChain"
-            }
-          }
-        ]
-      }
-    }
-  ]
-};
-
-export const IDL: LockreleaseTokenPool = {
-  "version": "0.1.1-dev",
-  "name": "lockrelease_token_pool",
-  "instructions": [
-    {
-      "name": "initGlobalConfig",
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "programData",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "updateGlobalConfig",
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "programData",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "selfServedAllowed",
-          "type": "bool"
-        }
       ]
     },
     {
-      "name": "initialize",
-      "accounts": [
-        {
-          "name": "state",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "mint",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "programData",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "router",
-          "type": "publicKey"
-        },
-        {
-          "name": "rmnRemote",
-          "type": "publicKey"
-        }
->>>>>>> main
+      "name": "poolConfig",
+      "discriminator": [
+        26,
+        108,
+        14,
+        123,
+        116,
+        230,
+        129,
+        43
       ]
     },
     {
@@ -1109,27 +939,7 @@ export const IDL: LockreleaseTokenPool = {
   ],
   "types": [
     {
-<<<<<<< HEAD
       "name": "baseChain",
-=======
-      "name": "poolConfig",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "version",
-            "type": "u8"
-          },
-          {
-            "name": "selfServedAllowed",
-            "type": "bool"
-          }
-        ]
-      }
-    },
-    {
-      "name": "state",
->>>>>>> main
       "type": {
         "kind": "struct",
         "fields": [
@@ -1290,6 +1100,22 @@ export const IDL: LockreleaseTokenPool = {
           {
             "name": "destPoolData",
             "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "poolConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "selfServedAllowed",
+            "type": "bool"
           }
         ]
       }

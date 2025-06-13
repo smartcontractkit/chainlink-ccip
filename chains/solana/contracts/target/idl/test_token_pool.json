@@ -1,16 +1,11 @@
 {
-<<<<<<< HEAD
   "address": "JuCcZ4smxAYv9QHJ36jshA7pA3FuQ3vQeWLUeAtZduJ",
   "metadata": {
     "name": "test_token_pool",
-    "version": "0.1.0-dev",
+    "version": "0.1.1-dev",
     "spec": "0.1.0",
     "description": "Created with Anchor"
   },
-=======
-  "version": "0.1.1-dev",
-  "name": "test_token_pool",
->>>>>>> main
   "instructions": [
     {
       "name": "accept_ownership",

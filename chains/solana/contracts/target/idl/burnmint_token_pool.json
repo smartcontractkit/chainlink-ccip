@@ -1,9 +1,8 @@
 {
-<<<<<<< HEAD
   "address": "41FGToCmdaWa1dgZLKFAjvmx6e6AjVTX7SVRibvsMGVB",
   "metadata": {
     "name": "burnmint_token_pool",
-    "version": "0.1.0-dev",
+    "version": "0.1.1-dev",
     "spec": "0.1.0",
     "description": "Created with Anchor"
   },
@@ -20,80 +19,6 @@
         85,
         150
       ],
-=======
-  "version": "0.1.1-dev",
-  "name": "burnmint_token_pool",
-  "instructions": [
-    {
-      "name": "initGlobalConfig",
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "programData",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "updateGlobalConfig",
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "programData",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "selfServedAllowed",
-          "type": "bool"
-        }
-      ]
-    },
-    {
-      "name": "initialize",
->>>>>>> main
       "accounts": [
         {
           "name": "state",
@@ -104,153 +29,7 @@
         },
         {
           "name": "authority",
-<<<<<<< HEAD
           "signer": true
-=======
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "programData",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "router",
-          "type": "publicKey"
-        },
-        {
-          "name": "rmnRemote",
-          "type": "publicKey"
-        }
-      ]
-    },
-    {
-      "name": "transferMintAuthorityToMultisig",
-      "accounts": [
-        {
-          "name": "state",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "mint",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "poolSigner",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "newMultisigMintAuthority",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "programData",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "typeVersion",
-      "docs": [
-        "Returns the program type (name) and version.",
-        "Used by offchain code to easily determine which program & version is being interacted with.",
-        "",
-        "# Arguments",
-        "* `ctx` - The context"
-      ],
-      "accounts": [
-        {
-          "name": "clock",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [],
-      "returns": "string"
-    },
-    {
-      "name": "transferOwnership",
-      "accounts": [
-        {
-          "name": "state",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "mint",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "proposedOwner",
-          "type": "publicKey"
-        }
-      ]
-    },
-    {
-      "name": "acceptOwnership",
-      "accounts": [
-        {
-          "name": "state",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "mint",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
->>>>>>> main
         }
       ],
       "args": []
@@ -481,6 +260,40 @@
       ]
     },
     {
+      "name": "init_global_config",
+      "discriminator": [
+        140,
+        136,
+        214,
+        48,
+        87,
+        0,
+        120,
+        255
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program"
+        },
+        {
+          "name": "program"
+        },
+        {
+          "name": "program_data"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "initialize",
       "discriminator": [
         175,
@@ -513,6 +326,9 @@
         },
         {
           "name": "program_data"
+        },
+        {
+          "name": "config"
         }
       ],
       "args": [
@@ -821,6 +637,49 @@
       ]
     },
     {
+      "name": "transfer_mint_authority_to_multisig",
+      "discriminator": [
+        229,
+        13,
+        219,
+        109,
+        252,
+        176,
+        138,
+        118
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "writable": true
+        },
+        {
+          "name": "mint",
+          "writable": true
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "pool_signer"
+        },
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "new_multisig_mint_authority"
+        },
+        {
+          "name": "program"
+        },
+        {
+          "name": "program_data"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "transfer_ownership",
       "discriminator": [
         65,
@@ -878,11 +737,48 @@
       ],
       "args": [],
       "returns": "string"
+    },
+    {
+      "name": "update_global_config",
+      "discriminator": [
+        164,
+        84,
+        130,
+        189,
+        111,
+        58,
+        250,
+        200
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "system_program"
+        },
+        {
+          "name": "program"
+        },
+        {
+          "name": "program_data"
+        }
+      ],
+      "args": [
+        {
+          "name": "self_served_allowed",
+          "type": "bool"
+        }
+      ]
     }
   ],
   "accounts": [
     {
-<<<<<<< HEAD
       "name": "ChainConfig",
       "discriminator": [
         13,
@@ -894,22 +790,19 @@
         148,
         56
       ]
-=======
+    },
+    {
       "name": "PoolConfig",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "version",
-            "type": "u8"
-          },
-          {
-            "name": "selfServedAllowed",
-            "type": "bool"
-          }
-        ]
-      }
->>>>>>> main
+      "discriminator": [
+        26,
+        108,
+        14,
+        123,
+        116,
+        230,
+        129,
+        43
+      ]
     },
     {
       "name": "State",
@@ -923,6 +816,48 @@
         182,
         177
       ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidMultisig",
+      "msg": "Invalid Multisig Mint"
+    },
+    {
+      "code": 6001,
+      "name": "MintAuthorityAlreadySet",
+      "msg": "Mint Authority already set"
+    },
+    {
+      "code": 6002,
+      "name": "FixedMintToken",
+      "msg": "Token with no Mint Authority"
+    },
+    {
+      "code": 6003,
+      "name": "InvalidToken2022Multisig",
+      "msg": "Invalid Multisig Account Data for Token 2022"
+    },
+    {
+      "code": 6004,
+      "name": "InvalidSPLTokenMultisig",
+      "msg": "Invalid Multisig Account Data for SPL Token"
+    },
+    {
+      "code": 6005,
+      "name": "PoolSignerNotInMultisig",
+      "msg": "Token Pool Signer PDA must be signer of the Multisig"
+    },
+    {
+      "code": 6006,
+      "name": "MultisigMustHaveMoreThanOneSigner",
+      "msg": "Multisig must have more than one signer"
+    },
+    {
+      "code": 6007,
+      "name": "InvalidMultisigOwner",
+      "msg": "Multisig Owner must match Token Program ID"
     }
   ],
   "types": [
@@ -1088,6 +1023,22 @@
           {
             "name": "dest_pool_data",
             "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PoolConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "self_served_allowed",
+            "type": "bool"
           }
         ]
       }
@@ -1269,48 +1220,6 @@
           }
         ]
       }
-    }
-  ],
-  "errors": [
-    {
-      "code": 6000,
-      "name": "InvalidMultisig",
-      "msg": "Invalid Multisig Mint"
-    },
-    {
-      "code": 6001,
-      "name": "MintAuthorityAlreadySet",
-      "msg": "Mint Authority already set"
-    },
-    {
-      "code": 6002,
-      "name": "FixedMintToken",
-      "msg": "Token with no Mint Authority"
-    },
-    {
-      "code": 6003,
-      "name": "InvalidToken2022Multisig",
-      "msg": "Invalid Multisig Account Data for Token 2022"
-    },
-    {
-      "code": 6004,
-      "name": "InvalidSPLTokenMultisig",
-      "msg": "Invalid Multisig Account Data for SPL Token"
-    },
-    {
-      "code": 6005,
-      "name": "PoolSignerNotInMultisig",
-      "msg": "Token Pool Signer PDA must be signer of the Multisig"
-    },
-    {
-      "code": 6006,
-      "name": "MultisigMustHaveMoreThanOneSigner",
-      "msg": "Multisig must have more than one signer"
-    },
-    {
-      "code": 6007,
-      "name": "InvalidMultisigOwner",
-      "msg": "Multisig Owner must match Token Program ID"
     }
   ]
 }
