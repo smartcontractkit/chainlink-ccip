@@ -28,3 +28,5 @@ eslint-report.json
 override*.toml
 # go work files
 go.work*
+
+devnet.config.yaml
