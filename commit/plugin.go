@@ -243,7 +243,7 @@ func (p *Plugin) ObservationQuorum(
 func (p *Plugin) Observation(
 	ctx context.Context, outCtx ocr3types.OutcomeContext, q types.Query,
 ) (types.Observation, error) {
-	if !p.offchainCfg.EnableDonBreakingChanges {
+	if p.offchainCfg.DonBreakingChangesVersion < pluginconfig.DonBreakingChangesVersion1RoleDonSupport {
 		p.lggr.Info("running old observation")
 		return p.observationOld(ctx, outCtx, q)
 	}
@@ -403,7 +403,7 @@ func (p *Plugin) ObserveFChain(lggr logger.Logger) map[cciptypes.ChainSelector]i
 func (p *Plugin) Outcome(
 	ctx context.Context, outCtx ocr3types.OutcomeContext, q types.Query, aos []types.AttributedObservation,
 ) (ocr3types.Outcome, error) {
-	if !p.offchainCfg.EnableDonBreakingChanges {
+	if p.offchainCfg.DonBreakingChangesVersion < pluginconfig.DonBreakingChangesVersion1RoleDonSupport {
 		p.lggr.Info("running old outcome")
 		return p.outcomeOld(ctx, outCtx, q, aos)
 	}

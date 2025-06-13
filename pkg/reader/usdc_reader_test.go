@@ -159,7 +159,7 @@ func Test_USDCMessageReader_MessagesByTokenID(t *testing.T) {
 	}
 
 	validChain := cciptypes.ChainSelector(sel.ETHEREUM_MAINNET_ARBITRUM_1.Selector)
-	validChainCCTP := cctpDestDomains[uint64(validChain)]
+	validChainCCTP := CCTPDestDomains[uint64(validChain)]
 	validReader := reader.NewMockExtended(t)
 	validReader.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
 	validReader.EXPECT().QueryKey(

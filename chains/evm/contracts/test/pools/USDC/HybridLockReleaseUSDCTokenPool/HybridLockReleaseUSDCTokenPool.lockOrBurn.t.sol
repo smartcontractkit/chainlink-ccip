@@ -26,14 +26,14 @@ contract HybridLockReleaseUSDCTokenPool_lockOrBurn is HybridLockReleaseUSDCToken
 
     uint256 amount = 1e6;
 
-    s_token.transfer(address(s_usdcTokenPool), amount);
+    s_USDCToken.transfer(address(s_usdcTokenPool), amount);
 
     vm.startPrank(s_routerAllowedOnRamp);
 
     vm.expectEmit();
     emit TokenPool.LockedOrBurned({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
-      token: address(s_token),
+      token: address(s_USDCToken),
       sender: address(s_routerAllowedOnRamp),
       amount: amount
     });
@@ -44,11 +44,11 @@ contract HybridLockReleaseUSDCTokenPool_lockOrBurn is HybridLockReleaseUSDCToken
         receiver: abi.encodePacked(receiver),
         amount: amount,
         remoteChainSelector: DEST_CHAIN_SELECTOR,
-        localToken: address(s_token)
+        localToken: address(s_USDCToken)
       })
     );
 
-    assertEq(s_token.balanceOf(address(s_usdcTokenPool)), amount, "Incorrect token amount in the tokenPool");
+    assertEq(s_USDCToken.balanceOf(address(s_usdcTokenPool)), amount, "Incorrect token amount in the tokenPool");
   }
 
   function test_PrimaryMechanism() public {
@@ -57,7 +57,7 @@ contract HybridLockReleaseUSDCTokenPool_lockOrBurn is HybridLockReleaseUSDCToken
 
     vm.startPrank(OWNER);
 
-    s_token.transfer(address(s_usdcTokenPool), amount);
+    s_USDCToken.transfer(address(s_usdcTokenPool), amount);
 
     vm.startPrank(s_routerAllowedOnRamp);
 
@@ -66,14 +66,14 @@ contract HybridLockReleaseUSDCTokenPool_lockOrBurn is HybridLockReleaseUSDCToken
     vm.expectEmit();
     emit TokenPool.OutboundRateLimitConsumed({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
-      token: address(s_token),
+      token: address(s_USDCToken),
       amount: amount
     });
 
     vm.expectEmit();
     emit ITokenMessenger.DepositForBurn(
       s_mockUSDC.s_nonce(),
-      address(s_token),
+      address(s_USDCToken),
       amount,
       address(s_usdcTokenPool),
       receiver,
@@ -85,7 +85,7 @@ contract HybridLockReleaseUSDCTokenPool_lockOrBurn is HybridLockReleaseUSDCToken
     vm.expectEmit();
     emit TokenPool.LockedOrBurned({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
-      token: address(s_token),
+      token: address(s_USDCToken),
       sender: address(s_routerAllowedOnRamp),
       amount: amount
     });
@@ -96,7 +96,7 @@ contract HybridLockReleaseUSDCTokenPool_lockOrBurn is HybridLockReleaseUSDCToken
         receiver: abi.encodePacked(receiver),
         amount: amount,
         remoteChainSelector: DEST_CHAIN_SELECTOR,
-        localToken: address(s_token)
+        localToken: address(s_USDCToken)
       })
     );
 
@@ -144,7 +144,7 @@ contract HybridLockReleaseUSDCTokenPool_lockOrBurn is HybridLockReleaseUSDCToken
 
     uint256 amount = 1e6;
 
-    s_token.transfer(address(s_usdcTokenPool), amount);
+    s_USDCToken.transfer(address(s_usdcTokenPool), amount);
 
     vm.startPrank(s_routerAllowedOnRamp);
 
@@ -159,7 +159,7 @@ contract HybridLockReleaseUSDCTokenPool_lockOrBurn is HybridLockReleaseUSDCToken
         receiver: abi.encodePacked(receiver),
         amount: amount,
         remoteChainSelector: DEST_CHAIN_SELECTOR,
-        localToken: address(s_token)
+        localToken: address(s_USDCToken)
       })
     );
   }

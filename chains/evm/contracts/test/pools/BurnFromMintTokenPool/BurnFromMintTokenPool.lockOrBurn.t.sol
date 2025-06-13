@@ -10,24 +10,24 @@ import {IERC20} from
 
 contract BurnFromMintTokenPool_lockOrBurn is BurnFromMintTokenPoolSetup {
   function test_constructor() public view {
-    assertEq(address(s_burnMintERC20), address(s_pool.getToken()));
+    assertEq(address(s_token), address(s_pool.getToken()));
     assertEq(address(s_mockRMNRemote), s_pool.getRmnProxy());
     assertEq(false, s_pool.getAllowListEnabled());
-    assertEq(type(uint256).max, s_burnMintERC20.allowance(address(s_pool), address(s_pool)));
+    assertEq(type(uint256).max, s_token.allowance(address(s_pool), address(s_pool)));
   }
 
   function test_lockOrBurn() public {
     uint256 burnAmount = 20_000e18;
 
-    deal(address(s_burnMintERC20), address(s_pool), burnAmount);
-    assertEq(s_burnMintERC20.balanceOf(address(s_pool)), burnAmount);
+    deal(address(s_token), address(s_pool), burnAmount);
+    assertEq(s_token.balanceOf(address(s_pool)), burnAmount);
 
-    vm.startPrank(s_burnMintOnRamp);
+    vm.startPrank(s_allowedOnRamp);
 
     vm.expectEmit();
     emit TokenPool.OutboundRateLimitConsumed({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
-      token: address(s_burnMintERC20),
+      token: address(s_token),
       amount: burnAmount
     });
 
@@ -37,13 +37,13 @@ contract BurnFromMintTokenPool_lockOrBurn is BurnFromMintTokenPoolSetup {
     vm.expectEmit();
     emit TokenPool.LockedOrBurned({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
-      token: address(s_burnMintERC20),
-      sender: address(s_burnMintOnRamp),
+      token: address(s_token),
+      sender: address(s_allowedOnRamp),
       amount: burnAmount
     });
 
     bytes4 expectedSignature = bytes4(keccak256("burnFrom(address,uint256)"));
-    vm.expectCall(address(s_burnMintERC20), abi.encodeWithSelector(expectedSignature, address(s_pool), burnAmount));
+    vm.expectCall(address(s_token), abi.encodeWithSelector(expectedSignature, address(s_pool), burnAmount));
 
     s_pool.lockOrBurn(
       Pool.LockOrBurnInV1({
@@ -51,19 +51,19 @@ contract BurnFromMintTokenPool_lockOrBurn is BurnFromMintTokenPoolSetup {
         receiver: bytes(""),
         amount: burnAmount,
         remoteChainSelector: DEST_CHAIN_SELECTOR,
-        localToken: address(s_burnMintERC20)
+        localToken: address(s_token)
       })
     );
 
-    assertEq(s_burnMintERC20.balanceOf(address(s_pool)), 0);
+    assertEq(s_token.balanceOf(address(s_pool)), 0);
   }
 
   // Should not burn tokens if cursed.
   function test_lockOrBurn_RevertWhen_PoolBurnRevertNotHealthy() public {
     vm.mockCall(address(s_mockRMNRemote), abi.encodeWithSignature("isCursed(bytes16)"), abi.encode(true));
 
-    uint256 before = s_burnMintERC20.balanceOf(address(s_pool));
-    vm.startPrank(s_burnMintOnRamp);
+    uint256 before = s_token.balanceOf(address(s_pool));
+    vm.startPrank(s_allowedOnRamp);
 
     vm.expectRevert(TokenPool.CursedByRMN.selector);
     s_pool.lockOrBurn(
@@ -72,11 +72,11 @@ contract BurnFromMintTokenPool_lockOrBurn is BurnFromMintTokenPoolSetup {
         receiver: bytes(""),
         amount: 1e5,
         remoteChainSelector: DEST_CHAIN_SELECTOR,
-        localToken: address(s_burnMintERC20)
+        localToken: address(s_token)
       })
     );
 
-    assertEq(s_burnMintERC20.balanceOf(address(s_pool)), before);
+    assertEq(s_token.balanceOf(address(s_pool)), before);
   }
 
   function test_lockOrBurn_RevertWhen_ChainNotAllowed() public {
@@ -86,8 +86,8 @@ contract BurnFromMintTokenPool_lockOrBurn is BurnFromMintTokenPoolSetup {
       Pool.ReleaseOrMintInV1({
         originalSender: bytes(""),
         receiver: OWNER,
-        amount: 1,
-        localToken: address(s_burnMintERC20),
+        sourceDenominatedAmount: 1,
+        localToken: address(s_token),
         remoteChainSelector: wrongChainSelector,
         sourcePoolAddress: _generateSourceTokenData().sourcePoolAddress,
         sourcePoolData: _generateSourceTokenData().extraData,

@@ -83,10 +83,11 @@ type DestinationAccessor interface {
 	//
 	// Access Type: Event(CommitReportAccepted)
 	// Contract: OffRamp
-	// Confidence: Unconfirmed
+	// Confidence: Unconfirmed, Finalized
 	CommitReportsGTETimestamp(
 		ctx context.Context,
 		ts time.Time,
+		confidence primitives.ConfidenceLevel,
 		limit int,
 	) ([]CommitPluginReportWithMeta, error)
 
@@ -211,7 +212,7 @@ type SourceAccessor interface {
 	GetTokenPriceUSD(
 		ctx context.Context,
 		address UnknownAddress,
-	) (BigInt, error)
+	) (TimestampedUnixBig, error)
 
 	// GetFeeQuoterDestChainConfig returns the fee quoter destination chain config.
 	//
