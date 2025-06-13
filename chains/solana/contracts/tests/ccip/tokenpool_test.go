@@ -60,6 +60,7 @@ func TestTokenPool(t *testing.T) {
 	ctx := tests.Context(t)
 
 	allowedOfframpEvmPDA, err := state.FindAllowedOfframpPDA(config.EvmChainSelector, dumbRamp, dumbRamp)
+	require.NoError(t, err)
 	allowedOfframpSvmPDA, err := state.FindAllowedOfframpPDA(config.SvmChainSelector, dumbRamp, dumbRamp)
 	require.NoError(t, err)
 
@@ -904,6 +905,7 @@ func TestTokenPool(t *testing.T) {
 			tokenPair, _, err := solana.FindProgramAddress([][]byte{[]byte("token_pair"), []byte(common.NumToStr(domain)), usdcMint[:]}, config.CctpTokenMessengerMinter) // faking that solana is again the remote domain
 			require.NoError(t, err)
 			localToken, _, err := solana.FindProgramAddress([][]byte{[]byte("local_token"), usdcMint.Bytes()}, config.CctpTokenMessengerMinter)
+			require.NoError(t, err)
 
 			return TokenMessengerMinterPDAs{
 				program:              config.CctpTokenMessengerMinter,
@@ -1048,7 +1050,7 @@ func TestTokenPool(t *testing.T) {
 					}
 
 					require.NoError(t, common.ExtendLookupTable(ctx, solanaGoClient, tpLookupTableAddr, admin, entries))
-					common.AwaitSlotChange(ctx, solanaGoClient)
+					require.NoError(t, common.AwaitSlotChange(ctx, solanaGoClient))
 				})
 
 				t.Run("Initialize", func(t *testing.T) {
@@ -1103,6 +1105,7 @@ func TestTokenPool(t *testing.T) {
 						cctpPool.svmChainConfig,
 						admin.PublicKey(),
 					).ValidateAndBuild()
+					require.NoError(t, err)
 
 					ixAppend, err := cctp_token_pool.NewAppendRemotePoolAddressesInstruction(
 						config.SvmChainSelector,
@@ -1294,7 +1297,6 @@ func TestTokenPool(t *testing.T) {
 
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment, common.AddSigners(tokenController))
 				})
-
 			})
 		})
 
@@ -1588,8 +1590,10 @@ func TestTokenPool(t *testing.T) {
 				require.Equal(t, usdcDecimals, decimals)
 
 				_, initial, err := tokens.TokenBalance(ctx, solanaGoClient, adminATA, config.DefaultCommitment)
+				require.NoError(t, err)
 
 				attestation, err = ccip.AttestCCTP(messageSentEventData.Message, attesters)
+				require.NoError(t, err)
 				offchainTokenData := cctp_token_pool.MessageAndAttestation{
 					Message:     cctp_token_pool.CctpMessage{Data: messageSentEventData.Message},
 					Attestation: attestation,
@@ -1650,6 +1654,7 @@ func TestTokenPool(t *testing.T) {
 				require.NotNil(t, res)
 
 				_, final, err := tokens.TokenBalance(ctx, solanaGoClient, adminATA, config.DefaultCommitment)
+				require.NoError(t, err)
 
 				require.Equal(t, uint64(initial)+messageAmount, uint64(final), "Admin should have received the USDC after receiving the message")
 			})
