@@ -225,6 +225,7 @@ func sendTransactionWithLookupTables(ctx context.Context, rpcClient *rpc.Client,
 					time.Sleep(50 * time.Millisecond)
 					continue
 				}
+				fmt.Printf("Failed Tx: %+v\n", tx)
 				fmt.Println("Unexpected error (most likely contract related), no point in retrying:", err)
 				return nil, err
 			}

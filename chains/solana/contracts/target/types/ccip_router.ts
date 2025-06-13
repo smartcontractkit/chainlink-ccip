@@ -996,7 +996,11 @@ export type CcipRouter = {
         {
           "name": "nonce",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "CHECK this represents the PDA where the message counters are stored. As it may be initialized or not,",
+            "and it may be in it's v1 or v2 form, it is an UncheckedAccount and the code handles all cases manually."
+          ]
         },
         {
           "name": "authority",
@@ -1320,7 +1324,11 @@ export type CcipRouter = {
             "type": "u8"
           },
           {
-            "name": "counter",
+            "name": "orderedNonce",
+            "type": "u64"
+          },
+          {
+            "name": "totalNonce",
             "type": "u64"
           }
         ]
@@ -2159,6 +2167,11 @@ export type CcipRouter = {
       "code": 7027,
       "name": "InvalidDerivationStage",
       "msg": "Unexpected account derivation stage"
+    },
+    {
+      "code": 7028,
+      "name": "InvalidNonceVersion",
+      "msg": "Invalid version of the Nonce account"
     }
   ]
 };
@@ -3161,7 +3174,11 @@ export const IDL: CcipRouter = {
         {
           "name": "nonce",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "CHECK this represents the PDA where the message counters are stored. As it may be initialized or not,",
+            "and it may be in it's v1 or v2 form, it is an UncheckedAccount and the code handles all cases manually."
+          ]
         },
         {
           "name": "authority",
@@ -3485,7 +3502,11 @@ export const IDL: CcipRouter = {
             "type": "u8"
           },
           {
-            "name": "counter",
+            "name": "orderedNonce",
+            "type": "u64"
+          },
+          {
+            "name": "totalNonce",
             "type": "u64"
           }
         ]
@@ -4324,6 +4345,11 @@ export const IDL: CcipRouter = {
       "code": 7027,
       "name": "InvalidDerivationStage",
       "msg": "Unexpected account derivation stage"
+    },
+    {
+      "code": 7028,
+      "name": "InvalidNonceVersion",
+      "msg": "Invalid version of the Nonce account"
     }
   ]
 };

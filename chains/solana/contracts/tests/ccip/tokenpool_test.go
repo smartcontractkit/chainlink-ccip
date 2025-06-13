@@ -1,7 +1,9 @@
 package contracts
 
 import (
+	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"strings"
 	"testing"
@@ -16,10 +18,19 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/testutils"
+
+	// use the real program bindings, although interacting with the mock contract
+
+	cctp_message_transmitter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/cctp_message_transmitter"
+	message_transmitter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/cctp_message_transmitter"
+	cctp_token_messenger_minter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/cctp_token_messenger_minter"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/cctp_token_pool"
+
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/rmn_remote"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_ccip_invalid_receiver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_ccip_receiver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/ccip"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
@@ -30,12 +41,13 @@ func TestTokenPool(t *testing.T) {
 
 	rmn_remote.SetProgramID(config.RMNRemoteProgram)
 	test_token_pool.SetProgramID(config.CcipTokenPoolProgram)
+	cctp_message_transmitter.SetProgramID(config.CctpMessageTransmitter)
 
 	// acting as program wrapped by a token pool
 	test_ccip_receiver.SetProgramID(config.CcipLogicReceiver)
 
-	// acting as "dumb" offramp that just proxies the pool,
-	// required for authnz in the pool but we don't want to test offramp internals here
+	// acting as "dumb" onramp & "dump" offramp that just proxies the pool,
+	// required for authnz in the pool but we don't want to test ramp internals here
 	test_ccip_invalid_receiver.SetProgramID(config.CcipInvalidReceiverProgram)
 
 	dumbRamp := config.CcipInvalidReceiverProgram
@@ -47,7 +59,8 @@ func TestTokenPool(t *testing.T) {
 
 	ctx := tests.Context(t)
 
-	allowedOfframpPDA, err := state.FindAllowedOfframpPDA(config.EvmChainSelector, dumbRamp, dumbRamp)
+	allowedOfframpEvmPDA, err := state.FindAllowedOfframpPDA(config.EvmChainSelector, dumbRamp, dumbRamp)
+	allowedOfframpSvmPDA, err := state.FindAllowedOfframpPDA(config.SvmChainSelector, dumbRamp, dumbRamp)
 	require.NoError(t, err)
 
 	solanaGoClient := testutils.DeployAllPrograms(t, testutils.PathToAnchorConfig, admin)
@@ -65,16 +78,25 @@ func TestTokenPool(t *testing.T) {
 	})
 
 	t.Run("setup:allowed offramp", func(t *testing.T) {
-		ix, err := test_ccip_invalid_receiver.NewAddOfframpInstruction(
+		evmIx, err := test_ccip_invalid_receiver.NewAddOfframpInstruction(
 			config.EvmChainSelector,
 			dumbRamp,
-			allowedOfframpPDA,
+			allowedOfframpEvmPDA,
 			admin.PublicKey(),
 			solana.SystemProgramID,
 		).ValidateAndBuild()
 		require.NoError(t, err)
 
-		testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+		svmIx, err := test_ccip_invalid_receiver.NewAddOfframpInstruction(
+			config.SvmChainSelector,
+			dumbRamp,
+			allowedOfframpSvmPDA,
+			admin.PublicKey(),
+			solana.SystemProgramID,
+		).ValidateAndBuild()
+		require.NoError(t, err)
+
+		testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{evmIx, svmIx}, admin, config.DefaultCommitment)
 	})
 
 	t.Run("setup: RMN Remote", func(t *testing.T) {
@@ -116,6 +138,7 @@ func TestTokenPool(t *testing.T) {
 	} {
 		t.Run(v.tokenName, func(t *testing.T) {
 			t.Parallel()
+
 			decimals := uint8(0)
 			amount := uint64(1000)
 
@@ -338,7 +361,7 @@ func TestTokenPool(t *testing.T) {
 							config.CcipTokenPoolProgram,
 							dumbRampPoolSigner,
 							dumbRamp,
-							allowedOfframpPDA,
+							allowedOfframpEvmPDA,
 							poolConfig,
 							v.tokenProgram,
 							mint,
@@ -478,7 +501,7 @@ func TestTokenPool(t *testing.T) {
 								config.CcipTokenPoolProgram,
 								dumbRampPoolSigner,
 								dumbRamp,
-								allowedOfframpPDA,
+								allowedOfframpEvmPDA,
 								poolConfig,
 								v.tokenProgram,
 								mint,
@@ -546,7 +569,7 @@ func TestTokenPool(t *testing.T) {
 								config.CcipTokenPoolProgram,
 								dumbRampPoolSigner,
 								dumbRamp,
-								allowedOfframpPDA,
+								allowedOfframpEvmPDA,
 								poolConfig,
 								v.tokenProgram,
 								mint,
@@ -579,7 +602,7 @@ func TestTokenPool(t *testing.T) {
 								config.CcipTokenPoolProgram,
 								dumbRampPoolSigner,
 								dumbRamp,
-								allowedOfframpPDA,
+								allowedOfframpEvmPDA,
 								poolConfig,
 								v.tokenProgram,
 								mint,
@@ -619,7 +642,7 @@ func TestTokenPool(t *testing.T) {
 								config.CcipTokenPoolProgram,
 								dumbRampPoolSigner,
 								dumbRamp,
-								allowedOfframpPDA,
+								allowedOfframpEvmPDA,
 								poolConfig,
 								v.tokenProgram,
 								mint,
@@ -648,7 +671,7 @@ func TestTokenPool(t *testing.T) {
 								config.CcipTokenPoolProgram,
 								dumbRampPoolSigner,
 								dumbRamp,
-								allowedOfframpPDA,
+								allowedOfframpEvmPDA,
 								poolConfig,
 								v.tokenProgram,
 								mint,
@@ -694,6 +717,7 @@ func TestTokenPool(t *testing.T) {
 	// test functionality with arbitrary wrapped program
 	t.Run("Wrapped", func(t *testing.T) {
 		t.Parallel()
+
 		mintPriv := solana.MustPrivateKeyFromBase58("5PMQ49JibQPVBFneTzixstoS2z888CoUgej1PoYgvmKXZcKw4b3Zd8vhCjKQcUDSjLnR9M1tUrzCCXLrPBZoqjJm")
 		p, err := tokens.NewTokenPool(solana.TokenProgramID, config.CcipTokenPoolProgram, mintPriv.PublicKey())
 		require.NoError(t, err)
@@ -799,7 +823,7 @@ func TestTokenPool(t *testing.T) {
 				config.CcipTokenPoolProgram,
 				dumbRampPoolSigner,
 				dumbRamp,
-				allowedOfframpPDA,
+				allowedOfframpEvmPDA,
 				p.PoolConfig,
 				solana.TokenProgramID,
 				mint,
@@ -819,6 +843,852 @@ func TestTokenPool(t *testing.T) {
 			res := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{rmI}, user, config.DefaultCommitment)
 			require.NotNil(t, res)
 			require.Contains(t, strings.Join(res.Meta.LogMessages, "\n"), "Called `ccip_token_release_mint`")
+		})
+	})
+
+	t.Run("CCTP token pool", func(t *testing.T) {
+		// do not run in parallel, as it checks the balances of the same users that are also used in the other suites
+
+		type MessageTransmitterPDAs struct {
+			program,
+			authorityPda,
+			messageTransmitter,
+			eventAuthority solana.PublicKey
+		}
+
+		getMessageTransmitterPDAs := func() MessageTransmitterPDAs {
+			t.Helper()
+
+			messageTransmitterPDA, _, err := solana.FindProgramAddress([][]byte{[]byte("message_transmitter")}, config.CctpMessageTransmitter)
+			require.NoError(t, err)
+			eventAuthority, _, err := solana.FindProgramAddress([][]byte{[]byte("__event_authority")}, config.CctpMessageTransmitter)
+			require.NoError(t, err)
+			authorityPda, _, err := solana.FindProgramAddress([][]byte{[]byte("message_transmitter_authority"), config.CctpTokenMessengerMinter.Bytes()}, config.CctpMessageTransmitter)
+			require.NoError(t, err)
+
+			return MessageTransmitterPDAs{
+				program:            config.CctpMessageTransmitter,
+				messageTransmitter: messageTransmitterPDA,
+				authorityPda:       authorityPda,
+				eventAuthority:     eventAuthority,
+			}
+		}
+
+		type TokenMessengerMinterPDAs struct {
+			program,
+			authorityPda,
+			tokenMessenger,
+			remoteTokenMessenger,
+			tokenMinter,
+			localToken,
+			tokenPair,
+			custodyTokenAccount,
+			eventAuthority solana.PublicKey
+		}
+
+		getTokenMessengerMinterPDAs := func(domain uint32, usdcMint solana.PublicKey) TokenMessengerMinterPDAs {
+			t.Helper()
+
+			authorityPda, _, err := solana.FindProgramAddress([][]byte{[]byte("sender_authority")}, config.CctpTokenMessengerMinter)
+			require.NoError(t, err)
+			tokenMessengerPDA, _, err := solana.FindProgramAddress([][]byte{[]byte("token_messenger")}, config.CctpTokenMessengerMinter)
+			require.NoError(t, err)
+			remoteTokenMessengerPDA, _, err := solana.FindProgramAddress([][]byte{[]byte("remote_token_messenger"), []byte(common.NumToStr(domain))}, config.CctpTokenMessengerMinter)
+			require.NoError(t, err)
+			tokenMinterPDA, _, err := solana.FindProgramAddress([][]byte{[]byte("token_minter")}, config.CctpTokenMessengerMinter)
+			require.NoError(t, err)
+			eventAuthority, _, err := solana.FindProgramAddress([][]byte{[]byte("__event_authority")}, config.CctpTokenMessengerMinter)
+			require.NoError(t, err)
+			custodyTokenAccount, _, err := solana.FindProgramAddress([][]byte{[]byte("custody"), usdcMint.Bytes()}, config.CctpTokenMessengerMinter)
+			require.NoError(t, err)
+			tokenPair, _, err := solana.FindProgramAddress([][]byte{[]byte("token_pair"), []byte(common.NumToStr(domain)), usdcMint[:]}, config.CctpTokenMessengerMinter) // faking that solana is again the remote domain
+			require.NoError(t, err)
+			localToken, _, err := solana.FindProgramAddress([][]byte{[]byte("local_token"), usdcMint.Bytes()}, config.CctpTokenMessengerMinter)
+
+			return TokenMessengerMinterPDAs{
+				program:              config.CctpTokenMessengerMinter,
+				authorityPda:         authorityPda,
+				tokenMessenger:       tokenMessengerPDA,
+				remoteTokenMessenger: remoteTokenMessengerPDA,
+				tokenMinter:          tokenMinterPDA,
+				eventAuthority:       eventAuthority,
+				localToken:           localToken,
+				tokenPair:            tokenPair,
+				custodyTokenAccount:  custodyTokenAccount,
+			}
+		}
+
+		type CctpTokenPoolPDAs struct {
+			program,
+			state,
+			signer,
+			tokenAccount,
+			svmChainConfig solana.PublicKey
+		}
+
+		getCctpTokenPoolPDAs := func(usdcMint solana.PublicKey) CctpTokenPoolPDAs {
+			t.Helper()
+
+			statePDA, err := tokens.TokenPoolConfigAddress(usdcMint, config.CctpTokenPoolProgram)
+			require.NoError(t, err)
+			signerPDA, err := tokens.TokenPoolSignerAddress(usdcMint, config.CctpTokenPoolProgram)
+			require.NoError(t, err)
+			poolTokenAccount, _, err := tokens.FindAssociatedTokenAddress(solana.TokenProgramID, usdcMint, signerPDA)
+			require.NoError(t, err)
+			chainConfigPDA, _, err := tokens.TokenPoolChainConfigPDA(config.SvmChainSelector, usdcMint, config.CctpTokenPoolProgram)
+			require.NoError(t, err)
+
+			return CctpTokenPoolPDAs{
+				program:        config.CctpTokenPoolProgram,
+				state:          statePDA,
+				signer:         signerPDA,
+				tokenAccount:   poolTokenAccount,
+				svmChainConfig: chainConfigPDA,
+			}
+		}
+
+		usdcMintPriv, err := solana.NewRandomPrivateKey()
+		require.NoError(t, err)
+		usdcMint := usdcMintPriv.PublicKey()
+		usdcDecimals := uint8(6)
+
+		// Example domain, used as both local and remote domain, to test something similar to a
+		// Solana <> Solana transfer. It has to be a valid domain due to used_nonces PDA derivation.
+		// As of May 2025, valid domains are 0 to 10 (https://developers.circle.com/stablecoins/supported-domains)
+		domain := uint32(5)
+
+		messageTransmitter := getMessageTransmitterPDAs()
+		tokenMessengerMinter := getTokenMessengerMinterPDAs(domain, usdcMint)
+		cctpPool := getCctpTokenPoolPDAs(usdcMint)
+
+		cctp_message_transmitter.SetProgramID(messageTransmitter.program)
+		cctp_token_messenger_minter.SetProgramID(tokenMessengerMinter.program)
+		cctp_token_pool.SetProgramID(config.CctpTokenPoolProgram)
+
+		attesters, otherKeys, _ := testutils.GenerateSignersAndTransmitters(t, 1)
+		attester := attesters[0]
+		attesterSolana := solana.PublicKey(common.ToLeftPadded32Bytes(attester.Address[:]))
+		tokenController := otherKeys[0]
+
+		var userATA solana.PublicKey
+		var adminATA solana.PublicKey
+
+		var tpLookupTable map[solana.PublicKey]solana.PublicKeySlice
+
+		t.Run("Setup", func(t *testing.T) {
+			type ProgramData struct {
+				DataType uint32
+				Address  solana.PublicKey
+			}
+
+			t.Run("CCTP token", func(t *testing.T) {
+				// create USDC token
+				instructions, err := tokens.CreateToken(ctx, solana.TokenProgramID, usdcMint, admin.PublicKey(), usdcDecimals, solanaGoClient, config.DefaultCommitment)
+				require.NoError(t, err)
+
+				// Admin: create associated token accounts & mint
+				createAdminI, adminTokenAccount, err := tokens.CreateAssociatedTokenAccount(solana.TokenProgramID, usdcMint, admin.PublicKey(), admin.PublicKey())
+				require.NoError(t, err)
+				adminATA = adminTokenAccount
+				mintToAdminI, err := tokens.MintTo(1000*1e6, solana.TokenProgramID, usdcMint, adminTokenAccount, admin.PublicKey())
+				require.NoError(t, err)
+
+				// User: create associated token account & mint
+				createUserI, userTokenAccount, err := tokens.CreateAssociatedTokenAccount(solana.TokenProgramID, usdcMint, user.PublicKey(), admin.PublicKey())
+				require.NoError(t, err)
+				userATA = userTokenAccount
+				mintToUserI, err := tokens.MintTo(100*1e6, solana.TokenProgramID, usdcMint, userTokenAccount, admin.PublicKey())
+				require.NoError(t, err)
+
+				instructions = append(instructions, createAdminI, mintToAdminI, createUserI, mintToUserI)
+
+				testutils.SendAndConfirm(ctx, t, solanaGoClient, instructions, admin, config.DefaultCommitment, common.AddSigners(usdcMintPriv))
+
+				// validate admin for example
+				outDec, outVal, err := tokens.TokenBalance(ctx, solanaGoClient, adminTokenAccount, config.DefaultCommitment)
+				require.NoError(t, err)
+				require.Equal(t, int(1_000*1e6), outVal)
+				require.Equal(t, usdcDecimals, outDec)
+			})
+
+			t.Run("CCTP token pool program", func(t *testing.T) {
+				t.Parallel()
+
+				t.Run("Create lookup table", func(t *testing.T) {
+					tpLookupTableAddr, err := common.CreateLookupTable(ctx, solanaGoClient, admin)
+					require.NoError(t, err)
+
+					entries := solana.PublicKeySlice{
+						tpLookupTableAddr,
+						solana.SystemProgramID, // placeholder for the token admin registry, as there is none in the dumb ramp
+						cctpPool.program,
+						cctpPool.state,
+						cctpPool.tokenAccount,
+						cctpPool.signer,
+						solana.TokenProgramID,
+						usdcMint,
+						solana.SystemProgramID, // placeholder for the fee token config, as there is none in the dumb ramp
+						solana.SystemProgramID, // placeholder for the router signer, as there is none in the dumb ramp
+						// -- CCTP custom entries --
+						messageTransmitter.messageTransmitter,
+						messageTransmitter.eventAuthority,
+						messageTransmitter.authorityPda,
+						messageTransmitter.program,
+						tokenMessengerMinter.authorityPda,
+						tokenMessengerMinter.tokenMessenger,
+						tokenMessengerMinter.tokenMinter,
+						tokenMessengerMinter.eventAuthority,
+						tokenMessengerMinter.custodyTokenAccount,
+						tokenMessengerMinter.localToken,
+						tokenMessengerMinter.program,
+					}
+
+					tpLookupTable = map[solana.PublicKey]solana.PublicKeySlice{
+						tpLookupTableAddr: entries,
+					}
+
+					require.NoError(t, common.ExtendLookupTable(ctx, solanaGoClient, tpLookupTableAddr, admin, entries))
+					common.AwaitSlotChange(ctx, solanaGoClient)
+				})
+
+				t.Run("Initialize", func(t *testing.T) {
+					// get program data account
+					data, err := solanaGoClient.GetAccountInfoWithOpts(ctx, config.CctpTokenPoolProgram, &rpc.GetAccountInfoOpts{
+						Commitment: config.DefaultCommitment,
+					})
+					require.NoError(t, err)
+					// Decode program data
+					var programData ProgramData
+					require.NoError(t, bin.UnmarshalBorsh(&programData, data.Bytes()))
+
+					poolInitI, err := cctp_token_pool.NewInitializeInstruction(
+						dumbRamp,
+						config.RMNRemoteProgram,
+						cctpPool.state,
+						usdcMint,
+						admin.PublicKey(),
+						solana.SystemProgramID,
+						cctpPool.program,
+						programData.Address,
+					).ValidateAndBuild()
+
+					require.NoError(t, err)
+
+					// set pool config
+					ixConfigure, err := cctp_token_pool.NewInitChainRemoteConfigInstruction(
+						config.SvmChainSelector,
+						usdcMint,
+						cctp_token_pool.RemoteConfig{
+							TokenAddress: cctp_token_pool.RemoteAddress{
+								Address: usdcMint.Bytes(),
+							},
+							Decimals:      usdcDecimals,
+							PoolAddresses: []cctp_token_pool.RemoteAddress{},
+						},
+						cctpPool.state,
+						cctpPool.svmChainConfig,
+						admin.PublicKey(),
+						solana.SystemProgramID,
+					).ValidateAndBuild()
+					require.NoError(t, err)
+
+					ixCctpConfigure, err := cctp_token_pool.NewEditChainRemoteConfigCctpInstruction(
+						config.SvmChainSelector,
+						usdcMint,
+						cctp_token_pool.CctpChain{
+							DomainId:          domain,
+							DestinationCaller: cctpPool.signer, // as it is svm<->svm, the caller is the pool signer
+						},
+						cctpPool.state,
+						cctpPool.svmChainConfig,
+						admin.PublicKey(),
+					).ValidateAndBuild()
+
+					ixAppend, err := cctp_token_pool.NewAppendRemotePoolAddressesInstruction(
+						config.SvmChainSelector,
+						usdcMint,
+						[]cctp_token_pool.RemoteAddress{{Address: cctpPool.signer.Bytes()}}, // when the source is Solana, the pool is identified by its signer
+						cctpPool.state,
+						cctpPool.svmChainConfig,
+						admin.PublicKey(),
+						solana.SystemProgramID,
+					).ValidateAndBuild()
+					require.NoError(t, err)
+
+					// create pool token account
+					createP, poolTokenAccount, err := tokens.CreateAssociatedTokenAccount(solana.TokenProgramID, usdcMint, cctpPool.signer, admin.PublicKey())
+					require.NoError(t, err)
+					require.Equal(t, poolTokenAccount, cctpPool.tokenAccount)
+
+					// submit tx with all instructions
+					res := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{poolInitI, ixConfigure, ixCctpConfigure, ixAppend, createP}, admin, config.DefaultCommitment)
+					require.NotNil(t, res)
+
+					// validate state
+					var configAccount cctp_token_pool.State
+					require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, cctpPool.state, config.DefaultCommitment, &configAccount))
+					require.Equal(t, cctpPool.tokenAccount, configAccount.Config.PoolTokenAccount)
+
+					// validate events
+					var eventConfigured tokens.EventChainConfigured
+					require.NoError(t, common.ParseEvent(res.Meta.LogMessages, "RemoteChainConfigured", &eventConfigured, config.PrintEvents))
+					require.Equal(t, config.SvmChainSelector, eventConfigured.ChainSelector)
+					require.Equal(t, 0, len(eventConfigured.PoolAddresses))
+					require.Equal(t, 0, len(eventConfigured.PreviousPoolAddresses))
+					require.Equal(t, cctp_token_pool.RemoteAddress{Address: usdcMint.Bytes()}, eventConfigured.Token)
+					require.Equal(t, 0, len(eventConfigured.PreviousToken.Address))
+					require.Equal(t, usdcMint, eventConfigured.Mint)
+
+					var eventAppended tokens.EventRemotePoolsAppended
+					require.NoError(t, common.ParseEvent(res.Meta.LogMessages, "RemotePoolsAppended", &eventAppended, config.PrintEvents))
+					require.Equal(t, config.SvmChainSelector, eventAppended.ChainSelector)
+					require.Equal(t, []cctp_token_pool.RemoteAddress{{Address: cctpPool.signer.Bytes()}}, eventAppended.PoolAddresses)
+					require.Equal(t, 0, len(eventAppended.PreviousPoolAddresses))
+					require.Equal(t, usdcMint, eventAppended.Mint)
+
+					var eventCctpEdit tokens.EventRemoteChainCctpConfigEdited
+					require.NoError(t, common.ParseEvent(res.Meta.LogMessages, "RemoteChainCctpConfigChanged", &eventCctpEdit, config.PrintEvents))
+					require.Equal(t, domain, eventCctpEdit.Config.DomainId)
+					require.Equal(t, cctpPool.signer, eventCctpEdit.Config.DestinationCaller)
+				})
+			})
+
+			t.Run("CCTP Message Transmitter program", func(t *testing.T) {
+				t.Parallel()
+
+				// get program data account
+				data, err := solanaGoClient.GetAccountInfoWithOpts(ctx, messageTransmitter.program, &rpc.GetAccountInfoOpts{
+					Commitment: config.DefaultCommitment,
+				})
+				require.NoError(t, err)
+				// Decode program data
+				var programData ProgramData
+				require.NoError(t, bin.UnmarshalBorsh(&programData, data.Bytes()))
+
+				ix, err := cctp_message_transmitter.NewInitializeInstruction(
+					cctp_message_transmitter.InitializeParams{
+						LocalDomain:        domain,
+						Attester:           attesterSolana,
+						MaxMessageBodySize: 1234,
+						Version:            0,
+					},
+					admin.PublicKey(),
+					admin.PublicKey(),
+					messageTransmitter.messageTransmitter,
+					programData.Address,
+					messageTransmitter.program,
+					solana.SystemProgramID,
+					messageTransmitter.eventAuthority,
+					messageTransmitter.program,
+				).ValidateAndBuild()
+				require.NoError(t, err)
+
+				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+			})
+
+			t.Run("CCTP Token Messenger Minter program", func(t *testing.T) {
+				t.Parallel()
+
+				t.Run("Initialize", func(t *testing.T) {
+					// get program data account
+					data, err := solanaGoClient.GetAccountInfoWithOpts(ctx, tokenMessengerMinter.program, &rpc.GetAccountInfoOpts{
+						Commitment: config.DefaultCommitment,
+					})
+					require.NoError(t, err)
+					// Decode program data
+					var programData ProgramData
+					require.NoError(t, bin.UnmarshalBorsh(&programData, data.Bytes()))
+
+					ix, err := cctp_token_messenger_minter.NewInitializeInstruction(
+						cctp_token_messenger_minter.InitializeParams{
+							TokenController:         tokenController.PublicKey(),
+							LocalMessageTransmitter: messageTransmitter.program,
+							MessageBodyVersion:      0,
+						},
+						admin.PublicKey(),
+						admin.PublicKey(),
+						tokenMessengerMinter.authorityPda,
+						tokenMessengerMinter.tokenMessenger,
+						tokenMessengerMinter.tokenMinter,
+						programData.Address,
+						tokenMessengerMinter.program,
+						solana.SystemProgramID,
+						tokenMessengerMinter.eventAuthority,
+						tokenMessengerMinter.program,
+					).ValidateAndBuild()
+					require.NoError(t, err)
+
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+				})
+
+				t.Run("Add remote token messenger", func(t *testing.T) {
+					ix, err := cctp_token_messenger_minter.NewAddRemoteTokenMessengerInstruction(
+						cctp_token_messenger_minter.AddRemoteTokenMessengerParams{
+							Domain:         domain,
+							TokenMessenger: tokenMessengerMinter.program,
+						},
+						admin.PublicKey(),
+						admin.PublicKey(),
+						tokenMessengerMinter.tokenMessenger,
+						tokenMessengerMinter.remoteTokenMessenger,
+						solana.SystemProgramID,
+						tokenMessengerMinter.eventAuthority,
+						tokenMessengerMinter.program,
+					).ValidateAndBuild()
+					require.NoError(t, err)
+
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+				})
+
+				t.Run("Add local token", func(t *testing.T) {
+					ix, err := cctp_token_messenger_minter.NewAddLocalTokenInstruction(
+						cctp_token_messenger_minter.AddLocalTokenParams{},
+						admin.PublicKey(),
+						tokenController.PublicKey(),
+						tokenMessengerMinter.tokenMinter,
+						tokenMessengerMinter.localToken,
+						tokenMessengerMinter.custodyTokenAccount,
+						usdcMint,
+						solana.TokenProgramID,
+						solana.SystemProgramID,
+						tokenMessengerMinter.eventAuthority,
+						tokenMessengerMinter.program,
+					).ValidateAndBuild()
+					require.NoError(t, err)
+
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment, common.AddSigners(tokenController))
+				})
+
+				t.Run("Link token pair", func(t *testing.T) {
+					ix, err := cctp_token_messenger_minter.NewLinkTokenPairInstruction(
+						cctp_token_messenger_minter.LinkTokenPairParams{
+							LocalToken:   tokenMessengerMinter.localToken,
+							RemoteDomain: domain,
+							RemoteToken:  usdcMint, // using Solana as remote domain, so using USDC mint as remote token
+						},
+						admin.PublicKey(),
+						tokenController.PublicKey(),
+						tokenMessengerMinter.tokenMinter,
+						tokenMessengerMinter.tokenPair,
+						solana.SystemProgramID,
+						tokenMessengerMinter.eventAuthority,
+						tokenMessengerMinter.program,
+					).ValidateAndBuild()
+					require.NoError(t, err)
+
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment, common.AddSigners(tokenController))
+				})
+
+				t.Run("Set max burn amount per message", func(t *testing.T) {
+					ix, err := cctp_token_messenger_minter.NewSetMaxBurnAmountPerMessageInstruction(
+						cctp_token_messenger_minter.SetMaxBurnAmountPerMessageParams{
+							BurnLimitPerMessage: 2 * 1e6, // 2 USDC, as it uses 6 decimals
+						},
+						tokenController.PublicKey(),
+						tokenMessengerMinter.tokenMinter,
+						tokenMessengerMinter.localToken,
+						tokenMessengerMinter.eventAuthority,
+						tokenMessengerMinter.program,
+					).ValidateAndBuild()
+					require.NoError(t, err)
+
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment, common.AddSigners(tokenController))
+				})
+
+			})
+		})
+
+		getCctpNonce := func(t *testing.T, messageBytes []byte) uint64 {
+			t.Helper()
+			nonceBytes := messageBytes[12:20] // extract nonce from message, which is the 12th to 20th byte of the message
+			nonce := binary.BigEndian.Uint64(nonceBytes)
+			return nonce
+		}
+
+		getUsedNoncesPDA := func(t *testing.T, messageSent message_transmitter.MessageSent) solana.PublicKey {
+			t.Helper()
+			nonce := getCctpNonce(t, messageSent.Message)
+			fmt.Println("Nonce for receiving message:", nonce)
+			firstNonce := (nonce-1)/6400*6400 + 1 // round down to the first nonce that is a multiple of 6400
+			fmt.Println("First nonce:", firstNonce)
+			firstNoncePda, _, err := solana.FindProgramAddress(
+				[][]byte{
+					[]byte("used_nonces"),
+					[]byte(common.NumToStr(domain)),
+					[]byte(common.NumToStr(firstNonce)),
+				},
+				messageTransmitter.program,
+			)
+			require.NoError(t, err)
+			return firstNoncePda
+		}
+
+		t.Run("CCTP sanity checks", func(t *testing.T) {
+			messageAmount := uint64(1123456) // 1.123456 USDC, as it uses 6 decimals
+
+			var messageSent message_transmitter.MessageSent
+			messageSentEventKeypair, err := solana.NewRandomPrivateKey()
+			require.NoError(t, err)
+
+			var attestation []byte
+
+			t.Run("DepositForBurnWithCaller", func(t *testing.T) {
+				ix, err := cctp_token_messenger_minter.NewDepositForBurnWithCallerInstruction(
+					cctp_token_messenger_minter.DepositForBurnWithCallerParams{
+						Amount:            messageAmount,
+						DestinationDomain: domain,
+						MintRecipient:     adminATA,
+						DestinationCaller: admin.PublicKey(),
+					},
+					user.PublicKey(),
+					user.PublicKey(),
+					tokenMessengerMinter.authorityPda,
+					userATA,
+					messageTransmitter.messageTransmitter,
+					tokenMessengerMinter.tokenMessenger,
+					tokenMessengerMinter.remoteTokenMessenger,
+					tokenMessengerMinter.tokenMinter,
+					tokenMessengerMinter.localToken,
+					usdcMint,
+					messageSentEventKeypair.PublicKey(),
+					messageTransmitter.program,
+					tokenMessengerMinter.program,
+					solana.TokenProgramID,
+					solana.SystemProgramID,
+					tokenMessengerMinter.eventAuthority,
+					tokenMessengerMinter.program,
+				).ValidateAndBuild()
+				require.NoError(t, err)
+
+				result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment, common.AddSigners(messageSentEventKeypair))
+
+				returnedNonce, err := common.ExtractTypedReturnValue(ctx, result.Meta.LogMessages, tokenMessengerMinter.program.String(), binary.LittleEndian.Uint64)
+				require.NoError(t, err)
+				fmt.Println("Nonce:", returnedNonce)
+
+				require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, messageSentEventKeypair.PublicKey(), config.DefaultCommitment, &messageSent))
+				fmt.Println("Message Sent Event Account Data:", messageSent)
+				fmt.Println("Message Sent Event Bytes (hex):", hex.EncodeToString(messageSent.Message))
+			})
+
+			t.Run("ReceiveMessage", func(t *testing.T) {
+				t.Run("Fund custody token account", func(t *testing.T) {
+					ix, err := tokens.MintTo(messageAmount, solana.TokenProgramID, usdcMint, tokenMessengerMinter.custodyTokenAccount, admin.PublicKey())
+					require.NoError(t, err)
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+
+					decimals, amount, err := tokens.TokenBalance(ctx, solanaGoClient, tokenMessengerMinter.custodyTokenAccount, config.DefaultCommitment)
+					require.NoError(t, err)
+					require.Equal(t, messageAmount, uint64(amount))
+					require.Equal(t, usdcDecimals, decimals)
+				})
+
+				t.Run("Actually receive message", func(t *testing.T) {
+					_, initial, err := tokens.TokenBalance(ctx, solanaGoClient, adminATA, config.DefaultCommitment)
+					require.NoError(t, err)
+
+					usedNoncesPDA := getUsedNoncesPDA(t, messageSent)
+
+					attestation, err = ccip.AttestCCTP(messageSent.Message, attesters)
+					fmt.Println("Attestation:", hex.EncodeToString(attestation))
+					require.NoError(t, err)
+
+					raw := message_transmitter.NewReceiveMessageInstruction(
+						message_transmitter.ReceiveMessageParams{
+							Message:     messageSent.Message,
+							Attestation: attestation,
+						},
+						admin.PublicKey(), // payer
+						admin.PublicKey(), // caller
+						messageTransmitter.authorityPda,
+						messageTransmitter.messageTransmitter,
+						usedNoncesPDA,
+						tokenMessengerMinter.program, // receiver
+						solana.SystemProgramID,
+						messageTransmitter.eventAuthority,
+						messageTransmitter.program,
+					)
+
+					raw.AccountMetaSlice = append(raw.AccountMetaSlice,
+						solana.Meta(tokenMessengerMinter.tokenMessenger),
+						solana.Meta(tokenMessengerMinter.remoteTokenMessenger),
+						solana.Meta(tokenMessengerMinter.tokenMinter).WRITE(),
+						solana.Meta(tokenMessengerMinter.localToken).WRITE(),
+						solana.Meta(tokenMessengerMinter.tokenPair),
+						solana.Meta(adminATA).WRITE(), // user receiving the USDC
+						solana.Meta(tokenMessengerMinter.custodyTokenAccount).WRITE(),
+						solana.Meta(solana.TokenProgramID),
+						solana.Meta(tokenMessengerMinter.eventAuthority),
+						solana.Meta(tokenMessengerMinter.program))
+
+					ix, err := raw.ValidateAndBuild()
+					require.NoError(t, err)
+
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+
+					_, final, err := tokens.TokenBalance(ctx, solanaGoClient, adminATA, config.DefaultCommitment)
+					require.NoError(t, err)
+
+					require.Equal(t, uint64(initial)+messageAmount, uint64(final), "Admin should have received the USDC after receiving the message")
+					fmt.Println("Final balance of admin's USDC ATA:", final)
+				})
+			})
+
+			t.Run("Reclaim event account rent", func(t *testing.T) {
+				initial, err := solanaGoClient.GetAccountInfoWithOpts(ctx, user.PublicKey(), &rpc.GetAccountInfoOpts{Commitment: config.DefaultCommitment})
+				require.NoError(t, err)
+
+				messageEventAccount, err := solanaGoClient.GetAccountInfoWithOpts(ctx, messageSentEventKeypair.PublicKey(), &rpc.GetAccountInfoOpts{Commitment: config.DefaultCommitment})
+				require.NoError(t, err)
+
+				reclaimIx, err := cctp_message_transmitter.NewReclaimEventAccountInstruction(
+					cctp_message_transmitter.ReclaimEventAccountParams{
+						Attestation: attestation,
+					},
+					user.PublicKey(),
+					messageTransmitter.messageTransmitter,
+					messageSentEventKeypair.PublicKey(),
+				).ValidateAndBuild()
+				require.NoError(t, err)
+
+				result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{reclaimIx}, user, config.DefaultCommitment)
+				require.NotNil(t, result)
+
+				final, err := solanaGoClient.GetAccountInfoWithOpts(ctx, user.PublicKey(), &rpc.GetAccountInfoOpts{Commitment: config.DefaultCommitment})
+				require.NoError(t, err)
+
+				require.Equal(t, initial.Value.Lamports-result.Meta.Fee+messageEventAccount.Value.Lamports, final.Value.Lamports)
+			})
+		})
+
+		t.Run("TypeVersion", func(t *testing.T) {
+			t.Parallel()
+
+			ix, err := cctp_token_pool.NewTypeVersionInstruction(solana.SysVarClockPubkey).ValidateAndBuild()
+			require.NoError(t, err)
+			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+			require.NotNil(t, result)
+
+			output, err := common.ExtractTypedReturnValue(ctx, result.Meta.LogMessages, config.CctpTokenPoolProgram.String(), func(b []byte) string {
+				require.Len(t, b, int(binary.LittleEndian.Uint32(b[:4]))+4) // the first 4 bytes just encodes the length
+				return string(b[4:])
+			})
+			require.NoError(t, err)
+			// regex from https://semver.org/#is-there-a-suggested-regular-expression-regex-to-check-a-semver-string
+			semverRegex := "(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-((?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?"
+			require.Regexp(t, fmt.Sprintf("^%s %s$", "cctp-token-pool", semverRegex), output)
+			fmt.Printf("Type Version: %s\n", output)
+		})
+
+		t.Run("E2E through pool (svm user -> svm admin)", func(t *testing.T) {
+			t.Parallel()
+
+			dumbRampCctpSigner, _, err := state.FindExternalTokenPoolsSignerPDA(config.CctpTokenPoolProgram, dumbRamp)
+			require.NoError(t, err)
+
+			remoteChainSelector := config.SvmChainSelector
+			fakeCcipFullNonce := uint64(1234567890)
+
+			messageSentEventAddress, _, err := solana.FindProgramAddress([][]byte{
+				[]byte("ccip_cctp_message_sent_event"),
+				user.PublicKey().Bytes(),
+				common.Uint64ToLE(remoteChainSelector),
+				common.Uint64ToLE(fakeCcipFullNonce),
+			}, cctpPool.program)
+			require.NoError(t, err)
+
+			messageAmount := uint64(1e5) // 0.1 USDC, as it uses 6 decimals
+			var messageSentEventData message_transmitter.MessageSent
+			var attestation []byte
+
+			t.Run("Basic onramp", func(t *testing.T) {
+				// fund pool signer with SOL so it can pay for the rent of the message sent event account
+				fundPoolSignerIx, err := tokens.NativeTransfer(1*solana.LAMPORTS_PER_SOL, admin.PublicKey(), cctpPool.signer)
+				require.NoError(t, err)
+
+				// fund pool signer with USDC, as the onramp would normally do it but we're using a mock ramp here
+				transferI, err := tokens.TokenTransferChecked(messageAmount, usdcDecimals, solana.TokenProgramID, adminATA, usdcMint, cctpPool.tokenAccount, admin.PublicKey(), solana.PublicKeySlice{})
+				require.NoError(t, err)
+
+				raw := test_ccip_invalid_receiver.NewPoolProxyLockOrBurnInstruction(
+					test_ccip_invalid_receiver.LockOrBurnInV1{
+						LocalToken:          usdcMint,
+						Amount:              messageAmount,
+						RemoteChainSelector: config.SvmChainSelector,
+						Receiver:            cctpPool.tokenAccount.Bytes(),
+						OriginalSender:      user.PublicKey(),
+						MsgFullNonce:        fakeCcipFullNonce,
+					},
+					cctpPool.program,
+					dumbRampCctpSigner,
+					cctpPool.state,
+					solana.TokenProgramID,
+					usdcMint,
+					cctpPool.signer,
+					cctpPool.tokenAccount,
+					config.RMNRemoteProgram,
+					config.RMNRemoteCursesPDA,
+					config.RMNRemoteConfigPDA,
+					cctpPool.svmChainConfig,
+				)
+
+				raw.AccountMetaSlice = append(raw.AccountMetaSlice,
+					solana.Meta(tokenMessengerMinter.authorityPda),
+					solana.Meta(messageTransmitter.messageTransmitter).WRITE(),
+					solana.Meta(tokenMessengerMinter.tokenMessenger),
+					solana.Meta(tokenMessengerMinter.tokenMinter),
+					solana.Meta(tokenMessengerMinter.localToken).WRITE(),
+					solana.Meta(messageTransmitter.program),
+					solana.Meta(tokenMessengerMinter.program),
+					solana.Meta(solana.SystemProgramID),
+					solana.Meta(tokenMessengerMinter.eventAuthority),
+					solana.Meta(tokenMessengerMinter.remoteTokenMessenger),
+					solana.Meta(messageSentEventAddress).WRITE(),
+				)
+
+				ix, err := raw.ValidateAndBuild()
+				require.NoError(t, err)
+
+				res := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{transferI, fundPoolSignerIx, ix}, admin, config.DefaultCommitment)
+				require.NotNil(t, res)
+
+				output, err := common.ExtractAnchorTypedReturnValue[cctp_token_pool.LockOrBurnOutV1](ctx, res.Meta.LogMessages, cctpPool.program.String())
+				require.NoError(t, err)
+				outputSourceDomain := binary.BigEndian.Uint32(output.DestPoolData[60:64])
+				require.Equal(t, outputSourceDomain, domain) // the source domain is Solana in this test
+
+				require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, messageSentEventAddress, config.DefaultCommitment, &messageSentEventData))
+				fmt.Println("Message Sent Event Data:", messageSentEventData)
+				require.Equal(t, cctpPool.signer, messageSentEventData.RentPayer)
+
+				var ccipCctpMessageSentEvent ccip.EventCcipCctpMessageSent
+				require.NoError(t, common.ParseEvent(res.Meta.LogMessages, "CcipCctpMessageSentEvent", &ccipCctpMessageSentEvent, config.PrintEvents))
+				require.Equal(t, user.PublicKey(), ccipCctpMessageSentEvent.OriginalSender)
+				require.Equal(t, config.SvmChainSelector, ccipCctpMessageSentEvent.RemoteChainSelector)
+				require.Equal(t, fakeCcipFullNonce, ccipCctpMessageSentEvent.MsgTotalNonce)
+				require.Equal(t, messageSentEventAddress, ccipCctpMessageSentEvent.EventAddress)
+				require.Equal(t, messageSentEventData.Message, ccipCctpMessageSentEvent.MessageSentBytes)
+				require.Equal(t, domain, ccipCctpMessageSentEvent.SourceDomain)
+
+				// Check CCTP nonce in all ways it appears
+				outputNonce := binary.BigEndian.Uint64(output.DestPoolData[24:32])                        // in pool returned dest data
+				require.Equal(t, outputNonce, getCctpNonce(t, ccipCctpMessageSentEvent.MessageSentBytes)) // in event message bytes
+				require.Equal(t, outputNonce, getCctpNonce(t, messageSentEventData.Message))              // in event account data
+				require.Equal(t, outputNonce, ccipCctpMessageSentEvent.CctpNonce)                         // in the event field
+			})
+
+			t.Run("Basic offramp", func(t *testing.T) {
+				fundCustodyIx, err := tokens.MintTo(messageAmount, solana.TokenProgramID, usdcMint, tokenMessengerMinter.custodyTokenAccount, admin.PublicKey())
+				require.NoError(t, err)
+				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{fundCustodyIx}, admin, config.DefaultCommitment)
+
+				decimals, amount, err := tokens.TokenBalance(ctx, solanaGoClient, tokenMessengerMinter.custodyTokenAccount, config.DefaultCommitment)
+				require.NoError(t, err)
+				require.Equal(t, messageAmount, uint64(amount))
+				require.Equal(t, usdcDecimals, decimals)
+
+				_, initial, err := tokens.TokenBalance(ctx, solanaGoClient, adminATA, config.DefaultCommitment)
+
+				attestation, err = ccip.AttestCCTP(messageSentEventData.Message, attesters)
+				offchainTokenData := cctp_token_pool.MessageAndAttestation{
+					Message:     cctp_token_pool.CctpMessage{Data: messageSentEventData.Message},
+					Attestation: attestation,
+				}
+				offchainTokenDataBuffer := new(bytes.Buffer)
+				require.NoError(t, offchainTokenData.MarshalWithEncoder(bin.NewBorshEncoder(offchainTokenDataBuffer)))
+
+				raw := test_ccip_invalid_receiver.NewPoolProxyReleaseOrMintInstruction(
+					test_ccip_invalid_receiver.ReleaseOrMintInV1{
+						OriginalSender:      user.PublicKey().Bytes(),
+						RemoteChainSelector: config.SvmChainSelector,
+						Receiver:            admin.PublicKey(),
+						Amount:              tokens.ToLittleEndianU256(messageAmount),
+						LocalToken:          usdcMint,
+						SourcePoolAddress:   cctpPool.signer.Bytes(), // when the source is Solana, the pool is identified by its signer
+						SourcePoolData:      []byte{},
+						OffchainTokenData:   offchainTokenDataBuffer.Bytes(),
+					},
+					cctpPool.program,
+					dumbRampCctpSigner,
+					dumbRamp,
+					allowedOfframpSvmPDA,
+					cctpPool.state,
+					solana.TokenProgramID,
+					usdcMint,
+					cctpPool.signer,
+					cctpPool.tokenAccount,
+					cctpPool.svmChainConfig,
+					config.RMNRemoteProgram,
+					config.RMNRemoteCursesPDA,
+					config.RMNRemoteConfigPDA,
+					adminATA,
+				)
+
+				raw.GetPoolSignerAccount().WRITE()
+
+				raw.AccountMetaSlice = append(raw.AccountMetaSlice,
+					solana.Meta(messageTransmitter.authorityPda),
+					solana.Meta(messageTransmitter.messageTransmitter),
+					solana.Meta(tokenMessengerMinter.program),
+					solana.Meta(solana.SystemProgramID),
+					solana.Meta(messageTransmitter.eventAuthority),
+					solana.Meta(messageTransmitter.program),
+					solana.Meta(tokenMessengerMinter.tokenMessenger),
+					solana.Meta(tokenMessengerMinter.tokenMinter).WRITE(),
+					solana.Meta(tokenMessengerMinter.localToken).WRITE(),
+					solana.Meta(tokenMessengerMinter.custodyTokenAccount).WRITE(),
+					solana.Meta(tokenMessengerMinter.eventAuthority),
+					solana.Meta(tokenMessengerMinter.remoteTokenMessenger),
+					solana.Meta(tokenMessengerMinter.tokenPair),
+					solana.Meta(getUsedNoncesPDA(t, messageSentEventData)).WRITE(),
+				)
+
+				ix, err := raw.ValidateAndBuild()
+				require.NoError(t, err)
+
+				res := testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{fundCustodyIx, ix}, admin, config.DefaultCommitment, tpLookupTable)
+				require.NotNil(t, res)
+
+				_, final, err := tokens.TokenBalance(ctx, solanaGoClient, adminATA, config.DefaultCommitment)
+
+				require.Equal(t, uint64(initial)+messageAmount, uint64(final), "Admin should have received the USDC after receiving the message")
+			})
+
+			t.Run("Reclaim event account rent", func(t *testing.T) {
+				poolSignerInfo, err := solanaGoClient.GetAccountInfoWithOpts(ctx, cctpPool.signer, &rpc.GetAccountInfoOpts{Commitment: config.DefaultCommitment})
+				require.NoError(t, err)
+				initialBalance := poolSignerInfo.Value.Lamports
+
+				messageSentAccount, err := solanaGoClient.GetAccountInfoWithOpts(ctx, messageSentEventAddress, &rpc.GetAccountInfoOpts{Commitment: config.DefaultCommitment})
+				require.NoError(t, err)
+				messageRent := messageSentAccount.Value.Lamports
+
+				reclaimIx := cctp_token_pool.NewReclaimEventAccountInstruction(
+					usdcMint,
+					user.PublicKey(),
+					remoteChainSelector,
+					fakeCcipFullNonce,
+					attestation,
+					cctpPool.state,
+					cctpPool.signer,
+					messageSentEventAddress,
+					messageTransmitter.messageTransmitter,
+					messageTransmitter.program,
+					admin.PublicKey(),
+					solana.SystemProgramID,
+				)
+
+				ix, err := reclaimIx.ValidateAndBuild()
+				require.NoError(t, err)
+
+				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+
+				poolSignerInfoAfter, err := solanaGoClient.GetAccountInfoWithOpts(ctx, cctpPool.signer, &rpc.GetAccountInfoOpts{Commitment: config.DefaultCommitment})
+				require.NoError(t, err)
+				finalBalance := poolSignerInfoAfter.Value.Lamports
+
+				require.Equal(t, finalBalance, initialBalance+messageRent)
+			})
 		})
 	})
 }

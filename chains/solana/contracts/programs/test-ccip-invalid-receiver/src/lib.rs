@@ -410,13 +410,14 @@ impl ReleaseOrMintInV1 {
     }
 }
 
-#[derive(Clone, AnchorSerialize, AnchorDeserialize)]
+#[derive(Clone, AnchorSerialize, AnchorDeserialize, Debug)]
 pub struct LockOrBurnInV1 {
     pub receiver: Vec<u8>, //  The recipient of the tokens on the destination chain
     pub remote_chain_selector: u64, // The chain ID of the destination chain
     pub original_sender: Pubkey, // The original sender of the tx on the source chain
     pub amount: u64, // local solana amount to lock/burn,  The amount of tokens to lock or burn, denominated in the source token's decimals
     pub local_token: Pubkey, //  The address on this chain of the token to lock or burn
+    pub msg_full_nonce: u64, // The onramp nonce for the current message, given the original_sender & remote chain selector
 }
 const TOKENPOOL_LOCK_OR_BURN_DISCRIMINATOR: [u8; 8] =
     [0x72, 0xa1, 0x5e, 0x1d, 0x93, 0x19, 0xe8, 0xbf]; // lock_or_burn_tokens

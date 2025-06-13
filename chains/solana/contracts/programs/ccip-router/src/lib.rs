@@ -616,4 +616,6 @@ pub enum CcipRouterError {
     InvalidAccountListForPdaDerivation,
     #[msg("Unexpected account derivation stage")]
     InvalidDerivationStage,
+    #[msg("Invalid version of the Nonce account")]
+    InvalidNonceVersion,
 }
