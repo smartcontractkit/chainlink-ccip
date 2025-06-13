@@ -2,6 +2,7 @@ package commit
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math"
 	"math/rand"
@@ -17,6 +18,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
@@ -145,13 +147,13 @@ func TestPlugin_RoleDonE2E_NoPrevOutcome(t *testing.T) {
 			}
 		}
 
-		p := s.newRoleDonTestPlugin(oracleID)
+		p := s.newRoleDonTestPlugin(oracleID, false)
 		plugins = append(plugins, p)
 	}
 
 	runner := testhelpers.NewOCR3Runner(plugins, s.oracles, ocr3types.Outcome{})
 	res, err := runner.RunRound(ctx)
-	t.Log(res, err)
+	require.NoError(t, err)
 
 	o, err := ocrTypCodec.DecodeOutcome(res.Outcome)
 	require.NoError(t, err)
@@ -229,7 +231,7 @@ func TestPlugin_RoleDonE2E_RangesAndPricesSelectedPreviously(t *testing.T) {
 			}
 		}
 
-		p := s.newRoleDonTestPlugin(oracleID)
+		p := s.newRoleDonTestPlugin(oracleID, false)
 		plugins = append(plugins, p)
 	}
 
@@ -271,14 +273,122 @@ func TestPlugin_RoleDonE2E_RangesAndPricesSelectedPreviously(t *testing.T) {
 	require.NoError(t, err)
 	runner := testhelpers.NewOCR3Runner(plugins, s.oracles, b)
 	res, err := runner.RunRound(ctx)
-	t.Log(res, err)
+	require.NoError(t, err)
 
 	o, err := ocrTypCodec.DecodeOutcome(res.Outcome)
 	require.NoError(t, err)
 	require.Equal(t, committypes.MainOutcome{InflightPriceOcrSequenceNumber: 54, RemainingPriceChecks: 9}, o.MainOutcome)
 }
 
-func (s roleDonTestSetup) newRoleDonTestPlugin(oracleID commontypes.OracleID) *Plugin {
+func TestPlugin_RoleDonE2E_Discovery(t *testing.T) {
+	ctx := tests.Context(t)
+
+	s := newRoleDonTestSetup(t, 3, 7, 1)
+	t.Logf("Running test with Role DON Setup:\n%s", s)
+
+	allChainsConfig := make(map[cciptypes.ChainSelector]readerinternal.ChainConfig)
+	for _, ch := range append(s.sourceChains, s.destChain) {
+		allChainsConfig[ch] = readerinternal.ChainConfig{
+			FChain:         s.fChain[ch],
+			SupportedNodes: s.oracleIDsToPeerIDsSet(s.chainOracles[ch]),
+			Config:         chainconfig.ChainConfig{},
+		}
+	}
+
+	leaderOracleID := -1
+	plugins := make([]ocr3types.ReportingPlugin[[]byte], 0, len(s.oracles))
+	for _, oracleID := range s.oracles {
+		deps := s.oracleDependencies[oracleID]
+
+		oracleChains := s.getChainsOfOracle(oracleID)
+		oracleSourceChainsSet := oracleChains.Clone()
+		oracleSourceChainsSet.Remove(s.destChain)
+		var oracleSourceChains []cciptypes.ChainSelector
+		if oracleSourceChainsSet.Cardinality() > 0 {
+			oracleSourceChains = oracleSourceChainsSet.ToSlice()
+			sort.Slice(oracleSourceChains, func(i, j int) bool { return oracleSourceChains[i] < oracleSourceChains[j] })
+		}
+
+		// Home Chain Expectations - Every oracle should be able to read
+		{
+			deps.homeChainReader.EXPECT().GetFChain().Return(s.fChain, nil)
+			deps.homeChainReader.EXPECT().GetAllChainConfigs().Return(allChainsConfig, nil)
+
+			deps.homeChainReader.EXPECT().GetSupportedChainsForPeer(mock.Anything).
+				RunAndReturn(func(id libocrtypes.PeerID) (mapset.Set[cciptypes.ChainSelector], error) {
+					if leaderOracleID == -1 {
+						leaderOracleID = int(oracleID)
+					} else if int(oracleID) != leaderOracleID {
+						t.Fatal("GetSupportedChainsForPeer was not called only by the leader")
+					}
+					supportedChainsOfOracle := s.getChainsOfOracle(s.peerIDToOracleID[id])
+					return supportedChainsOfOracle, nil
+				}).Maybe() // once by the leader
+
+			deps.homeChainReader.EXPECT().GetChainConfig(mock.Anything).
+				RunAndReturn(func(ch cciptypes.ChainSelector) (readerinternal.ChainConfig, error) {
+					return allChainsConfig[ch], nil
+				})
+		}
+
+		// Discovery and Sync
+		{
+			deps.ccipReader.EXPECT().DiscoverContracts(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, selectors []cciptypes.ChainSelector) (ccipreader.ContractAddresses, error) {
+				addrs := ccipreader.ContractAddresses{}
+
+				// the following contracts can only be discovered by dest supporting oracles
+				if oracleChains.Contains(s.destChain) {
+					addrs = map[string]map[cciptypes.ChainSelector]cciptypes.UnknownAddress{
+						consts.ContractNameOffRamp:      {s.destChain: []byte("offramp")},
+						consts.ContractNameNonceManager: {s.destChain: []byte("nonceManager")},
+						consts.ContractNameRMNRemote:    {s.destChain: []byte("rmnRemote")},
+						consts.ContractNameRouter:       {s.destChain: []byte("router")},
+						consts.ContractNameFeeQuoter:    {s.destChain: []byte("feeQuoter")},
+						consts.ContractNameOnRamp:       {s.sourceChains[0]: []byte("onramp")},
+					}
+				}
+
+				if oracleChains.Contains(s.sourceChains[0]) {
+					if len(addrs) == 0 {
+						addrs = map[string]map[cciptypes.ChainSelector]cciptypes.UnknownAddress{
+							consts.ContractNameFeeQuoter: {},
+							consts.ContractNameRouter:    {},
+						}
+					}
+					addrs[consts.ContractNameFeeQuoter][s.sourceChains[0]] = cciptypes.UnknownAddress("feeQuoter")
+					addrs[consts.ContractNameRouter][s.sourceChains[0]] = cciptypes.UnknownAddress("router")
+				}
+
+				return addrs, nil
+			})
+
+			deps.ccipReader.EXPECT().Sync(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, addresses ccipreader.ContractAddresses) error {
+				require.Equal(t, ccipreader.ContractAddresses{
+					// offramp is synced once and cannot change afterwards
+					//consts.ContractNameOffRamp:      {s.destChain: []byte("offramp")},
+					consts.ContractNameOnRamp:       {s.sourceChains[0]: []byte("onramp")},
+					consts.ContractNameNonceManager: {s.destChain: []byte("nonceManager")},
+					consts.ContractNameRMNRemote:    {s.destChain: []byte("rmnRemote")},
+					consts.ContractNameRouter:       {s.sourceChains[0]: []byte("router"), s.destChain: []byte("router")},
+					consts.ContractNameFeeQuoter:    {s.sourceChains[0]: []byte("feeQuoter"), s.destChain: []byte("feeQuoter")},
+				}, addresses)
+				return nil
+			})
+		}
+
+		p := s.newRoleDonTestPlugin(oracleID, true)
+		plugins = append(plugins, p)
+	}
+	runner := testhelpers.NewOCR3Runner(plugins, s.oracles, ocr3types.Outcome{})
+	res, err := runner.RunRound(ctx)
+	require.NoError(t, err)
+	require.Greater(t, leaderOracleID, 0)
+
+	_, err = ocrTypCodec.DecodeOutcome(res.Outcome)
+	require.NoError(t, err)
+}
+
+func (s roleDonTestSetup) newRoleDonTestPlugin(oracleID commontypes.OracleID, initContracts bool) *Plugin {
 	deps := s.oracleDependencies[oracleID]
 	p := NewPlugin(
 		plugintypes.DonID(999),
@@ -319,7 +429,7 @@ func (s roleDonTestSetup) newRoleDonTestPlugin(oracleID commontypes.OracleID) *P
 		deps.addressCodec,
 		deps.reportBuilder,
 	)
-	p.contractsInitialized.Store(true)
+	p.contractsInitialized.Store(!initContracts)
 	return p
 }
 
