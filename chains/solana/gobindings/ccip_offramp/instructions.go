@@ -292,9 +292,11 @@ var (
 	// is "TokenTransferAccounts", it means the `accounts_to_save` block in this response contains
 	// all accounts relating to a single token being transferred. Use this information to construct
 	// the `token_indexes` vector that `execute` requires.
+	// * `next_stage`: If nonempty, this means the instruction must get called again with this value
+	// as the `stage` argument.
 	//
 	// Therefore, and starting with an empty `remaining_accounts` list, the caller must repeteadly
-	// call `derive_accounts_execute` until `ask_again_with` is returned empty.
+	// call `derive_accounts_execute` until `next_stage` is returned empty.
 	//
 	// # Arguments
 	//
@@ -310,7 +312,7 @@ var (
 	// * `merkle_root`: Merkle root as per the commit report.
 	// * `buffer_id`: If the execution will be buffered, the buffer id that will be used by the
 	// `execute_caller`: If the execution will not be buffered, this should be empty.
-	// * `token_receiver`: Receiver of token transfers, if any (i.e. report.message.token_receiver.)
+	// * `token_receiver`: Receiver of token transfers, if any (i.e. report.message.token_receiver)
 	Instruction_DeriveAccountsExecute = ag_binary.TypeID([8]byte{119, 242, 51, 244, 183, 138, 179, 159})
 
 	Instruction_CloseCommitReportAccount = ag_binary.TypeID([8]byte{109, 145, 129, 64, 226, 172, 61, 106})

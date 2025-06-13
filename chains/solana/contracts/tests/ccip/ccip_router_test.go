@@ -5287,7 +5287,6 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, 2, initBal1-currBal1) // burned amount
 		})
-
 	})
 
 	///////////////////////////
@@ -10608,9 +10607,8 @@ func deriveExecutionAccounts(ctx context.Context,
 
 		if len(derivation.NextStage) == 0 {
 			return derivedAccounts, lookUpTables
-		} else {
-			stage = derivation.NextStage
 		}
+		stage = derivation.NextStage
 	}
 }
 
@@ -10673,9 +10671,8 @@ func deriveSendAccounts(ctx context.Context,
 
 		if len(derivation.NextStage) == 0 {
 			return derivedAccounts, lookUpTables, tokenIndices
-		} else {
-			stage = derivation.NextStage
 		}
+		stage = derivation.NextStage
 	}
 }
 
