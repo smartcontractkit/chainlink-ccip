@@ -8,7 +8,6 @@ import {Client} from "../../../libraries/Client.sol";
 import {Internal} from "../../../libraries/Internal.sol";
 import {Pool} from "../../../libraries/Pool.sol";
 import {OffRamp} from "../../../offRamp/OffRamp.sol";
-import {LockReleaseTokenPool} from "../../../pools/LockReleaseTokenPool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {MaybeRevertMessageReceiverNo165} from "../../helpers/receivers/MaybeRevertMessageReceiverNo165.sol";
 import {OffRampSetup} from "./OffRampSetup.t.sol";
@@ -52,11 +51,11 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     vm.expectCall(
       s_destPoolByToken[s_destTokens[0]],
       abi.encodeWithSelector(
-        LockReleaseTokenPool.releaseOrMint.selector,
+        TokenPool.releaseOrMint.selector,
         Pool.ReleaseOrMintInV1({
           originalSender: message.sender,
           receiver: message.receiver,
-          amount: message.tokenAmounts[0].amount,
+          sourceDenominatedAmount: message.tokenAmounts[0].amount,
           localToken: message.tokenAmounts[0].destTokenAddress,
           remoteChainSelector: SOURCE_CHAIN_SELECTOR_1,
           sourcePoolAddress: message.tokenAmounts[0].sourcePoolAddress,
@@ -97,9 +96,21 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     message.receiver = STRANGER;
 
     vm.expectEmit();
-    emit TokenPool.Released(address(s_offRamp), STRANGER, amounts[0]);
+    emit TokenPool.ReleasedOrMinted({
+      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+      token: message.tokenAmounts[0].destTokenAddress,
+      sender: address(s_offRamp),
+      recipient: STRANGER,
+      amount: amounts[0]
+    });
     vm.expectEmit();
-    emit TokenPool.Minted(address(s_offRamp), STRANGER, amounts[1]);
+    emit TokenPool.ReleasedOrMinted({
+      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+      token: message.tokenAmounts[1].destTokenAddress,
+      sender: address(s_offRamp),
+      recipient: STRANGER,
+      amount: amounts[1]
+    });
 
     s_offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length), new uint32[](0));
   }

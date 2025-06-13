@@ -405,8 +405,9 @@ func (d *dataGenerator) commitObservation() committypes.Observation {
 			FChain:            fChain,
 			TimestampNow:      time.Now().UTC(),
 		},
-		DiscoveryObs: genDiscoveryObservation(d.numSourceChains, d.numContractsPerChain),
-		FChain:       fChain,
+		DiscoveryObs:          genDiscoveryObservation(d.numSourceChains, d.numContractsPerChain),
+		FChain:                fChain,
+		OnChainPriceOcrSeqNum: rand.Uint64(),
 	}
 }
 
@@ -589,9 +590,9 @@ func (d *dataGenerator) execOutcome() exectypes.Outcome {
 	return exectypes.Outcome{
 		State:         exectypes.PluginState(genRandomString(128)),
 		CommitReports: commitReports,
-		Report: cciptypes.ExecutePluginReport{
+		Reports: []cciptypes.ExecutePluginReport{{
 			ChainReports: chainReports,
-		},
+		}},
 	}
 }
 

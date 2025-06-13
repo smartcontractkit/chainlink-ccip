@@ -10,6 +10,7 @@ echo " └───────────────────────�
 # as specified in the foundry.toml.
 OPTIMIZE_RUNS_OFFRAMP=800
 OPTIMIZE_RUNS_FEE_QUOTER=8000
+OPTIMIZE_RUNS_BURN_MINT_FAST_TRASNFER_TOKEN_POOL=8000
 PROJECT="ccip"
 FOUNDRY_PROJECT_SUFFIX="-compile"
 export FOUNDRY_PROFILE="$PROJECT"$FOUNDRY_PROJECT_SUFFIX
@@ -44,7 +45,7 @@ compileContract() {
     mv $(find $dir/build -type f -name '*.json' ! -name 'build.json') $dir/build/build.json
 
     # Copy the generated abi files to a single folder
-    cp "$CONTRACTS_DIR"/solc/$PROJECT/"$contract"/"$contract".sol/"$contract".abi.json "$ABI_DIR""$contract".abi
+    cp "$CONTRACTS_DIR"/solc/$PROJECT/"$contract"/"$contract".sol/"$contract".abi.json "$ABI_DIR""$contract".abi.json
   fi
 }
 
@@ -60,6 +61,9 @@ function getOptimizations() {
       "FeeQuoter")
         optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_FEE_QUOTER"
         ;;
+      "BurnMintFastTransferTokenPool")
+        optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_BURN_MINT_FAST_TRASNFER_TOKEN_POOL"
+        ;;
     esac
 
     echo "$optimize_runs_override"
@@ -70,7 +74,6 @@ compileContract FeeQuoter
 compileContract onRamp/OnRamp
 compileContract applications/PingPongDemo
 compileContract applications/EtherSenderReceiver
-compileContract MultiAggregateRateLimiter
 compileContract Router
 compileContract tokenAdminRegistry/TokenAdminRegistry
 compileContract tokenAdminRegistry/RegistryModuleOwnerCustom
@@ -92,6 +95,8 @@ compileContract pools/BurnToAddressMintTokenPool
 compileContract pools/TokenPool
 compileContract pools/USDC/USDCTokenPool
 compileContract pools/SiloedLockReleaseTokenPool
+compileContract pools/BurnMintFastTransferTokenPool
+
 
 # Test helpers
 compileContract test/helpers/BurnMintERC677Helper

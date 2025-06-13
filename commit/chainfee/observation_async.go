@@ -49,36 +49,82 @@ func (o *baseObserver) getChainsFeeComponents(
 	ctx context.Context,
 	lggr logger.Logger,
 ) map[cciptypes.ChainSelector]types.ChainFeeComponents {
-	supportedChains, err := o.getSupportedChains(lggr, o.cs, o.oracleID, o.destChain)
+	supportedSourceChains, err := o.getSupportedSourceChains()
 	if err != nil {
 		lggr.Errorw("failed to get supported chains unable to get chains fee components", "err", err)
 		return map[cciptypes.ChainSelector]types.ChainFeeComponents{}
 	}
-	return o.ccipReader.GetChainsFeeComponents(ctx, supportedChains)
+
+	if len(supportedSourceChains) == 0 {
+		lggr.Debugw("no supported source chains found, returning empty chains fee components")
+		return map[cciptypes.ChainSelector]types.ChainFeeComponents{}
+	}
+
+	return o.ccipReader.GetChainsFeeComponents(ctx, supportedSourceChains)
 }
 
 func (o *baseObserver) getNativeTokenPrices(
 	ctx context.Context,
 	lggr logger.Logger,
 ) map[cciptypes.ChainSelector]cciptypes.BigInt {
-	supportedChains, err := o.getSupportedChains(lggr, o.cs, o.oracleID, o.destChain)
+	supportedSourceChains, err := o.getSupportedSourceChains()
 	if err != nil {
 		lggr.Errorw("failed to get supported chains unable to get native token prices", "err", err)
 		return map[cciptypes.ChainSelector]cciptypes.BigInt{}
 	}
-	return o.ccipReader.GetWrappedNativeTokenPriceUSD(ctx, supportedChains)
+	return o.ccipReader.GetWrappedNativeTokenPriceUSD(ctx, supportedSourceChains)
 }
 
 func (o *baseObserver) getChainFeePriceUpdates(
 	ctx context.Context,
 	lggr logger.Logger,
 ) map[cciptypes.ChainSelector]Update {
-	supportedChains, err := o.getSupportedChains(lggr, o.cs, o.oracleID, o.destChain)
+	supportsDest, err := o.cs.SupportsDestChain(o.oracleID)
 	if err != nil {
-		lggr.Errorw("failed to get supported chains unable to get chain fee price updates", "err", err)
+		lggr.Errorw("get chain fee price updates: failed to check if oracle supports destination chain", "err", err)
 		return map[cciptypes.ChainSelector]Update{}
 	}
-	return feeUpdatesFromTimestampedBig(o.ccipReader.GetChainFeePriceUpdate(ctx, supportedChains))
+	if !supportsDest {
+		lggr.Debugw("this oracle does not support destination chain, returning empty chain fee price updates")
+		return map[cciptypes.ChainSelector]Update{}
+	}
+
+	enabledSourceChains, err := o.getEnabledSourceChains(ctx)
+	if err != nil {
+		lggr.Errorw("failed to get enabled source chains unable to get chain fee price updates", "err", err)
+		return map[cciptypes.ChainSelector]Update{}
+	}
+
+	if len(enabledSourceChains) == 0 {
+		lggr.Debugw("no enabled source chains found, returning empty chain fee price updates")
+		return map[cciptypes.ChainSelector]Update{}
+	}
+
+	return feeUpdatesFromTimestampedBig(
+		o.ccipReader.GetChainFeePriceUpdate(ctx, enabledSourceChains),
+	)
+}
+
+func (o *baseObserver) getEnabledSourceChains(ctx context.Context) ([]cciptypes.ChainSelector, error) {
+	allSourceChains, err := o.cs.KnownSourceChainsSlice()
+	if err != nil {
+		return nil, err
+	}
+
+	sourceChainsCfg, err := o.ccipReader.GetOffRampSourceChainsConfig(ctx, allSourceChains)
+	if err != nil {
+		return nil, err
+	}
+
+	enabledSourceChains := make([]cciptypes.ChainSelector, 0, len(sourceChainsCfg))
+	for chain, cfg := range sourceChainsCfg {
+		if cfg.IsEnabled && o.destChain != chain {
+			enabledSourceChains = append(enabledSourceChains, chain)
+		}
+	}
+
+	sort.Slice(enabledSourceChains, func(i, j int) bool { return enabledSourceChains[i] < enabledSourceChains[j] })
+	return enabledSourceChains, nil
 }
 
 func (o *baseObserver) invalidateCaches(_ context.Context, _ logger.Logger) {}
@@ -86,20 +132,15 @@ func (o *baseObserver) invalidateCaches(_ context.Context, _ logger.Logger) {}
 func (o *baseObserver) close() {
 }
 
-func (o *baseObserver) getSupportedChains(
-	lggr logger.Logger,
-	cs plugincommon.ChainSupport,
-	oracleID commontypes.OracleID,
-	destChain cciptypes.ChainSelector,
-) ([]cciptypes.ChainSelector, error) {
-	supportedChains, err := cs.SupportedChains(oracleID)
+// getSupportedChains returns all the supported source chains for the given oracle ID.
+func (o *baseObserver) getSupportedSourceChains() ([]cciptypes.ChainSelector, error) {
+	supportedChains, err := o.cs.SupportedChains(o.oracleID)
 	if err != nil {
 		return nil, err
 	}
 
-	supportedChains.Remove(destChain)
+	supportedChains.Remove(o.destChain)
 	if supportedChains.Cardinality() == 0 {
-		lggr.Info("no supported chains other than dest chain to observe")
 		return nil, nil
 	}
 

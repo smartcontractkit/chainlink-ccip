@@ -2,22 +2,30 @@
 pragma solidity ^0.8.24;
 
 import {Pool} from "../../../libraries/Pool.sol";
-import {RateLimiter} from "../../../libraries/RateLimiter.sol";
-
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {LockReleaseTokenPoolSetup} from "./LockReleaseTokenPoolSetup.t.sol";
 
 contract LockReleaseTokenPool_lockOrBurn is LockReleaseTokenPoolSetup {
-  function testFuzz_LockOrBurnNoAllowList_Success(
+  function testFuzz_lockOrBurn_LockOrBurnNoAllowList(
     uint256 amount
   ) public {
     amount = bound(amount, 1, _getOutboundRateLimiterConfig().capacity);
     vm.startPrank(s_allowedOnRamp);
 
     vm.expectEmit();
-    emit RateLimiter.TokensConsumed(amount);
+    emit TokenPool.OutboundRateLimitConsumed({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      token: address(s_token),
+      amount: amount
+    });
+
     vm.expectEmit();
-    emit TokenPool.Locked(s_allowedOnRamp, amount);
+    emit TokenPool.LockedOrBurned({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      token: address(s_token),
+      sender: address(s_allowedOnRamp),
+      amount: amount
+    });
 
     s_lockReleaseTokenPool.lockOrBurn(
       Pool.LockOrBurnInV1({
@@ -30,14 +38,24 @@ contract LockReleaseTokenPool_lockOrBurn is LockReleaseTokenPoolSetup {
     );
   }
 
-  function test_LockOrBurnWithAllowList() public {
+  function test_lockOrBurn_LockOrBurnWithAllowList() public {
     uint256 amount = 100;
     vm.startPrank(s_allowedOnRamp);
 
     vm.expectEmit();
-    emit RateLimiter.TokensConsumed(amount);
+    emit TokenPool.OutboundRateLimitConsumed({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      token: address(s_token),
+      amount: amount
+    });
+
     vm.expectEmit();
-    emit TokenPool.Locked(s_allowedOnRamp, amount);
+    emit TokenPool.LockedOrBurned({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      token: address(s_token),
+      sender: address(s_allowedOnRamp),
+      amount: amount
+    });
 
     s_lockReleaseTokenPoolWithAllowList.lockOrBurn(
       Pool.LockOrBurnInV1({
@@ -50,7 +68,12 @@ contract LockReleaseTokenPool_lockOrBurn is LockReleaseTokenPoolSetup {
     );
 
     vm.expectEmit();
-    emit TokenPool.Locked(s_allowedOnRamp, amount);
+    emit TokenPool.LockedOrBurned({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      token: address(s_token),
+      sender: address(s_allowedOnRamp),
+      amount: amount
+    });
 
     s_lockReleaseTokenPoolWithAllowList.lockOrBurn(
       Pool.LockOrBurnInV1({
@@ -63,7 +86,7 @@ contract LockReleaseTokenPool_lockOrBurn is LockReleaseTokenPoolSetup {
     );
   }
 
-  function test_RevertWhen_LockOrBurnWithAllowList() public {
+  function test_lockOrBurn_RevertWhen_LockOrBurnWithAllowList() public {
     vm.startPrank(s_allowedOnRamp);
 
     vm.expectRevert(abi.encodeWithSelector(TokenPool.SenderNotAllowed.selector, STRANGER));
@@ -79,7 +102,7 @@ contract LockReleaseTokenPool_lockOrBurn is LockReleaseTokenPoolSetup {
     );
   }
 
-  function test_RevertWhen_PoolBurnRevertNotHealthy() public {
+  function test_lockOrBurn_RevertWhen_PoolBurnRevertNotHealthy() public {
     // Should not burn tokens if cursed.
     vm.mockCall(address(s_mockRMNRemote), abi.encodeWithSignature("isCursed(bytes16)"), abi.encode(true));
     uint256 before = s_token.balanceOf(address(s_lockReleaseTokenPoolWithAllowList));

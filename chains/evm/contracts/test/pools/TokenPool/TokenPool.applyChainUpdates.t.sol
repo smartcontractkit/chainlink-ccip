@@ -251,25 +251,11 @@ contract TokenPool_applyChainUpdates is BaseTest {
       remoteChainSelector: unusedChainSelector,
       remotePoolAddresses: new bytes[](0),
       remoteTokenAddress: abi.encode(address(2)),
-      outboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 0, rate: 0}),
-      inboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 100e22, rate: 1e12})
+      outboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 0, rate: 100}),
+      inboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 101, rate: 100})
     });
 
     // Outbound
-
-    vm.expectRevert(
-      abi.encodeWithSelector(RateLimiter.InvalidRateLimitRate.selector, chainUpdates[0].outboundRateLimiterConfig)
-    );
-    s_tokenPool.applyChainUpdates(new uint64[](0), chainUpdates);
-
-    chainUpdates[0].outboundRateLimiterConfig.rate = 100;
-
-    vm.expectRevert(
-      abi.encodeWithSelector(RateLimiter.InvalidRateLimitRate.selector, chainUpdates[0].outboundRateLimiterConfig)
-    );
-    s_tokenPool.applyChainUpdates(new uint64[](0), chainUpdates);
-
-    chainUpdates[0].outboundRateLimiterConfig.capacity = 100;
 
     vm.expectRevert(
       abi.encodeWithSelector(RateLimiter.InvalidRateLimitRate.selector, chainUpdates[0].outboundRateLimiterConfig)
@@ -286,21 +272,6 @@ contract TokenPool_applyChainUpdates is BaseTest {
     // Inbound
 
     chainUpdates[0].inboundRateLimiterConfig.capacity = 0;
-    chainUpdates[0].inboundRateLimiterConfig.rate = 0;
-
-    vm.expectRevert(
-      abi.encodeWithSelector(RateLimiter.InvalidRateLimitRate.selector, chainUpdates[0].inboundRateLimiterConfig)
-    );
-    s_tokenPool.applyChainUpdates(new uint64[](0), chainUpdates);
-
-    chainUpdates[0].inboundRateLimiterConfig.rate = 100;
-
-    vm.expectRevert(
-      abi.encodeWithSelector(RateLimiter.InvalidRateLimitRate.selector, chainUpdates[0].inboundRateLimiterConfig)
-    );
-    s_tokenPool.applyChainUpdates(new uint64[](0), chainUpdates);
-
-    chainUpdates[0].inboundRateLimiterConfig.capacity = 100;
 
     vm.expectRevert(
       abi.encodeWithSelector(RateLimiter.InvalidRateLimitRate.selector, chainUpdates[0].inboundRateLimiterConfig)

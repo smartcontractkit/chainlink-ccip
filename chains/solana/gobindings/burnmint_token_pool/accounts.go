@@ -7,6 +7,7 @@ import (
 	ag_binary "github.com/gagliardetto/binary"
 )
 
+<<<<<<< HEAD
 type ChainConfigAccount struct {
 	Base BaseChain
 }
@@ -21,19 +22,46 @@ func (obj ChainConfigAccount) MarshalWithEncoder(encoder *ag_binary.Encoder) (er
 	}
 	// Serialize `Base` param:
 	err = encoder.Encode(obj.Base)
+=======
+type PoolConfig struct {
+	Version           uint8
+	SelfServedAllowed bool
+}
+
+var PoolConfigDiscriminator = [8]byte{26, 108, 14, 123, 116, 230, 129, 43}
+
+func (obj PoolConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Write account discriminator:
+	err = encoder.WriteBytes(PoolConfigDiscriminator[:], false)
+	if err != nil {
+		return err
+	}
+	// Serialize `Version` param:
+	err = encoder.Encode(obj.Version)
+	if err != nil {
+		return err
+	}
+	// Serialize `SelfServedAllowed` param:
+	err = encoder.Encode(obj.SelfServedAllowed)
+>>>>>>> main
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
+<<<<<<< HEAD
 func (obj *ChainConfigAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+=======
+func (obj *PoolConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+>>>>>>> main
 	// Read and check account discriminator:
 	{
 		discriminator, err := decoder.ReadTypeID()
 		if err != nil {
 			return err
 		}
+<<<<<<< HEAD
 		if !discriminator.Equal(ChainConfigAccountDiscriminator[:]) {
 			return fmt.Errorf(
 				"wrong discriminator: wanted %s, got %s",
@@ -43,13 +71,33 @@ func (obj *ChainConfigAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) 
 	}
 	// Deserialize `Base`:
 	err = decoder.Decode(&obj.Base)
+=======
+		if !discriminator.Equal(PoolConfigDiscriminator[:]) {
+			return fmt.Errorf(
+				"wrong discriminator: wanted %s, got %s",
+				"[26 108 14 123 116 230 129 43]",
+				fmt.Sprint(discriminator[:]))
+		}
+	}
+	// Deserialize `Version`:
+	err = decoder.Decode(&obj.Version)
+	if err != nil {
+		return err
+	}
+	// Deserialize `SelfServedAllowed`:
+	err = decoder.Decode(&obj.SelfServedAllowed)
+>>>>>>> main
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
+<<<<<<< HEAD
 type StateAccount struct {
+=======
+type State struct {
+>>>>>>> main
 	Version uint8
 	Config  BaseConfig
 }

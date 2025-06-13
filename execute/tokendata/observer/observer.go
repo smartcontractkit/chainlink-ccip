@@ -57,7 +57,7 @@ func NewConfigBasedCompositeObservers(
 	destChainSelector cciptypes.ChainSelector,
 	config []pluginconfig.TokenDataObserverConfig,
 	encoder cciptypes.TokenDataEncoder,
-	readers map[cciptypes.ChainSelector]contractreader.ContractReaderFacade,
+	readers map[cciptypes.ChainSelector]contractreader.Extended,
 	addrCodec cciptypes.AddressCodec,
 ) (TokenDataObserver, error) {
 	observers := make([]TokenDataObserver, len(config))
@@ -135,7 +135,7 @@ func (c *compositeTokenDataObserver) Observe(
 			c.lggr.Error("Error while observing token data", "error", err)
 			continue
 		}
-		merged, err = merge(tokenDataObservations, tokenData)
+		merged, err = merge(c.lggr, tokenDataObservations, tokenData)
 		if err != nil {
 			c.lggr.Error("Error while merging token data",
 				"error", err)
@@ -199,6 +199,7 @@ func (c *compositeTokenDataObserver) initTokenDataObservations(
 // merge merges token data from two observations, it's used to combine token data from multiple observers.
 // In case of token data mismatch, it returns an error and the base observation.
 func merge(
+	lggr logger.Logger,
 	base exectypes.TokenDataObservations,
 	from exectypes.TokenDataObservations,
 ) (exectypes.TokenDataObservations, error) {
@@ -211,7 +212,9 @@ func merge(
 			// Merge only TokenData created by the observer
 			for i, newTokenData := range messageTokenData.TokenData {
 				if base[chainSelector][seq].TokenData[i].IsReady() {
-					// Already processed by another observer, skip or raise a warning
+					lggr.Warnw("Token data already processed by another observer",
+						"chainSelector", chainSelector,
+						"seqNum", seq)
 					continue
 				}
 				if newTokenData.Supported {

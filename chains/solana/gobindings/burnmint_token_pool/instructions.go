@@ -28,6 +28,7 @@ func init() {
 }
 
 var (
+<<<<<<< HEAD
 	Instruction_AcceptOwnership = ag_binary.TypeID([8]byte{172, 23, 43, 13, 238, 213, 85, 150})
 
 	Instruction_AppendRemotePoolAddresses = ag_binary.TypeID([8]byte{172, 57, 83, 55, 70, 112, 26, 197})
@@ -55,6 +56,15 @@ var (
 	Instruction_SetRouter = ag_binary.TypeID([8]byte{236, 248, 107, 200, 151, 160, 44, 250})
 
 	Instruction_TransferOwnership = ag_binary.TypeID([8]byte{65, 177, 215, 73, 53, 45, 99, 47})
+=======
+	Instruction_InitGlobalConfig = ag_binary.TypeID([8]byte{140, 136, 214, 48, 87, 0, 120, 255})
+
+	Instruction_UpdateGlobalConfig = ag_binary.TypeID([8]byte{164, 84, 130, 189, 111, 58, 250, 200})
+
+	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
+
+	Instruction_TransferMintAuthorityToMultisig = ag_binary.TypeID([8]byte{229, 13, 219, 109, 252, 176, 138, 118})
+>>>>>>> main
 
 	// Returns the program type (name) and version.
 	// Used by offchain code to easily determine which program & version is being interacted with.
@@ -67,6 +77,21 @@ var (
 // InstructionIDToName returns the name of the instruction given its ID.
 func InstructionIDToName(id ag_binary.TypeID) string {
 	switch id {
+<<<<<<< HEAD
+=======
+	case Instruction_InitGlobalConfig:
+		return "InitGlobalConfig"
+	case Instruction_UpdateGlobalConfig:
+		return "UpdateGlobalConfig"
+	case Instruction_Initialize:
+		return "Initialize"
+	case Instruction_TransferMintAuthorityToMultisig:
+		return "TransferMintAuthorityToMultisig"
+	case Instruction_TypeVersion:
+		return "TypeVersion"
+	case Instruction_TransferOwnership:
+		return "TransferOwnership"
+>>>>>>> main
 	case Instruction_AcceptOwnership:
 		return "AcceptOwnership"
 	case Instruction_AppendRemotePoolAddresses:
@@ -118,10 +143,26 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 	ag_binary.AnchorTypeIDEncoding,
 	[]ag_binary.VariantType{
 		{
+<<<<<<< HEAD
 			Name: "accept_ownership", Type: (*AcceptOwnership)(nil),
 		},
 		{
 			Name: "append_remote_pool_addresses", Type: (*AppendRemotePoolAddresses)(nil),
+=======
+			"init_global_config", (*InitGlobalConfig)(nil),
+		},
+		{
+			"update_global_config", (*UpdateGlobalConfig)(nil),
+		},
+		{
+			"initialize", (*Initialize)(nil),
+		},
+		{
+			"transfer_mint_authority_to_multisig", (*TransferMintAuthorityToMultisig)(nil),
+		},
+		{
+			"type_version", (*TypeVersion)(nil),
+>>>>>>> main
 		},
 		{
 			Name: "configure_allow_list", Type: (*ConfigureAllowList)(nil),

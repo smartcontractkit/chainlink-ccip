@@ -2,6 +2,7 @@ name: "Build lint and test CCIP-OCR3"
 
 on:
   pull_request:
+  merge_group:
   push:
     branches:
       - 'main'
@@ -14,7 +15,7 @@ jobs:
         working-directory: .
     steps:
       - name: Checkout repository
-        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: Determine Go version

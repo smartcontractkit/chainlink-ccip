@@ -5,6 +5,7 @@
  * IDL can be found at `target/idl/test_token_pool.json`.
  */
 export type TestTokenPool = {
+<<<<<<< HEAD
   "address": "JuCcZ4smxAYv9QHJ36jshA7pA3FuQ3vQeWLUeAtZduJ",
   "metadata": {
     "name": "testTokenPool",
@@ -12,6 +13,10 @@ export type TestTokenPool = {
     "spec": "0.1.0",
     "description": "Created with Anchor"
   },
+=======
+  "version": "0.1.1-dev",
+  "name": "test_token_pool",
+>>>>>>> main
   "instructions": [
     {
       "name": "acceptOwnership",
@@ -763,7 +768,18 @@ export type TestTokenPool = {
           }
         ]
       }
+<<<<<<< HEAD
     },
+=======
+    }
+  ]
+};
+
+export const IDL: TestTokenPool = {
+  "version": "0.1.1-dev",
+  "name": "test_token_pool",
+  "instructions": [
+>>>>>>> main
     {
       "name": "rateLimitConfig",
       "type": {

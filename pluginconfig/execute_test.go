@@ -15,6 +15,7 @@ func TestExecuteOffchainConfig_Validate(t *testing.T) {
 		RootSnoozeTime            commonconfig.Duration
 		MessageVisibilityInterval commonconfig.Duration
 		BatchingStrategyID        uint32
+		MaxCommitReportsToFetch   uint64
 	}
 	tests := []struct {
 		name    string
@@ -29,6 +30,7 @@ func TestExecuteOffchainConfig_Validate(t *testing.T) {
 				RootSnoozeTime:            *commonconfig.MustNewDuration(1),
 				MessageVisibilityInterval: *commonconfig.MustNewDuration(1),
 				BatchingStrategyID:        0,
+				MaxCommitReportsToFetch:   1,
 			},
 			false,
 		},
@@ -40,6 +42,7 @@ func TestExecuteOffchainConfig_Validate(t *testing.T) {
 				RootSnoozeTime:            *commonconfig.MustNewDuration(1),
 				MessageVisibilityInterval: *commonconfig.MustNewDuration(1),
 				BatchingStrategyID:        0,
+				MaxCommitReportsToFetch:   1,
 			},
 			true,
 		},
@@ -51,6 +54,7 @@ func TestExecuteOffchainConfig_Validate(t *testing.T) {
 				RootSnoozeTime:            *commonconfig.MustNewDuration(1),
 				MessageVisibilityInterval: *commonconfig.MustNewDuration(1),
 				BatchingStrategyID:        0,
+				MaxCommitReportsToFetch:   1,
 			},
 			true,
 		},
@@ -62,6 +66,7 @@ func TestExecuteOffchainConfig_Validate(t *testing.T) {
 				RootSnoozeTime:            *commonconfig.MustNewDuration(0),
 				MessageVisibilityInterval: *commonconfig.MustNewDuration(1),
 				BatchingStrategyID:        0,
+				MaxCommitReportsToFetch:   1,
 			},
 			true,
 		},
@@ -73,6 +78,19 @@ func TestExecuteOffchainConfig_Validate(t *testing.T) {
 				RootSnoozeTime:            *commonconfig.MustNewDuration(1),
 				MessageVisibilityInterval: *commonconfig.MustNewDuration(0),
 				BatchingStrategyID:        0,
+				MaxCommitReportsToFetch:   1,
+			},
+			true,
+		},
+		{
+			"invalid, MaxCommitReportsToFetch not set",
+			fields{
+				BatchGasLimit:             1,
+				InflightCacheExpiry:       *commonconfig.MustNewDuration(1),
+				RootSnoozeTime:            *commonconfig.MustNewDuration(1),
+				MessageVisibilityInterval: *commonconfig.MustNewDuration(1),
+				BatchingStrategyID:        0,
+				MaxCommitReportsToFetch:   0,
 			},
 			true,
 		},
@@ -85,6 +103,7 @@ func TestExecuteOffchainConfig_Validate(t *testing.T) {
 				RootSnoozeTime:            tt.fields.RootSnoozeTime,
 				MessageVisibilityInterval: tt.fields.MessageVisibilityInterval,
 				BatchingStrategyID:        tt.fields.BatchingStrategyID,
+				MaxCommitReportsToFetch:   tt.fields.MaxCommitReportsToFetch,
 			}
 			if err := e.Validate(); (err != nil) != tt.wantErr {
 				t.Errorf("ExecuteOffchainConfig.Validate() error = %v, wantErr %v", err, tt.wantErr)
@@ -101,6 +120,7 @@ func TestExecuteOffchainConfig_EncodeDecode(t *testing.T) {
 		MessageVisibilityInterval commonconfig.Duration
 		BatchingStrategyID        uint32
 		TokenDataObserver         []TokenDataObserverConfig
+		MaxCommitReportsToFetch   uint64
 	}
 	tests := []struct {
 		name   string
@@ -114,6 +134,7 @@ func TestExecuteOffchainConfig_EncodeDecode(t *testing.T) {
 				RootSnoozeTime:            *commonconfig.MustNewDuration(1),
 				MessageVisibilityInterval: *commonconfig.MustNewDuration(1),
 				BatchingStrategyID:        0,
+				MaxCommitReportsToFetch:   1,
 			},
 		},
 		{
@@ -124,6 +145,7 @@ func TestExecuteOffchainConfig_EncodeDecode(t *testing.T) {
 				RootSnoozeTime:            *commonconfig.MustNewDuration(1),
 				MessageVisibilityInterval: *commonconfig.MustNewDuration(1),
 				BatchingStrategyID:        0,
+				MaxCommitReportsToFetch:   1,
 			},
 		},
 	}
@@ -136,6 +158,7 @@ func TestExecuteOffchainConfig_EncodeDecode(t *testing.T) {
 				MessageVisibilityInterval: tt.fields.MessageVisibilityInterval,
 				BatchingStrategyID:        tt.fields.BatchingStrategyID,
 				TokenDataObservers:        tt.fields.TokenDataObserver,
+				MaxCommitReportsToFetch:   tt.fields.MaxCommitReportsToFetch,
 			}
 			encoded, err := EncodeExecuteOffchainConfig(e)
 			require.NoError(t, err)

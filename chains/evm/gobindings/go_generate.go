@@ -8,7 +8,6 @@ package ccip
 //go:generate go run generation/generate/wrap.go ccip OffRampWithMessageTransformer offramp_with_message_transformer latest
 //go:generate go run generation/generate/wrap.go ccip FeeQuoter fee_quoter latest
 //go:generate go run generation/generate/wrap.go ccip NonceManager nonce_manager latest
-//go:generate go run generation/generate/wrap.go ccip MultiAggregateRateLimiter multi_aggregate_rate_limiter latest
 //go:generate go run generation/generate/wrap.go ccip TokenAdminRegistry token_admin_registry latest
 //go:generate go run generation/generate/wrap.go ccip TokenPoolFactory token_pool_factory latest
 //go:generate go run generation/generate/wrap.go ccip FactoryBurnMintERC20 factory_burn_mint_erc20 latest
@@ -26,6 +25,7 @@ package ccip
 //go:generate go run generation/generate/wrap.go ccip USDCTokenPool usdc_token_pool latest
 //go:generate go run generation/generate/wrap.go ccip SiloedLockReleaseTokenPool siloed_lock_release_token_pool latest
 //go:generate go run generation/generate/wrap.go ccip BurnToAddressMintTokenPool burn_to_address_mint_token_pool latest
+//go:generate go run generation/generate/wrap.go ccip BurnMintFastTransferTokenPool fast_transfer_token_pool latest
 
 // Helpers
 //go:generate go run generation/generate/wrap.go ccip MaybeRevertMessageReceiver maybe_revert_message_receiver latest

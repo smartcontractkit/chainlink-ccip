@@ -1,4 +1,5 @@
 {
+<<<<<<< HEAD
   "address": "8eqh8wppT9c5rw4ERqNCffvU6cNFJWff9WmkcYtmGiqC",
   "metadata": {
     "name": "lockrelease_token_pool",
@@ -19,6 +20,80 @@
         85,
         150
       ],
+=======
+  "version": "0.1.1-dev",
+  "name": "lockrelease_token_pool",
+  "instructions": [
+    {
+      "name": "initGlobalConfig",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "updateGlobalConfig",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "selfServedAllowed",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "initialize",
+>>>>>>> main
       "accounts": [
         {
           "name": "state",
@@ -29,7 +104,107 @@
         },
         {
           "name": "authority",
+<<<<<<< HEAD
           "signer": true
+=======
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "router",
+          "type": "publicKey"
+        },
+        {
+          "name": "rmnRemote",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
+      "name": "typeVersion",
+      "docs": [
+        "Returns the program type (name) and version.",
+        "Used by offchain code to easily determine which program & version is being interacted with.",
+        "",
+        "# Arguments",
+        "* `ctx` - The context"
+      ],
+      "accounts": [
+        {
+          "name": "clock",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [],
+      "returns": "string"
+    },
+    {
+      "name": "transferOwnership",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "proposedOwner",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
+      "name": "acceptOwnership",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+>>>>>>> main
         }
       ],
       "args": []
@@ -817,6 +992,7 @@
   ],
   "accounts": [
     {
+<<<<<<< HEAD
       "name": "ChainConfig",
       "discriminator": [
         13,
@@ -828,6 +1004,22 @@
         148,
         56
       ]
+=======
+      "name": "PoolConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "selfServedAllowed",
+            "type": "bool"
+          }
+        ]
+      }
+>>>>>>> main
     },
     {
       "name": "State",

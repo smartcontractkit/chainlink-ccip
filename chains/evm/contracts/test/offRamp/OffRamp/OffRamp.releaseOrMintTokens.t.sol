@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {IPoolV1} from "../../../interfaces/IPool.sol";
+
 import {Client} from "../../../libraries/Client.sol";
 import {Internal} from "../../../libraries/Internal.sol";
 import {Pool} from "../../../libraries/Pool.sol";
 import {OffRamp} from "../../../offRamp/OffRamp.sol";
-import {LockReleaseTokenPool} from "../../../pools/LockReleaseTokenPool.sol";
 import {MaybeRevertingBurnMintTokenPool} from "../../helpers/MaybeRevertingBurnMintTokenPool.sol";
 import {OffRampSetup} from "./OffRampSetup.t.sol";
 import {CallWithExactGas} from "@chainlink/contracts/src/v0.8/shared/call/CallWithExactGas.sol";
@@ -34,11 +35,11 @@ contract OffRamp_releaseOrMintTokens is OffRampSetup {
     vm.expectCall(
       s_destPoolBySourceToken[srcTokenAmounts[0].token],
       abi.encodeWithSelector(
-        LockReleaseTokenPool.releaseOrMint.selector,
+        IPoolV1.releaseOrMint.selector,
         Pool.ReleaseOrMintInV1({
           originalSender: abi.encode(OWNER),
           receiver: OWNER,
-          amount: srcTokenAmounts[0].amount,
+          sourceDenominatedAmount: srcTokenAmounts[0].amount,
           localToken: s_destTokenBySourceToken[srcTokenAmounts[0].token],
           remoteChainSelector: SOURCE_CHAIN_SELECTOR_1,
           sourcePoolAddress: sourceTokenAmounts[0].sourcePoolAddress,
@@ -70,11 +71,11 @@ contract OffRamp_releaseOrMintTokens is OffRampSetup {
     vm.expectCall(
       s_destPoolBySourceToken[srcTokenAmounts[0].token],
       abi.encodeWithSelector(
-        LockReleaseTokenPool.releaseOrMint.selector,
+        IPoolV1.releaseOrMint.selector,
         Pool.ReleaseOrMintInV1({
           originalSender: abi.encode(OWNER),
           receiver: OWNER,
-          amount: srcTokenAmounts[0].amount,
+          sourceDenominatedAmount: srcTokenAmounts[0].amount,
           localToken: s_destTokenBySourceToken[srcTokenAmounts[0].token],
           remoteChainSelector: SOURCE_CHAIN_SELECTOR_1,
           sourcePoolAddress: sourceTokenAmounts[0].sourcePoolAddress,
@@ -150,11 +151,11 @@ contract OffRamp_releaseOrMintTokens is OffRampSetup {
     vm.mockCall(
       s_destPoolBySourceToken[srcTokenAmounts[0].token],
       abi.encodeWithSelector(
-        LockReleaseTokenPool.releaseOrMint.selector,
+        IPoolV1.releaseOrMint.selector,
         Pool.ReleaseOrMintInV1({
           originalSender: abi.encode(OWNER),
           receiver: OWNER,
-          amount: amount,
+          sourceDenominatedAmount: amount,
           localToken: s_destTokenBySourceToken[srcTokenAmounts[0].token],
           remoteChainSelector: SOURCE_CHAIN_SELECTOR_1,
           sourcePoolAddress: sourceTokenAmounts[0].sourcePoolAddress,
@@ -205,11 +206,11 @@ contract OffRamp_releaseOrMintTokens is OffRampSetup {
     vm.expectCall(
       s_destPoolBySourceToken[srcTokenAmounts[0].token],
       abi.encodeWithSelector(
-        LockReleaseTokenPool.releaseOrMint.selector,
+        IPoolV1.releaseOrMint.selector,
         Pool.ReleaseOrMintInV1({
           originalSender: abi.encode(OWNER),
           receiver: OWNER,
-          amount: srcTokenAmounts[0].amount,
+          sourceDenominatedAmount: srcTokenAmounts[0].amount,
           localToken: s_destTokenBySourceToken[srcTokenAmounts[0].token],
           remoteChainSelector: SOURCE_CHAIN_SELECTOR_3,
           sourcePoolAddress: sourceTokenAmounts[0].sourcePoolAddress,

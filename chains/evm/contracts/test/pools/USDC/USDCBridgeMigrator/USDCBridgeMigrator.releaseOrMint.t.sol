@@ -23,7 +23,7 @@ contract USDCBridgeMigrator_releaseOrMint is HybridLockReleaseUSDCTokenPool_rele
     // Add 1e12 liquidity so that there's enough to release
     vm.startPrank(s_usdcTokenPool.getLiquidityProvider(SOURCE_CHAIN_SELECTOR));
 
-    s_token.approve(address(s_usdcTokenPool), type(uint256).max);
+    s_USDCToken.approve(address(s_usdcTokenPool), type(uint256).max);
     s_usdcTokenPool.provideLiquidity(SOURCE_CHAIN_SELECTOR, amount);
 
     // By Default, the source chain will be indicated as use-CCTP so we need to change that. We create a message
@@ -33,7 +33,13 @@ contract USDCBridgeMigrator_releaseOrMint is HybridLockReleaseUSDCTokenPool_rele
     vm.startPrank(s_routerAllowedOffRamp);
 
     vm.expectEmit();
-    emit TokenPool.Released(s_routerAllowedOffRamp, recipient, amount);
+    emit TokenPool.ReleasedOrMinted({
+      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+      token: address(s_USDCToken),
+      sender: s_routerAllowedOffRamp,
+      recipient: recipient,
+      amount: amount
+    });
 
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
@@ -46,8 +52,8 @@ contract USDCBridgeMigrator_releaseOrMint is HybridLockReleaseUSDCTokenPool_rele
       Pool.ReleaseOrMintInV1({
         originalSender: abi.encode(OWNER),
         receiver: recipient,
-        amount: amount,
-        localToken: address(s_token),
+        sourceDenominatedAmount: amount,
+        localToken: address(s_USDCToken),
         remoteChainSelector: SOURCE_CHAIN_SELECTOR,
         sourcePoolAddress: sourceTokenData.sourcePoolAddress,
         sourcePoolData: abi.encode(LOCK_RELEASE_FLAG),
@@ -59,8 +65,8 @@ contract USDCBridgeMigrator_releaseOrMint is HybridLockReleaseUSDCTokenPool_rele
     // recipient
 
     assertEq(poolReturnDataV1.destinationAmount, amount, "destinationAmount and actual amount transferred differ");
-    assertEq(s_token.balanceOf(address(s_usdcTokenPool)), 0, "Tokens should be transferred out of the pool");
-    assertEq(s_token.balanceOf(recipient), amount, "Tokens should be transferred to the recipient");
+    assertEq(s_USDCToken.balanceOf(address(s_usdcTokenPool)), 0, "Tokens should be transferred out of the pool");
+    assertEq(s_USDCToken.balanceOf(recipient), amount, "Tokens should be transferred to the recipient");
 
     // We also want to check that the system uses CCTP Burn/Mint for all other messages that don't have that flag
     // which after a migration will mean all new messages.
@@ -73,8 +79,8 @@ contract USDCBridgeMigrator_releaseOrMint is HybridLockReleaseUSDCTokenPool_rele
       Pool.ReleaseOrMintInV1({
         originalSender: abi.encode(OWNER),
         receiver: recipient,
-        amount: amount,
-        localToken: address(s_token),
+        sourceDenominatedAmount: amount,
+        localToken: address(s_USDCToken),
         remoteChainSelector: SOURCE_CHAIN_SELECTOR,
         sourcePoolAddress: sourceTokenData.sourcePoolAddress,
         sourcePoolData: "",
@@ -100,7 +106,7 @@ contract USDCBridgeMigrator_releaseOrMint is HybridLockReleaseUSDCTokenPool_rele
     // Add 1e12 liquidity so that there's enough to release
     vm.startPrank(s_usdcTokenPool.getLiquidityProvider(SOURCE_CHAIN_SELECTOR));
 
-    s_token.approve(address(s_usdcTokenPool), type(uint256).max);
+    s_USDCToken.approve(address(s_usdcTokenPool), type(uint256).max);
 
     // I picked 3x the amount to be stuck so that we can have enough to release with a buffer
     s_usdcTokenPool.provideLiquidity(SOURCE_CHAIN_SELECTOR, amount * 3);
@@ -146,13 +152,21 @@ contract USDCBridgeMigrator_releaseOrMint is HybridLockReleaseUSDCTokenPool_rele
       "There should still be 1e6 tokens excluded from the burn"
     );
 
-    assertEq(s_token.balanceOf(address(s_usdcTokenPool)), 1e6, "All tokens minus the excluded should be in the pool");
+    assertEq(
+      s_USDCToken.balanceOf(address(s_usdcTokenPool)), 1e6, "All tokens minus the excluded should be in the pool"
+    );
 
     // Now that the burn is successful, we can release the tokens that were excluded from the burn
     vm.startPrank(s_routerAllowedOffRamp);
 
     vm.expectEmit();
-    emit TokenPool.Released(s_routerAllowedOffRamp, recipient, amount);
+    emit TokenPool.ReleasedOrMinted({
+      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+      token: address(s_USDCToken),
+      sender: s_routerAllowedOffRamp,
+      recipient: recipient,
+      amount: amount
+    });
 
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
@@ -165,8 +179,8 @@ contract USDCBridgeMigrator_releaseOrMint is HybridLockReleaseUSDCTokenPool_rele
       Pool.ReleaseOrMintInV1({
         originalSender: abi.encode(OWNER),
         receiver: recipient,
-        amount: amount,
-        localToken: address(s_token),
+        sourceDenominatedAmount: amount,
+        localToken: address(s_USDCToken),
         remoteChainSelector: SOURCE_CHAIN_SELECTOR,
         sourcePoolAddress: sourceTokenData.sourcePoolAddress,
         sourcePoolData: abi.encode(LOCK_RELEASE_FLAG),
@@ -175,8 +189,8 @@ contract USDCBridgeMigrator_releaseOrMint is HybridLockReleaseUSDCTokenPool_rele
     );
 
     assertEq(poolReturnDataV1.destinationAmount, amount, "destinationAmount and actual amount transferred differ");
-    assertEq(s_token.balanceOf(address(s_usdcTokenPool)), 0, "Tokens should be transferred out of the pool");
-    assertEq(s_token.balanceOf(recipient), amount, "Tokens should be transferred to the recipient");
+    assertEq(s_USDCToken.balanceOf(address(s_usdcTokenPool)), 0, "Tokens should be transferred out of the pool");
+    assertEq(s_USDCToken.balanceOf(recipient), amount, "Tokens should be transferred to the recipient");
     assertEq(
       s_usdcTokenPool.getExcludedTokensByChain(SOURCE_CHAIN_SELECTOR),
       0,

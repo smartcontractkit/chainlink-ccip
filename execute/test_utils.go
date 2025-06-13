@@ -60,7 +60,8 @@ type IntTest struct {
 	usdcServer          *ConfigurableAttestationServer
 	lbtcServer          *ConfigurableAttestationServer
 	tokenObserverConfig []pluginconfig.TokenDataObserverConfig
-	tokenChainReader    map[cciptypes.ChainSelector]contractreader.ContractReaderFacade
+	tokenChainReader    map[cciptypes.ChainSelector]contractreader.Extended
+	offChainCfg         pluginconfig.ExecuteOffchainConfig
 }
 
 func SetupSimpleTest(t *testing.T,
@@ -92,8 +93,17 @@ func SetupSimpleTest(t *testing.T,
 		dstSelector:         dstSelector,
 		ccipReader:          &ccipReader,
 		tokenObserverConfig: []pluginconfig.TokenDataObserverConfig{},
-		tokenChainReader:    map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{},
+		tokenChainReader:    map[cciptypes.ChainSelector]contractreader.Extended{},
+		offChainCfg: pluginconfig.ExecuteOffchainConfig{
+			MessageVisibilityInterval: *commonconfig.MustNewDuration(8 * time.Hour),
+			BatchGasLimit:             100000000,
+			MaxCommitReportsToFetch:   10,
+		},
 	}
+}
+
+func (it *IntTest) WithOffChainConfig(cfg pluginconfig.ExecuteOffchainConfig) {
+	it.offChainCfg = cfg
 }
 
 func (it *IntTest) WithMessages(
@@ -191,7 +201,7 @@ func (it *IntTest) WithUSDC(
 		usdcEvents[i] = types.Sequence{Data: e}
 	}
 
-	r := readermock.NewMockContractReaderFacade(it.t)
+	r := readermock.NewMockExtended(it.t)
 	r.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil).Maybe()
 	r.EXPECT().QueryKey(
 		mock.Anything,
@@ -201,7 +211,7 @@ func (it *IntTest) WithUSDC(
 		mock.Anything,
 	).Return(usdcEvents, nil).Maybe()
 
-	it.tokenChainReader = map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
+	it.tokenChainReader = map[cciptypes.ChainSelector]contractreader.Extended{
 		srcSelector:    r,
 		it.dstSelector: r,
 	}
@@ -231,10 +241,6 @@ func (it *IntTest) WithLBTC(
 }
 
 func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
-	cfg := pluginconfig.ExecuteOffchainConfig{
-		MessageVisibilityInterval: *commonconfig.MustNewDuration(8 * time.Hour),
-		BatchGasLimit:             100000000,
-	}
 	chainConfigInfos := []reader.ChainConfigInfo{
 		{
 			ChainSelector: it.dstSelector,
@@ -283,9 +289,9 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 
 	oracleIDToP2pID := testhelpers.CreateOracleIDToP2pID(1, 2, 3)
 	nodesSetup := []nodeSetup{
-		it.newNode(cfg, homeChain, ep, tkObs, oracleIDToP2pID, 1, 1, [32]byte{0xde, 0xad}, mockAddrCodec),
-		it.newNode(cfg, homeChain, ep, tkObs, oracleIDToP2pID, 2, 1, [32]byte{0xde, 0xad}, mockAddrCodec),
-		it.newNode(cfg, homeChain, ep, tkObs, oracleIDToP2pID, 3, 1, [32]byte{0xde, 0xad}, mockAddrCodec),
+		it.newNode(it.offChainCfg, homeChain, ep, tkObs, oracleIDToP2pID, 1, 1, [32]byte{0xde, 0xad}, mockAddrCodec),
+		it.newNode(it.offChainCfg, homeChain, ep, tkObs, oracleIDToP2pID, 2, 1, [32]byte{0xde, 0xad}, mockAddrCodec),
+		it.newNode(it.offChainCfg, homeChain, ep, tkObs, oracleIDToP2pID, 3, 1, [32]byte{0xde, 0xad}, mockAddrCodec),
 	}
 
 	require.NoError(it.t, homeChain.Close())

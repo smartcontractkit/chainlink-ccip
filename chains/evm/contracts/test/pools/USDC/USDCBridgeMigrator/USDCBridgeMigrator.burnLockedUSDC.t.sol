@@ -25,12 +25,17 @@ contract USDCBridgeMigrator_BurnLockedUSDC is HybridLockReleaseUSDCTokenPool_loc
 
     uint256 amount = 1e6;
 
-    s_token.transfer(address(s_usdcTokenPool), amount);
+    s_USDCToken.transfer(address(s_usdcTokenPool), amount);
 
     vm.startPrank(s_routerAllowedOnRamp);
 
     vm.expectEmit();
-    emit TokenPool.Locked(s_routerAllowedOnRamp, amount);
+    emit TokenPool.LockedOrBurned({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      token: address(s_USDCToken),
+      sender: address(s_routerAllowedOnRamp),
+      amount: amount
+    });
 
     s_usdcTokenPool.lockOrBurn(
       Pool.LockOrBurnInV1({
@@ -38,12 +43,12 @@ contract USDCBridgeMigrator_BurnLockedUSDC is HybridLockReleaseUSDCTokenPool_loc
         receiver: abi.encodePacked(receiver),
         amount: amount,
         remoteChainSelector: DEST_CHAIN_SELECTOR,
-        localToken: address(s_token)
+        localToken: address(s_USDCToken)
       })
     );
 
     // Ensure that the tokens are properly locked
-    assertEq(s_token.balanceOf(address(s_usdcTokenPool)), amount, "Incorrect token amount in the tokenPool");
+    assertEq(s_USDCToken.balanceOf(address(s_usdcTokenPool)), amount, "Incorrect token amount in the tokenPool");
 
     assertEq(
       s_usdcTokenPool.getLockedTokensForChain(DEST_CHAIN_SELECTOR),
@@ -77,12 +82,12 @@ contract USDCBridgeMigrator_BurnLockedUSDC is HybridLockReleaseUSDCTokenPool_loc
     emit USDCBridgeMigrator.CCTPMigrationExecuted(DEST_CHAIN_SELECTOR, amount);
 
     // Ensure the call to the burn function is properly
-    vm.expectCall(address(s_token), abi.encodeWithSelector(bytes4(keccak256("burn(uint256)")), amount));
+    vm.expectCall(address(s_USDCToken), abi.encodeWithSelector(bytes4(keccak256("burn(uint256)")), amount));
 
     s_usdcTokenPool.burnLockedUSDC();
 
     // Assert that the tokens were actually burned
-    assertEq(s_token.balanceOf(address(s_usdcTokenPool)), 0, "Tokens were not burned out of the tokenPool");
+    assertEq(s_USDCToken.balanceOf(address(s_usdcTokenPool)), 0, "Tokens were not burned out of the tokenPool");
 
     // Ensure the proposal slot was cleared and there's no tokens locked for the destination chain anymore
     assertEq(s_usdcTokenPool.getCurrentProposedCCTPChainMigration(), 0, "Proposal Slot should be empty");

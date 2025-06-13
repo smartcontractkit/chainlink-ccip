@@ -112,7 +112,7 @@ func (r *OCR3Runner[RI]) RunRound(ctx context.Context) (result RoundResult[RI], 
 	}
 
 	// check that all the reports are the same.
-	if countUniqueReports(slicelib.Flatten(allReports)) > 1 {
+	if countUniqueReports(allReports) > 1 {
 		return RoundResult[RI]{}, fmt.Errorf("reports are not equal")
 	}
 
@@ -201,12 +201,16 @@ func countUniqueOutcomes(outcomes []ocr3types.Outcome) int {
 	return slicelib.CountUnique(flattenedHashes)
 }
 
-func countUniqueReports[RI any](reports []ocr3types.ReportPlus[RI]) int {
-	flattenedHashes := make([]string, 0, len(reports))
-	for _, report := range reports {
+func countUniqueReports[RI any](allReports [][]ocr3types.ReportPlus[RI]) int {
+	// Create hashes for each node's set of reports
+	nodeHashes := make([]string, len(allReports))
+	for i, reports := range allReports {
 		h := sha256.New()
-		h.Write(report.ReportWithInfo.Report)
-		flattenedHashes = append(flattenedHashes, hex.EncodeToString(h.Sum(nil)))
+		for _, report := range reports {
+			h.Write(report.ReportWithInfo.Report)
+		}
+		nodeHashes[i] = hex.EncodeToString(h.Sum(nil))
 	}
-	return slicelib.CountUnique(flattenedHashes)
+
+	return slicelib.CountUnique(nodeHashes)
 }

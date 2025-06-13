@@ -293,7 +293,7 @@ checksum = "ace50bade8e6234aa140d9a2f552bbee1db4d353f69b8217bc503490fc1a9f26"
 
 [[package]]
 name = "base-token-pool"
-version = "0.1.0-dev"
+version = "0.1.1-dev"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -456,7 +456,7 @@ checksum = "1628fb46dfa0b37568d12e5edd512553eccf6a22a78e8bde00bb4aed84d5bdbf"
 
 [[package]]
 name = "burnmint-token-pool"
-version = "0.1.0-dev"
+version = "0.1.1-dev"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -1000,7 +1000,7 @@ dependencies = [
 
 [[package]]
 name = "lockrelease-token-pool"
-version = "0.1.0-dev"
+version = "0.1.1-dev"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -2768,7 +2768,7 @@ dependencies = [
 
 [[package]]
 name = "test-token-pool"
-version = "0.1.0-dev"
+version = "0.1.1-dev"
 dependencies = [
  "anchor-lang",
  "anchor-spl",

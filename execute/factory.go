@@ -57,14 +57,11 @@ const (
 	// maxReportCount controls how many OCR3 reports can be returned. Note that
 	// the actual exec report type (ExecutePluginReport) may contain multiple
 	// per-source-chain reports. These are not limited by this value.
-	maxReportCount = 1
+	maxReportCount = 50
 
 	// lenientMaxMsgsPerObs is set to the maximum number of messages that can be observed in one observation, this is a bit
 	// lenient and acts as an indicator other than a hard limit.
 	lenientMaxMsgsPerObs = 100
-
-	// maxCommitReportsToFetch is set to the maximum number of commit reports that can be fetched in each round.
-	maxCommitReportsToFetch = 1000
 )
 
 // PluginFactory implements common ReportingPluginFactory and is used for (re-)initializing commit plugin instances.
@@ -137,16 +134,19 @@ func (p PluginFactory) NewReportingPlugin(
 	// - Extended reader adds finality violation and contract binding management.
 	// - Observed reader adds metric reporting.
 	readers := make(map[cciptypes.ChainSelector]contractreader.ContractReaderFacade)
+	extended := make(map[cciptypes.ChainSelector]contractreader.Extended)
 	for chain, cr := range p.contractReaders {
 		chainID, err1 := sel.GetChainIDFromSelector(uint64(chain))
 		if err1 != nil {
 			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to get chain id from selector: %w", err1)
 		}
-		readers[chain] = contractreader.NewExtendedContractReader(
+		reader := contractreader.NewExtendedContractReader(
 			contractreader.NewObserverReader(cr, lggr, chainID))
+		readers[chain] = reader
+		extended[chain] = reader
 	}
 
-	ccipReader := readerpkg.NewCCIPChainReader(
+	ccipReader, err := readerpkg.NewCCIPChainReader(
 		ctx,
 		logutil.WithComponent(lggr, "CCIPReader"),
 		readers,
@@ -155,6 +155,9 @@ func (p PluginFactory) NewReportingPlugin(
 		p.ocrConfig.Config.OfframpAddress,
 		p.addrCodec,
 	)
+	if err != nil {
+		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to create ccip reader: %w", err)
+	}
 
 	tokenDataObserver, err := observer.NewConfigBasedCompositeObservers(
 		ctx,
@@ -162,7 +165,7 @@ func (p PluginFactory) NewReportingPlugin(
 		p.ocrConfig.Config.ChainSelector,
 		offchainConfig.TokenDataObservers,
 		p.tokenDataEncoder,
-		readers,
+		extended,
 		p.addrCodec,
 	)
 	if err != nil {

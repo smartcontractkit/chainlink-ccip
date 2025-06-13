@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {ILiquidityContainer} from "../../interfaces/ILiquidityContainer.sol";
-import {ITokenMessenger} from "../USDC/ITokenMessenger.sol";
+import {ITokenMessenger} from "./interfaces/ITokenMessenger.sol";
 
 import {Pool} from "../../libraries/Pool.sol";
 import {TokenPool} from "../TokenPool.sol";
@@ -15,7 +14,7 @@ import {IERC20} from
 import {SafeERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 import {EnumerableSet} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableSet.sol";
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
 
 // bytes4(keccak256("NO_CCTP_USE_LOCK_RELEASE"))
 bytes4 constant LOCK_RELEASE_FLAG = 0xfa7c07de;
@@ -33,6 +32,8 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
   event LiquidityProviderSet(
     address indexed oldProvider, address indexed newProvider, uint64 indexed remoteChainSelector
   );
+  event LiquidityAdded(address indexed provider, uint256 indexed amount);
+  event LiquidityRemoved(address indexed provider, uint256 indexed amount);
 
   event LockReleaseEnabled(uint64 indexed remoteChainSelector);
   event LockReleaseDisabled(uint64 indexed remoteChainSelector);
@@ -81,6 +82,28 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
     return _lockReleaseOutgoingMessage(lockOrBurnIn);
   }
 
+  /// @notice Contains the alternative mechanism, in this implementation is "Lock" on outgoing tokens
+  function _lockReleaseOutgoingMessage(
+    Pool.LockOrBurnInV1 calldata lockOrBurnIn
+  ) internal virtual returns (Pool.LockOrBurnOutV1 memory) {
+    _validateLockOrBurn(lockOrBurnIn);
+
+    // Increase internal accounting of locked tokens for burnLockedUSDC() migration
+    s_lockedTokensByChainSelector[lockOrBurnIn.remoteChainSelector] += lockOrBurnIn.amount;
+
+    emit LockedOrBurned({
+      remoteChainSelector: lockOrBurnIn.remoteChainSelector,
+      token: address(i_token),
+      sender: msg.sender,
+      amount: lockOrBurnIn.amount
+    });
+
+    return Pool.LockOrBurnOutV1({
+      destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
+      destPoolData: abi.encode(LOCK_RELEASE_FLAG)
+    });
+  }
+
   /// @notice Release tokens from the pool to the recipient
   /// @dev The _validateReleaseOrMint check is an essential security check
   function releaseOrMint(
@@ -103,7 +126,7 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
   function _lockReleaseIncomingMessage(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) internal virtual returns (Pool.ReleaseOrMintOutV1 memory) {
-    _validateReleaseOrMint(releaseOrMintIn);
+    _validateReleaseOrMint(releaseOrMintIn, releaseOrMintIn.sourceDenominatedAmount);
 
     // Circle requires a supply-lock to prevent incoming messages once the migration process begins.
     // This prevents new incoming messages once the migration has begun to ensure any the procedure runs as expected
@@ -116,33 +139,22 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
     // This branch ensures that we're subtracting from the correct mapping. It is also safe to subtract from the
     // excluded tokens mapping, as this function would only be invoked in the event of a stuck tx after a migration
     if (s_lockedTokensByChainSelector[releaseOrMintIn.remoteChainSelector] == 0) {
-      s_tokensExcludedFromBurn[releaseOrMintIn.remoteChainSelector] -= releaseOrMintIn.amount;
+      s_tokensExcludedFromBurn[releaseOrMintIn.remoteChainSelector] -= releaseOrMintIn.sourceDenominatedAmount;
     } else {
-      s_lockedTokensByChainSelector[releaseOrMintIn.remoteChainSelector] -= releaseOrMintIn.amount;
+      s_lockedTokensByChainSelector[releaseOrMintIn.remoteChainSelector] -= releaseOrMintIn.sourceDenominatedAmount;
     }
 
-    getToken().safeTransfer(releaseOrMintIn.receiver, releaseOrMintIn.amount);
+    i_token.safeTransfer(releaseOrMintIn.receiver, releaseOrMintIn.sourceDenominatedAmount);
 
-    emit Released(msg.sender, releaseOrMintIn.receiver, releaseOrMintIn.amount);
-
-    return Pool.ReleaseOrMintOutV1({destinationAmount: releaseOrMintIn.amount});
-  }
-
-  /// @notice Contains the alternative mechanism, in this implementation is "Lock" on outgoing tokens
-  function _lockReleaseOutgoingMessage(
-    Pool.LockOrBurnInV1 calldata lockOrBurnIn
-  ) internal virtual returns (Pool.LockOrBurnOutV1 memory) {
-    _validateLockOrBurn(lockOrBurnIn);
-
-    // Increase internal accounting of locked tokens for burnLockedUSDC() migration
-    s_lockedTokensByChainSelector[lockOrBurnIn.remoteChainSelector] += lockOrBurnIn.amount;
-
-    emit Locked(msg.sender, lockOrBurnIn.amount);
-
-    return Pool.LockOrBurnOutV1({
-      destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
-      destPoolData: abi.encode(LOCK_RELEASE_FLAG)
+    emit ReleasedOrMinted({
+      remoteChainSelector: releaseOrMintIn.remoteChainSelector,
+      token: address(i_token),
+      sender: msg.sender,
+      recipient: releaseOrMintIn.receiver,
+      amount: releaseOrMintIn.sourceDenominatedAmount
     });
+
+    return Pool.ReleaseOrMintOutV1({destinationAmount: releaseOrMintIn.sourceDenominatedAmount});
   }
 
   // ================================================================
@@ -193,7 +205,7 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
 
     i_token.safeTransferFrom(msg.sender, address(this), amount);
 
-    emit ILiquidityContainer.LiquidityAdded(msg.sender, amount);
+    emit LiquidityAdded(msg.sender, amount);
   }
 
   /// @notice Removed liquidity to the pool. The tokens will be sent to msg.sender.
@@ -213,7 +225,7 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
 
     i_token.safeTransfer(msg.sender, amount);
 
-    emit ILiquidityContainer.LiquidityRemoved(msg.sender, amount);
+    emit LiquidityRemoved(msg.sender, amount);
   }
 
   // ================================================================

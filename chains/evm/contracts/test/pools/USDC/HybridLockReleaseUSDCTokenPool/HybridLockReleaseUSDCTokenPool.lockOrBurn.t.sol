@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {ITokenMessenger} from "../../../../pools/USDC/ITokenMessenger.sol";
+import {ITokenMessenger} from "../../../../pools/USDC/interfaces/ITokenMessenger.sol";
 
 import {Pool} from "../../../../libraries/Pool.sol";
-import {RateLimiter} from "../../../../libraries/RateLimiter.sol";
 import {TokenPool} from "../../../../pools/TokenPool.sol";
 import {HybridLockReleaseUSDCTokenPool} from "../../../../pools/USDC/HybridLockReleaseUSDCTokenPool.sol";
 import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
@@ -27,12 +26,17 @@ contract HybridLockReleaseUSDCTokenPool_lockOrBurn is HybridLockReleaseUSDCToken
 
     uint256 amount = 1e6;
 
-    s_token.transfer(address(s_usdcTokenPool), amount);
+    s_USDCToken.transfer(address(s_usdcTokenPool), amount);
 
     vm.startPrank(s_routerAllowedOnRamp);
 
     vm.expectEmit();
-    emit TokenPool.Locked(s_routerAllowedOnRamp, amount);
+    emit TokenPool.LockedOrBurned({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      token: address(s_USDCToken),
+      sender: address(s_routerAllowedOnRamp),
+      amount: amount
+    });
 
     s_usdcTokenPool.lockOrBurn(
       Pool.LockOrBurnInV1({
@@ -40,11 +44,11 @@ contract HybridLockReleaseUSDCTokenPool_lockOrBurn is HybridLockReleaseUSDCToken
         receiver: abi.encodePacked(receiver),
         amount: amount,
         remoteChainSelector: DEST_CHAIN_SELECTOR,
-        localToken: address(s_token)
+        localToken: address(s_USDCToken)
       })
     );
 
-    assertEq(s_token.balanceOf(address(s_usdcTokenPool)), amount, "Incorrect token amount in the tokenPool");
+    assertEq(s_USDCToken.balanceOf(address(s_usdcTokenPool)), amount, "Incorrect token amount in the tokenPool");
   }
 
   function test_PrimaryMechanism() public {
@@ -53,19 +57,23 @@ contract HybridLockReleaseUSDCTokenPool_lockOrBurn is HybridLockReleaseUSDCToken
 
     vm.startPrank(OWNER);
 
-    s_token.transfer(address(s_usdcTokenPool), amount);
+    s_USDCToken.transfer(address(s_usdcTokenPool), amount);
 
     vm.startPrank(s_routerAllowedOnRamp);
 
     USDCTokenPool.Domain memory expectedDomain = s_usdcTokenPool.getDomain(DEST_CHAIN_SELECTOR);
 
     vm.expectEmit();
-    emit RateLimiter.TokensConsumed(amount);
+    emit TokenPool.OutboundRateLimitConsumed({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      token: address(s_USDCToken),
+      amount: amount
+    });
 
     vm.expectEmit();
     emit ITokenMessenger.DepositForBurn(
       s_mockUSDC.s_nonce(),
-      address(s_token),
+      address(s_USDCToken),
       amount,
       address(s_usdcTokenPool),
       receiver,
@@ -75,7 +83,12 @@ contract HybridLockReleaseUSDCTokenPool_lockOrBurn is HybridLockReleaseUSDCToken
     );
 
     vm.expectEmit();
-    emit TokenPool.Burned(s_routerAllowedOnRamp, amount);
+    emit TokenPool.LockedOrBurned({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      token: address(s_USDCToken),
+      sender: address(s_routerAllowedOnRamp),
+      amount: amount
+    });
 
     Pool.LockOrBurnOutV1 memory poolReturnDataV1 = s_usdcTokenPool.lockOrBurn(
       Pool.LockOrBurnInV1({
@@ -83,7 +96,7 @@ contract HybridLockReleaseUSDCTokenPool_lockOrBurn is HybridLockReleaseUSDCToken
         receiver: abi.encodePacked(receiver),
         amount: amount,
         remoteChainSelector: DEST_CHAIN_SELECTOR,
-        localToken: address(s_token)
+        localToken: address(s_USDCToken)
       })
     );
 
@@ -131,7 +144,7 @@ contract HybridLockReleaseUSDCTokenPool_lockOrBurn is HybridLockReleaseUSDCToken
 
     uint256 amount = 1e6;
 
-    s_token.transfer(address(s_usdcTokenPool), amount);
+    s_USDCToken.transfer(address(s_usdcTokenPool), amount);
 
     vm.startPrank(s_routerAllowedOnRamp);
 
@@ -146,7 +159,7 @@ contract HybridLockReleaseUSDCTokenPool_lockOrBurn is HybridLockReleaseUSDCToken
         receiver: abi.encodePacked(receiver),
         amount: amount,
         remoteChainSelector: DEST_CHAIN_SELECTOR,
-        localToken: address(s_token)
+        localToken: address(s_USDCToken)
       })
     );
   }

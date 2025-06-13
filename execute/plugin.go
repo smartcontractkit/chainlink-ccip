@@ -286,6 +286,7 @@ func getPendingReportsForExecution(
 	canExecute CanExecuteHandle,
 	fetchFrom time.Time,
 	cursedSourceChains map[cciptypes.ChainSelector]bool,
+	limit int,
 	lggr logger.Logger,
 ) (
 	groupedCommits exectypes.CommitObservations,
@@ -302,7 +303,7 @@ func getPendingReportsForExecution(
 
 	// Assuming each report can have minimum one message, max reports shouldn't exceed the max messages
 	unfinalizedIncrementReports, err := ccipReader.CommitReportsGTETimestamp(
-		ctx, queryFromTimestampForNewReports, primitives.Unconfirmed, maxCommitReportsToFetch,
+		ctx, queryFromTimestampForNewReports, primitives.Unconfirmed, limit,
 	)
 	if err != nil {
 		return nil, nil, nil, err
@@ -484,17 +485,19 @@ func (p *Plugin) ObservationQuorum(
 		quorumhelper.QuorumTwoFPlusOne, p.reportingCfg.N, p.reportingCfg.F, aos), nil
 }
 
-// selectReport takes a list of reports in execution order and selects the first reports that fit within the
+// selectReports takes a list of reports in execution order and selects the first reports that fit within the
 // maxReportSizeBytes. Individual messages in a commit report may be skipped for various reasons, for example if an
 // out-of-order execution is detected or the message requires additional off-chain metadata which is not yet available.
 // If there is not enough space in the final report, it may be partially executed by searching for a subset of messages
 // which can fit in the final report.
-func selectReport(
+//
+// The output of this function are canonical data structures which can be directly included in the final outcome.
+func selectReports(
 	ctx context.Context,
 	lggr logger.Logger,
 	commitReports []exectypes.CommitData,
 	builder report.ExecReportBuilder,
-) ([]cciptypes.ExecutePluginReportSingleChain, []exectypes.CommitData, error) {
+) ([]cciptypes.ExecutePluginReport, [][]exectypes.CommitData, error) {
 	// TODO: It may be desirable for this entire function to be an interface so that
 	//       different selection algorithms can be used.
 
@@ -515,7 +518,7 @@ func selectReport(
 			continue
 		}
 
-		// If the report has not been fully executed, keep it for the next round.
+		// If the commit report has not been fully executed, keep it for the next round.
 		// Detect a report was not fully executed
 		if len(commitReports[i].Messages) > len(commitReports[i].ExecutedMessages) {
 			pendingReports++
@@ -523,6 +526,8 @@ func selectReport(
 	}
 
 	execReports, selectedReports, err := builder.Build()
+
+	// TODO: count pending reports during Build() when we select which reports can be returned.
 
 	lggr.Debugw("selected report to be executed", "reports", selectedReports)
 	lggr.Infow(
@@ -532,22 +537,35 @@ func selectReport(
 	return execReports, selectedReports, err
 }
 
-func extractReportInfo(report exectypes.Outcome) cciptypes.ExecuteReportInfo {
-	merkleRoots := []cciptypes.MerkleRootChain{}
+func extractReportInfo(report exectypes.Outcome) ([]cciptypes.ExecuteReportInfo, error) {
+	var ri []cciptypes.ExecuteReportInfo
+	commitReportIdx := 0
 
-	for _, commitReport := range report.CommitReports {
-		merkleRoots = append(merkleRoots, cciptypes.MerkleRootChain{
-			ChainSel:      commitReport.SourceChain,
-			OnRampAddress: commitReport.OnRampAddress,
-			SeqNumsRange:  commitReport.SequenceNumberRange,
-			MerkleRoot:    commitReport.MerkleRoot,
+	for _, execReport := range report.Reports {
+		var merkleRoots []cciptypes.MerkleRootChain
+
+		for i := 0; i < len(execReport.ChainReports); i++ {
+			if commitReportIdx >= len(report.CommitReports) {
+				return nil, fmt.Errorf("not enough commit reports for the "+
+					"number of chain reports in exec report %d", i)
+			}
+			cr := report.CommitReports[commitReportIdx]
+			merkleRoots = append(merkleRoots, cciptypes.MerkleRootChain{
+				ChainSel:      cr.SourceChain,
+				OnRampAddress: cr.OnRampAddress,
+				SeqNumsRange:  cr.SequenceNumberRange,
+				MerkleRoot:    cr.MerkleRoot,
+			})
+			commitReportIdx++
+		}
+
+		ri = append(ri, cciptypes.ExecuteReportInfo{
+			AbstractReports: execReport.ChainReports,
+			MerkleRoots:     merkleRoots,
 		})
 	}
 
-	return cciptypes.ExecuteReportInfo{
-		AbstractReports: report.Report.ChainReports,
-		MerkleRoots:     merkleRoots,
-	}
+	return ri, nil
 }
 
 func (p *Plugin) Reports(
@@ -560,26 +578,29 @@ func (p *Plugin) Reports(
 		return nil, nil
 	}
 
+	lggr.Debug("Decoding outcome in Reports function")
 	decodedOutcome, err := p.ocrTypeCodec.DecodeOutcome(outcome)
 	if err != nil {
+		lggr.Errorw("unable to decode outcome", "err", err)
 		return nil, fmt.Errorf("unable to decode outcome: %w", err)
 	}
 
-	if len(decodedOutcome.Report.ChainReports) == 0 {
-		lggr.Warn("empty report", "report", decodedOutcome.Report)
+	if len(decodedOutcome.Reports) == 0 {
+		lggr.Warn("empty report", "outcome", decodedOutcome)
 		return nil, nil
 	}
 
-	encodedReport, err := p.reportCodec.Encode(ctx, decodedOutcome.Report)
+	lggr.Debug("extracting report info")
+	reportInfos, err := extractReportInfo(decodedOutcome)
+	lggr.Debugw("report infos", "reportInfos", reportInfos)
 	if err != nil {
-		return nil, fmt.Errorf("unable to encode report: %w", err)
+		return nil, fmt.Errorf("extract report info: %w", err)
 	}
-
-	reportInfo := extractReportInfo(decodedOutcome)
-	lggr.Debugw("report info in UnfinalizedReports()", "reportInfo", reportInfo)
-	encodedInfo, err := reportInfo.Encode()
-	if err != nil {
-		return nil, err
+	if len(reportInfos) != len(decodedOutcome.Reports) {
+		lggr.Errorw("report infos length mismatch", "expected", len(decodedOutcome.Reports),
+			"got", len(reportInfos))
+		return nil, fmt.Errorf("expected %d report infos that equals number of reports"+
+			", got %d", len(decodedOutcome.Reports), len(reportInfos))
 	}
 
 	transmissionSchedule, err := plugincommon.GetTransmissionSchedule(
@@ -590,20 +611,36 @@ func (p *Plugin) Reports(
 	if err != nil {
 		return nil, fmt.Errorf("get transmission schedule: %w", err)
 	}
+
 	lggr.Debugw("transmission schedule override",
 		"transmissionSchedule", transmissionSchedule, "oracleIDToP2PID", p.oracleIDToP2pID)
 
-	r := []ocr3types.ReportPlus[[]byte]{
-		{
+	lggr.Debug("Encoding reports and adding them to final report")
+	// Handle all reports in the outcome
+	var reports []ocr3types.ReportPlus[[]byte]
+	for i, execReport := range decodedOutcome.Reports {
+		lggr.Debugw("Encoding Report: ", "report", execReport)
+		encodedReport, err := p.reportCodec.Encode(ctx, execReport)
+		if err != nil {
+			return nil, fmt.Errorf("unable to encode report %w", err)
+		}
+
+		encodedInfo, err := reportInfos[i].Encode()
+		if err != nil {
+			lggr.Errorw("unable to encode report info", "err", err)
+			return nil, fmt.Errorf("unable to encode report info %w", err)
+		}
+
+		reports = append(reports, ocr3types.ReportPlus[[]byte]{
 			ReportWithInfo: ocr3types.ReportWithInfo[[]byte]{
 				Report: encodedReport,
 				Info:   encodedInfo,
 			},
 			TransmissionScheduleOverride: transmissionSchedule,
-		},
+		})
 	}
 
-	return r, nil
+	return reports, nil
 }
 
 // validateReport validates various aspects of the report.
@@ -641,7 +678,10 @@ func (p *Plugin) validateReport(
 	}
 
 	if !supports {
-		lggr.Warnw("dest chain not supported, can't run report acceptance procedures")
+		lggr.Errorw("dest chain not supported by this oracle, can't run report acceptance procedures, " +
+			"transmission schedule is wrong - check CCIPHome chainConfigs and ensure that the right oracles are " +
+			"assigned as readers of the destination chain, or if " +
+			"this oracle should support the destination chain but isn't!")
 		return cciptypes.ExecutePluginReport{},
 			plugincommon.NewErrInvalidReport("dest chain not supported")
 	}
@@ -779,6 +819,19 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 ) (bool, error) {
 	ctx, lggr := logutil.WithOCRInfo(ctx, p.lggr, seqNr, logutil.PhaseShouldAccept)
 
+	supportsDest, err := p.supportsDestChain()
+	if err != nil {
+		lggr.Errorw("error checking if destination chain is supported", "err", err)
+		return false, fmt.Errorf("checking if destination chain is supported: %w", err)
+	}
+	if !supportsDest {
+		lggr.Errorw("dest chain not supported by this oracle, can't run report acceptance procedures, " +
+			"transmission schedule is wrong - check CCIPHome chainConfigs and ensure that the right oracles are " +
+			"assigned as readers of the destination chain, or if " +
+			"this oracle should support the destination chain but isn't!")
+		return false, plugincommon.NewErrInvalidReport("destination chain not supported")
+	}
+
 	decodedReport, err := p.validateReport(ctx, lggr, r)
 	if errors.Is(err, plugincommon.ErrInvalidReport) {
 		lggr.Infow("report not valid, not accepting", "err", err)
@@ -862,11 +915,15 @@ func (p *Plugin) supportedChains(id commontypes.OracleID) (mapset.Set[cciptypes.
 }
 
 func (p *Plugin) supportsDestChain() (bool, error) {
+	return p.supportsChain(p.destChain)
+}
+
+func (p *Plugin) supportsChain(chainSel cciptypes.ChainSelector) (bool, error) {
 	chains, err := p.supportedChains(p.reportingCfg.OracleID)
 	if err != nil {
 		return false, fmt.Errorf("error getting supported chains: %w", err)
 	}
-	return chains.Contains(p.destChain), nil
+	return chains.Contains(chainSel), nil
 }
 
 // Interface compatibility checks.
