@@ -18,7 +18,6 @@ pub enum ErrorCode {
     Full = 2,
 }
 
-#[constant]
 pub const MAX_ADDRS: usize = 64;
 
 #[zero_copy]

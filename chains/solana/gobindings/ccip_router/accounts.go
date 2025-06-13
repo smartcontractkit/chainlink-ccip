@@ -8,27 +8,27 @@ import (
 	ag_solanago "github.com/gagliardetto/solana-go"
 )
 
-type AllowedOfframp struct{}
+type AllowedOfframpAccount struct{}
 
-var AllowedOfframpDiscriminator = [8]byte{247, 97, 179, 16, 207, 36, 236, 132}
+var AllowedOfframpAccountDiscriminator = [8]byte{247, 97, 179, 16, 207, 36, 236, 132}
 
-func (obj AllowedOfframp) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj AllowedOfframpAccount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Write account discriminator:
-	err = encoder.WriteBytes(AllowedOfframpDiscriminator[:], false)
+	err = encoder.WriteBytes(AllowedOfframpAccountDiscriminator[:], false)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (obj *AllowedOfframp) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *AllowedOfframpAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Read and check account discriminator:
 	{
 		discriminator, err := decoder.ReadTypeID()
 		if err != nil {
 			return err
 		}
-		if !discriminator.Equal(AllowedOfframpDiscriminator[:]) {
+		if !discriminator.Equal(AllowedOfframpAccountDiscriminator[:]) {
 			return fmt.Errorf(
 				"wrong discriminator: wanted %s, got %s",
 				"[247 97 179 16 207 36 236 132]",
@@ -38,7 +38,7 @@ func (obj *AllowedOfframp) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err
 	return nil
 }
 
-type Config struct {
+type ConfigAccount struct {
 	Version            uint8
 	DefaultCodeVersion CodeVersion
 	SvmChainSelector   uint64
@@ -50,11 +50,11 @@ type Config struct {
 	FeeAggregator      ag_solanago.PublicKey
 }
 
-var ConfigDiscriminator = [8]byte{155, 12, 170, 224, 30, 250, 204, 130}
+var ConfigAccountDiscriminator = [8]byte{155, 12, 170, 224, 30, 250, 204, 130}
 
-func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj ConfigAccount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Write account discriminator:
-	err = encoder.WriteBytes(ConfigDiscriminator[:], false)
+	err = encoder.WriteBytes(ConfigAccountDiscriminator[:], false)
 	if err != nil {
 		return err
 	}
@@ -106,14 +106,14 @@ func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	return nil
 }
 
-func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *ConfigAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Read and check account discriminator:
 	{
 		discriminator, err := decoder.ReadTypeID()
 		if err != nil {
 			return err
 		}
-		if !discriminator.Equal(ConfigDiscriminator[:]) {
+		if !discriminator.Equal(ConfigAccountDiscriminator[:]) {
 			return fmt.Errorf(
 				"wrong discriminator: wanted %s, got %s",
 				"[155 12 170 224 30 250 204 130]",
@@ -168,18 +168,18 @@ func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 	return nil
 }
 
-type DestChain struct {
+type DestChainAccount struct {
 	Version       uint8
 	ChainSelector uint64
 	State         DestChainState
 	Config        DestChainConfig
 }
 
-var DestChainDiscriminator = [8]byte{77, 18, 241, 132, 212, 54, 218, 16}
+var DestChainAccountDiscriminator = [8]byte{77, 18, 241, 132, 212, 54, 218, 16}
 
-func (obj DestChain) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj DestChainAccount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Write account discriminator:
-	err = encoder.WriteBytes(DestChainDiscriminator[:], false)
+	err = encoder.WriteBytes(DestChainAccountDiscriminator[:], false)
 	if err != nil {
 		return err
 	}
@@ -206,14 +206,14 @@ func (obj DestChain) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) 
 	return nil
 }
 
-func (obj *DestChain) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *DestChainAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Read and check account discriminator:
 	{
 		discriminator, err := decoder.ReadTypeID()
 		if err != nil {
 			return err
 		}
-		if !discriminator.Equal(DestChainDiscriminator[:]) {
+		if !discriminator.Equal(DestChainAccountDiscriminator[:]) {
 			return fmt.Errorf(
 				"wrong discriminator: wanted %s, got %s",
 				"[77 18 241 132 212 54 218 16]",
@@ -243,16 +243,16 @@ func (obj *DestChain) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err erro
 	return nil
 }
 
-type Nonce struct {
+type NonceAccount struct {
 	Version uint8
 	Counter uint64
 }
 
-var NonceDiscriminator = [8]byte{143, 197, 147, 95, 106, 165, 50, 43}
+var NonceAccountDiscriminator = [8]byte{143, 197, 147, 95, 106, 165, 50, 43}
 
-func (obj Nonce) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj NonceAccount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Write account discriminator:
-	err = encoder.WriteBytes(NonceDiscriminator[:], false)
+	err = encoder.WriteBytes(NonceAccountDiscriminator[:], false)
 	if err != nil {
 		return err
 	}
@@ -269,14 +269,14 @@ func (obj Nonce) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	return nil
 }
 
-func (obj *Nonce) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *NonceAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Read and check account discriminator:
 	{
 		discriminator, err := decoder.ReadTypeID()
 		if err != nil {
 			return err
 		}
-		if !discriminator.Equal(NonceDiscriminator[:]) {
+		if !discriminator.Equal(NonceAccountDiscriminator[:]) {
 			return fmt.Errorf(
 				"wrong discriminator: wanted %s, got %s",
 				"[143 197 147 95 106 165 50 43]",
@@ -290,6 +290,103 @@ func (obj *Nonce) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	}
 	// Deserialize `Counter`:
 	err = decoder.Decode(&obj.Counter)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type TokenAdminRegistryAccount struct {
+	Version              uint8
+	Administrator        ag_solanago.PublicKey
+	PendingAdministrator ag_solanago.PublicKey
+	LookupTable          ag_solanago.PublicKey
+	WritableIndexes      [2]ag_binary.Uint128
+	Mint                 ag_solanago.PublicKey
+}
+
+var TokenAdminRegistryAccountDiscriminator = [8]byte{70, 92, 207, 200, 76, 17, 57, 114}
+
+func (obj TokenAdminRegistryAccount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Write account discriminator:
+	err = encoder.WriteBytes(TokenAdminRegistryAccountDiscriminator[:], false)
+	if err != nil {
+		return err
+	}
+	// Serialize `Version` param:
+	err = encoder.Encode(obj.Version)
+	if err != nil {
+		return err
+	}
+	// Serialize `Administrator` param:
+	err = encoder.Encode(obj.Administrator)
+	if err != nil {
+		return err
+	}
+	// Serialize `PendingAdministrator` param:
+	err = encoder.Encode(obj.PendingAdministrator)
+	if err != nil {
+		return err
+	}
+	// Serialize `LookupTable` param:
+	err = encoder.Encode(obj.LookupTable)
+	if err != nil {
+		return err
+	}
+	// Serialize `WritableIndexes` param:
+	err = encoder.Encode(obj.WritableIndexes)
+	if err != nil {
+		return err
+	}
+	// Serialize `Mint` param:
+	err = encoder.Encode(obj.Mint)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *TokenAdminRegistryAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Read and check account discriminator:
+	{
+		discriminator, err := decoder.ReadTypeID()
+		if err != nil {
+			return err
+		}
+		if !discriminator.Equal(TokenAdminRegistryAccountDiscriminator[:]) {
+			return fmt.Errorf(
+				"wrong discriminator: wanted %s, got %s",
+				"[70 92 207 200 76 17 57 114]",
+				fmt.Sprint(discriminator[:]))
+		}
+	}
+	// Deserialize `Version`:
+	err = decoder.Decode(&obj.Version)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Administrator`:
+	err = decoder.Decode(&obj.Administrator)
+	if err != nil {
+		return err
+	}
+	// Deserialize `PendingAdministrator`:
+	err = decoder.Decode(&obj.PendingAdministrator)
+	if err != nil {
+		return err
+	}
+	// Deserialize `LookupTable`:
+	err = decoder.Decode(&obj.LookupTable)
+	if err != nil {
+		return err
+	}
+	// Deserialize `WritableIndexes`:
+	err = decoder.Decode(&obj.WritableIndexes)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Mint`:
+	err = decoder.Decode(&obj.Mint)
 	if err != nil {
 		return err
 	}

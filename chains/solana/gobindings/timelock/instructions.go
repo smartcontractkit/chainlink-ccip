@@ -30,10 +30,10 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-var ProgramID ag_solanago.PublicKey
+var ProgramID ag_solanago.PublicKey = ag_solanago.MustPublicKeyFromBase58("DoajfR5tK24xVw51fWcawUZWhAXD8yrBJVacc13neVQA")
 
-func SetProgramID(pubkey ag_solanago.PublicKey) {
-	ProgramID = pubkey
+func SetProgramID(PublicKey ag_solanago.PublicKey) {
+	ProgramID = PublicKey
 	ag_solanago.RegisterInstructionDecoder(ProgramID, registryDecodeInstruction)
 }
 
@@ -46,48 +46,26 @@ func init() {
 }
 
 var (
-	// Initialize the timelock configuration.
+	// Accept ownership of the timelock config.
+	//
+	// The proposed new owner must call this function to assume ownership.
 	//
 	// # Parameters
 	//
-	// - `ctx`: The context containing the accounts required for initialization.
-	// - `timelock_id`: A unique, padded identifier for this timelock instance.
-	// - `min_delay`: The minimum delay (in seconds) required for scheduled operations.
-	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
+	// - `ctx`: The context containing the configuration account.
+	// - `_timelock_id`: The timelock identifier.
+	Instruction_AcceptOwnership = ag_binary.TypeID([8]byte{172, 23, 43, 13, 238, 213, 85, 150})
 
-	// Add a new access role in batch. Only the admin is allowed to perform this operation.
+	// Append additional data to an instruction of a bypasser operation.
 	//
 	// # Parameters
 	//
-	// - `ctx`: The context containing the accounts required for batch adding access.
-	// - `timelock_id`: A unique, padded identifier for this timelock instance.
-	// - `role`: The role to be added.
-	Instruction_BatchAddAccess = ag_binary.TypeID([8]byte{73, 141, 223, 79, 66, 154, 226, 67})
-
-	// Initialize a new standard timelock operation.
-	//
-	// This sets up a new operation with the given ID, predecessor, salt, and expected number of instructions.
-	//
-	// # Parameters
-	//
-	// - `ctx`: The context containing the operation account.
-	// - `_timelock_id`: A padded identifier for the timelock (unused here but required for PDA derivation).
-	// - `id`: The unique identifier for the operation.
-	// - `predecessor`: The identifier of the predecessor operation.
-	// - `salt`: A salt value to help create unique PDAs.
-	// - `instruction_count`: The total number of instructions that will be added to this operation.
-	Instruction_InitializeOperation = ag_binary.TypeID([8]byte{15, 96, 217, 171, 124, 4, 113, 243})
-
-	// Append a new instruction to an existing standard operation.
-	//
-	// # Parameters
-	//
-	// - `ctx`: The context containing the operation account.
-	// - `_timelock_id`: The timelock identifier (for PDA derivation).
+	// - `ctx`: The context containing the bypasser operation account.
+	// - `_timelock_id`: The timelock identifier.
 	// - `_id`: The operation identifier.
-	// - `program_id`: The target program for the instruction.
-	// - `accounts`: The list of accounts required for the instruction.
-	Instruction_InitializeInstruction = ag_binary.TypeID([8]byte{195, 230, 213, 135, 144, 148, 142, 85})
+	// - `ix_index`: The index of the instruction.
+	// - `ix_data_chunk`: The data to append.
+	Instruction_AppendBypasserInstructionData = ag_binary.TypeID([8]byte{184, 232, 151, 222, 111, 117, 215, 197})
 
 	// Append additional instruction data to an instruction of an existing standard operation.
 	//
@@ -100,16 +78,66 @@ var (
 	// - `ix_data_chunk`: A chunk of data to be appended.
 	Instruction_AppendInstructionData = ag_binary.TypeID([8]byte{76, 77, 102, 131, 136, 12, 45, 5})
 
-	// Finalize a standard operation.
-	//
-	// Finalizing an operation marks it as ready for scheduling.
+	// Add a new access role in batch. Only the admin is allowed to perform this operation.
 	//
 	// # Parameters
 	//
-	// - `ctx`: The context containing the operation account.
-	// - `_timelock_id`: The timelock identifier (for PDA derivation).
+	// - `ctx`: The context containing the accounts required for batch adding access.
+	// - `timelock_id`: A unique, padded identifier for this timelock instance.
+	// - `role`: The role to be added.
+	Instruction_BatchAddAccess = ag_binary.TypeID([8]byte{73, 141, 223, 79, 66, 154, 226, 67})
+
+	// Block a function selector from being called.
+	//
+	// Only the admin can block function selectors.
+	//
+	// # Parameters
+	//
+	// - `ctx`: The context containing the configuration account.
+	// - `_timelock_id`: The timelock identifier.
+	// - `selector`: The 8-byte function selector(Anchor discriminator) to block.
+	Instruction_BlockFunctionSelector = ag_binary.TypeID([8]byte{119, 89, 101, 41, 72, 143, 218, 185})
+
+	// Execute operations immediately using the bypasser flow, bypassing time delays
+	// and predecessor checks.
+	//
+	// This function provides an emergency execution mechanism that:
+	// 1. Skips the timelock waiting period required for standard operations
+	// 2. Does not enforce predecessor dependencies
+	// 3. Closes the operation account after execution
+	//
+	// # Emergency Use Only
+	//
+	// The bypasser flow is intended strictly for emergency situations where
+	// waiting for the standard timelock delay would cause harm. Access to this
+	// function is tightly controlled through the Bypasser role.
+	//
+	// # Parameters
+	//
+	// - `ctx`: Context containing operation accounts and signer information
+	// - `timelock_id`: Identifier for the timelock instance
+	// - `_id`: Operation ID (used for PDA derivation)
+	Instruction_BypasserExecuteBatch = ag_binary.TypeID([8]byte{90, 62, 66, 6, 227, 174, 30, 194})
+
+	// Cancel a scheduled operation.
+	//
+	// # Parameters
+	//
+	// - `ctx`: The context containing the accounts for cancellation.
+	// - `timelock_id`: The timelock identifier.
+	// - `id`: The operation identifier (precalculated).
+	Instruction_Cancel = ag_binary.TypeID([8]byte{232, 219, 223, 41, 219, 236, 220, 190})
+
+	// Clear a finalized bypasser operation.
+	//
+	// Closes the bypasser operation account.
+	//
+	// # Parameters
+	//
+	// - `ctx`: The context containing the bypasser operation account.
+	// - `_timelock_id`: The timelock identifier.
 	// - `_id`: The operation identifier.
-	Instruction_FinalizeOperation = ag_binary.TypeID([8]byte{63, 208, 32, 98, 85, 182, 236, 140})
+	Instruction_ClearBypasserOperation = ag_binary.TypeID([8]byte{200, 21, 249, 130, 56, 13, 128, 32})
 
 	// Clear an operation that has been finalized.
 	//
@@ -121,25 +149,6 @@ var (
 	// - `_timelock_id`: The timelock identifier.
 	// - `_id`: The operation identifier.
 	Instruction_ClearOperation = ag_binary.TypeID([8]byte{111, 217, 62, 240, 224, 75, 60, 58})
-
-	// Schedule a finalized operation to be executed after a delay.
-	//
-	// # Parameters
-	//
-	// - `ctx`: The context containing the accounts for scheduling.
-	// - `timelock_id`: The timelock identifier.
-	// - `id`: The operation identifier.
-	// - `delay`: The delay (in seconds) before the operation can be executed.
-	Instruction_ScheduleBatch = ag_binary.TypeID([8]byte{242, 140, 87, 106, 71, 226, 86, 32})
-
-	// Cancel a scheduled operation.
-	//
-	// # Parameters
-	//
-	// - `ctx`: The context containing the accounts for cancellation.
-	// - `timelock_id`: The timelock identifier.
-	// - `id`: The operation identifier (precalculated).
-	Instruction_Cancel = ag_binary.TypeID([8]byte{232, 219, 223, 41, 219, 236, 220, 190})
 
 	// Executes a scheduled batch of operations after validating readiness and predecessor dependencies.
 	//
@@ -163,6 +172,48 @@ var (
 	// security through program derivation.
 	Instruction_ExecuteBatch = ag_binary.TypeID([8]byte{112, 159, 211, 51, 238, 70, 212, 60})
 
+	// Finalize a bypasser operation.
+	//
+	// Marks the bypasser operation as finalized, ready for execution.
+	//
+	// # Parameters
+	//
+	// - `ctx`: The context containing the bypasser operation account.
+	// - `_timelock_id`: The timelock identifier.
+	// - `_id`: The operation identifier.
+	Instruction_FinalizeBypasserOperation = ag_binary.TypeID([8]byte{45, 55, 198, 51, 124, 24, 169, 250})
+
+	// Finalize a standard operation.
+	//
+	// Finalizing an operation marks it as ready for scheduling.
+	//
+	// # Parameters
+	//
+	// - `ctx`: The context containing the operation account.
+	// - `_timelock_id`: The timelock identifier (for PDA derivation).
+	// - `_id`: The operation identifier.
+	Instruction_FinalizeOperation = ag_binary.TypeID([8]byte{63, 208, 32, 98, 85, 182, 236, 140})
+
+	// Initialize the timelock configuration.
+	//
+	// # Parameters
+	//
+	// - `ctx`: The context containing the accounts required for initialization.
+	// - `timelock_id`: A unique, padded identifier for this timelock instance.
+	// - `min_delay`: The minimum delay (in seconds) required for scheduled operations.
+	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
+
+	// Initialize an instruction for a bypasser operation.
+	//
+	// # Parameters
+	//
+	// - `ctx`: The context containing the bypasser operation account.
+	// - `_timelock_id`: The timelock identifier.
+	// - `_id`: The operation identifier.
+	// - `program_id`: The target program for the instruction.
+	// - `accounts`: The list of accounts required for the instruction.
+	Instruction_InitializeBypasserInstruction = ag_binary.TypeID([8]byte{50, 17, 205, 172, 175, 140, 195, 39})
+
 	// Initialize a bypasser operation.
 	//
 	// Bypasser operations have no predecessor and can be executed without delay.
@@ -176,103 +227,40 @@ var (
 	// - `instruction_count`: The number of instructions to be added.
 	Instruction_InitializeBypasserOperation = ag_binary.TypeID([8]byte{58, 27, 48, 204, 19, 197, 63, 26})
 
-	// Initialize an instruction for a bypasser operation.
+	// Append a new instruction to an existing standard operation.
 	//
 	// # Parameters
 	//
-	// - `ctx`: The context containing the bypasser operation account.
-	// - `_timelock_id`: The timelock identifier.
+	// - `ctx`: The context containing the operation account.
+	// - `_timelock_id`: The timelock identifier (for PDA derivation).
 	// - `_id`: The operation identifier.
 	// - `program_id`: The target program for the instruction.
 	// - `accounts`: The list of accounts required for the instruction.
-	Instruction_InitializeBypasserInstruction = ag_binary.TypeID([8]byte{50, 17, 205, 172, 175, 140, 195, 39})
+	Instruction_InitializeInstruction = ag_binary.TypeID([8]byte{195, 230, 213, 135, 144, 148, 142, 85})
 
-	// Append additional data to an instruction of a bypasser operation.
+	// Initialize a new standard timelock operation.
+	//
+	// This sets up a new operation with the given ID, predecessor, salt, and expected number of instructions.
 	//
 	// # Parameters
 	//
-	// - `ctx`: The context containing the bypasser operation account.
-	// - `_timelock_id`: The timelock identifier.
-	// - `_id`: The operation identifier.
-	// - `ix_index`: The index of the instruction.
-	// - `ix_data_chunk`: The data to append.
-	Instruction_AppendBypasserInstructionData = ag_binary.TypeID([8]byte{184, 232, 151, 222, 111, 117, 215, 197})
+	// - `ctx`: The context containing the operation account.
+	// - `_timelock_id`: A padded identifier for the timelock (unused here but required for PDA derivation).
+	// - `id`: The unique identifier for the operation.
+	// - `predecessor`: The identifier of the predecessor operation.
+	// - `salt`: A salt value to help create unique PDAs.
+	// - `instruction_count`: The total number of instructions that will be added to this operation.
+	Instruction_InitializeOperation = ag_binary.TypeID([8]byte{15, 96, 217, 171, 124, 4, 113, 243})
 
-	// Finalize a bypasser operation.
-	//
-	// Marks the bypasser operation as finalized, ready for execution.
+	// Schedule a finalized operation to be executed after a delay.
 	//
 	// # Parameters
 	//
-	// - `ctx`: The context containing the bypasser operation account.
-	// - `_timelock_id`: The timelock identifier.
-	// - `_id`: The operation identifier.
-	Instruction_FinalizeBypasserOperation = ag_binary.TypeID([8]byte{45, 55, 198, 51, 124, 24, 169, 250})
-
-	// Clear a finalized bypasser operation.
-	//
-	// Closes the bypasser operation account.
-	//
-	// # Parameters
-	//
-	// - `ctx`: The context containing the bypasser operation account.
-	// - `_timelock_id`: The timelock identifier.
-	// - `_id`: The operation identifier.
-	Instruction_ClearBypasserOperation = ag_binary.TypeID([8]byte{200, 21, 249, 130, 56, 13, 128, 32})
-
-	// Execute operations immediately using the bypasser flow, bypassing time delays
-	// and predecessor checks.
-	//
-	// This function provides an emergency execution mechanism that:
-	// 1. Skips the timelock waiting period required for standard operations
-	// 2. Does not enforce predecessor dependencies
-	// 3. Closes the operation account after execution
-	//
-	// # Emergency Use Only
-	//
-	// The bypasser flow is intended strictly for emergency situations where
-	// waiting for the standard timelock delay would cause harm. Access to this
-	// function is tightly controlled through the Bypasser role.
-	//
-	// # Parameters
-	//
-	// - `ctx`: Context containing operation accounts and signer information
-	// - `timelock_id`: Identifier for the timelock instance
-	// - `_id`: Operation ID (used for PDA derivation)
-	Instruction_BypasserExecuteBatch = ag_binary.TypeID([8]byte{90, 62, 66, 6, 227, 174, 30, 194})
-
-	// Update the minimum delay required for scheduled operations.
-	//
-	// Only the admin can update the delay.
-	//
-	// # Parameters
-	//
-	// - `ctx`: The context containing the configuration account.
-	// - `_timelock_id`: The timelock identifier.
-	// - `delay`: The new minimum delay value.
-	Instruction_UpdateDelay = ag_binary.TypeID([8]byte{164, 186, 80, 62, 85, 88, 182, 147})
-
-	// Block a function selector from being called.
-	//
-	// Only the admin can block function selectors.
-	//
-	// # Parameters
-	//
-	// - `ctx`: The context containing the configuration account.
-	// - `_timelock_id`: The timelock identifier.
-	// - `selector`: The 8-byte function selector(Anchor discriminator) to block.
-	Instruction_BlockFunctionSelector = ag_binary.TypeID([8]byte{119, 89, 101, 41, 72, 143, 218, 185})
-
-	// Unblock a previously blocked function selector.
-	//
-	// Only the admin can unblock function selectors.
-	//
-	// # Parameters
-	//
-	// - `ctx`: The context containing the configuration account.
-	// - `_timelock_id`: The timelock identifier.
-	// - `selector`: The function selector to unblock.
-	Instruction_UnblockFunctionSelector = ag_binary.TypeID([8]byte{53, 84, 245, 196, 149, 52, 30, 57})
+	// - `ctx`: The context containing the accounts for scheduling.
+	// - `timelock_id`: The timelock identifier.
+	// - `id`: The operation identifier.
+	// - `delay`: The delay (in seconds) before the operation can be executed.
+	Instruction_ScheduleBatch = ag_binary.TypeID([8]byte{242, 140, 87, 106, 71, 226, 86, 32})
 
 	// Propose a new owner for the timelock instance config.
 	//
@@ -285,62 +273,74 @@ var (
 	// - `proposed_owner`: The public key of the proposed new owner.
 	Instruction_TransferOwnership = ag_binary.TypeID([8]byte{65, 177, 215, 73, 53, 45, 99, 47})
 
-	// Accept ownership of the timelock config.
+	// Unblock a previously blocked function selector.
 	//
-	// The proposed new owner must call this function to assume ownership.
+	// Only the admin can unblock function selectors.
 	//
 	// # Parameters
 	//
 	// - `ctx`: The context containing the configuration account.
 	// - `_timelock_id`: The timelock identifier.
-	Instruction_AcceptOwnership = ag_binary.TypeID([8]byte{172, 23, 43, 13, 238, 213, 85, 150})
+	// - `selector`: The function selector to unblock.
+	Instruction_UnblockFunctionSelector = ag_binary.TypeID([8]byte{53, 84, 245, 196, 149, 52, 30, 57})
+
+	// Update the minimum delay required for scheduled operations.
+	//
+	// Only the admin can update the delay.
+	//
+	// # Parameters
+	//
+	// - `ctx`: The context containing the configuration account.
+	// - `_timelock_id`: The timelock identifier.
+	// - `delay`: The new minimum delay value.
+	Instruction_UpdateDelay = ag_binary.TypeID([8]byte{164, 186, 80, 62, 85, 88, 182, 147})
 )
 
 // InstructionIDToName returns the name of the instruction given its ID.
 func InstructionIDToName(id ag_binary.TypeID) string {
 	switch id {
-	case Instruction_Initialize:
-		return "Initialize"
-	case Instruction_BatchAddAccess:
-		return "BatchAddAccess"
-	case Instruction_InitializeOperation:
-		return "InitializeOperation"
-	case Instruction_InitializeInstruction:
-		return "InitializeInstruction"
-	case Instruction_AppendInstructionData:
-		return "AppendInstructionData"
-	case Instruction_FinalizeOperation:
-		return "FinalizeOperation"
-	case Instruction_ClearOperation:
-		return "ClearOperation"
-	case Instruction_ScheduleBatch:
-		return "ScheduleBatch"
-	case Instruction_Cancel:
-		return "Cancel"
-	case Instruction_ExecuteBatch:
-		return "ExecuteBatch"
-	case Instruction_InitializeBypasserOperation:
-		return "InitializeBypasserOperation"
-	case Instruction_InitializeBypasserInstruction:
-		return "InitializeBypasserInstruction"
-	case Instruction_AppendBypasserInstructionData:
-		return "AppendBypasserInstructionData"
-	case Instruction_FinalizeBypasserOperation:
-		return "FinalizeBypasserOperation"
-	case Instruction_ClearBypasserOperation:
-		return "ClearBypasserOperation"
-	case Instruction_BypasserExecuteBatch:
-		return "BypasserExecuteBatch"
-	case Instruction_UpdateDelay:
-		return "UpdateDelay"
-	case Instruction_BlockFunctionSelector:
-		return "BlockFunctionSelector"
-	case Instruction_UnblockFunctionSelector:
-		return "UnblockFunctionSelector"
-	case Instruction_TransferOwnership:
-		return "TransferOwnership"
 	case Instruction_AcceptOwnership:
 		return "AcceptOwnership"
+	case Instruction_AppendBypasserInstructionData:
+		return "AppendBypasserInstructionData"
+	case Instruction_AppendInstructionData:
+		return "AppendInstructionData"
+	case Instruction_BatchAddAccess:
+		return "BatchAddAccess"
+	case Instruction_BlockFunctionSelector:
+		return "BlockFunctionSelector"
+	case Instruction_BypasserExecuteBatch:
+		return "BypasserExecuteBatch"
+	case Instruction_Cancel:
+		return "Cancel"
+	case Instruction_ClearBypasserOperation:
+		return "ClearBypasserOperation"
+	case Instruction_ClearOperation:
+		return "ClearOperation"
+	case Instruction_ExecuteBatch:
+		return "ExecuteBatch"
+	case Instruction_FinalizeBypasserOperation:
+		return "FinalizeBypasserOperation"
+	case Instruction_FinalizeOperation:
+		return "FinalizeOperation"
+	case Instruction_Initialize:
+		return "Initialize"
+	case Instruction_InitializeBypasserInstruction:
+		return "InitializeBypasserInstruction"
+	case Instruction_InitializeBypasserOperation:
+		return "InitializeBypasserOperation"
+	case Instruction_InitializeInstruction:
+		return "InitializeInstruction"
+	case Instruction_InitializeOperation:
+		return "InitializeOperation"
+	case Instruction_ScheduleBatch:
+		return "ScheduleBatch"
+	case Instruction_TransferOwnership:
+		return "TransferOwnership"
+	case Instruction_UnblockFunctionSelector:
+		return "UnblockFunctionSelector"
+	case Instruction_UpdateDelay:
+		return "UpdateDelay"
 	default:
 		return ""
 	}
@@ -362,67 +362,67 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 	ag_binary.AnchorTypeIDEncoding,
 	[]ag_binary.VariantType{
 		{
-			"initialize", (*Initialize)(nil),
+			Name: "accept_ownership", Type: (*AcceptOwnershipInstruction)(nil),
 		},
 		{
-			"batch_add_access", (*BatchAddAccess)(nil),
+			Name: "append_bypasser_instruction_data", Type: (*AppendBypasserInstructionDataInstruction)(nil),
 		},
 		{
-			"initialize_operation", (*InitializeOperation)(nil),
+			Name: "append_instruction_data", Type: (*AppendInstructionDataInstruction)(nil),
 		},
 		{
-			"initialize_instruction", (*InitializeInstruction)(nil),
+			Name: "batch_add_access", Type: (*BatchAddAccessInstruction)(nil),
 		},
 		{
-			"append_instruction_data", (*AppendInstructionData)(nil),
+			Name: "block_function_selector", Type: (*BlockFunctionSelectorInstruction)(nil),
 		},
 		{
-			"finalize_operation", (*FinalizeOperation)(nil),
+			Name: "bypasser_execute_batch", Type: (*BypasserExecuteBatchInstruction)(nil),
 		},
 		{
-			"clear_operation", (*ClearOperation)(nil),
+			Name: "cancel", Type: (*CancelInstruction)(nil),
 		},
 		{
-			"schedule_batch", (*ScheduleBatch)(nil),
+			Name: "clear_bypasser_operation", Type: (*ClearBypasserOperationInstruction)(nil),
 		},
 		{
-			"cancel", (*Cancel)(nil),
+			Name: "clear_operation", Type: (*ClearOperationInstruction)(nil),
 		},
 		{
-			"execute_batch", (*ExecuteBatch)(nil),
+			Name: "execute_batch", Type: (*ExecuteBatchInstruction)(nil),
 		},
 		{
-			"initialize_bypasser_operation", (*InitializeBypasserOperation)(nil),
+			Name: "finalize_bypasser_operation", Type: (*FinalizeBypasserOperationInstruction)(nil),
 		},
 		{
-			"initialize_bypasser_instruction", (*InitializeBypasserInstruction)(nil),
+			Name: "finalize_operation", Type: (*FinalizeOperationInstruction)(nil),
 		},
 		{
-			"append_bypasser_instruction_data", (*AppendBypasserInstructionData)(nil),
+			Name: "initialize", Type: (*InitializeInstruction)(nil),
 		},
 		{
-			"finalize_bypasser_operation", (*FinalizeBypasserOperation)(nil),
+			Name: "initialize_bypasser_instruction", Type: (*InitializeBypasserInstructionInstruction)(nil),
 		},
 		{
-			"clear_bypasser_operation", (*ClearBypasserOperation)(nil),
+			Name: "initialize_bypasser_operation", Type: (*InitializeBypasserOperationInstruction)(nil),
 		},
 		{
-			"bypasser_execute_batch", (*BypasserExecuteBatch)(nil),
+			Name: "initialize_instruction", Type: (*InitializeInstructionInstruction)(nil),
 		},
 		{
-			"update_delay", (*UpdateDelay)(nil),
+			Name: "initialize_operation", Type: (*InitializeOperationInstruction)(nil),
 		},
 		{
-			"block_function_selector", (*BlockFunctionSelector)(nil),
+			Name: "schedule_batch", Type: (*ScheduleBatchInstruction)(nil),
 		},
 		{
-			"unblock_function_selector", (*UnblockFunctionSelector)(nil),
+			Name: "transfer_ownership", Type: (*TransferOwnershipInstruction)(nil),
 		},
 		{
-			"transfer_ownership", (*TransferOwnership)(nil),
+			Name: "unblock_function_selector", Type: (*UnblockFunctionSelectorInstruction)(nil),
 		},
 		{
-			"accept_ownership", (*AcceptOwnership)(nil),
+			Name: "update_delay", Type: (*UpdateDelayInstruction)(nil),
 		},
 	},
 )
@@ -460,14 +460,14 @@ func (inst *Instruction) MarshalWithEncoder(encoder *ag_binary.Encoder) error {
 }
 
 func registryDecodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (interface{}, error) {
-	inst, err := DecodeInstruction(accounts, data)
+	inst, err := decodeInstruction(accounts, data)
 	if err != nil {
 		return nil, err
 	}
 	return inst, nil
 }
 
-func DecodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (*Instruction, error) {
+func decodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (*Instruction, error) {
 	inst := new(Instruction)
 	if err := ag_binary.NewBorshDecoder(data).Decode(inst); err != nil {
 		return nil, fmt.Errorf("unable to decode instruction: %w", err)
@@ -479,4 +479,26 @@ func DecodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (*Instr
 		}
 	}
 	return inst, nil
+}
+
+func DecodeInstructions(message *ag_solanago.Message) (instructions []*Instruction, err error) {
+	for _, ins := range message.Instructions {
+		var programID ag_solanago.PublicKey
+		if programID, err = message.Program(ins.ProgramIDIndex); err != nil {
+			return
+		}
+		if !programID.Equals(ProgramID) {
+			continue
+		}
+		var accounts []*ag_solanago.AccountMeta
+		if accounts, err = ins.ResolveInstructionAccounts(message); err != nil {
+			return
+		}
+		var insDecoded *Instruction
+		if insDecoded, err = decodeInstruction(accounts, ins.Data); err != nil {
+			return
+		}
+		instructions = append(instructions, insDecoded)
+	}
+	return
 }

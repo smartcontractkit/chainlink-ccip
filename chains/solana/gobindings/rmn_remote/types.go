@@ -2,7 +2,105 @@
 
 package rmn_remote
 
-import ag_binary "github.com/gagliardetto/binary"
+import (
+	ag_binary "github.com/gagliardetto/binary"
+	ag_solanago "github.com/gagliardetto/solana-go"
+)
+
+type CodeVersion ag_binary.BorshEnum
+
+const (
+	CodeVersionDefault CodeVersion = iota
+	CodeVersionV1
+)
+
+func (value CodeVersion) String() string {
+	switch value {
+	case CodeVersionDefault:
+		return "Default"
+	case CodeVersionV1:
+		return "V1"
+	default:
+		return ""
+	}
+}
+
+type Config struct {
+	Version            uint8
+	Owner              ag_solanago.PublicKey
+	ProposedOwner      ag_solanago.PublicKey
+	DefaultCodeVersion CodeVersion
+}
+
+func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Version` param:
+	err = encoder.Encode(obj.Version)
+	if err != nil {
+		return err
+	}
+	// Serialize `Owner` param:
+	err = encoder.Encode(obj.Owner)
+	if err != nil {
+		return err
+	}
+	// Serialize `ProposedOwner` param:
+	err = encoder.Encode(obj.ProposedOwner)
+	if err != nil {
+		return err
+	}
+	// Serialize `DefaultCodeVersion` param:
+	err = encoder.Encode(obj.DefaultCodeVersion)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Version`:
+	err = decoder.Decode(&obj.Version)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Owner`:
+	err = decoder.Decode(&obj.Owner)
+	if err != nil {
+		return err
+	}
+	// Deserialize `ProposedOwner`:
+	err = decoder.Decode(&obj.ProposedOwner)
+	if err != nil {
+		return err
+	}
+	// Deserialize `DefaultCodeVersion`:
+	err = decoder.Decode(&obj.DefaultCodeVersion)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type ConfigSet struct {
+	DefaultCodeVersion CodeVersion
+}
+
+func (obj ConfigSet) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `DefaultCodeVersion` param:
+	err = encoder.Encode(obj.DefaultCodeVersion)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *ConfigSet) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `DefaultCodeVersion`:
+	err = decoder.Decode(&obj.DefaultCodeVersion)
+	if err != nil {
+		return err
+	}
+	return nil
+}
 
 type CurseSubject struct {
 	Value [16]uint8
@@ -26,20 +124,145 @@ func (obj *CurseSubject) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err e
 	return nil
 }
 
-type CodeVersion ag_binary.BorshEnum
+type Curses struct {
+	Version        uint8
+	CursedSubjects []CurseSubject
+}
 
-const (
-	Default_CodeVersion CodeVersion = iota
-	V1_CodeVersion
-)
-
-func (value CodeVersion) String() string {
-	switch value {
-	case Default_CodeVersion:
-		return "Default"
-	case V1_CodeVersion:
-		return "V1"
-	default:
-		return ""
+func (obj Curses) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Version` param:
+	err = encoder.Encode(obj.Version)
+	if err != nil {
+		return err
 	}
+	// Serialize `CursedSubjects` param:
+	err = encoder.Encode(obj.CursedSubjects)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *Curses) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Version`:
+	err = decoder.Decode(&obj.Version)
+	if err != nil {
+		return err
+	}
+	// Deserialize `CursedSubjects`:
+	err = decoder.Decode(&obj.CursedSubjects)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type OwnershipTransferRequested struct {
+	From ag_solanago.PublicKey
+	To   ag_solanago.PublicKey
+}
+
+func (obj OwnershipTransferRequested) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `From` param:
+	err = encoder.Encode(obj.From)
+	if err != nil {
+		return err
+	}
+	// Serialize `To` param:
+	err = encoder.Encode(obj.To)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *OwnershipTransferRequested) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `From`:
+	err = decoder.Decode(&obj.From)
+	if err != nil {
+		return err
+	}
+	// Deserialize `To`:
+	err = decoder.Decode(&obj.To)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type OwnershipTransferred struct {
+	From ag_solanago.PublicKey
+	To   ag_solanago.PublicKey
+}
+
+func (obj OwnershipTransferred) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `From` param:
+	err = encoder.Encode(obj.From)
+	if err != nil {
+		return err
+	}
+	// Serialize `To` param:
+	err = encoder.Encode(obj.To)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *OwnershipTransferred) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `From`:
+	err = decoder.Decode(&obj.From)
+	if err != nil {
+		return err
+	}
+	// Deserialize `To`:
+	err = decoder.Decode(&obj.To)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type SubjectCursed struct {
+	Subject CurseSubject
+}
+
+func (obj SubjectCursed) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Subject` param:
+	err = encoder.Encode(obj.Subject)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *SubjectCursed) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Subject`:
+	err = decoder.Decode(&obj.Subject)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type SubjectUncursed struct {
+	Subject CurseSubject
+}
+
+func (obj SubjectUncursed) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Subject` param:
+	err = encoder.Encode(obj.Subject)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *SubjectUncursed) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Subject`:
+	err = decoder.Decode(&obj.Subject)
+	if err != nil {
+		return err
+	}
+	return nil
 }

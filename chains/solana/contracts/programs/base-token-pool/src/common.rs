@@ -607,7 +607,7 @@ mod tests {
     #[test]
     fn test_larger_incoming_decimal() {
         let mut u256_bytes = [0u8; 32];
-        U256::from(BASE_VALUE * BASE_VALUE).to_little_endian(&mut u256_bytes);
+        u256_bytes = U256::from(BASE_VALUE * BASE_VALUE).to_little_endian();
         let local_val = to_svm_token_amount(u256_bytes, 18, 9).unwrap();
         assert!(local_val == BASE_VALUE);
     }
@@ -615,7 +615,7 @@ mod tests {
     #[test]
     fn test_smaller_incoming_decimal() {
         let mut u256_bytes = [0u8; 32];
-        U256::from(BASE_VALUE).to_little_endian(&mut u256_bytes);
+        u256_bytes = U256::from(BASE_VALUE).to_little_endian();
         let local_val = to_svm_token_amount(u256_bytes, 9, 18).unwrap();
         assert!(local_val == BASE_VALUE * BASE_VALUE);
     }
@@ -623,7 +623,7 @@ mod tests {
     #[test]
     fn test_equal_incoming_decimal() {
         let mut u256_bytes = [0u8; 32];
-        U256::from(BASE_VALUE).to_little_endian(&mut u256_bytes);
+        u256_bytes = U256::from(BASE_VALUE).to_little_endian();
         let local_val = to_svm_token_amount(u256_bytes, 9, 9).unwrap();
         assert!(local_val == BASE_VALUE);
     }
@@ -631,7 +631,7 @@ mod tests {
     #[test]
     fn test_u256_overflow() {
         let mut u256_bytes = [0u8; 32];
-        U256::from(BASE_VALUE * BASE_VALUE).to_little_endian(&mut u256_bytes);
+        u256_bytes = U256::from(BASE_VALUE * BASE_VALUE).to_little_endian();
         let res = to_svm_token_amount(u256_bytes, 0, 18);
         assert!(res.is_err());
     }
@@ -639,7 +639,7 @@ mod tests {
     #[test]
     fn test_u256_divide_to_zero() {
         let mut u256_bytes = [0u8; 32];
-        U256::from(BASE_VALUE).to_little_endian(&mut u256_bytes);
+        u256_bytes = U256::from(BASE_VALUE).to_little_endian();
         let local_val = to_svm_token_amount(u256_bytes, 18, 0).unwrap();
         assert!(local_val == 0);
     }
@@ -647,10 +647,10 @@ mod tests {
     #[test]
     fn test_u64_overflow() {
         let mut u256_bytes = [0u8; 32];
-        U256::from(u64::MAX)
+        u256_bytes = U256::from(u64::MAX)
             .checked_add(U256::from(1))
             .unwrap()
-            .to_little_endian(&mut u256_bytes);
+            .to_little_endian();
         let res = to_svm_token_amount(u256_bytes, 0, 0);
         assert!(res.is_err());
     }

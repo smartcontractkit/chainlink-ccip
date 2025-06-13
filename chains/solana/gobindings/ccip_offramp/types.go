@@ -7,18 +7,100 @@ import (
 	ag_solanago "github.com/gagliardetto/solana-go"
 )
 
-type CommitInput struct {
-	PriceUpdates  PriceUpdates
-	MerkleRoot    *MerkleRoot `bin:"optional"`
-	RmnSignatures [][64]uint8
+type CommitReport struct {
+	Version         uint8
+	ChainSelector   uint64
+	MerkleRoot      [32]uint8
+	Timestamp       int64
+	MinMsgNr        uint64
+	MaxMsgNr        uint64
+	ExecutionStates ag_binary.Uint128
 }
 
-func (obj CommitInput) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `PriceUpdates` param:
-	err = encoder.Encode(obj.PriceUpdates)
+func (obj CommitReport) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Version` param:
+	err = encoder.Encode(obj.Version)
 	if err != nil {
 		return err
 	}
+	// Serialize `ChainSelector` param:
+	err = encoder.Encode(obj.ChainSelector)
+	if err != nil {
+		return err
+	}
+	// Serialize `MerkleRoot` param:
+	err = encoder.Encode(obj.MerkleRoot)
+	if err != nil {
+		return err
+	}
+	// Serialize `Timestamp` param:
+	err = encoder.Encode(obj.Timestamp)
+	if err != nil {
+		return err
+	}
+	// Serialize `MinMsgNr` param:
+	err = encoder.Encode(obj.MinMsgNr)
+	if err != nil {
+		return err
+	}
+	// Serialize `MaxMsgNr` param:
+	err = encoder.Encode(obj.MaxMsgNr)
+	if err != nil {
+		return err
+	}
+	// Serialize `ExecutionStates` param:
+	err = encoder.Encode(obj.ExecutionStates)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *CommitReport) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Version`:
+	err = decoder.Decode(&obj.Version)
+	if err != nil {
+		return err
+	}
+	// Deserialize `ChainSelector`:
+	err = decoder.Decode(&obj.ChainSelector)
+	if err != nil {
+		return err
+	}
+	// Deserialize `MerkleRoot`:
+	err = decoder.Decode(&obj.MerkleRoot)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Timestamp`:
+	err = decoder.Decode(&obj.Timestamp)
+	if err != nil {
+		return err
+	}
+	// Deserialize `MinMsgNr`:
+	err = decoder.Decode(&obj.MinMsgNr)
+	if err != nil {
+		return err
+	}
+	// Deserialize `MaxMsgNr`:
+	err = decoder.Decode(&obj.MaxMsgNr)
+	if err != nil {
+		return err
+	}
+	// Deserialize `ExecutionStates`:
+	err = decoder.Decode(&obj.ExecutionStates)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type CommitReportAccepted struct {
+	MerkleRoot   *MerkleRoot `bin:"optional"`
+	PriceUpdates PriceUpdates
+}
+
+func (obj CommitReportAccepted) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `MerkleRoot` param (optional):
 	{
 		if obj.MerkleRoot == nil {
@@ -37,20 +119,15 @@ func (obj CommitInput) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error
 			}
 		}
 	}
-	// Serialize `RmnSignatures` param:
-	err = encoder.Encode(obj.RmnSignatures)
+	// Serialize `PriceUpdates` param:
+	err = encoder.Encode(obj.PriceUpdates)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (obj *CommitInput) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `PriceUpdates`:
-	err = decoder.Decode(&obj.PriceUpdates)
-	if err != nil {
-		return err
-	}
+func (obj *CommitReportAccepted) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `MerkleRoot` (optional):
 	{
 		ok, err := decoder.ReadBool()
@@ -64,74 +141,349 @@ func (obj *CommitInput) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err er
 			}
 		}
 	}
-	// Deserialize `RmnSignatures`:
-	err = decoder.Decode(&obj.RmnSignatures)
+	// Deserialize `PriceUpdates`:
+	err = decoder.Decode(&obj.PriceUpdates)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-type PriceUpdates struct {
-	TokenPriceUpdates []TokenPriceUpdate
-	GasPriceUpdates   []GasPriceUpdate
+type CommitReportPDAClosed struct {
+	SourceChainSelector uint64
+	MerkleRoot          [32]uint8
 }
 
-func (obj PriceUpdates) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `TokenPriceUpdates` param:
-	err = encoder.Encode(obj.TokenPriceUpdates)
+func (obj CommitReportPDAClosed) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `SourceChainSelector` param:
+	err = encoder.Encode(obj.SourceChainSelector)
 	if err != nil {
 		return err
 	}
-	// Serialize `GasPriceUpdates` param:
-	err = encoder.Encode(obj.GasPriceUpdates)
+	// Serialize `MerkleRoot` param:
+	err = encoder.Encode(obj.MerkleRoot)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (obj *PriceUpdates) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `TokenPriceUpdates`:
-	err = decoder.Decode(&obj.TokenPriceUpdates)
+func (obj *CommitReportPDAClosed) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `SourceChainSelector`:
+	err = decoder.Decode(&obj.SourceChainSelector)
 	if err != nil {
 		return err
 	}
-	// Deserialize `GasPriceUpdates`:
-	err = decoder.Decode(&obj.GasPriceUpdates)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-type TokenPriceUpdate struct {
-	SourceToken ag_solanago.PublicKey
-	UsdPerToken [28]uint8
-}
-
-func (obj TokenPriceUpdate) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `SourceToken` param:
-	err = encoder.Encode(obj.SourceToken)
-	if err != nil {
-		return err
-	}
-	// Serialize `UsdPerToken` param:
-	err = encoder.Encode(obj.UsdPerToken)
+	// Deserialize `MerkleRoot`:
+	err = decoder.Decode(&obj.MerkleRoot)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (obj *TokenPriceUpdate) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `SourceToken`:
-	err = decoder.Decode(&obj.SourceToken)
+type Config struct {
+	Version                    uint8
+	DefaultCodeVersion         uint8
+	Padding0                   [6]uint8
+	SvmChainSelector           uint64
+	EnableManualExecutionAfter int64
+	Padding1                   [8]uint8
+	Owner                      ag_solanago.PublicKey
+	ProposedOwner              ag_solanago.PublicKey
+	Padding2                   [8]uint8
+	Ocr3                       [2]Ocr3Config
+}
+
+func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Version` param:
+	err = encoder.Encode(obj.Version)
 	if err != nil {
 		return err
 	}
-	// Deserialize `UsdPerToken`:
-	err = decoder.Decode(&obj.UsdPerToken)
+	// Serialize `DefaultCodeVersion` param:
+	err = encoder.Encode(obj.DefaultCodeVersion)
+	if err != nil {
+		return err
+	}
+	// Serialize `Padding0` param:
+	err = encoder.Encode(obj.Padding0)
+	if err != nil {
+		return err
+	}
+	// Serialize `SvmChainSelector` param:
+	err = encoder.Encode(obj.SvmChainSelector)
+	if err != nil {
+		return err
+	}
+	// Serialize `EnableManualExecutionAfter` param:
+	err = encoder.Encode(obj.EnableManualExecutionAfter)
+	if err != nil {
+		return err
+	}
+	// Serialize `Padding1` param:
+	err = encoder.Encode(obj.Padding1)
+	if err != nil {
+		return err
+	}
+	// Serialize `Owner` param:
+	err = encoder.Encode(obj.Owner)
+	if err != nil {
+		return err
+	}
+	// Serialize `ProposedOwner` param:
+	err = encoder.Encode(obj.ProposedOwner)
+	if err != nil {
+		return err
+	}
+	// Serialize `Padding2` param:
+	err = encoder.Encode(obj.Padding2)
+	if err != nil {
+		return err
+	}
+	// Serialize `Ocr3` param:
+	err = encoder.Encode(obj.Ocr3)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Version`:
+	err = decoder.Decode(&obj.Version)
+	if err != nil {
+		return err
+	}
+	// Deserialize `DefaultCodeVersion`:
+	err = decoder.Decode(&obj.DefaultCodeVersion)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Padding0`:
+	err = decoder.Decode(&obj.Padding0)
+	if err != nil {
+		return err
+	}
+	// Deserialize `SvmChainSelector`:
+	err = decoder.Decode(&obj.SvmChainSelector)
+	if err != nil {
+		return err
+	}
+	// Deserialize `EnableManualExecutionAfter`:
+	err = decoder.Decode(&obj.EnableManualExecutionAfter)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Padding1`:
+	err = decoder.Decode(&obj.Padding1)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Owner`:
+	err = decoder.Decode(&obj.Owner)
+	if err != nil {
+		return err
+	}
+	// Deserialize `ProposedOwner`:
+	err = decoder.Decode(&obj.ProposedOwner)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Padding2`:
+	err = decoder.Decode(&obj.Padding2)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Ocr3`:
+	err = decoder.Decode(&obj.Ocr3)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type ConfigOcrPluginType struct {
+	Discriminant uint8
+}
+
+func (obj ConfigOcrPluginType) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Discriminant` param:
+	err = encoder.Encode(obj.Discriminant)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *ConfigOcrPluginType) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Discriminant`:
+	err = decoder.Decode(&obj.Discriminant)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type ConfigSet struct {
+	SvmChainSelector           uint64
+	EnableManualExecutionAfter int64
+}
+
+func (obj ConfigSet) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `SvmChainSelector` param:
+	err = encoder.Encode(obj.SvmChainSelector)
+	if err != nil {
+		return err
+	}
+	// Serialize `EnableManualExecutionAfter` param:
+	err = encoder.Encode(obj.EnableManualExecutionAfter)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *ConfigSet) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `SvmChainSelector`:
+	err = decoder.Decode(&obj.SvmChainSelector)
+	if err != nil {
+		return err
+	}
+	// Deserialize `EnableManualExecutionAfter`:
+	err = decoder.Decode(&obj.EnableManualExecutionAfter)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type ExecutionReportBuffer struct {
+	Version     uint8
+	ChunkBitmap uint64
+	NumChunks   uint8
+	ChunkLength uint32
+	Data        []byte
+}
+
+func (obj ExecutionReportBuffer) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Version` param:
+	err = encoder.Encode(obj.Version)
+	if err != nil {
+		return err
+	}
+	// Serialize `ChunkBitmap` param:
+	err = encoder.Encode(obj.ChunkBitmap)
+	if err != nil {
+		return err
+	}
+	// Serialize `NumChunks` param:
+	err = encoder.Encode(obj.NumChunks)
+	if err != nil {
+		return err
+	}
+	// Serialize `ChunkLength` param:
+	err = encoder.Encode(obj.ChunkLength)
+	if err != nil {
+		return err
+	}
+	// Serialize `Data` param:
+	err = encoder.Encode(obj.Data)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *ExecutionReportBuffer) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Version`:
+	err = decoder.Decode(&obj.Version)
+	if err != nil {
+		return err
+	}
+	// Deserialize `ChunkBitmap`:
+	err = decoder.Decode(&obj.ChunkBitmap)
+	if err != nil {
+		return err
+	}
+	// Deserialize `NumChunks`:
+	err = decoder.Decode(&obj.NumChunks)
+	if err != nil {
+		return err
+	}
+	// Deserialize `ChunkLength`:
+	err = decoder.Decode(&obj.ChunkLength)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Data`:
+	err = decoder.Decode(&obj.Data)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type ExecutionStateChanged struct {
+	SourceChainSelector uint64
+	SequenceNumber      uint64
+	MessageId           [32]uint8
+	MessageHash         [32]uint8
+	State               MessageExecutionState
+}
+
+func (obj ExecutionStateChanged) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `SourceChainSelector` param:
+	err = encoder.Encode(obj.SourceChainSelector)
+	if err != nil {
+		return err
+	}
+	// Serialize `SequenceNumber` param:
+	err = encoder.Encode(obj.SequenceNumber)
+	if err != nil {
+		return err
+	}
+	// Serialize `MessageId` param:
+	err = encoder.Encode(obj.MessageId)
+	if err != nil {
+		return err
+	}
+	// Serialize `MessageHash` param:
+	err = encoder.Encode(obj.MessageHash)
+	if err != nil {
+		return err
+	}
+	// Serialize `State` param:
+	err = encoder.Encode(obj.State)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *ExecutionStateChanged) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `SourceChainSelector`:
+	err = decoder.Decode(&obj.SourceChainSelector)
+	if err != nil {
+		return err
+	}
+	// Deserialize `SequenceNumber`:
+	err = decoder.Decode(&obj.SequenceNumber)
+	if err != nil {
+		return err
+	}
+	// Deserialize `MessageId`:
+	err = decoder.Decode(&obj.MessageId)
+	if err != nil {
+		return err
+	}
+	// Deserialize `MessageHash`:
+	err = decoder.Decode(&obj.MessageHash)
+	if err != nil {
+		return err
+	}
+	// Deserialize `State`:
+	err = decoder.Decode(&obj.State)
 	if err != nil {
 		return err
 	}
@@ -165,6 +517,28 @@ func (obj *GasPriceUpdate) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err
 	}
 	// Deserialize `UsdPerUnitGas`:
 	err = decoder.Decode(&obj.UsdPerUnitGas)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type GlobalState struct {
+	LatestPriceSequenceNumber uint64
+}
+
+func (obj GlobalState) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `LatestPriceSequenceNumber` param:
+	err = encoder.Encode(obj.LatestPriceSequenceNumber)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *GlobalState) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `LatestPriceSequenceNumber`:
+	err = decoder.Decode(&obj.LatestPriceSequenceNumber)
 	if err != nil {
 		return err
 	}
@@ -237,374 +611,79 @@ func (obj *MerkleRoot) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 	return nil
 }
 
-type ConfigOcrPluginType struct {
-	Discriminant uint8
+type MessageExecutionState ag_binary.BorshEnum
+
+const (
+	MessageExecutionStateUntouched MessageExecutionState = iota
+	MessageExecutionStateInProgress
+	MessageExecutionStateSuccess
+	MessageExecutionStateFailure
+)
+
+func (value MessageExecutionState) String() string {
+	switch value {
+	case MessageExecutionStateUntouched:
+		return "Untouched"
+	case MessageExecutionStateInProgress:
+		return "InProgress"
+	case MessageExecutionStateSuccess:
+		return "Success"
+	case MessageExecutionStateFailure:
+		return "Failure"
+	default:
+		return ""
+	}
 }
 
-func (obj ConfigOcrPluginType) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `Discriminant` param:
-	err = encoder.Encode(obj.Discriminant)
+type Ocr3Config struct {
+	PluginType   ConfigOcrPluginType
+	ConfigInfo   Ocr3ConfigInfo
+	Signers      [16][20]uint8
+	Transmitters [16][32]uint8
+}
+
+func (obj Ocr3Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `PluginType` param:
+	err = encoder.Encode(obj.PluginType)
+	if err != nil {
+		return err
+	}
+	// Serialize `ConfigInfo` param:
+	err = encoder.Encode(obj.ConfigInfo)
+	if err != nil {
+		return err
+	}
+	// Serialize `Signers` param:
+	err = encoder.Encode(obj.Signers)
+	if err != nil {
+		return err
+	}
+	// Serialize `Transmitters` param:
+	err = encoder.Encode(obj.Transmitters)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (obj *ConfigOcrPluginType) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `Discriminant`:
-	err = decoder.Decode(&obj.Discriminant)
+func (obj *Ocr3Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `PluginType`:
+	err = decoder.Decode(&obj.PluginType)
 	if err != nil {
 		return err
 	}
-	return nil
-}
-
-type ExecutionReportSingleChain struct {
-	SourceChainSelector uint64
-	Message             Any2SVMRampMessage
-	OffchainTokenData   [][]byte
-	Proofs              [][32]uint8
-}
-
-func (obj ExecutionReportSingleChain) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `SourceChainSelector` param:
-	err = encoder.Encode(obj.SourceChainSelector)
+	// Deserialize `ConfigInfo`:
+	err = decoder.Decode(&obj.ConfigInfo)
 	if err != nil {
 		return err
 	}
-	// Serialize `Message` param:
-	err = encoder.Encode(obj.Message)
+	// Deserialize `Signers`:
+	err = decoder.Decode(&obj.Signers)
 	if err != nil {
 		return err
 	}
-	// Serialize `OffchainTokenData` param:
-	err = encoder.Encode(obj.OffchainTokenData)
-	if err != nil {
-		return err
-	}
-	// Serialize `Proofs` param:
-	err = encoder.Encode(obj.Proofs)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *ExecutionReportSingleChain) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `SourceChainSelector`:
-	err = decoder.Decode(&obj.SourceChainSelector)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Message`:
-	err = decoder.Decode(&obj.Message)
-	if err != nil {
-		return err
-	}
-	// Deserialize `OffchainTokenData`:
-	err = decoder.Decode(&obj.OffchainTokenData)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Proofs`:
-	err = decoder.Decode(&obj.Proofs)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-type RampMessageHeader struct {
-	MessageId           [32]uint8
-	SourceChainSelector uint64
-	DestChainSelector   uint64
-	SequenceNumber      uint64
-	Nonce               uint64
-}
-
-func (obj RampMessageHeader) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `MessageId` param:
-	err = encoder.Encode(obj.MessageId)
-	if err != nil {
-		return err
-	}
-	// Serialize `SourceChainSelector` param:
-	err = encoder.Encode(obj.SourceChainSelector)
-	if err != nil {
-		return err
-	}
-	// Serialize `DestChainSelector` param:
-	err = encoder.Encode(obj.DestChainSelector)
-	if err != nil {
-		return err
-	}
-	// Serialize `SequenceNumber` param:
-	err = encoder.Encode(obj.SequenceNumber)
-	if err != nil {
-		return err
-	}
-	// Serialize `Nonce` param:
-	err = encoder.Encode(obj.Nonce)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *RampMessageHeader) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `MessageId`:
-	err = decoder.Decode(&obj.MessageId)
-	if err != nil {
-		return err
-	}
-	// Deserialize `SourceChainSelector`:
-	err = decoder.Decode(&obj.SourceChainSelector)
-	if err != nil {
-		return err
-	}
-	// Deserialize `DestChainSelector`:
-	err = decoder.Decode(&obj.DestChainSelector)
-	if err != nil {
-		return err
-	}
-	// Deserialize `SequenceNumber`:
-	err = decoder.Decode(&obj.SequenceNumber)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Nonce`:
-	err = decoder.Decode(&obj.Nonce)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-type Any2SVMRampExtraArgs struct {
-	ComputeUnits     uint32
-	IsWritableBitmap uint64
-}
-
-func (obj Any2SVMRampExtraArgs) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `ComputeUnits` param:
-	err = encoder.Encode(obj.ComputeUnits)
-	if err != nil {
-		return err
-	}
-	// Serialize `IsWritableBitmap` param:
-	err = encoder.Encode(obj.IsWritableBitmap)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *Any2SVMRampExtraArgs) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `ComputeUnits`:
-	err = decoder.Decode(&obj.ComputeUnits)
-	if err != nil {
-		return err
-	}
-	// Deserialize `IsWritableBitmap`:
-	err = decoder.Decode(&obj.IsWritableBitmap)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-type Any2SVMRampMessage struct {
-	Header        RampMessageHeader
-	Sender        []byte
-	Data          []byte
-	TokenReceiver ag_solanago.PublicKey
-	TokenAmounts  []Any2SVMTokenTransfer
-	ExtraArgs     Any2SVMRampExtraArgs
-}
-
-func (obj Any2SVMRampMessage) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `Header` param:
-	err = encoder.Encode(obj.Header)
-	if err != nil {
-		return err
-	}
-	// Serialize `Sender` param:
-	err = encoder.Encode(obj.Sender)
-	if err != nil {
-		return err
-	}
-	// Serialize `Data` param:
-	err = encoder.Encode(obj.Data)
-	if err != nil {
-		return err
-	}
-	// Serialize `TokenReceiver` param:
-	err = encoder.Encode(obj.TokenReceiver)
-	if err != nil {
-		return err
-	}
-	// Serialize `TokenAmounts` param:
-	err = encoder.Encode(obj.TokenAmounts)
-	if err != nil {
-		return err
-	}
-	// Serialize `ExtraArgs` param:
-	err = encoder.Encode(obj.ExtraArgs)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *Any2SVMRampMessage) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `Header`:
-	err = decoder.Decode(&obj.Header)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Sender`:
-	err = decoder.Decode(&obj.Sender)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Data`:
-	err = decoder.Decode(&obj.Data)
-	if err != nil {
-		return err
-	}
-	// Deserialize `TokenReceiver`:
-	err = decoder.Decode(&obj.TokenReceiver)
-	if err != nil {
-		return err
-	}
-	// Deserialize `TokenAmounts`:
-	err = decoder.Decode(&obj.TokenAmounts)
-	if err != nil {
-		return err
-	}
-	// Deserialize `ExtraArgs`:
-	err = decoder.Decode(&obj.ExtraArgs)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-type Any2SVMTokenTransfer struct {
-	SourcePoolAddress []byte
-	DestTokenAddress  ag_solanago.PublicKey
-	DestGasAmount     uint32
-	ExtraData         []byte
-	Amount            CrossChainAmount
-}
-
-func (obj Any2SVMTokenTransfer) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `SourcePoolAddress` param:
-	err = encoder.Encode(obj.SourcePoolAddress)
-	if err != nil {
-		return err
-	}
-	// Serialize `DestTokenAddress` param:
-	err = encoder.Encode(obj.DestTokenAddress)
-	if err != nil {
-		return err
-	}
-	// Serialize `DestGasAmount` param:
-	err = encoder.Encode(obj.DestGasAmount)
-	if err != nil {
-		return err
-	}
-	// Serialize `ExtraData` param:
-	err = encoder.Encode(obj.ExtraData)
-	if err != nil {
-		return err
-	}
-	// Serialize `Amount` param:
-	err = encoder.Encode(obj.Amount)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *Any2SVMTokenTransfer) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `SourcePoolAddress`:
-	err = decoder.Decode(&obj.SourcePoolAddress)
-	if err != nil {
-		return err
-	}
-	// Deserialize `DestTokenAddress`:
-	err = decoder.Decode(&obj.DestTokenAddress)
-	if err != nil {
-		return err
-	}
-	// Deserialize `DestGasAmount`:
-	err = decoder.Decode(&obj.DestGasAmount)
-	if err != nil {
-		return err
-	}
-	// Deserialize `ExtraData`:
-	err = decoder.Decode(&obj.ExtraData)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Amount`:
-	err = decoder.Decode(&obj.Amount)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-type SVMTokenAmount struct {
-	Token  ag_solanago.PublicKey
-	Amount uint64
-}
-
-func (obj SVMTokenAmount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `Token` param:
-	err = encoder.Encode(obj.Token)
-	if err != nil {
-		return err
-	}
-	// Serialize `Amount` param:
-	err = encoder.Encode(obj.Amount)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *SVMTokenAmount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `Token`:
-	err = decoder.Decode(&obj.Token)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Amount`:
-	err = decoder.Decode(&obj.Amount)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-type CrossChainAmount struct {
-	LeBytes [32]uint8
-}
-
-func (obj CrossChainAmount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `LeBytes` param:
-	err = encoder.Encode(obj.LeBytes)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *CrossChainAmount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `LeBytes`:
-	err = decoder.Decode(&obj.LeBytes)
+	// Deserialize `Transmitters`:
+	err = decoder.Decode(&obj.Transmitters)
 	if err != nil {
 		return err
 	}
@@ -666,21 +745,22 @@ func (obj *Ocr3ConfigInfo) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err
 	return nil
 }
 
-type Ocr3Config struct {
-	PluginType   ConfigOcrPluginType
-	ConfigInfo   Ocr3ConfigInfo
-	Signers      [16][20]uint8
-	Transmitters [16][32]uint8
+type OcrConfigSet struct {
+	OcrPluginType OcrPluginType
+	ConfigDigest  [32]uint8
+	Signers       [][20]uint8
+	Transmitters  []ag_solanago.PublicKey
+	F             uint8
 }
 
-func (obj Ocr3Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `PluginType` param:
-	err = encoder.Encode(obj.PluginType)
+func (obj OcrConfigSet) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `OcrPluginType` param:
+	err = encoder.Encode(obj.OcrPluginType)
 	if err != nil {
 		return err
 	}
-	// Serialize `ConfigInfo` param:
-	err = encoder.Encode(obj.ConfigInfo)
+	// Serialize `ConfigDigest` param:
+	err = encoder.Encode(obj.ConfigDigest)
 	if err != nil {
 		return err
 	}
@@ -694,17 +774,22 @@ func (obj Ocr3Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error)
 	if err != nil {
 		return err
 	}
-	return nil
-}
-
-func (obj *Ocr3Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `PluginType`:
-	err = decoder.Decode(&obj.PluginType)
+	// Serialize `F` param:
+	err = encoder.Encode(obj.F)
 	if err != nil {
 		return err
 	}
-	// Deserialize `ConfigInfo`:
-	err = decoder.Decode(&obj.ConfigInfo)
+	return nil
+}
+
+func (obj *OcrConfigSet) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `OcrPluginType`:
+	err = decoder.Decode(&obj.OcrPluginType)
+	if err != nil {
+		return err
+	}
+	// Deserialize `ConfigDigest`:
+	err = decoder.Decode(&obj.ConfigDigest)
 	if err != nil {
 		return err
 	}
@@ -715,6 +800,403 @@ func (obj *Ocr3Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 	}
 	// Deserialize `Transmitters`:
 	err = decoder.Decode(&obj.Transmitters)
+	if err != nil {
+		return err
+	}
+	// Deserialize `F`:
+	err = decoder.Decode(&obj.F)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type OcrPluginType ag_binary.BorshEnum
+
+const (
+	OcrPluginTypeCommit OcrPluginType = iota
+	OcrPluginTypeExecution
+)
+
+func (value OcrPluginType) String() string {
+	switch value {
+	case OcrPluginTypeCommit:
+		return "Commit"
+	case OcrPluginTypeExecution:
+		return "Execution"
+	default:
+		return ""
+	}
+}
+
+type OnRampAddress struct {
+	Bytes [64]uint8
+	Len   uint32
+}
+
+func (obj OnRampAddress) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Bytes` param:
+	err = encoder.Encode(obj.Bytes)
+	if err != nil {
+		return err
+	}
+	// Serialize `Len` param:
+	err = encoder.Encode(obj.Len)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *OnRampAddress) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Bytes`:
+	err = decoder.Decode(&obj.Bytes)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Len`:
+	err = decoder.Decode(&obj.Len)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type OwnershipTransferRequested struct {
+	From ag_solanago.PublicKey
+	To   ag_solanago.PublicKey
+}
+
+func (obj OwnershipTransferRequested) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `From` param:
+	err = encoder.Encode(obj.From)
+	if err != nil {
+		return err
+	}
+	// Serialize `To` param:
+	err = encoder.Encode(obj.To)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *OwnershipTransferRequested) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `From`:
+	err = decoder.Decode(&obj.From)
+	if err != nil {
+		return err
+	}
+	// Deserialize `To`:
+	err = decoder.Decode(&obj.To)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type OwnershipTransferred struct {
+	From ag_solanago.PublicKey
+	To   ag_solanago.PublicKey
+}
+
+func (obj OwnershipTransferred) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `From` param:
+	err = encoder.Encode(obj.From)
+	if err != nil {
+		return err
+	}
+	// Serialize `To` param:
+	err = encoder.Encode(obj.To)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *OwnershipTransferred) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `From`:
+	err = decoder.Decode(&obj.From)
+	if err != nil {
+		return err
+	}
+	// Deserialize `To`:
+	err = decoder.Decode(&obj.To)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type PriceUpdates struct {
+	TokenPriceUpdates []TokenPriceUpdate
+	GasPriceUpdates   []GasPriceUpdate
+}
+
+func (obj PriceUpdates) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `TokenPriceUpdates` param:
+	err = encoder.Encode(obj.TokenPriceUpdates)
+	if err != nil {
+		return err
+	}
+	// Serialize `GasPriceUpdates` param:
+	err = encoder.Encode(obj.GasPriceUpdates)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *PriceUpdates) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `TokenPriceUpdates`:
+	err = decoder.Decode(&obj.TokenPriceUpdates)
+	if err != nil {
+		return err
+	}
+	// Deserialize `GasPriceUpdates`:
+	err = decoder.Decode(&obj.GasPriceUpdates)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type ReferenceAddresses struct {
+	Version            uint8
+	Router             ag_solanago.PublicKey
+	FeeQuoter          ag_solanago.PublicKey
+	OfframpLookupTable ag_solanago.PublicKey
+	RmnRemote          ag_solanago.PublicKey
+}
+
+func (obj ReferenceAddresses) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Version` param:
+	err = encoder.Encode(obj.Version)
+	if err != nil {
+		return err
+	}
+	// Serialize `Router` param:
+	err = encoder.Encode(obj.Router)
+	if err != nil {
+		return err
+	}
+	// Serialize `FeeQuoter` param:
+	err = encoder.Encode(obj.FeeQuoter)
+	if err != nil {
+		return err
+	}
+	// Serialize `OfframpLookupTable` param:
+	err = encoder.Encode(obj.OfframpLookupTable)
+	if err != nil {
+		return err
+	}
+	// Serialize `RmnRemote` param:
+	err = encoder.Encode(obj.RmnRemote)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *ReferenceAddresses) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Version`:
+	err = decoder.Decode(&obj.Version)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Router`:
+	err = decoder.Decode(&obj.Router)
+	if err != nil {
+		return err
+	}
+	// Deserialize `FeeQuoter`:
+	err = decoder.Decode(&obj.FeeQuoter)
+	if err != nil {
+		return err
+	}
+	// Deserialize `OfframpLookupTable`:
+	err = decoder.Decode(&obj.OfframpLookupTable)
+	if err != nil {
+		return err
+	}
+	// Deserialize `RmnRemote`:
+	err = decoder.Decode(&obj.RmnRemote)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type ReferenceAddressesSet struct {
+	Router             ag_solanago.PublicKey
+	FeeQuoter          ag_solanago.PublicKey
+	OfframpLookupTable ag_solanago.PublicKey
+	RmnRemote          ag_solanago.PublicKey
+}
+
+func (obj ReferenceAddressesSet) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Router` param:
+	err = encoder.Encode(obj.Router)
+	if err != nil {
+		return err
+	}
+	// Serialize `FeeQuoter` param:
+	err = encoder.Encode(obj.FeeQuoter)
+	if err != nil {
+		return err
+	}
+	// Serialize `OfframpLookupTable` param:
+	err = encoder.Encode(obj.OfframpLookupTable)
+	if err != nil {
+		return err
+	}
+	// Serialize `RmnRemote` param:
+	err = encoder.Encode(obj.RmnRemote)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *ReferenceAddressesSet) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Router`:
+	err = decoder.Decode(&obj.Router)
+	if err != nil {
+		return err
+	}
+	// Deserialize `FeeQuoter`:
+	err = decoder.Decode(&obj.FeeQuoter)
+	if err != nil {
+		return err
+	}
+	// Deserialize `OfframpLookupTable`:
+	err = decoder.Decode(&obj.OfframpLookupTable)
+	if err != nil {
+		return err
+	}
+	// Deserialize `RmnRemote`:
+	err = decoder.Decode(&obj.RmnRemote)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type SkippedAlreadyExecutedMessage struct {
+	SourceChainSelector uint64
+	SequenceNumber      uint64
+}
+
+func (obj SkippedAlreadyExecutedMessage) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `SourceChainSelector` param:
+	err = encoder.Encode(obj.SourceChainSelector)
+	if err != nil {
+		return err
+	}
+	// Serialize `SequenceNumber` param:
+	err = encoder.Encode(obj.SequenceNumber)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *SkippedAlreadyExecutedMessage) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `SourceChainSelector`:
+	err = decoder.Decode(&obj.SourceChainSelector)
+	if err != nil {
+		return err
+	}
+	// Deserialize `SequenceNumber`:
+	err = decoder.Decode(&obj.SequenceNumber)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type SourceChain struct {
+	Version       uint8
+	ChainSelector uint64
+	State         SourceChainState
+	Config        SourceChainConfig
+}
+
+func (obj SourceChain) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Version` param:
+	err = encoder.Encode(obj.Version)
+	if err != nil {
+		return err
+	}
+	// Serialize `ChainSelector` param:
+	err = encoder.Encode(obj.ChainSelector)
+	if err != nil {
+		return err
+	}
+	// Serialize `State` param:
+	err = encoder.Encode(obj.State)
+	if err != nil {
+		return err
+	}
+	// Serialize `Config` param:
+	err = encoder.Encode(obj.Config)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *SourceChain) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Version`:
+	err = decoder.Decode(&obj.Version)
+	if err != nil {
+		return err
+	}
+	// Deserialize `ChainSelector`:
+	err = decoder.Decode(&obj.ChainSelector)
+	if err != nil {
+		return err
+	}
+	// Deserialize `State`:
+	err = decoder.Decode(&obj.State)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Config`:
+	err = decoder.Decode(&obj.Config)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type SourceChainAdded struct {
+	SourceChainSelector uint64
+	SourceChainConfig   SourceChainConfig
+}
+
+func (obj SourceChainAdded) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `SourceChainSelector` param:
+	err = encoder.Encode(obj.SourceChainSelector)
+	if err != nil {
+		return err
+	}
+	// Serialize `SourceChainConfig` param:
+	err = encoder.Encode(obj.SourceChainConfig)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *SourceChainAdded) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `SourceChainSelector`:
+	err = decoder.Decode(&obj.SourceChainSelector)
+	if err != nil {
+		return err
+	}
+	// Deserialize `SourceChainConfig`:
+	err = decoder.Decode(&obj.SourceChainConfig)
 	if err != nil {
 		return err
 	}
@@ -776,33 +1258,33 @@ func (obj *SourceChainConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (
 	return nil
 }
 
-type OnRampAddress struct {
-	Bytes [64]uint8
-	Len   uint32
+type SourceChainConfigUpdated struct {
+	SourceChainSelector uint64
+	SourceChainConfig   SourceChainConfig
 }
 
-func (obj OnRampAddress) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `Bytes` param:
-	err = encoder.Encode(obj.Bytes)
+func (obj SourceChainConfigUpdated) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `SourceChainSelector` param:
+	err = encoder.Encode(obj.SourceChainSelector)
 	if err != nil {
 		return err
 	}
-	// Serialize `Len` param:
-	err = encoder.Encode(obj.Len)
+	// Serialize `SourceChainConfig` param:
+	err = encoder.Encode(obj.SourceChainConfig)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (obj *OnRampAddress) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `Bytes`:
-	err = decoder.Decode(&obj.Bytes)
+func (obj *SourceChainConfigUpdated) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `SourceChainSelector`:
+	err = decoder.Decode(&obj.SourceChainSelector)
 	if err != nil {
 		return err
 	}
-	// Deserialize `Len`:
-	err = decoder.Decode(&obj.Len)
+	// Deserialize `SourceChainConfig`:
+	err = decoder.Decode(&obj.SourceChainConfig)
 	if err != nil {
 		return err
 	}
@@ -831,62 +1313,79 @@ func (obj *SourceChainState) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (e
 	return nil
 }
 
-type OcrPluginType ag_binary.BorshEnum
-
-const (
-	Commit_OcrPluginType OcrPluginType = iota
-	Execution_OcrPluginType
-)
-
-func (value OcrPluginType) String() string {
-	switch value {
-	case Commit_OcrPluginType:
-		return "Commit"
-	case Execution_OcrPluginType:
-		return "Execution"
-	default:
-		return ""
-	}
+type TokenPriceUpdate struct {
+	SourceToken ag_solanago.PublicKey
+	UsdPerToken [28]uint8
 }
 
-type MessageExecutionState ag_binary.BorshEnum
-
-const (
-	Untouched_MessageExecutionState MessageExecutionState = iota
-	InProgress_MessageExecutionState
-	Success_MessageExecutionState
-	Failure_MessageExecutionState
-)
-
-func (value MessageExecutionState) String() string {
-	switch value {
-	case Untouched_MessageExecutionState:
-		return "Untouched"
-	case InProgress_MessageExecutionState:
-		return "InProgress"
-	case Success_MessageExecutionState:
-		return "Success"
-	case Failure_MessageExecutionState:
-		return "Failure"
-	default:
-		return ""
+func (obj TokenPriceUpdate) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `SourceToken` param:
+	err = encoder.Encode(obj.SourceToken)
+	if err != nil {
+		return err
 	}
+	// Serialize `UsdPerToken` param:
+	err = encoder.Encode(obj.UsdPerToken)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
-type CodeVersion ag_binary.BorshEnum
-
-const (
-	Default_CodeVersion CodeVersion = iota
-	V1_CodeVersion
-)
-
-func (value CodeVersion) String() string {
-	switch value {
-	case Default_CodeVersion:
-		return "Default"
-	case V1_CodeVersion:
-		return "V1"
-	default:
-		return ""
+func (obj *TokenPriceUpdate) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `SourceToken`:
+	err = decoder.Decode(&obj.SourceToken)
+	if err != nil {
+		return err
 	}
+	// Deserialize `UsdPerToken`:
+	err = decoder.Decode(&obj.UsdPerToken)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type Transmitted struct {
+	OcrPluginType  OcrPluginType
+	ConfigDigest   [32]uint8
+	SequenceNumber uint64
+}
+
+func (obj Transmitted) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `OcrPluginType` param:
+	err = encoder.Encode(obj.OcrPluginType)
+	if err != nil {
+		return err
+	}
+	// Serialize `ConfigDigest` param:
+	err = encoder.Encode(obj.ConfigDigest)
+	if err != nil {
+		return err
+	}
+	// Serialize `SequenceNumber` param:
+	err = encoder.Encode(obj.SequenceNumber)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *Transmitted) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `OcrPluginType`:
+	err = decoder.Decode(&obj.OcrPluginType)
+	if err != nil {
+		return err
+	}
+	// Deserialize `ConfigDigest`:
+	err = decoder.Decode(&obj.ConfigDigest)
+	if err != nil {
+		return err
+	}
+	// Deserialize `SequenceNumber`:
+	err = decoder.Decode(&obj.SequenceNumber)
+	if err != nil {
+		return err
+	}
+	return nil
 }

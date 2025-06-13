@@ -14,10 +14,10 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-var ProgramID ag_solanago.PublicKey
+var ProgramID ag_solanago.PublicKey = ag_solanago.MustPublicKeyFromBase58("EvhgrPhTDt4LcSPS2kfJgH6T6XWZ6wT3X9ncDGLT1vui")
 
-func SetProgramID(pubkey ag_solanago.PublicKey) {
-	ProgramID = pubkey
+func SetProgramID(PublicKey ag_solanago.PublicKey) {
+	ProgramID = PublicKey
 	ag_solanago.RegisterInstructionDecoder(ProgramID, registryDecodeInstruction)
 }
 
@@ -30,11 +30,6 @@ func init() {
 }
 
 var (
-	// The initialization is responsibility of the External User, CCIP is not handling initialization of Accounts
-	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
-
-	Instruction_SetRejectAll = ag_binary.TypeID([8]byte{42, 90, 30, 32, 7, 99, 130, 151})
-
 	// This function is called by the CCIP Router to execute the CCIP message.
 	// The method name needs to be ccip_receive with Anchor encoding,
 	// if not using Anchor the discriminator needs to be [0x0b, 0xf4, 0x09, 0xf9, 0x2c, 0x53, 0x2f, 0xf5]
@@ -43,24 +38,29 @@ var (
 	// In this case, it increments the counter value by 1 and logs the parsed message.
 	Instruction_CcipReceive = ag_binary.TypeID([8]byte{11, 244, 9, 249, 44, 83, 47, 245})
 
+	Instruction_CcipTokenLockBurn = ag_binary.TypeID([8]byte{200, 14, 50, 9, 44, 91, 121, 37})
+
 	Instruction_CcipTokenReleaseMint = ag_binary.TypeID([8]byte{20, 148, 113, 198, 229, 170, 71, 48})
 
-	Instruction_CcipTokenLockBurn = ag_binary.TypeID([8]byte{200, 14, 50, 9, 44, 91, 121, 37})
+	// The initialization is responsibility of the External User, CCIP is not handling initialization of Accounts
+	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
+
+	Instruction_SetRejectAll = ag_binary.TypeID([8]byte{42, 90, 30, 32, 7, 99, 130, 151})
 )
 
 // InstructionIDToName returns the name of the instruction given its ID.
 func InstructionIDToName(id ag_binary.TypeID) string {
 	switch id {
+	case Instruction_CcipReceive:
+		return "CcipReceive"
+	case Instruction_CcipTokenLockBurn:
+		return "CcipTokenLockBurn"
+	case Instruction_CcipTokenReleaseMint:
+		return "CcipTokenReleaseMint"
 	case Instruction_Initialize:
 		return "Initialize"
 	case Instruction_SetRejectAll:
 		return "SetRejectAll"
-	case Instruction_CcipReceive:
-		return "CcipReceive"
-	case Instruction_CcipTokenReleaseMint:
-		return "CcipTokenReleaseMint"
-	case Instruction_CcipTokenLockBurn:
-		return "CcipTokenLockBurn"
 	default:
 		return ""
 	}
@@ -82,19 +82,19 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 	ag_binary.AnchorTypeIDEncoding,
 	[]ag_binary.VariantType{
 		{
-			"initialize", (*Initialize)(nil),
+			Name: "ccip_receive", Type: (*CcipReceiveInstruction)(nil),
 		},
 		{
-			"set_reject_all", (*SetRejectAll)(nil),
+			Name: "ccip_token_lock_burn", Type: (*CcipTokenLockBurnInstruction)(nil),
 		},
 		{
-			"ccip_receive", (*CcipReceive)(nil),
+			Name: "ccip_token_release_mint", Type: (*CcipTokenReleaseMintInstruction)(nil),
 		},
 		{
-			"ccip_token_release_mint", (*CcipTokenReleaseMint)(nil),
+			Name: "initialize", Type: (*InitializeInstruction)(nil),
 		},
 		{
-			"ccip_token_lock_burn", (*CcipTokenLockBurn)(nil),
+			Name: "set_reject_all", Type: (*SetRejectAllInstruction)(nil),
 		},
 	},
 )
@@ -132,14 +132,14 @@ func (inst *Instruction) MarshalWithEncoder(encoder *ag_binary.Encoder) error {
 }
 
 func registryDecodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (interface{}, error) {
-	inst, err := DecodeInstruction(accounts, data)
+	inst, err := decodeInstruction(accounts, data)
 	if err != nil {
 		return nil, err
 	}
 	return inst, nil
 }
 
-func DecodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (*Instruction, error) {
+func decodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (*Instruction, error) {
 	inst := new(Instruction)
 	if err := ag_binary.NewBorshDecoder(data).Decode(inst); err != nil {
 		return nil, fmt.Errorf("unable to decode instruction: %w", err)
@@ -151,4 +151,26 @@ func DecodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (*Instr
 		}
 	}
 	return inst, nil
+}
+
+func DecodeInstructions(message *ag_solanago.Message) (instructions []*Instruction, err error) {
+	for _, ins := range message.Instructions {
+		var programID ag_solanago.PublicKey
+		if programID, err = message.Program(ins.ProgramIDIndex); err != nil {
+			return
+		}
+		if !programID.Equals(ProgramID) {
+			continue
+		}
+		var accounts []*ag_solanago.AccountMeta
+		if accounts, err = ins.ResolveInstructionAccounts(message); err != nil {
+			return
+		}
+		var insDecoded *Instruction
+		if insDecoded, err = decodeInstruction(accounts, ins.Data); err != nil {
+			return
+		}
+		instructions = append(instructions, insDecoded)
+	}
+	return
 }

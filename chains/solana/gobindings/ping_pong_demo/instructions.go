@@ -12,10 +12,10 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-var ProgramID ag_solanago.PublicKey
+var ProgramID ag_solanago.PublicKey = ag_solanago.MustPublicKeyFromBase58("PPbZmYFf5SPAM9Jhm9mNmYoCwT7icPYVKAfJoMCQovU")
 
-func SetProgramID(pubkey ag_solanago.PublicKey) {
-	ProgramID = pubkey
+func SetProgramID(PublicKey ag_solanago.PublicKey) {
+	ProgramID = PublicKey
 	ag_solanago.RegisterInstructionDecoder(ProgramID, registryDecodeInstruction)
 }
 
@@ -28,9 +28,19 @@ func init() {
 }
 
 var (
-	Instruction_InitializeConfig = ag_binary.TypeID([8]byte{208, 127, 21, 1, 194, 190, 196, 70})
+	Instruction_CcipReceive = ag_binary.TypeID([8]byte{11, 244, 9, 249, 44, 83, 47, 245})
 
 	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
+
+	Instruction_InitializeConfig = ag_binary.TypeID([8]byte{208, 127, 21, 1, 194, 190, 196, 70})
+
+	Instruction_SetCounterpart = ag_binary.TypeID([8]byte{118, 28, 243, 127, 218, 176, 228, 228})
+
+	Instruction_SetExtraArgs = ag_binary.TypeID([8]byte{103, 87, 237, 252, 141, 176, 81, 193})
+
+	Instruction_SetPaused = ag_binary.TypeID([8]byte{91, 60, 125, 192, 176, 225, 166, 218})
+
+	Instruction_StartPingPong = ag_binary.TypeID([8]byte{53, 36, 169, 135, 221, 239, 52, 103})
 
 	// Returns the program type (name) and version.
 	// Used by offchain code to easily determine which program & version is being interacted with.
@@ -38,37 +48,27 @@ var (
 	// # Arguments
 	// * `ctx` - The context
 	Instruction_TypeVersion = ag_binary.TypeID([8]byte{129, 251, 8, 243, 122, 229, 252, 164})
-
-	Instruction_SetCounterpart = ag_binary.TypeID([8]byte{118, 28, 243, 127, 218, 176, 228, 228})
-
-	Instruction_SetPaused = ag_binary.TypeID([8]byte{91, 60, 125, 192, 176, 225, 166, 218})
-
-	Instruction_SetExtraArgs = ag_binary.TypeID([8]byte{103, 87, 237, 252, 141, 176, 81, 193})
-
-	Instruction_StartPingPong = ag_binary.TypeID([8]byte{53, 36, 169, 135, 221, 239, 52, 103})
-
-	Instruction_CcipReceive = ag_binary.TypeID([8]byte{11, 244, 9, 249, 44, 83, 47, 245})
 )
 
 // InstructionIDToName returns the name of the instruction given its ID.
 func InstructionIDToName(id ag_binary.TypeID) string {
 	switch id {
-	case Instruction_InitializeConfig:
-		return "InitializeConfig"
-	case Instruction_Initialize:
-		return "Initialize"
-	case Instruction_TypeVersion:
-		return "TypeVersion"
-	case Instruction_SetCounterpart:
-		return "SetCounterpart"
-	case Instruction_SetPaused:
-		return "SetPaused"
-	case Instruction_SetExtraArgs:
-		return "SetExtraArgs"
-	case Instruction_StartPingPong:
-		return "StartPingPong"
 	case Instruction_CcipReceive:
 		return "CcipReceive"
+	case Instruction_Initialize:
+		return "Initialize"
+	case Instruction_InitializeConfig:
+		return "InitializeConfig"
+	case Instruction_SetCounterpart:
+		return "SetCounterpart"
+	case Instruction_SetExtraArgs:
+		return "SetExtraArgs"
+	case Instruction_SetPaused:
+		return "SetPaused"
+	case Instruction_StartPingPong:
+		return "StartPingPong"
+	case Instruction_TypeVersion:
+		return "TypeVersion"
 	default:
 		return ""
 	}
@@ -90,28 +90,28 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 	ag_binary.AnchorTypeIDEncoding,
 	[]ag_binary.VariantType{
 		{
-			"initialize_config", (*InitializeConfig)(nil),
+			Name: "ccip_receive", Type: (*CcipReceiveInstruction)(nil),
 		},
 		{
-			"initialize", (*Initialize)(nil),
+			Name: "initialize", Type: (*InitializeInstruction)(nil),
 		},
 		{
-			"type_version", (*TypeVersion)(nil),
+			Name: "initialize_config", Type: (*InitializeConfigInstruction)(nil),
 		},
 		{
-			"set_counterpart", (*SetCounterpart)(nil),
+			Name: "set_counterpart", Type: (*SetCounterpartInstruction)(nil),
 		},
 		{
-			"set_paused", (*SetPaused)(nil),
+			Name: "set_extra_args", Type: (*SetExtraArgsInstruction)(nil),
 		},
 		{
-			"set_extra_args", (*SetExtraArgs)(nil),
+			Name: "set_paused", Type: (*SetPausedInstruction)(nil),
 		},
 		{
-			"start_ping_pong", (*StartPingPong)(nil),
+			Name: "start_ping_pong", Type: (*StartPingPongInstruction)(nil),
 		},
 		{
-			"ccip_receive", (*CcipReceive)(nil),
+			Name: "type_version", Type: (*TypeVersionInstruction)(nil),
 		},
 	},
 )
@@ -149,14 +149,14 @@ func (inst *Instruction) MarshalWithEncoder(encoder *ag_binary.Encoder) error {
 }
 
 func registryDecodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (interface{}, error) {
-	inst, err := DecodeInstruction(accounts, data)
+	inst, err := decodeInstruction(accounts, data)
 	if err != nil {
 		return nil, err
 	}
 	return inst, nil
 }
 
-func DecodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (*Instruction, error) {
+func decodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (*Instruction, error) {
 	inst := new(Instruction)
 	if err := ag_binary.NewBorshDecoder(data).Decode(inst); err != nil {
 		return nil, fmt.Errorf("unable to decode instruction: %w", err)
@@ -168,4 +168,26 @@ func DecodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (*Instr
 		}
 	}
 	return inst, nil
+}
+
+func DecodeInstructions(message *ag_solanago.Message) (instructions []*Instruction, err error) {
+	for _, ins := range message.Instructions {
+		var programID ag_solanago.PublicKey
+		if programID, err = message.Program(ins.ProgramIDIndex); err != nil {
+			return
+		}
+		if !programID.Equals(ProgramID) {
+			continue
+		}
+		var accounts []*ag_solanago.AccountMeta
+		if accounts, err = ins.ResolveInstructionAccounts(message); err != nil {
+			return
+		}
+		var insDecoded *Instruction
+		if insDecoded, err = decodeInstruction(accounts, ins.Data); err != nil {
+			return
+		}
+		instructions = append(instructions, insDecoded)
+	}
+	return
 }

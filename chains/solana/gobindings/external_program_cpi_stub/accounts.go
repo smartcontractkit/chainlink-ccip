@@ -7,15 +7,15 @@ import (
 	ag_binary "github.com/gagliardetto/binary"
 )
 
-type Value struct {
+type ValueAccount struct {
 	Value uint8
 }
 
-var ValueDiscriminator = [8]byte{135, 158, 244, 117, 72, 203, 24, 194}
+var ValueAccountDiscriminator = [8]byte{135, 158, 244, 117, 72, 203, 24, 194}
 
-func (obj Value) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj ValueAccount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Write account discriminator:
-	err = encoder.WriteBytes(ValueDiscriminator[:], false)
+	err = encoder.WriteBytes(ValueAccountDiscriminator[:], false)
 	if err != nil {
 		return err
 	}
@@ -27,14 +27,14 @@ func (obj Value) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	return nil
 }
 
-func (obj *Value) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *ValueAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Read and check account discriminator:
 	{
 		discriminator, err := decoder.ReadTypeID()
 		if err != nil {
 			return err
 		}
-		if !discriminator.Equal(ValueDiscriminator[:]) {
+		if !discriminator.Equal(ValueAccountDiscriminator[:]) {
 			return fmt.Errorf(
 				"wrong discriminator: wanted %s, got %s",
 				"[135 158 244 117 72 203 24 194]",

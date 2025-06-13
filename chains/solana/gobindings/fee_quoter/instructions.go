@@ -12,10 +12,10 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-var ProgramID ag_solanago.PublicKey
+var ProgramID ag_solanago.PublicKey = ag_solanago.MustPublicKeyFromBase58("FeeQPGkKDeRV1MgoYfMH6L8o3KeuYjwUZrgn4LRKfjHi")
 
-func SetProgramID(pubkey ag_solanago.PublicKey) {
-	ProgramID = pubkey
+func SetProgramID(PublicKey ag_solanago.PublicKey) {
+	ProgramID = PublicKey
 	ag_solanago.RegisterInstructionDecoder(ProgramID, registryDecodeInstruction)
 }
 
@@ -28,36 +28,6 @@ func init() {
 }
 
 var (
-	// Initializes the Fee Quoter.
-	//
-	// The initialization is responsibility of Admin, nothing more than calling this method should be done first.
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for initialization.
-	// * `max_fee_juels_per_msg` - The maximum fee in juels that can be charged per message.
-	// * `onramp` - The public key of the onramp.
-	//
-	// The function also uses the link_token_mint account from the context.
-	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
-
-	// Returns the program type (name) and version.
-	// Used by offchain code to easily determine which program & version is being interacted with.
-	//
-	// # Arguments
-	// * `ctx` - The context
-	Instruction_TypeVersion = ag_binary.TypeID([8]byte{129, 251, 8, 243, 122, 229, 252, 164})
-
-	// Transfers the ownership of the fee quoter to a new proposed owner.
-	//
-	// Shared func signature with other programs
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for the transfer.
-	// * `proposed_owner` - The public key of the new proposed owner.
-	Instruction_TransferOwnership = ag_binary.TypeID([8]byte{65, 177, 215, 73, 53, 45, 99, 47})
-
 	// Accepts the ownership of the fee quoter by the proposed owner.
 	//
 	// Shared func signature with other programs
@@ -68,37 +38,6 @@ var (
 	// The new owner must be a signer of the transaction.
 	Instruction_AcceptOwnership = ag_binary.TypeID([8]byte{172, 23, 43, 13, 238, 213, 85, 150})
 
-	// Sets the default code version to be used. This is then used by the slim routing layer to determine
-	// which version of the versioned business logic module (`instructions`) to use. Only the admin may set this.
-	//
-	// Shared func signature with other programs
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for updating the configuration.
-	// * `code_version` - The new code version to be set as default.
-	Instruction_SetDefaultCodeVersion = ag_binary.TypeID([8]byte{47, 151, 233, 254, 121, 82, 206, 152})
-
-	// Sets the max_fee_juels_per_msg, which is an upper bound on how much can be billed for any message.
-	// (1 juels = 1e-18 LINK)
-	//
-	// Only the admin may set this.
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for updating the configuration.
-	// * `max_fee_juels_per_msg` - The new value for the max_feel_juels_per_msg config.
-	Instruction_SetMaxFeeJuelsPerMsg = ag_binary.TypeID([8]byte{50, 235, 110, 147, 169, 199, 69, 46})
-
-	// Sets the link_token_mint and updates the link_token_local_decimals.
-	//
-	// Only the admin may set this.
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for updating the configuration.
-	Instruction_SetLinkTokenMint = ag_binary.TypeID([8]byte{190, 216, 49, 254, 200, 81, 12, 17})
-
 	// Adds a billing token configuration.
 	// Only CCIP Admin can add a billing token configuration.
 	//
@@ -107,15 +46,6 @@ var (
 	// * `ctx` - The context containing the accounts required for adding the billing token configuration.
 	// * `config` - The billing token configuration to be added.
 	Instruction_AddBillingTokenConfig = ag_binary.TypeID([8]byte{63, 156, 254, 216, 227, 53, 0, 69})
-
-	// Updates the billing token configuration.
-	// Only CCIP Admin can update a billing token configuration.
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for updating the billing token configuration.
-	// * `config` - The new billing token configuration.
-	Instruction_UpdateBillingTokenConfig = ag_binary.TypeID([8]byte{140, 184, 124, 146, 204, 62, 244, 79})
 
 	// Adds a new destination chain selector to the fee quoter.
 	//
@@ -129,41 +59,6 @@ var (
 	// * `dest_chain_config` - The configuration for the chain as destination.
 	Instruction_AddDestChain = ag_binary.TypeID([8]byte{122, 202, 174, 155, 55, 100, 102, 36})
 
-	// Disables the destination chain selector.
-	//
-	// The Admin is the only one able to disable the chain selector as destination. This method is thought of as an emergency kill-switch.
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for disabling the chain selector.
-	// * `chain_selector` - The destination chain selector to be disabled.
-	Instruction_DisableDestChain = ag_binary.TypeID([8]byte{200, 195, 114, 206, 152, 86, 50, 41})
-
-	// Updates the configuration of the destination chain selector.
-	//
-	// The Admin is the only one able to update the destination chain config.
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for updating the chain selector.
-	// * `chain_selector` - The destination chain selector to be updated.
-	// * `dest_chain_config` - The new configuration for the destination chain.
-	Instruction_UpdateDestChainConfig = ag_binary.TypeID([8]byte{215, 122, 81, 22, 190, 58, 219, 13})
-
-	// Sets the token transfer fee configuration for a particular token when it's transferred to a particular dest chain.
-	// It is an upsert, initializing the per-chain-per-token config account if it doesn't exist
-	// and overwriting it if it does.
-	//
-	// Only the Admin can perform this operation.
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for setting the token billing configuration.
-	// * `chain_selector` - The chain selector.
-	// * `mint` - The public key of the token mint.
-	// * `cfg` - The token transfer fee configuration.
-	Instruction_SetTokenTransferFeeConfig = ag_binary.TypeID([8]byte{76, 243, 16, 214, 126, 11, 254, 77})
-
 	// Add a price updater address to the list of allowed price updaters.
 	// On price updates, the fee quoter will check the that caller is allowed.
 	//
@@ -173,13 +68,15 @@ var (
 	// * `price_updater` - The price updater address.
 	Instruction_AddPriceUpdater = ag_binary.TypeID([8]byte{200, 26, 13, 120, 226, 182, 64, 16})
 
-	// Remove a price updater address from the list of allowed price updaters.
+	// Disables the destination chain selector.
+	//
+	// The Admin is the only one able to disable the chain selector as destination. This method is thought of as an emergency kill-switch.
 	//
 	// # Arguments
 	//
-	// * `ctx` - The context containing the accounts required for this operation.
-	// * `price_updater` - The price updater address.
-	Instruction_RemovePriceUpdater = ag_binary.TypeID([8]byte{10, 61, 172, 48, 110, 8, 162, 198})
+	// * `ctx` - The context containing the accounts required for disabling the chain selector.
+	// * `chain_selector` - The destination chain selector to be disabled.
+	Instruction_DisableDestChain = ag_binary.TypeID([8]byte{200, 195, 114, 206, 152, 86, 50, 41})
 
 	// Calculates the fee for sending a message to the destination chain.
 	//
@@ -210,6 +107,109 @@ var (
 	// - deserialized and processed extra args
 	Instruction_GetFee = ag_binary.TypeID([8]byte{115, 195, 235, 161, 25, 219, 60, 29})
 
+	// Initializes the Fee Quoter.
+	//
+	// The initialization is responsibility of Admin, nothing more than calling this method should be done first.
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for initialization.
+	// * `max_fee_juels_per_msg` - The maximum fee in juels that can be charged per message.
+	// * `onramp` - The public key of the onramp.
+	//
+	// The function also uses the link_token_mint account from the context.
+	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
+
+	// Remove a price updater address from the list of allowed price updaters.
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for this operation.
+	// * `price_updater` - The price updater address.
+	Instruction_RemovePriceUpdater = ag_binary.TypeID([8]byte{10, 61, 172, 48, 110, 8, 162, 198})
+
+	// Sets the default code version to be used. This is then used by the slim routing layer to determine
+	// which version of the versioned business logic module (`instructions`) to use. Only the admin may set this.
+	//
+	// Shared func signature with other programs
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for updating the configuration.
+	// * `code_version` - The new code version to be set as default.
+	Instruction_SetDefaultCodeVersion = ag_binary.TypeID([8]byte{47, 151, 233, 254, 121, 82, 206, 152})
+
+	// Sets the link_token_mint and updates the link_token_local_decimals.
+	//
+	// Only the admin may set this.
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for updating the configuration.
+	Instruction_SetLinkTokenMint = ag_binary.TypeID([8]byte{190, 216, 49, 254, 200, 81, 12, 17})
+
+	// Sets the max_fee_juels_per_msg, which is an upper bound on how much can be billed for any message.
+	// (1 juels = 1e-18 LINK)
+	//
+	// Only the admin may set this.
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for updating the configuration.
+	// * `max_fee_juels_per_msg` - The new value for the max_feel_juels_per_msg config.
+	Instruction_SetMaxFeeJuelsPerMsg = ag_binary.TypeID([8]byte{50, 235, 110, 147, 169, 199, 69, 46})
+
+	// Sets the token transfer fee configuration for a particular token when it's transferred to a particular dest chain.
+	// It is an upsert, initializing the per-chain-per-token config account if it doesn't exist
+	// and overwriting it if it does.
+	//
+	// Only the Admin can perform this operation.
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for setting the token billing configuration.
+	// * `chain_selector` - The chain selector.
+	// * `mint` - The public key of the token mint.
+	// * `cfg` - The token transfer fee configuration.
+	Instruction_SetTokenTransferFeeConfig = ag_binary.TypeID([8]byte{76, 243, 16, 214, 126, 11, 254, 77})
+
+	// Transfers the ownership of the fee quoter to a new proposed owner.
+	//
+	// Shared func signature with other programs
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for the transfer.
+	// * `proposed_owner` - The public key of the new proposed owner.
+	Instruction_TransferOwnership = ag_binary.TypeID([8]byte{65, 177, 215, 73, 53, 45, 99, 47})
+
+	// Returns the program type (name) and version.
+	// Used by offchain code to easily determine which program & version is being interacted with.
+	//
+	// # Arguments
+	// * `ctx` - The context
+	Instruction_TypeVersion = ag_binary.TypeID([8]byte{129, 251, 8, 243, 122, 229, 252, 164})
+
+	// Updates the billing token configuration.
+	// Only CCIP Admin can update a billing token configuration.
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for updating the billing token configuration.
+	// * `config` - The new billing token configuration.
+	Instruction_UpdateBillingTokenConfig = ag_binary.TypeID([8]byte{140, 184, 124, 146, 204, 62, 244, 79})
+
+	// Updates the configuration of the destination chain selector.
+	//
+	// The Admin is the only one able to update the destination chain config.
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for updating the chain selector.
+	// * `chain_selector` - The destination chain selector to be updated.
+	// * `dest_chain_config` - The new configuration for the destination chain.
+	Instruction_UpdateDestChainConfig = ag_binary.TypeID([8]byte{215, 122, 81, 22, 190, 58, 219, 13})
+
 	// Updates prices for tokens and gas. This method may only be called by an allowed price updater.
 	//
 	// # Arguments
@@ -233,38 +233,38 @@ var (
 // InstructionIDToName returns the name of the instruction given its ID.
 func InstructionIDToName(id ag_binary.TypeID) string {
 	switch id {
-	case Instruction_Initialize:
-		return "Initialize"
-	case Instruction_TypeVersion:
-		return "TypeVersion"
-	case Instruction_TransferOwnership:
-		return "TransferOwnership"
 	case Instruction_AcceptOwnership:
 		return "AcceptOwnership"
-	case Instruction_SetDefaultCodeVersion:
-		return "SetDefaultCodeVersion"
-	case Instruction_SetMaxFeeJuelsPerMsg:
-		return "SetMaxFeeJuelsPerMsg"
-	case Instruction_SetLinkTokenMint:
-		return "SetLinkTokenMint"
 	case Instruction_AddBillingTokenConfig:
 		return "AddBillingTokenConfig"
-	case Instruction_UpdateBillingTokenConfig:
-		return "UpdateBillingTokenConfig"
 	case Instruction_AddDestChain:
 		return "AddDestChain"
-	case Instruction_DisableDestChain:
-		return "DisableDestChain"
-	case Instruction_UpdateDestChainConfig:
-		return "UpdateDestChainConfig"
-	case Instruction_SetTokenTransferFeeConfig:
-		return "SetTokenTransferFeeConfig"
 	case Instruction_AddPriceUpdater:
 		return "AddPriceUpdater"
-	case Instruction_RemovePriceUpdater:
-		return "RemovePriceUpdater"
+	case Instruction_DisableDestChain:
+		return "DisableDestChain"
 	case Instruction_GetFee:
 		return "GetFee"
+	case Instruction_Initialize:
+		return "Initialize"
+	case Instruction_RemovePriceUpdater:
+		return "RemovePriceUpdater"
+	case Instruction_SetDefaultCodeVersion:
+		return "SetDefaultCodeVersion"
+	case Instruction_SetLinkTokenMint:
+		return "SetLinkTokenMint"
+	case Instruction_SetMaxFeeJuelsPerMsg:
+		return "SetMaxFeeJuelsPerMsg"
+	case Instruction_SetTokenTransferFeeConfig:
+		return "SetTokenTransferFeeConfig"
+	case Instruction_TransferOwnership:
+		return "TransferOwnership"
+	case Instruction_TypeVersion:
+		return "TypeVersion"
+	case Instruction_UpdateBillingTokenConfig:
+		return "UpdateBillingTokenConfig"
+	case Instruction_UpdateDestChainConfig:
+		return "UpdateDestChainConfig"
 	case Instruction_UpdatePrices:
 		return "UpdatePrices"
 	default:
@@ -288,55 +288,55 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 	ag_binary.AnchorTypeIDEncoding,
 	[]ag_binary.VariantType{
 		{
-			"initialize", (*Initialize)(nil),
+			Name: "accept_ownership", Type: (*AcceptOwnershipInstruction)(nil),
 		},
 		{
-			"type_version", (*TypeVersion)(nil),
+			Name: "add_billing_token_config", Type: (*AddBillingTokenConfigInstruction)(nil),
 		},
 		{
-			"transfer_ownership", (*TransferOwnership)(nil),
+			Name: "add_dest_chain", Type: (*AddDestChainInstruction)(nil),
 		},
 		{
-			"accept_ownership", (*AcceptOwnership)(nil),
+			Name: "add_price_updater", Type: (*AddPriceUpdaterInstruction)(nil),
 		},
 		{
-			"set_default_code_version", (*SetDefaultCodeVersion)(nil),
+			Name: "disable_dest_chain", Type: (*DisableDestChainInstruction)(nil),
 		},
 		{
-			"set_max_fee_juels_per_msg", (*SetMaxFeeJuelsPerMsg)(nil),
+			Name: "get_fee", Type: (*GetFeeInstruction)(nil),
 		},
 		{
-			"set_link_token_mint", (*SetLinkTokenMint)(nil),
+			Name: "initialize", Type: (*InitializeInstruction)(nil),
 		},
 		{
-			"add_billing_token_config", (*AddBillingTokenConfig)(nil),
+			Name: "remove_price_updater", Type: (*RemovePriceUpdaterInstruction)(nil),
 		},
 		{
-			"update_billing_token_config", (*UpdateBillingTokenConfig)(nil),
+			Name: "set_default_code_version", Type: (*SetDefaultCodeVersionInstruction)(nil),
 		},
 		{
-			"add_dest_chain", (*AddDestChain)(nil),
+			Name: "set_link_token_mint", Type: (*SetLinkTokenMintInstruction)(nil),
 		},
 		{
-			"disable_dest_chain", (*DisableDestChain)(nil),
+			Name: "set_max_fee_juels_per_msg", Type: (*SetMaxFeeJuelsPerMsgInstruction)(nil),
 		},
 		{
-			"update_dest_chain_config", (*UpdateDestChainConfig)(nil),
+			Name: "set_token_transfer_fee_config", Type: (*SetTokenTransferFeeConfigInstruction)(nil),
 		},
 		{
-			"set_token_transfer_fee_config", (*SetTokenTransferFeeConfig)(nil),
+			Name: "transfer_ownership", Type: (*TransferOwnershipInstruction)(nil),
 		},
 		{
-			"add_price_updater", (*AddPriceUpdater)(nil),
+			Name: "type_version", Type: (*TypeVersionInstruction)(nil),
 		},
 		{
-			"remove_price_updater", (*RemovePriceUpdater)(nil),
+			Name: "update_billing_token_config", Type: (*UpdateBillingTokenConfigInstruction)(nil),
 		},
 		{
-			"get_fee", (*GetFee)(nil),
+			Name: "update_dest_chain_config", Type: (*UpdateDestChainConfigInstruction)(nil),
 		},
 		{
-			"update_prices", (*UpdatePrices)(nil),
+			Name: "update_prices", Type: (*UpdatePricesInstruction)(nil),
 		},
 	},
 )
@@ -374,14 +374,14 @@ func (inst *Instruction) MarshalWithEncoder(encoder *ag_binary.Encoder) error {
 }
 
 func registryDecodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (interface{}, error) {
-	inst, err := DecodeInstruction(accounts, data)
+	inst, err := decodeInstruction(accounts, data)
 	if err != nil {
 		return nil, err
 	}
 	return inst, nil
 }
 
-func DecodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (*Instruction, error) {
+func decodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (*Instruction, error) {
 	inst := new(Instruction)
 	if err := ag_binary.NewBorshDecoder(data).Decode(inst); err != nil {
 		return nil, fmt.Errorf("unable to decode instruction: %w", err)
@@ -393,4 +393,26 @@ func DecodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (*Instr
 		}
 	}
 	return inst, nil
+}
+
+func DecodeInstructions(message *ag_solanago.Message) (instructions []*Instruction, err error) {
+	for _, ins := range message.Instructions {
+		var programID ag_solanago.PublicKey
+		if programID, err = message.Program(ins.ProgramIDIndex); err != nil {
+			return
+		}
+		if !programID.Equals(ProgramID) {
+			continue
+		}
+		var accounts []*ag_solanago.AccountMeta
+		if accounts, err = ins.ResolveInstructionAccounts(message); err != nil {
+			return
+		}
+		var insDecoded *Instruction
+		if insDecoded, err = decodeInstruction(accounts, ins.Data); err != nil {
+			return
+		}
+		instructions = append(instructions, insDecoded)
+	}
+	return
 }

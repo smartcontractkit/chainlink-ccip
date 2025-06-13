@@ -12,10 +12,10 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-var ProgramID ag_solanago.PublicKey
+var ProgramID ag_solanago.PublicKey = ag_solanago.MustPublicKeyFromBase58("RmnXLft1mSEwDgMKu2okYuHkiazxntFFcZFrrcXxYg7")
 
-func SetProgramID(pubkey ag_solanago.PublicKey) {
-	ProgramID = pubkey
+func SetProgramID(PublicKey ag_solanago.PublicKey) {
+	ProgramID = PublicKey
 	ag_solanago.RegisterInstructionDecoder(ProgramID, registryDecodeInstruction)
 }
 
@@ -28,32 +28,6 @@ func init() {
 }
 
 var (
-	// Initializes the Rmn Remote contract.
-	//
-	// The initialization is responsibility of Admin, nothing more than calling this method should be done first.
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for initialization.
-	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
-
-	// Returns the program type (name) and version.
-	// Used by offchain code to easily determine which program & version is being interacted with.
-	//
-	// # Arguments
-	// * `ctx` - The context
-	Instruction_TypeVersion = ag_binary.TypeID([8]byte{129, 251, 8, 243, 122, 229, 252, 164})
-
-	// Transfers the ownership of the fee quoter to a new proposed owner.
-	//
-	// Shared func signature with other programs.
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for the transfer.
-	// * `proposed_owner` - The public key of the new proposed owner.
-	Instruction_TransferOwnership = ag_binary.TypeID([8]byte{65, 177, 215, 73, 53, 45, 99, 47})
-
 	// Accepts the ownership of the fee quoter by the proposed owner.
 	//
 	// Shared func signature with other programs.
@@ -63,6 +37,26 @@ var (
 	// * `ctx` - The context containing the accounts required for accepting ownership.
 	// The new owner must be a signer of the transaction.
 	Instruction_AcceptOwnership = ag_binary.TypeID([8]byte{172, 23, 43, 13, 238, 213, 85, 150})
+
+	// Curses an abstract subject. If the subject is CurseSubject::GLOBAL,
+	// the entire chain will be cursed.
+	//
+	// Only the CCIP Admin may perform this operation
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for adding a new curse.
+	// * `subject` - The subject to curse.
+	Instruction_Curse = ag_binary.TypeID([8]byte{10, 127, 226, 227, 138, 3, 192, 73})
+
+	// Initializes the Rmn Remote contract.
+	//
+	// The initialization is responsibility of Admin, nothing more than calling this method should be done first.
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for initialization.
+	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
 
 	// Sets the default code version to be used. This is then used by the slim routing layer to determine
 	// which version of the versioned business logic module (`instructions`) to use. Only the admin may set this.
@@ -75,16 +69,22 @@ var (
 	// * `code_version` - The new code version to be set as default.
 	Instruction_SetDefaultCodeVersion = ag_binary.TypeID([8]byte{47, 151, 233, 254, 121, 82, 206, 152})
 
-	// Curses an abstract subject. If the subject is CurseSubject::GLOBAL,
-	// the entire chain will be cursed.
+	// Transfers the ownership of the fee quoter to a new proposed owner.
 	//
-	// Only the CCIP Admin may perform this operation
+	// Shared func signature with other programs.
 	//
 	// # Arguments
 	//
-	// * `ctx` - The context containing the accounts required for adding a new curse.
-	// * `subject` - The subject to curse.
-	Instruction_Curse = ag_binary.TypeID([8]byte{10, 127, 226, 227, 138, 3, 192, 73})
+	// * `ctx` - The context containing the accounts required for the transfer.
+	// * `proposed_owner` - The public key of the new proposed owner.
+	Instruction_TransferOwnership = ag_binary.TypeID([8]byte{65, 177, 215, 73, 53, 45, 99, 47})
+
+	// Returns the program type (name) and version.
+	// Used by offchain code to easily determine which program & version is being interacted with.
+	//
+	// # Arguments
+	// * `ctx` - The context
+	Instruction_TypeVersion = ag_binary.TypeID([8]byte{129, 251, 8, 243, 122, 229, 252, 164})
 
 	// Uncurses an abstract subject. If the subject is CurseSubject::GLOBAL,
 	// the entire chain curse will be lifted. (note that any other specific
@@ -112,18 +112,18 @@ var (
 // InstructionIDToName returns the name of the instruction given its ID.
 func InstructionIDToName(id ag_binary.TypeID) string {
 	switch id {
-	case Instruction_Initialize:
-		return "Initialize"
-	case Instruction_TypeVersion:
-		return "TypeVersion"
-	case Instruction_TransferOwnership:
-		return "TransferOwnership"
 	case Instruction_AcceptOwnership:
 		return "AcceptOwnership"
-	case Instruction_SetDefaultCodeVersion:
-		return "SetDefaultCodeVersion"
 	case Instruction_Curse:
 		return "Curse"
+	case Instruction_Initialize:
+		return "Initialize"
+	case Instruction_SetDefaultCodeVersion:
+		return "SetDefaultCodeVersion"
+	case Instruction_TransferOwnership:
+		return "TransferOwnership"
+	case Instruction_TypeVersion:
+		return "TypeVersion"
 	case Instruction_Uncurse:
 		return "Uncurse"
 	case Instruction_VerifyNotCursed:
@@ -149,28 +149,28 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 	ag_binary.AnchorTypeIDEncoding,
 	[]ag_binary.VariantType{
 		{
-			"initialize", (*Initialize)(nil),
+			Name: "accept_ownership", Type: (*AcceptOwnershipInstruction)(nil),
 		},
 		{
-			"type_version", (*TypeVersion)(nil),
+			Name: "curse", Type: (*CurseInstruction)(nil),
 		},
 		{
-			"transfer_ownership", (*TransferOwnership)(nil),
+			Name: "initialize", Type: (*InitializeInstruction)(nil),
 		},
 		{
-			"accept_ownership", (*AcceptOwnership)(nil),
+			Name: "set_default_code_version", Type: (*SetDefaultCodeVersionInstruction)(nil),
 		},
 		{
-			"set_default_code_version", (*SetDefaultCodeVersion)(nil),
+			Name: "transfer_ownership", Type: (*TransferOwnershipInstruction)(nil),
 		},
 		{
-			"curse", (*Curse)(nil),
+			Name: "type_version", Type: (*TypeVersionInstruction)(nil),
 		},
 		{
-			"uncurse", (*Uncurse)(nil),
+			Name: "uncurse", Type: (*UncurseInstruction)(nil),
 		},
 		{
-			"verify_not_cursed", (*VerifyNotCursed)(nil),
+			Name: "verify_not_cursed", Type: (*VerifyNotCursedInstruction)(nil),
 		},
 	},
 )
@@ -208,14 +208,14 @@ func (inst *Instruction) MarshalWithEncoder(encoder *ag_binary.Encoder) error {
 }
 
 func registryDecodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (interface{}, error) {
-	inst, err := DecodeInstruction(accounts, data)
+	inst, err := decodeInstruction(accounts, data)
 	if err != nil {
 		return nil, err
 	}
 	return inst, nil
 }
 
-func DecodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (*Instruction, error) {
+func decodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (*Instruction, error) {
 	inst := new(Instruction)
 	if err := ag_binary.NewBorshDecoder(data).Decode(inst); err != nil {
 		return nil, fmt.Errorf("unable to decode instruction: %w", err)
@@ -227,4 +227,26 @@ func DecodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (*Instr
 		}
 	}
 	return inst, nil
+}
+
+func DecodeInstructions(message *ag_solanago.Message) (instructions []*Instruction, err error) {
+	for _, ins := range message.Instructions {
+		var programID ag_solanago.PublicKey
+		if programID, err = message.Program(ins.ProgramIDIndex); err != nil {
+			return
+		}
+		if !programID.Equals(ProgramID) {
+			continue
+		}
+		var accounts []*ag_solanago.AccountMeta
+		if accounts, err = ins.ResolveInstructionAccounts(message); err != nil {
+			return
+		}
+		var insDecoded *Instruction
+		if insDecoded, err = decodeInstruction(accounts, ins.Data); err != nil {
+			return
+		}
+		instructions = append(instructions, insDecoded)
+	}
+	return
 }

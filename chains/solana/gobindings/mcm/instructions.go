@@ -30,10 +30,10 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-var ProgramID ag_solanago.PublicKey
+var ProgramID ag_solanago.PublicKey = ag_solanago.MustPublicKeyFromBase58("5vNJx78mz7KVMjhuipyr9jKBKcMrKYGdjGkgE4LUmjKk")
 
-func SetProgramID(pubkey ag_solanago.PublicKey) {
-	ProgramID = pubkey
+func SetProgramID(PublicKey ag_solanago.PublicKey) {
+	ProgramID = PublicKey
 	ag_solanago.RegisterInstructionDecoder(ProgramID, registryDecodeInstruction)
 }
 
@@ -46,6 +46,136 @@ func init() {
 }
 
 var (
+	// Accept ownership of the multisig config.
+	//
+	// The proposed new owner must call this function to assume ownership.
+	//
+	// # Parameters
+	//
+	// - `ctx`: The context containing the configuration account.
+	// - `_multisig_id`: The multisig identifier.
+	Instruction_AcceptOwnership = ag_binary.TypeID([8]byte{172, 23, 43, 13, 238, 213, 85, 150})
+
+	// Append a batch of ECDSA signatures to the temporary storage.
+	//
+	// Allows adding multiple signatures in batches to overcome transaction size limits.
+	//
+	// # Parameters
+	//
+	// - `ctx`: The context containing required accounts.
+	// - `multisig_id`: The multisig instance identifier.
+	// - `root`: The Merkle root being approved.
+	// - `valid_until`: Timestamp until which the root will remain valid.
+	// - `signatures_batch`: A batch of ECDSA signatures to be verified.
+	Instruction_AppendSignatures = ag_binary.TypeID([8]byte{195, 112, 164, 69, 37, 137, 198, 54})
+
+	// Append a batch of signer addresses to the temporary storage.
+	//
+	// Allows adding multiple signer addresses in batches to overcome transaction size limits.
+	//
+	// # Parameters
+	//
+	// - `ctx`: The context containing required accounts.
+	// - `multisig_id`: The multisig instance identifier.
+	// - `signers_batch`: A batch of Ethereum addresses (20 bytes each) to be added as signers.
+	Instruction_AppendSigners = ag_binary.TypeID([8]byte{238, 209, 251, 39, 41, 241, 146, 25})
+
+	// Clear the temporary signature storage.
+	//
+	// Closes the account storing signatures, allowing it to be reinitialized if needed.
+	//
+	// # Parameters
+	//
+	// - `ctx`: The context containing required accounts.
+	// - `multisig_id`: The multisig instance identifier.
+	// - `root`: The Merkle root associated with the signatures.
+	// - `valid_until`: Timestamp until which the root would remain valid.
+	Instruction_ClearSignatures = ag_binary.TypeID([8]byte{80, 0, 39, 255, 46, 165, 193, 109})
+
+	// Clear the temporary signer storage.
+	//
+	// Closes the account storing signer addresses, allowing it to be reinitialized if needed.
+	//
+	// # Parameters
+	//
+	// - `ctx`: The context containing required accounts.
+	// - `multisig_id`: The multisig instance identifier.
+	Instruction_ClearSigners = ag_binary.TypeID([8]byte{90, 140, 170, 146, 128, 75, 100, 175})
+
+	// Executes an operation after verifying it's authorized in the current Merkle root.
+	//
+	// This function:
+	// 1. Performs extensive validation checks on the operation
+	// - Ensures the operation is within the allowed count range
+	// - Verifies chain ID matches the configured chain
+	// - Checks the root has not expired
+	// - Validates the operation's nonce against current state
+	// 2. Verifies the operation's inclusion in the Merkle tree
+	// 3. Executes the cross-program invocation with the multisig signer PDA
+	//
+	// # Parameters
+	//
+	// - `ctx`: Context containing operation accounts and signer information
+	// - `multisig_id`: Identifier for the multisig instance
+	// - `chain_id`: Network identifier that must match configuration
+	// - `nonce`: Operation counter that must match current state
+	// - `data`: Instruction data to be executed
+	// - `proof`: Merkle proof for operation verification
+	//
+	// # Security Considerations
+	//
+	// This instruction implements secure privilege delegation through PDA signing.
+	// The multisig's signer PDA becomes the authoritative signer for the operation,
+	// allowing controlled execution of privileged actions while maintaining the
+	// security guarantees of the Merkle root validation.
+	Instruction_Execute = ag_binary.TypeID([8]byte{130, 221, 242, 154, 13, 193, 189, 29})
+
+	// Finalize the signature configuration.
+	//
+	// Marks the signature list as finalized and ready for verification when setting a new root.
+	//
+	// # Parameters
+	//
+	// - `ctx`: The context containing required accounts.
+	// - `multisig_id`: The multisig instance identifier.
+	// - `root`: The Merkle root associated with the signatures.
+	// - `valid_until`: Timestamp until which the root will remain valid.
+	Instruction_FinalizeSignatures = ag_binary.TypeID([8]byte{77, 138, 152, 199, 37, 141, 189, 159})
+
+	// Finalize the signer configuration.
+	//
+	// Marks the signer list as complete and ready for incorporation into the multisig configuration.
+	//
+	// # Parameters
+	//
+	// - `ctx`: The context containing required accounts.
+	// - `multisig_id`: The multisig instance identifier.
+	Instruction_FinalizeSigners = ag_binary.TypeID([8]byte{49, 254, 154, 226, 137, 199, 120, 63})
+
+	// Initialize storage for ECDSA signatures.
+	//
+	// Creates a temporary account to hold signatures that will validate a new Merkle root.
+	//
+	// # Parameters
+	//
+	// - `ctx`: The context containing required accounts.
+	// - `multisig_id`: The multisig instance identifier.
+	// - `root`: The new Merkle root these signatures will approve.
+	// - `valid_until`: Timestamp until which the root will remain valid.
+	// - `total_signatures`: The total number of signatures to be added.
+	Instruction_InitSignatures = ag_binary.TypeID([8]byte{190, 120, 207, 36, 26, 58, 196, 13})
+
+	// Initialize the storage for signer addresses.
+	//
+	// Creates a temporary account to hold signer addresses during the multisig configuration process.
+	//
+	// # Parameters
+	//
+	// - `ctx`: The context containing required accounts.
+	// - `multisig_id`: The multisig instance identifier.
+	// - `total_signers`: The total number of signers to be added.
+	Instruction_InitSigners = ag_binary.TypeID([8]byte{102, 182, 129, 16, 138, 142, 223, 196})
+
 	// Initialize a new multisig configuration.
 	//
 	// Creates the foundation for a new multisig instance by initializing the core configuration
@@ -72,27 +202,6 @@ var (
 	// After initialization, the owner can transfer ownership through the two-step
 	// transfer_ownership/accept_ownership process.
 	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
-
-	// Propose a new owner for the multisig instance config.
-	//
-	// Only the current owner (admin) can propose a new owner.
-	//
-	// # Parameters
-	//
-	// - `ctx`: The context containing the configuration account.
-	// - `_multisig_id`: The multisig identifier.
-	// - `proposed_owner`: The public key of the proposed new owner.
-	Instruction_TransferOwnership = ag_binary.TypeID([8]byte{65, 177, 215, 73, 53, 45, 99, 47})
-
-	// Accept ownership of the multisig config.
-	//
-	// The proposed new owner must call this function to assume ownership.
-	//
-	// # Parameters
-	//
-	// - `ctx`: The context containing the configuration account.
-	// - `_multisig_id`: The multisig identifier.
-	Instruction_AcceptOwnership = ag_binary.TypeID([8]byte{172, 23, 43, 13, 238, 213, 85, 150})
 
 	// Set up the configuration for the multisig instance.
 	//
@@ -148,158 +257,49 @@ var (
 	// - `metadata_proof`: Merkle proof validating the metadata.
 	Instruction_SetRoot = ag_binary.TypeID([8]byte{183, 49, 10, 206, 168, 183, 131, 67})
 
-	// Executes an operation after verifying it's authorized in the current Merkle root.
+	// Propose a new owner for the multisig instance config.
 	//
-	// This function:
-	// 1. Performs extensive validation checks on the operation
-	// - Ensures the operation is within the allowed count range
-	// - Verifies chain ID matches the configured chain
-	// - Checks the root has not expired
-	// - Validates the operation's nonce against current state
-	// 2. Verifies the operation's inclusion in the Merkle tree
-	// 3. Executes the cross-program invocation with the multisig signer PDA
+	// Only the current owner (admin) can propose a new owner.
 	//
 	// # Parameters
 	//
-	// - `ctx`: Context containing operation accounts and signer information
-	// - `multisig_id`: Identifier for the multisig instance
-	// - `chain_id`: Network identifier that must match configuration
-	// - `nonce`: Operation counter that must match current state
-	// - `data`: Instruction data to be executed
-	// - `proof`: Merkle proof for operation verification
-	//
-	// # Security Considerations
-	//
-	// This instruction implements secure privilege delegation through PDA signing.
-	// The multisig's signer PDA becomes the authoritative signer for the operation,
-	// allowing controlled execution of privileged actions while maintaining the
-	// security guarantees of the Merkle root validation.
-	Instruction_Execute = ag_binary.TypeID([8]byte{130, 221, 242, 154, 13, 193, 189, 29})
-
-	// Initialize the storage for signer addresses.
-	//
-	// Creates a temporary account to hold signer addresses during the multisig configuration process.
-	//
-	// # Parameters
-	//
-	// - `ctx`: The context containing required accounts.
-	// - `multisig_id`: The multisig instance identifier.
-	// - `total_signers`: The total number of signers to be added.
-	Instruction_InitSigners = ag_binary.TypeID([8]byte{102, 182, 129, 16, 138, 142, 223, 196})
-
-	// Append a batch of signer addresses to the temporary storage.
-	//
-	// Allows adding multiple signer addresses in batches to overcome transaction size limits.
-	//
-	// # Parameters
-	//
-	// - `ctx`: The context containing required accounts.
-	// - `multisig_id`: The multisig instance identifier.
-	// - `signers_batch`: A batch of Ethereum addresses (20 bytes each) to be added as signers.
-	Instruction_AppendSigners = ag_binary.TypeID([8]byte{238, 209, 251, 39, 41, 241, 146, 25})
-
-	// Clear the temporary signer storage.
-	//
-	// Closes the account storing signer addresses, allowing it to be reinitialized if needed.
-	//
-	// # Parameters
-	//
-	// - `ctx`: The context containing required accounts.
-	// - `multisig_id`: The multisig instance identifier.
-	Instruction_ClearSigners = ag_binary.TypeID([8]byte{90, 140, 170, 146, 128, 75, 100, 175})
-
-	// Finalize the signer configuration.
-	//
-	// Marks the signer list as complete and ready for incorporation into the multisig configuration.
-	//
-	// # Parameters
-	//
-	// - `ctx`: The context containing required accounts.
-	// - `multisig_id`: The multisig instance identifier.
-	Instruction_FinalizeSigners = ag_binary.TypeID([8]byte{49, 254, 154, 226, 137, 199, 120, 63})
-
-	// Initialize storage for ECDSA signatures.
-	//
-	// Creates a temporary account to hold signatures that will validate a new Merkle root.
-	//
-	// # Parameters
-	//
-	// - `ctx`: The context containing required accounts.
-	// - `multisig_id`: The multisig instance identifier.
-	// - `root`: The new Merkle root these signatures will approve.
-	// - `valid_until`: Timestamp until which the root will remain valid.
-	// - `total_signatures`: The total number of signatures to be added.
-	Instruction_InitSignatures = ag_binary.TypeID([8]byte{190, 120, 207, 36, 26, 58, 196, 13})
-
-	// Append a batch of ECDSA signatures to the temporary storage.
-	//
-	// Allows adding multiple signatures in batches to overcome transaction size limits.
-	//
-	// # Parameters
-	//
-	// - `ctx`: The context containing required accounts.
-	// - `multisig_id`: The multisig instance identifier.
-	// - `root`: The Merkle root being approved.
-	// - `valid_until`: Timestamp until which the root will remain valid.
-	// - `signatures_batch`: A batch of ECDSA signatures to be verified.
-	Instruction_AppendSignatures = ag_binary.TypeID([8]byte{195, 112, 164, 69, 37, 137, 198, 54})
-
-	// Clear the temporary signature storage.
-	//
-	// Closes the account storing signatures, allowing it to be reinitialized if needed.
-	//
-	// # Parameters
-	//
-	// - `ctx`: The context containing required accounts.
-	// - `multisig_id`: The multisig instance identifier.
-	// - `root`: The Merkle root associated with the signatures.
-	// - `valid_until`: Timestamp until which the root would remain valid.
-	Instruction_ClearSignatures = ag_binary.TypeID([8]byte{80, 0, 39, 255, 46, 165, 193, 109})
-
-	// Finalize the signature configuration.
-	//
-	// Marks the signature list as finalized and ready for verification when setting a new root.
-	//
-	// # Parameters
-	//
-	// - `ctx`: The context containing required accounts.
-	// - `multisig_id`: The multisig instance identifier.
-	// - `root`: The Merkle root associated with the signatures.
-	// - `valid_until`: Timestamp until which the root will remain valid.
-	Instruction_FinalizeSignatures = ag_binary.TypeID([8]byte{77, 138, 152, 199, 37, 141, 189, 159})
+	// - `ctx`: The context containing the configuration account.
+	// - `_multisig_id`: The multisig identifier.
+	// - `proposed_owner`: The public key of the proposed new owner.
+	Instruction_TransferOwnership = ag_binary.TypeID([8]byte{65, 177, 215, 73, 53, 45, 99, 47})
 )
 
 // InstructionIDToName returns the name of the instruction given its ID.
 func InstructionIDToName(id ag_binary.TypeID) string {
 	switch id {
-	case Instruction_Initialize:
-		return "Initialize"
-	case Instruction_TransferOwnership:
-		return "TransferOwnership"
 	case Instruction_AcceptOwnership:
 		return "AcceptOwnership"
-	case Instruction_SetConfig:
-		return "SetConfig"
-	case Instruction_SetRoot:
-		return "SetRoot"
-	case Instruction_Execute:
-		return "Execute"
-	case Instruction_InitSigners:
-		return "InitSigners"
+	case Instruction_AppendSignatures:
+		return "AppendSignatures"
 	case Instruction_AppendSigners:
 		return "AppendSigners"
+	case Instruction_ClearSignatures:
+		return "ClearSignatures"
 	case Instruction_ClearSigners:
 		return "ClearSigners"
+	case Instruction_Execute:
+		return "Execute"
+	case Instruction_FinalizeSignatures:
+		return "FinalizeSignatures"
 	case Instruction_FinalizeSigners:
 		return "FinalizeSigners"
 	case Instruction_InitSignatures:
 		return "InitSignatures"
-	case Instruction_AppendSignatures:
-		return "AppendSignatures"
-	case Instruction_ClearSignatures:
-		return "ClearSignatures"
-	case Instruction_FinalizeSignatures:
-		return "FinalizeSignatures"
+	case Instruction_InitSigners:
+		return "InitSigners"
+	case Instruction_Initialize:
+		return "Initialize"
+	case Instruction_SetConfig:
+		return "SetConfig"
+	case Instruction_SetRoot:
+		return "SetRoot"
+	case Instruction_TransferOwnership:
+		return "TransferOwnership"
 	default:
 		return ""
 	}
@@ -321,46 +321,46 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 	ag_binary.AnchorTypeIDEncoding,
 	[]ag_binary.VariantType{
 		{
-			"initialize", (*Initialize)(nil),
+			Name: "accept_ownership", Type: (*AcceptOwnershipInstruction)(nil),
 		},
 		{
-			"transfer_ownership", (*TransferOwnership)(nil),
+			Name: "append_signatures", Type: (*AppendSignaturesInstruction)(nil),
 		},
 		{
-			"accept_ownership", (*AcceptOwnership)(nil),
+			Name: "append_signers", Type: (*AppendSignersInstruction)(nil),
 		},
 		{
-			"set_config", (*SetConfig)(nil),
+			Name: "clear_signatures", Type: (*ClearSignaturesInstruction)(nil),
 		},
 		{
-			"set_root", (*SetRoot)(nil),
+			Name: "clear_signers", Type: (*ClearSignersInstruction)(nil),
 		},
 		{
-			"execute", (*Execute)(nil),
+			Name: "execute", Type: (*ExecuteInstruction)(nil),
 		},
 		{
-			"init_signers", (*InitSigners)(nil),
+			Name: "finalize_signatures", Type: (*FinalizeSignaturesInstruction)(nil),
 		},
 		{
-			"append_signers", (*AppendSigners)(nil),
+			Name: "finalize_signers", Type: (*FinalizeSignersInstruction)(nil),
 		},
 		{
-			"clear_signers", (*ClearSigners)(nil),
+			Name: "init_signatures", Type: (*InitSignaturesInstruction)(nil),
 		},
 		{
-			"finalize_signers", (*FinalizeSigners)(nil),
+			Name: "init_signers", Type: (*InitSignersInstruction)(nil),
 		},
 		{
-			"init_signatures", (*InitSignatures)(nil),
+			Name: "initialize", Type: (*InitializeInstruction)(nil),
 		},
 		{
-			"append_signatures", (*AppendSignatures)(nil),
+			Name: "set_config", Type: (*SetConfigInstruction)(nil),
 		},
 		{
-			"clear_signatures", (*ClearSignatures)(nil),
+			Name: "set_root", Type: (*SetRootInstruction)(nil),
 		},
 		{
-			"finalize_signatures", (*FinalizeSignatures)(nil),
+			Name: "transfer_ownership", Type: (*TransferOwnershipInstruction)(nil),
 		},
 	},
 )
@@ -398,14 +398,14 @@ func (inst *Instruction) MarshalWithEncoder(encoder *ag_binary.Encoder) error {
 }
 
 func registryDecodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (interface{}, error) {
-	inst, err := DecodeInstruction(accounts, data)
+	inst, err := decodeInstruction(accounts, data)
 	if err != nil {
 		return nil, err
 	}
 	return inst, nil
 }
 
-func DecodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (*Instruction, error) {
+func decodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (*Instruction, error) {
 	inst := new(Instruction)
 	if err := ag_binary.NewBorshDecoder(data).Decode(inst); err != nil {
 		return nil, fmt.Errorf("unable to decode instruction: %w", err)
@@ -417,4 +417,26 @@ func DecodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (*Instr
 		}
 	}
 	return inst, nil
+}
+
+func DecodeInstructions(message *ag_solanago.Message) (instructions []*Instruction, err error) {
+	for _, ins := range message.Instructions {
+		var programID ag_solanago.PublicKey
+		if programID, err = message.Program(ins.ProgramIDIndex); err != nil {
+			return
+		}
+		if !programID.Equals(ProgramID) {
+			continue
+		}
+		var accounts []*ag_solanago.AccountMeta
+		if accounts, err = ins.ResolveInstructionAccounts(message); err != nil {
+			return
+		}
+		var insDecoded *Instruction
+		if insDecoded, err = decodeInstruction(accounts, ins.Data); err != nil {
+			return
+		}
+		instructions = append(instructions, insDecoded)
+	}
+	return
 }

@@ -1,202 +1,71 @@
+/**
+ * Program IDL in camelCase format in order to be used in JS/TS.
+ *
+ * Note that this is only a type helper and is not the actual IDL. The original
+ * IDL can be found at `target/idl/ccip_common.json`.
+ */
 export type CcipCommon = {
-  "version": "0.1.0-dev",
-  "name": "ccip_common",
+  "address": "Ccip842gzYHhvdDkSyi2YVCoAWPbYJoApMFzSxQroE9C",
+  "metadata": {
+    "name": "ccipCommon",
+    "version": "0.1.0-dev",
+    "spec": "0.1.0"
+  },
   "instructions": [],
-  "accounts": [
-    {
-      "name": "tokenAdminRegistry",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "version",
-            "type": "u8"
-          },
-          {
-            "name": "administrator",
-            "type": "publicKey"
-          },
-          {
-            "name": "pendingAdministrator",
-            "type": "publicKey"
-          },
-          {
-            "name": "lookupTable",
-            "type": "publicKey"
-          },
-          {
-            "name": "writableIndexes",
-            "type": {
-              "array": [
-                "u128",
-                2
-              ]
-            }
-          },
-          {
-            "name": "mint",
-            "type": "publicKey"
-          }
-        ]
-      }
-    }
-  ],
   "errors": [
     {
       "code": 10000,
-      "name": "InvalidSequenceInterval",
+      "name": "invalidSequenceInterval",
       "msg": "The given sequence interval is invalid"
     },
     {
       "code": 10001,
-      "name": "InvalidInputsPoolAccounts",
+      "name": "invalidInputsPoolAccounts",
       "msg": "Invalid pool accounts"
     },
     {
       "code": 10002,
-      "name": "InvalidInputsTokenAccounts",
+      "name": "invalidInputsTokenAccounts",
       "msg": "Invalid token accounts"
     },
     {
       "code": 10003,
-      "name": "InvalidInputsTokenAdminRegistryAccounts",
+      "name": "invalidInputsTokenAdminRegistryAccounts",
       "msg": "Invalid Token Admin Registry account"
     },
     {
       "code": 10004,
-      "name": "InvalidInputsLookupTableAccounts",
+      "name": "invalidInputsLookupTableAccounts",
       "msg": "Invalid LookupTable account"
     },
     {
       "code": 10005,
-      "name": "InvalidInputsLookupTableAccountWritable",
+      "name": "invalidInputsLookupTableAccountWritable",
       "msg": "Invalid LookupTable account writable access"
     },
     {
       "code": 10006,
-      "name": "InvalidInputsPoolSignerAccounts",
+      "name": "invalidInputsPoolSignerAccounts",
       "msg": "Invalid pool signer account"
     },
     {
       "code": 10007,
-      "name": "InvalidChainFamilySelector",
+      "name": "invalidChainFamilySelector",
       "msg": "Invalid chain family selector"
     },
     {
       "code": 10008,
-      "name": "InvalidEncoding",
+      "name": "invalidEncoding",
       "msg": "Invalid encoding"
     },
     {
       "code": 10009,
-      "name": "InvalidEVMAddress",
+      "name": "invalidEvmAddress",
       "msg": "Invalid EVM address"
     },
     {
       "code": 10010,
-      "name": "InvalidSVMAddress",
-      "msg": "Invalid SVM address"
-    }
-  ]
-};
-
-export const IDL: CcipCommon = {
-  "version": "0.1.0-dev",
-  "name": "ccip_common",
-  "instructions": [],
-  "accounts": [
-    {
-      "name": "tokenAdminRegistry",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "version",
-            "type": "u8"
-          },
-          {
-            "name": "administrator",
-            "type": "publicKey"
-          },
-          {
-            "name": "pendingAdministrator",
-            "type": "publicKey"
-          },
-          {
-            "name": "lookupTable",
-            "type": "publicKey"
-          },
-          {
-            "name": "writableIndexes",
-            "type": {
-              "array": [
-                "u128",
-                2
-              ]
-            }
-          },
-          {
-            "name": "mint",
-            "type": "publicKey"
-          }
-        ]
-      }
-    }
-  ],
-  "errors": [
-    {
-      "code": 10000,
-      "name": "InvalidSequenceInterval",
-      "msg": "The given sequence interval is invalid"
-    },
-    {
-      "code": 10001,
-      "name": "InvalidInputsPoolAccounts",
-      "msg": "Invalid pool accounts"
-    },
-    {
-      "code": 10002,
-      "name": "InvalidInputsTokenAccounts",
-      "msg": "Invalid token accounts"
-    },
-    {
-      "code": 10003,
-      "name": "InvalidInputsTokenAdminRegistryAccounts",
-      "msg": "Invalid Token Admin Registry account"
-    },
-    {
-      "code": 10004,
-      "name": "InvalidInputsLookupTableAccounts",
-      "msg": "Invalid LookupTable account"
-    },
-    {
-      "code": 10005,
-      "name": "InvalidInputsLookupTableAccountWritable",
-      "msg": "Invalid LookupTable account writable access"
-    },
-    {
-      "code": 10006,
-      "name": "InvalidInputsPoolSignerAccounts",
-      "msg": "Invalid pool signer account"
-    },
-    {
-      "code": 10007,
-      "name": "InvalidChainFamilySelector",
-      "msg": "Invalid chain family selector"
-    },
-    {
-      "code": 10008,
-      "name": "InvalidEncoding",
-      "msg": "Invalid encoding"
-    },
-    {
-      "code": 10009,
-      "name": "InvalidEVMAddress",
-      "msg": "Invalid EVM address"
-    },
-    {
-      "code": 10010,
-      "name": "InvalidSVMAddress",
+      "name": "invalidSvmAddress",
       "msg": "Invalid SVM address"
     }
   ]

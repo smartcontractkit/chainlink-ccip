@@ -12,10 +12,10 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-var ProgramID ag_solanago.PublicKey
+var ProgramID ag_solanago.PublicKey = ag_solanago.MustPublicKeyFromBase58("2zZwzyptLqwFJFEFxjPvrdhiGpH9pJ3MfrrmZX6NTKxm")
 
-func SetProgramID(pubkey ag_solanago.PublicKey) {
-	ProgramID = pubkey
+func SetProgramID(PublicKey ag_solanago.PublicKey) {
+	ProgramID = PublicKey
 	ag_solanago.RegisterInstructionDecoder(ProgramID, registryDecodeInstruction)
 }
 
@@ -28,48 +28,48 @@ func init() {
 }
 
 var (
-	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
-
-	Instruction_Empty = ag_binary.TypeID([8]byte{214, 44, 4, 247, 12, 41, 217, 110})
-
-	Instruction_U8InstructionData = ag_binary.TypeID([8]byte{17, 175, 156, 253, 91, 173, 26, 228})
-
-	Instruction_StructInstructionData = ag_binary.TypeID([8]byte{132, 84, 80, 47, 117, 198, 94, 67})
+	Instruction_AccountMut = ag_binary.TypeID([8]byte{12, 2, 137, 19, 22, 235, 144, 70})
 
 	Instruction_AccountRead = ag_binary.TypeID([8]byte{79, 53, 80, 124, 182, 81, 206, 85})
-
-	Instruction_AccountMut = ag_binary.TypeID([8]byte{12, 2, 137, 19, 22, 235, 144, 70})
 
 	// instruction that accepts arbitrarily large instruction data.
 	Instruction_BigInstructionData = ag_binary.TypeID([8]byte{250, 215, 200, 174, 42, 217, 129, 182})
 
+	Instruction_ComputeHeavy = ag_binary.TypeID([8]byte{114, 240, 76, 252, 181, 175, 211, 78})
+
+	Instruction_Empty = ag_binary.TypeID([8]byte{214, 44, 4, 247, 12, 41, 217, 110})
+
+	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
+
 	// no-op instruction that does nothing, also can be used to test maximum account references(remaining_accounts)
 	Instruction_NoOp = ag_binary.TypeID([8]byte{36, 122, 159, 43, 166, 240, 121, 88})
 
-	Instruction_ComputeHeavy = ag_binary.TypeID([8]byte{114, 240, 76, 252, 181, 175, 211, 78})
+	Instruction_StructInstructionData = ag_binary.TypeID([8]byte{132, 84, 80, 47, 117, 198, 94, 67})
+
+	Instruction_U8InstructionData = ag_binary.TypeID([8]byte{17, 175, 156, 253, 91, 173, 26, 228})
 )
 
 // InstructionIDToName returns the name of the instruction given its ID.
 func InstructionIDToName(id ag_binary.TypeID) string {
 	switch id {
-	case Instruction_Initialize:
-		return "Initialize"
-	case Instruction_Empty:
-		return "Empty"
-	case Instruction_U8InstructionData:
-		return "U8InstructionData"
-	case Instruction_StructInstructionData:
-		return "StructInstructionData"
-	case Instruction_AccountRead:
-		return "AccountRead"
 	case Instruction_AccountMut:
 		return "AccountMut"
+	case Instruction_AccountRead:
+		return "AccountRead"
 	case Instruction_BigInstructionData:
 		return "BigInstructionData"
-	case Instruction_NoOp:
-		return "NoOp"
 	case Instruction_ComputeHeavy:
 		return "ComputeHeavy"
+	case Instruction_Empty:
+		return "Empty"
+	case Instruction_Initialize:
+		return "Initialize"
+	case Instruction_NoOp:
+		return "NoOp"
+	case Instruction_StructInstructionData:
+		return "StructInstructionData"
+	case Instruction_U8InstructionData:
+		return "U8InstructionData"
 	default:
 		return ""
 	}
@@ -91,31 +91,31 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 	ag_binary.AnchorTypeIDEncoding,
 	[]ag_binary.VariantType{
 		{
-			"initialize", (*Initialize)(nil),
+			Name: "account_mut", Type: (*AccountMutInstruction)(nil),
 		},
 		{
-			"empty", (*Empty)(nil),
+			Name: "account_read", Type: (*AccountReadInstruction)(nil),
 		},
 		{
-			"u8_instruction_data", (*U8InstructionData)(nil),
+			Name: "big_instruction_data", Type: (*BigInstructionDataInstruction)(nil),
 		},
 		{
-			"struct_instruction_data", (*StructInstructionData)(nil),
+			Name: "compute_heavy", Type: (*ComputeHeavyInstruction)(nil),
 		},
 		{
-			"account_read", (*AccountRead)(nil),
+			Name: "empty", Type: (*EmptyInstruction)(nil),
 		},
 		{
-			"account_mut", (*AccountMut)(nil),
+			Name: "initialize", Type: (*InitializeInstruction)(nil),
 		},
 		{
-			"big_instruction_data", (*BigInstructionData)(nil),
+			Name: "no_op", Type: (*NoOpInstruction)(nil),
 		},
 		{
-			"no_op", (*NoOp)(nil),
+			Name: "struct_instruction_data", Type: (*StructInstructionDataInstruction)(nil),
 		},
 		{
-			"compute_heavy", (*ComputeHeavy)(nil),
+			Name: "u8_instruction_data", Type: (*U8InstructionDataInstruction)(nil),
 		},
 	},
 )
@@ -153,14 +153,14 @@ func (inst *Instruction) MarshalWithEncoder(encoder *ag_binary.Encoder) error {
 }
 
 func registryDecodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (interface{}, error) {
-	inst, err := DecodeInstruction(accounts, data)
+	inst, err := decodeInstruction(accounts, data)
 	if err != nil {
 		return nil, err
 	}
 	return inst, nil
 }
 
-func DecodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (*Instruction, error) {
+func decodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (*Instruction, error) {
 	inst := new(Instruction)
 	if err := ag_binary.NewBorshDecoder(data).Decode(inst); err != nil {
 		return nil, fmt.Errorf("unable to decode instruction: %w", err)
@@ -172,4 +172,26 @@ func DecodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (*Instr
 		}
 	}
 	return inst, nil
+}
+
+func DecodeInstructions(message *ag_solanago.Message) (instructions []*Instruction, err error) {
+	for _, ins := range message.Instructions {
+		var programID ag_solanago.PublicKey
+		if programID, err = message.Program(ins.ProgramIDIndex); err != nil {
+			return
+		}
+		if !programID.Equals(ProgramID) {
+			continue
+		}
+		var accounts []*ag_solanago.AccountMeta
+		if accounts, err = ins.ResolveInstructionAccounts(message); err != nil {
+			return
+		}
+		var insDecoded *Instruction
+		if insDecoded, err = decodeInstruction(accounts, ins.Data); err != nil {
+			return
+		}
+		instructions = append(instructions, insDecoded)
+	}
+	return
 }

@@ -39,7 +39,7 @@ jobs:
     needs: [ changes ]
     if: ${{ needs.changes.outputs.solana_changes == 'true' }}
     name: Get Anchor Version
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-8cores-32GB
     outputs:
       anchor_version: ${{ steps.anchorversion.outputs.anchor }}
     steps:
@@ -93,7 +93,7 @@ jobs:
     needs: [ changes, get_anchor_version, build_solana ]
     if: ${{ needs.changes.outputs.solana_changes == 'true' }}
     name: rust tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-8cores-32GB
     steps:
     - uses: actions/checkout@v4
     - name: Cache cargo target dir
@@ -175,7 +175,7 @@ jobs:
     needs: [ changes, get_anchor_version, build_solana ]
     if: ${{ needs.changes.outputs.solana_changes == 'true' }}
     name: lint + check artifacts
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-8cores-32GB
     steps:
       - uses: actions/checkout@v4
       - name: Cache cargo target dir
@@ -212,7 +212,7 @@ jobs:
           rm -rf target/idl target/types &&\
           anchor build"
 
-          go install github.com/gagliardetto/anchor-go@v0.2.3
+          go install github.com/fragmetric-labs/solana-anchor-go
           ./scripts/anchor-go-gen.sh
           make format
           git diff --exit-code

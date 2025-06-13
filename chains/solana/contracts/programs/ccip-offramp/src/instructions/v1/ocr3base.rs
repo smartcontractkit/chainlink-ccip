@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_lang::solana_program::sysvar;
 use anchor_lang::solana_program::{keccak, secp256k1_recover::*};
 
-use crate::ocr3base::{ConfigSet, Transmitted, MAX_ORACLES};
+use crate::ocr3base::{OcrConfigSet, Transmitted, MAX_ORACLES};
 use crate::state::{Ocr3Config, Ocr3ConfigInfo};
 use crate::CcipOfframpError;
 use crate::OcrPluginType;
@@ -18,7 +18,7 @@ pub const TRANSMIT_MSGDATA_EXTRA_CONSTANT_LENGTH_COMPONENT_FOR_SIGNATURES: u128 
     + 32; // length of rawVs
 
 #[zero_copy]
-#[derive(AnchorSerialize, AnchorDeserialize, InitSpace, Default)]
+#[derive(InitSpace, Default)]
 pub(super) struct ReportContext {
     // byte_words consists of:
     // [0]: ConfigDigest
@@ -118,7 +118,7 @@ pub fn ocr3_set(
     ocr3_config.config_info.f = cfg.f;
     ocr3_config.config_info.config_digest = cfg.config_digest;
 
-    emit!(ConfigSet {
+    emit!(OcrConfigSet {
         ocr_plugin_type: ocr3_config.plugin_type.try_into()?,
         config_digest: ocr3_config.config_info.config_digest,
         signers,

@@ -8,17 +8,17 @@ import (
 	ag_solanago "github.com/gagliardetto/solana-go"
 )
 
-type BaseState struct {
+type BaseStateAccount struct {
 	Owner         ag_solanago.PublicKey
 	ProposedOwner ag_solanago.PublicKey
 	Router        ag_solanago.PublicKey
 }
 
-var BaseStateDiscriminator = [8]byte{46, 139, 13, 192, 80, 181, 96, 46}
+var BaseStateAccountDiscriminator = [8]byte{46, 139, 13, 192, 80, 181, 96, 46}
 
-func (obj BaseState) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj BaseStateAccount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Write account discriminator:
-	err = encoder.WriteBytes(BaseStateDiscriminator[:], false)
+	err = encoder.WriteBytes(BaseStateAccountDiscriminator[:], false)
 	if err != nil {
 		return err
 	}
@@ -40,14 +40,14 @@ func (obj BaseState) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) 
 	return nil
 }
 
-func (obj *BaseState) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *BaseStateAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Read and check account discriminator:
 	{
 		discriminator, err := decoder.ReadTypeID()
 		if err != nil {
 			return err
 		}
-		if !discriminator.Equal(BaseStateDiscriminator[:]) {
+		if !discriminator.Equal(BaseStateAccountDiscriminator[:]) {
 			return fmt.Errorf(
 				"wrong discriminator: wanted %s, got %s",
 				"[46 139 13 192 80 181 96 46]",
@@ -72,16 +72,16 @@ func (obj *BaseState) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err erro
 	return nil
 }
 
-type RemoteChainConfig struct {
+type RemoteChainConfigAccount struct {
 	Recipient      []byte
 	ExtraArgsBytes []byte
 }
 
-var RemoteChainConfigDiscriminator = [8]byte{248, 170, 246, 200, 84, 101, 138, 67}
+var RemoteChainConfigAccountDiscriminator = [8]byte{248, 170, 246, 200, 84, 101, 138, 67}
 
-func (obj RemoteChainConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj RemoteChainConfigAccount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Write account discriminator:
-	err = encoder.WriteBytes(RemoteChainConfigDiscriminator[:], false)
+	err = encoder.WriteBytes(RemoteChainConfigAccountDiscriminator[:], false)
 	if err != nil {
 		return err
 	}
@@ -98,14 +98,14 @@ func (obj RemoteChainConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err
 	return nil
 }
 
-func (obj *RemoteChainConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *RemoteChainConfigAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Read and check account discriminator:
 	{
 		discriminator, err := decoder.ReadTypeID()
 		if err != nil {
 			return err
 		}
-		if !discriminator.Equal(RemoteChainConfigDiscriminator[:]) {
+		if !discriminator.Equal(RemoteChainConfigAccountDiscriminator[:]) {
 			return fmt.Errorf(
 				"wrong discriminator: wanted %s, got %s",
 				"[248 170 246 200 84 101 138 67]",

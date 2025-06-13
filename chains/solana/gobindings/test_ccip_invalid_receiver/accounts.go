@@ -7,27 +7,27 @@ import (
 	ag_binary "github.com/gagliardetto/binary"
 )
 
-type AllowedOfframp struct{}
+type AllowedOfframpAccount struct{}
 
-var AllowedOfframpDiscriminator = [8]byte{247, 97, 179, 16, 207, 36, 236, 132}
+var AllowedOfframpAccountDiscriminator = [8]byte{247, 97, 179, 16, 207, 36, 236, 132}
 
-func (obj AllowedOfframp) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj AllowedOfframpAccount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Write account discriminator:
-	err = encoder.WriteBytes(AllowedOfframpDiscriminator[:], false)
+	err = encoder.WriteBytes(AllowedOfframpAccountDiscriminator[:], false)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (obj *AllowedOfframp) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *AllowedOfframpAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Read and check account discriminator:
 	{
 		discriminator, err := decoder.ReadTypeID()
 		if err != nil {
 			return err
 		}
-		if !discriminator.Equal(AllowedOfframpDiscriminator[:]) {
+		if !discriminator.Equal(AllowedOfframpAccountDiscriminator[:]) {
 			return fmt.Errorf(
 				"wrong discriminator: wanted %s, got %s",
 				"[247 97 179 16 207 36 236 132]",
@@ -37,15 +37,15 @@ func (obj *AllowedOfframp) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err
 	return nil
 }
 
-type Counter struct {
+type CounterAccount struct {
 	Value uint8
 }
 
-var CounterDiscriminator = [8]byte{255, 176, 4, 245, 188, 253, 124, 25}
+var CounterAccountDiscriminator = [8]byte{255, 176, 4, 245, 188, 253, 124, 25}
 
-func (obj Counter) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj CounterAccount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Write account discriminator:
-	err = encoder.WriteBytes(CounterDiscriminator[:], false)
+	err = encoder.WriteBytes(CounterAccountDiscriminator[:], false)
 	if err != nil {
 		return err
 	}
@@ -57,14 +57,14 @@ func (obj Counter) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	return nil
 }
 
-func (obj *Counter) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *CounterAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Read and check account discriminator:
 	{
 		discriminator, err := decoder.ReadTypeID()
 		if err != nil {
 			return err
 		}
-		if !discriminator.Equal(CounterDiscriminator[:]) {
+		if !discriminator.Equal(CounterAccountDiscriminator[:]) {
 			return fmt.Errorf(
 				"wrong discriminator: wanted %s, got %s",
 				"[255 176 4 245 188 253 124 25]",
