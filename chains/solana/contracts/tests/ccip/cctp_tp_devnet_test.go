@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"strings"
 	"testing"
 
 	bin "github.com/gagliardetto/binary"
@@ -56,6 +57,7 @@ func TestCctpTpDevnet(t *testing.T) {
 	})
 
 	ccip_router.SetProgramID(referenceAddresses.Router)
+	fee_quoter.SetProgramID(referenceAddresses.FeeQuoter)
 
 	linkMint := solana.MustPublicKeyFromBase58(devnetInfo.LinkMint)
 
@@ -283,6 +285,35 @@ func TestCctpTpDevnet(t *testing.T) {
 		})
 	})
 
+	fqPerChainPerToken, _, err := state.FindFqPerChainPerTokenConfigPDA(chainSelector, usdcMint, referenceAddresses.FeeQuoter)
+	require.NoError(t, err)
+	fqConfigPDA, _, err := state.FindFqConfigPDA(referenceAddresses.FeeQuoter)
+	require.NoError(t, err)
+
+	t.Run("FeeQuoter PerChainPerToken", func(t *testing.T) {
+		t.Skip()
+
+		ix, err := fee_quoter.NewSetTokenTransferFeeConfigInstruction(
+			chainSelector,
+			usdcMint,
+			fee_quoter.TokenTransferFeeConfig{
+				MinFeeUsdcents:    0,
+				MaxFeeUsdcents:    1, // TODO, placeholder value
+				DeciBps:           0,
+				DestGasOverhead:   1000, // TODO, placeholder value
+				DestBytesOverhead: 68,   // 64 bytes for the message + 4 bytes for the length (vec prefix)
+				IsEnabled:         true,
+			},
+			fqConfigPDA,
+			fqPerChainPerToken,
+			deployer.PublicKey(),
+			solana.SystemProgramID,
+		).ValidateAndBuild()
+		require.NoError(t, err)
+
+		testutils.SendAndConfirm(ctx, t, client, []solana.Instruction{ix}, deployer, config.DefaultCommitment)
+	})
+
 	t.Run("Router interaction (setup + onramp)", func(t *testing.T) {
 		// t.Skip()
 
@@ -425,8 +456,6 @@ func TestCctpTpDevnet(t *testing.T) {
 			require.NoError(t, err)
 			fqWsolBillingConfigPDA, _, err := state.FindFqBillingTokenConfigPDA(solana.SolMint, referenceAddresses.FeeQuoter)
 			require.NoError(t, err)
-			fqConfigPDA, _, err := state.FindFqConfigPDA(referenceAddresses.FeeQuoter)
-			require.NoError(t, err)
 			fqDestChainPDA, _, err := state.FindFqDestChainPDA(chainSelector, referenceAddresses.FeeQuoter)
 			require.NoError(t, err)
 			fqLinkTokenConfig, _, err := state.FindFqBillingTokenConfigPDA(linkMint, referenceAddresses.FeeQuoter)
@@ -434,8 +463,6 @@ func TestCctpTpDevnet(t *testing.T) {
 			rmnRemoteCurses, _, err := state.FindRMNRemoteCursesPDA(referenceAddresses.RmnRemote)
 			require.NoError(t, err)
 			rmnRemoteConfig, _, err := state.FindRMNRemoteConfigPDA(referenceAddresses.RmnRemote)
-			require.NoError(t, err)
-			fqPerChainPerToken, _, err := state.FindFqPerChainPerTokenConfigPDA(chainSelector, usdcMint, referenceAddresses.FeeQuoter)
 			require.NoError(t, err)
 
 			adminUsdcATA, _, err := tokens.FindAssociatedTokenAddress(solana.TokenProgramID, usdcMint, admin.PublicKey())
@@ -507,13 +534,15 @@ func TestCctpTpDevnet(t *testing.T) {
 
 			result := testutils.SendAndConfirmWithLookupTables(ctx, t, client, []solana.Instruction{approveIx, ix}, admin, config.DefaultCommitment, tpLookupTable)
 			require.NotNil(t, result)
-			fmt.Printf("Result: %v\n", result.Meta.LogMessages)
+			tx, err := result.Transaction.GetTransaction()
+			fmt.Printf("Transaction Signature: %v\n", tx.Signatures)
+			fmt.Printf("Result: \n    %s\n", strings.Join(result.Meta.LogMessages, "\n    "))
 
 			var ccipSentEvent ccip.EventCCIPMessageSent
 			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "CCIPMessageSent", &ccipSentEvent, config.PrintEvents))
 
 			var cctpSentEvent ccip.EventCcipCctpMessageSent
-			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "CctpMessageSentEvent", &cctpSentEvent, config.PrintEvents))
+			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "CcipCctpMessageSentEvent", &cctpSentEvent, config.PrintEvents))
 		})
 	})
 }
