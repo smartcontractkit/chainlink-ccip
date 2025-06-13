@@ -390,7 +390,7 @@ fn parse_remaining_release_accounts<'info>(
 fn to_solana_pubkey(address: &RemoteAddress) -> Pubkey {
     let mut solana_address = [0; 32];
     let remote_bytes = address.len();
-    solana_address[32 - remote_bytes..].copy_from_slice(&address);
+    solana_address[32 - remote_bytes..].copy_from_slice(address);
     Pubkey::new_from_array(solana_address)
 }
 
@@ -438,7 +438,7 @@ fn cctp_deposit_for_burn_with_caller(
         ctx.accounts.cctp_token_messenger_minter.to_account_info(),
     ];
 
-    let signer_keys = vec![
+    let signer_keys = [
         ctx.accounts.pool_signer.key(),
         ctx.accounts.cctp_message_sent_event.key(),
     ];
@@ -474,7 +474,7 @@ fn cctp_deposit_for_burn_with_caller(
     invoke_signed(
         &instruction,
         &acc_infos,
-        &[&pool_signer_seeds, &message_sent_event_seeds],
+        &[pool_signer_seeds, message_sent_event_seeds],
     )?;
 
     let (_, cctp_nonce_bytes) = get_return_data().unwrap();
@@ -486,13 +486,13 @@ fn cctp_deposit_for_burn_with_caller(
 fn cctp_receive_message<'info>(
     ctx: &Context<'_, '_, 'info, 'info, TokenOfframp<'info>>,
     remaining: &TokenOfframpRemainingAccounts<'info>,
-    message_and_attestation_bytes: &Vec<u8>,
+    message_and_attestation_bytes: &[u8],
 ) -> Result<()> {
     let mut instruction_data = Vec::with_capacity(
         RECEIVE_MESSAGE_DISCRIMINATOR.len() + message_and_attestation_bytes.len(),
     );
     instruction_data.extend_from_slice(&RECEIVE_MESSAGE_DISCRIMINATOR);
-    instruction_data.extend_from_slice(&message_and_attestation_bytes);
+    instruction_data.extend_from_slice(message_and_attestation_bytes);
 
     let acc_infos = vec![
         ctx.accounts.pool_signer.clone().to_account_info(),

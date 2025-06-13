@@ -446,7 +446,7 @@ mod helpers {
                 authority.key.as_ref(),
                 &[nonce_bump],
             ];
-            let signer_seeds = &[&nonce_seeds[..]];
+            let signer_seeds = &[nonce_seeds];
             let cpi_ctx = CpiContext::new_with_signer(
                 system_program.to_account_info(),
                 init_accs,
