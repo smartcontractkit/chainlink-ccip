@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"slices"
 	"sort"
 	"sync"
 	"time"
@@ -18,7 +17,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/addressbook"
@@ -229,130 +227,22 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 	return reports, nil
 }
 
-type ExecutionStateChangedEvent struct {
-	SourceChainSelector cciptypes.ChainSelector
-	SequenceNumber      cciptypes.SeqNum
-	MessageID           cciptypes.Bytes32
-	MessageHash         cciptypes.Bytes32
-	State               uint8
-	ReturnData          cciptypes.Bytes
-	GasUsed             big.Int
-}
-
 func (r *ccipChainReader) ExecutedMessages(
 	ctx context.Context,
 	rangesPerChain map[cciptypes.ChainSelector][]cciptypes.SeqNumRange,
 	confidence primitives.ConfidenceLevel,
 ) (map[cciptypes.ChainSelector][]cciptypes.SeqNum, error) {
-	lggr := logutil.WithContextValues(ctx, r.lggr)
-
-	if err := validateReaderExistence(r.contractReaders, r.destChain); err != nil {
-		return nil, err
-	}
-
-	// trim empty ranges from rangesPerChain
-	// otherwise we may get SQL errors from the chainreader.
-	nonEmptyRangesPerChain := make(map[cciptypes.ChainSelector][]cciptypes.SeqNumRange)
-	for chain, ranges := range rangesPerChain {
-		if len(ranges) > 0 {
-			nonEmptyRangesPerChain[chain] = ranges
-		}
-	}
-
-	dataTyp := ExecutionStateChangedEvent{}
-	keyFilter, countSqNrs := createExecutedMessagesKeyFilter(nonEmptyRangesPerChain, confidence)
-	if countSqNrs == 0 {
-		lggr.Debugw("no sequence numbers to query", "nonEmptyRangesPerChain", nonEmptyRangesPerChain)
-		return nil, nil
-	}
-	iter, err := r.contractReaders[r.destChain].ExtendedQueryKey(
-		ctx,
-		consts.ContractNameOffRamp,
-		keyFilter,
-		query.LimitAndSort{
-			SortBy: []query.SortBy{query.NewSortBySequence(query.Asc)},
-			Limit: query.Limit{
-				Count: countSqNrs,
-			},
-		},
-		&dataTyp,
-	)
+	destChainAccessor, err := getChainAccessor(r.accessors, r.destChain)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query offRamp: %w", err)
+		return nil, fmt.Errorf("unable to getChainAccessor: %w", err)
 	}
 
-	executed := make(map[cciptypes.ChainSelector][]cciptypes.SeqNum)
-	for _, item := range iter {
-		stateChange, ok := item.Data.(*ExecutionStateChangedEvent)
-		if !ok {
-			return nil, fmt.Errorf("failed to cast %T to ExecutionStateChangedEvent", item.Data)
-		}
-
-		if err := validateExecutionStateChangedEvent(stateChange, nonEmptyRangesPerChain); err != nil {
-			lggr.Errorw("validate execution state changed event",
-				"err", err, "stateChange", stateChange)
-			continue
-		}
-
-		executed[stateChange.SourceChainSelector] =
-			append(executed[stateChange.SourceChainSelector], stateChange.SequenceNumber)
+	executedMessageSeqNumbersByChain, err := destChainAccessor.ExecutedMessages(ctx, rangesPerChain, confidence)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get executed messages from accessor: %w", err)
 	}
 
-	return executed, nil
-}
-
-func createExecutedMessagesKeyFilter(
-	rangesPerChain map[cciptypes.ChainSelector][]cciptypes.SeqNumRange,
-	confidence primitives.ConfidenceLevel) (query.KeyFilter, uint64) {
-
-	var chainExpressions []query.Expression
-	var countSqNrs uint64
-	// final query should look like
-	// (chainA && (sqRange1 || sqRange2 || ...)) || (chainB && (sqRange1 || sqRange2 || ...))
-	sortedChains := maps.Keys(rangesPerChain)
-	slices.Sort(sortedChains)
-	for _, srcChain := range sortedChains {
-		seqNumRanges := rangesPerChain[srcChain]
-		var seqRangeExpressions []query.Expression
-		for _, seqNr := range seqNumRanges {
-			expr := query.Comparator(consts.EventAttributeSequenceNumber,
-				primitives.ValueComparator{
-					Value:    seqNr.Start(),
-					Operator: primitives.Gte,
-				},
-				primitives.ValueComparator{
-					Value:    seqNr.End(),
-					Operator: primitives.Lte,
-				})
-			seqRangeExpressions = append(seqRangeExpressions, expr)
-			countSqNrs += uint64(seqNr.End() - seqNr.Start() + 1)
-		}
-		combinedSeqNrs := query.Or(seqRangeExpressions...)
-
-		chainExpressions = append(chainExpressions, query.And(
-			combinedSeqNrs,
-			query.Comparator(consts.EventAttributeSourceChain, primitives.ValueComparator{
-				Value:    srcChain,
-				Operator: primitives.Eq,
-			}),
-		))
-	}
-	extendedQuery := query.Or(chainExpressions...)
-
-	keyFilter := query.KeyFilter{
-		Key: consts.EventNameExecutionStateChanged,
-		Expressions: []query.Expression{
-			extendedQuery,
-			// We don't need to wait for an execute state changed event to be finalized
-			// before we optimistically mark a message as executed.
-			query.Comparator(consts.EventAttributeState, primitives.ValueComparator{
-				Value:    0,
-				Operator: primitives.Gt,
-			}),
-			query.Confidence(confidence),
-		},
-	}
-	return keyFilter, countSqNrs
+	return executedMessageSeqNumbersByChain, nil
 }
 
 func (r *ccipChainReader) MsgsBetweenSeqNums(
@@ -1627,35 +1517,6 @@ func (r *ccipChainReader) processFeeQuoterResults(results []types.BatchReadResul
 	}
 
 	return FeeQuoterConfig{}, fmt.Errorf("invalid type for fee quoter static config: %T", val)
-}
-
-func validateExecutionStateChangedEvent(
-	ev *ExecutionStateChangedEvent, rangesByChain map[cciptypes.ChainSelector][]cciptypes.SeqNumRange) error {
-	if ev == nil {
-		return fmt.Errorf("execution state changed event is nil")
-	}
-
-	if _, ok := rangesByChain[ev.SourceChainSelector]; !ok {
-		return fmt.Errorf("source chain of messages was not queries")
-	}
-
-	if !ev.SequenceNumber.IsWithinRanges(rangesByChain[ev.SourceChainSelector]) {
-		return fmt.Errorf("execution state changed event sequence number is not in the expected range")
-	}
-
-	if ev.MessageHash.IsEmpty() {
-		return fmt.Errorf("nil message hash")
-	}
-
-	if ev.MessageID.IsEmpty() {
-		return fmt.Errorf("message ID is zero")
-	}
-
-	if ev.State == 0 {
-		return fmt.Errorf("state is zero")
-	}
-
-	return nil
 }
 
 // ccipReaderInternal defines the interface that ConfigPoller needs from the ccipChainReader
