@@ -10,7 +10,9 @@ import (
 type RemoteAddress = base.RemoteAddress
 type RemoteConfig = base.RemoteConfig
 type LockOrBurnInV1 = base.LockOrBurnInV1
+type LockOrBurnOutV1 = base.LockOrBurnOutV1
 type ReleaseOrMintInV1 = base.ReleaseOrMintInV1
+type ReleaseOrMintOutV1 = base.ReleaseOrMintOutV1
 type RateLimitConfig = base.RateLimitConfig
 type BaseConfig = base.BaseConfig
 type BaseChain = base.BaseChain

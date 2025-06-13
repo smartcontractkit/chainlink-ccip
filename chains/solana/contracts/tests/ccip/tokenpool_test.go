@@ -1298,9 +1298,16 @@ func TestTokenPool(t *testing.T) {
 			})
 		})
 
-		getUsedNoncesPDA := func(t *testing.T, messageSent message_transmitter.MessageSent) solana.PublicKey {
-			nonceBytes := messageSent.Message[12:20] // extract nonce from message, which is the 12th to 20th byte of the message
+		getCctpNonce := func(t *testing.T, messageBytes []byte) uint64 {
+			t.Helper()
+			nonceBytes := messageBytes[12:20] // extract nonce from message, which is the 12th to 20th byte of the message
 			nonce := binary.BigEndian.Uint64(nonceBytes)
+			return nonce
+		}
+
+		getUsedNoncesPDA := func(t *testing.T, messageSent message_transmitter.MessageSent) solana.PublicKey {
+			t.Helper()
+			nonce := getCctpNonce(t, messageSent.Message)
 			fmt.Println("Nonce for receiving message:", nonce)
 			firstNonce := (nonce-1)/6400*6400 + 1 // round down to the first nonce that is a multiple of 6400
 			fmt.Println("First nonce:", firstNonce)
@@ -1483,7 +1490,7 @@ func TestTokenPool(t *testing.T) {
 			fakeCcipFullNonce := uint64(1234567890)
 
 			messageSentEventAddress, _, err := solana.FindProgramAddress([][]byte{
-				[]byte("cctp_message_sent_event"),
+				[]byte("ccip_cctp_message_sent_event"),
 				user.PublicKey().Bytes(),
 				common.Uint64ToLE(remoteChainSelector),
 				common.Uint64ToLE(fakeCcipFullNonce),
@@ -1545,21 +1552,29 @@ func TestTokenPool(t *testing.T) {
 				res := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{transferI, fundPoolSignerIx, ix}, admin, config.DefaultCommitment)
 				require.NotNil(t, res)
 
+				output, err := common.ExtractAnchorTypedReturnValue[cctp_token_pool.LockOrBurnOutV1](ctx, res.Meta.LogMessages, cctpPool.program.String())
+				require.NoError(t, err)
+				outputSourceDomain := binary.BigEndian.Uint32(output.DestPoolData[60:64])
+				require.Equal(t, outputSourceDomain, domain) // the source domain is Solana in this test
+
 				require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, messageSentEventAddress, config.DefaultCommitment, &messageSentEventData))
 				fmt.Println("Message Sent Event Data:", messageSentEventData)
 				require.Equal(t, cctpPool.signer, messageSentEventData.RentPayer)
 
-				messageSentEventAccInfo, err := solanaGoClient.GetAccountInfoWithOpts(ctx, messageSentEventAddress, &rpc.GetAccountInfoOpts{Commitment: config.DefaultCommitment})
-				fmt.Println("Message Sent Event Account Info:", messageSentEventAccInfo)
-				fmt.Println("Message Sent Event Account Info (Owner):", messageSentEventAccInfo.Value.Owner)
+				var ccipCctpMessageSentEvent ccip.EventCcipCctpMessageSent
+				require.NoError(t, common.ParseEvent(res.Meta.LogMessages, "CcipCctpMessageSentEvent", &ccipCctpMessageSentEvent, config.PrintEvents))
+				require.Equal(t, user.PublicKey(), ccipCctpMessageSentEvent.OriginalSender)
+				require.Equal(t, config.SvmChainSelector, ccipCctpMessageSentEvent.RemoteChainSelector)
+				require.Equal(t, fakeCcipFullNonce, ccipCctpMessageSentEvent.MsgTotalNonce)
+				require.Equal(t, messageSentEventAddress, ccipCctpMessageSentEvent.EventAddress)
+				require.Equal(t, messageSentEventData.Message, ccipCctpMessageSentEvent.MessageSentBytes)
+				require.Equal(t, domain, ccipCctpMessageSentEvent.SourceDomain)
 
-				var tpMessageSentEvent ccip.CctpTokenPoolMessageSent
-				require.NoError(t, common.ParseEvent(res.Meta.LogMessages, "CctpMessageSentEvent", &tpMessageSentEvent, config.PrintEvents))
-				require.Equal(t, user.PublicKey(), tpMessageSentEvent.OriginalSender)
-				require.Equal(t, config.SvmChainSelector, tpMessageSentEvent.RemoteChainSelector)
-				require.Equal(t, fakeCcipFullNonce, tpMessageSentEvent.MsgFullNonce)
-				require.Equal(t, messageSentEventAddress, tpMessageSentEvent.EventAddress)
-				require.Equal(t, messageSentEventData.Message, tpMessageSentEvent.MessageSentBytes)
+				// Check CCTP nonce in all ways it appears
+				outputNonce := binary.BigEndian.Uint64(output.DestPoolData[24:32])                        // in pool returned dest data
+				require.Equal(t, outputNonce, getCctpNonce(t, ccipCctpMessageSentEvent.MessageSentBytes)) // in event message bytes
+				require.Equal(t, outputNonce, getCctpNonce(t, messageSentEventData.Message))              // in event account data
+				require.Equal(t, outputNonce, ccipCctpMessageSentEvent.CctpNonce)                         // in the event field
 			})
 
 			t.Run("Basic offramp", func(t *testing.T) {

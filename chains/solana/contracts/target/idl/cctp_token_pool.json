@@ -877,7 +877,7 @@
       ]
     },
     {
-      "name": "CctpMessageSentEvent",
+      "name": "CcipCctpMessageSentEvent",
       "fields": [
         {
           "name": "originalSender",
@@ -890,13 +890,23 @@
           "index": false
         },
         {
-          "name": "msgFullNonce",
+          "name": "msgTotalNonce",
           "type": "u64",
           "index": false
         },
         {
           "name": "eventAddress",
           "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "sourceDomain",
+          "type": "u32",
+          "index": false
+        },
+        {
+          "name": "cctpNonce",
+          "type": "u64",
           "index": false
         },
         {

@@ -397,7 +397,7 @@ func ExtractAnchorTypedReturnValue[T any, PT anchorType[T]](ctx context.Context,
 	if err != nil {
 		return nil, err
 	}
-	err = PT(&result).UnmarshalWithDecoder(bin.NewBinDecoder(bytes))
+	err = PT(&result).UnmarshalWithDecoder(bin.NewBorshDecoder(bytes))
 	if err != nil {
 		return nil, err
 	}

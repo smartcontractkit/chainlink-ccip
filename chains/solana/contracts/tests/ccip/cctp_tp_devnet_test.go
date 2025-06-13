@@ -323,7 +323,7 @@ func TestCctpTpDevnet(t *testing.T) {
 
 		messageSentEvent, _, err := solana.FindProgramAddress(
 			[][]byte{
-				[]byte("cctp_message_sent_event"),
+				[]byte("ccip_cctp_message_sent_event"),
 				admin.PublicKey().Bytes(), // original sender
 				common.Uint64ToLE(chainSelector),
 				common.Uint64ToLE(nonces.TotalNonce + 1), // next counter, as it will be incremented for the new msg
@@ -512,7 +512,7 @@ func TestCctpTpDevnet(t *testing.T) {
 			var ccipSentEvent ccip.EventCCIPMessageSent
 			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "CCIPMessageSent", &ccipSentEvent, config.PrintEvents))
 
-			var cctpSentEvent ccip.CctpTokenPoolMessageSent
+			var cctpSentEvent ccip.EventCcipCctpMessageSent
 			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "CctpMessageSentEvent", &cctpSentEvent, config.PrintEvents))
 		})
 	})

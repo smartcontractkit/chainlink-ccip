@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::instruction::{AccountMeta, Instruction};
-use anchor_lang::solana_program::program::invoke_signed;
+use solana_program::program::{get_return_data, invoke_signed};
 
 use base_token_pool::common::*;
 use base_token_pool::rate_limiter::*;
@@ -14,6 +14,8 @@ pub const RECLAIM_EVENT_ACCOUNT_DISCRIMINATOR: [u8; 8] = [94, 198, 180, 159, 131
 
 pub mod context;
 use crate::context::*;
+
+const SOLANA_DOMAIN_ID: u32 = 5; // Circle's CCTP domain ID for Solana is always 5, see https://developers.circle.com/stablecoins/supported-domains
 
 #[program]
 pub mod cctp_token_pool {
@@ -270,7 +272,7 @@ pub mod cctp_token_pool {
             CctpTokenPoolError::InvalidReceiver
         );
 
-        cctp_deposit_for_burn_with_caller(&ctx, &lock_or_burn)?;
+        let cctp_nonce = cctp_deposit_for_burn_with_caller(&ctx, &lock_or_burn)?;
 
         let cctp_event_data = ctx.accounts.cctp_message_sent_event.try_borrow_data()?;
         // The first 8 bytes are the discriminator, so we skip them
@@ -283,12 +285,14 @@ pub mod cctp_token_pool {
             CctpTokenPoolError::InvalidMessageSentEventAccount
         );
 
-        emit!(CctpMessageSentEvent {
+        emit!(CcipCctpMessageSentEvent {
             original_sender: lock_or_burn.original_sender,
             remote_chain_selector: lock_or_burn.remote_chain_selector,
-            msg_full_nonce: lock_or_burn.msg_total_nonce,
+            msg_total_nonce: lock_or_burn.msg_total_nonce,
             event_address: ctx.accounts.cctp_message_sent_event.key(),
             message_sent_bytes: cctp_message_bytes.to_vec(),
+            source_domain: SOLANA_DOMAIN_ID,
+            cctp_nonce,
         });
 
         emit!(Burned {
@@ -297,13 +301,14 @@ pub mod cctp_token_pool {
             mint: ctx.accounts.state.config.mint,
         });
 
+        let extra_data = LockOrBurnExtraData {
+            nonce: cctp_nonce,
+            source_domain: SOLANA_DOMAIN_ID,
+        };
+
         Ok(LockOrBurnOutV1 {
             dest_token_address: ctx.accounts.chain_config.base.remote.token_address.clone(),
-            dest_pool_data: {
-                let mut abi_encoded_decimals = vec![0u8; 32];
-                abi_encoded_decimals[31] = ctx.accounts.state.config.decimals;
-                abi_encoded_decimals
-            },
+            dest_pool_data: extra_data.abi_encode().to_vec(),
         })
     }
 
@@ -392,7 +397,7 @@ fn to_solana_pubkey(address: &RemoteAddress) -> Pubkey {
 fn cctp_deposit_for_burn_with_caller(
     ctx: &Context<TokenOnramp>,
     lock_or_burn: &LockOrBurnInV1,
-) -> Result<()> {
+) -> Result<u64> {
     let mint_recipient = Pubkey::new_from_array(lock_or_burn.receiver[0..32].try_into().unwrap());
 
     let destination_domain = ctx.accounts.chain_config.cctp.domain_id;
@@ -470,8 +475,12 @@ fn cctp_deposit_for_burn_with_caller(
         &instruction,
         &acc_infos,
         &[&pool_signer_seeds, &message_sent_event_seeds],
-    )
-    .map_err(|_| CctpTokenPoolError::FailedCctpCpi.into())
+    )?;
+
+    let (_, cctp_nonce_bytes) = get_return_data().unwrap();
+    Ok(u64::from_le_bytes(
+        cctp_nonce_bytes.as_slice().try_into().unwrap(),
+    ))
 }
 
 fn cctp_receive_message<'info>(
@@ -554,6 +563,49 @@ fn transfer_cctp_tokens(ctx: &Context<TokenOfframp>, amount: u64, decimals: u8) 
     anchor_spl::token::transfer_checked(cpi_ctx, amount, decimals)
 }
 
+pub struct LockOrBurnExtraData {
+    pub nonce: u64,         // The nonce of the message being locked or burned
+    pub source_domain: u32, // The source chain domain ID, which for Solana is always 5
+}
+
+impl LockOrBurnExtraData {
+    // ABI-encoding left-pads each number to 32-bytes, and uses big-endian encoding.
+
+    // The nonce is in bytes 24..32 in the serialized data (u64 is 8 bytes)
+    const NONCE_INDEXES: (usize, usize) = (24, 32);
+    // The source domain is in bytes 60..64 in the serialized data (u32 is 4 bytes)
+    const SOURCE_DOMAIN_INDEXES: (usize, usize) = (60, 64);
+
+    pub fn abi_encode(&self) -> [u8; 64] {
+        let mut bytes = [0u8; 64];
+        bytes[Self::NONCE_INDEXES.0..Self::NONCE_INDEXES.1]
+            .copy_from_slice(&self.nonce.to_be_bytes());
+        bytes[Self::SOURCE_DOMAIN_INDEXES.0..Self::SOURCE_DOMAIN_INDEXES.1]
+            .copy_from_slice(&self.source_domain.to_be_bytes());
+        bytes
+    }
+
+    pub fn abi_decode(bytes: &[u8]) -> Result<Self> {
+        if bytes.len() != 64 {
+            return Err(CctpTokenPoolError::InvalidMessageSentEventAccount.into());
+        }
+        let nonce = u64::from_be_bytes(
+            bytes[Self::NONCE_INDEXES.0..Self::NONCE_INDEXES.1]
+                .try_into()
+                .unwrap(),
+        );
+        let source_domain = u32::from_be_bytes(
+            bytes[Self::SOURCE_DOMAIN_INDEXES.0..Self::SOURCE_DOMAIN_INDEXES.1]
+                .try_into()
+                .unwrap(),
+        );
+        Ok(Self {
+            nonce,
+            source_domain,
+        })
+    }
+}
+
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct CctpMessage {
     pub data: Vec<u8>,
@@ -620,11 +672,20 @@ pub struct RemoteChainCctpConfigChanged {
 }
 
 #[event]
-pub struct CctpMessageSentEvent {
+pub struct CcipCctpMessageSentEvent {
+    // Seeds for the CCTP message sent event account
     pub original_sender: Pubkey,
     pub remote_chain_selector: u64,
-    pub msg_full_nonce: u64,
+    pub msg_total_nonce: u64,
+
+    // Actual event account address, derived from the seeds above
     pub event_address: Pubkey,
+
+    // CCTP values identifying the message
+    pub source_domain: u32, // The source chain domain ID, which for Solana is always 5
+    pub cctp_nonce: u64,
+
+    // CCTP message bytes, used to get the attestation offchain and receive the message on dest
     pub message_sent_bytes: Vec<u8>,
 }
 

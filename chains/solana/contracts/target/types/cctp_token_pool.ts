@@ -877,7 +877,7 @@ export type CctpTokenPool = {
       ]
     },
     {
-      "name": "CctpMessageSentEvent",
+      "name": "CcipCctpMessageSentEvent",
       "fields": [
         {
           "name": "originalSender",
@@ -890,13 +890,23 @@ export type CctpTokenPool = {
           "index": false
         },
         {
-          "name": "msgFullNonce",
+          "name": "msgTotalNonce",
           "type": "u64",
           "index": false
         },
         {
           "name": "eventAddress",
           "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "sourceDomain",
+          "type": "u32",
+          "index": false
+        },
+        {
+          "name": "cctpNonce",
+          "type": "u64",
           "index": false
         },
         {
@@ -1825,7 +1835,7 @@ export const IDL: CctpTokenPool = {
       ]
     },
     {
-      "name": "CctpMessageSentEvent",
+      "name": "CcipCctpMessageSentEvent",
       "fields": [
         {
           "name": "originalSender",
@@ -1838,13 +1848,23 @@ export const IDL: CctpTokenPool = {
           "index": false
         },
         {
-          "name": "msgFullNonce",
+          "name": "msgTotalNonce",
           "type": "u64",
           "index": false
         },
         {
           "name": "eventAddress",
           "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "sourceDomain",
+          "type": "u32",
+          "index": false
+        },
+        {
+          "name": "cctpNonce",
+          "type": "u64",
           "index": false
         },
         {
