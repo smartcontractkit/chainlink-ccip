@@ -52,4 +52,9 @@ interface IFeeQuoter is IPriceRegistry {
     Internal.EVM2AnyTokenTransfer[] calldata onRampTokenTransfers,
     Client.EVMTokenAmount[] calldata sourceTokenAmounts
   ) external view returns (bytes[] memory destExecDataPerToken);
+
+  function processPoolReturnDataNew(
+    uint64 destChainSelector,
+    Internal.EVM2AnyCommitVerifierTokenTransfer[] calldata onRampTokenTransfers
+  ) external view returns (bytes[] memory destExecDataPerToken);
 }
