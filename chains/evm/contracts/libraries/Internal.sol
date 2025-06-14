@@ -328,6 +328,55 @@ library Internal {
   // │                            1.7                               │
   // ================================================================
 
+  // send
+
+  struct EVM2AnyCommitVerifierMessage {
+    CommitVerifierMessageHeader header; // Message header.
+    address sender; // sender address on the source chain.
+    bytes data; // arbitrary data payload supplied by the message sender.
+    bytes receiver; // receiver address on the destination chain.
+    bytes extraArgs; // destination-chain specific extra args, such as the gasLimit for EVM chains.
+    address feeToken; // fee token.
+    uint256 feeTokenAmount; // fee token amount.
+    uint256 feeValueJuels; // fee amount in Juels.
+    EVM2AnyCommitVerifierTokenTransfer[] tokenAmounts; // array of tokens and amounts to transfer.
+  }
+
+  struct CommitVerifierMessageHeader {
+    bytes32 messageId; // Unique identifier for the message, generated with the source chain's encoding scheme (i.e. not necessarily abi.encoded).
+    uint64 sourceChainSelector; // ─╮ the chain selector of the source chain, note: not chainId.
+    uint64 destChainSelector; //    │ the chain selector of the destination chain, note: not chainId.
+    uint64 sequenceNumber; //      ─╯ sequence number, not unique across lanes.
+    RequiredVerifiers[] requiredVerifiers;
+  }
+
+  struct RequiredVerifiers {
+    bytes32 verifierId;
+    bytes payload; // in the case of commit: the nonce
+    uint256 feeAmount;
+    uint64 gasLimit; // gas limit for the verifier to execute the commit
+  }
+
+  struct EVM2AnyCommitVerifierTokenTransfer {
+    address sourceTokenAddress;
+    // The source pool EVM address. This value is trusted as it was obtained through the onRamp. It can be relied
+    // upon by the destination pool to validate the source pool.
+    address sourcePoolAddress;
+    // The EVM address of the destination token.
+    // This value is UNTRUSTED as any pool owner can return whatever value they want.
+    bytes destTokenAddress;
+    // Optional pool data to be transferred to the destination chain. Be default this is capped at
+    // CCIP_LOCK_OR_BURN_V1_RET_BYTES bytes. If more data is required, the TokenTransferFeeConfig.destBytesOverhead
+    // has to be set for the specific token.
+    bytes extraData;
+    uint256 amount; // Amount of tokens.
+    // Destination chain data used to execute the token transfer on the destination chain. For an EVM destination, it
+    // consists of the amount of gas available for the releaseOrMint and transfer calls made by the offRamp.
+    bytes destExecData;
+  }
+
+  // receive
+
   struct Any2EVMMultiProofMessage {
     RampMessageHeader header; // Message header.
     bytes sender; // sender address on the source chain.
@@ -349,5 +398,24 @@ library Internal {
     bytes extraData;
     uint256 amount; // Amount of tokens.
     bytes4[] securityModuleSelectors; //
+  }
+
+  // TODO optimize
+  function _hash(EVM2AnyCommitVerifierMessage memory original, bytes32 metadataHash) internal pure returns (bytes32) {
+    // Fixed-size message fields are included in nested hash to reduce stack pressure.
+    // This hashing scheme is also used by RMN. If changing it, please notify the RMN maintainers.
+    return keccak256(
+      abi.encode(
+        MerkleMultiProof.LEAF_DOMAIN_SEPARATOR,
+        metadataHash,
+        keccak256(
+          abi.encode(original.sender, original.header.sequenceNumber, original.feeToken, original.feeTokenAmount)
+        ),
+        keccak256(original.receiver),
+        keccak256(original.data),
+        keccak256(abi.encode(original.tokenAmounts)),
+        keccak256(original.extraArgs)
+      )
+    );
   }
 }
