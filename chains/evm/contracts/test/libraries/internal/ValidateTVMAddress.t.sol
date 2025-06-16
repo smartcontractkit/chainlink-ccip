@@ -25,10 +25,7 @@ contract Internal_validateTVMAddress is Test {
 
   function test_validateTVMAddress_RevertWhen_ShortLength() public {
     bytes memory shortAddress = new bytes(35);
-    // Fill with non-zero data to avoid zero address check
-    for (uint256 i = 0; i < 35; i++) {
-      shortAddress[i] = 0x01;
-    }
+    shortAddress[2] = 0x01; // account_id as non-zero to isolate length check
     vm.expectRevert(abi.encodeWithSelector(Internal.InvalidTVMAddress.selector, shortAddress));
     this.validateTVMAddress(shortAddress);
   }
