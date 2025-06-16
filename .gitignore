@@ -26,3 +26,6 @@
 .idea
 
 vendor/
+
+# Ignore personal settings
+**/.claude/settings.local.json
