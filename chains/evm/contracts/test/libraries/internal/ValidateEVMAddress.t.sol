@@ -38,7 +38,7 @@ contract Internal_validateEVMAddress is Test {
     bytes memory lowerBoundary = abi.encode(Internal.EVM_PRECOMPILE_SPACE);
     this.validateEVMAddress(lowerBoundary);
 
-    bytes memory upperBoundary = abi.encode(uint256(type(uint160).max));
+    bytes memory upperBoundary = abi.encode(type(uint160).max);
     this.validateEVMAddress(upperBoundary);
   }
 }

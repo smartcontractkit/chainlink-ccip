@@ -32,6 +32,14 @@ contract Internal_validateTVMAddress is Test {
     this.validateTVMAddress(longAddress);
   }
 
+  function test_validateTVMAddress_MinimalNonZeroAccountId() public {
+    bytes memory tvmAddress = new bytes(36);
+    tvmAddress[0] = 0x00; // flags
+    tvmAddress[1] = 0x00; // workchain_id
+    tvmAddress[2] = 0x01; // non-zero account_id
+    this.validateTVMAddress(tvmAddress);
+  }
+
   function test_validateTVMAddress_RevertWhen_ZeroAccountId() public {
     bytes memory invalidTVMAddress = hex"11ff000000000000000000000000000000000000000000000000000000000000000012ab";
     vm.expectRevert(abi.encodeWithSelector(Internal.InvalidTVMAddress.selector, invalidTVMAddress));
