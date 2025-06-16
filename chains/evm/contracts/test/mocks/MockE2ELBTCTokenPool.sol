@@ -63,10 +63,12 @@ contract MockE2ELBTCTokenPool is TokenPool, ITypeAndVersion {
     );
     _validateReleaseOrMint(releaseOrMintIn, localAmount);
 
-    (bytes memory payload,) = abi.decode(releaseOrMintIn.offchainTokenData, (bytes, bytes));
-    bytes32 payloadHash = sha256(payload);
-    if (payloadHash != bytes32(releaseOrMintIn.sourcePoolData)) {
-      revert TokenDataMismatch(bytes32(releaseOrMintIn.sourcePoolData), payloadHash);
+    if (i_destPoolData.length == 32) {
+      (bytes memory payload,) = abi.decode(releaseOrMintIn.offchainTokenData, (bytes, bytes));
+      bytes32 payloadHash = sha256(payload);
+      if (payloadHash != bytes32(releaseOrMintIn.sourcePoolData)) {
+        revert TokenDataMismatch(bytes32(releaseOrMintIn.sourcePoolData), payloadHash);
+      }
     }
 
     // Mint to the receiver
