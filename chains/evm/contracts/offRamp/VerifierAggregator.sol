@@ -3,7 +3,6 @@ pragma solidity ^0.8.24;
 
 import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol";
 import {IMessageInterceptor} from "../interfaces/IMessageInterceptor.sol";
-import {INonceManager} from "../interfaces/INonceManager.sol";
 import {IPoolV1} from "../interfaces/IPool.sol";
 import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
@@ -46,7 +45,6 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   error InsufficientGasToCompleteTx(bytes4 err);
   error SkippedAlreadyExecutedMessage(uint64 sourceChainSelector, uint64 sequenceNumber);
   error InvalidVerifierSelector(bytes4 selector);
-  error InvalidNonce(uint64 nonce);
 
   /// @dev Atlas depends on various events, if changing, please notify Atlas.
   event StaticConfigSet(StaticConfig staticConfig);
@@ -67,7 +65,6 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     uint16 gasForCallExactCheck; // │ Gas for call exact check
     IRMNRemote rmnRemote; // ───────╯ RMN Verification Contract
     address tokenAdminRegistry; // Token admin registry address
-    address nonceManager; // Nonce manager address
   }
 
   /// @dev Per-chain source config (defining a lane from a Source Chain -> Dest OffRamp).
@@ -108,8 +105,6 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   IRMNRemote internal immutable i_rmnRemote;
   /// @dev The address of the token admin registry.
   address internal immutable i_tokenAdminRegistry;
-  /// @dev The address of the nonce manager.
-  address internal immutable i_nonceManager;
   /// @dev The minimum amount of gas to perform the call with exact gas.
   /// We include this in the offRamp so that we can redeploy to adjust it should a hardfork change the gas costs of
   /// relevant opcodes in callWithExactGas.
@@ -138,10 +133,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     DynamicConfig memory dynamicConfig,
     SourceChainConfigArgs[] memory sourceChainConfigs
   ) {
-    if (
-      address(staticConfig.rmnRemote) == address(0) || staticConfig.tokenAdminRegistry == address(0)
-        || staticConfig.nonceManager == address(0)
-    ) {
+    if (address(staticConfig.rmnRemote) == address(0) || staticConfig.tokenAdminRegistry == address(0)) {
       revert ZeroAddressNotAllowed();
     }
 
@@ -152,7 +144,6 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     i_chainSelector = staticConfig.localChainSelector;
     i_rmnRemote = staticConfig.rmnRemote;
     i_tokenAdminRegistry = staticConfig.tokenAdminRegistry;
-    i_nonceManager = staticConfig.nonceManager;
     i_gasForCallExactCheck = staticConfig.gasForCallExactCheck;
     emit StaticConfigSet(staticConfig);
 
@@ -240,12 +231,14 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       revert InvalidMessageDestChainSelector(report.message.header.destChainSelector);
     }
 
+    Internal.MessageExecutionState originalState =
+      getExecutionState(sourceChainSelector, report.message.header.sequenceNumber);
+
     // SECURITY CRITICAL CHECK.
-    _verifyMessage(report.message, report.proofs);
+    _verifyMessage(report.message, originalState, report.proofs);
 
     Internal.Any2EVMMultiProofMessage memory message = _beforeExecuteSingleMessage(report.message);
 
-    Internal.MessageExecutionState originalState = getExecutionState(sourceChainSelector, message.header.sequenceNumber);
     // Two valid cases here, we either have never touched this message before, or we tried to execute and failed. This
     // check protects against reentry and re-execution because the other state is IN_PROGRESS which should not be
     // allowed to execute.
@@ -256,21 +249,6 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       )
     ) {
       revert SkippedAlreadyExecutedMessage(sourceChainSelector, message.header.sequenceNumber);
-    }
-
-    // Nonce changes per state transition (these only apply for ordered messages):
-    // UNTOUCHED -> FAILURE  nonce bump.
-    // UNTOUCHED -> SUCCESS  nonce bump.
-    // FAILURE   -> SUCCESS  no nonce bump.
-    // UNTOUCHED messages MUST be executed in order always.
-    // If nonce == 0 then out of order execution is allowed.
-    if (message.header.nonce != 0) {
-      if (originalState == Internal.MessageExecutionState.UNTOUCHED) {
-        // If a nonce is not incremented, that means it was skipped, and we can ignore the message.
-        if (
-          !INonceManager(i_nonceManager).incrementInboundNonce(sourceChainSelector, message.header.nonce, message.sender)
-        ) revert InvalidNonce(message.header.nonce);
-      }
     }
 
     uint32 gasLimitOverride = report.gasOverride == 0 ? report.message.gasLimit : report.gasOverride;
@@ -304,7 +282,11 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     );
   }
 
-  function _verifyMessage(Internal.Any2EVMMultiProofMessage calldata message, bytes[] calldata proofs) internal {
+  function _verifyMessage(
+    Internal.Any2EVMMultiProofMessage calldata message,
+    Internal.MessageExecutionState originalState,
+    bytes[] calldata proofs
+  ) internal {
     if (message.securityModuleSelectors.length != proofs.length) {
       revert InvalidProofLength(message.securityModuleSelectors.length, proofs.length);
     }
@@ -316,7 +298,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       if (verifier == address(0)) {
         revert InvalidVerifierSelector(selector);
       }
-      IVerifier(verifier).validateReport(abi.encode(message), proofs[i], i);
+      IVerifier(verifier).validateReport(abi.encode(message), proofs[i], i, originalState);
     }
   }
 
@@ -548,8 +530,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       localChainSelector: i_chainSelector,
       gasForCallExactCheck: i_gasForCallExactCheck,
       rmnRemote: i_rmnRemote,
-      tokenAdminRegistry: i_tokenAdminRegistry,
-      nonceManager: i_nonceManager
+      tokenAdminRegistry: i_tokenAdminRegistry
     });
   }
 
