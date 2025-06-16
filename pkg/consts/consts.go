@@ -77,15 +77,6 @@ const (
 	MethodNameGetInboundNonce  = "GetInboundNonce"
 	MethodNameGetOutboundNonce = "GetOutboundNonce"
 
-	// Deprecated: TODO: remove after chainlink is updated.
-	MethodNameOfframpGetDynamicConfig = "OfframpGetDynamicConfig"
-	// Deprecated: TODO: remove after chainlink is updated.
-	MethodNameOfframpGetStaticConfig = "OfframpGetStaticConfig"
-	// Deprecated: TODO: remove after chainlink is updated.
-	MethodNameOnrampGetDynamicConfig = "OnrampGetDynamicConfig"
-	// Deprecated: TODO: remove after chainlink is updated.
-	MethodNameOnrampGetStaticConfig = "OnrampGetStaticConfig"
-
 	/*
 		// On EVM:
 		function commit(
