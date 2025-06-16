@@ -126,7 +126,7 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
   function _lockReleaseIncomingMessage(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) internal virtual returns (Pool.ReleaseOrMintOutV1 memory) {
-    _validateReleaseOrMint(releaseOrMintIn);
+    _validateReleaseOrMint(releaseOrMintIn, releaseOrMintIn.sourceDenominatedAmount);
 
     // Circle requires a supply-lock to prevent incoming messages once the migration process begins.
     // This prevents new incoming messages once the migration has begun to ensure any the procedure runs as expected
@@ -139,22 +139,22 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
     // This branch ensures that we're subtracting from the correct mapping. It is also safe to subtract from the
     // excluded tokens mapping, as this function would only be invoked in the event of a stuck tx after a migration
     if (s_lockedTokensByChainSelector[releaseOrMintIn.remoteChainSelector] == 0) {
-      s_tokensExcludedFromBurn[releaseOrMintIn.remoteChainSelector] -= releaseOrMintIn.amount;
+      s_tokensExcludedFromBurn[releaseOrMintIn.remoteChainSelector] -= releaseOrMintIn.sourceDenominatedAmount;
     } else {
-      s_lockedTokensByChainSelector[releaseOrMintIn.remoteChainSelector] -= releaseOrMintIn.amount;
+      s_lockedTokensByChainSelector[releaseOrMintIn.remoteChainSelector] -= releaseOrMintIn.sourceDenominatedAmount;
     }
 
-    i_token.safeTransfer(releaseOrMintIn.receiver, releaseOrMintIn.amount);
+    i_token.safeTransfer(releaseOrMintIn.receiver, releaseOrMintIn.sourceDenominatedAmount);
 
     emit ReleasedOrMinted({
       remoteChainSelector: releaseOrMintIn.remoteChainSelector,
       token: address(i_token),
       sender: msg.sender,
       recipient: releaseOrMintIn.receiver,
-      amount: releaseOrMintIn.amount
+      amount: releaseOrMintIn.sourceDenominatedAmount
     });
 
-    return Pool.ReleaseOrMintOutV1({destinationAmount: releaseOrMintIn.amount});
+    return Pool.ReleaseOrMintOutV1({destinationAmount: releaseOrMintIn.sourceDenominatedAmount});
   }
 
   // ================================================================

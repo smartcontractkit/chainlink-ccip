@@ -298,6 +298,13 @@ func DeduplicateReports(
 	deduplicated := make([]ccipocr3.CommitPluginReportWithMeta, 0, len(reports))
 
 	for _, report := range reports {
+		if len(report.Report.BlessedMerkleRoots) == 0 && len(report.Report.UnblessedMerkleRoots) == 0 {
+			lggr.Debugw("DeduplicateReports: skipping report with no Merkle roots",
+				"timestamp", report.Timestamp,
+				"blockNum", report.BlockNum)
+			continue
+		}
+
 		key, err := generateKey(report) // generateKey is already in the package
 		if err != nil {
 			lggr.Errorw("DeduplicateReports: Failed to generate key for report, skipping",

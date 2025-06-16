@@ -55,7 +55,7 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
         Pool.ReleaseOrMintInV1({
           originalSender: message.sender,
           receiver: message.receiver,
-          amount: message.tokenAmounts[0].amount,
+          sourceDenominatedAmount: message.tokenAmounts[0].amount,
           localToken: message.tokenAmounts[0].destTokenAddress,
           remoteChainSelector: SOURCE_CHAIN_SELECTOR_1,
           sourcePoolAddress: message.tokenAmounts[0].sourcePoolAddress,

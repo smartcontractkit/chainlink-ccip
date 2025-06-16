@@ -21,6 +21,7 @@ var (
 	CcipInvalidReceiverProgram = GetProgramID("test_ccip_invalid_receiver")
 	CcipTokenPoolProgram       = GetProgramID("test_token_pool")
 	Token2022Program           = solana.Token2022ProgramID
+	SPLTokenProgram            = solana.TokenProgramID
 	FeeQuoterProgram           = GetProgramID("fee_quoter")
 	CcipOfframpProgram         = GetProgramID("ccip_offramp")
 	RMNRemoteProgram           = GetProgramID("rmn_remote")
