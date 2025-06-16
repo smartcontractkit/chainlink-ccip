@@ -355,6 +355,7 @@ library Internal {
     bytes payload; // in the case of commit: the nonce
     uint256 feeAmount;
     uint64 gasLimit; // gas limit for the verifier to execute the commit
+    bytes extraArgs;
   }
 
   struct EVM2AnyCommitVerifierTokenTransfer {
