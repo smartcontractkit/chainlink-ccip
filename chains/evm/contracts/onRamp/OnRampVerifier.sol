@@ -1,19 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IEVM2AnyOnRampClient} from "../interfaces/IEVM2AnyOnRampClient.sol";
 import {IFeeQuoter} from "../interfaces/IFeeQuoter.sol";
 import {IMessageInterceptor} from "../interfaces/IMessageInterceptor.sol";
 import {INonceManager} from "../interfaces/INonceManager.sol";
-import {IPoolV1} from "../interfaces/IPool.sol";
 import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
-import {IRouter} from "../interfaces/IRouter.sol";
-import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {Client} from "../libraries/Client.sol";
 import {Internal} from "../libraries/Internal.sol";
-import {Pool} from "../libraries/Pool.sol";
 import {USDPriceWith18Decimals} from "../libraries/USDPriceWith18Decimals.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 
@@ -27,14 +22,14 @@ import {EnumerableSet} from
 /// @notice The OnRamp is a contract that handles lane-specific fee logic.
 /// @dev The OnRamp and OffRamp form a cross chain upgradeable unit. Any change to one of them results in an onchain
 /// upgrade of both contracts.
-contract CommitVerifier is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender {
+contract CommitVerifier is ITypeAndVersion, Ownable2StepMsgSender {
   using SafeERC20 for IERC20;
   using EnumerableSet for EnumerableSet.AddressSet;
   using USDPriceWith18Decimals for uint224;
 
   error CannotSendZeroTokens();
   error UnsupportedToken(address token);
-  error MustBeCalledByRouter();
+  error MustBeCalledByVerifierAggregator();
   error RouterMustSetOriginalSender();
   error InvalidConfig();
   error CursedByRMN(uint64 destChainSelector);
@@ -47,7 +42,7 @@ contract CommitVerifier is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMs
 
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event DestChainConfigSet(
-    uint64 indexed destChainSelector, uint64 sequenceNumber, IRouter router, bool allowlistEnabled
+    uint64 indexed destChainSelector, uint64 sequenceNumber, address router, bool allowlistEnabled
   );
   event FeeTokenWithdrawn(address indexed feeAggregator, address indexed feeToken, uint256 amount);
   /// RMN depends on this event, if changing, please notify the RMN maintainers.
@@ -82,9 +77,9 @@ contract CommitVerifier is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMs
   struct DestChainConfig {
     // The last used sequence number. This is zero in the case where no messages have yet been sent.
     // 0 is not a valid sequence number for any real transaction as this value will be incremented before use.
-    uint64 sequenceNumber; // ──╮ The last used sequence number.
-    bool allowlistEnabled; //   │ True if the allowlist is enabled.
-    IRouter router; // ─────────╯ Local router address  that is allowed to send messages to the destination chain.
+    uint64 sequenceNumber; // ──────╮ The last used sequence number.
+    bool allowlistEnabled; //       │ True if the allowlist is enabled.
+    address verifierAggregator; // ─╯ Local router address  that is allowed to send messages to the destination chain.
     EnumerableSet.AddressSet allowedSendersList; // The list of addresses allowed to send messages.
   }
 
@@ -93,20 +88,20 @@ contract CommitVerifier is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMs
   // solhint-disable gas-struct-packing
   struct DestChainConfigArgs {
     uint64 destChainSelector; // ─╮ Destination chain selector.
-    IRouter router; //            │ Source router address.
+    address verifierAggregator; //│ Source router address.
     bool allowlistEnabled; // ────╯ True if the allowlist is enabled.
   }
 
   /// @dev Struct to hold the allowlist configuration args per dest chain.
   struct AllowlistConfigArgs {
-    uint64 destChainSelector; // ──╮ Destination chain selector.
-    bool allowlistEnabled; // ─────╯ True if the allowlist is enabled.
+    uint64 destChainSelector; // ─╮ Destination chain selector.
+    bool allowlistEnabled; // ────╯ True if the allowlist is enabled.
     address[] addedAllowlistedSenders; // list of senders to be added to the allowedSendersList.
     address[] removedAllowlistedSenders; // list of senders to be removed from the allowedSendersList.
   }
 
   // STATIC CONFIG
-  string public constant override typeAndVersion = "OnRamp 1.6.0";
+  string public constant override typeAndVersion = "CommitVerifier 1.7.0-dev";
   /// @dev The chain ID of the source chain that this contract is deployed to.
   uint64 private immutable i_chainSelector;
   /// @dev The rmn contract.
@@ -157,59 +152,46 @@ contract CommitVerifier is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMs
     return s_destChainConfigs[destChainSelector].sequenceNumber + 1;
   }
 
-  /// @inheritdoc IEVM2AnyOnRampClient
   function forwardToVerifier(
     uint64 destChainSelector,
-    Client.EVM2AnyMessage calldata message,
+    // Memory to avoid stack too deep.
+    Client.EVM2AnyMessage memory message,
     uint256 feeTokenAmount,
     address originalSender,
-    bytes verifierData
-  ) external returns (bytes32) {
-    DestChainConfig storage destChainConfig = s_destChainConfigs[destChainSelector];
+    bytes calldata verifierData
+  ) external returns (bytes memory) {
+    _validateOriginalSender(originalSender);
 
-    // NOTE: assumes the message has already been validated through the getFee call.
-    // Validate originalSender is set and allowed. Not validated in `getFee` since it is not user-driven.
+    // Convert message fee to juels and retrieve converted args.
+    // Validate pool return data after it is populated (view function - no state changes).
+    (uint256 feeValueJuels, bool isOutOfOrderExecution, bytes memory extraArgs, bytes memory tokenReceiver) = IFeeQuoter(
+      s_dynamicConfig.feeQuoter
+    ).processMessageArgs(destChainSelector, message.feeToken, feeTokenAmount, message.extraArgs, message.receiver);
+
+    uint64 nonce = 0;
+    if (!isOutOfOrderExecution) {
+      // If the message is not out of order execution, we need to increment the nonce.
+      nonce = INonceManager(i_nonceManager).getIncrementedOutboundNonce(destChainSelector, originalSender);
+    }
+
+    return abi.encode(nonce);
+  }
+
+  function _validateOriginalSender(
+    address originalSender
+  ) internal view {
     if (originalSender == address(0)) revert RouterMustSetOriginalSender();
 
+    // If the allowlist is enabled, check if the original sender is allowed.
+    DestChainConfig storage destChainConfig = s_destChainConfigs[i_chainSelector];
     if (destChainConfig.allowlistEnabled) {
       if (!destChainConfig.allowedSendersList.contains(originalSender)) {
         revert SenderNotAllowed(originalSender);
       }
     }
 
-    // Router address may be zero intentionally to pause, which should stop all messages.
-    if (msg.sender != address(destChainConfig.router)) revert MustBeCalledByRouter();
-
-    {
-      // scoped to reduce stack usage
-      address messageInterceptor = s_dynamicConfig.messageInterceptor;
-      if (messageInterceptor != address(0)) {
-        IMessageInterceptor(messageInterceptor).onOutboundMessage(destChainSelector, message);
-      }
-    }
-
-    // Convert message fee to juels and retrieve converted args.
-    // Validate pool return data after it is populated (view function - no state changes).
-    bool isOutOfOrderExecution;
-    bytes memory tokenReceiver;
-    (newMessage.feeValueJuels, isOutOfOrderExecution, newMessage.extraArgs, tokenReceiver) = IFeeQuoter(
-      s_dynamicConfig.feeQuoter
-    ).processMessageArgs(destChainSelector, message.feeToken, feeTokenAmount, message.extraArgs, message.receiver);
-
-    //    newMessage.header.nonce = isOutOfOrderExecution
-    //      ? 0
-    //      : INonceManager(i_nonceManager).getIncrementedOutboundNonce(destChainSelector, originalSender);
-
-    return newMessage.header.messageId;
-  }
-
-  /// @notice hook for applying custom logic to the message from the router
-  /// @param message router message
-  /// @return transformedMessage modified message
-  function _postProcessMessage(
-    Internal.EVM2AnyRampMessage memory message
-  ) internal virtual returns (Internal.EVM2AnyRampMessage memory transformedMessage) {
-    return message;
+    // VerifierAggregator address may be zero intentionally to pause, which should stop all messages.
+    if (msg.sender != address(destChainConfig.verifierAggregator)) revert MustBeCalledByVerifierAggregator();
   }
 
   // ================================================================
@@ -286,11 +268,14 @@ contract CommitVerifier is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMs
 
       DestChainConfig storage destChainConfig = s_destChainConfigs[destChainSelector];
       // The router can be zero to pause the destination chain
-      destChainConfig.router = destChainConfigArg.router;
+      destChainConfig.verifierAggregator = destChainConfigArg.verifierAggregator;
       destChainConfig.allowlistEnabled = destChainConfigArg.allowlistEnabled;
 
       emit DestChainConfigSet(
-        destChainSelector, destChainConfig.sequenceNumber, destChainConfigArg.router, destChainConfig.allowlistEnabled
+        destChainSelector,
+        destChainConfig.sequenceNumber,
+        destChainConfigArg.verifierAggregator,
+        destChainConfig.allowlistEnabled
       );
     }
   }
@@ -299,15 +284,15 @@ contract CommitVerifier is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMs
   /// @param destChainSelector The destination chain selector.
   /// @return sequenceNumber The last used sequence number.
   /// @return allowlistEnabled boolean indicator to specify if allowlist check is enabled.
-  /// @return router address of the router.
+  /// @return verifierAggregator address of the verifierAggregator.
   function getDestChainConfig(
     uint64 destChainSelector
-  ) external view returns (uint64 sequenceNumber, bool allowlistEnabled, address router) {
+  ) external view returns (uint64 sequenceNumber, bool allowlistEnabled, address verifierAggregator) {
     DestChainConfig storage config = s_destChainConfigs[destChainSelector];
     sequenceNumber = config.sequenceNumber;
     allowlistEnabled = config.allowlistEnabled;
-    router = address(config.router);
-    return (sequenceNumber, allowlistEnabled, router);
+    verifierAggregator = config.verifierAggregator;
+    return (sequenceNumber, allowlistEnabled, verifierAggregator);
   }
 
   /// @notice get allowedSenders List configured for the DestinationChainSelector.
@@ -380,7 +365,6 @@ contract CommitVerifier is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMs
   // │                             Fees                             │
   // ================================================================
 
-  /// @inheritdoc IEVM2AnyOnRampClient
   /// @dev getFee MUST revert if the feeToken is not listed in the fee token config, as the router assumes it does.
   /// @param destChainSelector The destination chain selector.
   /// @param message The message to get quote for.

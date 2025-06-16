@@ -26,6 +26,7 @@ import {EnumerableSet} from
 /// @notice The OnRamp is a contract that handles lane-specific fee logic.
 /// @dev The OnRamp and OffRamp form a cross chain upgradeable unit. Any change to one of them results in an onchain
 /// upgrade of both contracts.
+// TODO post process hooks?
 contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender {
   using SafeERC20 for IERC20;
   using EnumerableSet for EnumerableSet.AddressSet;
@@ -149,16 +150,11 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     // NOTE: assumes the message has already been validated through the getFee call.
     // Validate originalSender is set and allowed. Not validated in `getFee` since it is not user-driven.
     if (originalSender == address(0)) revert RouterMustSetOriginalSender();
-
     // Router address may be zero intentionally to pause, which should stop all messages.
     if (msg.sender != address(destChainConfig.router)) revert MustBeCalledByRouter();
 
-    {
-      // scoped to reduce stack usage
-      address messageInterceptor = s_dynamicConfig.messageInterceptor;
-      if (messageInterceptor != address(0)) {
-        IMessageInterceptor(messageInterceptor).onOutboundMessage(destChainSelector, message);
-      }
+    if (s_dynamicConfig.messageInterceptor != address(0)) {
+      IMessageInterceptor(s_dynamicConfig.messageInterceptor).onOutboundMessage(destChainSelector, message);
     }
 
     Internal.EVM2AnyCommitVerifierMessage memory newMessage = Internal.EVM2AnyCommitVerifierMessage({
@@ -204,8 +200,6 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       newMessage.tokenAmounts[i].destExecData = destExecDataPerToken[i];
     }
 
-    newMessage = _postProcessMessage(newMessage);
-
     // Hash only after all fields have been set.
     newMessage.header.messageId = Internal._hash(
       newMessage,
@@ -222,58 +216,6 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     s_dynamicConfig.reentrancyGuardEntered = false;
 
     return newMessage.header.messageId;
-  }
-
-  /// @notice hook for applying custom logic to the message from the router
-  /// @param message router message
-  /// @return transformedMessage modified message
-  function _postProcessMessage(
-    Internal.EVM2AnyCommitVerifierMessage memory message
-  ) internal virtual returns (Internal.EVM2AnyCommitVerifierMessage memory transformedMessage) {
-    return message;
-  }
-
-  /// @notice Uses a pool to lock or burn a token.
-  /// @param tokenAndAmount Token address and amount to lock or burn.
-  /// @param destChainSelector Target destination chain selector of the message.
-  /// @param receiver Message receiver.
-  /// @param originalSender Message sender.
-  /// @return EVM2AnyCommitVerifierTokenTransfer EVM2Any token and amount data.
-  function _lockOrBurnSingleToken(
-    Client.EVMTokenAmount memory tokenAndAmount,
-    uint64 destChainSelector,
-    bytes memory receiver,
-    address originalSender
-  ) internal returns (Internal.EVM2AnyCommitVerifierTokenTransfer memory) {
-    if (tokenAndAmount.amount == 0) revert CannotSendZeroTokens();
-
-    IPoolV1 sourcePool = getPoolBySourceToken(destChainSelector, IERC20(tokenAndAmount.token));
-    // We don't have to check if it supports the pool version in a non-reverting way here because
-    // if we revert here, there is no effect on CCIP. Therefore we directly call the supportsInterface
-    // function and not through the ERC165Checker.
-    if (address(sourcePool) == address(0) || !sourcePool.supportsInterface(Pool.CCIP_POOL_V1)) {
-      revert UnsupportedToken(tokenAndAmount.token);
-    }
-
-    Pool.LockOrBurnOutV1 memory poolReturnData = sourcePool.lockOrBurn(
-      Pool.LockOrBurnInV1({
-        receiver: receiver,
-        remoteChainSelector: destChainSelector,
-        originalSender: originalSender,
-        amount: tokenAndAmount.amount,
-        localToken: tokenAndAmount.token
-      })
-    );
-
-    // NOTE: pool data validations are outsourced to the FeeQuoter to handle family-specific logic handling.
-    return Internal.EVM2AnyCommitVerifierTokenTransfer({
-      sourceTokenAddress: tokenAndAmount.token,
-      sourcePoolAddress: address(sourcePool),
-      destTokenAddress: poolReturnData.destTokenAddress,
-      extraData: poolReturnData.destPoolData,
-      amount: tokenAndAmount.amount,
-      destExecData: "" // This is set in the processPoolReturnData function.
-    });
   }
 
   // ================================================================
@@ -381,6 +323,49 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     uint64 // destChainSelector
   ) external pure returns (address[] memory) {
     revert GetSupportedTokensFunctionalityRemovedCheckAdminRegistry();
+  }
+
+  /// @notice Uses a pool to lock or burn a token.
+  /// @param tokenAndAmount Token address and amount to lock or burn.
+  /// @param destChainSelector Target destination chain selector of the message.
+  /// @param receiver Message receiver.
+  /// @param originalSender Message sender.
+  /// @return EVM2AnyCommitVerifierTokenTransfer EVM2Any token and amount data.
+  function _lockOrBurnSingleToken(
+    Client.EVMTokenAmount memory tokenAndAmount,
+    uint64 destChainSelector,
+    bytes memory receiver,
+    address originalSender
+  ) internal returns (Internal.EVM2AnyCommitVerifierTokenTransfer memory) {
+    if (tokenAndAmount.amount == 0) revert CannotSendZeroTokens();
+
+    IPoolV1 sourcePool = getPoolBySourceToken(destChainSelector, IERC20(tokenAndAmount.token));
+    // We don't have to check if it supports the pool version in a non-reverting way here because
+    // if we revert here, there is no effect on CCIP. Therefore we directly call the supportsInterface
+    // function and not through the ERC165Checker.
+    if (address(sourcePool) == address(0) || !sourcePool.supportsInterface(Pool.CCIP_POOL_V1)) {
+      revert UnsupportedToken(tokenAndAmount.token);
+    }
+
+    Pool.LockOrBurnOutV1 memory poolReturnData = sourcePool.lockOrBurn(
+      Pool.LockOrBurnInV1({
+        receiver: receiver,
+        remoteChainSelector: destChainSelector,
+        originalSender: originalSender,
+        amount: tokenAndAmount.amount,
+        localToken: tokenAndAmount.token
+      })
+    );
+
+    // NOTE: pool data validations are outsourced to the FeeQuoter to handle family-specific logic handling.
+    return Internal.EVM2AnyCommitVerifierTokenTransfer({
+      sourceTokenAddress: tokenAndAmount.token,
+      sourcePoolAddress: address(sourcePool),
+      destTokenAddress: poolReturnData.destTokenAddress,
+      extraData: poolReturnData.destPoolData,
+      amount: tokenAndAmount.amount,
+      destExecData: "" // This is set in the processPoolReturnData function.
+    });
   }
 
   // ================================================================
