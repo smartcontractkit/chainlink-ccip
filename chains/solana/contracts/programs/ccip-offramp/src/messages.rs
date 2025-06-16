@@ -3,6 +3,8 @@ use anchor_lang::prelude::*;
 pub const CCIP_RECEIVE_DISCRIMINATOR: [u8; 8] = [0x0b, 0xf4, 0x09, 0xf9, 0x2c, 0x53, 0x2f, 0xf5]; // ccip_receive
 pub const TOKENPOOL_RELEASE_OR_MINT_DISCRIMINATOR: [u8; 8] =
     [0x5c, 0x64, 0x96, 0xc6, 0xfc, 0x3f, 0xa4, 0xe4]; // release_or_mint_tokens
+pub const TOKENPOOL_DERIVE_RELEASE_OR_MINT_DISCRIMINATOR: [u8; 8] =
+    [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]; // derive_release_or_mint_tokens TODO
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
 /// Report that is submitted by the execution DON at the execution phase. (including chain selector data)
