@@ -22,14 +22,14 @@ contract Internal_validate32ByteAddress is Test {
   }
 
   function test_validate32ByteAddress_RevertWhen_AddressBelowMinValue() public {
-    uint256 minValue = 1000;
+    uint256 minValue = 100;
     bytes memory belowMinAddress = abi.encode(minValue - 1);
     vm.expectRevert(abi.encodeWithSelector(Internal.Invalid32ByteAddress.selector, belowMinAddress));
     this.validate32ByteAddress(belowMinAddress, minValue);
   }
 
   function test_validate32ByteAddress_BoundaryMinValue() public {
-    uint256 minValue = 1000;
+    uint256 minValue = 100;
     bytes memory exactMinAddress = abi.encode(minValue);
     this.validate32ByteAddress(exactMinAddress, minValue);
   }
