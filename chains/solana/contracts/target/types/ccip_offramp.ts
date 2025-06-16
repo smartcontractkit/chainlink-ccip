@@ -1841,6 +1841,18 @@ export type CcipOfframp = {
             "type": "publicKey"
           },
           {
+            "name": "tokenReceiver",
+            "type": "publicKey"
+          },
+          {
+            "name": "tokenTransfers",
+            "type": {
+              "vec": {
+                "defined": "TokenTransferAndOffchainData"
+              }
+            }
+          },
+          {
             "name": "messageAccounts",
             "type": {
               "vec": {
@@ -1853,10 +1865,8 @@ export type CcipOfframp = {
             "type": "u64"
           },
           {
-            "name": "mintsOfTransferredTokens",
-            "type": {
-              "vec": "publicKey"
-            }
+            "name": "originalSender",
+            "type": "bytes"
           },
           {
             "name": "merkleRoot",
@@ -1870,10 +1880,24 @@ export type CcipOfframp = {
           {
             "name": "bufferId",
             "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TokenTransferAndOffchainData",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "transfer",
+            "type": {
+              "defined": "Any2SVMTokenTransfer"
+            }
           },
           {
-            "name": "tokenReceiver",
-            "type": "publicKey"
+            "name": "data",
+            "type": "bytes"
           }
         ]
       }
@@ -2122,7 +2146,13 @@ export type CcipOfframp = {
             "name": "RetrieveTokenLUTs"
           },
           {
-            "name": "TokenTransferAccounts"
+            "name": "TokenTransferAccounts",
+            "fields": [
+              {
+                "name": "tokenSubstage",
+                "type": "string"
+              }
+            ]
           }
         ]
       }
@@ -2784,6 +2814,11 @@ export type CcipOfframp = {
       "code": 9068,
       "name": "InvalidDerivationStage",
       "msg": "Unexpected account derivation stage"
+    },
+    {
+      "code": 9069,
+      "name": "InvalidTokenPoolAccountDerivationResponse",
+      "msg": "Token pool returned an unexpected derivation response"
     }
   ]
 };
@@ -4631,6 +4666,18 @@ export const IDL: CcipOfframp = {
             "type": "publicKey"
           },
           {
+            "name": "tokenReceiver",
+            "type": "publicKey"
+          },
+          {
+            "name": "tokenTransfers",
+            "type": {
+              "vec": {
+                "defined": "TokenTransferAndOffchainData"
+              }
+            }
+          },
+          {
             "name": "messageAccounts",
             "type": {
               "vec": {
@@ -4643,10 +4690,8 @@ export const IDL: CcipOfframp = {
             "type": "u64"
           },
           {
-            "name": "mintsOfTransferredTokens",
-            "type": {
-              "vec": "publicKey"
-            }
+            "name": "originalSender",
+            "type": "bytes"
           },
           {
             "name": "merkleRoot",
@@ -4660,10 +4705,24 @@ export const IDL: CcipOfframp = {
           {
             "name": "bufferId",
             "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TokenTransferAndOffchainData",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "transfer",
+            "type": {
+              "defined": "Any2SVMTokenTransfer"
+            }
           },
           {
-            "name": "tokenReceiver",
-            "type": "publicKey"
+            "name": "data",
+            "type": "bytes"
           }
         ]
       }
@@ -4912,7 +4971,13 @@ export const IDL: CcipOfframp = {
             "name": "RetrieveTokenLUTs"
           },
           {
-            "name": "TokenTransferAccounts"
+            "name": "TokenTransferAccounts",
+            "fields": [
+              {
+                "name": "tokenSubstage",
+                "type": "string"
+              }
+            ]
           }
         ]
       }
@@ -5574,6 +5639,11 @@ export const IDL: CcipOfframp = {
       "code": 9068,
       "name": "InvalidDerivationStage",
       "msg": "Unexpected account derivation stage"
+    },
+    {
+      "code": 9069,
+      "name": "InvalidTokenPoolAccountDerivationResponse",
+      "msg": "Token pool returned an unexpected derivation response"
     }
   ]
 };

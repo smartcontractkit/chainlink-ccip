@@ -7368,6 +7368,9 @@ func TestCCIPRouter(t *testing.T) {
 					solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
 					solana.NewAccountMeta(solana.SystemProgramID, false, false),
 				)
+				for i, meta := range raw.AccountMetaSlice {
+					fmt.Printf("Raw [%d]: %v\n", i, meta)
+				}
 
 				instruction, err = raw.ValidateAndBuild()
 				require.NoError(t, err)
@@ -7463,15 +7466,15 @@ func TestCCIPRouter(t *testing.T) {
 					ccip_offramp.CcipAccountMeta{Pubkey: solana.SystemProgramID, IsSigner: false, IsWritable: false},
 				)
 
-				mintsOfTransferredTokens := []solana.PublicKey{}
 				bufferID := []byte{}
+				tokenTransferAndOffchainData := []ccip_offramp.TokenTransferAndOffchainData{}
 
 				derivedAccounts, derivedLookUpTables, tokenIndices := deriveExecutionAccounts(ctx,
 					t,
 					transmitter,
 					messagingAccounts,
 					sourceChainSelector,
-					mintsOfTransferredTokens,
+					tokenTransferAndOffchainData,
 					root,
 					bufferID,
 					executionReport.Message.TokenReceiver,
@@ -7484,6 +7487,9 @@ func TestCCIPRouter(t *testing.T) {
 					SetTokenIndexes(tokenIndices)
 				builder.AccountMetaSlice = derivedAccounts
 
+				for i, meta := range builder.AccountMetaSlice {
+					fmt.Printf("Derived [%d]: %v\n", i, meta)
+				}
 				instruction, err = builder.ValidateAndBuild()
 				require.NoError(t, err)
 
@@ -8801,6 +8807,9 @@ func TestCCIPRouter(t *testing.T) {
 					raw.AccountMetaSlice = append(raw.AccountMetaSlice, solana.Meta(token0.OfframpSigner))
 					raw.AccountMetaSlice = append(raw.AccountMetaSlice, tokenMetas...)
 
+					for i, acc := range raw.AccountMetaSlice {
+						fmt.Printf("[%d]: %v\n", i, acc)
+					}
 					instruction, err = raw.ValidateAndBuild()
 					require.NoError(t, err)
 
@@ -8908,25 +8917,33 @@ func TestCCIPRouter(t *testing.T) {
 						ccip_offramp.CcipAccountMeta{Pubkey: config.ReceiverTargetAccountPDA, IsSigner: false, IsWritable: true},
 						ccip_offramp.CcipAccountMeta{Pubkey: solana.SystemProgramID, IsSigner: false, IsWritable: false},
 					)
-					mintsOfTransferredTokens := []solana.PublicKey{message.TokenAmounts[0].DestTokenAddress}
 					bufferID := []byte{}
-
+					tokenTransferAndOffchainData := []ccip_offramp.TokenTransferAndOffchainData{{
+						Transfer: message.TokenAmounts[0],
+						Data:     executionReport.OffchainTokenData[0],
+					}}
 					derivedAccounts, derivedLookUpTables, tokenIndices := deriveExecutionAccounts(ctx,
 						t,
 						transmitter,
 						messagingAccounts,
 						sourceChainSelector,
-						mintsOfTransferredTokens,
+						tokenTransferAndOffchainData,
 						root,
 						bufferID,
 						executionReport.Message.TokenReceiver,
 						solanaGoClient,
 					)
+
+					fmt.Printf("Indexes: %v\n", tokenIndices)
 					builder := ccip_offramp.NewExecuteInstructionBuilder().
 						SetRawExecutionReport(rawExecutionReport).
 						SetReportContextByteWords(reportContext).
 						SetTokenIndexes(tokenIndices)
+
 					builder.AccountMetaSlice = derivedAccounts
+					for i, acc := range builder.AccountMetaSlice {
+						fmt.Printf("[%d]: %v\n", i, acc)
+					}
 					instruction, err = builder.ValidateAndBuild()
 					require.NoError(t, err)
 
@@ -10432,13 +10449,14 @@ func TestCCIPRouter(t *testing.T) {
 					ccip_offramp.CcipAccountMeta{Pubkey: config.ReceiverTargetAccountPDA, IsSigner: false, IsWritable: true},
 					ccip_offramp.CcipAccountMeta{Pubkey: solana.SystemProgramID, IsSigner: false, IsWritable: false},
 				)
-				mintsOfTransferredTokens := []solana.PublicKey{}
+				tokenTransferAndOffchainData := []ccip_offramp.TokenTransferAndOffchainData{}
+
 				derivedAccounts, derivedLookUpTables, tokenIndices := deriveExecutionAccounts(ctx,
 					t,
 					transmitter,
 					messagingAccounts,
 					sourceChainSelector,
-					mintsOfTransferredTokens,
+					tokenTransferAndOffchainData,
 					root,
 					root[:],
 					executionReport.Message.TokenReceiver,
@@ -10634,7 +10652,7 @@ func deriveExecutionAccounts(ctx context.Context,
 	transmitter solana.PrivateKey,
 	messagingAccounts []ccip_offramp.CcipAccountMeta,
 	sourceChainSelector uint64,
-	mintsOfTransferredTokens []solana.PublicKey,
+	tokenTransferAndOffchainData []ccip_offramp.TokenTransferAndOffchainData,
 	merkleRoot [32]uint8,
 	bufferID []byte,
 	tokenReceiver solana.PublicKey,
@@ -10644,13 +10662,13 @@ func deriveExecutionAccounts(ctx context.Context,
 	stage := "Start"
 	for {
 		params := ccip_offramp.DeriveAccountsExecuteParams{
-			ExecuteCaller:            transmitter.PublicKey(),
-			MessageAccounts:          messagingAccounts,
-			SourceChainSelector:      sourceChainSelector,
-			MintsOfTransferredTokens: mintsOfTransferredTokens,
-			MerkleRoot:               merkleRoot,
-			BufferId:                 bufferID,
-			TokenReceiver:            tokenReceiver,
+			ExecuteCaller:       transmitter.PublicKey(),
+			MessageAccounts:     messagingAccounts,
+			SourceChainSelector: sourceChainSelector,
+			TokenTransfers:      tokenTransferAndOffchainData,
+			MerkleRoot:          merkleRoot,
+			BufferId:            bufferID,
+			TokenReceiver:       tokenReceiver,
 		}
 
 		deriveRaw := ccip_offramp.NewDeriveAccountsExecuteInstruction(
@@ -10665,7 +10683,7 @@ func deriveExecutionAccounts(ctx context.Context,
 		derivation, err := common.ExtractAnchorTypedReturnValue[ccip_offramp.DeriveAccountsResponse](ctx, tx.Meta.LogMessages, config.CcipOfframpProgram.String())
 		require.NoError(t, err)
 
-		if derivation.CurrentStage == "TokenTransferAccounts" {
+		if derivation.CurrentStage == "TokenTransferAccounts/Start" {
 			// We offset the current index from the capacity of the default meta slice (the fixed accounts)
 			tokenIndex := len(derivedAccounts) - cap(ccip_offramp.NewExecuteInstructionBuilder().AccountMetaSlice)
 			tokenIndices = append(tokenIndices, byte(tokenIndex))

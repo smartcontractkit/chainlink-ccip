@@ -612,18 +612,29 @@ func (obj *CrossChainAmount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (e
 }
 
 type DeriveAccountsExecuteParams struct {
-	ExecuteCaller            ag_solanago.PublicKey
-	MessageAccounts          []CcipAccountMeta
-	SourceChainSelector      uint64
-	MintsOfTransferredTokens []ag_solanago.PublicKey
-	MerkleRoot               [32]uint8
-	BufferId                 []byte
-	TokenReceiver            ag_solanago.PublicKey
+	ExecuteCaller       ag_solanago.PublicKey
+	TokenReceiver       ag_solanago.PublicKey
+	TokenTransfers      []TokenTransferAndOffchainData
+	MessageAccounts     []CcipAccountMeta
+	SourceChainSelector uint64
+	OriginalSender      []byte
+	MerkleRoot          [32]uint8
+	BufferId            []byte
 }
 
 func (obj DeriveAccountsExecuteParams) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `ExecuteCaller` param:
 	err = encoder.Encode(obj.ExecuteCaller)
+	if err != nil {
+		return err
+	}
+	// Serialize `TokenReceiver` param:
+	err = encoder.Encode(obj.TokenReceiver)
+	if err != nil {
+		return err
+	}
+	// Serialize `TokenTransfers` param:
+	err = encoder.Encode(obj.TokenTransfers)
 	if err != nil {
 		return err
 	}
@@ -637,8 +648,8 @@ func (obj DeriveAccountsExecuteParams) MarshalWithEncoder(encoder *ag_binary.Enc
 	if err != nil {
 		return err
 	}
-	// Serialize `MintsOfTransferredTokens` param:
-	err = encoder.Encode(obj.MintsOfTransferredTokens)
+	// Serialize `OriginalSender` param:
+	err = encoder.Encode(obj.OriginalSender)
 	if err != nil {
 		return err
 	}
@@ -652,17 +663,22 @@ func (obj DeriveAccountsExecuteParams) MarshalWithEncoder(encoder *ag_binary.Enc
 	if err != nil {
 		return err
 	}
-	// Serialize `TokenReceiver` param:
-	err = encoder.Encode(obj.TokenReceiver)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
 func (obj *DeriveAccountsExecuteParams) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `ExecuteCaller`:
 	err = decoder.Decode(&obj.ExecuteCaller)
+	if err != nil {
+		return err
+	}
+	// Deserialize `TokenReceiver`:
+	err = decoder.Decode(&obj.TokenReceiver)
+	if err != nil {
+		return err
+	}
+	// Deserialize `TokenTransfers`:
+	err = decoder.Decode(&obj.TokenTransfers)
 	if err != nil {
 		return err
 	}
@@ -676,8 +692,8 @@ func (obj *DeriveAccountsExecuteParams) UnmarshalWithDecoder(decoder *ag_binary.
 	if err != nil {
 		return err
 	}
-	// Deserialize `MintsOfTransferredTokens`:
-	err = decoder.Decode(&obj.MintsOfTransferredTokens)
+	// Deserialize `OriginalSender`:
+	err = decoder.Decode(&obj.OriginalSender)
 	if err != nil {
 		return err
 	}
@@ -691,8 +707,36 @@ func (obj *DeriveAccountsExecuteParams) UnmarshalWithDecoder(decoder *ag_binary.
 	if err != nil {
 		return err
 	}
-	// Deserialize `TokenReceiver`:
-	err = decoder.Decode(&obj.TokenReceiver)
+	return nil
+}
+
+type TokenTransferAndOffchainData struct {
+	Transfer Any2SVMTokenTransfer
+	Data     []byte
+}
+
+func (obj TokenTransferAndOffchainData) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Transfer` param:
+	err = encoder.Encode(obj.Transfer)
+	if err != nil {
+		return err
+	}
+	// Serialize `Data` param:
+	err = encoder.Encode(obj.Data)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *TokenTransferAndOffchainData) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Transfer`:
+	err = decoder.Decode(&obj.Transfer)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Data`:
+	err = decoder.Decode(&obj.Data)
 	if err != nil {
 		return err
 	}
@@ -1060,29 +1104,77 @@ func (value OcrPluginType) String() string {
 	}
 }
 
-type DeriveExecuteAccountsStage ag_binary.BorshEnum
-
-const (
-	GatherBasicInfo_DeriveExecuteAccountsStage DeriveExecuteAccountsStage = iota
-	BuildMainAccountList_DeriveExecuteAccountsStage
-	RetrieveTokenLUTs_DeriveExecuteAccountsStage
-	TokenTransferAccounts_DeriveExecuteAccountsStage
-)
-
-func (value DeriveExecuteAccountsStage) String() string {
-	switch value {
-	case GatherBasicInfo_DeriveExecuteAccountsStage:
-		return "GatherBasicInfo"
-	case BuildMainAccountList_DeriveExecuteAccountsStage:
-		return "BuildMainAccountList"
-	case RetrieveTokenLUTs_DeriveExecuteAccountsStage:
-		return "RetrieveTokenLUTs"
-	case TokenTransferAccounts_DeriveExecuteAccountsStage:
-		return "TokenTransferAccounts"
-	default:
-		return ""
-	}
+type DeriveExecuteAccountsStage interface {
+	isDeriveExecuteAccountsStage()
 }
+
+type deriveExecuteAccountsStageContainer struct {
+	Enum                  ag_binary.BorshEnum `borsh_enum:"true"`
+	GatherBasicInfo       GatherBasicInfo
+	BuildMainAccountList  BuildMainAccountList
+	RetrieveTokenLUTs     RetrieveTokenLUTs
+	TokenTransferAccounts TokenTransferAccounts
+}
+
+type GatherBasicInfo uint8
+
+func (obj GatherBasicInfo) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	return nil
+}
+
+func (obj *GatherBasicInfo) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	return nil
+}
+
+func (_ *GatherBasicInfo) isDeriveExecuteAccountsStage() {}
+
+type BuildMainAccountList uint8
+
+func (obj BuildMainAccountList) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	return nil
+}
+
+func (obj *BuildMainAccountList) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	return nil
+}
+
+func (_ *BuildMainAccountList) isDeriveExecuteAccountsStage() {}
+
+type RetrieveTokenLUTs uint8
+
+func (obj RetrieveTokenLUTs) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	return nil
+}
+
+func (obj *RetrieveTokenLUTs) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	return nil
+}
+
+func (_ *RetrieveTokenLUTs) isDeriveExecuteAccountsStage() {}
+
+type TokenTransferAccounts struct {
+	TokenSubstage string
+}
+
+func (obj TokenTransferAccounts) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `TokenSubstage` param:
+	err = encoder.Encode(obj.TokenSubstage)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *TokenTransferAccounts) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `TokenSubstage`:
+	err = decoder.Decode(&obj.TokenSubstage)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (_ *TokenTransferAccounts) isDeriveExecuteAccountsStage() {}
 
 type MessageExecutionState ag_binary.BorshEnum
 

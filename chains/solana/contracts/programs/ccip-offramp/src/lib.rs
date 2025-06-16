@@ -816,4 +816,6 @@ pub enum CcipOfframpError {
     InvalidAccountListForPdaDerivation,
     #[msg("Unexpected account derivation stage")]
     InvalidDerivationStage,
+    #[msg("Token pool returned an unexpected derivation response")]
+    InvalidTokenPoolAccountDerivationResponse,
 }

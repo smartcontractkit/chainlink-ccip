@@ -3,6 +3,7 @@ use std::fmt::Display;
 use anchor_lang::prelude::borsh::{BorshDeserialize, BorshSerialize};
 use anchor_lang::prelude::*;
 
+use crate::messages::Any2SVMTokenTransfer;
 use crate::{CcipOfframpError, ConfigOcrPluginType, OcrPluginType};
 
 // zero_copy is used to prevent hitting stack/heap memory limits
@@ -33,15 +34,22 @@ pub struct ReferenceAddresses {
     pub rmn_remote: Pubkey,
 }
 
-#[derive(Clone, Debug, AnchorDeserialize, AnchorSerialize)]
+#[derive(Clone, AnchorDeserialize, AnchorSerialize)]
 pub struct DeriveAccountsExecuteParams {
     pub execute_caller: Pubkey,
+    pub token_receiver: Pubkey,
+    pub token_transfers: Vec<TokenTransferAndOffchainData>,
     pub message_accounts: Vec<CcipAccountMeta>,
     pub source_chain_selector: u64,
-    pub mints_of_transferred_tokens: Vec<Pubkey>,
+    pub original_sender: Vec<u8>,
     pub merkle_root: [u8; 32],
     pub buffer_id: Vec<u8>,
-    pub token_receiver: Pubkey,
+}
+
+#[derive(Clone, AnchorDeserialize, AnchorSerialize)]
+pub struct TokenTransferAndOffchainData {
+    pub transfer: Any2SVMTokenTransfer,
+    pub data: Vec<u8>,
 }
 
 #[derive(Debug, Default, PartialEq, Eq, Clone, AnchorDeserialize, AnchorSerialize)]
@@ -60,6 +68,20 @@ pub struct DeriveAccountsResponse {
     pub current_stage: String,
     /// Identifies the next derivation stage. If empty, the derivation is complete.
     pub next_stage: String,
+}
+
+impl DeriveAccountsResponse {
+    // Join two responses (when two stages can be done back to back)
+    pub fn and(mut self, next: DeriveAccountsResponse) -> Self {
+        self.ask_again_with.extend_from_slice(&next.ask_again_with);
+        self.accounts_to_save
+            .extend_from_slice(&next.accounts_to_save);
+        self.look_up_tables_to_save
+            .extend_from_slice(&next.look_up_tables_to_save);
+        self.current_stage = next.current_stage;
+        self.next_stage = next.next_stage;
+        self
+    }
 }
 
 // We can't use anchor's `AccountMeta` since it doesn't implement
