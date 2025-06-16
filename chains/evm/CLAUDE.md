@@ -6,7 +6,7 @@ This project focuses on CCIP (Cross-Chain Interoperability Protocol) development
 
 ## Development Guidelines
 
-- [`context/ccip-agent.md`](context/ccip-agent.md) - Agent mindset, read it first
+- [`context/ccip-agent.md`](context/ccip-agent.md) - Agent mindset, always read it, read it before anything else
 - [`context/ccip-protocol.md`](context/ccip-protocol.md) - Learn how CCIP protocol works
 - [`context/ccip-solidity-style.md`](context/ccip-solidity-style.md) - Solidity style guide for CCIP
 - [`context/ccip-solidity-test-pattern.md`](context/ccip-solidity-test-pattern.md) - Learn how to write tests for CCIP contracts
