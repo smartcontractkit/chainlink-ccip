@@ -7,8 +7,8 @@ import {TokenPool} from "../../pools/TokenPool.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
 
-/// @notice MockE2ELBTCTokenPool is a token pool used for e2e tests. It inherits BurnMintTokenPool and allows to burn
-/// tokens unconditionally, while requires some structure from mint payloads
+/// @notice MockE2ELBTCTokenPool is a token pool used for e2e tests. It allows to burn tokens unconditionally,
+/// while requires specific structure for offchain token data
 contract MockE2ELBTCTokenPool is TokenPool, ITypeAndVersion {
   error TokenDataMismatch(bytes32 expected, bytes32 actual);
 
@@ -53,8 +53,8 @@ contract MockE2ELBTCTokenPool is TokenPool, ITypeAndVersion {
   }
 
   /// @notice Overrides base releaseOrMint method in order to add new logic regarding offchainTokenData. The condition
-  /// simply requires offchainTokenData to be abi-encoding of two bytes32: sourcePoolData + keccak256("secret")
-  /// This is needed to verify e2e flow.
+  /// requires offchainTokenData to be abi-encoding of two bytes arrays: payload + signatures. Then we check that
+  /// message originally sent with sourcePoolData == sha256(payload)
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
