@@ -11,30 +11,30 @@ contract Internal_validateEVMAddress is Test {
     Internal._validateEVMAddress(encoded);
   }
 
-  function test_validateEVMAddress_succeeds_onValidAddress() public {
+  function test_validateEVMAddress_ValidAddress() public {
     address validAddress = 0x1234567890123456789012345678901234567890;
     this.validateEVMAddress(abi.encode(validAddress));
   }
 
-  function test_validateEVMAddress_reverts_onInvalidLength() public {
+  function test_validateEVMAddress_RevertWhen_InvalidLength() public {
     bytes memory invalidAddress = new bytes(31);
     vm.expectRevert(abi.encodeWithSelector(Internal.InvalidEVMAddress.selector, invalidAddress));
     this.validateEVMAddress(invalidAddress);
   }
 
-  function test_validateEVMAddress_reverts_onPrecompileAddress() public {
+  function test_validateEVMAddress_RevertWhen_PrecompileAddress() public {
     bytes memory precompileAddress = abi.encode(address(0x01));
     vm.expectRevert(abi.encodeWithSelector(Internal.InvalidEVMAddress.selector, precompileAddress));
     this.validateEVMAddress(precompileAddress);
   }
 
-  function test_validateEVMAddress_reverts_onOversizedAddress() public {
+  function test_validateEVMAddress_RevertWhen_OversizedAddress() public {
     bytes memory invalidAddress = abi.encode(uint256(type(uint160).max) + 1);
     vm.expectRevert(abi.encodeWithSelector(Internal.InvalidEVMAddress.selector, invalidAddress));
     this.validateEVMAddress(invalidAddress);
   }
 
-  function test_validateEVMAddress_succeeds_onBoundaryAddresses() public {
+  function test_validateEVMAddress_BoundaryAddresses() public {
     bytes memory lowerBoundary = abi.encode(Internal.EVM_PRECOMPILE_SPACE);
     this.validateEVMAddress(lowerBoundary);
 

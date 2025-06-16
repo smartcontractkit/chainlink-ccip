@@ -11,12 +11,12 @@ contract Internal_validateTVMAddress is Test {
     Internal._validateTVMAddress(encoded);
   }
 
-  function test_validateTVMAddress_succeeds_onValidAddress() public {
+  function test_validateTVMAddress_ValidAddress() public {
     bytes memory validTvmAddress = hex"11ff1234567890123456789012345678901234567890123456789012345678901234abcd";
     this.validateTVMAddress(validTvmAddress);
   }
 
-  function test_validateTVMAddress_reverts_onShortLength() public {
+  function test_validateTVMAddress_RevertWhen_ShortLength() public {
     bytes memory shortAddress = new bytes(35);
     // Fill with non-zero data to avoid zero address check
     for (uint256 i = 0; i < 35; i++) {
@@ -26,13 +26,13 @@ contract Internal_validateTVMAddress is Test {
     this.validateTVMAddress(shortAddress);
   }
 
-  function test_validateTVMAddress_reverts_onLongLength() public {
+  function test_validateTVMAddress_RevertWhen_LongLength() public {
     bytes memory longAddress = new bytes(37);
     vm.expectRevert(abi.encodeWithSelector(Internal.InvalidTVMAddress.selector, longAddress));
     this.validateTVMAddress(longAddress);
   }
 
-  function test_validateTVMAddress_reverts_onZeroAccountId() public {
+  function test_validateTVMAddress_RevertWhen_ZeroAccountId() public {
     bytes memory invalidTVMAddress = hex"11ff000000000000000000000000000000000000000000000000000000000000000012ab";
     vm.expectRevert(abi.encodeWithSelector(Internal.InvalidTVMAddress.selector, invalidTVMAddress));
     this.validateTVMAddress(invalidTVMAddress);
