@@ -54,7 +54,7 @@ contract OnRampOverSuperchainInterop_hashInteropMessage is OnRampOverSuperchainI
     assertTrue(messageHash1 != messageHash2);
   }
 
-  function testFuzz_DifferentMessageData(
+  function testFuzz_DifferentMessageData_Success(
     bytes memory sender,
     bytes memory data,
     address receiver,

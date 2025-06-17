@@ -14,6 +14,8 @@ contract OnRampOverSuperchainInteropSetup is OnRampSetup {
     s_onRampOverSuperchainInterop = new OnRampOverSuperchainInterop(
       s_onRamp.getStaticConfig(), s_onRamp.getDynamicConfig(), _generateDestChainConfigArgs(s_sourceRouter)
     );
+
+    assertEq(s_onRampOverSuperchainInterop.typeAndVersion(), "OnRampOverSuperchainInterop 1.6.1-dev");
   }
 
   function _generateBasicAny2EVMMessage() internal returns (Internal.Any2EVMRampMessage memory) {
