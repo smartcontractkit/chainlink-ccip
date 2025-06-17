@@ -12,7 +12,7 @@ import (
 
 // Transfers the ownership of the fee quoter to a new proposed owner.
 //
-// Shared func signature with other programs
+// # Shared func signature with other programs
 //
 // # Arguments
 //

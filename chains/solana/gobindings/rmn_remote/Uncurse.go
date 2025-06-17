@@ -14,7 +14,7 @@ import (
 // the entire chain curse will be lifted. (note that any other specific
 // subject curses will remain active.)
 //
-// Only the CCIP Admin may perform this operation
+// # Only the CCIP Admin may perform this operation
 //
 // # Arguments
 //
