@@ -44,6 +44,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   error SenderNotAllowed(address sender);
   error InvalidAllowListRequest(uint64 destChainSelector);
   error ReentrancyGuardReentrantCall();
+  error MessageIdUnexpectedlySet(bytes32 messageId);
 
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event DestChainConfigSet(
@@ -106,9 +107,8 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   }
 
   // STATIC CONFIG
-  string public constant override typeAndVersion = "OnRamp 1.6.0";
   /// @dev The chain ID of the source chain that this contract is deployed to.
-  uint64 private immutable i_chainSelector;
+  uint64 internal immutable i_chainSelector;
   /// @dev The rmn contract.
   IRMNRemote private immutable i_rmnRemote;
   /// @dev The address of the nonce manager.
@@ -144,6 +144,11 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     _applyDestChainConfigUpdates(destChainConfigArgs);
   }
 
+  /// @notice Using a function because constant state variables cannot be overridden by child contracts.
+  function typeAndVersion() public pure virtual override returns (string memory) {
+    return "OnRamp 1.6.1-dev";
+  }
+
   // ================================================================
   // │                          Messaging                           │
   // ================================================================
@@ -155,6 +160,24 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     uint64 destChainSelector
   ) external view returns (uint64) {
     return s_destChainConfigs[destChainSelector].sequenceNumber + 1;
+  }
+
+  /// @notice Generates a message ID for a given message.
+  /// the messageId field of the passed-in message should not be set.
+  /// @param message The message to generate a message ID for.
+  /// @return messageId The message ID.
+  function generateMessageId(
+    Internal.EVM2AnyRampMessage memory message
+  ) public view returns (bytes32) {
+    if (message.header.messageId != "") {
+      revert MessageIdUnexpectedlySet(message.header.messageId);
+    }
+    return Internal._hash(
+      message,
+      keccak256(
+        abi.encode(Internal.EVM_2_ANY_MESSAGE_HASH, i_chainSelector, message.header.destChainSelector, address(this))
+      )
+    );
   }
 
   /// @inheritdoc IEVM2AnyOnRampClient
@@ -244,12 +267,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     newMessage = _postProcessMessage(newMessage);
 
     // Hash only after all fields have been set.
-    newMessage.header.messageId = Internal._hash(
-      newMessage,
-      // Metadata hash preimage to ensure global uniqueness, ensuring 2 identical messages sent to 2 different lanes
-      // will have a distinct hash.
-      keccak256(abi.encode(Internal.EVM_2_ANY_MESSAGE_HASH, i_chainSelector, destChainSelector, address(this)))
-    );
+    newMessage.header.messageId = generateMessageId(newMessage);
 
     // Emit message request.
     // This must happen after any pool events as some tokens (e.g. USDC) emit events that we expect to precede this
