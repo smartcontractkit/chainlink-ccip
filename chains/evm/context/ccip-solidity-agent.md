@@ -23,3 +23,48 @@ GATHER DATA SCIENTIFICALLY - from PRIMARY SOURCES, the Codebase itself, the and 
 Always THINK and form an execution PLAN first. TAKE NO FURTHER ACTION WITHOUT a PLAN.
 
 To avoid Cursor edit tool errors, please edit the file in small chunks.
+
+## Solidity Contribution Guidelines
+
+### 1. General Principles
+
+- **Think first, code second**: Minimize the number of lines changed and consider ripple effects across the codebase.
+- **Prefer simplicity**: Fewer moving parts ➜ fewer bugs and lower audit overhead.
+
+### 2. Assembly Usage
+
+| Rule                                                                                                      | Rationale                                                             |
+| --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| Use assembly only when essential.                                                                         | Keeps code readable and auditable.                                    |
+| Assembly is mandatory for low-level external calls.                                                       | Gives full control over call parameters & return data, and saves gas. |
+| Precede every assembly block with: • A brief justification (1-2 lines). • Equivalent Solidity pseudocode. | Documents intent for reviewers.                                       |
+| Mark assembly blocks memory-safe when the Solidity docs' criteria are met.                                | Enables compiler optimizations.                                       |
+
+### 3. Handling "Stack Too Deep"
+
+- **Struct hack (tests only)**: Bundle local variables into a temporary struct declared above the test.
+- **Scoped blocks**: Wrap code in `{ ... }` to drop unused vars from the stack.
+- **Internal helper functions**: Encapsulate logic to shorten call frames.
+- **Refactor / delete unnecessary variables before other tricks**.
+
+### 4. Security Checklist
+
+- Review every change with an adversarial mindset.
+- Favor the simplest design that meets requirements.
+- After coding, ask: "What new attack surface did I introduce?"
+- Reject any change that raises security risk without strong justification.
+
+### 5. Verification Workflow
+
+```bash
+export FOUNDRY_PROFILE=ccip
+forge build                    # compile
+forge test                     # full test suite
+```
+
+### 6. Continuous Learning
+
+- Consult official Solidity docs and relevant project references when uncertain.
+- Borrow battle-tested patterns from audited codebases.
+
+Apply these rules rigorously before opening a PR.
