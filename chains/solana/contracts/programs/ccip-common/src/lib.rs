@@ -64,8 +64,7 @@ pub mod router_accounts {
         pub mint: Pubkey,
         // if true, the pool supports calling `derive_accounts_lock_or_burn` and
         // `derive_accounts_release_or_mint` to derive the list of accounts and LUTs
-        // needed to interact with it. See `complex_burn_mint_token_pool.rs` for an
-        // implementation example.
+        // needed to interact with it.
         pub supports_auto_derivation: bool,
     }
 }
