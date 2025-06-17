@@ -501,7 +501,7 @@ func (u solanaUSDCMessageReader) MessagesByTokenID(
 		for tokenID, metadata := range cctpData {
 			if metadata.Nonce == event.CctpNonce && metadata.SourceDomain == event.SourceDomain {
 				out[tokenID] = event.MessageSentBytes
-				u.lggr.Infow("Found CCTP event", "event", event)
+				u.lggr.Infow("Found CCTP event", "tokenID", tokenID, "event", event)
 				break
 			}
 		}
