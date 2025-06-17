@@ -337,18 +337,11 @@ func createExecutedMessagesKeyFilter(
 			}),
 		))
 	}
-	extendedQuery := query.Or(chainExpressions...)
 
 	keyFilter := query.KeyFilter{
 		Key: consts.EventNameExecutionStateChanged,
 		Expressions: []query.Expression{
-			extendedQuery,
-			// We don't need to wait for an execute state changed event to be finalized
-			// before we optimistically mark a message as executed.
-			query.Comparator(consts.EventAttributeState, primitives.ValueComparator{
-				Value:    0,
-				Operator: primitives.Gt,
-			}),
+			query.Or(chainExpressions...),
 			query.Confidence(confidence),
 		},
 	}
@@ -1651,8 +1644,12 @@ func validateExecutionStateChangedEvent(
 		return fmt.Errorf("message ID is zero")
 	}
 
-	if ev.State == 0 {
-		return fmt.Errorf("state is zero")
+	// This should never happen, because UNTOUCHED(0) and IN_PROGRESS(1) are internal
+	// statuses used by the contract to track the state of the message during TX.
+	// However, ExecutionStateChange event must never be emitted with anything other than
+	// SUCCESS(2) or FAILURE(3)
+	if ev.State < 2 {
+		return fmt.Errorf("state is not SUCCESS(2) or FAILURE(3), got %d", ev.State)
 	}
 
 	return nil
