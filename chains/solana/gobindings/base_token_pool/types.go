@@ -529,6 +529,116 @@ func (obj *ReleaseOrMintOutV1) UnmarshalWithDecoder(decoder *ag_binary.Decoder) 
 	return nil
 }
 
+type DeriveAccountsResponse struct {
+	AskAgainWith       []CcipAccountMeta
+	AccountsToSave     []CcipAccountMeta
+	LookUpTablesToSave []ag_solanago.PublicKey
+	CurrentStage       string
+	NextStage          string
+}
+
+func (obj DeriveAccountsResponse) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `AskAgainWith` param:
+	err = encoder.Encode(obj.AskAgainWith)
+	if err != nil {
+		return err
+	}
+	// Serialize `AccountsToSave` param:
+	err = encoder.Encode(obj.AccountsToSave)
+	if err != nil {
+		return err
+	}
+	// Serialize `LookUpTablesToSave` param:
+	err = encoder.Encode(obj.LookUpTablesToSave)
+	if err != nil {
+		return err
+	}
+	// Serialize `CurrentStage` param:
+	err = encoder.Encode(obj.CurrentStage)
+	if err != nil {
+		return err
+	}
+	// Serialize `NextStage` param:
+	err = encoder.Encode(obj.NextStage)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *DeriveAccountsResponse) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `AskAgainWith`:
+	err = decoder.Decode(&obj.AskAgainWith)
+	if err != nil {
+		return err
+	}
+	// Deserialize `AccountsToSave`:
+	err = decoder.Decode(&obj.AccountsToSave)
+	if err != nil {
+		return err
+	}
+	// Deserialize `LookUpTablesToSave`:
+	err = decoder.Decode(&obj.LookUpTablesToSave)
+	if err != nil {
+		return err
+	}
+	// Deserialize `CurrentStage`:
+	err = decoder.Decode(&obj.CurrentStage)
+	if err != nil {
+		return err
+	}
+	// Deserialize `NextStage`:
+	err = decoder.Decode(&obj.NextStage)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type CcipAccountMeta struct {
+	Pubkey     ag_solanago.PublicKey
+	IsSigner   bool
+	IsWritable bool
+}
+
+func (obj CcipAccountMeta) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Pubkey` param:
+	err = encoder.Encode(obj.Pubkey)
+	if err != nil {
+		return err
+	}
+	// Serialize `IsSigner` param:
+	err = encoder.Encode(obj.IsSigner)
+	if err != nil {
+		return err
+	}
+	// Serialize `IsWritable` param:
+	err = encoder.Encode(obj.IsWritable)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *CcipAccountMeta) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Pubkey`:
+	err = decoder.Decode(&obj.Pubkey)
+	if err != nil {
+		return err
+	}
+	// Deserialize `IsSigner`:
+	err = decoder.Decode(&obj.IsSigner)
+	if err != nil {
+		return err
+	}
+	// Deserialize `IsWritable`:
+	err = decoder.Decode(&obj.IsWritable)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 type RateLimitTokenBucket struct {
 	Tokens      uint64
 	LastUpdated uint64

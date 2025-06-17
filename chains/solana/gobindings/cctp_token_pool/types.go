@@ -149,3 +149,21 @@ func (obj *CctpChain) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err erro
 	}
 	return nil
 }
+
+type DeriveStage ag_binary.BorshEnum
+
+const (
+	RetrieveChainConfig_DeriveStage DeriveStage = iota
+	BuildDynamicAccounts_DeriveStage
+)
+
+func (value DeriveStage) String() string {
+	switch value {
+	case RetrieveChainConfig_DeriveStage:
+		return "RetrieveChainConfig"
+	case BuildDynamicAccounts_DeriveStage:
+		return "BuildDynamicAccounts"
+	default:
+		return ""
+	}
+}
