@@ -507,7 +507,7 @@ func (u solanaUSDCMessageReader) MessagesByTokenID(
 	}
 
 	// Check if any were missed.
-	for tokenID, _ := range tokens {
+	for tokenID := range tokens {
 		if _, ok := out[tokenID]; !ok {
 			// Token is not available in the source chain, it should never happen at this stage
 			u.lggr.Warnw("Message not found in the source chain",
