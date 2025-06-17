@@ -1551,32 +1551,73 @@ func TestTokenPool(t *testing.T) {
 				ix, err := raw.ValidateAndBuild()
 				require.NoError(t, err)
 
-				res := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{transferI, fundPoolSignerIx, ix}, admin, config.DefaultCommitment)
-				require.NotNil(t, res)
+				t.Run("When there is a global curse, it fails", func(t *testing.T) {
+					// Create IX to curse
+					globalCurse := rmn_remote.CurseSubject{
+						Value: [16]uint8{0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01},
+					}
+					curseIx, err := rmn_remote.NewCurseInstruction(
+						globalCurse,
+						config.RMNRemoteConfigPDA,
+						admin.PublicKey(),
+						config.RMNRemoteCursesPDA,
+						solana.SystemProgramID,
+					).ValidateAndBuild()
+					require.NoError(t, err)
 
-				output, err := common.ExtractAnchorTypedReturnValue[cctp_token_pool.LockOrBurnOutV1](ctx, res.Meta.LogMessages, cctpPool.program.String())
-				require.NoError(t, err)
-				outputSourceDomain := binary.BigEndian.Uint32(output.DestPoolData[60:64])
-				require.Equal(t, outputSourceDomain, domain) // the source domain is Solana in this test
+					// submit curse and onramp in the same transaction, so there are no side-effects to other tests
+					// as the tx is atomic and reverts
+					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{fundPoolSignerIx, transferI, curseIx, ix},
+						admin, config.DefaultCommitment, []string{ccip.GloballyCursed_RmnRemoteError.String()})
+				})
 
-				require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, messageSentEventAddress, config.DefaultCommitment, &messageSentEventData))
-				fmt.Println("Message Sent Event Data:", messageSentEventData)
-				require.Equal(t, cctpPool.signer, messageSentEventData.RentPayer)
+				t.Run("When there is a lane curse, it fails", func(t *testing.T) {
+					// Create IX to curse
+					svmCurse := rmn_remote.CurseSubject{}
+					binary.LittleEndian.PutUint64(svmCurse.Value[:], config.SvmChainSelector)
+					curseIx, err := rmn_remote.NewCurseInstruction(
+						svmCurse,
+						config.RMNRemoteConfigPDA,
+						admin.PublicKey(),
+						config.RMNRemoteCursesPDA,
+						solana.SystemProgramID,
+					).ValidateAndBuild()
+					require.NoError(t, err)
 
-				var ccipCctpMessageSentEvent ccip.EventCcipCctpMessageSent
-				require.NoError(t, common.ParseEvent(res.Meta.LogMessages, "CcipCctpMessageSentEvent", &ccipCctpMessageSentEvent, config.PrintEvents))
-				require.Equal(t, user.PublicKey(), ccipCctpMessageSentEvent.OriginalSender)
-				require.Equal(t, config.SvmChainSelector, ccipCctpMessageSentEvent.RemoteChainSelector)
-				require.Equal(t, fakeCcipFullNonce, ccipCctpMessageSentEvent.MsgTotalNonce)
-				require.Equal(t, messageSentEventAddress, ccipCctpMessageSentEvent.EventAddress)
-				require.Equal(t, messageSentEventData.Message, ccipCctpMessageSentEvent.MessageSentBytes)
-				require.Equal(t, domain, ccipCctpMessageSentEvent.SourceDomain)
+					// submit curse and onramp in the same transaction, so there are no side-effects to other tests
+					// as the tx is atomic and reverts
+					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{fundPoolSignerIx, transferI, curseIx, ix},
+						admin, config.DefaultCommitment, []string{ccip.SubjectCursed_RmnRemoteError.String()})
+				})
 
-				// Check CCTP nonce in all ways it appears
-				outputNonce := binary.BigEndian.Uint64(output.DestPoolData[24:32])                        // in pool returned dest data
-				require.Equal(t, outputNonce, getCctpNonce(t, ccipCctpMessageSentEvent.MessageSentBytes)) // in event message bytes
-				require.Equal(t, outputNonce, getCctpNonce(t, messageSentEventData.Message))              // in event account data
-				require.Equal(t, outputNonce, ccipCctpMessageSentEvent.CctpNonce)                         // in the event field
+				t.Run("When there is no curse, it succeeds", func(t *testing.T) {
+					res := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{transferI, fundPoolSignerIx, ix}, admin, config.DefaultCommitment)
+					require.NotNil(t, res)
+
+					output, err := common.ExtractAnchorTypedReturnValue[cctp_token_pool.LockOrBurnOutV1](ctx, res.Meta.LogMessages, cctpPool.program.String())
+					require.NoError(t, err)
+					outputSourceDomain := binary.BigEndian.Uint32(output.DestPoolData[60:64])
+					require.Equal(t, outputSourceDomain, domain) // the source domain is Solana in this test
+
+					require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, messageSentEventAddress, config.DefaultCommitment, &messageSentEventData))
+					fmt.Println("Message Sent Event Data:", messageSentEventData)
+					require.Equal(t, cctpPool.signer, messageSentEventData.RentPayer)
+
+					var ccipCctpMessageSentEvent ccip.EventCcipCctpMessageSent
+					require.NoError(t, common.ParseEvent(res.Meta.LogMessages, "CcipCctpMessageSentEvent", &ccipCctpMessageSentEvent, config.PrintEvents))
+					require.Equal(t, user.PublicKey(), ccipCctpMessageSentEvent.OriginalSender)
+					require.Equal(t, config.SvmChainSelector, ccipCctpMessageSentEvent.RemoteChainSelector)
+					require.Equal(t, fakeCcipFullNonce, ccipCctpMessageSentEvent.MsgTotalNonce)
+					require.Equal(t, messageSentEventAddress, ccipCctpMessageSentEvent.EventAddress)
+					require.Equal(t, messageSentEventData.Message, ccipCctpMessageSentEvent.MessageSentBytes)
+					require.Equal(t, domain, ccipCctpMessageSentEvent.SourceDomain)
+
+					// Check CCTP nonce in all ways it appears
+					outputNonce := binary.BigEndian.Uint64(output.DestPoolData[24:32])                        // in pool returned dest data
+					require.Equal(t, outputNonce, getCctpNonce(t, ccipCctpMessageSentEvent.MessageSentBytes)) // in event message bytes
+					require.Equal(t, outputNonce, getCctpNonce(t, messageSentEventData.Message))              // in event account data
+					require.Equal(t, outputNonce, ccipCctpMessageSentEvent.CctpNonce)                         // in the event field
+				})
 			})
 
 			t.Run("Basic offramp", func(t *testing.T) {
@@ -1650,13 +1691,54 @@ func TestTokenPool(t *testing.T) {
 				ix, err := raw.ValidateAndBuild()
 				require.NoError(t, err)
 
-				res := testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{fundCustodyIx, ix}, admin, config.DefaultCommitment, tpLookupTable)
-				require.NotNil(t, res)
+				t.Run("When there is a global curse, it fails", func(t *testing.T) {
+					// Create IX to curse
+					globalCurse := rmn_remote.CurseSubject{
+						Value: [16]uint8{0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01},
+					}
+					curseIx, err := rmn_remote.NewCurseInstruction(
+						globalCurse,
+						config.RMNRemoteConfigPDA,
+						admin.PublicKey(),
+						config.RMNRemoteCursesPDA,
+						solana.SystemProgramID,
+					).ValidateAndBuild()
+					require.NoError(t, err)
 
-				_, final, err := tokens.TokenBalance(ctx, solanaGoClient, adminATA, config.DefaultCommitment)
-				require.NoError(t, err)
+					// submit curse and offramp in the same transaction, so there are no side-effects to other tests
+					// as the tx is atomic and reverts
+					testutils.SendAndFailWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{fundCustodyIx, curseIx, ix},
+						admin, config.DefaultCommitment, tpLookupTable, []string{ccip.GloballyCursed_RmnRemoteError.String()})
+				})
 
-				require.Equal(t, uint64(initial)+messageAmount, uint64(final), "Admin should have received the USDC after receiving the message")
+				t.Run("When there is a lane curse, it fails", func(t *testing.T) {
+					svmCurse := rmn_remote.CurseSubject{}
+					binary.LittleEndian.PutUint64(svmCurse.Value[:], config.SvmChainSelector)
+					curseIx, err := rmn_remote.NewCurseInstruction(
+						svmCurse,
+						config.RMNRemoteConfigPDA,
+						admin.PublicKey(),
+						config.RMNRemoteCursesPDA,
+						solana.SystemProgramID,
+					).ValidateAndBuild()
+					require.NoError(t, err)
+
+					// submit curse and offramp in the same transaction, so there are no side-effects to other tests
+					// as the tx is atomic and reverts
+					testutils.SendAndFailWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{fundCustodyIx, curseIx, ix},
+						admin, config.DefaultCommitment, tpLookupTable, []string{ccip.SubjectCursed_RmnRemoteError.String()})
+				})
+
+				t.Run("When there is no curse, it succeeds", func(t *testing.T) {
+					res := testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{fundCustodyIx, ix},
+						admin, config.DefaultCommitment, tpLookupTable)
+					require.NotNil(t, res)
+
+					_, final, err := tokens.TokenBalance(ctx, solanaGoClient, adminATA, config.DefaultCommitment)
+					require.NoError(t, err)
+
+					require.Equal(t, uint64(initial)+messageAmount, uint64(final), "Admin should have received the USDC after receiving the message")
+				})
 			})
 
 			t.Run("Reclaim event account rent", func(t *testing.T) {
