@@ -15,10 +15,14 @@ pub const RECLAIM_EVENT_ACCOUNT_DISCRIMINATOR: [u8; 8] = [94, 198, 180, 159, 131
 pub mod context;
 use crate::context::*;
 
+mod derive;
+
 const SOLANA_DOMAIN_ID: u32 = 5; // Circle's CCTP domain ID for Solana is always 5, see https://developers.circle.com/stablecoins/supported-domains
 
 #[program]
 pub mod cctp_token_pool {
+    use std::str::FromStr;
+
     use super::*;
 
     pub fn initialize(
@@ -355,6 +359,23 @@ pub mod cctp_token_pool {
         invoke_signed(&instruction, &acc_infos, &[signer_seeds])?;
 
         Ok(())
+    }
+
+    pub fn derive_accounts_release_or_mint_tokens<'info>(
+        ctx: Context<'_, '_, 'info, 'info, Empty<'info>>,
+        stage: String,
+        release_or_mint: ReleaseOrMintInV1,
+    ) -> Result<DeriveAccountsResponse> {
+        let stage = derive::release_or_mint::DeriveStage::from_str(&stage)?;
+
+        match stage {
+            derive::release_or_mint::DeriveStage::RetrieveChainConfig => {
+                derive::release_or_mint::retrieve_chain_config(&release_or_mint)
+            }
+            derive::release_or_mint::DeriveStage::BuildDynamicAccounts => {
+                derive::release_or_mint::build_dynamic_accounts(ctx, &release_or_mint)
+            }
+        }
     }
 }
 
