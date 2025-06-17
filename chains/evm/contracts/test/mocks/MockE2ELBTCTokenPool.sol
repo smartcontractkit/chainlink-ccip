@@ -58,10 +58,8 @@ contract MockE2ELBTCTokenPool is TokenPool, ITypeAndVersion {
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
-    uint256 localAmount = _calculateLocalAmount(
-      releaseOrMintIn.sourceDenominatedAmount, _parseRemoteDecimals(releaseOrMintIn.sourcePoolData)
-    );
-    _validateReleaseOrMint(releaseOrMintIn, localAmount);
+    uint256 amount = releaseOrMintIn.sourceDenominatedAmount;
+    _validateReleaseOrMint(releaseOrMintIn, amount);
 
     if (i_destPoolData.length == 32) {
       (bytes memory payload,) = abi.decode(releaseOrMintIn.offchainTokenData, (bytes, bytes));
@@ -72,16 +70,16 @@ contract MockE2ELBTCTokenPool is TokenPool, ITypeAndVersion {
     }
 
     // Mint to the receiver
-    IBurnMintERC20(address(i_token)).mint(releaseOrMintIn.receiver, localAmount);
+    IBurnMintERC20(address(i_token)).mint(releaseOrMintIn.receiver, amount);
 
     emit ReleasedOrMinted({
       remoteChainSelector: releaseOrMintIn.remoteChainSelector,
       token: address(i_token),
       sender: msg.sender,
       recipient: releaseOrMintIn.receiver,
-      amount: localAmount
+      amount: amount
     });
 
-    return Pool.ReleaseOrMintOutV1({destinationAmount: localAmount});
+    return Pool.ReleaseOrMintOutV1({destinationAmount: amount});
   }
 }
