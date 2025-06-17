@@ -33,7 +33,7 @@ contract OnRampOverSuperchainInterop is OnRamp {
     Internal.EVM2AnyRampMessage memory processedMessage = super._postProcessMessage(message);
 
     // Get the gas limit from the extraArgs
-    uint256 gasLimit = _extractGasLimit(processedMessage.extraArgs);
+    uint256 gasLimit = extractGasLimit(processedMessage.extraArgs);
 
     Internal.Any2EVMTokenTransfer[] memory destTokenTranfers =
       new Internal.Any2EVMTokenTransfer[](processedMessage.tokenAmounts.length);
@@ -86,7 +86,7 @@ contract OnRampOverSuperchainInterop is OnRamp {
   /// It is likely in future ramp versions, which should sunset this superchain-specific ramp.
   /// @param extraArgs The extraArgs to extract the gas limit from
   /// @return gasLimit The gas limit
-  function _extractGasLimit(
+  function extractGasLimit(
     bytes memory extraArgs
   ) public pure returns (uint256 gasLimit) {
     if (extraArgs.length < 36) {
