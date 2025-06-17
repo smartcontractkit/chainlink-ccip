@@ -2,6 +2,7 @@ package contracts
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
@@ -21,6 +22,7 @@ import (
 
 	// use the real program bindings, although interacting with the mock contract
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/base_token_pool"
 	cctp_message_transmitter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/cctp_message_transmitter"
 	message_transmitter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/cctp_message_transmitter"
 	cctp_token_messenger_minter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/cctp_token_messenger_minter"
@@ -1696,4 +1698,52 @@ func TestTokenPool(t *testing.T) {
 			})
 		})
 	})
+}
+
+func deriveCctpReleaseOrMintAccounts(ctx context.Context,
+	t *testing.T,
+	transmitter solana.PrivateKey,
+	releaseOrMint cctp_token_pool.ReleaseOrMintInV1,
+	solanaGoClient *rpc.Client) (accounts []*solana.AccountMeta, lookUpTables []solana.PublicKey) {
+
+	derivedAccounts := []*solana.AccountMeta{}
+	askWith := []*solana.AccountMeta{}
+	stage := "Start"
+	for {
+		deriveRaw := cctp_token_pool.NewDeriveAccountsReleaseOrMintTokensInstruction(
+			stage,
+			releaseOrMint,
+			config.OfframpConfigPDA,
+		)
+		deriveRaw.AccountMetaSlice = append(deriveRaw.AccountMetaSlice, askWith...)
+		derive, err := deriveRaw.ValidateAndBuild()
+		require.NoError(t, err)
+		tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{derive}, transmitter, config.DefaultCommitment)
+		derivation, err := common.ExtractAnchorTypedReturnValue[base_token_pool.DeriveAccountsResponse](ctx, tx.Meta.LogMessages, config.CctpTokenPoolProgram.String())
+		require.NoError(t, err)
+
+		for _, meta := range derivation.AccountsToSave {
+			derivedAccounts = append(derivedAccounts, &solana.AccountMeta{
+				PublicKey:  meta.Pubkey,
+				IsWritable: meta.IsWritable,
+				IsSigner:   meta.IsSigner,
+			})
+		}
+
+		askWith = []*solana.AccountMeta{}
+		for _, meta := range derivation.AskAgainWith {
+			askWith = append(askWith, &solana.AccountMeta{
+				PublicKey:  meta.Pubkey,
+				IsWritable: meta.IsWritable,
+				IsSigner:   meta.IsSigner,
+			})
+		}
+
+		lookUpTables = append(lookUpTables, derivation.LookUpTablesToSave...)
+
+		if len(derivation.NextStage) == 0 {
+			return derivedAccounts, lookUpTables
+		}
+		stage = derivation.NextStage
+	}
 }

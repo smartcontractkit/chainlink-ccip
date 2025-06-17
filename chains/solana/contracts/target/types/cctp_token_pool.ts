@@ -749,6 +749,31 @@ export type CctpTokenPool = {
           "type": "bytes"
         }
       ]
+    },
+    {
+      "name": "deriveAccountsReleaseOrMintTokens",
+      "accounts": [
+        {
+          "name": "clock",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "stage",
+          "type": "string"
+        },
+        {
+          "name": "releaseOrMint",
+          "type": {
+            "defined": "ReleaseOrMintInV1"
+          }
+        }
+      ],
+      "returns": {
+        "defined": "DeriveAccountsResponse"
+      }
     }
   ],
   "accounts": [
@@ -858,6 +883,20 @@ export type CctpTokenPool = {
           {
             "name": "destinationCaller",
             "type": "publicKey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DeriveStage",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "RetrieveChainConfig"
+          },
+          {
+            "name": "BuildDynamicAccounts"
           }
         ]
       }
@@ -1707,6 +1746,31 @@ export const IDL: CctpTokenPool = {
           "type": "bytes"
         }
       ]
+    },
+    {
+      "name": "deriveAccountsReleaseOrMintTokens",
+      "accounts": [
+        {
+          "name": "clock",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "stage",
+          "type": "string"
+        },
+        {
+          "name": "releaseOrMint",
+          "type": {
+            "defined": "ReleaseOrMintInV1"
+          }
+        }
+      ],
+      "returns": {
+        "defined": "DeriveAccountsResponse"
+      }
     }
   ],
   "accounts": [
@@ -1816,6 +1880,20 @@ export const IDL: CctpTokenPool = {
           {
             "name": "destinationCaller",
             "type": "publicKey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DeriveStage",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "RetrieveChainConfig"
+          },
+          {
+            "name": "BuildDynamicAccounts"
           }
         ]
       }

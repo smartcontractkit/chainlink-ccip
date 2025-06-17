@@ -10,7 +10,6 @@ use std::{
 };
 
 pub mod release_or_mint {
-
     use base_token_pool::common::POOL_CHAINCONFIG_SEED;
 
     use crate::{
@@ -69,7 +68,6 @@ pub mod release_or_mint {
             )],
             // We don't need the domain for the first two PDAs, so we return them now to keep
             // return sizes balanced.
-            // TODO read/write/sign
             accounts_to_save: vec![
                 // cctp_authority_pda
                 TokenOfframpRemainingAccounts::get_message_transmitter_pda(&[
@@ -103,7 +101,6 @@ pub mod release_or_mint {
         let remote_token_address_bytes =
             to_solana_pubkey(&chain_config.base.remote.token_address).to_bytes();
 
-        // TODO read/write/sign
         Ok(DeriveAccountsResponse {
             accounts_to_save: vec![
                 // cctp_token_messenger_minter
@@ -122,19 +119,19 @@ pub mod release_or_mint {
                 .readonly(),
                 // cctp_token_minter_account
                 TokenOfframpRemainingAccounts::get_token_messenger_minter_pda(&[b"token_minter"])
-                    .readonly(),
+                    .writable(),
                 // cctp_local_token
                 TokenOfframpRemainingAccounts::get_token_messenger_minter_pda(&[
                     b"local_token",
                     mint.as_ref(),
                 ])
-                .readonly(),
+                .writable(),
                 // cctp_custody_token_account
                 TokenOfframpRemainingAccounts::get_token_messenger_minter_pda(&[
                     b"custody",
                     mint.as_ref(),
                 ])
-                .readonly(),
+                .writable(),
                 // cctp_token_messenger_event_authority
                 TokenOfframpRemainingAccounts::get_token_messenger_minter_pda(&[
                     b"__event_authority",
@@ -159,7 +156,7 @@ pub mod release_or_mint {
                     domain_seed,
                     nonce_seed.as_ref(),
                 ])
-                .readonly(),
+                .writable(),
             ],
             current_stage: DeriveStage::BuildDynamicAccounts.to_string(),
             ..Default::default()
