@@ -24,7 +24,7 @@ contract FastTransferTokenPoolHelper is FastTransferTokenPoolAbstract {
   ) FastTransferTokenPoolAbstract(token, localTokenDecimals, allowlist, rmnProxy, router) {}
 
   // Implementation of abstract functions
-  function _handleFastTransferLockOrBurn(address sender, uint256 amount) internal override {
+  function _handleFastTransferLockOrBurn(uint64, address sender, uint256 amount) internal override {
     // For testing, we'll just transfer tokens from sender to this contract
     getToken().safeTransferFrom(sender, address(this), amount);
   }
@@ -44,6 +44,7 @@ contract FastTransferTokenPoolHelper is FastTransferTokenPoolAbstract {
   /// the accounting-based approach for pool fee management.
   function _handleFastFillReimbursement(
     bytes32,
+    uint64,
     address filler,
     uint256 fillerReimbursementAmount,
     uint256 poolReimbursementAmount
