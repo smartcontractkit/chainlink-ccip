@@ -349,15 +349,15 @@ impl TokenOfframpRemainingAccounts<'_> {
     }
 
     #[inline]
-    fn get_message_transmitter_pda(seeds: &[&[u8]]) -> Pubkey {
+    pub fn get_message_transmitter_pda(seeds: &[&[u8]]) -> Pubkey {
         Pubkey::find_program_address(seeds, &MESSAGE_TRANSMITTER).0
     }
     #[inline]
-    fn get_token_messenger_minter_pda(seeds: &[&[u8]]) -> Pubkey {
+    pub fn get_token_messenger_minter_pda(seeds: &[&[u8]]) -> Pubkey {
         Pubkey::find_program_address(seeds, &TOKEN_MESSENGER_MINTER).0
     }
 
-    fn first_nonce_seed(offchain_token_data: &[u8]) -> Result<Vec<u8>> {
+    pub fn first_nonce_seed(offchain_token_data: &[u8]) -> Result<Vec<u8>> {
         let message_and_attestation = MessageAndAttestation::try_from_slice(offchain_token_data)
             .expect("Failed to deserialize MessageAndAttestation");
 
