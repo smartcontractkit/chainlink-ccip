@@ -357,6 +357,13 @@ func TestCCIPChainReader_ExecutedStateEvent_WithInvalidStates(t *testing.T) {
 	)
 	require.NoError(t, err)
 
+	t.Cleanup(func() {
+		err := ccipReader.Close()
+		if err != nil {
+			t.Logf("Error closing ccipReader: %v", err)
+		}
+	})
+
 	seqRange := []cciptypes.SeqNumRange{cciptypes.NewSeqNumRange(1, 5)}
 	results, err := ccipReader.ExecutedMessages(
 		t.Context(),
