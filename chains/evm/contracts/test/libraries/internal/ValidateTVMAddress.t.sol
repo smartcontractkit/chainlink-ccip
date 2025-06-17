@@ -5,19 +5,19 @@ import {Internal} from "../../../libraries/Internal.sol";
 import {Test} from "forge-std/Test.sol";
 
 contract Internal_validateTVMAddress is Test {
-  function test_validateTVMAddress_MasterchainAddress() public {
+  function test_validateTVMAddress_MasterchainAddress() public pure {
     // Ef9nROksb3HHdvu87ymeMb9285wkXNVvIHW4nGoiAmtBMZG9, -1:6744e92c6f71c776fbbcef299e31bf76f39c245cd56f2075b89c6a22026b4131
     bytes memory masterchainAddress = hex"11ff6744e92c6f71c776fbbcef299e31bf76f39c245cd56f2075b89c6a22026b413191bd";
     Internal._validateTVMAddress(masterchainAddress);
   }
 
-  function test_validateTVMAddress_BasechainAddress() public {
+  function test_validateTVMAddress_BasechainAddress() public pure {
     // EQAdp38Cabu7dshi6kJLJX32O9GssNTraBtoyarfv1U7kzWP, 0:1da77f0269bbbb76c862ea424b257df63bd1acb0d4eb681b68c9aadfbf553b93
     bytes memory basechainAddress = hex"11001da77f0269bbbb76c862ea424b257df63bd1acb0d4eb681b68c9aadfbf553b93358f";
     Internal._validateTVMAddress(basechainAddress);
   }
 
-  function test_validateTVMAddress_MinimalNonZeroAccountId() public {
+  function test_validateTVMAddress_MinimalNonZeroAccountId() public pure {
     bytes memory tvmAddress = new bytes(36);
     tvmAddress[0] = 0x00; // flags
     tvmAddress[1] = 0x00; // workchain_id
