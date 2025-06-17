@@ -11,6 +11,7 @@ import {MerkleMultiProof} from "../libraries/MerkleMultiProof.sol";
 library Internal {
   error InvalidEVMAddress(bytes encodedAddress);
   error Invalid32ByteAddress(bytes encodedAddress);
+  error InvalidTVMAddress(bytes encodedAddress);
 
   /// @dev We limit return data to a selector plus 4 words. This is to avoid malicious contracts from returning
   /// large amounts of data and causing repeated out-of-gas scenarios.
@@ -190,6 +191,24 @@ library Internal {
         revert Invalid32ByteAddress(encodedAddress);
       }
     }
+  }
+
+  /// @notice This methods provides validation for TON User-friendly addresses by ensuring the address is 36 bytes long.
+  /// @dev The encodedAddress is expected to be the 36-byte raw representation:
+  /// - 1 byte: flags (isBounceable, isTestnetOnly, etc.)
+  /// - 1 byte: workchain_id (0x00 for BaseChain, 0xff for MasterChain)
+  /// - 32 bytes: account_id
+  /// - 2 bytes: CRC16 checksum(computationally heavy, validation omitted for simplicity)
+  /// @param encodedAddress The 36-byte TON address.
+  function _validateTVMAddress(
+    bytes memory encodedAddress
+  ) internal pure {
+    if (encodedAddress.length != 36) revert InvalidTVMAddress(encodedAddress);
+    bytes32 accountId;
+    assembly {
+      accountId := mload(add(encodedAddress, 0x22)) // 0x22 = 0x20 (data start) + 2 (offset for account_id)
+    }
+    if (accountId == bytes32(0)) revert InvalidTVMAddress(encodedAddress);
   }
 
   /// @notice Enum listing the possible message execution states within the offRamp contract.
