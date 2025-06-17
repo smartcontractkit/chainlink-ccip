@@ -116,3 +116,6 @@ compileContract test/helpers/EncodingUtils
 compileContract offRamp/OffRampWithMessageTransformer
 compileContract onRamp/OnRampWithMessageTransformer
 
+# Superchain Interop On/OffRamps
+compileContract onRamp/OnRampOverSuperchainInterop
+
