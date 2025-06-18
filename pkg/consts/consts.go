@@ -132,6 +132,10 @@ const (
 	EventAttributeSourceChain    = "SourceChain"
 	EventAttributeDestChain      = "DestChain"
 	EventAttributeState          = "State"
+
+	// Required for Solana CCTP
+	EventAttributeMsgTotalNonce = "MsgTotalNonce"
+	EventAttributeSourceDomain  = "SourceDomain"
 )
 
 // Dedicated filters
