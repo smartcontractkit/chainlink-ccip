@@ -67,6 +67,32 @@ export type CctpTokenPool = {
       "returns": "string"
     },
     {
+      "name": "setRmnRemote",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "rmnRemote",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
       "name": "transferOwnership",
       "accounts": [
         {
@@ -1023,6 +1049,32 @@ export const IDL: CctpTokenPool = {
       ],
       "args": [],
       "returns": "string"
+    },
+    {
+      "name": "setRmnRemote",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "rmnRemote",
+          "type": "publicKey"
+        }
+      ]
     },
     {
       "name": "transferOwnership",

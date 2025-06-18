@@ -51,6 +51,12 @@ pub mod cctp_token_pool {
         Ok(response)
     }
 
+    // TODO remove this method, only used for internal testing
+    pub fn set_rmn_remote(ctx: Context<SetConfig>, rmn_remote: Pubkey) -> Result<()> {
+        ctx.accounts.state.config.rmn_remote = rmn_remote;
+        Ok(())
+    }
+
     pub fn transfer_ownership(ctx: Context<SetConfig>, proposed_owner: Pubkey) -> Result<()> {
         ctx.accounts.state.config.transfer_ownership(proposed_owner)
     }

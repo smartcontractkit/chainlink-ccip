@@ -128,6 +128,8 @@ func TestCctpTpDevnet(t *testing.T) {
 		t.Skip()
 
 		t.Run("Initialize", func(t *testing.T) {
+			t.Skip()
+
 			type ProgramData struct {
 				DataType uint32
 				Address  solana.PublicKey
@@ -325,17 +327,25 @@ func TestCctpTpDevnet(t *testing.T) {
 		routerSigner, _, err := state.FindExternalTokenPoolsSignerPDA(cctpPool.program, referenceAddresses.Router)
 		require.NoError(t, err)
 
-		t.Run("Update pool router config", func(t *testing.T) {
+		t.Run("Update pool router/rmn config", func(t *testing.T) {
 			t.Skip()
 
-			ix, err := cctp_token_pool.NewSetRouterInstruction(
+			rmnIx, err := cctp_token_pool.NewSetRmnRemoteInstruction(
+				referenceAddresses.RmnRemote,
+				cctpPool.state,
+				usdcMint,
+				admin.PublicKey(),
+			).ValidateAndBuild()
+			require.NoError(t, err)
+
+			routerIx, err := cctp_token_pool.NewSetRouterInstruction(
 				referenceAddresses.Router,
 				cctpPool.state,
 				usdcMint,
 				admin.PublicKey(),
 			).ValidateAndBuild()
 			require.NoError(t, err)
-			testutils.SendAndConfirm(ctx, t, client, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+			testutils.SendAndConfirm(ctx, t, client, []solana.Instruction{rmnIx, routerIx}, admin, config.DefaultCommitment)
 		})
 
 		routerNoncesPDA, err := state.FindNoncePDA(chainSelector, admin.PublicKey(), referenceAddresses.Router)
@@ -486,8 +496,11 @@ func TestCctpTpDevnet(t *testing.T) {
 							Amount: amount,
 						},
 					},
-					FeeToken:  solana.PublicKey{},
-					ExtraArgs: []byte{},
+					FeeToken: solana.PublicKey{},
+					ExtraArgs: testutils.MustSerializeExtraArgs(t, fee_quoter.GenericExtraArgsV2{
+						GasLimit:                 bin.Uint128{Lo: 1000000, Hi: 0}, // TODO, placeholder value
+						AllowOutOfOrderExecution: true,
+					}, ccip.GenericExtraArgsV2Tag),
 				}, // TODO
 				[]byte{0}, // with no message, token accounts start at idx 0
 				routerConfig,

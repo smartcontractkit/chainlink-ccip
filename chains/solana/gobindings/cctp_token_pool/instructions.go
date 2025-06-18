@@ -37,6 +37,8 @@ var (
 	// * `ctx` - The context
 	Instruction_TypeVersion = ag_binary.TypeID([8]byte{129, 251, 8, 243, 122, 229, 252, 164})
 
+	Instruction_SetRmnRemote = ag_binary.TypeID([8]byte{245, 90, 107, 30, 153, 214, 24, 240})
+
 	Instruction_TransferOwnership = ag_binary.TypeID([8]byte{65, 177, 215, 73, 53, 45, 99, 47})
 
 	Instruction_AcceptOwnership = ag_binary.TypeID([8]byte{172, 23, 43, 13, 238, 213, 85, 150})
@@ -73,6 +75,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "Initialize"
 	case Instruction_TypeVersion:
 		return "TypeVersion"
+	case Instruction_SetRmnRemote:
+		return "SetRmnRemote"
 	case Instruction_TransferOwnership:
 		return "TransferOwnership"
 	case Instruction_AcceptOwnership:
@@ -126,6 +130,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"type_version", (*TypeVersion)(nil),
+		},
+		{
+			"set_rmn_remote", (*SetRmnRemote)(nil),
 		},
 		{
 			"transfer_ownership", (*TransferOwnership)(nil),
