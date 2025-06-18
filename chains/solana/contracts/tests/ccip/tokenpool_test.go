@@ -1719,7 +1719,7 @@ func deriveCctpReleaseOrMintAccounts(ctx context.Context,
 		derive, err := deriveRaw.ValidateAndBuild()
 		require.NoError(t, err)
 		tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{derive}, transmitter, config.DefaultCommitment)
-		derivation, err := common.ExtractAnchorTypedReturnValue[base_token_pool.DeriveAccountsResponse](ctx, tx.Meta.LogMessages, config.CctpTokenPoolProgram.String())
+		derivation, err := common.ExtractAnchorTypedReturnValue[cctp_token_pool.DeriveAccountsResponse](ctx, tx.Meta.LogMessages, config.CctpTokenPoolProgram.String())
 		require.NoError(t, err)
 
 		for _, meta := range derivation.AccountsToSave {

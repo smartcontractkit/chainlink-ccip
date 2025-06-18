@@ -388,7 +388,7 @@ impl ToMeta for Pubkey {
         CcipAccountMeta {
             pubkey: self,
             is_signer: true,
-            is_writable: true,
+            is_writable: false,
         }
     }
 }

@@ -66,7 +66,7 @@ pub mod release_or_mint {
                 ],
                 crate::ID,
             )],
-            // We don't need the domain for the first two PDAs, so we return them now to keep
+            // We don't need the domain for the first few PDAs, so we return them now to keep
             // return sizes balanced.
             accounts_to_save: vec![
                 // cctp_authority_pda
@@ -80,6 +80,23 @@ pub mod release_or_mint {
                     b"message_transmitter",
                 ])
                 .readonly(),
+                // cctp_token_messenger_minter
+                TOKEN_MESSENGER_MINTER.readonly(),
+                // system_program
+                System::id().readonly(),
+                // cctp_event_authority
+                TokenOfframpRemainingAccounts::get_message_transmitter_pda(&[b"__event_authority"])
+                    .readonly(),
+                // cctp_message_transmitter
+                MESSAGE_TRANSMITTER.readonly(),
+                // cctp_token_messenger_account
+                TokenOfframpRemainingAccounts::get_token_messenger_minter_pda(&[
+                    b"token_messenger",
+                ])
+                .readonly(),
+                // cctp_token_minter_account
+                TokenOfframpRemainingAccounts::get_token_messenger_minter_pda(&[b"token_minter"])
+                    .writable(),
             ],
             current_stage: DeriveStage::RetrieveChainConfig.to_string(),
             next_stage: DeriveStage::BuildDynamicAccounts.to_string(),
@@ -103,23 +120,6 @@ pub mod release_or_mint {
 
         Ok(DeriveAccountsResponse {
             accounts_to_save: vec![
-                // cctp_token_messenger_minter
-                TOKEN_MESSENGER_MINTER.readonly(),
-                // system_program
-                System::id().readonly(),
-                // cctp_event_authority
-                TokenOfframpRemainingAccounts::get_message_transmitter_pda(&[b"__event_authority"])
-                    .readonly(),
-                // cctp_message_transmitter
-                MESSAGE_TRANSMITTER.readonly(),
-                // cctp_token_messenger_account
-                TokenOfframpRemainingAccounts::get_token_messenger_minter_pda(&[
-                    b"token_messenger",
-                ])
-                .readonly(),
-                // cctp_token_minter_account
-                TokenOfframpRemainingAccounts::get_token_messenger_minter_pda(&[b"token_minter"])
-                    .writable(),
                 // cctp_local_token
                 TokenOfframpRemainingAccounts::get_token_messenger_minter_pda(&[
                     b"local_token",

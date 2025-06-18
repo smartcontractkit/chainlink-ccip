@@ -16,3 +16,4 @@ type ReleaseOrMintOutV1 = base.ReleaseOrMintOutV1
 type RateLimitConfig = base.RateLimitConfig
 type BaseConfig = base.BaseConfig
 type BaseChain = base.BaseChain
+type DeriveAccountsResponse = base.DeriveAccountsResponse
