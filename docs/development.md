@@ -67,3 +67,69 @@ The **Chainlink-CCIP** repository's CI runs a subset of these tests when you ope
 6. **Final Integration Test Run**:
     - Once integration tests pass, merge your **Chainlink** PR into `develop`.
     - Re-run integration tests on **Chainlink-CCIP** to verify stability.
+
+### Running Integration Tests Locally Using Docker
+
+Integration tests on Mac with ARM64 architecture have been reported to take over 10 minutes.
+As a temporary workaround, you can use the following Docker-based setup to run them more efficiently.
+
+One-Time Container Setup
+```bash
+# Run the following command once to set up the container
+docker run --platform linux/amd64 -it --name amd64-ubuntu -v $HOME/amd64-root:/root ubuntu:22.04
+```
+
+You’ll now be inside the container:
+```bash
+# Install essential packages
+apt update && apt install -y build-essential wget vim
+
+# Install Go
+wget https://go.dev/dl/go1.24.2.linux-amd64.tar.gz
+tar -C /usr/local -xzf go1.24.2.linux-amd64.tar.gz
+echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
+
+# Install PostgreSQL
+apt install postgresql-14
+```
+
+Now configure PostgreSQL:
+```bash
+vim /etc/postgresql/14/main/pg_hba.conf  # Change 'peer' or 'scram-sha-256' to 'trust'
+service postgresql restart
+psql -U postgres
+```
+
+Inside the `psql` prompt:
+```bash
+create database cl_test;
+\q
+```
+
+Then:
+```bash
+echo 'export CL_DATABASE_URL="postgres://postgres@localhost:5432/cl_test"' >> ~/.bashrc
+```
+You can now exit the container `(Ctrl+D)`.
+
+**Running the Tests**
+```bash
+# From your local machine, copy the Chainlink repo to the container
+docker exec amd64-ubuntu rm -rf /app && docker cp ./chainlink amd64-ubuntu:/app
+
+# Start and attach to the container
+docker start -ai amd64-ubuntu
+service postgresql start
+```
+
+Inside the container, navigate to the Chainlink repo and prepare the test DB:
+```bash
+cd /app
+go run ./core/store/cmd/preparetest
+```
+
+Then, run the integration tests:
+```bash
+cd integration-tests  # This must be done — it's a separate Go module
+go test -v -timeout 5m -run "Test_CCIPTopologies_EVM2EVM_RoleDON_AllSupportSource_SomeSupportDest" ./...
+```

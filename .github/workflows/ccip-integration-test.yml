@@ -49,7 +49,7 @@ jobs:
             name: "USDC Test"
           - cmd: cd integration-tests/smoke/ccip && go test ccip_ooo_execution_test.go -timeout 12m -test.parallel=1 -count=1 -json
             name: "OOO Execution Test"
-          - cmd: cd integration-tests/smoke/ccip && go test -run "^Test_CCIPMessaging_EVM2EVM$" ccip_messaging_test.go -timeout 20m -test.parallel=2 -count=1 -json
+          - cmd: cd integration-tests/smoke/ccip && go test -run "^Test_CCIPMessaging_EVM2EVM$" ccip_messaging_test.go -timeout 15m -test.parallel=1 -count=1 -json
             name: "Messaging Test Test_CCIPMessaging_EVM2EVM"
           - cmd: cd integration-tests/smoke/ccip && go test -run "^Test_CCIPMessaging_EVM2Solana$" ccip_messaging_test.go -timeout 30m -test.parallel=2 -count=1 -json
             name: "Messaging Test Test_CCIPMessaging_EVM2Solana"
@@ -74,6 +74,8 @@ jobs:
           #   name: "Token Price Updates Test"
           - cmd: cd integration-tests/smoke/ccip && go test ccip_reader_test.go -timeout 5m -test.parallel=1 -count=1 -json
             name: "CCIPReader Test"
+          - cmd: cd integration-tests/smoke/ccip && go test -run "^Test_CCIPTopologies_EVM2EVM_RoleDON_AllSupportSource_SomeSupportDest$" ccip_topologies_test.go -timeout 20m -test.parallel=2 -count=1 -json
+            name: "Test_CCIPTopologies_EVM2EVM_RoleDON_AllSupportSource_SomeSupportDest"
     
     name: Integration Tests (${{ matrix.type.name }})
     runs-on: ubuntu-latest

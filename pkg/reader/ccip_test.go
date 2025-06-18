@@ -752,7 +752,7 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round1(t *testing.T) {
 		configPoller:    mockCache,
 	}
 
-	contractAddresses, err := ccipChainReader.DiscoverContracts(ctx, sourceChain[:])
+	contractAddresses, err := ccipChainReader.DiscoverContracts(ctx, []cciptypes.ChainSelector{destChain}, sourceChain[:])
 	require.NoError(t, err)
 
 	assert.Equal(t, expectedContractAddresses, contractAddresses)
@@ -876,7 +876,8 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round2(t *testing.T) {
 		configPoller:    mockCache,
 	}
 
-	contractAddresses, err := ccipChainReader.DiscoverContracts(ctx, sourceChain[:])
+	contractAddresses, err := ccipChainReader.DiscoverContracts(ctx, []cciptypes.ChainSelector{
+		sourceChain[0], sourceChain[1], destChain}, sourceChain[:])
 	require.NoError(t, err)
 	require.Equal(t, expectedContractAddresses, contractAddresses)
 	mockCache.AssertExpectations(t)
@@ -921,7 +922,11 @@ func TestCCIPChainReader_DiscoverContracts_GetAllSourceChainConfig_Errors(t *tes
 		configPoller: mockCache,
 	}
 
-	_, err := ccipChainReader.DiscoverContracts(ctx, []cciptypes.ChainSelector{sourceChain1, sourceChain2})
+	_, err := ccipChainReader.DiscoverContracts(
+		ctx,
+		[]cciptypes.ChainSelector{sourceChain1, sourceChain2, destChain},
+		[]cciptypes.ChainSelector{sourceChain1, sourceChain2},
+	)
 	require.Error(t, err)
 	require.ErrorIs(t, err, getLatestValueErr)
 	mockCache.AssertExpectations(t)
@@ -954,7 +959,9 @@ func TestCCIPChainReader_DiscoverContracts_GetOfframpStaticConfig_Errors(t *test
 		configPoller: mockCache,
 	}
 
-	_, err := ccipChainReader.DiscoverContracts(ctx, []cciptypes.ChainSelector{sourceChain1, sourceChain2})
+	_, err := ccipChainReader.DiscoverContracts(ctx,
+		[]cciptypes.ChainSelector{sourceChain1, sourceChain2, destChain},
+		[]cciptypes.ChainSelector{sourceChain1, sourceChain2})
 	require.Error(t, err)
 	require.ErrorIs(t, err, getLatestValueErr)
 	mockCache.AssertExpectations(t)
@@ -1584,7 +1591,7 @@ func TestCCIPChainReader_DiscoverContracts_Parallel(t *testing.T) {
 
 	// Measure execution time
 	start := time.Now()
-	contractAddresses, err := ccipReader.DiscoverContracts(ctx, sourceChains)
+	contractAddresses, err := ccipReader.DiscoverContracts(ctx, append(sourceChains, destChain), sourceChains)
 	duration := time.Since(start)
 
 	// Verify execution
