@@ -40,7 +40,7 @@ contract OnRampOverSuperchainInterop_extractGasLimit is OnRampOverSuperchainInte
     return shortArgs;
   }
 
-  function test_BasicGasLimitExtraction_EVMExtraArgsV1() public view {
+  function test_EVMExtraArgsV1() public view {
     uint256 expectedGasLimit = 200000;
     bytes memory extraArgs = _generateEVMExtraArgsV1(expectedGasLimit);
 
@@ -49,7 +49,7 @@ contract OnRampOverSuperchainInterop_extractGasLimit is OnRampOverSuperchainInte
     assertEq(actualGasLimit, expectedGasLimit);
   }
 
-  function test_BasicGasLimitExtraction_GenericExtraArgsV2() public view {
+  function test_GenericExtraArgsV2() public view {
     uint256 expectedGasLimit = 200000;
     bytes memory extraArgs = _generateGenericExtraArgsV2(expectedGasLimit, false);
 
@@ -58,7 +58,7 @@ contract OnRampOverSuperchainInterop_extractGasLimit is OnRampOverSuperchainInte
     assertEq(actualGasLimit, expectedGasLimit);
   }
 
-  function test_ZeroGasLimit_EVMExtraArgsV1() public view {
+  function test_ZeroGasLimit() public view {
     uint256 expectedGasLimit = 0;
     bytes memory extraArgs = _generateEVMExtraArgsV1(expectedGasLimit);
 
@@ -67,7 +67,7 @@ contract OnRampOverSuperchainInterop_extractGasLimit is OnRampOverSuperchainInte
     assertEq(actualGasLimit, expectedGasLimit);
   }
 
-  function test_MaximumGasLimit_GenericExtraArgsV2() public view {
+  function test_MaximumGasLimit() public view {
     uint256 expectedGasLimit = type(uint256).max;
     bytes memory extraArgs = _generateGenericExtraArgsV2(expectedGasLimit, true);
 
@@ -76,7 +76,7 @@ contract OnRampOverSuperchainInterop_extractGasLimit is OnRampOverSuperchainInte
     assertEq(actualGasLimit, expectedGasLimit);
   }
 
-  function test_ExtraArgsWithAdditionalData() public view {
+  function test_AdditionalData() public view {
     uint256 expectedGasLimit = 500000;
     bytes memory additionalData = abi.encode("extra", "data");
     bytes memory extraArgs = _generateExtraArgsWithAdditionalData(expectedGasLimit, additionalData);
@@ -86,7 +86,7 @@ contract OnRampOverSuperchainInterop_extractGasLimit is OnRampOverSuperchainInte
     assertEq(actualGasLimit, expectedGasLimit);
   }
 
-  function testFuzz_VariousGasLimits_Success(
+  function testFuzz_ExtractGasLimit_Success(
     uint256 gasLimit
   ) public view {
     assertEq(s_onRampOverSuperchainInterop.extractGasLimit(_generateEVMExtraArgsV1(gasLimit)), gasLimit);

@@ -53,7 +53,13 @@ contract OnRampOverSuperchainInterop is OnRamp {
     // between validated logData and message content.
     // What is emitted at source is verified as the final message format used in execution.
     Internal.Any2EVMRampMessage memory interopMessage = Internal.Any2EVMRampMessage({
-      header: processedMessage.header,
+      header: Internal.RampMessageHeader({ // deep copy, because we will be setting the messageId later
+        messageId: "",
+        sourceChainSelector: processedMessage.header.sourceChainSelector,
+        destChainSelector: processedMessage.header.destChainSelector,
+        sequenceNumber: processedMessage.header.sequenceNumber,
+        nonce: processedMessage.header.nonce
+      }),
       sender: abi.encode(processedMessage.sender),
       data: processedMessage.data,
       receiver: abi.decode(processedMessage.receiver, (address)),
@@ -103,7 +109,7 @@ contract OnRampOverSuperchainInterop is OnRamp {
   function hashInteropMessage(
     Internal.Any2EVMRampMessage memory message
   ) public view returns (bytes32) {
-    bytes32 metaDataHash = keccak256(
+    bytes32 offRampMetaDataHash = keccak256(
       abi.encode(
         Internal.ANY_2_EVM_MESSAGE_HASH,
         i_chainSelector,
@@ -112,7 +118,7 @@ contract OnRampOverSuperchainInterop is OnRamp {
       )
     );
 
-    return Internal._hash(message, metaDataHash);
+    return Internal._hash(message, offRampMetaDataHash);
   }
 
   function reemitInteropMessage(

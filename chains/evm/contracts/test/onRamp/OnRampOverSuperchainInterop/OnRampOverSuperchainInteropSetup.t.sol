@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {Router} from "../../../Router.sol";
+import {Client} from "../../../libraries/Client.sol";
 import {Internal} from "../../../libraries/Internal.sol";
 import {OnRampOverSuperchainInterop} from "../../../onRamp/OnRampOverSuperchainInterop.sol";
 import {OnRampSetup} from "../OnRamp/OnRampSetup.t.sol";
+import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
 contract OnRampOverSuperchainInteropSetup is OnRampSetup {
   OnRampOverSuperchainInterop internal s_onRampOverSuperchainInterop;
@@ -15,7 +18,55 @@ contract OnRampOverSuperchainInteropSetup is OnRampSetup {
       s_onRamp.getStaticConfig(), s_onRamp.getDynamicConfig(), _generateDestChainConfigArgs(s_sourceRouter)
     );
 
+    // Authorize the SuperchainInterop Onramp to call the NonceManager
+    address[] memory authorizedCallers = new address[](1);
+    authorizedCallers[0] = address(s_onRampOverSuperchainInterop);
+    s_outboundNonceManager.applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: authorizedCallers, removedCallers: new address[](0)})
+    );
+
+    // Authorize the SuperchainInterop Onramp to call TokenPools
+    Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](1);
+    onRampUpdates[0] =
+      Router.OnRamp({destChainSelector: DEST_CHAIN_SELECTOR, onRamp: address(s_onRampOverSuperchainInterop)});
+
+    s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), new Router.OffRamp[](0));
+
     assertEq(s_onRampOverSuperchainInterop.typeAndVersion(), "OnRampOverSuperchainInterop 1.6.1-dev");
+  }
+
+  function _EVM2AnyRampMessageToAny2EVMRampMessage(
+    Internal.EVM2AnyRampMessage memory message
+  ) internal view returns (Internal.Any2EVMRampMessage memory) {
+    Internal.Any2EVMTokenTransfer[] memory tokenTransfers =
+      new Internal.Any2EVMTokenTransfer[](message.tokenAmounts.length);
+
+    for (uint256 i = 0; i < message.tokenAmounts.length; ++i) {
+      tokenTransfers[i] = Internal.Any2EVMTokenTransfer({
+        sourcePoolAddress: abi.encode(message.tokenAmounts[i].sourcePoolAddress),
+        destTokenAddress: abi.decode(message.tokenAmounts[i].destTokenAddress, (address)),
+        destGasAmount: abi.decode(message.tokenAmounts[i].destExecData, (uint32)),
+        extraData: message.tokenAmounts[i].extraData,
+        amount: message.tokenAmounts[i].amount
+      });
+    }
+
+    uint256 gasLimit = s_onRampOverSuperchainInterop.extractGasLimit(message.extraArgs);
+
+    return Internal.Any2EVMRampMessage({
+      header: Internal.RampMessageHeader({
+        messageId: message.header.messageId,
+        sourceChainSelector: message.header.sourceChainSelector,
+        destChainSelector: message.header.destChainSelector,
+        sequenceNumber: message.header.sequenceNumber,
+        nonce: message.header.nonce
+      }),
+      sender: abi.encode(message.sender),
+      data: message.data,
+      receiver: abi.decode(message.receiver, (address)),
+      gasLimit: gasLimit,
+      tokenAmounts: tokenTransfers
+    });
   }
 
   function _generateBasicAny2EVMMessage() internal returns (Internal.Any2EVMRampMessage memory) {
@@ -70,7 +121,7 @@ contract OnRampOverSuperchainInteropSetup is OnRampSetup {
     uint256 gasLimit,
     uint64 sequenceNumber,
     uint64 nonce
-  ) internal view returns (Internal.Any2EVMRampMessage memory) {
+  ) internal pure returns (Internal.Any2EVMRampMessage memory) {
     Internal.Any2EVMTokenTransfer[] memory tokenTransfers = new Internal.Any2EVMTokenTransfer[](0);
 
     return Internal.Any2EVMRampMessage({
@@ -87,5 +138,50 @@ contract OnRampOverSuperchainInteropSetup is OnRampSetup {
       gasLimit: gasLimit,
       tokenAmounts: tokenTransfers
     });
+  }
+
+  function _getOffRampMetadataHash() internal view returns (bytes32) {
+    return keccak256(
+      abi.encode(
+        Internal.ANY_2_EVM_MESSAGE_HASH,
+        SOURCE_CHAIN_SELECTOR,
+        DEST_CHAIN_SELECTOR,
+        keccak256(abi.encode(address(s_onRampOverSuperchainInterop)))
+      )
+    );
+  }
+
+  function _getOnRampMetadataHash(
+    uint64 destChainSelector
+  ) internal view returns (bytes32) {
+    return keccak256(
+      abi.encode(
+        Internal.EVM_2_ANY_MESSAGE_HASH,
+        SOURCE_CHAIN_SELECTOR,
+        destChainSelector,
+        address(s_onRampOverSuperchainInterop)
+      )
+    );
+  }
+
+  function _generateInitialSourceDestMessages(
+    uint64 destChainSelector,
+    Client.EVM2AnyMessage memory message,
+    uint256 feeAmount
+  ) internal view returns (Internal.EVM2AnyRampMessage memory, Internal.Any2EVMRampMessage memory) {
+    // Need to pass in custom metadata hash because s_onRampOverSuperchainInterop is not the same address as s_onRamp
+    Internal.EVM2AnyRampMessage memory evm2AnyMessage = _evmMessageToEvent(
+      message,
+      SOURCE_CHAIN_SELECTOR,
+      1,
+      1,
+      feeAmount,
+      feeAmount,
+      OWNER,
+      _getOnRampMetadataHash(destChainSelector),
+      s_tokenAdminRegistry
+    );
+
+    return (evm2AnyMessage, _EVM2AnyRampMessageToAny2EVMRampMessage(evm2AnyMessage));
   }
 }
