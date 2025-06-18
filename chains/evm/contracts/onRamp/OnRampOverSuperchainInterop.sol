@@ -26,7 +26,9 @@ contract OnRampOverSuperchainInterop is OnRamp {
     DestChainConfigArgs[] memory destChainConfigs
   ) OnRamp(staticConfig, dynamicConfig, destChainConfigs) {}
 
-  /// @notice Override _postProcessMessage to calculate messageId and store the message
+  /// @notice Override _postProcessMessage hook to calculate messageId and store the message
+  /// @param message The message to process.
+  /// @return processedMessage The processed message.
   function _postProcessMessage(
     Internal.EVM2AnyRampMessage memory message
   ) internal virtual override returns (Internal.EVM2AnyRampMessage memory) {
@@ -104,8 +106,14 @@ contract OnRampOverSuperchainInterop is OnRamp {
     assembly {
       gasLimit := mload(add(extraArgs, 0x24))
     }
+
+    return gasLimit;
   }
 
+  /// @notice Hashes the interop message.
+  /// @dev This uniquely identifies the interop message using the same logic as the offRamp.
+  /// @param message The interop message to hash.
+  /// @return messageHash The hash of the interop message.
   function hashInteropMessage(
     Internal.Any2EVMRampMessage memory message
   ) public view returns (bytes32) {
@@ -121,6 +129,10 @@ contract OnRampOverSuperchainInterop is OnRamp {
     return Internal._hash(message, offRampMetaDataHash);
   }
 
+  /// @notice Re-emits the CCIPSuperchainMessageSent event for a previously sent interop message.
+  /// @dev This is necessary because Superchain Interop dest chain does not persist events forever.
+  /// A typical persistance time is 7 days.
+  /// @param interopMessage The previously-sent interop message to re-emit.
   function reemitInteropMessage(
     Internal.Any2EVMRampMessage calldata interopMessage
   ) external {

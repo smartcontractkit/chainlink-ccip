@@ -12,7 +12,7 @@ contract OnRamp_generateMessageId is OnRampSetup {
     );
   }
 
-  function test_BasicMessageId() public {
+  function test_BasicMessageId() public view {
     Internal.EVM2AnyRampMessage memory message = _messageToEvent(_generateEmptyMessage(), 1, 1, 100e18, OWNER);
 
     bytes32 expectedMessageId = message.header.messageId;
@@ -23,7 +23,7 @@ contract OnRamp_generateMessageId is OnRampSetup {
     assertEq(messageId, expectedMessageId);
   }
 
-  function test_TokenMessageId() public {
+  function test_TokenMessageId() public view {
     Internal.EVM2AnyRampMessage memory message =
       _messageToEvent(_generateSingleTokenMessage(s_sourceTokens[0], 1000e18), 1, 1, 100e18, OWNER);
 
@@ -35,7 +35,7 @@ contract OnRamp_generateMessageId is OnRampSetup {
     assertEq(messageId, expectedMessageId);
   }
 
-  function test_SameMessageProducesSameId() public {
+  function test_SameMessageProducesSameId() public view {
     Internal.EVM2AnyRampMessage memory message = _messageToEvent(_generateEmptyMessage(), 1, 1, 100e18, OWNER);
     message.header.messageId = "";
 
@@ -45,7 +45,7 @@ contract OnRamp_generateMessageId is OnRampSetup {
     assertEq(messageId1, messageId2);
   }
 
-  function test_DifferentMessageProduceDifferentIds() public {
+  function test_DifferentMessageProduceDifferentIds() public view {
     Internal.EVM2AnyRampMessage memory message1 = _messageToEvent(_generateEmptyMessage(), 1, 1, 100e18, OWNER);
     message1.header.messageId = "";
 

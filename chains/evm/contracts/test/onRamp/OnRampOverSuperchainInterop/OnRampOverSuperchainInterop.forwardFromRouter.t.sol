@@ -81,7 +81,7 @@ contract OnRampOverSuperchainInterop_forwardFromRouter is OnRampOverSuperchainIn
     }
   }
 
-  function test_ForwardFromRouter_MessageWithTokens() public {
+  function test_MessageWithToken() public {
     Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(s_sourceFeeToken, 100);
     uint256 gasLimit = 300000;
     message.extraArgs =
