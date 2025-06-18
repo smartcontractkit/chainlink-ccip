@@ -893,7 +893,11 @@ func (r *ccipChainReader) Sync(ctx context.Context, contracts ContractAddresses)
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
+				tStart := time.Now()
 				_, err := bindReaderContract(ctx, lggr, r.contractReaders, chainSel, contractName, address, r.addrCodec)
+				tDur := time.Since(tStart)
+				lggr.Debugw("bind reader contract call finished",
+					"duration", tDur, "contractName", contractName, "addr", address, "chainSel", chainSel, "err", err)
 				if err != nil {
 					if !errors.Is(err, ErrContractReaderNotFound) {
 						mu.Lock()
