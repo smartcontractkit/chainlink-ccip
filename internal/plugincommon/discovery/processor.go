@@ -374,6 +374,8 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 			"unable to sync contracts - this is usually due to RPC issues,"+
 				" please check your RPC endpoints and their health!",
 			"err", err)
+	} else {
+		lggr.Infow("contracts sync successfully", "contracts", contracts)
 	}
 
 	return dt.Outcome{}, nil
