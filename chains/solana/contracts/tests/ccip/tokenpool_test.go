@@ -22,7 +22,6 @@ import (
 
 	// use the real program bindings, although interacting with the mock contract
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/base_token_pool"
 	cctp_message_transmitter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/cctp_message_transmitter"
 	message_transmitter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/cctp_message_transmitter"
 	cctp_token_messenger_minter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/cctp_token_messenger_minter"
@@ -1795,13 +1794,13 @@ func deriveCctpReleaseOrMintAccounts(ctx context.Context,
 		deriveRaw := cctp_token_pool.NewDeriveAccountsReleaseOrMintTokensInstruction(
 			stage,
 			releaseOrMint,
-			config.OfframpConfigPDA,
+			solana.SysVarClockPubkey,
 		)
 		deriveRaw.AccountMetaSlice = append(deriveRaw.AccountMetaSlice, askWith...)
 		derive, err := deriveRaw.ValidateAndBuild()
 		require.NoError(t, err)
 		tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{derive}, transmitter, config.DefaultCommitment)
-		derivation, err := common.ExtractAnchorTypedReturnValue[base_token_pool.DeriveAccountsResponse](ctx, tx.Meta.LogMessages, config.CctpTokenPoolProgram.String())
+		derivation, err := common.ExtractAnchorTypedReturnValue[cctp_token_pool.DeriveAccountsResponse](ctx, tx.Meta.LogMessages, config.CctpTokenPoolProgram.String())
 		require.NoError(t, err)
 
 		for _, meta := range derivation.AccountsToSave {
