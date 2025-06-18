@@ -110,16 +110,15 @@ Then:
 ```bash
 echo 'export CL_DATABASE_URL="postgres://postgres@localhost:5432/cl_test"' >> ~/.bashrc
 ```
-You can now exit the container `(Ctrl+D)`.
 
 **Running the Tests**
 ```bash
-# From your local machine, copy the Chainlink repo to the container
-docker exec amd64-ubuntu rm -rf /app && docker cp ./chainlink amd64-ubuntu:/app
-
-# Start and attach to the container
+# Start and attach to the container (if stopped, i.e. you exited)
 docker start -ai amd64-ubuntu
 service postgresql start
+
+# From your local machine, copy the Chainlink repo to the container
+docker exec amd64-ubuntu rm -rf /app && docker cp ./chainlink amd64-ubuntu:/app
 ```
 
 Inside the container, navigate to the Chainlink repo and prepare the test DB:
@@ -131,5 +130,14 @@ go run ./core/store/cmd/preparetest
 Then, run the integration tests:
 ```bash
 cd integration-tests  # This must be done — it's a separate Go module
+go test -v -timeout 5m -run "Test_CCIPTopologies_EVM2EVM_RoleDON_AllSupportSource_SomeSupportDest" ./...
+```
+
+You can now make changes changes in your localhost and run tests on docker using:
+```bash
+# copy the changes to docker (localhost)
+docker exec amd64-ubuntu rm -rf /app && docker cp ./chainlink amd64-ubuntu:/app
+
+# re-run the tests (docker container)
 go test -v -timeout 5m -run "Test_CCIPTopologies_EVM2EVM_RoleDON_AllSupportSource_SomeSupportDest" ./...
 ```
