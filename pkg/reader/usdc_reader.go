@@ -68,6 +68,11 @@ func (m MessageSentEvent) unpackID() (eventID, error) {
 	return result, nil
 }
 
+// solanaUSDCTokenPoolContractName is the name used to bind the TokenPool contract in CR.
+// Private because it's specific to Solana, but it's also needed in the CR config so this
+// isn't perfect.
+const solanaUSDCTokenPoolContractName = "USDCTokenPool"
+
 func NewUSDCMessageReader(
 	ctx context.Context,
 	lggr logger.Logger,
@@ -95,7 +100,7 @@ func NewUSDCMessageReader(
 				lggr,
 				contractReaders,
 				chainSelector,
-				consts.ContractNameCCTPMessageTransmitter,
+				consts.ContractNameCCTPMessageTransmitter, // TODO: this is specific to EVM, should it be private?
 				bytesAddress,
 				addrCodec,
 			)
@@ -120,7 +125,7 @@ func NewUSDCMessageReader(
 				lggr,
 				contractReaders,
 				chainSelector,
-				consts.ContractNameCCTPMessageTransmitter,
+				solanaUSDCTokenPoolContractName,
 				bytesAddress,
 				addrCodec,
 			)
@@ -477,7 +482,7 @@ func (u solanaUSDCMessageReader) MessagesByTokenID(
 
 	iter, err := u.contractReader.ExtendedQueryKey(
 		ctx,
-		"USDCTokenPool",
+		solanaUSDCTokenPoolContractName,
 		keyFilter,
 		query.NewLimitAndSort(
 			query.Limit{Count: uint64(len(cctpData))},
