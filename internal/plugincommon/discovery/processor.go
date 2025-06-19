@@ -3,7 +3,7 @@ package discovery
 import (
 	"context"
 	"fmt"
-	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/smartcontractkit/libocr/commontypes"
@@ -375,9 +375,8 @@ func (cdp *ContractDiscoveryProcessor) Close() error {
 // readerSyncer is a helper to sync the CCIP contracts to the ccip reader in a thread-safe manner
 // and avoid multiple syncs at the same time.
 type readerSyncer struct {
-	mu      sync.Mutex
-	syncing bool
-	reader  *reader.CCIPReader
+	busy   atomic.Bool
+	reader *reader.CCIPReader
 }
 
 // Sync syncs the CCIP contracts to the ccip reader in a thread-safe manner.
@@ -386,22 +385,10 @@ type readerSyncer struct {
 // Returns true if a sync was already in progress.
 // Make sure to pass a context with a timeout to avoid blocking the plugin for too long.
 func (s *readerSyncer) Sync(ctx context.Context, contracts reader.ContractAddresses) (alreadySyncing bool, err error) {
-	s.mu.Lock()
-	if s.syncing {
-		s.mu.Unlock()
+	if !s.busy.CompareAndSwap(false, true) {
 		return true, nil
 	}
-
-	// still have the lock at this point, so we can safely set syncing to true.
-	s.syncing = true
-	// safe to unlock here because callers will read the "true" value of syncing if Sync() is re-entered.
-	s.mu.Unlock()
-
-	defer func() {
-		s.mu.Lock()
-		s.syncing = false
-		s.mu.Unlock()
-	}()
+	defer s.busy.Store(false)
 
 	return false, (*s.reader).Sync(ctx, contracts)
 }
