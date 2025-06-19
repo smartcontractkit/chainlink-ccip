@@ -7,11 +7,12 @@ import (
 	"strconv"
 	"time"
 
+	"golang.org/x/exp/maps"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
-	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
@@ -749,6 +750,7 @@ func (l *DefaultAccessor) processCommitReports(
 	if len(reports) < limit {
 		return reports
 	}
+	lggr.Errorw("too many commit reports received, commit report results are truncated", "numTruncatedReports", len(reports)-limit)
 	return reports[:limit]
 }
 
