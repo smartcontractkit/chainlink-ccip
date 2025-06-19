@@ -1554,7 +1554,6 @@ func TestTokenPool(t *testing.T) {
 				require.NoError(t, err)
 
 				t.Run("When there is a global curse, it fails", func(t *testing.T) {
-					// Create IX to curse
 					globalCurse := rmn_remote.CurseSubject{
 						Value: [16]uint8{0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01},
 					}
@@ -1574,7 +1573,6 @@ func TestTokenPool(t *testing.T) {
 				})
 
 				t.Run("When there is a lane curse, it fails", func(t *testing.T) {
-					// Create IX to curse
 					svmCurse := rmn_remote.CurseSubject{}
 					binary.LittleEndian.PutUint64(svmCurse.Value[:], config.SvmChainSelector)
 					curseIx, err := rmn_remote.NewCurseInstruction(
@@ -1674,13 +1672,7 @@ func TestTokenPool(t *testing.T) {
 
 				t.Run("Account derivation", func(t *testing.T) {
 					accounts, tables := deriveCctpReleaseOrMintAccounts(ctx, t, admin, releaseOrMintIn, solanaGoClient)
-
-					// Check lookup tables
-					// require.Len(t, tables, 1)
 					require.Equal(t, []solana.PublicKey{}, tables)
-
-					// Check accounts
-					// require.Len(t, accounts, 14)
 					require.Equal(t, additionalAccountMetas, accounts)
 				})
 
@@ -1719,7 +1711,6 @@ func TestTokenPool(t *testing.T) {
 				require.NoError(t, err)
 
 				t.Run("When there is a global curse, it fails", func(t *testing.T) {
-					// Create IX to curse
 					globalCurse := rmn_remote.CurseSubject{
 						Value: [16]uint8{0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01},
 					}
@@ -1824,7 +1815,6 @@ func deriveCctpReleaseOrMintAccounts(ctx context.Context,
 		deriveRaw := cctp_token_pool.NewDeriveAccountsReleaseOrMintTokensInstruction(
 			stage,
 			releaseOrMint,
-			// solana.SysVarClockPubkey,
 		)
 		deriveRaw.AccountMetaSlice = append(deriveRaw.AccountMetaSlice, askWith...)
 		derive, err := deriveRaw.ValidateAndBuild()
