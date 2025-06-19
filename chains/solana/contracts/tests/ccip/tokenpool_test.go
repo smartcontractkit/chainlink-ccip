@@ -1781,50 +1781,50 @@ func TestTokenPool(t *testing.T) {
 	})
 }
 
-func deriveCctpReleaseOrMintAccounts(ctx context.Context,
-	t *testing.T,
-	transmitter solana.PrivateKey,
-	releaseOrMint cctp_token_pool.ReleaseOrMintInV1,
-	solanaGoClient *rpc.Client) (accounts []*solana.AccountMeta, lookUpTables []solana.PublicKey) {
+// func deriveCctpReleaseOrMintAccounts(ctx context.Context,
+// 	t *testing.T,
+// 	transmitter solana.PrivateKey,
+// 	releaseOrMint cctp_token_pool.ReleaseOrMintInV1,
+// 	solanaGoClient *rpc.Client) (accounts []*solana.AccountMeta, lookUpTables []solana.PublicKey) {
 
-	derivedAccounts := []*solana.AccountMeta{}
-	askWith := []*solana.AccountMeta{}
-	stage := "Start"
-	for {
-		deriveRaw := cctp_token_pool.NewDeriveAccountsReleaseOrMintTokensInstruction(
-			stage,
-			releaseOrMint,
-			solana.SysVarClockPubkey,
-		)
-		deriveRaw.AccountMetaSlice = append(deriveRaw.AccountMetaSlice, askWith...)
-		derive, err := deriveRaw.ValidateAndBuild()
-		require.NoError(t, err)
-		tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{derive}, transmitter, config.DefaultCommitment)
-		derivation, err := common.ExtractAnchorTypedReturnValue[cctp_token_pool.DeriveAccountsResponse](ctx, tx.Meta.LogMessages, config.CctpTokenPoolProgram.String())
-		require.NoError(t, err)
+// 	derivedAccounts := []*solana.AccountMeta{}
+// 	askWith := []*solana.AccountMeta{}
+// 	stage := "Start"
+// 	for {
+// 		deriveRaw := cctp_token_pool.NewDeriveAccountsReleaseOrMintTokensInstruction(
+// 			stage,
+// 			releaseOrMint,
+// 			solana.SysVarClockPubkey,
+// 		)
+// 		deriveRaw.AccountMetaSlice = append(deriveRaw.AccountMetaSlice, askWith...)
+// 		derive, err := deriveRaw.ValidateAndBuild()
+// 		require.NoError(t, err)
+// 		tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{derive}, transmitter, config.DefaultCommitment)
+// 		derivation, err := common.ExtractAnchorTypedReturnValue[cctp_token_pool.DeriveAccountsResponse](ctx, tx.Meta.LogMessages, config.CctpTokenPoolProgram.String())
+// 		require.NoError(t, err)
 
-		for _, meta := range derivation.AccountsToSave {
-			derivedAccounts = append(derivedAccounts, &solana.AccountMeta{
-				PublicKey:  meta.Pubkey,
-				IsWritable: meta.IsWritable,
-				IsSigner:   meta.IsSigner,
-			})
-		}
+// 		for _, meta := range derivation.AccountsToSave {
+// 			derivedAccounts = append(derivedAccounts, &solana.AccountMeta{
+// 				PublicKey:  meta.Pubkey,
+// 				IsWritable: meta.IsWritable,
+// 				IsSigner:   meta.IsSigner,
+// 			})
+// 		}
 
-		askWith = []*solana.AccountMeta{}
-		for _, meta := range derivation.AskAgainWith {
-			askWith = append(askWith, &solana.AccountMeta{
-				PublicKey:  meta.Pubkey,
-				IsWritable: meta.IsWritable,
-				IsSigner:   meta.IsSigner,
-			})
-		}
+// 		askWith = []*solana.AccountMeta{}
+// 		for _, meta := range derivation.AskAgainWith {
+// 			askWith = append(askWith, &solana.AccountMeta{
+// 				PublicKey:  meta.Pubkey,
+// 				IsWritable: meta.IsWritable,
+// 				IsSigner:   meta.IsSigner,
+// 			})
+// 		}
 
-		lookUpTables = append(lookUpTables, derivation.LookUpTablesToSave...)
+// 		lookUpTables = append(lookUpTables, derivation.LookUpTablesToSave...)
 
-		if len(derivation.NextStage) == 0 {
-			return derivedAccounts, lookUpTables
-		}
-		stage = derivation.NextStage
-	}
-}
+// 		if len(derivation.NextStage) == 0 {
+// 			return derivedAccounts, lookUpTables
+// 		}
+// 		stage = derivation.NextStage
+// 	}
+// }
