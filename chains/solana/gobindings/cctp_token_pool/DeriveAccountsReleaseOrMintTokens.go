@@ -15,14 +15,13 @@ type DeriveAccountsReleaseOrMintTokens struct {
 	Stage         *string
 	ReleaseOrMint *ReleaseOrMintInV1
 
-	// [0] = [] clock
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewDeriveAccountsReleaseOrMintTokensInstructionBuilder creates a new `DeriveAccountsReleaseOrMintTokens` instruction builder.
 func NewDeriveAccountsReleaseOrMintTokensInstructionBuilder() *DeriveAccountsReleaseOrMintTokens {
 	nd := &DeriveAccountsReleaseOrMintTokens{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 1),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 0),
 	}
 	return nd
 }
@@ -37,17 +36,6 @@ func (inst *DeriveAccountsReleaseOrMintTokens) SetStage(stage string) *DeriveAcc
 func (inst *DeriveAccountsReleaseOrMintTokens) SetReleaseOrMint(releaseOrMint ReleaseOrMintInV1) *DeriveAccountsReleaseOrMintTokens {
 	inst.ReleaseOrMint = &releaseOrMint
 	return inst
-}
-
-// SetClockAccount sets the "clock" account.
-func (inst *DeriveAccountsReleaseOrMintTokens) SetClockAccount(clock ag_solanago.PublicKey) *DeriveAccountsReleaseOrMintTokens {
-	inst.AccountMetaSlice[0] = ag_solanago.Meta(clock)
-	return inst
-}
-
-// GetClockAccount gets the "clock" account.
-func (inst *DeriveAccountsReleaseOrMintTokens) GetClockAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
 }
 
 func (inst DeriveAccountsReleaseOrMintTokens) Build() *Instruction {
@@ -80,9 +68,6 @@ func (inst *DeriveAccountsReleaseOrMintTokens) Validate() error {
 
 	// Check whether all (required) accounts are set:
 	{
-		if inst.AccountMetaSlice[0] == nil {
-			return errors.New("accounts.Clock is not set")
-		}
 	}
 	return nil
 }
@@ -102,9 +87,7 @@ func (inst *DeriveAccountsReleaseOrMintTokens) EncodeToTree(parent ag_treeout.Br
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=1]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("clock", inst.AccountMetaSlice[0]))
-					})
+					instructionBranch.Child("Accounts[len=0]").ParentFunc(func(accountsBranch ag_treeout.Branches) {})
 				})
 		})
 }
@@ -140,11 +123,8 @@ func (obj *DeriveAccountsReleaseOrMintTokens) UnmarshalWithDecoder(decoder *ag_b
 func NewDeriveAccountsReleaseOrMintTokensInstruction(
 	// Parameters:
 	stage string,
-	releaseOrMint ReleaseOrMintInV1,
-	// Accounts:
-	clock ag_solanago.PublicKey) *DeriveAccountsReleaseOrMintTokens {
+	releaseOrMint ReleaseOrMintInV1) *DeriveAccountsReleaseOrMintTokens {
 	return NewDeriveAccountsReleaseOrMintTokensInstructionBuilder().
 		SetStage(stage).
-		SetReleaseOrMint(releaseOrMint).
-		SetClockAccount(clock)
+		SetReleaseOrMint(releaseOrMint)
 }

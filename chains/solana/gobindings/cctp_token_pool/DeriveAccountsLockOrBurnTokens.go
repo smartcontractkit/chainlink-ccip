@@ -15,14 +15,13 @@ type DeriveAccountsLockOrBurnTokens struct {
 	Stage      *string
 	LockOrBurn *LockOrBurnInV1
 
-	// [0] = [] clock
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewDeriveAccountsLockOrBurnTokensInstructionBuilder creates a new `DeriveAccountsLockOrBurnTokens` instruction builder.
 func NewDeriveAccountsLockOrBurnTokensInstructionBuilder() *DeriveAccountsLockOrBurnTokens {
 	nd := &DeriveAccountsLockOrBurnTokens{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 1),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 0),
 	}
 	return nd
 }
@@ -37,17 +36,6 @@ func (inst *DeriveAccountsLockOrBurnTokens) SetStage(stage string) *DeriveAccoun
 func (inst *DeriveAccountsLockOrBurnTokens) SetLockOrBurn(lockOrBurn LockOrBurnInV1) *DeriveAccountsLockOrBurnTokens {
 	inst.LockOrBurn = &lockOrBurn
 	return inst
-}
-
-// SetClockAccount sets the "clock" account.
-func (inst *DeriveAccountsLockOrBurnTokens) SetClockAccount(clock ag_solanago.PublicKey) *DeriveAccountsLockOrBurnTokens {
-	inst.AccountMetaSlice[0] = ag_solanago.Meta(clock)
-	return inst
-}
-
-// GetClockAccount gets the "clock" account.
-func (inst *DeriveAccountsLockOrBurnTokens) GetClockAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
 }
 
 func (inst DeriveAccountsLockOrBurnTokens) Build() *Instruction {
@@ -80,9 +68,6 @@ func (inst *DeriveAccountsLockOrBurnTokens) Validate() error {
 
 	// Check whether all (required) accounts are set:
 	{
-		if inst.AccountMetaSlice[0] == nil {
-			return errors.New("accounts.Clock is not set")
-		}
 	}
 	return nil
 }
@@ -102,9 +87,7 @@ func (inst *DeriveAccountsLockOrBurnTokens) EncodeToTree(parent ag_treeout.Branc
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=1]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("clock", inst.AccountMetaSlice[0]))
-					})
+					instructionBranch.Child("Accounts[len=0]").ParentFunc(func(accountsBranch ag_treeout.Branches) {})
 				})
 		})
 }
@@ -140,11 +123,8 @@ func (obj *DeriveAccountsLockOrBurnTokens) UnmarshalWithDecoder(decoder *ag_bina
 func NewDeriveAccountsLockOrBurnTokensInstruction(
 	// Parameters:
 	stage string,
-	lockOrBurn LockOrBurnInV1,
-	// Accounts:
-	clock ag_solanago.PublicKey) *DeriveAccountsLockOrBurnTokens {
+	lockOrBurn LockOrBurnInV1) *DeriveAccountsLockOrBurnTokens {
 	return NewDeriveAccountsLockOrBurnTokensInstructionBuilder().
 		SetStage(stage).
-		SetLockOrBurn(lockOrBurn).
-		SetClockAccount(clock)
+		SetLockOrBurn(lockOrBurn)
 }

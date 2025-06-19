@@ -3,7 +3,6 @@
 package cctp_token_pool
 
 import (
-	"errors"
 	ag_binary "github.com/gagliardetto/binary"
 	ag_solanago "github.com/gagliardetto/solana-go"
 	ag_format "github.com/gagliardetto/solana-go/text/format"
@@ -16,28 +15,15 @@ import (
 // # Arguments
 // * `ctx` - The context
 type TypeVersion struct {
-
-	// [0] = [] clock
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewTypeVersionInstructionBuilder creates a new `TypeVersion` instruction builder.
 func NewTypeVersionInstructionBuilder() *TypeVersion {
 	nd := &TypeVersion{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 1),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 0),
 	}
 	return nd
-}
-
-// SetClockAccount sets the "clock" account.
-func (inst *TypeVersion) SetClockAccount(clock ag_solanago.PublicKey) *TypeVersion {
-	inst.AccountMetaSlice[0] = ag_solanago.Meta(clock)
-	return inst
-}
-
-// GetClockAccount gets the "clock" account.
-func (inst *TypeVersion) GetClockAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
 }
 
 func (inst TypeVersion) Build() *Instruction {
@@ -60,9 +46,6 @@ func (inst TypeVersion) ValidateAndBuild() (*Instruction, error) {
 func (inst *TypeVersion) Validate() error {
 	// Check whether all (required) accounts are set:
 	{
-		if inst.AccountMetaSlice[0] == nil {
-			return errors.New("accounts.Clock is not set")
-		}
 	}
 	return nil
 }
@@ -79,9 +62,7 @@ func (inst *TypeVersion) EncodeToTree(parent ag_treeout.Branches) {
 					instructionBranch.Child("Params[len=0]").ParentFunc(func(paramsBranch ag_treeout.Branches) {})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=1]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("clock", inst.AccountMetaSlice[0]))
-					})
+					instructionBranch.Child("Accounts[len=0]").ParentFunc(func(accountsBranch ag_treeout.Branches) {})
 				})
 		})
 }
@@ -94,9 +75,6 @@ func (obj *TypeVersion) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err er
 }
 
 // NewTypeVersionInstruction declares a new TypeVersion instruction with the provided parameters and accounts.
-func NewTypeVersionInstruction(
-	// Accounts:
-	clock ag_solanago.PublicKey) *TypeVersion {
-	return NewTypeVersionInstructionBuilder().
-		SetClockAccount(clock)
+func NewTypeVersionInstruction() *TypeVersion {
+	return NewTypeVersionInstructionBuilder()
 }

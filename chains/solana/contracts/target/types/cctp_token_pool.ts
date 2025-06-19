@@ -56,13 +56,7 @@ export type CctpTokenPool = {
         "# Arguments",
         "* `ctx` - The context"
       ],
-      "accounts": [
-        {
-          "name": "clock",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
+      "accounts": [],
       "args": [],
       "returns": "string"
     },
@@ -511,7 +505,7 @@ export type CctpTokenPool = {
         },
         {
           "name": "poolSigner",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         },
         {
@@ -778,13 +772,7 @@ export type CctpTokenPool = {
     },
     {
       "name": "deriveAccountsReleaseOrMintTokens",
-      "accounts": [
-        {
-          "name": "clock",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
+      "accounts": [],
       "args": [
         {
           "name": "stage",
@@ -803,13 +791,7 @@ export type CctpTokenPool = {
     },
     {
       "name": "deriveAccountsLockOrBurnTokens",
-      "accounts": [
-        {
-          "name": "clock",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
+      "accounts": [],
       "args": [
         {
           "name": "stage",
@@ -1118,13 +1100,7 @@ export const IDL: CctpTokenPool = {
         "# Arguments",
         "* `ctx` - The context"
       ],
-      "accounts": [
-        {
-          "name": "clock",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
+      "accounts": [],
       "args": [],
       "returns": "string"
     },
@@ -1573,7 +1549,7 @@ export const IDL: CctpTokenPool = {
         },
         {
           "name": "poolSigner",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         },
         {
@@ -1840,13 +1816,7 @@ export const IDL: CctpTokenPool = {
     },
     {
       "name": "deriveAccountsReleaseOrMintTokens",
-      "accounts": [
-        {
-          "name": "clock",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
+      "accounts": [],
       "args": [
         {
           "name": "stage",
@@ -1865,13 +1835,7 @@ export const IDL: CctpTokenPool = {
     },
     {
       "name": "deriveAccountsLockOrBurnTokens",
-      "accounts": [
-        {
-          "name": "clock",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
+      "accounts": [],
       "args": [
         {
           "name": "stage",

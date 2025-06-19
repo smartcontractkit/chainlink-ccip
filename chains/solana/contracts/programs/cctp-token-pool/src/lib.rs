@@ -368,7 +368,7 @@ pub mod cctp_token_pool {
     }
 
     pub fn derive_accounts_release_or_mint_tokens<'info>(
-        ctx: Context<'_, '_, 'info, 'info, Empty<'info>>,
+        ctx: Context<'_, '_, 'info, 'info, Empty>,
         stage: String,
         release_or_mint: ReleaseOrMintInV1,
     ) -> Result<DeriveAccountsResponse> {
@@ -385,7 +385,7 @@ pub mod cctp_token_pool {
     }
 
     pub fn derive_accounts_lock_or_burn_tokens<'info>(
-        ctx: Context<'_, '_, 'info, 'info, Empty<'info>>,
+        ctx: Context<'_, '_, 'info, 'info, Empty>,
         stage: String,
         lock_or_burn: LockOrBurnInV1,
     ) -> Result<DeriveAccountsResponse> {

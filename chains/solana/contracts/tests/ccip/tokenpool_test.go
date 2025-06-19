@@ -976,6 +976,7 @@ func TestTokenPool(t *testing.T) {
 		var adminATA solana.PublicKey
 
 		var tpLookupTable map[solana.PublicKey]solana.PublicKeySlice
+		var tpLookupTableAddr solana.PublicKey
 
 		t.Run("Setup", func(t *testing.T) {
 			type ProgramData struct {
@@ -1017,7 +1018,7 @@ func TestTokenPool(t *testing.T) {
 				t.Parallel()
 
 				t.Run("Create lookup table", func(t *testing.T) {
-					tpLookupTableAddr, err := common.CreateLookupTable(ctx, solanaGoClient, admin)
+					tpLookupTableAddr, err = common.CreateLookupTable(ctx, solanaGoClient, admin)
 					require.NoError(t, err)
 
 					entries := solana.PublicKeySlice{
@@ -1466,7 +1467,7 @@ func TestTokenPool(t *testing.T) {
 		t.Run("TypeVersion", func(t *testing.T) {
 			t.Parallel()
 
-			ix, err := cctp_token_pool.NewTypeVersionInstruction(solana.SysVarClockPubkey).ValidateAndBuild()
+			ix, err := cctp_token_pool.NewTypeVersionInstruction().ValidateAndBuild()
 			require.NoError(t, err)
 			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 			require.NotNil(t, result)
@@ -1642,16 +1643,56 @@ func TestTokenPool(t *testing.T) {
 				offchainTokenDataBuffer := new(bytes.Buffer)
 				require.NoError(t, offchainTokenData.MarshalWithEncoder(bin.NewBorshEncoder(offchainTokenDataBuffer)))
 
+				releaseOrMintIn := cctp_token_pool.ReleaseOrMintInV1{
+					OriginalSender:      cctp_token_pool.RemoteAddress{Address: user.PublicKey().Bytes()},
+					RemoteChainSelector: config.SvmChainSelector,
+					Receiver:            admin.PublicKey(),
+					Amount:              tokens.ToLittleEndianU256(messageAmount),
+					LocalToken:          usdcMint,
+					SourcePoolAddress:   cctp_token_pool.RemoteAddress{Address: cctpPool.signer.Bytes()}, // when the source is Solana, the pool is identified by its signer
+					SourcePoolData:      []byte{},
+					OffchainTokenData:   offchainTokenDataBuffer.Bytes(),
+				}
+
+				additionalAccountMetas := []*solana.AccountMeta{
+					solana.Meta(messageTransmitter.authorityPda),
+					solana.Meta(messageTransmitter.messageTransmitter),
+					solana.Meta(tokenMessengerMinter.program),
+					solana.Meta(solana.SystemProgramID),
+					solana.Meta(messageTransmitter.eventAuthority),
+					solana.Meta(messageTransmitter.program),
+					solana.Meta(tokenMessengerMinter.tokenMessenger),
+					solana.Meta(tokenMessengerMinter.tokenMinter).WRITE(),
+					solana.Meta(tokenMessengerMinter.localToken).WRITE(),
+					solana.Meta(tokenMessengerMinter.custodyTokenAccount).WRITE(),
+					solana.Meta(tokenMessengerMinter.eventAuthority),
+					solana.Meta(tokenMessengerMinter.remoteTokenMessenger),
+					solana.Meta(tokenMessengerMinter.tokenPair),
+					solana.Meta(getUsedNoncesPDA(t, messageSentEventData)).WRITE(),
+				}
+
+				t.Run("Account derivation", func(t *testing.T) {
+					accounts, tables := deriveCctpReleaseOrMintAccounts(ctx, t, admin, releaseOrMintIn, solanaGoClient)
+
+					// Check lookup tables
+					// require.Len(t, tables, 1)
+					require.Equal(t, []solana.PublicKey{}, tables)
+
+					// Check accounts
+					// require.Len(t, accounts, 14)
+					require.Equal(t, additionalAccountMetas, accounts)
+				})
+
 				raw := test_ccip_invalid_receiver.NewPoolProxyReleaseOrMintInstruction(
 					test_ccip_invalid_receiver.ReleaseOrMintInV1{
-						OriginalSender:      user.PublicKey().Bytes(),
-						RemoteChainSelector: config.SvmChainSelector,
-						Receiver:            admin.PublicKey(),
-						Amount:              tokens.ToLittleEndianU256(messageAmount),
-						LocalToken:          usdcMint,
-						SourcePoolAddress:   cctpPool.signer.Bytes(), // when the source is Solana, the pool is identified by its signer
-						SourcePoolData:      []byte{},
-						OffchainTokenData:   offchainTokenDataBuffer.Bytes(),
+						OriginalSender:      releaseOrMintIn.OriginalSender.Address,
+						RemoteChainSelector: releaseOrMintIn.RemoteChainSelector,
+						Receiver:            releaseOrMintIn.Receiver,
+						Amount:              releaseOrMintIn.Amount,
+						LocalToken:          releaseOrMintIn.LocalToken,
+						SourcePoolAddress:   releaseOrMintIn.SourcePoolAddress.Address,
+						SourcePoolData:      releaseOrMintIn.SourcePoolData,
+						OffchainTokenData:   releaseOrMintIn.OffchainTokenData,
 					},
 					cctpPool.program,
 					dumbRampCctpSigner,
@@ -1669,24 +1710,9 @@ func TestTokenPool(t *testing.T) {
 					adminATA,
 				)
 
-				raw.GetPoolSignerAccount().WRITE()
+				raw.GetPoolSignerAccount().WRITE() // CCTP requires this, though other pools don't (which is why the bindings don't do it by default)
 
-				raw.AccountMetaSlice = append(raw.AccountMetaSlice,
-					solana.Meta(messageTransmitter.authorityPda),
-					solana.Meta(messageTransmitter.messageTransmitter),
-					solana.Meta(tokenMessengerMinter.program),
-					solana.Meta(solana.SystemProgramID),
-					solana.Meta(messageTransmitter.eventAuthority),
-					solana.Meta(messageTransmitter.program),
-					solana.Meta(tokenMessengerMinter.tokenMessenger),
-					solana.Meta(tokenMessengerMinter.tokenMinter).WRITE(),
-					solana.Meta(tokenMessengerMinter.localToken).WRITE(),
-					solana.Meta(tokenMessengerMinter.custodyTokenAccount).WRITE(),
-					solana.Meta(tokenMessengerMinter.eventAuthority),
-					solana.Meta(tokenMessengerMinter.remoteTokenMessenger),
-					solana.Meta(tokenMessengerMinter.tokenPair),
-					solana.Meta(getUsedNoncesPDA(t, messageSentEventData)).WRITE(),
-				)
+				raw.AccountMetaSlice = append(raw.AccountMetaSlice, additionalAccountMetas...)
 
 				ix, err := raw.ValidateAndBuild()
 				require.NoError(t, err)
@@ -1780,50 +1806,60 @@ func TestTokenPool(t *testing.T) {
 	})
 }
 
-// func deriveCctpReleaseOrMintAccounts(ctx context.Context,
-// 	t *testing.T,
-// 	transmitter solana.PrivateKey,
-// 	releaseOrMint cctp_token_pool.ReleaseOrMintInV1,
-// 	solanaGoClient *rpc.Client) (accounts []*solana.AccountMeta, lookUpTables []solana.PublicKey) {
+func deriveCctpReleaseOrMintAccounts(ctx context.Context,
+	t *testing.T,
+	transmitter solana.PrivateKey,
+	releaseOrMint cctp_token_pool.ReleaseOrMintInV1,
+	solanaGoClient *rpc.Client,
+) (derivedAccounts []*solana.AccountMeta, lookUpTables []solana.PublicKey) {
+	t.Helper()
 
-// 	derivedAccounts := []*solana.AccountMeta{}
-// 	askWith := []*solana.AccountMeta{}
-// 	stage := "Start"
-// 	for {
-// 		deriveRaw := cctp_token_pool.NewDeriveAccountsReleaseOrMintTokensInstruction(
-// 			stage,
-// 			releaseOrMint,
-// 			solana.SysVarClockPubkey,
-// 		)
-// 		deriveRaw.AccountMetaSlice = append(deriveRaw.AccountMetaSlice, askWith...)
-// 		derive, err := deriveRaw.ValidateAndBuild()
-// 		require.NoError(t, err)
-// 		tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{derive}, transmitter, config.DefaultCommitment)
-// 		derivation, err := common.ExtractAnchorTypedReturnValue[cctp_token_pool.DeriveAccountsResponse](ctx, tx.Meta.LogMessages, config.CctpTokenPoolProgram.String())
-// 		require.NoError(t, err)
+	derivedAccounts = make([]*solana.AccountMeta, 0)
+	lookUpTables = make([]solana.PublicKey, 0)
 
-// 		for _, meta := range derivation.AccountsToSave {
-// 			derivedAccounts = append(derivedAccounts, &solana.AccountMeta{
-// 				PublicKey:  meta.Pubkey,
-// 				IsWritable: meta.IsWritable,
-// 				IsSigner:   meta.IsSigner,
-// 			})
-// 		}
+	askWith := []*solana.AccountMeta{}
+	stage := "Start"
+	for {
+		deriveRaw := cctp_token_pool.NewDeriveAccountsReleaseOrMintTokensInstruction(
+			stage,
+			releaseOrMint,
+			// solana.SysVarClockPubkey,
+		)
+		deriveRaw.AccountMetaSlice = append(deriveRaw.AccountMetaSlice, askWith...)
+		derive, err := deriveRaw.ValidateAndBuild()
+		require.NoError(t, err)
+		tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{derive}, transmitter, config.DefaultCommitment)
+		derivation, err := common.ExtractAnchorTypedReturnValue[cctp_token_pool.DeriveAccountsResponse](ctx, tx.Meta.LogMessages, config.CctpTokenPoolProgram.String())
+		require.NoError(t, err)
+		fmt.Printf("Derivation: %+v\n", derivation)
 
-// 		askWith = []*solana.AccountMeta{}
-// 		for _, meta := range derivation.AskAgainWith {
-// 			askWith = append(askWith, &solana.AccountMeta{
-// 				PublicKey:  meta.Pubkey,
-// 				IsWritable: meta.IsWritable,
-// 				IsSigner:   meta.IsSigner,
-// 			})
-// 		}
+		for _, meta := range derivation.AccountsToSave {
+			derivedAccounts = append(derivedAccounts, &solana.AccountMeta{
+				PublicKey:  meta.Pubkey,
+				IsWritable: meta.IsWritable,
+				IsSigner:   meta.IsSigner,
+			})
+		}
 
-// 		lookUpTables = append(lookUpTables, derivation.LookUpTablesToSave...)
+		askWith = []*solana.AccountMeta{}
+		for _, meta := range derivation.AskAgainWith {
+			askWith = append(askWith, &solana.AccountMeta{
+				PublicKey:  meta.Pubkey,
+				IsWritable: meta.IsWritable,
+				IsSigner:   meta.IsSigner,
+			})
+		}
 
-// 		if len(derivation.NextStage) == 0 {
-// 			return derivedAccounts, lookUpTables
-// 		}
-// 		stage = derivation.NextStage
-// 	}
-// }
+		if len(derivation.LookUpTablesToSave) > 0 {
+			fmt.Printf("Lookup tables before append: %+v\n", lookUpTables)
+			lookUpTables = append(lookUpTables, derivation.LookUpTablesToSave...)
+			fmt.Printf("Lookup tables after append: %+v\n", lookUpTables)
+		}
+
+		if len(derivation.NextStage) == 0 {
+			fmt.Printf("Lookup tables on return: %+v\n", lookUpTables)
+			return derivedAccounts, lookUpTables
+		}
+		stage = derivation.NextStage
+	}
+}

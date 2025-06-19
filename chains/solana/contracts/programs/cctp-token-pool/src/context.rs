@@ -48,10 +48,7 @@ pub struct InitializeTokenPool<'info> {
 }
 
 #[derive(Accounts)]
-pub struct Empty<'info> {
-    // This is unused, but Anchor requires that there is at least one account in the context
-    pub clock: Sysvar<'info, Clock>,
-}
+pub struct Empty {}
 
 #[derive(Accounts)]
 pub struct SetConfig<'info> {
@@ -186,6 +183,8 @@ pub struct TokenOfframp<'info> {
 
     /// CHECK: CPI signer
     #[account(
+        mut, // CCTP's receive_message method requires that this account is mutable,
+             // although it does not really mutate it
         seeds = [POOL_SIGNER_SEED, mint.key().as_ref()],
         bump,
         address = state.config.pool_signer,
