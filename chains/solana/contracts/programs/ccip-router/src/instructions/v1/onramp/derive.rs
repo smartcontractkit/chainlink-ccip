@@ -490,6 +490,14 @@ fn derive_ccip_send_accounts_additional_token_nested<'info>(
     invoke(&ix, nested_derivation_accounts)?;
 
     let (_, data) = get_return_data().unwrap();
-    DeriveAccountsResponse::try_from_slice(&data)
-        .map_err(|_| CcipRouterError::InvalidTokenPoolAccountDerivationResponse.into())
+    let mut response = DeriveAccountsResponse::try_from_slice(&data)
+        .map_err(|_| CcipRouterError::InvalidTokenPoolAccountDerivationResponse)?;
+
+    // We're coming back from a nested derivation call, so we turn the stage reported
+    // by it into our substage.
+    response.next_stage = DeriveAccountsCcipSendStage::TokenTransferAccounts {
+        token_substage: response.next_stage,
+    }
+    .to_string();
+    Ok(response)
 }

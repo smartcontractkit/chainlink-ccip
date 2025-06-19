@@ -368,8 +368,16 @@ fn derive_execute_accounts_additional_token_nested(
     invoke(&ix, nested_derivation_accounts)?;
 
     let (_, data) = get_return_data().unwrap();
-    DeriveAccountsResponse::try_from_slice(&data)
-        .map_err(|_| CcipOfframpError::InvalidTokenPoolAccountDerivationResponse.into())
+    let mut response = DeriveAccountsResponse::try_from_slice(&data)
+        .map_err(|_| CcipOfframpError::InvalidTokenPoolAccountDerivationResponse)?;
+
+    // We're coming back from a nested derivation call, so we turn the stage reported
+    // by it into our substage.
+    response.next_stage = DeriveExecuteAccountsStage::TokenTransferAccounts {
+        token_substage: response.next_stage,
+    }
+    .to_string();
+    Ok(response)
 }
 
 // Derives all static accounts for one token: those that don't change per invocation
