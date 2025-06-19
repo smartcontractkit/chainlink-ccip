@@ -495,9 +495,11 @@ fn derive_ccip_send_accounts_additional_token_nested<'info>(
 
     // We're coming back from a nested derivation call, so we turn the stage reported
     // by it into our substage.
-    response.next_stage = DeriveAccountsCcipSendStage::TokenTransferAccounts {
-        token_substage: response.next_stage,
+    if !response.next_stage.is_empty() {
+        response.next_stage = DeriveAccountsCcipSendStage::TokenTransferAccounts {
+            token_substage: response.next_stage,
+        }
+        .to_string();
     }
-    .to_string();
     Ok(response)
 }

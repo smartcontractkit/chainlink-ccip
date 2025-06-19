@@ -373,10 +373,12 @@ fn derive_execute_accounts_additional_token_nested(
 
     // We're coming back from a nested derivation call, so we turn the stage reported
     // by it into our substage.
-    response.next_stage = DeriveExecuteAccountsStage::TokenTransferAccounts {
-        token_substage: response.next_stage,
+    if !response.next_stage.is_empty() {
+        response.next_stage = DeriveExecuteAccountsStage::TokenTransferAccounts {
+            token_substage: response.next_stage,
+        }
+        .to_string();
     }
-    .to_string();
     Ok(response)
 }
 
