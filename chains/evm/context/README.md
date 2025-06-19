@@ -2,7 +2,7 @@
 
 **EXPERIMENTAL CONTENT - FOR AI AGENTS ONLY**
 
-This directory contains specialized documentation designed exclusively for AI agent working as software engineer on the CCIP codebase.
+This directory, along with `CLAUDE.md` in parent directory, contain specialized documentation designed exclusively for AI agents working on the CCIP codebase.
 
 ## Purpose
 
