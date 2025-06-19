@@ -131,3 +131,32 @@ func validateMerkleRoots(merkleRoots []MerkleRoot) error {
 
 	return nil
 }
+
+func validateExecutionStateChangedEvent(
+	ev *ExecutionStateChangedEvent, rangesByChain map[cciptypes.ChainSelector][]cciptypes.SeqNumRange) error {
+	if ev == nil {
+		return fmt.Errorf("execution state changed event is nil")
+	}
+
+	if _, ok := rangesByChain[ev.SourceChainSelector]; !ok {
+		return fmt.Errorf("source chain of messages was not queries")
+	}
+
+	if !ev.SequenceNumber.IsWithinRanges(rangesByChain[ev.SourceChainSelector]) {
+		return fmt.Errorf("execution state changed event sequence number is not in the expected range")
+	}
+
+	if ev.MessageHash.IsEmpty() {
+		return fmt.Errorf("nil message hash")
+	}
+
+	if ev.MessageID.IsEmpty() {
+		return fmt.Errorf("message ID is zero")
+	}
+
+	if ev.State == 0 {
+		return fmt.Errorf("state is zero")
+	}
+
+	return nil
+}
