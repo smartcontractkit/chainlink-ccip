@@ -27,6 +27,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/cctp_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/example_ccip_sender"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/rmn_remote"
@@ -48,6 +49,7 @@ func TestCCIPRouter(t *testing.T) {
 	ccip_offramp.SetProgramID(config.CcipOfframpProgram)
 	example_ccip_sender.SetProgramID(config.CcipBaseSender)
 	rmn_remote.SetProgramID(config.RMNRemoteProgram)
+	cctp_token_pool.SetProgramID(config.CctpTokenPoolProgram)
 
 	ctx := tests.Context(t)
 	user := solana.MustPrivateKeyFromBase58("ZZdVf32Npuhci4u4ir2NW9491Y3FTv2Gwk41HMpvgJoh81UM42LcNqAN8SXapHfPcr61QP7sJj7K2mKHt7qFCoV")
@@ -58,6 +60,7 @@ func TestCCIPRouter(t *testing.T) {
 	token0PoolAdmin := solana.MustPrivateKeyFromBase58("2NqkEEvMWf5Y8aUTSZvGCfyqPi4KjBKJShXWH4BrTWVyfxBzJm22S1K4gtkgzHcAhStseHypRV7mKPsx5nVa9h2e")
 	token1PoolAdmin := solana.MustPrivateKeyFromBase58("rAJULkVqwXHED22STrDdUPxfGqSi6gkHfSpgaYSTzp3X9MCqsYegEcWMJVZ5yQFw5H3mNdsBAJpR9xfdYRGfb7J")
 	token2PoolAdmin := solana.MustPrivateKeyFromBase58("3UUqZ5xa3xv9fX1UJQyHsJtovE2gzmJUJjybizjrAvxh7NUmVyVQHUkJVkQwBKtVr5vLVCp1DWAeAzv46WzLoEmS")
+	usdcPoolAdmin := solana.MustPrivateKeyFromBase58("2Gjx3b1ZY7P3A63EnPRSVWQsKth8BXXjQQNLjzAsiLFrDxbBQwZ62yDG8BiN5RjG8VYveMdZFy7gLjzsdKboPM7N")
 	feeAggregator := solana.MustPrivateKeyFromBase58("NPchsbT3bkkziJPBUxto3eVTVKHcV4tou33NjRY8inArmzi7EXKBf5cC7MX47xqYMwkZGbkw7t55jCciCStSwNs")
 
 	nonceEvmPDA, gerr := state.FindNoncePDA(config.EvmChainSelector, user.PublicKey(), config.CcipRouterProgram)
@@ -96,11 +99,10 @@ func TestCCIPRouter(t *testing.T) {
 	token1Decimals := uint8(18)
 	token2Decimals := uint8(9)
 	link22Decimals := uint8(9) // Solana Decimals for Link Token2022 token
+	usdcDecimals := uint8(6)   // Solana Decimals for USDC token
 
 	// token addresses
 	// Create link22 token, managed by "legacyAdmin" (not "ccipAdmin" who manages CCIP).
-	// Random-generated key, but fixing it adds determinism to tests to make it easier to debug.
-	linkMintPrivK := solana.MustPrivateKeyFromBase58("32YVeJArcWWWV96fztfkRQhohyFz5Hwno93AeGVrN4g2LuFyvwznrNd9A6tbvaTU6BuyBsynwJEMLre8vSy3CrVU")
 
 	token0Multisig := solana.MustPrivateKeyFromBase58("5BayUa1C1nfiSptuV521hYPKZZsjHJM5YDfWZJkyrDgnEhzvZS4x5Nuqn6n4E6anuqAc7dJpAr1faNUwyK99cf3C") // EkopXthh6nbLKkgEnACc94mygKsSfcaX4EjXLgt1LiR4
 
@@ -113,8 +115,11 @@ func TestCCIPRouter(t *testing.T) {
 	token2Mint := solana.MustPrivateKeyFromBase58("2b4zgrXRBDkAuhFMEUEaMJHXwPfPX5REmy3gA3Vxhj7efTLkZEBuq49mDSdQyCJFyG3KPRGt2PVoGF8VqhGUTo9")
 	token2, gerr := tokens.NewTokenPool(config.Token2022Program, config.CcipTokenPoolProgram, token2Mint.PublicKey())
 	require.NoError(t, gerr)
+	linkMintPrivK := solana.MustPrivateKeyFromBase58("32YVeJArcWWWV96fztfkRQhohyFz5Hwno93AeGVrN4g2LuFyvwznrNd9A6tbvaTU6BuyBsynwJEMLre8vSy3CrVU")
 	linkPool, gerr := tokens.NewTokenPool(config.Token2022Program, config.CcipTokenPoolProgram, linkMintPrivK.PublicKey())
 	require.NoError(t, gerr)
+	usdcMintPrivK := solana.MustPrivateKeyFromBase58("3NnpbE8mrtqhC99YLxhZU4xQTBQBha6tKjfTa123DtR6bmGH1NQS59QELnNarvgHzzvRjAdDTqsfGYjyWHf6mwtA")
+	usdcPool, gerr := tokens.NewTokenPool(config.SPLTokenProgram, config.CctpTokenPoolProgram, usdcMintPrivK.PublicKey())
 
 	signers, transmitters, getTransmitter := testutils.GenerateSignersAndTransmitters(t, config.MaxOracles)
 
@@ -197,6 +202,7 @@ func TestCCIPRouter(t *testing.T) {
 				token0PoolAdmin,
 				token1PoolAdmin,
 				token2PoolAdmin,
+				usdcPoolAdmin,
 				feeAggregator),
 				solanaGoClient,
 				t)
@@ -395,6 +401,9 @@ func TestCCIPRouter(t *testing.T) {
 			ix2, ixErr2 := tokens.CreateToken(ctx, token2.Program, token2.Mint, token2PoolAdmin.PublicKey(), token2Decimals, solanaGoClient, config.DefaultCommitment)
 			require.NoError(t, ixErr2)
 
+			ixUsdc, ixErrUsdc := tokens.CreateToken(ctx, usdcPool.Program, usdcPool.Mint, usdcPoolAdmin.PublicKey(), usdcDecimals, solanaGoClient, config.DefaultCommitment)
+			require.NoError(t, ixErrUsdc)
+
 			// mint tokens to user
 			ixAta0, addr0, ataErr := tokens.CreateAssociatedTokenAccount(token0.Program, token0.Mint, user.PublicKey(), token0PoolAdmin.PublicKey())
 			require.NoError(t, ataErr)
@@ -408,6 +417,10 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, ataErr)
 			ixMintTo2, mintErr := tokens.MintTo(10000000, token2.Program, token2.Mint, addr2, token2PoolAdmin.PublicKey())
 			require.NoError(t, mintErr)
+			ixAtaUsdc, usdcAddr, ataErr := tokens.CreateAssociatedTokenAccount(usdcPool.Program, usdcPool.Mint, user.PublicKey(), usdcPoolAdmin.PublicKey())
+			require.NoError(t, ataErr)
+			ixMintToUsdc, mintErr := tokens.MintTo(10000000, usdcPool.Program, usdcPool.Mint, usdcAddr, usdcPoolAdmin.PublicKey())
+			require.NoError(t, mintErr)
 
 			// create ATA for receiver (receiver program address)
 			ixAtaReceiver0, recAddr0, recErr := tokens.CreateAssociatedTokenAccount(token0.Program, token0.Mint, config.ReceiverExternalExecutionConfigPDA, token0PoolAdmin.PublicKey())
@@ -418,6 +431,8 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, recErr)
 			ixAtaReceiverLink, recAddrLink, recErr := tokens.CreateAssociatedTokenAccount(link22.program, link22.mint, config.ReceiverExternalExecutionConfigPDA, legacyAdmin.PublicKey())
 			require.NoError(t, recErr)
+			ixAtaReceiverUsdc, recAddrUsdc, recErr := tokens.CreateAssociatedTokenAccount(usdcPool.Program, usdcPool.Mint, config.ReceiverExternalExecutionConfigPDA, usdcPoolAdmin.PublicKey())
+			require.NoError(t, recErr)
 
 			token0.User[user.PublicKey()] = addr0
 			token0.User[config.ReceiverExternalExecutionConfigPDA] = recAddr0
@@ -427,6 +442,8 @@ func TestCCIPRouter(t *testing.T) {
 			token2.User[config.ReceiverExternalExecutionConfigPDA] = recAddr2
 			linkPool.User[user.PublicKey()] = link22.userATA
 			linkPool.User[config.ReceiverExternalExecutionConfigPDA] = recAddrLink
+			usdcPool.User[user.PublicKey()] = usdcAddr
+			usdcPool.User[config.ReceiverExternalExecutionConfigPDA] = recAddrUsdc
 
 			ix0 = append(ix0, ixAta0, ixMintTo0, ixAtaReceiver0)
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, ix0, token0PoolAdmin, config.DefaultCommitment, common.AddSigners(token0Mint))
@@ -434,6 +451,8 @@ func TestCCIPRouter(t *testing.T) {
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, ix1, token1PoolAdmin, config.DefaultCommitment, common.AddSigners(token1Mint))
 			ix2 = append(ix2, ixAta2, ixMintTo2, ixAtaReceiver2)
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, ix2, token2PoolAdmin, config.DefaultCommitment, common.AddSigners(token2Mint))
+			ixUsdc = append(ixUsdc, ixAtaUsdc, ixMintToUsdc, ixAtaReceiverUsdc)
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, ixUsdc, usdcPoolAdmin, config.DefaultCommitment, common.AddSigners(usdcMintPrivK))
 
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ixAtaReceiverLink}, legacyAdmin, config.DefaultCommitment)
 		})
@@ -604,6 +623,63 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, len(link22Entries), len(lookupTableEntriesLink))
 			require.Equal(t, link22Entries, lookupTableEntriesLink)
+
+			t.Run("CCTP USDC token pool", func(t *testing.T) {
+				// get program data account
+				data, err := solanaGoClient.GetAccountInfoWithOpts(ctx, config.CctpTokenPoolProgram, &rpc.GetAccountInfoOpts{
+					Commitment: config.DefaultCommitment,
+				})
+				require.NoError(t, err)
+				// Decode program data
+				var programData ProgramData
+				require.NoError(t, bin.UnmarshalBorsh(&programData, data.Bytes()))
+
+				ixInit, err := cctp_token_pool.NewInitializeInstruction(
+					config.CcipRouterProgram,
+					config.RMNRemoteProgram,
+					usdcPool.PoolConfig,
+					usdcPool.Mint,
+					legacyAdmin.PublicKey(),
+					solana.SystemProgramID,
+					config.CctpTokenPoolProgram,
+					programData.Address,
+				).ValidateAndBuild()
+				require.NoError(t, err)
+
+				ixTransfer, err := cctp_token_pool.NewTransferOwnershipInstruction(
+					usdcPoolAdmin.PublicKey(),
+					usdcPool.PoolConfig,
+					usdcPool.Mint,
+					legacyAdmin.PublicKey(),
+				).ValidateAndBuild()
+				require.NoError(t, err)
+
+				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ixInit, ixTransfer}, legacyAdmin, config.DefaultCommitment)
+
+				ixAccept, err := cctp_token_pool.NewAcceptOwnershipInstruction(
+					usdcPool.PoolConfig,
+					usdcPool.Mint,
+					usdcPoolAdmin.PublicKey(),
+				).ValidateAndBuild()
+				require.NoError(t, err)
+
+				ixAta, addr, err := tokens.CreateAssociatedTokenAccount(usdcPool.Program, usdcPool.Mint, usdcPool.PoolSigner, usdcPoolAdmin.PublicKey())
+				require.NoError(t, err)
+				usdcPool.PoolTokenAccount = addr
+				usdcPool.User[usdcPool.PoolSigner] = usdcPool.PoolTokenAccount
+
+				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ixAccept, ixAta}, usdcPoolAdmin, config.DefaultCommitment)
+
+				// Lookup Table for Tokens
+				require.NoError(t, usdcPool.SetupLookupTable(ctx, solanaGoClient, usdcPoolAdmin))
+				usdcEntries := usdcPool.ToTokenPoolEntries()
+
+				// Verify Lookup tables where correctly initialized
+				lookupTableEntriesUsdc, err := common.GetAddressLookupTable(ctx, solanaGoClient, usdcPool.PoolLookupTable)
+				require.NoError(t, err)
+				require.Equal(t, len(usdcEntries), len(lookupTableEntriesUsdc))
+				require.Equal(t, usdcEntries, lookupTableEntriesUsdc)
+			})
 		})
 
 		t.Run("Ccip Send address lookup table", func(t *testing.T) {
@@ -3300,6 +3376,26 @@ func TestCCIPRouter(t *testing.T) {
 				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, token1PoolAdmin, config.DefaultCommitment, []string{ccip.Unauthorized_CcipRouterError.String()})
 			})
 		})
+
+		t.Run("CCTP Token Pool", func(t *testing.T) {
+			/*
+				This is only a partial setup of the CCTP Token Pool. The goal here is to be able to test the account
+				derivation, integrating the onramp/offramp derivation with the pool derivation.
+				Full setup of the CCTP Token Pool is done in the tokenpool_test.go, and not here, as CCTP's vendored
+				contracts need to be configured as well and we don't want this suite to keep growing unboundedly.
+			*/
+
+			initIx, err := cctp_token_pool.NewInitChainRemoteConfigInstruction(config.EvmChainSelector, usdcPool.Mint, cctp_token_pool.RemoteConfig{
+				TokenAddress: cctp_token_pool.RemoteAddress{Address: config.EVMUsdcAddressBytes},
+				Decimals:     usdcDecimals,
+			}, usdcPool.PoolConfig, usdcPool.Chain[config.EvmChainSelector], usdcPoolAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+			require.NoError(t, err)
+
+			rlIx, err := cctp_token_pool.NewSetChainRateLimitInstruction(config.EvmChainSelector, usdcPool.Mint, cctp_token_pool.RateLimitConfig{}, cctp_token_pool.RateLimitConfig{}, usdcPool.PoolConfig, usdcPool.Chain[config.EvmChainSelector], usdcPoolAdmin.PublicKey()).ValidateAndBuild()
+			require.NoError(t, err)
+
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{initIx, rlIx}, usdcPoolAdmin, config.DefaultCommitment)
+		})
 	})
 
 	/////////////////////////////
@@ -5346,6 +5442,10 @@ func TestCCIPRouter(t *testing.T) {
 			_, currBal1, err := tokens.TokenBalance(ctx, solanaGoClient, token1.User[user.PublicKey()], config.DefaultCommitment)
 			require.NoError(t, err)
 			require.Equal(t, 2, initBal1-currBal1) // burned amount
+		})
+
+		t.Run("Deriving accounts with a token pool that also requires derivation", func(t *testing.T) {
+			// TODO
 		})
 	})
 
