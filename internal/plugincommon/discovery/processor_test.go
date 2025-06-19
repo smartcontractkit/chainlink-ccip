@@ -1,6 +1,7 @@
 package discovery
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -242,11 +243,12 @@ func TestContractDiscoveryProcessor_Outcome_HappyPath(t *testing.T) {
 		},
 		consts.ContractNameRouter: {},
 	}
+	syncCalled := make(chan struct{})
 	mockReader.
 		EXPECT().
 		Sync(mock.Anything, expectedContracts).
+		Run(func(_ context.Context, _ reader.ContractAddresses) { close(syncCalled) }).
 		Return(nil)
-	defer mockReader.AssertExpectations(t)
 
 	cdp := internalNewContractDiscoveryProcessor(
 		lggr,
@@ -287,6 +289,8 @@ func TestContractDiscoveryProcessor_Outcome_HappyPath(t *testing.T) {
 	outcome, err := cdp.Outcome(ctx, discoverytypes.Outcome{}, discoverytypes.Query{}, aos)
 	assert.NoError(t, err)
 	assert.Empty(t, outcome)
+
+	waitForSync(t, syncCalled)
 }
 
 func TestContractDiscovery_Outcome_HappyPath_FRoleDONAndFDestChainAreDifferent(t *testing.T) {
@@ -325,11 +329,12 @@ func TestContractDiscovery_Outcome_HappyPath_FRoleDONAndFDestChainAreDifferent(t
 		},
 		consts.ContractNameFeeQuoter: {}, // no consensus
 	}
+	syncCalled := make(chan struct{})
 	mockReader.
 		EXPECT().
 		Sync(mock.Anything, expectedContracts).
+		Run(func(_ context.Context, _ reader.ContractAddresses) { close(syncCalled) }).
 		Return(nil)
-	defer mockReader.AssertExpectations(t)
 
 	cdp := internalNewContractDiscoveryProcessor(
 		lggr,
@@ -381,6 +386,7 @@ func TestContractDiscovery_Outcome_HappyPath_FRoleDONAndFDestChainAreDifferent(t
 	outcome, err := cdp.Outcome(ctx, discoverytypes.Outcome{}, discoverytypes.Query{}, aos)
 	assert.NoError(t, err)
 	assert.Empty(t, outcome)
+	waitForSync(t, syncCalled)
 }
 
 func TestContractDiscoveryProcessor_Outcome_NotEnoughObservations(t *testing.T) {
@@ -415,11 +421,12 @@ func TestContractDiscoveryProcessor_Outcome_NotEnoughObservations(t *testing.T) 
 		consts.ContractNameFeeQuoter:    {},
 		consts.ContractNameRouter:       {},
 	}
+	syncCalled := make(chan struct{})
 	mockReader.
 		EXPECT().
 		Sync(mock.Anything, expectedContracts).
+		Run(func(_ context.Context, _ reader.ContractAddresses) { close(syncCalled) }).
 		Return(nil)
-	defer mockReader.AssertExpectations(t)
 
 	cdp := internalNewContractDiscoveryProcessor(
 		lggr,
@@ -464,6 +471,7 @@ func TestContractDiscoveryProcessor_Outcome_NotEnoughObservations(t *testing.T) 
 	outcome, err := cdp.Outcome(ctx, discoverytypes.Outcome{}, discoverytypes.Query{}, aos)
 	assert.NoError(t, err)
 	assert.Empty(t, outcome)
+	waitForSync(t, syncCalled)
 }
 
 func TestContractDiscoveryProcessor_Outcome_ErrorSyncingContracts(t *testing.T) {
@@ -500,12 +508,13 @@ func TestContractDiscoveryProcessor_Outcome_ErrorSyncingContracts(t *testing.T) 
 		consts.ContractNameFeeQuoter: {},
 		consts.ContractNameRouter:    {},
 	}
+	syncCalled := make(chan struct{})
 	syncErr := errors.New("sync error")
 	mockReader.
 		EXPECT().
 		Sync(mock.Anything, expectedContracts).
+		Run(func(_ context.Context, _ reader.ContractAddresses) { close(syncCalled) }).
 		Return(syncErr)
-	defer mockReader.AssertExpectations(t)
 
 	cdp := internalNewContractDiscoveryProcessor(
 		lggr,
@@ -541,6 +550,7 @@ func TestContractDiscoveryProcessor_Outcome_ErrorSyncingContracts(t *testing.T) 
 	outcome, err := cdp.Outcome(ctx, discoverytypes.Outcome{}, discoverytypes.Query{}, aos)
 	require.NoError(t, err)
 	require.Equal(t, outcome, discoverytypes.Outcome{})
+	waitForSync(t, syncCalled)
 }
 
 func TestContractDiscoveryProcessor_ValidateObservation_HappyPath(t *testing.T) {
@@ -896,4 +906,21 @@ func TestReaderSyncer_Sync_ErrorPropagation(t *testing.T) {
 
 	assert.ErrorIs(t, err, expectedErr)
 	assert.False(t, alreadySyncing)
+}
+
+func waitForSync(t *testing.T, syncCalled chan struct{}) {
+	t.Helper()
+	var timer <-chan time.Time
+	if d, ok := t.Deadline(); ok {
+		// Give a small buffer before the deadline expires.
+		timer = time.After(time.Until(d) - 100*time.Millisecond)
+	} else {
+		timer = time.After(2 * time.Second)
+	}
+
+	select {
+	case <-syncCalled:
+	case <-timer:
+		t.Fatal("timed out waiting for syncer.Sync to be called")
+	}
 }
