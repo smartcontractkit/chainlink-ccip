@@ -234,17 +234,16 @@ pub fn derive_execute_accounts_additional_tokens<'info>(
         CcipOfframpError::InvalidAccountListForPdaDerivation
     );
 
-    let tokens_left = (ctx.remaining_accounts.len() - 1) / 2;
+    let max_tokens_left = params
+        .token_transfers
+        .len()
+        .min((ctx.remaining_accounts.len() - 1) / 2);
     let reference_addresses = &ctx.remaining_accounts[0];
 
     // Token admin registries, one per token transferred.
-    let registries = &ctx.remaining_accounts[1..tokens_left + 1];
+    let registries = &ctx.remaining_accounts[1..max_tokens_left + 1];
     // Look up tables, one per token transferred.
-    let luts = &ctx.remaining_accounts[tokens_left + 1..2 * tokens_left + 1];
-    // If we're doing nested derivation (i.e. we are deriving accounts for a
-    // dynamic token pool with multiple derivation stages) these are the accounts
-    // that the token pool required us to send for this stage.
-    let nested_derivation_accounts = &ctx.remaining_accounts[2 * tokens_left + 1..];
+    let luts = &ctx.remaining_accounts[max_tokens_left + 1..2 * max_tokens_left + 1];
     // Registry of the token we're *currently* deriving
     let first_token_registry = &registries[0];
     // LUT of the token we're *currently* deriving
@@ -255,25 +254,32 @@ pub fn derive_execute_accounts_additional_tokens<'info>(
     let first_lut_account: AddressLookupTable = AddressLookupTable::deserialize(first_lut_data)
         .map_err(|_| CommonCcipError::InvalidInputsLookupTableAccounts)?;
     let first_token_mint = first_lut_account.addresses[7];
-    let first_token_program = first_lut_account.addresses[2];
+    let first_pool_program = first_lut_account.addresses[2];
 
     // We find the transfer for this specific token
-    let transfer = params
+    let (this_token_index, this_transfer) = params
         .token_transfers
         .iter()
-        .find(|tt| tt.transfer.dest_token_address == first_token_mint)
+        .enumerate()
+        .find(|(_, tt)| tt.transfer.dest_token_address == first_token_mint)
         .ok_or(CcipOfframpError::InvalidAccountListForPdaDerivation)?;
+    let tokens_left = max_tokens_left - this_token_index;
+
+    // If we're doing nested derivation (i.e. we are deriving accounts for a
+    // dynamic token pool with multiple derivation stages) these are the accounts
+    // that the token pool required us to send for this stage.
+    let nested_derivation_accounts = &ctx.remaining_accounts[2 * tokens_left + 1..];
 
     // Reconstruct the `ReleaseOrMint` the same way the offramp will
     let release_or_mint = ReleaseOrMintInV1 {
         original_sender: params.original_sender.clone(),
         receiver: params.token_receiver,
-        amount: transfer.transfer.amount,
-        local_token: transfer.transfer.dest_token_address,
+        amount: this_transfer.transfer.amount,
+        local_token: this_transfer.transfer.dest_token_address,
         remote_chain_selector: params.source_chain_selector,
-        source_pool_address: transfer.transfer.source_pool_address.clone(),
-        source_pool_data: transfer.transfer.extra_data.clone(),
-        offchain_token_data: transfer.data.clone(),
+        source_pool_address: this_transfer.transfer.source_pool_address.clone(),
+        source_pool_data: this_transfer.transfer.extra_data.clone(),
+        offchain_token_data: this_transfer.data.clone(),
     };
 
     let mut response = DeriveAccountsResponse::default();
@@ -295,7 +301,7 @@ pub fn derive_execute_accounts_additional_tokens<'info>(
             &release_or_mint,
             substage,
             nested_derivation_accounts,
-            first_token_program.key(),
+            first_pool_program.key(),
         )?);
     }
 

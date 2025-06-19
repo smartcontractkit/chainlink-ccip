@@ -1,5 +1,6 @@
 use crate::context::Empty;
 use anchor_lang::prelude::*;
+use base_token_pool::common::POOL_CHAINCONFIG_SEED;
 use base_token_pool::common::{
     CcipAccountMeta, CcipTokenPoolError, DeriveAccountsResponse, ReleaseOrMintInV1, ToMeta,
 };
@@ -9,23 +10,22 @@ use std::{
     str::FromStr,
 };
 
-pub mod release_or_mint {
-    use base_token_pool::common::POOL_CHAINCONFIG_SEED;
+use crate::{
+    context::{TokenOfframpRemainingAccounts, MESSAGE_TRANSMITTER, TOKEN_MESSENGER_MINTER},
+    to_solana_pubkey, ChainConfig,
+};
 
-    use crate::{
-        context::{TokenOfframpRemainingAccounts, MESSAGE_TRANSMITTER, TOKEN_MESSENGER_MINTER},
-        to_solana_pubkey, ChainConfig,
-    };
+// Local helper to find a readonly CCIP meta for a given seed + program_id combo.
+// Short name for compactness.
+fn find(seeds: &[&[u8]], program_id: Pubkey) -> CcipAccountMeta {
+    Pubkey::find_program_address(seeds, &program_id)
+        .0
+        .readonly()
+}
+
+pub mod release_or_mint {
 
     use super::*;
-
-    // Local helper to find a readonly CCIP meta for a given seed + program_id combo.
-    // Short name for compactness.
-    fn find(seeds: &[&[u8]], program_id: Pubkey) -> CcipAccountMeta {
-        Pubkey::find_program_address(seeds, &program_id)
-            .0
-            .readonly()
-    }
 
     #[derive(Clone, Debug)]
     pub enum DeriveStage {
@@ -161,5 +161,36 @@ pub mod release_or_mint {
             current_stage: DeriveStage::BuildDynamicAccounts.to_string(),
             ..Default::default()
         })
+    }
+}
+
+pub mod lock_or_burn {
+    use super::*;
+
+    #[derive(Clone, Debug)]
+    pub enum DeriveStage {
+        RetrieveChainConfig,
+        BuildDynamicAccounts,
+    }
+
+    impl Display for DeriveStage {
+        fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+            match self {
+                DeriveStage::RetrieveChainConfig => f.write_str("RetrieveChainConfig"),
+                DeriveStage::BuildDynamicAccounts => f.write_str("BuildDynamicAccounts"),
+            }
+        }
+    }
+
+    impl FromStr for DeriveStage {
+        type Err = CcipTokenPoolError;
+
+        fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+            match s {
+                "Start" | "RetrieveChainConfig" => Ok(Self::RetrieveChainConfig),
+                "BuildDynamicAccounts" => Ok(Self::BuildDynamicAccounts),
+                _ => Err(CcipTokenPoolError::InvalidDerivationStage),
+            }
+        }
     }
 }

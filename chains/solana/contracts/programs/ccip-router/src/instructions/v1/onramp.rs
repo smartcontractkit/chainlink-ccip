@@ -346,8 +346,8 @@ impl OnRamp for Impl {
             DeriveAccountsCcipSendStage::RetrieveTokenLUTs => {
                 derive::derive_ccip_send_accounts_retrieve_luts(ctx)
             }
-            DeriveAccountsCcipSendStage::TokenTransferAccounts => {
-                derive::derive_execute_accounts_additional_tokens(ctx, params)
+            DeriveAccountsCcipSendStage::TokenTransferAccounts { token_substage } => {
+                derive::derive_execute_accounts_additional_tokens(ctx, params, &token_substage)
             }
         }
     }

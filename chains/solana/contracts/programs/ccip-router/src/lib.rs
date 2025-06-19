@@ -618,4 +618,6 @@ pub enum CcipRouterError {
     InvalidDerivationStage,
     #[msg("Invalid version of the Nonce account")]
     InvalidNonceVersion,
+    #[msg("Token pool returned an unexpected derivation response")]
+    InvalidTokenPoolAccountDerivationResponse,
 }

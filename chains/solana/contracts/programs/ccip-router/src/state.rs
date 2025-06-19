@@ -3,6 +3,8 @@ use std::fmt::Display;
 use anchor_lang::prelude::borsh::{BorshDeserialize, BorshSerialize};
 use anchor_lang::prelude::*;
 
+use crate::messages::SVM2AnyMessage;
+
 #[derive(Debug, PartialEq, Eq, Clone, Copy, InitSpace, BorshSerialize, BorshDeserialize)]
 #[repr(u8)]
 pub enum CodeVersion {
@@ -125,6 +127,20 @@ pub struct DeriveAccountsResponse {
     pub next_stage: String,
 }
 
+impl DeriveAccountsResponse {
+    // Join two responses (when two stages can be done back to back)
+    pub fn and(mut self, next: DeriveAccountsResponse) -> Self {
+        self.ask_again_with.extend_from_slice(&next.ask_again_with);
+        self.accounts_to_save
+            .extend_from_slice(&next.accounts_to_save);
+        self.look_up_tables_to_save
+            .extend_from_slice(&next.look_up_tables_to_save);
+        self.current_stage = next.current_stage;
+        self.next_stage = next.next_stage;
+        self
+    }
+}
+
 // We can't use anchor's `AccountMeta` since it doesn't implement
 // AnchorSerialize/AnchorDeserialize, and it's too small to warrant wrapping.
 #[derive(Debug, Default, PartialEq, Eq, Clone, AnchorDeserialize, AnchorSerialize)]
@@ -206,6 +222,5 @@ impl ToMeta for CcipAccountMeta {
 pub struct DeriveAccountsCcipSendParams {
     pub dest_chain_selector: u64,
     pub ccip_send_caller: Pubkey,
-    pub fee_token_mint: Pubkey,
-    pub mints_of_transferred_tokens: Vec<Pubkey>,
+    pub message: SVM2AnyMessage,
 }

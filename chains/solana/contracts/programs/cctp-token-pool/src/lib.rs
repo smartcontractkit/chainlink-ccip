@@ -383,6 +383,25 @@ pub mod cctp_token_pool {
             }
         }
     }
+
+    pub fn derive_accounts_lock_or_burn_tokens<'info>(
+        ctx: Context<'_, '_, 'info, 'info, Empty<'info>>,
+        stage: String,
+        lock_or_burn: LockOrBurnInV1,
+    ) -> Result<DeriveAccountsResponse> {
+        let stage = derive::lock_or_burn::DeriveStage::from_str(&stage)?;
+
+        match stage {
+            derive::lock_or_burn::DeriveStage::RetrieveChainConfig => {
+                // derive::lock_or_burn::retrieve_chain_config(&lock_or_burn)
+                todo!();
+            }
+            derive::lock_or_burn::DeriveStage::BuildDynamicAccounts => {
+                // derive::lock_or_burn::build_dynamic_accounts(ctx, &lock_or_burn)
+                todo!();
+            }
+        }
+    }
 }
 
 fn parse_remaining_release_accounts<'info>(
