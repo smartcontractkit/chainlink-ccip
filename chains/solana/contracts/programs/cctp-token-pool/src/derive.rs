@@ -28,21 +28,21 @@ pub mod release_or_mint {
     use super::*;
 
     #[derive(Clone, Debug)]
-    pub enum DeriveStage {
+    pub enum OfframpDeriveStage {
         RetrieveChainConfig,
         BuildDynamicAccounts,
     }
 
-    impl Display for DeriveStage {
+    impl Display for OfframpDeriveStage {
         fn fmt(&self, f: &mut Formatter) -> fmt::Result {
             match self {
-                DeriveStage::RetrieveChainConfig => f.write_str("RetrieveChainConfig"),
-                DeriveStage::BuildDynamicAccounts => f.write_str("BuildDynamicAccounts"),
+                OfframpDeriveStage::RetrieveChainConfig => f.write_str("RetrieveChainConfig"),
+                OfframpDeriveStage::BuildDynamicAccounts => f.write_str("BuildDynamicAccounts"),
             }
         }
     }
 
-    impl FromStr for DeriveStage {
+    impl FromStr for OfframpDeriveStage {
         type Err = CcipTokenPoolError;
 
         fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
@@ -98,8 +98,8 @@ pub mod release_or_mint {
                 TokenOfframpRemainingAccounts::get_token_messenger_minter_pda(&[b"token_minter"])
                     .writable(),
             ],
-            current_stage: DeriveStage::RetrieveChainConfig.to_string(),
-            next_stage: DeriveStage::BuildDynamicAccounts.to_string(),
+            current_stage: OfframpDeriveStage::RetrieveChainConfig.to_string(),
+            next_stage: OfframpDeriveStage::BuildDynamicAccounts.to_string(),
             ..Default::default()
         })
     }
@@ -158,7 +158,7 @@ pub mod release_or_mint {
                 ])
                 .writable(),
             ],
-            current_stage: DeriveStage::BuildDynamicAccounts.to_string(),
+            current_stage: OfframpDeriveStage::BuildDynamicAccounts.to_string(),
             ..Default::default()
         })
     }
@@ -168,21 +168,21 @@ pub mod lock_or_burn {
     use super::*;
 
     #[derive(Clone, Debug)]
-    pub enum DeriveStage {
+    pub enum OnrampDeriveStage {
         RetrieveChainConfig,
         BuildDynamicAccounts,
     }
 
-    impl Display for DeriveStage {
+    impl Display for OnrampDeriveStage {
         fn fmt(&self, f: &mut Formatter) -> fmt::Result {
             match self {
-                DeriveStage::RetrieveChainConfig => f.write_str("RetrieveChainConfig"),
-                DeriveStage::BuildDynamicAccounts => f.write_str("BuildDynamicAccounts"),
+                OnrampDeriveStage::RetrieveChainConfig => f.write_str("RetrieveChainConfig"),
+                OnrampDeriveStage::BuildDynamicAccounts => f.write_str("BuildDynamicAccounts"),
             }
         }
     }
 
-    impl FromStr for DeriveStage {
+    impl FromStr for OnrampDeriveStage {
         type Err = CcipTokenPoolError;
 
         fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {

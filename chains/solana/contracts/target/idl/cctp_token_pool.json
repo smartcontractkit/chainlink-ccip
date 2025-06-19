@@ -800,6 +800,31 @@
       "returns": {
         "defined": "DeriveAccountsResponse"
       }
+    },
+    {
+      "name": "deriveAccountsLockOrBurnTokens",
+      "accounts": [
+        {
+          "name": "clock",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "stage",
+          "type": "string"
+        },
+        {
+          "name": "lockOrBurn",
+          "type": {
+            "defined": "LockOrBurnInV1"
+          }
+        }
+      ],
+      "returns": {
+        "defined": "DeriveAccountsResponse"
+      }
     }
   ],
   "accounts": [
@@ -914,7 +939,21 @@
       }
     },
     {
-      "name": "DeriveStage",
+      "name": "OnrampDeriveStage",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "RetrieveChainConfig"
+          },
+          {
+            "name": "BuildDynamicAccounts"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OfframpDeriveStage",
       "type": {
         "kind": "enum",
         "variants": [

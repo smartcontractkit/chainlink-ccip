@@ -372,13 +372,13 @@ pub mod cctp_token_pool {
         stage: String,
         release_or_mint: ReleaseOrMintInV1,
     ) -> Result<DeriveAccountsResponse> {
-        let stage = derive::release_or_mint::DeriveStage::from_str(&stage)?;
+        let stage = derive::release_or_mint::OfframpDeriveStage::from_str(&stage)?;
 
         match stage {
-            derive::release_or_mint::DeriveStage::RetrieveChainConfig => {
+            derive::release_or_mint::OfframpDeriveStage::RetrieveChainConfig => {
                 derive::release_or_mint::retrieve_chain_config(&release_or_mint)
             }
-            derive::release_or_mint::DeriveStage::BuildDynamicAccounts => {
+            derive::release_or_mint::OfframpDeriveStage::BuildDynamicAccounts => {
                 derive::release_or_mint::build_dynamic_accounts(ctx, &release_or_mint)
             }
         }
@@ -389,14 +389,14 @@ pub mod cctp_token_pool {
         stage: String,
         lock_or_burn: LockOrBurnInV1,
     ) -> Result<DeriveAccountsResponse> {
-        let stage = derive::lock_or_burn::DeriveStage::from_str(&stage)?;
+        let stage = derive::lock_or_burn::OnrampDeriveStage::from_str(&stage)?;
 
         match stage {
-            derive::lock_or_burn::DeriveStage::RetrieveChainConfig => {
+            derive::lock_or_burn::OnrampDeriveStage::RetrieveChainConfig => {
                 // derive::lock_or_burn::retrieve_chain_config(&lock_or_burn)
                 todo!();
             }
-            derive::lock_or_burn::DeriveStage::BuildDynamicAccounts => {
+            derive::lock_or_burn::OnrampDeriveStage::BuildDynamicAccounts => {
                 // derive::lock_or_burn::build_dynamic_accounts(ctx, &lock_or_burn)
                 todo!();
             }

@@ -312,16 +312,17 @@ pub fn derive_execute_accounts_additional_tokens<'info>(
 
     let token_registry_account: Account<TokenAdminRegistry> =
         Account::try_from(token_registry).expect("parsing token admin registry account");
-    if token_registry_account.supports_auto_derivation {
-        let (this_token_index, this_transfer) = params
-            .message
-            .token_amounts
-            .iter()
-            .enumerate()
-            .find(|(_, ta)| ta.token == token_mint)
-            .ok_or(CcipRouterError::InvalidAccountListForPdaDerivation)?;
+    let (this_token_index, this_transfer) = params
+        .message
+        .token_amounts
+        .iter()
+        .enumerate()
+        .find(|(_, ta)| ta.token == token_mint)
+        .ok_or(CcipRouterError::InvalidAccountListForPdaDerivation)?;
 
-        let number_of_tokens_left = params.message.token_amounts.len() - this_token_index;
+    let number_of_tokens_left = params.message.token_amounts.len() - this_token_index;
+
+    if token_registry_account.supports_auto_derivation {
         let nested_derivation_accounts = &ctx.remaining_accounts
             [fee_quoter_fixed_accounts_len + accounts_per_token_len * number_of_tokens_left..];
 
@@ -336,6 +337,33 @@ pub fn derive_execute_accounts_additional_tokens<'info>(
             pool_program.key(),
             this_transfer,
         )?);
+    }
+
+    if response.next_stage != String::default() {
+        // We aren't done yet with this token, so we return as-is. The nested `derive`
+        // call has already populated the `ask_again_with` list.
+        return Ok(response);
+    }
+
+    if number_of_tokens_left > 1 {
+        // We aren't done yet with all tokens; as need to derive more tokens we tell the user
+        // to ask again with one fewer.
+        response.ask_again_with.clear();
+        response.ask_again_with.extend(
+            fee_quoter_fixed_accounts
+                .iter()
+                .chain(
+                    ctx.remaining_accounts
+                        .iter()
+                        .skip(fee_quoter_fixed_accounts_len + accounts_per_token_len),
+                )
+                .map(|a| a.key.readonly()),
+        );
+
+        response.next_stage = DeriveAccountsCcipSendStage::TokenTransferAccounts {
+            token_substage: "Start".to_string(),
+        }
+        .to_string();
     }
 
     Ok(response)
@@ -395,28 +423,14 @@ fn derive_ccip_send_additional_token_static<'info>(
             }),
     );
 
-    let mut ask_again_with = vec![];
-    let next_stage = if ctx.remaining_accounts.len() > 1 {
-        // We aren't done yet, we need to derive more tokens, so we tell the user
-        // to ask again with one fewer token.
-        ask_again_with.extend(ctx.remaining_accounts[1..].iter().map(|a| a.key.readonly()));
-        DeriveAccountsCcipSendStage::TokenTransferAccounts {
-            token_substage: "Start".to_string(),
-        }
-        .to_string()
-    } else {
-        "".to_string()
-    };
-
     Ok(DeriveAccountsResponse {
-        ask_again_with,
         accounts_to_save,
         look_up_tables_to_save: vec![*token_lut.key],
         current_stage: DeriveAccountsCcipSendStage::TokenTransferAccounts {
             token_substage: "Start".to_string(),
         }
         .to_string(),
-        next_stage,
+        ..Default::default()
     })
 }
 

@@ -1675,13 +1675,9 @@
             "type": "publicKey"
           },
           {
-            "name": "feeTokenMint",
-            "type": "publicKey"
-          },
-          {
-            "name": "mintsOfTransferredTokens",
+            "name": "message",
             "type": {
-              "vec": "publicKey"
+              "defined": "SVM2AnyMessage"
             }
           }
         ]
@@ -1702,7 +1698,13 @@
             "name": "RetrieveTokenLUTs"
           },
           {
-            "name": "TokenTransferAccounts"
+            "name": "TokenTransferAccounts",
+            "fields": [
+              {
+                "name": "tokenSubstage",
+                "type": "string"
+              }
+            ]
           }
         ]
       }
@@ -2172,6 +2174,11 @@
       "code": 7028,
       "name": "InvalidNonceVersion",
       "msg": "Invalid version of the Nonce account"
+    },
+    {
+      "code": 7029,
+      "name": "InvalidTokenPoolAccountDerivationResponse",
+      "msg": "Token pool returned an unexpected derivation response"
     }
   ]
 }

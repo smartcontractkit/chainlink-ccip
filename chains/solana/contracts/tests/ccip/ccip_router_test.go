@@ -5240,6 +5240,7 @@ func TestCCIPRouter(t *testing.T) {
 			derivedAccounts, derivedLookUpTables, tokenIndices := deriveSendAccounts(ctx,
 				t,
 				user,
+				message,
 				destinationChainSelector,
 				message.FeeToken,
 				[]solana.PublicKey{},
@@ -5315,6 +5316,7 @@ func TestCCIPRouter(t *testing.T) {
 			derivedAccounts, derivedLookUpTables, tokenIndices := deriveSendAccounts(ctx,
 				t,
 				user,
+				message,
 				destinationChainSelector,
 				message.FeeToken,
 				[]solana.PublicKey{token0.Mint, token1.Mint},
@@ -10718,6 +10720,7 @@ func deriveExecutionAccounts(ctx context.Context,
 func deriveSendAccounts(ctx context.Context,
 	t *testing.T,
 	transmitter solana.PrivateKey,
+	message ccip_router.SVM2AnyMessage,
 	destChainSelector uint64,
 	feeTokenMint solana.PublicKey,
 	mintsOfTransferredTokens []solana.PublicKey,
@@ -10728,10 +10731,9 @@ func deriveSendAccounts(ctx context.Context,
 	tokenIndex := byte(0)
 	for {
 		params := ccip_router.DeriveAccountsCcipSendParams{
-			DestChainSelector:        destChainSelector,
-			CcipSendCaller:           transmitter.PublicKey(),
-			FeeTokenMint:             feeTokenMint,
-			MintsOfTransferredTokens: mintsOfTransferredTokens,
+			DestChainSelector: destChainSelector,
+			CcipSendCaller:    transmitter.PublicKey(),
+			Message:           message,
 		}
 
 		fmt.Printf("Stage: %s\n", stage)
@@ -10747,7 +10749,7 @@ func deriveSendAccounts(ctx context.Context,
 		derivation, err := common.ExtractAnchorTypedReturnValue[ccip_router.DeriveAccountsResponse](ctx, tx.Meta.LogMessages, config.CcipRouterProgram.String())
 		require.NoError(t, err)
 
-		if derivation.CurrentStage == "TokenTransferAccounts" {
+		if derivation.CurrentStage == "TokenTransferAccounts/Start" {
 			tokenIndices = append(tokenIndices, tokenIndex)
 			tokenIndex += byte(len(derivation.AccountsToSave))
 		}

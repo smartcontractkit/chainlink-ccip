@@ -311,7 +311,7 @@ pub fn derive_execute_accounts_additional_tokens<'info>(
         return Ok(response);
     }
 
-    if registries.len() > 1 {
+    if tokens_left > 1 {
         // We aren't done yet with all tokens; as need to derive more tokens we tell the user
         // to ask again with one fewer.
         response

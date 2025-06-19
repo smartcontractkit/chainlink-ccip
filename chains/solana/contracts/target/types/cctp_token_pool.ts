@@ -800,6 +800,31 @@ export type CctpTokenPool = {
       "returns": {
         "defined": "DeriveAccountsResponse"
       }
+    },
+    {
+      "name": "deriveAccountsLockOrBurnTokens",
+      "accounts": [
+        {
+          "name": "clock",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "stage",
+          "type": "string"
+        },
+        {
+          "name": "lockOrBurn",
+          "type": {
+            "defined": "LockOrBurnInV1"
+          }
+        }
+      ],
+      "returns": {
+        "defined": "DeriveAccountsResponse"
+      }
     }
   ],
   "accounts": [
@@ -914,7 +939,21 @@ export type CctpTokenPool = {
       }
     },
     {
-      "name": "DeriveStage",
+      "name": "OnrampDeriveStage",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "RetrieveChainConfig"
+          },
+          {
+            "name": "BuildDynamicAccounts"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OfframpDeriveStage",
       "type": {
         "kind": "enum",
         "variants": [
@@ -1823,6 +1862,31 @@ export const IDL: CctpTokenPool = {
       "returns": {
         "defined": "DeriveAccountsResponse"
       }
+    },
+    {
+      "name": "deriveAccountsLockOrBurnTokens",
+      "accounts": [
+        {
+          "name": "clock",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "stage",
+          "type": "string"
+        },
+        {
+          "name": "lockOrBurn",
+          "type": {
+            "defined": "LockOrBurnInV1"
+          }
+        }
+      ],
+      "returns": {
+        "defined": "DeriveAccountsResponse"
+      }
     }
   ],
   "accounts": [
@@ -1937,7 +2001,21 @@ export const IDL: CctpTokenPool = {
       }
     },
     {
-      "name": "DeriveStage",
+      "name": "OnrampDeriveStage",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "RetrieveChainConfig"
+          },
+          {
+            "name": "BuildDynamicAccounts"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OfframpDeriveStage",
       "type": {
         "kind": "enum",
         "variants": [
