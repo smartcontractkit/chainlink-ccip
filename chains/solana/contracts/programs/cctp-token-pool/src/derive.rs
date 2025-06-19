@@ -93,7 +93,7 @@ pub mod release_or_mint {
             ],
             current_stage: OfframpDeriveStage::RetrieveChainConfig.to_string(),
             next_stage: OfframpDeriveStage::BuildDynamicAccounts.to_string(),
-            look_up_tables_to_save: vec![],
+            ..Default::default()
         })
     }
 
@@ -134,7 +134,6 @@ pub mod release_or_mint {
                     .writable(),
             ],
             current_stage: OfframpDeriveStage::BuildDynamicAccounts.to_string(),
-            look_up_tables_to_save: vec![],
             ..Default::default()
         })
     }
@@ -222,7 +221,7 @@ pub mod lock_or_burn {
                 // system_program
                 System::id().readonly(),
                 // cctp_event_authority
-                get_message_transmitter_pda(&[b"__event_authority"]).readonly(),
+                get_token_messenger_minter_pda(&[b"__event_authority"]).readonly(),
                 // cctp_remote_token_messenger_key
                 get_token_messenger_minter_pda(&[b"remote_token_messenger", domain_seed])
                     .readonly(),
@@ -234,7 +233,7 @@ pub mod lock_or_burn {
                         &lock_or_burn.remote_chain_selector.to_le_bytes(),
                         &lock_or_burn.msg_total_nonce.to_le_bytes(),
                     ],
-                    System::id(),
+                    crate::ID,
                 )
                 .writable(),
             ],

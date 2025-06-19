@@ -1491,13 +1491,13 @@ func TestTokenPool(t *testing.T) {
 			require.NoError(t, err)
 
 			remoteChainSelector := config.SvmChainSelector
-			fakeCcipFullNonce := uint64(1234567890)
+			fakeCcipTotalNonce := uint64(1234567890)
 
 			messageSentEventAddress, _, err := solana.FindProgramAddress([][]byte{
 				[]byte("ccip_cctp_message_sent_event"),
 				user.PublicKey().Bytes(),
 				common.Uint64ToLE(remoteChainSelector),
-				common.Uint64ToLE(fakeCcipFullNonce),
+				common.Uint64ToLE(fakeCcipTotalNonce),
 			}, cctpPool.program)
 			require.NoError(t, err)
 
@@ -1514,15 +1514,44 @@ func TestTokenPool(t *testing.T) {
 				transferI, err := tokens.TokenTransferChecked(messageAmount, usdcDecimals, solana.TokenProgramID, adminATA, usdcMint, cctpPool.tokenAccount, admin.PublicKey(), solana.PublicKeySlice{})
 				require.NoError(t, err)
 
+				lockOrBurnIn := cctp_token_pool.LockOrBurnInV1{
+					LocalToken:          usdcMint,
+					Amount:              messageAmount,
+					RemoteChainSelector: config.SvmChainSelector,
+					Receiver:            cctpPool.tokenAccount.Bytes(),
+					OriginalSender:      user.PublicKey(),
+					MsgTotalNonce:       fakeCcipTotalNonce,
+				}
+
+				additionalAccountMetas := []*solana.AccountMeta{
+					solana.Meta(tokenMessengerMinter.authorityPda),
+					solana.Meta(messageTransmitter.messageTransmitter).WRITE(),
+					solana.Meta(tokenMessengerMinter.tokenMessenger),
+					solana.Meta(tokenMessengerMinter.tokenMinter),
+					solana.Meta(tokenMessengerMinter.localToken).WRITE(),
+					solana.Meta(messageTransmitter.program),
+					solana.Meta(tokenMessengerMinter.program),
+					solana.Meta(solana.SystemProgramID),
+					solana.Meta(tokenMessengerMinter.eventAuthority),
+					solana.Meta(tokenMessengerMinter.remoteTokenMessenger),
+					solana.Meta(messageSentEventAddress).WRITE(),
+				}
+
+				t.Run("Accounts derivation", func(t *testing.T) {
+					accounts, tables := deriveCctpIxAccounts(ctx, t, solanaGoClient, admin, func(stage string, askWith []*solana.AccountMeta) RawIx {
+						raw := cctp_token_pool.NewDeriveAccountsLockOrBurnTokensInstruction(
+							stage,
+							lockOrBurnIn,
+						)
+						raw.AccountMetaSlice = append(raw.AccountMetaSlice, askWith...)
+						return raw
+					})
+					require.Equal(t, []solana.PublicKey{}, tables)
+					require.Equal(t, additionalAccountMetas, accounts)
+				})
+
 				raw := test_ccip_invalid_receiver.NewPoolProxyLockOrBurnInstruction(
-					test_ccip_invalid_receiver.LockOrBurnInV1{
-						LocalToken:          usdcMint,
-						Amount:              messageAmount,
-						RemoteChainSelector: config.SvmChainSelector,
-						Receiver:            cctpPool.tokenAccount.Bytes(),
-						OriginalSender:      user.PublicKey(),
-						MsgFullNonce:        fakeCcipFullNonce,
-					},
+					test_ccip_invalid_receiver.LockOrBurnInV1(lockOrBurnIn),
 					cctpPool.program,
 					dumbRampCctpSigner,
 					cctpPool.state,
@@ -1536,19 +1565,7 @@ func TestTokenPool(t *testing.T) {
 					cctpPool.svmChainConfig,
 				)
 
-				raw.AccountMetaSlice = append(raw.AccountMetaSlice,
-					solana.Meta(tokenMessengerMinter.authorityPda),
-					solana.Meta(messageTransmitter.messageTransmitter).WRITE(),
-					solana.Meta(tokenMessengerMinter.tokenMessenger),
-					solana.Meta(tokenMessengerMinter.tokenMinter),
-					solana.Meta(tokenMessengerMinter.localToken).WRITE(),
-					solana.Meta(messageTransmitter.program),
-					solana.Meta(tokenMessengerMinter.program),
-					solana.Meta(solana.SystemProgramID),
-					solana.Meta(tokenMessengerMinter.eventAuthority),
-					solana.Meta(tokenMessengerMinter.remoteTokenMessenger),
-					solana.Meta(messageSentEventAddress).WRITE(),
-				)
+				raw.AccountMetaSlice = append(raw.AccountMetaSlice, additionalAccountMetas...)
 
 				ix, err := raw.ValidateAndBuild()
 				require.NoError(t, err)
@@ -1607,7 +1624,7 @@ func TestTokenPool(t *testing.T) {
 					require.NoError(t, common.ParseEvent(res.Meta.LogMessages, "CcipCctpMessageSentEvent", &ccipCctpMessageSentEvent, config.PrintEvents))
 					require.Equal(t, user.PublicKey(), ccipCctpMessageSentEvent.OriginalSender)
 					require.Equal(t, config.SvmChainSelector, ccipCctpMessageSentEvent.RemoteChainSelector)
-					require.Equal(t, fakeCcipFullNonce, ccipCctpMessageSentEvent.MsgTotalNonce)
+					require.Equal(t, fakeCcipTotalNonce, ccipCctpMessageSentEvent.MsgTotalNonce)
 					require.Equal(t, messageSentEventAddress, ccipCctpMessageSentEvent.EventAddress)
 					require.Equal(t, messageSentEventData.Message, ccipCctpMessageSentEvent.MessageSentBytes)
 					require.Equal(t, domain, ccipCctpMessageSentEvent.SourceDomain)
@@ -1670,7 +1687,7 @@ func TestTokenPool(t *testing.T) {
 					solana.Meta(getUsedNoncesPDA(t, messageSentEventData)).WRITE(),
 				}
 
-				t.Run("Account derivation", func(t *testing.T) {
+				t.Run("Accounts derivation", func(t *testing.T) {
 					accounts, tables := deriveCctpIxAccounts(ctx, t, solanaGoClient, admin, func(stage string, askWith []*solana.AccountMeta) RawIx {
 						raw := cctp_token_pool.NewDeriveAccountsReleaseOrMintTokensInstruction(
 							stage,
@@ -1779,7 +1796,7 @@ func TestTokenPool(t *testing.T) {
 					usdcMint,
 					user.PublicKey(),
 					remoteChainSelector,
-					fakeCcipFullNonce,
+					fakeCcipTotalNonce,
 					attestation,
 					cctpPool.state,
 					cctpPool.signer,
