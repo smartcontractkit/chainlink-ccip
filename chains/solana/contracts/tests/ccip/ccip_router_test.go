@@ -2880,6 +2880,75 @@ func TestCCIPRouter(t *testing.T) {
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, token1PoolAdmin, config.DefaultCommitment)
 				})
 			})
+
+			t.Run("setup: CCTP USDC pool", func(t *testing.T) {
+				t.Run("propose pool as CCIP Admin", func(t *testing.T) {
+					instruction, err := ccip_router.NewCcipAdminProposeAdministratorInstruction(
+						usdcPoolAdmin.PublicKey(),
+						config.RouterConfigPDA,
+						usdcPool.AdminRegistryPDA,
+						usdcPool.Mint,
+						ccipAdmin.PublicKey(),
+						solana.SystemProgramID,
+					).ValidateAndBuild()
+					require.NoError(t, err)
+
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment)
+
+					// Validate Token Pool Registry PDA
+					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
+					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, usdcPool.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+					require.NoError(t, err)
+					require.Equal(t, uint8(1), tokenAdminRegistry.Version)
+					require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.Administrator)
+					require.Equal(t, usdcPoolAdmin.PublicKey(), tokenAdminRegistry.PendingAdministrator)
+					require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.LookupTable)
+				})
+
+				t.Run("accept token admin registry as token admin", func(t *testing.T) {
+					instruction, err := ccip_router.NewAcceptAdminRoleTokenAdminRegistryInstruction(
+						config.RouterConfigPDA,
+						usdcPool.AdminRegistryPDA,
+						usdcPool.Mint,
+						usdcPoolAdmin.PublicKey(),
+					).ValidateAndBuild()
+					require.NoError(t, err)
+
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, usdcPoolAdmin, config.DefaultCommitment)
+
+					// Validate Token Pool Registry PDA
+					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
+					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, usdcPool.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+					require.NoError(t, err)
+					require.Equal(t, uint8(1), tokenAdminRegistry.Version)
+					require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.PendingAdministrator)
+					require.Equal(t, usdcPoolAdmin.PublicKey(), tokenAdminRegistry.Administrator)
+					require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.LookupTable)
+				})
+
+				t.Run("set pool", func(t *testing.T) {
+					ix, err := ccip_router.NewSetPoolInstruction(
+						usdcPool.WritableIndexes,
+						config.RouterConfigPDA,
+						usdcPool.AdminRegistryPDA,
+						usdcPool.Mint,
+						usdcPool.PoolLookupTable,
+						usdcPoolAdmin.PublicKey(),
+					).ValidateAndBuild()
+					require.NoError(t, err)
+
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, usdcPoolAdmin, config.DefaultCommitment)
+
+					// Validate Token Pool Registry PDA
+					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
+					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, usdcPool.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+					require.NoError(t, err)
+					require.Equal(t, usdcPoolAdmin.PublicKey(), tokenAdminRegistry.Administrator)
+					require.Equal(t, uint8(1), tokenAdminRegistry.Version)
+					require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.PendingAdministrator)
+					require.Equal(t, usdcPool.PoolLookupTable, tokenAdminRegistry.LookupTable)
+				})
+			})
 		})
 
 		t.Run("Token Admin Registry by Mint Authority", func(t *testing.T) {
