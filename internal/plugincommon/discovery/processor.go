@@ -3,6 +3,7 @@ package discovery
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
@@ -342,7 +343,9 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 	// fail the entire outcome because of that. The reason being is that if this node is a leader
 	// of an OCR round, it will NOT be able to complete the round due to failing to compute the Outcome.
 	// TODO: we should move Sync calls to observation but that requires updates to the Outcome struct for discovery.
-	if err := (*cdp.reader).Sync(ctx, contracts); err != nil {
+	timeoutCtx, cancel := context.WithTimeout(ctx, 1*time.Second)
+	defer cancel()
+	if err := (*cdp.reader).Sync(timeoutCtx, contracts); err != nil {
 		lggr.Errorw(
 			"unable to sync contracts - this is usually due to RPC issues,"+
 				" please check your RPC endpoints and their health!",
