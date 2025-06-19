@@ -5,6 +5,9 @@ import {Identifier} from "./IIdentifier.sol";
 
 /// @title ICrossL2Inbox
 /// @notice Interface for the CrossL2Inbox contract.
+/// @dev This is a copy of the ICrossL2Inbox interface from the ethereum-optimism/interop-lib repo.
+/// This interface is post-audit and has been stable for many months, but has not been officially
+/// included in a versioned release.
 interface ICrossL2Inbox {
   error ReentrantCall();
 
