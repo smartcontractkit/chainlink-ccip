@@ -22,6 +22,8 @@ use crate::{
     CcipRouterError,
 };
 
+use super::helpers::load_nonce;
+
 // Local helper to find a readonly CCIP meta for a given seed + program_id combo.
 // Short name for compactness.
 fn find(seeds: &[&[u8]], program_id: Pubkey) -> CcipAccountMeta {
@@ -233,6 +235,7 @@ pub fn derive_ccip_send_accounts_finish_main_account_list<'info>(
 
 pub fn derive_ccip_send_accounts_retrieve_luts<'info>(
     ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
+    params: &DeriveAccountsCcipSendParams,
 ) -> Result<DeriveAccountsResponse> {
     let fee_quoter_fixed_accounts_len = 5usize;
     let accounts_per_token_len = 3usize;
@@ -245,6 +248,15 @@ pub fn derive_ccip_send_accounts_retrieve_luts<'info>(
             .iter()
             .map(|a| a.key.readonly()),
     );
+    ask_again_with.push(find(
+        &[
+            seed::NONCE,
+            params.dest_chain_selector.to_le_bytes().as_ref(),
+            params.ccip_send_caller.key().as_ref(),
+        ],
+        crate::ID,
+    ));
+
     ask_again_with.extend(
         ctx.remaining_accounts[fee_quoter_fixed_accounts_len..]
             .chunks(accounts_per_token_len)
@@ -276,14 +288,15 @@ pub fn derive_execute_accounts_additional_tokens<'info>(
     params: DeriveAccountsCcipSendParams,
     substage: &str,
 ) -> Result<DeriveAccountsResponse> {
-    let fee_quoter_fixed_accounts_len = 5usize;
+    let token_derivation_fixed_accounts_len = 6usize;
     let accounts_per_token_len = 4usize;
 
-    let fee_quoter_fixed_accounts = &ctx.remaining_accounts[..fee_quoter_fixed_accounts_len];
+    let token_derivation_fixed_accounts =
+        &ctx.remaining_accounts[..token_derivation_fixed_accounts_len];
     // We extract the accounts for the first token
     let [token_registry, billing_config, per_chain_per_token_config, token_lut] = &ctx
-        .remaining_accounts
-        [fee_quoter_fixed_accounts_len..fee_quoter_fixed_accounts_len + accounts_per_token_len]
+        .remaining_accounts[token_derivation_fixed_accounts_len
+        ..token_derivation_fixed_accounts_len + accounts_per_token_len]
     else {
         return Err(CcipRouterError::InvalidAccountListForPdaDerivation.into());
     };
@@ -323,14 +336,14 @@ pub fn derive_execute_accounts_additional_tokens<'info>(
     let number_of_tokens_left = params.message.token_amounts.len() - this_token_index;
 
     if token_registry_account.supports_auto_derivation {
-        let nested_derivation_accounts = &ctx.remaining_accounts
-            [fee_quoter_fixed_accounts_len + accounts_per_token_len * number_of_tokens_left..];
+        let nested_derivation_accounts = &ctx.remaining_accounts[token_derivation_fixed_accounts_len
+            + accounts_per_token_len * number_of_tokens_left..];
 
         // Nested derivation is supported, so we go one level deeper.
         response = response.and(derive_ccip_send_accounts_additional_token_nested(
             &params,
             substage,
-            fee_quoter_fixed_accounts,
+            token_derivation_fixed_accounts,
             nested_derivation_accounts,
             billing_config,
             per_chain_per_token_config,
@@ -350,12 +363,12 @@ pub fn derive_execute_accounts_additional_tokens<'info>(
         // to ask again with one fewer.
         response.ask_again_with.clear();
         response.ask_again_with.extend(
-            fee_quoter_fixed_accounts
+            token_derivation_fixed_accounts
                 .iter()
                 .chain(
                     ctx.remaining_accounts
                         .iter()
-                        .skip(fee_quoter_fixed_accounts_len + accounts_per_token_len),
+                        .skip(token_derivation_fixed_accounts_len + accounts_per_token_len),
                 )
                 .map(|a| a.key.readonly()),
         );
@@ -438,7 +451,7 @@ fn derive_ccip_send_additional_token_static<'info>(
 fn derive_ccip_send_accounts_additional_token_nested<'info>(
     params: &DeriveAccountsCcipSendParams,
     substage: &str,
-    fee_quoter_fixed_accounts: &[AccountInfo<'info>],
+    token_derivation_fixed_accounts: &[AccountInfo<'info>],
     nested_derivation_accounts: &[AccountInfo<'info>],
     billing_config: &AccountInfo<'info>,
     per_chain_per_token_config: &AccountInfo<'info>,
@@ -446,16 +459,19 @@ fn derive_ccip_send_accounts_additional_token_nested<'info>(
     transfer: &SVMTokenAmount,
 ) -> Result<DeriveAccountsResponse> {
     let get_fee_result = get_fee_cpi(
-        fee_quoter_fixed_accounts[0].clone(),
-        fee_quoter_fixed_accounts[1].clone(),
-        fee_quoter_fixed_accounts[2].clone(),
-        fee_quoter_fixed_accounts[3].clone(),
-        fee_quoter_fixed_accounts[4].clone(),
+        token_derivation_fixed_accounts[0].clone(),
+        token_derivation_fixed_accounts[1].clone(),
+        token_derivation_fixed_accounts[2].clone(),
+        token_derivation_fixed_accounts[3].clone(),
+        token_derivation_fixed_accounts[4].clone(),
         params.dest_chain_selector,
         &params.message,
         vec![billing_config.clone(), per_chain_per_token_config.clone()],
     )?;
-    let nonce = 0u64; // TODO
+
+    let total_nonce = load_nonce(&token_derivation_fixed_accounts[5])
+        .map(|n| n.total_nonce)
+        .unwrap_or_default();
 
     let lock_or_burn = LockOrBurnInV1 {
         receiver: get_fee_result
@@ -468,7 +484,7 @@ fn derive_ccip_send_accounts_additional_token_nested<'info>(
         original_sender: params.ccip_send_caller,
         amount: transfer.amount,
         local_token: transfer.token,
-        msg_total_nonce: nonce,
+        msg_total_nonce: total_nonce,
     };
 
     let acc_metas: Vec<AccountMeta> = nested_derivation_accounts

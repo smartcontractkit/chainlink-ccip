@@ -344,7 +344,7 @@ impl OnRamp for Impl {
                 derive::derive_ccip_send_accounts_finish_main_account_list(ctx, params)
             }
             DeriveAccountsCcipSendStage::RetrieveTokenLUTs => {
-                derive::derive_ccip_send_accounts_retrieve_luts(ctx)
+                derive::derive_ccip_send_accounts_retrieve_luts(ctx, &params)
             }
             DeriveAccountsCcipSendStage::TokenTransferAccounts { token_substage } => {
                 derive::derive_execute_accounts_additional_tokens(ctx, params, &token_substage)
@@ -498,7 +498,7 @@ mod helpers {
         Ok(nonce)
     }
 
-    fn load_nonce(account_info: &AccountInfo) -> Result<Nonce> {
+    pub(super) fn load_nonce(account_info: &AccountInfo) -> Result<Nonce> {
         let data = account_info.try_borrow_data()?;
         let mut data: &[u8] = &data;
         Nonce::try_deserialize(&mut data)
