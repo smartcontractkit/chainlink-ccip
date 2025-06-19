@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import {Internal} from "./Internal.sol";
 
-import {Identifier} from "../interfaces/optimism/IIdentifier.sol";
+import {Identifier} from "../vender/optimism/interop-lib/v0/src/interfaces/IIdentifier.sol";
 
 library SuperchainInterop {
   /// @notice The custom event used to relay messages over superchain.

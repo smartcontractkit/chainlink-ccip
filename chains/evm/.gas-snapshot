@@ -341,7 +341,7 @@ OnRampOverSuperchainInterop_hashInteropMessage:test_SameMessageProducesSameHash(
 OnRampOverSuperchainInterop_hashInteropMessage:test_TokenMessageHash() (gas: 26327)
 OnRampOverSuperchainInterop_reemitInteropMessage:test_ReemitBasicMessage() (gas: 198479)
 OnRampOverSuperchainInterop_reemitInteropMessage:test_ReemitTokenMessage() (gas: 288310)
-OnRampOverSuperchainInterop_reemitInteropMessage:test_RepeatReemitPTTMessage() (gas: 360164)
+OnRampOverSuperchainInterop_reemitInteropMessage:test_RepeatReemitPTTMessage() (gas: 368039)
 OnRampTokenPoolReentrancy:test_OnRampTokenPoolReentrancy() (gas: 257983)
 OnRampWithMessageTransformer_executeSingleMessage:test_forwardFromRouter() (gas: 133023)
 OnRampWithMessageTransformer_setMessageTransformer:test_setMessageTransformer() (gas: 684970)

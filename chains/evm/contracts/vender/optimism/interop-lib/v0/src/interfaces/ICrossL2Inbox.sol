@@ -22,29 +22,6 @@ interface ICrossL2Inbox {
 
   event ExecutingMessage(bytes32 indexed msgHash, Identifier id);
 
-  function version() external view returns (string memory);
-
-  /// @notice Returns the interop start timestamp.
-  /// @return interopStart_ interop start timestamp.
-  function interopStart() external view returns (uint256 interopStart_);
-
-  /// @notice Returns the origin address of the Identifier.
-  function origin() external view returns (address);
-
-  /// @notice Returns the block number of the Identifier.
-  function blockNumber() external view returns (uint256);
-
-  /// @notice Returns the log index of the Identifier.
-  function logIndex() external view returns (uint256);
-
-  /// @notice Returns the timestamp of the Identifier.
-  function timestamp() external view returns (uint256);
-
-  /// @notice Returns the chain ID of the Identifier.
-  function chainId() external view returns (uint256);
-
-  function setInteropStart() external;
-
   /// @notice Validates a cross chain message on the destination chain
   ///         and emits an ExecutingMessage event. This function is useful
   ///         for applications that understand the schema of the _message payload and want to
