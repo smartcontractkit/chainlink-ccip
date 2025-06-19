@@ -469,9 +469,12 @@ fn derive_ccip_send_accounts_additional_token_nested<'info>(
         vec![billing_config.clone(), per_chain_per_token_config.clone()],
     )?;
 
+    // +1 because in `ccip_send` it will be bumped before `LockOrBurnInV1` reaches
+    // the pool.
     let total_nonce = load_nonce(&token_derivation_fixed_accounts[5])
         .map(|n| n.total_nonce)
-        .unwrap_or_default();
+        .unwrap_or_default()
+        + 1;
 
     let lock_or_burn = LockOrBurnInV1 {
         receiver: get_fee_result
