@@ -1671,7 +1671,14 @@ func TestTokenPool(t *testing.T) {
 				}
 
 				t.Run("Account derivation", func(t *testing.T) {
-					accounts, tables := deriveCctpReleaseOrMintAccounts(ctx, t, admin, releaseOrMintIn, solanaGoClient)
+					accounts, tables := deriveCctpIxAccounts(ctx, t, solanaGoClient, admin, func(stage string, askWith []*solana.AccountMeta) RawIx {
+						raw := cctp_token_pool.NewDeriveAccountsReleaseOrMintTokensInstruction(
+							stage,
+							releaseOrMintIn,
+						)
+						raw.AccountMetaSlice = append(raw.AccountMetaSlice, askWith...)
+						return raw
+					})
 					require.Equal(t, []solana.PublicKey{}, tables)
 					require.Equal(t, additionalAccountMetas, accounts)
 				})
@@ -1798,11 +1805,16 @@ func TestTokenPool(t *testing.T) {
 	})
 }
 
-func deriveCctpReleaseOrMintAccounts(ctx context.Context,
+type RawIx interface {
+	ValidateAndBuild() (*cctp_token_pool.Instruction, error)
+}
+
+func deriveCctpIxAccounts(
+	ctx context.Context,
 	t *testing.T,
-	transmitter solana.PrivateKey,
-	releaseOrMint cctp_token_pool.ReleaseOrMintInV1,
 	solanaGoClient *rpc.Client,
+	signer solana.PrivateKey,
+	createRawIx func(stage string, askWith []*solana.AccountMeta) RawIx,
 ) (derivedAccounts []*solana.AccountMeta, lookUpTables []solana.PublicKey) {
 	t.Helper()
 
@@ -1812,17 +1824,12 @@ func deriveCctpReleaseOrMintAccounts(ctx context.Context,
 	askWith := []*solana.AccountMeta{}
 	stage := "Start"
 	for {
-		deriveRaw := cctp_token_pool.NewDeriveAccountsReleaseOrMintTokensInstruction(
-			stage,
-			releaseOrMint,
-		)
-		deriveRaw.AccountMetaSlice = append(deriveRaw.AccountMetaSlice, askWith...)
+		deriveRaw := createRawIx(stage, askWith)
 		derive, err := deriveRaw.ValidateAndBuild()
 		require.NoError(t, err)
-		tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{derive}, transmitter, config.DefaultCommitment)
+		tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{derive}, signer, config.DefaultCommitment)
 		derivation, err := common.ExtractAnchorTypedReturnValue[cctp_token_pool.DeriveAccountsResponse](ctx, tx.Meta.LogMessages, config.CctpTokenPoolProgram.String())
 		require.NoError(t, err)
-		fmt.Printf("Derivation: %+v\n", derivation)
 
 		for _, meta := range derivation.AccountsToSave {
 			derivedAccounts = append(derivedAccounts, &solana.AccountMeta{
@@ -1842,13 +1849,10 @@ func deriveCctpReleaseOrMintAccounts(ctx context.Context,
 		}
 
 		if len(derivation.LookUpTablesToSave) > 0 {
-			fmt.Printf("Lookup tables before append: %+v\n", lookUpTables)
 			lookUpTables = append(lookUpTables, derivation.LookUpTablesToSave...)
-			fmt.Printf("Lookup tables after append: %+v\n", lookUpTables)
 		}
 
 		if len(derivation.NextStage) == 0 {
-			fmt.Printf("Lookup tables on return: %+v\n", lookUpTables)
 			return derivedAccounts, lookUpTables
 		}
 		stage = derivation.NextStage
