@@ -21,25 +21,6 @@ CCIP operates through a combination of onchain contracts and offchain Distribute
 1. **Commit Phase**: Messages are collected, merkle roots are generated, and committed onchain
 2. **Execute Phase**: Messages are validated against committed roots and executed on the destination chain
 
-### High-Level Components
-
-```
-Source Chain                                  Destination Chain
-┌─────────┐                                    ┌─────────┐
-│ Router  │                                    │ Router  │
-└─────────┘                                    └─────────┘
-     │                                              │
-     ▼                                              ▼
-┌─────────┐                                    ┌─────────┐
-│ OnRamp  │           Offchain DON             │ OffRamp │
-└─────────┘─────────────────────────────────── └─────────┘
-     │                                              │
-     ▼                                              ▼
-┌─────────────┐                            ┌─────────────┐
-│Token Pools  │                            │Token Pools  │
-└─────────────┘                            └─────────────┘
-```
-
 ## Key Components
 
 ### 1. Router (`Router.sol`)
@@ -139,9 +120,6 @@ Handle token transfers across chains with different mechanisms:
 
 ```
 User → Router.ccipSend() → OnRamp.forwardFromRouter() → Event Emission
-         ↓                           ↓
-    Token Transfer            FeeQuoter.getValidatedFee()
-    to Token Pool
 ```
 
 1. User calls `Router.ccipSend()` with destination and message
@@ -157,8 +135,6 @@ User → Router.ccipSend() → OnRamp.forwardFromRouter() → Event Emission
 
 ```
 DON Observes Events → Generate Merkle Root → Create Commit Report → OffRamp.commit()
-                                                ↓
-                                         RMN Verification
 ```
 
 1. Offchain DON nodes observe OnRamp events
@@ -171,8 +147,6 @@ DON Observes Events → Generate Merkle Root → Create Commit Report → OffRam
 
 ```
 DON Creates Execution Report → OffRamp.execute() → Router.routeMessage() → Receiver.ccipReceive()
-                                    ↓                        ↓
-                            Merkle Proof Verification   Token Release
 ```
 
 1. Execution plugin identifies messages ready for execution
