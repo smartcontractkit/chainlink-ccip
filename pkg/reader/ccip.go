@@ -763,8 +763,8 @@ func (r *ccipChainReader) Sync(ctx context.Context, contracts ContractAddresses)
 		return fmt.Errorf("set address book state: %w", err)
 	}
 
-	var errs []error
 	lggr := logutil.WithContextValues(ctx, r.lggr)
+	var errs []error
 
 	for contractName, chainSelToAddress := range contracts {
 		for chainSel, address := range chainSelToAddress {
