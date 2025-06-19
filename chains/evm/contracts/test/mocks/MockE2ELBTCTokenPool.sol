@@ -14,10 +14,10 @@ contract MockE2ELBTCTokenPool is TokenPool, ITypeAndVersion {
 
   string public constant override typeAndVersion = "MockE2ELBTCTokenPool 1.5.1";
 
-  // This variable i_destPoolData will have either a 32-byte or non-32-byte value, which will change the off-chain behavior.
-  // If it is 32 bytes, the off-chain will consider it as attestation enabled and call the attestation API.
-  // If it is non-32 bytes, the off-chain will consider it as attestation disabled.
-  bytes public i_destPoolData;
+  // s_destPoolData has either a 32-byte or non-32-byte value, which changes the off-chain behavior.
+  // If it is 32 bytes, the off-chain considers attestation enabled and calls the attestation API.
+  // If it is non-32 bytes, the off-chain considers attestation disabled.
+  bytes public s_destPoolData;
 
   constructor(
     IBurnMintERC20 token,
@@ -26,7 +26,7 @@ contract MockE2ELBTCTokenPool is TokenPool, ITypeAndVersion {
     address router,
     bytes memory destPoolData
   ) TokenPool(token, 8, allowlist, rmnProxy, router) {
-    i_destPoolData = destPoolData;
+    s_destPoolData = destPoolData;
   }
 
   /// @notice Overrides base lockOrBurn method in order to provide custom destPoolData. This destPoolData imitates
@@ -48,7 +48,7 @@ contract MockE2ELBTCTokenPool is TokenPool, ITypeAndVersion {
 
     return Pool.LockOrBurnOutV1({
       destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
-      destPoolData: i_destPoolData
+      destPoolData: s_destPoolData
     });
   }
 
@@ -61,7 +61,7 @@ contract MockE2ELBTCTokenPool is TokenPool, ITypeAndVersion {
     uint256 amount = releaseOrMintIn.sourceDenominatedAmount;
     _validateReleaseOrMint(releaseOrMintIn, amount);
 
-    if (i_destPoolData.length == 32) {
+    if (s_destPoolData.length == 32) {
       (bytes memory payload,) = abi.decode(releaseOrMintIn.offchainTokenData, (bytes, bytes));
       bytes32 payloadHash = sha256(payload);
       if (payloadHash != bytes32(releaseOrMintIn.sourcePoolData)) {
