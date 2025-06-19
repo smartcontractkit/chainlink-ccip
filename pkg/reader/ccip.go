@@ -763,10 +763,7 @@ func (r *ccipChainReader) Sync(ctx context.Context, contracts ContractAddresses)
 		return fmt.Errorf("set address book state: %w", err)
 	}
 
-	wg := sync.WaitGroup{}
 	var errs []error
-	mu := new(sync.Mutex)
-
 	lggr := logutil.WithContextValues(ctx, r.lggr)
 
 	for contractName, chainSelToAddress := range contracts {
@@ -781,28 +778,20 @@ func (r *ccipChainReader) Sync(ctx context.Context, contracts ContractAddresses)
 				continue
 			}
 
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				tStart := time.Now()
-				_, err := bindReaderContract(ctx, lggr, r.contractReaders, chainSel, contractName, address, r.addrCodec)
-				tDur := time.Since(tStart)
-				lggr.Debugw("bind reader contract call finished",
-					"duration", tDur, "contractName", contractName, "addr", address, "chainSel", chainSel, "err", err)
-				if err != nil {
-					if !errors.Is(err, ErrContractReaderNotFound) {
-						mu.Lock()
-						errs = append(errs, err)
-						mu.Unlock()
-					} else {
-						r.lggr.Debugf("skipping binding %s on unsupported chain %d", contractName, chainSel)
-					}
+			// try to bind
+			_, err := bindReaderContract(ctx, lggr, r.contractReaders, chainSel, contractName, address, r.addrCodec)
+			if err != nil {
+				if errors.Is(err, ErrContractReaderNotFound) {
+					// don't support this chain
+					continue
 				}
-			}()
+				// some other error, gather
+				// TODO: maybe return early?
+				errs = append(errs, err)
+			}
 		}
 	}
 
-	wg.Wait()
 	return errors.Join(errs...)
 }
 
