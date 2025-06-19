@@ -163,9 +163,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   }
 
   /// @notice Generates a message ID for a given message.
-  /// the messageId field of the passed-in message should not be set.
-  /// @param message The message to generate a message ID for.
-  /// @return messageId The message ID.
+  /// The messageId field of the passed-in message must be empty for correct ID generation.
+  /// @param message The message to generate an ID for.
+  /// @return The message ID.
   function generateMessageId(
     Internal.EVM2AnyRampMessage memory message
   ) public view returns (bytes32) {
@@ -174,6 +174,8 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     }
     return Internal._hash(
       message,
+      // Metadata hash preimage to ensure global uniqueness, ensuring 2 identical messages sent to 2 different lanes
+      // will have a distinct hash.
       keccak256(
         abi.encode(Internal.EVM_2_ANY_MESSAGE_HASH, i_chainSelector, message.header.destChainSelector, address(this))
       )

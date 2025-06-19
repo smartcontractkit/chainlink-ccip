@@ -5,7 +5,8 @@ import {Internal} from "../libraries/Internal.sol";
 import {SuperchainInterop} from "../libraries/SuperchainInterop.sol";
 import {OnRamp} from "./OnRamp.sol";
 
-/// @notice OnRamp that supports superchain interoperability by storing sent messages for re-emission
+/// @notice This OnRamp supports OP Superchain Interop by emitting an interop-friendly event
+/// and storing sent messages for re-emission when old source logs get pruned on remote chains.
 contract OnRampOverSuperchainInterop is OnRamp {
   error MessageDoesNotExist(uint64 destChainSelector, uint64 sequenceNumber, bytes32 messageHash);
   error ExtraArgsTooShort(uint256 length);
@@ -16,9 +17,8 @@ contract OnRampOverSuperchainInterop is OnRamp {
     return "OnRampOverSuperchainInterop 1.6.1-dev";
   }
 
-  /// @dev stores sent interop message hashes to facilitate re-emission.
-  mapping(uint64 destChainSelector => mapping(uint64 sequenceNumber => bytes32 messageHash)) internal
-    s_sentInteropMessageHashes;
+  /// @dev Stores previouslysent interop message hashes to facilitate re-emission.
+  mapping(uint64 sequenceNumber => bytes32 messageHash) internal s_sentInteropMessageHashes;
 
   constructor(
     StaticConfig memory staticConfig,
@@ -26,9 +26,14 @@ contract OnRampOverSuperchainInterop is OnRamp {
     DestChainConfigArgs[] memory destChainConfigs
   ) OnRamp(staticConfig, dynamicConfig, destChainConfigs) {}
 
-  /// @notice Override _postProcessMessage hook to calculate messageId and store the message
+  /// @notice Override _postProcessMessage hook to emit interop-friendly event and store the message hash.
+  /// @dev Superchain Interop, and most trustless cross-chain verifier solutions, rely on the fact that
+  /// source storage or event data can be verified on the destination chain. This requires source and dest
+  /// leveraging the same data, without offchain translation from EVM2AnyRampMessage to Any2EVMRampMessage.
+  /// Here, we convert EVM2AnyRampMessage to Any2EVMRampMessage before emitting CCIPSuperchainMessageSent event.
+  /// This makes CCIPSuperchainMessageSent event data readily usable by the OffRamp and for future re-emissions.
   /// @param message The message to process.
-  /// @return processedMessage The processed message.
+  /// @return The processed message, in this case the unaltered, original message being passed in.
   function _postProcessMessage(
     Internal.EVM2AnyRampMessage memory message
   ) internal virtual override returns (Internal.EVM2AnyRampMessage memory) {
@@ -76,9 +81,8 @@ contract OnRampOverSuperchainInterop is OnRamp {
     interopMessage.header.messageId = messageId;
 
     // Interop hash uniquely identifies the interop message.
-    bytes32 interopMessageHash = hashInteropMessage(interopMessage);
-    s_sentInteropMessageHashes[interopMessage.header.destChainSelector][interopMessage.header.sequenceNumber] =
-      interopMessageHash;
+    bytes32 interopMessageHash = SuperchainInterop._hashInteropMessage(interopMessage);
+    s_sentInteropMessageHashes[interopMessage.header.sequenceNumber] = interopMessageHash;
 
     emit SuperchainInterop.CCIPSuperchainMessageSent(
       interopMessage.header.destChainSelector, interopMessage.header.sequenceNumber, interopMessage
@@ -110,48 +114,32 @@ contract OnRampOverSuperchainInterop is OnRamp {
     return gasLimit;
   }
 
-  /// @notice Hashes the interop message.
-  /// @dev This uniquely identifies the interop message using the same logic as the offRamp.
-  /// @param message The interop message to hash.
-  /// @return messageHash The hash of the interop message.
-  function hashInteropMessage(
-    Internal.Any2EVMRampMessage memory message
-  ) public view returns (bytes32) {
-    bytes32 offRampMetaDataHash = keccak256(
-      abi.encode(
-        Internal.ANY_2_EVM_MESSAGE_HASH,
-        i_chainSelector,
-        message.header.destChainSelector,
-        keccak256(abi.encode(address(this)))
-      )
-    );
-
-    return Internal._hash(message, offRampMetaDataHash);
-  }
-
   /// @notice Re-emits the CCIPSuperchainMessageSent event for a previously sent interop message.
-  /// @dev This is necessary because Superchain Interop dest chain does not persist events forever.
-  /// A typical persistance time is 7 days.
+  /// @dev This is necessary because Superchain does not persist cross-chain events on dest forever.
+  /// A typical persistance window is 7 days. After that, the event needs to be re-emitted at source.
   /// @param interopMessage The previously-sent interop message to re-emit.
   function reemitInteropMessage(
     Internal.Any2EVMRampMessage calldata interopMessage
   ) external {
-    // Validate that the message is meant for this chain.
+    // Validate that the message came from this chain.
     if (interopMessage.header.sourceChainSelector != i_chainSelector) {
       revert InvalidSourceChainSelector(interopMessage.header.sourceChainSelector);
     }
 
-    bytes32 interopMessageHash = hashInteropMessage(interopMessage);
+    bytes32 interopMessageHash = SuperchainInterop._hashInteropMessage(interopMessage);
 
     uint64 destChainSelector = interopMessage.header.destChainSelector;
     uint64 sequenceNumber = interopMessage.header.sequenceNumber;
 
-    // Validates that the message had been sent before.
-    if (s_sentInteropMessageHashes[destChainSelector][sequenceNumber] != interopMessageHash) {
+    // Validates that the message had been sent before from this OnRamp.
+    if (s_sentInteropMessageHashes[sequenceNumber] != interopMessageHash) {
       revert MessageDoesNotExist(destChainSelector, sequenceNumber, interopMessageHash);
     }
 
     // Re-emit the CCIPMessageSent event with the same data
+    // Note we are not checking allowlist here. For the message to be re-emitted, it must have been sent
+    // at a time when sender is allowed. To remain consistent with regular CCIP manual exec behavior,
+    // we allow re-emissions regardless of current allowlist state at the source.
     emit SuperchainInterop.CCIPSuperchainMessageSent(
       interopMessage.header.destChainSelector, interopMessage.header.sequenceNumber, interopMessage
     );

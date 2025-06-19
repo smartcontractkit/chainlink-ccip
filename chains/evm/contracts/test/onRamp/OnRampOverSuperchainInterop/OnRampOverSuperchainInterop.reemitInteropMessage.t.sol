@@ -103,7 +103,7 @@ contract OnRampOverSuperchainInterop_reemitInteropMessage is OnRampOverSuperchai
     // Try to re-emit a message that was never sent
     Internal.Any2EVMRampMessage memory any2EvmMessage = _generateBasicAny2EVMMessage();
 
-    bytes32 expectedHash = s_onRampOverSuperchainInterop.hashInteropMessage(any2EvmMessage);
+    bytes32 expectedHash = SuperchainInterop._hashInteropMessage(any2EvmMessage);
 
     vm.expectRevert(
       abi.encodeWithSelector(
@@ -138,7 +138,7 @@ contract OnRampOverSuperchainInterop_reemitInteropMessage is OnRampOverSuperchai
     any2EvmMessages[1].header.destChainSelector = DEST_CHAIN_SELECTOR + 1;
 
     for (uint256 i = 0; i < 3; i++) {
-      bytes32 expectedHash = s_onRampOverSuperchainInterop.hashInteropMessage(any2EvmMessages[i]);
+      bytes32 expectedHash = SuperchainInterop._hashInteropMessage(any2EvmMessages[i]);
 
       vm.expectRevert(
         abi.encodeWithSelector(

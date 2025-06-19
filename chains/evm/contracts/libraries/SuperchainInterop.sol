@@ -22,4 +22,25 @@ library SuperchainInterop {
     Identifier identifier; // The metadata of the CCIPSuperchainMessageSent event.
     bytes[] offchainTokenData; // Offchain token attestation data for each token transfer.
   }
+
+  /// @notice Generate an unique hash for an Any2EVMRampMessage.
+  /// @dev This is similiar to how messageId is generated in the OnRamp, but using the Any2EVMRampMessage
+  /// type, and OffRamp metadata hash. This gives a unique identifier for the message that can be derived
+  /// in both the On/OffRampOverSuperchainInterop.
+  /// @param message The interop message to hash.
+  /// @return messageHash The hash of the interop message.
+  function _hashInteropMessage(
+    Internal.Any2EVMRampMessage memory message
+  ) internal view returns (bytes32) {
+    bytes32 offRampMetaDataHash = keccak256(
+      abi.encode(
+        Internal.ANY_2_EVM_MESSAGE_HASH,
+        message.header.sourceChainSelector,
+        message.header.destChainSelector,
+        keccak256(abi.encode(address(this)))
+      )
+    );
+
+    return Internal._hash(message, offRampMetaDataHash);
+  }
 }
