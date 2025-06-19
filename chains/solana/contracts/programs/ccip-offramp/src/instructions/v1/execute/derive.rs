@@ -149,23 +149,9 @@ pub fn derive_execute_accounts_build_main_account_list<'info>(
         accounts_to_save.extend_from_slice(&params.message_accounts[1..]);
     }
 
-    // If there are no tokens, we're done. If there are tokens, we
-    // start by reading the registries on next stage.
-    let ask_again_with: Vec<_> = params
-        .token_transfers
-        .iter()
-        .map(|tt| {
-            find(
-                &[
-                    seed::TOKEN_ADMIN_REGISTRY,
-                    tt.transfer.dest_token_address.as_ref(),
-                ],
-                router,
-            )
-        })
-        .collect();
-
-    let next_stage = if ask_again_with.is_empty() {
+    let (next_stage, ask_again_with) = if params.token_transfers.is_empty() {
+        // We're done (no further stages) so we need to consider whether it's the
+        // buffered case to append the buffer PDA.
         if !params.buffer_id.is_empty() {
             let buffer_pda = find(
                 &[
@@ -177,11 +163,26 @@ pub fn derive_execute_accounts_build_main_account_list<'info>(
             );
             accounts_to_save.push(buffer_pda.writable());
         }
-        "".to_string()
+        ("".to_string(), vec![])
     } else {
-        DeriveExecuteAccountsStage::RetrieveTokenLUTs.to_string()
+        // There are tokens, so we continue by retrieving their lookup tables on next stage.
+        (
+            DeriveExecuteAccountsStage::RetrieveTokenLUTs.to_string(),
+            params
+                .token_transfers
+                .iter()
+                .map(|tt| {
+                    find(
+                        &[
+                            seed::TOKEN_ADMIN_REGISTRY,
+                            tt.transfer.dest_token_address.as_ref(),
+                        ],
+                        router,
+                    )
+                })
+                .collect(),
+        )
     };
-
     Ok(DeriveAccountsResponse {
         accounts_to_save,
         ask_again_with,
@@ -194,21 +195,13 @@ pub fn derive_execute_accounts_build_main_account_list<'info>(
 pub fn derive_execute_accounts_retrieve_luts<'info>(
     ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
 ) -> Result<DeriveAccountsResponse> {
-    let registries: Vec<_> = ctx
-        .remaining_accounts
-        .iter()
-        .map(|registry| {
-            let token_admin_registry_account: Account<TokenAdminRegistry> =
-                Account::try_from(registry).expect("parsing token admin registry account");
-            token_admin_registry_account
-        })
-        .collect();
-
-    let lookup_table_metas = registries.iter().map(|r| r.lookup_table.readonly());
-    // reference_addresses, followed by all registries, followed by all LUTs
+    // reference_addresses, followed registries and LUTs for each token
     let mut ask_again_with = vec![find(&[seed::REFERENCE_ADDRESSES], crate::ID)];
-    ask_again_with.extend(ctx.remaining_accounts.iter().map(|a| a.key.readonly()));
-    ask_again_with.extend(lookup_table_metas);
+    ask_again_with.extend(ctx.remaining_accounts.iter().flat_map(|account| {
+        let registry: Account<TokenAdminRegistry> =
+            Account::try_from(account).expect("parsing token admin registry account");
+        [account.key().readonly(), registry.lookup_table.readonly()].into_iter()
+    }));
 
     Ok(DeriveAccountsResponse {
         accounts_to_save: vec![],
@@ -227,43 +220,26 @@ pub fn derive_execute_accounts_additional_tokens<'info>(
     params: &DeriveAccountsExecuteParams,
     substage: &str,
 ) -> Result<DeriveAccountsResponse> {
-    // The reference addresses account and at least one registry + LUT.
-    require_gte!(
-        ctx.remaining_accounts.len(),
-        3,
-        CcipOfframpError::InvalidAccountListForPdaDerivation
-    );
+    let [reference_addresses, token_registry, token_lut, ..] = ctx.remaining_accounts else {
+        return Err(CcipOfframpError::InvalidAccountListForPdaDerivation.into());
+    };
 
-    let max_tokens_left = params
-        .token_transfers
-        .len()
-        .min((ctx.remaining_accounts.len() - 1) / 2);
-    let reference_addresses = &ctx.remaining_accounts[0];
-
-    // Token admin registries, one per token transferred.
-    let registries = &ctx.remaining_accounts[1..max_tokens_left + 1];
-    // Look up tables, one per token transferred.
-    let luts = &ctx.remaining_accounts[max_tokens_left + 1..2 * max_tokens_left + 1];
-    // Registry of the token we're *currently* deriving
-    let first_token_registry = &registries[0];
-    // LUT of the token we're *currently* deriving
-    let first_token_lut = &luts[0];
-    let first_token_admin_registry_account: Account<TokenAdminRegistry> =
-        Account::try_from(first_token_registry).expect("parsing token admin registry account");
-    let first_lut_data = &mut &first_token_lut.data.borrow()[..];
-    let first_lut_account: AddressLookupTable = AddressLookupTable::deserialize(first_lut_data)
+    let registry_account: Account<TokenAdminRegistry> =
+        Account::try_from(token_registry).expect("parsing token admin registry account");
+    let lut_data = &mut &token_lut.data.borrow()[..];
+    let lut_account: AddressLookupTable = AddressLookupTable::deserialize(lut_data)
         .map_err(|_| CommonCcipError::InvalidInputsLookupTableAccounts)?;
-    let first_token_mint = first_lut_account.addresses[7];
-    let first_pool_program = first_lut_account.addresses[2];
+    let token_mint = lut_account.addresses[7];
+    let pool_program = lut_account.addresses[2];
 
     // We find the transfer for this specific token
     let (this_token_index, this_transfer) = params
         .token_transfers
         .iter()
         .enumerate()
-        .find(|(_, tt)| tt.transfer.dest_token_address == first_token_mint)
+        .find(|(_, tt)| tt.transfer.dest_token_address == token_mint)
         .ok_or(CcipOfframpError::InvalidAccountListForPdaDerivation)?;
-    let tokens_left = max_tokens_left - this_token_index;
+    let tokens_left = params.token_transfers.len() - this_token_index;
 
     // If we're doing nested derivation (i.e. we are deriving accounts for a
     // dynamic token pool with multiple derivation stages) these are the accounts
@@ -291,17 +267,17 @@ pub fn derive_execute_accounts_additional_tokens<'info>(
             &release_or_mint,
             params.source_chain_selector,
             reference_addresses,
-            first_token_lut,
+            token_lut,
         )?);
     }
 
-    if first_token_admin_registry_account.supports_auto_derivation {
+    if registry_account.supports_auto_derivation {
         // Nested derivation is supported, so we go one level deeper.
         response = response.and(derive_execute_accounts_additional_token_nested(
             &release_or_mint,
             substage,
             nested_derivation_accounts,
-            first_pool_program.key(),
+            pool_program.key(),
         )?);
     }
 
@@ -317,12 +293,13 @@ pub fn derive_execute_accounts_additional_tokens<'info>(
         response
             .ask_again_with
             .push(find(&[seed::REFERENCE_ADDRESSES], crate::ID));
-        response
-            .ask_again_with
-            .extend(registries.iter().skip(1).map(|r| r.key.readonly()));
-        response
-            .ask_again_with
-            .extend(luts.iter().skip(1).map(|l| l.key.readonly()));
+        response.ask_again_with.extend(
+            ctx.remaining_accounts
+                .iter()
+                // We skip all accounts for the token we just derived.
+                .skip(3)
+                .map(|a| a.key().readonly()),
+        );
         response.next_stage = DeriveExecuteAccountsStage::TokenTransferAccounts {
             token_substage: "Start".to_string(),
         }
