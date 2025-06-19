@@ -10,7 +10,7 @@ use crate::state::{
     CodeVersion, DeriveAccountsCcipSendParams, DeriveAccountsResponse, DestChainConfig,
 };
 use crate::token_context::{
-    AcceptAdminRoleTokenAdminRegistry, ModifyTokenAdminRegistry,
+    AcceptAdminRoleTokenAdminRegistry, EditPoolTokenAdminRegistry, ModifyTokenAdminRegistry,
     OverridePendingTokenAdminRegistryByCCIPAdmin, OverridePendingTokenAdminRegistryByOwner,
     RegisterTokenAdminRegistryByCCIPAdmin, RegisterTokenAdminRegistryByOwner,
     SetPoolTokenAdminRegistry,
@@ -168,6 +168,14 @@ pub trait TokenAdminRegistry {
     fn accept_admin_role_token_admin_registry(
         &self,
         ctx: Context<AcceptAdminRoleTokenAdminRegistry>,
+    ) -> Result<()>;
+
+    /// Setter method for the pool's flag for support of account auto-derivation
+    fn set_pool_supports_auto_derivation(
+        &self,
+        ctx: Context<EditPoolTokenAdminRegistry>,
+        mint: Pubkey,
+        supports_auto_derivation: bool,
     ) -> Result<()>;
 
     /// Sets the lookup table for pool for a token.

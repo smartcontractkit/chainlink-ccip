@@ -156,6 +156,26 @@ pub struct SetPoolTokenAdminRegistry<'info> {
 }
 
 #[derive(Accounts)]
+#[instruction(mint: Pubkey)]
+pub struct EditPoolTokenAdminRegistry<'info> {
+    #[account(
+        seeds = [seed::CONFIG],
+        bump,
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
+    )]
+    pub config: Account<'info, Config>,
+    #[account(
+        mut,
+        seeds = [seed::TOKEN_ADMIN_REGISTRY, mint.as_ref()],
+        bump,
+        constraint = valid_version(token_admin_registry.version, MAX_TOKEN_REGISTRY_V) @ CcipRouterError::InvalidVersion,
+    )]
+    pub token_admin_registry: Account<'info, TokenAdminRegistry>,
+    #[account(mut, address = token_admin_registry.administrator @ CcipRouterError::Unauthorized)]
+    pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
 pub struct AcceptAdminRoleTokenAdminRegistry<'info> {
     #[account(
         seeds = [seed::CONFIG],

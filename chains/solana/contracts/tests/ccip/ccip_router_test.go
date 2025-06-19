@@ -2947,6 +2947,30 @@ func TestCCIPRouter(t *testing.T) {
 					require.Equal(t, uint8(1), tokenAdminRegistry.Version)
 					require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.PendingAdministrator)
 					require.Equal(t, usdcPool.PoolLookupTable, tokenAdminRegistry.LookupTable)
+					require.Equal(t, false, tokenAdminRegistry.SupportsAutoDerivation)
+				})
+
+				t.Run("set pool account auto-derivation support", func(t *testing.T) {
+					ix, err := ccip_router.NewSetPoolSupportsAutoDerivationInstruction(
+						usdcPool.Mint,
+						true,
+						config.RouterConfigPDA,
+						usdcPool.AdminRegistryPDA,
+						usdcPoolAdmin.PublicKey(),
+					).ValidateAndBuild()
+					require.NoError(t, err)
+
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, usdcPoolAdmin, config.DefaultCommitment)
+
+					// Validate Token Pool Registry PDA
+					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
+					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, usdcPool.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+					require.NoError(t, err)
+					require.Equal(t, usdcPoolAdmin.PublicKey(), tokenAdminRegistry.Administrator)
+					require.Equal(t, uint8(1), tokenAdminRegistry.Version)
+					require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.PendingAdministrator)
+					require.Equal(t, usdcPool.PoolLookupTable, tokenAdminRegistry.LookupTable)
+					require.Equal(t, true, tokenAdminRegistry.SupportsAutoDerivation)
 				})
 			})
 		})

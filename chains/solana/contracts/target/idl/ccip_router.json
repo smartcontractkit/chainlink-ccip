@@ -857,6 +857,47 @@
       ]
     },
     {
+      "name": "setPoolSupportsAutoDerivation",
+      "docs": [
+        "Edits the pool config flags for a given token mint.",
+        "",
+        "The administrator of the token admin registry is the only one allowed to invoke this.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for setting the pool.",
+        "* `mint` - The mint of the pool to be edited.",
+        "* `supports_auto_derivation` - A boolean flag indicating whether the pool supports auto-derivation of accounts."
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenAdminRegistry",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "mint",
+          "type": "publicKey"
+        },
+        {
+          "name": "supportsAutoDerivation",
+          "type": "bool"
+        }
+      ]
+    },
+    {
       "name": "setPool",
       "docs": [
         "Sets the pool lookup table for a given token mint.",
@@ -2024,6 +2065,21 @@
         {
           "name": "newAdmin",
           "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "PoolEdited",
+      "fields": [
+        {
+          "name": "token",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "supportsAutoDerivation",
+          "type": "bool",
           "index": false
         }
       ]
