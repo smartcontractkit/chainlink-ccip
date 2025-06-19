@@ -393,12 +393,10 @@ pub mod cctp_token_pool {
 
         match stage {
             derive::lock_or_burn::OnrampDeriveStage::RetrieveChainConfig => {
-                // derive::lock_or_burn::retrieve_chain_config(&lock_or_burn)
-                todo!();
+                derive::lock_or_burn::retrieve_chain_config(&lock_or_burn)
             }
             derive::lock_or_burn::OnrampDeriveStage::BuildDynamicAccounts => {
-                // derive::lock_or_burn::build_dynamic_accounts(ctx, &lock_or_burn)
-                todo!();
+                derive::lock_or_burn::build_dynamic_accounts(ctx, &lock_or_burn)
             }
         }
     }

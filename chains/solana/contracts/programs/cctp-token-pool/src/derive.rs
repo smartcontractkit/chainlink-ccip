@@ -1,8 +1,10 @@
-use crate::context::Empty;
+use crate::context::{
+    get_message_transmitter_pda, get_token_messenger_minter_pda, Empty, MESSAGE_SENT_EVENT_SEED,
+};
 use anchor_lang::prelude::*;
-use base_token_pool::common::POOL_CHAINCONFIG_SEED;
 use base_token_pool::common::{
-    CcipAccountMeta, CcipTokenPoolError, DeriveAccountsResponse, ReleaseOrMintInV1, ToMeta,
+    CcipAccountMeta, CcipTokenPoolError, DeriveAccountsResponse, LockOrBurnInV1, ReleaseOrMintInV1,
+    ToMeta, POOL_CHAINCONFIG_SEED,
 };
 use core::fmt;
 use std::{
@@ -14,7 +16,6 @@ use crate::{
     context::{TokenOfframpRemainingAccounts, MESSAGE_TRANSMITTER, TOKEN_MESSENGER_MINTER},
     to_solana_pubkey, ChainConfig,
 };
-
 // Local helper to find a readonly CCIP meta for a given seed + program_id combo.
 // Short name for compactness.
 fn find(seeds: &[&[u8]], program_id: Pubkey) -> CcipAccountMeta {
@@ -70,33 +71,25 @@ pub mod release_or_mint {
             // return sizes balanced.
             accounts_to_save: vec![
                 // cctp_authority_pda
-                TokenOfframpRemainingAccounts::get_message_transmitter_pda(&[
+                get_message_transmitter_pda(&[
                     b"message_transmitter_authority",
                     TOKEN_MESSENGER_MINTER.as_ref(),
                 ])
                 .readonly(),
                 // cctp_message_transmitter_account
-                TokenOfframpRemainingAccounts::get_message_transmitter_pda(&[
-                    b"message_transmitter",
-                ])
-                .readonly(),
+                get_message_transmitter_pda(&[b"message_transmitter"]).readonly(),
                 // cctp_token_messenger_minter
                 TOKEN_MESSENGER_MINTER.readonly(),
                 // system_program
                 System::id().readonly(),
                 // cctp_event_authority
-                TokenOfframpRemainingAccounts::get_message_transmitter_pda(&[b"__event_authority"])
-                    .readonly(),
+                get_message_transmitter_pda(&[b"__event_authority"]).readonly(),
                 // cctp_message_transmitter
                 MESSAGE_TRANSMITTER.readonly(),
                 // cctp_token_messenger_account
-                TokenOfframpRemainingAccounts::get_token_messenger_minter_pda(&[
-                    b"token_messenger",
-                ])
-                .readonly(),
+                get_token_messenger_minter_pda(&[b"token_messenger"]).readonly(),
                 // cctp_token_minter_account
-                TokenOfframpRemainingAccounts::get_token_messenger_minter_pda(&[b"token_minter"])
-                    .writable(),
+                get_token_messenger_minter_pda(&[b"token_minter"]).writable(),
             ],
             current_stage: OfframpDeriveStage::RetrieveChainConfig.to_string(),
             next_stage: OfframpDeriveStage::BuildDynamicAccounts.to_string(),
@@ -121,42 +114,24 @@ pub mod release_or_mint {
         Ok(DeriveAccountsResponse {
             accounts_to_save: vec![
                 // cctp_local_token
-                TokenOfframpRemainingAccounts::get_token_messenger_minter_pda(&[
-                    b"local_token",
-                    mint.as_ref(),
-                ])
-                .writable(),
+                get_token_messenger_minter_pda(&[b"local_token", mint.as_ref()]).writable(),
                 // cctp_custody_token_account
-                TokenOfframpRemainingAccounts::get_token_messenger_minter_pda(&[
-                    b"custody",
-                    mint.as_ref(),
-                ])
-                .writable(),
+                get_token_messenger_minter_pda(&[b"custody", mint.as_ref()]).writable(),
                 // cctp_token_messenger_event_authority
-                TokenOfframpRemainingAccounts::get_token_messenger_minter_pda(&[
-                    b"__event_authority",
-                ])
-                .readonly(),
+                get_token_messenger_minter_pda(&[b"__event_authority"]).readonly(),
                 // cctp_remote_token_messenger_key
-                TokenOfframpRemainingAccounts::get_token_messenger_minter_pda(&[
-                    b"remote_token_messenger",
-                    domain_seed,
-                ])
-                .readonly(),
+                get_token_messenger_minter_pda(&[b"remote_token_messenger", domain_seed])
+                    .readonly(),
                 // cctp_token_pair
-                TokenOfframpRemainingAccounts::get_token_messenger_minter_pda(&[
+                get_token_messenger_minter_pda(&[
                     b"token_pair",
                     domain_seed,
                     &remote_token_address_bytes,
                 ])
                 .readonly(),
                 // cctp_used_nonces
-                TokenOfframpRemainingAccounts::get_message_transmitter_pda(&[
-                    b"used_nonces",
-                    domain_seed,
-                    nonce_seed.as_ref(),
-                ])
-                .writable(),
+                get_message_transmitter_pda(&[b"used_nonces", domain_seed, nonce_seed.as_ref()])
+                    .writable(),
             ],
             current_stage: OfframpDeriveStage::BuildDynamicAccounts.to_string(),
             ..Default::default()
@@ -192,5 +167,79 @@ pub mod lock_or_burn {
                 _ => Err(CcipTokenPoolError::InvalidDerivationStage),
             }
         }
+    }
+
+    pub fn retrieve_chain_config(lock_or_burn: &LockOrBurnInV1) -> Result<DeriveAccountsResponse> {
+        Ok(DeriveAccountsResponse {
+            ask_again_with: vec![find(
+                &[
+                    POOL_CHAINCONFIG_SEED,
+                    &lock_or_burn.remote_chain_selector.to_le_bytes(),
+                    lock_or_burn.local_token.as_ref(),
+                ],
+                crate::ID,
+            )],
+            // We don't need the domain for the first few PDAs, so we return them now to keep
+            // return sizes balanced.
+            accounts_to_save: vec![
+                // cctp_authority_pda
+                get_token_messenger_minter_pda(&[b"sender_authority"]).readonly(),
+                // cctp_message_transmitter_account
+                get_message_transmitter_pda(&[b"message_transmitter"]).writable(),
+                // cctp_token_messenger_account
+                get_token_messenger_minter_pda(&[b"token_messenger"]).readonly(),
+                // cctp_token_minter_account
+                get_token_messenger_minter_pda(&[b"token_minter"]).readonly(),
+                // cctp_local_token
+                get_token_messenger_minter_pda(&[
+                    b"local_token",
+                    lock_or_burn.local_token.as_ref(),
+                ])
+                .writable(),
+            ],
+            current_stage: OnrampDeriveStage::RetrieveChainConfig.to_string(),
+            next_stage: OnrampDeriveStage::BuildDynamicAccounts.to_string(),
+            ..Default::default()
+        })
+    }
+
+    pub fn build_dynamic_accounts<'info>(
+        ctx: Context<'_, '_, 'info, 'info, Empty<'info>>,
+        lock_or_burn: &LockOrBurnInV1,
+    ) -> Result<DeriveAccountsResponse> {
+        let chain_config = Account::<'info, ChainConfig>::try_from(&ctx.remaining_accounts[0])?;
+        let domain_id = chain_config.cctp.domain_id;
+        let domain_str = domain_id.to_string();
+        let domain_seed = domain_str.as_bytes();
+
+        Ok(DeriveAccountsResponse {
+            accounts_to_save: vec![
+                // cctp_message_transmitter
+                MESSAGE_TRANSMITTER.readonly(),
+                // cctp_token_messenger_minter
+                TOKEN_MESSENGER_MINTER.readonly(),
+                // system_program
+                System::id().readonly(),
+                // cctp_event_authority
+                get_message_transmitter_pda(&[b"__event_authority"]).readonly(),
+                // cctp_remote_token_messenger_key
+                get_token_messenger_minter_pda(&[b"remote_token_messenger", domain_seed])
+                    .readonly(),
+                // cctp_message_sent_event
+                find(
+                    &[
+                        MESSAGE_SENT_EVENT_SEED,
+                        &lock_or_burn.original_sender.to_bytes(),
+                        &lock_or_burn.remote_chain_selector.to_le_bytes(),
+                        &lock_or_burn.msg_total_nonce.to_le_bytes(),
+                    ],
+                    System::id(),
+                )
+                .writable(),
+            ],
+            current_stage: OnrampDeriveStage::BuildDynamicAccounts.to_string(),
+            next_stage: "".to_string(),
+            ..Default::default()
+        })
     }
 }

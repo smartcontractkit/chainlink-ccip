@@ -242,6 +242,15 @@ pub struct TokenOfframp<'info> {
     pub receiver_token_account: InterfaceAccount<'info, TokenAccount>,
 }
 
+#[inline]
+pub fn get_message_transmitter_pda(seeds: &[&[u8]]) -> Pubkey {
+    Pubkey::find_program_address(seeds, &MESSAGE_TRANSMITTER).0
+}
+#[inline]
+pub fn get_token_messenger_minter_pda(seeds: &[&[u8]]) -> Pubkey {
+    Pubkey::find_program_address(seeds, &TOKEN_MESSENGER_MINTER).0
+}
+
 // This contains the CCTP-specific accounts that are used in the offramp. As they are too many, they don't fit inside
 // a single Context struct (as Anchor would require too much memory to validate all of them), so we use a separate struct
 // and do the address validations manually.
@@ -276,7 +285,7 @@ impl TokenOfframpRemainingAccounts<'_> {
 
         require_keys_eq!(
             self.cctp_authority_pda.key(),
-            Self::get_message_transmitter_pda(&[
+            get_message_transmitter_pda(&[
                 b"message_transmitter_authority",
                 TOKEN_MESSENGER_MINTER.as_ref(),
             ])
@@ -284,12 +293,12 @@ impl TokenOfframpRemainingAccounts<'_> {
 
         require_keys_eq!(
             self.cctp_message_transmitter_account.key(),
-            Self::get_message_transmitter_pda(&[b"message_transmitter"])
+            get_message_transmitter_pda(&[b"message_transmitter"])
         );
 
         require_keys_eq!(
             self.cctp_used_nonces.key(),
-            Self::get_message_transmitter_pda(&[b"used_nonces", domain_seed, nonce_seed.as_ref()])
+            get_message_transmitter_pda(&[b"used_nonces", domain_seed, nonce_seed.as_ref()])
         );
 
         require_keys_eq!(
@@ -301,34 +310,34 @@ impl TokenOfframpRemainingAccounts<'_> {
 
         require_keys_eq!(
             self.cctp_event_authority.key(),
-            Self::get_message_transmitter_pda(&[b"__event_authority"])
+            get_message_transmitter_pda(&[b"__event_authority"])
         );
 
         require_keys_eq!(self.cctp_message_transmitter.key(), MESSAGE_TRANSMITTER);
 
         require_keys_eq!(
             self.cctp_token_messenger_account.key(),
-            Self::get_token_messenger_minter_pda(&[b"token_messenger"])
+            get_token_messenger_minter_pda(&[b"token_messenger"])
         );
 
         require_keys_eq!(
             self.cctp_token_minter_account.key(),
-            Self::get_token_messenger_minter_pda(&[b"token_minter"])
+            get_token_messenger_minter_pda(&[b"token_minter"])
         );
 
         require_keys_eq!(
             self.cctp_local_token.key(),
-            Self::get_token_messenger_minter_pda(&[b"local_token", mint.as_ref()])
+            get_token_messenger_minter_pda(&[b"local_token", mint.as_ref()])
         );
 
         require_keys_eq!(
             self.cctp_remote_token_messenger_key.key(),
-            Self::get_token_messenger_minter_pda(&[b"remote_token_messenger", domain_seed])
+            get_token_messenger_minter_pda(&[b"remote_token_messenger", domain_seed])
         );
 
         require_keys_eq!(
             self.cctp_token_pair.key(),
-            Self::get_token_messenger_minter_pda(&[
+            get_token_messenger_minter_pda(&[
                 b"token_pair",
                 domain_seed,
                 remote_token_address.as_ref()
@@ -337,24 +346,15 @@ impl TokenOfframpRemainingAccounts<'_> {
 
         require_keys_eq!(
             self.cctp_custody_token_account.key(),
-            Self::get_token_messenger_minter_pda(&[b"custody", mint.key().as_ref()])
+            get_token_messenger_minter_pda(&[b"custody", mint.key().as_ref()])
         );
 
         require_keys_eq!(
             self.cctp_token_messenger_event_authority.key(),
-            Self::get_token_messenger_minter_pda(&[b"__event_authority"])
+            get_token_messenger_minter_pda(&[b"__event_authority"])
         );
 
         Ok(())
-    }
-
-    #[inline]
-    pub fn get_message_transmitter_pda(seeds: &[&[u8]]) -> Pubkey {
-        Pubkey::find_program_address(seeds, &MESSAGE_TRANSMITTER).0
-    }
-    #[inline]
-    pub fn get_token_messenger_minter_pda(seeds: &[&[u8]]) -> Pubkey {
-        Pubkey::find_program_address(seeds, &TOKEN_MESSENGER_MINTER).0
     }
 
     pub fn first_nonce_seed(offchain_token_data: &[u8]) -> Result<Vec<u8>> {
