@@ -121,5 +121,11 @@ pub mod events {
             pub token: Pubkey,
             pub new_admin: Pubkey,
         }
+
+        #[event]
+        pub struct PoolEdited {
+            pub token: Pubkey,
+            pub supports_auto_derivation: bool,
+        }
     }
 }

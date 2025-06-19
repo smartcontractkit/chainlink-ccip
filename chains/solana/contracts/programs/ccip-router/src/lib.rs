@@ -418,6 +418,24 @@ pub mod ccip_router {
             .transfer_admin_role_token_admin_registry(ctx, new_admin)
     }
 
+    /// Edits the pool config flags for a given token mint.
+    ///
+    /// The administrator of the token admin registry is the only one allowed to invoke this.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for setting the pool.
+    /// * `mint` - The mint of the pool to be edited.
+    /// * `supports_auto_derivation` - A boolean flag indicating whether the pool supports auto-derivation of accounts.
+    pub fn set_pool_supports_auto_derivation(
+        ctx: Context<EditPoolTokenAdminRegistry>,
+        mint: Pubkey,
+        supports_auto_derivation: bool,
+    ) -> Result<()> {
+        router::token_admin_registry(ctx.accounts.config.default_code_version)
+            .set_pool_supports_auto_derivation(ctx, mint, supports_auto_derivation)
+    }
+
     /// Sets the pool lookup table for a given token mint.
     ///
     /// The administrator of the token admin registry can set the pool lookup table for a given token mint.
