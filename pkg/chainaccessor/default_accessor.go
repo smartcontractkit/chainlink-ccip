@@ -750,7 +750,8 @@ func (l *DefaultAccessor) processCommitReports(
 	if len(reports) < limit {
 		return reports
 	}
-	lggr.Errorw("too many commit reports received, commit report results are truncated", "numTruncatedReports", len(reports)-limit)
+	lggr.Errorw("too many commit reports received, commit report results are truncated",
+		"numTruncatedReports", len(reports)-limit)
 	return reports[:limit]
 }
 
