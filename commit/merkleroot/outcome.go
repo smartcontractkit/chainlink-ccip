@@ -448,6 +448,11 @@ func getConsensusObservation(
 	twoFChainPlus1 := consensus.MakeMultiThreshold(fChains, consensus.TwoFPlus1)
 	fChain := consensus.MakeMultiThreshold(fChains, consensus.F)
 
+	fDestChain, ok := fChain.Get(destChain)
+	if !ok {
+		return consensusObservation{}, fmt.Errorf("no consensus value for fDestChain(%d): %v", fDestChain, fChain)
+	}
+
 	consensusObs := consensusObservation{
 		MerkleRoots:      consensus.GetConsensusMap(lggr, "Merkle Root", aggObs.MerkleRoots, twoFChainPlus1),
 		RMNEnabledChains: consensus.GetConsensusMap(lggr, "RMNEnabledChains", aggObs.RMNEnabledChains, twoFChainPlus1),
@@ -456,14 +461,40 @@ func getConsensusObservation(
 			"OnRamp Max Seq Nums",
 			aggObs.OnRampMaxSeqNums,
 			fChain),
-		OffRampNextSeqNums: consensus.GetOrderedConsensus(
-			lggr,
-			"OffRamp Next Seq Nums",
-			aggObs.OffRampNextSeqNums,
-			fChain),
-		RMNRemoteConfig: consensus.GetConsensusMap(lggr, "RMNRemote cfg", rmnRemoteConfigs, twoFChainPlus1),
-		FChain:          fChains,
+		OffRampNextSeqNums: getOffRampNextSequenceNumbersConsensus(lggr, uint(fDestChain), aggObs.OffRampNextSeqNums),
+		RMNRemoteConfig:    consensus.GetConsensusMap(lggr, "RMNRemote cfg", rmnRemoteConfigs, twoFChainPlus1),
+		FChain:             fChains,
 	}
 
 	return consensusObs, nil
+}
+
+// getOffRampNextSequenceNumbersConsensus accepts a list of offramp sequence number observations per chain
+// and computes the consensus value for each chain.
+//
+// Similar to consensus.GetOrderedConsensus but uses fDestChain, since this values are observed
+// from the destination chain, instead of fChain for each source chain.
+func getOffRampNextSequenceNumbersConsensus(
+	lggr logger.Logger,
+	fDestChain uint,
+	observationsPerChain map[cciptypes.ChainSelector][]cciptypes.SeqNum,
+) map[cciptypes.ChainSelector]cciptypes.SeqNum {
+	lggr = logger.With(lggr, "fDestChain", fDestChain)
+
+	offRampNextSeqNumsConsensus := make(map[cciptypes.ChainSelector]cciptypes.SeqNum)
+	for sourceChain, observedNextSeqNums := range observationsPerChain {
+		if uint(len(observedNextSeqNums)) < 2*fDestChain+1 {
+			lggr.Warnw("not enough observations for OffRampNextSeqNums consensus on chain",
+				"sourceChain", sourceChain, "observedNextSeqNums", observedNextSeqNums,
+			)
+			continue
+		}
+
+		sort.Slice(observedNextSeqNums, func(i, j int) bool { return observedNextSeqNums[i] < observedNextSeqNums[j] })
+		offRampNextSeqNumsConsensus[sourceChain] = observedNextSeqNums[fDestChain]
+	}
+
+	lggr.Debugw("computed offRampNextSeqNumsConsensus",
+		"offRampNextSeqNumsConsensus", offRampNextSeqNumsConsensus, "observations", observationsPerChain)
+	return offRampNextSeqNumsConsensus
 }
