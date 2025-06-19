@@ -3,7 +3,9 @@ package discovery
 import (
 	"errors"
 	"fmt"
+	"sync"
 	"testing"
+	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/stretchr/testify/assert"
@@ -795,4 +797,103 @@ func internalNewContractDiscoveryProcessor(
 		oracleIDToP2PID,
 		plugincommon.NoopReporter{},
 	)
+}
+
+func TestReaderSyncer_Sync_FirstCall(t *testing.T) {
+	mockReader := mock_reader.NewMockCCIPReader(t)
+	var readerInstance reader.CCIPReader = mockReader
+	syncer := &readerSyncer{reader: &readerInstance}
+
+	contracts := reader.ContractAddresses{}
+	mockReader.On("Sync", mock.Anything, contracts).Return(nil)
+
+	alreadySyncing, err := syncer.Sync(t.Context(), contracts)
+
+	assert.NoError(t, err)
+	assert.False(t, alreadySyncing)
+}
+
+func TestReaderSyncer_Sync_ConcurrentCall(t *testing.T) {
+	mockReader := mock_reader.NewMockCCIPReader(t)
+	var readerInstance reader.CCIPReader = mockReader
+	syncer := &readerSyncer{reader: &readerInstance}
+	contracts := reader.ContractAddresses{}
+
+	// Simulate a long-running sync operation
+	syncStarted := make(chan struct{})
+	mockReader.On("Sync", mock.Anything, contracts).Run(func(args mock.Arguments) {
+		close(syncStarted)
+		time.Sleep(100 * time.Millisecond)
+	}).Return(nil).Once()
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	var alreadySyncing1, alreadySyncing2 bool
+	var err1, err2 error
+
+	// First call starts the sync
+	go func() {
+		defer wg.Done()
+		alreadySyncing1, err1 = syncer.Sync(t.Context(), contracts)
+	}()
+
+	// Wait for the first sync to actually start
+	<-syncStarted
+
+	// Second call should find that the syncer is busy
+	go func() {
+		defer wg.Done()
+		alreadySyncing2, err2 = syncer.Sync(t.Context(), contracts)
+	}()
+
+	wg.Wait()
+
+	// The first call should not have been reported as 'already syncing'
+	assert.False(t, alreadySyncing1)
+	assert.NoError(t, err1)
+
+	// The second call should have been reported as 'already syncing'
+	assert.True(t, alreadySyncing2)
+	assert.NoError(t, err2)
+
+	// Ensure that subsequent calls are not blocked
+	mockReader.On("Sync", mock.Anything, contracts).Return(nil).Once()
+	alreadySyncing3, err3 := syncer.Sync(t.Context(), contracts)
+	assert.False(t, alreadySyncing3)
+	assert.NoError(t, err3)
+}
+
+func TestReaderSyncer_Sync_AfterCompletion(t *testing.T) {
+	mockReader := mock_reader.NewMockCCIPReader(t)
+	var readerInstance reader.CCIPReader = mockReader
+	syncer := &readerSyncer{reader: &readerInstance}
+	contracts := reader.ContractAddresses{}
+
+	// First call
+	mockReader.On("Sync", mock.Anything, contracts).Return(nil).Once()
+	alreadySyncing, err := syncer.Sync(t.Context(), contracts)
+	assert.NoError(t, err)
+	assert.False(t, alreadySyncing)
+
+	// Second call after completion
+	mockReader.On("Sync", mock.Anything, contracts).Return(nil).Once()
+	alreadySyncing, err = syncer.Sync(t.Context(), contracts)
+	assert.NoError(t, err)
+	assert.False(t, alreadySyncing)
+}
+
+func TestReaderSyncer_Sync_ErrorPropagation(t *testing.T) {
+	mockReader := mock_reader.NewMockCCIPReader(t)
+	var readerInstance reader.CCIPReader = mockReader
+	syncer := &readerSyncer{reader: &readerInstance}
+	contracts := reader.ContractAddresses{}
+
+	expectedErr := errors.New("sync error")
+	mockReader.On("Sync", mock.Anything, contracts).Return(expectedErr)
+
+	alreadySyncing, err := syncer.Sync(t.Context(), contracts)
+
+	assert.ErrorIs(t, err, expectedErr)
+	assert.False(t, alreadySyncing)
 }

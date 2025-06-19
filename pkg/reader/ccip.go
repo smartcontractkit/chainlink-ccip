@@ -14,6 +14,7 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"golang.org/x/exp/maps"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -765,35 +766,56 @@ func (r *ccipChainReader) Sync(ctx context.Context, contracts ContractAddresses)
 		return fmt.Errorf("set address book state: %w", err)
 	}
 
-	lggr := logutil.WithContextValues(ctx, r.lggr)
-	var errs []error
+	// construct a map of chain selector to bound contract to be able to bind in parallel.
+	type boundContract struct {
+		name    string
+		address cciptypes.UnknownAddress
+	}
+
+	var chainToContractBinding = make(map[cciptypes.ChainSelector]boundContract)
 	for contractName, chainSelToAddress := range contracts {
 		for chainSel, address := range chainSelToAddress {
-			// defense in depth: don't bind if the address is empty.
-			// callers should ensure this but we double check here.
-			if len(address) == 0 {
-				lggr.Warnw("skipping binding empty address for contract",
-					"contractName", contractName,
-					"chainSel", chainSel,
-				)
-				continue
-			}
-
-			// try to bind
-			_, err := bindReaderContract(ctx, lggr, r.contractReaders, chainSel, contractName, address, r.addrCodec)
-			if err != nil {
-				if errors.Is(err, ErrContractReaderNotFound) {
-					// don't support this chain
-					continue
-				}
-				// some other error, gather
-				// TODO: maybe return early?
-				errs = append(errs, err)
+			chainToContractBinding[chainSel] = boundContract{
+				name:    contractName,
+				address: address,
 			}
 		}
 	}
 
-	return errors.Join(errs...)
+	lggr := logutil.WithContextValues(ctx, r.lggr)
+	var errGroup errgroup.Group
+	for chainSelector, boundContract := range chainToContractBinding {
+		errGroup.Go(func() error {
+			// defense in depth: don't bind if the address is empty.
+			// callers should ensure this but we double check here.
+			if len(boundContract.address) == 0 {
+				lggr.Warnw("skipping binding empty address for contract",
+					"contractName", boundContract.name,
+					"chainSel", chainSelector,
+				)
+				return nil
+			}
+
+			// the extended reader will do nothing if the contract is already bound.
+			_, err := bindReaderContract(ctx, lggr, r.contractReaders, chainSelector, boundContract.name, boundContract.address, r.addrCodec)
+			if err != nil {
+				if errors.Is(err, ErrContractReaderNotFound) {
+					// don't support this chain, nothing to do.
+					return nil
+				}
+
+				return fmt.Errorf("bind reader contract %s on chain %s: %w", boundContract.name, chainSelector, err)
+			}
+
+			return nil
+		})
+	}
+
+	if err := errGroup.Wait(); err != nil {
+		return fmt.Errorf("bind reader contracts: %w", err)
+	}
+
+	return nil
 }
 
 // TODO(NONEVM-1865): remove this function once from CCIPReader interface once CAL migration is complete.

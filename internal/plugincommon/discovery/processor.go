@@ -3,6 +3,7 @@ package discovery
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/smartcontractkit/libocr/commontypes"
@@ -23,6 +24,9 @@ import (
 // Ensure that PluginProcessor is implemented.
 var _ plugincommon.PluginProcessor[dt.Query, dt.Observation, dt.Outcome] = &ContractDiscoveryProcessor{}
 
+// syncTimeout is the timeout for the ccip reader sync operation.
+const syncTimeout = 5 * time.Second
+
 // ContractDiscoveryProcessor is a plugin processor for discovering contracts.
 type ContractDiscoveryProcessor struct {
 	lggr            logger.Logger
@@ -31,6 +35,7 @@ type ContractDiscoveryProcessor struct {
 	dest            cciptypes.ChainSelector
 	fRoleDON        int
 	oracleIDToP2PID map[commontypes.OracleID]ragep2ptypes.PeerID
+	syncer          *readerSyncer
 }
 
 func NewContractDiscoveryProcessor(
@@ -49,6 +54,7 @@ func NewContractDiscoveryProcessor(
 		dest:            dest,
 		fRoleDON:        fRoleDON,
 		oracleIDToP2PID: oracleIDToP2PID,
+		syncer:          &readerSyncer{reader: reader},
 	}
 	return plugincommon.NewTrackedProcessor(lggr, p, "discovery", reporter)
 }
@@ -343,18 +349,59 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 	// fail the entire outcome because of that. The reason being is that if this node is a leader
 	// of an OCR round, it will NOT be able to complete the round due to failing to compute the Outcome.
 	// TODO: we should move Sync calls to observation but that requires updates to the Outcome struct for discovery.
-	timeoutCtx, cancel := context.WithTimeout(ctx, 1*time.Second)
-	defer cancel()
-	if err := (*cdp.reader).Sync(timeoutCtx, contracts); err != nil {
-		lggr.Errorw(
-			"unable to sync contracts - this is usually due to RPC issues,"+
-				" please check your RPC endpoints and their health!",
-			"err", err)
-	}
+	go func(syncer *readerSyncer, lggr logger.Logger) {
+		ctx, cancel := context.WithTimeout(context.Background(), syncTimeout)
+		defer cancel()
+		alreadySyncing, err := syncer.Sync(ctx, contracts)
+		if err != nil {
+			lggr.Errorw(
+				"unable to sync contracts - this is usually due to RPC issues,"+
+					" please check your RPC endpoints and their health!",
+				"err", err)
+		} else if alreadySyncing {
+			lggr.Infow("discovery syncer is already syncing, skipping sync until its done or it times out")
+		} else {
+			lggr.Infow("discovery successfully synced contracts", "contracts", contracts)
+		}
+	}(cdp.syncer, lggr)
 
 	return dt.Outcome{}, nil
 }
 
 func (cdp *ContractDiscoveryProcessor) Close() error {
 	return nil
+}
+
+// readerSyncer is a helper to sync the CCIP contracts to the ccip reader in a thread-safe manner
+// and avoid multiple syncs at the same time.
+type readerSyncer struct {
+	mu      sync.Mutex
+	syncing bool
+	reader  *reader.CCIPReader
+}
+
+// Sync syncs the CCIP contracts to the ccip reader in a thread-safe manner.
+// It ensures that only one sync operation can be in progress at a time.
+//
+// Returns true if a sync was already in progress.
+// Make sure to pass a context with a timeout to avoid blocking the plugin for too long.
+func (s *readerSyncer) Sync(ctx context.Context, contracts reader.ContractAddresses) (alreadySyncing bool, err error) {
+	s.mu.Lock()
+	if s.syncing {
+		s.mu.Unlock()
+		return true, nil
+	}
+
+	// still have the lock at this point, so we can safely set syncing to true.
+	s.syncing = true
+	// safe to unlock here because callers will read the "true" value of syncing if Sync() is re-entered.
+	s.mu.Unlock()
+
+	defer func() {
+		s.mu.Lock()
+		s.syncing = false
+		s.mu.Unlock()
+	}()
+
+	return false, (*s.reader).Sync(ctx, contracts)
 }
