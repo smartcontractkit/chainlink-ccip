@@ -32,7 +32,7 @@ func TestContractDiscoveryProcessor_Observation_SupportsDest_HappyPath(t *testin
 	mockReader := mock_reader.NewMockCCIPReader(t)
 	mockReaderIface := reader.CCIPReader(mockReader)
 	mockHomeChain := mock_home_chain.NewMockHomeChain(t)
-	lggr := logger.Test(t)
+	lggr := logger.Nop()
 	dest := cciptypes.ChainSelector(1)
 	source := cciptypes.ChainSelector(2)
 	fRoleDON := 1
@@ -102,7 +102,7 @@ func TestContractDiscoveryProcessor_Observation_ErrorGettingFChain(t *testing.T)
 	mockReader := mock_reader.NewMockCCIPReader(t)
 	mockReaderIface := reader.CCIPReader(mockReader)
 	mockHomeChain := mock_home_chain.NewMockHomeChain(t)
-	lggr := logger.Test(t)
+	lggr := logger.Nop()
 	dest := cciptypes.ChainSelector(1)
 	fRoleDON := 1
 
@@ -132,7 +132,7 @@ func TestContractDiscoveryProcessor_Observation_SourceReadersNotReady(t *testing
 	mockReader := mock_reader.NewMockCCIPReader(t)
 	mockReaderIface := reader.CCIPReader(mockReader)
 	mockHomeChain := mock_home_chain.NewMockHomeChain(t)
-	lggr := logger.Test(t)
+	lggr := logger.Nop()
 	dest := cciptypes.ChainSelector(1)
 	source := cciptypes.ChainSelector(2)
 	fRoleDON := 1
@@ -171,7 +171,7 @@ func TestContractDiscoveryProcessor_Observation_ErrorDiscoveringContracts(t *tes
 	mockReader := mock_reader.NewMockCCIPReader(t)
 	mockReaderIface := reader.CCIPReader(mockReader)
 	mockHomeChain := mock_home_chain.NewMockHomeChain(t)
-	lggr := logger.Test(t)
+	lggr := logger.Nop()
 	dest := cciptypes.ChainSelector(1)
 	source := cciptypes.ChainSelector(2)
 	fRoleDON := 1
@@ -210,7 +210,7 @@ func TestContractDiscoveryProcessor_Outcome_HappyPath(t *testing.T) {
 	mockReader := mock_reader.NewMockCCIPReader(t)
 	mockReaderIface := reader.CCIPReader(mockReader)
 	mockHomeChain := mock_home_chain.NewMockHomeChain(t)
-	lggr := logger.Test(t)
+	lggr := logger.Nop()
 	dest := cciptypes.ChainSelector(1)
 	source1 := cciptypes.ChainSelector(2)
 	source2 := cciptypes.ChainSelector(3)
@@ -297,7 +297,7 @@ func TestContractDiscovery_Outcome_HappyPath_FRoleDONAndFDestChainAreDifferent(t
 	mockReader := mock_reader.NewMockCCIPReader(t)
 	mockReaderIface := reader.CCIPReader(mockReader)
 	mockHomeChain := mock_home_chain.NewMockHomeChain(t)
-	lggr := logger.Test(t)
+	lggr := logger.Nop()
 	dest := cciptypes.ChainSelector(1)
 	source1 := cciptypes.ChainSelector(2)
 	source2 := cciptypes.ChainSelector(3)
@@ -393,7 +393,7 @@ func TestContractDiscoveryProcessor_Outcome_NotEnoughObservations(t *testing.T) 
 	mockReader := mock_reader.NewMockCCIPReader(t)
 	mockReaderIface := reader.CCIPReader(mockReader)
 	mockHomeChain := mock_home_chain.NewMockHomeChain(t)
-	lggr := logger.Test(t)
+	lggr := logger.Nop()
 	dest := cciptypes.ChainSelector(1)
 	source1 := cciptypes.ChainSelector(2)
 	source2 := cciptypes.ChainSelector(3)
@@ -478,7 +478,7 @@ func TestContractDiscoveryProcessor_Outcome_ErrorSyncingContracts(t *testing.T) 
 	mockReader := mock_reader.NewMockCCIPReader(t)
 	mockReaderIface := reader.CCIPReader(mockReader)
 	mockHomeChain := mock_home_chain.NewMockHomeChain(t)
-	lggr := logger.Test(t)
+	lggr := logger.Nop()
 	dest := cciptypes.ChainSelector(1)
 	source1 := cciptypes.ChainSelector(2)
 	source2 := cciptypes.ChainSelector(3)
@@ -555,7 +555,7 @@ func TestContractDiscoveryProcessor_Outcome_ErrorSyncingContracts(t *testing.T) 
 
 func TestContractDiscoveryProcessor_ValidateObservation_HappyPath(t *testing.T) {
 	mockHomeChain := mock_home_chain.NewMockHomeChain(t)
-	lggr := logger.Test(t)
+	lggr := logger.Nop()
 	dest := cciptypes.ChainSelector(1)
 	fRoleDON := 1
 	oracleID := commontypes.OracleID(1)
@@ -589,7 +589,7 @@ func TestContractDiscoveryProcessor_ValidateObservation_HappyPath(t *testing.T) 
 
 func TestContractDiscoveryProcessor_ValidateObservation_NoPeerID(t *testing.T) {
 	mockHomeChain := mock_home_chain.NewMockHomeChain(t)
-	lggr := logger.Test(t)
+	lggr := logger.Nop()
 	dest := cciptypes.ChainSelector(1)
 	fRoleDON := 1
 	oracleID := commontypes.OracleID(1)
@@ -617,7 +617,7 @@ func TestContractDiscoveryProcessor_ValidateObservation_NoPeerID(t *testing.T) {
 
 func TestContractDiscoveryProcessor_ValidateObservation_ErrorGettingSupportedChains(t *testing.T) {
 	mockHomeChain := mock_home_chain.NewMockHomeChain(t)
-	lggr := logger.Test(t)
+	lggr := logger.Nop()
 	dest := cciptypes.ChainSelector(1)
 	fRoleDON := 1
 	oracleID := commontypes.OracleID(1)
@@ -735,7 +735,7 @@ func TestContractDiscoveryProcessor_ValidateObservation_OracleNotAllowedToObserv
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			lggr := logger.Test(t)
+			lggr := logger.Nop()
 			fRoleDON := 1
 			oracleID := commontypes.OracleID(1)
 			peerID := ragep2ptypes.PeerID([32]byte{1, 2, 3})
