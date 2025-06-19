@@ -93,12 +93,12 @@ pub mod release_or_mint {
             ],
             current_stage: OfframpDeriveStage::RetrieveChainConfig.to_string(),
             next_stage: OfframpDeriveStage::BuildDynamicAccounts.to_string(),
-            ..Default::default()
+            look_up_tables_to_save: vec![],
         })
     }
 
     pub fn build_dynamic_accounts<'info>(
-        ctx: Context<'_, '_, 'info, 'info, Empty<'info>>,
+        ctx: Context<'_, '_, 'info, 'info, Empty>,
         release_or_mint: &ReleaseOrMintInV1,
     ) -> Result<DeriveAccountsResponse> {
         let chain_config = Account::<'info, ChainConfig>::try_from(&ctx.remaining_accounts[0])?;
@@ -134,6 +134,7 @@ pub mod release_or_mint {
                     .writable(),
             ],
             current_stage: OfframpDeriveStage::BuildDynamicAccounts.to_string(),
+            look_up_tables_to_save: vec![],
             ..Default::default()
         })
     }
@@ -204,7 +205,7 @@ pub mod lock_or_burn {
     }
 
     pub fn build_dynamic_accounts<'info>(
-        ctx: Context<'_, '_, 'info, 'info, Empty<'info>>,
+        ctx: Context<'_, '_, 'info, 'info, Empty>,
         lock_or_burn: &LockOrBurnInV1,
     ) -> Result<DeriveAccountsResponse> {
         let chain_config = Account::<'info, ChainConfig>::try_from(&ctx.remaining_accounts[0])?;

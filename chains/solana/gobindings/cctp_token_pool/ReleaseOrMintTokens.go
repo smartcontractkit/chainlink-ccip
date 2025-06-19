@@ -30,7 +30,7 @@ type ReleaseOrMintTokens struct {
 	//
 	// [5] = [WRITE] mint
 	//
-	// [6] = [] poolSigner
+	// [6] = [WRITE] poolSigner
 	//
 	// [7] = [WRITE] poolTokenAccount
 	//
@@ -136,7 +136,7 @@ func (inst *ReleaseOrMintTokens) GetMintAccount() *ag_solanago.AccountMeta {
 
 // SetPoolSignerAccount sets the "poolSigner" account.
 func (inst *ReleaseOrMintTokens) SetPoolSignerAccount(poolSigner ag_solanago.PublicKey) *ReleaseOrMintTokens {
-	inst.AccountMetaSlice[6] = ag_solanago.Meta(poolSigner)
+	inst.AccountMetaSlice[6] = ag_solanago.Meta(poolSigner).WRITE()
 	return inst
 }
 

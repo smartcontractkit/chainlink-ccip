@@ -56,13 +56,7 @@
         "# Arguments",
         "* `ctx` - The context"
       ],
-      "accounts": [
-        {
-          "name": "clock",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
+      "accounts": [],
       "args": [],
       "returns": "string"
     },
@@ -511,7 +505,7 @@
         },
         {
           "name": "poolSigner",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         },
         {
@@ -778,13 +772,7 @@
     },
     {
       "name": "deriveAccountsReleaseOrMintTokens",
-      "accounts": [
-        {
-          "name": "clock",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
+      "accounts": [],
       "args": [
         {
           "name": "stage",
@@ -803,13 +791,7 @@
     },
     {
       "name": "deriveAccountsLockOrBurnTokens",
-      "accounts": [
-        {
-          "name": "clock",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
+      "accounts": [],
       "args": [
         {
           "name": "stage",
