@@ -797,7 +797,14 @@ func (r *ccipChainReader) Sync(ctx context.Context, contracts ContractAddresses)
 			}
 
 			// the extended reader will do nothing if the contract is already bound.
-			_, err := bindReaderContract(ctx, lggr, r.contractReaders, chainSelector, boundContract.name, boundContract.address, r.addrCodec)
+			_, err := bindReaderContract(
+				ctx,
+				lggr,
+				r.contractReaders,
+				chainSelector,
+				boundContract.name,
+				boundContract.address,
+				r.addrCodec)
 			if err != nil {
 				if errors.Is(err, ErrContractReaderNotFound) {
 					// don't support this chain, nothing to do.
