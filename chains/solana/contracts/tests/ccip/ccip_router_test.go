@@ -5431,8 +5431,6 @@ func TestCCIPRouter(t *testing.T) {
 				user,
 				message,
 				destinationChainSelector,
-				message.FeeToken,
-				[]solana.PublicKey{},
 				solanaGoClient)
 
 			builder := ccip_router.NewCcipSendInstructionBuilder().
@@ -5507,8 +5505,6 @@ func TestCCIPRouter(t *testing.T) {
 				user,
 				message,
 				destinationChainSelector,
-				message.FeeToken,
-				[]solana.PublicKey{token0.Mint, token1.Mint},
 				solanaGoClient)
 
 			lookupTables := ccipSendLookupTable
@@ -5538,7 +5534,38 @@ func TestCCIPRouter(t *testing.T) {
 		})
 
 		t.Run("Deriving accounts with a token pool that also requires derivation", func(t *testing.T) {
-			// TODO
+			destinationChainSelector := config.EvmChainSelector
+			message := ccip_router.SVM2AnyMessage{
+				FeeToken: wsol.mint,
+				Receiver: validReceiverAddress[:],
+				Data:     []byte{4, 5, 6},
+				TokenAmounts: []ccip_router.SVMTokenAmount{
+					{
+						Token:  usdcPool.Mint,
+						Amount: 1,
+					},
+				},
+				ExtraArgs: emptyGenericExtraArgsV2,
+			}
+
+			derivedAccounts, derivedLookUpTables, tokenIndices := deriveSendAccounts(ctx,
+				t,
+				user,
+				message,
+				destinationChainSelector,
+				solanaGoClient)
+			lookupTables := ccipSendLookupTable
+			for _, table := range derivedLookUpTables {
+				entries, lutErr := common.GetAddressLookupTable(ctx, solanaGoClient, table)
+				require.NoError(t, lutErr)
+				lookupTables[table] = entries
+			}
+
+			for i, meta := range derivedAccounts {
+				fmt.Printf("Derived: [%d] %v\n", i, meta)
+			}
+
+			fmt.Printf("%v\n", tokenIndices)
 		})
 	})
 
@@ -10915,8 +10942,6 @@ func deriveSendAccounts(ctx context.Context,
 	transmitter solana.PrivateKey,
 	message ccip_router.SVM2AnyMessage,
 	destChainSelector uint64,
-	feeTokenMint solana.PublicKey,
-	mintsOfTransferredTokens []solana.PublicKey,
 	solanaGoClient *rpc.Client) (accounts []*solana.AccountMeta, lookUpTables []solana.PublicKey, tokenIndices []byte) {
 	derivedAccounts := []*solana.AccountMeta{}
 	askWith := []*solana.AccountMeta{}
@@ -10929,7 +10954,6 @@ func deriveSendAccounts(ctx context.Context,
 			Message:           message,
 		}
 
-		fmt.Printf("Stage: %s\n", stage)
 		deriveRaw := ccip_router.NewDeriveAccountsCcipSendInstruction(
 			params,
 			stage,
@@ -10938,6 +10962,10 @@ func deriveSendAccounts(ctx context.Context,
 		deriveRaw.AccountMetaSlice = append(deriveRaw.AccountMetaSlice, askWith...)
 		derive, err := deriveRaw.ValidateAndBuild()
 		require.NoError(t, err)
+		fmt.Printf("Calling derive with stage %s and account list: \n", stage)
+		for i, acc := range deriveRaw.AccountMetaSlice {
+			fmt.Printf("[%d]: %v\n", i, acc)
+		}
 		tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{derive}, transmitter, config.DefaultCommitment)
 		derivation, err := common.ExtractAnchorTypedReturnValue[ccip_router.DeriveAccountsResponse](ctx, tx.Meta.LogMessages, config.CcipRouterProgram.String())
 		require.NoError(t, err)
