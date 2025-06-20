@@ -17,6 +17,8 @@ use crate::context::*;
 #[program]
 pub mod burnmint_token_pool {
 
+    use anchor_spl::token;
+
     use super::*;
 
     pub fn init_global_config(ctx: Context<InitGlobalConfig>) -> Result<()> {
@@ -91,11 +93,13 @@ pub mod burnmint_token_pool {
             spl_token_2022::state::Multisig::unpack_from_slice(multisig_data)
                 .map_err(|_| CcipBnMTokenPoolError::InvalidToken2022Multisig)?
                 .into()
-        } else {
-            // If the token program is not spl-token-2022, we assume it is the original SPL Token Program
+        } else if token_program_id == &spl_token::ID {
             spl_token::state::Multisig::unpack_from_slice(multisig_data)
                 .map_err(|_| CcipBnMTokenPoolError::InvalidSPLTokenMultisig)?
                 .into()
+        } else {
+            // Reject any unsupported token programs
+            return Err(CcipBnMTokenPoolError::UnsupportedTokenProgram.into());
         };
 
         // If using a multisig, it must have more than one valid signer
@@ -106,6 +110,13 @@ pub mod burnmint_token_pool {
             CcipBnMTokenPoolError::MultisigMustHaveMoreThanOneSigner
         );
         let m = multisig_account.m as usize;
+
+        // The multisig must be valid, m must be less than or equal to n
+        require_gte!(
+            n,
+            m,
+            CcipBnMTokenPoolError::InvalidMultisigThreshold
+        );
         // The Pool signer must be at least m times a signer, so it can mint by itself
         require_gte!(
             multisig_account
@@ -136,14 +147,14 @@ pub mod burnmint_token_pool {
         let account_infos: Vec<AccountInfo> =
             if old_mint_authority != ctx.accounts.pool_signer.key() {
                 // If the old mint authority is not the pool signer, we need to include the multisig account in the instruction
-                let multisig_account = ctx
+                let multisig_signer_account = ctx
                     .remaining_accounts
                     .iter()
                     .find(|acc| acc.key() == old_mint_authority)
                     .ok_or(CcipBnMTokenPoolError::InvalidMultisig)?;
                 vec![
                     ctx.accounts.mint.to_account_info(),
-                    multisig_account.to_account_info(),
+                    multisig_signer_account.to_account_info(),
                     ctx.accounts.pool_signer.to_account_info(),
                 ]
             } else {
