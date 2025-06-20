@@ -349,23 +349,25 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 	// fail the entire outcome because of that. The reason being is that if this node is a leader
 	// of an OCR round, it will NOT be able to complete the round due to failing to compute the Outcome.
 	// TODO: we should move Sync calls to observation but that requires updates to the Outcome struct for discovery.
-	go func(syncer *readerSyncer, lggr logger.Logger) {
-		ctx, cancel := context.WithTimeout(context.Background(), syncTimeout)
-		defer cancel()
-		alreadySyncing, err := syncer.Sync(ctx, contracts)
-		if err != nil {
-			lggr.Errorw(
-				"unable to sync contracts - this is usually due to RPC issues,"+
-					" please check your RPC endpoints and their health!",
-				"err", err)
-		} else if alreadySyncing {
-			lggr.Infow("discovery syncer is already syncing, skipping sync until its done or it times out")
-		} else {
-			lggr.Infow("discovery successfully synced contracts", "contracts", contracts)
-		}
-	}(cdp.syncer, lggr)
+	go cdp.syncContracts(lggr, contracts)
 
 	return dt.Outcome{}, nil
+}
+
+func (cdp *ContractDiscoveryProcessor) syncContracts(lggr logger.Logger, contracts reader.ContractAddresses) {
+	ctx, cancel := context.WithTimeout(context.Background(), syncTimeout)
+	defer cancel()
+	alreadySyncing, err := cdp.syncer.Sync(ctx, contracts)
+	if err != nil {
+		lggr.Errorw(
+			"unable to sync contracts - this is usually due to RPC issues,"+
+				" please check your RPC endpoints and their health!",
+			"err", err)
+	} else if alreadySyncing {
+		lggr.Infow("discovery syncer is already syncing, skipping sync until its done or it times out")
+	} else {
+		lggr.Infow("discovery successfully synced contracts", "contracts", contracts)
+	}
 }
 
 func (cdp *ContractDiscoveryProcessor) Close() error {
