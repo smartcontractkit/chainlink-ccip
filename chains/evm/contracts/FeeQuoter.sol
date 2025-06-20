@@ -307,7 +307,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   /// - On L1 chains like Ethereum or Avax, the only component is the gas price.
   /// - On Optimistic Rollups, there are two components - the L2 gas price, and L1 base fee for data availability.
   /// - On future chains, there could be more or differing price components.
-  /// PriceRegistry does not contain chain-specific logic to parse destination chain price components.
   /// @param destChainSelector The destination chain to get the price for.
   /// @return gasPrice The encoded gasPrice for the given destination chain ID.
   /// @dev Does not validate if the chain is enabled
