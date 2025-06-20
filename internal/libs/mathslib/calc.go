@@ -78,7 +78,6 @@ func CalculateUsdPerUnitGas(
 		// sourceGasPrice * 1e10 becomes in units of 1e-18 APT/gas == wei/gas.
 
 		// Apt has 8 decimals, usdPerFeeCoin represents 1e18 USD per 1e8 whole apt, or 1e18 USD/1e28wei.
-		// usdPerFeeCoin / 1e8 becomes in units of 1e18 USD * 1e18 / wei.
 
 		// 28 - 10 = 18, so we need to divide by 1e18 to get 1e18 USD/gas.
 

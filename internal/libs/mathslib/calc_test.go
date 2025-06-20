@@ -171,24 +171,24 @@ func TestCalculateUsdPerUnitGas(t *testing.T) {
 		},
 		{
 			name:           "apt base fee case",
-			sourceGasPrice: big.NewInt(100),                                     // 100 octas per gas
-			usdPerFeeCoin:  new(big.Int).Mul(big.NewInt(5e8), big.NewInt(1e18)), // $5/APT
-			chainSelector:  AptChainSelector,                                    // 1e8 APT per full token
-			exp:            big.NewInt(5e10),                                    // 0.00000005 USD per gas
+			sourceGasPrice: big.NewInt(100),                                                                       // 1 octas per gas
+			usdPerFeeCoin:  new(big.Int).Mul(big.NewInt(5), new(big.Int).Mul(big.NewInt(1e10), big.NewInt(1e18))), // $5/APT
+			chainSelector:  AptChainSelector,                                                                      // 1e8 APT per full token
+			exp:            big.NewInt(5e12),
 		},
 		{
 			name:           "apt high fee case",
-			sourceGasPrice: big.NewInt(100000),                                   // 100000 octas per gas == 0.001 APT per gas
-			usdPerFeeCoin:  new(big.Int).Mul(big.NewInt(20e8), big.NewInt(1e18)), // $20/APT
-			chainSelector:  AptChainSelector,                                     // 1e8 APT per full token
-			exp:            big.NewInt(2e14),                                     // 0.0002 USD per gas
+			sourceGasPrice: big.NewInt(100000),                                    // 100000 octas per gas == 0.001 APT per gas
+			usdPerFeeCoin:  new(big.Int).Mul(big.NewInt(20e10), big.NewInt(1e18)), // $20/APT
+			chainSelector:  AptChainSelector,                                      // 1e8 APT per full token
+			exp:            big.NewInt(2e16),
 		},
 		{
 			name:           "apt low fee case",
 			sourceGasPrice: big.NewInt(100),
-			usdPerFeeCoin:  new(big.Int).Mul(big.NewInt(1e8), big.NewInt(1e18)), // $1/APT
-			chainSelector:  AptChainSelector,                                    // 1e8 APT per full token
-			exp:            big.NewInt(1e10),                                    // 0.00000001 USD per gas
+			usdPerFeeCoin:  new(big.Int).Mul(big.NewInt(1e10), big.NewInt(1e18)), // $1/APT
+			chainSelector:  AptChainSelector,                                     // 1e8 APT per full token
+			exp:            big.NewInt(1e12),
 		},
 		{
 			name:           "apt 0 fee case",
