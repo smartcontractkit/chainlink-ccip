@@ -764,28 +764,38 @@ export type BurnmintTokenPool = {
     },
     {
       "code": 6003,
+      "name": "UnsupportedTokenProgram",
+      "msg": "Unsupported Token Program"
+    },
+    {
+      "code": 6004,
       "name": "InvalidToken2022Multisig",
       "msg": "Invalid Multisig Account Data for Token 2022"
     },
     {
-      "code": 6004,
+      "code": 6005,
       "name": "InvalidSPLTokenMultisig",
       "msg": "Invalid Multisig Account Data for SPL Token"
     },
     {
-      "code": 6005,
+      "code": 6006,
       "name": "PoolSignerNotInMultisig",
       "msg": "Token Pool Signer PDA must be signer of the Multisig"
     },
     {
-      "code": 6006,
+      "code": 6007,
       "name": "MultisigMustHaveMoreThanOneSigner",
       "msg": "Multisig must have more than one signer"
     },
     {
-      "code": 6007,
+      "code": 6008,
       "name": "InvalidMultisigOwner",
       "msg": "Multisig Owner must match Token Program ID"
+    },
+    {
+      "code": 6009,
+      "name": "InvalidMultisigThreshold",
+      "msg": "Invalid multisig threshold: required signatures cannot exceed total signers"
     }
   ]
 };
@@ -1556,28 +1566,38 @@ export const IDL: BurnmintTokenPool = {
     },
     {
       "code": 6003,
+      "name": "UnsupportedTokenProgram",
+      "msg": "Unsupported Token Program"
+    },
+    {
+      "code": 6004,
       "name": "InvalidToken2022Multisig",
       "msg": "Invalid Multisig Account Data for Token 2022"
     },
     {
-      "code": 6004,
+      "code": 6005,
       "name": "InvalidSPLTokenMultisig",
       "msg": "Invalid Multisig Account Data for SPL Token"
     },
     {
-      "code": 6005,
+      "code": 6006,
       "name": "PoolSignerNotInMultisig",
       "msg": "Token Pool Signer PDA must be signer of the Multisig"
     },
     {
-      "code": 6006,
+      "code": 6007,
       "name": "MultisigMustHaveMoreThanOneSigner",
       "msg": "Multisig must have more than one signer"
     },
     {
-      "code": 6007,
+      "code": 6008,
       "name": "InvalidMultisigOwner",
       "msg": "Multisig Owner must match Token Program ID"
+    },
+    {
+      "code": 6009,
+      "name": "InvalidMultisigThreshold",
+      "msg": "Invalid multisig threshold: required signatures cannot exceed total signers"
     }
   ]
 };

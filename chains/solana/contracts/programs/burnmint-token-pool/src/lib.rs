@@ -110,11 +110,7 @@ pub mod burnmint_token_pool {
         let m = multisig_account.m as usize;
 
         // The multisig must be valid, m must be less than or equal to n
-        require_gte!(
-            n,
-            m,
-            CcipBnMTokenPoolError::InvalidMultisigThreshold
-        );
+        require_gte!(n, m, CcipBnMTokenPoolError::InvalidMultisigThreshold);
         // The Pool signer must be at least m times a signer, so it can mint by itself
         require_gte!(
             multisig_account
