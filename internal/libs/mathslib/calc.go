@@ -75,14 +75,16 @@ func CalculateUsdPerUnitGas(
 
 	case chainsel.FamilyAptos:
 		// In Aptos, sourceGasPrice is denoted in octas/gas unit or 1e-8 APT/gas.
-		// APT has 8 decimals, usdPerFeeCoin represents 1e18 USD * 1e8 APT = 1e28 USD per full APT
-		// To get 1e18 USD/gas we have
-		//   sourceGasPrice (1e8) * usdPerFeeCoin (1e28) / 1e18
-		//     = (octas / gas) * (1e18 USD * 1e8 octas) / 1e18
-		//     = (octas / gas) * 1e28 / 1e18
-		//     = 1e8 * 1e28 / 1e18
-		//     = 1e36 / 1e18
-		//     = 1e18 USD / gas
+		// APT has 8 decimals, usdPerFeeCoin represents 1e18 USD * 1e10 APT = 1e28 USD per full APT
+
+		// UsdPerFeeCoin is 1e18 USD per 1e18 smallest token unit, when APT has 8 decimals.
+		// 1e18 smallest token unit is 1e10 whole tokens, so UsdPerFeeCoin represents 1e18 USD * 1e10
+		// APT = 1e28 per APT
+
+		// = (wei / gas) * (1e18 USD * 1e18 / wei) / 1e18
+		// = (sourceGasPrice * 1e10) * (usdPerFeeCoin / 1e10) / 1e18
+		// = (sourceGasPrice * usdPerFeeCoin) / 1e18
+
 		tmp := new(big.Int).Mul(sourceGasPrice, usdPerFeeCoin)
 		return tmp.Div(tmp, big.NewInt(1e18)), nil
 
