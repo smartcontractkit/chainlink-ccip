@@ -16,6 +16,7 @@ import (
 var (
 	SolChainSelector = ccipocr3.ChainSelector(sel.SOLANA_DEVNET.Selector)
 	EvmChainSelector = ccipocr3.ChainSelector(sel.ETHEREUM_TESTNET_SEPOLIA.Selector)
+	AptChainSelector = ccipocr3.ChainSelector(sel.APTOS_TESTNET.Selector)
 )
 
 func TestDeviates(t *testing.T) {
@@ -167,6 +168,34 @@ func TestCalculateUsdPerUnitGas(t *testing.T) {
 			usdPerFeeCoin:  new(big.Int).Mul(big.NewInt(150e9), big.NewInt(1e18)),
 			chainSelector:  SolChainSelector,
 			exp:            big.NewInt(0),
+		},
+		{
+			name:           "apt base fee case",
+			sourceGasPrice: big.NewInt(100),                                     // 100 octas per gas
+			usdPerFeeCoin:  new(big.Int).Mul(big.NewInt(5e8), big.NewInt(1e18)), // $5/APT
+			chainSelector:  AptChainSelector,                                    // 1e8 APT per full token
+			exp:            big.NewInt(5e12),                                    // 0.000005 USD per gas
+		},
+		{
+			name:           "apt high fee case",
+			sourceGasPrice: big.NewInt(100000),                                   // 100000 octas per gas == 0.001 APT per gas
+			usdPerFeeCoin:  new(big.Int).Mul(big.NewInt(20e8), big.NewInt(1e18)), // $20/APT
+			chainSelector:  AptChainSelector,                                     // 1e8 APT per full token
+			exp:            big.NewInt(2e16),                                     // 0.02 USD per gas
+		},
+		{
+			name:           "apt low fee case",
+			sourceGasPrice: big.NewInt(100),
+			usdPerFeeCoin:  new(big.Int).Mul(big.NewInt(1e8), big.NewInt(1e18)), // $1/APT
+			chainSelector:  AptChainSelector,                                    // 1e8 APT per full token
+			exp:            big.NewInt(1e12),                                    // 0.000001 USD per gas
+		},
+		{
+			name:           "apt 0 fee case",
+			sourceGasPrice: big.NewInt(0),
+			usdPerFeeCoin:  new(big.Int).Mul(big.NewInt(1e8), big.NewInt(1e18)), // $1/APT
+			chainSelector:  AptChainSelector,                                    // 1e8 APT per full token
+			exp:            big.NewInt(0),                                       // 0 USD per gas
 		},
 	}
 
