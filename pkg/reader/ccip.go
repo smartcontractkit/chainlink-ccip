@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"slices"
 	"sort"
 	"sync"
 	"time"
@@ -672,14 +673,14 @@ func (r *ccipChainReader) discoverOffRampContracts(
 }
 
 func (r *ccipChainReader) DiscoverContracts(ctx context.Context,
-	chains []cciptypes.ChainSelector,
+	supportedChains, allChains []cciptypes.ChainSelector,
 ) (ContractAddresses, error) {
 	var resp ContractAddresses
+	var err error
 	lggr := logutil.WithContextValues(ctx, r.lggr)
 
-	// Discover destination contracts if the dest chain is supported.
-	if err := validateReaderExistence(r.contractReaders, r.destChain); err == nil {
-		resp, err = r.discoverOffRampContracts(ctx, lggr, chains)
+	if slices.Contains(supportedChains, r.destChain) {
+		resp, err = r.discoverOffRampContracts(ctx, lggr, allChains)
 		// Can't continue with discovery if the destination chain is not available.
 		// We read source chains OnRamps from there, and onRamps are essential for feeQuoter and Router discovery.
 		if err != nil {
@@ -692,21 +693,18 @@ func (r *ccipChainReader) DiscoverContracts(ctx context.Context,
 	// configured through consensus when the Sync function is called, but until
 	// that happens the ErrNoBindings case must be handled gracefully.
 
-	myChains := maps.Keys(r.contractReaders)
-
 	// Use wait group for parallel processing
 	var wg sync.WaitGroup
 	mu := new(sync.Mutex)
 
 	// Process each source chain's OnRamp configurations
-	for _, chain := range myChains {
+	for _, chain := range supportedChains {
 		if chain == r.destChain {
 			continue
 		}
-
-		// Check if we have a reader for this chain
+		// Sanity check that we have a reader for this chain
 		if _, exists := r.contractReaders[chain]; !exists {
-			lggr.Debugw("Contract reader not found for chain", "chain", chain)
+			lggr.Errorw("Contract reader not found for a supported chain", "chain", chain)
 			continue
 		}
 
@@ -767,6 +765,7 @@ func (r *ccipChainReader) Sync(ctx context.Context, contracts ContractAddresses)
 
 	lggr := logutil.WithContextValues(ctx, r.lggr)
 	var errs []error
+
 	for contractName, chainSelToAddress := range contracts {
 		for chainSel, address := range chainSelToAddress {
 			// defense in depth: don't bind if the address is empty.

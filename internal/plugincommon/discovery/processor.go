@@ -3,6 +3,7 @@ package discovery
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
@@ -30,6 +31,7 @@ type ContractDiscoveryProcessor struct {
 	dest            cciptypes.ChainSelector
 	fRoleDON        int
 	oracleIDToP2PID map[commontypes.OracleID]ragep2ptypes.PeerID
+	peerID          ragep2ptypes.PeerID
 }
 
 func NewContractDiscoveryProcessor(
@@ -39,8 +41,15 @@ func NewContractDiscoveryProcessor(
 	dest cciptypes.ChainSelector,
 	fRoleDON int,
 	oracleIDToP2PID map[commontypes.OracleID]ragep2ptypes.PeerID,
+	oracleID commontypes.OracleID,
 	reporter plugincommon.MetricsReporter,
 ) plugincommon.PluginProcessor[dt.Query, dt.Observation, dt.Outcome] {
+	peerID, ok := oracleIDToP2PID[oracleID]
+	if !ok {
+		lggr.Errorf("peerID not found for oracle %d oracleIDToPeerID=%v", oracleID, oracleIDToP2PID)
+		return nil
+	}
+
 	p := &ContractDiscoveryProcessor{
 		lggr:            lggr,
 		reader:          reader,
@@ -48,6 +57,7 @@ func NewContractDiscoveryProcessor(
 		dest:            dest,
 		fRoleDON:        fRoleDON,
 		oracleIDToP2PID: oracleIDToP2PID,
+		peerID:          peerID,
 	}
 	return plugincommon.NewTrackedProcessor(lggr, p, "discovery", reporter)
 }
@@ -76,7 +86,13 @@ func (cdp *ContractDiscoveryProcessor) Observation(
 		return dt.Observation{}, fmt.Errorf("unable to get chain configs: %w, seqNr: %d", err, seqNr)
 	}
 
-	contracts, err := (*cdp.reader).DiscoverContracts(ctx, maps.Keys(chainConfigs))
+	supportedChains, err := cdp.getSupportedChains()
+	if err != nil {
+		return dt.Observation{}, fmt.Errorf("get supported chains for peer %d: %w", cdp.peerID, err)
+	}
+
+	cdp.lggr.Infow("about to discover contracts", "supportedChains", supportedChains)
+	contracts, err := (*cdp.reader).DiscoverContracts(ctx, supportedChains, maps.Keys(chainConfigs))
 	if err != nil {
 		return dt.Observation{}, fmt.Errorf("unable to discover contracts: %w, seqNr: %d", err, seqNr)
 	}
@@ -85,6 +101,17 @@ func (cdp *ContractDiscoveryProcessor) Observation(
 		FChain:    fChain,
 		Addresses: contracts,
 	}, nil
+}
+
+func (cdp *ContractDiscoveryProcessor) getSupportedChains() ([]cciptypes.ChainSelector, error) {
+	supportedChains, err := cdp.homechain.GetSupportedChainsForPeer(cdp.peerID)
+	if err != nil {
+		return nil, fmt.Errorf("get supported chains for peer %d: %w", cdp.peerID, err)
+	}
+
+	supportedChainsSlice := supportedChains.ToSlice()
+	sort.Slice(supportedChainsSlice, func(i, j int) bool { return supportedChainsSlice[i] < supportedChainsSlice[j] })
+	return supportedChainsSlice, nil
 }
 
 func (cdp *ContractDiscoveryProcessor) ValidateObservation(
