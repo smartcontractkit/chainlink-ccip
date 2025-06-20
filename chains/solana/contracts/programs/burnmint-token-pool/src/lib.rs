@@ -17,8 +17,6 @@ use crate::context::*;
 #[program]
 pub mod burnmint_token_pool {
 
-    use anchor_spl::token;
-
     use super::*;
 
     pub fn init_global_config(ctx: Context<InitGlobalConfig>) -> Result<()> {
