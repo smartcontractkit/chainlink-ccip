@@ -81,7 +81,7 @@ contract OnRampOverSuperchainInterop is OnRamp {
     interopMessage.header.messageId = messageId;
 
     // Interop hash uniquely identifies the interop message.
-    bytes32 interopMessageHash = SuperchainInterop._hashInteropMessage(interopMessage);
+    bytes32 interopMessageHash = SuperchainInterop._hashInteropMessage(interopMessage, address(this));
     s_sentInteropMessageHashes[interopMessage.header.sequenceNumber] = interopMessageHash;
 
     emit SuperchainInterop.CCIPSuperchainMessageSent(
@@ -126,7 +126,7 @@ contract OnRampOverSuperchainInterop is OnRamp {
       revert InvalidSourceChainSelector(interopMessage.header.sourceChainSelector);
     }
 
-    bytes32 interopMessageHash = SuperchainInterop._hashInteropMessage(interopMessage);
+    bytes32 interopMessageHash = SuperchainInterop._hashInteropMessage(interopMessage, address(this));
 
     uint64 destChainSelector = interopMessage.header.destChainSelector;
     uint64 sequenceNumber = interopMessage.header.sequenceNumber;

@@ -9,7 +9,7 @@ contract OnRampOverSuperchainInterop_hashInteropMessage is OnRampOverSuperchainI
   function test_BasicMessageHash() public {
     Internal.Any2EVMRampMessage memory message = _generateBasicAny2EVMMessage();
 
-    bytes32 messageHash = SuperchainInterop._hashInteropMessage(message);
+    bytes32 messageHash = SuperchainInterop._hashInteropMessage(message, address(s_onRampOverSuperchainInterop));
     bytes32 expectedMessageHash = Internal._hash(message, _getOffRampMetadataHash());
 
     assertEq(messageHash, expectedMessageHash);
@@ -18,7 +18,7 @@ contract OnRampOverSuperchainInterop_hashInteropMessage is OnRampOverSuperchainI
   function test_TokenMessageHash() public {
     Internal.Any2EVMRampMessage memory message = _generateAny2EVMMessageWithTokens();
 
-    bytes32 messageHash = SuperchainInterop._hashInteropMessage(message);
+    bytes32 messageHash = SuperchainInterop._hashInteropMessage(message, address(s_onRampOverSuperchainInterop));
     bytes32 expectedMessageHash = Internal._hash(message, _getOffRampMetadataHash());
 
     assertEq(messageHash, expectedMessageHash);
@@ -27,8 +27,8 @@ contract OnRampOverSuperchainInterop_hashInteropMessage is OnRampOverSuperchainI
   function test_SameMessageProducesSameHash() public {
     Internal.Any2EVMRampMessage memory message = _generateBasicAny2EVMMessage();
 
-    bytes32 messageHash1 = SuperchainInterop._hashInteropMessage(message);
-    bytes32 messageHash2 = SuperchainInterop._hashInteropMessage(message);
+    bytes32 messageHash1 = SuperchainInterop._hashInteropMessage(message, address(s_onRampOverSuperchainInterop));
+    bytes32 messageHash2 = SuperchainInterop._hashInteropMessage(message, address(s_onRampOverSuperchainInterop));
 
     assertEq(messageHash1, messageHash2);
   }
@@ -36,10 +36,10 @@ contract OnRampOverSuperchainInterop_hashInteropMessage is OnRampOverSuperchainI
   function test_DifferentMessageProduceDifferentHashes() public {
     Internal.Any2EVMRampMessage memory message = _generateBasicAny2EVMMessage();
 
-    bytes32 messageHash1 = SuperchainInterop._hashInteropMessage(message);
+    bytes32 messageHash1 = SuperchainInterop._hashInteropMessage(message, address(s_onRampOverSuperchainInterop));
 
     message.header.destChainSelector = DEST_CHAIN_SELECTOR + 1;
-    bytes32 messageHash2 = SuperchainInterop._hashInteropMessage(message);
+    bytes32 messageHash2 = SuperchainInterop._hashInteropMessage(message, address(s_onRampOverSuperchainInterop));
 
     assertTrue(messageHash1 != messageHash2);
   }
@@ -55,7 +55,7 @@ contract OnRampOverSuperchainInterop_hashInteropMessage is OnRampOverSuperchainI
     Internal.Any2EVMRampMessage memory message =
       _generateAny2EVMMessageWithCustomFields(sender, data, receiver, gasLimit, sequenceNumber, nonce);
 
-    bytes32 messageHash = SuperchainInterop._hashInteropMessage(message);
+    bytes32 messageHash = SuperchainInterop._hashInteropMessage(message, address(s_onRampOverSuperchainInterop));
     bytes32 expectedMessageHash = Internal._hash(message, _getOffRampMetadataHash());
 
     assertEq(messageHash, expectedMessageHash);

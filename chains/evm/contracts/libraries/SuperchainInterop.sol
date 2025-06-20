@@ -30,14 +30,15 @@ library SuperchainInterop {
   /// @param message The interop message to hash.
   /// @return messageHash The hash of the interop message.
   function _hashInteropMessage(
-    Internal.Any2EVMRampMessage memory message
-  ) internal view returns (bytes32) {
+    Internal.Any2EVMRampMessage memory message,
+    address onRamp
+  ) internal pure returns (bytes32) {
     bytes32 offRampMetaDataHash = keccak256(
       abi.encode(
         Internal.ANY_2_EVM_MESSAGE_HASH,
         message.header.sourceChainSelector,
         message.header.destChainSelector,
-        keccak256(abi.encode(address(this)))
+        keccak256(abi.encode(onRamp))
       )
     );
 
