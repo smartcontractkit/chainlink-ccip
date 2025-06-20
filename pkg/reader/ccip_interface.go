@@ -269,7 +269,8 @@ type CCIPReader interface {
 	// They are returned per contract and source chain selector.
 	// allChains is needed because there is no way to enumerate all chain selectors on Solana. We'll attempt to
 	// fetch the source config from the offramp for each of them.
-	DiscoverContracts(ctx context.Context, allChains []cciptypes.ChainSelector) (ContractAddresses, error)
+	DiscoverContracts(ctx context.Context,
+		supportedChains, allChains []cciptypes.ChainSelector) (ContractAddresses, error)
 
 	// LinkPriceUSD gets the LINK price in 1e-18 USDs from the FeeQuoter contract on the destination chain.
 	// For example, if the price is 1 LINK = 10 USD, this function will return 10e18 (10 * 1e18). You can think of this

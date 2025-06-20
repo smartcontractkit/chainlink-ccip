@@ -195,7 +195,7 @@ func (r InMemoryCCIPReader) GetChainFeePriceUpdate(
 
 func (r InMemoryCCIPReader) DiscoverContracts(
 	ctx context.Context,
-	allChains []cciptypes.ChainSelector) (reader.ContractAddresses, error) {
+	supportedChains, allChains []cciptypes.ChainSelector) (reader.ContractAddresses, error) {
 	return nil, nil
 }
 

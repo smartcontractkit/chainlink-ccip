@@ -67,7 +67,7 @@ func TestContractDiscoveryProcessor_Observation_SupportsDest_HappyPath(t *testin
 	}
 	mockReader.
 		EXPECT().
-		DiscoverContracts(mock.Anything, mock.Anything).
+		DiscoverContracts(mock.Anything, mock.Anything, mock.Anything).
 		Return(expectedContracts, nil)
 
 	mockHomeChain.EXPECT().GetFChain().Return(expectedFChain, nil)
@@ -81,8 +81,11 @@ func TestContractDiscoveryProcessor_Observation_SupportsDest_HappyPath(t *testin
 		mockHomeChain,
 		dest,
 		fRoleDON,
-		nil, // oracleIDToP2PID, not needed for this test,
+		map[commontypes.OracleID]ragep2ptypes.PeerID{0: {}},
+		0,
 	)
+
+	mockHomeChain.EXPECT().GetSupportedChainsForPeer(ragep2ptypes.PeerID{}).Return(mapset.NewSet(source, dest), nil)
 
 	observation, err := cdp.Observation(ctx, discoverytypes.Outcome{}, discoverytypes.Query{})
 	assert.NoError(t, err)
@@ -118,7 +121,8 @@ func TestContractDiscoveryProcessor_Observation_ErrorGettingFChain(t *testing.T)
 		mockHomeChain,
 		dest,
 		fRoleDON,
-		nil, // oracleIDToP2PID, not needed for this test
+		map[commontypes.OracleID]ragep2ptypes.PeerID{0: {}},
+		0,
 	)
 
 	observation, err := cdp.Observation(ctx, discoverytypes.Outcome{}, discoverytypes.Query{})
@@ -144,7 +148,7 @@ func TestContractDiscoveryProcessor_Observation_SourceReadersNotReady(t *testing
 	}
 	mockReader.
 		EXPECT().
-		DiscoverContracts(mock.Anything, mock.Anything).
+		DiscoverContracts(mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 
 	mockHomeChain.EXPECT().GetFChain().Return(expectedFChain, nil)
@@ -158,9 +162,11 @@ func TestContractDiscoveryProcessor_Observation_SourceReadersNotReady(t *testing
 		mockHomeChain,
 		dest,
 		fRoleDON,
-		nil, // oracleIDToP2PID, not needed for this test
+		map[commontypes.OracleID]ragep2ptypes.PeerID{0: {}},
+		0,
 	)
 
+	mockHomeChain.EXPECT().GetSupportedChainsForPeer(ragep2ptypes.PeerID{}).Return(mapset.NewSet(source, dest), nil)
 	observation, err := cdp.Observation(ctx, discoverytypes.Outcome{}, discoverytypes.Query{})
 	assert.NoError(t, err)
 	assert.Equal(t, expectedFChain, observation.FChain)
@@ -184,7 +190,7 @@ func TestContractDiscoveryProcessor_Observation_ErrorDiscoveringContracts(t *tes
 	discoveryErr := fmt.Errorf("discovery error")
 	mockReader.
 		EXPECT().
-		DiscoverContracts(mock.Anything, mock.Anything).
+		DiscoverContracts(mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, discoveryErr)
 	mockHomeChain.EXPECT().GetFChain().Return(expectedFChain, nil)
 	mockHomeChain.EXPECT().GetAllChainConfigs().Return(nil, nil)
@@ -197,9 +203,11 @@ func TestContractDiscoveryProcessor_Observation_ErrorDiscoveringContracts(t *tes
 		mockHomeChain,
 		dest,
 		fRoleDON,
-		nil, // oracleIDToP2PID, not needed for this test
+		map[commontypes.OracleID]ragep2ptypes.PeerID{0: {}},
+		0,
 	)
 
+	mockHomeChain.EXPECT().GetSupportedChainsForPeer(ragep2ptypes.PeerID{}).Return(mapset.NewSet(source, dest), nil)
 	observation, err := cdp.Observation(ctx, discoverytypes.Outcome{}, discoverytypes.Query{})
 	assert.Error(t, err)
 	assert.Empty(t, observation.FChain)
@@ -256,7 +264,8 @@ func TestContractDiscoveryProcessor_Outcome_HappyPath(t *testing.T) {
 		mockHomeChain,
 		dest,
 		fRoleDON,
-		nil, // oracleIDToP2PID, not needed for this test
+		map[commontypes.OracleID]ragep2ptypes.PeerID{0: {}},
+		0,
 	)
 
 	obsSrc := discoverytypes.Observation{
@@ -342,7 +351,8 @@ func TestContractDiscovery_Outcome_HappyPath_FRoleDONAndFDestChainAreDifferent(t
 		mockHomeChain,
 		dest,
 		fRoleDON,
-		nil, // oracleIDToP2PID, not needed for this test
+		map[commontypes.OracleID]ragep2ptypes.PeerID{0: {}},
+		0,
 	)
 
 	fChainObs := discoverytypes.Observation{
@@ -434,7 +444,8 @@ func TestContractDiscoveryProcessor_Outcome_NotEnoughObservations(t *testing.T) 
 		mockHomeChain,
 		dest,
 		fRoleDON,
-		nil, // oracleIDToP2PID, not needed for this test
+		map[commontypes.OracleID]ragep2ptypes.PeerID{0: {}},
+		0,
 	)
 
 	fChainObs := discoverytypes.Observation{
@@ -522,7 +533,8 @@ func TestContractDiscoveryProcessor_Outcome_ErrorSyncingContracts(t *testing.T) 
 		mockHomeChain,
 		dest,
 		fRoleDON,
-		nil, // oracleIDToP2PID, not needed for this test
+		map[commontypes.OracleID]ragep2ptypes.PeerID{0: {}},
+		0,
 	)
 
 	obs := discoverytypes.Observation{
@@ -576,6 +588,7 @@ func TestContractDiscoveryProcessor_ValidateObservation_HappyPath(t *testing.T) 
 		dest,
 		fRoleDON,
 		oracleIDToP2PID,
+		oracleID,
 	)
 
 	ao := plugincommon.AttributedObservation[discoverytypes.Observation]{
@@ -593,9 +606,7 @@ func TestContractDiscoveryProcessor_ValidateObservation_NoPeerID(t *testing.T) {
 	dest := cciptypes.ChainSelector(1)
 	fRoleDON := 1
 	oracleID := commontypes.OracleID(1)
-
-	oracleIDToP2PID := map[commontypes.OracleID]ragep2ptypes.PeerID{}
-
+	oracleIDToP2PID := map[commontypes.OracleID]ragep2ptypes.PeerID{oracleID: {}}
 	cdp := internalNewContractDiscoveryProcessor(
 		lggr,
 		nil, // reader, not needed for this test
@@ -603,10 +614,11 @@ func TestContractDiscoveryProcessor_ValidateObservation_NoPeerID(t *testing.T) {
 		dest,
 		fRoleDON,
 		oracleIDToP2PID,
+		oracleID,
 	)
 
 	ao := plugincommon.AttributedObservation[discoverytypes.Observation]{
-		OracleID:    oracleID,
+		OracleID:    oracleID + 1, // +1 implies another oracle
 		Observation: dummyObservation,
 	}
 
@@ -638,6 +650,7 @@ func TestContractDiscoveryProcessor_ValidateObservation_ErrorGettingSupportedCha
 		dest,
 		fRoleDON,
 		oracleIDToP2PID,
+		oracleID,
 	)
 
 	ao := plugincommon.AttributedObservation[discoverytypes.Observation]{
@@ -756,6 +769,7 @@ func TestContractDiscoveryProcessor_ValidateObservation_OracleNotAllowedToObserv
 				dest,
 				fRoleDON,
 				oracleIDToP2PID,
+				oracleID,
 			)
 
 			ao := plugincommon.AttributedObservation[discoverytypes.Observation]{
@@ -797,6 +811,7 @@ func internalNewContractDiscoveryProcessor(
 	dest cciptypes.ChainSelector,
 	fRoleDON int,
 	oracleIDToP2PID map[commontypes.OracleID]ragep2ptypes.PeerID,
+	oracleID commontypes.OracleID,
 ) plugincommon.PluginProcessor[discoverytypes.Query, discoverytypes.Observation, discoverytypes.Outcome] {
 	return NewContractDiscoveryProcessor(
 		lggr,
@@ -805,6 +820,7 @@ func internalNewContractDiscoveryProcessor(
 		dest,
 		fRoleDON,
 		oracleIDToP2PID,
+		oracleID,
 		plugincommon.NoopReporter{},
 	)
 }

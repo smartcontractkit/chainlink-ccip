@@ -8,6 +8,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
 	sel "github.com/smartcontractkit/chain-selectors"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
@@ -281,7 +282,7 @@ func (o *observedCCIPReader) GetRmnCurseInfo(ctx context.Context) (CurseInfo, er
 
 func (o *observedCCIPReader) DiscoverContracts(
 	ctx context.Context,
-	allChains []cciptypes.ChainSelector,
+	supportedChains, allChains []cciptypes.ChainSelector,
 ) (ContractAddresses, error) {
 	contractAddressesLength := func(addresses ContractAddresses) float64 {
 		return mapOfMapLength(addresses)
@@ -291,7 +292,7 @@ func (o *observedCCIPReader) DiscoverContracts(
 		o,
 		"DiscoverContracts",
 		func() (ContractAddresses, error) {
-			return o.CCIPReader.DiscoverContracts(ctx, allChains)
+			return o.CCIPReader.DiscoverContracts(ctx, supportedChains, allChains)
 		},
 		contractAddressesLength,
 	)
