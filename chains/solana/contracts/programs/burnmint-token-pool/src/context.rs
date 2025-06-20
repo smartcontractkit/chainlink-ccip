@@ -467,6 +467,8 @@ pub enum CcipBnMTokenPoolError {
     MintAuthorityAlreadySet,
     #[msg("Token with no Mint Authority")]
     FixedMintToken,
+    #[msg("Unsupported Token Program")]
+    UnsupportedTokenProgram,
     #[msg("Invalid Multisig Account Data for Token 2022")]
     InvalidToken2022Multisig,
     #[msg("Invalid Multisig Account Data for SPL Token")]
@@ -477,6 +479,8 @@ pub enum CcipBnMTokenPoolError {
     MultisigMustHaveMoreThanOneSigner,
     #[msg("Multisig Owner must match Token Program ID")]
     InvalidMultisigOwner,
+    #[msg("Invalid multisig threshold: required signatures cannot exceed total signers")]
+    InvalidMultisigThreshold,
 }
 
 // This account can not be declared in the common crate, the program ID for that Account would be incorrect.
