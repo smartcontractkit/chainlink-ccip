@@ -136,45 +136,23 @@ impl Execute for Impl {
     fn derive_accounts_execute<'info>(
         &self,
         ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
-        DeriveAccountsExecuteParams {
-            execute_caller,
-            message_accounts,
-            source_chain_selector,
-            mints_of_transferred_tokens,
-            merkle_root,
-            buffer_id,
-            token_receiver,
-        }: DeriveAccountsExecuteParams,
+        params: DeriveAccountsExecuteParams,
         stage: String,
     ) -> Result<DeriveAccountsResponse> {
         let stage = derive::DeriveExecuteAccountsStage::from_str(stage.as_str())?;
 
         match stage {
             derive::DeriveExecuteAccountsStage::GatherBasicInfo => {
-                derive::derive_execute_accounts_gather_basic_info(source_chain_selector)
+                derive::derive_execute_accounts_gather_basic_info(params.source_chain_selector)
             }
             derive::DeriveExecuteAccountsStage::BuildMainAccountList => {
-                derive::derive_execute_accounts_build_main_account_list(
-                    ctx,
-                    source_chain_selector,
-                    &merkle_root,
-                    execute_caller,
-                    &mints_of_transferred_tokens,
-                    &message_accounts,
-                    &buffer_id,
-                )
+                derive::derive_execute_accounts_build_main_account_list(ctx, &params)
             }
             derive::DeriveExecuteAccountsStage::RetrieveTokenLUTs => {
                 derive::derive_execute_accounts_retrieve_luts(ctx)
             }
-            derive::DeriveExecuteAccountsStage::TokenTransferAccounts => {
-                derive::derive_execute_accounts_additional_tokens(
-                    ctx,
-                    execute_caller,
-                    token_receiver,
-                    source_chain_selector,
-                    &buffer_id,
-                )
+            derive::DeriveExecuteAccountsStage::TokenTransferAccounts { token_substage } => {
+                derive::derive_execute_accounts_additional_tokens(ctx, &params, &token_substage)
             }
         }
     }

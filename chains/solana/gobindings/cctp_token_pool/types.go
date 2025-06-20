@@ -149,3 +149,39 @@ func (obj *CctpChain) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err erro
 	}
 	return nil
 }
+
+type OnrampDeriveStage ag_binary.BorshEnum
+
+const (
+	RetrieveChainConfig_OnrampDeriveStage OnrampDeriveStage = iota
+	BuildDynamicAccounts_OnrampDeriveStage
+)
+
+func (value OnrampDeriveStage) String() string {
+	switch value {
+	case RetrieveChainConfig_OnrampDeriveStage:
+		return "RetrieveChainConfig"
+	case BuildDynamicAccounts_OnrampDeriveStage:
+		return "BuildDynamicAccounts"
+	default:
+		return ""
+	}
+}
+
+type OfframpDeriveStage ag_binary.BorshEnum
+
+const (
+	RetrieveChainConfig_OfframpDeriveStage OfframpDeriveStage = iota
+	BuildDynamicAccounts_OfframpDeriveStage
+)
+
+func (value OfframpDeriveStage) String() string {
+	switch value {
+	case RetrieveChainConfig_OfframpDeriveStage:
+		return "RetrieveChainConfig"
+	case BuildDynamicAccounts_OfframpDeriveStage:
+		return "BuildDynamicAccounts"
+	default:
+		return ""
+	}
+}

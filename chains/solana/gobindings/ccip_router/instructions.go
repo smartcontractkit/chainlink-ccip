@@ -250,6 +250,17 @@ var (
 	// * `new_admin` - The public key of the new admin.
 	Instruction_TransferAdminRoleTokenAdminRegistry = ag_binary.TypeID([8]byte{178, 98, 203, 181, 203, 107, 106, 14})
 
+	// Edits the pool config flags for a given token mint.
+	//
+	// The administrator of the token admin registry is the only one allowed to invoke this.
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for setting the pool.
+	// * `mint` - The mint of the pool to be edited.
+	// * `supports_auto_derivation` - A boolean flag indicating whether the pool supports auto-derivation of accounts.
+	Instruction_SetPoolSupportsAutoDerivation = ag_binary.TypeID([8]byte{197, 227, 67, 153, 75, 20, 234, 139})
+
 	// Sets the pool lookup table for a given token mint.
 	//
 	// The administrator of the token admin registry can set the pool lookup table for a given token mint.
@@ -381,6 +392,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "AcceptAdminRoleTokenAdminRegistry"
 	case Instruction_TransferAdminRoleTokenAdminRegistry:
 		return "TransferAdminRoleTokenAdminRegistry"
+	case Instruction_SetPoolSupportsAutoDerivation:
+		return "SetPoolSupportsAutoDerivation"
 	case Instruction_SetPool:
 		return "SetPool"
 	case Instruction_WithdrawBilledFunds:
@@ -473,6 +486,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"transfer_admin_role_token_admin_registry", (*TransferAdminRoleTokenAdminRegistry)(nil),
+		},
+		{
+			"set_pool_supports_auto_derivation", (*SetPoolSupportsAutoDerivation)(nil),
 		},
 		{
 			"set_pool", (*SetPool)(nil),

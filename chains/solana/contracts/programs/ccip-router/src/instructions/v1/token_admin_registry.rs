@@ -1,20 +1,19 @@
-use crate::{
-    events::token_admin_registry as events,
-    instructions::interfaces::TokenAdminRegistry,
-    token_admin_registry_writable,
-    token_context::{
-        OverridePendingTokenAdminRegistryByCCIPAdmin, OverridePendingTokenAdminRegistryByOwner,
-    },
-};
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::get_associated_token_address_with_program_id;
 use ccip_common::seed;
 use solana_program::{address_lookup_table::state::AddressLookupTable, log::sol_log};
 
-use crate::{
-    token_context::{RegisterTokenAdminRegistryByCCIPAdmin, RegisterTokenAdminRegistryByOwner},
-    AcceptAdminRoleTokenAdminRegistry, CcipRouterError, ModifyTokenAdminRegistry,
+use crate::events::token_admin_registry as events;
+use crate::instructions::interfaces::TokenAdminRegistry;
+use crate::token_admin_registry_writable;
+use crate::token_context::{
+    OverridePendingTokenAdminRegistryByCCIPAdmin, OverridePendingTokenAdminRegistryByOwner,
+    RegisterTokenAdminRegistryByCCIPAdmin, RegisterTokenAdminRegistryByOwner,
     SetPoolTokenAdminRegistry,
+};
+use crate::{
+    AcceptAdminRoleTokenAdminRegistry, CcipRouterError, EditPoolTokenAdminRegistry,
+    ModifyTokenAdminRegistry,
 };
 
 const MINIMUM_TOKEN_POOL_ACCOUNTS: usize = 9;
@@ -124,6 +123,24 @@ impl TokenAdminRegistry for Impl {
         emit!(events::AdministratorTransferred {
             token: token_mint,
             new_admin,
+        });
+
+        Ok(())
+    }
+
+    fn set_pool_supports_auto_derivation(
+        &self,
+        ctx: Context<EditPoolTokenAdminRegistry>,
+        mint: Pubkey,
+        supports_auto_derivation: bool,
+    ) -> Result<()> {
+        let token_admin_registry = &mut ctx.accounts.token_admin_registry;
+
+        token_admin_registry.supports_auto_derivation = supports_auto_derivation;
+
+        emit!(events::PoolEdited {
+            token: mint,
+            supports_auto_derivation,
         });
 
         Ok(())
@@ -244,11 +261,15 @@ fn init_with_pending_administrator(
         CcipRouterError::InvalidTokenAdminRegistryInputsZeroAddress
     );
 
-    token_admin_registry.version = 1;
-    token_admin_registry.administrator = Pubkey::new_from_array([0; 32]);
-    token_admin_registry.pending_administrator = new_admin;
-    token_admin_registry.lookup_table = Pubkey::new_from_array([0; 32]);
-    token_admin_registry.mint = token_mint;
+    token_admin_registry.set_inner(ccip_common::router_accounts::TokenAdminRegistry {
+        version: 1,
+        administrator: Pubkey::new_from_array([0; 32]),
+        pending_administrator: new_admin,
+        lookup_table: Pubkey::new_from_array([0; 32]),
+        writable_indexes: [0, 0],
+        mint: token_mint,
+        supports_auto_derivation: false,
+    });
 
     emit!(events::AdministratorTransferRequested {
         token: token_mint,

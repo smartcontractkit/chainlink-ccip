@@ -103,7 +103,7 @@ func TestCctpTpDevnet(t *testing.T) {
 	t.Run("TypeVersion", func(t *testing.T) {
 		t.Skip()
 
-		ix, err := cctp_token_pool.NewTypeVersionInstruction(solana.SysVarClockPubkey).ValidateAndBuild()
+		ix, err := cctp_token_pool.NewTypeVersionInstruction().ValidateAndBuild()
 		require.NoError(t, err)
 		result := testutils.SendAndConfirm(ctx, t, client, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 		require.NotNil(t, result)

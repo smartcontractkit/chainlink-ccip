@@ -857,6 +857,47 @@ export type CcipRouter = {
       ]
     },
     {
+      "name": "setPoolSupportsAutoDerivation",
+      "docs": [
+        "Edits the pool config flags for a given token mint.",
+        "",
+        "The administrator of the token admin registry is the only one allowed to invoke this.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for setting the pool.",
+        "* `mint` - The mint of the pool to be edited.",
+        "* `supports_auto_derivation` - A boolean flag indicating whether the pool supports auto-derivation of accounts."
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenAdminRegistry",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "mint",
+          "type": "publicKey"
+        },
+        {
+          "name": "supportsAutoDerivation",
+          "type": "bool"
+        }
+      ]
+    },
+    {
       "name": "setPool",
       "docs": [
         "Sets the pool lookup table for a given token mint.",
@@ -1675,13 +1716,9 @@ export type CcipRouter = {
             "type": "publicKey"
           },
           {
-            "name": "feeTokenMint",
-            "type": "publicKey"
-          },
-          {
-            "name": "mintsOfTransferredTokens",
+            "name": "message",
             "type": {
-              "vec": "publicKey"
+              "defined": "SVM2AnyMessage"
             }
           }
         ]
@@ -1702,7 +1739,13 @@ export type CcipRouter = {
             "name": "RetrieveTokenLUTs"
           },
           {
-            "name": "TokenTransferAccounts"
+            "name": "TokenTransferAccounts",
+            "fields": [
+              {
+                "name": "tokenSubstage",
+                "type": "string"
+              }
+            ]
           }
         ]
       }
@@ -2025,6 +2068,21 @@ export type CcipRouter = {
           "index": false
         }
       ]
+    },
+    {
+      "name": "PoolEdited",
+      "fields": [
+        {
+          "name": "token",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "supportsAutoDerivation",
+          "type": "bool",
+          "index": false
+        }
+      ]
     }
   ],
   "errors": [
@@ -2172,6 +2230,11 @@ export type CcipRouter = {
       "code": 7028,
       "name": "InvalidNonceVersion",
       "msg": "Invalid version of the Nonce account"
+    },
+    {
+      "code": 7029,
+      "name": "InvalidTokenPoolAccountDerivationResponse",
+      "msg": "Token pool returned an unexpected derivation response"
     }
   ]
 };
@@ -3035,6 +3098,47 @@ export const IDL: CcipRouter = {
       ]
     },
     {
+      "name": "setPoolSupportsAutoDerivation",
+      "docs": [
+        "Edits the pool config flags for a given token mint.",
+        "",
+        "The administrator of the token admin registry is the only one allowed to invoke this.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for setting the pool.",
+        "* `mint` - The mint of the pool to be edited.",
+        "* `supports_auto_derivation` - A boolean flag indicating whether the pool supports auto-derivation of accounts."
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenAdminRegistry",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "mint",
+          "type": "publicKey"
+        },
+        {
+          "name": "supportsAutoDerivation",
+          "type": "bool"
+        }
+      ]
+    },
+    {
       "name": "setPool",
       "docs": [
         "Sets the pool lookup table for a given token mint.",
@@ -3853,13 +3957,9 @@ export const IDL: CcipRouter = {
             "type": "publicKey"
           },
           {
-            "name": "feeTokenMint",
-            "type": "publicKey"
-          },
-          {
-            "name": "mintsOfTransferredTokens",
+            "name": "message",
             "type": {
-              "vec": "publicKey"
+              "defined": "SVM2AnyMessage"
             }
           }
         ]
@@ -3880,7 +3980,13 @@ export const IDL: CcipRouter = {
             "name": "RetrieveTokenLUTs"
           },
           {
-            "name": "TokenTransferAccounts"
+            "name": "TokenTransferAccounts",
+            "fields": [
+              {
+                "name": "tokenSubstage",
+                "type": "string"
+              }
+            ]
           }
         ]
       }
@@ -4203,6 +4309,21 @@ export const IDL: CcipRouter = {
           "index": false
         }
       ]
+    },
+    {
+      "name": "PoolEdited",
+      "fields": [
+        {
+          "name": "token",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "supportsAutoDerivation",
+          "type": "bool",
+          "index": false
+        }
+      ]
     }
   ],
   "errors": [
@@ -4350,6 +4471,11 @@ export const IDL: CcipRouter = {
       "code": 7028,
       "name": "InvalidNonceVersion",
       "msg": "Invalid version of the Nonce account"
+    },
+    {
+      "code": 7029,
+      "name": "InvalidTokenPoolAccountDerivationResponse",
+      "msg": "Token pool returned an unexpected derivation response"
     }
   ]
 };
