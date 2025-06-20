@@ -129,6 +129,48 @@ func NewUSDCMessageReader(
 	}, nil
 }
 
+// Deprecated
+// TODO(NONEVM-1865): Remove once the chainAccessor is passed down here from the factory. Then use accessor.Sync().
+func bindReaderContract[T contractreader.ContractReaderFacade](
+	ctx context.Context,
+	lggr logger.Logger,
+	readers map[cciptypes.ChainSelector]T,
+	chainSel cciptypes.ChainSelector,
+	contractName string,
+	address []byte,
+	codec cciptypes.AddressCodec,
+) (types.BoundContract, error) {
+	if err := validateReaderExistence(readers, chainSel); err != nil {
+		return types.BoundContract{}, fmt.Errorf("validate reader existence: %w", err)
+	}
+
+	addressStr, err := codec.AddressBytesToString(address, chainSel)
+	if err != nil {
+		return types.BoundContract{}, fmt.Errorf("unable to convert address bytes to string: %w, address: %v", err, address)
+	}
+
+	contract := types.BoundContract{
+		Address: addressStr,
+		Name:    contractName,
+	}
+
+	lggr.Debugw("Binding contract",
+		"chainSel", chainSel,
+		"contractName", contractName,
+		"address", addressStr,
+	)
+	// Bind the contract address to the reader.
+	// If the same address exists -> no-op
+	// If the address is changed -> updates the address, overwrites the existing one
+	// If the contract not bound -> binds to the new address
+	if err := readers[chainSel].Bind(ctx, []types.BoundContract{contract}); err != nil {
+		return types.BoundContract{},
+			fmt.Errorf("unable to bind %s %s for chain %d: %w", contractName, addressStr, chainSel, err)
+	}
+
+	return contract, nil
+}
+
 // compositeUSDCMessageReader is a USDCMessageReader that can handle different chain families.
 type compositeUSDCMessageReader struct {
 	lggr    logger.Logger

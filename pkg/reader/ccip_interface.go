@@ -16,6 +16,7 @@ import (
 )
 
 var (
+	ErrChainAccessorNotFound  = errors.New("chain accessor not found")
 	ErrContractReaderNotFound = errors.New("contract reader not found")
 	ErrContractWriterNotFound = errors.New("contract writer not found")
 )
