@@ -2053,7 +2053,7 @@ func (m *mockConfigCache) Ready() error {
 	return m.Called().Error(0)
 }
 
-func Test_printTruncatedReports(t *testing.T) {
+func Test_printReports(t *testing.T) {
 	genGasPriceReport := func() cciptypes.CommitPluginReportWithMeta {
 		return cciptypes.CommitPluginReportWithMeta{
 			Report: cciptypes.CommitPluginReport{
@@ -2115,7 +2115,7 @@ func Test_printTruncatedReports(t *testing.T) {
 		}
 
 		lggr, hook := logger.TestObserved(t, zapcore.DebugLevel)
-		printTruncatedReports(lggr, reports)
+		printReports(lggr, reports)
 
 		fmt.Println(hook.Len())
 		assert.Len(t, hook.All(), 1)
@@ -2141,7 +2141,7 @@ func Test_printTruncatedReports(t *testing.T) {
 		}
 
 		lggr, hook := logger.TestObserved(t, zapcore.DebugLevel)
-		printTruncatedReports(lggr, reports)
+		printReports(lggr, reports)
 
 		fmt.Println(hook.Len())
 		assert.Len(t, hook.All(), 1)

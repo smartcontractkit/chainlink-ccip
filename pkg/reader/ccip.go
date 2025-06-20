@@ -205,9 +205,12 @@ type RMNCurseResponse struct {
 
 // ---------------------------------------------------
 
-// printTruncatedReports is used to reduce the amount of data logged. Especially on Solana where gas and token
-// price updates are split into separate reports there is an excessive amount of data logged.
-func printTruncatedReports(lggr logger.Logger, reports []cciptypes.CommitPluginReportWithMeta) {
+// printReports is used to trim the size of the printed report. There can be a
+// large number of reports, especially on Solana where gas and token
+// price updates are split into separate reports. This function removes price
+// only reports, and removes price data from combined reports in an attempt to
+// ensure merkle roots are easier to find if logs are truncated.
+func printReports(lggr logger.Logger, reports []cciptypes.CommitPluginReportWithMeta) {
 	tokenPriceUpdates := 0
 	gasPriceUpdates := 0
 	var truncatedReports []cciptypes.CommitPluginReportWithMeta
@@ -246,7 +249,7 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 		return nil, fmt.Errorf("failed to get commit reports from accessor: %w", err)
 	}
 
-	printTruncatedReports(lggr, reports)
+	printReports(lggr, reports)
 
 	return reports, nil
 }
