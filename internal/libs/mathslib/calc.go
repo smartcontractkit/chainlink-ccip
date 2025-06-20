@@ -77,14 +77,14 @@ func CalculateUsdPerUnitGas(
 		// In Aptos, sourceGasPrice is denoted in octas/gas unit or 1e-8 APT/gas.
 		// sourceGasPrice * 1e10 becomes in units of 1e-18 APT/gas == wei/gas.
 
-		// Apt has 8 decimals, usdPerFeeCoin represents 1e18 USD per 1e8 whole apt, or 1e18 USD/1e26wei.
+		// Apt has 8 decimals, usdPerFeeCoin represents 1e18 USD per 1e8 whole apt, or 1e18 USD/1e28wei.
 		// usdPerFeeCoin / 1e8 becomes in units of 1e18 USD * 1e18 / wei.
 
-		// 26 - 10 = 16, so we need to divide by 1e16 to get 1e18 USD/gas.
+		// 28 - 10 = 18, so we need to divide by 1e18 to get 1e18 USD/gas.
 
 		tmp := new(big.Int).Mul(sourceGasPrice, usdPerFeeCoin)
-		power16 := big.NewInt(0).Exp(big.NewInt(10), big.NewInt(16), nil)
-		return tmp.Div(tmp, power16), nil
+		power18 := big.NewInt(0).Exp(big.NewInt(10), big.NewInt(18), nil)
+		return tmp.Div(tmp, power18), nil
 
 	default:
 		return nil, fmt.Errorf("unsupported family %s", family)
