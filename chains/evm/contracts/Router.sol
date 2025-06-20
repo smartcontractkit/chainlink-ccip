@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {IAny2EVMMessageReceiver} from "./interfaces/IAny2EVMMessageReceiver.sol";
-import {IEVM2AnyOnRamp} from "./interfaces/IEVM2AnyOnRamp.sol";
+import {IEVM2AnyOnRampClient} from "./interfaces/IEVM2AnyOnRampClient.sol";
 import {IRMN} from "./interfaces/IRMN.sol";
 import {IRouter} from "./interfaces/IRouter.sol";
 import {IRouterClient} from "./interfaces/IRouterClient.sol";
@@ -88,7 +88,7 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
     }
     address onRamp = s_onRamps[destinationChainSelector];
     if (onRamp == address(0)) revert UnsupportedDestinationChain(destinationChainSelector);
-    return IEVM2AnyOnRamp(onRamp).getFee(destinationChainSelector, message);
+    return IEVM2AnyOnRampClient(onRamp).getFee(destinationChainSelector, message);
   }
 
   /// @notice This functionality has been removed and will revert when called.
@@ -98,7 +98,7 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
     if (!isChainSupported(chainSelector)) {
       return new address[](0);
     }
-    return IEVM2AnyOnRamp(s_onRamps[uint256(chainSelector)]).getSupportedTokens(chainSelector);
+    return IEVM2AnyOnRampClient(s_onRamps[uint256(chainSelector)]).getSupportedTokens(chainSelector);
   }
 
   /// @inheritdoc IRouterClient
@@ -122,7 +122,7 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
       // as part of the native fee coin payment.
       message.feeToken = s_wrappedNative;
       // We rely on getFee to validate that the feeToken is whitelisted.
-      feeTokenAmount = IEVM2AnyOnRamp(onRamp).getFee(destinationChainSelector, message);
+      feeTokenAmount = IEVM2AnyOnRampClient(onRamp).getFee(destinationChainSelector, message);
       // Ensure sufficient native.
       if (msg.value < feeTokenAmount) revert InsufficientFeeTokenAmount();
       // Wrap and send native payment.
@@ -133,7 +133,7 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
     } else {
       if (msg.value > 0) revert InvalidMsgValue();
       // We rely on getFee to validate that the feeToken is whitelisted.
-      feeTokenAmount = IEVM2AnyOnRamp(onRamp).getFee(destinationChainSelector, message);
+      feeTokenAmount = IEVM2AnyOnRampClient(onRamp).getFee(destinationChainSelector, message);
       IERC20(message.feeToken).safeTransferFrom(msg.sender, onRamp, feeTokenAmount);
     }
 
@@ -143,12 +143,12 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
       // We rely on getPoolBySourceToken to validate that the token is whitelisted.
       token.safeTransferFrom(
         msg.sender,
-        address(IEVM2AnyOnRamp(onRamp).getPoolBySourceToken(destinationChainSelector, token)),
+        address(IEVM2AnyOnRampClient(onRamp).getPoolBySourceToken(destinationChainSelector, token)),
         message.tokenAmounts[i].amount
       );
     }
 
-    return IEVM2AnyOnRamp(onRamp).forwardFromRouter(destinationChainSelector, message, feeTokenAmount, msg.sender);
+    return IEVM2AnyOnRampClient(onRamp).forwardFromRouter(destinationChainSelector, message, feeTokenAmount, msg.sender);
   }
 
   // ================================================================

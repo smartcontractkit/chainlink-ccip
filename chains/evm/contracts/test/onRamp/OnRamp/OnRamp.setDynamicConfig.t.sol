@@ -49,7 +49,7 @@ contract OnRamp_setDynamicConfig is OnRampSetup {
       allowlistAdmin: address(0)
     });
 
-    // Invalid price reg reverts.
+    // Invalid fee quoter reverts.
     newConfig.feeQuoter = address(0);
     vm.expectRevert(OnRamp.InvalidConfig.selector);
     s_onRamp.setDynamicConfig(newConfig);
