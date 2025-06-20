@@ -171,9 +171,9 @@ func TestCalculateUsdPerUnitGas(t *testing.T) {
 		},
 		{
 			name:           "apt base fee case",
-			sourceGasPrice: big.NewInt(100),                                                                       // 1 octas per gas
-			usdPerFeeCoin:  new(big.Int).Mul(big.NewInt(5), new(big.Int).Mul(big.NewInt(1e10), big.NewInt(1e18))), // $5/APT
-			chainSelector:  AptChainSelector,                                                                      // 1e8 APT per full token
+			sourceGasPrice: big.NewInt(100),
+			usdPerFeeCoin:  new(big.Int).Mul(big.NewInt(5), new(big.Int).Mul(big.NewInt(1e10), big.NewInt(1e18))),
+			chainSelector:  AptChainSelector,
 			exp:            big.NewInt(5e12),
 		},
 		{
