@@ -145,7 +145,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   }
 
   /// @notice Using a function because constant state variables cannot be overridden by child contracts.
-  function typeAndVersion() public pure virtual override returns (string memory) {
+  function typeAndVersion() external pure virtual override returns (string memory) {
     return "OnRamp 1.6.1-dev";
   }
 

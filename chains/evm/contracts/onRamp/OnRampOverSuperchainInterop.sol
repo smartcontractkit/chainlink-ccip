@@ -12,13 +12,13 @@ contract OnRampOverSuperchainInterop is OnRamp {
   error ExtraArgsTooShort(uint256 length);
   error InvalidSourceChainSelector(uint64 sourceChainSelector);
 
-  /// @notice Using a function because constant state variables cannot be overridden by child contracts.
-  function typeAndVersion() public pure virtual override returns (string memory) {
-    return "OnRampOverSuperchainInterop 1.6.1-dev";
-  }
+  // STATIC CONFIG
+  string public constant override typeAndVersion = "OnRampOverSuperchainInterop 1.6.1-dev";
 
-  /// @dev Stores previouslysent interop message hashes to facilitate re-emission.
-  mapping(uint64 sequenceNumber => bytes32 messageHash) internal s_sentInteropMessageHashes;
+  /// @notice Stores previously sent interop message hashes to facilitate re-emission.
+  /// @dev destChainSelector and sequenceNumber uniquely identify a message for a given onramp.
+  mapping(uint64 destChainSelector => mapping(uint64 sequenceNumber => bytes32 messageHash)) internal
+    s_sentInteropMessageHashes;
 
   constructor(
     StaticConfig memory staticConfig,
@@ -37,16 +37,14 @@ contract OnRampOverSuperchainInterop is OnRamp {
   function _postProcessMessage(
     Internal.EVM2AnyRampMessage memory message
   ) internal virtual override returns (Internal.EVM2AnyRampMessage memory) {
-    Internal.EVM2AnyRampMessage memory processedMessage = super._postProcessMessage(message);
-
     // Get the gas limit from the extraArgs
-    uint256 gasLimit = extractGasLimit(processedMessage.extraArgs);
+    uint256 gasLimit = extractGasLimit(message.extraArgs);
 
-    Internal.Any2EVMTokenTransfer[] memory destTokenTranfers =
-      new Internal.Any2EVMTokenTransfer[](processedMessage.tokenAmounts.length);
-    for (uint256 i = 0; i < processedMessage.tokenAmounts.length; ++i) {
-      Internal.EVM2AnyTokenTransfer memory tokenTransfer = processedMessage.tokenAmounts[i];
-      destTokenTranfers[i] = Internal.Any2EVMTokenTransfer({
+    Internal.Any2EVMTokenTransfer[] memory destTokenTransfers =
+      new Internal.Any2EVMTokenTransfer[](message.tokenAmounts.length);
+    for (uint256 i = 0; i < message.tokenAmounts.length; ++i) {
+      Internal.EVM2AnyTokenTransfer memory tokenTransfer = message.tokenAmounts[i];
+      destTokenTransfers[i] = Internal.Any2EVMTokenTransfer({
         sourcePoolAddress: abi.encode(tokenTransfer.sourcePoolAddress),
         destTokenAddress: abi.decode(tokenTransfer.destTokenAddress, (address)),
         destGasAmount: abi.decode(tokenTransfer.destExecData, (uint32)),
@@ -62,33 +60,31 @@ contract OnRampOverSuperchainInterop is OnRamp {
     Internal.Any2EVMRampMessage memory interopMessage = Internal.Any2EVMRampMessage({
       header: Internal.RampMessageHeader({ // deep copy, because we will be setting the messageId later
         messageId: "",
-        sourceChainSelector: processedMessage.header.sourceChainSelector,
-        destChainSelector: processedMessage.header.destChainSelector,
-        sequenceNumber: processedMessage.header.sequenceNumber,
-        nonce: processedMessage.header.nonce
+        sourceChainSelector: message.header.sourceChainSelector,
+        destChainSelector: message.header.destChainSelector,
+        sequenceNumber: message.header.sequenceNumber,
+        nonce: message.header.nonce
       }),
-      sender: abi.encode(processedMessage.sender),
-      data: processedMessage.data,
-      receiver: abi.decode(processedMessage.receiver, (address)),
+      sender: abi.encode(message.sender),
+      data: message.data,
+      receiver: abi.decode(message.receiver, (address)),
       gasLimit: gasLimit,
-      tokenAmounts: destTokenTranfers
+      tokenAmounts: destTokenTransfers
     });
 
-    // Calculate the messageId the same way it's done in forwardFromRouter
-    bytes32 messageId = generateMessageId(processedMessage);
-
-    // Parent OnRamp has not set the messageId yet, need to set it here.
-    interopMessage.header.messageId = messageId;
+    // Parent OnRamp has not set the messageId yet, calculate messageId the same way it's done in parent OnRamp
+    // and set it in the interop message.
+    interopMessage.header.messageId = generateMessageId(message);
 
     // Interop hash uniquely identifies the interop message.
-    bytes32 interopMessageHash = SuperchainInterop._hashInteropMessage(interopMessage, address(this));
-    s_sentInteropMessageHashes[interopMessage.header.sequenceNumber] = interopMessageHash;
+    s_sentInteropMessageHashes[interopMessage.header.destChainSelector][interopMessage.header.sequenceNumber] =
+      SuperchainInterop._hashInteropMessage(interopMessage, address(this));
 
     emit SuperchainInterop.CCIPSuperchainMessageSent(
       interopMessage.header.destChainSelector, interopMessage.header.sequenceNumber, interopMessage
     );
 
-    return processedMessage;
+    return message;
   }
 
   /// @notice Extracts the gas limit from the extraArgs
@@ -116,7 +112,7 @@ contract OnRampOverSuperchainInterop is OnRamp {
 
   /// @notice Re-emits the CCIPSuperchainMessageSent event for a previously sent interop message.
   /// @dev This is necessary because Superchain does not persist cross-chain events on dest forever.
-  /// A typical persistance window is 7 days. After that, the event needs to be re-emitted at source.
+  /// A typical persistence window is 7 days. After that, the event needs to be re-emitted at source.
   /// @param interopMessage The previously-sent interop message to re-emit.
   function reemitInteropMessage(
     Internal.Any2EVMRampMessage calldata interopMessage
@@ -128,12 +124,14 @@ contract OnRampOverSuperchainInterop is OnRamp {
 
     bytes32 interopMessageHash = SuperchainInterop._hashInteropMessage(interopMessage, address(this));
 
-    uint64 destChainSelector = interopMessage.header.destChainSelector;
-    uint64 sequenceNumber = interopMessage.header.sequenceNumber;
-
     // Validates that the message had been sent before from this OnRamp.
-    if (s_sentInteropMessageHashes[sequenceNumber] != interopMessageHash) {
-      revert MessageDoesNotExist(destChainSelector, sequenceNumber, interopMessageHash);
+    if (
+      s_sentInteropMessageHashes[interopMessage.header.destChainSelector][interopMessage.header.sequenceNumber]
+        != interopMessageHash
+    ) {
+      revert MessageDoesNotExist(
+        interopMessage.header.destChainSelector, interopMessage.header.sequenceNumber, interopMessageHash
+      );
     }
 
     // Re-emit the CCIPMessageSent event with the same data
