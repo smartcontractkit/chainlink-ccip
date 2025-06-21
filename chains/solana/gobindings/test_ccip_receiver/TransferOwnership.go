@@ -10,9 +10,9 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// SetRejectAll is the `setRejectAll` instruction.
-type SetRejectAll struct {
-	RejectAll *bool
+// TransferOwnership is the `transferOwnership` instruction.
+type TransferOwnership struct {
+	NewOwner *ag_solanago.PublicKey
 
 	// [0] = [WRITE] counter
 	//
@@ -20,64 +20,64 @@ type SetRejectAll struct {
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
-// NewSetRejectAllInstructionBuilder creates a new `SetRejectAll` instruction builder.
-func NewSetRejectAllInstructionBuilder() *SetRejectAll {
-	nd := &SetRejectAll{
+// NewTransferOwnershipInstructionBuilder creates a new `TransferOwnership` instruction builder.
+func NewTransferOwnershipInstructionBuilder() *TransferOwnership {
+	nd := &TransferOwnership{
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 2),
 	}
 	return nd
 }
 
-// SetRejectAll sets the "rejectAll" parameter.
-func (inst *SetRejectAll) SetRejectAll(rejectAll bool) *SetRejectAll {
-	inst.RejectAll = &rejectAll
+// SetNewOwner sets the "newOwner" parameter.
+func (inst *TransferOwnership) SetNewOwner(newOwner ag_solanago.PublicKey) *TransferOwnership {
+	inst.NewOwner = &newOwner
 	return inst
 }
 
 // SetCounterAccount sets the "counter" account.
-func (inst *SetRejectAll) SetCounterAccount(counter ag_solanago.PublicKey) *SetRejectAll {
+func (inst *TransferOwnership) SetCounterAccount(counter ag_solanago.PublicKey) *TransferOwnership {
 	inst.AccountMetaSlice[0] = ag_solanago.Meta(counter).WRITE()
 	return inst
 }
 
 // GetCounterAccount gets the "counter" account.
-func (inst *SetRejectAll) GetCounterAccount() *ag_solanago.AccountMeta {
+func (inst *TransferOwnership) GetCounterAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
 // SetAuthorityAccount sets the "authority" account.
-func (inst *SetRejectAll) SetAuthorityAccount(authority ag_solanago.PublicKey) *SetRejectAll {
+func (inst *TransferOwnership) SetAuthorityAccount(authority ag_solanago.PublicKey) *TransferOwnership {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(authority).SIGNER()
 	return inst
 }
 
 // GetAuthorityAccount gets the "authority" account.
-func (inst *SetRejectAll) GetAuthorityAccount() *ag_solanago.AccountMeta {
+func (inst *TransferOwnership) GetAuthorityAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[1]
 }
 
-func (inst SetRejectAll) Build() *Instruction {
+func (inst TransferOwnership) Build() *Instruction {
 	return &Instruction{BaseVariant: ag_binary.BaseVariant{
 		Impl:   inst,
-		TypeID: Instruction_SetRejectAll,
+		TypeID: Instruction_TransferOwnership,
 	}}
 }
 
 // ValidateAndBuild validates the instruction parameters and accounts;
 // if there is a validation error, it returns the error.
 // Otherwise, it builds and returns the instruction.
-func (inst SetRejectAll) ValidateAndBuild() (*Instruction, error) {
+func (inst TransferOwnership) ValidateAndBuild() (*Instruction, error) {
 	if err := inst.Validate(); err != nil {
 		return nil, err
 	}
 	return inst.Build(), nil
 }
 
-func (inst *SetRejectAll) Validate() error {
+func (inst *TransferOwnership) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
-		if inst.RejectAll == nil {
-			return errors.New("RejectAll parameter is not set")
+		if inst.NewOwner == nil {
+			return errors.New("NewOwner parameter is not set")
 		}
 	}
 
@@ -93,17 +93,17 @@ func (inst *SetRejectAll) Validate() error {
 	return nil
 }
 
-func (inst *SetRejectAll) EncodeToTree(parent ag_treeout.Branches) {
+func (inst *TransferOwnership) EncodeToTree(parent ag_treeout.Branches) {
 	parent.Child(ag_format.Program(ProgramName, ProgramID)).
 		//
 		ParentFunc(func(programBranch ag_treeout.Branches) {
-			programBranch.Child(ag_format.Instruction("SetRejectAll")).
+			programBranch.Child(ag_format.Instruction("TransferOwnership")).
 				//
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("RejectAll", *inst.RejectAll))
+						paramsBranch.Child(ag_format.Param("NewOwner", *inst.NewOwner))
 					})
 
 					// Accounts of the instruction:
@@ -115,32 +115,32 @@ func (inst *SetRejectAll) EncodeToTree(parent ag_treeout.Branches) {
 		})
 }
 
-func (obj SetRejectAll) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `RejectAll` param:
-	err = encoder.Encode(obj.RejectAll)
+func (obj TransferOwnership) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `NewOwner` param:
+	err = encoder.Encode(obj.NewOwner)
 	if err != nil {
 		return err
 	}
 	return nil
 }
-func (obj *SetRejectAll) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `RejectAll`:
-	err = decoder.Decode(&obj.RejectAll)
+func (obj *TransferOwnership) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `NewOwner`:
+	err = decoder.Decode(&obj.NewOwner)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-// NewSetRejectAllInstruction declares a new SetRejectAll instruction with the provided parameters and accounts.
-func NewSetRejectAllInstruction(
+// NewTransferOwnershipInstruction declares a new TransferOwnership instruction with the provided parameters and accounts.
+func NewTransferOwnershipInstruction(
 	// Parameters:
-	rejectAll bool,
+	newOwner ag_solanago.PublicKey,
 	// Accounts:
 	counter ag_solanago.PublicKey,
-	authority ag_solanago.PublicKey) *SetRejectAll {
-	return NewSetRejectAllInstructionBuilder().
-		SetRejectAll(rejectAll).
+	authority ag_solanago.PublicKey) *TransferOwnership {
+	return NewTransferOwnershipInstructionBuilder().
+		SetNewOwner(newOwner).
 		SetCounterAccount(counter).
 		SetAuthorityAccount(authority)
 }
