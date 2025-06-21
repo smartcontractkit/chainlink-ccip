@@ -25,7 +25,7 @@ contract BurnMintFastTransferTokenPool_validateSendRequest is BurnMintFastTransf
     s_token.approve(address(s_pool), type(uint256).max);
   }
 
-  function test_validateSendRequest_Success() public {
+  function test_validateSendRequest_Success() public view {
     // From the setup, we have a pool with the default chain config and no allowlist.
     // This should not revert - all validations pass
     s_pool.getCcipSendTokenFee(

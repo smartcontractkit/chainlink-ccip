@@ -5,13 +5,13 @@ import {Internal} from "../../../libraries/Internal.sol";
 import {Test} from "forge-std/Test.sol";
 
 contract Internal_validate32ByteAddress is Test {
-  function test_validate32ByteAddress_ValidAddress() public {
+  function test_validate32ByteAddress_ValidAddress() public pure {
     bytes memory valid32ByteAddress =
       abi.encode(uint256(0x1234567890123456789012345678901234567890123456789012345678901234));
     Internal._validate32ByteAddress(valid32ByteAddress, 0);
   }
 
-  function test_validate32ByteAddress_BoundaryMinValue() public {
+  function test_validate32ByteAddress_BoundaryMinValue() public pure {
     uint256 minValue = 100;
     bytes memory exactMinAddress = abi.encode(minValue);
     Internal._validate32ByteAddress(exactMinAddress, minValue);

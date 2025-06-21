@@ -16,7 +16,7 @@ Always index the above when touching CCIP Solidity, and THINK about a plan befor
 ## Commands
 
 Chainlink CCIP EVM uses Foundry. You can reference the [Foundry Book](https://getfoundry.sh/forge/overview) when you need to read the manual.
-All Foundry commands should be run with ccip profile by default
+All Foundry commands should be run with FOUNDRY_PROFILE=ccip.
 
 ```bash
 export FOUNDRY_PROFILE=ccip

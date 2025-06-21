@@ -5,12 +5,12 @@ import {Internal} from "../../../libraries/Internal.sol";
 import {Test} from "forge-std/Test.sol";
 
 contract Internal_validateEVMAddress is Test {
-  function test_validateEVMAddress_ValidAddress() public {
+  function test_validateEVMAddress_ValidAddress() public pure {
     address validAddress = 0x1234567890123456789012345678901234567890;
     Internal._validateEVMAddress(abi.encode(validAddress));
   }
 
-  function test_validateEVMAddress_BoundaryAddresses() public {
+  function test_validateEVMAddress_BoundaryAddresses() public pure {
     bytes memory lowerBoundary = abi.encode(Internal.EVM_PRECOMPILE_SPACE);
     Internal._validateEVMAddress(lowerBoundary);
     bytes memory upperBoundary = abi.encode(type(uint160).max);
