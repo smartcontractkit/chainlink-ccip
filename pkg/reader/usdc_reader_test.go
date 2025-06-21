@@ -334,7 +334,7 @@ func Test_SourceTokenDataPayload_ToBytes(t *testing.T) {
 			payload1 := NewSourceTokenDataPayload(tc.nonce, tc.sourceDomain)
 			bytes := payload1.ToBytes()
 
-			payload2, err := NewSourceTokenDataPayloadFromBytes(bytes)
+			payload2, err := extractABIPayload(bytes)
 			require.NoError(t, err)
 			require.Equal(t, *payload1, *payload2)
 		})
@@ -372,7 +372,7 @@ func Test_SourceTokenDataPayload_FromBytes(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := NewSourceTokenDataPayloadFromBytes(tc.data)
+			got, err := extractABIPayload(tc.data)
 
 			if !tc.wantErr {
 				require.NoError(t, err)
