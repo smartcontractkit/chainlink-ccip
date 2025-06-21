@@ -3,6 +3,9 @@ package discovery
 import (
 	"context"
 	"fmt"
+	"sort"
+	"sync/atomic"
+	"time"
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
@@ -22,6 +25,9 @@ import (
 // Ensure that PluginProcessor is implemented.
 var _ plugincommon.PluginProcessor[dt.Query, dt.Observation, dt.Outcome] = &ContractDiscoveryProcessor{}
 
+// syncTimeout is the timeout for the ccip reader sync operation.
+const syncTimeout = 5 * time.Second
+
 // ContractDiscoveryProcessor is a plugin processor for discovering contracts.
 type ContractDiscoveryProcessor struct {
 	lggr            logger.Logger
@@ -30,6 +36,8 @@ type ContractDiscoveryProcessor struct {
 	dest            cciptypes.ChainSelector
 	fRoleDON        int
 	oracleIDToP2PID map[commontypes.OracleID]ragep2ptypes.PeerID
+	syncer          *readerSyncer
+	peerID          ragep2ptypes.PeerID
 }
 
 func NewContractDiscoveryProcessor(
@@ -39,8 +47,15 @@ func NewContractDiscoveryProcessor(
 	dest cciptypes.ChainSelector,
 	fRoleDON int,
 	oracleIDToP2PID map[commontypes.OracleID]ragep2ptypes.PeerID,
+	oracleID commontypes.OracleID,
 	reporter plugincommon.MetricsReporter,
 ) plugincommon.PluginProcessor[dt.Query, dt.Observation, dt.Outcome] {
+	peerID, ok := oracleIDToP2PID[oracleID]
+	if !ok {
+		lggr.Errorf("peerID not found for oracle %d oracleIDToPeerID=%v", oracleID, oracleIDToP2PID)
+		return nil
+	}
+
 	p := &ContractDiscoveryProcessor{
 		lggr:            lggr,
 		reader:          reader,
@@ -48,6 +63,8 @@ func NewContractDiscoveryProcessor(
 		dest:            dest,
 		fRoleDON:        fRoleDON,
 		oracleIDToP2PID: oracleIDToP2PID,
+		syncer:          &readerSyncer{reader: reader},
+		peerID:          peerID,
 	}
 	return plugincommon.NewTrackedProcessor(lggr, p, "discovery", reporter)
 }
@@ -76,7 +93,13 @@ func (cdp *ContractDiscoveryProcessor) Observation(
 		return dt.Observation{}, fmt.Errorf("unable to get chain configs: %w, seqNr: %d", err, seqNr)
 	}
 
-	contracts, err := (*cdp.reader).DiscoverContracts(ctx, maps.Keys(chainConfigs))
+	supportedChains, err := cdp.getSupportedChains()
+	if err != nil {
+		return dt.Observation{}, fmt.Errorf("get supported chains for peer %d: %w", cdp.peerID, err)
+	}
+
+	cdp.lggr.Infow("about to discover contracts", "supportedChains", supportedChains)
+	contracts, err := (*cdp.reader).DiscoverContracts(ctx, supportedChains, maps.Keys(chainConfigs))
 	if err != nil {
 		return dt.Observation{}, fmt.Errorf("unable to discover contracts: %w, seqNr: %d", err, seqNr)
 	}
@@ -85,6 +108,17 @@ func (cdp *ContractDiscoveryProcessor) Observation(
 		FChain:    fChain,
 		Addresses: contracts,
 	}, nil
+}
+
+func (cdp *ContractDiscoveryProcessor) getSupportedChains() ([]cciptypes.ChainSelector, error) {
+	supportedChains, err := cdp.homechain.GetSupportedChainsForPeer(cdp.peerID)
+	if err != nil {
+		return nil, fmt.Errorf("get supported chains for peer %d: %w", cdp.peerID, err)
+	}
+
+	supportedChainsSlice := supportedChains.ToSlice()
+	sort.Slice(supportedChainsSlice, func(i, j int) bool { return supportedChainsSlice[i] < supportedChainsSlice[j] })
+	return supportedChainsSlice, nil
 }
 
 func (cdp *ContractDiscoveryProcessor) ValidateObservation(
@@ -342,16 +376,48 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 	// fail the entire outcome because of that. The reason being is that if this node is a leader
 	// of an OCR round, it will NOT be able to complete the round due to failing to compute the Outcome.
 	// TODO: we should move Sync calls to observation but that requires updates to the Outcome struct for discovery.
-	if err := (*cdp.reader).Sync(ctx, contracts); err != nil {
-		lggr.Errorw(
-			"unable to sync contracts - this is usually due to RPC issues,"+
-				" please check your RPC endpoints and their health!",
-			"err", err)
-	}
+	go cdp.syncContracts(lggr, contracts)
 
 	return dt.Outcome{}, nil
 }
 
+func (cdp *ContractDiscoveryProcessor) syncContracts(lggr logger.Logger, contracts reader.ContractAddresses) {
+	ctx, cancel := context.WithTimeout(context.Background(), syncTimeout)
+	defer cancel()
+	alreadySyncing, err := cdp.syncer.Sync(ctx, contracts)
+	if err != nil {
+		lggr.Errorw(
+			"unable to sync contracts - this is usually due to RPC issues,"+
+				" please check your RPC endpoints and their health!",
+			"err", err)
+	} else if alreadySyncing {
+		lggr.Infow("discovery syncer is already syncing, skipping sync until its done or it times out")
+	} else {
+		lggr.Infow("discovery successfully synced contracts", "contracts", contracts)
+	}
+}
+
 func (cdp *ContractDiscoveryProcessor) Close() error {
 	return nil
+}
+
+// readerSyncer is a helper to sync the CCIP contracts to the ccip reader in a thread-safe manner
+// and avoid multiple syncs at the same time.
+type readerSyncer struct {
+	busy   atomic.Bool
+	reader *reader.CCIPReader
+}
+
+// Sync syncs the CCIP contracts to the ccip reader in a thread-safe manner.
+// It ensures that only one sync operation can be in progress at a time.
+//
+// Returns true if a sync was already in progress.
+// Make sure to pass a context with a timeout to avoid blocking the plugin for too long.
+func (s *readerSyncer) Sync(ctx context.Context, contracts reader.ContractAddresses) (alreadySyncing bool, err error) {
+	if !s.busy.CompareAndSwap(false, true) {
+		return true, nil
+	}
+	defer s.busy.Store(false)
+
+	return false, (*s.reader).Sync(ctx, contracts)
 }

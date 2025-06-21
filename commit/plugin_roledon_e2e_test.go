@@ -93,7 +93,7 @@ func TestPlugin_RoleDonE2E_NoPrevOutcome(t *testing.T) {
 
 		// Discovery and Sync - Out of scope of this test case
 		{
-			deps.ccipReader.EXPECT().DiscoverContracts(mock.Anything, mock.Anything).Return(nil, nil)
+			deps.ccipReader.EXPECT().DiscoverContracts(mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 			deps.ccipReader.EXPECT().Sync(mock.Anything, mock.Anything).Return(nil)
 		}
 
@@ -206,7 +206,7 @@ func TestPlugin_RoleDonE2E_RangesAndPricesSelectedPreviously(t *testing.T) {
 
 		// Discovery and Sync - Out of scope of this test case
 		{
-			deps.ccipReader.EXPECT().DiscoverContracts(mock.Anything, mock.Anything).Return(nil, nil)
+			deps.ccipReader.EXPECT().DiscoverContracts(mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 			deps.ccipReader.EXPECT().Sync(mock.Anything, mock.Anything).Return(nil)
 		}
 
@@ -295,7 +295,6 @@ func TestPlugin_RoleDonE2E_Discovery(t *testing.T) {
 		}
 	}
 
-	leaderOracleID := -1
 	plugins := make([]ocr3types.ReportingPlugin[[]byte], 0, len(s.oracles))
 	for _, oracleID := range s.oracles {
 		deps := s.oracleDependencies[oracleID]
@@ -316,11 +315,6 @@ func TestPlugin_RoleDonE2E_Discovery(t *testing.T) {
 
 			deps.homeChainReader.EXPECT().GetSupportedChainsForPeer(mock.Anything).
 				RunAndReturn(func(id libocrtypes.PeerID) (mapset.Set[cciptypes.ChainSelector], error) {
-					if leaderOracleID == -1 {
-						leaderOracleID = int(oracleID)
-					} else if int(oracleID) != leaderOracleID {
-						t.Fatal("GetSupportedChainsForPeer was not called only by the leader")
-					}
 					supportedChainsOfOracle := s.getChainsOfOracle(s.peerIDToOracleID[id])
 					return supportedChainsOfOracle, nil
 				}).Maybe() // once by the leader
@@ -333,8 +327,8 @@ func TestPlugin_RoleDonE2E_Discovery(t *testing.T) {
 
 		// Discovery and Sync
 		{
-			deps.ccipReader.EXPECT().DiscoverContracts(mock.Anything, mock.Anything).
-				RunAndReturn(func(ctx context.Context, selectors []cciptypes.ChainSelector,
+			deps.ccipReader.EXPECT().DiscoverContracts(mock.Anything, mock.Anything, mock.Anything).
+				RunAndReturn(func(ctx context.Context, supportedChains, selectors []cciptypes.ChainSelector,
 				) (ccipreader.ContractAddresses, error) {
 					addrs := ccipreader.ContractAddresses{}
 
@@ -385,7 +379,6 @@ func TestPlugin_RoleDonE2E_Discovery(t *testing.T) {
 	runner := testhelpers.NewOCR3Runner(plugins, s.oracles, ocr3types.Outcome{})
 	res, err := runner.RunRound(ctx)
 	require.NoError(t, err)
-	require.Greater(t, leaderOracleID, 0)
 
 	_, err = ocrTypCodec.DecodeOutcome(res.Outcome)
 	require.NoError(t, err)
