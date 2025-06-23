@@ -98,7 +98,7 @@ func (cdp *ContractDiscoveryProcessor) Observation(
 		return dt.Observation{}, fmt.Errorf("get supported chains for peer %d: %w", cdp.peerID, err)
 	}
 
-	cdp.lggr.Infow("about to discover contracts", "supportedChains", supportedChains)
+	cdp.lggr.Debugw("about to discover contracts", "supportedChains", supportedChains)
 	contracts, err := (*cdp.reader).DiscoverContracts(ctx, supportedChains, maps.Keys(chainConfigs))
 	if err != nil {
 		return dt.Observation{}, fmt.Errorf("unable to discover contracts: %w, seqNr: %d", err, seqNr)
@@ -272,7 +272,7 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 	ctx context.Context, _ dt.Outcome, _ dt.Query, aos []plugincommon.AttributedObservation[dt.Observation],
 ) (dt.Outcome, error) {
 	lggr := logutil.WithContextValues(ctx, cdp.lggr)
-	lggr.Infow("Processing contract discovery outcome")
+	lggr.Debugw("Processing contract discovery outcome")
 	contracts := make(reader.ContractAddresses)
 
 	agg := aggregateObservations(lggr, cdp.dest, aos)
@@ -294,7 +294,7 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 			agg.onrampAddrs,
 			destThresh,
 		)
-		lggr.Infow("Determined consensus onramps",
+		lggr.Debugw("Determined consensus onramps",
 			"onrampConsensus", onrampConsensus,
 			"onrampAddrs", agg.onrampAddrs,
 			"fChainThresh", fChainThresh,
@@ -311,7 +311,7 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 		agg.nonceManagerAddrs,
 		fChainThresh,
 	)
-	lggr.Infow("Determined consensus nonce manager",
+	lggr.Debugw("Determined consensus nonce manager",
 		"nonceManagerConsensus", nonceManagerConsensus,
 		"nonceManagerAddrs", agg.nonceManagerAddrs,
 		"fChainThresh", fChainThresh,
@@ -328,7 +328,7 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 		agg.rmnRemoteAddrs,
 		fChainThresh,
 	)
-	lggr.Infow("Determined consensus RMNRemote",
+	lggr.Debugw("Determined consensus RMNRemote",
 		"rmnRemoteConsensus", rmnRemoteConsensus,
 		"rmnRemoteAddrs", agg.rmnRemoteAddrs,
 		"fChainThresh", fChainThresh,
@@ -344,7 +344,7 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 		agg.feeQuoterAddrs,
 		fChainThresh,
 	)
-	lggr.Infow("Determined consensus fee quoter",
+	lggr.Debugw("Determined consensus fee quoter",
 		"feeQuoterConsensus", feeQuoterConsensus,
 		"feeQuoterAddrs", agg.feeQuoterAddrs,
 		"fChainThresh", fChainThresh,
@@ -361,7 +361,7 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 		agg.routerAddrs,
 		fChainThresh,
 	)
-	lggr.Infow("Determined consensus router",
+	lggr.Debugw("Determined consensus router",
 		"routerConsensus", routerConsensus,
 		"routerAddrs", agg.routerAddrs,
 		"fChainThresh", fChainThresh,
@@ -391,9 +391,9 @@ func (cdp *ContractDiscoveryProcessor) syncContracts(lggr logger.Logger, contrac
 				" please check your RPC endpoints and their health!",
 			"err", err)
 	} else if alreadySyncing {
-		lggr.Infow("discovery syncer is already syncing, skipping sync until its done or it times out")
+		lggr.Debugw("discovery syncer is already syncing, skipping sync until its done or it times out")
 	} else {
-		lggr.Infow("discovery successfully synced contracts", "contracts", contracts)
+		lggr.Debugw("discovery successfully synced contracts", "contracts", contracts)
 	}
 }
 

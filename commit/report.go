@@ -38,7 +38,7 @@ func encodeReports(
 			return nil, fmt.Errorf("found empty report")
 		}
 
-		lggr.Infow("encoding report and report info",
+		lggr.Debugw("encoding report and report info",
 			"report", report.Report,
 			"reportInfo", report.ReportInfo)
 
@@ -74,7 +74,7 @@ func (p *Plugin) Reports(
 		return nil, fmt.Errorf("decode outcome: %w", err)
 	}
 
-	lggr.Infow("generating report",
+	lggr.Debugw("generating report",
 		"roots", outcome.MerkleRootOutcome.RootsToReport,
 		"tokenPriceUpdates", outcome.TokenPriceOutcome.TokenPrices,
 		"gasPriceUpdates", outcome.ChainFeeOutcome.GasPrices,
@@ -181,7 +181,7 @@ func (p *Plugin) validateReport(
 	if p.offchainCfg.RMNEnabled &&
 		len(decodedReport.BlessedMerkleRoots) > 0 &&
 		consensus.LtFPlusOne(int(reportInfo.RemoteF), len(decodedReport.RMNSignatures)) {
-		lggr.Infof("report with insufficient RMN signatures %d < %d+1",
+		lggr.Debugf("report with insufficient RMN signatures %d < %d+1",
 			len(decodedReport.RMNSignatures), reportInfo.RemoteF)
 		return cciptypes.CommitPluginReport{}, plugincommon.NewErrInvalidReport("insufficient RMN signatures")
 	}
@@ -240,7 +240,7 @@ func (p *Plugin) validateReport(
 		p.ccipReader,
 	)
 	if err != nil {
-		lggr.Infow("report reached transmission protocol but not transmitted, invalid merkle roots state",
+		lggr.Warnw("report reached transmission protocol but not transmitted, invalid merkle roots state",
 			"err", err,
 			"blessedMerkleRoots", decodedReport.BlessedMerkleRoots,
 			"unblessedMerkleRoots", decodedReport.UnblessedMerkleRoots)
@@ -258,15 +258,15 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 
 	decodedReport, err := p.validateReport(ctx, lggr, seqNr, r)
 	if errors.Is(err, plugincommon.ErrInvalidReport) {
-		lggr.Infow("report not valid, not accepting", "err", err)
+		lggr.Errorw("report not valid, not accepting", "err", err)
 		return false, nil
 	}
 	if err != nil {
-		lggr.Infow("validation error", "err", err)
+		lggr.Errorw("validation error", "err", err)
 		return false, fmt.Errorf("validating report: %w", err)
 	}
 
-	lggr.Infow("ShouldAcceptedAttestedReport passed checks",
+	lggr.Debugw("ShouldAcceptedAttestedReport passed checks",
 		"timestamp", time.Now().UTC(),
 		"blessedRootsLen", len(decodedReport.BlessedMerkleRoots),
 		"unblessedRootsLen", len(decodedReport.UnblessedMerkleRoots),
@@ -301,7 +301,7 @@ func (p *Plugin) isStaleReport(
 	if seqNr <= latestPriceSeqNr &&
 		len(decodedReport.BlessedMerkleRoots) == 0 &&
 		len(decodedReport.UnblessedMerkleRoots) == 0 {
-		lggr.Infow(
+		lggr.Debugw(
 			"skipping stale report due to stale price seq nr and no merkle roots",
 			"latestPriceSeqNr", latestPriceSeqNr)
 		return true
@@ -347,15 +347,15 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 
 	decodedReport, err := p.validateReport(ctx, lggr, seqNr, r)
 	if errors.Is(err, plugincommon.ErrInvalidReport) {
-		lggr.Infow("report not valid, not transmitting", "err", err)
+		lggr.Errorw("report not valid, not transmitting", "err", err)
 		return false, nil
 	}
 	if err != nil {
-		lggr.Infow("validation error", "err", err)
+		lggr.Errorw("validation error", "err", err)
 		return false, fmt.Errorf("validating report: %w", err)
 	}
 
-	lggr.Infow("ShouldTransmitAcceptedReport passed checks",
+	lggr.Debugw("ShouldTransmitAcceptedReport passed checks",
 		"seqNr", seqNr,
 		"timestamp", time.Now().UTC(),
 		"blessedRootsLen", len(decodedReport.BlessedMerkleRoots),

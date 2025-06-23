@@ -105,7 +105,7 @@ func (p *Processor) prepareRMNController(ctx context.Context, lggr logger.Logger
 		return nil
 	}
 
-	lggr.Infow("Initializing RMN controller", "rmnRemoteCfg", prevOutcome.RMNRemoteCfg)
+	lggr.Debugw("Initializing RMN controller", "rmnRemoteCfg", prevOutcome.RMNRemoteCfg)
 
 	rmnNodesInfo, err := p.rmnHomeReader.GetRMNNodesInfo(prevOutcome.RMNRemoteCfg.ConfigDigest)
 	if err != nil {
@@ -114,7 +114,7 @@ func (p *Processor) prepareRMNController(ctx context.Context, lggr logger.Logger
 
 	oraclePeerIDs := make([]ragep2ptypes.PeerID, 0, len(p.oracleIDToP2pID))
 	for _, p2pID := range p.oracleIDToP2pID {
-		lggr.Infow("Adding oracle node to peerIDs", "p2pID", p2pID.String())
+		lggr.Debugw("Adding oracle node to peerIDs", "p2pID", p2pID.String())
 		oraclePeerIDs = append(oraclePeerIDs, p2pID)
 	}
 

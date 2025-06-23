@@ -98,7 +98,7 @@ func (p *Processor) Query(ctx context.Context, prevOutcome Outcome) (Query, erro
 		}
 
 		if errors.Is(err, rmn.ErrAllChainsNotReady) {
-			lggr.Infow("none of the observation requests were ready to be observed by RMN, got empty responses")
+			lggr.Warnw("none of the observation requests were ready to be observed by RMN, got empty responses")
 			return Query{}, nil
 		}
 
