@@ -175,6 +175,7 @@ func NewCCIPReaderWithExtendedContractReaders(
 	}
 
 	cr.accessors = cas
+	cr.configPoller.SetChainAccessorsTestOnly(cas)
 	return cr
 }
 

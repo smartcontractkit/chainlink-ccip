@@ -108,16 +108,22 @@ type DestinationAccessor interface {
 	// NextSeqNum reads the source chain config to get the next expected
 	// sequence number for the given source chains.
 	//
-	// Access Type: Method(GetSourceChainConfig)
+	// Access Type: Method(NextSeqNum)
 	// Contract: OffRamp
 	// Confidence: Unconfirmed
-	//
-	// TODO: Have a single "GetSourceChainConfigs" method for the log poller to
-	//       use for cached values, and the plugin to use for non-cached values.
-	//       Rename to "GetSourceChainConfig".
-	//      See Design Doc (NextSeqNum) for notes.
 	NextSeqNum(ctx context.Context, sources []ChainSelector) (
 		seqNum map[ChainSelector]SeqNum, err error)
+
+	// GetSourceChainConfigs queries the configured chain as a destination chain and returns
+	// the source chain configs for the provided source chains.
+	//
+	// Access Type: Method(GetSourceChainConfigs)
+	// Contract: OffRamp
+	// Confidence: Unconfirmed
+	GetSourceChainConfigs(
+		ctx context.Context,
+		sourceChainSelectors []ChainSelector,
+	) (map[ChainSelector]SourceChainConfig, error)
 
 	// Nonces for all provided selector/address pairs. Addresses must be encoded
 	// according to the source chain requirements by using the AddressCodec.
