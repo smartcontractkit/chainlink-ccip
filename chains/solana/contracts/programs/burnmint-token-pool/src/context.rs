@@ -309,8 +309,7 @@ pub struct TokenOnramp<'info> {
     )]
     pub state: Account<'info, State>,
     #[account(address = *mint.to_account_info().owner)]
-    /// CHECK: CPI to underlying token program
-    pub token_program: AccountInfo<'info>,
+    pub token_program: Interface<'info, TokenInterface>,
     #[account(mut)]
     pub mint: InterfaceAccount<'info, Mint>,
     #[account(
