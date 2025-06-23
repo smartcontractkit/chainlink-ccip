@@ -38,14 +38,20 @@ func NewDefaultAccessor(
 	contractReader contractreader.Extended,
 	contractWriter types.ContractWriter,
 	addrCodec cciptypes.AddressCodec,
-) cciptypes.ChainAccessor {
+) (cciptypes.ChainAccessor, error) {
+	if contractReader == nil {
+		return nil, fmt.Errorf("contractReader cannot be nil")
+	}
+	if contractWriter == nil {
+		return nil, fmt.Errorf("contractWriter cannot be nil")
+	}
 	return &DefaultAccessor{
 		lggr:           lggr,
 		chainSelector:  chainSelector,
 		contractReader: contractReader,
 		contractWriter: contractWriter,
 		addrCodec:      addrCodec,
-	}
+	}, nil
 }
 
 func (l *DefaultAccessor) Metadata() cciptypes.AccessorMetadata {

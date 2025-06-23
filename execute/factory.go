@@ -75,6 +75,7 @@ type PluginFactory struct {
 	homeChainReader  reader.HomeChain
 	estimateProvider cciptypes.EstimateProvider
 	tokenDataEncoder cciptypes.TokenDataEncoder
+	chainAccessors   map[cciptypes.ChainSelector]cciptypes.ChainAccessor
 	contractReaders  map[cciptypes.ChainSelector]types.ContractReader
 	chainWriters     map[cciptypes.ChainSelector]types.ContractWriter
 }
@@ -89,6 +90,7 @@ type PluginFactoryParams struct {
 	HomeChainReader  reader.HomeChain
 	TokenDataEncoder cciptypes.TokenDataEncoder
 	EstimateProvider cciptypes.EstimateProvider
+	ChainAccessors   map[cciptypes.ChainSelector]cciptypes.ChainAccessor
 	ContractReaders  map[cciptypes.ChainSelector]types.ContractReader
 	ContractWriters  map[cciptypes.ChainSelector]types.ContractWriter
 }
@@ -106,6 +108,7 @@ func NewExecutePluginFactory(params PluginFactoryParams) *PluginFactory {
 		homeChainReader:  params.HomeChainReader,
 		estimateProvider: params.EstimateProvider,
 		tokenDataEncoder: params.TokenDataEncoder,
+		chainAccessors:   params.ChainAccessors,
 		contractReaders:  params.ContractReaders,
 		chainWriters:     params.ContractWriters,
 	}
