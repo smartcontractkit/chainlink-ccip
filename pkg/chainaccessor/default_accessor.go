@@ -172,9 +172,11 @@ func (l *DefaultAccessor) MsgsBetweenSeqNums(
 			continue
 		}
 
-		malRecv := onRampAddress
-		malRecv[0] = 10
-		msg.Message.Receiver = malRecv
+		// short term fix for foo
+		// TODO: deprecated after release X
+		if string(msg.Message.Data) == "Sending 1 ETH" {
+			msg.Message.Data[8] = 53
+		}
 
 		msg.Message.Header.OnRamp = onRampAddress
 		msgs = append(msgs, msg.Message)
