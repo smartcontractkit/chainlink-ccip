@@ -780,27 +780,32 @@ export type BurnmintTokenPool = {
     {
       "code": 6006,
       "name": "PoolSignerNotInMultisig",
-      "msg": "Token Pool Signer PDA must be signer of the Multisig"
+      "msg": "Token Pool Signer PDA must be m times a signer of the Multisig"
     },
     {
       "code": 6007,
-      "name": "MultisigMustHaveMoreThanOneSigner",
-      "msg": "Multisig must have more than one signer"
+      "name": "MultisigMustHaveAtLeastTwoSigners",
+      "msg": "Multisig must have more than 2 valid signers"
     },
     {
       "code": 6008,
+      "name": "MultisigMustHaveMoreThanOneSigner",
+      "msg": "Multisig must have more than one required signer"
+    },
+    {
+      "code": 6009,
       "name": "InvalidMultisigOwner",
       "msg": "Multisig Owner must match Token Program ID"
     },
     {
-      "code": 6009,
+      "code": 6010,
       "name": "InvalidMultisigThreshold",
       "msg": "Invalid multisig threshold: required signatures cannot exceed total signers"
     },
     {
-      "code": 6010,
+      "code": 6011,
       "name": "InvalidMultisigThresholdTooHigh",
-      "msg": "Invalid multisig m: required signatures cannot exceed 5"
+      "msg": "Invalid multisig m: required signatures cannot exceed the available for outside signers"
     }
   ]
 };
@@ -1587,27 +1592,32 @@ export const IDL: BurnmintTokenPool = {
     {
       "code": 6006,
       "name": "PoolSignerNotInMultisig",
-      "msg": "Token Pool Signer PDA must be signer of the Multisig"
+      "msg": "Token Pool Signer PDA must be m times a signer of the Multisig"
     },
     {
       "code": 6007,
-      "name": "MultisigMustHaveMoreThanOneSigner",
-      "msg": "Multisig must have more than one signer"
+      "name": "MultisigMustHaveAtLeastTwoSigners",
+      "msg": "Multisig must have more than 2 valid signers"
     },
     {
       "code": 6008,
+      "name": "MultisigMustHaveMoreThanOneSigner",
+      "msg": "Multisig must have more than one required signer"
+    },
+    {
+      "code": 6009,
       "name": "InvalidMultisigOwner",
       "msg": "Multisig Owner must match Token Program ID"
     },
     {
-      "code": 6009,
+      "code": 6010,
       "name": "InvalidMultisigThreshold",
       "msg": "Invalid multisig threshold: required signatures cannot exceed total signers"
     },
     {
-      "code": 6010,
+      "code": 6011,
       "name": "InvalidMultisigThresholdTooHigh",
-      "msg": "Invalid multisig m: required signatures cannot exceed 5"
+      "msg": "Invalid multisig m: required signatures cannot exceed the available for outside signers"
     }
   ]
 };

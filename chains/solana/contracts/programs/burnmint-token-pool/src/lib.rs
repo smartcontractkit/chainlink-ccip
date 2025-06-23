@@ -100,40 +100,16 @@ pub mod burnmint_token_pool {
             return Err(CcipBnMTokenPoolError::UnsupportedTokenProgram.into());
         };
 
-        // If using a multisig, it must have more than one valid signer
         let n = multisig_account.n as usize;
-        require_gt!(
-            n,
-            1,
-            CcipBnMTokenPoolError::MultisigMustHaveMoreThanOneSigner
-        );
         let m = multisig_account.m as usize;
 
-        // The multisig must be valid, m must be less than or equal to n
-        require_gte!(n, m, CcipBnMTokenPoolError::InvalidMultisigThreshold);
+        let signer_count = multisig_account
+            .signers
+            .iter()
+            .filter(|s| *s == &ctx.accounts.pool_signer.key())
+            .count();
 
-        // The Pool signer must be at least m times a signer, so it can mint by itself
-        require_gte!(
-            multisig_account
-                .signers
-                .iter()
-                .filter(|s| *s == &ctx.accounts.pool_signer.key())
-                .count(),
-            m,
-            CcipBnMTokenPoolError::PoolSignerNotInMultisig
-        );
-
-        // The amount of appearances of the token pool signer must be 5 at most as if not the multisig is useless outside of the burnmint token pool context
-        // If greater than 5, there will not be enough slots for other signers to sign a mint operation
-        require_gte!(
-            5,
-            multisig_account
-                .signers
-                .iter()
-                .filter(|s| *s == &ctx.accounts.pool_signer.key())
-                .count(),
-            CcipBnMTokenPoolError::InvalidMultisigThresholdTooHigh
-        );
+        validate_multisig_config(n, m, signer_count)?;
 
         // Transfer the mint authority to the new mint authority using the corresponding Token Program. It can be token 22 or token SPL
         let ix = spl_token_2022::instruction::set_authority(
@@ -577,6 +553,41 @@ pub fn mint_tokens(
         amount: parsed_amount,
         mint: accounts.mint.key(),
     });
+
+    Ok(())
+}
+
+pub fn validate_multisig_config(n: usize, m: usize, signer_count: usize) -> Result<()> {
+    // Multisig must have at least two signers
+    require_gte!(
+        n,
+        2,
+        CcipBnMTokenPoolError::MultisigMustHaveAtLeastTwoSigners
+    );
+
+    // Threshold must be at least one
+    require_gte!(
+        m,
+        1,
+        CcipBnMTokenPoolError::MultisigMustHaveMoreThanOneSigner
+    );
+
+    // Threshold must not exceed the total number of signers
+    require_gte!(n, m, CcipBnMTokenPoolError::InvalidMultisigThreshold);
+
+    // Pool signer must appear at least m times to satisfy the threshold on its own
+    require_gte!(
+        signer_count,
+        m,
+        CcipBnMTokenPoolError::PoolSignerNotInMultisig
+    );
+
+    // Pool signer must not appear more than (n - m) times
+    require_gte!(
+        n - m,
+        signer_count,
+        CcipBnMTokenPoolError::InvalidMultisigThresholdTooHigh
+    );
 
     Ok(())
 }
