@@ -60,6 +60,7 @@ pub mod burnmint_token_pool {
                 rmn_remote,
             ),
         });
+
         Ok(())
     }
 
