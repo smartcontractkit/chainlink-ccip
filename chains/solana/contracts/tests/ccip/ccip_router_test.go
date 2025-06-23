@@ -5534,38 +5534,82 @@ func TestCCIPRouter(t *testing.T) {
 		})
 
 		t.Run("Deriving accounts with a token pool that also requires derivation", func(t *testing.T) {
-			destinationChainSelector := config.EvmChainSelector
 			message := ccip_router.SVM2AnyMessage{
-				FeeToken: wsol.mint,
 				Receiver: validReceiverAddress[:],
-				Data:     []byte{4, 5, 6},
+				Data:     []byte{},
 				TokenAmounts: []ccip_router.SVMTokenAmount{
-					{
-						Token:  usdcPool.Mint,
-						Amount: 1,
-					},
+					{Token: usdcPool.Mint, Amount: 7},
 				},
+				FeeToken:  solana.PublicKey{},
 				ExtraArgs: emptyGenericExtraArgsV2,
 			}
 
-			derivedAccounts, derivedLookUpTables, tokenIndices := deriveSendAccounts(ctx,
+			// as there are many accounts to check, we print the index of the first mismatch by checking them one
+			// by one instead of all at once
+			expectedAccounts := []*solana.AccountMeta{
+				solana.Meta(config.RouterConfigPDA),
+				solana.Meta(config.EvmDestChainStatePDA).WRITE(),
+				solana.Meta(nonceEvmPDA).WRITE(),
+				solana.Meta(user.PublicKey()).WRITE(),
+				solana.Meta(solana.SystemProgramID),
+				// billing:
+				solana.Meta(config.SPLTokenProgram),
+				solana.Meta(wsol.mint),              // paying in native SOL
+				solana.Meta(solana.SystemProgramID), // no user ATA, as paying in native SOL
+				solana.Meta(wsol.billingATA).WRITE(),
+				solana.Meta(config.BillingSignerPDA),
+				// fee quoter CPI:
+				solana.Meta(config.FeeQuoterProgram),
+				solana.Meta(config.FqConfigPDA),
+				solana.Meta(config.FqEvmDestChainPDA),
+				solana.Meta(wsol.fqBillingConfigPDA),
+				solana.Meta(link22.fqBillingConfigPDA),
+				// RMN CPI:
+				solana.Meta(config.RMNRemoteProgram),
+				solana.Meta(config.RMNRemoteCursesPDA),
+				solana.Meta(config.RMNRemoteConfigPDA),
+				// token pool (static accounts):
+				solana.Meta(usdcPool.User[user.PublicKey()]).WRITE(),
+				solana.Meta(usdcPool.Chain[config.EvmChainSelector]),
+				solana.Meta(usdcPool.PoolLookupTable),
+				solana.Meta(usdcPool.AdminRegistryPDA),
+				solana.Meta(usdcPool.PoolProgram),
+				solana.Meta(usdcPool.PoolConfig),
+				solana.Meta(usdcPool.PoolTokenAccount),
+				solana.Meta(usdcPool.PoolSigner),
+				solana.Meta(usdcPool.Program),
+				solana.Meta(usdcPool.Mint),
+				solana.Meta(usdcPool.RouterSigner),
+				// token pool (derived additional accounts):
+			}
+			fmt.Printf("Expected accounts: %d\n", len(expectedAccounts))
+			for i, acc := range expectedAccounts {
+				fmt.Printf("Account %d: %s\n", i, acc.PublicKey)
+			}
+
+			derivedAccounts, derivedLookUpTables, tokenIndices := deriveSendAccounts(
+				ctx,
 				t,
 				user,
 				message,
-				destinationChainSelector,
-				solanaGoClient)
-			lookupTables := ccipSendLookupTable
-			for _, table := range derivedLookUpTables {
-				entries, lutErr := common.GetAddressLookupTable(ctx, solanaGoClient, table)
-				require.NoError(t, lutErr)
-				lookupTables[table] = entries
-			}
+				config.EvmChainSelector,
+				// message.FeeToken,
+				// []solana.PublicKey{usdcPool.Mint},
+				solanaGoClient,
+			)
 
-			for i, meta := range derivedAccounts {
-				fmt.Printf("Derived: [%d] %v\n", i, meta)
-			}
+			require.Equal(t, []uint8{0}, tokenIndices)
 
-			fmt.Printf("%v\n", tokenIndices)
+			var ccipSendAltAddr solana.PublicKey
+			for k := range ccipSendLookupTable {
+				ccipSendAltAddr = k
+			}
+			require.Equal(t, []solana.PublicKey{ccipSendAltAddr, usdcPool.PoolLookupTable}, derivedLookUpTables)
+
+			require.Len(t, derivedAccounts, len(expectedAccounts), "Derived accounts length mismatch")
+			for i, expected := range expectedAccounts {
+				require.Equal(t, expected, derivedAccounts[i], "Account at index %d does not match expected", i)
+			}
 		})
 	})
 
@@ -10942,7 +10986,7 @@ func deriveSendAccounts(ctx context.Context,
 	transmitter solana.PrivateKey,
 	message ccip_router.SVM2AnyMessage,
 	destChainSelector uint64,
-	solanaGoClient *rpc.Client) (accounts []*solana.AccountMeta, lookUpTables []solana.PublicKey, tokenIndices []byte) {
+	solanaGoClient *rpc.Client) (accounts []*solana.AccountMeta, lookUpTables []solana.PublicKey, tokenIndices []uint8) {
 	derivedAccounts := []*solana.AccountMeta{}
 	askWith := []*solana.AccountMeta{}
 	stage := "Start"
@@ -10969,6 +11013,7 @@ func deriveSendAccounts(ctx context.Context,
 		tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{derive}, transmitter, config.DefaultCommitment)
 		derivation, err := common.ExtractAnchorTypedReturnValue[ccip_router.DeriveAccountsResponse](ctx, tx.Meta.LogMessages, config.CcipRouterProgram.String())
 		require.NoError(t, err)
+		fmt.Printf("Derivation: %+v\n", derivation)
 
 		if derivation.CurrentStage == "TokenTransferAccounts/Start" {
 			tokenIndices = append(tokenIndices, tokenIndex)
