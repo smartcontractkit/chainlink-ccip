@@ -275,7 +275,7 @@ pub mod lockrelease_token_pool {
         })
     }
 
-    // set the rebalancer address for the pool, if the rebalancer is the default address then only the pool owner can rebalance
+    // set the rebalancer address for the pool, if the rebalancer is the default address then no rebalance is allowed
     pub fn set_rebalancer(ctx: Context<SetConfig>, rebalancer: Pubkey) -> Result<()> {
         ctx.accounts.state.config.set_rebalancer(rebalancer)
     }
