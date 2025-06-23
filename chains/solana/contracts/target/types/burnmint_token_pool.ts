@@ -796,6 +796,11 @@ export type BurnmintTokenPool = {
       "code": 6009,
       "name": "InvalidMultisigThreshold",
       "msg": "Invalid multisig threshold: required signatures cannot exceed total signers"
+    },
+    {
+      "code": 6010,
+      "name": "InvalidMultisigThresholdTooHigh",
+      "msg": "Invalid multisig m: required signatures cannot exceed 5"
     }
   ]
 };
@@ -1598,6 +1603,11 @@ export const IDL: BurnmintTokenPool = {
       "code": 6009,
       "name": "InvalidMultisigThreshold",
       "msg": "Invalid multisig threshold: required signatures cannot exceed total signers"
+    },
+    {
+      "code": 6010,
+      "name": "InvalidMultisigThresholdTooHigh",
+      "msg": "Invalid multisig m: required signatures cannot exceed 5"
     }
   ]
 };

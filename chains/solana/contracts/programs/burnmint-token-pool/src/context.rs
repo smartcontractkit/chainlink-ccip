@@ -481,6 +481,8 @@ pub enum CcipBnMTokenPoolError {
     InvalidMultisigOwner,
     #[msg("Invalid multisig threshold: required signatures cannot exceed total signers")]
     InvalidMultisigThreshold,
+    #[msg("Invalid multisig m: required signatures cannot exceed 5")]
+    InvalidMultisigThresholdTooHigh,
 }
 
 // This account can not be declared in the common crate, the program ID for that Account would be incorrect.

@@ -111,6 +111,7 @@ pub mod burnmint_token_pool {
 
         // The multisig must be valid, m must be less than or equal to n
         require_gte!(n, m, CcipBnMTokenPoolError::InvalidMultisigThreshold);
+
         // The Pool signer must be at least m times a signer, so it can mint by itself
         require_gte!(
             multisig_account
@@ -120,6 +121,18 @@ pub mod burnmint_token_pool {
                 .count(),
             m,
             CcipBnMTokenPoolError::PoolSignerNotInMultisig
+        );
+
+        // The amount of appearances of the token pool signer must be 5 at most as if not the multisig is useless outside of the burnmint token pool context
+        // If greater than 5, there will not be enough slots for other signers to sign a mint operation
+        require_gte!(
+            5,
+            multisig_account
+                .signers
+                .iter()
+                .filter(|s| *s == &ctx.accounts.pool_signer.key())
+                .count(),
+            CcipBnMTokenPoolError::InvalidMultisigThresholdTooHigh
         );
 
         // Transfer the mint authority to the new mint authority using the corresponding Token Program. It can be token 22 or token SPL
