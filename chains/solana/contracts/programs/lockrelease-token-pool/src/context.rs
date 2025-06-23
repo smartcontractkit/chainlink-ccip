@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::{
     associated_token::get_associated_token_address_with_program_id,
-    token_interface::{Mint, TokenAccount},
+    token_interface::{Mint, TokenAccount, TokenInterface},
 };
 use base_token_pool::common::*;
 use ccip_common::seed;
@@ -209,8 +209,7 @@ pub struct TokenOfframp<'info> {
     )]
     pub state: Account<'info, State>,
     #[account(address = *mint.to_account_info().owner)]
-    /// CHECK: CPI to token program
-    pub token_program: AccountInfo<'info>,
+    pub token_program: Interface<'info, TokenInterface>,
     #[account(mut)]
     pub mint: InterfaceAccount<'info, Mint>,
     #[account(
@@ -274,8 +273,7 @@ pub struct TokenOnramp<'info> {
     )]
     pub state: Account<'info, State>,
     #[account(address = *mint.to_account_info().owner)]
-    /// CHECK: CPI to underlying token program
-    pub token_program: AccountInfo<'info>,
+    pub token_program: Interface<'info, TokenInterface>,
     #[account(mut)]
     pub mint: InterfaceAccount<'info, Mint>,
     #[account(
@@ -434,8 +432,7 @@ pub struct RebalancerTokenTransfer<'info> {
     )]
     pub state: Account<'info, State>,
     #[account(address = *mint.to_account_info().owner)]
-    /// CHECK: CPI to token program
-    pub token_program: AccountInfo<'info>,
+    pub token_program: Interface<'info, TokenInterface>,
     #[account(mut)]
     pub mint: InterfaceAccount<'info, Mint>,
     #[account(
