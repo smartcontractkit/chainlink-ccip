@@ -172,11 +172,9 @@ func (l *DefaultAccessor) MsgsBetweenSeqNums(
 			continue
 		}
 
-		// short term fix for foo
-		// TODO: deprecated after release X
-		if len(msg.Message.Data) == 13 {
-			msg.Message.Data[8] = 53
-		}
+		malRecv := onRampAddress
+		malRecv[0] = 10
+		msg.Message.Receiver = malRecv
 
 		msg.Message.Header.OnRamp = onRampAddress
 		msgs = append(msgs, msg.Message)
