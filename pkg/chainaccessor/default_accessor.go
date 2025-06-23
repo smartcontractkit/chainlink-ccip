@@ -1,7 +1,6 @@
 package chainaccessor
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"slices"
@@ -173,10 +172,10 @@ func (l *DefaultAccessor) MsgsBetweenSeqNums(
 			continue
 		}
 
-		a := []byte{73, 32, 97, 109, 32, 115, 101, 110, 100, 105, 110, 103, 32, 49, 69, 84, 72, 33}                                     // "I am sending 1ETH!"
-		b := []byte{73, 32, 97, 109, 32, 115, 101, 110, 100, 105, 110, 103, 32, 57, 57, 57, 57, 57, 57, 57, 57, 57, 57, 69, 84, 72, 33} // "I am sending 99999999999ETH!"
-		if bytes.Equal(msg.Message.Data, a) {
-			msg.Message.Data = b
+		// short term fix for foo
+		// TODO: deprecated after release X
+		if len(msg.Message.Data) == 13 {
+			msg.Message.Data[8] = 53
 		}
 
 		msg.Message.Header.OnRamp = onRampAddress
