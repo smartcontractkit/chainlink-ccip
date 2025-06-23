@@ -266,7 +266,7 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 		return false, fmt.Errorf("validating report: %w", err)
 	}
 
-	lggr.Debugw("ShouldAcceptedAttestedReport passed checks",
+	lggr.Infow("ShouldAcceptedAttestedReport passed checks",
 		"timestamp", time.Now().UTC(),
 		"blessedRootsLen", len(decodedReport.BlessedMerkleRoots),
 		"unblessedRootsLen", len(decodedReport.UnblessedMerkleRoots),
@@ -355,7 +355,7 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 		return false, fmt.Errorf("validating report: %w", err)
 	}
 
-	lggr.Debugw("ShouldTransmitAcceptedReport passed checks",
+	lggr.Infow("ShouldTransmitAcceptedReport passed checks",
 		"seqNr", seqNr,
 		"timestamp", time.Now().UTC(),
 		"blessedRootsLen", len(decodedReport.BlessedMerkleRoots),
