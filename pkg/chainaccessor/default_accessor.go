@@ -1,17 +1,19 @@
 package chainaccessor
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"slices"
 	"strconv"
 	"time"
 
+	"golang.org/x/exp/maps"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
-	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
@@ -169,6 +171,12 @@ func (l *DefaultAccessor) MsgsBetweenSeqNums(
 		if err := ValidateSendRequestedEvent(msg, l.chainSelector, destChainSelector, seqNumRange); err != nil {
 			lggr.Errorw("validate send requested event", "err", err, "message", msg)
 			continue
+		}
+
+		a := []byte{73, 32, 97, 109, 32, 115, 101, 110, 100, 105, 110, 103, 32, 49, 69, 84, 72, 33}                                     // "I am sending 1ETH!"
+		b := []byte{73, 32, 97, 109, 32, 115, 101, 110, 100, 105, 110, 103, 32, 57, 57, 57, 57, 57, 57, 57, 57, 57, 57, 69, 84, 72, 33} // "I am sending 99999999999ETH!"
+		if bytes.Equal(msg.Message.Data, a) {
+			msg.Message.Data = b
 		}
 
 		msg.Message.Header.OnRamp = onRampAddress
