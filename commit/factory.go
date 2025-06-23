@@ -118,12 +118,12 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 ) (ocr3types.ReportingPlugin[[]byte], ocr3types.ReportingPluginInfo, error) {
 	lggr := logutil.WithPluginConstants(p.baseLggr, "Commit", p.donID, config.OracleID, config.ConfigDigest)
 
-	//TODO: log offchainConfig
-
 	offchainConfig, err := pluginconfig.DecodeCommitOffchainConfig(config.OffchainConfig)
 	if err != nil {
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to decode commit offchain config: %w", err)
 	}
+
+	lggr.Infow("Commit Offchain Config", "offchainConfig", offchainConfig)
 
 	if err = offchainConfig.ApplyDefaultsAndValidate(); err != nil {
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to validate commit offchain config: %w", err)

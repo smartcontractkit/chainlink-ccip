@@ -100,14 +100,10 @@ func (p *processor) Outcome(
 		return gasPrices[i].ChainSel < gasPrices[j].ChainSel
 	})
 
-	if len(gasPrices) != 0 {
-		lggr.Infow("Gas Prices Outcome",
-			"gasPrices", gasPrices,
-			"consensusTimestamp", consensusObs.TimestampNow,
-		)
-	} else {
-		lggr.Debugw("No gas prices to update")
-	}
+	lggr.Debugw("Gas Prices Outcome",
+		"gasPrices", gasPrices,
+		"consensusTimestamp", consensusObs.TimestampNow,
+	)
 
 	out := Outcome{GasPrices: gasPrices}
 	return out, nil
