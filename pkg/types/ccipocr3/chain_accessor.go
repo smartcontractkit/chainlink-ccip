@@ -108,14 +108,9 @@ type DestinationAccessor interface {
 	// NextSeqNum reads the source chain config to get the next expected
 	// sequence number for the given source chains.
 	//
-	// Access Type: Method(GetSourceChainConfig)
+	// Access Type: Method(NextSeqNum)
 	// Contract: OffRamp
 	// Confidence: Unconfirmed
-	//
-	// TODO: Have a single "GetSourceChainConfigs" method for the log poller to
-	//       use for cached values, and the plugin to use for non-cached values.
-	//       Rename to "GetSourceChainConfig".
-	//      See Design Doc (NextSeqNum) for notes.
 	NextSeqNum(ctx context.Context, sources []ChainSelector) (
 		seqNum map[ChainSelector]SeqNum, err error)
 
@@ -153,13 +148,15 @@ type DestinationAccessor interface {
 	// TODO: this should go away, it's a call to the ConfigPoller.
 	GetOffRampConfigDigest(ctx context.Context, pluginType uint8) ([32]byte, error)
 
-	// GetOffRampSourceChainsConfig returns the sourceChains config for all the provided source chains.
-	// If a config was not found it will be missing from the returned map.
+	// GetOffRampSourceChainConfigs queries the configured chain as a destination chain and returns
+	// the source chain configs for the provided source chains.
 	//
-	// TODO: this should go away, it's a call to the ConfigPoller.
-	GetOffRampSourceChainsConfig(
+	// Access Type: Method(GetOffRampSourceChainConfigs)
+	// Contract: OffRamp
+	// Confidence: Unconfirmed
+	GetOffRampSourceChainConfigs(
 		ctx context.Context,
-		sourceChains []ChainSelector,
+		sourceChainSelectors []ChainSelector,
 	) (map[ChainSelector]SourceChainConfig, error)
 }
 

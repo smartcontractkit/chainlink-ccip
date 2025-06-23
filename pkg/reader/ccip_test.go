@@ -2115,6 +2115,11 @@ func (m *mockConfigCache) GetOfframpSourceChainConfigs(
 	return args.Get(0).(map[cciptypes.ChainSelector]StaticSourceChainConfig), args.Error(1)
 }
 
+func (m *mockConfigCache) SetChainAccessorsTestOnly(
+	chainAccessors map[cciptypes.ChainSelector]cciptypes.ChainAccessor) {
+	m.Called(chainAccessors)
+}
+
 // Update Start method to accept context parameter
 func (m *mockConfigCache) Start(ctx context.Context) error {
 	return m.Called(ctx).Error(0)
