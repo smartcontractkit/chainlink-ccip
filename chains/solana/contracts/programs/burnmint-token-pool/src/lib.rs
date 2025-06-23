@@ -91,31 +91,25 @@ pub mod burnmint_token_pool {
             spl_token_2022::state::Multisig::unpack_from_slice(multisig_data)
                 .map_err(|_| CcipBnMTokenPoolError::InvalidToken2022Multisig)?
                 .into()
-        } else {
-            // If the token program is not spl-token-2022, we assume it is the original SPL Token Program
+        } else if token_program_id == &spl_token::ID {
             spl_token::state::Multisig::unpack_from_slice(multisig_data)
                 .map_err(|_| CcipBnMTokenPoolError::InvalidSPLTokenMultisig)?
                 .into()
+        } else {
+            // Reject any unsupported token programs
+            return Err(CcipBnMTokenPoolError::UnsupportedTokenProgram.into());
         };
 
-        // If using a multisig, it must have more than one valid signer
         let n = multisig_account.n as usize;
-        require_gt!(
-            n,
-            1,
-            CcipBnMTokenPoolError::MultisigMustHaveMoreThanOneSigner
-        );
         let m = multisig_account.m as usize;
-        // The Pool signer must be at least m times a signer, so it can mint by itself
-        require_gte!(
-            multisig_account
-                .signers
-                .iter()
-                .filter(|s| *s == &ctx.accounts.pool_signer.key())
-                .count(),
-            m,
-            CcipBnMTokenPoolError::PoolSignerNotInMultisig
-        );
+
+        let signer_count = multisig_account
+            .signers
+            .iter()
+            .filter(|s| *s == &ctx.accounts.pool_signer.key())
+            .count();
+
+        validate_multisig_config(n, m, signer_count)?;
 
         // Transfer the mint authority to the new mint authority using the corresponding Token Program. It can be token 22 or token SPL
         let ix = spl_token_2022::instruction::set_authority(
@@ -136,14 +130,14 @@ pub mod burnmint_token_pool {
         let account_infos: Vec<AccountInfo> =
             if old_mint_authority != ctx.accounts.pool_signer.key() {
                 // If the old mint authority is not the pool signer, we need to include the multisig account in the instruction
-                let multisig_account = ctx
+                let multisig_signer_account = ctx
                     .remaining_accounts
                     .iter()
                     .find(|acc| acc.key() == old_mint_authority)
                     .ok_or(CcipBnMTokenPoolError::InvalidMultisig)?;
                 vec![
                     ctx.accounts.mint.to_account_info(),
-                    multisig_account.to_account_info(),
+                    multisig_signer_account.to_account_info(),
                     ctx.accounts.pool_signer.to_account_info(),
                 ]
             } else {
@@ -559,6 +553,41 @@ pub fn mint_tokens(
         amount: parsed_amount,
         mint: accounts.mint.key(),
     });
+
+    Ok(())
+}
+
+pub fn validate_multisig_config(n: usize, m: usize, signer_count: usize) -> Result<()> {
+    // Multisig must have at least two signers
+    require_gte!(
+        n,
+        2,
+        CcipBnMTokenPoolError::MultisigMustHaveAtLeastTwoSigners
+    );
+
+    // Threshold must be at least one
+    require_gte!(
+        m,
+        1,
+        CcipBnMTokenPoolError::MultisigMustHaveMoreThanOneSigner
+    );
+
+    // Threshold must not exceed the total number of signers
+    require_gte!(n, m, CcipBnMTokenPoolError::InvalidMultisigThreshold);
+
+    // Pool signer must appear at least m times to satisfy the threshold on its own
+    require_gte!(
+        signer_count,
+        m,
+        CcipBnMTokenPoolError::PoolSignerNotInMultisig
+    );
+
+    // Pool signer must not appear more than (n - m) times
+    require_gte!(
+        n - m,
+        signer_count,
+        CcipBnMTokenPoolError::InvalidMultisigThresholdTooHigh
+    );
 
     Ok(())
 }
