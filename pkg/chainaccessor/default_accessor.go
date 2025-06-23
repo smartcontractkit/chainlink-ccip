@@ -148,8 +148,13 @@ func (l *DefaultAccessor) MsgsBetweenSeqNums(
 		msgs = append(msgs, msg.Message)
 	}
 
+	msgsWitoutDataField := make([]cciptypes.Message, len(msgs))
+	for i, msg := range msgs {
+		msgsWitoutDataField[i] = msg.CopyWithoutData()
+	}
+
 	lggr.Infow("decoded messages between sequence numbers",
-		"msgs", msgs,
+		"msgsWithoutDataField", msgsWitoutDataField,
 		"sourceChainSelector", l.chainSelector,
 		"seqNumRange", seqNumRange.String(),
 	)
