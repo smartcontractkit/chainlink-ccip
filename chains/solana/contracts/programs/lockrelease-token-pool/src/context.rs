@@ -427,7 +427,7 @@ pub struct DeleteChainConfig<'info> {
 }
 
 #[derive(Accounts)]
-pub struct TokenTransfer<'info> {
+pub struct RebalancerTokenTransfer<'info> {
     #[account(
         seeds = [POOL_STATE_SEED, mint.key().as_ref()],
         bump,
@@ -450,7 +450,8 @@ pub struct TokenTransfer<'info> {
 
     #[account(mut, token::mint = mint, token::token_program = token_program)]
     pub remote_token_account: InterfaceAccount<'info, TokenAccount>,
-    #[account(constraint = authority.key() == state.config.owner || authority.key() == state.config.rebalancer @ CcipTokenPoolError::Unauthorized)]
+    // Only the owner or rebalancer can rebalance the token pool (provide or withdraw liquidity)
+    #[account(constraint = authority.key() == state.config.rebalancer @ CcipTokenPoolError::Unauthorized)]
     pub authority: Signer<'info>,
 }
 
