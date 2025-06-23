@@ -120,7 +120,7 @@ pub fn derive_ccip_send_accounts_finish_main_account_list<'info>(
     let fee_billing_signer = &ctx.remaining_accounts[1];
     let fee_token_program = fee_token_mint_info.owner;
 
-    let is_fee_in_sol = *fee_token_program == Pubkey::default();
+    let is_fee_in_sol = params.message.fee_token == Pubkey::default();
 
     let fee_token_user_ata = if is_fee_in_sol {
         Pubkey::default().readonly()
