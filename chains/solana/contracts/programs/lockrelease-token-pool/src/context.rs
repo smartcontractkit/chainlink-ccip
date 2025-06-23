@@ -447,7 +447,7 @@ pub struct RebalancerTokenTransfer<'info> {
 
     #[account(mut, token::mint = mint, token::token_program = token_program)]
     pub remote_token_account: InterfaceAccount<'info, TokenAccount>,
-    // Only the owner or rebalancer can rebalance the token pool (provide or withdraw liquidity)
+    // Only the rebalancer can provide or withdraw tokens liquidity
     #[account(constraint = authority.key() == state.config.rebalancer @ CcipTokenPoolError::Unauthorized)]
     pub authority: Signer<'info>,
 }
