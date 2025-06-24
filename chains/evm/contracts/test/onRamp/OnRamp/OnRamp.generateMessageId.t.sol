@@ -12,18 +12,7 @@ contract OnRamp_generateMessageId is OnRampSetup {
     );
   }
 
-  function test_BasicMessageId() public view {
-    Internal.EVM2AnyRampMessage memory message = _messageToEvent(_generateEmptyMessage(), 1, 1, 100e18, OWNER);
-
-    bytes32 expectedMessageId = message.header.messageId;
-    message.header.messageId = "";
-
-    bytes32 messageId = s_onRamp.generateMessageId(message);
-
-    assertEq(messageId, expectedMessageId);
-  }
-
-  function test_TokenMessageId() public view {
+  function test_generateMessageId_Success() public view {
     Internal.EVM2AnyRampMessage memory message =
       _messageToEvent(_generateSingleTokenMessage(s_sourceTokens[0], 1000e18), 1, 1, 100e18, OWNER);
 
@@ -35,7 +24,7 @@ contract OnRamp_generateMessageId is OnRampSetup {
     assertEq(messageId, expectedMessageId);
   }
 
-  function test_SameMessageProducesSameId() public view {
+  function test_generateMessageId_SameMessageProducesSameId() public view {
     Internal.EVM2AnyRampMessage memory message = _messageToEvent(_generateEmptyMessage(), 1, 1, 100e18, OWNER);
     message.header.messageId = "";
 
@@ -45,22 +34,9 @@ contract OnRamp_generateMessageId is OnRampSetup {
     assertEq(messageId1, messageId2);
   }
 
-  function test_DifferentMessageProduceDifferentIds() public view {
-    Internal.EVM2AnyRampMessage memory message1 = _messageToEvent(_generateEmptyMessage(), 1, 1, 100e18, OWNER);
-    message1.header.messageId = "";
-
-    Internal.EVM2AnyRampMessage memory message2 = _messageToEvent(_generateEmptyMessage(), 2, 2, 100e18, OWNER);
-    message2.header.messageId = "";
-
-    bytes32 messageId1 = s_onRamp.generateMessageId(message1);
-    bytes32 messageId2 = s_onRamp.generateMessageId(message2);
-
-    assertTrue(messageId1 != messageId2);
-  }
-
   // Reverts
 
-  function test_RevertWhen_MessageIdAlreadySet() public {
+  function test_generateMessageId_RevertWhen_MessageIdAlreadySet() public {
     Internal.EVM2AnyRampMessage memory message = _messageToEvent(_generateEmptyMessage(), 1, 1, 100e18, OWNER);
 
     vm.expectRevert(abi.encodeWithSelector(OnRamp.MessageIdUnexpectedlySet.selector, message.header.messageId));

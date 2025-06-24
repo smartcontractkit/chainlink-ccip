@@ -16,7 +16,7 @@ contract OnRampOverSuperchainInterop_forwardFromRouter is OnRampOverSuperchainIn
     vm.startPrank(address(s_sourceRouter));
   }
 
-  function test_SingleBasicMessage() public {
+  function test_forwardFromRouter_SingleBasicMessage() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
 
     uint256 feeAmount = 1234567890;
@@ -34,7 +34,7 @@ contract OnRampOverSuperchainInterop_forwardFromRouter is OnRampOverSuperchainIn
     s_onRampOverSuperchainInterop.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
   }
 
-  function test_ThreeConsecutiveMessages() public {
+  function test_forwardFromRouter_ThreeConsecutiveMessages() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
 
     uint256 feeAmount = 1234567890;
@@ -79,7 +79,7 @@ contract OnRampOverSuperchainInterop_forwardFromRouter is OnRampOverSuperchainIn
     }
   }
 
-  function test_MessageWithToken() public {
+  function test_forwardFromRouter_MessageWithToken() public {
     Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(s_sourceFeeToken, 100);
     uint256 gasLimit = 300000;
     message.extraArgs =

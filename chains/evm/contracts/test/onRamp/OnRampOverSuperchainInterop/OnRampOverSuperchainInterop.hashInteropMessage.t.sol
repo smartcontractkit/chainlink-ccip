@@ -6,7 +6,7 @@ import {SuperchainInterop} from "../../../libraries/SuperchainInterop.sol";
 import {OnRampOverSuperchainInteropSetup} from "./OnRampOverSuperchainInteropSetup.t.sol";
 
 contract OnRampOverSuperchainInterop_hashInteropMessage is OnRampOverSuperchainInteropSetup {
-  function test_BasicMessageHash() public {
+  function test_hashInteropMessage_BasicMessageHash() public {
     Internal.Any2EVMRampMessage memory message = _generateBasicAny2EVMMessage();
 
     bytes32 messageHash = SuperchainInterop._hashInteropMessage(message, address(s_onRampOverSuperchainInterop));
@@ -15,7 +15,7 @@ contract OnRampOverSuperchainInterop_hashInteropMessage is OnRampOverSuperchainI
     assertEq(messageHash, expectedMessageHash);
   }
 
-  function test_TokenMessageHash() public {
+  function test_hashInteropMessage_TokenMessageHash() public {
     Internal.Any2EVMRampMessage memory message = _generateAny2EVMMessageWithTokens();
 
     bytes32 messageHash = SuperchainInterop._hashInteropMessage(message, address(s_onRampOverSuperchainInterop));
@@ -24,7 +24,7 @@ contract OnRampOverSuperchainInterop_hashInteropMessage is OnRampOverSuperchainI
     assertEq(messageHash, expectedMessageHash);
   }
 
-  function test_SameMessageProducesSameHash() public {
+  function test_hashInteropMessage_SameMessageProducesSameHash() public {
     Internal.Any2EVMRampMessage memory message = _generateBasicAny2EVMMessage();
 
     bytes32 messageHash1 = SuperchainInterop._hashInteropMessage(message, address(s_onRampOverSuperchainInterop));
@@ -33,7 +33,7 @@ contract OnRampOverSuperchainInterop_hashInteropMessage is OnRampOverSuperchainI
     assertEq(messageHash1, messageHash2);
   }
 
-  function test_DifferentMessageProduceDifferentHashes() public {
+  function test_hashInteropMessage_DifferentMessageProduceDifferentHashes() public {
     Internal.Any2EVMRampMessage memory message = _generateBasicAny2EVMMessage();
 
     bytes32 messageHash1 = SuperchainInterop._hashInteropMessage(message, address(s_onRampOverSuperchainInterop));
@@ -44,7 +44,7 @@ contract OnRampOverSuperchainInterop_hashInteropMessage is OnRampOverSuperchainI
     assertTrue(messageHash1 != messageHash2);
   }
 
-  function testFuzz_DifferentMessageData_Success(
+  function testFuzz_hashInteropMessage_DifferentMessageData(
     bytes memory sender,
     bytes memory data,
     address receiver,
