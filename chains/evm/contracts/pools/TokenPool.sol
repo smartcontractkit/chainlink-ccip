@@ -159,7 +159,7 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
 
   /// @notice Gets the IERC20 token that this pool can lock or burn.
   /// @return token The IERC20 token representation.
-  function getToken() public view returns (IERC20 token) {
+  function getToken() public view virtual returns (IERC20 token) {
     return i_token;
   }
 
