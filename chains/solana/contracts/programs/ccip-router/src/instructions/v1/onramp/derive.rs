@@ -7,7 +7,9 @@ use anchor_lang::prelude::*;
 use anchor_spl::{
     associated_token::get_associated_token_address_with_program_id, token::spl_token::native_mint,
 };
-use ccip_common::{router_accounts::TokenAdminRegistry, seed, CommonCcipError};
+use ccip_common::seed;
+use ccip_common::v1::load_token_admin_registry_checked;
+use ccip_common::CommonCcipError;
 use solana_program::{
     address_lookup_table::state::AddressLookupTable,
     instruction::Instruction,
@@ -262,8 +264,8 @@ pub fn derive_ccip_send_accounts_retrieve_luts<'info>(
             .chunks(accounts_per_token_len)
             .flat_map(|accs| {
                 let registry = &accs[0];
-                let token_admin_registry_account: Account<TokenAdminRegistry> =
-                    Account::try_from(registry).expect("parsing token admin registry account");
+                let token_admin_registry_account =
+                    load_token_admin_registry_checked(registry).unwrap();
                 let lut = token_admin_registry_account.lookup_table;
                 accs.iter()
                     .map(|a| a.key.readonly())
@@ -323,8 +325,7 @@ pub fn derive_execute_accounts_additional_tokens<'info>(
         )?);
     }
 
-    let token_registry_account: Account<TokenAdminRegistry> =
-        Account::try_from(token_registry).expect("parsing token admin registry account");
+    let token_registry_account = load_token_admin_registry_checked(token_registry)?;
     let (this_token_index, this_transfer) = params
         .message
         .token_amounts

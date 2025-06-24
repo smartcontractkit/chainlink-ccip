@@ -10,11 +10,9 @@ use crate::{
 };
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::get_associated_token_address_with_program_id;
-use ccip_common::{
-    router_accounts::TokenAdminRegistry,
-    seed::{self, EXECUTION_REPORT_BUFFER},
-    CommonCcipError,
-};
+use ccip_common::seed::{self, EXECUTION_REPORT_BUFFER};
+use ccip_common::v1::load_token_admin_registry_checked;
+use ccip_common::CommonCcipError;
 use solana_program::{
     address_lookup_table::state::AddressLookupTable,
     instruction::Instruction,
@@ -198,8 +196,8 @@ pub fn derive_execute_accounts_retrieve_luts<'info>(
     // reference_addresses, followed registries and LUTs for each token
     let mut ask_again_with = vec![find(&[seed::REFERENCE_ADDRESSES], crate::ID)];
     ask_again_with.extend(ctx.remaining_accounts.iter().flat_map(|account| {
-        let registry: Account<TokenAdminRegistry> =
-            Account::try_from(account).expect("parsing token admin registry account");
+        let registry = load_token_admin_registry_checked(account)
+            .expect("parsing token admin registry account");
         [account.key().readonly(), registry.lookup_table.readonly()].into_iter()
     }));
 
@@ -224,8 +222,7 @@ pub fn derive_execute_accounts_additional_tokens<'info>(
         return Err(CcipOfframpError::InvalidAccountListForPdaDerivation.into());
     };
 
-    let registry_account: Account<TokenAdminRegistry> =
-        Account::try_from(token_registry).expect("parsing token admin registry account");
+    let registry = load_token_admin_registry_checked(token_registry)?;
     let lut_data = &mut &token_lut.data.borrow()[..];
     let lut_account: AddressLookupTable = AddressLookupTable::deserialize(lut_data)
         .map_err(|_| CommonCcipError::InvalidInputsLookupTableAccounts)?;
@@ -271,7 +268,7 @@ pub fn derive_execute_accounts_additional_tokens<'info>(
         )?);
     }
 
-    if registry_account.supports_auto_derivation {
+    if registry.supports_auto_derivation {
         // Nested derivation is supported, so we go one level deeper.
         response = response.and(derive_execute_accounts_additional_token_nested(
             &release_or_mint,

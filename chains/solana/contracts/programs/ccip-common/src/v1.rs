@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use anchor_lang::Discriminator;
 use ethnum::U256;
 use solana_program::address_lookup_table::state::AddressLookupTable;
 
@@ -10,6 +11,7 @@ use crate::{
 pub const MIN_TOKEN_POOL_ACCOUNTS: usize = 13; // see TokenAccounts struct for all required accounts
 const U160_MAX: U256 = U256::from_words(u32::MAX as u128, u128::MAX);
 const EVM_PRECOMPILE_SPACE: u32 = 1024;
+const V1_TOKEN_ADMIN_REGISTRY_SIZE: usize = 169; // for migration v1->v2 of the TokenAdminRegistry, which adds the `supports_auto_derivation` field.
 
 pub struct TokenAccounts<'a> {
     pub user_token_account: &'a AccountInfo<'a>,
@@ -128,8 +130,7 @@ pub fn validate_and_parse_token_accounts<'info>(
     // Additional validations that can't be expressed in the account context
     {
         // Check Lookup Table Address configured in TokenAdminRegistry
-        let token_admin_registry_account: Account<TokenAdminRegistry> =
-            Account::try_from(token_admin_registry)?;
+        let token_admin_registry_account = load_token_admin_registry_checked(token_admin_registry)?;
         require_keys_eq!(
             token_admin_registry_account.lookup_table,
             lookup_table.key(),
@@ -205,6 +206,56 @@ pub fn validate_and_parse_token_accounts<'info>(
         ccip_router_pool_signer_bump: bumps.ccip_router_pool_signer,
         ccip_offramp_pool_signer_bump,
         remaining_accounts,
+    })
+}
+
+pub fn load_token_admin_registry_checked<'info>(
+    token_admin_registry: &'info AccountInfo<'info>,
+) -> Result<TokenAdminRegistry> {
+    Ok(
+        if token_admin_registry.data_len() == V1_TOKEN_ADMIN_REGISTRY_SIZE {
+            load_v1_token_admin_registry(token_admin_registry)?
+        } else {
+            // this uses Anchor's built-in deserialization that already has ownership and discriminator checks
+            Account::<TokenAdminRegistry>::try_from(token_admin_registry)?.into_inner()
+        },
+    )
+}
+
+fn load_v1_token_admin_registry<'info>(
+    token_admin_registry: &AccountInfo<'info>,
+) -> Result<TokenAdminRegistry> {
+    let data = token_admin_registry.try_borrow_data()?;
+
+    require_keys_eq!(
+        token_admin_registry.owner.key(),
+        crate::ID, // ccip-common crate must have the same ID as ccip-router, which is the actual program that owns it
+        CommonCcipError::InvalidInputsTokenAdminRegistryAccounts
+    );
+
+    require!(
+        TokenAdminRegistry::DISCRIMINATOR == &data[..8],
+        CommonCcipError::InvalidInputsTokenAdminRegistryAccounts
+    );
+
+    let version = u8::from_le_bytes([data[8]]);
+    require_eq!(
+        version,
+        1, // this deserialization is only valid for v1
+        CommonCcipError::InvalidInputsTokenAdminRegistryAccounts
+    );
+
+    Ok(TokenAdminRegistry {
+        version: 1,
+        administrator: Pubkey::new_from_array(data[9..41].try_into().unwrap()),
+        pending_administrator: Pubkey::new_from_array(data[41..73].try_into().unwrap()),
+        lookup_table: Pubkey::new_from_array(data[73..105].try_into().unwrap()),
+        writable_indexes: [
+            u128::from_le_bytes(data[105..121].try_into().unwrap()),
+            u128::from_le_bytes(data[121..137].try_into().unwrap()),
+        ],
+        mint: Pubkey::new_from_array(data[137..169].try_into().unwrap()),
+        supports_auto_derivation: false, // this is the field that is missing in v1, and it defaults to false
     })
 }
 
