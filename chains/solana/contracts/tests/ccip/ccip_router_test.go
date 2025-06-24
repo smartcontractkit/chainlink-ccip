@@ -5151,6 +5151,16 @@ func TestCCIPRouter(t *testing.T) {
 					errorStr: common.ConstraintSeeds_AnchorError.String(),
 				},
 				{
+					name:     "extra accounts not in lookup table",
+					index:    1_000, // large number to indicate append
+					errorStr: ccip.InvalidInputsLookupTableAccounts_CcipRouterError.String(),
+				},
+				{
+					name:     "remaining accounts mismatch",
+					index:    13, // only works with token0
+					errorStr: ccip.InvalidInputsLookupTableAccounts_CcipRouterError.String(),
+				},
+				{
 					name:     "invalid token pool signer",
 					index:    12,
 					errorStr: common.ConstraintSeeds_AnchorError.String(),

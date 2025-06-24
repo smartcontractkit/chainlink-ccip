@@ -143,9 +143,9 @@ pub fn validate_and_parse_token_accounts<'info>(
             AddressLookupTable::deserialize(lookup_table_data)
                 .map_err(|_| CommonCcipError::InvalidInputsLookupTableAccounts)?;
 
-        // reconstruct + validate expected values in token pool lookup table.
-        // There might be additional accounts for token pools that support auto-derivation,
-        // which are not validated here as they might not be in the lookup table.
+        // reconstruct + validate expected values in token pool lookup table
+        // base set of constant accounts (10)
+        // + additional constant accounts (remaining_accounts) that are not required but may be used for additional token pool functionality (like CPI)
         let required_entries = [
             lookup_table,
             token_admin_registry,
@@ -160,11 +160,27 @@ pub fn validate_and_parse_token_accounts<'info>(
         ];
         {
             // validate pool addresses
-            let expected_keys: Vec<Pubkey> = required_entries.iter().map(|x| x.key()).collect();
-            require!(
-                lookup_table_account.addresses[..expected_keys.len()].as_ref() == expected_keys,
-                CommonCcipError::InvalidInputsLookupTableAccounts
-            );
+            let mut expected_keys: Vec<Pubkey> = required_entries.iter().map(|x| x.key()).collect();
+            let mut remaining_keys: Vec<Pubkey> =
+                remaining_accounts.iter().map(|x| x.key()).collect();
+            expected_keys.append(&mut remaining_keys);
+            if token_admin_registry_account.supports_auto_derivation {
+                // When auto-derivation is supported, there may be more accounts than what the lookup table contains.
+                // On those extra accounts, given that the token pool supports derivation, we also trust that the pool
+                // performs the required checks.
+                let n = lookup_table_account.addresses.len();
+                require!(
+                    lookup_table_account.addresses.as_ref() == expected_keys[..n].to_vec(),
+                    CommonCcipError::InvalidInputsLookupTableAccounts
+                );
+            } else {
+                // When the pool does not support auto-derivation, the lookup table must contain all the expected accounts,
+                // and CCIP is expected to validate them.
+                require!(
+                    lookup_table_account.addresses.as_ref() == expected_keys,
+                    CommonCcipError::InvalidInputsLookupTableAccounts
+                );
+            }
         }
         {
             // validate pool address writable
