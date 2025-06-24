@@ -5,7 +5,8 @@ use std::{
 
 use anchor_lang::prelude::*;
 use anchor_spl::{
-    associated_token::get_associated_token_address_with_program_id, token::spl_token::native_mint,
+    associated_token::get_associated_token_address_with_program_id,
+    token::spl_token::{self, native_mint},
 };
 use ccip_common::{router_accounts::TokenAdminRegistry, seed, CommonCcipError};
 use solana_program::{
@@ -17,7 +18,7 @@ use solana_program::{
 use crate::{
     context::ViewConfigOnly,
     instructions::v1::{fees::get_fee_cpi, messages::pools::LockOrBurnInV1},
-    messages::{SVMTokenAmount, TOKENPOOL_DERIVE_LOCK_OR_BURN_DISCRIMINATOR},
+    messages::TOKENPOOL_DERIVE_LOCK_OR_BURN_DISCRIMINATOR,
     state::{CcipAccountMeta, DeriveAccountsCcipSendParams, DeriveAccountsResponse, ToMeta},
     CcipRouterError,
 };
@@ -37,8 +38,10 @@ pub enum DeriveAccountsCcipSendStage {
     Start,
     FinishMainAccountList,
     RetrieveTokenLUTs,
+    RetrievePoolPrograms,
     // N stages, one per token
-    TokenTransferAccounts { token_substage: String },
+    TokenTransferStaticAccounts,
+    NestedTokenDerive { token_substage: String },
 }
 
 impl Display for DeriveAccountsCcipSendStage {
@@ -51,8 +54,14 @@ impl Display for DeriveAccountsCcipSendStage {
             DeriveAccountsCcipSendStage::RetrieveTokenLUTs => {
                 f.write_str("RetrieveTokenLookupTables")
             }
-            DeriveAccountsCcipSendStage::TokenTransferAccounts { token_substage } => {
-                f.write_fmt(format_args!("TokenTransferAccounts/{token_substage}"))
+            DeriveAccountsCcipSendStage::RetrievePoolPrograms => {
+                f.write_str("RetrievePoolPrograms")
+            }
+            DeriveAccountsCcipSendStage::TokenTransferStaticAccounts => {
+                f.write_str("TokenTransferStaticAccounts")
+            }
+            DeriveAccountsCcipSendStage::NestedTokenDerive { token_substage } => {
+                f.write_fmt(format_args!("NestedTokenDerive/{token_substage}"))
             }
         }
     }
@@ -69,7 +78,9 @@ impl FromStr for DeriveAccountsCcipSendStage {
             (Some("Start"), None) => Ok(Self::Start),
             (Some("FinishMainAccountList"), None) => Ok(Self::FinishMainAccountList),
             (Some("RetrieveTokenLookupTables"), None) => Ok(Self::RetrieveTokenLUTs),
-            (Some("TokenTransferAccounts"), token_substage) => Ok(Self::TokenTransferAccounts {
+            (Some("RetrievePoolPrograms"), None) => Ok(Self::RetrievePoolPrograms),
+            (Some("TokenTransferStaticAccounts"), None) => Ok(Self::TokenTransferStaticAccounts),
+            (Some("NestedTokenDerive"), token_substage) => Ok(Self::NestedTokenDerive {
                 token_substage: token_substage.unwrap_or("Start").to_string(),
             }),
             _ => Err(CcipRouterError::InvalidDerivationStage),
@@ -97,8 +108,15 @@ pub fn derive_ccip_send_accounts_start(
         solana_program::system_program::ID.readonly(),
     ];
 
+    let is_fee_in_sol = params.message.fee_token == Pubkey::default();
+
     let ask_again_with = vec![
-        params.message.fee_token.readonly(),
+        if is_fee_in_sol {
+            spl_token::native_mint::id()
+        } else {
+            params.message.fee_token
+        }
+        .readonly(),
         find(&[seed::FEE_BILLING_SIGNER], crate::ID),
     ];
 
@@ -118,25 +136,28 @@ pub fn derive_ccip_send_accounts_finish_main_account_list<'info>(
     let selector = params.dest_chain_selector.to_le_bytes();
     let fee_token_mint_info = &ctx.remaining_accounts[0];
     let fee_billing_signer = &ctx.remaining_accounts[1];
-    let fee_token_program = fee_token_mint_info.owner;
 
     let is_fee_in_sol = params.message.fee_token == Pubkey::default();
 
-    let fee_token_user_ata = if is_fee_in_sol {
-        Pubkey::default().readonly()
+    let (fee_token_user_ata, fee_token_program) = if is_fee_in_sol {
+        (Pubkey::default().readonly(), spl_token::ID.readonly())
     } else {
-        get_associated_token_address_with_program_id(
-            &params.ccip_send_caller.key(),
-            &params.message.fee_token,
-            &fee_token_program.key(),
+        let fee_token_program = fee_token_mint_info.owner;
+        (
+            get_associated_token_address_with_program_id(
+                &params.ccip_send_caller.key(),
+                &params.message.fee_token,
+                &fee_token_program.key(),
+            )
+            .writable(),
+            fee_token_program.readonly(),
         )
-        .writable()
     };
 
     let fee_token_receiver = get_associated_token_address_with_program_id(
         fee_billing_signer.key,
-        &params.message.fee_token,
-        &fee_token_program.key(),
+        fee_token_mint_info.key,
+        &fee_token_program.pubkey,
     );
 
     let config = &ctx.accounts.config;
@@ -153,11 +174,7 @@ pub fn derive_ccip_send_accounts_finish_main_account_list<'info>(
         find(
             &[
                 seed::FEE_BILLING_TOKEN_CONFIG,
-                if is_fee_in_sol {
-                    native_mint::ID.as_ref() // pre-2022 WSOL
-                } else {
-                    params.message.fee_token.as_ref()
-                },
+                fee_token_mint_info.key().as_ref(),
             ],
             config.fee_quoter,
         ),
@@ -276,27 +293,66 @@ pub fn derive_ccip_send_accounts_retrieve_luts<'info>(
         ask_again_with,
         look_up_tables_to_save: vec![],
         current_stage: DeriveAccountsCcipSendStage::RetrieveTokenLUTs.to_string(),
-        next_stage: DeriveAccountsCcipSendStage::TokenTransferAccounts {
-            token_substage: "Start".to_string(),
-        }
-        .to_string(),
+        next_stage: DeriveAccountsCcipSendStage::RetrievePoolPrograms.to_string(),
     })
 }
 
-pub fn derive_execute_accounts_additional_tokens<'info>(
+pub fn derive_ccip_send_accounts_retrieve_pool_programs<'info>(
     ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
-    params: DeriveAccountsCcipSendParams,
-    substage: &str,
 ) -> Result<DeriveAccountsResponse> {
     let token_derivation_fixed_accounts_len = 6usize;
     let accounts_per_token_len = 4usize;
 
+    // Accounts needed for get_fee cpi
+    // + [registry, billing_config, per_chain_per_token_config, lookup_table, pool_program]
+    let mut ask_again_with = vec![];
+    ask_again_with.extend(
+        ctx.remaining_accounts[0..token_derivation_fixed_accounts_len]
+            .iter()
+            .map(|a| a.key.readonly()),
+    );
+
+    ask_again_with.extend(
+        ctx.remaining_accounts[token_derivation_fixed_accounts_len..]
+            .chunks(accounts_per_token_len)
+            .flat_map(|accs| {
+                let lut = &accs[3];
+                let lut_data = &mut &lut.data.borrow()[..];
+                let lut_account: AddressLookupTable =
+                    AddressLookupTable::deserialize(lut_data).expect("Deserialize LUT");
+                let pool_program = lut_account.addresses[2];
+                accs.iter()
+                    .map(|a| a.key.readonly())
+                    .chain(Some(pool_program.readonly()))
+            }),
+    );
+
+    Ok(DeriveAccountsResponse {
+        accounts_to_save: vec![],
+        ask_again_with,
+        look_up_tables_to_save: vec![],
+        current_stage: DeriveAccountsCcipSendStage::RetrievePoolPrograms.to_string(),
+        next_stage: DeriveAccountsCcipSendStage::TokenTransferStaticAccounts.to_string(),
+    })
+}
+
+pub fn derive_ccip_send_accounts_additional_tokens_static<'info>(
+    ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
+    params: DeriveAccountsCcipSendParams,
+) -> Result<DeriveAccountsResponse> {
+    let mut response = DeriveAccountsResponse {
+        current_stage: DeriveAccountsCcipSendStage::TokenTransferStaticAccounts.to_string(),
+        ..Default::default()
+    };
+    let token_derivation_fixed_accounts_len = 6usize;
+    let accounts_per_token_len = 5usize;
+
     let token_derivation_fixed_accounts =
         &ctx.remaining_accounts[..token_derivation_fixed_accounts_len];
     // We extract the accounts for the first token
-    let [token_registry, billing_config, per_chain_per_token_config, token_lut] = &ctx
-        .remaining_accounts[token_derivation_fixed_accounts_len
-        ..token_derivation_fixed_accounts_len + accounts_per_token_len]
+    let [token_registry, _billing_config, _per_chain_per_token_config, token_lut, _pool_program] =
+        &ctx.remaining_accounts[token_derivation_fixed_accounts_len
+            ..token_derivation_fixed_accounts_len + accounts_per_token_len]
     else {
         return Err(CcipRouterError::InvalidAccountListForPdaDerivation.into());
     };
@@ -307,90 +363,6 @@ pub fn derive_execute_accounts_additional_tokens<'info>(
     let token_mint = lut_account.addresses[7];
     let pool_program = lut_account.addresses[2];
     let token_program = lut_account.addresses[6];
-    let mut response = DeriveAccountsResponse::default();
-    if substage == "Start" {
-        // All tokens derive a static list of accounts. If we're in the first substage
-        // of derivation ("Start"), which is common to dynamic and static pools, we derive
-        // the list of static accounts now.
-        response = response.and(derive_ccip_send_additional_token_static(
-            &ctx,
-            &params,
-            token_lut,
-            lut_account,
-            token_mint,
-            pool_program,
-            token_program,
-        )?);
-    }
-
-    let token_registry_account: Account<TokenAdminRegistry> =
-        Account::try_from(token_registry).expect("parsing token admin registry account");
-    let (this_token_index, this_transfer) = params
-        .message
-        .token_amounts
-        .iter()
-        .enumerate()
-        .find(|(_, ta)| ta.token == token_mint)
-        .ok_or(CcipRouterError::InvalidAccountListForPdaDerivation)?;
-
-    let number_of_tokens_left = params.message.token_amounts.len() - this_token_index;
-
-    if token_registry_account.supports_auto_derivation {
-        let nested_derivation_accounts = &ctx.remaining_accounts[token_derivation_fixed_accounts_len
-            + accounts_per_token_len * number_of_tokens_left..];
-
-        // Nested derivation is supported, so we go one level deeper.
-        response = response.and(derive_ccip_send_accounts_additional_token_nested(
-            &params,
-            substage,
-            token_derivation_fixed_accounts,
-            nested_derivation_accounts,
-            billing_config,
-            per_chain_per_token_config,
-            pool_program.key(),
-            this_transfer,
-        )?);
-    }
-
-    if response.next_stage != String::default() {
-        // We aren't done yet with this token, so we return as-is. The nested `derive`
-        // call has already populated the `ask_again_with` list.
-        return Ok(response);
-    }
-
-    if number_of_tokens_left > 1 {
-        // We aren't done yet with all tokens; as need to derive more tokens we tell the user
-        // to ask again with one fewer.
-        response.ask_again_with.clear();
-        response.ask_again_with.extend(
-            token_derivation_fixed_accounts
-                .iter()
-                .chain(
-                    ctx.remaining_accounts
-                        .iter()
-                        .skip(token_derivation_fixed_accounts_len + accounts_per_token_len),
-                )
-                .map(|a| a.key.readonly()),
-        );
-
-        response.next_stage = DeriveAccountsCcipSendStage::TokenTransferAccounts {
-            token_substage: "Start".to_string(),
-        }
-        .to_string();
-    }
-
-    Ok(response)
-}
-
-fn derive_ccip_send_additional_token_static<'info>(
-    ctx: &Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
-    params: &DeriveAccountsCcipSendParams,
-    token_lut: &AccountInfo<'info>,
-    lut_account: AddressLookupTable<'_>,
-    token_mint: Pubkey,
-    pool_program: Pubkey,
-    token_program: Pubkey,
-) -> std::result::Result<DeriveAccountsResponse, Error> {
     let selector = params.dest_chain_selector.to_le_bytes();
     let sender_token_account = get_associated_token_address_with_program_id(
         &params.ccip_send_caller,
@@ -419,45 +391,89 @@ fn derive_ccip_send_additional_token_static<'info>(
     )
     .writable();
 
-    let mut accounts_to_save = vec![
+    response.accounts_to_save = vec![
         sender_token_account,
         token_billing_config,
         pool_chain_config,
     ];
-    accounts_to_save.extend(
-        lut_account
-            .addresses
-            .iter()
-            .enumerate()
-            .map(|(i, a)| match i {
-                // PoolConfig, PoolTokenAccount and Mint from the LUT are writable.
-                3 | 4 | 7 => a.writable(),
-                _ => a.readonly(),
-            }),
-    );
+    response
+        .accounts_to_save
+        .extend(
+            lut_account
+                .addresses
+                .iter()
+                .enumerate()
+                .map(|(i, a)| match i {
+                    // PoolConfig, PoolTokenAccount and Mint from the LUT are writable.
+                    3 | 4 | 7 => a.writable(),
+                    _ => a.readonly(),
+                }),
+        );
+    response.look_up_tables_to_save = vec![*token_lut.key];
 
-    Ok(DeriveAccountsResponse {
-        accounts_to_save,
-        look_up_tables_to_save: vec![*token_lut.key],
-        current_stage: DeriveAccountsCcipSendStage::TokenTransferAccounts {
+    let (this_token_index, _) = params
+        .message
+        .token_amounts
+        .iter()
+        .enumerate()
+        .find(|(_, ta)| ta.token == token_mint)
+        .ok_or(CcipRouterError::InvalidAccountListForPdaDerivation)?;
+
+    let number_of_tokens_left = params.message.token_amounts.len() - this_token_index;
+    let token_registry_account: Account<TokenAdminRegistry> =
+        Account::try_from(token_registry).expect("parsing token admin registry account");
+
+    if token_registry_account.supports_auto_derivation {
+        // Nested derivation is supported, so we go one level deeper
+        response.next_stage = DeriveAccountsCcipSendStage::NestedTokenDerive {
             token_substage: "Start".to_string(),
         }
-        .to_string(),
-        ..Default::default()
-    })
+        .to_string();
+        response.ask_again_with = ctx
+            .remaining_accounts
+            .iter()
+            .map(|a| a.key.readonly())
+            .collect();
+    } else if number_of_tokens_left > 1 {
+        // We aren't done yet with all tokens; as need to derive more tokens we tell the user
+        // to ask again with one fewer.
+        response.ask_again_with.clear();
+        response.ask_again_with.extend(
+            token_derivation_fixed_accounts
+                .iter()
+                .chain(
+                    ctx.remaining_accounts
+                        .iter()
+                        .skip(token_derivation_fixed_accounts_len + accounts_per_token_len),
+                )
+                .map(|a| a.key.readonly()),
+        );
+
+        response.next_stage = DeriveAccountsCcipSendStage::TokenTransferStaticAccounts.to_string();
+    }
+
+    Ok(response)
 }
 
 #[allow(clippy::too_many_arguments)]
-fn derive_ccip_send_accounts_additional_token_nested<'info>(
+pub fn derive_ccip_send_accounts_additional_token_nested<'info>(
+    ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
     params: &DeriveAccountsCcipSendParams,
     substage: &str,
-    token_derivation_fixed_accounts: &[AccountInfo<'info>],
-    nested_derivation_accounts: &[AccountInfo<'info>],
-    billing_config: &AccountInfo<'info>,
-    per_chain_per_token_config: &AccountInfo<'info>,
-    pool_program: Pubkey,
-    transfer: &SVMTokenAmount,
 ) -> Result<DeriveAccountsResponse> {
+    let token_derivation_fixed_accounts_len = 6usize;
+    let accounts_per_token_len = 5usize;
+
+    let token_derivation_fixed_accounts =
+        &ctx.remaining_accounts[..token_derivation_fixed_accounts_len];
+    // We extract the accounts for the first token
+    let [_token_registry, billing_config, per_chain_per_token_config, token_lut, pool_program] =
+        &ctx.remaining_accounts[token_derivation_fixed_accounts_len
+            ..token_derivation_fixed_accounts_len + accounts_per_token_len]
+    else {
+        return Err(CcipRouterError::InvalidAccountListForPdaDerivation.into());
+    };
+
     let get_fee_result = get_fee_cpi(
         token_derivation_fixed_accounts[0].clone(),
         token_derivation_fixed_accounts[1].clone(),
@@ -468,6 +484,24 @@ fn derive_ccip_send_accounts_additional_token_nested<'info>(
         &params.message,
         vec![billing_config.clone(), per_chain_per_token_config.clone()],
     )?;
+
+    let lut_data = &mut &token_lut.data.borrow()[..];
+    let lut_account: AddressLookupTable = AddressLookupTable::deserialize(lut_data)
+        .map_err(|_| CommonCcipError::InvalidInputsLookupTableAccounts)?;
+    let token_mint = lut_account.addresses[7];
+
+    let (this_token_index, transfer) = params
+        .message
+        .token_amounts
+        .iter()
+        .enumerate()
+        .find(|(_, ta)| ta.token == token_mint)
+        .ok_or(CcipRouterError::InvalidAccountListForPdaDerivation)?;
+    let number_of_tokens_left = params.message.token_amounts.len() - this_token_index;
+    let start_of_nested_accounts =
+        token_derivation_fixed_accounts_len + accounts_per_token_len * number_of_tokens_left;
+
+    let nested_derivation_accounts = &ctx.remaining_accounts[start_of_nested_accounts..];
 
     // +1 because in `ccip_send` it will be bumped before `LockOrBurnInV1` reaches
     // the pool.
@@ -501,7 +535,7 @@ fn derive_ccip_send_accounts_additional_token_nested<'info>(
     data.extend_from_slice(&lock_or_burn.try_to_vec().unwrap());
 
     let ix = Instruction {
-        program_id: pool_program,
+        program_id: pool_program.key(),
         accounts: acc_metas,
         data,
     };
@@ -509,16 +543,42 @@ fn derive_ccip_send_accounts_additional_token_nested<'info>(
     invoke(&ix, nested_derivation_accounts)?;
 
     let (_, data) = get_return_data().unwrap();
-    let mut response = DeriveAccountsResponse::try_from_slice(&data)
-        .map_err(|_| CcipRouterError::InvalidTokenPoolAccountDerivationResponse)?;
+    let mut response = DeriveAccountsResponse {
+        ask_again_with: ctx.remaining_accounts[..start_of_nested_accounts]
+            .iter()
+            .map(|a| a.key().readonly())
+            .collect(),
+        ..Default::default()
+    };
+    response = response.and(
+        DeriveAccountsResponse::try_from_slice(&data)
+            .map_err(|_| CcipRouterError::InvalidTokenPoolAccountDerivationResponse)?,
+    );
 
     // We're coming back from a nested derivation call, so we turn the stage reported
     // by it into our substage.
     if !response.next_stage.is_empty() {
-        response.next_stage = DeriveAccountsCcipSendStage::TokenTransferAccounts {
+        response.next_stage = DeriveAccountsCcipSendStage::NestedTokenDerive {
             token_substage: response.next_stage,
         }
         .to_string();
+    } else if number_of_tokens_left > 1 {
+        // We're done with the nested calls (next stage is empty) and there are more
+        // tokens to do, so we go back to the static stage with one fewer token.
+        response.ask_again_with.clear();
+        response.ask_again_with.extend(
+            token_derivation_fixed_accounts
+                .iter()
+                .chain(
+                    ctx.remaining_accounts
+                        .iter()
+                        .skip(token_derivation_fixed_accounts_len + accounts_per_token_len),
+                )
+                .map(|a| a.key.readonly()),
+        );
+
+        response.next_stage = DeriveAccountsCcipSendStage::TokenTransferStaticAccounts.to_string();
     }
+
     Ok(response)
 }

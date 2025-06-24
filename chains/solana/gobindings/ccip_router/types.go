@@ -678,6 +678,7 @@ type deriveAccountsCcipSendStageContainer struct {
 	Start                 Start
 	FinishMainAccountList FinishMainAccountList
 	RetrieveTokenLUTs     RetrieveTokenLUTs
+	RetrievePoolPrograms  RetrievePoolPrograms
 	TokenTransferAccounts TokenTransferAccounts
 }
 
@@ -716,6 +717,18 @@ func (obj *RetrieveTokenLUTs) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (
 }
 
 func (_ *RetrieveTokenLUTs) isDeriveAccountsCcipSendStage() {}
+
+type RetrievePoolPrograms uint8
+
+func (obj RetrievePoolPrograms) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	return nil
+}
+
+func (obj *RetrievePoolPrograms) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	return nil
+}
+
+func (_ *RetrievePoolPrograms) isDeriveAccountsCcipSendStage() {}
 
 type TokenTransferAccounts struct {
 	TokenSubstage string

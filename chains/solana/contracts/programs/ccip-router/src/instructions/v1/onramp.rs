@@ -346,8 +346,18 @@ impl OnRamp for Impl {
             DeriveAccountsCcipSendStage::RetrieveTokenLUTs => {
                 derive::derive_ccip_send_accounts_retrieve_luts(ctx, &params)
             }
-            DeriveAccountsCcipSendStage::TokenTransferAccounts { token_substage } => {
-                derive::derive_execute_accounts_additional_tokens(ctx, params, &token_substage)
+            DeriveAccountsCcipSendStage::RetrievePoolPrograms => {
+                derive::derive_ccip_send_accounts_retrieve_pool_programs(ctx)
+            }
+            DeriveAccountsCcipSendStage::TokenTransferStaticAccounts => {
+                derive::derive_ccip_send_accounts_additional_tokens_static(ctx, params)
+            }
+            DeriveAccountsCcipSendStage::NestedTokenDerive { token_substage } => {
+                derive::derive_ccip_send_accounts_additional_token_nested(
+                    ctx,
+                    &params,
+                    &token_substage,
+                )
             }
         }
     }
