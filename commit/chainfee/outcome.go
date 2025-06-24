@@ -38,6 +38,8 @@ func (p *processor) Outcome(
 
 	// No need to update yet
 	if len(consensusObs.FeeComponents) == 0 {
+		lggr.Warn("no consensus on fee components, nothing to update",
+			"consensusObs", consensusObs)
 		return Outcome{}, nil
 	}
 
@@ -316,6 +318,10 @@ func (p *processor) getGasPricesToUpdate(
 				ChainSel: chain,
 				GasPrice: packedFee,
 			})
+		} else {
+			lggr.Debugw("chain fee update not needed: within deviation thresholds",
+				"executionFeeDeviationPPB", feeConfig.GasPriceDeviationPPB,
+				"dataAvFeeDeviationPPB", feeConfig.DAGasPriceDeviationPPB)
 		}
 	}
 

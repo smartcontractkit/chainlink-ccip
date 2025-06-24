@@ -44,13 +44,7 @@ func (p *Processor) Outcome(
 		return Outcome{}, err
 	}
 
-	if outcome.OutcomeType == ReportEmpty {
-		lggr.Debugw(SendingOutcome,
-			"outcome", outcome, "nextState", nextState, "outcomeDuration", time.Since(tStart))
-		return outcome, nil
-	}
-
-	lggr.Infow(SendingOutcome,
+	lggr.Debugw(SendingOutcome,
 		"outcome", outcome, "nextState", nextState, "outcomeDuration", time.Since(tStart))
 	return outcome, nil
 }
