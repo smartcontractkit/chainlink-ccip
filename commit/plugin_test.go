@@ -3,6 +3,7 @@ package commit
 import (
 	"errors"
 	"math/big"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -486,6 +487,82 @@ func Test_Outcome_prices(t *testing.T) {
 
 			// make assertions
 			require.Equal(t, tc.expMainOutcome, outcome.MainOutcome)
+		})
+	}
+}
+
+func TestPlugin_logWhenExceedFrequency(t *testing.T) {
+	testCases := []struct {
+		name          string
+		frequency     time.Duration
+		calls         []time.Duration // delays between calls
+		expectedCalls int             // expected number of times logFunc is called
+		description   string
+	}{
+		{
+			name:          "first call always logs",
+			frequency:     time.Minute,
+			calls:         []time.Duration{0},
+			expectedCalls: 1,
+			description:   "First call should always execute logFunc",
+		},
+		{
+			name:          "second call too soon",
+			frequency:     time.Minute,
+			calls:         []time.Duration{0, time.Second},
+			expectedCalls: 1,
+			description:   "Second call within frequency should not execute logFunc",
+		},
+		{
+			name:          "second call after frequency",
+			frequency:     100 * time.Millisecond,
+			calls:         []time.Duration{0, 150 * time.Millisecond},
+			expectedCalls: 2,
+			description:   "Second call after frequency should execute logFunc",
+		},
+		{
+			name:      "multiple calls mixed timing",
+			frequency: 100 * time.Millisecond,
+			calls: []time.Duration{
+				0,                     // first call, should log
+				50 * time.Millisecond, // too soon
+				60 * time.Millisecond, // total 110ms, should log and reset timer
+				90 * time.Millisecond, // too soon again
+				10 * time.Millisecond, // total 100ms, should log and reset timer
+			},
+			expectedCalls: 3,
+			description:   "Only calls that exceed frequency should execute logFunc",
+		},
+		{
+			name:          "zero frequency",
+			frequency:     0,
+			calls:         []time.Duration{0, 0, 0},
+			expectedCalls: 3,
+			description:   "Zero frequency should allow all calls",
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			var lastLog atomic.Pointer[time.Time]
+			callCount := 0
+
+			logFunc := func() {
+				callCount++
+			}
+
+			// Create a mock plugin (we only need the method)
+			p := &Plugin{}
+
+			// Execute calls with specified delays
+			for i, delay := range tt.calls {
+				if i > 0 {
+					time.Sleep(delay)
+				}
+				p.logWhenExceedFrequency(&lastLog, tt.frequency, logFunc)
+			}
+
+			assert.Equal(t, tt.expectedCalls, callCount, tt.description)
 		})
 	}
 }

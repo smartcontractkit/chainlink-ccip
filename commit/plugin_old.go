@@ -93,7 +93,7 @@ func (p *Plugin) observationOld(
 		return nil, fmt.Errorf("encode observation: %w, observation: %+v, seq nr: %d", err, obs, outCtx.SeqNr)
 	}
 
-	lggr.Infow("Commit plugin making observation", "encodedObservation", encoded, "observation", obs)
+	lggr.Debugw("Commit plugin making observation", "encodedObservation", encoded, "observation", obs)
 	return encoded, nil
 }
 
@@ -236,8 +236,9 @@ func (p *Plugin) outcomeOld(
 	}
 
 	if p.discoveryProcessor != nil {
-		lggr.Infow("Processing discovery observations", "discoveryObservations", discoveryObservations)
-
+		p.logWhenExceedFrequency(&p.lastStateLog, stateLoggingFrequency, func() {
+			lggr.Debugw("Processing discovery observations", "discoveryObservations", discoveryObservations)
+		})
 		// The outcome phase of the discovery processor is binding contracts to the chain reader. This is the reason
 		// we ignore the outcome of the discovery processor.
 		_, err = p.discoveryProcessor.Outcome(ctx, dt.Outcome{}, dt.Query{}, discoveryObservations)

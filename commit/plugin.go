@@ -44,6 +44,8 @@ type attributedMerkleRootObservation = plugincommon.AttributedObservation[merkle
 type attributedTokenPricesObservation = plugincommon.AttributedObservation[tokenprice.Observation]
 type attributedChainFeeObservation = plugincommon.AttributedObservation[chainfee.Observation]
 
+var stateLoggingFrequency = 30 * time.Minute
+
 type Plugin struct {
 	donID             plugintypes.DonID
 	oracleID          commontypes.OracleID
@@ -69,6 +71,7 @@ type Plugin struct {
 
 	// state
 	contractsInitialized atomic.Bool
+	lastStateLog         atomic.Pointer[time.Time]
 }
 
 func NewPlugin(
@@ -461,7 +464,9 @@ func (p *Plugin) Outcome(
 	}
 
 	if p.discoveryProcessor != nil {
-		lggr.Debugw("Processing discovery observations", "discoveryObservations", discoveryObservations)
+		p.logWhenExceedFrequency(&p.lastStateLog, stateLoggingFrequency, func() {
+			lggr.Debugw("Processing discovery observations", "discoveryObservations", discoveryObservations)
+		})
 
 		// The outcome phase of the discovery processor is binding contracts to the chain reader. This is the reason
 		// we ignore the outcome of the discovery processor.
@@ -648,6 +653,24 @@ func reportsInitialRequestTimerDuration(maxQueryDuration time.Duration) time.Dur
 	}
 
 	return maxAllowedReportTimeout
+}
+
+// logWhenExceedFrequency logs state information if enough time has passed since the last state log.
+// This function is thread-safe and uses atomic operations.
+func (p *Plugin) logWhenExceedFrequency(lastLog *atomic.Pointer[time.Time], frequency time.Duration, logFunc func()) {
+	now := time.Now()
+
+	lastLogPtr := lastLog.Load()
+	var lastLogTime time.Time
+	if lastLogPtr != nil {
+		lastLogTime = *lastLogPtr
+	}
+
+	// Check if enough time has passed since the last log
+	if now.Sub(lastLogTime) >= frequency {
+		lastLog.Store(&now)
+		logFunc()
+	}
 }
 
 // Interface compatibility checks.

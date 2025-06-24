@@ -293,7 +293,7 @@ func (r *ccipChainReader) LatestMsgSeqNum(
 			chain, r.destChain, err)
 	}
 
-	lggr.Infow("chain reader returning latest onramp sequence number",
+	lggr.Debugw("chain reader returning latest onramp sequence number",
 		"seqNum", seqNum, "sourceChainSelector", chain)
 	return seqNum, nil
 }
