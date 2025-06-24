@@ -388,3 +388,105 @@ pub fn validate_svm_address(address: &[u8], address_must_be_nonzero: bool) -> Re
         .map(|_| ())
         .map_err(|_| CommonCcipError::InvalidSVMAddress.into())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn get_expected() -> TokenAdminRegistry {
+        TokenAdminRegistry {
+            version: 1,
+            administrator: Pubkey::new_unique(),
+            pending_administrator: Pubkey::new_unique(),
+            lookup_table: Pubkey::new_unique(),
+            writable_indexes: [1, 2],
+            mint: Pubkey::new_unique(),
+            supports_auto_derivation: false,
+        }
+    }
+
+    fn to_v1_bytes(t: &TokenAdminRegistry) -> Vec<u8> {
+        let mut bytes = t.try_to_vec().unwrap();
+        bytes.pop(); // remove the `supports_auto_derivation` field, as this is not part of the v1 data
+        bytes
+    }
+
+    fn to_acc_info<'a>(
+        key: &'a Pubkey,
+        lamports: &'a mut u64,
+        data: &'a mut [u8],
+    ) -> AccountInfo<'a> {
+        AccountInfo::new(key, false, true, lamports, data, &crate::ID, false, 0)
+    }
+
+    #[test]
+    fn test_valid_load_v1_token_admin_registry() {
+        let expected = get_expected();
+
+        let bytes = to_v1_bytes(&expected);
+
+        let mut data = vec![0u8; V1_TOKEN_ADMIN_REGISTRY_SIZE];
+        data[0..8].copy_from_slice(&TokenAdminRegistry::DISCRIMINATOR);
+        data[8..].copy_from_slice(bytes.as_slice());
+
+        let (mut lamports, key) = (0u64, Pubkey::new_unique());
+        let account_info = to_acc_info(&key, &mut lamports, &mut data);
+        let token_admin_registry = load_v1_token_admin_registry(&account_info).unwrap();
+
+        assert_eq!(token_admin_registry, expected);
+    }
+
+    #[test]
+    fn test_invalid_discriminator() {
+        let source = get_expected();
+        let bytes = to_v1_bytes(&source);
+
+        let mut data = vec![0u8; V1_TOKEN_ADMIN_REGISTRY_SIZE];
+        data[0..8].copy_from_slice(&TokenAdminRegistry::DISCRIMINATOR);
+        data[2] = 2; // change the discriminator to an invalid one
+        data[8..].copy_from_slice(bytes.as_slice());
+
+        let (mut lamports, key) = (0u64, Pubkey::new_unique());
+        let account_info = to_acc_info(&key, &mut lamports, &mut data);
+
+        let result = load_v1_token_admin_registry(&account_info);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_invalid_version() {
+        for v in [0, 2, 255] {
+            let mut source = get_expected();
+            source.version = v; // change the version to an invalid one for this function
+            let bytes = to_v1_bytes(&source);
+
+            let mut data = vec![0u8; V1_TOKEN_ADMIN_REGISTRY_SIZE];
+            data[0..8].copy_from_slice(&TokenAdminRegistry::DISCRIMINATOR);
+            data[8..].copy_from_slice(bytes.as_slice());
+
+            let (mut lamports, key) = (0u64, Pubkey::new_unique());
+            let account_info = to_acc_info(&key, &mut lamports, &mut data);
+
+            let result = load_v1_token_admin_registry(&account_info);
+            assert!(result.is_err(), "Version {} should not be valid", v);
+        }
+    }
+
+    #[test]
+    fn test_invalid_owner() {
+        let source = get_expected();
+        let bytes = to_v1_bytes(&source);
+
+        let mut data = vec![0u8; V1_TOKEN_ADMIN_REGISTRY_SIZE];
+        data[0..8].copy_from_slice(&TokenAdminRegistry::DISCRIMINATOR);
+        data[8..].copy_from_slice(bytes.as_slice());
+
+        let (mut lamports, key) = (0u64, Pubkey::new_unique());
+        let mut account_info = to_acc_info(&key, &mut lamports, &mut data);
+        let invalid_owner = Pubkey::new_unique();
+        account_info.owner = &invalid_owner; // change the owner to an invalid one
+
+        let result = load_v1_token_admin_registry(&account_info);
+        assert!(result.is_err());
+    }
+}

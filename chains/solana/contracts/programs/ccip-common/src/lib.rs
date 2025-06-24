@@ -52,7 +52,7 @@ pub mod router_accounts {
     use super::*;
 
     #[account]
-    #[derive(InitSpace)]
+    #[derive(InitSpace, PartialEq, Debug)]
     pub struct TokenAdminRegistry {
         pub version: u8,
         pub administrator: Pubkey,

@@ -5526,8 +5526,6 @@ func TestCCIPRouter(t *testing.T) {
 		})
 
 		t.Run("Deriving accounts with a token pool that also requires derivation", func(t *testing.T) {
-			t.Skip() // TODO: this test is not working yet, as the token pool program account is not passed to the derivation at the right time
-
 			message := ccip_router.SVM2AnyMessage{
 				Receiver: validReceiverAddress[:],
 				Data:     []byte{},
