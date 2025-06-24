@@ -49,11 +49,11 @@ contract OnRampOverSuperchainInteropSetup is OnRampSetup {
       });
     }
 
-    bytes memory last32Bytes = new bytes(32);
+    bytes memory gasLimitBytes = new bytes(32);
     for (uint256 i = 0; i < 32; ++i) {
-      last32Bytes[i] = message.extraArgs[4 + i];
+      gasLimitBytes[i] = message.extraArgs[4 + i];
     }
-    uint256 gasLimit = abi.decode(last32Bytes, (uint256));
+    uint256 gasLimit = abi.decode(gasLimitBytes, (uint256));
 
     return Internal.Any2EVMRampMessage({
       header: Internal.RampMessageHeader({

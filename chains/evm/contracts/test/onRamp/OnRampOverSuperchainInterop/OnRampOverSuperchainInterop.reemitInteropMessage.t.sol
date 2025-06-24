@@ -53,13 +53,15 @@ contract OnRampOverSuperchainInterop_reemitInteropMessage is OnRampOverSuperchai
       _generateInitialSourceDestMessages(DEST_CHAIN_SELECTOR, message, feeAmount);
 
     vm.stopPrank();
-    // Same message can be re-emitted multiple times, by any address
+    // Same message can be re-emitted multiple times, by different addresses at different blocks
     for (uint256 i = 0; i < 3; ++i) {
       vm.expectEmit();
       emit SuperchainInterop.CCIPSuperchainMessageSent(DEST_CHAIN_SELECTOR, 1, any2EvmMessage);
 
-      // Mock calling from a different account each time to validate reemitInteropMessage is permissionless
+      vm.roll(block.number + 100);
+      vm.warp(block.timestamp + 100);
 
+      // Mock calling from a different account each time to validate reemitInteropMessage is permissionless
       vm.prank(makeAddr(string(abi.encode("reemitPTT", i))));
       s_onRampOverSuperchainInterop.reemitInteropMessage(any2EvmMessage);
     }

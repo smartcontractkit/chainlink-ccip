@@ -6,7 +6,7 @@ import {OnRampOverSuperchainInterop} from "../../../onRamp/OnRampOverSuperchainI
 import {OnRampOverSuperchainInteropSetup} from "./OnRampOverSuperchainInteropSetup.t.sol";
 
 contract OnRampOverSuperchainInterop_extractGasLimit is OnRampOverSuperchainInteropSetup {
-  function test_extractGasLimit_Success() public view {
+  function test_extractGasLimit() public view {
     uint256 expectedGasLimit = 200000;
     bytes memory extraArgs = Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: expectedGasLimit}));
 

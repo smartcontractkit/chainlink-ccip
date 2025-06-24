@@ -6,7 +6,7 @@ import {OnRamp} from "../../../onRamp/OnRamp.sol";
 import {OnRampSetup} from "./OnRampSetup.t.sol";
 
 contract OnRamp_generateMessageId is OnRampSetup {
-  function test_generateMessageId_Success() public view {
+  function test_generateMessageId() public view {
     Internal.EVM2AnyRampMessage memory message =
       _messageToEvent(_generateSingleTokenMessage(s_sourceTokens[0], 1000e18), 1, 1, 100e18, OWNER);
 
