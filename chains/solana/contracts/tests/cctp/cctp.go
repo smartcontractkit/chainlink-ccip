@@ -4,10 +4,11 @@ import (
 	"testing"
 
 	"github.com/gagliardetto/solana-go"
+	"github.com/stretchr/testify/require"
+
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
-	"github.com/test-go/testify/require"
 )
 
 //////////////////////////
@@ -80,7 +81,7 @@ func GetTokenMessengerMinterPDAs(t *testing.T, domain uint32, usdcMint solana.Pu
 	}
 }
 
-type CctpTokenPoolPDAs struct {
+type TokenPoolPDAs struct {
 	Program,
 	State,
 	Signer,
@@ -88,7 +89,7 @@ type CctpTokenPoolPDAs struct {
 	SvmChainConfig solana.PublicKey
 }
 
-func GetCctpTokenPoolPDAs(t *testing.T, usdcMint solana.PublicKey) CctpTokenPoolPDAs {
+func GetTokenPoolPDAs(t *testing.T, usdcMint solana.PublicKey) TokenPoolPDAs {
 	t.Helper()
 
 	statePDA, err := tokens.TokenPoolConfigAddress(usdcMint, config.CctpTokenPoolProgram)
@@ -100,7 +101,7 @@ func GetCctpTokenPoolPDAs(t *testing.T, usdcMint solana.PublicKey) CctpTokenPool
 	chainConfigPDA, _, err := tokens.TokenPoolChainConfigPDA(config.SvmChainSelector, usdcMint, config.CctpTokenPoolProgram)
 	require.NoError(t, err)
 
-	return CctpTokenPoolPDAs{
+	return TokenPoolPDAs{
 		Program:        config.CctpTokenPoolProgram,
 		State:          statePDA,
 		Signer:         signerPDA,

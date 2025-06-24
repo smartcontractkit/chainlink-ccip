@@ -121,6 +121,7 @@ func TestCCIPRouter(t *testing.T) {
 	require.NoError(t, gerr)
 	usdcMintPrivK := solana.MustPrivateKeyFromBase58("3NnpbE8mrtqhC99YLxhZU4xQTBQBha6tKjfTa123DtR6bmGH1NQS59QELnNarvgHzzvRjAdDTqsfGYjyWHf6mwtA")
 	usdcPool, gerr := tokens.NewTokenPool(config.SPLTokenProgram, config.CctpTokenPoolProgram, usdcMintPrivK.PublicKey())
+	require.NoError(t, gerr)
 
 	signers, transmitters, getTransmitter := testutils.GenerateSignersAndTransmitters(t, config.MaxOracles)
 

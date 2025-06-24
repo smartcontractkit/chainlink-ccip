@@ -852,8 +852,8 @@ func TestTokenPool(t *testing.T) {
 	t.Run("CCTP token pool", func(t *testing.T) {
 		// do not run in parallel, as it checks the balances of the same users that are also used in the other suites
 
-		usdcMintPriv, err := solana.NewRandomPrivateKey()
-		require.NoError(t, err)
+		usdcMintPriv, kErr := solana.NewRandomPrivateKey()
+		require.NoError(t, kErr)
 		usdcMint := usdcMintPriv.PublicKey()
 		usdcDecimals := uint8(6)
 
@@ -864,7 +864,7 @@ func TestTokenPool(t *testing.T) {
 
 		messageTransmitter := cctp.GetMessageTransmitterPDAs(t)
 		tokenMessengerMinter := cctp.GetTokenMessengerMinterPDAs(t, domain, usdcMint)
-		cctpPool := cctp.GetCctpTokenPoolPDAs(t, usdcMint)
+		cctpPool := cctp.GetTokenPoolPDAs(t, usdcMint)
 
 		cctp_message_transmitter.SetProgramID(messageTransmitter.Program)
 		cctp_token_messenger_minter.SetProgramID(tokenMessengerMinter.Program)
@@ -921,8 +921,8 @@ func TestTokenPool(t *testing.T) {
 				t.Parallel()
 
 				t.Run("Create lookup table", func(t *testing.T) {
-					tpLookupTableAddr, err = common.CreateLookupTable(ctx, solanaGoClient, admin)
-					require.NoError(t, err)
+					tpLookupTableAddr, kErr = common.CreateLookupTable(ctx, solanaGoClient, admin)
+					require.NoError(t, kErr)
 
 					entries := solana.PublicKeySlice{
 						tpLookupTableAddr,

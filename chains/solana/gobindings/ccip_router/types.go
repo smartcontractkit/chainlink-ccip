@@ -674,12 +674,13 @@ type DeriveAccountsCcipSendStage interface {
 }
 
 type deriveAccountsCcipSendStageContainer struct {
-	Enum                  ag_binary.BorshEnum `borsh_enum:"true"`
-	Start                 Start
-	FinishMainAccountList FinishMainAccountList
-	RetrieveTokenLUTs     RetrieveTokenLUTs
-	RetrievePoolPrograms  RetrievePoolPrograms
-	TokenTransferAccounts TokenTransferAccounts
+	Enum                        ag_binary.BorshEnum `borsh_enum:"true"`
+	Start                       Start
+	FinishMainAccountList       FinishMainAccountList
+	RetrieveTokenLUTs           RetrieveTokenLUTs
+	RetrievePoolPrograms        RetrievePoolPrograms
+	TokenTransferStaticAccounts TokenTransferStaticAccounts
+	NestedTokenDerive           NestedTokenDerive
 }
 
 type Start uint8
@@ -730,11 +731,23 @@ func (obj *RetrievePoolPrograms) UnmarshalWithDecoder(decoder *ag_binary.Decoder
 
 func (_ *RetrievePoolPrograms) isDeriveAccountsCcipSendStage() {}
 
-type TokenTransferAccounts struct {
+type TokenTransferStaticAccounts uint8
+
+func (obj TokenTransferStaticAccounts) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	return nil
+}
+
+func (obj *TokenTransferStaticAccounts) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	return nil
+}
+
+func (_ *TokenTransferStaticAccounts) isDeriveAccountsCcipSendStage() {}
+
+type NestedTokenDerive struct {
 	TokenSubstage string
 }
 
-func (obj TokenTransferAccounts) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj NestedTokenDerive) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `TokenSubstage` param:
 	err = encoder.Encode(obj.TokenSubstage)
 	if err != nil {
@@ -743,7 +756,7 @@ func (obj TokenTransferAccounts) MarshalWithEncoder(encoder *ag_binary.Encoder) 
 	return nil
 }
 
-func (obj *TokenTransferAccounts) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *NestedTokenDerive) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `TokenSubstage`:
 	err = decoder.Decode(&obj.TokenSubstage)
 	if err != nil {
@@ -752,7 +765,7 @@ func (obj *TokenTransferAccounts) UnmarshalWithDecoder(decoder *ag_binary.Decode
 	return nil
 }
 
-func (_ *TokenTransferAccounts) isDeriveAccountsCcipSendStage() {}
+func (_ *NestedTokenDerive) isDeriveAccountsCcipSendStage() {}
 
 type CodeVersion ag_binary.BorshEnum
 
