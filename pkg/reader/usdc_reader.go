@@ -71,6 +71,8 @@ func (m MessageSentEvent) unpackID() (eventID, error) {
 // solanaUSDCTokenPoolContractName is the name used to bind the TokenPool contract in CR.
 // Private because it's specific to Solana, but it's also needed in the CR config so this
 // isn't perfect.
+//
+//nolint:gosec // this is not a hardcoded credential
 const solanaUSDCTokenPoolContractName = "USDCTokenPool"
 
 func NewUSDCMessageReader(
