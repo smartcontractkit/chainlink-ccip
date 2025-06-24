@@ -68,13 +68,6 @@ func (m MessageSentEvent) unpackID() (eventID, error) {
 	return result, nil
 }
 
-// solanaUSDCTokenPoolContractName is the name used to bind the TokenPool contract in CR.
-// Private because it's specific to Solana, but it's also needed in the CR config so this
-// isn't perfect.
-//
-//nolint:gosec // this is not a hardcoded credential
-const solanaUSDCTokenPoolContractName = "USDCTokenPool"
-
 func NewUSDCMessageReader(
 	ctx context.Context,
 	lggr logger.Logger,
@@ -127,7 +120,7 @@ func NewUSDCMessageReader(
 				lggr,
 				contractReaders,
 				chainSelector,
-				solanaUSDCTokenPoolContractName,
+				consts.ContractNameCCTPMessageTransmitter,
 				bytesAddress,
 				addrCodec,
 			)
@@ -139,6 +132,38 @@ func NewUSDCMessageReader(
 				lggr:           lggr,
 				contractReader: contractReaders[chainSelector],
 				cctpDestDomain: domains,
+			}
+
+			expressions := []query.Expression{query.Confidence(primitives.Finalized)}
+
+			keyFilter, err := query.Where(
+				consts.EventNameCCTPMessageSent,
+				expressions...,
+			)
+			if err != nil {
+				return nil, err
+			}
+
+			iter, err := contractReaders[chainSelector].ExtendedQueryKey(
+				ctx,
+				consts.ContractNameCCTPMessageTransmitter,
+				keyFilter,
+				query.NewLimitAndSort(
+					query.Limit{Count: uint64(100)},
+					query.NewSortBySequence(query.Asc),
+				),
+				&SolanaCCTPUSDCMessageEvent{},
+			)
+			if err != nil {
+				return nil, fmt.Errorf("error querying contract reader for chain: %w", err)
+			}
+			for _, item := range iter {
+				event, ok1 := item.Data.(*SolanaCCTPUSDCMessageEvent)
+				if !ok1 {
+					return nil, fmt.Errorf("failed to cast %v to Message", item.Data)
+				}
+
+				lggr.Debugw("Found CCTP event", "event", event)
 			}
 		default:
 			return nil, fmt.Errorf("unsupported chain selector family %s for chain %d", family, chainSelector)
@@ -427,14 +452,14 @@ func (u solanaUSDCMessageReader) MessagesByTokenID(
 		// TODO: optimize. CR modifier or a new field in our event.
 		expressions = append(expressions, query.And(
 			query.Comparator(
-				"msg_total_nonce",
+				consts.EventAttributeMsgTotalNonce,
 				primitives.ValueComparator{
 					Value:    data.Nonce,
 					Operator: primitives.Eq,
 				},
 			),
 			query.Comparator(
-				"source_domain",
+				consts.EventAttributeSourceDomain,
 				primitives.ValueComparator{
 					Value:    data.SourceDomain,
 					Operator: primitives.Eq,
@@ -475,7 +500,7 @@ func (u solanaUSDCMessageReader) MessagesByTokenID(
 
 	// Parent expressions for the query.
 	keyFilter, err := query.Where(
-		"CCIPCCTPMessageSent", // don't bother with const
+		consts.EventNameCCTPMessageSent, // Using same as EVM for consistency. Only used by off-chain components so name does not have to align with on-chain
 		expressions...,
 	)
 	if err != nil {
@@ -484,7 +509,7 @@ func (u solanaUSDCMessageReader) MessagesByTokenID(
 
 	iter, err := u.contractReader.ExtendedQueryKey(
 		ctx,
-		solanaUSDCTokenPoolContractName,
+		consts.ContractNameCCTPMessageTransmitter,
 		keyFilter,
 		query.NewLimitAndSort(
 			query.Limit{Count: uint64(len(cctpData))},
