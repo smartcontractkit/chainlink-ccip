@@ -2083,6 +2083,36 @@ export type CcipRouter = {
           "index": false
         }
       ]
+    },
+    {
+      "name": "PdaUpgraded",
+      "fields": [
+        {
+          "name": "address",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "oldVersion",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "newVersion",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "index": false
+        },
+        {
+          "name": "seeds",
+          "type": "bytes",
+          "index": false
+        }
+      ]
     }
   ],
   "errors": [
@@ -4321,6 +4351,36 @@ export const IDL: CcipRouter = {
         {
           "name": "supportsAutoDerivation",
           "type": "bool",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "PdaUpgraded",
+      "fields": [
+        {
+          "name": "address",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "oldVersion",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "newVersion",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "index": false
+        },
+        {
+          "name": "seeds",
+          "type": "bytes",
           "index": false
         }
       ]

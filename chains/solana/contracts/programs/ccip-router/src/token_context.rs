@@ -9,7 +9,7 @@ use crate::CcipRouterError;
 use anchor_spl::token_interface::Mint;
 
 // track state versions
-const MAX_TOKEN_REGISTRY_V: u8 = 1;
+const MAX_TOKEN_REGISTRY_V: u8 = 2;
 
 #[derive(Accounts)]
 pub struct RegisterTokenAdminRegistryByCCIPAdmin<'info> {
@@ -48,7 +48,7 @@ pub struct OverridePendingTokenAdminRegistryByCCIPAdmin<'info> {
         mut,
         seeds = [seed::TOKEN_ADMIN_REGISTRY, mint.key().as_ref()],
         bump,
-        constraint = valid_version(token_admin_registry.version, MAX_TOKEN_REGISTRY_V) @ CcipRouterError::InvalidVersion,
+        constraint = token_admin_registry.version == MAX_TOKEN_REGISTRY_V @ CcipRouterError::InvalidVersion,
     )]
     pub token_admin_registry: Account<'info, TokenAdminRegistry>,
     pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
@@ -99,7 +99,7 @@ pub struct OverridePendingTokenAdminRegistryByOwner<'info> {
         mut,
         seeds = [seed::TOKEN_ADMIN_REGISTRY, mint.key().as_ref()],
         bump,
-        constraint = valid_version(token_admin_registry.version, MAX_TOKEN_REGISTRY_V) @ CcipRouterError::InvalidVersion,
+        constraint = token_admin_registry.version == MAX_TOKEN_REGISTRY_V @ CcipRouterError::InvalidVersion,
     )]
     pub token_admin_registry: Account<'info, TokenAdminRegistry>,
     pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
@@ -125,7 +125,7 @@ pub struct ModifyTokenAdminRegistry<'info> {
         mut,
         seeds = [seed::TOKEN_ADMIN_REGISTRY, mint.key().as_ref()],
         bump,
-        constraint = valid_version(token_admin_registry.version, MAX_TOKEN_REGISTRY_V) @ CcipRouterError::InvalidVersion,
+        constraint = token_admin_registry.version == MAX_TOKEN_REGISTRY_V @ CcipRouterError::InvalidVersion,
     )]
     pub token_admin_registry: Account<'info, TokenAdminRegistry>,
     pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
@@ -145,7 +145,7 @@ pub struct SetPoolTokenAdminRegistry<'info> {
         mut,
         seeds = [seed::TOKEN_ADMIN_REGISTRY, mint.key().as_ref()],
         bump,
-        constraint = valid_version(token_admin_registry.version, MAX_TOKEN_REGISTRY_V) @ CcipRouterError::InvalidVersion,
+        constraint = token_admin_registry.version == MAX_TOKEN_REGISTRY_V @ CcipRouterError::InvalidVersion,
     )]
     pub token_admin_registry: Account<'info, TokenAdminRegistry>,
     pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
@@ -168,7 +168,7 @@ pub struct EditPoolTokenAdminRegistry<'info> {
         mut,
         seeds = [seed::TOKEN_ADMIN_REGISTRY, mint.as_ref()],
         bump,
-        constraint = valid_version(token_admin_registry.version, MAX_TOKEN_REGISTRY_V) @ CcipRouterError::InvalidVersion,
+        constraint = token_admin_registry.version == MAX_TOKEN_REGISTRY_V @ CcipRouterError::InvalidVersion,
     )]
     pub token_admin_registry: Account<'info, TokenAdminRegistry>,
     #[account(mut, address = token_admin_registry.administrator @ CcipRouterError::Unauthorized)]
@@ -187,12 +187,41 @@ pub struct AcceptAdminRoleTokenAdminRegistry<'info> {
         mut,
         seeds = [seed::TOKEN_ADMIN_REGISTRY, mint.key().as_ref()],
         bump,
-        constraint = valid_version(token_admin_registry.version, MAX_TOKEN_REGISTRY_V) @ CcipRouterError::InvalidVersion,
+        constraint = token_admin_registry.version == MAX_TOKEN_REGISTRY_V @ CcipRouterError::InvalidVersion,
     )]
     pub token_admin_registry: Account<'info, TokenAdminRegistry>,
     pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
     #[account(mut, address = token_admin_registry.pending_administrator @ CcipRouterError::Unauthorized)]
     pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct UpgradeTokenAdminRegistry<'info> {
+    #[account(
+        seeds = [seed::CONFIG],
+        bump,
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
+    )]
+    pub config: Account<'info, Config>,
+
+    #[account(
+        mut,
+        seeds = [seed::TOKEN_ADMIN_REGISTRY, mint.key().as_ref()],
+        bump,
+        constraint = token_admin_registry.version == 1 @ CcipRouterError::InvalidVersion, // only migrate from version 1
+        realloc = ANCHOR_DISCRIMINATOR + TokenAdminRegistry::INIT_SPACE,
+        realloc::payer = authority,
+        realloc::zero = true, // it could be `false` while there's a single migration, but we leave it as `true` for
+                              // future-proofing in case we ever have more migrations, and the extra cost is negligible
+    )]
+    pub token_admin_registry: Account<'info, TokenAdminRegistry>,
+
+    pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
+
+    #[account(mut)] // anyone may invoke this migration
+    pub authority: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
 }
 
 pub mod token_admin_registry_writable {

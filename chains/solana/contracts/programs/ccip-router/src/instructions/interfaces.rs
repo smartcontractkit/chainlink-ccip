@@ -13,7 +13,7 @@ use crate::token_context::{
     AcceptAdminRoleTokenAdminRegistry, EditPoolTokenAdminRegistry, ModifyTokenAdminRegistry,
     OverridePendingTokenAdminRegistryByCCIPAdmin, OverridePendingTokenAdminRegistryByOwner,
     RegisterTokenAdminRegistryByCCIPAdmin, RegisterTokenAdminRegistryByOwner,
-    SetPoolTokenAdminRegistry,
+    SetPoolTokenAdminRegistry, UpgradeTokenAdminRegistry,
 };
 use crate::GetFee;
 
@@ -185,5 +185,13 @@ pub trait TokenAdminRegistry {
         &self,
         ctx: Context<SetPoolTokenAdminRegistry>,
         writable_indexes: Vec<u8>,
+    ) -> Result<()>;
+
+    /// Upgrades the token admin registry from v1 to v2.
+    /// This is a one-way operation that cannot be reverted. It is permissionless
+    /// and the resulting value is backwards compatible.
+    fn upgrade_token_admin_registry_from_v1(
+        &self,
+        ctx: Context<UpgradeTokenAdminRegistry>,
     ) -> Result<()>;
 }

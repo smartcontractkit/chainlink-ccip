@@ -9,7 +9,7 @@ use crate::token_admin_registry_writable;
 use crate::token_context::{
     OverridePendingTokenAdminRegistryByCCIPAdmin, OverridePendingTokenAdminRegistryByOwner,
     RegisterTokenAdminRegistryByCCIPAdmin, RegisterTokenAdminRegistryByOwner,
-    SetPoolTokenAdminRegistry,
+    SetPoolTokenAdminRegistry, UpgradeTokenAdminRegistry,
 };
 use crate::{
     AcceptAdminRoleTokenAdminRegistry, CcipRouterError, EditPoolTokenAdminRegistry,
@@ -146,6 +146,32 @@ impl TokenAdminRegistry for Impl {
         Ok(())
     }
 
+    fn upgrade_token_admin_registry_from_v1(
+        &self,
+        ctx: Context<UpgradeTokenAdminRegistry>,
+    ) -> Result<()> {
+        let token_admin_registry = &mut ctx.accounts.token_admin_registry;
+
+        // Upgrade from v1 to v2 (already checked in the context)
+        token_admin_registry.version = 2;
+        // Set backwards-compatible value (false). It can be upgraded via a different method by the owner afterwards.
+        token_admin_registry.supports_auto_derivation = false;
+
+        emit!(crate::events::PdaUpgraded {
+            address: token_admin_registry.key(),
+            old_version: 1,
+            new_version: 2,
+            name: "TokenAdminRegistry".to_string(),
+            seeds: [
+                seed::TOKEN_ADMIN_REGISTRY,
+                token_admin_registry.mint.as_ref()
+            ]
+            .concat(),
+        });
+
+        Ok(())
+    }
+
     // TODO: Add a test with look up table as 0 address
     fn set_pool(
         &self,
@@ -262,7 +288,7 @@ fn init_with_pending_administrator(
     );
 
     token_admin_registry.set_inner(ccip_common::router_accounts::TokenAdminRegistry {
-        version: 1,
+        version: 2,
         administrator: Pubkey::new_from_array([0; 32]),
         pending_administrator: new_admin,
         lookup_table: Pubkey::new_from_array([0; 32]),

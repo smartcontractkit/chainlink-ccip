@@ -361,6 +361,8 @@ mod helpers {
     };
     use rmn_remote::state::CurseSubject;
 
+    use crate::event::events::PdaUpgraded;
+
     use super::*;
 
     const LEAF_DOMAIN_SEPARATOR: [u8; 32] = [0; 32];
@@ -489,6 +491,20 @@ mod helpers {
             nonce.version = 2; // migrate to version 2
             nonce.total_nonce = nonce.ordered_nonce; // we need an initial value for the new total_nonce, and this way
                                                      // we maintain the invariant that total_nonce >= ordered_nonce
+
+            emit!(PdaUpgraded {
+                address: account_info.key(),
+                old_version: 1,
+                new_version: 2,
+                name: "Nonce".to_string(),
+                seeds: [
+                    seed::NONCE,
+                    dest_chain_selector.to_le_bytes().as_ref(),
+                    authority.key().as_ref()
+                ]
+                .concat(),
+            });
+
             return Ok(nonce);
         }
 

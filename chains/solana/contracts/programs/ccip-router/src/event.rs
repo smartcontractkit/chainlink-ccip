@@ -5,6 +5,15 @@ use crate::{DestChainConfig, SVM2AnyRampMessage};
 pub mod events {
     use super::*;
 
+    #[event]
+    pub struct PdaUpgraded {
+        pub address: Pubkey,
+        pub old_version: u8,
+        pub new_version: u8,
+        pub name: String,
+        pub seeds: Vec<u8>,
+    }
+
     pub mod on_ramp {
         use super::*;
         #[event]
