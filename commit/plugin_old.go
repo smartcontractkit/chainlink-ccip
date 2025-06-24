@@ -236,7 +236,7 @@ func (p *Plugin) outcomeOld(
 	}
 
 	if p.discoveryProcessor != nil {
-		p.logWhenExceedFrequency(&p.lastStateLog, stateLoggingFrequency, func() {
+		logutil.LogWhenExceedFrequency(&p.lastStateLog, stateLoggingFrequency, func() {
 			lggr.Debugw("Processing discovery observations", "discoveryObservations", discoveryObservations)
 		})
 		// The outcome phase of the discovery processor is binding contracts to the chain reader. This is the reason

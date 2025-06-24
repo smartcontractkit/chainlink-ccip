@@ -44,7 +44,7 @@ type attributedMerkleRootObservation = plugincommon.AttributedObservation[merkle
 type attributedTokenPricesObservation = plugincommon.AttributedObservation[tokenprice.Observation]
 type attributedChainFeeObservation = plugincommon.AttributedObservation[chainfee.Observation]
 
-var stateLoggingFrequency = 30 * time.Minute
+const stateLoggingFrequency = 30 * time.Minute
 
 type Plugin struct {
 	donID             plugintypes.DonID
@@ -464,7 +464,7 @@ func (p *Plugin) Outcome(
 	}
 
 	if p.discoveryProcessor != nil {
-		p.logWhenExceedFrequency(&p.lastStateLog, stateLoggingFrequency, func() {
+		logutil.LogWhenExceedFrequency(&p.lastStateLog, stateLoggingFrequency, func() {
 			lggr.Debugw("Processing discovery observations", "discoveryObservations", discoveryObservations)
 		})
 
@@ -653,24 +653,6 @@ func reportsInitialRequestTimerDuration(maxQueryDuration time.Duration) time.Dur
 	}
 
 	return maxAllowedReportTimeout
-}
-
-// logWhenExceedFrequency logs state information if enough time has passed since the last state log.
-// This function is thread-safe and uses atomic operations.
-func (p *Plugin) logWhenExceedFrequency(lastLog *atomic.Pointer[time.Time], frequency time.Duration, logFunc func()) {
-	now := time.Now()
-
-	lastLogPtr := lastLog.Load()
-	var lastLogTime time.Time
-	if lastLogPtr != nil {
-		lastLogTime = *lastLogPtr
-	}
-
-	// Check if enough time has passed since the last log
-	if now.Sub(lastLogTime) >= frequency {
-		lastLog.Store(&now)
-		logFunc()
-	}
 }
 
 // Interface compatibility checks.
