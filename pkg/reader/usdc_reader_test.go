@@ -133,7 +133,7 @@ func Test_USDCMessageReader_MessagesByTokenID(t *testing.T) {
 	emptyChain := cciptypes.ChainSelector(sel.ETHEREUM_MAINNET.Selector)
 	emptyReader := reader.NewMockExtended(t)
 	emptyReader.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
-	emptyReader.EXPECT().QueryKey(
+	emptyReader.EXPECT().ExtendedQueryKey(
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
@@ -144,7 +144,7 @@ func Test_USDCMessageReader_MessagesByTokenID(t *testing.T) {
 	faultyChain := cciptypes.ChainSelector(sel.AVALANCHE_MAINNET.Selector)
 	faultyReader := reader.NewMockExtended(t)
 	faultyReader.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
-	faultyReader.EXPECT().QueryKey(
+	faultyReader.EXPECT().ExtendedQueryKey(
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
@@ -162,7 +162,7 @@ func Test_USDCMessageReader_MessagesByTokenID(t *testing.T) {
 	validChainCCTP := CCTPDestDomains[uint64(validChain)]
 	validReader := reader.NewMockExtended(t)
 	validReader.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
-	validReader.EXPECT().QueryKey(
+	validReader.EXPECT().ExtendedQueryKey(
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
@@ -310,7 +310,7 @@ func Test_MessageSentEvent_unpackID(t *testing.T) {
 	}
 }
 
-func Test_SourceTokenDataPayload_ToBytes(t *testing.T) {
+func Test_extractABIPayload_ToBytes(t *testing.T) {
 	tt := []struct {
 		nonce        uint64
 		sourceDomain uint32
@@ -341,7 +341,7 @@ func Test_SourceTokenDataPayload_ToBytes(t *testing.T) {
 	}
 }
 
-func Test_SourceTokenDataPayload_FromBytes(t *testing.T) {
+func Test_extractABIPayload_FromBytes(t *testing.T) {
 	tt := []struct {
 		name    string
 		data    []byte
