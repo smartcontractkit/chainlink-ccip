@@ -457,60 +457,58 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 	//nolint:lll
 	prices := make(map[cciptypes.ChainSelector]cciptypes.BigInt)
 
-	// Use errgroup for parallel processing with proper error handling
-	var eg errgroup.Group
+	var wg sync.WaitGroup
 	var mu sync.Mutex
 
-	for _, chain := range selectors {
+	for _, chainSelector := range selectors {
 		// Capture loop variable
-		chain := chain
+		chain := chainSelector
 
-		eg.Go(func() error {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
 			chainAccessor, err := getChainAccessor(r.accessors, chain)
 			if err != nil {
 				lggr.Errorw("chain accessor not found, chain native price skipped", "chain", chain, "err", err)
-				return nil // Don't fail the entire operation for one chain
+				return
 			}
 
 			config, err := r.configPoller.GetChainConfig(ctx, chain)
 			if err != nil {
 				lggr.Warnw("failed to get chain config for native token address", "chain", chain, "err", err)
-				return nil
+				return
 			}
 			nativeTokenAddress := config.Router.WrappedNativeAddress
 
 			if cciptypes.UnknownAddress(nativeTokenAddress).IsZeroOrEmpty() {
 				lggr.Warnw("Native token address is zero or empty. Ignore for disabled chains otherwise "+
 					"check for router misconfiguration", "chain", chain, "address", nativeTokenAddress.String())
-				return nil
+				return
 			}
 
 			price, err := chainAccessor.GetTokenPriceUSD(ctx, cciptypes.UnknownAddress(nativeTokenAddress))
 			if err != nil {
 				lggr.Errorw("failed to get native token price", "chain", chain, "address", nativeTokenAddress.String(), "err", err)
-				return nil
+				return
 			}
 
 			if price.Timestamp == 0 {
 				lggr.Warnw("no native token price available", "chain", chain)
-				return nil
+				return
 			}
 			if price.Value == nil || price.Value.Cmp(big.NewInt(0)) <= 0 {
 				lggr.Errorw("native token price is nil or non-positive", "chain", chain)
-				return nil
+				return
 			}
 
 			mu.Lock()
 			prices[chain] = cciptypes.NewBigInt(price.Value)
 			mu.Unlock()
-
-			return nil
-		})
+		}()
 	}
 
-	if err := eg.Wait(); err != nil {
-		lggr.Errorw("error in parallel price fetching", "err", err)
-	}
+	wg.Wait()
 
 	return prices
 }
