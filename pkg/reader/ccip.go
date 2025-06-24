@@ -554,8 +554,6 @@ func (r *ccipChainReader) buildSigners(signers []signer) []cciptypes.RemoteSigne
 }
 
 func (r *ccipChainReader) GetRMNRemoteConfig(ctx context.Context) (cciptypes.RemoteConfig, error) {
-	lggr := logutil.WithContextValues(ctx, r.lggr)
-
 	if err := validateReaderExistence(r.contractReaders, r.destChain); err != nil {
 		return cciptypes.RemoteConfig{}, fmt.Errorf("validate dest=%d extended reader existence: %w", r.destChain, err)
 	}
@@ -576,7 +574,7 @@ func (r *ccipChainReader) GetRMNRemoteConfig(ctx context.Context) (cciptypes.Rem
 		return cciptypes.RemoteConfig{}, fmt.Errorf("get RMNRemote proxy contract address: %w", err)
 	}
 
-	rmnRemoteAddress, err := r.getRMNRemoteAddress(ctx, lggr, r.destChain, proxyContractAddress)
+	rmnRemoteAddress, err := r.getRMNRemoteAddress(ctx, r.destChain, proxyContractAddress)
 	if err != nil {
 		return cciptypes.RemoteConfig{}, fmt.Errorf("get RMNRemote address: %w", err)
 	}
@@ -821,21 +819,14 @@ func (r *ccipChainReader) Sync(ctx context.Context, contracts ContractAddresses)
 				return nil
 			}
 
-			// the extended reader will do nothing if the contract is already bound.
-			_, err := bindReaderContract(
-				ctx,
-				lggr,
-				r.contractReaders,
-				chainSelector,
-				boundContract.name,
-				boundContract.address,
-				r.addrCodec)
-			if err != nil {
-				if errors.Is(err, ErrContractReaderNotFound) {
-					// don't support this chain, nothing to do.
-					return nil
-				}
+			chainAccessor, err := getChainAccessor(r.accessors, chainSelector)
+			if err != nil && errors.Is(err, ErrChainAccessorNotFound) {
+				// don't support this chain, nothing to do.
+				return nil
+			}
 
+			err = chainAccessor.Sync(ctx, boundContract.name, boundContract.address)
+			if err != nil {
 				return fmt.Errorf("bind reader contract %s on chain %s: %w", boundContract.name, chainSelector, err)
 			}
 
@@ -1156,12 +1147,15 @@ type versionedConfig struct {
 //nolint:lll
 func (r *ccipChainReader) getRMNRemoteAddress(
 	ctx context.Context,
-	lggr logger.Logger,
 	chain cciptypes.ChainSelector,
 	rmnRemoteProxyAddress []byte) ([]byte, error) {
-	_, err := bindReaderContract(ctx, lggr, r.contractReaders, chain, consts.ContractNameRMNProxy, rmnRemoteProxyAddress, r.addrCodec)
+	chainAccessor, err := getChainAccessor(r.accessors, chain)
 	if err != nil {
-		return nil, fmt.Errorf("bind RMN proxy contract: %w", err)
+		return nil, fmt.Errorf("unable to getChainAccessor: %w", err)
+	}
+	err = chainAccessor.Sync(ctx, consts.ContractNameRMNProxy, rmnRemoteProxyAddress)
+	if err != nil {
+		return nil, fmt.Errorf("sync RMN proxy contract: %w", err)
 	}
 
 	// Get the address from cache instead of making a contract call

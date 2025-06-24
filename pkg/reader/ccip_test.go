@@ -151,11 +151,20 @@ func TestCCIPChainReader_Sync_HappyPath_BindsContractsSuccessfully(t *testing.T)
 	s1Onramp := []byte{0x1}
 	s2Onramp := []byte{0x2}
 	destNonceMgr := []byte{0x3}
+	offRamp := []byte{0x4}
 
 	mockAddrCodec := internal.NewMockAddressCodecHex(t)
 	destNonceMgrAddrStr, err := mockAddrCodec.AddressBytesToString(destNonceMgr, destChain)
 	require.NoError(t, err)
+	offRampAddrStr, err := mockAddrCodec.AddressBytesToString(offRamp, destChain)
+	require.NoError(t, err)
 	destExtended := reader_mocks.NewMockExtended(t)
+	destExtended.EXPECT().Bind(mock.Anything, []types.BoundContract{
+		{
+			Name:    consts.ContractNameOffRamp,
+			Address: offRampAddrStr,
+		},
+	}).Return(nil)
 	destExtended.EXPECT().Bind(mock.Anything, []types.BoundContract{
 		{
 			Name:    consts.ContractNameNonceManager,
@@ -187,17 +196,26 @@ func TestCCIPChainReader_Sync_HappyPath_BindsContractsSuccessfully(t *testing.T)
 	defer source1Extended.AssertExpectations(t)
 	defer source2Extended.AssertExpectations(t)
 
-	ccipReader := &ccipChainReader{
-		contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
+	cw := writer_mocks.NewMockContractWriter(t)
+	contractWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
+	contractWriters[destChain] = cw
+	contractWriters[sourceChain1] = cw
+	contractWriters[sourceChain2] = cw
+
+	ccipReader, err := newCCIPChainReaderInternal(
+		ctx,
+		logger.Test(t),
+		map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
 			destChain:    destExtended,
 			sourceChain1: source1Extended,
 			sourceChain2: source2Extended,
 		},
-		donAddressBook: addressbook.NewBook(),
-		destChain:      destChain,
-		lggr:           logger.Test(t),
-		addrCodec:      mockAddrCodec,
-	}
+		contractWriters,
+		destChain,
+		offRamp,
+		mockAddrCodec,
+	)
+	require.NoError(t, err)
 
 	contracts := ContractAddresses{
 		consts.ContractNameOnRamp: {
@@ -211,6 +229,8 @@ func TestCCIPChainReader_Sync_HappyPath_BindsContractsSuccessfully(t *testing.T)
 
 	err = ccipReader.Sync(ctx, contracts)
 	require.NoError(t, err)
+	err = ccipReader.Close()
+	require.NoError(t, err)
 }
 
 func TestCCIPChainReader_Sync_HappyPath_SkipsEmptyAddress(t *testing.T) {
@@ -219,6 +239,7 @@ func TestCCIPChainReader_Sync_HappyPath_SkipsEmptyAddress(t *testing.T) {
 	sourceChain1 := cciptypes.ChainSelector(2)
 	sourceChain2 := cciptypes.ChainSelector(3)
 	s1Onramp := []byte{0x1}
+	offRamp := []byte{0x4}
 
 	// empty address, should get skipped
 	s2Onramp := []byte{}
@@ -228,6 +249,14 @@ func TestCCIPChainReader_Sync_HappyPath_SkipsEmptyAddress(t *testing.T) {
 	mockAddrCodec := internal.NewMockAddressCodecHex(t)
 	destNonceMgrAddrStr, err := mockAddrCodec.AddressBytesToString(destNonceMgr, destChain)
 	require.NoError(t, err)
+	offRampAddrStr, err := mockAddrCodec.AddressBytesToString(offRamp, destChain)
+	require.NoError(t, err)
+	destExtended.EXPECT().Bind(mock.Anything, []types.BoundContract{
+		{
+			Name:    consts.ContractNameOffRamp,
+			Address: offRampAddrStr,
+		},
+	}).Return(nil)
 	destExtended.EXPECT().Bind(mock.Anything, []types.BoundContract{
 		{
 			Name:    consts.ContractNameNonceManager,
@@ -252,17 +281,26 @@ func TestCCIPChainReader_Sync_HappyPath_SkipsEmptyAddress(t *testing.T) {
 	defer source1Extended.AssertExpectations(t)
 	defer source2Extended.AssertExpectations(t)
 
-	ccipReader := &ccipChainReader{
-		contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
+	cw := writer_mocks.NewMockContractWriter(t)
+	contractWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
+	contractWriters[destChain] = cw
+	contractWriters[sourceChain1] = cw
+	contractWriters[sourceChain2] = cw
+
+	ccipReader, err := newCCIPChainReaderInternal(
+		ctx,
+		logger.Test(t),
+		map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
 			destChain:    destExtended,
 			sourceChain1: source1Extended,
 			sourceChain2: source2Extended,
 		},
-		donAddressBook: addressbook.NewBook(),
-		destChain:      destChain,
-		lggr:           logger.Test(t),
-		addrCodec:      mockAddrCodec,
-	}
+		contractWriters,
+		destChain,
+		offRamp,
+		mockAddrCodec,
+	)
+	require.NoError(t, err)
 
 	contracts := ContractAddresses{
 		consts.ContractNameOnRamp: {
@@ -276,6 +314,8 @@ func TestCCIPChainReader_Sync_HappyPath_SkipsEmptyAddress(t *testing.T) {
 
 	err = ccipReader.Sync(ctx, contracts)
 	require.NoError(t, err)
+	err = ccipReader.Close()
+	require.NoError(t, err)
 }
 
 func TestCCIPChainReader_Sync_HappyPath_DontSupportAllChains(t *testing.T) {
@@ -286,11 +326,20 @@ func TestCCIPChainReader_Sync_HappyPath_DontSupportAllChains(t *testing.T) {
 	s1Onramp := []byte{0x1}
 	s2Onramp := []byte{0x2}
 	destNonceMgr := []byte{0x3}
+	offRamp := []byte{0x4}
 	destExtended := reader_mocks.NewMockExtended(t)
 	mockAddrCodec := internal.NewMockAddressCodecHex(t)
 
 	destNonceMgrAddrStr, err := mockAddrCodec.AddressBytesToString(destNonceMgr, destChain)
 	require.NoError(t, err)
+	offRampAddrStr, err := mockAddrCodec.AddressBytesToString(offRamp, destChain)
+	require.NoError(t, err)
+	destExtended.EXPECT().Bind(mock.Anything, []types.BoundContract{
+		{
+			Name:    consts.ContractNameOffRamp,
+			Address: offRampAddrStr,
+		},
+	}).Return(nil)
 	destExtended.EXPECT().Bind(mock.Anything, []types.BoundContract{
 		{
 			Name:    consts.ContractNameNonceManager,
@@ -312,16 +361,24 @@ func TestCCIPChainReader_Sync_HappyPath_DontSupportAllChains(t *testing.T) {
 	defer destExtended.AssertExpectations(t)
 	defer source2Extended.AssertExpectations(t)
 
-	ccipReader := &ccipChainReader{
-		contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
+	cw := writer_mocks.NewMockContractWriter(t)
+	contractWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
+	contractWriters[destChain] = cw
+	contractWriters[sourceChain2] = cw
+
+	ccipReader, err := newCCIPChainReaderInternal(
+		ctx,
+		logger.Test(t),
+		map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
 			destChain:    destExtended,
 			sourceChain2: source2Extended,
 		},
-		donAddressBook: addressbook.NewBook(),
-		destChain:      destChain,
-		lggr:           logger.Test(t),
-		addrCodec:      mockAddrCodec,
-	}
+		contractWriters,
+		destChain,
+		offRamp,
+		mockAddrCodec,
+	)
+	require.NoError(t, err)
 
 	contracts := ContractAddresses{
 		consts.ContractNameOnRamp: {
@@ -335,6 +392,8 @@ func TestCCIPChainReader_Sync_HappyPath_DontSupportAllChains(t *testing.T) {
 
 	err = ccipReader.Sync(ctx, contracts)
 	require.NoError(t, err)
+	err = ccipReader.Close()
+	require.NoError(t, err)
 }
 
 func TestCCIPChainReader_Sync_BindError(t *testing.T) {
@@ -345,11 +404,20 @@ func TestCCIPChainReader_Sync_BindError(t *testing.T) {
 	s1Onramp := []byte{0x1}
 	s2Onramp := []byte{0x2}
 	destNonceMgr := []byte{0x3}
+	offRamp := []byte{0x4}
 
 	mockAddrCodec := internal.NewMockAddressCodecHex(t)
 	destNonceMgrAddrStr, err := mockAddrCodec.AddressBytesToString(destNonceMgr, destChain)
 	require.NoError(t, err)
+	offRampAddrStr, err := mockAddrCodec.AddressBytesToString(offRamp, destChain)
+	require.NoError(t, err)
 	destExtended := reader_mocks.NewMockExtended(t)
+	destExtended.EXPECT().Bind(mock.Anything, []types.BoundContract{
+		{
+			Name:    consts.ContractNameOffRamp,
+			Address: offRampAddrStr,
+		},
+	}).Return(nil)
 	destExtended.EXPECT().Bind(mock.Anything, []types.BoundContract{
 		{
 			Name:    consts.ContractNameNonceManager,
@@ -382,17 +450,26 @@ func TestCCIPChainReader_Sync_BindError(t *testing.T) {
 	defer source1Extended.AssertExpectations(t)
 	defer source2Extended.AssertExpectations(t)
 
-	ccipReader := &ccipChainReader{
-		contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
+	cw := writer_mocks.NewMockContractWriter(t)
+	contractWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
+	contractWriters[destChain] = cw
+	contractWriters[sourceChain1] = cw
+	contractWriters[sourceChain2] = cw
+
+	ccipReader, err := newCCIPChainReaderInternal(
+		ctx,
+		logger.Test(t),
+		map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
 			destChain:    destExtended,
 			sourceChain1: source1Extended,
 			sourceChain2: source2Extended,
 		},
-		donAddressBook: addressbook.NewBook(),
-		destChain:      destChain,
-		lggr:           logger.Test(t),
-		addrCodec:      mockAddrCodec,
-	}
+		contractWriters,
+		destChain,
+		offRamp,
+		mockAddrCodec,
+	)
+	require.NoError(t, err)
 
 	contracts := ContractAddresses{
 		consts.ContractNameOnRamp: {
@@ -407,6 +484,8 @@ func TestCCIPChainReader_Sync_BindError(t *testing.T) {
 	err = ccipReader.Sync(ctx, contracts)
 	require.Error(t, err)
 	require.ErrorIs(t, err, expectedErr)
+	err = ccipReader.Close()
+	require.NoError(t, err)
 }
 
 // The round1 version returns NoBindingFound errors for onramp contracts to simulate

@@ -77,9 +77,36 @@ func (l *DefaultAccessor) GetChainFeeComponents(ctx context.Context) (cciptypes.
 	return *fc, nil
 }
 
-func (l *DefaultAccessor) Sync(ctx context.Context, contracts cciptypes.ContractAddresses) error {
-	// TODO(NONEVM-1865): implement
-	panic("implement me")
+func (l *DefaultAccessor) Sync(
+	ctx context.Context,
+	contractName string,
+	contractAddress cciptypes.UnknownAddress,
+) error {
+	lggr := logutil.WithContextValues(ctx, l.lggr)
+	addressStr, err := l.addrCodec.AddressBytesToString(contractAddress, l.chainSelector)
+	if err != nil {
+		return fmt.Errorf("unable to convert address bytes to string: %w, address: %v", err, contractAddress)
+	}
+
+	contract := types.BoundContract{
+		Address: addressStr,
+		Name:    contractName,
+	}
+
+	lggr.Debugw("Binding contract",
+		"chainSelector", l.chainSelector,
+		"contractName", contractName,
+		"address", addressStr,
+	)
+	// Bind the contract address to the reader.
+	// If the same address exists -> no-op
+	// If the address is changed -> updates the address, overwrites the existing one
+	// If the contract not bound -> binds to the new address
+	if err := l.contractReader.Bind(ctx, []types.BoundContract{contract}); err != nil {
+		return fmt.Errorf("unable to bind %s %s for chain %d: %w", contractName, addressStr, l.chainSelector, err)
+	}
+
+	return nil
 }
 
 func (l *DefaultAccessor) MsgsBetweenSeqNums(
