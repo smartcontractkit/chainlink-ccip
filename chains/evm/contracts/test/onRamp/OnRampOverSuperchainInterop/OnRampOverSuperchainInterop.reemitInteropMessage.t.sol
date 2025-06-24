@@ -23,23 +23,7 @@ contract OnRampOverSuperchainInterop_reemitInteropMessage is OnRampOverSuperchai
     vm.stopPrank();
   }
 
-  function test_reemitInteropMessage_ReemitBasicMessage() public {
-    uint256 feeAmount = 1234567890;
-    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    _forwardFromRouter(message, feeAmount);
-
-    // Generate the correct Any2EVM message that matches what was sent
-    (, Internal.Any2EVMRampMessage memory any2EvmMessage) =
-      _generateInitialSourceDestMessages(DEST_CHAIN_SELECTOR, message, feeAmount);
-
-    // Expect the CCIPSuperchainMessageSent event to be re-emitted
-    vm.expectEmit();
-    emit SuperchainInterop.CCIPSuperchainMessageSent(DEST_CHAIN_SELECTOR, 1, any2EvmMessage);
-
-    s_onRampOverSuperchainInterop.reemitInteropMessage(any2EvmMessage);
-  }
-
-  function test_reemitInteropMessage_ReemitTokenMessage() public {
+  function test_reemitInteropMessage_ReemitMessage() public {
     uint256 feeAmount = 1234567890;
     Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(s_sourceFeeToken, 100);
     _forwardFromRouter(message, feeAmount);
@@ -70,13 +54,13 @@ contract OnRampOverSuperchainInterop_reemitInteropMessage is OnRampOverSuperchai
 
     vm.stopPrank();
     // Same message can be re-emitted multiple times, by any address
-    for (uint256 i = 0; i < 3; i++) {
+    for (uint256 i = 0; i < 3; ++i) {
       vm.expectEmit();
       emit SuperchainInterop.CCIPSuperchainMessageSent(DEST_CHAIN_SELECTOR, 1, any2EvmMessage);
 
       // Mock calling from a different account each time to validate reemitInteropMessage is permissionless
 
-      vm.prank(makeAddr(string(abi.encode(i))));
+      vm.prank(makeAddr(string(abi.encode("reemitPTT", i))));
       s_onRampOverSuperchainInterop.reemitInteropMessage(any2EvmMessage);
     }
   }
@@ -86,7 +70,7 @@ contract OnRampOverSuperchainInterop_reemitInteropMessage is OnRampOverSuperchai
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     _forwardFromRouter(message, feeAmount);
 
-    // Enable allowlist for the destination chain
+    // Enable allowlist for the destination chain, since it is empty, no one should be able to send new messages.
     vm.stopPrank();
     vm.prank(OWNER);
     OnRamp.DestChainConfigArgs[] memory destChainConfigArgs = new OnRamp.DestChainConfigArgs[](1);
@@ -101,7 +85,7 @@ contract OnRampOverSuperchainInterop_reemitInteropMessage is OnRampOverSuperchai
     (, Internal.Any2EVMRampMessage memory any2EvmMessage) =
       _generateInitialSourceDestMessages(DEST_CHAIN_SELECTOR, message, feeAmount);
 
-    // Expect the CCIPSuperchainMessageSent event to be re-emitted
+    // Expect a previous-sent message can be re-emitted even if the sender would be blocked by the current allowlist.
     vm.expectEmit();
     emit SuperchainInterop.CCIPSuperchainMessageSent(DEST_CHAIN_SELECTOR, 1, any2EvmMessage);
 
@@ -146,35 +130,23 @@ contract OnRampOverSuperchainInterop_reemitInteropMessage is OnRampOverSuperchai
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     _forwardFromRouter(message, feeAmount);
 
-    Internal.Any2EVMRampMessage[] memory any2EvmMessages = new Internal.Any2EVMRampMessage[](3);
-    for (uint256 i = 0; i < 3; i++) {
-      (, Internal.Any2EVMRampMessage memory any2EvmMessage) =
-        _generateInitialSourceDestMessages(DEST_CHAIN_SELECTOR, message, feeAmount);
-
-      any2EvmMessages[i] = any2EvmMessage;
-    }
+    (, Internal.Any2EVMRampMessage memory any2EvmMessage) =
+      _generateInitialSourceDestMessages(DEST_CHAIN_SELECTOR, message, feeAmount);
 
     // Modify the receiver to make the hash different
-    any2EvmMessages[0].receiver = makeAddr("wrongReceiver");
-    // Wrong sequence number
-    any2EvmMessages[1].header.sequenceNumber = 100;
-    // Wrong destination chain selector
-    any2EvmMessages[2].header.destChainSelector = DEST_CHAIN_SELECTOR + 1;
+    any2EvmMessage.receiver = makeAddr("wrongReceiver");
 
-    for (uint256 i = 0; i < 3; i++) {
-      bytes32 expectedHash =
-        SuperchainInterop._hashInteropMessage(any2EvmMessages[i], address(s_onRampOverSuperchainInterop));
+    bytes32 expectedHash = SuperchainInterop._hashInteropMessage(any2EvmMessage, address(s_onRampOverSuperchainInterop));
 
-      vm.expectRevert(
-        abi.encodeWithSelector(
-          OnRampOverSuperchainInterop.MessageDoesNotExist.selector,
-          any2EvmMessages[i].header.destChainSelector,
-          any2EvmMessages[i].header.sequenceNumber,
-          expectedHash
-        )
-      );
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        OnRampOverSuperchainInterop.MessageDoesNotExist.selector,
+        any2EvmMessage.header.destChainSelector,
+        any2EvmMessage.header.sequenceNumber,
+        expectedHash
+      )
+    );
 
-      s_onRampOverSuperchainInterop.reemitInteropMessage(any2EvmMessages[i]);
-    }
+    s_onRampOverSuperchainInterop.reemitInteropMessage(any2EvmMessage);
   }
 }

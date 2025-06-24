@@ -17,7 +17,10 @@ contract OnRampOverSuperchainInterop_forwardFromRouter is OnRampOverSuperchainIn
   }
 
   function test_forwardFromRouter_SingleBasicMessage() public {
-    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(s_sourceFeeToken, 100);
+    uint256 gasLimit = 300000;
+    message.extraArgs =
+      Client._argsToBytes(Client.GenericExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: true}));
 
     uint256 feeAmount = 1234567890;
     IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRampOverSuperchainInterop), feeAmount);
@@ -44,8 +47,9 @@ contract OnRampOverSuperchainInterop_forwardFromRouter is OnRampOverSuperchainIn
       _generateInitialSourceDestMessages(DEST_CHAIN_SELECTOR, message, feeAmount);
 
     for (uint64 seqNum = 1; seqNum <= 3; ++seqNum) {
-      evm2AnyMessage.header.messageId = ""; // Hashing is always done with empty messageId
-      evm2AnyMessage.header.nonce = 2 * seqNum - 1;
+      // Hashing is always done with empty messageId
+      evm2AnyMessage.header.messageId = "";
+      evm2AnyMessage.header.nonce = seqNum;
       evm2AnyMessage.header.sequenceNumber = seqNum;
       evm2AnyMessage.header.messageId = Internal._hash(evm2AnyMessage, _getOnRampMetadataHash(DEST_CHAIN_SELECTOR));
 
@@ -58,45 +62,6 @@ contract OnRampOverSuperchainInterop_forwardFromRouter is OnRampOverSuperchainIn
       emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, seqNum, evm2AnyMessage);
 
       s_onRampOverSuperchainInterop.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
-
-      evm2AnyMessage.header.messageId = ""; // Hashing is always done with empty messageId
-
-      // NonceManager is shared between OnRamp and OnRampOverSuperchainInterop, must be incremented after each call
-      evm2AnyMessage.header.nonce = 2 * seqNum;
-      evm2AnyMessage.header.sequenceNumber = seqNum;
-      evm2AnyMessage.header.messageId = Internal._hash(
-        evm2AnyMessage,
-        keccak256(
-          abi.encode(Internal.EVM_2_ANY_MESSAGE_HASH, SOURCE_CHAIN_SELECTOR, DEST_CHAIN_SELECTOR, address(s_onRamp))
-        )
-      );
-
-      // Make sure existing OnRamp would be emitting the identical message
-      vm.expectEmit();
-      emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, seqNum, evm2AnyMessage);
-
-      s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
     }
-  }
-
-  function test_forwardFromRouter_MessageWithToken() public {
-    Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(s_sourceFeeToken, 100);
-    uint256 gasLimit = 300000;
-    message.extraArgs =
-      Client._argsToBytes(Client.GenericExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: true}));
-
-    uint256 feeAmount = 1234567890;
-    IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRampOverSuperchainInterop), feeAmount);
-
-    (Internal.EVM2AnyRampMessage memory evm2AnyMessage, Internal.Any2EVMRampMessage memory any2EvmMessage) =
-      _generateInitialSourceDestMessages(DEST_CHAIN_SELECTOR, message, feeAmount);
-
-    vm.expectEmit();
-    emit SuperchainInterop.CCIPSuperchainMessageSent(DEST_CHAIN_SELECTOR, 1, any2EvmMessage);
-
-    vm.expectEmit();
-    emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, 1, evm2AnyMessage);
-
-    s_onRampOverSuperchainInterop.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
   }
 }

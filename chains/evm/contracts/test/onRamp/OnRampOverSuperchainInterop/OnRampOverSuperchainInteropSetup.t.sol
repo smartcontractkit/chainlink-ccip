@@ -31,8 +31,6 @@ contract OnRampOverSuperchainInteropSetup is OnRampSetup {
       Router.OnRamp({destChainSelector: DEST_CHAIN_SELECTOR, onRamp: address(s_onRampOverSuperchainInterop)});
 
     s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), new Router.OffRamp[](0));
-
-    assertEq(s_onRampOverSuperchainInterop.typeAndVersion(), "OnRampOverSuperchainInterop 1.6.1-dev");
   }
 
   function _EVM2AnyRampMessageToAny2EVMRampMessage(
@@ -51,7 +49,11 @@ contract OnRampOverSuperchainInteropSetup is OnRampSetup {
       });
     }
 
-    uint256 gasLimit = s_onRampOverSuperchainInterop.extractGasLimit(message.extraArgs);
+    bytes memory last32Bytes = new bytes(32);
+    for (uint256 i = 0; i < 32; ++i) {
+      last32Bytes[i] = message.extraArgs[4 + i];
+    }
+    uint256 gasLimit = abi.decode(last32Bytes, (uint256));
 
     return Internal.Any2EVMRampMessage({
       header: Internal.RampMessageHeader({

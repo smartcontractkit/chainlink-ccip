@@ -6,12 +6,6 @@ import {OnRamp} from "../../../onRamp/OnRamp.sol";
 import {OnRampSetup} from "./OnRampSetup.t.sol";
 
 contract OnRamp_generateMessageId is OnRampSetup {
-  function _getMetadataHash() internal view returns (bytes32) {
-    return keccak256(
-      abi.encode(Internal.EVM_2_ANY_MESSAGE_HASH, SOURCE_CHAIN_SELECTOR, DEST_CHAIN_SELECTOR, address(s_onRamp))
-    );
-  }
-
   function test_generateMessageId_Success() public view {
     Internal.EVM2AnyRampMessage memory message =
       _messageToEvent(_generateSingleTokenMessage(s_sourceTokens[0], 1000e18), 1, 1, 100e18, OWNER);
@@ -21,14 +15,19 @@ contract OnRamp_generateMessageId is OnRampSetup {
 
     bytes32 messageId = s_onRamp.generateMessageId(message);
 
-    assertEq(messageId, expectedMessageId);
+    assertEq(expectedMessageId, messageId);
   }
 
-  function test_generateMessageId_SameMessageProducesSameId() public view {
+  function test_generateMessageId_SameMessageProducesSameId() public {
     Internal.EVM2AnyRampMessage memory message = _messageToEvent(_generateEmptyMessage(), 1, 1, 100e18, OWNER);
     message.header.messageId = "";
 
     bytes32 messageId1 = s_onRamp.generateMessageId(message);
+
+    // MessageId should remain the same when calculated in a different block
+    vm.roll(block.number + 100);
+    vm.warp(block.timestamp + 100);
+
     bytes32 messageId2 = s_onRamp.generateMessageId(message);
 
     assertEq(messageId1, messageId2);

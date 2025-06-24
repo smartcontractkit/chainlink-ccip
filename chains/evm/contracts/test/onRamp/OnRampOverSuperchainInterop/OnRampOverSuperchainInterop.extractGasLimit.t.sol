@@ -30,20 +30,13 @@ contract OnRampOverSuperchainInterop_extractGasLimit is OnRampOverSuperchainInte
 
   // Reverts
 
-  function test_extractGasLimit_RevertWhen_EmptyExtraArgs() public {
-    bytes memory emptyArgs = new bytes(0);
-
-    vm.expectRevert(abi.encodeWithSelector(OnRampOverSuperchainInterop.ExtraArgsTooShort.selector, 0));
-    s_onRampOverSuperchainInterop.extractGasLimit(emptyArgs);
-  }
-
   function test_extractGasLimit_RevertWhen_ExtraArgsTooShort(
     uint256 length
   ) public {
     vm.expectRevert(abi.encodeWithSelector(OnRampOverSuperchainInterop.ExtraArgsTooShort.selector, 0));
     s_onRampOverSuperchainInterop.extractGasLimit(new bytes(0));
 
-    vm.expectRevert(abi.encodeWithSelector(OnRampOverSuperchainInterop.ExtraArgsTooShort.selector, 31));
-    s_onRampOverSuperchainInterop.extractGasLimit(new bytes(31));
+    vm.expectRevert(abi.encodeWithSelector(OnRampOverSuperchainInterop.ExtraArgsTooShort.selector, 35));
+    s_onRampOverSuperchainInterop.extractGasLimit(new bytes(35));
   }
 }
