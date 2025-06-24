@@ -133,6 +133,38 @@ func NewUSDCMessageReader(
 				contractReader: contractReaders[chainSelector],
 				cctpDestDomain: domains,
 			}
+
+			expressions := []query.Expression{query.Confidence(primitives.Finalized)}
+
+			keyFilter, err := query.Where(
+				consts.EventNameCCTPMessageSent,
+				expressions...,
+			)
+			if err != nil {
+				return nil, err
+			}
+
+			iter, err := contractReaders[chainSelector].ExtendedQueryKey(
+				ctx,
+				consts.ContractNameCCTPMessageTransmitter,
+				keyFilter,
+				query.NewLimitAndSort(
+					query.Limit{Count: uint64(100)},
+					query.NewSortBySequence(query.Asc),
+				),
+				&SolanaCCTPUSDCMessageEvent{},
+			)
+			if err != nil {
+				return nil, fmt.Errorf("error querying contract reader for chain: %w", err)
+			}
+			for _, item := range iter {
+				event, ok1 := item.Data.(*SolanaCCTPUSDCMessageEvent)
+				if !ok1 {
+					return nil, fmt.Errorf("failed to cast %v to Message", item.Data)
+				}
+
+				lggr.Debugw("Found CCTP event", "event", event)
+			}
 		default:
 			return nil, fmt.Errorf("unsupported chain selector family %s for chain %d", family, chainSelector)
 		}
