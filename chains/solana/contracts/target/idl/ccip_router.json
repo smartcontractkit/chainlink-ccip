@@ -1739,7 +1739,13 @@
             "name": "RetrieveTokenLUTs"
           },
           {
-            "name": "TokenTransferAccounts",
+            "name": "RetrievePoolPrograms"
+          },
+          {
+            "name": "TokenTransferStaticAccounts"
+          },
+          {
+            "name": "NestedTokenDerive",
             "fields": [
               {
                 "name": "tokenSubstage",

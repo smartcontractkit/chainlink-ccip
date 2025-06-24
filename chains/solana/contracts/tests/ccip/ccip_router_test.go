@@ -21,6 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/cctp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/testutils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/base_token_pool"
@@ -120,6 +121,7 @@ func TestCCIPRouter(t *testing.T) {
 	require.NoError(t, gerr)
 	usdcMintPrivK := solana.MustPrivateKeyFromBase58("3NnpbE8mrtqhC99YLxhZU4xQTBQBha6tKjfTa123DtR6bmGH1NQS59QELnNarvgHzzvRjAdDTqsfGYjyWHf6mwtA")
 	usdcPool, gerr := tokens.NewTokenPool(config.SPLTokenProgram, config.CctpTokenPoolProgram, usdcMintPrivK.PublicKey())
+	require.NoError(t, gerr)
 
 	signers, transmitters, getTransmitter := testutils.GenerateSignersAndTransmitters(t, config.MaxOracles)
 
@@ -5149,16 +5151,6 @@ func TestCCIPRouter(t *testing.T) {
 					errorStr: common.ConstraintSeeds_AnchorError.String(),
 				},
 				{
-					name:     "extra accounts not in lookup table",
-					index:    1_000, // large number to indicate append
-					errorStr: ccip.InvalidInputsLookupTableAccounts_CcipRouterError.String(),
-				},
-				{
-					name:     "remaining accounts mismatch",
-					index:    13, // only works with token0
-					errorStr: ccip.InvalidInputsLookupTableAccounts_CcipRouterError.String(),
-				},
-				{
 					name:     "invalid token pool signer",
 					index:    12,
 					errorStr: common.ConstraintSeeds_AnchorError.String(),
@@ -5546,18 +5538,35 @@ func TestCCIPRouter(t *testing.T) {
 				ExtraArgs: emptyGenericExtraArgsV2,
 			}
 
+			// Using 0 as a domain because we're only partially configuring the pool for this test suite,
+			// so it contains the default.
+			domain := uint32(0)
+
+			messageTransmitter := cctp.GetMessageTransmitterPDAs(t)
+			tokenMessengerMinter := cctp.GetTokenMessengerMinterPDAs(t, domain, usdcPool.Mint)
+			// NOTE: This is sensitive to test order. If it's wrong, it will cause account 41 to mismatch.
+			nonce := uint64(14)
+
+			messageSendEvent, _, _ := solana.FindProgramAddress([][]byte{
+				[]byte("ccip_cctp_message_sent_event"),
+				user.PublicKey().Bytes(),
+				common.Uint64ToLE(config.EvmChainSelector),
+				common.Uint64ToLE(nonce),
+			},
+				config.CctpTokenPoolProgram)
+
 			// as there are many accounts to check, we print the index of the first mismatch by checking them one
 			// by one instead of all at once
 			expectedAccounts := []*solana.AccountMeta{
 				solana.Meta(config.RouterConfigPDA),
 				solana.Meta(config.EvmDestChainStatePDA).WRITE(),
 				solana.Meta(nonceEvmPDA).WRITE(),
-				solana.Meta(user.PublicKey()).WRITE(),
+				solana.Meta(user.PublicKey()).WRITE().SIGNER(),
 				solana.Meta(solana.SystemProgramID),
 				// billing:
-				solana.Meta(config.SPLTokenProgram),
-				solana.Meta(wsol.mint),              // paying in native SOL
-				solana.Meta(solana.SystemProgramID), // no user ATA, as paying in native SOL
+				solana.Meta(wsol.program),
+				solana.Meta(wsol.mint),          // paying in native SOL
+				solana.Meta(common.ZeroAddress), // no user ATA, as paying in native SOL
 				solana.Meta(wsol.billingATA).WRITE(),
 				solana.Meta(config.BillingSignerPDA),
 				// fee quoter CPI:
@@ -5572,41 +5581,42 @@ func TestCCIPRouter(t *testing.T) {
 				solana.Meta(config.RMNRemoteConfigPDA),
 				// token pool (static accounts):
 				solana.Meta(usdcPool.User[user.PublicKey()]).WRITE(),
-				solana.Meta(usdcPool.Chain[config.EvmChainSelector]),
+				solana.Meta(usdcPool.Billing[config.EvmChainSelector]),
+				solana.Meta(usdcPool.Chain[config.EvmChainSelector]).WRITE(),
 				solana.Meta(usdcPool.PoolLookupTable),
 				solana.Meta(usdcPool.AdminRegistryPDA),
 				solana.Meta(usdcPool.PoolProgram),
-				solana.Meta(usdcPool.PoolConfig),
-				solana.Meta(usdcPool.PoolTokenAccount),
+				solana.Meta(usdcPool.PoolConfig).WRITE(),
+				solana.Meta(usdcPool.PoolTokenAccount).WRITE(),
 				solana.Meta(usdcPool.PoolSigner),
 				solana.Meta(usdcPool.Program),
-				solana.Meta(usdcPool.Mint),
+				solana.Meta(usdcPool.Mint).WRITE(),
+				solana.Meta(usdcPool.FeeTokenConfig),
 				solana.Meta(usdcPool.RouterSigner),
 				// token pool (derived additional accounts):
-			}
-			fmt.Printf("Expected accounts: %d\n", len(expectedAccounts))
-			for i, acc := range expectedAccounts {
-				fmt.Printf("Account %d: %s\n", i, acc.PublicKey)
+				solana.Meta(tokenMessengerMinter.AuthorityPda),
+				solana.Meta(messageTransmitter.MessageTransmitter).WRITE(),
+				solana.Meta(tokenMessengerMinter.TokenMessenger),
+				solana.Meta(tokenMessengerMinter.TokenMinter),
+				solana.Meta(tokenMessengerMinter.LocalToken).WRITE(),
+				solana.Meta(config.CctpMessageTransmitter),
+				solana.Meta(config.CctpTokenMessengerMinter),
+				solana.Meta(solana.SystemProgramID), // no user ATA, as paying in native SOL
+				solana.Meta(tokenMessengerMinter.EventAuthority),
+				solana.Meta(tokenMessengerMinter.RemoteTokenMessenger),
+				solana.Meta(messageSendEvent).WRITE(),
 			}
 
-			derivedAccounts, derivedLookUpTables, tokenIndices := deriveSendAccounts(
+			derivedAccounts, _, tokenIndices := deriveSendAccounts(
 				ctx,
 				t,
 				user,
 				message,
 				config.EvmChainSelector,
-				// message.FeeToken,
-				// []solana.PublicKey{usdcPool.Mint},
 				solanaGoClient,
 			)
 
 			require.Equal(t, []uint8{0}, tokenIndices)
-
-			var ccipSendAltAddr solana.PublicKey
-			for k := range ccipSendLookupTable {
-				ccipSendAltAddr = k
-			}
-			require.Equal(t, []solana.PublicKey{ccipSendAltAddr, usdcPool.PoolLookupTable}, derivedLookUpTables)
 
 			require.Len(t, derivedAccounts, len(expectedAccounts), "Derived accounts length mismatch")
 			for i, expected := range expectedAccounts {
@@ -7636,9 +7646,6 @@ func TestCCIPRouter(t *testing.T) {
 					solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
 					solana.NewAccountMeta(solana.SystemProgramID, false, false),
 				)
-				for i, meta := range raw.AccountMetaSlice {
-					fmt.Printf("Raw [%d]: %v\n", i, meta)
-				}
 
 				instruction, err = raw.ValidateAndBuild()
 				require.NoError(t, err)
@@ -7755,9 +7762,6 @@ func TestCCIPRouter(t *testing.T) {
 					SetTokenIndexes(tokenIndices)
 				builder.AccountMetaSlice = derivedAccounts
 
-				for i, meta := range builder.AccountMetaSlice {
-					fmt.Printf("Derived [%d]: %v\n", i, meta)
-				}
 				instruction, err = builder.ValidateAndBuild()
 				require.NoError(t, err)
 
@@ -9075,9 +9079,6 @@ func TestCCIPRouter(t *testing.T) {
 					raw.AccountMetaSlice = append(raw.AccountMetaSlice, solana.Meta(token0.OfframpSigner))
 					raw.AccountMetaSlice = append(raw.AccountMetaSlice, tokenMetas...)
 
-					for i, acc := range raw.AccountMetaSlice {
-						fmt.Printf("[%d]: %v\n", i, acc)
-					}
 					instruction, err = raw.ValidateAndBuild()
 					require.NoError(t, err)
 
@@ -9202,16 +9203,12 @@ func TestCCIPRouter(t *testing.T) {
 						solanaGoClient,
 					)
 
-					fmt.Printf("Indexes: %v\n", tokenIndices)
 					builder := ccip_offramp.NewExecuteInstructionBuilder().
 						SetRawExecutionReport(rawExecutionReport).
 						SetReportContextByteWords(reportContext).
 						SetTokenIndexes(tokenIndices)
 
 					builder.AccountMetaSlice = derivedAccounts
-					for i, acc := range builder.AccountMetaSlice {
-						fmt.Printf("[%d]: %v\n", i, acc)
-					}
 					instruction, err = builder.ValidateAndBuild()
 					require.NoError(t, err)
 
@@ -11008,16 +11005,11 @@ func deriveSendAccounts(ctx context.Context,
 		deriveRaw.AccountMetaSlice = append(deriveRaw.AccountMetaSlice, askWith...)
 		derive, err := deriveRaw.ValidateAndBuild()
 		require.NoError(t, err)
-		fmt.Printf("Calling derive with stage %s and account list: \n", stage)
-		for i, acc := range deriveRaw.AccountMetaSlice {
-			fmt.Printf("[%d]: %v\n", i, acc)
-		}
 		tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{derive}, transmitter, config.DefaultCommitment)
 		derivation, err := common.ExtractAnchorTypedReturnValue[ccip_router.DeriveAccountsResponse](ctx, tx.Meta.LogMessages, config.CcipRouterProgram.String())
 		require.NoError(t, err)
-		fmt.Printf("Derivation: %+v\n", derivation)
 
-		if derivation.CurrentStage == "TokenTransferAccounts/Start" {
+		if derivation.CurrentStage == "TokenTransferStaticAccounts" {
 			tokenIndices = append(tokenIndices, tokenIndex)
 			tokenIndex += byte(len(derivation.AccountsToSave))
 		}

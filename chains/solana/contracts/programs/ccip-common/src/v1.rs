@@ -143,9 +143,9 @@ pub fn validate_and_parse_token_accounts<'info>(
             AddressLookupTable::deserialize(lookup_table_data)
                 .map_err(|_| CommonCcipError::InvalidInputsLookupTableAccounts)?;
 
-        // reconstruct + validate expected values in token pool lookup table
-        // base set of constant accounts (10)
-        // + additional constant accounts (remaining_accounts) that are not required but may be used for additional token pool functionality (like CPI)
+        // reconstruct + validate expected values in token pool lookup table.
+        // There might be additional accounts for token pools that support auto-derivation,
+        // which are not validated here as they might not be in the lookup table.
         let required_entries = [
             lookup_table,
             token_admin_registry,
@@ -160,12 +160,9 @@ pub fn validate_and_parse_token_accounts<'info>(
         ];
         {
             // validate pool addresses
-            let mut expected_keys: Vec<Pubkey> = required_entries.iter().map(|x| x.key()).collect();
-            let mut remaining_keys: Vec<Pubkey> =
-                remaining_accounts.iter().map(|x| x.key()).collect();
-            expected_keys.append(&mut remaining_keys);
+            let expected_keys: Vec<Pubkey> = required_entries.iter().map(|x| x.key()).collect();
             require!(
-                lookup_table_account.addresses.as_ref() == expected_keys,
+                lookup_table_account.addresses[..expected_keys.len()].as_ref() == expected_keys,
                 CommonCcipError::InvalidInputsLookupTableAccounts
             );
         }

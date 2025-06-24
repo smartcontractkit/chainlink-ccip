@@ -213,6 +213,13 @@ pub mod lock_or_burn {
         let domain_str = domain_id.to_string();
         let domain_seed = domain_str.as_bytes();
 
+        msg!(
+            "Sender: {:?}, selector: {:?}, nonce: {:?}",
+            lock_or_burn.original_sender,
+            lock_or_burn.remote_chain_selector,
+            lock_or_burn.msg_total_nonce
+        );
+
         Ok(DeriveAccountsResponse {
             accounts_to_save: vec![
                 // cctp_message_transmitter
