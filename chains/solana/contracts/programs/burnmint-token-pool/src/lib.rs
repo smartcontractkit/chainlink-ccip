@@ -295,13 +295,19 @@ pub mod burnmint_token_pool {
         remove: Vec<Pubkey>,
     ) -> Result<()> {
         let list = &mut ctx.accounts.state.config.allow_list;
-        for key in remove {
-            require!(
-                list.contains(&key),
-                CcipTokenPoolError::AllowlistKeyDidNotExist
-            );
-            list.retain(|k| k != &key);
-        }
+        // Cache initial length
+        let initial_list_len = list.len();
+        // Collect all keys to remove into a HashSet for O(1) lookups
+        let keys_to_remove: std::collections::HashSet<Pubkey> = remove.into_iter().collect();
+        // Perform a single pass through the list
+        list.retain(|k| !keys_to_remove.contains(k));
+
+        // We don't store repeated keys, so the keys_to_remove should match the removed keys
+        require_eq!(
+            initial_list_len,
+            list.len().checked_add(keys_to_remove.len()).unwrap(),
+            CcipTokenPoolError::AllowlistKeyDidNotExist
+        );
 
         Ok(())
     }
