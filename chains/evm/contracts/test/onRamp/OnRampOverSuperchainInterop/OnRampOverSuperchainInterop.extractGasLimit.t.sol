@@ -30,9 +30,7 @@ contract OnRampOverSuperchainInterop_extractGasLimit is OnRampOverSuperchainInte
 
   // Reverts
 
-  function test_extractGasLimit_RevertWhen_ExtraArgsTooShort(
-    uint256 length
-  ) public {
+  function test_extractGasLimit_RevertWhen_ExtraArgsTooShort() public {
     vm.expectRevert(abi.encodeWithSelector(OnRampOverSuperchainInterop.ExtraArgsTooShort.selector, 0));
     s_onRampOverSuperchainInterop.extractGasLimit(new bytes(0));
 
