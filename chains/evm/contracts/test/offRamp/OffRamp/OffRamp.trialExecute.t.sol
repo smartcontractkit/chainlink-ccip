@@ -4,7 +4,6 @@ pragma solidity ^0.8.24;
 import {ERC165CheckerReverting} from "../../../libraries/ERC165CheckerReverting.sol";
 import {Internal} from "../../../libraries/Internal.sol";
 import {RateLimiter} from "../../../libraries/RateLimiter.sol";
-import {MultiOCR3Base} from "../../../ocr/MultiOCR3Base.sol";
 import {OffRamp} from "../../../offRamp/OffRamp.sol";
 import {OffRampSetup} from "./OffRampSetup.t.sol";
 import {CallWithExactGas} from "@chainlink/contracts/src/v0.8/shared/call/CallWithExactGas.sol";
