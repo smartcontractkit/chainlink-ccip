@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol";
-import {IMessageInterceptor} from "../interfaces/IMessageInterceptor.sol";
 import {IPoolV1} from "../interfaces/IPool.sol";
 import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
@@ -86,7 +85,6 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// @dev Dynamic offRamp config.
   /// @dev Since DynamicConfig is part of DynamicConfigSet event, if changing it, we should update the ABI on Atlas.
   struct DynamicConfig {
-    address messageInterceptor; // Optional, validates incoming messages (zero address = no interceptor).
     bool reentrancyGuardEntered; // Reentrancy guard, used to prevent reentrant calls.
   }
 
@@ -377,16 +375,6 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       data: message.data,
       destTokenAmounts: destTokenAmounts
     });
-
-    // The main message interceptor is the aggregate rate limiter, but we also allow for a custom interceptor. This is
-    // why we always have to call into the contract when it's enabled, even when there are no tokens in the message.
-    address messageInterceptor = s_dynamicConfig.messageInterceptor;
-    if (messageInterceptor != address(0)) {
-      try IMessageInterceptor(messageInterceptor).onInboundMessage(any2EvmMessage) {}
-      catch (bytes memory err) {
-        revert IMessageInterceptor.MessageValidationError(err);
-      }
-    }
 
     // There are three cases in which we skip calling the receiver:
     // 1. If the message data is empty AND the gas limit is 0.
