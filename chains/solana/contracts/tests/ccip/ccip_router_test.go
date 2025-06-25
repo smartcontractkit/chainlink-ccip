@@ -2,7 +2,6 @@ package contracts
 
 import (
 	"bytes"
-	"context"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
@@ -5428,12 +5427,13 @@ func TestCCIPRouter(t *testing.T) {
 				ExtraArgs: emptyGenericExtraArgsV2,
 			}
 
-			derivedAccounts, derivedLookUpTables, tokenIndices := deriveSendAccounts(ctx,
+			derivedAccounts, derivedLookUpTables, tokenIndices := testutils.DeriveSendAccounts(ctx,
 				t,
 				user,
 				message,
 				destinationChainSelector,
-				solanaGoClient)
+				solanaGoClient,
+				config.CcipRouterProgram)
 
 			builder := ccip_router.NewCcipSendInstructionBuilder().
 				SetDestChainSelector(destinationChainSelector).
@@ -5502,12 +5502,14 @@ func TestCCIPRouter(t *testing.T) {
 			ixApprove1, err := tokens.TokenApproveChecked(2, token1Decimals, token1.Program, userTokenAccount1, token1.Mint, config.BillingSignerPDA, user.PublicKey(), nil)
 			require.NoError(t, err)
 
-			derivedAccounts, derivedLookUpTables, tokenIndices := deriveSendAccounts(ctx,
+			derivedAccounts, derivedLookUpTables, tokenIndices := testutils.DeriveSendAccounts(ctx,
 				t,
 				user,
 				message,
 				destinationChainSelector,
-				solanaGoClient)
+				solanaGoClient,
+				config.CcipRouterProgram,
+			)
 
 			lookupTables := ccipSendLookupTable
 			for _, table := range derivedLookUpTables {
@@ -5615,13 +5617,14 @@ func TestCCIPRouter(t *testing.T) {
 				solana.Meta(messageSendEvent).WRITE(),
 			}
 
-			derivedAccounts, _, tokenIndices := deriveSendAccounts(
+			derivedAccounts, _, tokenIndices := testutils.DeriveSendAccounts(
 				ctx,
 				t,
 				user,
 				message,
 				config.EvmChainSelector,
 				solanaGoClient,
+				config.CcipRouterProgram,
 			)
 
 			require.Equal(t, []uint8{0}, tokenIndices)
@@ -7752,7 +7755,7 @@ func TestCCIPRouter(t *testing.T) {
 				bufferID := []byte{}
 				tokenTransferAndOffchainData := []ccip_offramp.TokenTransferAndOffchainData{}
 
-				derivedAccounts, derivedLookUpTables, tokenIndices := deriveExecutionAccounts(ctx,
+				derivedAccounts, derivedLookUpTables, tokenIndices := testutils.DeriveExecutionAccounts(ctx,
 					t,
 					transmitter,
 					messagingAccounts,
@@ -9199,7 +9202,7 @@ func TestCCIPRouter(t *testing.T) {
 						Transfer: message.TokenAmounts[0],
 						Data:     executionReport.OffchainTokenData[0],
 					}}
-					derivedAccounts, derivedLookUpTables, tokenIndices := deriveExecutionAccounts(ctx,
+					derivedAccounts, derivedLookUpTables, tokenIndices := testutils.DeriveExecutionAccounts(ctx,
 						t,
 						transmitter,
 						messagingAccounts,
@@ -10724,7 +10727,7 @@ func TestCCIPRouter(t *testing.T) {
 				)
 				tokenTransferAndOffchainData := []ccip_offramp.TokenTransferAndOffchainData{}
 
-				derivedAccounts, derivedLookUpTables, tokenIndices := deriveExecutionAccounts(ctx,
+				derivedAccounts, derivedLookUpTables, tokenIndices := testutils.DeriveExecutionAccounts(ctx,
 					t,
 					transmitter,
 					messagingAccounts,
@@ -10918,130 +10921,4 @@ func TestCCIPRouter(t *testing.T) {
 			})
 		})
 	})
-}
-
-func deriveExecutionAccounts(ctx context.Context,
-	t *testing.T,
-	transmitter solana.PrivateKey,
-	messagingAccounts []ccip_offramp.CcipAccountMeta,
-	sourceChainSelector uint64,
-	tokenTransferAndOffchainData []ccip_offramp.TokenTransferAndOffchainData,
-	merkleRoot [32]uint8,
-	bufferID []byte,
-	tokenReceiver solana.PublicKey,
-	solanaGoClient *rpc.Client) (accounts []*solana.AccountMeta, lookUpTables []solana.PublicKey, tokenIndices []byte) {
-	derivedAccounts := []*solana.AccountMeta{}
-	askWith := []*solana.AccountMeta{}
-	stage := "Start"
-	for {
-		params := ccip_offramp.DeriveAccountsExecuteParams{
-			ExecuteCaller:       transmitter.PublicKey(),
-			MessageAccounts:     messagingAccounts,
-			SourceChainSelector: sourceChainSelector,
-			TokenTransfers:      tokenTransferAndOffchainData,
-			MerkleRoot:          merkleRoot,
-			BufferId:            bufferID,
-			TokenReceiver:       tokenReceiver,
-		}
-
-		deriveRaw := ccip_offramp.NewDeriveAccountsExecuteInstruction(
-			params,
-			stage,
-			config.OfframpConfigPDA,
-		)
-		deriveRaw.AccountMetaSlice = append(deriveRaw.AccountMetaSlice, askWith...)
-		derive, err := deriveRaw.ValidateAndBuild()
-		require.NoError(t, err)
-		tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{derive}, transmitter, config.DefaultCommitment)
-		derivation, err := common.ExtractAnchorTypedReturnValue[ccip_offramp.DeriveAccountsResponse](ctx, tx.Meta.LogMessages, config.CcipOfframpProgram.String())
-		require.NoError(t, err)
-
-		if derivation.CurrentStage == "TokenTransferAccounts/Start" {
-			// We offset the current index from the capacity of the default meta slice (the fixed accounts)
-			tokenIndex := len(derivedAccounts) - cap(ccip_offramp.NewExecuteInstructionBuilder().AccountMetaSlice)
-			tokenIndices = append(tokenIndices, byte(tokenIndex))
-		}
-
-		for _, meta := range derivation.AccountsToSave {
-			derivedAccounts = append(derivedAccounts, &solana.AccountMeta{
-				PublicKey:  meta.Pubkey,
-				IsWritable: meta.IsWritable,
-				IsSigner:   meta.IsSigner,
-			})
-		}
-
-		askWith = []*solana.AccountMeta{}
-		for _, meta := range derivation.AskAgainWith {
-			askWith = append(askWith, &solana.AccountMeta{
-				PublicKey:  meta.Pubkey,
-				IsWritable: meta.IsWritable,
-				IsSigner:   meta.IsSigner,
-			})
-		}
-
-		lookUpTables = append(lookUpTables, derivation.LookUpTablesToSave...)
-
-		if len(derivation.NextStage) == 0 {
-			return derivedAccounts, lookUpTables, tokenIndices
-		}
-		stage = derivation.NextStage
-	}
-}
-
-func deriveSendAccounts(ctx context.Context,
-	t *testing.T,
-	transmitter solana.PrivateKey,
-	message ccip_router.SVM2AnyMessage,
-	destChainSelector uint64,
-	solanaGoClient *rpc.Client) (accounts []*solana.AccountMeta, lookUpTables []solana.PublicKey, tokenIndices []uint8) {
-	derivedAccounts := []*solana.AccountMeta{}
-	askWith := []*solana.AccountMeta{}
-	stage := "Start"
-	tokenIndex := byte(0)
-	for {
-		params := ccip_router.DeriveAccountsCcipSendParams{
-			DestChainSelector: destChainSelector,
-			CcipSendCaller:    transmitter.PublicKey(),
-			Message:           message,
-		}
-
-		deriveRaw := ccip_router.NewDeriveAccountsCcipSendInstruction(
-			params,
-			stage,
-			config.RouterConfigPDA,
-		)
-		deriveRaw.AccountMetaSlice = append(deriveRaw.AccountMetaSlice, askWith...)
-		derive, err := deriveRaw.ValidateAndBuild()
-		require.NoError(t, err)
-		tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{derive}, transmitter, config.DefaultCommitment)
-		derivation, err := common.ExtractAnchorTypedReturnValue[ccip_router.DeriveAccountsResponse](ctx, tx.Meta.LogMessages, config.CcipRouterProgram.String())
-		require.NoError(t, err)
-
-		if derivation.CurrentStage == "TokenTransferStaticAccounts" {
-			tokenIndices = append(tokenIndices, tokenIndex)
-			tokenIndex += byte(len(derivation.AccountsToSave))
-		}
-
-		for _, meta := range derivation.AccountsToSave {
-			derivedAccounts = append(derivedAccounts, &solana.AccountMeta{
-				PublicKey:  meta.Pubkey,
-				IsWritable: meta.IsWritable,
-				IsSigner:   meta.IsSigner,
-			})
-		}
-		askWith = []*solana.AccountMeta{}
-		for _, meta := range derivation.AskAgainWith {
-			askWith = append(askWith, &solana.AccountMeta{
-				PublicKey:  meta.Pubkey,
-				IsWritable: meta.IsWritable,
-				IsSigner:   meta.IsSigner,
-			})
-		}
-		lookUpTables = append(lookUpTables, derivation.LookUpTablesToSave...)
-
-		if len(derivation.NextStage) == 0 {
-			return derivedAccounts, lookUpTables, tokenIndices
-		}
-		stage = derivation.NextStage
-	}
 }
