@@ -6,7 +6,10 @@ package contracts
 import (
 	"encoding/binary"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"net/http"
 	"strings"
 	"testing"
 
@@ -25,6 +28,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/ccip"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/eth"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 )
@@ -349,6 +353,7 @@ func TestCctpTpDevnet(t *testing.T) {
 		})
 
 		routerNoncesPDA, err := state.FindNoncePDA(chainSelector, admin.PublicKey(), referenceAddresses.Router)
+		fmt.Printf("Router Nonces PDA: %s\n", routerNoncesPDA)
 		require.NoError(t, err)
 
 		var nonces ccip_router.Nonce
@@ -374,7 +379,81 @@ func TestCctpTpDevnet(t *testing.T) {
 			},
 			cctpTpProgram,
 		)
+		fmt.Printf("Message Sent Event PDA: %s\n", messageSentEvent)
 		require.NoError(t, err)
+
+		type AttestationResponse struct {
+			Attestation string `json:"attestation"`
+			Status      string `json:"status"`
+		}
+
+		t.Run("Reclaim some accounts", func(t *testing.T) {
+			resp, err := client.GetAccountInfoWithOpts(
+				ctx,
+				messageSentEvent,
+				&rpc.GetAccountInfoOpts{
+					Commitment: config.DefaultCommitment,
+					DataSlice:  nil,
+				},
+			)
+			require.NoError(t, err)
+			bytes := resp.Value.Data.GetBinary()
+			messageBytes := bytes[44:]
+			messageHash := hex.EncodeToString(eth.Keccak256(messageBytes))
+
+			url := fmt.Sprintf("https://iris-api-sandbox.circle.com/v1/attestations/0x%s", messageHash)
+			req, err := http.NewRequest("GET", url, nil)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Accept", "application/json")
+
+			res, err := http.DefaultClient.Do(req)
+			require.NoError(t, err)
+			defer res.Body.Close()
+
+			body, err := ioutil.ReadAll(res.Body)
+			fmt.Printf("StatusCode: %d - Body: %s\n", res.StatusCode, body)
+
+			var attestation []byte
+
+			if res.StatusCode >= 200 && res.StatusCode < 300 {
+				fmt.Println("Success:", res.Status)
+				var attestationResponse AttestationResponse
+				err = json.Unmarshal(body, &attestationResponse)
+				fmt.Println("AttestationResponse:", attestationResponse)
+				require.NoError(t, err)
+
+				if attestationResponse.Status == "complete" {
+					fmt.Println("Attestation completed")
+					attestation, err = hex.DecodeString(attestationResponse.Attestation[2:]) // remove 0x prefix
+					require.NoError(t, err)
+					fmt.Println("Attestation:", attestation)
+				} else {
+					fmt.Println("Attestation not completed yet, retrying...")
+					t.Fail()
+				}
+			}
+
+			fmt.Printf("Message Hash: %s\n", messageHash)
+			fmt.Printf("Attestation: %s\n", hex.EncodeToString(attestation))
+
+			ix, err := cctp_token_pool.NewReclaimEventAccountInstruction(
+				usdcMint,
+				admin.PublicKey(),
+				chainSelector,
+				nonces.TotalNonce+1,
+				attestation,
+				cctpPool.state,
+				cctpPool.signer,
+				messageSentEvent,
+				messageTransmitter.messageTransmitter,
+				messageTransmitter.program,
+				admin.PublicKey(),
+				solana.SystemProgramID,
+			).ValidateAndBuild()
+
+			testutils.SendAndConfirm(ctx, t, client, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+		})
 
 		t.Run("Create Lookup Table", func(t *testing.T) {
 			// t.Skip()
