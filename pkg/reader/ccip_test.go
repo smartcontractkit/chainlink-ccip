@@ -376,9 +376,10 @@ func TestCCIPChainReader_ExecutedStateEvent_WithInvalidStates(t *testing.T) {
 		primitives.Unconfirmed,
 	)
 	require.NoError(t, err)
-	require.Len(t, results, 2)
+	require.Len(t, results, 3)
 
 	require.Equal(t, cciptypes.SeqNum(2), results[chainB][0])
+	require.Equal(t, cciptypes.SeqNum(3), results[chainC][0])
 	require.Equal(t, cciptypes.SeqNum(4), results[chainD][0])
 }
 
