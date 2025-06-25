@@ -215,22 +215,22 @@ type RMNCurseResponse struct {
 func printReports(lggr logger.Logger, reports []cciptypes.CommitPluginReportWithMeta) {
 	tokenPriceUpdates := 0
 	gasPriceUpdates := 0
-	var truncatedReports []cciptypes.CommitPluginReportWithMeta
+	var reportsWithRoots []cciptypes.CommitPluginReportWithMeta
 	for _, report := range reports {
 		gasPriceUpdates += len(report.Report.PriceUpdates.GasPriceUpdates)
 		tokenPriceUpdates += len(report.Report.PriceUpdates.TokenPriceUpdates)
 
-		if len(report.Report.UnblessedMerkleRoots) > 0 || len(report.Report.BlessedMerkleRoots) > 0 {
+		if !report.Report.HasNoRoots() {
 			// remove price updates from the report.
 			cp := report
 			cp.Report.PriceUpdates = cciptypes.PriceUpdates{}
-			truncatedReports = append(truncatedReports, cp)
+			reportsWithRoots = append(reportsWithRoots, cp)
 		}
 	}
 	lggr.Debugw("decoded commit reports",
 		"numTokenPriceUpdates", tokenPriceUpdates,
 		"numGasPriceUpdates", gasPriceUpdates,
-		"reports", truncatedReports)
+		"reportsWithRoots", reportsWithRoots)
 }
 
 func (r *ccipChainReader) CommitReportsGTETimestamp(

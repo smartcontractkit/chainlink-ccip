@@ -36,8 +36,7 @@ type CommitPluginReport struct {
 func (r CommitPluginReport) IsEmpty() bool {
 	return len(r.BlessedMerkleRoots) == 0 &&
 		len(r.UnblessedMerkleRoots) == 0 &&
-		len(r.PriceUpdates.TokenPriceUpdates) == 0 &&
-		len(r.PriceUpdates.GasPriceUpdates) == 0
+		r.PriceUpdates.IsEmpty()
 }
 
 func (r CommitPluginReport) HasNoRoots() bool {
@@ -70,6 +69,10 @@ func (m MerkleRootChain) Equals(other MerkleRootChain) bool {
 type PriceUpdates struct {
 	TokenPriceUpdates []TokenPrice    `json:"tokenPriceUpdates"`
 	GasPriceUpdates   []GasPriceChain `json:"gasPriceUpdates"`
+}
+
+func (pu PriceUpdates) IsEmpty() bool {
+	return len(pu.TokenPriceUpdates) == 0 && len(pu.GasPriceUpdates) == 0
 }
 
 // CommitReportInfo is the info data that will be sent with the along with the report
