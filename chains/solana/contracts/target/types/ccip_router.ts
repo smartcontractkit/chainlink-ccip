@@ -898,6 +898,51 @@ export type CcipRouter = {
       ]
     },
     {
+      "name": "upgradeTokenAdminRegistryFromV1",
+      "docs": [
+        "Upgrades the Token Admin Registry from version 1 to the current version.",
+        "",
+        "Anyone may invoke this method, as the upgrade has safe defaults for any new value,",
+        "and those can then be changed by the Token Admin Registry Admin via separate instructions.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for the upgrade."
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenAdminRegistry",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "types Anchor would attempt to deserialize the data _before_ realloc'ing it, which would fail.",
+            "The code will load it and realloc it to the new size manually, and migrate its data."
+          ]
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "setPool",
       "docs": [
         "Sets the pool lookup table for a given token mint.",
@@ -3173,6 +3218,51 @@ export const IDL: CcipRouter = {
           "type": "bool"
         }
       ]
+    },
+    {
+      "name": "upgradeTokenAdminRegistryFromV1",
+      "docs": [
+        "Upgrades the Token Admin Registry from version 1 to the current version.",
+        "",
+        "Anyone may invoke this method, as the upgrade has safe defaults for any new value,",
+        "and those can then be changed by the Token Admin Registry Admin via separate instructions.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for the upgrade."
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenAdminRegistry",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "types Anchor would attempt to deserialize the data _before_ realloc'ing it, which would fail.",
+            "The code will load it and realloc it to the new size manually, and migrate its data."
+          ]
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
     },
     {
       "name": "setPool",

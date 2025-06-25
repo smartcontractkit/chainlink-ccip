@@ -377,37 +377,12 @@ func TestCctpTpDevnet(t *testing.T) {
 		require.NoError(t, err)
 
 		t.Run("Create Lookup Table", func(t *testing.T) {
+			// t.Skip()
+
 			tpLookupTableAddr, err = common.CreateLookupTable(ctx, client, admin)
 			require.NoError(t, err)
 
-			// // // These are the "real" static-only entries
-			// entries := solana.PublicKeySlice{
-			// 	tpLookupTableAddr,
-			// 	tokenAdminRegistry,
-			// 	cctpPool.program,
-			// 	cctpPool.state,
-			// 	cctpPool.tokenAccount,
-			// 	cctpPool.signer,
-			// 	solana.TokenProgramID,
-			// 	usdcMint,
-			// 	fqUsdcBillingTokenConfig,
-			// 	routerSigner,
-			// 	// -- CCTP custom entries --
-			// 	tokenMessengerMinter.authorityPda,
-			// 	messageTransmitter.messageTransmitter,
-			// 	tokenMessengerMinter.tokenMessenger,
-			// 	tokenMessengerMinter.tokenMinter,
-			// 	tokenMessengerMinter.localToken,
-			// 	messageTransmitter.program,
-			// 	tokenMessengerMinter.program,
-			// 	tokenMessengerMinter.eventAuthority,
-			//
-			// 	messageTransmitter.authorityPda,
-			// 	messageTransmitter.eventAuthority,
-			// 	tokenMessengerMinter.custodyTokenAccount,
-			// }
-
-			// These are the "test" static+variable entries
+			// These are the "real" static-only entries
 			entries := solana.PublicKeySlice{
 				tpLookupTableAddr,
 				tokenAdminRegistry,
@@ -429,10 +404,38 @@ func TestCctpTpDevnet(t *testing.T) {
 				tokenMessengerMinter.program,
 				solana.SystemProgramID,
 				tokenMessengerMinter.eventAuthority,
-				// -- CCTP variable entries for LockOrBurn --
-				tokenMessengerMinter.remoteTokenMessenger,
-				messageSentEvent, // 20 - writable
+
+				// messageTransmitter.authorityPda,
+				// messageTransmitter.eventAuthority,
+				// tokenMessengerMinter.custodyTokenAccount,
 			}
+
+			// // These are the "test" static+variable entries
+			// entries := solana.PublicKeySlice{
+			// 	tpLookupTableAddr,
+			// 	tokenAdminRegistry,
+			// 	cctpPool.program,
+			// 	cctpPool.state,        // 3 - writable
+			// 	cctpPool.tokenAccount, // 4 - writable
+			// 	cctpPool.signer,       // 5 - writable (to pay for event account)
+			// 	solana.TokenProgramID,
+			// 	usdcMint, // 7 - writable
+			// 	fqUsdcBillingTokenConfig,
+			// 	routerSigner,
+			// 	// -- CCTP custom entries --
+			// 	tokenMessengerMinter.authorityPda,
+			// 	messageTransmitter.messageTransmitter, // 11 - writable
+			// 	tokenMessengerMinter.tokenMessenger,
+			// 	tokenMessengerMinter.tokenMinter,
+			// 	tokenMessengerMinter.localToken, // 14 - writable
+			// 	messageTransmitter.program,
+			// 	tokenMessengerMinter.program,
+			// 	solana.SystemProgramID,
+			// 	tokenMessengerMinter.eventAuthority,
+			// 	// -- CCTP variable entries for LockOrBurn --
+			// 	tokenMessengerMinter.remoteTokenMessenger,
+			// 	messageSentEvent, // 20 - writable
+			// }
 
 			tpLookupTable = map[solana.PublicKey]solana.PublicKeySlice{
 				tpLookupTableAddr: entries,
@@ -446,8 +449,33 @@ func TestCctpTpDevnet(t *testing.T) {
 
 		writableIndexes := []byte{3, 4, 5, 7, 11, 14, 20}
 
+		t.Run("Upgrade TokenAdminRegistry", func(t *testing.T) {
+			t.Skip()
+
+			ix, err := ccip_router.NewUpgradeTokenAdminRegistryFromV1Instruction(
+				routerConfig,
+				tokenAdminRegistry,
+				usdcMint,
+				admin.PublicKey(),
+				solana.SystemProgramID,
+			).ValidateAndBuild()
+			require.NoError(t, err)
+			testutils.SendAndConfirm(ctx, t, client, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+		})
+
 		t.Run("SetPool", func(t *testing.T) {
-			ix, err := ccip_router.NewSetPoolInstruction(
+			// t.Skip()
+
+			autoDerivationIx, err := ccip_router.NewSetPoolSupportsAutoDerivationInstruction(
+				usdcMint,
+				true,
+				routerConfig,
+				tokenAdminRegistry,
+				admin.PublicKey(),
+			).ValidateAndBuild()
+			require.NoError(t, err)
+
+			poolIx, err := ccip_router.NewSetPoolInstruction(
 				writableIndexes,
 				routerConfig,
 				tokenAdminRegistry,
@@ -457,7 +485,7 @@ func TestCctpTpDevnet(t *testing.T) {
 			).ValidateAndBuild()
 			require.NoError(t, err)
 
-			testutils.SendAndConfirm(ctx, t, client, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+			testutils.SendAndConfirm(ctx, t, client, []solana.Instruction{autoDerivationIx, poolIx}, admin, config.DefaultCommitment)
 		})
 
 		t.Run("CCIP Send", func(t *testing.T) {
@@ -544,6 +572,10 @@ func TestCctpTpDevnet(t *testing.T) {
 				solana.Meta(cctpPool.chainConfig).WRITE(),
 			)
 			raw.AccountMetaSlice = append(raw.AccountMetaSlice, tpAltEntries...)
+			raw.AccountMetaSlice = append(raw.AccountMetaSlice,
+				solana.Meta(tokenMessengerMinter.remoteTokenMessenger),
+				solana.Meta(messageSentEvent).WRITE(),
+			)
 
 			ix, err := raw.ValidateAndBuild()
 			require.NoError(t, err)

@@ -1,10 +1,13 @@
-use anchor_lang::prelude::*;
+use anchor_lang::{prelude::*, system_program, Discriminator};
 use anchor_spl::associated_token::get_associated_token_address_with_program_id;
-use ccip_common::seed;
 use solana_program::{address_lookup_table::state::AddressLookupTable, log::sol_log};
 
+use ccip_common::router_accounts::TokenAdminRegistry;
+use ccip_common::seed::{self};
+
+use crate::context::ANCHOR_DISCRIMINATOR;
 use crate::events::token_admin_registry as events;
-use crate::instructions::interfaces::TokenAdminRegistry;
+use crate::instructions::interfaces::TokenAdminRegistry as TokenAdminRegistryTrait;
 use crate::token_admin_registry_writable;
 use crate::token_context::{
     OverridePendingTokenAdminRegistryByCCIPAdmin, OverridePendingTokenAdminRegistryByOwner,
@@ -19,7 +22,7 @@ use crate::{
 const MINIMUM_TOKEN_POOL_ACCOUNTS: usize = 9;
 
 pub struct Impl;
-impl TokenAdminRegistry for Impl {
+impl TokenAdminRegistryTrait for Impl {
     fn ccip_admin_propose_administrator(
         &self,
         ctx: Context<RegisterTokenAdminRegistryByCCIPAdmin>,
@@ -150,15 +153,67 @@ impl TokenAdminRegistry for Impl {
         &self,
         ctx: Context<UpgradeTokenAdminRegistry>,
     ) -> Result<()> {
-        let token_admin_registry = &mut ctx.accounts.token_admin_registry;
+        let acc_info = ctx.accounts.token_admin_registry.to_account_info();
 
-        // Upgrade from v1 to v2 (already checked in the context)
+        // Validate the account to upgrade (the context already checks initialization and size)
+        {
+            msg!("Validating account to upgrade...");
+            let data = acc_info.try_borrow_data()?;
+            require!(
+                data[..8] == TokenAdminRegistry::DISCRIMINATOR,
+                CcipRouterError::InvalidInputsTokenAdminRegistryAccounts
+            );
+            require_eq!(
+                data[8], // version byte
+                1,
+                CcipRouterError::InvalidInputsTokenAdminRegistryAccounts
+            );
+        }
+
+        // Extend the account to the new size (realloc)
+        {
+            msg!("Extending account...");
+            let required_space = ANCHOR_DISCRIMINATOR + TokenAdminRegistry::INIT_SPACE;
+            let minimum_balance = Rent::get()?.minimum_balance(required_space);
+            let current_lamports = acc_info.lamports();
+
+            if current_lamports < minimum_balance {
+                system_program::transfer(
+                    CpiContext::new(
+                        ctx.accounts.system_program.to_account_info(),
+                        system_program::Transfer {
+                            from: ctx.accounts.authority.to_account_info(),
+                            to: acc_info.clone(),
+                        },
+                    ),
+                    minimum_balance.checked_sub(current_lamports).unwrap(),
+                )?;
+            }
+            acc_info.realloc(required_space, false)?;
+        }
+
+        let mut token_admin_registry: TokenAdminRegistry;
+
+        // Load realloc'd data
+        {
+            msg!("Deserialize account...");
+            let data = acc_info.try_borrow_data()?;
+            let mut data: &[u8] = &data;
+
+            token_admin_registry = TokenAdminRegistry::try_deserialize(&mut data)?;
+        }
+
+        // Upgrade data from v1 to v2
         token_admin_registry.version = 2;
-        // Set backwards-compatible value (false). It can be upgraded via a different method by the owner afterwards.
-        token_admin_registry.supports_auto_derivation = false;
+        token_admin_registry.supports_auto_derivation = false; // Safe default value.
+                                                               // Upgradeable by its admin later with other methods
+
+        // Persist the upgraded account data
+        msg!("Re-serialize account...");
+        token_admin_registry.try_serialize(&mut &mut acc_info.try_borrow_mut_data()?[..])?;
 
         emit!(crate::events::PdaUpgraded {
-            address: token_admin_registry.key(),
+            address: acc_info.key(),
             old_version: 1,
             new_version: 2,
             name: "TokenAdminRegistry".to_string(),
@@ -277,7 +332,7 @@ impl TokenAdminRegistry for Impl {
 }
 
 fn init_with_pending_administrator(
-    token_admin_registry: &mut Account<'_, ccip_common::router_accounts::TokenAdminRegistry>,
+    token_admin_registry: &mut Account<'_, TokenAdminRegistry>,
     token_mint: Pubkey,
     new_admin: Pubkey,
 ) -> Result<()> {
@@ -287,7 +342,7 @@ fn init_with_pending_administrator(
         CcipRouterError::InvalidTokenAdminRegistryInputsZeroAddress
     );
 
-    token_admin_registry.set_inner(ccip_common::router_accounts::TokenAdminRegistry {
+    token_admin_registry.set_inner(TokenAdminRegistry {
         version: 2,
         administrator: Pubkey::new_from_array([0; 32]),
         pending_administrator: new_admin,

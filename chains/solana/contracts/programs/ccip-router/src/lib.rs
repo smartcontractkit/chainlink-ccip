@@ -436,6 +436,21 @@ pub mod ccip_router {
             .set_pool_supports_auto_derivation(ctx, mint, supports_auto_derivation)
     }
 
+    /// Upgrades the Token Admin Registry from version 1 to the current version.
+    ///
+    /// Anyone may invoke this method, as the upgrade has safe defaults for any new value,
+    /// and those can then be changed by the Token Admin Registry Admin via separate instructions.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for the upgrade.
+    pub fn upgrade_token_admin_registry_from_v1(
+        ctx: Context<UpgradeTokenAdminRegistry>,
+    ) -> Result<()> {
+        router::token_admin_registry(ctx.accounts.config.default_code_version)
+            .upgrade_token_admin_registry_from_v1(ctx)
+    }
+
     /// Sets the pool lookup table for a given token mint.
     ///
     /// The administrator of the token admin registry can set the pool lookup table for a given token mint.

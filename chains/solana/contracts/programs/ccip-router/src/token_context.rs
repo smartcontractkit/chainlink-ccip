@@ -204,17 +204,18 @@ pub struct UpgradeTokenAdminRegistry<'info> {
     )]
     pub config: Account<'info, Config>,
 
+    /// CHECK: The token admin registry PDA to upgrade. It is an UncheckedAccount because for regular Account
+    /// types Anchor would attempt to deserialize the data _before_ realloc'ing it, which would fail.
+    /// The code will load it and realloc it to the new size manually, and migrate its data.
     #[account(
         mut,
         seeds = [seed::TOKEN_ADMIN_REGISTRY, mint.key().as_ref()],
         bump,
-        constraint = token_admin_registry.version == 1 @ CcipRouterError::InvalidVersion, // only migrate from version 1
-        realloc = ANCHOR_DISCRIMINATOR + TokenAdminRegistry::INIT_SPACE,
-        realloc::payer = authority,
-        realloc::zero = true, // it could be `false` while there's a single migration, but we leave it as `true` for
-                              // future-proofing in case we ever have more migrations, and the extra cost is negligible
+        owner = crate::ID, // this checks it was initialized
+        // this checks that the size is consistent with the v1 version
+        constraint = token_admin_registry.data_len() == ccip_common::v1::V1_TOKEN_ADMIN_REGISTRY_SIZE @ CcipRouterError::InvalidInputsTokenAdminRegistryAccounts
     )]
-    pub token_admin_registry: Account<'info, TokenAdminRegistry>,
+    pub token_admin_registry: UncheckedAccount<'info>, // unchecked, as the code will load it and realloc it
 
     pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
 

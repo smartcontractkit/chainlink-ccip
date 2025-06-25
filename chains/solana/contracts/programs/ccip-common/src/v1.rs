@@ -11,7 +11,7 @@ use crate::{
 pub const MIN_TOKEN_POOL_ACCOUNTS: usize = 13; // see TokenAccounts struct for all required accounts
 const U160_MAX: U256 = U256::from_words(u32::MAX as u128, u128::MAX);
 const EVM_PRECOMPILE_SPACE: u32 = 1024;
-const V1_TOKEN_ADMIN_REGISTRY_SIZE: usize = 169; // for migration v1->v2 of the TokenAdminRegistry, which adds the `supports_auto_derivation` field.
+pub const V1_TOKEN_ADMIN_REGISTRY_SIZE: usize = 169; // for migration v1->v2 of the TokenAdminRegistry, which adds the `supports_auto_derivation` field.
 
 pub struct TokenAccounts<'a> {
     pub user_token_account: &'a AccountInfo<'a>,
