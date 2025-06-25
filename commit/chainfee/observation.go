@@ -70,7 +70,7 @@ func (p *processor) Observation(
 			mapset.NewSet(maps.Keys(nativeTokenPrices)...),
 		)
 
-	lggr.Debugw("observed fee components",
+	lggr.Infow("observed fee components",
 		"feeComponents", feeComponents,
 		"nativeTokenPrices", nativeTokenPrices,
 		"chainFeeUpdates", chainFeeUpdates,
@@ -81,7 +81,7 @@ func (p *processor) Observation(
 	)
 
 	if len(chainsWithNativeTokenPrices.ToSlice()) == 0 {
-		lggr.Debugw("don't have any chains with native token prices",
+		lggr.Infow("don't have any chains with native token prices",
 			"chainsWithoutNativeTokenPrices", chainsWithoutNativeTokenPrices.ToSlice())
 		return Observation{
 			FChain:          fChain,

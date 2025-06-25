@@ -111,7 +111,7 @@ func Test_validateMerkleRootsState(t *testing.T) {
 
 			reader.EXPECT().GetOffRampSourceChainsConfig(ctx, chains).Return(sourceChainConfig, nil).Maybe()
 
-			err := ValidateMerkleRootsState(ctx, rep.BlessedMerkleRoots, rep.UnblessedMerkleRoots, reader)
+			err := ValidateMerkleRootsFreshness(ctx, rep.BlessedMerkleRoots, rep.UnblessedMerkleRoots, reader)
 			if tc.expErr {
 				assert.Error(t, err)
 				return

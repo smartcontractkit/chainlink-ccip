@@ -51,8 +51,10 @@ func (p *Plugin) observationOld(
 			return nil, fmt.Errorf("encode discovery observation: %w, observation: %+v", err, obs)
 		}
 
-		lggr.Infow("contracts not initialized, only making discovery observations", "discoveryObs", discoveryObs)
-		lggr.Infow("commit plugin making observation", "encodedObservation", encoded, "observation", obs)
+		lggr.Infow("contracts not initialized, only making discovery observations")
+		logutil.LogWhenExceedFrequency(&p.lastStateLog, stateLoggingFrequency, func() {
+			lggr.Infow("Commit plugin making observation", "encodedObservation", encoded, "observation", obs)
+		})
 
 		return encoded, nil
 	}
@@ -93,7 +95,7 @@ func (p *Plugin) observationOld(
 		return nil, fmt.Errorf("encode observation: %w, observation: %+v, seq nr: %d", err, obs, outCtx.SeqNr)
 	}
 
-	lggr.Debugw("Commit plugin making observation", "encodedObservation", encoded, "observation", obs)
+	lggr.Infow("Commit plugin making observation", "encodedObservation", encoded, "observation", obs)
 	return encoded, nil
 }
 

@@ -44,7 +44,7 @@ func (p *Processor) Outcome(
 		return Outcome{}, err
 	}
 
-	lggr.Debugw(SendingOutcome,
+	lggr.Infow(SendingOutcome,
 		"outcome", outcome, "nextState", nextState, "outcomeDuration", time.Since(tStart))
 	return outcome, nil
 }

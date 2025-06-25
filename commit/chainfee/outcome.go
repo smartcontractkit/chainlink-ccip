@@ -102,7 +102,7 @@ func (p *processor) Outcome(
 		return gasPrices[i].ChainSel < gasPrices[j].ChainSel
 	})
 
-	lggr.Debugw("Gas Prices Outcome",
+	lggr.Infow("Gas Prices Outcome",
 		"gasPrices", gasPrices,
 		"consensusTimestamp", consensusObs.TimestampNow,
 	)
@@ -318,11 +318,16 @@ func (p *processor) getGasPricesToUpdate(
 				ChainSel: chain,
 				GasPrice: packedFee,
 			})
-		} else {
-			lggr.Debugw("chain fee update not needed: within deviation thresholds",
-				"executionFeeDeviationPPB", feeConfig.GasPriceDeviationPPB,
-				"dataAvFeeDeviationPPB", feeConfig.DAGasPriceDeviationPPB)
+			continue
 		}
+
+		lggr.Infow("chain fee update not needed",
+			"chain", chain,
+			"currentChainFee", currentChainFee,
+			"lastUpdateTimestamp", lastUpdate.Timestamp,
+			"currentTimestamp", consensusTimestamp,
+			"executionFeeDeviationPPB", feeConfig.GasPriceDeviationPPB,
+			"dataAvFeeDeviationPPB", feeConfig.DAGasPriceDeviationPPB)
 	}
 
 	return gasPrices

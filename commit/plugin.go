@@ -248,7 +248,7 @@ func (p *Plugin) Observation(
 	ctx context.Context, outCtx ocr3types.OutcomeContext, q types.Query,
 ) (types.Observation, error) {
 	if p.offchainCfg.DonBreakingChangesVersion < pluginconfig.DonBreakingChangesVersion1RoleDonSupport {
-		p.lggr.Debugw("running old observation")
+		p.lggr.Info("running old observation")
 		return p.observationOld(ctx, outCtx, q)
 	}
 
@@ -277,8 +277,10 @@ func (p *Plugin) Observation(
 			return nil, fmt.Errorf("encode discovery observation: %w, observation: %+v", err, obs)
 		}
 
-		lggr.Debugw("contracts not initialized, only making discovery observations", "discoveryObs", discoveryObs)
-		lggr.Debugw("commit plugin making observation", "encodedObservation", encoded, "observation", obs)
+		lggr.Infow("contracts not initialized, only making discovery observations")
+		logutil.LogWhenExceedFrequency(&p.lastStateLog, stateLoggingFrequency, func() {
+			lggr.Infow("Commit plugin making observation", "encodedObservation", encoded, "observation", obs)
+		})
 
 		return encoded, nil
 	}
@@ -332,7 +334,7 @@ func (p *Plugin) Observation(
 		return nil, fmt.Errorf("encode observation: %w, observation: %+v, seq nr: %d", err, obs, outCtx.SeqNr)
 	}
 
-	lggr.Debugw("Commit plugin making observation", "encodedObservation", encoded, "observation", obs)
+	lggr.Infow("Commit plugin making observation", "encodedObservation", encoded, "observation", obs)
 	return encoded, nil
 }
 
@@ -408,7 +410,7 @@ func (p *Plugin) Outcome(
 	ctx context.Context, outCtx ocr3types.OutcomeContext, q types.Query, aos []types.AttributedObservation,
 ) (ocr3types.Outcome, error) {
 	if p.offchainCfg.DonBreakingChangesVersion < pluginconfig.DonBreakingChangesVersion1RoleDonSupport {
-		p.lggr.Debugw("running old outcome")
+		p.lggr.Info("running old outcome")
 		return p.outcomeOld(ctx, outCtx, q, aos)
 	}
 
@@ -540,7 +542,7 @@ func (p *Plugin) Outcome(
 	}
 	p.metricsReporter.TrackOutcome(out)
 
-	lggr.Debugw("Commit plugin finished outcome", "outcome", out)
+	lggr.Infow("Commit plugin finished outcome", "outcome", out)
 	return p.ocrTypeCodec.EncodeOutcome(out)
 }
 
