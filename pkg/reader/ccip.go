@@ -456,41 +456,60 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 	//
 	//nolint:lll
 	prices := make(map[cciptypes.ChainSelector]cciptypes.BigInt)
-	for _, chain := range selectors {
-		chainAccessor, err := getChainAccessor(r.accessors, chain)
-		if err != nil {
-			lggr.Errorw("chain accessor not found, chain native price skipped", "chain", chain, "err", err)
-			continue
-		}
 
-		config, err := r.configPoller.GetChainConfig(ctx, chain)
-		if err != nil {
-			lggr.Warnw("failed to get chain config for native token address", "chain", chain, "err", err)
-			continue
-		}
-		nativeTokenAddress := config.Router.WrappedNativeAddress
+	var wg sync.WaitGroup
+	var mu sync.Mutex
 
-		if cciptypes.UnknownAddress(nativeTokenAddress).IsZeroOrEmpty() {
-			lggr.Warnw("Native token address is zero or empty. Ignore for disabled chains otherwise "+
-				"check for router misconfiguration", "chain", chain, "address", nativeTokenAddress.String())
-			continue
-		}
-		price, err := chainAccessor.GetTokenPriceUSD(ctx, cciptypes.UnknownAddress(nativeTokenAddress))
-		if err != nil {
-			lggr.Errorw("failed to get native token price", "chain", chain, "address", nativeTokenAddress.String(), "err", err)
-			continue
-		}
+	for _, chainSelector := range selectors {
+		// Capture loop variable
+		chain := chainSelector
 
-		if price.Timestamp == 0 {
-			lggr.Warnw("no native token price available", "chain", chain)
-			continue
-		}
-		if price.Value == nil || price.Value.Cmp(big.NewInt(0)) <= 0 {
-			lggr.Errorw("native token price is nil or non-positive", "chain", chain)
-			continue
-		}
-		prices[chain] = cciptypes.NewBigInt(price.Value)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			chainAccessor, err := getChainAccessor(r.accessors, chain)
+			if err != nil {
+				lggr.Errorw("chain accessor not found, chain native price skipped", "chain", chain, "err", err)
+				return
+			}
+
+			config, err := r.configPoller.GetChainConfig(ctx, chain)
+			if err != nil {
+				lggr.Warnw("failed to get chain config for native token address", "chain", chain, "err", err)
+				return
+			}
+			nativeTokenAddress := config.Router.WrappedNativeAddress
+
+			if cciptypes.UnknownAddress(nativeTokenAddress).IsZeroOrEmpty() {
+				lggr.Warnw("Native token address is zero or empty. Ignore for disabled chains otherwise "+
+					"check for router misconfiguration", "chain", chain, "address", nativeTokenAddress.String())
+				return
+			}
+
+			price, err := chainAccessor.GetTokenPriceUSD(ctx, cciptypes.UnknownAddress(nativeTokenAddress))
+			if err != nil {
+				lggr.Errorw("failed to get native token price", "chain", chain, "address", nativeTokenAddress.String(), "err", err)
+				return
+			}
+
+			if price.Timestamp == 0 {
+				lggr.Warnw("no native token price available", "chain", chain)
+				return
+			}
+			if price.Value == nil || price.Value.Cmp(big.NewInt(0)) <= 0 {
+				lggr.Errorw("native token price is nil or non-positive", "chain", chain)
+				return
+			}
+
+			mu.Lock()
+			prices[chain] = cciptypes.NewBigInt(price.Value)
+			mu.Unlock()
+		}()
 	}
+
+	wg.Wait()
+
 	return prices
 }
 
@@ -527,8 +546,6 @@ func (r *ccipChainReader) buildSigners(signers []signer) []cciptypes.RemoteSigne
 }
 
 func (r *ccipChainReader) GetRMNRemoteConfig(ctx context.Context) (cciptypes.RemoteConfig, error) {
-	lggr := logutil.WithContextValues(ctx, r.lggr)
-
 	if err := validateReaderExistence(r.contractReaders, r.destChain); err != nil {
 		return cciptypes.RemoteConfig{}, fmt.Errorf("validate dest=%d extended reader existence: %w", r.destChain, err)
 	}
@@ -549,7 +566,7 @@ func (r *ccipChainReader) GetRMNRemoteConfig(ctx context.Context) (cciptypes.Rem
 		return cciptypes.RemoteConfig{}, fmt.Errorf("get RMNRemote proxy contract address: %w", err)
 	}
 
-	rmnRemoteAddress, err := r.getRMNRemoteAddress(ctx, lggr, r.destChain, proxyContractAddress)
+	rmnRemoteAddress, err := r.getRMNRemoteAddress(ctx, r.destChain, proxyContractAddress)
 	if err != nil {
 		return cciptypes.RemoteConfig{}, fmt.Errorf("get RMNRemote address: %w", err)
 	}
@@ -794,21 +811,14 @@ func (r *ccipChainReader) Sync(ctx context.Context, contracts ContractAddresses)
 				return nil
 			}
 
-			// the extended reader will do nothing if the contract is already bound.
-			_, err := bindReaderContract(
-				ctx,
-				lggr,
-				r.contractReaders,
-				chainSelector,
-				boundContract.name,
-				boundContract.address,
-				r.addrCodec)
-			if err != nil {
-				if errors.Is(err, ErrContractReaderNotFound) {
-					// don't support this chain, nothing to do.
-					return nil
-				}
+			chainAccessor, err := getChainAccessor(r.accessors, chainSelector)
+			if err != nil && errors.Is(err, ErrChainAccessorNotFound) {
+				// don't support this chain, nothing to do.
+				return nil
+			}
 
+			err = chainAccessor.Sync(ctx, boundContract.name, boundContract.address)
+			if err != nil {
 				return fmt.Errorf("bind reader contract %s on chain %s: %w", boundContract.name, chainSelector, err)
 			}
 
@@ -1129,12 +1139,15 @@ type versionedConfig struct {
 //nolint:lll
 func (r *ccipChainReader) getRMNRemoteAddress(
 	ctx context.Context,
-	lggr logger.Logger,
 	chain cciptypes.ChainSelector,
 	rmnRemoteProxyAddress []byte) ([]byte, error) {
-	_, err := bindReaderContract(ctx, lggr, r.contractReaders, chain, consts.ContractNameRMNProxy, rmnRemoteProxyAddress, r.addrCodec)
+	chainAccessor, err := getChainAccessor(r.accessors, chain)
 	if err != nil {
-		return nil, fmt.Errorf("bind RMN proxy contract: %w", err)
+		return nil, fmt.Errorf("unable to getChainAccessor: %w", err)
+	}
+	err = chainAccessor.Sync(ctx, consts.ContractNameRMNProxy, rmnRemoteProxyAddress)
+	if err != nil {
+		return nil, fmt.Errorf("sync RMN proxy contract: %w", err)
 	}
 
 	// Get the address from cache instead of making a contract call

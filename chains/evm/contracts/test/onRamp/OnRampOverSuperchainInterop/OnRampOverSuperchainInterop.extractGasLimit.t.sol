@@ -6,113 +6,35 @@ import {OnRampOverSuperchainInterop} from "../../../onRamp/OnRampOverSuperchainI
 import {OnRampOverSuperchainInteropSetup} from "./OnRampOverSuperchainInteropSetup.t.sol";
 
 contract OnRampOverSuperchainInterop_extractGasLimit is OnRampOverSuperchainInteropSetup {
-  function _generateEVMExtraArgsV1(
-    uint256 gasLimit
-  ) internal pure returns (bytes memory) {
-    Client.EVMExtraArgsV1 memory extraArgs = Client.EVMExtraArgsV1({gasLimit: gasLimit});
-    return Client._argsToBytes(extraArgs);
-  }
-
-  function _generateGenericExtraArgsV2(
-    uint256 gasLimit,
-    bool allowOutOfOrderExecution
-  ) internal pure returns (bytes memory) {
-    Client.GenericExtraArgsV2 memory extraArgs =
-      Client.GenericExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: allowOutOfOrderExecution});
-    return Client._argsToBytes(extraArgs);
-  }
-
-  function _generateExtraArgsWithAdditionalData(
-    uint256 gasLimit,
-    bytes memory additionalData
-  ) internal pure returns (bytes memory) {
-    bytes4 selector = bytes4(keccak256("extraArgs"));
-    return abi.encodeWithSelector(selector, gasLimit, additionalData);
-  }
-
-  function _generateShortExtraArgs(
-    uint256 length
-  ) internal pure returns (bytes memory) {
-    bytes memory shortArgs = new bytes(length);
-    for (uint256 i = 0; i < length; i++) {
-      shortArgs[i] = bytes1(uint8(i % 256));
-    }
-    return shortArgs;
-  }
-
-  function test_EVMExtraArgsV1() public view {
+  function test_extractGasLimit() public view {
     uint256 expectedGasLimit = 200000;
-    bytes memory extraArgs = _generateEVMExtraArgsV1(expectedGasLimit);
+    bytes memory extraArgs = Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: expectedGasLimit}));
 
-    uint256 actualGasLimit = s_onRampOverSuperchainInterop.extractGasLimit(extraArgs);
+    assertEq(expectedGasLimit, s_onRampOverSuperchainInterop.extractGasLimit(extraArgs));
 
-    assertEq(actualGasLimit, expectedGasLimit);
+    extraArgs =
+      Client._argsToBytes(Client.GenericExtraArgsV2({gasLimit: expectedGasLimit, allowOutOfOrderExecution: false}));
+    assertEq(expectedGasLimit, s_onRampOverSuperchainInterop.extractGasLimit(extraArgs));
   }
 
-  function test_GenericExtraArgsV2() public view {
-    uint256 expectedGasLimit = 200000;
-    bytes memory extraArgs = _generateGenericExtraArgsV2(expectedGasLimit, false);
+  function testFuzz_extractGasLimit_VariousGasLimitAndDataSize(uint256 gasLimit, uint256 length) public view {
+    length = bound(length, 0, 10_000);
 
-    uint256 actualGasLimit = s_onRampOverSuperchainInterop.extractGasLimit(extraArgs);
-
-    assertEq(actualGasLimit, expectedGasLimit);
-  }
-
-  function test_ZeroGasLimit() public view {
-    uint256 expectedGasLimit = 0;
-    bytes memory extraArgs = _generateEVMExtraArgsV1(expectedGasLimit);
-
-    uint256 actualGasLimit = s_onRampOverSuperchainInterop.extractGasLimit(extraArgs);
-
-    assertEq(actualGasLimit, expectedGasLimit);
-  }
-
-  function test_MaximumGasLimit() public view {
-    uint256 expectedGasLimit = type(uint256).max;
-    bytes memory extraArgs = _generateGenericExtraArgsV2(expectedGasLimit, true);
-
-    uint256 actualGasLimit = s_onRampOverSuperchainInterop.extractGasLimit(extraArgs);
-
-    assertEq(actualGasLimit, expectedGasLimit);
-  }
-
-  function test_AdditionalData() public view {
-    uint256 expectedGasLimit = 500000;
-    bytes memory additionalData = abi.encode("extra", "data");
-    bytes memory extraArgs = _generateExtraArgsWithAdditionalData(expectedGasLimit, additionalData);
-
-    uint256 actualGasLimit = s_onRampOverSuperchainInterop.extractGasLimit(extraArgs);
-
-    assertEq(actualGasLimit, expectedGasLimit);
-  }
-
-  function testFuzz_ExtractGasLimit_Success(
-    uint256 gasLimit
-  ) public view {
-    assertEq(s_onRampOverSuperchainInterop.extractGasLimit(_generateEVMExtraArgsV1(gasLimit)), gasLimit);
-    assertEq(s_onRampOverSuperchainInterop.extractGasLimit(_generateGenericExtraArgsV2(gasLimit, true)), gasLimit);
     assertEq(
-      s_onRampOverSuperchainInterop.extractGasLimit(_generateExtraArgsWithAdditionalData(gasLimit, new bytes(100))),
-      gasLimit
+      gasLimit,
+      s_onRampOverSuperchainInterop.extractGasLimit(
+        abi.encodeWithSelector(bytes4(keccak256("extraArgsV3")), gasLimit, new bytes(length))
+      )
     );
   }
 
   // Reverts
 
-  function test_RevertWhen_EmptyExtraArgs() public {
-    bytes memory emptyArgs = new bytes(0);
-
+  function test_extractGasLimit_RevertWhen_ExtraArgsTooShort() public {
     vm.expectRevert(abi.encodeWithSelector(OnRampOverSuperchainInterop.ExtraArgsTooShort.selector, 0));
-    s_onRampOverSuperchainInterop.extractGasLimit(emptyArgs);
-  }
+    s_onRampOverSuperchainInterop.extractGasLimit(new bytes(0));
 
-  function testFuzz_RevertWhen_ExtraArgsTooShort(
-    uint8 length
-  ) public {
-    vm.assume(length < 36);
-    bytes memory shortArgs = _generateShortExtraArgs(length);
-
-    vm.expectRevert(abi.encodeWithSelector(OnRampOverSuperchainInterop.ExtraArgsTooShort.selector, length));
-    s_onRampOverSuperchainInterop.extractGasLimit(shortArgs);
+    vm.expectRevert(abi.encodeWithSelector(OnRampOverSuperchainInterop.ExtraArgsTooShort.selector, 35));
+    s_onRampOverSuperchainInterop.extractGasLimit(new bytes(35));
   }
 }
