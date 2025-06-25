@@ -14,7 +14,7 @@ contract OCRVerifier is ITypeAndVersion, Ownable2StepMsgSender {
   string public constant override typeAndVersion = "OCRVerifier 1.7.0-dev";
 
   // Maximum number of oracles the offchain reporting protocol is designed for
-  uint256 internal constant MAX_NUM_ORACLES = 32;
+  uint256 internal constant MAX_NUM_ORACLES = 64;
 
   /// @notice Triggers a new run of the offchain reporting protocol.
   /// @param configDigest configDigest of this configuration.
@@ -52,7 +52,7 @@ contract OCRVerifier is ITypeAndVersion, Ownable2StepMsgSender {
   /// @notice Args to update an OCR Config.
   struct OCRConfigArgs {
     bytes32 configDigest; // The new config digest.
-    uint8 F; //                              │ Maximum number of faulty/dishonest oracles.
+    uint8 F; // Maximum number of faulty/dishonest oracles.
     address[] signers; // signing address of each oracle.
   }
 

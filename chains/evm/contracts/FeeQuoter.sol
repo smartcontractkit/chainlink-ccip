@@ -1200,7 +1200,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
 
   function processPoolReturnDataNew(
     uint64 destChainSelector,
-    Internal.EVM2AnyCommitVerifierTokenTransfer[] calldata onRampTokenTransfers
+    Internal.EVMTokenTransfer[] calldata onRampTokenTransfers
   ) external view returns (bytes[] memory destExecDataPerToken) {
     bytes4 chainFamilySelector = s_destChainConfigs[destChainSelector].chainFamilySelector;
     destExecDataPerToken = new bytes[](onRampTokenTransfers.length);
