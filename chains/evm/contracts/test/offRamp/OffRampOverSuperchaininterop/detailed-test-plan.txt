@@ -1,0 +1,696 @@
+# Detailed Test Plan for OffRampOverSuperchainInterop
+
+## Overview
+
+This document provides a comprehensive test plan for the OffRampOverSuperchainInterop contract, focusing exclusively on the functionality that differs from the regular OffRamp contract. As per the high-level test plan, we will NOT test unchanged functionality (lines 558-1003) to avoid duplication.
+
+## Contract Analysis Summary
+
+### Key Differences to Test:
+1. **No OCR3 inheritance**: Uses Ownable2StepMsgSender instead of MultiOCR3Base
+2. **CrossL2Inbox validation**: Replaces merkle root verification with CrossL2Inbox.validateMessage
+3. **Allowed transmitters**: Manual transmitter management instead of OCR3 signers
+4. **Chain mapping**: New chainSelector to chainId mapping functionality
+5. **Execution flow**: Different execute() and manuallyExecute() signatures
+6. **No commit phase**: Messages are validated directly without a separate commit step
+7. **Chain fork protection**: _whenChainNotForked() modifier
+8. **Message decoding**: decodeLogDataIntoMessage() function
+9. **Message hash calculation**: Uses SuperchainInterop._hashInteropMessage()
+
+## Test File Structure
+
+```
+contracts/test/offRamp/OffRampOverSuperchainInterop/
+├── OffRampOverSuperchainInteropSetup.t.sol
+├── OffRampOverSuperchainInterop.constructor.t.sol
+├── OffRampOverSuperchainInterop.execute.t.sol
+├── OffRampOverSuperchainInterop.manuallyExecute.t.sol
+├── OffRampOverSuperchainInterop.decodeLogDataIntoMessage.t.sol
+├── OffRampOverSuperchainInterop.executeSingleReport.t.sol
+├── OffRampOverSuperchainInterop.applyAllowedTransmitterUpdates.t.sol
+├── OffRampOverSuperchainInterop.applyChainSelectorToChainIdConfigUpdates.t.sol
+├── OffRampOverSuperchainInterop.getStaticConfig.t.sol
+├── OffRampOverSuperchainInterop.whenChainNotForked.t.sol
+```
+
+## Detailed Test Cases
+
+### 1. Constructor Tests (OffRampOverSuperchainInterop.constructor.t.sol)
+
+#### Test Cases:
+
+##### 1.1 test_Constructor_Success
+- **Scenario**: Deploy with valid parameters
+- **Inputs**: Valid StaticConfig, DynamicConfig, sourceChainConfigs, allowedTransmitters, chainSelectorToChainIdConfigArgs
+- **Expected**: 
+  - Contract deploys successfully
+  - All immutable variables set correctly
+  - StaticConfigSet event emitted
+  - DynamicConfigSet event emitted
+  - SourceChainConfigSet events emitted
+  - AllowedTransmitterAdded events emitted
+  - ChainSelectorToChainIdConfigAdded events emitted
+  - i_chainID set to current block.chainid
+
+##### 1.2 test_Constructor_RevertWhen_ZeroCrossL2Inbox
+- **Scenario**: Deploy with zero address for crossL2Inbox
+- **Expected**: Revert with ZeroAddressNotAllowed()
+
+##### 1.3 test_Constructor_RevertWhen_ZeroTokenAdminRegistry
+- **Scenario**: Deploy with zero address for tokenAdminRegistry
+- **Expected**: Revert with ZeroAddressNotAllowed()
+
+##### 1.4 test_Constructor_RevertWhen_ZeroNonceManager
+- **Scenario**: Deploy with zero address for nonceManager
+- **Expected**: Revert with ZeroAddressNotAllowed()
+
+##### 1.5 test_Constructor_RevertWhen_ZeroChainSelector
+- **Scenario**: Deploy with chainSelector = 0
+- **Expected**: Revert with ZeroChainSelectorNotAllowed()
+
+##### 1.6 test_Constructor_EmptyAllowedTransmitters
+- **Scenario**: Deploy with empty allowedTransmitters array
+- **Expected**: Contract deploys, no AllowedTransmitterAdded events
+
+##### 1.7 test_Constructor_EmptyChainSelectorToChainIdConfig
+- **Scenario**: Deploy with empty chainSelectorToChainIdConfigArgs array
+- **Expected**: Contract deploys, no ChainSelectorToChainIdConfigAdded events
+
+##### 1.8 test_Constructor_MultipleSourceChainConfigs
+- **Scenario**: Deploy with multiple source chain configurations
+- **Expected**: All configurations set correctly, appropriate events emitted
+
+### 2. Execute Function Tests (OffRampOverSuperchainInterop.execute.t.sol)
+
+#### Test Cases:
+
+##### 2.1 test_Execute_Success_SingleMessage
+- **Scenario**: Valid execution by allowed transmitter
+- **Setup**: 
+  - Add transmitter to allowed list
+  - Create valid ExecutionReport with proper logData
+  - Mock CrossL2Inbox.validateMessage to succeed
+- **Expected**: 
+  - Message executes successfully
+  - ExecutionStateChanged event with SUCCESS state
+  - Nonce incremented
+  - Token transfers completed
+
+##### 2.2 test_Execute_Success_GasEstimationSender
+- **Scenario**: Execution by GAS_ESTIMATION_SENDER
+- **Setup**: Use Internal.GAS_ESTIMATION_SENDER as msg.sender
+- **Expected**: Execution proceeds without reverting on transmitter check
+
+##### 2.3 test_Execute_RevertWhen_UnauthorizedTransmitter
+- **Scenario**: Execution by non-allowed transmitter
+- **Setup**: Use address not in allowed transmitters list
+- **Expected**: Revert with UnauthorizedTransmitter()
+
+##### 2.4 test_Execute_Success_AlreadyExecutedMessage
+- **Scenario**: Execute already successful message
+- **Setup**: Execute message twice
+- **Expected**: Second execution emits SkippedAlreadyExecutedMessage event
+
+##### 2.5 test_Execute_Success_PreviouslyFailedMessage
+- **Scenario**: Execute after previous FAILURE state
+- **Setup**: Set message state to FAILURE, then execute
+- **Expected**: Emits AlreadyAttempted event, no state change
+
+##### 2.6 test_Execute_CrossL2InboxValidation
+- **Scenario**: Verify CrossL2Inbox.validateMessage is called correctly
+- **Setup**: Mock CrossL2Inbox with expectation
+- **Expected**: validateMessage called with correct identifier and keccak256(logData)
+
+### 3. Manual Execute Tests (OffRampOverSuperchainInterop.manuallyExecute.t.sol)
+
+#### Test Cases:
+
+##### 3.1 test_ManuallyExecute_Success_AfterThreshold
+- **Scenario**: Manual execution after threshold time
+- **Setup**: 
+  - Warp time beyond permissionLessExecutionThresholdSeconds
+  - Create valid report with gas overrides
+- **Expected**: Message executes successfully
+
+##### 3.2 test_ManuallyExecute_Success_PreviouslyFailed
+- **Scenario**: Manual execution of FAILURE state message
+- **Setup**: Set message to FAILURE state
+- **Expected**: State transitions from FAILURE to SUCCESS
+
+##### 3.3 test_ManuallyExecute_Success_GasLimitOverride
+- **Scenario**: Override receiver execution gas limit
+- **Setup**: Set receiverExecutionGasLimit > original
+- **Expected**: Message executed with new gas limit
+
+##### 3.4 test_ManuallyExecute_Success_TokenGasOverrides
+- **Scenario**: Override token gas limits
+- **Setup**: Provide higher tokenGasOverrides array
+- **Expected**: Tokens transferred with new gas limits
+
+##### 3.5 test_ManuallyExecute_RevertWhen_BeforeThreshold
+- **Scenario**: Manual execution before threshold
+- **Setup**: Current time < message.sequenceNumber + threshold
+- **Expected**: Revert with ManualExecutionNotYetEnabled()
+
+##### 3.6 test_ManuallyExecute_RevertWhen_InvalidGasLimit
+- **Scenario**: Gas limit lower than original
+- **Setup**: receiverExecutionGasLimit < message.gasLimit
+- **Expected**: Revert with InvalidManualExecutionGasLimit()
+
+##### 3.7 test_ManuallyExecute_RevertWhen_InvalidTokenGasOverride
+- **Scenario**: Token gas override lower than original
+- **Setup**: tokenGasOverrides[i] < sourceTokenAmount.destGasAmount
+- **Expected**: Revert with InvalidManualExecutionTokenGasOverride()
+
+##### 3.8 test_ManuallyExecute_RevertWhen_GasAmountCountMismatch
+- **Scenario**: Wrong tokenGasOverrides array length
+- **Setup**: tokenGasOverrides.length != tokenAmounts.length
+- **Expected**: Revert with ManualExecutionGasAmountCountMismatch()
+
+##### 3.9 test_ManuallyExecute_RevertWhen_ExecutionFailsForUntouchedMessage
+- **Scenario**: Manual execution fails but message was UNTOUCHED
+- **Setup**: Force execution to fail for UNTOUCHED message
+- **Expected**: State changes from UNTOUCHED to FAILURE, no revert
+
+##### 3.10 test_ManuallyExecute_RevertWhen_ExecutionFailsForFailedMessage
+- **Scenario**: Manual execution fails for already FAILURE message
+- **Setup**: Message already in FAILURE state, execution fails again
+- **Expected**: Revert with ExecutionError()
+
+### 4. Message Decoding Tests (OffRampOverSuperchainInterop.decodeLogDataIntoMessage.t.sol)
+
+#### Test Cases:
+
+##### 4.1 test_DecodeLogDataIntoMessage_Success
+- **Scenario**: Valid log data decoding
+- **Inputs**: Properly formatted logData with correct selector and message
+- **Expected**: Returns correctly decoded Any2EVMRampMessage
+
+##### 4.2 test_DecodeLogDataIntoMessage_RevertWhen_InvalidSelector
+- **Scenario**: Wrong event selector in first 32 bytes
+- **Inputs**: logData with incorrect selector
+- **Expected**: Revert with InvalidInteropLogSelector()
+
+##### 4.3 test_DecodeLogDataIntoMessage_RevertWhen_DestChainSelectorMismatch
+- **Scenario**: Message destChainSelector != i_chainSelector
+- **Inputs**: Message with different destChainSelector
+- **Expected**: Revert with MismatchedDestChainSelector()
+
+##### 4.4 test_DecodeLogDataIntoMessage_RevertWhen_SequenceNumberMismatch
+- **Scenario**: Decoded sequence number != header sequence number
+- **Inputs**: Mismatched sequence numbers
+- **Expected**: Revert with MismatchedSequenceNumber()
+
+##### 4.5 testFuzz_DecodeLogDataIntoMessage_VariousMessageSizes
+- **Scenario**: Fuzz test with various message sizes
+- **Inputs**: Random valid messages of different sizes
+- **Expected**: All decode successfully
+
+### 5. Execute Single Report Tests (OffRampOverSuperchainInterop.executeSingleReport.t.sol)
+
+#### Test Cases:
+
+##### 5.1 test_ExecuteSingleReport_Success_ValidReport
+- **Scenario**: Valid report execution
+- **Setup**: Valid report with matching source chain config
+- **Expected**: 
+  - Message executes successfully
+  - State transitions from UNTOUCHED to SUCCESS
+  - Correct messageHash in event using SuperchainInterop._hashInteropMessage
+
+##### 5.2 test_ExecuteSingleReport_Success_OrderedMessageNonceIncrement
+- **Scenario**: Ordered message (nonce != 0) increments nonce
+- **Setup**: Message with non-zero nonce
+- **Expected**: NonceManager.incrementInboundNonce called and returns true
+
+##### 5.3 test_ExecuteSingleReport_Success_UnorderedMessage
+- **Scenario**: Unordered message (nonce = 0) execution
+- **Setup**: Message with nonce = 0
+- **Expected**: Executes without nonce check
+
+##### 5.4 test_ExecuteSingleReport_RevertWhen_InvalidDestChainSelector
+- **Scenario**: Message for different chain
+- **Setup**: destChainSelector != i_chainSelector
+- **Expected**: Revert with InvalidDestChainSelector()
+
+##### 5.5 test_ExecuteSingleReport_RevertWhen_InvalidSourceOnRamp
+- **Scenario**: Report origin != configured OnRamp
+- **Setup**: report.identifier.origin != decoded onRamp address
+- **Expected**: Revert with InvalidSourceOnRamp()
+
+##### 5.6 test_ExecuteSingleReport_RevertWhen_ChainIdNotConfigured
+- **Scenario**: No chainId mapping for sourceChainSelector
+- **Setup**: s_sourceChainSelectorToChainId[selector] = 0
+- **Expected**: Revert with ChainIdNotConfiguredForSelector()
+
+##### 5.7 test_ExecuteSingleReport_RevertWhen_ChainIdMismatch
+- **Scenario**: Report chainId != configured chainId
+- **Setup**: Different chainIds
+- **Expected**: Revert with SourceChainSelectorMismatch()
+
+##### 5.8 test_ExecuteSingleReport_CrossL2InboxValidation
+- **Scenario**: Verify CrossL2Inbox integration
+- **Setup**: Mock validateMessage expectations
+- **Expected**: validateMessage called with correct params
+
+##### 5.9 test_ExecuteSingleReport_RevertWhen_TokenDataMismatch
+- **Scenario**: Token data array length mismatch
+- **Setup**: offchainTokenData.length != tokenAmounts.length
+- **Expected**: Revert with TokenDataMismatch()
+
+##### 5.10 test_ExecuteSingleReport_StateTransitions
+- **Scenario**: Test all valid state transitions
+- **Cases**:
+  - UNTOUCHED → IN_PROGRESS → SUCCESS
+  - UNTOUCHED → IN_PROGRESS → FAILURE
+  - FAILURE → IN_PROGRESS → SUCCESS (manual only)
+
+### 6. Transmitter Management Tests (OffRampOverSuperchainInterop.applyAllowedTransmitterUpdates.t.sol)
+
+#### Test Cases:
+
+##### 6.1 test_ApplyAllowedTransmitterUpdates_AddSingleTransmitter
+- **Scenario**: Add one transmitter
+- **Inputs**: Single address in transmittersToAdd
+- **Expected**: 
+  - Transmitter added to set
+  - AllowedTransmitterAdded event emitted
+
+##### 6.2 test_ApplyAllowedTransmitterUpdates_AddMultipleTransmitters
+- **Scenario**: Add multiple transmitters
+- **Inputs**: Array of addresses in transmittersToAdd
+- **Expected**: All transmitters added, events for each
+
+##### 6.3 test_ApplyAllowedTransmitterUpdates_RemoveTransmitter
+- **Scenario**: Remove existing transmitter
+- **Setup**: Add transmitter first
+- **Inputs**: Address in transmittersToRemove
+- **Expected**: 
+  - Transmitter removed from set
+  - AllowedTransmitterRemoved event emitted
+
+##### 6.4 test_ApplyAllowedTransmitterUpdates_AddAndRemove
+- **Scenario**: Add and remove in same call
+- **Inputs**: Both arrays populated
+- **Expected**: Removals processed first, then additions
+
+##### 6.5 test_ApplyAllowedTransmitterUpdates_RevertWhen_ZeroAddress
+- **Scenario**: Try to add zero address
+- **Inputs**: address(0) in transmittersToAdd
+- **Expected**: Revert with ZeroAddressNotAllowed()
+
+##### 6.6 test_ApplyAllowedTransmitterUpdates_DuplicateAdd
+- **Scenario**: Add same transmitter twice
+- **Inputs**: Duplicate address in array or already exists
+- **Expected**: Only one event emitted, no error
+
+##### 6.7 test_ApplyAllowedTransmitterUpdates_RemoveNonExistent
+- **Scenario**: Remove non-existent transmitter
+- **Inputs**: Address not in set
+- **Expected**: No event emitted, no error
+
+##### 6.8 test_ApplyAllowedTransmitterUpdates_OnlyOwner
+- **Scenario**: Non-owner tries to update
+- **Setup**: Use non-owner address
+- **Expected**: Revert with appropriate access control error
+
+##### 6.9 test_GetAllAllowedTransmitters
+- **Scenario**: Verify getter function
+- **Setup**: Add multiple transmitters
+- **Expected**: Returns complete array of transmitters
+
+### 7. Chain Mapping Tests (OffRampOverSuperchainInterop.applyChainSelectorToChainIdConfigUpdates.t.sol)
+
+#### Test Cases:
+
+##### 7.1 test_ApplyChainSelectorToChainIdConfig_SetSingleMapping
+- **Scenario**: Set one chainSelector->chainId mapping
+- **Inputs**: Single ChainSelectorToChainIdConfigArgs
+- **Expected**: 
+  - Mapping stored correctly
+  - ChainSelectorToChainIdConfigAdded event emitted
+
+##### 7.2 test_ApplyChainSelectorToChainIdConfig_SetMultipleMappings
+- **Scenario**: Set multiple mappings
+- **Inputs**: Array of configs
+- **Expected**: All mappings set, events for each
+
+##### 7.3 test_ApplyChainSelectorToChainIdConfig_UnsetMapping
+- **Scenario**: Remove existing mapping
+- **Setup**: Set mapping first
+- **Inputs**: chainSelector in chainSelectorsToUnset
+- **Expected**: 
+  - Mapping deleted
+  - ChainSelectorToChainIdConfigRemoved event emitted
+
+##### 7.4 test_ApplyChainSelectorToChainIdConfig_UpdateExisting
+- **Scenario**: Update existing mapping
+- **Inputs**: New chainId for existing selector
+- **Expected**: Mapping updated, new event emitted
+
+##### 7.5 test_ApplyChainSelectorToChainIdConfig_RevertWhen_ZeroChainId
+- **Scenario**: Try to set zero chainId
+- **Inputs**: chainId = 0
+- **Expected**: Revert with ZeroChainIdNotAllowed()
+
+##### 7.6 test_ApplyChainSelectorToChainIdConfig_RevertWhen_ZeroChainSelector
+- **Scenario**: Try to set zero chainSelector
+- **Inputs**: chainSelector = 0
+- **Expected**: Revert with ZeroChainSelectorNotAllowed()
+
+##### 7.7 test_ApplyChainSelectorToChainIdConfig_UnsetNonExistent
+- **Scenario**: Unset non-existent mapping
+- **Inputs**: Selector not in mappings
+- **Expected**: No event emitted
+
+##### 7.8 test_ApplyChainSelectorToChainIdConfig_OnlyOwner
+- **Scenario**: Non-owner tries to update
+- **Setup**: Use non-owner address
+- **Expected**: Revert with access control error
+
+##### 7.9 test_GetChainIdBySourceChainSelector
+- **Scenario**: Verify getter function
+- **Setup**: Set multiple mappings
+- **Expected**: Returns correct chainId for each selector
+
+### 8. Static Config Tests (OffRampOverSuperchainInterop.getStaticConfig.t.sol)
+
+#### Test Cases:
+
+##### 8.1 test_GetStaticConfig_ReturnsCorrectValues
+- **Scenario**: Verify all static config values
+- **Setup**: Deploy contract with known values
+- **Expected**: 
+  - chainSelector matches
+  - gasForCallExactCheck matches
+  - crossL2Inbox address matches
+  - tokenAdminRegistry matches
+  - nonceManager matches
+
+##### 8.2 test_GetStaticConfig_ImmutableAfterDeployment
+- **Scenario**: Verify config doesn't change
+- **Setup**: Call multiple times at different states
+- **Expected**: Always returns same values
+
+### 9. Chain Fork Protection Tests (OffRampOverSuperchainInterop.whenChainNotForked.t.sol)
+
+#### Test Cases:
+
+##### 9.1 test_WhenChainNotForked_Success
+- **Scenario**: Normal operation on same chain
+- **Setup**: block.chainid == i_chainID
+- **Expected**: Functions execute normally
+
+##### 9.2 test_WhenChainNotForked_RevertWhen_ChainIdChanged
+- **Scenario**: Chain ID has changed (fork detected)
+- **Setup**: Mock block.chainid to different value
+- **Expected**: Revert with ForkedChain(expected, actual)
+
+##### 9.3 test_Execute_RevertWhen_ChainForked
+- **Scenario**: Execute reverts on forked chain
+- **Setup**: Mock different chainid
+- **Expected**: Execute reverts with ForkedChain
+
+##### 9.4 test_ManuallyExecute_RevertWhen_ChainForked
+- **Scenario**: ManuallyExecute reverts on forked chain
+- **Setup**: Mock different chainid
+- **Expected**: ManuallyExecute reverts with ForkedChain
+
+### 10. Additional Critical Edge Cases
+
+#### 10.1 Execute Edge Cases
+
+##### 10.1.1 test_Execute_RevertWhen_SourceChainNotEnabled
+- **Scenario**: Execute message from disabled source chain
+- **Setup**: Source chain config with isEnabled = false
+- **Expected**: Revert with SourceChainNotEnabled()
+
+##### 10.1.2 test_Execute_Success_MessageInterceptor
+- **Scenario**: Message interceptor is set and validates message
+- **Setup**: Deploy and set message interceptor
+- **Expected**: Interceptor called, execution continues
+
+##### 10.1.3 test_Execute_RevertWhen_MessageInterceptorReverts
+- **Scenario**: Message interceptor validation fails
+- **Setup**: Interceptor reverts on validation
+- **Expected**: Revert with MessageValidationError()
+
+#### 10.2 Manual Execute Edge Cases
+
+##### 10.2.1 test_ManuallyExecute_Success_ZeroGasOverride
+- **Scenario**: Manual execution with zero gas override (use original)
+- **Setup**: receiverExecutionGasLimit = 0
+- **Expected**: Uses original gas limit from message
+
+##### 10.2.2 test_ManuallyExecute_Success_EmptyTokensArray
+- **Scenario**: Manual execution of message with no tokens
+- **Setup**: Message with empty tokenAmounts array
+- **Expected**: Executes successfully without token transfers
+
+#### 10.3 Security Test Cases
+
+##### 10.3.1 test_ExecuteSingleReport_RevertWhen_InvalidLogDataLength
+- **Scenario**: Log data too short to contain required fields
+- **Setup**: logData shorter than 96 bytes
+- **Expected**: Revert with abi decoding error
+
+##### 10.3.2 test_ExecuteSingleReport_RevertWhen_CrossL2InboxReverts
+- **Scenario**: CrossL2Inbox.validateMessage reverts
+- **Setup**: Mock validateMessage to revert
+- **Expected**: Transaction reverts with CrossL2Inbox error
+
+##### 10.3.3 test_Execute_ReentrancyProtection
+- **Scenario**: Attempt reentrancy via malicious receiver
+- **Setup**: Receiver tries to call execute during execution
+- **Expected**: Revert with appropriate error
+
+#### 10.4 Integration Test Cases
+
+##### 10.4.1 test_EndToEnd_SuccessfulMessageExecution
+- **Scenario**: Complete flow from execute to receiver
+- **Setup**: Full setup with all components
+- **Expected**: 
+  - CrossL2Inbox validates
+  - Nonce increments
+  - Tokens transfer
+  - Receiver gets message
+  - Events emitted
+
+##### 10.4.2 test_EndToEnd_ManualExecutionAfterFailure
+- **Scenario**: Message fails, then manually executed
+- **Setup**: First execution fails, wait, manually execute
+- **Expected**: 
+  - First: UNTOUCHED → FAILURE
+  - Second: FAILURE → SUCCESS
+
+#### 10.5 Gas Optimization Tests
+
+##### 10.5.1 test_Execute_GasUsageWithinLimits
+- **Scenario**: Measure gas usage for typical execution
+- **Setup**: Standard message execution
+- **Expected**: Gas usage within expected bounds
+
+##### 10.5.2 test_ManuallyExecute_GasUsageWithOverrides
+- **Scenario**: Gas usage with manual overrides
+- **Setup**: Manual execution with gas overrides
+- **Expected**: Additional gas usage is minimal
+
+## Test Helpers and Setup
+
+### OffRampOverSuperchainInteropSetup.t.sol
+
+```solidity
+contract OffRampOverSuperchainInteropSetup is BaseTest {
+    // Mock contracts
+    ICrossL2Inbox internal s_mockCrossL2Inbox;
+    
+    // Test contract
+    OffRampOverSuperchainInterop internal s_offRamp;
+    
+    // Test data
+    address[] internal s_allowedTransmitters;
+    OffRampOverSuperchainInterop.ChainSelectorToChainIdConfigArgs[] internal s_chainIdConfigs;
+    
+    function setUp() public virtual override {
+        // Deploy mocks
+        s_mockCrossL2Inbox = new MockCrossL2Inbox();
+        
+        // Setup test data
+        s_allowedTransmitters = new address[](2);
+        s_allowedTransmitters[0] = makeAddr("transmitter1");
+        s_allowedTransmitters[1] = makeAddr("transmitter2");
+        
+        // Deploy contract
+        _deployOffRamp();
+    }
+    
+    function _deployOffRamp() internal {
+        // Implementation
+    }
+    
+    function _generateValidExecutionReport() internal returns (SuperchainInterop.ExecutionReport memory) {
+        // Helper to create valid execution reports
+    }
+    
+    function _generateLogData(Internal.Any2EVMRampMessage memory message) internal returns (bytes memory) {
+        // Helper to encode log data
+    }
+}
+```
+
+### Mock Contracts
+
+```solidity
+contract MockCrossL2Inbox is ICrossL2Inbox {
+    mapping(bytes32 => bool) public validMessages;
+    bool public shouldRevert;
+    
+    function validateMessage(Identifier calldata _id, bytes32 _msgHash) external {
+        if (shouldRevert) {
+            revert("CrossL2Inbox: validation failed");
+        }
+        if (!validMessages[_msgHash]) {
+            revert("Invalid message");
+        }
+        emit ExecutingMessage(_msgHash, _id);
+    }
+    
+    function setValidMessage(bytes32 _msgHash, bool _valid) external {
+        validMessages[_msgHash] = _valid;
+    }
+    
+    function setShouldRevert(bool _shouldRevert) external {
+        shouldRevert = _shouldRevert;
+    }
+    
+    function calculateChecksum(Identifier memory _id, bytes32 _msgHash) external pure returns (bytes32) {
+        return keccak256(abi.encode(_id, _msgHash));
+    }
+}
+
+contract ReentrantReceiver is IAny2EVMMessageReceiver {
+    OffRampOverSuperchainInterop public offRamp;
+    SuperchainInterop.ExecutionReport public report;
+    
+    constructor(address _offRamp) {
+        offRamp = OffRampOverSuperchainInterop(_offRamp);
+    }
+    
+    function ccipReceive(Client.Any2EVMMessage calldata) external {
+        // Attempt reentrancy
+        offRamp.execute(report);
+    }
+}
+```
+
+### Helper Functions
+
+```solidity
+// Helper to create valid Identifier
+function _createIdentifier(
+    address origin,
+    uint256 blockNumber,
+    uint256 logIndex,
+    uint256 timestamp,
+    uint256 chainId
+) internal pure returns (Identifier memory) {
+    return Identifier({
+        origin: origin,
+        blockNumber: blockNumber,
+        logIndex: logIndex,
+        timestamp: timestamp,
+        chainId: chainId
+    });
+}
+
+// Helper to encode log data
+function _encodeLogData(
+    uint64 destChainSelector,
+    uint64 sequenceNumber,
+    Internal.Any2EVMRampMessage memory message
+) internal pure returns (bytes memory) {
+    return abi.encodePacked(
+        SuperchainInterop.SENT_MESSAGE_LOG_SELECTOR,
+        abi.encode(destChainSelector, sequenceNumber),
+        abi.encode(message)
+    );
+}
+
+// Helper to create execution report
+function _createExecutionReport(
+    Internal.Any2EVMRampMessage memory message,
+    Identifier memory identifier,
+    bytes[] memory offchainTokenData
+) internal view returns (SuperchainInterop.ExecutionReport memory) {
+    bytes memory logData = _encodeLogData(
+        message.header.destChainSelector,
+        message.header.sequenceNumber,
+        message
+    );
+    
+    return SuperchainInterop.ExecutionReport({
+        logData: logData,
+        identifier: identifier,
+        offchainTokenData: offchainTokenData
+    });
+}
+```
+
+## Coverage Requirements
+
+### Branch Coverage Goals:
+- 100% coverage of all new/modified functions
+- All error conditions tested
+- All event emissions verified
+- All state transitions validated
+
+### Integration Points:
+- CrossL2Inbox.validateMessage interaction
+- NonceManager integration for ordered messages
+- Router message delivery
+- Token pool interactions (inherited functionality)
+
+## Notes
+
+1. **Focus on Differences**: Only test functionality that differs from regular OffRamp
+2. **No Duplicate Testing**: Skip testing of unchanged functions (lines 558-1003)
+3. **Mock External Calls**: Use mocks for CrossL2Inbox and other external contracts
+4. **Gas Optimization**: Test gas usage for critical paths
+5. **Security Focus**: Ensure transmitter authorization and message validation are robust
+
+## Test Execution Summary
+
+### Total Test Cases: 75+
+- Constructor Tests: 8
+- Execute Function Tests: 9 (including edge cases)
+- Manual Execute Tests: 12 (including edge cases)
+- Message Decoding Tests: 5
+- Execute Single Report Tests: 10
+- Transmitter Management Tests: 9
+- Chain Mapping Tests: 9
+- Static Config Tests: 2
+- Chain Fork Protection Tests: 4
+- Security & Integration Tests: 7
+
+### Priority Order for Implementation:
+1. **Critical Path Tests** (Constructor, Execute, ExecuteSingleReport)
+2. **Security Tests** (Transmitter authorization, CrossL2Inbox validation)
+3. **Manual Execution Tests** (Important for user recovery)
+4. **Configuration Tests** (Chain mapping, transmitter management)
+5. **Edge Cases and Integration Tests**
+
+### Key Testing Principles:
+- Each test should be independent and not rely on others
+- Use descriptive test names following the established pattern
+- Verify both positive and negative cases
+- Check all events are emitted correctly
+- Ensure state changes are as expected
+- Mock external dependencies appropriately
+- Focus on the differences from regular OffRamp
+
+### Success Criteria:
+- All tests pass
+- 100% branch coverage for new/modified code
+- No security vulnerabilities
+- Gas usage within acceptable limits
+- Clear documentation and maintainable test code

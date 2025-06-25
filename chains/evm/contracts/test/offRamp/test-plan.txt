@@ -22,65 +22,15 @@ This test plan outlines the strategy for testing OffRampOverSuperchainInterop, w
 - Configuration management (getDynamicConfig, setDynamicConfig, applySourceChainConfigUpdates)
 - ccipReceive (always reverts)
 
+### Ignore unchanged functions in your test generation at this time, only generate test for any diference w.r.t the existing OffRamp.
+
 ## Test Strategy to Avoid Duplication
 
-### 1. Create Abstract Base Test Contract
+### 1. THINK very deeply to create a far more detailed test plan
 
-```solidity
-// contracts/test/offRamp/OffRampCommonTests.t.sol
-abstract contract OffRampCommonTests is BaseTest {
-    // Abstract functions that implementations must override
-    function _deployOffRamp() internal virtual returns (address);
-    function _executeMessage(Internal.Any2EVMRampMessage memory message) internal virtual;
-    function _generateValidExecutionContext(Internal.Any2EVMRampMessage memory message) 
-        internal virtual returns (bytes memory);
-    function _setupExecutionEnvironment() internal virtual;
-    
-    // Common test functions for unchanged functionality
-    function test_getExecutionState() public { }
-    function test_setExecutionState() public { }
-    function test_releaseOrMintSingleToken_Success() public { }
-    function test_releaseOrMintSingleToken_PoolDoesNotExist() public { }
-    function test_releaseOrMintSingleToken_BalanceMismatch() public { }
-    function test_releaseOrMintTokens_MultipleTokens() public { }
-    function test_trialExecute_Success() public { }
-    function test_trialExecute_Failure() public { }
-    function test_executeSingleMessage_NoTokens() public { }
-    function test_executeSingleMessage_WithTokens() public { }
-    function test_executeSingleMessage_MessageInterceptor() public { }
-    function test_setDynamicConfig() public { }
-    function test_applySourceChainConfigUpdates() public { }
-    function test_ccipReceive_AlwaysReverts() public { }
-}
-```
 
-### 2. Implementation for OffRampOverSuperchainInterop
+### 2. Create Test setup, and helper contract if necessary.
 
-```solidity
-// contracts/test/offRamp/OffRampOverSuperchainInterop/OffRampOverSuperchainInterop_CommonFunctionality.t.sol
-contract OffRampOverSuperchainInterop_CommonFunctionality is OffRampCommonTests, OffRampOverSuperchainInteropSetup {
-    function _deployOffRamp() internal override returns (address) {
-        return address(s_offRamp);
-    }
-    
-    function _executeMessage(Internal.Any2EVMRampMessage memory message) internal override {
-        SuperchainInterop.ExecutionReport memory report = _generateExecutionReport(message);
-        vm.prank(s_allowedTransmitter);
-        s_offRamp.execute(report);
-    }
-    
-    function _generateValidExecutionContext(Internal.Any2EVMRampMessage memory message) 
-        internal override returns (bytes memory) {
-        return _generateValidLogData(message);
-    }
-    
-    function _setupExecutionEnvironment() internal override {
-        // Setup CrossL2Inbox mocks
-        // Add allowed transmitters
-        // Configure chain mappings
-    }
-}
-```
 
 ### 3. Test Only New/Changed Functionality
 
@@ -98,10 +48,9 @@ contracts/test/offRamp/OffRampOverSuperchainInterop/
 ├── OffRampOverSuperchainInterop.applyChainSelectorToChainIdConfigUpdates.t.sol
 ├── OffRampOverSuperchainInterop.getStaticConfig.t.sol
 ├── OffRampOverSuperchainInterop.whenChainNotForked.t.sol
-└── OffRampOverSuperchainInterop_CommonFunctionality.t.sol
 ```
 
-## Detailed Test Coverage
+## Example Test Coverage
 
 ### Constructor Tests (OffRampOverSuperchainInterop.constructor.t.sol)
 - Valid deployment with all parameters
@@ -171,121 +120,3 @@ contracts/test/offRamp/OffRampOverSuperchainInterop/
 ### Static Config Tests (OffRampOverSuperchainInterop.getStaticConfig.t.sol)
 - Verify all static config values
 - CrossL2Inbox address included
-
-### Fork Detection Tests (OffRampOverSuperchainInterop.whenChainNotForked.t.sol)
-- Success: Same chain ID
-- Revert: Chain fork detected
-
-## Test Data Helpers
-
-### Setup Contract Structure
-
-```solidity
-contract OffRampOverSuperchainInteropSetup is BaseTest, TokenSetup {
-    OffRampOverSuperchainInterop internal s_offRamp;
-    ICrossL2Inbox internal s_mockCrossL2Inbox;
-    
-    address internal s_allowedTransmitter = makeAddr("transmitter");
-    uint64 internal SOURCE_CHAIN_SELECTOR = 1;
-    uint256 internal SOURCE_CHAIN_ID = 10; // Optimism
-    
-    function setUp() public virtual override {
-        super.setUp();
-        
-        // Deploy mock CrossL2Inbox
-        s_mockCrossL2Inbox = new MockCrossL2Inbox();
-        
-        // Deploy OffRampOverSuperchainInterop
-        OffRampOverSuperchainInterop.StaticConfig memory staticConfig = 
-            OffRampOverSuperchainInterop.StaticConfig({
-                chainSelector: DEST_CHAIN_SELECTOR,
-                gasForCallExactCheck: 5000,
-                crossL2Inbox: s_mockCrossL2Inbox,
-                tokenAdminRegistry: address(s_tokenAdminRegistry),
-                nonceManager: address(s_nonceManager)
-            });
-            
-        // ... continue setup
-    }
-    
-    // Helper functions
-    function _generateExecutionReport(
-        Internal.Any2EVMRampMessage memory message
-    ) internal returns (SuperchainInterop.ExecutionReport memory);
-    
-    function _generateValidLogData(
-        Internal.Any2EVMRampMessage memory message
-    ) internal returns (bytes memory);
-    
-    function _mockCrossL2InboxValidation(
-        Identifier memory identifier,
-        bytes32 messageHash,
-        bool shouldSucceed
-    ) internal;
-}
-```
-
-## Integration Test Scenarios
-
-### CrossL2Inbox Integration
-1. Mock successful validation
-2. Mock validation failure
-3. Test with different identifiers
-4. Verify correct message hash calculation
-
-### Message Flow Tests
-1. End-to-end message execution with tokens
-2. Message execution without tokens
-3. Failed message retry with manual execution
-4. Concurrent execution attempts
-
-### Gas Limit Tests
-1. Exact gas usage for token transfers
-2. Receiver execution gas limits
-3. Gas estimation mode behavior
-
-## Benefits of This Approach
-
-1. **80% Test Reuse**: Most functionality tests are written once and inherited
-2. **Clear Separation**: New features are tested in isolation
-3. **Maintainability**: Changes to common tests automatically apply to both contracts
-4. **No Duplication**: Common test logic exists in one place
-5. **Flexibility**: Can add contract-specific assertions as needed
-
-## Execution Timeline
-
-### Phase 1: Infrastructure (Day 1)
-- Create OffRampCommonTests abstract contract
-- Set up OffRampOverSuperchainInteropSetup
-- Create test data helpers
-
-### Phase 2: Common Tests Migration (Day 2-3)
-- Migrate execution state tests
-- Migrate token handling tests
-- Migrate configuration tests
-- Implement abstract methods for both contracts
-
-### Phase 3: New Functionality Tests (Day 4-5)
-- Constructor and static config
-- Execute and manual execute
-- Message decoding
-- Transmitter management
-- Chain mapping
-
-### Phase 4: Integration Tests (Day 6)
-- CrossL2Inbox integration
-- End-to-end scenarios
-- Edge cases and error paths
-
-### Phase 5: Validation (Day 7)
-- Coverage analysis
-- Gas optimization tests
-- Final review and cleanup
-
-## Success Metrics
-
-- 100% code coverage for new functionality
-- 95%+ code coverage for inherited functionality
-- Zero test duplication between OffRamp and OffRampOverSuperchainInterop
-- All critical security paths tested
-- Clear documentation and maintainable test structure
