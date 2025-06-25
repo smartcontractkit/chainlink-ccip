@@ -450,7 +450,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       Pool.ReleaseOrMintInV1({
         originalSender: originalSender,
         receiver: receiver,
-        amount: sourceTokenAmount.amount,
+        sourceDenominatedAmount: sourceTokenAmount.amount,
         localToken: localToken,
         remoteChainSelector: sourceChainSelector,
         sourcePoolAddress: sourceTokenAmount.sourcePoolAddress,

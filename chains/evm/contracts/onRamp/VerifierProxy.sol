@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {IEVM2AnyOnRampClient} from "../interfaces/IEVM2AnyOnRampClient.sol";
-import {IFeeQuoter} from "../interfaces/IFeeQuoter.sol";
+import {IFeeQuoterV2} from "../interfaces/IFeeQuoterV2.sol";
 import {IPoolV1} from "../interfaces/IPool.sol";
 import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
@@ -174,7 +174,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     // Convert message fee to juels and retrieve converted args.
     // Validate pool return data after it is populated (view function - no state changes).
     bytes memory tokenReceiver;
-    (newMessage.feeValueJuels,, newMessage.extraArgs, tokenReceiver) = IFeeQuoter(s_dynamicConfig.feeQuoter)
+    (newMessage.feeValueJuels,, newMessage.extraArgs, tokenReceiver) = IFeeQuoterV2(s_dynamicConfig.feeQuoter)
       .processMessageArgs(destChainSelector, message.feeToken, feeTokenAmount, message.extraArgs, message.receiver);
 
     Client.EVMTokenAmount[] memory tokenAmounts = message.tokenAmounts;
@@ -185,7 +185,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     }
 
     bytes[] memory destExecDataPerToken =
-      IFeeQuoter(s_dynamicConfig.feeQuoter).processPoolReturnDataNew(destChainSelector, newMessage.tokenAmounts);
+      IFeeQuoterV2(s_dynamicConfig.feeQuoter).processPoolReturnDataNew(destChainSelector, newMessage.tokenAmounts);
 
     for (uint256 i = 0; i < newMessage.tokenAmounts.length; ++i) {
       newMessage.tokenAmounts[i].destExecData = destExecDataPerToken[i];
@@ -372,7 +372,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   ) external view returns (uint256 feeTokenAmount) {
     if (i_rmnRemote.isCursed(bytes16(uint128(destChainSelector)))) revert CursedByRMN(destChainSelector);
 
-    return IFeeQuoter(s_dynamicConfig.feeQuoter).getValidatedFee(destChainSelector, message);
+    return IFeeQuoterV2(s_dynamicConfig.feeQuoter).getValidatedFee(destChainSelector, message);
   }
 
   /// @notice Withdraws the outstanding fee token balances to the fee aggregator.
