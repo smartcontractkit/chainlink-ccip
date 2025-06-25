@@ -352,9 +352,9 @@ library Internal {
 
   struct RequiredVerifier {
     bytes32 verifierId;
-    bytes payload; // in the case of commit: the nonce
+    bytes payload; // in the case of commit: the nonce.
     uint256 feeAmount;
-    uint64 gasLimit; // gas limit for the verifier to execute the commit
+    uint64 gasLimit; // gas limit for the verifier to verify on the destination chain.
     bytes extraArgs;
   }
 
