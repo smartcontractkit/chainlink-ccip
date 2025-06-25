@@ -32,6 +32,9 @@ contract CommitVerifier is IVerifier, OCRVerifier {
     _validateOCRSignatures(rawReport, ocrProof);
 
     Internal.Any2EVMMultiProofMessage memory message = abi.decode(rawReport, (Internal.Any2EVMMultiProofMessage));
+    Internal.RequiredVerifier memory requiredVerifier = message.requiredVerifiers[verifierIndex];
+
+    uint64 nonce = abi.decode(requiredVerifier.payload, (uint64));
 
     // Nonce changes per state transition (these only apply for ordered messages):
     // UNTOUCHED -> FAILURE  nonce bump.
@@ -39,14 +42,12 @@ contract CommitVerifier is IVerifier, OCRVerifier {
     // FAILURE   -> SUCCESS  no nonce bump.
     // UNTOUCHED messages MUST be executed in order always.
     // If nonce == 0 then out of order execution is allowed.
-    if (message.header.nonce != 0) {
+    if (nonce != 0) {
       if (originalState == Internal.MessageExecutionState.UNTOUCHED) {
         // If a nonce is not incremented, that means it was skipped, and we can ignore the message.
         if (
-          !INonceManager(i_nonceManager).incrementInboundNonce(
-            message.header.sourceChainSelector, message.header.nonce, message.sender
-          )
-        ) revert InvalidNonce(message.header.nonce);
+          !INonceManager(i_nonceManager).incrementInboundNonce(message.header.sourceChainSelector, nonce, message.sender)
+        ) revert InvalidNonce(nonce);
       }
     }
   }

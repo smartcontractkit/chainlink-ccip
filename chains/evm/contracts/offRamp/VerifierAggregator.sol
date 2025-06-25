@@ -45,6 +45,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   error InsufficientGasToCompleteTx(bytes4 err);
   error SkippedAlreadyExecutedMessage(uint64 sourceChainSelector, uint64 sequenceNumber);
   error InvalidVerifierSelector(bytes4 selector);
+  error ReentrancyGuardReentrantCall();
 
   /// @dev Atlas depends on various events, if changing, please notify Atlas.
   event StaticConfigSet(StaticConfig staticConfig);
@@ -71,7 +72,6 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   struct SourceChainConfig {
     IRouter router; // ─╮ Local router to use for messages coming from this source chain.
     bool isEnabled; // ─╯ Flag whether the source chain is enabled or not.
-    bytes onRamp; // OnRamp address on the source chain.
   }
 
   /// @dev Same as SourceChainConfig but with source chain selector so that an array of these
@@ -87,6 +87,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// @dev Since DynamicConfig is part of DynamicConfigSet event, if changing it, we should update the ABI on Atlas.
   struct DynamicConfig {
     address messageInterceptor; // Optional, validates incoming messages (zero address = no interceptor).
+    bool reentrancyGuardEntered; // Reentrancy guard, used to prevent reentrant calls.
   }
 
   struct AggregatedReport {
@@ -218,6 +219,9 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   function execute(
     AggregatedReport calldata report
   ) external {
+    if (s_dynamicConfig.reentrancyGuardEntered) revert ReentrancyGuardReentrantCall();
+    s_dynamicConfig.reentrancyGuardEntered = true;
+
     uint64 sourceChainSelector = report.message.header.sourceChainSelector;
 
     if (i_rmnRemote.isCursed(bytes16(uint128(sourceChainSelector)))) {
@@ -251,10 +255,10 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       revert SkippedAlreadyExecutedMessage(sourceChainSelector, message.header.sequenceNumber);
     }
 
-    uint32 gasLimitOverride = report.gasOverride == 0 ? report.message.gasLimit : report.gasOverride;
+    uint32 gasLimit = report.gasOverride == 0 ? report.message.gasLimit : report.gasOverride;
 
     _setExecutionState(sourceChainSelector, message.header.sequenceNumber, Internal.MessageExecutionState.IN_PROGRESS);
-    (Internal.MessageExecutionState newState, bytes memory returnData) = _trialExecute(message, gasLimitOverride);
+    (Internal.MessageExecutionState newState, bytes memory returnData) = _trialExecute(message, gasLimit);
     _setExecutionState(sourceChainSelector, message.header.sequenceNumber, newState);
 
     // Since it's hard to estimate whether manual execution will succeed, we revert the entire transaction if it
@@ -280,23 +284,26 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     emit ExecutionStateChanged(
       sourceChainSelector, message.header.sequenceNumber, message.header.messageId, newState, returnData
     );
+    s_dynamicConfig.reentrancyGuardEntered = false;
   }
 
+  /// @notice Verifies the message and its proofs. It loops through each of the verifiers in order, verifying the
+  /// message and its proof.
   function _verifyMessage(
     Internal.Any2EVMMultiProofMessage calldata message,
     Internal.MessageExecutionState originalState,
     bytes[] calldata proofs
   ) internal {
-    if (message.securityModuleSelectors.length != proofs.length) {
-      revert InvalidProofLength(message.securityModuleSelectors.length, proofs.length);
+    if (message.requiredVerifiers.length != proofs.length) {
+      revert InvalidProofLength(message.requiredVerifiers.length, proofs.length);
     }
 
-    for (uint256 i = 0; i < message.securityModuleSelectors.length; ++i) {
-      bytes4 selector = bytes4(message.securityModuleSelectors[i]);
+    for (uint256 i = 0; i < message.requiredVerifiers.length; ++i) {
+      bytes4 verifierId = bytes4(message.requiredVerifiers[i].verifierId);
 
-      address verifier = s_verifiers[selector];
+      address verifier = s_verifiers[verifierId];
       if (verifier == address(0)) {
-        revert InvalidVerifierSelector(selector);
+        revert InvalidVerifierSelector(verifierId);
       }
       IVerifier(verifier).validateReport(abi.encode(message), proofs[i], i, originalState);
     }
@@ -308,12 +315,12 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// @return errData Revert data in bytes if CCIP receiver reverted during execution.
   function _trialExecute(
     Internal.Any2EVMMultiProofMessage memory message,
-    uint32 gasLimitOverride
+    uint32 gasLimit
   ) internal returns (Internal.MessageExecutionState executionState, bytes memory) {
     (bool success, bytes memory returnData,) = CallWithExactGas._callWithExactGasSafeReturnData(
       abi.encodeCall(this.executeSingleMessage, (message)),
       address(this),
-      gasLimitOverride,
+      gasLimit,
       i_gasForCallExactCheck,
       Internal.MAX_RET_BYTES
     );
@@ -589,7 +596,6 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
         revert ZeroAddressNotAllowed();
       }
 
-      currentConfig.onRamp = newOnRamp;
       currentConfig.isEnabled = sourceConfigUpdate.isEnabled;
       currentConfig.router = sourceConfigUpdate.router;
 
@@ -623,20 +629,9 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   function _setDynamicConfig(
     DynamicConfig memory dynamicConfig
   ) internal {
+    // TODO: reentrancy guard can be set to false
     s_dynamicConfig = dynamicConfig;
 
     emit DynamicConfigSet(dynamicConfig);
-  }
-
-  // ================================================================
-  // │                            Access                            │
-  // ================================================================
-
-  /// @notice Reverts as this contract should not be able to receive CCIP messages.
-  function ccipReceive(
-    Client.Any2EVMMessage calldata
-  ) external pure {
-    // solhint-disable-next-line
-    revert();
   }
 }

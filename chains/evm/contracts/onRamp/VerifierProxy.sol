@@ -158,14 +158,13 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     }
 
     Internal.EVM2AnyCommitVerifierMessage memory newMessage = Internal.EVM2AnyCommitVerifierMessage({
-      header: Internal.CommitVerifierMessageHeader({
+      header: Internal.Header({
         // Should be generated after the message is complete.
         messageId: "",
         sourceChainSelector: i_localChainSelector,
         destChainSelector: destChainSelector,
         // We need the next available sequence number so we increment before we use the value.
-        sequenceNumber: ++destChainConfig.sequenceNumber,
-        requiredVerifiers: new Internal.RequiredVerifiers[](0)
+        sequenceNumber: ++destChainConfig.sequenceNumber
       }),
       sender: originalSender,
       data: message.data,
@@ -175,7 +174,8 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       feeTokenAmount: feeTokenAmount,
       feeValueJuels: 0, // calculated later.
       // Should be populated via lock / burn pool calls.
-      tokenAmounts: new Internal.EVM2AnyCommitVerifierTokenTransfer[](message.tokenAmounts.length)
+      tokenAmounts: new Internal.EVMTokenTransfer[](message.tokenAmounts.length),
+      requiredVerifiers: new Internal.RequiredVerifier[](0)
     });
 
     // Convert message fee to juels and retrieve converted args.
@@ -336,7 +336,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     uint64 destChainSelector,
     bytes memory receiver,
     address originalSender
-  ) internal returns (Internal.EVM2AnyCommitVerifierTokenTransfer memory) {
+  ) internal returns (Internal.EVMTokenTransfer memory) {
     if (tokenAndAmount.amount == 0) revert CannotSendZeroTokens();
 
     IPoolV1 sourcePool = getPoolBySourceToken(destChainSelector, IERC20(tokenAndAmount.token));
@@ -358,7 +358,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     );
 
     // NOTE: pool data validations are outsourced to the FeeQuoter to handle family-specific logic handling.
-    return Internal.EVM2AnyCommitVerifierTokenTransfer({
+    return Internal.EVMTokenTransfer({
       sourceTokenAddress: tokenAndAmount.token,
       sourcePoolAddress: address(sourcePool),
       destTokenAddress: poolReturnData.destTokenAddress,
