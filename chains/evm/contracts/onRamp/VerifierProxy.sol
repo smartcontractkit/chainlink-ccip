@@ -166,19 +166,16 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       receiver: message.receiver,
       feeToken: message.feeToken,
       feeTokenAmount: feeTokenAmount,
-      feeValueJuels: 0, // calculated later.
-      // Should be populated via lock / burn pool calls.
-      tokenAmounts: new Internal.EVMTokenTransfer[](message.tokenAmounts.length),
-      requiredVerifiers: new Internal.RequiredVerifier[](0)
+      feeValueJuels: 0, // Populated by the FeeQuoter.
+      tokenAmounts: new Internal.EVMTokenTransfer[](message.tokenAmounts.length), // Populated via lock/burn pool calls.
+      requiredVerifiers: new Internal.RequiredVerifier[](0) // Populated by the FeeQuoter.
     });
 
     // Convert message fee to juels and retrieve converted args.
     // Validate pool return data after it is populated (view function - no state changes).
-    bool isOutOfOrderExecution;
     bytes memory tokenReceiver;
-    (newMessage.feeValueJuels, isOutOfOrderExecution, newMessage.extraArgs, tokenReceiver) = IFeeQuoter(
-      s_dynamicConfig.feeQuoter
-    ).processMessageArgs(destChainSelector, message.feeToken, feeTokenAmount, message.extraArgs, message.receiver);
+    (newMessage.feeValueJuels,, newMessage.extraArgs, tokenReceiver) = IFeeQuoter(s_dynamicConfig.feeQuoter)
+      .processMessageArgs(destChainSelector, message.feeToken, feeTokenAmount, message.extraArgs, message.receiver);
 
     Client.EVMTokenAmount[] memory tokenAmounts = message.tokenAmounts;
     // Lock / burn the tokens as last step. TokenPools may not always be trusted.
@@ -203,8 +200,6 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     );
 
     // Emit message request.
-    // This must happen after any pool events as some tokens (e.g. USDC) emit events that we expect to precede this
-    // event in the offchain code.
     emit CCIPMessageSent(destChainSelector, newMessage.header.sequenceNumber, newMessage);
 
     s_dynamicConfig.reentrancyGuardEntered = false;
