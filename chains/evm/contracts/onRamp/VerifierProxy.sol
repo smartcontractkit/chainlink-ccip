@@ -3,7 +3,6 @@ pragma solidity ^0.8.24;
 
 import {IEVM2AnyOnRampClient} from "../interfaces/IEVM2AnyOnRampClient.sol";
 import {IFeeQuoter} from "../interfaces/IFeeQuoter.sol";
-import {IMessageInterceptor} from "../interfaces/IMessageInterceptor.sol";
 import {IPoolV1} from "../interfaces/IPool.sol";
 import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
@@ -64,7 +63,6 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   struct DynamicConfig {
     address feeQuoter; // FeeQuoter address.
     bool reentrancyGuardEntered; // Reentrancy protection.
-    address messageInterceptor; // Optional message interceptor to validate messages. Zero address = no interceptor.
     address feeAggregator; // Fee aggregator address.
   }
 
@@ -152,10 +150,6 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     if (originalSender == address(0)) revert RouterMustSetOriginalSender();
     // Router address may be zero intentionally to pause, which should stop all messages.
     if (msg.sender != address(destChainConfig.router)) revert MustBeCalledByRouter();
-
-    if (s_dynamicConfig.messageInterceptor != address(0)) {
-      IMessageInterceptor(s_dynamicConfig.messageInterceptor).onOutboundMessage(destChainSelector, message);
-    }
 
     Internal.EVM2AnyCommitVerifierMessage memory newMessage = Internal.EVM2AnyCommitVerifierMessage({
       header: Internal.Header({
