@@ -419,7 +419,7 @@ library Internal {
     );
   }
 
-  function EVM2AnyToAny2EVMMultiProofMessage(
+  function _evm2AnyToAny2EVMMultiProofMessage(
     EVM2AnyCommitVerifierMessage memory evm2Any,
     uint32 gasLimit
   ) internal pure returns (Any2EVMMultiProofMessage memory) {
