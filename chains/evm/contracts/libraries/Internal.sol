@@ -331,7 +331,7 @@ library Internal {
   // send
 
   struct EVM2AnyCommitVerifierMessage {
-    CommitVerifierMessageHeader header; // Message header.
+    Header header; // Message header.
     address sender; // sender address on the source chain.
     bytes data; // arbitrary data payload supplied by the message sender.
     bytes receiver; // receiver address on the destination chain.
@@ -339,18 +339,18 @@ library Internal {
     address feeToken; // fee token.
     uint256 feeTokenAmount; // fee token amount.
     uint256 feeValueJuels; // fee amount in Juels.
-    EVM2AnyCommitVerifierTokenTransfer[] tokenAmounts; // array of tokens and amounts to transfer.
+    EVMTokenTransfer[] tokenAmounts; // array of tokens and amounts to transfer.
+    RequiredVerifier[] requiredVerifiers;
   }
 
-  struct CommitVerifierMessageHeader {
+  struct Header {
     bytes32 messageId; // Unique identifier for the message, generated with the source chain's encoding scheme (i.e. not necessarily abi.encoded).
     uint64 sourceChainSelector; // ─╮ the chain selector of the source chain, note: not chainId.
     uint64 destChainSelector; //    │ the chain selector of the destination chain, note: not chainId.
     uint64 sequenceNumber; //      ─╯ sequence number, not unique across lanes.
-    RequiredVerifiers[] requiredVerifiers;
   }
 
-  struct RequiredVerifiers {
+  struct RequiredVerifier {
     bytes32 verifierId;
     bytes payload; // in the case of commit: the nonce
     uint256 feeAmount;
@@ -358,7 +358,7 @@ library Internal {
     bytes extraArgs;
   }
 
-  struct EVM2AnyCommitVerifierTokenTransfer {
+  struct EVMTokenTransfer {
     address sourceTokenAddress;
     // The source pool EVM address. This value is trusted as it was obtained through the onRamp. It can be relied
     // upon by the destination pool to validate the source pool.
@@ -379,13 +379,13 @@ library Internal {
   // receive
 
   struct Any2EVMMultiProofMessage {
-    RampMessageHeader header; // Message header.
+    Header header; // Message header.
     bytes sender; // sender address on the source chain.
     bytes data; // arbitrary data payload supplied by the message sender.
     address receiver; // receiver address on the destination chain.
     uint32 gasLimit; // user supplied maximum gas amount available for dest chain execution & token pool ops.
     Any2EVMMultiProofTokenTransfer[] tokenAmounts; // array of tokens and amounts to transfer.
-    bytes32[] securityModuleSelectors; //
+    RequiredVerifier[] requiredVerifiers; //
   }
 
   struct Any2EVMMultiProofTokenTransfer {
@@ -398,7 +398,6 @@ library Internal {
     // has to be set for the specific token.
     bytes extraData;
     uint256 amount; // Amount of tokens.
-    bytes4[] securityModuleSelectors; //
   }
 
   // TODO optimize
@@ -418,5 +417,33 @@ library Internal {
         keccak256(original.extraArgs)
       )
     );
+  }
+
+  function EVM2AnyToAny2EVMMultiProofMessage(
+    EVM2AnyCommitVerifierMessage memory evm2Any,
+    uint32 gasLimit
+  ) internal pure returns (Any2EVMMultiProofMessage memory) {
+    Any2EVMMultiProofTokenTransfer[] memory tokenAmounts =
+      new Any2EVMMultiProofTokenTransfer[](evm2Any.tokenAmounts.length);
+
+    for (uint256 i = 0; i < evm2Any.tokenAmounts.length; i++) {
+      EVMTokenTransfer memory tokenTransfer = evm2Any.tokenAmounts[i];
+      tokenAmounts[i] = Any2EVMMultiProofTokenTransfer({
+        sourcePoolAddress: abi.encode(tokenTransfer.sourcePoolAddress),
+        destTokenAddress: abi.decode(tokenTransfer.destTokenAddress, (address)),
+        extraData: tokenTransfer.destExecData,
+        amount: tokenTransfer.amount
+      });
+    }
+
+    return Any2EVMMultiProofMessage({
+      header: evm2Any.header,
+      sender: abi.encode(evm2Any.sender),
+      data: evm2Any.data,
+      receiver: abi.decode(evm2Any.receiver, (address)),
+      gasLimit: gasLimit,
+      tokenAmounts: tokenAmounts,
+      requiredVerifiers: evm2Any.requiredVerifiers
+    });
   }
 }
