@@ -103,4 +103,15 @@ library Client {
   ) internal pure returns (bytes memory bts) {
     return abi.encodeWithSelector(SVM_EXTRA_ARGS_V1_TAG, extraArgs);
   }
+
+  // ================================================================
+  // │                           ModSec                             │
+  // ================================================================
+
+  bytes4 public constant MOD_SEC_EXTRA_ARGS_V1_TAG = 0x302326cb;
+
+  struct ModSecExtraArgsV1 {
+    bytes chainExtraArgs; // Chain specific extra args, compatible with the existing pre-1.7 ExtraArgs.
+    bytes[] verifierExtraArgs; // Extra args for each verifier.
+  }
 }
