@@ -439,12 +439,6 @@ func createExecutedMessagesKeyFilter(
 		Key: consts.EventNameExecutionStateChanged,
 		Expressions: []query.Expression{
 			extendedQuery,
-			// We don't need to wait for an execute state changed event to be finalized
-			// before we optimistically mark a message as executed.
-			query.Comparator(consts.EventAttributeState, primitives.ValueComparator{
-				Value:    0, // > 0 corresponds to:  IN_PROGRESS, SUCCESS, FAILURE
-				Operator: primitives.Gt,
-			}),
 			query.Confidence(confidence),
 		},
 	}

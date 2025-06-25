@@ -64,12 +64,6 @@ func TestCCIPChainReader_CreateExecutedMessagesKeyFilter(t *testing.T) {
 							},
 						},
 					},
-					{
-						Primitive: &primitives.Comparator{
-							Name:             consts.EventAttributeState,
-							ValueComparators: []primitives.ValueComparator{{Value: 0, Operator: primitives.Gt}},
-						},
-					},
 					{Primitive: &primitives.Confidence{ConfidenceLevel: primitives.Finalized}},
 				},
 			},
@@ -138,12 +132,6 @@ func TestCCIPChainReader_CreateExecutedMessagesKeyFilter(t *testing.T) {
 									},
 								},
 							},
-						},
-					},
-					{
-						Primitive: &primitives.Comparator{
-							Name:             consts.EventAttributeState,
-							ValueComparators: []primitives.ValueComparator{{Value: 0, Operator: primitives.Gt}},
 						},
 					},
 					{Primitive: &primitives.Confidence{ConfidenceLevel: primitives.Finalized}},
@@ -255,12 +243,6 @@ func TestCCIPChainReader_CreateExecutedMessagesKeyFilter(t *testing.T) {
 									},
 								},
 							},
-						},
-					},
-					{
-						Primitive: &primitives.Comparator{
-							Name:             consts.EventAttributeState,
-							ValueComparators: []primitives.ValueComparator{{Value: 0, Operator: primitives.Gt}},
 						},
 					},
 					{Primitive: &primitives.Confidence{ConfidenceLevel: primitives.Finalized}},
