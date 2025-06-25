@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {IFeeQuoter} from "../interfaces/IFeeQuoter.sol";
-import {IMessageInterceptor} from "../interfaces/IMessageInterceptor.sol";
 import {INonceManager} from "../interfaces/INonceManager.sol";
 import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
@@ -158,15 +157,15 @@ contract CommitVerifier is ITypeAndVersion, Ownable2StepMsgSender {
     Client.EVM2AnyMessage memory message,
     uint256 feeTokenAmount,
     address originalSender,
-    bytes calldata verifierData
+    bytes calldata // verifierData
   ) external returns (bytes memory) {
     _validateOriginalSender(originalSender);
 
     // Convert message fee to juels and retrieve converted args.
     // Validate pool return data after it is populated (view function - no state changes).
-    (uint256 feeValueJuels, bool isOutOfOrderExecution, bytes memory extraArgs, bytes memory tokenReceiver) = IFeeQuoter(
-      s_dynamicConfig.feeQuoter
-    ).processMessageArgs(destChainSelector, message.feeToken, feeTokenAmount, message.extraArgs, message.receiver);
+    (, bool isOutOfOrderExecution,,) = IFeeQuoter(s_dynamicConfig.feeQuoter).processMessageArgs(
+      destChainSelector, message.feeToken, feeTokenAmount, message.extraArgs, message.receiver
+    );
 
     uint64 nonce = 0;
     if (!isOutOfOrderExecution) {

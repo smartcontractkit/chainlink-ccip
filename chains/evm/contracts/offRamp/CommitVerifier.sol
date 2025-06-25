@@ -12,7 +12,7 @@ contract CommitVerifier is IVerifier, OCRVerifier {
 
   error InvalidNonce(uint64 nonce);
 
-  address internal i_nonceManager;
+  address internal immutable i_nonceManager;
 
   constructor(
     address nonceManager
