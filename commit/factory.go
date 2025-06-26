@@ -73,6 +73,7 @@ type PluginFactory struct {
 	addrCodec         cciptypes.AddressCodec
 	homeChainReader   reader.HomeChain
 	homeChainSelector cciptypes.ChainSelector
+	chainAccessors    map[cciptypes.ChainSelector]cciptypes.ChainAccessor
 	contractReaders   map[cciptypes.ChainSelector]types.ContractReader
 	chainWriters      map[cciptypes.ChainSelector]types.ContractWriter
 	rmnPeerClient     rmn.PeerClient
@@ -88,6 +89,7 @@ type CommitPluginFactoryParams struct {
 	AddrCodec         cciptypes.AddressCodec
 	HomeChainReader   reader.HomeChain
 	HomeChainSelector cciptypes.ChainSelector
+	ChainAccessors    map[cciptypes.ChainSelector]cciptypes.ChainAccessor
 	ContractReaders   map[cciptypes.ChainSelector]types.ContractReader
 	ContractWriters   map[cciptypes.ChainSelector]types.ContractWriter
 	RmnPeerClient     rmn.PeerClient
@@ -106,6 +108,7 @@ func NewCommitPluginFactory(params CommitPluginFactoryParams) *PluginFactory {
 		addrCodec:         params.AddrCodec,
 		homeChainReader:   params.HomeChainReader,
 		homeChainSelector: params.HomeChainSelector,
+		chainAccessors:    params.ChainAccessors,
 		contractReaders:   params.ContractReaders,
 		chainWriters:      params.ContractWriters,
 		rmnPeerClient:     params.RmnPeerClient,
