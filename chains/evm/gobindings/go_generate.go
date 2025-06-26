@@ -43,3 +43,6 @@ package ccip
 
 // EncodingUtils
 //go:generate go run generation/generate/wrap.go ccip EncodingUtils ccip_encoding_utils latest
+
+// Superchain Interop
+//go:generate go run generation/generate/wrap.go ccip OnRampOverSuperchainInterop onramp_over_superchain_interop latest
