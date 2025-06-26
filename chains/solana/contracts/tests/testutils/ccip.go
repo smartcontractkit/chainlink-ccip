@@ -49,8 +49,8 @@ func DeriveSendAccounts(
 		deriveRaw.AccountMetaSlice = append(deriveRaw.AccountMetaSlice, askWith...)
 		derive, err := deriveRaw.ValidateAndBuild()
 		require.NoError(t, err)
-		tx := SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{derive}, authority, config.DefaultCommitment)
-		derivation, err := common.ExtractAnchorTypedReturnValue[ccip_router.DeriveAccountsResponse](ctx, tx.Meta.LogMessages, router.String())
+		tx := SimulateTransaction(ctx, t, solanaGoClient, []solana.Instruction{derive}, authority)
+		derivation, err := common.ExtractAnchorTypedReturnValue[ccip_router.DeriveAccountsResponse](ctx, tx.Value.Logs, router.String())
 		require.NoError(t, err)
 		fmt.Printf("Derive stage: %s. Len: %d\n", derivation.CurrentStage, len(derivation.AccountsToSave))
 		if derivation.CurrentStage == "TokenTransferStaticAccounts/0" {
