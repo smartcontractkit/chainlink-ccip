@@ -47,7 +47,6 @@ pub struct UpdateGlobalConfig<'info> {
     pub config: Account<'info, PoolConfig>, // Global Config PDA of the Token Pool
 
     pub authority: Signer<'info>,
-    pub system_program: Program<'info, System>,
 
     // Ensures that the provided program is the LockreleaseTokenPool program,
     // and that its associated program data account matches the expected one.
