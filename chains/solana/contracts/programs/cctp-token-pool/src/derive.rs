@@ -180,24 +180,8 @@ pub mod lock_or_burn {
                 ],
                 crate::ID,
             )],
-            // We don't need the domain for the first few PDAs, so we return them now to keep
-            // return sizes balanced.
-            accounts_to_save: vec![
-                // cctp_authority_pda
-                get_token_messenger_minter_pda(&[b"sender_authority"]).readonly(),
-                // cctp_message_transmitter_account
-                get_message_transmitter_pda(&[b"message_transmitter"]).writable(),
-                // cctp_token_messenger_account
-                get_token_messenger_minter_pda(&[b"token_messenger"]).readonly(),
-                // cctp_token_minter_account
-                get_token_messenger_minter_pda(&[b"token_minter"]).readonly(),
-                // cctp_local_token
-                get_token_messenger_minter_pda(&[
-                    b"local_token",
-                    lock_or_burn.local_token.as_ref(),
-                ])
-                .writable(),
-            ],
+            // The static PDAs have already been returned by CCIP via the LUT, so there's no additional accounts here
+            accounts_to_save: vec![],
             current_stage: OnrampDeriveStage::RetrieveChainConfig.to_string(),
             next_stage: OnrampDeriveStage::BuildDynamicAccounts.to_string(),
             ..Default::default()
@@ -222,14 +206,6 @@ pub mod lock_or_burn {
 
         Ok(DeriveAccountsResponse {
             accounts_to_save: vec![
-                // cctp_message_transmitter
-                MESSAGE_TRANSMITTER.readonly(),
-                // cctp_token_messenger_minter
-                TOKEN_MESSENGER_MINTER.readonly(),
-                // system_program
-                System::id().readonly(),
-                // cctp_event_authority
-                get_token_messenger_minter_pda(&[b"__event_authority"]).readonly(),
                 // cctp_remote_token_messenger_key
                 get_token_messenger_minter_pda(&[b"remote_token_messenger", domain_seed])
                     .readonly(),
