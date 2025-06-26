@@ -107,7 +107,7 @@ func NewTokenPool(tokenProgram solana.PublicKey, poolProgram solana.PublicKey, m
 		AdminRegistryPDA:      tokenAdminRegistryPDA,
 		PoolProgram:           poolProgram,
 		PoolLookupTable:       solana.PublicKey{},
-		WritableIndexes:       []uint8{3, 4, 7}, // see ToTokenPoolEntries for writable indexes
+		WritableIndexes:       []uint8{3, 4, 7}, // see ToTokenPoolEntries for writable indexes.
 		User:                  map[solana.PublicKey]solana.PublicKey{},
 		Chain:                 map[uint64]solana.PublicKey{},
 		Billing:               map[uint64]solana.PublicKey{},

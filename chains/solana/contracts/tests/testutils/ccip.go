@@ -49,7 +49,7 @@ func DeriveSendAccounts(
 		deriveRaw.AccountMetaSlice = append(deriveRaw.AccountMetaSlice, askWith...)
 		derive, err := deriveRaw.ValidateAndBuild()
 		require.NoError(t, err)
-		tx := SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{derive}, authority, config.DefaultCommitment)
+		tx := SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{derive}, authority, config.DefaultCommitment, common.AddComputeUnitLimit(300_000))
 		derivation, err := common.ExtractAnchorTypedReturnValue[ccip_router.DeriveAccountsResponse](ctx, tx.Meta.LogMessages, router.String())
 		require.NoError(t, err)
 		fmt.Printf("Derive stage: %s. Len: %d\n", derivation.CurrentStage, len(derivation.AccountsToSave))

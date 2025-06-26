@@ -28,7 +28,7 @@ use crate::{
 use super::helpers::load_nonce;
 
 // Most token pools have four static addresses + the 10 elements of a LUT.
-const TOKEN_ACCOUNTS_STATIC_PAGE_SIZE: usize = 14;
+const TOKEN_ACCOUNTS_STATIC_PAGE_SIZE: usize = 7;
 
 // Local helper to find a readonly CCIP meta for a given seed + program_id combo.
 // Short name for compactness.
@@ -585,18 +585,26 @@ pub fn derive_ccip_send_accounts_additional_token_nested<'info>(
             .iter()
             .map(|a| a.key().readonly())
             .collect(),
+        current_stage: DeriveAccountsCcipSendStage::NestedTokenDerive {
+            token_substage: substage.to_string(),
+        }
+        .to_string(),
         ..Default::default()
     };
-    response = response.and(
-        DeriveAccountsResponse::try_from_slice(&data)
-            .map_err(|_| CcipRouterError::InvalidTokenPoolAccountDerivationResponse)?,
-    );
+    let nested_response = DeriveAccountsResponse::try_from_slice(&data)
+        .map_err(|_| CcipRouterError::InvalidTokenPoolAccountDerivationResponse)?;
+
+    response
+        .ask_again_with
+        .extend_from_slice(&nested_response.ask_again_with);
+    response.accounts_to_save = nested_response.accounts_to_save;
+    response.look_up_tables_to_save = nested_response.look_up_tables_to_save;
 
     // We're coming back from a nested derivation call, so we turn the stage reported
     // by it into our substage.
-    if !response.next_stage.is_empty() {
+    if !nested_response.next_stage.is_empty() {
         response.next_stage = DeriveAccountsCcipSendStage::NestedTokenDerive {
-            token_substage: response.next_stage,
+            token_substage: nested_response.next_stage,
         }
         .to_string();
     } else if number_of_tokens_left > 1 {
@@ -616,6 +624,8 @@ pub fn derive_ccip_send_accounts_additional_token_nested<'info>(
 
         response.next_stage =
             DeriveAccountsCcipSendStage::TokenTransferStaticAccounts { page: 0 }.to_string();
+    } else {
+        response.next_stage = "".to_string();
     }
 
     Ok(response)

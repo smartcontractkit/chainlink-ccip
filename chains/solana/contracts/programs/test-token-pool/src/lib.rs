@@ -6,6 +6,9 @@ declare_id!("JuCcZ4smxAYv9QHJ36jshA7pA3FuQ3vQeWLUeAtZduJ");
 mod context;
 use crate::context::*;
 
+const ARBITRARY_SEED: &[u8] = b"arbitrary_seed";
+const ANOTHER_ARBITRARY_SEED: &[u8] = b"another_arbitrary_seed";
+
 #[program]
 pub mod test_token_pool {
     use anchor_lang::solana_program::{instruction::Instruction, program::invoke_signed};
@@ -246,6 +249,21 @@ pub mod test_token_pool {
         ctx: Context<'_, '_, '_, 'info, TokenOnramp<'info>>,
         lock_or_burn: LockOrBurnInV1,
     ) -> Result<LockOrBurnOutV1> {
+        // The second and third remaining accounts are not used, but must be passed to verify
+        // the autoderive functionality. The first remaining account is the (potential) multisig
+        require_eq!(
+            ctx.remaining_accounts[1].key(),
+            Pubkey::find_program_address(&[ARBITRARY_SEED], &crate::ID).0,
+            CcipTokenPoolError::InvalidInputs
+        );
+        require_eq!(
+            ctx.remaining_accounts[2].key(),
+            Pubkey::find_program_address(&[ANOTHER_ARBITRARY_SEED], &crate::ID).0,
+            CcipTokenPoolError::InvalidInputs
+        );
+
+        let remaining_accounts = &ctx.remaining_accounts[3..];
+
         validate_lock_or_burn(
             &lock_or_burn,
             ctx.accounts.state.config.mint,
@@ -273,11 +291,11 @@ pub mod test_token_pool {
                 let signer = &ctx.accounts.pool_signer;
                 // first remaining accounts is the wrapped program
                 require!(
-                    !ctx.remaining_accounts.is_empty(),
+                    !remaining_accounts.is_empty(),
                     CcipTokenPoolError::InvalidInputs
                 );
                 let (wrapped_program, remaining_accounts) =
-                    ctx.remaining_accounts.split_first().unwrap();
+                    remaining_accounts.split_first().unwrap();
 
                 // The accounts of the user that will be used in the CPI instruction, none of them are signers
                 // They need to specify if mutable or not, but none of them is allowed to init, realloc or close
@@ -324,6 +342,36 @@ pub mod test_token_pool {
                 abi_encoded_decimals[31] = ctx.accounts.state.config.decimals;
                 abi_encoded_decimals
             },
+        })
+    }
+
+    pub fn derive_accounts_release_or_mint_tokens<'info>(
+        _ctx: Context<'_, '_, 'info, 'info, Empty>,
+        stage: String,
+        _release_or_mint: ReleaseOrMintInV1,
+    ) -> Result<DeriveAccountsResponse> {
+        Ok(DeriveAccountsResponse {
+            current_stage: stage,
+            ..Default::default()
+        })
+    }
+
+    pub fn derive_accounts_lock_or_burn_tokens<'info>(
+        _ctx: Context<'_, '_, 'info, 'info, Empty>,
+        stage: String,
+        _lock_or_burn: LockOrBurnInV1,
+    ) -> Result<DeriveAccountsResponse> {
+        Ok(DeriveAccountsResponse {
+            current_stage: stage,
+            accounts_to_save: vec![
+                Pubkey::find_program_address(&[ARBITRARY_SEED], &crate::ID)
+                    .0
+                    .readonly(),
+                Pubkey::find_program_address(&[ANOTHER_ARBITRARY_SEED], &crate::ID)
+                    .0
+                    .readonly(),
+            ],
+            ..Default::default()
         })
     }
 }

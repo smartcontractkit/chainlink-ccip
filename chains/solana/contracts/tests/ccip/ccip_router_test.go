@@ -2735,6 +2735,25 @@ func TestCCIPRouter(t *testing.T) {
 					require.Equal(t, token0.PoolLookupTable, tokenAdminRegistry.LookupTable)
 				})
 
+				t.Run("Setting up token autoderivation", func(t *testing.T) {
+					base := ccip_router.NewSetPoolSupportsAutoDerivationInstruction(
+						token0.Mint,
+						true,
+						config.RouterConfigPDA,
+						token0.AdminRegistryPDA,
+						token0PoolAdmin.PublicKey(),
+					)
+					instruction, err := base.ValidateAndBuild()
+					require.NoError(t, err)
+
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, token0PoolAdmin, config.DefaultCommitment)
+
+					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
+					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token0.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+					require.NoError(t, err)
+					require.Equal(t, true, tokenAdminRegistry.SupportsAutoDerivation)
+				})
+
 				t.Run("When Token Pool Admin wants to set up the pool again to zero, it is none", func(t *testing.T) {
 					instruction, err := ccip_router.NewSetPoolInstruction(
 						token0.WritableIndexes,
@@ -3176,6 +3195,25 @@ func TestCCIPRouter(t *testing.T) {
 					require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.PendingAdministrator)
 					require.Equal(t, token1.PoolLookupTable, tokenAdminRegistry.LookupTable)
 				})
+
+				t.Run("Setting up token autoderivation", func(t *testing.T) {
+					base := ccip_router.NewSetPoolSupportsAutoDerivationInstruction(
+						token1.Mint,
+						true,
+						config.RouterConfigPDA,
+						token1.AdminRegistryPDA,
+						token1PoolAdmin.PublicKey(),
+					)
+					instruction, err := base.ValidateAndBuild()
+					require.NoError(t, err)
+
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, token1PoolAdmin, config.DefaultCommitment)
+					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
+					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token1.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+					require.NoError(t, err)
+					require.Equal(t, true, tokenAdminRegistry.SupportsAutoDerivation)
+				})
+
 			})
 
 			t.Run("Transfer admin role for token admin registry", func(t *testing.T) {
@@ -4780,7 +4818,6 @@ func TestCCIPRouter(t *testing.T) {
 				require.NoError(t, err)
 
 				destinationChainSelector := config.EvmChainSelector
-				destinationChainStatePDA := config.EvmDestChainStatePDA
 				message := ccip_router.SVM2AnyMessage{
 					FeeToken: wsol.mint,
 					Receiver: validReceiverAddress[:],
@@ -4797,42 +4834,34 @@ func TestCCIPRouter(t *testing.T) {
 				userTokenAccount, ok := token0.User[user.PublicKey()]
 				require.True(t, ok)
 
-				base := ccip_router.NewCcipSendInstruction(
-					destinationChainSelector,
+				derivedAccounts, derivedLookUpTables, tokenIndices := testutils.DeriveSendAccounts(ctx,
+					t,
+					user,
 					message,
-					[]byte{0}, // starting indices for accounts
-					config.RouterConfigPDA,
-					destinationChainStatePDA,
-					nonceEvmPDA,
-					user.PublicKey(),
-					solana.SystemProgramID,
-					wsol.program,
-					wsol.mint,
-					wsol.userATA,
-					wsol.billingATA,
-					config.BillingSignerPDA,
-					config.FeeQuoterProgram,
-					config.FqConfigPDA,
-					config.FqEvmDestChainPDA,
-					wsol.fqBillingConfigPDA,
-					link22.fqBillingConfigPDA,
-					config.RMNRemoteProgram,
-					config.RMNRemoteCursesPDA,
-					config.RMNRemoteConfigPDA,
-				)
-				base.GetFeeTokenUserAssociatedAccountAccount().WRITE()
+					destinationChainSelector,
+					solanaGoClient,
+					config.CcipRouterProgram)
 
-				tokenMetas, addressTables, err := tokens.ParseTokenLookupTable(ctx, solanaGoClient, token0, userTokenAccount)
-				require.NoError(t, err)
-				base.AccountMetaSlice = append(base.AccountMetaSlice, tokenMetas...)
+				builder := ccip_router.NewCcipSendInstructionBuilder().
+					SetDestChainSelector(destinationChainSelector).
+					SetMessage(message).
+					SetTokenIndexes(tokenIndices)
+				builder.AccountMetaSlice = derivedAccounts
 
-				ix, err := base.ValidateAndBuild()
+				ix, err := builder.ValidateAndBuild()
+
 				require.NoError(t, err)
+				lookupTables := ccipSendLookupTable
+				for _, table := range derivedLookUpTables {
+					entries, lutErr := common.GetAddressLookupTable(ctx, solanaGoClient, table)
+					require.NoError(t, lutErr)
+					lookupTables[table] = entries
+				}
 
 				ixApprove, err := tokens.TokenApproveChecked(1, token0Decimals, token0.Program, userTokenAccount, token0.Mint, config.BillingSignerPDA, user.PublicKey(), nil)
 				require.NoError(t, err)
 
-				result := testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{ixApprove, ix}, user, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(300_000))
+				result := testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{ixApprove, ix}, user, config.DefaultCommitment, lookupTables, common.AddComputeUnitLimit(300_000))
 				require.NotNil(t, result)
 
 				fullNonces.evm.user++ // we just sent a successful message from the user to EVM
@@ -4892,7 +4921,6 @@ func TestCCIPRouter(t *testing.T) {
 				require.NoError(t, err)
 
 				destinationChainSelector := config.EvmChainSelector
-				destinationChainStatePDA := config.EvmDestChainStatePDA
 				message := ccip_router.SVM2AnyMessage{
 					FeeToken: wsol.mint,
 					Receiver: validReceiverAddress[:],
@@ -4915,51 +4943,36 @@ func TestCCIPRouter(t *testing.T) {
 				userTokenAccount1, ok := token1.User[user.PublicKey()]
 				require.True(t, ok)
 
-				base := ccip_router.NewCcipSendInstruction(
-					destinationChainSelector,
+				derivedAccounts, derivedLookUpTables, tokenIndices := testutils.DeriveSendAccounts(ctx,
+					t,
+					user,
 					message,
-					[]byte{0, 14}, // starting indices for accounts
-					config.RouterConfigPDA,
-					destinationChainStatePDA,
-					nonceEvmPDA,
-					user.PublicKey(),
-					solana.SystemProgramID,
-					wsol.program,
-					wsol.mint,
-					wsol.userATA,
-					wsol.billingATA,
-					config.BillingSignerPDA,
-					config.FeeQuoterProgram,
-					config.FqConfigPDA,
-					config.FqEvmDestChainPDA,
-					wsol.fqBillingConfigPDA,
-					link22.fqBillingConfigPDA,
-					config.RMNRemoteProgram,
-					config.RMNRemoteCursesPDA,
-					config.RMNRemoteConfigPDA,
-				)
-				base.GetFeeTokenUserAssociatedAccountAccount().WRITE()
+					destinationChainSelector,
+					solanaGoClient,
+					config.CcipRouterProgram)
 
-				tokenMetas0, addressTables, err := tokens.ParseTokenLookupTable(ctx, solanaGoClient, token0, userTokenAccount0)
+				builder := ccip_router.NewCcipSendInstructionBuilder().
+					SetDestChainSelector(destinationChainSelector).
+					SetMessage(message).
+					SetTokenIndexes(tokenIndices)
+				builder.AccountMetaSlice = derivedAccounts
+
+				ix, err := builder.ValidateAndBuild()
+
 				require.NoError(t, err)
-				base.AccountMetaSlice = append(base.AccountMetaSlice, tokenMetas0...)
-				tokenMetas1, addressTables1, err := tokens.ParseTokenLookupTable(ctx, solanaGoClient, token1, userTokenAccount1)
-				require.NoError(t, err)
-				base.AccountMetaSlice = append(base.AccountMetaSlice, tokenMetas1...)
-				addressTables[token1.PoolLookupTable] = addressTables1[token1.PoolLookupTable]
-				for k, v := range ccipSendLookupTable {
-					addressTables[k] = v
+				lookupTables := ccipSendLookupTable
+				for _, table := range derivedLookUpTables {
+					entries, lutErr := common.GetAddressLookupTable(ctx, solanaGoClient, table)
+					require.NoError(t, lutErr)
+					lookupTables[table] = entries
 				}
-
-				ix, err := base.ValidateAndBuild()
-				require.NoError(t, err)
 
 				ixApprove0, err := tokens.TokenApproveChecked(1, token0Decimals, token0.Program, userTokenAccount0, token0.Mint, config.BillingSignerPDA, user.PublicKey(), nil)
 				require.NoError(t, err)
 				ixApprove1, err := tokens.TokenApproveChecked(2, token1Decimals, token1.Program, userTokenAccount1, token1.Mint, config.BillingSignerPDA, user.PublicKey(), nil)
 				require.NoError(t, err)
 
-				result := testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{ixApprove0, ixApprove1, ix}, user, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(800_000))
+				result := testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{ixApprove0, ixApprove1, ix}, user, config.DefaultCommitment, lookupTables, common.AddComputeUnitLimit(800_000))
 				require.NotNil(t, result)
 
 				fullNonces.evm.user++ // we just sent a successful message from the user to EVM

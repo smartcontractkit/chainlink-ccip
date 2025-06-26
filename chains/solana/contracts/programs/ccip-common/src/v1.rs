@@ -235,8 +235,8 @@ pub fn load_token_admin_registry_checked<'info>(
     )
 }
 
-fn load_v1_token_admin_registry<'info>(
-    token_admin_registry: &AccountInfo<'info>,
+fn load_v1_token_admin_registry(
+    token_admin_registry: &AccountInfo<'_>,
 ) -> Result<TokenAdminRegistry> {
     let data = token_admin_registry.try_borrow_data()?;
 
@@ -247,7 +247,7 @@ fn load_v1_token_admin_registry<'info>(
     );
 
     require!(
-        TokenAdminRegistry::DISCRIMINATOR == &data[..8],
+        TokenAdminRegistry::DISCRIMINATOR == data[..8],
         CommonCcipError::InvalidInputsTokenAdminRegistryAccounts
     );
 
