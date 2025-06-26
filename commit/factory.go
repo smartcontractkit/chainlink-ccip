@@ -123,6 +123,8 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to decode commit offchain config: %w", err)
 	}
 
+	lggr.Infow("Commit Offchain Config", "offchainConfig", offchainConfig)
+
 	if err = offchainConfig.ApplyDefaultsAndValidate(); err != nil {
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to validate commit offchain config: %w", err)
 	}

@@ -1,122 +1,111 @@
 package merkleroot
 
 import (
-	"fmt"
 	"testing"
+
+	"github.com/stretchr/testify/mock"
 
 	"github.com/stretchr/testify/assert"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	reader2 "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
-func Test_validateMerkleRootsState(t *testing.T) {
-	sourceChainConfig := map[cciptypes.ChainSelector]reader2.StaticSourceChainConfig{
-		10: {IsRMNVerificationDisabled: false, IsEnabled: true},
-		20: {IsRMNVerificationDisabled: false, IsEnabled: true},
-		30: {IsRMNVerificationDisabled: true, IsEnabled: true},
-	}
-
-	testCases := []struct {
-		name                 string
-		onRampNextSeqNum     []plugintypes.SeqNumChain
-		offRampExpNextSeqNum map[cciptypes.ChainSelector]cciptypes.SeqNum
-		readerErr            error
-		expErr               bool
-	}{
-		{
-			name: "happy path",
-			onRampNextSeqNum: []plugintypes.SeqNumChain{
-				plugintypes.NewSeqNumChain(10, 100),
-				plugintypes.NewSeqNumChain(20, 200),
-			},
-			offRampExpNextSeqNum: map[cciptypes.ChainSelector]cciptypes.SeqNum{10: 100, 20: 200},
-			expErr:               false,
-		},
-		{
-			name: "one root is stale",
-			onRampNextSeqNum: []plugintypes.SeqNumChain{
-				plugintypes.NewSeqNumChain(10, 100),
-				plugintypes.NewSeqNumChain(20, 200),
-			},
-			// <- 200 is already on chain
-			offRampExpNextSeqNum: map[cciptypes.ChainSelector]cciptypes.SeqNum{10: 100, 20: 201},
-			expErr:               true,
-		},
-		{
-			name: "one root has gap",
-			onRampNextSeqNum: []plugintypes.SeqNumChain{
-				plugintypes.NewSeqNumChain(10, 101), // <- onchain 99 but we submit 101 instead of 100
-				plugintypes.NewSeqNumChain(20, 200),
-			},
-			offRampExpNextSeqNum: map[cciptypes.ChainSelector]cciptypes.SeqNum{10: 100, 20: 200},
-			expErr:               true,
-		},
-		{
-			name: "reader returned wrong number of seq nums, should be ok",
-			onRampNextSeqNum: []plugintypes.SeqNumChain{
-				plugintypes.NewSeqNumChain(10, 100),
-				plugintypes.NewSeqNumChain(20, 200),
-			},
-			offRampExpNextSeqNum: map[cciptypes.ChainSelector]cciptypes.SeqNum{10: 100, 20: 200, 30: 300},
-			expErr:               false,
-		},
-		{
-			name: "reader error",
-			onRampNextSeqNum: []plugintypes.SeqNumChain{
-				plugintypes.NewSeqNumChain(10, 100),
-				plugintypes.NewSeqNumChain(20, 200),
-			},
-			offRampExpNextSeqNum: map[cciptypes.ChainSelector]cciptypes.SeqNum{10: 100, 20: 200},
-			readerErr:            fmt.Errorf("reader error"),
-			expErr:               true,
-		},
-		{
-			name: "happy path one root unblessed",
-			onRampNextSeqNum: []plugintypes.SeqNumChain{
-				plugintypes.NewSeqNumChain(10, 100),
-				plugintypes.NewSeqNumChain(20, 200),
-				plugintypes.NewSeqNumChain(30, 300),
-			},
-			offRampExpNextSeqNum: map[cciptypes.ChainSelector]cciptypes.SeqNum{10: 100, 20: 200, 30: 300},
-			expErr:               false,
-		},
-	}
-
+func TestValidateRootBlessings(t *testing.T) {
 	ctx := tests.Context(t)
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			reader := readermock.NewMockCCIPReader(t)
-			rep := cciptypes.CommitPluginReport{}
-			chains := make([]cciptypes.ChainSelector, 0, len(tc.onRampNextSeqNum))
-			for _, snc := range tc.onRampNextSeqNum {
-				if sourceChainConfig[snc.ChainSel].IsRMNVerificationDisabled {
-					rep.UnblessedMerkleRoots = append(rep.UnblessedMerkleRoots, cciptypes.MerkleRootChain{
-						ChainSel:     snc.ChainSel,
-						SeqNumsRange: cciptypes.NewSeqNumRange(snc.SeqNum, snc.SeqNum+10),
-					})
-				} else {
-					rep.BlessedMerkleRoots = append(rep.BlessedMerkleRoots, cciptypes.MerkleRootChain{
-						ChainSel:     snc.ChainSel,
-						SeqNumsRange: cciptypes.NewSeqNumRange(snc.SeqNum, snc.SeqNum+10),
-					})
-				}
-				chains = append(chains, snc.ChainSel)
-			}
-			reader.EXPECT().NextSeqNum(ctx, chains).Return(tc.offRampExpNextSeqNum, tc.readerErr)
-
-			reader.EXPECT().GetOffRampSourceChainsConfig(ctx, chains).Return(sourceChainConfig, nil).Maybe()
-
-			err := ValidateMerkleRootsState(ctx, rep.BlessedMerkleRoots, rep.UnblessedMerkleRoots, reader)
-			if tc.expErr {
-				assert.Error(t, err)
-				return
-			}
-			assert.NoError(t, err)
-		})
+	chainA := cciptypes.ChainSelector(1)
+	chainB := cciptypes.ChainSelector(2)
+	blessed := []cciptypes.MerkleRootChain{{ChainSel: chainA}}
+	unblessed := []cciptypes.MerkleRootChain{{ChainSel: chainB}}
+	sourceChainConfig := map[cciptypes.ChainSelector]reader2.StaticSourceChainConfig{
+		chainA: {IsRMNVerificationDisabled: false, IsEnabled: true},
+		chainB: {IsRMNVerificationDisabled: true, IsEnabled: true},
 	}
+
+	// Helper function to copy and override config
+	copyConfigWithOverride := func(chain cciptypes.ChainSelector,
+		override reader2.StaticSourceChainConfig) map[cciptypes.ChainSelector]reader2.StaticSourceChainConfig {
+		config := make(map[cciptypes.ChainSelector]reader2.StaticSourceChainConfig)
+		for k, v := range sourceChainConfig {
+			config[k] = v
+		}
+		config[chain] = override
+		return config
+	}
+
+	reader := readermock.NewMockCCIPReader(t)
+	reader.EXPECT().GetOffRampSourceChainsConfig(ctx, mock.Anything).Return(sourceChainConfig, nil).Maybe()
+
+	err := ValidateRootBlessings(ctx, reader, blessed, unblessed)
+	assert.NoError(t, err)
+
+	t.Run("duplicate chain", func(t *testing.T) {
+		dup := []cciptypes.MerkleRootChain{{ChainSel: chainA}}
+		err := ValidateRootBlessings(ctx, reader, blessed, dup)
+		assert.ErrorContains(t, err, "duplicate chain")
+	})
+
+	t.Run("missing chain in config", func(t *testing.T) {
+		mockReader2 := readermock.NewMockCCIPReader(t)
+		// Only include chainA, missing chainB
+		configMissingChain := map[cciptypes.ChainSelector]reader2.StaticSourceChainConfig{
+			chainA: sourceChainConfig[chainA],
+		}
+		mockReader2.EXPECT().GetOffRampSourceChainsConfig(ctx, []cciptypes.ChainSelector{chainA, chainB}).Return(
+			configMissingChain, nil).Maybe()
+
+		err := ValidateRootBlessings(ctx, mockReader2, blessed, unblessed)
+		assert.ErrorContains(t, err, "not in the offRampSourceChainsConfig")
+	})
+
+	t.Run("RMN-disabled but blessed", func(t *testing.T) {
+		mockReader3 := readermock.NewMockCCIPReader(t)
+		configWithRMNDisabled := copyConfigWithOverride(chainA, reader2.StaticSourceChainConfig{
+			IsRMNVerificationDisabled: true,
+			IsEnabled:                 true,
+		})
+		mockReader3.EXPECT().GetOffRampSourceChainsConfig(ctx, []cciptypes.ChainSelector{chainA, chainB}).Return(
+			configWithRMNDisabled, nil).Maybe()
+		err := ValidateRootBlessings(ctx, mockReader3, blessed, unblessed)
+		assert.ErrorContains(t, err, "RMN-disabled but root is blessed")
+	})
+
+	t.Run("disabled but blessed", func(t *testing.T) {
+		mockReader4 := readermock.NewMockCCIPReader(t)
+		configWithDisabled := copyConfigWithOverride(chainA, reader2.StaticSourceChainConfig{
+			IsRMNVerificationDisabled: false,
+			IsEnabled:                 false,
+		})
+		mockReader4.EXPECT().GetOffRampSourceChainsConfig(ctx, []cciptypes.ChainSelector{chainA, chainB}).Return(
+			configWithDisabled, nil).Maybe()
+		err := ValidateRootBlessings(ctx, mockReader4, blessed, unblessed)
+		assert.ErrorContains(t, err, "disabled but root is blessed")
+	})
+
+	t.Run("RMN-enabled but unblessed", func(t *testing.T) {
+		mockReader5 := readermock.NewMockCCIPReader(t)
+		configWithRMNEnabled := copyConfigWithOverride(chainB, reader2.StaticSourceChainConfig{
+			IsRMNVerificationDisabled: false,
+			IsEnabled:                 true,
+		})
+		mockReader5.EXPECT().GetOffRampSourceChainsConfig(ctx, []cciptypes.ChainSelector{chainA, chainB}).Return(
+			configWithRMNEnabled, nil).Maybe()
+		err := ValidateRootBlessings(ctx, mockReader5, blessed, unblessed)
+		assert.ErrorContains(t, err, "RMN-enabled but root is unblessed")
+	})
+
+	t.Run("disabled but root is reported", func(t *testing.T) {
+		mockReader6 := readermock.NewMockCCIPReader(t)
+		configWithDisabled := copyConfigWithOverride(chainB, reader2.StaticSourceChainConfig{
+			IsRMNVerificationDisabled: true,
+			IsEnabled:                 false,
+		})
+		mockReader6.EXPECT().GetOffRampSourceChainsConfig(ctx, []cciptypes.ChainSelector{chainA, chainB}).Return(
+			configWithDisabled, nil).Maybe()
+		err := ValidateRootBlessings(ctx, mockReader6, blessed, unblessed)
+		assert.ErrorContains(t, err, "disabled but root is reported")
+	})
 }
