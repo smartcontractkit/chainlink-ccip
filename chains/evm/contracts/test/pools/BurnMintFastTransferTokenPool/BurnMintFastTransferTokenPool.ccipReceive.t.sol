@@ -29,6 +29,10 @@ contract BurnMintFastTransferTokenPool_ccipReceive is BurnMintFastTransferTokenP
     vm.expectEmit();
     emit IERC20.Transfer(address(0), RECEIVER, expectedMintAmount);
 
+    // Expect inbound rate limit consumption (mint amount consumed)
+    vm.expectEmit();
+    emit TokenPool.InboundRateLimitConsumed(DEST_CHAIN_SELECTOR, address(s_token), TRANSFER_AMOUNT);
+
     vm.expectEmit();
     emit IFastTransferPool.FastTransferSettled(fillId, message.messageId, 0, 0, IFastTransferPool.FillState.NOT_FILLED);
 

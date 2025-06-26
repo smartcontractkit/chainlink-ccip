@@ -298,8 +298,6 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
 
     // Calculate the local amount.
     uint256 localAmount = _calculateLocalAmount(sourceAmountNetFee, sourceDecimals);
-    // We rate limit when there are funds going to an end user, not when they are going to a filler.
-    _consumeInboundRateLimit(sourceChainSelector, localAmount);
 
     s_fills[fillId] = FillInfo({state: IFastTransferPool.FillState.FILLED, filler: msg.sender});
 
@@ -345,19 +343,18 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     if (fillInfo.state == IFastTransferPool.FillState.NOT_FILLED) {
       // Set the local pool fee to zero, as fees are only applied for fast-fill operations
       localPoolFee = 0;
-      // Rate limits should be consumed only when the request was not fast-filled. During fast fill, the rate limit is
-      // consumed by the filler.
-      _consumeInboundRateLimit(sourceChainSelector, localAmount);
       // When no filler is involved, we send the entire amount to the receiver.
       _handleSlowFill(fillId, localAmount, abi.decode(mintMessage.receiver, (address)));
     } else if (fillInfo.state == IFastTransferPool.FillState.FILLED) {
-      // The request was fast-filled, so we reimburse the filler and accumulate the pool.
       fillerReimbursementAmount = localAmount - localPoolFee;
       _handleFastFillReimbursement(fillId, fillInfo.filler, fillerReimbursementAmount, localPoolFee);
     } else {
       // The catch all assertion for already settled fills ensures that any wrong value will revert.
       revert AlreadySettled(fillId);
     }
+    // Rate limiting should apply to the full sourceAmount regardless of whether the request was fast-filled or not.
+    // This ensures that the rate limit controls the overall rate of release/mint operations.
+    _consumeInboundRateLimit(sourceChainSelector, localAmount);
     s_fills[fillId].state = IFastTransferPool.FillState.SETTLED;
     emit FastTransferSettled(fillId, settlementId, fillerReimbursementAmount, localPoolFee, fillInfo.state);
   }
