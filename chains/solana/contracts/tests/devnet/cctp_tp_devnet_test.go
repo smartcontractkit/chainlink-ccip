@@ -528,7 +528,7 @@ func TestCctpTpDevnet(t *testing.T) {
 			common.AwaitSlotChange(ctx, client)
 		})
 
-		writableIndexes := []byte{3, 4, 5, 7, 11, 14, 20}
+		writableIndexes := []byte{3, 4, 5, 7, 11, 14}
 
 		t.Run("Upgrade TokenAdminRegistry", func(t *testing.T) {
 			t.Skip()
@@ -611,6 +611,11 @@ func TestCctpTpDevnet(t *testing.T) {
 			}
 
 			derivedAccounts, derivedLookupTables, tokenIndices := testutils.DeriveSendAccounts(ctx, t, admin, message, chainSelector, client, referenceAddresses.Router)
+
+			fmt.Printf("Derived Accounts: %d\n", len(derivedAccounts))
+			for i, acc := range derivedAccounts {
+				fmt.Printf("  %d: %s\n", i, acc.PublicKey)
+			}
 
 			builder := ccip_router.NewCcipSendInstructionBuilder().
 				SetDestChainSelector(chainSelector).
