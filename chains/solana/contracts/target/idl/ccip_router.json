@@ -1787,7 +1787,13 @@
             "name": "RetrievePoolPrograms"
           },
           {
-            "name": "TokenTransferStaticAccounts"
+            "name": "TokenTransferStaticAccounts",
+            "fields": [
+              {
+                "name": "page",
+                "type": "u32"
+              }
+            ]
           },
           {
             "name": "NestedTokenDerive",

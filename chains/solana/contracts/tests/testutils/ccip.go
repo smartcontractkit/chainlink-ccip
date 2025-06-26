@@ -32,6 +32,7 @@ func DeriveSendAccounts(
 	tokenIndex := byte(0)
 	routerConfigPDA, _, err := state.FindConfigPDA(router)
 	require.NoError(t, err)
+	derivingTokens := false
 
 	for {
 		params := ccip_router.DeriveAccountsCcipSendParams{
@@ -49,12 +50,15 @@ func DeriveSendAccounts(
 		derive, err := deriveRaw.ValidateAndBuild()
 		require.NoError(t, err)
 		tx := SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{derive}, authority, config.DefaultCommitment)
-		fmt.Printf("Derive logs: %s\n", tx.Meta.LogMessages)
 		derivation, err := common.ExtractAnchorTypedReturnValue[ccip_router.DeriveAccountsResponse](ctx, tx.Meta.LogMessages, router.String())
 		require.NoError(t, err)
-
-		if derivation.CurrentStage == "TokenTransferStaticAccounts" {
+		fmt.Printf("Derive stage: %s. Len: %d\n", derivation.CurrentStage, len(derivation.AccountsToSave))
+		if derivation.CurrentStage == "TokenTransferStaticAccounts/0" {
 			tokenIndices = append(tokenIndices, tokenIndex)
+			derivingTokens = true
+		}
+
+		if derivingTokens {
 			tokenIndex += byte(len(derivation.AccountsToSave))
 		}
 

@@ -27,6 +27,9 @@ use crate::{
 
 use super::helpers::load_nonce;
 
+// Most token pools have four static addresses + the 10 elements of a LUT.
+const TOKEN_ACCOUNTS_STATIC_PAGE_SIZE: usize = 14;
+
 // Local helper to find a readonly CCIP meta for a given seed + program_id combo.
 // Short name for compactness.
 fn find(seeds: &[&[u8]], program_id: Pubkey) -> CcipAccountMeta {
@@ -41,9 +44,15 @@ pub enum DeriveAccountsCcipSendStage {
     FinishMainAccountList,
     RetrieveTokenLUTs,
     RetrievePoolPrograms,
-    // N stages, one per token
-    TokenTransferStaticAccounts,
-    NestedTokenDerive { token_substage: String },
+    // N stages, one per token for the ones below.
+    TokenTransferStaticAccounts {
+        // Might be too many to fit in one response, so the user
+        // may be required to request multiple pages.
+        page: u32,
+    },
+    NestedTokenDerive {
+        token_substage: String,
+    },
 }
 
 impl Display for DeriveAccountsCcipSendStage {
@@ -59,8 +68,8 @@ impl Display for DeriveAccountsCcipSendStage {
             DeriveAccountsCcipSendStage::RetrievePoolPrograms => {
                 f.write_str("RetrievePoolPrograms")
             }
-            DeriveAccountsCcipSendStage::TokenTransferStaticAccounts => {
-                f.write_str("TokenTransferStaticAccounts")
+            DeriveAccountsCcipSendStage::TokenTransferStaticAccounts { page } => {
+                f.write_fmt(format_args!("TokenTransferStaticAccounts/{page}"))
             }
             DeriveAccountsCcipSendStage::NestedTokenDerive { token_substage } => {
                 f.write_fmt(format_args!("NestedTokenDerive/{token_substage}"))
@@ -81,7 +90,12 @@ impl FromStr for DeriveAccountsCcipSendStage {
             (Some("FinishMainAccountList"), None) => Ok(Self::FinishMainAccountList),
             (Some("RetrieveTokenLookupTables"), None) => Ok(Self::RetrieveTokenLUTs),
             (Some("RetrievePoolPrograms"), None) => Ok(Self::RetrievePoolPrograms),
-            (Some("TokenTransferStaticAccounts"), None) => Ok(Self::TokenTransferStaticAccounts),
+            (Some("TokenTransferStaticAccounts"), Some(page)) => {
+                Ok(Self::TokenTransferStaticAccounts {
+                    page: str::parse::<u32>(page)
+                        .or(Err(CcipRouterError::InvalidDerivationStage))?,
+                })
+            }
             (Some("NestedTokenDerive"), token_substage) => Ok(Self::NestedTokenDerive {
                 token_substage: token_substage.unwrap_or("Start").to_string(),
             }),
@@ -334,16 +348,19 @@ pub fn derive_ccip_send_accounts_retrieve_pool_programs<'info>(
         ask_again_with,
         look_up_tables_to_save: vec![],
         current_stage: DeriveAccountsCcipSendStage::RetrievePoolPrograms.to_string(),
-        next_stage: DeriveAccountsCcipSendStage::TokenTransferStaticAccounts.to_string(),
+        next_stage: DeriveAccountsCcipSendStage::TokenTransferStaticAccounts { page: 0 }
+            .to_string(),
     })
 }
 
 pub fn derive_ccip_send_accounts_additional_tokens_static<'info>(
     ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
     params: DeriveAccountsCcipSendParams,
+    page: u32,
 ) -> Result<DeriveAccountsResponse> {
     let mut response = DeriveAccountsResponse {
-        current_stage: DeriveAccountsCcipSendStage::TokenTransferStaticAccounts.to_string(),
+        current_stage: DeriveAccountsCcipSendStage::TokenTransferStaticAccounts { page }
+            .to_string(),
         ..Default::default()
     };
     let token_derivation_fixed_accounts_len = 6usize;
@@ -393,25 +410,43 @@ pub fn derive_ccip_send_accounts_additional_tokens_static<'info>(
     )
     .writable();
 
-    response.accounts_to_save = vec![
+    if page == 0 {
+        response.look_up_tables_to_save = vec![*token_lut.key];
+    }
+
+    let mut all_accounts_to_save = vec![
         sender_token_account,
         token_billing_config,
         pool_chain_config,
     ];
-    response
-        .accounts_to_save
-        .extend(
-            lut_account
-                .addresses
-                .iter()
-                .enumerate()
-                .map(|(i, a)| match i {
-                    // PoolConfig, PoolTokenAccount and Mint from the LUT are writable.
-                    3 | 4 | 7 => a.writable(),
-                    _ => a.readonly(),
-                }),
-        );
-    response.look_up_tables_to_save = vec![*token_lut.key];
+    all_accounts_to_save.extend(
+        lut_account
+            .addresses
+            .iter()
+            .enumerate()
+            .map(|(i, a)| match i {
+                // PoolConfig, PoolTokenAccount and Mint from the LUT are writable.
+                3 | 4 | 7 => a.writable(),
+                _ => a.readonly(),
+            }),
+    );
+    let start_of_page = TOKEN_ACCOUNTS_STATIC_PAGE_SIZE * page as usize;
+    let num_accounts_in_page =
+        TOKEN_ACCOUNTS_STATIC_PAGE_SIZE.min(all_accounts_to_save.len() - start_of_page);
+    let end_of_page = start_of_page + num_accounts_in_page;
+    all_accounts_to_save[start_of_page..end_of_page].clone_into(&mut response.accounts_to_save);
+
+    if end_of_page != all_accounts_to_save.len() {
+        response.next_stage =
+            DeriveAccountsCcipSendStage::TokenTransferStaticAccounts { page: page + 1 }.to_string();
+        // Different pages take the same inputs to derive, so we just reiterate the request:
+        response.ask_again_with = ctx
+            .remaining_accounts
+            .iter()
+            .map(|a| a.key().readonly())
+            .collect();
+        return Ok(response);
+    }
 
     let (this_token_index, _) = params
         .message
@@ -450,7 +485,8 @@ pub fn derive_ccip_send_accounts_additional_tokens_static<'info>(
                 .map(|a| a.key.readonly()),
         );
 
-        response.next_stage = DeriveAccountsCcipSendStage::TokenTransferStaticAccounts.to_string();
+        response.next_stage =
+            DeriveAccountsCcipSendStage::TokenTransferStaticAccounts { page: 0 }.to_string();
     }
 
     Ok(response)
@@ -578,7 +614,8 @@ pub fn derive_ccip_send_accounts_additional_token_nested<'info>(
                 .map(|a| a.key.readonly()),
         );
 
-        response.next_stage = DeriveAccountsCcipSendStage::TokenTransferStaticAccounts.to_string();
+        response.next_stage =
+            DeriveAccountsCcipSendStage::TokenTransferStaticAccounts { page: 0 }.to_string();
     }
 
     Ok(response)

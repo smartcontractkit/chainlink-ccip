@@ -731,13 +731,25 @@ func (obj *RetrievePoolPrograms) UnmarshalWithDecoder(decoder *ag_binary.Decoder
 
 func (_ *RetrievePoolPrograms) isDeriveAccountsCcipSendStage() {}
 
-type TokenTransferStaticAccounts uint8
+type TokenTransferStaticAccounts struct {
+	Page uint32
+}
 
 func (obj TokenTransferStaticAccounts) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Page` param:
+	err = encoder.Encode(obj.Page)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
 func (obj *TokenTransferStaticAccounts) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Page`:
+	err = decoder.Decode(&obj.Page)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 

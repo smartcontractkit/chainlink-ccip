@@ -1787,7 +1787,13 @@ export type CcipRouter = {
             "name": "RetrievePoolPrograms"
           },
           {
-            "name": "TokenTransferStaticAccounts"
+            "name": "TokenTransferStaticAccounts",
+            "fields": [
+              {
+                "name": "page",
+                "type": "u32"
+              }
+            ]
           },
           {
             "name": "NestedTokenDerive",
@@ -4109,7 +4115,13 @@ export const IDL: CcipRouter = {
             "name": "RetrievePoolPrograms"
           },
           {
-            "name": "TokenTransferStaticAccounts"
+            "name": "TokenTransferStaticAccounts",
+            "fields": [
+              {
+                "name": "page",
+                "type": "u32"
+              }
+            ]
           },
           {
             "name": "NestedTokenDerive",
