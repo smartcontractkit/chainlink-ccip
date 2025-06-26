@@ -31,11 +31,13 @@ contract OnRampOverSuperchainInteropSetup is OnRampSetup {
       Router.OnRamp({destChainSelector: DEST_CHAIN_SELECTOR, onRamp: address(s_onRampOverSuperchainInterop)});
 
     s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), new Router.OffRamp[](0));
+
+    assertEq("OnRampOverSuperchainInterop 1.6.1-dev", s_onRampOverSuperchainInterop.typeAndVersion());
   }
 
   function _EVM2AnyRampMessageToAny2EVMRampMessage(
     Internal.EVM2AnyRampMessage memory message
-  ) internal view returns (Internal.Any2EVMRampMessage memory) {
+  ) internal pure returns (Internal.Any2EVMRampMessage memory) {
     Internal.Any2EVMTokenTransfer[] memory tokenTransfers =
       new Internal.Any2EVMTokenTransfer[](message.tokenAmounts.length);
 
