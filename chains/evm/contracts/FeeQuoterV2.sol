@@ -7,7 +7,7 @@ import {FeeQuoter} from "./FeeQuoter.sol";
 import {Internal} from "./libraries/Internal.sol";
 import {Pool} from "./libraries/Pool.sol";
 
-contract FeeQuoterV2 is FeeQuoter {
+contract FeeQuoterV2 is IFeeQuoterV2, FeeQuoter {
   constructor(
     StaticConfig memory staticConfig,
     address[] memory priceUpdaters,
@@ -66,5 +66,20 @@ contract FeeQuoterV2 is FeeQuoter {
       destExecDataPerToken[i] = abi.encode(destGasAmount);
     }
     return destExecDataPerToken;
+  }
+
+  function parseExtraArgs(
+    bytes calldata extraArgs
+  )
+    external
+    view
+    returns (
+      uint256 gasLimit,
+      bytes memory tokenReceiver,
+      bytes memory destChainExtraArgs,
+      bytes[] memory verifierExtraArgs
+    )
+  {
+    return (0, bytes(""), bytes(""), new bytes[](0));
   }
 }
