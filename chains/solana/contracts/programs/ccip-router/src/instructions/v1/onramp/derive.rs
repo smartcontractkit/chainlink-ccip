@@ -9,7 +9,7 @@ use anchor_spl::{
     token::spl_token::{self, native_mint},
 };
 use ccip_common::seed;
-use ccip_common::v1::load_token_admin_registry_checked;
+use ccip_common::v1::{load_token_admin_registry_checked, token_admin_registry_writable};
 use ccip_common::CommonCcipError;
 use solana_program::{
     address_lookup_table::state::AddressLookupTable,
@@ -414,22 +414,19 @@ pub fn derive_ccip_send_accounts_additional_tokens_static<'info>(
         response.look_up_tables_to_save = vec![*token_lut.key];
     }
 
+    let token_admin_registry = load_token_admin_registry_checked(token_registry)?;
+
     let mut all_accounts_to_save = vec![
         sender_token_account,
         token_billing_config,
         pool_chain_config,
     ];
-    all_accounts_to_save.extend(
-        lut_account
-            .addresses
-            .iter()
-            .enumerate()
-            .map(|(i, a)| match i {
-                // PoolConfig, PoolTokenAccount and Mint from the LUT are writable.
-                3 | 4 | 7 => a.writable(),
-                _ => a.readonly(),
-            }),
-    );
+    all_accounts_to_save.extend(lut_account.addresses.iter().enumerate().map(|(i, a)| {
+        match token_admin_registry_writable::is(&token_admin_registry, i.try_into().unwrap()) {
+            true => a.writable(),
+            false => a.readonly(),
+        }
+    }));
     let start_of_page = TOKEN_ACCOUNTS_STATIC_PAGE_SIZE * page as usize;
     let num_accounts_in_page =
         TOKEN_ACCOUNTS_STATIC_PAGE_SIZE.min(all_accounts_to_save.len() - start_of_page);

@@ -188,15 +188,38 @@ pub fn validate_and_parse_token_accounts<'info>(
             // check that the writability of the passed accounts match the writable configuration (using indexes)
             let mut expected_is_writable: Vec<bool> =
                 required_entries.iter().map(|x| x.is_writable).collect();
+
             let mut remaining_is_writable: Vec<bool> =
-                remaining_accounts.iter().map(|x| x.is_writable).collect();
+                if token_admin_registry_account.supports_auto_derivation {
+                    // when auto-derivation is supported, we only validate the accounts present in the LUT
+                    // as the pool is expected to validate the rest of the accounts. The LUT must contain
+                    // the required entries, plus it may contain some additional ones that are static,
+                    // and finally the auto-derivation may add more accounts at the end (static or message-dependant).
+                    let end = lookup_table_account.addresses.len() - required_entries.len();
+                    remaining_accounts[..end]
+                        .iter()
+                        .map(|x| x.is_writable)
+                        .collect()
+                } else {
+                    // when auto-derivation is not supported, we validate all remaining accounts
+                    // as they are all expected to be in the LUT
+                    remaining_accounts.iter().map(|x| x.is_writable).collect()
+                };
+
             expected_is_writable.append(&mut remaining_is_writable);
             for (i, is_writable) in expected_is_writable.iter().enumerate() {
-                require_eq!(
-                    token_admin_registry_writable::is(&token_admin_registry_account, i as u8),
-                    *is_writable,
-                    CommonCcipError::InvalidInputsLookupTableAccountWritable
-                );
+                let expected =
+                    token_admin_registry_writable::is(&token_admin_registry_account, i as u8);
+                let actual = *is_writable;
+                if expected != actual {
+                    msg!(
+                        "Expected account at index {} to be writable {}, but it is {}",
+                        i,
+                        expected,
+                        actual
+                    );
+                    return Err(CommonCcipError::InvalidInputsLookupTableAccountWritable.into());
+                }
             }
         }
     }
