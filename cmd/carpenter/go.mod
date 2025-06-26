@@ -38,7 +38,7 @@ require (
 	github.com/prometheus/common v0.59.1 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
-	github.com/smartcontractkit/chain-selectors v1.0.47 // indirect
+	github.com/smartcontractkit/chain-selectors v1.0.61-0.20250626160107-a67b73efc039 // indirect
 	github.com/smartcontractkit/chainlink-common v0.4.2-0.20250121163309-3e179a73cb92 // indirect
 	github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go v0.0.0-20250131130834-15e0d4cde2a6 // indirect
 	github.com/smartcontractkit/libocr v0.0.0-20241007185508-adbe57025f12 // indirect

@@ -19,6 +19,7 @@ require (
 
 require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
+	github.com/smartcontractkit/chain-selectors v1.0.61-0.20250626160107-a67b73efc039 // indirect
 	golang.org/x/net v0.37.0 // indirect
 )
 
