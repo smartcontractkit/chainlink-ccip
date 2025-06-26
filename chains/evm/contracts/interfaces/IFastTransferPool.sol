@@ -18,7 +18,7 @@ interface IFastTransferPool {
     uint256 fastTransferFee; // Fee paid to the fast transfer filler in the same asset as requested.
   }
 
-  error AlreadyFilled(bytes32 fillId);
+  error AlreadyFilledOrSettled(bytes32 fillId);
   error AlreadySettled(bytes32 fillId);
 
   /// @notice Emitted when a fast transfer is requested

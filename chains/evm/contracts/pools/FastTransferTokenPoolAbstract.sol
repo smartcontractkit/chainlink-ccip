@@ -133,11 +133,11 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     uint256 amount,
     uint256 maxFastTransferFee,
     bytes calldata receiver,
-    address feeToken,
+    address settlementFeeToken,
     bytes calldata extraArgs
   ) external payable virtual override returns (bytes32 settlementId) {
     (Quote memory quote, Client.EVM2AnyMessage memory message) =
-      _getFeeQuoteAndCCIPMessage(destinationChainSelector, amount, receiver, feeToken, extraArgs);
+      _getFeeQuoteAndCCIPMessage(destinationChainSelector, amount, receiver, settlementFeeToken, extraArgs);
     _consumeOutboundRateLimit(destinationChainSelector, amount);
     if (quote.fastTransferFee > maxFastTransferFee) {
       revert QuoteFeeExceedsUserMaxLimit(quote.fastTransferFee, maxFastTransferFee);
@@ -145,9 +145,9 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     _handleFastTransferLockOrBurn(msg.sender, amount);
 
     // If the user is not paying in native, we need to transfer the fee token to the contract.
-    if (feeToken != address(0)) {
-      IERC20(feeToken).safeTransferFrom(msg.sender, address(this), quote.ccipSettlementFee);
-      IERC20(feeToken).safeApprove(i_ccipRouter, quote.ccipSettlementFee);
+    if (settlementFeeToken != address(0)) {
+      IERC20(settlementFeeToken).safeTransferFrom(msg.sender, address(this), quote.ccipSettlementFee);
+      IERC20(settlementFeeToken).safeApprove(i_ccipRouter, quote.ccipSettlementFee);
     }
 
     settlementId = IRouterClient(getRouter()).ccipSend{value: msg.value}(destinationChainSelector, message);
@@ -294,7 +294,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     }
 
     FillInfo memory fillInfo = s_fills[fillId];
-    if (fillInfo.state != IFastTransferPool.FillState.NOT_FILLED) revert AlreadyFilled(fillId);
+    if (fillInfo.state != IFastTransferPool.FillState.NOT_FILLED) revert AlreadyFilledOrSettled(fillId);
 
     // Calculate the local amount.
     uint256 localAmount = _calculateLocalAmount(sourceAmountNetFee, sourceDecimals);
