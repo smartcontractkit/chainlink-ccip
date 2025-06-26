@@ -10,6 +10,7 @@ import {Client} from "../libraries/Client.sol";
 import {Internal} from "../libraries/Internal.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 
+import {IVerifierSender} from "../interfaces/IVerifier.sol";
 import {IERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from
@@ -20,7 +21,7 @@ import {EnumerableSet} from
 /// @notice The OnRamp is a contract that handles lane-specific fee logic.
 /// @dev The OnRamp and OffRamp form a cross chain upgradeable unit. Any change to one of them results in an onchain
 /// upgrade of both contracts.
-contract CommitVerifier is ITypeAndVersion, Ownable2StepMsgSender {
+contract CommitVerifier is IVerifierSender, ITypeAndVersion, Ownable2StepMsgSender {
   using SafeERC20 for IERC20;
   using EnumerableSet for EnumerableSet.AddressSet;
 
@@ -38,14 +39,10 @@ contract CommitVerifier is ITypeAndVersion, Ownable2StepMsgSender {
   error ReentrancyGuardReentrantCall();
 
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
-  event DestChainConfigSet(
-    uint64 indexed destChainSelector, uint64 sequenceNumber, address router, bool allowlistEnabled
-  );
+  event DestChainConfigSet(uint64 indexed destChainSelector, address router, bool allowlistEnabled);
   event FeeTokenWithdrawn(address indexed feeAggregator, address indexed feeToken, uint256 amount);
   /// RMN depends on this event, if changing, please notify the RMN maintainers.
-  event CCIPMessageSent(
-    uint64 indexed destChainSelector, uint64 indexed sequenceNumber, Internal.EVM2AnyRampMessage message
-  );
+  event CCIPMessageSent(uint64 indexed destChainSelector, Internal.EVM2AnyRampMessage message);
   event AllowListAdminSet(address indexed allowlistAdmin);
   event AllowListSendersAdded(uint64 indexed destChainSelector, address[] senders);
   event AllowListSendersRemoved(uint64 indexed destChainSelector, address[] senders);
@@ -72,9 +69,6 @@ contract CommitVerifier is ITypeAndVersion, Ownable2StepMsgSender {
 
   /// @dev Struct to hold the configs for a single destination chain.
   struct DestChainConfig {
-    // The last used sequence number. This is zero in the case where no messages have yet been sent.
-    // 0 is not a valid sequence number for any real transaction as this value will be incremented before use.
-    uint64 sequenceNumber; // ──────╮ The last used sequence number.
     bool allowlistEnabled; //       │ True if the allowlist is enabled.
     address verifierAggregator; // ─╯ Local router address  that is allowed to send messages to the destination chain.
     EnumerableSet.AddressSet allowedSendersList; // The list of addresses allowed to send messages.
@@ -140,35 +134,20 @@ contract CommitVerifier is ITypeAndVersion, Ownable2StepMsgSender {
   // │                          Messaging                           │
   // ================================================================
 
-  /// @notice Gets the next sequence number to be used in the onRamp.
-  /// @param destChainSelector The destination chain selector.
-  /// @return nextSequenceNumber The next sequence number to be used.
-  function getExpectedNextSequenceNumber(
-    uint64 destChainSelector
-  ) external view returns (uint64) {
-    return s_destChainConfigs[destChainSelector].sequenceNumber + 1;
-  }
+  function forwardToVerifier(bytes calldata rawMessage, uint256 verifierIndex) external returns (bytes memory) {
+    Internal.EVM2AnyCommitVerifierMessage memory message =
+      abi.decode(rawMessage, (Internal.EVM2AnyCommitVerifierMessage));
 
-  function forwardToVerifier(
-    uint64 destChainSelector,
-    // Memory to avoid stack too deep.
-    Client.EVM2AnyMessage memory message,
-    uint256 feeTokenAmount,
-    address originalSender,
-    bytes calldata // verifierData
-  ) external returns (bytes memory) {
-    _validateOriginalSender(originalSender);
+    _validateOriginalSender(message.sender);
 
-    // Convert message fee to juels and retrieve converted args.
-    // Validate pool return data after it is populated (view function - no state changes).
-    (, bool isOutOfOrderExecution,,) = IFeeQuoter(s_dynamicConfig.feeQuoter).processMessageArgs(
-      destChainSelector, message.feeToken, feeTokenAmount, message.extraArgs, message.receiver
-    );
+    // TODO check extraArgs
+    bool isOutOfOrderExecution = abi.decode(message.verifierExtraArgs[verifierIndex], (bool));
 
     uint64 nonce = 0;
     if (!isOutOfOrderExecution) {
       // If the message is not out of order execution, we need to increment the nonce.
-      nonce = INonceManager(i_nonceManager).getIncrementedOutboundNonce(destChainSelector, originalSender);
+      nonce =
+        INonceManager(i_nonceManager).getIncrementedOutboundNonce(message.header.destChainSelector, message.sender);
     }
 
     return abi.encode(nonce);
@@ -269,27 +248,22 @@ contract CommitVerifier is ITypeAndVersion, Ownable2StepMsgSender {
       destChainConfig.allowlistEnabled = destChainConfigArg.allowlistEnabled;
 
       emit DestChainConfigSet(
-        destChainSelector,
-        destChainConfig.sequenceNumber,
-        destChainConfigArg.verifierAggregator,
-        destChainConfig.allowlistEnabled
+        destChainSelector, destChainConfigArg.verifierAggregator, destChainConfig.allowlistEnabled
       );
     }
   }
 
   /// @notice get ChainConfig configured for the DestinationChainSelector.
   /// @param destChainSelector The destination chain selector.
-  /// @return sequenceNumber The last used sequence number.
   /// @return allowlistEnabled boolean indicator to specify if allowlist check is enabled.
   /// @return verifierAggregator address of the verifierAggregator.
   function getDestChainConfig(
     uint64 destChainSelector
-  ) external view returns (uint64 sequenceNumber, bool allowlistEnabled, address verifierAggregator) {
+  ) external view returns (bool allowlistEnabled, address verifierAggregator) {
     DestChainConfig storage config = s_destChainConfigs[destChainSelector];
-    sequenceNumber = config.sequenceNumber;
     allowlistEnabled = config.allowlistEnabled;
     verifierAggregator = config.verifierAggregator;
-    return (sequenceNumber, allowlistEnabled, verifierAggregator);
+    return (allowlistEnabled, verifierAggregator);
   }
 
   /// @notice get allowedSenders List configured for the DestinationChainSelector.

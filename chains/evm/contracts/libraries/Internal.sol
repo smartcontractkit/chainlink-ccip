@@ -328,14 +328,13 @@ library Internal {
   // │                            1.7                               │
   // ================================================================
 
-  // send
-
   struct EVM2AnyCommitVerifierMessage {
     Header header; // Message header.
     address sender; // sender address on the source chain.
     bytes data; // arbitrary data payload supplied by the message sender.
     bytes receiver; // receiver address on the destination chain.
-    bytes extraArgs; // destination-chain specific extra args, such as the gasLimit for EVM chains.
+    bytes destChainExtraArgs; // destination-chain specific extra args, such as the gasLimit for EVM chains.
+    bytes[] verifierExtraArgs; // destination-chain specific extra args, such as the gasLimit for EVM chains.
     address feeToken; // fee token.
     uint256 feeTokenAmount; // fee token amount.
     uint256 feeValueJuels; // fee amount in Juels.
@@ -374,6 +373,7 @@ library Internal {
     // Destination chain data used to execute the token transfer on the destination chain. For an EVM destination, it
     // consists of the amount of gas available for the releaseOrMint and transfer calls made by the offRamp.
     bytes destExecData;
+    bytes32 requiredVerifierId; // The ID of the required verifier for this token transfer.
   }
 
   // receive
@@ -414,7 +414,8 @@ library Internal {
         keccak256(original.receiver),
         keccak256(original.data),
         keccak256(abi.encode(original.tokenAmounts)),
-        keccak256(original.extraArgs)
+        keccak256(original.destChainExtraArgs),
+        original.verifierExtraArgs
       )
     );
   }
