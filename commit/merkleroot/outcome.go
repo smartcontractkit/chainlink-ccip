@@ -138,9 +138,9 @@ func reportRangesOutcome(
 			rangesToReport = append(rangesToReport, chainRange)
 
 			if rng.End() != chainRange.SeqNumRange.End() { // Check if the range was truncated.
-				lggr.Infof("Range for chain %d: %s (before truncate: %v)", chainSel, chainRange.SeqNumRange, rng)
+				lggr.Debugf("Range for chain %d: %s (before truncate: %v)", chainSel, chainRange.SeqNumRange, rng)
 			} else {
-				lggr.Infof("Range for chain %d: %s", chainSel, chainRange.SeqNumRange)
+				lggr.Debugf("Range for chain %d: %s", chainSel, chainRange.SeqNumRange)
 			}
 		}
 	}
@@ -159,7 +159,7 @@ func reportRangesOutcome(
 	}
 
 	if len(rangesToReport) == 0 {
-		lggr.Info("No ranges to report, outcomeType is ReportEmpty")
+		lggr.Debug("No ranges to report, outcomeType is ReportEmpty")
 		return Outcome{OutcomeType: ReportEmpty}
 	}
 
@@ -333,10 +333,10 @@ func filterValidRoots(
 			"root", rk, "isSigned", signedRoots.Contains(rk), "rmnEnabled", rmnEnabledChains[root.ChainSel])
 
 		if rootIsValid {
-			lggr2.Infow("root valid, added to the results")
+			lggr2.Debugw("root valid, added to the results")
 			validRoots = append(validRoots, root)
 		} else {
-			lggr2.Infow("root invalid, skipping")
+			lggr2.Debugw("root invalid, skipping")
 		}
 	}
 
