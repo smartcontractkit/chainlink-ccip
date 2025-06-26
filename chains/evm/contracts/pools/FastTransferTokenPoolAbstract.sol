@@ -339,6 +339,8 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     FillInfo memory fillInfo = s_fills[fillId];
     // The amount to reimburse to the filler in local denomination.
     uint256 fillerReimbursementAmount = 0;
+    // Mark the fill as settled by updating its state in storage. Use fillInfo for further operations.
+    s_fills[fillId].state = IFastTransferPool.FillState.SETTLED;
 
     if (fillInfo.state == IFastTransferPool.FillState.NOT_FILLED) {
       // Set the local pool fee to zero, as fees are only applied for fast-fill operations
@@ -355,7 +357,6 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     // Rate limiting should apply to the full sourceAmount regardless of whether the request was fast-filled or not.
     // This ensures that the rate limit controls the overall rate of release/mint operations.
     _consumeInboundRateLimit(sourceChainSelector, localAmount);
-    s_fills[fillId].state = IFastTransferPool.FillState.SETTLED;
     emit FastTransferSettled(fillId, settlementId, fillerReimbursementAmount, localPoolFee, fillInfo.state);
   }
 
