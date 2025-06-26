@@ -7,13 +7,15 @@ import {IPoolV1} from "../interfaces/IPool.sol";
 import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
 import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
-import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
+import {IVerifierSender} from "../interfaces/IVerifier.sol";
 
 import {Client} from "../libraries/Client.sol";
 import {Internal} from "../libraries/Internal.sol";
 import {Pool} from "../libraries/Pool.sol";
 import {USDPriceWith18Decimals} from "../libraries/USDPriceWith18Decimals.sol";
+import {VerifierRegistry} from "../verifiers/VerifierRegistry.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
+import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {IERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
@@ -40,6 +42,8 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   error GetSupportedTokensFunctionalityRemovedCheckAdminRegistry();
   error InvalidDestChainConfig(uint64 destChainSelector);
   error ReentrancyGuardReentrantCall();
+  error MalformedVerifierExtraArgs(bytes verifierExtraArgs);
+  error InvalidVerifierId(bytes32 verifierId);
 
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event DestChainConfigSet(uint64 indexed destChainSelector, uint64 sequenceNumber, IRouter router);
@@ -56,6 +60,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     uint64 chainSelector; // ────╮ Local chain selector.
     IRMNRemote rmnRemote; // ────╯ RMN remote address.
     address tokenAdminRegistry; // Token admin registry address.
+    address verifierRegistry; // Verifier registry address.
   }
 
   /// @dev Struct that contains the dynamic configuration
@@ -90,6 +95,8 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   IRMNRemote private immutable i_rmnRemote;
   /// @dev The address of the token admin registry.
   address private immutable i_tokenAdminRegistry;
+  /// @dev The address of the verifier registry.
+  address private immutable i_verifierRegistry;
 
   // DYNAMIC CONFIG
   /// @dev The dynamic config for the onRamp.
@@ -97,6 +104,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
   /// @dev The destination chain specific configs.
   mapping(uint64 destChainSelector => DestChainConfig destChainConfig) private s_destChainConfigs;
+
+  // TODO move to verifier registry?
+  mapping(bytes32 verifierId => address verifierAddress) private s_verifiers;
 
   constructor(
     StaticConfig memory staticConfig,
@@ -113,6 +123,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     i_localChainSelector = staticConfig.chainSelector;
     i_rmnRemote = staticConfig.rmnRemote;
     i_tokenAdminRegistry = staticConfig.tokenAdminRegistry;
+    i_verifierRegistry = staticConfig.verifierRegistry;
 
     _setDynamicConfig(dynamicConfig);
     _applyDestChainConfigUpdates(destChainConfigArgs);
@@ -151,6 +162,13 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     // Router address may be zero intentionally to pause, which should stop all messages.
     if (msg.sender != address(destChainConfig.router)) revert MustBeCalledByRouter();
 
+    (
+      uint256 executionGasLimit,
+      bytes memory tokenReceiver,
+      bytes memory destChainExtraArgs,
+      bytes[] memory verifierExtraArgs
+    ) = IFeeQuoterV2(s_dynamicConfig.feeQuoter).parseExtraArgs(message.extraArgs);
+
     Internal.EVM2AnyCommitVerifierMessage memory newMessage = Internal.EVM2AnyCommitVerifierMessage({
       header: Internal.Header({
         // Should be generated after the message is complete.
@@ -162,34 +180,35 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       }),
       sender: originalSender,
       data: message.data,
-      extraArgs: "",
+      destChainExtraArgs: destChainExtraArgs,
+      verifierExtraArgs: verifierExtraArgs,
       receiver: message.receiver,
       feeToken: message.feeToken,
       feeTokenAmount: feeTokenAmount,
       feeValueJuels: 0, // Populated by the FeeQuoter.
-      tokenAmounts: new Internal.EVMTokenTransfer[](message.tokenAmounts.length), // Populated via lock/burn pool calls.
+      tokenAmounts: new Internal.EVMTokenTransfer[](0), // Populated by the FeeQuoter.
       requiredVerifiers: new Internal.RequiredVerifier[](0) // Populated by the FeeQuoter.
     });
 
-    // Convert message fee to juels and retrieve converted args.
-    // Validate pool return data after it is populated (view function - no state changes).
-    bytes memory tokenReceiver;
-    (newMessage.feeValueJuels,, newMessage.extraArgs, tokenReceiver) = IFeeQuoterV2(s_dynamicConfig.feeQuoter)
-      .processMessageArgs(destChainSelector, message.feeToken, feeTokenAmount, message.extraArgs, message.receiver);
+    newMessage.tokenAmounts = _handleTokens(message.tokenAmounts, tokenReceiver, originalSender, destChainSelector);
 
-    Client.EVMTokenAmount[] memory tokenAmounts = message.tokenAmounts;
-    // Lock / burn the tokens as last step. TokenPools may not always be trusted.
-    for (uint256 i = 0; i < message.tokenAmounts.length; ++i) {
-      newMessage.tokenAmounts[i] =
-        _lockOrBurnSingleToken(tokenAmounts[i], destChainSelector, tokenReceiver, originalSender);
+    for (uint256 i = 0; i < newMessage.verifierExtraArgs.length; ++i) {
+      if (newMessage.verifierExtraArgs[i].length < 32) {
+        // TODO encode efficiently
+        revert MalformedVerifierExtraArgs(newMessage.verifierExtraArgs[i]);
+      }
+
+      // TODO does this work?
+      bytes32 verifierId = bytes32(newMessage.verifierExtraArgs[i]);
+      address verifierAddress = s_verifiers[verifierId];
+      if (verifierAddress == address(0)) {
+        revert InvalidVerifierId(verifierId);
+      }
+
+      IVerifierSender(verifierAddress).forwardToVerifier(abi.encode(newMessage), i);
     }
 
-    bytes[] memory destExecDataPerToken =
-      IFeeQuoterV2(s_dynamicConfig.feeQuoter).processPoolReturnDataNew(destChainSelector, newMessage.tokenAmounts);
-
-    for (uint256 i = 0; i < newMessage.tokenAmounts.length; ++i) {
-      newMessage.tokenAmounts[i].destExecData = destExecDataPerToken[i];
-    }
+    // TODO Convert fee
 
     // Hash only after all fields have been set.
     newMessage.header.messageId = Internal._hash(
@@ -207,6 +226,26 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     return newMessage.header.messageId;
   }
 
+  function _handleTokens(
+    Client.EVMTokenAmount[] memory tokenAmounts,
+    bytes memory tokenReceiver,
+    address originalSender,
+    uint64 destChainSelector
+  ) internal returns (Internal.EVMTokenTransfer[] memory tokenTransfers) {
+    tokenTransfers = new Internal.EVMTokenTransfer[](tokenAmounts.length);
+    // Lock / burn the tokens as last step. TokenPools may not always be trusted.
+    for (uint256 i = 0; i < tokenAmounts.length; ++i) {
+      tokenTransfers[i] = _lockOrBurnSingleToken(tokenAmounts[i], destChainSelector, tokenReceiver, originalSender);
+    }
+
+    bytes[] memory destExecDataPerToken =
+      IFeeQuoterV2(s_dynamicConfig.feeQuoter).processPoolReturnDataNew(destChainSelector, tokenTransfers);
+
+    for (uint256 i = 0; i < tokenTransfers.length; ++i) {
+      tokenTransfers[i].destExecData = destExecDataPerToken[i];
+    }
+  }
+
   // ================================================================
   // │                           Config                             │
   // ================================================================
@@ -214,11 +253,12 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   /// @notice Returns the static onRamp config.
   /// @dev RMN depends on this function, if modified, please notify the RMN maintainers.
   /// @return staticConfig the static configuration.
-  function getStaticConfig() external view returns (StaticConfig memory) {
+  function getStaticConfig() public view returns (StaticConfig memory) {
     return StaticConfig({
       chainSelector: i_localChainSelector,
       rmnRemote: i_rmnRemote,
-      tokenAdminRegistry: i_tokenAdminRegistry
+      tokenAdminRegistry: i_tokenAdminRegistry,
+      verifierRegistry: i_verifierRegistry
     });
   }
 
@@ -247,14 +287,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
     s_dynamicConfig = dynamicConfig;
 
-    emit ConfigSet(
-      StaticConfig({
-        chainSelector: i_localChainSelector,
-        rmnRemote: i_rmnRemote,
-        tokenAdminRegistry: i_tokenAdminRegistry
-      }),
-      dynamicConfig
-    );
+    emit ConfigSet(getStaticConfig(), dynamicConfig);
   }
 
   /// @notice Updates destination chains specific configs.
@@ -353,7 +386,8 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       destTokenAddress: poolReturnData.destTokenAddress,
       extraData: poolReturnData.destPoolData,
       amount: tokenAndAmount.amount,
-      destExecData: "" // This is set in the processPoolReturnData function.
+      destExecData: "", // This is set in the processPoolReturnData function.
+      requiredVerifierId: bytes32(0)
     });
   }
 
