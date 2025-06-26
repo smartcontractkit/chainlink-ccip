@@ -669,7 +669,7 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 		t.Run("self-onboard", func(t *testing.T) {
 
 			// Enable self-served token pool onboarding
-			ix, err := tokenpool.NewUpdateGlobalConfigInstruction(true, configPDA, admin.PublicKey(), solana.SystemProgramID, poolProgram, programData.Address).ValidateAndBuild()
+			ix, err := tokenpool.NewUpdateGlobalConfigInstruction(true, configPDA, admin.PublicKey(), poolProgram, programData.Address).ValidateAndBuild()
 			require.NoError(t, err)
 
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{
