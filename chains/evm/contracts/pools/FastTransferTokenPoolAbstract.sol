@@ -336,7 +336,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
       mintMessage.receiver
     );
 
-    // Cache current fill info preserves the pre-update state to decide which hook to call.
+    // Cache current fill info to decide which hook to call.
     FillInfo memory fillInfo = s_fills[fillId];
     /// Mark the fill as SETTLED before any value transfers or external calls.
     /// This makes the new state visible immediately, preventing the same fill
