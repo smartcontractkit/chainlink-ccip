@@ -4,7 +4,6 @@ pragma solidity ^0.8.24;
 import {Identifier} from "../../../vendor/optimism/interop-lib/v0/src/interfaces/IIdentifier.sol";
 
 import {Internal} from "../../../libraries/Internal.sol";
-import {SuperchainInterop} from "../../../libraries/SuperchainInterop.sol";
 import {OffRampOverSuperchainInterop} from "../../../offRamp/OffRampOverSuperchainInterop.sol";
 import {OffRampOverSuperchainInteropSetup} from "./OffRampOverSuperchainInteropSetup.t.sol";
 

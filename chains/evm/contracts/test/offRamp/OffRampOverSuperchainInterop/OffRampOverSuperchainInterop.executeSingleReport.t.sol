@@ -1,22 +1,18 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {ICrossL2Inbox} from "../../../vendor/optimism/interop-lib/v0/src/interfaces/ICrossL2Inbox.sol";
 import {Identifier} from "../../../vendor/optimism/interop-lib/v0/src/interfaces/IIdentifier.sol";
 
 import {Router} from "../../../Router.sol";
 import {Internal} from "../../../libraries/Internal.sol";
-import {SuperchainInterop} from "../../../libraries/SuperchainInterop.sol";
 import {OffRamp} from "../../../offRamp/OffRamp.sol";
 import {OffRampOverSuperchainInterop} from "../../../offRamp/OffRampOverSuperchainInterop.sol";
 
-import {MaybeRevertMessageReceiver} from "../../helpers/receivers/MaybeRevertMessageReceiver.sol";
+import {LogMessageDataReceiver} from "../../helpers/receivers/LogMessageDataReceiver.sol";
 import {MockCrossL2Inbox} from "../../mocks/MockCrossL2Inbox.sol";
 import {OffRampOverSuperchainInteropSetup} from "./OffRampOverSuperchainInteropSetup.t.sol";
 
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
-import {IERC20} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/token/ERC20/IERC20.sol";
 
 contract OffRampOverSuperchainInterop_executeSingleReport is OffRampOverSuperchainInteropSetup {
   event ExecutionStateChanged(
@@ -49,7 +45,7 @@ contract OffRampOverSuperchainInterop_executeSingleReport is OffRampOverSupercha
 
   function test_executeSingleReport() public {
     // Setup receiver
-    MaybeRevertMessageReceiver receiver = new MaybeRevertMessageReceiver(false);
+    LogMessageDataReceiver receiver = new LogMessageDataReceiver();
 
     // Generate message
     Internal.Any2EVMRampMessage memory message = _generateValidMessage(SOURCE_CHAIN_SELECTOR_1, 1);
@@ -80,6 +76,10 @@ contract OffRampOverSuperchainInterop_executeSingleReport is OffRampOverSupercha
     // Execute the report as transmitter
     vm.stopPrank();
     vm.prank(s_validTransmitters[0]);
+
+    vm.expectEmit();
+    emit LogMessageDataReceiver.MessageReceived(message.data);
+
     s_offRampOverSuperchainInterop.executeSingleReport(report, new OffRamp.GasLimitOverride[](0));
 
     // Verify message was executed

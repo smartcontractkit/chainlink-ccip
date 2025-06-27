@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {ICrossL2Inbox} from "../../../vendor/optimism/interop-lib/v0/src/interfaces/ICrossL2Inbox.sol";
 import {Identifier} from "../../../vendor/optimism/interop-lib/v0/src/interfaces/IIdentifier.sol";
 
 import {Internal} from "../../../libraries/Internal.sol";

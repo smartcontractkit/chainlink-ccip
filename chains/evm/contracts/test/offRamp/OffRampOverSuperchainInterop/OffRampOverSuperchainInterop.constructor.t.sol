@@ -49,16 +49,19 @@ contract OffRampOverSuperchainInterop_constructor is OffRampOverSuperchainIntero
 
     // Verify static config
     OffRamp.StaticConfig memory retrievedStaticConfig = offRamp.getStaticConfig();
-    assertEq(DEST_CHAIN_SELECTOR, retrievedStaticConfig.chainSelector);
-    assertEq(GAS_FOR_CALL_EXACT_CHECK, retrievedStaticConfig.gasForCallExactCheck);
-    assertEq(address(s_mockRMNRemote), address(retrievedStaticConfig.rmnRemote));
-    assertEq(address(s_tokenAdminRegistry), retrievedStaticConfig.tokenAdminRegistry);
-    assertEq(address(s_inboundNonceManager), retrievedStaticConfig.nonceManager);
+    assertEq(staticConfig.chainSelector, retrievedStaticConfig.chainSelector);
+    assertEq(staticConfig.gasForCallExactCheck, retrievedStaticConfig.gasForCallExactCheck);
+    assertEq(staticConfig.rmnRemote, address(retrievedStaticConfig.rmnRemote));
+    assertEq(staticConfig.tokenAdminRegistry, retrievedStaticConfig.tokenAdminRegistry);
+    assertEq(staticConfig.nonceManager, retrievedStaticConfig.nonceManager);
 
     // Verify dynamic config
     OffRamp.DynamicConfig memory retrievedDynamicConfig = offRamp.getDynamicConfig();
-    assertEq(address(s_feeQuoter), retrievedDynamicConfig.feeQuoter);
-    assertEq(60 * 60, retrievedDynamicConfig.permissionLessExecutionThresholdSeconds);
-    assertEq(address(0), retrievedDynamicConfig.messageInterceptor);
+    assertEq(dynamicConfig.feeQuoter, retrievedDynamicConfig.feeQuoter);
+    assertEq(
+      dynamicConfig.permissionLessExecutionThresholdSeconds,
+      retrievedDynamicConfig.permissionLessExecutionThresholdSeconds
+    );
+    assertEq(dynamicConfig.messageInterceptor, retrievedDynamicConfig.messageInterceptor);
   }
 }

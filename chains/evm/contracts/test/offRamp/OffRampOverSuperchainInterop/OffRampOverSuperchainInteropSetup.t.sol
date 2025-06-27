@@ -1,13 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {ICrossL2Inbox} from "../../../vendor/optimism/interop-lib/v0/src/interfaces/ICrossL2Inbox.sol";
 import {Identifier} from "../../../vendor/optimism/interop-lib/v0/src/interfaces/IIdentifier.sol";
 
 import {OffRampOverSuperchainInteropHelper} from "../../helpers/OffRampOverSuperchainInteropHelper.sol";
 import {MockCrossL2Inbox} from "../../mocks/MockCrossL2Inbox.sol";
-
-import {IRMNRemote} from "../../../interfaces/IRMNRemote.sol";
 
 import {Internal} from "../../../libraries/Internal.sol";
 import {SuperchainInterop} from "../../../libraries/SuperchainInterop.sol";
@@ -15,7 +12,6 @@ import {MultiOCR3Base} from "../../../ocr/MultiOCR3Base.sol";
 import {OffRamp} from "../../../offRamp/OffRamp.sol";
 import {OffRampOverSuperchainInterop} from "../../../offRamp/OffRampOverSuperchainInterop.sol";
 
-import {OffRampHelper} from "../../helpers/OffRampHelper.sol";
 import {OffRampSetup} from "../OffRamp/OffRampSetup.t.sol";
 
 contract OffRampOverSuperchainInteropSetup is OffRampSetup {

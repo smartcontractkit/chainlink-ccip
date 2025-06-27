@@ -11,6 +11,9 @@ import {OffRamp} from "./OffRamp.sol";
 
 /// @notice This OffRamp supports OP Superchain Interop. It leverages CrossL2Inbox to verify validity of a message,
 /// as opposed to relying on roots signed by Commit DON.
+/// @dev This OffRamp maintains the same Internal.ExecutionReport interface for execute, but it enforces
+/// exactly 1 message per report. Batching is not supported, because this OffRamp only runs on OP L2s,
+/// the benefits of batching is minimal, it is not worth the complexity.
 contract OffRampOverSuperchainInterop is OffRamp {
   error InvalidSourceChainSelector(uint64 sourceChainSelector, uint64 expected);
   error InvalidDestChainSelector(uint64 destChainSelector, uint64 expected);
@@ -84,8 +87,8 @@ contract OffRampOverSuperchainInterop is OffRamp {
   /// Additional checks are necessary, the most critical ones are OnRamp and chainId validation.
   /// @param sourceChainSelector The source chain selector of the message.
   /// @param report The execution report to verify.
-  /// @return timestampCommitted The timestamp of the message.
-  /// @return hashedLeaves The hashed leaves for the message.
+  /// @return timestampCommitted The source timestamp of the message.
+  /// @return hashedLeaves Array of 1 hashed message.
   function _verifyMessage(
     uint64 sourceChainSelector,
     Internal.ExecutionReport memory report
@@ -151,8 +154,8 @@ contract OffRampOverSuperchainInterop is OffRamp {
   // ================================================================
 
   /// @notice Updates sourceChainSelector to chainId mapping.
-  /// @param chainSelectorsToUnset Array of chainIds to remove from the mapping.
-  /// @param chainSelectorsToSet Array of chainId to sourceChainSelector mappings to add.
+  /// @param chainSelectorsToUnset Array of selectors to remove from the mapping.
+  /// @param chainSelectorsToSet Array of selector to chainId mappings to add.
   function applyChainSelectorToChainIdConfigUpdates(
     uint64[] memory chainSelectorsToUnset,
     ChainSelectorToChainIdConfigArgs[] memory chainSelectorsToSet
@@ -161,8 +164,8 @@ contract OffRampOverSuperchainInterop is OffRamp {
   }
 
   /// @notice Internal function to update the sourceChainSelector tp chainId mapping.
-  /// @param chainSelectorsToUnset Array of chain selector to remove.
-  /// @param chainSelectorsToSet Array of chain selectors to add.
+  /// @param chainSelectorsToUnset Array of selectors to remove from the mapping.
+  /// @param chainSelectorsToSet Array of selector to chainId mappings to add.
   function _applyChainSelectorToChainIdConfigUpdates(
     uint64[] memory chainSelectorsToUnset,
     ChainSelectorToChainIdConfigArgs[] memory chainSelectorsToSet
@@ -190,6 +193,8 @@ contract OffRampOverSuperchainInterop is OffRamp {
   }
 
   /// @notice Returns the chainId for a given sourceChainSelector.
+  /// @param sourceChainSelector The source chain selector to get the chainId for.
+  /// @return chainId The chainId for the given sourceChainSelector.
   function getChainId(
     uint64 sourceChainSelector
   ) external view returns (uint256) {
@@ -197,6 +202,7 @@ contract OffRampOverSuperchainInterop is OffRamp {
   }
 
   /// @notice Returns the CrossL2Inbox address.
+  /// @return crossL2Inbox The address of the CrossL2Inbox.
   function getCrossL2Inbox() external view returns (address) {
     return address(i_crossL2Inbox);
   }
