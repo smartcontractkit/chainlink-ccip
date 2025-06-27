@@ -1,10 +1,14 @@
 package v2
 
 import (
+	"bytes"
 	"context"
+	"encoding/hex"
 	"fmt"
+	"math/big"
 	"strings"
 
+	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
@@ -98,16 +102,29 @@ func (u *CTTPv2TokenDataObserver) IsTokenSupported(
 	sourceChain cciptypes.ChainSelector,
 	msgToken cciptypes.RampTokenAmount,
 ) bool {
+	_, err := u.getValidatedSourceTokenDataPayload(sourceChain, msgToken)
+	return err == nil
+}
+
+// TODO: doc
+func (u *CTTPv2TokenDataObserver) getValidatedSourceTokenDataPayload(
+	sourceChain cciptypes.ChainSelector,
+	msgToken cciptypes.RampTokenAmount,
+) (*SourceTokenDataPayload, error) {
 	if !strings.EqualFold(u.supportedPoolsBySelector[sourceChain], msgToken.SourcePoolAddress.String()) {
-		return false
+		return nil, fmt.Errorf("unsupported token pool address")
 	}
 
-	tokenData, err := reader.NewSourceTokenDataPayloadFromBytes(msgToken.ExtraData)
+	tokenData, err := DecodeSourceTokenDataPayload(msgToken.ExtraData)
 	if err != nil {
-		return false
+		return nil, err
 	}
 
-	return tokenData.CCTPVersion == reader.CttpVersion2
+	if tokenData.CCTPVersion != reader.CttpVersion2 {
+		return nil, fmt.Errorf("unsupported CCTP version: %d", tokenData.CCTPVersion)
+	}
+
+	return tokenData, nil
 }
 
 func (u *CTTPv2TokenDataObserver) Close() error {
@@ -323,4 +340,262 @@ func (u *CTTPv2TokenDataObserver) getSourceDomainId(
 	}
 
 	return sourceDomainId, nil
+}
+
+type CCTPv2Response struct {
+	cctpMessages map[string]Message
+	err          error
+}
+
+func (u *CTTPv2TokenDataObserver) getTokenDataForSourceChain(
+	ctx context.Context,
+	sourceChain cciptypes.ChainSelector,
+	attestationEncoder AttestationEncoder,
+	messages map[cciptypes.SeqNum]cciptypes.Message,
+) map[cciptypes.SeqNum]exectypes.MessageTokenData {
+	result := make(map[cciptypes.SeqNum]exectypes.MessageTokenData)
+
+	var seqNumToSourceTokenDataPayloads = make(map[cciptypes.SeqNum][]*SourceTokenDataPayload)
+	for seqNum, message := range messages {
+		seqNumToSourceTokenDataPayloads[seqNum] = u.getSourceTokenDataPayloads(sourceChain, message)
+	}
+	// If >1 source domain IDs are found, return errored TokenData
+	// If no source domain ID is found, return empty TokenData
+	sourceDomainId, err := getSourceDomainId(sourceChain, seqNumToSourceTokenDataPayloads)
+	if err != nil {
+		// TODO: impl
+	}
+	txHashes := mapset.NewSet[string]()
+	for _, message := range messages {
+		txHashes.Add(message.Header.TxHash)
+	}
+
+	responses := u.callCCTPv2API(sourceDomainId, txHashes)
+
+	// Now associate SourceTokenDataPayload with CCTPv2Message, and update claimedNonces
+	for seqNum, sourceTokenDataPayloads := range seqNumToSourceTokenDataPayloads {
+		txHash := messages[seqNum].Header.TxHash
+		result[seqNum] = associate(ctx, attestationEncoder, sourceTokenDataPayloads, responses[txHash])
+	}
+
+	return result
+}
+
+func (u *CTTPv2TokenDataObserver) callCCTPv2API(
+	sourceDomainId uint32,
+	txHashes mapset.Set[string],
+) map[string]CCTPv2Response {
+	return nil
+}
+
+// TODO: doc
+func getSourceDomainId(
+	sourceChain cciptypes.ChainSelector,
+	seqNumToSourceTokenDataPayloads map[cciptypes.SeqNum][]*SourceTokenDataPayload,
+) (uint32, error) {
+	sourceDomainIdSet := false
+	var sourceDomainId uint32
+	for seqNum, sourceTokenDataPayloads := range seqNumToSourceTokenDataPayloads {
+		for _, sourceTokenDataPayload := range sourceTokenDataPayloads {
+			if sourceTokenDataPayload == nil {
+				continue
+			}
+
+			if !sourceDomainIdSet {
+				sourceDomainId = sourceTokenDataPayload.SourceDomain
+				sourceDomainIdSet = true
+			} else if sourceDomainId != sourceTokenDataPayload.SourceDomain {
+				return 0, fmt.Errorf("multiple source domain IDs found for the same source chain: sourceChain %d, "+
+					"sourceDomainIDs %d and %d, seqNum %d", sourceChain, sourceDomainId,
+					sourceTokenDataPayload.SourceDomain, seqNum)
+			}
+		}
+	}
+
+	if !sourceDomainIdSet {
+		return 0, fmt.Errorf("no source domain ID found for source chain %s", sourceChain)
+	}
+
+	return sourceDomainId, nil
+}
+
+// TODO: doc
+func (u *CTTPv2TokenDataObserver) getSourceTokenDataPayloads(
+	sourceChain cciptypes.ChainSelector,
+	message cciptypes.Message,
+) []*SourceTokenDataPayload {
+	sourceTokenDataPayloads := make([]*SourceTokenDataPayload, 0, len(message.TokenAmounts))
+	for _, tokenAmount := range message.TokenAmounts {
+		sourceTokenDataPayload, err := u.getValidatedSourceTokenDataPayload(sourceChain, tokenAmount)
+		if err != nil {
+			sourceTokenDataPayloads = append(sourceTokenDataPayloads, nil)
+		} else {
+			sourceTokenDataPayloads = append(sourceTokenDataPayloads, sourceTokenDataPayload)
+		}
+	}
+
+	return sourceTokenDataPayloads
+}
+
+// TODO: better name, doc
+func associate(
+	ctx context.Context,
+	attestationEncoder AttestationEncoder,
+	sourceTokenDataPayloads []*SourceTokenDataPayload,
+	cctpResponse CCTPv2Response,
+) exectypes.MessageTokenData {
+	result := make([]exectypes.TokenData, 0, len(sourceTokenDataPayloads))
+	for _, sourceTokenData := range sourceTokenDataPayloads {
+		var tokenData exectypes.TokenData
+
+		if sourceTokenData == nil {
+			tokenData = exectypes.NotSupportedTokenData()
+		} else {
+			cctpMessage, err := findCctpMessage(sourceTokenData, cctpResponse)
+			if err != nil {
+				tokenData = exectypes.NewErrorTokenData(err)
+			} else {
+				tokenData = cctpMessage.TokenData(ctx, attestationEncoder)
+				delete(cctpResponse.cctpMessages, cctpMessage.EventNonce)
+			}
+		}
+
+		result = append(result, tokenData)
+	}
+
+	return exectypes.NewMessageTokenData(result...)
+}
+
+func findCctpMessage(
+	sourceTokenData *SourceTokenDataPayload,
+	cctpResponse CCTPv2Response,
+) (Message, error) {
+	if cctpResponse.err != nil {
+		return Message{}, cctpResponse.err
+	}
+
+	for _, cctpMessage := range cctpResponse.cctpMessages {
+		if match(sourceTokenData, cctpMessage) {
+			return cctpMessage, nil
+		}
+	}
+
+	return Message{}, nil
+}
+
+type SourceTokenDataPayload struct {
+	Nonce                uint64
+	SourceDomain         uint32
+	CCTPVersion          reader.CCTPVersion
+	Amount               cciptypes.BigInt
+	DestinationDomain    uint32
+	MintRecipient        cciptypes.Bytes32
+	BurnToken            cciptypes.Bytes32
+	DestinationCaller    cciptypes.Bytes32
+	MaxFee               cciptypes.BigInt
+	MinFinalityThreshold uint32
+}
+
+func DecodeSourceTokenDataPayload(data []byte) (*SourceTokenDataPayload, error) {
+	argTypes := abi.Arguments{
+		{Type: mustABIType("uint64")},
+		{Type: mustABIType("uint32")},
+		{Type: mustABIType("uint8")},
+		{Type: mustABIType("uint256")},
+		{Type: mustABIType("uint32")},
+		{Type: mustABIType("bytes32")},
+		{Type: mustABIType("bytes32")},
+		{Type: mustABIType("bytes32")},
+		{Type: mustABIType("uint256")},
+		{Type: mustABIType("uint32")},
+	}
+
+	vals, err := argTypes.Unpack(data)
+	if err != nil {
+		return nil, err
+	}
+	if len(vals) != 10 {
+		return nil, fmt.Errorf("unexpected number of unpacked values")
+	}
+
+	return &SourceTokenDataPayload{
+		Nonce:                vals[0].(uint64),
+		SourceDomain:         vals[1].(uint32),
+		CCTPVersion:          reader.CCTPVersion(vals[2].(uint8)),
+		Amount:               cciptypes.NewBigInt(vals[3].(*big.Int)),
+		DestinationDomain:    vals[4].(uint32),
+		MintRecipient:        vals[5].([32]byte),
+		BurnToken:            vals[6].([32]byte),
+		DestinationCaller:    vals[7].([32]byte),
+		MaxFee:               cciptypes.NewBigInt(vals[8].(*big.Int)),
+		MinFinalityThreshold: vals[9].(uint32),
+	}, nil
+}
+
+func mustABIType(t string) abi.Type {
+	typ, err := abi.NewType(t, "", nil)
+	if err != nil {
+		panic(err)
+	}
+	return typ
+}
+
+// TODO: doc, rename
+func match(
+	sourceTokenData *SourceTokenDataPayload,
+	cctpMessage Message,
+) bool {
+	if int(sourceTokenData.CCTPVersion) != cctpMessage.CCTPVersion {
+		return false
+	}
+	if fmt.Sprintf("%d", sourceTokenData.SourceDomain) != cctpMessage.DecodedMessage.SourceDomain {
+		return false
+	}
+	if fmt.Sprintf("%d", sourceTokenData.DestinationDomain) != cctpMessage.DecodedMessage.DestinationDomain {
+		return false
+	}
+
+	// MinFinalityThreshold is optional
+	if cctpMessage.DecodedMessage.MinFinalityThreshold != "" &&
+		fmt.Sprintf("%d", sourceTokenData.MinFinalityThreshold) != cctpMessage.DecodedMessage.MinFinalityThreshold {
+		return false
+	}
+
+	if sourceTokenData.Amount.String() != cctpMessage.DecodedMessage.DecodedMessageBody.Amount {
+		return false
+	}
+
+	if cctpMessage.DecodedMessage.DecodedMessageBody.MaxFee != "" &&
+		sourceTokenData.MaxFee.String() != cctpMessage.DecodedMessage.DecodedMessageBody.MaxFee {
+		return false
+	}
+
+	if !addressMatch(cctpMessage.DecodedMessage.DestinationCaller, sourceTokenData.DestinationCaller) {
+		return false
+	}
+
+	if !addressMatch(cctpMessage.DecodedMessage.DecodedMessageBody.BurnToken, sourceTokenData.BurnToken) {
+		return false
+	}
+
+	if !addressMatch(cctpMessage.DecodedMessage.DecodedMessageBody.MintRecipient, sourceTokenData.MintRecipient) {
+		return false
+	}
+
+	return true
+}
+
+// TODO: doc, rename
+func addressMatch(cctpAddress string, sourceAddress cciptypes.Bytes32) bool {
+	cctpAddressBytes, err := hex.DecodeString(strings.TrimPrefix(cctpAddress, "0x"))
+	if err != nil {
+		// TODO: log
+		return false
+	}
+	if len(cctpAddressBytes) > 32 {
+		// TODO: log
+		return false
+	}
+
+	return bytes.Equal(sourceAddress[32-len(cctpAddressBytes):], cctpAddressBytes)
 }
