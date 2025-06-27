@@ -249,21 +249,21 @@ pub mod test_token_pool {
         ctx: Context<'_, '_, '_, 'info, TokenOnramp<'info>>,
         lock_or_burn: LockOrBurnInV1,
     ) -> Result<LockOrBurnOutV1> {
-        let arbitrary_accounts_start = ctx.remaining_accounts.len() - 2;
-        // The second and third remaining accounts are not used, but must be passed to verify
-        // the autoderive functionality. The first remaining account is the (potential) multisig
-        require_eq!(
-            ctx.remaining_accounts[arbitrary_accounts_start].key(),
-            Pubkey::find_program_address(&[ARBITRARY_SEED], &crate::ID).0,
-            CcipTokenPoolError::InvalidInputs
-        );
-        require_eq!(
-            ctx.remaining_accounts[arbitrary_accounts_start + 1].key(),
-            Pubkey::find_program_address(&[ANOTHER_ARBITRARY_SEED], &crate::ID).0,
-            CcipTokenPoolError::InvalidInputs
-        );
+        // The last two remaining accounts are not used, but if present they verify the autoderive
+        // functionality. The first remaining account is the (potential) multisig
 
-        let remaining_accounts = &ctx.remaining_accounts[arbitrary_accounts_start + 2..];
+        if let [.., a, b] = &ctx.remaining_accounts {
+            require_eq!(
+                a.key(),
+                Pubkey::find_program_address(&[ARBITRARY_SEED], &crate::ID).0,
+                CcipTokenPoolError::InvalidInputs
+            );
+            require_eq!(
+                b.key(),
+                Pubkey::find_program_address(&[ANOTHER_ARBITRARY_SEED], &crate::ID).0,
+                CcipTokenPoolError::InvalidInputs
+            );
+        }
 
         validate_lock_or_burn(
             &lock_or_burn,
@@ -292,11 +292,11 @@ pub mod test_token_pool {
                 let signer = &ctx.accounts.pool_signer;
                 // first remaining accounts is the wrapped program
                 require!(
-                    !remaining_accounts.is_empty(),
+                    !ctx.remaining_accounts.is_empty(),
                     CcipTokenPoolError::InvalidInputs
                 );
                 let (wrapped_program, remaining_accounts) =
-                    remaining_accounts.split_first().unwrap();
+                    ctx.remaining_accounts.split_first().unwrap();
 
                 // The accounts of the user that will be used in the CPI instruction, none of them are signers
                 // They need to specify if mutable or not, but none of them is allowed to init, realloc or close

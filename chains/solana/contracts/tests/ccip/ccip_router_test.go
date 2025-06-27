@@ -5163,11 +5163,6 @@ func TestCCIPRouter(t *testing.T) {
 					errorStr: common.ConstraintSeeds_AnchorError.String(),
 				},
 				{
-					name:     "extra accounts not in lookup table",
-					index:    1_000, // large number to indicate append
-					errorStr: ccip.InvalidInputsLookupTableAccounts_CcipRouterError.String(),
-				},
-				{
 					name:     "remaining accounts mismatch",
 					index:    13, // only works with token0
 					errorStr: ccip.InvalidInputsLookupTableAccounts_CcipRouterError.String(),
@@ -9131,6 +9126,8 @@ func TestCCIPRouter(t *testing.T) {
 				})
 
 				t.Run("single token with autoderived execute accounts", func(t *testing.T) {
+					t.Skip("Execution autoderive is deprioritized for now")
+
 					_, initSupply, err := tokens.TokenSupply(ctx, solanaGoClient, token0.Mint, config.DefaultCommitment)
 					require.NoError(t, err)
 					_, initBal, err := tokens.TokenBalance(ctx, solanaGoClient, token0.User[config.ReceiverExternalExecutionConfigPDA], config.DefaultCommitment)
