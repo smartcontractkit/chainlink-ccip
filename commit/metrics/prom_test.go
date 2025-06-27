@@ -296,11 +296,15 @@ func Test_MerkleRoots(t *testing.T) {
 			reporter.TrackProcessorOutput(processor, plugincommon.ObservationMethod, tc.observation)
 
 			roots := int(testutil.ToFloat64(
-				reporter.processorOutputCounter.WithLabelValues("evm", chainID, processor, plugincommon.ObservationMethod, "roots")),
+				reporter.processorOutputCounter.WithLabelValues(
+					"evm", chainID, processor, plugincommon.ObservationMethod, "roots",
+				)),
 			)
 			require.Equal(t, tc.expectedRoots, roots)
 			messages := int(testutil.ToFloat64(
-				reporter.processorOutputCounter.WithLabelValues("evm", chainID, processor, plugincommon.ObservationMethod, "messages")),
+				reporter.processorOutputCounter.WithLabelValues(
+					"evm", chainID, processor, plugincommon.ObservationMethod, "messages",
+				)),
 			)
 			require.Equal(t, tc.expectedMessages, messages)
 		})
@@ -355,15 +359,21 @@ func Test_MerkleRoots(t *testing.T) {
 			reporter.TrackProcessorOutput(processor, plugincommon.OutcomeMethod, tc.outcome)
 
 			roots := int(testutil.ToFloat64(
-				reporter.processorOutputCounter.WithLabelValues("evm", chainID, processor, plugincommon.OutcomeMethod, "roots")),
+				reporter.processorOutputCounter.WithLabelValues(
+					"evm", chainID, processor, plugincommon.OutcomeMethod, "roots",
+				)),
 			)
 			require.Equal(t, tc.expectedRoots, roots)
 			messages := int(testutil.ToFloat64(
-				reporter.processorOutputCounter.WithLabelValues("evm", chainID, processor, plugincommon.OutcomeMethod, "messages")),
+				reporter.processorOutputCounter.WithLabelValues(
+					"evm", chainID, processor, plugincommon.OutcomeMethod, "messages",
+				)),
 			)
 			require.Equal(t, tc.expectedMessages, messages)
 			rmns := int(testutil.ToFloat64(
-				reporter.processorOutputCounter.WithLabelValues("evm", chainID, processor, plugincommon.OutcomeMethod, "rmnSignatures")),
+				reporter.processorOutputCounter.WithLabelValues(
+					"evm", chainID, processor, plugincommon.OutcomeMethod, "rmnSignatures",
+				)),
 			)
 			require.Equal(t, tc.expectedRMNSignatures, rmns)
 		})

@@ -218,7 +218,9 @@ func Test_CommitReportsGTETimestamp(t *testing.T) {
 				testutil.ToFloat64(reader.PromDataSetSizeGauge.WithLabelValues("evm", chainID, "CommitReportsGTETimestamp")),
 			)
 
-			count := internal.CounterFromHistogramByLabels(t, reader.PromQueryHistogram, "evm", chainID, "CommitReportsGTETimestamp")
+			count := internal.CounterFromHistogramByLabels(
+				t, reader.PromQueryHistogram, "evm", chainID, "CommitReportsGTETimestamp",
+			)
 			require.Equal(t, 1, count)
 		})
 	}

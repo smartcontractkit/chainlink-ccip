@@ -10,7 +10,7 @@ import (
 // If the selector is invalid, it returns "unknown" for both values and doesn't raise any error.
 // This case should never happen in practice, but it is handled gracefully to avoid panics.
 // It's very convenient to use this function for Prometheus metrics
-func GetChainInfoFromSelector(selector cciptypes.ChainSelector) (string, string, bool) {
+func GetChainInfoFromSelector(selector cciptypes.ChainSelector) (chainFamily string, chainID string, ok bool) {
 	chainID, err1 := sel.GetChainIDFromSelector(uint64(selector))
 	chainFamily, err2 := sel.GetSelectorFamily(uint64(selector))
 
