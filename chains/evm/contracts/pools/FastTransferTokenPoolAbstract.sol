@@ -336,12 +336,18 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
       mintMessage.receiver
     );
 
+    // Cache current fill info preserves the pre-update state to decide which hook to call.
     FillInfo memory fillInfo = s_fills[fillId];
+    /// Mark the fill as SETTLED before any value transfers or external calls.
+    /// This makes the new state visible immediately, preventing the same fill
+    /// from being settled twice even if execution re-enters this contract.
+    s_fills[fillId].state = IFastTransferPool.FillState.SETTLED;
+    // Rate limiting should apply to the full sourceAmount regardless of whether the request was fast-filled or not.
+    // This ensures that the rate limit controls the overall rate of release/mint operations.
+    _consumeInboundRateLimit(sourceChainSelector, localAmount);
+
     // The amount to reimburse to the filler in local denomination.
     uint256 fillerReimbursementAmount = 0;
-    // Mark the fill as settled by updating its state in storage. Use fillInfo for further operations.
-    s_fills[fillId].state = IFastTransferPool.FillState.SETTLED;
-
     if (fillInfo.state == IFastTransferPool.FillState.NOT_FILLED) {
       // Set the local pool fee to zero, as fees are only applied for fast-fill operations
       localPoolFee = 0;
@@ -354,9 +360,6 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
       // The catch all assertion for already settled fills ensures that any wrong value will revert.
       revert AlreadySettled(fillId);
     }
-    // Rate limiting should apply to the full sourceAmount regardless of whether the request was fast-filled or not.
-    // This ensures that the rate limit controls the overall rate of release/mint operations.
-    _consumeInboundRateLimit(sourceChainSelector, localAmount);
     emit FastTransferSettled(fillId, settlementId, fillerReimbursementAmount, localPoolFee, fillInfo.state);
   }
 
