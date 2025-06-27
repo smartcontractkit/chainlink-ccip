@@ -7,7 +7,8 @@ import {IPoolV1} from "../interfaces/IPool.sol";
 import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
 import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
-import {IVerifierSender} from "../interfaces/IVerifier.sol";
+import {IVerifierSender} from "../interfaces/verifiers/IVerifier.sol";
+import {IVerifierRegistry} from "../interfaces/verifiers/IVerifierRegistry.sol";
 
 import {Client} from "../libraries/Client.sol";
 import {Internal} from "../libraries/Internal.sol";
@@ -105,9 +106,6 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   /// @dev The destination chain specific configs.
   mapping(uint64 destChainSelector => DestChainConfig destChainConfig) private s_destChainConfigs;
 
-  // TODO move to verifier registry?
-  mapping(bytes32 verifierId => address verifierAddress) private s_verifiers;
-
   constructor(
     StaticConfig memory staticConfig,
     DynamicConfig memory dynamicConfig,
@@ -200,7 +198,8 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
       // TODO does this work?
       bytes32 verifierId = bytes32(newMessage.verifierExtraArgs[i]);
-      address verifierAddress = s_verifiers[verifierId];
+
+      address verifierAddress = IVerifierRegistry(i_verifierRegistry).getVerifier(verifierId);
       if (verifierAddress == address(0)) {
         revert InvalidVerifierId(verifierId);
       }
@@ -218,7 +217,6 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       keccak256(abi.encode(Internal.EVM_2_ANY_MESSAGE_HASH, i_localChainSelector, destChainSelector, address(this)))
     );
 
-    // Emit message request.
     emit CCIPMessageSent(destChainSelector, newMessage.header.sequenceNumber, newMessage);
 
     s_dynamicConfig.reentrancyGuardEntered = false;

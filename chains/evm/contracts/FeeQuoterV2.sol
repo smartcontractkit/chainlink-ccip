@@ -68,6 +68,13 @@ contract FeeQuoterV2 is IFeeQuoterV2, FeeQuoter {
     return destExecDataPerToken;
   }
 
+  struct ModSecExtraArgs {
+    uint256 gasLimit;
+    bytes tokenReceiver;
+    bytes destChainExtraArgs;
+    bytes[] verifierExtraArgs;
+  }
+
   function parseExtraArgs(
     bytes calldata extraArgs
   )
