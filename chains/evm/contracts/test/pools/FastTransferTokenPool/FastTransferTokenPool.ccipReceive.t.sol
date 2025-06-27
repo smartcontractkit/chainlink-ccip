@@ -8,6 +8,8 @@ import {CCIPReceiver} from "../../../applications/CCIPReceiver.sol";
 import {Client} from "../../../libraries/Client.sol";
 import {Internal} from "../../../libraries/Internal.sol";
 import {FastTransferTokenPoolAbstract} from "../../../pools/FastTransferTokenPoolAbstract.sol";
+
+import {TokenPool} from "../../../pools/TokenPool.sol";
 import {FastTransferTokenPoolSetup} from "./FastTransferTokenPoolSetup.t.sol";
 
 import {IERC20Metadata} from
@@ -43,6 +45,8 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
       s_pool.computeFillId(message.messageId, SOURCE_AMOUNT - fastTransferFee, SOURCE_DECIMALS, abi.encode(RECEIVER));
 
     vm.expectEmit();
+    emit TokenPool.InboundRateLimitConsumed(SOURCE_CHAIN_SELECTOR, address(s_token), SOURCE_AMOUNT);
+    vm.expectEmit();
     emit IFastTransferPool.FastTransferSettled(fillId, MESSAGE_ID, 0, 0, IFastTransferPool.FillState.NOT_FILLED);
 
     s_pool.ccipReceive(message);
@@ -66,6 +70,8 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
     Client.Any2EVMMessage memory message =
       _generateMintMessage(RECEIVER, SOURCE_AMOUNT, SOURCE_DECIMALS, FAST_FEE_FILLER_BPS, 0);
 
+    vm.expectEmit();
+    emit TokenPool.InboundRateLimitConsumed(SOURCE_CHAIN_SELECTOR, address(s_token), SOURCE_AMOUNT);
     vm.expectEmit();
     emit IFastTransferPool.FastTransferSettled(fillId, MESSAGE_ID, SOURCE_AMOUNT, 0, IFastTransferPool.FillState.FILLED);
 
@@ -91,6 +97,8 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
     Client.Any2EVMMessage memory message =
       _generateMintMessage(RECEIVER, sourceAmount, sourceDecimals, FAST_FEE_FILLER_BPS, 0);
 
+    vm.expectEmit();
+    emit TokenPool.InboundRateLimitConsumed(SOURCE_CHAIN_SELECTOR, address(s_token), expectedLocalAmount);
     s_pool.ccipReceive(message);
 
     // Verify receiver got the scaled amount
@@ -107,6 +115,8 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
 
     bytes32 fillId = s_pool.computeFillId(message.messageId, SOURCE_AMOUNT - 0, SOURCE_DECIMALS, abi.encode(RECEIVER));
 
+    vm.expectEmit();
+    emit TokenPool.InboundRateLimitConsumed(SOURCE_CHAIN_SELECTOR, address(s_token), SOURCE_AMOUNT);
     vm.expectEmit();
     emit IFastTransferPool.FastTransferSettled(fillId, MESSAGE_ID, 0, 0, IFastTransferPool.FillState.NOT_FILLED);
 
@@ -138,6 +148,8 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
     uint256 amountAfterFees = SOURCE_AMOUNT - fillerFeeAmount - poolFeeAmount;
     bytes32 fillId = s_pool.computeFillId(message.messageId, amountAfterFees, SOURCE_DECIMALS, abi.encode(RECEIVER));
 
+    vm.expectEmit();
+    emit TokenPool.InboundRateLimitConsumed(SOURCE_CHAIN_SELECTOR, address(s_token), SOURCE_AMOUNT);
     vm.expectEmit();
     emit IFastTransferPool.FastTransferSettled(fillId, MESSAGE_ID, 0, 0, IFastTransferPool.FillState.NOT_FILLED);
     s_pool.ccipReceive(message);
@@ -186,6 +198,8 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
     // Expected filler reimbursement = SOURCE_AMOUNT - poolFeeAmount
     uint256 expectedFillerReimbursement = SOURCE_AMOUNT - poolFeeAmount;
     vm.expectEmit();
+    emit TokenPool.InboundRateLimitConsumed(SOURCE_CHAIN_SELECTOR, address(s_token), SOURCE_AMOUNT);
+    vm.expectEmit();
     emit IFastTransferPool.FastTransferSettled(
       fillId, MESSAGE_ID, expectedFillerReimbursement, poolFeeAmount, IFastTransferPool.FillState.FILLED
     );
@@ -232,6 +246,8 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
     // Expected scaled amounts for settlement
     uint256 expectedFillerReimbursement = expectedLocalAmount; // Full amount scaled to dest decimals
 
+    vm.expectEmit();
+    emit TokenPool.InboundRateLimitConsumed(SOURCE_CHAIN_SELECTOR, address(s_token), expectedLocalAmount);
     vm.expectEmit();
     emit IFastTransferPool.FastTransferSettled(
       fillId, MESSAGE_ID, expectedFillerReimbursement, 0, IFastTransferPool.FillState.FILLED
