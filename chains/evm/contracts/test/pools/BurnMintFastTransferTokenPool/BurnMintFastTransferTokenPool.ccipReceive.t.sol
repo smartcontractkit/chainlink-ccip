@@ -25,13 +25,13 @@ contract BurnMintFastTransferTokenPool_ccipReceive is BurnMintFastTransferTokenP
     bytes32 fillId =
       s_pool.computeFillId(message.messageId, TRANSFER_AMOUNT - fastTransferFee, SOURCE_DECIMALS, abi.encode(RECEIVER));
 
-    // A transfer from address(0) meant the tokens were minted
-    vm.expectEmit();
-    emit IERC20.Transfer(address(0), RECEIVER, expectedMintAmount);
-
     // Expect inbound rate limit consumption (mint amount consumed)
     vm.expectEmit();
     emit TokenPool.InboundRateLimitConsumed(DEST_CHAIN_SELECTOR, address(s_token), TRANSFER_AMOUNT);
+
+    // A transfer from address(0) meant the tokens were minted
+    vm.expectEmit();
+    emit IERC20.Transfer(address(0), RECEIVER, expectedMintAmount);
 
     vm.expectEmit();
     emit IFastTransferPool.FastTransferSettled(fillId, message.messageId, 0, 0, IFastTransferPool.FillState.NOT_FILLED);
