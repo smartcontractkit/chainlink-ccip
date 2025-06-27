@@ -45,14 +45,14 @@ func NewCTTPv2AttestationClient(
 // GetMessages TODO: doc
 func (c *CTTPv2AttestationClient) GetMessages(
 	ctx context.Context,
-	sourceDomainId string,
+	sourceDomainId uint32,
 	transactionHash string,
 ) (Messages, error) {
-	path := fmt.Sprintf("%s/%s/%s?transactionHash=%s", apiVersionV2, messagesPath, sourceDomainId, transactionHash)
+	path := fmt.Sprintf("%s/%s/%d?transactionHash=%s", apiVersionV2, messagesPath, sourceDomainId, transactionHash)
 	body, status, err := c.client.Get(ctx, path)
 	if err != nil {
 		return Messages{},
-			fmt.Errorf("http call failed to get CCTPv2 messages for sourceDomainId %s and transactionHash %s, error: %w",
+			fmt.Errorf("http call failed to get CCTPv2 messages for sourceDomainId %d and transactionHash %s, error: %w",
 				sourceDomainId, transactionHash, err)
 	}
 
