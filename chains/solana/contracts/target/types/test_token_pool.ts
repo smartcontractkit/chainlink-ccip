@@ -487,6 +487,44 @@ export type TestTokenPool = {
       "returns": {
         "defined": "LockOrBurnOutV1"
       }
+    },
+    {
+      "name": "deriveAccountsReleaseOrMintTokens",
+      "accounts": [],
+      "args": [
+        {
+          "name": "stage",
+          "type": "string"
+        },
+        {
+          "name": "releaseOrMint",
+          "type": {
+            "defined": "ReleaseOrMintInV1"
+          }
+        }
+      ],
+      "returns": {
+        "defined": "DeriveAccountsResponse"
+      }
+    },
+    {
+      "name": "deriveAccountsLockOrBurnTokens",
+      "accounts": [],
+      "args": [
+        {
+          "name": "stage",
+          "type": "string"
+        },
+        {
+          "name": "lockOrBurn",
+          "type": {
+            "defined": "LockOrBurnInV1"
+          }
+        }
+      ],
+      "returns": {
+        "defined": "DeriveAccountsResponse"
+      }
     }
   ],
   "accounts": [
@@ -1034,6 +1072,44 @@ export const IDL: TestTokenPool = {
       ],
       "returns": {
         "defined": "LockOrBurnOutV1"
+      }
+    },
+    {
+      "name": "deriveAccountsReleaseOrMintTokens",
+      "accounts": [],
+      "args": [
+        {
+          "name": "stage",
+          "type": "string"
+        },
+        {
+          "name": "releaseOrMint",
+          "type": {
+            "defined": "ReleaseOrMintInV1"
+          }
+        }
+      ],
+      "returns": {
+        "defined": "DeriveAccountsResponse"
+      }
+    },
+    {
+      "name": "deriveAccountsLockOrBurnTokens",
+      "accounts": [],
+      "args": [
+        {
+          "name": "stage",
+          "type": "string"
+        },
+        {
+          "name": "lockOrBurn",
+          "type": {
+            "defined": "LockOrBurnInV1"
+          }
+        }
+      ],
+      "returns": {
+        "defined": "DeriveAccountsResponse"
       }
     }
   ],

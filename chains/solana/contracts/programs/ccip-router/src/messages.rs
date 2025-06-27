@@ -2,6 +2,9 @@ use std::convert::Into;
 
 use anchor_lang::prelude::*;
 
+pub const TOKENPOOL_DERIVE_LOCK_OR_BURN_DISCRIMINATOR: [u8; 8] =
+    [20, 237, 184, 4, 166, 153, 108, 174]; // derive_accounts_lock_or_burn_tokens
+
 #[derive(Clone, Copy, AnchorSerialize, AnchorDeserialize)]
 // Family-agnostic header for OnRamp & OffRamp messages
 // The messageId is not expected to match hash(message), since it may originate from another ramp family

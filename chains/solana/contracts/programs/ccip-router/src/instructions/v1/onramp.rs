@@ -344,11 +344,23 @@ impl OnRamp for Impl {
                 derive::derive_ccip_send_accounts_finish_main_account_list(ctx, params)
             }
             DeriveAccountsCcipSendStage::RetrieveTokenLUTs => {
-                derive::derive_ccip_send_accounts_retrieve_luts(ctx)
+                derive::derive_ccip_send_accounts_retrieve_luts(ctx, &params)
             }
-            DeriveAccountsCcipSendStage::TokenTransferAccounts => {
-                derive::derive_execute_accounts_additional_tokens(ctx, params)
+            DeriveAccountsCcipSendStage::RetrievePoolPrograms => {
+                derive::derive_ccip_send_accounts_retrieve_pool_programs(ctx)
             }
+            DeriveAccountsCcipSendStage::TokenTransferStaticAccounts { page, token } => {
+                derive::derive_ccip_send_accounts_additional_tokens_static(ctx, params, page, token)
+            }
+            DeriveAccountsCcipSendStage::NestedTokenDerive {
+                token_substage,
+                token,
+            } => derive::derive_ccip_send_accounts_additional_token_nested(
+                ctx,
+                &params,
+                &token_substage,
+                token,
+            ),
         }
     }
 }
@@ -360,6 +372,8 @@ mod helpers {
         CommonCcipError, CHAIN_FAMILY_SELECTOR_EVM, CHAIN_FAMILY_SELECTOR_SVM,
     };
     use rmn_remote::state::CurseSubject;
+
+    use crate::event::events::PdaUpgraded;
 
     use super::*;
 
@@ -489,6 +503,20 @@ mod helpers {
             nonce.version = 2; // migrate to version 2
             nonce.total_nonce = nonce.ordered_nonce; // we need an initial value for the new total_nonce, and this way
                                                      // we maintain the invariant that total_nonce >= ordered_nonce
+
+            emit!(PdaUpgraded {
+                address: account_info.key(),
+                old_version: 1,
+                new_version: 2,
+                name: "Nonce".to_string(),
+                seeds: [
+                    seed::NONCE,
+                    dest_chain_selector.to_le_bytes().as_ref(),
+                    authority.key().as_ref()
+                ]
+                .concat(),
+            });
+
             return Ok(nonce);
         }
 
@@ -498,7 +526,7 @@ mod helpers {
         Ok(nonce)
     }
 
-    fn load_nonce(account_info: &AccountInfo) -> Result<Nonce> {
+    pub(super) fn load_nonce(account_info: &AccountInfo) -> Result<Nonce> {
         let data = account_info.try_borrow_data()?;
         let mut data: &[u8] = &data;
         Nonce::try_deserialize(&mut data)

@@ -250,6 +250,27 @@ var (
 	// * `new_admin` - The public key of the new admin.
 	Instruction_TransferAdminRoleTokenAdminRegistry = ag_binary.TypeID([8]byte{178, 98, 203, 181, 203, 107, 106, 14})
 
+	// Edits the pool config flags for a given token mint.
+	//
+	// The administrator of the token admin registry is the only one allowed to invoke this.
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for setting the pool.
+	// * `mint` - The mint of the pool to be edited.
+	// * `supports_auto_derivation` - A boolean flag indicating whether the pool supports auto-derivation of accounts.
+	Instruction_SetPoolSupportsAutoDerivation = ag_binary.TypeID([8]byte{197, 227, 67, 153, 75, 20, 234, 139})
+
+	// Upgrades the Token Admin Registry from version 1 to the current version.
+	//
+	// Anyone may invoke this method, as the upgrade has safe defaults for any new value,
+	// and those can then be changed by the Token Admin Registry Admin via separate instructions.
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for the upgrade.
+	Instruction_UpgradeTokenAdminRegistryFromV1 = ag_binary.TypeID([8]byte{124, 26, 79, 44, 190, 150, 213, 49})
+
 	// Sets the pool lookup table for a given token mint.
 	//
 	// The administrator of the token admin registry can set the pool lookup table for a given token mint.
@@ -381,6 +402,10 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "AcceptAdminRoleTokenAdminRegistry"
 	case Instruction_TransferAdminRoleTokenAdminRegistry:
 		return "TransferAdminRoleTokenAdminRegistry"
+	case Instruction_SetPoolSupportsAutoDerivation:
+		return "SetPoolSupportsAutoDerivation"
+	case Instruction_UpgradeTokenAdminRegistryFromV1:
+		return "UpgradeTokenAdminRegistryFromV1"
 	case Instruction_SetPool:
 		return "SetPool"
 	case Instruction_WithdrawBilledFunds:
@@ -473,6 +498,12 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"transfer_admin_role_token_admin_registry", (*TransferAdminRoleTokenAdminRegistry)(nil),
+		},
+		{
+			"set_pool_supports_auto_derivation", (*SetPoolSupportsAutoDerivation)(nil),
+		},
+		{
+			"upgrade_token_admin_registry_from_v1", (*UpgradeTokenAdminRegistryFromV1)(nil),
 		},
 		{
 			"set_pool", (*SetPool)(nil),

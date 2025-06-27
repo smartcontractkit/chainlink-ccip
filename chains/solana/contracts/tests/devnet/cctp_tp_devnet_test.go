@@ -6,7 +6,10 @@ package contracts
 import (
 	"encoding/binary"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"net/http"
 	"strings"
 	"testing"
 
@@ -25,6 +28,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/ccip"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/eth"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 )
@@ -62,7 +66,7 @@ func TestCctpTpDevnet(t *testing.T) {
 	ccip_router.SetProgramID(referenceAddresses.Router)
 	fee_quoter.SetProgramID(referenceAddresses.FeeQuoter)
 
-	linkMint := solana.MustPublicKeyFromBase58(devnetInfo.LinkMint)
+	// linkMint := solana.MustPublicKeyFromBase58(devnetInfo.LinkMint)
 
 	cctpTpProgram := solana.MustPublicKeyFromBase58(devnetInfo.CCTP.TokenPool)
 	cctpMtProgram := solana.MustPublicKeyFromBase58(devnetInfo.CCTP.MessageTransmitter)
@@ -103,7 +107,7 @@ func TestCctpTpDevnet(t *testing.T) {
 	t.Run("TypeVersion", func(t *testing.T) {
 		t.Skip()
 
-		ix, err := cctp_token_pool.NewTypeVersionInstruction(solana.SysVarClockPubkey).ValidateAndBuild()
+		ix, err := cctp_token_pool.NewTypeVersionInstruction().ValidateAndBuild()
 		require.NoError(t, err)
 		result := testutils.SendAndConfirm(ctx, t, client, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 		require.NotNil(t, result)
@@ -349,6 +353,7 @@ func TestCctpTpDevnet(t *testing.T) {
 		})
 
 		routerNoncesPDA, err := state.FindNoncePDA(chainSelector, admin.PublicKey(), referenceAddresses.Router)
+		fmt.Printf("Router Nonces PDA: %s\n", routerNoncesPDA)
 		require.NoError(t, err)
 
 		var nonces ccip_router.Nonce
@@ -374,40 +379,91 @@ func TestCctpTpDevnet(t *testing.T) {
 			},
 			cctpTpProgram,
 		)
+		fmt.Printf("Message Sent Event PDA: %s\n", messageSentEvent)
 		require.NoError(t, err)
 
+		type AttestationResponse struct {
+			Attestation string `json:"attestation"`
+			Status      string `json:"status"`
+		}
+
+		t.Run("Reclaim some accounts", func(t *testing.T) {
+			t.Skip()
+
+			resp, err := client.GetAccountInfoWithOpts(
+				ctx,
+				messageSentEvent,
+				&rpc.GetAccountInfoOpts{
+					Commitment: config.DefaultCommitment,
+					DataSlice:  nil,
+				},
+			)
+			require.NoError(t, err)
+			bytes := resp.Value.Data.GetBinary()
+			messageBytes := bytes[44:]
+			messageHash := hex.EncodeToString(eth.Keccak256(messageBytes))
+
+			url := fmt.Sprintf("https://iris-api-sandbox.circle.com/v1/attestations/0x%s", messageHash)
+			req, err := http.NewRequest("GET", url, nil)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Accept", "application/json")
+
+			res, err := http.DefaultClient.Do(req)
+			require.NoError(t, err)
+			defer res.Body.Close()
+
+			body, err := ioutil.ReadAll(res.Body)
+			fmt.Printf("StatusCode: %d - Body: %s\n", res.StatusCode, body)
+
+			var attestation []byte
+
+			if res.StatusCode >= 200 && res.StatusCode < 300 {
+				fmt.Println("Success:", res.Status)
+				var attestationResponse AttestationResponse
+				err = json.Unmarshal(body, &attestationResponse)
+				fmt.Println("AttestationResponse:", attestationResponse)
+				require.NoError(t, err)
+
+				if attestationResponse.Status == "complete" {
+					fmt.Println("Attestation completed")
+					attestation, err = hex.DecodeString(attestationResponse.Attestation[2:]) // remove 0x prefix
+					require.NoError(t, err)
+					fmt.Println("Attestation:", attestation)
+				} else {
+					fmt.Println("Attestation not completed yet, retrying...")
+					t.Fail()
+				}
+			}
+
+			fmt.Printf("Message Hash: %s\n", messageHash)
+			fmt.Printf("Attestation: %s\n", hex.EncodeToString(attestation))
+
+			ix, err := cctp_token_pool.NewReclaimEventAccountInstruction(
+				usdcMint,
+				admin.PublicKey(),
+				chainSelector,
+				nonces.TotalNonce+1,
+				attestation,
+				cctpPool.state,
+				cctpPool.signer,
+				messageSentEvent,
+				messageTransmitter.messageTransmitter,
+				messageTransmitter.program,
+				admin.PublicKey(),
+				solana.SystemProgramID,
+			).ValidateAndBuild()
+
+			testutils.SendAndConfirm(ctx, t, client, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+		})
+
 		t.Run("Create Lookup Table", func(t *testing.T) {
+			t.Skip()
+
 			tpLookupTableAddr, err = common.CreateLookupTable(ctx, client, admin)
 			require.NoError(t, err)
 
-			// // // These are the "real" static-only entries
-			// entries := solana.PublicKeySlice{
-			// 	tpLookupTableAddr,
-			// 	tokenAdminRegistry,
-			// 	cctpPool.program,
-			// 	cctpPool.state,
-			// 	cctpPool.tokenAccount,
-			// 	cctpPool.signer,
-			// 	solana.TokenProgramID,
-			// 	usdcMint,
-			// 	fqUsdcBillingTokenConfig,
-			// 	routerSigner,
-			// 	// -- CCTP custom entries --
-			// 	tokenMessengerMinter.authorityPda,
-			// 	messageTransmitter.messageTransmitter,
-			// 	tokenMessengerMinter.tokenMessenger,
-			// 	tokenMessengerMinter.tokenMinter,
-			// 	tokenMessengerMinter.localToken,
-			// 	messageTransmitter.program,
-			// 	tokenMessengerMinter.program,
-			// 	tokenMessengerMinter.eventAuthority,
-			//
-			// 	messageTransmitter.authorityPda,
-			// 	messageTransmitter.eventAuthority,
-			// 	tokenMessengerMinter.custodyTokenAccount,
-			// }
-
-			// These are the "test" static+variable entries
+			// These are the "real" static-only entries
 			entries := solana.PublicKeySlice{
 				tpLookupTableAddr,
 				tokenAdminRegistry,
@@ -429,10 +485,38 @@ func TestCctpTpDevnet(t *testing.T) {
 				tokenMessengerMinter.program,
 				solana.SystemProgramID,
 				tokenMessengerMinter.eventAuthority,
-				// -- CCTP variable entries for LockOrBurn --
-				tokenMessengerMinter.remoteTokenMessenger,
-				messageSentEvent, // 20 - writable
+
+				// messageTransmitter.authorityPda,
+				// messageTransmitter.eventAuthority,
+				// tokenMessengerMinter.custodyTokenAccount,
 			}
+
+			// // These are the "test" static+variable entries
+			// entries := solana.PublicKeySlice{
+			// 	tpLookupTableAddr,
+			// 	tokenAdminRegistry,
+			// 	cctpPool.program,
+			// 	cctpPool.state,        // 3 - writable
+			// 	cctpPool.tokenAccount, // 4 - writable
+			// 	cctpPool.signer,       // 5 - writable (to pay for event account)
+			// 	solana.TokenProgramID,
+			// 	usdcMint, // 7 - writable
+			// 	fqUsdcBillingTokenConfig,
+			// 	routerSigner,
+			// 	// -- CCTP custom entries --
+			// 	tokenMessengerMinter.authorityPda,
+			// 	messageTransmitter.messageTransmitter, // 11 - writable
+			// 	tokenMessengerMinter.tokenMessenger,
+			// 	tokenMessengerMinter.tokenMinter,
+			// 	tokenMessengerMinter.localToken, // 14 - writable
+			// 	messageTransmitter.program,
+			// 	tokenMessengerMinter.program,
+			// 	solana.SystemProgramID,
+			// 	tokenMessengerMinter.eventAuthority,
+			// 	// -- CCTP variable entries for LockOrBurn --
+			// 	tokenMessengerMinter.remoteTokenMessenger,
+			// 	messageSentEvent, // 20 - writable
+			// }
 
 			tpLookupTable = map[solana.PublicKey]solana.PublicKeySlice{
 				tpLookupTableAddr: entries,
@@ -446,8 +530,33 @@ func TestCctpTpDevnet(t *testing.T) {
 
 		writableIndexes := []byte{3, 4, 5, 7, 11, 14, 20}
 
+		t.Run("Upgrade TokenAdminRegistry", func(t *testing.T) {
+			t.Skip()
+
+			ix, err := ccip_router.NewUpgradeTokenAdminRegistryFromV1Instruction(
+				routerConfig,
+				tokenAdminRegistry,
+				usdcMint,
+				admin.PublicKey(),
+				solana.SystemProgramID,
+			).ValidateAndBuild()
+			require.NoError(t, err)
+			testutils.SendAndConfirm(ctx, t, client, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+		})
+
 		t.Run("SetPool", func(t *testing.T) {
-			ix, err := ccip_router.NewSetPoolInstruction(
+			t.Skip()
+
+			autoDerivationIx, err := ccip_router.NewSetPoolSupportsAutoDerivationInstruction(
+				usdcMint,
+				true,
+				routerConfig,
+				tokenAdminRegistry,
+				admin.PublicKey(),
+			).ValidateAndBuild()
+			require.NoError(t, err)
+
+			poolIx, err := ccip_router.NewSetPoolInstruction(
 				writableIndexes,
 				routerConfig,
 				tokenAdminRegistry,
@@ -457,26 +566,26 @@ func TestCctpTpDevnet(t *testing.T) {
 			).ValidateAndBuild()
 			require.NoError(t, err)
 
-			testutils.SendAndConfirm(ctx, t, client, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+			testutils.SendAndConfirm(ctx, t, client, []solana.Instruction{autoDerivationIx, poolIx}, admin, config.DefaultCommitment)
 		})
 
 		t.Run("CCIP Send", func(t *testing.T) {
-			routerDestChain, err := state.FindDestChainStatePDA(chainSelector, referenceAddresses.Router)
-			require.NoError(t, err)
+			// routerDestChain, err := state.FindDestChainStatePDA(chainSelector, referenceAddresses.Router)
+			// require.NoError(t, err)
 			routerBillingSignerPDA, _, err := state.FindFeeBillingSignerPDA(referenceAddresses.Router)
 			require.NoError(t, err)
-			routerWsolReceiver, _, err := tokens.FindAssociatedTokenAddress(solana.TokenProgramID, solana.SolMint, routerBillingSignerPDA)
-			require.NoError(t, err)
-			fqWsolBillingConfigPDA, _, err := state.FindFqBillingTokenConfigPDA(solana.SolMint, referenceAddresses.FeeQuoter)
-			require.NoError(t, err)
-			fqDestChainPDA, _, err := state.FindFqDestChainPDA(chainSelector, referenceAddresses.FeeQuoter)
-			require.NoError(t, err)
-			fqLinkTokenConfig, _, err := state.FindFqBillingTokenConfigPDA(linkMint, referenceAddresses.FeeQuoter)
-			require.NoError(t, err)
-			rmnRemoteCurses, _, err := state.FindRMNRemoteCursesPDA(referenceAddresses.RmnRemote)
-			require.NoError(t, err)
-			rmnRemoteConfig, _, err := state.FindRMNRemoteConfigPDA(referenceAddresses.RmnRemote)
-			require.NoError(t, err)
+			// routerWsolReceiver, _, err := tokens.FindAssociatedTokenAddress(solana.TokenProgramID, solana.SolMint, routerBillingSignerPDA)
+			// require.NoError(t, err)
+			// fqWsolBillingConfigPDA, _, err := state.FindFqBillingTokenConfigPDA(solana.SolMint, referenceAddresses.FeeQuoter)
+			// require.NoError(t, err)
+			// fqDestChainPDA, _, err := state.FindFqDestChainPDA(chainSelector, referenceAddresses.FeeQuoter)
+			// require.NoError(t, err)
+			// fqLinkTokenConfig, _, err := state.FindFqBillingTokenConfigPDA(linkMint, referenceAddresses.FeeQuoter)
+			// require.NoError(t, err)
+			// rmnRemoteCurses, _, err := state.FindRMNRemoteCursesPDA(referenceAddresses.RmnRemote)
+			// require.NoError(t, err)
+			// rmnRemoteConfig, _, err := state.FindRMNRemoteConfigPDA(referenceAddresses.RmnRemote)
+			// require.NoError(t, err)
 
 			adminUsdcATA, _, err := tokens.FindAssociatedTokenAddress(solana.TokenProgramID, usdcMint, admin.PublicKey())
 			require.NoError(t, err)
@@ -485,70 +594,93 @@ func TestCctpTpDevnet(t *testing.T) {
 
 			approveIx, err := tokens.TokenApproveChecked(amount, usdcDecimals, solana.TokenProgramID, adminUsdcATA, usdcMint, routerBillingSignerPDA, admin.PublicKey(), []solana.PublicKey{})
 
-			raw := ccip_router.NewCcipSendInstruction(
-				chainSelector,
-				ccip_router.SVM2AnyMessage{
-					Receiver: fullReceiverAddress[:],
-					Data:     []byte{},
-					TokenAmounts: []ccip_router.SVMTokenAmount{
-						{
-							Token:  usdcMint,
-							Amount: amount,
-						},
+			message := ccip_router.SVM2AnyMessage{
+				Receiver: fullReceiverAddress[:],
+				Data:     []byte{},
+				TokenAmounts: []ccip_router.SVMTokenAmount{
+					{
+						Token:  usdcMint,
+						Amount: amount,
 					},
-					FeeToken: solana.PublicKey{},
-					ExtraArgs: testutils.MustSerializeExtraArgs(t, fee_quoter.GenericExtraArgsV2{
-						GasLimit:                 bin.Uint128{Lo: 1000000, Hi: 0}, // TODO, placeholder value
-						AllowOutOfOrderExecution: true,
-					}, ccip.GenericExtraArgsV2Tag),
-				}, // TODO
-				[]byte{0}, // with no message, token accounts start at idx 0
-				routerConfig,
-				routerDestChain,
-				routerNoncesPDA,
-				admin.PublicKey(),
-				solana.SystemProgramID,
-				solana.TokenProgramID,
-				solana.WrappedSol,
-				solana.PublicKey{}, // no user ATA for fees, as paying in SOL
-				routerWsolReceiver,
-				routerBillingSignerPDA,
-				referenceAddresses.FeeQuoter,
-				fqConfigPDA,
-				fqDestChainPDA,
-				fqWsolBillingConfigPDA,
-				fqLinkTokenConfig,
-				referenceAddresses.RmnRemote,
-				rmnRemoteCurses,
-				rmnRemoteConfig,
-			)
-
-			tpAltEntries := solana.AccountMetaSlice{}
-			for i, entry := range tpLookupTable[tpLookupTableAddr] {
-				writable := false
-				for _, j := range writableIndexes {
-					if i == int(j) {
-						writable = true
-						tpAltEntries = append(tpAltEntries, solana.Meta(entry).WRITE())
-						break
-					}
-				}
-				if !writable {
-					tpAltEntries = append(tpAltEntries, solana.Meta(entry))
-				}
+				},
+				FeeToken: solana.PublicKey{},
+				ExtraArgs: testutils.MustSerializeExtraArgs(t, fee_quoter.GenericExtraArgsV2{
+					GasLimit:                 bin.Uint128{Lo: 1000000, Hi: 0}, // TODO, placeholder value
+					AllowOutOfOrderExecution: true,
+				}, ccip.GenericExtraArgsV2Tag),
 			}
 
-			raw.AccountMetaSlice = append(raw.AccountMetaSlice,
-				solana.Meta(adminUsdcATA).WRITE(),
-				solana.Meta(fqPerChainPerToken),
-				solana.Meta(cctpPool.chainConfig).WRITE(),
-			)
-			raw.AccountMetaSlice = append(raw.AccountMetaSlice, tpAltEntries...)
+			derivedAccounts, derivedLookupTables, tokenIndices := testutils.DeriveSendAccounts(ctx, t, admin, message, chainSelector, client, referenceAddresses.Router)
 
-			ix, err := raw.ValidateAndBuild()
+			builder := ccip_router.NewCcipSendInstructionBuilder().
+				SetDestChainSelector(chainSelector).
+				SetMessage(message).
+				SetTokenIndexes(tokenIndices)
+			builder.AccountMetaSlice = derivedAccounts
+			ix, err := builder.ValidateAndBuild()
 			require.NoError(t, err)
 
-			result := testutils.SendAndConfirmWithLookupTables(ctx, t, client, []solana.Instruction{approveIx, ix}, admin, config.DefaultCommitment, tpLookupTable)
+			lookupTables := make(map[solana.PublicKey]solana.PublicKeySlice)
+			for _, table := range derivedLookupTables {
+				entries, lutErr := common.GetAddressLookupTable(ctx, client, table)
+				require.NoError(t, lutErr)
+				lookupTables[table] = entries
+			}
+
+			// raw := ccip_router.NewCcipSendInstruction(
+			// 	chainSelector,
+			// 	message,
+			// 	[]byte{0}, // with no message, token accounts start at idx 0
+			// 	routerConfig,
+			// 	routerDestChain,
+			// 	routerNoncesPDA,
+			// 	admin.PublicKey(),
+			// 	solana.SystemProgramID,
+			// 	solana.TokenProgramID,
+			// 	solana.WrappedSol,
+			// 	solana.PublicKey{}, // no user ATA for fees, as paying in SOL
+			// 	routerWsolReceiver,
+			// 	routerBillingSignerPDA,
+			// 	referenceAddresses.FeeQuoter,
+			// 	fqConfigPDA,
+			// 	fqDestChainPDA,
+			// 	fqWsolBillingConfigPDA,
+			// 	fqLinkTokenConfig,
+			// 	referenceAddresses.RmnRemote,
+			// 	rmnRemoteCurses,
+			// 	rmnRemoteConfig,
+			// )
+
+			// tpAltEntries := solana.AccountMetaSlice{}
+			// for i, entry := range tpLookupTable[tpLookupTableAddr] {
+			// 	writable := false
+			// 	for _, j := range writableIndexes {
+			// 		if i == int(j) {
+			// 			writable = true
+			// 			tpAltEntries = append(tpAltEntries, solana.Meta(entry).WRITE())
+			// 			break
+			// 		}
+			// 	}
+			// 	if !writable {
+			// 		tpAltEntries = append(tpAltEntries, solana.Meta(entry))
+			// 	}
+			// }
+
+			// raw.AccountMetaSlice = append(raw.AccountMetaSlice,
+			// 	solana.Meta(adminUsdcATA).WRITE(),
+			// 	solana.Meta(fqPerChainPerToken),
+			// 	solana.Meta(cctpPool.chainConfig).WRITE(),
+			// )
+			// raw.AccountMetaSlice = append(raw.AccountMetaSlice, tpAltEntries...)
+			// raw.AccountMetaSlice = append(raw.AccountMetaSlice,
+			// 	solana.Meta(tokenMessengerMinter.remoteTokenMessenger),
+			// 	solana.Meta(messageSentEvent).WRITE(),
+			// )
+
+			// ix, err := raw.ValidateAndBuild()
+			// require.NoError(t, err)
+
+			result := testutils.SendAndConfirmWithLookupTables(ctx, t, client, []solana.Instruction{approveIx, ix}, admin, config.DefaultCommitment, lookupTables)
 			require.NotNil(t, result)
 			tx, err := result.Transaction.GetTransaction()
 			fmt.Printf("Transaction Signature: %v\n", tx.Signatures)

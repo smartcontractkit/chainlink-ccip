@@ -857,6 +857,92 @@ export type CcipRouter = {
       ]
     },
     {
+      "name": "setPoolSupportsAutoDerivation",
+      "docs": [
+        "Edits the pool config flags for a given token mint.",
+        "",
+        "The administrator of the token admin registry is the only one allowed to invoke this.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for setting the pool.",
+        "* `mint` - The mint of the pool to be edited.",
+        "* `supports_auto_derivation` - A boolean flag indicating whether the pool supports auto-derivation of accounts."
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenAdminRegistry",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "mint",
+          "type": "publicKey"
+        },
+        {
+          "name": "supportsAutoDerivation",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "upgradeTokenAdminRegistryFromV1",
+      "docs": [
+        "Upgrades the Token Admin Registry from version 1 to the current version.",
+        "",
+        "Anyone may invoke this method, as the upgrade has safe defaults for any new value,",
+        "and those can then be changed by the Token Admin Registry Admin via separate instructions.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for the upgrade."
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenAdminRegistry",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "types Anchor would attempt to deserialize the data _before_ realloc'ing it, which would fail.",
+            "The code will load it and realloc it to the new size manually, and migrate its data."
+          ]
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "setPool",
       "docs": [
         "Sets the pool lookup table for a given token mint.",
@@ -1675,13 +1761,9 @@ export type CcipRouter = {
             "type": "publicKey"
           },
           {
-            "name": "feeTokenMint",
-            "type": "publicKey"
-          },
-          {
-            "name": "mintsOfTransferredTokens",
+            "name": "message",
             "type": {
-              "vec": "publicKey"
+              "defined": "SVM2AnyMessage"
             }
           }
         ]
@@ -1702,7 +1784,33 @@ export type CcipRouter = {
             "name": "RetrieveTokenLUTs"
           },
           {
-            "name": "TokenTransferAccounts"
+            "name": "RetrievePoolPrograms"
+          },
+          {
+            "name": "TokenTransferStaticAccounts",
+            "fields": [
+              {
+                "name": "token",
+                "type": "u32"
+              },
+              {
+                "name": "page",
+                "type": "u32"
+              }
+            ]
+          },
+          {
+            "name": "NestedTokenDerive",
+            "fields": [
+              {
+                "name": "token",
+                "type": "u32"
+              },
+              {
+                "name": "tokenSubstage",
+                "type": "string"
+              }
+            ]
           }
         ]
       }
@@ -2025,6 +2133,51 @@ export type CcipRouter = {
           "index": false
         }
       ]
+    },
+    {
+      "name": "PoolEdited",
+      "fields": [
+        {
+          "name": "token",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "supportsAutoDerivation",
+          "type": "bool",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "PdaUpgraded",
+      "fields": [
+        {
+          "name": "address",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "oldVersion",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "newVersion",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "index": false
+        },
+        {
+          "name": "seeds",
+          "type": "bytes",
+          "index": false
+        }
+      ]
     }
   ],
   "errors": [
@@ -2172,6 +2325,16 @@ export type CcipRouter = {
       "code": 7028,
       "name": "InvalidNonceVersion",
       "msg": "Invalid version of the Nonce account"
+    },
+    {
+      "code": 7029,
+      "name": "InvalidTokenPoolAccountDerivationResponse",
+      "msg": "Token pool returned an unexpected derivation response"
+    },
+    {
+      "code": 7030,
+      "name": "AccountDerivationResponseTooLarge",
+      "msg": "Can't fit account derivation response."
     }
   ]
 };
@@ -3035,6 +3198,92 @@ export const IDL: CcipRouter = {
       ]
     },
     {
+      "name": "setPoolSupportsAutoDerivation",
+      "docs": [
+        "Edits the pool config flags for a given token mint.",
+        "",
+        "The administrator of the token admin registry is the only one allowed to invoke this.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for setting the pool.",
+        "* `mint` - The mint of the pool to be edited.",
+        "* `supports_auto_derivation` - A boolean flag indicating whether the pool supports auto-derivation of accounts."
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenAdminRegistry",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "mint",
+          "type": "publicKey"
+        },
+        {
+          "name": "supportsAutoDerivation",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "upgradeTokenAdminRegistryFromV1",
+      "docs": [
+        "Upgrades the Token Admin Registry from version 1 to the current version.",
+        "",
+        "Anyone may invoke this method, as the upgrade has safe defaults for any new value,",
+        "and those can then be changed by the Token Admin Registry Admin via separate instructions.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for the upgrade."
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenAdminRegistry",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "types Anchor would attempt to deserialize the data _before_ realloc'ing it, which would fail.",
+            "The code will load it and realloc it to the new size manually, and migrate its data."
+          ]
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "setPool",
       "docs": [
         "Sets the pool lookup table for a given token mint.",
@@ -3853,13 +4102,9 @@ export const IDL: CcipRouter = {
             "type": "publicKey"
           },
           {
-            "name": "feeTokenMint",
-            "type": "publicKey"
-          },
-          {
-            "name": "mintsOfTransferredTokens",
+            "name": "message",
             "type": {
-              "vec": "publicKey"
+              "defined": "SVM2AnyMessage"
             }
           }
         ]
@@ -3880,7 +4125,33 @@ export const IDL: CcipRouter = {
             "name": "RetrieveTokenLUTs"
           },
           {
-            "name": "TokenTransferAccounts"
+            "name": "RetrievePoolPrograms"
+          },
+          {
+            "name": "TokenTransferStaticAccounts",
+            "fields": [
+              {
+                "name": "token",
+                "type": "u32"
+              },
+              {
+                "name": "page",
+                "type": "u32"
+              }
+            ]
+          },
+          {
+            "name": "NestedTokenDerive",
+            "fields": [
+              {
+                "name": "token",
+                "type": "u32"
+              },
+              {
+                "name": "tokenSubstage",
+                "type": "string"
+              }
+            ]
           }
         ]
       }
@@ -4203,6 +4474,51 @@ export const IDL: CcipRouter = {
           "index": false
         }
       ]
+    },
+    {
+      "name": "PoolEdited",
+      "fields": [
+        {
+          "name": "token",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "supportsAutoDerivation",
+          "type": "bool",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "PdaUpgraded",
+      "fields": [
+        {
+          "name": "address",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "oldVersion",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "newVersion",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "index": false
+        },
+        {
+          "name": "seeds",
+          "type": "bytes",
+          "index": false
+        }
+      ]
     }
   ],
   "errors": [
@@ -4350,6 +4666,16 @@ export const IDL: CcipRouter = {
       "code": 7028,
       "name": "InvalidNonceVersion",
       "msg": "Invalid version of the Nonce account"
+    },
+    {
+      "code": 7029,
+      "name": "InvalidTokenPoolAccountDerivationResponse",
+      "msg": "Token pool returned an unexpected derivation response"
+    },
+    {
+      "code": 7030,
+      "name": "AccountDerivationResponseTooLarge",
+      "msg": "Can't fit account derivation response."
     }
   ]
 };

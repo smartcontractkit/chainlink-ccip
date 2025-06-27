@@ -418,6 +418,39 @@ pub mod ccip_router {
             .transfer_admin_role_token_admin_registry(ctx, new_admin)
     }
 
+    /// Edits the pool config flags for a given token mint.
+    ///
+    /// The administrator of the token admin registry is the only one allowed to invoke this.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for setting the pool.
+    /// * `mint` - The mint of the pool to be edited.
+    /// * `supports_auto_derivation` - A boolean flag indicating whether the pool supports auto-derivation of accounts.
+    pub fn set_pool_supports_auto_derivation(
+        ctx: Context<EditPoolTokenAdminRegistry>,
+        mint: Pubkey,
+        supports_auto_derivation: bool,
+    ) -> Result<()> {
+        router::token_admin_registry(ctx.accounts.config.default_code_version)
+            .set_pool_supports_auto_derivation(ctx, mint, supports_auto_derivation)
+    }
+
+    /// Upgrades the Token Admin Registry from version 1 to the current version.
+    ///
+    /// Anyone may invoke this method, as the upgrade has safe defaults for any new value,
+    /// and those can then be changed by the Token Admin Registry Admin via separate instructions.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for the upgrade.
+    pub fn upgrade_token_admin_registry_from_v1(
+        ctx: Context<UpgradeTokenAdminRegistry>,
+    ) -> Result<()> {
+        router::token_admin_registry(ctx.accounts.config.default_code_version)
+            .upgrade_token_admin_registry_from_v1(ctx)
+    }
+
     /// Sets the pool lookup table for a given token mint.
     ///
     /// The administrator of the token admin registry can set the pool lookup table for a given token mint.
@@ -618,4 +651,8 @@ pub enum CcipRouterError {
     InvalidDerivationStage,
     #[msg("Invalid version of the Nonce account")]
     InvalidNonceVersion,
+    #[msg("Token pool returned an unexpected derivation response")]
+    InvalidTokenPoolAccountDerivationResponse,
+    #[msg("Can't fit account derivation response.")]
+    AccountDerivationResponseTooLarge,
 }

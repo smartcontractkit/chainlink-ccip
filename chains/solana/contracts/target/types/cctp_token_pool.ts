@@ -56,13 +56,7 @@ export type CctpTokenPool = {
         "# Arguments",
         "* `ctx` - The context"
       ],
-      "accounts": [
-        {
-          "name": "clock",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
+      "accounts": [],
       "args": [],
       "returns": "string"
     },
@@ -511,7 +505,7 @@ export type CctpTokenPool = {
         },
         {
           "name": "poolSigner",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         },
         {
@@ -775,6 +769,44 @@ export type CctpTokenPool = {
           "type": "bytes"
         }
       ]
+    },
+    {
+      "name": "deriveAccountsReleaseOrMintTokens",
+      "accounts": [],
+      "args": [
+        {
+          "name": "stage",
+          "type": "string"
+        },
+        {
+          "name": "releaseOrMint",
+          "type": {
+            "defined": "ReleaseOrMintInV1"
+          }
+        }
+      ],
+      "returns": {
+        "defined": "DeriveAccountsResponse"
+      }
+    },
+    {
+      "name": "deriveAccountsLockOrBurnTokens",
+      "accounts": [],
+      "args": [
+        {
+          "name": "stage",
+          "type": "string"
+        },
+        {
+          "name": "lockOrBurn",
+          "type": {
+            "defined": "LockOrBurnInV1"
+          }
+        }
+      ],
+      "returns": {
+        "defined": "DeriveAccountsResponse"
+      }
     }
   ],
   "accounts": [
@@ -884,6 +916,34 @@ export type CctpTokenPool = {
           {
             "name": "destinationCaller",
             "type": "publicKey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OnrampDeriveStage",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "RetrieveChainConfig"
+          },
+          {
+            "name": "BuildDynamicAccounts"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OfframpDeriveStage",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "RetrieveChainConfig"
+          },
+          {
+            "name": "BuildDynamicAccounts"
           }
         ]
       }
@@ -1040,13 +1100,7 @@ export const IDL: CctpTokenPool = {
         "# Arguments",
         "* `ctx` - The context"
       ],
-      "accounts": [
-        {
-          "name": "clock",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
+      "accounts": [],
       "args": [],
       "returns": "string"
     },
@@ -1495,7 +1549,7 @@ export const IDL: CctpTokenPool = {
         },
         {
           "name": "poolSigner",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         },
         {
@@ -1759,6 +1813,44 @@ export const IDL: CctpTokenPool = {
           "type": "bytes"
         }
       ]
+    },
+    {
+      "name": "deriveAccountsReleaseOrMintTokens",
+      "accounts": [],
+      "args": [
+        {
+          "name": "stage",
+          "type": "string"
+        },
+        {
+          "name": "releaseOrMint",
+          "type": {
+            "defined": "ReleaseOrMintInV1"
+          }
+        }
+      ],
+      "returns": {
+        "defined": "DeriveAccountsResponse"
+      }
+    },
+    {
+      "name": "deriveAccountsLockOrBurnTokens",
+      "accounts": [],
+      "args": [
+        {
+          "name": "stage",
+          "type": "string"
+        },
+        {
+          "name": "lockOrBurn",
+          "type": {
+            "defined": "LockOrBurnInV1"
+          }
+        }
+      ],
+      "returns": {
+        "defined": "DeriveAccountsResponse"
+      }
     }
   ],
   "accounts": [
@@ -1868,6 +1960,34 @@ export const IDL: CctpTokenPool = {
           {
             "name": "destinationCaller",
             "type": "publicKey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OnrampDeriveStage",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "RetrieveChainConfig"
+          },
+          {
+            "name": "BuildDynamicAccounts"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OfframpDeriveStage",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "RetrieveChainConfig"
+          },
+          {
+            "name": "BuildDynamicAccounts"
           }
         ]
       }
