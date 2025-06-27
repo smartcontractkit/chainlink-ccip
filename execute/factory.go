@@ -136,12 +136,17 @@ func (p PluginFactory) NewReportingPlugin(
 	readers := make(map[cciptypes.ChainSelector]contractreader.ContractReaderFacade)
 	extended := make(map[cciptypes.ChainSelector]contractreader.Extended)
 	for chain, cr := range p.contractReaders {
+		chainFamily, err1 := sel.GetSelectorFamily(uint64(chain))
+		if err1 != nil {
+			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to get chain family from selector: %w", err1)
+		}
 		chainID, err1 := sel.GetChainIDFromSelector(uint64(chain))
 		if err1 != nil {
 			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to get chain id from selector: %w", err1)
 		}
 		reader := contractreader.NewExtendedContractReader(
-			contractreader.NewObserverReader(cr, lggr, chainID))
+			contractreader.NewObserverReader(cr, lggr, chainFamily, chainID),
+		)
 		readers[chain] = reader
 		extended[chain] = reader
 	}
