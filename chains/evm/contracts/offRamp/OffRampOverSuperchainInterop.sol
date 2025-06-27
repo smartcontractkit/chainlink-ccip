@@ -11,7 +11,6 @@ import {IRouter} from "../interfaces/IRouter.sol";
 import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
 
 import {Client} from "../libraries/Client.sol";
-import {ERC165CheckerReverting} from "../libraries/ERC165CheckerReverting.sol";
 import {Internal} from "../libraries/Internal.sol";
 import {Pool} from "../libraries/Pool.sol";
 import {SuperchainInterop} from "../libraries/SuperchainInterop.sol";
@@ -21,33 +20,19 @@ import {Identifier} from "../vendor/optimism/interop-lib/v0/src/interfaces/IIden
 
 import {OffRamp} from "./OffRamp.sol";
 
-import {IERC20} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/token/ERC20/IERC20.sol";
-import {EnumerableSet} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
-
 /// @notice This OffRamp supports OP Superchain Interop. It leverages CrossL2Inbox to verify validity of a message,
 /// as opposed to relying on roots signed by oracles.
-/// @dev This OffRamp does not expect transmission to come from DONs, therefore it does not inherite MultiOCR3Base
 contract OffRampOverSuperchainInterop is OffRamp {
-  using ERC165CheckerReverting for address;
-  using EnumerableSet for EnumerableSet.UintSet;
-  using EnumerableSet for EnumerableSet.AddressSet;
-
-  error MessageNotVerified(uint64 sourceChainSelector, bytes32 messageId);
-  error InvalidDestChainSelector(uint64 destChainSelector);
+  error InvalidSourceChainSelector(uint64 sourceChainSelector, uint64 expected);
+  error InvalidDestChainSelector(uint64 destChainSelector, uint64 expected);
   error InvalidSourceOnRamp(address sourceOnRamp);
-  error InvalidInteropLogSelector(bytes32 selector);
-  error MismatchedDestChainSelector(uint64 expectedSelector, uint64 gotSelector);
-  error MismatchedSequenceNumber(uint64 expectedSequenceNumber, uint64 gotSequenceNumber);
   error ZeroChainIdNotAllowed();
   error ChainIdNotConfiguredForSelector(uint64 sourceChainSelector);
+  error OperationNotSupportedbyThisOffRampType();
+  error InvalidMessageCountInReport(uint256 numMessages, uint256 expected);
+  error InvalidProofsWordLength(uint256 length, uint256 expected);
 
-  /// @dev Atlas depends on various events, if changing, please notify Atlas.
-
-  event AllowedTransmitterAdded(address indexed transmitter);
-  event AllowedTransmitterRemoved(address indexed transmitter);
-  event ChainSelectorToChainIdConfigAdded(uint64 indexed chainSelector, uint256 indexed chainId);
+  event ChainSelectorToChainIdConfigUpdated(uint64 indexed chainSelector, uint256 indexed chainId);
   event ChainSelectorToChainIdConfigRemoved(uint64 indexed chainSelector, uint256 indexed chainId);
 
   struct ChainSelectorToChainIdConfigArgs {
@@ -58,7 +43,6 @@ contract OffRampOverSuperchainInterop is OffRamp {
   /// @dev The CrossL2Inbox interface.
   ICrossL2Inbox internal immutable i_crossL2Inbox;
 
-  // Not using enumerable map to make contract size smaller.
   mapping(uint64 sourceChainSelector => uint256 chainId) private s_sourceChainSelectorToChainId;
 
   constructor(
@@ -73,226 +57,100 @@ contract OffRampOverSuperchainInterop is OffRamp {
     _applyChainSelectorToChainIdConfigUpdates(new uint64[](0), chainSelectorToChainIdConfigArgs);
   }
 
-  // ================================================================================================
-  // │                       Code below are new in Superchain Interop OffRamp                       │
-  // ================================================================================================
-
-  // ================================================================
-  // │        Execution - Most logic, e.g. message status           │
-  // │        transitions, stay the same, added interop-specific    │
-  // │        message parsing and validation                        │
-  // ================================================================
-
-  function decodeLogDataIntoMessage(
-    bytes calldata logData
-  ) internal view returns (Internal.Any2EVMRampMessage memory message) {
-    // Validate Selector (also reverts if LOG0 with no topics)
-    bytes32 selector = abi.decode(logData[:32], (bytes32));
-    if (selector != SuperchainInterop.SENT_MESSAGE_LOG_SELECTOR) revert InvalidInteropLogSelector(selector);
-
-    uint64 destChainSelector;
-    uint64 sequenceNumber;
-    (destChainSelector, sequenceNumber) = abi.decode(logData[32:96], (uint64, uint64));
-
-    // Data
-    message = abi.decode(logData[96:], (Internal.Any2EVMRampMessage));
-    if (message.header.destChainSelector != i_chainSelector) {
-      revert MismatchedDestChainSelector(destChainSelector, message.header.destChainSelector);
-    }
-    if (message.header.sequenceNumber != sequenceNumber) {
-      revert MismatchedSequenceNumber(sequenceNumber, message.header.sequenceNumber);
-    }
-
-    return message;
-  }
-
-  function manuallyExecute(
-    SuperchainInterop.ExecutionReport calldata report,
-    GasLimitOverride memory gasLimitOverride
-  ) external {
-    uint256 newLimit = gasLimitOverride.receiverExecutionGasLimit;
-    Internal.Any2EVMRampMessage memory message = decodeLogDataIntoMessage(report.logData);
-    if (newLimit != 0) {
-      // Checks to ensure messages will not be executed with less gas than specified.
-      if (newLimit < message.gasLimit) {
-        revert InvalidManualExecutionGasLimit(message.header.sourceChainSelector, message.header.messageId, newLimit);
-      }
-    }
-    if (message.tokenAmounts.length != gasLimitOverride.tokenGasOverrides.length) {
-      revert ManualExecutionGasAmountCountMismatch(message.header.messageId, message.header.sequenceNumber);
-    }
-
-    // The gas limit can not be lowered as that could cause the message to fail. If manual execution is done
-    // from an UNTOUCHED state and we would allow lower gas limit, anyone could grief by executing the message with
-    // lower gas limit than the DON would have used. This results in the message being marked FAILURE and the DON
-    // would not attempt it with the correct gas limit.
-    for (uint256 tokenIndex = 0; tokenIndex < message.tokenAmounts.length; ++tokenIndex) {
-      uint256 tokenGasOverride = gasLimitOverride.tokenGasOverrides[tokenIndex];
-      if (tokenGasOverride != 0) {
-        uint256 destGasAmount = message.tokenAmounts[tokenIndex].destGasAmount;
-        if (tokenGasOverride < destGasAmount) {
-          revert InvalidManualExecutionTokenGasOverride(
-            message.header.messageId, tokenIndex, destGasAmount, tokenGasOverride
-          );
-        }
-      }
-    }
-
-    _executeSingleReport(report, message, gasLimitOverride, true);
-  }
-
-  function execute(
-    SuperchainInterop.ExecutionReport calldata report
-  ) external {
-    GasLimitOverride memory gasLimitOverride;
-    _executeSingleReport(report, decodeLogDataIntoMessage(report.logData), gasLimitOverride, false);
-  }
-
-  // Easier to not batch, given CrossL2Inbox.validateMessage can fail.
-  function _executeSingleReport(
-    SuperchainInterop.ExecutionReport calldata report,
+  /// @notice Constructs the Identifier from the proofData, then log hash from the message.
+  /// @param message The message to construct proofData and log hash.
+  /// @param proofs Identifier split into 5 words, each representing a field in order.
+  /// @return identifier The identifier constructed from the proofs.
+  /// @return logHash The log hash constructed from the message.
+  function _constructProofs(
     Internal.Any2EVMRampMessage memory message,
-    GasLimitOverride memory gasLimitOverride,
-    bool manualExecution
-  ) internal {
-    uint64 sourceChainSelector = message.header.sourceChainSelector;
-    address onRampAddress = abi.decode(_getEnabledSourceChainConfig(sourceChainSelector).onRamp, (address));
+    bytes32[] memory proofs
+  ) internal pure returns (Identifier memory identifier, bytes32 logHash) {
+    if (proofs.length != 5) revert InvalidProofsWordLength(proofs.length, 5);
+
+    identifier = Identifier({
+      origin: address(uint160(uint256(proofs[0]))),
+      blockNumber: uint256(proofs[1]),
+      logIndex: uint256(proofs[2]),
+      timestamp: uint256(proofs[3]),
+      chainId: uint256(proofs[4])
+    });
+
+    logHash = keccak256(
+      abi.encode(
+        SuperchainInterop.SENT_MESSAGE_LOG_SELECTOR,
+        message.header.destChainSelector,
+        message.header.sequenceNumber,
+        message
+      )
+    );
+
+    return (identifier, logHash);
+  }
+
+  function _verifyMessage(
+    uint64 sourceChainSelector,
+    Internal.ExecutionReport memory report
+  ) internal virtual override returns (uint256 timestampCommitted, bytes32[] memory hashedLeaves) {
+    if (report.messages.length != 1) revert InvalidMessageCountInReport(report.messages.length, 1);
+    Internal.Any2EVMRampMessage memory message = report.messages[0];
 
     // Validate that the message is meant for this chain.
-    if (message.header.destChainSelector != i_chainSelector) {
-      revert InvalidDestChainSelector(message.header.destChainSelector);
+    if (message.header.sourceChainSelector != sourceChainSelector) {
+      revert InvalidSourceChainSelector(message.header.sourceChainSelector, sourceChainSelector);
     }
+    if (message.header.destChainSelector != i_chainSelector) {
+      revert InvalidDestChainSelector(message.header.destChainSelector, i_chainSelector);
+    }
+
+    (Identifier memory identifier, bytes32 logHash) = _constructProofs(message, report.proofs);
+    address onRampAddress = abi.decode(_getEnabledSourceChainConfig(sourceChainSelector).onRamp, (address));
+
     // Validate that the message was emitted by the corresponding OnRamp.
-    if (report.identifier.origin != onRampAddress) {
-      revert InvalidSourceOnRamp(report.identifier.origin);
+    if (identifier.origin != onRampAddress) {
+      revert InvalidSourceOnRamp(identifier.origin);
     }
     // Validate that the chainId maps to the expected sourceChainSelector
-    {
-      // Scope to reduce stack depth.
-      uint256 expectedChainId = s_sourceChainSelectorToChainId[sourceChainSelector];
-      if (expectedChainId == 0) {
-        revert ChainIdNotConfiguredForSelector(sourceChainSelector);
-      }
-      if (expectedChainId != report.identifier.chainId) {
-        revert SourceChainSelectorMismatch(sourceChainSelector, sourceChainSelector);
-      }
+    // Scope to reduce stack depth.
+    uint256 expectedChainId = s_sourceChainSelectorToChainId[sourceChainSelector];
+    if (expectedChainId == 0) {
+      revert ChainIdNotConfiguredForSelector(sourceChainSelector);
+    }
+    if (expectedChainId != identifier.chainId) {
+      revert SourceChainSelectorMismatch(sourceChainSelector, sourceChainSelector);
     }
 
     // SECURITY CRITICAL CHECK.
     // Validate the exact log was emitted on the source chain.
-    i_crossL2Inbox.validateMessage(report.identifier, keccak256(report.logData));
+    i_crossL2Inbox.validateMessage(identifier, logHash);
 
-    // Main body of the single message execution logic.
-    uint256 gasStart = gasleft();
-    message = _beforeExecuteSingleMessage(message);
+    hashedLeaves = new bytes32[](1);
+    hashedLeaves[0] = SuperchainInterop._hashInteropMessage(message, onRampAddress);
 
-    Internal.MessageExecutionState originalState = getExecutionState(sourceChainSelector, message.header.sequenceNumber);
-    // Two valid cases here, we either have never touched this message before, or we tried to execute and failed. This
-    // check protects against reentry and re-execution because the other state is IN_PROGRESS which should not be
-    // allowed to execute.
-    if (
-      !(
-        originalState == Internal.MessageExecutionState.UNTOUCHED
-          || originalState == Internal.MessageExecutionState.FAILURE
-      )
-    ) {
-      // If the message has already been executed, we skip it. We want to not revert on race conditions between
-      // executing parties. This will allow us to open up manual exec while also attempting with the DON, without
-      // reverting an entire DON batch when a user manually executes while the tx is inflight.
-      emit SkippedAlreadyExecutedMessage(sourceChainSelector, message.header.sequenceNumber);
-      return;
-    }
-    uint32[] memory tokenGasOverrides;
-    if (manualExecution) {
-      tokenGasOverrides = gasLimitOverride.tokenGasOverrides;
-      // For Superchain Interop, we allow manual execution if we previously failed
-      // or if enough time has passed since the message was created
-      bool isOldMessage =
-        (block.timestamp - message.header.sequenceNumber) > s_dynamicConfig.permissionLessExecutionThresholdSeconds;
-      // Manually execution is fine if we previously failed or if the message is old enough.
-      // Acceptable state transitions: UNTOUCHED->SUCCESS, UNTOUCHED->FAILURE, FAILURE->SUCCESS.
-      if (!(isOldMessage || originalState == Internal.MessageExecutionState.FAILURE)) {
-        revert ManualExecutionNotYetEnabled(sourceChainSelector);
-      }
+    // Non-zero timestamp signals the message is verified.
+    // Because there is no Commit timestamp, the timestmap of the message is taken from the time it is sent.
+    // If this OffRamp only accepts low-latency messages from source chains within OP Mesh,
+    // this will be very close to the commit timestamp.
+    // If this OffRamp can accept messages from high-latency sources,
+    // `permissionLessExecutionThresholdSeconds` needs to be adjusted..
+    return (identifier.timestamp, hashedLeaves);
+  }
 
-      // Manual execution gas limit can override gas limit specified in the message. Value of 0 indicates no override.
-      if (gasLimitOverride.receiverExecutionGasLimit != 0) {
-        message.gasLimit = gasLimitOverride.receiverExecutionGasLimit;
-      }
-    } else {
-      // Relayer can only execute a message once.
-      // Acceptable state transitions: UNTOUCHED->SUCCESS, UNTOUCHED->FAILURE.
-      if (originalState != Internal.MessageExecutionState.UNTOUCHED) {
-        emit AlreadyAttempted(sourceChainSelector, message.header.sequenceNumber);
-        return;
-      }
-    }
-
-    // Nonce changes per state transition (these only apply for ordered messages):
-    // UNTOUCHED -> FAILURE  nonce bump.
-    // UNTOUCHED -> SUCCESS  nonce bump.
-    // FAILURE   -> SUCCESS  no nonce bump.
-    // UNTOUCHED messages MUST be executed in order always.
-    // If nonce == 0 then out of order execution is allowed.
-    if (message.header.nonce != 0) {
-      if (originalState == Internal.MessageExecutionState.UNTOUCHED) {
-        // If a nonce is not incremented, that means it was skipped, and we can ignore the message.
-        if (
-          !INonceManager(i_nonceManager).incrementInboundNonce(sourceChainSelector, message.header.nonce, message.sender)
-        ) return;
-      }
-    }
-
-    // We check when executing as a defense in depth measure.
-    if (message.tokenAmounts.length != report.offchainTokenData.length) {
-      revert TokenDataMismatch(sourceChainSelector, message.header.sequenceNumber);
-    }
-
-    _setExecutionState(sourceChainSelector, message.header.sequenceNumber, Internal.MessageExecutionState.IN_PROGRESS);
-    (Internal.MessageExecutionState newState, bytes memory returnData) =
-      _trialExecute(message, report.offchainTokenData, tokenGasOverrides);
-    _setExecutionState(sourceChainSelector, message.header.sequenceNumber, newState);
-
-    // Since it's hard to estimate whether manual execution will succeed, we revert the entire transaction if it
-    // fails. This will show the user if their manual exec will fail before they submit it.
-    if (manualExecution) {
-      if (newState == Internal.MessageExecutionState.FAILURE) {
-        if (originalState != Internal.MessageExecutionState.UNTOUCHED) {
-          // If manual execution fails, we revert the entire transaction, unless the originalState is UNTOUCHED as we
-          // would still be making progress by changing the state from UNTOUCHED to FAILURE.
-          revert ExecutionError(message.header.messageId, returnData);
-        }
-      }
-    }
-
-    // The only valid prior states are UNTOUCHED and FAILURE (checked above).
-    // The only valid post states are FAILURE and SUCCESS (checked below).
-    if (newState != Internal.MessageExecutionState.SUCCESS) {
-      if (newState != Internal.MessageExecutionState.FAILURE) {
-        revert InvalidNewState(sourceChainSelector, message.header.sequenceNumber, newState);
-      }
-    }
-
-    emit ExecutionStateChanged(
-      sourceChainSelector,
-      message.header.sequenceNumber,
-      message.header.messageId,
-      SuperchainInterop._hashInteropMessage(message, onRampAddress),
-      newState,
-      returnData,
-      // This emit covers not only the execution through the router, but also all of the overhead in executing the
-      // message. This gives the most accurate representation of the gas used in the execution.
-      gasStart - gasleft()
-    );
+  /// @notice Commit is not supported by OffRamp over Superchain Interop, it is replaced by CrossL2Inbox.
+  /// @dev This function is explicitly removed to allow the compiler's UnusedPruner step to remove most
+  /// of the commit-related code from the contract bytecode size.
+  function commit(
+    bytes32[2] calldata,
+    bytes calldata,
+    bytes32[] calldata,
+    bytes32[] calldata,
+    bytes32
+  ) external override {
+    revert OperationNotSupportedbyThisOffRampType();
   }
 
   // ================================================================
-  // │                Commit - Completely Removed                   │
-  // ================================================================
-
-  // ================================================================
-  // │         Access - Ported transmitter check from OCR3Base,     │
-  // │         added chainSelector to chainId resolution            │
+  // │                        Custom Configs                        │
   // ================================================================
 
   /// @notice Updates sourceChainSelector to chainId mapping.
@@ -305,9 +163,9 @@ contract OffRampOverSuperchainInterop is OffRamp {
     _applyChainSelectorToChainIdConfigUpdates(chainSelectorsToUnset, chainSelectorsToSet);
   }
 
-  /// @notice Internal function to update the chainId to sourceChainSelector mapping.
-  /// @param chainSelectorsToUnset Array of chainIds to remove from the mapping.
-  /// @param chainSelectorsToSet Array of chainId to sourceChainSelector mappings to add.
+  /// @notice Internal function to update the sourceChainSelector tp chainId mapping.
+  /// @param chainSelectorsToUnset Array of chain selector to remove.
+  /// @param chainSelectorsToSet Array of chain selectors to add.
   function _applyChainSelectorToChainIdConfigUpdates(
     uint64[] memory chainSelectorsToUnset,
     ChainSelectorToChainIdConfigArgs[] memory chainSelectorsToSet
@@ -329,17 +187,13 @@ contract OffRampOverSuperchainInterop is OffRamp {
       if (config.chainSelector == 0) {
         revert ZeroChainSelectorNotAllowed();
       }
-      // Not validating if chainSelector is within s_sourceChainSelectors for this config to
-      // be able to evolve quickly.
       s_sourceChainSelectorToChainId[config.chainSelector] = config.chainId;
-      emit ChainSelectorToChainIdConfigAdded(config.chainSelector, config.chainId);
+      emit ChainSelectorToChainIdConfigUpdated(config.chainSelector, config.chainId);
     }
   }
 
-  /// @notice Gets the chainId for a given sourceChainSelector.
-  /// @param sourceChainSelector The sourceChainSelector to look up.
-  /// @return chainId The corresponding chainId.
-  function getChainIdBySourceChainSelector(
+  /// @notice Returns the chainId for a given sourceChainSelector.
+  function getChainId(
     uint64 sourceChainSelector
   ) external view returns (uint256) {
     return s_sourceChainSelectorToChainId[sourceChainSelector];

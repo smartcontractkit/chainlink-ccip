@@ -389,45 +389,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     if (numMsgs == 0) revert EmptyReport(report.sourceChainSelector);
     if (numMsgs != report.offchainTokenData.length) revert UnexpectedTokenData();
 
-    bytes32[] memory hashedLeaves = new bytes32[](numMsgs);
-
-    {
-      // We do this hash here instead of in _verify to avoid two separate loops over the same data. Hashing all of the
-      // message fields ensures that the message being executed is correct and not tampered with. Including the known
-      // OnRamp ensures that the message originates from the correct on ramp version. We know the sourceChainSelector
-      // and i_destChainSelector are correct because we revert below when they are not.
-      bytes32 metaDataHash = keccak256(
-        abi.encode(
-          Internal.ANY_2_EVM_MESSAGE_HASH,
-          sourceChainSelector,
-          i_chainSelector,
-          keccak256(_getEnabledSourceChainConfig(sourceChainSelector).onRamp)
-        )
-      );
-
-      for (uint256 i = 0; i < numMsgs; ++i) {
-        Internal.Any2EVMRampMessage memory message = report.messages[i];
-
-        // Commits do not verify the destChainSelector in the message since only the root is committed, so we
-        // have to check it explicitly. This check is also important as we have assumed the metaDataHash above uses
-        // the i_chainSelector as the destChainSelector.
-        if (message.header.destChainSelector != i_chainSelector) {
-          revert InvalidMessageDestChainSelector(message.header.destChainSelector);
-        }
-        // If the message source chain selector does not match the report's source chain selector and the root has not
-        // been committed for the report source chain selector this will be caught by the root verification.
-        // This acts as an extra check to ensure the message source chain selector matches the report's source chain.
-        if (message.header.sourceChainSelector != sourceChainSelector) {
-          revert SourceChainSelectorMismatch(sourceChainSelector, message.header.sourceChainSelector);
-        }
-
-        hashedLeaves[i] = Internal._hash(message, metaDataHash);
-      }
-    }
-
-    // SECURITY CRITICAL CHECK.
-    uint256 timestampCommitted = _verify(sourceChainSelector, hashedLeaves, report.proofs, report.proofFlagBits);
-    if (timestampCommitted == 0) revert RootNotCommitted(sourceChainSelector);
+    (uint256 timestampCommitted, bytes32[] memory hashedLeaves) = _verifyMessage(sourceChainSelector, report);
 
     // Execute messages.
     for (uint256 i = 0; i < numMsgs; ++i) {
@@ -812,7 +774,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     bytes32[] calldata rs,
     bytes32[] calldata ss,
     bytes32 rawVs
-  ) external {
+  ) external virtual {
     CommitReport memory commitReport = abi.decode(report, (CommitReport));
     DynamicConfig storage dynamicConfig = s_dynamicConfig;
 
@@ -911,6 +873,58 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     return s_roots[sourceChainSelector][root];
   }
 
+  /// @notice Security check on the report, verifies that it has been signed by the Commit DON.
+  /// @dev This function is virtual. Inheriting contracts can override how message security is guaranteed.
+  /// @param sourceChainSelector The source chain selector.
+  /// @param report The report to verify.
+  /// @return timestampCommitted The timestamp of the committed root.
+  /// @return hashedLeaves The hash for every message in the report.
+  function _verifyMessage(
+    uint64 sourceChainSelector,
+    Internal.ExecutionReport memory report
+  ) internal virtual returns (uint256 timestampCommitted, bytes32[] memory hashedLeaves) {
+    uint256 numMsgs = report.messages.length;
+    hashedLeaves = new bytes32[](numMsgs);
+
+    // We do this hash here instead of in _verify to avoid two separate loops over the same data. Hashing all of the
+    // message fields ensures that the message being executed is correct and not tampered with. Including the known
+    // OnRamp ensures that the message originates from the correct OnRamp version. We know the sourceChainSelector
+    // and i_destChainSelector are correct because we revert below when they are not.
+    bytes32 metaDataHash = keccak256(
+      abi.encode(
+        Internal.ANY_2_EVM_MESSAGE_HASH,
+        sourceChainSelector,
+        i_chainSelector,
+        keccak256(_getEnabledSourceChainConfig(sourceChainSelector).onRamp)
+      )
+    );
+
+    for (uint256 i = 0; i < numMsgs; ++i) {
+      Internal.Any2EVMRampMessage memory message = report.messages[i];
+
+      // Commits do not verify the destChainSelector in the message since only the root is committed, so we
+      // have to check it explicitly. This check is also important as we have assumed the metaDataHash above uses
+      // the i_chainSelector as the destChainSelector.
+      if (message.header.destChainSelector != i_chainSelector) {
+        revert InvalidMessageDestChainSelector(message.header.destChainSelector);
+      }
+      // If the message source chain selector does not match the report's source chain selector and the root has not
+      // been committed for the report source chain selector this will be caught by the root verification.
+      // This acts as an extra check to ensure the message source chain selector matches the report's source chain.
+      if (message.header.sourceChainSelector != sourceChainSelector) {
+        revert SourceChainSelectorMismatch(sourceChainSelector, message.header.sourceChainSelector);
+      }
+
+      hashedLeaves[i] = Internal._hash(message, metaDataHash);
+    }
+
+    // SECURITY CRITICAL CHECK.
+    timestampCommitted = _verify(sourceChainSelector, hashedLeaves, report.proofs, report.proofFlagBits);
+    if (timestampCommitted == 0) revert RootNotCommitted(sourceChainSelector);
+
+    return (timestampCommitted, hashedLeaves);
+  }
+
   /// @notice Returns timestamp of when root was accepted or 0 if verification fails.
   /// @dev This method uses a merkle tree within a merkle tree, with the hashedLeaves,
   /// proofs and proofFlagBits being used to get the root of the inner tree.
@@ -929,7 +943,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @inheritdoc MultiOCR3Base
   function _afterOCR3ConfigSet(
     uint8 ocrPluginType
-  ) internal override {
+  ) internal virtual override {
     bool isSignatureVerificationEnabled = s_ocrConfigs[ocrPluginType].configInfo.isSignatureVerificationEnabled;
 
     if (ocrPluginType == uint8(Internal.OCRPluginType.Commit)) {
