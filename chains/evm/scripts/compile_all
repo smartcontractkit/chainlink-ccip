@@ -119,4 +119,5 @@ compileContract onRamp/OnRampWithMessageTransformer
 
 # Superchain Interop On/OffRamps
 compileContract onRamp/OnRampOverSuperchainInterop
+compileContract offRamp/OffRampOverSuperchainInterop
 

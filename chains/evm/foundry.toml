@@ -28,7 +28,7 @@ dynamic_test_linking = true
 # This profile should be used prior to any release to ensure the tests are passing with via-ir enabled. Enabling via-ir
 # locally or in CI will slow down the compilation process, so it is not recommended to use it for everyday development.
 [profile.ccip-compile]
-optimizer_runs = 200
+optimizer_runs = 800
 via_ir = true
 
 [fmt]

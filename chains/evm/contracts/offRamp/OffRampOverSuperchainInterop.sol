@@ -1,18 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol";
-import {IMessageInterceptor} from "../interfaces/IMessageInterceptor.sol";
-import {INonceManager} from "../interfaces/INonceManager.sol";
-import {IPoolV1} from "../interfaces/IPool.sol";
-
-import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
-import {IRouter} from "../interfaces/IRouter.sol";
-import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
-
-import {Client} from "../libraries/Client.sol";
 import {Internal} from "../libraries/Internal.sol";
-import {Pool} from "../libraries/Pool.sol";
 import {SuperchainInterop} from "../libraries/SuperchainInterop.sol";
 
 import {ICrossL2Inbox} from "../vendor/optimism/interop-lib/v0/src/interfaces/ICrossL2Inbox.sol";
@@ -21,7 +10,7 @@ import {Identifier} from "../vendor/optimism/interop-lib/v0/src/interfaces/IIden
 import {OffRamp} from "./OffRamp.sol";
 
 /// @notice This OffRamp supports OP Superchain Interop. It leverages CrossL2Inbox to verify validity of a message,
-/// as opposed to relying on roots signed by oracles.
+/// as opposed to relying on roots signed by Commit DON.
 contract OffRampOverSuperchainInterop is OffRamp {
   error InvalidSourceChainSelector(uint64 sourceChainSelector, uint64 expected);
   error InvalidDestChainSelector(uint64 destChainSelector, uint64 expected);
@@ -41,9 +30,10 @@ contract OffRampOverSuperchainInterop is OffRamp {
     uint256 chainId;
   }
 
-  /// @dev The CrossL2Inbox interface.
+  /// @dev CrossL2Inbox is a pre-deploy at a fixed address on OP L2s.
   ICrossL2Inbox internal immutable i_crossL2Inbox;
 
+  /// @dev Resolve source selector to source chainId for message verification.
   mapping(uint64 sourceChainSelector => uint256 chainId) private s_sourceChainSelectorToChainId;
 
   constructor(
@@ -58,9 +48,9 @@ contract OffRampOverSuperchainInterop is OffRamp {
     _applyChainSelectorToChainIdConfigUpdates(new uint64[](0), chainSelectorToChainIdConfigArgs);
   }
 
-  /// @notice Constructs the Identifier from the proofData, then log hash from the message.
-  /// @param message The message to construct proofData and log hash.
-  /// @param proofs Identifier split into 5 words, each representing a field in order.
+  /// @notice Construct the Identifier from the proofData, then log hash from the message.
+  /// @param message The message to construct proofData and log hash for.
+  /// @param proofs Identifier split into an ordered array of 5 32-byte words.
   /// @return identifier The identifier constructed from the proofs.
   /// @return logHash The log hash constructed from the message.
   function _constructProofs(
@@ -89,6 +79,13 @@ contract OffRampOverSuperchainInterop is OffRamp {
     return (identifier, logHash);
   }
 
+  /// @notice Verify the message was indeed sent on the source chain by checking against the CrossL2Inbox.
+  /// @dev Place no trust assumption on the report, every field of the report can be forged.
+  /// Additional checks are necessary, the most critical ones are OnRamp and chainId validation.
+  /// @param sourceChainSelector The source chain selector of the message.
+  /// @param report The execution report to verify.
+  /// @return timestampCommitted The timestamp of the message.
+  /// @return hashedLeaves The hashed leaves for the message.
   function _verifyMessage(
     uint64 sourceChainSelector,
     Internal.ExecutionReport memory report

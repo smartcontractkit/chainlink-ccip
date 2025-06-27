@@ -37,4 +37,12 @@ contract OffRampOverSuperchainInteropHelper is OffRampOverSuperchainInterop {
   ) public returns (uint256 timestampCommitted, bytes32[] memory hashedLeaves) {
     return _verifyMessage(sourceChainSelector, report);
   }
+
+  /// @notice Exposes the internal _executeSingleReport function as public for testing
+  function executeSingleReport(
+    Internal.ExecutionReport memory rep,
+    GasLimitOverride[] memory manualExecGasExecOverrides
+  ) public {
+    _executeSingleReport(rep, manualExecGasExecOverrides);
+  }
 }
