@@ -2,7 +2,7 @@
 pragma solidity ^0.8.10;
 
 import {INonceManager} from "../interfaces/INonceManager.sol";
-import {IVerifier} from "../interfaces/IVerifier.sol";
+import {IVerifier} from "../interfaces/verifiers/IVerifier.sol";
 
 import {Internal} from "../libraries/Internal.sol";
 import {OCRVerifier} from "../ocr/OCRVerifier.sol";

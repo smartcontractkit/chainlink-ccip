@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {Internal} from "../libraries/Internal.sol";
+import {Internal} from "../../libraries/Internal.sol";
 
 interface IVerifier {
   /// @notice Message execution

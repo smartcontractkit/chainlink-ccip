@@ -10,7 +10,7 @@ import {Client} from "../libraries/Client.sol";
 import {Internal} from "../libraries/Internal.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 
-import {IVerifierSender} from "../interfaces/IVerifier.sol";
+import {IVerifierSender} from "../interfaces/verifiers/IVerifier.sol";
 import {IERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from
@@ -138,7 +138,16 @@ contract CommitVerifier is IVerifierSender, ITypeAndVersion, Ownable2StepMsgSend
     Internal.EVM2AnyCommitVerifierMessage memory message =
       abi.decode(rawMessage, (Internal.EVM2AnyCommitVerifierMessage));
 
-    _validateOriginalSender(message.sender);
+    // If the allowlist is enabled, check if the original sender is allowed.
+    DestChainConfig storage destChainConfig = s_destChainConfigs[i_chainSelector];
+    if (destChainConfig.allowlistEnabled) {
+      if (!destChainConfig.allowedSendersList.contains(message.sender)) {
+        revert SenderNotAllowed(message.sender);
+      }
+    }
+
+    // VerifierAggregator address may be zero intentionally to pause, which should stop all messages.
+    if (msg.sender != address(destChainConfig.verifierAggregator)) revert MustBeCalledByVerifierAggregator();
 
     // TODO check extraArgs
     bool isOutOfOrderExecution = abi.decode(message.verifierExtraArgs[verifierIndex], (bool));
@@ -151,23 +160,6 @@ contract CommitVerifier is IVerifierSender, ITypeAndVersion, Ownable2StepMsgSend
     }
 
     return abi.encode(nonce);
-  }
-
-  function _validateOriginalSender(
-    address originalSender
-  ) internal view {
-    if (originalSender == address(0)) revert RouterMustSetOriginalSender();
-
-    // If the allowlist is enabled, check if the original sender is allowed.
-    DestChainConfig storage destChainConfig = s_destChainConfigs[i_chainSelector];
-    if (destChainConfig.allowlistEnabled) {
-      if (!destChainConfig.allowedSendersList.contains(originalSender)) {
-        revert SenderNotAllowed(originalSender);
-      }
-    }
-
-    // VerifierAggregator address may be zero intentionally to pause, which should stop all messages.
-    if (msg.sender != address(destChainConfig.verifierAggregator)) revert MustBeCalledByVerifierAggregator();
   }
 
   // ================================================================
