@@ -312,19 +312,6 @@ func TestTokenPool(t *testing.T) {
 						transferI, err := tokens.TokenTransferChecked(amount, decimals, v.tokenProgram, p.User[admin.PublicKey()], mint, poolTokenAccount, admin.PublicKey(), solana.PublicKeySlice{})
 						require.NoError(t, err)
 
-						arbitraryMutableAccountPda, _, err := solana.FindProgramAddress(
-							[][]byte{
-								[]byte("arbitrary_seed"),
-							},
-							p.PoolProgram,
-						)
-						arbitraryAccountPda, _, err := solana.FindProgramAddress(
-							[][]byte{
-								[]byte("another_arbitrary_seed"),
-							},
-							p.PoolProgram,
-						)
-
 						raw := test_ccip_invalid_receiver.NewPoolProxyLockOrBurnInstruction(
 							test_ccip_invalid_receiver.LockOrBurnInV1{
 								LocalToken:          mint,
@@ -343,8 +330,6 @@ func TestTokenPool(t *testing.T) {
 							config.RMNRemoteConfigPDA,
 							p.Chain[config.EvmChainSelector],
 						)
-						raw.AccountMetaSlice = append(raw.AccountMetaSlice, solana.NewAccountMeta(arbitraryMutableAccountPda, true, false))
-						raw.AccountMetaSlice = append(raw.AccountMetaSlice, solana.NewAccountMeta(arbitraryAccountPda, false, false))
 						lbI, err := raw.ValidateAndBuild()
 						require.NoError(t, err)
 
@@ -483,19 +468,6 @@ func TestTokenPool(t *testing.T) {
 							).ValidateAndBuild()
 							require.NoError(t, err)
 
-							arbitraryMutableAccountPda, _, err := solana.FindProgramAddress(
-								[][]byte{
-									[]byte("arbitrary_seed"),
-								},
-								p.PoolProgram,
-							)
-							arbitraryAccountPda, _, err := solana.FindProgramAddress(
-								[][]byte{
-									[]byte("another_arbitrary_seed"),
-								},
-								p.PoolProgram,
-							)
-
 							// Do not alter global state, so don't just submit the curse instruction in a tx that succeeds,
 							// as that may break parallel tests. Instead, submit the curse ix together with the pool ix
 							// that fails, which reverts the entire tx and does not affect other tests.
@@ -518,8 +490,6 @@ func TestTokenPool(t *testing.T) {
 								config.RMNRemoteConfigPDA,
 								p.Chain[config.EvmChainSelector],
 							)
-							raw.AccountMetaSlice = append(raw.AccountMetaSlice, solana.NewAccountMeta(arbitraryMutableAccountPda, true, false))
-							raw.AccountMetaSlice = append(raw.AccountMetaSlice, solana.NewAccountMeta(arbitraryAccountPda, false, false))
 							lbI, err := raw.ValidateAndBuild()
 							require.NoError(t, err)
 
@@ -567,19 +537,6 @@ func TestTokenPool(t *testing.T) {
 							).ValidateAndBuild()
 							require.NoError(t, err)
 
-							arbitraryMutableAccountPda, _, err := solana.FindProgramAddress(
-								[][]byte{
-									[]byte("arbitrary_seed"),
-								},
-								p.PoolProgram,
-							)
-							arbitraryAccountPda, _, err := solana.FindProgramAddress(
-								[][]byte{
-									[]byte("another_arbitrary_seed"),
-								},
-								p.PoolProgram,
-							)
-
 							// Do not alter global state, so don't just submit the curse instruction in a tx that succeeds,
 							// as that may break parallel tests. Instead, submit the curse ix together with the pool ix
 							// that fails, which reverts the entire tx and does not affect other tests.
@@ -602,8 +559,6 @@ func TestTokenPool(t *testing.T) {
 								config.RMNRemoteConfigPDA,
 								p.Chain[config.EvmChainSelector],
 							)
-							raw.AccountMetaSlice = append(raw.AccountMetaSlice, solana.NewAccountMeta(arbitraryMutableAccountPda, true, false))
-							raw.AccountMetaSlice = append(raw.AccountMetaSlice, solana.NewAccountMeta(arbitraryAccountPda, false, false))
 							lbI, err := raw.ValidateAndBuild()
 							require.NoError(t, err)
 
@@ -839,19 +794,6 @@ func TestTokenPool(t *testing.T) {
 		})
 
 		t.Run("burnOrLock", func(t *testing.T) {
-			arbitraryMutableAccountPda, _, err := solana.FindProgramAddress(
-				[][]byte{
-					[]byte("arbitrary_seed"),
-				},
-				p.PoolProgram,
-			)
-			arbitraryAccountPda, _, err := solana.FindProgramAddress(
-				[][]byte{
-					[]byte("another_arbitrary_seed"),
-				},
-				p.PoolProgram,
-			)
-
 			raw := test_ccip_invalid_receiver.NewPoolProxyLockOrBurnInstruction(
 				test_ccip_invalid_receiver.LockOrBurnInV1{LocalToken: mint, RemoteChainSelector: config.EvmChainSelector},
 				p.PoolProgram,
@@ -866,8 +808,6 @@ func TestTokenPool(t *testing.T) {
 				config.RMNRemoteConfigPDA,
 				p.Chain[config.EvmChainSelector],
 			)
-			raw.AccountMetaSlice = append(raw.AccountMetaSlice, solana.NewAccountMeta(arbitraryMutableAccountPda, true, false))
-			raw.AccountMetaSlice = append(raw.AccountMetaSlice, solana.NewAccountMeta(arbitraryAccountPda, false, false))
 			raw.AccountMetaSlice = append(raw.AccountMetaSlice, solana.NewAccountMeta(config.CcipLogicReceiver, false, false))
 			lbI, err := raw.ValidateAndBuild()
 			require.NoError(t, err)

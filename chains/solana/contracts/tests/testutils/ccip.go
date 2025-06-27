@@ -2,18 +2,18 @@ package testutils
 
 import (
 	"context"
-	"fmt"
 	"regexp"
 	"testing"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
+	"github.com/stretchr/testify/require"
+
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
-	"github.com/stretchr/testify/require"
 )
 
 func DeriveSendAccounts(
@@ -34,7 +34,7 @@ func DeriveSendAccounts(
 	routerConfigPDA, _, err := state.FindConfigPDA(router)
 	require.NoError(t, err)
 	derivingTokens := false
-
+	var re = regexp.MustCompile(`^TokenTransferStaticAccounts/\d+/0$`)
 	for {
 		params := ccip_router.DeriveAccountsCcipSendParams{
 			DestChainSelector: destChainSelector,
@@ -54,7 +54,7 @@ func DeriveSendAccounts(
 		derivation, err := common.ExtractAnchorTypedReturnValue[ccip_router.DeriveAccountsResponse](ctx, tx.Meta.LogMessages, router.String())
 		require.NoError(t, err)
 
-		isStartOfToken, _ := regexp.MatchString(`^TokenTransferStaticAccounts/\d+/0$`, derivation.CurrentStage)
+		isStartOfToken := re.MatchString(derivation.CurrentStage)
 		if isStartOfToken {
 			tokenIndices = append(tokenIndices, tokenIndex)
 			derivingTokens = true

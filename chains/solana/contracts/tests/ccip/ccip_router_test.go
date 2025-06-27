@@ -3213,7 +3213,6 @@ func TestCCIPRouter(t *testing.T) {
 					require.NoError(t, err)
 					require.Equal(t, true, tokenAdminRegistry.SupportsAutoDerivation)
 				})
-
 			})
 
 			t.Run("Transfer admin role for token admin registry", func(t *testing.T) {
