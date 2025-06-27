@@ -41,7 +41,7 @@ pub fn validate_and_parse_token_accounts<'info>(
     fee_quoter: Pubkey,
     offramp: Option<Pubkey>, // id of the offramp program that called this function, when the caller is not the router
     raw_acc_infos: &'info [AccountInfo<'info>],
-) -> Result<TokenAccounts> {
+) -> Result<TokenAccounts<'info>> {
     // The program_id here is provided solely to satisfy the interface of try_accounts.
     // Note: All program IDs for PDA derivation are explicitly defined in the account context
     // (TokenAccountsValidationContext) via seeds and program attributes.
