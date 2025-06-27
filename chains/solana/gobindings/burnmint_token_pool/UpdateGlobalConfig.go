@@ -18,18 +18,16 @@ type UpdateGlobalConfig struct {
 	//
 	// [1] = [SIGNER] authority
 	//
-	// [2] = [] systemProgram
+	// [2] = [] program
 	//
-	// [3] = [] program
-	//
-	// [4] = [] programData
+	// [3] = [] programData
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewUpdateGlobalConfigInstructionBuilder creates a new `UpdateGlobalConfig` instruction builder.
 func NewUpdateGlobalConfigInstructionBuilder() *UpdateGlobalConfig {
 	nd := &UpdateGlobalConfig{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 5),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 4),
 	}
 	return nd
 }
@@ -62,37 +60,26 @@ func (inst *UpdateGlobalConfig) GetAuthorityAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[1]
 }
 
-// SetSystemProgramAccount sets the "systemProgram" account.
-func (inst *UpdateGlobalConfig) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *UpdateGlobalConfig {
-	inst.AccountMetaSlice[2] = ag_solanago.Meta(systemProgram)
-	return inst
-}
-
-// GetSystemProgramAccount gets the "systemProgram" account.
-func (inst *UpdateGlobalConfig) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
-}
-
 // SetProgramAccount sets the "program" account.
 func (inst *UpdateGlobalConfig) SetProgramAccount(program ag_solanago.PublicKey) *UpdateGlobalConfig {
-	inst.AccountMetaSlice[3] = ag_solanago.Meta(program)
+	inst.AccountMetaSlice[2] = ag_solanago.Meta(program)
 	return inst
 }
 
 // GetProgramAccount gets the "program" account.
 func (inst *UpdateGlobalConfig) GetProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice[2]
 }
 
 // SetProgramDataAccount sets the "programData" account.
 func (inst *UpdateGlobalConfig) SetProgramDataAccount(programData ag_solanago.PublicKey) *UpdateGlobalConfig {
-	inst.AccountMetaSlice[4] = ag_solanago.Meta(programData)
+	inst.AccountMetaSlice[3] = ag_solanago.Meta(programData)
 	return inst
 }
 
 // GetProgramDataAccount gets the "programData" account.
 func (inst *UpdateGlobalConfig) GetProgramDataAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[4]
+	return inst.AccountMetaSlice[3]
 }
 
 func (inst UpdateGlobalConfig) Build() *Instruction {
@@ -129,12 +116,9 @@ func (inst *UpdateGlobalConfig) Validate() error {
 			return errors.New("accounts.Authority is not set")
 		}
 		if inst.AccountMetaSlice[2] == nil {
-			return errors.New("accounts.SystemProgram is not set")
-		}
-		if inst.AccountMetaSlice[3] == nil {
 			return errors.New("accounts.Program is not set")
 		}
-		if inst.AccountMetaSlice[4] == nil {
+		if inst.AccountMetaSlice[3] == nil {
 			return errors.New("accounts.ProgramData is not set")
 		}
 	}
@@ -155,12 +139,11 @@ func (inst *UpdateGlobalConfig) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=5]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("       config", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("    authority", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("      program", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("  programData", inst.AccountMetaSlice[4]))
+					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+						accountsBranch.Child(ag_format.Meta("     config", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("  authority", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("    program", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("programData", inst.AccountMetaSlice[3]))
 					})
 				})
 		})
@@ -190,14 +173,12 @@ func NewUpdateGlobalConfigInstruction(
 	// Accounts:
 	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
-	systemProgram ag_solanago.PublicKey,
 	program ag_solanago.PublicKey,
 	programData ag_solanago.PublicKey) *UpdateGlobalConfig {
 	return NewUpdateGlobalConfigInstructionBuilder().
 		SetSelfServedAllowed(selfServedAllowed).
 		SetConfigAccount(config).
 		SetAuthorityAccount(authority).
-		SetSystemProgramAccount(systemProgram).
 		SetProgramAccount(program).
 		SetProgramDataAccount(programData)
 }
