@@ -1790,6 +1790,10 @@ export type CcipRouter = {
             "name": "TokenTransferStaticAccounts",
             "fields": [
               {
+                "name": "token",
+                "type": "u32"
+              },
+              {
                 "name": "page",
                 "type": "u32"
               }
@@ -1798,6 +1802,10 @@ export type CcipRouter = {
           {
             "name": "NestedTokenDerive",
             "fields": [
+              {
+                "name": "token",
+                "type": "u32"
+              },
               {
                 "name": "tokenSubstage",
                 "type": "string"
@@ -4118,6 +4126,10 @@ export const IDL: CcipRouter = {
             "name": "TokenTransferStaticAccounts",
             "fields": [
               {
+                "name": "token",
+                "type": "u32"
+              },
+              {
                 "name": "page",
                 "type": "u32"
               }
@@ -4126,6 +4138,10 @@ export const IDL: CcipRouter = {
           {
             "name": "NestedTokenDerive",
             "fields": [
+              {
+                "name": "token",
+                "type": "u32"
+              },
               {
                 "name": "tokenSubstage",
                 "type": "string"

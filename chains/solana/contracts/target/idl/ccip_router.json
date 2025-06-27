@@ -1790,6 +1790,10 @@
             "name": "TokenTransferStaticAccounts",
             "fields": [
               {
+                "name": "token",
+                "type": "u32"
+              },
+              {
                 "name": "page",
                 "type": "u32"
               }
@@ -1798,6 +1802,10 @@
           {
             "name": "NestedTokenDerive",
             "fields": [
+              {
+                "name": "token",
+                "type": "u32"
+              },
               {
                 "name": "tokenSubstage",
                 "type": "string"

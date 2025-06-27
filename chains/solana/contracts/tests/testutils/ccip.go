@@ -3,6 +3,7 @@ package testutils
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"testing"
 
 	"github.com/gagliardetto/solana-go"
@@ -49,11 +50,19 @@ func DeriveSendAccounts(
 		deriveRaw.AccountMetaSlice = append(deriveRaw.AccountMetaSlice, askWith...)
 		derive, err := deriveRaw.ValidateAndBuild()
 		require.NoError(t, err)
+		for i, acc := range askWith {
+			fmt.Printf("About to ask (%s) with (%d): %v\n", stage, i, acc)
+		}
 		tx := SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{derive}, authority, config.DefaultCommitment, common.AddComputeUnitLimit(300_000))
 		derivation, err := common.ExtractAnchorTypedReturnValue[ccip_router.DeriveAccountsResponse](ctx, tx.Meta.LogMessages, router.String())
 		require.NoError(t, err)
 		fmt.Printf("Derive stage: %s. Len: %d\n", derivation.CurrentStage, len(derivation.AccountsToSave))
-		if derivation.CurrentStage == "TokenTransferStaticAccounts/0" {
+		for i, acc := range derivation.AccountsToSave {
+			fmt.Printf("Received in stage (%s) the account (%d): %v\n", stage, i, acc)
+		}
+
+		isStartOfToken, _ := regexp.MatchString(`^TokenTransferStaticAccounts/\d+/0$`, derivation.CurrentStage)
+		if isStartOfToken {
 			tokenIndices = append(tokenIndices, tokenIndex)
 			derivingTokens = true
 		}

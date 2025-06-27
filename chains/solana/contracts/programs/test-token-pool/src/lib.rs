@@ -249,20 +249,21 @@ pub mod test_token_pool {
         ctx: Context<'_, '_, '_, 'info, TokenOnramp<'info>>,
         lock_or_burn: LockOrBurnInV1,
     ) -> Result<LockOrBurnOutV1> {
+        let arbitrary_accounts_start = ctx.remaining_accounts.len() - 2;
         // The second and third remaining accounts are not used, but must be passed to verify
         // the autoderive functionality. The first remaining account is the (potential) multisig
         require_eq!(
-            ctx.remaining_accounts[1].key(),
+            ctx.remaining_accounts[arbitrary_accounts_start].key(),
             Pubkey::find_program_address(&[ARBITRARY_SEED], &crate::ID).0,
             CcipTokenPoolError::InvalidInputs
         );
         require_eq!(
-            ctx.remaining_accounts[2].key(),
+            ctx.remaining_accounts[arbitrary_accounts_start + 1].key(),
             Pubkey::find_program_address(&[ANOTHER_ARBITRARY_SEED], &crate::ID).0,
             CcipTokenPoolError::InvalidInputs
         );
 
-        let remaining_accounts = &ctx.remaining_accounts[3..];
+        let remaining_accounts = &ctx.remaining_accounts[arbitrary_accounts_start + 2..];
 
         validate_lock_or_burn(
             &lock_or_burn,

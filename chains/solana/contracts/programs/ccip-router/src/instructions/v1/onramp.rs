@@ -349,16 +349,18 @@ impl OnRamp for Impl {
             DeriveAccountsCcipSendStage::RetrievePoolPrograms => {
                 derive::derive_ccip_send_accounts_retrieve_pool_programs(ctx)
             }
-            DeriveAccountsCcipSendStage::TokenTransferStaticAccounts { page } => {
-                derive::derive_ccip_send_accounts_additional_tokens_static(ctx, params, page)
+            DeriveAccountsCcipSendStage::TokenTransferStaticAccounts { page, token } => {
+                derive::derive_ccip_send_accounts_additional_tokens_static(ctx, params, page, token)
             }
-            DeriveAccountsCcipSendStage::NestedTokenDerive { token_substage } => {
-                derive::derive_ccip_send_accounts_additional_token_nested(
-                    ctx,
-                    &params,
-                    &token_substage,
-                )
-            }
+            DeriveAccountsCcipSendStage::NestedTokenDerive {
+                token_substage,
+                token,
+            } => derive::derive_ccip_send_accounts_additional_token_nested(
+                ctx,
+                &params,
+                &token_substage,
+                token,
+            ),
         }
     }
 }
