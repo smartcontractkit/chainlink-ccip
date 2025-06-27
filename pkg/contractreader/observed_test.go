@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
+	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
@@ -22,7 +23,7 @@ func Test_GetBatchValue(t *testing.T) {
 	t.Cleanup(resetMetrics)
 
 	ctx := tests.Context(t)
-	chainFamily := "solana"
+	chainFamily := chainsel.FamilySolana
 	chainID := "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG"
 	mockedReader := mocked.NewMockContractReaderFacade(t)
 
@@ -81,7 +82,7 @@ func Test_GetLatestValue(t *testing.T) {
 	t.Cleanup(resetMetrics)
 
 	ctx := tests.Context(t)
-	chainFamily := "aptos"
+	chainFamily := chainsel.FamilyAptos
 	chainID := "1"
 	mockedReader := mocked.NewMockContractReaderFacade(t)
 
