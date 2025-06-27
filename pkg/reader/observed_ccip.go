@@ -314,7 +314,7 @@ func (o *observedCCIPReader) trackChainFeeComponents(
 	for k, v := range components {
 		chainFamily, chainID, ok := libs.GetChainInfoFromSelector(k)
 		if !ok {
-			o.lggr.Error("failed to get chainID from selector", "selector", k)
+			o.lggr.Error("failed to get chainID/chainFamily from selector", "selector", k)
 			continue
 		}
 
@@ -332,6 +332,7 @@ func (o *observedCCIPReader) trackChainFeeComponents(
 		o.lggr.Debugw(
 			"observed chain fee components",
 			"destChainID", chainID,
+			"destChainFamily", chainFamily,
 			"executionFee", v.ExecutionFee,
 			"dataAvailabilityFee", v.DataAvailabilityFee,
 		)
