@@ -24,8 +24,7 @@ contract OffRampOverSuperchainInteropSetup is OffRampSetup {
   uint256 internal constant CHAIN_ID_3 = 300;
 
   MockCrossL2Inbox internal s_mockCrossL2Inbox;
-  OffRampOverSuperchainInterop internal s_offRampOverSuperchainInterop;
-  OffRampOverSuperchainInteropHelper internal s_offRampHelper;
+  OffRampOverSuperchainInteropHelper internal s_offRampOverSuperchainInterop;
 
   function setUp() public virtual override {
     super.setUp();
@@ -64,17 +63,10 @@ contract OffRampOverSuperchainInteropSetup is OffRampSetup {
       chainId: CHAIN_ID_1
     });
 
-    s_offRampOverSuperchainInterop = new OffRampOverSuperchainInterop(
-      staticConfig, dynamicConfig, sourceChainConfigs, address(s_mockCrossL2Inbox), chainIdConfigs
-    );
-
     // Also deploy helper version for targeted testing
-    s_offRampHelper = new OffRampOverSuperchainInteropHelper(
+    s_offRampOverSuperchainInterop = new OffRampOverSuperchainInteropHelper(
       staticConfig, dynamicConfig, sourceChainConfigs, address(s_mockCrossL2Inbox), chainIdConfigs
     );
-
-    // Cast to OffRamp to access setOCR3Configs
-    s_offRamp = OffRampHelper(address(s_offRampOverSuperchainInterop));
 
     // Setup OCR config to allow execution by transmitters
     s_configDigestExec = _getBasicConfigDigest(F, s_emptySigners, s_validTransmitters);
@@ -118,8 +110,41 @@ contract OffRampOverSuperchainInteropSetup is OffRampSetup {
         Internal.ANY_2_EVM_MESSAGE_HASH,
         SOURCE_CHAIN_SELECTOR,
         DEST_CHAIN_SELECTOR,
-        keccak256(abi.encode(address(s_offRampHelper)))
+        keccak256(abi.encode(address(s_offRampOverSuperchainInterop)))
       )
+    );
+  }
+
+  function _getLogHash(
+    uint64 destChainSelector,
+    uint64 sequenceNumber,
+    Internal.Any2EVMRampMessage memory message
+  ) internal pure returns (bytes32) {
+    return
+      keccak256(abi.encode(SuperchainInterop.SENT_MESSAGE_LOG_SELECTOR, destChainSelector, sequenceNumber, message));
+  }
+
+  function _getValidProofsAndIdentifier(
+    uint256 blockNumber,
+    uint256 logIndex,
+    uint256 timestamp
+  ) internal pure returns (bytes32[] memory, Identifier memory) {
+    bytes32[] memory proofs = new bytes32[](5);
+    proofs[0] = bytes32(uint256(uint160(ON_RAMP_ADDRESS)));
+    proofs[1] = bytes32(blockNumber);
+    proofs[2] = bytes32(logIndex);
+    proofs[3] = bytes32(timestamp);
+    proofs[4] = bytes32(CHAIN_ID_1);
+
+    return (
+      proofs,
+      Identifier({
+        origin: ON_RAMP_ADDRESS,
+        blockNumber: blockNumber,
+        logIndex: logIndex,
+        timestamp: timestamp,
+        chainId: CHAIN_ID_1
+      })
     );
   }
 }

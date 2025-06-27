@@ -25,9 +25,10 @@ import {OffRamp} from "./OffRamp.sol";
 contract OffRampOverSuperchainInterop is OffRamp {
   error InvalidSourceChainSelector(uint64 sourceChainSelector, uint64 expected);
   error InvalidDestChainSelector(uint64 destChainSelector, uint64 expected);
-  error InvalidSourceOnRamp(address sourceOnRamp);
+  error InvalidSourceOnRamp(uint64 sourceChainSelector, address sourceOnRamp);
   error ZeroChainIdNotAllowed();
   error ChainIdNotConfiguredForSelector(uint64 sourceChainSelector);
+  error ChainIdMismatch(uint64 sourceChainSelector, uint256 chainId, uint256 expectedChainId);
   error OperationNotSupportedbyThisOffRampType();
   error InvalidMessageCountInReport(uint256 numMessages, uint256 expected);
   error InvalidProofsWordLength(uint256 length, uint256 expected);
@@ -108,16 +109,15 @@ contract OffRampOverSuperchainInterop is OffRamp {
 
     // Validate that the message was emitted by the corresponding OnRamp.
     if (identifier.origin != onRampAddress) {
-      revert InvalidSourceOnRamp(identifier.origin);
+      revert InvalidSourceOnRamp(sourceChainSelector, identifier.origin);
     }
     // Validate that the chainId maps to the expected sourceChainSelector
-    // Scope to reduce stack depth.
     uint256 expectedChainId = s_sourceChainSelectorToChainId[sourceChainSelector];
     if (expectedChainId == 0) {
       revert ChainIdNotConfiguredForSelector(sourceChainSelector);
     }
     if (expectedChainId != identifier.chainId) {
-      revert SourceChainSelectorMismatch(sourceChainSelector, sourceChainSelector);
+      revert ChainIdMismatch(sourceChainSelector, identifier.chainId, expectedChainId);
     }
 
     // SECURITY CRITICAL CHECK.
@@ -145,7 +145,7 @@ contract OffRampOverSuperchainInterop is OffRamp {
     bytes32[] calldata,
     bytes32[] calldata,
     bytes32
-  ) external override {
+  ) external pure override {
     revert OperationNotSupportedbyThisOffRampType();
   }
 
