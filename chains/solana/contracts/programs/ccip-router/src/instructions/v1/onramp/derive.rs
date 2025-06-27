@@ -27,8 +27,7 @@ use crate::{
 
 use super::helpers::load_nonce;
 
-// Most token pools have four static addresses + the 10 elements of a LUT.
-const TOKEN_ACCOUNTS_STATIC_PAGE_SIZE: usize = 7;
+const MIN_PAGE_SIZE: usize = 4;
 
 // Local helper to find a readonly CCIP meta for a given seed + program_id combo.
 // Short name for compactness.
@@ -432,36 +431,47 @@ pub fn derive_ccip_send_accounts_additional_tokens_static<'info>(
         response.look_up_tables_to_save = vec![*token_lut.key];
     }
 
-    let mut all_accounts_to_save = vec![
+    response.accounts_to_save = vec![
         sender_token_account,
         token_billing_config,
         pool_chain_config,
     ];
-    all_accounts_to_save.extend(
-        lut_account
-            .addresses
-            .iter()
-            .enumerate()
-            .map(|(i, a)| match i {
-                // PoolConfig, PoolTokenAccount and Mint from the LUT are writable.
-                3 | 4 | 7 => a.writable(),
-                _ => a.readonly(),
-            }),
-    );
-    let start_of_page = TOKEN_ACCOUNTS_STATIC_PAGE_SIZE * page as usize;
-    let num_accounts_in_page =
-        TOKEN_ACCOUNTS_STATIC_PAGE_SIZE.min(all_accounts_to_save.len() - start_of_page);
-    let end_of_page = start_of_page + num_accounts_in_page;
-    all_accounts_to_save[start_of_page..end_of_page].clone_into(&mut response.accounts_to_save);
+    response
+        .accounts_to_save
+        .extend(
+            lut_account
+                .addresses
+                .iter()
+                .enumerate()
+                .map(|(i, a)| match i {
+                    // PoolConfig, PoolTokenAccount and Mint from the LUT are writable.
+                    3 | 4 | 7 => a.writable(),
+                    _ => a.readonly(),
+                }),
+        );
 
-    if end_of_page != all_accounts_to_save.len() {
-        response.next_stage = DeriveAccountsCcipSendStage::TokenTransferStaticAccounts {
-            page: page + 1,
-            token,
+    let max_response_accounts = 26;
+    if response.ask_again_with.len() + response.accounts_to_save.len() > max_response_accounts {
+        let total_accounts_to_save = response.accounts_to_save.len();
+        // paging is necessary, because we can't fit everything in one response.
+        let max_accounts_per_page = max_response_accounts - response.ask_again_with.len();
+        require_gte!(
+            max_accounts_per_page,
+            MIN_PAGE_SIZE,
+            CcipRouterError::AccountDerivationResponseTooLarge
+        );
+        let start_of_page = max_accounts_per_page * page as usize;
+        let end_of_page = total_accounts_to_save.min(start_of_page + max_accounts_per_page);
+        response.accounts_to_save = response.accounts_to_save[start_of_page..end_of_page].to_vec();
+        if end_of_page < total_accounts_to_save {
+            response.next_stage = DeriveAccountsCcipSendStage::TokenTransferStaticAccounts {
+                page: page + 1,
+                token,
+            }
+            .to_string();
+            // Different pages take the same inputs to derive, so we just reiterate the request:
+            return Ok(response);
         }
-        .to_string();
-        // Different pages take the same inputs to derive, so we just reiterate the request:
-        return Ok(response);
     }
 
     let token_admin_registry = load_token_admin_registry_checked(token_registry)?;

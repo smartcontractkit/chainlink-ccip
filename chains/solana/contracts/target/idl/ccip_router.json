@@ -2330,6 +2330,11 @@
       "code": 7029,
       "name": "InvalidTokenPoolAccountDerivationResponse",
       "msg": "Token pool returned an unexpected derivation response"
+    },
+    {
+      "code": 7030,
+      "name": "AccountDerivationResponseTooLarge",
+      "msg": "Can't fit account derivation response."
     }
   ]
 }

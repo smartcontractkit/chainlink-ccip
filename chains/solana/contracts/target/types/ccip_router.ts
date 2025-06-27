@@ -2330,6 +2330,11 @@ export type CcipRouter = {
       "code": 7029,
       "name": "InvalidTokenPoolAccountDerivationResponse",
       "msg": "Token pool returned an unexpected derivation response"
+    },
+    {
+      "code": 7030,
+      "name": "AccountDerivationResponseTooLarge",
+      "msg": "Can't fit account derivation response."
     }
   ]
 };
@@ -4666,6 +4671,11 @@ export const IDL: CcipRouter = {
       "code": 7029,
       "name": "InvalidTokenPoolAccountDerivationResponse",
       "msg": "Token pool returned an unexpected derivation response"
+    },
+    {
+      "code": 7030,
+      "name": "AccountDerivationResponseTooLarge",
+      "msg": "Can't fit account derivation response."
     }
   ]
 };
