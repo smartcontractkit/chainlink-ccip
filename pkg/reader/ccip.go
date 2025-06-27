@@ -116,7 +116,7 @@ func newCCIPChainReaderWithConfigPollerInternal(
 	if configPoller != nil {
 		reader.configPoller = configPoller
 	} else {
-		reader.configPoller = newConfigPoller(lggr, reader, defaultRefreshPeriod)
+		reader.configPoller = newConfigPoller(lggr, reader, reader.accessors, defaultRefreshPeriod)
 	}
 
 	contracts := ContractAddresses{
@@ -320,56 +320,23 @@ func (r *ccipChainReader) GetExpectedNextSequenceNumber(
 	return expectedNextSeqNum, nil
 }
 
-// NextSeqNum returns the current sequence numbers for chains.
-// This always fetches fresh data directly from contracts to ensure accuracy.
-// Critical for proper message sequencing.
+// NextSeqNum returns the current sequence numbers for chains. It should only ever fetch
+// the latest sequence numbers directly from the chain accessor, not from the config poller cache
+// to ensure accuracy and proper message sequencing, and to avoid delays.
 func (r *ccipChainReader) NextSeqNum(
 	ctx context.Context, chains []cciptypes.ChainSelector,
 ) (map[cciptypes.ChainSelector]cciptypes.SeqNum, error) {
-	if err := validateReaderExistence(r.contractReaders, r.destChain); err != nil {
-		return nil, err
-	}
-
-	lggr := logutil.WithContextValues(ctx, r.lggr)
-
-	// Use our direct fetch method that doesn't affect the cache
-	cfgs, err := r.fetchFreshSourceChainConfigs(ctx, r.destChain, chains)
+	chainAccessor, err := getChainAccessor(r.accessors, r.destChain)
 	if err != nil {
-		return nil, fmt.Errorf("get source chains config: %w", err)
+		return nil, fmt.Errorf("unable to getChainAccessor: %w", err)
 	}
 
-	res := make(map[cciptypes.ChainSelector]cciptypes.SeqNum, len(chains))
-	for _, chain := range chains {
-		cfg, exists := cfgs[chain]
-		if !exists {
-			lggr.Warnf("source chain config not found for chain %d, chain is skipped.", chain)
-			continue
-		}
-
-		if !cfg.IsEnabled {
-			lggr.Infof("source chain %d is disabled, chain is skipped.", chain)
-			continue
-		}
-
-		if len(cfg.OnRamp) == 0 {
-			lggr.Errorf("onRamp misconfigured for chain %d, chain is skipped: %x", chain, cfg.OnRamp)
-			continue
-		}
-
-		if len(cfg.Router) == 0 {
-			lggr.Errorf("router is empty for chain %d, chain is skipped: %v", chain, cfg.Router)
-			continue
-		}
-
-		if cfg.MinSeqNr == 0 {
-			lggr.Errorf("minSeqNr not found for chain %d or is set to 0, chain is skipped.", chain)
-			continue
-		}
-
-		res[chain] = cciptypes.SeqNum(cfg.MinSeqNr)
+	nextSeqNums, err := chainAccessor.NextSeqNum(ctx, chains)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get next sequence numbers for chains: %w", err)
 	}
 
-	return res, err
+	return nextSeqNums, nil
 }
 
 func (r *ccipChainReader) Nonces(
@@ -982,93 +949,6 @@ func (r *ccipChainReader) getOffRampSourceChainsConfig(
 	return configs, nil
 }
 
-// fetchFreshSourceChainConfigs always fetches fresh source chain configs directly from contracts
-// without using any cached values. Use this when up-to-date data is critical, especially
-// for sequence number accuracy.
-func (r *ccipChainReader) fetchFreshSourceChainConfigs(
-	ctx context.Context,
-	destChain cciptypes.ChainSelector,
-	sourceChains []cciptypes.ChainSelector,
-) (map[cciptypes.ChainSelector]cciptypes.SourceChainConfig, error) {
-	lggr := logutil.WithContextValues(ctx, r.lggr)
-
-	reader, exists := r.contractReaders[destChain]
-	if !exists {
-		return nil, fmt.Errorf("no contract reader for chain %d", destChain)
-	}
-
-	// Filter out destination chain
-	filteredSourceChains := filterOutChainSelector(sourceChains, destChain)
-	if len(filteredSourceChains) == 0 {
-		return make(map[cciptypes.ChainSelector]cciptypes.SourceChainConfig), nil
-	}
-
-	// Prepare batch requests for the sourceChains to fetch the latest Unfinalized config values.
-	contractBatch := make([]types.BatchRead, 0, len(filteredSourceChains))
-	validSourceChains := make([]cciptypes.ChainSelector, 0, len(filteredSourceChains))
-
-	for _, chain := range filteredSourceChains {
-		validSourceChains = append(validSourceChains, chain)
-		contractBatch = append(contractBatch, types.BatchRead{
-			ReadName: consts.MethodNameGetSourceChainConfig,
-			Params: map[string]any{
-				"sourceChainSelector": chain,
-			},
-			ReturnVal: new(cciptypes.SourceChainConfig),
-		})
-	}
-
-	// Execute batch request
-	results, _, err := reader.ExtendedBatchGetLatestValues(
-		ctx,
-		contractreader.ExtendedBatchGetLatestValuesRequest{
-			consts.ContractNameOffRamp: contractBatch,
-		},
-		false,
-	)
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to get source chain configs: %w", err)
-	}
-
-	if len(results) != 1 {
-		return nil, fmt.Errorf("unexpected number of results: %d", len(results))
-	}
-
-	// Process results
-	configs := make(map[cciptypes.ChainSelector]cciptypes.SourceChainConfig)
-
-	for _, readResult := range results {
-		if len(readResult) != len(validSourceChains) {
-			return nil, fmt.Errorf("selectors and source chain configs length mismatch: sourceChains=%v, results=%v",
-				validSourceChains, results)
-		}
-
-		for i, chain := range validSourceChains {
-			v, err := readResult[i].GetResult()
-			if err != nil {
-				lggr.Errorw("Failed to get source chain config",
-					"chain", chain,
-					"error", err)
-				return nil, fmt.Errorf("GetSourceChainConfig for chainSelector=%d failed: %w", chain, err)
-			}
-
-			cfg, ok := v.(*cciptypes.SourceChainConfig)
-			if !ok {
-				lggr.Errorw("Invalid result type from GetSourceChainConfig",
-					"chain", chain,
-					"type", fmt.Sprintf("%T", v))
-				return nil, fmt.Errorf(
-					"invalid result type (%T) from GetSourceChainConfig for chainSelector=%d, expected *SourceChainConfig", v, chain)
-			}
-
-			configs[chain] = *cfg
-		}
-	}
-
-	return configs, nil
-}
-
 // offRampStaticChainConfig is used to parse the response from the offRamp contract's getStaticConfig method.
 // See: <chainlink repo>/contracts/src/v0.8/ccip/offRamp/OffRamp.sol:StaticConfig
 type offRampStaticChainConfig struct {
@@ -1575,11 +1455,6 @@ type ccipReaderInternal interface {
 	processConfigResults(
 		chainSel cciptypes.ChainSelector,
 		batchResult types.BatchGetLatestValuesResult) (ChainConfigSnapshot, error)
-
-	// fetchFreshSourceChainConfigs fetches source chain configurations from the specified destination chain
-	fetchFreshSourceChainConfigs(
-		ctx context.Context, destChain cciptypes.ChainSelector,
-		sourceChains []cciptypes.ChainSelector) (map[cciptypes.ChainSelector]cciptypes.SourceChainConfig, error)
 }
 
 // getDestChain returns the destination chain selector

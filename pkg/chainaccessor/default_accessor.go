@@ -465,10 +465,127 @@ func createExecutedMessagesKeyFilter(
 
 func (l *DefaultAccessor) NextSeqNum(
 	ctx context.Context,
-	sources []cciptypes.ChainSelector,
+	sourceChainSelectors []cciptypes.ChainSelector,
 ) (seqNum map[cciptypes.ChainSelector]cciptypes.SeqNum, err error) {
-	// TODO(NONEVM-1865): implement
-	panic("implement me")
+	lggr := logutil.WithContextValues(ctx, l.lggr)
+
+	cfgs, err := l.GetOffRampSourceChainConfigs(ctx, sourceChainSelectors)
+	if err != nil {
+		return nil, fmt.Errorf("get source chains config: %w", err)
+	}
+
+	res := make(map[cciptypes.ChainSelector]cciptypes.SeqNum, len(sourceChainSelectors))
+	for _, chain := range sourceChainSelectors {
+		cfg, exists := cfgs[chain]
+		if !exists {
+			lggr.Warnf("source chain config not found for chain %d, chain is skipped.", chain)
+			continue
+		}
+
+		if !cfg.IsEnabled {
+			lggr.Infof("source chain %d is disabled, chain is skipped.", chain)
+			continue
+		}
+
+		if len(cfg.OnRamp) == 0 {
+			lggr.Errorf("onRamp misconfigured for chain %d, chain is skipped: %x", chain, cfg.OnRamp)
+			continue
+		}
+
+		if len(cfg.Router) == 0 {
+			lggr.Errorf("router is empty for chain %d, chain is skipped: %v", chain, cfg.Router)
+			continue
+		}
+
+		if cfg.MinSeqNr == 0 {
+			lggr.Errorf("minSeqNr not found for chain %d or is set to 0, chain is skipped.", chain)
+			continue
+		}
+
+		res[chain] = cciptypes.SeqNum(cfg.MinSeqNr)
+	}
+
+	return res, err
+}
+
+func (l *DefaultAccessor) GetOffRampSourceChainConfigs(
+	ctx context.Context,
+	sourceChainSelectors []cciptypes.ChainSelector,
+) (map[cciptypes.ChainSelector]cciptypes.SourceChainConfig, error) {
+	lggr := logutil.WithContextValues(ctx, l.lggr)
+
+	// Filter out destination chain
+	filteredSourceChains := slicelib.Filter(sourceChainSelectors, func(cs cciptypes.ChainSelector) bool {
+		return cs != l.chainSelector
+	})
+	if len(filteredSourceChains) == 0 {
+		return make(map[cciptypes.ChainSelector]cciptypes.SourceChainConfig), nil
+	}
+
+	// Prepare batch requests for the sourceChains to fetch the latest Unfinalized config values.
+	contractBatch := make([]types.BatchRead, 0, len(filteredSourceChains))
+	validSourceChains := make([]cciptypes.ChainSelector, 0, len(filteredSourceChains))
+
+	for _, chain := range filteredSourceChains {
+		validSourceChains = append(validSourceChains, chain)
+		contractBatch = append(contractBatch, types.BatchRead{
+			ReadName: consts.MethodNameGetSourceChainConfig,
+			Params: map[string]any{
+				"sourceChainSelector": chain,
+			},
+			ReturnVal: new(cciptypes.SourceChainConfig),
+		})
+	}
+
+	// Execute batch request
+	results, _, err := l.contractReader.ExtendedBatchGetLatestValues(
+		ctx,
+		contractreader.ExtendedBatchGetLatestValuesRequest{
+			consts.ContractNameOffRamp: contractBatch,
+		},
+		false,
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get source chain configs: %w", err)
+	}
+
+	if len(results) != 1 {
+		return nil, fmt.Errorf("unexpected number of results: %d", len(results))
+	}
+
+	// Process results
+	configs := make(map[cciptypes.ChainSelector]cciptypes.SourceChainConfig)
+
+	for _, readResult := range results {
+		if len(readResult) != len(validSourceChains) {
+			return nil, fmt.Errorf("selectors and source chain configs length mismatch: sourceChains=%v, results=%v",
+				validSourceChains, results)
+		}
+
+		for i, chain := range validSourceChains {
+			v, err := readResult[i].GetResult()
+			if err != nil {
+				lggr.Errorw("Failed to get source chain config",
+					"chain", chain,
+					"error", err)
+				return nil, fmt.Errorf("GetSourceChainConfig for chainSelector=%d failed: %w", chain, err)
+			}
+
+			cfg, ok := v.(*cciptypes.SourceChainConfig)
+			if !ok {
+				lggr.Errorw("Invalid result type from GetSourceChainConfig",
+					"chain", chain,
+					"type", fmt.Sprintf("%T", v))
+				return nil, fmt.Errorf(
+					"invalid result type (%T) from GetSourceChainConfig for chainSelector=%d, expected *SourceChainConfig", v, chain)
+			}
+
+			configs[chain] = *cfg
+		}
+	}
+
+	return configs, nil
 }
 
 func (l *DefaultAccessor) Nonces(
@@ -716,14 +833,6 @@ func (l *DefaultAccessor) GetLatestPriceSeqNr(ctx context.Context) (uint64, erro
 }
 
 func (l *DefaultAccessor) GetOffRampConfigDigest(ctx context.Context, pluginType uint8) ([32]byte, error) {
-	// TODO(NONEVM-1865): implement
-	panic("implement me")
-}
-
-func (l *DefaultAccessor) GetOffRampSourceChainsConfig(
-	ctx context.Context,
-	sourceChains []cciptypes.ChainSelector,
-) (map[cciptypes.ChainSelector]cciptypes.SourceChainConfig, error) {
 	// TODO(NONEVM-1865): implement
 	panic("implement me")
 }
