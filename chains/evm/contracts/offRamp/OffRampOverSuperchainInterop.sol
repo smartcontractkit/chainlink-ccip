@@ -13,7 +13,7 @@ import {OffRamp} from "./OffRamp.sol";
 /// as opposed to relying on roots signed by Commit DON.
 /// @dev This OffRamp maintains the same Internal.ExecutionReport interface for execute, but it enforces
 /// exactly 1 message per report. Batching is not supported, because this OffRamp only runs on OP L2s,
-/// the benefits of batching is minimal, it is not worth the complexity.
+/// the benefit of batching is minimal, it is not worth the complexity.
 contract OffRampOverSuperchainInterop is OffRamp {
   error InvalidSourceChainSelector(uint64 sourceChainSelector, uint64 expected);
   error InvalidDestChainSelector(uint64 destChainSelector, uint64 expected);
@@ -21,7 +21,7 @@ contract OffRampOverSuperchainInterop is OffRamp {
   error ZeroChainIdNotAllowed();
   error ChainIdNotConfiguredForSelector(uint64 sourceChainSelector);
   error ChainIdMismatch(uint64 sourceChainSelector, uint256 chainId, uint256 expectedChainId);
-  error OperationNotSupportedbyThisOffRampType();
+  error OperationNotSupportedByThisOffRampType();
   error InvalidMessageCountInReport(uint256 numMessages, uint256 expected);
   error InvalidProofsWordLength(uint256 length, uint256 expected);
 
@@ -128,11 +128,11 @@ contract OffRampOverSuperchainInterop is OffRamp {
     hashedLeaves[0] = SuperchainInterop._hashInteropMessage(message, onRampAddress);
 
     // Non-zero timestamp signals the message is verified.
-    // Because there is no Commit timestamp, the timestmap of the message is taken from the time it is sent.
+    // Because there is no Commit timestamp, the timestamp of the message is taken from the time it is sent.
     // If this OffRamp only accepts low-latency messages from source chains within OP Mesh,
     // this will be very close to the commit timestamp.
     // If this OffRamp can accept messages from high-latency sources,
-    // `permissionLessExecutionThresholdSeconds` needs to be adjusted..
+    // `permissionLessExecutionThresholdSeconds` needs to be adjusted.
     return (identifier.timestamp, hashedLeaves);
   }
 
@@ -146,7 +146,7 @@ contract OffRampOverSuperchainInterop is OffRamp {
     bytes32[] calldata,
     bytes32
   ) external pure override {
-    revert OperationNotSupportedbyThisOffRampType();
+    revert OperationNotSupportedByThisOffRampType();
   }
 
   // ================================================================
@@ -163,7 +163,7 @@ contract OffRampOverSuperchainInterop is OffRamp {
     _applyChainSelectorToChainIdConfigUpdates(chainSelectorsToUnset, chainSelectorsToSet);
   }
 
-  /// @notice Internal function to update the sourceChainSelector tp chainId mapping.
+  /// @notice Internal function to update the sourceChainSelector to chainId mapping.
   /// @param chainSelectorsToUnset Array of selectors to remove from the mapping.
   /// @param chainSelectorsToSet Array of selector to chainId mappings to add.
   function _applyChainSelectorToChainIdConfigUpdates(

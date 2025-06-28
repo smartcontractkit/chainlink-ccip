@@ -12,7 +12,7 @@ contract OffRampOverSuperchainInterop_commit is OffRampOverSuperchainInteropSetu
     bytes32[] memory ss;
     bytes32 rawVs;
 
-    vm.expectRevert(OffRampOverSuperchainInterop.OperationNotSupportedbyThisOffRampType.selector);
+    vm.expectRevert(OffRampOverSuperchainInterop.OperationNotSupportedByThisOffRampType.selector);
     s_offRampOverSuperchainInterop.commit(reportContext, report, rs, ss, rawVs);
   }
 }
