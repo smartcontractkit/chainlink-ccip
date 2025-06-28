@@ -19,8 +19,8 @@ import (
 )
 
 const (
-	chainID  = "2337"
-	selector = cciptypes.ChainSelector(12922642891491394802)
+	chainID  = "2"
+	selector = cciptypes.ChainSelector(743186221051783445)
 )
 
 func Test_LatencyIsTracked(t *testing.T) {
@@ -59,17 +59,17 @@ func Test_LatencyIsTracked(t *testing.T) {
 	}
 
 	l1 := internal.CounterFromHistogramByLabels(
-		t, metrics.PromExecLatencyHistogram, chainID, "observation", "GetCommitReports",
+		t, metrics.PromExecLatencyHistogram, "aptos", chainID, "observation", "GetCommitReports",
 	)
 	require.Equal(t, count, l1)
 
 	l2 := internal.CounterFromHistogramByLabels(
-		t, metrics.PromExecLatencyHistogram, chainID, "outcome", "GetCommitReports",
+		t, metrics.PromExecLatencyHistogram, "aptos", chainID, "outcome", "GetCommitReports",
 	)
 	require.Equal(t, count, l2)
 
 	l3 := internal.CounterFromHistogramByLabels(
-		t, metrics.PromExecLatencyHistogram, chainID, "query", "GetCommitReports",
+		t, metrics.PromExecLatencyHistogram, "aptos", chainID, "query", "GetCommitReports",
 	)
 	require.Equal(t, count, l3)
 }
@@ -95,12 +95,12 @@ func Test_ErrorIsTrackedWhenOriginReturns(t *testing.T) {
 	}
 
 	l1 := internal.CounterFromHistogramByLabels(
-		t, metrics.PromExecLatencyHistogram, chainID, "outcome", "GetCommitReports",
+		t, metrics.PromExecLatencyHistogram, "aptos", chainID, "outcome", "GetCommitReports",
 	)
 	require.Equal(t, 0, l1)
 
 	l2 := testutil.ToFloat64(
-		metrics.PromExecErrors.WithLabelValues(chainID, "outcome", "GetCommitReports"),
+		metrics.PromExecErrors.WithLabelValues("aptos", chainID, "outcome", "GetCommitReports"),
 	)
 	require.Equal(t, float64(count), l2)
 }

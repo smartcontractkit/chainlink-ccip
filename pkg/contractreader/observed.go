@@ -36,7 +36,7 @@ var (
 			Help:    "The amount of time elapsed during the ChainReader's GetLatestValue execution",
 			Buckets: buckets,
 		},
-		[]string{"chainID", "contract", "method"},
+		[]string{"chainFamily", "chainID", "contract", "method"},
 	)
 	CrBatchRequestsDurations = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
@@ -44,28 +44,29 @@ var (
 			Help:    "The amount of time elapsed during the ChainReader's BatchGetLatestValues execution",
 			Buckets: buckets,
 		},
-		[]string{"chainID"},
+		[]string{"chainFamily", "chainID"},
 	)
 	CrBatchSizes = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "contract_reader_batch_request_size",
 			Help: "The size of the batch request",
 		},
-		[]string{"chainID"},
+		[]string{"chainFamily", "chainID"},
 	)
 	CrErrors = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "contract_reader_errors",
 			Help: "The number of errors that occurred during the ChainReader's execution",
 		},
-		[]string{"chainID", "function", "contract"},
+		[]string{"chainFamily", "chainID", "function", "contract"},
 	)
 )
 
 type Observed struct {
 	ContractReaderFacade
-	lggr    logger.Logger
-	chainID string
+	lggr        logger.Logger
+	chainFamily string
+	chainID     string
 
 	// Prometheus components for tracking metrics
 	directRequestsDurations *prometheus.HistogramVec
@@ -77,11 +78,13 @@ type Observed struct {
 func NewObserverReader(
 	cr ContractReaderFacade,
 	lggr logger.Logger,
+	chainFamily string,
 	chainID string,
 ) *Observed {
 	return &Observed{
 		ContractReaderFacade:    cr,
 		lggr:                    lggr,
+		chainFamily:             chainFamily,
 		chainID:                 chainID,
 		directRequestsDurations: CrDirectRequestsDurations,
 		batchRequestsDurations:  CrBatchRequestsDurations,
@@ -107,11 +110,12 @@ func (o *Observed) GetLatestValue(
 
 	contract, function := unpackReadIdentifier(readIdentifier)
 	o.directRequestsDurations.
-		WithLabelValues(o.chainID, contract, function).
+		WithLabelValues(o.chainFamily, o.chainID, contract, function).
 		Observe(float64(duration))
 
 	o.maybeTrackErrors(err, "GetLatestValue", contract+"-"+function)
 	o.lggr.Debugw("Observed GetLatestValue",
+		"chainFamily", o.chainFamily,
 		"chainID", o.chainID,
 		"contract", contract,
 		"function", function,
@@ -130,15 +134,16 @@ func (o *Observed) BatchGetLatestValues(
 	duration := time.Since(start)
 
 	o.batchRequestsDurations.
-		WithLabelValues(o.chainID).
+		WithLabelValues(o.chainFamily, o.chainID).
 		Observe(float64(duration))
 
 	o.batchSizes.
-		WithLabelValues(o.chainID).
+		WithLabelValues(o.chainFamily, o.chainID).
 		Add(float64(len(request)))
 
 	o.maybeTrackErrors(err, "BatchGetLatestValues", "")
 	o.lggr.Debugw("Observed BatchGetLatestValues",
+		"chainFamily", o.chainFamily,
 		"chainID", o.chainID,
 		"millis", duration.Milliseconds(),
 		"size", len(request),
@@ -152,7 +157,7 @@ func (o *Observed) maybeTrackErrors(err error, function string, contract string)
 		return
 	}
 	o.errors.
-		WithLabelValues(o.chainID, function, contract).
+		WithLabelValues(o.chainFamily, o.chainID, function, contract).
 		Inc()
 }
 
