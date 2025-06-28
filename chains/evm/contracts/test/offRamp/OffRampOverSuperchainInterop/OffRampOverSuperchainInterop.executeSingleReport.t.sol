@@ -6,7 +6,6 @@ import {Identifier} from "../../../vendor/optimism/interop-lib/v0/src/interfaces
 import {Router} from "../../../Router.sol";
 import {Internal} from "../../../libraries/Internal.sol";
 import {OffRamp} from "../../../offRamp/OffRamp.sol";
-import {OffRampOverSuperchainInterop} from "../../../offRamp/OffRampOverSuperchainInterop.sol";
 
 import {LogMessageDataReceiver} from "../../helpers/receivers/LogMessageDataReceiver.sol";
 import {MockCrossL2Inbox} from "../../mocks/MockCrossL2Inbox.sol";
