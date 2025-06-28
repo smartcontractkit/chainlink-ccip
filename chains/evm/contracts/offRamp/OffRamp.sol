@@ -943,7 +943,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @inheritdoc MultiOCR3Base
   function _afterOCR3ConfigSet(
     uint8 ocrPluginType
-  ) internal virtual override {
+  ) internal override {
     bool isSignatureVerificationEnabled = s_ocrConfigs[ocrPluginType].configInfo.isSignatureVerificationEnabled;
 
     if (ocrPluginType == uint8(Internal.OCRPluginType.Commit)) {

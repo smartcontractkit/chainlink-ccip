@@ -3,8 +3,6 @@ pragma solidity ^0.8.0;
 
 import {Internal} from "./Internal.sol";
 
-import {Identifier} from "../vendor/optimism/interop-lib/v0/src/interfaces/IIdentifier.sol";
-
 library SuperchainInterop {
   /// @notice Event selector for the CCIPMessageSent event, needed for Superchain validation.
   bytes32 internal constant SENT_MESSAGE_LOG_SELECTOR =

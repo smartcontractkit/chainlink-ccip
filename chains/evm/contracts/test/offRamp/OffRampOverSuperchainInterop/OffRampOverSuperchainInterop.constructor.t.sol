@@ -51,7 +51,7 @@ contract OffRampOverSuperchainInterop_constructor is OffRampOverSuperchainIntero
     OffRamp.StaticConfig memory retrievedStaticConfig = offRamp.getStaticConfig();
     assertEq(staticConfig.chainSelector, retrievedStaticConfig.chainSelector);
     assertEq(staticConfig.gasForCallExactCheck, retrievedStaticConfig.gasForCallExactCheck);
-    assertEq(staticConfig.rmnRemote, address(retrievedStaticConfig.rmnRemote));
+    assertEq(address(staticConfig.rmnRemote), address(retrievedStaticConfig.rmnRemote));
     assertEq(staticConfig.tokenAdminRegistry, retrievedStaticConfig.tokenAdminRegistry);
     assertEq(staticConfig.nonceManager, retrievedStaticConfig.nonceManager);
 

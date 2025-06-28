@@ -55,7 +55,7 @@ function getOptimizations() {
     local optimize_runs_override=""
 
     case $1 in
-      "OffRamp" | "OffRampWithMessageTransformer")
+      "OffRamp" | "OffRampOverSuperchainInterop" | "OffRampWithMessageTransformer")
         optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_OFFRAMP"
         ;;
       "FeeQuoter")
