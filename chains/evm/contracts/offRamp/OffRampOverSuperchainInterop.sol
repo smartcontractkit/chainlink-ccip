@@ -89,8 +89,9 @@ contract OffRampOverSuperchainInterop is OffRamp {
   }
 
   /// @notice Verify the message was indeed sent on the source chain by checking against the CrossL2Inbox.
-  /// @dev Place no trust assumption on the report, every field of the report can be forged.
-  /// Additional checks are necessary, the most critical ones are OnRamp and chainId validation.
+  /// @dev No trust assumption can be placed on the report, every field of the report can be forged.
+  /// In addition to CrossL2Inbox validation, many checks are necessary,
+  /// e.g. Identifier.chainId must match sourceChainSelector.
   /// @param sourceChainSelector The source chain selector of the message.
   /// @param report The execution report to verify.
   /// @return timestampCommitted The source timestamp of the message.
@@ -102,10 +103,11 @@ contract OffRampOverSuperchainInterop is OffRamp {
     if (report.messages.length != 1) revert InvalidMessageCountInReport(report.messages.length, 1);
     Internal.Any2EVMRampMessage memory message = report.messages[0];
 
-    // Validate that the message is meant for this chain.
+    // Sanity check on report integrity.
     if (message.header.sourceChainSelector != sourceChainSelector) {
       revert InvalidSourceChainSelector(message.header.sourceChainSelector, sourceChainSelector);
     }
+    // Validate that the message is meant for this chain.
     if (message.header.destChainSelector != i_chainSelector) {
       revert InvalidDestChainSelector(message.header.destChainSelector, i_chainSelector);
     }
@@ -137,7 +139,7 @@ contract OffRampOverSuperchainInterop is OffRamp {
     // Because there is no Commit timestamp, the timestamp of the message is taken from the time it is sent.
     // If this OffRamp only accepts low-latency messages from source chains within OP Mesh,
     // this will be very close to the commit timestamp.
-    // If this OffRamp can accept messages from high-latency sources,
+    // If this OffRamp accepts messages from high-safety-latency sources, e.g alt OP L2s not in OP Mesh,
     // `permissionLessExecutionThresholdSeconds` needs to be adjusted.
     return (identifier.timestamp, hashedLeaves);
   }
