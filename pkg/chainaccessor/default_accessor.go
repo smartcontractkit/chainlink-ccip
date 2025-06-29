@@ -244,6 +244,8 @@ func (l *DefaultAccessor) LatestMsgSeqNum(
 		return 0, fmt.Errorf("failed to cast %v to SendRequestedEvent", item.Data)
 	}
 
+	l.lggr.Info("CCIPSEND REQUEST RECIEVED: %v", msg)
+
 	if err := ValidateSendRequestedEvent(msg, l.chainSelector, destChainSelector,
 		cciptypes.NewSeqNumRange(msg.Message.Header.SequenceNumber, msg.Message.Header.SequenceNumber)); err != nil {
 		return 0, fmt.Errorf("message invalid msg %v: %w", msg, err)

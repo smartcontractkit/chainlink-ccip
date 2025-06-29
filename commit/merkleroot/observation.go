@@ -239,6 +239,7 @@ func (p *Processor) getObservation(
 			FChain:             p.observer.ObserveFChain(ctx),
 		}, nextState, nil
 	case buildingReport:
+		p.lggr.Info("GENERATING MERKLE REPORT")
 		if q.RetryRMNSignatures {
 			// RMN signature computation failed, we only want to retry getting the RMN signatures in the next round.
 			// So there's nothing to observe except for fChain, i.e. we don't want to build the report yet.

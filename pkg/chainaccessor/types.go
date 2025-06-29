@@ -15,7 +15,7 @@ import (
 // message is sent.
 type SendRequestedEvent struct {
 	DestChainSelector cciptypes.ChainSelector
-	SequenceNumber    cciptypes.SeqNum
+	SequenceNumber    cciptypes.SeqNum `json:"seqNum,string"`
 	Message           cciptypes.Message
 }
 
