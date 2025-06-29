@@ -46,3 +46,4 @@ package ccip
 
 // Superchain Interop
 //go:generate go run generation/generate/wrap.go ccip OnRampOverSuperchainInterop onramp_over_superchain_interop latest
+//go:generate go run generation/generate/wrap.go ccip OffRampOverSuperchainInterop offramp_over_superchain_interop latest
