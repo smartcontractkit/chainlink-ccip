@@ -14,16 +14,6 @@ import {OffRampOverSuperchainInteropSetup} from "./OffRampOverSuperchainInteropS
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
 contract OffRampOverSuperchainInterop_executeSingleReport is OffRampOverSuperchainInteropSetup {
-  event ExecutionStateChanged(
-    uint64 indexed sourceChainSelector,
-    uint64 indexed sequenceNumber,
-    bytes32 indexed messageId,
-    bytes32 messageHash,
-    Internal.MessageExecutionState state,
-    bytes returnData,
-    uint256 gasUsed
-  );
-
   function setUp() public virtual override {
     super.setUp();
 
