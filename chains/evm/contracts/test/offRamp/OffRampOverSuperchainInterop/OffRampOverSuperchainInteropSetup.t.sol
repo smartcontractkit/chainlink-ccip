@@ -116,8 +116,10 @@ contract OffRampOverSuperchainInteropSetup is OffRampSetup {
     uint64 sequenceNumber,
     Internal.Any2EVMRampMessage memory message
   ) internal pure returns (bytes32) {
-    return
-      keccak256(abi.encode(SuperchainInterop.SENT_MESSAGE_LOG_SELECTOR, destChainSelector, sequenceNumber, message));
+    bytes memory logData = bytes.concat(
+      abi.encode(SuperchainInterop.SENT_MESSAGE_LOG_SELECTOR, destChainSelector, sequenceNumber), abi.encode(message)
+    );
+    return keccak256(logData);
   }
 
   function _getValidProofsAndIdentifier(

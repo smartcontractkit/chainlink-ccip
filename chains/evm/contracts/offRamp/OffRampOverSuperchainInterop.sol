@@ -70,12 +70,18 @@ contract OffRampOverSuperchainInterop is OffRamp {
       chainId: uint256(proofs[4])
     });
 
+    // Concatenation as opposed to abi.encode all fields is necessary to construct correct log data
+    // [0x00] event_selector
+    // [0x20] dest_chain_selector
+    // [0x40] sequence_number
+    // [0x60] offset_to_message ← should be 0x20, but would be 0x80 if abi.encode all fields at once
+    // [0x80] message...
     logHash = keccak256(
-      abi.encode(
+      bytes.concat(
         SuperchainInterop.SENT_MESSAGE_LOG_SELECTOR,
-        message.header.destChainSelector,
-        message.header.sequenceNumber,
-        message
+        bytes32(uint256(message.header.destChainSelector)),
+        bytes32(uint256(message.header.sequenceNumber)),
+        abi.encode(message)
       )
     );
 
