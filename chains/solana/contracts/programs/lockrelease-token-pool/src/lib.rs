@@ -13,6 +13,32 @@ pub mod lockrelease_token_pool {
 
     use super::*;
 
+    pub fn init_global_config(ctx: Context<InitGlobalConfig>) -> Result<()> {
+        ctx.accounts.config.set_inner(PoolConfig {
+            self_served_allowed: false,
+            version: 1,
+        });
+
+        emit!(GlobalConfigUpdated {
+            self_served_allowed: ctx.accounts.config.self_served_allowed,
+        });
+
+        Ok(())
+    }
+
+    pub fn update_global_config(
+        ctx: Context<UpdateGlobalConfig>,
+        self_served_allowed: bool,
+    ) -> Result<()> {
+        ctx.accounts.config.self_served_allowed = self_served_allowed;
+
+        emit!(GlobalConfigUpdated {
+            self_served_allowed: ctx.accounts.config.self_served_allowed,
+        });
+
+        Ok(())
+    }
+
     pub fn initialize(
         ctx: Context<InitializeTokenPool>,
         router: Pubkey,
@@ -167,13 +193,19 @@ pub mod lockrelease_token_pool {
         remove: Vec<Pubkey>,
     ) -> Result<()> {
         let list = &mut ctx.accounts.state.config.allow_list;
-        for key in remove {
-            require!(
-                list.contains(&key),
-                CcipTokenPoolError::AllowlistKeyDidNotExist
-            );
-            list.retain(|k| k != &key);
-        }
+        // Cache initial length
+        let initial_list_len = list.len();
+        // Collect all keys to remove into a HashSet for O(1) lookups
+        let keys_to_remove: std::collections::HashSet<Pubkey> = remove.into_iter().collect();
+        // Perform a single pass through the list
+        list.retain(|k| !keys_to_remove.contains(k));
+
+        // We don't store repeated keys, so the keys_to_remove should match the removed keys
+        require_eq!(
+            initial_list_len,
+            list.len().checked_add(keys_to_remove.len()).unwrap(),
+            CcipTokenPoolError::AllowlistKeyDidNotExist
+        );
 
         Ok(())
     }
@@ -249,6 +281,7 @@ pub mod lockrelease_token_pool {
         })
     }
 
+    // set the rebalancer address for the pool, if the rebalancer is the default address then no rebalance is allowed
     pub fn set_rebalancer(ctx: Context<SetConfig>, rebalancer: Pubkey) -> Result<()> {
         ctx.accounts.state.config.set_rebalancer(rebalancer)
     }
@@ -257,7 +290,8 @@ pub mod lockrelease_token_pool {
         ctx.accounts.state.config.set_can_accept_liquidity(allow)
     }
 
-    pub fn provide_liquidity(ctx: Context<TokenTransfer>, amount: u64) -> Result<()> {
+    pub fn provide_liquidity(ctx: Context<RebalancerTokenTransfer>, amount: u64) -> Result<()> {
+        require_gt!(amount, 0, CcipTokenPoolError::TransferZeroTokensNotAllowed);
         require!(
             ctx.accounts.state.config.can_accept_liquidity,
             CcipTokenPoolError::LiquidityNotAccepted
@@ -275,7 +309,12 @@ pub mod lockrelease_token_pool {
     }
 
     // withdraw liquidity can be used to transfer liquidity from one pool to another by setting the `rebalancer` to the calling pool
-    pub fn withdraw_liquidity(ctx: Context<TokenTransfer>, amount: u64) -> Result<()> {
+    pub fn withdraw_liquidity(ctx: Context<RebalancerTokenTransfer>, amount: u64) -> Result<()> {
+        require_gt!(amount, 0, CcipTokenPoolError::TransferZeroTokensNotAllowed);
+        require!(
+            ctx.accounts.state.config.can_accept_liquidity,
+            CcipTokenPoolError::LiquidityNotAccepted
+        );
         transfer_tokens(
             ctx.accounts.token_program.key(),
             ctx.accounts.remote_token_account.to_account_info(), // to

@@ -44,17 +44,17 @@ contract USDCSetup is BaseTest {
   address internal s_previousPool = makeAddr("previousPool");
   Router internal s_router;
 
-  IBurnMintERC20 internal s_token;
+  IBurnMintERC20 internal s_USDCToken;
 
   function setUp() public virtual override {
     super.setUp();
     BurnMintERC677 usdcToken = new BurnMintERC677("USD Coin", "USDC", 6, 0);
-    s_token = usdcToken;
+    s_USDCToken = usdcToken;
 
-    deal(address(s_token), OWNER, type(uint256).max);
+    deal(address(s_USDCToken), OWNER, type(uint256).max);
     _setUpRamps();
 
-    s_mockUSDCTransmitter = new MockE2EUSDCTransmitter(0, DEST_DOMAIN_IDENTIFIER, address(s_token));
+    s_mockUSDCTransmitter = new MockE2EUSDCTransmitter(0, DEST_DOMAIN_IDENTIFIER, address(s_USDCToken));
     s_mockUSDC = new MockUSDCTokenMessenger(0, address(s_mockUSDCTransmitter));
     s_cctpMessageTransmitterProxy = new CCTPMessageTransmitterProxy(s_mockUSDC);
     usdcToken.grantMintAndBurnRoles(address(s_mockUSDCTransmitter));
@@ -81,7 +81,7 @@ contract USDCSetup is BaseTest {
     chainUpdates[0] = TokenPool.ChainUpdate({
       remoteChainSelector: SOURCE_CHAIN_SELECTOR,
       remotePoolAddresses: sourcePoolAddresses,
-      remoteTokenAddress: abi.encode(address(s_token)),
+      remoteTokenAddress: abi.encode(address(s_USDCToken)),
       outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: _getInboundRateLimiterConfig()
     });
@@ -97,7 +97,7 @@ contract USDCSetup is BaseTest {
   }
 
   function _setUpRamps() internal {
-    s_router = new Router(address(s_token), address(s_mockRMNRemote));
+    s_router = new Router(address(s_USDCToken), address(s_mockRMNRemote));
 
     Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](1);
     onRampUpdates[0] = Router.OnRamp({destChainSelector: DEST_CHAIN_SELECTOR, onRamp: s_routerAllowedOnRamp});

@@ -30,7 +30,7 @@ contract USDCBridgeMigrator_withdrawLiquidity is USDCBridgeMigratorSetup {
     // Add 1e12 liquidity so that there's enough to release
     vm.startPrank(s_usdcTokenPool.getLiquidityProvider(DEST_CHAIN_SELECTOR));
 
-    s_token.approve(address(s_usdcTokenPool), type(uint256).max);
+    s_USDCToken.approve(address(s_usdcTokenPool), type(uint256).max);
 
     s_usdcTokenPool.provideLiquidity(DEST_CHAIN_SELECTOR, LIQUIDITY_AMOUNT);
   }

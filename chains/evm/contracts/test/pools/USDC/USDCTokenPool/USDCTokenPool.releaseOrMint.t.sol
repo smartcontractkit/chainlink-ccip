@@ -22,7 +22,7 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
   }
 
   function testFuzz_ReleaseOrMint_Success(address recipient, uint256 amount) public {
-    vm.assume(recipient != address(0) && recipient != address(s_token));
+    vm.assume(recipient != address(0) && recipient != address(s_USDCToken));
     amount = bound(amount, 0, _getInboundRateLimiterConfig().capacity);
 
     USDCMessage memory usdcMessage = USDCMessage({
@@ -35,7 +35,7 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
       destinationCaller: bytes32(uint256(uint160(address(s_usdcTokenPool)))),
       messageBody: _formatMessage(
         0,
-        bytes32(uint256(uint160(address(s_token)))),
+        bytes32(uint256(uint160(address(s_USDCToken)))),
         bytes32(uint256(uint160(recipient))),
         amount,
         bytes32(uint256(uint160(OWNER)))
@@ -58,12 +58,12 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
       abi.encode(USDCTokenPool.MessageAndAttestation({message: message, attestation: attestation}));
 
     // The mocked receiver does not release the token to the pool, so we manually do it here
-    deal(address(s_token), address(s_usdcTokenPool), amount);
+    deal(address(s_USDCToken), address(s_usdcTokenPool), amount);
 
     vm.expectEmit();
     emit TokenPool.ReleasedOrMinted({
       remoteChainSelector: SOURCE_CHAIN_SELECTOR,
-      token: address(s_token),
+      token: address(s_USDCToken),
       sender: s_routerAllowedOffRamp,
       recipient: recipient,
       amount: amount
@@ -79,8 +79,8 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
       Pool.ReleaseOrMintInV1({
         originalSender: abi.encode(OWNER),
         receiver: recipient,
-        amount: amount,
-        localToken: address(s_token),
+        sourceDenominatedAmount: amount,
+        localToken: address(s_USDCToken),
         remoteChainSelector: SOURCE_CHAIN_SELECTOR,
         sourcePoolAddress: sourceTokenData.sourcePoolAddress,
         sourcePoolData: sourceTokenData.extraData,
@@ -103,7 +103,7 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
       destinationCaller: bytes32(uint256(uint160(address(s_previousPool)))),
       messageBody: _formatMessage(
         0,
-        bytes32(uint256(uint160(address(s_token)))),
+        bytes32(uint256(uint160(address(s_USDCToken)))),
         bytes32(uint256(uint160(recipient))),
         amount,
         bytes32(uint256(uint160(OWNER)))
@@ -126,7 +126,7 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
       abi.encode(USDCTokenPool.MessageAndAttestation({message: message, attestation: attestation}));
 
     // The mocked receiver does not release the token to the pool, so we manually do it here
-    deal(address(s_token), address(s_usdcTokenPool), amount);
+    deal(address(s_USDCToken), address(s_usdcTokenPool), amount);
 
     vm.expectCall(
       address(s_previousPool),
@@ -135,8 +135,8 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
         Pool.ReleaseOrMintInV1({
           originalSender: abi.encode(OWNER),
           receiver: recipient,
-          amount: amount,
-          localToken: address(s_token),
+          sourceDenominatedAmount: amount,
+          localToken: address(s_USDCToken),
           remoteChainSelector: SOURCE_CHAIN_SELECTOR,
           sourcePoolAddress: sourceTokenData.sourcePoolAddress,
           sourcePoolData: sourceTokenData.extraData,
@@ -150,8 +150,8 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
       Pool.ReleaseOrMintInV1({
         originalSender: abi.encode(OWNER),
         receiver: recipient,
-        amount: amount,
-        localToken: address(s_token),
+        sourceDenominatedAmount: amount,
+        localToken: address(s_USDCToken),
         remoteChainSelector: SOURCE_CHAIN_SELECTOR,
         sourcePoolAddress: sourceTokenData.sourcePoolAddress,
         sourcePoolData: sourceTokenData.extraData,
@@ -178,7 +178,7 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
     });
 
     // The mocked receiver does not release the token to the pool, so we manually do it here
-    deal(address(s_token), address(s_usdcTokenPool), amount);
+    deal(address(s_USDCToken), address(s_usdcTokenPool), amount);
 
     bytes memory offchainTokenData =
       abi.encode(USDCTokenPool.MessageAndAttestation({message: encodedUsdcMessage, attestation: attestation}));
@@ -193,8 +193,8 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
       Pool.ReleaseOrMintInV1({
         originalSender: abi.encode(OWNER),
         receiver: OWNER,
-        amount: amount,
-        localToken: address(s_token),
+        sourceDenominatedAmount: amount,
+        localToken: address(s_USDCToken),
         remoteChainSelector: SOURCE_CHAIN_SELECTOR,
         sourcePoolAddress: sourceTokenData.sourcePoolAddress,
         sourcePoolData: sourceTokenData.extraData,
@@ -220,7 +220,7 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
       destinationCaller: bytes32(uint256(uint160(address(s_usdcTokenPool)))),
       messageBody: _formatMessage(
         0,
-        bytes32(uint256(uint160(address(s_token)))),
+        bytes32(uint256(uint160(address(s_USDCToken)))),
         bytes32(uint256(uint160(OWNER))),
         amount,
         bytes32(uint256(uint160(OWNER)))
@@ -246,8 +246,8 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
       Pool.ReleaseOrMintInV1({
         originalSender: abi.encode(OWNER),
         receiver: OWNER,
-        amount: amount,
-        localToken: address(s_token),
+        sourceDenominatedAmount: amount,
+        localToken: address(s_USDCToken),
         remoteChainSelector: SOURCE_CHAIN_SELECTOR,
         sourcePoolAddress: sourceTokenData.sourcePoolAddress,
         sourcePoolData: sourceTokenData.extraData,
@@ -273,15 +273,15 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
       abi.encode(USDCTokenPool.MessageAndAttestation({message: bytes(""), attestation: bytes("")}));
 
     vm.expectRevert(
-      abi.encodeWithSelector(RateLimiter.TokenMaxCapacityExceeded.selector, capacity, amount, address(s_token))
+      abi.encodeWithSelector(RateLimiter.TokenMaxCapacityExceeded.selector, capacity, amount, address(s_USDCToken))
     );
 
     s_usdcTokenPool.releaseOrMint(
       Pool.ReleaseOrMintInV1({
         originalSender: abi.encode(OWNER),
         receiver: recipient,
-        amount: amount,
-        localToken: address(s_token),
+        sourceDenominatedAmount: amount,
+        localToken: address(s_USDCToken),
         remoteChainSelector: SOURCE_CHAIN_SELECTOR,
         sourcePoolAddress: sourceTokenData.sourcePoolAddress,
         sourcePoolData: sourceTokenData.extraData,

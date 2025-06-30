@@ -673,6 +673,11 @@ func TestCommitReportCache_DeduplicateReports(t *testing.T) {
 				r1, r2, r4, r7DiffChain,
 			}, // r3Dupe, r5NoRoots, r6Dupe should be filtered out
 		},
+		{
+			name:     "Multiple reports without roots",
+			reports:  []ccipocr3.CommitPluginReportWithMeta{r5NoRoots, r5NoRoots, r5NoRoots},
+			expected: []ccipocr3.CommitPluginReportWithMeta{}, // All reports should be skipped
+		},
 	}
 
 	for _, tc := range testCases {

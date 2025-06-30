@@ -760,7 +760,7 @@ func prepareCcipReaderMock(
 	}
 
 	if enableDiscovery {
-		ccipReader.EXPECT().DiscoverContracts(mock.Anything, mock.Anything).Return(nil, nil)
+		ccipReader.EXPECT().DiscoverContracts(mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 		ccipReader.EXPECT().Sync(mock.Anything, mock.Anything).Return(nil)
 	}
 }
@@ -1008,7 +1008,7 @@ func defaultNodeParams(t *testing.T) SetupNodeParams {
 		MerkleRootAsyncObserverDisabled: true, // we want to keep it disabled since this test is deterministic
 		ChainFeeAsyncObserverDisabled:   true,
 		TokenPriceAsyncObserverDisabled: true,
-		EnableDonBreakingChanges:        true,
+		DonBreakingChangesVersion:       pluginconfig.DonBreakingChangesVersion1RoleDonSupport,
 	}
 
 	reportingCfg := ocr3types.ReportingPluginConfig{F: 1, ConfigDigest: digest}

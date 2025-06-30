@@ -16,6 +16,7 @@ import (
 )
 
 var (
+	ErrChainAccessorNotFound  = errors.New("chain accessor not found")
 	ErrContractReaderNotFound = errors.New("contract reader not found")
 	ErrContractWriterNotFound = errors.New("contract writer not found")
 )
@@ -261,11 +262,16 @@ type CCIPReader interface {
 	// from the destination chain RMN remote contract. Caller should be able to access destination.
 	GetRmnCurseInfo(ctx context.Context) (CurseInfo, error)
 
-	// DiscoverContracts reads the destination chain for contract addresses. They are returned per
-	// contract and source chain selector.
+	// DiscoverContracts will discover as many addresses as possible based on which addresses are already known.
+	// Initially only the offramp address is known so in the first round the oracles that support the destination chain
+	// are reading the offramp to discover onRamps, dest routers, rmn remote, nonce manager and fee quoter addresses.
+	// On the next round the oracles that support the source chains should be able to access the onRamps since their
+	// addresses are known. That's how they eventually discover source fee quoters and source routers.
+	// They are returned per contract and source chain selector.
 	// allChains is needed because there is no way to enumerate all chain selectors on Solana. We'll attempt to
 	// fetch the source config from the offramp for each of them.
-	DiscoverContracts(ctx context.Context, allChains []cciptypes.ChainSelector) (ContractAddresses, error)
+	DiscoverContracts(ctx context.Context,
+		supportedChains, allChains []cciptypes.ChainSelector) (ContractAddresses, error)
 
 	// LinkPriceUSD gets the LINK price in 1e-18 USDs from the FeeQuoter contract on the destination chain.
 	// For example, if the price is 1 LINK = 10 USD, this function will return 10e18 (10 * 1e18). You can think of this

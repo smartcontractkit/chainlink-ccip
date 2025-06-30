@@ -20,7 +20,7 @@ contract HybridLockReleaseUSDCTokenPoolSetup is USDCSetup {
     s_usdcTokenPool = new HybridLockReleaseUSDCTokenPool(
       s_mockUSDC,
       s_cctpMessageTransmitterProxy,
-      s_token,
+      s_USDCToken,
       new address[](0),
       address(s_mockRMNRemote),
       address(s_router),
@@ -35,7 +35,7 @@ contract HybridLockReleaseUSDCTokenPoolSetup is USDCSetup {
     s_usdcTokenPoolTransferLiquidity = new HybridLockReleaseUSDCTokenPool(
       s_mockUSDC,
       s_cctpMessageTransmitterProxy,
-      s_token,
+      s_USDCToken,
       new address[](0),
       address(s_mockRMNRemote),
       address(s_router),
@@ -44,7 +44,7 @@ contract HybridLockReleaseUSDCTokenPoolSetup is USDCSetup {
     allowedCallerParams[0].caller = address(s_usdcTokenPoolTransferLiquidity);
     s_cctpMessageTransmitterProxyForTransferLiquidity.configureAllowedCallers(allowedCallerParams);
 
-    BurnMintERC677(address(s_token)).grantMintAndBurnRoles(address(s_usdcTokenPool));
+    BurnMintERC677(address(s_USDCToken)).grantMintAndBurnRoles(address(s_usdcTokenPool));
 
     _poolApplyChainUpdates(address(s_usdcTokenPool));
 

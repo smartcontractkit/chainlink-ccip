@@ -84,11 +84,12 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
-    _validateReleaseOrMint(releaseOrMintIn);
-
     // Calculate the local amount
-    uint256 localAmount =
-      _calculateLocalAmount(releaseOrMintIn.amount, _parseRemoteDecimals(releaseOrMintIn.sourcePoolData));
+    uint256 localAmount = _calculateLocalAmount(
+      releaseOrMintIn.sourceDenominatedAmount, _parseRemoteDecimals(releaseOrMintIn.sourcePoolData)
+    );
+
+    _validateReleaseOrMint(releaseOrMintIn, localAmount);
 
     // Save gas by using storage instead of memory as a value may need to be updated.
     SiloConfig storage remoteConfig = s_chainConfigs[releaseOrMintIn.remoteChainSelector];

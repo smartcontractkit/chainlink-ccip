@@ -6,12 +6,14 @@ import (
 
 	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go/programs/token"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/testutils"
+	burnmint_tokenpool "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/burnmint_token_pool"
 	tokenpool "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/lockrelease_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/rmn_remote"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_ccip_invalid_receiver"
@@ -19,6 +21,34 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 )
+
+type PoolInfo struct {
+	poolName    string
+	poolProgram solana.PublicKey
+}
+
+var pools = []PoolInfo{
+	{poolName: "lockrelease", poolProgram: config.CcipBasePoolLockRelease},
+	{poolName: "burnmint", poolProgram: config.CcipBasePoolBurnMint},
+}
+
+type TokenInfo struct {
+	tokenName    string
+	tokenProgram solana.PublicKey
+	multisig     bool
+}
+
+var tokenPrograms = []TokenInfo{
+	{tokenName: "spl-token", tokenProgram: solana.TokenProgramID, multisig: false},
+	{tokenName: "spl-token", tokenProgram: solana.TokenProgramID, multisig: true},
+	{tokenName: "spl-token-2022", tokenProgram: config.Token2022Program, multisig: false},
+	{tokenName: "spl-token-2022", tokenProgram: config.Token2022Program, multisig: true},
+}
+
+type ProgramData struct {
+	DataType uint32
+	Address  solana.PublicKey
+}
 
 // TestBaseTokenPoolHappyPath does basic happy path checks on the lock/release and burn/mint example pools
 // more detailed token pool tests are handled by the test-token-pool which is used in the tokenpool_test.go and ccip_router_test.go
@@ -64,10 +94,7 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 		})
 
 		t.Run("RMN Remote", func(t *testing.T) {
-			type ProgramData struct {
-				DataType uint32
-				Address  solana.PublicKey
-			}
+
 			// get program data account
 			data, err := solanaGoClient.GetAccountInfoWithOpts(ctx, config.RMNRemoteProgram, &rpc.GetAccountInfoOpts{
 				Commitment: config.DefaultCommitment,
@@ -93,37 +120,53 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 		})
 	})
 
-	// test functionality with token & token-2022 standards
-	for _, v := range []struct {
-		tokenName    string
-		tokenProgram solana.PublicKey
-	}{
-		{tokenName: "spl-token", tokenProgram: solana.TokenProgramID},
-		{tokenName: "spl-token-2022", tokenProgram: config.Token2022Program},
-	} {
-		// test functionality with each pool type (burnmint & lockrelease)
-		for _, p := range []struct {
-			poolName    string
-			poolProgram solana.PublicKey
-		}{
-			{poolName: "burnmint", poolProgram: config.CcipBasePoolBurnMint},
-			{poolName: "lockrelease", poolProgram: config.CcipBasePoolLockRelease},
-		} {
+	// test functionality with each pool type (burnmint & lockrelease)
+	for _, p := range pools {
+
+		var programData ProgramData
+		var configPDA solana.PublicKey
+		poolProgram := p.poolProgram
+
+		t.Run("setup:tokenPool "+p.poolName, func(t *testing.T) {
+
+			// get program data account
+			data, err := solanaGoClient.GetAccountInfoWithOpts(ctx, p.poolProgram, &rpc.GetAccountInfoOpts{
+				Commitment: config.DefaultCommitment,
+			})
+			require.NoError(t, err)
+			// Decode program data
+			require.NoError(t, bin.UnmarshalBorsh(&programData, data.Bytes()))
+
+			// Global Configuration
+			configPDA, err = tokens.TokenPoolGlobalConfigPDA(p.poolProgram)
+			require.NoError(t, err)
+
+			ix, err := tokenpool.NewInitGlobalConfigInstruction(configPDA, admin.PublicKey(), solana.SystemProgramID, poolProgram, programData.Address).ValidateAndBuild()
+			require.NoError(t, err)
+
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{
+				&tokens.TokenInstruction{Instruction: ix, Program: p.poolProgram},
+			}, admin, config.DefaultCommitment)
+
+		})
+
+		// test functionality with token & token-2022 standards
+		for _, v := range tokenPrograms {
+
 			t.Run(p.poolName+" "+v.tokenName, func(t *testing.T) {
 				t.Parallel()
 
 				decimals := uint8(0)
 				amount := uint64(1000)
-				poolProgram := p.poolProgram
 
 				// for _, poolProgram := range []solana.PublicKey{config.CcipBasePoolBurnMint} {
 				rampPoolSignerPDA, _, _ := state.FindExternalTokenPoolsSignerPDA(poolProgram, dumbRamp)
 
 				mintPriv, err := solana.NewRandomPrivateKey()
 				require.NoError(t, err)
-				p, err := tokens.NewTokenPool(v.tokenProgram, poolProgram, mintPriv.PublicKey())
+				tokenPool, err := tokens.NewTokenPool(v.tokenProgram, poolProgram, mintPriv.PublicKey())
 				require.NoError(t, err)
-				mint := p.Mint
+				mint := tokenPool.Mint
 
 				t.Run("setup:token", func(t *testing.T) {
 					// create token
@@ -133,7 +176,7 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 					// create admin associated token account
 					createI, tokenAccount, err := tokens.CreateAssociatedTokenAccount(v.tokenProgram, mint, admin.PublicKey(), admin.PublicKey())
 					require.NoError(t, err)
-					p.User[admin.PublicKey()] = tokenAccount // set admin token account
+					tokenPool.User[admin.PublicKey()] = tokenAccount // set admin token account
 
 					// mint tokens to admin
 					mintToI, err := tokens.MintTo(amount, v.tokenProgram, mint, tokenAccount, admin.PublicKey())
@@ -143,7 +186,7 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, instructions, admin, config.DefaultCommitment, common.AddSigners(mintPriv))
 
 					// validate
-					outDec, outVal, err := tokens.TokenBalance(ctx, solanaGoClient, p.User[admin.PublicKey()], config.DefaultCommitment)
+					outDec, outVal, err := tokens.TokenBalance(ctx, solanaGoClient, tokenPool.User[admin.PublicKey()], config.DefaultCommitment)
 					require.NoError(t, err)
 					require.Equal(t, int(amount), outVal)
 					require.Equal(t, decimals, outDec)
@@ -158,43 +201,45 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 					require.NoError(t, err)
 
 					t.Run("setup", func(t *testing.T) {
-						type ProgramData struct {
-							DataType uint32
-							Address  solana.PublicKey
+
+						poolInitI, err := tokenpool.NewInitializeInstruction(dumbRamp, config.RMNRemoteProgram, poolConfig, mint, admin.PublicKey(), solana.SystemProgramID, poolProgram, programData.Address, configPDA).ValidateAndBuild()
+						require.NoError(t, err)
+
+						newMintAuthority := poolSigner
+
+						if v.multisig {
+							// create multisig
+							multisig, err := solana.NewRandomPrivateKey()
+							require.NoError(t, err)
+							ixMsig, ixErrMsig := tokens.CreateMultisig(ctx, admin.PublicKey(), v.tokenProgram, multisig.PublicKey(), 1, []solana.PublicKey{admin.PublicKey(), poolSigner}, solanaGoClient, config.DefaultCommitment)
+							require.NoError(t, ixErrMsig)
+							testutils.SendAndConfirm(ctx, t, solanaGoClient, ixMsig, admin, config.DefaultCommitment, common.AddSigners(multisig, admin))
+
+							newMintAuthority = multisig.PublicKey()
+							tokenPool.MintAuthorityMultisig = multisig.PublicKey() // set multisig as mint authority
 						}
-						// get program data account
-						data, err := solanaGoClient.GetAccountInfoWithOpts(ctx, poolProgram, &rpc.GetAccountInfoOpts{
-							Commitment: config.DefaultCommitment,
-						})
-						require.NoError(t, err)
-						// Decode program data
-						var programData ProgramData
-						require.NoError(t, bin.UnmarshalBorsh(&programData, data.Bytes()))
 
-						poolInitI, err := tokenpool.NewInitializeInstruction(dumbRamp, config.RMNRemoteProgram, poolConfig, mint, admin.PublicKey(), solana.SystemProgramID, poolProgram, programData.Address).ValidateAndBuild()
-						require.NoError(t, err)
-
-						// make pool mint_authority for token (required for burn/mint)
-						authI, err := tokens.SetTokenMintAuthority(v.tokenProgram, poolSigner, mint, admin.PublicKey())
+						// make pool mint_authority for token (required for burn/mint) poolsigner or multisig
+						authI, err := tokens.SetTokenMintAuthority(v.tokenProgram, newMintAuthority, mint, admin.PublicKey())
 						require.NoError(t, err)
 
 						// set pool config
 						ixConfigure, err := tokenpool.NewInitChainRemoteConfigInstruction(
 							config.EvmChainSelector,
-							p.Mint,
+							tokenPool.Mint,
 							tokenpool.RemoteConfig{
 								TokenAddress: remoteToken,
 								Decimals:     9,
 							},
 							poolConfig,
-							p.Chain[config.EvmChainSelector],
+							tokenPool.Chain[config.EvmChainSelector],
 							admin.PublicKey(),
 							solana.SystemProgramID,
 						).ValidateAndBuild()
 						require.NoError(t, err)
 
 						ixAppend, err := tokenpool.NewAppendRemotePoolAddressesInstruction(
-							config.EvmChainSelector, p.Mint, []tokenpool.RemoteAddress{remotePool}, poolConfig, p.Chain[config.EvmChainSelector], admin.PublicKey(), solana.SystemProgramID,
+							config.EvmChainSelector, tokenPool.Mint, []tokenpool.RemoteAddress{remotePool}, poolConfig, tokenPool.Chain[config.EvmChainSelector], admin.PublicKey(), solana.SystemProgramID,
 						).ValidateAndBuild()
 						require.NoError(t, err)
 
@@ -241,9 +286,9 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 					})
 
 					t.Run("lockOrBurn", func(t *testing.T) {
-						require.Equal(t, fmt.Sprintf("%d", amount), getBalance(p.User[admin.PublicKey()]))
+						require.Equal(t, fmt.Sprintf("%d", amount), getBalance(tokenPool.User[admin.PublicKey()]))
 
-						transferI, err := tokens.TokenTransferChecked(amount, decimals, v.tokenProgram, p.User[admin.PublicKey()], mint, poolTokenAccount, admin.PublicKey(), solana.PublicKeySlice{})
+						transferI, err := tokens.TokenTransferChecked(amount, decimals, v.tokenProgram, tokenPool.User[admin.PublicKey()], mint, poolTokenAccount, admin.PublicKey(), solana.PublicKeySlice{})
 						require.NoError(t, err)
 
 						lbI, err := test_ccip_invalid_receiver.NewPoolProxyLockOrBurnInstruction(
@@ -262,7 +307,7 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 							config.RMNRemoteProgram,
 							config.RMNRemoteCursesPDA,
 							config.RMNRemoteConfigPDA,
-							p.Chain[config.EvmChainSelector],
+							tokenPool.Chain[config.EvmChainSelector],
 						).ValidateAndBuild()
 						require.NoError(t, err)
 
@@ -270,7 +315,7 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 						require.NotNil(t, res)
 
 						// validate balances
-						require.Equal(t, "0", getBalance(p.User[admin.PublicKey()]))
+						require.Equal(t, "0", getBalance(tokenPool.User[admin.PublicKey()]))
 						expectedPoolBal := uint64(0)
 						if poolProgram == config.CcipBasePoolLockRelease {
 							expectedPoolBal = amount
@@ -279,9 +324,9 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 					})
 
 					t.Run("releaseOrMint", func(t *testing.T) {
-						require.Equal(t, "0", getBalance(p.User[admin.PublicKey()]))
+						require.Equal(t, "0", getBalance(tokenPool.User[admin.PublicKey()]))
 
-						rmI, err := test_ccip_invalid_receiver.NewPoolProxyReleaseOrMintInstruction(
+						raw := test_ccip_invalid_receiver.NewPoolProxyReleaseOrMintInstruction(
 							test_ccip_invalid_receiver.ReleaseOrMintInV1{
 								LocalToken:          mint,
 								SourcePoolAddress:   remotePool.Address,
@@ -298,12 +343,18 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 							mint,
 							poolSigner,
 							poolTokenAccount,
-							p.Chain[config.EvmChainSelector],
+							tokenPool.Chain[config.EvmChainSelector],
 							config.RMNRemoteProgram,
 							config.RMNRemoteCursesPDA,
 							config.RMNRemoteConfigPDA,
-							p.User[admin.PublicKey()],
-						).ValidateAndBuild()
+							tokenPool.User[admin.PublicKey()],
+						)
+
+						if v.multisig {
+							raw.AccountMetaSlice.Append(solana.Meta(tokenPool.MintAuthorityMultisig))
+						}
+
+						rmI, err := raw.ValidateAndBuild()
 						require.NoError(t, err)
 
 						cu := testutils.GetRequiredCU(ctx, t, solanaGoClient, []solana.Instruction{rmI}, admin, config.DefaultCommitment)
@@ -316,7 +367,7 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 						require.NotNil(t, res)
 
 						// validate balances
-						require.Equal(t, fmt.Sprintf("%d", amount), getBalance(p.User[admin.PublicKey()]))
+						require.Equal(t, fmt.Sprintf("%d", amount), getBalance(tokenPool.User[admin.PublicKey()]))
 						require.Equal(t, "0", getBalance(poolTokenAccount))
 					})
 
@@ -326,44 +377,339 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 							return
 						}
 
-						require.Equal(t, fmt.Sprintf("%d", amount), getBalance(p.User[admin.PublicKey()]))
+						require.Equal(t, fmt.Sprintf("%d", amount), getBalance(tokenPool.User[admin.PublicKey()]))
 						require.Equal(t, "0", getBalance(poolTokenAccount))
 
-						approveIx, err := tokens.TokenApproveChecked(amount, decimals, v.tokenProgram, p.User[admin.PublicKey()], p.Mint, poolSigner, admin.PublicKey(), solana.PublicKeySlice{})
+						approveIx, err := tokens.TokenApproveChecked(amount, decimals, v.tokenProgram, tokenPool.User[admin.PublicKey()], tokenPool.Mint, poolSigner, admin.PublicKey(), solana.PublicKeySlice{})
 						require.NoError(t, err)
 
 						acceptIx, err := tokenpool.NewSetCanAcceptLiquidityInstruction(true, poolConfig, mint, admin.PublicKey()).ValidateAndBuild()
 						require.NoError(t, err)
 
-						provideIx, err := tokenpool.NewProvideLiquidityInstruction(amount, poolConfig, v.tokenProgram, p.Mint, poolSigner, poolTokenAccount, p.User[admin.PublicKey()], admin.PublicKey()).ValidateAndBuild()
+						setRebalancerIx, err := tokenpool.NewSetRebalancerInstruction(admin.PublicKey(), poolConfig, mint, admin.PublicKey()).ValidateAndBuild()
+						require.NoError(t, err)
+
+						provideIx, err := tokenpool.NewProvideLiquidityInstruction(amount, poolConfig, v.tokenProgram, tokenPool.Mint, poolSigner, poolTokenAccount, tokenPool.User[admin.PublicKey()], admin.PublicKey()).ValidateAndBuild()
 						require.NoError(t, err)
 
 						testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{
 							approveIx,
+							&tokens.TokenInstruction{Instruction: setRebalancerIx, Program: poolProgram},
 							&tokens.TokenInstruction{Instruction: provideIx, Program: poolProgram},
 						}, admin, rpc.CommitmentConfirmed, []string{"Liquidity not accepted"})
 
 						testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{
 							approveIx,
 							&tokens.TokenInstruction{Instruction: acceptIx, Program: poolProgram},
+							&tokens.TokenInstruction{Instruction: setRebalancerIx, Program: poolProgram},
 							&tokens.TokenInstruction{Instruction: provideIx, Program: poolProgram},
 						}, admin, rpc.CommitmentConfirmed)
 
-						require.Equal(t, "0", getBalance(p.User[admin.PublicKey()]))
+						require.Equal(t, "0", getBalance(tokenPool.User[admin.PublicKey()]))
 						require.Equal(t, fmt.Sprintf("%d", amount), getBalance(poolTokenAccount))
 
-						withdrawIx, err := tokenpool.NewWithdrawLiquidityInstruction(amount, poolConfig, v.tokenProgram, p.Mint, poolSigner, poolTokenAccount, p.User[admin.PublicKey()], admin.PublicKey()).ValidateAndBuild()
+						withdrawIx, err := tokenpool.NewWithdrawLiquidityInstruction(amount, poolConfig, v.tokenProgram, tokenPool.Mint, poolSigner, poolTokenAccount, tokenPool.User[admin.PublicKey()], admin.PublicKey()).ValidateAndBuild()
 						require.NoError(t, err)
 
 						testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{
 							&tokens.TokenInstruction{Instruction: withdrawIx, Program: poolProgram},
 						}, admin, rpc.CommitmentConfirmed)
 
-						require.Equal(t, fmt.Sprintf("%d", amount), getBalance(p.User[admin.PublicKey()]))
+						require.Equal(t, fmt.Sprintf("%d", amount), getBalance(tokenPool.User[admin.PublicKey()]))
 						require.Equal(t, "0", getBalance(poolTokenAccount))
 					})
 				})
+
+				// If it wasn't a multisig, then we test the upgrade path to change the mint authority to a multisig
+				if p.poolName == "burnmint" && !v.multisig {
+
+					poolSigner, err := tokens.TokenPoolSignerAddress(mint, poolProgram)
+					require.NoError(t, err)
+					poolConfig, err := tokens.TokenPoolConfigAddress(mint, poolProgram)
+					require.NoError(t, err)
+
+					// create multisig
+					multisig, err := solana.NewRandomPrivateKey()
+					require.NoError(t, err)
+					ixMsig, ixErrMsig := tokens.CreateMultisig(ctx, admin.PublicKey(), v.tokenProgram, multisig.PublicKey(), 1, []solana.PublicKey{admin.PublicKey(), poolSigner}, solanaGoClient, config.DefaultCommitment)
+					require.NoError(t, ixErrMsig)
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, ixMsig, admin, config.DefaultCommitment, common.AddSigners(multisig, admin))
+
+					t.Run("try to upgrade to invalid token program multisig", func(t *testing.T) {
+
+						// create invalidMultisig
+						invalidMultisig, err := solana.NewRandomPrivateKey()
+						require.NoError(t, err)
+						poolSigner, err := tokens.TokenPoolSignerAddress(mint, poolProgram)
+						require.NoError(t, err)
+
+						var invalidTokenProgram solana.PublicKey
+						if v.tokenProgram == solana.TokenProgramID {
+							invalidTokenProgram = solana.Token2022ProgramID
+						} else {
+							invalidTokenProgram = solana.TokenProgramID
+						}
+						ixMsig, ixErrMsig := tokens.CreateMultisig(ctx, admin.PublicKey(), invalidTokenProgram, invalidMultisig.PublicKey(), 1, []solana.PublicKey{admin.PublicKey(), poolSigner}, solanaGoClient, config.DefaultCommitment)
+						require.NoError(t, ixErrMsig)
+						testutils.SendAndConfirm(ctx, t, solanaGoClient, ixMsig, admin, config.DefaultCommitment, common.AddSigners(invalidMultisig, admin))
+
+						newMintAuthority := invalidMultisig.PublicKey()
+						tokenPool.MintAuthorityMultisig = newMintAuthority
+
+						// set multisig as mint authority
+						ixTransferMint, err := burnmint_tokenpool.NewTransferMintAuthorityToMultisigInstruction(
+							poolConfig,
+							tokenPool.Mint,
+							v.tokenProgram,
+							poolSigner,
+							admin.PublicKey(),
+							newMintAuthority,
+							p.poolProgram,
+							programData.Address,
+						).ValidateAndBuild()
+						require.NoError(t, err)
+
+						testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{
+							&tokens.TokenInstruction{Instruction: ixTransferMint, Program: poolProgram},
+						}, admin, config.DefaultCommitment, []string{"InvalidMultisigOwner."})
+
+						// Check that the mint authority was not changed in the Mint Account
+						mintAccount := token.Mint{}
+						err = common.GetAccountDataBorshInto(ctx, solanaGoClient, mint, config.DefaultCommitment, &mintAccount)
+						require.NoError(t, err)
+
+						require.Equal(t, solana.PublicKey(poolSigner), *mintAccount.MintAuthority)
+					})
+
+					t.Run("try to upgrade to invalid m configured multisig", func(t *testing.T) {
+
+						// create invalidMultisig
+						invalidMultisig, err := solana.NewRandomPrivateKey()
+						require.NoError(t, err)
+						poolSigner, err := tokens.TokenPoolSignerAddress(mint, poolProgram)
+						require.NoError(t, err)
+
+						ixMsig, ixErrMsig := tokens.CreateMultisig(ctx, admin.PublicKey(), v.tokenProgram, invalidMultisig.PublicKey(), 2, []solana.PublicKey{admin.PublicKey(), poolSigner}, solanaGoClient, config.DefaultCommitment)
+						require.NoError(t, ixErrMsig)
+						testutils.SendAndConfirm(ctx, t, solanaGoClient, ixMsig, admin, config.DefaultCommitment, common.AddSigners(invalidMultisig, admin))
+
+						newMintAuthority := invalidMultisig.PublicKey()
+						tokenPool.MintAuthorityMultisig = newMintAuthority
+
+						// set multisig as mint authority
+						ixTransferMint, err := burnmint_tokenpool.NewTransferMintAuthorityToMultisigInstruction(
+							poolConfig,
+							tokenPool.Mint,
+							v.tokenProgram,
+							poolSigner,
+							admin.PublicKey(),
+							newMintAuthority,
+							p.poolProgram,
+							programData.Address,
+						).ValidateAndBuild()
+						require.NoError(t, err)
+
+						testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{
+							&tokens.TokenInstruction{Instruction: ixTransferMint, Program: poolProgram},
+						}, admin, config.DefaultCommitment, []string{"PoolSignerNotInMultisig"})
+
+						// Check that the mint authority was not changed in the Mint Account
+						mintAccount := token.Mint{}
+						err = common.GetAccountDataBorshInto(ctx, solanaGoClient, mint, config.DefaultCommitment, &mintAccount)
+						require.NoError(t, err)
+
+						require.Equal(t, solana.PublicKey(poolSigner), *mintAccount.MintAuthority)
+					})
+
+					t.Run("try to upgrade to multisig without poolsigner", func(t *testing.T) {
+
+						// create invalidMultisig
+						invalidMultisig, err := solana.NewRandomPrivateKey()
+						require.NoError(t, err)
+						poolSigner, err := tokens.TokenPoolSignerAddress(mint, poolProgram)
+						require.NoError(t, err)
+
+						ixMsig, ixErrMsig := tokens.CreateMultisig(ctx, admin.PublicKey(), v.tokenProgram, invalidMultisig.PublicKey(), 1, []solana.PublicKey{admin.PublicKey(), admin.PublicKey()}, solanaGoClient, config.DefaultCommitment)
+						require.NoError(t, ixErrMsig)
+						testutils.SendAndConfirm(ctx, t, solanaGoClient, ixMsig, admin, config.DefaultCommitment, common.AddSigners(invalidMultisig, admin))
+
+						newMintAuthority := invalidMultisig.PublicKey()
+						tokenPool.MintAuthorityMultisig = newMintAuthority
+
+						// set multisig as mint authority
+						ixTransferMint, err := burnmint_tokenpool.NewTransferMintAuthorityToMultisigInstruction(
+							poolConfig,
+							tokenPool.Mint,
+							v.tokenProgram,
+							poolSigner,
+							admin.PublicKey(),
+							newMintAuthority,
+							p.poolProgram,
+							programData.Address,
+						).ValidateAndBuild()
+						require.NoError(t, err)
+
+						testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{
+							&tokens.TokenInstruction{Instruction: ixTransferMint, Program: poolProgram},
+						}, admin, config.DefaultCommitment, []string{"PoolSignerNotInMultisig"})
+
+						// Check that the mint authority was not changed in the Mint Account
+						mintAccount := token.Mint{}
+						err = common.GetAccountDataBorshInto(ctx, solanaGoClient, mint, config.DefaultCommitment, &mintAccount)
+						require.NoError(t, err)
+
+						require.Equal(t, solana.PublicKey(poolSigner), *mintAccount.MintAuthority)
+					})
+					t.Run("upgrade to valid multisig", func(t *testing.T) {
+
+						newMintAuthority := multisig.PublicKey()
+						tokenPool.MintAuthorityMultisig = newMintAuthority
+
+						// set multisig as mint authority
+						ixTransferMint, err := burnmint_tokenpool.NewTransferMintAuthorityToMultisigInstruction(
+							poolConfig,
+							tokenPool.Mint,
+							v.tokenProgram,
+							poolSigner,
+							admin.PublicKey(),
+							newMintAuthority,
+							p.poolProgram,
+							programData.Address,
+						).ValidateAndBuild()
+						require.NoError(t, err)
+
+						testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{
+							&tokens.TokenInstruction{Instruction: ixTransferMint, Program: poolProgram},
+						}, admin, config.DefaultCommitment)
+
+						// Check that the mint authority was changed in the Mint Account
+						mintAccount := token.Mint{}
+						err = common.GetAccountDataBorshInto(ctx, solanaGoClient, mint, config.DefaultCommitment, &mintAccount)
+						require.NoError(t, err)
+
+						require.Equal(t, solana.PublicKey(newMintAuthority), *mintAccount.MintAuthority)
+					})
+					t.Run("try to transfer back", func(t *testing.T) {
+
+						poolSigner, err := tokens.TokenPoolSignerAddress(mint, poolProgram)
+						require.NoError(t, err)
+						poolConfig, err := tokens.TokenPoolConfigAddress(mint, poolProgram)
+						require.NoError(t, err)
+
+						// rolling back the change needs to be done manually, as the pool program does not support it
+						ixTransferMint, err := burnmint_tokenpool.NewTransferMintAuthorityToMultisigInstruction(
+							poolConfig,
+							tokenPool.Mint,
+							v.tokenProgram,
+							poolSigner,
+							admin.PublicKey(),
+							poolSigner,
+							p.poolProgram,
+							programData.Address,
+						).ValidateAndBuild()
+						require.NoError(t, err)
+
+						testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{
+							&tokens.TokenInstruction{Instruction: ixTransferMint, Program: poolProgram},
+						}, admin, config.DefaultCommitment, []string{"InvalidMultisigOwner"})
+
+						// Check that the mint authority was not changed in the Mint Account
+						mintAccount := token.Mint{}
+						err = common.GetAccountDataBorshInto(ctx, solanaGoClient, mint, config.DefaultCommitment, &mintAccount)
+						require.NoError(t, err)
+
+						require.Equal(t, solana.PublicKey(multisig.PublicKey()), *mintAccount.MintAuthority)
+					})
+					t.Run("transfer to another multisig", func(t *testing.T) {
+
+						poolSigner, err := tokens.TokenPoolSignerAddress(mint, poolProgram)
+						require.NoError(t, err)
+						poolConfig, err := tokens.TokenPoolConfigAddress(mint, poolProgram)
+						require.NoError(t, err)
+
+						// create multisig
+						anotherMultisig, err := solana.NewRandomPrivateKey()
+						require.NoError(t, err)
+						ixMsig, ixErrMsig := tokens.CreateMultisig(ctx, admin.PublicKey(), v.tokenProgram, anotherMultisig.PublicKey(), 1, []solana.PublicKey{admin.PublicKey(), poolSigner}, solanaGoClient, config.DefaultCommitment)
+						require.NoError(t, ixErrMsig)
+						testutils.SendAndConfirm(ctx, t, solanaGoClient, ixMsig, admin, config.DefaultCommitment, common.AddSigners(anotherMultisig, admin))
+
+						raw := burnmint_tokenpool.NewTransferMintAuthorityToMultisigInstruction(
+							poolConfig,
+							tokenPool.Mint,
+							v.tokenProgram,
+							poolSigner,
+							admin.PublicKey(),
+							anotherMultisig.PublicKey(),
+							p.poolProgram,
+							programData.Address,
+						)
+
+						raw.AccountMetaSlice.Append(solana.Meta(multisig.PublicKey()))
+
+						ixTransferMint, err := raw.ValidateAndBuild()
+						require.NoError(t, err)
+
+						testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{
+							&tokens.TokenInstruction{Instruction: ixTransferMint, Program: poolProgram},
+						}, admin, config.DefaultCommitment)
+
+						// Check that the mint authority was changed in the Mint Account
+						mintAccount := token.Mint{}
+						err = common.GetAccountDataBorshInto(ctx, solanaGoClient, mint, config.DefaultCommitment, &mintAccount)
+						require.NoError(t, err)
+
+						require.Equal(t, solana.PublicKey(anotherMultisig.PublicKey()), *mintAccount.MintAuthority)
+					})
+				}
 			})
 		}
+
+		// Test self onboarding to the pool
+		t.Run("self-onboard", func(t *testing.T) {
+
+			// Enable self-served token pool onboarding
+			ix, err := tokenpool.NewUpdateGlobalConfigInstruction(true, configPDA, admin.PublicKey(), poolProgram, programData.Address).ValidateAndBuild()
+			require.NoError(t, err)
+
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{
+				&tokens.TokenInstruction{Instruction: ix, Program: p.poolProgram},
+			}, admin, config.DefaultCommitment)
+
+			// Create a new token owner
+			newOwner, err := solana.NewRandomPrivateKey()
+			require.NoError(t, err)
+			testutils.FundAccounts(ctx, []solana.PrivateKey{newOwner}, solanaGoClient, t)
+
+			// Initialize a Token Pool in the CLL Token Pool Program for my own mint
+			for _, v := range tokenPrograms {
+				t.Run("self-onboard "+v.tokenName, func(t *testing.T) {
+					t.Parallel()
+
+					mintPriv, err := solana.NewRandomPrivateKey()
+					require.NoError(t, err)
+					p, err := tokens.NewTokenPool(v.tokenProgram, p.poolProgram, mintPriv.PublicKey())
+					require.NoError(t, err)
+					mint := p.Mint
+
+					// create token
+					instructions, err := tokens.CreateToken(ctx, v.tokenProgram, mint, newOwner.PublicKey(), uint8(6), solanaGoClient, config.DefaultCommitment)
+					require.NoError(t, err)
+
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, instructions, newOwner, config.DefaultCommitment, common.AddSigners(mintPriv))
+
+					poolConfig, err := tokens.TokenPoolConfigAddress(mint, p.PoolProgram)
+					require.NoError(t, err)
+
+					poolInitI, err := tokenpool.NewInitializeInstruction(dumbRamp, config.RMNRemoteProgram, poolConfig, mint, newOwner.PublicKey(), solana.SystemProgramID, p.PoolProgram, programData.Address, configPDA).ValidateAndBuild()
+					require.NoError(t, err)
+
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{
+						&tokens.TokenInstruction{Instruction: poolInitI, Program: p.PoolProgram},
+					}, newOwner, config.DefaultCommitment)
+
+				})
+			}
+		})
 	}
 }

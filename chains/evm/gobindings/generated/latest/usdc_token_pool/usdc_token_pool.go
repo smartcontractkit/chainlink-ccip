@@ -44,14 +44,14 @@ type PoolLockOrBurnOutV1 struct {
 }
 
 type PoolReleaseOrMintInV1 struct {
-	OriginalSender      []byte
-	RemoteChainSelector uint64
-	Receiver            common.Address
-	Amount              *big.Int
-	LocalToken          common.Address
-	SourcePoolAddress   []byte
-	SourcePoolData      []byte
-	OffchainTokenData   []byte
+	OriginalSender          []byte
+	RemoteChainSelector     uint64
+	Receiver                common.Address
+	SourceDenominatedAmount *big.Int
+	LocalToken              common.Address
+	SourcePoolAddress       []byte
+	SourcePoolData          []byte
+	OffchainTokenData       []byte
 }
 
 type PoolReleaseOrMintOutV1 struct {

@@ -17,7 +17,7 @@ contract USDCTokenPoolSetup is USDCSetup {
     s_usdcTokenPool = new USDCTokenPoolHelper(
       s_mockUSDC,
       s_cctpMessageTransmitterProxy,
-      s_token,
+      s_USDCToken,
       new address[](0),
       address(s_mockRMNRemote),
       address(s_router),
@@ -34,7 +34,7 @@ contract USDCTokenPoolSetup is USDCSetup {
     s_usdcTokenPoolWithAllowList = new USDCTokenPoolHelper(
       s_mockUSDC,
       s_cctpMessageTransmitterProxy,
-      s_token,
+      s_USDCToken,
       s_allowedList,
       address(s_mockRMNRemote),
       address(s_router),

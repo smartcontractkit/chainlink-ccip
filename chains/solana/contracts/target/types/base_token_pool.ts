@@ -1,5 +1,5 @@
 export type BaseTokenPool = {
-  "version": "0.1.0-dev",
+  "version": "0.1.1-dev",
   "name": "base_token_pool",
   "instructions": [],
   "types": [
@@ -296,6 +296,16 @@ export type BaseTokenPool = {
   ],
   "events": [
     {
+      "name": "GlobalConfigUpdated",
+      "fields": [
+        {
+          "name": "selfServedAllowed",
+          "type": "bool",
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "Burned",
       "fields": [
         {
@@ -570,6 +580,26 @@ export type BaseTokenPool = {
       ]
     },
     {
+      "name": "MintAuthorityTransferred",
+      "fields": [
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "oldMintAuthority",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "newMintAuthority",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "TokensConsumed",
       "fields": [
         {
@@ -692,12 +722,17 @@ export type BaseTokenPool = {
       "code": 6019,
       "name": "LiquidityNotAccepted",
       "msg": "Liquidity not accepted"
+    },
+    {
+      "code": 6020,
+      "name": "TransferZeroTokensNotAllowed",
+      "msg": "Transfering zero tokens is not allowed"
     }
   ]
 };
 
 export const IDL: BaseTokenPool = {
-  "version": "0.1.0-dev",
+  "version": "0.1.1-dev",
   "name": "base_token_pool",
   "instructions": [],
   "types": [
@@ -994,6 +1029,16 @@ export const IDL: BaseTokenPool = {
   ],
   "events": [
     {
+      "name": "GlobalConfigUpdated",
+      "fields": [
+        {
+          "name": "selfServedAllowed",
+          "type": "bool",
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "Burned",
       "fields": [
         {
@@ -1268,6 +1313,26 @@ export const IDL: BaseTokenPool = {
       ]
     },
     {
+      "name": "MintAuthorityTransferred",
+      "fields": [
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "oldMintAuthority",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "newMintAuthority",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "TokensConsumed",
       "fields": [
         {
@@ -1390,6 +1455,11 @@ export const IDL: BaseTokenPool = {
       "code": 6019,
       "name": "LiquidityNotAccepted",
       "msg": "Liquidity not accepted"
+    },
+    {
+      "code": 6020,
+      "name": "TransferZeroTokensNotAllowed",
+      "msg": "Transfering zero tokens is not allowed"
     }
   ]
 };
