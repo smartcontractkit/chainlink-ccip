@@ -24,6 +24,24 @@ var ErrReportValidation = errors.New("report validation errors")
 // ErrInvalidReport is used when a report is found to be invalid.
 var ErrInvalidReport = errors.New("invalid report")
 
+var ErrStaleReport = errors.New("stale report")
+
+// NewErrStaleReport is returned when the report is stale, meaning it has already been processed or is outdated.
+func NewErrStaleReport(reason string) error {
+	return &errWrappedStaleReport{reason: reason}
+}
+
+type errWrappedStaleReport struct {
+	reason string
+}
+
+func (e *errWrappedStaleReport) Error() string {
+	return fmt.Sprintf("stale report error: %v", e.reason)
+}
+func (e *errWrappedStaleReport) Unwrap() error {
+	return ErrStaleReport
+}
+
 // NewErrValidatingReport is returned when the report could not be validated due to an error.
 func NewErrValidatingReport(err error) error {
 	return &errWrappedValidatingReport{err: err}
