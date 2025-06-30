@@ -44,7 +44,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   // A domain is a USDC representation of a chain.
   struct DomainUpdate {
     bytes32 allowedCaller; //       Address allowed to mint on the domain
-    bytes32 mintRecipient; // Address to mint to on the destination chain
+    bytes32 mintRecipient; //       Address to mint to on the destination chain
     uint32 domainIdentifier; // ──╮ Unique domain ID
     uint64 destChainSelector; //  │ The destination chain for this domain
     bool enabled; // ─────────────╯ Whether the domain is enabled
@@ -132,6 +132,8 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     }
 
     bytes32 decodedReceiver;
+    // For EVM chains, the mintRecipient is not used, but is needed for Solana, where the mintRecipient will
+    // be a PDA owned by the pool, and will forward the tokens to its final destination after minting.
     if (domain.mintRecipient != bytes32(0)) {
       decodedReceiver = domain.mintRecipient;
     } else {
