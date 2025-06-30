@@ -132,6 +132,22 @@ pub mod test_token_pool {
         ctx: Context<'_, '_, '_, 'info, TokenOfframp<'info>>,
         release_or_mint: ReleaseOrMintInV1,
     ) -> Result<ReleaseOrMintOutV1> {
+        // The last two remaining accounts are not used, but if present they verify the autoderive
+        // functionality. The first remaining account is the (potential) multisig
+
+        if let [.., a, b] = &ctx.remaining_accounts {
+            require_eq!(
+                a.key(),
+                Pubkey::find_program_address(&[ARBITRARY_SEED], &crate::ID).0,
+                CcipTokenPoolError::InvalidInputs
+            );
+            require_eq!(
+                b.key(),
+                Pubkey::find_program_address(&[ANOTHER_ARBITRARY_SEED], &crate::ID).0,
+                CcipTokenPoolError::InvalidInputs
+            );
+        }
+
         let parsed_amount = to_svm_token_amount(
             release_or_mint.amount,
             ctx.accounts.chain_config.base.remote.decimals,
@@ -353,6 +369,14 @@ pub mod test_token_pool {
     ) -> Result<DeriveAccountsResponse> {
         Ok(DeriveAccountsResponse {
             current_stage: stage,
+            accounts_to_save: vec![
+                Pubkey::find_program_address(&[ARBITRARY_SEED], &crate::ID)
+                    .0
+                    .readonly(),
+                Pubkey::find_program_address(&[ANOTHER_ARBITRARY_SEED], &crate::ID)
+                    .0
+                    .readonly(),
+            ],
             ..Default::default()
         })
     }

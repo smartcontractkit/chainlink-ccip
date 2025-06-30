@@ -2,6 +2,7 @@ package testutils
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"testing"
 
@@ -33,7 +34,6 @@ func DeriveSendAccounts(
 	tokenIndex := byte(0)
 	routerConfigPDA, _, err := state.FindConfigPDA(router)
 	require.NoError(t, err)
-	derivingTokens := false
 	var re = regexp.MustCompile(`^TokenTransferStaticAccounts/\d+/0$`)
 	for {
 		params := ccip_router.DeriveAccountsCcipSendParams{
@@ -56,13 +56,9 @@ func DeriveSendAccounts(
 
 		isStartOfToken := re.MatchString(derivation.CurrentStage)
 		if isStartOfToken {
-			tokenIndices = append(tokenIndices, tokenIndex)
-			derivingTokens = true
+			tokenIndices = append(tokenIndices, tokenIndex-byte(cap(ccip_router.NewCcipSendInstructionBuilder().AccountMetaSlice)))
 		}
-
-		if derivingTokens {
-			tokenIndex += byte(len(derivation.AccountsToSave))
-		}
+		tokenIndex += byte(len(derivation.AccountsToSave))
 
 		for _, meta := range derivation.AccountsToSave {
 			derivedAccounts = append(derivedAccounts, &solana.AccountMeta{
@@ -103,6 +99,8 @@ func DeriveExecutionAccounts(
 	derivedAccounts := []*solana.AccountMeta{}
 	askWith := []*solana.AccountMeta{}
 	stage := "Start"
+	tokenIndex := byte(0)
+	var re = regexp.MustCompile(`^TokenTransferStaticAccounts/\d+/0$`)
 	for {
 		params := ccip_offramp.DeriveAccountsExecuteParams{
 			ExecuteCaller:       transmitter.PublicKey(),
@@ -122,15 +120,17 @@ func DeriveExecutionAccounts(
 		deriveRaw.AccountMetaSlice = append(deriveRaw.AccountMetaSlice, askWith...)
 		derive, err := deriveRaw.ValidateAndBuild()
 		require.NoError(t, err)
+
+		fmt.Printf("Stage: %s\n", stage)
 		tx := SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{derive}, transmitter, config.DefaultCommitment)
 		derivation, err := common.ExtractAnchorTypedReturnValue[ccip_offramp.DeriveAccountsResponse](ctx, tx.Meta.LogMessages, config.CcipOfframpProgram.String())
 		require.NoError(t, err)
 
-		if derivation.CurrentStage == "TokenTransferAccounts/Start" {
-			// We offset the current index from the capacity of the default meta slice (the fixed accounts)
-			tokenIndex := len(derivedAccounts) - cap(ccip_offramp.NewExecuteInstructionBuilder().AccountMetaSlice)
-			tokenIndices = append(tokenIndices, byte(tokenIndex))
+		isStartOfToken := re.MatchString(derivation.CurrentStage)
+		if isStartOfToken {
+			tokenIndices = append(tokenIndices, tokenIndex-byte(cap(ccip_offramp.NewExecuteInstructionBuilder().AccountMetaSlice)))
 		}
+		tokenIndex += byte(len(derivation.AccountsToSave))
 
 		for _, meta := range derivation.AccountsToSave {
 			derivedAccounts = append(derivedAccounts, &solana.AccountMeta{

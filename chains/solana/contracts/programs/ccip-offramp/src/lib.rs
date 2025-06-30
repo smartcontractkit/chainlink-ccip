@@ -818,4 +818,6 @@ pub enum CcipOfframpError {
     InvalidDerivationStage,
     #[msg("Token pool returned an unexpected derivation response")]
     InvalidTokenPoolAccountDerivationResponse,
+    #[msg("Can't fit account derivation response.")]
+    AccountDerivationResponseTooLarge,
 }
