@@ -109,7 +109,7 @@ func NewUSDCMessageReader(
 			}
 		case sel.FamilySolana:
 			// Bind the TokenPool contract, the contract re-emits the USDC MessageSent event along with other metadata.
-			bytesAddress, err := addrCodec.AddressStringToBytes(token.SourcePoolAddress, chainSelector)
+			bytesAddress, err := addrCodec.AddressStringToBytes(token.SourceMessageTransmitterAddr, chainSelector)
 			if err != nil {
 				return nil, err
 			}
