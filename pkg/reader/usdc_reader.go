@@ -382,6 +382,37 @@ func (u solanaUSDCMessageReader) getMessageTokenData(
 	return messageTransmitterEvents, nil
 }
 
+/*
+	type EventCcipCctpMessageSent struct {
+		Discriminator       [8]byte
+		OriginalSender      solana.PublicKey
+		RemoteChainSelector uint64
+		MsgTotalNonce       uint64
+		EventAddress        solana.PublicKey
+		SourceDomain        uint32
+		CctpNonce           uint64
+		MessageSentBytes    []byte
+	}
+
+#[event]
+
+	pub struct CcipCctpMessageSentEvent {
+	    // Seeds for the CCTP message sent event account
+	    pub original_sender: Pubkey,
+	    pub remote_chain_selector: u64,
+	    pub msg_total_nonce: u64,
+
+	    // Actual event account address, derived from the seeds above
+	    pub event_address: Pubkey,
+
+	    // CCTP values identifying the message
+	    pub source_domain: u32, // The source chain domain ID, which for Solana is always 5
+	    pub cctp_nonce: u64,
+
+	    // CCTP message bytes, used to get the attestation offchain and receive the message on dest
+	    pub message_sent_bytes: Vec<u8>,
+	}
+*/
 type SolanaCCTPUSDCMessageEvent struct {
 	Discriminator       [8]byte
 	OriginalSender      [32]byte
@@ -402,6 +433,8 @@ func (u solanaUSDCMessageReader) MessagesByTokenID(
 	if len(tokens) == 0 {
 		return map[MessageTokenID]cciptypes.Bytes{}, nil
 	}
+	u.lggr.Debugw("Searching for Solana CCTP USDC logs",
+		"numExpected", len(tokens))
 
 	// Parse the extra data field to get the CCTP nonces and source domains.
 	cctpData, err := u.getMessageTokenData(tokens)
@@ -410,7 +443,6 @@ func (u solanaUSDCMessageReader) MessagesByTokenID(
 	}
 
 	// Query the token pool contract for the MessageSent event data.
-
 	expressions := []query.Expression{query.Confidence(primitives.Finalized)}
 	for _, data := range cctpData {
 		// This is much more expensive than the EVM version. Rather than a
@@ -434,36 +466,6 @@ func (u solanaUSDCMessageReader) MessagesByTokenID(
 				},
 			),
 		))
-		/*
-			type EventCcipCctpMessageSent struct {
-				Discriminator       [8]byte
-				OriginalSender      solana.PublicKey
-				RemoteChainSelector uint64
-				MsgTotalNonce       uint64
-				EventAddress        solana.PublicKey
-				SourceDomain        uint32
-				CctpNonce           uint64
-				MessageSentBytes    []byte
-			}
-
-			#[event]
-			pub struct CcipCctpMessageSentEvent {
-			    // Seeds for the CCTP message sent event account
-			    pub original_sender: Pubkey,
-			    pub remote_chain_selector: u64,
-			    pub msg_total_nonce: u64,
-
-			    // Actual event account address, derived from the seeds above
-			    pub event_address: Pubkey,
-
-			    // CCTP values identifying the message
-			    pub source_domain: u32, // The source chain domain ID, which for Solana is always 5
-			    pub cctp_nonce: u64,
-
-			    // CCTP message bytes, used to get the attestation offchain and receive the message on dest
-			    pub message_sent_bytes: Vec<u8>,
-			}
-		*/
 	}
 
 	// Parent expressions for the query.
@@ -518,6 +520,7 @@ func (u solanaUSDCMessageReader) MessagesByTokenID(
 				"seqNr", tokenID.SeqNr,
 				"tokenIndex", tokenID.Index,
 				"chainSelector", source,
+				"data", cctpData[tokenID],
 			)
 		}
 	}
