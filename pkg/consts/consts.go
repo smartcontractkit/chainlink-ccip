@@ -16,7 +16,7 @@ const (
 	ContractNameRMNProxy               = "RMNProxy"
 	ContractNameRouter                 = "Router"
 	ContractNameCCTPMessageTransmitter = "MessageTransmitter"
-	ContractNameUSDCTokenPool          = "USDCTokenPool" // Solana USDC Token Pool
+	ContractNameUSDCTokenPool          = "USDCTokenPool" //nolint:gosec // Solana USDC Token Pool contract name
 )
 
 func AllContractNames() []string {
