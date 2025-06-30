@@ -16,6 +16,7 @@ const (
 	ContractNameRMNProxy               = "RMNProxy"
 	ContractNameRouter                 = "Router"
 	ContractNameCCTPMessageTransmitter = "MessageTransmitter"
+	ContractNameUSDCTokenPool          = "USDCTokenPool" //nolint:gosec // Solana USDC Token Pool contract name
 )
 
 func AllContractNames() []string {
@@ -132,6 +133,10 @@ const (
 	EventAttributeSourceChain    = "SourceChain"
 	EventAttributeDestChain      = "DestChain"
 	EventAttributeState          = "State"
+
+	// Required for Solana CCTP
+	EventAttributeMsgTotalNonce = "MsgTotalNonce"
+	EventAttributeSourceDomain  = "SourceDomain"
 )
 
 // Dedicated filters
