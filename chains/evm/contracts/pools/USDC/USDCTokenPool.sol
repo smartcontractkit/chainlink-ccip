@@ -1,18 +1,21 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {IPoolV1} from "../../interfaces/IPool.sol";
 import {IMessageTransmitter} from "./interfaces/IMessageTransmitter.sol";
 import {ITokenMessenger} from "./interfaces/ITokenMessenger.sol";
-import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {Pool} from "../../libraries/Pool.sol";
 import {TokenPool} from "../TokenPool.sol";
 import {CCTPMessageTransmitterProxy} from "./CCTPMessageTransmitterProxy.sol";
 
+import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 import {IERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC165} from
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
 
 /// @notice This pool mints and burns USDC tokens through the Cross Chain Transfer
 /// Protocol (CCTP).
@@ -33,6 +36,8 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   error InvalidDestinationDomain(uint32 expected, uint32 got);
   error InvalidReceiver(bytes receiver);
   error InvalidTransmitterInProxy();
+  error InvalidPreviousPool();
+  error InvalidMessageLength(uint256 length);
 
   // This data is supplied from offchain and contains everything needed
   // to receive the USDC tokens.
@@ -110,7 +115,12 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
 
     // For new token pools, no previous pool exists, and so the previousPool is not needed, and thus
     // the zero address is a valid value.
+    if (previousPool == address(this) || !IERC165(previousPool).supportsInterface(type(IPoolV1).interfaceId)) {
+      revert InvalidPreviousPool();
+    }
+
     i_previousPool = previousPool;
+
     emit ConfigSet(address(tokenMessenger));
   }
 
@@ -193,7 +203,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     }
     address destinationCaller = address(uint160(uint256(destinationCallerBytes32)));
 
-    if (destinationCaller == i_previousPool) {
+    if (i_previousPool != address(0) && destinationCaller == i_previousPool) {
       return USDCTokenPool(i_previousPool).releaseOrMint(releaseOrMintIn);
     }
 
@@ -227,6 +237,8 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   ///     * destinationCaller     32         bytes32    84
   ///     * messageBody           dynamic    bytes      116
   function _validateMessage(bytes memory usdcMessage, SourceTokenDataPayload memory sourceTokenData) internal view {
+    if (usdcMessage.length < 116) revert InvalidMessageLength(usdcMessage.length);
+
     uint32 version;
     // solhint-disable-next-line no-inline-assembly
     assembly {

@@ -5,10 +5,13 @@ import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/I
 
 import {Router} from "../../../Router.sol";
 
+import {IPoolV1} from "../../../interfaces/IPool.sol";
 import {Pool} from "../../../libraries/Pool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {CCTPMessageTransmitterProxy} from "../../../pools/USDC/CCTPMessageTransmitterProxy.sol";
 import {BurnMintERC677} from "@chainlink/contracts/src/v0.8/shared/token/ERC677/BurnMintERC677.sol";
+import {IERC165} from
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
 
 import {BaseTest} from "../../BaseTest.t.sol";
 import {MockE2EUSDCTransmitter} from "../../mocks/MockE2EUSDCTransmitter.sol";
@@ -65,6 +68,13 @@ contract USDCSetup is BaseTest {
       s_previousPool,
       abi.encodeWithSelector(TokenPool.releaseOrMint.selector),
       abi.encode(Pool.ReleaseOrMintOutV1({destinationAmount: 1}))
+    );
+
+    // Mock the previous pool's supportsInterface function to return true for IPoolV1 interface
+    vm.mockCall(
+      s_previousPool,
+      abi.encodeWithSelector(IERC165.supportsInterface.selector, type(IPoolV1).interfaceId),
+      abi.encode(true)
     );
   }
 
