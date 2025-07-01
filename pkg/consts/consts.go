@@ -135,7 +135,7 @@ const (
 	EventAttributeState          = "State"
 
 	// Required for Solana CCTP
-	EventAttributeMsgTotalNonce = "MsgTotalNonce"
+	EventAttributeCCTPNonce     = "CctpNonce"
 	EventAttributeSourceDomain  = "SourceDomain"
 )
 
