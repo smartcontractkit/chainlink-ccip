@@ -127,12 +127,16 @@ func (s *USDCAttestationClient) fetchSingleMessage(
 	messageHash := cciptypes.Bytes32(s.hasher.Hash(message))
 	body, _, err := s.client.Get(ctx, fmt.Sprintf("%s/%s/%s", apiVersion, attestationPath, messageHash.String()))
 	if err != nil {
+		s.lggr.Warnw("Failed to fetch attestation from the API", "err", err)
 		return tokendata.ErrorAttestationStatus(err)
 	}
 	response, err := attestationFromResponse(body)
 	if err != nil {
+		s.lggr.Warnw("Failed to parse attestation from the response", "err", err, "body", body)
 		return tokendata.ErrorAttestationStatus(err)
 	}
+
+	s.lggr.Debugw("Attestation received", "message", message, "response", response)
 	return tokendata.SuccessAttestationStatus(messageHash[:], message, response)
 }
 
