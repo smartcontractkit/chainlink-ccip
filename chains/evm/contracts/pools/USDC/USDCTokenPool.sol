@@ -237,13 +237,16 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   ///     * destinationCaller     32         bytes32    84
   ///     * messageBody           dynamic    bytes      116
   function _validateMessage(bytes memory usdcMessage, SourceTokenDataPayload memory sourceTokenData) internal view {
+    // 116 is the minimum length of a valid USDC message. Since destinationCaller needs to be checked for the previous 
+    // pool, this ensures that it can be parsed correctly and that the message is not too short. Since messageBody is 
+    // dynamic and not always used, it is not checked.
     if (usdcMessage.length < 116) revert InvalidMessageLength(usdcMessage.length);
 
     uint32 version;
     // solhint-disable-next-line no-inline-assembly
     assembly {
       // We truncate using the datatype of the version variable, meaning
-      // we will only be left with the first 4 bytes of the message.
+      // we will only be left with the first 4 bytes of the message when we cast it to uint32.
       version := mload(add(usdcMessage, 4)) // 0 + 4 = 4
     }
     // This token pool only supports version 0 of the CCTP message format
