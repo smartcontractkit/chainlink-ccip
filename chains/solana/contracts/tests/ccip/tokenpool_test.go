@@ -312,7 +312,7 @@ func TestTokenPool(t *testing.T) {
 						transferI, err := tokens.TokenTransferChecked(amount, decimals, v.tokenProgram, p.User[admin.PublicKey()], mint, poolTokenAccount, admin.PublicKey(), solana.PublicKeySlice{})
 						require.NoError(t, err)
 
-						lbI, err := test_ccip_invalid_receiver.NewPoolProxyLockOrBurnInstruction(
+						raw := test_ccip_invalid_receiver.NewPoolProxyLockOrBurnInstruction(
 							test_ccip_invalid_receiver.LockOrBurnInV1{
 								LocalToken:          mint,
 								Amount:              amount,
@@ -329,7 +329,8 @@ func TestTokenPool(t *testing.T) {
 							config.RMNRemoteCursesPDA,
 							config.RMNRemoteConfigPDA,
 							p.Chain[config.EvmChainSelector],
-						).ValidateAndBuild()
+						)
+						lbI, err := raw.ValidateAndBuild()
 						require.NoError(t, err)
 
 						res := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{transferI, lbI}, admin, config.DefaultCommitment)
@@ -471,7 +472,7 @@ func TestTokenPool(t *testing.T) {
 							// as that may break parallel tests. Instead, submit the curse ix together with the pool ix
 							// that fails, which reverts the entire tx and does not affect other tests.
 
-							lbI, err := test_ccip_invalid_receiver.NewPoolProxyLockOrBurnInstruction(
+							raw := test_ccip_invalid_receiver.NewPoolProxyLockOrBurnInstruction(
 								test_ccip_invalid_receiver.LockOrBurnInV1{
 									LocalToken:          mint,
 									Amount:              amount,
@@ -488,7 +489,8 @@ func TestTokenPool(t *testing.T) {
 								config.RMNRemoteCursesPDA,
 								config.RMNRemoteConfigPDA,
 								p.Chain[config.EvmChainSelector],
-							).ValidateAndBuild()
+							)
+							lbI, err := raw.ValidateAndBuild()
 							require.NoError(t, err)
 
 							testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{curseI, lbI}, admin, config.DefaultCommitment, []string{"Error Code: GloballyCursed"})
@@ -539,7 +541,7 @@ func TestTokenPool(t *testing.T) {
 							// as that may break parallel tests. Instead, submit the curse ix together with the pool ix
 							// that fails, which reverts the entire tx and does not affect other tests.
 
-							lbI, err := test_ccip_invalid_receiver.NewPoolProxyLockOrBurnInstruction(
+							raw := test_ccip_invalid_receiver.NewPoolProxyLockOrBurnInstruction(
 								test_ccip_invalid_receiver.LockOrBurnInV1{
 									LocalToken:          mint,
 									Amount:              amount,
@@ -556,7 +558,8 @@ func TestTokenPool(t *testing.T) {
 								config.RMNRemoteCursesPDA,
 								config.RMNRemoteConfigPDA,
 								p.Chain[config.EvmChainSelector],
-							).ValidateAndBuild()
+							)
+							lbI, err := raw.ValidateAndBuild()
 							require.NoError(t, err)
 
 							testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{curseI, lbI}, admin, config.DefaultCommitment, []string{"Error Code: SubjectCursed"})

@@ -732,10 +732,16 @@ func (obj *RetrievePoolPrograms) UnmarshalWithDecoder(decoder *ag_binary.Decoder
 func (_ *RetrievePoolPrograms) isDeriveAccountsCcipSendStage() {}
 
 type TokenTransferStaticAccounts struct {
-	Page uint32
+	Token uint32
+	Page  uint32
 }
 
 func (obj TokenTransferStaticAccounts) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Token` param:
+	err = encoder.Encode(obj.Token)
+	if err != nil {
+		return err
+	}
 	// Serialize `Page` param:
 	err = encoder.Encode(obj.Page)
 	if err != nil {
@@ -745,6 +751,11 @@ func (obj TokenTransferStaticAccounts) MarshalWithEncoder(encoder *ag_binary.Enc
 }
 
 func (obj *TokenTransferStaticAccounts) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Token`:
+	err = decoder.Decode(&obj.Token)
+	if err != nil {
+		return err
+	}
 	// Deserialize `Page`:
 	err = decoder.Decode(&obj.Page)
 	if err != nil {
@@ -756,10 +767,16 @@ func (obj *TokenTransferStaticAccounts) UnmarshalWithDecoder(decoder *ag_binary.
 func (_ *TokenTransferStaticAccounts) isDeriveAccountsCcipSendStage() {}
 
 type NestedTokenDerive struct {
+	Token         uint32
 	TokenSubstage string
 }
 
 func (obj NestedTokenDerive) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Token` param:
+	err = encoder.Encode(obj.Token)
+	if err != nil {
+		return err
+	}
 	// Serialize `TokenSubstage` param:
 	err = encoder.Encode(obj.TokenSubstage)
 	if err != nil {
@@ -769,6 +786,11 @@ func (obj NestedTokenDerive) MarshalWithEncoder(encoder *ag_binary.Encoder) (err
 }
 
 func (obj *NestedTokenDerive) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Token`:
+	err = decoder.Decode(&obj.Token)
+	if err != nil {
+		return err
+	}
 	// Deserialize `TokenSubstage`:
 	err = decoder.Decode(&obj.TokenSubstage)
 	if err != nil {

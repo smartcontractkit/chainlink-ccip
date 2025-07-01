@@ -142,18 +142,30 @@ impl Execute for Impl {
         let stage = derive::DeriveExecuteAccountsStage::from_str(stage.as_str())?;
 
         match stage {
-            derive::DeriveExecuteAccountsStage::GatherBasicInfo => {
-                derive::derive_execute_accounts_gather_basic_info(params.source_chain_selector)
+            derive::DeriveExecuteAccountsStage::Start => {
+                derive::derive_execute_accounts_start(params.source_chain_selector)
             }
-            derive::DeriveExecuteAccountsStage::BuildMainAccountList => {
+            derive::DeriveExecuteAccountsStage::FinishMainAccountList => {
                 derive::derive_execute_accounts_build_main_account_list(ctx, &params)
             }
             derive::DeriveExecuteAccountsStage::RetrieveTokenLUTs => {
                 derive::derive_execute_accounts_retrieve_luts(ctx)
             }
-            derive::DeriveExecuteAccountsStage::TokenTransferAccounts { token_substage } => {
-                derive::derive_execute_accounts_additional_tokens(ctx, &params, &token_substage)
+            derive::DeriveExecuteAccountsStage::RetrievePoolPrograms => {
+                derive::derive_execute_accounts_retrieve_pool_programs(ctx)
             }
+            derive::DeriveExecuteAccountsStage::TokenTransferStaticAccounts { token, page } => {
+                derive::derive_execute_accounts_additional_tokens_static(ctx, &params, page, token)
+            }
+            derive::DeriveExecuteAccountsStage::NestedTokenDerive {
+                token,
+                token_substage,
+            } => derive::derive_execute_accounts_additional_token_nested(
+                ctx,
+                &params,
+                &token_substage,
+                token,
+            ),
         }
     }
 }

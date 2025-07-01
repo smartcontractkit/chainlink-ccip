@@ -1790,6 +1790,10 @@ export type CcipRouter = {
             "name": "TokenTransferStaticAccounts",
             "fields": [
               {
+                "name": "token",
+                "type": "u32"
+              },
+              {
                 "name": "page",
                 "type": "u32"
               }
@@ -1798,6 +1802,10 @@ export type CcipRouter = {
           {
             "name": "NestedTokenDerive",
             "fields": [
+              {
+                "name": "token",
+                "type": "u32"
+              },
               {
                 "name": "tokenSubstage",
                 "type": "string"
@@ -2322,6 +2330,11 @@ export type CcipRouter = {
       "code": 7029,
       "name": "InvalidTokenPoolAccountDerivationResponse",
       "msg": "Token pool returned an unexpected derivation response"
+    },
+    {
+      "code": 7030,
+      "name": "AccountDerivationResponseTooLarge",
+      "msg": "Can't fit account derivation response."
     }
   ]
 };
@@ -4118,6 +4131,10 @@ export const IDL: CcipRouter = {
             "name": "TokenTransferStaticAccounts",
             "fields": [
               {
+                "name": "token",
+                "type": "u32"
+              },
+              {
                 "name": "page",
                 "type": "u32"
               }
@@ -4126,6 +4143,10 @@ export const IDL: CcipRouter = {
           {
             "name": "NestedTokenDerive",
             "fields": [
+              {
+                "name": "token",
+                "type": "u32"
+              },
               {
                 "name": "tokenSubstage",
                 "type": "string"
@@ -4650,6 +4671,11 @@ export const IDL: CcipRouter = {
       "code": 7029,
       "name": "InvalidTokenPoolAccountDerivationResponse",
       "msg": "Token pool returned an unexpected derivation response"
+    },
+    {
+      "code": 7030,
+      "name": "AccountDerivationResponseTooLarge",
+      "msg": "Can't fit account derivation response."
     }
   ]
 };

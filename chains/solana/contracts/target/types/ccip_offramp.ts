@@ -2137,17 +2137,37 @@ export type CcipOfframp = {
         "kind": "enum",
         "variants": [
           {
-            "name": "GatherBasicInfo"
+            "name": "Start"
           },
           {
-            "name": "BuildMainAccountList"
+            "name": "FinishMainAccountList"
           },
           {
             "name": "RetrieveTokenLUTs"
           },
           {
-            "name": "TokenTransferAccounts",
+            "name": "RetrievePoolPrograms"
+          },
+          {
+            "name": "TokenTransferStaticAccounts",
             "fields": [
+              {
+                "name": "token",
+                "type": "u32"
+              },
+              {
+                "name": "page",
+                "type": "u32"
+              }
+            ]
+          },
+          {
+            "name": "NestedTokenDerive",
+            "fields": [
+              {
+                "name": "token",
+                "type": "u32"
+              },
               {
                 "name": "tokenSubstage",
                 "type": "string"
@@ -2819,6 +2839,11 @@ export type CcipOfframp = {
       "code": 9069,
       "name": "InvalidTokenPoolAccountDerivationResponse",
       "msg": "Token pool returned an unexpected derivation response"
+    },
+    {
+      "code": 9070,
+      "name": "AccountDerivationResponseTooLarge",
+      "msg": "Can't fit account derivation response."
     }
   ]
 };
@@ -4962,17 +4987,37 @@ export const IDL: CcipOfframp = {
         "kind": "enum",
         "variants": [
           {
-            "name": "GatherBasicInfo"
+            "name": "Start"
           },
           {
-            "name": "BuildMainAccountList"
+            "name": "FinishMainAccountList"
           },
           {
             "name": "RetrieveTokenLUTs"
           },
           {
-            "name": "TokenTransferAccounts",
+            "name": "RetrievePoolPrograms"
+          },
+          {
+            "name": "TokenTransferStaticAccounts",
             "fields": [
+              {
+                "name": "token",
+                "type": "u32"
+              },
+              {
+                "name": "page",
+                "type": "u32"
+              }
+            ]
+          },
+          {
+            "name": "NestedTokenDerive",
+            "fields": [
+              {
+                "name": "token",
+                "type": "u32"
+              },
               {
                 "name": "tokenSubstage",
                 "type": "string"
@@ -5644,6 +5689,11 @@ export const IDL: CcipOfframp = {
       "code": 9069,
       "name": "InvalidTokenPoolAccountDerivationResponse",
       "msg": "Token pool returned an unexpected derivation response"
+    },
+    {
+      "code": 9070,
+      "name": "AccountDerivationResponseTooLarge",
+      "msg": "Can't fit account derivation response."
     }
   ]
 };
