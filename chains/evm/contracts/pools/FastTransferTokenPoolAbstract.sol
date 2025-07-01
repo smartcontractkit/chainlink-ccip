@@ -414,10 +414,9 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   }
 
   /// @notice Handles settlement when the request was not fast-filled
-  /// @dev The first param is the fillId. It's unused in this implementation, but kept to allow overriding this function
-  /// to handle the slow fill in a different way.
-  /// @dev The second param is the chainSelector. It's unused in this implementation, but kept to allow overriding this function
-  /// to handle the slow fill in a different way.
+  /// @dev The first two parameters, `fillId` and `chainSelector`, are unused in this implementation.
+  /// They are included to allow derived contracts to override this function and implement custom logic
+  /// for handling slow fills.
   /// @param localSettlementAmount The amount to settle in local token
   /// @param receiver The receiver address
   function _handleSlowFill(bytes32, uint64, uint256 localSettlementAmount, address receiver) internal virtual {
