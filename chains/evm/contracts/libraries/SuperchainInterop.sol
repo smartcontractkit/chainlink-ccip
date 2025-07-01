@@ -4,10 +4,6 @@ pragma solidity ^0.8.0;
 import {Internal} from "./Internal.sol";
 
 library SuperchainInterop {
-  /// @notice Event selector for the CCIPMessageSent event, needed for Superchain validation.
-  bytes32 internal constant SENT_MESSAGE_LOG_SELECTOR =
-    0xb056c48de8fce43e6c30818e5f9c6a56a7014ef5944b6329ed5c76afff7e838a;
-
   /// @notice The custom event used to relay messages over superchain.
   /// @param destChainSelector The destination chain selector.
   /// @param sequenceNumber The sequence number of the message.
@@ -17,7 +13,7 @@ library SuperchainInterop {
   );
 
   /// @notice Generate an unique hash for an Any2EVMRampMessage.
-  /// @dev This is similiar to how messageId is generated in the OnRamp, but using the Any2EVMRampMessage
+  /// @dev This is similar to how messageId is generated in the OnRamp, but using the Any2EVMRampMessage
   /// type, and OffRamp metadata hash. This gives a unique identifier for the message that can be derived
   /// in both the On/OffRampOverSuperchainInterop.
   /// @param message The interop message to hash.

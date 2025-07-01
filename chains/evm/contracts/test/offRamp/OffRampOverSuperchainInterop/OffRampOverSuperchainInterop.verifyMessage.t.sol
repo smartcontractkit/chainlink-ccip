@@ -115,14 +115,14 @@ contract OffRampOverSuperchainInterop_verifyMessage is OffRampOverSuperchainInte
       proofFlagBits: 0
     });
 
-    vm.expectRevert(abi.encodeWithSelector(OffRampOverSuperchainInterop.InvalidMessageCountInReport.selector, 0, 1));
+    vm.expectRevert(abi.encodeWithSelector(OffRampOverSuperchainInterop.ReportMustContainExactlyOneMessage.selector));
     s_offRampOverSuperchainInterop.verifyMessage(SOURCE_CHAIN_SELECTOR_1, report);
 
     report.messages = new Internal.Any2EVMRampMessage[](2);
     report.messages[0] = _generateValidMessage(SOURCE_CHAIN_SELECTOR_1, 1);
     report.messages[1] = _generateValidMessage(SOURCE_CHAIN_SELECTOR_1, 2);
 
-    vm.expectRevert(abi.encodeWithSelector(OffRampOverSuperchainInterop.InvalidMessageCountInReport.selector, 2, 1));
+    vm.expectRevert(abi.encodeWithSelector(OffRampOverSuperchainInterop.ReportMustContainExactlyOneMessage.selector));
     s_offRampOverSuperchainInterop.verifyMessage(SOURCE_CHAIN_SELECTOR_1, report);
   }
 

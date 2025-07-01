@@ -117,7 +117,8 @@ contract OffRampOverSuperchainInteropSetup is OffRampSetup {
     Internal.Any2EVMRampMessage memory message
   ) internal pure returns (bytes32) {
     bytes memory logData = bytes.concat(
-      abi.encode(SuperchainInterop.SENT_MESSAGE_LOG_SELECTOR, destChainSelector, sequenceNumber), abi.encode(message)
+      abi.encode(SuperchainInterop.CCIPSuperchainMessageSent.selector, destChainSelector, sequenceNumber),
+      abi.encode(message)
     );
     return keccak256(logData);
   }
