@@ -495,13 +495,17 @@ func (u solanaUSDCMessageReader) MessagesByTokenID(
 		return nil, fmt.Errorf("error querying contract reader for chain %d: %w", source, err)
 	}
 
+	u.lggr.Debugw("CR query results", "count", len(iter))
+
 	// 3. Read CR responses and store the results.
 	out := make(map[MessageTokenID]cciptypes.Bytes)
 	for _, item := range iter {
+		u.lggr.Debugw("CR query item", "item", item)
 		event, ok1 := item.Data.(*SolanaCCTPUSDCMessageEvent)
 		if !ok1 {
 			return nil, fmt.Errorf("failed to cast %v to Message", item.Data)
 		}
+		u.lggr.Debugw("CR query event", "event", event)
 
 		// This is O(n^2). We could optimize it by storing the cctpData in a map with a composite key.
 		for tokenID, metadata := range cctpData {
