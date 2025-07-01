@@ -78,7 +78,7 @@ func TestCctpTpDevnet(t *testing.T) {
 	usdcEvmBytes := [32]byte{}
 	copy(usdcEvmBytes[32-len(usdcEvmPartialBytes):], usdcEvmPartialBytes)
 
-	receiverAddress := "bd27CdAB5c9109B3390B25b4Dff7d970918cc550" // sepolia, just a test address
+	receiverAddress := devnetInfo.CCTP.Sepolia.ReceiverAddress
 	receiverAddrBytes, err := hex.DecodeString(receiverAddress)
 	require.NoError(t, err)
 	fullReceiverAddress := [32]byte{}
@@ -86,8 +86,13 @@ func TestCctpTpDevnet(t *testing.T) {
 
 	chainSelector := devnetInfo.ChainSelectors.Sepolia
 	domain := domains[chainSelector]
-	domainDestCaller := solana.PublicKeyFromBytes(fullReceiverAddress[:]) // TODO
-	remotePoolAddress := domainDestCaller                                 // TODO
+	domainDestCaller := solana.PublicKeyFromBytes(fullReceiverAddress[:])
+
+	remotePoolBytes, err := hex.DecodeString(devnetInfo.CCTP.Sepolia.TokenPool)
+	require.NoError(t, err)
+	remotePoolAddressBytes := [32]byte{}
+	copy(remotePoolAddressBytes[32-len(remotePoolBytes):], remotePoolBytes)
+	remotePoolAddress := solana.PublicKey(remotePoolAddressBytes)
 
 	cctpPool := getCctpTokenPoolPDAs(t, cctpTpProgram, chainSelector, usdcMint)
 	messageTransmitter := getMessageTransmitterPDAs(t, cctpMtProgram, cctpTmmProgram)
@@ -121,140 +126,136 @@ func TestCctpTpDevnet(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("Initialize TokenPool", func(t *testing.T) {
-		t.Skip()
+		// t.Skip()
 
-		t.Run("Initialize", func(t *testing.T) {
-			t.Skip()
+		type ProgramData struct {
+			DataType uint32
+			Address  solana.PublicKey
+		}
 
-			type ProgramData struct {
-				DataType uint32
-				Address  solana.PublicKey
-			}
-
-			// get program data account
-			data, err := client.GetAccountInfoWithOpts(ctx, cctpPool.program, &rpc.GetAccountInfoOpts{
-				Commitment: config.DefaultCommitment,
-			})
-			require.NoError(t, err)
-			// Decode program data
-			var programData ProgramData
-			require.NoError(t, bin.UnmarshalBorsh(&programData, data.Bytes()))
-
-			// poolInitI, err := cctp_token_pool.NewInitializeInstruction(
-			// 	referenceAddresses.Router,
-			// 	referenceAddresses.RmnRemote,
-			// 	cctpPool.state,
-			// 	usdcMint,
-			// 	admin.PublicKey(),
-			// 	solana.SystemProgramID,
-			// 	cctpPool.program,
-			// 	programData.Address,
-			// ).ValidateAndBuild()
-			// require.NoError(t, err)
-
-			// poolEditI, err := cctp_token_pool.NewSetRmnRemoteInstruction(
-			// 	referenceAddresses.RmnRemote,
-			// 	cctpPool.state,
-			// 	usdcMint,
-			// 	admin.PublicKey(),
-			// ).ValidateAndBuild()
-			// require.NoError(t, err)
-
-			// // set pool config
-			// ixConfigure, err := cctp_token_pool.NewInitChainRemoteConfigInstruction(
-			// 	chainSelector,
-			// 	usdcMint,
-			// 	cctp_token_pool.RemoteConfig{
-			// 		TokenAddress: cctp_token_pool.RemoteAddress{
-			// 			Address: usdcMint.Bytes(),
-			// 		},
-			// 		Decimals:      usdcDecimals,
-			// 		PoolAddresses: []cctp_token_pool.RemoteAddress{},
-			// 	},
-			// 	cctpPool.state,
-			// 	cctpPool.chainConfig,
-			// 	admin.PublicKey(),
-			// 	solana.SystemProgramID,
-			// ).ValidateAndBuild()
-			// require.NoError(t, err)
-
-			ixEditChainRemoteConfig, err := cctp_token_pool.NewEditChainRemoteConfigInstruction(
-				chainSelector,
-				usdcMint,
-				cctp_token_pool.RemoteConfig{
-					PoolAddresses: []base_token_pool.RemoteAddress{},
-					TokenAddress: base_token_pool.RemoteAddress{
-						Address: usdcEvmBytes[:],
-					},
-					Decimals: usdcDecimals,
-				},
-				cctpPool.state,
-				cctpPool.chainConfig,
-				admin.PublicKey(),
-				solana.SystemProgramID,
-			).ValidateAndBuild()
-			require.NoError(t, err)
-
-			ixCctpConfigure, err := cctp_token_pool.NewEditChainRemoteConfigCctpInstruction(
-				chainSelector,
-				usdcMint,
-				cctp_token_pool.CctpChain{
-					DomainId:          domain,
-					DestinationCaller: domainDestCaller,
-				},
-				cctpPool.state,
-				cctpPool.chainConfig,
-				admin.PublicKey(),
-			).ValidateAndBuild()
-			require.NoError(t, err)
-
-			ixAppend, err := cctp_token_pool.NewAppendRemotePoolAddressesInstruction(
-				chainSelector,
-				usdcMint,
-				[]cctp_token_pool.RemoteAddress{{Address: remotePoolAddress.Bytes()}},
-				cctpPool.state,
-				cctpPool.chainConfig,
-				admin.PublicKey(),
-				solana.SystemProgramID,
-			).ValidateAndBuild()
-			require.NoError(t, err)
-
-			// create pool token account
-			// createP, poolTokenAccount, err := tokens.CreateAssociatedTokenAccount(solana.TokenProgramID, usdcMint, cctpPool.signer, admin.PublicKey())
-			// require.NoError(t, err)
-			// require.Equal(t, poolTokenAccount, cctpPool.tokenAccount)
-
-			// submit tx with all instructions
-			res := testutils.SendAndConfirm(ctx, t, client, []solana.Instruction{ixEditChainRemoteConfig, ixAppend, ixCctpConfigure}, admin, config.DefaultCommitment)
-			require.NotNil(t, res)
-
-			// 	// validate state
-			// 	var configAccount cctp_token_pool.State
-			// 	require.NoError(t, common.GetAccountDataBorshInto(ctx, client, cctpPool.state, config.DefaultCommitment, &configAccount))
-			// 	require.Equal(t, cctpPool.tokenAccount, configAccount.Config.PoolTokenAccount)
-
-			// 	// validate events
-			// 	var eventConfigured tokens.EventChainConfigured
-			// 	require.NoError(t, common.ParseEvent(res.Meta.LogMessages, "RemoteChainConfigured", &eventConfigured, config.PrintEvents))
-			// 	require.Equal(t, chainSelector, eventConfigured.ChainSelector)
-			// 	require.Equal(t, 0, len(eventConfigured.PoolAddresses))
-			// 	require.Equal(t, 0, len(eventConfigured.PreviousPoolAddresses))
-			// 	require.Equal(t, cctp_token_pool.RemoteAddress{Address: usdcMint.Bytes()}, eventConfigured.Token)
-			// 	require.Equal(t, 0, len(eventConfigured.PreviousToken.Address))
-			// 	require.Equal(t, usdcMint, eventConfigured.Mint)
-
-			var eventAppended tokens.EventRemotePoolsAppended
-			require.NoError(t, common.ParseEvent(res.Meta.LogMessages, "RemotePoolsAppended", &eventAppended, config.PrintEvents))
-			require.Equal(t, chainSelector, eventAppended.ChainSelector)
-			// require.Equal(t, []cctp_token_pool.RemoteAddress{{Address: remotePoolAddress.Bytes()}}, eventAppended.PoolAddresses)
-			// require.Equal(t, 0, len(eventAppended.PreviousPoolAddresses))
-			require.Equal(t, usdcMint, eventAppended.Mint)
-
-			var eventCctpEdit tokens.EventRemoteChainCctpConfigEdited
-			require.NoError(t, common.ParseEvent(res.Meta.LogMessages, "RemoteChainCctpConfigChanged", &eventCctpEdit, config.PrintEvents))
-			require.Equal(t, domain, eventCctpEdit.Config.DomainId)
-			require.Equal(t, domainDestCaller, eventCctpEdit.Config.DestinationCaller)
+		// get program data account
+		data, err := client.GetAccountInfoWithOpts(ctx, cctpPool.program, &rpc.GetAccountInfoOpts{
+			Commitment: config.DefaultCommitment,
 		})
+		require.NoError(t, err)
+		// Decode program data
+		var programData ProgramData
+		require.NoError(t, bin.UnmarshalBorsh(&programData, data.Bytes()))
+
+		// poolInitI, err := cctp_token_pool.NewInitializeInstruction(
+		// 	referenceAddresses.Router,
+		// 	referenceAddresses.RmnRemote,
+		// 	cctpPool.state,
+		// 	usdcMint,
+		// 	admin.PublicKey(),
+		// 	solana.SystemProgramID,
+		// 	cctpPool.program,
+		// 	programData.Address,
+		// ).ValidateAndBuild()
+		// require.NoError(t, err)
+
+		// poolEditI, err := cctp_token_pool.NewSetRmnRemoteInstruction(
+		// 	referenceAddresses.RmnRemote,
+		// 	cctpPool.state,
+		// 	usdcMint,
+		// 	admin.PublicKey(),
+		// ).ValidateAndBuild()
+		// require.NoError(t, err)
+
+		// // set pool config
+		// ixConfigure, err := cctp_token_pool.NewInitChainRemoteConfigInstruction(
+		// 	chainSelector,
+		// 	usdcMint,
+		// 	cctp_token_pool.RemoteConfig{
+		// 		TokenAddress: cctp_token_pool.RemoteAddress{
+		// 			Address: usdcMint.Bytes(),
+		// 		},
+		// 		Decimals:      usdcDecimals,
+		// 		PoolAddresses: []cctp_token_pool.RemoteAddress{},
+		// 	},
+		// 	cctpPool.state,
+		// 	cctpPool.chainConfig,
+		// 	admin.PublicKey(),
+		// 	solana.SystemProgramID,
+		// ).ValidateAndBuild()
+		// require.NoError(t, err)
+
+		ixEditChainRemoteConfig, err := cctp_token_pool.NewEditChainRemoteConfigInstruction(
+			chainSelector,
+			usdcMint,
+			cctp_token_pool.RemoteConfig{
+				PoolAddresses: []base_token_pool.RemoteAddress{},
+				TokenAddress: base_token_pool.RemoteAddress{
+					Address: usdcEvmBytes[:],
+				},
+				Decimals: usdcDecimals,
+			},
+			cctpPool.state,
+			cctpPool.chainConfig,
+			admin.PublicKey(),
+			solana.SystemProgramID,
+		).ValidateAndBuild()
+		require.NoError(t, err)
+
+		ixCctpConfigure, err := cctp_token_pool.NewEditChainRemoteConfigCctpInstruction(
+			chainSelector,
+			usdcMint,
+			cctp_token_pool.CctpChain{
+				DomainId:          domain,
+				DestinationCaller: domainDestCaller,
+			},
+			cctpPool.state,
+			cctpPool.chainConfig,
+			admin.PublicKey(),
+		).ValidateAndBuild()
+		require.NoError(t, err)
+
+		ixAppend, err := cctp_token_pool.NewAppendRemotePoolAddressesInstruction(
+			chainSelector,
+			usdcMint,
+			[]cctp_token_pool.RemoteAddress{{Address: remotePoolAddress.Bytes()}},
+			cctpPool.state,
+			cctpPool.chainConfig,
+			admin.PublicKey(),
+			solana.SystemProgramID,
+		).ValidateAndBuild()
+		require.NoError(t, err)
+
+		// create pool token account
+		// createP, poolTokenAccount, err := tokens.CreateAssociatedTokenAccount(solana.TokenProgramID, usdcMint, cctpPool.signer, admin.PublicKey())
+		// require.NoError(t, err)
+		// require.Equal(t, poolTokenAccount, cctpPool.tokenAccount)
+
+		// submit tx with all instructions
+		res := testutils.SendAndConfirm(ctx, t, client, []solana.Instruction{ixEditChainRemoteConfig, ixAppend, ixCctpConfigure}, admin, config.DefaultCommitment)
+		require.NotNil(t, res)
+
+		// 	// validate state
+		// 	var configAccount cctp_token_pool.State
+		// 	require.NoError(t, common.GetAccountDataBorshInto(ctx, client, cctpPool.state, config.DefaultCommitment, &configAccount))
+		// 	require.Equal(t, cctpPool.tokenAccount, configAccount.Config.PoolTokenAccount)
+
+		// 	// validate events
+		// 	var eventConfigured tokens.EventChainConfigured
+		// 	require.NoError(t, common.ParseEvent(res.Meta.LogMessages, "RemoteChainConfigured", &eventConfigured, config.PrintEvents))
+		// 	require.Equal(t, chainSelector, eventConfigured.ChainSelector)
+		// 	require.Equal(t, 0, len(eventConfigured.PoolAddresses))
+		// 	require.Equal(t, 0, len(eventConfigured.PreviousPoolAddresses))
+		// 	require.Equal(t, cctp_token_pool.RemoteAddress{Address: usdcMint.Bytes()}, eventConfigured.Token)
+		// 	require.Equal(t, 0, len(eventConfigured.PreviousToken.Address))
+		// 	require.Equal(t, usdcMint, eventConfigured.Mint)
+
+		var eventAppended tokens.EventRemotePoolsAppended
+		require.NoError(t, common.ParseEvent(res.Meta.LogMessages, "RemotePoolsAppended", &eventAppended, config.PrintEvents))
+		require.Equal(t, chainSelector, eventAppended.ChainSelector)
+		// require.Equal(t, []cctp_token_pool.RemoteAddress{{Address: remotePoolAddress.Bytes()}}, eventAppended.PoolAddresses)
+		// require.Equal(t, 0, len(eventAppended.PreviousPoolAddresses))
+		require.Equal(t, usdcMint, eventAppended.Mint)
+
+		var eventCctpEdit tokens.EventRemoteChainCctpConfigEdited
+		require.NoError(t, common.ParseEvent(res.Meta.LogMessages, "RemoteChainCctpConfigChanged", &eventCctpEdit, config.PrintEvents))
+		require.Equal(t, domain, eventCctpEdit.Config.DomainId)
+		require.Equal(t, domainDestCaller, eventCctpEdit.Config.DestinationCaller)
 	})
 
 	t.Run("TokenAdminRegistry", func(t *testing.T) {

@@ -42,6 +42,8 @@ type DevnetInfo struct {
 		} `yaml:"message"`
 		Sepolia struct {
 			RecipientBase58 string `yaml:"recipient_base58"`
+			ReceiverAddress string `yaml:"receiver_address"`
+			TokenPool       string `yaml:"token_pool"`
 		} `yaml:"sepolia"`
 	} `yaml:"cctp"`
 	RPC string `yaml:"rpc"`
