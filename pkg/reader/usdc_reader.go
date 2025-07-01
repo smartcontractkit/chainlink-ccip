@@ -444,7 +444,7 @@ func (u solanaUSDCMessageReader) MessagesByTokenID(
 
 	// Query the token pool contract for the MessageSent event data.
 	expressions := []query.Expression{query.Confidence(primitives.Finalized)}
-	for _, data := range cctpData {
+	for id, data := range cctpData {
 		// This is much more expensive than the EVM version. Rather than a
 		// single ANY expression, we have separate expressions for each
 		// nonce and source domain pair. This is because Solana doesn't have
@@ -466,7 +466,10 @@ func (u solanaUSDCMessageReader) MessagesByTokenID(
 				},
 			),
 		))
+		u.lggr.Debugw("CCIP Data", "tokenID", id, "Nonce", data.Nonce, "SourceDomain", data.SourceDomain)
 	}
+
+	u.lggr.Debugw("Expresions", "count", len(expressions))
 
 	// Parent expressions for the query.
 	keyFilter, err := query.Where(
