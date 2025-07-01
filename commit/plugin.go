@@ -44,6 +44,8 @@ type attributedMerkleRootObservation = plugincommon.AttributedObservation[merkle
 type attributedTokenPricesObservation = plugincommon.AttributedObservation[tokenprice.Observation]
 type attributedChainFeeObservation = plugincommon.AttributedObservation[chainfee.Observation]
 
+const stateLoggingFrequency = 30 * time.Minute
+
 type Plugin struct {
 	donID             plugintypes.DonID
 	oracleID          commontypes.OracleID
@@ -69,6 +71,7 @@ type Plugin struct {
 
 	// state
 	contractsInitialized atomic.Bool
+	lastStateLog         atomic.Pointer[time.Time]
 }
 
 func NewPlugin(
@@ -154,6 +157,7 @@ func NewPlugin(
 		destChain,
 		reportingCfg.F,
 		oracleIDToP2pID,
+		reportingCfg.OracleID,
 		reporter,
 	)
 
@@ -273,8 +277,10 @@ func (p *Plugin) Observation(
 			return nil, fmt.Errorf("encode discovery observation: %w, observation: %+v", err, obs)
 		}
 
-		lggr.Infow("contracts not initialized, only making discovery observations", "discoveryObs", discoveryObs)
-		lggr.Infow("commit plugin making observation", "encodedObservation", encoded, "observation", obs)
+		lggr.Infow("contracts not initialized, only making discovery observations")
+		logutil.LogWhenExceedFrequency(&p.lastStateLog, stateLoggingFrequency, func() {
+			lggr.Infow("Commit plugin making observation", "encodedObservation", encoded, "observation", obs)
+		})
 
 		return encoded, nil
 	}
@@ -460,7 +466,9 @@ func (p *Plugin) Outcome(
 	}
 
 	if p.discoveryProcessor != nil {
-		lggr.Infow("Processing discovery observations", "discoveryObservations", discoveryObservations)
+		logutil.LogWhenExceedFrequency(&p.lastStateLog, stateLoggingFrequency, func() {
+			lggr.Debugw("Processing discovery observations", "discoveryObservations", discoveryObservations)
+		})
 
 		// The outcome phase of the discovery processor is binding contracts to the chain reader. This is the reason
 		// we ignore the outcome of the discovery processor.

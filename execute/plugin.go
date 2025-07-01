@@ -135,6 +135,7 @@ func NewPlugin(
 			destChain,
 			reportingCfg.F,
 			oracleIDToP2pID,
+			reportingCfg.OracleID,
 			metricsReporter,
 		),
 		chainSupport: plugincommon.NewChainSupport(

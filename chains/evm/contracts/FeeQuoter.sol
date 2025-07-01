@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {IFeeQuoter} from "./interfaces/IFeeQuoter.sol";
-import {IPriceRegistry} from "./interfaces/IPriceRegistry.sol";
 import {IReceiver} from "@chainlink/contracts/src/v0.8/keystone/interfaces/IReceiver.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
@@ -172,7 +171,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   /// @dev The decimals that Keystone reports prices in.
   uint256 public constant KEYSTONE_PRICE_DECIMALS = 18;
 
-  string public constant override typeAndVersion = "FeeQuoter 1.6.0";
+  string public constant override typeAndVersion = "FeeQuoter 1.6.1-dev";
 
   /// @dev The gas price per unit of gas for a given destination chain, in USD with 18 decimals. Multiple gas prices can
   /// be encoded into the same value. Each price takes {Internal.GAS_PRICE_BITS} bits. For example, if Optimism is the
@@ -247,7 +246,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   // │                     Price calculations                       │
   // ================================================================
 
-  /// @inheritdoc IPriceRegistry
+  /// @inheritdoc IFeeQuoter
   function getTokenPrice(
     address token
   ) public view override returns (Internal.TimestampedPackedUint224 memory) {
@@ -308,7 +307,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   /// - On L1 chains like Ethereum or Avax, the only component is the gas price.
   /// - On Optimistic Rollups, there are two components - the L2 gas price, and L1 base fee for data availability.
   /// - On future chains, there could be more or differing price components.
-  /// PriceRegistry does not contain chain-specific logic to parse destination chain price components.
   /// @param destChainSelector The destination chain to get the price for.
   /// @return gasPrice The encoded gasPrice for the given destination chain ID.
   /// @dev Does not validate if the chain is enabled
@@ -419,7 +417,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   // │                         Fee tokens                           │
   // ================================================================
 
-  /// @inheritdoc IPriceRegistry
+  /// @inheritdoc IFeeQuoter
   function getFeeTokens() external view returns (address[] memory) {
     return s_feeTokens.values();
   }
@@ -456,7 +454,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   // │                       Price updates                          │
   // ================================================================
 
-  /// @inheritdoc IPriceRegistry
+  /// @inheritdoc IFeeQuoter
   function updatePrices(
     Internal.PriceUpdates calldata priceUpdates
   ) external override {
@@ -899,6 +897,9 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
     ) {
       return Internal._validate32ByteAddress(destAddress, Internal.APTOS_PRECOMPILE_SPACE);
     }
+    if (chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_TVM) {
+      return Internal._validateTVMAddress(destAddress);
+    }
     revert InvalidChainFamilySelector(chainFamilySelector);
   }
 
@@ -1010,6 +1011,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
       destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_EVM
         || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_APTOS
         || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SUI
+        || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_TVM
     ) {
       gasLimit = _parseGenericExtraArgsFromBytes(
         message.extraArgs,
@@ -1132,6 +1134,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
       destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_EVM
         || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_APTOS
         || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SUI
+        || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_TVM
     ) {
       Client.GenericExtraArgsV2 memory parsedExtraArgs =
         _parseUnvalidatedEVMExtraArgsFromBytes(extraArgs, destChainConfig.defaultTxGasLimit);
@@ -1232,6 +1235,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
               && destChainConfig.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_SVM
               && destChainConfig.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_APTOS
               && destChainConfig.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_SUI
+              && destChainConfig.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_TVM
           )
       ) {
         revert InvalidDestChainConfig(destChainSelector);

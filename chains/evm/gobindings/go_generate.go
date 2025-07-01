@@ -38,7 +38,11 @@ package ccip
 //go:generate go run generation/generate/wrap.go ccip EtherSenderReceiver ether_sender_receiver latest
 //go:generate go run generation/generate/wrap.go ccip MockE2EUSDCTokenMessenger mock_usdc_token_messenger latest
 //go:generate go run generation/generate/wrap.go ccip MockE2EUSDCTransmitter mock_usdc_token_transmitter latest
+//go:generate go run generation/generate/wrap.go ccip MockE2ELBTCTokenPool mock_lbtc_token_pool latest
 //go:generate go run generation/generate/wrap.go ccip CCIPReaderTester ccip_reader_tester latest
 
 // EncodingUtils
 //go:generate go run generation/generate/wrap.go ccip EncodingUtils ccip_encoding_utils latest
+
+// Superchain Interop
+//go:generate go run generation/generate/wrap.go ccip OnRampOverSuperchainInterop onramp_over_superchain_interop latest

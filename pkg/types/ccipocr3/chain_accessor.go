@@ -71,8 +71,8 @@ type AllAccessors interface {
 	GetChainFeeComponents(ctx context.Context) (ChainFeeComponents, error)
 
 	// Sync can be used to perform frequent syncing operations inside the reader implementation.
-	// Returns a bool indicating whether something was updated.
-	Sync(ctx context.Context, contracts ContractAddresses) error
+	// Returns an error if the sync operation failed.
+	Sync(ctx context.Context, contractName string, contractAddress UnknownAddress) error
 }
 
 // DestinationAccessor contains all functions typically associated by the destination chain.
@@ -101,7 +101,7 @@ type DestinationAccessor interface {
 	// Confidence: Unconfirmed, Finalized
 	ExecutedMessages(
 		ctx context.Context,
-		ranges map[ChainSelector]SeqNumRange,
+		ranges map[ChainSelector][]SeqNumRange,
 		confidence ConfidenceLevel,
 	) (map[ChainSelector][]SeqNum, error)
 

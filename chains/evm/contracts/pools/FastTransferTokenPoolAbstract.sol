@@ -133,11 +133,11 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     uint256 amount,
     uint256 maxFastTransferFee,
     bytes calldata receiver,
-    address feeToken,
+    address settlementFeeToken,
     bytes calldata extraArgs
   ) external payable virtual override returns (bytes32 settlementId) {
     (Quote memory quote, Client.EVM2AnyMessage memory message) =
-      _getFeeQuoteAndCCIPMessage(destinationChainSelector, amount, receiver, feeToken, extraArgs);
+      _getFeeQuoteAndCCIPMessage(destinationChainSelector, amount, receiver, settlementFeeToken, extraArgs);
     _consumeOutboundRateLimit(destinationChainSelector, amount);
     if (quote.fastTransferFee > maxFastTransferFee) {
       revert QuoteFeeExceedsUserMaxLimit(quote.fastTransferFee, maxFastTransferFee);
@@ -145,9 +145,9 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     _handleFastTransferLockOrBurn(destinationChainSelector, msg.sender, amount);
 
     // If the user is not paying in native, we need to transfer the fee token to the contract.
-    if (feeToken != address(0)) {
-      IERC20(feeToken).safeTransferFrom(msg.sender, address(this), quote.ccipSettlementFee);
-      IERC20(feeToken).safeApprove(i_ccipRouter, quote.ccipSettlementFee);
+    if (settlementFeeToken != address(0)) {
+      IERC20(settlementFeeToken).safeTransferFrom(msg.sender, address(this), quote.ccipSettlementFee);
+      IERC20(settlementFeeToken).safeApprove(i_ccipRouter, quote.ccipSettlementFee);
     }
 
     settlementId = IRouterClient(getRouter()).ccipSend{value: msg.value}(destinationChainSelector, message);
@@ -294,12 +294,10 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     }
 
     FillInfo memory fillInfo = s_fills[fillId];
-    if (fillInfo.state != IFastTransferPool.FillState.NOT_FILLED) revert AlreadyFilled(fillId);
+    if (fillInfo.state != IFastTransferPool.FillState.NOT_FILLED) revert AlreadyFilledOrSettled(fillId);
 
     // Calculate the local amount.
     uint256 localAmount = _calculateLocalAmount(sourceAmountNetFee, sourceDecimals);
-    // We rate limit when there are funds going to an end user, not when they are going to a filler.
-    _consumeInboundRateLimit(sourceChainSelector, localAmount);
 
     s_fills[fillId] = FillInfo({state: IFastTransferPool.FillState.FILLED, filler: msg.sender});
 
@@ -338,20 +336,24 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
       mintMessage.receiver
     );
 
+    // Cache current fill info to decide which hook to call.
     FillInfo memory fillInfo = s_fills[fillId];
+    /// Mark the fill as SETTLED before any value transfers or external calls.
+    /// This makes the new state visible immediately, preventing the same fill
+    /// from being settled twice even if execution re-enters this contract.
+    s_fills[fillId].state = IFastTransferPool.FillState.SETTLED;
+    // Rate limiting should apply to the full sourceAmount regardless of whether the request was fast-filled or not.
+    // This ensures that the rate limit controls the overall rate of release/mint operations.
+    _consumeInboundRateLimit(sourceChainSelector, localAmount);
+
     // The amount to reimburse to the filler in local denomination.
     uint256 fillerReimbursementAmount = 0;
-
     if (fillInfo.state == IFastTransferPool.FillState.NOT_FILLED) {
       // Set the local pool fee to zero, as fees are only applied for fast-fill operations
       localPoolFee = 0;
-      // Rate limits should be consumed only when the request was not fast-filled. During fast fill, the rate limit is
-      // consumed by the filler.
-      _consumeInboundRateLimit(sourceChainSelector, localAmount);
       // When no filler is involved, we send the entire amount to the receiver.
       _handleSlowFill(fillId, sourceChainSelector, localAmount, abi.decode(mintMessage.receiver, (address)));
     } else if (fillInfo.state == IFastTransferPool.FillState.FILLED) {
-      // The request was fast-filled, so we reimburse the filler and accumulate the pool.
       fillerReimbursementAmount = localAmount - localPoolFee;
       _handleFastFillReimbursement(
         fillId, sourceChainSelector, fillInfo.filler, fillerReimbursementAmount, localPoolFee
@@ -360,7 +362,6 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
       // The catch all assertion for already settled fills ensures that any wrong value will revert.
       revert AlreadySettled(fillId);
     }
-    s_fills[fillId].state = IFastTransferPool.FillState.SETTLED;
     emit FastTransferSettled(fillId, settlementId, fillerReimbursementAmount, localPoolFee, fillInfo.state);
   }
 

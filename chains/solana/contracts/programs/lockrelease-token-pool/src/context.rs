@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::{
     associated_token::get_associated_token_address_with_program_id,
-    token_interface::{Mint, TokenAccount},
+    token_interface::{Mint, TokenAccount, TokenInterface},
 };
 use base_token_pool::common::*;
 use ccip_common::seed;
@@ -47,7 +47,6 @@ pub struct UpdateGlobalConfig<'info> {
     pub config: Account<'info, PoolConfig>, // Global Config PDA of the Token Pool
 
     pub authority: Signer<'info>,
-    pub system_program: Program<'info, System>,
 
     // Ensures that the provided program is the LockreleaseTokenPool program,
     // and that its associated program data account matches the expected one.
@@ -209,8 +208,7 @@ pub struct TokenOfframp<'info> {
     )]
     pub state: Account<'info, State>,
     #[account(address = *mint.to_account_info().owner)]
-    /// CHECK: CPI to token program
-    pub token_program: AccountInfo<'info>,
+    pub token_program: Interface<'info, TokenInterface>,
     #[account(mut)]
     pub mint: InterfaceAccount<'info, Mint>,
     #[account(
@@ -274,8 +272,7 @@ pub struct TokenOnramp<'info> {
     )]
     pub state: Account<'info, State>,
     #[account(address = *mint.to_account_info().owner)]
-    /// CHECK: CPI to underlying token program
-    pub token_program: AccountInfo<'info>,
+    pub token_program: Interface<'info, TokenInterface>,
     #[account(mut)]
     pub mint: InterfaceAccount<'info, Mint>,
     #[account(
@@ -427,15 +424,14 @@ pub struct DeleteChainConfig<'info> {
 }
 
 #[derive(Accounts)]
-pub struct TokenTransfer<'info> {
+pub struct RebalancerTokenTransfer<'info> {
     #[account(
         seeds = [POOL_STATE_SEED, mint.key().as_ref()],
         bump,
     )]
     pub state: Account<'info, State>,
     #[account(address = *mint.to_account_info().owner)]
-    /// CHECK: CPI to token program
-    pub token_program: AccountInfo<'info>,
+    pub token_program: Interface<'info, TokenInterface>,
     #[account(mut)]
     pub mint: InterfaceAccount<'info, Mint>,
     #[account(
@@ -450,7 +446,8 @@ pub struct TokenTransfer<'info> {
 
     #[account(mut, token::mint = mint, token::token_program = token_program)]
     pub remote_token_account: InterfaceAccount<'info, TokenAccount>,
-    #[account(constraint = authority.key() == state.config.owner || authority.key() == state.config.rebalancer @ CcipTokenPoolError::Unauthorized)]
+    // Only the rebalancer can provide or withdraw tokens liquidity
+    #[account(address = state.config.rebalancer @ CcipTokenPoolError::Unauthorized)]
     pub authority: Signer<'info>,
 }
 
