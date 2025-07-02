@@ -78,7 +78,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   /// For dest pool version 1.5.1, this is the destination chain's token pool.
   struct Domain {
     bytes32 allowedCaller; //      Address allowed to mint on the domain
-    bytes32 mintRecipient; // Address to mint to on the destination chain
+    bytes32 mintRecipient; //      Address to mint to on the destination chain
     uint32 domainIdentifier; // ─╮ Unique domain ID
     bool enabled; // ────────────╯ Whether the domain is enabled
   }
@@ -198,7 +198,8 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     bytes32 destinationCallerBytes32;
     bytes memory messageBytes = msgAndAttestation.message;
     assembly {
-      // Parse out the bytes32 destinationCaller from messageBytes
+      // destinationCaller is a 32-byte word starting at position 84 in messageBytes body, so add 32 to skip the 1st word
+      // representing bytes length
       destinationCallerBytes32 := mload(add(messageBytes, 116)) // 84 + 32 = 116
     }
     address destinationCaller = address(uint160(uint256(destinationCallerBytes32)));
@@ -246,7 +247,10 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     // solhint-disable-next-line no-inline-assembly
     assembly {
       // We truncate using the datatype of the version variable, meaning
-      // we will only be left with the first 4 bytes of the message when we cast it to uint32.
+      // we will only be left with the first 4 bytes of the message when we cast it to uint32. We want the lower 4 bytes
+      // to be the version when casted to a uint32 , so we only add 4. If you added 32, attempting to skip the first word
+      // containing the length, then version would be in the upper-4 bytes of the corresponding slot, which
+      // would not be as easily parsed into a uint32.
       version := mload(add(usdcMessage, 4)) // 0 + 4 = 4
     }
     // This token pool only supports version 0 of the CCTP message format
