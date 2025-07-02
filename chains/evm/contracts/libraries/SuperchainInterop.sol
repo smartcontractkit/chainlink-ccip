@@ -3,8 +3,6 @@ pragma solidity ^0.8.0;
 
 import {Internal} from "./Internal.sol";
 
-import {Identifier} from "../vendor/optimism/interop-lib/v0/src/interfaces/IIdentifier.sol";
-
 library SuperchainInterop {
   /// @notice The custom event used to relay messages over superchain.
   /// @param destChainSelector The destination chain selector.
@@ -14,17 +12,8 @@ library SuperchainInterop {
     uint64 indexed destChainSelector, uint64 indexed sequenceNumber, Internal.Any2EVMRampMessage message
   );
 
-  /// @notice Exec report data used for OffRampOverSuperchainInterop message execution.
-  struct ExecutionReport {
-    /// @notice The complete log data of the CCIPSuperchainMessageSent event.
-    /// 1st 32-byte word is selector, then indexed 32-byte words, then abi-encoded event data.
-    bytes logData;
-    Identifier identifier; // The metadata of the CCIPSuperchainMessageSent event.
-    bytes[] offchainTokenData; // Offchain token attestation data for each token transfer.
-  }
-
   /// @notice Generate an unique hash for an Any2EVMRampMessage.
-  /// @dev This is similiar to how messageId is generated in the OnRamp, but using the Any2EVMRampMessage
+  /// @dev This is similar to how messageId is generated in the OnRamp, but using the Any2EVMRampMessage
   /// type, and OffRamp metadata hash. This gives a unique identifier for the message that can be derived
   /// in both the On/OffRampOverSuperchainInterop.
   /// @param message The interop message to hash.

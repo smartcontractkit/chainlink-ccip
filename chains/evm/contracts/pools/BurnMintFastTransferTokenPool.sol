@@ -43,6 +43,8 @@ contract BurnMintFastTransferTokenPool is FastTransferTokenPoolAbstract {
     IBurnMintERC20(address(i_token)).mint(receiver, amount);
   }
 
+  /// @notice Returns the accumulated pool fees
+  /// @return The total accumulated pool fees, which is the balance of the token in the pool contract.
   function getAccumulatedPoolFees() public view override returns (uint256) {
     return getToken().balanceOf(address(this));
   }
