@@ -558,7 +558,7 @@ func TestCctpTpDevnet(t *testing.T) {
 				}, ccip.GenericExtraArgsV2Tag),
 			}
 
-			derivedAccounts, derivedLookupTables, _ := testutils.DeriveSendAccounts(ctx, t, admin, message, chainSelector, client, referenceAddresses.Router)
+			derivedAccounts, derivedLookupTables, tokenIndexes := testutils.DeriveSendAccounts(ctx, t, admin, message, chainSelector, client, referenceAddresses.Router)
 
 			fmt.Printf("Derived Accounts: %d\n", len(derivedAccounts))
 			for i, acc := range derivedAccounts {
@@ -568,7 +568,7 @@ func TestCctpTpDevnet(t *testing.T) {
 			builder := ccip_router.NewCcipSendInstructionBuilder().
 				SetDestChainSelector(chainSelector).
 				SetMessage(message).
-				SetTokenIndexes([]byte{0}) // TODO read from derivation result
+				SetTokenIndexes(tokenIndexes)
 			builder.AccountMetaSlice = derivedAccounts
 			ix, err := builder.ValidateAndBuild()
 			require.NoError(t, err)
