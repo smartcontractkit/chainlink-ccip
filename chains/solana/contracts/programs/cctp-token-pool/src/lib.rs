@@ -40,6 +40,7 @@ pub mod cctp_token_pool {
                 rmn_remote,
             ),
             fund_manager: Pubkey::default(),
+            fund_reclaim_destination: Pubkey::default(),
         });
 
         Ok(())
@@ -73,6 +74,14 @@ pub mod cctp_token_pool {
 
     pub fn set_fund_manager(ctx: Context<SetConfig>, fund_manager: Pubkey) -> Result<()> {
         ctx.accounts.state.fund_manager = fund_manager;
+        Ok(())
+    }
+
+    pub fn set_fund_reclaim_destination(
+        ctx: Context<SetConfig>,
+        fund_reclaim_destination: Pubkey,
+    ) -> Result<()> {
+        ctx.accounts.state.fund_reclaim_destination = fund_reclaim_destination;
         Ok(())
     }
 
@@ -369,6 +378,30 @@ pub mod cctp_token_pool {
         ];
 
         invoke_signed(&instruction, &acc_infos, &[signer_seeds])?;
+
+        Ok(())
+    }
+
+    /// Returns an amount of SOL from the pool signer account to the designated
+    /// fund reclaimer. There are three entities involved:
+    ///
+    /// * `owner`: can configure the reclaimer and fund manager.
+    /// * `fund_manager`: can execute this instruction.
+    /// * `fund_reclaim_destination`: receives the funds.
+    pub fn reclaim_funds(ctx: Context<ReclaimFunds>, amount: u64) -> Result<()> {
+        require!(amount > 0, CctpTokenPoolError::InvalidSolAmount);
+
+        let pool_signer_lamports = ctx.accounts.pool_signer.lamports();
+        require!(
+            pool_signer_lamports >= amount,
+            CctpTokenPoolError::InsufficientFunds
+        );
+
+        **ctx.accounts.pool_signer.try_borrow_mut_lamports()? -= amount;
+        **ctx
+            .accounts
+            .fund_reclaim_destination
+            .try_borrow_mut_lamports()? += amount;
 
         Ok(())
     }
@@ -702,6 +735,8 @@ pub struct State {
     // Authority allowed to reclaim funds (i.e. from closing the CCTP event PDA, or de-funding an
     // overfunded signer PDA.)
     pub fund_manager: Pubkey,
+    // Receiver of funds reclaimed from the signer PDA.
+    pub fund_reclaim_destination: Pubkey,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, InitSpace)]
@@ -760,4 +795,8 @@ pub enum CctpTokenPoolError {
     FailedCctpCpi,
     #[msg("Fund Manager is invalid or misconfigured")]
     InvalidFundManager,
+    #[msg("Insufficient funds")]
+    InsufficientFunds,
+    #[msg("Invalid SOL amount")]
+    InvalidSolAmount,
 }

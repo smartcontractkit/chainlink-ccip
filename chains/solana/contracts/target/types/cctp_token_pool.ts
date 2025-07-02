@@ -160,6 +160,32 @@ export type CctpTokenPool = {
       ]
     },
     {
+      "name": "setFundReclaimDestination",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "fundReclaimDestination",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
       "name": "setRouter",
       "accounts": [
         {
@@ -797,6 +823,53 @@ export type CctpTokenPool = {
       ]
     },
     {
+      "name": "reclaimFunds",
+      "docs": [
+        "Returns an amount of SOL from the pool signer account to the designated",
+        "fund reclaimer. There are three entities involved:",
+        "",
+        "* `owner`: can configure the reclaimer and fund manager.",
+        "* `fund_manager`: can execute this instruction.",
+        "* `fund_reclaim_destination`: receives the funds."
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "poolSigner",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "fundReclaimDestination",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "to be a particular fund reclaimer"
+          ]
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "deriveAccountsReleaseOrMintTokens",
       "accounts": [],
       "args": [
@@ -853,6 +926,10 @@ export type CctpTokenPool = {
           },
           {
             "name": "fundManager",
+            "type": "publicKey"
+          },
+          {
+            "name": "fundReclaimDestination",
             "type": "publicKey"
           }
         ]
@@ -1073,6 +1150,16 @@ export type CctpTokenPool = {
       "code": 12007,
       "name": "InvalidFundManager",
       "msg": "Fund Manager is invalid or misconfigured"
+    },
+    {
+      "code": 12008,
+      "name": "InsufficientFunds",
+      "msg": "Insufficient funds"
+    },
+    {
+      "code": 12009,
+      "name": "InvalidSolAmount",
+      "msg": "Invalid SOL amount"
     }
   ]
 };
@@ -1239,6 +1326,32 @@ export const IDL: CctpTokenPool = {
       ]
     },
     {
+      "name": "setFundReclaimDestination",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "fundReclaimDestination",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
       "name": "setRouter",
       "accounts": [
         {
@@ -1876,6 +1989,53 @@ export const IDL: CctpTokenPool = {
       ]
     },
     {
+      "name": "reclaimFunds",
+      "docs": [
+        "Returns an amount of SOL from the pool signer account to the designated",
+        "fund reclaimer. There are three entities involved:",
+        "",
+        "* `owner`: can configure the reclaimer and fund manager.",
+        "* `fund_manager`: can execute this instruction.",
+        "* `fund_reclaim_destination`: receives the funds."
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "poolSigner",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "fundReclaimDestination",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "to be a particular fund reclaimer"
+          ]
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "deriveAccountsReleaseOrMintTokens",
       "accounts": [],
       "args": [
@@ -1932,6 +2092,10 @@ export const IDL: CctpTokenPool = {
           },
           {
             "name": "fundManager",
+            "type": "publicKey"
+          },
+          {
+            "name": "fundReclaimDestination",
             "type": "publicKey"
           }
         ]
@@ -2152,6 +2316,16 @@ export const IDL: CctpTokenPool = {
       "code": 12007,
       "name": "InvalidFundManager",
       "msg": "Fund Manager is invalid or misconfigured"
+    },
+    {
+      "code": 12008,
+      "name": "InsufficientFunds",
+      "msg": "Insufficient funds"
+    },
+    {
+      "code": 12009,
+      "name": "InvalidSolAmount",
+      "msg": "Invalid SOL amount"
     }
   ]
 };

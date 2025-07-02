@@ -736,3 +736,38 @@ pub struct ReclaimEventAccount<'info> {
 
     pub system_program: Program<'info, System>,
 }
+
+#[derive(Accounts)]
+#[instruction(amount: u64)]
+pub struct ReclaimFunds<'info> {
+    #[account(
+        seeds = [
+            POOL_STATE_SEED,
+            mint.key().as_ref()
+        ],
+        bump,
+    )]
+    pub state: Account<'info, State>,
+
+    pub mint: InterfaceAccount<'info, Mint>,
+
+    /// CHECK: CPI signer for SOL recovery, validated by seeds constraint
+    #[account(
+        mut,
+        seeds = [POOL_SIGNER_SEED, mint.key().as_ref()],
+        address = state.config.pool_signer,
+        bump,
+    )]
+    pub pool_signer: UncheckedAccount<'info>,
+
+    /// CHECK: Destination account to receive SOL. Preconfigured by the owner
+    /// to be a particular fund reclaimer
+    #[account(
+        mut,
+        address = state.fund_reclaim_destination
+    )]
+    pub fund_reclaim_destination: UncheckedAccount<'info>,
+
+    #[account(mut, constraint = authority.key() == state.fund_manager @ CctpTokenPoolError::InvalidFundManager)]
+    pub authority: Signer<'info>,
+}
