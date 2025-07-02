@@ -431,6 +431,7 @@ pub struct CcipSend<'info> {
     // pool signer
     // token program
     // token mint
+    // fee token config
     // ccip_router_pools_signer - derivable PDA [seed::EXTERNAL_TOKEN_POOL, pool_program]
     // ...additional accounts for pool config
     // ] x N tokens

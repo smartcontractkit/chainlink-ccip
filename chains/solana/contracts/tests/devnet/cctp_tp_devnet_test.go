@@ -302,8 +302,8 @@ func TestCctpTpDevnet(t *testing.T) {
 				MinFeeUsdcents:    0,
 				MaxFeeUsdcents:    1, // TODO, placeholder value
 				DeciBps:           0,
-				DestGasOverhead:   1000, // TODO, placeholder value
-				DestBytesOverhead: 68,   // 64 bytes for the message + 4 bytes for the length (vec prefix)
+				DestGasOverhead:   700000, // TODO, placeholder value
+				DestBytesOverhead: 68,     // 64 bytes for the message + 4 bytes for the length (vec prefix)
 				IsEnabled:         true,
 			},
 			fqConfigPDA,
@@ -553,12 +553,12 @@ func TestCctpTpDevnet(t *testing.T) {
 				},
 				FeeToken: solana.PublicKey{},
 				ExtraArgs: testutils.MustSerializeExtraArgs(t, fee_quoter.GenericExtraArgsV2{
-					GasLimit:                 bin.Uint128{Lo: 1000000, Hi: 0}, // TODO, placeholder value
+					GasLimit:                 bin.Uint128{Lo: 500000, Hi: 0}, // TODO, placeholder value
 					AllowOutOfOrderExecution: true,
 				}, ccip.GenericExtraArgsV2Tag),
 			}
 
-			derivedAccounts, derivedLookupTables, tokenIndices := testutils.DeriveSendAccounts(ctx, t, admin, message, chainSelector, client, referenceAddresses.Router)
+			derivedAccounts, derivedLookupTables, _ := testutils.DeriveSendAccounts(ctx, t, admin, message, chainSelector, client, referenceAddresses.Router)
 
 			fmt.Printf("Derived Accounts: %d\n", len(derivedAccounts))
 			for i, acc := range derivedAccounts {
@@ -568,7 +568,7 @@ func TestCctpTpDevnet(t *testing.T) {
 			builder := ccip_router.NewCcipSendInstructionBuilder().
 				SetDestChainSelector(chainSelector).
 				SetMessage(message).
-				SetTokenIndexes(tokenIndices)
+				SetTokenIndexes([]byte{0}) // TODO read from derivation result
 			builder.AccountMetaSlice = derivedAccounts
 			ix, err := builder.ValidateAndBuild()
 			require.NoError(t, err)

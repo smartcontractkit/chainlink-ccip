@@ -52,12 +52,12 @@ func DeriveSendAccounts(
 		require.NoError(t, err)
 		tx := SimulateTransaction(ctx, t, solanaGoClient, []solana.Instruction{derive}, authority)
 		derivation, err := common.ExtractAnchorTypedReturnValue[ccip_router.DeriveAccountsResponse](ctx, tx.Value.Logs, router.String())
-		// if err != nil {
-		// 	fmt.Printf("Error deriving accounts for stage %s: %v\n", stage, err)
-		for _, line := range tx.Value.Logs {
-			fmt.Println(line)
+		if err != nil {
+			fmt.Printf("Error deriving accounts for stage %s: %v\n", stage, err)
+			for _, line := range tx.Value.Logs {
+				fmt.Println(line)
+			}
 		}
-		// }
 		require.NoError(t, err)
 		fmt.Printf("Derive stage: %s. Len: %d\n", derivation.CurrentStage, len(derivation.AccountsToSave))
 

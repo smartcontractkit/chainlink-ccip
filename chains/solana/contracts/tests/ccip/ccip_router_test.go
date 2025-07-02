@@ -191,6 +191,13 @@ func TestCCIPRouter(t *testing.T) {
 	var ccipSendLookupTable map[solana.PublicKey]solana.PublicKeySlice
 	var offrampLookupTable map[solana.PublicKey]solana.PublicKeySlice
 
+	// Using 0 as a cctpDomain because we're only partially configuring the pool for this test suite,
+	// so it contains the default.
+	cctpDomain := uint32(0)
+
+	messageTransmitter := cctp.GetMessageTransmitterPDAs(t)
+	tokenMessengerMinter := cctp.GetTokenMessengerMinterPDAs(t, cctpDomain, usdcMintPrivK.PublicKey())
+
 	t.Run("setup", func(t *testing.T) {
 		t.Run("funding", func(t *testing.T) {
 			testutils.FundAccounts(ctx, append(
@@ -670,6 +677,19 @@ func TestCCIPRouter(t *testing.T) {
 				usdcPool.User[usdcPool.PoolSigner] = usdcPool.PoolTokenAccount
 
 				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ixAccept, ixAta}, usdcPoolAdmin, config.DefaultCommitment)
+
+				usdcPool.AdditionalAccounts = append(usdcPool.AdditionalAccounts,
+					tokenMessengerMinter.AuthorityPda,
+					messageTransmitter.MessageTransmitter, // 11 - writable
+					tokenMessengerMinter.TokenMessenger,
+					tokenMessengerMinter.TokenMinter,
+					tokenMessengerMinter.LocalToken, // 14 - writable
+					config.CctpMessageTransmitter,
+					config.CctpTokenMessengerMinter,
+					solana.SystemProgramID,
+					tokenMessengerMinter.EventAuthority,
+				) // add test additional accounts in pool interactions
+				usdcPool.WritableIndexes = append(usdcPool.WritableIndexes, 11, 14)
 
 				// Lookup Table for Tokens
 				require.NoError(t, usdcPool.SetupLookupTable(ctx, solanaGoClient, usdcPoolAdmin))
@@ -5555,20 +5575,15 @@ func TestCCIPRouter(t *testing.T) {
 				ExtraArgs: emptyGenericExtraArgsV2,
 			}
 
-			// Using 0 as a domain because we're only partially configuring the pool for this test suite,
-			// so it contains the default.
-			domain := uint32(0)
-
-			messageTransmitter := cctp.GetMessageTransmitterPDAs(t)
-			tokenMessengerMinter := cctp.GetTokenMessengerMinterPDAs(t, domain, usdcPool.Mint)
-			// NOTE: This is sensitive to test order. If it's wrong, it will cause account 41 to mismatch.
-			nonce := uint64(14)
+			var nonces ccip_router.Nonce
+			require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, nonceEvmPDA, rpc.CommitmentFinalized, &nonces)) // read finalized, not just confirmed, as that is what the derivation will use
+			fmt.Printf("Current nonces: %+v from PDA %s\n", nonces, nonceEvmPDA)
 
 			messageSendEvent, _, _ := solana.FindProgramAddress([][]byte{
 				[]byte("ccip_cctp_message_sent_event"),
 				user.PublicKey().Bytes(),
 				common.Uint64ToLE(config.EvmChainSelector),
-				common.Uint64ToLE(nonce),
+				common.Uint64ToLE(nonces.TotalNonce + 1), // +1 as it will be incremented during the ccip_send
 			},
 				config.CctpTokenPoolProgram)
 
