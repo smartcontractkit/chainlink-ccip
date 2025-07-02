@@ -14,35 +14,35 @@ contract MockCrossL2Inbox is ICrossL2Inbox {
   }
 
   ValidateMessageCall[] public s_validateMessageCalls;
-  mapping(bytes32 => mapping(bytes32 => bool)) public s_validationSuccesses;
-  mapping(bytes32 => mapping(bytes32 => string)) public s_validationErrors;
+  mapping(bytes32 identifierHash => mapping(bytes32 msgHash => bool success)) public s_validationSuccesses;
+  mapping(bytes32 identifierHash => mapping(bytes32 msgHash => string revertMessage)) public s_validationErrors;
 
-  function validateMessage(Identifier calldata _id, bytes32 _msgHash) external {
-    s_validateMessageCalls.push(ValidateMessageCall({identifier: _id, msgHash: _msgHash}));
+  function validateMessage(Identifier calldata identifier, bytes32 msgHash) external {
+    s_validateMessageCalls.push(ValidateMessageCall({identifier: identifier, msgHash: msgHash}));
 
-    bytes32 idHash = keccak256(abi.encode(_id));
+    bytes32 idHash = keccak256(abi.encode(identifier));
 
     // Check if there's a specific error set for this identifier and msgHash
-    if (bytes(s_validationErrors[idHash][_msgHash]).length > 0) {
-      revert ValidationFailed(s_validationErrors[idHash][_msgHash]);
+    if (bytes(s_validationErrors[idHash][msgHash]).length > 0) {
+      revert ValidationFailed(s_validationErrors[idHash][msgHash]);
     }
 
     // Check if there's a specific success result
-    if (s_validationSuccesses[idHash][_msgHash]) {
+    if (s_validationSuccesses[idHash][msgHash]) {
       return;
     }
 
-    revert UnexpectedCall(idHash, _msgHash);
+    revert UnexpectedCall(idHash, msgHash);
   }
 
-  function setValidationSuccess(Identifier memory _id, bytes32 _msgHash) external {
-    bytes32 idHash = keccak256(abi.encode(_id));
-    s_validationSuccesses[idHash][_msgHash] = true;
+  function setValidationSuccess(Identifier memory identifier, bytes32 msgHash) external {
+    bytes32 idHash = keccak256(abi.encode(identifier));
+    s_validationSuccesses[idHash][msgHash] = true;
   }
 
-  function setValidationError(Identifier memory _id, bytes32 _msgHash, string memory _error) external {
-    bytes32 idHash = keccak256(abi.encode(_id));
-    s_validationErrors[idHash][_msgHash] = _error;
+  function setValidationError(Identifier memory identifier, bytes32 msgHash, string memory revertMessage) external {
+    bytes32 idHash = keccak256(abi.encode(identifier));
+    s_validationErrors[idHash][msgHash] = revertMessage;
   }
 
   function getValidateMessageCallCount() external view returns (uint256) {
@@ -59,7 +59,7 @@ contract MockCrossL2Inbox is ICrossL2Inbox {
     delete s_validateMessageCalls;
   }
 
-  function calculateChecksum(Identifier memory _id, bytes32 _msgHash) external pure returns (bytes32 checksum_) {
-    return keccak256(abi.encode(_id, _msgHash));
+  function calculateChecksum(Identifier memory identifier, bytes32 msgHash) external pure returns (bytes32 checksum_) {
+    return keccak256(abi.encode(identifier, msgHash));
   }
 }

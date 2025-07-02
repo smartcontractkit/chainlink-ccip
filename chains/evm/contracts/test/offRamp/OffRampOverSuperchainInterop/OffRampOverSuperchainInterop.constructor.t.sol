@@ -54,6 +54,7 @@ contract OffRampOverSuperchainInterop_constructor is OffRampOverSuperchainIntero
     assertEq(address(staticConfig.rmnRemote), address(retrievedStaticConfig.rmnRemote));
     assertEq(staticConfig.tokenAdminRegistry, retrievedStaticConfig.tokenAdminRegistry);
     assertEq(staticConfig.nonceManager, retrievedStaticConfig.nonceManager);
+    assertEq("OffRampOverSuperchainInterop 1.6.1-dev", offRamp.typeAndVersion());
 
     // Verify dynamic config
     OffRamp.DynamicConfig memory retrievedDynamicConfig = offRamp.getDynamicConfig();
