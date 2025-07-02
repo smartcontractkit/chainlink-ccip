@@ -43,6 +43,8 @@ var (
 
 	Instruction_AcceptOwnership = ag_binary.TypeID([8]byte{172, 23, 43, 13, 238, 213, 85, 150})
 
+	Instruction_SetFundManager = ag_binary.TypeID([8]byte{120, 5, 18, 143, 165, 103, 181, 139})
+
 	Instruction_SetRouter = ag_binary.TypeID([8]byte{236, 248, 107, 200, 151, 160, 44, 250})
 
 	Instruction_InitChainRemoteConfig = ag_binary.TypeID([8]byte{21, 150, 133, 36, 2, 116, 199, 129})
@@ -85,6 +87,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "TransferOwnership"
 	case Instruction_AcceptOwnership:
 		return "AcceptOwnership"
+	case Instruction_SetFundManager:
+		return "SetFundManager"
 	case Instruction_SetRouter:
 		return "SetRouter"
 	case Instruction_InitChainRemoteConfig:
@@ -147,6 +151,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"accept_ownership", (*AcceptOwnership)(nil),
+		},
+		{
+			"set_fund_manager", (*SetFundManager)(nil),
 		},
 		{
 			"set_router", (*SetRouter)(nil),

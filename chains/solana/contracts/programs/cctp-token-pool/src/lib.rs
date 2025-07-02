@@ -39,6 +39,7 @@ pub mod cctp_token_pool {
                 router,
                 rmn_remote,
             ),
+            fund_manager: Pubkey::default(),
         });
 
         Ok(())
@@ -68,6 +69,11 @@ pub mod cctp_token_pool {
     // shared func signature with other programs
     pub fn accept_ownership(ctx: Context<AcceptOwnership>) -> Result<()> {
         ctx.accounts.state.config.accept_ownership()
+    }
+
+    pub fn set_fund_manager(ctx: Context<SetConfig>, fund_manager: Pubkey) -> Result<()> {
+        ctx.accounts.state.fund_manager = fund_manager;
+        Ok(())
     }
 
     // set_router changes the expected signers for mint/release + burn/lock method calls
@@ -693,6 +699,9 @@ impl CctpMessage {
 pub struct State {
     pub version: u8,
     pub config: BaseConfig,
+    // Authority allowed to reclaim funds (i.e. from closing the CCTP event PDA, or de-funding an
+    // overfunded signer PDA.)
+    pub fund_manager: Pubkey,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, InitSpace)]
@@ -749,4 +758,6 @@ pub enum CctpTokenPoolError {
     InvalidMessageSentEventAccount,
     #[msg("Failed CCTP CPI")]
     FailedCctpCpi,
+    #[msg("Fund Manager is invalid or misconfigured")]
+    InvalidFundManager,
 }

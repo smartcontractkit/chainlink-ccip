@@ -134,6 +134,32 @@ export type CctpTokenPool = {
       "args": []
     },
     {
+      "name": "setFundManager",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "fundManager",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
       "name": "setRouter",
       "accounts": [
         {
@@ -824,6 +850,10 @@ export type CctpTokenPool = {
             "type": {
               "defined": "BaseConfig"
             }
+          },
+          {
+            "name": "fundManager",
+            "type": "publicKey"
           }
         ]
       }
@@ -1038,6 +1068,11 @@ export type CctpTokenPool = {
       "code": 12006,
       "name": "FailedCctpCpi",
       "msg": "Failed CCTP CPI"
+    },
+    {
+      "code": 12007,
+      "name": "InvalidFundManager",
+      "msg": "Fund Manager is invalid or misconfigured"
     }
   ]
 };
@@ -1178,6 +1213,32 @@ export const IDL: CctpTokenPool = {
       "args": []
     },
     {
+      "name": "setFundManager",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "fundManager",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
       "name": "setRouter",
       "accounts": [
         {
@@ -1868,6 +1929,10 @@ export const IDL: CctpTokenPool = {
             "type": {
               "defined": "BaseConfig"
             }
+          },
+          {
+            "name": "fundManager",
+            "type": "publicKey"
           }
         ]
       }
@@ -2082,6 +2147,11 @@ export const IDL: CctpTokenPool = {
       "code": 12006,
       "name": "FailedCctpCpi",
       "msg": "Failed CCTP CPI"
+    },
+    {
+      "code": 12007,
+      "name": "InvalidFundManager",
+      "msg": "Fund Manager is invalid or misconfigured"
     }
   ]
 };

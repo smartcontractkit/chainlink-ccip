@@ -382,7 +382,7 @@ pub struct TokenOnramp<'info> {
         seeds = [POOL_STATE_SEED, mint.key().as_ref()],
         bump,
     )]
-    pub state: Account<'info, State>,
+    pub state: Box<Account<'info, State>>,
 
     pub token_program: Interface<'info, TokenInterface>,
 
@@ -731,7 +731,7 @@ pub struct ReclaimEventAccount<'info> {
     #[account(address = MESSAGE_TRANSMITTER)]
     pub cctp_message_transmitter: UncheckedAccount<'info>,
 
-    #[account(mut, constraint = authority.key() == state.config.owner)]
+    #[account(mut, constraint = authority.key() == state.fund_manager @ CctpTokenPoolError::InvalidFundManager)]
     pub authority: Signer<'info>,
 
     pub system_program: Program<'info, System>,

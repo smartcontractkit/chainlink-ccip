@@ -1720,7 +1720,14 @@ func TestTokenPool(t *testing.T) {
 				ix, err := reclaimIx.ValidateAndBuild()
 				require.NoError(t, err)
 
-				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+				// There's no fund manager, so funds cannot be reclaimed
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment, []string{"Fund Manager is invalid"})
+
+				fundManagerIxRaw := cctp_token_pool.NewSetFundManagerInstruction(admin.PublicKey(), cctpPool.State, usdcMint, admin.PublicKey())
+				fundManagerIx, err := fundManagerIxRaw.ValidateAndBuild()
+				require.NoError(t, err)
+
+				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{fundManagerIx, ix}, admin, config.DefaultCommitment)
 
 				poolSignerInfoAfter, err := solanaGoClient.GetAccountInfoWithOpts(ctx, cctpPool.Signer, &rpc.GetAccountInfoOpts{Commitment: config.DefaultCommitment})
 				require.NoError(t, err)
