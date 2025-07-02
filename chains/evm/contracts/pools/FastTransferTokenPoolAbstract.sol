@@ -142,7 +142,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     if (quote.fastTransferFee > maxFastTransferFee) {
       revert QuoteFeeExceedsUserMaxLimit(quote.fastTransferFee, maxFastTransferFee);
     }
-    _handleFastTransferLockOrBurn(msg.sender, amount);
+    _handleFastTransferLockOrBurn(destinationChainSelector, msg.sender, amount);
 
     // If the user is not paying in native, we need to transfer the fee token to the contract.
     if (settlementFeeToken != address(0)) {
@@ -309,7 +309,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   // @inheritdoc CCIPReceiver
   function _ccipReceive(
     Client.Any2EVMMessage memory message
-  ) internal virtual override onlyRouter {
+  ) internal virtual override {
     _settle(message.sourceChainSelector, message.messageId, message.sender, abi.decode(message.data, (MintMessage)));
   }
 
@@ -352,10 +352,12 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
       // Set the local pool fee to zero, as fees are only applied for fast-fill operations
       localPoolFee = 0;
       // When no filler is involved, we send the entire amount to the receiver.
-      _handleSlowFill(fillId, localAmount, abi.decode(mintMessage.receiver, (address)));
+      _handleSlowFill(fillId, sourceChainSelector, localAmount, abi.decode(mintMessage.receiver, (address)));
     } else if (fillInfo.state == IFastTransferPool.FillState.FILLED) {
       fillerReimbursementAmount = localAmount - localPoolFee;
-      _handleFastFillReimbursement(fillId, fillInfo.filler, fillerReimbursementAmount, localPoolFee);
+      _handleFastFillReimbursement(
+        fillId, sourceChainSelector, fillInfo.filler, fillerReimbursementAmount, localPoolFee
+      );
     } else {
       // The catch all assertion for already settled fills ensures that any wrong value will revert.
       revert AlreadySettled(fillId);
@@ -390,9 +392,11 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   // ================================================================
 
   /// @notice Handles the token to transfer on fast fill request at source chain.
+  /// @dev The first param is the chainSelector. It's unused in this implementation, but kept to allow overriding this function
+  /// to handle the transfer in a different way.
   /// @param sender The sender address.
   /// @param amount The amount to transfer.
-  function _handleFastTransferLockOrBurn(address sender, uint256 amount) internal virtual {
+  function _handleFastTransferLockOrBurn(uint64, address sender, uint256 amount) internal virtual {
     // Since this is a fast transfer, the Router doesn't forward the tokens to the pool.
     getToken().safeTransferFrom(sender, address(this), amount);
     // Use the normal burn logic once the tokens are in the pool.
@@ -410,11 +414,12 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   }
 
   /// @notice Handles settlement when the request was not fast-filled
-  /// @dev The first param is the fillId. It's unused in this implementation, but kept to allow overriding this function
-  /// to handle the slow fill in a different way.
+  /// @dev The first two parameters, `fillId` and `chainSelector`, are unused in this implementation.
+  /// They are included to allow derived contracts to override this function and implement custom logic
+  /// for handling slow fills.
   /// @param localSettlementAmount The amount to settle in local token
   /// @param receiver The receiver address
-  function _handleSlowFill(bytes32, uint256 localSettlementAmount, address receiver) internal virtual {
+  function _handleSlowFill(bytes32, uint64, uint256 localSettlementAmount, address receiver) internal virtual {
     _releaseOrMint(receiver, localSettlementAmount);
   }
 
@@ -434,6 +439,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   /// @param poolReimbursementAmount The amount to reimburse to the pool (the pool fee).
   function _handleFastFillReimbursement(
     bytes32,
+    uint64,
     address filler,
     uint256 fillerReimbursementAmount,
     uint256 poolReimbursementAmount
