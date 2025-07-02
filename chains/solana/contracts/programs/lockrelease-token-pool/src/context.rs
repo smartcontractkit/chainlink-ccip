@@ -91,6 +91,26 @@ pub struct InitializeTokenPool<'info> {
 }
 
 #[derive(Accounts)]
+pub struct AdminUpdateTokenPool<'info> {
+    #[account(
+        seeds = [POOL_STATE_SEED, mint.key().as_ref()],
+        bump,
+    )]
+    pub state: Account<'info, State>, // config PDA for token pool
+    pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
+
+    #[account(mut)]
+    pub authority: Signer<'info>,
+
+    #[account(constraint = program.programdata_address()? == Some(program_data.key()))]
+    pub program: Program<'info, LockreleaseTokenPool>,
+
+    // The upgrade authority of the token pool program can update certain values of their token pools only (router and rmn addresses for testing)
+    #[account(constraint = allowed_admin_modify_token_pool(&program_data, &authority, &state) @ CcipTokenPoolError::Unauthorized)]
+    pub program_data: Account<'info, ProgramData>,
+}
+
+#[derive(Accounts)]
 pub struct Empty<'info> {
     // This is unused, but Anchor requires that there is at least one account in the context
     pub clock: Sysvar<'info, Clock>,
@@ -457,6 +477,10 @@ pub struct RebalancerTokenTransfer<'info> {
 pub struct PoolConfig {
     pub version: u8,
     pub self_served_allowed: bool,
+
+    // Default adress values for the token pool
+    pub router: Pubkey,
+    pub rmn_remote: Pubkey,
 }
 
 /// Checks if the given authority is allowed to initialize the token pool.
@@ -469,4 +493,14 @@ pub fn allowed_to_initialize_token_pool(
     program_data.upgrade_authority_address == Some(authority.key()) || // The upgrade authority of the token pool program can initialize a token pool
     (config.self_served_allowed && Some(authority.key()) == mint.mint_authority.into() )
     // or the mint authority of the token (when self-serve is allowed)
+}
+
+/// Checks that the authority and the token pool owner are the upgrade authority
+pub fn allowed_admin_modify_token_pool(
+    program_data: &Account<ProgramData>,
+    authority: &Signer,
+    state: &Account<State>,
+) -> bool {
+    program_data.upgrade_authority_address == Some(authority.key()) && // Only the upgrade authority of the token pool program can modify certain values of a given token pool
+    state.config.owner == authority.key() // if only if the token pool is owned by the upgrade authority
 }

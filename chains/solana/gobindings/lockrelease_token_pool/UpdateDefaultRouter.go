@@ -10,9 +10,9 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// UpdateGlobalConfig is the `updateGlobalConfig` instruction.
-type UpdateGlobalConfig struct {
-	SelfServedAllowed *bool
+// UpdateDefaultRouter is the `updateDefaultRouter` instruction.
+type UpdateDefaultRouter struct {
+	RouterAddress *ag_solanago.PublicKey
 
 	// [0] = [WRITE] config
 	//
@@ -24,86 +24,86 @@ type UpdateGlobalConfig struct {
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
-// NewUpdateGlobalConfigInstructionBuilder creates a new `UpdateGlobalConfig` instruction builder.
-func NewUpdateGlobalConfigInstructionBuilder() *UpdateGlobalConfig {
-	nd := &UpdateGlobalConfig{
+// NewUpdateDefaultRouterInstructionBuilder creates a new `UpdateDefaultRouter` instruction builder.
+func NewUpdateDefaultRouterInstructionBuilder() *UpdateDefaultRouter {
+	nd := &UpdateDefaultRouter{
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 4),
 	}
 	return nd
 }
 
-// SetSelfServedAllowed sets the "selfServedAllowed" parameter.
-func (inst *UpdateGlobalConfig) SetSelfServedAllowed(selfServedAllowed bool) *UpdateGlobalConfig {
-	inst.SelfServedAllowed = &selfServedAllowed
+// SetRouterAddress sets the "routerAddress" parameter.
+func (inst *UpdateDefaultRouter) SetRouterAddress(routerAddress ag_solanago.PublicKey) *UpdateDefaultRouter {
+	inst.RouterAddress = &routerAddress
 	return inst
 }
 
 // SetConfigAccount sets the "config" account.
-func (inst *UpdateGlobalConfig) SetConfigAccount(config ag_solanago.PublicKey) *UpdateGlobalConfig {
+func (inst *UpdateDefaultRouter) SetConfigAccount(config ag_solanago.PublicKey) *UpdateDefaultRouter {
 	inst.AccountMetaSlice[0] = ag_solanago.Meta(config).WRITE()
 	return inst
 }
 
 // GetConfigAccount gets the "config" account.
-func (inst *UpdateGlobalConfig) GetConfigAccount() *ag_solanago.AccountMeta {
+func (inst *UpdateDefaultRouter) GetConfigAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
 // SetAuthorityAccount sets the "authority" account.
-func (inst *UpdateGlobalConfig) SetAuthorityAccount(authority ag_solanago.PublicKey) *UpdateGlobalConfig {
+func (inst *UpdateDefaultRouter) SetAuthorityAccount(authority ag_solanago.PublicKey) *UpdateDefaultRouter {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(authority).SIGNER()
 	return inst
 }
 
 // GetAuthorityAccount gets the "authority" account.
-func (inst *UpdateGlobalConfig) GetAuthorityAccount() *ag_solanago.AccountMeta {
+func (inst *UpdateDefaultRouter) GetAuthorityAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[1]
 }
 
 // SetProgramAccount sets the "program" account.
-func (inst *UpdateGlobalConfig) SetProgramAccount(program ag_solanago.PublicKey) *UpdateGlobalConfig {
+func (inst *UpdateDefaultRouter) SetProgramAccount(program ag_solanago.PublicKey) *UpdateDefaultRouter {
 	inst.AccountMetaSlice[2] = ag_solanago.Meta(program)
 	return inst
 }
 
 // GetProgramAccount gets the "program" account.
-func (inst *UpdateGlobalConfig) GetProgramAccount() *ag_solanago.AccountMeta {
+func (inst *UpdateDefaultRouter) GetProgramAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[2]
 }
 
 // SetProgramDataAccount sets the "programData" account.
-func (inst *UpdateGlobalConfig) SetProgramDataAccount(programData ag_solanago.PublicKey) *UpdateGlobalConfig {
+func (inst *UpdateDefaultRouter) SetProgramDataAccount(programData ag_solanago.PublicKey) *UpdateDefaultRouter {
 	inst.AccountMetaSlice[3] = ag_solanago.Meta(programData)
 	return inst
 }
 
 // GetProgramDataAccount gets the "programData" account.
-func (inst *UpdateGlobalConfig) GetProgramDataAccount() *ag_solanago.AccountMeta {
+func (inst *UpdateDefaultRouter) GetProgramDataAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[3]
 }
 
-func (inst UpdateGlobalConfig) Build() *Instruction {
+func (inst UpdateDefaultRouter) Build() *Instruction {
 	return &Instruction{BaseVariant: ag_binary.BaseVariant{
 		Impl:   inst,
-		TypeID: Instruction_UpdateGlobalConfig,
+		TypeID: Instruction_UpdateDefaultRouter,
 	}}
 }
 
 // ValidateAndBuild validates the instruction parameters and accounts;
 // if there is a validation error, it returns the error.
 // Otherwise, it builds and returns the instruction.
-func (inst UpdateGlobalConfig) ValidateAndBuild() (*Instruction, error) {
+func (inst UpdateDefaultRouter) ValidateAndBuild() (*Instruction, error) {
 	if err := inst.Validate(); err != nil {
 		return nil, err
 	}
 	return inst.Build(), nil
 }
 
-func (inst *UpdateGlobalConfig) Validate() error {
+func (inst *UpdateDefaultRouter) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
-		if inst.SelfServedAllowed == nil {
-			return errors.New("SelfServedAllowed parameter is not set")
+		if inst.RouterAddress == nil {
+			return errors.New("RouterAddress parameter is not set")
 		}
 	}
 
@@ -125,17 +125,17 @@ func (inst *UpdateGlobalConfig) Validate() error {
 	return nil
 }
 
-func (inst *UpdateGlobalConfig) EncodeToTree(parent ag_treeout.Branches) {
+func (inst *UpdateDefaultRouter) EncodeToTree(parent ag_treeout.Branches) {
 	parent.Child(ag_format.Program(ProgramName, ProgramID)).
 		//
 		ParentFunc(func(programBranch ag_treeout.Branches) {
-			programBranch.Child(ag_format.Instruction("UpdateGlobalConfig")).
+			programBranch.Child(ag_format.Instruction("UpdateDefaultRouter")).
 				//
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("SelfServedAllowed", *inst.SelfServedAllowed))
+						paramsBranch.Child(ag_format.Param("RouterAddress", *inst.RouterAddress))
 					})
 
 					// Accounts of the instruction:
@@ -149,34 +149,34 @@ func (inst *UpdateGlobalConfig) EncodeToTree(parent ag_treeout.Branches) {
 		})
 }
 
-func (obj UpdateGlobalConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `SelfServedAllowed` param:
-	err = encoder.Encode(obj.SelfServedAllowed)
+func (obj UpdateDefaultRouter) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `RouterAddress` param:
+	err = encoder.Encode(obj.RouterAddress)
 	if err != nil {
 		return err
 	}
 	return nil
 }
-func (obj *UpdateGlobalConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `SelfServedAllowed`:
-	err = decoder.Decode(&obj.SelfServedAllowed)
+func (obj *UpdateDefaultRouter) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `RouterAddress`:
+	err = decoder.Decode(&obj.RouterAddress)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-// NewUpdateGlobalConfigInstruction declares a new UpdateGlobalConfig instruction with the provided parameters and accounts.
-func NewUpdateGlobalConfigInstruction(
+// NewUpdateDefaultRouterInstruction declares a new UpdateDefaultRouter instruction with the provided parameters and accounts.
+func NewUpdateDefaultRouterInstruction(
 	// Parameters:
-	selfServedAllowed bool,
+	routerAddress ag_solanago.PublicKey,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
 	program ag_solanago.PublicKey,
-	programData ag_solanago.PublicKey) *UpdateGlobalConfig {
-	return NewUpdateGlobalConfigInstructionBuilder().
-		SetSelfServedAllowed(selfServedAllowed).
+	programData ag_solanago.PublicKey) *UpdateDefaultRouter {
+	return NewUpdateDefaultRouterInstructionBuilder().
+		SetRouterAddress(routerAddress).
 		SetConfigAccount(config).
 		SetAuthorityAccount(authority).
 		SetProgramAccount(program).

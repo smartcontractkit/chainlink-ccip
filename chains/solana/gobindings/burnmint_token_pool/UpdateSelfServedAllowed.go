@@ -10,8 +10,8 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// UpdateGlobalConfig is the `updateGlobalConfig` instruction.
-type UpdateGlobalConfig struct {
+// UpdateSelfServedAllowed is the `updateSelfServedAllowed` instruction.
+type UpdateSelfServedAllowed struct {
 	SelfServedAllowed *bool
 
 	// [0] = [WRITE] config
@@ -24,82 +24,82 @@ type UpdateGlobalConfig struct {
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
-// NewUpdateGlobalConfigInstructionBuilder creates a new `UpdateGlobalConfig` instruction builder.
-func NewUpdateGlobalConfigInstructionBuilder() *UpdateGlobalConfig {
-	nd := &UpdateGlobalConfig{
+// NewUpdateSelfServedAllowedInstructionBuilder creates a new `UpdateSelfServedAllowed` instruction builder.
+func NewUpdateSelfServedAllowedInstructionBuilder() *UpdateSelfServedAllowed {
+	nd := &UpdateSelfServedAllowed{
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 4),
 	}
 	return nd
 }
 
 // SetSelfServedAllowed sets the "selfServedAllowed" parameter.
-func (inst *UpdateGlobalConfig) SetSelfServedAllowed(selfServedAllowed bool) *UpdateGlobalConfig {
+func (inst *UpdateSelfServedAllowed) SetSelfServedAllowed(selfServedAllowed bool) *UpdateSelfServedAllowed {
 	inst.SelfServedAllowed = &selfServedAllowed
 	return inst
 }
 
 // SetConfigAccount sets the "config" account.
-func (inst *UpdateGlobalConfig) SetConfigAccount(config ag_solanago.PublicKey) *UpdateGlobalConfig {
+func (inst *UpdateSelfServedAllowed) SetConfigAccount(config ag_solanago.PublicKey) *UpdateSelfServedAllowed {
 	inst.AccountMetaSlice[0] = ag_solanago.Meta(config).WRITE()
 	return inst
 }
 
 // GetConfigAccount gets the "config" account.
-func (inst *UpdateGlobalConfig) GetConfigAccount() *ag_solanago.AccountMeta {
+func (inst *UpdateSelfServedAllowed) GetConfigAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
 // SetAuthorityAccount sets the "authority" account.
-func (inst *UpdateGlobalConfig) SetAuthorityAccount(authority ag_solanago.PublicKey) *UpdateGlobalConfig {
+func (inst *UpdateSelfServedAllowed) SetAuthorityAccount(authority ag_solanago.PublicKey) *UpdateSelfServedAllowed {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(authority).SIGNER()
 	return inst
 }
 
 // GetAuthorityAccount gets the "authority" account.
-func (inst *UpdateGlobalConfig) GetAuthorityAccount() *ag_solanago.AccountMeta {
+func (inst *UpdateSelfServedAllowed) GetAuthorityAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[1]
 }
 
 // SetProgramAccount sets the "program" account.
-func (inst *UpdateGlobalConfig) SetProgramAccount(program ag_solanago.PublicKey) *UpdateGlobalConfig {
+func (inst *UpdateSelfServedAllowed) SetProgramAccount(program ag_solanago.PublicKey) *UpdateSelfServedAllowed {
 	inst.AccountMetaSlice[2] = ag_solanago.Meta(program)
 	return inst
 }
 
 // GetProgramAccount gets the "program" account.
-func (inst *UpdateGlobalConfig) GetProgramAccount() *ag_solanago.AccountMeta {
+func (inst *UpdateSelfServedAllowed) GetProgramAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[2]
 }
 
 // SetProgramDataAccount sets the "programData" account.
-func (inst *UpdateGlobalConfig) SetProgramDataAccount(programData ag_solanago.PublicKey) *UpdateGlobalConfig {
+func (inst *UpdateSelfServedAllowed) SetProgramDataAccount(programData ag_solanago.PublicKey) *UpdateSelfServedAllowed {
 	inst.AccountMetaSlice[3] = ag_solanago.Meta(programData)
 	return inst
 }
 
 // GetProgramDataAccount gets the "programData" account.
-func (inst *UpdateGlobalConfig) GetProgramDataAccount() *ag_solanago.AccountMeta {
+func (inst *UpdateSelfServedAllowed) GetProgramDataAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[3]
 }
 
-func (inst UpdateGlobalConfig) Build() *Instruction {
+func (inst UpdateSelfServedAllowed) Build() *Instruction {
 	return &Instruction{BaseVariant: ag_binary.BaseVariant{
 		Impl:   inst,
-		TypeID: Instruction_UpdateGlobalConfig,
+		TypeID: Instruction_UpdateSelfServedAllowed,
 	}}
 }
 
 // ValidateAndBuild validates the instruction parameters and accounts;
 // if there is a validation error, it returns the error.
 // Otherwise, it builds and returns the instruction.
-func (inst UpdateGlobalConfig) ValidateAndBuild() (*Instruction, error) {
+func (inst UpdateSelfServedAllowed) ValidateAndBuild() (*Instruction, error) {
 	if err := inst.Validate(); err != nil {
 		return nil, err
 	}
 	return inst.Build(), nil
 }
 
-func (inst *UpdateGlobalConfig) Validate() error {
+func (inst *UpdateSelfServedAllowed) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
 		if inst.SelfServedAllowed == nil {
@@ -125,11 +125,11 @@ func (inst *UpdateGlobalConfig) Validate() error {
 	return nil
 }
 
-func (inst *UpdateGlobalConfig) EncodeToTree(parent ag_treeout.Branches) {
+func (inst *UpdateSelfServedAllowed) EncodeToTree(parent ag_treeout.Branches) {
 	parent.Child(ag_format.Program(ProgramName, ProgramID)).
 		//
 		ParentFunc(func(programBranch ag_treeout.Branches) {
-			programBranch.Child(ag_format.Instruction("UpdateGlobalConfig")).
+			programBranch.Child(ag_format.Instruction("UpdateSelfServedAllowed")).
 				//
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
@@ -149,7 +149,7 @@ func (inst *UpdateGlobalConfig) EncodeToTree(parent ag_treeout.Branches) {
 		})
 }
 
-func (obj UpdateGlobalConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj UpdateSelfServedAllowed) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `SelfServedAllowed` param:
 	err = encoder.Encode(obj.SelfServedAllowed)
 	if err != nil {
@@ -157,7 +157,7 @@ func (obj UpdateGlobalConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (er
 	}
 	return nil
 }
-func (obj *UpdateGlobalConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *UpdateSelfServedAllowed) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `SelfServedAllowed`:
 	err = decoder.Decode(&obj.SelfServedAllowed)
 	if err != nil {
@@ -166,16 +166,16 @@ func (obj *UpdateGlobalConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) 
 	return nil
 }
 
-// NewUpdateGlobalConfigInstruction declares a new UpdateGlobalConfig instruction with the provided parameters and accounts.
-func NewUpdateGlobalConfigInstruction(
+// NewUpdateSelfServedAllowedInstruction declares a new UpdateSelfServedAllowed instruction with the provided parameters and accounts.
+func NewUpdateSelfServedAllowedInstruction(
 	// Parameters:
 	selfServedAllowed bool,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
 	program ag_solanago.PublicKey,
-	programData ag_solanago.PublicKey) *UpdateGlobalConfig {
-	return NewUpdateGlobalConfigInstructionBuilder().
+	programData ag_solanago.PublicKey) *UpdateSelfServedAllowed {
+	return NewUpdateSelfServedAllowedInstructionBuilder().
 		SetSelfServedAllowed(selfServedAllowed).
 		SetConfigAccount(config).
 		SetAuthorityAccount(authority).

@@ -84,6 +84,12 @@ impl BaseConfig {
         let pool_token_account =
             get_associated_token_address_with_program_id(&pool_signer, &mint.key(), &token_program);
 
+        emit!(TokenPoolInitialized {
+            mint: mint.key(),
+            token_program,
+            owner,
+        });
+
         Self {
             token_program,
             mint: mint.key(),
@@ -150,6 +156,25 @@ impl BaseConfig {
             old_router,
             new_router,
         });
+        Ok(())
+    }
+
+    pub fn set_rmn(&mut self, rmn_address: Pubkey) -> Result<()> {
+        require_keys_neq!(
+            rmn_address,
+            Pubkey::default(),
+            CcipTokenPoolError::InvalidInputs
+        );
+
+        let old_rmn = self.rmn_remote;
+        self.rmn_remote = rmn_address;
+
+        emit!(RmnRemoteUpdated {
+            old_rmn_remote: old_rmn,
+            new_rmn_remote: rmn_address,
+            mint: self.mint.key(),
+        });
+
         Ok(())
     }
 
@@ -334,6 +359,8 @@ pub struct ReleaseOrMintOutV1 {
 #[event]
 pub struct GlobalConfigUpdated {
     pub self_served_allowed: bool,
+    pub router: Pubkey,
+    pub rmn_remote: Pubkey,
 }
 
 #[event]
@@ -407,10 +434,24 @@ pub struct RouterUpdated {
 }
 
 #[event]
+pub struct RmnRemoteUpdated {
+    pub old_rmn_remote: Pubkey,
+    pub new_rmn_remote: Pubkey,
+    pub mint: Pubkey,
+}
+
+#[event]
 pub struct OwnershipTransferRequested {
     pub from: Pubkey,
     pub to: Pubkey,
     pub mint: Pubkey,
+}
+
+#[event]
+pub struct TokenPoolInitialized {
+    pub mint: Pubkey,
+    pub token_program: Pubkey,
+    pub owner: Pubkey,
 }
 
 #[event]
