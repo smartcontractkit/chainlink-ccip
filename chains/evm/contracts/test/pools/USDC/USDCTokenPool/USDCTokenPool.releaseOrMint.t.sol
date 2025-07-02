@@ -89,6 +89,77 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
     );
   }
 
+  function test_ReleaseOrMint_PreviousPool() public {
+    address recipient = address(s_usdcTokenPool);
+    uint256 amount = 1e6;
+
+    USDCMessage memory usdcMessage = USDCMessage({
+      version: 0,
+      sourceDomain: SOURCE_DOMAIN_IDENTIFIER,
+      destinationDomain: DEST_DOMAIN_IDENTIFIER,
+      nonce: 0x060606060606,
+      sender: SOURCE_CHAIN_TOKEN_SENDER,
+      recipient: bytes32(uint256(uint160(recipient))),
+      destinationCaller: bytes32(uint256(uint160(address(s_previousPool)))),
+      messageBody: _formatMessage(
+        0,
+        bytes32(uint256(uint160(address(s_USDCToken)))),
+        bytes32(uint256(uint160(recipient))),
+        amount,
+        bytes32(uint256(uint160(OWNER)))
+      )
+    });
+
+    bytes memory message = _generateUSDCMessage(usdcMessage);
+    bytes memory attestation = bytes("attestation bytes");
+
+    Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
+      sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
+      destTokenAddress: abi.encode(address(s_usdcTokenPool)),
+      extraData: abi.encode(
+        USDCTokenPool.SourceTokenDataPayload({nonce: usdcMessage.nonce, sourceDomain: SOURCE_DOMAIN_IDENTIFIER})
+      ),
+      destGasAmount: USDC_DEST_TOKEN_GAS
+    });
+
+    bytes memory offchainTokenData =
+      abi.encode(USDCTokenPool.MessageAndAttestation({message: message, attestation: attestation}));
+
+    // The mocked receiver does not release the token to the pool, so we manually do it here
+    deal(address(s_USDCToken), address(s_usdcTokenPool), amount);
+
+    vm.expectCall(
+      address(s_previousPool),
+      abi.encodeWithSelector(
+        TokenPool.releaseOrMint.selector,
+        Pool.ReleaseOrMintInV1({
+          originalSender: abi.encode(OWNER),
+          receiver: recipient,
+          sourceDenominatedAmount: amount,
+          localToken: address(s_USDCToken),
+          remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+          sourcePoolAddress: sourceTokenData.sourcePoolAddress,
+          sourcePoolData: sourceTokenData.extraData,
+          offchainTokenData: offchainTokenData
+        })
+      )
+    );
+
+    vm.startPrank(s_routerAllowedOffRamp);
+    s_usdcTokenPool.releaseOrMint(
+      Pool.ReleaseOrMintInV1({
+        originalSender: abi.encode(OWNER),
+        receiver: recipient,
+        sourceDenominatedAmount: amount,
+        localToken: address(s_USDCToken),
+        remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+        sourcePoolAddress: sourceTokenData.sourcePoolAddress,
+        sourcePoolData: sourceTokenData.extraData,
+        offchainTokenData: offchainTokenData
+      })
+    );
+  }
+
   // https://etherscan.io/tx/0xac9f501fe0b76df1f07a22e1db30929fd12524bc7068d74012dff948632f0883
   function test_ReleaseOrMintRealTx() public {
     bytes memory encodedUsdcMessage =

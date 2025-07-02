@@ -23,7 +23,8 @@ contract HybridLockReleaseUSDCTokenPoolSetup is USDCSetup {
       s_USDCToken,
       new address[](0),
       address(s_mockRMNRemote),
-      address(s_router)
+      address(s_router),
+      s_previousPool
     );
     CCTPMessageTransmitterProxy.AllowedCallerConfigArgs[] memory allowedCallerParams =
       new CCTPMessageTransmitterProxy.AllowedCallerConfigArgs[](1);
@@ -37,7 +38,8 @@ contract HybridLockReleaseUSDCTokenPoolSetup is USDCSetup {
       s_USDCToken,
       new address[](0),
       address(s_mockRMNRemote),
-      address(s_router)
+      address(s_router),
+      s_previousPool
     );
     allowedCallerParams[0].caller = address(s_usdcTokenPoolTransferLiquidity);
     s_cctpMessageTransmitterProxyForTransferLiquidity.configureAllowedCallers(allowedCallerParams);
@@ -49,6 +51,7 @@ contract HybridLockReleaseUSDCTokenPoolSetup is USDCSetup {
     USDCTokenPool.DomainUpdate[] memory domains = new USDCTokenPool.DomainUpdate[](1);
     domains[0] = USDCTokenPool.DomainUpdate({
       destChainSelector: DEST_CHAIN_SELECTOR,
+      mintRecipient: bytes32(0),
       domainIdentifier: 9999,
       allowedCaller: keccak256("allowedCaller"),
       enabled: true
