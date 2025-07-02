@@ -76,9 +76,36 @@ func (l *DefaultAccessor) GetChainFeeComponents(ctx context.Context) (cciptypes.
 	return *fc, nil
 }
 
-func (l *DefaultAccessor) Sync(ctx context.Context, contracts cciptypes.ContractAddresses) error {
-	// TODO(NONEVM-1865): implement
-	panic("implement me")
+func (l *DefaultAccessor) Sync(
+	ctx context.Context,
+	contractName string,
+	contractAddress cciptypes.UnknownAddress,
+) error {
+	lggr := logutil.WithContextValues(ctx, l.lggr)
+	addressStr, err := l.addrCodec.AddressBytesToString(contractAddress, l.chainSelector)
+	if err != nil {
+		return fmt.Errorf("unable to convert address bytes to string: %w, address: %v", err, contractAddress)
+	}
+
+	contract := types.BoundContract{
+		Address: addressStr,
+		Name:    contractName,
+	}
+
+	lggr.Debugw("Binding contract",
+		"chainSelector", l.chainSelector,
+		"contractName", contractName,
+		"address", addressStr,
+	)
+	// Bind the contract address to the reader.
+	// If the same address exists -> no-op
+	// If the address is changed -> updates the address, overwrites the existing one
+	// If the contract not bound -> binds to the new address
+	if err := l.contractReader.Bind(ctx, []types.BoundContract{contract}); err != nil {
+		return fmt.Errorf("unable to bind %s %s for chain %d: %w", contractName, addressStr, l.chainSelector, err)
+	}
+
+	return nil
 }
 
 func (l *DefaultAccessor) MsgsBetweenSeqNums(
@@ -148,8 +175,20 @@ func (l *DefaultAccessor) MsgsBetweenSeqNums(
 		msgs = append(msgs, msg.Message)
 	}
 
-	lggr.Infow("decoded messages between sequence numbers",
-		"msgs", msgs,
+	msgsWithoutDataField := make([]cciptypes.Message, len(msgs))
+	for i, msg := range msgs {
+		msgsWithoutDataField[i] = msg.CopyWithoutData()
+	}
+
+	lggr.Debugw("decoded messages between sequence numbers",
+		"msgsWithoutDataField", msgsWithoutDataField,
+		"sourceChainSelector", l.chainSelector,
+		"seqNumRange", seqNumRange.String(),
+	)
+	lggr.Infow("decoded message IDs between sequence numbers",
+		"seqNum.MsgID", slicelib.Map(msgsWithoutDataField, func(m cciptypes.Message) string {
+			return fmt.Sprintf("%d.%d", m.Header.SequenceNumber, m.Header.MessageID)
+		}),
 		"sourceChainSelector", l.chainSelector,
 		"seqNumRange", seqNumRange.String(),
 	)
@@ -314,11 +353,114 @@ func (l *DefaultAccessor) CommitReportsGTETimestamp(
 
 func (l *DefaultAccessor) ExecutedMessages(
 	ctx context.Context,
-	ranges map[cciptypes.ChainSelector]cciptypes.SeqNumRange,
+	rangesPerChain map[cciptypes.ChainSelector][]cciptypes.SeqNumRange,
 	confidence cciptypes.ConfidenceLevel,
 ) (map[cciptypes.ChainSelector][]cciptypes.SeqNum, error) {
-	// TODO(NONEVM-1865): implement
-	panic("implement me")
+	lggr := logutil.WithContextValues(ctx, l.lggr)
+
+	// trim empty ranges from rangesPerChain
+	// otherwise we may get SQL errors from the chainreader.
+	nonEmptyRangesPerChain := make(map[cciptypes.ChainSelector][]cciptypes.SeqNumRange)
+	for chain, ranges := range rangesPerChain {
+		if len(ranges) > 0 {
+			nonEmptyRangesPerChain[chain] = ranges
+		}
+	}
+
+	dataTyp := ExecutionStateChangedEvent{}
+	keyFilter, countSqNrs := createExecutedMessagesKeyFilter(nonEmptyRangesPerChain, confidence)
+	if countSqNrs == 0 {
+		lggr.Debugw("no sequence numbers to query", "nonEmptyRangesPerChain", nonEmptyRangesPerChain)
+		return nil, nil
+	}
+	iter, err := l.contractReader.ExtendedQueryKey(
+		ctx,
+		consts.ContractNameOffRamp,
+		keyFilter,
+		query.LimitAndSort{
+			SortBy: []query.SortBy{query.NewSortBySequence(query.Asc)},
+			Limit: query.Limit{
+				Count: countSqNrs,
+			},
+		},
+		&dataTyp,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query offRamp: %w", err)
+	}
+
+	executed := make(map[cciptypes.ChainSelector][]cciptypes.SeqNum)
+	for _, item := range iter {
+		stateChange, ok := item.Data.(*ExecutionStateChangedEvent)
+		if !ok {
+			return nil, fmt.Errorf("failed to cast %T to ExecutionStateChangedEvent", item.Data)
+		}
+
+		if err := validateExecutionStateChangedEvent(stateChange, nonEmptyRangesPerChain); err != nil {
+			lggr.Errorw("validate execution state changed event",
+				"err", err, "stateChange", stateChange)
+			continue
+		}
+
+		executed[stateChange.SourceChainSelector] =
+			append(executed[stateChange.SourceChainSelector], stateChange.SequenceNumber)
+	}
+
+	return executed, nil
+}
+
+func createExecutedMessagesKeyFilter(
+	rangesPerChain map[cciptypes.ChainSelector][]cciptypes.SeqNumRange,
+	confidence primitives.ConfidenceLevel) (query.KeyFilter, uint64) {
+
+	var chainExpressions []query.Expression
+	var countSqNrs uint64
+	// final query should look like
+	// (chainA && (sqRange1 || sqRange2 || ...)) || (chainB && (sqRange1 || sqRange2 || ...))
+	sortedChains := maps.Keys(rangesPerChain)
+	slices.Sort(sortedChains)
+	for _, srcChain := range sortedChains {
+		seqNumRanges := rangesPerChain[srcChain]
+		var seqRangeExpressions []query.Expression
+		for _, seqNrRange := range seqNumRanges {
+			expr := query.Comparator(consts.EventAttributeSequenceNumber,
+				primitives.ValueComparator{
+					Value:    seqNrRange.Start(),
+					Operator: primitives.Gte,
+				},
+				primitives.ValueComparator{
+					Value:    seqNrRange.End(),
+					Operator: primitives.Lte,
+				})
+			seqRangeExpressions = append(seqRangeExpressions, expr)
+			countSqNrs += uint64(seqNrRange.End() - seqNrRange.Start() + 1)
+		}
+		combinedSeqNrs := query.Or(seqRangeExpressions...)
+
+		chainExpressions = append(chainExpressions, query.And(
+			combinedSeqNrs,
+			query.Comparator(consts.EventAttributeSourceChain, primitives.ValueComparator{
+				Value:    srcChain,
+				Operator: primitives.Eq,
+			}),
+		))
+	}
+	extendedQuery := query.Or(chainExpressions...)
+
+	keyFilter := query.KeyFilter{
+		Key: consts.EventNameExecutionStateChanged,
+		Expressions: []query.Expression{
+			extendedQuery,
+			// We don't need to wait for an execute state changed event to be finalized
+			// before we optimistically mark a message as executed.
+			query.Comparator(consts.EventAttributeState, primitives.ValueComparator{
+				Value:    0, // > 0 corresponds to:  IN_PROGRESS, SUCCESS, FAILURE
+				Operator: primitives.Gt,
+			}),
+			query.Confidence(confidence),
+		},
+	}
+	return keyFilter, countSqNrs
 }
 
 func (l *DefaultAccessor) NextSeqNum(

@@ -27,6 +27,17 @@ type CommitReportAcceptedEvent struct {
 	PriceUpdates         PriceUpdates
 }
 
+// ExecutionStateChangedEvent represents the contents of the event emitted by the CCIP OffRamp
+type ExecutionStateChangedEvent struct {
+	SourceChainSelector cciptypes.ChainSelector
+	SequenceNumber      cciptypes.SeqNum
+	MessageID           cciptypes.Bytes32
+	MessageHash         cciptypes.Bytes32
+	State               uint8
+	ReturnData          cciptypes.Bytes
+	GasUsed             big.Int
+}
+
 type MerkleRoot struct {
 	SourceChainSelector uint64
 	OnRampAddress       cciptypes.UnknownAddress

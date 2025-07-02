@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {HybridLockReleaseUSDCTokenPool} from "../../../../pools/USDC/HybridLockReleaseUSDCTokenPool.sol";
 import {USDCSetup} from "../USDCSetup.t.sol";
 
-contract HybridLockReleaseUSDCTokenPoolSetup is USDCSetup {
+contract USDCBridgeMigratorSetup is USDCSetup {
   HybridLockReleaseUSDCTokenPool internal s_usdcTokenPool;
   HybridLockReleaseUSDCTokenPool internal s_usdcTokenPoolTransferLiquidity;
 
@@ -17,7 +17,8 @@ contract HybridLockReleaseUSDCTokenPoolSetup is USDCSetup {
       s_USDCToken,
       new address[](0),
       address(s_mockRMNRemote),
-      address(s_router)
+      address(s_router),
+      s_previousPool
     );
 
     s_usdcTokenPoolTransferLiquidity = new HybridLockReleaseUSDCTokenPool(
@@ -26,7 +27,8 @@ contract HybridLockReleaseUSDCTokenPoolSetup is USDCSetup {
       s_USDCToken,
       new address[](0),
       address(s_mockRMNRemote),
-      address(s_router)
+      address(s_router),
+      s_previousPool
     );
   }
 }

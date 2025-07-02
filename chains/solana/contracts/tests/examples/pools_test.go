@@ -386,17 +386,22 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 						acceptIx, err := tokenpool.NewSetCanAcceptLiquidityInstruction(true, poolConfig, mint, admin.PublicKey()).ValidateAndBuild()
 						require.NoError(t, err)
 
+						setRebalancerIx, err := tokenpool.NewSetRebalancerInstruction(admin.PublicKey(), poolConfig, mint, admin.PublicKey()).ValidateAndBuild()
+						require.NoError(t, err)
+
 						provideIx, err := tokenpool.NewProvideLiquidityInstruction(amount, poolConfig, v.tokenProgram, tokenPool.Mint, poolSigner, poolTokenAccount, tokenPool.User[admin.PublicKey()], admin.PublicKey()).ValidateAndBuild()
 						require.NoError(t, err)
 
 						testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{
 							approveIx,
+							&tokens.TokenInstruction{Instruction: setRebalancerIx, Program: poolProgram},
 							&tokens.TokenInstruction{Instruction: provideIx, Program: poolProgram},
 						}, admin, rpc.CommitmentConfirmed, []string{"Liquidity not accepted"})
 
 						testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{
 							approveIx,
 							&tokens.TokenInstruction{Instruction: acceptIx, Program: poolProgram},
+							&tokens.TokenInstruction{Instruction: setRebalancerIx, Program: poolProgram},
 							&tokens.TokenInstruction{Instruction: provideIx, Program: poolProgram},
 						}, admin, rpc.CommitmentConfirmed)
 
@@ -664,7 +669,7 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 		t.Run("self-onboard", func(t *testing.T) {
 
 			// Enable self-served token pool onboarding
-			ix, err := tokenpool.NewUpdateGlobalConfigInstruction(true, configPDA, admin.PublicKey(), solana.SystemProgramID, poolProgram, programData.Address).ValidateAndBuild()
+			ix, err := tokenpool.NewUpdateGlobalConfigInstruction(true, configPDA, admin.PublicKey(), poolProgram, programData.Address).ValidateAndBuild()
 			require.NoError(t, err)
 
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{

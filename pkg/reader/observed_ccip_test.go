@@ -28,8 +28,8 @@ func Test_GetChainsFeeComponents(t *testing.T) {
 	ctx := tests.Context(t)
 	chain1 := "2337"
 	selector1 := cciptypes.ChainSelector(12922642891491394802)
-	chain2 := "3337"
-	selector2 := cciptypes.ChainSelector(4793464827907405086)
+	chain2 := "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d"
+	selector2 := cciptypes.ChainSelector(124615329519749607)
 
 	fees := map[cciptypes.ChainSelector]types.ChainFeeComponents{
 		selector1: {
@@ -54,22 +54,22 @@ func Test_GetChainsFeeComponents(t *testing.T) {
 	require.Equal(
 		t,
 		10.0,
-		testutil.ToFloat64(reader.PromChainFeeGauge.WithLabelValues(chain1, "execCost")),
+		testutil.ToFloat64(reader.PromChainFeeGauge.WithLabelValues("evm", chain1, "execCost")),
 	)
 	require.Equal(
 		t,
 		15.0,
-		testutil.ToFloat64(reader.PromChainFeeGauge.WithLabelValues(chain1, "daCost")),
+		testutil.ToFloat64(reader.PromChainFeeGauge.WithLabelValues("evm", chain1, "daCost")),
 	)
 	require.Equal(
 		t,
 		0.0,
-		testutil.ToFloat64(reader.PromChainFeeGauge.WithLabelValues(chain2, "execCost")),
+		testutil.ToFloat64(reader.PromChainFeeGauge.WithLabelValues("solana", chain2, "execCost")),
 	)
 	require.Equal(
 		t,
 		2.0,
-		testutil.ToFloat64(reader.PromChainFeeGauge.WithLabelValues(chain2, "daCost")),
+		testutil.ToFloat64(reader.PromChainFeeGauge.WithLabelValues("solana", chain2, "daCost")),
 	)
 }
 
@@ -141,12 +141,12 @@ func Test_GetDestChainFeeComponents(t *testing.T) {
 			require.Equal(
 				t,
 				tc.expExec,
-				testutil.ToFloat64(reader.PromChainFeeGauge.WithLabelValues(chainID, "execCost")),
+				testutil.ToFloat64(reader.PromChainFeeGauge.WithLabelValues("evm", chainID, "execCost")),
 			)
 			require.Equal(
 				t,
 				tc.expDa,
-				testutil.ToFloat64(reader.PromChainFeeGauge.WithLabelValues(chainID, "daCost")),
+				testutil.ToFloat64(reader.PromChainFeeGauge.WithLabelValues("evm", chainID, "daCost")),
 			)
 		})
 	}
@@ -215,10 +215,12 @@ func Test_CommitReportsGTETimestamp(t *testing.T) {
 			require.Equal(
 				t,
 				float64(tc.expectedCount),
-				testutil.ToFloat64(reader.PromDataSetSizeGauge.WithLabelValues(chainID, "CommitReportsGTETimestamp")),
+				testutil.ToFloat64(reader.PromDataSetSizeGauge.WithLabelValues("evm", chainID, "CommitReportsGTETimestamp")),
 			)
 
-			count := internal.CounterFromHistogramByLabels(t, reader.PromQueryHistogram, chainID, "CommitReportsGTETimestamp")
+			count := internal.CounterFromHistogramByLabels(
+				t, reader.PromQueryHistogram, "evm", chainID, "CommitReportsGTETimestamp",
+			)
 			require.Equal(t, 1, count)
 		})
 	}
@@ -226,8 +228,8 @@ func Test_CommitReportsGTETimestamp(t *testing.T) {
 
 func Test_LatestMsgSeqNum(t *testing.T) {
 	ctx := tests.Context(t)
-	chainID := "2337"
-	chainSelector := cciptypes.ChainSelector(12922642891491394802)
+	chainID := "1"
+	chainSelector := cciptypes.ChainSelector(4741433654826277614)
 
 	t.Cleanup(cleanupMetrics())
 
@@ -253,12 +255,12 @@ func Test_LatestMsgSeqNum(t *testing.T) {
 	require.Equal(
 		t,
 		1,
-		internal.CounterFromHistogramByLabels(t, reader.PromQueryHistogram, chainID, "LatestMsgSeqNum"),
+		internal.CounterFromHistogramByLabels(t, reader.PromQueryHistogram, "aptos", chainID, "LatestMsgSeqNum"),
 	)
 	require.Equal(
 		t,
 		0.0,
-		testutil.ToFloat64(reader.PromDataSetSizeGauge.WithLabelValues(chainID, "CommitReportsGTETimestamp")),
+		testutil.ToFloat64(reader.PromDataSetSizeGauge.WithLabelValues("aptos", chainID, "CommitReportsGTETimestamp")),
 	)
 
 	_, err = r.LatestMsgSeqNum(ctx, failure)
@@ -266,12 +268,12 @@ func Test_LatestMsgSeqNum(t *testing.T) {
 	require.Equal(
 		t,
 		2,
-		internal.CounterFromHistogramByLabels(t, reader.PromQueryHistogram, chainID, "LatestMsgSeqNum"),
+		internal.CounterFromHistogramByLabels(t, reader.PromQueryHistogram, "aptos", chainID, "LatestMsgSeqNum"),
 	)
 	require.Equal(
 		t,
 		0.0,
-		testutil.ToFloat64(reader.PromDataSetSizeGauge.WithLabelValues(chainID, "CommitReportsGTETimestamp")),
+		testutil.ToFloat64(reader.PromDataSetSizeGauge.WithLabelValues("aptos", chainID, "CommitReportsGTETimestamp")),
 	)
 }
 

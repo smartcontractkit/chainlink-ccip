@@ -47,11 +47,6 @@ export type LockreleaseTokenPool = {
           "isSigner": true
         },
         {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
           "name": "program",
           "isMut": false,
           "isSigner": false
@@ -893,11 +888,6 @@ export const IDL: LockreleaseTokenPool = {
           "name": "authority",
           "isMut": false,
           "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
         },
         {
           "name": "program",

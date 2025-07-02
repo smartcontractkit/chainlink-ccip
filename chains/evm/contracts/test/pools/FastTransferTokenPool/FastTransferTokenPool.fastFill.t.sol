@@ -152,14 +152,14 @@ contract FastTransferTokenPool_fastFill_Test is FastTransferTokenPoolSetup {
     assertEq(s_token.balanceOf(RECEIVER), SOURCE_AMOUNT * 2);
   }
 
-  function test_FastFill_RevertWhen_AlreadyFilled() public {
+  function test_FastFill_RevertWhen_AlreadyFilledOrSettled() public {
     bytes32 fillId = s_pool.computeFillId(SETTLEMENT_ID, SOURCE_AMOUNT, SOURCE_DECIMALS, abi.encode(RECEIVER));
 
     // First fill
     s_pool.fastFill(fillId, SETTLEMENT_ID, DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, SOURCE_DECIMALS, RECEIVER);
 
     // Attempt second fill
-    vm.expectRevert(abi.encodeWithSelector(IFastTransferPool.AlreadyFilled.selector, fillId));
+    vm.expectRevert(abi.encodeWithSelector(IFastTransferPool.AlreadyFilledOrSettled.selector, fillId));
     s_pool.fastFill(fillId, SETTLEMENT_ID, DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, SOURCE_DECIMALS, RECEIVER);
   }
 

@@ -47,7 +47,6 @@ pub struct UpdateGlobalConfig<'info> {
     pub config: Account<'info, PoolConfig>, // Global Config PDA of the Token Pool
 
     pub authority: Signer<'info>,
-    pub system_program: Program<'info, System>,
 
     // Ensures that the provided program is the BurnmintTokenPool program,
     // and that its associated program data account matches the expected one.
@@ -78,8 +77,7 @@ pub struct InitializeTokenPool<'info> {
     #[account(constraint = program.programdata_address()? == Some(program_data.key()))]
     pub program: Program<'info, BurnmintTokenPool>,
 
-    // Token pool initialization only allowed by program upgrade authority. Initializing token pools managed
-    // by the CLL deployment of this program is limited to CLL. Users must deploy their own instance of this program.
+    // The upgrade authority of the token pool program can initialize a token pool or the mint authority of the token
     #[account(constraint = allowed_to_initialize_token_pool(&program_data, &authority, &config, &mint) @ CcipTokenPoolError::Unauthorized)]
     pub program_data: Account<'info, ProgramData>,
 
@@ -309,8 +307,7 @@ pub struct TokenOnramp<'info> {
     )]
     pub state: Account<'info, State>,
     #[account(address = *mint.to_account_info().owner)]
-    /// CHECK: CPI to underlying token program
-    pub token_program: AccountInfo<'info>,
+    pub token_program: Interface<'info, TokenInterface>,
     #[account(mut)]
     pub mint: InterfaceAccount<'info, Mint>,
     #[account(
@@ -467,16 +464,26 @@ pub enum CcipBnMTokenPoolError {
     MintAuthorityAlreadySet,
     #[msg("Token with no Mint Authority")]
     FixedMintToken,
+    #[msg("Unsupported Token Program")]
+    UnsupportedTokenProgram,
     #[msg("Invalid Multisig Account Data for Token 2022")]
     InvalidToken2022Multisig,
     #[msg("Invalid Multisig Account Data for SPL Token")]
     InvalidSPLTokenMultisig,
-    #[msg("Token Pool Signer PDA must be signer of the Multisig")]
+    #[msg("Token Pool Signer PDA must be m times a signer of the Multisig")]
     PoolSignerNotInMultisig,
-    #[msg("Multisig must have more than one signer")]
+    #[msg("Multisig must have more than 2 valid signers")]
+    MultisigMustHaveAtLeastTwoSigners,
+    #[msg("Multisig must have more than one required signer")]
     MultisigMustHaveMoreThanOneSigner,
     #[msg("Multisig Owner must match Token Program ID")]
     InvalidMultisigOwner,
+    #[msg("Invalid multisig threshold: required signatures cannot exceed total signers")]
+    InvalidMultisigThreshold,
+    #[msg(
+        "Invalid multisig m: required signatures cannot exceed the available for outside signers"
+    )]
+    InvalidMultisigThresholdTooHigh,
 }
 
 // This account can not be declared in the common crate, the program ID for that Account would be incorrect.
