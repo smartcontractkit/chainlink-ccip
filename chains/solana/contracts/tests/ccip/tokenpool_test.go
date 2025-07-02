@@ -1428,7 +1428,13 @@ func TestTokenPool(t *testing.T) {
 					MsgTotalNonce:       fakeCcipTotalNonce,
 				}
 
+				dynamicAdditionalAccountMetas := []*solana.AccountMeta{
+					solana.Meta(tokenMessengerMinter.RemoteTokenMessenger),
+					solana.Meta(messageSentEventAddress).WRITE(),
+				}
+
 				additionalAccountMetas := []*solana.AccountMeta{
+					// static ones, present in LUT
 					solana.Meta(tokenMessengerMinter.AuthorityPda),
 					solana.Meta(messageTransmitter.MessageTransmitter).WRITE(),
 					solana.Meta(tokenMessengerMinter.TokenMessenger),
@@ -1438,9 +1444,8 @@ func TestTokenPool(t *testing.T) {
 					solana.Meta(tokenMessengerMinter.Program),
 					solana.Meta(solana.SystemProgramID),
 					solana.Meta(tokenMessengerMinter.EventAuthority),
-					solana.Meta(tokenMessengerMinter.RemoteTokenMessenger),
-					solana.Meta(messageSentEventAddress).WRITE(),
 				}
+				additionalAccountMetas = append(additionalAccountMetas, dynamicAdditionalAccountMetas...)
 
 				t.Run("Accounts derivation", func(t *testing.T) {
 					accounts, tables := deriveCctpIxAccounts(ctx, t, solanaGoClient, admin, func(stage string, askWith []*solana.AccountMeta) RawIx {
@@ -1452,7 +1457,7 @@ func TestTokenPool(t *testing.T) {
 						return raw
 					})
 					require.Equal(t, []solana.PublicKey{}, tables)
-					require.Equal(t, additionalAccountMetas, accounts)
+					require.Equal(t, dynamicAdditionalAccountMetas, accounts)
 				})
 
 				raw := test_ccip_invalid_receiver.NewPoolProxyLockOrBurnInstruction(
