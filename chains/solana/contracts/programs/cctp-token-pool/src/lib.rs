@@ -15,6 +15,12 @@ pub const RECLAIM_EVENT_ACCOUNT_DISCRIMINATOR: [u8; 8] = [94, 198, 180, 159, 131
 pub mod context;
 use crate::context::*;
 
+mod cctp_message;
+use crate::cctp_message::*;
+
+mod token_pool_extra_data;
+use crate::token_pool_extra_data::*;
+
 mod derive;
 
 const SOLANA_DOMAIN_ID: u32 = 5; // Circle's CCTP domain ID for Solana is always 5, see https://developers.circle.com/stablecoins/supported-domains
@@ -245,6 +251,8 @@ pub mod cctp_token_pool {
             ctx.accounts.rmn_remote_config.to_account_info(),
         )?;
 
+        validate_cctp_and_ccip_messages(&msg_att.message, &release_or_mint)?;
+
         let message_and_attestation_bytes = msg_att.try_to_vec().unwrap();
         cctp_receive_message(&ctx, &remaining, &message_and_attestation_bytes)?;
         transfer_cctp_tokens(&ctx, parsed_amount, ctx.accounts.state.config.decimals)?;
@@ -311,7 +319,7 @@ pub mod cctp_token_pool {
             mint: ctx.accounts.state.config.mint,
         });
 
-        let extra_data = LockOrBurnExtraData {
+        let extra_data = TokenPoolExtraData {
             nonce: cctp_nonce,
             source_domain: SOLANA_DOMAIN_ID,
         };
@@ -527,6 +535,40 @@ fn cctp_deposit_for_burn_with_caller(
     ))
 }
 
+// Checks consistency in the data between the CCTP and CCIP messages
+fn validate_cctp_and_ccip_messages(
+    cctp_msg: &CctpMessage,
+    release_or_mint: &ReleaseOrMintInV1,
+) -> Result<()> {
+    let source_extra_data = TokenPoolExtraData::abi_decode(&release_or_mint.source_pool_data)?;
+
+    require_gte!(
+        cctp_msg.data.len(),
+        CctpMessage::MINIMUM_LENGTH,
+        CctpTokenPoolError::MalformedCctpMessage
+    );
+
+    require_eq!(
+        cctp_msg.source_domain(),
+        source_extra_data.source_domain,
+        CctpTokenPoolError::InvalidSourceDomain
+    );
+
+    require_eq!(
+        cctp_msg.destination_domain(),
+        SOLANA_DOMAIN_ID,
+        CctpTokenPoolError::InvalidDestDomain
+    );
+
+    require_eq!(
+        cctp_msg.nonce(),
+        source_extra_data.nonce,
+        CctpTokenPoolError::InvalidNonce
+    );
+
+    Ok(())
+}
+
 fn cctp_receive_message<'info>(
     ctx: &Context<'_, '_, 'info, 'info, TokenOfframp<'info>>,
     remaining: &TokenOfframpRemainingAccounts<'info>,
@@ -607,54 +649,6 @@ fn transfer_cctp_tokens(ctx: &Context<TokenOfframp>, amount: u64, decimals: u8) 
     anchor_spl::token::transfer_checked(cpi_ctx, amount, decimals)
 }
 
-pub struct LockOrBurnExtraData {
-    pub nonce: u64,         // The nonce of the message being locked or burned
-    pub source_domain: u32, // The source chain domain ID, which for Solana is always 5
-}
-
-impl LockOrBurnExtraData {
-    // ABI-encoding left-pads each number to 32-bytes, and uses big-endian encoding.
-
-    // The nonce is in bytes 24..32 in the serialized data (u64 is 8 bytes)
-    const NONCE_INDEXES: (usize, usize) = (24, 32);
-    // The source domain is in bytes 60..64 in the serialized data (u32 is 4 bytes)
-    const SOURCE_DOMAIN_INDEXES: (usize, usize) = (60, 64);
-
-    pub fn abi_encode(&self) -> [u8; 64] {
-        let mut bytes = [0u8; 64];
-        bytes[Self::NONCE_INDEXES.0..Self::NONCE_INDEXES.1]
-            .copy_from_slice(&self.nonce.to_be_bytes());
-        bytes[Self::SOURCE_DOMAIN_INDEXES.0..Self::SOURCE_DOMAIN_INDEXES.1]
-            .copy_from_slice(&self.source_domain.to_be_bytes());
-        bytes
-    }
-
-    pub fn abi_decode(bytes: &[u8]) -> Result<Self> {
-        if bytes.len() != 64 {
-            return Err(CctpTokenPoolError::InvalidMessageSentEventAccount.into());
-        }
-        let nonce = u64::from_be_bytes(
-            bytes[Self::NONCE_INDEXES.0..Self::NONCE_INDEXES.1]
-                .try_into()
-                .unwrap(),
-        );
-        let source_domain = u32::from_be_bytes(
-            bytes[Self::SOURCE_DOMAIN_INDEXES.0..Self::SOURCE_DOMAIN_INDEXES.1]
-                .try_into()
-                .unwrap(),
-        );
-        Ok(Self {
-            nonce,
-            source_domain,
-        })
-    }
-}
-
-#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
-pub struct CctpMessage {
-    pub data: Vec<u8>,
-}
-
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct MessageAndAttestation {
     pub message: CctpMessage,
@@ -667,23 +661,6 @@ pub struct DepositForBurnWithCallerParams {
     pub destination_domain: u32,
     pub mint_recipient: Pubkey,
     pub destination_caller: Pubkey,
-}
-
-impl CctpMessage {
-    const MAX_NONCES: u64 = 6400;
-
-    fn nonce(&self) -> u64 {
-        u64::from_be_bytes(self.data[12..20].try_into().unwrap())
-    }
-
-    fn first_nonce(&self) -> u64 {
-        self.nonce()
-            .checked_sub(1)
-            .and_then(|n| n.checked_div(Self::MAX_NONCES))
-            .and_then(|n| n.checked_mul(Self::MAX_NONCES))
-            .and_then(|n| n.checked_add(1))
-            .unwrap()
-    }
 }
 
 // NOTE: accounts derivations must be native to program - will cause ownership check issues if imported
@@ -739,14 +716,22 @@ pub enum CctpTokenPoolError {
     InvalidTokenData = 6000, // offset for CctpTokenPoolErrors, so they don't overlap with errors of other CCIP programs
     #[msg("Invalid receiver")]
     InvalidReceiver,
-    #[msg("Invalid domain")]
-    InvalidDomain,
+    #[msg("Invalid source domain")]
+    InvalidSourceDomain,
+    #[msg("Invalid destination domain")]
+    InvalidDestDomain,
+    #[msg("Invalid nonce")]
+    InvalidNonce,
+    #[msg("CCTP message is malformed or too short")]
+    MalformedCctpMessage,
     #[msg("Invalid Token Messenger Minter")]
     InvalidTokenMessengerMinter,
     #[msg("Invalid Message Transmitter")]
     InvalidMessageTransmitter,
     #[msg("Invalid Message Sent Event Account")]
     InvalidMessageSentEventAccount,
+    #[msg("Invalid Token Pool Extra Data")]
+    InvalidTokenPoolExtraData,
     #[msg("Failed CCTP CPI")]
     FailedCctpCpi,
 }

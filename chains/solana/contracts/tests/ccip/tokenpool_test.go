@@ -1569,6 +1569,10 @@ func TestTokenPool(t *testing.T) {
 				offchainTokenDataBuffer := new(bytes.Buffer)
 				require.NoError(t, offchainTokenData.MarshalWithEncoder(bin.NewBorshEncoder(offchainTokenDataBuffer)))
 
+				sourcePoolData := make([]byte, 64)
+				binary.BigEndian.PutUint64(sourcePoolData[24:32], getCctpNonce(t, messageSentEventData.Message))
+				binary.BigEndian.PutUint32(sourcePoolData[60:64], domain)
+
 				releaseOrMintIn := cctp_token_pool.ReleaseOrMintInV1{
 					OriginalSender:      cctp_token_pool.RemoteAddress{Address: user.PublicKey().Bytes()},
 					RemoteChainSelector: config.SvmChainSelector,
@@ -1576,7 +1580,7 @@ func TestTokenPool(t *testing.T) {
 					Amount:              tokens.ToLittleEndianU256(messageAmount),
 					LocalToken:          usdcMint,
 					SourcePoolAddress:   cctp_token_pool.RemoteAddress{Address: cctpPool.Signer.Bytes()}, // when the source is Solana, the pool is identified by its signer
-					SourcePoolData:      []byte{},
+					SourcePoolData:      sourcePoolData[:],
 					OffchainTokenData:   offchainTokenDataBuffer.Bytes(),
 				}
 

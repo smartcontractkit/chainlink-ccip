@@ -1016,26 +1016,46 @@
     },
     {
       "code": 12002,
-      "name": "InvalidDomain",
-      "msg": "Invalid domain"
+      "name": "InvalidSourceDomain",
+      "msg": "Invalid source domain"
     },
     {
       "code": 12003,
+      "name": "InvalidDestDomain",
+      "msg": "Invalid destination domain"
+    },
+    {
+      "code": 12004,
+      "name": "InvalidNonce",
+      "msg": "Invalid nonce"
+    },
+    {
+      "code": 12005,
+      "name": "MalformedCctpMessage",
+      "msg": "CCTP message is malformed or too short"
+    },
+    {
+      "code": 12006,
       "name": "InvalidTokenMessengerMinter",
       "msg": "Invalid Token Messenger Minter"
     },
     {
-      "code": 12004,
+      "code": 12007,
       "name": "InvalidMessageTransmitter",
       "msg": "Invalid Message Transmitter"
     },
     {
-      "code": 12005,
+      "code": 12008,
       "name": "InvalidMessageSentEventAccount",
       "msg": "Invalid Message Sent Event Account"
     },
     {
-      "code": 12006,
+      "code": 12009,
+      "name": "InvalidTokenPoolExtraData",
+      "msg": "Invalid Token Pool Extra Data"
+    },
+    {
+      "code": 12010,
       "name": "FailedCctpCpi",
       "msg": "Failed CCTP CPI"
     }
