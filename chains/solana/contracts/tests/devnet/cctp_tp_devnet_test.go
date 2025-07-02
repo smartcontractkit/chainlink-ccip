@@ -84,15 +84,15 @@ func TestCctpTpDevnet(t *testing.T) {
 	fullReceiverAddress := [32]byte{}
 	copy(fullReceiverAddress[32-len(receiverAddrBytes):], receiverAddrBytes)
 
-	chainSelector := devnetInfo.ChainSelectors.Sepolia
-	domain := domains[chainSelector]
-	domainDestCaller := solana.PublicKeyFromBytes(fullReceiverAddress[:])
-
 	remotePoolBytes, err := hex.DecodeString(devnetInfo.CCTP.Sepolia.TokenPool)
 	require.NoError(t, err)
 	remotePoolAddressBytes := [32]byte{}
 	copy(remotePoolAddressBytes[32-len(remotePoolBytes):], remotePoolBytes)
 	remotePoolAddress := solana.PublicKey(remotePoolAddressBytes)
+
+	chainSelector := devnetInfo.ChainSelectors.Sepolia
+	domain := domains[chainSelector]
+	domainDestCaller := remotePoolAddress
 
 	cctpPool := getCctpTokenPoolPDAs(t, cctpTpProgram, chainSelector, usdcMint)
 	messageTransmitter := getMessageTransmitterPDAs(t, cctpMtProgram, cctpTmmProgram)
@@ -126,7 +126,7 @@ func TestCctpTpDevnet(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("Initialize TokenPool", func(t *testing.T) {
-		// t.Skip()
+		t.Skip()
 
 		type ProgramData struct {
 			DataType uint32
@@ -302,8 +302,8 @@ func TestCctpTpDevnet(t *testing.T) {
 				MinFeeUsdcents:    0,
 				MaxFeeUsdcents:    1, // TODO, placeholder value
 				DeciBps:           0,
-				DestGasOverhead:   700000, // TODO, placeholder value
-				DestBytesOverhead: 68,     // 64 bytes for the message + 4 bytes for the length (vec prefix)
+				DestGasOverhead:   200000,
+				DestBytesOverhead: 68, // 64 bytes for the message + 4 bytes for the length (vec prefix)
 				IsEnabled:         true,
 			},
 			fqConfigPDA,
@@ -538,7 +538,7 @@ func TestCctpTpDevnet(t *testing.T) {
 			adminUsdcATA, _, err := tokens.FindAssociatedTokenAddress(solana.TokenProgramID, usdcMint, admin.PublicKey())
 			require.NoError(t, err)
 
-			amount := uint64(2) // 2e-6 USDC
+			amount := uint64(1 * 1e4) // 0.01 USDC
 
 			approveIx, err := tokens.TokenApproveChecked(amount, usdcDecimals, solana.TokenProgramID, adminUsdcATA, usdcMint, routerBillingSignerPDA, admin.PublicKey(), []solana.PublicKey{})
 
@@ -553,7 +553,7 @@ func TestCctpTpDevnet(t *testing.T) {
 				},
 				FeeToken: solana.PublicKey{},
 				ExtraArgs: testutils.MustSerializeExtraArgs(t, fee_quoter.GenericExtraArgsV2{
-					GasLimit:                 bin.Uint128{Lo: 500000, Hi: 0}, // TODO, placeholder value
+					GasLimit:                 bin.Uint128{Lo: 0, Hi: 0},
 					AllowOutOfOrderExecution: true,
 				}, ccip.GenericExtraArgsV2Tag),
 			}
