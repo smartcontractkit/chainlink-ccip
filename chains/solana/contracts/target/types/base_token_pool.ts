@@ -791,7 +791,7 @@ export type BaseTokenPool = {
       "msg": "Liquidity not accepted"
     },
     {
-      "code": 6020,
+      "code": 6021,
       "name": "TransferZeroTokensNotAllowed",
       "msg": "Transfering zero tokens is not allowed"
     }
@@ -1591,7 +1591,7 @@ export const IDL: BaseTokenPool = {
       "msg": "Liquidity not accepted"
     },
     {
-      "code": 6020,
+      "code": 6021,
       "name": "TransferZeroTokensNotAllowed",
       "msg": "Transfering zero tokens is not allowed"
     }
