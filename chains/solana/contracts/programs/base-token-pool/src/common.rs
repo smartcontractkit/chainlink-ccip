@@ -563,6 +563,8 @@ pub enum CcipTokenPoolError {
     // Lock/Release errors
     #[msg("Liquidity not accepted")]
     LiquidityNotAccepted,
+    #[msg("Transfering zero tokens is not allowed")]
+    TransferZeroTokensNotAllowed,
 }
 
 // validate_lock_or_burn checks for correctness on inputs

@@ -47,11 +47,6 @@ export type BurnmintTokenPool = {
           "isSigner": true
         },
         {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
           "name": "program",
           "isMut": false,
           "isSigner": false
@@ -764,28 +759,48 @@ export type BurnmintTokenPool = {
     },
     {
       "code": 6003,
+      "name": "UnsupportedTokenProgram",
+      "msg": "Unsupported Token Program"
+    },
+    {
+      "code": 6004,
       "name": "InvalidToken2022Multisig",
       "msg": "Invalid Multisig Account Data for Token 2022"
     },
     {
-      "code": 6004,
+      "code": 6005,
       "name": "InvalidSPLTokenMultisig",
       "msg": "Invalid Multisig Account Data for SPL Token"
     },
     {
-      "code": 6005,
-      "name": "PoolSignerNotInMultisig",
-      "msg": "Token Pool Signer PDA must be signer of the Multisig"
-    },
-    {
       "code": 6006,
-      "name": "MultisigMustHaveMoreThanOneSigner",
-      "msg": "Multisig must have more than one signer"
+      "name": "PoolSignerNotInMultisig",
+      "msg": "Token Pool Signer PDA must be m times a signer of the Multisig"
     },
     {
       "code": 6007,
+      "name": "MultisigMustHaveAtLeastTwoSigners",
+      "msg": "Multisig must have more than 2 valid signers"
+    },
+    {
+      "code": 6008,
+      "name": "MultisigMustHaveMoreThanOneSigner",
+      "msg": "Multisig must have more than one required signer"
+    },
+    {
+      "code": 6009,
       "name": "InvalidMultisigOwner",
       "msg": "Multisig Owner must match Token Program ID"
+    },
+    {
+      "code": 6010,
+      "name": "InvalidMultisigThreshold",
+      "msg": "Invalid multisig threshold: required signatures cannot exceed total signers"
+    },
+    {
+      "code": 6011,
+      "name": "InvalidMultisigThresholdTooHigh",
+      "msg": "Invalid multisig m: required signatures cannot exceed the available for outside signers"
     }
   ]
 };
@@ -839,11 +854,6 @@ export const IDL: BurnmintTokenPool = {
           "isSigner": true
         },
         {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
           "name": "program",
           "isMut": false,
           "isSigner": false
@@ -1556,28 +1566,48 @@ export const IDL: BurnmintTokenPool = {
     },
     {
       "code": 6003,
+      "name": "UnsupportedTokenProgram",
+      "msg": "Unsupported Token Program"
+    },
+    {
+      "code": 6004,
       "name": "InvalidToken2022Multisig",
       "msg": "Invalid Multisig Account Data for Token 2022"
     },
     {
-      "code": 6004,
+      "code": 6005,
       "name": "InvalidSPLTokenMultisig",
       "msg": "Invalid Multisig Account Data for SPL Token"
     },
     {
-      "code": 6005,
-      "name": "PoolSignerNotInMultisig",
-      "msg": "Token Pool Signer PDA must be signer of the Multisig"
-    },
-    {
       "code": 6006,
-      "name": "MultisigMustHaveMoreThanOneSigner",
-      "msg": "Multisig must have more than one signer"
+      "name": "PoolSignerNotInMultisig",
+      "msg": "Token Pool Signer PDA must be m times a signer of the Multisig"
     },
     {
       "code": 6007,
+      "name": "MultisigMustHaveAtLeastTwoSigners",
+      "msg": "Multisig must have more than 2 valid signers"
+    },
+    {
+      "code": 6008,
+      "name": "MultisigMustHaveMoreThanOneSigner",
+      "msg": "Multisig must have more than one required signer"
+    },
+    {
+      "code": 6009,
       "name": "InvalidMultisigOwner",
       "msg": "Multisig Owner must match Token Program ID"
+    },
+    {
+      "code": 6010,
+      "name": "InvalidMultisigThreshold",
+      "msg": "Invalid multisig threshold: required signatures cannot exceed total signers"
+    },
+    {
+      "code": 6011,
+      "name": "InvalidMultisigThresholdTooHigh",
+      "msg": "Invalid multisig m: required signatures cannot exceed the available for outside signers"
     }
   ]
 };

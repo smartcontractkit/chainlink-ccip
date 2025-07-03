@@ -266,7 +266,7 @@ func Test_Processor_Outcome(t *testing.T) {
 				},
 				OffRampNextSeqNums: []plugintypes.SeqNumChain{
 					{ChainSel: chainA, SeqNum: 10},
-					// chainB missing
+					{ChainSel: chainB, SeqNum: 5},
 					{ChainSel: chainC, SeqNum: 1},
 					{ChainSel: chainE, SeqNum: 4},
 				},
@@ -1395,6 +1395,76 @@ func TestCheckForReportTransmission(t *testing.T) {
 				tt.consensusObservation,
 			)
 			require.Equal(t, tt.expectedOutcome, outcome)
+		})
+	}
+}
+
+func Test_getOffRampNextSequenceNumbersConsensus(t *testing.T) {
+	lggr := logger.Test(t)
+
+	testCases := []struct {
+		name                 string
+		fDestChain           uint
+		observationsPerChain map[cciptypes.ChainSelector][]cciptypes.SeqNum
+		expRes               map[cciptypes.ChainSelector]cciptypes.SeqNum
+	}{
+		{
+			name:       "single chain, enough observations",
+			fDestChain: 1,
+			observationsPerChain: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
+				1001: {10, 20, 30},
+			},
+			expRes: map[cciptypes.ChainSelector]cciptypes.SeqNum{
+				1001: 20, // Sorted: [10, 20, 30], index = fDestChain = 1
+			},
+		},
+		{
+			name:       "single chain, not enough observations",
+			fDestChain: 1,
+			observationsPerChain: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
+				1002: {15, 25}, // Needs >= 2*fDestChain+1 = 3 observations
+			},
+			expRes: map[cciptypes.ChainSelector]cciptypes.SeqNum{},
+		},
+		{
+			name:       "multiple chains, mixed validity",
+			fDestChain: 1,
+			observationsPerChain: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
+				1003: {5, 15, 10},     // valid -> sorted: [5, 10, 15], index 1 = 10
+				1004: {1, 2},          // not enough
+				1005: {30, 20, 10, 0}, // valid -> sorted: [0, 10, 20, 30], index 1 = 10
+			},
+			expRes: map[cciptypes.ChainSelector]cciptypes.SeqNum{
+				1003: 10,
+				1005: 10,
+			},
+		},
+		{
+			name:       "edge case: fDestChain = 0",
+			fDestChain: 0,
+			observationsPerChain: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
+				1006: {7, 3, 5}, // Sorted: [3, 5, 7], index 0 = 3
+			},
+			expRes: map[cciptypes.ChainSelector]cciptypes.SeqNum{
+				1006: 3,
+			},
+		},
+		{
+			name:       "large fDestChain, exact observations",
+			fDestChain: 2,
+			observationsPerChain: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
+				1007: {50, 10, 30, 20, 40}, // Sorted: [10, 20, 30, 40, 50], index 2 = 30
+			},
+			expRes: map[cciptypes.ChainSelector]cciptypes.SeqNum{
+				1007: 30,
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			res := getOffRampNextSequenceNumbersConsensus(lggr, tc.fDestChain, tc.observationsPerChain)
+			require.Equal(t, tc.expRes, res)
 		})
 	}
 }
