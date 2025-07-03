@@ -1036,26 +1036,31 @@ export type CctpTokenPool = {
     },
     {
       "code": 12006,
+      "name": "InvalidCctpMessageVersion",
+      "msg": "Invalid CCTP message version"
+    },
+    {
+      "code": 12007,
       "name": "InvalidTokenMessengerMinter",
       "msg": "Invalid Token Messenger Minter"
     },
     {
-      "code": 12007,
+      "code": 12008,
       "name": "InvalidMessageTransmitter",
       "msg": "Invalid Message Transmitter"
     },
     {
-      "code": 12008,
+      "code": 12009,
       "name": "InvalidMessageSentEventAccount",
       "msg": "Invalid Message Sent Event Account"
     },
     {
-      "code": 12009,
+      "code": 12010,
       "name": "InvalidTokenPoolExtraData",
       "msg": "Invalid Token Pool Extra Data"
     },
     {
-      "code": 12010,
+      "code": 12011,
       "name": "FailedCctpCpi",
       "msg": "Failed CCTP CPI"
     }
@@ -2100,26 +2105,31 @@ export const IDL: CctpTokenPool = {
     },
     {
       "code": 12006,
+      "name": "InvalidCctpMessageVersion",
+      "msg": "Invalid CCTP message version"
+    },
+    {
+      "code": 12007,
       "name": "InvalidTokenMessengerMinter",
       "msg": "Invalid Token Messenger Minter"
     },
     {
-      "code": 12007,
+      "code": 12008,
       "name": "InvalidMessageTransmitter",
       "msg": "Invalid Message Transmitter"
     },
     {
-      "code": 12008,
+      "code": 12009,
       "name": "InvalidMessageSentEventAccount",
       "msg": "Invalid Message Sent Event Account"
     },
     {
-      "code": 12009,
+      "code": 12010,
       "name": "InvalidTokenPoolExtraData",
       "msg": "Invalid Token Pool Extra Data"
     },
     {
-      "code": 12010,
+      "code": 12011,
       "name": "FailedCctpCpi",
       "msg": "Failed CCTP CPI"
     }

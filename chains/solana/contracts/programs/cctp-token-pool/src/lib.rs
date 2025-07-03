@@ -23,7 +23,11 @@ use crate::token_pool_extra_data::*;
 
 mod derive;
 
-const SOLANA_DOMAIN_ID: u32 = 5; // Circle's CCTP domain ID for Solana is always 5, see https://developers.circle.com/stablecoins/supported-domains
+// Circle's CCTP domain ID for Solana is always 5, see https://developers.circle.com/stablecoins/supported-domains
+const SOLANA_DOMAIN_ID: u32 = 5;
+
+// We restrict to the first version. New pool may be required for subsequent versions.
+const SUPPORTED_CCTP_MESSAGE_VERSION: u32 = 0;
 
 #[program]
 pub mod cctp_token_pool {
@@ -549,6 +553,12 @@ fn validate_cctp_and_ccip_messages(
     );
 
     require_eq!(
+        cctp_msg.version(),
+        SUPPORTED_CCTP_MESSAGE_VERSION,
+        CctpTokenPoolError::InvalidCctpMessageVersion
+    );
+
+    require_eq!(
         cctp_msg.source_domain(),
         source_extra_data.source_domain,
         CctpTokenPoolError::InvalidSourceDomain
@@ -724,6 +734,8 @@ pub enum CctpTokenPoolError {
     InvalidNonce,
     #[msg("CCTP message is malformed or too short")]
     MalformedCctpMessage,
+    #[msg("Invalid CCTP message version")]
+    InvalidCctpMessageVersion,
     #[msg("Invalid Token Messenger Minter")]
     InvalidTokenMessengerMinter,
     #[msg("Invalid Message Transmitter")]
