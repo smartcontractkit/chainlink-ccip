@@ -127,21 +127,14 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     return s_fills[fillId];
   }
 
-  /// @notice Fee breakdown for fast transfer operations.
-  /// @dev This struct helps avoid stack too deep errors when emitting events with detailed fee information.
-  /// Rather than calculating fees inline during event emission, we can pack them into this struct.
-  struct FeeBreakdown {
-    uint256 fillerFee; // Fee amount going to the filler
-    uint256 poolFee; // Fee amount going to the pool
-  }
-
   /// @notice Combined data structure for CCIP send operations.
   /// @dev This struct helps avoid stack too deep errors by grouping related data that needs to be
   /// passed together from fee calculation to message sending. Without this grouping, the function
   /// would exceed Solidity's stack depth limit when handling multiple return values.
   struct FastTransferOpData {
     IFastTransferPool.Quote quote; // Fee quote information for the CCIP message
-    FeeBreakdown feeBreakdown; // Detailed breakdown of fast transfer fees
+    uint256 fillerFee; // Fee amount going to the filler
+    uint256 poolFee; // Fee amount going to the pool
     Client.EVM2AnyMessage message; // The CCIP message to be sent
   }
 
@@ -178,8 +171,8 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
       settlementId: settlementId,
       sourceAmountNetFee: amountNetFee,
       sourceDecimals: i_tokenDecimals,
-      fillerFee: fastTransferOpData.feeBreakdown.fillerFee,
-      poolFee: fastTransferOpData.feeBreakdown.poolFee,
+      fillerFee: fastTransferOpData.fillerFee,
+      poolFee: fastTransferOpData.poolFee,
       receiver: receiver
     });
 
@@ -246,11 +239,10 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
       revert TransferAmountExceedsMaxFillAmount(destinationChainSelector, amount);
     }
 
-    (fastTransferOpData.feeBreakdown.fillerFee, fastTransferOpData.feeBreakdown.poolFee) = _calculateFastTransferFees(
+    (fastTransferOpData.fillerFee, fastTransferOpData.poolFee) = _calculateFastTransferFees(
       amount, destChainConfig.fastTransferFillerFeeBps, destChainConfig.fastTransferPoolFeeBps
     );
-    fastTransferOpData.quote.fastTransferFee =
-      fastTransferOpData.feeBreakdown.fillerFee + fastTransferOpData.feeBreakdown.poolFee;
+    fastTransferOpData.quote.fastTransferFee = fastTransferOpData.fillerFee + fastTransferOpData.poolFee;
     bytes memory extraArgs;
 
     // We use 0 as a toggle for whether the destination chain requires custom ExtraArgs. Zero would not be a sensible
