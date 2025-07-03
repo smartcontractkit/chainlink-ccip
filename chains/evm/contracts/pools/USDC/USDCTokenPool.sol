@@ -113,13 +113,12 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     i_localDomainIdentifier = transmitter.localDomain();
     i_token.safeIncreaseAllowance(address(i_tokenMessenger), type(uint256).max);
 
-    // For new token pools, if no previous pool exists, and so the previousPool is not needed
-    // the zero address is a valid value. We do not want to call supportsInterface on the zero address because
-    // it will revert, so we short circuit the check if the previousPool is the zero address.
-    if (
-      previousPool != address(0)
-        && (previousPool == address(this) || !IERC165(previousPool).supportsInterface(type(IPoolV1).interfaceId))
-    ) {
+    // Sanity check, previousPool should not be current pool.
+    if (previousPool == address(this)) {
+      revert InvalidPreviousPool();
+    }
+    // Sanity check, if previousPool exists, it should be a valid token pool, we check it with supportsInterface.
+    if (previousPool != address(0) && !IERC165(previousPool).supportsInterface(type(IPoolV1).interfaceId)) {
       revert InvalidPreviousPool();
     }
 
