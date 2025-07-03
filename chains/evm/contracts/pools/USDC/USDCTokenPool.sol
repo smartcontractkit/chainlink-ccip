@@ -113,11 +113,11 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     i_localDomainIdentifier = transmitter.localDomain();
     i_token.safeIncreaseAllowance(address(i_tokenMessenger), type(uint256).max);
 
-    // Sanity check, previousPool should not be current pool.
+    // PreviousPool should not be current pool.
     if (previousPool == address(this)) {
       revert InvalidPreviousPool();
     }
-    // Sanity check, if previousPool exists, it should be a valid token pool, we check it with supportsInterface.
+    // If previousPool exists, it should be a valid token pool, we check it with supportsInterface.
     if (previousPool != address(0) && !IERC165(previousPool).supportsInterface(type(IPoolV1).interfaceId)) {
       revert InvalidPreviousPool();
     }
