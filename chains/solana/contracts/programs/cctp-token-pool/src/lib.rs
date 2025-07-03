@@ -41,6 +41,7 @@ pub mod cctp_token_pool {
             ),
             fund_manager: Pubkey::default(),
             fund_reclaim_destination: Pubkey::default(),
+            minimum_signer_funds: 0,
         });
 
         Ok(())
@@ -74,6 +75,11 @@ pub mod cctp_token_pool {
 
     pub fn set_fund_manager(ctx: Context<SetConfig>, fund_manager: Pubkey) -> Result<()> {
         ctx.accounts.state.fund_manager = fund_manager;
+        Ok(())
+    }
+
+    pub fn set_minimum_signer_funds(ctx: Context<SetConfig>, amount: u64) -> Result<()> {
+        ctx.accounts.state.minimum_signer_funds = amount;
         Ok(())
     }
 
@@ -340,9 +346,9 @@ pub mod cctp_token_pool {
     pub fn reclaim_event_account(
         ctx: Context<ReclaimEventAccount>,
         mint: Pubkey,
-        _original_sender: Pubkey,
-        _remote_chain_selector: u64,
-        _msg_nonce: u64,
+        original_sender: Pubkey,
+        remote_chain_selector: u64,
+        msg_nonce: u64,
         attestation: Vec<u8>,
     ) -> Result<()> {
         let attestation_bytes = attestation.try_to_vec()?;
@@ -379,6 +385,13 @@ pub mod cctp_token_pool {
 
         invoke_signed(&instruction, &acc_infos, &[signer_seeds])?;
 
+        emit!(CcipCctpMessageEventAccountClosed {
+            original_sender,
+            remote_chain_selector,
+            msg_total_nonce: msg_nonce,
+            address: ctx.accounts.message_sent_event_account.key()
+        });
+
         Ok(())
     }
 
@@ -388,12 +401,14 @@ pub mod cctp_token_pool {
     /// * `owner`: can configure the reclaimer and fund manager.
     /// * `fund_manager`: can execute this instruction.
     /// * `fund_reclaim_destination`: receives the funds.
+    ///
+    /// The resulting funds on the PDA cannot drop below `minimum_signer_funds`.
     pub fn reclaim_funds(ctx: Context<ReclaimFunds>, amount: u64) -> Result<()> {
         require!(amount > 0, CctpTokenPoolError::InvalidSolAmount);
 
         let pool_signer_lamports = ctx.accounts.pool_signer.lamports();
         require!(
-            pool_signer_lamports >= amount,
+            pool_signer_lamports >= amount + ctx.accounts.state.minimum_signer_funds,
             CctpTokenPoolError::InsufficientFunds
         );
 
@@ -737,6 +752,8 @@ pub struct State {
     pub fund_manager: Pubkey,
     // Receiver of funds reclaimed from the signer PDA.
     pub fund_reclaim_destination: Pubkey,
+    // Funds in the signer PDA cannot drop under this value when reclaiming.
+    pub minimum_signer_funds: u64,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, InitSpace)]
@@ -775,6 +792,16 @@ pub struct CcipCctpMessageSentEvent {
 
     // CCTP message bytes, used to get the attestation offchain and receive the message on dest
     pub message_sent_bytes: Vec<u8>,
+}
+
+#[event]
+pub struct CcipCctpMessageEventAccountClosed {
+    // Seeds for the CCTP message sent event account
+    original_sender: Pubkey,
+    remote_chain_selector: u64,
+    msg_total_nonce: u64,
+    // Actual event account address, derived from the seeds above
+    address: Pubkey,
 }
 
 #[error_code]

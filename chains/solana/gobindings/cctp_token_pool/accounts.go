@@ -13,6 +13,7 @@ type State struct {
 	Config                 BaseConfig
 	FundManager            ag_solanago.PublicKey
 	FundReclaimDestination ag_solanago.PublicKey
+	MinimumSignerFunds     uint64
 }
 
 var StateDiscriminator = [8]byte{216, 146, 107, 94, 104, 75, 182, 177}
@@ -40,6 +41,11 @@ func (obj State) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	}
 	// Serialize `FundReclaimDestination` param:
 	err = encoder.Encode(obj.FundReclaimDestination)
+	if err != nil {
+		return err
+	}
+	// Serialize `MinimumSignerFunds` param:
+	err = encoder.Encode(obj.MinimumSignerFunds)
 	if err != nil {
 		return err
 	}
@@ -77,6 +83,11 @@ func (obj *State) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	}
 	// Deserialize `FundReclaimDestination`:
 	err = decoder.Decode(&obj.FundReclaimDestination)
+	if err != nil {
+		return err
+	}
+	// Deserialize `MinimumSignerFunds`:
+	err = decoder.Decode(&obj.MinimumSignerFunds)
 	if err != nil {
 		return err
 	}

@@ -160,6 +160,32 @@ export type CctpTokenPool = {
       ]
     },
     {
+      "name": "setMinimumSignerFunds",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "setFundReclaimDestination",
       "accounts": [
         {
@@ -830,7 +856,9 @@ export type CctpTokenPool = {
         "",
         "* `owner`: can configure the reclaimer and fund manager.",
         "* `fund_manager`: can execute this instruction.",
-        "* `fund_reclaim_destination`: receives the funds."
+        "* `fund_reclaim_destination`: receives the funds.",
+        "",
+        "The resulting funds on the PDA cannot drop below `minimum_signer_funds`."
       ],
       "accounts": [
         {
@@ -931,6 +959,10 @@ export type CctpTokenPool = {
           {
             "name": "fundReclaimDestination",
             "type": "publicKey"
+          },
+          {
+            "name": "minimumSignerFunds",
+            "type": "u64"
           }
         ]
       }
@@ -1105,6 +1137,31 @@ export type CctpTokenPool = {
         {
           "name": "messageSentBytes",
           "type": "bytes",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "CcipCctpMessageEventAccountClosed",
+      "fields": [
+        {
+          "name": "originalSender",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "remoteChainSelector",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "msgTotalNonce",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "address",
+          "type": "publicKey",
           "index": false
         }
       ]
@@ -1326,6 +1383,32 @@ export const IDL: CctpTokenPool = {
       ]
     },
     {
+      "name": "setMinimumSignerFunds",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "setFundReclaimDestination",
       "accounts": [
         {
@@ -1996,7 +2079,9 @@ export const IDL: CctpTokenPool = {
         "",
         "* `owner`: can configure the reclaimer and fund manager.",
         "* `fund_manager`: can execute this instruction.",
-        "* `fund_reclaim_destination`: receives the funds."
+        "* `fund_reclaim_destination`: receives the funds.",
+        "",
+        "The resulting funds on the PDA cannot drop below `minimum_signer_funds`."
       ],
       "accounts": [
         {
@@ -2097,6 +2182,10 @@ export const IDL: CctpTokenPool = {
           {
             "name": "fundReclaimDestination",
             "type": "publicKey"
+          },
+          {
+            "name": "minimumSignerFunds",
+            "type": "u64"
           }
         ]
       }
@@ -2271,6 +2360,31 @@ export const IDL: CctpTokenPool = {
         {
           "name": "messageSentBytes",
           "type": "bytes",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "CcipCctpMessageEventAccountClosed",
+      "fields": [
+        {
+          "name": "originalSender",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "remoteChainSelector",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "msgTotalNonce",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "address",
+          "type": "publicKey",
           "index": false
         }
       ]

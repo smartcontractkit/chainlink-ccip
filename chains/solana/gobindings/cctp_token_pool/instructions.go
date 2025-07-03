@@ -45,6 +45,8 @@ var (
 
 	Instruction_SetFundManager = ag_binary.TypeID([8]byte{120, 5, 18, 143, 165, 103, 181, 139})
 
+	Instruction_SetMinimumSignerFunds = ag_binary.TypeID([8]byte{142, 36, 82, 253, 191, 111, 114, 53})
+
 	Instruction_SetFundReclaimDestination = ag_binary.TypeID([8]byte{81, 6, 71, 218, 85, 141, 95, 162})
 
 	Instruction_SetRouter = ag_binary.TypeID([8]byte{236, 248, 107, 200, 151, 160, 44, 250})
@@ -77,6 +79,8 @@ var (
 	// * `owner`: can configure the reclaimer and fund manager.
 	// * `fund_manager`: can execute this instruction.
 	// * `fund_reclaim_destination`: receives the funds.
+	//
+	// The resulting funds on the PDA cannot drop below `minimum_signer_funds`.
 	Instruction_ReclaimFunds = ag_binary.TypeID([8]byte{38, 246, 147, 248, 43, 41, 43, 198})
 
 	Instruction_DeriveAccountsReleaseOrMintTokens = ag_binary.TypeID([8]byte{40, 91, 244, 228, 0, 2, 51, 238})
@@ -99,6 +103,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "AcceptOwnership"
 	case Instruction_SetFundManager:
 		return "SetFundManager"
+	case Instruction_SetMinimumSignerFunds:
+		return "SetMinimumSignerFunds"
 	case Instruction_SetFundReclaimDestination:
 		return "SetFundReclaimDestination"
 	case Instruction_SetRouter:
@@ -168,6 +174,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"set_fund_manager", (*SetFundManager)(nil),
+		},
+		{
+			"set_minimum_signer_funds", (*SetMinimumSignerFunds)(nil),
 		},
 		{
 			"set_fund_reclaim_destination", (*SetFundReclaimDestination)(nil),
