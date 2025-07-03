@@ -364,6 +364,16 @@ export type BaseTokenPool = {
           "name": "selfServedAllowed",
           "type": "bool",
           "index": false
+        },
+        {
+          "name": "router",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "rmnRemote",
+          "type": "publicKey",
+          "index": false
         }
       ]
     },
@@ -602,6 +612,26 @@ export type BaseTokenPool = {
       ]
     },
     {
+      "name": "RmnRemoteUpdated",
+      "fields": [
+        {
+          "name": "oldRmnRemote",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "newRmnRemote",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "OwnershipTransferRequested",
       "fields": [
         {
@@ -616,6 +646,26 @@ export type BaseTokenPool = {
         },
         {
           "name": "mint",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "TokenPoolInitialized",
+      "fields": [
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenProgram",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "owner",
           "type": "publicKey",
           "index": false
         }
@@ -1164,6 +1214,16 @@ export const IDL: BaseTokenPool = {
           "name": "selfServedAllowed",
           "type": "bool",
           "index": false
+        },
+        {
+          "name": "router",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "rmnRemote",
+          "type": "publicKey",
+          "index": false
         }
       ]
     },
@@ -1402,6 +1462,26 @@ export const IDL: BaseTokenPool = {
       ]
     },
     {
+      "name": "RmnRemoteUpdated",
+      "fields": [
+        {
+          "name": "oldRmnRemote",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "newRmnRemote",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "OwnershipTransferRequested",
       "fields": [
         {
@@ -1416,6 +1496,26 @@ export const IDL: BaseTokenPool = {
         },
         {
           "name": "mint",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "TokenPoolInitialized",
+      "fields": [
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenProgram",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "owner",
           "type": "publicKey",
           "index": false
         }
