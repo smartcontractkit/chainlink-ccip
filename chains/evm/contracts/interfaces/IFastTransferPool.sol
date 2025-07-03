@@ -29,7 +29,8 @@ interface IFastTransferPool {
     /// @param sourceAmountNetFee The amount being transferred, excluding the fast fill fee, expressed in source token decimals.
     uint256 sourceAmountNetFee,
     uint8 sourceDecimals,
-    uint256 fastTransferFee,
+    uint256 fillerFee,
+    uint256 poolFee,
     bytes receiver
   );
   /// @notice Emitted when a fast transfer is filled. This means the end user has received the tokens but the slow
