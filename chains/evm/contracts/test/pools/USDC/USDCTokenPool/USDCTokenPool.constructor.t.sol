@@ -22,6 +22,20 @@ contract USDCTokenPool_constructor is USDCSetup {
     );
   }
 
+  function test_constructor_PreviousPoolZeroAddress() public {
+    USDCTokenPool usdcTokenPool = new USDCTokenPool(
+      s_mockUSDC,
+      s_cctpMessageTransmitterProxy,
+      s_USDCToken,
+      new address[](0),
+      address(s_mockRMNRemote),
+      address(s_router),
+      address(0)
+    );
+
+    assertEq(usdcTokenPool.i_previousPool(), address(0));
+  }
+
   function test_constructor_RevertWhen_TokenMessangerAddressZero() public {
     vm.expectRevert(USDCTokenPool.InvalidConfig.selector);
     new USDCTokenPool(
