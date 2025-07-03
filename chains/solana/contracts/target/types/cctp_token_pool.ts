@@ -3,6 +3,37 @@ export type CctpTokenPool = {
   "name": "cctp_token_pool",
   "instructions": [
     {
+      "name": "initGlobalConfig",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "initialize",
       "accounts": [
         {
@@ -34,6 +65,11 @@ export type CctpTokenPool = {
           "name": "programData",
           "isMut": false,
           "isSigner": false
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": [
@@ -59,32 +95,6 @@ export type CctpTokenPool = {
       "accounts": [],
       "args": [],
       "returns": "string"
-    },
-    {
-      "name": "setRmnRemote",
-      "accounts": [
-        {
-          "name": "state",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "mint",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "rmnRemote",
-          "type": "publicKey"
-        }
-      ]
     },
     {
       "name": "transferOwnership",
@@ -138,7 +148,7 @@ export type CctpTokenPool = {
       "accounts": [
         {
           "name": "state",
-          "isMut": true,
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -148,13 +158,59 @@ export type CctpTokenPool = {
         },
         {
           "name": "authority",
-          "isMut": false,
+          "isMut": true,
           "isSigner": true
+        },
+        {
+          "name": "program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": [
         {
           "name": "newRouter",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
+      "name": "setRmn",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "rmnAddress",
           "type": "publicKey"
         }
       ]
@@ -824,6 +880,18 @@ export type CctpTokenPool = {
             "type": {
               "defined": "BaseConfig"
             }
+          }
+        ]
+      }
+    },
+    {
+      "name": "poolConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
           }
         ]
       }
@@ -1072,6 +1140,37 @@ export const IDL: CctpTokenPool = {
   "name": "cctp_token_pool",
   "instructions": [
     {
+      "name": "initGlobalConfig",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "initialize",
       "accounts": [
         {
@@ -1103,6 +1202,11 @@ export const IDL: CctpTokenPool = {
           "name": "programData",
           "isMut": false,
           "isSigner": false
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": [
@@ -1128,32 +1232,6 @@ export const IDL: CctpTokenPool = {
       "accounts": [],
       "args": [],
       "returns": "string"
-    },
-    {
-      "name": "setRmnRemote",
-      "accounts": [
-        {
-          "name": "state",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "mint",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "rmnRemote",
-          "type": "publicKey"
-        }
-      ]
     },
     {
       "name": "transferOwnership",
@@ -1207,7 +1285,7 @@ export const IDL: CctpTokenPool = {
       "accounts": [
         {
           "name": "state",
-          "isMut": true,
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -1217,13 +1295,59 @@ export const IDL: CctpTokenPool = {
         },
         {
           "name": "authority",
-          "isMut": false,
+          "isMut": true,
           "isSigner": true
+        },
+        {
+          "name": "program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": [
         {
           "name": "newRouter",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
+      "name": "setRmn",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "rmnAddress",
           "type": "publicKey"
         }
       ]
@@ -1893,6 +2017,18 @@ export const IDL: CctpTokenPool = {
             "type": {
               "defined": "BaseConfig"
             }
+          }
+        ]
+      }
+    },
+    {
+      "name": "poolConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
           }
         ]
       }

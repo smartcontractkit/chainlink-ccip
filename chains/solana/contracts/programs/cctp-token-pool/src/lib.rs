@@ -35,6 +35,12 @@ pub mod cctp_token_pool {
 
     use super::*;
 
+    pub fn init_global_config(ctx: Context<InitGlobalConfig>) -> Result<()> {
+        ctx.accounts.config.set_inner(PoolConfig { version: 1 });
+
+        Ok(())
+    }
+
     pub fn initialize(
         ctx: Context<InitializeTokenPool>,
         router: Pubkey,
@@ -65,12 +71,6 @@ pub mod cctp_token_pool {
         Ok(response)
     }
 
-    // TODO remove this method, only used for internal testing
-    pub fn set_rmn_remote(ctx: Context<SetConfig>, rmn_remote: Pubkey) -> Result<()> {
-        ctx.accounts.state.config.rmn_remote = rmn_remote;
-        Ok(())
-    }
-
     pub fn transfer_ownership(ctx: Context<SetConfig>, proposed_owner: Pubkey) -> Result<()> {
         ctx.accounts.state.config.transfer_ownership(proposed_owner)
     }
@@ -82,11 +82,15 @@ pub mod cctp_token_pool {
 
     // set_router changes the expected signers for mint/release + burn/lock method calls
     // this is used to update the router address
-    pub fn set_router(ctx: Context<SetConfig>, new_router: Pubkey) -> Result<()> {
+    pub fn set_router(ctx: Context<AdminUpdateTokenPool>, new_router: Pubkey) -> Result<()> {
         ctx.accounts
             .state
             .config
             .set_router(new_router, ctx.program_id)
+    }
+
+    pub fn set_rmn(ctx: Context<AdminUpdateTokenPool>, rmn_address: Pubkey) -> Result<()> {
+        ctx.accounts.state.config.set_rmn(rmn_address)
     }
 
     // initialize remote config (with no remote pools as it must be zero sized)
@@ -107,7 +111,7 @@ pub mod cctp_token_pool {
             .set(remote_chain_selector, mint, cfg)
     }
 
-    // edit remote config
+    // edit remote config's CCIP values
     pub fn edit_chain_remote_config(
         ctx: Context<EditChainConfigDynamicSize>,
         remote_chain_selector: u64,
@@ -120,6 +124,7 @@ pub mod cctp_token_pool {
             .set(remote_chain_selector, mint, cfg)
     }
 
+    // edit remote config's values that are specific to CCTP
     pub fn edit_chain_remote_config_cctp(
         ctx: Context<EditChainConfig>,
         _remote_chain_selector: u64,
@@ -199,13 +204,19 @@ pub mod cctp_token_pool {
         remove: Vec<Pubkey>,
     ) -> Result<()> {
         let list = &mut ctx.accounts.state.config.allow_list;
-        for key in remove {
-            require!(
-                list.contains(&key),
-                CcipTokenPoolError::AllowlistKeyDidNotExist
-            );
-            list.retain(|k| k != &key);
-        }
+        // Cache initial length
+        let initial_list_len = list.len();
+        // Collect all keys to remove into a HashSet for O(1) lookups
+        let keys_to_remove: std::collections::HashSet<Pubkey> = remove.into_iter().collect();
+        // Perform a single pass through the list
+        list.retain(|k| !keys_to_remove.contains(k));
+
+        // We don't store repeated keys, so the keys_to_remove should match the removed keys
+        require_eq!(
+            initial_list_len,
+            list.len().checked_add(keys_to_remove.len()).unwrap(),
+            CcipTokenPoolError::AllowlistKeyDidNotExist
+        );
 
         Ok(())
     }
@@ -307,6 +318,7 @@ pub mod cctp_token_pool {
             CctpTokenPoolError::InvalidMessageSentEventAccount
         );
 
+        // This event is specific to this CCTP Token Pool program
         emit!(CcipCctpMessageSentEvent {
             original_sender: lock_or_burn.original_sender,
             remote_chain_selector: lock_or_burn.remote_chain_selector,
@@ -317,6 +329,7 @@ pub mod cctp_token_pool {
             cctp_nonce,
         });
 
+        // This event is standardized with the BurnmintTokenPool program
         emit!(Burned {
             sender: ctx.accounts.authority.key(),
             amount: lock_or_burn.amount,
@@ -330,6 +343,7 @@ pub mod cctp_token_pool {
 
         Ok(LockOrBurnOutV1 {
             dest_token_address: ctx.accounts.chain_config.base.remote.token_address.clone(),
+            // The dest_poll_data is then read by the remote pool, so we standardize on ABI-encoding
             dest_pool_data: extra_data.abi_encode().to_vec(),
         })
     }
@@ -688,6 +702,15 @@ pub struct CctpChain {
     // Using u32 here because it's what CCTP uses in its Params structs.
     pub domain_id: u32,
     pub destination_caller: Pubkey, // The allowed caller to invoke CCTP's receive_message on the dest chain
+}
+
+#[account]
+#[derive(InitSpace)]
+pub struct PoolConfig {
+    // This is mainly a placeholder in case we ever want to include global configs that apply
+    // to how all pools behave.
+    // For now, it is pretty much empty.
+    pub version: u8,
 }
 
 #[account]

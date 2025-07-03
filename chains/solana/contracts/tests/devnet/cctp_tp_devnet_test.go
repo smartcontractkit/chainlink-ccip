@@ -125,22 +125,22 @@ func TestCctpTpDevnet(t *testing.T) {
 	tokenAdminRegistry, _, err := state.FindTokenAdminRegistryPDA(usdcMint, referenceAddresses.Router)
 	require.NoError(t, err)
 
+	type ProgramData struct {
+		DataType uint32
+		Address  solana.PublicKey
+	}
+
+	// get program data account
+	data, err := client.GetAccountInfoWithOpts(ctx, cctpPool.program, &rpc.GetAccountInfoOpts{
+		Commitment: config.DefaultCommitment,
+	})
+	require.NoError(t, err)
+	// Decode program data
+	var programData ProgramData
+	require.NoError(t, bin.UnmarshalBorsh(&programData, data.Bytes()))
+
 	t.Run("Initialize TokenPool", func(t *testing.T) {
 		t.Skip()
-
-		type ProgramData struct {
-			DataType uint32
-			Address  solana.PublicKey
-		}
-
-		// get program data account
-		data, err := client.GetAccountInfoWithOpts(ctx, cctpPool.program, &rpc.GetAccountInfoOpts{
-			Commitment: config.DefaultCommitment,
-		})
-		require.NoError(t, err)
-		// Decode program data
-		var programData ProgramData
-		require.NoError(t, bin.UnmarshalBorsh(&programData, data.Bytes()))
 
 		// poolInitI, err := cctp_token_pool.NewInitializeInstruction(
 		// 	referenceAddresses.Router,
@@ -327,11 +327,13 @@ func TestCctpTpDevnet(t *testing.T) {
 		t.Run("Update pool router/rmn config", func(t *testing.T) {
 			t.Skip()
 
-			rmnIx, err := cctp_token_pool.NewSetRmnRemoteInstruction(
+			rmnIx, err := cctp_token_pool.NewSetRmnInstruction(
 				referenceAddresses.RmnRemote,
 				cctpPool.state,
 				usdcMint,
 				admin.PublicKey(),
+				cctpPool.program,
+				programData.Address,
 			).ValidateAndBuild()
 			require.NoError(t, err)
 
@@ -340,6 +342,8 @@ func TestCctpTpDevnet(t *testing.T) {
 				cctpPool.state,
 				usdcMint,
 				admin.PublicKey(),
+				cctpPool.program,
+				programData.Address,
 			).ValidateAndBuild()
 			require.NoError(t, err)
 			testutils.SendAndConfirm(ctx, t, client, []solana.Instruction{rmnIx, routerIx}, admin, config.DefaultCommitment)

@@ -642,6 +642,15 @@ func TestCCIPRouter(t *testing.T) {
 				var programData ProgramData
 				require.NoError(t, bin.UnmarshalBorsh(&programData, data.Bytes()))
 
+				poolGlobalInitI, err := cctp_token_pool.NewInitGlobalConfigInstruction(
+					usdcPool.GlobalConfig,
+					legacyAdmin.PublicKey(),
+					solana.SystemProgramID,
+					usdcPool.PoolProgram,
+					programData.Address,
+				).ValidateAndBuild()
+				require.NoError(t, err)
+
 				ixInit, err := cctp_token_pool.NewInitializeInstruction(
 					config.CcipRouterProgram,
 					config.RMNRemoteProgram,
@@ -651,6 +660,7 @@ func TestCCIPRouter(t *testing.T) {
 					solana.SystemProgramID,
 					config.CctpTokenPoolProgram,
 					programData.Address,
+					usdcPool.GlobalConfig,
 				).ValidateAndBuild()
 				require.NoError(t, err)
 
@@ -662,7 +672,7 @@ func TestCCIPRouter(t *testing.T) {
 				).ValidateAndBuild()
 				require.NoError(t, err)
 
-				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ixInit, ixTransfer}, legacyAdmin, config.DefaultCommitment)
+				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{poolGlobalInitI, ixInit, ixTransfer}, legacyAdmin, config.DefaultCommitment)
 
 				ixAccept, err := cctp_token_pool.NewAcceptOwnershipInstruction(
 					usdcPool.PoolConfig,

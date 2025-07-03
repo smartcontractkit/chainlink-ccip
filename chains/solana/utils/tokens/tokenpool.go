@@ -31,6 +31,8 @@ type TokenPool struct {
 	PoolLookupTable                                       solana.PublicKey
 	WritableIndexes                                       []uint8
 
+	GlobalConfig solana.PublicKey // Global Config PDA of the Token Pool
+
 	AdditionalAccounts solana.PublicKeySlice
 
 	// AssociatedTokenAddress Lookups
@@ -98,6 +100,10 @@ func NewTokenPool(tokenProgram solana.PublicKey, poolProgram solana.PublicKey, m
 	if err != nil {
 		return TokenPool{}, err
 	}
+	globalConfigPDA, err := TokenPoolGlobalConfigPDA(poolProgram)
+	if err != nil {
+		return TokenPool{}, err
+	}
 
 	p := TokenPool{
 		Program:               tokenProgram,
@@ -113,6 +119,7 @@ func NewTokenPool(tokenProgram solana.PublicKey, poolProgram solana.PublicKey, m
 		Billing:               map[uint64]solana.PublicKey{},
 		RouterSigner:          routerSignerPDA,
 		OfframpSigner:         offrampSignerPDA,
+		GlobalConfig:          globalConfigPDA,
 	}
 	p.Chain[config.EvmChainSelector] = evmChainPDA
 	p.Chain[config.SvmChainSelector] = svmChainPDA

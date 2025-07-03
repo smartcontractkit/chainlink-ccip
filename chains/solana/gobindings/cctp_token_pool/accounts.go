@@ -60,6 +60,48 @@ func (obj *State) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	return nil
 }
 
+type PoolConfig struct {
+	Version uint8
+}
+
+var PoolConfigDiscriminator = [8]byte{26, 108, 14, 123, 116, 230, 129, 43}
+
+func (obj PoolConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Write account discriminator:
+	err = encoder.WriteBytes(PoolConfigDiscriminator[:], false)
+	if err != nil {
+		return err
+	}
+	// Serialize `Version` param:
+	err = encoder.Encode(obj.Version)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *PoolConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Read and check account discriminator:
+	{
+		discriminator, err := decoder.ReadTypeID()
+		if err != nil {
+			return err
+		}
+		if !discriminator.Equal(PoolConfigDiscriminator[:]) {
+			return fmt.Errorf(
+				"wrong discriminator: wanted %s, got %s",
+				"[26 108 14 123 116 230 129 43]",
+				fmt.Sprint(discriminator[:]))
+		}
+	}
+	// Deserialize `Version`:
+	err = decoder.Decode(&obj.Version)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 type ChainConfig struct {
 	Base BaseChain
 	Cctp CctpChain

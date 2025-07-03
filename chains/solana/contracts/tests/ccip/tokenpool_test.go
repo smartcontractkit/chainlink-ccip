@@ -970,6 +970,15 @@ func TestTokenPool(t *testing.T) {
 					var programData ProgramData
 					require.NoError(t, bin.UnmarshalBorsh(&programData, data.Bytes()))
 
+					poolGlobalInitI, err := cctp_token_pool.NewInitGlobalConfigInstruction(
+						cctpPool.GlobalConfig,
+						admin.PublicKey(),
+						solana.SystemProgramID,
+						cctpPool.Program,
+						programData.Address,
+					).ValidateAndBuild()
+					require.NoError(t, err)
+
 					poolInitI, err := cctp_token_pool.NewInitializeInstruction(
 						dumbRamp,
 						config.RMNRemoteProgram,
@@ -979,6 +988,7 @@ func TestTokenPool(t *testing.T) {
 						solana.SystemProgramID,
 						cctpPool.Program,
 						programData.Address,
+						cctpPool.GlobalConfig,
 					).ValidateAndBuild()
 
 					require.NoError(t, err)
@@ -1031,7 +1041,7 @@ func TestTokenPool(t *testing.T) {
 					require.Equal(t, poolTokenAccount, cctpPool.TokenAccount)
 
 					// submit tx with all instructions
-					res := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{poolInitI, ixConfigure, ixCctpConfigure, ixAppend, createP}, admin, config.DefaultCommitment)
+					res := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{poolGlobalInitI, poolInitI, ixConfigure, ixCctpConfigure, ixAppend, createP}, admin, config.DefaultCommitment)
 					require.NotNil(t, res)
 
 					// validate state

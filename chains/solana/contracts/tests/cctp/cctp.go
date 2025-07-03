@@ -83,6 +83,7 @@ func GetTokenMessengerMinterPDAs(t *testing.T, domain uint32, usdcMint solana.Pu
 
 type TokenPoolPDAs struct {
 	Program,
+	GlobalConfig,
 	State,
 	Signer,
 	TokenAccount,
@@ -94,6 +95,8 @@ func GetTokenPoolPDAs(t *testing.T, usdcMint solana.PublicKey) TokenPoolPDAs {
 
 	statePDA, err := tokens.TokenPoolConfigAddress(usdcMint, config.CctpTokenPoolProgram)
 	require.NoError(t, err)
+	globalConfigPDA, err := tokens.TokenPoolGlobalConfigPDA(config.CctpTokenPoolProgram)
+	require.NoError(t, err)
 	signerPDA, err := tokens.TokenPoolSignerAddress(usdcMint, config.CctpTokenPoolProgram)
 	require.NoError(t, err)
 	poolTokenAccount, _, err := tokens.FindAssociatedTokenAddress(solana.TokenProgramID, usdcMint, signerPDA)
@@ -103,6 +106,7 @@ func GetTokenPoolPDAs(t *testing.T, usdcMint solana.PublicKey) TokenPoolPDAs {
 
 	return TokenPoolPDAs{
 		Program:        config.CctpTokenPoolProgram,
+		GlobalConfig:   globalConfigPDA,
 		State:          statePDA,
 		Signer:         signerPDA,
 		TokenAccount:   poolTokenAccount,

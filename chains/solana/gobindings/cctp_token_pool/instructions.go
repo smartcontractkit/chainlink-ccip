@@ -28,6 +28,8 @@ func init() {
 }
 
 var (
+	Instruction_InitGlobalConfig = ag_binary.TypeID([8]byte{140, 136, 214, 48, 87, 0, 120, 255})
+
 	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
 
 	// Returns the program type (name) and version.
@@ -37,13 +39,13 @@ var (
 	// * `ctx` - The context
 	Instruction_TypeVersion = ag_binary.TypeID([8]byte{129, 251, 8, 243, 122, 229, 252, 164})
 
-	Instruction_SetRmnRemote = ag_binary.TypeID([8]byte{245, 90, 107, 30, 153, 214, 24, 240})
-
 	Instruction_TransferOwnership = ag_binary.TypeID([8]byte{65, 177, 215, 73, 53, 45, 99, 47})
 
 	Instruction_AcceptOwnership = ag_binary.TypeID([8]byte{172, 23, 43, 13, 238, 213, 85, 150})
 
 	Instruction_SetRouter = ag_binary.TypeID([8]byte{236, 248, 107, 200, 151, 160, 44, 250})
+
+	Instruction_SetRmn = ag_binary.TypeID([8]byte{252, 89, 60, 179, 198, 54, 169, 120})
 
 	Instruction_InitChainRemoteConfig = ag_binary.TypeID([8]byte{21, 150, 133, 36, 2, 116, 199, 129})
 
@@ -75,18 +77,20 @@ var (
 // InstructionIDToName returns the name of the instruction given its ID.
 func InstructionIDToName(id ag_binary.TypeID) string {
 	switch id {
+	case Instruction_InitGlobalConfig:
+		return "InitGlobalConfig"
 	case Instruction_Initialize:
 		return "Initialize"
 	case Instruction_TypeVersion:
 		return "TypeVersion"
-	case Instruction_SetRmnRemote:
-		return "SetRmnRemote"
 	case Instruction_TransferOwnership:
 		return "TransferOwnership"
 	case Instruction_AcceptOwnership:
 		return "AcceptOwnership"
 	case Instruction_SetRouter:
 		return "SetRouter"
+	case Instruction_SetRmn:
+		return "SetRmn"
 	case Instruction_InitChainRemoteConfig:
 		return "InitChainRemoteConfig"
 	case Instruction_EditChainRemoteConfig:
@@ -134,13 +138,13 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 	ag_binary.AnchorTypeIDEncoding,
 	[]ag_binary.VariantType{
 		{
+			"init_global_config", (*InitGlobalConfig)(nil),
+		},
+		{
 			"initialize", (*Initialize)(nil),
 		},
 		{
 			"type_version", (*TypeVersion)(nil),
-		},
-		{
-			"set_rmn_remote", (*SetRmnRemote)(nil),
 		},
 		{
 			"transfer_ownership", (*TransferOwnership)(nil),
@@ -150,6 +154,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"set_router", (*SetRouter)(nil),
+		},
+		{
+			"set_rmn", (*SetRmn)(nil),
 		},
 		{
 			"init_chain_remote_config", (*InitChainRemoteConfig)(nil),

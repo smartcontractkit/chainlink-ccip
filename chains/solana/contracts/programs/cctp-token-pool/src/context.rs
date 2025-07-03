@@ -5,9 +5,12 @@ use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 use base_token_pool::common::*;
 use ccip_common::seed;
 
-use crate::{CctpTokenPoolError, ChainConfig, MessageAndAttestation, State};
+use crate::program::CctpTokenPool;
+use crate::{CctpTokenPoolError, ChainConfig, MessageAndAttestation, PoolConfig, State};
 
 const MAX_POOL_STATE_V: u8 = 1;
+const MAX_POOL_CONFIG_V: u8 = 1;
+
 const ANCHOR_DISCRIMINATOR: usize = 8;
 
 pub const TOKEN_MESSENGER_MINTER: Pubkey =
@@ -16,6 +19,31 @@ pub const MESSAGE_TRANSMITTER: Pubkey =
     solana_program::pubkey!("CCTPmbSD7gX1bxKPAmg77w8oFzNFpaQiQUWD43TKaecd");
 
 pub const MESSAGE_SENT_EVENT_SEED: &[u8] = b"ccip_cctp_message_sent_event";
+
+#[derive(Accounts)]
+pub struct InitGlobalConfig<'info> {
+    #[account(
+        init,
+        seeds = [CONFIG_SEED],
+        bump,
+        payer = authority,
+        space = ANCHOR_DISCRIMINATOR + PoolConfig::INIT_SPACE,
+    )]
+    pub config: Account<'info, PoolConfig>, // Global Config PDA of the Token Pool
+
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
+
+    // Ensures that the provided program is the BurnmintTokenPool program,
+    // and that its associated program data account matches the expected one.
+    // This guarantees that only the program's upgrade authority can modify the global config.
+    #[account(constraint = program.programdata_address()? == Some(program_data.key()))]
+    pub program: Program<'info, CctpTokenPool>,
+    // Global Config updates only allowed by program upgrade authority
+    #[account(constraint = program_data.upgrade_authority_address == Some(authority.key()) @ CcipTokenPoolError::Unauthorized)]
+    pub program_data: Account<'info, ProgramData>,
+}
 
 #[derive(Accounts)]
 pub struct InitializeTokenPool<'info> {
@@ -41,9 +69,39 @@ pub struct InitializeTokenPool<'info> {
     // Token pool initialization only allowed by program upgrade authority. Initializing token pools managed
     // by the CLL deployment of this program is limited to CLL. Users must deploy their own instance of this program.
     #[account(constraint = program.programdata_address()? == Some(program_data.key()))]
-    pub program: Program<'info, crate::program::CctpTokenPool>,
+    pub program: Program<'info, CctpTokenPool>,
 
     #[account(constraint = program_data.upgrade_authority_address == Some(authority.key()))]
+    pub program_data: Account<'info, ProgramData>,
+
+    #[account(
+        seeds = [CONFIG_SEED],
+        bump,
+        constraint = valid_version(config.version, MAX_POOL_CONFIG_V) @ CcipTokenPoolError::InvalidVersion,
+    )]
+    pub config: Account<'info, PoolConfig>, // Global Config PDA of the Token Pool
+}
+
+#[derive(Accounts)]
+pub struct AdminUpdateTokenPool<'info> {
+    #[account(
+        seeds = [POOL_STATE_SEED, mint.key().as_ref()],
+        bump,
+    )]
+    pub state: Account<'info, State>, // config PDA for token pool
+    pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
+
+    #[account(mut)]
+    pub authority: Signer<'info>,
+
+    #[account(constraint = program.programdata_address()? == Some(program_data.key()))]
+    pub program: Program<'info, CctpTokenPool>,
+
+    // The upgrade authority of the token pool program can update certain values of their token pools only
+    // (router and rmn addresses, for testing)
+    // This is consistent with the BurnmintTokenPool program, although it is expected that this pool will always
+    // be owned by the upgrade authority of the token pool program.
+    #[account(constraint = allowed_admin_modify_token_pool(&program_data, &authority, &state) @ CcipTokenPoolError::Unauthorized)]
     pub program_data: Account<'info, ProgramData>,
 }
 
@@ -735,4 +793,14 @@ pub struct ReclaimEventAccount<'info> {
     pub authority: Signer<'info>,
 
     pub system_program: Program<'info, System>,
+}
+
+/// Checks that the authority and the token pool owner are the upgrade authority
+pub fn allowed_admin_modify_token_pool(
+    program_data: &Account<ProgramData>,
+    authority: &Signer,
+    state: &Account<State>,
+) -> bool {
+    program_data.upgrade_authority_address == Some(authority.key()) && // Only the upgrade authority of the token pool program can modify certain values of a given token pool
+    state.config.owner == authority.key() // if only if the token pool is owned by the upgrade authority
 }
