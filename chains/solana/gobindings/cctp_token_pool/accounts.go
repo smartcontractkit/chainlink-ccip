@@ -10,6 +10,7 @@ import (
 type State struct {
 	Version uint8
 	Config  BaseConfig
+	Funding FundingConfig
 }
 
 var StateDiscriminator = [8]byte{216, 146, 107, 94, 104, 75, 182, 177}
@@ -27,6 +28,11 @@ func (obj State) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	}
 	// Serialize `Config` param:
 	err = encoder.Encode(obj.Config)
+	if err != nil {
+		return err
+	}
+	// Serialize `Funding` param:
+	err = encoder.Encode(obj.Funding)
 	if err != nil {
 		return err
 	}
@@ -54,6 +60,11 @@ func (obj *State) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	}
 	// Deserialize `Config`:
 	err = decoder.Decode(&obj.Config)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Funding`:
+	err = decoder.Decode(&obj.Funding)
 	if err != nil {
 		return err
 	}

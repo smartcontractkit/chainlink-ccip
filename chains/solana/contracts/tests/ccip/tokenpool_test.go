@@ -1720,13 +1720,81 @@ func TestTokenPool(t *testing.T) {
 				ix, err := reclaimIx.ValidateAndBuild()
 				require.NoError(t, err)
 
-				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+				// There's no fund manager, so funds cannot be reclaimed
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment, []string{"Fund Manager is invalid"})
+
+				fundManagerIxRaw := cctp_token_pool.NewSetFundManagerInstruction(admin.PublicKey(), cctpPool.State, usdcMint, admin.PublicKey())
+				fundManagerIx, err := fundManagerIxRaw.ValidateAndBuild()
+				require.NoError(t, err)
+
+				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{fundManagerIx, ix}, admin, config.DefaultCommitment)
 
 				poolSignerInfoAfter, err := solanaGoClient.GetAccountInfoWithOpts(ctx, cctpPool.Signer, &rpc.GetAccountInfoOpts{Commitment: config.DefaultCommitment})
 				require.NoError(t, err)
 				finalBalance := poolSignerInfoAfter.Value.Lamports
 
 				require.Equal(t, finalBalance, initialBalance+messageRent)
+			})
+
+			t.Run("Reclaim funds from signer account", func(t *testing.T) {
+				poolSignerInfoInitial, err := solanaGoClient.GetAccountInfoWithOpts(ctx, cctpPool.Signer, &rpc.GetAccountInfoOpts{Commitment: config.DefaultCommitment})
+				require.NoError(t, err)
+				startingBalance := poolSignerInfoInitial.Value.Lamports
+				require.LessOrEqual(t, startingBalance, 1*solana.LAMPORTS_PER_SOL)
+
+				userAtaBalanceInitial, err := solanaGoClient.GetAccountInfoWithOpts(ctx, userATA, &rpc.GetAccountInfoOpts{Commitment: config.DefaultCommitment})
+				require.NoError(t, err)
+				startingAtaBalance := userAtaBalanceInitial.Value.Lamports
+
+				// Fund pool signer to exactly 1 SOL
+				fundPoolSignerIx, err := tokens.NativeTransfer(1*solana.LAMPORTS_PER_SOL-startingBalance, admin.PublicKey(), cctpPool.Signer)
+				require.NoError(t, err)
+				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{fundPoolSignerIx}, admin, config.DefaultCommitment)
+
+				// Can't reclaim funds to invalid (unconfigured) receiver
+				reclaimToInvalidIx, err := cctp_token_pool.NewReclaimFundsInstruction(solana.LAMPORTS_PER_SOL/5, cctpPool.State, usdcMint, cctpPool.Signer, userATA, admin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+				require.NoError(t, err)
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{reclaimToInvalidIx}, admin, config.DefaultCommitment, []string{"Invalid destination for funds reclaim"})
+
+				// We set reclaim destination to user ATA
+				reclaimDestinationConfigIx, err := cctp_token_pool.NewSetFundReclaimDestinationInstruction(userATA, cctpPool.State, usdcMint, admin.PublicKey()).ValidateAndBuild()
+				require.NoError(t, err)
+				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{reclaimDestinationConfigIx}, admin, config.DefaultCommitment)
+
+				// Can't reclaim invalid values
+				reclaimZeroIx, err := cctp_token_pool.NewReclaimFundsInstruction(0, cctpPool.State, usdcMint, cctpPool.Signer, userATA, admin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+				require.NoError(t, err)
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{reclaimZeroIx}, admin, config.DefaultCommitment, []string{"Invalid SOL amount"})
+
+				reclaimExcessiveFundsIx, err := cctp_token_pool.NewReclaimFundsInstruction(2*solana.LAMPORTS_PER_SOL, cctpPool.State, usdcMint, cctpPool.Signer, userATA, admin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+				require.NoError(t, err)
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{reclaimExcessiveFundsIx}, admin, config.DefaultCommitment, []string{"Insufficient funds"})
+
+				// reclaim limits are enforced
+				setLimitIx, err := cctp_token_pool.NewSetMinimumSignerFundsInstruction(solana.LAMPORTS_PER_SOL/2, cctpPool.State, usdcMint, admin.PublicKey()).ValidateAndBuild()
+				require.NoError(t, err)
+				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{setLimitIx}, admin, config.DefaultCommitment)
+				reclaimFundsOverLimitIx, err := cctp_token_pool.NewReclaimFundsInstruction(3*solana.LAMPORTS_PER_SOL/4, cctpPool.State, usdcMint, cctpPool.Signer, userATA, admin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+				require.NoError(t, err)
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{reclaimFundsOverLimitIx}, admin, config.DefaultCommitment, []string{"Insufficient funds"})
+
+				// Otherwise, reclaiming succeeds
+				validReclaimAmount := solana.LAMPORTS_PER_SOL / 4
+				validReclaimIx, err := cctp_token_pool.NewReclaimFundsInstruction(validReclaimAmount, cctpPool.State, usdcMint, cctpPool.Signer, userATA, admin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+				require.NoError(t, err)
+				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{validReclaimIx}, admin, config.DefaultCommitment)
+
+				poolSignerInfoAfter, err := solanaGoClient.GetAccountInfoWithOpts(ctx, cctpPool.Signer, &rpc.GetAccountInfoOpts{Commitment: config.DefaultCommitment})
+				require.NoError(t, err)
+				finalBalance := poolSignerInfoAfter.Value.Lamports
+
+				userAtaBalanceAfter, err := solanaGoClient.GetAccountInfoWithOpts(ctx, userATA, &rpc.GetAccountInfoOpts{Commitment: config.DefaultCommitment})
+				require.NoError(t, err)
+				finalAtaBalance := userAtaBalanceAfter.Value.Lamports
+
+				require.Equal(t, finalBalance, startingBalance-validReclaimAmount)
+				require.Equal(t, finalAtaBalance, startingAtaBalance+validReclaimAmount)
+
 			})
 		})
 	})
