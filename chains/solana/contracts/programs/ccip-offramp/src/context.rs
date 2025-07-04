@@ -584,6 +584,16 @@ pub struct ExecuteReportContext<'info> {
 }
 
 #[derive(Accounts)]
+pub struct ViewConfigOnly<'info> {
+    #[account(
+        seeds = [seed::CONFIG],
+        bump,
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipOfframpError::InvalidVersion,
+    )]
+    pub config: AccountLoader<'info, Config>,
+}
+
+#[derive(Accounts)]
 #[instruction(source_chain_selector: u64, root: Vec<u8>)]
 pub struct CloseCommitReportAccount<'info> {
     #[account(

@@ -33,6 +33,112 @@ pub struct ReferenceAddresses {
     pub rmn_remote: Pubkey,
 }
 
+#[derive(Clone, Debug, AnchorDeserialize, AnchorSerialize)]
+pub struct DeriveAccountsExecuteParams {
+    pub execute_caller: Pubkey,
+    pub message_accounts: Vec<CcipAccountMeta>,
+    pub source_chain_selector: u64,
+    pub mints_of_transferred_tokens: Vec<Pubkey>,
+    pub merkle_root: [u8; 32],
+    pub buffer_id: Vec<u8>,
+    pub token_receiver: Pubkey,
+}
+
+#[derive(Debug, Default, PartialEq, Eq, Clone, AnchorDeserialize, AnchorSerialize)]
+pub struct DeriveAccountsResponse {
+    /// If this vector is not empty, you must call the `derive_` method again including
+    /// exactly these accounts as the `remaining_accounts` field.
+    pub ask_again_with: Vec<CcipAccountMeta>,
+    /// You must append these accounts at the end of a separate list. When `next_stage`
+    /// is finally empty, this separate list will contain all the accounts to use for the
+    /// instruction of interest.
+    pub accounts_to_save: Vec<CcipAccountMeta>,
+    /// Append these look up tables at the end of a list. It will contain all LUTs
+    /// that the instruction of interest can use.
+    pub look_up_tables_to_save: Vec<Pubkey>,
+    /// Identifies the derivation stage.
+    pub current_stage: String,
+    /// Identifies the next derivation stage. If empty, the derivation is complete.
+    pub next_stage: String,
+}
+
+// We can't use anchor's `AccountMeta` since it doesn't implement
+// AnchorSerialize/AnchorDeserialize, and it's too small to warrant wrapping.
+#[derive(Debug, Default, PartialEq, Eq, Clone, AnchorDeserialize, AnchorSerialize)]
+pub struct CcipAccountMeta {
+    pub pubkey: Pubkey,
+    pub is_signer: bool,
+    pub is_writable: bool,
+}
+
+pub trait ToMeta {
+    fn readonly(self) -> CcipAccountMeta;
+    fn writable(self) -> CcipAccountMeta;
+    fn signer(self) -> CcipAccountMeta;
+}
+
+impl From<AccountMeta> for CcipAccountMeta {
+    fn from(meta: AccountMeta) -> Self {
+        Self {
+            pubkey: meta.pubkey,
+            is_signer: meta.is_signer,
+            is_writable: meta.is_writable,
+        }
+    }
+}
+
+impl ToMeta for Pubkey {
+    fn readonly(self) -> CcipAccountMeta {
+        CcipAccountMeta {
+            pubkey: self,
+            is_signer: false,
+            is_writable: false,
+        }
+    }
+
+    fn writable(self) -> CcipAccountMeta {
+        CcipAccountMeta {
+            pubkey: self,
+            is_signer: false,
+            is_writable: true,
+        }
+    }
+
+    fn signer(self) -> CcipAccountMeta {
+        CcipAccountMeta {
+            pubkey: self,
+            is_signer: true,
+            is_writable: true,
+        }
+    }
+}
+
+impl ToMeta for CcipAccountMeta {
+    fn readonly(self) -> CcipAccountMeta {
+        CcipAccountMeta {
+            pubkey: self.pubkey,
+            is_signer: self.is_signer,
+            is_writable: false,
+        }
+    }
+
+    fn writable(self) -> CcipAccountMeta {
+        CcipAccountMeta {
+            pubkey: self.pubkey,
+            is_signer: self.is_signer,
+            is_writable: true,
+        }
+    }
+
+    fn signer(self) -> CcipAccountMeta {
+        CcipAccountMeta {
+            pubkey: self.pubkey,
+            is_signer: true,
+            is_writable: self.is_writable,
+        }
+    }
+}
+
 #[zero_copy]
 #[derive(AnchorSerialize, AnchorDeserialize, InitSpace, Default)]
 pub struct Ocr3ConfigInfo {
