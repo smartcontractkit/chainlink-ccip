@@ -219,10 +219,8 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   ) public view virtual override returns (Quote memory quote) {
     (InternalQuote memory internalQuote,) =
       _getInternalQuoteAndCCIPMessage(destinationChainSelector, amount, receiver, settlementFeeToken, extraArgs);
-    return Quote({
-      ccipSettlementFee: internalQuote.ccipSettlementFee,
-      fastTransferFee: internalQuote.totalFastTransferFee
-    });
+    return
+      Quote({ccipSettlementFee: internalQuote.ccipSettlementFee, fastTransferFee: internalQuote.totalFastTransferFee});
   }
 
   function _getInternalQuoteAndCCIPMessage(
@@ -243,8 +241,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     (internalQuote.fillerFeeComponent, internalQuote.poolFeeComponent) = _calculateFastTransferFees(
       amount, destChainConfig.fastTransferFillerFeeBps, destChainConfig.fastTransferPoolFeeBps
     );
-    internalQuote.totalFastTransferFee =
-      internalQuote.fillerFeeComponent + internalQuote.poolFeeComponent;
+    internalQuote.totalFastTransferFee = internalQuote.fillerFeeComponent + internalQuote.poolFeeComponent;
 
     bytes memory extraArgs;
 
