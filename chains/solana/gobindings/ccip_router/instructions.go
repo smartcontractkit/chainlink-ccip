@@ -321,7 +321,7 @@ var (
 	// * `message` - The message to be sent. The size limit of data is 256 bytes.
 	Instruction_GetFee = ag_binary.TypeID([8]byte{115, 195, 235, 161, 25, 219, 60, 29})
 
-	// Automatically derives all acounts required to call `ccip_send`.
+	// Automatically derives all accounts required to call `ccip_send`.
 	//
 	// This method receives the bare minimum amount of information needed to construct
 	// the entire account list to send a transaction, and builds it iteratively
@@ -341,7 +341,7 @@ var (
 	// * `next_stage`: If nonempty, this means the instruction must get called again with this value
 	// as the `stage` argument.
 	//
-	// Therefore, and starting with an empty `remaining_accounts` list, the caller must repeteadly
+	// Therefore, and starting with an empty `remaining_accounts` list, the caller must repeatedly
 	// call `derive_accounts_ccip_send` until `next_stage` is returned empty.
 	//
 	// # Arguments

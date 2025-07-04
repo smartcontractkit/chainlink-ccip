@@ -263,7 +263,7 @@ impl TokenAdminRegistryTrait for Impl {
                 CcipRouterError::InvalidInputsLookupTableAccounts
             );
 
-            // The mandatory accounts (PDAs) are stored in the lookup table to save space even if they can be infered
+            // The mandatory accounts (PDAs) are stored in the lookup table to save space even if they can be inferred
             let (token_admin_registry, _) = Pubkey::find_program_address(
                 &[seed::TOKEN_ADMIN_REGISTRY, token_mint.as_ref()],
                 ctx.program_id,
