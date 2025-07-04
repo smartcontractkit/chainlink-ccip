@@ -1,6 +1,7 @@
 package tokens
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
 	"fmt"
@@ -11,6 +12,8 @@ import (
 	"github.com/gagliardetto/solana-go/programs/system"
 	"github.com/gagliardetto/solana-go/programs/token"
 	"github.com/gagliardetto/solana-go/rpc"
+
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 )
 
 // parallel test execution can cause race conditions for setting the token program in the solana_go SDK
@@ -33,16 +36,34 @@ func (inst *TokenInstruction) ProgramID() solana.PublicKey {
 // NOTE: functions in this file are mainly wrapped version of the versions that exist in `solana-go` but these allow specifying the token program
 
 func CreateToken(ctx context.Context, program, mint, admin solana.PublicKey, decimals uint8, client *rpc.Client, commitment rpc.CommitmentType) ([]solana.Instruction, error) {
+	ixs := []solana.Instruction{}
+
+	// initialize mint account
+	mintSize := token.MINT_SIZE
+	if program == config.Token2022Program {
+		mintSize += 1 + 36 + 83 // MintCloseAuthorityExtension overhead: header + ext + padding
+	}
+
 	// get stake amount for init
-	lamports, err := client.GetMinimumBalanceForRentExemption(ctx, token.MINT_SIZE, commitment)
+	lamports, err := client.GetMinimumBalanceForRentExemption(ctx, uint64(mintSize), commitment) //nolint:gosec
 	if err != nil {
 		return nil, err
 	}
 
-	// initialize mint account
-	initI, err := system.NewCreateAccountInstruction(lamports, token.MINT_SIZE, program, admin, mint).ValidateAndBuild()
+	initI, err := system.NewCreateAccountInstruction(lamports, uint64(mintSize), program, admin, mint).ValidateAndBuild() //nolint:gosec
 	if err != nil {
 		return nil, err
+	}
+
+	ixs = append(ixs, initI)
+
+	if program == config.Token2022Program {
+		closeMintExtensionI, closeMintErr := NewInitializeMintCloseAuthorityIx(mint, &admin, &program)
+		if closeMintErr != nil {
+			return nil, closeMintErr
+		}
+		// closeWrap := &TokenInstruction{closeMintExtensionI, program}
+		ixs = append(ixs, closeMintExtensionI)
 	}
 
 	// initialize mint
@@ -52,7 +73,38 @@ func CreateToken(ctx context.Context, program, mint, admin solana.PublicKey, dec
 	}
 
 	mintWrap := &TokenInstruction{mintI, program}
-	return []solana.Instruction{initI, mintWrap}, nil
+	ixs = append(ixs, mintWrap)
+	return ixs, nil
+}
+
+func NewInitializeMintCloseAuthorityIx(
+	mint solana.PublicKey,
+	closeAuthority *solana.PublicKey,
+	programID *solana.PublicKey,
+) (solana.Instruction, error) {
+	data := buildIxData(closeAuthority)
+
+	return &solana.GenericInstruction{
+		ProgID: *programID,
+		AccountValues: solana.AccountMetaSlice{
+			{PublicKey: mint, IsSigner: false, IsWritable: true},
+		},
+		DataBytes: data,
+	}, nil
+}
+
+func buildIxData(closeAuthority *solana.PublicKey) []byte {
+	var buf bytes.Buffer
+	buf.WriteByte(25)
+
+	if closeAuthority == nil {
+		buf.WriteByte(0)
+	} else {
+		buf.WriteByte(1)
+		buf.Write(closeAuthority.Bytes())
+	}
+
+	return buf.Bytes()
 }
 
 func CreateMultisig(ctx context.Context, payer, program, multisig solana.PublicKey, m uint8, signers []solana.PublicKey, client *rpc.Client, commitment rpc.CommitmentType) ([]solana.Instruction, error) {
