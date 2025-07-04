@@ -2,7 +2,7 @@
 pragma solidity ^0.8.4;
 
 /// @title IFastTransferPool
-/// @notice Interface for the CCIP Fast-Transfer Pool
+/// @notice Interface for the CCIP Fast-Transfer Pool.
 interface IFastTransferPool {
   /// @notice Enum representing the state of a fill request.
   enum FillState {
@@ -12,7 +12,7 @@ interface IFastTransferPool {
 
   }
 
-  /// @notice Quote struct containing fee information
+  /// @notice Quote struct containing fee information.
   struct Quote {
     uint256 ccipSettlementFee; // Fee paid to for CCIP settlement in CCIP supported fee tokens.
     uint256 fastTransferFee; // Fee paid to the fast transfer filler in the same asset as requested.
@@ -21,12 +21,13 @@ interface IFastTransferPool {
   error AlreadyFilledOrSettled(bytes32 fillId);
   error AlreadySettled(bytes32 fillId);
 
-  /// @notice Emitted when a fast transfer is requested
+  /// @notice Emitted when a fast transfer is requested.
   event FastTransferRequested(
     uint64 indexed destinationChainSelector,
     bytes32 indexed fillId,
     bytes32 indexed settlementId,
-    /// @param sourceAmountNetFee The amount being transferred, excluding the fast fill fee, expressed in source token decimals.
+    /// @param sourceAmountNetFee The amount being transferred, excluding the fast fill fee, expressed in source token
+    /// decimals.
     uint256 sourceAmountNetFee,
     uint8 sourceDecimals,
     uint256 fillerFee,
@@ -84,7 +85,7 @@ interface IFastTransferPool {
     bytes calldata extraArgs
   ) external payable returns (bytes32 settlementId);
 
-  /// @notice Fast fills a transfer using liquidity provider funds
+  /// @notice Fast fills a transfer using liquidity provider funds.
   /// @param settlementId The settlement ID, which under normal circumstances is the same as the CCIP message ID.
   /// @param fillId The fill ID, computed from the fill request parameters.
   /// @param sourceChainSelector The source chain selector.
