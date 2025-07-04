@@ -43,6 +43,12 @@ var (
 
 	Instruction_AcceptOwnership = ag_binary.TypeID([8]byte{172, 23, 43, 13, 238, 213, 85, 150})
 
+	Instruction_SetFundManager = ag_binary.TypeID([8]byte{120, 5, 18, 143, 165, 103, 181, 139})
+
+	Instruction_SetMinimumSignerFunds = ag_binary.TypeID([8]byte{142, 36, 82, 253, 191, 111, 114, 53})
+
+	Instruction_SetFundReclaimDestination = ag_binary.TypeID([8]byte{81, 6, 71, 218, 85, 141, 95, 162})
+
 	Instruction_SetRouter = ag_binary.TypeID([8]byte{236, 248, 107, 200, 151, 160, 44, 250})
 
 	Instruction_SetRmn = ag_binary.TypeID([8]byte{252, 89, 60, 179, 198, 54, 169, 120})
@@ -69,6 +75,16 @@ var (
 
 	Instruction_ReclaimEventAccount = ag_binary.TypeID([8]byte{94, 198, 180, 159, 131, 236, 15, 174})
 
+	// Returns an amount of SOL from the pool signer account to the designated
+	// fund reclaimer. There are three entities involved:
+	//
+	// * `owner`: can configure the reclaimer and fund manager.
+	// * `fund_manager`: can execute this instruction.
+	// * `fund_reclaim_destination`: receives the funds.
+	//
+	// The resulting funds on the PDA cannot drop below `minimum_signer_funds`.
+	Instruction_ReclaimFunds = ag_binary.TypeID([8]byte{38, 246, 147, 248, 43, 41, 43, 198})
+
 	Instruction_DeriveAccountsReleaseOrMintTokens = ag_binary.TypeID([8]byte{40, 91, 244, 228, 0, 2, 51, 238})
 
 	Instruction_DeriveAccountsLockOrBurnTokens = ag_binary.TypeID([8]byte{20, 237, 184, 4, 166, 153, 108, 174})
@@ -87,6 +103,12 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "TransferOwnership"
 	case Instruction_AcceptOwnership:
 		return "AcceptOwnership"
+	case Instruction_SetFundManager:
+		return "SetFundManager"
+	case Instruction_SetMinimumSignerFunds:
+		return "SetMinimumSignerFunds"
+	case Instruction_SetFundReclaimDestination:
+		return "SetFundReclaimDestination"
 	case Instruction_SetRouter:
 		return "SetRouter"
 	case Instruction_SetRmn:
@@ -113,6 +135,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "LockOrBurnTokens"
 	case Instruction_ReclaimEventAccount:
 		return "ReclaimEventAccount"
+	case Instruction_ReclaimFunds:
+		return "ReclaimFunds"
 	case Instruction_DeriveAccountsReleaseOrMintTokens:
 		return "DeriveAccountsReleaseOrMintTokens"
 	case Instruction_DeriveAccountsLockOrBurnTokens:
@@ -153,6 +177,15 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 			"accept_ownership", (*AcceptOwnership)(nil),
 		},
 		{
+			"set_fund_manager", (*SetFundManager)(nil),
+		},
+		{
+			"set_minimum_signer_funds", (*SetMinimumSignerFunds)(nil),
+		},
+		{
+			"set_fund_reclaim_destination", (*SetFundReclaimDestination)(nil),
+		},
+		{
 			"set_router", (*SetRouter)(nil),
 		},
 		{
@@ -190,6 +223,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"reclaim_event_account", (*ReclaimEventAccount)(nil),
+		},
+		{
+			"reclaim_funds", (*ReclaimFunds)(nil),
 		},
 		{
 			"derive_accounts_release_or_mint_tokens", (*DeriveAccountsReleaseOrMintTokens)(nil),

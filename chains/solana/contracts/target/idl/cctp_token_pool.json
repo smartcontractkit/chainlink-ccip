@@ -144,6 +144,84 @@
       "args": []
     },
     {
+      "name": "setFundManager",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "fundManager",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
+      "name": "setMinimumSignerFunds",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "setFundReclaimDestination",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "fundReclaimDestination",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
       "name": "setRouter",
       "accounts": [
         {
@@ -827,6 +905,60 @@
       ]
     },
     {
+      "name": "reclaimFunds",
+      "docs": [
+        "Returns an amount of SOL from the pool signer account to the designated",
+        "fund reclaimer. There are three entities involved:",
+        "",
+        "* `owner`: can configure the reclaimer and fund manager.",
+        "* `fund_manager`: can execute this instruction.",
+        "* `fund_reclaim_destination`: receives the funds.",
+        "",
+        "The resulting funds on the PDA cannot drop below `minimum_signer_funds`."
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "poolSigner",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "fundReclaimDestination",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "to be a particular fund reclaimer"
+          ]
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "deriveAccountsReleaseOrMintTokens",
       "accounts": [],
       "args": [
@@ -879,6 +1011,12 @@
             "name": "config",
             "type": {
               "defined": "BaseConfig"
+            }
+          },
+          {
+            "name": "funding",
+            "type": {
+              "defined": "FundingConfig"
             }
           }
         ]
@@ -968,6 +1106,26 @@
           {
             "name": "destinationCaller",
             "type": "publicKey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FundingConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "manager",
+            "type": "publicKey"
+          },
+          {
+            "name": "reclaimDestination",
+            "type": "publicKey"
+          },
+          {
+            "name": "minimumSignerFunds",
+            "type": "u64"
           }
         ]
       }
@@ -1069,6 +1227,50 @@
           "index": false
         }
       ]
+    },
+    {
+      "name": "CcipCctpMessageEventAccountClosed",
+      "fields": [
+        {
+          "name": "originalSender",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "remoteChainSelector",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "msgTotalNonce",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "address",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "CcipCctpFundingConfigChanged",
+      "fields": [
+        {
+          "name": "old",
+          "type": {
+            "defined": "FundingConfig"
+          },
+          "index": false
+        },
+        {
+          "name": "new",
+          "type": {
+            "defined": "FundingConfig"
+          },
+          "index": false
+        }
+      ]
     }
   ],
   "errors": [
@@ -1131,6 +1333,26 @@
       "code": 12011,
       "name": "FailedCctpCpi",
       "msg": "Failed CCTP CPI"
+    },
+    {
+      "code": 12007,
+      "name": "InvalidFundManager",
+      "msg": "Fund Manager is invalid or misconfigured"
+    },
+    {
+      "code": 12008,
+      "name": "InvalidReclaimDestination",
+      "msg": "Invalid destination for funds reclaim"
+    },
+    {
+      "code": 12009,
+      "name": "InsufficientFunds",
+      "msg": "Insufficient funds"
+    },
+    {
+      "code": 12010,
+      "name": "InvalidSolAmount",
+      "msg": "Invalid SOL amount"
     }
   ]
 }

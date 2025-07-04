@@ -33,6 +33,8 @@ const SUPPORTED_CCTP_MESSAGE_VERSION: u32 = 0;
 pub mod cctp_token_pool {
     use std::str::FromStr;
 
+    use anchor_lang::solana_program::{program::invoke_signed, system_instruction::transfer};
+
     use super::*;
 
     pub fn init_global_config(ctx: Context<InitGlobalConfig>) -> Result<()> {
@@ -55,6 +57,11 @@ pub mod cctp_token_pool {
                 router,
                 rmn_remote,
             ),
+            funding: FundingConfig {
+                manager: Pubkey::default(),
+                reclaim_destination: Pubkey::default(),
+                minimum_signer_funds: 0,
+            },
         });
 
         Ok(())
@@ -78,6 +85,42 @@ pub mod cctp_token_pool {
     // shared func signature with other programs
     pub fn accept_ownership(ctx: Context<AcceptOwnership>) -> Result<()> {
         ctx.accounts.state.config.accept_ownership()
+    }
+
+    pub fn set_fund_manager(ctx: Context<SetConfig>, fund_manager: Pubkey) -> Result<()> {
+        let old = ctx.accounts.state.funding;
+        ctx.accounts.state.funding.manager = fund_manager;
+
+        emit!(CcipCctpFundingConfigChanged {
+            old,
+            new: ctx.accounts.state.funding
+        });
+        Ok(())
+    }
+
+    pub fn set_minimum_signer_funds(ctx: Context<SetConfig>, amount: u64) -> Result<()> {
+        let old = ctx.accounts.state.funding;
+        ctx.accounts.state.funding.minimum_signer_funds = amount;
+
+        emit!(CcipCctpFundingConfigChanged {
+            old,
+            new: ctx.accounts.state.funding
+        });
+        Ok(())
+    }
+
+    pub fn set_fund_reclaim_destination(
+        ctx: Context<SetConfig>,
+        fund_reclaim_destination: Pubkey,
+    ) -> Result<()> {
+        let old = ctx.accounts.state.funding;
+        ctx.accounts.state.funding.reclaim_destination = fund_reclaim_destination;
+
+        emit!(CcipCctpFundingConfigChanged {
+            old,
+            new: ctx.accounts.state.funding
+        });
+        Ok(())
     }
 
     // set_router changes the expected signers for mint/release + burn/lock method calls
@@ -351,9 +394,9 @@ pub mod cctp_token_pool {
     pub fn reclaim_event_account(
         ctx: Context<ReclaimEventAccount>,
         mint: Pubkey,
-        _original_sender: Pubkey,
-        _remote_chain_selector: u64,
-        _msg_nonce: u64,
+        original_sender: Pubkey,
+        remote_chain_selector: u64,
+        msg_nonce: u64,
         attestation: Vec<u8>,
     ) -> Result<()> {
         let attestation_bytes = attestation.try_to_vec()?;
@@ -389,6 +432,59 @@ pub mod cctp_token_pool {
         ];
 
         invoke_signed(&instruction, &acc_infos, &[signer_seeds])?;
+
+        emit!(CcipCctpMessageEventAccountClosed {
+            original_sender,
+            remote_chain_selector,
+            msg_total_nonce: msg_nonce,
+            address: ctx.accounts.message_sent_event_account.key()
+        });
+
+        Ok(())
+    }
+
+    /// Returns an amount of SOL from the pool signer account to the designated
+    /// fund reclaimer. There are three entities involved:
+    ///
+    /// * `owner`: can configure the reclaimer and fund manager.
+    /// * `fund_manager`: can execute this instruction.
+    /// * `fund_reclaim_destination`: receives the funds.
+    ///
+    /// The resulting funds on the PDA cannot drop below `minimum_signer_funds`.
+    pub fn reclaim_funds(ctx: Context<ReclaimFunds>, amount: u64) -> Result<()> {
+        require_gt!(amount, 0, CctpTokenPoolError::InvalidSolAmount);
+
+        let pool_signer_lamports = ctx.accounts.pool_signer.lamports();
+
+        require_gte!(
+            pool_signer_lamports,
+            amount
+                .checked_add(ctx.accounts.state.funding.minimum_signer_funds)
+                .expect("Minimum funds calculation"),
+            CctpTokenPoolError::InsufficientFunds
+        );
+
+        let mint_key = ctx.accounts.mint.key();
+        let signer_seeds: &[&[u8]] = &[
+            POOL_SIGNER_SEED,
+            mint_key.as_ref(),
+            &[ctx.bumps.pool_signer],
+        ];
+
+        let transfer_instruction = transfer(
+            &ctx.accounts.pool_signer.key(),
+            &ctx.accounts.fund_reclaim_destination.key(),
+            amount,
+        );
+
+        invoke_signed(
+            &transfer_instruction,
+            &[
+                ctx.accounts.pool_signer.to_account_info(),
+                ctx.accounts.fund_reclaim_destination.to_account_info(),
+            ],
+            &[signer_seeds],
+        )?;
 
         Ok(())
     }
@@ -694,6 +790,18 @@ pub struct DepositForBurnWithCallerParams {
 pub struct State {
     pub version: u8,
     pub config: BaseConfig,
+    pub funding: FundingConfig,
+}
+
+#[derive(InitSpace, AnchorDeserialize, AnchorSerialize, Clone, Copy)]
+pub struct FundingConfig {
+    // Authority allowed to reclaim funds (i.e. from closing the CCTP event PDA, or de-funding an
+    // overfunded signer PDA.)
+    pub manager: Pubkey,
+    // Receiver of funds reclaimed from the signer PDA.
+    pub reclaim_destination: Pubkey,
+    // Funds in the signer PDA cannot drop under this value when reclaiming.
+    pub minimum_signer_funds: u64,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, InitSpace)]
@@ -743,6 +851,22 @@ pub struct CcipCctpMessageSentEvent {
     pub message_sent_bytes: Vec<u8>,
 }
 
+#[event]
+pub struct CcipCctpMessageEventAccountClosed {
+    // Seeds for the CCTP message sent event account
+    original_sender: Pubkey,
+    remote_chain_selector: u64,
+    msg_total_nonce: u64,
+    // Actual event account address, derived from the seeds above
+    address: Pubkey,
+}
+
+#[event]
+pub struct CcipCctpFundingConfigChanged {
+    old: FundingConfig,
+    new: FundingConfig,
+}
+
 #[error_code]
 pub enum CctpTokenPoolError {
     #[msg("Invalid token data")]
@@ -769,4 +893,12 @@ pub enum CctpTokenPoolError {
     InvalidTokenPoolExtraData,
     #[msg("Failed CCTP CPI")]
     FailedCctpCpi,
+    #[msg("Fund Manager is invalid or misconfigured")]
+    InvalidFundManager,
+    #[msg("Invalid destination for funds reclaim")]
+    InvalidReclaimDestination,
+    #[msg("Insufficient funds")]
+    InsufficientFunds,
+    #[msg("Invalid SOL amount")]
+    InvalidSolAmount,
 }

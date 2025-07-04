@@ -117,6 +117,50 @@ func (obj *DepositForBurnWithCallerParams) UnmarshalWithDecoder(decoder *ag_bina
 	return nil
 }
 
+type FundingConfig struct {
+	Manager            ag_solanago.PublicKey
+	ReclaimDestination ag_solanago.PublicKey
+	MinimumSignerFunds uint64
+}
+
+func (obj FundingConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Manager` param:
+	err = encoder.Encode(obj.Manager)
+	if err != nil {
+		return err
+	}
+	// Serialize `ReclaimDestination` param:
+	err = encoder.Encode(obj.ReclaimDestination)
+	if err != nil {
+		return err
+	}
+	// Serialize `MinimumSignerFunds` param:
+	err = encoder.Encode(obj.MinimumSignerFunds)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *FundingConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Manager`:
+	err = decoder.Decode(&obj.Manager)
+	if err != nil {
+		return err
+	}
+	// Deserialize `ReclaimDestination`:
+	err = decoder.Decode(&obj.ReclaimDestination)
+	if err != nil {
+		return err
+	}
+	// Deserialize `MinimumSignerFunds`:
+	err = decoder.Decode(&obj.MinimumSignerFunds)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 type CctpChain struct {
 	DomainId          uint32
 	DestinationCaller ag_solanago.PublicKey
