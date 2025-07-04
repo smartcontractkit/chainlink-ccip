@@ -129,11 +129,11 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
 
   /// @dev This struct helps avoid stack too deep errors by grouping related data that needs to be
   /// passed together from fee calculation to message sending.
-  struct MessageAndFees {
-    IFastTransferPool.Quote quote; // Fee quote information for the CCIP message.
-    uint256 fillerFee; // Fee amount going to the filler.
-    uint256 poolFee; // Fee amount going to the pool.
-    Client.EVM2AnyMessage message; // The CCIP message to be sent.
+  struct FeeQuote {
+    uint256 ccipSettlementFee; // Fee paid to for CCIP settlement in CCIP supported fee tokens.
+    uint256 totalFastTransferFee;
+    uint256 fillerFeeComponent; // Fee amount going to the filler.
+    uint256 poolFeeComponent; // Fee amount going to the pool.
   }
 
   /// @inheritdoc IFastTransferPool
@@ -145,34 +145,32 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     address settlementFeeToken,
     bytes calldata extraArgs
   ) external payable virtual override returns (bytes32 settlementId) {
-    MessageAndFees memory messageAndFees =
+    (FeeQuote memory feeQuote, Client.EVM2AnyMessage memory message) =
       _getFeeQuoteAndCCIPMessage(destinationChainSelector, amount, receiver, settlementFeeToken, extraArgs);
 
     _consumeOutboundRateLimit(destinationChainSelector, amount);
-    if (messageAndFees.quote.fastTransferFee > maxFastTransferFee) {
-      revert QuoteFeeExceedsUserMaxLimit(messageAndFees.quote.fastTransferFee, maxFastTransferFee);
+    if (feeQuote.totalFastTransferFee > maxFastTransferFee) {
+      revert QuoteFeeExceedsUserMaxLimit(feeQuote.totalFastTransferFee, maxFastTransferFee);
     }
 
     _handleFastTransferLockOrBurn(destinationChainSelector, msg.sender, amount);
 
     // If the user is not paying in native, we need to transfer the fee token to the contract.
     if (settlementFeeToken != address(0)) {
-      IERC20(settlementFeeToken).safeTransferFrom(msg.sender, address(this), messageAndFees.quote.ccipSettlementFee);
-      IERC20(settlementFeeToken).safeApprove(i_ccipRouter, messageAndFees.quote.ccipSettlementFee);
+      IERC20(settlementFeeToken).safeTransferFrom(msg.sender, address(this), feeQuote.ccipSettlementFee);
+      IERC20(settlementFeeToken).safeApprove(i_ccipRouter, feeQuote.ccipSettlementFee);
     }
 
-    settlementId =
-      IRouterClient(getRouter()).ccipSend{value: msg.value}(destinationChainSelector, messageAndFees.message);
-    uint256 amountNetFee = amount - messageAndFees.quote.fastTransferFee;
+    settlementId = IRouterClient(getRouter()).ccipSend{value: msg.value}(destinationChainSelector, message);
 
     emit FastTransferRequested({
       destinationChainSelector: destinationChainSelector,
-      fillId: computeFillId(settlementId, amountNetFee, i_tokenDecimals, receiver),
+      fillId: computeFillId(settlementId, amount - feeQuote.totalFastTransferFee, i_tokenDecimals, receiver),
       settlementId: settlementId,
-      sourceAmountNetFee: amountNetFee,
+      sourceAmountNetFee: amount - feeQuote.totalFastTransferFee,
       sourceDecimals: i_tokenDecimals,
-      fillerFee: messageAndFees.fillerFee,
-      poolFee: messageAndFees.poolFee,
+      fillerFee: feeQuote.fillerFeeComponent,
+      poolFee: feeQuote.poolFeeComponent,
       receiver: receiver
     });
 
@@ -218,8 +216,13 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     bytes calldata receiver,
     address settlementFeeToken,
     bytes calldata extraArgs
-  ) public view virtual override returns (Quote memory) {
-    return _getFeeQuoteAndCCIPMessage(destinationChainSelector, amount, receiver, settlementFeeToken, extraArgs).quote;
+  ) public view virtual override returns (Quote memory quote) {
+    (FeeQuote memory fastTransferOpData,) =
+      _getFeeQuoteAndCCIPMessage(destinationChainSelector, amount, receiver, settlementFeeToken, extraArgs);
+    return Quote({
+      ccipSettlementFee: fastTransferOpData.ccipSettlementFee,
+      fastTransferFee: fastTransferOpData.totalFastTransferFee
+    });
   }
 
   function _getFeeQuoteAndCCIPMessage(
@@ -228,7 +231,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     bytes calldata receiver,
     address settlementFeeToken,
     bytes calldata
-  ) internal view virtual returns (MessageAndFees memory fastTransferOpData) {
+  ) internal view virtual returns (FeeQuote memory fastTransferOpData, Client.EVM2AnyMessage memory message) {
     _validateSendRequest(destinationChainSelector);
 
     // Using storage here appears to be cheaper.
@@ -237,10 +240,12 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
       revert TransferAmountExceedsMaxFillAmount(destinationChainSelector, amount);
     }
 
-    (fastTransferOpData.fillerFee, fastTransferOpData.poolFee) = _calculateFastTransferFees(
+    (fastTransferOpData.fillerFeeComponent, fastTransferOpData.poolFeeComponent) = _calculateFastTransferFees(
       amount, destChainConfig.fastTransferFillerFeeBps, destChainConfig.fastTransferPoolFeeBps
     );
-    fastTransferOpData.quote.fastTransferFee = fastTransferOpData.fillerFee + fastTransferOpData.poolFee;
+    fastTransferOpData.totalFastTransferFee =
+      fastTransferOpData.fillerFeeComponent + fastTransferOpData.poolFeeComponent;
+
     bytes memory extraArgs;
 
     // We use 0 as a toggle for whether the destination chain requires custom ExtraArgs. Zero would not be a sensible
@@ -254,7 +259,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
       );
     }
 
-    fastTransferOpData.message = Client.EVM2AnyMessage({
+    message = Client.EVM2AnyMessage({
       receiver: destChainConfig.destinationPool,
       data: abi.encode(
         MintMessage({
@@ -270,9 +275,8 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
       extraArgs: extraArgs
     });
 
-    fastTransferOpData.quote.ccipSettlementFee =
-      IRouterClient(getRouter()).getFee(destinationChainSelector, fastTransferOpData.message);
-    return fastTransferOpData;
+    fastTransferOpData.ccipSettlementFee = IRouterClient(getRouter()).getFee(destinationChainSelector, message);
+    return (fastTransferOpData, message);
   }
 
   // ================================================================
