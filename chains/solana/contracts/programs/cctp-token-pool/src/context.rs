@@ -731,7 +731,7 @@ pub struct ReclaimEventAccount<'info> {
     #[account(address = MESSAGE_TRANSMITTER)]
     pub cctp_message_transmitter: UncheckedAccount<'info>,
 
-    #[account(mut, constraint = authority.key() == state.funding.manager @ CctpTokenPoolError::InvalidFundManager)]
+    #[account(mut, address = state.funding.manager @ CctpTokenPoolError::InvalidFundManager)]
     pub authority: Signer<'info>,
 
     pub system_program: Program<'info, System>,

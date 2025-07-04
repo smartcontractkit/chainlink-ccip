@@ -432,7 +432,9 @@ pub mod cctp_token_pool {
 
         require_gte!(
             pool_signer_lamports,
-            amount + ctx.accounts.state.funding.minimum_signer_funds,
+            amount
+                .checked_add(ctx.accounts.state.funding.minimum_signer_funds)
+                .expect("Minimum funds calculation"),
             CctpTokenPoolError::InsufficientFunds
         );
 
