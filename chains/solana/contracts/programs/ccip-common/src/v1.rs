@@ -195,7 +195,9 @@ pub fn validate_and_parse_token_accounts<'info>(
                     // as the pool is expected to validate the rest of the accounts. The LUT must contain
                     // the required entries, plus it may contain some additional ones that are static,
                     // and finally the auto-derivation may add more accounts at the end (static or message-dependant).
-                    let end = lookup_table_account.addresses.len() - required_entries.len();
+                    let lut_len = lookup_table_account.addresses.len();
+                    let end = lut_len.checked_sub(required_entries.len()).unwrap();
+
                     remaining_accounts[..end]
                         .iter()
                         .map(|x| x.is_writable)

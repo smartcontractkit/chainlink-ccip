@@ -10,9 +10,12 @@ use crate::{
 };
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::get_associated_token_address_with_program_id;
-use ccip_common::seed::{self, EXECUTION_REPORT_BUFFER};
 use ccip_common::v1::load_token_admin_registry_checked;
 use ccip_common::CommonCcipError;
+use ccip_common::{
+    seed::{self, EXECUTION_REPORT_BUFFER},
+    v1::token_admin_registry_writable,
+};
 use solana_program::{
     address_lookup_table::state::AddressLookupTable,
     instruction::Instruction,
@@ -331,9 +334,8 @@ pub fn derive_execute_accounts_additional_tokens_static<'info>(
         *AccountLoader::<'info, ReferenceAddresses>::try_from(reference_addresses)?.load()?;
 
     let lookup_table_data = &mut &token_lut.data.borrow()[..];
-    let lookup_table_account: AddressLookupTable =
-        AddressLookupTable::deserialize(lookup_table_data)
-            .map_err(|_| CommonCcipError::InvalidInputsLookupTableAccounts)?;
+    let lut_account: AddressLookupTable = AddressLookupTable::deserialize(lookup_table_data)
+        .map_err(|_| CommonCcipError::InvalidInputsLookupTableAccounts)?;
 
     let ccip_offramp_pool_signer = find(
         &[seed::EXTERNAL_TOKEN_POOLS_SIGNER, pool_program.as_ref()],
@@ -369,6 +371,8 @@ pub fn derive_execute_accounts_additional_tokens_static<'info>(
     )
     .writable();
 
+    let token_admin_registry = load_token_admin_registry_checked(token_registry)?;
+
     response.accounts_to_save.extend_from_slice(&[
         ccip_offramp_pool_signer,
         user_token_account,
@@ -377,17 +381,12 @@ pub fn derive_execute_accounts_additional_tokens_static<'info>(
     ]);
     response
         .accounts_to_save
-        .extend(
-            lookup_table_account
-                .addresses
-                .iter()
-                .enumerate()
-                .map(|(i, a)| match i {
-                    // PoolConfig, PoolTokenAccount and Mint from the LUT are writable.
-                    3 | 4 | 7 => a.writable(),
-                    _ => a.readonly(),
-                }),
-        );
+        .extend(lut_account.addresses.iter().enumerate().map(|(i, a)| {
+            match token_admin_registry_writable::is(&token_admin_registry, i.try_into().unwrap()) {
+                true => a.writable(),
+                false => a.readonly(),
+            }
+        }));
 
     let max_response_accounts = 26;
     if response.ask_again_with.len() + response.accounts_to_save.len() > max_response_accounts {
