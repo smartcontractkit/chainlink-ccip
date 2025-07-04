@@ -214,10 +214,20 @@ pub struct TokenOnramp<'info> {
     )]
     pub chain_config: Account<'info, ChainConfig>,
     // remaining accounts -----------------
+    // [
+    //   arbitrary account for derive testing: [ARBITRARY_SEED]
+    //   arbitrary account for derive testing: [ANOTHER_ARBITRARY_SEED]
+    // ]
+    //
+    // +
+    //
     // LockAndRelease: []
     // BurnAndMint: []
     // Wrapped: [wrapped program, ..remaining_accounts]
 }
+
+#[derive(Accounts)]
+pub struct Empty {}
 
 #[derive(Accounts)]
 #[instruction(remote_chain_selector: u64, mint: Pubkey)]

@@ -3,6 +3,8 @@ use std::fmt::Display;
 use anchor_lang::prelude::borsh::{BorshDeserialize, BorshSerialize};
 use anchor_lang::prelude::*;
 
+use crate::messages::SVM2AnyMessage;
+
 #[derive(Debug, PartialEq, Eq, Clone, Copy, InitSpace, BorshSerialize, BorshDeserialize)]
 #[repr(u8)]
 pub enum CodeVersion {
@@ -102,6 +104,123 @@ pub struct DestChain {
 #[account]
 #[derive(InitSpace)]
 pub struct Nonce {
-    pub version: u8,  // version to check if nonce account is already initialized
-    pub counter: u64, // Counter per user and per lane to use as nonce for all the messages to be executed in order
+    pub version: u8,        // version to check if nonce account is already initialized
+    pub ordered_nonce: u64, // Counter per user and per lane to use as nonce for all the messages to be executed in order
+    pub total_nonce: u64, // Counter per user per lane, regardless of whether they are executed in order or not
+}
+
+#[derive(Debug, Default, PartialEq, Eq, Clone, AnchorDeserialize, AnchorSerialize)]
+pub struct DeriveAccountsResponse {
+    /// If this vector is not empty, you must call the `derive_` method again including
+    /// exactly these accounts as the `remaining_accounts` field.
+    pub ask_again_with: Vec<CcipAccountMeta>,
+    /// You must append these accounts at the end of a separate list. When `next_stage`
+    /// is finally empty, this separate list will contain all the accounts to use for the
+    /// instruction of interest.
+    pub accounts_to_save: Vec<CcipAccountMeta>,
+    /// Append these look up tables at the end of a list. It will contain all LUTs
+    /// that the instruction of interest can use.
+    pub look_up_tables_to_save: Vec<Pubkey>,
+    /// Identifies the derivation stage.
+    pub current_stage: String,
+    /// Identifies the next derivation stage. If empty, the derivation is complete.
+    pub next_stage: String,
+}
+
+impl DeriveAccountsResponse {
+    // Join two responses (when two stages can be done back to back)
+    pub fn and(mut self, next: DeriveAccountsResponse) -> Self {
+        self.ask_again_with.extend_from_slice(&next.ask_again_with);
+        self.accounts_to_save
+            .extend_from_slice(&next.accounts_to_save);
+        self.look_up_tables_to_save
+            .extend_from_slice(&next.look_up_tables_to_save);
+        self.current_stage = next.current_stage;
+        self.next_stage = next.next_stage;
+        self
+    }
+}
+
+// We can't use anchor's `AccountMeta` since it doesn't implement
+// AnchorSerialize/AnchorDeserialize, and it's too small to warrant wrapping.
+#[derive(Debug, Default, PartialEq, Eq, Clone, AnchorDeserialize, AnchorSerialize)]
+pub struct CcipAccountMeta {
+    pub pubkey: Pubkey,
+    pub is_signer: bool,
+    pub is_writable: bool,
+}
+
+pub trait ToMeta {
+    fn readonly(self) -> CcipAccountMeta;
+    fn writable(self) -> CcipAccountMeta;
+    fn signer(self) -> CcipAccountMeta;
+}
+
+impl From<AccountMeta> for CcipAccountMeta {
+    fn from(meta: AccountMeta) -> Self {
+        Self {
+            pubkey: meta.pubkey,
+            is_signer: meta.is_signer,
+            is_writable: meta.is_writable,
+        }
+    }
+}
+
+impl ToMeta for Pubkey {
+    fn readonly(self) -> CcipAccountMeta {
+        CcipAccountMeta {
+            pubkey: self,
+            is_signer: false,
+            is_writable: false,
+        }
+    }
+
+    fn writable(self) -> CcipAccountMeta {
+        CcipAccountMeta {
+            pubkey: self,
+            is_signer: false,
+            is_writable: true,
+        }
+    }
+
+    fn signer(self) -> CcipAccountMeta {
+        CcipAccountMeta {
+            pubkey: self,
+            is_signer: true,
+            is_writable: false,
+        }
+    }
+}
+
+impl ToMeta for CcipAccountMeta {
+    fn readonly(self) -> CcipAccountMeta {
+        CcipAccountMeta {
+            pubkey: self.pubkey,
+            is_signer: self.is_signer,
+            is_writable: false,
+        }
+    }
+
+    fn writable(self) -> CcipAccountMeta {
+        CcipAccountMeta {
+            pubkey: self.pubkey,
+            is_signer: self.is_signer,
+            is_writable: true,
+        }
+    }
+
+    fn signer(self) -> CcipAccountMeta {
+        CcipAccountMeta {
+            pubkey: self.pubkey,
+            is_signer: true,
+            is_writable: self.is_writable,
+        }
+    }
+}
+
+#[derive(Clone, Debug, AnchorDeserialize, AnchorSerialize)]
+pub struct DeriveAccountsCcipSendParams {
+    pub dest_chain_selector: u64,
+    pub ccip_send_caller: Pubkey,
+    pub message: SVM2AnyMessage,
 }

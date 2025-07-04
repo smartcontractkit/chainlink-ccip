@@ -435,6 +435,10 @@ export type TestCcipInvalidReceiver = {
           {
             "name": "localToken",
             "type": "publicKey"
+          },
+          {
+            "name": "msgTotalNonce",
+            "type": "u64"
           }
         ]
       }
@@ -879,6 +883,10 @@ export const IDL: TestCcipInvalidReceiver = {
           {
             "name": "localToken",
             "type": "publicKey"
+          },
+          {
+            "name": "msgTotalNonce",
+            "type": "u64"
           }
         ]
       }

@@ -9,7 +9,7 @@ use crate::CcipRouterError;
 use anchor_spl::token_interface::Mint;
 
 // track state versions
-const MAX_TOKEN_REGISTRY_V: u8 = 1;
+const MAX_TOKEN_REGISTRY_V: u8 = 2;
 
 #[derive(Accounts)]
 pub struct RegisterTokenAdminRegistryByCCIPAdmin<'info> {
@@ -48,7 +48,7 @@ pub struct OverridePendingTokenAdminRegistryByCCIPAdmin<'info> {
         mut,
         seeds = [seed::TOKEN_ADMIN_REGISTRY, mint.key().as_ref()],
         bump,
-        constraint = valid_version(token_admin_registry.version, MAX_TOKEN_REGISTRY_V) @ CcipRouterError::InvalidVersion,
+        constraint = token_admin_registry.version == MAX_TOKEN_REGISTRY_V @ CcipRouterError::InvalidVersion,
     )]
     pub token_admin_registry: Account<'info, TokenAdminRegistry>,
     pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
@@ -99,7 +99,7 @@ pub struct OverridePendingTokenAdminRegistryByOwner<'info> {
         mut,
         seeds = [seed::TOKEN_ADMIN_REGISTRY, mint.key().as_ref()],
         bump,
-        constraint = valid_version(token_admin_registry.version, MAX_TOKEN_REGISTRY_V) @ CcipRouterError::InvalidVersion,
+        constraint = token_admin_registry.version == MAX_TOKEN_REGISTRY_V @ CcipRouterError::InvalidVersion,
     )]
     pub token_admin_registry: Account<'info, TokenAdminRegistry>,
     pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
@@ -125,7 +125,7 @@ pub struct ModifyTokenAdminRegistry<'info> {
         mut,
         seeds = [seed::TOKEN_ADMIN_REGISTRY, mint.key().as_ref()],
         bump,
-        constraint = valid_version(token_admin_registry.version, MAX_TOKEN_REGISTRY_V) @ CcipRouterError::InvalidVersion,
+        constraint = token_admin_registry.version == MAX_TOKEN_REGISTRY_V @ CcipRouterError::InvalidVersion,
     )]
     pub token_admin_registry: Account<'info, TokenAdminRegistry>,
     pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
@@ -145,12 +145,32 @@ pub struct SetPoolTokenAdminRegistry<'info> {
         mut,
         seeds = [seed::TOKEN_ADMIN_REGISTRY, mint.key().as_ref()],
         bump,
-        constraint = valid_version(token_admin_registry.version, MAX_TOKEN_REGISTRY_V) @ CcipRouterError::InvalidVersion,
+        constraint = token_admin_registry.version == MAX_TOKEN_REGISTRY_V @ CcipRouterError::InvalidVersion,
     )]
     pub token_admin_registry: Account<'info, TokenAdminRegistry>,
     pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
     /// CHECK: anchor does not support automatic lookup table deserialization
     pub pool_lookuptable: UncheckedAccount<'info>,
+    #[account(mut, address = token_admin_registry.administrator @ CcipRouterError::Unauthorized)]
+    pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
+#[instruction(mint: Pubkey)]
+pub struct EditPoolTokenAdminRegistry<'info> {
+    #[account(
+        seeds = [seed::CONFIG],
+        bump,
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
+    )]
+    pub config: Account<'info, Config>,
+    #[account(
+        mut,
+        seeds = [seed::TOKEN_ADMIN_REGISTRY, mint.as_ref()],
+        bump,
+        constraint = token_admin_registry.version == MAX_TOKEN_REGISTRY_V @ CcipRouterError::InvalidVersion,
+    )]
+    pub token_admin_registry: Account<'info, TokenAdminRegistry>,
     #[account(mut, address = token_admin_registry.administrator @ CcipRouterError::Unauthorized)]
     pub authority: Signer<'info>,
 }
@@ -167,12 +187,42 @@ pub struct AcceptAdminRoleTokenAdminRegistry<'info> {
         mut,
         seeds = [seed::TOKEN_ADMIN_REGISTRY, mint.key().as_ref()],
         bump,
-        constraint = valid_version(token_admin_registry.version, MAX_TOKEN_REGISTRY_V) @ CcipRouterError::InvalidVersion,
+        constraint = token_admin_registry.version == MAX_TOKEN_REGISTRY_V @ CcipRouterError::InvalidVersion,
     )]
     pub token_admin_registry: Account<'info, TokenAdminRegistry>,
     pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
     #[account(mut, address = token_admin_registry.pending_administrator @ CcipRouterError::Unauthorized)]
     pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct UpgradeTokenAdminRegistry<'info> {
+    #[account(
+        seeds = [seed::CONFIG],
+        bump,
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
+    )]
+    pub config: Account<'info, Config>,
+
+    /// CHECK: The token admin registry PDA to upgrade. It is an UncheckedAccount because for regular Account
+    /// types Anchor would attempt to deserialize the data _before_ realloc'ing it, which would fail.
+    /// The code will load it and realloc it to the new size manually, and migrate its data.
+    #[account(
+        mut,
+        seeds = [seed::TOKEN_ADMIN_REGISTRY, mint.key().as_ref()],
+        bump,
+        owner = crate::ID, // this checks it was initialized
+        // this checks that the size is consistent with the v1 version
+        constraint = token_admin_registry.data_len() == ccip_common::v1::V1_TOKEN_ADMIN_REGISTRY_SIZE @ CcipRouterError::InvalidInputsTokenAdminRegistryAccounts
+    )]
+    pub token_admin_registry: UncheckedAccount<'info>, // unchecked, as the code will load it and realloc it
+
+    pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
+
+    #[account(mut)] // anyone may invoke this migration
+    pub authority: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
 }
 
 pub mod token_admin_registry_writable {
@@ -216,6 +266,7 @@ pub mod token_admin_registry_writable {
                 lookup_table: Pubkey::default(),
                 writable_indexes: [0, 0],
                 mint: Pubkey::default(),
+                supports_auto_derivation: false,
             };
 
             set(state, 0);
@@ -255,6 +306,7 @@ pub mod token_admin_registry_writable {
                     2u128.pow(127 - 8) + 2u128.pow(127 - 56) + 2u128.pow(127 - 100),
                 ],
                 mint: Pubkey::default(),
+                supports_auto_derivation: false,
             };
 
             assert!(!is(state, 0));
