@@ -5,11 +5,14 @@ package lockrelease_token_pool
 import (
 	"fmt"
 	ag_binary "github.com/gagliardetto/binary"
+	ag_solanago "github.com/gagliardetto/solana-go"
 )
 
 type PoolConfig struct {
 	Version           uint8
 	SelfServedAllowed bool
+	Router            ag_solanago.PublicKey
+	RmnRemote         ag_solanago.PublicKey
 }
 
 var PoolConfigDiscriminator = [8]byte{26, 108, 14, 123, 116, 230, 129, 43}
@@ -27,6 +30,16 @@ func (obj PoolConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error)
 	}
 	// Serialize `SelfServedAllowed` param:
 	err = encoder.Encode(obj.SelfServedAllowed)
+	if err != nil {
+		return err
+	}
+	// Serialize `Router` param:
+	err = encoder.Encode(obj.Router)
+	if err != nil {
+		return err
+	}
+	// Serialize `RmnRemote` param:
+	err = encoder.Encode(obj.RmnRemote)
 	if err != nil {
 		return err
 	}
@@ -54,6 +67,16 @@ func (obj *PoolConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 	}
 	// Deserialize `SelfServedAllowed`:
 	err = decoder.Decode(&obj.SelfServedAllowed)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Router`:
+	err = decoder.Decode(&obj.Router)
+	if err != nil {
+		return err
+	}
+	// Deserialize `RmnRemote`:
+	err = decoder.Decode(&obj.RmnRemote)
 	if err != nil {
 		return err
 	}

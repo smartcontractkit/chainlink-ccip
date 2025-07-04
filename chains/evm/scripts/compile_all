@@ -55,7 +55,7 @@ function getOptimizations() {
     local optimize_runs_override=""
 
     case $1 in
-      "OffRamp" | "OffRampWithMessageTransformer")
+      "OffRamp" | "OffRampOverSuperchainInterop" | "OffRampWithMessageTransformer")
         optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_OFFRAMP"
         ;;
       "FeeQuoter")
@@ -94,6 +94,7 @@ compileContract pools/BurnWithFromMintTokenPool
 compileContract pools/BurnToAddressMintTokenPool
 compileContract pools/TokenPool
 compileContract pools/USDC/USDCTokenPool
+compileContract pools/USDC/HybridLockReleaseUSDCTokenPool
 compileContract pools/SiloedLockReleaseTokenPool
 compileContract pools/BurnMintFastTransferTokenPool
 
@@ -119,4 +120,5 @@ compileContract onRamp/OnRampWithMessageTransformer
 
 # Superchain Interop On/OffRamps
 compileContract onRamp/OnRampOverSuperchainInterop
+compileContract offRamp/OffRampOverSuperchainInterop
 
