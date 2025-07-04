@@ -9482,9 +9482,9 @@ func TestCCIPRouter(t *testing.T) {
 					config.RMNRemoteConfigPDA,
 				).ValidateAndBuild()
 				require.NoError(t, err)
-				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(300_000))
+				result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(300_000))
 				event := common.EventCommitReportAccepted{}
-				require.NoError(t, common.ParseEventCommitReportAccepted(tx.Meta.LogMessages, "CommitReportAccepted", &event))
+				require.NoError(t, common.ParseEventCommitReportAccepted(result.Meta.LogMessages, "CommitReportAccepted", &event))
 
 				executionReport := ccip_offramp.ExecutionReportSingleChain{
 					SourceChainSelector: sourceChainSelector,
@@ -9528,7 +9528,8 @@ func TestCCIPRouter(t *testing.T) {
 					require.NoError(t, lutErr)
 					lookupTables[table] = entries
 				}
-				tx = testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, lookupTables, common.AddComputeUnitLimit(400_000))
+				result = testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, lookupTables, common.AddComputeUnitLimit(400_000))
+				require.NotNil(t, result)
 
 				// validate amounts
 				_, finalBal0, err := tokens.TokenBalance(ctx, solanaGoClient, token0.User[config.ReceiverExternalExecutionConfigPDA], config.DefaultCommitment)
