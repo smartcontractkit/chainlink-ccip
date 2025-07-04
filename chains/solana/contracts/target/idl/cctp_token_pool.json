@@ -888,6 +888,11 @@
           "name": "authority",
           "isMut": true,
           "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": [
@@ -953,16 +958,10 @@
             }
           },
           {
-            "name": "fundManager",
-            "type": "publicKey"
-          },
-          {
-            "name": "fundReclaimDestination",
-            "type": "publicKey"
-          },
-          {
-            "name": "minimumSignerFunds",
-            "type": "u64"
+            "name": "funding",
+            "type": {
+              "defined": "FundingConfig"
+            }
           }
         ]
       }
@@ -1039,6 +1038,26 @@
           {
             "name": "destinationCaller",
             "type": "publicKey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FundingConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "manager",
+            "type": "publicKey"
+          },
+          {
+            "name": "reclaimDestination",
+            "type": "publicKey"
+          },
+          {
+            "name": "minimumSignerFunds",
+            "type": "u64"
           }
         ]
       }
@@ -1165,6 +1184,25 @@
           "index": false
         }
       ]
+    },
+    {
+      "name": "CcipCctpFundingConfigChanged",
+      "fields": [
+        {
+          "name": "old",
+          "type": {
+            "defined": "FundingConfig"
+          },
+          "index": false
+        },
+        {
+          "name": "new",
+          "type": {
+            "defined": "FundingConfig"
+          },
+          "index": false
+        }
+      ]
     }
   ],
   "errors": [
@@ -1210,11 +1248,16 @@
     },
     {
       "code": 12008,
+      "name": "InvalidReclaimDestination",
+      "msg": "Invalid destination for funds reclaim"
+    },
+    {
+      "code": 12009,
       "name": "InsufficientFunds",
       "msg": "Insufficient funds"
     },
     {
-      "code": 12009,
+      "code": 12010,
       "name": "InvalidSolAmount",
       "msg": "Invalid SOL amount"
     }

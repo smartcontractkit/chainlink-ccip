@@ -31,13 +31,15 @@ type ReclaimFunds struct {
 	// ··········· to be a particular fund reclaimer
 	//
 	// [4] = [WRITE, SIGNER] authority
+	//
+	// [5] = [] systemProgram
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewReclaimFundsInstructionBuilder creates a new `ReclaimFunds` instruction builder.
 func NewReclaimFundsInstructionBuilder() *ReclaimFunds {
 	nd := &ReclaimFunds{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 5),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 6),
 	}
 	return nd
 }
@@ -105,6 +107,17 @@ func (inst *ReclaimFunds) GetAuthorityAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[4]
 }
 
+// SetSystemProgramAccount sets the "systemProgram" account.
+func (inst *ReclaimFunds) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *ReclaimFunds {
+	inst.AccountMetaSlice[5] = ag_solanago.Meta(systemProgram)
+	return inst
+}
+
+// GetSystemProgramAccount gets the "systemProgram" account.
+func (inst *ReclaimFunds) GetSystemProgramAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[5]
+}
+
 func (inst ReclaimFunds) Build() *Instruction {
 	return &Instruction{BaseVariant: ag_binary.BaseVariant{
 		Impl:   inst,
@@ -147,6 +160,9 @@ func (inst *ReclaimFunds) Validate() error {
 		if inst.AccountMetaSlice[4] == nil {
 			return errors.New("accounts.Authority is not set")
 		}
+		if inst.AccountMetaSlice[5] == nil {
+			return errors.New("accounts.SystemProgram is not set")
+		}
 	}
 	return nil
 }
@@ -165,12 +181,13 @@ func (inst *ReclaimFunds) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=5]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Accounts[len=6]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("                 state", inst.AccountMetaSlice[0]))
 						accountsBranch.Child(ag_format.Meta("                  mint", inst.AccountMetaSlice[1]))
 						accountsBranch.Child(ag_format.Meta("            poolSigner", inst.AccountMetaSlice[2]))
 						accountsBranch.Child(ag_format.Meta("fundReclaimDestination", inst.AccountMetaSlice[3]))
 						accountsBranch.Child(ag_format.Meta("             authority", inst.AccountMetaSlice[4]))
+						accountsBranch.Child(ag_format.Meta("         systemProgram", inst.AccountMetaSlice[5]))
 					})
 				})
 		})
@@ -202,12 +219,14 @@ func NewReclaimFundsInstruction(
 	mint ag_solanago.PublicKey,
 	poolSigner ag_solanago.PublicKey,
 	fundReclaimDestination ag_solanago.PublicKey,
-	authority ag_solanago.PublicKey) *ReclaimFunds {
+	authority ag_solanago.PublicKey,
+	systemProgram ag_solanago.PublicKey) *ReclaimFunds {
 	return NewReclaimFundsInstructionBuilder().
 		SetAmount(amount).
 		SetStateAccount(state).
 		SetMintAccount(mint).
 		SetPoolSignerAccount(poolSigner).
 		SetFundReclaimDestinationAccount(fundReclaimDestination).
-		SetAuthorityAccount(authority)
+		SetAuthorityAccount(authority).
+		SetSystemProgramAccount(systemProgram)
 }

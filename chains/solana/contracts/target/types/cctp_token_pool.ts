@@ -888,6 +888,11 @@ export type CctpTokenPool = {
           "name": "authority",
           "isMut": true,
           "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": [
@@ -953,16 +958,10 @@ export type CctpTokenPool = {
             }
           },
           {
-            "name": "fundManager",
-            "type": "publicKey"
-          },
-          {
-            "name": "fundReclaimDestination",
-            "type": "publicKey"
-          },
-          {
-            "name": "minimumSignerFunds",
-            "type": "u64"
+            "name": "funding",
+            "type": {
+              "defined": "FundingConfig"
+            }
           }
         ]
       }
@@ -1039,6 +1038,26 @@ export type CctpTokenPool = {
           {
             "name": "destinationCaller",
             "type": "publicKey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FundingConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "manager",
+            "type": "publicKey"
+          },
+          {
+            "name": "reclaimDestination",
+            "type": "publicKey"
+          },
+          {
+            "name": "minimumSignerFunds",
+            "type": "u64"
           }
         ]
       }
@@ -1165,6 +1184,25 @@ export type CctpTokenPool = {
           "index": false
         }
       ]
+    },
+    {
+      "name": "CcipCctpFundingConfigChanged",
+      "fields": [
+        {
+          "name": "old",
+          "type": {
+            "defined": "FundingConfig"
+          },
+          "index": false
+        },
+        {
+          "name": "new",
+          "type": {
+            "defined": "FundingConfig"
+          },
+          "index": false
+        }
+      ]
     }
   ],
   "errors": [
@@ -1210,11 +1248,16 @@ export type CctpTokenPool = {
     },
     {
       "code": 12008,
+      "name": "InvalidReclaimDestination",
+      "msg": "Invalid destination for funds reclaim"
+    },
+    {
+      "code": 12009,
       "name": "InsufficientFunds",
       "msg": "Insufficient funds"
     },
     {
-      "code": 12009,
+      "code": 12010,
       "name": "InvalidSolAmount",
       "msg": "Invalid SOL amount"
     }
@@ -2111,6 +2154,11 @@ export const IDL: CctpTokenPool = {
           "name": "authority",
           "isMut": true,
           "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": [
@@ -2176,16 +2224,10 @@ export const IDL: CctpTokenPool = {
             }
           },
           {
-            "name": "fundManager",
-            "type": "publicKey"
-          },
-          {
-            "name": "fundReclaimDestination",
-            "type": "publicKey"
-          },
-          {
-            "name": "minimumSignerFunds",
-            "type": "u64"
+            "name": "funding",
+            "type": {
+              "defined": "FundingConfig"
+            }
           }
         ]
       }
@@ -2262,6 +2304,26 @@ export const IDL: CctpTokenPool = {
           {
             "name": "destinationCaller",
             "type": "publicKey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FundingConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "manager",
+            "type": "publicKey"
+          },
+          {
+            "name": "reclaimDestination",
+            "type": "publicKey"
+          },
+          {
+            "name": "minimumSignerFunds",
+            "type": "u64"
           }
         ]
       }
@@ -2388,6 +2450,25 @@ export const IDL: CctpTokenPool = {
           "index": false
         }
       ]
+    },
+    {
+      "name": "CcipCctpFundingConfigChanged",
+      "fields": [
+        {
+          "name": "old",
+          "type": {
+            "defined": "FundingConfig"
+          },
+          "index": false
+        },
+        {
+          "name": "new",
+          "type": {
+            "defined": "FundingConfig"
+          },
+          "index": false
+        }
+      ]
     }
   ],
   "errors": [
@@ -2433,11 +2514,16 @@ export const IDL: CctpTokenPool = {
     },
     {
       "code": 12008,
+      "name": "InvalidReclaimDestination",
+      "msg": "Invalid destination for funds reclaim"
+    },
+    {
+      "code": 12009,
       "name": "InsufficientFunds",
       "msg": "Insufficient funds"
     },
     {
-      "code": 12009,
+      "code": 12010,
       "name": "InvalidSolAmount",
       "msg": "Invalid SOL amount"
     }

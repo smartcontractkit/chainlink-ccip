@@ -23,6 +23,8 @@ const SOLANA_DOMAIN_ID: u32 = 5; // Circle's CCTP domain ID for Solana is always
 pub mod cctp_token_pool {
     use std::str::FromStr;
 
+    use anchor_lang::solana_program::{program::invoke_signed, system_instruction::transfer};
+
     use super::*;
 
     pub fn initialize(
@@ -39,9 +41,11 @@ pub mod cctp_token_pool {
                 router,
                 rmn_remote,
             ),
-            fund_manager: Pubkey::default(),
-            fund_reclaim_destination: Pubkey::default(),
-            minimum_signer_funds: 0,
+            funding: FundingConfig {
+                manager: Pubkey::default(),
+                reclaim_destination: Pubkey::default(),
+                minimum_signer_funds: 0,
+            },
         });
 
         Ok(())
@@ -74,12 +78,24 @@ pub mod cctp_token_pool {
     }
 
     pub fn set_fund_manager(ctx: Context<SetConfig>, fund_manager: Pubkey) -> Result<()> {
-        ctx.accounts.state.fund_manager = fund_manager;
+        let old = ctx.accounts.state.funding;
+        ctx.accounts.state.funding.manager = fund_manager;
+
+        emit!(CcipCctpFundingConfigChanged {
+            old,
+            new: ctx.accounts.state.funding
+        });
         Ok(())
     }
 
     pub fn set_minimum_signer_funds(ctx: Context<SetConfig>, amount: u64) -> Result<()> {
-        ctx.accounts.state.minimum_signer_funds = amount;
+        let old = ctx.accounts.state.funding;
+        ctx.accounts.state.funding.minimum_signer_funds = amount;
+
+        emit!(CcipCctpFundingConfigChanged {
+            old,
+            new: ctx.accounts.state.funding
+        });
         Ok(())
     }
 
@@ -87,7 +103,13 @@ pub mod cctp_token_pool {
         ctx: Context<SetConfig>,
         fund_reclaim_destination: Pubkey,
     ) -> Result<()> {
-        ctx.accounts.state.fund_reclaim_destination = fund_reclaim_destination;
+        let old = ctx.accounts.state.funding;
+        ctx.accounts.state.funding.reclaim_destination = fund_reclaim_destination;
+
+        emit!(CcipCctpFundingConfigChanged {
+            old,
+            new: ctx.accounts.state.funding
+        });
         Ok(())
     }
 
@@ -404,19 +426,37 @@ pub mod cctp_token_pool {
     ///
     /// The resulting funds on the PDA cannot drop below `minimum_signer_funds`.
     pub fn reclaim_funds(ctx: Context<ReclaimFunds>, amount: u64) -> Result<()> {
-        require!(amount > 0, CctpTokenPoolError::InvalidSolAmount);
+        require_gt!(amount, 0, CctpTokenPoolError::InvalidSolAmount);
 
         let pool_signer_lamports = ctx.accounts.pool_signer.lamports();
-        require!(
-            pool_signer_lamports >= amount + ctx.accounts.state.minimum_signer_funds,
+
+        require_gte!(
+            pool_signer_lamports,
+            amount + ctx.accounts.state.funding.minimum_signer_funds,
             CctpTokenPoolError::InsufficientFunds
         );
 
-        **ctx.accounts.pool_signer.try_borrow_mut_lamports()? -= amount;
-        **ctx
-            .accounts
-            .fund_reclaim_destination
-            .try_borrow_mut_lamports()? += amount;
+        let mint_key = ctx.accounts.mint.key();
+        let signer_seeds: &[&[u8]] = &[
+            POOL_SIGNER_SEED,
+            mint_key.as_ref(),
+            &[ctx.bumps.pool_signer],
+        ];
+
+        let transfer_instruction = transfer(
+            &ctx.accounts.pool_signer.key(),
+            &ctx.accounts.fund_reclaim_destination.key(),
+            amount,
+        );
+
+        invoke_signed(
+            &transfer_instruction,
+            &[
+                ctx.accounts.pool_signer.to_account_info(),
+                ctx.accounts.fund_reclaim_destination.to_account_info(),
+            ],
+            &[signer_seeds],
+        )?;
 
         Ok(())
     }
@@ -747,11 +787,16 @@ impl CctpMessage {
 pub struct State {
     pub version: u8,
     pub config: BaseConfig,
+    pub funding: FundingConfig,
+}
+
+#[derive(InitSpace, AnchorDeserialize, AnchorSerialize, Clone, Copy)]
+pub struct FundingConfig {
     // Authority allowed to reclaim funds (i.e. from closing the CCTP event PDA, or de-funding an
     // overfunded signer PDA.)
-    pub fund_manager: Pubkey,
+    pub manager: Pubkey,
     // Receiver of funds reclaimed from the signer PDA.
-    pub fund_reclaim_destination: Pubkey,
+    pub reclaim_destination: Pubkey,
     // Funds in the signer PDA cannot drop under this value when reclaiming.
     pub minimum_signer_funds: u64,
 }
@@ -804,6 +849,12 @@ pub struct CcipCctpMessageEventAccountClosed {
     address: Pubkey,
 }
 
+#[event]
+pub struct CcipCctpFundingConfigChanged {
+    old: FundingConfig,
+    new: FundingConfig,
+}
+
 #[error_code]
 pub enum CctpTokenPoolError {
     #[msg("Invalid token data")]
@@ -822,6 +873,8 @@ pub enum CctpTokenPoolError {
     FailedCctpCpi,
     #[msg("Fund Manager is invalid or misconfigured")]
     InvalidFundManager,
+    #[msg("Invalid destination for funds reclaim")]
+    InvalidReclaimDestination,
     #[msg("Insufficient funds")]
     InsufficientFunds,
     #[msg("Invalid SOL amount")]

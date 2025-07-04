@@ -731,7 +731,7 @@ pub struct ReclaimEventAccount<'info> {
     #[account(address = MESSAGE_TRANSMITTER)]
     pub cctp_message_transmitter: UncheckedAccount<'info>,
 
-    #[account(mut, constraint = authority.key() == state.fund_manager @ CctpTokenPoolError::InvalidFundManager)]
+    #[account(mut, constraint = authority.key() == state.funding.manager @ CctpTokenPoolError::InvalidFundManager)]
     pub authority: Signer<'info>,
 
     pub system_program: Program<'info, System>,
@@ -764,10 +764,12 @@ pub struct ReclaimFunds<'info> {
     /// to be a particular fund reclaimer
     #[account(
         mut,
-        address = state.fund_reclaim_destination
+        address = state.funding.reclaim_destination @ CctpTokenPoolError::InvalidReclaimDestination
     )]
     pub fund_reclaim_destination: UncheckedAccount<'info>,
 
-    #[account(mut, constraint = authority.key() == state.fund_manager @ CctpTokenPoolError::InvalidFundManager)]
+    #[account(mut, constraint = authority.key() == state.funding.manager @ CctpTokenPoolError::InvalidFundManager)]
     pub authority: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
 }

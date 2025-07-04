@@ -5,15 +5,12 @@ package cctp_token_pool
 import (
 	"fmt"
 	ag_binary "github.com/gagliardetto/binary"
-	ag_solanago "github.com/gagliardetto/solana-go"
 )
 
 type State struct {
-	Version                uint8
-	Config                 BaseConfig
-	FundManager            ag_solanago.PublicKey
-	FundReclaimDestination ag_solanago.PublicKey
-	MinimumSignerFunds     uint64
+	Version uint8
+	Config  BaseConfig
+	Funding FundingConfig
 }
 
 var StateDiscriminator = [8]byte{216, 146, 107, 94, 104, 75, 182, 177}
@@ -34,18 +31,8 @@ func (obj State) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	if err != nil {
 		return err
 	}
-	// Serialize `FundManager` param:
-	err = encoder.Encode(obj.FundManager)
-	if err != nil {
-		return err
-	}
-	// Serialize `FundReclaimDestination` param:
-	err = encoder.Encode(obj.FundReclaimDestination)
-	if err != nil {
-		return err
-	}
-	// Serialize `MinimumSignerFunds` param:
-	err = encoder.Encode(obj.MinimumSignerFunds)
+	// Serialize `Funding` param:
+	err = encoder.Encode(obj.Funding)
 	if err != nil {
 		return err
 	}
@@ -76,18 +63,8 @@ func (obj *State) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	if err != nil {
 		return err
 	}
-	// Deserialize `FundManager`:
-	err = decoder.Decode(&obj.FundManager)
-	if err != nil {
-		return err
-	}
-	// Deserialize `FundReclaimDestination`:
-	err = decoder.Decode(&obj.FundReclaimDestination)
-	if err != nil {
-		return err
-	}
-	// Deserialize `MinimumSignerFunds`:
-	err = decoder.Decode(&obj.MinimumSignerFunds)
+	// Deserialize `Funding`:
+	err = decoder.Decode(&obj.Funding)
 	if err != nil {
 		return err
 	}
