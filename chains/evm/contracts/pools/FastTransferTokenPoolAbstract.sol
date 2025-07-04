@@ -93,6 +93,15 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     address filler;
   }
 
+  /// @dev This struct helps avoid stack too deep errors by encapsulating fee components.
+  struct InternalQuote {
+    uint256 ccipSettlementFee; // Fee paid to for CCIP settlement in CCIP supported fee tokens.
+    uint256 totalFastTransferFee; // Fee paid to the fast transfer filler in the same asset as requested.
+    // The following two are the fee components that are used to calculate the total fast transfer fee.
+    uint256 fillerFeeComponent; // Fee amount going to the filler.
+    uint256 poolFeeComponent; // Fee amount going to the pool.
+  }
+
   /// @notice The division factor for basis points (BPS). This also represents the maximum BPS fee for fast transfer.
   uint256 internal constant BPS_DIVIDER = 10_000;
 
@@ -127,15 +136,6 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     return s_fills[fillId];
   }
 
-  /// @dev This struct helps avoid stack too deep errors by grouping related data that needs to be
-  /// passed together from fee calculation to message sending.
-  struct FeeQuote {
-    uint256 ccipSettlementFee; // Fee paid to for CCIP settlement in CCIP supported fee tokens.
-    uint256 totalFastTransferFee;
-    uint256 fillerFeeComponent; // Fee amount going to the filler.
-    uint256 poolFeeComponent; // Fee amount going to the pool.
-  }
-
   /// @inheritdoc IFastTransferPool
   function ccipSendToken(
     uint64 destinationChainSelector,
@@ -145,32 +145,32 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     address settlementFeeToken,
     bytes calldata extraArgs
   ) external payable virtual override returns (bytes32 settlementId) {
-    (FeeQuote memory feeQuote, Client.EVM2AnyMessage memory message) =
-      _getFeeQuoteAndCCIPMessage(destinationChainSelector, amount, receiver, settlementFeeToken, extraArgs);
+    (InternalQuote memory internalQuote, Client.EVM2AnyMessage memory message) =
+      _getInternalQuoteAndCCIPMessage(destinationChainSelector, amount, receiver, settlementFeeToken, extraArgs);
 
     _consumeOutboundRateLimit(destinationChainSelector, amount);
-    if (feeQuote.totalFastTransferFee > maxFastTransferFee) {
-      revert QuoteFeeExceedsUserMaxLimit(feeQuote.totalFastTransferFee, maxFastTransferFee);
+    if (internalQuote.totalFastTransferFee > maxFastTransferFee) {
+      revert QuoteFeeExceedsUserMaxLimit(internalQuote.totalFastTransferFee, maxFastTransferFee);
     }
 
     _handleFastTransferLockOrBurn(destinationChainSelector, msg.sender, amount);
 
     // If the user is not paying in native, we need to transfer the fee token to the contract.
     if (settlementFeeToken != address(0)) {
-      IERC20(settlementFeeToken).safeTransferFrom(msg.sender, address(this), feeQuote.ccipSettlementFee);
-      IERC20(settlementFeeToken).safeApprove(i_ccipRouter, feeQuote.ccipSettlementFee);
+      IERC20(settlementFeeToken).safeTransferFrom(msg.sender, address(this), internalQuote.ccipSettlementFee);
+      IERC20(settlementFeeToken).safeApprove(i_ccipRouter, internalQuote.ccipSettlementFee);
     }
 
     settlementId = IRouterClient(getRouter()).ccipSend{value: msg.value}(destinationChainSelector, message);
 
     emit FastTransferRequested({
       destinationChainSelector: destinationChainSelector,
-      fillId: computeFillId(settlementId, amount - feeQuote.totalFastTransferFee, i_tokenDecimals, receiver),
+      fillId: computeFillId(settlementId, amount - internalQuote.totalFastTransferFee, i_tokenDecimals, receiver),
       settlementId: settlementId,
-      sourceAmountNetFee: amount - feeQuote.totalFastTransferFee,
+      sourceAmountNetFee: amount - internalQuote.totalFastTransferFee,
       sourceDecimals: i_tokenDecimals,
-      fillerFee: feeQuote.fillerFeeComponent,
-      poolFee: feeQuote.poolFeeComponent,
+      fillerFee: internalQuote.fillerFeeComponent,
+      poolFee: internalQuote.poolFeeComponent,
       receiver: receiver
     });
 
@@ -217,21 +217,21 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     address settlementFeeToken,
     bytes calldata extraArgs
   ) public view virtual override returns (Quote memory quote) {
-    (FeeQuote memory fastTransferOpData,) =
-      _getFeeQuoteAndCCIPMessage(destinationChainSelector, amount, receiver, settlementFeeToken, extraArgs);
+    (InternalQuote memory fastTransferOpData,) =
+      _getInternalQuoteAndCCIPMessage(destinationChainSelector, amount, receiver, settlementFeeToken, extraArgs);
     return Quote({
       ccipSettlementFee: fastTransferOpData.ccipSettlementFee,
       fastTransferFee: fastTransferOpData.totalFastTransferFee
     });
   }
 
-  function _getFeeQuoteAndCCIPMessage(
+  function _getInternalQuoteAndCCIPMessage(
     uint64 destinationChainSelector,
     uint256 amount,
     bytes calldata receiver,
     address settlementFeeToken,
     bytes calldata
-  ) internal view virtual returns (FeeQuote memory fastTransferOpData, Client.EVM2AnyMessage memory message) {
+  ) internal view virtual returns (InternalQuote memory fastTransferOpData, Client.EVM2AnyMessage memory message) {
     _validateSendRequest(destinationChainSelector);
 
     // Using storage here appears to be cheaper.
