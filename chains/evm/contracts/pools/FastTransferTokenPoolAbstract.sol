@@ -217,11 +217,11 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     address settlementFeeToken,
     bytes calldata extraArgs
   ) public view virtual override returns (Quote memory quote) {
-    (InternalQuote memory fastTransferOpData,) =
+    (InternalQuote memory internalQuote,) =
       _getInternalQuoteAndCCIPMessage(destinationChainSelector, amount, receiver, settlementFeeToken, extraArgs);
     return Quote({
-      ccipSettlementFee: fastTransferOpData.ccipSettlementFee,
-      fastTransferFee: fastTransferOpData.totalFastTransferFee
+      ccipSettlementFee: internalQuote.ccipSettlementFee,
+      fastTransferFee: internalQuote.totalFastTransferFee
     });
   }
 
@@ -231,7 +231,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     bytes calldata receiver,
     address settlementFeeToken,
     bytes calldata
-  ) internal view virtual returns (InternalQuote memory fastTransferOpData, Client.EVM2AnyMessage memory message) {
+  ) internal view virtual returns (InternalQuote memory internalQuote, Client.EVM2AnyMessage memory message) {
     _validateSendRequest(destinationChainSelector);
 
     // Using storage here appears to be cheaper.
@@ -240,11 +240,11 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
       revert TransferAmountExceedsMaxFillAmount(destinationChainSelector, amount);
     }
 
-    (fastTransferOpData.fillerFeeComponent, fastTransferOpData.poolFeeComponent) = _calculateFastTransferFees(
+    (internalQuote.fillerFeeComponent, internalQuote.poolFeeComponent) = _calculateFastTransferFees(
       amount, destChainConfig.fastTransferFillerFeeBps, destChainConfig.fastTransferPoolFeeBps
     );
-    fastTransferOpData.totalFastTransferFee =
-      fastTransferOpData.fillerFeeComponent + fastTransferOpData.poolFeeComponent;
+    internalQuote.totalFastTransferFee =
+      internalQuote.fillerFeeComponent + internalQuote.poolFeeComponent;
 
     bytes memory extraArgs;
 
@@ -275,8 +275,8 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
       extraArgs: extraArgs
     });
 
-    fastTransferOpData.ccipSettlementFee = IRouterClient(getRouter()).getFee(destinationChainSelector, message);
-    return (fastTransferOpData, message);
+    internalQuote.ccipSettlementFee = IRouterClient(getRouter()).getFee(destinationChainSelector, message);
+    return (internalQuote, message);
   }
 
   // ================================================================
