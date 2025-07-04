@@ -281,7 +281,8 @@ pub mod cctp_token_pool {
 
         let remaining = parse_remaining_release_accounts(
             ctx.remaining_accounts,
-            &release_or_mint,
+            release_or_mint.local_token,
+            &msg_att.message,
             ctx.accounts.chain_config.cctp.domain_id,
             remote_token_address_bytes,
         )?;
@@ -526,7 +527,8 @@ pub mod cctp_token_pool {
 
 fn parse_remaining_release_accounts<'info>(
     remaining: &'info [AccountInfo<'info>],
-    release_or_mint: &ReleaseOrMintInV1,
+    mint: Pubkey,
+    cctp_msg: &CctpMessage,
     cctp_domain_id: u32,
     remote_token_address: [u8; 32],
 ) -> Result<TokenOfframpRemainingAccounts<'info>> {
@@ -548,7 +550,7 @@ fn parse_remaining_release_accounts<'info>(
         cctp_used_nonces: next_account_info(&mut remaining_accounts)?,
     };
 
-    result.validate(release_or_mint, cctp_domain_id, remote_token_address)?;
+    result.validate(mint, cctp_msg, cctp_domain_id, remote_token_address)?;
 
     Ok(result)
 }
@@ -809,7 +811,10 @@ pub struct CctpChain {
     // Domain ID for CCTP, used to identify the chain. This is a sequential number starting from 0.
     // Using u32 here because it's what CCTP uses in its Params structs.
     pub domain_id: u32,
-    pub destination_caller: Pubkey, // The allowed caller to invoke CCTP's receive_message on the dest chain
+    // The allowed caller to invoke CCTP's receive_message on the dest chain, which is the token pool there.
+    // It is encoded into a Solana Pubkey, as per
+    // https://developers.circle.com/stablecoins/solana-programs#mint-recipient-for-solana-as-source-chain-transfers
+    pub destination_caller: Pubkey,
 }
 
 #[account]

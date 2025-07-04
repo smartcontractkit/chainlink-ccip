@@ -5,8 +5,9 @@ use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 use base_token_pool::common::*;
 use ccip_common::seed;
 
+use crate::cctp_message::CctpMessage;
 use crate::program::CctpTokenPool;
-use crate::{CctpTokenPoolError, ChainConfig, MessageAndAttestation, PoolConfig, State};
+use crate::{CctpTokenPoolError, ChainConfig, PoolConfig, State};
 
 const MAX_POOL_STATE_V: u8 = 1;
 const MAX_POOL_CONFIG_V: u8 = 1;
@@ -331,12 +332,12 @@ pub struct TokenOfframpRemainingAccounts<'info> {
 impl TokenOfframpRemainingAccounts<'_> {
     pub fn validate(
         &self,
-        release_or_mint: &ReleaseOrMintInV1,
+        mint: Pubkey,
+        cctp_msg: &CctpMessage,
         domain_id: u32,
         remote_token_address: [u8; 32],
     ) -> Result<()> {
-        let mint = release_or_mint.local_token;
-        let nonce_seed = Self::first_nonce_seed(&release_or_mint.offchain_token_data)?;
+        let nonce_seed = Self::first_nonce_seed(cctp_msg);
         let domain_str = domain_id.to_string();
         let domain_seed = domain_str.as_bytes();
 
@@ -414,16 +415,8 @@ impl TokenOfframpRemainingAccounts<'_> {
         Ok(())
     }
 
-    pub fn first_nonce_seed(offchain_token_data: &[u8]) -> Result<Vec<u8>> {
-        let message_and_attestation = MessageAndAttestation::try_from_slice(offchain_token_data)
-            .expect("Failed to deserialize MessageAndAttestation");
-
-        Ok(message_and_attestation
-            .message
-            .first_nonce()
-            .to_string()
-            .as_bytes()
-            .to_vec())
+    pub fn first_nonce_seed(msg: &CctpMessage) -> Vec<u8> {
+        msg.first_nonce().to_string().as_bytes().to_vec()
     }
 }
 

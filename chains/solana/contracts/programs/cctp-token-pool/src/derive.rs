@@ -26,6 +26,7 @@ fn find(seeds: &[&[u8]], program_id: Pubkey) -> CcipAccountMeta {
 }
 
 pub mod release_or_mint {
+    use crate::MessageAndAttestation;
 
     use super::*;
 
@@ -105,8 +106,9 @@ pub mod release_or_mint {
         let chain_config = Account::<'info, ChainConfig>::try_from(&ctx.remaining_accounts[0])?;
         let domain_id = chain_config.cctp.domain_id;
         let mint = release_or_mint.local_token;
-        let nonce_seed =
-            TokenOfframpRemainingAccounts::first_nonce_seed(&release_or_mint.offchain_token_data)?;
+        let cctp_msg =
+            MessageAndAttestation::try_from_slice(&release_or_mint.offchain_token_data)?.message;
+        let nonce_seed = TokenOfframpRemainingAccounts::first_nonce_seed(&cctp_msg);
         let domain_str = domain_id.to_string();
         let domain_seed = domain_str.as_bytes();
         let remote_token_address_bytes =
