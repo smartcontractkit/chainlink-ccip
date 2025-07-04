@@ -1808,7 +1808,6 @@ func TestTokenPool(t *testing.T) {
 
 				require.Equal(t, finalBalance, startingBalance-validReclaimAmount)
 				require.Equal(t, finalAtaBalance, startingAtaBalance+validReclaimAmount)
-
 			})
 		})
 	})

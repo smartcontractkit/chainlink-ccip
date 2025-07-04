@@ -1335,22 +1335,22 @@ export type CctpTokenPool = {
       "msg": "Failed CCTP CPI"
     },
     {
-      "code": 12007,
+      "code": 12012,
       "name": "InvalidFundManager",
       "msg": "Fund Manager is invalid or misconfigured"
     },
     {
-      "code": 12008,
+      "code": 12013,
       "name": "InvalidReclaimDestination",
       "msg": "Invalid destination for funds reclaim"
     },
     {
-      "code": 12009,
+      "code": 12014,
       "name": "InsufficientFunds",
       "msg": "Insufficient funds"
     },
     {
-      "code": 12010,
+      "code": 12015,
       "name": "InvalidSolAmount",
       "msg": "Invalid SOL amount"
     }
@@ -2694,22 +2694,22 @@ export const IDL: CctpTokenPool = {
       "msg": "Failed CCTP CPI"
     },
     {
-      "code": 12007,
+      "code": 12012,
       "name": "InvalidFundManager",
       "msg": "Fund Manager is invalid or misconfigured"
     },
     {
-      "code": 12008,
+      "code": 12013,
       "name": "InvalidReclaimDestination",
       "msg": "Invalid destination for funds reclaim"
     },
     {
-      "code": 12009,
+      "code": 12014,
       "name": "InsufficientFunds",
       "msg": "Insufficient funds"
     },
     {
-      "code": 12010,
+      "code": 12015,
       "name": "InvalidSolAmount",
       "msg": "Invalid SOL amount"
     }
