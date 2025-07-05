@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
@@ -32,7 +33,14 @@ type ConfigPoller interface {
 		ctx context.Context,
 		destChain cciptypes.ChainSelector,
 		sourceChains []cciptypes.ChainSelector) (map[cciptypes.ChainSelector]StaticSourceChainConfig, error)
+	ConfigPollerTester
 	services.Service
+}
+
+type ConfigPollerTester interface {
+	// SetChainAccessorsTestOnly allows setting chain accessors for testing purposes only.
+	// TODO(NONEVM-1460): Remove this method once we pass accessors in from the plugin factory.
+	SetChainAccessorsTestOnly(chainAccessors map[cciptypes.ChainSelector]cciptypes.ChainAccessor)
 }
 
 // configPoller handles caching of chain configuration data for multiple chains
@@ -40,10 +48,11 @@ type configPoller struct {
 	services.StateMachine // Embeds the StateMachine for lifecycle management
 
 	sync.RWMutex
-	chainCaches   map[cciptypes.ChainSelector]*chainCache
-	refreshPeriod time.Duration
-	reader        ccipReaderInternal
-	lggr          logger.Logger
+	chainCaches    map[cciptypes.ChainSelector]*chainCache
+	refreshPeriod  time.Duration
+	reader         ccipReaderInternal // TODO(NONEVM-1460): remove once we no longer need to call back into ccipReader
+	chainAccessors map[cciptypes.ChainSelector]cciptypes.ChainAccessor
+	lggr           logger.Logger
 
 	// Track known source chains for each destination chain
 	knownSourceChains map[cciptypes.ChainSelector]map[cciptypes.ChainSelector]bool
@@ -75,12 +84,14 @@ type chainCache struct {
 func newConfigPoller(
 	lggr logger.Logger,
 	reader ccipReaderInternal,
+	chainAccessors map[cciptypes.ChainSelector]cciptypes.ChainAccessor,
 	refreshPeriod time.Duration,
 ) *configPoller {
 	return &configPoller{
 		chainCaches:       make(map[cciptypes.ChainSelector]*chainCache),
 		refreshPeriod:     refreshPeriod,
 		reader:            reader,
+		chainAccessors:    chainAccessors,
 		lggr:              lggr,
 		knownSourceChains: make(map[cciptypes.ChainSelector]map[cciptypes.ChainSelector]bool),
 		stopChan:          make(chan struct{}),
@@ -363,7 +374,9 @@ func (c *configPoller) batchRefreshChainAndSourceConfigs(
 	chainConfigRequests := c.reader.prepareBatchConfigRequests(destChain)
 
 	// 2. Filter source chains and prepare queries
-	filteredSourceChains := filterOutChainSelector(sourceChains, destChain)
+	filteredSourceChains := slicelib.Filter(sourceChains, func(cs cciptypes.ChainSelector) bool {
+		return cs != destChain
+	})
 	sourceQueries := c.prepareSourceChainQueries(filteredSourceChains)
 
 	// 3. Append source queries to existing requests and get standard count
@@ -522,14 +535,16 @@ func (c *configPoller) GetOfframpSourceChainConfigs(
 	destChain cciptypes.ChainSelector,
 	sourceChains []cciptypes.ChainSelector,
 ) (map[cciptypes.ChainSelector]StaticSourceChainConfig, error) {
-	// Verify we have a reader for the destination chain
-	if _, exists := c.reader.getContractReader(destChain); !exists {
-		c.lggr.Errorw("No contract reader for destination chain", "chain", destChain)
-		return nil, fmt.Errorf("no contract reader for destination chain %d", destChain)
+	// Verify we have a chain accessor for the destination chain
+	if _, err := getChainAccessor(c.chainAccessors, destChain); err != nil {
+		c.lggr.Errorw("No chain accessor for destination chain", "chain", destChain)
+		return nil, fmt.Errorf("no chain accessor for destination chain %d", destChain)
 	}
 
 	// Filter out destination chain from source chains
-	filteredSourceChains := filterOutChainSelector(sourceChains, destChain)
+	filteredSourceChains := slicelib.Filter(sourceChains, func(cs cciptypes.ChainSelector) bool {
+		return cs != destChain
+	})
 	if len(filteredSourceChains) == 0 {
 		return make(map[cciptypes.ChainSelector]StaticSourceChainConfig), nil
 	}
@@ -673,7 +688,11 @@ func (c *configPoller) refreshSourceChainConfigs(
 
 	// Fetch configs from the contract
 	startTime := time.Now()
-	sourceChainConfigs, err := c.reader.fetchFreshSourceChainConfigs(ctx, destChain, chainsToFetch)
+	destChainAccessor, err := getChainAccessor(c.chainAccessors, destChain)
+	if err != nil {
+		return nil, fmt.Errorf("get chain accessor for dest chain %d: %w", destChain, err)
+	}
+	sourceChainConfigs, err := destChainAccessor.GetOffRampSourceChainConfigs(ctx, chainsToFetch)
 	fetchConfigLatency := time.Since(startTime)
 
 	if err != nil {
@@ -741,21 +760,11 @@ func (c *configPoller) fetchChainConfig(
 	return c.reader.processConfigResults(chainSel, batchResult)
 }
 
-// filterOutChainSelector removes a specified chain selector from a slice of chain selectors
-func filterOutChainSelector(
-	chains []cciptypes.ChainSelector,
-	chainToFilter cciptypes.ChainSelector) []cciptypes.ChainSelector {
-	if len(chains) == 0 {
-		return nil
-	}
-
-	filtered := make([]cciptypes.ChainSelector, 0, len(chains))
-	for _, chain := range chains {
-		if chain != chainToFilter {
-			filtered = append(filtered, chain)
-		}
-	}
-	return filtered
+func (c *configPoller) SetChainAccessorsTestOnly(
+	chainAccessors map[cciptypes.ChainSelector]cciptypes.ChainAccessor) {
+	c.Lock()
+	defer c.Unlock()
+	c.chainAccessors = chainAccessors
 }
 
 // StaticSourceChainConfigFromSourceChainConfig creates a StaticSourceChainConfig from a SourceChainConfig,
