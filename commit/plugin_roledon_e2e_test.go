@@ -523,7 +523,7 @@ func newRoleDonTestSetup(t *testing.T, numSourceChains, numOracles, fChain int) 
 
 	s.chainOracles = map[cciptypes.ChainSelector][]commontypes.OracleID{}
 	for chainSel, f := range s.fChain {
-		numRequiredOracles := 2*f + 1
+		numRequiredOracles := 3*f + 1
 		s.chainOracles[chainSel] = getRandomPermutation(s.oracles, numRequiredOracles+rand.Intn(2))
 	}
 
