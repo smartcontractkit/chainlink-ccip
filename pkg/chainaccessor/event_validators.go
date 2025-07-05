@@ -154,8 +154,12 @@ func validateExecutionStateChangedEvent(
 		return fmt.Errorf("message ID is zero")
 	}
 
-	if ev.State == 0 {
-		return fmt.Errorf("state is zero")
+	// This should never happen, because UNTOUCHED(0) are internal
+	// statuses used by the contract to track the state of the message during TX.
+	// ExecutionStateChange event must never be emitted with anything other than
+	// IN_PROGRESS(1) or SUCCESS(2) or FAILURE(3)
+	if ev.State < 1 {
+		return fmt.Errorf("state UNTOUCHED(0) spotted in logs, got %d", ev.State)
 	}
 
 	return nil

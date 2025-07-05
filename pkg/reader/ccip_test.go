@@ -24,9 +24,11 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/internal"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
 	writer_mocks "github.com/smartcontractkit/chainlink-ccip/mocks/chainlink_common"
 	reader_mocks "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/addressbook"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/chainaccessor"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
@@ -2094,6 +2096,100 @@ func TestCCIPChainReader_GetChainFeePriceUpdate(t *testing.T) {
 		err = ccipReader.Close()
 		require.NoError(t, err)
 	})
+}
+
+func TestCCIPChainReader_ExecutedStateEvent_WithInvalidStates(t *testing.T) {
+	events := []types.Sequence{
+		{
+			Data: &chainaccessor.ExecutionStateChangedEvent{
+				SourceChainSelector: chainA,
+				SequenceNumber:      cciptypes.SeqNum(1),
+				State:               0,
+				MessageID:           rand.RandomBytes32(),
+				MessageHash:         rand.RandomBytes32(),
+			},
+		},
+		{
+			Data: &chainaccessor.ExecutionStateChangedEvent{
+				SourceChainSelector: chainB,
+				SequenceNumber:      cciptypes.SeqNum(2),
+				State:               2,
+				MessageID:           rand.RandomBytes32(),
+				MessageHash:         rand.RandomBytes32(),
+			},
+		},
+		{
+			Data: &chainaccessor.ExecutionStateChangedEvent{
+				SourceChainSelector: chainC,
+				SequenceNumber:      cciptypes.SeqNum(3),
+				State:               1,
+				MessageID:           rand.RandomBytes32(),
+				MessageHash:         rand.RandomBytes32(),
+			},
+		},
+		{
+			Data: &chainaccessor.ExecutionStateChangedEvent{
+				SourceChainSelector: chainD,
+				SequenceNumber:      cciptypes.SeqNum(4),
+				State:               3,
+				MessageID:           rand.RandomBytes32(),
+				MessageHash:         rand.RandomBytes32(),
+			},
+		},
+	}
+
+	destCR := reader_mocks.NewMockContractReaderFacade(t)
+	destCR.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
+	destCR.EXPECT().QueryKey(
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+	).Return(events, nil).Maybe()
+	destCR.EXPECT().HealthReport().Return(nil).Maybe()
+
+	cw := writer_mocks.NewMockContractWriter(t)
+	contractWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
+	contractWriters[chainA] = cw
+
+	ccipReader, err := newCCIPChainReaderInternal(
+		tests.Context(t),
+		logger.Test(t),
+		map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
+			chainA: destCR,
+		},
+		contractWriters,
+		chainA,
+		[]byte("0x3"),
+		internal.NewMockAddressCodecHex(t),
+	)
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		err := ccipReader.Close()
+		if err != nil {
+			t.Logf("Error closing ccipReader: %v", err)
+		}
+	})
+
+	seqRange := []cciptypes.SeqNumRange{cciptypes.NewSeqNumRange(1, 5)}
+	results, err := ccipReader.ExecutedMessages(
+		t.Context(),
+		map[cciptypes.ChainSelector][]cciptypes.SeqNumRange{
+			chainA: seqRange,
+			chainB: seqRange,
+			chainC: seqRange,
+			chainD: seqRange,
+		},
+		primitives.Unconfirmed,
+	)
+	require.NoError(t, err)
+	require.Len(t, results, 3)
+
+	require.Equal(t, cciptypes.SeqNum(2), results[chainB][0])
+	require.Equal(t, cciptypes.SeqNum(3), results[chainC][0])
+	require.Equal(t, cciptypes.SeqNum(4), results[chainD][0])
 }
 
 type mockConfigCache struct {
