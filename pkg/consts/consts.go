@@ -4,7 +4,7 @@ package consts
 
 // Contract Names
 const (
-	ContractNameOffRamp                = "offramp"
+	ContractNameOffRamp                = "OffRamp"
 	ContractNameOnRamp                 = "onramp"
 	ContractNameFeeQuoter              = "FeeQuoter"
 	ContractNameCapabilitiesRegistry   = "CapabilitiesRegistry"
@@ -42,12 +42,12 @@ const (
 	MethodNameRouterGetWrappedNative = "GetWrappedNative"
 
 	// OffRamp methods
-	MethodNameGetSourceChainConfig            = "get_source_chain_config"
-	MethodNameOffRampGetAllSourceChainConfigs = "get_all_source_chain_configs"
-	MethodNameOffRampGetDynamicConfig         = "get_dynamic_config"
-	MethodNameOffRampGetStaticConfig          = "get_static_config"
-	MethodNameOffRampLatestConfigDetails      = "latest_config_details"
-	MethodNameGetLatestPriceSequenceNumber    = "get_latest_price_sequence_number"
+	MethodNameGetSourceChainConfig            = "GetSourceChainConfig"
+	MethodNameOffRampGetAllSourceChainConfigs = "OffRampGetAllSourceChainConfigs"
+	MethodNameOffRampGetDynamicConfig         = "OffRampGetDynamicConfig"
+	MethodNameOffRampGetStaticConfig          = "OffRampGetStaticConfig"
+	MethodNameOffRampLatestConfigDetails      = "OffRampLatestConfigDetails"
+	MethodNameGetLatestPriceSequenceNumber    = "GetLatestPriceSequenceNumber"
 	MethodNameGetMerkleRoot                   = "GetMerkleRoot"
 	MethodNameGetExecutionState               = "GetExecutionState"
 
