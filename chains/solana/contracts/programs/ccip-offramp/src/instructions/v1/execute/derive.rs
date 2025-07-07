@@ -43,7 +43,6 @@ pub enum DeriveExecuteAccountsStage {
     FinishMainAccountList,
     RetrieveTokenLUTs,
     RetrievePoolPrograms,
-    // N stages, one per token
     // N stages, one per token for the ones below.
     TokenTransferStaticAccounts {
         // Index of the current token being derived.

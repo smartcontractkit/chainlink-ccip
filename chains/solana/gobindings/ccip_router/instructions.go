@@ -331,12 +331,12 @@ var (
 	//
 	// * `accounts_to_save`: The caller must append these accounts to a list they maintain.
 	// When complete, this list will contain all accounts needed to call `ccip_send`.
-	// * `ask_again_with`: When this list is not empty, the caller must call `derive_accounts_ccip_send`
+	// * `ask_again_with`: When `next_stage` is not empty, the caller must call `derive_accounts_ccip_send`
 	// again, including exactly these accounts as the `remaining_accounts`.
 	// * `lookup_tables_to_save`: The caller must save those LUTs. They can be used for `ccip_send`.
 	// * `current_stage`: A string describing the current stage of the derivation process. When the stage
-	// is "TokenTransferAccounts", it means the `accounts_to_save` block in this response contains
-	// all accounts relating to a single token being transferred. Use this information to construct
+	// is "TokenTransferStaticAccounts/<N>/0", it means the `accounts_to_save` block in this response contains
+	// all accounts relating to the Nth token being transferred. Use this information to construct
 	// the `token_indexes` vector that `ccip_send` requires.
 	// * `next_stage`: If nonempty, this means the instruction must get called again with this value
 	// as the `stage` argument.
