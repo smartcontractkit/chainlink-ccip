@@ -38,7 +38,6 @@ pub mod fee_quoter {
     /// * `onramp` - The public key of the onramp.
     ///
     /// The function also uses the link_token_mint account from the context.
-    #[allow(clippy::too_many_arguments)]
     pub fn initialize(
         ctx: Context<Initialize>,
         max_fee_juels_per_msg: u128,

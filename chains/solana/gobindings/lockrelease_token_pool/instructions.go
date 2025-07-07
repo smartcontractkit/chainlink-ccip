@@ -30,7 +30,11 @@ func init() {
 var (
 	Instruction_InitGlobalConfig = ag_binary.TypeID([8]byte{140, 136, 214, 48, 87, 0, 120, 255})
 
-	Instruction_UpdateGlobalConfig = ag_binary.TypeID([8]byte{164, 84, 130, 189, 111, 58, 250, 200})
+	Instruction_UpdateSelfServedAllowed = ag_binary.TypeID([8]byte{210, 165, 57, 132, 64, 203, 100, 73})
+
+	Instruction_UpdateDefaultRouter = ag_binary.TypeID([8]byte{29, 86, 6, 222, 73, 220, 6, 186})
+
+	Instruction_UpdateDefaultRmn = ag_binary.TypeID([8]byte{204, 186, 36, 125, 180, 133, 227, 162})
 
 	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
 
@@ -46,6 +50,8 @@ var (
 	Instruction_AcceptOwnership = ag_binary.TypeID([8]byte{172, 23, 43, 13, 238, 213, 85, 150})
 
 	Instruction_SetRouter = ag_binary.TypeID([8]byte{236, 248, 107, 200, 151, 160, 44, 250})
+
+	Instruction_SetRmn = ag_binary.TypeID([8]byte{252, 89, 60, 179, 198, 54, 169, 120})
 
 	Instruction_InitializeStateVersion = ag_binary.TypeID([8]byte{54, 186, 181, 26, 2, 198, 200, 158})
 
@@ -81,8 +87,12 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 	switch id {
 	case Instruction_InitGlobalConfig:
 		return "InitGlobalConfig"
-	case Instruction_UpdateGlobalConfig:
-		return "UpdateGlobalConfig"
+	case Instruction_UpdateSelfServedAllowed:
+		return "UpdateSelfServedAllowed"
+	case Instruction_UpdateDefaultRouter:
+		return "UpdateDefaultRouter"
+	case Instruction_UpdateDefaultRmn:
+		return "UpdateDefaultRmn"
 	case Instruction_Initialize:
 		return "Initialize"
 	case Instruction_TypeVersion:
@@ -93,6 +103,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "AcceptOwnership"
 	case Instruction_SetRouter:
 		return "SetRouter"
+	case Instruction_SetRmn:
+		return "SetRmn"
 	case Instruction_InitializeStateVersion:
 		return "InitializeStateVersion"
 	case Instruction_InitChainRemoteConfig:
@@ -145,7 +157,13 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 			"init_global_config", (*InitGlobalConfig)(nil),
 		},
 		{
-			"update_global_config", (*UpdateGlobalConfig)(nil),
+			"update_self_served_allowed", (*UpdateSelfServedAllowed)(nil),
+		},
+		{
+			"update_default_router", (*UpdateDefaultRouter)(nil),
+		},
+		{
+			"update_default_rmn", (*UpdateDefaultRmn)(nil),
 		},
 		{
 			"initialize", (*Initialize)(nil),
@@ -161,6 +179,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"set_router", (*SetRouter)(nil),
+		},
+		{
+			"set_rmn", (*SetRmn)(nil),
 		},
 		{
 			"initialize_state_version", (*InitializeStateVersion)(nil),

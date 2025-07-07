@@ -2,9 +2,9 @@
 pragma solidity ^0.8.24;
 
 import {USDCBridgeMigrator} from "../../../../pools/USDC/USDCBridgeMigrator.sol";
-import {HybridLockReleaseUSDCTokenPoolSetup} from "./USDCBridgeMigratorSetup.t.sol";
+import {USDCBridgeMigratorSetup} from "./USDCBridgeMigratorSetup.t.sol";
 
-contract USDCBridgeMigrator_cancelMigrationProposal is HybridLockReleaseUSDCTokenPoolSetup {
+contract USDCBridgeMigrator_cancelMigrationProposal is USDCBridgeMigratorSetup {
   function test_cancelExistingCCTPMigrationProposal() public {
     vm.startPrank(OWNER);
 
