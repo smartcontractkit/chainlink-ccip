@@ -22,9 +22,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
-	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
-
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
+	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata/usdc"
 	"github.com/smartcontractkit/chainlink-ccip/internal"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
@@ -539,16 +538,11 @@ func mockReader(t *testing.T, contractAddress string, message []usdcMessage) *re
 		items[i] = types.Sequence{Data: newUSDCMessageEvent(t, m.eventPayload)}
 	}
 
-	contract := types.BoundContract{
-		Address: contractAddress,
-		Name:    consts.ContractNameCCTPMessageTransmitter,
-	}
-
 	r := readermock.NewMockExtended(t)
 	r.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil).Maybe()
-	r.EXPECT().QueryKey(
+	r.EXPECT().ExtendedQueryKey(
 		mock.Anything,
-		contract,
+		consts.ContractNameCCTPMessageTransmitter,
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
