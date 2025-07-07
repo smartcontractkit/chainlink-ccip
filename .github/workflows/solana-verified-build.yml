@@ -53,7 +53,7 @@ jobs:
     - uses: actions-rust-lang/setup-rust-toolchain@9399c7bb15d4c7d47b27263d024f0a4978346ba4 # v1
     - name: Install Solana Verify
       run: |
-        cargo install solana-verify
+        cargo install solana-verify@0.4.6
     - name: Cache cargo target dir
       id: cache-target
       uses: actions/cache@v4 # v4

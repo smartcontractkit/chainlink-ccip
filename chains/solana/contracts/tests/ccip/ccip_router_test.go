@@ -112,6 +112,7 @@ func TestCCIPRouter(t *testing.T) {
 	token1Mint := solana.MustPrivateKeyFromBase58("5uBhsiup2KiXPNznVSZaFeuegvLXCtmVmuW4u7kfBbP3xSmT1BZgmapKYiCCwi8GUgwdSQniAah3rJaUJdhPprcB")
 	token1, gerr := tokens.NewTokenPool(config.Token2022Program, config.CcipTokenPoolProgram, token1Mint.PublicKey())
 	require.NoError(t, gerr)
+	token1.WithTokenExtensions = true // token1 is a token2022 with extensions enabled
 	token2Mint := solana.MustPrivateKeyFromBase58("2b4zgrXRBDkAuhFMEUEaMJHXwPfPX5REmy3gA3Vxhj7efTLkZEBuq49mDSdQyCJFyG3KPRGt2PVoGF8VqhGUTo9")
 	token2, gerr := tokens.NewTokenPool(config.Token2022Program, config.CcipTokenPoolProgram, token2Mint.PublicKey())
 	require.NoError(t, gerr)
@@ -396,17 +397,17 @@ func TestCCIPRouter(t *testing.T) {
 		})
 
 		t.Run("token", func(t *testing.T) {
-			ix0, ixErr0 := tokens.CreateToken(ctx, token0.Program, token0.Mint, token0PoolAdmin.PublicKey(), token0Decimals, solanaGoClient, config.DefaultCommitment)
+			ix0, ixErr0 := tokens.CreateTokenFrom(ctx, token0, token0PoolAdmin.PublicKey(), token0Decimals, solanaGoClient, config.DefaultCommitment)
 			require.NoError(t, ixErr0)
 
 			ixMsig, ixErrMsig := tokens.CreateMultisig(ctx, user.PublicKey(), config.SPLTokenProgram, token0Multisig.PublicKey(), 1, []solana.PublicKey{token0PoolAdmin.PublicKey(), token0.PoolSigner}, solanaGoClient, config.DefaultCommitment)
 			require.NoError(t, ixErrMsig)
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, ixMsig, token0PoolAdmin, config.DefaultCommitment, common.AddSigners(token0Multisig, user))
 
-			ix1, ixErr1 := tokens.CreateToken(ctx, token1.Program, token1.Mint, token1PoolAdmin.PublicKey(), token1Decimals, solanaGoClient, config.DefaultCommitment)
+			ix1, ixErr1 := tokens.CreateTokenFrom(ctx, token1, token1PoolAdmin.PublicKey(), token1Decimals, solanaGoClient, config.DefaultCommitment)
 			require.NoError(t, ixErr1)
 
-			ix2, ixErr2 := tokens.CreateToken(ctx, token2.Program, token2.Mint, token2PoolAdmin.PublicKey(), token2Decimals, solanaGoClient, config.DefaultCommitment)
+			ix2, ixErr2 := tokens.CreateTokenFrom(ctx, token2, token2PoolAdmin.PublicKey(), token2Decimals, solanaGoClient, config.DefaultCommitment)
 			require.NoError(t, ixErr2)
 
 			ixUsdc, ixErrUsdc := tokens.CreateToken(ctx, usdcPool.Program, usdcPool.Mint, usdcPoolAdmin.PublicKey(), usdcDecimals, solanaGoClient, config.DefaultCommitment)
