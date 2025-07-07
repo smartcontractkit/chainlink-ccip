@@ -135,8 +135,8 @@ const (
 	EventAttributeState          = "State"
 
 	// Required for Solana CCTP
-	EventAttributeCCTPNonce     = "CctpNonce"
-	EventAttributeSourceDomain  = "SourceDomain"
+	EventAttributeCCTPNonce    = "CctpNonce"
+	EventAttributeSourceDomain = "SourceDomain"
 )
 
 // Dedicated filters
