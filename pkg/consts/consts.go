@@ -4,8 +4,8 @@ package consts
 
 // Contract Names
 const (
-	ContractNameOffRamp                = "OffRamp"
-	ContractNameOnRamp                 = "OnRamp"
+	ContractNameOffRamp                = "offramp"
+	ContractNameOnRamp                 = "onramp"
 	ContractNameFeeQuoter              = "FeeQuoter"
 	ContractNameCapabilitiesRegistry   = "CapabilitiesRegistry"
 	ContractNameCCIPConfig             = "CCIPHome"
@@ -36,26 +36,26 @@ func AllContractNames() []string {
 }
 
 // Method Names
-// TODO: these should be better organized, maybe separate packages.
+// TODO: these should be better organized, ContractNameOnRampmaybe separate packages.
 const (
 	// Router methods
 	MethodNameRouterGetWrappedNative = "GetWrappedNative"
 
 	// OffRamp methods
-	MethodNameGetSourceChainConfig            = "GetSourceChainConfig"
-	MethodNameOffRampGetAllSourceChainConfigs = "OffRampGetAllSourceChainConfigs"
-	MethodNameOffRampGetDynamicConfig         = "OffRampGetDynamicConfig"
-	MethodNameOffRampGetStaticConfig          = "OffRampGetStaticConfig"
-	MethodNameOffRampLatestConfigDetails      = "OffRampLatestConfigDetails"
-	MethodNameGetLatestPriceSequenceNumber    = "GetLatestPriceSequenceNumber"
+	MethodNameGetSourceChainConfig            = "get_source_chain_config"
+	MethodNameOffRampGetAllSourceChainConfigs = "get_all_source_chain_configs"
+	MethodNameOffRampGetDynamicConfig         = "get_dynamic_config"
+	MethodNameOffRampGetStaticConfig          = "get_static_config"
+	MethodNameOffRampLatestConfigDetails      = "latest_config_details"
+	MethodNameGetLatestPriceSequenceNumber    = "get_latest_price_sequence_number"
 	MethodNameGetMerkleRoot                   = "GetMerkleRoot"
 	MethodNameGetExecutionState               = "GetExecutionState"
 
 	// OnRamp methods
-	MethodNameOnRampGetDynamicConfig        = "OnRampGetDynamicConfig"
-	MethodNameOnRampGetStaticConfig         = "OnRampGetStaticConfig"
-	MethodNameOnRampGetDestChainConfig      = "OnRampGetDestChainConfig"
-	MethodNameGetExpectedNextSequenceNumber = "GetExpectedNextSequenceNumber"
+	MethodNameOnRampGetDynamicConfig        = "get_dynamic_config"
+	MethodNameOnRampGetStaticConfig         = "get_static_config"
+	MethodNameOnRampGetDestChainConfig      = "get_dest_chain_config"
+	MethodNameGetExpectedNextSequenceNumber = "get_expected_next_sequence_number"
 
 	// FeeQuoter view/pure methods
 	MethodNameFeeQuoterGetTokenPrices       = "GetTokenPrices"

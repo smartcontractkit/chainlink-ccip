@@ -161,6 +161,8 @@ func (l *DefaultAccessor) MsgsBetweenSeqNums(
 
 	msgs := make([]cciptypes.Message, 0)
 	for _, item := range seq {
+		lggr.Debugw("DEBUG MSG: ", item, len(seq))
+
 		msg, ok := item.Data.(*SendRequestedEvent)
 		if !ok {
 			return nil, fmt.Errorf("failed to cast %v to Message", item.Data)
@@ -170,6 +172,8 @@ func (l *DefaultAccessor) MsgsBetweenSeqNums(
 			lggr.Errorw("validate send requested event", "err", err, "message", msg)
 			continue
 		}
+
+		lggr.Debugw("DEBUG MSG1: ", msg.Message, len(msgs))
 
 		msg.Message.Header.OnRamp = onRampAddress
 		msgs = append(msgs, msg.Message)
