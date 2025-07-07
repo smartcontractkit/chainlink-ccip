@@ -77,8 +77,7 @@ pub struct InitializeTokenPool<'info> {
     #[account(constraint = program.programdata_address()? == Some(program_data.key()))]
     pub program: Program<'info, LockreleaseTokenPool>,
 
-    // Token pool initialization only allowed by program upgrade authority. Initializing token pools managed
-    // by the CLL deployment of this program is limited to CLL. Users must deploy their own instance of this program.
+    // The upgrade authority of the token pool program can initialize a token pool or the mint authority of the token
     #[account(constraint = allowed_to_initialize_token_pool(&program_data, &authority, &config, &mint) @ CcipTokenPoolError::Unauthorized)]
     pub program_data: Account<'info, ProgramData>,
 

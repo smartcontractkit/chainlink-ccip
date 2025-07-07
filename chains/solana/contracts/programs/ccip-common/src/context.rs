@@ -35,7 +35,7 @@ pub struct TokenAccountsValidationContext<'info> {
     /// CHECK: Pool chain config PDA
     #[account(
         seeds = [
-            seed::TOKEN_POOL_CONFIG,
+            seed::TOKEN_POOL_CHAIN_CONFIG,
             chain_selector.to_le_bytes().as_ref(),
             mint.key().as_ref(),
         ],
