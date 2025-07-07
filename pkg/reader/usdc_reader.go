@@ -95,7 +95,7 @@ func NewUSDCMessageReader(
 				lggr,
 				contractReaders,
 				chainSelector,
-				consts.ContractNameCCTPMessageTransmitter, // TODO: this is specific to EVM, should it be private?
+				consts.ContractNameCCTPMessageTransmitter,
 				bytesAddress,
 				addrCodec,
 			)
@@ -382,37 +382,7 @@ func (u solanaUSDCMessageReader) getMessageTokenData(
 	return messageTransmitterEvents, nil
 }
 
-/*
-	type EventCcipCctpMessageSent struct {
-		Discriminator       [8]byte
-		OriginalSender      solana.PublicKey
-		RemoteChainSelector uint64
-		MsgTotalNonce       uint64
-		EventAddress        solana.PublicKey
-		SourceDomain        uint32
-		CctpNonce           uint64
-		MessageSentBytes    []byte
-	}
-
-#[event]
-
-	pub struct CcipCctpMessageSentEvent {
-	    // Seeds for the CCTP message sent event account
-	    pub original_sender: Pubkey,
-	    pub remote_chain_selector: u64,
-	    pub msg_total_nonce: u64,
-
-	    // Actual event account address, derived from the seeds above
-	    pub event_address: Pubkey,
-
-	    // CCTP values identifying the message
-	    pub source_domain: u32, // The source chain domain ID, which for Solana is always 5
-	    pub cctp_nonce: u64,
-
-	    // CCTP message bytes, used to get the attestation offchain and receive the message on dest
-	    pub message_sent_bytes: Vec<u8>,
-	}
-*/
+// SolanaCCTPUSDCMessageEvent matches the onChain CcipCctpMessageSentEvent.
 type SolanaCCTPUSDCMessageEvent struct {
 	Discriminator       [8]byte
 	OriginalSender      [32]byte
