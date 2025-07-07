@@ -44,6 +44,9 @@ type TokenPool struct {
 	// CCIP CPI signers
 	RouterSigner  solana.PublicKey
 	OfframpSigner solana.PublicKey
+
+	// Token Extensions
+	WithTokenExtensions bool
 }
 
 func (tp TokenPool) ToTokenPoolEntries() []solana.PublicKey {
@@ -112,6 +115,7 @@ func NewTokenPool(tokenProgram solana.PublicKey, poolProgram solana.PublicKey, m
 		Billing:               map[uint64]solana.PublicKey{},
 		RouterSigner:          routerSignerPDA,
 		OfframpSigner:         offrampSignerPDA,
+		WithTokenExtensions:   false, // default to false, can be set later if needed
 	}
 	p.Chain[config.EvmChainSelector] = evmChainPDA
 	p.Chain[config.SvmChainSelector] = svmChainPDA
