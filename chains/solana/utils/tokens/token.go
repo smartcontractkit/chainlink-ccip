@@ -36,11 +36,15 @@ func (inst *TokenInstruction) ProgramID() solana.PublicKey {
 // NOTE: functions in this file are mainly wrapped version of the versions that exist in `solana-go` but these allow specifying the token program
 
 func CreateToken(ctx context.Context, program, mint, admin solana.PublicKey, decimals uint8, client *rpc.Client, commitment rpc.CommitmentType) ([]solana.Instruction, error) {
+	return CreateTokenWithExtensions(ctx, program, mint, admin, decimals, client, commitment, false)
+}
+
+func CreateTokenWithExtensions(ctx context.Context, program, mint, admin solana.PublicKey, decimals uint8, client *rpc.Client, commitment rpc.CommitmentType, createWithExtensions bool) ([]solana.Instruction, error) {
 	ixs := []solana.Instruction{}
 
 	// initialize mint account
 	mintSize := token.MINT_SIZE
-	if program == config.Token2022Program {
+	if program == config.Token2022Program && createWithExtensions {
 		mintSize += 1 + 36 + 83 // MintCloseAuthorityExtension overhead: header + ext + padding
 	}
 
@@ -57,12 +61,11 @@ func CreateToken(ctx context.Context, program, mint, admin solana.PublicKey, dec
 
 	ixs = append(ixs, initI)
 
-	if program == config.Token2022Program {
+	if program == config.Token2022Program && createWithExtensions {
 		closeMintExtensionI, closeMintErr := NewInitializeMintCloseAuthorityIx(mint, &admin, &program)
 		if closeMintErr != nil {
 			return nil, closeMintErr
 		}
-		// closeWrap := &TokenInstruction{closeMintExtensionI, program}
 		ixs = append(ixs, closeMintExtensionI)
 	}
 

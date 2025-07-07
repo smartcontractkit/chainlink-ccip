@@ -388,7 +388,7 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, ixErrMsig)
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, ixMsig, token0PoolAdmin, config.DefaultCommitment, common.AddSigners(token0Multisig, user))
 
-			ix1, ixErr1 := tokens.CreateToken(ctx, token1.Program, token1.Mint, token1PoolAdmin.PublicKey(), token1Decimals, solanaGoClient, config.DefaultCommitment)
+			ix1, ixErr1 := tokens.CreateTokenWithExtensions(ctx, token1.Program, token1.Mint, token1PoolAdmin.PublicKey(), token1Decimals, solanaGoClient, config.DefaultCommitment, true)
 			require.NoError(t, ixErr1)
 
 			ix2, ixErr2 := tokens.CreateToken(ctx, token2.Program, token2.Mint, token2PoolAdmin.PublicKey(), token2Decimals, solanaGoClient, config.DefaultCommitment)
