@@ -22,10 +22,12 @@ contract USDCSetup is BaseTest {
     uint32 version;
     uint32 sourceDomain;
     uint32 destinationDomain;
-    uint64 nonce;
+    bytes32 nonce;
     bytes32 sender;
     bytes32 recipient;
     bytes32 destinationCaller;
+    uint32 minFinalityThreshold;
+    uint32 finalityThresholdExecuted;
     bytes messageBody;
   }
 
@@ -45,6 +47,7 @@ contract USDCSetup is BaseTest {
   address internal s_routerAllowedOnRamp = address(3456);
   address internal s_routerAllowedOffRamp = address(234);
   address internal s_previousPool = makeAddr("previousPool");
+  address internal s_previousPoolMessageTransmitterProxy = makeAddr("previousPoolMessageTransmitterProxy");
   Router internal s_router;
 
   IBurnMintERC20 internal s_USDCToken;
@@ -57,9 +60,10 @@ contract USDCSetup is BaseTest {
     deal(address(s_USDCToken), OWNER, type(uint256).max);
     _setUpRamps();
 
-    s_mockUSDCTransmitter = new MockE2EUSDCTransmitter(0, DEST_DOMAIN_IDENTIFIER, address(s_USDCToken));
-    s_mockUSDC = new MockUSDCTokenMessenger(0, address(s_mockUSDCTransmitter));
+    s_mockUSDCTransmitter = new MockE2EUSDCTransmitter(1, DEST_DOMAIN_IDENTIFIER, address(s_USDCToken));
+    s_mockUSDC = new MockUSDCTokenMessenger(1, address(s_mockUSDCTransmitter));
     s_cctpMessageTransmitterProxy = new CCTPMessageTransmitterProxy(s_mockUSDC);
+
     usdcToken.grantMintAndBurnRoles(address(s_mockUSDCTransmitter));
     usdcToken.grantMintAndBurnRoles(address(s_mockUSDC));
 
@@ -68,6 +72,14 @@ contract USDCSetup is BaseTest {
       s_previousPool,
       abi.encodeWithSelector(TokenPool.releaseOrMint.selector),
       abi.encode(Pool.ReleaseOrMintOutV1({destinationAmount: 1}))
+    );
+
+    // Mock the previous pool's i_cctpMessageTransmitterProxy function to return an address
+    // This is used to determine if the message was sent using CCTP V1 or V2
+    vm.mockCall(
+      s_previousPool,
+      abi.encodeWithSelector(bytes4(keccak256("i_messageTransmitterProxy()"))),
+      abi.encode(s_previousPoolMessageTransmitterProxy)
     );
 
     // Mock the previous pool's supportsInterface function to return true for IPoolV1 interface
@@ -130,6 +142,8 @@ contract USDCSetup is BaseTest {
       usdcMessage.sender,
       usdcMessage.recipient,
       usdcMessage.destinationCaller,
+      usdcMessage.minFinalityThreshold,
+      usdcMessage.finalityThresholdExecuted,
       usdcMessage.messageBody
     );
   }

@@ -31,8 +31,8 @@ var (
 )
 
 var MockE2EUSDCTokenMessengerMetaData = &bind.MetaData{
-	ABI: "[{\"type\":\"constructor\",\"inputs\":[{\"name\":\"version\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"transmitter\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"DESTINATION_TOKEN_MESSENGER\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"depositForBurnWithCaller\",\"inputs\":[{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"destinationDomain\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"mintRecipient\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"burnToken\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"destinationCaller\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"localMessageTransmitter\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"localMessageTransmitterWithRelay\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"contractIMessageTransmitterWithRelay\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"messageBodyVersion\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"s_nonce\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"stateMutability\":\"view\"},{\"type\":\"event\",\"name\":\"DepositForBurn\",\"inputs\":[{\"name\":\"nonce\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"burnToken\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"},{\"name\":\"depositor\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"mintRecipient\",\"type\":\"bytes32\",\"indexed\":false,\"internalType\":\"bytes32\"},{\"name\":\"destinationDomain\",\"type\":\"uint32\",\"indexed\":false,\"internalType\":\"uint32\"},{\"name\":\"destinationTokenMessenger\",\"type\":\"bytes32\",\"indexed\":false,\"internalType\":\"bytes32\"},{\"name\":\"destinationCaller\",\"type\":\"bytes32\",\"indexed\":false,\"internalType\":\"bytes32\"}],\"anonymous\":false}]",
-	Bin: "0x60e0346100b757601f61082538819003918201601f19168301916001600160401b038311848410176100bc5780849260409485528339810103126100b75780519063ffffffff821682036100b757602001516001600160a01b038116918282036100b757608052600080546001600160401b031916600117905560a05260c05260405161075290816100d382396080518181816101fc01526103fb015260a051816104ae015260c05181818161039c015261065f0152f35b600080fd5b634e487b7160e01b600052604160045260246000fdfe608080604052600436101561001357600080fd5b600090813560e01c9081632c12192114610464575080637eccf63e1461041f5780639cdbb181146103c0578063a250c66a14610351578063f856ddb6146100be5763fb8406a91461006357600080fd5b346100bb57807ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126100bb5760206040517f17c71eed51b181d8ae1908b4743526c6dbf099c201f158a1acd5f6718e82e8f68152f35b80fd5b50346100bb5760a07ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126100bb576024359060043563ffffffff831680840361034d576044356064359173ffffffffffffffffffffffffffffffffffffffff831680930361034957608435916040517f23b872dd0000000000000000000000000000000000000000000000000000000081523360048201523060248201528560448201526020816064818a895af1801561030257610311575b50833b1561030d57604051967f42966c68000000000000000000000000000000000000000000000000000000008852856004890152868860248183895af1978815610302576020986102e2575b5061024f67ffffffffffffffff9185604051917fffffffff000000000000000000000000000000000000000000000000000000007f000000000000000000000000000000000000000000000000000000000000000060e01b168c8401528860248401528560448401528960648401523360848401526084835261024a60a4846104d6565b6105ca565b1695867fffffffffffffffffffffffffffffffffffffffffffffffff00000000000000008254161790556040519485528685015260408401527f17c71eed51b181d8ae1908b4743526c6dbf099c201f158a1acd5f6718e82e8f660608401526080830152827f2fa9ca894982930190727e75500a97d8dc500233a5065e0f3126c48fbe0343c060a03394a4604051908152f35b876102fa67ffffffffffffffff939961024f936104d6565b9791506101c6565b6040513d89823e3d90fd5b8580fd5b6020813d602011610341575b8161032a602093836104d6565b8101031261033d57518015158114610179575b8680fd5b3d915061031d565b8480fd5b8280fd5b50346100bb57807ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126100bb57602060405173ffffffffffffffffffffffffffffffffffffffff7f0000000000000000000000000000000000000000000000000000000000000000168152f35b50346100bb57807ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126100bb57602060405163ffffffff7f0000000000000000000000000000000000000000000000000000000000000000168152f35b50346100bb57807ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126100bb5767ffffffffffffffff6020915416604051908152f35b9050346104d257817ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126104d25760209073ffffffffffffffffffffffffffffffffffffffff7f0000000000000000000000000000000000000000000000000000000000000000168152f35b5080fd5b90601f7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0910116810190811067ffffffffffffffff82111761051757604052565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b90816020910312610566575167ffffffffffffffff811681036105665790565b600080fd5b919082519283825260005b8481106105b55750507fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0601f8460006020809697860101520116010190565b80602080928401015182828601015201610576565b90806106cb575063ffffffff60209161064460405194859384937f0ba469bc0000000000000000000000000000000000000000000000000000000085521660048401527f17c71eed51b181d8ae1908b4743526c6dbf099c201f158a1acd5f6718e82e8f6602484015260606044840152606483019061056b565b0381600073ffffffffffffffffffffffffffffffffffffffff7f0000000000000000000000000000000000000000000000000000000000000000165af19081156106bf57600091610693575090565b6106b5915060203d6020116106b8575b6106ad81836104d6565b810190610546565b90565b503d6106a3565b6040513d6000823e3d90fd5b9160209161064463ffffffff9260405195869485947ff7259a750000000000000000000000000000000000000000000000000000000086521660048501527f17c71eed51b181d8ae1908b4743526c6dbf099c201f158a1acd5f6718e82e8f66024850152604484015260806064840152608483019061056b56fea164736f6c634300081a000a",
+	ABI: "[{\"type\":\"constructor\",\"inputs\":[{\"name\":\"version\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"transmitter\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"DESTINATION_TOKEN_MESSENGER\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"depositForBurn\",\"inputs\":[{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"destinationDomain\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"mintRecipient\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"burnToken\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"destinationCaller\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"maxFee\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"minFinalityThreshold\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"localMessageTransmitter\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"localMessageTransmitterWithRelay\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"contractIMessageTransmitterWithRelay\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"messageBodyVersion\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"s_nonce\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"stateMutability\":\"view\"},{\"type\":\"event\",\"name\":\"DepositForBurn\",\"inputs\":[{\"name\":\"burnToken\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"},{\"name\":\"depositor\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"mintRecipient\",\"type\":\"bytes32\",\"indexed\":false,\"internalType\":\"bytes32\"},{\"name\":\"destinationDomain\",\"type\":\"uint32\",\"indexed\":false,\"internalType\":\"uint32\"},{\"name\":\"destinationTokenMessenger\",\"type\":\"bytes32\",\"indexed\":false,\"internalType\":\"bytes32\"},{\"name\":\"destinationCaller\",\"type\":\"bytes32\",\"indexed\":false,\"internalType\":\"bytes32\"},{\"name\":\"maxFee\",\"type\":\"uint32\",\"indexed\":false,\"internalType\":\"uint32\"},{\"name\":\"minFinalityThreshold\",\"type\":\"uint32\",\"indexed\":true,\"internalType\":\"uint32\"},{\"name\":\"hookData\",\"type\":\"bytes\",\"indexed\":false,\"internalType\":\"bytes\"}],\"anonymous\":false}]",
+	Bin: "0x60e0346100b757601f61083b38819003918201601f19168301916001600160401b038311848410176100bc5780849260409485528339810103126100b75780519063ffffffff821682036100b757602001516001600160a01b038116918282036100b757608052600080546001600160401b031916600117905560a05260c05260405161076890816100d382396080518181816102110152610411015260a051816104c4015260c0518181816103b201526106750152f35b600080fd5b634e487b7160e01b600052604160045260246000fdfe608080604052600436101561001357600080fd5b600090813560e01c9081632c1219211461047a575080637eccf63e146104355780639cdbb181146103d6578063a250c66a14610367578063d04857b0146100be5763fb8406a91461006357600080fd5b346100bb57807ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126100bb5760206040517f17c71eed51b181d8ae1908b4743526c6dbf099c201f158a1acd5f6718e82e8f68152f35b80fd5b50346100bb5760e07ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126100bb5760243560043563ffffffff8216808303610363576044356064359173ffffffffffffffffffffffffffffffffffffffff831680930361035f576084359060a4359263ffffffff841680940361035b5760c4359663ffffffff881680980361031f576040517f23b872dd0000000000000000000000000000000000000000000000000000000081523360048201523060248201528760448201526020816064818d8b5af1801561031457610323575b50853b1561031f576040517f42966c680000000000000000000000000000000000000000000000000000000081528760048201528981602481838b5af18015610314576102fe575b5061027f9084604051917fffffffff000000000000000000000000000000000000000000000000000000007f000000000000000000000000000000000000000000000000000000000000000060e01b1660208401528860248401528460448401528960648401523360848401528b60a48401528b60c48401528b60e48401528b61010484015260e4835261027a610104846104ec565b6105e0565b50604051958652602086015260408501527f17c71eed51b181d8ae1908b4743526c6dbf099c201f158a1acd5f6718e82e8f66060850152608084015260a083015260e060c08301528360e0830152836101008301527f6a4c152b4ad8c08f204453d58ef2ac1c0bb69627dd545cf47507d32d036e67d56101003393a480f35b9861030d8161027f939b6104ec565b98906101e4565b6040513d8c823e3d90fd5b8880fd5b6020813d602011610353575b8161033c602093836104ec565b8101031261034f5751801515811461019c575b8980fd5b3d915061032f565b8780fd5b8580fd5b8380fd5b50346100bb57807ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126100bb57602060405173ffffffffffffffffffffffffffffffffffffffff7f0000000000000000000000000000000000000000000000000000000000000000168152f35b50346100bb57807ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126100bb57602060405163ffffffff7f0000000000000000000000000000000000000000000000000000000000000000168152f35b50346100bb57807ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126100bb5767ffffffffffffffff6020915416604051908152f35b9050346104e857817ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126104e85760209073ffffffffffffffffffffffffffffffffffffffff7f0000000000000000000000000000000000000000000000000000000000000000168152f35b5080fd5b90601f7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0910116810190811067ffffffffffffffff82111761052d57604052565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b9081602091031261057c575167ffffffffffffffff8116810361057c5790565b600080fd5b919082519283825260005b8481106105cb5750507fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0601f8460006020809697860101520116010190565b8060208092840101518282860101520161058c565b90806106e1575063ffffffff60209161065a60405194859384937f0ba469bc0000000000000000000000000000000000000000000000000000000085521660048401527f17c71eed51b181d8ae1908b4743526c6dbf099c201f158a1acd5f6718e82e8f66024840152606060448401526064830190610581565b0381600073ffffffffffffffffffffffffffffffffffffffff7f0000000000000000000000000000000000000000000000000000000000000000165af19081156106d5576000916106a9575090565b6106cb915060203d6020116106ce575b6106c381836104ec565b81019061055c565b90565b503d6106b9565b6040513d6000823e3d90fd5b9160209161065a63ffffffff9260405195869485947ff7259a750000000000000000000000000000000000000000000000000000000086521660048501527f17c71eed51b181d8ae1908b4743526c6dbf099c201f158a1acd5f6718e82e8f66024850152604484015260806064840152608483019061058156fea164736f6c634300081a000a",
 }
 
 var MockE2EUSDCTokenMessengerABI = MockE2EUSDCTokenMessengerMetaData.ABI
@@ -281,16 +281,16 @@ func (_MockE2EUSDCTokenMessenger *MockE2EUSDCTokenMessengerCallerSession) SNonce
 	return _MockE2EUSDCTokenMessenger.Contract.SNonce(&_MockE2EUSDCTokenMessenger.CallOpts)
 }
 
-func (_MockE2EUSDCTokenMessenger *MockE2EUSDCTokenMessengerTransactor) DepositForBurnWithCaller(opts *bind.TransactOpts, amount *big.Int, destinationDomain uint32, mintRecipient [32]byte, burnToken common.Address, destinationCaller [32]byte) (*types.Transaction, error) {
-	return _MockE2EUSDCTokenMessenger.contract.Transact(opts, "depositForBurnWithCaller", amount, destinationDomain, mintRecipient, burnToken, destinationCaller)
+func (_MockE2EUSDCTokenMessenger *MockE2EUSDCTokenMessengerTransactor) DepositForBurn(opts *bind.TransactOpts, amount *big.Int, destinationDomain uint32, mintRecipient [32]byte, burnToken common.Address, destinationCaller [32]byte, maxFee uint32, minFinalityThreshold uint32) (*types.Transaction, error) {
+	return _MockE2EUSDCTokenMessenger.contract.Transact(opts, "depositForBurn", amount, destinationDomain, mintRecipient, burnToken, destinationCaller, maxFee, minFinalityThreshold)
 }
 
-func (_MockE2EUSDCTokenMessenger *MockE2EUSDCTokenMessengerSession) DepositForBurnWithCaller(amount *big.Int, destinationDomain uint32, mintRecipient [32]byte, burnToken common.Address, destinationCaller [32]byte) (*types.Transaction, error) {
-	return _MockE2EUSDCTokenMessenger.Contract.DepositForBurnWithCaller(&_MockE2EUSDCTokenMessenger.TransactOpts, amount, destinationDomain, mintRecipient, burnToken, destinationCaller)
+func (_MockE2EUSDCTokenMessenger *MockE2EUSDCTokenMessengerSession) DepositForBurn(amount *big.Int, destinationDomain uint32, mintRecipient [32]byte, burnToken common.Address, destinationCaller [32]byte, maxFee uint32, minFinalityThreshold uint32) (*types.Transaction, error) {
+	return _MockE2EUSDCTokenMessenger.Contract.DepositForBurn(&_MockE2EUSDCTokenMessenger.TransactOpts, amount, destinationDomain, mintRecipient, burnToken, destinationCaller, maxFee, minFinalityThreshold)
 }
 
-func (_MockE2EUSDCTokenMessenger *MockE2EUSDCTokenMessengerTransactorSession) DepositForBurnWithCaller(amount *big.Int, destinationDomain uint32, mintRecipient [32]byte, burnToken common.Address, destinationCaller [32]byte) (*types.Transaction, error) {
-	return _MockE2EUSDCTokenMessenger.Contract.DepositForBurnWithCaller(&_MockE2EUSDCTokenMessenger.TransactOpts, amount, destinationDomain, mintRecipient, burnToken, destinationCaller)
+func (_MockE2EUSDCTokenMessenger *MockE2EUSDCTokenMessengerTransactorSession) DepositForBurn(amount *big.Int, destinationDomain uint32, mintRecipient [32]byte, burnToken common.Address, destinationCaller [32]byte, maxFee uint32, minFinalityThreshold uint32) (*types.Transaction, error) {
+	return _MockE2EUSDCTokenMessenger.Contract.DepositForBurn(&_MockE2EUSDCTokenMessenger.TransactOpts, amount, destinationDomain, mintRecipient, burnToken, destinationCaller, maxFee, minFinalityThreshold)
 }
 
 type MockE2EUSDCTokenMessengerDepositForBurnIterator struct {
@@ -354,7 +354,6 @@ func (it *MockE2EUSDCTokenMessengerDepositForBurnIterator) Close() error {
 }
 
 type MockE2EUSDCTokenMessengerDepositForBurn struct {
-	Nonce                     uint64
 	BurnToken                 common.Address
 	Amount                    *big.Int
 	Depositor                 common.Address
@@ -362,15 +361,14 @@ type MockE2EUSDCTokenMessengerDepositForBurn struct {
 	DestinationDomain         uint32
 	DestinationTokenMessenger [32]byte
 	DestinationCaller         [32]byte
+	MaxFee                    uint32
+	MinFinalityThreshold      uint32
+	HookData                  []byte
 	Raw                       types.Log
 }
 
-func (_MockE2EUSDCTokenMessenger *MockE2EUSDCTokenMessengerFilterer) FilterDepositForBurn(opts *bind.FilterOpts, nonce []uint64, burnToken []common.Address, depositor []common.Address) (*MockE2EUSDCTokenMessengerDepositForBurnIterator, error) {
+func (_MockE2EUSDCTokenMessenger *MockE2EUSDCTokenMessengerFilterer) FilterDepositForBurn(opts *bind.FilterOpts, burnToken []common.Address, depositor []common.Address, minFinalityThreshold []uint32) (*MockE2EUSDCTokenMessengerDepositForBurnIterator, error) {
 
-	var nonceRule []interface{}
-	for _, nonceItem := range nonce {
-		nonceRule = append(nonceRule, nonceItem)
-	}
 	var burnTokenRule []interface{}
 	for _, burnTokenItem := range burnToken {
 		burnTokenRule = append(burnTokenRule, burnTokenItem)
@@ -381,19 +379,20 @@ func (_MockE2EUSDCTokenMessenger *MockE2EUSDCTokenMessengerFilterer) FilterDepos
 		depositorRule = append(depositorRule, depositorItem)
 	}
 
-	logs, sub, err := _MockE2EUSDCTokenMessenger.contract.FilterLogs(opts, "DepositForBurn", nonceRule, burnTokenRule, depositorRule)
+	var minFinalityThresholdRule []interface{}
+	for _, minFinalityThresholdItem := range minFinalityThreshold {
+		minFinalityThresholdRule = append(minFinalityThresholdRule, minFinalityThresholdItem)
+	}
+
+	logs, sub, err := _MockE2EUSDCTokenMessenger.contract.FilterLogs(opts, "DepositForBurn", burnTokenRule, depositorRule, minFinalityThresholdRule)
 	if err != nil {
 		return nil, err
 	}
 	return &MockE2EUSDCTokenMessengerDepositForBurnIterator{contract: _MockE2EUSDCTokenMessenger.contract, event: "DepositForBurn", logs: logs, sub: sub}, nil
 }
 
-func (_MockE2EUSDCTokenMessenger *MockE2EUSDCTokenMessengerFilterer) WatchDepositForBurn(opts *bind.WatchOpts, sink chan<- *MockE2EUSDCTokenMessengerDepositForBurn, nonce []uint64, burnToken []common.Address, depositor []common.Address) (event.Subscription, error) {
+func (_MockE2EUSDCTokenMessenger *MockE2EUSDCTokenMessengerFilterer) WatchDepositForBurn(opts *bind.WatchOpts, sink chan<- *MockE2EUSDCTokenMessengerDepositForBurn, burnToken []common.Address, depositor []common.Address, minFinalityThreshold []uint32) (event.Subscription, error) {
 
-	var nonceRule []interface{}
-	for _, nonceItem := range nonce {
-		nonceRule = append(nonceRule, nonceItem)
-	}
 	var burnTokenRule []interface{}
 	for _, burnTokenItem := range burnToken {
 		burnTokenRule = append(burnTokenRule, burnTokenItem)
@@ -404,7 +403,12 @@ func (_MockE2EUSDCTokenMessenger *MockE2EUSDCTokenMessengerFilterer) WatchDeposi
 		depositorRule = append(depositorRule, depositorItem)
 	}
 
-	logs, sub, err := _MockE2EUSDCTokenMessenger.contract.WatchLogs(opts, "DepositForBurn", nonceRule, burnTokenRule, depositorRule)
+	var minFinalityThresholdRule []interface{}
+	for _, minFinalityThresholdItem := range minFinalityThreshold {
+		minFinalityThresholdRule = append(minFinalityThresholdRule, minFinalityThresholdItem)
+	}
+
+	logs, sub, err := _MockE2EUSDCTokenMessenger.contract.WatchLogs(opts, "DepositForBurn", burnTokenRule, depositorRule, minFinalityThresholdRule)
 	if err != nil {
 		return nil, err
 	}
@@ -456,7 +460,7 @@ func (_MockE2EUSDCTokenMessenger *MockE2EUSDCTokenMessenger) ParseLog(log types.
 }
 
 func (MockE2EUSDCTokenMessengerDepositForBurn) Topic() common.Hash {
-	return common.HexToHash("0x2fa9ca894982930190727e75500a97d8dc500233a5065e0f3126c48fbe0343c0")
+	return common.HexToHash("0x6a4c152b4ad8c08f204453d58ef2ac1c0bb69627dd545cf47507d32d036e67d5")
 }
 
 func (_MockE2EUSDCTokenMessenger *MockE2EUSDCTokenMessenger) Address() common.Address {
@@ -474,11 +478,11 @@ type MockE2EUSDCTokenMessengerInterface interface {
 
 	SNonce(opts *bind.CallOpts) (uint64, error)
 
-	DepositForBurnWithCaller(opts *bind.TransactOpts, amount *big.Int, destinationDomain uint32, mintRecipient [32]byte, burnToken common.Address, destinationCaller [32]byte) (*types.Transaction, error)
+	DepositForBurn(opts *bind.TransactOpts, amount *big.Int, destinationDomain uint32, mintRecipient [32]byte, burnToken common.Address, destinationCaller [32]byte, maxFee uint32, minFinalityThreshold uint32) (*types.Transaction, error)
 
-	FilterDepositForBurn(opts *bind.FilterOpts, nonce []uint64, burnToken []common.Address, depositor []common.Address) (*MockE2EUSDCTokenMessengerDepositForBurnIterator, error)
+	FilterDepositForBurn(opts *bind.FilterOpts, burnToken []common.Address, depositor []common.Address, minFinalityThreshold []uint32) (*MockE2EUSDCTokenMessengerDepositForBurnIterator, error)
 
-	WatchDepositForBurn(opts *bind.WatchOpts, sink chan<- *MockE2EUSDCTokenMessengerDepositForBurn, nonce []uint64, burnToken []common.Address, depositor []common.Address) (event.Subscription, error)
+	WatchDepositForBurn(opts *bind.WatchOpts, sink chan<- *MockE2EUSDCTokenMessengerDepositForBurn, burnToken []common.Address, depositor []common.Address, minFinalityThreshold []uint32) (event.Subscription, error)
 
 	ParseDepositForBurn(log types.Log) (*MockE2EUSDCTokenMessengerDepositForBurn, error)
 

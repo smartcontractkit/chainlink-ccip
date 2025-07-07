@@ -45,16 +45,19 @@ contract MockE2EUSDCTransmitter is IMessageTransmitterWithRelay {
   }
 
   /// @param message The original message on the source chain
-  ///     * Message format:
-  ///     * Field                 Bytes      Type       Index
-  ///     * version               4          uint32     0
-  ///     * sourceDomain          4          uint32     4
-  ///     * destinationDomain     4          uint32     8
-  ///     * nonce                 8          uint64     12
-  ///     * sender                32         bytes32    20
-  ///     * recipient             32         bytes32    52
-  ///     * destinationCaller     32         bytes32    84
-  ///     * messageBody           dynamic    bytes      116
+  /// Message Format:
+  /// Field                      Size (bytes)   Type      Offset
+  /// ----------------------------------------------------------
+  /// version                    4              uint32    0
+  /// sourceDomain               4              uint32    4
+  /// destinationDomain          4              uint32    8
+  /// nonce                      32             bytes32   12
+  /// sender                     32             bytes32   44
+  /// recipient                  32             bytes32   76
+  /// destinationCaller          32             bytes32   108
+  /// minFinalityThreshold       4              uint32    140
+  /// finalityThresholdExecuted  4              uint32    144
+  /// messageBody                dynamic        bytes     148
   function receiveMessage(bytes calldata message, bytes calldata) external returns (bool success) {
     // The receiver of the funds is the _mintRecipient in the following encoded format
     //   function _formatMessage(
@@ -66,7 +69,8 @@ contract MockE2EUSDCTransmitter is IMessageTransmitterWithRelay {
     //  ) internal pure returns (bytes memory) {
     //    return abi.encodePacked(_version, _burnToken, _mintRecipient, _amount, _messageSender);
     //  }
-    address recipient = address(bytes20(message[116 + 36 + 12:116 + 36 + 12 + 20]));
+    // The messageBody doesn't begin until 148 bytes into the message, so we need to start with an offset of 148
+    address recipient = address(bytes20(message[148 + 36 + 12:148 + 36 + 12 + 20]));
     // We always mint 1 token to not complicate the test.
     i_token.mint(recipient, 1);
 

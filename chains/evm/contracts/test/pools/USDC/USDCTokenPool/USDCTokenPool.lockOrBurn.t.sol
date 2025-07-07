@@ -28,14 +28,16 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
 
     vm.expectEmit();
     emit ITokenMessenger.DepositForBurn(
-      s_mockUSDC.s_nonce(),
       address(s_USDCToken),
       amount,
       address(s_usdcTokenPool),
       receiver,
       expectedDomain.domainIdentifier,
       s_mockUSDC.DESTINATION_TOKEN_MESSENGER(),
-      expectedDomain.allowedCaller
+      expectedDomain.allowedCaller,
+      s_usdcTokenPool.MAX_FEE(),
+      s_usdcTokenPool.FINALITY_THRESHOLD(),
+      ""
     );
 
     vm.expectEmit();
@@ -57,7 +59,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
     );
 
     uint64 nonce = abi.decode(poolReturnDataV1.destPoolData, (uint64));
-    assertEq(s_mockUSDC.s_nonce() - 1, nonce);
+    assertEq(nonce, 0);
   }
 
   function test_LockOrBurn_MintRecipientOverride() public {
@@ -89,14 +91,16 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
 
     vm.expectEmit();
     emit ITokenMessenger.DepositForBurn(
-      s_mockUSDC.s_nonce(),
       address(s_USDCToken),
       amount,
       address(s_usdcTokenPool),
       extraMintRecipient,
       expectedDomain.domainIdentifier,
       s_mockUSDC.DESTINATION_TOKEN_MESSENGER(),
-      expectedDomain.allowedCaller
+      expectedDomain.allowedCaller,
+      s_usdcTokenPool.MAX_FEE(),
+      s_usdcTokenPool.FINALITY_THRESHOLD(),
+      ""
     );
 
     vm.expectEmit();
@@ -120,7 +124,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
     );
 
     uint64 nonce = abi.decode(poolReturnDataV1.destPoolData, (uint64));
-    assertEq(s_mockUSDC.s_nonce() - 1, nonce);
+    assertEq(nonce, 0);
   }
 
   function testFuzz_LockOrBurn_Success(bytes32 destinationReceiver, uint256 amount) public {
@@ -140,14 +144,16 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
 
     vm.expectEmit();
     emit ITokenMessenger.DepositForBurn(
-      s_mockUSDC.s_nonce(),
       address(s_USDCToken),
       amount,
       address(s_usdcTokenPool),
       destinationReceiver,
       expectedDomain.domainIdentifier,
       s_mockUSDC.DESTINATION_TOKEN_MESSENGER(),
-      expectedDomain.allowedCaller
+      expectedDomain.allowedCaller,
+      s_usdcTokenPool.MAX_FEE(),
+      s_usdcTokenPool.FINALITY_THRESHOLD(),
+      ""
     );
 
     vm.expectEmit();
@@ -169,7 +175,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
     );
 
     uint64 nonce = abi.decode(poolReturnDataV1.destPoolData, (uint64));
-    assertEq(s_mockUSDC.s_nonce() - 1, nonce);
+    assertEq(nonce, 0);
     assertEq(poolReturnDataV1.destTokenAddress, abi.encode(DEST_CHAIN_USDC_TOKEN));
   }
 
@@ -190,14 +196,16 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
 
     vm.expectEmit();
     emit ITokenMessenger.DepositForBurn(
-      s_mockUSDC.s_nonce(),
       address(s_USDCToken),
       amount,
       address(s_usdcTokenPoolWithAllowList),
       destinationReceiver,
       expectedDomain.domainIdentifier,
       s_mockUSDC.DESTINATION_TOKEN_MESSENGER(),
-      expectedDomain.allowedCaller
+      expectedDomain.allowedCaller,
+      s_usdcTokenPoolWithAllowList.MAX_FEE(),
+      s_usdcTokenPoolWithAllowList.FINALITY_THRESHOLD(),
+      ""
     );
 
     vm.expectEmit();
@@ -218,7 +226,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
       })
     );
     uint64 nonce = abi.decode(poolReturnDataV1.destPoolData, (uint64));
-    assertEq(s_mockUSDC.s_nonce() - 1, nonce);
+    assertEq(nonce, 0);
     assertEq(poolReturnDataV1.destTokenAddress, abi.encode(DEST_CHAIN_USDC_TOKEN));
   }
 

@@ -5,24 +5,25 @@ import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
 import {USDCTokenPoolSetup} from "./USDCTokenPoolSetup.t.sol";
 
 contract USDCTokenPool__validateMessage is USDCTokenPoolSetup {
-  function testFuzz_ValidateMessage_Success(uint32 sourceDomain, uint64 nonce) public {
+  function testFuzz_ValidateMessage_Success(uint32 sourceDomain, bytes32 nonce) public {
     vm.pauseGasMetering();
     USDCMessage memory usdcMessage = USDCMessage({
-      version: 0,
+      version: 1,
       sourceDomain: sourceDomain,
       destinationDomain: DEST_DOMAIN_IDENTIFIER,
       nonce: nonce,
       sender: SOURCE_CHAIN_TOKEN_SENDER,
       recipient: bytes32(uint256(299999)),
       destinationCaller: bytes32(uint256(uint160(address(s_usdcTokenPool)))),
+      minFinalityThreshold: s_usdcTokenPool.FINALITY_THRESHOLD(),
+      finalityThresholdExecuted: s_usdcTokenPool.FINALITY_THRESHOLD(),
       messageBody: bytes("")
     });
-
     bytes memory encodedUsdcMessage = _generateUSDCMessage(usdcMessage);
 
     vm.resumeGasMetering();
     s_usdcTokenPool.validateMessage(
-      encodedUsdcMessage, USDCTokenPool.SourceTokenDataPayload({nonce: nonce, sourceDomain: sourceDomain})
+      encodedUsdcMessage, USDCTokenPool.SourceTokenDataPayload({nonce: 0, sourceDomain: sourceDomain})
     );
   }
 
@@ -30,18 +31,20 @@ contract USDCTokenPool__validateMessage is USDCTokenPoolSetup {
 
   function test_RevertWhen_ValidateInvalidMessage() public {
     USDCMessage memory usdcMessage = USDCMessage({
-      version: 0,
+      version: 1,
       sourceDomain: 1553252,
       destinationDomain: DEST_DOMAIN_IDENTIFIER,
-      nonce: 387289284924,
+      nonce: keccak256("0xC11"),
       sender: SOURCE_CHAIN_TOKEN_SENDER,
       recipient: bytes32(uint256(92398429395823)),
       destinationCaller: bytes32(uint256(uint160(address(s_usdcTokenPool)))),
+      minFinalityThreshold: s_usdcTokenPool.FINALITY_THRESHOLD(),
+      finalityThresholdExecuted: s_usdcTokenPool.FINALITY_THRESHOLD(),
       messageBody: bytes("")
     });
 
     USDCTokenPool.SourceTokenDataPayload memory sourceTokenData =
-      USDCTokenPool.SourceTokenDataPayload({nonce: usdcMessage.nonce, sourceDomain: usdcMessage.sourceDomain});
+      USDCTokenPool.SourceTokenDataPayload({nonce: 0, sourceDomain: usdcMessage.sourceDomain});
 
     bytes memory encodedUsdcMessage = _generateUSDCMessage(usdcMessage);
 
@@ -53,16 +56,7 @@ contract USDCTokenPool__validateMessage is USDCTokenPoolSetup {
       abi.encodeWithSelector(USDCTokenPool.InvalidSourceDomain.selector, expectedSourceDomain, usdcMessage.sourceDomain)
     );
     s_usdcTokenPool.validateMessage(
-      encodedUsdcMessage,
-      USDCTokenPool.SourceTokenDataPayload({nonce: usdcMessage.nonce, sourceDomain: expectedSourceDomain})
-    );
-
-    uint64 expectedNonce = usdcMessage.nonce + 1;
-
-    vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidNonce.selector, expectedNonce, usdcMessage.nonce));
-    s_usdcTokenPool.validateMessage(
-      encodedUsdcMessage,
-      USDCTokenPool.SourceTokenDataPayload({nonce: expectedNonce, sourceDomain: usdcMessage.sourceDomain})
+      encodedUsdcMessage, USDCTokenPool.SourceTokenDataPayload({nonce: 0, sourceDomain: expectedSourceDomain})
     );
 
     usdcMessage.destinationDomain = DEST_DOMAIN_IDENTIFIER + 1;
@@ -74,7 +68,7 @@ contract USDCTokenPool__validateMessage is USDCTokenPoolSetup {
 
     s_usdcTokenPool.validateMessage(
       _generateUSDCMessage(usdcMessage),
-      USDCTokenPool.SourceTokenDataPayload({nonce: usdcMessage.nonce, sourceDomain: usdcMessage.sourceDomain})
+      USDCTokenPool.SourceTokenDataPayload({nonce: 0, sourceDomain: usdcMessage.sourceDomain})
     );
     usdcMessage.destinationDomain = DEST_DOMAIN_IDENTIFIER;
 
