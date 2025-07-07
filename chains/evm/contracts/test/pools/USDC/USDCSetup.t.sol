@@ -18,7 +18,6 @@ import {MockE2EUSDCTransmitter} from "../../mocks/MockE2EUSDCTransmitter.sol";
 import {MockUSDCTokenMessenger} from "../../mocks/MockUSDCTokenMessenger.sol";
 
 contract USDCSetup is BaseTest {
-
   // solhint-disable-next-line gas-struct-packing
   struct USDCMessage {
     uint32 version;
