@@ -113,7 +113,7 @@ contract USDCTokenPool_constructor is USDCSetup {
         new address[](0),
         address(s_mockRMNRemote),
         address(s_router),
-        bytes32(uint256(0)) // placeholder, will be replaced below
+        s_previousPool // placeholder, will be replaced below
       )
     );
 
@@ -171,6 +171,34 @@ contract USDCTokenPool_constructor is USDCSetup {
       address(s_mockRMNRemote),
       address(s_router),
       invalidPreviousPool
+    );
+  }
+
+  function test_constructor_RevertWhen_InvalidPreviousPool_MessageTransmitterProxyReverts() public {
+    // Create a mock previous pool address
+    address mockPreviousPool = makeAddr("MOCK_PREVIOUS_POOL");
+
+    // Mock supportsInterface to return true so it passes the first check
+    vm.mockCall(
+      mockPreviousPool,
+      abi.encodeWithSelector(IERC165.supportsInterface.selector, type(IPoolV1).interfaceId),
+      abi.encode(true)
+    );
+
+    // Mock i_messageTransmitterProxy() to revert by returning an error
+    vm.mockCallRevert(mockPreviousPool, abi.encodeWithSelector(bytes4(keccak256("i_messageTransmitterProxy()"))), "");
+
+    // Expect the constructor to revert with InvalidPreviousPool
+    vm.expectRevert(USDCTokenPool.InvalidPreviousPool.selector);
+
+    new USDCTokenPool(
+      s_mockUSDC,
+      s_cctpMessageTransmitterProxy,
+      s_USDCToken,
+      new address[](0),
+      address(s_mockRMNRemote),
+      address(s_router),
+      mockPreviousPool
     );
   }
 }

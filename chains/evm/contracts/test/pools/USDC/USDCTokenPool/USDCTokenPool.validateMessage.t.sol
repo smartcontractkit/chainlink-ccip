@@ -84,5 +84,32 @@ contract USDCTokenPool__validateMessage is USDCTokenPoolSetup {
     bytes memory shortMessage = new bytes(100);
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidMessageLength.selector, 100));
     s_usdcTokenPool.validateMessage(shortMessage, sourceTokenData);
+
+    // Test for InvalidMinFinalityThreshold
+    usdcMessage.version = 1;
+    usdcMessage.destinationDomain = DEST_DOMAIN_IDENTIFIER;
+    usdcMessage.minFinalityThreshold = s_usdcTokenPool.FINALITY_THRESHOLD() + 1;
+    bytes memory invalidMinFinalityMsg = _generateUSDCMessage(usdcMessage);
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        USDCTokenPool.InvalidMinFinalityThreshold.selector,
+        s_usdcTokenPool.FINALITY_THRESHOLD(),
+        usdcMessage.minFinalityThreshold
+      )
+    );
+    s_usdcTokenPool.validateMessage(invalidMinFinalityMsg, sourceTokenData);
+
+    // Test for InvalidExecutionFinalityThreshold
+    usdcMessage.minFinalityThreshold = s_usdcTokenPool.FINALITY_THRESHOLD();
+    usdcMessage.finalityThresholdExecuted = s_usdcTokenPool.FINALITY_THRESHOLD() + 1;
+    bytes memory invalidExecFinalityMsg = _generateUSDCMessage(usdcMessage);
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        USDCTokenPool.InvalidExecutionFinalityThreshold.selector,
+        s_usdcTokenPool.FINALITY_THRESHOLD(),
+        usdcMessage.finalityThresholdExecuted
+      )
+    );
+    s_usdcTokenPool.validateMessage(invalidExecFinalityMsg, sourceTokenData);
   }
 }
