@@ -161,7 +161,7 @@ func (l *DefaultAccessor) MsgsBetweenSeqNums(
 
 	msgs := make([]cciptypes.Message, 0)
 	for _, item := range seq {
-		lggr.Debugw("DEBUG MSG: ", item, len(seq))
+		lggr.Debugw("DEBUG MSG: ", "item Data", item.Data, "seqLength", len(seq))
 
 		msg, ok := item.Data.(*SendRequestedEvent)
 		if !ok {
@@ -173,7 +173,7 @@ func (l *DefaultAccessor) MsgsBetweenSeqNums(
 			continue
 		}
 
-		lggr.Debugw("DEBUG MSG1: ", msg.Message, len(msgs))
+		lggr.Debugw("DEBUG MSG1: ", "msg", msg.Message, "msglength", len(msgs))
 
 		msg.Message.Header.OnRamp = onRampAddress
 		msgs = append(msgs, msg.Message)
