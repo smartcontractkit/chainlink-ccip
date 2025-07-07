@@ -1067,7 +1067,7 @@ export type CcipOfframp = {
         "# Arguments",
         "",
         "* `ctx` - The context containing the accounts required for buffering.",
-        "* `buffer_id` - An arbitrary buffer id defined by the caller (could be the message_id).",
+        "* `buffer_id` - An arbitrary buffer id defined by the caller (could be the message_id). Max 32 bytes.",
         "* `report_length` - Total length in bytes of the execution report.",
         "* `chunk` - The specific chunk to add to the buffer. Chunk must have a consistent size, except",
         "the last one in the buffer, which may be smaller.",
@@ -1156,6 +1156,71 @@ export type CcipOfframp = {
           "type": "bytes"
         }
       ]
+    },
+    {
+      "name": "deriveAccountsExecute",
+      "docs": [
+        "Automatically derives all acounts required to call `ccip_execute`.",
+        "",
+        "This method receives the bare minimum amount of information needed to construct",
+        "the entire account list to execute a transaction, and builds it iteratively",
+        "over the course of multiple calls.",
+        "",
+        "The return type contains:",
+        "",
+        "* `accounts_to_save`: The caller must append these accounts to a list they maintain.",
+        "When complete, this list will contain all accounts needed to call `ccip_execute`.",
+        "* `ask_again_with`: When this list is not empty, the caller must call `derive_accounts_execute`",
+        "again, including exactly these accounts as the `remaining_accounts`.",
+        "* `lookup_tables_to_save`: The caller must save those LUTs. They can be used for `ccip_execute`.",
+        "* `current_stage`: A string describing the current stage of the derivation process. When the stage",
+        "is \"TokenTransferAccounts\", it means the `accounts_to_save` block in this response contains",
+        "all accounts relating to a single token being transferred. Use this information to construct",
+        "the `token_indexes` vector that `execute` requires.",
+        "* `next_stage`: If nonempty, this means the instruction must get called again with this value",
+        "as the `stage` argument.",
+        "",
+        "Therefore, and starting with an empty `remaining_accounts` list, the caller must repeteadly",
+        "call `derive_accounts_execute` until `next_stage` is returned empty.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx`: Context containing only the offramp config.",
+        "* `stage`: Requested derivation stage. Pass \"Start\" the first time, then for each subsequent",
+        "call, pass the value returned in `response.next_stage` until empty.",
+        "* `params`:",
+        "* `execute_caller`: Public key of the account that will sign the call to `ccip_execute`.",
+        "* `message_accounts`: If the transaction involves messaging, the message accounts.",
+        "* `source_chain_selector`: CCIP chain selector for the source chain.",
+        "* `mints_of_transferred_token`: List of all token mints for tokens being transferred (i.e.",
+        "the entries in `report.message.token_amounts.destination_address`.)",
+        "* `merkle_root`: Merkle root as per the commit report.",
+        "* `buffer_id`: If the execution will be buffered, the buffer id that will be used by the",
+        "`execute_caller`: If the execution will not be buffered, this should be empty.",
+        "* `token_receiver`: Receiver of token transfers, if any (i.e. report.message.token_receiver)"
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "params",
+          "type": {
+            "defined": "DeriveAccountsExecuteParams"
+          }
+        },
+        {
+          "name": "stage",
+          "type": "string"
+        }
+      ],
+      "returns": {
+        "defined": "DeriveAccountsResponse"
+      }
     },
     {
       "name": "closeCommitReportAccount",
@@ -1767,6 +1832,154 @@ export type CcipOfframp = {
       }
     },
     {
+      "name": "DeriveAccountsExecuteParams",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "executeCaller",
+            "type": "publicKey"
+          },
+          {
+            "name": "tokenReceiver",
+            "type": "publicKey"
+          },
+          {
+            "name": "tokenTransfers",
+            "type": {
+              "vec": {
+                "defined": "TokenTransferAndOffchainData"
+              }
+            }
+          },
+          {
+            "name": "messageAccounts",
+            "type": {
+              "vec": {
+                "defined": "CcipAccountMeta"
+              }
+            }
+          },
+          {
+            "name": "sourceChainSelector",
+            "type": "u64"
+          },
+          {
+            "name": "originalSender",
+            "type": "bytes"
+          },
+          {
+            "name": "merkleRoot",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "bufferId",
+            "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TokenTransferAndOffchainData",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "transfer",
+            "type": {
+              "defined": "Any2SVMTokenTransfer"
+            }
+          },
+          {
+            "name": "data",
+            "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DeriveAccountsResponse",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "askAgainWith",
+            "docs": [
+              "If this vector is not empty, you must call the `derive_` method again including",
+              "exactly these accounts as the `remaining_accounts` field."
+            ],
+            "type": {
+              "vec": {
+                "defined": "CcipAccountMeta"
+              }
+            }
+          },
+          {
+            "name": "accountsToSave",
+            "docs": [
+              "You must append these accounts at the end of a separate list. When `next_stage`",
+              "is finally empty, this separate list will contain all the accounts to use for the",
+              "instruction of interest."
+            ],
+            "type": {
+              "vec": {
+                "defined": "CcipAccountMeta"
+              }
+            }
+          },
+          {
+            "name": "lookUpTablesToSave",
+            "docs": [
+              "Append these look up tables at the end of a list. It will contain all LUTs",
+              "that the instruction of interest can use."
+            ],
+            "type": {
+              "vec": "publicKey"
+            }
+          },
+          {
+            "name": "currentStage",
+            "docs": [
+              "Identifies the derivation stage."
+            ],
+            "type": "string"
+          },
+          {
+            "name": "nextStage",
+            "docs": [
+              "Identifies the next derivation stage. If empty, the derivation is complete."
+            ],
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CcipAccountMeta",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pubkey",
+            "type": "publicKey"
+          },
+          {
+            "name": "isSigner",
+            "type": "bool"
+          },
+          {
+            "name": "isWritable",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
       "name": "Ocr3ConfigInfo",
       "type": {
         "kind": "struct",
@@ -1914,6 +2127,52 @@ export type CcipOfframp = {
           },
           {
             "name": "Execution"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DeriveExecuteAccountsStage",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Start"
+          },
+          {
+            "name": "FinishMainAccountList"
+          },
+          {
+            "name": "RetrieveTokenLUTs"
+          },
+          {
+            "name": "RetrievePoolPrograms"
+          },
+          {
+            "name": "TokenTransferStaticAccounts",
+            "fields": [
+              {
+                "name": "token",
+                "type": "u32"
+              },
+              {
+                "name": "page",
+                "type": "u32"
+              }
+            ]
+          },
+          {
+            "name": "NestedTokenDerive",
+            "fields": [
+              {
+                "name": "token",
+                "type": "u32"
+              },
+              {
+                "name": "tokenSubstage",
+                "type": "string"
+              }
+            ]
           }
         ]
       }
@@ -2553,13 +2812,38 @@ export type CcipOfframp = {
     },
     {
       "code": 9064,
+      "name": "ExecutionReportBufferInvalidIdSize",
+      "msg": "Invalid ID size for buffer"
+    },
+    {
+      "code": 9065,
       "name": "ExecutionReportBufferIncomplete",
       "msg": "Execution report buffer is not complete: chunks are missing"
     },
     {
-      "code": 9065,
+      "code": 9066,
       "name": "ExecutionReportUnavailable",
       "msg": "Execution report wasn't provided either directly or via buffer"
+    },
+    {
+      "code": 9067,
+      "name": "InvalidAccountListForPdaDerivation",
+      "msg": "Invalid account list for PDA derivation"
+    },
+    {
+      "code": 9068,
+      "name": "InvalidDerivationStage",
+      "msg": "Unexpected account derivation stage"
+    },
+    {
+      "code": 9069,
+      "name": "InvalidTokenPoolAccountDerivationResponse",
+      "msg": "Token pool returned an unexpected derivation response"
+    },
+    {
+      "code": 9070,
+      "name": "AccountDerivationResponseTooLarge",
+      "msg": "Can't fit account derivation response."
     }
   ]
 };
@@ -3633,7 +3917,7 @@ export const IDL: CcipOfframp = {
         "# Arguments",
         "",
         "* `ctx` - The context containing the accounts required for buffering.",
-        "* `buffer_id` - An arbitrary buffer id defined by the caller (could be the message_id).",
+        "* `buffer_id` - An arbitrary buffer id defined by the caller (could be the message_id). Max 32 bytes.",
         "* `report_length` - Total length in bytes of the execution report.",
         "* `chunk` - The specific chunk to add to the buffer. Chunk must have a consistent size, except",
         "the last one in the buffer, which may be smaller.",
@@ -3722,6 +4006,71 @@ export const IDL: CcipOfframp = {
           "type": "bytes"
         }
       ]
+    },
+    {
+      "name": "deriveAccountsExecute",
+      "docs": [
+        "Automatically derives all acounts required to call `ccip_execute`.",
+        "",
+        "This method receives the bare minimum amount of information needed to construct",
+        "the entire account list to execute a transaction, and builds it iteratively",
+        "over the course of multiple calls.",
+        "",
+        "The return type contains:",
+        "",
+        "* `accounts_to_save`: The caller must append these accounts to a list they maintain.",
+        "When complete, this list will contain all accounts needed to call `ccip_execute`.",
+        "* `ask_again_with`: When this list is not empty, the caller must call `derive_accounts_execute`",
+        "again, including exactly these accounts as the `remaining_accounts`.",
+        "* `lookup_tables_to_save`: The caller must save those LUTs. They can be used for `ccip_execute`.",
+        "* `current_stage`: A string describing the current stage of the derivation process. When the stage",
+        "is \"TokenTransferAccounts\", it means the `accounts_to_save` block in this response contains",
+        "all accounts relating to a single token being transferred. Use this information to construct",
+        "the `token_indexes` vector that `execute` requires.",
+        "* `next_stage`: If nonempty, this means the instruction must get called again with this value",
+        "as the `stage` argument.",
+        "",
+        "Therefore, and starting with an empty `remaining_accounts` list, the caller must repeteadly",
+        "call `derive_accounts_execute` until `next_stage` is returned empty.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx`: Context containing only the offramp config.",
+        "* `stage`: Requested derivation stage. Pass \"Start\" the first time, then for each subsequent",
+        "call, pass the value returned in `response.next_stage` until empty.",
+        "* `params`:",
+        "* `execute_caller`: Public key of the account that will sign the call to `ccip_execute`.",
+        "* `message_accounts`: If the transaction involves messaging, the message accounts.",
+        "* `source_chain_selector`: CCIP chain selector for the source chain.",
+        "* `mints_of_transferred_token`: List of all token mints for tokens being transferred (i.e.",
+        "the entries in `report.message.token_amounts.destination_address`.)",
+        "* `merkle_root`: Merkle root as per the commit report.",
+        "* `buffer_id`: If the execution will be buffered, the buffer id that will be used by the",
+        "`execute_caller`: If the execution will not be buffered, this should be empty.",
+        "* `token_receiver`: Receiver of token transfers, if any (i.e. report.message.token_receiver)"
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "params",
+          "type": {
+            "defined": "DeriveAccountsExecuteParams"
+          }
+        },
+        {
+          "name": "stage",
+          "type": "string"
+        }
+      ],
+      "returns": {
+        "defined": "DeriveAccountsResponse"
+      }
     },
     {
       "name": "closeCommitReportAccount",
@@ -4333,6 +4682,154 @@ export const IDL: CcipOfframp = {
       }
     },
     {
+      "name": "DeriveAccountsExecuteParams",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "executeCaller",
+            "type": "publicKey"
+          },
+          {
+            "name": "tokenReceiver",
+            "type": "publicKey"
+          },
+          {
+            "name": "tokenTransfers",
+            "type": {
+              "vec": {
+                "defined": "TokenTransferAndOffchainData"
+              }
+            }
+          },
+          {
+            "name": "messageAccounts",
+            "type": {
+              "vec": {
+                "defined": "CcipAccountMeta"
+              }
+            }
+          },
+          {
+            "name": "sourceChainSelector",
+            "type": "u64"
+          },
+          {
+            "name": "originalSender",
+            "type": "bytes"
+          },
+          {
+            "name": "merkleRoot",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "bufferId",
+            "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TokenTransferAndOffchainData",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "transfer",
+            "type": {
+              "defined": "Any2SVMTokenTransfer"
+            }
+          },
+          {
+            "name": "data",
+            "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DeriveAccountsResponse",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "askAgainWith",
+            "docs": [
+              "If this vector is not empty, you must call the `derive_` method again including",
+              "exactly these accounts as the `remaining_accounts` field."
+            ],
+            "type": {
+              "vec": {
+                "defined": "CcipAccountMeta"
+              }
+            }
+          },
+          {
+            "name": "accountsToSave",
+            "docs": [
+              "You must append these accounts at the end of a separate list. When `next_stage`",
+              "is finally empty, this separate list will contain all the accounts to use for the",
+              "instruction of interest."
+            ],
+            "type": {
+              "vec": {
+                "defined": "CcipAccountMeta"
+              }
+            }
+          },
+          {
+            "name": "lookUpTablesToSave",
+            "docs": [
+              "Append these look up tables at the end of a list. It will contain all LUTs",
+              "that the instruction of interest can use."
+            ],
+            "type": {
+              "vec": "publicKey"
+            }
+          },
+          {
+            "name": "currentStage",
+            "docs": [
+              "Identifies the derivation stage."
+            ],
+            "type": "string"
+          },
+          {
+            "name": "nextStage",
+            "docs": [
+              "Identifies the next derivation stage. If empty, the derivation is complete."
+            ],
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CcipAccountMeta",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pubkey",
+            "type": "publicKey"
+          },
+          {
+            "name": "isSigner",
+            "type": "bool"
+          },
+          {
+            "name": "isWritable",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
       "name": "Ocr3ConfigInfo",
       "type": {
         "kind": "struct",
@@ -4480,6 +4977,52 @@ export const IDL: CcipOfframp = {
           },
           {
             "name": "Execution"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DeriveExecuteAccountsStage",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Start"
+          },
+          {
+            "name": "FinishMainAccountList"
+          },
+          {
+            "name": "RetrieveTokenLUTs"
+          },
+          {
+            "name": "RetrievePoolPrograms"
+          },
+          {
+            "name": "TokenTransferStaticAccounts",
+            "fields": [
+              {
+                "name": "token",
+                "type": "u32"
+              },
+              {
+                "name": "page",
+                "type": "u32"
+              }
+            ]
+          },
+          {
+            "name": "NestedTokenDerive",
+            "fields": [
+              {
+                "name": "token",
+                "type": "u32"
+              },
+              {
+                "name": "tokenSubstage",
+                "type": "string"
+              }
+            ]
           }
         ]
       }
@@ -5119,13 +5662,38 @@ export const IDL: CcipOfframp = {
     },
     {
       "code": 9064,
+      "name": "ExecutionReportBufferInvalidIdSize",
+      "msg": "Invalid ID size for buffer"
+    },
+    {
+      "code": 9065,
       "name": "ExecutionReportBufferIncomplete",
       "msg": "Execution report buffer is not complete: chunks are missing"
     },
     {
-      "code": 9065,
+      "code": 9066,
       "name": "ExecutionReportUnavailable",
       "msg": "Execution report wasn't provided either directly or via buffer"
+    },
+    {
+      "code": 9067,
+      "name": "InvalidAccountListForPdaDerivation",
+      "msg": "Invalid account list for PDA derivation"
+    },
+    {
+      "code": 9068,
+      "name": "InvalidDerivationStage",
+      "msg": "Unexpected account derivation stage"
+    },
+    {
+      "code": 9069,
+      "name": "InvalidTokenPoolAccountDerivationResponse",
+      "msg": "Token pool returned an unexpected derivation response"
+    },
+    {
+      "code": 9070,
+      "name": "AccountDerivationResponseTooLarge",
+      "msg": "Can't fit account derivation response."
     }
   ]
 };

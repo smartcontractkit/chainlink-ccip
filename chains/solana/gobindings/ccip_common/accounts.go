@@ -9,12 +9,13 @@ import (
 )
 
 type TokenAdminRegistry struct {
-	Version              uint8
-	Administrator        ag_solanago.PublicKey
-	PendingAdministrator ag_solanago.PublicKey
-	LookupTable          ag_solanago.PublicKey
-	WritableIndexes      [2]ag_binary.Uint128
-	Mint                 ag_solanago.PublicKey
+	Version                uint8
+	Administrator          ag_solanago.PublicKey
+	PendingAdministrator   ag_solanago.PublicKey
+	LookupTable            ag_solanago.PublicKey
+	WritableIndexes        [2]ag_binary.Uint128
+	Mint                   ag_solanago.PublicKey
+	SupportsAutoDerivation bool
 }
 
 var TokenAdminRegistryDiscriminator = [8]byte{70, 92, 207, 200, 76, 17, 57, 114}
@@ -52,6 +53,11 @@ func (obj TokenAdminRegistry) MarshalWithEncoder(encoder *ag_binary.Encoder) (er
 	}
 	// Serialize `Mint` param:
 	err = encoder.Encode(obj.Mint)
+	if err != nil {
+		return err
+	}
+	// Serialize `SupportsAutoDerivation` param:
+	err = encoder.Encode(obj.SupportsAutoDerivation)
 	if err != nil {
 		return err
 	}
@@ -99,6 +105,11 @@ func (obj *TokenAdminRegistry) UnmarshalWithDecoder(decoder *ag_binary.Decoder) 
 	}
 	// Deserialize `Mint`:
 	err = decoder.Decode(&obj.Mint)
+	if err != nil {
+		return err
+	}
+	// Deserialize `SupportsAutoDerivation`:
+	err = decoder.Decode(&obj.SupportsAutoDerivation)
 	if err != nil {
 		return err
 	}

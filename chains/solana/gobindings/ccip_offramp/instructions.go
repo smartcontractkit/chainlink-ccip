@@ -260,7 +260,7 @@ var (
 	// # Arguments
 	//
 	// * `ctx` - The context containing the accounts required for buffering.
-	// * `buffer_id` - An arbitrary buffer id defined by the caller (could be the message_id).
+	// * `buffer_id` - An arbitrary buffer id defined by the caller (could be the message_id). Max 32 bytes.
 	// * `report_length` - Total length in bytes of the execution report.
 	// * `chunk` - The specific chunk to add to the buffer. Chunk must have a consistent size, except
 	// the last one in the buffer, which may be smaller.
@@ -274,6 +274,46 @@ var (
 	// was made when buffering data. The buffer account will otherwise automatically close
 	// and return funds to the caller whenever buffered execution succeeds.
 	Instruction_CloseExecutionReportBuffer = ag_binary.TypeID([8]byte{0, 16, 4, 246, 238, 95, 223, 31})
+
+	// Automatically derives all acounts required to call `ccip_execute`.
+	//
+	// This method receives the bare minimum amount of information needed to construct
+	// the entire account list to execute a transaction, and builds it iteratively
+	// over the course of multiple calls.
+	//
+	// The return type contains:
+	//
+	// * `accounts_to_save`: The caller must append these accounts to a list they maintain.
+	// When complete, this list will contain all accounts needed to call `ccip_execute`.
+	// * `ask_again_with`: When this list is not empty, the caller must call `derive_accounts_execute`
+	// again, including exactly these accounts as the `remaining_accounts`.
+	// * `lookup_tables_to_save`: The caller must save those LUTs. They can be used for `ccip_execute`.
+	// * `current_stage`: A string describing the current stage of the derivation process. When the stage
+	// is "TokenTransferAccounts", it means the `accounts_to_save` block in this response contains
+	// all accounts relating to a single token being transferred. Use this information to construct
+	// the `token_indexes` vector that `execute` requires.
+	// * `next_stage`: If nonempty, this means the instruction must get called again with this value
+	// as the `stage` argument.
+	//
+	// Therefore, and starting with an empty `remaining_accounts` list, the caller must repeteadly
+	// call `derive_accounts_execute` until `next_stage` is returned empty.
+	//
+	// # Arguments
+	//
+	// * `ctx`: Context containing only the offramp config.
+	// * `stage`: Requested derivation stage. Pass "Start" the first time, then for each subsequent
+	// call, pass the value returned in `response.next_stage` until empty.
+	// * `params`:
+	// * `execute_caller`: Public key of the account that will sign the call to `ccip_execute`.
+	// * `message_accounts`: If the transaction involves messaging, the message accounts.
+	// * `source_chain_selector`: CCIP chain selector for the source chain.
+	// * `mints_of_transferred_token`: List of all token mints for tokens being transferred (i.e.
+	// the entries in `report.message.token_amounts.destination_address`.)
+	// * `merkle_root`: Merkle root as per the commit report.
+	// * `buffer_id`: If the execution will be buffered, the buffer id that will be used by the
+	// `execute_caller`: If the execution will not be buffered, this should be empty.
+	// * `token_receiver`: Receiver of token transfers, if any (i.e. report.message.token_receiver)
+	Instruction_DeriveAccountsExecute = ag_binary.TypeID([8]byte{119, 242, 51, 244, 183, 138, 179, 159})
 
 	Instruction_CloseCommitReportAccount = ag_binary.TypeID([8]byte{109, 145, 129, 64, 226, 172, 61, 106})
 )
@@ -319,6 +359,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "BufferExecutionReport"
 	case Instruction_CloseExecutionReportBuffer:
 		return "CloseExecutionReportBuffer"
+	case Instruction_DeriveAccountsExecute:
+		return "DeriveAccountsExecute"
 	case Instruction_CloseCommitReportAccount:
 		return "CloseCommitReportAccount"
 	default:
@@ -397,6 +439,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"close_execution_report_buffer", (*CloseExecutionReportBuffer)(nil),
+		},
+		{
+			"derive_accounts_execute", (*DeriveAccountsExecute)(nil),
 		},
 		{
 			"close_commit_report_account", (*CloseCommitReportAccount)(nil),
