@@ -38,6 +38,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   error InvalidTransmitterInProxy();
   error InvalidPreviousPool();
   error InvalidMessageLength(uint256 length);
+  error InvalidCCTPVersion(CCTPVersion expected, CCTPVersion got);
 
   // This data is supplied from offchain and contains everything needed
   // to receive the USDC tokens.
@@ -55,9 +56,24 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     bool enabled; // ─────────────╯ Whether the domain is enabled
   }
 
+  enum CCTPVersion {
+    UNDEFINED,
+    CCTP_V1,
+    CCTP_V2
+  }
+
+  // solhint-disable-next-line gas-struct-packing
   struct SourceTokenDataPayload {
     uint64 nonce;
     uint32 sourceDomain;
+    CCTPVersion cctpVersion;
+    uint256 amount;
+    uint32 destinationDomain;
+    bytes32 mintRecipient;
+    address burnToken;
+    bytes32 destinationCaller;
+    uint256 maxFee;
+    uint32 minFinalityThreshold;
   }
 
   string public constant override typeAndVersion = "USDCTokenPool 1.6.1-dev";
@@ -170,9 +186,22 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
       amount: lockOrBurnIn.amount
     });
 
+    SourceTokenDataPayload memory sourceTokenDataPayload = SourceTokenDataPayload({
+      nonce: nonce,
+      sourceDomain: i_localDomainIdentifier,
+      cctpVersion: CCTPVersion.CCTP_V1,
+      amount: lockOrBurnIn.amount,
+      destinationDomain: i_localDomainIdentifier,
+      mintRecipient: decodedReceiver,
+      burnToken: address(i_token),
+      destinationCaller: domain.allowedCaller,
+      maxFee: 0,
+      minFinalityThreshold: 0
+    });
+
     return Pool.LockOrBurnOutV1({
       destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
-      destPoolData: abi.encode(SourceTokenDataPayload({nonce: nonce, sourceDomain: i_localDomainIdentifier}))
+      destPoolData: abi.encode(sourceTokenDataPayload)
     });
   }
 
@@ -276,6 +305,10 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
       sourceDomain := mload(add(usdcMessage, 8)) // 4 + 4 = 8
       destinationDomain := mload(add(usdcMessage, 12)) // 8 + 4 = 12
       nonce := mload(add(usdcMessage, 20)) // 12 + 8 = 20
+    }
+
+    if (sourceTokenData.cctpVersion != CCTPVersion.CCTP_V1) {
+      revert InvalidCCTPVersion(CCTPVersion.CCTP_V1, sourceTokenData.cctpVersion);
     }
 
     if (sourceDomain != sourceTokenData.sourceDomain) {

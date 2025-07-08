@@ -24,7 +24,19 @@ contract USDCTokenPoolCCTPV2__validateMessage is USDCTokenPoolCCTPV2Setup {
 
     vm.resumeGasMetering();
     s_usdcTokenPool.validateMessage(
-      encodedUsdcMessage, USDCTokenPool.SourceTokenDataPayload({nonce: 0, sourceDomain: sourceDomain})
+      encodedUsdcMessage,
+      USDCTokenPool.SourceTokenDataPayload({
+        nonce: 0,
+        sourceDomain: sourceDomain,
+        cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V2,
+        amount: 0,
+        destinationDomain: DEST_DOMAIN_IDENTIFIER,
+        mintRecipient: bytes32(0),
+        burnToken: address(0),
+        destinationCaller: bytes32(0),
+        maxFee: 0,
+        minFinalityThreshold: 0
+      })
     );
   }
 
@@ -44,8 +56,18 @@ contract USDCTokenPoolCCTPV2__validateMessage is USDCTokenPoolCCTPV2Setup {
       messageBody: bytes("")
     });
 
-    USDCTokenPool.SourceTokenDataPayload memory sourceTokenData =
-      USDCTokenPool.SourceTokenDataPayload({nonce: 0, sourceDomain: usdcMessage.sourceDomain});
+    USDCTokenPool.SourceTokenDataPayload memory sourceTokenData = USDCTokenPool.SourceTokenDataPayload({
+      nonce: 0,
+      sourceDomain: usdcMessage.sourceDomain,
+      cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V2,
+      amount: 0,
+      destinationDomain: DEST_DOMAIN_IDENTIFIER,
+      mintRecipient: bytes32(0),
+      burnToken: address(0),
+      destinationCaller: bytes32(0),
+      maxFee: 0,
+      minFinalityThreshold: 0
+    });
 
     bytes memory encodedUsdcMessage = _generateUSDCMessageCCTPV2(usdcMessage);
 
@@ -57,7 +79,19 @@ contract USDCTokenPoolCCTPV2__validateMessage is USDCTokenPoolCCTPV2Setup {
       abi.encodeWithSelector(USDCTokenPool.InvalidSourceDomain.selector, expectedSourceDomain, usdcMessage.sourceDomain)
     );
     s_usdcTokenPool.validateMessage(
-      encodedUsdcMessage, USDCTokenPool.SourceTokenDataPayload({nonce: 0, sourceDomain: expectedSourceDomain})
+      encodedUsdcMessage,
+      USDCTokenPool.SourceTokenDataPayload({
+        nonce: 0,
+        sourceDomain: expectedSourceDomain,
+        cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V2,
+        amount: 0,
+        destinationDomain: DEST_DOMAIN_IDENTIFIER,
+        mintRecipient: bytes32(0),
+        burnToken: address(0),
+        destinationCaller: bytes32(0),
+        maxFee: 0,
+        minFinalityThreshold: 0
+      })
     );
 
     usdcMessage.destinationDomain = DEST_DOMAIN_IDENTIFIER + 1;
@@ -69,7 +103,18 @@ contract USDCTokenPoolCCTPV2__validateMessage is USDCTokenPoolCCTPV2Setup {
 
     s_usdcTokenPool.validateMessage(
       _generateUSDCMessageCCTPV2(usdcMessage),
-      USDCTokenPool.SourceTokenDataPayload({nonce: 0, sourceDomain: usdcMessage.sourceDomain})
+      USDCTokenPool.SourceTokenDataPayload({
+        nonce: 0,
+        sourceDomain: usdcMessage.sourceDomain,
+        cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V2,
+        amount: 0,
+        destinationDomain: DEST_DOMAIN_IDENTIFIER,
+        mintRecipient: bytes32(0),
+        burnToken: address(0),
+        destinationCaller: bytes32(0),
+        maxFee: 0,
+        minFinalityThreshold: 0
+      })
     );
     usdcMessage.destinationDomain = DEST_DOMAIN_IDENTIFIER;
 
@@ -112,5 +157,28 @@ contract USDCTokenPoolCCTPV2__validateMessage is USDCTokenPoolCCTPV2Setup {
       )
     );
     s_usdcTokenPool.validateMessage(invalidExecFinalityMsg, sourceTokenData);
+
+    // Test for InvalidCCTPVersion
+    usdcMessage.minFinalityThreshold = s_usdcTokenPool.FINALITY_THRESHOLD();
+    usdcMessage.finalityThresholdExecuted = s_usdcTokenPool.FINALITY_THRESHOLD();
+    bytes memory validMessage = _generateUSDCMessageCCTPV2(usdcMessage);
+    USDCTokenPool.SourceTokenDataPayload memory invalidCCTPVersionData = USDCTokenPool.SourceTokenDataPayload({
+      nonce: 0,
+      sourceDomain: usdcMessage.sourceDomain,
+      cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V1,
+      amount: 0,
+      destinationDomain: DEST_DOMAIN_IDENTIFIER,
+      mintRecipient: bytes32(0),
+      burnToken: address(0),
+      destinationCaller: bytes32(0),
+      maxFee: 0,
+      minFinalityThreshold: 0
+    });
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        USDCTokenPool.InvalidCCTPVersion.selector, USDCTokenPool.CCTPVersion.CCTP_V2, USDCTokenPool.CCTPVersion.CCTP_V1
+      )
+    );
+    s_usdcTokenPool.validateMessage(validMessage, invalidCCTPVersionData);
   }
 }

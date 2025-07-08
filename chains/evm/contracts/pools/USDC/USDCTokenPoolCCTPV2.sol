@@ -101,11 +101,24 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
       amount: lockOrBurnIn.amount
     });
 
+    SourceTokenDataPayload memory sourceTokenDataPayload = SourceTokenDataPayload({
+      nonce: uint64(0),
+      sourceDomain: i_localDomainIdentifier,
+      cctpVersion: CCTPVersion.CCTP_V2,
+      amount: lockOrBurnIn.amount,
+      destinationDomain: i_localDomainIdentifier,
+      mintRecipient: decodedReceiver,
+      burnToken: address(i_token),
+      destinationCaller: domain.allowedCaller,
+      maxFee: MAX_FEE,
+      minFinalityThreshold: FINALITY_THRESHOLD
+    });
+
     // As of CCTP v2, the nonce is not returned to this contract upon sending the message, and will instead be
     // acquired off-chain and included in the destination-message's offchainTokenData, so we set it to 0.
     return Pool.LockOrBurnOutV1({
       destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
-      destPoolData: abi.encode(SourceTokenDataPayload({nonce: uint64(0), sourceDomain: i_localDomainIdentifier}))
+      destPoolData: abi.encode(sourceTokenDataPayload)
     });
   }
 
@@ -228,6 +241,11 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
     // Check that the destination domain in the CCTP message matches the immutable domain of this pool.
     if (destinationDomain != i_localDomainIdentifier) {
       revert InvalidDestinationDomain(i_localDomainIdentifier, destinationDomain);
+    }
+
+    // Check that the CCTP version in the CCTP message matches the expected version.
+    if (sourceTokenData.cctpVersion != CCTPVersion.CCTP_V2) {
+      revert USDCTokenPool.InvalidCCTPVersion(CCTPVersion.CCTP_V2, sourceTokenData.cctpVersion);
     }
 
     // This pool only supports slow transfers on CCTP, so ensure that the message matches the same requirements.

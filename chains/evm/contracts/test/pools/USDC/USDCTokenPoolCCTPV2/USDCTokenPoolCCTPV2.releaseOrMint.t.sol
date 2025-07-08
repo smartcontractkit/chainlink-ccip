@@ -50,7 +50,20 @@ contract USDCTokenPoolCCTPV2_releaseOrMint is USDCTokenPoolCCTPV2Setup {
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: abi.encode(USDCTokenPool.SourceTokenDataPayload({nonce: 0, sourceDomain: SOURCE_DOMAIN_IDENTIFIER})),
+      extraData: abi.encode(
+        USDCTokenPool.SourceTokenDataPayload({
+          nonce: 0,
+          sourceDomain: SOURCE_DOMAIN_IDENTIFIER,
+          cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V2,
+          amount: amount,
+          destinationDomain: DEST_DOMAIN_IDENTIFIER,
+          mintRecipient: bytes32(0),
+          burnToken: address(s_USDCToken),
+          destinationCaller: bytes32(0),
+          maxFee: 0,
+          minFinalityThreshold: 0
+        })
+      ),
       destGasAmount: USDC_DEST_TOKEN_GAS
     });
 
@@ -119,7 +132,20 @@ contract USDCTokenPoolCCTPV2_releaseOrMint is USDCTokenPoolCCTPV2Setup {
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: abi.encode(USDCTokenPool.SourceTokenDataPayload({nonce: 0, sourceDomain: SOURCE_DOMAIN_IDENTIFIER})),
+      extraData: abi.encode(
+        USDCTokenPool.SourceTokenDataPayload({
+          nonce: 0,
+          sourceDomain: SOURCE_DOMAIN_IDENTIFIER,
+          cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V2,
+          amount: amount,
+          destinationDomain: DEST_DOMAIN_IDENTIFIER,
+          mintRecipient: bytes32(0),
+          burnToken: address(s_USDCToken),
+          destinationCaller: bytes32(0),
+          maxFee: 0,
+          minFinalityThreshold: 0
+        })
+      ),
       destGasAmount: USDC_DEST_TOKEN_GAS
     });
 
@@ -174,7 +200,20 @@ contract USDCTokenPoolCCTPV2_releaseOrMint is USDCTokenPoolCCTPV2Setup {
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: abi.encode(USDCTokenPool.SourceTokenDataPayload({nonce: nonce, sourceDomain: sourceDomain})),
+      extraData: abi.encode(
+        USDCTokenPool.SourceTokenDataPayload({
+          nonce: nonce,
+          sourceDomain: sourceDomain,
+          cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V2,
+          amount: amount,
+          destinationDomain: DEST_DOMAIN_IDENTIFIER,
+          mintRecipient: bytes32(0),
+          burnToken: address(s_USDCToken),
+          destinationCaller: bytes32(0),
+          maxFee: 0,
+          minFinalityThreshold: 0
+        })
+      ),
       destGasAmount: USDC_DEST_TOKEN_GAS
     });
 
@@ -233,7 +272,20 @@ contract USDCTokenPoolCCTPV2_releaseOrMint is USDCTokenPoolCCTPV2Setup {
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: abi.encode(USDCTokenPool.SourceTokenDataPayload({nonce: 0, sourceDomain: SOURCE_DOMAIN_IDENTIFIER})),
+      extraData: abi.encode(
+        USDCTokenPool.SourceTokenDataPayload({
+          nonce: 0,
+          sourceDomain: SOURCE_DOMAIN_IDENTIFIER,
+          cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V2,
+          amount: amount,
+          destinationDomain: DEST_DOMAIN_IDENTIFIER,
+          mintRecipient: bytes32(0),
+          burnToken: address(s_USDCToken),
+          destinationCaller: bytes32(0),
+          maxFee: 0,
+          minFinalityThreshold: 0
+        })
+      ),
       destGasAmount: USDC_DEST_TOKEN_GAS
     });
 
@@ -266,7 +318,20 @@ contract USDCTokenPoolCCTPV2_releaseOrMint is USDCTokenPoolCCTPV2Setup {
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: abi.encode(USDCTokenPool.SourceTokenDataPayload({nonce: 1, sourceDomain: SOURCE_DOMAIN_IDENTIFIER})),
+      extraData: abi.encode(
+        USDCTokenPool.SourceTokenDataPayload({
+          nonce: 1,
+          sourceDomain: SOURCE_DOMAIN_IDENTIFIER,
+          cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V2,
+          amount: amount,
+          destinationDomain: DEST_DOMAIN_IDENTIFIER,
+          mintRecipient: bytes32(0),
+          burnToken: address(s_USDCToken),
+          destinationCaller: bytes32(0),
+          maxFee: 0,
+          minFinalityThreshold: 0
+        })
+      ),
       destGasAmount: USDC_DEST_TOKEN_GAS
     });
 
