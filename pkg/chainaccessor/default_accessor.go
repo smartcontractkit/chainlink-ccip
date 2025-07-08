@@ -2,16 +2,18 @@ package chainaccessor
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"slices"
 	"strconv"
 	"time"
 
+	"golang.org/x/exp/maps"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
-	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
@@ -172,6 +174,7 @@ func (l *DefaultAccessor) MsgsBetweenSeqNums(
 		}
 
 		msg.Message.Header.OnRamp = onRampAddress
+		msg.Message.Header.TxHash = "0x" + hex.EncodeToString(item.TxHash)
 		msgs = append(msgs, msg.Message)
 	}
 
