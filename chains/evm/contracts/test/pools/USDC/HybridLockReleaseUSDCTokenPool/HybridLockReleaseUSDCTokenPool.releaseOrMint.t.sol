@@ -110,7 +110,7 @@ contract HybridLockReleaseUSDCTokenPool_releaseOrMint is HybridLockReleaseUSDCTo
       abi.encode(USDCTokenPool.MessageAndAttestation({message: encodedUsdcMessage, attestation: attestation}));
 
     vm.expectCall(
-      address(s_mockUSDCTransmitter),
+      address(s_mockUSDCTransmitterCCTPV2),
       abi.encodeWithSelector(MockE2EUSDCTransmitter.receiveMessage.selector, encodedUsdcMessage, attestation)
     );
 

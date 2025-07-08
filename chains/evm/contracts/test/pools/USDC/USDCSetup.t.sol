@@ -15,11 +15,23 @@ import {IERC165} from
 
 import {BaseTest} from "../../BaseTest.t.sol";
 import {MockE2EUSDCTransmitter} from "../../mocks/MockE2EUSDCTransmitter.sol";
+import {MockE2EUSDCTransmitterCCTPV2} from "../../mocks/MockE2EUSDCTransmitterCCTPV2.sol";
 import {MockUSDCTokenMessenger} from "../../mocks/MockUSDCTokenMessenger.sol";
 
 contract USDCSetup is BaseTest {
-  // solhint-disable-next-line gas-struct-packing
   struct USDCMessage {
+    uint32 version;
+    uint32 sourceDomain;
+    uint32 destinationDomain;
+    uint64 nonce;
+    bytes32 sender;
+    bytes32 recipient;
+    bytes32 destinationCaller;
+    bytes messageBody;
+  }
+
+  // solhint-disable-next-line gas-struct-packing
+  struct USDCMessageCCTPV2 {
     uint32 version;
     uint32 sourceDomain;
     uint32 destinationDomain;
@@ -43,6 +55,8 @@ contract USDCSetup is BaseTest {
 
   MockUSDCTokenMessenger internal s_mockUSDC;
   MockE2EUSDCTransmitter internal s_mockUSDCTransmitter;
+  MockE2EUSDCTransmitterCCTPV2 internal s_mockUSDCTransmitterCCTPV2;
+
   CCTPMessageTransmitterProxy internal s_cctpMessageTransmitterProxy;
 
   address internal s_routerAllowedOnRamp = address(3456);
@@ -61,11 +75,12 @@ contract USDCSetup is BaseTest {
     deal(address(s_USDCToken), OWNER, type(uint256).max);
     _setUpRamps();
 
-    s_mockUSDCTransmitter = new MockE2EUSDCTransmitter(1, DEST_DOMAIN_IDENTIFIER, address(s_USDCToken));
-    s_mockUSDC = new MockUSDCTokenMessenger(1, address(s_mockUSDCTransmitter));
+    s_mockUSDCTransmitterCCTPV2 = new MockE2EUSDCTransmitterCCTPV2(1, DEST_DOMAIN_IDENTIFIER, address(s_USDCToken));
+    s_mockUSDC = new MockUSDCTokenMessenger(1, address(s_mockUSDCTransmitterCCTPV2));
+
     s_cctpMessageTransmitterProxy = new CCTPMessageTransmitterProxy(s_mockUSDC);
 
-    usdcToken.grantMintAndBurnRoles(address(s_mockUSDCTransmitter));
+    usdcToken.grantMintAndBurnRoles(address(s_mockUSDCTransmitterCCTPV2));
     usdcToken.grantMintAndBurnRoles(address(s_mockUSDC));
 
     // Mock the previous pool's releaseOrMint function to return the input amount
@@ -134,6 +149,21 @@ contract USDCSetup is BaseTest {
 
   function _generateUSDCMessage(
     USDCMessage memory usdcMessage
+  ) internal pure returns (bytes memory) {
+    return abi.encodePacked(
+      usdcMessage.version,
+      usdcMessage.sourceDomain,
+      usdcMessage.destinationDomain,
+      usdcMessage.nonce,
+      usdcMessage.sender,
+      usdcMessage.recipient,
+      usdcMessage.destinationCaller,
+      usdcMessage.messageBody
+    );
+  }
+
+  function _generateUSDCMessageCCTPV2(
+    USDCMessageCCTPV2 memory usdcMessage
   ) internal pure returns (bytes memory) {
     return abi.encodePacked(
       usdcMessage.version,

@@ -3,30 +3,18 @@ pragma solidity ^0.8.24;
 
 import {CCTPMessageTransmitterProxy} from "../../../../pools/USDC/CCTPMessageTransmitterProxy.sol";
 import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
-import {USDCTokenPoolHelper} from "../../../helpers/USDCTokenPoolHelper.sol";
+import {USDCTokenPoolCCTPV2Helper} from "../../../helpers/USDCTokenPoolCCTPV2Helper.sol";
 import {USDCSetup} from "../USDCSetup.t.sol";
 
-import {MockE2EUSDCTransmitter} from "../../../mocks/MockE2EUSDCTransmitter.sol";
-import {MockUSDCTokenMessenger} from "../../../mocks/MockUSDCTokenMessenger.sol";
-
-import {BurnMintERC677} from "@chainlink/contracts/src/v0.8/shared/token/ERC677/BurnMintERC677.sol";
-
-contract USDCTokenPoolSetup is USDCSetup {
-  USDCTokenPoolHelper internal s_usdcTokenPool;
-  USDCTokenPoolHelper internal s_usdcTokenPoolWithAllowList;
+contract USDCTokenPoolCCTPV2Setup is USDCSetup {
+  USDCTokenPoolCCTPV2Helper internal s_usdcTokenPool;
+  USDCTokenPoolCCTPV2Helper internal s_usdcTokenPoolWithAllowList;
   address[] internal s_allowedList;
 
   function setUp() public virtual override {
     super.setUp();
 
-    s_mockUSDCTransmitter = new MockE2EUSDCTransmitter(0, DEST_DOMAIN_IDENTIFIER, address(s_USDCToken));
-    s_mockUSDC = new MockUSDCTokenMessenger(0, address(s_mockUSDCTransmitter));
-    s_cctpMessageTransmitterProxy = new CCTPMessageTransmitterProxy(s_mockUSDC);
-
-    BurnMintERC677(address(s_USDCToken)).grantMintAndBurnRoles(address(s_mockUSDCTransmitter));
-    BurnMintERC677(address(s_USDCToken)).grantMintAndBurnRoles(address(s_mockUSDC));
-
-    s_usdcTokenPool = new USDCTokenPoolHelper(
+    s_usdcTokenPool = new USDCTokenPoolCCTPV2Helper(
       s_mockUSDC,
       s_cctpMessageTransmitterProxy,
       s_USDCToken,
@@ -43,7 +31,7 @@ contract USDCTokenPoolSetup is USDCSetup {
     s_cctpMessageTransmitterProxy.configureAllowedCallers(allowedCallerParams);
 
     s_allowedList.push(vm.randomAddress());
-    s_usdcTokenPoolWithAllowList = new USDCTokenPoolHelper(
+    s_usdcTokenPoolWithAllowList = new USDCTokenPoolCCTPV2Helper(
       s_mockUSDC,
       s_cctpMessageTransmitterProxy,
       s_USDCToken,

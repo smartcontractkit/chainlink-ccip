@@ -26,6 +26,7 @@ contract HybridLockReleaseUSDCTokenPoolSetup is USDCSetup {
       address(s_router),
       s_previousPool
     );
+
     CCTPMessageTransmitterProxy.AllowedCallerConfigArgs[] memory allowedCallerParams =
       new CCTPMessageTransmitterProxy.AllowedCallerConfigArgs[](1);
     allowedCallerParams[0] =

@@ -38,8 +38,6 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   error InvalidTransmitterInProxy();
   error InvalidPreviousPool();
   error InvalidMessageLength(uint256 length);
-  error InvalidMinFinalityThreshold(uint32 expected, uint32 got);
-  error InvalidExecutionFinalityThreshold(uint32 expected, uint32 got);
 
   // This data is supplied from offchain and contains everything needed
   // to receive the USDC tokens.
@@ -65,13 +63,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   string public constant override typeAndVersion = "USDCTokenPool 1.6.1-dev";
 
   // We restrict to the first version. New pool may be required for subsequent versions.
-  uint32 public constant SUPPORTED_USDC_VERSION = 1;
-
-  // CCTP's max fee is based on the use of fast-burn. Since this pool does not utilize that feature, max fee should be 0.
-  uint32 public constant MAX_FEE = 0;
-
-  // TODO: Add Comment
-  uint32 public constant FINALITY_THRESHOLD = 2000;
+  uint32 public immutable i_supportedUSDCVersion;
 
   // The local USDC config
   ITokenMessenger public immutable i_tokenMessenger;
@@ -92,13 +84,12 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   }
 
   // A mapping of CCIP chain identifiers to destination domains
-  mapping(uint64 chainSelector => Domain CCTPDomain) private s_chainToDomain;
+  mapping(uint64 chainSelector => Domain CCTPDomain) internal s_chainToDomain;
 
   // In the event of an inflight message during a token pool migration, we need to route the message to the
   // previous pool to satisfy the allowedCaller. The currently in-use token pool must be set as an offRamp
   // in the router in order for the previous pool to accept the incoming call.
   address public immutable i_previousPool;
-  address public immutable i_previousMessageTransmitterProxy;
 
   constructor(
     ITokenMessenger tokenMessenger,
@@ -107,14 +98,17 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     address[] memory allowlist,
     address rmnProxy,
     address router,
-    address previousPool
+    address previousPool,
+    uint32 supportedUSDCVersion
   ) TokenPool(token, 6, allowlist, rmnProxy, router) {
+    i_supportedUSDCVersion = supportedUSDCVersion;
+
     if (address(tokenMessenger) == address(0)) revert InvalidConfig();
     IMessageTransmitter transmitter = IMessageTransmitter(tokenMessenger.localMessageTransmitter());
     uint32 transmitterVersion = transmitter.version();
-    if (transmitterVersion != SUPPORTED_USDC_VERSION) revert InvalidMessageVersion(transmitterVersion);
+    if (transmitterVersion != i_supportedUSDCVersion) revert InvalidMessageVersion(transmitterVersion);
     uint32 tokenMessengerVersion = tokenMessenger.messageBodyVersion();
-    if (tokenMessengerVersion != SUPPORTED_USDC_VERSION) revert InvalidTokenMessengerVersion(tokenMessengerVersion);
+    if (tokenMessengerVersion != i_supportedUSDCVersion) revert InvalidTokenMessengerVersion(tokenMessengerVersion);
     if (cctpMessageTransmitterProxy.i_cctpTransmitter() != transmitter) revert InvalidTransmitterInProxy();
 
     i_tokenMessenger = tokenMessenger;
@@ -129,16 +123,6 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     // If previousPool exists, it should be a valid token pool, we check it with supportsInterface.
     if (previousPool != address(0) && !IERC165(previousPool).supportsInterface(type(IPoolV1).interfaceId)) {
       revert InvalidPreviousPool();
-    }
-
-    if (previousPool != address(0)) {
-      try USDCTokenPool(previousPool).i_messageTransmitterProxy() returns (CCTPMessageTransmitterProxy proxy) {
-        i_previousMessageTransmitterProxy = address(proxy);
-      } catch {
-        revert InvalidPreviousPool();
-      }
-    } else {
-      i_previousMessageTransmitterProxy = address(0);
     }
 
     i_previousPool = previousPool;
@@ -175,14 +159,8 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     // Since this pool is the msg sender of the CCTP transaction, only this contract
     // is able to call replaceDepositForBurn. Since this contract does not implement
     // replaceDepositForBurn, the tokens cannot be maliciously re-routed to another address.
-    i_tokenMessenger.depositForBurn(
-      lockOrBurnIn.amount,
-      domain.domainIdentifier,
-      decodedReceiver,
-      address(i_token),
-      domain.allowedCaller,
-      MAX_FEE,
-      FINALITY_THRESHOLD
+    uint64 nonce = i_tokenMessenger.depositForBurnWithCaller(
+      lockOrBurnIn.amount, domain.domainIdentifier, decodedReceiver, address(i_token), domain.allowedCaller
     );
 
     emit LockedOrBurned({
@@ -192,11 +170,9 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
       amount: lockOrBurnIn.amount
     });
 
-    // As of CCTP v2, the nonce is not returned to this contract upon sending the message, and will instead be
-    // acquired off-chain and included in the destination-message's offchainTokenData, so we set it to 0.
     return Pool.LockOrBurnOutV1({
       destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
-      destPoolData: abi.encode(SourceTokenDataPayload({nonce: uint64(0), sourceDomain: i_localDomainIdentifier}))
+      destPoolData: abi.encode(SourceTokenDataPayload({nonce: nonce, sourceDomain: i_localDomainIdentifier}))
     });
   }
 
@@ -221,6 +197,8 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     MessageAndAttestation memory msgAndAttestation =
       abi.decode(releaseOrMintIn.offchainTokenData, (MessageAndAttestation));
 
+    _validateMessage(msgAndAttestation.message, sourceTokenDataPayload);
+
     // If the destinationCaller is the previous pool, indicating an inflight message during the migration, we need to
     // route the message to the previous pool to satisfy the allowedCaller.
     bytes32 destinationCallerBytes32;
@@ -228,20 +206,13 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     assembly {
       // destinationCaller is a 32-byte word starting at position 84 in messageBytes body, so add 32 to skip the 1st word
       // representing bytes length
-      destinationCallerBytes32 := mload(add(messageBytes, 140)) // 108 + 32 = 140
+      destinationCallerBytes32 := mload(add(messageBytes, 116)) // 84 + 32 = 116
     }
     address destinationCaller = address(uint160(uint256(destinationCallerBytes32)));
 
-    // TODO: Fix this for previous pool. Consider checking the previous pool's transmitter proxy.
-    if (i_previousPool != address(0) && destinationCaller == i_previousMessageTransmitterProxy) {
-      // If the destinationCaller is the previous pool's message transmitter proxy, we can use this
-      // as an indication that CCTP V1 was used to send the message, and route it to the previous pool for minting.
+    if (i_previousPool != address(0) && destinationCaller == i_previousPool) {
       return USDCTokenPool(i_previousPool).releaseOrMint(releaseOrMintIn);
     }
-
-    // We call this after the destinationCaller check to ensure that the message is valid for CCTP V2. If it was called
-    // before, then a V1 message which should be forwarded to the previous pool will be rejected.
-    _validateMessage(msgAndAttestation.message, sourceTokenDataPayload);
 
     if (!i_messageTransmitterProxy.receiveMessage(msgAndAttestation.message, msgAndAttestation.attestation)) {
       revert UnlockingUSDCFailed();
@@ -260,25 +231,26 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
 
   /// @notice Validates the USDC encoded message against the given parameters.
   /// @param usdcMessage The USDC encoded message
-  /// @param sourceTokenData The expected source chain CCTP identifier as provided by the CCIP-Source-Pool.
-  /// @dev Only supports version SUPPORTED_USDC_VERSION of the CCTP V2 message format
+  /// @param sourceTokenData The expected source chain token data to check against
+  /// @dev Only supports version SUPPORTED_USDC_VERSION of the CCTP message format
   /// @dev Message format for USDC:
-  ///     * Field                      Bytes      Type       Index
-  ///     * version                    4          uint32     0
-  ///     * sourceDomain               4          uint32     4
-  ///     * destinationDomain          4          uint32     8
-  ///     * nonce                      32         bytes32   12
-  ///     * sender                     32         bytes32   44
-  ///     * recipient                  32         bytes32   76
-  ///     * destinationCaller          32         bytes32   108
-  ///     * minFinalityThreshold       32         uint32    140
-  ///     * finalityThresholdExecuted  32         uint32    144
-  ///     * messageBody                dynamic    bytes     148
-  function _validateMessage(bytes memory usdcMessage, SourceTokenDataPayload memory sourceTokenData) internal view {
+  ///     * Field                 Bytes      Type       Index
+  ///     * version               4          uint32     0
+  ///     * sourceDomain          4          uint32     4
+  ///     * destinationDomain     4          uint32     8
+  ///     * nonce                 8          uint64     12
+  ///     * sender                32         bytes32    20
+  ///     * recipient             32         bytes32    52
+  ///     * destinationCaller     32         bytes32    84
+  ///     * messageBody           dynamic    bytes      116
+  function _validateMessage(
+    bytes memory usdcMessage,
+    SourceTokenDataPayload memory sourceTokenData
+  ) internal view virtual {
     // 116 is the minimum length of a valid USDC message. Since destinationCaller needs to be checked for the previous
     // pool, this ensures that it can be parsed correctly and that the message is not too short. Since messageBody is
     // dynamic and not always used, it is not checked.
-    if (usdcMessage.length < 148) revert InvalidMessageLength(usdcMessage.length);
+    if (usdcMessage.length < 116) revert InvalidMessageLength(usdcMessage.length);
 
     uint32 version;
     // solhint-disable-next-line no-inline-assembly
@@ -293,39 +265,26 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     // This token pool only supports version 0 of the CCTP message format
     // We check the version prior to loading the rest of the message
     // to avoid unexpected reverts due to out-of-bounds reads.
-    if (version != SUPPORTED_USDC_VERSION) revert InvalidMessageVersion(version);
+    if (version != i_supportedUSDCVersion) revert InvalidMessageVersion(version);
 
-    uint32 messageSourceDomain;
+    uint32 sourceDomain;
     uint32 destinationDomain;
-    uint32 minFinalityThreshold;
-    uint32 finalityThresholdExecuted;
+    uint64 nonce;
 
     // solhint-disable-next-line no-inline-assembly
     assembly {
-      messageSourceDomain := mload(add(usdcMessage, 8)) // 4 + 4 = 8
+      sourceDomain := mload(add(usdcMessage, 8)) // 4 + 4 = 8
       destinationDomain := mload(add(usdcMessage, 12)) // 8 + 4 = 12
-      minFinalityThreshold := mload(add(usdcMessage, 144)) // 140 + 4 = 144
-      finalityThresholdExecuted := mload(add(usdcMessage, 148)) // 144 + 4 = 148
+      nonce := mload(add(usdcMessage, 20)) // 12 + 8 = 20
     }
 
-    // Check that the source domain included in the CCTP Message matches the one forwarded by the source pool.
-    if (messageSourceDomain != sourceTokenData.sourceDomain) {
-      revert InvalidSourceDomain(sourceTokenData.sourceDomain, messageSourceDomain);
+    if (sourceDomain != sourceTokenData.sourceDomain) {
+      revert InvalidSourceDomain(sourceTokenData.sourceDomain, sourceDomain);
     }
-
-    // Check that the destination domain in the CCTP message matches the immutable domain of this pool.
     if (destinationDomain != i_localDomainIdentifier) {
       revert InvalidDestinationDomain(i_localDomainIdentifier, destinationDomain);
     }
-
-    // This pool only supports slow transfers on CCTP, so ensure that the message matches the same requirements.
-    if (minFinalityThreshold != FINALITY_THRESHOLD) {
-      revert InvalidMinFinalityThreshold(FINALITY_THRESHOLD, minFinalityThreshold);
-    }
-
-    if (finalityThresholdExecuted != FINALITY_THRESHOLD) {
-      revert InvalidExecutionFinalityThreshold(FINALITY_THRESHOLD, finalityThresholdExecuted);
-    }
+    if (nonce != sourceTokenData.nonce) revert InvalidNonce(sourceTokenData.nonce, nonce);
   }
 
   // ================================================================
