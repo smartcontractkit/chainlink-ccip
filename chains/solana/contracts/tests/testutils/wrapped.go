@@ -20,7 +20,7 @@ import (
 // this is used to keep a consistent interface to introduce less code churn in the tests
 
 func SendAndConfirm(ctx context.Context, t *testing.T, rpcClient *rpc.Client, instructions []solana.Instruction, signer solana.PrivateKey, commitment rpc.CommitmentType, opts ...common.TxModifier) *rpc.GetTransactionResult {
-	res, err := common.SendAndConfirm(ctx, rpcClient, instructions, signer, commitment, opts...)
+	res, err := common.SendAndConfirmWithRetries(ctx, rpcClient, instructions, signer, commitment, opts...)
 	require.NoError(t, err)
 
 	return res
@@ -28,7 +28,7 @@ func SendAndConfirm(ctx context.Context, t *testing.T, rpcClient *rpc.Client, in
 
 func SendAndConfirmWithLookupTables(ctx context.Context, t *testing.T, rpcClient *rpc.Client, instructions []solana.Instruction,
 	signer solana.PrivateKey, commitment rpc.CommitmentType, lookupTables map[solana.PublicKey]solana.PublicKeySlice, opts ...common.TxModifier) *rpc.GetTransactionResult {
-	res, err := common.SendAndConfirmWithLookupTables(ctx, rpcClient, instructions, signer, commitment, lookupTables, opts...)
+	res, err := common.SendAndConfirmWithLookupTablesAndRetries(ctx, rpcClient, instructions, signer, commitment, lookupTables, opts...)
 	require.NoError(t, err)
 
 	return res
