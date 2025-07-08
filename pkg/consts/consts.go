@@ -137,9 +137,9 @@ const (
 
 // Event Attributes
 const (
-	EventAttributeSequenceNumber = "SequenceNumber"
-	EventAttributeSourceChain    = "SourceChain"
-	EventAttributeDestChain      = "DestChain"
+	EventAttributeSequenceNumber = "seqNum"
+	EventAttributeSourceChain    = "sourceChainSelector"
+	EventAttributeDestChain      = "destChainSelector"
 	EventAttributeState          = "State"
 )
 
