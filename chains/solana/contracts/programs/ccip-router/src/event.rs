@@ -5,6 +5,15 @@ use crate::{DestChainConfig, SVM2AnyRampMessage};
 pub mod events {
     use super::*;
 
+    #[event]
+    pub struct PdaUpgraded {
+        pub address: Pubkey,
+        pub old_version: u8,
+        pub new_version: u8,
+        pub name: String,
+        pub seeds: Vec<u8>,
+    }
+
     pub mod on_ramp {
         use super::*;
         #[event]
@@ -120,6 +129,12 @@ pub mod events {
         pub struct AdministratorTransferred {
             pub token: Pubkey,
             pub new_admin: Pubkey,
+        }
+
+        #[event]
+        pub struct PoolEdited {
+            pub token: Pubkey,
+            pub supports_auto_derivation: bool,
         }
     }
 }

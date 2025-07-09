@@ -98,7 +98,15 @@ func SetupTestValidatorWithAnchorPrograms(t *testing.T, pathToAnchorConfig strin
 
 	flags := []string{}
 	for k, v := range anchorData.Programs.Localnet {
-		flags = append(flags, "--upgradeable-program", v, filepath.Join(ContractsDir, k+".so"), upgradeAuthority)
+		filename := k + ".so"
+		file := filepath.Join(ContractsDir, filename) // try target/deploy binaries first
+		if _, err := os.Stat(file); os.IsNotExist(err) {
+			file = filepath.Join(VendorContractsDir, filename) // try target/vendor binaries next
+			if _, err := os.Stat(file); os.IsNotExist(err) {
+				require.FailNowf(t, "Program file not found", "Could not find program file %s in either %s or %s", filename, ContractsDir, VendorContractsDir)
+			}
+		}
+		flags = append(flags, "--upgradeable-program", v, file, upgradeAuthority)
 	}
 	url, _ := SetupLocalSolNodeWithFlags(t, flags...)
 	return url

@@ -502,6 +502,305 @@ func (obj *DestChainConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (er
 	return nil
 }
 
+type DeriveAccountsResponse struct {
+	// If this vector is not empty, you must call the `derive_` method again including
+	// exactly these accounts as the `remaining_accounts` field.
+	AskAgainWith []CcipAccountMeta
+
+	// You must append these accounts at the end of a separate list. When `next_stage`
+	// is finally empty, this separate list will contain all the accounts to use for the
+	// instruction of interest.
+	AccountsToSave []CcipAccountMeta
+
+	// Append these look up tables at the end of a list. It will contain all LUTs
+	// that the instruction of interest can use.
+	LookUpTablesToSave []ag_solanago.PublicKey
+
+	// Identifies the derivation stage.
+	CurrentStage string
+
+	// Identifies the next derivation stage. If empty, the derivation is complete.
+	NextStage string
+}
+
+func (obj DeriveAccountsResponse) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `AskAgainWith` param:
+	err = encoder.Encode(obj.AskAgainWith)
+	if err != nil {
+		return err
+	}
+	// Serialize `AccountsToSave` param:
+	err = encoder.Encode(obj.AccountsToSave)
+	if err != nil {
+		return err
+	}
+	// Serialize `LookUpTablesToSave` param:
+	err = encoder.Encode(obj.LookUpTablesToSave)
+	if err != nil {
+		return err
+	}
+	// Serialize `CurrentStage` param:
+	err = encoder.Encode(obj.CurrentStage)
+	if err != nil {
+		return err
+	}
+	// Serialize `NextStage` param:
+	err = encoder.Encode(obj.NextStage)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *DeriveAccountsResponse) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `AskAgainWith`:
+	err = decoder.Decode(&obj.AskAgainWith)
+	if err != nil {
+		return err
+	}
+	// Deserialize `AccountsToSave`:
+	err = decoder.Decode(&obj.AccountsToSave)
+	if err != nil {
+		return err
+	}
+	// Deserialize `LookUpTablesToSave`:
+	err = decoder.Decode(&obj.LookUpTablesToSave)
+	if err != nil {
+		return err
+	}
+	// Deserialize `CurrentStage`:
+	err = decoder.Decode(&obj.CurrentStage)
+	if err != nil {
+		return err
+	}
+	// Deserialize `NextStage`:
+	err = decoder.Decode(&obj.NextStage)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type CcipAccountMeta struct {
+	Pubkey     ag_solanago.PublicKey
+	IsSigner   bool
+	IsWritable bool
+}
+
+func (obj CcipAccountMeta) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Pubkey` param:
+	err = encoder.Encode(obj.Pubkey)
+	if err != nil {
+		return err
+	}
+	// Serialize `IsSigner` param:
+	err = encoder.Encode(obj.IsSigner)
+	if err != nil {
+		return err
+	}
+	// Serialize `IsWritable` param:
+	err = encoder.Encode(obj.IsWritable)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *CcipAccountMeta) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Pubkey`:
+	err = decoder.Decode(&obj.Pubkey)
+	if err != nil {
+		return err
+	}
+	// Deserialize `IsSigner`:
+	err = decoder.Decode(&obj.IsSigner)
+	if err != nil {
+		return err
+	}
+	// Deserialize `IsWritable`:
+	err = decoder.Decode(&obj.IsWritable)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type DeriveAccountsCcipSendParams struct {
+	DestChainSelector uint64
+	CcipSendCaller    ag_solanago.PublicKey
+	Message           SVM2AnyMessage
+}
+
+func (obj DeriveAccountsCcipSendParams) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `DestChainSelector` param:
+	err = encoder.Encode(obj.DestChainSelector)
+	if err != nil {
+		return err
+	}
+	// Serialize `CcipSendCaller` param:
+	err = encoder.Encode(obj.CcipSendCaller)
+	if err != nil {
+		return err
+	}
+	// Serialize `Message` param:
+	err = encoder.Encode(obj.Message)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *DeriveAccountsCcipSendParams) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `DestChainSelector`:
+	err = decoder.Decode(&obj.DestChainSelector)
+	if err != nil {
+		return err
+	}
+	// Deserialize `CcipSendCaller`:
+	err = decoder.Decode(&obj.CcipSendCaller)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Message`:
+	err = decoder.Decode(&obj.Message)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type DeriveAccountsCcipSendStage interface {
+	isDeriveAccountsCcipSendStage()
+}
+
+type deriveAccountsCcipSendStageContainer struct {
+	Enum                        ag_binary.BorshEnum `borsh_enum:"true"`
+	Start                       Start
+	FinishMainAccountList       FinishMainAccountList
+	RetrieveTokenLUTs           RetrieveTokenLUTs
+	RetrievePoolPrograms        RetrievePoolPrograms
+	TokenTransferStaticAccounts TokenTransferStaticAccounts
+	NestedTokenDerive           NestedTokenDerive
+}
+
+type Start uint8
+
+func (obj Start) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	return nil
+}
+
+func (obj *Start) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	return nil
+}
+
+func (_ *Start) isDeriveAccountsCcipSendStage() {}
+
+type FinishMainAccountList uint8
+
+func (obj FinishMainAccountList) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	return nil
+}
+
+func (obj *FinishMainAccountList) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	return nil
+}
+
+func (_ *FinishMainAccountList) isDeriveAccountsCcipSendStage() {}
+
+type RetrieveTokenLUTs uint8
+
+func (obj RetrieveTokenLUTs) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	return nil
+}
+
+func (obj *RetrieveTokenLUTs) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	return nil
+}
+
+func (_ *RetrieveTokenLUTs) isDeriveAccountsCcipSendStage() {}
+
+type RetrievePoolPrograms uint8
+
+func (obj RetrievePoolPrograms) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	return nil
+}
+
+func (obj *RetrievePoolPrograms) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	return nil
+}
+
+func (_ *RetrievePoolPrograms) isDeriveAccountsCcipSendStage() {}
+
+type TokenTransferStaticAccounts struct {
+	Token uint32
+	Page  uint32
+}
+
+func (obj TokenTransferStaticAccounts) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Token` param:
+	err = encoder.Encode(obj.Token)
+	if err != nil {
+		return err
+	}
+	// Serialize `Page` param:
+	err = encoder.Encode(obj.Page)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *TokenTransferStaticAccounts) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Token`:
+	err = decoder.Decode(&obj.Token)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Page`:
+	err = decoder.Decode(&obj.Page)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (_ *TokenTransferStaticAccounts) isDeriveAccountsCcipSendStage() {}
+
+type NestedTokenDerive struct {
+	Token         uint32
+	TokenSubstage string
+}
+
+func (obj NestedTokenDerive) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Token` param:
+	err = encoder.Encode(obj.Token)
+	if err != nil {
+		return err
+	}
+	// Serialize `TokenSubstage` param:
+	err = encoder.Encode(obj.TokenSubstage)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *NestedTokenDerive) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Token`:
+	err = decoder.Decode(&obj.Token)
+	if err != nil {
+		return err
+	}
+	// Deserialize `TokenSubstage`:
+	err = decoder.Decode(&obj.TokenSubstage)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (_ *NestedTokenDerive) isDeriveAccountsCcipSendStage() {}
+
 type CodeVersion ag_binary.BorshEnum
 
 const (

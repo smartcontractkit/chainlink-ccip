@@ -16,7 +16,6 @@ use super::v1;
  * As we currently have a single version, all branches lead to the same outcome, but the code is structured in a way
  * that is easy to extend to multiple versions.
  */
-
 pub fn public(
     lane_code_version: CodeVersion,
     default_code_version: CodeVersion,
