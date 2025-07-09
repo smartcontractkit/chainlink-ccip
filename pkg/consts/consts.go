@@ -5,7 +5,7 @@ package consts
 // Contract Names
 const (
 	ContractNameOffRamp                = "OffRamp"
-	ContractNameOnRamp                 = "onramp"
+	ContractNameOnRamp                 = "OnRamp"
 	ContractNameFeeQuoter              = "FeeQuoter"
 	ContractNameCapabilitiesRegistry   = "CapabilitiesRegistry"
 	ContractNameCCIPConfig             = "CCIPHome"
@@ -52,10 +52,10 @@ const (
 	MethodNameGetExecutionState               = "GetExecutionState"
 
 	// OnRamp methods
-	MethodNameOnRampGetDynamicConfig        = "get_dynamic_config"
-	MethodNameOnRampGetStaticConfig         = "get_static_config"
-	MethodNameOnRampGetDestChainConfig      = "get_dest_chain_config"
-	MethodNameGetExpectedNextSequenceNumber = "get_expected_next_sequence_number"
+	MethodNameOnRampGetDynamicConfig        = "OnRampGetDynamicConfig"
+	MethodNameOnRampGetStaticConfig         = "OnRampGetStaticConfig"
+	MethodNameOnRampGetDestChainConfig      = "OnRampGetDestChainConfig"
+	MethodNameGetExpectedNextSequenceNumber = "GetExpectedNextSequenceNumber"
 
 	// FeeQuoter view/pure methods
 	MethodNameFeeQuoterGetTokenPrices       = "GetTokenPrices"
