@@ -26,11 +26,6 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
   // TODO: Add Comment
   uint32 public constant FINALITY_THRESHOLD = 2000;
 
-  // In the event of an inflight message during a token pool migration, we need to route the message to the
-  // previous pool to satisfy the allowedCaller. The currently in-use token pool must be set as an offRamp
-  // in the router in order for the previous pool to accept the incoming call.
-  address public immutable i_previousMessageTransmitterProxy;
-
   // TODO: Fix Comments
   // Note: This constructor is only used for CCTP V2, which is why the supportedUSDCVersion is set to 1.
   constructor(
@@ -137,8 +132,6 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
     _validateReleaseOrMint(releaseOrMintIn, releaseOrMintIn.sourceDenominatedAmount);
-    SourceTokenDataPayload memory sourceTokenDataPayload =
-      abi.decode(releaseOrMintIn.sourcePoolData, (SourceTokenDataPayload));
 
     MessageAndAttestation memory msgAndAttestation =
       abi.decode(releaseOrMintIn.offchainTokenData, (MessageAndAttestation));
@@ -154,12 +147,25 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
     }
     address destinationCaller = address(uint160(uint256(destinationCallerBytes32)));
 
-    // TODO: Fix this for previous pool. Consider checking the previous pool's transmitter proxy.
-    if (i_previousPool != address(0) && destinationCaller == i_previousMessageTransmitterProxy) {
+    // If the destinationCaller is the previous pool's message transmitter proxy, we can use this
+    // as an indication that CCTP V1 was used to send the message, and route it to the previous pool for minting.
+    // In previous versions, the sourcePoolData only contained two fields, a uint64 and uint32. For structs stored only
+    // in memory, the compiler assigns each field to its only 32-byte slot, instead of tightly packing line in storage.
+    // This means that the sourcePoolData will be 64 bytes long. This indicates an inflight message during the
+    // migration, and needs to be routed to the previous pool, otherwise the parsing will revert.
+    if (
+      (i_previousPool != address(0) && destinationCaller == i_previousMessageTransmitterProxy)
+        || releaseOrMintIn.sourcePoolData.length == 64
+    ) {
       // If the destinationCaller is the previous pool's message transmitter proxy, we can use this
       // as an indication that CCTP V1 was used to send the message, and route it to the previous pool for minting.
       return USDCTokenPool(i_previousPool).releaseOrMint(releaseOrMintIn);
     }
+
+    // This decoding is done after the check for the previous pool to avoid issues with decoding the previous pool's
+    // sourcePoolData into a struct with a different number of fields.
+    SourceTokenDataPayload memory sourceTokenDataPayload =
+      abi.decode(releaseOrMintIn.sourcePoolData, (SourceTokenDataPayload));
 
     // We call this after the destinationCaller check to ensure that the message is valid for CCTP V2. If it was called
     // before, then a V1 message which should be forwarded to the previous pool will be rejected.

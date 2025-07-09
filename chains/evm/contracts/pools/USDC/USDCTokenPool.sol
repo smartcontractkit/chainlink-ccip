@@ -107,6 +107,11 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   // in the router in order for the previous pool to accept the incoming call.
   address public immutable i_previousPool;
 
+  // In the event of an inflight message during a token pool migration, we need to route the message to the
+  // previous pool to satisfy the allowedCaller. The currently in-use token pool must be set as an offRamp
+  // in the router in order for the previous pool to accept the incoming call.
+  address public immutable i_previousMessageTransmitterProxy;
+
   constructor(
     ITokenMessenger tokenMessenger,
     CCTPMessageTransmitterProxy cctpMessageTransmitterProxy,
@@ -139,6 +144,16 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     // If previousPool exists, it should be a valid token pool, we check it with supportsInterface.
     if (previousPool != address(0) && !IERC165(previousPool).supportsInterface(type(IPoolV1).interfaceId)) {
       revert InvalidPreviousPool();
+    }
+
+    if (previousPool != address(0)) {
+      try USDCTokenPool(previousPool).i_messageTransmitterProxy() returns (CCTPMessageTransmitterProxy proxy) {
+        i_previousMessageTransmitterProxy = address(proxy);
+      } catch {
+        revert InvalidPreviousPool();
+      }
+    } else {
+      i_previousMessageTransmitterProxy = address(0);
     }
 
     i_previousPool = previousPool;
@@ -220,13 +235,9 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
     _validateReleaseOrMint(releaseOrMintIn, releaseOrMintIn.sourceDenominatedAmount);
-    SourceTokenDataPayload memory sourceTokenDataPayload =
-      abi.decode(releaseOrMintIn.sourcePoolData, (SourceTokenDataPayload));
 
     MessageAndAttestation memory msgAndAttestation =
       abi.decode(releaseOrMintIn.offchainTokenData, (MessageAndAttestation));
-
-    _validateMessage(msgAndAttestation.message, sourceTokenDataPayload);
 
     // If the destinationCaller is the previous pool, indicating an inflight message during the migration, we need to
     // route the message to the previous pool to satisfy the allowedCaller.
@@ -239,9 +250,24 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     }
     address destinationCaller = address(uint160(uint256(destinationCallerBytes32)));
 
-    if (i_previousPool != address(0) && destinationCaller == i_previousPool) {
+    // If the destinationCaller is the previous pool, indicating an inflight message during the migration, we need to
+    // route the message to the previous pool to satisfy the allowedCaller.
+    // In previous versions, the sourcePoolData only contained two fields, a uint64 and uint32. For structs stored only
+    // in memory, the compiler assigns each field to its only 32-byte slot, instead of tightly packing line in storage.
+    // This means that the sourcePoolData will be 64 bytes long. This indicates an inflight message during the
+    // migration, and needs to be routed to the previous pool, otherwise the parsing will revert.
+    if (
+      (i_previousPool != address(0) && destinationCaller == i_previousMessageTransmitterProxy)
+        || releaseOrMintIn.sourcePoolData.length == 64
+    ) {
       return USDCTokenPool(i_previousPool).releaseOrMint(releaseOrMintIn);
     }
+
+    // This decoding is done after the check for the previous pool to avoid duplicate decoding.
+    SourceTokenDataPayload memory sourceTokenDataPayload =
+      abi.decode(releaseOrMintIn.sourcePoolData, (SourceTokenDataPayload));
+
+    _validateMessage(msgAndAttestation.message, sourceTokenDataPayload);
 
     if (!i_messageTransmitterProxy.receiveMessage(msgAndAttestation.message, msgAndAttestation.attestation)) {
       revert UnlockingUSDCFailed();

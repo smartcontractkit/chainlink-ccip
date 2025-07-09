@@ -111,7 +111,7 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
       nonce: 0x060606060606,
       sender: SOURCE_CHAIN_TOKEN_SENDER,
       recipient: bytes32(uint256(uint160(recipient))),
-      destinationCaller: bytes32(uint256(uint160(address(s_previousPool)))),
+      destinationCaller: bytes32(uint256(uint160(address(s_previousPoolMessageTransmitterProxy)))),
       messageBody: _formatMessage(
         0,
         bytes32(uint256(uint160(address(s_USDCToken)))),
@@ -344,6 +344,85 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
         remoteChainSelector: SOURCE_CHAIN_SELECTOR,
         sourcePoolAddress: sourceTokenData.sourcePoolAddress,
         sourcePoolData: sourceTokenData.extraData,
+        offchainTokenData: offchainTokenData
+      })
+    );
+  }
+
+  function test_ReleaseOrMint_12ByteSourcePoolData() public {
+    address recipient = address(1234);
+    uint256 amount = 1e6;
+
+    // Create a 12-byte sourcePoolData that represents the old SourceTokenDataPayload structure
+    // with just uint64 nonce and uint32 sourceDomain
+    uint64 nonce = 12345;
+    uint32 sourceDomain = SOURCE_DOMAIN_IDENTIFIER;
+    bytes memory oldSourcePoolData = abi.encode(nonce, sourceDomain);
+
+    // Verify it's exactly 64 bytes (32 bytes for each field)
+    assertEq(oldSourcePoolData.length, 64, "Old sourcePoolData should be exactly 12 bytes");
+
+    USDCMessage memory usdcMessage = USDCMessage({
+      version: 0,
+      sourceDomain: SOURCE_DOMAIN_IDENTIFIER,
+      destinationDomain: DEST_DOMAIN_IDENTIFIER,
+      nonce: nonce,
+      sender: SOURCE_CHAIN_TOKEN_SENDER,
+      recipient: bytes32(uint256(uint160(recipient))),
+      destinationCaller: bytes32(uint256(uint160(address(s_usdcTokenPool)))),
+      messageBody: _formatMessage(
+        0,
+        bytes32(uint256(uint160(address(s_USDCToken)))),
+        bytes32(uint256(uint160(recipient))),
+        amount,
+        bytes32(uint256(uint160(OWNER)))
+      )
+    });
+
+    bytes memory message = _generateUSDCMessage(usdcMessage);
+    bytes memory attestation = bytes("attestation bytes");
+
+    Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
+      sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
+      destTokenAddress: abi.encode(address(s_usdcTokenPool)),
+      extraData: oldSourcePoolData, // Use the 12-byte old format
+      destGasAmount: USDC_DEST_TOKEN_GAS
+    });
+
+    bytes memory offchainTokenData =
+      abi.encode(USDCTokenPool.MessageAndAttestation({message: message, attestation: attestation}));
+
+    // The mocked receiver does not release the token to the pool, so we manually do it here
+    deal(address(s_USDCToken), address(s_usdcTokenPool), amount);
+
+    // Expect a call to the previous pool since sourcePoolData is 12 bytes
+    vm.expectCall(
+      address(s_previousPool),
+      abi.encodeWithSelector(
+        TokenPool.releaseOrMint.selector,
+        Pool.ReleaseOrMintInV1({
+          originalSender: abi.encode(OWNER),
+          receiver: recipient,
+          sourceDenominatedAmount: amount,
+          localToken: address(s_USDCToken),
+          remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+          sourcePoolAddress: sourceTokenData.sourcePoolAddress,
+          sourcePoolData: oldSourcePoolData,
+          offchainTokenData: offchainTokenData
+        })
+      )
+    );
+
+    vm.startPrank(s_routerAllowedOffRamp);
+    s_usdcTokenPool.releaseOrMint(
+      Pool.ReleaseOrMintInV1({
+        originalSender: abi.encode(OWNER),
+        receiver: recipient,
+        sourceDenominatedAmount: amount,
+        localToken: address(s_USDCToken),
+        remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+        sourcePoolAddress: sourceTokenData.sourcePoolAddress,
+        sourcePoolData: oldSourcePoolData,
         offchainTokenData: offchainTokenData
       })
     );
