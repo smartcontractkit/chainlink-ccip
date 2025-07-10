@@ -45,7 +45,8 @@ contract OnRampOverSuperchainInterop is OnRamp {
     for (uint256 i = 0; i < message.tokenAmounts.length; ++i) {
       Internal.EVM2AnyTokenTransfer memory tokenTransfer = message.tokenAmounts[i];
 
-      // Validate destTokenAddress is an EVM address, catch TokenPool bad return data early.
+      // TokenPool owners can return arbitrary destTokenAddress values, so we validate
+      // early to catch malicious/malformed data before abi.decode() potentially fails with unclear errors.
       Internal._validateEVMAddress(tokenTransfer.destTokenAddress);
 
       destTokenTransfers[i] = Internal.Any2EVMTokenTransfer({
