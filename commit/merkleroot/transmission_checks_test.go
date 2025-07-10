@@ -11,7 +11,7 @@ import (
 
 	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	reader2 "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 func TestValidateRootBlessings(t *testing.T) {

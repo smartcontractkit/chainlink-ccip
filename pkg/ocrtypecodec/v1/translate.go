@@ -14,7 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1/ocrtypecodecpb"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 type protoTranslator struct{}

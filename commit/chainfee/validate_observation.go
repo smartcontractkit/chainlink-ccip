@@ -8,7 +8,7 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"golang.org/x/exp/maps"
 )

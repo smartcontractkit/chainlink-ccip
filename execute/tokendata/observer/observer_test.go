@@ -14,8 +14,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 func Test_CompositeTokenDataObserver_EmptyObservers(t *testing.T) {

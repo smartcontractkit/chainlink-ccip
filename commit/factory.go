@@ -15,6 +15,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/commit/internal/builder"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/commit/metrics"
@@ -24,7 +26,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 

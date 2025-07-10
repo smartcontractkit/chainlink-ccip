@@ -13,7 +13,7 @@ import (
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 func TestArbitrumPriceSource_Validate(t *testing.T) {

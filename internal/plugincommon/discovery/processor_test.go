@@ -25,7 +25,7 @@ import (
 	mock_reader "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 func TestContractDiscoveryProcessor_Observation_SupportsDest_HappyPath(t *testing.T) {

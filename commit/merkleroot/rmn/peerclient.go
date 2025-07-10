@@ -16,7 +16,7 @@ import (
 
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/peergroup"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 )

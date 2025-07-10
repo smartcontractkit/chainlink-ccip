@@ -13,7 +13,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
 	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 func Test_CachingInstances(t *testing.T) {

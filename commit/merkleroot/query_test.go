@@ -19,8 +19,8 @@ import (
 	rmnmocks "github.com/smartcontractkit/chainlink-ccip/mocks/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 func TestProcessor_Query(t *testing.T) {

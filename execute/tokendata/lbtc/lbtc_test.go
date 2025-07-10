@@ -15,7 +15,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata/lbtc"
 	"github.com/smartcontractkit/chainlink-ccip/internal"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 func TestTokenDataObserver_Observe_LBTCAndRegularTokens(t *testing.T) {

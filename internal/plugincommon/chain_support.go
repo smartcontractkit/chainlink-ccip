@@ -13,7 +13,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 // ChainSupport contains functions that enable an oracle to determine which chains are accessible by itself and

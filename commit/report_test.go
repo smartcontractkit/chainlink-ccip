@@ -19,16 +19,17 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
 	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"github.com/smartcontractkit/chainlink-ccip/commit/internal/builder"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
 	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
+	ccipocr3mock "github.com/smartcontractkit/chainlink-ccip/mocks/chainlink_common/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/mocks/internal_/plugincommon"
-	ccipocr3mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
 	ocrtypecodec "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 

@@ -13,7 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 // Creator handles peer group creation

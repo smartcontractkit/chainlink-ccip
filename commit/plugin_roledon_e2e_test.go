@@ -22,6 +22,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
 	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
@@ -34,11 +36,10 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	readerinternal "github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	"github.com/smartcontractkit/chainlink-ccip/mocks/chainlink_common/ccipocr3"
 	mockinternalreader "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	mockreader "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
-	"github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
 	ccipreader "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 

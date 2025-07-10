@@ -11,7 +11,7 @@ import (
 	"github.com/smartcontractkit/libocr/ragep2p/types"
 	"github.com/stretchr/testify/mock"
 
-	"github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-ccip/mocks/chainlink_common/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 
 	"github.com/stretchr/testify/require"
@@ -25,7 +25,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	codec_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/ocrtypecodec/v1"
 	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 func Test_Observation_CacheUpdate(t *testing.T) {
