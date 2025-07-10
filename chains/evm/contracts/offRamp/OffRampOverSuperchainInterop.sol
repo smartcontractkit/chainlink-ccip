@@ -14,6 +14,7 @@ import {Identifier} from "../vendor/optimism/interop-lib/v0/src/interfaces/IIden
 /// exactly 1 message per report. Batching is not supported, because this OffRamp only runs on OP L2s,
 /// the benefit of batching is minimal, it is not worth the complexity.
 contract OffRampOverSuperchainInterop is OffRamp {
+  error CrossL2InboxCannotBeZero();
   error InvalidSourceChainSelector(uint64 sourceChainSelector, uint64 expected);
   error InvalidDestChainSelector(uint64 destChainSelector, uint64 expected);
   error InvalidSourceOnRamp(uint64 sourceChainSelector, address sourceOnRamp);
@@ -47,6 +48,9 @@ contract OffRampOverSuperchainInterop is OffRamp {
     address crossL2Inbox,
     ChainSelectorToChainIdConfigArgs[] memory chainSelectorToChainIdConfigArgs
   ) OffRamp(staticConfig, dynamicConfig, sourceChainConfigs) {
+    if (crossL2Inbox == address(0)) {
+      revert CrossL2InboxCannotBeZero();
+    }
     i_crossL2Inbox = ICrossL2Inbox(crossL2Inbox);
 
     _applyChainSelectorToChainIdConfigUpdates(new uint64[](0), chainSelectorToChainIdConfigArgs);
