@@ -68,7 +68,7 @@ contract OffRampOverSuperchainInterop_constructor is OffRampOverSuperchainIntero
 
   // Reverts
 
-  function test_constructor_RevertWhen_InvalidCrossL2Inbox() public {
+  function test_constructor_RevertWhen_ZeroCrossL2Inbox() public {
     OffRamp.StaticConfig memory staticConfig = OffRamp.StaticConfig({
       chainSelector: DEST_CHAIN_SELECTOR,
       gasForCallExactCheck: GAS_FOR_CALL_EXACT_CHECK,
@@ -77,7 +77,7 @@ contract OffRampOverSuperchainInterop_constructor is OffRampOverSuperchainIntero
       nonceManager: address(s_inboundNonceManager)
     });
 
-    vm.expectRevert(abi.encodeWithSelector(OffRampOverSuperchainInterop.InvalidCrossL2Inbox.selector, address(0)));
+    vm.expectRevert(abi.encodeWithSelector(OffRampOverSuperchainInterop.CrossL2InboxCannotBeZero.selector));
     new OffRampOverSuperchainInterop(
       staticConfig,
       _generateDynamicOffRampConfig(address(s_feeQuoter)),

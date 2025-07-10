@@ -263,7 +263,7 @@ OffRampOverSuperchainInterop_applyChainSelectorToChainIdConfigUpdates:test_apply
 OffRampOverSuperchainInterop_applyChainSelectorToChainIdConfigUpdates:test_applyChainSelectorToChainIdConfigUpdates_EmptyInput() (gas: 13283)
 OffRampOverSuperchainInterop_applyChainSelectorToChainIdConfigUpdates:test_applyChainSelectorToChainIdConfigUpdates_RemoveNonExistentConfig() (gas: 15972)
 OffRampOverSuperchainInterop_constructProofs:test_constructProofs() (gas: 27915)
-OffRampOverSuperchainInterop_constructor:test_constructor() (gas: 4918021)
+OffRampOverSuperchainInterop_constructor:test_constructor() (gas: 4917952)
 OffRampOverSuperchainInterop_executeSingleReport:test_executeSingleReport() (gas: 494095)
 OffRampOverSuperchainInterop_verifyMessage:test_verifyMessage() (gas: 239266)
 OffRampWithMessageTransformer_executeSingleReport:test_executeSingleReport() (gas: 308180)
