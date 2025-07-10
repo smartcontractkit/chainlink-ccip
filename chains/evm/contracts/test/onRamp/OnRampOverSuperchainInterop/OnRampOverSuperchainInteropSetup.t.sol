@@ -4,7 +4,6 @@ pragma solidity ^0.8.24;
 import {Router} from "../../../Router.sol";
 import {Client} from "../../../libraries/Client.sol";
 import {Internal} from "../../../libraries/Internal.sol";
-import {OnRampOverSuperchainInterop} from "../../../onRamp/OnRampOverSuperchainInterop.sol";
 
 import {OnRampOverSuperchainInteropHelper} from "../../helpers/OnRampOverSuperchainInteropHelper.sol";
 import {OnRampSetup} from "../OnRamp/OnRampSetup.t.sol";
