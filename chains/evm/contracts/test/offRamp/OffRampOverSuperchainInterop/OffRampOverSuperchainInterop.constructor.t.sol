@@ -77,7 +77,7 @@ contract OffRampOverSuperchainInterop_constructor is OffRampOverSuperchainIntero
       nonceManager: address(s_inboundNonceManager)
     });
 
-    vm.expectRevert(abi.encodeWithSelector(OffRampOverSuperchainInterop.CrossL2InboxCannotBeZero.selector));
+    vm.expectRevert(OffRampOverSuperchainInterop.CrossL2InboxCannotBeZero.selector);
     new OffRampOverSuperchainInterop(
       staticConfig,
       _generateDynamicOffRampConfig(address(s_feeQuoter)),

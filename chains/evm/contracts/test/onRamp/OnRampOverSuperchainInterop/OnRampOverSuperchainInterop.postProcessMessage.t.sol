@@ -35,25 +35,25 @@ contract OnRampOverSuperchainInterop_postProcessMessage is OnRampOverSuperchainI
       _generateInitialSourceDestMessages(DEST_CHAIN_SELECTOR, message, feeAmount);
     evm2AnyMessage.header.messageId = "";
 
-    bytes memory shortAddress = new bytes(19);
-    bytes memory longAddress = abi.encode(address(0x1234567890123456789012345678901234567890));
+    bytes memory encodePackedAddress = abi.encodePacked(address(234));
+    bytes memory longAddress = abi.encode(abi.encode(address(0x1234567890123456789012345678901234567890)));
     bytes memory highAddress = abi.encode(uint256(type(uint160).max) + 1);
     bytes memory precompileAddress = abi.encode(address(1));
 
-    evm2AnyMessage.tokenAmounts[0].destTokenAddress = abi.encode(shortAddress);
-    vm.expectRevert(abi.encodeWithSelector(Internal.InvalidEVMAddress.selector, abi.encode(shortAddress)));
+    evm2AnyMessage.tokenAmounts[0].destTokenAddress = encodePackedAddress;
+    vm.expectRevert(abi.encodeWithSelector(Internal.InvalidEVMAddress.selector, encodePackedAddress));
     s_onRampOverSuperchainInterop.postProcessMessage(evm2AnyMessage);
 
-    evm2AnyMessage.tokenAmounts[0].destTokenAddress = abi.encode(longAddress);
-    vm.expectRevert(abi.encodeWithSelector(Internal.InvalidEVMAddress.selector, abi.encode(longAddress)));
+    evm2AnyMessage.tokenAmounts[0].destTokenAddress = longAddress;
+    vm.expectRevert(abi.encodeWithSelector(Internal.InvalidEVMAddress.selector, longAddress));
     s_onRampOverSuperchainInterop.postProcessMessage(evm2AnyMessage);
 
-    evm2AnyMessage.tokenAmounts[0].destTokenAddress = abi.encode(highAddress);
-    vm.expectRevert(abi.encodeWithSelector(Internal.InvalidEVMAddress.selector, abi.encode(highAddress)));
+    evm2AnyMessage.tokenAmounts[0].destTokenAddress = highAddress;
+    vm.expectRevert(abi.encodeWithSelector(Internal.InvalidEVMAddress.selector, highAddress));
     s_onRampOverSuperchainInterop.postProcessMessage(evm2AnyMessage);
 
-    evm2AnyMessage.tokenAmounts[0].destTokenAddress = abi.encode(precompileAddress);
-    vm.expectRevert(abi.encodeWithSelector(Internal.InvalidEVMAddress.selector, abi.encode(precompileAddress)));
+    evm2AnyMessage.tokenAmounts[0].destTokenAddress = precompileAddress;
+    vm.expectRevert(abi.encodeWithSelector(Internal.InvalidEVMAddress.selector, precompileAddress));
     s_onRampOverSuperchainInterop.postProcessMessage(evm2AnyMessage);
   }
 }
