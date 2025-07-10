@@ -17,15 +17,15 @@ const (
 	messagesPath = "messages"
 )
 
-type CTTPv2AttestationClient struct {
+type CCTPv2AttestationClient struct {
 	lggr   logger.Logger
 	client http.HTTPClient
 }
 
-func NewCTTPv2AttestationClient(
+func NewCCTPv2AttestationClient(
 	lggr logger.Logger,
 	config pluginconfig.USDCCCTPObserverConfig,
-) (*CTTPv2AttestationClient, error) {
+) (*CCTPv2AttestationClient, error) {
 	client, err := http.GetHTTPClient(
 		lggr,
 		config.AttestationAPI,
@@ -36,24 +36,24 @@ func NewCTTPv2AttestationClient(
 	if err != nil {
 		return nil, fmt.Errorf("create HTTP client: %w", err)
 	}
-	return &CTTPv2AttestationClient{
+	return &CCTPv2AttestationClient{
 		lggr:   lggr,
 		client: client,
 	}, nil
 }
 
 // GetMessages TODO: doc
-func (c *CTTPv2AttestationClient) GetMessages(
+func (c *CCTPv2AttestationClient) GetMessages(
 	ctx context.Context,
-	sourceDomainId uint32,
+	sourceDomainID uint32,
 	transactionHash string,
 ) (Messages, error) {
-	path := fmt.Sprintf("%s/%s/%d?transactionHash=%s", apiVersionV2, messagesPath, sourceDomainId, transactionHash)
+	path := fmt.Sprintf("%s/%s/%d?transactionHash=%s", apiVersionV2, messagesPath, sourceDomainID, transactionHash)
 	body, status, err := c.client.Get(ctx, path)
 	if err != nil {
 		return Messages{},
-			fmt.Errorf("http call failed to get CCTPv2 messages for sourceDomainId %d and transactionHash %s, error: %w",
-				sourceDomainId, transactionHash, err)
+			fmt.Errorf("http call failed to get CCTPv2 messages for sourceDomainID %d and transactionHash %s, error: %w",
+				sourceDomainID, transactionHash, err)
 	}
 
 	if status != 200 {

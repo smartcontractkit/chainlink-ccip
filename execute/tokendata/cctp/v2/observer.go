@@ -5,20 +5,85 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"math/big"
 	"strings"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	"github.com/ethereum/go-ethereum/accounts/abi"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 
-	//"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 )
+
+// exectypes and cciptypes
+// type TokenDataObservations map[cciptypes.ChainSelector]map[cciptypes.SeqNum]MessageTokenData
+// type ChainSelector uint64
+// type SeqNum uint64
+//type MessageTokenData struct {
+//	TokenData []TokenData
+//}
+//type TokenData struct {
+//	Ready bool            `json:"ready"`
+//	Data  cciptypes.Bytes `json:"data"`
+//	// Error and Supported are used only for internal processing, we don't want nodes to gossip about the
+//	// internals they see during processing
+//	Error     error `json:"-"`
+//	Supported bool  `json:"-"`
+//}
+// type MessageObservations map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Message
+//type Message struct {
+//	// Header is the family-agnostic header for OnRamp and OffRamp messages.
+//	// This is always set on all CCIP messages.
+//	Header RampMessageHeader `json:"header"`
+//	// Sender address on the source chain.
+//	// i.e if the source chain is EVM, this is an abi-encoded EVM address.
+//	Sender UnknownAddress `json:"sender"`
+//	// Data is the arbitrary data payload supplied by the message sender.
+//	Data Bytes `json:"data"`
+//	// Receiver is the receiver address on the destination chain.
+//	// This is encoded in the destination chain family specific encoding.
+//	// i.e if the destination is EVM, this is abi.encode(receiver).
+//	Receiver UnknownAddress `json:"receiver"`
+//	// ExtraArgs is destination-chain specific extra args,
+//	// such as the gasLimit for EVM chains.
+//	// This field is encoded in the source chain encoding scheme.
+//	ExtraArgs Bytes `json:"extraArgs"`
+//	// FeeToken is the fee token address.
+//	// i.e if the source chain is EVM, len(FeeToken) == 20 (i.e, is not abi-encoded).
+//	FeeToken UnknownAddress `json:"feeToken"`
+//	// FeeTokenAmount is the amount of fee tokens paid.
+//	FeeTokenAmount BigInt `json:"feeTokenAmount"`
+//	// FeeValueJuels is the fee amount in Juels
+//	FeeValueJuels BigInt `json:"feeValueJuels"`
+//	// TokenAmounts is the array of tokens and amounts to transfer.
+//	TokenAmounts []RampTokenAmount `json:"tokenAmounts"`
+//}
+//type RampMessageHeader struct {
+//	// MessageID is a unique identifier for the message, it should be unique across all chains.
+//	// It is generated on the chain that the CCIP send is requested (i.e. the source chain of a message).
+//	MessageID Bytes32 `json:"messageId"`
+//	// SourceChainSelector is the chain selector of the chain that the message originated from.
+//	SourceChainSelector ChainSelector `json:"sourceChainSelector,string"`
+//	// DestChainSelector is the chain selector of the chain that the message is destined for.
+//	DestChainSelector ChainSelector `json:"destChainSelector,string"`
+//	// SequenceNumber is an auto-incrementing sequence number for the message.
+//	// Not unique across lanes.
+//	SequenceNumber SeqNum `json:"seqNum,string"`
+//	// Nonce is the nonce for this lane for this sender, not unique across senders/lanes
+//	Nonce uint64 `json:"nonce"`
+//
+//	// MsgHash is the hash of all the message fields.
+//	// NOTE: The field is expected to be empty, and will be populated by the plugin using the MsgHasher interface.
+//	MsgHash Bytes32 `json:"msgHash"` // populated
+//
+//	// OnRamp is the address of the onramp that sent the message.
+//	// NOTE: This is populated by the ccip reader. Not emitted explicitly onchain.
+//	OnRamp UnknownAddress `json:"onRamp"`
+//
+//	// TxHash is the hash of the transaction that emitted this message.
+//	TxHash string `json:"txHash"`
+//}
 
 const (
 	attestationStatusComplete string = "complete"
@@ -26,21 +91,21 @@ const (
 
 type AttestationEncoder func(context.Context, cciptypes.Bytes, cciptypes.Bytes) (cciptypes.Bytes, error)
 
-type CTTPv2TokenDataObserver struct {
+type CCTPv2TokenDataObserver struct {
 	lggr                     logger.Logger
 	destChainSelector        cciptypes.ChainSelector
 	supportedPoolsBySelector map[cciptypes.ChainSelector]string
 	attestationEncoder       AttestationEncoder
-	attestationClient        *CTTPv2AttestationClient
+	attestationClient        *CCTPv2AttestationClient
 }
 
-func NewCTTPv2TokenDataObserver(
+func NewCCTPv2TokenDataObserver(
 	lggr logger.Logger,
 	destChainSelector cciptypes.ChainSelector,
 	usdcConfig pluginconfig.USDCCCTPObserverConfig,
 	attestationEncoder AttestationEncoder,
-) (*CTTPv2TokenDataObserver, error) {
-	attestationClient, err := NewCTTPv2AttestationClient(lggr, usdcConfig)
+) (*CCTPv2TokenDataObserver, error) {
+	attestationClient, err := NewCCTPv2AttestationClient(lggr, usdcConfig)
 	if err != nil {
 		return nil, fmt.Errorf("create attestation client: %w", err)
 	}
@@ -51,7 +116,7 @@ func NewCTTPv2TokenDataObserver(
 	lggr.Infow("Created USDC Token Data Observer",
 		"supportedTokenPools", supportedPoolsBySelector,
 	)
-	return &CTTPv2TokenDataObserver{
+	return &CCTPv2TokenDataObserver{
 		lggr:                     lggr,
 		destChainSelector:        destChainSelector,
 		supportedPoolsBySelector: supportedPoolsBySelector,
@@ -60,14 +125,14 @@ func NewCTTPv2TokenDataObserver(
 	}, nil
 }
 
-func InitCTTPv2TokenDataObserver(
+func InitCCTPv2TokenDataObserver(
 	lggr logger.Logger,
 	destChainSelector cciptypes.ChainSelector,
 	supportedPoolsBySelector map[cciptypes.ChainSelector]string,
 	attestationEncoder AttestationEncoder,
-	attestationClient *CTTPv2AttestationClient,
-) *CTTPv2TokenDataObserver {
-	return &CTTPv2TokenDataObserver{
+	attestationClient *CCTPv2AttestationClient,
+) *CCTPv2TokenDataObserver {
+	return &CCTPv2TokenDataObserver{
 		lggr:                     lggr,
 		destChainSelector:        destChainSelector,
 		supportedPoolsBySelector: supportedPoolsBySelector,
@@ -76,34 +141,11 @@ func InitCTTPv2TokenDataObserver(
 	}
 }
 
-//// Observe TODO: doc
-//func (u *CTTPv2TokenDataObserver) Observe(
-//	ctx context.Context,
-//	messages exectypes.MessageObservations,
-//) (exectypes.TokenDataObservations, error) {
-//	lggr := logutil.WithContextValues(ctx, u.lggr)
-//
-//	tokenDataObservations := make(exectypes.TokenDataObservations)
-//	for chainSelector, chainMessages := range messages {
-//		seqNum2TokenData := make(map[cciptypes.SeqNum]exectypes.MessageTokenData)
-//
-//		for seqNum, message := range chainMessages {
-//			seqNum2TokenData[seqNum] = u.getMessageTokenData(ctx, lggr, chainSelector, message)
-//		}
-//
-//		tokenDataObservations[chainSelector] = seqNum2TokenData
-//	}
-//
-//	return tokenDataObservations, nil
-//}
-
 // Observe TODO: doc
-func (u *CTTPv2TokenDataObserver) Observe(
+func (u *CCTPv2TokenDataObserver) Observe(
 	ctx context.Context,
 	messages exectypes.MessageObservations,
 ) (exectypes.TokenDataObservations, error) {
-	//lggr := logutil.WithContextValues(ctx, u.lggr)
-
 	tokenDataObservations := make(exectypes.TokenDataObservations)
 	for chainSelector, chainMessages := range messages {
 		tokenDataObservations[chainSelector] = u.getTokenDataForSourceChain(ctx, chainSelector, u.attestationEncoder, chainMessages)
@@ -113,297 +155,145 @@ func (u *CTTPv2TokenDataObserver) Observe(
 }
 
 // IsTokenSupported TODO: doc
-func (u *CTTPv2TokenDataObserver) IsTokenSupported(
+func (u *CCTPv2TokenDataObserver) IsTokenSupported(
 	sourceChain cciptypes.ChainSelector,
 	msgToken cciptypes.RampTokenAmount,
 ) bool {
-	_, err := u.getValidatedSourceTokenDataPayload(sourceChain, msgToken)
+	_, err := getCCTPv2SourceTokenDataPayload(u.supportedPoolsBySelector[sourceChain], msgToken)
 	return err == nil
 }
 
-// TODO: doc
-func (u *CTTPv2TokenDataObserver) getValidatedSourceTokenDataPayload(
-	sourceChain cciptypes.ChainSelector,
-	msgToken cciptypes.RampTokenAmount,
-) (*SourceTokenDataPayload, error) {
-	if !strings.EqualFold(u.supportedPoolsBySelector[sourceChain], msgToken.SourcePoolAddress.String()) {
-		return nil, fmt.Errorf("unsupported token pool address")
-	}
-
-	tokenData, err := DecodeSourceTokenDataPayload(msgToken.ExtraData)
-	if err != nil {
-		return nil, err
-	}
-
-	if tokenData.CCTPVersion != reader.CttpVersion2 {
-		return nil, fmt.Errorf("unsupported CCTP version: %d", tokenData.CCTPVersion)
-	}
-
-	return tokenData, nil
-}
-
-func (u *CTTPv2TokenDataObserver) Close() error {
+func (u *CCTPv2TokenDataObserver) Close() error {
 	return nil
 }
-
-//// TODO: doc, impl
-//// Only call CCTP v2 API if the message has CCTP v2 tokens
-//func (u *CTTPv2TokenDataObserver) getMessageTokenData(
-//	ctx context.Context,
-//	lggr logger.Logger,
-//	sourceChain cciptypes.ChainSelector,
-//	message cciptypes.Message,
-//) exectypes.MessageTokenData {
-//	cctpV2TokenIndexes := u.getCctpV2TokenIndexes(sourceChain, message)
-//	// If there are no CCTP v2 tokens, we can return an empty token data
-//	if len(cctpV2TokenIndexes) == 0 {
-//		tokenData := make([]exectypes.TokenData, len(message.TokenAmounts))
-//		return exectypes.NewMessageTokenData(tokenData...)
-//	}
-//
-//	sourceDomainId, err := u.getSourceDomainId(message, cctpV2TokenIndexes)
-//	if err != nil {
-//		err = fmt.Errorf("failed to get source domain ID for CCIP message %s: %w", message.Header.MessageID, err)
-//		return errorTokenData(lggr, message, cctpV2TokenIndexes, err)
-//	}
-//
-//	cctpV2Messages, err := u.getRelevantCctpV2Messages(ctx, message, sourceDomainId)
-//	if err != nil {
-//		err = fmt.Errorf(
-//			"failed to get relevant CCTPv2 messages for: CCIP message ID %s, source domain ID %d, "+
-//				"transaction hash %s, error %w",
-//			message.Header.MessageID, sourceDomainId, message.Header.TxHash, err,
-//		)
-//		return errorTokenData(lggr, message, cctpV2TokenIndexes, err)
-//	}
-//
-//	return u.associateTokensToAttestations(ctx, cctpV2Messages, message, sourceDomainId, cctpV2TokenIndexes)
-//}
-//
-//// TODO: doc
-//func errorTokenData(
-//	lggr logger.Logger,
-//	message cciptypes.Message,
-//	cctpV2TokenIndexes []int,
-//	err error,
-//) exectypes.MessageTokenData {
-//	lggr.Warnf(err.Error())
-//	tokenData := make([]exectypes.TokenData, len(message.TokenAmounts))
-//	for _, tokenIndex := range cctpV2TokenIndexes {
-//		tokenData[tokenIndex] = exectypes.NewErrorTokenData(err)
-//	}
-//	return exectypes.NewMessageTokenData(tokenData...)
-//}
-//
-//// TODO: doc
-//func (u *CTTPv2TokenDataObserver) associateTokensToAttestations(
-//	ctx context.Context,
-//	cctpV2Messages Messages,
-//	message cciptypes.Message,
-//	sourceDomainId uint32,
-//	cctpV2TokenIndexes []int,
-//) exectypes.MessageTokenData {
-//	tokenData := make([]exectypes.TokenData, len(message.TokenAmounts))
-//	assignedCctpMessages := make([]bool, len(cctpV2Messages.Messages))
-//
-//	for _, tokenIndex := range cctpV2TokenIndexes {
-//		amount := message.TokenAmounts[tokenIndex].Amount.String()
-//		found := false
-//		for i, cctpV2msg := range cctpV2Messages.Messages {
-//			if cctpV2msg.DecodedMessage.DecodedMessageBody.Amount == amount && !assignedCctpMessages[i] {
-//				tokenData[tokenIndex] = cctpV2msg.TokenData(ctx, u.attestationEncoder)
-//				assignedCctpMessages[i] = true
-//				found = true
-//				break
-//			}
-//		}
-//
-//		if !found {
-//			err := missingCctpV2MessageError(u.lggr, message, sourceDomainId, tokenIndex)
-//			tokenData[tokenIndex] = exectypes.NewErrorTokenData(err)
-//		}
-//	}
-//
-//	return exectypes.NewMessageTokenData(tokenData...)
-//}
-//
-//// TODO: doc
-//func missingCctpV2MessageError(
-//	lggr logger.Logger,
-//	message cciptypes.Message,
-//	sourceDomainId uint32,
-//	tokenIndex int,
-//) error {
-//	msg := fmt.Sprintf(
-//		"A CCTPv2 USDC token transfer was made for message ID %s with token index %d, however, when fetching "+
-//			"the CCTP v2 messages from the CCTPv2 HTTP API for the CCIP message's transaction hash %s and source "+
-//			"domain ID %d, no CCTP v2 message was found that had the same token amount as the CCIP token transfer. "+
-//			"Either we incorrectly filtered out the correct CCTPv2 message in an earlier step (which is a bug), or "+
-//			"the CCTP v2 API is not returning the expected message (which is a bug in the CCTP v2 API). Call the "+
-//			"CCTP v2 API with souceDomainId %d and transactionHash %s to see if there is a message with amount %s, "+
-//			"to confirm if the issue is with the CCTP v2 API or with the filtering logic. One potential cause is "+
-//			"that we filter CCTP v2 messages by the CCIP message's decoded receiver address, so we may have "+
-//			"decoded it incorrectly. The raw/undecoded CCIP message receiver address is %s",
-//		message.Header.MessageID.String(), tokenIndex, message.Header.TxHash, sourceDomainId, sourceDomainId,
-//		message.Header.TxHash, message.TokenAmounts[tokenIndex].Amount.String(), message.Receiver.String())
-//
-//	lggr.Warnf(msg)
-//	return fmt.Errorf(msg)
-//}
-//
-//// TODO: doc, note about EVM ABI decoding
-//func (u *CTTPv2TokenDataObserver) getRelevantCctpV2Messages(
-//	ctx context.Context,
-//	message cciptypes.Message,
-//	sourceDomainId uint32,
-//) (Messages, error) {
-//
-//	cctpV2Messages, err := u.attestationClient.GetMessages(ctx, sourceDomainId, message.Header.TxHash)
-//	if err != nil {
-//		return Messages{}, err
-//	}
-//
-//	decodedReceiver, err := decodeEvmReceiver(message.Receiver)
-//	if err != nil {
-//		return Messages{}, fmt.Errorf("failed to EVM ABI decode receiver address: %w", err)
-//	}
-//
-//	// filter for CCTP v2 messages that have correct receiver and are v2
-//	return filterForRelevantCctpV2Messages(cctpV2Messages, decodedReceiver.String()), nil
-//}
-//
-//// TODO: doc
-//func filterForRelevantCctpV2Messages(cctpV2Messages Messages, receiver string) Messages {
-//	relevantCctpV2Messages := make([]Message, 0)
-//
-//	for _, msg := range cctpV2Messages.Messages {
-//		if msg.CCTPVersion != int(reader.CttpVersion2) {
-//			continue
-//		}
-//
-//		if msg.DecodedMessage.DecodedMessageBody.MintRecipient == receiver {
-//			relevantCctpV2Messages = append(relevantCctpV2Messages, msg)
-//		}
-//	}
-//
-//	return Messages{Messages: relevantCctpV2Messages}
-//}
-//
-//// TODO: doc
-//func decodeEvmReceiver(receiver cciptypes.UnknownAddress) (cciptypes.Bytes, error) {
-//	argType, err := abi.NewType("address", "", nil)
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	args := abi.Arguments{{Type: argType}}
-//	unpacked, err := args.Unpack(receiver)
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	return unpacked[0].([]byte), nil
-//}
-//
-//// TODO: doc
-//func (u *CTTPv2TokenDataObserver) getCctpV2TokenIndexes(
-//	sourceChain cciptypes.ChainSelector,
-//	message cciptypes.Message,
-//) []int {
-//	tokenIndexes := make([]int, 0)
-//	for i, tokenAmount := range message.TokenAmounts {
-//		if u.IsTokenSupported(sourceChain, tokenAmount) {
-//			tokenIndexes = append(tokenIndexes, i)
-//		}
-//	}
-//
-//	return tokenIndexes
-//}
-//
-//// TODO: doc
-//func (u *CTTPv2TokenDataObserver) getSourceDomainId(
-//	message cciptypes.Message,
-//	cctpV2TokenIndexes []int,
-//) (uint32, error) {
-//	if len(cctpV2TokenIndexes) == 0 {
-//		return 0, fmt.Errorf("getSourceDomainId was called with an empty cctpV2TokenIndexes")
-//	}
-//
-//	var sourceDomainId uint32
-//
-//	for _, tokenIndex := range cctpV2TokenIndexes {
-//		tokenAmount := message.TokenAmounts[tokenIndex]
-//		tokenData, err := reader.NewSourceTokenDataPayloadFromBytes(tokenAmount.ExtraData)
-//		if err != nil {
-//			return 0, fmt.Errorf("failed to decode token data at index %d, error: %w", tokenIndex, err)
-//		}
-//
-//		if sourceDomainId == 0 {
-//			sourceDomainId = tokenData.SourceDomain
-//		} else if sourceDomainId != tokenData.SourceDomain {
-//			// A message originates from a single source domain, so we should not have multiple source domain IDs
-//			return 0, fmt.Errorf(
-//				"multiple source domain IDs for two different CCTPv2 transfers found in the same CCIP message:"+
-//					"sourceDomainIDs %d and %d",
-//				sourceDomainId, tokenData.SourceDomain,
-//			)
-//		}
-//	}
-//
-//	if sourceDomainId == 0 {
-//		return 0, fmt.Errorf("no token data had a non-zero source domain ID")
-//	}
-//
-//	return sourceDomainId, nil
-//}
 
 type CCTPv2Response struct {
 	cctpMessages map[string]Message
 	err          error
 }
 
-func (u *CTTPv2TokenDataObserver) getTokenDataForSourceChain(
+func initMessageTokenData(message cciptypes.Message) exectypes.MessageTokenData {
+	result := make([]exectypes.TokenData, 0, len(message.TokenAmounts))
+	for range message.TokenAmounts {
+		result = append(result, exectypes.NotSupportedTokenData())
+	}
+	return exectypes.NewMessageTokenData(result...)
+}
+
+//type CCTPv2MessageOrError struct {
+//	message Message
+//	err     error
+//}
+//
+//func (c CCTPv2MessageOrError) TokenData(ctx context.Context, attestationEncoder AttestationEncoder) exectypes.TokenData {
+//	if c.err != nil {
+//		return exectypes.NewErrorTokenData(c.err)
+//	}
+//	return c.message.TokenData(ctx, attestationEncoder)
+//}
+//
+//func blah() {
+//	var attestationEncoder AttestationEncoder
+//	var ctx context.Context
+//	var ccipMessages map[cciptypes.SeqNum]cciptypes.Message
+//	var sourceTokenDataPayloads map[cciptypes.SeqNum]map[int]SourceTokenDataPayload
+//	// convert SourceTokenDataPayload to CCTPv2 Message
+//	var cctpV2Responses map[string]CCTPv2Response
+//	var matchedCCTPv2Messages map[cciptypes.SeqNum]map[int]CCTPv2MessageOrError
+//
+//	for seqNum, tokenPayloads := range sourceTokenDataPayloads {
+//		cctpV2Response := cctpV2Responses[ccipMessages[seqNum].Header.TxHash]
+//		for tokenIndex, sourceTokenData := range tokenPayloads {
+//			cctpMessageOrError := findAndConsumeCCTPv2Message(cctpV2Response, sourceTokenData)
+//			// TODO: enrich error
+//			matchedCCTPv2Messages[seqNum][tokenIndex] = cctpMessageOrError
+//		}
+//	}
+//
+//	// Convert CCTPv2 Message to TokenData
+//	var result map[cciptypes.SeqNum]exectypes.MessageTokenData
+//	for seqNum, ccipMessage := range ccipMessages {
+//		tokenDataList := make([]exectypes.TokenData, 0, len(ccipMessage.TokenAmounts))
+//		for tokenIndex := range ccipMessage.TokenAmounts {
+//			var tokenData exectypes.TokenData
+//			cctpMessageOrError, ok := matchedCCTPv2Messages[seqNum][tokenIndex]
+//			if !ok {
+//				tokenData = exectypes.NotSupportedTokenData()
+//			} else if cctpMessageOrError.err != nil {
+//				tokenData = exectypes.NewErrorTokenData(cctpMessageOrError.err)
+//			} else {
+//				tokenData = cctpMessageOrError.message.TokenData(ctx, attestationEncoder)
+//			}
+//
+//			tokenDataList = append(tokenDataList, tokenData)
+//		}
+//		result[seqNum] = exectypes.NewMessageTokenData(tokenDataList...)
+//	}
+//}
+//
+//func findAndConsumeCCTPv2Message(
+//	cctpV2Response CCTPv2Response,
+//	tokenPayload SourceTokenDataPayload,
+//) CCTPv2MessageOrError {
+//	return CCTPv2MessageOrError{}
+//}
+
+func (u *CCTPv2TokenDataObserver) getTokenDataForSourceChain(
 	ctx context.Context,
 	sourceChain cciptypes.ChainSelector,
 	attestationEncoder AttestationEncoder,
 	messages map[cciptypes.SeqNum]cciptypes.Message,
 ) map[cciptypes.SeqNum]exectypes.MessageTokenData {
 	result := make(map[cciptypes.SeqNum]exectypes.MessageTokenData)
+	for seqNum, message := range messages {
+		result[seqNum] = initMessageTokenData(message)
+	}
+
+	cctpV2EnabledTokenPoolAddress, ok := u.supportedPoolsBySelector[sourceChain]
+	if !ok {
+		return result
+	}
 
 	var seqNumToSourceTokenDataPayloads = make(map[cciptypes.SeqNum][]*SourceTokenDataPayload)
 	for seqNum, message := range messages {
-		seqNumToSourceTokenDataPayloads[seqNum] = u.getSourceTokenDataPayloads(sourceChain, message)
+		seqNumToSourceTokenDataPayloads[seqNum] =
+			getCCTPv2SourceTokenDataPayloads(cctpV2EnabledTokenPoolAddress, message)
 	}
-	// If >1 source domain IDs are found, return errored TokenData
-	// If no source domain ID is found, return empty TokenData
+
 	sourceDomainId, err := getSourceDomainId(sourceChain, seqNumToSourceTokenDataPayloads)
 	if err != nil {
-		// TODO: impl
+		// TODO: impl, convert non-nil sourceTokenDataPayloads to error TokenData, nil to NotSupportedTokenData
 	}
+
 	txHashes := mapset.NewSet[string]()
-	// Only add tx hashes that have CCTPv2 tokens
-	for _, message := range messages {
-		txHashes.Add(message.Header.TxHash)
+	// Only add tx hashes of messages that have CCTPv2 tokens
+	for seqNum, payloads := range seqNumToSourceTokenDataPayloads {
+		for _, payload := range payloads {
+			if payload != nil {
+				txHashes.Add(messages[seqNum].Header.TxHash)
+				break
+			}
+		}
 	}
 
 	// Only call this for tx hashes that have CCTPv2 tokens
 	responses := u.callCCTPv2API(ctx, sourceDomainId, txHashes)
 
-	// Now associate SourceTokenDataPayload with CCTPv2Message
 	for seqNum, sourceTokenDataPayloads := range seqNumToSourceTokenDataPayloads {
 		txHash := messages[seqNum].Header.TxHash
-		result[seqNum] = associate(ctx, attestationEncoder, sourceTokenDataPayloads, responses[txHash])
+		result[seqNum] = convertSourceTokenPayloadsToTokenData(ctx, messages[seqNum], attestationEncoder, sourceTokenDataPayloads, responses[txHash])
 	}
 
 	return result
 }
 
 // TODO: doc
-func (u *CTTPv2TokenDataObserver) callCCTPv2API(
+func (u *CCTPv2TokenDataObserver) callCCTPv2API(
 	ctx context.Context,
 	sourceDomainId uint32,
 	txHashes mapset.Set[string],
 ) map[string]CCTPv2Response {
+	// TODO: fix, this is actually txHash to Response
 	nonceToResponse := make(map[string]CCTPv2Response)
 	for txHash := range txHashes.Iter() {
 		cctpResponse, err := u.attestationClient.GetMessages(ctx, sourceDomainId, txHash)
@@ -427,7 +317,8 @@ func (u *CTTPv2TokenDataObserver) callCCTPv2API(
 	return nonceToResponse
 }
 
-// TODO: doc
+// getSourceDomainId returns the source domain ID for the provided source chain. All SourceTokenDataPayloads for the
+// given source chain must have the same source domain ID. If no SourceTokenDataPayloads are found for the
 func getSourceDomainId(
 	sourceChain cciptypes.ChainSelector,
 	seqNumToSourceTokenDataPayloads map[cciptypes.SeqNum][]*SourceTokenDataPayload,
@@ -458,45 +349,30 @@ func getSourceDomainId(
 	return sourceDomainId, nil
 }
 
-// TODO: doc
-func (u *CTTPv2TokenDataObserver) getSourceTokenDataPayloads(
-	sourceChain cciptypes.ChainSelector,
-	message cciptypes.Message,
-) []*SourceTokenDataPayload {
-	sourceTokenDataPayloads := make([]*SourceTokenDataPayload, 0, len(message.TokenAmounts))
-	for _, tokenAmount := range message.TokenAmounts {
-		sourceTokenDataPayload, err := u.getValidatedSourceTokenDataPayload(sourceChain, tokenAmount)
-		if err != nil {
-			sourceTokenDataPayloads = append(sourceTokenDataPayloads, nil)
-		} else {
-			sourceTokenDataPayloads = append(sourceTokenDataPayloads, sourceTokenDataPayload)
-		}
-	}
-
-	return sourceTokenDataPayloads
-}
-
-// TODO: better name, doc
-// handle cctpResponse.err != nil
-func associate(
+// Iterates over the provided sourceTokenDataPayloads and for each attempt to find a matching CCTPv2 message in the
+// provided cctpResponse. If a match is found, the corresponding TokenData is created using the CCTPv2 message.
+// Basically this function transforms SourceTokenDataPayload -> CTTPv2 Message -> TokenData
+func convertSourceTokenPayloadsToTokenData(
 	ctx context.Context,
+	message cciptypes.Message,
 	attestationEncoder AttestationEncoder,
 	sourceTokenDataPayloads []*SourceTokenDataPayload,
 	cctpResponse CCTPv2Response,
 ) exectypes.MessageTokenData {
 	result := make([]exectypes.TokenData, 0, len(sourceTokenDataPayloads))
-	for _, sourceTokenData := range sourceTokenDataPayloads {
+	for tokenIndex, sourceTokenData := range sourceTokenDataPayloads {
 		var tokenData exectypes.TokenData
 
 		if sourceTokenData == nil {
 			tokenData = exectypes.NotSupportedTokenData()
 		} else {
-			cctpMessage, err := findCctpMessage(sourceTokenData, cctpResponse)
+			cctpMessage, err := findCctpMessage(message, tokenIndex, sourceTokenData, cctpResponse)
 			if err != nil {
 				tokenData = exectypes.NewErrorTokenData(err)
 			} else {
 				tokenData = cctpMessage.TokenData(ctx, attestationEncoder)
-				// TODO: doc
+				// If a CCTPv2 message was found, we need to delete it from the cctpResponse to avoid
+				// reusing it for other SourceTokenDataPayloads.
 				delete(cctpResponse.cctpMessages, cctpMessage.EventNonce)
 			}
 		}
@@ -507,12 +383,18 @@ func associate(
 	return exectypes.NewMessageTokenData(result...)
 }
 
+// findCctpMessage searches for a matching CCTPv2 Message in cctpResponse based on the provided SourceTokenDataPayload
 func findCctpMessage(
+	ccipMessage cciptypes.Message,
+	tokenIndex int,
 	sourceTokenData *SourceTokenDataPayload,
 	cctpResponse CCTPv2Response,
 ) (Message, error) {
 	if cctpResponse.err != nil {
 		return Message{}, cctpResponse.err
+	}
+	if sourceTokenData == nil {
+		return Message{}, fmt.Errorf("sourceTokenData is nil")
 	}
 
 	for _, cctpMessage := range cctpResponse.cctpMessages {
@@ -521,67 +403,21 @@ func findCctpMessage(
 		}
 	}
 
-	return Message{}, nil
+	errMsg := fmt.Sprintf(
+		"A CCTPv2 USDC token transfer was made for message ID %s with token index %d, however, when fetching "+
+			"the CCTP v2 messages from the CCTPv2 HTTP API for the CCIP message's transaction hash %s and source "+
+			"domain ID %d, no CCTP v2 message was found that matches the CCIP token transfer. "+
+			"Either we incorrectly filtered out the associated CCTPv2 message in an earlier step (which is a bug), or "+
+			"the CCTP v2 API is not returning the expected message. Call the "+
+			"CCTP v2 API with sourceDomainID %d and transactionHash %s to verify if there is a message with fields: %v",
+		ccipMessage.Header.MessageID.String(), tokenIndex, ccipMessage.Header.TxHash, sourceTokenData.SourceDomain,
+		sourceTokenData.SourceDomain, ccipMessage.Header.TxHash, sourceTokenData,
+	)
+
+	return Message{}, fmt.Errorf(errMsg)
 }
 
-type SourceTokenDataPayload struct {
-	Nonce                uint64
-	SourceDomain         uint32
-	CCTPVersion          reader.CCTPVersion
-	Amount               cciptypes.BigInt
-	DestinationDomain    uint32
-	MintRecipient        cciptypes.Bytes32
-	BurnToken            cciptypes.Bytes32
-	DestinationCaller    cciptypes.Bytes32
-	MaxFee               cciptypes.BigInt
-	MinFinalityThreshold uint32
-}
-
-func DecodeSourceTokenDataPayload(data []byte) (*SourceTokenDataPayload, error) {
-	argTypes := abi.Arguments{
-		{Type: mustABIType("uint64")},
-		{Type: mustABIType("uint32")},
-		{Type: mustABIType("uint8")},
-		{Type: mustABIType("uint256")},
-		{Type: mustABIType("uint32")},
-		{Type: mustABIType("bytes32")},
-		{Type: mustABIType("bytes32")},
-		{Type: mustABIType("bytes32")},
-		{Type: mustABIType("uint256")},
-		{Type: mustABIType("uint32")},
-	}
-
-	vals, err := argTypes.Unpack(data)
-	if err != nil {
-		return nil, err
-	}
-	if len(vals) != 10 {
-		return nil, fmt.Errorf("unexpected number of unpacked values")
-	}
-
-	return &SourceTokenDataPayload{
-		Nonce:                vals[0].(uint64),
-		SourceDomain:         vals[1].(uint32),
-		CCTPVersion:          reader.CCTPVersion(vals[2].(uint8)),
-		Amount:               cciptypes.NewBigInt(vals[3].(*big.Int)),
-		DestinationDomain:    vals[4].(uint32),
-		MintRecipient:        vals[5].([32]byte),
-		BurnToken:            vals[6].([32]byte),
-		DestinationCaller:    vals[7].([32]byte),
-		MaxFee:               cciptypes.NewBigInt(vals[8].(*big.Int)),
-		MinFinalityThreshold: vals[9].(uint32),
-	}, nil
-}
-
-func mustABIType(t string) abi.Type {
-	typ, err := abi.NewType(t, "", nil)
-	if err != nil {
-		panic(err)
-	}
-	return typ
-}
-
-// TODO: doc, rename
+// matchesCctpMessage checks if the SourceTokenDataPayload matches the provided CCTPv2 Message.
 func (s *SourceTokenDataPayload) matchesCctpMessage(
 	cctpMessage Message,
 ) bool {
@@ -605,6 +441,7 @@ func (s *SourceTokenDataPayload) matchesCctpMessage(
 		return false
 	}
 
+	// MaxFee is optional
 	if cctpMessage.DecodedMessage.DecodedMessageBody.MaxFee != "" &&
 		s.MaxFee.String() != cctpMessage.DecodedMessage.DecodedMessageBody.MaxFee {
 		return false
@@ -625,7 +462,10 @@ func (s *SourceTokenDataPayload) matchesCctpMessage(
 	return true
 }
 
-// TODO: doc, rename
+// addressMatch returns true if the provided cctpAddress matches the right-aligned bytes of sourceAddress
+// This is needed because the address returned by the CCTP v2 API is not padded (e.g. EVM addresses will be 20 bytes,
+// Solana addresses will be 32 bytes, etc) however sourceAddress is always 32 bytes, and for EVM addresses (which are
+// 20 bytes) the leftmost 12 bytes will be zero due to ABI encoding.
 func addressMatch(cctpAddress string, sourceAddress cciptypes.Bytes32) bool {
 	cctpAddressBytes, err := hex.DecodeString(strings.TrimPrefix(cctpAddress, "0x"))
 	if err != nil {

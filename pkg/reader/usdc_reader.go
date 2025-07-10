@@ -343,9 +343,9 @@ func (u evmUSDCMessageReader) recreateMessageTransmitterEvents(
 type CCTPVersion uint8
 
 const (
-	CttpUnknownVersion CCTPVersion = iota
-	CttpVersion1
-	CttpVersion2
+	CctpUnknownVersion CCTPVersion = iota
+	CctpVersion1
+	CctpVersion2
 )
 
 // SourceTokenDataPayload extracts the nonce and source domain from the USDC message.
@@ -361,7 +361,7 @@ func NewSourceTokenDataPayload(nonce uint64, sourceDomain uint32) *SourceTokenDa
 	return &SourceTokenDataPayload{
 		Nonce:        nonce,
 		SourceDomain: sourceDomain,
-		CCTPVersion:  CttpUnknownVersion,
+		CCTPVersion:  CctpUnknownVersion,
 	}
 }
 
@@ -377,7 +377,7 @@ func NewSourceTokenDataPayloadFromBytes(extraData cciptypes.Bytes) (*SourceToken
 	// Extract the sourceDomain (next 4 bytes), padded to 32 bytes
 	sourceDomain := binary.BigEndian.Uint32(extraData[60:64])
 
-	cctpVersion := CttpUnknownVersion
+	cctpVersion := CctpUnknownVersion
 	if len(extraData) >= 96 {
 		// Extract the CCTP version (next 1 byte), padded to 32 bytes
 		cctpVersion = CCTPVersion(extraData[95])
