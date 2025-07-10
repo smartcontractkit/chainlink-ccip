@@ -65,4 +65,25 @@ contract OffRampOverSuperchainInterop_constructor is OffRampOverSuperchainIntero
     );
     assertEq(dynamicConfig.messageInterceptor, retrievedDynamicConfig.messageInterceptor);
   }
+
+  // Reverts
+
+  function test_constructor_RevertWhen_InvalidCrossL2Inbox() public {
+    OffRamp.StaticConfig memory staticConfig = OffRamp.StaticConfig({
+      chainSelector: DEST_CHAIN_SELECTOR,
+      gasForCallExactCheck: GAS_FOR_CALL_EXACT_CHECK,
+      rmnRemote: s_mockRMNRemote,
+      tokenAdminRegistry: address(s_tokenAdminRegistry),
+      nonceManager: address(s_inboundNonceManager)
+    });
+
+    vm.expectRevert(abi.encodeWithSelector(OffRampOverSuperchainInterop.InvalidCrossL2Inbox.selector, address(0)));
+    new OffRampOverSuperchainInterop(
+      staticConfig,
+      _generateDynamicOffRampConfig(address(s_feeQuoter)),
+      new OffRamp.SourceChainConfigArgs[](0),
+      address(0), // Invalid crossL2Inbox
+      new OffRampOverSuperchainInterop.ChainSelectorToChainIdConfigArgs[](0)
+    );
+  }
 }
