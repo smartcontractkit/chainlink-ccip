@@ -1,23 +1,19 @@
 package v2
 
 import (
-	"bytes"
-	"encoding/hex"
-	"math/big"
-	"reflect"
-	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
-const sourceTokenDataPayloadHex = "0x" +
+const sourceTokenDataPayloadHexV2 = "0x" +
 	"000000000000000000000000000000000000000000000000000000000000007b" + // uint64  nonce
 	"000000000000000000000000000000000000000000000000000000000000006f" + // uint32  sourceDomain
-	"0000000000000000000000000000000000000000000000000000000000000001" + // uint8   cctpVersion
+	"0000000000000000000000000000000000000000000000000000000000000002" + // uint8   cctpVersion (2 for CctpVersion2)
 	"00000000000000000000000000000000000000000000000000000000000003e8" + // uint256 amount
 	"0000000000000000000000000000000000000000000000000000000012345678" + // uint32  destinationDomain
 	"0000000000000000000000001234567890abcdef1234567890abcdef12345678" + // bytes32 mintRecipient
@@ -26,302 +22,373 @@ const sourceTokenDataPayloadHex = "0x" +
 	"0000000000000000000000000000000000000000000000000000000000000032" + // uint256 maxFee
 	"0000000000000000000000000000000000000000000000000000000000000005" // uint32  minFinalityThreshold
 
-func TestDecodeSourceTokenDataPayload(t *testing.T) {
+var sourceTokenDataPayload = SourceTokenDataPayload{
+	Nonce:                123,
+	SourceDomain:         111,
+	CCTPVersion:          reader.CctpVersion2,
+	Amount:               cciptypes.NewBigIntFromInt64(1000),
+	DestinationDomain:    0x12345678,
+	MintRecipient:        mustBytes32("0x0000000000000000000000001234567890abcdef1234567890abcdef12345678"),
+	BurnToken:            mustBytes32("0x2222222222222222222222222222222222222222222222222222222222222222"),
+	DestinationCaller:    mustBytes32("0x3333333333333333333333333333333333333333333333333333333333333333"),
+	MaxFee:               cciptypes.NewBigIntFromInt64(50),
+	MinFinalityThreshold: 5,
+}
+
+func TestGetSourceDomainID(t *testing.T) {
 	tests := []struct {
-		name      string
-		bytes     []byte
-		expectErr bool
-		expected  *SourceTokenDataPayload
+		name                            string
+		sourceChain                     cciptypes.ChainSelector
+		seqNumToSourceTokenDataPayloads map[cciptypes.SeqNum]map[int]SourceTokenDataPayload
+		expectedSourceDomainID          uint32
+		expectError                     bool
 	}{
 		{
-			name:      "Decode valid payload",
-			bytes:     mustBytes(sourceTokenDataPayloadHex),
-			expectErr: false,
-			expected: &SourceTokenDataPayload{
-				Nonce:                123,
-				SourceDomain:         111,
-				CCTPVersion:          reader.CCTPVersion(1),
-				Amount:               cciptypes.NewBigInt(big.NewInt(1000)),
-				DestinationDomain:    0x12345678,
-				MintRecipient:        mustBytes32("0x0000000000000000000000001234567890abcdef1234567890abcdef12345678"),
-				BurnToken:            mustBytes32("0x2222222222222222222222222222222222222222222222222222222222222222"),
-				DestinationCaller:    mustBytes32("0x3333333333333333333333333333333333333333333333333333333333333333"),
-				MaxFee:               cciptypes.NewBigInt(big.NewInt(50)),
-				MinFinalityThreshold: 5,
+			name:        "single sequence number with single token - valid",
+			sourceChain: cciptypes.ChainSelector(1),
+			seqNumToSourceTokenDataPayloads: map[cciptypes.SeqNum]map[int]SourceTokenDataPayload{
+				1: {
+					0: {SourceDomain: 123},
+				},
 			},
+			expectedSourceDomainID: 123,
+			expectError:            false,
 		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			got, err := DecodeSourceTokenDataPayload(tc.bytes)
-			if tc.expectErr {
-				if err == nil {
-					t.Fatalf("expected error, got nil")
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("failed to decode SourceTokenDataPayload: %v", err)
-			}
-
-			// compare scalar fields
-			if got.Nonce != tc.expected.Nonce ||
-				got.SourceDomain != tc.expected.SourceDomain ||
-				got.DestinationDomain != tc.expected.DestinationDomain ||
-				got.MinFinalityThreshold != tc.expected.MinFinalityThreshold ||
-				uint8(got.CCTPVersion) != uint8(tc.expected.CCTPVersion) {
-				t.Fatalf("scalar fields mismatch\nwant %+v\ngot  %+v", tc.expected, got)
-			}
-
-			// compare big.Int-wrapped values via String()
-			if got.Amount.String() != tc.expected.Amount.String() ||
-				got.MaxFee.String() != tc.expected.MaxFee.String() {
-				t.Fatalf("big.Int fields mismatch\nwant %v / %v\ngot  %v / %v",
-					tc.expected.Amount, tc.expected.MaxFee, got.Amount, got.MaxFee)
-			}
-
-			// compare bytes32
-			if !bytes.Equal(got.MintRecipient[:], tc.expected.MintRecipient[:]) ||
-				!bytes.Equal(got.BurnToken[:], tc.expected.BurnToken[:]) ||
-				!bytes.Equal(got.DestinationCaller[:], tc.expected.DestinationCaller[:]) {
-				t.Fatalf("bytes32 fields mismatch\nwant %+v\ngot  %+v", tc.expected, got)
-			}
-
-			// fall-back reflect check to catch anything missed
-			if !reflect.DeepEqual(got, tc.expected) {
-				t.Fatalf("DecodeSourceTokenDataPayload mismatch\nwant %+v\ngot  %+v", tc.expected, got)
-			}
-		})
-	}
-}
-
-// mustBytes32 converts a 0x-prefixed hex string to a [32]byte.
-func mustBytes32(h string) (out [32]byte) {
-	b, err := hex.DecodeString(strings.TrimPrefix(h, "0x"))
-	if err != nil {
-		panic(err)
-	}
-	copy(out[32-len(b):], b) // right-align like EVM abi-encoding
-	return
-}
-
-func mustBytes(h string) []byte {
-	b, err := hex.DecodeString(strings.TrimPrefix(h, "0x"))
-	if err != nil {
-		panic(err)
-	}
-	return b
-}
-
-func happyPathPayload() SourceTokenDataPayload {
-	return SourceTokenDataPayload{
-		CCTPVersion:          1,
-		SourceDomain:         111,
-		DestinationDomain:    222,
-		MinFinalityThreshold: 5,
-		Amount:               cciptypes.NewBigIntFromInt64(1_000),
-		MaxFee:               cciptypes.NewBigIntFromInt64(10),
-		BurnToken:            mustBytes32("0x1111"),
-		MintRecipient:        mustBytes32("0x2222"),
-		DestinationCaller:    mustBytes32("0x3333"),
-	}
-}
-
-func happyPathMessage() Message {
-	return Message{
-		CCTPVersion: 1,
-		DecodedMessage: DecodedMessage{
-			SourceDomain:         "111",
-			DestinationDomain:    "222",
-			MinFinalityThreshold: "5",
-			DestinationCaller:    "0x3333",
-			DecodedMessageBody: DecodedMessageBody{
-				BurnToken:     "0x1111",
-				MintRecipient: "0x2222",
-				Amount:        "1000",
-				MaxFee:        "10",
+		{
+			name:        "single sequence number with multiple tokens - same domain",
+			sourceChain: cciptypes.ChainSelector(1),
+			seqNumToSourceTokenDataPayloads: map[cciptypes.SeqNum]map[int]SourceTokenDataPayload{
+				1: {
+					0: {SourceDomain: 123},
+					1: {SourceDomain: 123},
+					2: {SourceDomain: 123},
+				},
 			},
-		},
-	}
-}
-
-func TestMatchesCctpMessage(t *testing.T) {
-	tests := []struct {
-		name   string
-		mutate func(*SourceTokenDataPayload, *Message) // introduce mismatch
-		wantOK bool
-	}{
-		{
-			name:   "all fields match (happy path)",
-			mutate: nil,
-			wantOK: true,
+			expectedSourceDomainID: 123,
+			expectError:            false,
 		},
 		{
-			name: "CCTP version mismatch",
-			mutate: func(p *SourceTokenDataPayload, m *Message) {
-				p.CCTPVersion = 2
+			name:        "multiple sequence numbers with single tokens - same domain",
+			sourceChain: cciptypes.ChainSelector(1),
+			seqNumToSourceTokenDataPayloads: map[cciptypes.SeqNum]map[int]SourceTokenDataPayload{
+				1: {
+					0: {SourceDomain: 456},
+				},
+				2: {
+					0: {SourceDomain: 456},
+				},
+				3: {
+					0: {SourceDomain: 456},
+				},
 			},
-			wantOK: false,
+			expectedSourceDomainID: 456,
+			expectError:            false,
 		},
 		{
-			name: "source domain mismatch",
-			mutate: func(p *SourceTokenDataPayload, m *Message) {
-				m.DecodedMessage.SourceDomain = "999"
+			name:        "multiple sequence numbers with multiple tokens - same domain",
+			sourceChain: cciptypes.ChainSelector(1),
+			seqNumToSourceTokenDataPayloads: map[cciptypes.SeqNum]map[int]SourceTokenDataPayload{
+				1: {
+					0: {SourceDomain: 789},
+					1: {SourceDomain: 789},
+				},
+				2: {
+					0: {SourceDomain: 789},
+					1: {SourceDomain: 789},
+					2: {SourceDomain: 789},
+				},
+				3: {
+					0: {SourceDomain: 789},
+				},
 			},
-			wantOK: false,
+			expectedSourceDomainID: 789,
+			expectError:            false,
 		},
 		{
-			name: "destination domain mismatch",
-			mutate: func(p *SourceTokenDataPayload, m *Message) {
-				p.DestinationDomain = 888
+			name:        "single sequence number with multiple tokens - different domains",
+			sourceChain: cciptypes.ChainSelector(1),
+			seqNumToSourceTokenDataPayloads: map[cciptypes.SeqNum]map[int]SourceTokenDataPayload{
+				1: {
+					0: {SourceDomain: 123},
+					1: {SourceDomain: 456},
+				},
 			},
-			wantOK: false,
+			expectedSourceDomainID: 0,
+			expectError:            true,
 		},
 		{
-			name: "min-finality mismatch (field present)",
-			mutate: func(p *SourceTokenDataPayload, m *Message) {
-				m.DecodedMessage.MinFinalityThreshold = "42"
+			name:        "multiple sequence numbers - different domains",
+			sourceChain: cciptypes.ChainSelector(1),
+			seqNumToSourceTokenDataPayloads: map[cciptypes.SeqNum]map[int]SourceTokenDataPayload{
+				1: {
+					0: {SourceDomain: 123},
+				},
+				2: {
+					0: {SourceDomain: 456},
+				},
 			},
-			wantOK: false,
+			expectedSourceDomainID: 0,
+			expectError:            true,
 		},
 		{
-			name: "min-finality absent on message (should still match)",
-			mutate: func(p *SourceTokenDataPayload, m *Message) {
-				m.DecodedMessage.MinFinalityThreshold = ""
+			name:        "mixed tokens with different domains in different sequences",
+			sourceChain: cciptypes.ChainSelector(1),
+			seqNumToSourceTokenDataPayloads: map[cciptypes.SeqNum]map[int]SourceTokenDataPayload{
+				1: {
+					0: {SourceDomain: 123},
+					1: {SourceDomain: 123},
+				},
+				2: {
+					0: {SourceDomain: 456},
+				},
 			},
-			wantOK: true,
+			expectedSourceDomainID: 0,
+			expectError:            true,
 		},
 		{
-			name: "amount mismatch",
-			mutate: func(p *SourceTokenDataPayload, m *Message) {
-				m.DecodedMessage.DecodedMessageBody.Amount = "999"
+			name:                            "empty source token data payloads",
+			sourceChain:                     cciptypes.ChainSelector(1),
+			seqNumToSourceTokenDataPayloads: map[cciptypes.SeqNum]map[int]SourceTokenDataPayload{},
+			expectedSourceDomainID:          0,
+			expectError:                     true,
+		},
+		{
+			name:                            "nil source token data payloads",
+			sourceChain:                     cciptypes.ChainSelector(1),
+			seqNumToSourceTokenDataPayloads: nil,
+			expectedSourceDomainID:          0,
+			expectError:                     true,
+		},
+		{
+			name:        "sequence numbers with empty token maps",
+			sourceChain: cciptypes.ChainSelector(1),
+			seqNumToSourceTokenDataPayloads: map[cciptypes.SeqNum]map[int]SourceTokenDataPayload{
+				1: {},
+				2: {},
 			},
-			wantOK: false,
+			expectedSourceDomainID: 0,
+			expectError:            true,
 		},
 		{
-			name: "max-fee mismatch (field present)",
-			mutate: func(p *SourceTokenDataPayload, m *Message) {
-				p.MaxFee = cciptypes.NewBigIntFromInt64(55)
+			name:        "mixed empty and non-empty token maps",
+			sourceChain: cciptypes.ChainSelector(1),
+			seqNumToSourceTokenDataPayloads: map[cciptypes.SeqNum]map[int]SourceTokenDataPayload{
+				1: {},
+				2: {
+					0: {SourceDomain: 999},
+				},
 			},
-			wantOK: false,
+			expectedSourceDomainID: 999,
+			expectError:            false,
 		},
 		{
-			name: "max-fee absent on message (should still match)",
-			mutate: func(p *SourceTokenDataPayload, m *Message) {
-				m.DecodedMessage.DecodedMessageBody.MaxFee = ""
+			name:        "zero domain ID should be valid",
+			sourceChain: cciptypes.ChainSelector(1),
+			seqNumToSourceTokenDataPayloads: map[cciptypes.SeqNum]map[int]SourceTokenDataPayload{
+				1: {
+					0: {SourceDomain: 0},
+				},
 			},
-			wantOK: true,
+			expectedSourceDomainID: 0,
+			expectError:            false,
 		},
 		{
-			name: "destination caller mismatch",
-			mutate: func(p *SourceTokenDataPayload, m *Message) {
-				m.DecodedMessage.DestinationCaller = "0xdeadbeef"
+			name:        "error occurs at first conflicting sequence number",
+			sourceChain: cciptypes.ChainSelector(1),
+			seqNumToSourceTokenDataPayloads: map[cciptypes.SeqNum]map[int]SourceTokenDataPayload{
+				5: {
+					0: {SourceDomain: 100},
+				},
+				3: {
+					0: {SourceDomain: 200}, // This will cause error when processed
+				},
+				1: {
+					0: {SourceDomain: 100},
+				},
 			},
-			wantOK: false,
-		},
-		{
-			name: "burn token mismatch",
-			mutate: func(p *SourceTokenDataPayload, m *Message) {
-				m.DecodedMessage.DecodedMessageBody.BurnToken = "0x9999"
-			},
-			wantOK: false,
-		},
-		{
-			name: "mint recipient mismatch",
-			mutate: func(p *SourceTokenDataPayload, m *Message) {
-				p.MintRecipient = mustBytes32("0xAAAA")
-			},
-			wantOK: false,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			p := happyPathPayload()
-			m := happyPathMessage()
-			if tc.mutate != nil {
-				tc.mutate(&p, &m)
-			}
-			got := p.matchesCctpMessage(m)
-			if got != tc.wantOK {
-				t.Fatalf("expected %v, got %v", tc.wantOK, got)
-			}
-		})
-	}
-}
-
-func TestAddressMatch(t *testing.T) {
-	tests := []struct {
-		name          string
-		cctpAddress   string
-		sourceAddress cciptypes.Bytes32
-		expectMatch   bool
-	}{
-		{
-			name:        "Exact match (20-byte address)",
-			cctpAddress: "0x8fe6b999dc680ccfdd5bf7eb0974218be2542daa",
-			sourceAddress: func() cciptypes.Bytes32 {
-				var b cciptypes.Bytes32
-				addr, _ := hex.DecodeString("0000000000000000000000008fe6b999dc680ccfdd5bf7eb0974218be2542daa")
-				copy(b[:], addr)
-				return b
-			}(),
-			expectMatch: true,
-		},
-		{
-			name:        "Exact match (32-byte address)",
-			cctpAddress: "0x111122223333444455556666777788889999aaaabbbbccccddddeeeeffff0000",
-			sourceAddress: func() cciptypes.Bytes32 {
-				var b cciptypes.Bytes32
-				addr, _ := hex.DecodeString("111122223333444455556666777788889999aaaabbbbccccddddeeeeffff0000")
-				copy(b[:], addr)
-				return b
-			}(),
-			expectMatch: true,
-		},
-		{
-			name:        "Mismatch address",
-			cctpAddress: "0x1111111111111111111111111111111111111111",
-			sourceAddress: func() cciptypes.Bytes32 {
-				var b cciptypes.Bytes32
-				addr, _ := hex.DecodeString("8fe6b999dc680ccfdd5bf7eb0974218be2542daa")
-				copy(b[12:], addr)
-				return b
-			}(),
-			expectMatch: false,
-		},
-		{
-			name:          "Too long address (>32 bytes)",
-			cctpAddress:   "0x" + strings.Repeat("aa", 33),
-			sourceAddress: cciptypes.Bytes32{},
-			expectMatch:   false,
-		},
-		{
-			name:          "Malformed hex",
-			cctpAddress:   "0x8fe6b999dc680ccfzzzzzzzz",
-			sourceAddress: cciptypes.Bytes32{},
-			expectMatch:   false,
-		},
-		{
-			name:        "Shorter byte slice match (e.g. last 4 bytes)",
-			cctpAddress: "0xdeadbeef",
-			sourceAddress: func() cciptypes.Bytes32 {
-				var b cciptypes.Bytes32
-				b[28] = 0xde
-				b[29] = 0xad
-				b[30] = 0xbe
-				b[31] = 0xef
-				return b
-			}(),
-			expectMatch: true,
+			expectedSourceDomainID: 0,
+			expectError:            true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := addressMatch(tt.cctpAddress, tt.sourceAddress)
-			require.Equal(t, tt.expectMatch, got)
+			sourceDomainID, err := getSourceDomainID(tt.sourceChain, tt.seqNumToSourceTokenDataPayloads)
+
+			if tt.expectError {
+				require.Error(t, err)
+				assert.Equal(t, uint32(0), sourceDomainID)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.expectedSourceDomainID, sourceDomainID)
+			}
+		})
+	}
+}
+
+func TestGetSourceTokenDataPayloads(t *testing.T) {
+	cctpV2SourcePoolAddress, _ := cciptypes.NewUnknownAddressFromHex("0x1234567890abcdef1234567890abcdef12345678")
+	unknownSourcePoolAddress1, _ := cciptypes.NewUnknownAddressFromHex("0x9999999999999999999999999999999999999999")
+	unknownSourcePoolAddress2, _ := cciptypes.NewUnknownAddressFromHex("0x8888888888888888888888888888888888888888")
+
+	tests := []struct {
+		name                          string
+		ccipMessage                   cciptypes.Message
+		cctpV2EnabledTokenPoolAddress string
+		expectedResults               map[int]SourceTokenDataPayload
+		expectedMapSize               int
+	}{
+		{
+			name: "single valid CCTP v2 token",
+			ccipMessage: cciptypes.Message{
+				TokenAmounts: []cciptypes.RampTokenAmount{
+					{
+						SourcePoolAddress: cctpV2SourcePoolAddress,
+						ExtraData:         mustBytes(sourceTokenDataPayloadHexV2),
+					},
+				},
+			},
+			cctpV2EnabledTokenPoolAddress: "0x1234567890abcdef1234567890abcdef12345678",
+			expectedResults: map[int]SourceTokenDataPayload{
+				0: sourceTokenDataPayload,
+			},
+			expectedMapSize: 1,
+		},
+		{
+			name: "multiple valid CCTP v2 tokens",
+			ccipMessage: cciptypes.Message{
+				TokenAmounts: []cciptypes.RampTokenAmount{
+					{
+						SourcePoolAddress: cctpV2SourcePoolAddress,
+						ExtraData:         mustBytes(sourceTokenDataPayloadHexV2),
+					},
+					{
+						SourcePoolAddress: cctpV2SourcePoolAddress,
+						ExtraData:         mustBytes(sourceTokenDataPayloadHexV2),
+					},
+				},
+			},
+			cctpV2EnabledTokenPoolAddress: "0x1234567890abcdef1234567890abcdef12345678",
+			expectedResults: map[int]SourceTokenDataPayload{
+				0: sourceTokenDataPayload,
+				1: sourceTokenDataPayload,
+			},
+			expectedMapSize: 2,
+		},
+		{
+			name: "mix of valid and invalid tokens - wrong pool address",
+			ccipMessage: cciptypes.Message{
+				TokenAmounts: []cciptypes.RampTokenAmount{
+					{
+						SourcePoolAddress: cctpV2SourcePoolAddress,
+						ExtraData:         mustBytes(sourceTokenDataPayloadHexV2),
+					},
+					{
+						SourcePoolAddress: unknownSourcePoolAddress1,
+						ExtraData:         mustBytes(sourceTokenDataPayloadHexV2),
+					},
+					{
+						SourcePoolAddress: cctpV2SourcePoolAddress,
+						ExtraData:         mustBytes(sourceTokenDataPayloadHexV2),
+					},
+				},
+			},
+			cctpV2EnabledTokenPoolAddress: "0x1234567890abcdef1234567890abcdef12345678",
+			expectedResults: map[int]SourceTokenDataPayload{
+				0: sourceTokenDataPayload,
+				2: sourceTokenDataPayload,
+			},
+			expectedMapSize: 2,
+		},
+		{
+			name: "mix of valid and invalid tokens - invalid ExtraData",
+			ccipMessage: cciptypes.Message{
+				TokenAmounts: []cciptypes.RampTokenAmount{
+					{
+						SourcePoolAddress: cctpV2SourcePoolAddress,
+						ExtraData:         mustBytes(sourceTokenDataPayloadHexV2),
+					},
+					{
+						SourcePoolAddress: cctpV2SourcePoolAddress,
+						ExtraData:         []byte("invalid data"), // Invalid ExtraData
+					},
+				},
+			},
+			cctpV2EnabledTokenPoolAddress: "0x1234567890abcdef1234567890abcdef12345678",
+			expectedResults: map[int]SourceTokenDataPayload{
+				0: sourceTokenDataPayload,
+			},
+			expectedMapSize: 1, // Only the first token should be included
+		},
+		{
+			name: "empty token amounts",
+			ccipMessage: cciptypes.Message{
+				TokenAmounts: []cciptypes.RampTokenAmount{},
+			},
+			cctpV2EnabledTokenPoolAddress: "0x1234567890abcdef1234567890abcdef12345678",
+			expectedResults:               map[int]SourceTokenDataPayload{},
+			expectedMapSize:               0,
+		},
+		{
+			name: "no valid CCTP v2 tokens - all wrong pool addresses",
+			ccipMessage: cciptypes.Message{
+				TokenAmounts: []cciptypes.RampTokenAmount{
+					{
+						SourcePoolAddress: unknownSourcePoolAddress1,
+						ExtraData:         mustBytes(sourceTokenDataPayloadHexV2),
+					},
+					{
+						SourcePoolAddress: unknownSourcePoolAddress2,
+						ExtraData:         mustBytes(sourceTokenDataPayloadHexV2),
+					},
+				},
+			},
+			cctpV2EnabledTokenPoolAddress: "0x1234567890abcdef1234567890abcdef12345678",
+			expectedResults:               map[int]SourceTokenDataPayload{},
+			expectedMapSize:               0,
+		},
+		{
+			name: "case insensitive pool address matching",
+			ccipMessage: cciptypes.Message{
+				TokenAmounts: []cciptypes.RampTokenAmount{
+					{
+						SourcePoolAddress: cctpV2SourcePoolAddress,
+						ExtraData:         mustBytes(sourceTokenDataPayloadHexV2),
+					},
+				},
+			},
+			cctpV2EnabledTokenPoolAddress: "0x1234567890ABCDEF1234567890ABCDEF12345678", // Uppercase
+			expectedResults: map[int]SourceTokenDataPayload{
+				0: sourceTokenDataPayload,
+			},
+			expectedMapSize: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := getSourceTokenDataPayloads(tt.ccipMessage, tt.cctpV2EnabledTokenPoolAddress)
+
+			// Check map size
+			assert.Equal(t, tt.expectedMapSize, len(result), "Map size mismatch")
+
+			// Check each expected result
+			for expectedIndex, expectedPayload := range tt.expectedResults {
+				actualPayload, exists := result[expectedIndex]
+				require.True(t, exists, "Expected payload at index %d not found", expectedIndex)
+
+				// Compare all fields
+				assert.Equal(t, expectedPayload.Nonce, actualPayload.Nonce, "Nonce mismatch at index %d", expectedIndex)
+				assert.Equal(t, expectedPayload.SourceDomain, actualPayload.SourceDomain, "SourceDomain mismatch at index %d", expectedIndex)
+				assert.Equal(t, expectedPayload.CCTPVersion, actualPayload.CCTPVersion, "CCTPVersion mismatch at index %d", expectedIndex)
+				assert.Equal(t, expectedPayload.Amount.String(), actualPayload.Amount.String(), "Amount mismatch at index %d", expectedIndex)
+				assert.Equal(t, expectedPayload.DestinationDomain, actualPayload.DestinationDomain, "DestinationDomain mismatch at index %d", expectedIndex)
+				assert.Equal(t, expectedPayload.MintRecipient, actualPayload.MintRecipient, "MintRecipient mismatch at index %d", expectedIndex)
+				assert.Equal(t, expectedPayload.BurnToken, actualPayload.BurnToken, "BurnToken mismatch at index %d", expectedIndex)
+				assert.Equal(t, expectedPayload.DestinationCaller, actualPayload.DestinationCaller, "DestinationCaller mismatch at index %d", expectedIndex)
+				assert.Equal(t, expectedPayload.MaxFee.String(), actualPayload.MaxFee.String(), "MaxFee mismatch at index %d", expectedIndex)
+				assert.Equal(t, expectedPayload.MinFinalityThreshold, actualPayload.MinFinalityThreshold, "MinFinalityThreshold mismatch at index %d", expectedIndex)
+			}
 		})
 	}
 }

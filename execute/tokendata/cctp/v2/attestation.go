@@ -13,8 +13,9 @@ import (
 )
 
 const (
-	apiVersionV2 = "v2"
-	messagesPath = "messages"
+	apiVersionV2                     = "v2"
+	messagesPath                     = "messages"
+	attestationStatusComplete string = "complete"
 )
 
 type CCTPv2AttestationClient struct {

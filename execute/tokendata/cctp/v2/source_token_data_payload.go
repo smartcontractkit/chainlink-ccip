@@ -1,6 +1,8 @@
 package v2
 
 import (
+	"bytes"
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"strings"
@@ -25,24 +27,66 @@ type SourceTokenDataPayload struct {
 	MinFinalityThreshold uint32             `abi:"minFinalityThreshold"`
 }
 
-// Returns a list of SourceTokenDataPayloads for the provided message. The length of the returned list is equal to
-// the number of tokens in the message. If a token is not supported or cannot be decoded, the corresponding entry
-// in the returned list will be nil.
-func getCCTPv2SourceTokenDataPayloads(
-	cctpV2EnabledTokenPoolAddress string,
-	message cciptypes.Message,
-) []*SourceTokenDataPayload {
-	sourceTokenDataPayloads := make([]*SourceTokenDataPayload, 0, len(message.TokenAmounts))
-	for _, tokenAmount := range message.TokenAmounts {
-		sourceTokenDataPayload, err := getCCTPv2SourceTokenDataPayload(cctpV2EnabledTokenPoolAddress, tokenAmount)
-		if err != nil {
-			sourceTokenDataPayloads = append(sourceTokenDataPayloads, nil)
-		} else {
-			sourceTokenDataPayloads = append(sourceTokenDataPayloads, sourceTokenDataPayload)
-		}
+// matchesCctpMessage checks if the SourceTokenDataPayload matches the provided CCTPv2 Message.
+func matchesCctpMessage(
+	s SourceTokenDataPayload,
+	m Message,
+) bool {
+	if int(s.CCTPVersion) != m.CCTPVersion {
+		return false
+	}
+	if fmt.Sprintf("%d", s.SourceDomain) != m.DecodedMessage.SourceDomain {
+		return false
+	}
+	if fmt.Sprintf("%d", s.DestinationDomain) != m.DecodedMessage.DestinationDomain {
+		return false
 	}
 
-	return sourceTokenDataPayloads
+	// MinFinalityThreshold is optional
+	if m.DecodedMessage.MinFinalityThreshold != "" &&
+		fmt.Sprintf("%d", s.MinFinalityThreshold) != m.DecodedMessage.MinFinalityThreshold {
+		return false
+	}
+
+	if s.Amount.String() != m.DecodedMessage.DecodedMessageBody.Amount {
+		return false
+	}
+
+	// MaxFee is optional
+	if m.DecodedMessage.DecodedMessageBody.MaxFee != "" &&
+		s.MaxFee.String() != m.DecodedMessage.DecodedMessageBody.MaxFee {
+		return false
+	}
+
+	if !addressMatch(m.DecodedMessage.DestinationCaller, s.DestinationCaller) {
+		return false
+	}
+
+	if !addressMatch(m.DecodedMessage.DecodedMessageBody.BurnToken, s.BurnToken) {
+		return false
+	}
+
+	if !addressMatch(m.DecodedMessage.DecodedMessageBody.MintRecipient, s.MintRecipient) {
+		return false
+	}
+
+	return true
+}
+
+// addressMatch returns true if the provided cctpAddress matches the right-aligned bytes of sourceAddress
+// This is needed because the address returned by the CCTP v2 API is not padded (e.g. EVM addresses will be 20 bytes,
+// Solana addresses will be 32 bytes, etc) however sourceAddress is always 32 bytes, and for EVM addresses (which are
+// 20 bytes) the leftmost 12 bytes will be zero due to ABI encoding.
+func addressMatch(cctpAddress string, sourceAddress cciptypes.Bytes32) bool {
+	cctpAddressBytes, err := hex.DecodeString(strings.TrimPrefix(cctpAddress, "0x"))
+	if err != nil {
+		return false
+	}
+	if len(cctpAddressBytes) > 32 {
+		return false
+	}
+
+	return bytes.Equal(sourceAddress[32-len(cctpAddressBytes):], cctpAddressBytes)
 }
 
 // TODO: doc
