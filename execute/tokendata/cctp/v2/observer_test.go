@@ -1249,31 +1249,31 @@ func (m *mockAttestationEncoder) Encode(_ context.Context, messageData, attestat
 	return append(messageData, attestationData...), nil
 }
 
-func TestConvertCCTPv2MessagesToMessageTokenData(t *testing.T) {
-	ctx := context.Background()
-
-	// Helper to create CCIP message with specific number of tokens
-	createCCIPMessageWithTokens := func(seqNum cciptypes.SeqNum, txHash string, tokenCount int) cciptypes.Message {
-		tokenAmounts := make([]cciptypes.RampTokenAmount, tokenCount)
-		sourcePoolAddress, _ := cciptypes.NewUnknownAddressFromHex("0x1111111111111111111111111111111111111111")
-		destTokenAddress, _ := cciptypes.NewUnknownAddressFromHex("0x2222222222222222222222222222222222222222")
-		for i := 0; i < tokenCount; i++ {
-			tokenAmounts[i] = cciptypes.RampTokenAmount{
-				SourcePoolAddress: sourcePoolAddress,
-				DestTokenAddress:  destTokenAddress,
-				Amount:            cciptypes.NewBigIntFromInt64(1000),
-				ExtraData:         []byte("extra"),
-			}
-		}
-		return cciptypes.Message{
-			Header: cciptypes.RampMessageHeader{
-				MessageID:      [32]byte{byte(seqNum)},
-				SequenceNumber: seqNum,
-				TxHash:         txHash,
-			},
-			TokenAmounts: tokenAmounts,
+// Helper to create CCIP message with specific number of tokens
+func createCCIPMessageWithTokens(seqNum cciptypes.SeqNum, txHash string, tokenCount int) cciptypes.Message {
+	tokenAmounts := make([]cciptypes.RampTokenAmount, tokenCount)
+	sourcePoolAddress, _ := cciptypes.NewUnknownAddressFromHex("0x1111111111111111111111111111111111111111")
+	destTokenAddress, _ := cciptypes.NewUnknownAddressFromHex("0x2222222222222222222222222222222222222222")
+	for i := 0; i < tokenCount; i++ {
+		tokenAmounts[i] = cciptypes.RampTokenAmount{
+			SourcePoolAddress: sourcePoolAddress,
+			DestTokenAddress:  destTokenAddress,
+			Amount:            cciptypes.NewBigIntFromInt64(1000),
+			ExtraData:         []byte("extra"),
 		}
 	}
+	return cciptypes.Message{
+		Header: cciptypes.RampMessageHeader{
+			MessageID:      [32]byte{byte(seqNum)},
+			SequenceNumber: seqNum,
+			TxHash:         txHash,
+		},
+		TokenAmounts: tokenAmounts,
+	}
+}
+
+func TestConvertCCTPv2MessagesToMessageTokenData(t *testing.T) {
+	ctx := context.Background()
 
 	// Helper to create a complete message with valid status
 	createCompleteMessage := func(nonce, sourceDomain, destDomain, amount string) Message {
@@ -1747,4 +1747,500 @@ type expectedTokenData struct {
 	supported bool
 	data      []byte
 	err       error
+}
+
+func TestNotSupportedMessageTokenData(t *testing.T) {
+	tests := []struct {
+		name         string
+		ccipMessages map[cciptypes.SeqNum]cciptypes.Message
+		expected     map[cciptypes.SeqNum]expectedMessageTokenData
+	}{
+		{
+			name:         "empty input",
+			ccipMessages: map[cciptypes.SeqNum]cciptypes.Message{},
+			expected:     map[cciptypes.SeqNum]expectedMessageTokenData{},
+		},
+		{
+			name: "single message with no tokens",
+			ccipMessages: map[cciptypes.SeqNum]cciptypes.Message{
+				1: createCCIPMessageWithTokens(1, "0xabc123", 0),
+			},
+			expected: map[cciptypes.SeqNum]expectedMessageTokenData{
+				1: {
+					tokenDataList: []expectedTokenData{},
+				},
+			},
+		},
+		{
+			name: "single message with single token",
+			ccipMessages: map[cciptypes.SeqNum]cciptypes.Message{
+				1: createCCIPMessageWithTokens(1, "0xabc123", 1),
+			},
+			expected: map[cciptypes.SeqNum]expectedMessageTokenData{
+				1: {
+					tokenDataList: []expectedTokenData{
+						{
+							ready:     false,
+							supported: false,
+							data:      nil,
+							err:       nil,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "single message with multiple tokens",
+			ccipMessages: map[cciptypes.SeqNum]cciptypes.Message{
+				1: createCCIPMessageWithTokens(1, "0xabc123", 3),
+			},
+			expected: map[cciptypes.SeqNum]expectedMessageTokenData{
+				1: {
+					tokenDataList: make([]expectedTokenData, 3),
+				},
+			},
+		},
+		{
+			name: "multiple messages with varying token counts",
+			ccipMessages: map[cciptypes.SeqNum]cciptypes.Message{
+				1: createCCIPMessageWithTokens(1, "0xabc123", 2),
+				2: createCCIPMessageWithTokens(2, "0xdef456", 0),
+				3: createCCIPMessageWithTokens(3, "0x789xyz", 1),
+				5: createCCIPMessageWithTokens(5, "0x111222", 4),
+			},
+			expected: map[cciptypes.SeqNum]expectedMessageTokenData{
+				1: {
+					tokenDataList: make([]expectedTokenData, 2),
+				},
+				2: {
+					tokenDataList: []expectedTokenData{},
+				},
+				3: {
+					tokenDataList: make([]expectedTokenData, 1),
+				},
+				5: {
+					tokenDataList: make([]expectedTokenData, 4),
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := notSupportedMessageTokenData(tt.ccipMessages)
+
+			// Verify result map length
+			require.Equal(t, len(tt.expected), len(result), "Result map length mismatch")
+
+			for expectedSeqNum, expectedMessageTokenData := range tt.expected {
+				actualMessageTokenData, exists := result[expectedSeqNum]
+				require.True(t, exists, "Expected sequence number %d not found in result", expectedSeqNum)
+
+				// Verify token data list length
+				require.Equal(t, len(expectedMessageTokenData.tokenDataList), len(actualMessageTokenData.TokenData),
+					"Token data list length mismatch for seqNum %d", expectedSeqNum)
+
+				// Verify each token data
+				for i, expectedTokenData := range expectedMessageTokenData.tokenDataList {
+					actualTokenData := actualMessageTokenData.TokenData[i]
+
+					require.Equal(t, expectedTokenData.ready, actualTokenData.Ready,
+						"Ready mismatch for seqNum %d, token %d", expectedSeqNum, i)
+					require.Equal(t, expectedTokenData.supported, actualTokenData.Supported,
+						"Supported mismatch for seqNum %d, token %d", expectedSeqNum, i)
+					require.Equal(t, expectedTokenData.data, []byte(actualTokenData.Data),
+						"Data mismatch for seqNum %d, token %d", expectedSeqNum, i)
+					require.NoError(t, actualTokenData.Error, "Expected no error for seqNum %d, token %d", expectedSeqNum, i)
+				}
+			}
+
+			// Verify no unexpected results
+			for actualSeqNum := range result {
+				_, exists := tt.expected[actualSeqNum]
+				require.True(t, exists, "Unexpected sequence number %d found in result", actualSeqNum)
+			}
+		})
+	}
+}
+
+func TestErrorMessageTokenData(t *testing.T) {
+	testError := errors.New("test error message")
+	networkError := errors.New("network connection failed")
+
+	tests := []struct {
+		name                    string
+		err                     error
+		ccipMessages            map[cciptypes.SeqNum]cciptypes.Message
+		sourceTokenDataPayloads map[cciptypes.SeqNum]map[int]SourceTokenDataPayload
+		expected                map[cciptypes.SeqNum]expectedMessageTokenData
+	}{
+		{
+			name:                    "empty inputs",
+			err:                     testError,
+			ccipMessages:            map[cciptypes.SeqNum]cciptypes.Message{},
+			sourceTokenDataPayloads: map[cciptypes.SeqNum]map[int]SourceTokenDataPayload{},
+			expected:                map[cciptypes.SeqNum]expectedMessageTokenData{},
+		},
+		{
+			name: "ccip messages but no source token data payloads",
+			err:  testError,
+			ccipMessages: map[cciptypes.SeqNum]cciptypes.Message{
+				1: createCCIPMessageWithTokens(1, "0xabc123", 2),
+				2: createCCIPMessageWithTokens(2, "0xdef456", 1),
+			},
+			sourceTokenDataPayloads: map[cciptypes.SeqNum]map[int]SourceTokenDataPayload{},
+			expected: map[cciptypes.SeqNum]expectedMessageTokenData{
+				1: {
+					tokenDataList: []expectedTokenData{
+						{
+							ready:     false,
+							supported: false,
+							data:      nil,
+							err:       nil,
+						},
+						{
+							ready:     false,
+							supported: false,
+							data:      nil,
+							err:       nil,
+						},
+					},
+				},
+				2: {
+					tokenDataList: []expectedTokenData{
+						{
+							ready:     false,
+							supported: false,
+							data:      nil,
+							err:       nil,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "single message with single token - error applied",
+			err:  testError,
+			ccipMessages: map[cciptypes.SeqNum]cciptypes.Message{
+				1: createCCIPMessageWithTokens(1, "0xabc123", 2),
+			},
+			sourceTokenDataPayloads: map[cciptypes.SeqNum]map[int]SourceTokenDataPayload{
+				1: {
+					0: createSourceTokenDataPayload(1, 2, 1000),
+				},
+			},
+			expected: map[cciptypes.SeqNum]expectedMessageTokenData{
+				1: {
+					tokenDataList: []expectedTokenData{
+						{
+							ready:     false,
+							supported: true,
+							data:      nil,
+							err:       testError,
+						},
+						{
+							ready:     false,
+							supported: false,
+							data:      nil,
+							err:       nil,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "single message with multiple tokens - partial error coverage",
+			err:  networkError,
+			ccipMessages: map[cciptypes.SeqNum]cciptypes.Message{
+				1: createCCIPMessageWithTokens(1, "0xabc123", 4),
+			},
+			sourceTokenDataPayloads: map[cciptypes.SeqNum]map[int]SourceTokenDataPayload{
+				1: {
+					1: createSourceTokenDataPayload(1, 2, 2000),
+					2: createSourceTokenDataPayload(1, 2, 3000),
+				},
+			},
+			expected: map[cciptypes.SeqNum]expectedMessageTokenData{
+				1: {
+					tokenDataList: []expectedTokenData{
+						{
+							ready:     false,
+							supported: false,
+							data:      nil,
+							err:       nil,
+						},
+						{
+							ready:     false,
+							supported: true,
+							data:      nil,
+							err:       networkError,
+						},
+						{
+							ready:     false,
+							supported: true,
+							data:      nil,
+							err:       networkError,
+						},
+						{
+							ready:     false,
+							supported: false,
+							data:      nil,
+							err:       nil,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "multiple messages with mixed error scenarios",
+			err:  testError,
+			ccipMessages: map[cciptypes.SeqNum]cciptypes.Message{
+				1: createCCIPMessageWithTokens(1, "0xabc123", 3),
+				2: createCCIPMessageWithTokens(2, "0xdef456", 1),
+				3: createCCIPMessageWithTokens(3, "0x789xyz", 2),
+			},
+			sourceTokenDataPayloads: map[cciptypes.SeqNum]map[int]SourceTokenDataPayload{
+				1: {
+					0: createSourceTokenDataPayload(1, 2, 1000),
+					2: createSourceTokenDataPayload(1, 2, 3000),
+				},
+				2: {
+					0: createSourceTokenDataPayload(3, 4, 2000),
+				},
+				// No payloads for seqNum 3
+			},
+			expected: map[cciptypes.SeqNum]expectedMessageTokenData{
+				1: {
+					tokenDataList: []expectedTokenData{
+						{
+							ready:     false,
+							supported: true,
+							data:      nil,
+							err:       testError,
+						},
+						{
+							ready:     false,
+							supported: false,
+							data:      nil,
+							err:       nil,
+						},
+						{
+							ready:     false,
+							supported: true,
+							data:      nil,
+							err:       testError,
+						},
+					},
+				},
+				2: {
+					tokenDataList: []expectedTokenData{
+						{
+							ready:     false,
+							supported: true,
+							data:      nil,
+							err:       testError,
+						},
+					},
+				},
+				3: {
+					tokenDataList: []expectedTokenData{
+						{
+							ready:     false,
+							supported: false,
+							data:      nil,
+							err:       nil,
+						},
+						{
+							ready:     false,
+							supported: false,
+							data:      nil,
+							err:       nil,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "all tokens have errors",
+			err:  networkError,
+			ccipMessages: map[cciptypes.SeqNum]cciptypes.Message{
+				1: createCCIPMessageWithTokens(1, "0xabc123", 2),
+			},
+			sourceTokenDataPayloads: map[cciptypes.SeqNum]map[int]SourceTokenDataPayload{
+				1: {
+					0: createSourceTokenDataPayload(1, 2, 1000),
+					1: createSourceTokenDataPayload(1, 2, 2000),
+				},
+			},
+			expected: map[cciptypes.SeqNum]expectedMessageTokenData{
+				1: {
+					tokenDataList: []expectedTokenData{
+						{
+							ready:     false,
+							supported: true,
+							data:      nil,
+							err:       networkError,
+						},
+						{
+							ready:     false,
+							supported: true,
+							data:      nil,
+							err:       networkError,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "message with no tokens but has source token data payloads",
+			err:  testError,
+			ccipMessages: map[cciptypes.SeqNum]cciptypes.Message{
+				1: createCCIPMessageWithTokens(1, "0xabc123", 0),
+			},
+			sourceTokenDataPayloads: map[cciptypes.SeqNum]map[int]SourceTokenDataPayload{
+				1: {
+					0: createSourceTokenDataPayload(1, 2, 1000),
+				},
+			},
+			expected: map[cciptypes.SeqNum]expectedMessageTokenData{
+				1: {
+					tokenDataList: []expectedTokenData{},
+				},
+			},
+		},
+		{
+			name: "token index gaps in source token data payloads",
+			err:  testError,
+			ccipMessages: map[cciptypes.SeqNum]cciptypes.Message{
+				1: createCCIPMessageWithTokens(1, "0xabc123", 5),
+			},
+			sourceTokenDataPayloads: map[cciptypes.SeqNum]map[int]SourceTokenDataPayload{
+				1: {
+					0: createSourceTokenDataPayload(1, 2, 1000),
+					2: createSourceTokenDataPayload(1, 2, 3000),
+					4: createSourceTokenDataPayload(1, 2, 5000),
+				},
+			},
+			expected: map[cciptypes.SeqNum]expectedMessageTokenData{
+				1: {
+					tokenDataList: []expectedTokenData{
+						{
+							ready:     false,
+							supported: true,
+							data:      nil,
+							err:       testError,
+						},
+						{
+							ready:     false,
+							supported: false,
+							data:      nil,
+							err:       nil,
+						},
+						{
+							ready:     false,
+							supported: true,
+							data:      nil,
+							err:       testError,
+						},
+						{
+							ready:     false,
+							supported: false,
+							data:      nil,
+							err:       nil,
+						},
+						{
+							ready:     false,
+							supported: true,
+							data:      nil,
+							err:       testError,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "nil error",
+			err:  nil,
+			ccipMessages: map[cciptypes.SeqNum]cciptypes.Message{
+				1: createCCIPMessageWithTokens(1, "0xabc123", 1),
+			},
+			sourceTokenDataPayloads: map[cciptypes.SeqNum]map[int]SourceTokenDataPayload{
+				1: {
+					0: createSourceTokenDataPayload(1, 2, 1000),
+				},
+			},
+			expected: map[cciptypes.SeqNum]expectedMessageTokenData{
+				1: {
+					tokenDataList: []expectedTokenData{
+						{
+							ready:     false,
+							supported: true,
+							data:      nil,
+							err:       nil,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "source token data payloads but no ccip messages",
+			err:  testError,
+			ccipMessages: map[cciptypes.SeqNum]cciptypes.Message{},
+			sourceTokenDataPayloads: map[cciptypes.SeqNum]map[int]SourceTokenDataPayload{
+				1: {
+					0: createSourceTokenDataPayload(1, 2, 1000),
+					1: createSourceTokenDataPayload(1, 2, 2000),
+				},
+				2: {
+					0: createSourceTokenDataPayload(2, 3, 3000),
+				},
+			},
+			expected: map[cciptypes.SeqNum]expectedMessageTokenData{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := errorMessageTokenData(tt.err, tt.ccipMessages, tt.sourceTokenDataPayloads)
+
+			// Verify result map length
+			require.Equal(t, len(tt.expected), len(result), "Result map length mismatch")
+
+			for expectedSeqNum, expectedMessageTokenData := range tt.expected {
+				actualMessageTokenData, exists := result[expectedSeqNum]
+				require.True(t, exists, "Expected sequence number %d not found in result", expectedSeqNum)
+
+				// Verify token data list length
+				require.Equal(t, len(expectedMessageTokenData.tokenDataList), len(actualMessageTokenData.TokenData),
+					"Token data list length mismatch for seqNum %d", expectedSeqNum)
+
+				// Verify each token data
+				for i, expectedTokenData := range expectedMessageTokenData.tokenDataList {
+					actualTokenData := actualMessageTokenData.TokenData[i]
+
+					require.Equal(t, expectedTokenData.ready, actualTokenData.Ready,
+						"Ready mismatch for seqNum %d, token %d", expectedSeqNum, i)
+					require.Equal(t, expectedTokenData.supported, actualTokenData.Supported,
+						"Supported mismatch for seqNum %d, token %d", expectedSeqNum, i)
+					require.Equal(t, expectedTokenData.data, []byte(actualTokenData.Data),
+						"Data mismatch for seqNum %d, token %d", expectedSeqNum, i)
+
+					// Check error
+					if expectedTokenData.err != nil {
+						require.Error(t, actualTokenData.Error, "Expected error for seqNum %d, token %d", expectedSeqNum, i)
+						require.Equal(t, expectedTokenData.err.Error(), actualTokenData.Error.Error(),
+							"Error message mismatch for seqNum %d, token %d", expectedSeqNum, i)
+					} else {
+						require.NoError(t, actualTokenData.Error, "Expected no error for seqNum %d, token %d", expectedSeqNum, i)
+					}
+				}
+			}
+
+			// Verify no unexpected results
+			for actualSeqNum := range result {
+				_, exists := tt.expected[actualSeqNum]
+				require.True(t, exists, "Unexpected sequence number %d found in result", actualSeqNum)
+			}
+		})
+	}
 }

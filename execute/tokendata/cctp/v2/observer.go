@@ -156,8 +156,16 @@ func errorMessageTokenData(
 ) map[cciptypes.SeqNum]exectypes.MessageTokenData {
 	result := notSupportedMessageTokenData(ccipMessages)
 	for seqNum, tokenPayloads := range sourceTokenDataPayloads {
+		msgTokenData, exists := result[seqNum]
+		if !exists {
+			continue
+		}
+
 		for tokenIndex := range tokenPayloads {
-			result[seqNum].TokenData[tokenIndex] = exectypes.NewErrorTokenData(err)
+			if tokenIndex >= len(msgTokenData.TokenData) {
+				continue
+			}
+			msgTokenData.TokenData[tokenIndex] = exectypes.NewErrorTokenData(err)
 		}
 	}
 
