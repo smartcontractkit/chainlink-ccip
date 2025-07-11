@@ -1,6 +1,7 @@
 package v2
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -388,6 +389,348 @@ func TestGetSourceTokenDataPayloads(t *testing.T) {
 				assert.Equal(t, expectedPayload.DestinationCaller, actualPayload.DestinationCaller, "DestinationCaller mismatch at index %d", expectedIndex)
 				assert.Equal(t, expectedPayload.MaxFee.String(), actualPayload.MaxFee.String(), "MaxFee mismatch at index %d", expectedIndex)
 				assert.Equal(t, expectedPayload.MinFinalityThreshold, actualPayload.MinFinalityThreshold, "MinFinalityThreshold mismatch at index %d", expectedIndex)
+			}
+		})
+	}
+}
+
+func TestMatchCCTPv2MessagesToSourceTokenDataPayloads(t *testing.T) {
+	// Helper to create a test Message with a given nonce
+	createMessage := func(nonce string, sourceDomain string, destDomain string, amount string) Message {
+		return Message{
+			EventNonce:  nonce,
+			CCTPVersion: 2,
+			DecodedMessage: DecodedMessage{
+				SourceDomain:      sourceDomain,
+				DestinationDomain: destDomain,
+				Nonce:             nonce,
+				DecodedMessageBody: DecodedMessageBody{
+					Amount:        amount,
+					BurnToken:     "0x1111",
+					MintRecipient: "0x2222",
+				},
+			},
+		}
+	}
+
+	// Helper to create a test SourceTokenDataPayload
+	createPayload := func(sourceDomain uint32, destDomain uint32, amount int64) SourceTokenDataPayload {
+		return SourceTokenDataPayload{
+			SourceDomain:      sourceDomain,
+			DestinationDomain: destDomain,
+			CCTPVersion:       reader.CctpVersion2,
+			Amount:            cciptypes.NewBigIntFromInt64(amount),
+			BurnToken:         mustBytes32("0x1111"),
+			MintRecipient:     mustBytes32("0x2222"),
+		}
+	}
+
+	// Always match function for testing
+	alwaysMatch := func(SourceTokenDataPayload, Message) bool { return true }
+
+	// Never match function for testing
+	neverMatch := func(SourceTokenDataPayload, Message) bool { return false }
+
+	// Real match function for testing actual matching
+	realMatch := func(payload SourceTokenDataPayload, msg Message) bool {
+		return matchesCctpMessage(payload, msg)
+	}
+
+	tests := []struct {
+		name                      string
+		cctpV2Messages            map[string]Message
+		sourceTokenDataPayloads   map[cciptypes.SeqNum]map[int]SourceTokenDataPayload
+		isMatch                   func(SourceTokenDataPayload, Message) bool
+		expectedResult            map[cciptypes.SeqNum]map[int]CCTPv2MessageOrError
+		expectedCCTPMessagesAfter map[string]Message // expected state of cctpV2Messages after function call
+	}{
+		{
+			name:                      "empty inputs",
+			cctpV2Messages:            map[string]Message{},
+			sourceTokenDataPayloads:   map[cciptypes.SeqNum]map[int]SourceTokenDataPayload{},
+			isMatch:                   alwaysMatch,
+			expectedResult:            map[cciptypes.SeqNum]map[int]CCTPv2MessageOrError{},
+			expectedCCTPMessagesAfter: map[string]Message{},
+		},
+		{
+			name: "empty source token data payloads",
+			cctpV2Messages: map[string]Message{
+				"123": createMessage("123", "1", "2", "1000"),
+			},
+			sourceTokenDataPayloads: map[cciptypes.SeqNum]map[int]SourceTokenDataPayload{},
+			isMatch:                 alwaysMatch,
+			expectedResult:          map[cciptypes.SeqNum]map[int]CCTPv2MessageOrError{},
+			expectedCCTPMessagesAfter: map[string]Message{
+				"123": createMessage("123", "1", "2", "1000"),
+			},
+		},
+		{
+			name:           "empty cctp messages",
+			cctpV2Messages: map[string]Message{},
+			sourceTokenDataPayloads: map[cciptypes.SeqNum]map[int]SourceTokenDataPayload{
+				1: {
+					0: createPayload(1, 2, 1000),
+				},
+			},
+			isMatch: alwaysMatch,
+			expectedResult: map[cciptypes.SeqNum]map[int]CCTPv2MessageOrError{
+				1: {
+					0: CCTPv2MessageOrError{
+						err: fmt.Errorf("no CCTPv2 message found for source token data payload, seqNum: %d, tokenIndex: %d", 1, 0),
+					},
+				},
+			},
+			expectedCCTPMessagesAfter: map[string]Message{},
+		},
+		{
+			name: "single match - perfect scenario",
+			cctpV2Messages: map[string]Message{
+				"123": createMessage("123", "1", "2", "1000"),
+			},
+			sourceTokenDataPayloads: map[cciptypes.SeqNum]map[int]SourceTokenDataPayload{
+				1: {
+					0: createPayload(1, 2, 1000),
+				},
+			},
+			isMatch: realMatch,
+			expectedResult: map[cciptypes.SeqNum]map[int]CCTPv2MessageOrError{
+				1: {
+					0: CCTPv2MessageOrError{
+						message: createMessage("123", "1", "2", "1000"),
+					},
+				},
+			},
+			expectedCCTPMessagesAfter: map[string]Message{}, // message should be removed after matching
+		},
+		{
+			name: "multiple matches in same sequence",
+			cctpV2Messages: map[string]Message{
+				"123": createMessage("123", "1", "2", "1000"),
+				"456": createMessage("456", "1", "2", "2000"),
+			},
+			sourceTokenDataPayloads: map[cciptypes.SeqNum]map[int]SourceTokenDataPayload{
+				1: {
+					0: createPayload(1, 2, 1000),
+					1: createPayload(1, 2, 2000),
+				},
+			},
+			isMatch: realMatch,
+			expectedResult: map[cciptypes.SeqNum]map[int]CCTPv2MessageOrError{
+				1: {
+					0: CCTPv2MessageOrError{
+						message: createMessage("123", "1", "2", "1000"),
+					},
+					1: CCTPv2MessageOrError{
+						message: createMessage("456", "1", "2", "2000"),
+					},
+				},
+			},
+			expectedCCTPMessagesAfter: map[string]Message{}, // all messages should be removed
+		},
+		{
+			name: "multiple sequences with matches",
+			cctpV2Messages: map[string]Message{
+				"123": createMessage("123", "1", "2", "1000"),
+				"456": createMessage("456", "3", "4", "2000"),
+			},
+			sourceTokenDataPayloads: map[cciptypes.SeqNum]map[int]SourceTokenDataPayload{
+				1: {
+					0: createPayload(1, 2, 1000),
+				},
+				2: {
+					0: createPayload(3, 4, 2000),
+				},
+			},
+			isMatch: realMatch,
+			expectedResult: map[cciptypes.SeqNum]map[int]CCTPv2MessageOrError{
+				1: {
+					0: CCTPv2MessageOrError{
+						message: createMessage("123", "1", "2", "1000"),
+					},
+				},
+				2: {
+					0: CCTPv2MessageOrError{
+						message: createMessage("456", "3", "4", "2000"),
+					},
+				},
+			},
+			expectedCCTPMessagesAfter: map[string]Message{}, // all messages should be removed
+		},
+		{
+			name: "partial matches - some payloads have no matching messages",
+			cctpV2Messages: map[string]Message{
+				"123": createMessage("123", "1", "2", "1000"),
+			},
+			sourceTokenDataPayloads: map[cciptypes.SeqNum]map[int]SourceTokenDataPayload{
+				1: {
+					0: createPayload(1, 2, 1000), // will match
+					1: createPayload(3, 4, 2000), // no matching message
+				},
+			},
+			isMatch: realMatch,
+			expectedResult: map[cciptypes.SeqNum]map[int]CCTPv2MessageOrError{
+				1: {
+					0: CCTPv2MessageOrError{
+						message: createMessage("123", "1", "2", "1000"),
+					},
+					1: CCTPv2MessageOrError{
+						err: fmt.Errorf("no CCTPv2 message found for source token data payload, seqNum: %d, tokenIndex: %d", 1, 1),
+					},
+				},
+			},
+			expectedCCTPMessagesAfter: map[string]Message{}, // matched message should be removed
+		},
+		{
+			name: "no matches found - isMatch always returns false",
+			cctpV2Messages: map[string]Message{
+				"123": createMessage("123", "1", "2", "1000"),
+				"456": createMessage("456", "3", "4", "2000"),
+			},
+			sourceTokenDataPayloads: map[cciptypes.SeqNum]map[int]SourceTokenDataPayload{
+				1: {
+					0: createPayload(1, 2, 1000),
+				},
+				2: {
+					0: createPayload(3, 4, 2000),
+				},
+			},
+			isMatch: neverMatch,
+			expectedResult: map[cciptypes.SeqNum]map[int]CCTPv2MessageOrError{
+				1: {
+					0: CCTPv2MessageOrError{
+						err: fmt.Errorf("no CCTPv2 message found for source token data payload, seqNum: %d, tokenIndex: %d", 1, 0),
+					},
+				},
+				2: {
+					0: CCTPv2MessageOrError{
+						err: fmt.Errorf("no CCTPv2 message found for source token data payload, seqNum: %d, tokenIndex: %d", 2, 0),
+					},
+				},
+			},
+			expectedCCTPMessagesAfter: map[string]Message{
+				"123": createMessage("123", "1", "2", "1000"),
+				"456": createMessage("456", "3", "4", "2000"),
+			},
+		},
+		{
+			name: "leftover messages after matching",
+			cctpV2Messages: map[string]Message{
+				"123": createMessage("123", "1", "2", "1000"),
+				"456": createMessage("456", "3", "4", "2000"),
+				"789": createMessage("789", "5", "6", "3000"), // no payload for this
+			},
+			sourceTokenDataPayloads: map[cciptypes.SeqNum]map[int]SourceTokenDataPayload{
+				1: {
+					0: createPayload(1, 2, 1000),
+				},
+			},
+			isMatch: realMatch,
+			expectedResult: map[cciptypes.SeqNum]map[int]CCTPv2MessageOrError{
+				1: {
+					0: CCTPv2MessageOrError{
+						message: createMessage("123", "1", "2", "1000"),
+					},
+				},
+			},
+			expectedCCTPMessagesAfter: map[string]Message{
+				"456": createMessage("456", "3", "4", "2000"),
+				"789": createMessage("789", "5", "6", "3000"),
+			},
+		},
+		{
+			name: "empty token payload maps in sequence",
+			cctpV2Messages: map[string]Message{
+				"123": createMessage("123", "1", "2", "1000"),
+			},
+			sourceTokenDataPayloads: map[cciptypes.SeqNum]map[int]SourceTokenDataPayload{
+				1: {}, // empty map
+				2: {
+					0: createPayload(1, 2, 1000),
+				},
+			},
+			isMatch: realMatch,
+			expectedResult: map[cciptypes.SeqNum]map[int]CCTPv2MessageOrError{
+				2: {
+					0: CCTPv2MessageOrError{
+						message: createMessage("123", "1", "2", "1000"),
+					},
+				},
+			},
+			expectedCCTPMessagesAfter: map[string]Message{}, // message should be consumed
+		},
+		{
+			name: "first match wins - message removed after first match",
+			cctpV2Messages: map[string]Message{
+				"123": createMessage("123", "1", "2", "1000"),
+			},
+			sourceTokenDataPayloads: map[cciptypes.SeqNum]map[int]SourceTokenDataPayload{
+				1: {
+					0: createPayload(1, 2, 1000), // will match
+				},
+				2: {
+					0: createPayload(1, 2, 1000), // same payload, but message already consumed
+				},
+			},
+			isMatch: realMatch,
+			expectedResult: map[cciptypes.SeqNum]map[int]CCTPv2MessageOrError{
+				1: {
+					0: CCTPv2MessageOrError{
+						message: createMessage("123", "1", "2", "1000"),
+					},
+				},
+				2: {
+					0: CCTPv2MessageOrError{
+						err: fmt.Errorf("no CCTPv2 message found for source token data payload, seqNum: %d, tokenIndex: %d", 2, 0),
+					},
+				},
+			},
+			expectedCCTPMessagesAfter: map[string]Message{}, // message consumed by first match
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Make a copy of cctpV2Messages to test mutation
+			cctpV2MessagesCopy := make(map[string]Message)
+			for k, v := range tt.cctpV2Messages {
+				cctpV2MessagesCopy[k] = v
+			}
+
+			result := matchCCTPv2MessagesToSourceTokenDataPayloads(
+				cctpV2MessagesCopy,
+				tt.sourceTokenDataPayloads,
+				tt.isMatch,
+			)
+
+			// Check result structure and content
+			require.Equal(t, len(tt.expectedResult), len(result), "Result map length mismatch")
+
+			for expectedSeqNum, expectedTokenMap := range tt.expectedResult {
+				actualTokenMap, exists := result[expectedSeqNum]
+				require.True(t, exists, "Expected sequence number %d not found in result", expectedSeqNum)
+				require.Equal(t, len(expectedTokenMap), len(actualTokenMap), "Token map length mismatch for seqNum %d", expectedSeqNum)
+
+				for expectedTokenIndex, expectedEntry := range expectedTokenMap {
+					actualEntry, exists := actualTokenMap[expectedTokenIndex]
+					require.True(t, exists, "Expected token index %d not found for seqNum %d", expectedTokenIndex, expectedSeqNum)
+
+					if expectedEntry.err != nil {
+						require.Error(t, actualEntry.err, "Expected error for seqNum %d, tokenIndex %d", expectedSeqNum, expectedTokenIndex)
+						require.Contains(t, actualEntry.err.Error(), "no CCTPv2 message found", "Error message should indicate no message found")
+						require.Equal(t, Message{}, actualEntry.message, "Message should be empty when error is present")
+					} else {
+						require.NoError(t, actualEntry.err, "Expected no error for seqNum %d, tokenIndex %d", expectedSeqNum, expectedTokenIndex)
+						require.Equal(t, expectedEntry.message, actualEntry.message, "Message mismatch for seqNum %d, tokenIndex %d", expectedSeqNum, expectedTokenIndex)
+					}
+				}
+			}
+
+			// Check that cctpV2Messages was properly mutated (messages removed after matching)
+			require.Equal(t, len(tt.expectedCCTPMessagesAfter), len(cctpV2MessagesCopy), "CCTP messages map length mismatch after function call")
+			for expectedNonce, expectedMessage := range tt.expectedCCTPMessagesAfter {
+				actualMessage, exists := cctpV2MessagesCopy[expectedNonce]
+				require.True(t, exists, "Expected CCTP message with nonce %s not found after function call", expectedNonce)
+				require.Equal(t, expectedMessage, actualMessage, "CCTP message mismatch for nonce %s", expectedNonce)
 			}
 		})
 	}
