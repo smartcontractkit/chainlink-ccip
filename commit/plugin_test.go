@@ -25,8 +25,8 @@ import (
 	reader2 "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	"github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	v1 "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 func Test_queryPhaseRmnRelatedTimers(t *testing.T) {

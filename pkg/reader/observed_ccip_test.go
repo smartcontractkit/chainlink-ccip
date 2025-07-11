@@ -19,7 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
 	mock_reader "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 func Test_GetChainsFeeComponents(t *testing.T) {

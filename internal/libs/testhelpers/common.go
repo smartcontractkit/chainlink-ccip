@@ -4,9 +4,10 @@ import (
 	"github.com/smartcontractkit/libocr/commontypes"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 func SetupConfigInfo(chainSelector ccipocr3.ChainSelector,

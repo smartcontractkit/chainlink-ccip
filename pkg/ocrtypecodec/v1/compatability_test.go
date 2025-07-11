@@ -13,7 +13,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	v1 "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 var inputObjectOld = exectypes.Outcome{

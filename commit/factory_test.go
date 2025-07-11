@@ -20,6 +20,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/internal"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
 	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
@@ -29,10 +31,9 @@ import (
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	reader2 "github.com/smartcontractkit/chainlink-ccip/internal/reader"
-	writer_mocks "github.com/smartcontractkit/chainlink-ccip/mocks/chainlink_common"
+	writer_mocks "github.com/smartcontractkit/chainlink-ccip/mocks/chainlink_common/types"
 	ocrtypecodec "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 

@@ -15,7 +15,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 // Observation will make several calls to fetch:

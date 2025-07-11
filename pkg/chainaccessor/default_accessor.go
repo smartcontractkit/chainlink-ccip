@@ -13,11 +13,12 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 	"golang.org/x/exp/maps"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 // DefaultAccessor is an implementation of cciptypes.ChainAccessor that allows the CCIPReader
@@ -48,11 +49,6 @@ func NewDefaultAccessor(
 	}
 }
 
-func (l *DefaultAccessor) Metadata() cciptypes.AccessorMetadata {
-	// TODO(NONEVM-1865): implement or remove from CAL interface
-	panic("implement me")
-}
-
 func (l *DefaultAccessor) GetContractAddress(contractName string) ([]byte, error) {
 	bindings := l.contractReader.GetBindings(contractName)
 	if len(bindings) != 1 {
@@ -67,13 +63,20 @@ func (l *DefaultAccessor) GetContractAddress(contractName string) ([]byte, error
 	return addressBytes, nil
 }
 
+func (l *DefaultAccessor) GetAllConfigLegacySnapshot(ctx context.Context) (cciptypes.ChainConfigSnapshot, error) {
+	panic("implement me")
+}
+
 func (l *DefaultAccessor) GetChainFeeComponents(ctx context.Context) (cciptypes.ChainFeeComponents, error) {
 	fc, err := l.contractWriter.GetFeeComponents(ctx)
 	if err != nil {
 		return cciptypes.ChainFeeComponents{}, fmt.Errorf("get fee components: %w", err)
 	}
 
-	return *fc, nil
+	return cciptypes.ChainFeeComponents{
+		ExecutionFee:        fc.ExecutionFee,
+		DataAvailabilityFee: fc.DataAvailabilityFee,
+	}, nil
 }
 
 func (l *DefaultAccessor) Sync(
@@ -196,7 +199,7 @@ func (l *DefaultAccessor) MsgsBetweenSeqNums(
 	return msgs, nil
 }
 
-func (l *DefaultAccessor) LatestMsgSeqNum(
+func (l *DefaultAccessor) LatestMessageTo(
 	ctx context.Context,
 	destChainSelector cciptypes.ChainSelector,
 ) (cciptypes.SeqNum, error) {
@@ -354,7 +357,7 @@ func (l *DefaultAccessor) CommitReportsGTETimestamp(
 func (l *DefaultAccessor) ExecutedMessages(
 	ctx context.Context,
 	rangesPerChain map[cciptypes.ChainSelector][]cciptypes.SeqNumRange,
-	confidence cciptypes.ConfidenceLevel,
+	confidence primitives.ConfidenceLevel,
 ) (map[cciptypes.ChainSelector][]cciptypes.SeqNum, error) {
 	lggr := logutil.WithContextValues(ctx, l.lggr)
 
@@ -733,7 +736,7 @@ func (l *DefaultAccessor) GetRMNRemoteConfig(ctx context.Context) (cciptypes.Rem
 	panic("implement me")
 }
 
-func (l *DefaultAccessor) GetRmnCurseInfo(ctx context.Context) (cciptypes.CurseInfo, error) {
+func (l *DefaultAccessor) GetRMNCurseInfo(ctx context.Context) (cciptypes.CurseInfo, error) {
 	// TODO(NONEVM-1865): implement
 	panic("implement me")
 }
