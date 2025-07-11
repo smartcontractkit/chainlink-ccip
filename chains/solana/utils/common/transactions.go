@@ -22,6 +22,12 @@ func SendAndConfirm(ctx context.Context, rpcClient *rpc.Client, instructions []s
 	return SendAndConfirmWithLookupTables(ctx, rpcClient, instructions, signer, commitment, emptyLookupTables, opts...)
 }
 
+func SendAndConfirmWithRetries(ctx context.Context, rpcClient *rpc.Client, instructions []solana.Instruction,
+	signer solana.PrivateKey, commitment rpc.CommitmentType, opts ...TxModifier) (*rpc.GetTransactionResult, error) {
+	emptyLookupTables := map[solana.PublicKey]solana.PublicKeySlice{}
+	return SendAndConfirmWithLookupTablesAndRetries(ctx, rpcClient, instructions, signer, commitment, emptyLookupTables, opts...)
+}
+
 func SendAndConfirmWithLookupTables(ctx context.Context, rpcClient *rpc.Client, instructions []solana.Instruction,
 	signer solana.PrivateKey, commitment rpc.CommitmentType, lookupTables map[solana.PublicKey]solana.PublicKeySlice, opts ...TxModifier) (*rpc.GetTransactionResult, error) {
 	txres, err := sendTransactionWithLookupTables(ctx, rpcClient, instructions, signer, commitment, TransactionConfigs{SkipPreflight: false, Retries: 1, RetryDelay: 50 * time.Millisecond}, lookupTables, opts...) // do not skipPreflight when expected to pass, preflight can help debug
