@@ -31,7 +31,7 @@ func (p *processor) ValidateObservation(
 	if err != nil {
 		return fmt.Errorf("failed to get supported chains: %w", err)
 	}
-	if err := validateObservedChains(ao, observerSupportedChains); err != nil {
+	if err := validateObservedChains(ao, observerSupportedChains, p.destChain); err != nil {
 		return fmt.Errorf("failed to validate observed chains: %w", err)
 	}
 
@@ -104,6 +104,7 @@ func validateFeeComponents(
 func validateObservedChains(
 	ao plugincommon.AttributedObservation[Observation],
 	observerSupportedChains mapset.Set[ccipocr3.ChainSelector],
+	destChain ccipocr3.ChainSelector,
 ) error {
 	obs := ao.Observation
 	if !areMapKeysEqual(obs.FeeComponents, obs.NativeTokenPrices) {
@@ -111,7 +112,12 @@ func validateObservedChains(
 	}
 
 	observedChains := append(maps.Keys(obs.FeeComponents), maps.Keys(obs.NativeTokenPrices)...)
-	observedChains = append(observedChains, maps.Keys(obs.ChainFeeUpdates)...)
+	if len(obs.ChainFeeUpdates) > 0 {
+		// chainFeeUpdates are read from the destination chain, if the oracle observed any chain fee updates
+		// it should support the destination chain.
+		observedChains = append(observedChains, destChain)
+	}
+
 	for _, chain := range observedChains {
 		if !observerSupportedChains.Contains(chain) {
 			return fmt.Errorf("chain %d is not supported by observer", chain)
