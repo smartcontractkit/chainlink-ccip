@@ -6,7 +6,8 @@ import {ITokenMessenger} from "./interfaces/ITokenMessenger.sol";
 import {Pool} from "../../libraries/Pool.sol";
 import {TokenPool} from "../TokenPool.sol";
 import {CCTPMessageTransmitterProxy} from "../USDC/CCTPMessageTransmitterProxy.sol";
-import {USDCTokenPool} from "../USDC/USDCTokenPool.sol";
+import {USDCTokenPoolCCTPV2} from "../USDC/USDCTokenPoolCCTPV2.sol";
+
 import {USDCBridgeMigrator} from "./USDCBridgeMigrator.sol";
 
 import {IERC20} from
@@ -24,7 +25,7 @@ bytes4 constant LOCK_RELEASE_FLAG = 0xfa7c07de;
 /// constructors between parents
 /// @dev The primary token mechanism in this pool is Burn/Mint with CCTP, with Lock/Release as the
 /// secondary, opt in mechanism for chains not currently supporting CCTP.
-contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
+contract HybridLockReleaseUSDCTokenPool is USDCTokenPoolCCTPV2, USDCBridgeMigrator {
   using SafeERC20 for IERC20;
   using EnumerableSet for EnumerableSet.UintSet;
 
@@ -47,6 +48,7 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
   /// balanceOf(pool) on home chain >= sum(totalSupply(mint/burn "wrapped" token) on all remote chains) should always hold
   mapping(uint64 remoteChainSelector => address liquidityProvider) internal s_liquidityProvider;
 
+  // Note: The supportedUSDCVersion is set to 1, as this pool is only compatible with CCTP V2.
   constructor(
     ITokenMessenger tokenMessenger,
     CCTPMessageTransmitterProxy cctpMessageTransmitterProxy,
@@ -56,7 +58,7 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
     address router,
     address previousPool
   )
-    USDCTokenPool(tokenMessenger, cctpMessageTransmitterProxy, token, allowlist, rmnProxy, router, previousPool)
+    USDCTokenPoolCCTPV2(tokenMessenger, cctpMessageTransmitterProxy, token, allowlist, rmnProxy, router, previousPool)
     USDCBridgeMigrator(address(token))
   {}
 

@@ -5,9 +5,9 @@ import {ITokenMessenger} from "../../pools/USDC/interfaces/ITokenMessenger.sol";
 import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
 
 import {CCTPMessageTransmitterProxy} from "../../pools/USDC/CCTPMessageTransmitterProxy.sol";
-import {USDCTokenPool} from "../../pools/USDC/USDCTokenPool.sol";
+import {USDCTokenPoolCCTPV2} from "../../pools/USDC/USDCTokenPoolCCTPV2.sol";
 
-contract USDCTokenPoolHelper is USDCTokenPool {
+contract USDCTokenPoolCCTPV2Helper is USDCTokenPoolCCTPV2 {
   constructor(
     ITokenMessenger tokenMessenger,
     CCTPMessageTransmitterProxy messageTransmitterProxy,
@@ -16,7 +16,7 @@ contract USDCTokenPoolHelper is USDCTokenPool {
     address rmnProxy,
     address router,
     address previousPool
-  ) USDCTokenPool(tokenMessenger, messageTransmitterProxy, token, allowlist, rmnProxy, router, previousPool, 0) {}
+  ) USDCTokenPoolCCTPV2(tokenMessenger, messageTransmitterProxy, token, allowlist, rmnProxy, router, previousPool) {}
 
   function validateMessage(bytes memory usdcMessage, SourceTokenDataPayload memory sourceTokenData) external view {
     return _validateMessage(usdcMessage, sourceTokenData);

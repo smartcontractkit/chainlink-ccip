@@ -72,14 +72,16 @@ contract HybridLockReleaseUSDCTokenPool_lockOrBurn is HybridLockReleaseUSDCToken
 
     vm.expectEmit();
     emit ITokenMessenger.DepositForBurn(
-      s_mockUSDC.s_nonce(),
       address(s_USDCToken),
       amount,
       address(s_usdcTokenPool),
       receiver,
       expectedDomain.domainIdentifier,
       s_mockUSDC.DESTINATION_TOKEN_MESSENGER(),
-      expectedDomain.allowedCaller
+      expectedDomain.allowedCaller,
+      s_usdcTokenPool.MAX_FEE(),
+      s_usdcTokenPool.FINALITY_THRESHOLD(),
+      ""
     );
 
     vm.expectEmit();
@@ -101,7 +103,7 @@ contract HybridLockReleaseUSDCTokenPool_lockOrBurn is HybridLockReleaseUSDCToken
     );
 
     uint64 nonce = abi.decode(poolReturnDataV1.destPoolData, (uint64));
-    assertEq(s_mockUSDC.s_nonce() - 1, nonce);
+    assertEq(nonce, 0);
   }
 
   function test_onLockReleaseMechanism_thenSwitchToPrimary() public {
