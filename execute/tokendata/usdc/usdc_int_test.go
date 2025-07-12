@@ -22,9 +22,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
-	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
-
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
+	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata/usdc"
 	"github.com/smartcontractkit/chainlink-ccip/internal"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
@@ -257,8 +256,8 @@ func Test_USDC_CCTP_Flow(t *testing.T) {
 		config,
 		testhelpers.USDCEncoder,
 		map[cciptypes.ChainSelector]contractreader.Extended{
-			fujiChain:    mockReader(t, fujiTransmitter, fuji),
-			sepoliaChain: mockReader(t, sepoliaTransmitter, sepolia),
+			fujiChain:    mockReader(t, fuji),
+			sepoliaChain: mockReader(t, sepolia),
 		},
 		mockAddrCodec,
 	)
@@ -533,22 +532,17 @@ func createToken(t *testing.T, nonce uint64, sourceDomain uint32, pool string) c
 	}
 }
 
-func mockReader(t *testing.T, contractAddress string, message []usdcMessage) *readermock.MockExtended {
+func mockReader(t *testing.T, message []usdcMessage) *readermock.MockExtended {
 	items := make([]types.Sequence, len(message))
 	for i, m := range message {
 		items[i] = types.Sequence{Data: newUSDCMessageEvent(t, m.eventPayload)}
 	}
 
-	contract := types.BoundContract{
-		Address: contractAddress,
-		Name:    consts.ContractNameCCTPMessageTransmitter,
-	}
-
 	r := readermock.NewMockExtended(t)
 	r.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil).Maybe()
-	r.EXPECT().QueryKey(
+	r.EXPECT().ExtendedQueryKey(
 		mock.Anything,
-		contract,
+		consts.ContractNameCCTPMessageTransmitter,
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
