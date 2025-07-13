@@ -10,8 +10,9 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 )
 
 func TestInMemoryCCIPReader_CommitReportsGTETimestamp(t *testing.T) {

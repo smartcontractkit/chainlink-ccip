@@ -16,9 +16,7 @@ func NewRMNReport(
 	laneUpdates []RMNLaneUpdate,
 ) RMNReport {
 	commonRMNLaneUpdates := make([]ccipocr3common.RMNLaneUpdate, len(laneUpdates))
-	for i, laneUpdate := range laneUpdates {
-		commonRMNLaneUpdates[i] = laneUpdate
-	}
+	copy(commonRMNLaneUpdates, laneUpdates)
 	return ccipocr3common.NewRMNReport(
 		reportVersionDigest,
 		destChainID,

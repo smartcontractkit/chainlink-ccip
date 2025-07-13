@@ -9,9 +9,10 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 // buildSingleChainReportHelper converts the on-chain event data stored in ccipocr3.ExecutePluginCommitData into the

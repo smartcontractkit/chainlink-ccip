@@ -20,8 +20,9 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
+	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 )
 
 const (

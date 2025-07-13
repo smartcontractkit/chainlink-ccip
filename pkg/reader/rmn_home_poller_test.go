@@ -17,8 +17,9 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
-	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
+	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
 )
 
 var (

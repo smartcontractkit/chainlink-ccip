@@ -18,8 +18,9 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 
-	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 )
 
 const (
