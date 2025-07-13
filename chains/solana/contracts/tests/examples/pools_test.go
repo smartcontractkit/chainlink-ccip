@@ -64,7 +64,7 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 
 	admin, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)
-	ctx := t.Context()
+	ctx := tests.Context(t)
 
 	solanaGoClient := testutils.DeployAllPrograms(t, testutils.PathToAnchorConfig, admin)
 	getBalance := func(account solana.PublicKey) string {

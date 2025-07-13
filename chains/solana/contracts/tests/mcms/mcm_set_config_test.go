@@ -25,7 +25,7 @@ func TestMcmSetConfig(t *testing.T) {
 	t.Parallel()
 	mcm.SetProgramID(config.McmProgram)
 
-	ctx := t.Context()
+	ctx := tests.Context(t)
 
 	admin, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)

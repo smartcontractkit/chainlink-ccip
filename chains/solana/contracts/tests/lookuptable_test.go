@@ -20,7 +20,7 @@ import (
 func TestSVMLookupTables(t *testing.T) {
 	t.Parallel()
 
-	ctx := t.Context()
+	ctx := tests.Context(t)
 	url := testutils.SetupLocalSolNode(t)
 	c := rpc.New(url)
 

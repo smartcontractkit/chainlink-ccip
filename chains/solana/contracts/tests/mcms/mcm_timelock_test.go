@@ -30,7 +30,7 @@ import (
 
 func TestMcmWithTimelock(t *testing.T) {
 	t.Parallel()
-	ctx := t.Context()
+	ctx := tests.Context(t)
 
 	mcm.SetProgramID(config.McmProgram)
 	timelock.SetProgramID(config.TimelockProgram)

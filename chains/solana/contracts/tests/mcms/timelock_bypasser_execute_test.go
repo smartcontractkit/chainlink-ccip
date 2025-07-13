@@ -24,7 +24,7 @@ import (
 
 func TestTimelockBypasserExecute(t *testing.T) {
 	t.Parallel()
-	ctx := t.Context()
+	ctx := tests.Context(t)
 
 	timelock.SetProgramID(config.TimelockProgram)
 	access_controller.SetProgramID(config.AccessControllerProgram)

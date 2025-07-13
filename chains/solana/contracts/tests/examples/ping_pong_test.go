@@ -95,7 +95,7 @@ func TestPingPong(t *testing.T) {
 
 	admin, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)
-	ctx := t.Context()
+	ctx := tests.Context(t)
 
 	linkMintPrivK := solana.MustPrivateKeyFromBase58("32YVeJArcWWWV96fztfkRQhohyFz5Hwno93AeGVrN4g2LuFyvwznrNd9A6tbvaTU6BuyBsynwJEMLre8vSy3CrVU")
 	linkMint := linkMintPrivK.PublicKey()

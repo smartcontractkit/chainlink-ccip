@@ -51,7 +51,7 @@ func TestCCIPRouter(t *testing.T) {
 	rmn_remote.SetProgramID(config.RMNRemoteProgram)
 	cctp_token_pool.SetProgramID(config.CctpTokenPoolProgram)
 
-	ctx := t.Context()
+	ctx := tests.Context(t)
 	user := solana.MustPrivateKeyFromBase58("ZZdVf32Npuhci4u4ir2NW9491Y3FTv2Gwk41HMpvgJoh81UM42LcNqAN8SXapHfPcr61QP7sJj7K2mKHt7qFCoV")
 	anotherUser := solana.MustPrivateKeyFromBase58("i9btAVgpmReUv9jH52xpPoYvtsv6XQSJrRGnLpTU4ArSP6E3Xa9aunyeT7n83QhMeLZMmRPnwY41xr7jFrTXAPR")
 	tokenlessUser := solana.MustPrivateKeyFromBase58("4g8xCc96ox2ksCcv5VggqaenkSsnkUEe8WZBazLyTCMFnB2r2bJtdNK2QW9E6mojMmMGpGcSGuKFeDQbGLiCqM3n")
