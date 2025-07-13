@@ -27,7 +27,6 @@ import (
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
@@ -395,7 +394,7 @@ func TestProcessor_Outcome(t *testing.T) {
 
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := tests.Context(t)
+			ctx := t.Context()
 			homeChainMock := mock_home_chain.NewMockHomeChain(t)
 			if tt.feeInfo == nil {
 				homeChainMock.EXPECT().GetChainConfig(mock.Anything).
@@ -438,7 +437,7 @@ func TestProcessor_Outcome(t *testing.T) {
 
 func TestProcessor_Outcome_cacheInvalidation(t *testing.T) {
 	lggr := logger.Test(t)
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	obs := &asyncObserver{
 		lggr:            lggr,

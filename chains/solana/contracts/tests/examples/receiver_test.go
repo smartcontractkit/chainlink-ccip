@@ -22,7 +22,7 @@ import (
 
 func TestCcipReceiver(t *testing.T) {
 	t.Parallel()
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	ccip_router.SetProgramID(config.CcipRouterProgram)
 	ccip_receiver.SetProgramID(config.CcipBaseReceiver)

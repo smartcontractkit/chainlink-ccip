@@ -20,7 +20,6 @@ import (
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 
@@ -252,7 +251,7 @@ func Test_USDC_CCTP_Flow(t *testing.T) {
 
 	mockAddrCodec := internal.NewMockAddressCodecHex(t)
 	tkReader, err := usdc.NewUSDCTokenDataObserver(
-		tests.Context(t),
+		t.Context(),
 		logger.Test(t),
 		baseChain,
 		config,

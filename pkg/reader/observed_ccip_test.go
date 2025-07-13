@@ -8,12 +8,12 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
@@ -26,7 +26,7 @@ import (
 func Test_GetChainsFeeComponents(t *testing.T) {
 	t.Cleanup(func() { reader.PromChainFeeGauge.Reset() })
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	chain1 := "2337"
 	selector1 := cciptypes.ChainSelector(12922642891491394802)
 	chain2 := "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d"
@@ -75,7 +75,7 @@ func Test_GetChainsFeeComponents(t *testing.T) {
 }
 
 func Test_GetDestChainFeeComponents(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	chainID := "2337"
 	chainSelector := cciptypes.ChainSelector(12922642891491394802)
 
@@ -154,7 +154,7 @@ func Test_GetDestChainFeeComponents(t *testing.T) {
 }
 
 func Test_CommitReportsGTETimestamp(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	chainID := "2337"
 	chainSelector := cciptypes.ChainSelector(12922642891491394802)
 
@@ -228,7 +228,7 @@ func Test_CommitReportsGTETimestamp(t *testing.T) {
 }
 
 func Test_LatestMsgSeqNum(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	chainID := "1"
 	chainSelector := cciptypes.ChainSelector(4741433654826277614)
 

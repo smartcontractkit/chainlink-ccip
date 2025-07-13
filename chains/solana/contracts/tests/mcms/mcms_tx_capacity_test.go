@@ -30,7 +30,7 @@ import (
 
 func TestMcmsCapacity(t *testing.T) {
 	t.Parallel()
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	mcm.SetProgramID(config.McmProgram)
 	timelock.SetProgramID(config.TimelockProgram)

@@ -6,11 +6,11 @@ import (
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
@@ -33,7 +33,7 @@ func Test_LatencyIsTracked(t *testing.T) {
 	query := types.Query([]byte("query"))
 	observation := types.Observation([]byte("observation"))
 	outcome := ocr3types.Outcome([]byte("outcome"))
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	lggr := logger.Test(t)
 	origin := FakePlugin{
 		query:       query,
@@ -90,7 +90,7 @@ func Test_ErrorIsTrackedWhenOriginReturns(t *testing.T) {
 	count := 100
 	for i := 0; i < count; i++ {
 		_, err = tracked.Outcome(
-			tests.Context(t), ocr3types.OutcomeContext{}, types.Query{}, []types.AttributedObservation{},
+			t.Context(), ocr3types.OutcomeContext{}, types.Query{}, []types.AttributedObservation{},
 		)
 		require.Error(t, err)
 	}

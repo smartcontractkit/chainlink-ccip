@@ -23,7 +23,7 @@ func TestMcmMultipleInstances(t *testing.T) {
 	t.Parallel()
 	mcm.SetProgramID(config.McmProgram)
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	admin, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)

@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
@@ -17,7 +17,7 @@ import (
 
 func TestProcessor_Outcome_cacheInvalidation(t *testing.T) {
 	lggr := logger.Test(t)
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	aobs := &asyncObserver{
 		lggr:            lggr,

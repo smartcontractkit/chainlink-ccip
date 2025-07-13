@@ -26,8 +26,6 @@ import (
 	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
-
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
@@ -409,7 +407,7 @@ func Test_populateUpdatesPerChain(t *testing.T) {
 func TestClient_ComputeReportSignatures(t *testing.T) {
 	newTestSetup := func(t *testing.T) testSetup {
 		lggr := logger.Test(t)
-		ctx := tests.Context(t)
+		ctx := t.Context()
 		resChan := make(chan PeerResponse, 200)
 		peerClient := newMockPeerClient(resChan)
 		rmnHomeReaderMock := readerpkg_mock.NewMockRMNHome(t)

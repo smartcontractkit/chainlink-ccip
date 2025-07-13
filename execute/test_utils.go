@@ -24,8 +24,6 @@ import (
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
-
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
@@ -269,7 +267,7 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 	}
 
 	homeChain := setupHomeChainPoller(it.t, it.lggr, chainConfigInfos)
-	ctx := tests.Context(it.t)
+	ctx := it.t.Context()
 	err := homeChain.Start(ctx)
 	require.NoError(it.t, err, "failed to start home chain poller")
 	mockAddrCodec := internal.NewMockAddressCodecHex(it.t)

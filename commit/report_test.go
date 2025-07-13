@@ -17,8 +17,6 @@ import (
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
@@ -223,7 +221,7 @@ func TestPluginReports(t *testing.T) {
 		},
 	}
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	lggr := logger.Test(t)
 	reportCodec := mocks.NewCommitPluginJSONReportCodec()
 
@@ -291,7 +289,7 @@ func TestPluginReports_InvalidOutcome(t *testing.T) {
 		lggr:         lggr,
 		ocrTypeCodec: ocrtypecodec.DefaultCommitCodec,
 	}
-	_, err := p.Reports(tests.Context(t), 0, []byte("invalid json"))
+	_, err := p.Reports(t.Context(), 0, []byte("invalid json"))
 	require.Error(t, err)
 }
 
@@ -368,7 +366,7 @@ func Test_IsStaleReportMerkleRoots(t *testing.T) {
 		},
 	}
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			reader := readermock.NewMockCCIPReader(t)
@@ -443,7 +441,7 @@ func Test_Plugin_isStaleReport(t *testing.T) {
 		},
 	}
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -474,7 +472,7 @@ func Test_Plugin_isStaleReport(t *testing.T) {
 }
 
 func Test_encodeReports(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	lggr := logger.Test(t)
 	var transmissionSchedule *ocr3types.TransmissionSchedule
 

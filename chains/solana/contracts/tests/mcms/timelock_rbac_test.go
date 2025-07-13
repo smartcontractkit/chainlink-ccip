@@ -23,7 +23,7 @@ import (
 
 func TestTimelockRBAC(t *testing.T) {
 	t.Parallel()
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	timelock.SetProgramID(config.TimelockProgram)
 	access_controller.SetProgramID(config.AccessControllerProgram)

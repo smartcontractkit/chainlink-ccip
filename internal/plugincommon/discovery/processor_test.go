@@ -17,8 +17,6 @@ import (
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
-
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
@@ -38,7 +36,7 @@ func TestContractDiscoveryProcessor_Observation_SupportsDest_HappyPath(t *testin
 	source := cciptypes.ChainSelector(2)
 	fRoleDON := 1
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	expectedFChain := map[cciptypes.ChainSelector]int{
 		dest:   1,
 		source: 2,
@@ -110,7 +108,7 @@ func TestContractDiscoveryProcessor_Observation_ErrorGettingFChain(t *testing.T)
 	dest := cciptypes.ChainSelector(1)
 	fRoleDON := 1
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	expectedErr := fmt.Errorf("error getting fchain")
 	mockHomeChain.EXPECT().GetFChain().Return(nil, expectedErr)
 	defer mockReader.AssertExpectations(t)
@@ -142,7 +140,7 @@ func TestContractDiscoveryProcessor_Observation_SourceReadersNotReady(t *testing
 	source := cciptypes.ChainSelector(2)
 	fRoleDON := 1
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	expectedFChain := map[cciptypes.ChainSelector]int{
 		dest:   1,
 		source: 2,
@@ -183,7 +181,7 @@ func TestContractDiscoveryProcessor_Observation_ErrorDiscoveringContracts(t *tes
 	source := cciptypes.ChainSelector(2)
 	fRoleDON := 1
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	expectedFChain := map[cciptypes.ChainSelector]int{
 		dest:   1,
 		source: 2,
@@ -295,7 +293,7 @@ func TestContractDiscoveryProcessor_Outcome_HappyPath(t *testing.T) {
 		{Observation: obsSrc},
 	}
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	outcome, err := cdp.Outcome(ctx, discoverytypes.Outcome{}, discoverytypes.Query{}, aos)
 	assert.NoError(t, err)
 	assert.Empty(t, outcome)
@@ -393,7 +391,7 @@ func TestContractDiscovery_Outcome_HappyPath_FRoleDONAndFDestChainAreDifferent(t
 		{Observation: fChainObs}, // no consensus on fChainObs
 	}
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	outcome, err := cdp.Outcome(ctx, discoverytypes.Outcome{}, discoverytypes.Query{}, aos)
 	assert.NoError(t, err)
 	assert.Empty(t, outcome)
@@ -479,7 +477,7 @@ func TestContractDiscoveryProcessor_Outcome_NotEnoughObservations(t *testing.T) 
 		{Observation: fChainObs},
 	}
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	outcome, err := cdp.Outcome(ctx, discoverytypes.Outcome{}, discoverytypes.Query{}, aos)
 	assert.NoError(t, err)
 	assert.Empty(t, outcome)
@@ -559,7 +557,7 @@ func TestContractDiscoveryProcessor_Outcome_ErrorSyncingContracts(t *testing.T) 
 		{Observation: obs},
 	}
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	outcome, err := cdp.Outcome(ctx, discoverytypes.Outcome{}, discoverytypes.Query{}, aos)
 	require.NoError(t, err)
 	require.Equal(t, outcome, discoverytypes.Outcome{})

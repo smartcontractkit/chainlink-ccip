@@ -19,10 +19,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
-
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
@@ -90,7 +88,7 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 	mockAddrCodec := internal.NewMockAddressCodecHex(t)
 	offrampAddress := []byte{0x3}
 	ccipReader, err := newCCIPChainReaderInternal(
-		tests.Context(t),
+		t.Context(),
 		logger.Test(t),
 		map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
 			chainA: sourceCRs[chainA],
@@ -145,7 +143,7 @@ func TestCCIPChainReader_GetContractAddress(t *testing.T) {
 }
 
 func TestCCIPChainReader_Sync_HappyPath_BindsContractsSuccessfully(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	destChain := cciptypes.ChainSelector(1)
 	sourceChain1 := cciptypes.ChainSelector(2)
 	sourceChain2 := cciptypes.ChainSelector(3)
@@ -235,7 +233,7 @@ func TestCCIPChainReader_Sync_HappyPath_BindsContractsSuccessfully(t *testing.T)
 }
 
 func TestCCIPChainReader_Sync_HappyPath_SkipsEmptyAddress(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	destChain := cciptypes.ChainSelector(1)
 	sourceChain1 := cciptypes.ChainSelector(2)
 	sourceChain2 := cciptypes.ChainSelector(3)
@@ -320,7 +318,7 @@ func TestCCIPChainReader_Sync_HappyPath_SkipsEmptyAddress(t *testing.T) {
 }
 
 func TestCCIPChainReader_Sync_HappyPath_DontSupportAllChains(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	destChain := cciptypes.ChainSelector(1)
 	sourceChain1 := cciptypes.ChainSelector(2)
 	sourceChain2 := cciptypes.ChainSelector(3)
@@ -398,7 +396,7 @@ func TestCCIPChainReader_Sync_HappyPath_DontSupportAllChains(t *testing.T) {
 }
 
 func TestCCIPChainReader_Sync_BindError(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	destChain := cciptypes.ChainSelector(1)
 	sourceChain1 := cciptypes.ChainSelector(2)
 	sourceChain2 := cciptypes.ChainSelector(3)
@@ -492,7 +490,7 @@ func TestCCIPChainReader_Sync_BindError(t *testing.T) {
 // The round1 version returns NoBindingFound errors for onramp contracts to simulate
 // the two-phase approach to discovering those contracts.
 func TestCCIPChainReader_DiscoverContracts_HappyPath_Round1(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	destChain := cciptypes.ChainSelector(1)
 	sourceChain := [2]cciptypes.ChainSelector{2, 3}
 	onramps := [2][]byte{{0x1}, {0x2}}
@@ -593,7 +591,7 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round1(t *testing.T) {
 
 // The round2 version includes calls to the onRamp contracts.
 func TestCCIPChainReader_DiscoverContracts_HappyPath_Round2(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	destChain := cciptypes.ChainSelector(1)
 	sourceChain := [2]cciptypes.ChainSelector{2, 3}
 	onramps := [2][]byte{{0x1}, {0x2}}
@@ -698,7 +696,7 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round2(t *testing.T) {
 }
 
 func TestCCIPChainReader_DiscoverContracts_GetAllSourceChainConfig_Errors(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	destChain := cciptypes.ChainSelector(1)
 	sourceChain1 := cciptypes.ChainSelector(2)
 	sourceChain2 := cciptypes.ChainSelector(3)
@@ -747,7 +745,7 @@ func TestCCIPChainReader_DiscoverContracts_GetAllSourceChainConfig_Errors(t *tes
 }
 
 func TestCCIPChainReader_DiscoverContracts_GetOfframpStaticConfig_Errors(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	destChain := cciptypes.ChainSelector(1)
 	sourceChain1 := cciptypes.ChainSelector(2)
 	sourceChain2 := cciptypes.ChainSelector(3)
@@ -877,7 +875,7 @@ func TestCCIPChainReader_getFeeQuoterTokenPriceUSD(t *testing.T) {
 	contractWriters[chainC] = cw
 
 	ccipReader, err := newCCIPChainReaderInternal(
-		tests.Context(t),
+		t.Context(),
 		logger.Test(t),
 		map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
 			chainC: destCR,
@@ -928,7 +926,7 @@ func TestCCIPFeeComponents_HappyPath(t *testing.T) {
 	sourceCRs[destChain].EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
 
 	ccipReader, err := newCCIPChainReaderInternal(
-		tests.Context(t),
+		t.Context(),
 		logger.Test(t),
 		map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
 			chainA: sourceCRs[chainA],
@@ -1290,7 +1288,7 @@ func TestCCIPChainReader_Nonces(t *testing.T) {
 			contractWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
 			contractWriters[chainB] = cw
 			ccipReader, err := newCCIPChainReaderInternal(
-				tests.Context(t),
+				t.Context(),
 				logger.Test(t),
 				map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
 					chainB: destReader,
@@ -1318,7 +1316,7 @@ func TestCCIPChainReader_Nonces(t *testing.T) {
 }
 
 func TestCCIPChainReader_DiscoverContracts_Parallel(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	destChain := cciptypes.ChainSelector(1)
 	sourceChains := []cciptypes.ChainSelector{2, 3, 4} // Adding one more chain for better parallelism testing
 
@@ -1462,7 +1460,7 @@ func TestCCIPChainReader_DiscoverContracts_Parallel(t *testing.T) {
 }
 
 func TestCCIPChainReader_GetWrappedNativeTokenPriceUSD(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	destChain := cciptypes.ChainSelector(1)
 	sourceChain1 := cciptypes.ChainSelector(2)
 	sourceChain2 := cciptypes.ChainSelector(3)
@@ -1541,7 +1539,7 @@ func TestCCIPChainReader_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 		contractWriters[sourceChain2] = cw
 
 		ccipReader, err := newCCIPChainReaderWithConfigPollerInternal(
-			tests.Context(t),
+			t.Context(),
 			logger.Test(t),
 			map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
 				sourceChain1: sourceReader1,
@@ -1606,7 +1604,7 @@ func TestCCIPChainReader_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 		contractWriters[sourceChain2] = cw
 
 		ccipReader, err := newCCIPChainReaderWithConfigPollerInternal(
-			tests.Context(t),
+			t.Context(),
 			logger.Test(t),
 			map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
 				sourceChain1: reader_mocks.NewMockContractReaderFacade(t),
@@ -1657,7 +1655,7 @@ func TestCCIPChainReader_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 		contractWriters[sourceChain1] = cw
 
 		ccipReader, err := newCCIPChainReaderWithConfigPollerInternal(
-			tests.Context(t),
+			t.Context(),
 			logger.Test(t),
 			map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
 				sourceChain1: sourceReader,
@@ -1761,7 +1759,7 @@ func TestCCIPChainReader_prepareBatchConfigRequests(t *testing.T) {
 }
 
 func TestCCIPChainReader_GetChainFeePriceUpdate(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	destChain := cciptypes.ChainSelector(1)
 	sourceChain1 := cciptypes.ChainSelector(2)
 	sourceChain2 := cciptypes.ChainSelector(3)
@@ -1828,7 +1826,7 @@ func TestCCIPChainReader_GetChainFeePriceUpdate(t *testing.T) {
 		contractWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
 		contractWriters[chainB] = cw
 		ccipReader, err := newCCIPChainReaderInternal(
-			tests.Context(t),
+			t.Context(),
 			logger.Test(t),
 			map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
 				chainB: mockReader,
@@ -1884,7 +1882,7 @@ func TestCCIPChainReader_GetChainFeePriceUpdate(t *testing.T) {
 		contractWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
 		contractWriters[destChain] = cw
 		ccipReader, err := newCCIPChainReaderInternal(
-			tests.Context(t),
+			t.Context(),
 			logger.Test(t),
 			map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
 				destChain: mockReader,
@@ -1922,7 +1920,7 @@ func TestCCIPChainReader_GetChainFeePriceUpdate(t *testing.T) {
 		contractWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
 		contractWriters[destChain] = cw
 		ccipReader, err := newCCIPChainReaderInternal(
-			tests.Context(t),
+			t.Context(),
 			logger.Test(t),
 			map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
 				destChain: mockReader,
@@ -1968,7 +1966,7 @@ func TestCCIPChainReader_GetChainFeePriceUpdate(t *testing.T) {
 		contractWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
 		contractWriters[destChain] = cw
 		ccipReader, err := newCCIPChainReaderInternal(
-			tests.Context(t),
+			t.Context(),
 			logger.Test(t),
 			map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
 				destChain: mockReader,
@@ -2013,7 +2011,7 @@ func TestCCIPChainReader_GetChainFeePriceUpdate(t *testing.T) {
 		contractWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
 		contractWriters[destChain] = cw
 		ccipReader, err := newCCIPChainReaderInternal(
-			tests.Context(t),
+			t.Context(),
 			logger.Test(t),
 			map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
 				destChain: mockReader,
@@ -2056,7 +2054,7 @@ func TestCCIPChainReader_GetChainFeePriceUpdate(t *testing.T) {
 		contractWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
 		contractWriters[destChain] = cw
 		ccipReader, err := newCCIPChainReaderInternal(
-			tests.Context(t),
+			t.Context(),
 			logger.Test(t),
 			map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
 				destChain: mockReader,
@@ -2078,7 +2076,7 @@ func TestCCIPChainReader_GetChainFeePriceUpdate(t *testing.T) {
 
 	t.Run("accessor does not exist for dest chain", func(t *testing.T) {
 		ccipReader, err := newCCIPChainReaderInternal(
-			tests.Context(t),
+			t.Context(),
 			logger.Test(t),
 			nil,
 			nil,

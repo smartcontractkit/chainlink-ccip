@@ -41,7 +41,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 	mcm.SetProgramID(config.McmProgram)
 	external_program_cpi_stub.SetProgramID(config.ExternalCpiStubProgram) // testing program
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	admin, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)

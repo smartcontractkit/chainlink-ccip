@@ -31,7 +31,7 @@ func TestCctpDevnet(t *testing.T) {
 	devnetInfo, err := getDevnetInfo()
 	require.NoError(t, err)
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	client := rpc.New(devnetInfo.RPC)
 
 	admin := solana.PrivateKey(devnetInfo.PrivateKeys.Admin)

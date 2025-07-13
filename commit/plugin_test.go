@@ -7,14 +7,14 @@ import (
 	"time"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
@@ -168,7 +168,7 @@ func TestObservation_prices(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// setup mock dependencies
-			ctx := tests.Context(t)
+			ctx := t.Context()
 			cs := plugincommon.NewMockChainSupport(t)
 			ccr := reader.NewMockCCIPReader(t)
 			mrp := plugincommon.NewMockPluginProcessor[merkleroot.Query, merkleroot.Observation, merkleroot.Outcome](t)
@@ -414,7 +414,7 @@ func Test_Outcome_prices(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// setup mock dependencies
-			ctx := tests.Context(t)
+			ctx := t.Context()
 			mrp := plugincommon.NewMockPluginProcessor[merkleroot.Query, merkleroot.Observation, merkleroot.Outcome](t)
 			tpp := plugincommon.NewMockPluginProcessor[tokenprice.Query, tokenprice.Observation, tokenprice.Outcome](t)
 			cfp := plugincommon.NewMockPluginProcessor[chainfee.Query, chainfee.Observation, chainfee.Outcome](t)

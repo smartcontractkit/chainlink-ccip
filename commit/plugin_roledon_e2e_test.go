@@ -18,7 +18,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 
@@ -44,7 +43,7 @@ import (
 )
 
 func TestPlugin_RoleDonE2E_NoPrevOutcome(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	s := newRoleDonTestSetup(t, 3, 7, 1)
 	const numUnderstaffedChains = 1
@@ -162,7 +161,7 @@ func TestPlugin_RoleDonE2E_NoPrevOutcome(t *testing.T) {
 }
 
 func TestPlugin_RoleDonE2E_RangesAndPricesSelectedPreviously(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	s := newRoleDonTestSetup(t, 4, 7, 1)
 	chainsWithMsgs := []cciptypes.ChainSelector{s.sourceChains[0], s.sourceChains[1]}
@@ -282,7 +281,7 @@ func TestPlugin_RoleDonE2E_RangesAndPricesSelectedPreviously(t *testing.T) {
 }
 
 func TestPlugin_RoleDonE2E_Discovery(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	s := newRoleDonTestSetup(t, 3, 7, 1)
 	t.Logf("Running test with Role DON Setup:\n%s", s)

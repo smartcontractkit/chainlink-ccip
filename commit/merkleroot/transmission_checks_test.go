@@ -7,8 +7,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
-
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
@@ -16,7 +14,7 @@ import (
 )
 
 func TestValidateRootBlessings(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	chainA := cciptypes.ChainSelector(1)
 	chainB := cciptypes.ChainSelector(2)
 	blessed := []cciptypes.MerkleRootChain{{ChainSel: chainA}}

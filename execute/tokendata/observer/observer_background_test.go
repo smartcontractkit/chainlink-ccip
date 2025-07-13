@@ -20,7 +20,7 @@ import (
 )
 
 func Test_backgroundObserver(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	lggr := mocks.NullLogger
 
 	numWorkers := 10

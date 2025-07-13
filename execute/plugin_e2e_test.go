@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	ocrtypecodec "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
 
@@ -284,7 +283,7 @@ func TestPluginMultipleReportsWithMultipleSourceChainsAndTimestamps(t *testing.T
 }
 
 func TestCommitReportCacheOptimization(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	srcSelector := cciptypes.ChainSelector(1)
 	dstSelector := cciptypes.ChainSelector(2)
@@ -375,7 +374,7 @@ func TestCommitReportCacheOptimization(t *testing.T) {
 }
 
 func TestPlugin_FinalizedUnfinalizedCaching(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	srcSelector := cciptypes.ChainSelector(1)
 	dstSelector := cciptypes.ChainSelector(2)
@@ -436,7 +435,7 @@ func TestPlugin_FinalizedUnfinalizedCaching(t *testing.T) {
 }
 
 func TestPlugin_CommitReportTimestampOrdering(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	srcChainA := cciptypes.ChainSelector(1)
 	srcChainB := cciptypes.ChainSelector(3)
@@ -518,7 +517,7 @@ func TestPlugin_CommitReportTimestampOrdering(t *testing.T) {
 }
 
 func TestPlugin_EncodingSizeLimits(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	srcSelector := cciptypes.ChainSelector(1)
 	dstSelector := cciptypes.ChainSelector(2)
