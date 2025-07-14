@@ -320,7 +320,7 @@ func (r *ccipChainReader) LatestMsgSeqNum(
 			chain, r.destChain, err)
 	}
 
-	lggr.Infow("chain reader returning latest onramp sequence number",
+	lggr.Debugw("chain reader returning latest onramp sequence number",
 		"seqNum", seqNum, "sourceChainSelector", chain)
 	return seqNum, nil
 }
@@ -483,41 +483,60 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 	//
 	//nolint:lll
 	prices := make(map[cciptypes.ChainSelector]cciptypes.BigInt)
-	for _, chain := range selectors {
-		chainAccessor, err := getChainAccessor(r.accessors, chain)
-		if err != nil {
-			lggr.Errorw("chain accessor not found, chain native price skipped", "chain", chain, "err", err)
-			continue
-		}
 
-		config, err := r.configPoller.GetChainConfig(ctx, chain)
-		if err != nil {
-			lggr.Warnw("failed to get chain config for native token address", "chain", chain, "err", err)
-			continue
-		}
-		nativeTokenAddress := config.Router.WrappedNativeAddress
+	var wg sync.WaitGroup
+	var mu sync.Mutex
 
-		if cciptypes.UnknownAddress(nativeTokenAddress).IsZeroOrEmpty() {
-			lggr.Warnw("Native token address is zero or empty. Ignore for disabled chains otherwise "+
-				"check for router misconfiguration", "chain", chain, "address", nativeTokenAddress.String())
-			continue
-		}
-		price, err := chainAccessor.GetTokenPriceUSD(ctx, cciptypes.UnknownAddress(nativeTokenAddress))
-		if err != nil {
-			lggr.Errorw("failed to get native token price", "chain", chain, "address", nativeTokenAddress.String(), "err", err)
-			continue
-		}
+	for _, chainSelector := range selectors {
+		// Capture loop variable
+		chain := chainSelector
 
-		if price.Timestamp == 0 {
-			lggr.Warnw("no native token price available", "chain", chain)
-			continue
-		}
-		if price.Value == nil || price.Value.Cmp(big.NewInt(0)) <= 0 {
-			lggr.Errorw("native token price is nil or non-positive", "chain", chain)
-			continue
-		}
-		prices[chain] = cciptypes.NewBigInt(price.Value)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			chainAccessor, err := getChainAccessor(r.accessors, chain)
+			if err != nil {
+				lggr.Errorw("chain accessor not found, chain native price skipped", "chain", chain, "err", err)
+				return
+			}
+
+			config, err := r.configPoller.GetChainConfig(ctx, chain)
+			if err != nil {
+				lggr.Warnw("failed to get chain config for native token address", "chain", chain, "err", err)
+				return
+			}
+			nativeTokenAddress := config.Router.WrappedNativeAddress
+
+			if cciptypes.UnknownAddress(nativeTokenAddress).IsZeroOrEmpty() {
+				lggr.Warnw("Native token address is zero or empty. Ignore for disabled chains otherwise "+
+					"check for router misconfiguration", "chain", chain, "address", nativeTokenAddress.String())
+				return
+			}
+
+			price, err := chainAccessor.GetTokenPriceUSD(ctx, cciptypes.UnknownAddress(nativeTokenAddress))
+			if err != nil {
+				lggr.Errorw("failed to get native token price", "chain", chain, "address", nativeTokenAddress.String(), "err", err)
+				return
+			}
+
+			if price.Timestamp == 0 {
+				lggr.Warnw("no native token price available", "chain", chain)
+				return
+			}
+			if price.Value == nil || price.Value.Cmp(big.NewInt(0)) <= 0 {
+				lggr.Errorw("native token price is nil or non-positive", "chain", chain)
+				return
+			}
+
+			mu.Lock()
+			prices[chain] = cciptypes.NewBigInt(price.Value)
+			mu.Unlock()
+		}()
 	}
+
+	wg.Wait()
+
 	return prices
 }
 

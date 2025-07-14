@@ -31,10 +31,19 @@ export type BurnmintTokenPool = {
           "isSigner": false
         }
       ],
-      "args": []
+      "args": [
+        {
+          "name": "routerAddress",
+          "type": "publicKey"
+        },
+        {
+          "name": "rmnAddress",
+          "type": "publicKey"
+        }
+      ]
     },
     {
-      "name": "updateGlobalConfig",
+      "name": "updateSelfServedAllowed",
       "accounts": [
         {
           "name": "config",
@@ -45,11 +54,6 @@ export type BurnmintTokenPool = {
           "name": "authority",
           "isMut": false,
           "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
         },
         {
           "name": "program",
@@ -66,6 +70,68 @@ export type BurnmintTokenPool = {
         {
           "name": "selfServedAllowed",
           "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "updateDefaultRouter",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "routerAddress",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
+      "name": "updateDefaultRmn",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "rmnAddress",
+          "type": "publicKey"
         }
       ]
     },
@@ -108,16 +174,7 @@ export type BurnmintTokenPool = {
           "isSigner": false
         }
       ],
-      "args": [
-        {
-          "name": "router",
-          "type": "publicKey"
-        },
-        {
-          "name": "rmnRemote",
-          "type": "publicKey"
-        }
-      ]
+      "args": []
     },
     {
       "name": "transferMintAuthorityToMultisig",
@@ -236,7 +293,7 @@ export type BurnmintTokenPool = {
       "accounts": [
         {
           "name": "state",
-          "isMut": true,
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -246,13 +303,59 @@ export type BurnmintTokenPool = {
         },
         {
           "name": "authority",
-          "isMut": false,
+          "isMut": true,
           "isSigner": true
+        },
+        {
+          "name": "program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": [
         {
           "name": "newRouter",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
+      "name": "setRmn",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "rmnAddress",
           "type": "publicKey"
         }
       ]
@@ -709,6 +812,14 @@ export type BurnmintTokenPool = {
           {
             "name": "selfServedAllowed",
             "type": "bool"
+          },
+          {
+            "name": "router",
+            "type": "publicKey"
+          },
+          {
+            "name": "rmnRemote",
+            "type": "publicKey"
           }
         ]
       }
@@ -843,10 +954,19 @@ export const IDL: BurnmintTokenPool = {
           "isSigner": false
         }
       ],
-      "args": []
+      "args": [
+        {
+          "name": "routerAddress",
+          "type": "publicKey"
+        },
+        {
+          "name": "rmnAddress",
+          "type": "publicKey"
+        }
+      ]
     },
     {
-      "name": "updateGlobalConfig",
+      "name": "updateSelfServedAllowed",
       "accounts": [
         {
           "name": "config",
@@ -857,11 +977,6 @@ export const IDL: BurnmintTokenPool = {
           "name": "authority",
           "isMut": false,
           "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
         },
         {
           "name": "program",
@@ -878,6 +993,68 @@ export const IDL: BurnmintTokenPool = {
         {
           "name": "selfServedAllowed",
           "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "updateDefaultRouter",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "routerAddress",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
+      "name": "updateDefaultRmn",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "rmnAddress",
+          "type": "publicKey"
         }
       ]
     },
@@ -920,16 +1097,7 @@ export const IDL: BurnmintTokenPool = {
           "isSigner": false
         }
       ],
-      "args": [
-        {
-          "name": "router",
-          "type": "publicKey"
-        },
-        {
-          "name": "rmnRemote",
-          "type": "publicKey"
-        }
-      ]
+      "args": []
     },
     {
       "name": "transferMintAuthorityToMultisig",
@@ -1048,7 +1216,7 @@ export const IDL: BurnmintTokenPool = {
       "accounts": [
         {
           "name": "state",
-          "isMut": true,
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -1058,13 +1226,59 @@ export const IDL: BurnmintTokenPool = {
         },
         {
           "name": "authority",
-          "isMut": false,
+          "isMut": true,
           "isSigner": true
+        },
+        {
+          "name": "program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": [
         {
           "name": "newRouter",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
+      "name": "setRmn",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "rmnAddress",
           "type": "publicKey"
         }
       ]
@@ -1521,6 +1735,14 @@ export const IDL: BurnmintTokenPool = {
           {
             "name": "selfServedAllowed",
             "type": "bool"
+          },
+          {
+            "name": "router",
+            "type": "publicKey"
+          },
+          {
+            "name": "rmnRemote",
+            "type": "publicKey"
           }
         ]
       }

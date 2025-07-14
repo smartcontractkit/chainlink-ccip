@@ -12,6 +12,8 @@ import (
 
 // InitGlobalConfig is the `initGlobalConfig` instruction.
 type InitGlobalConfig struct {
+	RouterAddress *ag_solanago.PublicKey
+	RmnAddress    *ag_solanago.PublicKey
 
 	// [0] = [WRITE] config
 	//
@@ -31,6 +33,18 @@ func NewInitGlobalConfigInstructionBuilder() *InitGlobalConfig {
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 5),
 	}
 	return nd
+}
+
+// SetRouterAddress sets the "routerAddress" parameter.
+func (inst *InitGlobalConfig) SetRouterAddress(routerAddress ag_solanago.PublicKey) *InitGlobalConfig {
+	inst.RouterAddress = &routerAddress
+	return inst
+}
+
+// SetRmnAddress sets the "rmnAddress" parameter.
+func (inst *InitGlobalConfig) SetRmnAddress(rmnAddress ag_solanago.PublicKey) *InitGlobalConfig {
+	inst.RmnAddress = &rmnAddress
+	return inst
 }
 
 // SetConfigAccount sets the "config" account.
@@ -106,6 +120,16 @@ func (inst InitGlobalConfig) ValidateAndBuild() (*Instruction, error) {
 }
 
 func (inst *InitGlobalConfig) Validate() error {
+	// Check whether all (required) parameters are set:
+	{
+		if inst.RouterAddress == nil {
+			return errors.New("RouterAddress parameter is not set")
+		}
+		if inst.RmnAddress == nil {
+			return errors.New("RmnAddress parameter is not set")
+		}
+	}
+
 	// Check whether all (required) accounts are set:
 	{
 		if inst.AccountMetaSlice[0] == nil {
@@ -136,7 +160,10 @@ func (inst *InitGlobalConfig) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=0]").ParentFunc(func(paramsBranch ag_treeout.Branches) {})
+					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+						paramsBranch.Child(ag_format.Param("RouterAddress", *inst.RouterAddress))
+						paramsBranch.Child(ag_format.Param("   RmnAddress", *inst.RmnAddress))
+					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=5]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
@@ -151,14 +178,37 @@ func (inst *InitGlobalConfig) EncodeToTree(parent ag_treeout.Branches) {
 }
 
 func (obj InitGlobalConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `RouterAddress` param:
+	err = encoder.Encode(obj.RouterAddress)
+	if err != nil {
+		return err
+	}
+	// Serialize `RmnAddress` param:
+	err = encoder.Encode(obj.RmnAddress)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 func (obj *InitGlobalConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `RouterAddress`:
+	err = decoder.Decode(&obj.RouterAddress)
+	if err != nil {
+		return err
+	}
+	// Deserialize `RmnAddress`:
+	err = decoder.Decode(&obj.RmnAddress)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
 // NewInitGlobalConfigInstruction declares a new InitGlobalConfig instruction with the provided parameters and accounts.
 func NewInitGlobalConfigInstruction(
+	// Parameters:
+	routerAddress ag_solanago.PublicKey,
+	rmnAddress ag_solanago.PublicKey,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
@@ -166,6 +216,8 @@ func NewInitGlobalConfigInstruction(
 	program ag_solanago.PublicKey,
 	programData ag_solanago.PublicKey) *InitGlobalConfig {
 	return NewInitGlobalConfigInstructionBuilder().
+		SetRouterAddress(routerAddress).
+		SetRmnAddress(rmnAddress).
 		SetConfigAccount(config).
 		SetAuthorityAccount(authority).
 		SetSystemProgramAccount(systemProgram).

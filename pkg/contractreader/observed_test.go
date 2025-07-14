@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
+	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
@@ -22,7 +23,8 @@ func Test_GetBatchValue(t *testing.T) {
 	t.Cleanup(resetMetrics)
 
 	ctx := tests.Context(t)
-	chainID := "solana"
+	chainFamily := chainsel.FamilySolana
+	chainID := "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG"
 	mockedReader := mocked.NewMockContractReaderFacade(t)
 
 	r := make(types.BatchGetLatestValuesResult)
@@ -45,26 +47,34 @@ func Test_GetBatchValue(t *testing.T) {
 	mockedReader.EXPECT().BatchGetLatestValues(ctx, request3).
 		Return(nil, fmt.Errorf("error"))
 
-	reader := contractreader.NewObserverReader(mockedReader, logger.Test(t), chainID)
+	reader := contractreader.NewObserverReader(mockedReader, logger.Test(t), chainFamily, chainID)
 
 	_, err := reader.BatchGetLatestValues(ctx, request1)
 	require.NoError(t, err)
-	require.Equal(t, float64(2), testutil.ToFloat64(contractreader.CrBatchSizes.WithLabelValues(chainID)))
+	require.Equal(t, float64(2), testutil.ToFloat64(
+		contractreader.CrBatchSizes.WithLabelValues(chainFamily, chainID)),
+	)
 
 	_, err = reader.BatchGetLatestValues(ctx, request2)
 	require.NoError(t, err)
-	require.Equal(t, float64(5), testutil.ToFloat64(contractreader.CrBatchSizes.WithLabelValues(chainID)))
+	require.Equal(t, float64(5), testutil.ToFloat64(
+		contractreader.CrBatchSizes.WithLabelValues(chainFamily, chainID)),
+	)
 
 	require.Equal(t,
 		float64(0),
-		testutil.ToFloat64(contractreader.CrErrors.WithLabelValues(chainID, "BatchGetLatestValues", "")),
+		testutil.ToFloat64(
+			contractreader.CrErrors.WithLabelValues(chainFamily, chainID, "BatchGetLatestValues", ""),
+		),
 	)
 
 	_, err = reader.BatchGetLatestValues(ctx, request3)
 	require.Error(t, err)
 	require.Equal(t,
 		float64(1),
-		testutil.ToFloat64(contractreader.CrErrors.WithLabelValues(chainID, "BatchGetLatestValues", "")),
+		testutil.ToFloat64(
+			contractreader.CrErrors.WithLabelValues(chainFamily, chainID, "BatchGetLatestValues", ""),
+		),
 	)
 }
 
@@ -72,6 +82,7 @@ func Test_GetLatestValue(t *testing.T) {
 	t.Cleanup(resetMetrics)
 
 	ctx := tests.Context(t)
+	chainFamily := chainsel.FamilyAptos
 	chainID := "1"
 	mockedReader := mocked.NewMockContractReaderFacade(t)
 
@@ -83,21 +94,23 @@ func Test_GetLatestValue(t *testing.T) {
 	mockedReader.EXPECT().GetLatestValue(ctx, contractID2, mock.Anything, mock.Anything, mock.Anything).
 		Return(fmt.Errorf("error"))
 
-	reader := contractreader.NewObserverReader(mockedReader, logger.Test(t), chainID)
+	reader := contractreader.NewObserverReader(mockedReader, logger.Test(t), chainFamily, chainID)
 
 	err := reader.GetLatestValue(ctx, contractID1, primitives.Unconfirmed, nil, nil)
 	require.NoError(t, err)
 
-	c1 := testutil.ToFloat64(contractreader.CrErrors.WithLabelValues(chainID, "contract", "read"))
+	c1 := testutil.ToFloat64(contractreader.CrErrors.WithLabelValues(chainFamily, chainID, "contract", "read"))
 	require.Equal(t, 0, int(c1))
 
-	c2 := internal.CounterFromHistogramByLabels(t, contractreader.CrDirectRequestsDurations, chainID, "contract", "read")
+	c2 := internal.CounterFromHistogramByLabels(
+		t, contractreader.CrDirectRequestsDurations, chainFamily, chainID, "contract", "read",
+	)
 	require.Equal(t, 1, c2)
 
 	err = reader.GetLatestValue(ctx, contractID2, primitives.Unconfirmed, nil, nil)
 	require.Error(t, err)
 
-	c3 := testutil.ToFloat64(contractreader.CrErrors.WithLabelValues(chainID, "contract", "faulty"))
+	c3 := testutil.ToFloat64(contractreader.CrErrors.WithLabelValues(chainFamily, chainID, "contract", "faulty"))
 	require.Equal(t, 0, int(c3))
 }
 

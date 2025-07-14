@@ -84,6 +84,12 @@ impl BaseConfig {
         let pool_token_account =
             get_associated_token_address_with_program_id(&pool_signer, &mint.key(), &token_program);
 
+        emit!(TokenPoolInitialized {
+            mint: mint.key(),
+            token_program,
+            owner,
+        });
+
         Self {
             token_program,
             mint: mint.key(),
@@ -150,6 +156,25 @@ impl BaseConfig {
             old_router,
             new_router,
         });
+        Ok(())
+    }
+
+    pub fn set_rmn(&mut self, rmn_address: Pubkey) -> Result<()> {
+        require_keys_neq!(
+            rmn_address,
+            Pubkey::default(),
+            CcipTokenPoolError::InvalidInputs
+        );
+
+        let old_rmn = self.rmn_remote;
+        self.rmn_remote = rmn_address;
+
+        emit!(RmnRemoteUpdated {
+            old_rmn_remote: old_rmn,
+            new_rmn_remote: rmn_address,
+            mint: self.mint.key(),
+        });
+
         Ok(())
     }
 
@@ -292,13 +317,15 @@ impl Deref for RemoteAddress {
     }
 }
 
-#[derive(Clone, AnchorSerialize, AnchorDeserialize)]
+#[derive(Clone, AnchorSerialize, AnchorDeserialize, Debug)]
 pub struct LockOrBurnInV1 {
     pub receiver: Vec<u8>, //  The recipient of the tokens on the destination chain
     pub remote_chain_selector: u64, // The chain ID of the destination chain
     pub original_sender: Pubkey, // The original sender of the tx on the source chain
     pub amount: u64, // local solana amount to lock/burn,  The amount of tokens to lock or burn, denominated in the source token's decimals
     pub local_token: Pubkey, //  The address on this chain of the token to lock or burn
+
+    pub msg_total_nonce: u64, // The onramp full nonce for the current message, given the original_sender and remote chain selector.
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
@@ -331,9 +358,97 @@ pub struct ReleaseOrMintOutV1 {
     pub destination_amount: u64, // token amounts local to solana
 }
 
+#[derive(Debug, Default, PartialEq, Eq, Clone, AnchorDeserialize, AnchorSerialize)]
+pub struct DeriveAccountsResponse {
+    pub ask_again_with: Vec<CcipAccountMeta>,
+    pub accounts_to_save: Vec<CcipAccountMeta>,
+    pub look_up_tables_to_save: Vec<Pubkey>,
+    pub current_stage: String,
+    pub next_stage: String,
+}
+
+// We can't use anchor's `AccountMeta` since it doesn't implement
+// AnchorSerialize/AnchorDeserialize, and it's too small to warrant wrapping.
+#[derive(Debug, Default, PartialEq, Eq, Clone, AnchorDeserialize, AnchorSerialize)]
+pub struct CcipAccountMeta {
+    pub pubkey: Pubkey,
+    pub is_signer: bool,
+    pub is_writable: bool,
+}
+
+pub trait ToMeta {
+    fn readonly(self) -> CcipAccountMeta;
+    fn writable(self) -> CcipAccountMeta;
+    fn signer(self) -> CcipAccountMeta;
+}
+
+impl From<AccountMeta> for CcipAccountMeta {
+    fn from(meta: AccountMeta) -> Self {
+        Self {
+            pubkey: meta.pubkey,
+            is_signer: meta.is_signer,
+            is_writable: meta.is_writable,
+        }
+    }
+}
+
+impl ToMeta for Pubkey {
+    fn readonly(self) -> CcipAccountMeta {
+        CcipAccountMeta {
+            pubkey: self,
+            is_signer: false,
+            is_writable: false,
+        }
+    }
+
+    fn writable(self) -> CcipAccountMeta {
+        CcipAccountMeta {
+            pubkey: self,
+            is_signer: false,
+            is_writable: true,
+        }
+    }
+
+    fn signer(self) -> CcipAccountMeta {
+        CcipAccountMeta {
+            pubkey: self,
+            is_signer: true,
+            is_writable: false,
+        }
+    }
+}
+
+impl ToMeta for CcipAccountMeta {
+    fn readonly(self) -> CcipAccountMeta {
+        CcipAccountMeta {
+            pubkey: self.pubkey,
+            is_signer: self.is_signer,
+            is_writable: false,
+        }
+    }
+
+    fn writable(self) -> CcipAccountMeta {
+        CcipAccountMeta {
+            pubkey: self.pubkey,
+            is_signer: self.is_signer,
+            is_writable: true,
+        }
+    }
+
+    fn signer(self) -> CcipAccountMeta {
+        CcipAccountMeta {
+            pubkey: self.pubkey,
+            is_signer: true,
+            is_writable: self.is_writable,
+        }
+    }
+}
+
 #[event]
 pub struct GlobalConfigUpdated {
     pub self_served_allowed: bool,
+    pub router: Pubkey,
+    pub rmn_remote: Pubkey,
 }
 
 #[event]
@@ -407,10 +522,24 @@ pub struct RouterUpdated {
 }
 
 #[event]
+pub struct RmnRemoteUpdated {
+    pub old_rmn_remote: Pubkey,
+    pub new_rmn_remote: Pubkey,
+    pub mint: Pubkey,
+}
+
+#[event]
 pub struct OwnershipTransferRequested {
     pub from: Pubkey,
     pub to: Pubkey,
     pub mint: Pubkey,
+}
+
+#[event]
+pub struct TokenPoolInitialized {
+    pub mint: Pubkey,
+    pub token_program: Pubkey,
+    pub owner: Pubkey,
 }
 
 #[event]
@@ -457,6 +586,8 @@ pub enum CcipTokenPoolError {
     RemotePoolAddressAlreadyExisted,
     #[msg("Expected empty pool addresses during initialization")]
     NonemptyPoolAddressesInit,
+    #[msg("Unexpected account derivation stage")]
+    InvalidDerivationStage,
 
     // Rate limit errors
     #[msg("RateLimit: bucket overfilled")]
@@ -473,6 +604,8 @@ pub enum CcipTokenPoolError {
     // Lock/Release errors
     #[msg("Liquidity not accepted")]
     LiquidityNotAccepted,
+    #[msg("Transfering zero tokens is not allowed")]
+    TransferZeroTokensNotAllowed,
 }
 
 // validate_lock_or_burn checks for correctness on inputs

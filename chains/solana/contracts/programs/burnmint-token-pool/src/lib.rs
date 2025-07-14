@@ -19,20 +19,28 @@ pub mod burnmint_token_pool {
 
     use super::*;
 
-    pub fn init_global_config(ctx: Context<InitGlobalConfig>) -> Result<()> {
+    pub fn init_global_config(
+        ctx: Context<InitGlobalConfig>,
+        router_address: Pubkey,
+        rmn_address: Pubkey,
+    ) -> Result<()> {
         ctx.accounts.config.set_inner(PoolConfig {
             self_served_allowed: false,
             version: 1,
+            router: router_address,
+            rmn_remote: rmn_address,
         });
 
         emit!(GlobalConfigUpdated {
             self_served_allowed: ctx.accounts.config.self_served_allowed,
+            router: ctx.accounts.config.router,
+            rmn_remote: ctx.accounts.config.rmn_remote,
         });
 
         Ok(())
     }
 
-    pub fn update_global_config(
+    pub fn update_self_served_allowed(
         ctx: Context<UpdateGlobalConfig>,
         self_served_allowed: bool,
     ) -> Result<()> {
@@ -40,24 +48,49 @@ pub mod burnmint_token_pool {
 
         emit!(GlobalConfigUpdated {
             self_served_allowed: ctx.accounts.config.self_served_allowed,
+            router: ctx.accounts.config.router,
+            rmn_remote: ctx.accounts.config.rmn_remote,
         });
 
         Ok(())
     }
 
-    pub fn initialize(
-        ctx: Context<InitializeTokenPool>,
-        router: Pubkey,
-        rmn_remote: Pubkey,
+    pub fn update_default_router(
+        ctx: Context<UpdateGlobalConfig>,
+        router_address: Pubkey,
     ) -> Result<()> {
+        ctx.accounts.config.router = router_address;
+
+        emit!(GlobalConfigUpdated {
+            self_served_allowed: ctx.accounts.config.self_served_allowed,
+            router: ctx.accounts.config.router,
+            rmn_remote: ctx.accounts.config.rmn_remote,
+        });
+
+        Ok(())
+    }
+
+    pub fn update_default_rmn(ctx: Context<UpdateGlobalConfig>, rmn_address: Pubkey) -> Result<()> {
+        ctx.accounts.config.rmn_remote = rmn_address;
+
+        emit!(GlobalConfigUpdated {
+            self_served_allowed: ctx.accounts.config.self_served_allowed,
+            router: ctx.accounts.config.router,
+            rmn_remote: ctx.accounts.config.rmn_remote,
+        });
+
+        Ok(())
+    }
+
+    pub fn initialize(ctx: Context<InitializeTokenPool>) -> Result<()> {
         ctx.accounts.state.set_inner(State {
             version: 1,
             config: BaseConfig::init(
                 &ctx.accounts.mint,
                 ctx.program_id.key(),
                 ctx.accounts.authority.key(),
-                router,
-                rmn_remote,
+                ctx.accounts.config.router,
+                ctx.accounts.config.rmn_remote,
             ),
         });
 
@@ -181,11 +214,15 @@ pub mod burnmint_token_pool {
 
     // set_router changes the expected signers for mint/release + burn/lock method calls
     // this is used to update the router address
-    pub fn set_router(ctx: Context<SetConfig>, new_router: Pubkey) -> Result<()> {
+    pub fn set_router(ctx: Context<AdminUpdateTokenPool>, new_router: Pubkey) -> Result<()> {
         ctx.accounts
             .state
             .config
             .set_router(new_router, ctx.program_id)
+    }
+
+    pub fn set_rmn(ctx: Context<AdminUpdateTokenPool>, rmn_address: Pubkey) -> Result<()> {
+        ctx.accounts.state.config.set_rmn(rmn_address)
     }
 
     // permissionless method to set a pool's `state.version` value, only when
@@ -295,13 +332,19 @@ pub mod burnmint_token_pool {
         remove: Vec<Pubkey>,
     ) -> Result<()> {
         let list = &mut ctx.accounts.state.config.allow_list;
-        for key in remove {
-            require!(
-                list.contains(&key),
-                CcipTokenPoolError::AllowlistKeyDidNotExist
-            );
-            list.retain(|k| k != &key);
-        }
+        // Cache initial length
+        let initial_list_len = list.len();
+        // Collect all keys to remove into a HashSet for O(1) lookups
+        let keys_to_remove: std::collections::HashSet<Pubkey> = remove.into_iter().collect();
+        // Perform a single pass through the list
+        list.retain(|k| !keys_to_remove.contains(k));
+
+        // We don't store repeated keys, so the keys_to_remove should match the removed keys
+        require_eq!(
+            initial_list_len,
+            list.len().checked_add(keys_to_remove.len()).unwrap(),
+            CcipTokenPoolError::AllowlistKeyDidNotExist
+        );
 
         Ok(())
     }

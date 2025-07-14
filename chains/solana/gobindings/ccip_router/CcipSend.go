@@ -35,6 +35,8 @@ type CcipSend struct {
 	// [1] = [WRITE] destChainState
 	//
 	// [2] = [WRITE] nonce
+	// ··········· CHECK this represents the PDA where the message counters are stored. As it may be initialized or not,
+	// ··········· and it may be in it's v1 or v2 form, it is an UncheckedAccount and the code handles all cases manually.
 	//
 	// [3] = [WRITE, SIGNER] authority
 	//
@@ -118,12 +120,16 @@ func (inst *CcipSend) GetDestChainStateAccount() *ag_solanago.AccountMeta {
 }
 
 // SetNonceAccount sets the "nonce" account.
+// CHECK this represents the PDA where the message counters are stored. As it may be initialized or not,
+// and it may be in it's v1 or v2 form, it is an UncheckedAccount and the code handles all cases manually.
 func (inst *CcipSend) SetNonceAccount(nonce ag_solanago.PublicKey) *CcipSend {
 	inst.AccountMetaSlice[2] = ag_solanago.Meta(nonce).WRITE()
 	return inst
 }
 
 // GetNonceAccount gets the "nonce" account.
+// CHECK this represents the PDA where the message counters are stored. As it may be initialized or not,
+// and it may be in it's v1 or v2 form, it is an UncheckedAccount and the code handles all cases manually.
 func (inst *CcipSend) GetNonceAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[2]
 }

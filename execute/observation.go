@@ -115,11 +115,15 @@ func (p *Plugin) Observation(
 	}
 
 	p.observer.TrackObservation(observation, state)
+	numCommitReports := 0
+	for _, reports := range observation.CommitReports {
+		numCommitReports += len(reports)
+	}
 	lggr.Infow("execute plugin got observation",
 		"observationWithoutMsgDataAndDiscoveryObs", observation.ToLogFormat(),
 		"duration", time.Since(tStart),
 		"state", state,
-		"numCommitReports", len(observation.CommitReports),
+		"numCommitReports", numCommitReports,
 		"numMessages", observation.Messages.Count())
 
 	return p.ocrTypeCodec.EncodeObservation(observation)
