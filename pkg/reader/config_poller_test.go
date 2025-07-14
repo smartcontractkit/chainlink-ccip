@@ -13,12 +13,11 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	reader_mocks "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 func setupBasicCache(t *testing.T) (*configPoller, *reader_mocks.MockExtended) {
@@ -237,7 +236,7 @@ func TestConfigPoller_StartStop(t *testing.T) {
 
 func TestConfigPoller_BatchRefresh(t *testing.T) {
 	cache, reader := setupBasicCache(t)
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	// Setup source chains
 	sourceChains := []cciptypes.ChainSelector{chainB, chainC}
@@ -264,7 +263,7 @@ func TestConfigPoller_BatchRefresh(t *testing.T) {
 
 func TestConfigPoller_RefreshAllKnownChains(t *testing.T) {
 	cache, reader := setupBasicCache(t)
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	// First populate the cache with initial data
 	setupInitialData(ctx, cache, reader)
@@ -357,7 +356,7 @@ func TestConfigPoller_TrackSourceChain(t *testing.T) {
 	assert.False(t, success)
 
 	// First populate the cache with an initial request
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	setupMockResponse(reader)
 	_, err := cache.GetChainConfig(ctx, chainA)
 	require.NoError(t, err)
@@ -385,7 +384,7 @@ func TestConfigPoller_TrackSourceChain(t *testing.T) {
 
 func TestConfigPoller_BackgroundErrorHandling(t *testing.T) {
 	cache, reader := setupBasicCache(t)
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	// Setup initial successful fetch
 	setupInitialData(ctx, cache, reader)
@@ -417,7 +416,7 @@ func TestConfigPoller_BackgroundErrorHandling(t *testing.T) {
 
 func TestConfigPoller_ConcurrentWithBackground(t *testing.T) {
 	cache, reader := setupBasicCache(t)
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	// Setup with initial data
 	setupInitialData(ctx, cache, reader)
@@ -454,7 +453,7 @@ func TestConfigPoller_ConcurrentWithBackground(t *testing.T) {
 
 func TestConfigCache_GetChainConfig_CacheHit(t *testing.T) {
 	cache, reader := setupBasicCache(t)
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	// Setup mock for initial fetch
 	mockCommitOCRConfig := OCRConfigResponse{
@@ -507,7 +506,7 @@ func TestConfigCache_GetChainConfig_CacheHit(t *testing.T) {
 
 func TestConfigCache_GetChainConfig_CacheUpdate(t *testing.T) {
 	cache, reader := setupBasicCache(t)
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	// Setup mock responses for two different fetches
 	setupMockBatchResponse := func(f uint8, n uint8) types.BatchGetLatestValuesResult {
@@ -569,7 +568,7 @@ func TestConfigCache_GetChainConfig_CacheUpdate(t *testing.T) {
 
 func TestConfigCache_GetChainConfig_Error(t *testing.T) {
 	cache, reader := setupBasicCache(t)
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	expectedErr := errors.New("fetch error")
 	reader.On("ExtendedBatchGetLatestValues",
@@ -585,7 +584,7 @@ func TestConfigCache_GetChainConfig_Error(t *testing.T) {
 
 func TestConfigCache_NoReader(t *testing.T) {
 	cache, _ := setupBasicCache(t)
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	// Test with a chain that has no reader
 	_, err := cache.GetChainConfig(ctx, chainB)
@@ -595,7 +594,7 @@ func TestConfigCache_NoReader(t *testing.T) {
 
 func TestConfigCache_ErrorWithCachedData(t *testing.T) {
 	cache, reader := setupBasicCache(t)
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	// Setup initial successful fetch
 	mockConfig := OCRConfigResponse{
@@ -647,7 +646,7 @@ func TestConfigCache_ErrorWithCachedData(t *testing.T) {
 
 func TestConfigCache_RefreshChainConfig(t *testing.T) {
 	cache, reader := setupBasicCache(t)
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	// Setup mock response
 	mockConfig := OCRConfigResponse{
@@ -687,7 +686,7 @@ func TestConfigCache_RefreshChainConfig(t *testing.T) {
 
 func TestConfigCache_ConcurrentAccess(t *testing.T) {
 	cache, reader := setupBasicCache(t)
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	// Setup mock response
 	mockConfig := OCRConfigResponse{
@@ -796,7 +795,7 @@ func TestConfigCache_Initialization(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			lggr := logger.Test(t)
-			ctx := tests.Context(t)
+			ctx := t.Context()
 
 			reader := tc.setupReader()
 			cache := newConfigPoller(lggr, reader, tc.refreshPeriod)
@@ -815,7 +814,7 @@ func TestConfigCache_Initialization(t *testing.T) {
 
 func TestConfigCache_GetChainConfig_SkippedContracts(t *testing.T) {
 	cache, reader := setupBasicCache(t)
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	// Setup mock response with skipped contracts
 	mockConfig := OCRConfigResponse{
@@ -854,7 +853,7 @@ func TestConfigCache_GetChainConfig_SkippedContracts(t *testing.T) {
 
 func TestConfigCache_InvalidResults(t *testing.T) {
 	cache, reader := setupBasicCache(t)
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	testCases := []struct {
 		name        string
@@ -959,7 +958,7 @@ func TestConfigCache_MultipleChains(t *testing.T) {
 	}
 
 	cache := newConfigPoller(logger.Test(t), reader, 1*time.Second)
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	// Setup mock response for both chains
 	setupMockResponse := func(f uint8) types.BatchGetLatestValuesResult {
@@ -1047,7 +1046,7 @@ func TestConfigCache_BackgroundRefreshPeriod(t *testing.T) {
 			}
 
 			cache := newConfigPoller(logger.Test(t), reader, tc.refreshPeriod)
-			ctx := tests.Context(t)
+			ctx := t.Context()
 
 			mockConfig := OCRConfigResponse{
 				OCRConfig: OCRConfig{
@@ -1100,7 +1099,7 @@ func TestConfigCache_BackgroundRefreshPeriod(t *testing.T) {
 
 func TestConfigCache_GetOfframpSourceChainConfigs_CacheHit(t *testing.T) {
 	cache, reader := setupBasicCache(t)
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	// Setup mock response for source chain configs
 	sourceChains := []cciptypes.ChainSelector{chainB, chainC}
@@ -1144,7 +1143,7 @@ func TestConfigCache_GetOfframpSourceChainConfigs_CacheHit(t *testing.T) {
 
 func TestConfigCache_GetOfframpSourceChainConfigs_Update(t *testing.T) {
 	cache, reader := setupBasicCache(t)
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	sourceChains := []cciptypes.ChainSelector{chainB, chainC}
 
@@ -1221,7 +1220,7 @@ func TestConfigCache_GetOfframpSourceChainConfigs_Update(t *testing.T) {
 
 func TestConfigCache_GetOfframpSourceChainConfigs_MixedSet(t *testing.T) {
 	cache, reader := setupBasicCache(t)
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	// First request for chains B and C
 	sourceChains1 := []cciptypes.ChainSelector{chainB, chainC}
@@ -1285,7 +1284,7 @@ func TestConfigCache_GetOfframpSourceChainConfigs_MixedSet(t *testing.T) {
 
 func TestConfigCache_RefreshSourceChainConfigs(t *testing.T) {
 	cache, reader := setupBasicCache(t)
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	sourceChains := []cciptypes.ChainSelector{chainB, chainC}
 
@@ -1350,7 +1349,7 @@ func TestConfigCache_RefreshSourceChainConfigs(t *testing.T) {
 
 func TestConfigCache_GetOfframpSourceChainConfigs_Error(t *testing.T) {
 	cache, reader := setupBasicCache(t)
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	sourceChains := []cciptypes.ChainSelector{chainB, chainC}
 
@@ -1386,7 +1385,7 @@ func TestConfigCache_GetOfframpSourceChainConfigs_Error(t *testing.T) {
 
 func TestConfigCache_GlobalSourceChainRefreshTime(t *testing.T) {
 	cache, reader := setupBasicCache(t)
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	// First set of chains to request
 	sourceChains1 := []cciptypes.ChainSelector{chainB, chainC}
@@ -1516,7 +1515,7 @@ func TestConfigCache_GetOrCreateChainCache_InitializesSourceChainConfig(t *testi
 
 func TestConfigCache_RefreshSourceChainConfigs_SetsGlobalTimestamp(t *testing.T) {
 	cache, reader := setupBasicCache(t)
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	sourceChains := []cciptypes.ChainSelector{chainB}
 
@@ -1555,7 +1554,7 @@ func TestConfigCache_RefreshSourceChainConfigs_SetsGlobalTimestamp(t *testing.T)
 func TestConfigPoller_GetChainsToRefresh(t *testing.T) {
 	// Setup test environment with destination chain A
 	cache, reader := setupBasicCache(t)
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	// We need to first populate the cache for chain A by making a call to GetChainConfig
 	setupMockResponse(reader)

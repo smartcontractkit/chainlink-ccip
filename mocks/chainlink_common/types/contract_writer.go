@@ -69,6 +69,68 @@ func (_c *MockContractWriter_Close_Call) RunAndReturn(run func() error) *MockCon
 	return _c
 }
 
+// GetEstimateFee provides a mock function with given fields: ctx, contract, method, args, toAddress, meta, val
+func (_m *MockContractWriter) GetEstimateFee(ctx context.Context, contract string, method string, args any, toAddress string, meta *types.TxMeta, val *big.Int) (types.EstimateFee, error) {
+	ret := _m.Called(ctx, contract, method, args, toAddress, meta, val)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetEstimateFee")
+	}
+
+	var r0 types.EstimateFee
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, any, string, *types.TxMeta, *big.Int) (types.EstimateFee, error)); ok {
+		return rf(ctx, contract, method, args, toAddress, meta, val)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, any, string, *types.TxMeta, *big.Int) types.EstimateFee); ok {
+		r0 = rf(ctx, contract, method, args, toAddress, meta, val)
+	} else {
+		r0 = ret.Get(0).(types.EstimateFee)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, any, string, *types.TxMeta, *big.Int) error); ok {
+		r1 = rf(ctx, contract, method, args, toAddress, meta, val)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockContractWriter_GetEstimateFee_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetEstimateFee'
+type MockContractWriter_GetEstimateFee_Call struct {
+	*mock.Call
+}
+
+// GetEstimateFee is a helper method to define mock.On call
+//   - ctx context.Context
+//   - contract string
+//   - method string
+//   - args any
+//   - toAddress string
+//   - meta *types.TxMeta
+//   - val *big.Int
+func (_e *MockContractWriter_Expecter) GetEstimateFee(ctx interface{}, contract interface{}, method interface{}, args interface{}, toAddress interface{}, meta interface{}, val interface{}) *MockContractWriter_GetEstimateFee_Call {
+	return &MockContractWriter_GetEstimateFee_Call{Call: _e.mock.On("GetEstimateFee", ctx, contract, method, args, toAddress, meta, val)}
+}
+
+func (_c *MockContractWriter_GetEstimateFee_Call) Run(run func(ctx context.Context, contract string, method string, args any, toAddress string, meta *types.TxMeta, val *big.Int)) *MockContractWriter_GetEstimateFee_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(any), args[4].(string), args[5].(*types.TxMeta), args[6].(*big.Int))
+	})
+	return _c
+}
+
+func (_c *MockContractWriter_GetEstimateFee_Call) Return(_a0 types.EstimateFee, _a1 error) *MockContractWriter_GetEstimateFee_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockContractWriter_GetEstimateFee_Call) RunAndReturn(run func(context.Context, string, string, any, string, *types.TxMeta, *big.Int) (types.EstimateFee, error)) *MockContractWriter_GetEstimateFee_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetFeeComponents provides a mock function with given fields: ctx
 func (_m *MockContractWriter) GetFeeComponents(ctx context.Context) (*types.ChainFeeComponents, error) {
 	ret := _m.Called(ctx)
@@ -128,7 +190,7 @@ func (_c *MockContractWriter_GetFeeComponents_Call) RunAndReturn(run func(contex
 }
 
 // GetTransactionStatus provides a mock function with given fields: ctx, transactionID
-func (_m *MockContractWriter) GetTransactionStatus(ctx context.Context, transactionID string) (types.TransactionStatus, error) {
+func (_m *MockContractWriter) GetTransactionStatus(ctx context.Context, transactionID types.IdempotencyKey) (types.TransactionStatus, error) {
 	ret := _m.Called(ctx, transactionID)
 
 	if len(ret) == 0 {
@@ -137,16 +199,16 @@ func (_m *MockContractWriter) GetTransactionStatus(ctx context.Context, transact
 
 	var r0 types.TransactionStatus
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) (types.TransactionStatus, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, types.IdempotencyKey) (types.TransactionStatus, error)); ok {
 		return rf(ctx, transactionID)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) types.TransactionStatus); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, types.IdempotencyKey) types.TransactionStatus); ok {
 		r0 = rf(ctx, transactionID)
 	} else {
 		r0 = ret.Get(0).(types.TransactionStatus)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, types.IdempotencyKey) error); ok {
 		r1 = rf(ctx, transactionID)
 	} else {
 		r1 = ret.Error(1)
@@ -162,14 +224,14 @@ type MockContractWriter_GetTransactionStatus_Call struct {
 
 // GetTransactionStatus is a helper method to define mock.On call
 //   - ctx context.Context
-//   - transactionID string
+//   - transactionID types.IdempotencyKey
 func (_e *MockContractWriter_Expecter) GetTransactionStatus(ctx interface{}, transactionID interface{}) *MockContractWriter_GetTransactionStatus_Call {
 	return &MockContractWriter_GetTransactionStatus_Call{Call: _e.mock.On("GetTransactionStatus", ctx, transactionID)}
 }
 
-func (_c *MockContractWriter_GetTransactionStatus_Call) Run(run func(ctx context.Context, transactionID string)) *MockContractWriter_GetTransactionStatus_Call {
+func (_c *MockContractWriter_GetTransactionStatus_Call) Run(run func(ctx context.Context, transactionID types.IdempotencyKey)) *MockContractWriter_GetTransactionStatus_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string))
+		run(args[0].(context.Context), args[1].(types.IdempotencyKey))
 	})
 	return _c
 }
@@ -179,7 +241,7 @@ func (_c *MockContractWriter_GetTransactionStatus_Call) Return(_a0 types.Transac
 	return _c
 }
 
-func (_c *MockContractWriter_GetTransactionStatus_Call) RunAndReturn(run func(context.Context, string) (types.TransactionStatus, error)) *MockContractWriter_GetTransactionStatus_Call {
+func (_c *MockContractWriter_GetTransactionStatus_Call) RunAndReturn(run func(context.Context, types.IdempotencyKey) (types.TransactionStatus, error)) *MockContractWriter_GetTransactionStatus_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -368,7 +430,7 @@ func (_c *MockContractWriter_Start_Call) RunAndReturn(run func(context.Context) 
 }
 
 // SubmitTransaction provides a mock function with given fields: ctx, contractName, method, args, transactionID, toAddress, meta, value
-func (_m *MockContractWriter) SubmitTransaction(ctx context.Context, contractName string, method string, args any, transactionID string, toAddress string, meta *types.TxMeta, value *big.Int) error {
+func (_m *MockContractWriter) SubmitTransaction(ctx context.Context, contractName string, method string, args any, transactionID types.IdempotencyKey, toAddress string, meta *types.TxMeta, value *big.Int) error {
 	ret := _m.Called(ctx, contractName, method, args, transactionID, toAddress, meta, value)
 
 	if len(ret) == 0 {
@@ -376,7 +438,7 @@ func (_m *MockContractWriter) SubmitTransaction(ctx context.Context, contractNam
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, any, string, string, *types.TxMeta, *big.Int) error); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, any, types.IdempotencyKey, string, *types.TxMeta, *big.Int) error); ok {
 		r0 = rf(ctx, contractName, method, args, transactionID, toAddress, meta, value)
 	} else {
 		r0 = ret.Error(0)
@@ -395,7 +457,7 @@ type MockContractWriter_SubmitTransaction_Call struct {
 //   - contractName string
 //   - method string
 //   - args any
-//   - transactionID string
+//   - transactionID types.IdempotencyKey
 //   - toAddress string
 //   - meta *types.TxMeta
 //   - value *big.Int
@@ -403,9 +465,9 @@ func (_e *MockContractWriter_Expecter) SubmitTransaction(ctx interface{}, contra
 	return &MockContractWriter_SubmitTransaction_Call{Call: _e.mock.On("SubmitTransaction", ctx, contractName, method, args, transactionID, toAddress, meta, value)}
 }
 
-func (_c *MockContractWriter_SubmitTransaction_Call) Run(run func(ctx context.Context, contractName string, method string, args any, transactionID string, toAddress string, meta *types.TxMeta, value *big.Int)) *MockContractWriter_SubmitTransaction_Call {
+func (_c *MockContractWriter_SubmitTransaction_Call) Run(run func(ctx context.Context, contractName string, method string, args any, transactionID types.IdempotencyKey, toAddress string, meta *types.TxMeta, value *big.Int)) *MockContractWriter_SubmitTransaction_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(any), args[4].(string), args[5].(string), args[6].(*types.TxMeta), args[7].(*big.Int))
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(any), args[4].(types.IdempotencyKey), args[5].(string), args[6].(*types.TxMeta), args[7].(*big.Int))
 	})
 	return _c
 }
@@ -415,7 +477,7 @@ func (_c *MockContractWriter_SubmitTransaction_Call) Return(_a0 error) *MockCont
 	return _c
 }
 
-func (_c *MockContractWriter_SubmitTransaction_Call) RunAndReturn(run func(context.Context, string, string, any, string, string, *types.TxMeta, *big.Int) error) *MockContractWriter_SubmitTransaction_Call {
+func (_c *MockContractWriter_SubmitTransaction_Call) RunAndReturn(run func(context.Context, string, string, any, types.IdempotencyKey, string, *types.TxMeta, *big.Int) error) *MockContractWriter_SubmitTransaction_Call {
 	_c.Call.Return(run)
 	return _c
 }

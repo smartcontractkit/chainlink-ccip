@@ -8,17 +8,19 @@ import (
 	"testing"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 var (
@@ -78,7 +80,7 @@ func TestRMNHomePoller_HealthReport(t *testing.T) {
 		rmnHomeBoundContract,
 		2*time.Millisecond,
 	)
-	require.NoError(t, poller.Start(tests.Context(t)))
+	require.NoError(t, poller.Start(t.Context()))
 
 	require.Eventually(t, func() bool {
 		active, _ := poller.GetAllConfigDigests()
@@ -255,7 +257,7 @@ func Test_RMNHomePoller_Close(t *testing.T) {
 		}
 	}).Return(nil)
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	require.NoError(t, poller.Start(ctx))
 
 	err1 := poller.Close()
