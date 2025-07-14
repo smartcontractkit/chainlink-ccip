@@ -166,13 +166,18 @@ func NewCCIPReaderWithExtendedContractReaders(
 	var cas = make(map[cciptypes.ChainSelector]cciptypes.ChainAccessor)
 	for ch, extendedCr := range extendedContractReaders {
 		cr.WithExtendedContractReader(ch, extendedCr)
-		cas[ch] = chainaccessor.NewDefaultAccessor(
+		accessor, err := chainaccessor.NewDefaultAccessor(
 			lggr,
 			ch,
 			extendedCr,
 			contractWriters[ch],
 			addrCodec,
 		)
+		if err != nil {
+			// Panic here since this is only called from tests in core
+			panic(fmt.Errorf("failed to create chain accessor for %s: %w", ch, err))
+		}
+		cas[ch] = accessor
 	}
 
 	cr.accessors = cas
