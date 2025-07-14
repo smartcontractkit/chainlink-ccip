@@ -8,6 +8,8 @@
 contracts/target/*
 !contracts/target/idl/
 !contracts/target/types/
+!contracts/target/vendor/
+!contracts/target/vendor/*
 contracts/programs/*/target
 contracts/.anchor
 # keypair used by anchor/anchor test
@@ -28,3 +30,4 @@ eslint-report.json
 override*.toml
 # go work files
 go.work*
+devnet.config.yaml

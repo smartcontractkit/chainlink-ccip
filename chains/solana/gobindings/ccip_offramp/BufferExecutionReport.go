@@ -26,7 +26,7 @@ import (
 // # Arguments
 //
 // * `ctx` - The context containing the accounts required for buffering.
-// * `buffer_id` - An arbitrary buffer id defined by the caller (could be the message_id).
+// * `buffer_id` - An arbitrary buffer id defined by the caller (could be the message_id). Max 32 bytes.
 // * `report_length` - Total length in bytes of the execution report.
 // * `chunk` - The specific chunk to add to the buffer. Chunk must have a consistent size, except
 // the last one in the buffer, which may be smaller.

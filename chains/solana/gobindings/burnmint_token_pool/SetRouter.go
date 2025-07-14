@@ -14,18 +14,22 @@ import (
 type SetRouter struct {
 	NewRouter *ag_solanago.PublicKey
 
-	// [0] = [WRITE] state
+	// [0] = [] state
 	//
 	// [1] = [] mint
 	//
-	// [2] = [SIGNER] authority
+	// [2] = [WRITE, SIGNER] authority
+	//
+	// [3] = [] program
+	//
+	// [4] = [] programData
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewSetRouterInstructionBuilder creates a new `SetRouter` instruction builder.
 func NewSetRouterInstructionBuilder() *SetRouter {
 	nd := &SetRouter{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 3),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 5),
 	}
 	return nd
 }
@@ -38,7 +42,7 @@ func (inst *SetRouter) SetNewRouter(newRouter ag_solanago.PublicKey) *SetRouter 
 
 // SetStateAccount sets the "state" account.
 func (inst *SetRouter) SetStateAccount(state ag_solanago.PublicKey) *SetRouter {
-	inst.AccountMetaSlice[0] = ag_solanago.Meta(state).WRITE()
+	inst.AccountMetaSlice[0] = ag_solanago.Meta(state)
 	return inst
 }
 
@@ -60,13 +64,35 @@ func (inst *SetRouter) GetMintAccount() *ag_solanago.AccountMeta {
 
 // SetAuthorityAccount sets the "authority" account.
 func (inst *SetRouter) SetAuthorityAccount(authority ag_solanago.PublicKey) *SetRouter {
-	inst.AccountMetaSlice[2] = ag_solanago.Meta(authority).SIGNER()
+	inst.AccountMetaSlice[2] = ag_solanago.Meta(authority).WRITE().SIGNER()
 	return inst
 }
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *SetRouter) GetAuthorityAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[2]
+}
+
+// SetProgramAccount sets the "program" account.
+func (inst *SetRouter) SetProgramAccount(program ag_solanago.PublicKey) *SetRouter {
+	inst.AccountMetaSlice[3] = ag_solanago.Meta(program)
+	return inst
+}
+
+// GetProgramAccount gets the "program" account.
+func (inst *SetRouter) GetProgramAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[3]
+}
+
+// SetProgramDataAccount sets the "programData" account.
+func (inst *SetRouter) SetProgramDataAccount(programData ag_solanago.PublicKey) *SetRouter {
+	inst.AccountMetaSlice[4] = ag_solanago.Meta(programData)
+	return inst
+}
+
+// GetProgramDataAccount gets the "programData" account.
+func (inst *SetRouter) GetProgramDataAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[4]
 }
 
 func (inst SetRouter) Build() *Instruction {
@@ -105,6 +131,12 @@ func (inst *SetRouter) Validate() error {
 		if inst.AccountMetaSlice[2] == nil {
 			return errors.New("accounts.Authority is not set")
 		}
+		if inst.AccountMetaSlice[3] == nil {
+			return errors.New("accounts.Program is not set")
+		}
+		if inst.AccountMetaSlice[4] == nil {
+			return errors.New("accounts.ProgramData is not set")
+		}
 	}
 	return nil
 }
@@ -123,10 +155,12 @@ func (inst *SetRouter) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("    state", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("     mint", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice[2]))
+					instructionBranch.Child("Accounts[len=5]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+						accountsBranch.Child(ag_format.Meta("      state", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("       mint", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("  authority", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("    program", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("programData", inst.AccountMetaSlice[4]))
 					})
 				})
 		})
@@ -156,10 +190,14 @@ func NewSetRouterInstruction(
 	// Accounts:
 	state ag_solanago.PublicKey,
 	mint ag_solanago.PublicKey,
-	authority ag_solanago.PublicKey) *SetRouter {
+	authority ag_solanago.PublicKey,
+	program ag_solanago.PublicKey,
+	programData ag_solanago.PublicKey) *SetRouter {
 	return NewSetRouterInstructionBuilder().
 		SetNewRouter(newRouter).
 		SetStateAccount(state).
 		SetMintAccount(mint).
-		SetAuthorityAccount(authority)
+		SetAuthorityAccount(authority).
+		SetProgramAccount(program).
+		SetProgramDataAccount(programData)
 }
