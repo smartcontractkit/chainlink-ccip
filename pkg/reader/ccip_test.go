@@ -2212,7 +2212,7 @@ func Test_printReports(t *testing.T) {
 				assert.Equal(t, int64(50), ctx.Integer)
 			case "numTokenPriceUpdates":
 				assert.Equal(t, int64(50), ctx.Integer)
-			case "reports":
+			case "reportsWithRoots":
 				assert.Nil(t, ctx.Interface)
 			default:
 				assert.Fail(t, "unexpected context key: %s", ctx.Key)
@@ -2238,7 +2238,7 @@ func Test_printReports(t *testing.T) {
 				assert.Equal(t, int64(0), ctx.Integer)
 			case "numTokenPriceUpdates":
 				assert.Equal(t, int64(25), ctx.Integer)
-			case "reports":
+			case "reportsWithRoots":
 				assert.Len(t, ctx.Interface, 50)
 			default:
 				assert.Fail(t, "unexpected context key: %s", ctx.Key)
