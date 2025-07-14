@@ -1,3 +1,81 @@
+// Package v2 implements CCTP v2 token data observation for Chainlink CCIP.
+//
+// # Overview
+//
+// Cross-Chain Transfer Protocol (CCTP) is Circle's protocol for transferring USDC natively across
+// blockchains. CCTP v2 is the second version of this protocol that enables secure, trust-minimized
+// transfer of USDC between supported chains.
+//
+// Attestations are cryptographic proofs that validate cross-chain token transfers. When USDC is
+// burned on a source chain, Circle's attestation service provides signed attestations that can be
+// used to mint the equivalent amount on the destination chain. These attestations contain the
+// original message data and Circle's signature, proving the burn occurred.
+//
+// # File Structure
+//
+// This file contains the CCTPv2TokenDataObserver, which processes CCIP messages to extract CCTP v2
+// token data and fetch corresponding attestations. The main components are:
+//
+//   - CCTPv2TokenDataObserver: Main struct that implements token data observation
+//   - Helper functions for processing CCIP messages and matching them to CCTP messages
+//   - Functions for fetching attestations from Circle's API
+//   - Token data transformation and validation logic
+//
+// # Main Processing Flow
+//
+// The primary transformation happens in the Observe method, which processes CCIP messages through
+// several stages:
+//
+//  1. **Token Identification**: Iterate through all CCIP messages and identify tokens that represent
+//     CCTP v2 transfers. A token is considered a CCTP v2 transfer if:
+//     - Its source pool address matches a configured CCTP v2-enabled pool
+//     - Its ExtraData field contains a valid SourceTokenDataPayload with CCTP version 2
+//     - The payload can be successfully ABI-decoded
+//
+//  2. **Transaction Hash Collection**: Extract unique transaction hashes from messages containing
+//     CCTP v2 tokens. This batching is crucial for efficiency - multiple tokens in the same
+//     transaction share the same attestation data, so we fetch attestations by transaction hash
+//     to minimize API calls to Circle's attestation service.
+//
+//  3. **Attestation Fetching**: Query Circle's attestation API for all collected transaction hashes
+//     to retrieve CCTP v2 messages and their attestations.
+//
+//  4. **Message Matching**: Match each SourceTokenDataPayload with its corresponding CCTP v2 Message.
+//     This matching is complex because:
+//     - SourceTokenDataPayload contains the original burn parameters but lacks the nonce
+//     - CCTP v2 contracts don't return the nonce in events, so it's not available in the payload
+//     - We must match on all available fields (amount, domains, addresses, etc.) to ensure
+//     each CCIP token transfer matches the correct attestation
+//     - CCTPv2 Messages are consumed after matching to prevent double-assignment
+//
+// 5. **Token Data Generation**: Transform matched pairs into MessageTokenData:
+//   - SourceTokenDataPayload + CCTP v2 Message → MessageTokenData
+//   - The message bytes and attestation are encoded together for on-chain use
+//   - Unmatched tokens become error tokens, unsupported tokens remain as not-supported
+//
+// # On-Chain Usage
+//
+// The resulting MessageTokenData contains encoded message bytes and attestation data that will be
+// passed to CCTP v2 contracts on the destination chain. The contracts will:
+//   - Verify the attestation signature against Circle's known public keys
+//   - Validate the message format and parameters
+//   - Mint the specified amount of USDC to the intended recipient
+//
+// # Data Structure Requirements
+//
+// The TokenDataObservations returned by Observe must maintain strict structural consistency:
+//   - For each input Message, there must be exactly one MessageTokenData in the result
+//   - MessageTokenData.TokenData length must equal the corresponding Message.TokenAmounts length
+//   - Array indexes must correspond (TokenData[i] relates to TokenAmounts[i])
+//   - This ensures downstream processing can correlate token data with the original message tokens
+//
+// # Error Handling
+//
+// The observer implements graceful error handling:
+//   - Network failures when fetching attestations are logged but don't stop processing
+//   - Invalid or unmatched tokens are marked with appropriate error states
+//   - Unsupported tokens (non-CCTP v2) are marked as not supported
+//   - Domain ID conflicts result in error tokens for all affected messages
 package v2
 
 import (
@@ -6,11 +84,11 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 
-	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
-	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
+	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
 type AttestationEncoder func(context.Context, cciptypes.Bytes, cciptypes.Bytes) (cciptypes.Bytes, error)
@@ -20,7 +98,7 @@ type CCTPv2TokenDataObserver struct {
 	destChainSelector        cciptypes.ChainSelector
 	supportedPoolsBySelector map[cciptypes.ChainSelector]string
 	attestationEncoder       AttestationEncoder
-	attestationClient        *CCTPv2AttestationClient
+	attestationClient        CCTPv2AttestationClient
 }
 
 func NewCCTPv2TokenDataObserver(
@@ -29,7 +107,7 @@ func NewCCTPv2TokenDataObserver(
 	usdcConfig pluginconfig.USDCCCTPObserverConfig,
 	attestationEncoder AttestationEncoder,
 ) (*CCTPv2TokenDataObserver, error) {
-	attestationClient, err := NewCCTPv2AttestationClient(lggr, usdcConfig)
+	attestationClient, err := NewCCTPv2AttestationClientHTTP(lggr, usdcConfig)
 	if err != nil {
 		return nil, fmt.Errorf("create attestation client: %w", err)
 	}
@@ -54,7 +132,7 @@ func InitCCTPv2TokenDataObserver(
 	destChainSelector cciptypes.ChainSelector,
 	supportedPoolsBySelector map[cciptypes.ChainSelector]string,
 	attestationEncoder AttestationEncoder,
-	attestationClient *CCTPv2AttestationClient,
+	attestationClient *CCTPv2AttestationClientHTTP,
 ) *CCTPv2TokenDataObserver {
 	return &CCTPv2TokenDataObserver{
 		lggr:                     lggr,
@@ -65,7 +143,9 @@ func InitCCTPv2TokenDataObserver(
 	}
 }
 
-// Observe TODO: doc
+// Observe processes a set of CCIP messages and returns token data observations.
+// For each source chain, it extracts CCTP v2 token data from message payloads,
+// fetches corresponding attestations, and converts them to MessageTokenData.
 func (u *CCTPv2TokenDataObserver) Observe(
 	ctx context.Context,
 	messages exectypes.MessageObservations,
@@ -81,7 +161,9 @@ func (u *CCTPv2TokenDataObserver) Observe(
 	return tokenDataObservations, nil
 }
 
-// IsTokenSupported TODO: doc
+// IsTokenSupported checks if a token from a given source chain is supported for CCTP v2 processing.
+// It verifies that the token's source pool address matches a configured pool and that
+// the token data payload can be successfully decoded as CCTP v2 format.
 func (u *CCTPv2TokenDataObserver) IsTokenSupported(
 	sourceChain cciptypes.ChainSelector,
 	msgToken cciptypes.RampTokenAmount,
@@ -94,7 +176,13 @@ func (u *CCTPv2TokenDataObserver) Close() error {
 	return nil
 }
 
-// TODO: doc
+// getMessageTokenDataForSourceChain takes a collection of CCIP Messages for a source chain, collects the messages'
+// TokenAmounts that are CCTP v2 transfers, fetches the attestations for these CCTP v2 transfers, and converts them to
+// MessageTokenData.
+//
+// Transaction hashes are collected and used to batch-fetch CCTP messages from the attestation service, as multiple
+// tokens within the same transaction will share the same attestation data. The function returns a map with the same
+// keys as the input ccipMessages map, ensuring each input message gets corresponding token data.
 func getMessageTokenDataForSourceChain(
 	ctx context.Context,
 	lggr logger.Logger,
@@ -102,37 +190,48 @@ func getMessageTokenDataForSourceChain(
 	ccipMessages map[cciptypes.SeqNum]cciptypes.Message,
 	supportedPoolsBySelector map[cciptypes.ChainSelector]string,
 	attestationEncoder AttestationEncoder,
-	attestationClient *CCTPv2AttestationClient,
+	attestationClient CCTPv2AttestationClient,
 ) map[cciptypes.SeqNum]exectypes.MessageTokenData {
+	// Step 1: Check if source chain has CCTP v2 support configured
+	// If not, all tokens are marked as not supported
 	cctpV2EnabledTokenPoolAddress, ok := supportedPoolsBySelector[sourceChain]
 	if !ok {
 		return notSupportedMessageTokenData(ccipMessages)
 	}
 
+	// Step 2: Extract and decode CCTP v2 token data payloads from CCIP messages
 	sourceTokenDataPayloads := make(map[cciptypes.SeqNum]map[int]SourceTokenDataPayload)
 	for seqNum, ccipMessage := range ccipMessages {
 		sourceTokenDataPayloads[seqNum] = getSourceTokenDataPayloads(ccipMessage, cctpV2EnabledTokenPoolAddress)
 	}
 
-	sourceDomainId, err := getSourceDomainID(sourceChain, sourceTokenDataPayloads)
+	// Step 3: Validate that all CCTP v2 tokens have the same source domain ID
+	// This is required because we need to query Circle's API with a single domain ID
+	// If tokens have different domain IDs, it indicates a configuration error
+	sourceDomainID, err := getSourceDomainID(sourceChain, sourceTokenDataPayloads)
 	if err != nil {
+		// Return error tokens for all CCTP v2 tokens, others remain not supported
 		return errorMessageTokenData(err, ccipMessages, sourceTokenDataPayloads)
 	}
 
-	var txHashes mapset.Set[string]
-	txHashes = getTxHashes(sourceTokenDataPayloads, ccipMessages)
+	// Step 4: Extract unique transaction hashes from messages with CCTP v2 tokens
+	txHashes := getTxHashes(sourceTokenDataPayloads, ccipMessages)
 
-	var cctpV2Messages map[string]Message
-	cctpV2Messages = getCCTPv2Messages(ctx, lggr, attestationClient, sourceDomainId, txHashes)
+	// Step 5: Fetch CCTP v2 messages and attestations from Circle's API
+	// Query the attestation service for all collected transaction hashes
+	// Each response contains the message data and attestation needed for on-chain minting
+	cctpV2Messages := getCCTPv2Messages(ctx, lggr, attestationClient, sourceDomainID, txHashes)
 
-	var tokenIndexToCCTPv2Message map[cciptypes.SeqNum]map[int]CCTPv2MessageOrError
-	tokenIndexToCCTPv2Message = matchCCTPv2MessagesToSourceTokenDataPayloads(
+	// Step 6: Match each SourceTokenDataPayload to its corresponding CCTP v2 Message
+	tokenIndexToCCTPv2Message := matchCCTPv2MessagesToSourceTokenDataPayloads(
 		cctpV2Messages, sourceTokenDataPayloads, matchesCctpMessage)
 
+	// Step 7: Convert matched CCTP messages to final MessageTokenData format
 	return convertCCTPv2MessagesToMessageTokenData(ctx, ccipMessages, tokenIndexToCCTPv2Message, attestationEncoder)
 }
 
-// TODO: doc
+// notSupportedMessageTokenData creates a MessageTokenData map where all tokens are marked as not supported.
+// This is used when a source chain doesn't have CCTP v2 support configured.
 func notSupportedMessageTokenData(
 	ccipMessages map[cciptypes.SeqNum]cciptypes.Message,
 ) map[cciptypes.SeqNum]exectypes.MessageTokenData {
@@ -148,7 +247,9 @@ func notSupportedMessageTokenData(
 	return result
 }
 
-// TODO: doc
+// errorMessageTokenData creates a MessageTokenData map where tokens with valid CCTP v2 payloads
+// are marked with error status, while other tokens remain as not supported.
+// This is used when an error occurs during CCTP v2 processing (e.g., domain ID conflicts).
 func errorMessageTokenData(
 	err error,
 	ccipMessages map[cciptypes.SeqNum]cciptypes.Message,
@@ -177,7 +278,9 @@ type CCTPv2MessageOrError struct {
 	err     error
 }
 
-// TODO: doc
+// convertCCTPv2MessagesToMessageTokenData converts matched CCTP v2 messages to MessageTokenData.
+// For each token, it either creates successful token data (if matching message exists),
+// error token data (if message has errors), or not supported token data (if no match).
 func convertCCTPv2MessagesToMessageTokenData(
 	ctx context.Context,
 	ccipMessages map[cciptypes.SeqNum]cciptypes.Message,
@@ -207,20 +310,22 @@ func convertCCTPv2MessagesToMessageTokenData(
 	return result
 }
 
-// TODO: doc
+// getCCTPv2Messages fetches CCTP v2 messages from the attestation service for given transaction hashes.
+// It queries the attestation client for each transaction hash and collects all returned messages,
+// indexed by their event nonce. Errors are logged but don't stop processing of other transactions.
 func getCCTPv2Messages(
 	ctx context.Context,
 	lggr logger.Logger,
-	attestationClient *CCTPv2AttestationClient,
-	sourceDomainId uint32,
+	attestationClient CCTPv2AttestationClient,
+	sourceDomainID uint32,
 	txHashes mapset.Set[string],
 ) map[string]Message {
 	cctpV2Messages := make(map[string]Message)
 	for txHash := range txHashes.Iter() {
-		cctpResponse, err := attestationClient.GetMessages(ctx, sourceDomainId, txHash)
+		cctpResponse, err := attestationClient.GetMessages(ctx, sourceDomainID, txHash)
 		if err != nil {
 			lggr.Infow("Failed to get CCTPv2 messages",
-				"sourceDomainId", sourceDomainId,
+				"sourceDomainID", sourceDomainID,
 				"txHash", txHash,
 				"error", err,
 			)
@@ -234,7 +339,8 @@ func getCCTPv2Messages(
 	return cctpV2Messages
 }
 
-// TODO: doc
+// getTxHashes extracts unique transaction hashes from CCIP messages that contain valid CCTP v2 token data.
+// It only includes transaction hashes for messages that have at least one valid CCTP v2 token payload.
 func getTxHashes(
 	sourceTokenDataPayloads map[cciptypes.SeqNum]map[int]SourceTokenDataPayload,
 	ccipMessages map[cciptypes.SeqNum]cciptypes.Message,
@@ -251,7 +357,9 @@ func getTxHashes(
 	return txHashes
 }
 
-// TODO: doc
+// matchCCTPv2MessagesToSourceTokenDataPayloads matches CCTP v2 messages to source token data payloads.
+// For each token payload, it finds the corresponding CCTP message using the provided matching function.
+// Messages are consumed (removed from the map) after being matched to prevent double-matching.
 func matchCCTPv2MessagesToSourceTokenDataPayloads(
 	cctpV2Messages map[string]Message,
 	sourceTokenDataPayloads map[cciptypes.SeqNum]map[int]SourceTokenDataPayload,
@@ -301,8 +409,6 @@ func getSourceTokenDataPayloads(
 		payload, err := getCCTPv2SourceTokenDataPayload(cctpV2EnabledTokenPoolAddress, tokenAmount)
 		if err == nil {
 			sourceTokenDataPayloads[i] = *payload
-		} else {
-			// TODO: debug log
 		}
 	}
 	return sourceTokenDataPayloads
@@ -314,13 +420,13 @@ func getSourceDomainID(
 	sourceChain cciptypes.ChainSelector,
 	seqNumToSourceTokenDataPayloads map[cciptypes.SeqNum]map[int]SourceTokenDataPayload,
 ) (uint32, error) {
-	sourceDomainIdSet := false
+	sourceDomainIDSet := false
 	var sourceDomainID uint32
 	for seqNum, sourceTokenDataPayloads := range seqNumToSourceTokenDataPayloads {
 		for _, sourceTokenDataPayload := range sourceTokenDataPayloads {
-			if !sourceDomainIdSet {
+			if !sourceDomainIDSet {
 				sourceDomainID = sourceTokenDataPayload.SourceDomain
-				sourceDomainIdSet = true
+				sourceDomainIDSet = true
 			} else if sourceDomainID != sourceTokenDataPayload.SourceDomain {
 				return 0, fmt.Errorf("multiple source domain IDs found for the same source chain: sourceChain %d, "+
 					"sourceDomainIDs %d and %d, seqNum %d", sourceChain, sourceDomainID,
@@ -329,7 +435,7 @@ func getSourceDomainID(
 		}
 	}
 
-	if !sourceDomainIdSet {
+	if !sourceDomainIDSet {
 		return 0, fmt.Errorf("no source domain ID found for source chain %s", sourceChain)
 	}
 

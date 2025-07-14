@@ -13,7 +13,12 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
-// SourceTokenDataPayload TODO: doc
+// SourceTokenDataPayload represents the ABI-encoded token data payload for CCTP v2 transfers.
+// This struct contains all the parameters needed to perform a cross-chain USDC transfer,
+// including burn parameters, destination details, and fees. It's extracted from the
+// ExtraData field of CCIP token amounts.
+// Nonce is expected to be 0 for CCTP v2 transfers, as the CCTP v2 protocol does not return a nonce on-chain. This
+// field exists for backwards compatibility.
 type SourceTokenDataPayload struct {
 	Nonce                uint64             `abi:"nonce"`
 	SourceDomain         uint32             `abi:"sourceDomain"`
@@ -89,7 +94,9 @@ func addressMatch(cctpAddress string, sourceAddress cciptypes.Bytes32) bool {
 	return bytes.Equal(sourceAddress[32-len(cctpAddressBytes):], cctpAddressBytes)
 }
 
-// TODO: doc
+// getCCTPv2SourceTokenDataPayload extracts and validates a CCTP v2 source token data payload
+// from a CCIP token amount. It verifies that the token's source pool address matches the
+// configured CCTP v2 pool and that the payload contains valid CCTP v2 data.
 func getCCTPv2SourceTokenDataPayload(
 	cctpV2EnabledTokenPoolAddress string,
 	msgToken cciptypes.RampTokenAmount,

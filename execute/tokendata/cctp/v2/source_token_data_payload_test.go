@@ -27,91 +27,56 @@ const sourceTokenDataPayloadHex = "0x" +
 	"0000000000000000000000000000000000000000000000000000000000000005" // uint32  minFinalityThreshold
 
 func TestDecodeSourceTokenDataPayload(t *testing.T) {
-	tests := []struct {
-		name      string
-		bytes     []byte
-		expectErr bool
-		expected  *SourceTokenDataPayload
-	}{
-		{
-			name:      "Decode valid payload",
-			bytes:     mustBytes(sourceTokenDataPayloadHex),
-			expectErr: false,
-			expected: &SourceTokenDataPayload{
-				Nonce:                123,
-				SourceDomain:         111,
-				CCTPVersion:          reader.CCTPVersion(1),
-				Amount:               cciptypes.NewBigInt(big.NewInt(1000)),
-				DestinationDomain:    0x12345678,
-				MintRecipient:        mustBytes32("0x0000000000000000000000001234567890abcdef1234567890abcdef12345678"),
-				BurnToken:            mustBytes32("0x2222222222222222222222222222222222222222222222222222222222222222"),
-				DestinationCaller:    mustBytes32("0x3333333333333333333333333333333333333333333333333333333333333333"),
-				MaxFee:               cciptypes.NewBigInt(big.NewInt(50)),
-				MinFinalityThreshold: 5,
-			},
-		},
-	}
+	t.Run("Decode valid payload", func(t *testing.T) {
+		expected := &SourceTokenDataPayload{
+			Nonce:                123,
+			SourceDomain:         111,
+			CCTPVersion:          reader.CCTPVersion(1),
+			Amount:               cciptypes.NewBigInt(big.NewInt(1000)),
+			DestinationDomain:    0x12345678,
+			MintRecipient:        mustBytes32(mintRecipientAddr32),
+			BurnToken:            mustBytes32(burnTokenAddr32),
+			DestinationCaller:    mustBytes32(destinationCallerAddr32),
+			MaxFee:               cciptypes.NewBigInt(big.NewInt(50)),
+			MinFinalityThreshold: 5,
+		}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			got, err := DecodeSourceTokenDataPayload(tc.bytes)
-			if tc.expectErr {
-				if err == nil {
-					t.Fatalf("expected error, got nil")
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("failed to decode SourceTokenDataPayload: %v", err)
-			}
-
-			// compare scalar fields
-			if got.Nonce != tc.expected.Nonce ||
-				got.SourceDomain != tc.expected.SourceDomain ||
-				got.DestinationDomain != tc.expected.DestinationDomain ||
-				got.MinFinalityThreshold != tc.expected.MinFinalityThreshold ||
-				uint8(got.CCTPVersion) != uint8(tc.expected.CCTPVersion) {
-				t.Fatalf("scalar fields mismatch\nwant %+v\ngot  %+v", tc.expected, got)
-			}
-
-			// compare big.Int-wrapped values via String()
-			if got.Amount.String() != tc.expected.Amount.String() ||
-				got.MaxFee.String() != tc.expected.MaxFee.String() {
-				t.Fatalf("big.Int fields mismatch\nwant %v / %v\ngot  %v / %v",
-					tc.expected.Amount, tc.expected.MaxFee, got.Amount, got.MaxFee)
-			}
-
-			// compare bytes32
-			if !bytes.Equal(got.MintRecipient[:], tc.expected.MintRecipient[:]) ||
-				!bytes.Equal(got.BurnToken[:], tc.expected.BurnToken[:]) ||
-				!bytes.Equal(got.DestinationCaller[:], tc.expected.DestinationCaller[:]) {
-				t.Fatalf("bytes32 fields mismatch\nwant %+v\ngot  %+v", tc.expected, got)
-			}
-
-			// fall-back reflect check to catch anything missed
-			if !reflect.DeepEqual(got, tc.expected) {
-				t.Fatalf("DecodeSourceTokenDataPayload mismatch\nwant %+v\ngot  %+v", tc.expected, got)
-			}
-		})
-	}
+		got, err := DecodeSourceTokenDataPayload(mustBytes(sourceTokenDataPayloadHex))
+		require.NoError(t, err)
+		verifyPayloadFields(t, expected, got)
+	})
 }
 
-// mustBytes32 converts a 0x-prefixed hex string to a [32]byte.
-func mustBytes32(h string) (out [32]byte) {
-	b, err := hex.DecodeString(strings.TrimPrefix(h, "0x"))
-	if err != nil {
-		panic(err)
-	}
-	copy(out[32-len(b):], b) // right-align like EVM abi-encoding
-	return
+// verifyPayloadFields compares two SourceTokenDataPayload structs
+func verifyPayloadFields(t *testing.T, expected, got *SourceTokenDataPayload) {
+	verifyScalarFields(t, expected, got)
+	verifyBigIntFields(t, expected, got)
+	verifyBytes32Fields(t, expected, got)
+
+	// fall-back reflect check to catch anything missed
+	require.True(t, reflect.DeepEqual(got, expected), "DeepEqual check failed")
 }
 
-func mustBytes(h string) []byte {
-	b, err := hex.DecodeString(strings.TrimPrefix(h, "0x"))
-	if err != nil {
-		panic(err)
-	}
-	return b
+// verifyScalarFields compares scalar fields
+func verifyScalarFields(t *testing.T, expected, got *SourceTokenDataPayload) {
+	require.Equal(t, expected.Nonce, got.Nonce)
+	require.Equal(t, expected.SourceDomain, got.SourceDomain)
+	require.Equal(t, expected.DestinationDomain, got.DestinationDomain)
+	require.Equal(t, expected.MinFinalityThreshold, got.MinFinalityThreshold)
+	require.Equal(t, uint8(expected.CCTPVersion), uint8(got.CCTPVersion))
+}
+
+// verifyBigIntFields compares big.Int fields
+func verifyBigIntFields(t *testing.T, expected, got *SourceTokenDataPayload) {
+	require.Equal(t, expected.Amount.String(), got.Amount.String())
+	require.Equal(t, expected.MaxFee.String(), got.MaxFee.String())
+}
+
+// verifyBytes32Fields compares bytes32 fields
+func verifyBytes32Fields(t *testing.T, expected, got *SourceTokenDataPayload) {
+	require.True(t, bytes.Equal(got.MintRecipient[:], expected.MintRecipient[:]))
+	require.True(t, bytes.Equal(got.BurnToken[:], expected.BurnToken[:]))
+	require.True(t, bytes.Equal(got.DestinationCaller[:], expected.DestinationCaller[:]))
 }
 
 func happyPathPayload() SourceTokenDataPayload {
@@ -282,7 +247,7 @@ func TestAddressMatch(t *testing.T) {
 		},
 		{
 			name:        "Mismatch address",
-			cctpAddress: "0x1111111111111111111111111111111111111111",
+			cctpAddress: supportedPoolAddr,
 			sourceAddress: func() cciptypes.Bytes32 {
 				var b cciptypes.Bytes32
 				addr, _ := hex.DecodeString("8fe6b999dc680ccfdd5bf7eb0974218be2542daa")

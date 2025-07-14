@@ -5,11 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata/http"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 )
 
 const (
@@ -18,15 +19,19 @@ const (
 	attestationStatusComplete string = "complete"
 )
 
-type CCTPv2AttestationClient struct {
+type CCTPv2AttestationClient interface {
+	GetMessages(ctx context.Context, sourceDomainID uint32, transactionHash string) (Messages, error)
+}
+
+type CCTPv2AttestationClientHTTP struct {
 	lggr   logger.Logger
 	client http.HTTPClient
 }
 
-func NewCCTPv2AttestationClient(
+func NewCCTPv2AttestationClientHTTP(
 	lggr logger.Logger,
 	config pluginconfig.USDCCCTPObserverConfig,
-) (*CCTPv2AttestationClient, error) {
+) (*CCTPv2AttestationClientHTTP, error) {
 	client, err := http.GetHTTPClient(
 		lggr,
 		config.AttestationAPI,
@@ -37,14 +42,16 @@ func NewCCTPv2AttestationClient(
 	if err != nil {
 		return nil, fmt.Errorf("create HTTP client: %w", err)
 	}
-	return &CCTPv2AttestationClient{
+	return &CCTPv2AttestationClientHTTP{
 		lggr:   lggr,
 		client: client,
 	}, nil
 }
 
-// GetMessages TODO: doc
-func (c *CCTPv2AttestationClient) GetMessages(
+// GetMessages fetches CCTP v2 messages and their attestations from Circle's attestation API.
+// It queries the API using the source domain ID and transaction hash to retrieve all
+// CCTP v2 messages associated with the given transaction.
+func (c *CCTPv2AttestationClientHTTP) GetMessages(
 	ctx context.Context,
 	sourceDomainID uint32,
 	transactionHash string,
@@ -58,13 +65,15 @@ func (c *CCTPv2AttestationClient) GetMessages(
 	}
 
 	if status != 200 {
-		return Messages{}, fmt.Errorf("http call failed to get CCTPv2 messages returned non-200 status: http status %d", status)
+		return Messages{}, fmt.Errorf(
+			"http call failed to get CCTPv2 messages returned non-200 status: http status %d", status)
 	}
 
 	return parseResponseBody(body)
 }
 
-// TODO: doc
+// parseResponseBody parses the JSON response from Circle's attestation API
+// and returns a Messages struct containing the decoded CCTP v2 messages.
 func parseResponseBody(body cciptypes.Bytes) (Messages, error) {
 	var messages Messages
 	if err := json.Unmarshal(body, &messages); err != nil {
@@ -73,12 +82,15 @@ func parseResponseBody(body cciptypes.Bytes) (Messages, error) {
 	return messages, nil
 }
 
-// Messages TODO: doc
+// Messages represents the response structure from Circle's attestation API,
+// containing a list of CCTP v2 messages with their attestations.
 type Messages struct {
 	Messages []Message `json:"messages"`
 }
 
-// Message TODO: doc
+// Message represents a single CCTP v2 message from Circle's attestation API.
+// It contains the message data, attestation signature, and decoded message details
+// needed for cross-chain USDC transfers.
 type Message struct {
 	Message        string         `json:"message"`
 	EventNonce     string         `json:"eventNonce"`
@@ -116,8 +128,10 @@ type DecodedMessageBody struct {
 	HookData        string `json:"hookData,omitempty"`
 }
 
-// TokenData TODO: doc
-// explain that nonce and sourceDomainId can be used to fetch the message from the CCTPv2 API
+// TokenData converts a CCTP v2 Message into TokenData for use in CCIP execution.
+// It encodes the message bytes and attestation together using the provided encoder.
+// The nonce and sourceDomainID can be used to uniquely identify and fetch this
+// message from Circle's CCTP v2 API.
 func (m *Message) TokenData(
 	ctx context.Context,
 	attestationEncoder AttestationEncoder,
@@ -125,7 +139,7 @@ func (m *Message) TokenData(
 	if m.Status != attestationStatusComplete {
 		return exectypes.NewErrorTokenData(
 			fmt.Errorf("A CCTPv2 Message's 'status' is not %s: "+
-				"nonce: %s, sourceDomainId: %s, status: %s",
+				"nonce: %s, sourceDomainID: %s, status: %s",
 				attestationStatusComplete, m.EventNonce, m.DecodedMessage.SourceDomain, m.Status),
 		)
 	}
@@ -134,7 +148,7 @@ func (m *Message) TokenData(
 	if err != nil {
 		return exectypes.NewErrorTokenData(
 			fmt.Errorf("A CCTPv2 Message's 'message' field could not be converted from string to bytes: "+
-				"nonce: %s, sourceDomainId: %s, error: %w",
+				"nonce: %s, sourceDomainID: %s, error: %w",
 				m.EventNonce, m.DecodedMessage.SourceDomain, err),
 		)
 	}
@@ -143,7 +157,7 @@ func (m *Message) TokenData(
 	if err != nil {
 		return exectypes.NewErrorTokenData(
 			fmt.Errorf("A CCTPv2 Message's 'attestation' field could not be converted from string to bytes: "+
-				"nonce: %s, sourceDomainId: %s, error: %w",
+				"nonce: %s, sourceDomainID: %s, error: %w",
 				m.EventNonce, m.DecodedMessage.SourceDomain, err),
 		)
 	}
@@ -152,7 +166,7 @@ func (m *Message) TokenData(
 	if err != nil {
 		return exectypes.NewErrorTokenData(
 			fmt.Errorf("attestationEncoder failed for a CCTPv2 message: "+
-				"nonce: %s, sourceDomainId: %s, error: %w",
+				"nonce: %s, sourceDomainID: %s, error: %w",
 				m.EventNonce, m.DecodedMessage.SourceDomain, err),
 		)
 	}
