@@ -393,7 +393,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     if (numMsgs == 0) revert EmptyReport(report.sourceChainSelector);
     if (numMsgs != report.offchainTokenData.length) revert UnexpectedTokenData();
 
-    (uint256 timestampCommitted, bytes32[] memory hashedLeaves) = _verifyMessage(sourceChainSelector, report);
+    (uint256 timestampCommitted, bytes32[] memory hashedLeaves) = _verifyReport(sourceChainSelector, report);
 
     // Execute messages.
     for (uint256 i = 0; i < numMsgs; ++i) {
@@ -883,7 +883,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @param report The report to verify.
   /// @return timestampCommitted The timestamp of the committed root.
   /// @return hashedLeaves The hash for every message in the report.
-  function _verifyMessage(
+  function _verifyReport(
     uint64 sourceChainSelector,
     Internal.ExecutionReport memory report
   ) internal virtual returns (uint256 timestampCommitted, bytes32[] memory hashedLeaves) {
