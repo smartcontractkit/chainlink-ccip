@@ -81,6 +81,7 @@ package v2
 import (
 	"context"
 	"fmt"
+	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
 
@@ -99,6 +100,7 @@ type CCTPv2TokenDataObserver struct {
 	supportedPoolsBySelector map[cciptypes.ChainSelector]string
 	attestationEncoder       AttestationEncoder
 	attestationClient        CCTPv2AttestationClient
+	metricsReporter          MetricsReporter
 }
 
 func NewCCTPv2TokenDataObserver(
@@ -107,7 +109,17 @@ func NewCCTPv2TokenDataObserver(
 	usdcConfig pluginconfig.USDCCCTPObserverConfig,
 	attestationEncoder AttestationEncoder,
 ) (*CCTPv2TokenDataObserver, error) {
-	attestationClient, err := NewCCTPv2AttestationClientHTTP(lggr, usdcConfig)
+	metricsReporter, err := NewMetricsReporter(lggr, destChainSelector)
+	if err != nil {
+		lggr.Errorw("Failed to create CCTP v2 metrics reporter",
+			"error", err,
+			"destChainSelector", destChainSelector,
+		)
+		// Use no-op reporter instead of failing
+		metricsReporter = NewNoOpMetricsReporter()
+	}
+
+	attestationClient, err := NewCCTPv2AttestationClientHTTP(lggr, usdcConfig, metricsReporter)
 	if err != nil {
 		lggr.Errorw("Failed to create CCTP v2 attestation client",
 			"error", err,
@@ -115,6 +127,7 @@ func NewCCTPv2TokenDataObserver(
 		)
 		return nil, fmt.Errorf("create attestation client: %w", err)
 	}
+
 	supportedPoolsBySelector := make(map[cciptypes.ChainSelector]string)
 	for chainSelector, tokenConfig := range usdcConfig.Tokens {
 		supportedPoolsBySelector[chainSelector] = tokenConfig.SourcePoolAddress
@@ -128,6 +141,7 @@ func NewCCTPv2TokenDataObserver(
 		supportedPoolsBySelector: supportedPoolsBySelector,
 		attestationEncoder:       attestationEncoder,
 		attestationClient:        attestationClient,
+		metricsReporter:          metricsReporter,
 	}, nil
 }
 
@@ -137,13 +151,16 @@ func InitCCTPv2TokenDataObserver(
 	supportedPoolsBySelector map[cciptypes.ChainSelector]string,
 	attestationEncoder AttestationEncoder,
 	attestationClient *CCTPv2AttestationClientHTTP,
+	metricsReporter MetricsReporter,
 ) *CCTPv2TokenDataObserver {
+
 	return &CCTPv2TokenDataObserver{
 		lggr:                     lggr,
 		destChainSelector:        destChainSelector,
 		supportedPoolsBySelector: supportedPoolsBySelector,
 		attestationEncoder:       attestationEncoder,
 		attestationClient:        attestationClient,
+		metricsReporter:          metricsReporter,
 	}
 }
 
@@ -154,13 +171,23 @@ func (u *CCTPv2TokenDataObserver) Observe(
 	ctx context.Context,
 	messages exectypes.MessageObservations,
 ) (exectypes.TokenDataObservations, error) {
+	startTime := time.Now()
+
 	tokenDataObservations := make(exectypes.TokenDataObservations)
 	for chainSelector, chainMessages := range messages {
+		chainStartTime := time.Now()
+
 		tokenDataObservations[chainSelector] = getMessageTokenDataForSourceChain(
 			ctx, u.lggr, chainSelector, chainMessages, u.supportedPoolsBySelector, u.attestationEncoder,
-			u.attestationClient,
+			u.attestationClient, u.metricsReporter,
+		)
+
+		u.metricsReporter.TrackObservationLatency(
+			chainSelector, "getMessageTokenDataForSourceChain", time.Since(chainStartTime),
 		)
 	}
+
+	u.metricsReporter.TrackObservationLatency(0, "observe_total", time.Since(startTime))
 
 	return tokenDataObservations, nil
 }
@@ -195,6 +222,7 @@ func getMessageTokenDataForSourceChain(
 	supportedPoolsBySelector map[cciptypes.ChainSelector]string,
 	attestationEncoder AttestationEncoder,
 	attestationClient CCTPv2AttestationClient,
+	metricsReporter MetricsReporter,
 ) map[cciptypes.SeqNum]exectypes.MessageTokenData {
 	// Step 1: Check if source chain has CCTP v2 support configured
 	// If not, all tokens are marked as not supported
@@ -228,10 +256,12 @@ func getMessageTokenDataForSourceChain(
 
 	// Step 6: Match each SourceTokenDataPayload to its corresponding CCTP v2 Message
 	tokenIndexToCCTPv2Message := matchCCTPv2MessagesToSourceTokenDataPayloads(
-		lggr, cctpV2Messages, sourceTokenDataPayloads, matchesCctpMessage)
+		lggr, cctpV2Messages, sourceTokenDataPayloads, matchesCctpMessage, sourceChain, metricsReporter)
 
 	// Step 7: Convert matched CCTP messages to final MessageTokenData format
-	return convertCCTPv2MessagesToMessageTokenData(ctx, ccipMessages, tokenIndexToCCTPv2Message, attestationEncoder)
+	return convertCCTPv2MessagesToMessageTokenData(
+		ctx, ccipMessages, tokenIndexToCCTPv2Message, attestationEncoder, sourceChain, metricsReporter,
+	)
 }
 
 // notSupportedMessageTokenData creates a MessageTokenData map where all tokens are marked as not supported.
@@ -290,26 +320,42 @@ func convertCCTPv2MessagesToMessageTokenData(
 	ccipMessages map[cciptypes.SeqNum]cciptypes.Message,
 	tokenIndexToCCTPv2Message map[cciptypes.SeqNum]map[int]CCTPv2MessageOrError,
 	attestationEncoder AttestationEncoder,
+	sourceChain cciptypes.ChainSelector,
+	metricsReporter MetricsReporter,
 ) map[cciptypes.SeqNum]exectypes.MessageTokenData {
 	result := make(map[cciptypes.SeqNum]exectypes.MessageTokenData)
+
+	successCount := 0
+	errorCount := 0
+	notSupportedCount := 0
+
 	for seqNum, ccipMessage := range ccipMessages {
 		tokenDataList := make([]exectypes.TokenData, 0, len(ccipMessage.TokenAmounts))
 		for tokenIndex := range ccipMessage.TokenAmounts {
 			var tokenData exectypes.TokenData
 			if tokenIndexToCCTPv2Message[seqNum] == nil {
 				tokenData = exectypes.NotSupportedTokenData()
+				notSupportedCount++
 			} else if cctpMessageOrError, ok := tokenIndexToCCTPv2Message[seqNum][tokenIndex]; !ok {
 				tokenData = exectypes.NotSupportedTokenData()
+				notSupportedCount++
 			} else if cctpMessageOrError.err != nil {
 				tokenData = exectypes.NewErrorTokenData(cctpMessageOrError.err)
+				errorCount++
 			} else {
 				tokenData = cctpMessageOrError.message.TokenData(ctx, attestationEncoder)
+				successCount++
 			}
 
 			tokenDataList = append(tokenDataList, tokenData)
 		}
 		result[seqNum] = exectypes.NewMessageTokenData(tokenDataList...)
 	}
+
+	// Track token processing metrics
+	metricsReporter.TrackTokenProcessed(sourceChain, "success", successCount)
+	metricsReporter.TrackTokenProcessed(sourceChain, "error", errorCount)
+	metricsReporter.TrackTokenProcessed(sourceChain, "not_supported", notSupportedCount)
 
 	return result
 }
@@ -327,6 +373,7 @@ func getCCTPv2Messages(
 	cctpV2Messages := make(map[string]Message)
 	for txHash := range txHashes.Iter() {
 		cctpResponse, err := attestationClient.GetMessages(ctx, sourceDomainID, txHash)
+
 		if err != nil {
 			lggr.Warnw("Failed to get CCTPv2 messages from attestation service",
 				"sourceDomainID", sourceDomainID,
@@ -375,8 +422,13 @@ func matchCCTPv2MessagesToSourceTokenDataPayloads(
 	cctpV2Messages map[string]Message,
 	sourceTokenDataPayloads map[cciptypes.SeqNum]map[int]SourceTokenDataPayload,
 	isMatch func(SourceTokenDataPayload, Message) bool,
+	sourceChain cciptypes.ChainSelector,
+	metricsReporter MetricsReporter,
 ) map[cciptypes.SeqNum]map[int]CCTPv2MessageOrError {
 	matchedCCTPv2Messages := make(map[cciptypes.SeqNum]map[int]CCTPv2MessageOrError)
+
+	matchedCount := 0
+	unmatchedCount := 0
 
 	for seqNum, tokenPayloads := range sourceTokenDataPayloads {
 		if len(tokenPayloads) > 0 {
@@ -390,6 +442,7 @@ func matchCCTPv2MessagesToSourceTokenDataPayloads(
 						message: cctpMessage,
 					}
 					foundNonce = nonce
+					matchedCount++
 					break
 				}
 			}
@@ -408,11 +461,16 @@ func matchCCTPv2MessagesToSourceTokenDataPayloads(
 						seqNum, tokenIndex,
 					),
 				}
+				unmatchedCount++
 			} else {
 				delete(cctpV2Messages, foundNonce)
 			}
 		}
 	}
+
+	// Track matching metrics
+	metricsReporter.TrackMessageMatching(sourceChain, "matched", matchedCount)
+	metricsReporter.TrackMessageMatching(sourceChain, "unmatched", unmatchedCount)
 
 	return matchedCCTPv2Messages
 }

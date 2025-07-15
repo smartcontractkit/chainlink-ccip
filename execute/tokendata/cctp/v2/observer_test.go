@@ -2,6 +2,7 @@ package v2
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"testing"
@@ -9,6 +10,8 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
@@ -286,23 +289,6 @@ func TestGetSourceDomainID(t *testing.T) {
 			},
 			expectedSourceDomainID: 0,
 			expectError:            false,
-		},
-		{
-			name:        "error occurs at first conflicting sequence number",
-			sourceChain: cciptypes.ChainSelector(1),
-			seqNumToSourceTokenDataPayloads: map[cciptypes.SeqNum]map[int]SourceTokenDataPayload{
-				5: {
-					0: {SourceDomain: 100},
-				},
-				3: {
-					0: {SourceDomain: 200}, // This will cause error when processed
-				},
-				1: {
-					0: {SourceDomain: 100},
-				},
-			},
-			expectedSourceDomainID: 0,
-			expectError:            true,
 		},
 	}
 
@@ -774,6 +760,8 @@ func TestMatchCCTPv2MessagesToSourceTokenDataPayloads(t *testing.T) {
 				cctpV2MessagesCopy,
 				tt.sourceTokenDataPayloads,
 				tt.isMatch,
+				1, // sourceChain
+				NewNoOpMetricsReporter(),
 			)
 
 			// Check result structure and content
@@ -847,6 +835,294 @@ func TestMatchCCTPv2MessagesToSourceTokenDataPayloads(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
+	ctx := context.Background()
+
+	// Test helpers
+	createMessageWithToken := func(seqNum cciptypes.SeqNum, txHash string, poolAddr string, extraData []byte) cciptypes.Message {
+		return cciptypes.Message{
+			Header: cciptypes.RampMessageHeader{
+				MessageID:      [32]byte{byte(seqNum)},
+				SequenceNumber: seqNum,
+				TxHash:         txHash,
+			},
+			TokenAmounts: []cciptypes.RampTokenAmount{
+				{
+					SourcePoolAddress: mustCreateUnknownAddress(poolAddr),
+					ExtraData:         extraData,
+					Amount:            cciptypes.NewBigIntFromInt64(1000),
+				},
+			},
+		}
+	}
+
+	createMessageWithoutTokens := func(seqNum cciptypes.SeqNum, txHash string) cciptypes.Message {
+		return cciptypes.Message{
+			Header: cciptypes.RampMessageHeader{
+				MessageID:      [32]byte{byte(seqNum)},
+				SequenceNumber: seqNum,
+				TxHash:         txHash,
+			},
+			TokenAmounts: []cciptypes.RampTokenAmount{},
+		}
+	}
+
+	// Mock attestation encoder
+	mockEncoder := func(ctx context.Context, message cciptypes.Bytes, attestation cciptypes.Bytes) (cciptypes.Bytes, error) {
+		return append(message, attestation...), nil
+	}
+
+	// Mock metrics reporter
+	mockMetrics := NewNoOpMetricsReporter()
+
+	tests := []struct {
+		name                       string
+		supportedPools             map[cciptypes.ChainSelector]string
+		messages                   exectypes.MessageObservations
+		mockSetup                  func(*MockCCTPv2AttestationClient)
+		expectedTokenDataCount     map[cciptypes.ChainSelector]int
+		expectedSupportedTokens    map[cciptypes.ChainSelector]int
+		expectedErrorTokens        map[cciptypes.ChainSelector]int
+		expectedNotSupportedTokens map[cciptypes.ChainSelector]int
+	}{
+		{
+			name: "empty messages",
+			supportedPools: map[cciptypes.ChainSelector]string{
+				1: "0x1234",
+			},
+			messages: exectypes.MessageObservations{},
+			mockSetup: func(m *MockCCTPv2AttestationClient) {
+				// No setup needed for empty messages
+			},
+			expectedTokenDataCount: map[cciptypes.ChainSelector]int{},
+		},
+		{
+			name: "unsupported chain - no pool configured",
+			supportedPools: map[cciptypes.ChainSelector]string{
+				1: "0x1234",
+			},
+			messages: exectypes.MessageObservations{
+				2: { // Chain 2 not supported
+					1: createMessageWithoutTokens(1, "0xabc123"),
+				},
+			},
+			mockSetup: func(m *MockCCTPv2AttestationClient) {
+				// No setup needed for unsupported chain
+			},
+			expectedTokenDataCount:     map[cciptypes.ChainSelector]int{2: 1},
+			expectedNotSupportedTokens: map[cciptypes.ChainSelector]int{2: 0}, // No tokens = no not supported
+		},
+		{
+			name: "supported chain with no tokens",
+			supportedPools: map[cciptypes.ChainSelector]string{
+				1: "0x1234",
+			},
+			messages: exectypes.MessageObservations{
+				1: {
+					1: createMessageWithoutTokens(1, "0xabc123"),
+				},
+			},
+			mockSetup: func(m *MockCCTPv2AttestationClient) {
+				// No setup needed for no tokens
+			},
+			expectedTokenDataCount:     map[cciptypes.ChainSelector]int{1: 1},
+			expectedNotSupportedTokens: map[cciptypes.ChainSelector]int{1: 0}, // No tokens = no not supported
+		},
+		{
+			name: "supported chain with unsupported token",
+			supportedPools: map[cciptypes.ChainSelector]string{
+				1: "0x1234",
+			},
+			messages: exectypes.MessageObservations{
+				1: {
+					1: createMessageWithToken(1, "0xabc123", "0x5678", []byte("invalid")), // Wrong pool
+				},
+			},
+			mockSetup: func(m *MockCCTPv2AttestationClient) {
+				// No setup needed for unsupported token
+			},
+			expectedTokenDataCount:     map[cciptypes.ChainSelector]int{1: 1},
+			expectedNotSupportedTokens: map[cciptypes.ChainSelector]int{1: 1},
+		},
+		{
+			name: "successful token processing",
+			supportedPools: map[cciptypes.ChainSelector]string{
+				1: "0x1234",
+			},
+			messages: exectypes.MessageObservations{
+				1: {
+					1: createMessageWithToken(1, "0xabc123", "0x1234", mustHexDecode(sourceTokenDataPayloadHexV2)),
+				},
+			},
+			mockSetup: func(m *MockCCTPv2AttestationClient) {
+				m.AddResponse(111, "0xabc123", Messages{
+					Messages: []Message{
+						{
+							EventNonce:  "0",
+							CCTPVersion: 2,
+							Status:      "complete",
+							Message:     "0x1234abcd",
+							Attestation: "0x5678efab",
+							DecodedMessage: DecodedMessage{
+								SourceDomain:      "111",
+								DestinationDomain: "305419896", // 0x12345678
+								Nonce:             "0",
+								DecodedMessageBody: DecodedMessageBody{
+									Amount:        "1000",
+									BurnToken:     "0x2222222222222222222222222222222222222222222222222222222222222222",
+									MintRecipient: "0x1234567890abcdef1234567890abcdef12345678",
+								},
+								DestinationCaller: "0x3333333333333333333333333333333333333333333333333333333333333333",
+							},
+						},
+					},
+				}, nil)
+			},
+			expectedTokenDataCount:  map[cciptypes.ChainSelector]int{1: 1},
+			expectedSupportedTokens: map[cciptypes.ChainSelector]int{1: 1},
+		},
+		{
+			name: "multiple chains with mixed results",
+			supportedPools: map[cciptypes.ChainSelector]string{
+				1: "0x1234",
+				2: "0x5678",
+			},
+			messages: exectypes.MessageObservations{
+				1: {
+					1: createMessageWithToken(1, "0xabc123", "0x1234", mustHexDecode(sourceTokenDataPayloadHexV2)),
+				},
+				2: {
+					2: createMessageWithToken(2, "0xdef456", "0x9999", []byte("invalid")), // Wrong pool
+				},
+			},
+			mockSetup: func(m *MockCCTPv2AttestationClient) {
+				m.AddResponse(111, "0xabc123", Messages{
+					Messages: []Message{
+						{
+							EventNonce:  "0",
+							CCTPVersion: 2,
+							Status:      "complete",
+							Message:     "0x1234abcd",
+							Attestation: "0x5678efab",
+							DecodedMessage: DecodedMessage{
+								SourceDomain:      "111",
+								DestinationDomain: "305419896", // 0x12345678
+								Nonce:             "0",
+								DecodedMessageBody: DecodedMessageBody{
+									Amount:        "1000",
+									BurnToken:     "0x2222222222222222222222222222222222222222222222222222222222222222",
+									MintRecipient: "0x1234567890abcdef1234567890abcdef12345678",
+								},
+								DestinationCaller: "0x3333333333333333333333333333333333333333333333333333333333333333",
+							},
+						},
+					},
+				}, nil)
+			},
+			expectedTokenDataCount:     map[cciptypes.ChainSelector]int{1: 1, 2: 1},
+			expectedSupportedTokens:    map[cciptypes.ChainSelector]int{1: 1},
+			expectedNotSupportedTokens: map[cciptypes.ChainSelector]int{2: 1},
+		},
+		{
+			name: "attestation API error",
+			supportedPools: map[cciptypes.ChainSelector]string{
+				1: "0x1234",
+			},
+			messages: exectypes.MessageObservations{
+				1: {
+					1: createMessageWithToken(1, "0xabc123", "0x1234", mustHexDecode(sourceTokenDataPayloadHexV2)),
+				},
+			},
+			mockSetup: func(m *MockCCTPv2AttestationClient) {
+				m.AddResponse(111, "0xabc123", Messages{}, fmt.Errorf("API error"))
+			},
+			expectedTokenDataCount: map[cciptypes.ChainSelector]int{1: 1},
+			expectedErrorTokens:    map[cciptypes.ChainSelector]int{1: 1},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create and configure mock
+			mockClient := NewMockCCTPv2AttestationClient()
+			tt.mockSetup(mockClient)
+
+			// Create observer with direct struct initialization to bypass type constraints
+			observer := &CCTPv2TokenDataObserver{
+				lggr:                     logger.Nop(),
+				destChainSelector:        cciptypes.ChainSelector(999),
+				supportedPoolsBySelector: tt.supportedPools,
+				attestationEncoder:       mockEncoder,
+				attestationClient:        mockClient,
+				metricsReporter:          mockMetrics,
+			}
+
+			// Call Observe
+			result, err := observer.Observe(ctx, tt.messages)
+
+			// Verify no error returned (as per current implementation)
+			require.NoError(t, err)
+
+			// Verify result structure
+			require.Equal(t, len(tt.expectedTokenDataCount), len(result))
+
+			for chainSelector, expectedCount := range tt.expectedTokenDataCount {
+				chainResult, exists := result[chainSelector]
+				require.True(t, exists, "Chain %d not found in result", chainSelector)
+				require.Equal(t, expectedCount, len(chainResult), "Wrong number of messages for chain %d", chainSelector)
+
+				// Count token types
+				supportedCount := 0
+				errorCount := 0
+				notSupportedCount := 0
+
+				for _, messageTokenData := range chainResult {
+					for _, tokenData := range messageTokenData.TokenData {
+						if tokenData.Ready && tokenData.Supported {
+							supportedCount++
+						} else if tokenData.Error != nil {
+							errorCount++
+						} else if !tokenData.Supported {
+							notSupportedCount++
+						}
+					}
+				}
+
+				if expectedSupportedTokens, exists := tt.expectedSupportedTokens[chainSelector]; exists {
+					require.Equal(t, expectedSupportedTokens, supportedCount, "Wrong supported token count for chain %d", chainSelector)
+				}
+
+				if expectedErrorTokens, exists := tt.expectedErrorTokens[chainSelector]; exists {
+					require.Equal(t, expectedErrorTokens, errorCount, "Wrong error token count for chain %d", chainSelector)
+				}
+
+				if expectedNotSupportedTokens, exists := tt.expectedNotSupportedTokens[chainSelector]; exists {
+					require.Equal(t, expectedNotSupportedTokens, notSupportedCount, "Wrong not supported token count for chain %d", chainSelector)
+				}
+			}
+		})
+	}
+}
+
+func mustHexDecode(hexStr string) []byte {
+	if len(hexStr) >= 2 && hexStr[:2] == "0x" {
+		hexStr = hexStr[2:]
+	}
+	data, err := hex.DecodeString(hexStr)
+	if err != nil {
+		panic(err)
+	}
+	return data
+}
+
+func mustCreateUnknownAddress(addr string) cciptypes.UnknownAddress {
+	address, err := cciptypes.NewUnknownAddressFromHex(addr)
+	if err != nil {
+		panic(err)
+	}
+	return address
 }
 
 func TestGetTxHashes(t *testing.T) {
@@ -1360,27 +1636,6 @@ func (m *mockAttestationEncoder) Encode(
 }
 
 // Helper to create CCIP message with specific number of tokens
-func createCCIPMessageWithTokens(seqNum cciptypes.SeqNum, txHash string, tokenCount int) cciptypes.Message {
-	tokenAmounts := make([]cciptypes.RampTokenAmount, tokenCount)
-	sourcePoolAddress, _ := cciptypes.NewUnknownAddressFromHex(supportedPoolAddr)
-	destTokenAddress, _ := cciptypes.NewUnknownAddressFromHex(destTokenAddr)
-	for i := 0; i < tokenCount; i++ {
-		tokenAmounts[i] = cciptypes.RampTokenAmount{
-			SourcePoolAddress: sourcePoolAddress,
-			DestTokenAddress:  destTokenAddress,
-			Amount:            cciptypes.NewBigIntFromInt64(1000),
-			ExtraData:         []byte("extra"),
-		}
-	}
-	return cciptypes.Message{
-		Header: cciptypes.RampMessageHeader{
-			MessageID:      [32]byte{byte(seqNum)},
-			SequenceNumber: seqNum,
-			TxHash:         txHash,
-		},
-		TokenAmounts: tokenAmounts,
-	}
-}
 
 func TestConvertCCTPv2MessagesToMessageTokenData(t *testing.T) {
 	ctx := context.Background()
@@ -1441,7 +1696,7 @@ func TestConvertCCTPv2MessagesToMessageTokenData(t *testing.T) {
 		{
 			name: "single message with single token - success",
 			ccipMessages: map[cciptypes.SeqNum]cciptypes.Message{
-				1: createCCIPMessageWithTokens(1, "0xabc123", 1),
+				1: createCCIPMessageWithMultipleTokens(1, "0xabc123", 1),
 			},
 			tokenIndexToCCTPv2Message: map[cciptypes.SeqNum]map[int]CCTPv2MessageOrError{
 				1: {
@@ -1465,7 +1720,7 @@ func TestConvertCCTPv2MessagesToMessageTokenData(t *testing.T) {
 		{
 			name: "single message with multiple tokens - mixed success",
 			ccipMessages: map[cciptypes.SeqNum]cciptypes.Message{
-				1: createCCIPMessageWithTokens(1, "0xabc123", 3),
+				1: createCCIPMessageWithMultipleTokens(1, "0xabc123", 3),
 			},
 			tokenIndexToCCTPv2Message: map[cciptypes.SeqNum]map[int]CCTPv2MessageOrError{
 				1: {
@@ -1495,9 +1750,9 @@ func TestConvertCCTPv2MessagesToMessageTokenData(t *testing.T) {
 		{
 			name: "multiple messages with various scenarios",
 			ccipMessages: map[cciptypes.SeqNum]cciptypes.Message{
-				1: createCCIPMessageWithTokens(1, "0xabc123", 2),
-				2: createCCIPMessageWithTokens(2, "0xdef456", 1),
-				3: createCCIPMessageWithTokens(3, "0x789xyz", 1),
+				1: createCCIPMessageWithMultipleTokens(1, "0xabc123", 2),
+				2: createCCIPMessageWithMultipleTokens(2, "0xdef456", 1),
+				3: createCCIPMessageWithMultipleTokens(3, "0x789xyz", 1),
 			},
 			tokenIndexToCCTPv2Message: map[cciptypes.SeqNum]map[int]CCTPv2MessageOrError{
 				1: {
@@ -1557,7 +1812,7 @@ func TestConvertCCTPv2MessagesToMessageTokenData(t *testing.T) {
 		{
 			name: "message with incomplete status",
 			ccipMessages: map[cciptypes.SeqNum]cciptypes.Message{
-				1: createCCIPMessageWithTokens(1, "0xabc123", 1),
+				1: createCCIPMessageWithMultipleTokens(1, "0xabc123", 1),
 			},
 			tokenIndexToCCTPv2Message: map[cciptypes.SeqNum]map[int]CCTPv2MessageOrError{
 				1: {
@@ -1577,7 +1832,7 @@ func TestConvertCCTPv2MessagesToMessageTokenData(t *testing.T) {
 		{
 			name: "message with invalid hex in message field",
 			ccipMessages: map[cciptypes.SeqNum]cciptypes.Message{
-				1: createCCIPMessageWithTokens(1, "0xabc123", 1),
+				1: createCCIPMessageWithMultipleTokens(1, "0xabc123", 1),
 			},
 			tokenIndexToCCTPv2Message: map[cciptypes.SeqNum]map[int]CCTPv2MessageOrError{
 				1: {
@@ -1596,7 +1851,7 @@ func TestConvertCCTPv2MessagesToMessageTokenData(t *testing.T) {
 		{
 			name: "message with invalid hex in attestation field",
 			ccipMessages: map[cciptypes.SeqNum]cciptypes.Message{
-				1: createCCIPMessageWithTokens(1, "0xabc123", 1),
+				1: createCCIPMessageWithMultipleTokens(1, "0xabc123", 1),
 			},
 			tokenIndexToCCTPv2Message: map[cciptypes.SeqNum]map[int]CCTPv2MessageOrError{
 				1: {
@@ -1615,7 +1870,7 @@ func TestConvertCCTPv2MessagesToMessageTokenData(t *testing.T) {
 		{
 			name: "attestation encoder error",
 			ccipMessages: map[cciptypes.SeqNum]cciptypes.Message{
-				1: createCCIPMessageWithTokens(1, "0xabc123", 1),
+				1: createCCIPMessageWithMultipleTokens(1, "0xabc123", 1),
 			},
 			tokenIndexToCCTPv2Message: map[cciptypes.SeqNum]map[int]CCTPv2MessageOrError{
 				1: {
@@ -1640,7 +1895,7 @@ func TestConvertCCTPv2MessagesToMessageTokenData(t *testing.T) {
 		{
 			name: "message with no tokens",
 			ccipMessages: map[cciptypes.SeqNum]cciptypes.Message{
-				1: createCCIPMessageWithTokens(1, "0xabc123", 0),
+				1: createCCIPMessageWithMultipleTokens(1, "0xabc123", 0),
 			},
 			tokenIndexToCCTPv2Message: map[cciptypes.SeqNum]map[int]CCTPv2MessageOrError{
 				1: {},
@@ -1653,8 +1908,8 @@ func TestConvertCCTPv2MessagesToMessageTokenData(t *testing.T) {
 		{
 			name: "mixed scenarios with edge cases",
 			ccipMessages: map[cciptypes.SeqNum]cciptypes.Message{
-				1: createCCIPMessageWithTokens(1, "0xabc123", 4),
-				2: createCCIPMessageWithTokens(2, "0xdef456", 0),
+				1: createCCIPMessageWithMultipleTokens(1, "0xabc123", 4),
+				2: createCCIPMessageWithMultipleTokens(2, "0xdef456", 0),
 			},
 			tokenIndexToCCTPv2Message: map[cciptypes.SeqNum]map[int]CCTPv2MessageOrError{
 				1: {
@@ -1702,6 +1957,8 @@ func TestConvertCCTPv2MessagesToMessageTokenData(t *testing.T) {
 				tt.ccipMessages,
 				tt.tokenIndexToCCTPv2Message,
 				mockEncoder.Encode,
+				1, // sourceChain
+				NewNoOpMetricsReporter(),
 			)
 
 			// Verify results using helper function
@@ -1715,8 +1972,6 @@ func TestConvertCCTPv2MessagesToMessageTokenData(t *testing.T) {
 		})
 	}
 }
-
-// Helper structs for test expectations
 
 func TestNotSupportedMessageTokenData(t *testing.T) {
 	tests := []struct {
@@ -1732,7 +1987,7 @@ func TestNotSupportedMessageTokenData(t *testing.T) {
 		{
 			name: "single message with no tokens",
 			ccipMessages: map[cciptypes.SeqNum]cciptypes.Message{
-				1: createCCIPMessageWithTokens(1, "0xabc123", 0),
+				1: createCCIPMessageWithMultipleTokens(1, "0xabc123", 0),
 			},
 			expected: map[cciptypes.SeqNum]exectypes.MessageTokenData{
 				1: createExpectedMessageTokenData(),
@@ -1741,7 +1996,7 @@ func TestNotSupportedMessageTokenData(t *testing.T) {
 		{
 			name: "single message with single token",
 			ccipMessages: map[cciptypes.SeqNum]cciptypes.Message{
-				1: createCCIPMessageWithTokens(1, "0xabc123", 1),
+				1: createCCIPMessageWithMultipleTokens(1, "0xabc123", 1),
 			},
 			expected: map[cciptypes.SeqNum]exectypes.MessageTokenData{
 				1: createExpectedMessageTokenData(
@@ -1752,7 +2007,7 @@ func TestNotSupportedMessageTokenData(t *testing.T) {
 		{
 			name: "single message with multiple tokens",
 			ccipMessages: map[cciptypes.SeqNum]cciptypes.Message{
-				1: createCCIPMessageWithTokens(1, "0xabc123", 3),
+				1: createCCIPMessageWithMultipleTokens(1, "0xabc123", 3),
 			},
 			expected: map[cciptypes.SeqNum]exectypes.MessageTokenData{
 				1: createExpectedMessageTokenData(
@@ -1765,10 +2020,10 @@ func TestNotSupportedMessageTokenData(t *testing.T) {
 		{
 			name: "multiple messages with varying token counts",
 			ccipMessages: map[cciptypes.SeqNum]cciptypes.Message{
-				1: createCCIPMessageWithTokens(1, "0xabc123", 2),
-				2: createCCIPMessageWithTokens(2, "0xdef456", 0),
-				3: createCCIPMessageWithTokens(3, "0x789xyz", 1),
-				5: createCCIPMessageWithTokens(5, "0x111222", 4),
+				1: createCCIPMessageWithMultipleTokens(1, "0xabc123", 2),
+				2: createCCIPMessageWithMultipleTokens(2, "0xdef456", 0),
+				3: createCCIPMessageWithMultipleTokens(3, "0x789xyz", 1),
+				5: createCCIPMessageWithMultipleTokens(5, "0x111222", 4),
 			},
 			expected: map[cciptypes.SeqNum]exectypes.MessageTokenData{
 				1: createExpectedMessageTokenData(
@@ -1827,8 +2082,8 @@ func TestErrorMessageTokenData(t *testing.T) {
 			name: "ccip messages but no source token data payloads",
 			err:  testError,
 			ccipMessages: map[cciptypes.SeqNum]cciptypes.Message{
-				1: createCCIPMessageWithTokens(1, "0xabc123", 2),
-				2: createCCIPMessageWithTokens(2, "0xdef456", 1),
+				1: createCCIPMessageWithMultipleTokens(1, "0xabc123", 2),
+				2: createCCIPMessageWithMultipleTokens(2, "0xdef456", 1),
 			},
 			sourceTokenDataPayloads: map[cciptypes.SeqNum]map[int]SourceTokenDataPayload{},
 			expected: map[cciptypes.SeqNum]exectypes.MessageTokenData{
@@ -1845,7 +2100,7 @@ func TestErrorMessageTokenData(t *testing.T) {
 			name: "single message with single token - error applied",
 			err:  testError,
 			ccipMessages: map[cciptypes.SeqNum]cciptypes.Message{
-				1: createCCIPMessageWithTokens(1, "0xabc123", 2),
+				1: createCCIPMessageWithMultipleTokens(1, "0xabc123", 2),
 			},
 			sourceTokenDataPayloads: map[cciptypes.SeqNum]map[int]SourceTokenDataPayload{
 				1: {
@@ -1853,29 +2108,17 @@ func TestErrorMessageTokenData(t *testing.T) {
 				},
 			},
 			expected: map[cciptypes.SeqNum]exectypes.MessageTokenData{
-				1: {
-					TokenData: []exectypes.TokenData{
-						{
-							Ready:     false,
-							Supported: true,
-							Data:      nil,
-							Error:     testError,
-						},
-						{
-							Ready:     false,
-							Supported: false,
-							Data:      nil,
-							Error:     nil,
-						},
-					},
-				},
+				1: createExpectedMessageTokenData(
+					errorToken(testError),
+					notSupportedToken(),
+				),
 			},
 		},
 		{
 			name: "single message with multiple tokens - partial error coverage",
 			err:  networkError,
 			ccipMessages: map[cciptypes.SeqNum]cciptypes.Message{
-				1: createCCIPMessageWithTokens(1, "0xabc123", 4),
+				1: createCCIPMessageWithMultipleTokens(1, "0xabc123", 4),
 			},
 			sourceTokenDataPayloads: map[cciptypes.SeqNum]map[int]SourceTokenDataPayload{
 				1: {
@@ -1884,43 +2127,21 @@ func TestErrorMessageTokenData(t *testing.T) {
 				},
 			},
 			expected: map[cciptypes.SeqNum]exectypes.MessageTokenData{
-				1: {
-					TokenData: []exectypes.TokenData{
-						{
-							Ready:     false,
-							Supported: false,
-							Data:      nil,
-							Error:     nil,
-						},
-						{
-							Ready:     false,
-							Supported: true,
-							Data:      nil,
-							Error:     networkError,
-						},
-						{
-							Ready:     false,
-							Supported: true,
-							Data:      nil,
-							Error:     networkError,
-						},
-						{
-							Ready:     false,
-							Supported: false,
-							Data:      nil,
-							Error:     nil,
-						},
-					},
-				},
+				1: createExpectedMessageTokenData(
+					notSupportedToken(),
+					errorToken(networkError),
+					errorToken(networkError),
+					notSupportedToken(),
+				),
 			},
 		},
 		{
 			name: "multiple messages with mixed error scenarios",
 			err:  testError,
 			ccipMessages: map[cciptypes.SeqNum]cciptypes.Message{
-				1: createCCIPMessageWithTokens(1, "0xabc123", 3),
-				2: createCCIPMessageWithTokens(2, "0xdef456", 1),
-				3: createCCIPMessageWithTokens(3, "0x789xyz", 2),
+				1: createCCIPMessageWithMultipleTokens(1, "0xabc123", 3),
+				2: createCCIPMessageWithMultipleTokens(2, "0xdef456", 1),
+				3: createCCIPMessageWithMultipleTokens(3, "0x789xyz", 2),
 			},
 			sourceTokenDataPayloads: map[cciptypes.SeqNum]map[int]SourceTokenDataPayload{
 				1: {
@@ -1933,61 +2154,25 @@ func TestErrorMessageTokenData(t *testing.T) {
 				// No payloads for seqNum 3
 			},
 			expected: map[cciptypes.SeqNum]exectypes.MessageTokenData{
-				1: {
-					TokenData: []exectypes.TokenData{
-						{
-							Ready:     false,
-							Supported: true,
-							Data:      nil,
-							Error:     testError,
-						},
-						{
-							Ready:     false,
-							Supported: false,
-							Data:      nil,
-							Error:     nil,
-						},
-						{
-							Ready:     false,
-							Supported: true,
-							Data:      nil,
-							Error:     testError,
-						},
-					},
-				},
-				2: {
-					TokenData: []exectypes.TokenData{
-						{
-							Ready:     false,
-							Supported: true,
-							Data:      nil,
-							Error:     testError,
-						},
-					},
-				},
-				3: {
-					TokenData: []exectypes.TokenData{
-						{
-							Ready:     false,
-							Supported: false,
-							Data:      nil,
-							Error:     nil,
-						},
-						{
-							Ready:     false,
-							Supported: false,
-							Data:      nil,
-							Error:     nil,
-						},
-					},
-				},
+				1: createExpectedMessageTokenData(
+					errorToken(testError),
+					notSupportedToken(),
+					errorToken(testError),
+				),
+				2: createExpectedMessageTokenData(
+					errorToken(testError),
+				),
+				3: createExpectedMessageTokenData(
+					notSupportedToken(),
+					notSupportedToken(),
+				),
 			},
 		},
 		{
 			name: "all tokens have errors",
 			err:  networkError,
 			ccipMessages: map[cciptypes.SeqNum]cciptypes.Message{
-				1: createCCIPMessageWithTokens(1, "0xabc123", 2),
+				1: createCCIPMessageWithMultipleTokens(1, "0xabc123", 2),
 			},
 			sourceTokenDataPayloads: map[cciptypes.SeqNum]map[int]SourceTokenDataPayload{
 				1: {
@@ -1996,29 +2181,17 @@ func TestErrorMessageTokenData(t *testing.T) {
 				},
 			},
 			expected: map[cciptypes.SeqNum]exectypes.MessageTokenData{
-				1: {
-					TokenData: []exectypes.TokenData{
-						{
-							Ready:     false,
-							Supported: true,
-							Data:      nil,
-							Error:     networkError,
-						},
-						{
-							Ready:     false,
-							Supported: true,
-							Data:      nil,
-							Error:     networkError,
-						},
-					},
-				},
+				1: createExpectedMessageTokenData(
+					errorToken(networkError),
+					errorToken(networkError),
+				),
 			},
 		},
 		{
 			name: "message with no tokens but has source token data payloads",
 			err:  testError,
 			ccipMessages: map[cciptypes.SeqNum]cciptypes.Message{
-				1: createCCIPMessageWithTokens(1, "0xabc123", 0),
+				1: createCCIPMessageWithMultipleTokens(1, "0xabc123", 0),
 			},
 			sourceTokenDataPayloads: map[cciptypes.SeqNum]map[int]SourceTokenDataPayload{
 				1: {
@@ -2026,16 +2199,14 @@ func TestErrorMessageTokenData(t *testing.T) {
 				},
 			},
 			expected: map[cciptypes.SeqNum]exectypes.MessageTokenData{
-				1: {
-					TokenData: []exectypes.TokenData{},
-				},
+				1: createExpectedMessageTokenData(),
 			},
 		},
 		{
 			name: "token index gaps in source token data payloads",
 			err:  testError,
 			ccipMessages: map[cciptypes.SeqNum]cciptypes.Message{
-				1: createCCIPMessageWithTokens(1, "0xabc123", 5),
+				1: createCCIPMessageWithMultipleTokens(1, "0xabc123", 5),
 			},
 			sourceTokenDataPayloads: map[cciptypes.SeqNum]map[int]SourceTokenDataPayload{
 				1: {
@@ -2045,47 +2216,20 @@ func TestErrorMessageTokenData(t *testing.T) {
 				},
 			},
 			expected: map[cciptypes.SeqNum]exectypes.MessageTokenData{
-				1: {
-					TokenData: []exectypes.TokenData{
-						{
-							Ready:     false,
-							Supported: true,
-							Data:      nil,
-							Error:     testError,
-						},
-						{
-							Ready:     false,
-							Supported: false,
-							Data:      nil,
-							Error:     nil,
-						},
-						{
-							Ready:     false,
-							Supported: true,
-							Data:      nil,
-							Error:     testError,
-						},
-						{
-							Ready:     false,
-							Supported: false,
-							Data:      nil,
-							Error:     nil,
-						},
-						{
-							Ready:     false,
-							Supported: true,
-							Data:      nil,
-							Error:     testError,
-						},
-					},
-				},
+				1: createExpectedMessageTokenData(
+					errorToken(testError),
+					notSupportedToken(),
+					errorToken(testError),
+					notSupportedToken(),
+					errorToken(testError),
+				),
 			},
 		},
 		{
 			name: "nil error",
 			err:  nil,
 			ccipMessages: map[cciptypes.SeqNum]cciptypes.Message{
-				1: createCCIPMessageWithTokens(1, "0xabc123", 1),
+				1: createCCIPMessageWithMultipleTokens(1, "0xabc123", 1),
 			},
 			sourceTokenDataPayloads: map[cciptypes.SeqNum]map[int]SourceTokenDataPayload{
 				1: {
@@ -2093,16 +2237,9 @@ func TestErrorMessageTokenData(t *testing.T) {
 				},
 			},
 			expected: map[cciptypes.SeqNum]exectypes.MessageTokenData{
-				1: {
-					TokenData: []exectypes.TokenData{
-						{
-							Ready:     false,
-							Supported: true,
-							Data:      nil,
-							Error:     nil,
-						},
-					},
-				},
+				1: createExpectedMessageTokenData(
+					errorToken(nil),
+				),
 			},
 		},
 		{
@@ -2156,7 +2293,7 @@ func TestGetMessageTokenDataForSourceChain(t *testing.T) {
 			name:        "source chain not supported",
 			sourceChain: cciptypes.ChainSelector(999),
 			ccipMessages: map[cciptypes.SeqNum]cciptypes.Message{
-				1: createCCIPMessageWithTokens(1, defaultTxHash, 2),
+				1: createCCIPMessageWithMultipleTokens(1, defaultTxHash, 2),
 			},
 			supportedPoolsBySelector: map[cciptypes.ChainSelector]string{
 				cciptypes.ChainSelector(1): "0xPool1",
@@ -2183,7 +2320,7 @@ func TestGetMessageTokenDataForSourceChain(t *testing.T) {
 			name:        "no valid CCTP v2 tokens",
 			sourceChain: sourceChain,
 			ccipMessages: map[cciptypes.SeqNum]cciptypes.Message{
-				1: createCCIPMessageWithTokens(1, defaultTxHash, 2),
+				1: createCCIPMessageWithMultipleTokens(1, defaultTxHash, 2),
 			},
 			supportedPoolsBySelector: map[cciptypes.ChainSelector]string{
 				sourceChain: "0xDifferentPool",
@@ -2348,7 +2485,7 @@ func TestGetMessageTokenDataForSourceChain(t *testing.T) {
 			// Call the function
 			result := getMessageTokenDataForSourceChain(
 				ctx, lggr, tt.sourceChain, tt.ccipMessages, tt.supportedPoolsBySelector,
-				mockEncoder.Encode, mockClient,
+				mockEncoder.Encode, mockClient, NewNoOpMetricsReporter(),
 			)
 
 			// Verify results

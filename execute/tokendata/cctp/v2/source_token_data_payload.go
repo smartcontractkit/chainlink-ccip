@@ -139,17 +139,68 @@ func DecodeSourceTokenDataPayload(data []byte) (*SourceTokenDataPayload, error) 
 		return nil, fmt.Errorf("unexpected number of unpacked values")
 	}
 
+	// Safely extract values with type checking
+	nonce, ok := vals[0].(uint64)
+	if !ok {
+		return nil, fmt.Errorf("invalid nonce type: expected uint64, got %T", vals[0])
+	}
+
+	sourceDomain, ok := vals[1].(uint32)
+	if !ok {
+		return nil, fmt.Errorf("invalid sourceDomain type: expected uint32, got %T", vals[1])
+	}
+
+	cctpVersionUint, ok := vals[2].(uint8)
+	if !ok {
+		return nil, fmt.Errorf("invalid cctpVersion type: expected uint8, got %T", vals[2])
+	}
+
+	amount, ok := vals[3].(*big.Int)
+	if !ok {
+		return nil, fmt.Errorf("invalid amount type: expected *big.Int, got %T", vals[3])
+	}
+
+	destinationDomain, ok := vals[4].(uint32)
+	if !ok {
+		return nil, fmt.Errorf("invalid destinationDomain type: expected uint32, got %T", vals[4])
+	}
+
+	mintRecipient, ok := vals[5].([32]byte)
+	if !ok {
+		return nil, fmt.Errorf("invalid mintRecipient type: expected [32]byte, got %T", vals[5])
+	}
+
+	burnToken, ok := vals[6].([32]byte)
+	if !ok {
+		return nil, fmt.Errorf("invalid burnToken type: expected [32]byte, got %T", vals[6])
+	}
+
+	destinationCaller, ok := vals[7].([32]byte)
+	if !ok {
+		return nil, fmt.Errorf("invalid destinationCaller type: expected [32]byte, got %T", vals[7])
+	}
+
+	maxFee, ok := vals[8].(*big.Int)
+	if !ok {
+		return nil, fmt.Errorf("invalid maxFee type: expected *big.Int, got %T", vals[8])
+	}
+
+	minFinalityThreshold, ok := vals[9].(uint32)
+	if !ok {
+		return nil, fmt.Errorf("invalid minFinalityThreshold type: expected uint32, got %T", vals[9])
+	}
+
 	return &SourceTokenDataPayload{
-		Nonce:                vals[0].(uint64),
-		SourceDomain:         vals[1].(uint32),
-		CCTPVersion:          reader.CCTPVersion(vals[2].(uint8)),
-		Amount:               cciptypes.NewBigInt(vals[3].(*big.Int)),
-		DestinationDomain:    vals[4].(uint32),
-		MintRecipient:        vals[5].([32]byte),
-		BurnToken:            vals[6].([32]byte),
-		DestinationCaller:    vals[7].([32]byte),
-		MaxFee:               cciptypes.NewBigInt(vals[8].(*big.Int)),
-		MinFinalityThreshold: vals[9].(uint32),
+		Nonce:                nonce,
+		SourceDomain:         sourceDomain,
+		CCTPVersion:          reader.CCTPVersion(cctpVersionUint),
+		Amount:               cciptypes.NewBigInt(amount),
+		DestinationDomain:    destinationDomain,
+		MintRecipient:        mintRecipient,
+		BurnToken:            burnToken,
+		DestinationCaller:    destinationCaller,
+		MaxFee:               cciptypes.NewBigInt(maxFee),
+		MinFinalityThreshold: minFinalityThreshold,
 	}, nil
 }
 

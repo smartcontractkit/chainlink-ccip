@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
@@ -23,14 +24,21 @@ type CCTPv2AttestationClient interface {
 	GetMessages(ctx context.Context, sourceDomainID uint32, transactionHash string) (Messages, error)
 }
 
+// AttestationMetricsReporter provides metrics reporting for attestation API calls
+type AttestationMetricsReporter interface {
+	TrackAttestationAPILatency(sourceDomain uint32, status string, latency time.Duration)
+}
+
 type CCTPv2AttestationClientHTTP struct {
-	lggr   logger.Logger
-	client http.HTTPClient
+	lggr            logger.Logger
+	client          http.HTTPClient
+	metricsReporter AttestationMetricsReporter
 }
 
 func NewCCTPv2AttestationClientHTTP(
 	lggr logger.Logger,
 	config pluginconfig.USDCCCTPObserverConfig,
+	metricsReporter AttestationMetricsReporter,
 ) (*CCTPv2AttestationClientHTTP, error) {
 	client, err := http.GetHTTPClient(
 		lggr,
@@ -43,8 +51,9 @@ func NewCCTPv2AttestationClientHTTP(
 		return nil, fmt.Errorf("create HTTP client: %w", err)
 	}
 	return &CCTPv2AttestationClientHTTP{
-		lggr:   lggr,
-		client: client,
+		lggr:            lggr,
+		client:          client,
+		metricsReporter: metricsReporter,
 	}, nil
 }
 
@@ -56,20 +65,32 @@ func (c *CCTPv2AttestationClientHTTP) GetMessages(
 	sourceDomainID uint32,
 	transactionHash string,
 ) (Messages, error) {
+	startTime := time.Now()
 	path := fmt.Sprintf("%s/%s/%d?transactionHash=%s", apiVersionV2, messagesPath, sourceDomainID, transactionHash)
 	body, status, err := c.client.Get(ctx, path)
+	latency := time.Since(startTime)
+
 	if err != nil {
+		c.metricsReporter.TrackAttestationAPILatency(sourceDomainID, "error", latency)
 		return Messages{},
 			fmt.Errorf("http call failed to get CCTPv2 messages for sourceDomainID %d and transactionHash %s, error: %w",
 				sourceDomainID, transactionHash, err)
 	}
 
 	if status != 200 {
+		c.metricsReporter.TrackAttestationAPILatency(sourceDomainID, "error", latency)
 		return Messages{}, fmt.Errorf(
 			"http call failed to get CCTPv2 messages returned non-200 status: http status %d", status)
 	}
 
-	return parseResponseBody(body)
+	result, err := parseResponseBody(body)
+	if err != nil {
+		c.metricsReporter.TrackAttestationAPILatency(sourceDomainID, "error", latency)
+		return Messages{}, err
+	}
+
+	c.metricsReporter.TrackAttestationAPILatency(sourceDomainID, "success", latency)
+	return result, nil
 }
 
 // parseResponseBody parses the JSON response from Circle's attestation API
