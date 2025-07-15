@@ -109,13 +109,17 @@ func NewCCTPv2TokenDataObserver(
 ) (*CCTPv2TokenDataObserver, error) {
 	attestationClient, err := NewCCTPv2AttestationClientHTTP(lggr, usdcConfig)
 	if err != nil {
+		lggr.Errorw("Failed to create CCTP v2 attestation client",
+			"error", err,
+			"destChainSelector", destChainSelector,
+		)
 		return nil, fmt.Errorf("create attestation client: %w", err)
 	}
 	supportedPoolsBySelector := make(map[cciptypes.ChainSelector]string)
 	for chainSelector, tokenConfig := range usdcConfig.Tokens {
 		supportedPoolsBySelector[chainSelector] = tokenConfig.SourcePoolAddress
 	}
-	lggr.Infow("Created USDC Token Data Observer",
+	lggr.Infow("Created CCTPv2 Token Data Observer",
 		"supportedTokenPools", supportedPoolsBySelector,
 	)
 	return &CCTPv2TokenDataObserver{
@@ -208,14 +212,14 @@ func getMessageTokenDataForSourceChain(
 	// Step 3: Validate that all CCTP v2 tokens have the same source domain ID
 	// This is required because we need to query Circle's API with a single domain ID
 	// If tokens have different domain IDs, it indicates a configuration error
-	sourceDomainID, err := getSourceDomainID(sourceChain, sourceTokenDataPayloads)
+	sourceDomainID, err := getSourceDomainID(lggr, sourceChain, sourceTokenDataPayloads)
 	if err != nil {
 		// Return error tokens for all CCTP v2 tokens, others remain not supported
 		return errorMessageTokenData(err, ccipMessages, sourceTokenDataPayloads)
 	}
 
 	// Step 4: Extract unique transaction hashes from messages with CCTP v2 tokens
-	txHashes := getTxHashes(sourceTokenDataPayloads, ccipMessages)
+	txHashes := getTxHashes(lggr, sourceTokenDataPayloads, ccipMessages)
 
 	// Step 5: Fetch CCTP v2 messages and attestations from Circle's API
 	// Query the attestation service for all collected transaction hashes
@@ -224,7 +228,7 @@ func getMessageTokenDataForSourceChain(
 
 	// Step 6: Match each SourceTokenDataPayload to its corresponding CCTP v2 Message
 	tokenIndexToCCTPv2Message := matchCCTPv2MessagesToSourceTokenDataPayloads(
-		cctpV2Messages, sourceTokenDataPayloads, matchesCctpMessage)
+		lggr, cctpV2Messages, sourceTokenDataPayloads, matchesCctpMessage)
 
 	// Step 7: Convert matched CCTP messages to final MessageTokenData format
 	return convertCCTPv2MessagesToMessageTokenData(ctx, ccipMessages, tokenIndexToCCTPv2Message, attestationEncoder)
@@ -324,7 +328,7 @@ func getCCTPv2Messages(
 	for txHash := range txHashes.Iter() {
 		cctpResponse, err := attestationClient.GetMessages(ctx, sourceDomainID, txHash)
 		if err != nil {
-			lggr.Infow("Failed to get CCTPv2 messages",
+			lggr.Warnw("Failed to get CCTPv2 messages from attestation service",
 				"sourceDomainID", sourceDomainID,
 				"txHash", txHash,
 				"error", err,
@@ -342,6 +346,7 @@ func getCCTPv2Messages(
 // getTxHashes extracts unique transaction hashes from CCIP messages that contain valid CCTP v2 token data.
 // It only includes transaction hashes for messages that have at least one valid CCTP v2 token payload.
 func getTxHashes(
+	lggr logger.Logger,
 	sourceTokenDataPayloads map[cciptypes.SeqNum]map[int]SourceTokenDataPayload,
 	ccipMessages map[cciptypes.SeqNum]cciptypes.Message,
 ) mapset.Set[string] {
@@ -350,6 +355,11 @@ func getTxHashes(
 		if len(payloads) > 0 {
 			if message, exists := ccipMessages[seqNum]; exists {
 				txHashes.Add(message.Header.TxHash)
+			} else {
+				lggr.Warnw("CCIP message not found for sequence number with token payloads",
+					"seqNum", seqNum,
+					"numPayloads", len(payloads),
+				)
 			}
 		}
 	}
@@ -361,6 +371,7 @@ func getTxHashes(
 // For each token payload, it finds the corresponding CCTP message using the provided matching function.
 // Messages are consumed (removed from the map) after being matched to prevent double-matching.
 func matchCCTPv2MessagesToSourceTokenDataPayloads(
+	lggr logger.Logger,
 	cctpV2Messages map[string]Message,
 	sourceTokenDataPayloads map[cciptypes.SeqNum]map[int]SourceTokenDataPayload,
 	isMatch func(SourceTokenDataPayload, Message) bool,
@@ -383,6 +394,14 @@ func matchCCTPv2MessagesToSourceTokenDataPayloads(
 				}
 			}
 			if foundNonce == "" {
+				lggr.Warnw("No matching CCTP v2 message found for token payload",
+					"seqNum", seqNum,
+					"tokenIndex", tokenIndex,
+					"sourceDomain", sourceTokenData.SourceDomain,
+					"destinationDomain", sourceTokenData.DestinationDomain,
+					"amount", sourceTokenData.Amount.String(),
+					"availableMessages", len(cctpV2Messages),
+				)
 				matchedCCTPv2Messages[seqNum][tokenIndex] = CCTPv2MessageOrError{
 					err: fmt.Errorf(
 						"no CCTPv2 message found for source token data payload, seqNum: %d, tokenIndex: %d",
@@ -417,6 +436,7 @@ func getSourceTokenDataPayloads(
 // getSourceDomainId returns the source domain ID for the provided source chain. All SourceTokenDataPayloads for the
 // given source chain must have the same source domain ID. If no SourceTokenDataPayloads are found for the
 func getSourceDomainID(
+	lggr logger.Logger,
 	sourceChain cciptypes.ChainSelector,
 	seqNumToSourceTokenDataPayloads map[cciptypes.SeqNum]map[int]SourceTokenDataPayload,
 ) (uint32, error) {
@@ -428,6 +448,12 @@ func getSourceDomainID(
 				sourceDomainID = sourceTokenDataPayload.SourceDomain
 				sourceDomainIDSet = true
 			} else if sourceDomainID != sourceTokenDataPayload.SourceDomain {
+				lggr.Errorw("Multiple source domain IDs detected for single source chain",
+					"sourceChain", sourceChain,
+					"firstDomainID", sourceDomainID,
+					"conflictingDomainID", sourceTokenDataPayload.SourceDomain,
+					"seqNum", seqNum,
+				)
 				return 0, fmt.Errorf("multiple source domain IDs found for the same source chain: sourceChain %d, "+
 					"sourceDomainIDs %d and %d, seqNum %d", sourceChain, sourceDomainID,
 					sourceTokenDataPayload.SourceDomain, seqNum)

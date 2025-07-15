@@ -308,7 +308,7 @@ func TestGetSourceDomainID(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sourceDomainID, err := getSourceDomainID(tt.sourceChain, tt.seqNumToSourceTokenDataPayloads)
+			sourceDomainID, err := getSourceDomainID(testLogger, tt.sourceChain, tt.seqNumToSourceTokenDataPayloads)
 
 			if tt.expectError {
 				require.Error(t, err)
@@ -770,6 +770,7 @@ func TestMatchCCTPv2MessagesToSourceTokenDataPayloads(t *testing.T) {
 			}
 
 			result := matchCCTPv2MessagesToSourceTokenDataPayloads(
+				testLogger,
 				cctpV2MessagesCopy,
 				tt.sourceTokenDataPayloads,
 				tt.isMatch,
@@ -1041,7 +1042,7 @@ func TestGetTxHashes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := getTxHashes(tt.sourceTokenDataPayloads, tt.ccipMessages)
+			result := getTxHashes(testLogger, tt.sourceTokenDataPayloads, tt.ccipMessages)
 
 			// Convert result set to slice for easier comparison
 			actualTxHashes := make([]string, 0, result.Cardinality())
