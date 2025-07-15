@@ -166,7 +166,7 @@ contract USDCBridgeMigrator_releaseOrMint is HybridLockReleaseUSDCTokenPool_rele
     );
 
     assertEq(
-      s_USDCToken.balanceOf(address(s_usdcTokenPool)), 1e6, "All tokens minus the excluded should be in the pool"
+      s_USDCToken.balanceOf(address(s_lockBox)), 1e6, "All tokens minus the excluded should be in the pool"
     );
 
     // Now that the burn is successful, we can release the tokens that were excluded from the burn

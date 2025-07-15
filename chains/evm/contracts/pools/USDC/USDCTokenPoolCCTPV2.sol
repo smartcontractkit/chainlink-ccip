@@ -26,9 +26,12 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
   // TODO: Add Comment
   uint32 public constant FINALITY_THRESHOLD = 2000;
 
+  ITokenMessenger public immutable i_legacyTokenMessenger;
+
   // TODO: Fix Comments
   // Note: This constructor is only used for CCTP V2, which is why the supportedUSDCVersion is set to 1.
   constructor(
+    ITokenMessenger legacyTokenMessenger,
     ITokenMessenger tokenMessenger,
     CCTPMessageTransmitterProxy cctpMessageTransmitterProxy,
     IERC20 token,
@@ -38,6 +41,8 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
     address previousPool
   ) USDCTokenPool(tokenMessenger, cctpMessageTransmitterProxy, token, allowlist, rmnProxy, router, previousPool, 1) {
     if (previousPool != address(0)) {
+      // If the previous pool exists, we need to acquire the previous pool's message transmitter proxy so that a 
+      // messages' destinationCaller can be checked against it.
       try USDCTokenPool(previousPool).i_messageTransmitterProxy() returns (CCTPMessageTransmitterProxy proxy) {
         i_previousMessageTransmitterProxy = address(proxy);
       } catch {
@@ -46,6 +51,10 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
     } else {
       i_previousMessageTransmitterProxy = address(0);
     }
+
+    // Increase allowance for the legacy token messenger to allow for the migration of tokens.
+    i_token.safeIncreaseAllowance(address(legacyTokenMessenger), type(uint256).max);
+    i_legacyTokenMessenger = legacyTokenMessenger;
 
     emit ConfigSet(address(tokenMessenger));
   }
@@ -76,18 +85,38 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
       decodedReceiver = abi.decode(lockOrBurnIn.receiver, (bytes32));
     }
 
+    uint64 nonce;
+    CCTPVersion cctpVersion;
     // Since this pool is the msg sender of the CCTP transaction, only this contract
     // is able to call replaceDepositForBurn. Since this contract does not implement
     // replaceDepositForBurn, the tokens cannot be maliciously re-routed to another address.
-    i_tokenMessenger.depositForBurn(
-      lockOrBurnIn.amount,
-      domain.domainIdentifier,
-      decodedReceiver,
-      address(i_token),
-      domain.allowedCaller,
-      MAX_FEE,
-      FINALITY_THRESHOLD
-    );
+
+    // If the CCTP version is CCTP_V1, we use the legacy token messenger to deposit for burn.
+    if (domain.cctpVersion == CCTPVersion.CCTP_V1) {
+      cctpVersion = CCTPVersion.CCTP_V1;
+
+      nonce = i_legacyTokenMessenger.depositForBurnWithCaller(
+        lockOrBurnIn.amount,
+        domain.domainIdentifier,
+        decodedReceiver,
+        address(i_token),
+        domain.allowedCaller
+      );
+
+    // If the CCTP version is CCTP_V2, we use the new token messenger to deposit for burn.
+    } else if (domain.cctpVersion == CCTPVersion.CCTP_V2) {
+      cctpVersion = CCTPVersion.CCTP_V2;
+
+      i_tokenMessenger.depositForBurn(
+        lockOrBurnIn.amount,
+        domain.domainIdentifier,
+        decodedReceiver,
+        address(i_token),
+        domain.allowedCaller,
+        MAX_FEE,
+        FINALITY_THRESHOLD
+      );
+    }
 
     emit LockedOrBurned({
       remoteChainSelector: lockOrBurnIn.remoteChainSelector,
@@ -97,9 +126,9 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
     });
 
     SourceTokenDataPayload memory sourceTokenDataPayload = SourceTokenDataPayload({
-      nonce: uint64(0),
+      nonce: nonce,
       sourceDomain: i_localDomainIdentifier,
-      cctpVersion: CCTPVersion.CCTP_V2,
+      cctpVersion: cctpVersion,
       amount: lockOrBurnIn.amount,
       destinationDomain: i_localDomainIdentifier,
       mintRecipient: decodedReceiver,

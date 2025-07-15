@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {ITokenMessenger} from "./interfaces/ITokenMessenger.sol";
 
+import {ERC20LockBox} from "../ERC20LockBox.sol";
 import {Pool} from "../../libraries/Pool.sol";
 import {TokenPool} from "../TokenPool.sol";
 import {CCTPMessageTransmitterProxy} from "../USDC/CCTPMessageTransmitterProxy.sol";
@@ -41,6 +42,7 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPoolCCTPV2, USDCBridgeMigrat
 
   error LanePausedForCCTPMigration(uint64 remoteChainSelector);
   error TokenLockingNotAllowedAfterMigration(uint64 remoteChainSelector);
+  error LockBoxCannotBeZeroAddress();
 
   /// @notice The address of the liquidity provider for a specific chain.
   /// External liquidity is not required when there is one canonical token deployed to a chain,
@@ -50,17 +52,30 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPoolCCTPV2, USDCBridgeMigrat
 
   // Note: The supportedUSDCVersion is set to 1, as this pool is only compatible with CCTP V2.
   constructor(
+    ITokenMessenger legacyTokenMessenger,
     ITokenMessenger tokenMessenger,
     CCTPMessageTransmitterProxy cctpMessageTransmitterProxy,
     IERC20 token,
     address[] memory allowlist,
     address rmnProxy,
     address router,
-    address previousPool
+    address previousPool,
+    address lockBox
   )
-    USDCTokenPoolCCTPV2(tokenMessenger, cctpMessageTransmitterProxy, token, allowlist, rmnProxy, router, previousPool)
-    USDCBridgeMigrator(address(token))
-  {}
+    USDCTokenPoolCCTPV2(legacyTokenMessenger, tokenMessenger, cctpMessageTransmitterProxy, token, allowlist, rmnProxy, router, previousPool)
+    USDCBridgeMigrator(address(token), lockBox)
+  {
+    // Note: The lockBox is used to hold the tokens that are locked in the pool.
+    // It is used to simplify pool upgrades without requiring a liquidity migration as the lockBox can be used to hold
+    // the tokens that are locked in the pool.
+    if (lockBox == address(0)) {
+      revert LockBoxCannotBeZeroAddress();
+    }
+
+    // Approve the lock box for unlimited token amounts so that the pool can deposit tokens into the lock box.
+    IERC20(token).safeApprove(lockBox, type(uint256).max);
+    i_lockBox = lockBox;
+  }
 
   // ================================================================
   // │                   Incoming/Outgoing Mechanisms               |
@@ -93,6 +108,8 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPoolCCTPV2, USDCBridgeMigrat
 
     // Increase internal accounting of locked tokens for burnLockedUSDC() migration
     s_lockedTokensByChainSelector[lockOrBurnIn.remoteChainSelector] += lockOrBurnIn.amount;
+
+    ERC20LockBox(i_lockBox).deposit(lockOrBurnIn.amount, lockOrBurnIn.remoteChainSelector);
 
     emit LockedOrBurned({
       remoteChainSelector: lockOrBurnIn.remoteChainSelector,
@@ -147,7 +164,7 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPoolCCTPV2, USDCBridgeMigrat
       s_lockedTokensByChainSelector[releaseOrMintIn.remoteChainSelector] -= releaseOrMintIn.sourceDenominatedAmount;
     }
 
-    i_token.safeTransfer(releaseOrMintIn.receiver, releaseOrMintIn.sourceDenominatedAmount);
+    ERC20LockBox(i_lockBox).withdraw(releaseOrMintIn.sourceDenominatedAmount, releaseOrMintIn.receiver, releaseOrMintIn.remoteChainSelector);
 
     emit ReleasedOrMinted({
       remoteChainSelector: releaseOrMintIn.remoteChainSelector,
@@ -206,7 +223,10 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPoolCCTPV2, USDCBridgeMigrat
 
     s_lockedTokensByChainSelector[remoteChainSelector] += amount;
 
+    // Deposit the provided liquidity into the lockbox for the specified remote chain
     i_token.safeTransferFrom(msg.sender, address(this), amount);
+    // TODO: Replace with actual Lockbox and not use shitty casting
+    ERC20LockBox(i_lockBox).deposit(amount, remoteChainSelector);
 
     emit LiquidityAdded(msg.sender, amount);
   }
@@ -226,7 +246,8 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPoolCCTPV2, USDCBridgeMigrat
 
     s_lockedTokensByChainSelector[remoteChainSelector] -= amount;
 
-    i_token.safeTransfer(msg.sender, amount);
+    // Withdraw the liquidity from the lock box for the specified remote chain
+    ERC20LockBox(i_lockBox).withdraw(amount, msg.sender, remoteChainSelector);
 
     emit LiquidityRemoved(msg.sender, amount);
   }

@@ -21,6 +21,7 @@ contract USDCTokenPoolSetup is USDCSetup {
 
     s_mockUSDCTransmitter = new MockE2EUSDCTransmitter(0, DEST_DOMAIN_IDENTIFIER, address(s_USDCToken));
     s_mockUSDC = new MockUSDCTokenMessenger(0, address(s_mockUSDCTransmitter));
+    s_mockLegacyUSDC = new MockUSDCTokenMessenger(0, address(s_mockUSDCTransmitter));
     s_cctpMessageTransmitterProxy = new CCTPMessageTransmitterProxy(s_mockUSDC);
 
     BurnMintERC677(address(s_USDCToken)).grantMintAndBurnRoles(address(s_mockUSDCTransmitter));
@@ -62,7 +63,8 @@ contract USDCTokenPoolSetup is USDCSetup {
       mintRecipient: bytes32(0),
       domainIdentifier: 9999,
       allowedCaller: keccak256("allowedCallerDestChain"),
-      enabled: true
+      enabled: true,
+      cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V1
     });
 
     s_usdcTokenPool.setDomains(domains);

@@ -9,6 +9,7 @@ import {USDCTokenPoolCCTPV2} from "../../pools/USDC/USDCTokenPoolCCTPV2.sol";
 
 contract USDCTokenPoolCCTPV2Helper is USDCTokenPoolCCTPV2 {
   constructor(
+    ITokenMessenger legacyTokenMessenger,
     ITokenMessenger tokenMessenger,
     CCTPMessageTransmitterProxy messageTransmitterProxy,
     IBurnMintERC20 token,
@@ -16,7 +17,7 @@ contract USDCTokenPoolCCTPV2Helper is USDCTokenPoolCCTPV2 {
     address rmnProxy,
     address router,
     address previousPool
-  ) USDCTokenPoolCCTPV2(tokenMessenger, messageTransmitterProxy, token, allowlist, rmnProxy, router, previousPool) {}
+  ) USDCTokenPoolCCTPV2(legacyTokenMessenger, tokenMessenger, messageTransmitterProxy, token, allowlist, rmnProxy, router, previousPool) {}
 
   function validateMessage(bytes memory usdcMessage, SourceTokenDataPayload memory sourceTokenData) external view {
     return _validateMessage(usdcMessage, sourceTokenData);

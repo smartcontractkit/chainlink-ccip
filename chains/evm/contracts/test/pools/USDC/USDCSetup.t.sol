@@ -54,6 +54,7 @@ contract USDCSetup is BaseTest {
   address internal constant DEST_CHAIN_USDC_TOKEN = address(0x23598918358198766);
 
   MockUSDCTokenMessenger internal s_mockUSDC;
+  MockUSDCTokenMessenger internal s_mockLegacyUSDC;
   MockE2EUSDCTransmitter internal s_mockUSDCTransmitter;
   MockE2EUSDCTransmitterCCTPV2 internal s_mockUSDCTransmitterCCTPV2;
 
@@ -77,6 +78,8 @@ contract USDCSetup is BaseTest {
 
     s_mockUSDCTransmitterCCTPV2 = new MockE2EUSDCTransmitterCCTPV2(1, DEST_DOMAIN_IDENTIFIER, address(s_USDCToken));
     s_mockUSDC = new MockUSDCTokenMessenger(1, address(s_mockUSDCTransmitterCCTPV2));
+    
+    s_mockLegacyUSDC = new MockUSDCTokenMessenger(0, address(s_mockUSDCTransmitter));
 
     s_cctpMessageTransmitterProxy = new CCTPMessageTransmitterProxy(s_mockUSDC);
 

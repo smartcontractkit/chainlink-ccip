@@ -53,6 +53,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     bytes32 mintRecipient; //       Address to mint to on the destination chain
     uint32 domainIdentifier; // ──╮ Unique domain ID
     uint64 destChainSelector; //  │ The destination chain for this domain
+    CCTPVersion cctpVersion; //   | CCTP version used on the domain
     bool enabled; // ─────────────╯ Whether the domain is enabled
   }
 
@@ -95,8 +96,9 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   struct Domain {
     bytes32 allowedCaller; //      Address allowed to mint on the domain
     bytes32 mintRecipient; //      Address to mint to on the destination chain
-    uint32 domainIdentifier; // ─╮ Unique domain ID
-    bool enabled; // ────────────╯ Whether the domain is enabled
+    uint32 domainIdentifier; // ──╮ Unique domain ID
+    CCTPVersion cctpVersion; //   │ CCTP version used on the domain
+    bool enabled; // ─────────────╯ Whether the domain is enabled
   }
 
   // A mapping of CCIP chain identifiers to destination domains
@@ -170,7 +172,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
   ) public virtual override returns (Pool.LockOrBurnOutV1 memory) {
     _validateLockOrBurn(lockOrBurnIn);
-
+    
     Domain memory domain = s_chainToDomain[lockOrBurnIn.remoteChainSelector];
     if (!domain.enabled) revert UnknownDomain(lockOrBurnIn.remoteChainSelector);
 
@@ -367,9 +369,10 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
       if (domain.allowedCaller == bytes32(0) || domain.destChainSelector == 0) revert InvalidDomain(domain);
 
       s_chainToDomain[domain.destChainSelector] = Domain({
-        domainIdentifier: domain.domainIdentifier,
-        mintRecipient: domain.mintRecipient,
         allowedCaller: domain.allowedCaller,
+        mintRecipient: domain.mintRecipient,
+        domainIdentifier: domain.domainIdentifier,
+        cctpVersion: domain.cctpVersion,
         enabled: domain.enabled
       });
     }

@@ -13,6 +13,7 @@ import {USDCTokenPoolCCTPV2Setup} from "./USDCTokenPoolCCTPV2Setup.t.sol";
 contract USDCTokenPoolCCTPV2_constructor is USDCTokenPoolCCTPV2Setup {
   function test_constructor() public {
     new USDCTokenPoolCCTPV2(
+      s_mockLegacyUSDC,
       s_mockUSDC,
       s_cctpMessageTransmitterProxy,
       s_USDCToken,
@@ -25,6 +26,7 @@ contract USDCTokenPoolCCTPV2_constructor is USDCTokenPoolCCTPV2Setup {
 
   function test_constructor_PreviousPoolZeroAddress() public {
     USDCTokenPoolCCTPV2 usdcTokenPool = new USDCTokenPoolCCTPV2(
+      s_mockLegacyUSDC,
       s_mockUSDC,
       s_cctpMessageTransmitterProxy,
       s_USDCToken,
@@ -40,6 +42,7 @@ contract USDCTokenPoolCCTPV2_constructor is USDCTokenPoolCCTPV2Setup {
   function test_constructor_RevertWhen_TokenMessangerAddressZero() public {
     vm.expectRevert(USDCTokenPool.InvalidConfig.selector);
     new USDCTokenPoolCCTPV2(
+      s_mockLegacyUSDC,
       ITokenMessenger(address(0)),
       s_cctpMessageTransmitterProxy,
       s_USDCToken,
@@ -59,6 +62,7 @@ contract USDCTokenPoolCCTPV2_constructor is USDCTokenPoolCCTPV2Setup {
     );
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidMessageVersion.selector, transmitterVersion));
     new USDCTokenPoolCCTPV2(
+      s_mockLegacyUSDC,
       s_mockUSDC,
       s_cctpMessageTransmitterProxy,
       s_USDCToken,
@@ -76,6 +80,7 @@ contract USDCTokenPoolCCTPV2_constructor is USDCTokenPoolCCTPV2Setup {
     );
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidTokenMessengerVersion.selector, tokenMessengerVersion));
     new USDCTokenPoolCCTPV2(
+      s_mockLegacyUSDC,
       s_mockUSDC,
       s_cctpMessageTransmitterProxy,
       s_USDCToken,
@@ -95,6 +100,7 @@ contract USDCTokenPoolCCTPV2_constructor is USDCTokenPoolCCTPV2Setup {
     );
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidTransmitterInProxy.selector));
     new USDCTokenPoolCCTPV2(
+      s_mockLegacyUSDC,
       s_mockUSDC,
       s_cctpMessageTransmitterProxy,
       s_USDCToken,
@@ -110,6 +116,7 @@ contract USDCTokenPoolCCTPV2_constructor is USDCTokenPoolCCTPV2Setup {
     bytes memory bytecode = abi.encodePacked(
       type(USDCTokenPoolCCTPV2).creationCode,
       abi.encode(
+        s_mockLegacyUSDC,
         s_mockUSDC,
         s_cctpMessageTransmitterProxy,
         s_USDCToken,
@@ -129,6 +136,7 @@ contract USDCTokenPoolCCTPV2_constructor is USDCTokenPoolCCTPV2Setup {
 
     // Now, re-encode the constructor args with the predicted address as previousPool
     bytes memory constructorArgs = abi.encode(
+      s_mockLegacyUSDC,
       s_mockUSDC,
       s_cctpMessageTransmitterProxy,
       s_USDCToken,
@@ -167,6 +175,7 @@ contract USDCTokenPoolCCTPV2_constructor is USDCTokenPoolCCTPV2Setup {
     vm.expectRevert(USDCTokenPool.InvalidPreviousPool.selector);
 
     new USDCTokenPoolCCTPV2(
+      s_mockLegacyUSDC,
       s_mockUSDC,
       s_cctpMessageTransmitterProxy,
       s_USDCToken,
@@ -195,6 +204,7 @@ contract USDCTokenPoolCCTPV2_constructor is USDCTokenPoolCCTPV2Setup {
     vm.expectRevert(USDCTokenPool.InvalidPreviousPool.selector);
 
     new USDCTokenPoolCCTPV2(
+      s_mockLegacyUSDC,
       s_mockUSDC,
       s_cctpMessageTransmitterProxy,
       s_USDCToken,

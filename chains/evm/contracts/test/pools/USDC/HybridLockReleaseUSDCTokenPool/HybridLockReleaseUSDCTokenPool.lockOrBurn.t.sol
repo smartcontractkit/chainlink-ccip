@@ -48,7 +48,7 @@ contract HybridLockReleaseUSDCTokenPool_lockOrBurn is HybridLockReleaseUSDCToken
       })
     );
 
-    assertEq(s_USDCToken.balanceOf(address(s_usdcTokenPool)), amount, "Incorrect token amount in the tokenPool");
+    assertEq(s_USDCToken.balanceOf(address(s_lockBox)), amount, "Incorrect token amount in the tokenPool");
   }
 
   function test_PrimaryMechanism() public {

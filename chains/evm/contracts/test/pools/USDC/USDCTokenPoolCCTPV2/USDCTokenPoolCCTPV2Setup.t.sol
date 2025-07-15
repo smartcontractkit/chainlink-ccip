@@ -15,6 +15,7 @@ contract USDCTokenPoolCCTPV2Setup is USDCSetup {
     super.setUp();
 
     s_usdcTokenPool = new USDCTokenPoolCCTPV2Helper(
+      s_mockLegacyUSDC,
       s_mockUSDC,
       s_cctpMessageTransmitterProxy,
       s_USDCToken,
@@ -32,6 +33,7 @@ contract USDCTokenPoolCCTPV2Setup is USDCSetup {
 
     s_allowedList.push(vm.randomAddress());
     s_usdcTokenPoolWithAllowList = new USDCTokenPoolCCTPV2Helper(
+      s_mockLegacyUSDC,
       s_mockUSDC,
       s_cctpMessageTransmitterProxy,
       s_USDCToken,
@@ -50,7 +52,8 @@ contract USDCTokenPoolCCTPV2Setup is USDCSetup {
       mintRecipient: bytes32(0),
       domainIdentifier: 9999,
       allowedCaller: keccak256("allowedCallerDestChain"),
-      enabled: true
+      enabled: true,
+      cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V2
     });
 
     s_usdcTokenPool.setDomains(domains);

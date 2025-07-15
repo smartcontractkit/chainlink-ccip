@@ -17,7 +17,7 @@ contract ERC20LockBox is Ownable2StepMsgSender {
     error InsufficientBalance(uint64 remoteChainSelector, uint256 requested, uint256 available);
     error TokenAmountCannotBeZero();
     error RecipientCannotBeZeroAddress();
-
+    error TokenAddressCannotBeZero();
     event AllowedCallerAdded(address indexed caller);
     event AllowedCallerRemoved(address indexed caller);
     event Deposit(uint64 indexed remoteChainSelector, address indexed depositor, uint256 amount);
@@ -36,8 +36,9 @@ contract ERC20LockBox is Ownable2StepMsgSender {
     /// @notice Initializes the contract with the token address
     /// @param token The address of the ERC20 token this contract will hold
     constructor(address token) {
-        // Validate that the token address is not zero
-        require(token != address(0), "Token address cannot be zero");
+        if (token == address(0)) {
+            revert TokenAddressCannotBeZero();
+        }
         i_token = token;
     }
 

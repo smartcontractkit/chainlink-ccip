@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {ERC20LockBox} from "../ERC20LockBox.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
 
@@ -38,10 +39,14 @@ abstract contract USDCBridgeMigrator is Ownable2StepMsgSender {
 
   EnumerableSet.UintSet internal s_migratedChains;
 
+  address public immutable i_lockBox;
+
   constructor(
-    address token
+    address token,
+    address lockBox
   ) {
     i_USDC = IBurnMintERC20(token);
+    i_lockBox = lockBox;
   }
 
   /// @notice Burn USDC locked for a specific lane so that destination USDC can be converted from
@@ -63,6 +68,10 @@ abstract contract USDCBridgeMigrator is Ownable2StepMsgSender {
     // Even though USDC is a trusted call, ensure CEI by updating state first
     delete s_lockedTokensByChainSelector[burnChainSelector];
     delete s_proposedUSDCMigrationChain;
+
+    // The CCTP burn function will attempt to burn out of the contract that calls it, so we need to withdraw the tokens
+    // from the lock box first otherwise the burn will revert.
+    ERC20LockBox(i_lockBox).withdraw(tokensToBurn, address(this), burnChainSelector);
 
     // This should only be called after this contract has been granted a "zero allowance minter role" on USDC by Circle,
     // otherwise the call will revert. Executing this burn will functionally convert all USDC on the destination chain
