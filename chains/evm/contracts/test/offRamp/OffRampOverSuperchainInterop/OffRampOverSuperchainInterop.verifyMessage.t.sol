@@ -62,6 +62,10 @@ contract OffRampOverSuperchainInterop_verifyReport is OffRampOverSuperchainInter
     uint256 timestamp,
     uint64 sequenceNumber
   ) public {
+    // Constrain inputs to avoid InvalidEncodingOfIdentifierInProofs
+    vm.assume(blockNumber != 0);
+    vm.assume(timestamp != 0);
+
     Internal.Any2EVMRampMessage memory message = _generateValidMessage(SOURCE_CHAIN_SELECTOR_1, sequenceNumber);
 
     (bytes32[] memory proofs, Identifier memory expectedIdentifier) =
@@ -217,6 +221,10 @@ contract OffRampOverSuperchainInterop_verifyReport is OffRampOverSuperchainInter
     address wrongOnRamp = makeAddr("wrong_onramp");
     bytes32[] memory proofs = new bytes32[](5);
     proofs[0] = bytes32(uint256(uint160(wrongOnRamp))); // Wrong onRamp
+    proofs[1] = bytes32(block.number); // blockNumber
+    proofs[2] = bytes32(uint256(1)); // logIndex (can be zero)
+    proofs[3] = bytes32(block.timestamp); // timestamp
+    proofs[4] = bytes32(CHAIN_ID_1); // chainId
 
     Internal.Any2EVMRampMessage[] memory messages = new Internal.Any2EVMRampMessage[](1);
     messages[0] = message;
@@ -258,6 +266,10 @@ contract OffRampOverSuperchainInterop_verifyReport is OffRampOverSuperchainInter
     // Identifier uses the new OnRamp
     bytes32[] memory proofs = new bytes32[](5);
     proofs[0] = bytes32(uint256(uint160(newOnRamp)));
+    proofs[1] = bytes32(block.number); // blockNumber
+    proofs[2] = bytes32(uint256(1)); // logIndex (can be zero)
+    proofs[3] = bytes32(block.timestamp); // timestamp
+    proofs[4] = bytes32(uint256(99)); // chainId (some non-zero value)
 
     Internal.Any2EVMRampMessage[] memory messages = new Internal.Any2EVMRampMessage[](1);
     messages[0] = message;
@@ -328,6 +340,25 @@ contract OffRampOverSuperchainInterop_verifyReport is OffRampOverSuperchainInter
 
     // Expect revert from MockCrossL2Inbox
     vm.expectRevert(abi.encodeWithSelector(MockCrossL2Inbox.ValidationFailed.selector, validationError));
+    s_offRampOverSuperchainInterop.verifyMessage(SOURCE_CHAIN_SELECTOR_1, report);
+  }
+
+  function test_verifyMessage_RevertWhen_ProofFlagBitsMustBeZero() public {
+    Internal.Any2EVMRampMessage memory message = _generateValidMessage(SOURCE_CHAIN_SELECTOR_1, 1);
+    (bytes32[] memory proofs,) = _getValidProofsAndIdentifier(block.number, 1, block.timestamp);
+
+    Internal.Any2EVMRampMessage[] memory messages = new Internal.Any2EVMRampMessage[](1);
+    messages[0] = message;
+
+    Internal.ExecutionReport memory report = Internal.ExecutionReport({
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
+      messages: messages,
+      offchainTokenData: new bytes[][](1),
+      proofs: proofs,
+      proofFlagBits: 1 // This should trigger ProofFlagBitsMustBeZero
+    });
+
+    vm.expectRevert(OffRampOverSuperchainInterop.ProofFlagBitsMustBeZero.selector);
     s_offRampOverSuperchainInterop.verifyMessage(SOURCE_CHAIN_SELECTOR_1, report);
   }
 }

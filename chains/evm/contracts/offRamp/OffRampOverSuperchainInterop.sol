@@ -120,7 +120,7 @@ contract OffRampOverSuperchainInterop is OffRamp {
     if (message.header.sourceChainSelector != sourceChainSelector) {
       revert InvalidSourceChainSelector(message.header.sourceChainSelector, sourceChainSelector);
     }
-    if (report.proofFlagBits == 0) {
+    if (report.proofFlagBits != 0) {
       revert ProofFlagBitsMustBeZero();
     }
     // Validate that the message is meant for this chain.
