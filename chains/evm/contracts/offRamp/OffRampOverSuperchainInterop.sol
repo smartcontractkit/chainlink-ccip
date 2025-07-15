@@ -24,6 +24,8 @@ contract OffRampOverSuperchainInterop is OffRamp {
   error OperationNotSupportedByThisOffRampType();
   error ReportMustContainExactlyOneMessage();
   error InvalidProofsWordLength(uint256 length, uint256 expected);
+  error ProofFlagBitsMustBeZero();
+  error InvalidEncodingOfIdentifierInProofs(bytes32[] proofs);
 
   event ChainSelectorToChainIdConfigUpdated(uint64 indexed chainSelector, uint256 indexed chainId);
   event ChainSelectorToChainIdConfigRemoved(uint64 indexed chainSelector, uint256 indexed chainId);
@@ -67,6 +69,12 @@ contract OffRampOverSuperchainInterop is OffRamp {
   ) internal pure returns (Identifier memory identifier, bytes32 logHash) {
     if (proofs.length != 5) revert InvalidProofsWordLength(proofs.length, 5);
 
+    // Sanity check that origin, blockNumber, timestamp, and chainId cannot be zero.
+    // Log index can be zero.
+    if (proofs[0] == 0 || proofs[1] == 0 || proofs[3] == 0 || proofs[4] == 0) {
+      revert InvalidEncodingOfIdentifierInProofs(proofs);
+    }
+
     identifier = Identifier({
       origin: address(uint160(uint256(proofs[0]))),
       blockNumber: uint256(proofs[1]),
@@ -101,7 +109,7 @@ contract OffRampOverSuperchainInterop is OffRamp {
   /// @param report The execution report to verify.
   /// @return timestampCommitted The source timestamp of the message.
   /// @return hashedLeaves Array of 1 hashed message.
-  function _verifyMessage(
+  function _verifyReport(
     uint64 sourceChainSelector,
     Internal.ExecutionReport memory report
   ) internal virtual override returns (uint256 timestampCommitted, bytes32[] memory hashedLeaves) {
@@ -111,6 +119,9 @@ contract OffRampOverSuperchainInterop is OffRamp {
     // Sanity check that the report is constructed correctly.
     if (message.header.sourceChainSelector != sourceChainSelector) {
       revert InvalidSourceChainSelector(message.header.sourceChainSelector, sourceChainSelector);
+    }
+    if (report.proofFlagBits == 0) {
+      revert ProofFlagBitsMustBeZero();
     }
     // Validate that the message is meant for this chain.
     if (message.header.destChainSelector != i_chainSelector) {
