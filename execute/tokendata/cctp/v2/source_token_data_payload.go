@@ -9,8 +9,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 
-	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
+	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 )
 
 // SourceTokenDataPayload represents the ABI-encoded token data payload for CCTP v2 transfers.

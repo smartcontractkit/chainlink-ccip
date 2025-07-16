@@ -87,9 +87,10 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 // AttestationEncoder encodes attestation data for on-chain use

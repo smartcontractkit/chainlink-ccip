@@ -133,7 +133,8 @@ func (u *USDCTokenDataObserver) IsTokenSupported(
 	if err != nil {
 		return false
 	}
-	hasExpectedCctpVersion := tokenData.CCTPVersion == reader.CctpVersion1 || tokenData.CCTPVersion == reader.CctpUnknownVersion
+	hasExpectedCctpVersion := tokenData.CCTPVersion == reader.CctpVersion1 ||
+		tokenData.CCTPVersion == reader.CctpUnknownVersion
 
 	return hasExpectedCctpVersion &&
 		strings.EqualFold(u.supportedPoolsBySelector[sourceChain], msgToken.SourcePoolAddress.String())
