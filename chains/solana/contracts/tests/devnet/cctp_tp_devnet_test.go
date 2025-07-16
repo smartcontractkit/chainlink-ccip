@@ -48,6 +48,8 @@ func TestCctpTpDevnet(t *testing.T) {
 	offrampAddress, err := solana.PublicKeyFromBase58(devnetInfo.Offramp)
 	require.NoError(t, err)
 
+	ccip_offramp.SetProgramID(offrampAddress)
+
 	offrampPDAs, err := getOfframpPDAs(offrampAddress)
 	require.NoError(t, err)
 
@@ -92,7 +94,12 @@ func TestCctpTpDevnet(t *testing.T) {
 
 	chainSelector := devnetInfo.ChainSelectors.Sepolia
 	domain := domains[chainSelector]
-	domainDestCaller := remotePoolAddress
+
+	destCallerBytes, err := hex.DecodeString(devnetInfo.CCTP.Sepolia.AllowedCaller)
+	require.NoError(t, err)
+	domainDestCallerBytes := [32]byte{}
+	copy(domainDestCallerBytes[32-len(destCallerBytes):], destCallerBytes)
+	domainDestCaller := solana.PublicKey(domainDestCallerBytes)
 
 	cctpPool := getCctpTokenPoolPDAs(t, cctpTpProgram, chainSelector, usdcMint)
 	messageTransmitter := getMessageTransmitterPDAs(t, cctpMtProgram, cctpTmmProgram)
@@ -536,6 +543,8 @@ func TestCctpTpDevnet(t *testing.T) {
 		})
 
 		t.Run("CCIP Send", func(t *testing.T) {
+			// t.Skip()
+
 			routerBillingSignerPDA, _, err := state.FindFeeBillingSignerPDA(referenceAddresses.Router)
 			require.NoError(t, err)
 
@@ -597,4 +606,37 @@ func TestCctpTpDevnet(t *testing.T) {
 			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "CcipCctpMessageSentEvent", &cctpSentEvent, config.PrintEvents))
 		})
 	})
+
+	t.Run("Derivation test", func(t *testing.T) {
+		t.Skip()
+
+		root := [32]uint8{35, 129, 161, 114, 237, 23, 73, 119, 13, 17, 209, 37, 35, 20, 29, 210, 233, 224, 175, 47, 168, 112, 112, 98, 156, 25, 30, 168, 114, 124, 121, 7}
+		tokenReceiver := solana.MustPublicKeyFromBase58("9e9yTkeXWKbhnTTRqeLnZtAQBCttFKP9Wwk2Scmefdgo")
+
+		messagingAccounts := []ccip_offramp.CcipAccountMeta{}
+		tokenTransferAndOffchainData := []ccip_offramp.TokenTransferAndOffchainData{
+			{
+				Transfer: ccip_offramp.Any2SVMTokenTransfer{
+					SourcePoolAddress: MustDecodeHex(t, "550b43420ff1ee9625488c509c89b89883062e4f"),
+					DestTokenAddress:  solana.MustPublicKeyFromBase58("4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"),
+					DestGasAmount:     180000,
+					ExtraData:         MustDecodeHex(t, "000000000000000000000000000000000000000000000000000000000005026e0000000000000000000000000000000000000000000000000000000000000000"),
+					Amount: ccip_offramp.CrossChainAmount{
+						LeBytes: [32]uint8{160,
+							134, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+					},
+				},
+				Data: MustDecodeHex(t, "000000000000000000000000000000000000000000000000000000000002bf20000000000000000000000000000000000000000000000000000000000002bf20000000000000000000000000000000000000000000000000000000000002bf20000000000000000000000000000000000000000000000000000000000002bf20000000000000000000000000000000000000000000000000000000000002bf20000000000000000000000000000000000000000000000000000000000002bf20000000000000000000000000000000000000000000000000000000000002bf20000000000000000000000000000000000000000000000000000000000002bf20000000000000000000000000000000000000000000000000000000000002bf20000000000000000000000000000000000000000000000000000000000002bf20000000000000000000000000000000000000000000000000000000000002bf20000000000000000000000000000000000000000000000000000000000002bf20000000000000000000000000000000000000000000000000000000000002bf20000000000000000000000000000000000000000000000000000000000002bf20000000000000000000000000000000000000000000000000000000000002bf20000000000000000000000000000000000000000000000000000000000002bf20000000000000000000000000000000000000000000000000000000000002bf20000000000000000000000000000000000000000000000000000000000002bf20000000000000000000000000000000000000000000000000000000000002bf20"),
+			},
+		}
+
+		testutils.DeriveExecutionAccounts(ctx, t, admin, messagingAccounts, 16015286601757825753, tokenTransferAndOffchainData, root, nil, tokenReceiver, client, offrampAddress)
+	})
+}
+
+func MustDecodeHex(t *testing.T, s string) []byte {
+	t.Helper()
+	b, err := hex.DecodeString(s)
+	require.NoError(t, err)
+	return b
 }
