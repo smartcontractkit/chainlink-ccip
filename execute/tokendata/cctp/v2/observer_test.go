@@ -1348,7 +1348,7 @@ type MockCCTPv2AttestationClient struct {
 
 // Interface check
 var _ interface {
-	GetMessages(ctx context.Context, sourceDomainID uint32, txHash string) (Messages, error)
+	GetMessages(ctx context.Context, sourceChain cciptypes.ChainSelector, sourceDomainID uint32, txHash string) (Messages, error)
 } = (*MockCCTPv2AttestationClient)(nil)
 
 type MockAttestationResponse struct {
@@ -1372,6 +1372,7 @@ func (m *MockCCTPv2AttestationClient) AddResponse(sourceDomainID uint32, txHash 
 
 func (m *MockCCTPv2AttestationClient) GetMessages(
 	ctx context.Context,
+	sourceChain cciptypes.ChainSelector,
 	sourceDomainID uint32,
 	txHash string,
 ) (Messages, error) {
@@ -1387,12 +1388,13 @@ func (m *MockCCTPv2AttestationClient) GetMessages(
 func getCCTPv2MessagesWithMockClient(
 	ctx context.Context,
 	attestationClient *MockCCTPv2AttestationClient,
+	sourceChain cciptypes.ChainSelector,
 	sourceDomainID uint32,
 	txHashes mapset.Set[string],
 ) map[string]Message {
 	cctpV2Messages := make(map[string]Message)
 	for txHash := range txHashes.Iter() {
-		cctpResponse, err := attestationClient.GetMessages(ctx, sourceDomainID, txHash)
+		cctpResponse, err := attestationClient.GetMessages(ctx, sourceChain, sourceDomainID, txHash)
 		if err == nil && len(cctpResponse.Messages) > 0 {
 			for _, msg := range cctpResponse.Messages {
 				cctpV2Messages[msg.EventNonce] = msg
@@ -1567,7 +1569,7 @@ func TestGetCCTPv2Messages(t *testing.T) {
 			}
 
 			// Call the function with our mock client
-			result := getCCTPv2MessagesWithMockClient(ctx, mockClient, tt.sourceDomainID, txHashesSet)
+			result := getCCTPv2MessagesWithMockClient(ctx, mockClient, testSourceChain, tt.sourceDomainID, txHashesSet)
 
 			// Verify results
 			require.Equal(t, len(tt.expectedMessages), len(result), "Result map length mismatch")
@@ -1697,7 +1699,7 @@ func TestConvertCCTPv2MessagesToMessageTokenData(t *testing.T) {
 			name:                      "empty inputs",
 			ccipMessages:              map[cciptypes.SeqNum]cciptypes.Message{},
 			tokenIndexToCCTPv2Message: map[cciptypes.SeqNum]map[int]CCTPv2MessageOrError{},
-			setupEncoder:              func(m *mockAttestationEncoder) {},
+			setupEncoder:              noopMockEncoder(),
 			expectedResults:           map[cciptypes.SeqNum]exectypes.MessageTokenData{},
 		},
 		{
@@ -1828,7 +1830,7 @@ func TestConvertCCTPv2MessagesToMessageTokenData(t *testing.T) {
 					},
 				},
 			},
-			setupEncoder: func(m *mockAttestationEncoder) {},
+			setupEncoder: noopMockEncoder(),
 			expectedResults: map[cciptypes.SeqNum]exectypes.MessageTokenData{
 				1: createExpectedMessageTokenData(
 					errorToken(errors.New(
@@ -1848,7 +1850,7 @@ func TestConvertCCTPv2MessagesToMessageTokenData(t *testing.T) {
 					},
 				},
 			},
-			setupEncoder: func(m *mockAttestationEncoder) {},
+			setupEncoder: noopMockEncoder(),
 			expectedResults: map[cciptypes.SeqNum]exectypes.MessageTokenData{
 				1: createExpectedMessageTokenData(
 					errorToken(errors.New("A CCTPv2 Message's 'message' field could not be converted from string to bytes")),
@@ -1867,7 +1869,7 @@ func TestConvertCCTPv2MessagesToMessageTokenData(t *testing.T) {
 					},
 				},
 			},
-			setupEncoder: func(m *mockAttestationEncoder) {},
+			setupEncoder: noopMockEncoder(),
 			expectedResults: map[cciptypes.SeqNum]exectypes.MessageTokenData{
 				1: createExpectedMessageTokenData(
 					errorToken(errors.New("A CCTPv2 Message's 'attestation' field could not be converted from string to bytes")),
@@ -1907,7 +1909,7 @@ func TestConvertCCTPv2MessagesToMessageTokenData(t *testing.T) {
 			tokenIndexToCCTPv2Message: map[cciptypes.SeqNum]map[int]CCTPv2MessageOrError{
 				1: {},
 			},
-			setupEncoder: func(m *mockAttestationEncoder) {},
+			setupEncoder: noopMockEncoder(),
 			expectedResults: map[cciptypes.SeqNum]exectypes.MessageTokenData{
 				1: createExpectedMessageTokenData(),
 			},

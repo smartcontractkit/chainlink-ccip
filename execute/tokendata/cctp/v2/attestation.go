@@ -22,12 +22,12 @@ const (
 
 // CCTPv2AttestationClient defines the interface for fetching CCTP v2 attestations from Circle's API
 type CCTPv2AttestationClient interface {
-	GetMessages(ctx context.Context, sourceDomainID uint32, transactionHash string) (Messages, error)
+	GetMessages(ctx context.Context, sourceChain cciptypes.ChainSelector, sourceDomainID uint32, transactionHash string) (Messages, error)
 }
 
 // AttestationMetricsReporter provides metrics reporting for attestation API calls
 type AttestationMetricsReporter interface {
-	TrackAttestationAPILatency(sourceDomain uint32, status string, latency time.Duration)
+	TrackAttestationAPILatency(sourceChain cciptypes.ChainSelector, sourceDomain uint32, status string, latency time.Duration)
 }
 
 // CCTPv2AttestationClientHTTP implements CCTPv2AttestationClient using HTTP calls to Circle's attestation API
@@ -65,6 +65,7 @@ func NewCCTPv2AttestationClientHTTP(
 // CCTP v2 messages associated with the given transaction.
 func (c *CCTPv2AttestationClientHTTP) GetMessages(
 	ctx context.Context,
+	sourceChain cciptypes.ChainSelector,
 	sourceDomainID uint32,
 	transactionHash string,
 ) (Messages, error) {
@@ -74,25 +75,25 @@ func (c *CCTPv2AttestationClientHTTP) GetMessages(
 	latency := time.Since(startTime)
 
 	if err != nil {
-		c.metricsReporter.TrackAttestationAPILatency(sourceDomainID, "error", latency)
+		c.metricsReporter.TrackAttestationAPILatency(sourceChain, sourceDomainID, "error", latency)
 		return Messages{},
 			fmt.Errorf("http call failed to get CCTPv2 messages for sourceDomainID %d and transactionHash %s, error: %w",
 				sourceDomainID, transactionHash, err)
 	}
 
 	if status != 200 {
-		c.metricsReporter.TrackAttestationAPILatency(sourceDomainID, "error", latency)
+		c.metricsReporter.TrackAttestationAPILatency(sourceChain, sourceDomainID, "error", latency)
 		return Messages{}, fmt.Errorf(
 			"http call failed to get CCTPv2 messages returned non-200 status: http status %d", status)
 	}
 
 	result, err := parseResponseBody(body)
 	if err != nil {
-		c.metricsReporter.TrackAttestationAPILatency(sourceDomainID, "error", latency)
+		c.metricsReporter.TrackAttestationAPILatency(sourceChain, sourceDomainID, "error", latency)
 		return Messages{}, err
 	}
 
-	c.metricsReporter.TrackAttestationAPILatency(sourceDomainID, "success", latency)
+	c.metricsReporter.TrackAttestationAPILatency(sourceChain, sourceDomainID, "success", latency)
 	return result, nil
 }
 

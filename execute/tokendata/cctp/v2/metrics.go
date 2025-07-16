@@ -28,7 +28,7 @@ var (
 				float64(20 * time.Second),
 			},
 		},
-		[]string{"chainFamily", "chainID", "sourceChain", "method"},
+		[]string{"destChainFamily", "destChainID", "sourceChain", "method"},
 	)
 
 	// Attestation API call latency
@@ -49,7 +49,7 @@ var (
 				float64(60 * time.Second),
 			},
 		},
-		[]string{"chainFamily", "chainID", "sourceDomain", "status"},
+		[]string{"destChainFamily", "destChainID", "sourceChainFamily", "sourceChainID", "sourceDomain", "status"},
 	)
 
 	// Token processing counters
@@ -58,7 +58,7 @@ var (
 			Name: "ccip_exec_tokendata_cctpv2_tokens_processed_total",
 			Help: "Total number of CCTP v2 tokens processed by status",
 		},
-		[]string{"chainFamily", "chainID", "sourceChain", "status"},
+		[]string{"destChainFamily", "destChainID", "sourceChain", "status"},
 	)
 
 	// Message matching counters
@@ -67,6 +67,6 @@ var (
 			Name: "ccip_exec_tokendata_cctpv2_message_matching_total",
 			Help: "Total number of CCTP v2 message matching attempts by result",
 		},
-		[]string{"chainFamily", "chainID", "sourceChain", "result"},
+		[]string{"destChainFamily", "destChainID", "sourceChain", "result"},
 	)
 )

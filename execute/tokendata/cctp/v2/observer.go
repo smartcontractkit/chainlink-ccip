@@ -240,7 +240,7 @@ func getMessageTokenDataForSourceChain(
 	// Step 5: Fetch CCTP v2 messages and attestations from Circle's API
 	// Query the attestation service for all collected transaction hashes
 	// Each response contains the message data and attestation needed for on-chain minting
-	cctpV2Messages := getCCTPv2Messages(ctx, lggr, attestationClient, sourceDomainID, txHashes)
+	cctpV2Messages := getCCTPv2Messages(ctx, lggr, attestationClient, sourceChain, sourceDomainID, txHashes)
 
 	// Step 6: Match each SourceTokenDataPayload to its corresponding CCTP v2 Message
 	tokenIndexToCCTPv2Message := matchCCTPv2MessagesToSourceTokenDataPayloads(
@@ -356,12 +356,13 @@ func getCCTPv2Messages(
 	ctx context.Context,
 	lggr logger.Logger,
 	attestationClient CCTPv2AttestationClient,
+	sourceChain cciptypes.ChainSelector,
 	sourceDomainID uint32,
 	txHashes mapset.Set[string],
 ) map[string]Message {
 	cctpV2Messages := make(map[string]Message)
 	for txHash := range txHashes.Iter() {
-		cctpResponse, err := attestationClient.GetMessages(ctx, sourceDomainID, txHash)
+		cctpResponse, err := attestationClient.GetMessages(ctx, sourceChain, sourceDomainID, txHash)
 
 		if err != nil {
 			lggr.Warnw("Failed to get CCTPv2 messages from attestation service",
