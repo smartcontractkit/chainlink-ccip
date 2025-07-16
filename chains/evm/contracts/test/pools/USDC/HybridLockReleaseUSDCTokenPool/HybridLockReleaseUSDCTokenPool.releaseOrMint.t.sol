@@ -92,9 +92,7 @@ contract HybridLockReleaseUSDCTokenPool_releaseOrMint is HybridLockReleaseUSDCTo
     // s_token.transfer(recipient, amount);
 
     assertEq(
-      s_USDCToken.balanceOf(address(s_lockBox)),
-      liquidityAmount - amount,
-      "Incorrect remaining liquidity in TokenPool"
+      s_USDCToken.balanceOf(address(s_lockBox)), liquidityAmount - amount, "Incorrect remaining liquidity in TokenPool"
     );
     assertEq(s_USDCToken.balanceOf(recipient), amount, "Tokens not transferred to recipient");
   }
@@ -332,9 +330,7 @@ contract HybridLockReleaseUSDCTokenPool_releaseOrMint_E2ETest is
     // Assert the tokens were delivered to the recipient
     assertEq(poolReturnDataV1.destinationAmount, amount, "destinationAmount and actual amount transferred differ");
     assertEq(
-      s_USDCToken.balanceOf(address(s_lockBox)),
-      liquidityAmount - amount,
-      "Incorrect remaining liquidity in TokenPool"
+      s_USDCToken.balanceOf(address(s_lockBox)), liquidityAmount - amount, "Incorrect remaining liquidity in TokenPool"
     );
     assertEq(s_USDCToken.balanceOf(recipient), amount, "Tokens not transferred to recipient");
   }

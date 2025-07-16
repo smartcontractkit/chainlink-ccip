@@ -41,7 +41,7 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
     address previousPool
   ) USDCTokenPool(tokenMessenger, cctpMessageTransmitterProxy, token, allowlist, rmnProxy, router, previousPool, 1) {
     if (previousPool != address(0)) {
-      // If the previous pool exists, we need to acquire the previous pool's message transmitter proxy so that a 
+      // If the previous pool exists, we need to acquire the previous pool's message transmitter proxy so that a
       // messages' destinationCaller can be checked against it.
       try USDCTokenPool(previousPool).i_messageTransmitterProxy() returns (CCTPMessageTransmitterProxy proxy) {
         i_previousMessageTransmitterProxy = address(proxy);
@@ -96,14 +96,10 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
       cctpVersion = CCTPVersion.CCTP_V1;
 
       nonce = i_legacyTokenMessenger.depositForBurnWithCaller(
-        lockOrBurnIn.amount,
-        domain.domainIdentifier,
-        decodedReceiver,
-        address(i_token),
-        domain.allowedCaller
+        lockOrBurnIn.amount, domain.domainIdentifier, decodedReceiver, address(i_token), domain.allowedCaller
       );
 
-    // If the CCTP version is CCTP_V2, we use the new token messenger to deposit for burn.
+      // If the CCTP version is CCTP_V2, we use the new token messenger to deposit for burn.
     } else if (domain.cctpVersion == CCTPVersion.CCTP_V2) {
       cctpVersion = CCTPVersion.CCTP_V2;
 

@@ -78,7 +78,7 @@ contract USDCSetup is BaseTest {
 
     s_mockUSDCTransmitterCCTPV2 = new MockE2EUSDCTransmitterCCTPV2(1, DEST_DOMAIN_IDENTIFIER, address(s_USDCToken));
     s_mockUSDC = new MockUSDCTokenMessenger(1, address(s_mockUSDCTransmitterCCTPV2));
-    
+
     s_mockLegacyUSDC = new MockUSDCTokenMessenger(0, address(s_mockUSDCTransmitter));
 
     s_cctpMessageTransmitterProxy = new CCTPMessageTransmitterProxy(s_mockUSDC);

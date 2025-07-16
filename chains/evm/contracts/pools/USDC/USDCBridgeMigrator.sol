@@ -41,10 +41,7 @@ abstract contract USDCBridgeMigrator is Ownable2StepMsgSender {
 
   address public immutable i_lockBox;
 
-  constructor(
-    address token,
-    address lockBox
-  ) {
+  constructor(address token, address lockBox) {
     i_USDC = IBurnMintERC20(token);
     i_lockBox = lockBox;
   }

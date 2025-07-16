@@ -3,8 +3,8 @@ pragma solidity ^0.8.24;
 
 import {ITokenMessenger} from "./interfaces/ITokenMessenger.sol";
 
-import {ERC20LockBox} from "../ERC20LockBox.sol";
 import {Pool} from "../../libraries/Pool.sol";
+import {ERC20LockBox} from "../ERC20LockBox.sol";
 import {TokenPool} from "../TokenPool.sol";
 import {CCTPMessageTransmitterProxy} from "../USDC/CCTPMessageTransmitterProxy.sol";
 import {USDCTokenPoolCCTPV2} from "../USDC/USDCTokenPoolCCTPV2.sol";
@@ -62,7 +62,16 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPoolCCTPV2, USDCBridgeMigrat
     address previousPool,
     address lockBox
   )
-    USDCTokenPoolCCTPV2(legacyTokenMessenger, tokenMessenger, cctpMessageTransmitterProxy, token, allowlist, rmnProxy, router, previousPool)
+    USDCTokenPoolCCTPV2(
+      legacyTokenMessenger,
+      tokenMessenger,
+      cctpMessageTransmitterProxy,
+      token,
+      allowlist,
+      rmnProxy,
+      router,
+      previousPool
+    )
     USDCBridgeMigrator(address(token), lockBox)
   {
     // Note: The lockBox is used to hold the tokens that are locked in the pool.
@@ -164,7 +173,9 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPoolCCTPV2, USDCBridgeMigrat
       s_lockedTokensByChainSelector[releaseOrMintIn.remoteChainSelector] -= releaseOrMintIn.sourceDenominatedAmount;
     }
 
-    ERC20LockBox(i_lockBox).withdraw(releaseOrMintIn.sourceDenominatedAmount, releaseOrMintIn.receiver, releaseOrMintIn.remoteChainSelector);
+    ERC20LockBox(i_lockBox).withdraw(
+      releaseOrMintIn.sourceDenominatedAmount, releaseOrMintIn.receiver, releaseOrMintIn.remoteChainSelector
+    );
 
     emit ReleasedOrMinted({
       remoteChainSelector: releaseOrMintIn.remoteChainSelector,

@@ -29,6 +29,7 @@ package ccip
 //go:generate go run generation/generate/wrap.go ccip HybridLockReleaseUSDCTokenPool hybrid_lock_release_usdc_token_pool latest
 //go:generate go run generation/generate/wrap.go ccip BurnMintFastTransferTokenPool fast_transfer_token_pool latest
 //go:generate go run generation/generate/wrap.go ccip CCTPMessageTransmitterProxy cctp_message_transmitter_proxy latest
+//go:generate go run generation/generate/wrap.go ccip ERC20LockBox erc20_lock_box latest
 
 // Helpers
 //go:generate go run generation/generate/wrap.go ccip MaybeRevertMessageReceiver maybe_revert_message_receiver latest

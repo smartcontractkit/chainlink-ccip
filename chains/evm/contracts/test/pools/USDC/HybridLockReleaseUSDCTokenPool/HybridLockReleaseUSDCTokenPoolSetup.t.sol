@@ -3,11 +3,11 @@ pragma solidity ^0.8.24;
 
 import {BurnMintERC677} from "@chainlink/contracts/src/v0.8/shared/token/ERC677/BurnMintERC677.sol";
 
+import {ERC20LockBox} from "../../../../pools/ERC20LockBox.sol";
 import {CCTPMessageTransmitterProxy} from "../../../../pools/USDC/CCTPMessageTransmitterProxy.sol";
 import {HybridLockReleaseUSDCTokenPool} from "../../../../pools/USDC/HybridLockReleaseUSDCTokenPool.sol";
 import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
 import {USDCSetup} from "../USDCSetup.t.sol";
-import {ERC20LockBox} from "../../../../pools/ERC20LockBox.sol";
 
 contract HybridLockReleaseUSDCTokenPoolSetup is USDCSetup {
   HybridLockReleaseUSDCTokenPool internal s_usdcTokenPool;
@@ -34,8 +34,7 @@ contract HybridLockReleaseUSDCTokenPoolSetup is USDCSetup {
       s_lockBox
     );
 
-    ERC20LockBox.AllowedCallerConfigArgs[] memory allowedCallers =
-      new ERC20LockBox.AllowedCallerConfigArgs[](1);
+    ERC20LockBox.AllowedCallerConfigArgs[] memory allowedCallers = new ERC20LockBox.AllowedCallerConfigArgs[](1);
 
     allowedCallers[0] = ERC20LockBox.AllowedCallerConfigArgs({caller: address(s_usdcTokenPool), allowed: true});
 

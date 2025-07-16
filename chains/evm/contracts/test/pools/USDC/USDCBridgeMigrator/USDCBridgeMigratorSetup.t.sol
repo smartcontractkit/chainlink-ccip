@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {ERC20LockBox} from "../../../../pools/ERC20LockBox.sol";
 import {HybridLockReleaseUSDCTokenPool} from "../../../../pools/USDC/HybridLockReleaseUSDCTokenPool.sol";
 import {USDCSetup} from "../USDCSetup.t.sol";
-import {ERC20LockBox} from "../../../../pools/ERC20LockBox.sol";
 
 contract USDCBridgeMigratorSetup is USDCSetup {
   HybridLockReleaseUSDCTokenPool internal s_usdcTokenPool;
@@ -28,10 +28,10 @@ contract USDCBridgeMigratorSetup is USDCSetup {
       s_lockBox
     );
 
-    ERC20LockBox.AllowedCallerConfigArgs[] memory allowedCallers =
-      new ERC20LockBox.AllowedCallerConfigArgs[](2);
+    ERC20LockBox.AllowedCallerConfigArgs[] memory allowedCallers = new ERC20LockBox.AllowedCallerConfigArgs[](2);
     allowedCallers[0] = ERC20LockBox.AllowedCallerConfigArgs({caller: address(s_usdcTokenPool), allowed: true});
-    allowedCallers[1] = ERC20LockBox.AllowedCallerConfigArgs({caller: address(s_usdcTokenPoolTransferLiquidity), allowed: true});
+    allowedCallers[1] =
+      ERC20LockBox.AllowedCallerConfigArgs({caller: address(s_usdcTokenPoolTransferLiquidity), allowed: true});
     ERC20LockBox(s_lockBox).configureAllowedCallers(allowedCallers);
 
     s_usdcTokenPoolTransferLiquidity = new HybridLockReleaseUSDCTokenPool(

@@ -47,7 +47,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     bytes attestation;
   }
 
-  // A domain is a USDC representation of a chain.
+  // solhint-disable-next-line gas-struct-packing
   struct DomainUpdate {
     bytes32 allowedCaller; //       Address allowed to mint on the domain
     bytes32 mintRecipient; //       Address to mint to on the destination chain
@@ -93,11 +93,12 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   /// @dev The allowedCaller represents the contract authorized to call receiveMessage on the destination CCTP message transmitter.
   /// For dest pool version 1.6.1, this is the MessageTransmitterProxy of the destination chain.
   /// For dest pool version 1.5.1, this is the destination chain's token pool.
+  // solhint-disable-next-line gas-struct-packing
   struct Domain {
     bytes32 allowedCaller; //      Address allowed to mint on the domain
     bytes32 mintRecipient; //      Address to mint to on the destination chain
     uint32 domainIdentifier; // ──╮ Unique domain ID
-    CCTPVersion cctpVersion; //   │ CCTP version used on the domain
+    CCTPVersion cctpVersion; //   │ CCTP version used on the domain. Enums are uint8 for packing purposes.
     bool enabled; // ─────────────╯ Whether the domain is enabled
   }
 
