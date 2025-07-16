@@ -22,12 +22,15 @@ const (
 
 // CCTPv2AttestationClient defines the interface for fetching CCTP v2 attestations from Circle's API
 type CCTPv2AttestationClient interface {
-	GetMessages(ctx context.Context, sourceChain cciptypes.ChainSelector, sourceDomainID uint32, transactionHash string) (Messages, error)
+	GetMessages(
+		ctx context.Context, sourceChain cciptypes.ChainSelector, sourceDomainID uint32, transactionHash string,
+	) (Messages, error)
 }
 
 // AttestationMetricsReporter provides metrics reporting for attestation API calls
 type AttestationMetricsReporter interface {
-	TrackAttestationAPILatency(sourceChain cciptypes.ChainSelector, sourceDomain uint32, status string, latency time.Duration)
+	TrackAttestationAPILatency(
+		sourceChain cciptypes.ChainSelector, sourceDomain uint32, status string, latency time.Duration)
 }
 
 // CCTPv2AttestationClientHTTP implements CCTPv2AttestationClient using HTTP calls to Circle's attestation API

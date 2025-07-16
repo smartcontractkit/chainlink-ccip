@@ -15,7 +15,8 @@ import (
 // MetricsReporter provides metrics reporting functionality for CCTP v2 observer
 type MetricsReporter interface {
 	TrackObservationLatency(sourceChain cciptypes.ChainSelector, method string, latency time.Duration)
-	TrackAttestationAPILatency(sourceChain cciptypes.ChainSelector, sourceDomain uint32, status string, latency time.Duration)
+	TrackAttestationAPILatency(
+		sourceChain cciptypes.ChainSelector, sourceDomain uint32, status string, latency time.Duration)
 	TrackTokenProcessed(sourceChain cciptypes.ChainSelector, status string, count int)
 	TrackMessageMatching(sourceChain cciptypes.ChainSelector, result string, count int)
 }
@@ -32,15 +33,17 @@ type noOpMetricsReporter struct{}
 
 func (n *noOpMetricsReporter) TrackObservationLatency(cciptypes.ChainSelector, string, time.Duration) {
 }
-func (n *noOpMetricsReporter) TrackAttestationAPILatency(cciptypes.ChainSelector, uint32, string, time.Duration) {}
-func (n *noOpMetricsReporter) TrackTokenProcessed(cciptypes.ChainSelector, string, int)                         {}
-func (n *noOpMetricsReporter) TrackMessageMatching(cciptypes.ChainSelector, string, int)                       {}
+func (n *noOpMetricsReporter) TrackAttestationAPILatency(cciptypes.ChainSelector, uint32, string, time.Duration) {
+}
+func (n *noOpMetricsReporter) TrackTokenProcessed(cciptypes.ChainSelector, string, int)  {}
+func (n *noOpMetricsReporter) TrackMessageMatching(cciptypes.ChainSelector, string, int) {}
 
 // NewMetricsReporter creates a new metrics reporter for CCTP v2
 func NewMetricsReporter(lggr logger.Logger, destChainSelector cciptypes.ChainSelector) (MetricsReporter, error) {
 	chainFamily, chainID, ok := libs.GetChainInfoFromSelector(destChainSelector)
 	if !ok {
-		return &noOpMetricsReporter{}, fmt.Errorf("chainFamily and chainID not found for selector %d", destChainSelector)
+		return &noOpMetricsReporter{}, fmt.Errorf("chainFamily and chainID not found for selector %d",
+			destChainSelector)
 	}
 
 	return &metricsReporter{
@@ -65,7 +68,9 @@ func (r *metricsReporter) TrackObservationLatency(
 }
 
 // TrackAttestationAPILatency tracks the latency of attestation API calls
-func (r *metricsReporter) TrackAttestationAPILatency(sourceChain cciptypes.ChainSelector, sourceDomain uint32, status string, latency time.Duration) {
+func (r *metricsReporter) TrackAttestationAPILatency(
+	sourceChain cciptypes.ChainSelector, sourceDomain uint32, status string, latency time.Duration,
+) {
 	sourceChainFamily, sourceChainID, ok := libs.GetChainInfoFromSelector(sourceChain)
 	if !ok {
 		// If we can't get chain info, use the selector as a fallback
@@ -73,7 +78,8 @@ func (r *metricsReporter) TrackAttestationAPILatency(sourceChain cciptypes.Chain
 		sourceChainID = strconv.FormatUint(uint64(sourceChain), 10)
 	}
 	PromCCTPv2AttestationAPILatencyHistogram.
-		WithLabelValues(r.destChainFamily, r.destChainID, sourceChainFamily, sourceChainID, strconv.FormatUint(uint64(sourceDomain), 10), status).
+		WithLabelValues(r.destChainFamily, r.destChainID, sourceChainFamily, sourceChainID,
+			strconv.FormatUint(uint64(sourceDomain), 10), status).
 		Observe(latency.Seconds())
 }
 
