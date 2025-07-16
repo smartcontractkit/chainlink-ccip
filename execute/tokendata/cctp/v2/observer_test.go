@@ -15,7 +15,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 const sourceTokenDataPayloadHexV2 = "0x" +
@@ -841,7 +842,9 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 	ctx := context.Background()
 
 	// Test helpers
-	createMessageWithToken := func(seqNum cciptypes.SeqNum, txHash string, poolAddr string, extraData []byte) cciptypes.Message {
+	createMessageWithToken := func(
+		seqNum cciptypes.SeqNum, txHash string, poolAddr string, extraData []byte,
+	) cciptypes.Message {
 		return cciptypes.Message{
 			Header: cciptypes.RampMessageHeader{
 				MessageID:      [32]byte{byte(seqNum)},
@@ -870,7 +873,9 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 	}
 
 	// Mock attestation encoder
-	mockEncoder := func(ctx context.Context, message cciptypes.Bytes, attestation cciptypes.Bytes) (cciptypes.Bytes, error) {
+	mockEncoder := func(
+		ctx context.Context, message cciptypes.Bytes, attestation cciptypes.Bytes,
+	) (cciptypes.Bytes, error) {
 		return append(message, attestation...), nil
 	}
 
@@ -1091,15 +1096,18 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 				}
 
 				if expectedSupportedTokens, exists := tt.expectedSupportedTokens[chainSelector]; exists {
-					require.Equal(t, expectedSupportedTokens, supportedCount, "Wrong supported token count for chain %d", chainSelector)
+					require.Equal(t, expectedSupportedTokens, supportedCount,
+						"Wrong supported token count for chain %d", chainSelector)
 				}
 
 				if expectedErrorTokens, exists := tt.expectedErrorTokens[chainSelector]; exists {
-					require.Equal(t, expectedErrorTokens, errorCount, "Wrong error token count for chain %d", chainSelector)
+					require.Equal(t, expectedErrorTokens, errorCount,
+						"Wrong error token count for chain %d", chainSelector)
 				}
 
 				if expectedNotSupportedTokens, exists := tt.expectedNotSupportedTokens[chainSelector]; exists {
-					require.Equal(t, expectedNotSupportedTokens, notSupportedCount, "Wrong not supported token count for chain %d", chainSelector)
+					require.Equal(t, expectedNotSupportedTokens, notSupportedCount,
+						"Wrong not supported token count for chain %d", chainSelector)
 				}
 			}
 		})

@@ -10,7 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 // SourceTokenDataPayload represents the ABI-encoded token data payload for CCTP v2 transfers.
@@ -117,6 +117,7 @@ func getCCTPv2SourceTokenDataPayload(
 	return tokenData, nil
 }
 
+// DecodeSourceTokenDataPayload decodes a byte array into a SourceTokenDataPayload struct
 func DecodeSourceTokenDataPayload(data []byte) (*SourceTokenDataPayload, error) {
 	argTypes := abi.Arguments{
 		{Type: mustABIType("uint64")},

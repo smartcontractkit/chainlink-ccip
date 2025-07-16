@@ -10,8 +10,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata/http"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 const (
@@ -20,6 +20,7 @@ const (
 	attestationStatusComplete string = "complete"
 )
 
+// CCTPv2AttestationClient defines the interface for fetching CCTP v2 attestations from Circle's API
 type CCTPv2AttestationClient interface {
 	GetMessages(ctx context.Context, sourceDomainID uint32, transactionHash string) (Messages, error)
 }
@@ -29,12 +30,14 @@ type AttestationMetricsReporter interface {
 	TrackAttestationAPILatency(sourceDomain uint32, status string, latency time.Duration)
 }
 
+// CCTPv2AttestationClientHTTP implements CCTPv2AttestationClient using HTTP calls to Circle's attestation API
 type CCTPv2AttestationClientHTTP struct {
 	lggr            logger.Logger
 	client          http.HTTPClient
 	metricsReporter AttestationMetricsReporter
 }
 
+// NewCCTPv2AttestationClientHTTP creates a new HTTP-based CCTP v2 attestation client
 func NewCCTPv2AttestationClientHTTP(
 	lggr logger.Logger,
 	config pluginconfig.USDCCCTPObserverConfig,

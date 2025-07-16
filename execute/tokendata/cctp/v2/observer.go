@@ -88,12 +88,14 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
+// AttestationEncoder encodes attestation data for on-chain use
 type AttestationEncoder func(context.Context, cciptypes.Bytes, cciptypes.Bytes) (cciptypes.Bytes, error)
 
+// CCTPv2TokenDataObserver observes CCTP v2 token data and fetches attestations for cross-chain transfers
 type CCTPv2TokenDataObserver struct {
 	lggr                     logger.Logger
 	destChainSelector        cciptypes.ChainSelector
@@ -103,6 +105,7 @@ type CCTPv2TokenDataObserver struct {
 	metricsReporter          MetricsReporter
 }
 
+// NewCCTPv2TokenDataObserver creates a new CCTP v2 token data observer
 func NewCCTPv2TokenDataObserver(
 	lggr logger.Logger,
 	destChainSelector cciptypes.ChainSelector,
@@ -145,6 +148,7 @@ func NewCCTPv2TokenDataObserver(
 	}, nil
 }
 
+// InitCCTPv2TokenDataObserver initializes a CCTP v2 token data observer with pre-configured dependencies
 func InitCCTPv2TokenDataObserver(
 	lggr logger.Logger,
 	destChainSelector cciptypes.ChainSelector,
@@ -307,6 +311,7 @@ func errorMessageTokenData(
 	return result
 }
 
+// CCTPv2MessageOrError represents either a successful CCTP v2 message or an error
 type CCTPv2MessageOrError struct {
 	message Message
 	err     error
