@@ -84,16 +84,19 @@ func newCCIPChainReaderWithConfigPollerInternal(
 
 	for chainSelector, cr := range contractReaders {
 		crs[chainSelector] = contractreader.NewExtendedContractReader(cr)
-		if contractWriters[chainSelector] == nil {
-			return nil, fmt.Errorf("contract writer for chain %s is not provided", chainSelector)
-		}
-		cas[chainSelector] = chainaccessor.NewDefaultAccessor(
+
+		// TODO: remove instantiation of the accessor once accessors are passed down from above
+		accessor, err := chainaccessor.NewDefaultAccessor(
 			lggr,
 			chainSelector,
 			crs[chainSelector],
 			contractWriters[chainSelector],
 			addrCodec,
 		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create chain accessor for chain %s: %w", chainSelector, err)
+		}
+		cas[chainSelector] = accessor
 	}
 
 	offrampAddrStr, err := addrCodec.AddressBytesToString(offrampAddress, destChain)

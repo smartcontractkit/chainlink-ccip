@@ -7,11 +7,12 @@ import (
 	"strconv"
 	"time"
 
+	"golang.org/x/exp/maps"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
-	"golang.org/x/exp/maps"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
@@ -39,14 +40,20 @@ func NewDefaultAccessor(
 	contractReader contractreader.Extended,
 	contractWriter types.ContractWriter,
 	addrCodec cciptypes.AddressCodec,
-) cciptypes.ChainAccessor {
+) (cciptypes.ChainAccessor, error) {
+	if contractReader == nil {
+		return nil, fmt.Errorf("contractReader cannot be nil")
+	}
+	if contractWriter == nil {
+		return nil, fmt.Errorf("contractWriter cannot be nil")
+	}
 	return &DefaultAccessor{
 		lggr:           lggr,
 		chainSelector:  chainSelector,
 		contractReader: contractReader,
 		contractWriter: contractWriter,
 		addrCodec:      addrCodec,
-	}
+	}, nil
 }
 
 func (l *DefaultAccessor) GetContractAddress(contractName string) ([]byte, error) {
