@@ -39,6 +39,16 @@ func SendAndConfirm(ctx context.Context, t *testing.T, rpcClient *rpc.Client, in
 	res, err := retryOnTimeouts(3, func() (*rpc.GetTransactionResult, error) {
 		return common.SendAndConfirm(ctx, rpcClient, instructions, signer, commitment, opts...)
 	})
+
+	if err != nil {
+		fmt.Printf("Transaction failed with error: %v\n", err)
+		tx, terr := res.Transaction.GetTransaction()
+		require.NoError(t, terr)
+		fmt.Printf("Transaction details: %v\n", tx)
+		for _, l := range res.Meta.LogMessages {
+			fmt.Printf("    %s\n", l)
+		}
+	}
 	require.NoError(t, err)
 
 	return res
@@ -49,6 +59,16 @@ func SendAndConfirmWithLookupTables(ctx context.Context, t *testing.T, rpcClient
 	res, err := retryOnTimeouts(3, func() (*rpc.GetTransactionResult, error) {
 		return common.SendAndConfirmWithLookupTables(ctx, rpcClient, instructions, signer, commitment, lookupTables, opts...)
 	})
+
+	if err != nil {
+		fmt.Printf("Transaction failed with error: %v\n", err)
+		tx, terr := res.Transaction.GetTransaction()
+		require.NoError(t, terr)
+		fmt.Printf("Transaction details: %v\n", tx)
+		for _, l := range res.Meta.LogMessages {
+			fmt.Printf("    %s\n", l)
+		}
+	}
 	require.NoError(t, err)
 
 	return res
