@@ -149,26 +149,6 @@ func NewCCTPv2TokenDataObserver(
 	}, nil
 }
 
-// InitCCTPv2TokenDataObserver initializes a CCTP v2 token data observer with pre-configured dependencies
-func InitCCTPv2TokenDataObserver(
-	lggr logger.Logger,
-	destChainSelector cciptypes.ChainSelector,
-	supportedPoolsBySelector map[cciptypes.ChainSelector]string,
-	attestationEncoder AttestationEncoder,
-	attestationClient *CCTPv2AttestationClientHTTP,
-	metricsReporter MetricsReporter,
-) *CCTPv2TokenDataObserver {
-
-	return &CCTPv2TokenDataObserver{
-		lggr:                     lggr,
-		destChainSelector:        destChainSelector,
-		supportedPoolsBySelector: supportedPoolsBySelector,
-		attestationEncoder:       attestationEncoder,
-		attestationClient:        attestationClient,
-		metricsReporter:          metricsReporter,
-	}
-}
-
 // Observe processes a set of CCIP messages and returns token data observations.
 // For each source chain, it extracts CCTP v2 token data from message payloads,
 // fetches corresponding attestations, and converts them to MessageTokenData.
@@ -229,6 +209,9 @@ func getMessageTokenDataForSourceChain(
 	attestationClient CCTPv2AttestationClient,
 	metricsReporter MetricsReporter,
 ) map[cciptypes.SeqNum]exectypes.MessageTokenData {
+	// Add sourceChain to logger context for all logs in this function
+	lggr = logger.With(lggr, "sourceChain", sourceChain)
+
 	// Step 1: Check if source chain has CCTP v2 support configured
 	// If not, all tokens are marked as not supported
 	cctpV2EnabledTokenPoolAddress, ok := supportedPoolsBySelector[sourceChain]
