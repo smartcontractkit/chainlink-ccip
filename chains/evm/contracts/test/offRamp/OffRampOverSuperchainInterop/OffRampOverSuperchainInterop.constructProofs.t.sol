@@ -47,6 +47,12 @@ contract OffRampOverSuperchainInterop_constructProofs is OffRampOverSuperchainIn
     uint64 chainSelector,
     uint64 sequenceNumber
   ) public view {
+    // Constrain inputs to avoid InvalidEncodingOfIdentifierInProofs
+    vm.assume(onRamp != address(0));
+    vm.assume(blockNumber != 0);
+    vm.assume(timestamp != 0);
+    vm.assume(chainId != 0);
+
     Internal.Any2EVMRampMessage memory message = _generateValidMessage(chainSelector, sequenceNumber);
 
     bytes32[] memory proofs = new bytes32[](5);
@@ -85,5 +91,46 @@ contract OffRampOverSuperchainInterop_constructProofs is OffRampOverSuperchainIn
     bytes32[] memory emptyProofs = new bytes32[](0);
     vm.expectRevert(abi.encodeWithSelector(OffRampOverSuperchainInterop.InvalidProofsWordLength.selector, 0, 5));
     s_offRampOverSuperchainInterop.constructProofs(message, emptyProofs);
+  }
+
+  function test_constructProofs_RevertWhen_InvalidEncodingOfIdentifierInProofs() public {
+    Internal.Any2EVMRampMessage memory message = _generateValidMessage(SOURCE_CHAIN_SELECTOR_1, 1);
+    bytes32[] memory proofs = new bytes32[](5);
+    proofs[0] = bytes32(uint256(uint160(ON_RAMP_ADDRESS)));
+    proofs[1] = bytes32(block.number);
+    proofs[2] = bytes32(uint256(1)); // logIndex (can be zero)
+    proofs[3] = bytes32(block.timestamp);
+    proofs[4] = bytes32(CHAIN_ID_1);
+
+    // Test proofs[0] (origin) cannot be zero
+    proofs[0] = bytes32(0);
+    vm.expectRevert(
+      abi.encodeWithSelector(OffRampOverSuperchainInterop.InvalidEncodingOfIdentifierInProofs.selector, proofs)
+    );
+    s_offRampOverSuperchainInterop.constructProofs(message, proofs);
+
+    // Reset and test proofs[1] (blockNumber) cannot be zero
+    proofs[0] = bytes32(uint256(uint160(ON_RAMP_ADDRESS)));
+    proofs[1] = bytes32(0);
+    vm.expectRevert(
+      abi.encodeWithSelector(OffRampOverSuperchainInterop.InvalidEncodingOfIdentifierInProofs.selector, proofs)
+    );
+    s_offRampOverSuperchainInterop.constructProofs(message, proofs);
+
+    // Reset and test proofs[3] (timestamp) cannot be zero
+    proofs[1] = bytes32(block.number);
+    proofs[3] = bytes32(0);
+    vm.expectRevert(
+      abi.encodeWithSelector(OffRampOverSuperchainInterop.InvalidEncodingOfIdentifierInProofs.selector, proofs)
+    );
+    s_offRampOverSuperchainInterop.constructProofs(message, proofs);
+
+    // Reset and test proofs[4] (chainId) cannot be zero
+    proofs[3] = bytes32(block.timestamp);
+    proofs[4] = bytes32(0);
+    vm.expectRevert(
+      abi.encodeWithSelector(OffRampOverSuperchainInterop.InvalidEncodingOfIdentifierInProofs.selector, proofs)
+    );
+    s_offRampOverSuperchainInterop.constructProofs(message, proofs);
   }
 }

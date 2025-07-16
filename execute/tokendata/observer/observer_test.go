@@ -8,20 +8,20 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata/observer"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
 func Test_CompositeTokenDataObserver_EmptyObservers(t *testing.T) {
 	mockAddrCodec := internal.NewMockAddressCodecHex(t)
 	obs, err := observer.NewConfigBasedCompositeObservers(
-		tests.Context(t),
+		t.Context(),
 		logger.Test(t),
 		100,
 		[]pluginconfig.TokenDataObserverConfig{},
