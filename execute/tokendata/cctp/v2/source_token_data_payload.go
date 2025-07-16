@@ -10,8 +10,14 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+)
 
-	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
+type CCTPVersion uint8
+
+const (
+	CctpUnknownVersion CCTPVersion = iota
+	CctpVersion1
+	CctpVersion2
 )
 
 // SourceTokenDataPayload represents the ABI-encoded token data payload for CCTP v2 transfers.
@@ -21,16 +27,16 @@ import (
 // Nonce is expected to be 0 for CCTP v2 transfers, as the CCTP v2 protocol does not return a nonce on-chain. This
 // field exists for backwards compatibility.
 type SourceTokenDataPayload struct {
-	Nonce                uint64             `abi:"nonce"`
-	SourceDomain         uint32             `abi:"sourceDomain"`
-	CCTPVersion          reader.CCTPVersion `abi:"cctpVersion"`
-	Amount               cciptypes.BigInt   `abi:"amount"`
-	DestinationDomain    uint32             `abi:"destinationDomain"`
-	MintRecipient        cciptypes.Bytes32  `abi:"mintRecipient"`
-	BurnToken            cciptypes.Bytes32  `abi:"burnToken"`
-	DestinationCaller    cciptypes.Bytes32  `abi:"destinationCaller"`
-	MaxFee               cciptypes.BigInt   `abi:"maxFee"`
-	MinFinalityThreshold uint32             `abi:"minFinalityThreshold"`
+	Nonce                uint64            `abi:"nonce"`
+	SourceDomain         uint32            `abi:"sourceDomain"`
+	CCTPVersion          CCTPVersion       `abi:"cctpVersion"`
+	Amount               cciptypes.BigInt  `abi:"amount"`
+	DestinationDomain    uint32            `abi:"destinationDomain"`
+	MintRecipient        cciptypes.Bytes32 `abi:"mintRecipient"`
+	BurnToken            cciptypes.Bytes32 `abi:"burnToken"`
+	DestinationCaller    cciptypes.Bytes32 `abi:"destinationCaller"`
+	MaxFee               cciptypes.BigInt  `abi:"maxFee"`
+	MinFinalityThreshold uint32            `abi:"minFinalityThreshold"`
 }
 
 // matchesCctpMessage checks if the SourceTokenDataPayload matches the provided CCTPv2 Message.
@@ -111,7 +117,7 @@ func getCCTPv2SourceTokenDataPayload(
 		return nil, err
 	}
 
-	if tokenData.CCTPVersion != reader.CctpVersion2 {
+	if tokenData.CCTPVersion != CctpVersion2 {
 		return nil, fmt.Errorf("unsupported CCTP version: %d", tokenData.CCTPVersion)
 	}
 
@@ -195,7 +201,7 @@ func DecodeSourceTokenDataPayload(data []byte) (*SourceTokenDataPayload, error) 
 	return &SourceTokenDataPayload{
 		Nonce:                nonce,
 		SourceDomain:         sourceDomain,
-		CCTPVersion:          reader.CCTPVersion(cctpVersionUint),
+		CCTPVersion:          CCTPVersion(cctpVersionUint),
 		Amount:               cciptypes.NewBigInt(amount),
 		DestinationDomain:    destinationDomain,
 		MintRecipient:        mintRecipient,

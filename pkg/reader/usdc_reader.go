@@ -339,34 +339,31 @@ func (u evmUSDCMessageReader) recreateMessageTransmitterEvents(
 	return messageTransmitterEvents, nil
 }
 
-// CCTPVersion TODO: doc
-type CCTPVersion uint8
-
-const (
-	CctpUnknownVersion CCTPVersion = iota
-	CctpVersion1
-	CctpVersion2
-)
-
 // SourceTokenDataPayload extracts the nonce and source domain from the USDC message.
 // Please see the Solidity code in USDCTokenPool to understand more details
+//
+//	struct SourceTokenDataPayload {
+//		uint64 nonce;
+//		uint32 sourceDomain;
+//	}
+//	return Pool.LockOrBurnOutV1({
+//	   destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
+//	   destPoolData: abi.encode(SourceTokenDataPayload({nonce: nonce, sourceDomain: i_localDomainIdentifier}))
+//	 });
+//
 // Implementation relies on the EVM internals, so entire struct is EVM-specific and can't be reused for other chains
 type SourceTokenDataPayload struct {
 	Nonce        uint64
 	SourceDomain uint32
-	CCTPVersion  CCTPVersion
 }
 
 func NewSourceTokenDataPayload(nonce uint64, sourceDomain uint32) *SourceTokenDataPayload {
 	return &SourceTokenDataPayload{
 		Nonce:        nonce,
 		SourceDomain: sourceDomain,
-		CCTPVersion:  CctpUnknownVersion,
 	}
 }
 
-// NewSourceTokenDataPayloadFromBytes TODO: doc, explain the old and new USDC token pools
-// TODO: test
 func NewSourceTokenDataPayloadFromBytes(extraData cciptypes.Bytes) (*SourceTokenDataPayload, error) {
 	if len(extraData) < 64 {
 		return nil, fmt.Errorf("extraData is too short, expected at least 64 bytes")
@@ -377,20 +374,12 @@ func NewSourceTokenDataPayloadFromBytes(extraData cciptypes.Bytes) (*SourceToken
 	// Extract the sourceDomain (next 4 bytes), padded to 32 bytes
 	sourceDomain := binary.BigEndian.Uint32(extraData[60:64])
 
-	cctpVersion := CctpUnknownVersion
-	if len(extraData) >= 96 {
-		// Extract the CCTP version (next 1 byte), padded to 32 bytes
-		cctpVersion = CCTPVersion(extraData[95])
-	}
-
 	return &SourceTokenDataPayload{
 		Nonce:        nonce,
 		SourceDomain: sourceDomain,
-		CCTPVersion:  cctpVersion,
 	}, nil
 }
 
-// TODO: update
 func (s SourceTokenDataPayload) ToBytes() cciptypes.Bytes {
 	nonceBytes := [32]byte{} // padded to 32 bytes
 	binary.BigEndian.PutUint64(nonceBytes[24:32], s.Nonce)

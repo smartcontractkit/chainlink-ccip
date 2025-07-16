@@ -11,8 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-
-	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 )
 
 const sourceTokenDataPayloadHex = "0x" +
@@ -32,7 +30,7 @@ func TestDecodeSourceTokenDataPayload(t *testing.T) {
 		expected := &SourceTokenDataPayload{
 			Nonce:                123,
 			SourceDomain:         111,
-			CCTPVersion:          reader.CCTPVersion(1),
+			CCTPVersion:          CCTPVersion(1),
 			Amount:               cciptypes.NewBigInt(big.NewInt(1000)),
 			DestinationDomain:    0x12345678,
 			MintRecipient:        mustBytes32(mintRecipientAddr32),

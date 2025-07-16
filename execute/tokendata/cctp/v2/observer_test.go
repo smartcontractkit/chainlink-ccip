@@ -14,7 +14,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
@@ -34,7 +33,7 @@ const sourceTokenDataPayloadHexV2 = "0x" +
 var sourceTokenDataPayload = SourceTokenDataPayload{
 	Nonce:                0,
 	SourceDomain:         111,
-	CCTPVersion:          reader.CctpVersion2,
+	CCTPVersion:          CctpVersion2,
 	Amount:               cciptypes.NewBigIntFromInt64(1000),
 	DestinationDomain:    0x12345678,
 	MintRecipient:        mustBytes32(mintRecipientAddr32),
@@ -97,7 +96,7 @@ func createSourceTokenDataPayload(sourceDomain uint32, destDomain uint32, amount
 		Nonce:             123, // Default nonce that matches the test CCTP message
 		SourceDomain:      sourceDomain,
 		DestinationDomain: destDomain,
-		CCTPVersion:       reader.CctpVersion2,
+		CCTPVersion:       CctpVersion2,
 		Amount:            cciptypes.NewBigIntFromInt64(amount),
 		BurnToken:         mustBytes32("0x1111"),
 		MintRecipient:     mustBytes32("0x2222"),

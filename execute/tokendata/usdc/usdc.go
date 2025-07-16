@@ -124,20 +124,11 @@ func (u *USDCTokenDataObserver) Observe(
 	return u.extractTokenData(ctx, lggr, messages, attestations)
 }
 
-// IsTokenSupported TODO: doc
 func (u *USDCTokenDataObserver) IsTokenSupported(
 	sourceChain cciptypes.ChainSelector,
 	msgToken cciptypes.RampTokenAmount,
 ) bool {
-	tokenData, err := reader.NewSourceTokenDataPayloadFromBytes(msgToken.ExtraData)
-	if err != nil {
-		return false
-	}
-	hasExpectedCctpVersion := tokenData.CCTPVersion == reader.CctpVersion1 ||
-		tokenData.CCTPVersion == reader.CctpUnknownVersion
-
-	return hasExpectedCctpVersion &&
-		strings.EqualFold(u.supportedPoolsBySelector[sourceChain], msgToken.SourcePoolAddress.String())
+	return strings.EqualFold(u.supportedPoolsBySelector[sourceChain], msgToken.SourcePoolAddress.String())
 }
 
 func (u *USDCTokenDataObserver) Close() error {
