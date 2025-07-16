@@ -2,6 +2,8 @@ package testutils
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"testing"
 
 	bin "github.com/gagliardetto/binary"
@@ -19,8 +21,24 @@ import (
 // this files includes wrapped methods to be used in testing without additional error checks
 // this is used to keep a consistent interface to introduce less code churn in the tests
 
-func SendAndConfirm(ctx context.Context, t *testing.T, rpcClient *rpc.Client, instructions []solana.Instruction, signer solana.PrivateKey, commitment rpc.CommitmentType, opts ...common.TxModifier) *rpc.GetTransactionResult {
-	res, err := common.SendAndConfirmWithRetries(ctx, rpcClient, instructions, signer, commitment, opts...)
+func retryOnTimeouts(maxAttempts int, fn func() (*rpc.GetTransactionResult, error)) (res *rpc.GetTransactionResult, err error) {
+	for i := range maxAttempts {
+		res, err = fn()
+		if err == nil || !errors.Is(err, &common.FindTxTimeoutError{}) {
+			return res, err
+		}
+		// we've seen on CI that sometimes the transaction is not found due to a timeout error because some
+		// underlying tool (likely the local validator there) is a little unreliable, so we retry
+		fmt.Printf("Retrying due to timeout error: %v (attempt %d out of %d)\n", err, i+1, maxAttempts)
+	}
+	return nil, fmt.Errorf("max attempts reached: %w", err)
+}
+
+func SendAndConfirm(ctx context.Context, t *testing.T, rpcClient *rpc.Client, instructions []solana.Instruction,
+	signer solana.PrivateKey, commitment rpc.CommitmentType, opts ...common.TxModifier) *rpc.GetTransactionResult {
+	res, err := retryOnTimeouts(3, func() (*rpc.GetTransactionResult, error) {
+		return common.SendAndConfirm(ctx, rpcClient, instructions, signer, commitment, opts...)
+	})
 	require.NoError(t, err)
 
 	return res
@@ -28,7 +46,9 @@ func SendAndConfirm(ctx context.Context, t *testing.T, rpcClient *rpc.Client, in
 
 func SendAndConfirmWithLookupTables(ctx context.Context, t *testing.T, rpcClient *rpc.Client, instructions []solana.Instruction,
 	signer solana.PrivateKey, commitment rpc.CommitmentType, lookupTables map[solana.PublicKey]solana.PublicKeySlice, opts ...common.TxModifier) *rpc.GetTransactionResult {
-	res, err := common.SendAndConfirmWithLookupTablesAndRetries(ctx, rpcClient, instructions, signer, commitment, lookupTables, opts...)
+	res, err := retryOnTimeouts(3, func() (*rpc.GetTransactionResult, error) {
+		return common.SendAndConfirmWithLookupTables(ctx, rpcClient, instructions, signer, commitment, lookupTables, opts...)
+	})
 	require.NoError(t, err)
 
 	return res
