@@ -131,7 +131,6 @@ func NewUSDCMessageReader(
 			readers[chainSelector] = solanaUSDCMessageReader{
 				lggr:           lggr,
 				contractReader: contractReaders[chainSelector],
-				cctpDestDomain: domains,
 			}
 		default:
 			return nil, fmt.Errorf("unsupported chain selector family %s for chain %d", family, chainSelector)
@@ -222,6 +221,9 @@ func AllAvailableDomains() map[uint64]uint32 {
 		chainSelector, _ := sel.SelectorFromChainId(chainID)
 		destDomains[chainSelector] = uint32(i + 100)
 	}
+
+	destDomains[sel.SOLANA_MAINNET.Selector] = 5
+	destDomains[sel.SOLANA_DEVNET.Selector] = 5
 
 	return destDomains
 }
@@ -363,7 +365,6 @@ func (u evmUSDCMessageReader) getMessageTransmitterEventIDs(
 type solanaUSDCMessageReader struct {
 	lggr           logger.Logger
 	contractReader contractreader.Extended
-	cctpDestDomain map[uint64]uint32
 }
 
 // getMessageTokenData extracts token data from the CCTP MessageSent event.
