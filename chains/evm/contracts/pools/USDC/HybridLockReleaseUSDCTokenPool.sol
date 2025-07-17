@@ -4,9 +4,11 @@ pragma solidity ^0.8.24;
 import {ITokenMessenger} from "./interfaces/ITokenMessenger.sol";
 
 import {Pool} from "../../libraries/Pool.sol";
+import {ERC20LockBox} from "../ERC20LockBox.sol";
 import {TokenPool} from "../TokenPool.sol";
 import {CCTPMessageTransmitterProxy} from "../USDC/CCTPMessageTransmitterProxy.sol";
-import {USDCTokenPool} from "../USDC/USDCTokenPool.sol";
+import {USDCTokenPoolCCTPV2} from "../USDC/USDCTokenPoolCCTPV2.sol";
+
 import {USDCBridgeMigrator} from "./USDCBridgeMigrator.sol";
 
 import {IERC20} from
@@ -24,7 +26,7 @@ bytes4 constant LOCK_RELEASE_FLAG = 0xfa7c07de;
 /// constructors between parents
 /// @dev The primary token mechanism in this pool is Burn/Mint with CCTP, with Lock/Release as the
 /// secondary, opt in mechanism for chains not currently supporting CCTP.
-contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
+contract HybridLockReleaseUSDCTokenPool is USDCTokenPoolCCTPV2, USDCBridgeMigrator {
   using SafeERC20 for IERC20;
   using EnumerableSet for EnumerableSet.UintSet;
 
@@ -40,6 +42,7 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
 
   error LanePausedForCCTPMigration(uint64 remoteChainSelector);
   error TokenLockingNotAllowedAfterMigration(uint64 remoteChainSelector);
+  error LockBoxCannotBeZeroAddress();
 
   /// @notice The address of the liquidity provider for a specific chain.
   /// External liquidity is not required when there is one canonical token deployed to a chain,
@@ -47,18 +50,41 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
   /// balanceOf(pool) on home chain >= sum(totalSupply(mint/burn "wrapped" token) on all remote chains) should always hold
   mapping(uint64 remoteChainSelector => address liquidityProvider) internal s_liquidityProvider;
 
+  // Note: The supportedUSDCVersion is set to 1, as this pool is only compatible with CCTP V2.
   constructor(
+    ITokenMessenger legacyTokenMessenger,
     ITokenMessenger tokenMessenger,
     CCTPMessageTransmitterProxy cctpMessageTransmitterProxy,
     IERC20 token,
     address[] memory allowlist,
     address rmnProxy,
     address router,
-    address previousPool
+    address previousPool,
+    address lockBox
   )
-    USDCTokenPool(tokenMessenger, cctpMessageTransmitterProxy, token, allowlist, rmnProxy, router, previousPool)
-    USDCBridgeMigrator(address(token))
-  {}
+    USDCTokenPoolCCTPV2(
+      legacyTokenMessenger,
+      tokenMessenger,
+      cctpMessageTransmitterProxy,
+      token,
+      allowlist,
+      rmnProxy,
+      router,
+      previousPool
+    )
+    USDCBridgeMigrator(address(token), lockBox)
+  {
+    // Note: The lockBox is used to hold the tokens that are locked in the pool.
+    // It is used to simplify pool upgrades without requiring a liquidity migration as the lockBox can be used to hold
+    // the tokens that are locked in the pool.
+    if (lockBox == address(0)) {
+      revert LockBoxCannotBeZeroAddress();
+    }
+
+    // Approve the lock box for unlimited token amounts so that the pool can deposit tokens into the lock box.
+    IERC20(token).safeApprove(lockBox, type(uint256).max);
+    i_lockBox = lockBox;
+  }
 
   // ================================================================
   // │                   Incoming/Outgoing Mechanisms               |
@@ -91,6 +117,8 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
 
     // Increase internal accounting of locked tokens for burnLockedUSDC() migration
     s_lockedTokensByChainSelector[lockOrBurnIn.remoteChainSelector] += lockOrBurnIn.amount;
+
+    ERC20LockBox(i_lockBox).deposit(address(i_token), lockOrBurnIn.amount, lockOrBurnIn.remoteChainSelector);
 
     emit LockedOrBurned({
       remoteChainSelector: lockOrBurnIn.remoteChainSelector,
@@ -145,7 +173,12 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
       s_lockedTokensByChainSelector[releaseOrMintIn.remoteChainSelector] -= releaseOrMintIn.sourceDenominatedAmount;
     }
 
-    i_token.safeTransfer(releaseOrMintIn.receiver, releaseOrMintIn.sourceDenominatedAmount);
+    ERC20LockBox(i_lockBox).withdraw(
+      address(i_token),
+      releaseOrMintIn.sourceDenominatedAmount,
+      releaseOrMintIn.receiver,
+      releaseOrMintIn.remoteChainSelector
+    );
 
     emit ReleasedOrMinted({
       remoteChainSelector: releaseOrMintIn.remoteChainSelector,
@@ -204,7 +237,10 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
 
     s_lockedTokensByChainSelector[remoteChainSelector] += amount;
 
+    // Deposit the provided liquidity into the lockbox for the specified remote chain
     i_token.safeTransferFrom(msg.sender, address(this), amount);
+    // TODO: Replace with actual Lockbox and not use shitty casting
+    ERC20LockBox(i_lockBox).deposit(address(i_token), amount, remoteChainSelector);
 
     emit LiquidityAdded(msg.sender, amount);
   }
@@ -224,7 +260,8 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
 
     s_lockedTokensByChainSelector[remoteChainSelector] -= amount;
 
-    i_token.safeTransfer(msg.sender, amount);
+    // Withdraw the liquidity from the lock box for the specified remote chain
+    ERC20LockBox(i_lockBox).withdraw(address(i_token), amount, msg.sender, remoteChainSelector);
 
     emit LiquidityRemoved(msg.sender, amount);
   }

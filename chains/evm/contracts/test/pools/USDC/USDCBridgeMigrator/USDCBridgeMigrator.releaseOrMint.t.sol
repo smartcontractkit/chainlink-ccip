@@ -44,7 +44,20 @@ contract USDCBridgeMigrator_releaseOrMint is HybridLockReleaseUSDCTokenPool_rele
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: abi.encode(USDCTokenPool.SourceTokenDataPayload({nonce: 1, sourceDomain: SOURCE_DOMAIN_IDENTIFIER})),
+      extraData: abi.encode(
+        USDCTokenPool.SourceTokenDataPayload({
+          nonce: 1,
+          sourceDomain: SOURCE_DOMAIN_IDENTIFIER,
+          cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V1,
+          amount: amount,
+          destinationDomain: DEST_DOMAIN_IDENTIFIER,
+          mintRecipient: bytes32(0),
+          burnToken: address(s_USDCToken),
+          destinationCaller: bytes32(0),
+          maxFee: 0,
+          minFinalityThreshold: 0
+        })
+      ),
       destGasAmount: USDC_DEST_TOKEN_GAS
     });
 
@@ -152,9 +165,7 @@ contract USDCBridgeMigrator_releaseOrMint is HybridLockReleaseUSDCTokenPool_rele
       "There should still be 1e6 tokens excluded from the burn"
     );
 
-    assertEq(
-      s_USDCToken.balanceOf(address(s_usdcTokenPool)), 1e6, "All tokens minus the excluded should be in the pool"
-    );
+    assertEq(s_USDCToken.balanceOf(address(s_lockBox)), 1e6, "All tokens minus the excluded should be in the pool");
 
     // Now that the burn is successful, we can release the tokens that were excluded from the burn
     vm.startPrank(s_routerAllowedOffRamp);
@@ -171,7 +182,20 @@ contract USDCBridgeMigrator_releaseOrMint is HybridLockReleaseUSDCTokenPool_rele
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: abi.encode(USDCTokenPool.SourceTokenDataPayload({nonce: 1, sourceDomain: SOURCE_DOMAIN_IDENTIFIER})),
+      extraData: abi.encode(
+        USDCTokenPool.SourceTokenDataPayload({
+          nonce: 1,
+          sourceDomain: SOURCE_DOMAIN_IDENTIFIER,
+          cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V1,
+          amount: amount,
+          destinationDomain: DEST_DOMAIN_IDENTIFIER,
+          mintRecipient: bytes32(0),
+          burnToken: address(s_USDCToken),
+          destinationCaller: bytes32(0),
+          maxFee: 0,
+          minFinalityThreshold: 0
+        })
+      ),
       destGasAmount: USDC_DEST_TOKEN_GAS
     });
 

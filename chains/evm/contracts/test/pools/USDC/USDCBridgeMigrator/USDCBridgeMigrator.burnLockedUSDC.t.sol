@@ -48,7 +48,7 @@ contract USDCBridgeMigrator_BurnLockedUSDC is HybridLockReleaseUSDCTokenPool_loc
     );
 
     // Ensure that the tokens are properly locked
-    assertEq(s_USDCToken.balanceOf(address(s_usdcTokenPool)), amount, "Incorrect token amount in the tokenPool");
+    assertEq(s_USDCToken.balanceOf(address(s_lockBox)), amount, "Incorrect token amount in the tokenPool");
 
     assertEq(
       s_usdcTokenPool.getLockedTokensForChain(DEST_CHAIN_SELECTOR),

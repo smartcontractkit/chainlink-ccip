@@ -86,6 +86,9 @@ contract BurnMintWithLockReleaseFlagTokenPool_releaseOrMint_e2eTest is
       "Lock/Release mech not configured for outgoing message to DEST_CHAIN_SELECTOR"
     );
 
+    // Deal tokens to the pool so that we can lock them in the lock box.
+    deal(address(s_USDCToken), address(s_usdcTokenPool), amount);
+
     vm.startPrank(s_routerAllowedOnRamp);
 
     // Get the output value from the hybrid pool which will be passed to the destination pool
