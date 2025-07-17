@@ -465,7 +465,7 @@ func TestCctpTpDevnet(t *testing.T) {
 				tpLookupTableAddr,
 				tokenAdminRegistry,
 				cctpPool.program,
-				cctpPool.state,        // 3 - writable
+				cctpPool.state,
 				cctpPool.tokenAccount, // 4 - writable
 				cctpPool.signer,       // 5 - writable (to pay for event account)
 				solana.TokenProgramID,
@@ -493,7 +493,7 @@ func TestCctpTpDevnet(t *testing.T) {
 			common.AwaitSlotChange(ctx, client)
 		})
 
-		writableIndexes := []byte{3, 4, 5, 7, 10, 16}
+		writableIndexes := []byte{4, 5, 7, 10, 16}
 
 		t.Run("Upgrade TokenAdminRegistry", func(t *testing.T) {
 			t.Skip()
