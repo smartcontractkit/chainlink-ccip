@@ -313,20 +313,24 @@ pub fn get_token_messenger_minter_pda(seeds: &[&[u8]]) -> Pubkey {
 // a single Context struct (as Anchor would require too much memory to validate all of them), so we use a separate struct
 // and do the address validations manually.
 pub struct TokenOfframpRemainingAccounts<'info> {
-    pub cctp_authority_pda: &'info AccountInfo<'info>,
+    // Accounts that are in the lookup table, as they are static and shared between onramp & offramp
     pub cctp_message_transmitter_account: &'info AccountInfo<'info>,
     pub cctp_token_messenger_minter: &'info AccountInfo<'info>,
     pub system_program: &'info AccountInfo<'info>,
-    pub cctp_event_authority: &'info AccountInfo<'info>,
     pub cctp_message_transmitter: &'info AccountInfo<'info>,
     pub cctp_token_messenger_account: &'info AccountInfo<'info>,
     pub cctp_token_minter_account: &'info AccountInfo<'info>,
     pub cctp_local_token: &'info AccountInfo<'info>,
-    pub cctp_custody_token_account: &'info AccountInfo<'info>,
-    pub cctp_token_messenger_event_authority: &'info AccountInfo<'info>,
-    pub cctp_remote_token_messenger_key: &'info AccountInfo<'info>,
-    pub cctp_token_pair: &'info AccountInfo<'info>,
-    pub cctp_used_nonces: &'info AccountInfo<'info>,
+    pub cctp_token_messenger_minter_event_authority: &'info AccountInfo<'info>,
+    // Accounts that are in the lookup table, but are just for the offramp (not really used by onramp)
+    pub cctp_authority_pda: &'info AccountInfo<'info>, // !
+    pub cctp_event_authority: &'info AccountInfo<'info>, // !
+    pub cctp_custody_token_account: &'info AccountInfo<'info>, // !
+
+    // Accounts that are not in the lookup table, as they are either dynamic or not shared with onramp
+    pub cctp_remote_token_messenger_key: &'info AccountInfo<'info>, // repeated but variadic
+    pub cctp_token_pair: &'info AccountInfo<'info>,                 // ! variadic
+    pub cctp_used_nonces: &'info AccountInfo<'info>,                // ! variadic
 }
 
 impl TokenOfframpRemainingAccounts<'_> {
@@ -408,7 +412,7 @@ impl TokenOfframpRemainingAccounts<'_> {
         );
 
         require_keys_eq!(
-            self.cctp_token_messenger_event_authority.key(),
+            self.cctp_token_messenger_minter_event_authority.key(),
             get_token_messenger_minter_pda(&[b"__event_authority"])
         );
 
@@ -493,15 +497,7 @@ pub struct TokenOnramp<'info> {
     )]
     pub chain_config: Account<'info, ChainConfig>,
 
-    // CCTP pool-specific accounts ----------------
-    /// CHECK this is not read by the pool, just forwarded to CCTP
-    #[account(
-        seeds = [b"sender_authority"],
-        bump,
-        seeds::program = cctp_token_messenger_minter,
-    )]
-    pub cctp_authority_pda: UncheckedAccount<'info>,
-
+    // CCTP pool-specific accounts in the lookup table ----------------
     /// CHECK this is not read by the pool, just forwarded to CCTP
     #[account(
         mut,
@@ -510,6 +506,22 @@ pub struct TokenOnramp<'info> {
         seeds::program = cctp_message_transmitter,
     )]
     pub cctp_message_transmitter_account: UncheckedAccount<'info>,
+
+    /// CHECK this is CCTP's TokenMessengerMinter program, which
+    /// is invoked by this program.
+    #[account(
+        address = TOKEN_MESSENGER_MINTER @ CctpTokenPoolError::InvalidTokenMessengerMinter
+    )]
+    pub cctp_token_messenger_minter: UncheckedAccount<'info>,
+
+    pub system_program: Program<'info, System>,
+
+    /// CHECK this is CCTP's MessageTransmitter program, which
+    /// is invoked CCTP's TokenMessengerMinter by this program.
+    #[account(
+        address = MESSAGE_TRANSMITTER @ CctpTokenPoolError::InvalidMessageTransmitter
+    )]
+    pub cctp_message_transmitter: UncheckedAccount<'info>,
 
     /// CHECK this is not read by the pool, just forwarded to CCTP
     #[account(
@@ -536,22 +548,6 @@ pub struct TokenOnramp<'info> {
     )]
     pub cctp_local_token: UncheckedAccount<'info>,
 
-    /// CHECK this is CCTP's MessageTransmitter program, which
-    /// is invoked CCTP's TokenMessengerMinter by this program.
-    #[account(
-        address = MESSAGE_TRANSMITTER @ CctpTokenPoolError::InvalidMessageTransmitter
-    )]
-    pub cctp_message_transmitter: UncheckedAccount<'info>,
-
-    /// CHECK this is CCTP's TokenMessengerMinter program, which
-    /// is invoked by this program.
-    #[account(
-        address = TOKEN_MESSENGER_MINTER @ CctpTokenPoolError::InvalidTokenMessengerMinter
-    )]
-    pub cctp_token_messenger_minter: UncheckedAccount<'info>,
-
-    pub system_program: Program<'info, System>,
-
     /// CHECK this is not read by the pool, just forwarded to CCTP
     #[account(
         seeds = [b"__event_authority"],
@@ -559,6 +555,15 @@ pub struct TokenOnramp<'info> {
         seeds::program = cctp_token_messenger_minter,
     )]
     pub cctp_event_authority: UncheckedAccount<'info>,
+
+    // CCTP pool-specific accounts NOT in the lookup table ----------------
+    /// CHECK this is not read by the pool, just forwarded to CCTP
+    #[account(
+        seeds = [b"sender_authority"],
+        bump,
+        seeds::program = cctp_token_messenger_minter,
+    )]
+    pub cctp_authority_pda: UncheckedAccount<'info>,
 
     /// CHECK this is not read by the pool, just forwarded to CCTP
     #[account(
