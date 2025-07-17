@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
@@ -278,13 +279,7 @@ func (n *NoopTokenDataObserver) isError(selector cciptypes.ChainSelector, seq cc
 		return false
 	}
 
-	for _, idx := range tokenIdxs {
-		if idx == tokenIdx {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(tokenIdxs, tokenIdx)
 }
 
 func (n *NoopTokenDataObserver) IsTokenSupported(_ cciptypes.ChainSelector, _ cciptypes.RampTokenAmount) bool {
