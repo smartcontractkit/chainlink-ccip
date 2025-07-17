@@ -495,6 +495,7 @@ pub mod cctp_token_pool {
         stage: String,
         release_or_mint: ReleaseOrMintInV1,
     ) -> Result<DeriveAccountsResponse> {
+        msg!("Stage: {}", stage);
         let stage = derive::release_or_mint::OfframpDeriveStage::from_str(&stage)?;
 
         match stage {
@@ -512,6 +513,7 @@ pub mod cctp_token_pool {
         stage: String,
         lock_or_burn: LockOrBurnInV1,
     ) -> Result<DeriveAccountsResponse> {
+        msg!("Stage: {}", stage);
         let stage = derive::lock_or_burn::OnrampDeriveStage::from_str(&stage)?;
 
         match stage {

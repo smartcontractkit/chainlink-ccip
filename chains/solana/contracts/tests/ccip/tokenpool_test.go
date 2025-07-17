@@ -892,7 +892,7 @@ func TestTokenPool(t *testing.T) {
 		domain := uint32(5)
 
 		messageTransmitter := cctp.GetMessageTransmitterPDAs(t)
-		tokenMessengerMinter := cctp.GetTokenMessengerMinterPDAs(t, domain, usdcMint)
+		tokenMessengerMinter := cctp.GetTokenMessengerMinterPDAs(t, domain, usdcMint, usdcMint[:])
 		cctpPool := cctp.GetTokenPoolPDAs(t, usdcMint)
 
 		cctp_message_transmitter.SetProgramID(messageTransmitter.Program)
@@ -1240,31 +1240,6 @@ func TestTokenPool(t *testing.T) {
 			})
 		})
 
-		getCctpNonce := func(t *testing.T, messageBytes []byte) uint64 {
-			t.Helper()
-			nonceBytes := messageBytes[12:20] // extract nonce from message, which is the 12th to 20th byte of the message
-			nonce := binary.BigEndian.Uint64(nonceBytes)
-			return nonce
-		}
-
-		getUsedNoncesPDA := func(t *testing.T, messageSent message_transmitter.MessageSent) solana.PublicKey {
-			t.Helper()
-			nonce := getCctpNonce(t, messageSent.Message)
-			fmt.Println("Nonce for receiving message:", nonce)
-			firstNonce := (nonce-1)/6400*6400 + 1 // round down to the first nonce that is a multiple of 6400
-			fmt.Println("First nonce:", firstNonce)
-			firstNoncePda, _, err := solana.FindProgramAddress(
-				[][]byte{
-					[]byte("used_nonces"),
-					[]byte(common.NumToStr(domain)),
-					[]byte(common.NumToStr(firstNonce)),
-				},
-				messageTransmitter.Program,
-			)
-			require.NoError(t, err)
-			return firstNoncePda
-		}
-
 		t.Run("CCTP sanity checks", func(t *testing.T) {
 			messageAmount := uint64(1123456) // 1.123456 USDC, as it uses 6 decimals
 
@@ -1329,7 +1304,7 @@ func TestTokenPool(t *testing.T) {
 					_, initial, err := tokens.TokenBalance(ctx, solanaGoClient, adminATA, config.DefaultCommitment)
 					require.NoError(t, err)
 
-					usedNoncesPDA := getUsedNoncesPDA(t, messageSent)
+					usedNoncesPDA := cctp.GetUsedNoncesPDA(t, messageSent.Message)
 
 					attestation, err = ccip.AttestCCTP(messageSent.Message, attesters)
 					fmt.Println("Attestation:", hex.EncodeToString(attestation))
@@ -1573,10 +1548,10 @@ func TestTokenPool(t *testing.T) {
 					require.Equal(t, domain, ccipCctpMessageSentEvent.SourceDomain)
 
 					// Check CCTP nonce in all ways it appears
-					outputNonce := binary.BigEndian.Uint64(output.DestPoolData[24:32])                        // in pool returned dest data
-					require.Equal(t, outputNonce, getCctpNonce(t, ccipCctpMessageSentEvent.MessageSentBytes)) // in event message bytes
-					require.Equal(t, outputNonce, getCctpNonce(t, messageSentEventData.Message))              // in event account data
-					require.Equal(t, outputNonce, ccipCctpMessageSentEvent.CctpNonce)                         // in the event field
+					outputNonce := binary.BigEndian.Uint64(output.DestPoolData[24:32])                      // in pool returned dest data
+					require.Equal(t, outputNonce, cctp.GetNonce(ccipCctpMessageSentEvent.MessageSentBytes)) // in event message bytes
+					require.Equal(t, outputNonce, cctp.GetNonce(messageSentEventData.Message))              // in event account data
+					require.Equal(t, outputNonce, ccipCctpMessageSentEvent.CctpNonce)                       // in the event field
 				})
 			})
 
@@ -1603,7 +1578,7 @@ func TestTokenPool(t *testing.T) {
 				require.NoError(t, offchainTokenData.MarshalWithEncoder(bin.NewBorshEncoder(offchainTokenDataBuffer)))
 
 				sourcePoolData := make([]byte, 64)
-				binary.BigEndian.PutUint64(sourcePoolData[24:32], getCctpNonce(t, messageSentEventData.Message))
+				binary.BigEndian.PutUint64(sourcePoolData[24:32], cctp.GetNonce(messageSentEventData.Message))
 				binary.BigEndian.PutUint32(sourcePoolData[60:64], domain)
 
 				releaseOrMintIn := cctp_token_pool.ReleaseOrMintInV1{
@@ -1624,7 +1599,7 @@ func TestTokenPool(t *testing.T) {
 					solana.Meta(tokenMessengerMinter.CustodyTokenAccount).WRITE(),
 					solana.Meta(tokenMessengerMinter.RemoteTokenMessenger),
 					solana.Meta(tokenMessengerMinter.TokenPair),
-					solana.Meta(getUsedNoncesPDA(t, messageSentEventData)).WRITE(),
+					solana.Meta(cctp.GetUsedNoncesPDA(t, messageSentEventData.Message)).WRITE(),
 				}
 
 				additionalAccountMetas := []*solana.AccountMeta{

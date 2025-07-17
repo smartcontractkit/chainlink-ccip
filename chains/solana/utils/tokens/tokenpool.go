@@ -57,7 +57,7 @@ func (tp TokenPool) ToTokenPoolEntries() []solana.PublicKey {
 		tp.PoolLookupTable,  // 0
 		tp.AdminRegistryPDA, // 1
 		tp.PoolProgram,      // 2
-		tp.PoolConfig,       // 3 - writable
+		tp.PoolConfig,       // 3
 		tp.PoolTokenAccount, // 4 - writable
 		tp.PoolSigner,       // 5
 		tp.Program,          // 6
@@ -116,7 +116,7 @@ func NewTokenPool(tokenProgram solana.PublicKey, poolProgram solana.PublicKey, m
 		AdminRegistryPDA:      tokenAdminRegistryPDA,
 		PoolProgram:           poolProgram,
 		PoolLookupTable:       solana.PublicKey{},
-		WritableIndexes:       []uint8{3, 4, 7}, // see ToTokenPoolEntries for writable indexes.
+		WritableIndexes:       []uint8{4, 7}, // see ToTokenPoolEntries for writable indexes.
 		User:                  map[solana.PublicKey]solana.PublicKey{},
 		Chain:                 map[uint64]solana.PublicKey{},
 		Billing:               map[uint64]solana.PublicKey{},

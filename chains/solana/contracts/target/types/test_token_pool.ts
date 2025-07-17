@@ -361,7 +361,7 @@ export type TestTokenPool = {
         },
         {
           "name": "state",
-          "isMut": true,
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -432,7 +432,7 @@ export type TestTokenPool = {
         },
         {
           "name": "state",
-          "isMut": true,
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -947,7 +947,7 @@ export const IDL: TestTokenPool = {
         },
         {
           "name": "state",
-          "isMut": true,
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -1018,7 +1018,7 @@ export const IDL: TestTokenPool = {
         },
         {
           "name": "state",
-          "isMut": true,
+          "isMut": false,
           "isSigner": false
         },
         {

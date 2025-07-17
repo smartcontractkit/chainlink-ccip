@@ -473,14 +473,13 @@ func TestCctpTpDevnet(t *testing.T) {
 				fqUsdcBillingTokenConfig,
 				routerSigner,
 				// -- CCTP custom entries --
-				tokenMessengerMinter.authorityPda,
-				messageTransmitter.messageTransmitter, // 11 - writable
-				tokenMessengerMinter.tokenMessenger,
-				tokenMessengerMinter.tokenMinter,
-				tokenMessengerMinter.localToken, // 14 - writable
-				messageTransmitter.program,
+				messageTransmitter.messageTransmitter, // 10 - writable
 				tokenMessengerMinter.program,
 				solana.SystemProgramID,
+				messageTransmitter.program,
+				tokenMessengerMinter.tokenMessenger,
+				tokenMessengerMinter.tokenMinter,
+				tokenMessengerMinter.localToken, // 16 - writable
 				tokenMessengerMinter.eventAuthority,
 			}
 
@@ -494,7 +493,7 @@ func TestCctpTpDevnet(t *testing.T) {
 			common.AwaitSlotChange(ctx, client)
 		})
 
-		writableIndexes := []byte{3, 4, 5, 7, 11, 14}
+		writableIndexes := []byte{3, 4, 5, 7, 10, 16}
 
 		t.Run("Upgrade TokenAdminRegistry", func(t *testing.T) {
 			t.Skip()

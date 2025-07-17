@@ -145,7 +145,10 @@ pub fn derive_execute_accounts_build_main_account_list<'info>(
     params: &DeriveAccountsExecuteParams,
 ) -> Result<DeriveAccountsResponse> {
     let ReferenceAddresses {
-        router, rmn_remote, ..
+        router,
+        rmn_remote,
+        offramp_lookup_table,
+        ..
     } = *AccountLoader::<'info, ReferenceAddresses>::try_from(&ctx.remaining_accounts[1])?
         .load()?;
 
@@ -220,7 +223,7 @@ pub fn derive_execute_accounts_build_main_account_list<'info>(
     Ok(DeriveAccountsResponse {
         accounts_to_save,
         ask_again_with,
-        look_up_tables_to_save: vec![],
+        look_up_tables_to_save: vec![offramp_lookup_table],
         current_stage: DeriveExecuteAccountsStage::FinishMainAccountList.to_string(),
         next_stage,
     })

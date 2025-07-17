@@ -322,15 +322,14 @@ pub struct TokenOfframpRemainingAccounts<'info> {
     pub cctp_token_minter_account: &'info AccountInfo<'info>,
     pub cctp_local_token: &'info AccountInfo<'info>,
     pub cctp_token_messenger_minter_event_authority: &'info AccountInfo<'info>,
-    // Accounts that are in the lookup table, but are just for the offramp (not really used by onramp)
-    pub cctp_authority_pda: &'info AccountInfo<'info>, // !
-    pub cctp_event_authority: &'info AccountInfo<'info>, // !
-    pub cctp_custody_token_account: &'info AccountInfo<'info>, // !
 
     // Accounts that are not in the lookup table, as they are either dynamic or not shared with onramp
-    pub cctp_remote_token_messenger_key: &'info AccountInfo<'info>, // repeated but variadic
-    pub cctp_token_pair: &'info AccountInfo<'info>,                 // ! variadic
-    pub cctp_used_nonces: &'info AccountInfo<'info>,                // ! variadic
+    pub cctp_authority_pda: &'info AccountInfo<'info>,
+    pub cctp_event_authority: &'info AccountInfo<'info>,
+    pub cctp_custody_token_account: &'info AccountInfo<'info>,
+    pub cctp_remote_token_messenger_key: &'info AccountInfo<'info>,
+    pub cctp_token_pair: &'info AccountInfo<'info>,
+    pub cctp_used_nonces: &'info AccountInfo<'info>,
 }
 
 impl TokenOfframpRemainingAccounts<'_> {

@@ -92,7 +92,6 @@ pub struct TokenOfframp<'info> {
     // Token pool accounts ------------------
     // consistent set + token pool program
     #[account(
-        mut,
         seeds = [POOL_STATE_SEED, mint.key().as_ref()],
         bump,
     )]
@@ -162,7 +161,6 @@ pub struct TokenOnramp<'info> {
     // Token pool accounts ------------------
     // consistent set + token pool program
     #[account(
-        mut,
         seeds = [POOL_STATE_SEED, mint.key().as_ref()],
         bump,
     )]
