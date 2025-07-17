@@ -383,20 +383,18 @@ func TestMatchCCTPv2MessagesToSourceTokenDataPayloads(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                      string
-		cctpV2Messages            map[string]Message
-		sourceTokenDataPayloads   map[cciptypes.SeqNum]map[int]SourceTokenDataPayload
-		isMatch                   func(SourceTokenDataPayload, Message) bool
-		expectedResult            map[cciptypes.SeqNum]map[int]CCTPv2MessageOrError
-		expectedCCTPMessagesAfter map[string]Message // expected state of cctpV2Messages after function call
+		name                    string
+		cctpV2Messages          map[string]Message
+		sourceTokenDataPayloads map[cciptypes.SeqNum]map[int]SourceTokenDataPayload
+		isMatch                 func(SourceTokenDataPayload, Message) bool
+		expectedResult          map[cciptypes.SeqNum]map[int]CCTPv2MessageOrError
 	}{
 		{
-			name:                      "empty inputs",
-			cctpV2Messages:            map[string]Message{},
-			sourceTokenDataPayloads:   map[cciptypes.SeqNum]map[int]SourceTokenDataPayload{},
-			isMatch:                   alwaysMatch,
-			expectedResult:            map[cciptypes.SeqNum]map[int]CCTPv2MessageOrError{},
-			expectedCCTPMessagesAfter: map[string]Message{},
+			name:                    "empty inputs",
+			cctpV2Messages:          map[string]Message{},
+			sourceTokenDataPayloads: map[cciptypes.SeqNum]map[int]SourceTokenDataPayload{},
+			isMatch:                 alwaysMatch,
+			expectedResult:          map[cciptypes.SeqNum]map[int]CCTPv2MessageOrError{},
 		},
 		{
 			name: "empty source token data payloads",
@@ -406,9 +404,6 @@ func TestMatchCCTPv2MessagesToSourceTokenDataPayloads(t *testing.T) {
 			sourceTokenDataPayloads: map[cciptypes.SeqNum]map[int]SourceTokenDataPayload{},
 			isMatch:                 alwaysMatch,
 			expectedResult:          map[cciptypes.SeqNum]map[int]CCTPv2MessageOrError{},
-			expectedCCTPMessagesAfter: map[string]Message{
-				"123": createCCTPv2Message("123", "1", "2", "1000"),
-			},
 		},
 		{
 			name:           "empty cctp messages",
@@ -426,7 +421,6 @@ func TestMatchCCTPv2MessagesToSourceTokenDataPayloads(t *testing.T) {
 					},
 				},
 			},
-			expectedCCTPMessagesAfter: map[string]Message{},
 		},
 		{
 			name: "single match - perfect scenario",
@@ -446,7 +440,6 @@ func TestMatchCCTPv2MessagesToSourceTokenDataPayloads(t *testing.T) {
 					},
 				},
 			},
-			expectedCCTPMessagesAfter: map[string]Message{}, // message should be removed after matching
 		},
 		{
 			name: "multiple matches in same sequence",
@@ -471,7 +464,6 @@ func TestMatchCCTPv2MessagesToSourceTokenDataPayloads(t *testing.T) {
 					},
 				},
 			},
-			expectedCCTPMessagesAfter: map[string]Message{}, // all messages should be removed
 		},
 		{
 			name: "multiple sequences with matches",
@@ -500,7 +492,6 @@ func TestMatchCCTPv2MessagesToSourceTokenDataPayloads(t *testing.T) {
 					},
 				},
 			},
-			expectedCCTPMessagesAfter: map[string]Message{}, // all messages should be removed
 		},
 		{
 			name: "partial matches - some payloads have no matching messages",
@@ -524,7 +515,6 @@ func TestMatchCCTPv2MessagesToSourceTokenDataPayloads(t *testing.T) {
 					},
 				},
 			},
-			expectedCCTPMessagesAfter: map[string]Message{}, // matched message should be removed
 		},
 		{
 			name: "no matches found - isMatch always returns false",
@@ -553,10 +543,6 @@ func TestMatchCCTPv2MessagesToSourceTokenDataPayloads(t *testing.T) {
 					},
 				},
 			},
-			expectedCCTPMessagesAfter: map[string]Message{
-				"123": createCCTPv2Message("123", "1", "2", "1000"),
-				"456": createCCTPv2Message("456", "3", "4", "2000"),
-			},
 		},
 		{
 			name: "leftover messages after matching",
@@ -578,10 +564,6 @@ func TestMatchCCTPv2MessagesToSourceTokenDataPayloads(t *testing.T) {
 					},
 				},
 			},
-			expectedCCTPMessagesAfter: map[string]Message{
-				"456": createCCTPv2Message("456", "3", "4", "2000"),
-				"789": createCCTPv2Message("789", "5", "6", "3000"),
-			},
 		},
 		{
 			name: "empty token payload maps in sequence",
@@ -602,10 +584,9 @@ func TestMatchCCTPv2MessagesToSourceTokenDataPayloads(t *testing.T) {
 					},
 				},
 			},
-			expectedCCTPMessagesAfter: map[string]Message{}, // message should be consumed
 		},
 		{
-			name: "one wins when competing for same message - message removed after first match",
+			name: "one wins when competing for same message - nonce marked as used after first match",
 			cctpV2Messages: map[string]Message{
 				"123": createCCTPv2Message("123", "1", "2", "1000"),
 			},
@@ -614,7 +595,7 @@ func TestMatchCCTPv2MessagesToSourceTokenDataPayloads(t *testing.T) {
 					0: createSourceTokenDataPayload(1, 2, 1000), // will match
 				},
 				2: {
-					0: createSourceTokenDataPayload(1, 2, 1000), // same payload, but message already consumed
+					0: createSourceTokenDataPayload(1, 2, 1000), // same payload, but nonce already used
 				},
 			},
 			isMatch: realMatch,
@@ -630,21 +611,14 @@ func TestMatchCCTPv2MessagesToSourceTokenDataPayloads(t *testing.T) {
 					},
 				},
 			},
-			expectedCCTPMessagesAfter: map[string]Message{}, // message consumed by first match
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Make a copy of cctpV2Messages to test mutation
-			cctpV2MessagesCopy := make(map[string]Message)
-			for k, v := range tt.cctpV2Messages {
-				cctpV2MessagesCopy[k] = v
-			}
-
 			result := matchCCTPv2MessagesToSourceTokenDataPayloads(
 				testLogger,
-				cctpV2MessagesCopy,
+				tt.cctpV2Messages,
 				tt.sourceTokenDataPayloads,
 				tt.isMatch,
 				1, // sourceChain
@@ -655,7 +629,7 @@ func TestMatchCCTPv2MessagesToSourceTokenDataPayloads(t *testing.T) {
 			require.Equal(t, len(tt.expectedResult), len(result), "Result map length mismatch")
 
 			// Special handling for the competing message test case
-			if tt.name == "one wins when competing for same message - message removed after first match" {
+			if tt.name == "one wins when competing for same message - nonce marked as used after first match" {
 				// Verify that exactly one seqNum gets the message and one gets an error
 				require.Equal(t, 2, len(result), "Should have results for both sequence numbers")
 
@@ -710,15 +684,6 @@ func TestMatchCCTPv2MessagesToSourceTokenDataPayloads(t *testing.T) {
 						}
 					}
 				}
-			}
-
-			// Check that cctpV2Messages was properly mutated (messages removed after matching)
-			require.Equal(t, len(tt.expectedCCTPMessagesAfter), len(cctpV2MessagesCopy),
-				"CCTP messages map length mismatch after function call")
-			for expectedNonce, expectedMessage := range tt.expectedCCTPMessagesAfter {
-				actualMessage, exists := cctpV2MessagesCopy[expectedNonce]
-				require.True(t, exists, "Expected CCTP message with nonce %s not found after function call", expectedNonce)
-				require.Equal(t, expectedMessage, actualMessage, "CCTP message mismatch for nonce %s", expectedNonce)
 			}
 		})
 	}
@@ -1222,6 +1187,7 @@ func TestGetCCTPv2Messages(t *testing.T) {
 		txHashes         []string
 		setupMock        func(*MockCCTPv2AttestationClient)
 		expectedMessages map[string]Message
+		expectedError    bool
 	}{
 		{
 			name:             "empty tx hashes",
@@ -1229,6 +1195,7 @@ func TestGetCCTPv2Messages(t *testing.T) {
 			txHashes:         []string{},
 			setupMock:        func(m *MockCCTPv2AttestationClient) {},
 			expectedMessages: map[string]Message{},
+			expectedError:    false,
 		},
 		{
 			name:           "single tx hash with single message",
@@ -1241,6 +1208,7 @@ func TestGetCCTPv2Messages(t *testing.T) {
 			expectedMessages: map[string]Message{
 				"100": createCCTPv2Message("100", "1", "2", "1000"),
 			},
+			expectedError: false,
 		},
 		{
 			name:           "single tx hash with multiple messages",
@@ -1255,6 +1223,7 @@ func TestGetCCTPv2Messages(t *testing.T) {
 				"100": createCCTPv2Message("100", "1", "2", "1000"),
 				"101": createCCTPv2Message("101", "1", "2", "2000"),
 			},
+			expectedError: false,
 		},
 		{
 			name:           "multiple tx hashes with single messages each",
@@ -1270,6 +1239,7 @@ func TestGetCCTPv2Messages(t *testing.T) {
 				"100": createCCTPv2Message("100", "1", "2", "1000"),
 				"200": createCCTPv2Message("200", "1", "2", "2000"),
 			},
+			expectedError: false,
 		},
 		{
 			name:           "multiple tx hashes with multiple messages each",
@@ -1289,6 +1259,7 @@ func TestGetCCTPv2Messages(t *testing.T) {
 				"200": createCCTPv2Message("200", "1", "2", "2000"),
 				"201": createCCTPv2Message("201", "1", "2", "2500"),
 			},
+			expectedError: false,
 		},
 		{
 			name:           "some tx hashes return errors",
@@ -1301,10 +1272,8 @@ func TestGetCCTPv2Messages(t *testing.T) {
 				msg3 := createCCTPv2Message("300", "1", "2", "3000")
 				m.AddResponse(1, "0x789xyz", createMessages(msg3), nil)
 			},
-			expectedMessages: map[string]Message{
-				"100": createCCTPv2Message("100", "1", "2", "1000"),
-				"300": createCCTPv2Message("300", "1", "2", "3000"),
-			},
+			expectedMessages: nil,
+			expectedError:    true,
 		},
 		{
 			name:           "all tx hashes return errors",
@@ -1314,7 +1283,8 @@ func TestGetCCTPv2Messages(t *testing.T) {
 				m.AddResponse(1, "0xabc123", Messages{}, fmt.Errorf("network error"))
 				m.AddResponse(1, "0xdef456", Messages{}, fmt.Errorf("timeout error"))
 			},
-			expectedMessages: map[string]Message{},
+			expectedMessages: nil,
+			expectedError:    true,
 		},
 		{
 			name:           "some tx hashes return empty messages",
@@ -1331,6 +1301,7 @@ func TestGetCCTPv2Messages(t *testing.T) {
 				"100": createCCTPv2Message("100", "1", "2", "1000"),
 				"300": createCCTPv2Message("300", "1", "2", "3000"),
 			},
+			expectedError: false,
 		},
 		{
 			name:           "duplicate event nonces (one of them wins)",
@@ -1345,6 +1316,7 @@ func TestGetCCTPv2Messages(t *testing.T) {
 			expectedMessages: map[string]Message{
 				"100": createCCTPv2Message("100", "1", "2", "1000"), // Could be either 1000 or 9999 due to map iteration order
 			},
+			expectedError: false,
 		},
 		{
 			name:           "different source domain ids",
@@ -1357,6 +1329,7 @@ func TestGetCCTPv2Messages(t *testing.T) {
 			expectedMessages: map[string]Message{
 				"100": createCCTPv2Message("100", "42", "2", "1000"),
 			},
+			expectedError: false,
 		},
 	}
 
@@ -1373,7 +1346,18 @@ func TestGetCCTPv2Messages(t *testing.T) {
 			}
 
 			// Call the function with our mock client
-			result := getCCTPv2Messages(ctx, testLogger, mockClient, testSourceChain, tt.sourceDomainID, txHashesSet)
+			result, err := getCCTPv2Messages(ctx, testLogger, mockClient, testSourceChain, tt.sourceDomainID, txHashesSet)
+
+			// Verify error expectation
+			if tt.expectedError {
+				require.Error(t, err, "Expected error but got none")
+				require.Nil(t, result, "Result should be nil when error occurs")
+				return
+			}
+
+			// Verify no error when not expected
+			require.NoError(t, err, "Unexpected error: %v", err)
+			require.NotNil(t, result, "Result should not be nil when no error occurs")
 
 			// Verify results
 			require.Equal(t, len(tt.expectedMessages), len(result), "Result map length mismatch")

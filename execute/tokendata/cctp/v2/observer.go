@@ -119,8 +119,7 @@ func NewCCTPv2TokenDataObserver(
 			"error", err,
 			"destChainSelector", destChainSelector,
 		)
-		// Use no-op reporter instead of failing
-		metricsReporter = NewNoOpMetricsReporter()
+		return nil, fmt.Errorf("create metrics reporter: %w", err)
 	}
 
 	attestationClient, err := NewCCTPv2AttestationClientHTTP(lggr, usdcConfig, metricsReporter)
@@ -227,7 +226,6 @@ func getMessageTokenDataForSourceChain(
 
 	// Step 3: Validate that all CCTP v2 tokens have the same source domain ID
 	// This is required because we need to query Circle's API with a single domain ID
-	// If tokens have different domain IDs, it indicates a configuration error
 	sourceDomainID, err := getSourceDomainID(lggr, sourceChain, sourceTokenDataPayloads)
 	if err != nil {
 		// Return error tokens for all CCTP v2 tokens, others remain not supported
@@ -240,7 +238,11 @@ func getMessageTokenDataForSourceChain(
 	// Step 5: Fetch CCTP v2 messages and attestations from Circle's API
 	// Query the attestation service for all collected transaction hashes
 	// Each response contains the message data and attestation needed for on-chain minting
-	cctpV2Messages := getCCTPv2Messages(ctx, lggr, attestationClient, sourceChain, sourceDomainID, txHashes)
+	cctpV2Messages, err := getCCTPv2Messages(ctx, lggr, attestationClient, sourceChain, sourceDomainID, txHashes)
+	if err != nil {
+		// Return error tokens for all CCTP v2 tokens, others remain not supported
+		return errorMessageTokenData(err, ccipMessages, sourceTokenDataPayloads)
+	}
 
 	// Step 6: Match each SourceTokenDataPayload to its corresponding CCTP v2 Message
 	tokenIndexToCCTPv2Message := matchCCTPv2MessagesToSourceTokenDataPayloads(
@@ -359,7 +361,7 @@ func getCCTPv2Messages(
 	sourceChain cciptypes.ChainSelector,
 	sourceDomainID uint32,
 	txHashes mapset.Set[string],
-) map[string]Message {
+) (map[string]Message, error) {
 	cctpV2Messages := make(map[string]Message)
 	for txHash := range txHashes.Iter() {
 		cctpResponse, err := attestationClient.GetMessages(ctx, sourceChain, sourceDomainID, txHash)
@@ -370,14 +372,15 @@ func getCCTPv2Messages(
 				"txHash", txHash,
 				"error", err,
 			)
-		} else {
-			for _, msg := range cctpResponse.Messages {
-				cctpV2Messages[msg.EventNonce] = msg
-			}
+			return nil, err
+		}
+
+		for _, msg := range cctpResponse.Messages {
+			cctpV2Messages[msg.EventNonce] = msg
 		}
 	}
 
-	return cctpV2Messages
+	return cctpV2Messages, nil
 }
 
 // getTxHashes extracts unique transaction hashes from CCIP messages that contain valid CCTP v2 token data.
@@ -406,7 +409,7 @@ func getTxHashes(
 
 // matchCCTPv2MessagesToSourceTokenDataPayloads matches CCTP v2 messages to source token data payloads.
 // For each token payload, it finds the corresponding CCTP message using the provided matching function.
-// Messages are consumed (removed from the map) after being matched to prevent double-matching.
+// A usedNonces set tracks which messages have been matched to prevent double-matching.
 func matchCCTPv2MessagesToSourceTokenDataPayloads(
 	lggr logger.Logger,
 	cctpV2Messages map[string]Message,
@@ -416,6 +419,7 @@ func matchCCTPv2MessagesToSourceTokenDataPayloads(
 	metricsReporter MetricsReporter,
 ) map[cciptypes.SeqNum]map[int]CCTPv2MessageOrError {
 	matchedCCTPv2Messages := make(map[cciptypes.SeqNum]map[int]CCTPv2MessageOrError)
+	usedNonces := mapset.NewSet[string]()
 
 	matchedCount := 0
 	unmatchedCount := 0
@@ -427,7 +431,7 @@ func matchCCTPv2MessagesToSourceTokenDataPayloads(
 		for tokenIndex, sourceTokenData := range tokenPayloads {
 			foundNonce := ""
 			for nonce, cctpMessage := range cctpV2Messages {
-				if isMatch(sourceTokenData, cctpMessage) {
+				if !usedNonces.Contains(nonce) && isMatch(sourceTokenData, cctpMessage) {
 					matchedCCTPv2Messages[seqNum][tokenIndex] = CCTPv2MessageOrError{
 						message: cctpMessage,
 					}
@@ -444,6 +448,7 @@ func matchCCTPv2MessagesToSourceTokenDataPayloads(
 					"destinationDomain", sourceTokenData.DestinationDomain,
 					"amount", sourceTokenData.Amount.String(),
 					"availableMessages", len(cctpV2Messages),
+					"usedNonces", usedNonces.Cardinality(),
 				)
 				matchedCCTPv2Messages[seqNum][tokenIndex] = CCTPv2MessageOrError{
 					err: fmt.Errorf(
@@ -453,7 +458,7 @@ func matchCCTPv2MessagesToSourceTokenDataPayloads(
 				}
 				unmatchedCount++
 			} else {
-				delete(cctpV2Messages, foundNonce)
+				usedNonces.Add(foundNonce)
 			}
 		}
 	}

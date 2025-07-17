@@ -158,8 +158,6 @@ type DecodedMessageBody struct {
 
 // TokenData converts a CCTP v2 Message into TokenData for use in CCIP execution.
 // It encodes the message bytes and attestation together using the provided encoder.
-// The nonce and sourceDomainID can be used to uniquely identify and fetch this
-// message from Circle's CCTP v2 API.
 func (m *Message) TokenData(
 	ctx context.Context,
 	attestationEncoder AttestationEncoder,
