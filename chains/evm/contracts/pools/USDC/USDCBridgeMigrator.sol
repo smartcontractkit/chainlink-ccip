@@ -68,7 +68,7 @@ abstract contract USDCBridgeMigrator is Ownable2StepMsgSender {
 
     // The CCTP burn function will attempt to burn out of the contract that calls it, so we need to withdraw the tokens
     // from the lock box first otherwise the burn will revert.
-    ERC20LockBox(i_lockBox).withdraw(tokensToBurn, address(this), burnChainSelector);
+    ERC20LockBox(i_lockBox).withdraw(address(i_USDC), tokensToBurn, address(this), burnChainSelector);
 
     // This should only be called after this contract has been granted a "zero allowance minter role" on USDC by Circle,
     // otherwise the call will revert. Executing this burn will functionally convert all USDC on the destination chain

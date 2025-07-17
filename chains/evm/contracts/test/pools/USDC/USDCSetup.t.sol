@@ -9,7 +9,9 @@ import {IPoolV1} from "../../../interfaces/IPool.sol";
 import {Pool} from "../../../libraries/Pool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {CCTPMessageTransmitterProxy} from "../../../pools/USDC/CCTPMessageTransmitterProxy.sol";
+import {TokenAdminRegistry} from "../../../tokenAdminRegistry/TokenAdminRegistry.sol";
 import {BurnMintERC677} from "@chainlink/contracts/src/v0.8/shared/token/ERC677/BurnMintERC677.sol";
+
 import {IERC165} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
 
@@ -66,12 +68,16 @@ contract USDCSetup is BaseTest {
   address internal s_previousPoolMessageTransmitterProxy = makeAddr("previousPoolMessageTransmitterProxy");
   Router internal s_router;
 
+  TokenAdminRegistry internal s_tokenAdminRegistry;
+
   IBurnMintERC20 internal s_USDCToken;
 
   function setUp() public virtual override {
     super.setUp();
     BurnMintERC677 usdcToken = new BurnMintERC677("USD Coin", "USDC", 6, 0);
     s_USDCToken = usdcToken;
+
+    s_tokenAdminRegistry = new TokenAdminRegistry();
 
     deal(address(s_USDCToken), OWNER, type(uint256).max);
     _setUpRamps();

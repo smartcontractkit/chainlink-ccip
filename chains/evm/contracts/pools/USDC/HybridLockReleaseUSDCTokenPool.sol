@@ -118,7 +118,7 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPoolCCTPV2, USDCBridgeMigrat
     // Increase internal accounting of locked tokens for burnLockedUSDC() migration
     s_lockedTokensByChainSelector[lockOrBurnIn.remoteChainSelector] += lockOrBurnIn.amount;
 
-    ERC20LockBox(i_lockBox).deposit(lockOrBurnIn.amount, lockOrBurnIn.remoteChainSelector);
+    ERC20LockBox(i_lockBox).deposit(address(i_token), lockOrBurnIn.amount, lockOrBurnIn.remoteChainSelector);
 
     emit LockedOrBurned({
       remoteChainSelector: lockOrBurnIn.remoteChainSelector,
@@ -174,7 +174,10 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPoolCCTPV2, USDCBridgeMigrat
     }
 
     ERC20LockBox(i_lockBox).withdraw(
-      releaseOrMintIn.sourceDenominatedAmount, releaseOrMintIn.receiver, releaseOrMintIn.remoteChainSelector
+      address(i_token),
+      releaseOrMintIn.sourceDenominatedAmount,
+      releaseOrMintIn.receiver,
+      releaseOrMintIn.remoteChainSelector
     );
 
     emit ReleasedOrMinted({
@@ -237,7 +240,7 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPoolCCTPV2, USDCBridgeMigrat
     // Deposit the provided liquidity into the lockbox for the specified remote chain
     i_token.safeTransferFrom(msg.sender, address(this), amount);
     // TODO: Replace with actual Lockbox and not use shitty casting
-    ERC20LockBox(i_lockBox).deposit(amount, remoteChainSelector);
+    ERC20LockBox(i_lockBox).deposit(address(i_token), amount, remoteChainSelector);
 
     emit LiquidityAdded(msg.sender, amount);
   }
@@ -258,7 +261,7 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPoolCCTPV2, USDCBridgeMigrat
     s_lockedTokensByChainSelector[remoteChainSelector] -= amount;
 
     // Withdraw the liquidity from the lock box for the specified remote chain
-    ERC20LockBox(i_lockBox).withdraw(amount, msg.sender, remoteChainSelector);
+    ERC20LockBox(i_lockBox).withdraw(address(i_token), amount, msg.sender, remoteChainSelector);
 
     emit LiquidityRemoved(msg.sender, amount);
   }

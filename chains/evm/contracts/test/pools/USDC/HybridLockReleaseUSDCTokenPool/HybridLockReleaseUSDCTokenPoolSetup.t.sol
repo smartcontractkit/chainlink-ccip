@@ -20,7 +20,7 @@ contract HybridLockReleaseUSDCTokenPoolSetup is USDCSetup {
   function setUp() public virtual override {
     super.setUp();
 
-    s_lockBox = address(new ERC20LockBox(address(s_USDCToken)));
+    s_lockBox = address(new ERC20LockBox(address(s_tokenAdminRegistry)));
 
     s_usdcTokenPool = new HybridLockReleaseUSDCTokenPool(
       s_mockLegacyUSDC,
@@ -34,9 +34,19 @@ contract HybridLockReleaseUSDCTokenPoolSetup is USDCSetup {
       s_lockBox
     );
 
-    ERC20LockBox.AllowedCallerConfigArgs[] memory allowedCallers = new ERC20LockBox.AllowedCallerConfigArgs[](1);
+    s_tokenAdminRegistry.proposeAdministrator(address(s_USDCToken), address(OWNER));
+    s_tokenAdminRegistry.acceptAdminRole(address(s_USDCToken));
+    s_tokenAdminRegistry.setPool(address(s_USDCToken), address(s_usdcTokenPool));
 
-    allowedCallers[0] = ERC20LockBox.AllowedCallerConfigArgs({caller: address(s_usdcTokenPool), allowed: true});
+    ERC20LockBox.AllowedCallerConfigArgs[] memory allowedCallers = new ERC20LockBox.AllowedCallerConfigArgs[](2);
+
+    allowedCallers[0] = ERC20LockBox.AllowedCallerConfigArgs({
+      token: address(s_USDCToken),
+      caller: address(s_usdcTokenPool),
+      allowed: true
+    });
+    allowedCallers[1] =
+      ERC20LockBox.AllowedCallerConfigArgs({token: address(s_USDCToken), caller: address(this), allowed: true});
 
     ERC20LockBox(s_lockBox).configureAllowedCallers(allowedCallers);
 

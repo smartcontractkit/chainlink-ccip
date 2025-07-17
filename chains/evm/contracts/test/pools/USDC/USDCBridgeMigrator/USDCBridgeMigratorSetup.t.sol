@@ -14,7 +14,7 @@ contract USDCBridgeMigratorSetup is USDCSetup {
   function setUp() public virtual override {
     super.setUp();
 
-    s_lockBox = address(new ERC20LockBox(address(s_USDCToken)));
+    s_lockBox = address(new ERC20LockBox(address(s_tokenAdminRegistry)));
 
     s_usdcTokenPool = new HybridLockReleaseUSDCTokenPool(
       s_mockLegacyUSDC,
@@ -28,10 +28,23 @@ contract USDCBridgeMigratorSetup is USDCSetup {
       s_lockBox
     );
 
+    vm.mockCall(
+      address(s_tokenAdminRegistry),
+      abi.encodeWithSignature("getPool(address)", address(s_USDCToken)),
+      abi.encode(address(s_usdcTokenPool))
+    );
+
     ERC20LockBox.AllowedCallerConfigArgs[] memory allowedCallers = new ERC20LockBox.AllowedCallerConfigArgs[](2);
-    allowedCallers[0] = ERC20LockBox.AllowedCallerConfigArgs({caller: address(s_usdcTokenPool), allowed: true});
-    allowedCallers[1] =
-      ERC20LockBox.AllowedCallerConfigArgs({caller: address(s_usdcTokenPoolTransferLiquidity), allowed: true});
+    allowedCallers[0] = ERC20LockBox.AllowedCallerConfigArgs({
+      token: address(s_USDCToken),
+      caller: address(s_usdcTokenPool),
+      allowed: true
+    });
+    allowedCallers[1] = ERC20LockBox.AllowedCallerConfigArgs({
+      token: address(s_USDCToken),
+      caller: address(s_usdcTokenPoolTransferLiquidity),
+      allowed: true
+    });
     ERC20LockBox(s_lockBox).configureAllowedCallers(allowedCallers);
 
     s_usdcTokenPoolTransferLiquidity = new HybridLockReleaseUSDCTokenPool(
