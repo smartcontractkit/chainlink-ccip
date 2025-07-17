@@ -337,6 +337,14 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
     assertEq(s_token.balanceOf(OWNER), balanceBefore - SOURCE_AMOUNT);
   }
 
+  function test_ccipSendToken_RevertWhen_ReceiverIsEmptyBytes() public {
+    // Setup: Empty receiver address
+    bytes memory emptyReceiver = "";
+
+    vm.expectRevert(abi.encodeWithSelector(FastTransferTokenPoolAbstract.InvalidReceiver.selector, emptyReceiver));
+    s_pool.ccipSendToken{value: 1 ether}(DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, 1 ether, emptyReceiver, address(0), "");
+  }
+
   function test_ccipSendToken_RevertWhen_FeeExceedsUserMaxLimit() public {
     // Setup: Calculate expected fee and set max limit lower
     uint256 expectedFee = (SOURCE_AMOUNT * FAST_FEE_FILLER_BPS) / 10_000; // 1% of 100 ether = 1 ether

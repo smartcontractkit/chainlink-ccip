@@ -41,6 +41,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   error TransferAmountExceedsMaxFillAmount(uint64 remoteChainSelector, uint256 amount);
   error InsufficientPoolFees(uint256 requested, uint256 available);
   error QuoteFeeExceedsUserMaxLimit(uint256 quoteFee, uint256 maxFastTransferFee);
+  error InvalidReceiver(bytes receiver);
 
   event DestChainConfigUpdated(
     uint64 indexed destinationChainSelector,
@@ -230,7 +231,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     address settlementFeeToken,
     bytes calldata
   ) internal view virtual returns (InternalQuote memory internalQuote, Client.EVM2AnyMessage memory message) {
-    _validateSendRequest(destinationChainSelector);
+    _validateSendRequest(destinationChainSelector, receiver);
 
     // Using storage here appears to be cheaper.
     DestChainConfig storage destChainConfig = s_fastTransferDestChainConfig[destinationChainSelector];
@@ -380,9 +381,11 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   /// @notice Validates the send request parameters. Can be overridden by derived contracts to add additional checks.
   /// @param destinationChainSelector The destination chain selector.
   /// @dev Checks if the destination chain is allowed, if the sender is allowed, and if the RMN curse applies.
-  function _validateSendRequest(
-    uint64 destinationChainSelector
-  ) internal view virtual {
+  function _validateSendRequest(uint64 destinationChainSelector, bytes calldata receiver) internal view virtual {
+    if (receiver.length == 0) {
+      revert InvalidReceiver(receiver);
+    }
+
     if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(destinationChainSelector)))) revert CursedByRMN();
     _checkAllowList(msg.sender);
     if (!isSupportedChain(destinationChainSelector)) revert ChainNotAllowed(destinationChainSelector);
