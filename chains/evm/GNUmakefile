@@ -36,7 +36,7 @@ ccip-lcov:
 .PHONY: wrappers
 wrappers: pnpmdep mockery abigen
 	./scripts/compile_all
-	go generate ./gobindings
+	go generate ./gobindings/latest
 
 wrappers-release: export metadata=true
 .PHONY: wrappers-release

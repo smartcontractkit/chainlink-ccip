@@ -6,7 +6,7 @@ function generate_bindings() {
   local idl_path_str="$1"
   IFS='/' read -r -a idl_path <<< "${idl_path_str}"
   IFS='.' read -r -a idl_name <<< "${idl_path[3]}"
-  anchor-go -src "${idl_path_str}" -dst ./gobindings/"${idl_name}" -codec borsh
+  anchor-go -src "${idl_path_str}" -dst ./gobindings/latest/"${idl_name}" -codec borsh
 }
 
 
