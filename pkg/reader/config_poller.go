@@ -41,10 +41,11 @@ type configPoller struct {
 	services.StateMachine // Embeds the StateMachine for lifecycle management
 
 	sync.RWMutex
-	chainCaches   map[cciptypes.ChainSelector]*chainCache
-	refreshPeriod time.Duration
-	reader        ccipReaderInternal
-	lggr          logger.Logger
+	chainCaches    map[cciptypes.ChainSelector]*chainCache
+	refreshPeriod  time.Duration
+	reader         ccipReaderInternal
+	chainAccessors map[cciptypes.ChainSelector]cciptypes.ChainAccessor
+	lggr           logger.Logger
 
 	// Track known source chains for each destination chain
 	knownSourceChains map[cciptypes.ChainSelector]map[cciptypes.ChainSelector]bool
@@ -76,12 +77,14 @@ type chainCache struct {
 func newConfigPoller(
 	lggr logger.Logger,
 	reader ccipReaderInternal,
+	chainAccessors map[cciptypes.ChainSelector]cciptypes.ChainAccessor,
 	refreshPeriod time.Duration,
 ) *configPoller {
 	return &configPoller{
 		chainCaches:       make(map[cciptypes.ChainSelector]*chainCache),
 		refreshPeriod:     refreshPeriod,
 		reader:            reader,
+		chainAccessors:    chainAccessors,
 		lggr:              lggr,
 		knownSourceChains: make(map[cciptypes.ChainSelector]map[cciptypes.ChainSelector]bool),
 		stopChan:          make(chan struct{}),
@@ -238,27 +241,6 @@ func (c *configPoller) refreshAllKnownChains() {
 
 }
 
-// extractStandardChainConfigResults creates a copy of the batch results with only the standard
-// chain config results (limiting OffRamp results to the standard count)
-func (c *configPoller) extractStandardChainConfigResults(
-	batchResult types.BatchGetLatestValuesResult,
-	standardOffRampRequestCount int,
-) types.BatchGetLatestValuesResult {
-	chainConfigResultsCopy := make(types.BatchGetLatestValuesResult)
-
-	for contract, results := range batchResult {
-		if contract.Name == consts.ContractNameOffRamp && len(results) > standardOffRampRequestCount {
-			// Only include the standard results (first N results)
-			chainConfigResultsCopy[contract] = results[:standardOffRampRequestCount]
-		} else {
-			// Copy as-is
-			chainConfigResultsCopy[contract] = results
-		}
-	}
-
-	return chainConfigResultsCopy
-}
-
 // processSourceChainResults extracts and processes source chain config results from the batch
 func (c *configPoller) processSourceChainResults(
 	batchResult types.BatchGetLatestValuesResult,
@@ -360,43 +342,54 @@ func (c *configPoller) batchRefreshChainAndSourceConfigs(
 ) error {
 	startTime := time.Now()
 
-	// 1. Prepare the standard chain config request
-	chainConfigRequests := c.reader.prepareBatchConfigRequests(destChain)
+	//// 1. Prepare the standard chain config request
+	//chainConfigRequests := c.reader.prepareBatchConfigRequests(destChain)
+	//
+	//// 2. Filter source chains and prepare queries
+	//filteredSourceChains := filterOutChainSelector(sourceChains, destChain)
+	//sourceQueries := c.prepareSourceChainQueries(filteredSourceChains)
+	//
+	//// 3. Append source queries to existing requests and get standard count
+	//standardOffRampRequestCount, _ := c.appendSourceQueriesToRequests(chainConfigRequests, sourceQueries)
+	//
+	//// 4. Get the contract reader for this chain
+	//reader, exists := c.reader.getContractReader(destChain)
+	//if !exists {
+	//	return fmt.Errorf("no contract reader for chain %d", destChain)
+	//}
+	//
+	//// 5. Execute the combined batch request
+	//batchResult, skipped, err := reader.ExtendedBatchGetLatestValues(ctx, chainConfigRequests, true)
+	//if err != nil {
+	//	return fmt.Errorf("batch get latest values for chain %d: %w", destChain, err)
+	//}
+	//
+	//if len(skipped) > 0 {
+	//	c.lggr.Infow("some contracts were skipped due to no bindings",
+	//		"chain", destChain,
+	//		"contracts", skipped)
+	//}
+	//
+	//// 6. Extract and process standard chain config results
+	//standardResultsCopy := c.extractStandardChainConfigResults(batchResult, standardOffRampRequestCount)
+	//
+	//chainConfig, err := c.reader.processConfigResults(destChain, standardResultsCopy)
+	//if err != nil {
+	//	return fmt.Errorf("process config results: %w", err)
+	//}
 
-	// 2. Filter source chains and prepare queries
-	filteredSourceChains := filterOutChainSelector(sourceChains, destChain)
-	sourceQueries := c.prepareSourceChainQueries(filteredSourceChains)
-
-	// 3. Append source queries to existing requests and get standard count
-	standardOffRampRequestCount, _ := c.appendSourceQueriesToRequests(chainConfigRequests, sourceQueries)
-
-	// 4. Get the contract reader for this chain
-	reader, exists := c.reader.getContractReader(destChain)
-	if !exists {
-		return fmt.Errorf("no contract reader for chain %d", destChain)
-	}
-
-	// 5. Execute the combined batch request
-	batchResult, skipped, err := reader.ExtendedBatchGetLatestValues(ctx, chainConfigRequests, true)
+	// Verify we have a chain accessor for the destination chain
+	destChainAccessor, err := getChainAccessor(c.chainAccessors, destChain)
 	if err != nil {
-		return fmt.Errorf("batch get latest values for chain %d: %w", destChain, err)
+		return fmt.Errorf("no chain accessor for destination chain %d: %w", destChain, err)
 	}
 
-	if len(skipped) > 0 {
-		c.lggr.Infow("some contracts were skipped due to no bindings",
-			"chain", destChain,
-			"contracts", skipped)
-	}
-
-	// 6. Extract and process standard chain config results
-	standardResultsCopy := c.extractStandardChainConfigResults(batchResult, standardOffRampRequestCount)
-
-	chainConfig, err := c.reader.processConfigResults(destChain, standardResultsCopy)
+	chainConfig, err := destChainAccessor.GetAllConfigLegacySnapshot(ctx, destChain, sourceChains)
 	if err != nil {
-		return fmt.Errorf("process config results: %w", err)
+		return fmt.Errorf("failed to get all config snapshot for chain %d: %w", destChain, err)
 	}
 
-	// 7. Update chain config cache
+	// Update chain config cache
 	chainCache := c.getOrCreateChainCache(destChain)
 
 	chainCache.chainConfigMu.Lock()

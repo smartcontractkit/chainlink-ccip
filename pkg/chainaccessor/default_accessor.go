@@ -70,8 +70,249 @@ func (l *DefaultAccessor) GetContractAddress(contractName string) ([]byte, error
 	return addressBytes, nil
 }
 
-func (l *DefaultAccessor) GetAllConfigLegacySnapshot(ctx context.Context) (cciptypes.ChainConfigSnapshot, error) {
-	panic("implement me")
+func (l *DefaultAccessor) GetAllConfigLegacySnapshot(
+	ctx context.Context,
+	destChainSelector cciptypes.ChainSelector,
+	sourceChainSelectors []cciptypes.ChainSelector,
+) (cciptypes.ChainConfigSnapshot, error) {
+	// 1. Prepare the standard chain config request
+	chainConfigRequests := l.prepareBatchConfigRequests(destChainSelector)
+
+	// 2. Filter out dest chain from source chain and prepare source chain queries
+	filteredSourceChains := slicelib.Filter(sourceChainSelectors, func(cs cciptypes.ChainSelector) bool {
+		return cs != l.chainSelector
+	})
+	sourceQueries := prepareSourceChainQueries(filteredSourceChains)
+
+	// 3. Append source queries to existing requests and get standard count
+	standardOffRampRequestCount, _ := appendSourceQueriesToRequests(chainConfigRequests, sourceQueries)
+
+	// 4. Execute the combined batch request
+	batchResult, skipped, err := l.contractReader.ExtendedBatchGetLatestValues(ctx, chainConfigRequests, true)
+	if err != nil {
+		return cciptypes.ChainConfigSnapshot{}, fmt.Errorf("batch get latest values for chain %d: %w", l.chainSelector, err)
+	}
+
+	if len(skipped) > 0 {
+		l.lggr.Infow("some contracts were skipped due to no bindings",
+			"chain", l.chainSelector,
+			"contracts", skipped)
+	}
+
+	// 5. Extract and process standard chain config results
+	standardResultsCopy := extractStandardChainConfigResults(batchResult, standardOffRampRequestCount)
+
+	chainConfig, err := processConfigResults(l.chainSelector, standardResultsCopy, destChainSelector)
+	if err != nil {
+		return cciptypes.ChainConfigSnapshot{}, fmt.Errorf("process config results: %w", err)
+	}
+
+	return chainConfig, nil
+}
+
+// Helper to prepare source chain queries
+func prepareSourceChainQueries(sourceChains []cciptypes.ChainSelector) []types.BatchRead {
+	sourceConfigQueries := make([]types.BatchRead, 0, len(sourceChains))
+	for _, chain := range sourceChains {
+		sourceConfigQueries = append(sourceConfigQueries, types.BatchRead{
+			ReadName: consts.MethodNameGetSourceChainConfig,
+			Params: map[string]any{
+				"sourceChainSelector": chain,
+			},
+			ReturnVal: new(cciptypes.SourceChainConfig),
+		})
+	}
+	return sourceConfigQueries
+}
+
+// Helper to find and append source chain queries to existing requests
+func appendSourceQueriesToRequests(
+	chainConfigRequests contractreader.ExtendedBatchGetLatestValuesRequest,
+	sourceQueries []types.BatchRead) (int, bool) {
+
+	var standardOffRampRequestCount int
+	var found bool
+
+	// Find if OffRamp already exists and get standard request count
+	for contractName, requests := range chainConfigRequests {
+		if contractName == consts.ContractNameOffRamp {
+			standardOffRampRequestCount = len(requests)
+
+			// Append source queries if we have any
+			if len(sourceQueries) > 0 {
+				chainConfigRequests[contractName] = append(requests, sourceQueries...)
+			}
+			found = true
+			break
+		}
+	}
+
+	return standardOffRampRequestCount, found
+}
+
+// extractStandardChainConfigResults creates a copy of the batch results with only the standard
+// chain config results (limiting OffRamp results to the standard count)
+func extractStandardChainConfigResults(
+	batchResult types.BatchGetLatestValuesResult,
+	standardOffRampRequestCount int,
+) types.BatchGetLatestValuesResult {
+	chainConfigResultsCopy := make(types.BatchGetLatestValuesResult)
+
+	for contract, results := range batchResult {
+		if contract.Name == consts.ContractNameOffRamp && len(results) > standardOffRampRequestCount {
+			// Only include the standard results (first N results)
+			chainConfigResultsCopy[contract] = results[:standardOffRampRequestCount]
+		} else {
+			// Copy as-is
+			chainConfigResultsCopy[contract] = results
+		}
+	}
+
+	return chainConfigResultsCopy
+}
+
+func processConfigResults(
+	chainSel cciptypes.ChainSelector,
+	batchResult types.BatchGetLatestValuesResult,
+	destChainSelector cciptypes.ChainSelector,
+) (cciptypes.ChainConfigSnapshot, error) {
+	config := cciptypes.ChainConfigSnapshot{}
+
+	for contract, results := range batchResult {
+		var err error
+		switch contract.Name {
+		case consts.ContractNameOffRamp:
+			config.Offramp, err = processOfframpResults(results)
+		case consts.ContractNameRMNProxy:
+			config.RMNProxy, err = processRMNProxyResults(results)
+		case consts.ContractNameRMNRemote:
+			config.RMNRemote, config.CurseInfo, err = processRMNRemoteResults(results, destChainSelector)
+		case consts.ContractNameFeeQuoter:
+			config.FeeQuoter, err = processFeeQuoterResults(results)
+		case consts.ContractNameOnRamp:
+			// Only process OnRamp results for source chains
+			if chainSel != destChainSelector {
+				config.OnRamp, err = processOnRampResults(results)
+			}
+		case consts.ContractNameRouter:
+			// Only process Router results for source chains
+			if chainSel != destChainSelector {
+				config.Router, err = processRouterResults(results)
+			}
+		default:
+			r.lggr.Warnw("Unhandled contract in batch results", "contract", contract.Name)
+		}
+		if err != nil {
+			return cciptypes.ChainConfigSnapshot{}, fmt.Errorf("process %s results: %w", contract.Name, err)
+		}
+	}
+
+	return config, nil
+}
+
+func (l *DefaultAccessor) prepareBatchConfigRequests(destChainSelector cciptypes.ChainSelector) contractreader.ExtendedBatchGetLatestValuesRequest {
+	var (
+		commitLatestOCRConfig cciptypes.OCRConfigResponse
+		execLatestOCRConfig   cciptypes.OCRConfigResponse
+		staticConfig          cciptypes.offRampStaticChainConfig
+		dynamicConfig         cciptypes.offRampDynamicChainConfig
+		rmnRemoteAddress      []byte
+		rmnDigestHeader       cciptypes.rmnDigestHeader
+		rmnVersionConfig      cciptypes.versionedConfig
+		feeQuoterConfig       cciptypes.feeQuoterStaticConfig
+		onRampDynamicConfig   cciptypes.getOnRampDynamicConfigResponse
+		onRampDestConfig      cciptypes.onRampDestChainConfig
+		wrappedNativeAddress  []byte
+		cursedSubjects        cciptypes.RMNCurseResponse
+	)
+
+	var requests contractreader.ExtendedBatchGetLatestValuesRequest
+
+	// Only add OnRamp config requests if this is a source chain (not destination chain)
+	if l.chainSelector != destChainSelector {
+		requests = contractreader.ExtendedBatchGetLatestValuesRequest{
+			consts.ContractNameOnRamp: {
+				{
+					ReadName:  consts.MethodNameOnRampGetDynamicConfig,
+					Params:    map[string]any{},
+					ReturnVal: &onRampDynamicConfig,
+				},
+				{
+					ReadName: consts.MethodNameOnRampGetDestChainConfig,
+					Params: map[string]any{
+						"destChainSelector": destChainSelector,
+					},
+					ReturnVal: &onRampDestConfig,
+				},
+			},
+			consts.ContractNameRouter: {
+				{
+					ReadName:  consts.MethodNameRouterGetWrappedNative,
+					Params:    map[string]any{},
+					ReturnVal: &wrappedNativeAddress,
+				},
+			},
+		}
+	} else {
+		// Add all other contract requests for the destination chain
+		requests = contractreader.ExtendedBatchGetLatestValuesRequest{
+			consts.ContractNameOffRamp: {
+				{
+					ReadName: consts.MethodNameOffRampLatestConfigDetails,
+					Params: map[string]any{
+						"ocrPluginType": consts.PluginTypeCommit,
+					},
+					ReturnVal: &commitLatestOCRConfig,
+				},
+				{
+					ReadName: consts.MethodNameOffRampLatestConfigDetails,
+					Params: map[string]any{
+						"ocrPluginType": consts.PluginTypeExecute,
+					},
+					ReturnVal: &execLatestOCRConfig,
+				},
+				{
+					ReadName:  consts.MethodNameOffRampGetStaticConfig,
+					Params:    map[string]any{},
+					ReturnVal: &staticConfig,
+				},
+				{
+					ReadName:  consts.MethodNameOffRampGetDynamicConfig,
+					Params:    map[string]any{},
+					ReturnVal: &dynamicConfig,
+				},
+			},
+			consts.ContractNameRMNProxy: {{
+				ReadName:  consts.MethodNameGetARM,
+				Params:    map[string]any{},
+				ReturnVal: &rmnRemoteAddress,
+			}},
+			consts.ContractNameRMNRemote: {
+				{
+					ReadName:  consts.MethodNameGetReportDigestHeader,
+					Params:    map[string]any{},
+					ReturnVal: &rmnDigestHeader,
+				},
+				{
+					ReadName:  consts.MethodNameGetVersionedConfig,
+					Params:    map[string]any{},
+					ReturnVal: &rmnVersionConfig,
+				},
+				{
+					ReadName:  consts.MethodNameGetCursedSubjects,
+					Params:    map[string]any{},
+					ReturnVal: &cursedSubjects,
+				},
+			},
+			consts.ContractNameFeeQuoter: {{
+				ReadName:  consts.MethodNameFeeQuoterGetStaticConfig,
+				Params:    map[string]any{},
+				ReturnVal: &feeQuoterConfig,
+			}},
+		}
+	}
+
+	return requests
 }
 
 func (l *DefaultAccessor) GetChainFeeComponents(ctx context.Context) (cciptypes.ChainFeeComponents, error) {
