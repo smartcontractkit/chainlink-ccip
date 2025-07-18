@@ -525,13 +525,13 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round1(t *testing.T) {
 	// Setup cache mock and configurations
 	mockCache := new(mockConfigCache)
 	// Destination chain config
-	destChainConfig := ChainConfigSnapshot{
-		Offramp: OfframpConfig{
-			StaticConfig: offRampStaticChainConfig{
+	destChainConfig := cciptypes.ChainConfigSnapshot{
+		Offramp: cciptypes.OfframpConfig{
+			StaticConfig: cciptypes.OffRampStaticChainConfig{
 				NonceManager: destNonceMgr,
 				RmnRemote:    destRMNRemote,
 			},
-			DynamicConfig: offRampDynamicChainConfig{
+			DynamicConfig: cciptypes.OffRampDynamicChainConfig{
 				FeeQuoter: destFeeQuoter,
 			},
 		},
@@ -539,9 +539,9 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round1(t *testing.T) {
 	// Set up cache expectations for destination chain and source chains
 	mockCache.On("GetChainConfig", mock.Anything, destChain).Return(destChainConfig, nil).Once()
 	mockCache.On("GetChainConfig", mock.Anything, sourceChain[0]).Return(
-		ChainConfigSnapshot{}, contractreader.ErrNoBindings).Maybe()
+		cciptypes.ChainConfigSnapshot{}, contractreader.ErrNoBindings).Maybe()
 	mockCache.On("GetChainConfig", mock.Anything, sourceChain[1]).Return(
-		ChainConfigSnapshot{}, contractreader.ErrNoBindings).Maybe()
+		cciptypes.ChainConfigSnapshot{}, contractreader.ErrNoBindings).Maybe()
 	mockCache.On(
 		"GetOfframpSourceChainConfigs",
 		mock.Anything,
@@ -636,13 +636,13 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round2(t *testing.T) {
 	// Setup cache mock and configurations
 	mockCache := new(mockConfigCache)
 	// Destination chain config
-	destChainConfig := ChainConfigSnapshot{
-		Offramp: OfframpConfig{
-			StaticConfig: offRampStaticChainConfig{
+	destChainConfig := cciptypes.ChainConfigSnapshot{
+		Offramp: cciptypes.OfframpConfig{
+			StaticConfig: cciptypes.OffRampStaticChainConfig{
 				NonceManager: destNonceMgr,
 				RmnRemote:    destRMNRemote,
 			},
-			DynamicConfig: offRampDynamicChainConfig{
+			DynamicConfig: cciptypes.OffRampDynamicChainConfig{
 				FeeQuoter: destFeeQuoter,
 			},
 		},
@@ -660,14 +660,14 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round2(t *testing.T) {
 		// Create mock reader for source chain
 		mockReaders[chain] = reader_mocks.NewMockExtended(t)
 
-		srcChainConfig := ChainConfigSnapshot{
-			OnRamp: OnRampConfig{
-				DynamicConfig: getOnRampDynamicConfigResponse{
-					DynamicConfig: onRampDynamicConfig{
+		srcChainConfig := cciptypes.ChainConfigSnapshot{
+			OnRamp: cciptypes.OnRampConfig{
+				DynamicConfig: cciptypes.GetOnRampDynamicConfigResponse{
+					DynamicConfig: cciptypes.OnRampDynamicConfig{
 						FeeQuoter: srcFeeQuoters[i],
 					},
 				},
-				DestChainConfig: onRampDestChainConfig{
+				DestChainConfig: cciptypes.OnRampDestChainConfig{
 					Router: srcRouters[i],
 				},
 			},
@@ -703,11 +703,11 @@ func TestCCIPChainReader_DiscoverContracts_GetAllSourceChainConfig_Errors(t *tes
 
 	// Setup cache mock and configuration
 	mockCache := new(mockConfigCache)
-	chainConfig := ChainConfigSnapshot{
-		Offramp: OfframpConfig{
+	chainConfig := cciptypes.ChainConfigSnapshot{
+		Offramp: cciptypes.OfframpConfig{
 			// We can leave the configs empty since we just need GetChainConfig to succeed
-			StaticConfig:  offRampStaticChainConfig{},
-			DynamicConfig: offRampDynamicChainConfig{},
+			StaticConfig:  cciptypes.OffRampStaticChainConfig{},
+			DynamicConfig: cciptypes.OffRampDynamicChainConfig{},
 		},
 	}
 	mockCache.On("GetChainConfig", mock.Anything, destChain).Return(chainConfig, nil)
@@ -754,7 +754,7 @@ func TestCCIPChainReader_DiscoverContracts_GetOfframpStaticConfig_Errors(t *test
 	// mock the call to get the static config - failure
 	getLatestValueErr := errors.New("some error")
 	mockCache := new(mockConfigCache)
-	mockCache.On("GetChainConfig", mock.Anything, destChain).Return(ChainConfigSnapshot{}, getLatestValueErr)
+	mockCache.On("GetChainConfig", mock.Anything, destChain).Return(cciptypes.ChainConfigSnapshot{}, getLatestValueErr)
 
 	// create the reader with cache
 	ccipChainReader := &ccipChainReader{
@@ -802,7 +802,7 @@ func TestCCIPChainReader_getDestFeeQuoterStaticConfig(t *testing.T) {
 
 	// Setup expected values
 	offrampAddress := []byte{0x3}
-	expectedConfig := feeQuoterStaticConfig{
+	expectedConfig := cciptypes.FeeQuoterStaticConfig{
 		MaxFeeJuelsPerMsg:  cciptypes.NewBigIntFromInt64(10),
 		LinkToken:          []byte{0x3, 0x4},
 		StalenessThreshold: 12,
@@ -810,8 +810,8 @@ func TestCCIPChainReader_getDestFeeQuoterStaticConfig(t *testing.T) {
 
 	// Setup cache with the expected config
 	mockCache := new(mockConfigCache)
-	chainConfig := ChainConfigSnapshot{
-		FeeQuoter: FeeQuoterConfig{
+	chainConfig := cciptypes.ChainConfigSnapshot{
+		FeeQuoter: cciptypes.FeeQuoterConfig{
 			StaticConfig: expectedConfig,
 		},
 	}
@@ -971,9 +971,9 @@ func TestCCIPChainReader_LinkPriceUSD(t *testing.T) {
 
 	// Setup mock cache with the fee quoter static config
 	mockCache := new(mockConfigCache)
-	chainConfig := ChainConfigSnapshot{
-		FeeQuoter: FeeQuoterConfig{
-			StaticConfig: feeQuoterStaticConfig{
+	chainConfig := cciptypes.ChainConfigSnapshot{
+		FeeQuoter: cciptypes.FeeQuoterConfig{
+			StaticConfig: cciptypes.FeeQuoterStaticConfig{
 				MaxFeeJuelsPerMsg:  cciptypes.NewBigIntFromInt64(10),
 				LinkToken:          tokenAddr,
 				StalenessThreshold: 12,
@@ -1024,13 +1024,13 @@ func Test_getCurseInfoFromCursedSubjects(t *testing.T) {
 		name              string
 		cursedSubjectsSet mapset.Set[[16]byte]
 		destChainSelector cciptypes.ChainSelector
-		expCurseInfo      CurseInfo
+		expCurseInfo      cciptypes.CurseInfo
 	}{
 		{
 			name:              "no cursed subjects",
 			cursedSubjectsSet: mapset.NewSet[[16]byte](),
 			destChainSelector: chainA,
-			expCurseInfo: CurseInfo{
+			expCurseInfo: cciptypes.CurseInfo{
 				CursedSourceChains: map[cciptypes.ChainSelector]bool{},
 				CursedDestination:  false,
 				GlobalCurse:        false,
@@ -1042,10 +1042,10 @@ func Test_getCurseInfoFromCursedSubjects(t *testing.T) {
 				chainSelectorToBytes16(chainB),
 				chainSelectorToBytes16(chainC),
 				chainSelectorToBytes16(chainA), // dest
-				GlobalCurseSubject,
+				cciptypes.GlobalCurseSubject,
 			),
 			destChainSelector: chainA,
-			expCurseInfo: CurseInfo{
+			expCurseInfo: cciptypes.CurseInfo{
 				CursedSourceChains: map[cciptypes.ChainSelector]bool{
 					chainB: true,
 					chainC: true,
@@ -1062,7 +1062,7 @@ func Test_getCurseInfoFromCursedSubjects(t *testing.T) {
 				chainSelectorToBytes16(chainA), // dest
 			),
 			destChainSelector: chainA,
-			expCurseInfo: CurseInfo{
+			expCurseInfo: cciptypes.CurseInfo{
 				CursedSourceChains: map[cciptypes.ChainSelector]bool{
 					chainB: true,
 					chainC: true,
@@ -1076,10 +1076,10 @@ func Test_getCurseInfoFromCursedSubjects(t *testing.T) {
 			cursedSubjectsSet: mapset.NewSet(
 				chainSelectorToBytes16(chainB),
 				chainSelectorToBytes16(chainC),
-				GlobalCurseSubject,
+				cciptypes.GlobalCurseSubject,
 			),
 			destChainSelector: chainA,
-			expCurseInfo: CurseInfo{
+			expCurseInfo: cciptypes.CurseInfo{
 				CursedSourceChains: map[cciptypes.ChainSelector]bool{
 					chainB: true,
 					chainC: true,
@@ -1095,7 +1095,7 @@ func Test_getCurseInfoFromCursedSubjects(t *testing.T) {
 				chainSelectorToBytes16(chainC),
 			),
 			destChainSelector: chainA,
-			expCurseInfo: CurseInfo{
+			expCurseInfo: cciptypes.CurseInfo{
 				CursedSourceChains: map[cciptypes.ChainSelector]bool{
 					chainB: true,
 					chainC: true,
@@ -1109,10 +1109,10 @@ func Test_getCurseInfoFromCursedSubjects(t *testing.T) {
 			cursedSubjectsSet: mapset.NewSet(
 				chainSelectorToBytes16(chainC),
 				chainSelectorToBytes16(chainA), // dest
-				GlobalCurseSubject,
+				cciptypes.GlobalCurseSubject,
 			),
 			destChainSelector: chainA,
-			expCurseInfo: CurseInfo{
+			expCurseInfo: cciptypes.CurseInfo{
 				CursedSourceChains: map[cciptypes.ChainSelector]bool{
 					chainC: true,
 				},
@@ -1324,13 +1324,13 @@ func TestCCIPChainReader_DiscoverContracts_Parallel(t *testing.T) {
 	mockCache := new(mockConfigCache)
 
 	// Destination chain config with a delay
-	destChainConfig := ChainConfigSnapshot{
-		Offramp: OfframpConfig{
-			StaticConfig: offRampStaticChainConfig{
+	destChainConfig := cciptypes.ChainConfigSnapshot{
+		Offramp: cciptypes.OfframpConfig{
+			StaticConfig: cciptypes.OffRampStaticChainConfig{
 				NonceManager: []byte{0x3},
 				RmnRemote:    []byte{0x4},
 			},
-			DynamicConfig: offRampDynamicChainConfig{
+			DynamicConfig: cciptypes.OffRampDynamicChainConfig{
 				FeeQuoter: []byte{0x5},
 			},
 		},
@@ -1354,14 +1354,14 @@ func TestCCIPChainReader_DiscoverContracts_Parallel(t *testing.T) {
 
 	// Set up source chain expectations with delays
 	for _, chain := range sourceChains {
-		srcChainConfig := ChainConfigSnapshot{
-			OnRamp: OnRampConfig{
-				DynamicConfig: getOnRampDynamicConfigResponse{
-					DynamicConfig: onRampDynamicConfig{
+		srcChainConfig := cciptypes.ChainConfigSnapshot{
+			OnRamp: cciptypes.OnRampConfig{
+				DynamicConfig: cciptypes.GetOnRampDynamicConfigResponse{
+					DynamicConfig: cciptypes.OnRampDynamicConfig{
 						FeeQuoter: []byte{0x7},
 					},
 				},
-				DestChainConfig: onRampDestChainConfig{
+				DestChainConfig: cciptypes.OnRampDestChainConfig{
 					Router: []byte{0x9},
 				},
 			},
@@ -1471,13 +1471,13 @@ func TestCCIPChainReader_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 	t.Run("happy path - gets prices for all chains", func(t *testing.T) {
 		// Setup mock cache with configs containing wrapped native addresses
 		mockCache := new(mockConfigCache)
-		sourceChain1Config := ChainConfigSnapshot{
-			Router: RouterConfig{
+		sourceChain1Config := cciptypes.ChainConfigSnapshot{
+			Router: cciptypes.RouterConfig{
 				WrappedNativeAddress: wrappedNative1,
 			},
 		}
-		sourceChain2Config := ChainConfigSnapshot{
-			Router: RouterConfig{
+		sourceChain2Config := cciptypes.ChainConfigSnapshot{
+			Router: cciptypes.RouterConfig{
 				WrappedNativeAddress: wrappedNative2,
 			},
 		}
@@ -1568,9 +1568,10 @@ func TestCCIPChainReader_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 
 	t.Run("handles missing chain configs", func(t *testing.T) {
 		mockCache := new(mockConfigCache)
-		mockCache.On("GetChainConfig", mock.Anything, sourceChain1).Return(ChainConfigSnapshot{}, fmt.Errorf("not found"))
-		mockCache.On("GetChainConfig", mock.Anything, sourceChain2).Return(ChainConfigSnapshot{
-			Router: RouterConfig{
+		mockCache.On("GetChainConfig", mock.Anything, sourceChain1).
+			Return(cciptypes.ChainConfigSnapshot{}, fmt.Errorf("not found"))
+		mockCache.On("GetChainConfig", mock.Anything, sourceChain2).Return(cciptypes.ChainConfigSnapshot{
+			Router: cciptypes.RouterConfig{
 				WrappedNativeAddress: wrappedNative2,
 			},
 		}, nil)
@@ -1632,8 +1633,8 @@ func TestCCIPChainReader_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 
 	t.Run("handles price fetch error", func(t *testing.T) {
 		mockCache := new(mockConfigCache)
-		sourceConfig := ChainConfigSnapshot{
-			Router: RouterConfig{
+		sourceConfig := cciptypes.ChainConfigSnapshot{
+			Router: cciptypes.RouterConfig{
 				WrappedNativeAddress: wrappedNative1,
 			},
 		}
@@ -1701,12 +1702,12 @@ func TestCCIPChainReader_prepareBatchConfigRequests(t *testing.T) {
 		// Verify OnRamp dynamic config request
 		require.Equal(t, consts.MethodNameOnRampGetDynamicConfig, onRampRequests[0].ReadName)
 		require.Empty(t, onRampRequests[0].Params)
-		require.IsType(t, &getOnRampDynamicConfigResponse{}, onRampRequests[0].ReturnVal)
+		require.IsType(t, &cciptypes.GetOnRampDynamicConfigResponse{}, onRampRequests[0].ReturnVal)
 
 		// Verify OnRamp dest chain config request
 		require.Equal(t, consts.MethodNameOnRampGetDestChainConfig, onRampRequests[1].ReadName)
 		require.Equal(t, map[string]any{"destChainSelector": destChain}, onRampRequests[1].Params)
-		require.IsType(t, &onRampDestChainConfig{}, onRampRequests[1].ReturnVal)
+		require.IsType(t, &cciptypes.OnRampDestChainConfig{}, onRampRequests[1].ReturnVal)
 
 		// Verify Router requests
 		routerRequests := requests[consts.ContractNameRouter]
@@ -1735,12 +1736,12 @@ func TestCCIPChainReader_prepareBatchConfigRequests(t *testing.T) {
 		// Check OffRamp commit config request
 		require.Equal(t, consts.MethodNameOffRampLatestConfigDetails, offRampRequests[0].ReadName)
 		require.Equal(t, map[string]any{"ocrPluginType": consts.PluginTypeCommit}, offRampRequests[0].Params)
-		require.IsType(t, &OCRConfigResponse{}, offRampRequests[0].ReturnVal)
+		require.IsType(t, &cciptypes.OCRConfigResponse{}, offRampRequests[0].ReturnVal)
 
 		// Check OffRamp execute config request
 		require.Equal(t, consts.MethodNameOffRampLatestConfigDetails, offRampRequests[1].ReadName)
 		require.Equal(t, map[string]any{"ocrPluginType": consts.PluginTypeExecute}, offRampRequests[1].Params)
-		require.IsType(t, &OCRConfigResponse{}, offRampRequests[1].ReturnVal)
+		require.IsType(t, &cciptypes.OCRConfigResponse{}, offRampRequests[1].ReturnVal)
 
 		// Verify RMN requests
 		rmnProxyRequests := requests[consts.ContractNameRMNProxy]
@@ -1754,7 +1755,7 @@ func TestCCIPChainReader_prepareBatchConfigRequests(t *testing.T) {
 		require.Len(t, feeQuoterRequests, 1)
 		require.Equal(t, consts.MethodNameFeeQuoterGetStaticConfig, feeQuoterRequests[0].ReadName)
 		require.Empty(t, feeQuoterRequests[0].Params)
-		require.IsType(t, &feeQuoterStaticConfig{}, feeQuoterRequests[0].ReturnVal)
+		require.IsType(t, &cciptypes.FeeQuoterStaticConfig{}, feeQuoterRequests[0].ReturnVal)
 	})
 }
 
@@ -2101,9 +2102,9 @@ type mockConfigCache struct {
 
 func (m *mockConfigCache) GetChainConfig(
 	ctx context.Context,
-	chainSel cciptypes.ChainSelector) (ChainConfigSnapshot, error) {
+	chainSel cciptypes.ChainSelector) (cciptypes.ChainConfigSnapshot, error) {
 	args := m.Called(ctx, chainSel)
-	return args.Get(0).(ChainConfigSnapshot), args.Error(1)
+	return args.Get(0).(cciptypes.ChainConfigSnapshot), args.Error(1)
 }
 
 func (m *mockConfigCache) GetOfframpSourceChainConfigs(

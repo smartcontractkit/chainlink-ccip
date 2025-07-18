@@ -26,46 +26,6 @@ var (
 // Currently only one contract per chain per name is supported.
 type ContractAddresses map[string]map[cciptypes.ChainSelector]cciptypes.UnknownAddress
 
-// ChainConfigSnapshot represents the complete configuration state of the chain
-type ChainConfigSnapshot struct {
-	Offramp   OfframpConfig
-	RMNProxy  RMNProxyConfig
-	RMNRemote RMNRemoteConfig
-	FeeQuoter FeeQuoterConfig
-	OnRamp    OnRampConfig
-	Router    RouterConfig
-	CurseInfo CurseInfo
-}
-
-type OnRampConfig struct {
-	DynamicConfig   getOnRampDynamicConfigResponse
-	DestChainConfig onRampDestChainConfig
-}
-
-type FeeQuoterConfig struct {
-	StaticConfig feeQuoterStaticConfig
-}
-
-type RMNRemoteConfig struct {
-	DigestHeader    rmnDigestHeader
-	VersionedConfig versionedConfig
-}
-
-type OfframpConfig struct {
-	CommitLatestOCRConfig OCRConfigResponse
-	ExecLatestOCRConfig   OCRConfigResponse
-	StaticConfig          offRampStaticChainConfig
-	DynamicConfig         offRampDynamicChainConfig
-}
-
-type RMNProxyConfig struct {
-	RemoteAddress []byte
-}
-
-type RouterConfig struct {
-	WrappedNativeAddress cciptypes.Bytes
-}
-
 func (ca ContractAddresses) Append(contract string, chain cciptypes.ChainSelector, address []byte) ContractAddresses {
 	resp := ca
 	if resp == nil {
@@ -266,7 +226,7 @@ type CCIPReader interface {
 
 	// GetRmnCurseInfo returns rmn curse/pausing information about the provided chains
 	// from the destination chain RMN remote contract. Caller should be able to access destination.
-	GetRmnCurseInfo(ctx context.Context) (CurseInfo, error)
+	GetRmnCurseInfo(ctx context.Context) (cciptypes.CurseInfo, error)
 
 	// DiscoverContracts will discover as many addresses as possible based on which addresses are already known.
 	// Initially only the offramp address is known so in the first round the oracles that support the destination chain

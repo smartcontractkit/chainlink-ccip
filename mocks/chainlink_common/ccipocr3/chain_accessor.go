@@ -148,9 +148,9 @@ func (_c *MockChainAccessor_ExecutedMessages_Call) RunAndReturn(run func(context
 	return _c
 }
 
-// GetAllConfigLegacySnapshot provides a mock function with given fields: ctx
-func (_m *MockChainAccessor) GetAllConfigLegacySnapshot(ctx context.Context) (ccipocr3.ChainConfigSnapshot, error) {
-	ret := _m.Called(ctx)
+// GetAllConfigLegacySnapshot provides a mock function with given fields: ctx, destChainSelector, sourceChainSelectors
+func (_m *MockChainAccessor) GetAllConfigLegacySnapshot(ctx context.Context, destChainSelector ccipocr3.ChainSelector, sourceChainSelectors []ccipocr3.ChainSelector) (ccipocr3.ChainConfigSnapshot, error) {
+	ret := _m.Called(ctx, destChainSelector, sourceChainSelectors)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetAllConfigLegacySnapshot")
@@ -158,17 +158,17 @@ func (_m *MockChainAccessor) GetAllConfigLegacySnapshot(ctx context.Context) (cc
 
 	var r0 ccipocr3.ChainConfigSnapshot
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context) (ccipocr3.ChainConfigSnapshot, error)); ok {
-		return rf(ctx)
+	if rf, ok := ret.Get(0).(func(context.Context, ccipocr3.ChainSelector, []ccipocr3.ChainSelector) (ccipocr3.ChainConfigSnapshot, error)); ok {
+		return rf(ctx, destChainSelector, sourceChainSelectors)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context) ccipocr3.ChainConfigSnapshot); ok {
-		r0 = rf(ctx)
+	if rf, ok := ret.Get(0).(func(context.Context, ccipocr3.ChainSelector, []ccipocr3.ChainSelector) ccipocr3.ChainConfigSnapshot); ok {
+		r0 = rf(ctx, destChainSelector, sourceChainSelectors)
 	} else {
 		r0 = ret.Get(0).(ccipocr3.ChainConfigSnapshot)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
-		r1 = rf(ctx)
+	if rf, ok := ret.Get(1).(func(context.Context, ccipocr3.ChainSelector, []ccipocr3.ChainSelector) error); ok {
+		r1 = rf(ctx, destChainSelector, sourceChainSelectors)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -183,13 +183,15 @@ type MockChainAccessor_GetAllConfigLegacySnapshot_Call struct {
 
 // GetAllConfigLegacySnapshot is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockChainAccessor_Expecter) GetAllConfigLegacySnapshot(ctx interface{}) *MockChainAccessor_GetAllConfigLegacySnapshot_Call {
-	return &MockChainAccessor_GetAllConfigLegacySnapshot_Call{Call: _e.mock.On("GetAllConfigLegacySnapshot", ctx)}
+//   - destChainSelector ccipocr3.ChainSelector
+//   - sourceChainSelectors []ccipocr3.ChainSelector
+func (_e *MockChainAccessor_Expecter) GetAllConfigLegacySnapshot(ctx interface{}, destChainSelector interface{}, sourceChainSelectors interface{}) *MockChainAccessor_GetAllConfigLegacySnapshot_Call {
+	return &MockChainAccessor_GetAllConfigLegacySnapshot_Call{Call: _e.mock.On("GetAllConfigLegacySnapshot", ctx, destChainSelector, sourceChainSelectors)}
 }
 
-func (_c *MockChainAccessor_GetAllConfigLegacySnapshot_Call) Run(run func(ctx context.Context)) *MockChainAccessor_GetAllConfigLegacySnapshot_Call {
+func (_c *MockChainAccessor_GetAllConfigLegacySnapshot_Call) Run(run func(ctx context.Context, destChainSelector ccipocr3.ChainSelector, sourceChainSelectors []ccipocr3.ChainSelector)) *MockChainAccessor_GetAllConfigLegacySnapshot_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context))
+		run(args[0].(context.Context), args[1].(ccipocr3.ChainSelector), args[2].([]ccipocr3.ChainSelector))
 	})
 	return _c
 }
@@ -199,7 +201,7 @@ func (_c *MockChainAccessor_GetAllConfigLegacySnapshot_Call) Return(_a0 ccipocr3
 	return _c
 }
 
-func (_c *MockChainAccessor_GetAllConfigLegacySnapshot_Call) RunAndReturn(run func(context.Context) (ccipocr3.ChainConfigSnapshot, error)) *MockChainAccessor_GetAllConfigLegacySnapshot_Call {
+func (_c *MockChainAccessor_GetAllConfigLegacySnapshot_Call) RunAndReturn(run func(context.Context, ccipocr3.ChainSelector, []ccipocr3.ChainSelector) (ccipocr3.ChainConfigSnapshot, error)) *MockChainAccessor_GetAllConfigLegacySnapshot_Call {
 	_c.Call.Return(run)
 	return _c
 }
