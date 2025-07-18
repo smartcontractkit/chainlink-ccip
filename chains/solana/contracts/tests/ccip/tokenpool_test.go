@@ -22,16 +22,16 @@ import (
 
 	// use the real program bindings, although interacting with the mock contract
 
-	cctp_message_transmitter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/cctp_message_transmitter"
-	message_transmitter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/cctp_message_transmitter"
-	cctp_token_messenger_minter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/cctp_token_messenger_minter"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/cctp_token_pool"
+	cctp_message_transmitter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/cctp_message_transmitter"
+	message_transmitter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/cctp_message_transmitter"
+	cctp_token_messenger_minter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/cctp_token_messenger_minter"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/cctp_token_pool"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/cctp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/rmn_remote"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_ccip_invalid_receiver"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_ccip_receiver"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/rmn_remote"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/test_ccip_invalid_receiver"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/test_ccip_receiver"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/test_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/ccip"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"

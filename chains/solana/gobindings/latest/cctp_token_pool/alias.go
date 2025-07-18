@@ -1,7 +1,7 @@
 package cctp_token_pool // revive:disable-line:var-naming
 
 import (
-	base "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/base_token_pool"
+	base "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/base_token_pool"
 )
 
 // DO NOT DELETE - imported custom types are are not-automatically resolved by `anchor-go` but are declared in the anchor idl

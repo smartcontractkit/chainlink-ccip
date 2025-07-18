@@ -13,7 +13,7 @@ import (
 // Sets the default code version to be used. This is then used by the slim routing layer to determine
 // which version of the versioned business logic module (`instructions`) to use. Only the admin may set this.
 //
-// # Shared func signature with other programs
+// Shared func signature with other programs
 //
 // # Arguments
 //

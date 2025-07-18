@@ -1,4 +1,4 @@
-module github.com/smartcontractkit/chainlink/chainlink-ccip/chains/solana/gobindings
+module github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings
 
 go 1.24.2
 
@@ -8,7 +8,6 @@ require (
 	github.com/gagliardetto/gofuzz v1.2.2
 	github.com/gagliardetto/solana-go v1.13.0
 	github.com/gagliardetto/treeout v0.1.4
-	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250718174749-c41db3bd00fe
 	github.com/stretchr/testify v1.10.0
 )
 
