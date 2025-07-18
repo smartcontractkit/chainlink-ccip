@@ -33,7 +33,7 @@ contract OnRampOverSuperchainInteropSetup is OnRampSetup {
 
     s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), new Router.OffRamp[](0));
 
-    assertEq("OnRampOverSuperchainInterop 1.6.1-dev", s_onRampOverSuperchainInterop.typeAndVersion());
+    assertEq("OnRampOverSuperchainInterop 1.6.2-dev", s_onRampOverSuperchainInterop.typeAndVersion());
   }
 
   function _EVM2AnyRampMessageToAny2EVMRampMessage(

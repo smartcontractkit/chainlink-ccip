@@ -13,7 +13,7 @@ contract OnRampOverSuperchainInterop is OnRamp {
   error InvalidSourceChainSelector(uint64 sourceChainSelector);
 
   // STATIC CONFIG
-  string public constant override typeAndVersion = "OnRampOverSuperchainInterop 1.6.1-dev";
+  string public constant override typeAndVersion = "OnRampOverSuperchainInterop 1.6.2-dev";
 
   /// @notice Stores previously sent interop message hashes to facilitate re-emission.
   /// @dev destChainSelector and sequenceNumber uniquely identify a message for a given onramp.
