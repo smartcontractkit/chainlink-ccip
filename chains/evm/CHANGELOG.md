@@ -1,18 +1,59 @@
 [NOTES.md](../../../chainlink/contracts/release/ccip/NOTES.md)# @chainlink/contracts-ccip
 
+## 1.6.1
+
+CCIP 1.6.1 is a minor release that focuses on token pools, introducing filler-based fast transfer functionality, fixing a variety of pool-related issues, and introducing further pool improvements.
+
+Key improvements include:
+
+- **Fast Transfer Pools** - New pool type enabling faster-than-finality cross-chain token transfers through fillers.
+  - Fillers can instantly fulfill transfers at destination, then get reimbursed during settlement when message arrive post source finality.
+  - Configurable fee splitting between pool operators and fillers.
+- **Rate Limit Fix** - Now uses local token denomination for rate limiting during releaseOrMint, properly accounting for scenarios where source and dest token decimals mismatch.
+  - `ReleaseOrMintInV1.amount` has been changed to `ReleaseOrMintInV1.sourceDenominatedAmount`
+  - conversion to local token denomination happens inside releaseOrMint
+
+### Minor Changes
+
+- [#940](https://github.com/smartcontractkit/chainlink-ccip/pull/940) [`17cfcfd`](https://github.com/smartcontractkit/chainlink-ccip/commit/17cfcfd32b) - #feature Introduce filler-based fast transfer TokenPool
+
+- [#1006](https://github.com/smartcontractkit/chainlink-ccip/pull/1006) [`4e7de54`](https://github.com/smartcontractkit/chainlink-ccip/commit/4e7de54014) - Change rate limiting to use local token denomination during releaseOrMint
+
+### Patch Changes
+
+- [#1066](https://github.com/smartcontractkit/chainlink-ccip/pull/1066) [`66c3cf7`](https://github.com/smartcontractkit/chainlink-ccip/commit/66c3cf78c9) - Emit fee breakdown in FastTransferRequested event
+
+- [#1024](https://github.com/smartcontractkit/chainlink-ccip/pull/1024) [`b53c52e`](https://github.com/smartcontractkit/chainlink-ccip/commit/b53c52e0f9) - Add chain selector parameter to fast transfer hooks
+
+- [#1054](https://github.com/smartcontractkit/chainlink-ccip/pull/1054) [`18e90fa`](https://github.com/smartcontractkit/chainlink-ccip/commit/18e90fa25f) - Consume inbound rate limit for fast transfers on settle
+
+- [#950](https://github.com/smartcontractkit/chainlink-ccip/pull/950) [`6d82d44`](https://github.com/smartcontractkit/chainlink-ccip/commit/6d82d44e86) - Series of TokenPool improvements, such as:
+  - removing `acceptLiquidity`from the LockRelease pool
+  - added a virtual `_releaseOrMint` and `_lockOrBurn` for easy pool implementations
+  - Merged `Locked` and `Burned` event into `LockedOrBurned`, merged `Released` and `Minted` into `ReleasedOrMinted`
+  - Removed `ILiquidityContainer`
+  - When calling transferLiquidity with uint256.max as amount, it will transfer the current amount in the pool
+  - Setting 0x0 as rebalancer is now allowed in siloed pools
+  - Removed the aggregate rate limiter logic in RateLimiter
+  - Allow setting 0 as rate and/or capacity
+  - Added `OutboundRateLimitConsumed` and `InboundRateLimitConsumed` events
+  - Use OZ 5 for non-token related imports
+  - add `RebalancerSet` event to the LockRelease pool
+
 ## 1.6.0
 
-CCIP 1.6 has a new home: [github.com/smartcontractkit/chainlink-ccip](https://github.com/smartcontractkit/chainlink-ccip)! 
+CCIP 1.6 has a new home: [github.com/smartcontractkit/chainlink-ccip](https://github.com/smartcontractkit/chainlink-ccip)!
 This is the new long-term home for not only the EVM contracts, but also SVM (Solana), Aptos and all future non-EVM chains.
 
 v1.6 is mostly an invisible release for end users, but features a full rework under the hood. Some of the features include
+
 - More gas efficient code, leading to lower fees.
 - Offchain RMN blessings.
   - The Commit DON now directly communicated with the RMN and submits pre-blessed roots.
   - Reduces gas cost of blessing significantly.
   - Reduces the number of onchain transactions, lowering the time it takes to execute a CCIP message.
 - Merged the CommitStore with the OffRamp.
-- A single OnRamp and OffRamp contract per chain instead of one per lane. 
+- A single OnRamp and OffRamp contract per chain instead of one per lane.
   - This greatly reduces the number of contracts deployed on each chain, and increases batching opportunities.
   - Faster chain expansion due to the reduced number of contracts.
   - Cross-source message execution in a single transaction.
@@ -24,8 +65,8 @@ v1.6 is mostly an invisible release for end users, but features a full rework un
 - A new way to permissionlessly onboard tokens to CCIP
   - In addition to the already existing owner() and getCCIPAdmin() functions, we introduce registering for OZ AccessControl.
   - A user that has the `DEFAULT_ADMIN_ROLE` on their token can now register their token on the TokenAdminRegistry.
-- Upgraded the Solidity compiler to 0.8.26, with most contracts now requiring ^0.8.24. 
- 
+- Upgraded the Solidity compiler to 0.8.26, with most contracts now requiring ^0.8.24.
+
 ### Minor Changes
 
 - [#804](https://github.com/smartcontractkit/chainlink-ccip/pull/804) [`875e982`](https://github.com/smartcontractkit/chainlink-ccip/commit/875e982e6437dc126710d8224dd7c792a197bea6) - #feature move contract to chainlink-ccip
@@ -143,7 +184,6 @@ v1.6 is mostly an invisible release for end users, but features a full rework un
 - [#14863](https://github.com/smartcontractkit/chainlink/pull/14863) [`84bcbe0`](https://github.com/smartcontractkit/chainlink/commit/84bcbe03ebfa3ab7f58b97897eb0c55b45191859) - Change else if to else..if..
 
 - [#15570](https://github.com/smartcontractkit/chainlink/pull/15570) [`c1341a5`](https://github.com/smartcontractkit/chainlink/commit/c1341a5081d098bce04a7564a6525a91f2beeecf) - Add getChainConfig to ccipHome
-
 
 ## 1.5.0
 
