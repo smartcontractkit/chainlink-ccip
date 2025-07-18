@@ -87,7 +87,7 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
   function test_ccipReceive_WithDifferentDecimals() public {
     uint8 sourceDecimals = 6; // USDC-like decimals
     uint8 destDecimals = IERC20Metadata(address(s_token)).decimals();
-    require(sourceDecimals != destDecimals, "Test requires different source and destination decimals");
+    assertTrue(sourceDecimals != destDecimals, "Test requires different source and destination decimals");
 
     uint256 sourceAmount = 100 * 10 ** sourceDecimals; // 100 tokens in source decimals
     uint256 expectedLocalAmount = sourceAmount * 10 ** 18 / 10 ** sourceDecimals; // Should be scaled to 18 decimals
@@ -220,7 +220,7 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
   function test_ccipReceive_FastFill_Settlement_WithDifferentDecimals() public {
     uint8 sourceDecimals = 6; // USDC-like decimals
     uint8 destDecimals = IERC20Metadata(address(s_token)).decimals();
-    require(sourceDecimals != destDecimals, "Test requires different source and destination decimals");
+    assertTrue(sourceDecimals != destDecimals, "Test requires different source and destination decimals");
 
     uint256 sourceAmount = 100 * 10 ** sourceDecimals; // 100 tokens in source decimals
     uint256 expectedLocalAmount = sourceAmount * 10 ** destDecimals / 10 ** sourceDecimals; // Scale to dest decimals
