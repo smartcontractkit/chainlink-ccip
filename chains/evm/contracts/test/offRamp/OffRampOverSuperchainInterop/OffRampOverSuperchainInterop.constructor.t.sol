@@ -54,7 +54,7 @@ contract OffRampOverSuperchainInterop_constructor is OffRampOverSuperchainIntero
     assertEq(address(staticConfig.rmnRemote), address(retrievedStaticConfig.rmnRemote));
     assertEq(staticConfig.tokenAdminRegistry, retrievedStaticConfig.tokenAdminRegistry);
     assertEq(staticConfig.nonceManager, retrievedStaticConfig.nonceManager);
-    assertEq("OffRampOverSuperchainInterop 1.6.1-dev", offRamp.typeAndVersion());
+    assertEq("OffRampOverSuperchainInterop 1.6.2-dev", offRamp.typeAndVersion());
 
     // Verify dynamic config
     OffRamp.DynamicConfig memory retrievedDynamicConfig = offRamp.getDynamicConfig();
@@ -64,5 +64,26 @@ contract OffRampOverSuperchainInterop_constructor is OffRampOverSuperchainIntero
       retrievedDynamicConfig.permissionLessExecutionThresholdSeconds
     );
     assertEq(dynamicConfig.messageInterceptor, retrievedDynamicConfig.messageInterceptor);
+  }
+
+  // Reverts
+
+  function test_constructor_RevertWhen_ZeroCrossL2Inbox() public {
+    OffRamp.StaticConfig memory staticConfig = OffRamp.StaticConfig({
+      chainSelector: DEST_CHAIN_SELECTOR,
+      gasForCallExactCheck: GAS_FOR_CALL_EXACT_CHECK,
+      rmnRemote: s_mockRMNRemote,
+      tokenAdminRegistry: address(s_tokenAdminRegistry),
+      nonceManager: address(s_inboundNonceManager)
+    });
+
+    vm.expectRevert(OffRampOverSuperchainInterop.CrossL2InboxCannotBeZero.selector);
+    new OffRampOverSuperchainInterop(
+      staticConfig,
+      _generateDynamicOffRampConfig(address(s_feeQuoter)),
+      new OffRamp.SourceChainConfigArgs[](0),
+      address(0), // Invalid crossL2Inbox
+      new OffRampOverSuperchainInterop.ChainSelectorToChainIdConfigArgs[](0)
+    );
   }
 }

@@ -15,6 +15,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/commit/internal/builder"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/commit/metrics"
@@ -24,7 +26,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -73,6 +74,7 @@ type PluginFactory struct {
 	addrCodec         cciptypes.AddressCodec
 	homeChainReader   reader.HomeChain
 	homeChainSelector cciptypes.ChainSelector
+	chainAccessors    map[cciptypes.ChainSelector]cciptypes.ChainAccessor
 	contractReaders   map[cciptypes.ChainSelector]types.ContractReader
 	chainWriters      map[cciptypes.ChainSelector]types.ContractWriter
 	rmnPeerClient     rmn.PeerClient
@@ -88,6 +90,7 @@ type CommitPluginFactoryParams struct {
 	AddrCodec         cciptypes.AddressCodec
 	HomeChainReader   reader.HomeChain
 	HomeChainSelector cciptypes.ChainSelector
+	ChainAccessors    map[cciptypes.ChainSelector]cciptypes.ChainAccessor
 	ContractReaders   map[cciptypes.ChainSelector]types.ContractReader
 	ContractWriters   map[cciptypes.ChainSelector]types.ContractWriter
 	RmnPeerClient     rmn.PeerClient
@@ -106,6 +109,7 @@ func NewCommitPluginFactory(params CommitPluginFactoryParams) *PluginFactory {
 		addrCodec:         params.AddrCodec,
 		homeChainReader:   params.HomeChainReader,
 		homeChainSelector: params.HomeChainSelector,
+		chainAccessors:    params.ChainAccessors,
 		contractReaders:   params.ContractReaders,
 		chainWriters:      params.ContractWriters,
 		rmnPeerClient:     params.RmnPeerClient,

@@ -3,7 +3,7 @@ package libs
 import (
 	sel "github.com/smartcontractkit/chain-selectors"
 
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 // GetChainInfoFromSelector returns the chain ID and family for a given chain selector

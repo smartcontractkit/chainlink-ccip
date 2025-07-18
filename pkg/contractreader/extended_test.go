@@ -14,7 +14,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	chainreadermocks "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
@@ -111,7 +110,7 @@ func TestFinalityViolation(t *testing.T) {
 	wrapped := contractreader.NewExtendedContractReader(cr)
 
 	_, err := wrapped.QueryKey(
-		tests.Context(t),
+		t.Context(),
 		types.BoundContract{},
 		query.KeyFilter{},
 		query.LimitAndSort{},
@@ -119,7 +118,7 @@ func TestFinalityViolation(t *testing.T) {
 	require.ErrorIs(t, err, contractreader.ErrFinalityViolated)
 
 	err = wrapped.GetLatestValue(
-		tests.Context(t),
+		t.Context(),
 		"",
 		primitives.Finalized,
 		nil,
@@ -127,7 +126,7 @@ func TestFinalityViolation(t *testing.T) {
 	require.ErrorIs(t, err, contractreader.ErrFinalityViolated)
 
 	_, err = wrapped.BatchGetLatestValues(
-		tests.Context(t),
+		t.Context(),
 		types.BatchGetLatestValuesRequest{})
 	require.ErrorIs(t, err, contractreader.ErrFinalityViolated)
 }

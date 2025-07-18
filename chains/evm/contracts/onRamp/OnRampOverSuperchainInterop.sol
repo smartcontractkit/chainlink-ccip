@@ -13,7 +13,7 @@ contract OnRampOverSuperchainInterop is OnRamp {
   error InvalidSourceChainSelector(uint64 sourceChainSelector);
 
   // STATIC CONFIG
-  string public constant override typeAndVersion = "OnRampOverSuperchainInterop 1.6.1-dev";
+  string public constant override typeAndVersion = "OnRampOverSuperchainInterop 1.6.2-dev";
 
   /// @notice Stores previously sent interop message hashes to facilitate re-emission.
   /// @dev destChainSelector and sequenceNumber uniquely identify a message for a given onramp.
@@ -44,6 +44,11 @@ contract OnRampOverSuperchainInterop is OnRamp {
       new Internal.Any2EVMTokenTransfer[](message.tokenAmounts.length);
     for (uint256 i = 0; i < message.tokenAmounts.length; ++i) {
       Internal.EVM2AnyTokenTransfer memory tokenTransfer = message.tokenAmounts[i];
+
+      // TokenPool owners can return arbitrary destTokenAddress values, so we validate
+      // early to catch malicious/malformed data before abi.decode() potentially fails with unclear errors.
+      Internal._validateEVMAddress(tokenTransfer.destTokenAddress);
+
       destTokenTransfers[i] = Internal.Any2EVMTokenTransfer({
         sourcePoolAddress: abi.encode(tokenTransfer.sourcePoolAddress),
         destTokenAddress: abi.decode(tokenTransfer.destTokenAddress, (address)),
