@@ -36,7 +36,7 @@ contract OffRampOverSuperchainInterop is OffRamp {
   }
 
   // STATIC CONFIG
-  string public constant override typeAndVersion = "OffRampOverSuperchainInterop 1.6.1-dev";
+  string public constant override typeAndVersion = "OffRampOverSuperchainInterop 1.6.2-dev";
   /// @dev CrossL2Inbox is a pre-deploy at a fixed address on OP L2s.
   ICrossL2Inbox internal immutable i_crossL2Inbox;
 
