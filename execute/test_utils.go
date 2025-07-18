@@ -202,7 +202,7 @@ func (it *IntTest) WithUSDC(
 
 	r := readermock.NewMockExtended(it.t)
 	r.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil).Maybe()
-	r.EXPECT().QueryKey(
+	r.EXPECT().ExtendedQueryKey(
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
