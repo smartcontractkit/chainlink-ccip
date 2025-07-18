@@ -4,15 +4,20 @@
 
 CCIP 1.6.1 is a minor release that focuses on token pools, introducing filler-based fast transfer functionality, and adding overall pool improvements.
 
+Key improvements include:
+
 - **Fast Transfer Pool** - New pool enabling faster-than-finality cross-chain token transfers through fillers.
   - Fillers can instantly fulfill transfers at destination, then get reimbursed during settlement when message arrive post source finality.
   - Configurable fee splitting between pool operators and fillers.
+- **Rate Limit With Local Denomination** - Token pools now use local token denomination for rate limiting during `releaseOrMint`, making it easier to handle tokens with different decimals cross-chain.
+  - `ReleaseOrMintInV1.amount` has been changed to `ReleaseOrMintInV1.sourceDenominatedAmount`.
+  - Conversion to local token denomination happens inside `releaseOrMint`.
 
 ### Minor Changes
 
 - [#940](https://github.com/smartcontractkit/chainlink-ccip/pull/940) [`17cfcfd`](https://github.com/smartcontractkit/chainlink-ccip/commit/17cfcfd32b) - #feature Introduce filler-based fast transfer token pool
 
-- [#1006](https://github.com/smartcontractkit/chainlink-ccip/pull/1006) [`4e7de54`](https://github.com/smartcontractkit/chainlink-ccip/commit/4e7de54014) - Change rate limiting to use local token denomination inside `releaseOrMint`
+- [#1006](https://github.com/smartcontractkit/chainlink-ccip/pull/1006) [`4e7de54`](https://github.com/smartcontractkit/chainlink-ccip/commit/4e7de54014) - #feature Change rate limiting to use local token denomination inside `releaseOrMint`
 
 ### Patch Changes
 
