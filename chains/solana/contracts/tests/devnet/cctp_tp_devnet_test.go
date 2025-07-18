@@ -86,13 +86,15 @@ func TestCctpTpDevnet(t *testing.T) {
 
 	remotePoolBytes, err := hex.DecodeString(devnetInfo.CCTP.Sepolia.TokenPool)
 	require.NoError(t, err)
-	remotePoolAddressBytes := [32]byte{}
-	copy(remotePoolAddressBytes[32-len(remotePoolBytes):], remotePoolBytes)
-	remotePoolAddress := solana.PublicKey(remotePoolAddressBytes)
 
 	chainSelector := devnetInfo.ChainSelectors.Sepolia
 	domain := domains[chainSelector]
-	domainDestCaller := remotePoolAddress
+
+	domainDestCallerAddress, err := hex.DecodeString(devnetInfo.CCTP.Sepolia.AllowedCaller)
+	require.NoError(t, err)
+	domainDestCallerBytes := [32]byte{}
+	copy(domainDestCallerBytes[32-len(domainDestCallerAddress):], domainDestCallerAddress)
+	domainDestCaller := solana.PublicKey(domainDestCallerBytes)
 
 	cctpPool := getCctpTokenPoolPDAs(t, cctpTpProgram, chainSelector, usdcMint)
 	messageTransmitter := getMessageTransmitterPDAs(t, cctpMtProgram, cctpTmmProgram)
@@ -213,7 +215,7 @@ func TestCctpTpDevnet(t *testing.T) {
 		ixAppend, err := cctp_token_pool.NewAppendRemotePoolAddressesInstruction(
 			chainSelector,
 			usdcMint,
-			[]cctp_token_pool.RemoteAddress{{Address: remotePoolAddress.Bytes()}},
+			[]cctp_token_pool.RemoteAddress{{Address: remotePoolBytes}},
 			cctpPool.state,
 			cctpPool.chainConfig,
 			admin.PublicKey(),
