@@ -211,7 +211,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
 
   /// @notice Using a function because constant state variables cannot be overridden by child contracts.
   function typeAndVersion() external pure virtual override returns (string memory) {
-    return "OffRamp 1.6.1-dev";
+    return "OffRamp 1.6.2-dev";
   }
 
   // ================================================================
