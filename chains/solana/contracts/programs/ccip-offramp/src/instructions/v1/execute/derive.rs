@@ -429,6 +429,21 @@ pub fn derive_execute_accounts_additional_tokens_static<'info>(
             token: token + 1,
         }
         .to_string();
+    } else {
+        // We're done with all tokens
+        if !params.buffer_id.is_empty() {
+            let buffer_pda = find(
+                &[
+                    EXECUTION_REPORT_BUFFER,
+                    &params.buffer_id,
+                    params.execute_caller.as_ref(),
+                ],
+                crate::ID,
+            );
+            response.accounts_to_save.push(buffer_pda.writable());
+        }
+        response.ask_again_with.clear();
+        response.next_stage = "".to_string(); // We're done, no more stages.
     }
 
     Ok(response)
@@ -524,8 +539,20 @@ pub fn derive_execute_accounts_additional_token_nested<'info>(
         }
         .to_string();
     } else {
+        // We're done with all tokens
+        if !params.buffer_id.is_empty() {
+            let buffer_pda = find(
+                &[
+                    EXECUTION_REPORT_BUFFER,
+                    &params.buffer_id,
+                    params.execute_caller.as_ref(),
+                ],
+                crate::ID,
+            );
+            response.accounts_to_save.push(buffer_pda.writable());
+        }
         response.ask_again_with.clear();
-        response.next_stage = "".to_string();
+        response.next_stage = "".to_string(); // We're done, no more stages.
     }
 
     Ok(response)

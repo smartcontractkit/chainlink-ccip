@@ -11007,6 +11007,8 @@ func TestCCIPRouter(t *testing.T) {
 					solana.Meta(tokenMessengerMinter.RemoteTokenMessenger),
 					solana.Meta(tokenMessengerMinter.TokenPair),
 					solana.Meta(cctp.GetUsedNoncesPDA(t, cctpMessageBytes[:])).WRITE(),
+					// Buffered exec report account:
+					solana.Meta(bufferPDA).WRITE(),
 				}
 
 				require.Len(t, derivedAccounts, len(expectedAccounts), "Derived accounts length mismatch")
