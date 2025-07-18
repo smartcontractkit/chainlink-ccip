@@ -244,37 +244,6 @@ var (
 	// * `raw_execution_report` - The serialized execution report containing the message and proofs.
 	Instruction_ManuallyExecute = ag_binary.TypeID([8]byte{238, 219, 224, 11, 226, 248, 47, 192})
 
-	// Initializes and/or inserts a chunk of report data to an execution report buffer.
-	//
-	// When execution reports are too large to fit in a single transaction, they can be chopped
-	// up in chunks first (as a special case, one chunk is also acceptable), and pre-buffered
-	// via multiple calls to this instruction.
-	//
-	// There's no need to pre-initialize the buffer: all chunks can be sent concurrently, and the
-	// first one to arrive will initialize the buffer.
-	//
-	// To benefit from buffering, the eventual call to `execute` or `manually_execute` must
-	// include an additional `remaining_account` with the PDA derived from
-	// ["execution_report_buffer", <buffer_id>, <caller_pubkey>].
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for buffering.
-	// * `buffer_id` - An arbitrary buffer id defined by the caller (could be the message_id).
-	// * `report_length` - Total length in bytes of the execution report.
-	// * `chunk` - The specific chunk to add to the buffer. Chunk must have a consistent size, except
-	// the last one in the buffer, which may be smaller.
-	// * `chunk_index` - The index of this chunk.
-	// * `num_chunks` - The total number of chunks in the report.
-	Instruction_BufferExecutionReport = ag_binary.TypeID([8]byte{35, 202, 252, 220, 2, 82, 189, 23})
-
-	// Closes the execution report buffer to reclaim funds.
-	//
-	// Note this is only necessary when aborting a buffered transaction, or when a mistake
-	// was made when buffering data. The buffer account will otherwise automatically close
-	// and return funds to the caller whenever buffered execution succeeds.
-	Instruction_CloseExecutionReportBuffer = ag_binary.TypeID([8]byte{0, 16, 4, 246, 238, 95, 223, 31})
-
 	Instruction_CloseCommitReportAccount = ag_binary.TypeID([8]byte{109, 145, 129, 64, 226, 172, 61, 106})
 )
 
@@ -315,10 +284,6 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "Execute"
 	case Instruction_ManuallyExecute:
 		return "ManuallyExecute"
-	case Instruction_BufferExecutionReport:
-		return "BufferExecutionReport"
-	case Instruction_CloseExecutionReportBuffer:
-		return "CloseExecutionReportBuffer"
 	case Instruction_CloseCommitReportAccount:
 		return "CloseCommitReportAccount"
 	default:
@@ -391,12 +356,6 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"manually_execute", (*ManuallyExecute)(nil),
-		},
-		{
-			"buffer_execution_report", (*BufferExecutionReport)(nil),
-		},
-		{
-			"close_execution_report_buffer", (*CloseExecutionReportBuffer)(nil),
 		},
 		{
 			"close_commit_report_account", (*CloseCommitReportAccount)(nil),

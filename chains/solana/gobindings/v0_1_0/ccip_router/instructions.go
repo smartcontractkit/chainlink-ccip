@@ -90,15 +90,6 @@ var (
 	// * `code_version` - The new code version to be set as default.
 	Instruction_SetDefaultCodeVersion = ag_binary.TypeID([8]byte{47, 151, 233, 254, 121, 82, 206, 152})
 
-	// Sets the address of the LINK token mint.
-	// The Admin is the only one able to set it.
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for updating the configuration.
-	// * `link_token_mint` - The new address of the LINK token mint.
-	Instruction_SetLinkTokenMint = ag_binary.TypeID([8]byte{190, 216, 49, 254, 200, 81, 12, 17})
-
 	// Updates the fee aggregator in the router configuration.
 	// The Admin is the only one able to update the fee aggregator.
 	//
@@ -314,8 +305,6 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "AcceptOwnership"
 	case Instruction_SetDefaultCodeVersion:
 		return "SetDefaultCodeVersion"
-	case Instruction_SetLinkTokenMint:
-		return "SetLinkTokenMint"
 	case Instruction_UpdateFeeAggregator:
 		return "UpdateFeeAggregator"
 	case Instruction_UpdateRmnRemote:
@@ -388,9 +377,6 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"set_default_code_version", (*SetDefaultCodeVersion)(nil),
-		},
-		{
-			"set_link_token_mint", (*SetLinkTokenMint)(nil),
 		},
 		{
 			"update_fee_aggregator", (*UpdateFeeAggregator)(nil),
