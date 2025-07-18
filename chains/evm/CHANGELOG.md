@@ -11,11 +11,11 @@ Key improvements include:
   - Configurable fee splitting between pool operators and fillers.
 - **Rate Limit Fix** - Now uses local token denomination for rate limiting during releaseOrMint, properly accounting for scenarios where source and dest token decimals mismatch.
   - `ReleaseOrMintInV1.amount` has been changed to `ReleaseOrMintInV1.sourceDenominatedAmount`
-  - conversion to local token denomination happens inside releaseOrMint
+  - Conversion to local token denomination happens inside `releaseOrMint`
 
 ### Minor Changes
 
-- [#940](https://github.com/smartcontractkit/chainlink-ccip/pull/940) [`17cfcfd`](https://github.com/smartcontractkit/chainlink-ccip/commit/17cfcfd32b) - #feature Introduce filler-based fast transfer TokenPool
+- [#940](https://github.com/smartcontractkit/chainlink-ccip/pull/940) [`17cfcfd`](https://github.com/smartcontractkit/chainlink-ccip/commit/17cfcfd32b) - #feature Introduce filler-based fast transfer token pool
 
 - [#1006](https://github.com/smartcontractkit/chainlink-ccip/pull/1006) [`4e7de54`](https://github.com/smartcontractkit/chainlink-ccip/commit/4e7de54014) - Change rate limiting to use local token denomination during releaseOrMint
 
@@ -25,20 +25,20 @@ Key improvements include:
 
 - [#1024](https://github.com/smartcontractkit/chainlink-ccip/pull/1024) [`b53c52e`](https://github.com/smartcontractkit/chainlink-ccip/commit/b53c52e0f9) - Add chain selector parameter to fast transfer hooks
 
-- [#1054](https://github.com/smartcontractkit/chainlink-ccip/pull/1054) [`18e90fa`](https://github.com/smartcontractkit/chainlink-ccip/commit/18e90fa25f) - Consume inbound rate limit for fast transfers on settle
+- [#1054](https://github.com/smartcontractkit/chainlink-ccip/pull/1054) [`18e90fa`](https://github.com/smartcontractkit/chainlink-ccip/commit/18e90fa25f) - Consume inbound rate limit for fast transfers during settle
 
-- [#950](https://github.com/smartcontractkit/chainlink-ccip/pull/950) [`6d82d44`](https://github.com/smartcontractkit/chainlink-ccip/commit/6d82d44e86) - Series of TokenPool improvements, such as:
-  - removing `acceptLiquidity`from the LockRelease pool
-  - added a virtual `_releaseOrMint` and `_lockOrBurn` for easy pool implementations
-  - Merged `Locked` and `Burned` event into `LockedOrBurned`, merged `Released` and `Minted` into `ReleasedOrMinted`
-  - Removed `ILiquidityContainer`
+- [#950](https://github.com/smartcontractkit/chainlink-ccip/pull/950) [`6d82d44`](https://github.com/smartcontractkit/chainlink-ccip/commit/6d82d44e86) - Series of TokenPool improvements:
+  - Remove `acceptLiquidity`from the LockRelease pool
+  - Add a virtual `_releaseOrMint` and `_lockOrBurn` for easy pool implementations
+  - Merge `Locked` and `Burned` event into `LockedOrBurned`, merge `Released` and `Minted` into `ReleasedOrMinted`
+  - Remove `ILiquidityContainer`
   - When calling transferLiquidity with uint256.max as amount, it will transfer the current amount in the pool
   - Setting 0x0 as rebalancer is now allowed in siloed pools
-  - Removed the aggregate rate limiter logic in RateLimiter
+  - Remove the aggregate rate limiter logic in RateLimiter
   - Allow setting 0 as rate and/or capacity
-  - Added `OutboundRateLimitConsumed` and `InboundRateLimitConsumed` events
+  - Add `OutboundRateLimitConsumed` and `InboundRateLimitConsumed` events
   - Use OZ 5 for non-token related imports
-  - add `RebalancerSet` event to the LockRelease pool
+  - Add `RebalancerSet` event to the LockRelease pool
 
 ## 1.6.0
 
