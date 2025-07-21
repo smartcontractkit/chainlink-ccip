@@ -1028,7 +1028,7 @@ func (r *ccipChainReader) fetchFreshSourceChainConfigs(
 	)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to get source chain configs: %w", err)
+		return nil, fmt.Errorf("failed to get source chain configs from EBGLV: %w", err)
 	}
 
 	if len(results) != 1 {
@@ -1037,7 +1037,6 @@ func (r *ccipChainReader) fetchFreshSourceChainConfigs(
 
 	// Process results
 	configs := make(map[cciptypes.ChainSelector]cciptypes.SourceChainConfig)
-
 	for _, readResult := range results {
 		if len(readResult) != len(validSourceChains) {
 			return nil, fmt.Errorf("selectors and source chain configs length mismatch: sourceChains=%v, results=%v",
@@ -1045,6 +1044,7 @@ func (r *ccipChainReader) fetchFreshSourceChainConfigs(
 		}
 
 		for i, chain := range validSourceChains {
+			r.lggr.Info("GETSOURCECHAINCONFIG RESULT THAT PLUGIN RECIEVED: ", readResult[i])
 			v, err := readResult[i].GetResult()
 			if err != nil {
 				lggr.Errorw("Failed to get source chain config",
@@ -1053,6 +1053,7 @@ func (r *ccipChainReader) fetchFreshSourceChainConfigs(
 				return nil, fmt.Errorf("GetSourceChainConfig for chainSelector=%d failed: %w", chain, err)
 			}
 
+			r.lggr.Info("SOURCE CHAIN CONFIG RESULT: ", v)
 			cfg, ok := v.(*cciptypes.SourceChainConfig)
 			if !ok {
 				lggr.Errorw("Invalid result type from GetSourceChainConfig",
@@ -1062,6 +1063,7 @@ func (r *ccipChainReader) fetchFreshSourceChainConfigs(
 					"invalid result type (%T) from GetSourceChainConfig for chainSelector=%d, expected *SourceChainConfig", v, chain)
 			}
 
+			r.lggr.Info("SOURCECHAINCONFIG CONFIG RECEIVED: ", cfg.OnRamp, cfg.IsEnabled, cfg.IsRMNVerificationDisabled, cfg.MinSeqNr)
 			configs[chain] = *cfg
 		}
 	}
