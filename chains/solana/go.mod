@@ -2,15 +2,15 @@ module github.com/smartcontractkit/chainlink-ccip/chains/solana
 
 go 1.24.2
 
-replace github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings => ./gobindings
-
 require (
+	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.3.0
 	github.com/gagliardetto/binary v0.8.0
+	github.com/gagliardetto/gofuzz v1.2.2
 	github.com/gagliardetto/solana-go v1.13.0
+	github.com/gagliardetto/treeout v0.1.4
 	github.com/pelletier/go-toml/v2 v2.2.3
 	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250320090719-315440f5b0a7
-	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/chainlink-common v0.4.2-0.20250121163309-3e179a73cb92
 	github.com/stretchr/testify v1.10.0
 	github.com/test-go/testify v1.1.4
@@ -20,8 +20,6 @@ require (
 )
 
 require (
-	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
-	github.com/gagliardetto/treeout v0.1.4 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	golang.org/x/net v0.37.0 // indirect
 )
