@@ -134,10 +134,8 @@ contract ERC20LockBox is Ownable2StepMsgSender {
         revert TokenAddressCannotBeZero();
       }
 
-      // Only the owner of the token pool can configure allowed callers
-      address tokenPool = i_tokenAdminRegistry.getPool(token);
-      address poolOwner = Ownable2StepMsgSender(tokenPool).owner();
-      if (msg.sender != poolOwner) {
+      // Only the administrator of the token can configure allowed callers
+      if (!i_tokenAdminRegistry.isAdministrator(token, msg.sender)) {
         revert Unauthorized(msg.sender);
       }
 

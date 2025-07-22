@@ -16,6 +16,13 @@ contract USDCBridgeMigratorSetup is USDCSetup {
 
     s_lockBox = address(new ERC20LockBox(address(s_tokenAdminRegistry)));
 
+    // Mock the isAdministrator function to return true so that the owner can configure allowed callers for the lock box.
+    vm.mockCall(
+      address(s_tokenAdminRegistry),
+      abi.encodeWithSignature("isAdministrator(address,address)", address(s_USDCToken), OWNER),
+      abi.encode(true)
+    );
+
     s_usdcTokenPool = new HybridLockReleaseUSDCTokenPool(
       s_mockLegacyUSDC,
       s_mockUSDC,
