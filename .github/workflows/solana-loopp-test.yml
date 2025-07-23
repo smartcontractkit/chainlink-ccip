@@ -185,6 +185,17 @@ jobs:
           CL_DATABASE_URL: ${{ env.DB_URL }}
           CL_SOLANA_CMD: chainlink-solana
 
+      # Upload logs (always run, even if tests fail) so they can be downloaded from the Actions UI
+      - name: Upload CCIP logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ccip-logs-${{ matrix.type.name }}
+          path: |
+            # CCIP integration-test logs
+            ${{ github.workspace }}/chainlink/integration-tests/smoke/ccip/logs/**/*.log
+          retention-days: 14
+
   integration-test-ccip-ocr3-loopp:
     if: always()
     runs-on: ubuntu-latest
