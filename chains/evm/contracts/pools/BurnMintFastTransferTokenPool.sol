@@ -14,7 +14,7 @@ import {SafeERC20} from
 contract BurnMintFastTransferTokenPool is FastTransferTokenPoolAbstract {
   using SafeERC20 for IERC20;
 
-  string public constant override typeAndVersion = "BurnMintFastTransferTokenPool 1.6.1-dev";
+  string public constant override typeAndVersion = "BurnMintFastTransferTokenPool 1.6.1";
 
   constructor(
     IBurnMintERC20 token,

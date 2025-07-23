@@ -52,7 +52,7 @@ pub mod router_accounts {
     use super::*;
 
     #[account]
-    #[derive(InitSpace)]
+    #[derive(InitSpace, PartialEq, Debug)]
     pub struct TokenAdminRegistry {
         pub version: u8,
         pub administrator: Pubkey,
@@ -62,5 +62,9 @@ pub mod router_accounts {
         // lookup table can store 256 addresses
         pub writable_indexes: [u128; 2],
         pub mint: Pubkey,
+        // if true, the pool supports calling `derive_accounts_lock_or_burn` and
+        // `derive_accounts_release_or_mint` to derive the list of accounts and LUTs
+        // needed to interact with it.
+        pub supports_auto_derivation: bool,
     }
 }

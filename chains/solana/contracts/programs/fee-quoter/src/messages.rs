@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 use crate::{extra_args::GenericExtraArgsV2, DestChainConfig};
 
-#[derive(Clone, AnchorSerialize, AnchorDeserialize)]
+#[derive(Clone, Debug, AnchorSerialize, AnchorDeserialize)]
 pub struct SVM2AnyMessage {
     pub receiver: Vec<u8>,
     pub data: Vec<u8>,

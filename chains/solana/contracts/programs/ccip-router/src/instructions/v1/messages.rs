@@ -11,6 +11,8 @@ pub mod pools {
         pub original_sender: Pubkey, // The original sender of the tx on the source chain
         pub amount: u64, // solana-specific amount uses u64 - the amount of tokens to lock or burn, denominated in the source token's decimals
         pub local_token: Pubkey, //  The address on this chain of the mint account to lock or burn
+
+        pub msg_total_nonce: u64, // The onramp nonce for the current message, given the original_sender & remote_chain_selector
     }
 
     impl ToTxData for LockOrBurnInV1 {

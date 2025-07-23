@@ -30,10 +30,11 @@ import (
 
 	rmnpb "github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 var (
