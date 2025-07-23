@@ -42,8 +42,8 @@ jobs:
       fail-fast: false
       matrix:
         type:
-          - cmd: cd integration-tests/smoke/ccip && go test -run "^Test_CCIPMessaging_EVM2Solana$" ccip_messaging_test.go -timeout 12m -test.parallel=2 -count=1 -json
-            name: "LOOPP Messaging Test Test_CCIPMessaging_EVM2Solana"
+          - cmd: cd integration-tests/smoke/ccip && go test -run "^Test_CCIPMessaging_EVM2EVM$" ccip_messaging_test.go -timeout 12m -test.parallel=2 -count=1 -json
+            name: "LOOPP Messaging Test Test_CCIPMessaging_EVM2EVM"
     
     name: Integration Tests (${{ matrix.type.name }})
     runs-on: ubuntu-latest
@@ -183,7 +183,7 @@ jobs:
         run: cd $GITHUB_WORKSPACE/chainlink/ && ${{ matrix.type.cmd }}
         env:
           CL_DATABASE_URL: ${{ env.DB_URL }}
-          CL_SOLANA_CMD: chainlink-solana
+          CL_EVM_CMD: chainlink-evm
 
       # Upload logs (always run, even if tests fail) so they can be downloaded from the Actions UI
       - name: Upload CCIP logs
@@ -194,7 +194,7 @@ jobs:
           path: |
             # CCIP integration-test logs
             ${{ github.workspace }}/chainlink/integration-tests/smoke/ccip/logs/**/*.log
-          retention-days: 14
+          retention-days: 7
 
   integration-test-ccip-ocr3-loopp:
     if: always()
