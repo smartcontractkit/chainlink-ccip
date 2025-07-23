@@ -142,7 +142,8 @@ func bindReaderContract[T contractreader.ContractReaderFacade](
 	codec cciptypes.AddressCodec,
 ) (types.BoundContract, error) {
 	if err := validateReaderExistence(readers, chainSel); err != nil {
-		return types.BoundContract{}, fmt.Errorf("validate reader existence: %w", err)
+		lggr.Warnf("chain reader doesn't exist for chain %d: %w", chainSel, err)
+		return types.BoundContract{}, nil
 	}
 
 	addressStr, err := codec.AddressBytesToString(address, chainSel)
@@ -219,6 +220,9 @@ func (u evmUSDCMessageReader) MessagesByTokenID(
 ) (map[MessageTokenID]cciptypes.Bytes, error) {
 	if len(tokens) == 0 {
 		return map[MessageTokenID]cciptypes.Bytes{}, nil
+	}
+	if u.contractReader == nil {
+		return nil, fmt.Errorf("no reader for chain %d", source)
 	}
 
 	// 1. Extract 3rd word from the MessageSent(bytes) - it's going to be our identifier
