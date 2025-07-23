@@ -455,7 +455,7 @@ func TestTokenPool(t *testing.T) {
 						})
 
 						t.Run("Rate Limit Admin", func(t *testing.T) {
-							// set invalid rate limit admin
+							// set invalid a new rate limit admin
 							ixRateAdmin, err := test_token_pool.NewSetRateLimitAdminInstruction(
 								p.Mint,
 								user.PublicKey(),
@@ -466,20 +466,22 @@ func TestTokenPool(t *testing.T) {
 
 							testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ixRateAdmin}, anotherAdmin, config.DefaultCommitment)
 
-							ixRatesValid, err := test_token_pool.NewSetChainRateLimitInstruction(config.EvmChainSelector, p.Mint, test_token_pool.RateLimitConfig{
-								Enabled:  true,
-								Capacity: amount,
-								Rate:     1, // slow refill
-							}, test_token_pool.RateLimitConfig{
-								Enabled:  false,
-								Capacity: 0,
-								Rate:     0,
-							}, poolConfig, p.Chain[config.EvmChainSelector], user.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+							// test new rate limit admin
+							ixRatesValid, err := test_token_pool.NewSetChainRateLimitInstruction(config.EvmChainSelector, p.Mint,
+								test_token_pool.RateLimitConfig{
+									Enabled:  true,
+									Capacity: amount,
+									Rate:     1,
+								}, test_token_pool.RateLimitConfig{
+									Enabled:  false,
+									Capacity: 0,
+									Rate:     0,
+								}, poolConfig, p.Chain[config.EvmChainSelector], user.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 							require.NoError(t, err)
 
 							testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ixRatesValid}, user, config.DefaultCommitment)
 
-							// set invalid rate limit admin
+							// undo rate limit admin
 							ixRateAdmin2, err := test_token_pool.NewSetRateLimitAdminInstruction(
 								p.Mint,
 								anotherAdmin.PublicKey(),
@@ -490,15 +492,17 @@ func TestTokenPool(t *testing.T) {
 
 							testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ixRateAdmin2}, anotherAdmin, config.DefaultCommitment)
 
-							ixRates, err := test_token_pool.NewSetChainRateLimitInstruction(config.EvmChainSelector, p.Mint, test_token_pool.RateLimitConfig{
-								Enabled:  true,
-								Capacity: amount,
-								Rate:     1, // slow refill
-							}, test_token_pool.RateLimitConfig{
-								Enabled:  false,
-								Capacity: 0,
-								Rate:     0,
-							}, poolConfig, p.Chain[config.EvmChainSelector], user.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+							// try to modify rate limit with invalid admin
+							ixRates, err := test_token_pool.NewSetChainRateLimitInstruction(config.EvmChainSelector, p.Mint,
+								test_token_pool.RateLimitConfig{
+									Enabled:  true,
+									Capacity: amount,
+									Rate:     1,
+								}, test_token_pool.RateLimitConfig{
+									Enabled:  false,
+									Capacity: 0,
+									Rate:     0,
+								}, poolConfig, p.Chain[config.EvmChainSelector], user.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 							require.NoError(t, err)
 
 							testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ixRates}, user, config.DefaultCommitment, []string{"Unauthorized."})
