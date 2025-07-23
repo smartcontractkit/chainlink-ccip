@@ -13,7 +13,7 @@ contract ERC20LockBox_configureAllowedCallers is ERC20LockBoxSetup {
     configArgs[0] = ERC20LockBox.AllowedCallerConfigArgs({token: token, caller: newCaller, allowed: true});
 
     vm.expectEmit();
-    emit ERC20LockBox.AllowedCallerAdded(newCaller);
+    emit ERC20LockBox.AllowedCallerAdded(token, newCaller);
 
     s_erc20LockBox.configureAllowedCallers(configArgs);
 
@@ -32,11 +32,11 @@ contract ERC20LockBox_configureAllowedCallers is ERC20LockBoxSetup {
     configArgs[2] = ERC20LockBox.AllowedCallerConfigArgs({token: token, caller: caller3, allowed: true});
 
     vm.expectEmit();
-    emit ERC20LockBox.AllowedCallerAdded(caller1);
+    emit ERC20LockBox.AllowedCallerAdded(token, caller1);
     vm.expectEmit();
-    emit ERC20LockBox.AllowedCallerAdded(caller2);
+    emit ERC20LockBox.AllowedCallerAdded(token, caller2);
     vm.expectEmit();
-    emit ERC20LockBox.AllowedCallerAdded(caller3);
+    emit ERC20LockBox.AllowedCallerAdded(token, caller3);
 
     s_erc20LockBox.configureAllowedCallers(configArgs);
 
@@ -61,7 +61,7 @@ contract ERC20LockBox_configureAllowedCallers is ERC20LockBoxSetup {
     removeConfig[0] = ERC20LockBox.AllowedCallerConfigArgs({token: token, caller: callerToRemove, allowed: false});
 
     vm.expectEmit();
-    emit ERC20LockBox.AllowedCallerRemoved(callerToRemove);
+    emit ERC20LockBox.AllowedCallerRemoved(token, callerToRemove);
 
     s_erc20LockBox.configureAllowedCallers(removeConfig);
 
@@ -78,9 +78,9 @@ contract ERC20LockBox_configureAllowedCallers is ERC20LockBoxSetup {
     configArgs[1] = ERC20LockBox.AllowedCallerConfigArgs({token: token, caller: callerToRemove, allowed: false});
 
     vm.expectEmit();
-    emit ERC20LockBox.AllowedCallerAdded(callerToAdd);
+    emit ERC20LockBox.AllowedCallerAdded(token, callerToAdd);
     vm.expectEmit();
-    emit ERC20LockBox.AllowedCallerRemoved(callerToRemove);
+    emit ERC20LockBox.AllowedCallerRemoved(token, callerToRemove);
 
     s_erc20LockBox.configureAllowedCallers(configArgs);
 
@@ -132,11 +132,11 @@ contract ERC20LockBox_configureAllowedCallers is ERC20LockBoxSetup {
     removeConfig[2] = ERC20LockBox.AllowedCallerConfigArgs({token: token, caller: caller2, allowed: false});
 
     vm.expectEmit();
-    emit ERC20LockBox.AllowedCallerRemoved(s_allowedCaller);
+    emit ERC20LockBox.AllowedCallerRemoved(token, s_allowedCaller);
     vm.expectEmit();
-    emit ERC20LockBox.AllowedCallerRemoved(caller1);
+    emit ERC20LockBox.AllowedCallerRemoved(token, caller1);
     vm.expectEmit();
-    emit ERC20LockBox.AllowedCallerRemoved(caller2);
+    emit ERC20LockBox.AllowedCallerRemoved(token, caller2);
 
     s_erc20LockBox.configureAllowedCallers(removeConfig);
 
@@ -167,7 +167,7 @@ contract ERC20LockBox_configureAllowedCallers is ERC20LockBoxSetup {
     reAddConfig[0] = ERC20LockBox.AllowedCallerConfigArgs({token: token, caller: caller, allowed: true});
 
     vm.expectEmit();
-    emit ERC20LockBox.AllowedCallerAdded(caller);
+    emit ERC20LockBox.AllowedCallerAdded(token, caller);
 
     s_erc20LockBox.configureAllowedCallers(reAddConfig);
     assertTrue(s_erc20LockBox.isAllowedCaller(token, caller));

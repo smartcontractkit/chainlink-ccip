@@ -24,8 +24,8 @@ contract ERC20LockBox is Ownable2StepMsgSender {
   error TokenAddressCannotBeZero();
   error TokenAdminRegistryCannotBeZeroAddress();
 
-  event AllowedCallerAdded(address indexed caller);
-  event AllowedCallerRemoved(address indexed caller);
+  event AllowedCallerAdded(address indexed token, address indexed caller);
+  event AllowedCallerRemoved(address indexed token, address indexed caller);
   event Deposit(uint64 indexed remoteChainSelector, address indexed depositor, uint256 amount);
   event Withdrawal(uint64 indexed remoteChainSelector, address indexed recipient, uint256 amount);
 
@@ -37,9 +37,8 @@ contract ERC20LockBox is Ownable2StepMsgSender {
 
   TokenAdminRegistry public immutable i_tokenAdminRegistry;
 
-  mapping(address => mapping(address => bool)) public s_allowedCallers;
-
-  mapping(address => mapping(uint64 => uint256)) public s_tokenBalances;
+  mapping(address => mapping(address => bool)) internal s_allowedCallers;
+  mapping(address => mapping(uint64 => uint256)) internal s_tokenBalances;
 
   constructor(
     address tokenAdminRegistry
@@ -55,20 +54,7 @@ contract ERC20LockBox is Ownable2StepMsgSender {
   /// @param amount The amount of tokens to deposit
   /// @param remoteChainSelector The chain selector for which to deposit tokens
   function deposit(address token, uint256 amount, uint64 remoteChainSelector) external {
-    // Validate the token address. It must be checked before the caller is authorized otherwise the allowed caller check
-    // will revert.
-    if (token == address(0)) {
-      revert TokenAddressCannotBeZero();
-    }
-
-    // Note: The caller may be a token pool or a liquidity provider.
-    if (!isAllowedCaller(token, msg.sender)) {
-      revert Unauthorized(msg.sender);
-    }
-
-    if (amount == 0) {
-      revert TokenAmountCannotBeZero();
-    }
+    _validateDepositWithdraw(token, amount);
 
     // Transfer tokens from the caller to this contract
     IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
@@ -85,28 +71,15 @@ contract ERC20LockBox is Ownable2StepMsgSender {
   /// @param recipient The address that will receive the withdrawn tokens
   /// @param remoteChainSelector The chain selector for which to withdraw tokens
   function withdraw(address token, uint256 amount, address recipient, uint64 remoteChainSelector) external {
-    // Validate the token address. It must be checked before the caller is authorized otherwise the allowed caller check
-    // will revert.
-    if (token == address(0)) {
-      revert TokenAddressCannotBeZero();
-    }
-
-    // Check if the caller is authorized
-    if (!isAllowedCaller(token, msg.sender)) {
-      revert Unauthorized(msg.sender);
-    }
+    _validateDepositWithdraw(token, amount);
 
     if (recipient == address(0)) {
       revert RecipientCannotBeZeroAddress();
     }
 
-    if (amount == 0) {
-      revert TokenAmountCannotBeZero();
-    }
-
-    // Check if sufficient balance exists for the chain selector
-    if (s_tokenBalances[token][remoteChainSelector] < amount) {
-      revert InsufficientBalance(remoteChainSelector, amount, s_tokenBalances[token][remoteChainSelector]);
+    uint256 balance = s_tokenBalances[token][remoteChainSelector];
+    if (balance < amount) {
+      revert InsufficientBalance(remoteChainSelector, amount, balance);
     }
 
     // Decrease the balance for the specified chain selector
@@ -134,7 +107,7 @@ contract ERC20LockBox is Ownable2StepMsgSender {
         revert TokenAddressCannotBeZero();
       }
 
-      // Only the administrator of the token can configure allowed callers
+      // Only the CCIP administrator of the token can configure allowed callers
       if (!i_tokenAdminRegistry.isAdministrator(token, msg.sender)) {
         revert Unauthorized(msg.sender);
       }
@@ -146,15 +119,34 @@ contract ERC20LockBox is Ownable2StepMsgSender {
         // Add the caller to the allowed set
         if (!s_allowedCallers[token][caller]) {
           s_allowedCallers[token][caller] = true;
-          emit AllowedCallerAdded(caller);
+          emit AllowedCallerAdded(token, caller);
         }
       } else {
         // Remove the caller from the allowed set
         if (s_allowedCallers[token][caller]) {
           delete s_allowedCallers[token][caller];
-          emit AllowedCallerRemoved(caller);
+          emit AllowedCallerRemoved(token, caller);
         }
       }
+    }
+  }
+
+  /// @notice Validates the deposit and withdraw functions
+  /// @param token The address of the ERC20 token
+  /// @param amount The amount of tokens to deposit or withdraw
+  function _validateDepositWithdraw(address token, uint256 amount) internal view {
+    // Validate the token address
+    if (token == address(0)) {
+      revert TokenAddressCannotBeZero();
+    }
+
+    // Check if the caller is authorized
+    if (!isAllowedCaller(token, msg.sender)) {
+      revert Unauthorized(msg.sender);
+    }
+
+    if (amount == 0) {
+      revert TokenAmountCannotBeZero();
     }
   }
 
@@ -163,7 +155,10 @@ contract ERC20LockBox is Ownable2StepMsgSender {
   /// @param caller The address to check
   /// @return allowed True if the address is allowed, false otherwise
   function isAllowedCaller(address token, address caller) public view returns (bool allowed) {
-    return (msg.sender == i_tokenAdminRegistry.getPool(token) || s_allowedCallers[token][caller]);
+    TokenAdminRegistry.TokenConfig memory tokenConfig = i_tokenAdminRegistry.getTokenConfig(token);
+
+    // The caller is allowed if they are the token pool, the administrator, or a specially allowed caller
+    return (caller == tokenConfig.tokenPool || caller == tokenConfig.administrator || s_allowedCallers[token][caller]);
   }
 
   /// @notice Get the balance for a specific token and remote chain selector
