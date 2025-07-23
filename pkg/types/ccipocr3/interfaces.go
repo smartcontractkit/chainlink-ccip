@@ -1,53 +1,26 @@
 package ccipocr3
 
 import (
-	"context"
+	ccipocr3common "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
-// TODO: Consolidate CommitPluginCodec, ExecutePluginCodec, MessageHasher, ExtraDataCodec into a single Codec interface.
+// Deprecated: Use ccipocr3common.UnknownAddress instead.
+type CommitPluginCodec = ccipocr3common.CommitPluginCodec
 
-type CommitPluginCodec interface {
-	Encode(context.Context, CommitPluginReport) ([]byte, error)
-	Decode(context.Context, []byte) (CommitPluginReport, error)
-}
+// Deprecated: Use ccipocr3common.ExecutePluginCodec instead.
+type ExecutePluginCodec = ccipocr3common.ExecutePluginCodec
 
-type ExecutePluginCodec interface {
-	Encode(context.Context, ExecutePluginReport) ([]byte, error)
-	Decode(context.Context, []byte) (ExecutePluginReport, error)
-}
+// Deprecated: Use ccipocr3common.MessageHasher instead.
+type MessageHasher = ccipocr3common.MessageHasher
 
-type MessageHasher interface {
-	Hash(context.Context, Message) (Bytes32, error)
-}
+// Deprecated: Use ccipocr3common.AddressCodec instead.
+type AddressCodec = ccipocr3common.AddressCodec
 
-type AddressCodec interface {
-	AddressBytesToString(UnknownAddress, ChainSelector) (string, error)
-	AddressStringToBytes(string, ChainSelector) (UnknownAddress, error)
-}
+// Deprecated: Use ccipocr3common.RMNCrypto instead.
+type RMNCrypto = ccipocr3common.RMNCrypto
 
-// RMNCrypto provides a chain-agnostic interface for verifying RMN signatures.
-// For example, on EVM, RMN reports are abi-encoded prior to being signed.
-// On Solana, they would be borsh encoded instead, etc.
-type RMNCrypto interface {
-	// VerifyReportSignatures verifies each provided signature against the provided report and the signer addresses.
-	// If any signature is invalid (no matching signer address is found), an error is returned immediately.
-	VerifyReportSignatures(
-		ctx context.Context,
-		sigs []RMNECDSASignature,
-		report RMNReport,
-		signerAddresses []UnknownAddress,
-	) error
-}
+// Deprecated: Use ccipocr3common.TokenDataEncoder instead.
+type TokenDataEncoder = ccipocr3common.TokenDataEncoder
 
-// TokenDataEncoder is a generic interface for encoding offchain token data for different chain families.
-// Right now it supports only USDC/CCTP, but every new token that requires offchain data processsing
-// should be added to that interface and implemented in the downstream repositories (e.g. chainlink-ccip, chainlink).
-type TokenDataEncoder interface {
-	EncodeUSDC(ctx context.Context, message Bytes, attestation Bytes) (Bytes, error)
-}
-
-// EstimateProvider is used to estimate the gas cost of a message or a merkle tree.
-type EstimateProvider interface {
-	CalculateMerkleTreeGas(numRequests int) uint64
-	CalculateMessageMaxGas(msg Message) uint64
-}
+// Deprecated: Use ccipocr3common.EstimateProvider instead.
+type EstimateProvider = ccipocr3common.EstimateProvider

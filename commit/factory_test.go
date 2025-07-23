@@ -13,12 +13,14 @@ import (
 
 	rmnpb "github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
-	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
+
 	"github.com/smartcontractkit/chainlink-ccip/internal"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
 	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
@@ -29,10 +31,9 @@ import (
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	reader2 "github.com/smartcontractkit/chainlink-ccip/internal/reader"
-	writer_mocks "github.com/smartcontractkit/chainlink-ccip/mocks/chainlink_common"
+	writer_mocks "github.com/smartcontractkit/chainlink-ccip/mocks/chainlink_common/types"
 	ocrtypecodec "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -297,7 +298,7 @@ func Test_maxReportLength(t *testing.T) {
 
 func TestPluginFactory_NewReportingPlugin(t *testing.T) {
 	t.Run("basic checks for the happy flow", func(t *testing.T) {
-		ctx := tests.Context(t)
+		ctx := t.Context()
 		lggr := mocks.NullLogger
 
 		offChainConfig := pluginconfig.CommitOffchainConfig{

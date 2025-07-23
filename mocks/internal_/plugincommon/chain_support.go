@@ -3,7 +3,7 @@
 package plugincommon
 
 import (
-	ccipocr3 "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	ccipocr3 "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	commontypes "github.com/smartcontractkit/libocr/commontypes"
 
 	mapset "github.com/deckarep/golang-set/v2"

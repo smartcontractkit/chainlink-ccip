@@ -3,7 +3,7 @@ package exectypes
 import (
 	"time"
 
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 // CommitData is the data that is committed to the chain.

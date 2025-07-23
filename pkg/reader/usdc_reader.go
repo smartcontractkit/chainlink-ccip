@@ -13,9 +13,10 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -90,6 +91,11 @@ func NewUSDCMessageReader(
 		}
 		switch family {
 		case sel.FamilyEVM:
+			contractReader, ok := contractReaders[chainSelector]
+			if !ok {
+				lggr.Errorf("chain reader is missing for chain %d, skipping", chainSelector)
+				continue
+			}
 			bytesAddress, err := addrCodec.AddressStringToBytes(token.SourceMessageTransmitterAddr, chainSelector)
 			if err != nil {
 				return nil, err
@@ -110,7 +116,7 @@ func NewUSDCMessageReader(
 			}
 			readers[chainSelector] = evmUSDCMessageReader{
 				lggr:           lggr,
-				contractReader: contractReaders[chainSelector],
+				contractReader: contractReader,
 				cctpDestDomain: domains,
 				boundContract:  contract, // TODO: this is not needed if we switch to the Extended contract reader.
 			}
@@ -219,7 +225,6 @@ func (u evmUSDCMessageReader) MessagesByTokenID(
 	if len(tokens) == 0 {
 		return map[MessageTokenID]cciptypes.Bytes{}, nil
 	}
-
 	// 1. Extract 3rd word from the MessageSent(bytes) - it's going to be our identifier
 	eventIDsByMsgTokenID, err := u.recreateMessageTransmitterEvents(dest, tokens)
 	if err != nil {

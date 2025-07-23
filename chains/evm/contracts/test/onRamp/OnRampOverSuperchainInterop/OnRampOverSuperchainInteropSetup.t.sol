@@ -4,17 +4,18 @@ pragma solidity ^0.8.24;
 import {Router} from "../../../Router.sol";
 import {Client} from "../../../libraries/Client.sol";
 import {Internal} from "../../../libraries/Internal.sol";
-import {OnRampOverSuperchainInterop} from "../../../onRamp/OnRampOverSuperchainInterop.sol";
+
+import {OnRampOverSuperchainInteropHelper} from "../../helpers/OnRampOverSuperchainInteropHelper.sol";
 import {OnRampSetup} from "../OnRamp/OnRampSetup.t.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
 contract OnRampOverSuperchainInteropSetup is OnRampSetup {
-  OnRampOverSuperchainInterop internal s_onRampOverSuperchainInterop;
+  OnRampOverSuperchainInteropHelper internal s_onRampOverSuperchainInterop;
 
   function setUp() public virtual override {
     super.setUp();
 
-    s_onRampOverSuperchainInterop = new OnRampOverSuperchainInterop(
+    s_onRampOverSuperchainInterop = new OnRampOverSuperchainInteropHelper(
       s_onRamp.getStaticConfig(), s_onRamp.getDynamicConfig(), _generateDestChainConfigArgs(s_sourceRouter)
     );
 
@@ -32,7 +33,7 @@ contract OnRampOverSuperchainInteropSetup is OnRampSetup {
 
     s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), new Router.OffRamp[](0));
 
-    assertEq("OnRampOverSuperchainInterop 1.6.1-dev", s_onRampOverSuperchainInterop.typeAndVersion());
+    assertEq("OnRampOverSuperchainInterop 1.6.2-dev", s_onRampOverSuperchainInterop.typeAndVersion());
   }
 
   function _EVM2AnyRampMessageToAny2EVMRampMessage(

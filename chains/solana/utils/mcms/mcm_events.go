@@ -3,7 +3,7 @@ package mcms
 import (
 	"github.com/gagliardetto/solana-go"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/mcm"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/mcm"
 )
 
 // Events - temporary event struct to decode

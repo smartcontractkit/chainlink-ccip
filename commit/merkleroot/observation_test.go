@@ -14,16 +14,17 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/maps"
 
-	"github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	types2 "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+
+	"github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/ragep2p/types"
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
@@ -37,7 +38,6 @@ import (
 	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -361,7 +361,7 @@ func Test_ObserveOffRampNextSeqNums(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			ctx := tests.Context(t)
+			ctx := t.Context()
 
 			chainSupport, ccipReader := tc.getDeps(t)
 			defer chainSupport.AssertExpectations(t)
@@ -757,7 +757,7 @@ func Test_computeMerkleRoot(t *testing.T) {
 }
 
 func Test_Processor_initializeRMNController(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	p := &Processor{
 		lggr:        logger.Test(t),
@@ -853,7 +853,7 @@ func Test_Processor_ObservationQuorum(t *testing.T) {
 		},
 	}
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			p := &Processor{

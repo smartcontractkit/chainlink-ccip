@@ -21,12 +21,13 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/pkg/addressbook"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/chainaccessor"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 // Default refresh period for cache if not specified
@@ -83,16 +84,19 @@ func newCCIPChainReaderWithConfigPollerInternal(
 
 	for chainSelector, cr := range contractReaders {
 		crs[chainSelector] = contractreader.NewExtendedContractReader(cr)
-		if contractWriters[chainSelector] == nil {
-			return nil, fmt.Errorf("contract writer for chain %s is not provided", chainSelector)
-		}
-		cas[chainSelector] = chainaccessor.NewDefaultAccessor(
+
+		// TODO: remove instantiation of the accessor once accessors are passed down from above
+		accessor, err := chainaccessor.NewDefaultAccessor(
 			lggr,
 			chainSelector,
 			crs[chainSelector],
 			contractWriters[chainSelector],
 			addrCodec,
 		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create chain accessor for chain %s: %w", chainSelector, err)
+		}
+		cas[chainSelector] = accessor
 	}
 
 	offrampAddrStr, err := addrCodec.AddressBytesToString(offrampAddress, destChain)
@@ -287,7 +291,7 @@ func (r *ccipChainReader) LatestMsgSeqNum(
 		return 0, fmt.Errorf("unable to getChainAccessor: %w", err)
 	}
 
-	seqNum, err := chainAccessor.LatestMsgSeqNum(ctx, r.destChain)
+	seqNum, err := chainAccessor.LatestMessageTo(ctx, r.destChain)
 	if err != nil {
 		return 0, fmt.Errorf("failed to call accessor LatestMsgSeqNum, source chain: %d, dest chain: %d: %w",
 			chain, r.destChain, err)
@@ -427,7 +431,10 @@ func (r *ccipChainReader) GetChainsFeeComponents(
 			continue
 		}
 
-		feeComponents[chain] = feeComponent
+		feeComponents[chain] = types.ChainFeeComponents{
+			ExecutionFee:        feeComponent.ExecutionFee,
+			DataAvailabilityFee: feeComponent.DataAvailabilityFee,
+		}
 	}
 	return feeComponents
 }

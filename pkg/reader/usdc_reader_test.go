@@ -16,12 +16,11 @@ import (
 	sel "github.com/smartcontractkit/chain-selectors"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	reader "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -53,7 +52,7 @@ func Test_USDCMessageReader_New(t *testing.T) {
 			errorMessage: "failed to get selector family for chain 1: unknown chain selector 1",
 		},
 		{
-			name: "missing readers",
+			name: "missing readers doesn't fail",
 			tokensConfig: map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig{
 				cciptypes.ChainSelector(sel.ETHEREUM_TESTNET_SEPOLIA.Selector): {
 					SourcePoolAddress:            address1,
@@ -61,8 +60,6 @@ func Test_USDCMessageReader_New(t *testing.T) {
 				},
 			},
 			readers: emptyReaders,
-			errorMessage: fmt.Sprintf("validate reader existence: chain %d: contract reader not found",
-				sel.ETHEREUM_TESTNET_SEPOLIA.Selector),
 		},
 		{
 			name: "binding errors",
@@ -110,7 +107,7 @@ func Test_USDCMessageReader_New(t *testing.T) {
 	mockAddrCodec := internal.NewMockAddressCodecHex(t)
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
-			ctx := tests.Context(t)
+			ctx := t.Context()
 			readers := make(map[cciptypes.ChainSelector]contractreader.Extended)
 			for k, v := range tc.readers() {
 				readers[k] = v
@@ -129,7 +126,7 @@ func Test_USDCMessageReader_New(t *testing.T) {
 }
 
 func Test_USDCMessageReader_MessagesByTokenID(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	emptyChain := cciptypes.ChainSelector(sel.ETHEREUM_MAINNET.Selector)
 	emptyReader := reader.NewMockExtended(t)
 	emptyReader.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
@@ -243,7 +240,7 @@ func Test_USDCMessageReader_MessagesByTokenID(t *testing.T) {
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
 			messages, err1 := usdcReader.MessagesByTokenID(
-				tests.Context(t),
+				t.Context(),
 				tc.sourceSelector,
 				tc.destSelector,
 				tokens,
