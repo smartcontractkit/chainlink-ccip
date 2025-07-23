@@ -93,7 +93,7 @@ func NewUSDCMessageReader(
 		case sel.FamilyEVM:
 			contractReader, ok := contractReaders[chainSelector]
 			if !ok {
-				lggr.Warnf("chain reader is missing for chain %d, skipping", chainSelector)
+				lggr.Errorf("chain reader is missing for chain %d, skipping", chainSelector)
 				continue
 			}
 			bytesAddress, err := addrCodec.AddressStringToBytes(token.SourceMessageTransmitterAddr, chainSelector)
