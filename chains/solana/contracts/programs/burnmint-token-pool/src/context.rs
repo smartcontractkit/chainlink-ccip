@@ -412,6 +412,18 @@ pub struct SetChainRateLimit<'info> {
 }
 
 #[derive(Accounts)]
+#[instruction(mint: Pubkey)]
+pub struct SetRateLimitAdmin<'info> {
+    #[account(
+        seeds = [POOL_STATE_SEED, mint.key().as_ref()],
+        bump,
+    )]
+    pub state: Account<'info, State>,
+    #[account(mut, constraint = authority.key() == state.config.owner)]
+    pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
 #[instruction(remote_chain_selector: u64, mint: Pubkey, cfg: RemoteConfig)]
 pub struct EditChainConfigDynamicSize<'info> {
     #[account(

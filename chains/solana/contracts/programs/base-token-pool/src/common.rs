@@ -187,6 +187,25 @@ impl BaseConfig {
         self.can_accept_liquidity = allow;
         Ok(())
     }
+
+    pub fn set_rate_limit_admin(&mut self, new_rate_limit_admin: Pubkey) -> Result<()> {
+        require_keys_neq!(
+            new_rate_limit_admin,
+            Pubkey::default(),
+            CcipTokenPoolError::InvalidInputs
+        );
+
+        let old_rate_limit_admin = self.rate_limit_admin;
+        self.rate_limit_admin = new_rate_limit_admin;
+
+        emit!(RateLimitAdminSet {
+            mint: self.mint,
+            old_rate_limit_admin,
+            new_rate_limit_admin,
+        });
+
+        Ok(())
+    }
 }
 
 #[derive(InitSpace, AnchorSerialize, AnchorDeserialize, Clone)]
@@ -526,6 +545,13 @@ pub struct RmnRemoteUpdated {
     pub old_rmn_remote: Pubkey,
     pub new_rmn_remote: Pubkey,
     pub mint: Pubkey,
+}
+
+#[event]
+pub struct RateLimitAdminSet {
+    pub mint: Pubkey,
+    pub old_rate_limit_admin: Pubkey,
+    pub new_rate_limit_admin: Pubkey,
 }
 
 #[event]
