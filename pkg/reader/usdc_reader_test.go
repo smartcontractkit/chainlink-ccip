@@ -52,7 +52,7 @@ func Test_USDCMessageReader_New(t *testing.T) {
 			errorMessage: "failed to get selector family for chain 1: unknown chain selector 1",
 		},
 		{
-			name: "missing readers",
+			name: "missing readers doesn't fail",
 			tokensConfig: map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig{
 				cciptypes.ChainSelector(sel.ETHEREUM_TESTNET_SEPOLIA.Selector): {
 					SourcePoolAddress:            address1,
@@ -60,8 +60,6 @@ func Test_USDCMessageReader_New(t *testing.T) {
 				},
 			},
 			readers: emptyReaders,
-			errorMessage: fmt.Sprintf("validate reader existence: chain %d: contract reader not found",
-				sel.ETHEREUM_TESTNET_SEPOLIA.Selector),
 		},
 		{
 			name: "binding errors",
