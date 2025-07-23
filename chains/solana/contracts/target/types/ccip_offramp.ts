@@ -2132,7 +2132,7 @@ export type CcipOfframp = {
       }
     },
     {
-      "name": "DeriveExecuteAccountsStage",
+      "name": "DeriveAccountsExecuteStage",
       "type": {
         "kind": "enum",
         "variants": [
@@ -4982,7 +4982,7 @@ export const IDL: CcipOfframp = {
       }
     },
     {
-      "name": "DeriveExecuteAccountsStage",
+      "name": "DeriveAccountsExecuteStage",
       "type": {
         "kind": "enum",
         "variants": [
