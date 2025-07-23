@@ -91,6 +91,11 @@ func NewUSDCMessageReader(
 		}
 		switch family {
 		case sel.FamilyEVM:
+			contractReader, ok := contractReaders[chainSelector]
+			if !ok {
+				lggr.Warnf("chain reader is missing for chain %d, skipping", chainSelector)
+				continue
+			}
 			bytesAddress, err := addrCodec.AddressStringToBytes(token.SourceMessageTransmitterAddr, chainSelector)
 			if err != nil {
 				return nil, err
@@ -111,7 +116,7 @@ func NewUSDCMessageReader(
 			}
 			readers[chainSelector] = evmUSDCMessageReader{
 				lggr:           lggr,
-				contractReader: contractReaders[chainSelector],
+				contractReader: contractReader,
 				cctpDestDomain: domains,
 				boundContract:  contract, // TODO: this is not needed if we switch to the Extended contract reader.
 			}
@@ -142,8 +147,7 @@ func bindReaderContract[T contractreader.ContractReaderFacade](
 	codec cciptypes.AddressCodec,
 ) (types.BoundContract, error) {
 	if err := validateReaderExistence(readers, chainSel); err != nil {
-		lggr.Warnf("chain reader doesn't exist for chain %d: %w", chainSel, err)
-		return types.BoundContract{}, nil
+		return types.BoundContract{}, fmt.Errorf("validate reader existence: %w", err)
 	}
 
 	addressStr, err := codec.AddressBytesToString(address, chainSel)
@@ -221,10 +225,6 @@ func (u evmUSDCMessageReader) MessagesByTokenID(
 	if len(tokens) == 0 {
 		return map[MessageTokenID]cciptypes.Bytes{}, nil
 	}
-	if u.contractReader == nil {
-		return nil, fmt.Errorf("no reader for chain %d", source)
-	}
-
 	// 1. Extract 3rd word from the MessageSent(bytes) - it's going to be our identifier
 	eventIDsByMsgTokenID, err := u.recreateMessageTransmitterEvents(dest, tokens)
 	if err != nil {
