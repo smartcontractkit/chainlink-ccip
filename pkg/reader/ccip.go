@@ -1025,6 +1025,8 @@ func (r *ccipChainReader) fetchFreshSourceChainConfigs(
 		})
 	}
 
+	r.lggr.Info("MAKE GET SOURCE CHAIN CONFIG CALL")
+
 	// Execute batch request
 	results, _, err := reader.ExtendedBatchGetLatestValues(
 		ctx,
