@@ -239,7 +239,6 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPoolCCTPV2, USDCBridgeMigrat
 
     // Deposit the provided liquidity into the lockbox for the specified remote chain
     i_token.safeTransferFrom(msg.sender, address(this), amount);
-    // TODO: Replace with actual Lockbox and not use shitty casting
     ERC20LockBox(i_lockBox).deposit(address(i_token), amount, remoteChainSelector);
 
     emit LiquidityAdded(msg.sender, amount);
