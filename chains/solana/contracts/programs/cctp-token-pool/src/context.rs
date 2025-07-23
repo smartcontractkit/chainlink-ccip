@@ -789,7 +789,6 @@ pub struct ReclaimEventAccount<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(amount: u64)]
 pub struct ReclaimFunds<'info> {
     #[account(
         seeds = [
