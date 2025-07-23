@@ -12,7 +12,8 @@ jobs:
     name: Detect changes
     runs-on: ubuntu-latest
     outputs:
-      e2e_should_run: ${{ steps.changes-loopp.outputs.e2e_should_run }}
+      # Propagate the result from the `changes` step (id: changes) so downstream jobs can use it.
+      e2e_should_run: ${{ steps.changes.outputs.e2e_should_run }}
     steps:
       - name: Checkout the repo
         uses: actions/checkout@v4
