@@ -67,9 +67,7 @@ impl Display for DeriveExecuteAccountsStage {
             DeriveExecuteAccountsStage::RetrieveTokenLUTs => {
                 f.write_str("RetrieveTokenLookupTables")
             }
-            &DeriveExecuteAccountsStage::RetrievePoolPrograms => {
-                f.write_str("RetrievePoolPrograms")
-            }
+            DeriveExecuteAccountsStage::RetrievePoolPrograms => f.write_str("RetrievePoolPrograms"),
             DeriveExecuteAccountsStage::TokenTransferStaticAccounts { token, page } => {
                 f.write_fmt(format_args!("TokenTransferStaticAccounts/{token}/{page}"))
             }
