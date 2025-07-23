@@ -10,7 +10,7 @@ require (
 	github.com/gagliardetto/solana-go v1.13.0
 	github.com/pelletier/go-toml/v2 v2.2.3
 	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250320090719-315440f5b0a7
-	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-00010101000000-000000000000
+	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20250718204720-0b2de278721f
 	github.com/smartcontractkit/chainlink-common v0.4.2-0.20250121163309-3e179a73cb92
 	github.com/stretchr/testify v1.10.0
 	github.com/test-go/testify v1.1.4
