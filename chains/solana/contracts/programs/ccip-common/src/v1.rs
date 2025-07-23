@@ -283,7 +283,7 @@ fn load_v1_token_admin_registry(
         TokenAdminRegistryV1::deserialize(&mut &data[ANCHOR_DISCRIMINATOR_SIZE..])
             .map_err(|_| CommonCcipError::InvalidInputsTokenAdminRegistryAccounts)?;
 
-    Ok(TokenAdminRegistry::try_from(token_admin_registry_v1)?)
+    TokenAdminRegistry::try_from(token_admin_registry_v1)
 }
 
 pub mod token_admin_registry_writable {

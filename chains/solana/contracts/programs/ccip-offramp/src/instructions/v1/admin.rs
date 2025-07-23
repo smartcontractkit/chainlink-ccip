@@ -25,8 +25,15 @@ impl Admin for Impl {
         proposed_owner: Pubkey,
     ) -> Result<()> {
         let mut config = ctx.accounts.config.load_mut()?;
-        require!(
-            proposed_owner != config.owner,
+        require_keys_neq!(
+            proposed_owner,
+            Pubkey::default(),
+            CcipOfframpError::RedundantOwnerProposal
+        );
+
+        require_keys_neq!(
+            proposed_owner,
+            config.owner,
             CcipOfframpError::RedundantOwnerProposal
         );
         emit!(OwnershipTransferRequested {
