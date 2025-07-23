@@ -36,7 +36,7 @@ pub struct InitGlobalConfig<'info> {
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
 
-    // Ensures that the provided program is the BurnmintTokenPool program,
+    // Ensures that the provided program is the CctpTokenPool program,
     // and that its associated program data account matches the expected one.
     // This guarantees that only the program's upgrade authority can modify the global config.
     #[account(constraint = program.programdata_address()? == Some(program_data.key()))]
