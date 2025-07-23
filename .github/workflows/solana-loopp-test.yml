@@ -42,8 +42,8 @@ jobs:
       fail-fast: false
       matrix:
         type:
-          - cmd: cd integration-tests/smoke/ccip && go test -run "^Test_CCIPMessaging_EVM2Solana$" ccip_messaging_test.go -timeout 30m -test.parallel=2 -count=1 -json
-            name: "Messaging Test Test_CCIPMessaging_EVM2Solana"
+          - cmd: cd integration-tests/smoke/ccip && go test -run "^Test_CCIPMessaging_EVM2Solana$" ccip_messaging_test.go -timeout 12m -test.parallel=2 -count=1 -json
+            name: "LOOPP Messaging Test Test_CCIPMessaging_EVM2Solana"
     
     name: Integration Tests (${{ matrix.type.name }})
     runs-on: ubuntu-latest
