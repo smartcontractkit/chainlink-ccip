@@ -454,6 +454,56 @@ func TestTokenPool(t *testing.T) {
 							}
 						})
 
+						t.Run("Rate Limit Admin", func(t *testing.T) {
+							// set invalid rate limit admin
+							ixRateAdmin, err := test_token_pool.NewSetRateLimitAdminInstruction(
+								p.Mint,
+								user.PublicKey(),
+								poolConfig,
+								anotherAdmin.PublicKey(),
+							).ValidateAndBuild()
+							require.NoError(t, err)
+
+							testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ixRateAdmin}, anotherAdmin, config.DefaultCommitment)
+
+							ixRatesValid, err := test_token_pool.NewSetChainRateLimitInstruction(config.EvmChainSelector, p.Mint, test_token_pool.RateLimitConfig{
+								Enabled:  true,
+								Capacity: amount,
+								Rate:     1, // slow refill
+							}, test_token_pool.RateLimitConfig{
+								Enabled:  false,
+								Capacity: 0,
+								Rate:     0,
+							}, poolConfig, p.Chain[config.EvmChainSelector], user.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+							require.NoError(t, err)
+
+							testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ixRatesValid}, user, config.DefaultCommitment)
+
+							// set invalid rate limit admin
+							ixRateAdmin2, err := test_token_pool.NewSetRateLimitAdminInstruction(
+								p.Mint,
+								anotherAdmin.PublicKey(),
+								poolConfig,
+								anotherAdmin.PublicKey(),
+							).ValidateAndBuild()
+							require.NoError(t, err)
+
+							testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ixRateAdmin2}, anotherAdmin, config.DefaultCommitment)
+
+							ixRates, err := test_token_pool.NewSetChainRateLimitInstruction(config.EvmChainSelector, p.Mint, test_token_pool.RateLimitConfig{
+								Enabled:  true,
+								Capacity: amount,
+								Rate:     1, // slow refill
+							}, test_token_pool.RateLimitConfig{
+								Enabled:  false,
+								Capacity: 0,
+								Rate:     0,
+							}, poolConfig, p.Chain[config.EvmChainSelector], user.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+							require.NoError(t, err)
+
+							testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ixRates}, user, config.DefaultCommitment, []string{"Unauthorized."})
+						})
+
 						t.Run("globally cursed", func(t *testing.T) {
 							globalCurse := rmn_remote.CurseSubject{
 								Value: [16]uint8{0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01},

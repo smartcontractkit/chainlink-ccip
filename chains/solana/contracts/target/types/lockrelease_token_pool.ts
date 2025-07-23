@@ -502,7 +502,7 @@ export type LockreleaseTokenPool = {
       "accounts": [
         {
           "name": "state",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         },
         {
@@ -1486,7 +1486,7 @@ export const IDL: LockreleaseTokenPool = {
       "accounts": [
         {
           "name": "state",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         },
         {

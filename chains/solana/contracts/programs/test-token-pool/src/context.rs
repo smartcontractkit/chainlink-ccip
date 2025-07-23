@@ -264,9 +264,22 @@ pub struct SetChainRateLimit<'info> {
         bump,
     )]
     pub chain_config: Account<'info, ChainConfig>,
-    #[account(mut, constraint = authority.key() == state.config.owner || authority.key() == state.config.rate_limit_admin)]
+    #[account(mut, constraint = authority.key() == state.config.owner || authority.key() == state.config.rate_limit_admin @ CcipTokenPoolError::Unauthorized)]
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(mint: Pubkey)]
+pub struct SetRateLimitAdmin<'info> {
+    #[account(
+        mut,
+        seeds = [POOL_STATE_SEED, mint.key().as_ref()],
+        bump,
+    )]
+    pub state: Account<'info, State>,
+    #[account(mut, constraint = authority.key() == state.config.owner @ CcipTokenPoolError::Unauthorized)]
+    pub authority: Signer<'info>,
 }
 
 #[derive(Accounts)]

@@ -548,7 +548,7 @@ export type BurnmintTokenPool = {
       "accounts": [
         {
           "name": "state",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         },
         {
@@ -1496,7 +1496,7 @@ export const IDL: BurnmintTokenPool = {
       "accounts": [
         {
           "name": "state",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         },
         {

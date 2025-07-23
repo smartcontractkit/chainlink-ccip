@@ -15,7 +15,7 @@ type SetRateLimitAdmin struct {
 	Mint              *ag_solanago.PublicKey
 	NewRateLimitAdmin *ag_solanago.PublicKey
 
-	// [0] = [] state
+	// [0] = [WRITE] state
 	//
 	// [1] = [WRITE, SIGNER] authority
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
@@ -43,7 +43,7 @@ func (inst *SetRateLimitAdmin) SetNewRateLimitAdmin(newRateLimitAdmin ag_solanag
 
 // SetStateAccount sets the "state" account.
 func (inst *SetRateLimitAdmin) SetStateAccount(state ag_solanago.PublicKey) *SetRateLimitAdmin {
-	inst.AccountMetaSlice[0] = ag_solanago.Meta(state)
+	inst.AccountMetaSlice[0] = ag_solanago.Meta(state).WRITE()
 	return inst
 }
 
