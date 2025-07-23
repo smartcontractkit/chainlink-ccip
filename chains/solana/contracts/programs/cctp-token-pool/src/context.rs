@@ -355,11 +355,6 @@ impl TokenOfframpRemainingAccounts<'_> {
         );
 
         require_keys_eq!(
-            self.cctp_used_nonces.key(),
-            get_message_transmitter_pda(&[b"used_nonces", domain_seed, nonce_seed.as_ref()])
-        );
-
-        require_keys_eq!(
             self.cctp_token_messenger_minter.key(),
             TOKEN_MESSENGER_MINTER,
         );
@@ -389,6 +384,16 @@ impl TokenOfframpRemainingAccounts<'_> {
         );
 
         require_keys_eq!(
+            self.cctp_custody_token_account.key(),
+            get_token_messenger_minter_pda(&[b"custody", mint.key().as_ref()])
+        );
+
+        require_keys_eq!(
+            self.cctp_token_messenger_event_authority.key(),
+            get_token_messenger_minter_pda(&[b"__event_authority"])
+        );
+
+        require_keys_eq!(
             self.cctp_remote_token_messenger_key.key(),
             get_token_messenger_minter_pda(&[b"remote_token_messenger", domain_seed])
         );
@@ -403,13 +408,8 @@ impl TokenOfframpRemainingAccounts<'_> {
         );
 
         require_keys_eq!(
-            self.cctp_custody_token_account.key(),
-            get_token_messenger_minter_pda(&[b"custody", mint.key().as_ref()])
-        );
-
-        require_keys_eq!(
-            self.cctp_token_messenger_event_authority.key(),
-            get_token_messenger_minter_pda(&[b"__event_authority"])
+            self.cctp_used_nonces.key(),
+            get_message_transmitter_pda(&[b"used_nonces", domain_seed, nonce_seed.as_ref()])
         );
 
         Ok(())
