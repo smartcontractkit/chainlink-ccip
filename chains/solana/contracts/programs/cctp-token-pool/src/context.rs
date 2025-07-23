@@ -537,7 +537,8 @@ pub struct TokenOnramp<'info> {
     pub cctp_local_token: UncheckedAccount<'info>,
 
     /// CHECK this is CCTP's MessageTransmitter program, which
-    /// is invoked CCTP's TokenMessengerMinter by this program.
+    /// is invoked transitively by CCTP's TokenMessengerMinter,
+    /// which in turn is invoked explicitly by this program.
     #[account(
         address = MESSAGE_TRANSMITTER @ CctpTokenPoolError::InvalidMessageTransmitter
     )]

@@ -52,7 +52,8 @@ type LockOrBurnTokens struct {
 	//
 	// [15] = [] cctpMessageTransmitter
 	// ··········· CHECK this is CCTP's MessageTransmitter program, which
-	// ··········· is invoked CCTP's TokenMessengerMinter by this program.
+	// ··········· is invoked transitively by CCTP's TokenMessengerMinter,
+	// ··········· which in turn is invoked explicitly by this program.
 	//
 	// [16] = [] cctpTokenMessengerMinter
 	// ··········· CHECK this is CCTP's TokenMessengerMinter program, which
@@ -265,7 +266,8 @@ func (inst *LockOrBurnTokens) GetCctpLocalTokenAccount() *ag_solanago.AccountMet
 
 // SetCctpMessageTransmitterAccount sets the "cctpMessageTransmitter" account.
 // CHECK this is CCTP's MessageTransmitter program, which
-// is invoked CCTP's TokenMessengerMinter by this program.
+// is invoked transitively by CCTP's TokenMessengerMinter,
+// which in turn is invoked explicitly by this program.
 func (inst *LockOrBurnTokens) SetCctpMessageTransmitterAccount(cctpMessageTransmitter ag_solanago.PublicKey) *LockOrBurnTokens {
 	inst.AccountMetaSlice[15] = ag_solanago.Meta(cctpMessageTransmitter)
 	return inst
@@ -273,7 +275,8 @@ func (inst *LockOrBurnTokens) SetCctpMessageTransmitterAccount(cctpMessageTransm
 
 // GetCctpMessageTransmitterAccount gets the "cctpMessageTransmitter" account.
 // CHECK this is CCTP's MessageTransmitter program, which
-// is invoked CCTP's TokenMessengerMinter by this program.
+// is invoked transitively by CCTP's TokenMessengerMinter,
+// which in turn is invoked explicitly by this program.
 func (inst *LockOrBurnTokens) GetCctpMessageTransmitterAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[15]
 }
