@@ -1054,6 +1054,7 @@ func (r *ccipChainReader) fetchFreshSourceChainConfigs(
 			}
 
 			r.lggr.Info("SOURCE CHAIN CONFIG RESULT: ", v)
+
 			cfg, ok := v.(*cciptypes.SourceChainConfig)
 			if !ok {
 				lggr.Errorw("Invalid result type from GetSourceChainConfig",
