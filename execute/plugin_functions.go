@@ -28,6 +28,7 @@ import (
 // validateCommitReportsReadingEligibility validates that if commit reports exist, the oracle supports the destination
 // chain and if messages exist the oracles supports the corresponding source chain.
 func validateCommitReportsReadingEligibility(
+	state exectypes.PluginState,
 	supportedChains mapset.Set[cciptypes.ChainSelector],
 	destChain cciptypes.ChainSelector,
 	observedData exectypes.CommitObservations,
@@ -45,13 +46,13 @@ func validateCommitReportsReadingEligibility(
 					chainSel, data.SourceChain)
 			}
 
-			if len(data.Messages) > 0 && !supportedChains.Contains(chainSel) {
+			if state == exectypes.GetMessages && len(data.Messages) > 0 && !supportedChains.Contains(chainSel) {
 				return fmt.Errorf("observed messages on chain %d while chain is not supported", chainSel)
 			}
 		}
 	}
 
-	if containsCommitReports && !supportedChains.Contains(destChain) {
+	if state == exectypes.GetCommitReports && containsCommitReports && !supportedChains.Contains(destChain) {
 		return fmt.Errorf("invalid observation, destination chain not supported but observed commit reports")
 	}
 

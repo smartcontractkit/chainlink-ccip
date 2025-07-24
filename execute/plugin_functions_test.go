@@ -1478,6 +1478,7 @@ func Test_allSeqNrsObserved(t *testing.T) {
 func Test_validateCommitReportsReadingEligibility(t *testing.T) {
 	tests := []struct {
 		name            string
+		state           exectypes.PluginState
 		destChain       cciptypes.ChainSelector
 		supportedChains mapset.Set[cciptypes.ChainSelector]
 		observedData    exectypes.CommitObservations
@@ -1486,6 +1487,7 @@ func Test_validateCommitReportsReadingEligibility(t *testing.T) {
 		{
 			name:            "ValidCommitReports",
 			supportedChains: mapset.NewSet(cciptypes.ChainSelector(99)),
+			state:           exectypes.GetCommitReports,
 			destChain:       cciptypes.ChainSelector(99),
 			observedData: exectypes.CommitObservations{
 				1: {
@@ -1500,6 +1502,7 @@ func Test_validateCommitReportsReadingEligibility(t *testing.T) {
 			name:            "ValidCommitReportsAndMsgs",
 			supportedChains: mapset.NewSet(cciptypes.ChainSelector(99), cciptypes.ChainSelector(2)),
 			destChain:       cciptypes.ChainSelector(99),
+			state:           exectypes.GetMessages,
 			observedData: exectypes.CommitObservations{
 				1: {
 					{SourceChain: 1, MerkleRoot: cciptypes.Bytes32{1}},
@@ -1513,6 +1516,7 @@ func Test_validateCommitReportsReadingEligibility(t *testing.T) {
 			name:            "ValidCommitReportsButMsgsChainNotSupported",
 			supportedChains: mapset.NewSet(cciptypes.ChainSelector(99)),
 			destChain:       cciptypes.ChainSelector(99),
+			state:           exectypes.GetMessages,
 			observedData: exectypes.CommitObservations{
 				1: {
 					{SourceChain: 1, MerkleRoot: cciptypes.Bytes32{1}},
@@ -1527,6 +1531,7 @@ func Test_validateCommitReportsReadingEligibility(t *testing.T) {
 			name:            "UnsupportedChain",
 			supportedChains: mapset.NewSet(cciptypes.ChainSelector(2)),
 			destChain:       cciptypes.ChainSelector(99),
+			state:           exectypes.GetCommitReports,
 			observedData: exectypes.CommitObservations{
 				2: {
 					{SourceChain: 2, MerkleRoot: cciptypes.Bytes32{2}},
@@ -1538,6 +1543,7 @@ func Test_validateCommitReportsReadingEligibility(t *testing.T) {
 			name:            "ValidChainSinceNoRootsAreObservedEvenIfDestNotSupported",
 			supportedChains: mapset.NewSet(cciptypes.ChainSelector(2)),
 			destChain:       cciptypes.ChainSelector(99),
+			state:           exectypes.GetCommitReports,
 			observedData: exectypes.CommitObservations{
 				2: {
 					{SourceChain: 2},
@@ -1547,6 +1553,7 @@ func Test_validateCommitReportsReadingEligibility(t *testing.T) {
 		{
 			name:            "MismatchedSourceChain",
 			supportedChains: mapset.NewSet(cciptypes.ChainSelector(1)),
+			state:           exectypes.GetCommitReports,
 			observedData: exectypes.CommitObservations{
 				1: {
 					{SourceChain: 2},
@@ -1558,7 +1565,7 @@ func Test_validateCommitReportsReadingEligibility(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			err := validateCommitReportsReadingEligibility(tc.supportedChains, tc.destChain, tc.observedData)
+			err := validateCommitReportsReadingEligibility(tc.state, tc.supportedChains, tc.destChain, tc.observedData)
 			if len(tc.expErr) != 0 {
 				assert.Error(t, err)
 				assert.ErrorContains(t, err, tc.expErr)
