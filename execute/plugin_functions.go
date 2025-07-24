@@ -33,27 +33,67 @@ func validateCommitReportsReadingEligibility(
 	destChain cciptypes.ChainSelector,
 	observedData exectypes.CommitObservations,
 ) error {
-	containsCommitReports := false
+	switch state {
+	case exectypes.GetCommitReports:
+		if err := validateGetCommitReportsObservation(supportedChains, destChain, observedData); err != nil {
+			return fmt.Errorf("validate get commit reports observation: %w", err)
+		}
+	case exectypes.GetMessages:
+		if err := validateGetMessagesObservation(supportedChains, observedData); err != nil {
+			return fmt.Errorf("validate get messages observation: %w", err)
+		}
+	case exectypes.Filter, exectypes.Initialized, exectypes.Unknown:
+		// nothing to validate
+		break
+	}
 
+	// generic validation
 	for chainSel, observedDataOfChain := range observedData {
 		for _, data := range observedDataOfChain {
-			if !data.MerkleRoot.IsEmpty() {
-				containsCommitReports = true
-			}
-
 			if data.SourceChain != chainSel {
-				return fmt.Errorf("invalid observed data, key=%d but data chain=%d",
-					chainSel, data.SourceChain)
-			}
-
-			if state == exectypes.GetMessages && len(data.Messages) > 0 && !supportedChains.Contains(chainSel) {
-				return fmt.Errorf("observed messages on chain %d while chain is not supported", chainSel)
+				return fmt.Errorf("invalid observed data, key=%d but data chain=%d", chainSel, data.SourceChain)
 			}
 		}
 	}
 
-	if state == exectypes.GetCommitReports && containsCommitReports && !supportedChains.Contains(destChain) {
-		return fmt.Errorf("invalid observation, destination chain not supported but observed commit reports")
+	return nil
+}
+
+func validateGetCommitReportsObservation(
+	supportedChains mapset.Set[cciptypes.ChainSelector],
+	destChain cciptypes.ChainSelector,
+	observedData exectypes.CommitObservations,
+) error {
+	for _, observedDataOfChain := range observedData {
+		for _, data := range observedDataOfChain {
+			if data.MerkleRoot.IsEmpty() {
+				continue
+			}
+			if !supportedChains.Contains(destChain) {
+				return fmt.Errorf("invalid observation, destination chain not supported but observed commit report")
+			}
+		}
+	}
+	return nil
+}
+
+func validateGetMessagesObservation(
+	supportedChains mapset.Set[cciptypes.ChainSelector],
+	observedData exectypes.CommitObservations,
+) error {
+	for chainSel, observedDataOfChain := range observedData {
+		containsMsgs := false
+
+		for _, data := range observedDataOfChain {
+			if len(data.Messages) > 0 {
+				containsMsgs = true
+				break
+			}
+		}
+
+		if containsMsgs && !supportedChains.Contains(chainSel) {
+			return fmt.Errorf("observed messages on chain %d while chain is not supported", chainSel)
+		}
 	}
 
 	return nil

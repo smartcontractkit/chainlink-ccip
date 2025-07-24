@@ -953,7 +953,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 				tt.fetchFrom,
 				tt.cursedSourceChains,
 				int(offchainConfigForTest.MaxCommitReportsToFetch), // limit int
-				currentTestLogger, // lggr logger.Logger
+				currentTestLogger,                                  // lggr logger.Logger
 			)
 			if !tt.wantErr(t, err, "getPendingReportsForExecution(...)") {
 				return
@@ -1101,7 +1101,7 @@ func TestPlugin_ValidateObservation_IneligibleCommitReportsObserver(t *testing.T
 	require.Error(t, err)
 	assert.Contains(t,
 		err.Error(),
-		"destination chain not supported but observed commit reports")
+		"destination chain not supported but observed commit report")
 }
 
 func TestPlugin_ValidateObservation_ValidateObservedSeqNum_Error(t *testing.T) {
