@@ -141,6 +141,7 @@ pub struct AddToAllowList<'info> {
         realloc = ANCHOR_DISCRIMINATOR + State::INIT_SPACE + 32 * (state.config.allow_list.len() + add.len()),
         realloc::payer = authority,
         realloc::zero = false,
+        constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub state: Account<'info, State>,
 
@@ -164,7 +165,8 @@ pub struct RemoveFromAllowlist<'info> {
         bump,
         realloc = ANCHOR_DISCRIMINATOR + State::INIT_SPACE + 32 * (state.config.allow_list.len().saturating_sub(remove.len())),
         realloc::payer = authority,
-        realloc::zero = false
+        realloc::zero = false,
+        constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub state: Account<'info, State>,
 
@@ -185,6 +187,7 @@ pub struct AcceptOwnership<'info> {
             mint.key().as_ref()
         ],
         bump,
+        constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub state: Account<'info, State>,
 
@@ -231,6 +234,7 @@ pub struct TokenOfframp<'info> {
             mint.key().as_ref()
         ],
         bump,
+        constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub state: Account<'info, State>,
 
@@ -432,6 +436,7 @@ pub struct TokenOnramp<'info> {
     #[account(
         seeds = [POOL_STATE_SEED, mint.key().as_ref()],
         bump,
+        constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub state: Box<Account<'info, State>>,
 
@@ -593,6 +598,7 @@ pub struct InitializeChainConfig<'info> {
             mint.key().as_ref()
         ],
         bump,
+        constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub state: Account<'info, State>,
 
@@ -624,6 +630,7 @@ pub struct EditChainConfig<'info> {
             mint.key().as_ref()
         ],
         bump,
+        constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub state: Account<'info, State>,
 
@@ -651,6 +658,7 @@ pub struct SetChainRateLimit<'info> {
             mint.key().as_ref()
         ],
         bump,
+        constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub state: Account<'info, State>,
 
@@ -676,6 +684,7 @@ pub struct SetRateLimitAdmin<'info> {
         mut,
         seeds = [POOL_STATE_SEED, mint.key().as_ref()],
         bump,
+        constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub state: Account<'info, State>,
     #[account(mut, constraint = authority.key() == state.config.owner @ CcipTokenPoolError::Unauthorized)]
@@ -691,6 +700,7 @@ pub struct EditChainConfigDynamicSize<'info> {
             mint.key().as_ref()
         ],
         bump,
+        constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub state: Account<'info, State>,
 
@@ -723,6 +733,7 @@ pub struct AppendRemotePoolAddresses<'info> {
             mint.key().as_ref()
         ],
         bump,
+        constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub state: Account<'info, State>,
 
@@ -757,6 +768,7 @@ pub struct DeleteChainConfig<'info> {
             mint.key().as_ref()
         ],
         bump,
+        constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub state: Account<'info, State>,
 
@@ -785,6 +797,7 @@ pub struct ReclaimEventAccount<'info> {
             mint.key().as_ref()
         ],
         bump,
+        constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub state: Account<'info, State>,
 
@@ -837,6 +850,7 @@ pub struct ReclaimFunds<'info> {
             mint.key().as_ref()
         ],
         bump,
+        constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub state: Account<'info, State>,
 
