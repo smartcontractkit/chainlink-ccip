@@ -6,6 +6,7 @@ import {ITokenMessenger} from "../../../../pools/USDC/interfaces/ITokenMessenger
 import {IERC165} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
 
+import {MockE2EUSDCTransmitter} from "../../../mocks/MockE2EUSDCTransmitter.sol";
 import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
 
 import {USDCTokenPoolSetup} from "./USDCTokenPoolSetup.t.sol";
@@ -39,7 +40,7 @@ contract USDCTokenPool_constructor is USDCTokenPoolSetup {
     assertEq(usdcTokenPool.i_previousPool(), address(0));
   }
 
-  function test_constructor_RevertWhen_TokenMessangerAddressZero() public {
+  function test_constructor_RevertWhen_TokenMessengerAddressZero() public {
     vm.expectRevert(USDCTokenPool.InvalidConfig.selector);
     new USDCTokenPool(
       ITokenMessenger(address(0)),
@@ -53,12 +54,8 @@ contract USDCTokenPool_constructor is USDCTokenPoolSetup {
     );
   }
 
-  function test_constructor_RevertWhen_TransmitterVersionDoesNotMatchSupportedUSDCVersion() public {
-    uint32 transmitterVersion = uint32(vm.randomUint());
-    vm.mockCall(
-      address(s_mockUSDCTransmitter), abi.encodeCall(s_mockUSDCTransmitter.version, ()), abi.encode(transmitterVersion)
-    );
-    vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidMessageVersion.selector, transmitterVersion));
+  function test_constructor_RevertWhen_InvalidMessageVersion() public {
+    vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidMessageVersion.selector, 0, 1));
     new USDCTokenPool(
       s_mockUSDC,
       s_cctpMessageTransmitterProxy,
@@ -67,16 +64,19 @@ contract USDCTokenPool_constructor is USDCTokenPoolSetup {
       address(s_mockRMNRemote),
       address(s_router),
       s_previousPool,
-      0
+      1
     );
   }
 
-  function test_constructor_RevertWhen_TokenMessengerVersionDoesNotMatchSupportedUSDCVersion() public {
-    uint32 tokenMessengerVersion = s_mockUSDC.messageBodyVersion() + 1;
+  function test_constructor_RevertWhen_InvalidTokenMessengerVersion() public {
+    // The error we want to call is most likely unreachable because the token messenger version is 0, but we mock it to 1 to test the error
     vm.mockCall(
-      address(s_mockUSDC), abi.encodeCall(s_mockUSDC.messageBodyVersion, ()), abi.encode(tokenMessengerVersion)
+      address(s_mockUSDCTransmitter),
+      abi.encodeWithSelector(MockE2EUSDCTransmitter.version.selector),
+      abi.encode(1)
     );
-    vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidTokenMessengerVersion.selector, tokenMessengerVersion));
+
+    vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidTokenMessengerVersion.selector, 0, 1));
     new USDCTokenPool(
       s_mockUSDC,
       s_cctpMessageTransmitterProxy,
@@ -85,7 +85,7 @@ contract USDCTokenPool_constructor is USDCTokenPoolSetup {
       address(s_mockRMNRemote),
       address(s_router),
       s_previousPool,
-      0
+      1
     );
   }
 
@@ -120,7 +120,8 @@ contract USDCTokenPool_constructor is USDCTokenPoolSetup {
         new address[](0),
         address(s_mockRMNRemote),
         address(s_router),
-        s_previousPool // placeholder, will be replaced below
+        s_previousPool, // placeholder, will be replaced below
+        0
       )
     );
 

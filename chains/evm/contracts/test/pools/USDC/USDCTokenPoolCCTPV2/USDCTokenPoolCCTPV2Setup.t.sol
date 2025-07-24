@@ -15,15 +15,25 @@ contract USDCTokenPoolCCTPV2Setup is USDCSetup {
     super.setUp();
 
     s_usdcTokenPool = new USDCTokenPoolCCTPV2Helper(
-      s_mockLegacyUSDC,
       s_mockUSDC,
       s_cctpMessageTransmitterProxy,
       s_USDCToken,
       new address[](0),
       address(s_mockRMNRemote),
-      address(s_router),
-      s_previousPool
+      address(s_router)
     );
+
+    address[] memory allowedTokenPoolProxies = new address[](3);
+    allowedTokenPoolProxies[0] = address(OWNER);
+    allowedTokenPoolProxies[1] = address(s_routerAllowedOnRamp);
+    allowedTokenPoolProxies[2] = address(s_routerAllowedOffRamp);
+
+    bool[] memory allowed = new bool[](3);
+    for(uint256 i = 0; i < allowedTokenPoolProxies.length; i++) {
+      allowed[i] = true;
+    }
+
+    s_usdcTokenPool.setAllowedTokenPoolProxies(allowedTokenPoolProxies, allowed);
 
     CCTPMessageTransmitterProxy.AllowedCallerConfigArgs[] memory allowedCallerParams =
       new CCTPMessageTransmitterProxy.AllowedCallerConfigArgs[](1);
@@ -33,15 +43,15 @@ contract USDCTokenPoolCCTPV2Setup is USDCSetup {
 
     s_allowedList.push(vm.randomAddress());
     s_usdcTokenPoolWithAllowList = new USDCTokenPoolCCTPV2Helper(
-      s_mockLegacyUSDC,
       s_mockUSDC,
       s_cctpMessageTransmitterProxy,
       s_USDCToken,
       s_allowedList,
       address(s_mockRMNRemote),
-      address(s_router),
-      s_previousPool
+      address(s_router)
     );
+
+    s_usdcTokenPoolWithAllowList.setAllowedTokenPoolProxies(allowedTokenPoolProxies, allowed);
 
     _poolApplyChainUpdates(address(s_usdcTokenPool));
     _poolApplyChainUpdates(address(s_usdcTokenPoolWithAllowList));

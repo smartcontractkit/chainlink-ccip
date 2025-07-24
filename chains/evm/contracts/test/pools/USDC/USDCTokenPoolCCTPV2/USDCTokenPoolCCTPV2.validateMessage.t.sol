@@ -118,12 +118,13 @@ contract USDCTokenPoolCCTPV2__validateMessage is USDCTokenPoolCCTPV2Setup {
     );
     usdcMessage.destinationDomain = DEST_DOMAIN_IDENTIFIER;
 
+    uint32 rightVersion = usdcMessage.version;
     uint32 wrongVersion = usdcMessage.version + 1;
 
     usdcMessage.version = wrongVersion;
     encodedUsdcMessage = _generateUSDCMessageCCTPV2(usdcMessage);
 
-    vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidMessageVersion.selector, wrongVersion));
+    vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidMessageVersion.selector, rightVersion, wrongVersion));
     s_usdcTokenPool.validateMessage(encodedUsdcMessage, sourceTokenData);
 
     // Create a byte string of length less than 116 (e.g., 100)

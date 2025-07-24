@@ -2,10 +2,12 @@
 pragma solidity ^0.8.24;
 
 import {IPoolV1} from "../../interfaces/IPool.sol";
+import {IRMN} from "../../interfaces/IRMN.sol";
 import {IMessageTransmitter} from "./interfaces/IMessageTransmitter.sol";
 import {ITokenMessenger} from "./interfaces/ITokenMessenger.sol";
 
 import {Pool} from "../../libraries/Pool.sol";
+import {TokenAdminRegistry} from "../../tokenAdminRegistry/TokenAdminRegistry.sol";
 import {TokenPool} from "../TokenPool.sol";
 import {CCTPMessageTransmitterProxy} from "./CCTPMessageTransmitterProxy.sol";
 
@@ -16,21 +18,28 @@ import {SafeERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC165} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
+import {EnumerableSet} from
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableSet.sol";
+
+import {console2 as console} from "forge-std/console2.sol";
 
 /// @notice This pool mints and burns USDC tokens through the Cross Chain Transfer
 /// Protocol (CCTP).
 contract USDCTokenPool is TokenPool, ITypeAndVersion {
   using SafeERC20 for IERC20;
+  using EnumerableSet for EnumerableSet.AddressSet;
 
   event DomainsSet(DomainUpdate[]);
   event ConfigSet(address tokenMessenger);
+  event AllowedTokenPoolProxyAdded(address tokenPoolProxy);
+  event AllowedTokenPoolProxyRemoved(address tokenPoolProxy);
 
   error UnknownDomain(uint64 domain);
   error UnlockingUSDCFailed();
   error InvalidConfig();
   error InvalidDomain(DomainUpdate domain);
-  error InvalidMessageVersion(uint32 version);
-  error InvalidTokenMessengerVersion(uint32 version);
+  error InvalidMessageVersion(uint32 expected, uint32 got); // TODO: Remove expected
+  error InvalidTokenMessengerVersion(uint32 expected, uint32 got); // TODO: Remove expected
   error InvalidNonce(uint64 expected, uint64 got);
   error InvalidSourceDomain(uint32 expected, uint32 got);
   error InvalidDestinationDomain(uint32 expected, uint32 got);
@@ -39,7 +48,9 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   error InvalidPreviousPool();
   error InvalidMessageLength(uint256 length);
   error InvalidCCTPVersion(CCTPVersion expected, CCTPVersion got);
-
+  error TokenPoolProxyAlreadyAllowed(address tokenPoolProxy);
+  error TokenPoolProxyNotAllowed(address tokenPoolProxy);
+  
   // This data is supplied from offchain and contains everything needed
   // to receive the USDC tokens.
   struct MessageAndAttestation {
@@ -115,6 +126,11 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   // in the router in order for the previous pool to accept the incoming call.
   address public immutable i_previousMessageTransmitterProxy;
 
+  // The token admin registry for the token pool.
+  address public s_USDCTokenPoolProxy;
+
+  EnumerableSet.AddressSet internal s_allowedTokenPoolProxies;
+
   constructor(
     ITokenMessenger tokenMessenger,
     CCTPMessageTransmitterProxy cctpMessageTransmitterProxy,
@@ -129,10 +145,21 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
 
     if (address(tokenMessenger) == address(0)) revert InvalidConfig();
     IMessageTransmitter transmitter = IMessageTransmitter(tokenMessenger.localMessageTransmitter());
+
     uint32 transmitterVersion = transmitter.version();
-    if (transmitterVersion != i_supportedUSDCVersion) revert InvalidMessageVersion(transmitterVersion);
+
+    console.log("transmitterVersion", transmitterVersion);
+    console.log("i_supportedUSDCVersion", i_supportedUSDCVersion);
+
+    if (transmitterVersion != i_supportedUSDCVersion) revert InvalidMessageVersion(transmitterVersion, i_supportedUSDCVersion);
+
     uint32 tokenMessengerVersion = tokenMessenger.messageBodyVersion();
-    if (tokenMessengerVersion != i_supportedUSDCVersion) revert InvalidTokenMessengerVersion(tokenMessengerVersion);
+
+    console.log("tokenMessengerVersion", tokenMessengerVersion);
+    console.log("i_supportedUSDCVersion", i_supportedUSDCVersion);
+
+    if (tokenMessengerVersion != i_supportedUSDCVersion) revert InvalidTokenMessengerVersion(tokenMessengerVersion, i_supportedUSDCVersion);
+
     if (cctpMessageTransmitterProxy.i_cctpTransmitter() != transmitter) revert InvalidTransmitterInProxy();
 
     i_tokenMessenger = tokenMessenger;
@@ -221,6 +248,25 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
       destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
       destPoolData: abi.encode(sourceTokenDataPayload)
     });
+  }
+
+  /// @notice Checks whether remote chain selector is configured on this contract, and if the msg.sender
+  /// is a permissioned onRamp for the given chain on the Router.
+  function _onlyOnRamp(
+    uint64 remoteChainSelector
+  ) internal view override {
+    if (!isSupportedChain(remoteChainSelector)) revert ChainNotAllowed(remoteChainSelector);
+    if (!s_allowedTokenPoolProxies.contains(msg.sender)) revert CallerIsNotARampOnRouter(msg.sender);
+  }
+
+  /// @notice Checks whether remote chain selector is configured on this contract, and if the msg.sender
+  /// is a permissioned offRamp for the given chain on the Router.
+  function _onlyOffRamp(
+    uint64 remoteChainSelector
+  ) internal view override {
+    if (!isSupportedChain(remoteChainSelector)) revert ChainNotAllowed(remoteChainSelector);
+
+    if (!s_allowedTokenPoolProxies.contains(msg.sender)) revert CallerIsNotARampOnRouter(msg.sender);
   }
 
   /// @notice Mint tokens from the pool to the recipient
@@ -323,7 +369,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     // This token pool only supports version 0 of the CCTP message format
     // We check the version prior to loading the rest of the message
     // to avoid unexpected reverts due to out-of-bounds reads.
-    if (version != i_supportedUSDCVersion) revert InvalidMessageVersion(version);
+    if (version != i_supportedUSDCVersion) revert InvalidMessageVersion(version, i_supportedUSDCVersion);
 
     uint32 sourceDomain;
     uint32 destinationDomain;
@@ -378,5 +424,26 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
       });
     }
     emit DomainsSet(domains);
+  }
+
+  function setAllowedTokenPoolProxies(
+    address[] calldata tokenPoolProxies,
+    bool[] calldata allowed
+  ) external onlyOwner {
+    for (uint256 i = 0; i < tokenPoolProxies.length; ++i) {
+      if (allowed[i]) {
+        if (!s_allowedTokenPoolProxies.add(tokenPoolProxies[i])) {
+          revert TokenPoolProxyAlreadyAllowed(tokenPoolProxies[i]);
+        }
+
+        emit AllowedTokenPoolProxyAdded(tokenPoolProxies[i]);
+      } else {
+        if (!s_allowedTokenPoolProxies.remove(tokenPoolProxies[i])) {
+          revert TokenPoolProxyNotAllowed(tokenPoolProxies[i]);
+        }
+
+        emit AllowedTokenPoolProxyRemoved(tokenPoolProxies[i]);
+      }
+    }
   }
 }

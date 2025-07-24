@@ -261,7 +261,11 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
   }
 
   function test_RevertWhen_CallerIsNotARampOnRouter() public {
-    vm.expectRevert(abi.encodeWithSelector(TokenPool.CallerIsNotARampOnRouter.selector, OWNER));
+    address randomAddress = makeAddr("RANDOM_ADDRESS");
+
+    vm.startPrank(randomAddress);
+
+    vm.expectRevert(abi.encodeWithSelector(TokenPool.CallerIsNotARampOnRouter.selector, randomAddress));
 
     s_usdcTokenPool.lockOrBurn(
       Pool.LockOrBurnInV1({

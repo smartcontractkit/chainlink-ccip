@@ -26,38 +26,27 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
   // TODO: Add Comment
   uint32 public constant FINALITY_THRESHOLD = 2000;
 
-  ITokenMessenger public immutable i_legacyTokenMessenger;
-
   // TODO: Fix Comments
   // Note: This constructor is only used for CCTP V2, which is why the supportedUSDCVersion is set to 1.
   constructor(
-    ITokenMessenger legacyTokenMessenger,
     ITokenMessenger tokenMessenger,
     CCTPMessageTransmitterProxy cctpMessageTransmitterProxy,
     IERC20 token,
     address[] memory allowlist,
     address rmnProxy,
-    address router,
-    address previousPool
-  ) USDCTokenPool(tokenMessenger, cctpMessageTransmitterProxy, token, allowlist, rmnProxy, router, previousPool, 1) {
-    if (previousPool != address(0)) {
-      // If the previous pool exists, we need to acquire the previous pool's message transmitter proxy so that a
-      // messages' destinationCaller can be checked against it.
-      try USDCTokenPool(previousPool).i_messageTransmitterProxy() returns (CCTPMessageTransmitterProxy proxy) {
-        i_previousMessageTransmitterProxy = address(proxy);
-      } catch {
-        revert InvalidPreviousPool();
-      }
-    } else {
-      i_previousMessageTransmitterProxy = address(0);
-    }
-
-    // Increase allowance for the legacy token messenger to allow for the migration of tokens.
-    i_token.safeIncreaseAllowance(address(legacyTokenMessenger), type(uint256).max);
-    i_legacyTokenMessenger = legacyTokenMessenger;
-
-    emit ConfigSet(address(tokenMessenger));
-  }
+    address router
+  )
+    USDCTokenPool(
+      tokenMessenger,
+      cctpMessageTransmitterProxy,
+      token,
+      allowlist,
+      rmnProxy,
+      router,
+      address(0),
+      1
+    )
+  {}
 
   /// @notice Burn tokens from the pool to initiate cross-chain transfer.
   /// @notice Outgoing messages (burn operations) are routed via `i_tokenMessenger.depositForBurnWithCaller`.
@@ -85,34 +74,15 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
       decodedReceiver = abi.decode(lockOrBurnIn.receiver, (bytes32));
     }
 
-    uint64 nonce;
-    CCTPVersion cctpVersion;
-    // Since this pool is the msg sender of the CCTP transaction, only this contract
-    // is able to call replaceDepositForBurn. Since this contract does not implement
-    // replaceDepositForBurn, the tokens cannot be maliciously re-routed to another address.
-
-    // If the CCTP version is CCTP_V1, we use the legacy token messenger to deposit for burn.
-    if (domain.cctpVersion == CCTPVersion.CCTP_V1) {
-      cctpVersion = CCTPVersion.CCTP_V1;
-
-      nonce = i_legacyTokenMessenger.depositForBurnWithCaller(
-        lockOrBurnIn.amount, domain.domainIdentifier, decodedReceiver, address(i_token), domain.allowedCaller
-      );
-
-      // If the CCTP version is CCTP_V2, we use the new token messenger to deposit for burn.
-    } else if (domain.cctpVersion == CCTPVersion.CCTP_V2) {
-      cctpVersion = CCTPVersion.CCTP_V2;
-
-      i_tokenMessenger.depositForBurn(
-        lockOrBurnIn.amount,
-        domain.domainIdentifier,
-        decodedReceiver,
-        address(i_token),
-        domain.allowedCaller,
-        MAX_FEE,
-        FINALITY_THRESHOLD
-      );
-    }
+    i_tokenMessenger.depositForBurn(
+      lockOrBurnIn.amount,
+      domain.domainIdentifier,
+      decodedReceiver,
+      address(i_token),
+      domain.allowedCaller,
+      MAX_FEE,
+      FINALITY_THRESHOLD
+    );
 
     emit LockedOrBurned({
       remoteChainSelector: lockOrBurnIn.remoteChainSelector,
@@ -122,9 +92,9 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
     });
 
     SourceTokenDataPayload memory sourceTokenDataPayload = SourceTokenDataPayload({
-      nonce: nonce,
+      nonce: 0,
       sourceDomain: i_localDomainIdentifier,
-      cctpVersion: cctpVersion,
+      cctpVersion: CCTPVersion.CCTP_V2,
       amount: lockOrBurnIn.amount,
       destinationDomain: i_localDomainIdentifier,
       mintRecipient: decodedReceiver,
@@ -160,32 +130,6 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
 
     MessageAndAttestation memory msgAndAttestation =
       abi.decode(releaseOrMintIn.offchainTokenData, (MessageAndAttestation));
-
-    // If the destinationCaller is the previous pool, indicating an inflight message during the migration, we need to
-    // route the message to the previous pool to satisfy the allowedCaller.
-    bytes32 destinationCallerBytes32;
-    bytes memory messageBytes = msgAndAttestation.message;
-    assembly {
-      // destinationCaller is a 32-byte word starting at position 84 in messageBytes body, so add 32 to skip the 1st word
-      // representing bytes length
-      destinationCallerBytes32 := mload(add(messageBytes, 140)) // 108 + 32 = 140
-    }
-    address destinationCaller = address(uint160(uint256(destinationCallerBytes32)));
-
-    // If the destinationCaller is the previous pool's message transmitter proxy, we can use this
-    // as an indication that CCTP V1 was used to send the message, and route it to the previous pool for minting.
-    // In previous versions, the sourcePoolData only contained two fields, a uint64 and uint32. For structs stored only
-    // in memory, the compiler assigns each field to its only 32-byte slot, instead of tightly packing line in storage.
-    // This means that the sourcePoolData will be 64 bytes long. This indicates an inflight message during the
-    // migration, and needs to be routed to the previous pool, otherwise the parsing will revert.
-    if (
-      (i_previousPool != address(0) && destinationCaller == i_previousMessageTransmitterProxy)
-        || releaseOrMintIn.sourcePoolData.length == 64
-    ) {
-      // If the destinationCaller is the previous pool's message transmitter proxy, we can use this
-      // as an indication that CCTP V1 was used to send the message, and route it to the previous pool for minting.
-      return USDCTokenPool(i_previousPool).releaseOrMint(releaseOrMintIn);
-    }
 
     // This decoding is done after the check for the previous pool to avoid issues with decoding the previous pool's
     // sourcePoolData into a struct with a different number of fields.
@@ -249,7 +193,7 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
     // This token pool only supports version 0 of the CCTP message format
     // We check the version prior to loading the rest of the message
     // to avoid unexpected reverts due to out-of-bounds reads.
-    if (version != i_supportedUSDCVersion) revert InvalidMessageVersion(version);
+    if (version != i_supportedUSDCVersion) revert InvalidMessageVersion(i_supportedUSDCVersion, version);
 
     uint32 messageSourceDomain;
     uint32 destinationDomain;

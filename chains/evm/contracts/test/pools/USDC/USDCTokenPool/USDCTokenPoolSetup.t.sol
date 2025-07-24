@@ -37,6 +37,19 @@ contract USDCTokenPoolSetup is USDCSetup {
       s_previousPool
     );
 
+    // Allow the usdcTokenPool to be used as a token pool proxy
+    address[] memory allowedTokenPoolProxies = new address[](3);
+    allowedTokenPoolProxies[0] = address(OWNER);
+    allowedTokenPoolProxies[1] = address(s_routerAllowedOnRamp);
+    allowedTokenPoolProxies[2] = address(s_routerAllowedOffRamp);
+
+    bool[] memory allowed = new bool[](5);
+    for(uint256 i = 0; i < allowedTokenPoolProxies.length; i++) {
+      allowed[i] = true;
+    }
+
+    s_usdcTokenPool.setAllowedTokenPoolProxies(allowedTokenPoolProxies, allowed); 
+
     CCTPMessageTransmitterProxy.AllowedCallerConfigArgs[] memory allowedCallerParams =
       new CCTPMessageTransmitterProxy.AllowedCallerConfigArgs[](1);
     allowedCallerParams[0] =
@@ -53,6 +66,8 @@ contract USDCTokenPoolSetup is USDCSetup {
       address(s_router),
       s_previousPool
     );
+
+    s_usdcTokenPoolWithAllowList.setAllowedTokenPoolProxies(allowedTokenPoolProxies, allowed);
 
     _poolApplyChainUpdates(address(s_usdcTokenPool));
     _poolApplyChainUpdates(address(s_usdcTokenPoolWithAllowList));

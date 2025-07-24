@@ -131,6 +131,7 @@ contract USDCTokenPool__validateMessage is USDCTokenPoolSetup {
         minFinalityThreshold: 0
       })
     );
+
     usdcMessage.destinationDomain = DEST_DOMAIN_IDENTIFIER;
 
     uint32 wrongVersion = usdcMessage.version + 1;
@@ -138,7 +139,7 @@ contract USDCTokenPool__validateMessage is USDCTokenPoolSetup {
     usdcMessage.version = wrongVersion;
     encodedUsdcMessage = _generateUSDCMessage(usdcMessage);
 
-    vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidMessageVersion.selector, wrongVersion));
+    vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidMessageVersion.selector, wrongVersion, 0));
     s_usdcTokenPool.validateMessage(encodedUsdcMessage, sourceTokenData);
 
     // Create a byte string of length less than 116 (e.g., 100)

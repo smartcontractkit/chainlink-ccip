@@ -83,6 +83,8 @@ contract USDCSetup is BaseTest {
     _setUpRamps();
 
     s_mockUSDCTransmitterCCTPV2 = new MockE2EUSDCTransmitterCCTPV2(1, DEST_DOMAIN_IDENTIFIER, address(s_USDCToken));
+    s_mockUSDCTransmitter = new MockE2EUSDCTransmitter(0, DEST_DOMAIN_IDENTIFIER, address(s_USDCToken));
+
     s_mockUSDC = new MockUSDCTokenMessenger(1, address(s_mockUSDCTransmitterCCTPV2));
 
     s_mockLegacyUSDC = new MockUSDCTokenMessenger(0, address(s_mockUSDCTransmitter));
@@ -113,6 +115,7 @@ contract USDCSetup is BaseTest {
       abi.encodeWithSelector(IERC165.supportsInterface.selector, type(IPoolV1).interfaceId),
       abi.encode(true)
     );
+
   }
 
   function _poolApplyChainUpdates(

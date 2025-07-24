@@ -9,24 +9,20 @@ import {USDCTokenPoolCCTPV2} from "../../pools/USDC/USDCTokenPoolCCTPV2.sol";
 
 contract USDCTokenPoolCCTPV2Helper is USDCTokenPoolCCTPV2 {
   constructor(
-    ITokenMessenger legacyTokenMessenger,
     ITokenMessenger tokenMessenger,
     CCTPMessageTransmitterProxy messageTransmitterProxy,
     IBurnMintERC20 token,
     address[] memory allowlist,
     address rmnProxy,
-    address router,
-    address previousPool
+    address router
   )
     USDCTokenPoolCCTPV2(
-      legacyTokenMessenger,
       tokenMessenger,
       messageTransmitterProxy,
       token,
       allowlist,
       rmnProxy,
-      router,
-      previousPool
+      router
     )
   {}
 
