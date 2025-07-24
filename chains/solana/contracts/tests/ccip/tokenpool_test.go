@@ -464,8 +464,6 @@ func TestTokenPool(t *testing.T) {
 							).ValidateAndBuild()
 							require.NoError(t, err)
 
-							testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ixRateAdmin}, anotherAdmin, config.DefaultCommitment)
-
 							// test new rate limit admin
 							ixRatesValid, err := test_token_pool.NewSetChainRateLimitInstruction(config.EvmChainSelector, p.Mint,
 								test_token_pool.RateLimitConfig{
@@ -479,8 +477,6 @@ func TestTokenPool(t *testing.T) {
 								}, poolConfig, p.Chain[config.EvmChainSelector], user.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 							require.NoError(t, err)
 
-							testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ixRatesValid}, user, config.DefaultCommitment)
-
 							// undo rate limit admin
 							ixRateAdmin2, err := test_token_pool.NewSetRateLimitAdminInstruction(
 								p.Mint,
@@ -489,8 +485,6 @@ func TestTokenPool(t *testing.T) {
 								anotherAdmin.PublicKey(),
 							).ValidateAndBuild()
 							require.NoError(t, err)
-
-							testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ixRateAdmin2}, anotherAdmin, config.DefaultCommitment)
 
 							// try to modify rate limit with invalid admin
 							ixRates, err := test_token_pool.NewSetChainRateLimitInstruction(config.EvmChainSelector, p.Mint,
@@ -505,7 +499,7 @@ func TestTokenPool(t *testing.T) {
 								}, poolConfig, p.Chain[config.EvmChainSelector], user.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 							require.NoError(t, err)
 
-							testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ixRates}, user, config.DefaultCommitment, []string{"Unauthorized."})
+							testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ixRateAdmin, ixRatesValid, ixRateAdmin2, ixRates}, user, config.DefaultCommitment, []string{"SetChainRateLimit"}, common.AddSigners(anotherAdmin))
 						})
 
 						t.Run("globally cursed", func(t *testing.T) {
