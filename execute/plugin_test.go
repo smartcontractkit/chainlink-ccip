@@ -953,7 +953,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 				tt.fetchFrom,
 				tt.cursedSourceChains,
 				int(offchainConfigForTest.MaxCommitReportsToFetch), // limit int
-				currentTestLogger,                                  // lggr logger.Logger
+				currentTestLogger,
 			)
 			if !tt.wantErr(t, err, "getPendingReportsForExecution(...)") {
 				return
