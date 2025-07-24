@@ -429,7 +429,7 @@ pub struct SetRateLimitAdmin<'info> {
         constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub state: Account<'info, State>,
-    #[account(mut, constraint = authority.key() == state.config.owner @ CcipTokenPoolError::Unauthorized)]
+    #[account(mut, address = state.config.owner @ CcipTokenPoolError::Unauthorized)]
     pub authority: Signer<'info>,
 }
 
