@@ -1,6 +1,6 @@
-module github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings
+module github.com/smartcontract/chainlink-ccip/chains/solana/gobindings/v0_1_1
 
-go 1.24.2
+go 1.24.4
 
 require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
@@ -8,6 +8,7 @@ require (
 	github.com/gagliardetto/gofuzz v1.2.2
 	github.com/gagliardetto/solana-go v1.13.0
 	github.com/gagliardetto/treeout v0.1.4
+	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20250723112221-ee17ed021f2c
 	github.com/stretchr/testify v1.10.0
 )
 
