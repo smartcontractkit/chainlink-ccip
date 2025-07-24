@@ -419,11 +419,12 @@ func validateCommonStateObservations(
 	}
 
 	// These checks are common to all states.
-	if err := validateCommitReportsReadingEligibility(supportedChains, decodedObservation.CommitReports); err != nil {
+	if err := validateCommitReportsReadingEligibility(
+		supportedChains, p.destChain, decodedObservation.CommitReports); err != nil {
 		return fmt.Errorf("validate commit reports reading eligibility: %w", err)
 	}
 
-	if err := validateObservedSequenceNumbers(supportedChains, decodedObservation.CommitReports); err != nil {
+	if err := validateObservedSequenceNumbers(decodedObservation.CommitReports); err != nil {
 		return fmt.Errorf("validate observed sequence numbers: %w", err)
 	}
 
