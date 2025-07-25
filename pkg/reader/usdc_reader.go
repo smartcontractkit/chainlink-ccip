@@ -445,7 +445,7 @@ func (u solanaUSDCMessageReader) MessagesByTokenID(
 	keyFilter, err := query.Where(
 		// Using same as EVM for consistency. Only used by off-chain components so name does not have to align with on-chain
 		consts.EventNameCCTPMessageSent,
-		expressions...,
+		query.Or(expressions...),
 	)
 	if err != nil {
 		return nil, err
