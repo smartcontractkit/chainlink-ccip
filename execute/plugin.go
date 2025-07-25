@@ -592,7 +592,7 @@ func (p *Plugin) Reports(
 	}
 
 	if len(decodedOutcome.Reports) == 0 {
-		lggr.Warn("empty report", "outcome", decodedOutcome)
+		lggr.Warnw("empty report", "outcome", decodedOutcome)
 		return nil, nil
 	}
 
