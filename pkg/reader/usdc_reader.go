@@ -35,13 +35,13 @@ const (
 // CCTPDestDomains could be fetched from USDC Token Pool
 var CCTPDestDomains = map[uint64]uint32{
 	// ---------- Mainnet Domains ----------
-	sel.ETHEREUM_MAINNET.Selector:                    0,
-	sel.AVALANCHE_MAINNET.Selector:                   1,
-	sel.ETHEREUM_MAINNET_OPTIMISM_1.Selector:         2,
-	sel.ETHEREUM_MAINNET_ARBITRUM_1.Selector:         3,
-	sel.SOLANA_MAINNET.Selector:                      5,
-	sel.ETHEREUM_MAINNET_BASE_1.Selector:             6,
-	sel.POLYGON_MAINNET.Selector:                     7,
+	sel.ETHEREUM_MAINNET.Selector:            0,
+	sel.AVALANCHE_MAINNET.Selector:           1,
+	sel.ETHEREUM_MAINNET_OPTIMISM_1.Selector: 2,
+	sel.ETHEREUM_MAINNET_ARBITRUM_1.Selector: 3,
+	sel.SOLANA_MAINNET.Selector:              5,
+	sel.ETHEREUM_MAINNET_BASE_1.Selector:     6,
+	sel.POLYGON_MAINNET.Selector:             7,
 	// ---------- Testnet Domains ----------
 	sel.ETHEREUM_TESTNET_SEPOLIA.Selector:            0,
 	sel.AVALANCHE_TESTNET_FUJI.Selector:              1,
