@@ -1,7 +1,7 @@
 package test_ccip_receiver // revive:disable-line:var-naming
 
 import (
-	ccipReceiver "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/example_ccip_receiver"
+	ccipReceiver "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/example_ccip_receiver"
 )
 
 // DO NOT DELETE - imported custom types are are not-automatically resolved by `anchor-go` but are declared in the anchor idl
