@@ -843,7 +843,7 @@ export type BaseTokenPool = {
     {
       "code": 6021,
       "name": "TransferZeroTokensNotAllowed",
-      "msg": "Transfering zero tokens is not allowed"
+      "msg": "Transferring zero tokens is not allowed"
     }
   ]
 };
@@ -1693,7 +1693,7 @@ export const IDL: BaseTokenPool = {
     {
       "code": 6021,
       "name": "TransferZeroTokensNotAllowed",
-      "msg": "Transfering zero tokens is not allowed"
+      "msg": "Transferring zero tokens is not allowed"
     }
   ]
 };

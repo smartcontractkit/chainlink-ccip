@@ -387,7 +387,7 @@ pub mod cctp_token_pool {
 
         Ok(LockOrBurnOutV1 {
             dest_token_address: ctx.accounts.chain_config.base.remote.token_address.clone(),
-            // The dest_poll_data is then read by the remote pool, so we standardize on ABI-encoding
+            // The dest_pool_data is then read by the remote pool, so we standardize on ABI-encoding
             dest_pool_data: extra_data.abi_encode().to_vec(),
         })
     }

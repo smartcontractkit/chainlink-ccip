@@ -1104,11 +1104,11 @@ func (value OcrPluginType) String() string {
 	}
 }
 
-type DeriveExecuteAccountsStage interface {
-	isDeriveExecuteAccountsStage()
+type DeriveAccountsExecuteStage interface {
+	isDeriveAccountsExecuteStage()
 }
 
-type deriveExecuteAccountsStageContainer struct {
+type deriveAccountsExecuteStageContainer struct {
 	Enum                        ag_binary.BorshEnum `borsh_enum:"true"`
 	Start                       Start
 	FinishMainAccountList       FinishMainAccountList
@@ -1128,7 +1128,7 @@ func (obj *Start) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	return nil
 }
 
-func (_ *Start) isDeriveExecuteAccountsStage() {}
+func (_ *Start) isDeriveAccountsExecuteStage() {}
 
 type FinishMainAccountList uint8
 
@@ -1140,7 +1140,7 @@ func (obj *FinishMainAccountList) UnmarshalWithDecoder(decoder *ag_binary.Decode
 	return nil
 }
 
-func (_ *FinishMainAccountList) isDeriveExecuteAccountsStage() {}
+func (_ *FinishMainAccountList) isDeriveAccountsExecuteStage() {}
 
 type RetrieveTokenLUTs uint8
 
@@ -1152,7 +1152,7 @@ func (obj *RetrieveTokenLUTs) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (
 	return nil
 }
 
-func (_ *RetrieveTokenLUTs) isDeriveExecuteAccountsStage() {}
+func (_ *RetrieveTokenLUTs) isDeriveAccountsExecuteStage() {}
 
 type RetrievePoolPrograms uint8
 
@@ -1164,7 +1164,7 @@ func (obj *RetrievePoolPrograms) UnmarshalWithDecoder(decoder *ag_binary.Decoder
 	return nil
 }
 
-func (_ *RetrievePoolPrograms) isDeriveExecuteAccountsStage() {}
+func (_ *RetrievePoolPrograms) isDeriveAccountsExecuteStage() {}
 
 type TokenTransferStaticAccounts struct {
 	Token uint32
@@ -1199,7 +1199,7 @@ func (obj *TokenTransferStaticAccounts) UnmarshalWithDecoder(decoder *ag_binary.
 	return nil
 }
 
-func (_ *TokenTransferStaticAccounts) isDeriveExecuteAccountsStage() {}
+func (_ *TokenTransferStaticAccounts) isDeriveAccountsExecuteStage() {}
 
 type NestedTokenDerive struct {
 	Token         uint32
@@ -1234,7 +1234,7 @@ func (obj *NestedTokenDerive) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (
 	return nil
 }
 
-func (_ *NestedTokenDerive) isDeriveExecuteAccountsStage() {}
+func (_ *NestedTokenDerive) isDeriveAccountsExecuteStage() {}
 
 type MessageExecutionState ag_binary.BorshEnum
 

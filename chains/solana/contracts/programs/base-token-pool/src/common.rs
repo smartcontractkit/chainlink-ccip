@@ -604,7 +604,7 @@ pub enum CcipTokenPoolError {
     // Lock/Release errors
     #[msg("Liquidity not accepted")]
     LiquidityNotAccepted,
-    #[msg("Transfering zero tokens is not allowed")]
+    #[msg("Transferring zero tokens is not allowed")]
     TransferZeroTokensNotAllowed,
 }
 
@@ -707,7 +707,7 @@ pub fn to_svm_token_amount(
 ) -> Result<u64> {
     let mut incoming_amount = U256::from_little_endian(&incoming_amount_bytes);
 
-    // handle differences in decimals by multipling/dividing by 10^N
+    // handle differences in decimals by multiplying/dividing by 10^N
     match incoming_decimal.cmp(&local_decimal) {
         std::cmp::Ordering::Less => {
             incoming_amount = incoming_amount

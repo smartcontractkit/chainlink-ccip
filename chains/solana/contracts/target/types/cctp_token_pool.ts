@@ -787,7 +787,8 @@ export type CctpTokenPool = {
           "isSigner": false,
           "docs": [
             "CHECK this is CCTP's MessageTransmitter program, which",
-            "is invoked CCTP's TokenMessengerMinter by this program."
+            "is invoked transitively by CCTP's TokenMessengerMinter,",
+            "which in turn is invoked explicitly by this program."
           ]
         },
         {
@@ -2146,7 +2147,8 @@ export const IDL: CctpTokenPool = {
           "isSigner": false,
           "docs": [
             "CHECK this is CCTP's MessageTransmitter program, which",
-            "is invoked CCTP's TokenMessengerMinter by this program."
+            "is invoked transitively by CCTP's TokenMessengerMinter,",
+            "which in turn is invoked explicitly by this program."
           ]
         },
         {

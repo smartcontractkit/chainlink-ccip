@@ -67,4 +67,38 @@ pub mod router_accounts {
         // needed to interact with it.
         pub supports_auto_derivation: bool,
     }
+
+    #[derive(AnchorDeserialize)]
+    pub(super) struct TokenAdminRegistryV1 {
+        pub version: u8,
+        pub administrator: Pubkey,
+        pub pending_administrator: Pubkey,
+        pub lookup_table: Pubkey,
+        pub writable_indexes: [u128; 2],
+        pub mint: Pubkey,
+    }
+
+    impl TryFrom<TokenAdminRegistryV1> for TokenAdminRegistry {
+        type Error = anchor_lang::error::Error;
+
+        fn try_from(
+            v1: TokenAdminRegistryV1,
+        ) -> std::result::Result<TokenAdminRegistry, Self::Error> {
+            require_eq!(
+                v1.version,
+                1, // this deserialization is only valid for v1
+                CommonCcipError::InvalidInputsTokenAdminRegistryAccounts
+            );
+
+            Ok(TokenAdminRegistry {
+                version: 1,
+                administrator: v1.administrator,
+                pending_administrator: v1.pending_administrator,
+                lookup_table: v1.lookup_table,
+                writable_indexes: v1.writable_indexes,
+                mint: v1.mint,
+                supports_auto_derivation: false, // this is not part of the v1 data, it defaults to false
+            })
+        }
+    }
 }

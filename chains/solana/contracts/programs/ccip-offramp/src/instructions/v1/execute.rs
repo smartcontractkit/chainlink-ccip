@@ -139,25 +139,25 @@ impl Execute for Impl {
         params: DeriveAccountsExecuteParams,
         stage: String,
     ) -> Result<DeriveAccountsResponse> {
-        let stage = derive::DeriveExecuteAccountsStage::from_str(stage.as_str())?;
+        let stage = derive::DeriveAccountsExecuteStage::from_str(stage.as_str())?;
 
         match stage {
-            derive::DeriveExecuteAccountsStage::Start => {
+            derive::DeriveAccountsExecuteStage::Start => {
                 derive::derive_execute_accounts_start(params.source_chain_selector)
             }
-            derive::DeriveExecuteAccountsStage::FinishMainAccountList => {
+            derive::DeriveAccountsExecuteStage::FinishMainAccountList => {
                 derive::derive_execute_accounts_build_main_account_list(ctx, &params)
             }
-            derive::DeriveExecuteAccountsStage::RetrieveTokenLUTs => {
+            derive::DeriveAccountsExecuteStage::RetrieveTokenLUTs => {
                 derive::derive_execute_accounts_retrieve_luts(ctx)
             }
-            derive::DeriveExecuteAccountsStage::RetrievePoolPrograms => {
+            derive::DeriveAccountsExecuteStage::RetrievePoolPrograms => {
                 derive::derive_execute_accounts_retrieve_pool_programs(ctx)
             }
-            derive::DeriveExecuteAccountsStage::TokenTransferStaticAccounts { token, page } => {
+            derive::DeriveAccountsExecuteStage::TokenTransferStaticAccounts { token, page } => {
                 derive::derive_execute_accounts_additional_tokens_static(ctx, &params, page, token)
             }
-            derive::DeriveExecuteAccountsStage::NestedTokenDerive {
+            derive::DeriveAccountsExecuteStage::NestedTokenDerive {
                 token,
                 token_substage,
             } => derive::derive_execute_accounts_additional_token_nested(
@@ -261,7 +261,7 @@ fn internal_execute<'info>(
         verify_merkle_root(
             &execution_report,
             commit_report.merkle_root,
-            None.into_iter(),
+            None,
             &source_chain.config.on_ramp,
         )?
     };
@@ -499,18 +499,15 @@ impl<'a> ExecuteReportContextRemainingAccountsLayout<'a> {
         self.messaging_accounts.is_some()
     }
 
-    pub fn receiver_and_message_account_keys(&self) -> impl Iterator<Item = Pubkey> {
-        let keys: Vec<Pubkey> = self
-            .messaging_accounts
+    pub fn receiver_and_message_account_keys(&self) -> Vec<Pubkey> {
+        self.messaging_accounts
             .iter()
             .flat_map(|accs| {
                 Some(accs.logic_receiver.key())
                     .into_iter()
                     .chain(accs.remaining_messaging_accounts.iter().map(|a| a.key()))
             })
-            .collect();
-
-        keys.into_iter()
+            .collect()
     }
 
     pub fn get_token_accounts_for<'b>(
@@ -657,7 +654,7 @@ pub fn verify_merkle_root(
     expected_root: [u8; 32],
     // logic receiver followed by all other message account keys, when they were
     // provided (i.e. when the message isn't a token transfer exclusively)
-    recv_and_msg_account_keys: impl Iterator<Item = Pubkey>,
+    recv_and_msg_account_keys: impl IntoIterator<Item = Pubkey>,
     on_ramp_address: &OnRampAddress,
 ) -> Result<[u8; 32]> {
     let hashed_leaf = hash(
@@ -718,7 +715,7 @@ pub fn validate_execution_report<'info>(
 
 fn hash(
     msg: &Any2SVMRampMessage,
-    recv_and_msg_account_keys: impl Iterator<Item = Pubkey>,
+    recv_and_msg_account_keys: impl IntoIterator<Item = Pubkey>,
     on_ramp_address: &OnRampAddress,
 ) -> [u8; 32] {
     use anchor_lang::solana_program::keccak;
@@ -735,6 +732,7 @@ fn hash(
     let header_nonce = msg.header.nonce.to_be_bytes();
 
     let remaining_account_bytes: Vec<u8> = recv_and_msg_account_keys
+        .into_iter()
         .flat_map(|k| k.try_to_vec().unwrap())
         .collect();
 
