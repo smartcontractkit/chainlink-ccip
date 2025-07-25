@@ -123,9 +123,14 @@ func reportRangesOutcome(
 		}
 
 		if onRampMaxSeqNum < offRampNextSeqNum-1 {
-			lggr.Errorw("sequence numbers between offRamp and onRamp reached an impossible state, "+
-				"offRamp latest executed sequence number is greater than onRamp latest executed sequence number",
-				"chain", chainSel, "onRampMaxSeqNum", onRampMaxSeqNum, "offRampNextSeqNum", offRampNextSeqNum)
+			if onRampMaxSeqNum == 0 {
+				lggr.Infow("OnRamp max sequence numbers consensus = 0. This might not indicate an issue" +
+					" but if it persists without progress on the commit plugin, investigate why oracles observe 0")
+			} else {
+				lggr.Errorw("sequence numbers between offRamp and onRamp reached an impossible state, "+
+					"offRamp latest executed sequence number is greater than onRamp latest executed sequence number",
+					"chain", chainSel, "onRampMaxSeqNum", onRampMaxSeqNum, "offRampNextSeqNum", offRampNextSeqNum)
+			}
 		}
 
 		newMsgsExist := offRampNextSeqNum <= onRampMaxSeqNum
