@@ -10944,7 +10944,7 @@ func TestCCIPRouter(t *testing.T) {
 					config.CcipOfframpProgram,
 				)
 
-				require.Len(t, derivedLookUpTables, 2, "Expected one lookup table to be derived")
+				require.Len(t, derivedLookUpTables, 2, "Expected two lookup tables to be derived")
 				require.Contains(t, derivedLookUpTables, usdcPool.PoolLookupTable, "Expected USDC pool lookup table to be derived")
 				require.Contains(t, derivedLookUpTables, offrampLookupTableAddr, "Expected offramp lookup table to be derived")
 
