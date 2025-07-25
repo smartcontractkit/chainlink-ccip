@@ -384,7 +384,9 @@ func (p *Plugin) ValidateObservation(
 		}
 	}
 
-	if err = validateCommonStateObservations(p, ao.Observer, decodedObservation, supportedChains); err != nil {
+	state := previousOutcome.State.Next()
+
+	if err = validateCommonStateObservations(p, ao.Observer, decodedObservation, supportedChains, state); err != nil {
 		return err
 	}
 
@@ -413,17 +415,19 @@ func validateCommonStateObservations(
 	oracleID commontypes.OracleID,
 	decodedObservation exectypes.Observation,
 	supportedChains mapset.Set[cciptypes.ChainSelector],
+	state exectypes.PluginState,
 ) error {
 	if err := plugincommon.ValidateFChain(decodedObservation.FChain); err != nil {
 		return fmt.Errorf("failed to validate FChain: %w", err)
 	}
 
 	// These checks are common to all states.
-	if err := validateCommitReportsReadingEligibility(supportedChains, decodedObservation.CommitReports); err != nil {
+	if err := validateCommitReportsReadingEligibility(
+		state, supportedChains, p.destChain, decodedObservation.CommitReports); err != nil {
 		return fmt.Errorf("validate commit reports reading eligibility: %w", err)
 	}
 
-	if err := validateObservedSequenceNumbers(supportedChains, decodedObservation.CommitReports); err != nil {
+	if err := validateObservedSequenceNumbers(decodedObservation.CommitReports); err != nil {
 		return fmt.Errorf("validate observed sequence numbers: %w", err)
 	}
 
