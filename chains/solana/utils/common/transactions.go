@@ -16,10 +16,24 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/fees"
 )
 
+type FindTxTimeoutError struct {
+	Signature solana.Signature
+}
+
+func (e *FindTxTimeoutError) Error() string {
+	return fmt.Sprintf("unable to find transaction within timeout (sig: %v)", e.Signature)
+}
+
 func SendAndConfirm(ctx context.Context, rpcClient *rpc.Client, instructions []solana.Instruction,
 	signer solana.PrivateKey, commitment rpc.CommitmentType, opts ...TxModifier) (*rpc.GetTransactionResult, error) {
 	emptyLookupTables := map[solana.PublicKey]solana.PublicKeySlice{}
 	return SendAndConfirmWithLookupTables(ctx, rpcClient, instructions, signer, commitment, emptyLookupTables, opts...)
+}
+
+func SendAndConfirmWithRetries(ctx context.Context, rpcClient *rpc.Client, instructions []solana.Instruction,
+	signer solana.PrivateKey, commitment rpc.CommitmentType, opts ...TxModifier) (*rpc.GetTransactionResult, error) {
+	emptyLookupTables := map[solana.PublicKey]solana.PublicKeySlice{}
+	return SendAndConfirmWithLookupTablesAndRetries(ctx, rpcClient, instructions, signer, commitment, emptyLookupTables, opts...)
 }
 
 func SendAndConfirmWithLookupTables(ctx context.Context, rpcClient *rpc.Client, instructions []solana.Instruction,
@@ -242,7 +256,7 @@ func sendTransactionWithLookupTables(ctx context.Context, rpcClient *rpc.Client,
 	count := 0
 	for txStatus != rpc.ConfirmationStatusConfirmed && txStatus != rpc.ConfirmationStatusFinalized {
 		if count > 500 {
-			return nil, fmt.Errorf("unable to find transaction within timeout (sig: %v)", txsig)
+			return nil, &FindTxTimeoutError{Signature: txsig}
 		}
 		count++
 		statusRes, sigErr := rpcClient.GetSignatureStatuses(ctx, true, txsig)
