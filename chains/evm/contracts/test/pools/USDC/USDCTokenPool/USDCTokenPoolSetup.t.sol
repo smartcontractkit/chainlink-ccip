@@ -6,6 +6,11 @@ import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
 import {USDCTokenPoolHelper} from "../../../helpers/USDCTokenPoolHelper.sol";
 import {USDCSetup} from "../USDCSetup.t.sol";
 
+import {MockE2EUSDCTransmitter} from "../../../mocks/MockE2EUSDCTransmitter.sol";
+import {MockUSDCTokenMessenger} from "../../../mocks/MockUSDCTokenMessenger.sol";
+
+import {BurnMintERC677} from "@chainlink/contracts/src/v0.8/shared/token/ERC677/BurnMintERC677.sol";
+
 contract USDCTokenPoolSetup is USDCSetup {
   USDCTokenPoolHelper internal s_usdcTokenPool;
   USDCTokenPoolHelper internal s_usdcTokenPoolWithAllowList;
@@ -13,6 +18,14 @@ contract USDCTokenPoolSetup is USDCSetup {
 
   function setUp() public virtual override {
     super.setUp();
+
+    s_mockUSDCTransmitter = new MockE2EUSDCTransmitter(0, DEST_DOMAIN_IDENTIFIER, address(s_USDCToken));
+    s_mockUSDC = new MockUSDCTokenMessenger(0, address(s_mockUSDCTransmitter));
+    s_mockLegacyUSDC = new MockUSDCTokenMessenger(0, address(s_mockUSDCTransmitter));
+    s_cctpMessageTransmitterProxy = new CCTPMessageTransmitterProxy(s_mockUSDC);
+
+    BurnMintERC677(address(s_USDCToken)).grantMintAndBurnRoles(address(s_mockUSDCTransmitter));
+    BurnMintERC677(address(s_USDCToken)).grantMintAndBurnRoles(address(s_mockUSDC));
 
     s_usdcTokenPool = new USDCTokenPoolHelper(
       s_mockUSDC,
@@ -23,6 +36,19 @@ contract USDCTokenPoolSetup is USDCSetup {
       address(s_router),
       s_previousPool
     );
+
+    // Allow the usdcTokenPool to be used as a token pool proxy
+    address[] memory allowedTokenPoolProxies = new address[](3);
+    allowedTokenPoolProxies[0] = address(OWNER);
+    allowedTokenPoolProxies[1] = address(s_routerAllowedOnRamp);
+    allowedTokenPoolProxies[2] = address(s_routerAllowedOffRamp);
+
+    bool[] memory allowed = new bool[](5);
+    for(uint256 i = 0; i < allowedTokenPoolProxies.length; i++) {
+      allowed[i] = true;
+    }
+
+    s_usdcTokenPool.setAllowedTokenPoolProxies(allowedTokenPoolProxies, allowed); 
 
     CCTPMessageTransmitterProxy.AllowedCallerConfigArgs[] memory allowedCallerParams =
       new CCTPMessageTransmitterProxy.AllowedCallerConfigArgs[](1);
@@ -41,6 +67,8 @@ contract USDCTokenPoolSetup is USDCSetup {
       s_previousPool
     );
 
+    s_usdcTokenPoolWithAllowList.setAllowedTokenPoolProxies(allowedTokenPoolProxies, allowed);
+
     _poolApplyChainUpdates(address(s_usdcTokenPool));
     _poolApplyChainUpdates(address(s_usdcTokenPoolWithAllowList));
 
@@ -50,7 +78,8 @@ contract USDCTokenPoolSetup is USDCSetup {
       mintRecipient: bytes32(0),
       domainIdentifier: 9999,
       allowedCaller: keccak256("allowedCallerDestChain"),
-      enabled: true
+      enabled: true,
+      cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V1
     });
 
     s_usdcTokenPool.setDomains(domains);

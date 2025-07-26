@@ -5,7 +5,7 @@ import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/I
 
 import {Pool} from "../../libraries/Pool.sol";
 import {BurnMintTokenPool} from "../BurnMintTokenPool.sol";
-import {LOCK_RELEASE_FLAG} from "./HybridLockReleaseUSDCTokenPool.sol";
+import {LOCK_RELEASE_FLAG} from "./USDCTokenPoolProxy.sol";
 
 /// @notice A standard BurnMintTokenPool with modified destPoolData so that the remote pool knows to release tokens
 /// instead of minting. This enables interoperability with HybridLockReleaseUSDCTokenPool which uses
