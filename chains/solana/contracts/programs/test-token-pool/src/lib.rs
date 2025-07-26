@@ -115,6 +115,18 @@ pub mod test_token_pool {
         )
     }
 
+    // set rate limit admin
+    pub fn set_rate_limit_admin(
+        ctx: Context<SetRateLimitAdmin>,
+        _mint: Pubkey,
+        new_rate_limit_admin: Pubkey,
+    ) -> Result<()> {
+        ctx.accounts
+            .state
+            .config
+            .set_rate_limit_admin(new_rate_limit_admin)
+    }
+
     // delete chain config
     pub fn delete_chain_config(
         _ctx: Context<DeleteChainConfig>,

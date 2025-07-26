@@ -632,6 +632,26 @@ export type BaseTokenPool = {
       ]
     },
     {
+      "name": "RateLimitAdminSet",
+      "fields": [
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "oldRateLimitAdmin",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "newRateLimitAdmin",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "OwnershipTransferRequested",
       "fields": [
         {
@@ -1476,6 +1496,26 @@ export const IDL: BaseTokenPool = {
         },
         {
           "name": "mint",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "RateLimitAdminSet",
+      "fields": [
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "oldRateLimitAdmin",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "newRateLimitAdmin",
           "type": "publicKey",
           "index": false
         }

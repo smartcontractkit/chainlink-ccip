@@ -94,6 +94,7 @@ pub struct AdminUpdateTokenPool<'info> {
     #[account(
         seeds = [POOL_STATE_SEED, mint.key().as_ref()],
         bump,
+        constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub state: Account<'info, State>, // config PDA for token pool
     pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
@@ -150,7 +151,8 @@ pub struct AddToAllowList<'info> {
         bump,
         realloc = ANCHOR_DISCRIMINATOR + State::INIT_SPACE + 32 * (state.config.allow_list.len() + add.len()),
         realloc::payer = authority,
-        realloc::zero = false
+        realloc::zero = false,
+        constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub state: Account<'info, State>,
     pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
@@ -168,7 +170,8 @@ pub struct RemoveFromAllowlist<'info> {
         bump,
         realloc = ANCHOR_DISCRIMINATOR + State::INIT_SPACE + 32 * (state.config.allow_list.len().saturating_sub(remove.len())),
         realloc::payer = authority,
-        realloc::zero = false
+        realloc::zero = false,
+        constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub state: Account<'info, State>,
     pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
@@ -183,6 +186,7 @@ pub struct AcceptOwnership<'info> {
         mut,
         seeds = [POOL_STATE_SEED, mint.key().as_ref()],
         bump,
+        constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub state: Account<'info, State>,
     pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
@@ -224,6 +228,7 @@ pub struct TokenOfframp<'info> {
     #[account(
         seeds = [POOL_STATE_SEED, mint.key().as_ref()],
         bump,
+        constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub state: Account<'info, State>,
     #[account(address = *mint.to_account_info().owner)]
@@ -288,6 +293,7 @@ pub struct TokenOnramp<'info> {
     #[account(
         seeds = [POOL_STATE_SEED, mint.key().as_ref()],
         bump,
+        constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub state: Account<'info, State>,
     #[account(address = *mint.to_account_info().owner)]
@@ -344,6 +350,7 @@ pub struct InitializeChainConfig<'info> {
     #[account(
         seeds = [POOL_STATE_SEED, mint.key().as_ref()],
         bump,
+        constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub state: Account<'info, State>,
     #[account(
@@ -365,6 +372,7 @@ pub struct SetChainRateLimit<'info> {
     #[account(
         seeds = [POOL_STATE_SEED, mint.key().as_ref()],
         bump,
+        constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub state: Account<'info, State>,
     #[account(
@@ -373,7 +381,21 @@ pub struct SetChainRateLimit<'info> {
         bump,
     )]
     pub chain_config: Account<'info, ChainConfig>,
-    #[account(mut, constraint = authority.key() == state.config.owner || authority.key() == state.config.rate_limit_admin)]
+    #[account(mut, constraint = authority.key() == state.config.owner || authority.key() == state.config.rate_limit_admin @ CcipTokenPoolError::Unauthorized)]
+    pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
+#[instruction(mint: Pubkey)]
+pub struct SetRateLimitAdmin<'info> {
+    #[account(
+        mut,
+        seeds = [POOL_STATE_SEED, mint.key().as_ref()],
+        bump,
+        constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
+    )]
+    pub state: Account<'info, State>,
+    #[account(mut, address = state.config.owner @ CcipTokenPoolError::Unauthorized)]
     pub authority: Signer<'info>,
 }
 
@@ -383,6 +405,7 @@ pub struct EditChainConfigDynamicSize<'info> {
     #[account(
         seeds = [POOL_STATE_SEED, mint.key().as_ref()],
         bump,
+        constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub state: Account<'info, State>,
     #[account(
@@ -405,6 +428,7 @@ pub struct AppendRemotePoolAddresses<'info> {
     #[account(
         seeds = [POOL_STATE_SEED, mint.key().as_ref()],
         bump,
+        constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub state: Account<'info, State>,
     #[account(
@@ -429,6 +453,7 @@ pub struct DeleteChainConfig<'info> {
     #[account(
         seeds = [POOL_STATE_SEED, mint.key().as_ref()],
         bump,
+        constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub state: Account<'info, State>,
     #[account(
@@ -447,6 +472,7 @@ pub struct RebalancerTokenTransfer<'info> {
     #[account(
         seeds = [POOL_STATE_SEED, mint.key().as_ref()],
         bump,
+        constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub state: Account<'info, State>,
     #[account(address = *mint.to_account_info().owner)]
