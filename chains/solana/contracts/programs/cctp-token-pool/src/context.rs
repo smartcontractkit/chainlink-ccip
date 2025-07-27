@@ -234,7 +234,7 @@ pub struct TokenOfframp<'info> {
     )]
     pub state: Account<'info, State>,
 
-    #[account(address = *mint.to_account_info().owner)]
+    #[account(address = state.config.token_program)]
     pub token_program: Interface<'info, TokenInterface>,
 
     #[account(mut)]
