@@ -953,7 +953,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 				tt.fetchFrom,
 				tt.cursedSourceChains,
 				int(offchainConfigForTest.MaxCommitReportsToFetch), // limit int
-				currentTestLogger, // lggr logger.Logger
+				currentTestLogger,
 			)
 			if !tt.wantErr(t, err, "getPendingReportsForExecution(...)") {
 				return
@@ -1084,7 +1084,7 @@ func TestPlugin_ValidateObservation_IneligibleCommitReportsObserver(t *testing.T
 	commitReports := map[cciptypes.ChainSelector][]exectypes.CommitData{
 		1: {
 			{
-				MerkleRoot:          cciptypes.Bytes32{},
+				MerkleRoot:          cciptypes.Bytes32{123},
 				SequenceNumberRange: cciptypes.NewSeqNumRange(1, 2),
 				SourceChain:         1,
 			},
@@ -1101,7 +1101,7 @@ func TestPlugin_ValidateObservation_IneligibleCommitReportsObserver(t *testing.T
 	require.Error(t, err)
 	assert.Contains(t,
 		err.Error(),
-		"validate commit reports reading eligibility: observer not allowed to read from chain 1")
+		"destination chain not supported but observed commit report")
 }
 
 func TestPlugin_ValidateObservation_ValidateObservedSeqNum_Error(t *testing.T) {
