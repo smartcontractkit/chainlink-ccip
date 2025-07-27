@@ -28,7 +28,7 @@ impl Admin for Impl {
         require_keys_neq!(
             proposed_owner,
             Pubkey::default(),
-            FeeQuoterError::RedundantOwnerProposal
+            FeeQuoterError::DefaultOwnerProposal
         );
         require_keys_neq!(
             proposed_owner,

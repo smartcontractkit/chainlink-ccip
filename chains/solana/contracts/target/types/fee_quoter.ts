@@ -1736,6 +1736,11 @@ export type FeeQuoter = {
       "code": 8036,
       "name": "InvalidCodeVersion",
       "msg": "Invalid code version"
+    },
+    {
+      "code": 8037,
+      "name": "DefaultOwnerProposal",
+      "msg": "Proposed owner is the default pubkey"
     }
   ]
 };
@@ -3478,6 +3483,11 @@ export const IDL: FeeQuoter = {
       "code": 8036,
       "name": "InvalidCodeVersion",
       "msg": "Invalid code version"
+    },
+    {
+      "code": 8037,
+      "name": "DefaultOwnerProposal",
+      "msg": "Proposed owner is the default pubkey"
     }
   ]
 };

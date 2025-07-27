@@ -2335,6 +2335,11 @@ export type CcipRouter = {
       "code": 7030,
       "name": "AccountDerivationResponseTooLarge",
       "msg": "Can't fit account derivation response."
+    },
+    {
+      "code": 7031,
+      "name": "DefaultOwnerProposal",
+      "msg": "Proposed owner is the default pubkey"
     }
   ]
 };
@@ -4676,6 +4681,11 @@ export const IDL: CcipRouter = {
       "code": 7030,
       "name": "AccountDerivationResponseTooLarge",
       "msg": "Can't fit account derivation response."
+    },
+    {
+      "code": 7031,
+      "name": "DefaultOwnerProposal",
+      "msg": "Proposed owner is the default pubkey"
     }
   ]
 };

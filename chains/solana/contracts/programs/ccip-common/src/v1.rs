@@ -266,7 +266,8 @@ fn load_v1_token_admin_registry(
 ) -> Result<TokenAdminRegistry> {
     const ANCHOR_DISCRIMINATOR_SIZE: usize = 8;
 
-    let data = token_admin_registry.try_borrow_data()?;
+    let borrowed_data = token_admin_registry.try_borrow_data()?;
+    let (discriminator, data) = borrowed_data.split_at(ANCHOR_DISCRIMINATOR_SIZE);
 
     require_keys_eq!(
         token_admin_registry.owner.key(),
@@ -275,13 +276,12 @@ fn load_v1_token_admin_registry(
     );
 
     require!(
-        TokenAdminRegistry::DISCRIMINATOR == data[..ANCHOR_DISCRIMINATOR_SIZE],
+        TokenAdminRegistry::DISCRIMINATOR == discriminator,
         CommonCcipError::InvalidInputsTokenAdminRegistryAccounts
     );
 
-    let token_admin_registry_v1 =
-        TokenAdminRegistryV1::deserialize(&mut &data[ANCHOR_DISCRIMINATOR_SIZE..])
-            .map_err(|_| CommonCcipError::InvalidInputsTokenAdminRegistryAccounts)?;
+    let token_admin_registry_v1 = TokenAdminRegistryV1::deserialize(&mut &data[..])
+        .map_err(|_| CommonCcipError::InvalidInputsTokenAdminRegistryAccounts)?;
 
     TokenAdminRegistry::try_from(token_admin_registry_v1)
 }

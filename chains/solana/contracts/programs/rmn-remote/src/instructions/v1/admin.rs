@@ -13,7 +13,7 @@ impl Admin for Impl {
         require_keys_neq!(
             proposed_owner,
             Pubkey::default(),
-            RmnRemoteError::RedundantOwnerProposal
+            RmnRemoteError::DefaultOwnerProposal
         );
         require_keys_neq!(
             proposed_owner,
