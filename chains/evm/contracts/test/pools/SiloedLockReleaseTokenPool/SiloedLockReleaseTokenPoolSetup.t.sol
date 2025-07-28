@@ -6,6 +6,9 @@ import {SiloedLockReleaseTokenPool} from "../../../pools/SiloedLockReleaseTokenP
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {BaseTest} from "../../BaseTest.t.sol";
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
+import {ERC20LockBox} from "../../../pools/ERC20LockBox.sol";
+
+import {TokenAdminRegistry} from "../../../tokenAdminRegistry/TokenAdminRegistry.sol";
 
 import {IERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
@@ -24,15 +27,32 @@ contract SiloedLockReleaseTokenPoolSetup is BaseTest {
   address internal s_siloedDestPoolAddress = address(4245234524);
   uint64 internal constant SILOED_CHAIN_SELECTOR = DEST_CHAIN_SELECTOR + 1;
 
+  ERC20LockBox internal s_lockBox;
+  TokenAdminRegistry internal s_tokenAdminRegistry;
+
   function setUp() public virtual override {
     super.setUp();
     s_token = new BurnMintERC20("LINK", "LNK", 18, 0, 0);
     deal(address(s_token), OWNER, type(uint256).max);
 
+    s_tokenAdminRegistry = new TokenAdminRegistry();
+    s_lockBox = new ERC20LockBox(address(s_tokenAdminRegistry));
+
     s_siloedLockReleaseTokenPool = new SiloedLockReleaseTokenPool(
-      s_token, DEFAULT_TOKEN_DECIMALS, new address[](0), address(s_mockRMNRemote), address(s_sourceRouter)
+      s_token, DEFAULT_TOKEN_DECIMALS, new address[](0), address(s_mockRMNRemote), address(s_sourceRouter), address(s_lockBox)
     );
 
+    vm.mockCall(
+      address(s_tokenAdminRegistry),
+      abi.encodeWithSignature("getTokenConfig(address)", address(s_token)),
+      abi.encode(TokenAdminRegistry.TokenConfig({
+        administrator: OWNER,
+        pendingAdministrator: address(0),
+        tokenPool: address(s_siloedLockReleaseTokenPool)
+      }))
+    );
+
+    // Set the rebalancer for the token pool
     s_siloedLockReleaseTokenPool.setRebalancer(OWNER);
 
     s_token.approve(address(s_siloedLockReleaseTokenPool), type(uint256).max);

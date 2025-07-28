@@ -1,28 +1,25 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IPoolV1} from "../../interfaces/IPool.sol";
-import {IRMN} from "../../interfaces/IRMN.sol";
-import {IMessageTransmitter} from "./interfaces/IMessageTransmitter.sol";
 import {ITokenMessenger} from "./interfaces/ITokenMessenger.sol";
+import {IMessageTransmitter} from "./interfaces/IMessageTransmitter.sol";
+import {IPoolV1} from "../../interfaces/IPool.sol";
 
-import {Pool} from "../../libraries/Pool.sol";
-import {TokenAdminRegistry} from "../../tokenAdminRegistry/TokenAdminRegistry.sol";
-import {TokenPool} from "../TokenPool.sol";
 import {CCTPMessageTransmitterProxy} from "./CCTPMessageTransmitterProxy.sol";
+import {Pool} from "../../libraries/Pool.sol";
+import {TokenPool} from "../TokenPool.sol";
 
-import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
+
 import {IERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
-
+import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 import {EnumerableSet} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableSet.sol";
 import {IERC165} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
 
-import {console2 as console} from "forge-std/console2.sol";
 
 /// @notice This pool mints and burns USDC tokens through the Cross Chain Transfer
 /// Protocol (CCTP).
@@ -149,17 +146,11 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
 
     uint32 transmitterVersion = transmitter.version();
 
-    console.log("transmitterVersion", transmitterVersion);
-    console.log("i_supportedUSDCVersion", i_supportedUSDCVersion);
-
     if (transmitterVersion != i_supportedUSDCVersion) {
       revert InvalidMessageVersion(transmitterVersion, i_supportedUSDCVersion);
     }
 
     uint32 tokenMessengerVersion = tokenMessenger.messageBodyVersion();
-
-    console.log("tokenMessengerVersion", tokenMessengerVersion);
-    console.log("i_supportedUSDCVersion", i_supportedUSDCVersion);
 
     if (tokenMessengerVersion != i_supportedUSDCVersion) {
       revert InvalidTokenMessengerVersion(tokenMessengerVersion, i_supportedUSDCVersion);

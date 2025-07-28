@@ -15,13 +15,7 @@ contract SiloedUSDCTokenPool_releaseOrMint is SiloedUSDCTokenPoolSetup {
   function setUp() public virtual override {
     super.setUp();
     
-    // Set up the allowed token pool proxies for testing
-    address[] memory tokenPoolProxies = new address[](1);
-    tokenPoolProxies[0] = s_routerAllowedOffRamp;
-    bool[] memory allowed = new bool[](1);
-    allowed[0] = true;
-    s_usdcTokenPool.setAllowedTokenPoolProxies(tokenPoolProxies, allowed);
-
+   
     // Set up silo designation for the test chain
     vm.startPrank(OWNER);
     uint64[] memory removes = new uint64[](0);

@@ -5,6 +5,7 @@ import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/I
 
 import {Pool} from "../libraries/Pool.sol";
 import {TokenPool} from "./TokenPool.sol";
+import {ERC20LockBox} from "./ERC20LockBox.sol";
 
 import {IERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
@@ -36,6 +37,9 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
   /// @notice The rebalancer for unsiloed chains, which can add liquidity to the shared pool.
   address internal s_rebalancer;
 
+  /// @notice The lock box for the token pool.
+  ERC20LockBox internal immutable i_lockBox;
+
   struct SiloConfigUpdate {
     uint64 remoteChainSelector;
     address rebalancer;
@@ -50,13 +54,20 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
   /// @notice The configuration for each chain that is siloed, or not. By default chains are not siloed.
   mapping(uint64 remoteChainSelector => SiloConfig) internal s_chainConfigs;
 
+
   constructor(
     IERC20 token,
     uint8 localTokenDecimals,
     address[] memory allowlist,
     address rmnProxy,
-    address router
-  ) TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) {}
+    address router,
+    address lockBox
+  ) TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) {
+    if (lockBox == address(0)) revert ZeroAddressNotAllowed();
+
+    token.safeApprove(lockBox, type(uint256).max);
+    i_lockBox = ERC20LockBox(lockBox);
+  }
 
   /// @notice Locks the token in the pool
   function lockOrBurn(
@@ -65,14 +76,20 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     // super.lockOrBurn will validate the lockOrBurnIn and revert if invalid.
     out = super.lockOrBurn(lockOrBurnIn);
 
+    uint64 remoteChainSelector;
+
     // If funds need to be siloed, update internal accounting;
     if (s_chainConfigs[lockOrBurnIn.remoteChainSelector].isSiloed) {
       s_chainConfigs[lockOrBurnIn.remoteChainSelector].tokenBalance += lockOrBurnIn.amount;
+      remoteChainSelector = lockOrBurnIn.remoteChainSelector;
     }
     // If the messages is going to a chain without siloed funds, update state accounting accordingly.
     else {
       s_unsiloedTokenBalance += lockOrBurnIn.amount;
     }
+
+    // Transfer the tokens to the lock box
+    i_lockBox.deposit(address(i_token), lockOrBurnIn.amount, remoteChainSelector);
 
     return out;
   }
@@ -101,15 +118,18 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     uint256 availableLiquidity = chainIsSiloed ? remoteConfig.tokenBalance : s_unsiloedTokenBalance;
     if (localAmount > availableLiquidity) revert InsufficientLiquidity(availableLiquidity, localAmount);
 
+    uint64 remoteChainSelector;
+
     // Deduct the amount from the correct silo balance, or the unsiloed balance.
     if (chainIsSiloed) {
       remoteConfig.tokenBalance -= localAmount;
+      remoteChainSelector = releaseOrMintIn.remoteChainSelector;
     } else {
       s_unsiloedTokenBalance -= localAmount;
     }
 
     // Release to the recipient
-    i_token.safeTransfer(releaseOrMintIn.receiver, localAmount);
+    i_lockBox.withdraw(address(i_token), localAmount, releaseOrMintIn.receiver, remoteChainSelector);
 
     emit ReleasedOrMinted({
       remoteChainSelector: releaseOrMintIn.remoteChainSelector,
@@ -285,6 +305,8 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     }
 
     i_token.safeTransferFrom(msg.sender, address(this), amount);
+    i_lockBox.deposit(address(i_token), amount, remoteChainSelector);
+
     emit LiquidityAdded(remoteChainSelector, msg.sender, amount);
   }
 
@@ -327,13 +349,16 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     if (amount > availableLiquidity) revert InsufficientLiquidity(availableLiquidity, amount);
 
     // Deduct the amount from the correct silo balance, or the unsiloed balance.
+    uint64 chainSelector;
     if (remoteConfig.isSiloed) {
       remoteConfig.tokenBalance -= amount;
+      chainSelector = remoteChainSelector;
     } else {
       s_unsiloedTokenBalance -= amount;
     }
 
-    i_token.safeTransfer(msg.sender, amount);
+    i_lockBox.withdraw(address(i_token), amount, msg.sender, chainSelector);
+
     emit LiquidityRemoved(remoteChainSelector, msg.sender, amount);
   }
 }

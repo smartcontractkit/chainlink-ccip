@@ -1,21 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {ITokenMessenger} from "./interfaces/ITokenMessenger.sol";
-
 import {Pool} from "../../libraries/Pool.sol";
-import {ERC20LockBox} from "../ERC20LockBox.sol";
-import {TokenPool} from "../TokenPool.sol";
-import {CCTPMessageTransmitterProxy} from "../USDC/CCTPMessageTransmitterProxy.sol";
-import {USDCTokenPoolCCTPV2} from "../USDC/USDCTokenPoolCCTPV2.sol";
-
 import {SiloedLockReleaseTokenPool} from "../SiloedLockReleaseTokenPool.sol";
 import {USDCBridgeMigrator} from "./USDCBridgeMigrator.sol";
 
 import {IERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 import {EnumerableSet} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
 
@@ -43,8 +34,8 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, USDCBridgeMigrator {
     address router,
     address lockBox
   )
-    SiloedLockReleaseTokenPool(token, localTokenDecimals, allowlist, rmnProxy, router)
-    USDCBridgeMigrator(address(token), lockBox)
+    SiloedLockReleaseTokenPool(token, localTokenDecimals, allowlist, rmnProxy, router, lockBox)
+    USDCBridgeMigrator(address(token))
   {}
 
   /// @notice Lock tokens for a specific chain selector.
@@ -96,13 +87,10 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, USDCBridgeMigrator {
 
   /// @notice This function is overridden to hard code the decimals to 6 since USDC is always 6 decimals
   function _parseRemoteDecimals(
-    bytes memory sourcePoolData
+    bytes memory
   ) internal pure override returns (uint8) {
     // The parent contract attempts to parse the decimals from the source pool data. However, since the source pool data
     // is always equal to the LOCK_RELEASE_FLAG, we need to hard code the decimals to 6 otherwise the function will revert.
-
-    // Since it is an invariant that a remote USDC token has 6 decimals, we can hard code the decimals to 6.
-    // If this invariant is violated, the mint amount will be incorrect and the recipient will receive the wrong amount.
     return 6;
   }
 
@@ -154,5 +142,20 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, USDCBridgeMigrator {
         emit AllowedTokenPoolProxyRemoved(tokenPoolProxies[i]);
       }
     }
+  }
+
+  function burnLockedUSDC() external {
+    uint64 burnChainSelector = s_proposedUSDCMigrationChain;
+    if (burnChainSelector == 0) revert NoMigrationProposalPending();
+
+    // Burnable tokens is the total locked minus the amount excluded from burn
+    uint256 tokensToBurn =
+      s_lockedTokensByChainSelector[burnChainSelector] - s_tokensExcludedFromBurn[burnChainSelector];
+      
+    // The CCTP burn function will attempt to burn out of the contract that calls it, so we need to withdraw the tokens
+    // from the lock box first otherwise the burn will revert.
+    i_lockBox.withdraw(address(i_token), tokensToBurn, address(this), burnChainSelector);
+
+    _burnLockedUSDC();
   }
 }

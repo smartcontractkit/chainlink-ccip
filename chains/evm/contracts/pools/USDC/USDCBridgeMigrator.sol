@@ -1,14 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {ERC20LockBox} from "../ERC20LockBox.sol";
-import {SiloedLockReleaseTokenPool} from "../SiloedLockReleaseTokenPool.sol";
-
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
 
 import {EnumerableSet} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
+
 
 /// @notice Allows migration of a lane in a token pool from Lock/Release to CCTP supported Burn/Mint. Contract
 /// functionality is based on hard requirements defined by Circle to allow for future CCTP compatibility
@@ -38,11 +36,8 @@ abstract contract USDCBridgeMigrator is Ownable2StepMsgSender {
 
   EnumerableSet.UintSet internal s_migratedChains;
 
-  address public immutable i_lockBox;
-
-  constructor(address token, address lockBox) {
+  constructor(address token) {
     i_USDC = IBurnMintERC20(token);
-    i_lockBox = lockBox;
   }
 
   /// @notice Burn USDC locked for a specific lane so that destination USDC can be converted from
@@ -51,9 +46,8 @@ abstract contract USDCBridgeMigrator is Ownable2StepMsgSender {
   /// @dev proposeCCTPMigration must be called first on an approved lane to execute properly.
   /// @dev This function signature should NEVER be overwritten, otherwise it will be unable to be called by
   /// circle to properly migrate USDC over to CCTP.
-  function burnLockedUSDC() external {
+  function _burnLockedUSDC() internal virtual {
     if (msg.sender != s_circleUSDCMigrator) revert onlyCircle();
-    if (s_proposedUSDCMigrationChain == 0) revert NoMigrationProposalPending();
 
     uint64 burnChainSelector = s_proposedUSDCMigrationChain;
 
@@ -64,10 +58,6 @@ abstract contract USDCBridgeMigrator is Ownable2StepMsgSender {
     // Even though USDC is a trusted call, ensure CEI by updating state first
     delete s_lockedTokensByChainSelector[burnChainSelector];
     delete s_proposedUSDCMigrationChain;
-
-    // The CCTP burn function will attempt to burn out of the contract that calls it, so we need to withdraw the tokens
-    // from the lock box first otherwise the burn will revert.
-    ERC20LockBox(i_lockBox).withdraw(address(i_USDC), tokensToBurn, address(this), burnChainSelector);
 
     // This should only be called after this contract has been granted a "zero allowance minter role" on USDC by Circle,
     // otherwise the call will revert. Executing this burn will functionally convert all USDC on the destination chain

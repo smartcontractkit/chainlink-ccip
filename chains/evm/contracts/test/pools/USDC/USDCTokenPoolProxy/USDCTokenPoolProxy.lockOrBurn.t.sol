@@ -34,28 +34,21 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
     bytes memory destPoolData = abi.encode(1, 2, 3);
     bytes memory destTokenAddress = abi.encode(localToken);
 
-    USDCTokenPoolProxy.PoolAddresses memory pools = s_usdcTokenPoolProxy.getPools();
-    assertEq(pools.cctpV1Pool, address(s_cctpV1Pool), "CCTP V1 pool address mismatch");
-    assertEq(pools.cctpV2Pool, address(s_cctpV2Pool), "CCTP V2 pool address mismatch");
-    assertEq(pools.lockReleasePool, address(s_lockReleasePool), "Lock release pool address mismatch");
-
+    // Set the DEST_CHAIN_SELECTOR to use CCTP V1 using the update function
+    uint64[] memory selectors = new uint64[](1);
+    selectors[0] = DEST_CHAIN_SELECTOR;
+    USDCTokenPoolProxy.LockOrBurnMechanism[] memory mechs = new USDCTokenPoolProxy.LockOrBurnMechanism[](1);
+    mechs[0] = USDCTokenPoolProxy.LockOrBurnMechanism.CCTP_V1;
+    s_usdcTokenPoolProxy.updateLockOrBurnMechanisms(selectors, mechs);
+   
     Pool.LockOrBurnInV1 memory lockOrBurnIn = Pool.LockOrBurnInV1({
       receiver: abi.encode(receiver),
-      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
       originalSender: sender,
       amount: amount,
       localToken: localToken
     });
 
-    // Mock the router's getOnRamp function to return the allowed on ramp
-    vm.mockCall(
-      address(s_router),
-      abi.encodeWithSelector(
-        bytes4(keccak256("getOnRamp(uint64)")),
-        uint64(SOURCE_CHAIN_SELECTOR)
-      ),    
-      abi.encode(s_routerAllowedOnRamp)
-    );
 
     // Mock the CCTP V1 pool's lockOrBurn to return expected output
     Pool.LockOrBurnOutV1 memory expectedOutput = Pool.LockOrBurnOutV1({
@@ -94,15 +87,6 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
       localToken: localToken
     });
 
-    // Mock the router's getOnRamp function to return the allowed on ramp
-    vm.mockCall(
-      address(s_router),
-      abi.encodeWithSelector(
-        bytes4(keccak256("getOnRamp(uint64)")),
-        uint64(DEST_CHAIN_SELECTOR)
-      ),    
-      abi.encode(s_routerAllowedOnRamp)
-    );
 
     // Mock the CCTP V2 pool's lockOrBurn to return expected output
     Pool.LockOrBurnOutV1 memory expectedOutput = Pool.LockOrBurnOutV1({
@@ -240,7 +224,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = Pool.LockOrBurnInV1({
       receiver: invalidReceiver,
-      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
       originalSender: sender,
       amount: amount,
       localToken: localToken
@@ -260,7 +244,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = Pool.LockOrBurnInV1({
       receiver: abi.encode(receiver),
-      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
       originalSender: sender,
       amount: invalidAmount,
       localToken: localToken

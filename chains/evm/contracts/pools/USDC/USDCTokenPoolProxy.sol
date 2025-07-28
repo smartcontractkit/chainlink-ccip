@@ -1,12 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {ITokenMessenger} from "./interfaces/ITokenMessenger.sol";
-
 import {Pool} from "../../libraries/Pool.sol";
-
 import {TokenPool} from "../TokenPool.sol";
-import {CCTPMessageTransmitterProxy} from "./CCTPMessageTransmitterProxy.sol";
 import {USDCTokenPool} from "./USDCTokenPool.sol";
 
 import {IERC20} from
@@ -73,7 +69,6 @@ contract USDCTokenPoolProxy is TokenPool {
   ) public virtual override returns (Pool.LockOrBurnOutV1 memory) {
     _validateLockOrBurn(lockOrBurnIn);
 
-    // TODO: Comments
     LockOrBurnMechanism mechanism = s_lockOrBurnMechanism[lockOrBurnIn.remoteChainSelector];
 
     if (mechanism == LockOrBurnMechanism.INVALID_MECHANISM) {
@@ -82,14 +77,15 @@ contract USDCTokenPoolProxy is TokenPool {
 
     PoolAddresses memory pools = s_pools;
 
-
     if (mechanism == LockOrBurnMechanism.LOCK_RELEASE) {
       return USDCTokenPool(pools.lockReleasePool).lockOrBurn(lockOrBurnIn);
     } else if (mechanism == LockOrBurnMechanism.CCTP_V1) {
       return USDCTokenPool(pools.cctpV1Pool).lockOrBurn(lockOrBurnIn);
-    } else if (mechanism == LockOrBurnMechanism.CCTP_V2) {
-      return USDCTokenPool(pools.cctpV2Pool).lockOrBurn(lockOrBurnIn);
     }
+
+    // Happy Path
+    return USDCTokenPool(pools.cctpV2Pool).lockOrBurn(lockOrBurnIn);
+
 
   }
 
