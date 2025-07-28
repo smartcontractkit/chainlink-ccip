@@ -863,7 +863,7 @@
     {
       "code": 6021,
       "name": "TransferZeroTokensNotAllowed",
-      "msg": "Transfering zero tokens is not allowed"
+      "msg": "Transferring zero tokens is not allowed"
     }
   ]
 }

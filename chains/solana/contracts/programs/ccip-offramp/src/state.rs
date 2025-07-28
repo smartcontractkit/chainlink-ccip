@@ -70,20 +70,6 @@ pub struct DeriveAccountsResponse {
     pub next_stage: String,
 }
 
-impl DeriveAccountsResponse {
-    // Join two responses (when two stages can be done back to back)
-    pub fn and(mut self, next: DeriveAccountsResponse) -> Self {
-        self.ask_again_with.extend_from_slice(&next.ask_again_with);
-        self.accounts_to_save
-            .extend_from_slice(&next.accounts_to_save);
-        self.look_up_tables_to_save
-            .extend_from_slice(&next.look_up_tables_to_save);
-        self.current_stage = next.current_stage;
-        self.next_stage = next.next_stage;
-        self
-    }
-}
-
 // We can't use anchor's `AccountMeta` since it doesn't implement
 // AnchorSerialize/AnchorDeserialize, and it's too small to warrant wrapping.
 #[derive(Debug, Default, PartialEq, Eq, Clone, AnchorDeserialize, AnchorSerialize)]

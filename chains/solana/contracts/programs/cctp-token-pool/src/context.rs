@@ -36,7 +36,7 @@ pub struct InitGlobalConfig<'info> {
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
 
-    // Ensures that the provided program is the BurnmintTokenPool program,
+    // Ensures that the provided program is the CctpTokenPool program,
     // and that its associated program data account matches the expected one.
     // This guarantees that only the program's upgrade authority can modify the global config.
     #[account(constraint = program.programdata_address()? == Some(program_data.key()))]
@@ -359,11 +359,6 @@ impl TokenOfframpRemainingAccounts<'_> {
         );
 
         require_keys_eq!(
-            self.cctp_used_nonces.key(),
-            get_message_transmitter_pda(&[b"used_nonces", domain_seed, nonce_seed.as_ref()])
-        );
-
-        require_keys_eq!(
             self.cctp_token_messenger_minter.key(),
             TOKEN_MESSENGER_MINTER,
         );
@@ -393,6 +388,16 @@ impl TokenOfframpRemainingAccounts<'_> {
         );
 
         require_keys_eq!(
+            self.cctp_custody_token_account.key(),
+            get_token_messenger_minter_pda(&[b"custody", mint.key().as_ref()])
+        );
+
+        require_keys_eq!(
+            self.cctp_token_messenger_event_authority.key(),
+            get_token_messenger_minter_pda(&[b"__event_authority"])
+        );
+
+        require_keys_eq!(
             self.cctp_remote_token_messenger_key.key(),
             get_token_messenger_minter_pda(&[b"remote_token_messenger", domain_seed])
         );
@@ -407,13 +412,8 @@ impl TokenOfframpRemainingAccounts<'_> {
         );
 
         require_keys_eq!(
-            self.cctp_custody_token_account.key(),
-            get_token_messenger_minter_pda(&[b"custody", mint.key().as_ref()])
-        );
-
-        require_keys_eq!(
-            self.cctp_token_messenger_event_authority.key(),
-            get_token_messenger_minter_pda(&[b"__event_authority"])
+            self.cctp_used_nonces.key(),
+            get_message_transmitter_pda(&[b"used_nonces", domain_seed, nonce_seed.as_ref()])
         );
 
         Ok(())
@@ -542,7 +542,8 @@ pub struct TokenOnramp<'info> {
     pub cctp_local_token: UncheckedAccount<'info>,
 
     /// CHECK this is CCTP's MessageTransmitter program, which
-    /// is invoked CCTP's TokenMessengerMinter by this program.
+    /// is invoked transitively by CCTP's TokenMessengerMinter,
+    /// which in turn is invoked explicitly by this program.
     #[account(
         address = MESSAGE_TRANSMITTER @ CctpTokenPoolError::InvalidMessageTransmitter
     )]
@@ -842,7 +843,6 @@ pub struct ReclaimEventAccount<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(amount: u64)]
 pub struct ReclaimFunds<'info> {
     #[account(
         seeds = [

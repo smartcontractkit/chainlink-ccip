@@ -655,4 +655,6 @@ pub enum CcipRouterError {
     InvalidTokenPoolAccountDerivationResponse,
     #[msg("Can't fit account derivation response.")]
     AccountDerivationResponseTooLarge,
+    #[msg("Proposed owner is the default pubkey")]
+    DefaultOwnerProposal,
 }

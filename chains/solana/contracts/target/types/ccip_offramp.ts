@@ -2132,7 +2132,7 @@ export type CcipOfframp = {
       }
     },
     {
-      "name": "DeriveExecuteAccountsStage",
+      "name": "DeriveAccountsExecuteStage",
       "type": {
         "kind": "enum",
         "variants": [
@@ -2844,6 +2844,11 @@ export type CcipOfframp = {
       "code": 9070,
       "name": "AccountDerivationResponseTooLarge",
       "msg": "Can't fit account derivation response."
+    },
+    {
+      "code": 9071,
+      "name": "DefaultOwnerProposal",
+      "msg": "Proposed owner is the default pubkey"
     }
   ]
 };
@@ -4982,7 +4987,7 @@ export const IDL: CcipOfframp = {
       }
     },
     {
-      "name": "DeriveExecuteAccountsStage",
+      "name": "DeriveAccountsExecuteStage",
       "type": {
         "kind": "enum",
         "variants": [
@@ -5694,6 +5699,11 @@ export const IDL: CcipOfframp = {
       "code": 9070,
       "name": "AccountDerivationResponseTooLarge",
       "msg": "Can't fit account derivation response."
+    },
+    {
+      "code": 9071,
+      "name": "DefaultOwnerProposal",
+      "msg": "Proposed owner is the default pubkey"
     }
   ]
 };
