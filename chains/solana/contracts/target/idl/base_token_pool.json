@@ -632,6 +632,26 @@
       ]
     },
     {
+      "name": "RateLimitAdminSet",
+      "fields": [
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "oldRateLimitAdmin",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "newRateLimitAdmin",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "OwnershipTransferRequested",
       "fields": [
         {

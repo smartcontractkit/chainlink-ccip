@@ -454,6 +454,54 @@ func TestTokenPool(t *testing.T) {
 							}
 						})
 
+						t.Run("Rate Limit Admin", func(t *testing.T) {
+							// set invalid a new rate limit admin
+							ixRateAdmin, err := test_token_pool.NewSetRateLimitAdminInstruction(
+								p.Mint,
+								user.PublicKey(),
+								poolConfig,
+								anotherAdmin.PublicKey(),
+							).ValidateAndBuild()
+							require.NoError(t, err)
+
+							// test new rate limit admin
+							ixRatesValid, err := test_token_pool.NewSetChainRateLimitInstruction(config.EvmChainSelector, p.Mint,
+								test_token_pool.RateLimitConfig{
+									Enabled:  true,
+									Capacity: amount,
+									Rate:     1,
+								}, test_token_pool.RateLimitConfig{
+									Enabled:  false,
+									Capacity: 0,
+									Rate:     0,
+								}, poolConfig, p.Chain[config.EvmChainSelector], user.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+							require.NoError(t, err)
+
+							// undo rate limit admin
+							ixRateAdmin2, err := test_token_pool.NewSetRateLimitAdminInstruction(
+								p.Mint,
+								anotherAdmin.PublicKey(),
+								poolConfig,
+								anotherAdmin.PublicKey(),
+							).ValidateAndBuild()
+							require.NoError(t, err)
+
+							// try to modify rate limit with invalid admin
+							ixRates, err := test_token_pool.NewSetChainRateLimitInstruction(config.EvmChainSelector, p.Mint,
+								test_token_pool.RateLimitConfig{
+									Enabled:  true,
+									Capacity: amount,
+									Rate:     1,
+								}, test_token_pool.RateLimitConfig{
+									Enabled:  false,
+									Capacity: 0,
+									Rate:     0,
+								}, poolConfig, p.Chain[config.EvmChainSelector], user.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+							require.NoError(t, err)
+
+							testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ixRateAdmin, ixRatesValid, ixRateAdmin2, ixRates}, user, config.DefaultCommitment, []string{"SetChainRateLimit"}, common.AddSigners(anotherAdmin))
+						})
+
 						t.Run("globally cursed", func(t *testing.T) {
 							globalCurse := rmn_remote.CurseSubject{
 								Value: [16]uint8{0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01},

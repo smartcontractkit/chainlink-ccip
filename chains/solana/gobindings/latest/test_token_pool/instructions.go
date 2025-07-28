@@ -44,6 +44,8 @@ var (
 
 	Instruction_SetChainRateLimit = ag_binary.TypeID([8]byte{188, 188, 161, 37, 100, 249, 123, 170})
 
+	Instruction_SetRateLimitAdmin = ag_binary.TypeID([8]byte{21, 182, 126, 128, 31, 241, 37, 34})
+
 	Instruction_DeleteChainConfig = ag_binary.TypeID([8]byte{241, 159, 142, 210, 64, 173, 77, 179})
 
 	Instruction_ReleaseOrMintTokens = ag_binary.TypeID([8]byte{92, 100, 150, 198, 252, 63, 164, 228})
@@ -74,6 +76,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "AppendRemotePoolAddresses"
 	case Instruction_SetChainRateLimit:
 		return "SetChainRateLimit"
+	case Instruction_SetRateLimitAdmin:
+		return "SetRateLimitAdmin"
 	case Instruction_DeleteChainConfig:
 		return "DeleteChainConfig"
 	case Instruction_ReleaseOrMintTokens:
@@ -127,6 +131,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"set_chain_rate_limit", (*SetChainRateLimit)(nil),
+		},
+		{
+			"set_rate_limit_admin", (*SetRateLimitAdmin)(nil),
 		},
 		{
 			"delete_chain_config", (*DeleteChainConfig)(nil),
