@@ -414,6 +414,7 @@ func decodeAttributedObservations(
 	return decoded, nil
 }
 
+//nolint:gocyclo // This function is complex, but it is not too long.
 func computeMessageObservationsConsensus(
 	lggr logger.Logger,
 	aos []plugincommon.AttributedObservation[exectypes.Observation],
@@ -454,7 +455,7 @@ func computeMessageObservationsConsensus(
 			case 2:
 				// In rare cases where more than f+1 nodes observed the message and f+1 nodes pseudo deleted the message
 				// because of observation size limit, we can end up with 2 consensus on the same message with one of
-				// them being psuedo deleted. We need to choose the one that wasn't deleted as the one with consensus.
+				// them being pseudo deleted. We need to choose the one that wasn't deleted as the one with consensus.
 				var msg *cciptypes.Message
 
 				if msgsWithConsensus[0].IsPseudoDeleted() && !msgsWithConsensus[1].IsPseudoDeleted() {

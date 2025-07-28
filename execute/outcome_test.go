@@ -1,15 +1,17 @@
 package execute
 
 import (
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"testing"
+
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
+	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 )
 
 func TestOutcome_PseudoDeletedConsensusConflict(t *testing.T) {
