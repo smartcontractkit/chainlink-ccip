@@ -25,20 +25,74 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 )
 
-// validateCommitReportsReadingEligibility validates that all commit reports' source chains are supported by observer
+// validateCommitReportsReadingEligibility validates that if commit reports exist, the oracle supports the destination
+// chain and if messages exist the oracles supports the corresponding source chain.
 func validateCommitReportsReadingEligibility(
+	state exectypes.PluginState,
+	supportedChains mapset.Set[cciptypes.ChainSelector],
+	destChain cciptypes.ChainSelector,
+	observedData exectypes.CommitObservations,
+) error {
+	switch state {
+	case exectypes.GetCommitReports:
+		if err := validateGetCommitReportsObservation(supportedChains, destChain, observedData); err != nil {
+			return fmt.Errorf("validate get commit reports observation: %w", err)
+		}
+	case exectypes.GetMessages:
+		if err := validateGetMessagesObservation(supportedChains, observedData); err != nil {
+			return fmt.Errorf("validate get messages observation: %w", err)
+		}
+	case exectypes.Filter, exectypes.Initialized, exectypes.Unknown:
+		// nothing to validate
+		break
+	}
+
+	// generic validation
+	for chainSel, observedDataOfChain := range observedData {
+		for _, data := range observedDataOfChain {
+			if data.SourceChain != chainSel {
+				return fmt.Errorf("invalid observed data, key=%d but data chain=%d", chainSel, data.SourceChain)
+			}
+		}
+	}
+
+	return nil
+}
+
+func validateGetCommitReportsObservation(
+	supportedChains mapset.Set[cciptypes.ChainSelector],
+	destChain cciptypes.ChainSelector,
+	observedData exectypes.CommitObservations,
+) error {
+	for _, observedDataOfChain := range observedData {
+		for _, data := range observedDataOfChain {
+			if data.MerkleRoot.IsEmpty() {
+				continue
+			}
+			if !supportedChains.Contains(destChain) {
+				return fmt.Errorf("invalid observation, destination chain not supported but observed commit report")
+			}
+		}
+	}
+	return nil
+}
+
+func validateGetMessagesObservation(
 	supportedChains mapset.Set[cciptypes.ChainSelector],
 	observedData exectypes.CommitObservations,
 ) error {
 	for chainSel, observedDataOfChain := range observedData {
-		if !supportedChains.Contains(chainSel) {
-			return fmt.Errorf("observer not allowed to read from chain %d", chainSel)
-		}
+		containsMsgs := false
+
 		for _, data := range observedDataOfChain {
-			if data.SourceChain != chainSel {
-				return fmt.Errorf("invalid observed data, key=%d but data chain=%d",
-					chainSel, data.SourceChain)
+			if len(data.Messages) > 0 {
+				containsMsgs = true
+				break
 			}
+		}
+
+		if containsMsgs && !supportedChains.Contains(chainSel) {
+			return fmt.Errorf("observed messages on chain %d while chain is not supported", chainSel)
 		}
 	}
 
@@ -170,17 +224,9 @@ func validateMessagesConformToCommitReports(
 
 // validateObservedSequenceNumbers checks if the sequence numbers of the provided messages are unique for each chain
 // and that they match the observed max sequence numbers.
-func validateObservedSequenceNumbers(
-	supportedChains mapset.Set[cciptypes.ChainSelector],
-	observedData map[cciptypes.ChainSelector][]exectypes.CommitData,
-) error {
-	for chainSel, commitData := range observedData {
-		if !supportedChains.Contains(chainSel) {
-			return fmt.Errorf("observed a non-supported chain %d", chainSel)
-		}
-
+func validateObservedSequenceNumbers(observedData map[cciptypes.ChainSelector][]exectypes.CommitData) error {
+	for _, commitData := range observedData {
 		// observed commitData must not contain duplicates
-
 		observedMerkleRoots := mapset.NewSet[string]()
 		observedRanges := make([]cciptypes.SeqNumRange, 0)
 
