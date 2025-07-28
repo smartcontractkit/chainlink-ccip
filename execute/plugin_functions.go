@@ -413,6 +413,7 @@ func decodeAttributedObservations(
 	return decoded, nil
 }
 
+//nolint:gocyclo // This function is complex, but it is not too long.
 func computeMessageObservationsConsensus(
 	lggr logger.Logger,
 	aos []plugincommon.AttributedObservation[exectypes.Observation],
@@ -450,8 +451,32 @@ func computeMessageObservationsConsensus(
 					results[chain] = make(map[cciptypes.SeqNum]cciptypes.Message)
 				}
 				results[chain][seqNum] = msgsWithConsensus[0]
+			case 2:
+				// In rare cases where more than f+1 nodes observed the message and f+1 nodes pseudo deleted the message
+				// because of observation size limit, we can end up with 2 consensus on the same message with one of
+				// them being pseudo deleted. We need to choose the one that wasn't deleted as the one with consensus.
+				var msg *cciptypes.Message
+
+				if msgsWithConsensus[0].IsPseudoDeleted() && !msgsWithConsensus[1].IsPseudoDeleted() {
+					msg = &msgsWithConsensus[1]
+				} else if msgsWithConsensus[1].IsPseudoDeleted() && !msgsWithConsensus[0].IsPseudoDeleted() {
+					msg = &msgsWithConsensus[0]
+				}
+
+				if msg == nil {
+					lggr.Errorw("more than one message reached consensus for a sequence number, skipping it",
+						"chain", chain, "seqNum", seqNum, "msgs", msgsWithConsensus)
+				}
+
+				if msg != nil {
+					if _, ok := results[chain]; !ok {
+						results[chain] = make(map[cciptypes.SeqNum]cciptypes.Message)
+					}
+					results[chain][seqNum] = *msg
+				}
+
 			default:
-				lggr.Warnw("more than one message reached consensus for a sequence number, skipping it",
+				lggr.Errorw("more than one message reached consensus for a sequence number, skipping it",
 					"chain", chain, "seqNum", seqNum, "msgs", msgsWithConsensus)
 			}
 		}
