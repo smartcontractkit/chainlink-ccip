@@ -115,7 +115,6 @@ contract USDCSetup is BaseTest {
       abi.encodeWithSelector(IERC165.supportsInterface.selector, type(IPoolV1).interfaceId),
       abi.encode(true)
     );
-
   }
 
   function _poolApplyChainUpdates(

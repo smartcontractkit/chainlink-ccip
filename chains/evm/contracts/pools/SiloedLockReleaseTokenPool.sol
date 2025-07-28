@@ -253,7 +253,7 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
   /// non-siloed chains.
   /// @param amount The amount of liquidity to provide.
   /// @dev Only the rebalancer for the chain can add liquidity
-  function provideSiloedLiquidity(uint64 remoteChainSelector, uint256 amount) external {
+  function provideSiloedLiquidity(uint64 remoteChainSelector, uint256 amount) external virtual {
     if (!s_chainConfigs[remoteChainSelector].isSiloed || remoteChainSelector == 0) {
       revert ChainNotSiloed(remoteChainSelector);
     }
@@ -267,11 +267,11 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
   /// @param amount The amount of liquidity to provide.
   function provideLiquidity(
     uint256 amount
-  ) external {
+  ) external virtual {
     _provideLiquidity(0, amount);
   }
 
-  function _provideLiquidity(uint64 remoteChainSelector, uint256 amount) internal {
+  function _provideLiquidity(uint64 remoteChainSelector, uint256 amount) internal virtual {
     if (amount == 0) revert LiquidityAmountCannotBeZero();
     if (msg.sender != getChainRebalancer(remoteChainSelector)) revert Unauthorized(msg.sender);
 

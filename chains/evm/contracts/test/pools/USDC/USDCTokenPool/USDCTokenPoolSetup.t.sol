@@ -44,11 +44,11 @@ contract USDCTokenPoolSetup is USDCSetup {
     allowedTokenPoolProxies[2] = address(s_routerAllowedOffRamp);
 
     bool[] memory allowed = new bool[](5);
-    for(uint256 i = 0; i < allowedTokenPoolProxies.length; i++) {
+    for (uint256 i = 0; i < allowedTokenPoolProxies.length; i++) {
       allowed[i] = true;
     }
 
-    s_usdcTokenPool.setAllowedTokenPoolProxies(allowedTokenPoolProxies, allowed); 
+    s_usdcTokenPool.setAllowedTokenPoolProxies(allowedTokenPoolProxies, allowed);
 
     CCTPMessageTransmitterProxy.AllowedCallerConfigArgs[] memory allowedCallerParams =
       new CCTPMessageTransmitterProxy.AllowedCallerConfigArgs[](1);

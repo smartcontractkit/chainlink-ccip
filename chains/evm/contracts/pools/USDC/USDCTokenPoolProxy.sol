@@ -21,17 +21,25 @@ contract USDCTokenPoolProxy is TokenPool {
   using SafeERC20 for IERC20;
 
   event LockOrBurnMechanismUpdated(uint64 indexed remoteChainSelector, LockOrBurnMechanism mechanism);
+  event PoolAddressesUpdated(PoolAddresses pools);
 
-  error InvalidLockOrBurnMechanism(LockOrBurnMechanism mechanism); 
+  error InvalidPoolAddresses();
+  error InvalidLockOrBurnMechanism(LockOrBurnMechanism mechanism);
   error InvalidMessageVersion(uint32 version);
 
   // bytes4(keccak256("NO_CCTP_USE_LOCK_RELEASE"))
 
-  address public s_cctpV1Pool;
-  address public s_cctpV2Pool;
-  address public s_lockReleasePool;
+  // @solhint-disable-next-line gas-struct-packing
+  struct PoolAddresses {
+    address cctpV1Pool;
+    address cctpV2Pool;
+    address lockReleasePool;
+  }
+
+  PoolAddresses internal s_pools;
 
   enum LockOrBurnMechanism {
+    INVALID_MECHANISM,
     CCTP_V1,
     CCTP_V2,
     LOCK_RELEASE
@@ -49,9 +57,15 @@ contract USDCTokenPoolProxy is TokenPool {
     address cctpV2Pool,
     address lockReleasePool
   ) TokenPool(token, 6, allowlist, rmnProxy, router) {
-    s_cctpV1Pool = cctpV1Pool;
-    s_cctpV2Pool = cctpV2Pool;
-    s_lockReleasePool = lockReleasePool;
+    if (cctpV1Pool == address(0) || cctpV2Pool == address(0) || lockReleasePool == address(0)) {
+      revert InvalidPoolAddresses();
+    }
+
+    s_pools = PoolAddresses({
+      cctpV1Pool: cctpV1Pool,
+      cctpV2Pool: cctpV2Pool,
+      lockReleasePool: lockReleasePool
+    });
   }
 
   function lockOrBurn(
@@ -62,19 +76,21 @@ contract USDCTokenPoolProxy is TokenPool {
     // TODO: Comments
     LockOrBurnMechanism mechanism = s_lockOrBurnMechanism[lockOrBurnIn.remoteChainSelector];
 
+    if (mechanism == LockOrBurnMechanism.INVALID_MECHANISM) {
+      revert InvalidLockOrBurnMechanism(mechanism);
+    }
+
+    PoolAddresses memory pools = s_pools;
+
+
     if (mechanism == LockOrBurnMechanism.LOCK_RELEASE) {
-      return USDCTokenPool(s_lockReleasePool).lockOrBurn(lockOrBurnIn);
+      return USDCTokenPool(pools.lockReleasePool).lockOrBurn(lockOrBurnIn);
+    } else if (mechanism == LockOrBurnMechanism.CCTP_V1) {
+      return USDCTokenPool(pools.cctpV1Pool).lockOrBurn(lockOrBurnIn);
+    } else if (mechanism == LockOrBurnMechanism.CCTP_V2) {
+      return USDCTokenPool(pools.cctpV2Pool).lockOrBurn(lockOrBurnIn);
     }
 
-    else if (mechanism == LockOrBurnMechanism.CCTP_V1) {
-    return USDCTokenPool(s_cctpV1Pool).lockOrBurn(lockOrBurnIn);
-    }
-
-    else if (mechanism == LockOrBurnMechanism.CCTP_V2) {
-      return USDCTokenPool(s_cctpV2Pool).lockOrBurn(lockOrBurnIn);
-    }
-
-    revert InvalidLockOrBurnMechanism(mechanism);
   }
 
   function releaseOrMint(
@@ -82,9 +98,11 @@ contract USDCTokenPoolProxy is TokenPool {
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
     _validateReleaseOrMint(releaseOrMintIn, releaseOrMintIn.sourceDenominatedAmount);
 
+    PoolAddresses memory pools = s_pools;
+
     // If the source pool data is the lock release flag, we use the lock release pool.
     if (bytes4(releaseOrMintIn.sourcePoolData) == LOCK_RELEASE_FLAG) {
-      return USDCTokenPool(s_lockReleasePool).releaseOrMint(releaseOrMintIn);
+      return USDCTokenPool(pools.lockReleasePool).releaseOrMint(releaseOrMintIn);
     }
 
     uint32 version;
@@ -99,14 +117,31 @@ contract USDCTokenPoolProxy is TokenPool {
       version := mload(add(usdcMessage, 4)) // 0 + 4 = 4
     }
 
+
     // TODO: Comments
     if (version == 0) {
-      return USDCTokenPool(s_cctpV1Pool).releaseOrMint(releaseOrMintIn);
+      return USDCTokenPool(pools.cctpV1Pool).releaseOrMint(releaseOrMintIn);
     } else if (version == 1) {
-      return USDCTokenPool(s_cctpV2Pool).releaseOrMint(releaseOrMintIn);
+      return USDCTokenPool(pools.cctpV2Pool).releaseOrMint(releaseOrMintIn);
     } else {
       revert InvalidMessageVersion(version);
     }
+  }
+
+  function updatePoolAddresses(
+    PoolAddresses calldata pools
+  ) external onlyOwner {
+    if (pools.cctpV1Pool == address(0) || pools.cctpV2Pool == address(0) || pools.lockReleasePool == address(0)) {
+      revert InvalidPoolAddresses();
+    }
+
+    s_pools = pools;
+
+    emit PoolAddressesUpdated(pools);
+  }
+
+  function getPools() public view returns (PoolAddresses memory) {
+    return s_pools;
   }
 
   function updateLockOrBurnMechanisms(
@@ -115,8 +150,7 @@ contract USDCTokenPoolProxy is TokenPool {
   ) external onlyOwner {
     for (uint256 i = 0; i < remoteChainSelectors.length; i++) {
       s_lockOrBurnMechanism[remoteChainSelectors[i]] = mechanisms[i];
-      emit LockOrBurnMechanismUpdated(remoteChainSelectors[i], mechanisms[i]);  
+      emit LockOrBurnMechanismUpdated(remoteChainSelectors[i], mechanisms[i]);
     }
   }
-
 }

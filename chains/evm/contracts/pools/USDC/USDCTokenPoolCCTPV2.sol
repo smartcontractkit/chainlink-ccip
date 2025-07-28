@@ -35,18 +35,7 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
     address[] memory allowlist,
     address rmnProxy,
     address router
-  )
-    USDCTokenPool(
-      tokenMessenger,
-      cctpMessageTransmitterProxy,
-      token,
-      allowlist,
-      rmnProxy,
-      router,
-      address(0),
-      1
-    )
-  {}
+  ) USDCTokenPool(tokenMessenger, cctpMessageTransmitterProxy, token, allowlist, rmnProxy, router, address(0), 1) {}
 
   /// @notice Burn tokens from the pool to initiate cross-chain transfer.
   /// @notice Outgoing messages (burn operations) are routed via `i_tokenMessenger.depositForBurnWithCaller`.

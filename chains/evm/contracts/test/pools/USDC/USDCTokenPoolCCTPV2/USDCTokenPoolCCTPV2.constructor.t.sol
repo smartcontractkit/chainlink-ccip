@@ -8,9 +8,10 @@ import {IERC165} from
 
 import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
 import {USDCTokenPoolCCTPV2} from "../../../../pools/USDC/USDCTokenPoolCCTPV2.sol";
-import {USDCTokenPoolCCTPV2Setup} from "./USDCTokenPoolCCTPV2Setup.t.sol";
+
 import {MockE2EUSDCTransmitter} from "../../../mocks/MockE2EUSDCTransmitter.sol";
 import {MockUSDCTokenMessenger} from "../../../mocks/MockUSDCTokenMessenger.sol";
+import {USDCTokenPoolCCTPV2Setup} from "./USDCTokenPoolCCTPV2Setup.t.sol";
 
 contract USDCTokenPoolCCTPV2_constructor is USDCTokenPoolCCTPV2Setup {
   function test_constructor() public {
@@ -50,12 +51,10 @@ contract USDCTokenPoolCCTPV2_constructor is USDCTokenPoolCCTPV2Setup {
   }
 
   function test_constructor_RevertWhen_InvalidTokenMessengerVersion() public {
-    // The error we want to call is most likely unreachable because the token messenger version is 1, but we mock it to 
+    // The error we want to call is most likely unreachable because the token messenger version is 1, but we mock it to
     // 0 to test the error
     vm.mockCall(
-      address(s_mockUSDC),
-      abi.encodeWithSelector(MockUSDCTokenMessenger.messageBodyVersion.selector),
-      abi.encode(0)
+      address(s_mockUSDC), abi.encodeWithSelector(MockUSDCTokenMessenger.messageBodyVersion.selector), abi.encode(0)
     );
 
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidTokenMessengerVersion.selector, 0, 1));

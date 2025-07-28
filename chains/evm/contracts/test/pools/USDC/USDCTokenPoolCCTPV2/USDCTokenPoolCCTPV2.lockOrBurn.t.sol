@@ -272,7 +272,7 @@ contract USDCTokenPoolCCTPV2_lockOrBurn is USDCTokenPoolCCTPV2Setup {
     address randomAddress = makeAddr("RANDOM_ADDRESS");
 
     vm.startPrank(randomAddress);
-      
+
     vm.expectRevert(abi.encodeWithSelector(TokenPool.CallerIsNotARampOnRouter.selector, randomAddress));
 
     s_usdcTokenPool.lockOrBurn(

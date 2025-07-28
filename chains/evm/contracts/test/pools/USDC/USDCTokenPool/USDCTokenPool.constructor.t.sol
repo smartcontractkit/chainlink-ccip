@@ -6,8 +6,8 @@ import {ITokenMessenger} from "../../../../pools/USDC/interfaces/ITokenMessenger
 import {IERC165} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
 
-import {MockE2EUSDCTransmitter} from "../../../mocks/MockE2EUSDCTransmitter.sol";
 import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
+import {MockE2EUSDCTransmitter} from "../../../mocks/MockE2EUSDCTransmitter.sol";
 
 import {USDCTokenPoolSetup} from "./USDCTokenPoolSetup.t.sol";
 
@@ -71,9 +71,7 @@ contract USDCTokenPool_constructor is USDCTokenPoolSetup {
   function test_constructor_RevertWhen_InvalidTokenMessengerVersion() public {
     // The error we want to call is most likely unreachable because the token messenger version is 0, but we mock it to 1 to test the error
     vm.mockCall(
-      address(s_mockUSDCTransmitter),
-      abi.encodeWithSelector(MockE2EUSDCTransmitter.version.selector),
-      abi.encode(1)
+      address(s_mockUSDCTransmitter), abi.encodeWithSelector(MockE2EUSDCTransmitter.version.selector), abi.encode(1)
     );
 
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidTokenMessengerVersion.selector, 0, 1));

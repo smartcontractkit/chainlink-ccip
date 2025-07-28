@@ -16,10 +16,11 @@ import {IERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IERC165} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
+
 import {EnumerableSet} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableSet.sol";
+import {IERC165} from
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
 
 import {console2 as console} from "forge-std/console2.sol";
 
@@ -50,7 +51,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   error InvalidCCTPVersion(CCTPVersion expected, CCTPVersion got);
   error TokenPoolProxyAlreadyAllowed(address tokenPoolProxy);
   error TokenPoolProxyNotAllowed(address tokenPoolProxy);
-  
+
   // This data is supplied from offchain and contains everything needed
   // to receive the USDC tokens.
   struct MessageAndAttestation {
@@ -151,14 +152,18 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     console.log("transmitterVersion", transmitterVersion);
     console.log("i_supportedUSDCVersion", i_supportedUSDCVersion);
 
-    if (transmitterVersion != i_supportedUSDCVersion) revert InvalidMessageVersion(transmitterVersion, i_supportedUSDCVersion);
+    if (transmitterVersion != i_supportedUSDCVersion) {
+      revert InvalidMessageVersion(transmitterVersion, i_supportedUSDCVersion);
+    }
 
     uint32 tokenMessengerVersion = tokenMessenger.messageBodyVersion();
 
     console.log("tokenMessengerVersion", tokenMessengerVersion);
     console.log("i_supportedUSDCVersion", i_supportedUSDCVersion);
 
-    if (tokenMessengerVersion != i_supportedUSDCVersion) revert InvalidTokenMessengerVersion(tokenMessengerVersion, i_supportedUSDCVersion);
+    if (tokenMessengerVersion != i_supportedUSDCVersion) {
+      revert InvalidTokenMessengerVersion(tokenMessengerVersion, i_supportedUSDCVersion);
+    }
 
     if (cctpMessageTransmitterProxy.i_cctpTransmitter() != transmitter) revert InvalidTransmitterInProxy();
 
@@ -426,10 +431,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     emit DomainsSet(domains);
   }
 
-  function setAllowedTokenPoolProxies(
-    address[] calldata tokenPoolProxies,
-    bool[] calldata allowed
-  ) external onlyOwner {
+  function setAllowedTokenPoolProxies(address[] calldata tokenPoolProxies, bool[] calldata allowed) external onlyOwner {
     for (uint256 i = 0; i < tokenPoolProxies.length; ++i) {
       if (allowed[i]) {
         if (!s_allowedTokenPoolProxies.add(tokenPoolProxies[i])) {

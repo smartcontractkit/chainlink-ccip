@@ -29,7 +29,7 @@ contract USDCTokenPoolCCTPV2Setup is USDCSetup {
     allowedTokenPoolProxies[2] = address(s_routerAllowedOffRamp);
 
     bool[] memory allowed = new bool[](3);
-    for(uint256 i = 0; i < allowedTokenPoolProxies.length; i++) {
+    for (uint256 i = 0; i < allowedTokenPoolProxies.length; i++) {
       allowed[i] = true;
     }
 
@@ -43,12 +43,7 @@ contract USDCTokenPoolCCTPV2Setup is USDCSetup {
 
     s_allowedList.push(vm.randomAddress());
     s_usdcTokenPoolWithAllowList = new USDCTokenPoolCCTPV2Helper(
-      s_mockUSDC,
-      s_cctpMessageTransmitterProxy,
-      s_USDCToken,
-      s_allowedList,
-      address(s_mockRMNRemote),
-      address(s_router)
+      s_mockUSDC, s_cctpMessageTransmitterProxy, s_USDCToken, s_allowedList, address(s_mockRMNRemote), address(s_router)
     );
 
     s_usdcTokenPoolWithAllowList.setAllowedTokenPoolProxies(allowedTokenPoolProxies, allowed);

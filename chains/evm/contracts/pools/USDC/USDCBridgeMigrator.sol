@@ -2,6 +2,8 @@
 pragma solidity ^0.8.24;
 
 import {ERC20LockBox} from "../ERC20LockBox.sol";
+import {SiloedLockReleaseTokenPool} from "../SiloedLockReleaseTokenPool.sol";
+
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
 
@@ -25,7 +27,6 @@ abstract contract USDCBridgeMigrator is Ownable2StepMsgSender {
   error onlyCircle();
   error ExistingMigrationProposal();
   error NoMigrationProposalPending();
-  error InvalidChainSelector();
 
   IBurnMintERC20 private immutable i_USDC;
 
@@ -34,8 +35,6 @@ abstract contract USDCBridgeMigrator is Ownable2StepMsgSender {
 
   mapping(uint64 chainSelector => uint256 lockedBalance) internal s_lockedTokensByChainSelector;
   mapping(uint64 remoteChainSelector => uint256 excludedTokens) internal s_tokensExcludedFromBurn;
-
-  mapping(uint64 chainSelector => bool shouldUseLockRelease) internal s_shouldUseLockRelease;
 
   EnumerableSet.UintSet internal s_migratedChains;
 
@@ -75,9 +74,6 @@ abstract contract USDCBridgeMigrator is Ownable2StepMsgSender {
     // to canonical USDC by removing the canonical USDC backing it from circulation.
     i_USDC.burn(tokensToBurn);
 
-    // Disable L/R automatically on burned chain and enable CCTP
-    delete s_shouldUseLockRelease[burnChainSelector];
-
     s_migratedChains.add(burnChainSelector);
 
     emit CCTPMigrationExecuted(burnChainSelector, tokensToBurn);
@@ -94,9 +90,6 @@ abstract contract USDCBridgeMigrator is Ownable2StepMsgSender {
   ) external onlyOwner {
     // Prevent overwriting existing migration proposals until the current one is finished
     if (s_proposedUSDCMigrationChain != 0) revert ExistingMigrationProposal();
-
-    // Ensure that the chain is currently using lock/release and not CCTP
-    if (!s_shouldUseLockRelease[remoteChainSelector]) revert InvalidChainSelector();
 
     s_proposedUSDCMigrationChain = remoteChainSelector;
 
