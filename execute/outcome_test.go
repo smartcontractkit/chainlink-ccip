@@ -41,6 +41,8 @@ func TestOutcome_PseudoDeletedConsensusConflict(t *testing.T) {
 		},
 		Sender: []byte{1, 1, 1, 1, 1},
 	}
+	tkData1 := exectypes.NewMessageTokenData(exectypes.NewSuccessTokenData([]byte{1, 1, 1, 1, 1, 1}))
+	tkData2 := exectypes.NewMessageTokenData(exectypes.NewSuccessTokenData([]byte{1, 1, 1, 1, 1, 2}))
 
 	oracleObservations := make(map[commontypes.OracleID]exectypes.Observation)
 
@@ -63,10 +65,10 @@ func TestOutcome_PseudoDeletedConsensusConflict(t *testing.T) {
 			},
 			TokenData: map[cciptypes.ChainSelector]map[cciptypes.SeqNum]exectypes.MessageTokenData{
 				srcChain1: {
-					srcChain1SeqNr: exectypes.NewMessageTokenData(),
+					srcChain1SeqNr: tkData1,
 				},
 				srcChain2: {
-					srcChain2SeqNr: exectypes.NewMessageTokenData(),
+					srcChain2SeqNr: tkData2,
 				},
 			},
 			FChain: map[cciptypes.ChainSelector]int{
@@ -81,6 +83,7 @@ func TestOutcome_PseudoDeletedConsensusConflict(t *testing.T) {
 			// Create a pseudo deleted message for srcChain2
 			msg2PseudoDeleted := createEmptyMessageWithIDAndSeqNum(obs.Messages[srcChain2][srcChain2SeqNr])
 			obs.Messages[srcChain2][srcChain2SeqNr] = msg2PseudoDeleted
+			obs.TokenData[srcChain2][srcChain2SeqNr] = exectypes.NewMessageTokenData()
 		}
 		oracleObservations[commontypes.OracleID(oracleID)] = obs
 	}
@@ -98,4 +101,6 @@ func TestOutcome_PseudoDeletedConsensusConflict(t *testing.T) {
 	require.Len(t, consensusObs.Messages, 2)
 	require.Equal(t, msg1, consensusObs.Messages[srcChain1][srcChain1SeqNr])
 	require.Equal(t, msg2, consensusObs.Messages[srcChain2][srcChain2SeqNr])
+	require.Equal(t, tkData1, consensusObs.TokenData[srcChain1][srcChain1SeqNr])
+	require.Equal(t, tkData2, consensusObs.TokenData[srcChain2][srcChain2SeqNr])
 }

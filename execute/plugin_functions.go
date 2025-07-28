@@ -469,11 +469,10 @@ func computeMessageObservationsConsensus(
 						"chain", chain, "seqNum", seqNum, "msgs", msgsWithConsensus)
 				}
 
-				if _, ok := results[chain]; !ok && msg != nil {
-					results[chain] = make(map[cciptypes.SeqNum]cciptypes.Message)
-				}
-
 				if msg != nil {
+					if _, ok := results[chain]; !ok {
+						results[chain] = make(map[cciptypes.SeqNum]cciptypes.Message)
+					}
 					results[chain][seqNum] = *msg
 				}
 
