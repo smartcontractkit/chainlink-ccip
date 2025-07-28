@@ -66,7 +66,7 @@ func (u solanaUSDCMessageReader) MessagesByTokenID(
 	}
 
 	// Query the token pool contract for the MessageSent event data.
-	expressions := []query.Expression{query.Confidence(primitives.Finalized)}
+	expressions := []query.Expression{}
 	for _, data := range cctpData {
 		// This is much more expensive than the EVM version. Rather than a
 		// single ANY expression, we have separate expressions for each
@@ -95,6 +95,7 @@ func (u solanaUSDCMessageReader) MessagesByTokenID(
 	keyFilter, err := query.Where(
 		// Using same as EVM for consistency. Only used by off-chain components so name does not have to align with on-chain
 		consts.EventNameCCTPMessageSent,
+		query.Confidence(primitives.Finalized),
 		query.Or(expressions...),
 	)
 	if err != nil {
