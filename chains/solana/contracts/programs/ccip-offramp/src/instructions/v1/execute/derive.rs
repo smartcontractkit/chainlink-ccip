@@ -38,7 +38,7 @@ fn find(seeds: &[&[u8]], program_id: Pubkey) -> CcipAccountMeta {
 }
 
 #[derive(Clone, Debug)]
-pub enum DeriveExecuteAccountsStage {
+pub enum DeriveAccountsExecuteStage {
     Start,
     FinishMainAccountList,
     RetrieveTokenLUTs,
@@ -57,23 +57,21 @@ pub enum DeriveExecuteAccountsStage {
     },
 }
 
-impl Display for DeriveExecuteAccountsStage {
+impl Display for DeriveAccountsExecuteStage {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
-            DeriveExecuteAccountsStage::Start => f.write_str("Start"),
-            DeriveExecuteAccountsStage::FinishMainAccountList => {
+            DeriveAccountsExecuteStage::Start => f.write_str("Start"),
+            DeriveAccountsExecuteStage::FinishMainAccountList => {
                 f.write_str("FinishMainAccountList")
             }
-            DeriveExecuteAccountsStage::RetrieveTokenLUTs => {
+            DeriveAccountsExecuteStage::RetrieveTokenLUTs => {
                 f.write_str("RetrieveTokenLookupTables")
             }
-            &DeriveExecuteAccountsStage::RetrievePoolPrograms => {
-                f.write_str("RetrievePoolPrograms")
-            }
-            DeriveExecuteAccountsStage::TokenTransferStaticAccounts { token, page } => {
+            DeriveAccountsExecuteStage::RetrievePoolPrograms => f.write_str("RetrievePoolPrograms"),
+            DeriveAccountsExecuteStage::TokenTransferStaticAccounts { token, page } => {
                 f.write_fmt(format_args!("TokenTransferStaticAccounts/{token}/{page}"))
             }
-            DeriveExecuteAccountsStage::NestedTokenDerive {
+            DeriveAccountsExecuteStage::NestedTokenDerive {
                 token_substage,
                 token,
             } => f.write_fmt(format_args!("NestedTokenDerive/{token}/{token_substage}")),
@@ -81,7 +79,7 @@ impl Display for DeriveExecuteAccountsStage {
     }
 }
 
-impl FromStr for DeriveExecuteAccountsStage {
+impl FromStr for DeriveAccountsExecuteStage {
     type Err = CcipOfframpError;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
@@ -135,8 +133,8 @@ pub fn derive_execute_accounts_start(source_chain_selector: u64) -> Result<Deriv
         accounts_to_save,
         ask_again_with,
         look_up_tables_to_save: vec![],
-        current_stage: DeriveExecuteAccountsStage::Start.to_string(),
-        next_stage: DeriveExecuteAccountsStage::FinishMainAccountList.to_string(),
+        current_stage: DeriveAccountsExecuteStage::Start.to_string(),
+        next_stage: DeriveAccountsExecuteStage::FinishMainAccountList.to_string(),
     })
 }
 
@@ -204,7 +202,7 @@ pub fn derive_execute_accounts_build_main_account_list<'info>(
     } else {
         // There are tokens, so we continue by retrieving their lookup tables on next stage.
         (
-            DeriveExecuteAccountsStage::RetrieveTokenLUTs.to_string(),
+            DeriveAccountsExecuteStage::RetrieveTokenLUTs.to_string(),
             params
                 .token_transfers
                 .iter()
@@ -224,7 +222,7 @@ pub fn derive_execute_accounts_build_main_account_list<'info>(
         accounts_to_save,
         ask_again_with,
         look_up_tables_to_save: vec![offramp_lookup_table],
-        current_stage: DeriveExecuteAccountsStage::FinishMainAccountList.to_string(),
+        current_stage: DeriveAccountsExecuteStage::FinishMainAccountList.to_string(),
         next_stage,
     })
 }
@@ -244,8 +242,8 @@ pub fn derive_execute_accounts_retrieve_luts<'info>(
         accounts_to_save: vec![],
         ask_again_with,
         look_up_tables_to_save: vec![],
-        current_stage: DeriveExecuteAccountsStage::RetrieveTokenLUTs.to_string(),
-        next_stage: DeriveExecuteAccountsStage::RetrievePoolPrograms.to_string(),
+        current_stage: DeriveAccountsExecuteStage::RetrieveTokenLUTs.to_string(),
+        next_stage: DeriveAccountsExecuteStage::RetrievePoolPrograms.to_string(),
     })
 }
 
@@ -281,8 +279,8 @@ pub fn derive_execute_accounts_retrieve_pool_programs<'info>(
         accounts_to_save: vec![],
         ask_again_with,
         look_up_tables_to_save: vec![],
-        current_stage: DeriveExecuteAccountsStage::RetrievePoolPrograms.to_string(),
-        next_stage: DeriveExecuteAccountsStage::TokenTransferStaticAccounts { page: 0, token: 0 }
+        current_stage: DeriveAccountsExecuteStage::RetrievePoolPrograms.to_string(),
+        next_stage: DeriveAccountsExecuteStage::TokenTransferStaticAccounts { page: 0, token: 0 }
             .to_string(),
     })
 }
@@ -294,7 +292,7 @@ pub fn derive_execute_accounts_additional_tokens_static<'info>(
     token: u32,
 ) -> Result<DeriveAccountsResponse> {
     let mut response = DeriveAccountsResponse {
-        current_stage: DeriveExecuteAccountsStage::TokenTransferStaticAccounts { token, page }
+        current_stage: DeriveAccountsExecuteStage::TokenTransferStaticAccounts { token, page }
             .to_string(),
         // It's possible we'll need to return to this function, so we
         // initialize with the same account list
@@ -404,7 +402,7 @@ pub fn derive_execute_accounts_additional_tokens_static<'info>(
         let end_of_page = total_accounts_to_save.min(start_of_page + max_accounts_per_page);
         response.accounts_to_save = response.accounts_to_save[start_of_page..end_of_page].to_vec();
         if end_of_page < total_accounts_to_save {
-            response.next_stage = DeriveExecuteAccountsStage::TokenTransferStaticAccounts {
+            response.next_stage = DeriveAccountsExecuteStage::TokenTransferStaticAccounts {
                 page: page + 1,
                 token,
             }
@@ -417,14 +415,14 @@ pub fn derive_execute_accounts_additional_tokens_static<'info>(
     let registry = load_token_admin_registry_checked(token_registry)?;
     if registry.supports_auto_derivation {
         // Nested derivation is supported, so we go one level deeper
-        response.next_stage = DeriveExecuteAccountsStage::NestedTokenDerive {
+        response.next_stage = DeriveAccountsExecuteStage::NestedTokenDerive {
             token_substage: "Start".to_string(),
             token,
         }
         .to_string();
     } else if token + 1 < params.token_transfers.len() as u32 {
         // We aren't done yet with all tokens
-        response.next_stage = DeriveExecuteAccountsStage::TokenTransferStaticAccounts {
+        response.next_stage = DeriveAccountsExecuteStage::TokenTransferStaticAccounts {
             page: 0,
             token: token + 1,
         }
@@ -477,7 +475,7 @@ pub fn derive_execute_accounts_additional_token_nested<'info>(
             .iter()
             .map(|a| a.key().readonly())
             .collect(),
-        current_stage: DeriveExecuteAccountsStage::NestedTokenDerive {
+        current_stage: DeriveAccountsExecuteStage::NestedTokenDerive {
             token_substage: substage.to_string(),
             token,
         }
@@ -527,13 +525,13 @@ pub fn derive_execute_accounts_additional_token_nested<'info>(
         response
             .ask_again_with
             .extend_from_slice(&nested_response.ask_again_with);
-        response.next_stage = DeriveExecuteAccountsStage::NestedTokenDerive {
+        response.next_stage = DeriveAccountsExecuteStage::NestedTokenDerive {
             token_substage: nested_response.next_stage,
             token,
         }
         .to_string();
     } else if token + 1 < params.token_transfers.len() as u32 {
-        response.next_stage = DeriveExecuteAccountsStage::TokenTransferStaticAccounts {
+        response.next_stage = DeriveAccountsExecuteStage::TokenTransferStaticAccounts {
             page: 0,
             token: token + 1,
         }

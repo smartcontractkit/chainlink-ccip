@@ -8,7 +8,6 @@ use solana_program::sysvar::instructions;
 use crate::program::CcipOfframp;
 use crate::state::{
     CommitReport, Config, ExecutionReportBuffer, GlobalState, ReferenceAddresses, SourceChain,
-    SourceChainConfig,
 };
 use crate::CcipOfframpError;
 
@@ -224,7 +223,7 @@ pub struct AcceptOwnership<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(new_chain_selector: u64, _source_chain_config: SourceChainConfig)]
+#[instruction(new_chain_selector: u64)]
 pub struct AddSourceChain<'info> {
     /// Adding a chain selector implies initializing the state for a new chain
     #[account(
@@ -642,7 +641,7 @@ pub struct CloseCommitReportAccount<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(buffer_id: Vec<u8>, report_length: u32, chunk: Vec<u8>, chunk_index: u8)]
+#[instruction(buffer_id: Vec<u8>, report_length: u32)]
 pub struct BufferExecutionReportContext<'info> {
     #[account(
         init_if_needed,

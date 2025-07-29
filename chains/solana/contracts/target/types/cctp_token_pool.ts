@@ -497,6 +497,31 @@ export type CctpTokenPool = {
       ]
     },
     {
+      "name": "setRateLimitAdmin",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "mint",
+          "type": "publicKey"
+        },
+        {
+          "name": "newRateLimitAdmin",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
       "name": "deleteChainConfig",
       "accounts": [
         {
@@ -769,7 +794,8 @@ export type CctpTokenPool = {
           "isSigner": false,
           "docs": [
             "CHECK this is CCTP's MessageTransmitter program, which",
-            "is invoked CCTP's TokenMessengerMinter by this program."
+            "is invoked transitively by CCTP's TokenMessengerMinter,",
+            "which in turn is invoked explicitly by this program."
           ]
         },
         {
@@ -1856,6 +1882,31 @@ export const IDL: CctpTokenPool = {
       ]
     },
     {
+      "name": "setRateLimitAdmin",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "mint",
+          "type": "publicKey"
+        },
+        {
+          "name": "newRateLimitAdmin",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
       "name": "deleteChainConfig",
       "accounts": [
         {
@@ -2128,7 +2179,8 @@ export const IDL: CctpTokenPool = {
           "isSigner": false,
           "docs": [
             "CHECK this is CCTP's MessageTransmitter program, which",
-            "is invoked CCTP's TokenMessengerMinter by this program."
+            "is invoked transitively by CCTP's TokenMessengerMinter,",
+            "which in turn is invoked explicitly by this program."
           ]
         },
         {

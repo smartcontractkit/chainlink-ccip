@@ -488,6 +488,11 @@
       "code": 9007,
       "name": "InvalidCodeVersion",
       "msg": "Invalid code version"
+    },
+    {
+      "code": 9008,
+      "name": "DefaultOwnerProposal",
+      "msg": "Proposed owner is the default pubkey"
     }
   ]
 }

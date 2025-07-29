@@ -36,7 +36,7 @@ pub struct InitGlobalConfig<'info> {
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
 
-    // Ensures that the provided program is the BurnmintTokenPool program,
+    // Ensures that the provided program is the CctpTokenPool program,
     // and that its associated program data account matches the expected one.
     // This guarantees that only the program's upgrade authority can modify the global config.
     #[account(constraint = program.programdata_address()? == Some(program_data.key()))]
@@ -88,6 +88,7 @@ pub struct AdminUpdateTokenPool<'info> {
     #[account(
         seeds = [POOL_STATE_SEED, mint.key().as_ref()],
         bump,
+        constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub state: Account<'info, State>, // config PDA for token pool
     pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
@@ -141,6 +142,7 @@ pub struct AddToAllowList<'info> {
         realloc = ANCHOR_DISCRIMINATOR + State::INIT_SPACE + 32 * (state.config.allow_list.len() + add.len()),
         realloc::payer = authority,
         realloc::zero = false,
+        constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub state: Account<'info, State>,
 
@@ -162,9 +164,11 @@ pub struct RemoveFromAllowlist<'info> {
             mint.key().as_ref()
         ],
         bump,
+        constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
         realloc = ANCHOR_DISCRIMINATOR + State::INIT_SPACE + 32 * (state.config.allow_list.len().saturating_sub(remove.len())),
         realloc::payer = authority,
-        realloc::zero = false
+        realloc::zero = false,
+        constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub state: Account<'info, State>,
 
@@ -185,6 +189,7 @@ pub struct AcceptOwnership<'info> {
             mint.key().as_ref()
         ],
         bump,
+        constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub state: Account<'info, State>,
 
@@ -231,10 +236,11 @@ pub struct TokenOfframp<'info> {
             mint.key().as_ref()
         ],
         bump,
+        constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub state: Account<'info, State>,
 
-    #[account(address = *mint.to_account_info().owner)]
+    #[account(address = state.config.token_program)]
     pub token_program: Interface<'info, TokenInterface>,
 
     #[account(mut)]
@@ -345,21 +351,8 @@ impl TokenOfframpRemainingAccounts<'_> {
         let domain_seed = domain_str.as_bytes();
 
         require_keys_eq!(
-            self.cctp_authority_pda.key(),
-            get_message_transmitter_pda(&[
-                b"message_transmitter_authority",
-                TOKEN_MESSENGER_MINTER.as_ref(),
-            ])
-        );
-
-        require_keys_eq!(
             self.cctp_message_transmitter_account.key(),
             get_message_transmitter_pda(&[b"message_transmitter"])
-        );
-
-        require_keys_eq!(
-            self.cctp_used_nonces.key(),
-            get_message_transmitter_pda(&[b"used_nonces", domain_seed, nonce_seed.as_ref()])
         );
 
         require_keys_eq!(
@@ -368,11 +361,6 @@ impl TokenOfframpRemainingAccounts<'_> {
         );
 
         require_keys_eq!(self.system_program.key(), System::id());
-
-        require_keys_eq!(
-            self.cctp_event_authority.key(),
-            get_message_transmitter_pda(&[b"__event_authority"])
-        );
 
         require_keys_eq!(self.cctp_message_transmitter.key(), MESSAGE_TRANSMITTER);
 
@@ -392,6 +380,29 @@ impl TokenOfframpRemainingAccounts<'_> {
         );
 
         require_keys_eq!(
+            self.cctp_token_messenger_minter_event_authority.key(),
+            get_token_messenger_minter_pda(&[b"__event_authority"])
+        );
+
+        require_keys_eq!(
+            self.cctp_authority_pda.key(),
+            get_message_transmitter_pda(&[
+                b"message_transmitter_authority",
+                TOKEN_MESSENGER_MINTER.as_ref(),
+            ])
+        );
+
+        require_keys_eq!(
+            self.cctp_event_authority.key(),
+            get_message_transmitter_pda(&[b"__event_authority"])
+        );
+
+        require_keys_eq!(
+            self.cctp_custody_token_account.key(),
+            get_token_messenger_minter_pda(&[b"custody", mint.key().as_ref()])
+        );
+
+        require_keys_eq!(
             self.cctp_remote_token_messenger_key.key(),
             get_token_messenger_minter_pda(&[b"remote_token_messenger", domain_seed])
         );
@@ -406,13 +417,8 @@ impl TokenOfframpRemainingAccounts<'_> {
         );
 
         require_keys_eq!(
-            self.cctp_custody_token_account.key(),
-            get_token_messenger_minter_pda(&[b"custody", mint.key().as_ref()])
-        );
-
-        require_keys_eq!(
-            self.cctp_token_messenger_minter_event_authority.key(),
-            get_token_messenger_minter_pda(&[b"__event_authority"])
+            self.cctp_used_nonces.key(),
+            get_message_transmitter_pda(&[b"used_nonces", domain_seed, nonce_seed.as_ref()])
         );
 
         Ok(())
@@ -435,6 +441,7 @@ pub struct TokenOnramp<'info> {
     #[account(
         seeds = [POOL_STATE_SEED, mint.key().as_ref()],
         bump,
+        constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub state: Box<Account<'info, State>>,
 
@@ -516,7 +523,8 @@ pub struct TokenOnramp<'info> {
     pub system_program: Program<'info, System>,
 
     /// CHECK this is CCTP's MessageTransmitter program, which
-    /// is invoked CCTP's TokenMessengerMinter by this program.
+    /// is invoked transitively by CCTP's TokenMessengerMinter,
+    /// which in turn is invoked explicitly by this program.
     #[account(
         address = MESSAGE_TRANSMITTER @ CctpTokenPoolError::InvalidMessageTransmitter
     )]
@@ -597,6 +605,7 @@ pub struct InitializeChainConfig<'info> {
             mint.key().as_ref()
         ],
         bump,
+        constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub state: Account<'info, State>,
 
@@ -628,6 +637,7 @@ pub struct EditChainConfig<'info> {
             mint.key().as_ref()
         ],
         bump,
+        constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub state: Account<'info, State>,
 
@@ -642,7 +652,49 @@ pub struct EditChainConfig<'info> {
     )]
     pub chain_config: Account<'info, ChainConfig>,
 
-    #[account(mut, constraint = authority.key() == state.config.owner || authority.key() == state.config.rate_limit_admin)]
+    #[account(mut, constraint = authority.key() == state.config.owner @ CcipTokenPoolError::Unauthorized)]
+    pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
+#[instruction(remote_chain_selector: u64, mint: Pubkey)]
+pub struct SetChainRateLimit<'info> {
+    #[account(
+        seeds = [
+            POOL_STATE_SEED,
+            mint.key().as_ref()
+        ],
+        bump,
+        constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
+    )]
+    pub state: Account<'info, State>,
+
+    #[account(
+        mut,
+        seeds = [
+            POOL_CHAINCONFIG_SEED,
+            &remote_chain_selector.to_le_bytes(),
+            mint.key().as_ref(),
+        ],
+        bump,
+    )]
+    pub chain_config: Account<'info, ChainConfig>,
+
+    #[account(mut, constraint = authority.key() == state.config.owner || authority.key() == state.config.rate_limit_admin @ CcipTokenPoolError::Unauthorized)]
+    pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
+#[instruction(mint: Pubkey)]
+pub struct SetRateLimitAdmin<'info> {
+    #[account(
+        mut,
+        seeds = [POOL_STATE_SEED, mint.key().as_ref()],
+        bump,
+        constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
+    )]
+    pub state: Account<'info, State>,
+    #[account(mut, address = state.config.owner @ CcipTokenPoolError::Unauthorized)]
     pub authority: Signer<'info>,
 }
 
@@ -655,6 +707,7 @@ pub struct EditChainConfigDynamicSize<'info> {
             mint.key().as_ref()
         ],
         bump,
+        constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub state: Account<'info, State>,
 
@@ -687,6 +740,7 @@ pub struct AppendRemotePoolAddresses<'info> {
             mint.key().as_ref()
         ],
         bump,
+        constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub state: Account<'info, State>,
 
@@ -721,6 +775,7 @@ pub struct DeleteChainConfig<'info> {
             mint.key().as_ref()
         ],
         bump,
+        constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub state: Account<'info, State>,
 
@@ -749,6 +804,7 @@ pub struct ReclaimEventAccount<'info> {
             mint.key().as_ref()
         ],
         bump,
+        constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub state: Account<'info, State>,
 
@@ -793,7 +849,6 @@ pub struct ReclaimEventAccount<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(amount: u64)]
 pub struct ReclaimFunds<'info> {
     #[account(
         seeds = [
@@ -801,6 +856,7 @@ pub struct ReclaimFunds<'info> {
             mint.key().as_ref()
         ],
         bump,
+        constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub state: Account<'info, State>,
 

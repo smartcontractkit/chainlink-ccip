@@ -23,16 +23,16 @@ import (
 
 	// use the real program bindings, although interacting with the mock contract
 
-	cctp_message_transmitter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/cctp_message_transmitter"
-	message_transmitter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/cctp_message_transmitter"
-	cctp_token_messenger_minter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/cctp_token_messenger_minter"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/cctp_token_pool"
+	cctp_message_transmitter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/cctp_message_transmitter"
+	message_transmitter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/cctp_message_transmitter"
+	cctp_token_messenger_minter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/cctp_token_messenger_minter"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/cctp_token_pool"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/cctp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/rmn_remote"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_ccip_invalid_receiver"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_ccip_receiver"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/rmn_remote"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/test_ccip_invalid_receiver"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/test_ccip_receiver"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/test_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/ccip"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
@@ -478,6 +478,54 @@ func TestTokenPool(t *testing.T) {
 									testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ixRates}, anotherAdmin, config.DefaultCommitment, []string{cfg.errStr})
 								})
 							}
+						})
+
+						t.Run("Rate Limit Admin", func(t *testing.T) {
+							// set invalid a new rate limit admin
+							ixRateAdmin, err := test_token_pool.NewSetRateLimitAdminInstruction(
+								p.Mint,
+								user.PublicKey(),
+								poolConfig,
+								anotherAdmin.PublicKey(),
+							).ValidateAndBuild()
+							require.NoError(t, err)
+
+							// test new rate limit admin
+							ixRatesValid, err := test_token_pool.NewSetChainRateLimitInstruction(config.EvmChainSelector, p.Mint,
+								test_token_pool.RateLimitConfig{
+									Enabled:  true,
+									Capacity: amount,
+									Rate:     1,
+								}, test_token_pool.RateLimitConfig{
+									Enabled:  false,
+									Capacity: 0,
+									Rate:     0,
+								}, poolConfig, p.Chain[config.EvmChainSelector], user.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+							require.NoError(t, err)
+
+							// undo rate limit admin
+							ixRateAdmin2, err := test_token_pool.NewSetRateLimitAdminInstruction(
+								p.Mint,
+								anotherAdmin.PublicKey(),
+								poolConfig,
+								anotherAdmin.PublicKey(),
+							).ValidateAndBuild()
+							require.NoError(t, err)
+
+							// try to modify rate limit with invalid admin
+							ixRates, err := test_token_pool.NewSetChainRateLimitInstruction(config.EvmChainSelector, p.Mint,
+								test_token_pool.RateLimitConfig{
+									Enabled:  true,
+									Capacity: amount,
+									Rate:     1,
+								}, test_token_pool.RateLimitConfig{
+									Enabled:  false,
+									Capacity: 0,
+									Rate:     0,
+								}, poolConfig, p.Chain[config.EvmChainSelector], user.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+							require.NoError(t, err)
+
+							testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ixRateAdmin, ixRatesValid, ixRateAdmin2, ixRates}, user, config.DefaultCommitment, []string{"SetChainRateLimit"}, common.AddSigners(anotherAdmin))
 						})
 
 						t.Run("globally cursed", func(t *testing.T) {

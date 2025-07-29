@@ -3,6 +3,7 @@ use anchor_lang::Discriminator;
 use ethnum::U256;
 use solana_program::address_lookup_table::state::AddressLookupTable;
 
+use crate::router_accounts::TokenAdminRegistryV1;
 use crate::{
     context::TokenAccountsValidationContext, router_accounts::TokenAdminRegistry, seed,
     CommonCcipError,
@@ -263,7 +264,10 @@ pub fn load_token_admin_registry_checked<'info>(
 fn load_v1_token_admin_registry(
     token_admin_registry: &AccountInfo<'_>,
 ) -> Result<TokenAdminRegistry> {
-    let data = token_admin_registry.try_borrow_data()?;
+    const ANCHOR_DISCRIMINATOR_SIZE: usize = 8;
+
+    let borrowed_data = token_admin_registry.try_borrow_data()?;
+    let (discriminator, data) = borrowed_data.split_at(ANCHOR_DISCRIMINATOR_SIZE);
 
     require_keys_eq!(
         token_admin_registry.owner.key(),
@@ -272,29 +276,14 @@ fn load_v1_token_admin_registry(
     );
 
     require!(
-        TokenAdminRegistry::DISCRIMINATOR == data[..8],
+        TokenAdminRegistry::DISCRIMINATOR == discriminator,
         CommonCcipError::InvalidInputsTokenAdminRegistryAccounts
     );
 
-    let version = u8::from_le_bytes([data[8]]);
-    require_eq!(
-        version,
-        1, // this deserialization is only valid for v1
-        CommonCcipError::InvalidInputsTokenAdminRegistryAccounts
-    );
+    let token_admin_registry_v1 = TokenAdminRegistryV1::deserialize(&mut &data[..])
+        .map_err(|_| CommonCcipError::InvalidInputsTokenAdminRegistryAccounts)?;
 
-    Ok(TokenAdminRegistry {
-        version: 1,
-        administrator: Pubkey::new_from_array(data[9..41].try_into().unwrap()),
-        pending_administrator: Pubkey::new_from_array(data[41..73].try_into().unwrap()),
-        lookup_table: Pubkey::new_from_array(data[73..105].try_into().unwrap()),
-        writable_indexes: [
-            u128::from_le_bytes(data[105..121].try_into().unwrap()),
-            u128::from_le_bytes(data[121..137].try_into().unwrap()),
-        ],
-        mint: Pubkey::new_from_array(data[137..169].try_into().unwrap()),
-        supports_auto_derivation: false, // this is the field that is missing in v1, and it defaults to false
-    })
+    TokenAdminRegistry::try_from(token_admin_registry_v1)
 }
 
 pub mod token_admin_registry_writable {
