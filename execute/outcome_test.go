@@ -5,13 +5,14 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 
-	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/libocr/commontypes"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
+	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 func TestOutcome_PseudoDeletedConsensusConflict(t *testing.T) {
