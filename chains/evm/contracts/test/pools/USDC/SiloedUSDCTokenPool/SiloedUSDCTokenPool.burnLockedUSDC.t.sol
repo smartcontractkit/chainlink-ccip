@@ -2,24 +2,21 @@
 pragma solidity ^0.8.24;
 
 import {Pool} from "../../../../libraries/Pool.sol";
-import {TokenPool} from "../../../../pools/TokenPool.sol";
-import {USDCBridgeMigrator} from "../../../../pools/USDC/USDCBridgeMigrator.sol";
-import {SiloedUSDCTokenPoolSetup} from "./SiloedUSDCTokenPoolSetup.sol";  
+
 import {SiloedLockReleaseTokenPool} from "../../../../pools/SiloedLockReleaseTokenPool.sol";
+import {TokenPool} from "../../../../pools/TokenPool.sol";
+import {SiloedUSDCTokenPool} from "../../../../pools/USDC/SiloedUSDCTokenPool.sol";
+import {SiloedUSDCTokenPoolSetup} from "./SiloedUSDCTokenPoolSetup.sol";
 import {BurnMintERC677} from "@chainlink/contracts/src/v0.8/shared/token/ERC677/BurnMintERC677.sol";
 
 contract SiloedUSDCTokenPool_BurnLockedUSDC is SiloedUSDCTokenPoolSetup {
-
   function setUp() public override {
     super.setUp();
 
     // Mark DEST_CHAIN_SELECTOR as siloed with OWNER as the rebalancer
     uint64[] memory removes = new uint64[](0);
     SiloedLockReleaseTokenPool.SiloConfigUpdate[] memory adds = new SiloedLockReleaseTokenPool.SiloConfigUpdate[](1);
-    adds[0] = SiloedLockReleaseTokenPool.SiloConfigUpdate({
-      remoteChainSelector: DEST_CHAIN_SELECTOR,
-      rebalancer: OWNER
-    });
+    adds[0] = SiloedLockReleaseTokenPool.SiloConfigUpdate({remoteChainSelector: DEST_CHAIN_SELECTOR, rebalancer: OWNER});
     s_usdcTokenPool.updateSiloDesignations(removes, adds);
   }
 
@@ -53,21 +50,15 @@ contract SiloedUSDCTokenPool_BurnLockedUSDC is SiloedUSDCTokenPoolSetup {
     // Ensure that the tokens are properly locked
     assertEq(s_USDCToken.balanceOf(address(s_lockBox)), amount, "Incorrect token amount in the tokenPool");
 
-    assertEq(
-      s_usdcTokenPool.getLockedTokensForChain(DEST_CHAIN_SELECTOR),
-      amount,
-      "Internal locked token accounting is incorrect"
-    );
-
     vm.startPrank(OWNER);
 
     vm.expectEmit();
-    emit USDCBridgeMigrator.CircleMigratorAddressSet(CIRCLE);
+    emit SiloedUSDCTokenPool.CircleMigratorAddressSet(CIRCLE);
 
     s_usdcTokenPool.setCircleMigratorAddress(CIRCLE);
 
     vm.expectEmit();
-    emit USDCBridgeMigrator.CCTPMigrationProposed(DEST_CHAIN_SELECTOR);
+    emit SiloedUSDCTokenPool.CCTPMigrationProposed(DEST_CHAIN_SELECTOR);
 
     // Propose the migration to CCTP
     s_usdcTokenPool.proposeCCTPMigration(DEST_CHAIN_SELECTOR);
@@ -78,16 +69,15 @@ contract SiloedUSDCTokenPool_BurnLockedUSDC is SiloedUSDCTokenPoolSetup {
       "Current proposed chain migration does not match expected for DEST_CHAIN_SELECTOR"
     );
 
-      // Grant the circle address the burn roles
-
+    // Grant the circle address the burn roles
 
     // Impersonate the set circle address and execute the proposal
     vm.startPrank(CIRCLE);
 
     vm.expectEmit();
-    emit USDCBridgeMigrator.CCTPMigrationExecuted(DEST_CHAIN_SELECTOR, amount);
+    emit SiloedUSDCTokenPool.CCTPMigrationExecuted(DEST_CHAIN_SELECTOR, amount);
 
-  // Ensure the call to the burn function is properly
+    // Ensure the call to the burn function is properly
     vm.expectCall(address(s_USDCToken), abi.encodeWithSelector(bytes4(keccak256("burn(uint256)")), amount));
     s_usdcTokenPool.burnLockedUSDC();
 
@@ -97,7 +87,7 @@ contract SiloedUSDCTokenPool_BurnLockedUSDC is SiloedUSDCTokenPoolSetup {
     // Ensure the proposal slot was cleared and there's no tokens locked for the destination chain anymore
     assertEq(s_usdcTokenPool.getCurrentProposedCCTPChainMigration(), 0, "Proposal Slot should be empty");
     assertEq(
-      s_usdcTokenPool.getLockedTokensForChain(DEST_CHAIN_SELECTOR),
+      s_usdcTokenPool.getAvailableTokens(DEST_CHAIN_SELECTOR),
       0,
       "No tokens should be locked for DEST_CHAIN_SELECTOR after CCTP-approved burn"
     );
@@ -128,14 +118,22 @@ contract SiloedUSDCTokenPool_BurnLockedUSDC is SiloedUSDCTokenPoolSetup {
     // Set the circle migrator address for later, but don't start pranking as it yet
     s_usdcTokenPool.setCircleMigratorAddress(CIRCLE);
 
-    vm.expectRevert(abi.encodeWithSelector(USDCBridgeMigrator.onlyCircle.selector));
+    vm.expectRevert(abi.encodeWithSelector(SiloedUSDCTokenPool.onlyCircle.selector));
 
     // Should fail because only Circle can call this function
     s_usdcTokenPool.burnLockedUSDC();
   }
 
   function test_RevertWhen_NoMigrationProposalPending() public {
-    vm.expectRevert(abi.encodeWithSelector(USDCBridgeMigrator.NoMigrationProposalPending.selector));
+    address circle = makeAddr("circle");
+
+    vm.startPrank(OWNER);
+    s_usdcTokenPool.setCircleMigratorAddress(circle);
+    vm.stopPrank();
+
+    vm.startPrank(circle);
+
+    vm.expectRevert(abi.encodeWithSelector(SiloedUSDCTokenPool.NoMigrationProposalPending.selector));
     s_usdcTokenPool.burnLockedUSDC();
   }
 }

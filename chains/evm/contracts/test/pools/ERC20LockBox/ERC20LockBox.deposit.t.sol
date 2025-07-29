@@ -18,7 +18,7 @@ contract ERC20LockBox_deposit is ERC20LockBoxSetup {
     s_token.approve(address(s_erc20LockBox), amount);
 
     vm.expectEmit();
-    emit ERC20LockBox.Deposit(DEST_CHAIN_SELECTOR, s_allowedCaller, amount);
+    emit ERC20LockBox.Deposit(address(s_token), DEST_CHAIN_SELECTOR, s_allowedCaller, amount);
 
     s_erc20LockBox.deposit(address(s_token), amount, DEST_CHAIN_SELECTOR);
 
@@ -78,7 +78,7 @@ contract ERC20LockBox_deposit is ERC20LockBoxSetup {
     s_token.approve(address(s_erc20LockBox), amount);
 
     vm.expectEmit(true, true, true, true);
-    emit ERC20LockBox.Deposit(DEST_CHAIN_SELECTOR, s_allowedCaller, amount);
+    emit ERC20LockBox.Deposit(address(s_token), DEST_CHAIN_SELECTOR, s_allowedCaller, amount);
 
     s_erc20LockBox.deposit(address(s_token), amount, DEST_CHAIN_SELECTOR);
 

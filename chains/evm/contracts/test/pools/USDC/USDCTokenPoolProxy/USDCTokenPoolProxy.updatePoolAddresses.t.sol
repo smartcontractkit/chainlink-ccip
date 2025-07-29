@@ -113,4 +113,4 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
     emit USDCTokenPoolProxy.PoolAddressesUpdated(newPools);
     s_usdcTokenPoolProxy.updatePoolAddresses(newPools);
   }
-} 
+}

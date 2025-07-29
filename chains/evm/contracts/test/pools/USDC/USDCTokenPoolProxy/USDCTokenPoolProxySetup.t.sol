@@ -1,15 +1,17 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {CCTPMessageTransmitterProxy} from "../../../../pools/USDC/CCTPMessageTransmitterProxy.sol";
 import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
 import {USDCTokenPoolCCTPV2} from "../../../../pools/USDC/USDCTokenPoolCCTPV2.sol";
 import {USDCTokenPoolProxy} from "../../../../pools/USDC/USDCTokenPoolProxy.sol";
-import {CCTPMessageTransmitterProxy} from "../../../../pools/USDC/CCTPMessageTransmitterProxy.sol";
-import {USDCTokenPoolHelper} from "../../../helpers/USDCTokenPoolHelper.sol";
-import {USDCTokenPoolCCTPV2Helper} from "../../../helpers/USDCTokenPoolCCTPV2Helper.sol";
+
 import {LockReleaseTokenPoolHelper} from "../../../helpers/LockReleaseTokenPoolHelper.sol";
-import {BurnMintERC677} from "@chainlink/contracts/src/v0.8/shared/token/ERC677/BurnMintERC677.sol";
+import {USDCTokenPoolCCTPV2Helper} from "../../../helpers/USDCTokenPoolCCTPV2Helper.sol";
+import {USDCTokenPoolHelper} from "../../../helpers/USDCTokenPoolHelper.sol";
+
 import {USDCSetup} from "../USDCSetup.t.sol";
+import {BurnMintERC677} from "@chainlink/contracts/src/v0.8/shared/token/ERC677/BurnMintERC677.sol";
 
 contract USDCTokenPoolProxySetup is USDCSetup {
   address internal s_cctpV1Pool = makeAddr("cctpV1Pool");
@@ -23,44 +25,19 @@ contract USDCTokenPoolProxySetup is USDCSetup {
     // Mock lockOrBurn and releaseOrMint calls for the pools
 
     // Mock lockOrBurn for s_cctpV1Pool
-    vm.mockCall(
-      address(s_cctpV1Pool),
-      abi.encodeWithSelector(USDCTokenPool.lockOrBurn.selector),
-      abi.encode()
-    );
+    vm.mockCall(address(s_cctpV1Pool), abi.encodeWithSelector(USDCTokenPool.lockOrBurn.selector), abi.encode());
     // Mock releaseOrMint for s_cctpV1Pool
-    vm.mockCall(
-      address(s_cctpV1Pool),
-      abi.encodeWithSelector(USDCTokenPool.releaseOrMint.selector),
-      abi.encode()
-    );
+    vm.mockCall(address(s_cctpV1Pool), abi.encodeWithSelector(USDCTokenPool.releaseOrMint.selector), abi.encode());
 
     // Mock lockOrBurn for s_cctpV2Pool
-    vm.mockCall(
-      address(s_cctpV2Pool),
-      abi.encodeWithSelector(USDCTokenPool.lockOrBurn.selector),
-      abi.encode()
-    );
+    vm.mockCall(address(s_cctpV2Pool), abi.encodeWithSelector(USDCTokenPool.lockOrBurn.selector), abi.encode());
     // Mock releaseOrMint for s_cctpV2Pool
-    vm.mockCall(
-      address(s_cctpV2Pool),
-      abi.encodeWithSelector(USDCTokenPool.releaseOrMint.selector),
-      abi.encode()
-    );
+    vm.mockCall(address(s_cctpV2Pool), abi.encodeWithSelector(USDCTokenPool.releaseOrMint.selector), abi.encode());
 
     // Mock lockOrBurn for s_lockReleasePool
-    vm.mockCall(
-      address(s_lockReleasePool),
-      abi.encodeWithSelector(USDCTokenPool.lockOrBurn.selector),
-      abi.encode()
-    );
+    vm.mockCall(address(s_lockReleasePool), abi.encodeWithSelector(USDCTokenPool.lockOrBurn.selector), abi.encode());
     // Mock releaseOrMint for s_lockReleasePool
-    vm.mockCall(
-      address(s_lockReleasePool),
-      abi.encodeWithSelector(USDCTokenPool.releaseOrMint.selector),
-      abi.encode()
-    );
-
+    vm.mockCall(address(s_lockReleasePool), abi.encodeWithSelector(USDCTokenPool.releaseOrMint.selector), abi.encode());
 
     // Deploy the proxy
     s_usdcTokenPoolProxy = new USDCTokenPoolProxy(
@@ -72,6 +49,9 @@ contract USDCTokenPoolProxySetup is USDCSetup {
       address(s_cctpV2Pool),
       address(s_lockReleasePool)
     );
+
+    // Deal some tokens to the proxy to test the transfer to the destination pool
+    deal(address(s_USDCToken), address(s_usdcTokenPoolProxy), 1000e6);
 
     // Configure the pools
     _poolApplyChainUpdates(address(s_usdcTokenPoolProxy));
@@ -87,4 +67,4 @@ contract USDCTokenPoolProxySetup is USDCSetup {
       CCTPMessageTransmitterProxy.AllowedCallerConfigArgs({caller: address(s_lockReleasePool), allowed: true});
     s_cctpMessageTransmitterProxy.configureAllowedCallers(allowedCallerParams);
   }
-} 
+}

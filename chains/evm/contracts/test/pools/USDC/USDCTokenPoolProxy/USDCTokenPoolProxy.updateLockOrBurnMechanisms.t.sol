@@ -102,4 +102,4 @@ contract USDCTokenPoolProxy_updateLockOrBurnMechanisms is USDCTokenPoolProxySetu
     s_usdcTokenPoolProxy.updateLockOrBurnMechanisms(chainSelectors, mechanisms);
     // Should not revert and should not change any state
   }
-} 
+}

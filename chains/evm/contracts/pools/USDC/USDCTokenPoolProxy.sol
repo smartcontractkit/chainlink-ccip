@@ -57,11 +57,7 @@ contract USDCTokenPoolProxy is TokenPool {
       revert InvalidPoolAddresses();
     }
 
-    s_pools = PoolAddresses({
-      cctpV1Pool: cctpV1Pool,
-      cctpV2Pool: cctpV2Pool,
-      lockReleasePool: lockReleasePool
-    });
+    s_pools = PoolAddresses({cctpV1Pool: cctpV1Pool, cctpV2Pool: cctpV2Pool, lockReleasePool: lockReleasePool});
   }
 
   function lockOrBurn(
@@ -77,16 +73,21 @@ contract USDCTokenPoolProxy is TokenPool {
 
     PoolAddresses memory pools = s_pools;
 
+    address destinationPool;
+
     if (mechanism == LockOrBurnMechanism.LOCK_RELEASE) {
-      return USDCTokenPool(pools.lockReleasePool).lockOrBurn(lockOrBurnIn);
+      destinationPool = pools.lockReleasePool;
     } else if (mechanism == LockOrBurnMechanism.CCTP_V1) {
-      return USDCTokenPool(pools.cctpV1Pool).lockOrBurn(lockOrBurnIn);
+      destinationPool = pools.cctpV1Pool;
+    }
+    else if (mechanism == LockOrBurnMechanism.CCTP_V2) {
+      destinationPool = pools.cctpV2Pool;
     }
 
-    // Happy Path
-    return USDCTokenPool(pools.cctpV2Pool).lockOrBurn(lockOrBurnIn);
+    // Transfer the tokens to the destination pool
+    i_token.safeTransfer(destinationPool, lockOrBurnIn.amount);
 
-
+    return USDCTokenPool(destinationPool).lockOrBurn(lockOrBurnIn);
   }
 
   function releaseOrMint(
@@ -112,7 +113,6 @@ contract USDCTokenPoolProxy is TokenPool {
       // would not be as easily parsed into a uint32.
       version := mload(add(usdcMessage, 4)) // 0 + 4 = 4
     }
-
 
     // TODO: Comments
     if (version == 0) {

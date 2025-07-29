@@ -3,18 +3,18 @@ pragma solidity ^0.8.24;
 
 import {Internal} from "../../../../libraries/Internal.sol";
 import {Pool} from "../../../../libraries/Pool.sol";
-import {TokenPool} from "../../../../pools/TokenPool.sol";
-import {LOCK_RELEASE_FLAG} from "../../../../pools/USDC/USDCTokenPoolProxy.sol";
-import {USDCBridgeMigrator} from "../../../../pools/USDC/USDCBridgeMigrator.sol";
-import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
+
 import {SiloedLockReleaseTokenPool} from "../../../../pools/SiloedLockReleaseTokenPool.sol";
+import {TokenPool} from "../../../../pools/TokenPool.sol";
+import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
+import {LOCK_RELEASE_FLAG} from "../../../../pools/USDC/USDCTokenPoolProxy.sol";
+
 import {SiloedUSDCTokenPoolSetup} from "./SiloedUSDCTokenPoolSetup.sol";
 
 contract SiloedUSDCTokenPool_lockOrBurn is SiloedUSDCTokenPoolSetup {
-
   function setUp() public virtual override {
     super.setUp();
-    
+
     // Deposit 1000 USDC into the pool so that it can be transferred to the lock box
     deal(address(s_USDCToken), address(s_usdcTokenPool), 1000e6);
 
@@ -22,10 +22,7 @@ contract SiloedUSDCTokenPool_lockOrBurn is SiloedUSDCTokenPoolSetup {
     vm.startPrank(OWNER);
     uint64[] memory removes = new uint64[](0);
     SiloedLockReleaseTokenPool.SiloConfigUpdate[] memory adds = new SiloedLockReleaseTokenPool.SiloConfigUpdate[](1);
-    adds[0] = SiloedLockReleaseTokenPool.SiloConfigUpdate({
-      remoteChainSelector: DEST_CHAIN_SELECTOR,
-      rebalancer: OWNER
-    });
+    adds[0] = SiloedLockReleaseTokenPool.SiloConfigUpdate({remoteChainSelector: DEST_CHAIN_SELECTOR, rebalancer: OWNER});
     s_usdcTokenPool.updateSiloDesignations(removes, adds);
     vm.stopPrank();
   }
@@ -54,13 +51,12 @@ contract SiloedUSDCTokenPool_lockOrBurn is SiloedUSDCTokenPoolSetup {
     Pool.LockOrBurnOutV1 memory result = s_usdcTokenPool.lockOrBurn(lockOrBurnIn);
 
     // Assert: Verify the result
-    assertEq(s_usdcTokenPool.getLockedTokensForChain(DEST_CHAIN_SELECTOR), amount);
+    assertEq(s_usdcTokenPool.getAvailableTokens(DEST_CHAIN_SELECTOR), amount);
 
     // destPoolData is the local token decimals abi-encoded to 32 bytes
     assertEq(result.destPoolData.length, 32);
     vm.stopPrank();
   }
-
 
   function test_lockOrBurn_UpdatesLockedTokensAccounting() public {
     // Arrange: Define test constants
@@ -83,13 +79,12 @@ contract SiloedUSDCTokenPool_lockOrBurn is SiloedUSDCTokenPoolSetup {
     Pool.LockOrBurnOutV1 memory result = s_usdcTokenPool.lockOrBurn(lockOrBurnIn);
 
     // Assert: Verify the locked tokens accounting is updated
-    assertEq(s_usdcTokenPool.getLockedTokensForChain(DEST_CHAIN_SELECTOR), amount);
+    assertEq(s_usdcTokenPool.getAvailableTokens(DEST_CHAIN_SELECTOR), amount);
 
     // destPoolData is the local token decimals abi-encoded to 32 bytes
     assertEq(result.destPoolData.length, 32);
     vm.stopPrank();
   }
-
 
   function test_lockOrBurn_MultipleLocks() public {
     // Arrange: Define test constants
@@ -125,7 +120,7 @@ contract SiloedUSDCTokenPool_lockOrBurn is SiloedUSDCTokenPoolSetup {
     Pool.LockOrBurnOutV1 memory result2 = s_usdcTokenPool.lockOrBurn(lockOrBurnIn2);
 
     // Assert: Verify the locked tokens accounting is updated correctly
-    assertEq(s_usdcTokenPool.getLockedTokensForChain(DEST_CHAIN_SELECTOR), amount1 + amount2);
+    assertEq(s_usdcTokenPool.getAvailableTokens(DEST_CHAIN_SELECTOR), amount1 + amount2);
 
     // destPoolData is the local token decimals abi-encoded to 32 bytes
     assertEq(result1.destPoolData.length, 32);
@@ -154,11 +149,86 @@ contract SiloedUSDCTokenPool_lockOrBurn is SiloedUSDCTokenPoolSetup {
     Pool.LockOrBurnOutV1 memory result = s_usdcTokenPool.lockOrBurn(lockOrBurnIn);
 
     // Assert: Verify the siloed tokens accounting is updated correctly
-    assertEq(s_usdcTokenPool.getLockedTokensForChain(DEST_CHAIN_SELECTOR), amount);
+    assertEq(s_usdcTokenPool.getAvailableTokens(DEST_CHAIN_SELECTOR), amount);
     assertTrue(s_usdcTokenPool.isSiloed(DEST_CHAIN_SELECTOR));
 
     // destPoolData is the local token decimals abi-encoded to 32 bytes
     assertEq(result.destPoolData.length, 32);
+    vm.stopPrank();
+  }
+
+  function test_lockOrBurn_RevertWhen_NotAllowedOnRamp() public {
+    // Arrange: Define test constants
+    address sender = makeAddr("sender");
+    uint256 amount = 1000e6;
+    address localToken = address(s_USDCToken);
+    bytes memory receiver = abi.encode(makeAddr("receiver"));
+    address unauthorizedCaller = makeAddr("unauthorized");
+
+    // Act & Assert: Call lockOrBurn with unauthorized caller
+    vm.startPrank(unauthorizedCaller);
+
+    Pool.LockOrBurnInV1 memory lockOrBurnIn = Pool.LockOrBurnInV1({
+      receiver: receiver,
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      originalSender: sender,
+      amount: amount,
+      localToken: localToken
+    });
+
+    vm.expectRevert(abi.encodeWithSelector(TokenPool.CallerIsNotARampOnRouter.selector, unauthorizedCaller));
+    s_usdcTokenPool.lockOrBurn(lockOrBurnIn);
+
+    vm.stopPrank();
+  }
+
+  function test_lockOrBurn_RevertWhen_ChainNotSupported() public {
+    // Arrange: Define test constants
+    address sender = makeAddr("sender");
+    uint256 amount = 1000e6;
+    address localToken = address(s_USDCToken);
+    bytes memory receiver = abi.encode(makeAddr("receiver"));
+    uint64 unsupportedChain = 999999999; // Chain that's not configured
+
+    // Act & Assert: Call lockOrBurn with unsupported chain
+    vm.startPrank(s_routerAllowedOnRamp);
+
+    Pool.LockOrBurnInV1 memory lockOrBurnIn = Pool.LockOrBurnInV1({
+      receiver: receiver,
+      remoteChainSelector: unsupportedChain,
+      originalSender: sender,
+      amount: amount,
+      localToken: localToken
+    });
+
+    vm.expectRevert(abi.encodeWithSelector(TokenPool.ChainNotAllowed.selector, unsupportedChain));
+    s_usdcTokenPool.lockOrBurn(lockOrBurnIn);
+
+    vm.stopPrank();
+  }
+
+  function test_lockOrBurn_RevertWhen_NotAllowedTokenPoolProxy() public {
+    // Arrange: Define test constants
+    address sender = makeAddr("sender");
+    uint256 amount = 1000e6;
+    address localToken = address(s_USDCToken);
+    bytes memory receiver = abi.encode(makeAddr("receiver"));
+    address unauthorizedProxy = makeAddr("unauthorizedProxy");
+
+    // Act & Assert: Call lockOrBurn with unauthorized proxy
+    vm.startPrank(unauthorizedProxy);
+
+    Pool.LockOrBurnInV1 memory lockOrBurnIn = Pool.LockOrBurnInV1({
+      receiver: receiver,
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      originalSender: sender,
+      amount: amount,
+      localToken: localToken
+    });
+
+    vm.expectRevert(abi.encodeWithSelector(TokenPool.CallerIsNotARampOnRouter.selector, unauthorizedProxy));
+    s_usdcTokenPool.lockOrBurn(lockOrBurnIn);
+
     vm.stopPrank();
   }
 }

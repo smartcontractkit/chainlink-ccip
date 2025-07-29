@@ -24,8 +24,8 @@ contract ERC20LockBox is Ownable2StepMsgSender {
 
   event AllowedCallerAdded(address indexed token, address indexed caller);
   event AllowedCallerRemoved(address indexed token, address indexed caller);
-  event Deposit(uint64 indexed remoteChainSelector, address indexed depositor, uint256 amount);
-  event Withdrawal(uint64 indexed remoteChainSelector, address indexed recipient, uint256 amount);
+  event Deposit(address indexed token, uint64 indexed remoteChainSelector, address indexed depositor, uint256 amount);
+  event Withdrawal(address indexed token, uint64 indexed remoteChainSelector, address indexed recipient, uint256 amount);
 
   struct AllowedCallerConfigArgs {
     address token;
@@ -60,7 +60,7 @@ contract ERC20LockBox is Ownable2StepMsgSender {
     // Increase the balance for the specified chain selector
     s_tokenBalances[token][remoteChainSelector] += amount;
 
-    emit Deposit(remoteChainSelector, msg.sender, amount);
+    emit Deposit(token, remoteChainSelector, msg.sender, amount);
   }
 
   /// @notice Withdraws tokens for a specific remote chain selector
@@ -88,7 +88,7 @@ contract ERC20LockBox is Ownable2StepMsgSender {
     IERC20(token).safeTransfer(recipient, amount);
 
     // Emit the withdrawal event
-    emit Withdrawal(remoteChainSelector, recipient, amount);
+    emit Withdrawal(token, remoteChainSelector, recipient, amount);
   }
 
   /// @notice Configures the allowed callers for deposit and withdraw functions

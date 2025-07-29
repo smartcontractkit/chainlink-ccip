@@ -42,7 +42,7 @@ contract SiloedUSDCTokenPoolSetup is USDCSetup {
     // Set the ramps as the allowed token pool proxies for testing purposes
     address[] memory tokenPoolProxies = new address[](2);
     tokenPoolProxies[0] = s_routerAllowedOnRamp;
-    tokenPoolProxies[1] = s_routerAllowedOffRamp; 
+    tokenPoolProxies[1] = s_routerAllowedOffRamp;
     bool[] memory allowed = new bool[](2);
     allowed[0] = true;
     allowed[1] = true;
@@ -57,7 +57,7 @@ contract SiloedUSDCTokenPoolSetup is USDCSetup {
       abi.encode(address(s_usdcTokenPool))
     );
 
-    // Allow the router to call the releaseOrMint function for the token pool 
+    // Allow the router to call the releaseOrMint function for the token pool
     ERC20LockBox.AllowedCallerConfigArgs[] memory allowedCallers = new ERC20LockBox.AllowedCallerConfigArgs[](2);
     allowedCallers[0] = ERC20LockBox.AllowedCallerConfigArgs({
       token: address(s_USDCToken),
@@ -81,6 +81,5 @@ contract SiloedUSDCTokenPoolSetup is USDCSetup {
       address(s_lockBox) // lockBox
     );
     _poolApplyChainUpdates(address(s_usdcTokenPoolTransferLiquidity));
-
   }
 }

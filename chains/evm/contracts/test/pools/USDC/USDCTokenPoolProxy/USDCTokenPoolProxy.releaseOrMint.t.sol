@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {Router} from "../../../../Router.sol";
 import {Pool} from "../../../../libraries/Pool.sol";
+import {TokenPool} from "../../../../pools/TokenPool.sol";
 import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
 import {USDCTokenPoolProxy} from "../../../../pools/USDC/USDCTokenPoolProxy.sol";
 import {LOCK_RELEASE_FLAG} from "../../../../pools/USDC/USDCTokenPoolProxy.sol";
 import {USDCTokenPoolProxySetup} from "./USDCTokenPoolProxySetup.t.sol";
-import {Router} from "../../../../Router.sol";
-import {TokenPool} from "../../../../pools/TokenPool.sol";
 
 contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
   function test_releaseOrMint_LockReleaseFlag() public {
@@ -43,9 +43,7 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
     });
 
     // Prepare expected output
-    Pool.ReleaseOrMintOutV1 memory expectedOut = Pool.ReleaseOrMintOutV1({
-      destinationAmount: testAmount
-    });
+    Pool.ReleaseOrMintOutV1 memory expectedOut = Pool.ReleaseOrMintOutV1({destinationAmount: testAmount});
 
     // Expect the lockReleasePool's releaseOrMint to be called and return expectedOut
     vm.mockCall(
@@ -62,7 +60,6 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
 
     vm.stopPrank();
   }
-
 
   function test_releaseOrMint_CCTPV2Flag() public {
     // Arrange: Prepare test data
@@ -107,9 +104,7 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
       offchainTokenData: offchainTokenData
     });
 
-    Pool.ReleaseOrMintOutV1 memory expectedOut = Pool.ReleaseOrMintOutV1({
-      destinationAmount: testAmount
-    });
+    Pool.ReleaseOrMintOutV1 memory expectedOut = Pool.ReleaseOrMintOutV1({destinationAmount: testAmount});
 
     // Expect the cctpV2Pool's releaseOrMint to be called and return expectedOut
     vm.mockCall(
@@ -136,7 +131,6 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
     bytes memory offchainTokenData = "";
     bytes memory emptyMessageBody = new bytes(0);
 
-    
     // Create a USDC message with version = 2 (not 0 or 1)
     USDCMessage memory usdcMessage = USDCMessage({
       version: uint32(2),
@@ -150,7 +144,7 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
     });
     bytes memory sourcePoolData = _generateUSDCMessage(usdcMessage);
 
-    // Mock the router's isOffRamp function to return true  
+    // Mock the router's isOffRamp function to return true
     vm.mockCall(
       address(s_router),
       abi.encodeWithSelector(Router.isOffRamp.selector, SOURCE_CHAIN_SELECTOR, s_routerAllowedOffRamp),
@@ -158,7 +152,7 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
     );
 
     vm.startPrank(s_routerAllowedOffRamp);
-    
+
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = Pool.ReleaseOrMintInV1({
       remoteChainSelector: SOURCE_CHAIN_SELECTOR,
       originalSender: originalSender,
@@ -168,11 +162,11 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
       sourcePoolData: sourcePoolData,
       sourcePoolAddress: sourcePoolAddress,
       offchainTokenData: offchainTokenData
-    }); 
+    });
 
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.InvalidMessageVersion.selector, 2));
     s_usdcTokenPoolProxy.releaseOrMint(releaseOrMintIn);
 
     vm.stopPrank();
   }
-} 
+}

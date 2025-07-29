@@ -4,8 +4,9 @@ pragma solidity ^0.8.24;
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {Pool} from "../libraries/Pool.sol";
-import {TokenPool} from "./TokenPool.sol";
+
 import {ERC20LockBox} from "./ERC20LockBox.sol";
+import {TokenPool} from "./TokenPool.sol";
 
 import {IERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
@@ -53,7 +54,6 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
 
   /// @notice The configuration for each chain that is siloed, or not. By default chains are not siloed.
   mapping(uint64 remoteChainSelector => SiloConfig) internal s_chainConfigs;
-
 
   constructor(
     IERC20 token,

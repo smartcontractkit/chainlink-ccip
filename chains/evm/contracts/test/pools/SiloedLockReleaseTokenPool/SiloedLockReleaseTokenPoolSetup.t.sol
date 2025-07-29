@@ -2,11 +2,12 @@
 pragma solidity ^0.8.24;
 
 import {Router} from "../../../Router.sol";
+
+import {ERC20LockBox} from "../../../pools/ERC20LockBox.sol";
 import {SiloedLockReleaseTokenPool} from "../../../pools/SiloedLockReleaseTokenPool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {BaseTest} from "../../BaseTest.t.sol";
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
-import {ERC20LockBox} from "../../../pools/ERC20LockBox.sol";
 
 import {TokenAdminRegistry} from "../../../tokenAdminRegistry/TokenAdminRegistry.sol";
 
@@ -39,17 +40,24 @@ contract SiloedLockReleaseTokenPoolSetup is BaseTest {
     s_lockBox = new ERC20LockBox(address(s_tokenAdminRegistry));
 
     s_siloedLockReleaseTokenPool = new SiloedLockReleaseTokenPool(
-      s_token, DEFAULT_TOKEN_DECIMALS, new address[](0), address(s_mockRMNRemote), address(s_sourceRouter), address(s_lockBox)
+      s_token,
+      DEFAULT_TOKEN_DECIMALS,
+      new address[](0),
+      address(s_mockRMNRemote),
+      address(s_sourceRouter),
+      address(s_lockBox)
     );
 
     vm.mockCall(
       address(s_tokenAdminRegistry),
       abi.encodeWithSignature("getTokenConfig(address)", address(s_token)),
-      abi.encode(TokenAdminRegistry.TokenConfig({
-        administrator: OWNER,
-        pendingAdministrator: address(0),
-        tokenPool: address(s_siloedLockReleaseTokenPool)
-      }))
+      abi.encode(
+        TokenAdminRegistry.TokenConfig({
+          administrator: OWNER,
+          pendingAdministrator: address(0),
+          tokenPool: address(s_siloedLockReleaseTokenPool)
+        })
+      )
     );
 
     // Set the rebalancer for the token pool

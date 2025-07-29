@@ -10,7 +10,7 @@ contract SiloedLockReleaseTokenPool_lockOrBurn is SiloedLockReleaseTokenPoolSetu
 
   function test_lockOrBurn_SiloedFunds() public {
     assertTrue(s_siloedLockReleaseTokenPool.isSiloed(SILOED_CHAIN_SELECTOR));
-    deal(address(s_token), address(s_siloedLockReleaseTokenPool), AMOUNT);  
+    deal(address(s_token), address(s_siloedLockReleaseTokenPool), AMOUNT);
 
     vm.startPrank(s_allowedOnRamp);
 
@@ -44,7 +44,7 @@ contract SiloedLockReleaseTokenPool_lockOrBurn is SiloedLockReleaseTokenPoolSetu
 
   function test_lockOrBurn_UnsiloedFunds() public {
     vm.startPrank(s_allowedOnRamp);
-    deal(address(s_token), address(s_siloedLockReleaseTokenPool), AMOUNT);  
+    deal(address(s_token), address(s_siloedLockReleaseTokenPool), AMOUNT);
 
     assertFalse(s_siloedLockReleaseTokenPool.isSiloed(DEST_CHAIN_SELECTOR));
 
