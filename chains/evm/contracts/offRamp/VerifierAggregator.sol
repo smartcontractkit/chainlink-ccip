@@ -21,10 +21,7 @@ import {IERC20} from
 import {EnumerableSet} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
 
-/// @notice OffRamp enables OCR networks to execute multiple messages in an OffRamp in a single transaction.
-/// @dev The OnRamp and OffRamp form a cross chain upgradeable unit. Any change to one of them results an
-/// onchain upgrade of both contracts.
-contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
+contract VerifierAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   using ERC165CheckerReverting for address;
   using EnumerableSet for EnumerableSet.UintSet;
 
