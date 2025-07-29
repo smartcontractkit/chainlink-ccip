@@ -127,13 +127,6 @@ func (p *Plugin) Observation(
 		"numCommitReports", numCommitReports,
 		"numMessages", observation.Messages.Count())
 
-	lggr.Debugw("[verbose] execute plugin got observation",
-		"observation", observation,
-		"duration", time.Since(tStart),
-		"state", state,
-		"numCommitReports", numCommitReports,
-		"numMessages", observation.Messages.Count())
-
 	return p.ocrTypeCodec.EncodeObservation(observation)
 }
 
