@@ -749,7 +749,7 @@ func computeTokenDataObservationsConsensus(
 				continue
 			}
 
-			if numChainObservations[selector] < f+1 {
+			if consensus.LtFPlusOne(f, numChainObservations[selector]) {
 				lggr.Infow("chain skipped from token data since not enough oracles observed it", "chain", selector)
 				continue
 			}
@@ -797,10 +797,11 @@ func initResultsAndValidators(
 	chainSeqNumTokenDataObservations map[chainSeqNumPair]int,
 ) {
 	for seqNr, msgTokenData := range seqMap {
-		if chainSeqNumTokenDataObservations[chainSeqNumPair{
+		cnt := chainSeqNumTokenDataObservations[chainSeqNumPair{
 			chain:  selector,
 			seqNum: seqNr,
-		}] < f+1 {
+		}]
+		if consensus.LtFPlusOne(f, cnt) {
 			continue
 		}
 
