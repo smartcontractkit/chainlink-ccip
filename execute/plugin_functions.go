@@ -647,6 +647,11 @@ type merkleRootData struct {
 	SequenceNumberRange cciptypes.SeqNumRange
 }
 
+type chainSeqNumPair struct {
+	chain  cciptypes.ChainSelector
+	seqNum cciptypes.SeqNum
+}
+
 // computeMessageHashesConsensus will iterate over observations of message hashes and come to consensus on them.
 // We select a hash if it has at least f+1 votes. If more than one hashes exist with at
 // least f+1 votes (reaching consensus threshold) then we log an error and skip that specific message.
@@ -658,11 +663,6 @@ func computeMessageHashesConsensus(
 	lggr = logger.With(lggr, "function", "computeMessageHashesConsensus", "fChain", fChain)
 
 	// for each (chain, seqNum) pair keep a count of the votes for each hash
-	type chainSeqNumPair struct {
-		chain  cciptypes.ChainSelector
-		seqNum cciptypes.SeqNum
-	}
-
 	hashVotes := make(map[chainSeqNumPair]map[cciptypes.Bytes32]int)
 	for _, observation := range observations {
 		for chain, hashes := range observation.Observation.Hashes {
@@ -717,6 +717,7 @@ func computeMessageHashesConsensus(
 	return results
 }
 
+//nolint:gocyclo // todo later
 func computeTokenDataObservationsConsensus(
 	lggr logger.Logger,
 	aos []plugincommon.AttributedObservation[exectypes.Observation],
@@ -727,11 +728,29 @@ func computeTokenDataObservationsConsensus(
 		make(map[cciptypes.ChainSelector]map[reader.MessageTokenID]consensus.OracleMinObservation[exectypes.TokenData])
 	results := make(exectypes.TokenDataObservations)
 
+	// count how many token data observations per chain and per sequence number and use the count to determine
+	// if token data should be initialized as empty or not appear at all.
+	numChainObservations := make(map[cciptypes.ChainSelector]int)
+	chainSeqNumTokenDataObservations := make(map[chainSeqNumPair]int)
+	for _, ao := range aos {
+		for selector, seqNums := range ao.Observation.TokenData {
+			numChainObservations[selector]++
+			for seqNum := range seqNums {
+				chainSeqNumTokenDataObservations[chainSeqNumPair{chain: selector, seqNum: seqNum}]++
+			}
+		}
+	}
+
 	for _, ao := range aos {
 		for selector, seqMap := range ao.Observation.TokenData {
 			f, ok := fChain[selector]
 			if !ok {
 				lggr.Warnw("no F defined for chain", "chain", selector)
+				continue
+			}
+
+			if numChainObservations[selector] < f+1 {
+				lggr.Infow("chain skipped from token data since not enough oracles observed it", "chain", selector)
 				continue
 			}
 
@@ -743,7 +762,8 @@ func computeTokenDataObservationsConsensus(
 				validators[selector] = make(map[reader.MessageTokenID]consensus.OracleMinObservation[exectypes.TokenData])
 			}
 
-			initResultsAndValidators(selector, f, seqMap, results, validators, ao.OracleID)
+			initResultsAndValidators(
+				selector, f, seqMap, results, validators, ao.OracleID, chainSeqNumTokenDataObservations)
 		}
 	}
 
@@ -774,8 +794,16 @@ func initResultsAndValidators(
 	results exectypes.TokenDataObservations,
 	validators map[cciptypes.ChainSelector]map[reader.MessageTokenID]consensus.OracleMinObservation[exectypes.TokenData],
 	oracleID commontypes.OracleID,
+	chainSeqNumTokenDataObservations map[chainSeqNumPair]int,
 ) {
 	for seqNr, msgTokenData := range seqMap {
+		if chainSeqNumTokenDataObservations[chainSeqNumPair{
+			chain:  selector,
+			seqNum: seqNr,
+		}] < f+1 {
+			continue
+		}
+
 		if _, ok := results[selector][seqNr]; !ok {
 			results[selector][seqNr] = exectypes.NewMessageTokenData()
 		}
