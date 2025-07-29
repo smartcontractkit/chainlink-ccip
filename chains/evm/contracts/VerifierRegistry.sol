@@ -21,4 +21,8 @@ contract VerifierRegistry is IVerifierRegistry, ITypeAndVersion, Ownable2StepMsg
   ) external view returns (address) {
     return s_verifiers[verifierId];
   }
+
+  function addVerifier(bytes32 verifierId, address verifierAddress) external {
+    s_verifiers[verifierId] = verifierAddress;
+  }
 }
