@@ -69,6 +69,14 @@ function getOptimizations() {
     echo "$optimize_runs_override"
 }
 
+# Mod sec
+compileContract onRamp/VerifierProxy
+compileContract onRamp/CommitVerifierOnRamp
+compileContract offRamp/VerifierAggregator
+compileContract offRamp/CommitVerifierOffRamp
+compileContract VerifierRegistry
+
+# 1.6
 compileContract offRamp/OffRamp
 compileContract FeeQuoter
 compileContract onRamp/OnRamp

@@ -4,13 +4,13 @@ pragma solidity ^0.8.24;
 import {IFeeQuoter} from "../interfaces/IFeeQuoter.sol";
 import {INonceManager} from "../interfaces/INonceManager.sol";
 import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
+import {IVerifierSender} from "../interfaces/verifiers/IVerifier.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {Client} from "../libraries/Client.sol";
 import {Internal} from "../libraries/Internal.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 
-import {IVerifierSender} from "../interfaces/verifiers/IVerifier.sol";
 import {IERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from
@@ -18,10 +18,10 @@ import {SafeERC20} from
 import {EnumerableSet} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
 
-/// @notice The OnRamp is a contract that handles lane-specific fee logic.
+/// @notice The CommitVerifierOnRamp is a contract that handles lane-specific fee logic.
 /// @dev The OnRamp and OffRamp form a cross chain upgradeable unit. Any change to one of them results in an onchain
 /// upgrade of both contracts.
-contract CommitVerifier is IVerifierSender, ITypeAndVersion, Ownable2StepMsgSender {
+contract CommitVerifierOnRamp is IVerifierSender, ITypeAndVersion, Ownable2StepMsgSender {
   using SafeERC20 for IERC20;
   using EnumerableSet for EnumerableSet.AddressSet;
 

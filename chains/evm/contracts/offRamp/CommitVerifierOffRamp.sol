@@ -7,7 +7,7 @@ import {IVerifier} from "../interfaces/verifiers/IVerifier.sol";
 import {Internal} from "../libraries/Internal.sol";
 import {OCRVerifier} from "../ocr/OCRVerifier.sol";
 
-contract CommitVerifier is IVerifier, OCRVerifier {
+contract CommitVerifierOffRamp is IVerifier, OCRVerifier {
   error ZeroAddressNotAllowed();
 
   error InvalidNonce(uint64 nonce);

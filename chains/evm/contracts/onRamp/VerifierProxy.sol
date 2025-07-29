@@ -10,11 +10,11 @@ import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
 import {IVerifierSender} from "../interfaces/verifiers/IVerifier.sol";
 import {IVerifierRegistry} from "../interfaces/verifiers/IVerifierRegistry.sol";
 
+import {VerifierRegistry} from "../VerifierRegistry.sol";
 import {Client} from "../libraries/Client.sol";
 import {Internal} from "../libraries/Internal.sol";
 import {Pool} from "../libraries/Pool.sol";
 import {USDPriceWith18Decimals} from "../libraries/USDPriceWith18Decimals.sol";
-import {VerifierRegistry} from "../verifiers/VerifierRegistry.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
@@ -25,11 +25,8 @@ import {SafeERC20} from
 import {EnumerableSet} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
 
-/// @notice The OnRamp is a contract that handles lane-specific fee logic.
-/// @dev The OnRamp and OffRamp form a cross chain upgradeable unit. Any change to one of them results in an onchain
-/// upgrade of both contracts.
 // TODO post process hooks?
-contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender {
+contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender {
   using SafeERC20 for IERC20;
   using EnumerableSet for EnumerableSet.AddressSet;
   using USDPriceWith18Decimals for uint224;
@@ -161,11 +158,13 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     if (msg.sender != address(destChainConfig.router)) revert MustBeCalledByRouter();
 
     (
-      uint256 executionGasLimit,
+      , //uint256 executionGasLimit,
       bytes memory tokenReceiver,
       bytes memory destChainExtraArgs,
       bytes[] memory verifierExtraArgs
     ) = IFeeQuoterV2(s_dynamicConfig.feeQuoter).parseExtraArgs(message.extraArgs);
+
+    // TODO GetFee for every verifier
 
     Internal.EVM2AnyCommitVerifierMessage memory newMessage = Internal.EVM2AnyCommitVerifierMessage({
       header: Internal.Header({
@@ -190,6 +189,14 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
     newMessage.tokenAmounts = _handleTokens(message.tokenAmounts, tokenReceiver, originalSender, destChainSelector);
 
+    // Hash only after all fields have been set, but before it's sent to the verifiers.
+    newMessage.header.messageId = Internal._hash(
+      newMessage,
+      // Metadata hash preimage to ensure global uniqueness, ensuring 2 identical messages sent to 2 different lanes
+      // will have a distinct hash.
+      keccak256(abi.encode(Internal.EVM_2_ANY_MESSAGE_HASH, i_localChainSelector, destChainSelector, address(this)))
+    );
+
     for (uint256 i = 0; i < newMessage.verifierExtraArgs.length; ++i) {
       if (newMessage.verifierExtraArgs[i].length < 32) {
         // TODO encode efficiently
@@ -206,16 +213,6 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
       IVerifierSender(verifierAddress).forwardToVerifier(abi.encode(newMessage), i);
     }
-
-    // TODO Convert fee
-
-    // Hash only after all fields have been set.
-    newMessage.header.messageId = Internal._hash(
-      newMessage,
-      // Metadata hash preimage to ensure global uniqueness, ensuring 2 identical messages sent to 2 different lanes
-      // will have a distinct hash.
-      keccak256(abi.encode(Internal.EVM_2_ANY_MESSAGE_HASH, i_localChainSelector, destChainSelector, address(this)))
-    );
 
     emit CCIPMessageSent(destChainSelector, newMessage.header.sequenceNumber, newMessage);
 
