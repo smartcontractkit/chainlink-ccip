@@ -460,10 +460,10 @@ func computeMessageObservationsConsensus(
 
 				if msgsWithConsensus[0].IsPseudoDeleted() && !msgsWithConsensus[1].IsPseudoDeleted() {
 					msg = &msgsWithConsensus[1]
-					lggr.Infow("more than one msg reached consensus, selected second")
+					lggr.Infow("two messages reached consensus, first is empty, second is full, selecting full")
 				} else if msgsWithConsensus[1].IsPseudoDeleted() && !msgsWithConsensus[0].IsPseudoDeleted() {
 					msg = &msgsWithConsensus[0]
-					lggr.Infow("more than one msg reached consensus, selected first")
+					lggr.Infow("two messages reached consensus, first is full, second is empty, selecting full")
 				}
 
 				if msg == nil {
