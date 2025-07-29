@@ -459,8 +459,10 @@ func computeMessageObservationsConsensus(
 
 				if msgsWithConsensus[0].IsPseudoDeleted() && !msgsWithConsensus[1].IsPseudoDeleted() {
 					msg = &msgsWithConsensus[1]
+					lggr.Infow("two messages reached consensus, first is empty, second is full, selecting full")
 				} else if msgsWithConsensus[1].IsPseudoDeleted() && !msgsWithConsensus[0].IsPseudoDeleted() {
 					msg = &msgsWithConsensus[0]
+					lggr.Infow("two messages reached consensus, first is full, second is empty, selecting full")
 				}
 
 				if msg == nil {
@@ -509,7 +511,13 @@ func prepareValidatorsForComputeMessageObservationsConsensus(
 			}
 			// Add reports
 			for _, msg := range messages {
-				validator.Add(msg, ao.OracleID)
+				// We add an empty message only with id and seq num in any case. If we cannot form consensus on the
+				// populated one we will form consensus on the unpopulated/empty one.
+				validator.Add(createEmptyMessageWithIDAndSeqNum(msg), ao.OracleID)
+
+				if !msg.IsPseudoDeleted() {
+					validator.Add(msg, ao.OracleID)
+				}
 			}
 		}
 	}
