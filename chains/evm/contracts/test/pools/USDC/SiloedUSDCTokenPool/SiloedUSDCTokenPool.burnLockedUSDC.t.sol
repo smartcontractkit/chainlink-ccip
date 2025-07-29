@@ -7,7 +7,6 @@ import {SiloedLockReleaseTokenPool} from "../../../../pools/SiloedLockReleaseTok
 import {TokenPool} from "../../../../pools/TokenPool.sol";
 import {SiloedUSDCTokenPool} from "../../../../pools/USDC/SiloedUSDCTokenPool.sol";
 import {SiloedUSDCTokenPoolSetup} from "./SiloedUSDCTokenPoolSetup.sol";
-import {BurnMintERC677} from "@chainlink/contracts/src/v0.8/shared/token/ERC677/BurnMintERC677.sol";
 
 contract SiloedUSDCTokenPool_BurnLockedUSDC is SiloedUSDCTokenPoolSetup {
   function setUp() public override {
@@ -135,5 +134,45 @@ contract SiloedUSDCTokenPool_BurnLockedUSDC is SiloedUSDCTokenPoolSetup {
 
     vm.expectRevert(abi.encodeWithSelector(SiloedUSDCTokenPool.NoMigrationProposalPending.selector));
     s_usdcTokenPool.burnLockedUSDC();
+  }
+
+  function test_RevertWhen_TokenLockingNotAllowedAfterMigration() public {
+    address CIRCLE = makeAddr("CIRCLE CCTP Migrator");
+
+    // Deal some tokens to the token pool
+    uint256 amount = 1000e6;
+    deal(address(s_USDCToken), address(s_usdcTokenPool), amount);
+
+    // Lock or burn those tokens for the destination chain
+    vm.startPrank(s_routerAllowedOnRamp);
+    s_usdcTokenPool.lockOrBurn(
+      Pool.LockOrBurnInV1({
+        originalSender: OWNER,
+        receiver: abi.encodePacked(STRANGER),
+        amount: amount,
+        remoteChainSelector: DEST_CHAIN_SELECTOR,
+        localToken: address(s_USDCToken)
+      })
+    );
+
+    vm.startPrank(OWNER);
+    s_usdcTokenPool.proposeCCTPMigration(DEST_CHAIN_SELECTOR);
+
+    // Set the circle migrator address
+    s_usdcTokenPool.setCircleMigratorAddress(CIRCLE);
+
+    // Execute the migration
+    vm.startPrank(CIRCLE);
+    s_usdcTokenPool.burnLockedUSDC();
+    vm.stopPrank();
+
+    // Act & Assert: Try to provide liquidity after migration and expect revert
+    vm.startPrank(OWNER);
+    s_USDCToken.approve(address(s_usdcTokenPool), type(uint256).max);
+    vm.expectRevert(
+      abi.encodeWithSelector(SiloedUSDCTokenPool.TokenLockingNotAllowedAfterMigration.selector, DEST_CHAIN_SELECTOR)
+    );
+    s_usdcTokenPool.provideSiloedLiquidity(DEST_CHAIN_SELECTOR, 500e6);
+    vm.stopPrank();
   }
 }

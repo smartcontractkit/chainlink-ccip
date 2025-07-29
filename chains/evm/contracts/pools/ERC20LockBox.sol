@@ -25,7 +25,9 @@ contract ERC20LockBox is Ownable2StepMsgSender {
   event AllowedCallerAdded(address indexed token, address indexed caller);
   event AllowedCallerRemoved(address indexed token, address indexed caller);
   event Deposit(address indexed token, uint64 indexed remoteChainSelector, address indexed depositor, uint256 amount);
-  event Withdrawal(address indexed token, uint64 indexed remoteChainSelector, address indexed recipient, uint256 amount);
+  event Withdrawal(
+    address indexed token, uint64 indexed remoteChainSelector, address indexed recipient, uint256 amount
+  );
 
   struct AllowedCallerConfigArgs {
     address token;

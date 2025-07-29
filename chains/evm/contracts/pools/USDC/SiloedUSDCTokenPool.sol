@@ -4,7 +4,6 @@ pragma solidity ^0.8.24;
 import {Pool} from "../../libraries/Pool.sol";
 import {SiloedLockReleaseTokenPool} from "../SiloedLockReleaseTokenPool.sol";
 
-import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
 import {IERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
@@ -12,6 +11,8 @@ import {EnumerableSet} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
 
 /// @notice A token pool for USDC which inherits the Siloed token functionality while adding the CCTP migration functionality
+/// @dev While it supports unsiloed chains, it is not recommended to use them. All chains should be siloed, otherwise
+/// the pool will not be able to migrate the tokens to CCTP in the future.
 contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool {
   using EnumerableSet for EnumerableSet.AddressSet;
   using EnumerableSet for EnumerableSet.UintSet;
@@ -34,14 +35,17 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool {
   error ChainAlreadyMigrated(uint64 remoteChainSelector);
   error TokenLockingNotAllowedAfterMigration(uint64 remoteChainSelector);
 
+  /// @notice The token pool proxies that are allowed to provide liquidity to the pool.
   EnumerableSet.AddressSet internal s_allowedTokenPoolProxies;
-  IBurnMintERC20 private immutable i_USDC;
 
+  /// @notice The address of the circle-controlled wallet which will execute a CCTP lane migration
   address internal s_circleUSDCMigrator;
   uint64 internal s_proposedUSDCMigrationChain;
 
+  /// @notice The tokens excluded from being burned in a CCTP-migration.
   mapping(uint64 remoteChainSelector => uint256 excludedTokens) internal s_tokensExcludedFromBurn;
 
+  /// @notice The chains that have been migrated to CCTP.
   EnumerableSet.UintSet internal s_migratedChains;
 
   constructor(
@@ -51,9 +55,7 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool {
     address rmnProxy,
     address router,
     address lockBox
-  ) SiloedLockReleaseTokenPool(token, localTokenDecimals, allowlist, rmnProxy, router, lockBox) {
-    i_USDC = IBurnMintERC20(address(token));
-  }
+  ) SiloedLockReleaseTokenPool(token, localTokenDecimals, allowlist, rmnProxy, router, lockBox) {}
 
   /// @notice Release tokens for a specific chain selector.
   /// @dev This function can only be called by an address specified by the owner to be controlled by circle
@@ -71,23 +73,24 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool {
     // Save gas by using storage instead of memory as a value may need to be updated.
     SiloConfig storage remoteConfig = s_chainConfigs[releaseOrMintIn.remoteChainSelector];
 
-    // Since remoteConfig.isSiloed is used more than once, caching in memory saves gas instead of multiple SLOADs.
-    bool chainIsSiloed = remoteConfig.isSiloed;
+    uint256 excludedTokens = s_tokensExcludedFromBurn[releaseOrMintIn.remoteChainSelector];
+
+    // Note: accounting for unsiloed chains is not supported. All chains must be siloed. This is because an unsiloed
+    // chain would not be considered eligible for a CCTP migration, and thus the pool would not be able to migrate
+    // the tokens to CCTP.
 
     // Additional security check to prevent underflow by explicitly ensuring that enough funds are available to release
-    uint256 availableLiquidity = chainIsSiloed ? remoteConfig.tokenBalance : s_unsiloedTokenBalance;
+    uint256 availableLiquidity = excludedTokens != 0 ? excludedTokens : remoteConfig.tokenBalance;
+
     if (localAmount > availableLiquidity) revert InsufficientLiquidity(availableLiquidity, localAmount);
 
-    // If the chain is Siloed then subtract the amount from the accounting for the silo
-    if (remoteConfig.isSiloed) {
-      // If the chain is Siloed and has no locked tokens, that means a migration has already occurred
-      // and the tokens should be excluded from burn, so we need to subtract the amount from the excluded tokens
-      // instead of the locked tokens
-      if (remoteConfig.tokenBalance == 0) {
-        s_tokensExcludedFromBurn[releaseOrMintIn.remoteChainSelector] -= localAmount;
-      } else {
-        remoteConfig.tokenBalance -= localAmount;
-      }
+    // If has excluded tokens, that means a migration has already occurred
+    // and the tokens should be excluded from burn, so we need to subtract the amount from the excluded tokens
+    // instead of the locked tokens
+    if (excludedTokens != 0) {
+      s_tokensExcludedFromBurn[releaseOrMintIn.remoteChainSelector] -= localAmount;
+    } else {
+      remoteConfig.tokenBalance -= localAmount;
     }
 
     // Release to the recipient
@@ -266,7 +269,7 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool {
     // This should only be called after this contract has been granted a "zero allowance minter role" on USDC by Circle,
     // otherwise the call will revert. Executing this burn will functionally convert all USDC on the destination chain
     // to canonical USDC by removing the canonical USDC backing it from circulation.
-    i_USDC.burn(tokensToBurn);
+    IBurnMintERC20(address(i_token)).burn(tokensToBurn);
 
     s_migratedChains.add(burnChainSelector);
 

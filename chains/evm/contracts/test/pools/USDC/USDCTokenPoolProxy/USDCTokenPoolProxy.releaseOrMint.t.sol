@@ -3,7 +3,6 @@ pragma solidity ^0.8.24;
 
 import {Router} from "../../../../Router.sol";
 import {Pool} from "../../../../libraries/Pool.sol";
-import {TokenPool} from "../../../../pools/TokenPool.sol";
 import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
 import {USDCTokenPoolProxy} from "../../../../pools/USDC/USDCTokenPoolProxy.sol";
 import {LOCK_RELEASE_FLAG} from "../../../../pools/USDC/USDCTokenPoolProxy.sol";
@@ -69,7 +68,6 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
     address localToken = address(s_USDCToken);
     bytes memory sourcePoolAddress = abi.encode(SOURCE_CHAIN_USDC_POOL);
     bytes memory originalSender = abi.encode(testSender);
-    bytes memory offchainTokenData = "";
     USDCMessage memory usdcMessage = USDCMessage({
       version: 1,
       sourceDomain: uint32(0),
@@ -80,7 +78,8 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
       destinationCaller: bytes32(0),
       messageBody: ""
     });
-    bytes memory sourcePoolData = _generateUSDCMessage(usdcMessage);
+    bytes memory sourcePoolData = "";
+    bytes memory offChainTokenData = _generateUSDCMessage(usdcMessage);
 
     // Mock the router's isOffRamp function to return true
     vm.mockCall(
@@ -101,7 +100,7 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
       // sourcePoolData should be a USDC Message where the version number is 1
       sourcePoolData: sourcePoolData,
       sourcePoolAddress: sourcePoolAddress,
-      offchainTokenData: offchainTokenData
+      offchainTokenData: offChainTokenData
     });
 
     Pool.ReleaseOrMintOutV1 memory expectedOut = Pool.ReleaseOrMintOutV1({destinationAmount: testAmount});
@@ -128,7 +127,6 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
     address localToken = address(s_USDCToken);
     bytes memory sourcePoolAddress = abi.encode(SOURCE_CHAIN_USDC_POOL);
     bytes memory originalSender = abi.encode(testSender);
-    bytes memory offchainTokenData = "";
     bytes memory emptyMessageBody = new bytes(0);
 
     // Create a USDC message with version = 2 (not 0 or 1)
@@ -142,7 +140,8 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
       destinationCaller: bytes32(0),
       messageBody: emptyMessageBody
     });
-    bytes memory sourcePoolData = _generateUSDCMessage(usdcMessage);
+    bytes memory sourcePoolData = "";
+    bytes memory offChainTokenData = _generateUSDCMessage(usdcMessage);
 
     // Mock the router's isOffRamp function to return true
     vm.mockCall(
@@ -161,7 +160,7 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
       localToken: localToken,
       sourcePoolData: sourcePoolData,
       sourcePoolAddress: sourcePoolAddress,
-      offchainTokenData: offchainTokenData
+      offchainTokenData: offChainTokenData
     });
 
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.InvalidMessageVersion.selector, 2));

@@ -1,12 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {Internal} from "../../../../libraries/Internal.sol";
 import {Pool} from "../../../../libraries/Pool.sol";
 
 import {SiloedLockReleaseTokenPool} from "../../../../pools/SiloedLockReleaseTokenPool.sol";
 import {TokenPool} from "../../../../pools/TokenPool.sol";
-import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
 import {LOCK_RELEASE_FLAG} from "../../../../pools/USDC/USDCTokenPoolProxy.sol";
 
 import {SiloedUSDCTokenPoolSetup} from "./SiloedUSDCTokenPoolSetup.sol";
@@ -82,6 +80,75 @@ contract SiloedUSDCTokenPool_releaseOrMint is SiloedUSDCTokenPoolSetup {
     vm.stopPrank();
   }
 
+  function test_releaseOrMint_SubtractsFromExcludedTokens() public {
+    // Arrange: Create a migration proposal and exclude tokens
+    vm.startPrank(OWNER);
+    s_usdcTokenPool.proposeCCTPMigration(SOURCE_CHAIN_SELECTOR);
+
+    // Set up the circle migrator address
+    address circleMigrator = makeAddr("circleMigrator");
+    s_usdcTokenPool.setCircleMigratorAddress(circleMigrator);
+
+    // Provide liquidity and exclude some tokens from burn
+    uint256 excludedAmount = 500e6;
+    s_USDCToken.approve(address(s_usdcTokenPool), type(uint256).max);
+    s_usdcTokenPool.provideSiloedLiquidity(SOURCE_CHAIN_SELECTOR, 1000e6);
+    s_usdcTokenPool.excludeTokensFromBurn(SOURCE_CHAIN_SELECTOR, excludedAmount);
+    vm.stopPrank();
+
+    // Execute the migration to mark the chain as migrated
+    vm.startPrank(circleMigrator);
+    s_usdcTokenPool.burnLockedUSDC();
+    vm.stopPrank();
+
+    // Verify the chain is now migrated and tokens are excluded
+    assertEq(s_usdcTokenPool.getExcludedTokensByChain(SOURCE_CHAIN_SELECTOR), excludedAmount);
+
+    // Arrange: Define test constants for releaseOrMint
+    address recipient = makeAddr("recipient");
+    uint256 releaseAmount = 200e6; // Amount to release (less than excluded amount)
+    address localToken = address(s_USDCToken);
+    bytes memory sourcePoolAddress = abi.encode(SOURCE_CHAIN_USDC_POOL);
+    bytes memory originalSender = abi.encode(makeAddr("sender"));
+
+    // Mock the router's isOffRamp function to return true
+    vm.mockCall(
+      address(s_router),
+      abi.encodeWithSelector(
+        bytes4(keccak256("isOffRamp(uint64,address)")), SOURCE_CHAIN_SELECTOR, s_routerAllowedOffRamp
+      ),
+      abi.encode(true)
+    );
+
+    vm.startPrank(s_routerAllowedOffRamp);
+
+    // Act: Call releaseOrMint - this should subtract from excluded tokens since the chain is migrated
+    Pool.ReleaseOrMintInV1 memory releaseOrMintIn = Pool.ReleaseOrMintInV1({
+      originalSender: originalSender,
+      receiver: recipient,
+      sourceDenominatedAmount: releaseAmount,
+      localToken: localToken,
+      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+      sourcePoolAddress: sourcePoolAddress,
+      sourcePoolData: abi.encode(LOCK_RELEASE_FLAG),
+      offchainTokenData: ""
+    });
+
+    Pool.ReleaseOrMintOutV1 memory result = s_usdcTokenPool.releaseOrMint(releaseOrMintIn);
+
+    // Assert: Verify the result and that excluded tokens were reduced
+    assertEq(result.destinationAmount, releaseAmount);
+    assertEq(s_USDCToken.balanceOf(recipient), releaseAmount);
+
+    // Verify that the excluded tokens were reduced by the release amount
+    uint256 remainingExcludedTokens = excludedAmount - releaseAmount;
+    assertEq(s_usdcTokenPool.getExcludedTokensByChain(SOURCE_CHAIN_SELECTOR), remainingExcludedTokens);
+
+    vm.stopPrank();
+  }
+
+  // Reverts
+
   function test_releaseOrMint_RevertWhen_InsufficientLiquidity() public {
     // Arrange: Define test constants
     address recipient = makeAddr("recipient");
@@ -145,9 +212,7 @@ contract SiloedUSDCTokenPool_releaseOrMint is SiloedUSDCTokenPoolSetup {
     // Mock the router's isOffRamp function to return false for unauthorized caller
     vm.mockCall(
       address(s_router),
-      abi.encodeWithSelector(
-        bytes4(keccak256("isOffRamp(uint64,address)")), SOURCE_CHAIN_SELECTOR, unauthorizedCaller
-      ),
+      abi.encodeWithSelector(bytes4(keccak256("isOffRamp(uint64,address)")), SOURCE_CHAIN_SELECTOR, unauthorizedCaller),
       abi.encode(false)
     );
 
@@ -218,9 +283,7 @@ contract SiloedUSDCTokenPool_releaseOrMint is SiloedUSDCTokenPoolSetup {
     // Mock the router's isOffRamp function to return true for the unauthorized proxy
     vm.mockCall(
       address(s_router),
-      abi.encodeWithSelector(
-        bytes4(keccak256("isOffRamp(uint64,address)")), SOURCE_CHAIN_SELECTOR, unauthorizedProxy
-      ),
+      abi.encodeWithSelector(bytes4(keccak256("isOffRamp(uint64,address)")), SOURCE_CHAIN_SELECTOR, unauthorizedProxy),
       abi.encode(true)
     );
 

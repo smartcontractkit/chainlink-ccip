@@ -160,7 +160,7 @@ contract ERC20LockBox_withdraw is ERC20LockBoxSetup {
     vm.startPrank(s_allowedCaller);
 
     vm.expectEmit(true, true, true, true);
-    emit ERC20LockBox.Withdrawal(address(s_token),  DEST_CHAIN_SELECTOR, s_recipient, amount);
+    emit ERC20LockBox.Withdrawal(address(s_token), DEST_CHAIN_SELECTOR, s_recipient, amount);
 
     s_erc20LockBox.withdraw(address(s_token), amount, s_recipient, DEST_CHAIN_SELECTOR);
 

@@ -95,11 +95,12 @@ compileContract pools/BurnToAddressMintTokenPool
 compileContract pools/TokenPool
 compileContract pools/USDC/USDCTokenPool
 compileContract pools/USDC/USDCTokenPoolCCTPV2
-compileContract pools/USDC/HybridLockReleaseUSDCTokenPool
 compileContract pools/USDC/CCTPMessageTransmitterProxy
 compileContract pools/SiloedLockReleaseTokenPool
 compileContract pools/BurnMintFastTransferTokenPool
 compileContract pools/ERC20LockBox
+compileContract pools/USDC/SiloedUSDCTokenPool
+compileContract pools/USDC/USDCTokenPoolProxy
 
 # Test helpers
 compileContract test/helpers/BurnMintERC677Helper

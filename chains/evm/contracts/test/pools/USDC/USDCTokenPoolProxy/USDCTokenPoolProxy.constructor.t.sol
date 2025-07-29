@@ -2,11 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {USDCTokenPoolProxy} from "../../../../pools/USDC/USDCTokenPoolProxy.sol";
-
-import {LockReleaseTokenPoolHelper} from "../../../helpers/LockReleaseTokenPoolHelper.sol";
-import {USDCTokenPoolCCTPV2Helper} from "../../../helpers/USDCTokenPoolCCTPV2Helper.sol";
-import {USDCTokenPoolHelper} from "../../../helpers/USDCTokenPoolHelper.sol";
-
 import {USDCSetup} from "../USDCSetup.t.sol";
 
 contract USDCTokenPoolProxy_constructor is USDCSetup {

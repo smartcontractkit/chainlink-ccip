@@ -5,16 +5,16 @@ import {SiloedUSDCTokenPool} from "../../../../pools/USDC/SiloedUSDCTokenPool.so
 import {SiloedUSDCTokenPoolSetup} from "./SiloedUSDCTokenPoolSetup.sol";
 
 contract SiloedUSDCTokenPool_setAllowedTokenPoolProxies is SiloedUSDCTokenPoolSetup {
-  address PROXY_1 = makeAddr("PROXY_1");
-  address PROXY_2 = makeAddr("PROXY_2");
-  address PROXY_3 = makeAddr("PROXY_3");
+  address public PROXY_1 = makeAddr("PROXY_1");
+  address public PROXY_2 = makeAddr("PROXY_2");
+  address public PROXY_3 = makeAddr("PROXY_3");
 
   function test_setAllowedTokenPoolProxies_Success() public {
     // Arrange: Prepare arrays for setting allowed proxies
     address[] memory proxies = new address[](2);
     proxies[0] = PROXY_1;
     proxies[1] = PROXY_2;
-    
+
     bool[] memory allowed = new bool[](2);
     allowed[0] = true;
     allowed[1] = true;
@@ -34,7 +34,7 @@ contract SiloedUSDCTokenPool_setAllowedTokenPoolProxies is SiloedUSDCTokenPoolSe
     // Arrange: Prepare arrays
     address[] memory proxies = new address[](1);
     proxies[0] = PROXY_1;
-    
+
     bool[] memory allowed = new bool[](1);
     allowed[0] = true;
 
@@ -50,7 +50,7 @@ contract SiloedUSDCTokenPool_setAllowedTokenPoolProxies is SiloedUSDCTokenPoolSe
     address[] memory proxies = new address[](2);
     proxies[0] = PROXY_1;
     proxies[1] = PROXY_2;
-    
+
     bool[] memory allowed = new bool[](1);
     allowed[0] = true;
 
@@ -65,7 +65,7 @@ contract SiloedUSDCTokenPool_setAllowedTokenPoolProxies is SiloedUSDCTokenPoolSe
     // Arrange: First set a proxy as allowed
     address[] memory proxies1 = new address[](1);
     proxies1[0] = PROXY_1;
-    
+
     bool[] memory allowed1 = new bool[](1);
     allowed1[0] = true;
 
@@ -82,7 +82,7 @@ contract SiloedUSDCTokenPool_setAllowedTokenPoolProxies is SiloedUSDCTokenPoolSe
     // Arrange: Try to remove a proxy that was never added
     address[] memory proxies = new address[](1);
     proxies[0] = PROXY_1;
-    
+
     bool[] memory allowed = new bool[](1);
     allowed[0] = false;
 
@@ -97,7 +97,7 @@ contract SiloedUSDCTokenPool_setAllowedTokenPoolProxies is SiloedUSDCTokenPoolSe
     // Arrange: First add a proxy
     address[] memory addProxies = new address[](1);
     addProxies[0] = PROXY_1;
-    
+
     bool[] memory addAllowed = new bool[](1);
     addAllowed[0] = true;
 
@@ -111,7 +111,7 @@ contract SiloedUSDCTokenPool_setAllowedTokenPoolProxies is SiloedUSDCTokenPoolSe
     // Act: Remove the proxy
     address[] memory removeProxies = new address[](1);
     removeProxies[0] = PROXY_1;
-    
+
     bool[] memory removeAllowed = new bool[](1);
     removeAllowed[0] = false;
 
@@ -128,7 +128,7 @@ contract SiloedUSDCTokenPool_setAllowedTokenPoolProxies is SiloedUSDCTokenPoolSe
     address[] memory proxies = new address[](2);
     proxies[0] = PROXY_1;
     proxies[1] = PROXY_2;
-    
+
     bool[] memory allowed = new bool[](2);
     allowed[0] = true;
     allowed[1] = true;
@@ -152,4 +152,4 @@ contract SiloedUSDCTokenPool_setAllowedTokenPoolProxies is SiloedUSDCTokenPoolSe
     }
     return false;
   }
-} 
+}

@@ -79,8 +79,7 @@ contract USDCTokenPoolProxy is TokenPool {
       destinationPool = pools.lockReleasePool;
     } else if (mechanism == LockOrBurnMechanism.CCTP_V1) {
       destinationPool = pools.cctpV1Pool;
-    }
-    else if (mechanism == LockOrBurnMechanism.CCTP_V2) {
+    } else if (mechanism == LockOrBurnMechanism.CCTP_V2) {
       destinationPool = pools.cctpV2Pool;
     }
 
@@ -103,7 +102,9 @@ contract USDCTokenPoolProxy is TokenPool {
     }
 
     uint32 version;
-    bytes memory usdcMessage = releaseOrMintIn.sourcePoolData;
+
+    // In both versions of CCTP, the version is stored in the first 4 bytes of the message, so this check is valid for both versions. If this changes in future versions, these branches will need to be updated.
+    bytes memory usdcMessage = releaseOrMintIn.offchainTokenData;
     // solhint-disable-next-line no-inline-assembly
     assembly {
       // We truncate using the datatype of the version variable, meaning
@@ -114,7 +115,6 @@ contract USDCTokenPoolProxy is TokenPool {
       version := mload(add(usdcMessage, 4)) // 0 + 4 = 4
     }
 
-    // TODO: Comments
     if (version == 0) {
       return USDCTokenPool(pools.cctpV1Pool).releaseOrMint(releaseOrMintIn);
     } else if (version == 1) {

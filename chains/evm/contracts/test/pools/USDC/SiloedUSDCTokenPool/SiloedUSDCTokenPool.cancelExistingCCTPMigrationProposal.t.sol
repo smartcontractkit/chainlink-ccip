@@ -10,7 +10,7 @@ contract SiloedUSDCTokenPool_cancelExistingCCTPMigrationProposal is SiloedUSDCTo
     // Arrange: Propose a migration first
     vm.startPrank(OWNER);
     s_usdcTokenPool.proposeCCTPMigration(DEST_CHAIN_SELECTOR);
-    
+
     // Act: Cancel the migration proposal
     s_usdcTokenPool.cancelExistingCCTPMigrationProposal();
     vm.stopPrank();
@@ -22,7 +22,7 @@ contract SiloedUSDCTokenPool_cancelExistingCCTPMigrationProposal is SiloedUSDCTo
   function test_cancelExistingCCTPMigrationProposal_RevertWhen_NoProposalPending() public {
     // Arrange: No migration proposal is set
     vm.startPrank(OWNER);
-    
+
     // Act & Assert: Expect revert when trying to cancel without a proposal
     vm.expectRevert(abi.encodeWithSelector(SiloedUSDCTokenPool.NoMigrationProposalPending.selector));
     s_usdcTokenPool.cancelExistingCCTPMigrationProposal();
@@ -47,8 +47,7 @@ contract SiloedUSDCTokenPool_cancelExistingCCTPMigrationProposal is SiloedUSDCTo
     vm.startPrank(OWNER);
     uint64[] memory removes = new uint64[](0);
     SiloedLockReleaseTokenPool.SiloConfigUpdate[] memory adds = new SiloedLockReleaseTokenPool.SiloConfigUpdate[](1);
-    adds[0] =
-      SiloedLockReleaseTokenPool.SiloConfigUpdate({remoteChainSelector: DEST_CHAIN_SELECTOR, rebalancer: OWNER});
+    adds[0] = SiloedLockReleaseTokenPool.SiloConfigUpdate({remoteChainSelector: DEST_CHAIN_SELECTOR, rebalancer: OWNER});
     s_usdcTokenPool.updateSiloDesignations(removes, adds);
 
     // Provide some amount of liquidity to DEST_CHAIN_SELECTOR and use that amount for exclusion
@@ -56,16 +55,15 @@ contract SiloedUSDCTokenPool_cancelExistingCCTPMigrationProposal is SiloedUSDCTo
     s_USDCToken.approve(address(s_usdcTokenPool), amount);
     s_usdcTokenPool.provideSiloedLiquidity(DEST_CHAIN_SELECTOR, amount);
 
-
     // Arrange: Propose migration and exclude some tokens
     s_usdcTokenPool.proposeCCTPMigration(DEST_CHAIN_SELECTOR);
 
     // Exclude some tokens
     s_usdcTokenPool.excludeTokensFromBurn(DEST_CHAIN_SELECTOR, amount);
-    
+
     // Verify tokens were excluded
     assertEq(s_usdcTokenPool.getExcludedTokensByChain(DEST_CHAIN_SELECTOR), amount);
-    
+
     // Act: Cancel the migration proposal
     s_usdcTokenPool.cancelExistingCCTPMigrationProposal();
     vm.stopPrank();
@@ -78,11 +76,11 @@ contract SiloedUSDCTokenPool_cancelExistingCCTPMigrationProposal is SiloedUSDCTo
     // Arrange: Propose a migration
     vm.startPrank(OWNER);
     s_usdcTokenPool.proposeCCTPMigration(DEST_CHAIN_SELECTOR);
-    
+
     // Act & Assert: Expect the CCTPMigrationCancelled event
     vm.expectEmit(true, false, false, false);
     emit SiloedUSDCTokenPool.CCTPMigrationCancelled(DEST_CHAIN_SELECTOR);
     s_usdcTokenPool.cancelExistingCCTPMigrationProposal();
     vm.stopPrank();
   }
-} 
+}
