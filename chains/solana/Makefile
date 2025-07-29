@@ -57,7 +57,7 @@ ccip-router-contracts-go-tests:
 
 .PHONY: test-token-pool-contracts-go-tests
 test-token-pool-contracts-go-tests:
-	go test -run TestBaseTokenPoolHappyPath -v -failfast ./... -json -covermode=atomic -coverpkg=./... -coverprofile=integration_coverage.txt 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci=true -singlepackage=true -hidepassingtests=false -hidepassinglogs=false
+	go test -run TestBaseTokenPoolHappyPath -run TestTokenPool -v -failfast ./... -json -covermode=atomic -coverpkg=./... -coverprofile=integration_coverage.txt 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci=true -singlepackage=true -hidepassingtests=false -hidepassinglogs=false
 
 .PHONY: build-contracts
 build-contracts:

@@ -10,7 +10,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_offramp"
 )
 
 func IsEvent(event string, data []byte) bool {

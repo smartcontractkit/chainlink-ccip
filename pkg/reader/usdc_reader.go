@@ -87,6 +87,11 @@ func NewUSDCMessageReader(
 		}
 		switch family {
 		case sel.FamilyEVM:
+			contractReader, ok := contractReaders[chainSelector]
+			if !ok {
+				lggr.Errorf("chain reader is missing for chain %d, skipping", chainSelector)
+				continue
+			}
 			bytesAddress, err := addrCodec.AddressStringToBytes(token.SourceMessageTransmitterAddr, chainSelector)
 			if err != nil {
 				return nil, err
@@ -107,7 +112,7 @@ func NewUSDCMessageReader(
 			}
 			readers[chainSelector] = evmUSDCMessageReader{
 				lggr:           lggr,
-				contractReader: contractReaders[chainSelector],
+				contractReader: contractReader,
 				cctpDestDomain: domains,
 			}
 		case sel.FamilySolana:
