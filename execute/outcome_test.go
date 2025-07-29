@@ -5,8 +5,9 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 
-	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/libocr/commontypes"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
