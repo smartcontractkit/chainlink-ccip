@@ -1077,10 +1077,11 @@ func Test_computeTokenDataObservationsConsensus(t *testing.T) {
 	}
 
 	tt := []struct {
-		name        string
-		F           int
-		observation []map[cciptypes.SeqNum]exectypes.MessageTokenData
-		expected    map[cciptypes.SeqNum]expected
+		name                   string
+		F                      int
+		observation            []map[cciptypes.SeqNum]exectypes.MessageTokenData
+		expected               map[cciptypes.SeqNum]expected
+		expectedMissingSeqNums map[cciptypes.SeqNum]bool
 	}{
 		{
 			name: "messages without token data",
@@ -1169,6 +1170,9 @@ func Test_computeTokenDataObservationsConsensus(t *testing.T) {
 				3: {ready: false},
 				4: {ready: false},
 				5: {ready: true, data: [][]byte{{51}, {52}}},
+			},
+			expectedMissingSeqNums: map[cciptypes.SeqNum]bool{
+				4: true,
 			},
 		},
 		{
@@ -1415,8 +1419,11 @@ func Test_computeTokenDataObservationsConsensus(t *testing.T) {
 
 			for seqNum, exp := range tc.expected {
 				mtd, ok := obs[chainSelector][seqNum]
+				if tc.expectedMissingSeqNums[seqNum] {
+					assert.False(t, ok)
+					continue
+				}
 				assert.True(t, ok)
-
 				assert.Equal(t, exp.ready, mtd.IsReady())
 				// No need to compare bytes when not ready
 				if exp.ready {

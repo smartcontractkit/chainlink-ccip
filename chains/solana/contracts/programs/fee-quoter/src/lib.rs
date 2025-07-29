@@ -443,4 +443,6 @@ pub enum FeeQuoterError {
     InvalidTokenTransferFeeDestBytesOverhead,
     #[msg("Invalid code version")]
     InvalidCodeVersion,
+    #[msg("Proposed owner is the default pubkey")]
+    DefaultOwnerProposal,
 }
