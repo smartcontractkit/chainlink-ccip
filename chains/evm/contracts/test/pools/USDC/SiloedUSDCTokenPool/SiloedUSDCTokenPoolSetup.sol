@@ -6,6 +6,8 @@ import {SiloedUSDCTokenPool} from "../../../../pools/USDC/SiloedUSDCTokenPool.so
 import {USDCSetup} from "../USDCSetup.t.sol";
 import {BurnMintERC677} from "@chainlink/contracts/src/v0.8/shared/token/ERC677/BurnMintERC677.sol";
 
+import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
+
 contract SiloedUSDCTokenPoolSetup is USDCSetup {
   SiloedUSDCTokenPool internal s_usdcTokenPool;
   SiloedUSDCTokenPool internal s_usdcTokenPoolTransferLiquidity;
@@ -33,20 +35,17 @@ contract SiloedUSDCTokenPoolSetup is USDCSetup {
       address(s_lockBox) // lockBox
     );
 
+    address[] memory authorizedCallers = new address[](3);
+    authorizedCallers[0] = OWNER;
+    authorizedCallers[1] = address(s_routerAllowedOnRamp);
+    authorizedCallers[2] = address(s_routerAllowedOffRamp);
+    s_usdcTokenPool.applyAuthorizedCallerUpdates(AuthorizedCallers.AuthorizedCallerArgs({addedCallers: authorizedCallers, removedCallers: new address[](0)}));
+
     BurnMintERC677(address(s_USDCToken)).grantBurnRole(address(s_usdcTokenPool));
 
     s_tokenAdminRegistry.proposeAdministrator(address(s_USDCToken), OWNER);
     s_tokenAdminRegistry.acceptAdminRole(address(s_USDCToken));
     s_tokenAdminRegistry.setPool(address(s_USDCToken), address(s_usdcTokenPool));
-
-    // Set the ramps as the allowed token pool proxies for testing purposes
-    address[] memory tokenPoolProxies = new address[](2);
-    tokenPoolProxies[0] = s_routerAllowedOnRamp;
-    tokenPoolProxies[1] = s_routerAllowedOffRamp;
-    bool[] memory allowed = new bool[](2);
-    allowed[0] = true;
-    allowed[1] = true;
-    s_usdcTokenPool.setAllowedTokenPoolProxies(tokenPoolProxies, allowed);
 
     _poolApplyChainUpdates(address(s_usdcTokenPool));
 
@@ -80,6 +79,9 @@ contract SiloedUSDCTokenPoolSetup is USDCSetup {
       address(s_router), // router
       address(s_lockBox) // lockBox
     );
+
+    s_usdcTokenPoolTransferLiquidity.applyAuthorizedCallerUpdates(AuthorizedCallers.AuthorizedCallerArgs({addedCallers: authorizedCallers, removedCallers: new address[](0)}));
+
     _poolApplyChainUpdates(address(s_usdcTokenPoolTransferLiquidity));
   }
 }

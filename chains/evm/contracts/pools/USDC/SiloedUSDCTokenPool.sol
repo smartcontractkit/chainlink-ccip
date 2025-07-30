@@ -10,10 +10,12 @@ import {IERC20} from
 import {EnumerableSet} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
 
+import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
+
 /// @notice A token pool for USDC which inherits the Siloed token functionality while adding the CCTP migration functionality
 /// @dev While it supports unsiloed chains, it is not recommended to use them. All chains should be siloed, otherwise
 /// the pool will not be able to migrate the tokens to CCTP in the future.
-contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool {
+contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
   using EnumerableSet for EnumerableSet.AddressSet;
   using EnumerableSet for EnumerableSet.UintSet;
 
@@ -48,6 +50,8 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool {
   /// @notice The chains that have been migrated to CCTP.
   EnumerableSet.UintSet internal s_migratedChains;
 
+  /// @dev The authorized callers are set as empty since the USDCTokenPoolProxy is the only authorized caller,
+  /// but cannot be deployed until after this contract is deployed. The allowed callers are set after deployment.
   constructor(
     IERC20 token,
     uint8 localTokenDecimals,
@@ -55,7 +59,8 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool {
     address rmnProxy,
     address router,
     address lockBox
-  ) SiloedLockReleaseTokenPool(token, localTokenDecimals, allowlist, rmnProxy, router, lockBox) {}
+  ) SiloedLockReleaseTokenPool(token, localTokenDecimals, allowlist, rmnProxy, router, lockBox) AuthorizedCallers(new address[](0)) {
+  }
 
   /// @notice Release tokens for a specific chain selector.
   /// @dev This function can only be called by an address specified by the owner to be controlled by circle
@@ -113,7 +118,7 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool {
     uint64 remoteChainSelector
   ) internal view override {
     if (!isSupportedChain(remoteChainSelector)) revert ChainNotAllowed(remoteChainSelector);
-    if (!s_allowedTokenPoolProxies.contains(msg.sender)) revert CallerIsNotARampOnRouter(msg.sender);
+    _validateCaller();
   }
 
   /// @notice Checks whether remote chain selector is configured on this contract, and if the msg.sender
@@ -122,8 +127,7 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool {
     uint64 remoteChainSelector
   ) internal view override {
     if (!isSupportedChain(remoteChainSelector)) revert ChainNotAllowed(remoteChainSelector);
-
-    if (!s_allowedTokenPoolProxies.contains(msg.sender)) revert CallerIsNotARampOnRouter(msg.sender);
+    _validateCaller();
   }
 
   /// @notice This function is overridden to update the locked tokens accounting for the bridge migrator code

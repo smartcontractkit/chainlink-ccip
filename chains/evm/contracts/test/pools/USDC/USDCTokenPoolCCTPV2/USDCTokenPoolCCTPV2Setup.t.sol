@@ -6,6 +6,8 @@ import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
 import {USDCTokenPoolCCTPV2Helper} from "../../../helpers/USDCTokenPoolCCTPV2Helper.sol";
 import {USDCSetup} from "../USDCSetup.t.sol";
 
+import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
+
 contract USDCTokenPoolCCTPV2Setup is USDCSetup {
   USDCTokenPoolCCTPV2Helper internal s_usdcTokenPool;
   USDCTokenPoolCCTPV2Helper internal s_usdcTokenPoolWithAllowList;
@@ -23,17 +25,11 @@ contract USDCTokenPoolCCTPV2Setup is USDCSetup {
       address(s_router)
     );
 
-    address[] memory allowedTokenPoolProxies = new address[](3);
-    allowedTokenPoolProxies[0] = address(OWNER);
-    allowedTokenPoolProxies[1] = address(s_routerAllowedOnRamp);
-    allowedTokenPoolProxies[2] = address(s_routerAllowedOffRamp);
-
-    bool[] memory allowed = new bool[](3);
-    for (uint256 i = 0; i < allowedTokenPoolProxies.length; i++) {
-      allowed[i] = true;
-    }
-
-    s_usdcTokenPool.setAllowedTokenPoolProxies(allowedTokenPoolProxies, allowed);
+    address[] memory allowedCallers = new address[](3);
+    allowedCallers[0] = OWNER;
+    allowedCallers[1] = address(s_routerAllowedOnRamp);
+    allowedCallers[2] = address(s_routerAllowedOffRamp);
+    s_usdcTokenPool.applyAuthorizedCallerUpdates(AuthorizedCallers.AuthorizedCallerArgs({addedCallers: allowedCallers, removedCallers: new address[](0)}));
 
     CCTPMessageTransmitterProxy.AllowedCallerConfigArgs[] memory allowedCallerParams =
       new CCTPMessageTransmitterProxy.AllowedCallerConfigArgs[](1);
@@ -46,7 +42,8 @@ contract USDCTokenPoolCCTPV2Setup is USDCSetup {
       s_mockUSDC, s_cctpMessageTransmitterProxy, s_USDCToken, s_allowedList, address(s_mockRMNRemote), address(s_router)
     );
 
-    s_usdcTokenPoolWithAllowList.setAllowedTokenPoolProxies(allowedTokenPoolProxies, allowed);
+    s_usdcTokenPoolWithAllowList.applyAuthorizedCallerUpdates(AuthorizedCallers.AuthorizedCallerArgs({addedCallers: allowedCallers, removedCallers: new address[](0)}));
+
 
     _poolApplyChainUpdates(address(s_usdcTokenPool));
     _poolApplyChainUpdates(address(s_usdcTokenPoolWithAllowList));

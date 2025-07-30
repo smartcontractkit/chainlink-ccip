@@ -10,6 +10,7 @@ import {MockE2EUSDCTransmitter} from "../../../mocks/MockE2EUSDCTransmitter.sol"
 import {MockUSDCTokenMessenger} from "../../../mocks/MockUSDCTokenMessenger.sol";
 
 import {BurnMintERC677} from "@chainlink/contracts/src/v0.8/shared/token/ERC677/BurnMintERC677.sol";
+import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
 contract USDCTokenPoolSetup is USDCSetup {
   USDCTokenPoolHelper internal s_usdcTokenPool;
@@ -37,19 +38,6 @@ contract USDCTokenPoolSetup is USDCSetup {
       s_previousPool
     );
 
-    // Allow the usdcTokenPool to be used as a token pool proxy
-    address[] memory allowedTokenPoolProxies = new address[](3);
-    allowedTokenPoolProxies[0] = address(OWNER);
-    allowedTokenPoolProxies[1] = address(s_routerAllowedOnRamp);
-    allowedTokenPoolProxies[2] = address(s_routerAllowedOffRamp);
-
-    bool[] memory allowed = new bool[](5);
-    for (uint256 i = 0; i < allowedTokenPoolProxies.length; i++) {
-      allowed[i] = true;
-    }
-
-    s_usdcTokenPool.setAllowedTokenPoolProxies(allowedTokenPoolProxies, allowed);
-
     CCTPMessageTransmitterProxy.AllowedCallerConfigArgs[] memory allowedCallerParams =
       new CCTPMessageTransmitterProxy.AllowedCallerConfigArgs[](1);
     allowedCallerParams[0] =
@@ -66,8 +54,14 @@ contract USDCTokenPoolSetup is USDCSetup {
       address(s_router),
       s_previousPool
     );
-
-    s_usdcTokenPoolWithAllowList.setAllowedTokenPoolProxies(allowedTokenPoolProxies, allowed);
+    
+    // Set the owner as an authorized caller for the pools
+    address[] memory authorizedCallers = new address[](3);
+    authorizedCallers[0] = OWNER;
+    authorizedCallers[1] = address(s_routerAllowedOnRamp);
+    authorizedCallers[2] = address(s_routerAllowedOffRamp);
+    s_usdcTokenPool.applyAuthorizedCallerUpdates(AuthorizedCallers.AuthorizedCallerArgs({addedCallers: authorizedCallers, removedCallers: new address[](0)}));
+    s_usdcTokenPoolWithAllowList.applyAuthorizedCallerUpdates(AuthorizedCallers.AuthorizedCallerArgs({addedCallers: authorizedCallers, removedCallers: new address[](0)}));
 
     _poolApplyChainUpdates(address(s_usdcTokenPool));
     _poolApplyChainUpdates(address(s_usdcTokenPoolWithAllowList));

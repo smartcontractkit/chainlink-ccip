@@ -8,6 +8,8 @@ import {TokenPool} from "../../../../pools/TokenPool.sol";
 
 import {SiloedUSDCTokenPoolSetup} from "./SiloedUSDCTokenPoolSetup.sol";
 
+import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
+
 contract SiloedUSDCTokenPool_lockOrBurn is SiloedUSDCTokenPoolSetup {
   function setUp() public virtual override {
     super.setUp();
@@ -173,7 +175,7 @@ contract SiloedUSDCTokenPool_lockOrBurn is SiloedUSDCTokenPoolSetup {
       localToken: localToken
     });
 
-    vm.expectRevert(abi.encodeWithSelector(TokenPool.CallerIsNotARampOnRouter.selector, unauthorizedCaller));
+    vm.expectRevert(abi.encodeWithSelector(AuthorizedCallers.UnauthorizedCaller.selector, unauthorizedCaller));
     s_usdcTokenPool.lockOrBurn(lockOrBurnIn);
 
     vm.stopPrank();
@@ -223,7 +225,7 @@ contract SiloedUSDCTokenPool_lockOrBurn is SiloedUSDCTokenPoolSetup {
       localToken: localToken
     });
 
-    vm.expectRevert(abi.encodeWithSelector(TokenPool.CallerIsNotARampOnRouter.selector, unauthorizedProxy));
+    vm.expectRevert(abi.encodeWithSelector(AuthorizedCallers.UnauthorizedCaller.selector, unauthorizedProxy));
     s_usdcTokenPool.lockOrBurn(lockOrBurnIn);
 
     vm.stopPrank();

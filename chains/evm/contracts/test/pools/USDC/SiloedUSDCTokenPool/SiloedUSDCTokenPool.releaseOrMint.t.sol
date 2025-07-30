@@ -7,6 +7,8 @@ import {SiloedLockReleaseTokenPool} from "../../../../pools/SiloedLockReleaseTok
 import {TokenPool} from "../../../../pools/TokenPool.sol";
 import {LOCK_RELEASE_FLAG} from "../../../../pools/USDC/USDCTokenPoolProxy.sol";
 
+import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
+
 import {SiloedUSDCTokenPoolSetup} from "./SiloedUSDCTokenPoolSetup.sol";
 
 contract SiloedUSDCTokenPool_releaseOrMint is SiloedUSDCTokenPoolSetup {
@@ -230,7 +232,7 @@ contract SiloedUSDCTokenPool_releaseOrMint is SiloedUSDCTokenPoolSetup {
       offchainTokenData: ""
     });
 
-    vm.expectRevert(abi.encodeWithSelector(TokenPool.CallerIsNotARampOnRouter.selector, unauthorizedCaller));
+    vm.expectRevert(abi.encodeWithSelector(AuthorizedCallers.UnauthorizedCaller.selector, unauthorizedCaller));
     s_usdcTokenPool.releaseOrMint(releaseOrMintIn);
 
     vm.stopPrank();
@@ -301,7 +303,7 @@ contract SiloedUSDCTokenPool_releaseOrMint is SiloedUSDCTokenPoolSetup {
       offchainTokenData: ""
     });
 
-    vm.expectRevert(abi.encodeWithSelector(TokenPool.CallerIsNotARampOnRouter.selector, unauthorizedProxy));
+    vm.expectRevert(abi.encodeWithSelector(AuthorizedCallers.UnauthorizedCaller.selector, unauthorizedProxy));
     s_usdcTokenPool.releaseOrMint(releaseOrMintIn);
 
     vm.stopPrank();

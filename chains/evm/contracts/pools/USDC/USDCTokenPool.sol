@@ -19,9 +19,11 @@ import {EnumerableSet} from
 import {IERC165} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
 
+import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
+
 /// @notice This pool mints and burns USDC tokens through the Cross Chain Transfer
 /// Protocol (CCTP).
-contract USDCTokenPool is TokenPool, ITypeAndVersion {
+contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
   using SafeERC20 for IERC20;
   using EnumerableSet for EnumerableSet.AddressSet;
 
@@ -127,6 +129,8 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
 
   EnumerableSet.AddressSet internal s_allowedTokenPoolProxies;
 
+  /// @dev The authorized callers are set as empty since the USDCTokenPoolProxy is the only authorized caller,
+  /// but cannot be deployed until after this contract is deployed. The allowed callers are set after deployment.
   constructor(
     ITokenMessenger tokenMessenger,
     CCTPMessageTransmitterProxy cctpMessageTransmitterProxy,
@@ -136,7 +140,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     address router,
     address previousPool,
     uint32 supportedUSDCVersion
-  ) TokenPool(token, 6, allowlist, rmnProxy, router) {
+  ) TokenPool(token, 6, allowlist, rmnProxy, router) AuthorizedCallers(new address[](0)) {
     i_supportedUSDCVersion = supportedUSDCVersion;
 
     if (address(tokenMessenger) == address(0)) revert InvalidConfig();
@@ -250,7 +254,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     uint64 remoteChainSelector
   ) internal view override {
     if (!isSupportedChain(remoteChainSelector)) revert ChainNotAllowed(remoteChainSelector);
-    if (!s_allowedTokenPoolProxies.contains(msg.sender)) revert CallerIsNotARampOnRouter(msg.sender);
+    _validateCaller();
   }
 
   /// @notice Checks whether remote chain selector is configured on this contract, and if the msg.sender
@@ -259,8 +263,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     uint64 remoteChainSelector
   ) internal view override {
     if (!isSupportedChain(remoteChainSelector)) revert ChainNotAllowed(remoteChainSelector);
-
-    if (!s_allowedTokenPoolProxies.contains(msg.sender)) revert CallerIsNotARampOnRouter(msg.sender);
+    _validateCaller();
   }
 
   /// @notice Mint tokens from the pool to the recipient

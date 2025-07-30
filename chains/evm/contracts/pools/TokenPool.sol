@@ -42,7 +42,7 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   using RateLimiter for RateLimiter.TokenBucket;
 
   error CallerIsNotARampOnRouter(address caller);
-  error ZeroAddressNotAllowed();
+  error ZeroAddressInvalid();
   error SenderNotAllowed(address sender);
   error AllowListNotEnabled();
   error NonExistentChain(uint64 remoteChainSelector);
@@ -127,7 +127,7 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   address internal s_rateLimitAdmin;
 
   constructor(IERC20 token, uint8 localTokenDecimals, address[] memory allowlist, address rmnProxy, address router) {
-    if (address(token) == address(0) || router == address(0) || rmnProxy == address(0)) revert ZeroAddressNotAllowed();
+    if (address(token) == address(0) || router == address(0) || rmnProxy == address(0)) revert ZeroAddressInvalid();
     i_token = token;
     i_rmnProxy = rmnProxy;
 
@@ -180,7 +180,7 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   function setRouter(
     address newRouter
   ) public onlyOwner {
-    if (newRouter == address(0)) revert ZeroAddressNotAllowed();
+    if (newRouter == address(0)) revert ZeroAddressInvalid();
     address oldRouter = address(s_router);
     s_router = IRouter(newRouter);
 
@@ -489,7 +489,7 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
       RateLimiter._validateTokenBucketConfig(newChain.inboundRateLimiterConfig);
 
       if (newChain.remoteTokenAddress.length == 0) {
-        revert ZeroAddressNotAllowed();
+        revert ZeroAddressInvalid();
       }
 
       // If the chain already exists, revert
@@ -533,7 +533,7 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   /// @param remotePoolAddress The address of the new remote pool.
   function _setRemotePool(uint64 remoteChainSelector, bytes memory remotePoolAddress) internal {
     if (remotePoolAddress.length == 0) {
-      revert ZeroAddressNotAllowed();
+      revert ZeroAddressInvalid();
     }
 
     bytes32 poolHash = keccak256(remotePoolAddress);

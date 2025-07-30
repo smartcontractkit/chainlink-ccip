@@ -63,7 +63,7 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     address router,
     address lockBox
   ) TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) {
-    if (lockBox == address(0)) revert ZeroAddressNotAllowed();
+    if (lockBox == address(0)) revert ZeroAddressInvalid();
 
     token.safeApprove(lockBox, type(uint256).max);
     i_lockBox = ERC20LockBox(lockBox);
@@ -206,7 +206,7 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
         revert InvalidChainSelector(adds[i].remoteChainSelector);
       }
 
-      if (adds[i].rebalancer == address(0)) revert ZeroAddressNotAllowed();
+      if (adds[i].rebalancer == address(0)) revert ZeroAddressInvalid();
 
       s_chainConfigs[adds[i].remoteChainSelector] =
         SiloConfig({tokenBalance: 0, rebalancer: adds[i].rebalancer, isSiloed: true});
