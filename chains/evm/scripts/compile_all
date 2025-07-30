@@ -98,7 +98,7 @@ compileContract pools/USDC/HybridLockReleaseUSDCTokenPool
 compileContract pools/USDC/CCTPMessageTransmitterProxy
 compileContract pools/SiloedLockReleaseTokenPool
 compileContract pools/BurnMintFastTransferTokenPool
-
+compileContract pools/ERC20LockBox
 
 # Test helpers
 compileContract test/helpers/BurnMintERC677Helper
