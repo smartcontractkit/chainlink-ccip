@@ -1,18 +1,21 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {IPoolV1} from "../../interfaces/IPool.sol";
 import {IMessageTransmitter} from "./interfaces/IMessageTransmitter.sol";
 import {ITokenMessenger} from "./interfaces/ITokenMessenger.sol";
-import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {Pool} from "../../libraries/Pool.sol";
 import {TokenPool} from "../TokenPool.sol";
 import {CCTPMessageTransmitterProxy} from "./CCTPMessageTransmitterProxy.sol";
 
+import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 import {IERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC165} from
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
 
 /// @notice This pool mints and burns USDC tokens through the Cross Chain Transfer
 /// Protocol (CCTP).
@@ -33,6 +36,8 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   error InvalidDestinationDomain(uint32 expected, uint32 got);
   error InvalidReceiver(bytes receiver);
   error InvalidTransmitterInProxy();
+  error InvalidPreviousPool();
+  error InvalidMessageLength(uint256 length);
 
   // This data is supplied from offchain and contains everything needed
   // to receive the USDC tokens.
@@ -44,6 +49,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   // A domain is a USDC representation of a chain.
   struct DomainUpdate {
     bytes32 allowedCaller; //       Address allowed to mint on the domain
+    bytes32 mintRecipient; //       Address to mint to on the destination chain
     uint32 domainIdentifier; // ──╮ Unique domain ID
     uint64 destChainSelector; //  │ The destination chain for this domain
     bool enabled; // ─────────────╯ Whether the domain is enabled
@@ -54,7 +60,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     uint32 sourceDomain;
   }
 
-  string public constant override typeAndVersion = "USDCTokenPool 1.6.1-dev";
+  string public constant override typeAndVersion = "USDCTokenPool 1.6.2-dev";
 
   // We restrict to the first version. New pool may be required for subsequent versions.
   uint32 public constant SUPPORTED_USDC_VERSION = 0;
@@ -72,6 +78,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   /// For dest pool version 1.5.1, this is the destination chain's token pool.
   struct Domain {
     bytes32 allowedCaller; //      Address allowed to mint on the domain
+    bytes32 mintRecipient; //      Address to mint to on the destination chain
     uint32 domainIdentifier; // ─╮ Unique domain ID
     bool enabled; // ────────────╯ Whether the domain is enabled
   }
@@ -79,13 +86,19 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   // A mapping of CCIP chain identifiers to destination domains
   mapping(uint64 chainSelector => Domain CCTPDomain) private s_chainToDomain;
 
+  // In the event of an inflight message during a token pool migration, we need to route the message to the
+  // previous pool to satisfy the allowedCaller. The currently in-use token pool must be set as an offRamp
+  // in the router in order for the previous pool to accept the incoming call.
+  address public immutable i_previousPool;
+
   constructor(
     ITokenMessenger tokenMessenger,
     CCTPMessageTransmitterProxy cctpMessageTransmitterProxy,
     IERC20 token,
     address[] memory allowlist,
     address rmnProxy,
-    address router
+    address router,
+    address previousPool
   ) TokenPool(token, 6, allowlist, rmnProxy, router) {
     if (address(tokenMessenger) == address(0)) revert InvalidConfig();
     IMessageTransmitter transmitter = IMessageTransmitter(tokenMessenger.localMessageTransmitter());
@@ -99,6 +112,18 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     i_messageTransmitterProxy = cctpMessageTransmitterProxy;
     i_localDomainIdentifier = transmitter.localDomain();
     i_token.safeIncreaseAllowance(address(i_tokenMessenger), type(uint256).max);
+
+    // PreviousPool should not be current pool.
+    if (previousPool == address(this)) {
+      revert InvalidPreviousPool();
+    }
+    // If previousPool exists, it should be a valid token pool, we check it with supportsInterface.
+    if (previousPool != address(0) && !IERC165(previousPool).supportsInterface(type(IPoolV1).interfaceId)) {
+      revert InvalidPreviousPool();
+    }
+
+    i_previousPool = previousPool;
+
     emit ConfigSet(address(tokenMessenger));
   }
 
@@ -118,7 +143,15 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     if (lockOrBurnIn.receiver.length != 32) {
       revert InvalidReceiver(lockOrBurnIn.receiver);
     }
-    bytes32 decodedReceiver = abi.decode(lockOrBurnIn.receiver, (bytes32));
+
+    bytes32 decodedReceiver;
+    // For EVM chains, the mintRecipient is not used, but is needed for Solana, where the mintRecipient will
+    // be a PDA owned by the pool, and will forward the tokens to its final destination after minting.
+    if (domain.mintRecipient != bytes32(0)) {
+      decodedReceiver = domain.mintRecipient;
+    } else {
+      decodedReceiver = abi.decode(lockOrBurnIn.receiver, (bytes32));
+    }
 
     // Since this pool is the msg sender of the CCTP transaction, only this contract
     // is able to call replaceDepositForBurn. Since this contract does not implement
@@ -157,10 +190,26 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     _validateReleaseOrMint(releaseOrMintIn, releaseOrMintIn.sourceDenominatedAmount);
     SourceTokenDataPayload memory sourceTokenDataPayload =
       abi.decode(releaseOrMintIn.sourcePoolData, (SourceTokenDataPayload));
+
     MessageAndAttestation memory msgAndAttestation =
       abi.decode(releaseOrMintIn.offchainTokenData, (MessageAndAttestation));
 
     _validateMessage(msgAndAttestation.message, sourceTokenDataPayload);
+
+    // If the destinationCaller is the previous pool, indicating an inflight message during the migration, we need to
+    // route the message to the previous pool to satisfy the allowedCaller.
+    bytes32 destinationCallerBytes32;
+    bytes memory messageBytes = msgAndAttestation.message;
+    assembly {
+      // destinationCaller is a 32-byte word starting at position 84 in messageBytes body, so add 32 to skip the 1st word
+      // representing bytes length
+      destinationCallerBytes32 := mload(add(messageBytes, 116)) // 84 + 32 = 116
+    }
+    address destinationCaller = address(uint160(uint256(destinationCallerBytes32)));
+
+    if (i_previousPool != address(0) && destinationCaller == i_previousPool) {
+      return USDCTokenPool(i_previousPool).releaseOrMint(releaseOrMintIn);
+    }
 
     if (!i_messageTransmitterProxy.receiveMessage(msgAndAttestation.message, msgAndAttestation.attestation)) {
       revert UnlockingUSDCFailed();
@@ -192,11 +241,19 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   ///     * destinationCaller     32         bytes32    84
   ///     * messageBody           dynamic    bytes      116
   function _validateMessage(bytes memory usdcMessage, SourceTokenDataPayload memory sourceTokenData) internal view {
+    // 116 is the minimum length of a valid USDC message. Since destinationCaller needs to be checked for the previous
+    // pool, this ensures that it can be parsed correctly and that the message is not too short. Since messageBody is
+    // dynamic and not always used, it is not checked.
+    if (usdcMessage.length < 116) revert InvalidMessageLength(usdcMessage.length);
+
     uint32 version;
     // solhint-disable-next-line no-inline-assembly
     assembly {
       // We truncate using the datatype of the version variable, meaning
-      // we will only be left with the first 4 bytes of the message.
+      // we will only be left with the first 4 bytes of the message when we cast it to uint32. We want the lower 4 bytes
+      // to be the version when casted to a uint32 , so we only add 4. If you added 32, attempting to skip the first word
+      // containing the length, then version would be in the upper-4 bytes of the corresponding slot, which
+      // would not be as easily parsed into a uint32.
       version := mload(add(usdcMessage, 4)) // 0 + 4 = 4
     }
     // This token pool only supports version 0 of the CCTP message format
@@ -246,6 +303,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
 
       s_chainToDomain[domain.destChainSelector] = Domain({
         domainIdentifier: domain.domainIdentifier,
+        mintRecipient: domain.mintRecipient,
         allowedCaller: domain.allowedCaller,
         enabled: domain.enabled
       });

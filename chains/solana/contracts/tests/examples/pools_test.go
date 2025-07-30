@@ -13,10 +13,10 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/testutils"
-	burnmint_tokenpool "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/burnmint_token_pool"
-	tokenpool "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/lockrelease_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/rmn_remote"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_ccip_invalid_receiver"
+	burnmint_tokenpool "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/burnmint_token_pool"
+	tokenpool "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/lockrelease_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/rmn_remote"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/test_ccip_invalid_receiver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
@@ -141,7 +141,7 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 			configPDA, err = tokens.TokenPoolGlobalConfigPDA(p.poolProgram)
 			require.NoError(t, err)
 
-			ix, err := tokenpool.NewInitGlobalConfigInstruction(configPDA, admin.PublicKey(), solana.SystemProgramID, poolProgram, programData.Address).ValidateAndBuild()
+			ix, err := tokenpool.NewInitGlobalConfigInstruction(dumbRamp, config.RMNRemoteProgram, configPDA, admin.PublicKey(), solana.SystemProgramID, poolProgram, programData.Address).ValidateAndBuild()
 			require.NoError(t, err)
 
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{
@@ -202,7 +202,7 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 
 					t.Run("setup", func(t *testing.T) {
 
-						poolInitI, err := tokenpool.NewInitializeInstruction(dumbRamp, config.RMNRemoteProgram, poolConfig, mint, admin.PublicKey(), solana.SystemProgramID, poolProgram, programData.Address, configPDA).ValidateAndBuild()
+						poolInitI, err := tokenpool.NewInitializeInstruction(poolConfig, mint, admin.PublicKey(), solana.SystemProgramID, poolProgram, programData.Address, configPDA).ValidateAndBuild()
 						require.NoError(t, err)
 
 						newMintAuthority := poolSigner
@@ -669,7 +669,7 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 		t.Run("self-onboard", func(t *testing.T) {
 
 			// Enable self-served token pool onboarding
-			ix, err := tokenpool.NewUpdateGlobalConfigInstruction(true, configPDA, admin.PublicKey(), solana.SystemProgramID, poolProgram, programData.Address).ValidateAndBuild()
+			ix, err := tokenpool.NewUpdateSelfServedAllowedInstruction(true, configPDA, admin.PublicKey(), poolProgram, programData.Address).ValidateAndBuild()
 			require.NoError(t, err)
 
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{
@@ -701,7 +701,7 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 					poolConfig, err := tokens.TokenPoolConfigAddress(mint, p.PoolProgram)
 					require.NoError(t, err)
 
-					poolInitI, err := tokenpool.NewInitializeInstruction(dumbRamp, config.RMNRemoteProgram, poolConfig, mint, newOwner.PublicKey(), solana.SystemProgramID, p.PoolProgram, programData.Address, configPDA).ValidateAndBuild()
+					poolInitI, err := tokenpool.NewInitializeInstruction(poolConfig, mint, newOwner.PublicKey(), solana.SystemProgramID, p.PoolProgram, programData.Address, configPDA).ValidateAndBuild()
 					require.NoError(t, err)
 
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{

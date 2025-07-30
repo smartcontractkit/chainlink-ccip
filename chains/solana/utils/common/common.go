@@ -35,6 +35,19 @@ func ToPadded64Bytes(input []byte) (result [64]byte) {
 	return result
 }
 
+func ToLeftPadded32Bytes(input []byte) (result [32]byte) {
+	if len(input) > 32 {
+		panic("input is too long")
+	}
+	start := 32 - len(input)
+	copy(result[start:], input[:])
+	return result
+}
+
+func NumToStr[T uint64 | uint32 | uint16 | uint8](num T) string {
+	return fmt.Sprintf("%d", num)
+}
+
 func To28BytesLE(value uint64) [28]byte {
 	le := make([]byte, 28)
 	binary.LittleEndian.PutUint64(le, value)

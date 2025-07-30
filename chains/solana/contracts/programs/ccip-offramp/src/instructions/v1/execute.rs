@@ -1,9 +1,12 @@
+use std::str::FromStr;
+
 use anchor_lang::prelude::*;
 use ccip_common::seed;
 use ccip_common::v1::{validate_and_parse_token_accounts, TokenAccounts, MIN_TOKEN_POOL_ACCOUNTS};
 use solana_program::instruction::Instruction;
 use solana_program::program::invoke_signed;
 
+use crate::context::ViewConfigOnly;
 use crate::context::{BufferExecutionReportContext, ExecuteReportContext, OcrPluginType};
 use crate::event::{ExecutionStateChanged, SkippedAlreadyExecutedMessage};
 use crate::instructions::interfaces::Execute;
@@ -11,7 +14,8 @@ use crate::messages::{
     Any2SVMRampMessage, ExecutionReportSingleChain, RampMessageHeader, SVMTokenAmount,
 };
 use crate::state::{
-    CommitReport, ExecutionReportBuffer, MessageExecutionState, OnRampAddress, SourceChain,
+    CommitReport, DeriveAccountsExecuteParams, DeriveAccountsResponse, ExecutionReportBuffer,
+    MessageExecutionState, OnRampAddress, SourceChain,
 };
 use crate::CcipOfframpError;
 
@@ -22,6 +26,7 @@ use super::ocr3base::{ocr3_transmit, ReportContext, Signatures};
 use super::ocr3impl::Ocr3ReportForExecutionReportSingleChain;
 use super::pools::{get_balance, interact_with_pool, CCIP_POOL_V1_RET_BYTES};
 use super::rmn::verify_uncursed_cpi;
+mod derive;
 
 pub struct Impl;
 impl Execute for Impl {
@@ -110,12 +115,16 @@ impl Execute for Impl {
     fn buffer_execution_report(
         &self,
         ctx: Context<BufferExecutionReportContext>,
-        _buffer_id: Vec<u8>,
+        buffer_id: Vec<u8>,
         report_length: u32,
         chunk: Vec<u8>,
         chunk_index: u8,
         num_chunks: u8,
     ) -> Result<()> {
+        require!(
+            buffer_id.len() <= 32 && !buffer_id.is_empty(),
+            CcipOfframpError::ExecutionReportBufferInvalidIdSize
+        );
         ctx.accounts.execution_report_buffer.add_chunk(
             report_length,
             &chunk,
@@ -123,12 +132,47 @@ impl Execute for Impl {
             num_chunks,
         )
     }
+
+    fn derive_accounts_execute<'info>(
+        &self,
+        ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
+        params: DeriveAccountsExecuteParams,
+        stage: String,
+    ) -> Result<DeriveAccountsResponse> {
+        let stage = derive::DeriveAccountsExecuteStage::from_str(stage.as_str())?;
+
+        match stage {
+            derive::DeriveAccountsExecuteStage::Start => {
+                derive::derive_execute_accounts_start(params.source_chain_selector)
+            }
+            derive::DeriveAccountsExecuteStage::FinishMainAccountList => {
+                derive::derive_execute_accounts_build_main_account_list(ctx, &params)
+            }
+            derive::DeriveAccountsExecuteStage::RetrieveTokenLUTs => {
+                derive::derive_execute_accounts_retrieve_luts(ctx)
+            }
+            derive::DeriveAccountsExecuteStage::RetrievePoolPrograms => {
+                derive::derive_execute_accounts_retrieve_pool_programs(ctx)
+            }
+            derive::DeriveAccountsExecuteStage::TokenTransferStaticAccounts { token, page } => {
+                derive::derive_execute_accounts_additional_tokens_static(ctx, &params, page, token)
+            }
+            derive::DeriveAccountsExecuteStage::NestedTokenDerive {
+                token,
+                token_substage,
+            } => derive::derive_execute_accounts_additional_token_nested(
+                ctx,
+                &params,
+                &token_substage,
+                token,
+            ),
+        }
+    }
 }
 
 /////////////
 // Helpers //
 /////////////
-
 fn ocr3_transmit_report<'info>(
     ctx: &Context<'_, '_, 'info, 'info, ExecuteReportContext<'info>>,
     execution_report: &ExecutionReportSingleChain,
@@ -217,7 +261,7 @@ fn internal_execute<'info>(
         verify_merkle_root(
             &execution_report,
             commit_report.merkle_root,
-            None.into_iter(),
+            None,
             &source_chain.config.on_ramp,
         )?
     };
@@ -432,7 +476,7 @@ fn internal_execute<'info>(
 pub struct ExecuteReportContextRemainingAccountsLayout<'a> {
     pub messaging_accounts: Option<ExecuteContextRemainingMessagingAccounts<'a>>,
     pub token_accounts_per_token: Vec<ExecuteContextRemainingTokenAccounts<'a>>,
-    pub buffering_account: Option<ExecuteContextRemainingBufferingAccount<'a>>,
+    pub _buffering_account: Option<ExecuteContextRemainingBufferingAccount<'a>>,
 }
 
 pub struct ExecuteContextRemainingMessagingAccounts<'a> {
@@ -447,7 +491,7 @@ pub struct ExecuteContextRemainingTokenAccounts<'a> {
 }
 
 pub struct ExecuteContextRemainingBufferingAccount<'a> {
-    pub execution_buffer_account: &'a AccountInfo<'a>,
+    pub _execution_buffer_account: &'a AccountInfo<'a>,
 }
 
 impl<'a> ExecuteReportContextRemainingAccountsLayout<'a> {
@@ -455,18 +499,15 @@ impl<'a> ExecuteReportContextRemainingAccountsLayout<'a> {
         self.messaging_accounts.is_some()
     }
 
-    pub fn receiver_and_message_account_keys(&self) -> impl Iterator<Item = Pubkey> {
-        let keys: Vec<Pubkey> = self
-            .messaging_accounts
+    pub fn receiver_and_message_account_keys(&self) -> Vec<Pubkey> {
+        self.messaging_accounts
             .iter()
             .flat_map(|accs| {
                 Some(accs.logic_receiver.key())
                     .into_iter()
                     .chain(accs.remaining_messaging_accounts.iter().map(|a| a.key()))
             })
-            .collect();
-
-        keys.into_iter()
+            .collect()
     }
 
     pub fn get_token_accounts_for<'b>(
@@ -509,7 +550,7 @@ impl<'a> ExecuteReportContextRemainingAccountsLayout<'a> {
             (
                 &remaining_accounts[0..(remaining_accounts.len() - 1)],
                 Some(ExecuteContextRemainingBufferingAccount {
-                    execution_buffer_account: remaining_accounts
+                    _execution_buffer_account: remaining_accounts
                         .last()
                         .ok_or(CcipOfframpError::ExecutionReportUnavailable)?,
                 }),
@@ -603,7 +644,7 @@ impl<'a> ExecuteReportContextRemainingAccountsLayout<'a> {
         Ok(Self {
             messaging_accounts,
             token_accounts_per_token,
-            buffering_account,
+            _buffering_account: buffering_account,
         })
     }
 }
@@ -613,7 +654,7 @@ pub fn verify_merkle_root(
     expected_root: [u8; 32],
     // logic receiver followed by all other message account keys, when they were
     // provided (i.e. when the message isn't a token transfer exclusively)
-    recv_and_msg_account_keys: impl Iterator<Item = Pubkey>,
+    recv_and_msg_account_keys: impl IntoIterator<Item = Pubkey>,
     on_ramp_address: &OnRampAddress,
 ) -> Result<[u8; 32]> {
     let hashed_leaf = hash(
@@ -674,7 +715,7 @@ pub fn validate_execution_report<'info>(
 
 fn hash(
     msg: &Any2SVMRampMessage,
-    recv_and_msg_account_keys: impl Iterator<Item = Pubkey>,
+    recv_and_msg_account_keys: impl IntoIterator<Item = Pubkey>,
     on_ramp_address: &OnRampAddress,
 ) -> [u8; 32] {
     use anchor_lang::solana_program::keccak;
@@ -691,6 +732,7 @@ fn hash(
     let header_nonce = msg.header.nonce.to_be_bytes();
 
     let remaining_account_bytes: Vec<u8> = recv_and_msg_account_keys
+        .into_iter()
         .flat_map(|k| k.try_to_vec().unwrap())
         .collect();
 

@@ -41,7 +41,7 @@ lint-go-fix:
 
 .PHONY: anchor-go-gen
 anchor-go-gen:
-	cd ./contracts && rm -rf ./target && anchor build && cd .. && ./scripts/anchor-go-gen.sh
+	cd ./contracts && find ./target -mindepth 1 ! -path './target/vendor*' -exec rm -rf {} + && anchor build && cd .. && ./scripts/anchor-go-gen.sh
 
 .PHONY: format
 format:
@@ -57,7 +57,7 @@ ccip-router-contracts-go-tests:
 
 .PHONY: test-token-pool-contracts-go-tests
 test-token-pool-contracts-go-tests:
-	go test -run TestBaseTokenPoolHappyPath -v -failfast ./... -json -covermode=atomic -coverpkg=./... -coverprofile=integration_coverage.txt 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci=true -singlepackage=true -hidepassingtests=false -hidepassinglogs=false
+	go test -run TestBaseTokenPoolHappyPath -run TestTokenPool -v -failfast ./... -json -covermode=atomic -coverpkg=./... -coverprofile=integration_coverage.txt 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci=true -singlepackage=true -hidepassingtests=false -hidepassinglogs=false
 
 .PHONY: build-contracts
 build-contracts:

@@ -6,13 +6,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/libocr/commontypes"
 
+	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -134,7 +135,7 @@ func TestSelectTokensForUpdate(t *testing.T) {
 
 // Test Plugin Outcome method returns the correct token prices
 func TestOutcome(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	lggr := logger.Test(t)
 	p := &processor{
 		lggr:            lggr,
@@ -166,7 +167,7 @@ func TestOutcome(t *testing.T) {
 
 // TestOutcome_EmptyObservations tests the Outcome method when observations only contain minimal data.
 func TestOutcome_EmptyObservations(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	lggr := logger.Test(t)
 	numOracles := 5 // Need enough oracles for consensus
 

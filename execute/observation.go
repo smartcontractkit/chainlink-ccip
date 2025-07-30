@@ -12,11 +12,12 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 // Observation collects data across two phases which happen in separate rounds.
@@ -115,11 +116,15 @@ func (p *Plugin) Observation(
 	}
 
 	p.observer.TrackObservation(observation, state)
+	numCommitReports := 0
+	for _, reports := range observation.CommitReports {
+		numCommitReports += len(reports)
+	}
 	lggr.Infow("execute plugin got observation",
 		"observationWithoutMsgDataAndDiscoveryObs", observation.ToLogFormat(),
 		"duration", time.Since(tStart),
 		"state", state,
-		"numCommitReports", len(observation.CommitReports),
+		"numCommitReports", numCommitReports,
 		"numMessages", observation.Messages.Count())
 
 	return p.ocrTypeCodec.EncodeObservation(observation)

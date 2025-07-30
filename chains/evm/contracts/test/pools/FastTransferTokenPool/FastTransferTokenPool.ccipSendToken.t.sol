@@ -109,6 +109,8 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
 
     Client.EVM2AnyMessage memory message = _createMessage(params, extraArgs);
     uint256 expectedFastTransferFee = params.amount * params.fastFeeBpsExpected / 10_000;
+    uint256 expectedFillerFee = expectedFastTransferFee; // All fee goes to filler in basic tests
+    uint256 expectedPoolFee = 0; // No pool fee in basic tests
     bytes32 fillId =
       s_pool.computeFillId(params.mockMessageId, params.amount - expectedFastTransferFee, 18, params.receiver);
 
@@ -122,7 +124,8 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
       settlementId: params.mockMessageId,
       sourceAmountNetFee: params.amount - expectedFastTransferFee,
       sourceDecimals: SOURCE_DECIMALS,
-      fastTransferFee: expectedFastTransferFee,
+      fillerFee: expectedFillerFee,
+      poolFee: expectedPoolFee,
       receiver: params.receiver
     });
 
@@ -188,17 +191,16 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
       s_pool.getCcipSendTokenFee(DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, abi.encode(RECEIVER), feeToken, "");
 
     uint256 expectedFastTransferFee = SOURCE_AMOUNT * FAST_FEE_FILLER_BPS / 10_000;
-    uint256 expectedAmountNetFee = SOURCE_AMOUNT - expectedFastTransferFee;
-    bytes32 expectedFillId = s_pool.computeFillId(fakeMessageId, expectedAmountNetFee, 18, abi.encode(RECEIVER));
 
     vm.expectEmit();
     emit IFastTransferPool.FastTransferRequested({
       destinationChainSelector: DEST_CHAIN_SELECTOR,
-      fillId: expectedFillId,
+      fillId: s_pool.computeFillId(fakeMessageId, SOURCE_AMOUNT - expectedFastTransferFee, 18, abi.encode(RECEIVER)), //expected fill id
       settlementId: fakeMessageId,
-      sourceAmountNetFee: expectedAmountNetFee,
+      sourceAmountNetFee: SOURCE_AMOUNT - expectedFastTransferFee, // expected amount net fee
       sourceDecimals: SOURCE_DECIMALS,
-      fastTransferFee: expectedFastTransferFee,
+      fillerFee: expectedFastTransferFee,
+      poolFee: 0,
       receiver: abi.encode(RECEIVER)
     });
 
@@ -238,7 +240,8 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
       settlementId: params.mockMessageId,
       sourceAmountNetFee: amountNetTotalFee,
       sourceDecimals: SOURCE_DECIMALS,
-      fastTransferFee: totalFastTransferFee,
+      fillerFee: fillerFeeAmount,
+      poolFee: poolFeeAmount,
       receiver: params.receiver
     });
 

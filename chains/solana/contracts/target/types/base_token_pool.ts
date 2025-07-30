@@ -161,6 +161,10 @@ export type BaseTokenPool = {
           {
             "name": "localToken",
             "type": "publicKey"
+          },
+          {
+            "name": "msgTotalNonce",
+            "type": "u64"
           }
         ]
       }
@@ -252,6 +256,64 @@ export type BaseTokenPool = {
       }
     },
     {
+      "name": "DeriveAccountsResponse",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "askAgainWith",
+            "type": {
+              "vec": {
+                "defined": "CcipAccountMeta"
+              }
+            }
+          },
+          {
+            "name": "accountsToSave",
+            "type": {
+              "vec": {
+                "defined": "CcipAccountMeta"
+              }
+            }
+          },
+          {
+            "name": "lookUpTablesToSave",
+            "type": {
+              "vec": "publicKey"
+            }
+          },
+          {
+            "name": "currentStage",
+            "type": "string"
+          },
+          {
+            "name": "nextStage",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CcipAccountMeta",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pubkey",
+            "type": "publicKey"
+          },
+          {
+            "name": "isSigner",
+            "type": "bool"
+          },
+          {
+            "name": "isWritable",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
       "name": "RateLimitTokenBucket",
       "type": {
         "kind": "struct",
@@ -301,6 +363,16 @@ export type BaseTokenPool = {
         {
           "name": "selfServedAllowed",
           "type": "bool",
+          "index": false
+        },
+        {
+          "name": "router",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "rmnRemote",
+          "type": "publicKey",
           "index": false
         }
       ]
@@ -540,6 +612,46 @@ export type BaseTokenPool = {
       ]
     },
     {
+      "name": "RmnRemoteUpdated",
+      "fields": [
+        {
+          "name": "oldRmnRemote",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "newRmnRemote",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "RateLimitAdminSet",
+      "fields": [
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "oldRateLimitAdmin",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "newRateLimitAdmin",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "OwnershipTransferRequested",
       "fields": [
         {
@@ -554,6 +666,26 @@ export type BaseTokenPool = {
         },
         {
           "name": "mint",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "TokenPoolInitialized",
+      "fields": [
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenProgram",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "owner",
           "type": "publicKey",
           "index": false
         }
@@ -695,38 +827,43 @@ export type BaseTokenPool = {
     },
     {
       "code": 6014,
+      "name": "InvalidDerivationStage",
+      "msg": "Unexpected account derivation stage"
+    },
+    {
+      "code": 6015,
       "name": "RLBucketOverfilled",
       "msg": "RateLimit: bucket overfilled"
     },
     {
-      "code": 6015,
+      "code": 6016,
       "name": "RLMaxCapacityExceeded",
       "msg": "RateLimit: max capacity exceeded"
     },
     {
-      "code": 6016,
+      "code": 6017,
       "name": "RLRateLimitReached",
       "msg": "RateLimit: rate limit reached"
     },
     {
-      "code": 6017,
+      "code": 6018,
       "name": "RLInvalidRateLimitRate",
       "msg": "RateLimit: invalid rate limit rate"
     },
     {
-      "code": 6018,
+      "code": 6019,
       "name": "RLDisabledNonZeroRateLimit",
       "msg": "RateLimit: disabled non-zero rate limit"
     },
     {
-      "code": 6019,
+      "code": 6020,
       "name": "LiquidityNotAccepted",
       "msg": "Liquidity not accepted"
     },
     {
-      "code": 6020,
+      "code": 6021,
       "name": "TransferZeroTokensNotAllowed",
-      "msg": "Transfering zero tokens is not allowed"
+      "msg": "Transferring zero tokens is not allowed"
     }
   ]
 };
@@ -894,6 +1031,10 @@ export const IDL: BaseTokenPool = {
           {
             "name": "localToken",
             "type": "publicKey"
+          },
+          {
+            "name": "msgTotalNonce",
+            "type": "u64"
           }
         ]
       }
@@ -985,6 +1126,64 @@ export const IDL: BaseTokenPool = {
       }
     },
     {
+      "name": "DeriveAccountsResponse",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "askAgainWith",
+            "type": {
+              "vec": {
+                "defined": "CcipAccountMeta"
+              }
+            }
+          },
+          {
+            "name": "accountsToSave",
+            "type": {
+              "vec": {
+                "defined": "CcipAccountMeta"
+              }
+            }
+          },
+          {
+            "name": "lookUpTablesToSave",
+            "type": {
+              "vec": "publicKey"
+            }
+          },
+          {
+            "name": "currentStage",
+            "type": "string"
+          },
+          {
+            "name": "nextStage",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CcipAccountMeta",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pubkey",
+            "type": "publicKey"
+          },
+          {
+            "name": "isSigner",
+            "type": "bool"
+          },
+          {
+            "name": "isWritable",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
       "name": "RateLimitTokenBucket",
       "type": {
         "kind": "struct",
@@ -1034,6 +1233,16 @@ export const IDL: BaseTokenPool = {
         {
           "name": "selfServedAllowed",
           "type": "bool",
+          "index": false
+        },
+        {
+          "name": "router",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "rmnRemote",
+          "type": "publicKey",
           "index": false
         }
       ]
@@ -1273,6 +1482,46 @@ export const IDL: BaseTokenPool = {
       ]
     },
     {
+      "name": "RmnRemoteUpdated",
+      "fields": [
+        {
+          "name": "oldRmnRemote",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "newRmnRemote",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "RateLimitAdminSet",
+      "fields": [
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "oldRateLimitAdmin",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "newRateLimitAdmin",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "OwnershipTransferRequested",
       "fields": [
         {
@@ -1287,6 +1536,26 @@ export const IDL: BaseTokenPool = {
         },
         {
           "name": "mint",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "TokenPoolInitialized",
+      "fields": [
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenProgram",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "owner",
           "type": "publicKey",
           "index": false
         }
@@ -1428,38 +1697,43 @@ export const IDL: BaseTokenPool = {
     },
     {
       "code": 6014,
+      "name": "InvalidDerivationStage",
+      "msg": "Unexpected account derivation stage"
+    },
+    {
+      "code": 6015,
       "name": "RLBucketOverfilled",
       "msg": "RateLimit: bucket overfilled"
     },
     {
-      "code": 6015,
+      "code": 6016,
       "name": "RLMaxCapacityExceeded",
       "msg": "RateLimit: max capacity exceeded"
     },
     {
-      "code": 6016,
+      "code": 6017,
       "name": "RLRateLimitReached",
       "msg": "RateLimit: rate limit reached"
     },
     {
-      "code": 6017,
+      "code": 6018,
       "name": "RLInvalidRateLimitRate",
       "msg": "RateLimit: invalid rate limit rate"
     },
     {
-      "code": 6018,
+      "code": 6019,
       "name": "RLDisabledNonZeroRateLimit",
       "msg": "RateLimit: disabled non-zero rate limit"
     },
     {
-      "code": 6019,
+      "code": 6020,
       "name": "LiquidityNotAccepted",
       "msg": "Liquidity not accepted"
     },
     {
-      "code": 6020,
+      "code": 6021,
       "name": "TransferZeroTokensNotAllowed",
-      "msg": "Transfering zero tokens is not allowed"
+      "msg": "Transferring zero tokens is not allowed"
     }
   ]
 };

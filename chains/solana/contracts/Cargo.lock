@@ -723,6 +723,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "cctp-token-pool"
+version = "0.1.0-dev"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "base-token-pool",
+ "build_commit",
+ "ccip_common",
+ "solana-program",
+]
+
+[[package]]
 name = "cfg-if"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

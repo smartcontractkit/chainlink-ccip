@@ -7,13 +7,13 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
-	sel "github.com/smartcontractkit/chain-selectors"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs"
 )
 
 const (
@@ -27,7 +27,7 @@ var (
 			Name: "ccip_reader_chain_fee_components",
 			Help: "This metric tracks the chain fee components for a given chain",
 		},
-		[]string{"chainID", "feeType"},
+		[]string{"chainFamily", "chainID", "feeType"},
 	)
 	PromQueryHistogram = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
@@ -47,14 +47,14 @@ var (
 				float64(5 * time.Second),
 			},
 		},
-		[]string{"chainID", "query"},
+		[]string{"chainFamily", "chainID", "query"},
 	)
 	PromDataSetSizeGauge = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "ccip_reader_data_set_size",
 			Help: "This metric tracks the size of the data returned by the CCIP reader queries",
 		},
-		[]string{"chainID", "query"},
+		[]string{"chainFamily", "chainID", "query"},
 	)
 )
 
@@ -68,6 +68,7 @@ type observedCCIPReader struct {
 	CCIPReader
 	lggr              logger.Logger
 	destChain         string
+	destChainFamily   string
 	destChainSelector cciptypes.ChainSelector
 
 	queryHistogram   *prometheus.HistogramVec
@@ -80,18 +81,14 @@ func NewObservedCCIPReader(
 	lggr logger.Logger,
 	destChainSelector cciptypes.ChainSelector,
 ) CCIPReader {
-	chainID, err := sel.GetChainIDFromSelector(uint64(destChainSelector))
-	if err != nil {
-		// This should never happen
-		lggr.Errorw("failed to get chain ID from selector", "selector", destChainSelector, "err", err)
-		chainID = "unknown"
-	}
+	chainFamily, chainID, _ := libs.GetChainInfoFromSelector(destChainSelector)
 
 	return &observedCCIPReader{
 		CCIPReader: reader,
 		lggr:       lggr,
 
 		destChain:         chainID,
+		destChainFamily:   chainFamily,
 		destChainSelector: destChainSelector,
 
 		queryHistogram:   PromQueryHistogram,
@@ -316,26 +313,27 @@ func (o *observedCCIPReader) trackChainFeeComponents(
 	components map[cciptypes.ChainSelector]types.ChainFeeComponents,
 ) {
 	for k, v := range components {
-		selector, err := sel.GetChainIDFromSelector(uint64(k))
-		if err != nil {
-			o.lggr.Error("failed to get chainID from selector", "err", err)
+		chainFamily, chainID, ok := libs.GetChainInfoFromSelector(k)
+		if !ok {
+			o.lggr.Error("failed to get chainID/chainFamily from selector", "selector", k)
 			continue
 		}
 
 		if v.ExecutionFee != nil {
 			o.chainFeesGauge.
-				WithLabelValues(selector, execCostLabel).
+				WithLabelValues(chainFamily, chainID, execCostLabel).
 				Set(float64(v.ExecutionFee.Int64()))
 		}
 		if v.DataAvailabilityFee != nil {
 			o.chainFeesGauge.
-				WithLabelValues(selector, dataCostLabel).
+				WithLabelValues(chainFamily, chainID, dataCostLabel).
 				Set(float64(v.DataAvailabilityFee.Int64()))
 		}
 
 		o.lggr.Debugw(
 			"observed chain fee components",
-			"destChainID", selector,
+			"destChainID", chainID,
+			"destChainFamily", chainFamily,
 			"executionFee", v.ExecutionFee,
 			"dataAvailabilityFee", v.DataAvailabilityFee,
 		)
@@ -356,12 +354,12 @@ func withObservedQueryAndResult[T any](
 	duration := time.Since(queryStarted)
 
 	o.queryHistogram.
-		WithLabelValues(o.destChain, queryName).
+		WithLabelValues(o.destChainFamily, o.destChain, queryName).
 		Observe(float64(duration))
 
 	if err == nil && dataSizeFn != nil {
 		o.dataSetSizeGauge.
-			WithLabelValues(o.destChain, queryName).
+			WithLabelValues(o.destChainFamily, o.destChain, queryName).
 			Set(dataSizeFn(results))
 	}
 

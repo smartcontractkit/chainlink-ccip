@@ -28,8 +28,8 @@ import (
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata/observer"
@@ -37,13 +37,12 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	codec_mocks "github.com/smartcontractkit/chainlink-ccip/mocks/chainlink_common/ccipocr3"
 	plugincommon_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/plugincommon"
 	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
-	codec_mocks "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	reader2 "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -226,7 +225,7 @@ func Test_checkAlreadyExecuted(t *testing.T) {
 				lggr:       logger.Test(t),
 				ccipReader: ccipReaderMock,
 			}
-			err := p.checkAlreadyExecuted(tests.Context(t), p.lggr, chainReports)
+			err := p.checkAlreadyExecuted(t.Context(), p.lggr, chainReports)
 			if tc.shouldErr {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), "already executed")
@@ -947,14 +946,14 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 			mockReader.EXPECT().ExecutedMessages(mock.Anything, mock.Anything, primitives.Unconfirmed).Return(unfinalized, nil)
 
 			got, gotFinalized, gotUnfinalized, err := getPendingReportsForExecution(
-				tests.Context(t),
+				t.Context(),
 				mockReader,
 				mockCache,
 				tt.canExec,
 				tt.fetchFrom,
 				tt.cursedSourceChains,
 				int(offchainConfigForTest.MaxCommitReportsToFetch), // limit int
-				currentTestLogger, // lggr logger.Logger
+				currentTestLogger,
 			)
 			if !tt.wantErr(t, err, "getPendingReportsForExecution(...)") {
 				return
@@ -982,13 +981,13 @@ func TestPlugin_Close(t *testing.T) {
 
 func TestPlugin_Query(t *testing.T) {
 	p := &Plugin{}
-	q, err := p.Query(tests.Context(t), ocr3types.OutcomeContext{})
+	q, err := p.Query(t.Context(), ocr3types.OutcomeContext{})
 	require.NoError(t, err)
 	require.Equal(t, types.Query{}, q)
 }
 
 func TestPlugin_ObservationQuorum(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	p := &Plugin{
 		reportingCfg: ocr3types.ReportingPluginConfig{F: 1},
 	}
@@ -1002,7 +1001,7 @@ func TestPlugin_ObservationQuorum(t *testing.T) {
 }
 
 func TestPlugin_ValidateObservation_NonDecodable(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	p := &Plugin{ocrTypeCodec: ocrTypeCodec}
 	err := p.ValidateObservation(ctx, ocr3types.OutcomeContext{}, types.Query{}, types.AttributedObservation{
 		Observation: []byte("not a valid observation"),
@@ -1012,7 +1011,7 @@ func TestPlugin_ValidateObservation_NonDecodable(t *testing.T) {
 }
 
 func TestPlugin_ValidateObservation_SupportedChainsError(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	p := &Plugin{
 		ocrTypeCodec: ocrTypeCodec,
 	}
@@ -1024,7 +1023,7 @@ func TestPlugin_ValidateObservation_SupportedChainsError(t *testing.T) {
 }
 
 func TestPlugin_ValidateObservation_IneligibleMessageObserver(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	lggr := logger.Test(t)
 
 	mockHomeChain := reader_mock.NewMockHomeChain(t)
@@ -1066,7 +1065,7 @@ func TestPlugin_ValidateObservation_IneligibleMessageObserver(t *testing.T) {
 }
 
 func TestPlugin_ValidateObservation_IneligibleCommitReportsObserver(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	lggr := logger.Test(t)
 
 	mockHomeChain := reader_mock.NewMockHomeChain(t)
@@ -1085,7 +1084,7 @@ func TestPlugin_ValidateObservation_IneligibleCommitReportsObserver(t *testing.T
 	commitReports := map[cciptypes.ChainSelector][]exectypes.CommitData{
 		1: {
 			{
-				MerkleRoot:          cciptypes.Bytes32{},
+				MerkleRoot:          cciptypes.Bytes32{123},
 				SequenceNumberRange: cciptypes.NewSeqNumRange(1, 2),
 				SourceChain:         1,
 			},
@@ -1102,11 +1101,11 @@ func TestPlugin_ValidateObservation_IneligibleCommitReportsObserver(t *testing.T
 	require.Error(t, err)
 	assert.Contains(t,
 		err.Error(),
-		"validate commit reports reading eligibility: observer not allowed to read from chain 1")
+		"destination chain not supported but observed commit report")
 }
 
 func TestPlugin_ValidateObservation_ValidateObservedSeqNum_Error(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	lggr := logger.Test(t)
 
 	mockHomeChain := reader_mock.NewMockHomeChain(t)
@@ -1142,7 +1141,7 @@ func TestPlugin_ValidateObservation_ValidateObservedSeqNum_Error(t *testing.T) {
 }
 
 func TestPlugin_ValidateObservation_CallsDiscoveryValidateObservation(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	lggr := logger.Test(t)
 
 	mockHomeChain := reader_mock.NewMockHomeChain(t)
@@ -1183,7 +1182,7 @@ func TestPlugin_Observation_BadPreviousOutcome(t *testing.T) {
 		lggr:         logger.Test(t),
 		ocrTypeCodec: ocrTypeCodec,
 	}
-	_, err := p.Observation(tests.Context(t), ocr3types.OutcomeContext{
+	_, err := p.Observation(t.Context(), ocr3types.OutcomeContext{
 		PreviousOutcome: []byte("not a valid observation"),
 	}, nil)
 	require.Error(t, err)
@@ -1230,7 +1229,7 @@ func TestPlugin_Observation_EligibilityCheckFailure(t *testing.T) {
 	}
 
 	// Run the test - this should fail with the eligibility check error
-	_, err := p.Observation(tests.Context(t), ocr3types.OutcomeContext{}, nil)
+	_, err := p.Observation(t.Context(), ocr3types.OutcomeContext{}, nil)
 	require.Error(t, err)
 	assert.Contains(t,
 		err.Error(),
@@ -1260,7 +1259,7 @@ func (c *noopCommitReportCache) DeduplicateReports(
 }
 
 func TestPlugin_Outcome_DestFChainNotAvailable(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	fChainMap := map[cciptypes.ChainSelector]int{
 		1: 1,
 		2: 2,
@@ -1284,7 +1283,7 @@ func TestPlugin_Outcome_DestFChainNotAvailable(t *testing.T) {
 }
 
 func TestPlugin_Outcome_BadObservationEncoding(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	p := &Plugin{
 		lggr:         logger.Test(t),
 		ocrTypeCodec: ocrTypeCodec,
@@ -1301,7 +1300,7 @@ func TestPlugin_Outcome_BadObservationEncoding(t *testing.T) {
 }
 
 func TestPlugin_Outcome_BelowF(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	fChainMap := map[cciptypes.ChainSelector]int{
 		0: 1,
 		2: 2,
@@ -1328,7 +1327,7 @@ func TestPlugin_Outcome_BelowF(t *testing.T) {
 }
 
 func TestPlugin_Outcome_CommitReportsMergeMissingValidator_Skips(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	fChainMap := map[cciptypes.ChainSelector]int{
 		10: 20,
 		0:  3,
@@ -1358,7 +1357,7 @@ func TestPlugin_Outcome_CommitReportsMergeMissingValidator_Skips(t *testing.T) {
 }
 
 func TestPlugin_Outcome_MessagesMergeError(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	fChainMap := map[cciptypes.ChainSelector]int{
 		0:  3,
 		10: 20,
@@ -1393,7 +1392,7 @@ func TestPlugin_Outcome_MessagesMergeError(t *testing.T) {
 }
 
 func TestPlugin_Reports_MultipleReports(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	lggr := logger.Test(t)
 
 	mockReportCodec := codec_mocks.NewMockExecutePluginCodec(t)
@@ -1475,7 +1474,7 @@ func TestPlugin_Reports_MultipleReports(t *testing.T) {
 }
 
 func TestPlugin_Reports_UnableToParse(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	p := &Plugin{
 		lggr:         logger.Test(t),
 		ocrTypeCodec: ocrTypeCodec,
@@ -1486,7 +1485,7 @@ func TestPlugin_Reports_UnableToParse(t *testing.T) {
 }
 
 func TestPlugin_Reports_UnableToEncode(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	codec := codec_mocks.NewMockExecutePluginCodec(t)
 	codec.On("Encode", mock.Anything, mock.Anything).
 		Return(nil, fmt.Errorf("test error"))
@@ -1535,7 +1534,7 @@ func TestPlugin_ShouldAcceptAttestedReport_DoesNotDecode(t *testing.T) {
 		homeChain:       homeChain,
 	}
 
-	_, err := p.ShouldAcceptAttestedReport(tests.Context(t), 0, ocr3types.ReportWithInfo[[]byte]{
+	_, err := p.ShouldAcceptAttestedReport(t.Context(), 0, ocr3types.ReportWithInfo[[]byte]{
 		Report: []byte("will not decode"), // faked out, see mock above
 	})
 	require.Error(t, err)
@@ -1561,7 +1560,7 @@ func TestPlugin_ShouldAcceptAttestedReport_NoReports(t *testing.T) {
 		oracleIDToP2pID: map[commontypes.OracleID]libocrtypes.PeerID{0: {1}},
 		homeChain:       homeChain,
 	}
-	result, err := p.ShouldAcceptAttestedReport(tests.Context(t), 0, ocr3types.ReportWithInfo[[]byte]{
+	result, err := p.ShouldAcceptAttestedReport(t.Context(), 0, ocr3types.ReportWithInfo[[]byte]{
 		Report: []byte("empty report"), // faked out, see mock above
 	})
 	require.NoError(t, err)
@@ -1812,7 +1811,7 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 				},
 			}
 
-			result, err := p.ShouldAcceptAttestedReport(tests.Context(t), 0, ocr3types.ReportWithInfo[[]byte]{
+			result, err := p.ShouldAcceptAttestedReport(t.Context(), 0, ocr3types.ReportWithInfo[[]byte]{
 				Report: []byte("report"), // faked out, see mock above
 			})
 
@@ -1841,7 +1840,7 @@ func TestPlugin_ShouldTransmitAcceptReport_NilReport(t *testing.T) {
 		lggr: lggr,
 	}
 
-	shouldTransmit, err := p.ShouldTransmitAcceptedReport(tests.Context(t), 1, ocr3types.ReportWithInfo[[]byte]{})
+	shouldTransmit, err := p.ShouldTransmitAcceptedReport(t.Context(), 1, ocr3types.ReportWithInfo[[]byte]{})
 	require.NoError(t, err)
 	require.False(t, shouldTransmit)
 }
@@ -1857,7 +1856,7 @@ func TestPlugin_ShouldTransmitAcceptedReport_DecodeFailure(t *testing.T) {
 		reportCodec: codec,
 	}
 
-	_, err := p.ShouldTransmitAcceptedReport(tests.Context(t), 1, ocr3types.ReportWithInfo[[]byte]{
+	_, err := p.ShouldTransmitAcceptedReport(t.Context(), 1, ocr3types.ReportWithInfo[[]byte]{
 		Report: []byte("will not decode"), // faked out, see mock above
 	})
 	require.Error(t, err)
@@ -1887,7 +1886,7 @@ func TestPlugin_ShouldTransmitAcceptReport_SupportsDestChainCheckFails(t *testin
 		reportCodec: codec,
 	}
 
-	_, err := p.ShouldTransmitAcceptedReport(tests.Context(t), 1, ocr3types.ReportWithInfo[[]byte]{
+	_, err := p.ShouldTransmitAcceptedReport(t.Context(), 1, ocr3types.ReportWithInfo[[]byte]{
 		Report: []byte("report"), // faked out, see mock above
 	})
 	require.Error(t, err)
@@ -1917,7 +1916,7 @@ func TestPlugin_ShouldTransmitAcceptReport_DontSupportDestChain(t *testing.T) {
 		reportCodec: codec,
 	}
 
-	shouldTransmit, err := p.ShouldTransmitAcceptedReport(tests.Context(t), 1, ocr3types.ReportWithInfo[[]byte]{
+	shouldTransmit, err := p.ShouldTransmitAcceptedReport(t.Context(), 1, ocr3types.ReportWithInfo[[]byte]{
 		Report: []byte("report"), // faked out, see mock above
 	})
 	require.NoError(t, err)
@@ -1970,7 +1969,7 @@ func TestPlugin_ShouldTransmitAcceptedReport_MismatchingConfigDigests(t *testing
 		ccipReader:  ccipReaderMock,
 	}
 
-	shouldTransmit, err := p.ShouldTransmitAcceptedReport(tests.Context(t), 1, ocr3types.ReportWithInfo[[]byte]{
+	shouldTransmit, err := p.ShouldTransmitAcceptedReport(t.Context(), 1, ocr3types.ReportWithInfo[[]byte]{
 		Report: []byte("report"), // faked out, see mock above
 	})
 	require.NoError(t, err)
@@ -2035,7 +2034,7 @@ func TestPlugin_ShouldTransmitAcceptReport_Success(t *testing.T) {
 		ccipReader:  ccipReaderMock,
 	}
 
-	shouldTransmit, err := p.ShouldTransmitAcceptedReport(tests.Context(t), 1, ocr3types.ReportWithInfo[[]byte]{
+	shouldTransmit, err := p.ShouldTransmitAcceptedReport(t.Context(), 1, ocr3types.ReportWithInfo[[]byte]{
 		Report: []byte("report"), // faked out, see mock above
 	})
 	require.NoError(t, err)
@@ -2104,7 +2103,7 @@ func TestPlugin_ShouldTransmitAcceptReport_Failure_AlreadyExecuted(t *testing.T)
 		ccipReader:  ccipReaderMock,
 	}
 
-	shouldTransmit, err := p.ShouldTransmitAcceptedReport(tests.Context(t), 1, ocr3types.ReportWithInfo[[]byte]{
+	shouldTransmit, err := p.ShouldTransmitAcceptedReport(t.Context(), 1, ocr3types.ReportWithInfo[[]byte]{
 		Report: []byte("report"), // faked out, see mock above
 	})
 	require.NoError(t, err)
@@ -2189,7 +2188,7 @@ func TestPlugin_Outcome_RealworldObservation(t *testing.T) {
 
 	jsonCodec := ocrtypecodec.NewExecCodecJSON()
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	p := &Plugin{
 		lggr:         logger.Test(t),
 		ocrTypeCodec: jsonCodec,

@@ -14,6 +14,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/execute/metrics"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata/observer"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
@@ -21,7 +23,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -75,6 +76,7 @@ type PluginFactory struct {
 	homeChainReader  reader.HomeChain
 	estimateProvider cciptypes.EstimateProvider
 	tokenDataEncoder cciptypes.TokenDataEncoder
+	chainAccessors   map[cciptypes.ChainSelector]cciptypes.ChainAccessor
 	contractReaders  map[cciptypes.ChainSelector]types.ContractReader
 	chainWriters     map[cciptypes.ChainSelector]types.ContractWriter
 }
@@ -88,6 +90,7 @@ type PluginFactoryParams struct {
 	AddrCodec        cciptypes.AddressCodec
 	HomeChainReader  reader.HomeChain
 	TokenDataEncoder cciptypes.TokenDataEncoder
+	ChainAccessors   map[cciptypes.ChainSelector]cciptypes.ChainAccessor
 	EstimateProvider cciptypes.EstimateProvider
 	ContractReaders  map[cciptypes.ChainSelector]types.ContractReader
 	ContractWriters  map[cciptypes.ChainSelector]types.ContractWriter
@@ -106,6 +109,7 @@ func NewExecutePluginFactory(params PluginFactoryParams) *PluginFactory {
 		homeChainReader:  params.HomeChainReader,
 		estimateProvider: params.EstimateProvider,
 		tokenDataEncoder: params.TokenDataEncoder,
+		chainAccessors:   params.ChainAccessors,
 		contractReaders:  params.ContractReaders,
 		chainWriters:     params.ContractWriters,
 	}
@@ -136,12 +140,17 @@ func (p PluginFactory) NewReportingPlugin(
 	readers := make(map[cciptypes.ChainSelector]contractreader.ContractReaderFacade)
 	extended := make(map[cciptypes.ChainSelector]contractreader.Extended)
 	for chain, cr := range p.contractReaders {
+		chainFamily, err1 := sel.GetSelectorFamily(uint64(chain))
+		if err1 != nil {
+			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to get chain family from selector: %w", err1)
+		}
 		chainID, err1 := sel.GetChainIDFromSelector(uint64(chain))
 		if err1 != nil {
 			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to get chain id from selector: %w", err1)
 		}
 		reader := contractreader.NewExtendedContractReader(
-			contractreader.NewObserverReader(cr, lggr, chainID))
+			contractreader.NewObserverReader(cr, lggr, chainFamily, chainID),
+		)
 		readers[chain] = reader
 		extended[chain] = reader
 	}

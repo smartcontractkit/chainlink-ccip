@@ -9,8 +9,9 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_common"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_common"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/cctp_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/test_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 )
@@ -30,6 +31,8 @@ type TokenPool struct {
 	PoolLookupTable                                       solana.PublicKey
 	WritableIndexes                                       []uint8
 
+	GlobalConfig solana.PublicKey // Global Config PDA of the Token Pool
+
 	AdditionalAccounts solana.PublicKeySlice
 
 	// AssociatedTokenAddress Lookups
@@ -44,6 +47,9 @@ type TokenPool struct {
 	// CCIP CPI signers
 	RouterSigner  solana.PublicKey
 	OfframpSigner solana.PublicKey
+
+	// Token Extensions
+	WithTokenExtensions bool
 }
 
 func (tp TokenPool) ToTokenPoolEntries() []solana.PublicKey {
@@ -97,6 +103,10 @@ func NewTokenPool(tokenProgram solana.PublicKey, poolProgram solana.PublicKey, m
 	if err != nil {
 		return TokenPool{}, err
 	}
+	globalConfigPDA, err := TokenPoolGlobalConfigPDA(poolProgram)
+	if err != nil {
+		return TokenPool{}, err
+	}
 
 	p := TokenPool{
 		Program:               tokenProgram,
@@ -106,12 +116,14 @@ func NewTokenPool(tokenProgram solana.PublicKey, poolProgram solana.PublicKey, m
 		AdminRegistryPDA:      tokenAdminRegistryPDA,
 		PoolProgram:           poolProgram,
 		PoolLookupTable:       solana.PublicKey{},
-		WritableIndexes:       []uint8{3, 4, 7}, // see ToTokenPoolEntries for writable indexes
+		WritableIndexes:       []uint8{3, 4, 7}, // see ToTokenPoolEntries for writable indexes.
 		User:                  map[solana.PublicKey]solana.PublicKey{},
 		Chain:                 map[uint64]solana.PublicKey{},
 		Billing:               map[uint64]solana.PublicKey{},
 		RouterSigner:          routerSignerPDA,
 		OfframpSigner:         offrampSignerPDA,
+		WithTokenExtensions:   false, // default to false, can be set later if needed
+		GlobalConfig:          globalConfigPDA,
 	}
 	p.Chain[config.EvmChainSelector] = evmChainPDA
 	p.Chain[config.SvmChainSelector] = svmChainPDA
@@ -191,6 +203,11 @@ type EventRemotePoolsAppended struct {
 	PoolAddresses         []test_token_pool.RemoteAddress
 	PreviousPoolAddresses []test_token_pool.RemoteAddress
 	Mint                  solana.PublicKey
+}
+
+type EventRemoteChainCctpConfigEdited struct {
+	Discriminator [8]byte
+	Config        cctp_token_pool.CctpChain
 }
 
 type EventRateLimitConfigured struct {

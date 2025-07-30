@@ -10,15 +10,17 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal"
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 const (
-	chainID  = "2337"
-	selector = cciptypes.ChainSelector(12922642891491394802)
+	chainID  = "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG"
+	selector = cciptypes.ChainSelector(16423721717087811551)
 )
 
 func Test_TrackingTokenReadiness(t *testing.T) {
@@ -67,14 +69,14 @@ func Test_TrackingTokenReadiness(t *testing.T) {
 
 			readyTokens := testutil.ToFloat64(
 				reporter.outputDetailsCounter.WithLabelValues(
-					chainID, plugincommon.ObservationMethod, string(tc.state), "tokenReady",
+					"solana", chainID, plugincommon.ObservationMethod, string(tc.state), "tokenReady",
 				),
 			)
 			require.Equal(t, tc.expectedReadyTokens, int(readyTokens))
 
 			waitingTokens := testutil.ToFloat64(
 				reporter.outputDetailsCounter.WithLabelValues(
-					chainID, plugincommon.ObservationMethod, string(tc.state), "tokenWaiting",
+					"solana", chainID, plugincommon.ObservationMethod, string(tc.state), "tokenWaiting",
 				),
 			)
 			require.Equal(t, tc.expectedWaitingTokens, int(waitingTokens))
@@ -133,21 +135,21 @@ func Test_TrackingObservations(t *testing.T) {
 
 			nonces := testutil.ToFloat64(
 				reporter.outputDetailsCounter.WithLabelValues(
-					chainID, plugincommon.ObservationMethod, string(tc.state), "nonces",
+					"solana", chainID, plugincommon.ObservationMethod, string(tc.state), "nonces",
 				),
 			)
 			require.Equal(t, tc.expectedNonces, int(nonces))
 
 			commitReports := testutil.ToFloat64(
 				reporter.outputDetailsCounter.WithLabelValues(
-					chainID, plugincommon.ObservationMethod, string(tc.state), "commitReports",
+					"solana", chainID, plugincommon.ObservationMethod, string(tc.state), "commitReports",
 				),
 			)
 			require.Equal(t, tc.expectedCommitReports, int(commitReports))
 
 			messages := testutil.ToFloat64(
 				reporter.outputDetailsCounter.WithLabelValues(
-					chainID, plugincommon.ObservationMethod, string(tc.state), "messages",
+					"solana", chainID, plugincommon.ObservationMethod, string(tc.state), "messages",
 				),
 			)
 			require.Equal(t, tc.expectedMessageCount, int(messages))
@@ -236,21 +238,21 @@ func Test_TrackingOutcomes(t *testing.T) {
 
 			messages := testutil.ToFloat64(
 				reporter.outputDetailsCounter.WithLabelValues(
-					chainID, plugincommon.OutcomeMethod, string(tc.state), "messages",
+					"solana", chainID, plugincommon.OutcomeMethod, string(tc.state), "messages",
 				),
 			)
 			require.Equal(t, tc.expectedMessagesCount, int(messages))
 
 			sourceChains := testutil.ToFloat64(
 				reporter.outputDetailsCounter.WithLabelValues(
-					chainID, plugincommon.OutcomeMethod, string(tc.state), "sourceChains",
+					"solana", chainID, plugincommon.OutcomeMethod, string(tc.state), "sourceChains",
 				),
 			)
 			require.Equal(t, tc.expectedSourceChainCount, int(sourceChains))
 
 			tokenData := testutil.ToFloat64(
 				reporter.outputDetailsCounter.WithLabelValues(
-					chainID, plugincommon.OutcomeMethod, string(tc.state), "tokenData",
+					"solana", chainID, plugincommon.OutcomeMethod, string(tc.state), "tokenData",
 				),
 			)
 			require.Equal(t, tc.expectedTokenDataCount, int(tokenData))
@@ -259,23 +261,21 @@ func Test_TrackingOutcomes(t *testing.T) {
 }
 
 func Test_SequenceNumbers(t *testing.T) {
-	chain1 := "2337"
 	selector1 := cciptypes.ChainSelector(12922642891491394802)
-	chain2 := "3337"
-	selector2 := cciptypes.ChainSelector(4793464827907405086)
+	selector2 := cciptypes.ChainSelector(909606746561742123)
 
 	tt := []struct {
 		name   string
 		obs    exectypes.Observation
 		out    exectypes.Outcome
 		method plugincommon.MethodType
-		exp    map[string]cciptypes.SeqNum
+		exp    map[cciptypes.ChainSelector]cciptypes.SeqNum
 	}{
 		{
 			name:   "empty observation should not report anything",
 			obs:    exectypes.Observation{},
 			method: plugincommon.ObservationMethod,
-			exp:    map[string]cciptypes.SeqNum{},
+			exp:    map[cciptypes.ChainSelector]cciptypes.SeqNum{},
 		},
 		{
 			name: "single chain observation with seq nr",
@@ -288,8 +288,8 @@ func Test_SequenceNumbers(t *testing.T) {
 				},
 			},
 			method: plugincommon.ObservationMethod,
-			exp: map[string]cciptypes.SeqNum{
-				chain1: 4,
+			exp: map[cciptypes.ChainSelector]cciptypes.SeqNum{
+				selector1: 4,
 			},
 		},
 		{
@@ -306,9 +306,9 @@ func Test_SequenceNumbers(t *testing.T) {
 				},
 			},
 			method: plugincommon.ObservationMethod,
-			exp: map[string]cciptypes.SeqNum{
-				chain1: 2,
-				chain2: 4,
+			exp: map[cciptypes.ChainSelector]cciptypes.SeqNum{
+				selector1: 2,
+				selector2: 4,
 			},
 		},
 		{
@@ -328,8 +328,8 @@ func Test_SequenceNumbers(t *testing.T) {
 				},
 			},
 			method: plugincommon.OutcomeMethod,
-			exp: map[string]cciptypes.SeqNum{
-				chain1: 2,
+			exp: map[cciptypes.ChainSelector]cciptypes.SeqNum{
+				selector1: 2,
 			},
 		},
 		{
@@ -364,9 +364,9 @@ func Test_SequenceNumbers(t *testing.T) {
 				},
 			},
 			method: plugincommon.OutcomeMethod,
-			exp: map[string]cciptypes.SeqNum{
-				chain1: 2,
-				chain2: 4,
+			exp: map[cciptypes.ChainSelector]cciptypes.SeqNum{
+				selector1: 2,
+				selector2: 4,
 			},
 		},
 	}
@@ -385,9 +385,12 @@ func Test_SequenceNumbers(t *testing.T) {
 				reporter.TrackOutcome(tc.out, exectypes.GetCommitReports)
 			}
 
-			for sourceChain, maxSeqNr := range tc.exp {
+			for sourceSelector, maxSeqNr := range tc.exp {
+				sourceFamily, sourceID, ok := libs.GetChainInfoFromSelector(sourceSelector)
+				require.True(t, ok)
+
 				seqNum := testutil.ToFloat64(
-					reporter.sequenceNumbers.WithLabelValues(chainID, sourceChain, tc.method),
+					reporter.sequenceNumbers.WithLabelValues("solana", chainID, sourceFamily, sourceID, tc.method),
 				)
 				require.Equal(t, float64(maxSeqNr), seqNum)
 			}
@@ -401,11 +404,13 @@ func Test_ExecLatency(t *testing.T) {
 
 	t.Run("single latency observation", func(t *testing.T) {
 		reporter.TrackLatency(exectypes.GetCommitReports, plugincommon.ObservationMethod, 100, nil)
-		l1 := internal.CounterFromHistogramByLabels(t, reporter.latencyHistogram, chainID, "observation", "GetCommitReports")
+		l1 := internal.CounterFromHistogramByLabels(
+			t, reporter.latencyHistogram, "solana", chainID, "observation", "GetCommitReports",
+		)
 		require.Equal(t, 1, l1)
 
 		errs := testutil.ToFloat64(
-			reporter.execErrors.WithLabelValues(chainID, "observation", "GetCommitReports"),
+			reporter.execErrors.WithLabelValues("solana", chainID, "observation", "GetCommitReports"),
 		)
 		require.Equal(t, float64(0), errs)
 	})
@@ -415,7 +420,7 @@ func Test_ExecLatency(t *testing.T) {
 		for i := 0; i < passCounter; i++ {
 			reporter.TrackLatency(exectypes.Filter, plugincommon.OutcomeMethod, time.Second, nil)
 		}
-		l2 := internal.CounterFromHistogramByLabels(t, reporter.latencyHistogram, chainID, "outcome", "Filter")
+		l2 := internal.CounterFromHistogramByLabels(t, reporter.latencyHistogram, "solana", chainID, "outcome", "Filter")
 		require.Equal(t, passCounter, l2)
 	})
 
@@ -425,7 +430,7 @@ func Test_ExecLatency(t *testing.T) {
 			reporter.TrackLatency(exectypes.GetMessages, plugincommon.ObservationMethod, time.Second, fmt.Errorf("error"))
 		}
 		errs := testutil.ToFloat64(
-			reporter.execErrors.WithLabelValues(chainID, "observation", "GetMessages"),
+			reporter.execErrors.WithLabelValues("solana", chainID, "observation", "GetMessages"),
 		)
 		require.Equal(t, float64(errCounter), errs)
 	})
@@ -440,11 +445,13 @@ func Test_LatencyAndErrors(t *testing.T) {
 		method := "query"
 
 		reporter.TrackProcessorLatency(processor, method, time.Second, nil)
-		l1 := internal.CounterFromHistogramByLabels(t, reporter.processorLatencyHistogram, chainID, processor, method)
+		l1 := internal.CounterFromHistogramByLabels(
+			t, reporter.processorLatencyHistogram, "solana", chainID, processor, method,
+		)
 		require.Equal(t, 1, l1)
 
 		errs := testutil.ToFloat64(
-			reporter.processorErrors.WithLabelValues(chainID, processor, method),
+			reporter.processorErrors.WithLabelValues("solana", chainID, processor, method),
 		)
 		require.Equal(t, float64(0), errs)
 	})
@@ -457,7 +464,9 @@ func Test_LatencyAndErrors(t *testing.T) {
 		for i := 0; i < passCounter; i++ {
 			reporter.TrackProcessorLatency(processor, method, time.Second, nil)
 		}
-		l2 := internal.CounterFromHistogramByLabels(t, reporter.processorLatencyHistogram, chainID, processor, method)
+		l2 := internal.CounterFromHistogramByLabels(
+			t, reporter.processorLatencyHistogram, "solana", chainID, processor, method,
+		)
 		require.Equal(t, passCounter, l2)
 	})
 
@@ -470,7 +479,7 @@ func Test_LatencyAndErrors(t *testing.T) {
 			reporter.TrackProcessorLatency(processor, method, time.Second, fmt.Errorf("error"))
 		}
 		errs := testutil.ToFloat64(
-			reporter.processorErrors.WithLabelValues(chainID, processor, method),
+			reporter.processorErrors.WithLabelValues("solana", chainID, processor, method),
 		)
 		require.Equal(t, float64(errCounter), errs)
 	})

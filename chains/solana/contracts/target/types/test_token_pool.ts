@@ -299,6 +299,31 @@ export type TestTokenPool = {
       ]
     },
     {
+      "name": "setRateLimitAdmin",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "mint",
+          "type": "publicKey"
+        },
+        {
+          "name": "newRateLimitAdmin",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
       "name": "deleteChainConfig",
       "accounts": [
         {
@@ -486,6 +511,44 @@ export type TestTokenPool = {
       ],
       "returns": {
         "defined": "LockOrBurnOutV1"
+      }
+    },
+    {
+      "name": "deriveAccountsReleaseOrMintTokens",
+      "accounts": [],
+      "args": [
+        {
+          "name": "stage",
+          "type": "string"
+        },
+        {
+          "name": "releaseOrMint",
+          "type": {
+            "defined": "ReleaseOrMintInV1"
+          }
+        }
+      ],
+      "returns": {
+        "defined": "DeriveAccountsResponse"
+      }
+    },
+    {
+      "name": "deriveAccountsLockOrBurnTokens",
+      "accounts": [],
+      "args": [
+        {
+          "name": "stage",
+          "type": "string"
+        },
+        {
+          "name": "lockOrBurn",
+          "type": {
+            "defined": "LockOrBurnInV1"
+          }
+        }
+      ],
+      "returns": {
+        "defined": "DeriveAccountsResponse"
       }
     }
   ],
@@ -847,6 +910,31 @@ export const IDL: TestTokenPool = {
       ]
     },
     {
+      "name": "setRateLimitAdmin",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "mint",
+          "type": "publicKey"
+        },
+        {
+          "name": "newRateLimitAdmin",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
       "name": "deleteChainConfig",
       "accounts": [
         {
@@ -1034,6 +1122,44 @@ export const IDL: TestTokenPool = {
       ],
       "returns": {
         "defined": "LockOrBurnOutV1"
+      }
+    },
+    {
+      "name": "deriveAccountsReleaseOrMintTokens",
+      "accounts": [],
+      "args": [
+        {
+          "name": "stage",
+          "type": "string"
+        },
+        {
+          "name": "releaseOrMint",
+          "type": {
+            "defined": "ReleaseOrMintInV1"
+          }
+        }
+      ],
+      "returns": {
+        "defined": "DeriveAccountsResponse"
+      }
+    },
+    {
+      "name": "deriveAccountsLockOrBurnTokens",
+      "accounts": [],
+      "args": [
+        {
+          "name": "stage",
+          "type": "string"
+        },
+        {
+          "name": "lockOrBurn",
+          "type": {
+            "defined": "LockOrBurnInV1"
+          }
+        }
+      ],
+      "returns": {
+        "defined": "DeriveAccountsResponse"
       }
     }
   ],

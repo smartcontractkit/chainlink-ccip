@@ -13,13 +13,14 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 // Ensure that PluginProcessor is implemented.
@@ -27,6 +28,7 @@ var _ plugincommon.PluginProcessor[dt.Query, dt.Observation, dt.Outcome] = &Cont
 
 // syncTimeout is the timeout for the ccip reader sync operation.
 const syncTimeout = 5 * time.Second
+const logFrequency = 30 * time.Minute // how often to log discovery progress
 
 // ContractDiscoveryProcessor is a plugin processor for discovering contracts.
 type ContractDiscoveryProcessor struct {
@@ -38,6 +40,7 @@ type ContractDiscoveryProcessor struct {
 	oracleIDToP2PID map[commontypes.OracleID]ragep2ptypes.PeerID
 	syncer          *readerSyncer
 	peerID          ragep2ptypes.PeerID
+	lastLogTime     atomic.Pointer[time.Time] // used to limit logging frequency
 }
 
 func NewContractDiscoveryProcessor(
@@ -98,7 +101,7 @@ func (cdp *ContractDiscoveryProcessor) Observation(
 		return dt.Observation{}, fmt.Errorf("get supported chains for peer %d: %w", cdp.peerID, err)
 	}
 
-	cdp.lggr.Infow("about to discover contracts", "supportedChains", supportedChains)
+	cdp.lggr.Debugw("about to discover contracts", "supportedChains", supportedChains)
 	contracts, err := (*cdp.reader).DiscoverContracts(ctx, supportedChains, maps.Keys(chainConfigs))
 	if err != nil {
 		return dt.Observation{}, fmt.Errorf("unable to discover contracts: %w, seqNr: %d", err, seqNr)
@@ -272,7 +275,7 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 	ctx context.Context, _ dt.Outcome, _ dt.Query, aos []plugincommon.AttributedObservation[dt.Observation],
 ) (dt.Outcome, error) {
 	lggr := logutil.WithContextValues(ctx, cdp.lggr)
-	lggr.Infow("Processing contract discovery outcome")
+	lggr.Debugw("Processing contract discovery outcome")
 	contracts := make(reader.ContractAddresses)
 
 	agg := aggregateObservations(lggr, cdp.dest, aos)
@@ -294,11 +297,14 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 			agg.onrampAddrs,
 			destThresh,
 		)
-		lggr.Infow("Determined consensus onramps",
-			"onrampConsensus", onrampConsensus,
-			"onrampAddrs", agg.onrampAddrs,
-			"fChainThresh", fChainThresh,
-		)
+		logutil.LogWhenExceedFrequency(
+			&cdp.lastLogTime, logFrequency, func() {
+				lggr.Debugw("Determined consensus onramps",
+					"onrampConsensus", onrampConsensus,
+					"onrampAddrs", agg.onrampAddrs,
+					"fChainThresh", fChainThresh,
+				)
+			})
 		if len(onrampConsensus) == 0 {
 			lggr.Warnw("No consensus on onramps, onrampConsensus map is empty")
 		}
@@ -311,7 +317,7 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 		agg.nonceManagerAddrs,
 		fChainThresh,
 	)
-	lggr.Infow("Determined consensus nonce manager",
+	lggr.Debugw("Determined consensus nonce manager",
 		"nonceManagerConsensus", nonceManagerConsensus,
 		"nonceManagerAddrs", agg.nonceManagerAddrs,
 		"fChainThresh", fChainThresh,
@@ -328,11 +334,14 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 		agg.rmnRemoteAddrs,
 		fChainThresh,
 	)
-	lggr.Infow("Determined consensus RMNRemote",
-		"rmnRemoteConsensus", rmnRemoteConsensus,
-		"rmnRemoteAddrs", agg.rmnRemoteAddrs,
-		"fChainThresh", fChainThresh,
-	)
+	logutil.LogWhenExceedFrequency(
+		&cdp.lastLogTime, logFrequency, func() {
+			lggr.Debugw("Determined consensus RMNRemote",
+				"rmnRemoteConsensus", rmnRemoteConsensus,
+				"rmnRemoteAddrs", agg.rmnRemoteAddrs,
+				"fChainThresh", fChainThresh,
+			)
+		})
 	if len(rmnRemoteConsensus) == 0 {
 		lggr.Warnw("No consensus on RMNRemote, rmnRemoteConsensus map is empty")
 	}
@@ -344,11 +353,14 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 		agg.feeQuoterAddrs,
 		fChainThresh,
 	)
-	lggr.Infow("Determined consensus fee quoter",
-		"feeQuoterConsensus", feeQuoterConsensus,
-		"feeQuoterAddrs", agg.feeQuoterAddrs,
-		"fChainThresh", fChainThresh,
-	)
+	logutil.LogWhenExceedFrequency(
+		&cdp.lastLogTime, logFrequency, func() {
+			lggr.Debugw("Determined consensus fee quoter",
+				"feeQuoterConsensus", feeQuoterConsensus,
+				"feeQuoterAddrs", agg.feeQuoterAddrs,
+				"fChainThresh", fChainThresh,
+			)
+		})
 	if len(feeQuoterConsensus) == 0 {
 		lggr.Warnw("No consensus on fee quoters, feeQuoterConsensus map is empty")
 	}
@@ -361,11 +373,14 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 		agg.routerAddrs,
 		fChainThresh,
 	)
-	lggr.Infow("Determined consensus router",
-		"routerConsensus", routerConsensus,
-		"routerAddrs", agg.routerAddrs,
-		"fChainThresh", fChainThresh,
-	)
+	logutil.LogWhenExceedFrequency(
+		&cdp.lastLogTime, logFrequency, func() {
+			lggr.Debugw("Determined consensus router",
+				"routerConsensus", routerConsensus,
+				"routerAddrs", agg.routerAddrs,
+				"fChainThresh", fChainThresh,
+			)
+		})
 	if len(routerConsensus) == 0 {
 		lggr.Warnw("No consensus on router, routerConsensus map is empty")
 	}
@@ -391,9 +406,9 @@ func (cdp *ContractDiscoveryProcessor) syncContracts(lggr logger.Logger, contrac
 				" please check your RPC endpoints and their health!",
 			"err", err)
 	} else if alreadySyncing {
-		lggr.Infow("discovery syncer is already syncing, skipping sync until its done or it times out")
+		lggr.Debugw("discovery syncer is already syncing, skipping sync until its done or it times out")
 	} else {
-		lggr.Infow("discovery successfully synced contracts", "contracts", contracts)
+		lggr.Debugw("discovery successfully synced contracts", "contracts", contracts)
 	}
 }
 

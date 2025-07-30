@@ -39,10 +39,19 @@ packages:
             AddressCodec:
             CommitPluginCodec:
     github.com/smartcontractkit/chainlink-common/pkg/types:
-            interfaces:
-                ContractWriter:
-                    config:
-                        dir: mocks/chainlink_common/
+        interfaces:
+            ContractWriter:
+                config:
+                    dir: mocks/chainlink_common/types/
+    github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3:
+        config:
+            dir: mocks/chainlink_common/ccipocr3/
+        interfaces:
+            ExecutePluginCodec:
+            EstimateProvider:
+            AddressCodec:
+            CommitPluginCodec:
+            ChainAccessor:
     github.com/smartcontractkit/libocr/networking:
         interfaces:
             PeerGroupFactory:

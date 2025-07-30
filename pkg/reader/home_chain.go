@@ -29,12 +29,14 @@ func NewObservedHomeChainReader(
 	lggr logger.Logger,
 	pollingInterval time.Duration,
 	ccipConfigBoundContract types.BoundContract,
+	chainFamily string,
 	chainID string,
 ) HomeChain {
 	return reader_internal.NewHomeChainConfigPoller(
 		contractreader.NewObserverReader(
 			homeChainReader,
 			lggr,
+			chainFamily,
 			chainID,
 		),
 		lggr,

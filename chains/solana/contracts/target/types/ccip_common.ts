@@ -36,6 +36,10 @@ export type CcipCommon = {
           {
             "name": "mint",
             "type": "publicKey"
+          },
+          {
+            "name": "supportsAutoDerivation",
+            "type": "bool"
           }
         ]
       }
@@ -138,6 +142,10 @@ export const IDL: CcipCommon = {
           {
             "name": "mint",
             "type": "publicKey"
+          },
+          {
+            "name": "supportsAutoDerivation",
+            "type": "bool"
           }
         ]
       }

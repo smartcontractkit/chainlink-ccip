@@ -33,7 +33,9 @@ package ccip
 //go:generate go run generation/generate/wrap.go ccip USDCTokenPool usdc_token_pool latest
 //go:generate go run generation/generate/wrap.go ccip SiloedLockReleaseTokenPool siloed_lock_release_token_pool latest
 //go:generate go run generation/generate/wrap.go ccip BurnToAddressMintTokenPool burn_to_address_mint_token_pool latest
+//go:generate go run generation/generate/wrap.go ccip HybridLockReleaseUSDCTokenPool hybrid_lock_release_usdc_token_pool latest
 //go:generate go run generation/generate/wrap.go ccip BurnMintFastTransferTokenPool fast_transfer_token_pool latest
+//go:generate go run generation/generate/wrap.go ccip CCTPMessageTransmitterProxy cctp_message_transmitter_proxy latest
 
 // Helpers
 //go:generate go run generation/generate/wrap.go ccip MaybeRevertMessageReceiver maybe_revert_message_receiver latest
@@ -51,3 +53,7 @@ package ccip
 
 // EncodingUtils
 //go:generate go run generation/generate/wrap.go ccip EncodingUtils ccip_encoding_utils latest
+
+// Superchain Interop
+//go:generate go run generation/generate/wrap.go ccip OnRampOverSuperchainInterop onramp_over_superchain_interop latest
+//go:generate go run generation/generate/wrap.go ccip OffRampOverSuperchainInterop offramp_over_superchain_interop latest
