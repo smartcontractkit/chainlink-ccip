@@ -299,6 +299,31 @@ export type TestTokenPool = {
       ]
     },
     {
+      "name": "setRateLimitAdmin",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "mint",
+          "type": "publicKey"
+        },
+        {
+          "name": "newRateLimitAdmin",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
       "name": "deleteChainConfig",
       "accounts": [
         {
@@ -881,6 +906,31 @@ export const IDL: TestTokenPool = {
           "type": {
             "defined": "RateLimitConfig"
           }
+        }
+      ]
+    },
+    {
+      "name": "setRateLimitAdmin",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "mint",
+          "type": "publicKey"
+        },
+        {
+          "name": "newRateLimitAdmin",
+          "type": "publicKey"
         }
       ]
     },

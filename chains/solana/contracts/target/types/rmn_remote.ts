@@ -488,6 +488,11 @@ export type RmnRemote = {
       "code": 9007,
       "name": "InvalidCodeVersion",
       "msg": "Invalid code version"
+    },
+    {
+      "code": 9008,
+      "name": "DefaultOwnerProposal",
+      "msg": "Proposed owner is the default pubkey"
     }
   ]
 };
@@ -982,6 +987,11 @@ export const IDL: RmnRemote = {
       "code": 9007,
       "name": "InvalidCodeVersion",
       "msg": "Invalid code version"
+    },
+    {
+      "code": 9008,
+      "name": "DefaultOwnerProposal",
+      "msg": "Proposed owner is the default pubkey"
     }
   ]
 };

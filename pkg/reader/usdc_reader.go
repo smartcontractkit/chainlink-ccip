@@ -6,12 +6,8 @@ import (
 	"fmt"
 
 	sel "github.com/smartcontractkit/chain-selectors"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
@@ -20,6 +16,9 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
+// USDCMessageReader retrieves each of the CCTPv1 MessageSent event created
+// when a ccipSend is made with USDC token transfer. The events are created
+// when the USDC Token pool calls the 3rd party MessageTransmitter contract.
 type USDCMessageReader interface {
 	MessagesByTokenID(ctx context.Context,
 		source, dest cciptypes.ChainSelector,
@@ -33,25 +32,22 @@ const (
 
 // CCTPDestDomains could be fetched from USDC Token Pool
 var CCTPDestDomains = map[uint64]uint32{
-	sel.ETHEREUM_MAINNET.Selector:                    0,
-	sel.AVALANCHE_MAINNET.Selector:                   1,
-	sel.ETHEREUM_MAINNET_OPTIMISM_1.Selector:         2,
-	sel.ETHEREUM_MAINNET_ARBITRUM_1.Selector:         3,
-	sel.ETHEREUM_MAINNET_BASE_1.Selector:             6,
-	sel.POLYGON_MAINNET.Selector:                     7,
+	// ---------- Mainnet Domains ----------
+	sel.ETHEREUM_MAINNET.Selector:            0,
+	sel.AVALANCHE_MAINNET.Selector:           1,
+	sel.ETHEREUM_MAINNET_OPTIMISM_1.Selector: 2,
+	sel.ETHEREUM_MAINNET_ARBITRUM_1.Selector: 3,
+	sel.SOLANA_MAINNET.Selector:              5,
+	sel.ETHEREUM_MAINNET_BASE_1.Selector:     6,
+	sel.POLYGON_MAINNET.Selector:             7,
+	// ---------- Testnet Domains ----------
 	sel.ETHEREUM_TESTNET_SEPOLIA.Selector:            0,
 	sel.AVALANCHE_TESTNET_FUJI.Selector:              1,
 	sel.ETHEREUM_TESTNET_SEPOLIA_OPTIMISM_1.Selector: 2,
 	sel.ETHEREUM_TESTNET_SEPOLIA_ARBITRUM_1.Selector: 3,
+	sel.SOLANA_DEVNET.Selector:                       5,
 	sel.ETHEREUM_TESTNET_SEPOLIA_BASE_1.Selector:     6,
 	sel.POLYGON_TESTNET_AMOY.Selector:                7,
-}
-
-type evmUSDCMessageReader struct {
-	lggr           logger.Logger
-	contractReader contractreader.ContractReaderFacade
-	cctpDestDomain map[uint64]uint32
-	boundContract  types.BoundContract
 }
 
 type eventID [32]byte
@@ -91,13 +87,18 @@ func NewUSDCMessageReader(
 		}
 		switch family {
 		case sel.FamilyEVM:
+			contractReader, ok := contractReaders[chainSelector]
+			if !ok {
+				lggr.Errorf("chain reader is missing for chain %d, skipping", chainSelector)
+				continue
+			}
 			bytesAddress, err := addrCodec.AddressStringToBytes(token.SourceMessageTransmitterAddr, chainSelector)
 			if err != nil {
 				return nil, err
 			}
 
 			// Bind the 3rd party MessageTransmitter contract, this is where CCTP MessageSent events are emitted.
-			contract, err := bindReaderContract(
+			_, err = bindReaderContract(
 				ctx,
 				lggr,
 				contractReaders,
@@ -111,14 +112,34 @@ func NewUSDCMessageReader(
 			}
 			readers[chainSelector] = evmUSDCMessageReader{
 				lggr:           lggr,
-				contractReader: contractReaders[chainSelector],
+				contractReader: contractReader,
 				cctpDestDomain: domains,
-				boundContract:  contract, // TODO: this is not needed if we switch to the Extended contract reader.
+			}
+		case sel.FamilySolana:
+			// Bind the TokenPool contract, the contract re-emits the USDC MessageSent event along with other metadata.
+			bytesAddress, err := addrCodec.AddressStringToBytes(token.SourceMessageTransmitterAddr, chainSelector)
+			if err != nil {
+				return nil, err
 			}
 
-		// TODO: Implement Solana USDC message reader
-		//case sel.FamilySolana:
-		//	panic("not implemented yet")
+			// Bind the 3rd party MessageTransmitter contract, this is where CCTP MessageSent events are emitted.
+			_, err = bindReaderContract(
+				ctx,
+				lggr,
+				contractReaders,
+				chainSelector,
+				consts.ContractNameUSDCTokenPool,
+				bytesAddress,
+				addrCodec,
+			)
+			if err != nil {
+				return nil, err
+			}
+
+			readers[chainSelector] = solanaUSDCMessageReader{
+				lggr:           lggr,
+				contractReader: contractReaders[chainSelector],
+			}
 		default:
 			return nil, fmt.Errorf("unsupported chain selector family %s for chain %d", family, chainSelector)
 		}
@@ -212,133 +233,6 @@ func AllAvailableDomains() map[uint64]uint32 {
 	return destDomains
 }
 
-func (u evmUSDCMessageReader) MessagesByTokenID(
-	ctx context.Context,
-	source, dest cciptypes.ChainSelector,
-	tokens map[MessageTokenID]cciptypes.RampTokenAmount,
-) (map[MessageTokenID]cciptypes.Bytes, error) {
-	if len(tokens) == 0 {
-		return map[MessageTokenID]cciptypes.Bytes{}, nil
-	}
-
-	// 1. Extract 3rd word from the MessageSent(bytes) - it's going to be our identifier
-	eventIDsByMsgTokenID, err := u.recreateMessageTransmitterEvents(dest, tokens)
-	if err != nil {
-		return nil, err
-	}
-
-	// 2. Query the MessageTransmitter contract for the MessageSent events based on the 3rd words.
-	// We need entire MessageSent payload to use that with the Attestation API
-	expressions := []query.Expression{query.Confidence(primitives.Finalized)}
-	if len(eventIDsByMsgTokenID) > 0 {
-		eventIDs := make([]eventID, 0, len(eventIDsByMsgTokenID))
-		for _, id := range eventIDsByMsgTokenID {
-			eventIDs = append(eventIDs, id)
-		}
-
-		expressions = append(expressions, query.Comparator(
-			consts.CCTPMessageSentValue,
-			primitives.ValueComparator{
-				Value:    primitives.Any(eventIDs),
-				Operator: primitives.Eq,
-			}))
-	}
-
-	keyFilter, err := query.Where(
-		consts.EventNameCCTPMessageSent,
-		expressions...,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	iter, err := u.contractReader.QueryKey(
-		ctx,
-		u.boundContract,
-		keyFilter,
-		query.NewLimitAndSort(
-			query.Limit{Count: uint64(len(eventIDsByMsgTokenID))},
-			query.NewSortBySequence(query.Asc),
-		),
-		&MessageSentEvent{},
-	)
-	if err != nil {
-		return nil, fmt.Errorf("error querying contract reader for chain %d: %w", source, err)
-	}
-
-	messageSentEvents := make(map[eventID]cciptypes.Bytes)
-	for _, item := range iter {
-		event, ok1 := item.Data.(*MessageSentEvent)
-		if !ok1 {
-			return nil, fmt.Errorf("failed to cast %v to Message", item.Data)
-		}
-		e, err1 := event.unpackID()
-		if err1 != nil {
-			return nil, err1
-		}
-		messageSentEvents[e] = event.Arg0
-	}
-
-	// 3. Remapping database events to the proper MessageTokenID
-	out := make(map[MessageTokenID]cciptypes.Bytes)
-	for tokenID, messageID := range eventIDsByMsgTokenID {
-		message, ok1 := messageSentEvents[messageID]
-		if !ok1 {
-			// Token not available in the source chain, it should never happen at this stage
-			u.lggr.Warnw("Message not found in the source chain",
-				"seqNr", tokenID.SeqNr,
-				"tokenIndex", tokenID.Index,
-				"chainSelector", source,
-			)
-			continue
-		}
-		out[tokenID] = message
-	}
-
-	return out, nil
-}
-
-func (u evmUSDCMessageReader) recreateMessageTransmitterEvents(
-	destChainSelector cciptypes.ChainSelector,
-	tokens map[MessageTokenID]cciptypes.RampTokenAmount,
-) (map[MessageTokenID]eventID, error) {
-	messageTransmitterEvents := make(map[MessageTokenID]eventID)
-
-	for id, token := range tokens {
-		sourceTokenPayload, err := NewSourceTokenDataPayloadFromBytes(token.ExtraData)
-		if err != nil {
-			return nil, err
-		}
-
-		destDomain, ok := u.cctpDestDomain[uint64(destChainSelector)]
-		if !ok {
-			return nil, fmt.Errorf("destination domain not found for chain %d", destChainSelector)
-		}
-
-		//nolint:lll
-		// USDC message payload:
-		// uint32 _msgVersion,
-		// uint32 _msgSourceDomain,
-		// uint32 _msgDestinationDomain,
-		// uint64 _msgNonce,
-		// bytes32 _msgSender,
-		// Since it's packed, all of these values contribute to the first slot
-		// https://github.com/circlefin/evm-cctp-contracts/blob/377c9bd813fb86a42d900ae4003599d82aef635a/src/MessageTransmitter.sol#L41
-		// https://github.com/circlefin/evm-cctp-contracts/blob/377c9bd813fb86a42d900ae4003599d82aef635a/src/MessageTransmitter.sol#L365
-		var buf []byte
-		buf = binary.BigEndian.AppendUint32(buf, CCTPMessageVersion)
-		buf = binary.BigEndian.AppendUint32(buf, sourceTokenPayload.SourceDomain)
-		buf = binary.BigEndian.AppendUint32(buf, destDomain)
-		buf = binary.BigEndian.AppendUint64(buf, sourceTokenPayload.Nonce)
-		// First 12 bytes of the sender address are always empty for EVM
-		senderBytes := [12]byte{}
-		buf = append(buf, senderBytes[:]...)
-
-		messageTransmitterEvents[id] = [32]byte(buf[:32])
-	}
-	return messageTransmitterEvents, nil
-}
-
 // SourceTokenDataPayload extracts the nonce and source domain from the USDC message.
 // Please see the Solidity code in USDCTokenPool to understand more details
 //
@@ -364,7 +258,10 @@ func NewSourceTokenDataPayload(nonce uint64, sourceDomain uint32) *SourceTokenDa
 	}
 }
 
-func NewSourceTokenDataPayloadFromBytes(extraData cciptypes.Bytes) (*SourceTokenDataPayload, error) {
+// extractABIPayload manually parses the nonce and sourceDomain out of the extra data field.
+// The ABI format is used on EVM and Solana. There is no re-encoding between chains, so other new
+// chains should use manual formatting as well. This is specific to CCTPv1.
+func extractABIPayload(extraData cciptypes.Bytes) (*SourceTokenDataPayload, error) {
 	if len(extraData) < 64 {
 		return nil, fmt.Errorf("extraData is too short, expected at least 64 bytes")
 	}

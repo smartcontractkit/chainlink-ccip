@@ -632,6 +632,26 @@ export type BaseTokenPool = {
       ]
     },
     {
+      "name": "RateLimitAdminSet",
+      "fields": [
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "oldRateLimitAdmin",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "newRateLimitAdmin",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "OwnershipTransferRequested",
       "fields": [
         {
@@ -843,7 +863,7 @@ export type BaseTokenPool = {
     {
       "code": 6021,
       "name": "TransferZeroTokensNotAllowed",
-      "msg": "Transfering zero tokens is not allowed"
+      "msg": "Transferring zero tokens is not allowed"
     }
   ]
 };
@@ -1482,6 +1502,26 @@ export const IDL: BaseTokenPool = {
       ]
     },
     {
+      "name": "RateLimitAdminSet",
+      "fields": [
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "oldRateLimitAdmin",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "newRateLimitAdmin",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "OwnershipTransferRequested",
       "fields": [
         {
@@ -1693,7 +1733,7 @@ export const IDL: BaseTokenPool = {
     {
       "code": 6021,
       "name": "TransferZeroTokensNotAllowed",
-      "msg": "Transfering zero tokens is not allowed"
+      "msg": "Transferring zero tokens is not allowed"
     }
   ]
 };

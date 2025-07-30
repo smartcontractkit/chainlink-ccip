@@ -106,7 +106,7 @@ func (s *USDCAttestationClient) Attestations(
 
 		for tokenID, message := range messagesByTokenID {
 			lggr.Debugw(
-				"Fetching attestation from the API",
+				"CCTP Attestation: Fetching attestation from the API",
 				"chainSelector", chainSelector,
 				"message", message,
 				"messageTokenID", tokenID,
@@ -128,12 +128,16 @@ func (s *USDCAttestationClient) fetchSingleMessage(
 	messageHash := cciptypes.Bytes32(s.hasher.Hash(message))
 	body, _, err := s.client.Get(ctx, fmt.Sprintf("%s/%s/%s", apiVersion, attestationPath, messageHash.String()))
 	if err != nil {
+		s.lggr.Errorw("CCTP Attestation: Failed to fetch attestation from the API", "err", err)
 		return tokendata.ErrorAttestationStatus(err)
 	}
 	response, err := attestationFromResponse(body)
 	if err != nil {
+		s.lggr.Errorw("CCTP Attestation: Failed to parse attestation from the response", "err", err, "body", body)
 		return tokendata.ErrorAttestationStatus(err)
 	}
+
+	s.lggr.Debugw("CCTP Attestation: Attestation received", "message", message, "response", response)
 	return tokendata.SuccessAttestationStatus(messageHash[:], message, response)
 }
 

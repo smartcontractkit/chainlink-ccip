@@ -187,6 +187,25 @@ impl BaseConfig {
         self.can_accept_liquidity = allow;
         Ok(())
     }
+
+    pub fn set_rate_limit_admin(&mut self, new_rate_limit_admin: Pubkey) -> Result<()> {
+        require_keys_neq!(
+            new_rate_limit_admin,
+            Pubkey::default(),
+            CcipTokenPoolError::InvalidInputs
+        );
+
+        let old_rate_limit_admin = self.rate_limit_admin;
+        self.rate_limit_admin = new_rate_limit_admin;
+
+        emit!(RateLimitAdminSet {
+            mint: self.mint,
+            old_rate_limit_admin,
+            new_rate_limit_admin,
+        });
+
+        Ok(())
+    }
 }
 
 #[derive(InitSpace, AnchorSerialize, AnchorDeserialize, Clone)]
@@ -529,6 +548,13 @@ pub struct RmnRemoteUpdated {
 }
 
 #[event]
+pub struct RateLimitAdminSet {
+    pub mint: Pubkey,
+    pub old_rate_limit_admin: Pubkey,
+    pub new_rate_limit_admin: Pubkey,
+}
+
+#[event]
 pub struct OwnershipTransferRequested {
     pub from: Pubkey,
     pub to: Pubkey,
@@ -604,7 +630,7 @@ pub enum CcipTokenPoolError {
     // Lock/Release errors
     #[msg("Liquidity not accepted")]
     LiquidityNotAccepted,
-    #[msg("Transfering zero tokens is not allowed")]
+    #[msg("Transferring zero tokens is not allowed")]
     TransferZeroTokensNotAllowed,
 }
 
@@ -707,7 +733,7 @@ pub fn to_svm_token_amount(
 ) -> Result<u64> {
     let mut incoming_amount = U256::from_little_endian(&incoming_amount_bytes);
 
-    // handle differences in decimals by multipling/dividing by 10^N
+    // handle differences in decimals by multiplying/dividing by 10^N
     match incoming_decimal.cmp(&local_decimal) {
         std::cmp::Ordering::Less => {
             incoming_amount = incoming_amount

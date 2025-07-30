@@ -197,7 +197,7 @@ pub mod cctp_token_pool {
 
     // set rate limit
     pub fn set_chain_rate_limit(
-        ctx: Context<EditChainConfig>,
+        ctx: Context<SetChainRateLimit>,
         remote_chain_selector: u64,
         mint: Pubkey,
         inbound: RateLimitConfig,
@@ -209,6 +209,18 @@ pub mod cctp_token_pool {
             inbound,
             outbound,
         )
+    }
+
+    // set rate limit admin
+    pub fn set_rate_limit_admin(
+        ctx: Context<SetRateLimitAdmin>,
+        _mint: Pubkey,
+        new_rate_limit_admin: Pubkey,
+    ) -> Result<()> {
+        ctx.accounts
+            .state
+            .config
+            .set_rate_limit_admin(new_rate_limit_admin)
     }
 
     // delete chain config
@@ -387,7 +399,7 @@ pub mod cctp_token_pool {
 
         Ok(LockOrBurnOutV1 {
             dest_token_address: ctx.accounts.chain_config.base.remote.token_address.clone(),
-            // The dest_poll_data is then read by the remote pool, so we standardize on ABI-encoding
+            // The dest_pool_data is then read by the remote pool, so we standardize on ABI-encoding
             dest_pool_data: extra_data.abi_encode().to_vec(),
         })
     }
