@@ -219,6 +219,7 @@ func (p *Plugin) validateReport(
 		return cciptypes.CommitPluginReport{}, plugincommon.NewErrValidatingReport(err)
 	}
 
+	lggr.Info("OFFRAMPCONFIGDIGEST: ", offRampConfigDigest)
 	if !bytes.Equal(offRampConfigDigest[:], p.reportingCfg.ConfigDigest[:]) {
 		lggr.Warnw("my config digest doesn't match offramp's config digest, not accepting report",
 			"myConfigDigest", p.reportingCfg.ConfigDigest,

@@ -504,6 +504,7 @@ func (c *configPoller) GetChainConfig(
 	// Check if we have any data in cache
 	if !chainCache.chainConfigRefresh.IsZero() {
 		defer chainCache.chainConfigMu.RUnlock()
+		c.lggr.Info("CACHE DATA INFO: ", chainCache.chainConfigData)
 		c.lggr.Debugw("Returning cached chain config",
 			"chain", chainSel,
 			"cacheAge", time.Since(chainCache.chainConfigRefresh))
@@ -618,6 +619,7 @@ func (c *configPoller) refreshChainConfig(
 	// Perform I/O operation WITHOUT holding the lock
 	startTime := time.Now()
 	newData, err := c.fetchChainConfig(ctx, chainSel)
+	c.lggr.Info("FETCHED CHAIN CONFIG: ", newData.Offramp.CommitLatestOCRConfig)
 	fetchConfigLatency := time.Since(startTime)
 
 	if err != nil {
@@ -728,11 +730,12 @@ func (c *configPoller) fetchChainConfig(
 	}
 
 	requests := c.reader.prepareBatchConfigRequests(chainSel)
+	c.lggr.Info("PREPARE REQUEST: ", requests)
 	batchResult, skipped, err := reader.ExtendedBatchGetLatestValues(ctx, requests, true)
 	if err != nil {
 		return ChainConfigSnapshot{}, fmt.Errorf("batch get latest values for chain %d: %w", chainSel, err)
 	}
-
+	c.lggr.Info("BATCH RESULT: ", batchResult)
 	if len(skipped) > 0 {
 		c.lggr.Infow("some contracts were skipped due to no bindings",
 			"chain", chainSel,
