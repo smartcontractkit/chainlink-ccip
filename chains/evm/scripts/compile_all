@@ -120,8 +120,8 @@ compileContract test/mocks/MockE2ELBTCTokenPool
 compileContract test/helpers/CCIPReaderTester
 # Offchain test encoding utils
 compileContract test/helpers/EncodingUtils
+compileContract test/helpers/VerifierEvents
 
 # Message Transformer On/OffRamps
 compileContract offRamp/OffRampWithMessageTransformer
 compileContract onRamp/OnRampWithMessageTransformer
-

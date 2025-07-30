@@ -6,6 +6,7 @@ package ccip
 //go:generate go run generation/generate/wrap.go ccip VerifierAggregator verifier_aggregator latest
 //go:generate go run generation/generate/wrap.go ccip CommitVerifierOffRamp commit_verifier_offramp latest
 //go:generate go run generation/generate/wrap.go ccip VerifierRegistry verifier_registry latest
+//go:generate go run generation/generate/wrap.go ccip VerifierEvents verifier_events latest
 
 //go:generate go run generation/generate/wrap.go ccip Router router latest
 //go:generate go run generation/generate/wrap.go ccip CCIPHome ccip_home latest
