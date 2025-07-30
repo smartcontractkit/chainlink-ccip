@@ -15,4 +15,8 @@ contract VerifierEvents {
   ) external {
     emit CCIPMessageSent(destChainSelector, sequenceNumber, message);
   }
+
+  function exposeAny2EVMMessage(
+    Internal.Any2EVMMultiProofMessage memory message
+  ) external pure {}
 }
