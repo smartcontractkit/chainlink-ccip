@@ -9,6 +9,7 @@ contract VerifierEvents {
   );
 
   uint64 public s_numMessagesExecuted;
+  uint64 public s_numMessagesReExecuted;
   mapping(bytes32 => bool) public s_messageExecuted;
 
   event CCIPMessageSent(
@@ -30,9 +31,12 @@ contract VerifierEvents {
   function executeMessage(
     Internal.Any2EVMMultiProofMessage memory message
   ) external {
-    require(!s_messageExecuted[_hashMessage(message)], "Message already executed");
+    if (s_messageExecuted[_hashMessage(message)]) {
+      s_numMessagesReExecuted++;
+    } else {
+      s_numMessagesExecuted++;
+    }
     s_messageExecuted[_hashMessage(message)] = true;
-    s_numMessagesExecuted++;
     emit MessageExecuted(message);
   }
 
