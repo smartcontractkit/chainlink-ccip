@@ -382,13 +382,43 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   /// @param destinationChainSelector The destination chain selector.
   /// @dev Checks if the destination chain is allowed, if the sender is allowed, and if the RMN curse applies.
   function _validateSendRequest(uint64 destinationChainSelector, bytes calldata receiver) internal view virtual {
-    if (receiver.length == 0) {
-      revert InvalidReceiver(receiver);
-    }
+    _validateReceiver(receiver);
 
     if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(destinationChainSelector)))) revert CursedByRMN();
     _checkAllowList(msg.sender);
     if (!isSupportedChain(destinationChainSelector)) revert ChainNotAllowed(destinationChainSelector);
+  }
+
+  /// @notice Validates receiver address parameters.
+  /// @dev Checks length bounds (0 < length ≤ 64) and ensures receiver is not all zeros.
+  /// @param receiver The receiver address to validate.
+  function _validateReceiver(
+    bytes calldata receiver
+  ) internal pure {
+    uint256 receiverLength = receiver.length;
+    if (receiverLength == 0 || receiverLength > 64) {
+      revert InvalidReceiver(receiver);
+    }
+
+    // Check if receiver is all zeros by scanning 32-byte words with early exit
+    bool hasNonZero;
+    assembly {
+      let dataPtr := receiver.offset
+      let endPtr := add(dataPtr, receiverLength)
+
+      // Process 32-byte words, abort on first non-zero word
+      for {} lt(dataPtr, endPtr) { dataPtr := add(dataPtr, 32) } {
+        let word := calldataload(dataPtr)
+        if word {
+          hasNonZero := 1
+          break
+        }
+      }
+    }
+
+    if (!hasNonZero) {
+      revert InvalidReceiver(receiver);
+    }
   }
 
   /// @notice Validates settlement prerequisites. Can be overridden by derived contracts to add additional checks.
