@@ -179,30 +179,6 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     return settlementId;
   }
 
-  function _emitFastTransferRequested(
-    uint64 destinationChainSelector,
-    bytes32 settlementId,
-    uint256 sourceAmountNetFee,
-    uint256 fillerFee,
-    uint256 poolFee,
-    bytes memory destinationPool,
-    bytes calldata receiver
-  ) internal {
-    bytes32 fillId = computeFillId(settlementId, sourceAmountNetFee, i_tokenDecimals, receiver);
-
-    emit FastTransferRequested({
-      destinationChainSelector: destinationChainSelector,
-      fillId: fillId,
-      settlementId: settlementId,
-      sourceAmountNetFee: sourceAmountNetFee,
-      sourceDecimals: i_tokenDecimals,
-      fillerFee: fillerFee,
-      poolFee: poolFee,
-      destinationPool: destinationPool,
-      receiver: receiver
-    });
-  }
-
   /// @inheritdoc IFastTransferPool
   function computeFillId(
     bytes32 settlementId,
@@ -657,5 +633,30 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     }
 
     emit FillerAllowListUpdated(fillersToAdd, fillersToRemove);
+  }
+
+  /// @dev Pulled out event emission into its own function to handle stack too deep in ccipSendToken
+  function _emitFastTransferRequested(
+    uint64 destinationChainSelector,
+    bytes32 settlementId,
+    uint256 sourceAmountNetFee,
+    uint256 fillerFee,
+    uint256 poolFee,
+    bytes memory destinationPool,
+    bytes calldata receiver
+  ) internal {
+    bytes32 fillId = computeFillId(settlementId, sourceAmountNetFee, i_tokenDecimals, receiver);
+
+    emit FastTransferRequested({
+      destinationChainSelector: destinationChainSelector,
+      fillId: fillId,
+      settlementId: settlementId,
+      sourceAmountNetFee: sourceAmountNetFee,
+      sourceDecimals: i_tokenDecimals,
+      fillerFee: fillerFee,
+      poolFee: poolFee,
+      destinationPool: destinationPool,
+      receiver: receiver
+    });
   }
 }
