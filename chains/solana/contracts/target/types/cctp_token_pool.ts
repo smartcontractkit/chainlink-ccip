@@ -931,44 +931,6 @@ export type CctpTokenPool = {
       ]
     },
     {
-      "name": "addVersionToChainConfig",
-      "accounts": [
-        {
-          "name": "state",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "chainConfig",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "remoteChainSelector",
-          "type": "u64"
-        },
-        {
-          "name": "mint",
-          "type": "publicKey"
-        }
-      ]
-    },
-    {
       "name": "reclaimFunds",
       "docs": [
         "Returns an amount of SOL from the pool signer account to the designated",
@@ -2374,44 +2336,6 @@ export const IDL: CctpTokenPool = {
         {
           "name": "attestation",
           "type": "bytes"
-        }
-      ]
-    },
-    {
-      "name": "addVersionToChainConfig",
-      "accounts": [
-        {
-          "name": "state",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "chainConfig",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "remoteChainSelector",
-          "type": "u64"
-        },
-        {
-          "name": "mint",
-          "type": "publicKey"
         }
       ]
     },

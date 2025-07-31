@@ -432,36 +432,6 @@ impl TokenOfframpRemainingAccounts<'_> {
 }
 
 #[derive(Accounts)]
-#[instruction(remote_chain_selector: u64, mint: Pubkey)]
-pub struct AddVersionToChainConfig<'info> {
-    #[account(
-        seeds = [
-            POOL_STATE_SEED,
-            mint.key().as_ref(),
-        ],
-        bump,
-    )]
-    pub state: Account<'info, State>,
-
-    /// CHECK
-    #[account(
-        mut,
-        seeds = [
-            POOL_CHAINCONFIG_SEED,
-            remote_chain_selector.to_le_bytes().as_ref(),
-            mint.as_ref()
-        ],
-        bump,
-    )]
-    pub chain_config: AccountInfo<'info>,
-
-    #[account(mut, address = state.config.owner @ CcipTokenPoolError::Unauthorized)]
-    pub authority: Signer<'info>,
-
-    pub system_program: Program<'info, anchor_lang::system_program::System>,
-}
-
-#[derive(Accounts)]
 #[instruction(lock_or_burn: LockOrBurnInV1)]
 pub struct TokenOnramp<'info> {
     // CCIP accounts ------------------------

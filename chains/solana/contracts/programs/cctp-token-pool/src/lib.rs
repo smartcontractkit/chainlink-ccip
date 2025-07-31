@@ -1,5 +1,5 @@
+use anchor_lang::prelude::*;
 use anchor_lang::solana_program::instruction::{AccountMeta, Instruction};
-use anchor_lang::{prelude::*, Discriminator};
 use solana_program::program::{get_return_data, invoke_signed};
 
 use base_token_pool::common::*;
@@ -454,66 +454,6 @@ pub mod cctp_token_pool {
             msg_total_nonce: msg_nonce,
             address: ctx.accounts.message_sent_event_account.key()
         });
-
-        Ok(())
-    }
-
-    pub fn add_version_to_chain_config(
-        ctx: Context<AddVersionToChainConfig>,
-        _remote_chain_selector: u64,
-        _mint: Pubkey,
-    ) -> Result<()> {
-        let acc_info = ctx.accounts.chain_config.to_account_info();
-
-        let chain_config_v0: ChainConfigV0;
-
-        // Validate the account to upgrade (the context already checks initialization and size)
-        {
-            let data = acc_info.try_borrow_data()?;
-            require!(
-                data[..8] == ChainConfig::DISCRIMINATOR,
-                CcipTokenPoolError::InvalidInputs
-            );
-
-            msg!("data {:?}", data);
-
-            chain_config_v0 = ChainConfigV0::deserialize(&mut &data[8..])?;
-        }
-
-        // Extend the account to the new size (realloc)
-        {
-            msg!("Extending account...");
-            let required_space = ANCHOR_DISCRIMINATOR + ChainConfig::INIT_SPACE;
-            let minimum_balance = Rent::get()?.minimum_balance(required_space);
-            let current_lamports = acc_info.lamports();
-
-            if current_lamports < minimum_balance {
-                anchor_lang::system_program::transfer(
-                    CpiContext::new(
-                        ctx.accounts.system_program.to_account_info(),
-                        anchor_lang::system_program::Transfer {
-                            from: ctx.accounts.authority.to_account_info(),
-                            to: acc_info.clone(),
-                        },
-                    ),
-                    minimum_balance.checked_sub(current_lamports).unwrap(),
-                )?;
-            }
-            acc_info.realloc(required_space, false)?;
-        }
-        msg!("Chain config V0 {:?}", chain_config_v0);
-
-        let chain_config = ChainConfig {
-            version: 1,
-            base: chain_config_v0.base,
-            cctp: chain_config_v0.cctp,
-        };
-
-        msg!("Chain config {:?}", chain_config);
-
-        // Persist the upgraded account data
-        msg!("Re-serialize account...");
-        chain_config.try_serialize(&mut &mut acc_info.try_borrow_mut_data()?[..])?;
 
         Ok(())
     }
