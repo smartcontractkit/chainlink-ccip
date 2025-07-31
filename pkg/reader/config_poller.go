@@ -735,7 +735,25 @@ func (c *configPoller) fetchChainConfig(
 	if err != nil {
 		return ChainConfigSnapshot{}, fmt.Errorf("batch get latest values for chain %d: %w", chainSel, err)
 	}
-	c.lggr.Info("BATCH RESULT: ", batchResult)
+
+	for chain, results := range batchResult {
+		for _, readResult := range results {
+			v, err := readResult.GetResult()
+			if err != nil {
+				c.lggr.Errorw("Error reading batch result",
+					"chain", chain,
+					"readName", readResult.ReadName,
+					"error", err)
+				continue
+			}
+
+			c.lggr.Infow("CONFIG RESULT",
+				"chain", chain,
+				"readName", readResult.ReadName,
+				"value", v)
+		}
+	}
+
 	if len(skipped) > 0 {
 		c.lggr.Infow("some contracts were skipped due to no bindings",
 			"chain", chainSel,

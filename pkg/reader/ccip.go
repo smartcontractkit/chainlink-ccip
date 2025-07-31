@@ -1431,6 +1431,7 @@ func (r *ccipChainReader) processOfframpResults(
 	processors := []resultProcessor{
 		// CommitLatestOCRConfig
 		func(val interface{}) error {
+			r.lggr.Info("DECODING OCRRESPONSE: ", val)
 			typed, ok := val.(*OCRConfigResponse)
 			if !ok {
 				return fmt.Errorf("invalid type for CommitLatestOCRConfig: %T", val)
