@@ -2543,6 +2543,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_event_emitter"
+version = "0.1.1-dev"
+dependencies = [
+ "anchor-lang",
+]
+
+[[package]]
 name = "thiserror"
 version = "1.0.57"
 source = "registry+https://github.com/rust-lang/crates.io-index"

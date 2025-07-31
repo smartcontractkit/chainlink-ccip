@@ -29,6 +29,7 @@ var (
 	CctpMessageTransmitter     = GetProgramID("cctp_message_transmitter")
 	CctpTokenMessengerMinter   = GetProgramID("cctp_token_messenger_minter")
 	CctpTokenPoolProgram       = GetProgramID("cctp_token_pool")
+	EventEmitter               = GetProgramID("test_event_emitter")
 
 	// test values
 	OnRampAddress                   = []byte{1, 2, 3}
