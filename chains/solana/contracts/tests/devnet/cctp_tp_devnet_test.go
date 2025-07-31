@@ -141,6 +141,26 @@ func TestCctpTpDevnet(t *testing.T) {
 	var programData ProgramData
 	require.NoError(t, bin.UnmarshalBorsh(&programData, data.Bytes()))
 
+	t.Run("Delete chain config", func(t *testing.T) {
+		t.Skip()
+
+		ix, err := cctp_token_pool.NewDeleteChainConfigInstruction(
+			chainSelector,
+			usdcMint,
+			cctpPool.state,
+			cctpPool.chainConfig,
+			admin.PublicKey(),
+		).ValidateAndBuild()
+		require.NoError(t, err)
+
+		res := testutils.SendAndConfirm(ctx, t, client, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+		require.NotNil(t, res)
+
+		for _, log := range res.Meta.LogMessages {
+			fmt.Println(log)
+		}
+	})
+
 	t.Run("Initialize TokenPool", func(t *testing.T) {
 		t.Skip()
 
@@ -165,22 +185,22 @@ func TestCctpTpDevnet(t *testing.T) {
 		// require.NoError(t, err)
 
 		// // set pool config
-		// ixConfigure, err := cctp_token_pool.NewInitChainRemoteConfigInstruction(
-		// 	chainSelector,
-		// 	usdcMint,
-		// 	cctp_token_pool.RemoteConfig{
-		// 		TokenAddress: cctp_token_pool.RemoteAddress{
-		// 			Address: usdcMint.Bytes(),
-		// 		},
-		// 		Decimals:      usdcDecimals,
-		// 		PoolAddresses: []cctp_token_pool.RemoteAddress{},
-		// 	},
-		// 	cctpPool.state,
-		// 	cctpPool.chainConfig,
-		// 	admin.PublicKey(),
-		// 	solana.SystemProgramID,
-		// ).ValidateAndBuild()
-		// require.NoError(t, err)
+		ixConfigure, err := cctp_token_pool.NewInitChainRemoteConfigInstruction(
+			chainSelector,
+			usdcMint,
+			cctp_token_pool.RemoteConfig{
+				TokenAddress: cctp_token_pool.RemoteAddress{
+					Address: usdcMint.Bytes(),
+				},
+				Decimals:      usdcDecimals,
+				PoolAddresses: []cctp_token_pool.RemoteAddress{},
+			},
+			cctpPool.state,
+			cctpPool.chainConfig,
+			admin.PublicKey(),
+			solana.SystemProgramID,
+		).ValidateAndBuild()
+		require.NoError(t, err)
 
 		ixEditChainRemoteConfig, err := cctp_token_pool.NewEditChainRemoteConfigInstruction(
 			chainSelector,
@@ -229,7 +249,7 @@ func TestCctpTpDevnet(t *testing.T) {
 		// require.Equal(t, poolTokenAccount, cctpPool.tokenAccount)
 
 		// submit tx with all instructions
-		res := testutils.SendAndConfirm(ctx, t, client, []solana.Instruction{ixEditChainRemoteConfig, ixAppend, ixCctpConfigure}, admin, config.DefaultCommitment)
+		res := testutils.SendAndConfirm(ctx, t, client, []solana.Instruction{ixConfigure, ixEditChainRemoteConfig, ixAppend, ixCctpConfigure}, admin, config.DefaultCommitment)
 		require.NotNil(t, res)
 
 		// 	// validate state
