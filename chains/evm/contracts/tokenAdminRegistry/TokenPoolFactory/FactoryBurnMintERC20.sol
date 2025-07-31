@@ -64,12 +64,6 @@ contract FactoryBurnMintERC20 is IBurnMintERC20, IGetCCIPAdmin, IERC165, ERC20Bu
 
     // Mint the initial supply to the new Owner, saving gas by not calling if the mint amount is zero
     if (preMint != 0) _mint(newOwner, preMint);
-
-    // Grant the deployer the minter and burner roles. This contract is expected to be deployed by a factory
-    // contract that will transfer ownership to the correct address after deployment, so granting minting and burning
-    // privileges here saves gas by not requiring two transactions.
-    grantMintRole(newOwner);
-    grantBurnRole(newOwner);
   }
 
   /// @inheritdoc IERC165
