@@ -135,6 +135,12 @@ impl ExecutionReportBuffer {
             chunk_length
         };
 
+        require_gt!(
+            global_chunk_length,
+            0,
+            CcipOfframpError::ExecutionReportBufferInvalidChunkSize
+        );
+
         require_eq!(
             total_chunks as u32,
             div_ceil(report_length, global_chunk_length),
