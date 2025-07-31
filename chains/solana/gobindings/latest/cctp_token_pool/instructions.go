@@ -77,6 +77,8 @@ var (
 
 	Instruction_ReclaimEventAccount = ag_binary.TypeID([8]byte{94, 198, 180, 159, 131, 236, 15, 174})
 
+	Instruction_AddVersionToChainConfig = ag_binary.TypeID([8]byte{191, 199, 123, 103, 57, 65, 16, 218})
+
 	// Returns an amount of SOL from the pool signer account to the designated
 	// fund reclaimer. There are three entities involved:
 	//
@@ -139,6 +141,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "LockOrBurnTokens"
 	case Instruction_ReclaimEventAccount:
 		return "ReclaimEventAccount"
+	case Instruction_AddVersionToChainConfig:
+		return "AddVersionToChainConfig"
 	case Instruction_ReclaimFunds:
 		return "ReclaimFunds"
 	case Instruction_DeriveAccountsReleaseOrMintTokens:
@@ -230,6 +234,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"reclaim_event_account", (*ReclaimEventAccount)(nil),
+		},
+		{
+			"add_version_to_chain_config", (*AddVersionToChainConfig)(nil),
 		},
 		{
 			"reclaim_funds", (*ReclaimFunds)(nil),

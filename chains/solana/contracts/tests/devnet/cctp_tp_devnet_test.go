@@ -141,6 +141,18 @@ func TestCctpTpDevnet(t *testing.T) {
 	var programData ProgramData
 	require.NoError(t, bin.UnmarshalBorsh(&programData, data.Bytes()))
 
+	t.Run("Upgrade chain config", func(t *testing.T) {
+		t.Skip()
+
+		ix, err := cctp_token_pool.NewAddVersionToChainConfigInstruction(chainSelector, usdcMint, cctpPool.state, cctpPool.chainConfig, admin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+		require.NoError(t, err)
+		res := testutils.SendAndConfirm(ctx, t, client, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+		require.NotNil(t, res)
+		for _, log := range res.Meta.LogMessages {
+			fmt.Println(log)
+		}
+	})
+
 	t.Run("Initialize TokenPool", func(t *testing.T) {
 		t.Skip()
 

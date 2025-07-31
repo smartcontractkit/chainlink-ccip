@@ -1466,6 +1466,12 @@ func TestTokenPool(t *testing.T) {
 			var messageSentEventData message_transmitter.MessageSent
 			var attestation []byte
 
+			t.Run("Test PDA upgrade", func(t *testing.T) {
+				ix, err := cctp_token_pool.NewAddVersionToChainConfigInstruction(config.SvmChainSelector, usdcMint, cctpPool.State, cctpPool.SvmChainConfig, admin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+				require.NoError(t, err)
+				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+			})
+
 			t.Run("Basic onramp", func(t *testing.T) {
 				// fund pool signer with SOL so it can pay for the rent of the message sent event account
 				fundPoolSignerIx, err := tokens.NativeTransfer(1*solana.LAMPORTS_PER_SOL, admin.PublicKey(), cctpPool.Signer)

@@ -931,6 +931,44 @@ export type CctpTokenPool = {
       ]
     },
     {
+      "name": "addVersionToChainConfig",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "chainConfig",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "CHECK"
+          ]
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "remoteChainSelector",
+          "type": "u64"
+        },
+        {
+          "name": "mint",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
       "name": "reclaimFunds",
       "docs": [
         "Returns an amount of SOL from the pool signer account to the designated",
@@ -1066,6 +1104,10 @@ export type CctpTokenPool = {
         "kind": "struct",
         "fields": [
           {
+            "name": "version",
+            "type": "u8"
+          },
+          {
             "name": "base",
             "type": {
               "defined": "BaseChain"
@@ -1168,6 +1210,26 @@ export type CctpTokenPool = {
           {
             "name": "destinationCaller",
             "type": "publicKey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ChainConfigV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "base",
+            "type": {
+              "defined": "BaseChain"
+            }
+          },
+          {
+            "name": "cctp",
+            "type": {
+              "defined": "CctpChain"
+            }
           }
         ]
       }
@@ -2316,6 +2378,44 @@ export const IDL: CctpTokenPool = {
       ]
     },
     {
+      "name": "addVersionToChainConfig",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "chainConfig",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "CHECK"
+          ]
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "remoteChainSelector",
+          "type": "u64"
+        },
+        {
+          "name": "mint",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
       "name": "reclaimFunds",
       "docs": [
         "Returns an amount of SOL from the pool signer account to the designated",
@@ -2451,6 +2551,10 @@ export const IDL: CctpTokenPool = {
         "kind": "struct",
         "fields": [
           {
+            "name": "version",
+            "type": "u8"
+          },
+          {
             "name": "base",
             "type": {
               "defined": "BaseChain"
@@ -2553,6 +2657,26 @@ export const IDL: CctpTokenPool = {
           {
             "name": "destinationCaller",
             "type": "publicKey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ChainConfigV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "base",
+            "type": {
+              "defined": "BaseChain"
+            }
+          },
+          {
+            "name": "cctp",
+            "type": {
+              "defined": "CctpChain"
+            }
           }
         ]
       }

@@ -11,6 +11,7 @@ use crate::{CctpTokenPoolError, ChainConfig, PoolConfig, State};
 
 const MAX_POOL_STATE_V: u8 = 1;
 const MAX_POOL_CONFIG_V: u8 = 1;
+const MAX_POOL_CHAIN_CONFIG_V: u8 = 1;
 
 const ANCHOR_DISCRIMINATOR: usize = 8;
 
@@ -271,6 +272,7 @@ pub struct TokenOfframp<'info> {
             mint.key().as_ref(),
         ],
         bump,
+        constraint = valid_version(chain_config.version, MAX_POOL_CHAIN_CONFIG_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub chain_config: Account<'info, ChainConfig>,
 
@@ -430,6 +432,36 @@ impl TokenOfframpRemainingAccounts<'_> {
 }
 
 #[derive(Accounts)]
+#[instruction(remote_chain_selector: u64, mint: Pubkey)]
+pub struct AddVersionToChainConfig<'info> {
+    #[account(
+        seeds = [
+            POOL_STATE_SEED,
+            mint.key().as_ref(),
+        ],
+        bump,
+    )]
+    pub state: Account<'info, State>,
+
+    /// CHECK
+    #[account(
+        mut,
+        seeds = [
+            POOL_CHAINCONFIG_SEED,
+            remote_chain_selector.to_le_bytes().as_ref(),
+            mint.as_ref()
+        ],
+        bump,
+    )]
+    pub chain_config: AccountInfo<'info>,
+
+    #[account(mut, address = state.config.owner @ CcipTokenPoolError::Unauthorized)]
+    pub authority: Signer<'info>,
+
+    pub system_program: Program<'info, anchor_lang::system_program::System>,
+}
+
+#[derive(Accounts)]
 #[instruction(lock_or_burn: LockOrBurnInV1)]
 pub struct TokenOnramp<'info> {
     // CCIP accounts ------------------------
@@ -500,6 +532,7 @@ pub struct TokenOnramp<'info> {
             mint.key().as_ref()
         ],
         bump,
+        constraint = valid_version(chain_config.version, MAX_POOL_CHAIN_CONFIG_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub chain_config: Account<'info, ChainConfig>,
 
@@ -649,6 +682,7 @@ pub struct EditChainConfig<'info> {
             mint.key().as_ref(),
         ],
         bump,
+        constraint = valid_version(chain_config.version, MAX_POOL_CHAIN_CONFIG_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub chain_config: Account<'info, ChainConfig>,
 
@@ -677,6 +711,7 @@ pub struct SetChainRateLimit<'info> {
             mint.key().as_ref(),
         ],
         bump,
+        constraint = valid_version(chain_config.version, MAX_POOL_CHAIN_CONFIG_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub chain_config: Account<'info, ChainConfig>,
 
@@ -719,6 +754,7 @@ pub struct EditChainConfigDynamicSize<'info> {
             mint.key().as_ref(),
         ],
         bump,
+        constraint = valid_version(chain_config.version, MAX_POOL_CHAIN_CONFIG_V) @ CcipTokenPoolError::InvalidVersion,
         realloc = ANCHOR_DISCRIMINATOR + ChainConfig::INIT_SPACE + cfg.pool_addresses.iter().map(RemoteAddress::space).sum::<usize>(),
         realloc::payer = authority,
         realloc::zero = false
@@ -752,6 +788,7 @@ pub struct AppendRemotePoolAddresses<'info> {
             mint.key().as_ref(),
         ],
         bump,
+        constraint = valid_version(chain_config.version, MAX_POOL_CHAIN_CONFIG_V) @ CcipTokenPoolError::InvalidVersion,
         realloc = ANCHOR_DISCRIMINATOR + ChainConfig::INIT_SPACE
             + chain_config.base.remote.pool_addresses.iter().map(RemoteAddress::space).sum::<usize>()
             + addresses.iter().map(RemoteAddress::space).sum::<usize>(),

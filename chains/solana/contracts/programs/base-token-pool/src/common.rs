@@ -208,7 +208,7 @@ impl BaseConfig {
     }
 }
 
-#[derive(InitSpace, AnchorSerialize, AnchorDeserialize, Clone)]
+#[derive(InitSpace, AnchorSerialize, AnchorDeserialize, Clone, Debug)]
 pub struct BaseChain {
     pub remote: RemoteConfig,
     pub inbound_rate_limit: RateLimitTokenBucket,
@@ -286,7 +286,7 @@ impl BaseChain {
     }
 }
 
-#[derive(InitSpace, Clone, AnchorSerialize, AnchorDeserialize)]
+#[derive(InitSpace, Clone, AnchorSerialize, AnchorDeserialize, Debug)]
 pub struct RemoteConfig {
     // Remote pool addresses are a vec to support multiple pool versions of the same token.
     // Although for a given remote chain, there should be one active pool address at a time,
@@ -311,7 +311,7 @@ impl RemoteConfig {
     }
 }
 
-#[derive(Default, InitSpace, Clone, AnchorDeserialize, AnchorSerialize, PartialEq, Eq)]
+#[derive(Default, InitSpace, Clone, AnchorDeserialize, AnchorSerialize, PartialEq, Eq, Debug)]
 pub struct RemoteAddress {
     #[max_len(64)]
     pub address: Vec<u8>,

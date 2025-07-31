@@ -7,14 +7,14 @@ use crate::common::CcipTokenPoolError;
 
 // NOTE: spl-token or spl-token-2022 use u64 for amounts
 
-#[derive(InitSpace, Clone, AnchorSerialize, AnchorDeserialize)]
+#[derive(InitSpace, Clone, AnchorSerialize, AnchorDeserialize, Debug)]
 pub struct RateLimitTokenBucket {
     pub tokens: u64, // Current number of tokens that are in the bucket. Represents how many tokens a single transaction can consume in a single transaction - different than total number of tokens within a pool
     pub last_updated: u64, // Timestamp in seconds of the last token refill, good for 100+ years.
     cfg: RateLimitConfig,
 }
 
-#[derive(InitSpace, Clone, AnchorSerialize, AnchorDeserialize)]
+#[derive(InitSpace, Clone, AnchorSerialize, AnchorDeserialize, Debug)]
 pub struct RateLimitConfig {
     pub enabled: bool, // Indication whether the rate limiting is enabled or not
     pub capacity: u64, // Maximum number of tokens that can be in the bucket.

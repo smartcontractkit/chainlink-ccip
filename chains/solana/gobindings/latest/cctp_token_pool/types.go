@@ -194,6 +194,39 @@ func (obj *CctpChain) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err erro
 	return nil
 }
 
+type ChainConfigV0 struct {
+	Base BaseChain
+	Cctp CctpChain
+}
+
+func (obj ChainConfigV0) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Base` param:
+	err = encoder.Encode(obj.Base)
+	if err != nil {
+		return err
+	}
+	// Serialize `Cctp` param:
+	err = encoder.Encode(obj.Cctp)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *ChainConfigV0) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Base`:
+	err = decoder.Decode(&obj.Base)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Cctp`:
+	err = decoder.Decode(&obj.Cctp)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 type OnrampDeriveStage ag_binary.BorshEnum
 
 const (
