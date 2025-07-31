@@ -26,6 +26,7 @@ contract CCTPMessageTransmitterProxy is Ownable2StepMsgSender, ITypeAndVersion {
   event AllowedCallerRemoved(address indexed caller);
 
   string public constant override typeAndVersion = "CCTPMessageTransmitterProxy 1.6.2";
+
   struct AllowedCallerConfigArgs {
     address caller;
     bool allowed;
