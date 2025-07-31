@@ -86,13 +86,15 @@ func TestCctpTpDevnet(t *testing.T) {
 
 	remotePoolBytes, err := hex.DecodeString(devnetInfo.CCTP.Sepolia.TokenPool)
 	require.NoError(t, err)
-	remotePoolAddressBytes := [32]byte{}
-	copy(remotePoolAddressBytes[32-len(remotePoolBytes):], remotePoolBytes)
-	remotePoolAddress := solana.PublicKey(remotePoolAddressBytes)
 
 	chainSelector := devnetInfo.ChainSelectors.Sepolia
 	domain := domains[chainSelector]
-	domainDestCaller := remotePoolAddress
+
+	domainDestCallerAddress, err := hex.DecodeString(devnetInfo.CCTP.Sepolia.AllowedCaller)
+	require.NoError(t, err)
+	domainDestCallerBytes := [32]byte{}
+	copy(domainDestCallerBytes[32-len(domainDestCallerAddress):], domainDestCallerAddress)
+	domainDestCaller := solana.PublicKey(domainDestCallerBytes)
 
 	cctpPool := getCctpTokenPoolPDAs(t, cctpTpProgram, chainSelector, usdcMint)
 	messageTransmitter := getMessageTransmitterPDAs(t, cctpMtProgram, cctpTmmProgram)
@@ -213,7 +215,7 @@ func TestCctpTpDevnet(t *testing.T) {
 		ixAppend, err := cctp_token_pool.NewAppendRemotePoolAddressesInstruction(
 			chainSelector,
 			usdcMint,
-			[]cctp_token_pool.RemoteAddress{{Address: remotePoolAddress.Bytes()}},
+			[]cctp_token_pool.RemoteAddress{{Address: remotePoolBytes}},
 			cctpPool.state,
 			cctpPool.chainConfig,
 			admin.PublicKey(),
@@ -465,7 +467,7 @@ func TestCctpTpDevnet(t *testing.T) {
 				tpLookupTableAddr,
 				tokenAdminRegistry,
 				cctpPool.program,
-				cctpPool.state,        // 3 - writable
+				cctpPool.state,
 				cctpPool.tokenAccount, // 4 - writable
 				cctpPool.signer,       // 5 - writable (to pay for event account)
 				solana.TokenProgramID,
@@ -473,14 +475,13 @@ func TestCctpTpDevnet(t *testing.T) {
 				fqUsdcBillingTokenConfig,
 				routerSigner,
 				// -- CCTP custom entries --
-				tokenMessengerMinter.authorityPda,
-				messageTransmitter.messageTransmitter, // 11 - writable
-				tokenMessengerMinter.tokenMessenger,
-				tokenMessengerMinter.tokenMinter,
-				tokenMessengerMinter.localToken, // 14 - writable
-				messageTransmitter.program,
+				messageTransmitter.messageTransmitter, // 10 - writable
 				tokenMessengerMinter.program,
 				solana.SystemProgramID,
+				messageTransmitter.program,
+				tokenMessengerMinter.tokenMessenger,
+				tokenMessengerMinter.tokenMinter,
+				tokenMessengerMinter.localToken, // 16 - writable
 				tokenMessengerMinter.eventAuthority,
 			}
 
@@ -494,7 +495,7 @@ func TestCctpTpDevnet(t *testing.T) {
 			common.AwaitSlotChange(ctx, client)
 		})
 
-		writableIndexes := []byte{3, 4, 5, 7, 11, 14}
+		writableIndexes := []byte{4, 5, 7, 10, 16}
 
 		t.Run("Upgrade TokenAdminRegistry", func(t *testing.T) {
 			t.Skip()

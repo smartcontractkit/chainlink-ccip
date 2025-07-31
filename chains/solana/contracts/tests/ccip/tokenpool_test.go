@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"maps"
 	"strings"
 	"testing"
 	"time"
@@ -73,6 +74,8 @@ func TestTokenPool(t *testing.T) {
 		return balanceRes.Value.Amount
 	}
 
+	var offrampLookupTable map[solana.PublicKey]solana.PublicKeySlice
+
 	remotePool := test_token_pool.RemoteAddress{Address: []byte{1, 2, 3}}
 	remoteToken := test_token_pool.RemoteAddress{Address: []byte{4, 5, 6}}
 
@@ -100,6 +103,29 @@ func TestTokenPool(t *testing.T) {
 		require.NoError(t, err)
 
 		testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{evmIx, svmIx}, admin, config.DefaultCommitment)
+	})
+
+	t.Run("setup: (dumb) offramp lookup table", func(t *testing.T) {
+		offrampLookupTableAddr, kErr := common.CreateLookupTable(ctx, solanaGoClient, admin)
+		require.NoError(t, kErr)
+
+		entries := solana.PublicKeySlice{
+			dumbRamp,
+			config.RMNRemoteProgram,
+			config.RMNRemoteConfigPDA,
+			config.RMNRemoteCursesPDA,
+			solana.SystemProgramID,
+			// hack just for the test to have it here - it shouldn't be in the table, but our tests are also
+			// cursing in the same tx (to avoid concurrency side-effects) and thus need the extra space
+			allowedOfframpSvmPDA,
+		}
+
+		offrampLookupTable = map[solana.PublicKey]solana.PublicKeySlice{
+			offrampLookupTableAddr: entries,
+		}
+
+		require.NoError(t, common.ExtendLookupTable(ctx, solanaGoClient, offrampLookupTableAddr, admin, entries))
+		require.NoError(t, common.AwaitSlotChange(ctx, solanaGoClient))
 	})
 
 	t.Run("setup: RMN Remote", func(t *testing.T) {
@@ -914,7 +940,7 @@ func TestTokenPool(t *testing.T) {
 		domain := uint32(5)
 
 		messageTransmitter := cctp.GetMessageTransmitterPDAs(t)
-		tokenMessengerMinter := cctp.GetTokenMessengerMinterPDAs(t, domain, usdcMint)
+		tokenMessengerMinter := cctp.GetTokenMessengerMinterPDAs(t, domain, usdcMint, usdcMint[:])
 		cctpPool := cctp.GetTokenPoolPDAs(t, usdcMint)
 
 		cctp_message_transmitter.SetProgramID(messageTransmitter.Program)
@@ -988,16 +1014,13 @@ func TestTokenPool(t *testing.T) {
 						solana.SystemProgramID, // placeholder for the router signer, as there is none in the dumb ramp
 						// -- CCTP custom entries --
 						messageTransmitter.MessageTransmitter,
-						messageTransmitter.EventAuthority,
-						messageTransmitter.AuthorityPda,
+						tokenMessengerMinter.Program,
+						solana.SystemProgramID,
 						messageTransmitter.Program,
-						tokenMessengerMinter.AuthorityPda,
 						tokenMessengerMinter.TokenMessenger,
 						tokenMessengerMinter.TokenMinter,
-						tokenMessengerMinter.EventAuthority,
-						tokenMessengerMinter.CustodyTokenAccount,
 						tokenMessengerMinter.LocalToken,
-						tokenMessengerMinter.Program,
+						tokenMessengerMinter.EventAuthority,
 					}
 
 					tpLookupTable = map[solana.PublicKey]solana.PublicKeySlice{
@@ -1265,31 +1288,6 @@ func TestTokenPool(t *testing.T) {
 			})
 		})
 
-		getCctpNonce := func(t *testing.T, messageBytes []byte) uint64 {
-			t.Helper()
-			nonceBytes := messageBytes[12:20] // extract nonce from message, which is the 12th to 20th byte of the message
-			nonce := binary.BigEndian.Uint64(nonceBytes)
-			return nonce
-		}
-
-		getUsedNoncesPDA := func(t *testing.T, messageSent message_transmitter.MessageSent) solana.PublicKey {
-			t.Helper()
-			nonce := getCctpNonce(t, messageSent.Message)
-			fmt.Println("Nonce for receiving message:", nonce)
-			firstNonce := (nonce-1)/6400*6400 + 1 // round down to the first nonce that is a multiple of 6400
-			fmt.Println("First nonce:", firstNonce)
-			firstNoncePda, _, err := solana.FindProgramAddress(
-				[][]byte{
-					[]byte("used_nonces"),
-					[]byte(common.NumToStr(domain)),
-					[]byte(common.NumToStr(firstNonce)),
-				},
-				messageTransmitter.Program,
-			)
-			require.NoError(t, err)
-			return firstNoncePda
-		}
-
 		t.Run("CCTP sanity checks", func(t *testing.T) {
 			messageAmount := uint64(1123456) // 1.123456 USDC, as it uses 6 decimals
 
@@ -1354,7 +1352,7 @@ func TestTokenPool(t *testing.T) {
 					_, initial, err := tokens.TokenBalance(ctx, solanaGoClient, adminATA, config.DefaultCommitment)
 					require.NoError(t, err)
 
-					usedNoncesPDA := getUsedNoncesPDA(t, messageSent)
+					usedNoncesPDA := cctp.GetUsedNoncesPDA(t, messageSent.Message)
 
 					attestation, err = ccip.AttestCCTP(messageSent.Message, attesters)
 					fmt.Println("Attestation:", hex.EncodeToString(attestation))
@@ -1487,20 +1485,20 @@ func TestTokenPool(t *testing.T) {
 				}
 
 				dynamicAdditionalAccountMetas := []*solana.AccountMeta{
+					solana.Meta(tokenMessengerMinter.AuthorityPda),
 					solana.Meta(tokenMessengerMinter.RemoteTokenMessenger),
 					solana.Meta(messageSentEventAddress).WRITE(),
 				}
 
 				additionalAccountMetas := []*solana.AccountMeta{
 					// static ones, present in LUT
-					solana.Meta(tokenMessengerMinter.AuthorityPda),
 					solana.Meta(messageTransmitter.MessageTransmitter).WRITE(),
+					solana.Meta(tokenMessengerMinter.Program),
+					solana.Meta(solana.SystemProgramID),
+					solana.Meta(messageTransmitter.Program),
 					solana.Meta(tokenMessengerMinter.TokenMessenger),
 					solana.Meta(tokenMessengerMinter.TokenMinter),
 					solana.Meta(tokenMessengerMinter.LocalToken).WRITE(),
-					solana.Meta(messageTransmitter.Program),
-					solana.Meta(tokenMessengerMinter.Program),
-					solana.Meta(solana.SystemProgramID),
 					solana.Meta(tokenMessengerMinter.EventAuthority),
 				}
 				additionalAccountMetas = append(additionalAccountMetas, dynamicAdditionalAccountMetas...)
@@ -1598,10 +1596,10 @@ func TestTokenPool(t *testing.T) {
 					require.Equal(t, domain, ccipCctpMessageSentEvent.SourceDomain)
 
 					// Check CCTP nonce in all ways it appears
-					outputNonce := binary.BigEndian.Uint64(output.DestPoolData[24:32])                        // in pool returned dest data
-					require.Equal(t, outputNonce, getCctpNonce(t, ccipCctpMessageSentEvent.MessageSentBytes)) // in event message bytes
-					require.Equal(t, outputNonce, getCctpNonce(t, messageSentEventData.Message))              // in event account data
-					require.Equal(t, outputNonce, ccipCctpMessageSentEvent.CctpNonce)                         // in the event field
+					outputNonce := binary.BigEndian.Uint64(output.DestPoolData[24:32])                      // in pool returned dest data
+					require.Equal(t, outputNonce, cctp.GetNonce(ccipCctpMessageSentEvent.MessageSentBytes)) // in event message bytes
+					require.Equal(t, outputNonce, cctp.GetNonce(messageSentEventData.Message))              // in event account data
+					require.Equal(t, outputNonce, ccipCctpMessageSentEvent.CctpNonce)                       // in the event field
 				})
 			})
 
@@ -1628,7 +1626,7 @@ func TestTokenPool(t *testing.T) {
 				require.NoError(t, offchainTokenData.MarshalWithEncoder(bin.NewBorshEncoder(offchainTokenDataBuffer)))
 
 				sourcePoolData := make([]byte, 64)
-				binary.BigEndian.PutUint64(sourcePoolData[24:32], getCctpNonce(t, messageSentEventData.Message))
+				binary.BigEndian.PutUint64(sourcePoolData[24:32], cctp.GetNonce(messageSentEventData.Message))
 				binary.BigEndian.PutUint32(sourcePoolData[60:64], domain)
 
 				releaseOrMintIn := cctp_token_pool.ReleaseOrMintInV1{
@@ -1642,22 +1640,28 @@ func TestTokenPool(t *testing.T) {
 					OffchainTokenData:   offchainTokenDataBuffer.Bytes(),
 				}
 
-				additionalAccountMetas := []*solana.AccountMeta{
+				dynamicAdditionalAccountMetas := []*solana.AccountMeta{
+					// Accounts not in LUT
 					solana.Meta(messageTransmitter.AuthorityPda),
+					solana.Meta(messageTransmitter.EventAuthority),
+					solana.Meta(tokenMessengerMinter.CustodyTokenAccount).WRITE(),
+					solana.Meta(tokenMessengerMinter.RemoteTokenMessenger),
+					solana.Meta(tokenMessengerMinter.TokenPair),
+					solana.Meta(cctp.GetUsedNoncesPDA(t, messageSentEventData.Message)).WRITE(),
+				}
+
+				additionalAccountMetas := []*solana.AccountMeta{
+					// Accounts present in LUT
 					solana.Meta(messageTransmitter.MessageTransmitter),
 					solana.Meta(tokenMessengerMinter.Program),
 					solana.Meta(solana.SystemProgramID),
-					solana.Meta(messageTransmitter.EventAuthority),
 					solana.Meta(messageTransmitter.Program),
 					solana.Meta(tokenMessengerMinter.TokenMessenger),
 					solana.Meta(tokenMessengerMinter.TokenMinter).WRITE(),
 					solana.Meta(tokenMessengerMinter.LocalToken).WRITE(),
-					solana.Meta(tokenMessengerMinter.CustodyTokenAccount).WRITE(),
 					solana.Meta(tokenMessengerMinter.EventAuthority),
-					solana.Meta(tokenMessengerMinter.RemoteTokenMessenger),
-					solana.Meta(tokenMessengerMinter.TokenPair),
-					solana.Meta(getUsedNoncesPDA(t, messageSentEventData)).WRITE(),
 				}
+				additionalAccountMetas = append(additionalAccountMetas, dynamicAdditionalAccountMetas...)
 
 				t.Run("Accounts derivation", func(t *testing.T) {
 					accounts, tables := deriveCctpIxAccounts(ctx, t, solanaGoClient, admin, func(stage string, askWith []*solana.AccountMeta) RawIx {
@@ -1669,7 +1673,7 @@ func TestTokenPool(t *testing.T) {
 						return raw
 					})
 					require.Equal(t, []solana.PublicKey{}, tables)
-					require.Equal(t, additionalAccountMetas, accounts)
+					require.Equal(t, dynamicAdditionalAccountMetas, accounts)
 				})
 
 				raw := test_ccip_invalid_receiver.NewPoolProxyReleaseOrMintInstruction(
@@ -1706,6 +1710,11 @@ func TestTokenPool(t *testing.T) {
 				ix, err := raw.ValidateAndBuild()
 				require.NoError(t, err)
 
+				// merge lookup tables into single map
+				lookupTables := map[solana.PublicKey]solana.PublicKeySlice{}
+				maps.Copy(lookupTables, offrampLookupTable)
+				maps.Copy(lookupTables, tpLookupTable)
+
 				t.Run("When there is a global curse, it fails", func(t *testing.T) {
 					globalCurse := rmn_remote.CurseSubject{
 						Value: [16]uint8{0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01},
@@ -1721,8 +1730,8 @@ func TestTokenPool(t *testing.T) {
 
 					// submit curse and offramp in the same transaction, so there are no side-effects to other tests
 					// as the tx is atomic and reverts
-					testutils.SendAndFailWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{fundCustodyIx, curseIx, ix},
-						admin, config.DefaultCommitment, tpLookupTable, []string{ccip.GloballyCursed_RmnRemoteError.String()})
+					testutils.SendAndFailWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{curseIx, ix},
+						admin, config.DefaultCommitment, lookupTables, []string{ccip.GloballyCursed_RmnRemoteError.String()})
 				})
 
 				t.Run("When there is a lane curse, it fails", func(t *testing.T) {
@@ -1739,13 +1748,13 @@ func TestTokenPool(t *testing.T) {
 
 					// submit curse and offramp in the same transaction, so there are no side-effects to other tests
 					// as the tx is atomic and reverts
-					testutils.SendAndFailWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{fundCustodyIx, curseIx, ix},
-						admin, config.DefaultCommitment, tpLookupTable, []string{ccip.SubjectCursed_RmnRemoteError.String()})
+					testutils.SendAndFailWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{curseIx, ix},
+						admin, config.DefaultCommitment, lookupTables, []string{ccip.SubjectCursed_RmnRemoteError.String()})
 				})
 
 				t.Run("When there is no curse, it succeeds", func(t *testing.T) {
 					res := testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{fundCustodyIx, ix},
-						admin, config.DefaultCommitment, tpLookupTable)
+						admin, config.DefaultCommitment, lookupTables)
 					require.NotNil(t, res)
 
 					_, final, err := tokens.TokenBalance(ctx, solanaGoClient, adminATA, config.DefaultCommitment)
