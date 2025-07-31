@@ -845,14 +845,8 @@ pub struct PoolConfig {
     pub version: u8,
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, InitSpace)]
-pub struct ChainConfigV0 {
-    pub base: BaseChain,
-    pub cctp: CctpChain,
-}
-
 #[account]
-#[derive(InitSpace, Debug)]
+#[derive(InitSpace)]
 pub struct ChainConfig {
     pub version: u8,
     pub base: BaseChain,

@@ -1177,26 +1177,6 @@ export type CctpTokenPool = {
       }
     },
     {
-      "name": "ChainConfigV0",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "base",
-            "type": {
-              "defined": "BaseChain"
-            }
-          },
-          {
-            "name": "cctp",
-            "type": {
-              "defined": "CctpChain"
-            }
-          }
-        ]
-      }
-    },
-    {
       "name": "OnrampDeriveStage",
       "type": {
         "kind": "enum",
@@ -2581,26 +2561,6 @@ export const IDL: CctpTokenPool = {
           {
             "name": "destinationCaller",
             "type": "publicKey"
-          }
-        ]
-      }
-    },
-    {
-      "name": "ChainConfigV0",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "base",
-            "type": {
-              "defined": "BaseChain"
-            }
-          },
-          {
-            "name": "cctp",
-            "type": {
-              "defined": "CctpChain"
-            }
           }
         ]
       }
