@@ -63,7 +63,7 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     address router,
     address lockBox
   ) TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) {
-    if (lockBox == address(0)) revert ZeroAddressInvalid();
+    if (lockBox == address(0)) revert ZeroAddressNotAllowed();
 
     token.safeApprove(lockBox, type(uint256).max);
     i_lockBox = ERC20LockBox(lockBox);
@@ -76,7 +76,11 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     // super.lockOrBurn will validate the lockOrBurnIn and revert if invalid.
     out = super.lockOrBurn(lockOrBurnIn);
 
-    uint64 remoteChainSelector;
+    // The zero chain selector is used to designate unsiloed chains. remoteChainSelector is set to 0 if the token is not
+    // siloed, and overwritten if the token is being locked for a siloed chain. Since the remote chain must be passed
+    // to the lock box's deposit function, this saves gas by only updating the remoteChainSelector if necessary for a
+    // siloed chain.
+    uint64 remoteChainSelector = 0;
 
     // If funds need to be siloed, update internal accounting;
     if (s_chainConfigs[lockOrBurnIn.remoteChainSelector].isSiloed) {
@@ -118,7 +122,10 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     uint256 availableLiquidity = chainIsSiloed ? remoteConfig.tokenBalance : s_unsiloedTokenBalance;
     if (localAmount > availableLiquidity) revert InsufficientLiquidity(availableLiquidity, localAmount);
 
-    uint64 remoteChainSelector;
+    // Since a chain selector must be passed to the lock box's withdraw function, setting it as zero for an unsiloed
+    // chain saves gas since it only needs to be set if the chain is siloed, as opposed to a more complicated series
+    // of branches and checks.
+    uint64 remoteChainSelector = 0;
 
     // Deduct the amount from the correct silo balance, or the unsiloed balance.
     if (chainIsSiloed) {
@@ -206,7 +213,7 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
         revert InvalidChainSelector(adds[i].remoteChainSelector);
       }
 
-      if (adds[i].rebalancer == address(0)) revert ZeroAddressInvalid();
+      if (adds[i].rebalancer == address(0)) revert ZeroAddressNotAllowed();
 
       s_chainConfigs[adds[i].remoteChainSelector] =
         SiloConfig({tokenBalance: 0, rebalancer: adds[i].rebalancer, isSiloed: true});
@@ -348,8 +355,8 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     uint256 availableLiquidity = remoteConfig.isSiloed ? remoteConfig.tokenBalance : s_unsiloedTokenBalance;
     if (amount > availableLiquidity) revert InsufficientLiquidity(availableLiquidity, amount);
 
-    // Deduct the amount from the correct silo balance, or the unsiloed balance.
-    uint64 chainSelector;
+    // Deduct the amount from the correct silo balance, or the unsiloed balance
+    uint64 chainSelector = 0;
     if (remoteConfig.isSiloed) {
       remoteConfig.tokenBalance -= amount;
       chainSelector = remoteChainSelector;

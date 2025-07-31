@@ -23,7 +23,7 @@ contract TokenPoolWithAllowList_setRouter is TokenPoolWithAllowListSetup {
   function test_RevertWhen_ZeroAddressNotAllowed() public {
     address newRouter = address(0);
 
-    vm.expectRevert(TokenPool.ZeroAddressInvalid.selector);
+    vm.expectRevert(TokenPool.ZeroAddressNotAllowed.selector);
 
     s_tokenPool.setRouter(newRouter);
   }

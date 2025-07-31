@@ -142,7 +142,7 @@ contract TokenPool_addRemotePool is TokenPoolSetup {
   function test_RevertWhen_ZeroLengthAddressNotAllowed() public {
     bytes memory remotePool = "";
 
-    vm.expectRevert(abi.encodeWithSelector(TokenPool.ZeroAddressInvalid.selector));
+    vm.expectRevert(abi.encodeWithSelector(TokenPool.ZeroAddressNotAllowed.selector));
 
     s_tokenPool.addRemotePool(DEST_CHAIN_SELECTOR, remotePool);
   }

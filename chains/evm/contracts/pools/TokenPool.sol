@@ -42,7 +42,7 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   using RateLimiter for RateLimiter.TokenBucket;
 
   error CallerIsNotARampOnRouter(address caller);
-  error ZeroAddressInvalid();
+  error ZeroAddressNotAllowed();
   error SenderNotAllowed(address sender);
   error AllowListNotEnabled();
   error NonExistentChain(uint64 remoteChainSelector);
@@ -127,7 +127,7 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   address internal s_rateLimitAdmin;
 
   constructor(IERC20 token, uint8 localTokenDecimals, address[] memory allowlist, address rmnProxy, address router) {
-    if (address(token) == address(0) || router == address(0) || rmnProxy == address(0)) revert ZeroAddressInvalid();
+    if (address(token) == address(0) || router == address(0) || rmnProxy == address(0)) revert ZeroAddressNotAllowed();
     i_token = token;
     i_rmnProxy = rmnProxy;
 
@@ -180,7 +180,7 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   function setRouter(
     address newRouter
   ) public onlyOwner {
-    if (newRouter == address(0)) revert ZeroAddressInvalid();
+    if (newRouter == address(0)) revert ZeroAddressNotAllowed();
     address oldRouter = address(s_router);
     s_router = IRouter(newRouter);
 
@@ -278,7 +278,7 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   /// for various exploits.
   function _validateLockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
-  ) internal virtual {
+  ) internal {
     if (!isSupportedToken(lockOrBurnIn.localToken)) revert InvalidToken(lockOrBurnIn.localToken);
     if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(lockOrBurnIn.remoteChainSelector)))) revert CursedByRMN();
     _checkAllowList(lockOrBurnIn.originalSender);
@@ -297,10 +297,7 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   /// @param localAmount The local amount to be released or minted.
   /// @dev This function should always be called before executing a release or mint. Not doing so would allow
   /// for various exploits.
-  function _validateReleaseOrMint(
-    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
-    uint256 localAmount
-  ) internal virtual {
+  function _validateReleaseOrMint(Pool.ReleaseOrMintInV1 calldata releaseOrMintIn, uint256 localAmount) internal {
     if (!isSupportedToken(releaseOrMintIn.localToken)) revert InvalidToken(releaseOrMintIn.localToken);
     if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(releaseOrMintIn.remoteChainSelector)))) revert CursedByRMN();
     _onlyOffRamp(releaseOrMintIn.remoteChainSelector);
@@ -489,7 +486,7 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
       RateLimiter._validateTokenBucketConfig(newChain.inboundRateLimiterConfig);
 
       if (newChain.remoteTokenAddress.length == 0) {
-        revert ZeroAddressInvalid();
+        revert ZeroAddressNotAllowed();
       }
 
       // If the chain already exists, revert
@@ -533,7 +530,7 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   /// @param remotePoolAddress The address of the new remote pool.
   function _setRemotePool(uint64 remoteChainSelector, bytes memory remotePoolAddress) internal {
     if (remotePoolAddress.length == 0) {
-      revert ZeroAddressInvalid();
+      revert ZeroAddressNotAllowed();
     }
 
     bytes32 poolHash = keccak256(remotePoolAddress);

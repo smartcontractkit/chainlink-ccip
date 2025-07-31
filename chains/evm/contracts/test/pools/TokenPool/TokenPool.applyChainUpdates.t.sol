@@ -219,7 +219,7 @@ contract TokenPool_applyChainUpdates is BaseTest {
       inboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 100e28, rate: 1e18})
     });
 
-    vm.expectRevert(TokenPool.ZeroAddressInvalid.selector);
+    vm.expectRevert(TokenPool.ZeroAddressNotAllowed.selector);
     s_tokenPool.applyChainUpdates(new uint64[](0), chainUpdates);
 
     chainUpdates = new TokenPool.ChainUpdate[](1);
@@ -231,7 +231,7 @@ contract TokenPool_applyChainUpdates is BaseTest {
       inboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 100e28, rate: 1e18})
     });
 
-    vm.expectRevert(TokenPool.ZeroAddressInvalid.selector);
+    vm.expectRevert(TokenPool.ZeroAddressNotAllowed.selector);
     s_tokenPool.applyChainUpdates(new uint64[](0), chainUpdates);
   }
 

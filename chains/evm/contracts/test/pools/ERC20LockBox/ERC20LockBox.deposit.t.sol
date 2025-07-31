@@ -8,7 +8,7 @@ contract ERC20LockBox_deposit is ERC20LockBoxSetup {
   function testFuzz_Deposit_Success(
     uint256 amount
   ) public {
-    vm.assume(amount > 0 && amount <= type(uint256).max / 2);
+    amount = bound(amount, 1, type(uint256).max / 2);
 
     uint256 lockBoxBalanceBefore = s_token.balanceOf(address(s_erc20LockBox));
     uint256 chainBalanceBefore = s_erc20LockBox.getBalance(address(s_token), DEST_CHAIN_SELECTOR);
