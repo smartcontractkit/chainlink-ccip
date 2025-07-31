@@ -384,6 +384,61 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
     s_pool.ccipSendToken{value: 1 ether}(DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, 1 ether, zeroReceiver64, address(0), "");
   }
 
+  function testFuzz_ccipSendToken_RevertWhen_ReceiverInvalid(
+    uint8 lengthSeed,
+    bool shouldBeAllZeros,
+    uint256 randomSeed
+  ) public {
+    // Generate receiver length 0-100 to test both valid and invalid range
+    uint256 receiverLength = bound(lengthSeed, 0, 100);
+
+    bytes memory receiver;
+    bool shouldRevert = false;
+
+    if (receiverLength == 0) {
+      // Test case 1: Empty receiver (should revert)
+      receiver = "";
+      shouldRevert = true;
+    } else if (receiverLength > 64) {
+      // Test case 2: Oversized receiver (should revert)
+      receiver = new bytes(receiverLength);
+      // Fill with non-zero data to ensure it's rejected for length, not content
+      for (uint256 i = 0; i < receiverLength; ++i) {
+        receiver[i] = bytes1(uint8(randomSeed + i) % 255 + 1); // Non-zero bytes
+      }
+      shouldRevert = true;
+    } else {
+      // Test case 3: Valid length (1-64), but potentially all zeros
+      receiver = new bytes(receiverLength);
+
+      if (shouldBeAllZeros) {
+        // Leave as all zeros (should revert)
+        shouldRevert = true;
+      } else {
+        // Fill with at least one non-zero byte (should succeed)
+        // Use randomSeed to determine where to place the non-zero byte
+        uint256 nonZeroIndex = randomSeed % receiverLength;
+        receiver[nonZeroIndex] = bytes1(uint8(randomSeed % 255) + 1); // Ensure non-zero
+        shouldRevert = false;
+      }
+    }
+
+    if (shouldRevert) {
+      vm.expectRevert(abi.encodeWithSelector(FastTransferTokenPoolAbstract.InvalidReceiver.selector, receiver));
+      s_pool.ccipSendToken{value: 1 ether}(DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, 1 ether, receiver, address(0), "");
+    } else {
+      // For valid receivers, we need to set up mocks for successful execution
+      bytes32 mockMessageId = keccak256("mockMessageId");
+      _setupMocks(mockMessageId);
+
+      // Should succeed
+      bytes32 settlementId =
+        s_pool.ccipSendToken{value: 1 ether}(DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, 1 ether, receiver, address(0), "");
+
+      assertEq(settlementId, mockMessageId);
+    }
+  }
+
   function test_ccipSendToken_RevertWhen_FeeExceedsUserMaxLimit() public {
     // Setup: Calculate expected fee and set max limit lower
     uint256 expectedFee = (SOURCE_AMOUNT * FAST_FEE_FILLER_BPS) / 10_000; // 1% of 100 ether = 1 ether

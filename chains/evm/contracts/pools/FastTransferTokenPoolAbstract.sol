@@ -404,17 +404,15 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     bool isNonZero = false;
     assembly {
       let dataPtr := receiver.offset
-
       // Load and check first 32 bytes
       if calldataload(dataPtr) { isNonZero := 1 }
-      if iszero(isNonZero) {
-        if gt(receiverLength, 32) {
-          // Load and check second 32 bytes only if receiver length > 32
-          // Note: dataPtr + 32 may exceed the actual receiver data bounds (e.g., for 40-byte receiver,
-          // this reads bytes [32, 64) where [40, 64) is out-of-bounds). However, this is safe because
-          // calldata is ABI-encoded with zero-padding to 32-byte boundaries, so out-of-bounds bytes are zeros.
-          if calldataload(add(dataPtr, 32)) { isNonZero := 1 }
-        }
+
+      if gt(receiverLength, 32) {
+        // Load and check second 32 bytes only if receiver length > 32
+        // Note: dataPtr + 32 may exceed the actual receiver data bounds (e.g., for 40-byte receiver,
+        // this reads bytes [32, 64) where [40, 64) is out-of-bounds). However, this is safe because
+        // calldata is ABI-encoded with zero-padding to 32-byte boundaries, so out-of-bounds bytes are zeros.
+        if calldataload(add(dataPtr, 32)) { isNonZero := 1 }
       }
     }
 
