@@ -32,6 +32,10 @@ interface IFastTransferPool {
     uint8 sourceDecimals,
     uint256 fillerFee,
     uint256 poolFee,
+    /// @param destinationPool The destination chain pool where both the fill and settlement processes will take place.
+    /// @dev This value is emitted in the event to ensure traceability, as the destination pool can change during pool upgrades.
+    /// The filler should rely on this value as the definitive source for the destination pool.
+    bytes destinationPool,
     bytes receiver
   );
   /// @notice Emitted when a fast transfer is filled. This means the end user has received the tokens but the slow

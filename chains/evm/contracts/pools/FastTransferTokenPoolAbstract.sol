@@ -164,18 +164,43 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
 
     settlementId = IRouterClient(getRouter()).ccipSend{value: msg.value}(destinationChainSelector, message);
 
-    emit FastTransferRequested({
-      destinationChainSelector: destinationChainSelector,
-      fillId: computeFillId(settlementId, amount - internalQuote.totalFastTransferFee, i_tokenDecimals, receiver),
-      settlementId: settlementId,
-      sourceAmountNetFee: amount - internalQuote.totalFastTransferFee,
-      sourceDecimals: i_tokenDecimals,
-      fillerFee: internalQuote.fillerFeeComponent,
-      poolFee: internalQuote.poolFeeComponent,
-      receiver: receiver
-    });
+    // Extracted FastTransferRequested into a helper to reduce the number of locals in this function,
+    // avoiding “stack too deep” compiler errors and keeping the main flow clear.
+    _emitFastTransferRequested(
+      destinationChainSelector,
+      settlementId,
+      amount - internalQuote.totalFastTransferFee,
+      internalQuote.fillerFeeComponent,
+      internalQuote.poolFeeComponent,
+      message.receiver,
+      receiver
+    );
 
     return settlementId;
+  }
+
+  function _emitFastTransferRequested(
+    uint64 destinationChainSelector,
+    bytes32 settlementId,
+    uint256 sourceAmountNetFee,
+    uint256 fillerFee,
+    uint256 poolFee,
+    bytes memory destinationPool,
+    bytes calldata receiver
+  ) internal {
+    bytes32 fillId = computeFillId(settlementId, sourceAmountNetFee, i_tokenDecimals, receiver);
+
+    emit FastTransferRequested({
+      destinationChainSelector: destinationChainSelector,
+      fillId: fillId,
+      settlementId: settlementId,
+      sourceAmountNetFee: sourceAmountNetFee,
+      sourceDecimals: i_tokenDecimals,
+      fillerFee: fillerFee,
+      poolFee: poolFee,
+      destinationPool: destinationPool,
+      receiver: receiver
+    });
   }
 
   /// @inheritdoc IFastTransferPool
