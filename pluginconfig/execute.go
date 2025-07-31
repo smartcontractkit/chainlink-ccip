@@ -56,8 +56,8 @@ type ExecuteOffchainConfig struct {
 	// MultipleReportsEnabled is a flag to enable/disable multiple reports per round.
 	MultipleReportsEnabled bool `json:"multipleReports"`
 
-	// SolanaAccountDerivation is a flag to enable/disable the use of on-chain account derivation to build the execute account list for Solana
-	SolanaAccountDerivation *string `json:"solanaAccountDerivation,omitempty"`
+	// SolanaChainWriterConfigVersion is a flag to specify which version of Solana ChainWriter configs to initialize the plugin with.
+	SolanaChainWriterConfigVersion *string `json:"solanaAccountDerivation,omitempty"`
 }
 
 func (e *ExecuteOffchainConfig) ApplyDefaultsAndValidate() error {
