@@ -143,7 +143,10 @@ pub fn derive_execute_accounts_build_main_account_list<'info>(
     params: &DeriveAccountsExecuteParams,
 ) -> Result<DeriveAccountsResponse> {
     let ReferenceAddresses {
-        router, rmn_remote, ..
+        router,
+        rmn_remote,
+        offramp_lookup_table,
+        ..
     } = *AccountLoader::<'info, ReferenceAddresses>::try_from(&ctx.remaining_accounts[1])?
         .load()?;
 
@@ -218,7 +221,7 @@ pub fn derive_execute_accounts_build_main_account_list<'info>(
     Ok(DeriveAccountsResponse {
         accounts_to_save,
         ask_again_with,
-        look_up_tables_to_save: vec![],
+        look_up_tables_to_save: vec![offramp_lookup_table],
         current_stage: DeriveAccountsExecuteStage::FinishMainAccountList.to_string(),
         next_stage,
     })
@@ -424,6 +427,21 @@ pub fn derive_execute_accounts_additional_tokens_static<'info>(
             token: token + 1,
         }
         .to_string();
+    } else {
+        // We're done with all tokens
+        if !params.buffer_id.is_empty() {
+            let buffer_pda = find(
+                &[
+                    EXECUTION_REPORT_BUFFER,
+                    &params.buffer_id,
+                    params.execute_caller.as_ref(),
+                ],
+                crate::ID,
+            );
+            response.accounts_to_save.push(buffer_pda.writable());
+        }
+        response.ask_again_with.clear();
+        response.next_stage = "".to_string(); // We're done, no more stages.
     }
 
     Ok(response)
@@ -519,8 +537,20 @@ pub fn derive_execute_accounts_additional_token_nested<'info>(
         }
         .to_string();
     } else {
+        // We're done with all tokens
+        if !params.buffer_id.is_empty() {
+            let buffer_pda = find(
+                &[
+                    EXECUTION_REPORT_BUFFER,
+                    &params.buffer_id,
+                    params.execute_caller.as_ref(),
+                ],
+                crate::ID,
+            );
+            response.accounts_to_save.push(buffer_pda.writable());
+        }
         response.ask_again_with.clear();
-        response.next_stage = "".to_string();
+        response.next_stage = "".to_string(); // We're done, no more stages.
     }
 
     Ok(response)

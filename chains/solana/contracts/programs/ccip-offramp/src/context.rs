@@ -574,6 +574,7 @@ pub struct ExecuteReportContext<'info> {
     // pool signer
     // token program
     // token mint
+    // fee token billing
     // ccip_router_pools_signer - derivable PDA [seed::EXTERNAL_TOKEN_POOL, pool_program], seeds::program=router (present in lookup table)
     // ...additional accounts for pool config
     // ] x N tokens
