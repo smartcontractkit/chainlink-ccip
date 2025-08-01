@@ -561,4 +561,30 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
 
     vm.startPrank(OWNER);
   }
+
+  function testFuzz_ccipSendToken_ValidReceiver(uint8 receiverLength, uint8 byteIndex, uint8 nonZeroMask) public {
+    // Bound receiver length (1-64 bytes)
+    receiverLength = uint8(bound(receiverLength, 1, 64));
+    byteIndex = uint8(bound(byteIndex, 0, receiverLength - 1));
+
+    // Ensure a non-zero mask
+    nonZeroMask = uint8(bound(nonZeroMask, 1, type(uint8).max));
+
+    // Create receiver with at least one non-zero byte
+    bytes memory validReceiver = new bytes(receiverLength);
+    validReceiver[byteIndex] = bytes1(nonZeroMask);
+
+    TestParams memory params = TestParams({
+      chainSelector: DEST_CHAIN_SELECTOR,
+      fastFeeBpsExpected: FAST_FEE_FILLER_BPS,
+      amount: SOURCE_AMOUNT,
+      mockMessageId: keccak256("mockMessageId"),
+      receiver: validReceiver
+    });
+
+    bytes memory extraArgs = Client._argsToBytes(
+      Client.GenericExtraArgsV2({gasLimit: SETTLEMENT_GAS_OVERHEAD, allowOutOfOrderExecution: true})
+    );
+    _executeTest(params, extraArgs);
+  }
 }
