@@ -17,6 +17,8 @@ contract SiloedLockReleaseTokenPool_provideSiloedLiquidity is SiloedLockReleaseT
   function test_provideSiloedLiquidity() public {
     uint256 amount = 1e24;
 
+    deal(address(s_token), address(s_siloedLockReleaseTokenPool), amount);
+
     vm.expectEmit();
     emit SiloedLockReleaseTokenPool.LiquidityAdded(SILOED_CHAIN_SELECTOR, OWNER, amount);
 

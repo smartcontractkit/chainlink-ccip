@@ -9,6 +9,8 @@ import {TokenPool} from "../../../../pools/TokenPool.sol";
 import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
 import {USDCTokenPoolSetup} from "./USDCTokenPoolSetup.t.sol";
 
+import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
+
 contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
   // Base test case, included for PR gas comparisons as fuzz tests are excluded from forge snapshot due to being flaky.
   function test_LockOrBurn() public {
@@ -75,7 +77,8 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
       mintRecipient: extraMintRecipient,
       domainIdentifier: expectedDomain.domainIdentifier,
       destChainSelector: DEST_CHAIN_SELECTOR,
-      enabled: expectedDomain.enabled
+      enabled: expectedDomain.enabled,
+      cctpVersion: expectedDomain.cctpVersion
     });
     vm.startPrank(OWNER);
     s_usdcTokenPool.setDomains(updates);
@@ -260,7 +263,11 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
   }
 
   function test_RevertWhen_CallerIsNotARampOnRouter() public {
-    vm.expectRevert(abi.encodeWithSelector(TokenPool.CallerIsNotARampOnRouter.selector, OWNER));
+    address randomAddress = makeAddr("RANDOM_ADDRESS");
+
+    vm.startPrank(randomAddress);
+
+    vm.expectRevert(abi.encodeWithSelector(AuthorizedCallers.UnauthorizedCaller.selector, randomAddress));
 
     s_usdcTokenPool.lockOrBurn(
       Pool.LockOrBurnInV1({

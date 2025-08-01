@@ -14,11 +14,13 @@ contract CCTPMessageTransmitterProxySetup is BaseTest {
 
   function setUp() public virtual override {
     super.setUp();
+
     vm.mockCall(
       s_tokenMessenger,
       abi.encodeWithSelector(ITokenMessenger.localMessageTransmitter.selector),
       abi.encode(s_cctpMessageTransmitter)
     );
+
     s_cctpMessageTransmitterProxy = new CCTPMessageTransmitterProxy(ITokenMessenger(s_tokenMessenger));
     CCTPMessageTransmitterProxy.AllowedCallerConfigArgs[] memory allowedCallerParams =
       new CCTPMessageTransmitterProxy.AllowedCallerConfigArgs[](1);
