@@ -584,4 +584,32 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
     );
     _executeTest(params, extraArgs);
   }
+
+  function test_ccipSendToken_ValidReceiver2(uint8 receiverLength, bytes32 receiverHead, bytes32 receiverTail) public {
+    receiverLength = uint8(bound(receiverLength, 1, 64));
+
+    // Combine the 2 halves into bytes of length 64
+    bytes memory validReceiver = abi.encodePacked(receiverHead, receiverTail);
+
+    // Set bytes array length to target receiver length
+    assembly {
+      mstore(validReceiver, receiverLength)
+    }
+
+    // throw out all-zero receiver
+    vm.assume(keccak256(validReceiver) != keccak256(new bytes(receiverLength)));
+
+    TestParams memory params = TestParams({
+      chainSelector: DEST_CHAIN_SELECTOR,
+      fastFeeBpsExpected: FAST_FEE_FILLER_BPS,
+      amount: SOURCE_AMOUNT,
+      mockMessageId: keccak256("mockMessageId"),
+      receiver: validReceiver
+    });
+
+    bytes memory extraArgs = Client._argsToBytes(
+      Client.GenericExtraArgsV2({gasLimit: SETTLEMENT_GAS_OVERHEAD, allowOutOfOrderExecution: true})
+    );
+    _executeTest(params, extraArgs);
+  }
 }
