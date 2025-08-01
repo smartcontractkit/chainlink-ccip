@@ -126,6 +126,7 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
       sourceDecimals: SOURCE_DECIMALS,
       fillerFee: expectedFillerFee,
       poolFee: expectedPoolFee,
+      destinationPool: destPoolAddress,
       receiver: params.receiver
     });
 
@@ -201,6 +202,7 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
       sourceDecimals: SOURCE_DECIMALS,
       fillerFee: expectedFastTransferFee,
       poolFee: 0,
+      destinationPool: destPoolAddress,
       receiver: abi.encode(RECEIVER)
     });
 
@@ -242,6 +244,7 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
       sourceDecimals: SOURCE_DECIMALS,
       fillerFee: fillerFeeAmount,
       poolFee: poolFeeAmount,
+      destinationPool: destPoolAddress,
       receiver: params.receiver
     });
 
