@@ -148,6 +148,8 @@ pub mod cctp_token_pool {
             CcipTokenPoolError::NonemptyPoolAddressesInit
         );
 
+        ctx.accounts.chain_config.version = 1;
+
         ctx.accounts
             .chain_config
             .base
@@ -823,7 +825,7 @@ pub struct FundingConfig {
     pub minimum_signer_funds: u64,
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, InitSpace)]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, InitSpace, Debug)]
 pub struct CctpChain {
     // Domain ID for CCTP, used to identify the chain. This is a sequential number starting from 0.
     // Using u32 here because it's what CCTP uses in its Params structs.
@@ -846,6 +848,7 @@ pub struct PoolConfig {
 #[account]
 #[derive(InitSpace)]
 pub struct ChainConfig {
+    pub version: u8,
     pub base: BaseChain,
     pub cctp: CctpChain,
 }

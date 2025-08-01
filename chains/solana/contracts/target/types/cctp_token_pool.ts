@@ -1066,6 +1066,10 @@ export type CctpTokenPool = {
         "kind": "struct",
         "fields": [
           {
+            "name": "version",
+            "type": "u8"
+          },
+          {
             "name": "base",
             "type": {
               "defined": "BaseChain"
@@ -2450,6 +2454,10 @@ export const IDL: CctpTokenPool = {
       "type": {
         "kind": "struct",
         "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
           {
             "name": "base",
             "type": {

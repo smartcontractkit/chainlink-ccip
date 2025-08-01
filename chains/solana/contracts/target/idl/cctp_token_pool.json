@@ -1066,6 +1066,10 @@
         "kind": "struct",
         "fields": [
           {
+            "name": "version",
+            "type": "u8"
+          },
+          {
             "name": "base",
             "type": {
               "defined": "BaseChain"
