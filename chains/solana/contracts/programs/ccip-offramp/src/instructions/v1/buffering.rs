@@ -174,10 +174,17 @@ pub fn deserialize_from_buffer_account(
     ))
 }
 
+// Using a.div_ceil(b) is unstable on Rust 1.68, so we implement our own version even though clippy may complain.
+// See https://github.com/rust-lang/rust/issues/88581 for more info.
+// Whenever we upgrade Anchor & Rust, we can remove this.
 fn div_ceil<T: Into<u32>>(a: T, b: T) -> u32 {
     let (a, b) = (a.into(), b.into());
     assert!(a + b - 1 > 0);
-    (a + b - 1) / b
+
+    #[allow(clippy::manual_div_ceil)]
+    let r = (a + b - 1) / b;
+
+    r
 }
 
 #[cfg(test)]
