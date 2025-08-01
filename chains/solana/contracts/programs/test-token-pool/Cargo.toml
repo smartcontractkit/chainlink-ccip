@@ -25,3 +25,7 @@ burnmint-token-pool = { version = "0.1.1-dev", path = "../burnmint-token-pool", 
 lockrelease-token-pool = { version = "0.1.1-dev", path = "../lockrelease-token-pool", features = ["no-entrypoint"] }
 rmn_remote = {path = "../rmn-remote", features = ["cpi"]}
 ccip_common = {path = "../ccip-common"}
+
+[lints.rust.unexpected_cfgs]
+level = "warn"
+check-cfg = ['cfg(target_os, values("solana"))', 'cfg(feature, values("anchor-debug", "custom-panic"))']

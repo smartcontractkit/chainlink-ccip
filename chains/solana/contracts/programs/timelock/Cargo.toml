@@ -24,3 +24,7 @@ arrayvec = { version = "1.0.0", path = "../../crates/arrayvec" }
 
 [dev-dependencies]
 hex = "0.4.3"
+
+[lints.rust.unexpected_cfgs]
+level = "warn"
+check-cfg = ['cfg(target_os, values("solana"))', 'cfg(feature, values("anchor-debug", "custom-panic"))']
