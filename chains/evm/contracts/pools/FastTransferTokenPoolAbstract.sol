@@ -164,7 +164,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
 
     settlementId = IRouterClient(getRouter()).ccipSend{value: msg.value}(destinationChainSelector, message);
 
-    // Extracted FastTransferRequested into a helper to reduce the number of locals in this function,
+    // Extracted FastTransferRequested into a helper to reduce the number of local variables in this function,
     // avoiding “stack too deep” compiler errors and keeping the main flow clear.
     _emitFastTransferRequested(
       destinationChainSelector,
