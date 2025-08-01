@@ -16,7 +16,7 @@ type LockOrBurnTokens struct {
 
 	// [0] = [SIGNER] authority
 	//
-	// [1] = [WRITE] state
+	// [1] = [] state
 	//
 	// [2] = [] tokenProgram
 	//
@@ -63,7 +63,7 @@ func (inst *LockOrBurnTokens) GetAuthorityAccount() *ag_solanago.AccountMeta {
 
 // SetStateAccount sets the "state" account.
 func (inst *LockOrBurnTokens) SetStateAccount(state ag_solanago.PublicKey) *LockOrBurnTokens {
-	inst.AccountMetaSlice[1] = ag_solanago.Meta(state).WRITE()
+	inst.AccountMetaSlice[1] = ag_solanago.Meta(state)
 	return inst
 }
 
