@@ -191,6 +191,7 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 	ccipReader, err := readerpkg.NewCCIPChainReader(
 		ctx,
 		logutil.WithComponent(lggr, "CCIPReader"),
+		p.chainAccessors,
 		readers,
 		p.chainWriters,
 		p.ocrConfig.Config.ChainSelector,

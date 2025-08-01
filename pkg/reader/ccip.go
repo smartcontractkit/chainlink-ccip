@@ -24,7 +24,6 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/addressbook"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/chainaccessor"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
@@ -51,6 +50,7 @@ type ccipChainReader struct {
 func newCCIPChainReaderInternal(
 	ctx context.Context,
 	lggr logger.Logger,
+	chainAccessors map[cciptypes.ChainSelector]cciptypes.ChainAccessor,
 	contractReaders map[cciptypes.ChainSelector]contractreader.ContractReaderFacade,
 	contractWriters map[cciptypes.ChainSelector]types.ContractWriter,
 	destChain cciptypes.ChainSelector,
@@ -60,6 +60,7 @@ func newCCIPChainReaderInternal(
 	return newCCIPChainReaderWithConfigPollerInternal(
 		ctx,
 		lggr,
+		chainAccessors,
 		contractReaders,
 		contractWriters,
 		destChain,
@@ -72,6 +73,7 @@ func newCCIPChainReaderInternal(
 func newCCIPChainReaderWithConfigPollerInternal(
 	ctx context.Context,
 	lggr logger.Logger,
+	chainAccessors map[cciptypes.ChainSelector]cciptypes.ChainAccessor,
 	contractReaders map[cciptypes.ChainSelector]contractreader.ContractReaderFacade,
 	contractWriters map[cciptypes.ChainSelector]types.ContractWriter,
 	destChain cciptypes.ChainSelector,
@@ -84,19 +86,6 @@ func newCCIPChainReaderWithConfigPollerInternal(
 
 	for chainSelector, cr := range contractReaders {
 		crs[chainSelector] = contractreader.NewExtendedContractReader(cr)
-
-		// TODO: remove instantiation of the accessor once accessors are passed down from above
-		accessor, err := chainaccessor.NewDefaultAccessor(
-			lggr,
-			chainSelector,
-			crs[chainSelector],
-			contractWriters[chainSelector],
-			addrCodec,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create chain accessor for chain %s: %w", chainSelector, err)
-		}
-		cas[chainSelector] = accessor
 	}
 
 	offrampAddrStr, err := addrCodec.AddressBytesToString(offrampAddress, destChain)
