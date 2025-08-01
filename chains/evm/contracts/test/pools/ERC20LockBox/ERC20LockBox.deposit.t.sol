@@ -52,7 +52,6 @@ contract ERC20LockBox_deposit is ERC20LockBoxSetup {
     assertEq(s_token.balanceOf(address(s_erc20LockBox)), amount1 + amount2);
   }
 
-
   function test_Deposit_FromDifferentCallers() public {
     uint256 amount = 1000e18;
     address caller1 = makeAddr("caller1");
@@ -92,7 +91,6 @@ contract ERC20LockBox_deposit is ERC20LockBoxSetup {
     assertEq(s_token.balanceOf(address(s_erc20LockBox)), amount * 2);
   }
 
-
   // ================================================================
   // │                        Revert Tests                          │
   // ================================================================
@@ -124,5 +122,4 @@ contract ERC20LockBox_deposit is ERC20LockBoxSetup {
 
     s_erc20LockBox.deposit(address(0), amount);
   }
-
 }

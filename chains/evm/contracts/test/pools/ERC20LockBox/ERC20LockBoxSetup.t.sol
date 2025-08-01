@@ -29,7 +29,7 @@ contract ERC20LockBoxSetup is BaseTest {
     s_tokenAdminRegistry.proposeAdministrator(address(s_token), address(OWNER));
     s_tokenAdminRegistry.acceptAdminRole(address(s_token));
 
-    vm.mockCall(s_tokenPool, abi.encodeWithSignature("isSupportedToken(address)", address(s_token)), abi.encode(true)); 
+    vm.mockCall(s_tokenPool, abi.encodeWithSignature("isSupportedToken(address)", address(s_token)), abi.encode(true));
 
     // Set the token pool for the token
     s_tokenAdminRegistry.setPool(address(s_token), s_tokenPool);

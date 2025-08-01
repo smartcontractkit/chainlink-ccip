@@ -10,7 +10,7 @@ contract ERC20LockBox_withdraw is ERC20LockBoxSetup {
   ) public {
     vm.assume(amount != 0);
     amount = bound(amount, 1, type(uint256).max / 2);
-  
+
     // Deposit tokens first
     _depositTokens(amount);
 
@@ -179,5 +179,4 @@ contract ERC20LockBox_withdraw is ERC20LockBoxSetup {
 
     s_erc20LockBox.withdraw(address(s_token), withdrawAmount, s_recipient);
   }
-
 }
