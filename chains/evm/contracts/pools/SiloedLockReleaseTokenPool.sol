@@ -4,6 +4,8 @@ pragma solidity ^0.8.24;
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {Pool} from "../libraries/Pool.sol";
+
+import {ERC20LockBox} from "./ERC20LockBox.sol";
 import {TokenPool} from "./TokenPool.sol";
 
 import {IERC20} from
@@ -36,6 +38,9 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
   /// @notice The rebalancer for unsiloed chains, which can add liquidity to the shared pool.
   address internal s_rebalancer;
 
+  /// @notice The lock box for the token pool.
+  ERC20LockBox internal immutable i_lockBox;
+
   struct SiloConfigUpdate {
     uint64 remoteChainSelector;
     address rebalancer;
@@ -55,8 +60,14 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     uint8 localTokenDecimals,
     address[] memory allowlist,
     address rmnProxy,
-    address router
-  ) TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) {}
+    address router,
+    address lockBox
+  ) TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) {
+    if (lockBox == address(0)) revert ZeroAddressNotAllowed();
+
+    token.safeApprove(lockBox, type(uint256).max);
+    i_lockBox = ERC20LockBox(lockBox);
+  }
 
   /// @notice Locks the token in the pool
   function lockOrBurn(
@@ -65,14 +76,24 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     // super.lockOrBurn will validate the lockOrBurnIn and revert if invalid.
     out = super.lockOrBurn(lockOrBurnIn);
 
+    // The zero chain selector is used to designate unsiloed chains. remoteChainSelector is set to 0 if the token is not
+    // siloed, and overwritten if the token is being locked for a siloed chain. Since the remote chain must be passed
+    // to the lock box's deposit function, this saves gas by only updating the remoteChainSelector if necessary for a
+    // siloed chain.
+    uint64 remoteChainSelector = 0;
+
     // If funds need to be siloed, update internal accounting;
     if (s_chainConfigs[lockOrBurnIn.remoteChainSelector].isSiloed) {
       s_chainConfigs[lockOrBurnIn.remoteChainSelector].tokenBalance += lockOrBurnIn.amount;
+      remoteChainSelector = lockOrBurnIn.remoteChainSelector;
     }
     // If the messages is going to a chain without siloed funds, update state accounting accordingly.
     else {
       s_unsiloedTokenBalance += lockOrBurnIn.amount;
     }
+
+    // Transfer the tokens to the lock box.
+    i_lockBox.deposit(address(i_token), lockOrBurnIn.amount);
 
     return out;
   }
@@ -101,15 +122,21 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     uint256 availableLiquidity = chainIsSiloed ? remoteConfig.tokenBalance : s_unsiloedTokenBalance;
     if (localAmount > availableLiquidity) revert InsufficientLiquidity(availableLiquidity, localAmount);
 
+    // Since a chain selector must be passed to the lock box's withdraw function, setting it as zero for an unsiloed
+    // chain saves gas since it only needs to be set if the chain is siloed, as opposed to a more complicated series
+    // of branches and checks.
+    uint64 remoteChainSelector = 0;
+
     // Deduct the amount from the correct silo balance, or the unsiloed balance.
     if (chainIsSiloed) {
       remoteConfig.tokenBalance -= localAmount;
+      remoteChainSelector = releaseOrMintIn.remoteChainSelector;
     } else {
       s_unsiloedTokenBalance -= localAmount;
     }
 
     // Release to the recipient
-    i_token.safeTransfer(releaseOrMintIn.receiver, localAmount);
+    i_lockBox.withdraw(address(i_token), localAmount, releaseOrMintIn.receiver);
 
     emit ReleasedOrMinted({
       remoteChainSelector: releaseOrMintIn.remoteChainSelector,
@@ -253,7 +280,7 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
   /// non-siloed chains.
   /// @param amount The amount of liquidity to provide.
   /// @dev Only the rebalancer for the chain can add liquidity
-  function provideSiloedLiquidity(uint64 remoteChainSelector, uint256 amount) external {
+  function provideSiloedLiquidity(uint64 remoteChainSelector, uint256 amount) external virtual {
     if (!s_chainConfigs[remoteChainSelector].isSiloed || remoteChainSelector == 0) {
       revert ChainNotSiloed(remoteChainSelector);
     }
@@ -267,11 +294,14 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
   /// @param amount The amount of liquidity to provide.
   function provideLiquidity(
     uint256 amount
-  ) external {
+  ) external virtual {
+    // The zero chain selector is used to designate unsiloed chains, so hard coding it in allows for a more efficient
+    // implementation where both liquidity functions can use the same internal function but with different external
+    // functions for liquidity providers.
     _provideLiquidity(0, amount);
   }
 
-  function _provideLiquidity(uint64 remoteChainSelector, uint256 amount) internal {
+  function _provideLiquidity(uint64 remoteChainSelector, uint256 amount) internal virtual {
     if (amount == 0) revert LiquidityAmountCannotBeZero();
     if (msg.sender != getChainRebalancer(remoteChainSelector)) revert Unauthorized(msg.sender);
 
@@ -285,6 +315,8 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     }
 
     i_token.safeTransferFrom(msg.sender, address(this), amount);
+    i_lockBox.deposit(address(i_token), amount);
+
     emit LiquidityAdded(remoteChainSelector, msg.sender, amount);
   }
 
@@ -299,6 +331,9 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
   function withdrawLiquidity(
     uint256 amount
   ) external {
+    // The zero chain selector is used to designate unsiloed chains, so hard coding it in allows for a more efficient
+    // implementation where both liquidity functions can use the same internal function but with different external
+    // functions for liquidity providers.
     _withdrawLiquidity(0, amount);
   }
 
@@ -308,6 +343,8 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
   /// which can be considered the liquidity for all non-siloed chains sharing liquidity.
   /// @param amount The amount of liquidity to remove.
   function withdrawSiloedLiquidity(uint64 remoteChainSelector, uint256 amount) external {
+    // The zero chain selector is used to designate unsiloed chains, and should never be used for siloed chains,
+    // so we revert instead of proceeding.
     if (!s_chainConfigs[remoteChainSelector].isSiloed || remoteChainSelector == 0) {
       revert ChainNotSiloed(remoteChainSelector);
     }
@@ -323,6 +360,7 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     SiloConfig storage remoteConfig = s_chainConfigs[remoteChainSelector];
 
     // Additional security check to prevent underflow by explicitly ensuring that enough funds are available to release
+    // While this is not strictly necessary, an explicit error code is preferred to a silent underflow.
     uint256 availableLiquidity = remoteConfig.isSiloed ? remoteConfig.tokenBalance : s_unsiloedTokenBalance;
     if (amount > availableLiquidity) revert InsufficientLiquidity(availableLiquidity, amount);
 
@@ -333,7 +371,10 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
       s_unsiloedTokenBalance -= amount;
     }
 
-    i_token.safeTransfer(msg.sender, amount);
+    // Withdraw the tokens directly from the lockbox to the rebalancer. This saves gas by avoiding the need to transfer
+    // the tokens to the contract first.
+    i_lockBox.withdraw(address(i_token), amount, msg.sender);
+
     emit LiquidityRemoved(remoteChainSelector, msg.sender, amount);
   }
 }
