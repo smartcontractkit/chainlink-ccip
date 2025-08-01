@@ -123,6 +123,7 @@ func (s StaticSourceChainConfig) check() (bool /* enabled */, error) {
 func NewCCIPChainReader(
 	ctx context.Context,
 	lggr logger.Logger,
+	chainAccessors map[cciptypes.ChainSelector]cciptypes.ChainAccessor,
 	contractReaders map[cciptypes.ChainSelector]contractreader.ContractReaderFacade,
 	contractWriters map[cciptypes.ChainSelector]types.ContractWriter,
 	destChain cciptypes.ChainSelector,
@@ -132,6 +133,7 @@ func NewCCIPChainReader(
 	reader, err := newCCIPChainReaderInternal(
 		ctx,
 		lggr,
+		chainAccessors,
 		contractReaders,
 		contractWriters,
 		destChain,

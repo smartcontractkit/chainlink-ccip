@@ -158,6 +158,7 @@ func (p PluginFactory) NewReportingPlugin(
 	ccipReader, err := readerpkg.NewCCIPChainReader(
 		ctx,
 		logutil.WithComponent(lggr, "CCIPReader"),
+		p.chainAccessors,
 		readers,
 		p.chainWriters,
 		p.ocrConfig.Config.ChainSelector,
