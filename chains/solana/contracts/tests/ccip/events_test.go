@@ -19,7 +19,7 @@ func TestEventEmitter(t *testing.T) {
 	ctx := tests.Context(t)
 	test_event_emitter.SetProgramID(config.EventEmitter)
 
-	deployer, err := solana.PrivateKeyFromBase58("4whgxZhpxcArYWzM1iTmokruAzws9YVi2f9M7pWwchQniaFXBr1WGSGXgadeqHtiRooxNiPosdLj2g2ohbtkWtu5")
+	deployer, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)
 
 	rpcClient := testutils.DeployAllPrograms(t, testutils.PathToAnchorConfig, deployer)
