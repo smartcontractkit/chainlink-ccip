@@ -24,16 +24,17 @@ contract ERC20LockBoxSetup is BaseTest {
     deal(address(s_token), OWNER, type(uint256).max);
     deal(address(s_token), s_allowedCaller, type(uint256).max);
 
+    // Deploy and configure the token admin registry for the token
     s_tokenAdminRegistry = new TokenAdminRegistry();
     s_tokenAdminRegistry.proposeAdministrator(address(s_token), address(OWNER));
     s_tokenAdminRegistry.acceptAdminRole(address(s_token));
 
-    vm.mockCall(s_tokenPool, abi.encodeWithSignature("owner()"), abi.encode(OWNER));
+    vm.mockCall(s_tokenPool, abi.encodeWithSignature("isSupportedToken(address)", address(s_token)), abi.encode(true)); 
 
-    vm.mockCall(s_tokenPool, abi.encodeWithSignature("isSupportedToken(address)", address(s_token)), abi.encode(true));
-
+    // Set the token pool for the token
     s_tokenAdminRegistry.setPool(address(s_token), s_tokenPool);
 
+    // Deploy the ERC20 lock box
     s_erc20LockBox = new ERC20LockBox(address(s_tokenAdminRegistry));
 
     // Configure the allowed caller

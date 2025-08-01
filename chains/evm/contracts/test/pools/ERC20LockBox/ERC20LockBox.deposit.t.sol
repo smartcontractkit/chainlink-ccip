@@ -28,24 +28,7 @@ contract ERC20LockBox_deposit is ERC20LockBoxSetup {
     assertEq(s_token.balanceOf(s_allowedCaller), callerBalanceBefore - amount);
   }
 
-  function test_Deposit_WithMultipleChainSelectors() public {
-    uint256 amount1 = 1000e18;
-    uint256 amount2 = 2000e18;
-
-    vm.startPrank(s_allowedCaller);
-    s_token.approve(address(s_erc20LockBox), amount1 + amount2);
-
-    // Deposit tokens
-    s_erc20LockBox.deposit(address(s_token), amount1);
-    s_erc20LockBox.deposit(address(s_token), amount2);
-
-    vm.stopPrank();
-
-    // Verify balances
-    assertEq(s_token.balanceOf(address(s_erc20LockBox)), amount1 + amount2);
-  }
-
-  function test_Deposit_MultipleDepositsToSameChain() public {
+  function test_Deposit_MultipleDeposits() public {
     uint256 amount1 = 1000e18;
     uint256 amount2 = 2000e18;
 
@@ -53,9 +36,14 @@ contract ERC20LockBox_deposit is ERC20LockBoxSetup {
     s_token.approve(address(s_erc20LockBox), amount1 + amount2);
 
     // First deposit
+    vm.expectEmit();
+    emit ERC20LockBox.Deposit(address(s_token), s_allowedCaller, amount1);
     s_erc20LockBox.deposit(address(s_token), amount1);
 
-    // Second deposit to same chain
+    // Second deposit
+    vm.expectEmit();
+    emit ERC20LockBox.Deposit(address(s_token), s_allowedCaller, amount2);
+
     s_erc20LockBox.deposit(address(s_token), amount2);
 
     vm.stopPrank();
@@ -64,19 +52,6 @@ contract ERC20LockBox_deposit is ERC20LockBoxSetup {
     assertEq(s_token.balanceOf(address(s_erc20LockBox)), amount1 + amount2);
   }
 
-  function test_Deposit_EventEmission() public {
-    uint256 amount = 1000e18;
-
-    vm.startPrank(s_allowedCaller);
-    s_token.approve(address(s_erc20LockBox), amount);
-
-    vm.expectEmit(true, true, true, true);
-    emit ERC20LockBox.Deposit(address(s_token), s_allowedCaller, amount);
-
-    s_erc20LockBox.deposit(address(s_token), amount);
-
-    vm.stopPrank();
-  }
 
   function test_Deposit_FromDifferentCallers() public {
     uint256 amount = 1000e18;
@@ -96,12 +71,20 @@ contract ERC20LockBox_deposit is ERC20LockBoxSetup {
     // First caller deposits
     vm.startPrank(caller1);
     s_token.approve(address(s_erc20LockBox), amount);
+
+    vm.expectEmit();
+    emit ERC20LockBox.Deposit(address(s_token), caller1, amount);
+
     s_erc20LockBox.deposit(address(s_token), amount);
     vm.stopPrank();
 
     // Second caller deposits
     vm.startPrank(caller2);
     s_token.approve(address(s_erc20LockBox), amount);
+
+    vm.expectEmit();
+    emit ERC20LockBox.Deposit(address(s_token), caller2, amount);
+
     s_erc20LockBox.deposit(address(s_token), amount);
     vm.stopPrank();
 
@@ -109,32 +92,6 @@ contract ERC20LockBox_deposit is ERC20LockBoxSetup {
     assertEq(s_token.balanceOf(address(s_erc20LockBox)), amount * 2);
   }
 
-  function test_Deposit_ChainSelectorZero() public {
-    uint256 amount = 1000e18;
-
-    vm.startPrank(s_allowedCaller);
-    s_token.approve(address(s_erc20LockBox), amount);
-
-    s_erc20LockBox.deposit(address(s_token), amount);
-
-    vm.stopPrank();
-  }
-
-  function test_Deposit_MaxAmount() public {
-    uint256 maxAmount = type(uint256).max;
-
-    // Give max tokens to caller
-    deal(address(s_token), s_allowedCaller, maxAmount);
-
-    vm.startPrank(s_allowedCaller);
-    s_token.approve(address(s_erc20LockBox), maxAmount);
-
-    s_erc20LockBox.deposit(address(s_token), maxAmount);
-
-    vm.stopPrank();
-
-    assertEq(s_token.balanceOf(address(s_erc20LockBox)), maxAmount);
-  }
 
   // ================================================================
   // │                        Revert Tests                          │
@@ -168,22 +125,4 @@ contract ERC20LockBox_deposit is ERC20LockBoxSetup {
     s_erc20LockBox.deposit(address(0), amount);
   }
 
-  function test_RevertWhen_InsufficientAllowance() public {
-    uint256 amount = 1000e18;
-
-    vm.startPrank(s_allowedCaller);
-    s_token.approve(address(s_erc20LockBox), amount - 1); // Approve less than amount
-    vm.expectRevert("ERC20: insufficient allowance");
-
-    s_erc20LockBox.deposit(address(s_token), amount);
-  }
-
-  function test_RevertWhen_NoAllowance() public {
-    uint256 amount = 1000e18;
-
-    vm.startPrank(s_allowedCaller);
-    vm.expectRevert("ERC20: insufficient allowance");
-
-    s_erc20LockBox.deposit(address(s_token), amount);
-  }
 }

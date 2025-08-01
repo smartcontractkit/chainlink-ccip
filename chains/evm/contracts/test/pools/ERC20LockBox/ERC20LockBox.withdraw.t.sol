@@ -8,8 +8,9 @@ contract ERC20LockBox_withdraw is ERC20LockBoxSetup {
   function testFuzz_Withdraw_Success(
     uint256 amount
   ) public {
-    vm.assume(amount > 0 && amount <= type(uint256).max / 2);
-
+    vm.assume(amount != 0);
+    amount = bound(amount, 1, type(uint256).max / 2);
+  
     // Deposit tokens first
     _depositTokens(amount);
 
@@ -30,7 +31,7 @@ contract ERC20LockBox_withdraw is ERC20LockBoxSetup {
     assertEq(s_token.balanceOf(address(s_erc20LockBox)), lockBoxBalanceBefore - amount);
   }
 
-  function test_Withdraw_WithMultipleChainSelectors() public {
+  function test_Withdraw_MultipleWithdrawals() public {
     uint256 amount1 = 1000e18;
     uint256 amount2 = 2000e18;
 
@@ -43,9 +44,13 @@ contract ERC20LockBox_withdraw is ERC20LockBoxSetup {
     vm.startPrank(s_allowedCaller);
 
     // Withdraw from first chain selector
+    vm.expectEmit();
+    emit ERC20LockBox.Withdrawal(address(s_token), s_recipient, amount1);
     s_erc20LockBox.withdraw(address(s_token), amount1, s_recipient);
 
     // Withdraw from second chain selector
+    vm.expectEmit();
+    emit ERC20LockBox.Withdrawal(address(s_token), s_recipient, amount2);
     s_erc20LockBox.withdraw(address(s_token), amount2, s_recipient);
 
     vm.stopPrank();
@@ -67,6 +72,9 @@ contract ERC20LockBox_withdraw is ERC20LockBoxSetup {
 
     vm.startPrank(s_allowedCaller);
 
+    vm.expectEmit();
+    emit ERC20LockBox.Withdrawal(address(s_token), s_recipient, withdrawAmount);
+
     s_erc20LockBox.withdraw(address(s_token), withdrawAmount, s_recipient);
 
     vm.stopPrank();
@@ -82,7 +90,7 @@ contract ERC20LockBox_withdraw is ERC20LockBoxSetup {
 
     vm.startPrank(s_allowedCaller);
 
-    vm.expectEmit(true, true, true, true);
+    vm.expectEmit();
     emit ERC20LockBox.Withdrawal(address(s_token), s_recipient, amount);
 
     s_erc20LockBox.withdraw(address(s_token), amount, s_recipient);
@@ -100,9 +108,13 @@ contract ERC20LockBox_withdraw is ERC20LockBoxSetup {
     vm.startPrank(s_allowedCaller);
 
     // Withdraw to first recipient
+    vm.expectEmit();
+    emit ERC20LockBox.Withdrawal(address(s_token), recipient1, amount);
     s_erc20LockBox.withdraw(address(s_token), amount, recipient1);
 
     // Withdraw to second recipient
+    vm.expectEmit();
+    emit ERC20LockBox.Withdrawal(address(s_token), recipient2, amount);
     s_erc20LockBox.withdraw(address(s_token), amount, recipient2);
 
     vm.stopPrank();
@@ -168,10 +180,4 @@ contract ERC20LockBox_withdraw is ERC20LockBoxSetup {
     s_erc20LockBox.withdraw(address(s_token), withdrawAmount, s_recipient);
   }
 
-  function test_RevertWhen_ChainSelectorHasNoBalance() public {
-    vm.startPrank(s_allowedCaller);
-    vm.expectRevert(abi.encodeWithSelector(ERC20LockBox.InsufficientBalance.selector, 1, 0));
-
-    s_erc20LockBox.withdraw(address(s_token), 1, s_recipient);
-  }
 }

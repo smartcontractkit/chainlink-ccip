@@ -190,7 +190,7 @@ contract ERC20LockBox_configureAllowedCallers is ERC20LockBoxSetup {
   // │                        Revert Tests                          │
   // ================================================================
 
-  function test_RevertWhen_NotOwner() public {
+  function test_RevertWhen_Unauthorized() public {
     address newCaller = makeAddr("new_caller");
     address token = address(s_token);
 
