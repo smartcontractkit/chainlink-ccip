@@ -384,61 +384,6 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
     s_pool.ccipSendToken{value: 1 ether}(DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, 1 ether, zeroReceiver64, address(0), "");
   }
 
-  function testFuzz_ccipSendToken_RevertWhen_ReceiverInvalid(
-    uint8 lengthSeed,
-    bool shouldBeAllZeros,
-    uint256 randomSeed
-  ) public {
-    // Generate receiver length 0-100 to test both valid and invalid range
-    uint256 receiverLength = bound(lengthSeed, 0, 100);
-
-    bytes memory receiver;
-    bool shouldRevert = false;
-
-    if (receiverLength == 0) {
-      // Test case 1: Empty receiver (should revert)
-      receiver = "";
-      shouldRevert = true;
-    } else if (receiverLength > 64) {
-      // Test case 2: Oversized receiver (should revert)
-      receiver = new bytes(receiverLength);
-      // Fill with non-zero data to ensure it's rejected for length, not content
-      for (uint256 i = 0; i < receiverLength; ++i) {
-        receiver[i] = bytes1(uint8(randomSeed + i) % 255 + 1); // Non-zero bytes
-      }
-      shouldRevert = true;
-    } else {
-      // Test case 3: Valid length (1-64), but potentially all zeros
-      receiver = new bytes(receiverLength);
-
-      if (shouldBeAllZeros) {
-        // Leave as all zeros (should revert)
-        shouldRevert = true;
-      } else {
-        // Fill with at least one non-zero byte (should succeed)
-        // Use randomSeed to determine where to place the non-zero byte
-        uint256 nonZeroIndex = randomSeed % receiverLength;
-        receiver[nonZeroIndex] = bytes1(uint8(randomSeed % 255) + 1); // Ensure non-zero
-        shouldRevert = false;
-      }
-    }
-
-    if (shouldRevert) {
-      vm.expectRevert(abi.encodeWithSelector(FastTransferTokenPoolAbstract.InvalidReceiver.selector, receiver));
-      s_pool.ccipSendToken{value: 1 ether}(DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, 1 ether, receiver, address(0), "");
-    } else {
-      // For valid receivers, we need to set up mocks for successful execution
-      bytes32 mockMessageId = keccak256("mockMessageId");
-      _setupMocks(mockMessageId);
-
-      // Should succeed
-      bytes32 settlementId =
-        s_pool.ccipSendToken{value: 1 ether}(DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, 1 ether, receiver, address(0), "");
-
-      assertEq(settlementId, mockMessageId);
-    }
-  }
-
   function test_ccipSendToken_RevertWhen_FeeExceedsUserMaxLimit() public {
     // Setup: Calculate expected fee and set max limit lower
     uint256 expectedFee = (SOURCE_AMOUNT * FAST_FEE_FILLER_BPS) / 10_000; // 1% of 100 ether = 1 ether
@@ -612,5 +557,31 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
     s_pool.updateFillerAllowList(fillersToAdd, new address[](0));
 
     vm.startPrank(OWNER);
+  }
+
+  function testFuzz_ccipSendToken_ValidReceiver(uint8 receiverLength, uint8 byteIndex, uint8 nonZeroMask) public {
+    // Bound receiver length (1-64 bytes)
+    receiverLength = uint8(bound(receiverLength, 1, 64));
+    byteIndex = uint8(bound(byteIndex, 0, receiverLength - 1));
+
+    // Ensure a non-zero mask
+    nonZeroMask = uint8(bound(nonZeroMask, 1, type(uint8).max));
+
+    // Create receiver with at least one non-zero byte
+    bytes memory validReceiver = new bytes(receiverLength);
+    validReceiver[byteIndex] = bytes1(nonZeroMask);
+
+    TestParams memory params = TestParams({
+      chainSelector: DEST_CHAIN_SELECTOR,
+      fastFeeBpsExpected: FAST_FEE_FILLER_BPS,
+      amount: SOURCE_AMOUNT,
+      mockMessageId: keccak256("mockMessageId"),
+      receiver: validReceiver
+    });
+
+    bytes memory extraArgs = Client._argsToBytes(
+      Client.GenericExtraArgsV2({gasLimit: SETTLEMENT_GAS_OVERHEAD, allowOutOfOrderExecution: true})
+    );
+    _executeTest(params, extraArgs);
   }
 }

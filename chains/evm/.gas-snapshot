@@ -95,7 +95,7 @@ FastTransferTokenPool_ccipSendToken_Test:test_ccipSendToken_APTOS_WithZeroSettle
 FastTransferTokenPool_ccipSendToken_Test:test_ccipSendToken_EqualFeeSplit() (gas: 73470)
 FastTransferTokenPool_ccipSendToken_Test:test_ccipSendToken_FeeQuote_WithPoolFee() (gas: 72990)
 FastTransferTokenPool_ccipSendToken_Test:test_ccipSendToken_FeeValidation_Success_WhenFeeEqualsLimit() (gas: 109216)
-FastTransferTokenPool_ccipSendToken_Test:test_ccipSendToken_FeeValidation_Success_WhenFeeWithinLimit() (gas: 109054)
+FastTransferTokenPool_ccipSendToken_Test:test_ccipSendToken_FeeValidation_Success_WhenFeeWithinLimit() (gas: 109032)
 FastTransferTokenPool_ccipSendToken_Test:test_ccipSendToken_NativeFee() (gas: 129426)
 FastTransferTokenPool_ccipSendToken_Test:test_ccipSendToken_NativeFee_ToSVM() (gas: 170316)
 FastTransferTokenPool_ccipSendToken_Test:test_ccipSendToken_WithERC20FeeToken() (gas: 150441)
