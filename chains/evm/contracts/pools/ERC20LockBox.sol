@@ -3,7 +3,6 @@ pragma solidity ^0.8.24;
 
 import {TokenAdminRegistry} from "../tokenAdminRegistry/TokenAdminRegistry.sol";
 
-import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 import {IERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
@@ -17,22 +16,20 @@ import {SafeERC20} from
 /// incoming messages.
 /// @dev This contract is designed to support any ERC20-token permissionlessly, as any token pool can use it as
 /// storage for their token liquidity. As a result many different tokens will be stored in this contract, but can
-/// only be withdrawn by the associated token pool as defined in the token admin registry.
-contract ERC20LockBox is Ownable2StepMsgSender, ITypeAndVersion {
+/// only be withdrawn by the associated token pool as defined in the token admin registry or an allowed caller.
+contract ERC20LockBox is ITypeAndVersion {
   using SafeERC20 for IERC20;
 
   error Unauthorized(address caller);
-  error InsufficientBalance(uint64 remoteChainSelector, uint256 requested, uint256 available);
+  error InsufficientBalance(uint256 requested, uint256 available);
   error TokenAmountCannotBeZero();
   error RecipientCannotBeZeroAddress();
   error TokenAddressCannotBeZero();
   error ZeroAddressNotAllowed();
 
   event AllowedCallerUpdated(address indexed token, address indexed caller, bool allowed);
-  event Deposit(address indexed token, uint64 indexed remoteChainSelector, address indexed depositor, uint256 amount);
-  event Withdrawal(
-    address indexed token, uint64 indexed remoteChainSelector, address indexed recipient, uint256 amount
-  );
+  event Deposit(address indexed token, address indexed depositor, uint256 amount);
+  event Withdrawal(address indexed token, address indexed recipient, uint256 amount);
 
   struct AllowedCallerConfigArgs {
     address token;
@@ -47,13 +44,8 @@ contract ERC20LockBox is Ownable2StepMsgSender, ITypeAndVersion {
   /// @notice The lockbox allows for multiple authorized callers for a token. This allows support for
   /// liquidity providers to manage tokens without requiring the token pool owner to interact directly.
   /// Only the owner in the token admin registry can configure allowed callers for a token, and
-  /// once a caller is allowed, they can call deposit and withdraw functions for the given token.
+  /// once a caller is allowed, they can call the deposit and withdraw functions for the given token.
   mapping(address token => mapping(address caller => bool isAllowed)) internal s_allowedCallers;
-
-  /// @notice The balance of available tokens for a given chain selector. This is a security measure to ensure that
-  /// tokens which may be siloed by a specific chain selector are not available to other chains. If a token does not
-  /// need to be siloed, then the chain selector 0 can be used to track the total balance of the token instead.
-  mapping(address token => mapping(uint64 remoteChainSelector => uint256 balance)) internal s_tokenBalances;
 
   string public constant typeAndVersion = "ERC20LockBox 1.0.0-dev";
 
@@ -72,46 +64,35 @@ contract ERC20LockBox is Ownable2StepMsgSender, ITypeAndVersion {
   /// time-consuming and error-prone process.
   /// @param token The address of the ERC20 token to deposit.
   /// @param amount The amount of tokens to deposit.
-  /// @param remoteChainSelector The chain selector for which to deposit tokens. 0 is a valid chain selector. If token
-  /// balances do not need to be Siloed by chain selector, then this is the recommended value.
-  /// @dev If a user sends tokens to the lockbox directly, without calling this function, then the tokens
-  /// will be unrecoverable since the internal s_tokenBalances mapping is will not be updated. It is NOT advised
-  /// to send tokens to the lockbox directly, and instead tokens should be deposited via a liquidity provider or
-  /// provideLiquidity function in the token pool itself.
-  function deposit(address token, uint256 amount, uint64 remoteChainSelector) external {
+  /// @dev This function does NOT support storing native tokens, as the token pool which handles native is expected to
+  /// have wrapped it into an ERC20-compatibletoken first.
+  function deposit(address token, uint256 amount) external {
     _validateDepositWithdraw(token, amount);
 
     IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
 
-    s_tokenBalances[token][remoteChainSelector] += amount;
-
-    emit Deposit(token, remoteChainSelector, msg.sender, amount);
+    emit Deposit(token, msg.sender, amount);
   }
 
   /// @notice Withdraws tokens for a specific remote chain selector.
   /// @param token The address of the ERC20 token to withdraw.
   /// @param amount The amount of tokens to withdraw.
   /// @param recipient The address that will receive the withdrawn tokens.
-  /// @param remoteChainSelector The chain selector for which to withdraw tokens.
-  function withdraw(address token, uint256 amount, address recipient, uint64 remoteChainSelector) external {
+  function withdraw(address token, uint256 amount, address recipient) external {
     _validateDepositWithdraw(token, amount);
 
     if (recipient == address(0)) {
       revert RecipientCannotBeZeroAddress();
     }
 
-    // An explicit balance check returns a more useful error message than a silent underflow with no useful information.
-    uint256 balance = s_tokenBalances[token][remoteChainSelector];
-    if (balance < amount) {
-      revert InsufficientBalance(remoteChainSelector, amount, balance);
+    uint256 balance = IERC20(token).balanceOf(address(this));
+    if (amount > balance) {
+      revert InsufficientBalance(amount, balance);
     }
-
-    // Decrease the balance for the specified chain selector.
-    s_tokenBalances[token][remoteChainSelector] -= amount;
 
     IERC20(token).safeTransfer(recipient, amount);
 
-    emit Withdrawal(token, remoteChainSelector, recipient, amount);
+    emit Withdrawal(token, recipient, amount);
   }
 
   /// @notice Configures the allowed callers for deposit and withdraw functions.
@@ -174,13 +155,5 @@ contract ERC20LockBox is Ownable2StepMsgSender, ITypeAndVersion {
 
     // The caller is allowed if they are the token pool, the administrator, or a designated allowed caller.
     return (caller == tokenConfig.tokenPool || caller == tokenConfig.administrator || s_allowedCallers[token][caller]);
-  }
-
-  /// @notice Get the balance for a specific token and remote chain selector.
-  /// @param token The address of the ERC20 token.
-  /// @param remoteChainSelector The remote chain selector to query.
-  /// @return balance The balance of tokens for the specified token and remote chain selector.
-  function getBalance(address token, uint64 remoteChainSelector) external view returns (uint256 balance) {
-    return s_tokenBalances[token][remoteChainSelector];
   }
 }

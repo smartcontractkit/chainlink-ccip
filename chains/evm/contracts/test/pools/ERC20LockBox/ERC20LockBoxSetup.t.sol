@@ -43,10 +43,12 @@ contract ERC20LockBoxSetup is BaseTest {
     s_erc20LockBox.configureAllowedCallers(configArgs);
   }
 
-  function _depositTokens(uint256 amount, uint64 remoteChainSelector) internal {
+  function _depositTokens(
+    uint256 amount
+  ) internal {
     vm.startPrank(s_allowedCaller);
     s_token.approve(address(s_erc20LockBox), amount);
-    s_erc20LockBox.deposit(address(s_token), amount, remoteChainSelector);
+    s_erc20LockBox.deposit(address(s_token), amount);
     vm.stopPrank();
   }
 }

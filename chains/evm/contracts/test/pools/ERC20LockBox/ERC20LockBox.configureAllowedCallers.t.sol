@@ -173,20 +173,6 @@ contract ERC20LockBox_configureAllowedCallers is ERC20LockBoxSetup {
     assertTrue(s_erc20LockBox.isAllowedCaller(token, caller));
   }
 
-  // Reverts
-  function test_RevertWhen_NotOwner() public {
-    address newCaller = makeAddr("new_caller");
-    address token = address(s_token);
-
-    ERC20LockBox.AllowedCallerConfigArgs[] memory configArgs = new ERC20LockBox.AllowedCallerConfigArgs[](1);
-    configArgs[0] = ERC20LockBox.AllowedCallerConfigArgs({token: token, caller: newCaller, allowed: true});
-
-    vm.startPrank(STRANGER);
-    vm.expectRevert(abi.encodeWithSelector(ERC20LockBox.Unauthorized.selector, STRANGER));
-
-    s_erc20LockBox.configureAllowedCallers(configArgs);
-  }
-
   function test_ConfigureAllowedCallers_ZeroAddress() public {
     address zeroAddress = address(0);
     address token = address(s_token);
@@ -198,6 +184,23 @@ contract ERC20LockBox_configureAllowedCallers is ERC20LockBoxSetup {
     s_erc20LockBox.configureAllowedCallers(configArgs);
 
     assertTrue(s_erc20LockBox.isAllowedCaller(token, zeroAddress));
+  }
+
+  // ================================================================
+  // │                        Revert Tests                          │
+  // ================================================================
+
+  function test_RevertWhen_NotOwner() public {
+    address newCaller = makeAddr("new_caller");
+    address token = address(s_token);
+
+    ERC20LockBox.AllowedCallerConfigArgs[] memory configArgs = new ERC20LockBox.AllowedCallerConfigArgs[](1);
+    configArgs[0] = ERC20LockBox.AllowedCallerConfigArgs({token: token, caller: newCaller, allowed: true});
+
+    vm.startPrank(STRANGER);
+    vm.expectRevert(abi.encodeWithSelector(ERC20LockBox.Unauthorized.selector, STRANGER));
+
+    s_erc20LockBox.configureAllowedCallers(configArgs);
   }
 
   function test_ConfigureAllowedCallers_ZeroTokenAddress() public {
