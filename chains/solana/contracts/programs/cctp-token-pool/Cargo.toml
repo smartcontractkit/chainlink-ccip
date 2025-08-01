@@ -1,6 +1,6 @@
 [package]
 name = "cctp-token-pool"
-version = "0.1.0-dev"
+version = "0.1.1-dev"
 description = "USDC Token Pool for CCIP utilizing CCTP"
 edition = "2021"
 

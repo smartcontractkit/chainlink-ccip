@@ -24,7 +24,7 @@ type ReleaseOrMintTokens struct {
 	// ··········· CHECK PDA of the router program verifying the signer is an allowed offramp.
 	// ··········· If PDA does not exist, the router doesn't allow this offramp
 	//
-	// [3] = [WRITE] state
+	// [3] = [] state
 	//
 	// [4] = [] tokenProgram
 	//
@@ -103,7 +103,7 @@ func (inst *ReleaseOrMintTokens) GetAllowedOfframpAccount() *ag_solanago.Account
 
 // SetStateAccount sets the "state" account.
 func (inst *ReleaseOrMintTokens) SetStateAccount(state ag_solanago.PublicKey) *ReleaseOrMintTokens {
-	inst.AccountMetaSlice[3] = ag_solanago.Meta(state).WRITE()
+	inst.AccountMetaSlice[3] = ag_solanago.Meta(state)
 	return inst
 }
 

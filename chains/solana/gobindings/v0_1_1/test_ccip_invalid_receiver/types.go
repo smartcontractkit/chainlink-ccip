@@ -117,6 +117,7 @@ type LockOrBurnInV1 struct {
 	OriginalSender      ag_solanago.PublicKey
 	Amount              uint64
 	LocalToken          ag_solanago.PublicKey
+	MsgTotalNonce       uint64
 }
 
 func (obj LockOrBurnInV1) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
@@ -142,6 +143,11 @@ func (obj LockOrBurnInV1) MarshalWithEncoder(encoder *ag_binary.Encoder) (err er
 	}
 	// Serialize `LocalToken` param:
 	err = encoder.Encode(obj.LocalToken)
+	if err != nil {
+		return err
+	}
+	// Serialize `MsgTotalNonce` param:
+	err = encoder.Encode(obj.MsgTotalNonce)
 	if err != nil {
 		return err
 	}
@@ -171,6 +177,11 @@ func (obj *LockOrBurnInV1) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err
 	}
 	// Deserialize `LocalToken`:
 	err = decoder.Decode(&obj.LocalToken)
+	if err != nil {
+		return err
+	}
+	// Deserialize `MsgTotalNonce`:
+	err = decoder.Decode(&obj.MsgTotalNonce)
 	if err != nil {
 		return err
 	}

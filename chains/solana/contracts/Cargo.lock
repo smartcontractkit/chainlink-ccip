@@ -682,7 +682,7 @@ dependencies = [
 
 [[package]]
 name = "ccip_common"
-version = "0.1.0-dev"
+version = "0.1.1-dev"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -692,7 +692,7 @@ dependencies = [
 
 [[package]]
 name = "ccip_offramp"
-version = "0.1.0-dev"
+version = "0.1.1-dev"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -708,7 +708,7 @@ dependencies = [
 
 [[package]]
 name = "ccip_router"
-version = "0.1.0-dev"
+version = "0.1.1-dev"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -724,7 +724,7 @@ dependencies = [
 
 [[package]]
 name = "cctp-token-pool"
-version = "0.1.0-dev"
+version = "0.1.1-dev"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -1007,7 +1007,7 @@ checksum = "b90ca2580b73ab6a1f724b76ca11ab632df820fd6040c336200d2c1df7b3c82c"
 
 [[package]]
 name = "example_ccip_receiver"
-version = "0.1.0-dev"
+version = "0.1.1-dev"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -1016,7 +1016,7 @@ dependencies = [
 
 [[package]]
 name = "example_ccip_sender"
-version = "0.1.0-dev"
+version = "0.1.1-dev"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -1040,7 +1040,7 @@ checksum = "835a3dc7d1ec9e75e2b5fb4ba75396837112d2060b03f7d43bc1897c7f7211da"
 
 [[package]]
 name = "fee_quoter"
-version = "0.1.0-dev"
+version = "0.1.1-dev"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -1357,7 +1357,7 @@ checksum = "b5e6163cb8c49088c2c36f57875e58ccd8c87c7427f7fbd50ea6710b2f3f2e8f"
 
 [[package]]
 name = "mcm"
-version = "0.1.0-dev"
+version = "0.1.1-dev"
 dependencies = [
  "anchor-lang",
  "hex",
@@ -1559,7 +1559,7 @@ checksum = "e3148f5046208a5d56bcfc03053e3ca6334e51da8dfb19b6cdc8b306fae3283e"
 
 [[package]]
 name = "ping_pong_demo"
-version = "0.1.0-dev"
+version = "0.1.1-dev"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -1793,7 +1793,7 @@ checksum = "c08c74e62047bb2de4ff487b251e4a92e24f48745648451635cec7d591162d9f"
 
 [[package]]
 name = "rmn_remote"
-version = "0.1.0-dev"
+version = "0.1.1-dev"
 dependencies = [
  "anchor-lang",
  "build_commit",
@@ -2534,7 +2534,7 @@ dependencies = [
 
 [[package]]
 name = "test_ccip_receiver"
-version = "0.1.0-dev"
+version = "0.1.1-dev"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
