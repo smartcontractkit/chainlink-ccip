@@ -585,6 +585,7 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
     _executeTest(params, extraArgs);
   }
 
+  // This test achieves higher input space coverage than setting 1 non-zero byte at random index
   function test_ccipSendToken_ValidReceiver2(uint8 receiverLength, bytes32 receiverHead, bytes32 receiverTail) public {
     receiverLength = uint8(bound(receiverLength, 1, 64));
 
@@ -596,7 +597,7 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
       mstore(validReceiver, receiverLength)
     }
 
-    // throw out all-zero receiver
+    // Throw out all-zero receiver
     vm.assume(keccak256(validReceiver) != keccak256(new bytes(receiverLength)));
 
     TestParams memory params = TestParams({
