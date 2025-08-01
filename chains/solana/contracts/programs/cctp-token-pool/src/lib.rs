@@ -148,6 +148,8 @@ pub mod cctp_token_pool {
             CcipTokenPoolError::NonemptyPoolAddressesInit
         );
 
+        ctx.accounts.chain_config.version = 1;
+
         ctx.accounts
             .chain_config
             .base
@@ -507,6 +509,7 @@ pub mod cctp_token_pool {
         stage: String,
         release_or_mint: ReleaseOrMintInV1,
     ) -> Result<DeriveAccountsResponse> {
+        msg!("Stage: {}", stage);
         let stage = derive::release_or_mint::OfframpDeriveStage::from_str(&stage)?;
 
         match stage {
@@ -524,6 +527,7 @@ pub mod cctp_token_pool {
         stage: String,
         lock_or_burn: LockOrBurnInV1,
     ) -> Result<DeriveAccountsResponse> {
+        msg!("Stage: {}", stage);
         let stage = derive::lock_or_burn::OnrampDeriveStage::from_str(&stage)?;
 
         match stage {
@@ -546,17 +550,20 @@ fn parse_remaining_release_accounts<'info>(
 ) -> Result<TokenOfframpRemainingAccounts<'info>> {
     let mut remaining_accounts = remaining.iter();
     let result = TokenOfframpRemainingAccounts {
-        cctp_authority_pda: next_account_info(&mut remaining_accounts)?,
+        // Accounts in lookup table
         cctp_message_transmitter_account: next_account_info(&mut remaining_accounts)?,
         cctp_token_messenger_minter: next_account_info(&mut remaining_accounts)?,
         system_program: next_account_info(&mut remaining_accounts)?,
-        cctp_event_authority: next_account_info(&mut remaining_accounts)?,
         cctp_message_transmitter: next_account_info(&mut remaining_accounts)?,
         cctp_token_messenger_account: next_account_info(&mut remaining_accounts)?,
         cctp_token_minter_account: next_account_info(&mut remaining_accounts)?,
         cctp_local_token: next_account_info(&mut remaining_accounts)?,
+        cctp_token_messenger_minter_event_authority: next_account_info(&mut remaining_accounts)?,
+
+        // Account not in lookup table
+        cctp_authority_pda: next_account_info(&mut remaining_accounts)?,
+        cctp_event_authority: next_account_info(&mut remaining_accounts)?,
         cctp_custody_token_account: next_account_info(&mut remaining_accounts)?,
-        cctp_token_messenger_event_authority: next_account_info(&mut remaining_accounts)?,
         cctp_remote_token_messenger_key: next_account_info(&mut remaining_accounts)?,
         cctp_token_pair: next_account_info(&mut remaining_accounts)?,
         cctp_used_nonces: next_account_info(&mut remaining_accounts)?,
@@ -733,7 +740,7 @@ fn cctp_receive_message<'info>(
         remaining.cctp_custody_token_account.to_account_info(),
         ctx.accounts.token_program.clone().to_account_info(),
         remaining
-            .cctp_token_messenger_event_authority
+            .cctp_token_messenger_minter_event_authority
             .to_account_info(),
         remaining.cctp_token_messenger_minter.to_account_info(),
     ];
@@ -818,7 +825,7 @@ pub struct FundingConfig {
     pub minimum_signer_funds: u64,
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, InitSpace)]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, InitSpace, Debug)]
 pub struct CctpChain {
     // Domain ID for CCTP, used to identify the chain. This is a sequential number starting from 0.
     // Using u32 here because it's what CCTP uses in its Params structs.
@@ -841,6 +848,7 @@ pub struct PoolConfig {
 #[account]
 #[derive(InitSpace)]
 pub struct ChainConfig {
+    pub version: u8,
     pub base: BaseChain,
     pub cctp: CctpChain,
 }

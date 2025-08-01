@@ -10,7 +10,6 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
@@ -102,6 +101,7 @@ func DeriveExecutionAccounts(
 	bufferID []byte,
 	tokenReceiver solana.PublicKey,
 	solanaGoClient *rpc.Client,
+	offramp solana.PublicKey,
 ) (accounts []*solana.AccountMeta, lookUpTables []solana.PublicKey, tokenIndices []byte) {
 	derivedAccounts := []*solana.AccountMeta{}
 	askWith := []*solana.AccountMeta{}
@@ -119,18 +119,21 @@ func DeriveExecutionAccounts(
 			TokenReceiver:       tokenReceiver,
 		}
 
+		offrampConfigPDA, _, err := state.FindConfigPDA(offramp)
+		require.NoError(t, err)
+
 		deriveRaw := ccip_offramp.NewDeriveAccountsExecuteInstruction(
 			params,
 			stage,
-			config.OfframpConfigPDA,
+			offrampConfigPDA,
 		)
 		deriveRaw.AccountMetaSlice = append(deriveRaw.AccountMetaSlice, askWith...)
 		derive, err := deriveRaw.ValidateAndBuild()
 		require.NoError(t, err)
 
 		fmt.Printf("Stage: %s\n", stage)
-		tx := SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{derive}, transmitter, config.DefaultCommitment)
-		derivation, err := common.ExtractAnchorTypedReturnValue[ccip_offramp.DeriveAccountsResponse](ctx, tx.Meta.LogMessages, config.CcipOfframpProgram.String())
+		tx := SimulateTransaction(ctx, t, solanaGoClient, []solana.Instruction{derive}, transmitter)
+		derivation, err := common.ExtractAnchorTypedReturnValue[ccip_offramp.DeriveAccountsResponse](ctx, tx.Value.Logs, offramp.String())
 		require.NoError(t, err)
 
 		isStartOfToken := re.MatchString(derivation.CurrentStage)
