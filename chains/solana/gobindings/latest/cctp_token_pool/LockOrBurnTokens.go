@@ -35,32 +35,33 @@ type LockOrBurnTokens struct {
 	//
 	// [9] = [] chainConfig
 	//
-	// [10] = [] cctpAuthorityPda
+	// [10] = [WRITE] cctpMessageTransmitterAccount
 	// ··········· CHECK this is not read by the pool, just forwarded to CCTP
 	//
-	// [11] = [WRITE] cctpMessageTransmitterAccount
-	// ··········· CHECK this is not read by the pool, just forwarded to CCTP
-	//
-	// [12] = [] cctpTokenMessengerAccount
-	// ··········· CHECK this is not read by the pool, just forwarded to CCTP
-	//
-	// [13] = [] cctpTokenMinterAccount
-	// ··········· CHECK this is not read by the pool, just forwarded to CCTP
-	//
-	// [14] = [WRITE] cctpLocalToken
-	// ··········· CHECK this is not read by the pool, just forwarded to CCTP
-	//
-	// [15] = [] cctpMessageTransmitter
-	// ··········· CHECK this is CCTP's MessageTransmitter program, which
-	// ··········· is invoked CCTP's TokenMessengerMinter by this program.
-	//
-	// [16] = [] cctpTokenMessengerMinter
+	// [11] = [] cctpTokenMessengerMinter
 	// ··········· CHECK this is CCTP's TokenMessengerMinter program, which
 	// ··········· is invoked by this program.
 	//
-	// [17] = [] systemProgram
+	// [12] = [] systemProgram
 	//
-	// [18] = [] cctpEventAuthority
+	// [13] = [] cctpMessageTransmitter
+	// ··········· CHECK this is CCTP's MessageTransmitter program, which
+	// ··········· is invoked transitively by CCTP's TokenMessengerMinter,
+	// ··········· which in turn is invoked explicitly by this program.
+	//
+	// [14] = [] cctpTokenMessengerAccount
+	// ··········· CHECK this is not read by the pool, just forwarded to CCTP
+	//
+	// [15] = [] cctpTokenMinterAccount
+	// ··········· CHECK this is not read by the pool, just forwarded to CCTP
+	//
+	// [16] = [WRITE] cctpLocalToken
+	// ··········· CHECK this is not read by the pool, just forwarded to CCTP
+	//
+	// [17] = [] cctpEventAuthority
+	// ··········· CHECK this is not read by the pool, just forwarded to CCTP
+	//
+	// [18] = [] cctpAuthorityPda
 	// ··········· CHECK this is not read by the pool, just forwarded to CCTP
 	//
 	// [19] = [] cctpRemoteTokenMessengerKey
@@ -198,91 +199,24 @@ func (inst *LockOrBurnTokens) GetChainConfigAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[9]
 }
 
-// SetCctpAuthorityPdaAccount sets the "cctpAuthorityPda" account.
-// CHECK this is not read by the pool, just forwarded to CCTP
-func (inst *LockOrBurnTokens) SetCctpAuthorityPdaAccount(cctpAuthorityPda ag_solanago.PublicKey) *LockOrBurnTokens {
-	inst.AccountMetaSlice[10] = ag_solanago.Meta(cctpAuthorityPda)
-	return inst
-}
-
-// GetCctpAuthorityPdaAccount gets the "cctpAuthorityPda" account.
-// CHECK this is not read by the pool, just forwarded to CCTP
-func (inst *LockOrBurnTokens) GetCctpAuthorityPdaAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[10]
-}
-
 // SetCctpMessageTransmitterAccountAccount sets the "cctpMessageTransmitterAccount" account.
 // CHECK this is not read by the pool, just forwarded to CCTP
 func (inst *LockOrBurnTokens) SetCctpMessageTransmitterAccountAccount(cctpMessageTransmitterAccount ag_solanago.PublicKey) *LockOrBurnTokens {
-	inst.AccountMetaSlice[11] = ag_solanago.Meta(cctpMessageTransmitterAccount).WRITE()
+	inst.AccountMetaSlice[10] = ag_solanago.Meta(cctpMessageTransmitterAccount).WRITE()
 	return inst
 }
 
 // GetCctpMessageTransmitterAccountAccount gets the "cctpMessageTransmitterAccount" account.
 // CHECK this is not read by the pool, just forwarded to CCTP
 func (inst *LockOrBurnTokens) GetCctpMessageTransmitterAccountAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[11]
-}
-
-// SetCctpTokenMessengerAccountAccount sets the "cctpTokenMessengerAccount" account.
-// CHECK this is not read by the pool, just forwarded to CCTP
-func (inst *LockOrBurnTokens) SetCctpTokenMessengerAccountAccount(cctpTokenMessengerAccount ag_solanago.PublicKey) *LockOrBurnTokens {
-	inst.AccountMetaSlice[12] = ag_solanago.Meta(cctpTokenMessengerAccount)
-	return inst
-}
-
-// GetCctpTokenMessengerAccountAccount gets the "cctpTokenMessengerAccount" account.
-// CHECK this is not read by the pool, just forwarded to CCTP
-func (inst *LockOrBurnTokens) GetCctpTokenMessengerAccountAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[12]
-}
-
-// SetCctpTokenMinterAccountAccount sets the "cctpTokenMinterAccount" account.
-// CHECK this is not read by the pool, just forwarded to CCTP
-func (inst *LockOrBurnTokens) SetCctpTokenMinterAccountAccount(cctpTokenMinterAccount ag_solanago.PublicKey) *LockOrBurnTokens {
-	inst.AccountMetaSlice[13] = ag_solanago.Meta(cctpTokenMinterAccount)
-	return inst
-}
-
-// GetCctpTokenMinterAccountAccount gets the "cctpTokenMinterAccount" account.
-// CHECK this is not read by the pool, just forwarded to CCTP
-func (inst *LockOrBurnTokens) GetCctpTokenMinterAccountAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[13]
-}
-
-// SetCctpLocalTokenAccount sets the "cctpLocalToken" account.
-// CHECK this is not read by the pool, just forwarded to CCTP
-func (inst *LockOrBurnTokens) SetCctpLocalTokenAccount(cctpLocalToken ag_solanago.PublicKey) *LockOrBurnTokens {
-	inst.AccountMetaSlice[14] = ag_solanago.Meta(cctpLocalToken).WRITE()
-	return inst
-}
-
-// GetCctpLocalTokenAccount gets the "cctpLocalToken" account.
-// CHECK this is not read by the pool, just forwarded to CCTP
-func (inst *LockOrBurnTokens) GetCctpLocalTokenAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[14]
-}
-
-// SetCctpMessageTransmitterAccount sets the "cctpMessageTransmitter" account.
-// CHECK this is CCTP's MessageTransmitter program, which
-// is invoked CCTP's TokenMessengerMinter by this program.
-func (inst *LockOrBurnTokens) SetCctpMessageTransmitterAccount(cctpMessageTransmitter ag_solanago.PublicKey) *LockOrBurnTokens {
-	inst.AccountMetaSlice[15] = ag_solanago.Meta(cctpMessageTransmitter)
-	return inst
-}
-
-// GetCctpMessageTransmitterAccount gets the "cctpMessageTransmitter" account.
-// CHECK this is CCTP's MessageTransmitter program, which
-// is invoked CCTP's TokenMessengerMinter by this program.
-func (inst *LockOrBurnTokens) GetCctpMessageTransmitterAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[15]
+	return inst.AccountMetaSlice[10]
 }
 
 // SetCctpTokenMessengerMinterAccount sets the "cctpTokenMessengerMinter" account.
 // CHECK this is CCTP's TokenMessengerMinter program, which
 // is invoked by this program.
 func (inst *LockOrBurnTokens) SetCctpTokenMessengerMinterAccount(cctpTokenMessengerMinter ag_solanago.PublicKey) *LockOrBurnTokens {
-	inst.AccountMetaSlice[16] = ag_solanago.Meta(cctpTokenMessengerMinter)
+	inst.AccountMetaSlice[11] = ag_solanago.Meta(cctpTokenMessengerMinter)
 	return inst
 }
 
@@ -290,30 +224,99 @@ func (inst *LockOrBurnTokens) SetCctpTokenMessengerMinterAccount(cctpTokenMessen
 // CHECK this is CCTP's TokenMessengerMinter program, which
 // is invoked by this program.
 func (inst *LockOrBurnTokens) GetCctpTokenMessengerMinterAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[16]
+	return inst.AccountMetaSlice[11]
 }
 
 // SetSystemProgramAccount sets the "systemProgram" account.
 func (inst *LockOrBurnTokens) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *LockOrBurnTokens {
-	inst.AccountMetaSlice[17] = ag_solanago.Meta(systemProgram)
+	inst.AccountMetaSlice[12] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
 // GetSystemProgramAccount gets the "systemProgram" account.
 func (inst *LockOrBurnTokens) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[17]
+	return inst.AccountMetaSlice[12]
+}
+
+// SetCctpMessageTransmitterAccount sets the "cctpMessageTransmitter" account.
+// CHECK this is CCTP's MessageTransmitter program, which
+// is invoked transitively by CCTP's TokenMessengerMinter,
+// which in turn is invoked explicitly by this program.
+func (inst *LockOrBurnTokens) SetCctpMessageTransmitterAccount(cctpMessageTransmitter ag_solanago.PublicKey) *LockOrBurnTokens {
+	inst.AccountMetaSlice[13] = ag_solanago.Meta(cctpMessageTransmitter)
+	return inst
+}
+
+// GetCctpMessageTransmitterAccount gets the "cctpMessageTransmitter" account.
+// CHECK this is CCTP's MessageTransmitter program, which
+// is invoked transitively by CCTP's TokenMessengerMinter,
+// which in turn is invoked explicitly by this program.
+func (inst *LockOrBurnTokens) GetCctpMessageTransmitterAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[13]
+}
+
+// SetCctpTokenMessengerAccountAccount sets the "cctpTokenMessengerAccount" account.
+// CHECK this is not read by the pool, just forwarded to CCTP
+func (inst *LockOrBurnTokens) SetCctpTokenMessengerAccountAccount(cctpTokenMessengerAccount ag_solanago.PublicKey) *LockOrBurnTokens {
+	inst.AccountMetaSlice[14] = ag_solanago.Meta(cctpTokenMessengerAccount)
+	return inst
+}
+
+// GetCctpTokenMessengerAccountAccount gets the "cctpTokenMessengerAccount" account.
+// CHECK this is not read by the pool, just forwarded to CCTP
+func (inst *LockOrBurnTokens) GetCctpTokenMessengerAccountAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[14]
+}
+
+// SetCctpTokenMinterAccountAccount sets the "cctpTokenMinterAccount" account.
+// CHECK this is not read by the pool, just forwarded to CCTP
+func (inst *LockOrBurnTokens) SetCctpTokenMinterAccountAccount(cctpTokenMinterAccount ag_solanago.PublicKey) *LockOrBurnTokens {
+	inst.AccountMetaSlice[15] = ag_solanago.Meta(cctpTokenMinterAccount)
+	return inst
+}
+
+// GetCctpTokenMinterAccountAccount gets the "cctpTokenMinterAccount" account.
+// CHECK this is not read by the pool, just forwarded to CCTP
+func (inst *LockOrBurnTokens) GetCctpTokenMinterAccountAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[15]
+}
+
+// SetCctpLocalTokenAccount sets the "cctpLocalToken" account.
+// CHECK this is not read by the pool, just forwarded to CCTP
+func (inst *LockOrBurnTokens) SetCctpLocalTokenAccount(cctpLocalToken ag_solanago.PublicKey) *LockOrBurnTokens {
+	inst.AccountMetaSlice[16] = ag_solanago.Meta(cctpLocalToken).WRITE()
+	return inst
+}
+
+// GetCctpLocalTokenAccount gets the "cctpLocalToken" account.
+// CHECK this is not read by the pool, just forwarded to CCTP
+func (inst *LockOrBurnTokens) GetCctpLocalTokenAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[16]
 }
 
 // SetCctpEventAuthorityAccount sets the "cctpEventAuthority" account.
 // CHECK this is not read by the pool, just forwarded to CCTP
 func (inst *LockOrBurnTokens) SetCctpEventAuthorityAccount(cctpEventAuthority ag_solanago.PublicKey) *LockOrBurnTokens {
-	inst.AccountMetaSlice[18] = ag_solanago.Meta(cctpEventAuthority)
+	inst.AccountMetaSlice[17] = ag_solanago.Meta(cctpEventAuthority)
 	return inst
 }
 
 // GetCctpEventAuthorityAccount gets the "cctpEventAuthority" account.
 // CHECK this is not read by the pool, just forwarded to CCTP
 func (inst *LockOrBurnTokens) GetCctpEventAuthorityAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[17]
+}
+
+// SetCctpAuthorityPdaAccount sets the "cctpAuthorityPda" account.
+// CHECK this is not read by the pool, just forwarded to CCTP
+func (inst *LockOrBurnTokens) SetCctpAuthorityPdaAccount(cctpAuthorityPda ag_solanago.PublicKey) *LockOrBurnTokens {
+	inst.AccountMetaSlice[18] = ag_solanago.Meta(cctpAuthorityPda)
+	return inst
+}
+
+// GetCctpAuthorityPdaAccount gets the "cctpAuthorityPda" account.
+// CHECK this is not read by the pool, just forwarded to CCTP
+func (inst *LockOrBurnTokens) GetCctpAuthorityPdaAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[18]
 }
 
@@ -403,31 +406,31 @@ func (inst *LockOrBurnTokens) Validate() error {
 			return errors.New("accounts.ChainConfig is not set")
 		}
 		if inst.AccountMetaSlice[10] == nil {
-			return errors.New("accounts.CctpAuthorityPda is not set")
-		}
-		if inst.AccountMetaSlice[11] == nil {
 			return errors.New("accounts.CctpMessageTransmitterAccount is not set")
 		}
-		if inst.AccountMetaSlice[12] == nil {
-			return errors.New("accounts.CctpTokenMessengerAccount is not set")
-		}
-		if inst.AccountMetaSlice[13] == nil {
-			return errors.New("accounts.CctpTokenMinterAccount is not set")
-		}
-		if inst.AccountMetaSlice[14] == nil {
-			return errors.New("accounts.CctpLocalToken is not set")
-		}
-		if inst.AccountMetaSlice[15] == nil {
-			return errors.New("accounts.CctpMessageTransmitter is not set")
-		}
-		if inst.AccountMetaSlice[16] == nil {
+		if inst.AccountMetaSlice[11] == nil {
 			return errors.New("accounts.CctpTokenMessengerMinter is not set")
 		}
-		if inst.AccountMetaSlice[17] == nil {
+		if inst.AccountMetaSlice[12] == nil {
 			return errors.New("accounts.SystemProgram is not set")
 		}
-		if inst.AccountMetaSlice[18] == nil {
+		if inst.AccountMetaSlice[13] == nil {
+			return errors.New("accounts.CctpMessageTransmitter is not set")
+		}
+		if inst.AccountMetaSlice[14] == nil {
+			return errors.New("accounts.CctpTokenMessengerAccount is not set")
+		}
+		if inst.AccountMetaSlice[15] == nil {
+			return errors.New("accounts.CctpTokenMinterAccount is not set")
+		}
+		if inst.AccountMetaSlice[16] == nil {
+			return errors.New("accounts.CctpLocalToken is not set")
+		}
+		if inst.AccountMetaSlice[17] == nil {
 			return errors.New("accounts.CctpEventAuthority is not set")
+		}
+		if inst.AccountMetaSlice[18] == nil {
+			return errors.New("accounts.CctpAuthorityPda is not set")
 		}
 		if inst.AccountMetaSlice[19] == nil {
 			return errors.New("accounts.CctpRemoteTokenMessengerKey is not set")
@@ -464,15 +467,15 @@ func (inst *LockOrBurnTokens) EncodeToTree(parent ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("            rmnRemoteCurses", inst.AccountMetaSlice[7]))
 						accountsBranch.Child(ag_format.Meta("            rmnRemoteConfig", inst.AccountMetaSlice[8]))
 						accountsBranch.Child(ag_format.Meta("                chainConfig", inst.AccountMetaSlice[9]))
-						accountsBranch.Child(ag_format.Meta("           cctpAuthorityPda", inst.AccountMetaSlice[10]))
-						accountsBranch.Child(ag_format.Meta("     cctpMessageTransmitter", inst.AccountMetaSlice[11]))
-						accountsBranch.Child(ag_format.Meta("         cctpTokenMessenger", inst.AccountMetaSlice[12]))
-						accountsBranch.Child(ag_format.Meta("            cctpTokenMinter", inst.AccountMetaSlice[13]))
-						accountsBranch.Child(ag_format.Meta("             cctpLocalToken", inst.AccountMetaSlice[14]))
-						accountsBranch.Child(ag_format.Meta("     cctpMessageTransmitter", inst.AccountMetaSlice[15]))
-						accountsBranch.Child(ag_format.Meta("   cctpTokenMessengerMinter", inst.AccountMetaSlice[16]))
-						accountsBranch.Child(ag_format.Meta("              systemProgram", inst.AccountMetaSlice[17]))
-						accountsBranch.Child(ag_format.Meta("         cctpEventAuthority", inst.AccountMetaSlice[18]))
+						accountsBranch.Child(ag_format.Meta("     cctpMessageTransmitter", inst.AccountMetaSlice[10]))
+						accountsBranch.Child(ag_format.Meta("   cctpTokenMessengerMinter", inst.AccountMetaSlice[11]))
+						accountsBranch.Child(ag_format.Meta("              systemProgram", inst.AccountMetaSlice[12]))
+						accountsBranch.Child(ag_format.Meta("     cctpMessageTransmitter", inst.AccountMetaSlice[13]))
+						accountsBranch.Child(ag_format.Meta("         cctpTokenMessenger", inst.AccountMetaSlice[14]))
+						accountsBranch.Child(ag_format.Meta("            cctpTokenMinter", inst.AccountMetaSlice[15]))
+						accountsBranch.Child(ag_format.Meta("             cctpLocalToken", inst.AccountMetaSlice[16]))
+						accountsBranch.Child(ag_format.Meta("         cctpEventAuthority", inst.AccountMetaSlice[17]))
+						accountsBranch.Child(ag_format.Meta("           cctpAuthorityPda", inst.AccountMetaSlice[18]))
 						accountsBranch.Child(ag_format.Meta("cctpRemoteTokenMessengerKey", inst.AccountMetaSlice[19]))
 						accountsBranch.Child(ag_format.Meta("       cctpMessageSentEvent", inst.AccountMetaSlice[20]))
 					})
@@ -512,15 +515,15 @@ func NewLockOrBurnTokensInstruction(
 	rmnRemoteCurses ag_solanago.PublicKey,
 	rmnRemoteConfig ag_solanago.PublicKey,
 	chainConfig ag_solanago.PublicKey,
-	cctpAuthorityPda ag_solanago.PublicKey,
 	cctpMessageTransmitterAccount ag_solanago.PublicKey,
+	cctpTokenMessengerMinter ag_solanago.PublicKey,
+	systemProgram ag_solanago.PublicKey,
+	cctpMessageTransmitter ag_solanago.PublicKey,
 	cctpTokenMessengerAccount ag_solanago.PublicKey,
 	cctpTokenMinterAccount ag_solanago.PublicKey,
 	cctpLocalToken ag_solanago.PublicKey,
-	cctpMessageTransmitter ag_solanago.PublicKey,
-	cctpTokenMessengerMinter ag_solanago.PublicKey,
-	systemProgram ag_solanago.PublicKey,
 	cctpEventAuthority ag_solanago.PublicKey,
+	cctpAuthorityPda ag_solanago.PublicKey,
 	cctpRemoteTokenMessengerKey ag_solanago.PublicKey,
 	cctpMessageSentEvent ag_solanago.PublicKey) *LockOrBurnTokens {
 	return NewLockOrBurnTokensInstructionBuilder().
@@ -535,15 +538,15 @@ func NewLockOrBurnTokensInstruction(
 		SetRmnRemoteCursesAccount(rmnRemoteCurses).
 		SetRmnRemoteConfigAccount(rmnRemoteConfig).
 		SetChainConfigAccount(chainConfig).
-		SetCctpAuthorityPdaAccount(cctpAuthorityPda).
 		SetCctpMessageTransmitterAccountAccount(cctpMessageTransmitterAccount).
+		SetCctpTokenMessengerMinterAccount(cctpTokenMessengerMinter).
+		SetSystemProgramAccount(systemProgram).
+		SetCctpMessageTransmitterAccount(cctpMessageTransmitter).
 		SetCctpTokenMessengerAccountAccount(cctpTokenMessengerAccount).
 		SetCctpTokenMinterAccountAccount(cctpTokenMinterAccount).
 		SetCctpLocalTokenAccount(cctpLocalToken).
-		SetCctpMessageTransmitterAccount(cctpMessageTransmitter).
-		SetCctpTokenMessengerMinterAccount(cctpTokenMessengerMinter).
-		SetSystemProgramAccount(systemProgram).
 		SetCctpEventAuthorityAccount(cctpEventAuthority).
+		SetCctpAuthorityPdaAccount(cctpAuthorityPda).
 		SetCctpRemoteTokenMessengerKeyAccount(cctpRemoteTokenMessengerKey).
 		SetCctpMessageSentEventAccount(cctpMessageSentEvent)
 }

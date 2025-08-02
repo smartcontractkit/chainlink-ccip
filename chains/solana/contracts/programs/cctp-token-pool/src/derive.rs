@@ -13,7 +13,7 @@ use std::{
 };
 
 use crate::{
-    context::{TokenOfframpRemainingAccounts, MESSAGE_TRANSMITTER, TOKEN_MESSENGER_MINTER},
+    context::{TokenOfframpRemainingAccounts, TOKEN_MESSENGER_MINTER},
     to_solana_pubkey, ChainConfig,
 };
 
@@ -78,20 +78,6 @@ pub mod release_or_mint {
                     TOKEN_MESSENGER_MINTER.as_ref(),
                 ])
                 .readonly(),
-                // cctp_message_transmitter_account
-                get_message_transmitter_pda(&[b"message_transmitter"]).readonly(),
-                // cctp_token_messenger_minter
-                TOKEN_MESSENGER_MINTER.readonly(),
-                // system_program
-                System::id().readonly(),
-                // cctp_event_authority
-                get_message_transmitter_pda(&[b"__event_authority"]).readonly(),
-                // cctp_message_transmitter
-                MESSAGE_TRANSMITTER.readonly(),
-                // cctp_token_messenger_account
-                get_token_messenger_minter_pda(&[b"token_messenger"]).readonly(),
-                // cctp_token_minter_account
-                get_token_messenger_minter_pda(&[b"token_minter"]).writable(),
             ],
             current_stage: OfframpDeriveStage::RetrieveChainConfig.to_string(),
             next_stage: OfframpDeriveStage::BuildDynamicAccounts.to_string(),
@@ -116,12 +102,10 @@ pub mod release_or_mint {
 
         Ok(DeriveAccountsResponse {
             accounts_to_save: vec![
-                // cctp_local_token
-                get_token_messenger_minter_pda(&[b"local_token", mint.as_ref()]).writable(),
+                // cctp_event_authority
+                get_message_transmitter_pda(&[b"__event_authority"]).readonly(),
                 // cctp_custody_token_account
                 get_token_messenger_minter_pda(&[b"custody", mint.as_ref()]).writable(),
-                // cctp_token_messenger_event_authority
-                get_token_messenger_minter_pda(&[b"__event_authority"]).readonly(),
                 // cctp_remote_token_messenger_key
                 get_token_messenger_minter_pda(&[b"remote_token_messenger", domain_seed])
                     .readonly(),
@@ -182,8 +166,10 @@ pub mod lock_or_burn {
                 ],
                 crate::ID,
             )],
-            // The static PDAs have already been returned by CCIP via the LUT, so there's no additional accounts here
-            accounts_to_save: vec![],
+            // The static PDAs have mostly already been returned by CCIP via the LUT, so we just return here the ones not shared with offramp (so not in LUT)
+            accounts_to_save: vec![
+                get_token_messenger_minter_pda(&[b"sender_authority"]).readonly()
+            ],
             current_stage: OnrampDeriveStage::RetrieveChainConfig.to_string(),
             next_stage: OnrampDeriveStage::BuildDynamicAccounts.to_string(),
             ..Default::default()

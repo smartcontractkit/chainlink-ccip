@@ -114,8 +114,9 @@ func (obj *PoolConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 }
 
 type ChainConfig struct {
-	Base BaseChain
-	Cctp CctpChain
+	Version uint8
+	Base    BaseChain
+	Cctp    CctpChain
 }
 
 var ChainConfigDiscriminator = [8]byte{13, 177, 233, 141, 212, 29, 148, 56}
@@ -123,6 +124,11 @@ var ChainConfigDiscriminator = [8]byte{13, 177, 233, 141, 212, 29, 148, 56}
 func (obj ChainConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Write account discriminator:
 	err = encoder.WriteBytes(ChainConfigDiscriminator[:], false)
+	if err != nil {
+		return err
+	}
+	// Serialize `Version` param:
+	err = encoder.Encode(obj.Version)
 	if err != nil {
 		return err
 	}
@@ -152,6 +158,11 @@ func (obj *ChainConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err er
 				"[13 177 233 141 212 29 148 56]",
 				fmt.Sprint(discriminator[:]))
 		}
+	}
+	// Deserialize `Version`:
+	err = decoder.Decode(&obj.Version)
+	if err != nil {
+		return err
 	}
 	// Deserialize `Base`:
 	err = decoder.Decode(&obj.Base)

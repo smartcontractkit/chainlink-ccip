@@ -38,6 +38,7 @@ pub mod ccip_router {
     #![warn(missing_docs)]
     use super::*;
 
+    #[allow(clippy::empty_line_after_outer_attr)]
     //////////////////////////
     /// Initialization Flow //
     //////////////////////////
@@ -124,6 +125,7 @@ pub mod ccip_router {
         router::admin(ctx.accounts.config.default_code_version).accept_ownership(ctx)
     }
 
+    #[allow(clippy::empty_line_after_outer_attr)]
     /////////////
     /// Config //
     /////////////
@@ -324,6 +326,7 @@ pub mod ccip_router {
             .rollback_ccip_version_for_dest_chain(ctx, dest_chain_selector)
     }
 
+    #[allow(clippy::empty_line_after_outer_attr)]
     ///////////////////////////
     /// Token Admin Registry //
     ///////////////////////////
@@ -467,6 +470,7 @@ pub mod ccip_router {
             .set_pool(ctx, writable_indexes)
     }
 
+    #[allow(clippy::empty_line_after_outer_attr)]
     //////////////
     /// Billing //
     //////////////
@@ -491,6 +495,7 @@ pub mod ccip_router {
         )
     }
 
+    #[allow(clippy::empty_line_after_outer_attr)]
     ///////////////////
     /// On Ramp Flow //
     ///////////////////
@@ -655,4 +660,6 @@ pub enum CcipRouterError {
     InvalidTokenPoolAccountDerivationResponse,
     #[msg("Can't fit account derivation response.")]
     AccountDerivationResponseTooLarge,
+    #[msg("Proposed owner is the default pubkey")]
+    DefaultOwnerProposal,
 }

@@ -52,7 +52,7 @@ func Test_USDCMessageReader_New(t *testing.T) {
 			errorMessage: "failed to get selector family for chain 1: unknown chain selector 1",
 		},
 		{
-			name: "missing readers",
+			name: "missing readers doesn't fail",
 			tokensConfig: map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig{
 				cciptypes.ChainSelector(sel.ETHEREUM_TESTNET_SEPOLIA.Selector): {
 					SourcePoolAddress:            address1,
@@ -60,8 +60,6 @@ func Test_USDCMessageReader_New(t *testing.T) {
 				},
 			},
 			readers: emptyReaders,
-			errorMessage: fmt.Sprintf("validate reader existence: chain %d: contract reader not found",
-				sel.ETHEREUM_TESTNET_SEPOLIA.Selector),
 		},
 		{
 			name: "binding errors",
@@ -132,7 +130,7 @@ func Test_USDCMessageReader_MessagesByTokenID(t *testing.T) {
 	emptyChain := cciptypes.ChainSelector(sel.ETHEREUM_MAINNET.Selector)
 	emptyReader := reader.NewMockExtended(t)
 	emptyReader.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
-	emptyReader.EXPECT().QueryKey(
+	emptyReader.EXPECT().ExtendedQueryKey(
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
@@ -143,7 +141,7 @@ func Test_USDCMessageReader_MessagesByTokenID(t *testing.T) {
 	faultyChain := cciptypes.ChainSelector(sel.AVALANCHE_MAINNET.Selector)
 	faultyReader := reader.NewMockExtended(t)
 	faultyReader.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
-	faultyReader.EXPECT().QueryKey(
+	faultyReader.EXPECT().ExtendedQueryKey(
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
@@ -161,7 +159,7 @@ func Test_USDCMessageReader_MessagesByTokenID(t *testing.T) {
 	validChainCCTP := CCTPDestDomains[uint64(validChain)]
 	validReader := reader.NewMockExtended(t)
 	validReader.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
-	validReader.EXPECT().QueryKey(
+	validReader.EXPECT().ExtendedQueryKey(
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
@@ -309,7 +307,7 @@ func Test_MessageSentEvent_unpackID(t *testing.T) {
 	}
 }
 
-func Test_SourceTokenDataPayload_ToBytes(t *testing.T) {
+func Test_extractABIPayload_ToBytes(t *testing.T) {
 	tt := []struct {
 		nonce        uint64
 		sourceDomain uint32
@@ -333,14 +331,14 @@ func Test_SourceTokenDataPayload_ToBytes(t *testing.T) {
 			payload1 := NewSourceTokenDataPayload(tc.nonce, tc.sourceDomain)
 			bytes := payload1.ToBytes()
 
-			payload2, err := NewSourceTokenDataPayloadFromBytes(bytes)
+			payload2, err := extractABIPayload(bytes)
 			require.NoError(t, err)
 			require.Equal(t, *payload1, *payload2)
 		})
 	}
 }
 
-func Test_SourceTokenDataPayload_FromBytes(t *testing.T) {
+func Test_extractABIPayload_FromBytes(t *testing.T) {
 	tt := []struct {
 		name    string
 		data    []byte
@@ -371,7 +369,7 @@ func Test_SourceTokenDataPayload_FromBytes(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := NewSourceTokenDataPayloadFromBytes(tc.data)
+			got, err := extractABIPayload(tc.data)
 
 			if !tc.wantErr {
 				require.NoError(t, err)

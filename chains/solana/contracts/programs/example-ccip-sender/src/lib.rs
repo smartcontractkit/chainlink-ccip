@@ -1,5 +1,3 @@
-#![allow(unexpected_cfgs)]
-
 use anchor_lang::prelude::*;
 use anchor_spl::token_2022::spl_token_2022::{self, instruction::transfer_checked};
 use solana_program::{

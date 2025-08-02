@@ -24,3 +24,7 @@ ccip_router = { path = "../ccip-router", features = ["cpi"] }
 
 [build-dependencies]
 build_commit = { path = "../../crates/build-commit" }
+
+[lints.rust.unexpected_cfgs]
+level = "warn"
+check-cfg = ['cfg(target_os, values("solana"))', 'cfg(feature, values("anchor-debug", "custom-panic", "custom-heap"))']

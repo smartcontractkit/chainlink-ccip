@@ -126,6 +126,7 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
       sourceDecimals: SOURCE_DECIMALS,
       fillerFee: expectedFillerFee,
       poolFee: expectedPoolFee,
+      destinationPool: destPoolAddress,
       receiver: params.receiver
     });
 
@@ -201,6 +202,7 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
       sourceDecimals: SOURCE_DECIMALS,
       fillerFee: expectedFastTransferFee,
       poolFee: 0,
+      destinationPool: destPoolAddress,
       receiver: abi.encode(RECEIVER)
     });
 
@@ -242,6 +244,7 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
       sourceDecimals: SOURCE_DECIMALS,
       fillerFee: fillerFeeAmount,
       poolFee: poolFeeAmount,
+      destinationPool: destPoolAddress,
       receiver: params.receiver
     });
 
@@ -335,6 +338,53 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
     // Verify transaction completed successfully
     assertEq(settlementId, mockMessageId);
     assertEq(s_token.balanceOf(OWNER), balanceBefore - SOURCE_AMOUNT);
+  }
+
+  function test_ccipSendToken_RevertWhen_ReceiverIsEmptyBytes() public {
+    // Setup: Empty receiver address
+    bytes memory emptyReceiver = "";
+
+    vm.expectRevert(abi.encodeWithSelector(FastTransferTokenPoolAbstract.InvalidReceiver.selector, emptyReceiver));
+    s_pool.ccipSendToken{value: 1 ether}(DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, 1 ether, emptyReceiver, address(0), "");
+  }
+
+  function test_ccipSendToken_RevertWhen_ReceiverExceedsMaxLength() public {
+    // Setup: Receiver longer than 64 bytes (65 bytes)
+    bytes memory oversizedReceiver = new bytes(65);
+    // Fill with non-zero data to ensure it's not rejected for being all zeros
+    for (uint256 i = 0; i < 65; i++) {
+      oversizedReceiver[i] = bytes1(uint8(i + 1));
+    }
+
+    vm.expectRevert(abi.encodeWithSelector(FastTransferTokenPoolAbstract.InvalidReceiver.selector, oversizedReceiver));
+    s_pool.ccipSendToken{value: 1 ether}(DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, 1 ether, oversizedReceiver, address(0), "");
+  }
+
+  function test_ccipSendToken_RevertWhen_ReceiverIsAllZeros() public {
+    // Setup: 20-byte receiver address filled with zeros (typical Ethereum address length)
+    bytes memory zeroReceiver20 = new bytes(20);
+    // bytes constructor already initializes to zeros
+
+    vm.expectRevert(abi.encodeWithSelector(FastTransferTokenPoolAbstract.InvalidReceiver.selector, zeroReceiver20));
+    s_pool.ccipSendToken{value: 1 ether}(DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, 1 ether, zeroReceiver20, address(0), "");
+
+    // Setup: 32-byte receiver address filled with zeros (one full word)
+    bytes memory zeroReceiver32 = new bytes(32);
+
+    vm.expectRevert(abi.encodeWithSelector(FastTransferTokenPoolAbstract.InvalidReceiver.selector, zeroReceiver32));
+    s_pool.ccipSendToken{value: 1 ether}(DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, 1 ether, zeroReceiver32, address(0), "");
+
+    // Setup: 40-byte receiver address filled with zeros
+    bytes memory zeroReceiver40 = new bytes(40);
+
+    vm.expectRevert(abi.encodeWithSelector(FastTransferTokenPoolAbstract.InvalidReceiver.selector, zeroReceiver40));
+    s_pool.ccipSendToken{value: 1 ether}(DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, 1 ether, zeroReceiver40, address(0), "");
+
+    // Setup: 64-byte receiver address filled with zeros (maximum allowed length)
+    bytes memory zeroReceiver64 = new bytes(64);
+
+    vm.expectRevert(abi.encodeWithSelector(FastTransferTokenPoolAbstract.InvalidReceiver.selector, zeroReceiver64));
+    s_pool.ccipSendToken{value: 1 ether}(DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, 1 ether, zeroReceiver64, address(0), "");
   }
 
   function test_ccipSendToken_RevertWhen_FeeExceedsUserMaxLimit() public {
@@ -510,5 +560,31 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
     s_pool.updateFillerAllowList(fillersToAdd, new address[](0));
 
     vm.startPrank(OWNER);
+  }
+
+  // This test achieves higher input space coverage than setting 1 non-zero byte at random index
+  function test_ccipSendToken_ValidReceiver(uint8 receiverLength, bytes32 receiverHead, bytes32 receiverTail) public {
+    receiverLength = uint8(bound(receiverLength, 1, 64));
+    // Combine the 2 halves into bytes of length 64
+    bytes memory validReceiver = abi.encodePacked(receiverHead, receiverTail);
+    // Set bytes array length to target receiver length
+    assembly {
+      mstore(validReceiver, receiverLength)
+    }
+
+    // Throw out all-zero receiver
+    vm.assume(keccak256(validReceiver) != keccak256(new bytes(receiverLength)));
+
+    TestParams memory params = TestParams({
+      chainSelector: DEST_CHAIN_SELECTOR,
+      fastFeeBpsExpected: FAST_FEE_FILLER_BPS,
+      amount: SOURCE_AMOUNT,
+      mockMessageId: keccak256("mockMessageId"),
+      receiver: validReceiver
+    });
+    bytes memory extraArgs = Client._argsToBytes(
+      Client.GenericExtraArgsV2({gasLimit: SETTLEMENT_GAS_OVERHEAD, allowOutOfOrderExecution: true})
+    );
+    _executeTest(params, extraArgs);
   }
 }
