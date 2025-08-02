@@ -1,4 +1,4 @@
-TEST_COUNT ?= 10
+TEST_COUNT ?= 11
 COVERAGE_FILE ?= coverage.out
 
 # Detect the system architecture
