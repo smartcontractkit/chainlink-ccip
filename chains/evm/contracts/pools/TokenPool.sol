@@ -667,7 +667,7 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   /// is a permissioned onRamp for the given chain on the Router.
   function _onlyOnRamp(
     uint64 remoteChainSelector
-  ) internal view virtual {
+  ) internal view {
     if (!isSupportedChain(remoteChainSelector)) revert ChainNotAllowed(remoteChainSelector);
     if (!(msg.sender == s_router.getOnRamp(remoteChainSelector))) revert CallerIsNotARampOnRouter(msg.sender);
   }
@@ -676,7 +676,7 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   /// is a permissioned offRamp for the given chain on the Router.
   function _onlyOffRamp(
     uint64 remoteChainSelector
-  ) internal view virtual {
+  ) internal view {
     if (!isSupportedChain(remoteChainSelector)) revert ChainNotAllowed(remoteChainSelector);
     if (!s_router.isOffRamp(remoteChainSelector, msg.sender)) revert CallerIsNotARampOnRouter(msg.sender);
   }

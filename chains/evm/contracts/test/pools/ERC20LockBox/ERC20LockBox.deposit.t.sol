@@ -91,10 +91,7 @@ contract ERC20LockBox_deposit is ERC20LockBoxSetup {
     assertEq(s_token.balanceOf(address(s_erc20LockBox)), amount * 2);
   }
 
-  // ================================================================
-  // │                        Revert Tests                          │
-  // ================================================================
-
+  // Reverts
   function test_RevertWhen_Unauthorized() public {
     uint256 amount = 1000e18;
 

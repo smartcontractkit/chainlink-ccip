@@ -47,7 +47,7 @@ contract ERC20LockBox is ITypeAndVersion {
   /// once a caller is allowed, they can call the deposit and withdraw functions for the given token.
   mapping(address token => mapping(address caller => bool isAllowed)) internal s_allowedCallers;
 
-  string public constant typeAndVersion = "ERC20LockBox 1.0.0-dev";
+  string public constant typeAndVersion = "ERC20LockBox 1.6.2-dev";
 
   constructor(
     address tokenAdminRegistry
@@ -147,13 +147,11 @@ contract ERC20LockBox is ITypeAndVersion {
   /// @param token The address of the ERC20 token.
   /// @param caller The address to check.
   /// @return allowed True if the address is allowed, false otherwise.
-  /// @dev This gives the token pool administrator full control over the tokens in the lockbox, as they
-  /// will be able to call withdraw() at any time for the given token and amount. Special care should be taken
-  /// to ensure that the token pool administrator is not malicious or compromised.
   function isAllowedCaller(address token, address caller) public view returns (bool allowed) {
     TokenAdminRegistry.TokenConfig memory tokenConfig = i_tokenAdminRegistry.getTokenConfig(token);
 
-    // The caller is allowed if they are the token pool, the administrator, or a designated allowed caller.
-    return (caller == tokenConfig.tokenPool || caller == tokenConfig.administrator || s_allowedCallers[token][caller]);
+    // The caller is allowed if they are the token pool or a specially designated allowed caller such as a
+    // liquidity provider.
+    return (caller == tokenConfig.tokenPool || s_allowedCallers[token][caller]);
   }
 }
