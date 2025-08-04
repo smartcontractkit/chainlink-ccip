@@ -174,16 +174,6 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
       revert InvalidPreviousPool();
     }
 
-    if (previousPool != address(0)) {
-      try USDCTokenPool(previousPool).i_messageTransmitterProxy() returns (CCTPMessageTransmitterProxy proxy) {
-        i_previousMessageTransmitterProxy = address(proxy);
-      } catch {
-        revert InvalidPreviousPool();
-      }
-    } else {
-      i_previousMessageTransmitterProxy = address(0);
-    }
-
     i_previousPool = previousPool;
 
     emit ConfigSet(address(tokenMessenger));
@@ -296,25 +286,39 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
     }
     address destinationCaller = address(uint160(uint256(destinationCallerBytes32)));
 
+    // Get the previous pool's message transmitter proxy that will call the CCTP V1 functions, instead of having
+    // to store it in this token pool, which saves gas in the constructor.
+    CCTPMessageTransmitterProxy previousMessageTransmitterProxy = USDCTokenPool(i_previousPool).i_messageTransmitterProxy();
+
     // If the destinationCaller is the previous pool, indicating an inflight message during the migration, we need to
-    // route the message to the previous pool to satisfy the allowedCaller.
+    // route the message to the correct destinationCaller.
     // In previous versions, the sourcePoolData only contained two fields, a uint64 and uint32. For structs stored only
     // in memory, the compiler assigns each field to its only 32-byte slot, instead of tightly packing line in storage.
     // This means that the sourcePoolData will be 64 bytes long. This indicates an inflight message during the
     // migration, and needs to be routed to the previous pool, otherwise the parsing will revert.
     if (
-      (i_previousPool != address(0) && destinationCaller == i_previousMessageTransmitterProxy)
+      (i_previousPool != address(0) && destinationCaller == address(previousMessageTransmitterProxy))
         || releaseOrMintIn.sourcePoolData.length == 64
     ) {
-      return USDCTokenPool(i_previousPool).releaseOrMint(releaseOrMintIn);
+      // Instead of calling releaseOrMint on the previous pool, we call receiveMessage on the previous pool's
+      // message transmitter proxy. This avoids having to set this token pool as an offRamp in the router,
+      // in order to bypass the previous pool's isOffRamp check.
+      // Note: This will require the previous pool's message transmitter proxy to be configured to allow this
+      // token pool as an allowed caller.
+      bool success = previousMessageTransmitterProxy.receiveMessage(msgAndAttestation.message, msgAndAttestation.attestation);
+      if (!success) revert UnlockingUSDCFailed();
+
+      return Pool.ReleaseOrMintOutV1({destinationAmount: releaseOrMintIn.sourceDenominatedAmount});
     }
 
-    // This decoding is done after the check for the previous pool to avoid duplicate decoding.
+    // This decoding is done after the check for the previous pool to avoid reverts that will occur  if the source pool
+    // data is using a different version.
     SourceTokenDataPayload memory sourceTokenDataPayload =
       abi.decode(releaseOrMintIn.sourcePoolData, (SourceTokenDataPayload));
 
     _validateMessage(msgAndAttestation.message, sourceTokenDataPayload);
 
+    // If the message is new and bound for this pool, we can call receiveMessage directly on the message transmitter proxy.
     if (!i_messageTransmitterProxy.receiveMessage(msgAndAttestation.message, msgAndAttestation.attestation)) {
       revert UnlockingUSDCFailed();
     }

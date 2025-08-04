@@ -7,6 +7,7 @@ import {RateLimiter} from "../../../../libraries/RateLimiter.sol";
 import {TokenPool} from "../../../../pools/TokenPool.sol";
 import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
 import {MockE2EUSDCTransmitter} from "../../../mocks/MockE2EUSDCTransmitter.sol";
+import {CCTPMessageTransmitterProxy} from "../../../../pools/USDC/CCTPMessageTransmitterProxy.sol";
 import {USDCTokenPoolSetup} from "./USDCTokenPoolSetup.t.sol";
 
 contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
@@ -151,19 +152,11 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
     deal(address(s_USDCToken), address(s_usdcTokenPool), amount);
 
     vm.expectCall(
-      address(s_previousPool),
+      address(s_previousPoolMessageTransmitterProxy), 
       abi.encodeWithSelector(
-        TokenPool.releaseOrMint.selector,
-        Pool.ReleaseOrMintInV1({
-          originalSender: abi.encode(OWNER),
-          receiver: recipient,
-          sourceDenominatedAmount: amount,
-          localToken: address(s_USDCToken),
-          remoteChainSelector: SOURCE_CHAIN_SELECTOR,
-          sourcePoolAddress: sourceTokenData.sourcePoolAddress,
-          sourcePoolData: sourceTokenData.extraData,
-          offchainTokenData: offchainTokenData
-        })
+        CCTPMessageTransmitterProxy.receiveMessage.selector,
+        message,
+        attestation
       )
     );
 
@@ -395,21 +388,13 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
     // The mocked receiver does not release the token to the pool, so we manually do it here
     deal(address(s_USDCToken), address(s_usdcTokenPool), amount);
 
-    // Expect a call to the previous pool since sourcePoolData is 12 bytes
+    // Expect a call to the previous pool's message transmitter proxy since sourcePoolData is 12 bytes
     vm.expectCall(
-      address(s_previousPool),
+      address(s_previousPoolMessageTransmitterProxy),
       abi.encodeWithSelector(
-        TokenPool.releaseOrMint.selector,
-        Pool.ReleaseOrMintInV1({
-          originalSender: abi.encode(OWNER),
-          receiver: recipient,
-          sourceDenominatedAmount: amount,
-          localToken: address(s_USDCToken),
-          remoteChainSelector: SOURCE_CHAIN_SELECTOR,
-          sourcePoolAddress: sourceTokenData.sourcePoolAddress,
-          sourcePoolData: oldSourcePoolData,
-          offchainTokenData: offchainTokenData
-        })
+        CCTPMessageTransmitterProxy.receiveMessage.selector,
+        message,
+        attestation
       )
     );
 

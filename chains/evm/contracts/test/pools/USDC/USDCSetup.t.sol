@@ -115,6 +115,13 @@ contract USDCSetup is BaseTest {
       abi.encodeWithSelector(IERC165.supportsInterface.selector, type(IPoolV1).interfaceId),
       abi.encode(true)
     );
+
+    // Mock the previous pool's message transmitter proxy to return true for IPoolV1 interface
+    vm.mockCall(
+      s_previousPoolMessageTransmitterProxy,
+      abi.encodeWithSelector(CCTPMessageTransmitterProxy.receiveMessage.selector),
+      abi.encode(true)
+    );
   }
 
   function _poolApplyChainUpdates(

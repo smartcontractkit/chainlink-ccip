@@ -164,7 +164,7 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
     bytes memory usdcMessage,
     SourceTokenDataPayload memory sourceTokenData
   ) internal view override {
-    // 116 is the minimum length of a valid USDC message. Since destinationCaller needs to be checked for the previous
+    // 148 is the minimum length of a valid USDC message. Since destinationCaller needs to be checked for the previous
     // pool, this ensures that it can be parsed correctly and that the message is not too short. Since messageBody is
     // dynamic and not always used, it is not checked.
     if (usdcMessage.length < 148) revert InvalidMessageLength(usdcMessage.length);
