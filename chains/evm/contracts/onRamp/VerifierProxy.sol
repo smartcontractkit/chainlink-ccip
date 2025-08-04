@@ -8,9 +8,7 @@ import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
 import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
 import {IVerifierSender} from "../interfaces/verifiers/IVerifier.sol";
-import {IVerifierRegistry} from "../interfaces/verifiers/IVerifierRegistry.sol";
 
-import {VerifierRegistry} from "../VerifierRegistry.sol";
 import {Client} from "../libraries/Client.sol";
 import {Internal} from "../libraries/Internal.sol";
 import {Pool} from "../libraries/Pool.sol";
@@ -48,7 +46,7 @@ contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsg
   event FeeTokenWithdrawn(address indexed feeAggregator, address indexed feeToken, uint256 amount);
   /// RMN depends on this event, if changing, please notify the RMN maintainers.
   event CCIPMessageSent(
-    uint64 indexed destChainSelector, uint64 indexed sequenceNumber, Internal.EVM2AnyCommitVerifierMessage message
+    uint64 indexed destChainSelector, uint64 indexed sequenceNumber, Internal.EVM2AnyVerifierMessage message
   );
 
   /// @dev Struct that contains the static configuration.
@@ -58,7 +56,6 @@ contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsg
     uint64 chainSelector; // ────╮ Local chain selector.
     IRMNRemote rmnRemote; // ────╯ RMN remote address.
     address tokenAdminRegistry; // Token admin registry address.
-    address verifierRegistry; // Verifier registry address.
   }
 
   /// @dev Struct that contains the dynamic configuration
@@ -75,14 +72,19 @@ contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsg
     // 0 is not a valid sequence number for any real transaction as this value will be incremented before use.
     uint64 sequenceNumber; // ──╮ The last used sequence number.
     IRouter router; // ─────────╯ Local router address  that is allowed to send messages to the destination chain.
+    address defaultVerifier;
+    address requiredVerifier;
+    address defaultExecutor;
   }
 
   /// @dev Same as DestChainConfig but with the destChainSelector so that an array of these can be passed in the
   /// constructor and the applyDestChainConfigUpdates function.
   // solhint-disable gas-struct-packing
   struct DestChainConfigArgs {
-    uint64 destChainSelector; // ─╮ Destination chain selector.
-    IRouter router; //            │ Source router address.
+    uint64 destChainSelector; // Destination chain selector.
+    IRouter router; //           Source router address.
+    address defaultVerifier;
+    address requiredVerifier;
   }
 
   // STATIC CONFIG
@@ -93,8 +95,6 @@ contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsg
   IRMNRemote private immutable i_rmnRemote;
   /// @dev The address of the token admin registry.
   address private immutable i_tokenAdminRegistry;
-  /// @dev The address of the verifier registry.
-  address private immutable i_verifierRegistry;
 
   // DYNAMIC CONFIG
   /// @dev The dynamic config for the onRamp.
@@ -118,7 +118,6 @@ contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsg
     i_localChainSelector = staticConfig.chainSelector;
     i_rmnRemote = staticConfig.rmnRemote;
     i_tokenAdminRegistry = staticConfig.tokenAdminRegistry;
-    i_verifierRegistry = staticConfig.verifierRegistry;
 
     _setDynamicConfig(dynamicConfig);
     _applyDestChainConfigUpdates(destChainConfigArgs);
@@ -149,7 +148,7 @@ contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsg
     if (s_dynamicConfig.reentrancyGuardEntered) revert ReentrancyGuardReentrantCall();
     s_dynamicConfig.reentrancyGuardEntered = true;
 
-    DestChainConfig storage destChainConfig = s_destChainConfigs[destChainSelector];
+    DestChainConfig memory destChainConfig = s_destChainConfigs[destChainSelector];
 
     // NOTE: assumes the message has already been validated through the getFee call.
     // Validate originalSender is set and allowed. Not validated in `getFee` since it is not user-driven.
@@ -157,16 +156,27 @@ contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsg
     // Router address may be zero intentionally to pause, which should stop all messages.
     if (msg.sender != address(destChainConfig.router)) revert MustBeCalledByRouter();
 
-    (
-      , //uint256 executionGasLimit,
-      bytes memory tokenReceiver,
-      bytes memory destChainExtraArgs,
-      bytes[] memory verifierExtraArgs
-    ) = IFeeQuoterV2(s_dynamicConfig.feeQuoter).parseExtraArgs(message.extraArgs);
+    // 1. parse extraArgs
+    Client.ModSecExtraArgsV1 memory resolvedExtraArgs = _parseExtraArgsWithDefaults(destChainConfig, message.extraArgs);
+    // TODO where does the TokenReceiver go? Exec args feels strange but don't have a better place.
+    bytes memory tokenReceiver =
+      IFeeQuoterV2(s_dynamicConfig.feeQuoter).resolveTokenReceiver(resolvedExtraArgs.executorArgs);
+
+    // 2. get pool params, potentially mutates verifier list
+    // 3. getFee on all verifiers
+    // 4. lockOrBurn
+
+    Internal.EVMTokenTransfer memory tokenTransferData;
+
+    //    newMessage.tokenAmounts = _handleTokens(message.tokenAmounts, tokenReceiver, originalSender, destChainSelector);
+
+    // 5. calculate msg ID
+    // 6. call each verifier
+    // 7. emit event
 
     // TODO GetFee for every verifier
 
-    Internal.EVM2AnyCommitVerifierMessage memory newMessage = Internal.EVM2AnyCommitVerifierMessage({
+    Internal.EVM2AnyVerifierMessage memory newMessage = Internal.EVM2AnyVerifierMessage({
       header: Internal.Header({
         // Should be generated after the message is complete.
         messageId: "",
@@ -177,17 +187,13 @@ contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsg
       }),
       sender: originalSender,
       data: message.data,
-      destChainExtraArgs: destChainExtraArgs,
-      verifierExtraArgs: verifierExtraArgs,
       receiver: message.receiver,
       feeToken: message.feeToken,
       feeTokenAmount: feeTokenAmount,
       feeValueJuels: 0, // Populated by the FeeQuoter.
-      tokenAmounts: new Internal.EVMTokenTransfer[](0), // Populated by the FeeQuoter.
-      requiredVerifiers: new Internal.RequiredVerifier[](0) // Populated by the FeeQuoter.
+      tokenTransfer: tokenTransferData,
+      receipts: new Internal.Receipt[](0)
     });
-
-    newMessage.tokenAmounts = _handleTokens(message.tokenAmounts, tokenReceiver, originalSender, destChainSelector);
 
     // Hash only after all fields have been set, but before it's sent to the verifiers.
     newMessage.header.messageId = Internal._hash(
@@ -197,21 +203,10 @@ contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsg
       keccak256(abi.encode(Internal.EVM_2_ANY_MESSAGE_HASH, i_localChainSelector, destChainSelector, address(this)))
     );
 
-    for (uint256 i = 0; i < newMessage.verifierExtraArgs.length; ++i) {
-      if (newMessage.verifierExtraArgs[i].length < 32) {
-        // TODO encode efficiently
-        revert MalformedVerifierExtraArgs(newMessage.verifierExtraArgs[i]);
-      }
+    for (uint256 i = 0; i < newMessage.receipts.length; ++i) {
+      address verifierId = newMessage.receipts[i].issuer;
 
-      // TODO does this work?
-      bytes32 verifierId = bytes32(newMessage.verifierExtraArgs[i]);
-
-      address verifierAddress = IVerifierRegistry(i_verifierRegistry).getVerifier(verifierId);
-      if (verifierAddress == address(0)) {
-        revert InvalidVerifierId(verifierId);
-      }
-
-      IVerifierSender(verifierAddress).forwardToVerifier(abi.encode(newMessage), i);
+      IVerifierSender(verifierId).forwardToVerifier(abi.encode(newMessage), i);
     }
 
     emit CCIPMessageSent(destChainSelector, newMessage.header.sequenceNumber, newMessage);
@@ -219,6 +214,31 @@ contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsg
     s_dynamicConfig.reentrancyGuardEntered = false;
 
     return newMessage.header.messageId;
+  }
+
+  function _parseExtraArgsWithDefaults(
+    DestChainConfig memory destChainConfig,
+    bytes calldata extraArgs
+  ) internal pure returns (Client.ModSecExtraArgsV1 memory resolvedArgs) {
+    if (bytes4(extraArgs[0:4]) == Client.MOD_SEC_EXTRA_ARGS_V1_TAG) {
+      resolvedArgs = abi.decode(extraArgs, (Client.ModSecExtraArgsV1));
+    } else {
+      // If old extraArgs are supplied, they are assumed to be for the default verifier and the default executor. This
+      // means any default verifier/executor has to be able to process all prior extraArgs.
+      resolvedArgs.executor = destChainConfig.defaultExecutor;
+      resolvedArgs.executorArgs = extraArgs;
+
+      resolvedArgs.requiredVerifiers = new Client.Verifier[](1);
+      resolvedArgs.requiredVerifiers[0] =
+        Client.Verifier({verifierAddress: destChainConfig.defaultVerifier, args: extraArgs});
+    }
+
+    // Add the required verifier, if set.
+    if (destChainConfig.requiredVerifier != address(0)) {
+      // TODO set required verifier
+    }
+
+    return resolvedArgs;
   }
 
   function _handleTokens(
@@ -252,8 +272,7 @@ contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsg
     return StaticConfig({
       chainSelector: i_localChainSelector,
       rmnRemote: i_rmnRemote,
-      tokenAdminRegistry: i_tokenAdminRegistry,
-      verifierRegistry: i_verifierRegistry
+      tokenAdminRegistry: i_tokenAdminRegistry
     });
   }
 
