@@ -1,5 +1,5 @@
 export type CcipRouter = {
-  "version": "0.1.0-dev",
+  "version": "0.1.1-dev",
   "name": "ccip_router",
   "docs": [
     "The `ccip_router` module contains the implementation of the Cross-Chain Interoperability Protocol (CCIP) Router.",
@@ -2345,7 +2345,7 @@ export type CcipRouter = {
 };
 
 export const IDL: CcipRouter = {
-  "version": "0.1.0-dev",
+  "version": "0.1.1-dev",
   "name": "ccip_router",
   "docs": [
     "The `ccip_router` module contains the implementation of the Cross-Chain Interoperability Protocol (CCIP) Router.",
