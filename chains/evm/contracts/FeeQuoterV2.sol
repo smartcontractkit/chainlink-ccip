@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {IFeeQuoterV2} from "./interfaces/IFeeQuoterV2.sol";
 
 import {FeeQuoter} from "./FeeQuoter.sol";
+import {Client} from "./libraries/Client.sol";
 import {Internal} from "./libraries/Internal.sol";
 import {Pool} from "./libraries/Pool.sol";
 
@@ -75,18 +76,13 @@ contract FeeQuoterV2 is IFeeQuoterV2, FeeQuoter {
     bytes[] verifierExtraArgs;
   }
 
-  function parseExtraArgs(
+  function resolveTokenReceiver(
     bytes calldata extraArgs
-  )
-    external
-    view
-    returns (
-      uint256 gasLimit,
-      bytes memory tokenReceiver,
-      bytes memory destChainExtraArgs,
-      bytes[] memory verifierExtraArgs
-    )
-  {
-    return (0, bytes(""), bytes(""), new bytes[](0));
+  ) external pure returns (bytes memory tokenReceiver) {
+    if (bytes4(extraArgs[:4]) != Client.SVM_EXTRA_ARGS_V1_TAG) {
+      return (bytes(""));
+    }
+
+    return abi.encode(abi.decode(extraArgs[4:], (Client.SVMExtraArgsV1)).tokenReceiver);
   }
 }

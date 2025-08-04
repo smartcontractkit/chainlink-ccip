@@ -32,9 +32,10 @@ contract CommitVerifierOffRamp is IVerifier, OCRVerifier {
     _validateOCRSignatures(rawReport, ocrProof);
 
     Internal.Any2EVMMultiProofMessage memory message = abi.decode(rawReport, (Internal.Any2EVMMultiProofMessage));
-    Internal.RequiredVerifier memory requiredVerifier = message.requiredVerifiers[verifierIndex];
+    // TODO fix
+    bytes memory requiredVerifier = message.requiredVerifiers[verifierIndex];
 
-    uint64 nonce = abi.decode(requiredVerifier.payload, (uint64));
+    uint64 nonce = abi.decode(requiredVerifier, (uint64));
 
     // Nonce changes per state transition (these only apply for ordered messages):
     // UNTOUCHED -> FAILURE  nonce bump.

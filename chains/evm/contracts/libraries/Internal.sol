@@ -328,32 +328,36 @@ library Internal {
   // │                            1.7                               │
   // ================================================================
 
-  struct EVM2AnyCommitVerifierMessage {
+  struct EVM2AnyVerifierMessage {
     Header header; // Message header.
     address sender; // sender address on the source chain.
     bytes data; // arbitrary data payload supplied by the message sender.
     bytes receiver; // receiver address on the destination chain.
-    bytes destChainExtraArgs; // destination-chain specific extra args, such as the gasLimit for EVM chains.
-    bytes[] verifierExtraArgs; // destination-chain specific extra args, such as the gasLimit for EVM chains.
     address feeToken; // fee token.
     uint256 feeTokenAmount; // fee token amount.
     uint256 feeValueJuels; // fee amount in Juels.
-    EVMTokenTransfer[] tokenAmounts; // array of tokens and amounts to transfer.
-    RequiredVerifier[] requiredVerifiers;
+    EVMTokenTransfer tokenTransfer;
+    Receipt[] receipts;
   }
 
   struct Header {
     bytes32 messageId; // Unique identifier for the message, generated with the source chain's encoding scheme (i.e. not necessarily abi.encoded).
     uint64 sourceChainSelector; // ─╮ the chain selector of the source chain, note: not chainId.
     uint64 destChainSelector; //    │ the chain selector of the destination chain, note: not chainId.
-    uint64 sequenceNumber; //      ─╯ sequence number, not unique across lanes.
+    uint64 sequenceNumber; // ──────╯ sequence number, not unique across lanes.
   }
 
-  struct RequiredVerifier {
-    bytes32 verifierId;
-    bytes payload; // in the case of commit: the nonce.
-    uint256 feeAmount;
-    uint64 gasLimit; // gas limit for the verifier to verify on the destination chain.
+  enum ReceiptType {
+    Verifier,
+    Executor
+  }
+
+  struct Receipt {
+    ReceiptType receiptType;
+    address issuer;
+    uint256 feeTokenAmount;
+    uint64 destGasLimit; // gas limit for the verifier to verify on the destination chain.
+    uint32 destBytesOverhead;
     bytes extraArgs;
   }
 
@@ -385,7 +389,7 @@ library Internal {
     address receiver; // receiver address on the destination chain.
     uint32 gasLimit; // user supplied maximum gas amount available for dest chain execution & token pool ops.
     Any2EVMMultiProofTokenTransfer[] tokenAmounts; // array of tokens and amounts to transfer.
-    RequiredVerifier[] requiredVerifiers; //
+    bytes[] requiredVerifiers; //
   }
 
   struct Any2EVMMultiProofTokenTransfer {
@@ -400,8 +404,8 @@ library Internal {
     uint256 amount; // Amount of tokens.
   }
 
-  // TODO optimize
-  function _hash(EVM2AnyCommitVerifierMessage memory original, bytes32 metadataHash) internal pure returns (bytes32) {
+  // TODO optimize & ensure everything is included
+  function _hash(EVM2AnyVerifierMessage memory original, bytes32 metadataHash) internal pure returns (bytes32) {
     // Fixed-size message fields are included in nested hash to reduce stack pressure.
     // This hashing scheme is also used by RMN. If changing it, please notify the RMN maintainers.
     return keccak256(
@@ -413,38 +417,36 @@ library Internal {
         ),
         keccak256(original.receiver),
         keccak256(original.data),
-        keccak256(abi.encode(original.tokenAmounts)),
-        keccak256(original.destChainExtraArgs),
-        original.verifierExtraArgs
+        keccak256(abi.encode(original.tokenTransfer))
       )
     );
   }
 
-  function _evm2AnyToAny2EVMMultiProofMessage(
-    EVM2AnyCommitVerifierMessage memory evm2Any,
-    uint32 gasLimit
-  ) internal pure returns (Any2EVMMultiProofMessage memory) {
-    Any2EVMMultiProofTokenTransfer[] memory tokenAmounts =
-      new Any2EVMMultiProofTokenTransfer[](evm2Any.tokenAmounts.length);
-
-    for (uint256 i = 0; i < evm2Any.tokenAmounts.length; i++) {
-      EVMTokenTransfer memory tokenTransfer = evm2Any.tokenAmounts[i];
-      tokenAmounts[i] = Any2EVMMultiProofTokenTransfer({
-        sourcePoolAddress: abi.encode(tokenTransfer.sourcePoolAddress),
-        destTokenAddress: abi.decode(tokenTransfer.destTokenAddress, (address)),
-        extraData: tokenTransfer.destExecData,
-        amount: tokenTransfer.amount
-      });
-    }
-
-    return Any2EVMMultiProofMessage({
-      header: evm2Any.header,
-      sender: abi.encode(evm2Any.sender),
-      data: evm2Any.data,
-      receiver: abi.decode(evm2Any.receiver, (address)),
-      gasLimit: gasLimit,
-      tokenAmounts: tokenAmounts,
-      requiredVerifiers: evm2Any.requiredVerifiers
-    });
-  }
+  //  function _evm2AnyToAny2EVMMultiProofMessage(
+  //    EVM2AnyVerifierMessage memory evm2Any,
+  //    uint32 gasLimit
+  //  ) internal pure returns (Any2EVMMultiProofMessage memory) {
+  //    Any2EVMMultiProofTokenTransfer[] memory tokenAmounts =
+  //      new Any2EVMMultiProofTokenTransfer[](evm2Any.tokenAmounts.length);
+  //
+  //    for (uint256 i = 0; i < evm2Any.tokenAmounts.length; i++) {
+  //      EVMTokenTransfer memory tokenTransfer = evm2Any.tokenAmounts[i];
+  //      tokenAmounts[i] = Any2EVMMultiProofTokenTransfer({
+  //        sourcePoolAddress: abi.encode(tokenTransfer.sourcePoolAddress),
+  //        destTokenAddress: abi.decode(tokenTransfer.destTokenAddress, (address)),
+  //        extraData: tokenTransfer.destExecData,
+  //        amount: tokenTransfer.amount
+  //      });
+  //    }
+  //
+  //    return Any2EVMMultiProofMessage({
+  //      header: evm2Any.header,
+  //      sender: abi.encode(evm2Any.sender),
+  //      data: evm2Any.data,
+  //      receiver: abi.decode(evm2Any.receiver, (address)),
+  //      gasLimit: gasLimit,
+  //      tokenAmounts: tokenAmounts,
+  //      requiredVerifiers: evm2Any.requiredVerifiers
+  //    });
+  //  }
 }

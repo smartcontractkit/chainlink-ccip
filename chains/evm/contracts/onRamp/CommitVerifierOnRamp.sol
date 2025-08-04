@@ -135,8 +135,7 @@ contract CommitVerifierOnRamp is IVerifierSender, ITypeAndVersion, Ownable2StepM
   // ================================================================
 
   function forwardToVerifier(bytes calldata rawMessage, uint256 verifierIndex) external returns (bytes memory) {
-    Internal.EVM2AnyCommitVerifierMessage memory message =
-      abi.decode(rawMessage, (Internal.EVM2AnyCommitVerifierMessage));
+    Internal.EVM2AnyVerifierMessage memory message = abi.decode(rawMessage, (Internal.EVM2AnyVerifierMessage));
 
     // If the allowlist is enabled, check if the original sender is allowed.
     DestChainConfig storage destChainConfig = s_destChainConfigs[i_chainSelector];
@@ -150,7 +149,7 @@ contract CommitVerifierOnRamp is IVerifierSender, ITypeAndVersion, Ownable2StepM
     if (msg.sender != address(destChainConfig.verifierAggregator)) revert MustBeCalledByVerifierAggregator();
 
     // TODO check extraArgs
-    bool isOutOfOrderExecution = abi.decode(message.verifierExtraArgs[verifierIndex], (bool));
+    bool isOutOfOrderExecution = abi.decode(message.receipts[verifierIndex].extraArgs, (bool));
 
     uint64 nonce = 0;
     if (!isOutOfOrderExecution) {

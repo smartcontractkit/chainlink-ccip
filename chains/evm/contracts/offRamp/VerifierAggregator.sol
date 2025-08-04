@@ -294,7 +294,7 @@ contract VerifierAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     }
 
     for (uint256 i = 0; i < message.requiredVerifiers.length; ++i) {
-      bytes4 verifierId = bytes4(message.requiredVerifiers[i].verifierId);
+      bytes4 verifierId = bytes4(message.requiredVerifiers[i]);
 
       address verifier = s_verifiers[verifierId];
       if (verifier == address(0)) {

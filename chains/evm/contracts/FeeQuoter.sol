@@ -1044,7 +1044,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
         }
       } else {
         // The messaging accounts needed for CCIP receiver on SVM are:
-        // message receiver, offramp PDA signer,
+        // message receiver, offRamp PDA signer,
         // plus remaining accounts specified in SVM extraArgs. Each account is 32 bytes.
         svmExpandedDataLength +=
           ((accountsLength + Client.SVM_MESSAGING_ACCOUNTS_OVERHEAD) * Client.SVM_ACCOUNT_BYTE_SIZE);
