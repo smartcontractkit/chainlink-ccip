@@ -14,15 +14,7 @@ interface IFeeQuoterV2 is IFeeQuoter {
     Internal.EVMTokenTransfer[] calldata onRampTokenTransfers
   ) external view returns (bytes[] memory destExecDataPerToken);
 
-  function parseExtraArgs(
+  function resolveTokenReceiver(
     bytes calldata extraArgs
-  )
-    external
-    view
-    returns (
-      uint256 gasLimit,
-      bytes memory tokenReceiver,
-      bytes memory destChainExtraArgs,
-      bytes[] memory verifierExtraArgs
-    );
+  ) external view returns (bytes memory tokenReceiver);
 }
