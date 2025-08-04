@@ -11,6 +11,7 @@ import {Client} from "../libraries/Client.sol";
 import {Internal} from "../libraries/Internal.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 
+import {IFeeQuoterV2} from "../interfaces/IFeeQuoterV2.sol";
 import {IERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from
@@ -31,30 +32,20 @@ contract CommitVerifierOnRamp is IVerifierSender, ITypeAndVersion, Ownable2StepM
   error RouterMustSetOriginalSender();
   error InvalidConfig();
   error CursedByRMN(uint64 destChainSelector);
-  error GetSupportedTokensFunctionalityRemovedCheckAdminRegistry();
   error InvalidDestChainConfig(uint64 destChainSelector);
   error OnlyCallableByOwnerOrAllowlistAdmin();
   error SenderNotAllowed(address sender);
   error InvalidAllowListRequest(uint64 destChainSelector);
-  error ReentrancyGuardReentrantCall();
 
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event DestChainConfigSet(uint64 indexed destChainSelector, address router, bool allowlistEnabled);
   event FeeTokenWithdrawn(address indexed feeAggregator, address indexed feeToken, uint256 amount);
-  /// RMN depends on this event, if changing, please notify the RMN maintainers.
-  event CCIPMessageSent(uint64 indexed destChainSelector, Internal.EVM2AnyRampMessage message);
-  event AllowListAdminSet(address indexed allowlistAdmin);
   event AllowListSendersAdded(uint64 indexed destChainSelector, address[] senders);
   event AllowListSendersRemoved(uint64 indexed destChainSelector, address[] senders);
 
-  /// @dev Struct that contains the static configuration.
-  /// RMN depends on this struct, if changing, please notify the RMN maintainers.
-  // solhint-disable-next-line gas-struct-packing
   struct StaticConfig {
-    uint64 chainSelector; // ────╮ Source chain selector.
-    IRMNRemote rmnRemote; // ────╯ RMN remote address.
-    address nonceManager; //       Nonce manager address.
-    address tokenAdminRegistry; // Token admin registry address.
+    IRMNRemote rmnRemote; // RMN remote address.
+    address nonceManager; // Nonce manager address.
   }
 
   /// @dev Struct that contains the dynamic configuration
@@ -62,14 +53,13 @@ contract CommitVerifierOnRamp is IVerifierSender, ITypeAndVersion, Ownable2StepM
   struct DynamicConfig {
     address feeQuoter; // FeeQuoter address.
     bool reentrancyGuardEntered; // Reentrancy protection.
-    address messageInterceptor; // Optional message interceptor to validate messages. Zero address = no interceptor.
     address feeAggregator; // Fee aggregator address.
     address allowlistAdmin; // authorized admin to add or remove allowed senders.
   }
 
   /// @dev Struct to hold the configs for a single destination chain.
   struct DestChainConfig {
-    bool allowlistEnabled; //       │ True if the allowlist is enabled.
+    bool allowlistEnabled; // ──────╮ True if the allowlist is enabled.
     address verifierAggregator; // ─╯ Local router address  that is allowed to send messages to the destination chain.
     EnumerableSet.AddressSet allowedSendersList; // The list of addresses allowed to send messages.
   }
@@ -78,9 +68,9 @@ contract CommitVerifierOnRamp is IVerifierSender, ITypeAndVersion, Ownable2StepM
   /// constructor and the applyDestChainConfigUpdates function.
   // solhint-disable gas-struct-packing
   struct DestChainConfigArgs {
-    uint64 destChainSelector; // ─╮ Destination chain selector.
-    address verifierAggregator; //│ Source router address.
-    bool allowlistEnabled; // ────╯ True if the allowlist is enabled.
+    uint64 destChainSelector; // ──╮ Destination chain selector.
+    address verifierAggregator; // │ Source router address.
+    bool allowlistEnabled; // ─────╯ True if the allowlist is enabled.
   }
 
   /// @dev Struct to hold the allowlist configuration args per dest chain.
@@ -93,14 +83,10 @@ contract CommitVerifierOnRamp is IVerifierSender, ITypeAndVersion, Ownable2StepM
 
   // STATIC CONFIG
   string public constant override typeAndVersion = "CommitVerifier 1.7.0-dev";
-  /// @dev The chain ID of the source chain that this contract is deployed to.
-  uint64 private immutable i_chainSelector;
   /// @dev The rmn contract.
   IRMNRemote private immutable i_rmnRemote;
   /// @dev The address of the nonce manager.
   address private immutable i_nonceManager;
-  /// @dev The address of the token admin registry.
-  address private immutable i_tokenAdminRegistry;
 
   // DYNAMIC CONFIG
   /// @dev The dynamic config for the onRamp.
@@ -114,17 +100,12 @@ contract CommitVerifierOnRamp is IVerifierSender, ITypeAndVersion, Ownable2StepM
     DynamicConfig memory dynamicConfig,
     DestChainConfigArgs[] memory destChainConfigArgs
   ) {
-    if (
-      staticConfig.chainSelector == 0 || address(staticConfig.rmnRemote) == address(0)
-        || staticConfig.nonceManager == address(0) || staticConfig.tokenAdminRegistry == address(0)
-    ) {
+    if (address(staticConfig.rmnRemote) == address(0) || staticConfig.nonceManager == address(0)) {
       revert InvalidConfig();
     }
 
-    i_chainSelector = staticConfig.chainSelector;
     i_rmnRemote = staticConfig.rmnRemote;
     i_nonceManager = staticConfig.nonceManager;
-    i_tokenAdminRegistry = staticConfig.tokenAdminRegistry;
 
     _setDynamicConfig(dynamicConfig);
     _applyDestChainConfigUpdates(destChainConfigArgs);
@@ -137,19 +118,26 @@ contract CommitVerifierOnRamp is IVerifierSender, ITypeAndVersion, Ownable2StepM
   function forwardToVerifier(bytes calldata rawMessage, uint256 verifierIndex) external returns (bytes memory) {
     Internal.EVM2AnyVerifierMessage memory message = abi.decode(rawMessage, (Internal.EVM2AnyVerifierMessage));
 
+    _assertNotCursed(message.header.destChainSelector);
+
     // If the allowlist is enabled, check if the original sender is allowed.
-    DestChainConfig storage destChainConfig = s_destChainConfigs[i_chainSelector];
+    DestChainConfig storage destChainConfig = s_destChainConfigs[message.header.destChainSelector];
+    // VerifierAggregator address may be zero intentionally to pause, which should stop all messages.
+    if (msg.sender != destChainConfig.verifierAggregator) revert MustBeCalledByVerifierAggregator();
+
     if (destChainConfig.allowlistEnabled) {
       if (!destChainConfig.allowedSendersList.contains(message.sender)) {
         revert SenderNotAllowed(message.sender);
       }
     }
 
-    // VerifierAggregator address may be zero intentionally to pause, which should stop all messages.
-    if (msg.sender != address(destChainConfig.verifierAggregator)) revert MustBeCalledByVerifierAggregator();
-
-    // TODO check extraArgs
-    bool isOutOfOrderExecution = abi.decode(message.receipts[verifierIndex].extraArgs, (bool));
+    (, bool isOutOfOrderExecution,,) = IFeeQuoter(s_dynamicConfig.feeQuoter).processMessageArgs(
+      message.header.destChainSelector,
+      message.feeToken,
+      message.feeTokenAmount,
+      message.receipts[verifierIndex].extraArgs,
+      message.receiver
+    );
 
     uint64 nonce = 0;
     if (!isOutOfOrderExecution) {
@@ -161,6 +149,12 @@ contract CommitVerifierOnRamp is IVerifierSender, ITypeAndVersion, Ownable2StepM
     return abi.encode(nonce);
   }
 
+  function _assertNotCursed(
+    uint64 destChainSelector
+  ) internal view {
+    if (i_rmnRemote.isCursed(bytes16(uint128(destChainSelector)))) revert CursedByRMN(destChainSelector);
+  }
+
   // ================================================================
   // │                           Config                             │
   // ================================================================
@@ -169,12 +163,7 @@ contract CommitVerifierOnRamp is IVerifierSender, ITypeAndVersion, Ownable2StepM
   /// @dev RMN depends on this function, if modified, please notify the RMN maintainers.
   /// @return staticConfig the static configuration.
   function getStaticConfig() external view returns (StaticConfig memory) {
-    return StaticConfig({
-      chainSelector: i_chainSelector,
-      rmnRemote: i_rmnRemote,
-      nonceManager: i_nonceManager,
-      tokenAdminRegistry: i_tokenAdminRegistry
-    });
+    return StaticConfig({rmnRemote: i_rmnRemote, nonceManager: i_nonceManager});
   }
 
   /// @notice Returns the dynamic onRamp config.
@@ -202,15 +191,7 @@ contract CommitVerifierOnRamp is IVerifierSender, ITypeAndVersion, Ownable2StepM
 
     s_dynamicConfig = dynamicConfig;
 
-    emit ConfigSet(
-      StaticConfig({
-        chainSelector: i_chainSelector,
-        rmnRemote: i_rmnRemote,
-        nonceManager: i_nonceManager,
-        tokenAdminRegistry: i_tokenAdminRegistry
-      }),
-      dynamicConfig
-    );
+    emit ConfigSet(StaticConfig({rmnRemote: i_rmnRemote, nonceManager: i_nonceManager}), dynamicConfig);
   }
 
   /// @notice Updates destination chains specific configs.
@@ -335,7 +316,7 @@ contract CommitVerifierOnRamp is IVerifierSender, ITypeAndVersion, Ownable2StepM
     uint64 destChainSelector,
     Client.EVM2AnyMessage calldata message
   ) external view returns (uint256 feeTokenAmount) {
-    if (i_rmnRemote.isCursed(bytes16(uint128(destChainSelector)))) revert CursedByRMN(destChainSelector);
+    _assertNotCursed(destChainSelector);
 
     return IFeeQuoter(s_dynamicConfig.feeQuoter).getValidatedFee(destChainSelector, message);
   }
