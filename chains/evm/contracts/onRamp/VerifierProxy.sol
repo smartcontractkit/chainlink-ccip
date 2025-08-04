@@ -47,7 +47,10 @@ contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsg
   event FeeTokenWithdrawn(address indexed feeAggregator, address indexed feeToken, uint256 amount);
   /// RMN depends on this event, if changing, please notify the RMN maintainers.
   event CCIPMessageSent(
-    uint64 indexed destChainSelector, uint64 indexed sequenceNumber, Internal.EVM2AnyVerifierMessage message
+    uint64 indexed destChainSelector,
+    uint64 indexed sequenceNumber,
+    Internal.EVM2AnyVerifierMessage message,
+    bytes[] receiptBlobs
   );
 
   /// @dev Struct that contains the static configuration.
@@ -162,9 +165,18 @@ contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsg
     // TODO where does the TokenReceiver go? Exec args feels strange but don't have a better place.
     bytes memory tokenReceiver =
       IFeeQuoterV2(s_dynamicConfig.feeQuoter).resolveTokenReceiver(resolvedExtraArgs.executorArgs);
+    if (tokenReceiver.length == 0) {
+      tokenReceiver = abi.encode(message.receiver);
+    }
 
-    // 2. get pool params, potentially mutates verifier list
+    // 2. get pool params, this potentially mutates verifier list
+
+    // TODO
+
     // 3. getFee on all verifiers
+
+    // TODO
+
     // 4. lockOrBurn
 
     Internal.EVMTokenTransfer memory tokenTransferData;
@@ -178,10 +190,6 @@ contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsg
     }
 
     // 5. calculate msg ID
-    // 6. call each verifier
-    // 7. emit event
-
-    // TODO GetFee for every verifier
 
     Internal.EVM2AnyVerifierMessage memory newMessage = Internal.EVM2AnyVerifierMessage({
       header: Internal.Header({
@@ -197,7 +205,7 @@ contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsg
       receiver: message.receiver,
       feeToken: message.feeToken,
       feeTokenAmount: feeTokenAmount,
-      feeValueJuels: 0, // Populated by the FeeQuoter.
+      feeValueJuels: 0, // TODO
       tokenTransfer: tokenTransferData,
       receipts: new Internal.Receipt[](0)
     });
@@ -210,13 +218,20 @@ contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsg
       keccak256(abi.encode(Internal.EVM_2_ANY_MESSAGE_HASH, i_localChainSelector, destChainSelector, address(this)))
     );
 
+    // 6. call each verifier
+
+    bytes memory encodedMessage = abi.encode(newMessage);
+    bytes[] memory receiptBlobs = new bytes[](newMessage.receipts.length);
+
     for (uint256 i = 0; i < newMessage.receipts.length; ++i) {
       address verifierId = newMessage.receipts[i].issuer;
 
-      IVerifierSender(verifierId).forwardToVerifier(abi.encode(newMessage), i);
+      IVerifierSender(verifierId).forwardToVerifier(encodedMessage, i);
     }
 
-    emit CCIPMessageSent(destChainSelector, newMessage.header.sequenceNumber, newMessage);
+    // 7. emit event
+
+    emit CCIPMessageSent(destChainSelector, newMessage.header.sequenceNumber, newMessage, receiptBlobs);
 
     s_dynamicConfig.reentrancyGuardEntered = false;
 
@@ -229,15 +244,36 @@ contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsg
   ) internal pure returns (Client.ModSecExtraArgsV1 memory resolvedArgs) {
     if (bytes4(extraArgs[0:4]) == Client.MOD_SEC_EXTRA_ARGS_V1_TAG) {
       resolvedArgs = abi.decode(extraArgs, (Client.ModSecExtraArgsV1));
+
+      // Requiring more verifiers than are supplied would make a transaction unexecutable forever.
+      if (resolvedArgs.optionalVerifiers.length <= resolvedArgs.optionalThreshold) {
+        revert();
+      }
+
+      // If a user specified an optional verifier, the threshold must be non-zero.
+      if (resolvedArgs.optionalVerifiers.length != 0 && resolvedArgs.optionalThreshold == 0) {
+        revert();
+      }
     } else {
       // If old extraArgs are supplied, they are assumed to be for the default verifier and the default executor. This
       // means any default verifier/executor has to be able to process all prior extraArgs.
-      resolvedArgs.executor = destChainConfig.defaultExecutor;
       resolvedArgs.executorArgs = extraArgs;
 
+      // We set the default here instead of using the similar logic below because we want to include the extraArgs.
       resolvedArgs.requiredVerifiers = new Client.Verifier[](1);
       resolvedArgs.requiredVerifiers[0] =
         Client.Verifier({verifierAddress: destChainConfig.defaultVerifier, args: extraArgs});
+    }
+
+    // Not supplying a verifier means the default is chosen.
+    if (resolvedArgs.requiredVerifiers.length + resolvedArgs.optionalVerifiers.length == 0) {
+      resolvedArgs.requiredVerifiers = new Client.Verifier[](1);
+      resolvedArgs.requiredVerifiers[0] = Client.Verifier({verifierAddress: destChainConfig.defaultVerifier, args: ""});
+    }
+
+    // Not supplying an executor means the default is chosen.
+    if (resolvedArgs.executor == address(0)) {
+      resolvedArgs.executor = destChainConfig.defaultExecutor;
     }
 
     // Add the required verifier, if set.
@@ -370,6 +406,8 @@ contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsg
     if (address(sourcePool) == address(0) || !sourcePool.supportsInterface(Pool.CCIP_POOL_V1)) {
       revert UnsupportedToken(tokenAndAmount.token);
     }
+
+    // TODO support CCIP_POOL_V2
 
     Pool.LockOrBurnOutV1 memory poolReturnData = sourcePool.lockOrBurn(
       Pool.LockOrBurnInV1({
