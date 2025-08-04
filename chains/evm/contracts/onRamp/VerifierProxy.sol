@@ -31,6 +31,7 @@ contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsg
 
   error CannotSendZeroTokens();
   error UnsupportedToken(address token);
+  error CanOnlySendOneTokenPerMessage();
   error MustBeCalledByRouter();
   error RouterMustSetOriginalSender();
   error InvalidConfig();
@@ -167,8 +168,14 @@ contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsg
     // 4. lockOrBurn
 
     Internal.EVMTokenTransfer memory tokenTransferData;
-
-    //    newMessage.tokenAmounts = _handleTokens(message.tokenAmounts, tokenReceiver, originalSender, destChainSelector);
+    if (message.tokenAmounts.length != 0) {
+      if (message.tokenAmounts.length != 1) {
+        revert CanOnlySendOneTokenPerMessage();
+      }
+      tokenTransferData = _lockOrBurnSingleToken(
+        message.tokenAmounts[0], destChainSelector, tokenReceiver, originalSender, resolvedExtraArgs.tokenArgs
+      );
+    }
 
     // 5. calculate msg ID
     // 6. call each verifier
@@ -239,26 +246,6 @@ contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsg
     }
 
     return resolvedArgs;
-  }
-
-  function _handleTokens(
-    Client.EVMTokenAmount[] memory tokenAmounts,
-    bytes memory tokenReceiver,
-    address originalSender,
-    uint64 destChainSelector
-  ) internal returns (Internal.EVMTokenTransfer[] memory tokenTransfers) {
-    tokenTransfers = new Internal.EVMTokenTransfer[](tokenAmounts.length);
-    // Lock / burn the tokens as last step. TokenPools may not always be trusted.
-    for (uint256 i = 0; i < tokenAmounts.length; ++i) {
-      tokenTransfers[i] = _lockOrBurnSingleToken(tokenAmounts[i], destChainSelector, tokenReceiver, originalSender);
-    }
-
-    bytes[] memory destExecDataPerToken =
-      IFeeQuoterV2(s_dynamicConfig.feeQuoter).processPoolReturnDataNew(destChainSelector, tokenTransfers);
-
-    for (uint256 i = 0; i < tokenTransfers.length; ++i) {
-      tokenTransfers[i].destExecData = destExecDataPerToken[i];
-    }
   }
 
   // ================================================================
@@ -371,7 +358,8 @@ contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsg
     Client.EVMTokenAmount memory tokenAndAmount,
     uint64 destChainSelector,
     bytes memory receiver,
-    address originalSender
+    address originalSender,
+    bytes memory extraArgs
   ) internal returns (Internal.EVMTokenTransfer memory) {
     if (tokenAndAmount.amount == 0) revert CannotSendZeroTokens();
 
