@@ -5,7 +5,7 @@ use solana_program::program::{get_return_data, invoke_signed};
 use base_token_pool::common::*;
 use base_token_pool::rate_limiter::*;
 
-declare_id!("CCitPr8yZbN8zEBEdwju8bnGgKMYcz6XSTbU61CMedj");
+declare_id!("CCiTPESGEevd7TBU8EGBKrcxuRq7jx3YtW6tPidnscaZ");
 
 pub const RECEIVE_MESSAGE_DISCRIMINATOR: [u8; 8] = [38, 144, 127, 225, 31, 225, 238, 25]; // global:receive_message
 pub const DEPOSIT_FOR_BURN_WITH_CALLER_DISCRIMINATOR: [u8; 8] =
