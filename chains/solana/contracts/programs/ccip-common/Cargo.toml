@@ -1,6 +1,6 @@
 [package]
 name = "ccip_common"
-version = "0.1.0-dev"
+version = "0.1.1-dev"
 edition = "2021"
 
 [lib]
@@ -21,3 +21,7 @@ solana-program = "1.17.25" # pin solana to 1.17
 anchor-lang = { version = "0.29.0", features = ["init-if-needed"] }
 anchor-spl = "0.29.0"
 ethnum = "1.5"
+
+[lints.rust.unexpected_cfgs]
+level = "warn"
+check-cfg = ['cfg(target_os, values("solana"))', 'cfg(feature, values("anchor-debug", "custom-panic"))']

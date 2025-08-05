@@ -1,6 +1,8 @@
 package cctp
 
 import (
+	"encoding/binary"
+	"fmt"
 	"testing"
 
 	"github.com/gagliardetto/solana-go"
@@ -50,7 +52,11 @@ type TokenMessengerMinterPDAs struct {
 	EventAuthority solana.PublicKey
 }
 
-func GetTokenMessengerMinterPDAs(t *testing.T, domain uint32, usdcMint solana.PublicKey) TokenMessengerMinterPDAs {
+func GetTokenMessengerMinterPDAs(t *testing.T, domain uint32, usdcMint solana.PublicKey, remoteTokenAddr []byte) TokenMessengerMinterPDAs {
+	remoteTokenAddrBytes := make([]byte, 32)
+	copy(remoteTokenAddrBytes[32-len(remoteTokenAddr):], remoteTokenAddr)
+	remoteTokenPubkey := solana.PublicKeyFromBytes(remoteTokenAddrBytes)
+
 	authorityPda, _, err := solana.FindProgramAddress([][]byte{[]byte("sender_authority")}, config.CctpTokenMessengerMinter)
 	require.NoError(t, err)
 	tokenMessengerPDA, _, err := solana.FindProgramAddress([][]byte{[]byte("token_messenger")}, config.CctpTokenMessengerMinter)
@@ -63,7 +69,7 @@ func GetTokenMessengerMinterPDAs(t *testing.T, domain uint32, usdcMint solana.Pu
 	require.NoError(t, err)
 	custodyTokenAccount, _, err := solana.FindProgramAddress([][]byte{[]byte("custody"), usdcMint.Bytes()}, config.CctpTokenMessengerMinter)
 	require.NoError(t, err)
-	tokenPair, _, err := solana.FindProgramAddress([][]byte{[]byte("token_pair"), []byte(common.NumToStr(domain)), usdcMint[:]}, config.CctpTokenMessengerMinter) // faking that solana is again the remote domain
+	tokenPair, _, err := solana.FindProgramAddress([][]byte{[]byte("token_pair"), []byte(common.NumToStr(domain)), remoteTokenPubkey[:]}, config.CctpTokenMessengerMinter) // faking that solana is again the remote domain
 	require.NoError(t, err)
 	localToken, _, err := solana.FindProgramAddress([][]byte{[]byte("local_token"), usdcMint.Bytes()}, config.CctpTokenMessengerMinter)
 	require.NoError(t, err)
@@ -112,4 +118,43 @@ func GetTokenPoolPDAs(t *testing.T, usdcMint solana.PublicKey) TokenPoolPDAs {
 		TokenAccount:   poolTokenAccount,
 		SvmChainConfig: chainConfigPDA,
 	}
+}
+
+func GetNonce(messageBytes []byte) uint64 {
+	nonceBytes := messageBytes[12:20] // extract nonce from message, which is the 12th to 20th byte of the message
+	nonce := binary.BigEndian.Uint64(nonceBytes)
+	return nonce
+}
+
+func SetNonce(messageBytes *[]byte, nonce uint64) {
+	binary.BigEndian.PutUint64((*messageBytes)[12:20], nonce) // set nonce in message, which is the 12th to 20th byte of the message
+}
+
+func GetSrcDomain(cctpMessage []byte) uint32 {
+	srcDomainBytes := cctpMessage[4:8] // extract source domain from message, which is the 4th to 8th byte of the message
+	srcDomain := binary.BigEndian.Uint32(srcDomainBytes)
+	return srcDomain
+}
+
+func SetSrcDomain(cctpMessage *[]byte, srcDomain uint32) {
+	binary.BigEndian.PutUint32((*cctpMessage)[4:8], srcDomain) // set source domain in message, which is the 4th to 8th byte of the message
+}
+
+func GetUsedNoncesPDA(t *testing.T, cctpMessage []byte) solana.PublicKey {
+	t.Helper()
+	nonce := GetNonce(cctpMessage)
+	fmt.Println("Nonce for receiving message:", nonce)
+	firstNonce := (nonce-1)/6400*6400 + 1 // round down to the first nonce that is a multiple of 6400
+	fmt.Println("First nonce:", firstNonce)
+	fmt.Println("Domain:", GetSrcDomain(cctpMessage))
+	firstNoncePda, _, err := solana.FindProgramAddress(
+		[][]byte{
+			[]byte("used_nonces"),
+			[]byte(common.NumToStr(GetSrcDomain(cctpMessage))),
+			[]byte(common.NumToStr(firstNonce)),
+		},
+		config.CctpMessageTransmitter,
+	)
+	require.NoError(t, err)
+	return firstNoncePda
 }

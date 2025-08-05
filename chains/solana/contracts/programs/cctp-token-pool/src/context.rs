@@ -11,6 +11,7 @@ use crate::{CctpTokenPoolError, ChainConfig, PoolConfig, State};
 
 const MAX_POOL_STATE_V: u8 = 1;
 const MAX_POOL_CONFIG_V: u8 = 1;
+const MAX_POOL_CHAIN_CONFIG_V: u8 = 1;
 
 const ANCHOR_DISCRIMINATOR: usize = 8;
 
@@ -88,6 +89,7 @@ pub struct AdminUpdateTokenPool<'info> {
     #[account(
         seeds = [POOL_STATE_SEED, mint.key().as_ref()],
         bump,
+        constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub state: Account<'info, State>, // config PDA for token pool
     pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
@@ -163,6 +165,7 @@ pub struct RemoveFromAllowlist<'info> {
             mint.key().as_ref()
         ],
         bump,
+        constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
         realloc = ANCHOR_DISCRIMINATOR + State::INIT_SPACE + 32 * (state.config.allow_list.len().saturating_sub(remove.len())),
         realloc::payer = authority,
         realloc::zero = false,
@@ -269,6 +272,7 @@ pub struct TokenOfframp<'info> {
             mint.key().as_ref(),
         ],
         bump,
+        constraint = valid_version(chain_config.version, MAX_POOL_CHAIN_CONFIG_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub chain_config: Account<'info, ChainConfig>,
 
@@ -317,17 +321,20 @@ pub fn get_token_messenger_minter_pda(seeds: &[&[u8]]) -> Pubkey {
 // a single Context struct (as Anchor would require too much memory to validate all of them), so we use a separate struct
 // and do the address validations manually.
 pub struct TokenOfframpRemainingAccounts<'info> {
-    pub cctp_authority_pda: &'info AccountInfo<'info>,
+    // Accounts that are in the lookup table, as they are static and shared between onramp & offramp
     pub cctp_message_transmitter_account: &'info AccountInfo<'info>,
     pub cctp_token_messenger_minter: &'info AccountInfo<'info>,
     pub system_program: &'info AccountInfo<'info>,
-    pub cctp_event_authority: &'info AccountInfo<'info>,
     pub cctp_message_transmitter: &'info AccountInfo<'info>,
     pub cctp_token_messenger_account: &'info AccountInfo<'info>,
     pub cctp_token_minter_account: &'info AccountInfo<'info>,
     pub cctp_local_token: &'info AccountInfo<'info>,
+    pub cctp_token_messenger_minter_event_authority: &'info AccountInfo<'info>,
+
+    // Accounts that are not in the lookup table, as they are either dynamic or not shared with onramp
+    pub cctp_authority_pda: &'info AccountInfo<'info>,
+    pub cctp_event_authority: &'info AccountInfo<'info>,
     pub cctp_custody_token_account: &'info AccountInfo<'info>,
-    pub cctp_token_messenger_event_authority: &'info AccountInfo<'info>,
     pub cctp_remote_token_messenger_key: &'info AccountInfo<'info>,
     pub cctp_token_pair: &'info AccountInfo<'info>,
     pub cctp_used_nonces: &'info AccountInfo<'info>,
@@ -346,14 +353,6 @@ impl TokenOfframpRemainingAccounts<'_> {
         let domain_seed = domain_str.as_bytes();
 
         require_keys_eq!(
-            self.cctp_authority_pda.key(),
-            get_message_transmitter_pda(&[
-                b"message_transmitter_authority",
-                TOKEN_MESSENGER_MINTER.as_ref(),
-            ])
-        );
-
-        require_keys_eq!(
             self.cctp_message_transmitter_account.key(),
             get_message_transmitter_pda(&[b"message_transmitter"])
         );
@@ -364,11 +363,6 @@ impl TokenOfframpRemainingAccounts<'_> {
         );
 
         require_keys_eq!(self.system_program.key(), System::id());
-
-        require_keys_eq!(
-            self.cctp_event_authority.key(),
-            get_message_transmitter_pda(&[b"__event_authority"])
-        );
 
         require_keys_eq!(self.cctp_message_transmitter.key(), MESSAGE_TRANSMITTER);
 
@@ -388,13 +382,26 @@ impl TokenOfframpRemainingAccounts<'_> {
         );
 
         require_keys_eq!(
-            self.cctp_custody_token_account.key(),
-            get_token_messenger_minter_pda(&[b"custody", mint.key().as_ref()])
+            self.cctp_token_messenger_minter_event_authority.key(),
+            get_token_messenger_minter_pda(&[b"__event_authority"])
         );
 
         require_keys_eq!(
-            self.cctp_token_messenger_event_authority.key(),
-            get_token_messenger_minter_pda(&[b"__event_authority"])
+            self.cctp_authority_pda.key(),
+            get_message_transmitter_pda(&[
+                b"message_transmitter_authority",
+                TOKEN_MESSENGER_MINTER.as_ref(),
+            ])
+        );
+
+        require_keys_eq!(
+            self.cctp_event_authority.key(),
+            get_message_transmitter_pda(&[b"__event_authority"])
+        );
+
+        require_keys_eq!(
+            self.cctp_custody_token_account.key(),
+            get_token_messenger_minter_pda(&[b"custody", mint.key().as_ref()])
         );
 
         require_keys_eq!(
@@ -495,18 +502,11 @@ pub struct TokenOnramp<'info> {
             mint.key().as_ref()
         ],
         bump,
+        constraint = valid_version(chain_config.version, MAX_POOL_CHAIN_CONFIG_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub chain_config: Account<'info, ChainConfig>,
 
-    // CCTP pool-specific accounts ----------------
-    /// CHECK this is not read by the pool, just forwarded to CCTP
-    #[account(
-        seeds = [b"sender_authority"],
-        bump,
-        seeds::program = cctp_token_messenger_minter,
-    )]
-    pub cctp_authority_pda: UncheckedAccount<'info>,
-
+    // CCTP pool-specific accounts in the lookup table ----------------
     /// CHECK this is not read by the pool, just forwarded to CCTP
     #[account(
         mut,
@@ -515,6 +515,23 @@ pub struct TokenOnramp<'info> {
         seeds::program = cctp_message_transmitter,
     )]
     pub cctp_message_transmitter_account: UncheckedAccount<'info>,
+
+    /// CHECK this is CCTP's TokenMessengerMinter program, which
+    /// is invoked by this program.
+    #[account(
+        address = TOKEN_MESSENGER_MINTER @ CctpTokenPoolError::InvalidTokenMessengerMinter
+    )]
+    pub cctp_token_messenger_minter: UncheckedAccount<'info>,
+
+    pub system_program: Program<'info, System>,
+
+    /// CHECK this is CCTP's MessageTransmitter program, which
+    /// is invoked transitively by CCTP's TokenMessengerMinter,
+    /// which in turn is invoked explicitly by this program.
+    #[account(
+        address = MESSAGE_TRANSMITTER @ CctpTokenPoolError::InvalidMessageTransmitter
+    )]
+    pub cctp_message_transmitter: UncheckedAccount<'info>,
 
     /// CHECK this is not read by the pool, just forwarded to CCTP
     #[account(
@@ -541,23 +558,6 @@ pub struct TokenOnramp<'info> {
     )]
     pub cctp_local_token: UncheckedAccount<'info>,
 
-    /// CHECK this is CCTP's MessageTransmitter program, which
-    /// is invoked transitively by CCTP's TokenMessengerMinter,
-    /// which in turn is invoked explicitly by this program.
-    #[account(
-        address = MESSAGE_TRANSMITTER @ CctpTokenPoolError::InvalidMessageTransmitter
-    )]
-    pub cctp_message_transmitter: UncheckedAccount<'info>,
-
-    /// CHECK this is CCTP's TokenMessengerMinter program, which
-    /// is invoked by this program.
-    #[account(
-        address = TOKEN_MESSENGER_MINTER @ CctpTokenPoolError::InvalidTokenMessengerMinter
-    )]
-    pub cctp_token_messenger_minter: UncheckedAccount<'info>,
-
-    pub system_program: Program<'info, System>,
-
     /// CHECK this is not read by the pool, just forwarded to CCTP
     #[account(
         seeds = [b"__event_authority"],
@@ -565,6 +565,15 @@ pub struct TokenOnramp<'info> {
         seeds::program = cctp_token_messenger_minter,
     )]
     pub cctp_event_authority: UncheckedAccount<'info>,
+
+    // CCTP pool-specific accounts NOT in the lookup table ----------------
+    /// CHECK this is not read by the pool, just forwarded to CCTP
+    #[account(
+        seeds = [b"sender_authority"],
+        bump,
+        seeds::program = cctp_token_messenger_minter,
+    )]
+    pub cctp_authority_pda: UncheckedAccount<'info>,
 
     /// CHECK this is not read by the pool, just forwarded to CCTP
     #[account(
@@ -643,6 +652,7 @@ pub struct EditChainConfig<'info> {
             mint.key().as_ref(),
         ],
         bump,
+        constraint = valid_version(chain_config.version, MAX_POOL_CHAIN_CONFIG_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub chain_config: Account<'info, ChainConfig>,
 
@@ -671,6 +681,7 @@ pub struct SetChainRateLimit<'info> {
             mint.key().as_ref(),
         ],
         bump,
+        constraint = valid_version(chain_config.version, MAX_POOL_CHAIN_CONFIG_V) @ CcipTokenPoolError::InvalidVersion,
     )]
     pub chain_config: Account<'info, ChainConfig>,
 
@@ -713,6 +724,7 @@ pub struct EditChainConfigDynamicSize<'info> {
             mint.key().as_ref(),
         ],
         bump,
+        constraint = valid_version(chain_config.version, MAX_POOL_CHAIN_CONFIG_V) @ CcipTokenPoolError::InvalidVersion,
         realloc = ANCHOR_DISCRIMINATOR + ChainConfig::INIT_SPACE + cfg.pool_addresses.iter().map(RemoteAddress::space).sum::<usize>(),
         realloc::payer = authority,
         realloc::zero = false
@@ -746,6 +758,7 @@ pub struct AppendRemotePoolAddresses<'info> {
             mint.key().as_ref(),
         ],
         bump,
+        constraint = valid_version(chain_config.version, MAX_POOL_CHAIN_CONFIG_V) @ CcipTokenPoolError::InvalidVersion,
         realloc = ANCHOR_DISCRIMINATOR + ChainConfig::INIT_SPACE
             + chain_config.base.remote.pool_addresses.iter().map(RemoteAddress::space).sum::<usize>()
             + addresses.iter().map(RemoteAddress::space).sum::<usize>(),

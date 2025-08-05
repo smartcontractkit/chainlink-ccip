@@ -1,5 +1,5 @@
 export type CctpTokenPool = {
-  "version": "0.1.0-dev",
+  "version": "0.1.1-dev",
   "name": "cctp_token_pool",
   "instructions": [
     {
@@ -767,19 +767,35 @@ export type CctpTokenPool = {
           "isSigner": false
         },
         {
-          "name": "cctpAuthorityPda",
-          "isMut": false,
+          "name": "cctpMessageTransmitterAccount",
+          "isMut": true,
           "isSigner": false,
           "docs": [
             "CHECK this is not read by the pool, just forwarded to CCTP"
           ]
         },
         {
-          "name": "cctpMessageTransmitterAccount",
-          "isMut": true,
+          "name": "cctpTokenMessengerMinter",
+          "isMut": false,
           "isSigner": false,
           "docs": [
-            "CHECK this is not read by the pool, just forwarded to CCTP"
+            "CHECK this is CCTP's TokenMessengerMinter program, which",
+            "is invoked by this program."
+          ]
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "cctpMessageTransmitter",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK this is CCTP's MessageTransmitter program, which",
+            "is invoked transitively by CCTP's TokenMessengerMinter,",
+            "which in turn is invoked explicitly by this program."
           ]
         },
         {
@@ -807,31 +823,15 @@ export type CctpTokenPool = {
           ]
         },
         {
-          "name": "cctpMessageTransmitter",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK this is CCTP's MessageTransmitter program, which",
-            "is invoked transitively by CCTP's TokenMessengerMinter,",
-            "which in turn is invoked explicitly by this program."
-          ]
-        },
-        {
-          "name": "cctpTokenMessengerMinter",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK this is CCTP's TokenMessengerMinter program, which",
-            "is invoked by this program."
-          ]
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
           "name": "cctpEventAuthority",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK this is not read by the pool, just forwarded to CCTP"
+          ]
+        },
+        {
+          "name": "cctpAuthorityPda",
           "isMut": false,
           "isSigner": false,
           "docs": [
@@ -1065,6 +1065,10 @@ export type CctpTokenPool = {
       "type": {
         "kind": "struct",
         "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
           {
             "name": "base",
             "type": {
@@ -1384,7 +1388,7 @@ export type CctpTokenPool = {
 };
 
 export const IDL: CctpTokenPool = {
-  "version": "0.1.0-dev",
+  "version": "0.1.1-dev",
   "name": "cctp_token_pool",
   "instructions": [
     {
@@ -2152,19 +2156,35 @@ export const IDL: CctpTokenPool = {
           "isSigner": false
         },
         {
-          "name": "cctpAuthorityPda",
-          "isMut": false,
+          "name": "cctpMessageTransmitterAccount",
+          "isMut": true,
           "isSigner": false,
           "docs": [
             "CHECK this is not read by the pool, just forwarded to CCTP"
           ]
         },
         {
-          "name": "cctpMessageTransmitterAccount",
-          "isMut": true,
+          "name": "cctpTokenMessengerMinter",
+          "isMut": false,
           "isSigner": false,
           "docs": [
-            "CHECK this is not read by the pool, just forwarded to CCTP"
+            "CHECK this is CCTP's TokenMessengerMinter program, which",
+            "is invoked by this program."
+          ]
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "cctpMessageTransmitter",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK this is CCTP's MessageTransmitter program, which",
+            "is invoked transitively by CCTP's TokenMessengerMinter,",
+            "which in turn is invoked explicitly by this program."
           ]
         },
         {
@@ -2192,31 +2212,15 @@ export const IDL: CctpTokenPool = {
           ]
         },
         {
-          "name": "cctpMessageTransmitter",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK this is CCTP's MessageTransmitter program, which",
-            "is invoked transitively by CCTP's TokenMessengerMinter,",
-            "which in turn is invoked explicitly by this program."
-          ]
-        },
-        {
-          "name": "cctpTokenMessengerMinter",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK this is CCTP's TokenMessengerMinter program, which",
-            "is invoked by this program."
-          ]
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
           "name": "cctpEventAuthority",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK this is not read by the pool, just forwarded to CCTP"
+          ]
+        },
+        {
+          "name": "cctpAuthorityPda",
           "isMut": false,
           "isSigner": false,
           "docs": [
@@ -2450,6 +2454,10 @@ export const IDL: CctpTokenPool = {
       "type": {
         "kind": "struct",
         "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
           {
             "name": "base",
             "type": {

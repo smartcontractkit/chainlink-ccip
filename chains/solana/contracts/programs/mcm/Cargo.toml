@@ -1,6 +1,6 @@
 [package]
 name = "mcm"
-version = "0.1.0-dev"
+version = "0.1.1-dev"
 description = "SVM implementation of ManyChainMultiSig"
 edition = "2021"
 
@@ -20,3 +20,7 @@ anchor-lang = "0.29.0"
 
 [dev-dependencies]
 hex = "0.4.3"
+
+[lints.rust.unexpected_cfgs]
+level = "warn"
+check-cfg = ['cfg(target_os, values("solana"))', 'cfg(feature, values("anchor-debug", "custom-panic", "custom-heap"))']

@@ -53,6 +53,7 @@ contract BurnMintFastTransferTokenPool_ccipSendToken is BurnMintFastTransferToke
       sourceDecimals: SOURCE_DECIMALS,
       fillerFee: expectedFillerFee,
       poolFee: expectedPoolFee,
+      destinationPool: abi.encode(s_remoteBurnMintPool),
       receiver: abi.encode(RECEIVER)
     });
 
@@ -96,6 +97,7 @@ contract BurnMintFastTransferTokenPool_ccipSendToken is BurnMintFastTransferToke
       sourceDecimals: SOURCE_DECIMALS,
       fillerFee: expectedFillerFee,
       poolFee: expectedPoolFee,
+      destinationPool: abi.encode(s_remoteBurnMintPool),
       receiver: abi.encode(RECEIVER)
     });
 
