@@ -16,9 +16,12 @@ import {SafeERC20} from
 /// liquidity migration. If a token pool is being modified, the token pool administrator can simply set the new token pool
 /// in the token admin registry, and the tokens will be automatically allowed to be withdrawn by the new token pool on
 /// incoming messages.
-/// @dev This contract is designed to support any ERC20-token permissionlessly, as any token pool can use it as
+/// @dev This contract is designed to support ERC20-tokens permissionlessly, as any compatible token pool can use it as
 /// storage for their token liquidity. As a result many different tokens will be stored in this contract, but can
 /// only be withdrawn by the associated token pool as defined in the token admin registry or an allowed caller.
+/// @dev Only token pools which implement IOwnable are supported. If a token pool uses an alternative access control
+/// mechanism, such as RBAC, it will not be able to use this lockbox, and should instead use a custom implementation
+/// specific to their access control mechanism.
 contract ERC20LockBox is ITypeAndVersion {
   using SafeERC20 for IERC20;
 
@@ -106,21 +109,14 @@ contract ERC20LockBox is ITypeAndVersion {
   /// @param configArgs Array of configuration arguments for allowed callers.
   function configureAllowedCallers(
     AllowedCallerConfigArgs[] calldata configArgs
-  ) external {
+  ) external virtual {
     for (uint256 i = 0; i < configArgs.length; ++i) {
       address token = configArgs[i].token;
       if (token == address(0)) {
         revert TokenAddressCannotBeZero();
       }
 
-      // Note: Only the owner of the token pool itself, which MAY NOT be the administrator of the token in the token
-      // admin registry, can configure allowed callers. Currently, the token pool owner manages liquidity providers,
-      // who are allowed to withdraw liquidity at will. Since an allowed caller can do the same on this contract,
-      // limiting who can manage that configuration ensures there are no additional trust assumptions for managing liquidity.
-      address poolOwner = IOwner(i_tokenAdminRegistry.getPool(token)).owner();
-      if (msg.sender != poolOwner) {
-        revert Unauthorized(msg.sender);
-      }
+      _validateCallerIsTokenPoolOwner(token);
 
       address caller = configArgs[i].caller;
       bool allowed = configArgs[i].allowed;
@@ -133,6 +129,23 @@ contract ERC20LockBox is ITypeAndVersion {
         s_allowedCallers[token][caller] = allowed;
         emit AllowedCallerUpdated(token, caller, allowed);
       }
+    }
+  }
+
+  /// @notice Validates that the caller is the owner of the token pool for a given token.
+  /// @param token The address of the ERC20 token.
+  /// @dev This function is only configured to support token pools which implement IOwnable. If a token pool
+  /// uses an alternative access control mechanism, such as RBAC, it will not be able to use this lockbox, and should
+  /// instead use a custom implementation which overrides this function.
+  function _validateCallerIsTokenPoolOwner(
+    address token
+  ) internal virtual {
+    // Only the owner of the token pool itself, which MAY NOT be the administrator of the token in the token
+    // admin registry, can configure allowed callers. Currently, the token pool owner manages liquidity providers,
+    // who are allowed to withdraw liquidity at will. Since an allowed caller can do the same on this contract, limiting
+    // who can manage that configuration ensures there are no additional trust assumptions for managing liquidity.
+    if (msg.sender != IOwner(i_tokenAdminRegistry.getPool(token)).owner()) {
+      revert Unauthorized(msg.sender);
     }
   }
 
