@@ -1,5 +1,5 @@
 export type RmnRemote = {
-  "version": "0.1.1-dev",
+  "version": "0.1.1",
   "name": "rmn_remote",
   "instructions": [
     {
@@ -498,7 +498,7 @@ export type RmnRemote = {
 };
 
 export const IDL: RmnRemote = {
-  "version": "0.1.1-dev",
+  "version": "0.1.1",
   "name": "rmn_remote",
   "instructions": [
     {

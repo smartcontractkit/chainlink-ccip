@@ -19,7 +19,7 @@ default = []
 anchor-lang = "0.29.0"
 anchor-spl = "0.29.0"
 solana-program = "1.17.25" # pin solana to 1.17
-example_ccip_receiver = { version = "0.1.1-dev", path = "../example-ccip-receiver", features = ["no-entrypoint"] }
+example_ccip_receiver = { version = "0.1.1", path = "../example-ccip-receiver", features = ["no-entrypoint"] }
 
 [lints.rust.unexpected_cfgs]
 level = "warn"
