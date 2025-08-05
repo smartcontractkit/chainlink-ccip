@@ -1,6 +1,6 @@
 [package]
 name = "example_ccip_sender"
-version = "0.1.1-dev"
+version = "0.1.1"
 description = "Created with Anchor"
 edition = "2021"
 
@@ -20,7 +20,7 @@ custom-heap = []
 solana-program = "1.17.25" # pin solana to 1.17
 anchor-lang = { version = "0.29.0", features = [] }
 anchor-spl = "0.29.0"
-ccip_router = { version = "0.1.1-dev", path = "../ccip-router", features = ["no-entrypoint"]}
+ccip_router = { version = "0.1.1", path = "../ccip-router", features = ["no-entrypoint"]}
 smalloc = "0.1.2"
 
 [lints.rust.unexpected_cfgs]
