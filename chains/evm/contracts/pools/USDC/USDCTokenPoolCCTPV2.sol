@@ -13,21 +13,21 @@ import {SafeERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /// @notice This pool mints and burns USDC tokens through the Cross Chain Transfer
-/// Protocol (CCTP).
+/// Protocol (CCTP) V2.
 contract USDCTokenPoolCCTPV2 is USDCTokenPool {
   using SafeERC20 for IERC20;
 
   error InvalidMinFinalityThreshold(uint32 expected, uint32 got);
   error InvalidExecutionFinalityThreshold(uint32 expected, uint32 got);
 
-  // CCTP's max fee is based on the use of fast-burn. Since this pool does not utilize that feature, max fee should be 0.
+  /// @dev CCTP's max fee is based on the use of fast-burn. Since this pool does not utilize that feature, max fee should be 0.
   uint32 public constant MAX_FEE = 0;
 
-  // TODO: Add Comment
+  /// @dev 2000 indicates that finality must be achieved before attestation is possible in CCTP V2.
   uint32 public constant FINALITY_THRESHOLD = 2000;
 
-  // TODO: Fix Comments
-  // Note: This constructor is only used for CCTP V2, which is why the supportedUSDCVersion is set to 1.
+  /// @dev This contract is only used for CCTP V2, which is why the supportedUSDCVersion field of the parent
+  /// constructor is set to 1.
   constructor(
     ITokenMessenger tokenMessenger,
     CCTPMessageTransmitterProxy cctpMessageTransmitterProxy,
@@ -80,6 +80,8 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
       amount: lockOrBurnIn.amount
     });
 
+    // As of CCTP v2, the nonce is not returned to this contract upon sending the message, and will instead be
+    // acquired off-chain and included in the destination-message's offchainTokenData, so we set it to 0.    
     SourceTokenDataPayload memory sourceTokenDataPayload = SourceTokenDataPayload({
       nonce: 0,
       sourceDomain: i_localDomainIdentifier,
@@ -93,8 +95,6 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
       minFinalityThreshold: FINALITY_THRESHOLD
     });
 
-    // As of CCTP v2, the nonce is not returned to this contract upon sending the message, and will instead be
-    // acquired off-chain and included in the destination-message's offchainTokenData, so we set it to 0.
     return Pool.LockOrBurnOutV1({
       destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
       destPoolData: abi.encode(sourceTokenDataPayload)
@@ -115,18 +115,15 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
-    _validateReleaseOrMint(releaseOrMintIn, releaseOrMintIn.sourceDenominatedAmount);
-
     MessageAndAttestation memory msgAndAttestation =
       abi.decode(releaseOrMintIn.offchainTokenData, (MessageAndAttestation));
 
-    // This decoding is done after the check for the previous pool to avoid issues with decoding the previous pool's
-    // sourcePoolData into a struct with a different number of fields.
     SourceTokenDataPayload memory sourceTokenDataPayload =
       abi.decode(releaseOrMintIn.sourcePoolData, (SourceTokenDataPayload));
 
-    // We call this after the destinationCaller check to ensure that the message is valid for CCTP V2. If it was called
-    // before, then a V1 message which should be forwarded to the previous pool will be rejected.
+    _validateReleaseOrMint(releaseOrMintIn, releaseOrMintIn.sourceDenominatedAmount);
+
+    // Validate the specific message format of the CCTP V2 message.
     _validateMessage(msgAndAttestation.message, sourceTokenDataPayload);
 
     if (!i_messageTransmitterProxy.receiveMessage(msgAndAttestation.message, msgAndAttestation.attestation)) {
@@ -164,9 +161,9 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
     bytes memory usdcMessage,
     SourceTokenDataPayload memory sourceTokenData
   ) internal view override {
-    // 148 is the minimum length of a valid USDC message. Since destinationCaller needs to be checked for the previous
-    // pool, this ensures that it can be parsed correctly and that the message is not too short. Since messageBody is
-    // dynamic and not always used, it is not checked.
+    // 148 is the minimum length of a valid USDC message in CCTP V2. Since destinationCaller needs to be checked for
+    // the previous pool, this ensures that it can be parsed correctly and that the message is not too short. Since
+    // messageBody is dynamic and not always used, it is not checked.
     if (usdcMessage.length < 148) revert InvalidMessageLength(usdcMessage.length);
 
     uint32 version;
@@ -179,7 +176,7 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
       // would not be as easily parsed into a uint32.
       version := mload(add(usdcMessage, 4)) // 0 + 4 = 4
     }
-    // This token pool only supports version 0 of the CCTP message format
+    // This token pool only supports version 1 of the CCTP message format
     // We check the version prior to loading the rest of the message
     // to avoid unexpected reverts due to out-of-bounds reads.
     if (version != i_supportedUSDCVersion) revert InvalidMessageVersion(i_supportedUSDCVersion, version);

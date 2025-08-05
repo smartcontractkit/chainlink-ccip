@@ -5,18 +5,9 @@ import {USDCTokenPoolProxy} from "../../../../pools/USDC/USDCTokenPoolProxy.sol"
 import {USDCTokenPoolProxySetup} from "./USDCTokenPoolProxySetup.t.sol";
 
 contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
-  address internal s_newCctpV1Pool;
-  address internal s_newCctpV2Pool;
-  address internal s_newLockReleasePool;
-
-  function setUp() public virtual override {
-    super.setUp();
-
-    // Create new pool addresses using makeAddr for testing updates
-    s_newCctpV1Pool = makeAddr("newCctpV1Pool");
-    s_newCctpV2Pool = makeAddr("newCctpV2Pool");
-    s_newLockReleasePool = makeAddr("newLockReleasePool");
-  }
+  address internal s_newCctpV1Pool = makeAddr("newCctpV1Pool");
+  address internal s_newCctpV2Pool = makeAddr("newCctpV2Pool");
+  address internal s_newLockReleasePool = makeAddr("newLockReleasePool");
 
   // Test successful pool address updates by owner
   function test_updatePoolAddresses() public {
@@ -62,9 +53,9 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
       lockReleasePool: s_newLockReleasePool
     });
 
-    // Act & Assert: Should revert with InvalidPoolAddresses error
+    // Act & Assert: Should revert with PoolAddressCannotBeZero error
     changePrank(OWNER);
-    vm.expectRevert(USDCTokenPoolProxy.InvalidPoolAddresses.selector);
+    vm.expectRevert(USDCTokenPoolProxy.PoolAddressCannotBeZero.selector);
     s_usdcTokenPoolProxy.updatePoolAddresses(newPools);
   }
 
@@ -77,9 +68,9 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
       lockReleasePool: s_newLockReleasePool
     });
 
-    // Act & Assert: Should revert with InvalidPoolAddresses error
+    // Act & Assert: Should revert with PoolAddressCannotBeZero error
     changePrank(OWNER);
-    vm.expectRevert(USDCTokenPoolProxy.InvalidPoolAddresses.selector);
+    vm.expectRevert(USDCTokenPoolProxy.PoolAddressCannotBeZero.selector);
     s_usdcTokenPoolProxy.updatePoolAddresses(newPools);
   }
 
@@ -92,9 +83,9 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
       lockReleasePool: address(0) // Zero address
     });
 
-    // Act & Assert: Should revert with InvalidPoolAddresses error
+    // Act & Assert: Should revert with PoolAddressCannotBeZero error
     changePrank(OWNER);
-    vm.expectRevert(USDCTokenPoolProxy.InvalidPoolAddresses.selector);
+    vm.expectRevert(USDCTokenPoolProxy.PoolAddressCannotBeZero.selector);
     s_usdcTokenPoolProxy.updatePoolAddresses(newPools);
   }
 

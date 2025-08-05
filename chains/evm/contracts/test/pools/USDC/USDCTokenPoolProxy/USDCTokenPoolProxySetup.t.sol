@@ -10,27 +10,15 @@ contract USDCTokenPoolProxySetup is USDCSetup {
   address internal s_cctpV1Pool = makeAddr("cctpV1Pool");
   address internal s_cctpV2Pool = makeAddr("cctpV2Pool");
   address internal s_lockReleasePool = makeAddr("lockReleasePool");
+  address internal s_mockTransmitterProxy = makeAddr("mockTransmitterProxy");
+
   USDCTokenPoolProxy internal s_usdcTokenPoolProxy;
 
   function setUp() public virtual override {
     super.setUp();
 
-    // Mock lockOrBurn and releaseOrMint calls for the pools
-
-    // Mock lockOrBurn for s_cctpV1Pool
-    vm.mockCall(address(s_cctpV1Pool), abi.encodeWithSelector(USDCTokenPool.lockOrBurn.selector), abi.encode());
-    // Mock releaseOrMint for s_cctpV1Pool
-    vm.mockCall(address(s_cctpV1Pool), abi.encodeWithSelector(USDCTokenPool.releaseOrMint.selector), abi.encode());
-
-    // Mock lockOrBurn for s_cctpV2Pool
-    vm.mockCall(address(s_cctpV2Pool), abi.encodeWithSelector(USDCTokenPool.lockOrBurn.selector), abi.encode());
-    // Mock releaseOrMint for s_cctpV2Pool
-    vm.mockCall(address(s_cctpV2Pool), abi.encodeWithSelector(USDCTokenPool.releaseOrMint.selector), abi.encode());
-
-    // Mock lockOrBurn for s_lockReleasePool
-    vm.mockCall(address(s_lockReleasePool), abi.encodeWithSelector(USDCTokenPool.lockOrBurn.selector), abi.encode());
-    // Mock releaseOrMint for s_lockReleasePool
-    vm.mockCall(address(s_lockReleasePool), abi.encodeWithSelector(USDCTokenPool.releaseOrMint.selector), abi.encode());
+    // Mock the transmitter proxy's receiveMessage function to return true
+    vm.mockCall(address(s_cctpV1Pool), abi.encodeWithSelector(bytes4(keccak256("i_messageTransmitterProxy()"))), abi.encode(s_mockTransmitterProxy));
 
     // Deploy the proxy
     s_usdcTokenPoolProxy = new USDCTokenPoolProxy(
@@ -38,9 +26,11 @@ contract USDCTokenPoolProxySetup is USDCSetup {
       address(s_router),
       new address[](0),
       address(s_mockRMNRemote),
-      address(s_cctpV1Pool),
-      address(s_cctpV2Pool),
-      address(s_lockReleasePool)
+      USDCTokenPoolProxy.PoolAddresses({
+        cctpV1Pool: s_cctpV1Pool,
+        cctpV2Pool: s_cctpV2Pool,
+        lockReleasePool: s_lockReleasePool
+      })
     );
 
     // Deal some tokens to the proxy to test the transfer to the destination pool
