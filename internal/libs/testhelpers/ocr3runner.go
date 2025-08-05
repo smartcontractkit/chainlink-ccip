@@ -7,7 +7,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"math/big"
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
@@ -174,14 +173,21 @@ func (r *OCR3Runner[RI]) selectLeader() ocr3types.ReportingPlugin[RI] {
 		return nil
 	}
 
-	idx, err := rand.Int(rand.Reader, big.NewInt(int64(numNodes)))
+	// Generate random bytes and convert to index to avoid big.Int truncation issues
+	randomBytes := make([]byte, 4)
+	_, err := rand.Read(randomBytes)
 	if err != nil {
 		panic(err)
 	}
-	if !idx.IsInt64() {
-		panic("index is not int64")
+
+	// Convert bytes to uint32 and mod by numNodes
+	var randomUint32 uint32
+	for i, b := range randomBytes {
+		randomUint32 |= uint32(b) << (8 * i)
 	}
-	return r.nodes[idx.Int64()]
+
+	idx := int(randomUint32 % uint32(numNodes))
+	return r.nodes[idx]
 }
 
 type RoundResult[RI any] struct {
