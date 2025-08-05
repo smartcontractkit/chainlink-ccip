@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {IOwner} from "../interfaces/IOwner.sol";
+
 import {TokenAdminRegistry} from "../tokenAdminRegistry/TokenAdminRegistry.sol";
 
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
@@ -108,11 +110,12 @@ contract ERC20LockBox is ITypeAndVersion {
         revert TokenAddressCannotBeZero();
       }
 
-      // Only the token administrator set in the token admin registry can modify the allowed callers.
-      // Note: This gives the token pool administrator full control over the tokens in the lockbox, as they
-      // will be able to determine who can call withdraw() at any time for the given token and amount.
-      // Special care should be taken to ensure that the token pool administrator is not malicious or compromised.
-      if (!i_tokenAdminRegistry.isAdministrator(token, msg.sender)) {
+      // Note: Only the owner of the token pool itself, which MAY NOT be the administrator of the token in the token
+      // admin registry, can configure allowed callers. Currently, the token pool owner manages liquidity providers,
+      // who are allowed to withdraw liquidity at will. Since an allowed caller can do the same on this contract,
+      // limiting who can manage that configuration ensures there are no additional trust assumptions for managing liquidity.
+      address poolOwner = IOwner(i_tokenAdminRegistry.getPool(token)).owner();
+      if (msg.sender != poolOwner) {
         revert Unauthorized(msg.sender);
       }
 
@@ -120,6 +123,10 @@ contract ERC20LockBox is ITypeAndVersion {
       bool allowed = configArgs[i].allowed;
 
       if (s_allowedCallers[token][caller] != allowed) {
+        // Allowing for external callers is critical to enabling more complex proxy-pool mechanisms such as USDC.
+        // In these designs, the contract registered with the token admin registry may not be directly responsible
+        // for handling tokens, and acts only as a proxy to another pool. Without allowing external callers,
+        // it would not be possible, as only the proxy would be able to interact with this contract.
         s_allowedCallers[token][caller] = allowed;
         emit AllowedCallerUpdated(token, caller, allowed);
       }
@@ -150,8 +157,8 @@ contract ERC20LockBox is ITypeAndVersion {
   function isAllowedCaller(address token, address caller) public view returns (bool allowed) {
     TokenAdminRegistry.TokenConfig memory tokenConfig = i_tokenAdminRegistry.getTokenConfig(token);
 
-    // The caller is allowed if they are the token pool or a specially designated allowed caller such as a
-    // liquidity provider.
+    // The caller is allowed if they are the token pool or a specially designated allowed caller. This allowed caller
+    // can include liquidity providers or additional token pools with unique proxy mechanisms, such as USDC.
     return (caller == tokenConfig.tokenPool || s_allowedCallers[token][caller]);
   }
 }

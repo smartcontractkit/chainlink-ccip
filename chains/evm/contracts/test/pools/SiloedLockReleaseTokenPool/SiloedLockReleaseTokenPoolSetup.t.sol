@@ -48,6 +48,14 @@ contract SiloedLockReleaseTokenPoolSetup is BaseTest {
       address(s_lockBox)
     );
 
+    // Mock the token pool for the token to be the siloed lock release token pool so that we can test the allowed caller configuration
+    vm.mockCall(
+      address(s_tokenAdminRegistry),
+      abi.encodeWithSignature("getPool(address)", address(s_token)),
+      abi.encode(address(s_siloedLockReleaseTokenPool))
+    );
+
+    // Mock the token config for the token to be the siloed lock release token pool so that we can test the allowed caller configuration
     vm.mockCall(
       address(s_tokenAdminRegistry),
       abi.encodeWithSignature("getTokenConfig(address)", address(s_token)),

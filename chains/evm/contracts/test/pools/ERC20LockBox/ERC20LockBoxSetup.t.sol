@@ -34,6 +34,9 @@ contract ERC20LockBoxSetup is BaseTest {
     // Set the token pool for the token
     s_tokenAdminRegistry.setPool(address(s_token), s_tokenPool);
 
+    // Mock the owner of the token pool to be the owner of the token so that we can test the allowed caller configuration
+    vm.mockCall(s_tokenPool, abi.encodeWithSignature("owner()"), abi.encode(OWNER));
+
     // Deploy the ERC20 lock box
     s_erc20LockBox = new ERC20LockBox(address(s_tokenAdminRegistry));
 
