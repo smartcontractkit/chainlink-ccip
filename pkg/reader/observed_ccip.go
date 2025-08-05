@@ -2,6 +2,7 @@ package reader
 
 import (
 	"context"
+	"math/big"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -320,14 +321,16 @@ func (o *observedCCIPReader) trackChainFeeComponents(
 		}
 
 		if v.ExecutionFee != nil {
+			execFeeFloat, _ := new(big.Float).SetInt(v.ExecutionFee).Float64()
 			o.chainFeesGauge.
 				WithLabelValues(chainFamily, chainID, execCostLabel).
-				Set(float64(v.ExecutionFee.Int64()))
+				Set(execFeeFloat)
 		}
 		if v.DataAvailabilityFee != nil {
+			dataFeeFloat, _ := new(big.Float).SetInt(v.DataAvailabilityFee).Float64()
 			o.chainFeesGauge.
 				WithLabelValues(chainFamily, chainID, dataCostLabel).
-				Set(float64(v.DataAvailabilityFee.Int64()))
+				Set(dataFeeFloat)
 		}
 
 		o.lggr.Debugw(

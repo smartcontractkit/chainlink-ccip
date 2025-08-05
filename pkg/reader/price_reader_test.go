@@ -243,7 +243,7 @@ func createMockReader(
 		results := make(commontypes.ContractBatchResults, 2)
 		// Price result
 		priceResult := commontypes.BatchReadResult{ReadName: consts.MethodNameGetLatestRoundData}
-		priceResult.SetResult(&LatestRoundData{Answer: big.NewInt(price.Int64())}, nil)
+		priceResult.SetResult(&LatestRoundData{Answer: new(big.Int).Set(price)}, nil)
 		results[0] = priceResult
 
 		// Decimals result
