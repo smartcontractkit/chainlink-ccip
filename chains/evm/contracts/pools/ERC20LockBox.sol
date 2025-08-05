@@ -44,9 +44,12 @@ contract ERC20LockBox is ITypeAndVersion {
   TokenAdminRegistry public immutable i_tokenAdminRegistry;
 
   /// @notice The lockbox allows for multiple authorized callers for a token. This allows support for
-  /// liquidity providers to manage tokens without requiring the token pool owner to interact directly.
-  /// Only the owner in the token admin registry can configure allowed callers for a token, and
-  /// once a caller is allowed, they can call the deposit and withdraw functions for the given token.
+  /// complex token pool designs, such as USDC, which uses a child pool to interact with the lockbox rather than
+  /// the contract registered with the token admin registry. Without this, it would not be possible to support
+  /// such designs as the contract which actually handles the tokens would not be able to interact with this contract.
+  /// It is also necessary as it enables liquidity providers to handle tokens, but must be managed carefully to ensure
+  /// that unauthorized entities are not configured as allowed callers, as they would be able to withdraw tokens
+  /// without requiring the token pool owner's approval.
   mapping(address token => mapping(address caller => bool isAllowed)) internal s_allowedCallers;
 
   string public constant typeAndVersion = "ERC20LockBox 1.6.2-dev";
@@ -157,8 +160,7 @@ contract ERC20LockBox is ITypeAndVersion {
   function isAllowedCaller(address token, address caller) public view returns (bool allowed) {
     TokenAdminRegistry.TokenConfig memory tokenConfig = i_tokenAdminRegistry.getTokenConfig(token);
 
-    // The caller is allowed if they are the token pool or a specially designated allowed caller. This allowed caller
-    // can include liquidity providers or additional token pools with unique proxy mechanisms, such as USDC.
+    // The caller is allowed if they are the token pool or a specially allowed caller.
     return (caller == tokenConfig.tokenPool || s_allowedCallers[token][caller]);
   }
 }
