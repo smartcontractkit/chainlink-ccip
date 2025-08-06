@@ -3,7 +3,7 @@ pragma solidity ^0.8.25;
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 
 /// @title HyperEVMLinker
-/// @notice This contract is used used to facilitate linking of an ERC20 from HyperEVM to HyperCore by storing the linker
+/// @notice This contract is used to facilitate linking of an ERC20 from HyperEVM to HyperCore by storing the linker
 /// address in the required slot.
 /// @dev This contract is built in accordance with the Hyperliquid standard at the following URL:
 /// https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/hyperevm/hypercore-less-than-greater-than-hyperevm-transfers#linking-core-and-evm-spot-assets
