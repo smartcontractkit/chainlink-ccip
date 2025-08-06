@@ -14,12 +14,10 @@ type EVMEventCodec struct {
 	abi abi.ABI
 }
 
-var _ modsectypes.EventCodec = (*EVMEventCodec)(nil)
-
-func NewEVMEventCodec(theAbi abi.ABI) (*EVMEventCodec, error) {
-	return &EVMEventCodec{
+func NewEVMEventCodec(theAbi abi.ABI) EVMEventCodec {
+	return EVMEventCodec{
 		abi: theAbi,
-	}, nil
+	}
 }
 
 func (c *EVMEventCodec) Decode(ctx context.Context, data []byte) (modsectypes.Message, error) {

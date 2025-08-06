@@ -83,8 +83,7 @@ func Test_Decode(t *testing.T) {
 	abi, err := abi.JSON(strings.NewReader(evmimpls.InternalABI))
 	require.NoError(t, err)
 
-	codec, err := evmimpls.NewEVMEventCodec(abi)
-	require.NoError(t, err)
+	codec := evmimpls.NewEVMEventCodec(abi)
 
 	decodedMsg, err := codec.Decode(context.Background(), receipt.Logs[0].Data)
 	require.NoError(t, err)

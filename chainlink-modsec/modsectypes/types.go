@@ -46,7 +46,7 @@ type Receipt struct {
 	ExtraArgs         []byte
 }
 
-// TODO: implement the type.
+// Message is a generic CCIP message.
 type Message struct {
 	Header         Header
 	Sender         []byte
@@ -57,14 +57,6 @@ type Message struct {
 	FeeValueJuels  *big.Int
 	TokenTransfer  TokenTransfer
 	Receipts       []Receipt
-}
-
-// EventCodec is an interface that provides a way to decode chain data into a message.
-// Messages can be emitted alongside other data, e.g. on EVM the message is emitted alongside
-// other indexed fields for ease of querying with plain ethereum clients.
-type EventCodec interface {
-	// Decode decodes chain data into a message.
-	Decode(ctx context.Context, data []byte) (Message, error)
 }
 
 // MessageCodec is an interface that provides a way to encode and decode messages for specific

@@ -24,7 +24,7 @@ type EVMSourceReader struct {
 	onRampProxyAddress common.Address
 	eventSig           common.Hash
 	logger             *log.Logger
-	evmEventCodec      modsectypes.EventCodec
+	evmEventCodec      EVMEventCodec
 	wg                 sync.WaitGroup
 	runCtxCancel       context.CancelFunc
 }
@@ -34,7 +34,7 @@ func NewEVMSourceReader(
 	onRampProxyAddress common.Address,
 	eventSig common.Hash,
 	logger *log.Logger,
-	evmEventCodec modsectypes.EventCodec,
+	evmEventCodec EVMEventCodec,
 ) *EVMSourceReader {
 	return &EVMSourceReader{
 		logSubscriber:      logSubscriber,

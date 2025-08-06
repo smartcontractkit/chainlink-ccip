@@ -46,8 +46,7 @@ func Test_ContractTransmitter(t *testing.T) {
 
 	internalABI, err := abi.JSON(strings.NewReader(evmimpls.InternalABI))
 	require.NoError(t, err)
-	eventCodec, err := evmimpls.NewEVMEventCodec(internalABI)
-	require.NoError(t, err)
+	eventCodec := evmimpls.NewEVMEventCodec(internalABI)
 
 	// Call transmit
 	tx, err := contract.EmitCCIPMessageSent(auth, gethwrappers.CCIPMessageSentEmitterEVM2AnyVerifierMessage{
