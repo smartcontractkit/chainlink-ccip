@@ -4,7 +4,7 @@ import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access
 
 /// @title HyperEVMLinker
 /// @notice This contract is used to link the hyperEVM to HyperCore by storing a special address in a required slot.
-/// @dev This contract is built in accordance with the Hyperliq standard at the following URL:
+/// @dev This contract is built in accordance with the Hyperliquid standard at the following URL:
 /// https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/hyperevm/hypercore-less-than-greater-than-hyperevm-transfers#linking-core-and-evm-spot-assets
 abstract contract HyperEVMLinker is Ownable2StepMsgSender {
   // In order to bridge to HyperCore, factory-deployed contracts must store the address of a finalizer linker at
