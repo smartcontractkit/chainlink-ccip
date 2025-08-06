@@ -20,7 +20,7 @@ contract FactoryBurnMintERC20_setHyperEVMLinker is BurnMintERC20Setup {
   function test_setHyperEVMLinker_Success() public {
     address testHyperEVMLinker = makeAddr("testHyperEVMLinker");
 
-    vm.expectEmit(true, false, false, false);
+    vm.expectEmit();
     emit HyperEVMLinker.HyperEVMLinkerSet(testHyperEVMLinker);
     s_factoryBurnMintERC20.setHyperEVMLinker(testHyperEVMLinker);
 
