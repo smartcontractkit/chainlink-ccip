@@ -5,7 +5,7 @@ import {Pool} from "../../../../libraries/Pool.sol";
 
 import {SiloedLockReleaseTokenPool} from "../../../../pools/SiloedLockReleaseTokenPool.sol";
 import {TokenPool} from "../../../../pools/TokenPool.sol";
-import {LOCK_RELEASE_FLAG} from "../../../../pools/USDC/USDCTokenPoolProxy.sol";
+import {LOCK_RELEASE_FLAG} from "../../../../pools/USDC/SiloedUSDCTokenPool.sol";
 
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 

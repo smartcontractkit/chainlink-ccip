@@ -9,12 +9,15 @@ import {IPoolV1} from "../../../interfaces/IPool.sol";
 import {Pool} from "../../../libraries/Pool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {CCTPMessageTransmitterProxy} from "../../../pools/USDC/CCTPMessageTransmitterProxy.sol";
+import {TokenAdminRegistry} from "../../../tokenAdminRegistry/TokenAdminRegistry.sol";
 import {BurnMintERC677} from "@chainlink/contracts/src/v0.8/shared/token/ERC677/BurnMintERC677.sol";
+
 import {IERC165} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
 
 import {BaseTest} from "../../BaseTest.t.sol";
 import {MockE2EUSDCTransmitter} from "../../mocks/MockE2EUSDCTransmitter.sol";
+import {MockE2EUSDCTransmitterCCTPV2} from "../../mocks/MockE2EUSDCTransmitterCCTPV2.sol";
 import {MockUSDCTokenMessenger} from "../../mocks/MockUSDCTokenMessenger.sol";
 
 contract USDCSetup is BaseTest {
@@ -29,6 +32,20 @@ contract USDCSetup is BaseTest {
     bytes messageBody;
   }
 
+  // solhint-disable-next-line gas-struct-packing
+  struct USDCMessageCCTPV2 {
+    uint32 version;
+    uint32 sourceDomain;
+    uint32 destinationDomain;
+    bytes32 nonce;
+    bytes32 sender;
+    bytes32 recipient;
+    bytes32 destinationCaller;
+    uint32 minFinalityThreshold;
+    uint32 finalityThresholdExecuted;
+    bytes messageBody;
+  }
+
   uint32 internal constant USDC_DEST_TOKEN_GAS = 180_000;
   uint32 internal constant SOURCE_DOMAIN_IDENTIFIER = 0x02020202;
   uint32 internal constant DEST_DOMAIN_IDENTIFIER = 0;
@@ -39,13 +56,19 @@ contract USDCSetup is BaseTest {
   address internal constant DEST_CHAIN_USDC_TOKEN = address(0x23598918358198766);
 
   MockUSDCTokenMessenger internal s_mockUSDC;
+  MockUSDCTokenMessenger internal s_mockLegacyUSDC;
   MockE2EUSDCTransmitter internal s_mockUSDCTransmitter;
+  MockE2EUSDCTransmitterCCTPV2 internal s_mockUSDCTransmitterCCTPV2;
+
   CCTPMessageTransmitterProxy internal s_cctpMessageTransmitterProxy;
 
   address internal s_routerAllowedOnRamp = address(3456);
   address internal s_routerAllowedOffRamp = address(234);
   address internal s_previousPool = makeAddr("previousPool");
+  address internal s_previousPoolMessageTransmitterProxy = makeAddr("previousPoolMessageTransmitterProxy");
   Router internal s_router;
+
+  TokenAdminRegistry internal s_tokenAdminRegistry;
 
   IBurnMintERC20 internal s_USDCToken;
 
@@ -54,13 +77,21 @@ contract USDCSetup is BaseTest {
     BurnMintERC677 usdcToken = new BurnMintERC677("USD Coin", "USDC", 6, 0);
     s_USDCToken = usdcToken;
 
+    s_tokenAdminRegistry = new TokenAdminRegistry();
+
     deal(address(s_USDCToken), OWNER, type(uint256).max);
     _setUpRamps();
 
+    s_mockUSDCTransmitterCCTPV2 = new MockE2EUSDCTransmitterCCTPV2(1, DEST_DOMAIN_IDENTIFIER, address(s_USDCToken));
     s_mockUSDCTransmitter = new MockE2EUSDCTransmitter(0, DEST_DOMAIN_IDENTIFIER, address(s_USDCToken));
-    s_mockUSDC = new MockUSDCTokenMessenger(0, address(s_mockUSDCTransmitter));
+
+    s_mockUSDC = new MockUSDCTokenMessenger(1, address(s_mockUSDCTransmitterCCTPV2));
+
+    s_mockLegacyUSDC = new MockUSDCTokenMessenger(0, address(s_mockUSDCTransmitter));
+
     s_cctpMessageTransmitterProxy = new CCTPMessageTransmitterProxy(s_mockUSDC);
-    usdcToken.grantMintAndBurnRoles(address(s_mockUSDCTransmitter));
+
+    usdcToken.grantMintAndBurnRoles(address(s_mockUSDCTransmitterCCTPV2));
     usdcToken.grantMintAndBurnRoles(address(s_mockUSDC));
 
     // Mock the previous pool's releaseOrMint function to return the input amount
@@ -70,10 +101,25 @@ contract USDCSetup is BaseTest {
       abi.encode(Pool.ReleaseOrMintOutV1({destinationAmount: 1}))
     );
 
+    // Mock the previous pool's i_cctpMessageTransmitterProxy function to return an address
+    // This is used to determine if the message was sent using CCTP V1 or V2
+    vm.mockCall(
+      s_previousPool,
+      abi.encodeWithSelector(bytes4(keccak256("i_messageTransmitterProxy()"))),
+      abi.encode(s_previousPoolMessageTransmitterProxy)
+    );
+
     // Mock the previous pool's supportsInterface function to return true for IPoolV1 interface
     vm.mockCall(
       s_previousPool,
       abi.encodeWithSelector(IERC165.supportsInterface.selector, type(IPoolV1).interfaceId),
+      abi.encode(true)
+    );
+
+    // Mock the previous pool's message transmitter proxy to return true for IPoolV1 interface
+    vm.mockCall(
+      s_previousPoolMessageTransmitterProxy,
+      abi.encodeWithSelector(CCTPMessageTransmitterProxy.receiveMessage.selector),
       abi.encode(true)
     );
   }
@@ -130,6 +176,23 @@ contract USDCSetup is BaseTest {
       usdcMessage.sender,
       usdcMessage.recipient,
       usdcMessage.destinationCaller,
+      usdcMessage.messageBody
+    );
+  }
+
+  function _generateUSDCMessageCCTPV2(
+    USDCMessageCCTPV2 memory usdcMessage
+  ) internal pure returns (bytes memory) {
+    return abi.encodePacked(
+      usdcMessage.version,
+      usdcMessage.sourceDomain,
+      usdcMessage.destinationDomain,
+      usdcMessage.nonce,
+      usdcMessage.sender,
+      usdcMessage.recipient,
+      usdcMessage.destinationCaller,
+      usdcMessage.minFinalityThreshold,
+      usdcMessage.finalityThresholdExecuted,
       usdcMessage.messageBody
     );
   }

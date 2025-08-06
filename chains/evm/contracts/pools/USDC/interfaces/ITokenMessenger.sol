@@ -1,3 +1,4 @@
+
 /*
  * Copyright (c) 2022, Circle Internet Financial Limited.
  *
@@ -53,6 +54,52 @@ interface ITokenMessenger {
     address burnToken,
     bytes32 destinationCaller
   ) external returns (uint64 nonce);
+
+  /// @notice Emitted when a DepositForBurn message is sent on CCTP V2
+  /// @notice Emitted when a DepositForBurn message is sent
+  /// @param burnToken address of token burnt on source domain
+  /// @param amount deposit amount
+  /// @param depositor address where deposit is transferred from
+  /// @param mintRecipient address receiving minted tokens on destination domain as bytes32
+  /// @param destinationDomain destination domain
+  /// @param destinationTokenMessenger address of TokenMessenger on destination domain as bytes32
+  /// @param destinationCaller authorized caller as bytes32 of receiveMessage() on destination domain.
+  /// If equal to bytes32(0), any address can broadcast the message.
+  /// @param maxFee maximum fee to pay on destination domain, in units of burnToken
+  /// @param minFinalityThreshold the minimum finality at which the message should be attested to.
+  /// @param hookData optional hook for execution on destination domain
+  event DepositForBurn(
+    address indexed burnToken,
+    uint256 amount,
+    address indexed depositor,
+    bytes32 mintRecipient,
+    uint32 destinationDomain,
+    bytes32 destinationTokenMessenger,
+    bytes32 destinationCaller,
+    uint32 maxFee,
+    uint32 indexed minFinalityThreshold,
+    bytes hookData
+  );
+
+  /// @notice Burns the tokens on the source side through Circles Cross Chain Transfer Protocol V2.
+  /// @param amount Amount of tokens to deposit and burn.
+  /// @param destinationDomain Destination domain identifier.
+  /// @param mintRecipient Address of mint recipient on destination domain.
+  /// @param burnToken Address of contract to burn deposited tokens, on local domain.
+  /// @param destinationCaller Caller on the destination domain, as bytes32.
+  /// @param maxFee Maximum fee to be paid for fast burn, specified in burnToken. Should be 0 when using non-fast mode.
+  /// @param minFinalityThreshold Minimum finality threshold at which the burn will be attested
+  /// should be 2000 for Standard, 1000 for Fast.
+  /// @dev This function is only available for CCTP V2.
+  function depositForBurn(
+    uint256 amount,
+    uint32 destinationDomain,
+    bytes32 mintRecipient,
+    address burnToken,
+    bytes32 destinationCaller,
+    uint32 maxFee,
+    uint32 minFinalityThreshold
+  ) external;
 
   /// Returns the version of the message body format.
   /// @dev immutable
