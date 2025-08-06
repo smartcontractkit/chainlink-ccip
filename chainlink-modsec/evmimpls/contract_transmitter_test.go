@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
@@ -17,8 +18,6 @@ import (
 )
 
 func Test_ContractTransmitter(t *testing.T) {
-	t.Skip("for now")
-
 	// Setup
 	privateKey, err := crypto.GenerateKey()
 	require.NoError(t, err)
@@ -34,10 +33,10 @@ func Test_ContractTransmitter(t *testing.T) {
 	require.NoError(t, err)
 	sim.Commit()
 
-	abi, err := gethwrappers.CCIPMessageSentEmitterMetaData.GetAbi()
+	emitterABI, err := gethwrappers.CCIPMessageSentEmitterMetaData.GetAbi()
 	require.NoError(t, err)
 
-	executeMethod, ok := abi.Methods["execute"]
+	executeMethod, ok := emitterABI.Methods["execute"]
 	require.True(t, ok)
 
 	transmitter := evmimpls.NewEVMContractTransmitter(sim.Client(), addr, executeMethod, auth)

@@ -10,14 +10,16 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/smartcontractkit/chainlink-ccip/chainlink-modsec/evmimpls/gethwrappers"
 	"github.com/smartcontractkit/chainlink-ccip/chainlink-modsec/modsectypes"
 )
 
 type EVMContractTransmitter struct {
-	signer              *bind.TransactOpts
-	client              TransactorClient
-	offRampProxyAddress common.Address
-	executeMethod       abi.Method
+	signer                         *bind.TransactOpts
+	client                         TransactorClient
+	offRampProxyAddress            common.Address
+	executeMethod                  abi.Method
+	decodeAny2EVMMultiProofMessage abi.Arguments
 }
 
 // Transmit implements modsectypes.ContractTransmitter.
@@ -27,7 +29,19 @@ func (e *EVMContractTransmitter) Transmit(
 	proofs [][]byte,
 	_ []byte,
 ) error {
-	callData, err := e.executeMethod.Inputs.Pack(encodedMessage, proofs)
+	if len(e.executeMethod.Inputs) != 2 {
+		return fmt.Errorf("execute method must have exactly two inputs")
+	}
+
+	// first argument of the execute method is the Any2EVMMultiProofMessage
+	any2EVMArguments := abi.Arguments{e.executeMethod.Inputs[0]}
+	unpacked, err := any2EVMArguments.Unpack(encodedMessage)
+	if err != nil {
+		return fmt.Errorf("failed to unpack Any2EVMMultiProofMessage: %w", err)
+	}
+	message := *abi.ConvertType(unpacked[0], new(gethwrappers.CCIPMessageSentEmitterAny2EVMMultiProofMessage)).(*gethwrappers.CCIPMessageSentEmitterAny2EVMMultiProofMessage)
+
+	callData, err := e.executeMethod.Inputs.Pack(message, proofs)
 	if err != nil {
 		return fmt.Errorf("failed to pack execute method inputs: %w", err)
 	}

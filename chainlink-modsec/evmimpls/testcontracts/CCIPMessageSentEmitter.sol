@@ -99,4 +99,9 @@ contract CCIPMessageSentEmitter {
     function execute(Any2EVMMultiProofMessage memory message, bytes[] memory proofs) public {
         emit Executed(message, proofs);
     }
+
+    function executeRaw(bytes memory encodedMessage, bytes[] memory proofs) public {
+        Any2EVMMultiProofMessage memory message = abi.decode(encodedMessage, (Any2EVMMultiProofMessage));
+        emit Executed(message, proofs);
+    }
 }

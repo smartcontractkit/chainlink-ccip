@@ -103,10 +103,7 @@ func (c *EVMMessageCodec) Decode(ctx context.Context, data []byte) (modsectypes.
 		return modsectypes.Message{}, fmt.Errorf("unpacked to empty slice")
 	}
 
-	message, ok := unpacked[0].(gethwrappers.CCIPMessageSentEmitterEVM2AnyVerifierMessage)
-	if !ok {
-		return modsectypes.Message{}, fmt.Errorf("failed to cast unpacked message to expected struct, got %T", unpacked[0])
-	}
+	message := *abi.ConvertType(unpacked[0], new(gethwrappers.CCIPMessageSentEmitterEVM2AnyVerifierMessage)).(*gethwrappers.CCIPMessageSentEmitterEVM2AnyVerifierMessage)
 
 	receipts := make([]modsectypes.Receipt, len(message.Receipts))
 	for i, r := range message.Receipts {
