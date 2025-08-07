@@ -158,6 +158,19 @@ func (r *ccipChainReader) WithExtendedContractReader(
 			r.lggr.Errorw("failed to insert or update contract", "err", err)
 			continue
 		}
+
+		chainAccessor, err := getChainAccessor(r.accessors, ch)
+		if err != nil {
+			r.lggr.Errorw("failed to get chain accessor", "chain", ch, "err", err)
+			continue
+		}
+		// Register the contract address in the chain accessor
+		err = chainAccessor.Sync(context.Background(), contractName, addressBytes)
+		if err != nil {
+			r.lggr.Errorw("failed to sync contract address in chain accessor",
+				"chain", ch, "contractName", contractName, "address", lastBinding.Binding.Address, "err", err)
+			continue
+		}
 	}
 
 	return r
