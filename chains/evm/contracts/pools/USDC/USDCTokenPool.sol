@@ -11,6 +11,7 @@ import {TokenPool} from "../TokenPool.sol";
 import {CCTPMessageTransmitterProxy} from "./CCTPMessageTransmitterProxy.sol";
 
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
+import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 import {IERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from
@@ -19,8 +20,6 @@ import {EnumerableSet} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableSet.sol";
 import {IERC165} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
-
-import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
 /// @notice This pool mints and burns USDC tokens through the Cross Chain Transfer
 /// Protocol (CCTP).
@@ -115,21 +114,6 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
   // A mapping of CCIP chain identifiers to destination domains
   mapping(uint64 chainSelector => Domain CCTPDomain) internal s_chainToDomain;
 
-  // In the event of an inflight message during a token pool migration, we need to route the message to the
-  // previous pool to satisfy the allowedCaller. The currently in-use token pool must be set as an offRamp
-  // in the router in order for the previous pool to accept the incoming call.
-  address public immutable i_previousPool;
-
-  // In the event of an inflight message during a token pool migration, we need to route the message to the
-  // previous pool to satisfy the allowedCaller. The currently in-use token pool must be set as an offRamp
-  // in the router in order for the previous pool to accept the incoming call.
-  address public immutable i_previousMessageTransmitterProxy;
-
-  // The token admin registry for the token pool.
-  address public s_USDCTokenPoolProxy;
-
-  EnumerableSet.AddressSet internal s_allowedTokenPoolProxies;
-
   /// @dev The authorized callers are set as empty since the USDCTokenPoolProxy is the only authorized caller,
   /// but cannot be deployed until after this contract is deployed. The allowed callers are set after deployment.
   constructor(
@@ -139,7 +123,6 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
     address[] memory allowlist,
     address rmnProxy,
     address router,
-    address previousPool,
     uint32 supportedUSDCVersion
   ) TokenPool(token, 6, allowlist, rmnProxy, router) AuthorizedCallers(new address[](0)) {
     i_supportedUSDCVersion = supportedUSDCVersion;
@@ -165,17 +148,6 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
     i_messageTransmitterProxy = cctpMessageTransmitterProxy;
     i_localDomainIdentifier = transmitter.localDomain();
     i_token.safeIncreaseAllowance(address(i_tokenMessenger), type(uint256).max);
-
-    // PreviousPool should not be current pool.
-    if (previousPool == address(this)) {
-      revert InvalidPreviousPool();
-    }
-    // If previousPool exists, it should be a valid token pool, we check it with supportsInterface.
-    if (previousPool != address(0) && !IERC165(previousPool).supportsInterface(type(IPoolV1).interfaceId)) {
-      revert InvalidPreviousPool();
-    }
-
-    i_previousPool = previousPool;
 
     emit ConfigSet(address(tokenMessenger));
   }
@@ -392,21 +364,4 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
     emit DomainsSet(domains);
   }
 
-  function setAllowedTokenPoolProxies(address[] calldata tokenPoolProxies, bool[] calldata allowed) external onlyOwner {
-    for (uint256 i = 0; i < tokenPoolProxies.length; ++i) {
-      if (allowed[i]) {
-        if (!s_allowedTokenPoolProxies.add(tokenPoolProxies[i])) {
-          revert TokenPoolProxyAlreadyAllowed(tokenPoolProxies[i]);
-        }
-
-        emit AllowedTokenPoolProxyAdded(tokenPoolProxies[i]);
-      } else {
-        if (!s_allowedTokenPoolProxies.remove(tokenPoolProxies[i])) {
-          revert TokenPoolProxyNotAllowed(tokenPoolProxies[i]);
-        }
-
-        emit AllowedTokenPoolProxyRemoved(tokenPoolProxies[i]);
-      }
-    }
-  }
 }

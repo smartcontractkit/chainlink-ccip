@@ -665,6 +665,10 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
 
   /// @notice Checks whether remote chain selector is configured on this contract, and if the msg.sender
   /// is a permissioned onRamp for the given chain on the Router.
+  /// @dev This function is marked virtual as other token pools may inherit from this contract, but do 
+  /// not receive calls from the ramps directly, instead receiving them from a proxy contract. In that
+  /// situation this function must be overridden and the ramp-check removed and replaced with a different 
+  /// access-control scheme.
   function _onlyOnRamp(
     uint64 remoteChainSelector
   ) internal view virtual {
@@ -674,6 +678,10 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
 
   /// @notice Checks whether remote chain selector is configured on this contract, and if the msg.sender
   /// is a permissioned offRamp for the given chain on the Router.
+  /// @dev This function is marked virtual as other token pools may inherit from this contract, but do 
+  /// not receive calls from the ramps directly, instead receiving them from a proxy contract. In that
+  /// situation this function must be overridden and the ramp-check removed and replaced with a different 
+  /// access-control scheme.
   function _onlyOffRamp(
     uint64 remoteChainSelector
   ) internal view virtual {

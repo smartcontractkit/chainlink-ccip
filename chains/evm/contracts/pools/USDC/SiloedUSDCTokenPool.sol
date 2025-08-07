@@ -6,19 +6,21 @@ import {Pool} from "../../libraries/Pool.sol";
 import {SiloedLockReleaseTokenPool} from "../SiloedLockReleaseTokenPool.sol";
 
 import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
+import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
+import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 import {IERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {EnumerableSet} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
 
-import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
-import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
-
 bytes4 constant LOCK_RELEASE_FLAG = 0xfa7c07de;
 
-/// @notice A token pool for USDC which inherits the Siloed token functionality while adding the CCTP migration functionality
-/// @dev While it supports unsiloed chains, it is not recommended to use them. All chains should be siloed, otherwise
-/// the pool will not be able to migrate the tokens to CCTP in the future.
+/// @notice A token pool for USDC which inherits the Siloed token functionality while adding the CCTP migration functionality.
+/// @dev While this technically supports unsiloed chains, as inherited from the parent contract, 
+/// it is not recommended to use them. All chains should be siloed, otherwise the chain will not be 
+/// able to migrate to CCTP in the future, due to the inability to manage the token
+/// balances under CCTP accounting rules defined at:
+/// https://github.com/circlefin/stablecoin-evm/blob/master/doc/bridged_USDC_standard.md
 contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
   using EnumerableSet for EnumerableSet.UintSet;
 
@@ -29,6 +31,7 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
   event TokensExcludedFromBurn(
     uint64 indexed remoteChainSelector, uint256 amount, uint256 burnableAmountAfterExclusion
   );
+
   error OnlyCircleCaller();
   error ExistingMigrationProposal();
   error NoMigrationProposalPending();
@@ -46,7 +49,7 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
   EnumerableSet.UintSet internal s_migratedChains;
 
   /// @dev The authorized callers are set as empty since the USDCTokenPoolProxy is the only authorized caller,
-  /// but cannot be deployed until after this contract is deployed. The allowed callers are set after deployment.
+  /// but cannot be deployed until after this contract. The allowed callers will be set after deployment.
   constructor(
     IERC20 token,
     uint8 localTokenDecimals,
@@ -74,10 +77,6 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     SiloConfig storage remoteConfig = s_chainConfigs[releaseOrMintIn.remoteChainSelector];
 
     uint256 excludedTokens = s_tokensExcludedFromBurn[releaseOrMintIn.remoteChainSelector];
-
-    // Note: accounting for unsiloed chains is not supported. All chains must be siloed. This is because an unsiloed
-    // chain would not be considered eligible for a CCTP migration, and thus the pool would not be able to migrate
-    // the tokens to CCTP.
 
     // Additional security check to prevent underflow by explicitly ensuring that enough funds are available to release
     uint256 availableLiquidity = excludedTokens != 0 ? excludedTokens : remoteConfig.tokenBalance;
@@ -107,25 +106,7 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     return Pool.ReleaseOrMintOutV1({destinationAmount: localAmount});
   }
 
-  /// @notice Checks whether remote chain selector is configured on this contract, and if the msg.sender
-  /// is a permissioned onRamp for the given chain on the Router.
-  function _onlyOnRamp(
-    uint64 remoteChainSelector
-  ) internal view override {
-    if (!isSupportedChain(remoteChainSelector)) revert ChainNotAllowed(remoteChainSelector);
-    _validateCaller();
-  }
-
-  /// @notice Checks whether remote chain selector is configured on this contract, and if the msg.sender
-  /// is a permissioned offRamp for the given chain on the Router.
-  function _onlyOffRamp(
-    uint64 remoteChainSelector
-  ) internal view override {
-    if (!isSupportedChain(remoteChainSelector)) revert ChainNotAllowed(remoteChainSelector);
-    _validateCaller();
-  }
-
-  /// @notice This function is overridden to update the locked tokens accounting for the bridge migrator code
+  /// @dev This function is overridden to prevent providing liquidity to a chain that has already been migrated, and thus should use CCTP-proper instead of a Lock/Release mechanism.
   function _provideLiquidity(uint64 remoteChainSelector, uint256 amount) internal override {
     if (s_migratedChains.contains(remoteChainSelector)) {
       revert TokenLockingNotAllowedAfterMigration(remoteChainSelector);
@@ -133,6 +114,38 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
 
     super._provideLiquidity(remoteChainSelector, amount);
   }
+
+  // ================================================================
+  // │                           Access                             │
+  // ================================================================
+
+  /// @dev This function is overridden to remove the On-Ramp check, as this pool does not receive calls
+  /// from the ramps directly, instead receiving them from a proxy contract first.
+  function _onlyOnRamp(
+    uint64 remoteChainSelector
+  ) internal view virtual override {
+    if (!isSupportedChain(remoteChainSelector)) revert ChainNotAllowed(remoteChainSelector);
+
+    // Validate logic is inherited from AuthorizedCallers, and is used to validate that the caller is the authorized USDC proxy contract rather than the ramp.
+    _validateCaller();
+  }
+
+  /// @dev This function is overridden to remove the Off-Ramp check, as this pool does not receive calls
+  /// from the ramps directly, instead receiving them from a proxy contract first.
+  function _onlyOffRamp(
+    uint64 remoteChainSelector
+  ) internal view virtual override {
+    if (!isSupportedChain(remoteChainSelector)) revert ChainNotAllowed(remoteChainSelector);
+
+    // Validate logic is inherited from AuthorizedCallers, and is used to validate that the caller is the authorized USDC proxy contract rather than the ramp.
+    _validateCaller();
+  }
+
+
+
+  // ================================================================
+  // │                  CCTP Migration functions                    │
+  // ================================================================
 
   /// @notice Propose a destination chain to migrate from lock/release mechanism to CCTP enabled burn/mint
   /// through a Circle controlled burn.
