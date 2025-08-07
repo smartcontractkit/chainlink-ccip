@@ -6,7 +6,7 @@ import {SiloedUSDCTokenPool} from "../../../../pools/USDC/SiloedUSDCTokenPool.so
 import {SiloedUSDCTokenPoolSetup} from "./SiloedUSDCTokenPoolSetup.sol";
 
 contract SiloedUSDCTokenPool_proposeCCTPMigration is SiloedUSDCTokenPoolSetup {
-  function test_proposeCCTPMigration_Success() public {
+  function test_proposeCCTPMigration() public {
     vm.expectEmit();
     emit SiloedUSDCTokenPool.CCTPMigrationProposed(DEST_CHAIN_SELECTOR);
     s_usdcTokenPool.proposeCCTPMigration(DEST_CHAIN_SELECTOR);

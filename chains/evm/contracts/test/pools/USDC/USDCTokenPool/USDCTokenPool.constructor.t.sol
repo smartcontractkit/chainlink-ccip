@@ -17,7 +17,6 @@ contract USDCTokenPool_constructor is USDCTokenPoolSetup {
       address(s_router),
       0
     );
-    
   }
 
   function test_constructor_RevertWhen_TokenMessengerAddressZero() public {

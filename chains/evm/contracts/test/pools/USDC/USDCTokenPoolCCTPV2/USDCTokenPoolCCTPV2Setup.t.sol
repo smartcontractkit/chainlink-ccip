@@ -10,7 +10,6 @@ import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/Aut
 
 contract USDCTokenPoolCCTPV2Setup is USDCSetup {
   USDCTokenPoolCCTPV2Helper internal s_usdcTokenPool;
-  USDCTokenPoolCCTPV2Helper internal s_usdcTokenPoolWithAllowList;
   address[] internal s_allowedList;
 
   function setUp() public virtual override {
@@ -25,6 +24,7 @@ contract USDCTokenPoolCCTPV2Setup is USDCSetup {
       address(s_router)
     );
 
+    // Set the on and off ramps as authorized callers for the pool.
     address[] memory allowedCallers = new address[](3);
     allowedCallers[0] = OWNER;
     allowedCallers[1] = address(s_routerAllowedOnRamp);
@@ -33,24 +33,17 @@ contract USDCTokenPoolCCTPV2Setup is USDCSetup {
       AuthorizedCallers.AuthorizedCallerArgs({addedCallers: allowedCallers, removedCallers: new address[](0)})
     );
 
+    // Set the pool as an authorized caller for the message transmitter proxy.
     CCTPMessageTransmitterProxy.AllowedCallerConfigArgs[] memory allowedCallerParams =
       new CCTPMessageTransmitterProxy.AllowedCallerConfigArgs[](1);
     allowedCallerParams[0] =
       CCTPMessageTransmitterProxy.AllowedCallerConfigArgs({caller: address(s_usdcTokenPool), allowed: true});
     s_cctpMessageTransmitterProxy.configureAllowedCallers(allowedCallerParams);
 
-    s_allowedList.push(vm.randomAddress());
-    s_usdcTokenPoolWithAllowList = new USDCTokenPoolCCTPV2Helper(
-      s_mockUSDC, s_cctpMessageTransmitterProxy, s_USDCToken, s_allowedList, address(s_mockRMNRemote), address(s_router)
-    );
-
-    s_usdcTokenPoolWithAllowList.applyAuthorizedCallerUpdates(
-      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: allowedCallers, removedCallers: new address[](0)})
-    );
-
+    // Apply the chain updates to the pool.
     _poolApplyChainUpdates(address(s_usdcTokenPool));
-    _poolApplyChainUpdates(address(s_usdcTokenPoolWithAllowList));
 
+    // Set the domain for the pool.
     USDCTokenPool.DomainUpdate[] memory domains = new USDCTokenPool.DomainUpdate[](1);
     domains[0] = USDCTokenPool.DomainUpdate({
       destChainSelector: DEST_CHAIN_SELECTOR,
@@ -60,8 +53,6 @@ contract USDCTokenPoolCCTPV2Setup is USDCSetup {
       enabled: true,
       cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V2
     });
-
     s_usdcTokenPool.setDomains(domains);
-    s_usdcTokenPoolWithAllowList.setDomains(domains);
   }
 }

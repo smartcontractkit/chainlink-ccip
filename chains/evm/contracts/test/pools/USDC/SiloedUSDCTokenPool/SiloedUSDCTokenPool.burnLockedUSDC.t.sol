@@ -20,7 +20,7 @@ contract SiloedUSDCTokenPool_burnLockedUSDC is SiloedUSDCTokenPoolSetup {
     s_usdcTokenPool.updateSiloDesignations(removes, adds);
   }
 
-  function test_burnLockedUSDC_Success() public {
+  function test_burnLockedUSDC() public {
     uint256 amount = 1e6;
 
     deal(address(s_USDCToken), address(s_usdcTokenPool), amount);
@@ -67,7 +67,6 @@ contract SiloedUSDCTokenPool_burnLockedUSDC is SiloedUSDCTokenPoolSetup {
       "Current proposed chain migration does not match expected for DEST_CHAIN_SELECTOR"
     );
 
-
     // Impersonate the set circle address and execute the proposal
     vm.startPrank(CIRCLE);
 
@@ -89,6 +88,8 @@ contract SiloedUSDCTokenPool_burnLockedUSDC is SiloedUSDCTokenPoolSetup {
       "No tokens should be locked for DEST_CHAIN_SELECTOR after CCTP-approved burn"
     );
   }
+
+  // Reverts
 
   function test_burnLockedUSDC_RevertWhen_InvalidPermissions() public {
     // Deal some tokens to the token pool
@@ -129,7 +130,7 @@ contract SiloedUSDCTokenPool_burnLockedUSDC is SiloedUSDCTokenPoolSetup {
     s_usdcTokenPool.burnLockedUSDC();
   }
 
-  function test_burnLockedUSDC_RevertWhen_TokenLockingNotAllowedAfterMigration() public { 
+  function test_burnLockedUSDC_RevertWhen_TokenLockingNotAllowedAfterMigration() public {
     // Deal some tokens to the token pool
     uint256 amount = 1000e6;
     deal(address(s_USDCToken), address(s_usdcTokenPool), amount);

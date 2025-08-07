@@ -6,7 +6,7 @@ import {SiloedUSDCTokenPool} from "../../../../pools/USDC/SiloedUSDCTokenPool.so
 import {SiloedUSDCTokenPoolSetup} from "./SiloedUSDCTokenPoolSetup.sol";
 
 contract SiloedUSDCTokenPool_cancelExistingCCTPMigrationProposal is SiloedUSDCTokenPoolSetup {
-  function test_cancelExistingCCTPMigrationProposal_Success() public {
+  function test_cancelExistingCCTPMigrationProposal() public {
     // Propose a migration first
     s_usdcTokenPool.proposeCCTPMigration(DEST_CHAIN_SELECTOR);
 
@@ -16,6 +16,8 @@ contract SiloedUSDCTokenPool_cancelExistingCCTPMigrationProposal is SiloedUSDCTo
     // Verify the proposal was cancelled
     assertEq(s_usdcTokenPool.getCurrentProposedCCTPChainMigration(), 0);
   }
+
+  // Reverts
 
   function test_cancelExistingCCTPMigrationProposal_RevertWhen_NoProposalPending() public {
     // Expect revert when trying to cancel without a proposal
@@ -60,6 +62,5 @@ contract SiloedUSDCTokenPool_cancelExistingCCTPMigrationProposal is SiloedUSDCTo
     vm.expectEmit();
     emit SiloedUSDCTokenPool.CCTPMigrationCancelled(DEST_CHAIN_SELECTOR);
     s_usdcTokenPool.cancelExistingCCTPMigrationProposal();
-    vm.stopPrank();
   }
 }

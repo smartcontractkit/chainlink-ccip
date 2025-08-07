@@ -69,7 +69,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
 
   // solhint-disable-next-line gas-struct-packing
   struct DomainUpdate {
-    bytes32 allowedCaller; // Address allowed to mint on the domain
+    bytes32 allowedCaller; // Address allowed to mint on the domain (destination MessageTransmitterProxy)
     bytes32 mintRecipient; // Address to mint to on the destination chain
     uint32 domainIdentifier; // Unique domain ID
     uint64 destChainSelector; // The destination chain for this domain
@@ -86,17 +86,16 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
   // Note: Since this struct never exists in storage, only in memory after an ABI-decoding, proper struct-packing
   // is not necessary and field ordering has been defined so as to best support off-chain code.
   // solhint-disable-next-line gas-struct-packing
-  // Note: This struct is only used in memory after ABI-decoding, so field ordering is chosen for off-chain compatibility.
   struct SourceTokenDataPayload {
-    uint64 nonce;                // Nonce of the message (used only in CCTP V1).
-    uint32 sourceDomain;         // Source domain of the message.
-    CCTPVersion cctpVersion;     // CCTP version for acquiring off-chain attestations.
-    uint256 amount;              // Amount of USDC burned/minted via CCTP.
-    uint32 destinationDomain;    // Destination domain of the message.
-    bytes32 mintRecipient;       // Address to mint to on the destination chain (end-user or pool PDA)
-    address burnToken;           // Local USDC token address
-    bytes32 destinationCaller;   // TransmitterProxy of the destination chain
-    uint256 maxFee;              // Max fee for the message (should be 0; no fast transfers)
+    uint64 nonce; // Nonce of the message (used only in CCTP V1).
+    uint32 sourceDomain; // Source domain of the message.
+    CCTPVersion cctpVersion; // CCTP version for acquiring off-chain attestations.
+    uint256 amount; // Amount of USDC burned/minted via CCTP.
+    uint32 destinationDomain; // Destination domain of the message.
+    bytes32 mintRecipient; // Address to mint to on the destination chain (end-user or pool PDA)
+    address burnToken; // Local USDC token address
+    bytes32 destinationCaller; // TransmitterProxy of the destination chain
+    uint256 maxFee; // Max fee for the message (should be 0; no fast transfers)
     uint32 minFinalityThreshold; // Minimum confirmation threshold before attestation (should be 2000).
   }
 
@@ -162,7 +161,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
       revert InvalidTokenMessengerVersion(tokenMessengerVersion, i_supportedUSDCVersion);
     }
 
-    // Check that the message transmitter proxy is configured to use the correct message transmitter for 
+    // Check that the message transmitter proxy is configured to use the correct message transmitter for
     // incoming messages (releaseOrMint).
     if (cctpMessageTransmitterProxy.i_cctpTransmitter() != transmitter) revert InvalidTransmitterInProxy();
 
