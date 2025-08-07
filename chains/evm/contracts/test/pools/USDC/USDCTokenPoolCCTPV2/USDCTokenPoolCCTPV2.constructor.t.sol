@@ -66,11 +66,13 @@ contract USDCTokenPoolCCTPV2_constructor is USDCTokenPoolCCTPV2Setup {
 
   function test_constructor_RevertWhen_InvalidTransmitterVersionInProxy() public {
     address transmitterAddress = makeAddr("INVALID_TRANSMITTER");
+    // Mock the message transmitter proxy to return an invalid transmitter address
     vm.mockCall(
       address(s_cctpMessageTransmitterProxy),
       abi.encodeCall(s_cctpMessageTransmitterProxy.i_cctpTransmitter, ()),
       abi.encode(transmitterAddress)
     );
+    // Expect the constructor to revert with InvalidTransmitterInProxy error
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidTransmitterInProxy.selector));
     new USDCTokenPoolCCTPV2(
       s_mockUSDC,

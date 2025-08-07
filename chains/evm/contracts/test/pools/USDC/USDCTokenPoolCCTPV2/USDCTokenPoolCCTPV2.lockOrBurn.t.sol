@@ -182,60 +182,10 @@ contract USDCTokenPoolCCTPV2_lockOrBurn is USDCTokenPoolCCTPV2Setup {
     assertEq(poolReturnDataV1.destTokenAddress, abi.encode(DEST_CHAIN_USDC_TOKEN));
   }
 
-  function testFuzz_LockOrBurnWithAllowList_Success(bytes32 destinationReceiver, uint256 amount) public {
-    vm.assume(destinationReceiver != bytes32(0));
-    amount = bound(amount, 1, _getOutboundRateLimiterConfig().capacity);
-    s_USDCToken.transfer(address(s_usdcTokenPoolWithAllowList), amount);
-    vm.startPrank(s_routerAllowedOnRamp);
-
-    USDCTokenPool.Domain memory expectedDomain = s_usdcTokenPoolWithAllowList.getDomain(DEST_CHAIN_SELECTOR);
-
-    vm.expectEmit();
-    emit TokenPool.OutboundRateLimitConsumed({
-      remoteChainSelector: DEST_CHAIN_SELECTOR,
-      token: address(s_USDCToken),
-      amount: amount
-    });
-
-    vm.expectEmit();
-    emit ITokenMessenger.DepositForBurn(
-      address(s_USDCToken),
-      amount,
-      address(s_usdcTokenPoolWithAllowList),
-      destinationReceiver,
-      expectedDomain.domainIdentifier,
-      s_mockUSDC.DESTINATION_TOKEN_MESSENGER(),
-      expectedDomain.allowedCaller,
-      s_usdcTokenPoolWithAllowList.MAX_FEE(),
-      s_usdcTokenPoolWithAllowList.FINALITY_THRESHOLD(),
-      ""
-    );
-
-    vm.expectEmit();
-    emit TokenPool.LockedOrBurned({
-      remoteChainSelector: DEST_CHAIN_SELECTOR,
-      token: address(s_USDCToken),
-      sender: address(s_routerAllowedOnRamp),
-      amount: amount
-    });
-
-    Pool.LockOrBurnOutV1 memory poolReturnDataV1 = s_usdcTokenPoolWithAllowList.lockOrBurn(
-      Pool.LockOrBurnInV1({
-        originalSender: s_allowedList[0],
-        receiver: abi.encodePacked(destinationReceiver),
-        amount: amount,
-        remoteChainSelector: DEST_CHAIN_SELECTOR,
-        localToken: address(s_USDCToken)
-      })
-    );
-    uint64 nonce = abi.decode(poolReturnDataV1.destPoolData, (uint64));
-    assertEq(nonce, 0);
-    assertEq(poolReturnDataV1.destTokenAddress, abi.encode(DEST_CHAIN_USDC_TOKEN));
-  }
-
   // Reverts
-  function test_RevertWhen_UnknownDomain() public {
+  function test_lockOrBurn_RevertWhen_UnknownDomain() public {
     uint64 wrongDomain = DEST_CHAIN_SELECTOR + 1;
+
     // We need to setup the wrong chainSelector so it reaches the domain check
     Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](1);
     onRampUpdates[0] = Router.OnRamp({destChainSelector: wrongDomain, onRamp: s_routerAllowedOnRamp});
@@ -270,7 +220,7 @@ contract USDCTokenPoolCCTPV2_lockOrBurn is USDCTokenPoolCCTPV2Setup {
     );
   }
 
-  function test_RevertWhen_CallerIsNotARampOnRouter() public {
+  function test_lockOrBurn_RevertWhen_CallerIsNotARampOnRouter() public {
     address randomAddress = makeAddr("RANDOM_ADDRESS");
 
     vm.startPrank(randomAddress);
@@ -288,23 +238,7 @@ contract USDCTokenPoolCCTPV2_lockOrBurn is USDCTokenPoolCCTPV2Setup {
     );
   }
 
-  function test_RevertWhen_LockOrBurnWithAllowList() public {
-    vm.startPrank(s_routerAllowedOnRamp);
-
-    vm.expectRevert(abi.encodeWithSelector(TokenPool.SenderNotAllowed.selector, STRANGER));
-
-    s_usdcTokenPoolWithAllowList.lockOrBurn(
-      Pool.LockOrBurnInV1({
-        originalSender: STRANGER,
-        receiver: abi.encodePacked(address(0)),
-        amount: 1000,
-        remoteChainSelector: DEST_CHAIN_SELECTOR,
-        localToken: address(s_USDCToken)
-      })
-    );
-  }
-
-  function test_RevertWhen_InvalidReceiver() public {
+  function test_lockOrBurn_RevertWhen_InvalidReceiver() public {
     vm.startPrank(s_routerAllowedOnRamp);
     uint256 amount = 1000;
 

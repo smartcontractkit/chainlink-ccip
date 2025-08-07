@@ -9,21 +9,21 @@ import {USDCTokenPool} from "./USDCTokenPool.sol";
 
 import {IERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /// @notice This pool mints and burns USDC tokens through the Cross Chain Transfer
 /// Protocol (CCTP) V2.
+/// @dev This pool inherits from the USDCTokenPool contract, but is not used for CCTP V1. It overrides
+/// only the functions which are different for CCTP V2, due to a different message format and
+/// deposit function. Since both pools use a message transmitter proxy, which will use the same
+/// function selector, the releaseOrMint function does not need to be overridden.
 contract USDCTokenPoolCCTPV2 is USDCTokenPool {
-  using SafeERC20 for IERC20;
-
   error InvalidMinFinalityThreshold(uint32 expected, uint32 got);
   error InvalidExecutionFinalityThreshold(uint32 expected, uint32 got);
 
   /// @dev CCTP's max fee is based on the use of fast-burn. Since this pool does not utilize that feature, max fee should be 0.
   uint32 public constant MAX_FEE = 0;
 
-  /// @dev 2000 indicates that finality must be achieved before attestation is possible in CCTP V2.
+  /// @dev 2000 indicates that finality must be reached before attestation is possible in CCTP V2.
   uint32 public constant FINALITY_THRESHOLD = 2000;
 
   /// @dev This contract is only used for CCTP V2, which is why the supportedUSDCVersion field of the parent
@@ -35,7 +35,7 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
     address[] memory allowlist,
     address rmnProxy,
     address router
-  ) USDCTokenPool(tokenMessenger, cctpMessageTransmitterProxy, token, allowlist, rmnProxy, router, address(0), 1) {}
+  ) USDCTokenPool(tokenMessenger, cctpMessageTransmitterProxy, token, allowlist, rmnProxy, router, 1) {}
 
   /// @notice Burn tokens from the pool to initiate cross-chain transfer.
   /// @notice Outgoing messages (burn operations) are routed via `i_tokenMessenger.depositForBurnWithCaller`.
@@ -80,8 +80,9 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
       amount: lockOrBurnIn.amount
     });
 
-    // As of CCTP v2, the nonce is not returned to this contract upon sending the message, and will instead be
-    // acquired off-chain and included in the destination-message's offchainTokenData, so we set it to 0.    
+    // In CCTP v2, the nonce is not returned to this contract upon sending the message request, and will instead be
+    // acquired off-chain and included in the destination-message's offchainTokenData. It is therefore set to 0,
+    // as the field is still required for other CCTP Versions.
     SourceTokenDataPayload memory sourceTokenDataPayload = SourceTokenDataPayload({
       nonce: 0,
       sourceDomain: i_localDomainIdentifier,
@@ -99,46 +100,6 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
       destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
       destPoolData: abi.encode(sourceTokenDataPayload)
     });
-  }
-
-  /// @notice Mint tokens from the pool to the recipient
-  /// * sourceTokenData is part of the verified message and passed directly from
-  /// the offRamp so it is guaranteed to be what the lockOrBurn pool released on the
-  /// source chain. It contains (nonce, sourceDomain) which is guaranteed by CCTP
-  /// to be unique.
-  /// * offchainTokenData is untrusted (can be supplied by manual execution), but we assert
-  /// that (nonce, sourceDomain) is equal to the message's (nonce, sourceDomain) and
-  /// receiveMessage will assert that Attestation contains a valid attestation signature
-  /// for that message, including its (nonce, sourceDomain). This way, the only
-  /// non-reverting offchainTokenData that can be supplied is a valid attestation for the
-  /// specific message that was sent on source.
-  function releaseOrMint(
-    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
-  ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
-    MessageAndAttestation memory msgAndAttestation =
-      abi.decode(releaseOrMintIn.offchainTokenData, (MessageAndAttestation));
-
-    SourceTokenDataPayload memory sourceTokenDataPayload =
-      abi.decode(releaseOrMintIn.sourcePoolData, (SourceTokenDataPayload));
-
-    _validateReleaseOrMint(releaseOrMintIn, releaseOrMintIn.sourceDenominatedAmount);
-
-    // Validate the specific message format of the CCTP V2 message.
-    _validateMessage(msgAndAttestation.message, sourceTokenDataPayload);
-
-    if (!i_messageTransmitterProxy.receiveMessage(msgAndAttestation.message, msgAndAttestation.attestation)) {
-      revert UnlockingUSDCFailed();
-    }
-
-    emit ReleasedOrMinted({
-      remoteChainSelector: releaseOrMintIn.remoteChainSelector,
-      token: address(i_token),
-      sender: msg.sender,
-      recipient: releaseOrMintIn.receiver,
-      amount: releaseOrMintIn.sourceDenominatedAmount
-    });
-
-    return Pool.ReleaseOrMintOutV1({destinationAmount: releaseOrMintIn.sourceDenominatedAmount});
   }
 
   /// @notice Validates the USDC encoded message against the given parameters.

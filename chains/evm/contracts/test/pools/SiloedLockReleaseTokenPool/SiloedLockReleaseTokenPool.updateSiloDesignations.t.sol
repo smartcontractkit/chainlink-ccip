@@ -96,7 +96,7 @@ contract SiloedLockReleaseTokenPool_updateSiloDesignations is SiloedLockReleaseT
       SiloedLockReleaseTokenPool.SiloConfigUpdate({remoteChainSelector: DEST_CHAIN_SELECTOR, rebalancer: address(0)});
 
     // Rebalancer address cannot be zero
-    vm.expectRevert(abi.encodeWithSelector(TokenPool.ZeroAddressInvalid.selector));
+    vm.expectRevert(abi.encodeWithSelector(TokenPool.ZeroAddressIsNotAllowed.selector));
 
     s_siloedLockReleaseTokenPool.updateSiloDesignations(new uint64[](0), adds);
   }

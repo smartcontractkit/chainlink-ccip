@@ -5,7 +5,44 @@ import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
 import {USDCTokenPoolCCTPV2} from "../../../../pools/USDC/USDCTokenPoolCCTPV2.sol";
 import {USDCTokenPoolCCTPV2Setup} from "./USDCTokenPoolCCTPV2Setup.t.sol";
 
-contract USDCTokenPoolCCTPV2__validateMessage is USDCTokenPoolCCTPV2Setup {
+contract USDCTokenPoolCCTPV2_validateMessage is USDCTokenPoolCCTPV2Setup {
+  USDCMessageCCTPV2 internal s_validUsdcMessage;
+  USDCTokenPool.SourceTokenDataPayload internal s_validSourceTokenData;
+
+  function setUp() public virtual override {
+    super.setUp();
+
+    // Create a valid USDC message for testing - this serves as the base message
+    // that individual tests can copy and modify to test specific validation failures
+    s_validUsdcMessage = USDCMessageCCTPV2({
+      version: 1,
+      sourceDomain: 1553252,
+      destinationDomain: DEST_DOMAIN_IDENTIFIER,
+      nonce: keccak256("0xC11"),
+      sender: SOURCE_CHAIN_TOKEN_SENDER,
+      recipient: bytes32(uint256(92398429395823)),
+      destinationCaller: bytes32(uint256(uint160(address(s_usdcTokenPool)))),
+      minFinalityThreshold: s_usdcTokenPool.FINALITY_THRESHOLD(),
+      finalityThresholdExecuted: s_usdcTokenPool.FINALITY_THRESHOLD(),
+      messageBody: bytes("")
+    });
+
+    // Create valid source token data payload that matches the valid USDC message
+    // This is used by tests that need to test payload validation failures
+    s_validSourceTokenData = USDCTokenPool.SourceTokenDataPayload({
+      nonce: 0,
+      sourceDomain: s_validUsdcMessage.sourceDomain,
+      cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V2,
+      amount: 0,
+      destinationDomain: DEST_DOMAIN_IDENTIFIER,
+      mintRecipient: bytes32(0),
+      burnToken: address(0),
+      destinationCaller: bytes32(0),
+      maxFee: 0,
+      minFinalityThreshold: 0
+    });
+  }
+
   function testFuzz_ValidateMessage_Success(uint32 sourceDomain, bytes32 nonce) public {
     vm.pauseGasMetering();
     USDCMessageCCTPV2 memory usdcMessage = USDCMessageCCTPV2({
@@ -42,44 +79,16 @@ contract USDCTokenPoolCCTPV2__validateMessage is USDCTokenPoolCCTPV2Setup {
 
   // Reverts
 
-  function test_RevertWhen_ValidateInvalidMessage() public {
-    USDCMessageCCTPV2 memory usdcMessage = USDCMessageCCTPV2({
-      version: 1,
-      sourceDomain: 1553252,
-      destinationDomain: DEST_DOMAIN_IDENTIFIER,
-      nonce: keccak256("0xC11"),
-      sender: SOURCE_CHAIN_TOKEN_SENDER,
-      recipient: bytes32(uint256(92398429395823)),
-      destinationCaller: bytes32(uint256(uint160(address(s_usdcTokenPool)))),
-      minFinalityThreshold: s_usdcTokenPool.FINALITY_THRESHOLD(),
-      finalityThresholdExecuted: s_usdcTokenPool.FINALITY_THRESHOLD(),
-      messageBody: bytes("")
-    });
-
-    USDCTokenPool.SourceTokenDataPayload memory sourceTokenData = USDCTokenPool.SourceTokenDataPayload({
-      nonce: 0,
-      sourceDomain: usdcMessage.sourceDomain,
-      cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V2,
-      amount: 0,
-      destinationDomain: DEST_DOMAIN_IDENTIFIER,
-      mintRecipient: bytes32(0),
-      burnToken: address(0),
-      destinationCaller: bytes32(0),
-      maxFee: 0,
-      minFinalityThreshold: 0
-    });
-
-    bytes memory encodedUsdcMessage = _generateUSDCMessageCCTPV2(usdcMessage);
-
-    s_usdcTokenPool.validateMessage(encodedUsdcMessage, sourceTokenData);
-
-    uint32 expectedSourceDomain = usdcMessage.sourceDomain + 1;
+  function test_validateMessage_RevertWhen_InvalidSourceDomain() public {
+    uint32 expectedSourceDomain = s_validUsdcMessage.sourceDomain + 1;
 
     vm.expectRevert(
-      abi.encodeWithSelector(USDCTokenPool.InvalidSourceDomain.selector, expectedSourceDomain, usdcMessage.sourceDomain)
+      abi.encodeWithSelector(
+        USDCTokenPool.InvalidSourceDomain.selector, expectedSourceDomain, s_validUsdcMessage.sourceDomain
+      )
     );
     s_usdcTokenPool.validateMessage(
-      encodedUsdcMessage,
+      _generateUSDCMessageCCTPV2(s_validUsdcMessage),
       USDCTokenPool.SourceTokenDataPayload({
         nonce: 0,
         sourceDomain: expectedSourceDomain,
@@ -93,79 +102,72 @@ contract USDCTokenPoolCCTPV2__validateMessage is USDCTokenPoolCCTPV2Setup {
         minFinalityThreshold: 0
       })
     );
+  }
 
-    usdcMessage.destinationDomain = DEST_DOMAIN_IDENTIFIER + 1;
+  function test_validateMessage_RevertWhen_InvalidDestinationDomain() public {
+    // Create a message with invalid destination domain
+    USDCMessageCCTPV2 memory invalidMessage = s_validUsdcMessage;
+    invalidMessage.destinationDomain = DEST_DOMAIN_IDENTIFIER + 1;
+
     vm.expectRevert(
       abi.encodeWithSelector(
-        USDCTokenPool.InvalidDestinationDomain.selector, DEST_DOMAIN_IDENTIFIER, usdcMessage.destinationDomain
+        USDCTokenPool.InvalidDestinationDomain.selector, DEST_DOMAIN_IDENTIFIER, invalidMessage.destinationDomain
       )
     );
 
-    s_usdcTokenPool.validateMessage(
-      _generateUSDCMessageCCTPV2(usdcMessage),
-      USDCTokenPool.SourceTokenDataPayload({
-        nonce: 0,
-        sourceDomain: usdcMessage.sourceDomain,
-        cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V2,
-        amount: 0,
-        destinationDomain: DEST_DOMAIN_IDENTIFIER,
-        mintRecipient: bytes32(0),
-        burnToken: address(0),
-        destinationCaller: bytes32(0),
-        maxFee: 0,
-        minFinalityThreshold: 0
-      })
-    );
-    usdcMessage.destinationDomain = DEST_DOMAIN_IDENTIFIER;
+    s_usdcTokenPool.validateMessage(_generateUSDCMessageCCTPV2(invalidMessage), s_validSourceTokenData);
+  }
 
-    uint32 rightVersion = usdcMessage.version;
-    uint32 wrongVersion = usdcMessage.version + 1;
+  function test_validateMessage_RevertWhen_InvalidMessageVersion() public {
+    // Create a message with invalid version
+    USDCMessageCCTPV2 memory invalidMessage = s_validUsdcMessage;
+    invalidMessage.version = 2;
 
-    usdcMessage.version = wrongVersion;
-    encodedUsdcMessage = _generateUSDCMessageCCTPV2(usdcMessage);
+    vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidMessageVersion.selector, 1, 2));
+    s_usdcTokenPool.validateMessage(_generateUSDCMessageCCTPV2(invalidMessage), s_validSourceTokenData);
+  }
 
-    vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidMessageVersion.selector, rightVersion, wrongVersion));
-    s_usdcTokenPool.validateMessage(encodedUsdcMessage, sourceTokenData);
-
-    // Create a byte string of length less than 116 (e.g., 100)
+  function test_validateMessage_RevertWhen_InvalidMessageLength() public {
     bytes memory shortMessage = new bytes(100);
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidMessageLength.selector, 100));
-    s_usdcTokenPool.validateMessage(shortMessage, sourceTokenData);
+    s_usdcTokenPool.validateMessage(shortMessage, s_validSourceTokenData);
+  }
 
-    // Test for InvalidMinFinalityThreshold
-    usdcMessage.version = 1;
-    usdcMessage.destinationDomain = DEST_DOMAIN_IDENTIFIER;
-    usdcMessage.minFinalityThreshold = s_usdcTokenPool.FINALITY_THRESHOLD() + 1;
-    bytes memory invalidMinFinalityMsg = _generateUSDCMessageCCTPV2(usdcMessage);
+  function test_validateMessage_RevertWhen_InvalidMinFinalityThreshold() public {
+    // Create a message with invalid min finality threshold
+    USDCMessageCCTPV2 memory invalidMessage = s_validUsdcMessage;
+    invalidMessage.minFinalityThreshold = s_usdcTokenPool.FINALITY_THRESHOLD() + 1;
+
     vm.expectRevert(
       abi.encodeWithSelector(
         USDCTokenPoolCCTPV2.InvalidMinFinalityThreshold.selector,
         s_usdcTokenPool.FINALITY_THRESHOLD(),
-        usdcMessage.minFinalityThreshold
+        invalidMessage.minFinalityThreshold
       )
     );
-    s_usdcTokenPool.validateMessage(invalidMinFinalityMsg, sourceTokenData);
+    s_usdcTokenPool.validateMessage(_generateUSDCMessageCCTPV2(invalidMessage), s_validSourceTokenData);
+  }
 
-    // Test for InvalidExecutionFinalityThreshold
-    usdcMessage.minFinalityThreshold = s_usdcTokenPool.FINALITY_THRESHOLD();
-    usdcMessage.finalityThresholdExecuted = s_usdcTokenPool.FINALITY_THRESHOLD() + 1;
-    bytes memory invalidExecFinalityMsg = _generateUSDCMessageCCTPV2(usdcMessage);
+  function test_validateMessage_RevertWhen_InvalidExecutionFinalityThreshold() public {
+    // Create a message with invalid execution finality threshold
+    USDCMessageCCTPV2 memory invalidMessage = s_validUsdcMessage;
+    invalidMessage.finalityThresholdExecuted = s_usdcTokenPool.FINALITY_THRESHOLD() + 1;
+
     vm.expectRevert(
       abi.encodeWithSelector(
         USDCTokenPoolCCTPV2.InvalidExecutionFinalityThreshold.selector,
         s_usdcTokenPool.FINALITY_THRESHOLD(),
-        usdcMessage.finalityThresholdExecuted
+        invalidMessage.finalityThresholdExecuted
       )
     );
-    s_usdcTokenPool.validateMessage(invalidExecFinalityMsg, sourceTokenData);
+    s_usdcTokenPool.validateMessage(_generateUSDCMessageCCTPV2(invalidMessage), s_validSourceTokenData);
+  }
 
-    // Test for InvalidCCTPVersion
-    usdcMessage.minFinalityThreshold = s_usdcTokenPool.FINALITY_THRESHOLD();
-    usdcMessage.finalityThresholdExecuted = s_usdcTokenPool.FINALITY_THRESHOLD();
-    bytes memory validMessage = _generateUSDCMessageCCTPV2(usdcMessage);
+  function test_validateMessage_RevertWhen_InvalidCCTPVersion() public {
+    // Create source token data with invalid CCTP version
     USDCTokenPool.SourceTokenDataPayload memory invalidCCTPVersionData = USDCTokenPool.SourceTokenDataPayload({
       nonce: 0,
-      sourceDomain: usdcMessage.sourceDomain,
+      sourceDomain: s_validUsdcMessage.sourceDomain,
       cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V1,
       amount: 0,
       destinationDomain: DEST_DOMAIN_IDENTIFIER,
@@ -180,6 +182,6 @@ contract USDCTokenPoolCCTPV2__validateMessage is USDCTokenPoolCCTPV2Setup {
         USDCTokenPool.InvalidCCTPVersion.selector, USDCTokenPool.CCTPVersion.CCTP_V2, USDCTokenPool.CCTPVersion.CCTP_V1
       )
     );
-    s_usdcTokenPool.validateMessage(validMessage, invalidCCTPVersionData);
+    s_usdcTokenPool.validateMessage(_generateUSDCMessageCCTPV2(s_validUsdcMessage), invalidCCTPVersionData);
   }
 }
