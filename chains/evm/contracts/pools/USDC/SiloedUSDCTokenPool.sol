@@ -157,6 +157,7 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     // Prevent overwriting existing migration proposals until the current one is finished
     if (s_proposedUSDCMigrationChain != 0) revert ExistingMigrationProposal();
     if (s_migratedChains.contains(remoteChainSelector)) revert ChainAlreadyMigrated(remoteChainSelector);
+    if (remoteChainSelector == 0) revert SiloedLockReleaseTokenPool.InvalidChainSelector(0);
 
     s_proposedUSDCMigrationChain = remoteChainSelector;
 

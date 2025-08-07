@@ -5,7 +5,6 @@ import {CCTPMessageTransmitterProxy} from "../../../../pools/USDC/CCTPMessageTra
 import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
 import {USDCTokenPoolHelper} from "../../../helpers/USDCTokenPoolHelper.sol";
 import {USDCSetup} from "../USDCSetup.t.sol";
-
 import {MockE2EUSDCTransmitter} from "../../../mocks/MockE2EUSDCTransmitter.sol";
 import {MockUSDCTokenMessenger} from "../../../mocks/MockUSDCTokenMessenger.sol";
 

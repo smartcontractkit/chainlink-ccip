@@ -18,6 +18,22 @@ import {EnumerableSet} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableSet.sol";
 
 /// @notice This pool mints and burns USDC tokens through the Cross Chain Transfer Protocol (CCTP).
+/*
+ On/OffRamp
+   |
+   | releaseOrMint() / LockOrBurn()
+   v
++------------------+    depositForBurn()    +------------------+
+| USDC Token Pool  | ---------------------> | Token Messenger  |
++------------------+                        +------------------+
+       |
+       | receiveMessage()
+       v
++-------------------------------+    receiveMessage()    +-----------------------+
+| CCTP Message Transmitter Proxy | --------------------> | Message Transmitter   |
++-------------------------------+                        +-----------------------+
+*/
+
 contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
   using SafeERC20 for IERC20;
   using EnumerableSet for EnumerableSet.AddressSet;
@@ -70,22 +86,23 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
   // Note: Since this struct never exists in storage, only in memory after an ABI-decoding, proper struct-packing
   // is not necessary and field ordering has been defined so as to best support off-chain code.
   // solhint-disable-next-line gas-struct-packing
+  // Note: This struct is only used in memory after ABI-decoding, so field ordering is chosen for off-chain compatibility.
   struct SourceTokenDataPayload {
-    uint64 nonce;
-    uint32 sourceDomain;
-    CCTPVersion cctpVersion;
-    uint256 amount;
-    uint32 destinationDomain;
-    bytes32 mintRecipient;
-    address burnToken;
-    bytes32 destinationCaller;
-    uint256 maxFee;
-    uint32 minFinalityThreshold;
+    uint64 nonce;                // Nonce of the message (used only in CCTP V1).
+    uint32 sourceDomain;         // Source domain of the message.
+    CCTPVersion cctpVersion;     // CCTP version for acquiring off-chain attestations.
+    uint256 amount;              // Amount of USDC burned/minted via CCTP.
+    uint32 destinationDomain;    // Destination domain of the message.
+    bytes32 mintRecipient;       // Address to mint to on the destination chain (end-user or pool PDA)
+    address burnToken;           // Local USDC token address
+    bytes32 destinationCaller;   // TransmitterProxy of the destination chain
+    uint256 maxFee;              // Max fee for the message (should be 0; no fast transfers)
+    uint32 minFinalityThreshold; // Minimum confirmation threshold before attestation (should be 2000).
   }
 
   string public constant override typeAndVersion = "USDCTokenPool 1.6.2-dev";
 
-  // We restrict to the first version. New pool may be required for subsequent versions.
+  /// @notice The version of the USDC message format that this pool supports. Version 0 is the legacy version of CCTP.
   uint32 public immutable i_supportedUSDCVersion;
 
   // The local USDC config
@@ -122,28 +139,38 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
     address router,
     uint32 supportedUSDCVersion
   ) TokenPool(token, 6, allowlist, rmnProxy, router) AuthorizedCallers(new address[](0)) {
+    // The version of the USDC message format that this pool supports. Version 0 is the legacy version of CCTP.
     i_supportedUSDCVersion = supportedUSDCVersion;
 
+    // The token messenger, which is used for outgoing messages (burn operations), has a corresponding message transmitter
+    // that is used for incoming messages (releaseOrMint).
     if (address(tokenMessenger) == address(0)) revert InvalidConfig();
     IMessageTransmitter transmitter = IMessageTransmitter(tokenMessenger.localMessageTransmitter());
 
     uint32 transmitterVersion = transmitter.version();
 
+    // Check that the message transmitter version is supported by this version of the token pool.
     if (transmitterVersion != i_supportedUSDCVersion) {
       revert InvalidMessageVersion(transmitterVersion, i_supportedUSDCVersion);
     }
 
+    // Check that the token messenger version is supported by this version of the token pool.
     uint32 tokenMessengerVersion = tokenMessenger.messageBodyVersion();
 
+    // If the token messenger version is not supported, revert.
     if (tokenMessengerVersion != i_supportedUSDCVersion) {
       revert InvalidTokenMessengerVersion(tokenMessengerVersion, i_supportedUSDCVersion);
     }
 
+    // Check that the message transmitter proxy is configured to use the correct message transmitter for 
+    // incoming messages (releaseOrMint).
     if (cctpMessageTransmitterProxy.i_cctpTransmitter() != transmitter) revert InvalidTransmitterInProxy();
 
     i_tokenMessenger = tokenMessenger;
     i_messageTransmitterProxy = cctpMessageTransmitterProxy;
     i_localDomainIdentifier = transmitter.localDomain();
+
+    // Allow the token messenger to burn tokens on behalf of this pool.
     i_token.safeIncreaseAllowance(address(i_tokenMessenger), type(uint256).max);
 
     emit ConfigSet(address(tokenMessenger));
@@ -189,6 +216,9 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
       amount: lockOrBurnIn.amount
     });
 
+    // Since this pool only utilizes CTTP V1, which does not support maxFee or minFinalityThreshold,
+    // we set them to 0. They are maintained in the struct for compatibility with CCTP V2, and ignored in the offchain
+    // code and destination token pool for V1 messages.
     SourceTokenDataPayload memory sourceTokenDataPayload = SourceTokenDataPayload({
       nonce: nonce,
       sourceDomain: i_localDomainIdentifier,

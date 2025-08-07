@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {ITokenMessenger} from "../../../../pools/USDC/interfaces/ITokenMessenger.sol";
 import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
+import {ITokenMessenger} from "../../../../pools/USDC/interfaces/ITokenMessenger.sol";
 import {MockE2EUSDCTransmitter} from "../../../mocks/MockE2EUSDCTransmitter.sol";
 import {USDCTokenPoolSetup} from "./USDCTokenPoolSetup.t.sol";
 
@@ -17,6 +17,7 @@ contract USDCTokenPool_constructor is USDCTokenPoolSetup {
       address(s_router),
       0
     );
+    
   }
 
   function test_constructor_RevertWhen_TokenMessengerAddressZero() public {
@@ -33,6 +34,7 @@ contract USDCTokenPool_constructor is USDCTokenPoolSetup {
   }
 
   function test_constructor_RevertWhen_InvalidMessageVersion() public {
+    // Should revert with InvalidMessageVersion error because the token messenger version is 0, but the token pool itself is being set with version of 1
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidMessageVersion.selector, 0, 1));
     new USDCTokenPool(
       s_mockUSDC,
@@ -46,11 +48,11 @@ contract USDCTokenPool_constructor is USDCTokenPoolSetup {
   }
 
   function test_constructor_RevertWhen_InvalidTokenMessengerVersion() public {
-    // The error we want to call is most likely unreachable because the token messenger version is 0, but we mock it to 1 to test the error
     vm.mockCall(
       address(s_mockUSDCTransmitter), abi.encodeWithSelector(MockE2EUSDCTransmitter.version.selector), abi.encode(1)
     );
 
+    // Should revert with InvalidTokenMessengerVersion error because the token messenger version is 0, but the transmitter version is 1
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidTokenMessengerVersion.selector, 0, 1));
     new USDCTokenPool(
       s_mockUSDC,
@@ -70,6 +72,7 @@ contract USDCTokenPool_constructor is USDCTokenPoolSetup {
       abi.encodeCall(s_cctpMessageTransmitterProxy.i_cctpTransmitter, ()),
       abi.encode(transmitterAddress)
     );
+
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidTransmitterInProxy.selector));
     new USDCTokenPool(
       s_mockUSDC,
