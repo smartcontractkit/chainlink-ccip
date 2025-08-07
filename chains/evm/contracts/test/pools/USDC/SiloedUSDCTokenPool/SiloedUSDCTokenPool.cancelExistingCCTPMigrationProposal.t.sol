@@ -78,7 +78,7 @@ contract SiloedUSDCTokenPool_cancelExistingCCTPMigrationProposal is SiloedUSDCTo
     s_usdcTokenPool.proposeCCTPMigration(DEST_CHAIN_SELECTOR);
 
     // Act & Assert: Expect the CCTPMigrationCancelled event
-    vm.expectEmit(true, false, false, false);
+    vm.expectEmit();
     emit SiloedUSDCTokenPool.CCTPMigrationCancelled(DEST_CHAIN_SELECTOR);
     s_usdcTokenPool.cancelExistingCCTPMigrationProposal();
     vm.stopPrank();

@@ -8,7 +8,7 @@ import {TokenPool} from "../../../../pools/TokenPool.sol";
 import {SiloedUSDCTokenPool} from "../../../../pools/USDC/SiloedUSDCTokenPool.sol";
 import {SiloedUSDCTokenPoolSetup} from "./SiloedUSDCTokenPoolSetup.sol";
 
-contract SiloedUSDCTokenPool_BurnLockedUSDC is SiloedUSDCTokenPoolSetup {
+contract SiloedUSDCTokenPool_burnLockedUSDC is SiloedUSDCTokenPoolSetup {
   function setUp() public override {
     super.setUp();
 
@@ -84,7 +84,7 @@ contract SiloedUSDCTokenPool_BurnLockedUSDC is SiloedUSDCTokenPoolSetup {
     assertEq(s_USDCToken.balanceOf(address(s_usdcTokenPool)), 0, "Tokens were not burned out of the tokenPool");
 
     // Ensure the proposal slot was cleared and there's no tokens locked for the destination chain anymore
-    assertEq(s_usdcTokenPool.getCurrentProposedCCTPChainMigration(), 0, "Proposal Slot should be empty");
+    assertEq(s_usdcTokenPool.getCurrentProposedCCTPChainMigration(), 0);
     assertEq(
       s_usdcTokenPool.getAvailableTokens(DEST_CHAIN_SELECTOR),
       0,
@@ -92,7 +92,7 @@ contract SiloedUSDCTokenPool_BurnLockedUSDC is SiloedUSDCTokenPoolSetup {
     );
   }
 
-  function test_RevertWhen_invalidPermissions() public {
+  function test_burnLockedUSDC_RevertWhen_InvalidPermissions() public {
     address CIRCLE = makeAddr("CIRCLE");
 
     // Deal some tokens to the token pool
@@ -117,13 +117,13 @@ contract SiloedUSDCTokenPool_BurnLockedUSDC is SiloedUSDCTokenPoolSetup {
     // Set the circle migrator address for later, but don't start pranking as it yet
     s_usdcTokenPool.setCircleMigratorAddress(CIRCLE);
 
-    vm.expectRevert(abi.encodeWithSelector(SiloedUSDCTokenPool.onlyCircle.selector));
+    vm.expectRevert(abi.encodeWithSelector(SiloedUSDCTokenPool.OnlyCircleCaller.selector));
 
     // Should fail because only Circle can call this function
     s_usdcTokenPool.burnLockedUSDC();
   }
 
-  function test_RevertWhen_NoMigrationProposalPending() public {
+  function test_burnLockedUSDC_RevertWhen_NoMigrationProposalPending() public {
     address circle = makeAddr("circle");
 
     vm.startPrank(OWNER);
@@ -136,7 +136,7 @@ contract SiloedUSDCTokenPool_BurnLockedUSDC is SiloedUSDCTokenPoolSetup {
     s_usdcTokenPool.burnLockedUSDC();
   }
 
-  function test_RevertWhen_TokenLockingNotAllowedAfterMigration() public {
+  function test_burnLockedUSDC_RevertWhen_TokenLockingNotAllowedAfterMigration() public {
     address CIRCLE = makeAddr("CIRCLE CCTP Migrator");
 
     // Deal some tokens to the token pool

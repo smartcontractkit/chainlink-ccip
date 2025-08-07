@@ -226,7 +226,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
   }
 
   // Reverts
-  function test_RevertWhen_UnknownDomain() public {
+  function test_lockOrBurn_RevertWhen_UnknownDomain() public {
     uint64 wrongDomain = DEST_CHAIN_SELECTOR + 1;
     // We need to setup the wrong chainSelector so it reaches the domain check
     Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](1);
@@ -262,7 +262,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
     );
   }
 
-  function test_RevertWhen_CallerIsNotARampOnRouter() public {
+  function test_lockOrBurn_RevertWhen_CallerIsNotARampOnRouter() public {
     address randomAddress = makeAddr("RANDOM_ADDRESS");
 
     vm.startPrank(randomAddress);
@@ -280,7 +280,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
     );
   }
 
-  function test_RevertWhen_LockOrBurnWithAllowList() public {
+  function test_lockOrBurn_RevertWhen_LockOrBurnWithAllowList() public {
     vm.startPrank(s_routerAllowedOnRamp);
 
     vm.expectRevert(abi.encodeWithSelector(TokenPool.SenderNotAllowed.selector, STRANGER));
@@ -296,7 +296,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
     );
   }
 
-  function test_RevertWhen_InvalidReceiver() public {
+  function test_lockOrBurn_RevertWhen_InvalidReceiver() public {
     vm.startPrank(s_routerAllowedOnRamp);
     uint256 amount = 1000;
 

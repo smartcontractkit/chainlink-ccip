@@ -5,7 +5,7 @@ import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
 import {USDCTokenPoolCCTPV2} from "../../../../pools/USDC/USDCTokenPoolCCTPV2.sol";
 import {USDCTokenPoolCCTPV2Setup} from "./USDCTokenPoolCCTPV2Setup.t.sol";
 
-contract USDCTokenPoolCCTPV2__validateMessage is USDCTokenPoolCCTPV2Setup {
+contract USDCTokenPoolCCTPV2_validateMessage is USDCTokenPoolCCTPV2Setup {
   function testFuzz_ValidateMessage_Success(uint32 sourceDomain, bytes32 nonce) public {
     vm.pauseGasMetering();
     USDCMessageCCTPV2 memory usdcMessage = USDCMessageCCTPV2({
@@ -42,7 +42,7 @@ contract USDCTokenPoolCCTPV2__validateMessage is USDCTokenPoolCCTPV2Setup {
 
   // Reverts
 
-  function test_RevertWhen_ValidateInvalidMessage() public {
+  function test_validateMessage_RevertWhen_InvalidMessage() public {
     USDCMessageCCTPV2 memory usdcMessage = USDCMessageCCTPV2({
       version: 1,
       sourceDomain: 1553252,

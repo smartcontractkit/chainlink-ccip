@@ -5,7 +5,7 @@ import {SiloedUSDCTokenPool} from "../../../../pools/USDC/SiloedUSDCTokenPool.so
 import {SiloedUSDCTokenPoolSetup} from "./SiloedUSDCTokenPoolSetup.sol";
 
 contract SiloedUSDCTokenPool_excludeTokensFromBurn is SiloedUSDCTokenPoolSetup {
-  function test_RevertWhen_excludeTokensWhenNoMigrationProposalPending() public {
+  function test_excludeTokensFromBurn_RevertWhen_NoMigrationProposalPending() public {
     // Set up silo designation for the test chain
     vm.expectRevert(abi.encodeWithSelector(SiloedUSDCTokenPool.NoMigrationProposalPending.selector));
 

@@ -159,7 +159,7 @@ contract USDCTokenPoolCCTPV2_releaseOrMint is USDCTokenPoolCCTPV2Setup {
   }
 
   // Reverts
-  function test_RevertWhen_UnlockingUSDCFailed() public {
+  function test_releaseOrMint_RevertWhen_UnlockingUSDCFailed() public {
     vm.startPrank(s_routerAllowedOffRamp);
     s_mockUSDCTransmitterCCTPV2.setShouldSucceed(false);
 
@@ -224,7 +224,7 @@ contract USDCTokenPoolCCTPV2_releaseOrMint is USDCTokenPoolCCTPV2Setup {
     );
   }
 
-  function test_RevertWhen_TokenMaxCapacityExceeded() public {
+  function test_releaseOrMint_RevertWhen_TokenMaxCapacityExceeded() public {
     uint256 capacity = _getInboundRateLimiterConfig().capacity;
     uint256 amount = 10 * capacity;
     address recipient = address(1);

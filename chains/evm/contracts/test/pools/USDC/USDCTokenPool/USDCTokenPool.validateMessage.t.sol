@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
 import {USDCTokenPoolSetup} from "./USDCTokenPoolSetup.t.sol";
 
-contract USDCTokenPool__validateMessage is USDCTokenPoolSetup {
+contract USDCTokenPool_validateMessage is USDCTokenPoolSetup {
   function testFuzz_ValidateMessage_Success(uint32 sourceDomain, uint64 nonce) public {
     vm.pauseGasMetering();
     USDCMessage memory usdcMessage = USDCMessage({
@@ -40,7 +40,7 @@ contract USDCTokenPool__validateMessage is USDCTokenPoolSetup {
 
   // Reverts
 
-  function test_RevertWhen_ValidateInvalidMessage() public {
+  function test_validateMessage_RevertWhen_InvalidMessage() public {
     USDCMessage memory usdcMessage = USDCMessage({
       version: 0,
       sourceDomain: 1553252,

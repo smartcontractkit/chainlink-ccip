@@ -12,6 +12,7 @@ import {EnumerableSet} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
 
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
+import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 bytes4 constant LOCK_RELEASE_FLAG = 0xfa7c07de;
 
@@ -19,11 +20,8 @@ bytes4 constant LOCK_RELEASE_FLAG = 0xfa7c07de;
 /// @dev While it supports unsiloed chains, it is not recommended to use them. All chains should be siloed, otherwise
 /// the pool will not be able to migrate the tokens to CCTP in the future.
 contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
-  using EnumerableSet for EnumerableSet.AddressSet;
   using EnumerableSet for EnumerableSet.UintSet;
 
-  event AllowedTokenPoolProxyAdded(address tokenPoolProxy);
-  event AllowedTokenPoolProxyRemoved(address tokenPoolProxy);
   event CCTPMigrationProposed(uint64 remoteChainSelector);
   event CCTPMigrationExecuted(uint64 remoteChainSelector, uint256 USDCBurned);
   event CCTPMigrationCancelled(uint64 existingProposalSelector);
@@ -31,17 +29,11 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
   event TokensExcludedFromBurn(
     uint64 indexed remoteChainSelector, uint256 amount, uint256 burnableAmountAfterExclusion
   );
-
-  error TokenPoolProxyAlreadyAllowed(address tokenPoolProxy);
-  error TokenPoolProxyNotAllowed(address tokenPoolProxy);
-  error onlyCircle();
+  error OnlyCircleCaller();
   error ExistingMigrationProposal();
   error NoMigrationProposalPending();
   error ChainAlreadyMigrated(uint64 remoteChainSelector);
   error TokenLockingNotAllowedAfterMigration(uint64 remoteChainSelector);
-
-  /// @notice The token pool proxies that are allowed to provide liquidity to the pool.
-  EnumerableSet.AddressSet internal s_allowedTokenPoolProxies;
 
   /// @notice The address of the circle-controlled wallet which will execute a CCTP lane migration
   address internal s_circleUSDCMigrator;
@@ -142,37 +134,6 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     super._provideLiquidity(remoteChainSelector, amount);
   }
 
-  /// @notice Set the allowed token pool proxies for the pool.
-  /// @dev This function can only be called by the owner
-  /// @param tokenPoolProxies The token pool proxies to set the allowed status for
-  /// @param allowed The allowed status for the token pool proxies
-  function setAllowedTokenPoolProxies(
-    address[] calldata tokenPoolProxies, // The token pool proxies to set the allowed status for
-    bool[] calldata allowed
-  ) external onlyOwner {
-    for (uint256 i = 0; i < tokenPoolProxies.length; ++i) {
-      if (allowed[i]) {
-        if (!s_allowedTokenPoolProxies.add(tokenPoolProxies[i])) {
-          revert TokenPoolProxyAlreadyAllowed(tokenPoolProxies[i]);
-        }
-
-        emit AllowedTokenPoolProxyAdded(tokenPoolProxies[i]);
-      } else {
-        if (!s_allowedTokenPoolProxies.remove(tokenPoolProxies[i])) {
-          revert TokenPoolProxyNotAllowed(tokenPoolProxies[i]);
-        }
-
-        emit AllowedTokenPoolProxyRemoved(tokenPoolProxies[i]);
-      }
-    }
-  }
-
-  /// @notice Get the allowed token pool proxies for the pool.
-  /// @return address[] The allowed token pool proxies
-  function getAllowedTokenPoolProxies() public view returns (address[] memory) {
-    return s_allowedTokenPoolProxies.values();
-  }
-
   /// @notice Propose a destination chain to migrate from lock/release mechanism to CCTP enabled burn/mint
   /// through a Circle controlled burn.
   /// @param remoteChainSelector the CCIP specific selector for the remote chain currently using a
@@ -257,7 +218,7 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
   /// @dev This function signature should NEVER be overwritten, otherwise it will be unable to be called by
   /// circle to properly migrate USDC over to CCTP.
   function burnLockedUSDC() external {
-    if (msg.sender != s_circleUSDCMigrator) revert onlyCircle();
+    if (msg.sender != s_circleUSDCMigrator) revert OnlyCircleCaller();
 
     uint64 burnChainSelector = s_proposedUSDCMigrationChain;
     if (burnChainSelector == 0) revert NoMigrationProposalPending();
