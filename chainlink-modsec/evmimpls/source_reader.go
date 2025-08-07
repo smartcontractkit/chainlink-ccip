@@ -8,17 +8,13 @@ import (
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/smartcontractkit/chainlink-ccip/chainlink-modsec/modsectypes"
+	"github.com/smartcontractkit/chainlink-ccip/chainlink-modsec/libmodsec/modsectypes"
 )
-
-type LogSubscriber interface {
-	SubscribeFilterLogs(ctx context.Context, q ethereum.FilterQuery, ch chan<- types.Log) (ethereum.Subscription, error)
-}
 
 var _ modsectypes.SourceReader = (*EVMSourceReader)(nil)
 
 type EVMSourceReader struct {
-	logSubscriber      LogSubscriber
+	logSubscriber      ethereum.LogFilterer
 	messageChan        chan modsectypes.Message
 	logsChan           chan types.Log
 	onRampProxyAddress common.Address
@@ -30,7 +26,7 @@ type EVMSourceReader struct {
 }
 
 func NewEVMSourceReader(
-	logSubscriber LogSubscriber,
+	logSubscriber ethereum.LogFilterer,
 	onRampProxyAddress common.Address,
 	eventSig common.Hash,
 	logger *log.Logger,

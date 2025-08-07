@@ -13,7 +13,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chainlink-modsec/evmimpls"
 	"github.com/smartcontractkit/chainlink-ccip/chainlink-modsec/evmimpls/gethwrappers"
-	"github.com/smartcontractkit/chainlink-ccip/chainlink-modsec/modsectypes"
+	"github.com/smartcontractkit/chainlink-ccip/chainlink-modsec/libmodsec/modsectypes"
 )
 
 func Test_DestReader(t *testing.T) {

@@ -9,7 +9,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chainlink-modsec/evmimpls"
 	"github.com/smartcontractkit/chainlink-ccip/chainlink-modsec/evmimpls/gethwrappers"
-	"github.com/smartcontractkit/chainlink-ccip/chainlink-modsec/modsectypes"
+	"github.com/smartcontractkit/chainlink-ccip/chainlink-modsec/libmodsec/modsectypes"
 )
 
 func TestMessageCodec_Decode(t *testing.T) {

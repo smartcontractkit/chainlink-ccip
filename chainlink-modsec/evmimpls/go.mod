@@ -4,7 +4,7 @@ go 1.24.2
 
 require (
 	github.com/ethereum/go-ethereum v1.16.2
-	github.com/smartcontractkit/chainlink-ccip/chainlink-modsec/modsectypes v0.0.0
+	github.com/smartcontractkit/chainlink-ccip/chainlink-modsec/libmodsec v0.0.0
 	github.com/stretchr/testify v1.10.0
 )
 
@@ -95,4 +95,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/smartcontractkit/chainlink-ccip/chainlink-modsec/modsectypes => ../modsectypes
+replace github.com/smartcontractkit/chainlink-ccip/chainlink-modsec/libmodsec => ../libmodsec
