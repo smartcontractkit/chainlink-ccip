@@ -117,7 +117,7 @@ contract SiloedUSDCTokenPool_burnLockedUSDC is SiloedUSDCTokenPoolSetup {
     // Set the circle migrator address for later, but don't start pranking as it yet
     s_usdcTokenPool.setCircleMigratorAddress(CIRCLE);
 
-    vm.expectRevert(abi.encodeWithSelector(SiloedUSDCTokenPool.OnlyCircleCaller.selector));
+    vm.expectRevert(abi.encodeWithSelector(SiloedUSDCTokenPool.OnlyCircle.selector));
 
     // Should fail because only Circle can call this function
     s_usdcTokenPool.burnLockedUSDC();

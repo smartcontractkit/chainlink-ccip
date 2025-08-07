@@ -1,13 +1,11 @@
-
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
 import {Pool} from "../../libraries/Pool.sol";
 import {SiloedLockReleaseTokenPool} from "../SiloedLockReleaseTokenPool.sol";
 
-import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
-import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
+import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
 import {IERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {EnumerableSet} from
@@ -16,8 +14,8 @@ import {EnumerableSet} from
 bytes4 constant LOCK_RELEASE_FLAG = 0xfa7c07de;
 
 /// @notice A token pool for USDC which inherits the Siloed token functionality while adding the CCTP migration functionality.
-/// @dev While this technically supports unsiloed chains, as inherited from the parent contract, 
-/// it is not recommended to use them. All chains should be siloed, otherwise the chain will not be 
+/// @dev While this technically supports unsiloed chains, as inherited from the parent contract,
+/// it is not recommended to use them. All chains should be siloed, otherwise the chain will not be
 /// able to migrate to CCTP in the future, due to the inability to manage the token
 /// balances under CCTP accounting rules defined at:
 /// https://github.com/circlefin/stablecoin-evm/blob/master/doc/bridged_USDC_standard.md
@@ -32,7 +30,7 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     uint64 indexed remoteChainSelector, uint256 amount, uint256 burnableAmountAfterExclusion
   );
 
-  error OnlyCircleCaller();
+  error OnlyCircle();
   error ExistingMigrationProposal();
   error NoMigrationProposalPending();
   error ChainAlreadyMigrated(uint64 remoteChainSelector);
@@ -57,8 +55,10 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     address rmnProxy,
     address router,
     address lockBox
-  ) SiloedLockReleaseTokenPool(token, localTokenDecimals, allowlist, rmnProxy, router, lockBox) AuthorizedCallers(new address[](0)) {
-  }
+  )
+    SiloedLockReleaseTokenPool(token, localTokenDecimals, allowlist, rmnProxy, router, lockBox)
+    AuthorizedCallers(new address[](0))
+  {}
 
   /// @notice Release tokens for a specific chain selector.
   /// @dev This function can only be called by an address specified by the owner to be controlled by circle
@@ -140,8 +140,6 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     // Validate logic is inherited from AuthorizedCallers, and is used to validate that the caller is the authorized USDC proxy contract rather than the ramp.
     _validateCaller();
   }
-
-
 
   // ================================================================
   // │                  CCTP Migration functions                    │
@@ -231,7 +229,7 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
   /// @dev This function signature should NEVER be overwritten, otherwise it will be unable to be called by
   /// circle to properly migrate USDC over to CCTP.
   function burnLockedUSDC() external {
-    if (msg.sender != s_circleUSDCMigrator) revert OnlyCircleCaller();
+    if (msg.sender != s_circleUSDCMigrator) revert OnlyCircle();
 
     uint64 burnChainSelector = s_proposedUSDCMigrationChain;
     if (burnChainSelector == 0) revert NoMigrationProposalPending();

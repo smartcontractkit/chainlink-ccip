@@ -78,8 +78,6 @@ contract SiloedUSDCTokenPool_releaseOrMint is SiloedUSDCTokenPoolSetup {
     assertEq(result.destinationAmount, localAmount);
     assertEq(s_USDCToken.balanceOf(recipient), localAmount);
     assertEq(s_usdcTokenPool.getAvailableTokens(SOURCE_CHAIN_SELECTOR), 0);
-
-    vm.stopPrank();
   }
 
   function test_releaseOrMint_SubtractsFromExcludedTokens() public {

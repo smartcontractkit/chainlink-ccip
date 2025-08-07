@@ -29,7 +29,9 @@ contract USDCTokenPoolCCTPV2Setup is USDCSetup {
     allowedCallers[0] = OWNER;
     allowedCallers[1] = address(s_routerAllowedOnRamp);
     allowedCallers[2] = address(s_routerAllowedOffRamp);
-    s_usdcTokenPool.applyAuthorizedCallerUpdates(AuthorizedCallers.AuthorizedCallerArgs({addedCallers: allowedCallers, removedCallers: new address[](0)}));
+    s_usdcTokenPool.applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: allowedCallers, removedCallers: new address[](0)})
+    );
 
     CCTPMessageTransmitterProxy.AllowedCallerConfigArgs[] memory allowedCallerParams =
       new CCTPMessageTransmitterProxy.AllowedCallerConfigArgs[](1);
@@ -42,8 +44,9 @@ contract USDCTokenPoolCCTPV2Setup is USDCSetup {
       s_mockUSDC, s_cctpMessageTransmitterProxy, s_USDCToken, s_allowedList, address(s_mockRMNRemote), address(s_router)
     );
 
-    s_usdcTokenPoolWithAllowList.applyAuthorizedCallerUpdates(AuthorizedCallers.AuthorizedCallerArgs({addedCallers: allowedCallers, removedCallers: new address[](0)}));
-
+    s_usdcTokenPoolWithAllowList.applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: allowedCallers, removedCallers: new address[](0)})
+    );
 
     _poolApplyChainUpdates(address(s_usdcTokenPool));
     _poolApplyChainUpdates(address(s_usdcTokenPoolWithAllowList));

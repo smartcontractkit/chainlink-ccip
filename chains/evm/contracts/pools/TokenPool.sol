@@ -127,7 +127,9 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   address internal s_rateLimitAdmin;
 
   constructor(IERC20 token, uint8 localTokenDecimals, address[] memory allowlist, address rmnProxy, address router) {
-    if (address(token) == address(0) || router == address(0) || rmnProxy == address(0)) revert ZeroAddressIsNotAllowed();
+    if (address(token) == address(0) || router == address(0) || rmnProxy == address(0)) {
+      revert ZeroAddressIsNotAllowed();
+    }
     i_token = token;
     i_rmnProxy = rmnProxy;
 
@@ -665,9 +667,9 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
 
   /// @notice Checks whether remote chain selector is configured on this contract, and if the msg.sender
   /// is a permissioned onRamp for the given chain on the Router.
-  /// @dev This function is marked virtual as other token pools may inherit from this contract, but do 
+  /// @dev This function is marked virtual as other token pools may inherit from this contract, but do
   /// not receive calls from the ramps directly, instead receiving them from a proxy contract. In that
-  /// situation this function must be overridden and the ramp-check removed and replaced with a different 
+  /// situation this function must be overridden and the ramp-check removed and replaced with a different
   /// access-control scheme.
   function _onlyOnRamp(
     uint64 remoteChainSelector
@@ -678,9 +680,9 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
 
   /// @notice Checks whether remote chain selector is configured on this contract, and if the msg.sender
   /// is a permissioned offRamp for the given chain on the Router.
-  /// @dev This function is marked virtual as other token pools may inherit from this contract, but do 
+  /// @dev This function is marked virtual as other token pools may inherit from this contract, but do
   /// not receive calls from the ramps directly, instead receiving them from a proxy contract. In that
-  /// situation this function must be overridden and the ramp-check removed and replaced with a different 
+  /// situation this function must be overridden and the ramp-check removed and replaced with a different
   /// access-control scheme.
   function _onlyOffRamp(
     uint64 remoteChainSelector

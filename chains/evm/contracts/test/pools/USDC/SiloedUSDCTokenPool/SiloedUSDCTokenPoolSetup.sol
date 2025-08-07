@@ -1,4 +1,3 @@
-
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
@@ -40,7 +39,9 @@ contract SiloedUSDCTokenPoolSetup is USDCSetup {
     authorizedCallers[0] = OWNER;
     authorizedCallers[1] = address(s_routerAllowedOnRamp);
     authorizedCallers[2] = address(s_routerAllowedOffRamp);
-    s_usdcTokenPool.applyAuthorizedCallerUpdates(AuthorizedCallers.AuthorizedCallerArgs({addedCallers: authorizedCallers, removedCallers: new address[](0)}));
+    s_usdcTokenPool.applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: authorizedCallers, removedCallers: new address[](0)})
+    );
 
     BurnMintERC677(address(s_USDCToken)).grantBurnRole(address(s_usdcTokenPool));
 
@@ -81,7 +82,9 @@ contract SiloedUSDCTokenPoolSetup is USDCSetup {
       address(s_lockBox) // lockBox
     );
 
-    s_usdcTokenPoolTransferLiquidity.applyAuthorizedCallerUpdates(AuthorizedCallers.AuthorizedCallerArgs({addedCallers: authorizedCallers, removedCallers: new address[](0)}));
+    s_usdcTokenPoolTransferLiquidity.applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: authorizedCallers, removedCallers: new address[](0)})
+    );
 
     _poolApplyChainUpdates(address(s_usdcTokenPoolTransferLiquidity));
   }
