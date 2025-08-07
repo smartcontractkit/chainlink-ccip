@@ -17,11 +17,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 
-	commonccipocr3 "github.com/smartcontractkit/chainlink-ccip/mocks/chainlink_common/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
+
+	commonccipocr3 "github.com/smartcontractkit/chainlink-ccip/mocks/chainlink_common/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
@@ -89,7 +90,7 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 	mockAddrCodec := internal.NewMockAddressCodecHex(t)
 	offrampAddress := []byte{0x3}
 	chainAccessors := createMockedChainAccessors(t, chainA, chainB, chainC)
-	mockExpectChainAccessorSyncCall(chainAccessors[chainC], consts.ContractNameOffRamp, offrampAddress, 1, nil)
+	mockExpectChainAccessorSyncCall(chainAccessors[chainC], consts.ContractNameOffRamp, offrampAddress, nil)
 	ccipReader, err := newCCIPChainReaderInternal(
 		t.Context(),
 		logger.Test(t),
@@ -168,10 +169,14 @@ func TestCCIPChainReader_Sync_HappyPath_BindsContractsSuccessfully(t *testing.T)
 	contractWriters[sourceChain2] = cw
 
 	chainAccessors := createMockedChainAccessors(t, destChain, sourceChain1, sourceChain2)
-	mockExpectChainAccessorSyncCall(chainAccessors[sourceChain1], consts.ContractNameOnRamp, s1Onramp, 1, nil)        // OnRamp sourceChain1
-	mockExpectChainAccessorSyncCall(chainAccessors[sourceChain2], consts.ContractNameOnRamp, s2Onramp, 1, nil)        // OnRamp sourceChain2
-	mockExpectChainAccessorSyncCall(chainAccessors[destChain], consts.ContractNameOffRamp, offRamp, 1, nil)           // OffRamp dest chain
-	mockExpectChainAccessorSyncCall(chainAccessors[destChain], consts.ContractNameNonceManager, destNonceMgr, 1, nil) // NonceManager dest chain
+	// OnRamp sourceChain1
+	mockExpectChainAccessorSyncCall(chainAccessors[sourceChain1], consts.ContractNameOnRamp, s1Onramp, nil)
+	// OnRamp sourceChain2
+	mockExpectChainAccessorSyncCall(chainAccessors[sourceChain2], consts.ContractNameOnRamp, s2Onramp, nil)
+	// OffRamp dest chain
+	mockExpectChainAccessorSyncCall(chainAccessors[destChain], consts.ContractNameOffRamp, offRamp, nil)
+	// NonceManager dest chain
+	mockExpectChainAccessorSyncCall(chainAccessors[destChain], consts.ContractNameNonceManager, destNonceMgr, nil)
 	ccipReader, err := newCCIPChainReaderInternal(
 		ctx,
 		logger.Test(t),
@@ -228,10 +233,10 @@ func TestCCIPChainReader_Sync_HappyPath_SkipsEmptyAddress(t *testing.T) {
 
 	chainAccessors := createMockedChainAccessors(t, destChain, sourceChain1)
 	// Sync() on OnRamp sourceChain1
-	mockExpectChainAccessorSyncCall(chainAccessors[sourceChain1], consts.ContractNameOnRamp, s1Onramp, 1, nil)
+	mockExpectChainAccessorSyncCall(chainAccessors[sourceChain1], consts.ContractNameOnRamp, s1Onramp, nil)
 	// Sync() OffRamp (from constructor) and NonceManager (from this test)
-	mockExpectChainAccessorSyncCall(chainAccessors[destChain], consts.ContractNameOffRamp, offRamp, 1, nil)
-	mockExpectChainAccessorSyncCall(chainAccessors[destChain], consts.ContractNameNonceManager, destNonceMgr, 1, nil)
+	mockExpectChainAccessorSyncCall(chainAccessors[destChain], consts.ContractNameOffRamp, offRamp, nil)
+	mockExpectChainAccessorSyncCall(chainAccessors[destChain], consts.ContractNameNonceManager, destNonceMgr, nil)
 	ccipReader, err := newCCIPChainReaderInternal(
 		ctx,
 		logger.Test(t),
@@ -285,10 +290,10 @@ func TestCCIPChainReader_Sync_HappyPath_DontSupportAllChains(t *testing.T) {
 
 	chainAccessors := createMockedChainAccessors(t, destChain, sourceChain2)
 	// OnRamp sourceChain2
-	mockExpectChainAccessorSyncCall(chainAccessors[sourceChain2], consts.ContractNameOnRamp, s2Onramp, 1, nil)
+	mockExpectChainAccessorSyncCall(chainAccessors[sourceChain2], consts.ContractNameOnRamp, s2Onramp, nil)
 	// OffRamp (during init) and NonceManager (from test)
-	mockExpectChainAccessorSyncCall(chainAccessors[destChain], consts.ContractNameOffRamp, offRamp, 1, nil)
-	mockExpectChainAccessorSyncCall(chainAccessors[destChain], consts.ContractNameNonceManager, destNonceMgr, 1, nil)
+	mockExpectChainAccessorSyncCall(chainAccessors[destChain], consts.ContractNameOffRamp, offRamp, nil)
+	mockExpectChainAccessorSyncCall(chainAccessors[destChain], consts.ContractNameNonceManager, destNonceMgr, nil)
 	ccipReader, err := newCCIPChainReaderInternal(
 		ctx,
 		logger.Test(t),
@@ -344,11 +349,11 @@ func TestCCIPChainReader_Sync_BindError(t *testing.T) {
 
 	chainAccessors := createMockedChainAccessors(t, destChain, sourceChain1, sourceChain2)
 	// sourceChain1 accessor will fail with an error
-	mockExpectChainAccessorSyncCall(chainAccessors[sourceChain1], consts.ContractNameOnRamp, s1Onramp, 1, expectedErr)
-	mockExpectChainAccessorSyncCall(chainAccessors[sourceChain2], consts.ContractNameOnRamp, s2Onramp, 1, nil)
+	mockExpectChainAccessorSyncCall(chainAccessors[sourceChain1], consts.ContractNameOnRamp, s1Onramp, expectedErr)
+	mockExpectChainAccessorSyncCall(chainAccessors[sourceChain2], consts.ContractNameOnRamp, s2Onramp, nil)
 	// OffRamp (during init) + NonceManager (from test)
-	mockExpectChainAccessorSyncCall(chainAccessors[destChain], consts.ContractNameOffRamp, offRamp, 1, nil)
-	mockExpectChainAccessorSyncCall(chainAccessors[destChain], consts.ContractNameNonceManager, destNonceMgr, 1, nil)
+	mockExpectChainAccessorSyncCall(chainAccessors[destChain], consts.ContractNameOffRamp, offRamp, nil)
+	mockExpectChainAccessorSyncCall(chainAccessors[destChain], consts.ContractNameNonceManager, destNonceMgr, nil)
 	ccipReader, err := newCCIPChainReaderInternal(
 		ctx,
 		logger.Test(t),
@@ -770,7 +775,7 @@ func TestCCIPChainReader_getFeeQuoterTokenPriceUSD(t *testing.T) {
 	contractWriters[chainC] = cw
 
 	chainAccessors := createMockedChainAccessors(t, chainA, chainB, chainC)
-	mockExpectChainAccessorSyncCall(chainAccessors[chainC], consts.ContractNameOffRamp, offrampAddress, 1, nil)
+	mockExpectChainAccessorSyncCall(chainAccessors[chainC], consts.ContractNameOffRamp, offrampAddress, nil)
 	ccipReader, err := newCCIPChainReaderInternal(
 		t.Context(),
 		logger.Test(t),
@@ -820,7 +825,7 @@ func TestCCIPFeeComponents_HappyPath(t *testing.T) {
 
 	offRampAddress := []byte{0x3}
 	chainAccessors := createMockedChainAccessors(t, chainA, chainB, chainC)
-	mockExpectChainAccessorSyncCall(chainAccessors[chainC], consts.ContractNameOffRamp, offRampAddress, 1, nil)
+	mockExpectChainAccessorSyncCall(chainAccessors[chainC], consts.ContractNameOffRamp, offRampAddress, nil)
 	mockExpectChainAccessorGetChainFeeComponentsCall(chainAccessors[chainA], expectedFeeComponents, nil)
 	mockExpectChainAccessorGetChainFeeComponentsCall(chainAccessors[chainB], expectedFeeComponents, nil)
 	mockExpectChainAccessorGetChainFeeComponentsCall(chainAccessors[chainC], expectedFeeComponents, nil)
@@ -1167,7 +1172,7 @@ func TestCCIPChainReader_Nonces(t *testing.T) {
 			contractWriters[chainB] = cw
 			chainAccessors := createMockedChainAccessors(t, chainB)
 			offRampAddress := []byte{0x3}
-			mockExpectChainAccessorSyncCall(chainAccessors[chainB], consts.ContractNameOffRamp, offRampAddress, 1, nil)
+			mockExpectChainAccessorSyncCall(chainAccessors[chainB], consts.ContractNameOffRamp, offRampAddress, nil)
 			mockExpectChainAccessorNoncesCall(chainAccessors[chainB], tc.expectedNonces)
 			ccipReader, err := newCCIPChainReaderInternal(
 				t.Context(),
@@ -1376,7 +1381,7 @@ func TestCCIPChainReader_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 
 		offRampAddress := []byte{0x3}
 		chainAccessors := createMockedChainAccessors(t, destChain, sourceChain1, sourceChain2)
-		mockExpectChainAccessorSyncCall(chainAccessors[destChain], consts.ContractNameOffRamp, offRampAddress, 1, nil)
+		mockExpectChainAccessorSyncCall(chainAccessors[destChain], consts.ContractNameOffRamp, offRampAddress, nil)
 		mockExpectChainAccessorGetTokenPriceUSD(
 			chainAccessors[sourceChain1],
 			cciptypes.UnknownAddress(wrappedNative1),
@@ -1428,8 +1433,12 @@ func TestCCIPChainReader_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 
 		offRampAddress := []byte{0x3}
 		chainAccessors := createMockedChainAccessors(t, destChain, sourceChain1, sourceChain2)
-		mockExpectChainAccessorSyncCall(chainAccessors[destChain], consts.ContractNameOffRamp, offRampAddress, 1, nil)
-		mockExpectChainAccessorGetTokenPriceUSD(chainAccessors[sourceChain2], cciptypes.UnknownAddress(wrappedNative2), cciptypes.TimestampedUnixBig{Value: big.NewInt(200), Timestamp: uint32(time.Now().Unix())})
+		mockExpectChainAccessorSyncCall(chainAccessors[destChain], consts.ContractNameOffRamp, offRampAddress, nil)
+		mockExpectChainAccessorGetTokenPriceUSD(
+			chainAccessors[sourceChain2],
+			cciptypes.UnknownAddress(wrappedNative2),
+			cciptypes.TimestampedUnixBig{Value: big.NewInt(200), Timestamp: uint32(time.Now().Unix())},
+		)
 		ccipReader, err := newCCIPChainReaderWithConfigPollerInternal(
 			t.Context(),
 			logger.Test(t),
@@ -1469,7 +1478,7 @@ func TestCCIPChainReader_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 
 		offRampAddress := []byte{0x3}
 		chainAccessors := createMockedChainAccessors(t, destChain, sourceChain1, sourceChain2)
-		mockExpectChainAccessorSyncCall(chainAccessors[destChain], consts.ContractNameOffRamp, offRampAddress, 1, nil)
+		mockExpectChainAccessorSyncCall(chainAccessors[destChain], consts.ContractNameOffRamp, offRampAddress, nil)
 		chainAccessors[sourceChain1].(*commonccipocr3.MockChainAccessor).EXPECT().
 			GetTokenPriceUSD(mock.Anything, cciptypes.UnknownAddress(wrappedNative1)).
 			Return(cciptypes.TimestampedUnixBig{}, fmt.Errorf("price fetch failed"))
@@ -1591,7 +1600,7 @@ func TestCCIPChainReader_GetChainFeePriceUpdate(t *testing.T) {
 		contractWriters[chainB] = cw
 		offRampAddress := []byte{0x3}
 		chainAccessors := createMockedChainAccessors(t, destChain, chainB, sourceChain1, sourceChain2)
-		mockExpectChainAccessorSyncCall(chainAccessors[chainB], consts.ContractNameOffRamp, offRampAddress, 1, nil)
+		mockExpectChainAccessorSyncCall(chainAccessors[chainB], consts.ContractNameOffRamp, offRampAddress, nil)
 		expectedResult := map[cciptypes.ChainSelector]cciptypes.TimestampedUnixBig{
 			sourceChain1: {Value: big.NewInt(100), Timestamp: uint32(time.Now().Unix())},
 			sourceChain2: {Value: big.NewInt(200), Timestamp: uint32(time.Now().Unix())},
@@ -1649,7 +1658,7 @@ func TestCCIPChainReader_GetChainFeePriceUpdate(t *testing.T) {
 		contractWriters[destChain] = cw
 		offRampAddress := []byte{0x3}
 		chainAccessors := createMockedChainAccessors(t, destChain, sourceChain1)
-		mockExpectChainAccessorSyncCall(chainAccessors[destChain], consts.ContractNameOffRamp, offRampAddress, 1, nil)
+		mockExpectChainAccessorSyncCall(chainAccessors[destChain], consts.ContractNameOffRamp, offRampAddress, nil)
 		chainAccessors[destChain].(*commonccipocr3.MockChainAccessor).EXPECT().
 			GetChainFeePriceUpdate(mock.Anything, selectors).
 			Return(map[cciptypes.ChainSelector]cciptypes.TimestampedBig{})
@@ -1682,7 +1691,7 @@ func TestCCIPChainReader_GetChainFeePriceUpdate(t *testing.T) {
 		contractWriters[destChain] = cw
 		offRampAddress := []byte{0x3}
 		chainAccessors := createMockedChainAccessors(t, destChain, sourceChain1, sourceChain3)
-		mockExpectChainAccessorSyncCall(chainAccessors[destChain], consts.ContractNameOffRamp, offRampAddress, 1, nil)
+		mockExpectChainAccessorSyncCall(chainAccessors[destChain], consts.ContractNameOffRamp, offRampAddress, nil)
 		expectedResult := map[cciptypes.ChainSelector]cciptypes.TimestampedUnixBig{
 			sourceChain1: {Value: big.NewInt(100), Timestamp: uint32(time.Now().Unix())},
 			sourceChain3: {Value: big.NewInt(0), Timestamp: uint32(time.Now().Unix())},
@@ -1714,45 +1723,6 @@ func TestCCIPChainReader_GetChainFeePriceUpdate(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("partial success - one result error", func(t *testing.T) {
-		selectors := []cciptypes.ChainSelector{sourceChain1, sourceChain3}
-
-		cw := writer_mocks.NewMockContractWriter(t)
-		contractWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
-		contractWriters[destChain] = cw
-		offRampAddress := []byte{0x3}
-		chainAccessors := createMockedChainAccessors(t, destChain, sourceChain1, sourceChain3)
-		mockExpectChainAccessorSyncCall(chainAccessors[destChain], consts.ContractNameOffRamp, offRampAddress, 1, nil)
-		expectedResult := map[cciptypes.ChainSelector]cciptypes.TimestampedUnixBig{
-			sourceChain1: {Value: big.NewInt(100), Timestamp: uint32(time.Now().Unix())},
-		}
-		mockExpectChainAccessorGetChainFeePriceUpdate(chainAccessors[destChain], selectors, expectedResult)
-		ccipReader, err := newCCIPChainReaderInternal(
-			t.Context(),
-			logger.Test(t),
-			chainAccessors,
-			map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
-				destChain: reader_mocks.NewMockContractReaderFacade(t),
-			},
-			contractWriters,
-			destChain,
-			offRampAddress,
-			internal.NewMockAddressCodecHex(t),
-		)
-		require.NoError(t, err)
-
-		feeUpdates := ccipReader.GetChainFeePriceUpdate(ctx, selectors)
-
-		require.Len(t, feeUpdates, 1)
-		require.Contains(t, feeUpdates, sourceChain1)
-		assert.NotNil(t, feeUpdates[sourceChain1].Value)
-		assert.Equal(t, 0, feeUpdates[sourceChain1].Value.Cmp(big.NewInt(100)))
-		assert.NotContains(t, feeUpdates, sourceChain3)
-
-		err = ccipReader.Close()
-		require.NoError(t, err)
-	})
-
 	t.Run("result count mismatch", func(t *testing.T) {
 		// Request two selectors, but mock response only has one result
 		selectors := []cciptypes.ChainSelector{sourceChain1, sourceChain2}
@@ -1762,7 +1732,7 @@ func TestCCIPChainReader_GetChainFeePriceUpdate(t *testing.T) {
 		contractWriters[destChain] = cw
 		offRampAddress := []byte{0x3}
 		chainAccessors := createMockedChainAccessors(t, destChain, sourceChain1, sourceChain2)
-		mockExpectChainAccessorSyncCall(chainAccessors[destChain], consts.ContractNameOffRamp, offRampAddress, 1, nil)
+		mockExpectChainAccessorSyncCall(chainAccessors[destChain], consts.ContractNameOffRamp, offRampAddress, nil)
 		expectedResult := map[cciptypes.ChainSelector]cciptypes.TimestampedUnixBig{
 			sourceChain1: {Value: big.NewInt(100), Timestamp: uint32(time.Now().Unix())},
 		}
@@ -1802,8 +1772,12 @@ func TestCCIPChainReader_GetChainFeePriceUpdate(t *testing.T) {
 		contractWriters[destChain] = cw
 		offRampAddress := []byte{0x3}
 		chainAccessors := createMockedChainAccessors(t, destChain, sourceChain1)
-		mockExpectChainAccessorSyncCall(chainAccessors[destChain], consts.ContractNameOffRamp, offRampAddress, 1, nil)
-		mockExpectChainAccessorGetChainFeePriceUpdate(chainAccessors[destChain], selectors, map[cciptypes.ChainSelector]cciptypes.TimestampedUnixBig{})
+		mockExpectChainAccessorSyncCall(chainAccessors[destChain], consts.ContractNameOffRamp, offRampAddress, nil)
+		mockExpectChainAccessorGetChainFeePriceUpdate(
+			chainAccessors[destChain],
+			selectors,
+			map[cciptypes.ChainSelector]cciptypes.TimestampedUnixBig{},
+		)
 		ccipReader, err := newCCIPChainReaderInternal(
 			t.Context(),
 			logger.Test(t),
@@ -1863,28 +1837,44 @@ func mockExpectChainAccessorSyncCall(
 	chainAccessor cciptypes.ChainAccessor,
 	expectedContractName string,
 	expectedContractAddress []byte,
-	expectedCalls int, err error,
+	err error,
 ) {
 	chainAccessor.(*commonccipocr3.MockChainAccessor).EXPECT().
-		Sync(mock.Anything, expectedContractName, cciptypes.UnknownAddress(expectedContractAddress)).Times(expectedCalls).Return(err)
+		Sync(mock.Anything, expectedContractName, cciptypes.UnknownAddress(expectedContractAddress)).
+		Once().Return(err)
 }
 
-func mockExpectChainAccessorNoncesCall(chainAccessor cciptypes.ChainAccessor, expectedResult map[cciptypes.ChainSelector]map[string]uint64) {
+func mockExpectChainAccessorNoncesCall(
+	chainAccessor cciptypes.ChainAccessor,
+	expectedResult map[cciptypes.ChainSelector]map[string]uint64,
+) {
 	chainAccessor.(*commonccipocr3.MockChainAccessor).EXPECT().
 		Nonces(mock.Anything, mock.Anything).Return(expectedResult, nil)
 }
 
-func mockExpectChainAccessorGetTokenPriceUSD(chainAccessor cciptypes.ChainAccessor, token cciptypes.UnknownAddress, price cciptypes.TimestampedUnixBig) {
+func mockExpectChainAccessorGetTokenPriceUSD(
+	chainAccessor cciptypes.ChainAccessor,
+	token cciptypes.UnknownAddress,
+	price cciptypes.TimestampedUnixBig,
+) {
 	chainAccessor.(*commonccipocr3.MockChainAccessor).EXPECT().
 		GetTokenPriceUSD(mock.Anything, token).Return(price, nil)
 }
 
-func mockExpectChainAccessorGetChainFeeComponentsCall(chainAccessor cciptypes.ChainAccessor, feeComponents cciptypes.ChainFeeComponents, err error) {
+func mockExpectChainAccessorGetChainFeeComponentsCall(
+	chainAccessor cciptypes.ChainAccessor,
+	feeComponents cciptypes.ChainFeeComponents,
+	err error,
+) {
 	chainAccessor.(*commonccipocr3.MockChainAccessor).EXPECT().
 		GetChainFeeComponents(mock.Anything).Return(feeComponents, err)
 }
 
-func mockExpectChainAccessorGetChainFeePriceUpdate(chainAccessor cciptypes.ChainAccessor, selectors []cciptypes.ChainSelector, expectedResult map[cciptypes.ChainSelector]cciptypes.TimestampedUnixBig) {
+func mockExpectChainAccessorGetChainFeePriceUpdate(
+	chainAccessor cciptypes.ChainAccessor,
+	selectors []cciptypes.ChainSelector,
+	expectedResult map[cciptypes.ChainSelector]cciptypes.TimestampedUnixBig,
+) {
 	// Convert TimestampedUnixBig to TimestampedBig
 	convertedResult := make(map[cciptypes.ChainSelector]cciptypes.TimestampedBig)
 	for k, v := range expectedResult {
