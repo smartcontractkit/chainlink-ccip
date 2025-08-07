@@ -267,11 +267,11 @@ func (o *observedCCIPReader) GetRMNRemoteConfig(ctx context.Context) (cciptypes.
 	)
 }
 
-func (o *observedCCIPReader) GetRmnCurseInfo(ctx context.Context) (CurseInfo, error) {
+func (o *observedCCIPReader) GetRmnCurseInfo(ctx context.Context) (cciptypes.CurseInfo, error) {
 	return withObservedQueryAndResult(
 		o,
 		"GetRmnCurseInfo",
-		func() (CurseInfo, error) {
+		func() (cciptypes.CurseInfo, error) {
 			return o.CCIPReader.GetRmnCurseInfo(ctx)
 		},
 		nil,

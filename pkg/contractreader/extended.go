@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	clcommontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
@@ -254,6 +254,10 @@ func (e *extendedContractReader) Bind(ctx context.Context, allBindings []types.B
 	if len(validBindings) == 0 {
 		return nil
 	}
+
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
 	err := e.reader.Bind(ctx, validBindings)
 	if err != nil {
 		return fmt.Errorf("failed to call ContractReader.Bind: %w", err)

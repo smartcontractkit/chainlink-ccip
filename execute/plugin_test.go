@@ -42,7 +42,6 @@ import (
 	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
-	reader2 "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -1210,7 +1209,7 @@ func TestPlugin_Observation_EligibilityCheckFailure(t *testing.T) {
 
 	mockCCIPReader.EXPECT().
 		GetRmnCurseInfo(mock.Anything).
-		Return(reader2.CurseInfo{}, nil).Maybe()
+		Return(cciptypes.CurseInfo{}, nil).Maybe()
 
 	// Create a simplified plugin structure that will test the eligibility failure
 	// This removes the dependency on actual cache implementations
@@ -1645,7 +1644,7 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 			) {
 				mockReader := basicCCIPReader()
 				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything).
-					Return(reader2.CurseInfo{
+					Return(cciptypes.CurseInfo{
 						CursedSourceChains: map[cciptypes.ChainSelector]bool{
 							cciptypes.ChainSelector(sourceChain): false,
 						}}, nil)
@@ -1667,7 +1666,7 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 			) {
 				mockReader := basicCCIPReader()
 				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything).
-					Return(reader2.CurseInfo{}, fmt.Errorf("test error"))
+					Return(cciptypes.CurseInfo{}, fmt.Errorf("test error"))
 
 				homeChain := basicHomeChain()
 				codec := basicMockCodec()
@@ -1687,7 +1686,7 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 			) {
 				mockReader := basicCCIPReader()
 				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything).
-					Return(reader2.CurseInfo{GlobalCurse: true}, nil)
+					Return(cciptypes.CurseInfo{GlobalCurse: true}, nil)
 
 				homeChain := basicHomeChain()
 				codec := basicMockCodec()
@@ -1707,7 +1706,7 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 			) {
 				mockReader := basicCCIPReader()
 				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything).
-					Return(reader2.CurseInfo{CursedDestination: true}, nil)
+					Return(cciptypes.CurseInfo{CursedDestination: true}, nil)
 
 				homeChain := basicHomeChain()
 				codec := basicMockCodec()
@@ -1727,7 +1726,7 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 			) {
 				mockReader := basicCCIPReader()
 				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything).
-					Return(reader2.CurseInfo{CursedSourceChains: map[cciptypes.ChainSelector]bool{
+					Return(cciptypes.CurseInfo{CursedSourceChains: map[cciptypes.ChainSelector]bool{
 						cciptypes.ChainSelector(sourceChain): true,
 					},
 					}, nil)

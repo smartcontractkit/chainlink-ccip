@@ -758,22 +758,22 @@ func (_c *MockCCIPReader_GetRMNRemoteConfig_Call) RunAndReturn(run func(context.
 }
 
 // GetRmnCurseInfo provides a mock function with given fields: ctx
-func (_m *MockCCIPReader) GetRmnCurseInfo(ctx context.Context) (reader.CurseInfo, error) {
+func (_m *MockCCIPReader) GetRmnCurseInfo(ctx context.Context) (ccipocr3.CurseInfo, error) {
 	ret := _m.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetRmnCurseInfo")
 	}
 
-	var r0 reader.CurseInfo
+	var r0 ccipocr3.CurseInfo
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context) (reader.CurseInfo, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context) (ccipocr3.CurseInfo, error)); ok {
 		return rf(ctx)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context) reader.CurseInfo); ok {
+	if rf, ok := ret.Get(0).(func(context.Context) ccipocr3.CurseInfo); ok {
 		r0 = rf(ctx)
 	} else {
-		r0 = ret.Get(0).(reader.CurseInfo)
+		r0 = ret.Get(0).(ccipocr3.CurseInfo)
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
@@ -803,12 +803,12 @@ func (_c *MockCCIPReader_GetRmnCurseInfo_Call) Run(run func(ctx context.Context)
 	return _c
 }
 
-func (_c *MockCCIPReader_GetRmnCurseInfo_Call) Return(_a0 reader.CurseInfo, _a1 error) *MockCCIPReader_GetRmnCurseInfo_Call {
+func (_c *MockCCIPReader_GetRmnCurseInfo_Call) Return(_a0 ccipocr3.CurseInfo, _a1 error) *MockCCIPReader_GetRmnCurseInfo_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockCCIPReader_GetRmnCurseInfo_Call) RunAndReturn(run func(context.Context) (reader.CurseInfo, error)) *MockCCIPReader_GetRmnCurseInfo_Call {
+func (_c *MockCCIPReader_GetRmnCurseInfo_Call) RunAndReturn(run func(context.Context) (ccipocr3.CurseInfo, error)) *MockCCIPReader_GetRmnCurseInfo_Call {
 	_c.Call.Return(run)
 	return _c
 }
