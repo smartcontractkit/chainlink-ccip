@@ -11,7 +11,7 @@ contract ERC20LockBox_constructor is Test {
   }
 
   function test_Constructor_RevertWhen_TokenAdminRegistryIsZeroAddress() public {
-    vm.expectRevert(ERC20LockBox.TokenAdminRegistryCannotBeZeroAddress.selector);
+    vm.expectRevert(ERC20LockBox.ZeroAddressNotAllowed.selector);
     new ERC20LockBox(address(0));
   }
 }

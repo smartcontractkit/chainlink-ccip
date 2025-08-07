@@ -86,7 +86,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
     uint32 minFinalityThreshold;
   }
 
-  string public constant override typeAndVersion = "USDCTokenPool 1.6.2-dev";
+  string public constant override typeAndVersion = "USDCTokenPool 1.6.2";
 
   // We restrict to the first version. New pool may be required for subsequent versions.
   uint32 public immutable i_supportedUSDCVersion;

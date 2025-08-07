@@ -5,14 +5,14 @@ import {IMessageTransmitter} from "./interfaces/IMessageTransmitter.sol";
 import {ITokenMessenger} from "./interfaces/ITokenMessenger.sol";
 
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
-
+import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 import {EnumerableSet} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
 
 /// @title CCTP Message Transmitter Proxy
 /// @notice A proxy contract for handling messages transmitted via the Cross Chain Transfer Protocol (CCTP).
 /// @dev This contract is responsible for sending messages to the `IMessageTransmitter` and ensuring only allowed callers can invoke it.
-contract CCTPMessageTransmitterProxy is Ownable2StepMsgSender {
+contract CCTPMessageTransmitterProxy is Ownable2StepMsgSender, ITypeAndVersion {
   using EnumerableSet for EnumerableSet.AddressSet;
 
   /// @notice Error thrown when a function is called by an unauthorized address.
@@ -22,6 +22,8 @@ contract CCTPMessageTransmitterProxy is Ownable2StepMsgSender {
   event AllowedCallerAdded(address indexed caller);
   /// @notice Emitted when an allowed caller is removed.
   event AllowedCallerRemoved(address indexed caller);
+
+  string public constant override typeAndVersion = "CCTPMessageTransmitterProxy 1.6.2";
 
   struct AllowedCallerConfigArgs {
     address caller;

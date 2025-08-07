@@ -48,6 +48,14 @@ contract SiloedLockReleaseTokenPoolSetup is BaseTest {
       address(s_lockBox)
     );
 
+    // Mock the token pool for the token to be the siloed lock release token pool so that we can test the allowed caller configuration
+    vm.mockCall(
+      address(s_tokenAdminRegistry),
+      abi.encodeWithSignature("getPool(address)", address(s_token)),
+      abi.encode(address(s_siloedLockReleaseTokenPool))
+    );
+
+    // Mock the token config for the token to be the siloed lock release token pool so that we can test the allowed caller configuration
     vm.mockCall(
       address(s_tokenAdminRegistry),
       abi.encodeWithSignature("getTokenConfig(address)", address(s_token)),
@@ -59,6 +67,18 @@ contract SiloedLockReleaseTokenPoolSetup is BaseTest {
         })
       )
     );
+
+    // Set the owner as an administrator for the token so that it can configure the allowed callers
+    vm.mockCall(
+      address(s_tokenAdminRegistry),
+      abi.encodeWithSignature("isAdministrator(address,address)", address(s_token), OWNER),
+      abi.encode(true)
+    );
+
+    ERC20LockBox.AllowedCallerConfigArgs[] memory allowedCallers = new ERC20LockBox.AllowedCallerConfigArgs[](1);
+    allowedCallers[0] =
+      ERC20LockBox.AllowedCallerConfigArgs({token: address(s_token), caller: address(OWNER), allowed: true});
+    s_lockBox.configureAllowedCallers(allowedCallers);
 
     // Set the rebalancer for the token pool
     s_siloedLockReleaseTokenPool.setRebalancer(OWNER);

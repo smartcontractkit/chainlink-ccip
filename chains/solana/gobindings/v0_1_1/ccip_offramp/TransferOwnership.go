@@ -12,7 +12,7 @@ import (
 
 // Transfers the ownership of the router to a new proposed owner.
 //
-// # Shared func signature with other programs
+// Shared func signature with other programs
 //
 // # Arguments
 //

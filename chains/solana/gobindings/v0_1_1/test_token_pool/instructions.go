@@ -44,11 +44,17 @@ var (
 
 	Instruction_SetChainRateLimit = ag_binary.TypeID([8]byte{188, 188, 161, 37, 100, 249, 123, 170})
 
+	Instruction_SetRateLimitAdmin = ag_binary.TypeID([8]byte{21, 182, 126, 128, 31, 241, 37, 34})
+
 	Instruction_DeleteChainConfig = ag_binary.TypeID([8]byte{241, 159, 142, 210, 64, 173, 77, 179})
 
 	Instruction_ReleaseOrMintTokens = ag_binary.TypeID([8]byte{92, 100, 150, 198, 252, 63, 164, 228})
 
 	Instruction_LockOrBurnTokens = ag_binary.TypeID([8]byte{114, 161, 94, 29, 147, 25, 232, 191})
+
+	Instruction_DeriveAccountsReleaseOrMintTokens = ag_binary.TypeID([8]byte{40, 91, 244, 228, 0, 2, 51, 238})
+
+	Instruction_DeriveAccountsLockOrBurnTokens = ag_binary.TypeID([8]byte{20, 237, 184, 4, 166, 153, 108, 174})
 )
 
 // InstructionIDToName returns the name of the instruction given its ID.
@@ -70,12 +76,18 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "AppendRemotePoolAddresses"
 	case Instruction_SetChainRateLimit:
 		return "SetChainRateLimit"
+	case Instruction_SetRateLimitAdmin:
+		return "SetRateLimitAdmin"
 	case Instruction_DeleteChainConfig:
 		return "DeleteChainConfig"
 	case Instruction_ReleaseOrMintTokens:
 		return "ReleaseOrMintTokens"
 	case Instruction_LockOrBurnTokens:
 		return "LockOrBurnTokens"
+	case Instruction_DeriveAccountsReleaseOrMintTokens:
+		return "DeriveAccountsReleaseOrMintTokens"
+	case Instruction_DeriveAccountsLockOrBurnTokens:
+		return "DeriveAccountsLockOrBurnTokens"
 	default:
 		return ""
 	}
@@ -121,6 +133,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 			"set_chain_rate_limit", (*SetChainRateLimit)(nil),
 		},
 		{
+			"set_rate_limit_admin", (*SetRateLimitAdmin)(nil),
+		},
+		{
 			"delete_chain_config", (*DeleteChainConfig)(nil),
 		},
 		{
@@ -128,6 +143,12 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"lock_or_burn_tokens", (*LockOrBurnTokens)(nil),
+		},
+		{
+			"derive_accounts_release_or_mint_tokens", (*DeriveAccountsReleaseOrMintTokens)(nil),
+		},
+		{
+			"derive_accounts_lock_or_burn_tokens", (*DeriveAccountsLockOrBurnTokens)(nil),
 		},
 	},
 )

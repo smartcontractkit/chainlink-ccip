@@ -23,6 +23,7 @@ pub mod ccip_offramp {
 
     use super::*;
 
+    #[allow(clippy::empty_line_after_outer_attr)]
     //////////////////////////
     /// Initialization Flow //
     //////////////////////////
@@ -144,6 +145,7 @@ pub mod ccip_offramp {
         router::admin(default_code_version).accept_ownership(ctx)
     }
 
+    #[allow(clippy::empty_line_after_outer_attr)]
     /////////////
     // Config //
     /////////////
@@ -360,6 +362,7 @@ pub mod ccip_offramp {
         )
     }
 
+    #[allow(clippy::empty_line_after_outer_attr)]
     ////////////////////
     /// Off Ramp Flow //
     ////////////////////
@@ -820,4 +823,6 @@ pub enum CcipOfframpError {
     InvalidTokenPoolAccountDerivationResponse,
     #[msg("Can't fit account derivation response.")]
     AccountDerivationResponseTooLarge,
+    #[msg("Proposed owner is the default pubkey")]
+    DefaultOwnerProposal,
 }

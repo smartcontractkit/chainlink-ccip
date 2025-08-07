@@ -132,7 +132,7 @@ func (p *Plugin) getMessagesOutcome(
 
 	// First ensure that all observed messages has hashes and token data.
 	if err := validateHashesExist(observation.Messages, observation.Hashes); err != nil {
-		lggr.Errorw("validate hashes exist: %w", err)
+		lggr.Errorw("validate hashes exist", "err", err)
 		return exectypes.Outcome{}
 	}
 	if err := validateTokenDataObservations(observation.Messages, observation.TokenData); err != nil {

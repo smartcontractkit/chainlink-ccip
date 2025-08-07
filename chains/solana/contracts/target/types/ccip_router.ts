@@ -1,5 +1,5 @@
 export type CcipRouter = {
-  "version": "0.1.0-dev",
+  "version": "0.1.1",
   "name": "ccip_router",
   "docs": [
     "The `ccip_router` module contains the implementation of the Cross-Chain Interoperability Protocol (CCIP) Router.",
@@ -2335,12 +2335,17 @@ export type CcipRouter = {
       "code": 7030,
       "name": "AccountDerivationResponseTooLarge",
       "msg": "Can't fit account derivation response."
+    },
+    {
+      "code": 7031,
+      "name": "DefaultOwnerProposal",
+      "msg": "Proposed owner is the default pubkey"
     }
   ]
 };
 
 export const IDL: CcipRouter = {
-  "version": "0.1.0-dev",
+  "version": "0.1.1",
   "name": "ccip_router",
   "docs": [
     "The `ccip_router` module contains the implementation of the Cross-Chain Interoperability Protocol (CCIP) Router.",
@@ -4676,6 +4681,11 @@ export const IDL: CcipRouter = {
       "code": 7030,
       "name": "AccountDerivationResponseTooLarge",
       "msg": "Can't fit account derivation response."
+    },
+    {
+      "code": 7031,
+      "name": "DefaultOwnerProposal",
+      "msg": "Proposed owner is the default pubkey"
     }
   ]
 };

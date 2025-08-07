@@ -1,5 +1,5 @@
 export type BurnmintTokenPool = {
-  "version": "0.1.1-dev",
+  "version": "0.1.1",
   "name": "burnmint_token_pool",
   "instructions": [
     {
@@ -540,6 +540,31 @@ export type BurnmintTokenPool = {
           "type": {
             "defined": "RateLimitConfig"
           }
+        }
+      ]
+    },
+    {
+      "name": "setRateLimitAdmin",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "mint",
+          "type": "publicKey"
+        },
+        {
+          "name": "newRateLimitAdmin",
+          "type": "publicKey"
         }
       ]
     },
@@ -922,7 +947,7 @@ export type BurnmintTokenPool = {
 };
 
 export const IDL: BurnmintTokenPool = {
-  "version": "0.1.1-dev",
+  "version": "0.1.1",
   "name": "burnmint_token_pool",
   "instructions": [
     {
@@ -1463,6 +1488,31 @@ export const IDL: BurnmintTokenPool = {
           "type": {
             "defined": "RateLimitConfig"
           }
+        }
+      ]
+    },
+    {
+      "name": "setRateLimitAdmin",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "mint",
+          "type": "publicKey"
+        },
+        {
+          "name": "newRateLimitAdmin",
+          "type": "publicKey"
         }
       ]
     },

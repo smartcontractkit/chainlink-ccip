@@ -24,16 +24,20 @@ contract ERC20LockBoxSetup is BaseTest {
     deal(address(s_token), OWNER, type(uint256).max);
     deal(address(s_token), s_allowedCaller, type(uint256).max);
 
+    // Deploy and configure the token admin registry for the token
     s_tokenAdminRegistry = new TokenAdminRegistry();
     s_tokenAdminRegistry.proposeAdministrator(address(s_token), address(OWNER));
     s_tokenAdminRegistry.acceptAdminRole(address(s_token));
 
-    vm.mockCall(s_tokenPool, abi.encodeWithSignature("owner()"), abi.encode(OWNER));
-
     vm.mockCall(s_tokenPool, abi.encodeWithSignature("isSupportedToken(address)", address(s_token)), abi.encode(true));
 
+    // Set the token pool for the token
     s_tokenAdminRegistry.setPool(address(s_token), s_tokenPool);
 
+    // Mock the owner of the token pool to be the owner of the token so that we can test the allowed caller configuration
+    vm.mockCall(s_tokenPool, abi.encodeWithSignature("owner()"), abi.encode(OWNER));
+
+    // Deploy the ERC20 lock box
     s_erc20LockBox = new ERC20LockBox(address(s_tokenAdminRegistry));
 
     // Configure the allowed caller
@@ -43,10 +47,12 @@ contract ERC20LockBoxSetup is BaseTest {
     s_erc20LockBox.configureAllowedCallers(configArgs);
   }
 
-  function _depositTokens(uint256 amount, uint64 remoteChainSelector) internal {
+  function _depositTokens(
+    uint256 amount
+  ) internal {
     vm.startPrank(s_allowedCaller);
     s_token.approve(address(s_erc20LockBox), amount);
-    s_erc20LockBox.deposit(address(s_token), amount, remoteChainSelector);
+    s_erc20LockBox.deposit(address(s_token), amount);
     vm.stopPrank();
   }
 }
