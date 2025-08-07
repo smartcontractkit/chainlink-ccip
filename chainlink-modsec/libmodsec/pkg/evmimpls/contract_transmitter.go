@@ -10,8 +10,8 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/smartcontractkit/chainlink-ccip/chainlink-modsec/evmimpls/gethwrappers"
-	"github.com/smartcontractkit/chainlink-ccip/chainlink-modsec/libmodsec/modsectypes"
+	"github.com/smartcontractkit/chainlink-modsec/libmodsec/pkg/evmimpls/gethwrappers"
+	"github.com/smartcontractkit/chainlink-modsec/libmodsec/pkg/modsectypes"
 )
 
 type EVMContractTransmitter struct {

@@ -8,7 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/smartcontractkit/chainlink-ccip/chainlink-modsec/libmodsec/modsectypes"
+	"github.com/smartcontractkit/chainlink-modsec/libmodsec/pkg/modsectypes"
 )
 
 var _ modsectypes.SourceReader = (*EVMSourceReader)(nil)

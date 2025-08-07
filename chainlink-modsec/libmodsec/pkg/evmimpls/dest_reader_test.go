@@ -11,9 +11,9 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient/simulated"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-ccip/chainlink-modsec/evmimpls"
-	"github.com/smartcontractkit/chainlink-ccip/chainlink-modsec/evmimpls/gethwrappers"
-	"github.com/smartcontractkit/chainlink-ccip/chainlink-modsec/libmodsec/modsectypes"
+	"github.com/smartcontractkit/chainlink-modsec/libmodsec/pkg/evmimpls"
+	"github.com/smartcontractkit/chainlink-modsec/libmodsec/pkg/evmimpls/gethwrappers"
+	"github.com/smartcontractkit/chainlink-modsec/libmodsec/pkg/modsectypes"
 )
 
 func Test_DestReader(t *testing.T) {

@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/smartcontractkit/chainlink-ccip/chainlink-modsec/libmodsec/modsectypes"
+	"github.com/smartcontractkit/chainlink-modsec/libmodsec/pkg/modsectypes"
 )
 
 var _ modsectypes.Signer = (*EVMSigner)(nil)

@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/smartcontractkit/chainlink-ccip/chainlink-modsec/libmodsec/modsectypes"
+	"github.com/smartcontractkit/chainlink-modsec/libmodsec/pkg/modsectypes"
 )
 
 var _ modsectypes.Hasher = (*EVMHasher)(nil)

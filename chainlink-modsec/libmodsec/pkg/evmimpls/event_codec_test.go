@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/smartcontractkit/chainlink-ccip/chainlink-modsec/evmimpls"
+	"github.com/smartcontractkit/chainlink-modsec/libmodsec/pkg/evmimpls"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -16,7 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient/simulated"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-ccip/chainlink-modsec/evmimpls/gethwrappers"
+	"github.com/smartcontractkit/chainlink-modsec/libmodsec/pkg/evmimpls/gethwrappers"
 )
 
 func Test_Decode(t *testing.T) {
