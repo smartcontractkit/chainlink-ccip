@@ -36,9 +36,9 @@ const defaultRefreshPeriod = 30 * time.Second
 // can be generated.
 type ccipChainReader struct {
 	lggr            logger.Logger
+	accessors       map[cciptypes.ChainSelector]cciptypes.ChainAccessor
 	contractReaders map[cciptypes.ChainSelector]contractreader.Extended
 	contractWriters map[cciptypes.ChainSelector]types.ContractWriter
-	accessors       map[cciptypes.ChainSelector]cciptypes.ChainAccessor
 
 	destChain      cciptypes.ChainSelector
 	offrampAddress string
@@ -82,7 +82,6 @@ func newCCIPChainReaderWithConfigPollerInternal(
 	configPoller ConfigPoller,
 ) (*ccipChainReader, error) {
 	var crs = make(map[cciptypes.ChainSelector]contractreader.Extended)
-	var cas = make(map[cciptypes.ChainSelector]cciptypes.ChainAccessor)
 
 	for chainSelector, cr := range contractReaders {
 		crs[chainSelector] = contractreader.NewExtendedContractReader(cr)
@@ -98,7 +97,7 @@ func newCCIPChainReaderWithConfigPollerInternal(
 		lggr:            lggr,
 		contractReaders: crs,
 		contractWriters: contractWriters,
-		accessors:       cas,
+		accessors:       chainAccessors,
 		destChain:       destChain,
 		offrampAddress:  offrampAddrStr,
 		addrCodec:       addrCodec,
@@ -132,7 +131,7 @@ func newCCIPChainReaderWithConfigPollerInternal(
 	return reader, nil
 }
 
-// WithExtendedContractReader sets the extended contract reader for the provided chain.
+// WithExtendedContractReader sets the extended contract reader for the provided chain and updates the address book.
 func (r *ccipChainReader) WithExtendedContractReader(
 	ch cciptypes.ChainSelector, cr contractreader.Extended) *ccipChainReader {
 	r.contractReaders[ch] = cr
@@ -829,7 +828,6 @@ func (r *ccipChainReader) Sync(ctx context.Context, contracts ContractAddresses)
 	return nil
 }
 
-// TODO(NONEVM-1865): remove this function once from CCIPReader interface once CAL migration is complete.
 func (r *ccipChainReader) GetContractAddress(contractName string, chain cciptypes.ChainSelector) ([]byte, error) {
 	return r.donAddressBook.GetContractAddress(addressbook.ContractName(contractName), chain)
 }
