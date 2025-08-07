@@ -6,8 +6,8 @@ import {IMessageTransmitter} from "../../../../pools/USDC/interfaces/IMessageTra
 import {CCTPMessageTransmitterProxy} from "../../../../pools/USDC/CCTPMessageTransmitterProxy.sol";
 import {CCTPMessageTransmitterProxySetup} from "./CCTPMessageTransmitterProxySetup.t.sol";
 
-contract CCTPMessageTransmitterProxy_receiveMesssage is CCTPMessageTransmitterProxySetup {
-  function test_receiveMesssage() public {
+contract CCTPMessageTransmitterProxy_receiveMessage is CCTPMessageTransmitterProxySetup {
+  function test_receiveMessage() public {
     bytes memory message = bytes("message");
     bytes memory attestation = bytes("attestation");
 
@@ -33,7 +33,7 @@ contract CCTPMessageTransmitterProxy_receiveMesssage is CCTPMessageTransmitterPr
   }
 
   // Revert cases
-  function test_receiveMessage_RevertWhen_UnAuthorizedCaller() public {
+  function test_receiveMessage_RevertWhen_UnauthorizedCaller() public {
     bytes memory message = bytes("message");
     bytes memory attestation = bytes("attestation");
 
