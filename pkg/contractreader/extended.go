@@ -310,7 +310,8 @@ func (e *extendedContractReader) bindingExists(b types.BoundContract) bool {
 	for _, boundContracts := range e.contractBindingsByName {
 		for _, boundContract := range boundContracts {
 			fmt.Println("bindingExists() - Checking binding:", boundContract.Binding, "against", b)
-			if boundContract.Binding.String() == b.String() {
+			// Ignore case when comparing addresses
+			if strings.EqualFold(boundContract.Binding.String(), strings.ToLower(b.String())) {
 				return true
 			}
 		}
