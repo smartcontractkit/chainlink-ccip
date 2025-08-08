@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"os"
 	"slices"
 	"sort"
 	"sync"
@@ -768,6 +769,7 @@ func (r *ccipChainReader) DiscoverContracts(ctx context.Context,
 // NOTE: You should ensure that Sync is called deterministically for every oracle in the DON to guarantee
 // a consistent shared addressbook state.
 func (r *ccipChainReader) Sync(ctx context.Context, contracts ContractAddresses) error {
+	fmt.Println("ccip.go Sync(). Process ID: ", os.Getpid())
 	addressBookEntries := make(addressbook.ContractAddresses)
 	for name, addrs := range contracts {
 		addressBookEntries[addressbook.ContractName(name)] = addrs
@@ -796,6 +798,7 @@ func (r *ccipChainReader) Sync(ctx context.Context, contracts ContractAddresses)
 	var errGroup errgroup.Group
 	for chainSelector, boundContract := range chainToContractBinding {
 		errGroup.Go(func() error {
+			fmt.Println("ccip.go Sync() go func. Process ID: ", os.Getpid())
 			// defense in depth: don't bind if the address is empty.
 			// callers should ensure this but we double check here.
 			if len(boundContract.address) == 0 {
