@@ -74,6 +74,7 @@ type PluginFactory struct {
 	homeChainSelector cciptypes.ChainSelector
 	chainAccessors    map[cciptypes.ChainSelector]cciptypes.ChainAccessor
 	contractReaders   map[cciptypes.ChainSelector]types.ContractReader
+	extendedReaders   map[cciptypes.ChainSelector]contractreader.Extended
 	chainWriters      map[cciptypes.ChainSelector]types.ContractWriter
 	rmnPeerClient     rmn.PeerClient
 	rmnCrypto         cciptypes.RMNCrypto
@@ -90,6 +91,7 @@ type CommitPluginFactoryParams struct {
 	HomeChainSelector cciptypes.ChainSelector
 	ChainAccessors    map[cciptypes.ChainSelector]cciptypes.ChainAccessor
 	ContractReaders   map[cciptypes.ChainSelector]types.ContractReader
+	ExtendedReaders   map[cciptypes.ChainSelector]contractreader.Extended
 	ContractWriters   map[cciptypes.ChainSelector]types.ContractWriter
 	RmnPeerClient     rmn.PeerClient
 	RmnCrypto         cciptypes.RMNCrypto
@@ -109,6 +111,7 @@ func NewCommitPluginFactory(params CommitPluginFactoryParams) *PluginFactory {
 		homeChainSelector: params.HomeChainSelector,
 		chainAccessors:    params.ChainAccessors,
 		contractReaders:   params.ContractReaders,
+		extendedReaders:   params.ExtendedReaders,
 		chainWriters:      params.ContractWriters,
 		rmnPeerClient:     params.RmnPeerClient,
 		rmnCrypto:         params.RmnCrypto,
@@ -136,22 +139,22 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 		oracleIDToP2PID[commontypes.OracleID(oracleID)] = node.P2pID
 	}
 
-	// Validate that the readers were already wrapped in the Extended interface from core.
-	readers := make(map[cciptypes.ChainSelector]contractreader.ContractReaderFacade, len(p.contractReaders))
+	// Validate that the readerFacades were already wrapped in the Extended interface from core.
+	readerFacades := make(map[cciptypes.ChainSelector]contractreader.ContractReaderFacade, len(p.contractReaders))
 	for chain, cr := range p.contractReaders {
-		extendedCr, ok := cr.(contractreader.Extended)
-		if !ok {
-			return nil, ocr3types.ReportingPluginInfo{},
-				fmt.Errorf("contract reader %T does not implement Extended interface for chain %d", cr, chain)
-		}
-		readers[chain] = extendedCr
+		//extendedCr, ok := cr.(contractreader.Extended)
+		//if !ok {
+		//	return nil, ocr3types.ReportingPluginInfo{},
+		//		fmt.Errorf("contract reader %T does not implement Extended interface for chain %d", cr, chain)
+		//}
+		readerFacades[chain] = cr
 	}
 
 	// Bind the RMNHome contract
 	var rmnHomeReader readerpkg.RMNHome
 	if offchainConfig.RMNEnabled {
 		rmnHomeAddress := p.ocrConfig.Config.RmnHomeAddress
-		rmnCr, ok := readers[p.homeChainSelector]
+		rmnCr, ok := p.extendedReaders[p.homeChainSelector]
 		if !ok {
 			return nil,
 				ocr3types.ReportingPluginInfo{},
@@ -183,7 +186,7 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 		ctx,
 		logutil.WithComponent(lggr, "CCIPReader"),
 		p.chainAccessors,
-		readers,
+		readerFacades,
 		p.chainWriters,
 		p.ocrConfig.Config.ChainSelector,
 		p.ocrConfig.Config.OfframpAddress,
@@ -194,7 +197,7 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 	}
 
 	// The node supports the chain that the token prices are on.
-	_, ok := readers[offchainConfig.PriceFeedChainSelector]
+	_, ok := readerFacades[offchainConfig.PriceFeedChainSelector]
 	if ok {
 		// Bind all token aggregate contracts
 		var bcs []types.BoundContract
@@ -215,7 +218,7 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 
 	onChainTokenPricesReader := readerpkg.NewPriceReader(
 		logutil.WithComponent(lggr, "PriceReader"),
-		readers,
+		readerFacades,
 		offchainConfig.TokenInfo,
 		ccipReader,
 		offchainConfig.PriceFeedChainSelector,

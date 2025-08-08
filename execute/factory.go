@@ -76,6 +76,7 @@ type PluginFactory struct {
 	tokenDataEncoder cciptypes.TokenDataEncoder
 	chainAccessors   map[cciptypes.ChainSelector]cciptypes.ChainAccessor
 	contractReaders  map[cciptypes.ChainSelector]types.ContractReader
+	extendedReaders  map[cciptypes.ChainSelector]contractreader.Extended
 	chainWriters     map[cciptypes.ChainSelector]types.ContractWriter
 }
 
@@ -91,6 +92,7 @@ type PluginFactoryParams struct {
 	ChainAccessors   map[cciptypes.ChainSelector]cciptypes.ChainAccessor
 	EstimateProvider cciptypes.EstimateProvider
 	ContractReaders  map[cciptypes.ChainSelector]types.ContractReader
+	ExtendedReaders  map[cciptypes.ChainSelector]contractreader.Extended
 	ContractWriters  map[cciptypes.ChainSelector]types.ContractWriter
 }
 
@@ -109,6 +111,7 @@ func NewExecutePluginFactory(params PluginFactoryParams) *PluginFactory {
 		tokenDataEncoder: params.TokenDataEncoder,
 		chainAccessors:   params.ChainAccessors,
 		contractReaders:  params.ContractReaders,
+		extendedReaders:  params.ExtendedReaders,
 		chainWriters:     params.ContractWriters,
 	}
 }
@@ -132,24 +135,24 @@ func (p PluginFactory) NewReportingPlugin(
 		oracleIDToP2PID[commontypes.OracleID(oracleID)] = node.P2pID
 	}
 
-	// Validate that the readers were already wrapped in the Extended interface from core.
-	readers := make(map[cciptypes.ChainSelector]contractreader.ContractReaderFacade)
-	extended := make(map[cciptypes.ChainSelector]contractreader.Extended)
-	for chain, cr := range p.contractReaders {
-		extendedCr, ok := cr.(contractreader.Extended)
-		if !ok {
-			return nil, ocr3types.ReportingPluginInfo{},
-				fmt.Errorf("contract reader %T does not implement Extended interface for chain %d", cr, chain)
-		}
-		readers[chain] = extendedCr
-		extended[chain] = extendedCr
+	// Validate that the readerFacades were already wrapped in the Extended interface from core.
+	readerFacades := make(map[cciptypes.ChainSelector]contractreader.ContractReaderFacade)
+	//extended := make(map[cciptypes.ChainSelector]contractreader.Extended)
+	for chain, cr := range p.extendedReaders {
+		//extendedCr, ok := cr.(contractreader.Extended)
+		//if !ok {
+		//	return nil, ocr3types.ReportingPluginInfo{},
+		//		fmt.Errorf("contract reader %T does not implement Extended interface for chain %d", cr, chain)
+		//}
+		readerFacades[chain] = cr
+		//extended[chain] = extendedCr
 	}
 
 	ccipReader, err := readerpkg.NewCCIPChainReader(
 		ctx,
 		logutil.WithComponent(lggr, "CCIPReader"),
 		p.chainAccessors,
-		readers,
+		readerFacades,
 		p.chainWriters,
 		p.ocrConfig.Config.ChainSelector,
 		p.ocrConfig.Config.OfframpAddress,
@@ -165,7 +168,7 @@ func (p PluginFactory) NewReportingPlugin(
 		p.ocrConfig.Config.ChainSelector,
 		offchainConfig.TokenDataObservers,
 		p.tokenDataEncoder,
-		extended,
+		p.extendedReaders,
 		p.addrCodec,
 	)
 	if err != nil {
