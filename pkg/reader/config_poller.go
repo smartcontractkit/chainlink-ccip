@@ -708,6 +708,7 @@ func (c *configPoller) refreshSourceChainConfigs(
 	c.lggr.Debugw("Successfully refreshed source chain configs",
 		"destChain", destChain,
 		"chainsCount", len(sourceChainConfigs),
+		"sourceChainConfigs", sourceChainConfigs,
 		"fetchConfigLatency", fetchConfigLatency)
 
 	result := make(map[cciptypes.ChainSelector]StaticSourceChainConfig, len(sourceChainConfigs))
