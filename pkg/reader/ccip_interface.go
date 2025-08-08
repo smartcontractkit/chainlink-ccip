@@ -12,7 +12,6 @@ import (
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
-	"github.com/smartcontractkit/chainlink-ccip/pkg/chainaccessor"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 )
 
@@ -123,6 +122,7 @@ func (s StaticSourceChainConfig) check() (bool /* enabled */, error) {
 func NewCCIPChainReader(
 	ctx context.Context,
 	lggr logger.Logger,
+	chainAccessors map[cciptypes.ChainSelector]cciptypes.ChainAccessor,
 	contractReaders map[cciptypes.ChainSelector]contractreader.ContractReaderFacade,
 	contractWriters map[cciptypes.ChainSelector]types.ContractWriter,
 	destChain cciptypes.ChainSelector,
@@ -132,6 +132,7 @@ func NewCCIPChainReader(
 	reader, err := newCCIPChainReaderInternal(
 		ctx,
 		lggr,
+		chainAccessors,
 		contractReaders,
 		contractWriters,
 		destChain,
@@ -152,35 +153,31 @@ func NewCCIPChainReader(
 func NewCCIPReaderWithExtendedContractReaders(
 	ctx context.Context,
 	lggr logger.Logger,
+	chainAccessors map[cciptypes.ChainSelector]cciptypes.ChainAccessor,
 	extendedContractReaders map[cciptypes.ChainSelector]contractreader.Extended,
 	contractWriters map[cciptypes.ChainSelector]types.ContractWriter,
 	destChain cciptypes.ChainSelector,
 	offrampAddress []byte,
 	addrCodec cciptypes.AddressCodec,
 ) CCIPReader {
-	cr, err := newCCIPChainReaderInternal(ctx, lggr, nil, contractWriters, destChain, offrampAddress, addrCodec)
+	cr, err := newCCIPChainReaderInternal(
+		ctx,
+		lggr,
+		chainAccessors,
+		nil,
+		contractWriters,
+		destChain,
+		offrampAddress,
+		addrCodec,
+	)
 	if err != nil {
 		// Panic here since right now this is only called from tests in core
 		panic(fmt.Errorf("failed to create CCIP reader: %w", err))
 	}
-	var cas = make(map[cciptypes.ChainSelector]cciptypes.ChainAccessor)
 	for ch, extendedCr := range extendedContractReaders {
 		cr.WithExtendedContractReader(ch, extendedCr)
-		accessor, err := chainaccessor.NewDefaultAccessor(
-			lggr,
-			ch,
-			extendedCr,
-			contractWriters[ch],
-			addrCodec,
-		)
-		if err != nil {
-			// Panic here since this is only called from tests in core
-			panic(fmt.Errorf("failed to create chain accessor for %s: %w", ch, err))
-		}
-		cas[ch] = accessor
 	}
 
-	cr.accessors = cas
 	return cr
 }
 

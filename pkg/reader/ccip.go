@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"os"
 	"slices"
 	"sort"
 	"sync"
@@ -24,7 +25,6 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/addressbook"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/chainaccessor"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
@@ -37,9 +37,9 @@ const defaultRefreshPeriod = 30 * time.Second
 // can be generated.
 type ccipChainReader struct {
 	lggr            logger.Logger
+	accessors       map[cciptypes.ChainSelector]cciptypes.ChainAccessor
 	contractReaders map[cciptypes.ChainSelector]contractreader.Extended
 	contractWriters map[cciptypes.ChainSelector]types.ContractWriter
-	accessors       map[cciptypes.ChainSelector]cciptypes.ChainAccessor
 
 	destChain      cciptypes.ChainSelector
 	offrampAddress string
@@ -51,6 +51,7 @@ type ccipChainReader struct {
 func newCCIPChainReaderInternal(
 	ctx context.Context,
 	lggr logger.Logger,
+	chainAccessors map[cciptypes.ChainSelector]cciptypes.ChainAccessor,
 	contractReaders map[cciptypes.ChainSelector]contractreader.ContractReaderFacade,
 	contractWriters map[cciptypes.ChainSelector]types.ContractWriter,
 	destChain cciptypes.ChainSelector,
@@ -60,6 +61,7 @@ func newCCIPChainReaderInternal(
 	return newCCIPChainReaderWithConfigPollerInternal(
 		ctx,
 		lggr,
+		chainAccessors,
 		contractReaders,
 		contractWriters,
 		destChain,
@@ -72,6 +74,7 @@ func newCCIPChainReaderInternal(
 func newCCIPChainReaderWithConfigPollerInternal(
 	ctx context.Context,
 	lggr logger.Logger,
+	chainAccessors map[cciptypes.ChainSelector]cciptypes.ChainAccessor,
 	contractReaders map[cciptypes.ChainSelector]contractreader.ContractReaderFacade,
 	contractWriters map[cciptypes.ChainSelector]types.ContractWriter,
 	destChain cciptypes.ChainSelector,
@@ -80,23 +83,9 @@ func newCCIPChainReaderWithConfigPollerInternal(
 	configPoller ConfigPoller,
 ) (*ccipChainReader, error) {
 	var crs = make(map[cciptypes.ChainSelector]contractreader.Extended)
-	var cas = make(map[cciptypes.ChainSelector]cciptypes.ChainAccessor)
 
 	for chainSelector, cr := range contractReaders {
 		crs[chainSelector] = contractreader.NewExtendedContractReader(cr)
-
-		// TODO: remove instantiation of the accessor once accessors are passed down from above
-		accessor, err := chainaccessor.NewDefaultAccessor(
-			lggr,
-			chainSelector,
-			crs[chainSelector],
-			contractWriters[chainSelector],
-			addrCodec,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create chain accessor for chain %s: %w", chainSelector, err)
-		}
-		cas[chainSelector] = accessor
 	}
 
 	offrampAddrStr, err := addrCodec.AddressBytesToString(offrampAddress, destChain)
@@ -109,7 +98,7 @@ func newCCIPChainReaderWithConfigPollerInternal(
 		lggr:            lggr,
 		contractReaders: crs,
 		contractWriters: contractWriters,
-		accessors:       cas,
+		accessors:       chainAccessors,
 		destChain:       destChain,
 		offrampAddress:  offrampAddrStr,
 		addrCodec:       addrCodec,
@@ -143,7 +132,7 @@ func newCCIPChainReaderWithConfigPollerInternal(
 	return reader, nil
 }
 
-// WithExtendedContractReader sets the extended contract reader for the provided chain.
+// WithExtendedContractReader sets the extended contract reader for the provided chain and updates the address book.
 func (r *ccipChainReader) WithExtendedContractReader(
 	ch cciptypes.ChainSelector, cr contractreader.Extended) *ccipChainReader {
 	r.contractReaders[ch] = cr
@@ -780,6 +769,7 @@ func (r *ccipChainReader) DiscoverContracts(ctx context.Context,
 // NOTE: You should ensure that Sync is called deterministically for every oracle in the DON to guarantee
 // a consistent shared addressbook state.
 func (r *ccipChainReader) Sync(ctx context.Context, contracts ContractAddresses) error {
+	fmt.Println("ccip.go Sync(). Process ID: ", os.Getpid())
 	addressBookEntries := make(addressbook.ContractAddresses)
 	for name, addrs := range contracts {
 		addressBookEntries[addressbook.ContractName(name)] = addrs
@@ -808,6 +798,7 @@ func (r *ccipChainReader) Sync(ctx context.Context, contracts ContractAddresses)
 	var errGroup errgroup.Group
 	for chainSelector, boundContract := range chainToContractBinding {
 		errGroup.Go(func() error {
+			fmt.Println("ccip.go Sync() go func. Process ID: ", os.Getpid())
 			// defense in depth: don't bind if the address is empty.
 			// callers should ensure this but we double check here.
 			if len(boundContract.address) == 0 {
@@ -840,7 +831,6 @@ func (r *ccipChainReader) Sync(ctx context.Context, contracts ContractAddresses)
 	return nil
 }
 
-// TODO(NONEVM-1865): remove this function once from CCIPReader interface once CAL migration is complete.
 func (r *ccipChainReader) GetContractAddress(contractName string, chain cciptypes.ChainSelector) ([]byte, error) {
 	return r.donAddressBook.GetContractAddress(addressbook.ContractName(contractName), chain)
 }
