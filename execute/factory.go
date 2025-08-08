@@ -137,15 +137,8 @@ func (p PluginFactory) NewReportingPlugin(
 
 	// Validate that the readerFacades were already wrapped in the Extended interface from core.
 	readerFacades := make(map[cciptypes.ChainSelector]contractreader.ContractReaderFacade)
-	//extended := make(map[cciptypes.ChainSelector]contractreader.Extended)
 	for chain, cr := range p.extendedReaders {
-		//extendedCr, ok := cr.(contractreader.Extended)
-		//if !ok {
-		//	return nil, ocr3types.ReportingPluginInfo{},
-		//		fmt.Errorf("contract reader %T does not implement Extended interface for chain %d", cr, chain)
-		//}
 		readerFacades[chain] = cr
-		//extended[chain] = extendedCr
 	}
 
 	ccipReader, err := readerpkg.NewCCIPChainReader(

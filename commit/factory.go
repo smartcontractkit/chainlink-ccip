@@ -142,11 +142,6 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 	// Validate that the readerFacades were already wrapped in the Extended interface from core.
 	readerFacades := make(map[cciptypes.ChainSelector]contractreader.ContractReaderFacade, len(p.contractReaders))
 	for chain, cr := range p.contractReaders {
-		//extendedCr, ok := cr.(contractreader.Extended)
-		//if !ok {
-		//	return nil, ocr3types.ReportingPluginInfo{},
-		//		fmt.Errorf("contract reader %T does not implement Extended interface for chain %d", cr, chain)
-		//}
 		readerFacades[chain] = cr
 	}
 
@@ -197,7 +192,7 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 	}
 
 	// The node supports the chain that the token prices are on.
-	_, ok := readerFacades[offchainConfig.PriceFeedChainSelector]
+	_, ok := p.chainAccessors[offchainConfig.PriceFeedChainSelector]
 	if ok {
 		// Bind all token aggregate contracts
 		var bcs []types.BoundContract
@@ -208,10 +203,15 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 			})
 		}
 		for _, bc := range bcs {
-			err = p.chainAccessors[offchainConfig.PriceFeedChainSelector].Sync(ctx, bc.Name, cciptypes.UnknownAddress(bc.Address))
+			err = p.chainAccessors[offchainConfig.PriceFeedChainSelector].Sync(
+				ctx,
+				bc.Name,
+				cciptypes.UnknownAddress(bc.Address),
+			)
 			if err != nil {
-				return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to sync price aggregator contract %s on chain %d: %w",
-					bc.Name, offchainConfig.PriceFeedChainSelector, err)
+				return nil, ocr3types.ReportingPluginInfo{},
+					fmt.Errorf("failed to sync price aggregator contract %s on chain %d: %w",
+						bc.Name, offchainConfig.PriceFeedChainSelector, err)
 			}
 		}
 	}

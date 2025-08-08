@@ -3,6 +3,7 @@ package chainaccessor
 import (
 	"context"
 	"fmt"
+	"os"
 	"slices"
 	"strconv"
 	"time"
@@ -95,6 +96,7 @@ func (l *DefaultAccessor) Sync(
 	contractName string,
 	contractAddress cciptypes.UnknownAddress,
 ) error {
+	fmt.Println("default_accessor.go Sync(). Process ID: ", os.Getpid())
 	lggr := logutil.WithContextValues(ctx, l.lggr)
 	addressStr, err := l.addrCodec.AddressBytesToString(contractAddress, l.chainSelector)
 	if err != nil {

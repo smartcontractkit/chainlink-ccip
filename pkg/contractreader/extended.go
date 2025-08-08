@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -250,12 +251,15 @@ func (e *extendedContractReader) ExtendedBatchGetLatestValues(
 }
 
 func (e *extendedContractReader) Bind(ctx context.Context, allBindings []types.BoundContract) error {
+	extendedReaderMemoryAddress := fmt.Sprintf("%p", e)
+	fmt.Println("extended.go Bind(). Process ID: ", os.Getpid(), " Extended reader memory address: ", extendedReaderMemoryAddress)
 	validBindings := slicelib.Filter(allBindings, func(b types.BoundContract) bool { return !e.bindingExists(b) })
 	if len(validBindings) == 0 {
 		return nil
 	}
 
-	fmt.Println("Bind() Binding contracts:", validBindings)
+	fmt.Printf("extended.go Bind() with memory address: %s, pid: %d, valid bindings: %d\n\n",
+		extendedReaderMemoryAddress, os.Getpid(), len(validBindings))
 	err := e.reader.Bind(ctx, validBindings)
 	if err != nil {
 		return fmt.Errorf("failed to call ContractReader.Bind: %w", err)
@@ -307,7 +311,6 @@ func (e *extendedContractReader) bindingExists(b types.BoundContract) bool {
 
 	for _, boundContracts := range e.contractBindingsByName {
 		for _, boundContract := range boundContracts {
-			fmt.Println("bindingExists() - Checking binding:", boundContract.Binding, "against", b)
 			// Ignore case when comparing addresses
 			if strings.EqualFold(boundContract.Binding.String(), strings.ToLower(b.String())) {
 				return true
