@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	sel "github.com/smartcontractkit/chain-selectors"
-
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
@@ -138,22 +136,15 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 		oracleIDToP2PID[commontypes.OracleID(oracleID)] = node.P2pID
 	}
 
-	// Map contract readers to ContractReaderFacade:
-	// - Extended reader adds finality violation and contract binding management.
-	// - Observed reader adds metric reporting.
+	// Validate that the readers were already wrapped in the Extended interface from core.
 	readers := make(map[cciptypes.ChainSelector]contractreader.ContractReaderFacade, len(p.contractReaders))
 	for chain, cr := range p.contractReaders {
-		chainFamily, err1 := sel.GetSelectorFamily(uint64(chain))
-		if err1 != nil {
-			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to get chain family from selector: %w", err1)
+		extendedCr, ok := cr.(contractreader.Extended)
+		if !ok {
+			return nil, ocr3types.ReportingPluginInfo{},
+				fmt.Errorf("contract reader %T does not implement Extended interface for chain %d", cr, chain)
 		}
-		chainID, err1 := sel.GetChainIDFromSelector(uint64(chain))
-		if err1 != nil {
-			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to get chain id from selector: %w", err1)
-		}
-		readers[chain] = contractreader.NewExtendedContractReader(
-			contractreader.NewObserverReader(cr, lggr, chainFamily, chainID),
-		)
+		readers[chain] = extendedCr
 	}
 
 	// Bind the RMNHome contract
@@ -213,8 +204,12 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 				Name:    consts.ContractNamePriceAggregator,
 			})
 		}
-		if err1 := readers[offchainConfig.PriceFeedChainSelector].Bind(ctx, bcs); err1 != nil {
-			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to bind token price contracts: %w", err1)
+		for _, bc := range bcs {
+			err = p.chainAccessors[offchainConfig.PriceFeedChainSelector].Sync(ctx, bc.Name, cciptypes.UnknownAddress(bc.Address))
+			if err != nil {
+				return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to sync price aggregator contract %s on chain %d: %w",
+					bc.Name, offchainConfig.PriceFeedChainSelector, err)
+			}
 		}
 	}
 

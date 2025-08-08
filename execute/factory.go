@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	sel "github.com/smartcontractkit/chain-selectors"
-
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
@@ -134,25 +132,17 @@ func (p PluginFactory) NewReportingPlugin(
 		oracleIDToP2PID[commontypes.OracleID(oracleID)] = node.P2pID
 	}
 
-	// Map contract readers to ContractReaderFacade:
-	// - Extended reader adds finality violation and contract binding management.
-	// - Observed reader adds metric reporting.
+	// Validate that the readers were already wrapped in the Extended interface from core.
 	readers := make(map[cciptypes.ChainSelector]contractreader.ContractReaderFacade)
 	extended := make(map[cciptypes.ChainSelector]contractreader.Extended)
 	for chain, cr := range p.contractReaders {
-		chainFamily, err1 := sel.GetSelectorFamily(uint64(chain))
-		if err1 != nil {
-			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to get chain family from selector: %w", err1)
+		extendedCr, ok := cr.(contractreader.Extended)
+		if !ok {
+			return nil, ocr3types.ReportingPluginInfo{},
+				fmt.Errorf("contract reader %T does not implement Extended interface for chain %d", cr, chain)
 		}
-		chainID, err1 := sel.GetChainIDFromSelector(uint64(chain))
-		if err1 != nil {
-			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to get chain id from selector: %w", err1)
-		}
-		reader := contractreader.NewExtendedContractReader(
-			contractreader.NewObserverReader(cr, lggr, chainFamily, chainID),
-		)
-		readers[chain] = reader
-		extended[chain] = reader
+		readers[chain] = extendedCr
+		extended[chain] = extendedCr
 	}
 
 	ccipReader, err := readerpkg.NewCCIPChainReader(
