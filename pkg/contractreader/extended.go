@@ -255,13 +255,16 @@ func (e *extendedContractReader) Bind(ctx context.Context, allBindings []types.B
 		return nil
 	}
 
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	fmt.Println("Bind() Binding contracts:", validBindings)
 	err := e.reader.Bind(ctx, validBindings)
+
 	if err != nil {
 		return fmt.Errorf("failed to call ContractReader.Bind: %w", err)
 	}
 
-	e.mu.Lock()
-	defer e.mu.Unlock()
 	for _, binding := range validBindings {
 		if e.multiBindAllowed[binding.Name] {
 			e.contractBindingsByName[binding.Name] = append(e.contractBindingsByName[binding.Name], ExtendedBoundContract{
@@ -270,6 +273,8 @@ func (e *extendedContractReader) Bind(ctx context.Context, allBindings []types.B
 			})
 		} else {
 			if len(e.contractBindingsByName[binding.Name]) > 0 {
+				fmt.Println("Bind() unbinding: ", e.contractBindingsByName[binding.Name][0].Binding)
+
 				// Unbind the previous binding
 				err := e.reader.Unbind(ctx, []types.BoundContract{e.contractBindingsByName[binding.Name][0].Binding})
 				if err != nil {
@@ -304,6 +309,7 @@ func (e *extendedContractReader) bindingExists(b types.BoundContract) bool {
 
 	for _, boundContracts := range e.contractBindingsByName {
 		for _, boundContract := range boundContracts {
+			fmt.Println("bindingExists() - Checking binding:", boundContract.Binding, "against", b)
 			if boundContract.Binding.String() == b.String() {
 				return true
 			}
