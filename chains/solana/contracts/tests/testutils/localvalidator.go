@@ -54,58 +54,71 @@ func getPorts(t *testing.T) (port string, wsPort string, faucetPort string) {
 func SetupLocalSolNodeWithFlags(t *testing.T, flags ...string) (string, string) {
 	t.Helper()
 
-	port, wsPort, faucetPort := getPorts(t)
+	attemptSetupLocalNode := func() (ready bool, url string, wsURL string) {
+		port, wsPort, faucetPort := getPorts(t)
 
-	url := "http://127.0.0.1:" + port
-	wsURL := "ws://127.0.0.1:" + wsPort
+		url = "http://127.0.0.1:" + port
+		wsURL = "ws://127.0.0.1:" + wsPort
 
-	args := append([]string{
-		"--reset",
-		"--rpc-port", port,
-		"--faucet-port", faucetPort,
-		"--ledger", t.TempDir(),
-		// Configurations to make the local cluster faster
-		"--ticks-per-slot", "8", // value in mainnet: 64
-		// account data direct mapping feature is disabled on mainnet,
-		// so we disable it here to make the local cluster more similar to mainnet
-		"--deactivate-feature", "EenyoWx9UMXYKpR8mW5Jmfmy2fRjzUtM7NduYMY8bx33",
-	}, flags...)
+		args := append([]string{
+			"--reset",
+			"--rpc-port", port,
+			"--faucet-port", faucetPort,
+			"--ledger", t.TempDir(),
+			// Configurations to make the local cluster faster
+			"--ticks-per-slot", "8", // value in mainnet: 64
+			// account data direct mapping feature is disabled on mainnet,
+			// so we disable it here to make the local cluster more similar to mainnet
+			"--deactivate-feature", "EenyoWx9UMXYKpR8mW5Jmfmy2fRjzUtM7NduYMY8bx33",
+		}, flags...)
 
-	cmd := exec.Command("solana-test-validator", args...)
+		cmd := exec.Command("solana-test-validator", args...)
 
-	var stdErr bytes.Buffer
-	cmd.Stderr = &stdErr
-	var stdOut bytes.Buffer
-	cmd.Stdout = &stdOut
-	require.NoError(t, cmd.Start())
-	t.Cleanup(func() {
-		assert.NoError(t, cmd.Process.Kill())
-		if err2 := cmd.Wait(); assert.Error(t, err2) {
-			if !assert.Contains(t, err2.Error(), "signal: killed", cmd.ProcessState.String()) {
-				t.Logf("solana-test-validator\n stdout: %s\n stderr: %s", stdOut.String(), stdErr.String())
+		var stdErr bytes.Buffer
+		cmd.Stderr = &stdErr
+		var stdOut bytes.Buffer
+		cmd.Stdout = &stdOut
+		require.NoError(t, cmd.Start())
+		t.Cleanup(func() {
+			assert.NoError(t, cmd.Process.Kill())
+			if err2 := cmd.Wait(); assert.Error(t, err2) {
+				if !assert.Contains(t, err2.Error(), "signal: killed", cmd.ProcessState.String()) {
+					t.Logf("solana-test-validator\n stdout: %s\n stderr: %s", stdOut.String(), stdErr.String())
+				}
 			}
-		}
-	})
+		})
 
-	// Wait for api server to boot
-	var ready bool
-	for i := 0; i < 30; i++ {
-		time.Sleep(time.Second)
-		client := rpc.New(url)
-		out, err := client.GetHealth(tests.Context(t))
-		if err != nil || out != rpc.HealthOk {
-			t.Logf("API server not ready yet (attempt %d)\n", i+1)
-			continue
+		// Wait for api server to boot
+		ready = false
+		for i := range 30 {
+			time.Sleep(time.Second)
+			client := rpc.New(url)
+			out, err := client.GetHealth(tests.Context(t))
+			if err != nil || out != rpc.HealthOk {
+				t.Logf("API server not ready yet (attempt %d)\n", i+1)
+				continue
+			}
+			ready = true
+			break
 		}
-		ready = true
-		break
-	}
-	if !ready {
-		t.Logf("Cmd output: %s\nCmd error: %s\n", stdOut.String(), stdErr.String())
-	}
-	require.True(t, ready)
+		if !ready {
+			t.Logf("Cmd output: %s\nCmd error: %s\n", stdOut.String(), stdErr.String())
+			return false, "", ""
+		}
 
-	return url, wsURL
+		return true, url, wsURL
+	}
+
+	maxAttempts := 3
+	for i := range maxAttempts {
+		t.Logf("Trying to start local solana node (attempt %d of %d)...", i+1, maxAttempts)
+		ready, url, wsURL := attemptSetupLocalNode()
+		if ready {
+			return url, wsURL
+		}
+	}
+	t.Fatal("Failed to start local solana node after multiple attempts")
+	return "", ""
 }
 
 func FundTestAccounts(t *testing.T, keys []solana.PublicKey, url string) {
