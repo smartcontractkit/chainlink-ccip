@@ -255,16 +255,14 @@ func (e *extendedContractReader) Bind(ctx context.Context, allBindings []types.B
 		return nil
 	}
 
-	e.mu.Lock()
-	defer e.mu.Unlock()
-
 	fmt.Println("Bind() Binding contracts:", validBindings)
 	err := e.reader.Bind(ctx, validBindings)
-
 	if err != nil {
 		return fmt.Errorf("failed to call ContractReader.Bind: %w", err)
 	}
 
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	for _, binding := range validBindings {
 		if e.multiBindAllowed[binding.Name] {
 			e.contractBindingsByName[binding.Name] = append(e.contractBindingsByName[binding.Name], ExtendedBoundContract{
