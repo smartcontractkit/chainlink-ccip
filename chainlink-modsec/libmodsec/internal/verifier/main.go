@@ -3,7 +3,6 @@ package verifier
 import (
 	"context"
 	"fmt"
-	"log"
 	"sync"
 )
 
@@ -17,15 +16,18 @@ import (
 //   - Collect results from verifiers as they are available.
 //   - Write verifier attestations to storage.
 func (s *Verifier) run() {
-	// Start reader
-	s.started = true
-	if s.poller == nil {
-		log.Println("No poller configured, verifier will not process any work.")
+	if s.writer == nil {
+		fmt.Println("No writer configured, verifier will not process any work.")
 		// TODO: surface an error.
 		return
 	}
 	if s.transformer == nil {
-		log.Println("No transformer configured, verifier will not process any work.")
+		fmt.Println("No transformer configured, verifier will not process any work.")
+		// TODO: surface an error.
+		return
+	}
+	if s.signer == nil {
+		fmt.Println("No signer configured, verifier will not process any work.")
 		// TODO: surface an error.
 		return
 	}
@@ -35,12 +37,12 @@ func (s *Verifier) run() {
 
 	var wg sync.WaitGroup
 
-	workCh := make(chan Work)
-	messageCh := make(chan StoredMessage)
+	transformCh := make(chan Work)
 	handlerPayloadCh := make(chan HandlerPayload)
-	resultCh := make(chan Result)
+	writePayloadCh := make(chan HandlerPayload)
+	writeAttestationCh := make(chan Attestation)
 
-	// produce data
+	// Read blockchain data for new work.
 	go func() {
 		wg.Add(1)
 		defer wg.Done()
@@ -48,16 +50,16 @@ func (s *Verifier) run() {
 		for true {
 			select {
 			case <-ctx.Done():
-				log.Println("Verifier shutting down poller...")
+				fmt.Println("Verifier shutting down poller...")
 				return
-			case data := <-s.poller.Watch(ctx):
+			case data := <-s.reader.Next(ctx):
 				fmt.Println(data)
-				workCh <- data
+				transformCh <- data // to transformer
 			}
 		}
 	}()
 
-	// transform data
+	// Transform work into the handler payload.
 	go func() {
 		wg.Add(1)
 		defer wg.Done()
@@ -65,13 +67,13 @@ func (s *Verifier) run() {
 		for true {
 			select {
 			case <-ctx.Done():
-				log.Println("Verifier shutting down transformer...")
+				fmt.Println("Verifier shutting down transformer...")
 				return
-			case work := <-workCh:
+			case work := <-transformCh:
 				payload := s.transformer.Transform(work)
 				fmt.Println("Payload transformed:", payload)
-				handlerPayloadCh <- payload
-				// TODO:: send StoredMessage to 'messageCh', it can be written ahead of verification.
+				handlerPayloadCh <- payload // to handler dispatch.
+				writePayloadCh <- payload   // to writer.
 			}
 		}
 	}()
@@ -84,17 +86,58 @@ func (s *Verifier) run() {
 		for true {
 			select {
 			case <-ctx.Done():
-				log.Println("Verifier shutting down handlers...")
+				fmt.Println("Verifier shutting down handlers...")
 				return
 			case payload := <-handlerPayloadCh:
-				log.Printf("Running handlers for payload: %v\n", payload)
+				fmt.Printf("Running handlers for payload: %v\n", payload)
 				// Dispatch payload to each handler.
 				for _, handler := range s.handlers {
-					go handler(ctx, payload, resultCh)
+					// TODO: signing needs to fit in before writing.
+					go handler(ctx, payload, writeAttestationCh)
 				}
 			}
 		}
 	}()
 
 	// write results
+	go func() {
+		wg.Add(1)
+		defer wg.Done()
+
+		for true {
+			select {
+			case <-ctx.Done():
+				fmt.Println("Verifier shutting down handlers...")
+				return
+			case payload := <-writePayloadCh:
+				for _, w := range s.writer {
+					if err := w.WriteMessage(ctx, payload); err != nil {
+						// TODO: surface an error.
+						fmt.Println("Error writing payload.")
+					}
+				}
+			case attestation := <-writeAttestationCh:
+				for _, w := range s.writer {
+					if err := w.WriteAttestation(ctx, attestation); err != nil {
+						// TODO: surface an error.
+						fmt.Println("Error writing payload.")
+					}
+				}
+			}
+		}
+	}()
+
+	// Wait for service to stop.
+	done := false
+	for !done {
+		select {
+		case <-s.stopCh:
+			cancel()
+			done = true
+		case <-ctx.Done():
+			done = true
+		}
+	}
+
+	wg.Wait()
 }

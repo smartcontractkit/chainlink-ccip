@@ -1,55 +1,8 @@
 package verifier
 
 import (
-	"context"
-
 	"github.com/smartcontractkit/chainlink-modsec/libmodsec/pkg/modsectypes"
 )
-
-// Poller is an interface that defines how to poll for new work to be processed.
-type Poller interface {
-	// Next returns a channel that will yield the next piece of work to be processed.
-	Next(ctx context.Context) <-chan Work
-
-	// Watch returns a channel that will yield all work to be processed.
-	Watch(ctx context.Context) <-chan Work
-}
-
-// Transformer is an interface that defines how to transform a Work item into a modsec message.
-// TODO: tranform from source to verifier and again from verifier to destination?
-type Transformer interface {
-	Transform(work Work) HandlerPayload
-}
-
-// StoredMessage represents a message that will be attested. It is the object written to the storage layer.
-type StoredMessage struct {
-	ID      string
-	Message modsectypes.Message
-	Encoded []byte
-	// block info?
-}
-
-// MessageAttestation represents the verifier's attestation of a message.
-type MessageAttestation struct {
-	Attestor string
-	Sig      []byte
-}
-
-// AttestationWriter is an interface that defines how to write attestations and messages to a storage layer.
-// The writer is responsible for deciding how to store the messages and attestations, including
-// how to avoid duplicates, and how to structure the storage for efficient scanning.
-type AttestationWriter interface {
-	// StoreMessage stores the message that is being attested.
-	// The writer implementation is responsible for deciding how to store the message.
-	// It should consider things like how it will be retrieved later, and how to avoid duplicates.
-	// For example, it may decide to store messages in a hierarchy based on the time, block number, sequence number, etc.
-	StoreMessage(ctx context.Context, msg StoredMessage) error
-
-	// StoreAttestation stores the attestation for a message.
-	// The writer implementation is responsible for deciding how to store the attestation.
-	// It should consider things like how it will be retrieved later, and how to avoid duplicates.
-	StoreAttestation(ctx context.Context, msg MessageAttestation) error
-}
 
 // Verifier is the main verifier service. It manages the lifecycle of data
 // fetching, handling, and writing a resulting attestation.
@@ -57,17 +10,12 @@ type Verifier struct {
 	workCh chan Work
 	stopCh chan struct{}
 
-	// handlers are registered by name.
-	handlers []Handler
-
-	// state
-	started bool
-
-	// configurable services
+	// configurable components
+	handlers    []Handler
 	signer      modsectypes.Signer
-	poller      Poller
+	reader      Reader
 	transformer Transformer
-	writer      []AttestationWriter
+	writer      []Writer
 	// Add more configurable fields as needed
 }
 
@@ -81,10 +29,10 @@ func WithSigner(signer modsectypes.Signer) Option {
 	}
 }
 
-// WithPoller sets a custom poller for the verifier
-func WithPoller(poller Poller) Option {
+// WithReader sets a reader for the verifier
+func WithReader(reader Reader) Option {
 	return func(v *Verifier) {
-		v.poller = poller
+		v.reader = reader
 	}
 }
 
@@ -96,13 +44,13 @@ func WithTransformer(transformer Transformer) Option {
 }
 
 // WithWriter adds a writer for the verifier
-func WithWriter(writer AttestationWriter) Option {
+func WithWriter(writer Writer) Option {
 	return func(v *Verifier) {
 		v.writer = append(v.writer, writer)
 	}
 }
 
-// WithHandler adds a handler function for a given name. Only one handler can be registered per name.
+// WithHandler adds a handler function, there can be more than one.
 func WithHandler(handler Handler) Option {
 	return func(v *Verifier) {
 		v.handlers = append(v.handlers, handler)
