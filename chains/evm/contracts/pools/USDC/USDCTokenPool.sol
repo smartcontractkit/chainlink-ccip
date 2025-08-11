@@ -33,7 +33,8 @@ import {EnumerableSet} from
 | CCTP Message Transmitter Proxy | --------------------> | Message Transmitter   |
 +-------------------------------+                        +-----------------------+
 */
-
+/// @dev This specific pool is used for CCTP V1. The CCTP V2 pool is a separate contract, which inherits many of the
+/// state management from this contract, only overriding the functions absolutely necessary for supporting CCTP V2.
 contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
   using SafeERC20 for IERC20;
   using EnumerableSet for EnumerableSet.AddressSet;
@@ -47,8 +48,8 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
   error UnlockingUSDCFailed();
   error InvalidConfig();
   error InvalidDomain(DomainUpdate domain);
-  error InvalidMessageVersion(uint32 expected, uint32 got); // TODO: Remove expected
-  error InvalidTokenMessengerVersion(uint32 expected, uint32 got); // TODO: Remove expected
+  error InvalidMessageVersion(uint32 expected, uint32 got);
+  error InvalidTokenMessengerVersion(uint32 expected, uint32 got);
   error InvalidNonce(uint64 expected, uint64 got);
   error InvalidSourceDomain(uint32 expected, uint32 got);
   error InvalidDestinationDomain(uint32 expected, uint32 got);
@@ -279,12 +280,13 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
     // call releaseOrMint on this contract, with a sourcePoolData from a previous
     // version will revert. However, this should never occur, as the USDC Proxy
     // which receives the message first, should never call this pool with that data,
-    // instead routing the message to a pool capable of decoding properly.
+    // instead formatting the message to the new format if necessary.
     SourceTokenDataPayload memory sourceTokenDataPayload =
       abi.decode(releaseOrMintIn.sourcePoolData, (SourceTokenDataPayload));
 
     _validateMessage(msgAndAttestation.message, sourceTokenDataPayload);
 
+    // Proxy the message to the message transmitter, which will mint the tokens through CCTP's contracts.
     if (!i_messageTransmitterProxy.receiveMessage(msgAndAttestation.message, msgAndAttestation.attestation)) {
       revert UnlockingUSDCFailed();
     }
