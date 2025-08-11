@@ -12,6 +12,11 @@ import {IERC20} from
 import {SafeERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 
+/// @dev The flag used to indicate that the source pool data is coming from a chain that does not have CCTP Support,
+/// and so the lock release pool should be used. The BurnMintWithLockReleaseTokenPool uses this flag as its source pool
+/// data to indicate that the tokens should be released from the lock release pool rather than attempting to be minted
+/// through CCTP.
+/// @dev The preimage is bytes4(keccak256("NO_CCTP_USE_LOCK_RELEASE")).
 bytes4 constant LOCK_RELEASE_FLAG = 0xfa7c07de;
 
 /// @notice A token pool proxy for USDC that allows for routing of messages to the correct pool based on the correct
@@ -38,6 +43,7 @@ contract USDCTokenPoolProxy is TokenPool, ITypeAndVersion {
   error PoolAddressCannotBeZero();
   error InvalidLockOrBurnMechanism(LockOrBurnMechanism mechanism);
   error InvalidMessageVersion(uint32 version);
+  error InvalidMessageLength(uint256 length);
 
   // solhint-disable-next-line gas-struct-packing
   struct PoolAddresses {
@@ -46,14 +52,14 @@ contract USDCTokenPoolProxy is TokenPool, ITypeAndVersion {
     address lockReleasePool;
   }
 
-  PoolAddresses internal s_pools;
-
   enum LockOrBurnMechanism {
     INVALID_MECHANISM,
     CCTP_V1,
     CCTP_V2,
     LOCK_RELEASE
   }
+
+  PoolAddresses internal s_pools;
 
   mapping(uint64 remoteChainSelector => LockOrBurnMechanism) internal s_lockOrBurnMechanism;
 
@@ -98,7 +104,7 @@ contract USDCTokenPoolProxy is TokenPool, ITypeAndVersion {
       destinationPool = pools.cctpV2Pool;
     }
 
-    // Transfer the tokens to the destination pool
+    // Transfer the tokens to the destination pool otherwise any burn or transfer will revert due to insufficient balance.
     i_token.safeTransfer(destinationPool, lockOrBurnIn.amount);
 
     return USDCTokenPool(destinationPool).lockOrBurn(lockOrBurnIn);
@@ -120,14 +126,19 @@ contract USDCTokenPoolProxy is TokenPool, ITypeAndVersion {
     // In previous versions of the USDC Token Pool, the sourcePoolData only contained two fields, a uint64 and uint32.
     // For structs stored only in memory, the compiler assigns each field to its own 32-byte slot, instead of tightly
     // packing like in storage. This means that a message originating from a previous version of the pool will have a
-    // sourcePoolData that is 64 bytes long. This indicates an inflight message originating from a previous version of
-    // the pool, and needs to be routed to the previous pool, otherwise sending it to the current pool will revert
-    // due to sourcePoolData not being able to be parsed in the new format.
+    // sourcePoolData that is 64 bytes long, indicating an inflight message originating from a previous version of
+    // the USDC Token pool.
     if (releaseOrMintIn.sourcePoolData.length == 64) {
       // Since the new pool and the inflight message should utilize the same version of CCTP, and would have the same
       // destinationCaller (the message transmitter proxy), we can route the message to the v1 pool, but we first
       // need to turn the source pool data into the new format so that the abi-decoding will succeed. Once there is
       // confidence that no more messages are inflight, these branches can be safely removed.
+
+      // While adding some complexity to the code, this is preferable than having to maintain support for the legacy token
+      // pool. Since that legacy pool has an Only-OffRamp check, this proxy would have to be set as an offRamp in the
+      // router, which is a design decision that is not ideal and presents additional security risks. This mechanism
+      // instead allows for the legacy pool to be removed, and the proxy to be updated to only have to utilize the new
+      // version of the USDC Token Pool.
       Pool.ReleaseOrMintInV1 memory legacyReleaseOrMintIn = _generateNewReleaseOrMintIn(releaseOrMintIn);
 
       // Since the CCTP v1 pool will have this contract set as an allowed caller, no additional configurations are
@@ -139,6 +150,12 @@ contract USDCTokenPoolProxy is TokenPool, ITypeAndVersion {
     // valid for both versions. If this changes in future versions, this will need to be updated.
     uint32 version;
     bytes memory usdcMessage = releaseOrMintIn.offchainTokenData;
+
+    // Check the first 4 bytes of the message to prevent an out-of-bounds read.
+    if (usdcMessage.length < 4) {
+      revert InvalidMessageLength(usdcMessage.length);
+    }
+
     // solhint-disable-next-line no-inline-assembly
     assembly {
       // We truncate using the datatype of the version variable, meaning

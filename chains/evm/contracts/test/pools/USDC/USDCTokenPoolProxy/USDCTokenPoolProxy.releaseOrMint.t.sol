@@ -9,6 +9,10 @@ import {LOCK_RELEASE_FLAG} from "../../../../pools/USDC/USDCTokenPoolProxy.sol";
 import {USDCTokenPoolProxySetup} from "./USDCTokenPoolProxySetup.t.sol";
 
 contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
+  address internal s_sender = makeAddr("sender");
+  address internal s_receiver = makeAddr("receiver");
+  bytes internal s_sourcePoolAddress = abi.encode(SOURCE_CHAIN_USDC_POOL);
+
   struct LegacySourcePoolData {
     uint64 nonce;
     uint32 sourceDomain;
@@ -17,12 +21,8 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
   function test_releaseOrMint_LockReleaseFlag() public {
     // Arrange: Prepare test data
     uint256 testAmount = 1234;
-    address testSender = makeAddr("sender");
-    address testReceiver = makeAddr("receiver");
-    address localToken = address(s_USDCToken);
     bytes memory lockReleaseFlag = abi.encodePacked(LOCK_RELEASE_FLAG);
-    bytes memory sourcePoolAddress = abi.encode(SOURCE_CHAIN_USDC_POOL);
-    bytes memory originalSender = abi.encode(testSender);
+    bytes memory originalSender = abi.encode(s_sender);
     bytes memory offchainTokenData = "";
 
     // Mock the router's isOffRamp function to return true
@@ -38,11 +38,11 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = Pool.ReleaseOrMintInV1({
       remoteChainSelector: SOURCE_CHAIN_SELECTOR,
       originalSender: originalSender,
-      receiver: testReceiver,
+      receiver: s_receiver,
       sourceDenominatedAmount: testAmount,
-      localToken: localToken,
+      localToken: address(s_USDCToken),
       sourcePoolData: lockReleaseFlag,
-      sourcePoolAddress: sourcePoolAddress,
+      sourcePoolAddress: s_sourcePoolAddress,
       offchainTokenData: offchainTokenData
     });
 
@@ -68,11 +68,7 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
   function test_releaseOrMint_CCTPV1Flag() public {
     // Arrange: Prepare test data
     uint256 testAmount = 4321;
-    address testSender = makeAddr("sender");
-    address testReceiver = makeAddr("receiver");
-    address localToken = address(s_USDCToken);
-    bytes memory sourcePoolAddress = abi.encode(SOURCE_CHAIN_USDC_POOL);
-    bytes memory originalSender = abi.encode(testSender);
+    bytes memory originalSender = abi.encode(s_sender);
     USDCMessage memory usdcMessage = USDCMessage({
       version: 0,
       sourceDomain: uint32(0),
@@ -99,11 +95,11 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = Pool.ReleaseOrMintInV1({
       remoteChainSelector: SOURCE_CHAIN_SELECTOR,
       originalSender: originalSender,
-      receiver: testReceiver,
+      receiver: s_receiver,
       sourceDenominatedAmount: testAmount,
-      localToken: localToken,
+      localToken: address(s_USDCToken),
       sourcePoolData: sourcePoolData,
-      sourcePoolAddress: sourcePoolAddress,
+      sourcePoolAddress: s_sourcePoolAddress,
       offchainTokenData: offChainTokenData
     });
 
@@ -128,11 +124,7 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
   function test_releaseOrMint_CCTPV2Flag() public {
     // Arrange: Prepare test data
     uint256 testAmount = 5678;
-    address testSender = makeAddr("sender");
-    address testReceiver = makeAddr("receiver");
-    address localToken = address(s_USDCToken);
-    bytes memory sourcePoolAddress = abi.encode(SOURCE_CHAIN_USDC_POOL);
-    bytes memory originalSender = abi.encode(testSender);
+    bytes memory originalSender = abi.encode(s_sender);
     USDCMessage memory usdcMessage = USDCMessage({
       version: 1,
       sourceDomain: uint32(0),
@@ -159,12 +151,12 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = Pool.ReleaseOrMintInV1({
       remoteChainSelector: SOURCE_CHAIN_SELECTOR,
       originalSender: originalSender,
-      receiver: testReceiver,
+      receiver: s_receiver,
       sourceDenominatedAmount: testAmount,
-      localToken: localToken,
+      localToken: address(s_USDCToken),
       // sourcePoolData should be a USDC Message where the version number is 1
       sourcePoolData: sourcePoolData,
-      sourcePoolAddress: sourcePoolAddress,
+      sourcePoolAddress: s_sourcePoolAddress,
       offchainTokenData: offChainTokenData
     });
 
@@ -187,8 +179,6 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
   function test_releaseOrMint_LegacyFormat() public {
     // Arrange: Prepare test data for legacy format (64 bytes)
     uint256 testAmount = 1e6;
-    address testSender = makeAddr("sender");
-    address testReceiver = makeAddr("receiver");
 
     LegacySourcePoolData memory legacySourcePoolData = LegacySourcePoolData({nonce: 12345, sourceDomain: 67890});
 
@@ -207,12 +197,12 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
     // Prepare input with legacy 64-byte sourcePoolData
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = Pool.ReleaseOrMintInV1({
       remoteChainSelector: SOURCE_CHAIN_SELECTOR,
-      originalSender: abi.encode(testSender),
-      receiver: testReceiver,
+      originalSender: abi.encode(s_sender),
+      receiver: s_receiver,
       sourceDenominatedAmount: testAmount,
       localToken: address(s_USDCToken),
       sourcePoolData: legacySourcePoolDataBytes, // 64 bytes: uint64 + uint32
-      sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
+      sourcePoolAddress: s_sourcePoolAddress,
       offchainTokenData: ""
     });
 
@@ -240,11 +230,6 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
   function test_releaseOrMint_InvalidVersion() public {
     // Arrange: Prepare test data
     uint256 testAmount = 1234;
-    address testSender = makeAddr("sender");
-    address testReceiver = makeAddr("receiver");
-    address localToken = address(s_USDCToken);
-    bytes memory sourcePoolAddress = abi.encode(SOURCE_CHAIN_USDC_POOL);
-    bytes memory originalSender = abi.encode(testSender);
     bytes memory emptyMessageBody = new bytes(0);
 
     // Create a USDC message with version = 2 (not 0 or 1)
@@ -272,16 +257,53 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
 
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = Pool.ReleaseOrMintInV1({
       remoteChainSelector: SOURCE_CHAIN_SELECTOR,
-      originalSender: originalSender,
-      receiver: testReceiver,
+      originalSender: abi.encode(s_sender),
+      receiver: s_receiver,
       sourceDenominatedAmount: testAmount,
-      localToken: localToken,
+      localToken: address(s_USDCToken),
       sourcePoolData: sourcePoolData,
-      sourcePoolAddress: sourcePoolAddress,
+      sourcePoolAddress: s_sourcePoolAddress,
       offchainTokenData: offChainTokenData
     });
 
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.InvalidMessageVersion.selector, 2));
+    s_usdcTokenPoolProxy.releaseOrMint(releaseOrMintIn);
+
+    vm.stopPrank();
+  }
+
+  function test_releaseOrMint_RevertWhen_InvalidMessageLength() public {
+    // Arrange: Prepare test data with offchainTokenData less than 4 bytes
+    uint256 testAmount = 1234;
+
+    // Create offchainTokenData with only 3 bytes (less than the required 4 bytes for version)
+    bytes memory shortOffchainTokenData = new bytes(3);
+    shortOffchainTokenData[0] = 0x01;
+    shortOffchainTokenData[1] = 0x02;
+    shortOffchainTokenData[2] = 0x03;
+
+    // Mock the router's isOffRamp function to return true
+    vm.mockCall(
+      address(s_router),
+      abi.encodeWithSelector(Router.isOffRamp.selector, SOURCE_CHAIN_SELECTOR, s_routerAllowedOffRamp),
+      abi.encode(true)
+    );
+
+    vm.startPrank(s_routerAllowedOffRamp);
+
+    Pool.ReleaseOrMintInV1 memory releaseOrMintIn = Pool.ReleaseOrMintInV1({
+      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+      originalSender: abi.encode(s_sender),
+      receiver: s_receiver,
+      sourceDenominatedAmount: testAmount,
+      localToken: address(s_USDCToken),
+      sourcePoolData: "", // Not lock release flag, not legacy format
+      sourcePoolAddress: s_sourcePoolAddress,
+      offchainTokenData: shortOffchainTokenData
+    });
+
+    // Expect revert with InvalidMessageLength error
+    vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.InvalidMessageLength.selector, 3));
     s_usdcTokenPoolProxy.releaseOrMint(releaseOrMintIn);
 
     vm.stopPrank();
