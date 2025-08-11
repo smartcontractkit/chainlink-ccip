@@ -70,6 +70,11 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     AuthorizedCallers(new address[](0))
   {}
 
+  /// @notice Using a function because constant state variables cannot be overridden by child contracts.
+  function typeAndVersion() external pure virtual override returns (string memory) {
+    return "SiloedUSDCTokenPool 1.6.3-dev";
+  }
+
   /// @notice Release tokens for a specific chain selector.
   /// @dev This function can only be called by an address specified by the owner to be controlled by circle
   /// @dev proposeCCTPMigration must be called first on an approved lane to execute properly.

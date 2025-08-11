@@ -30,8 +30,6 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
   event SiloRebalancerSet(uint64 indexed remoteChainSelector, address oldRebalancer, address newRebalancer);
   event UnsiloedRebalancerSet(address oldRebalancer, address newRebalancer);
 
-  string public constant override typeAndVersion = "SiloedLockReleaseTokenPool 1.6.1";
-
   /// @notice The amount of tokens available for remote chains which are not siloed as an additional security precaution.
   uint256 internal s_unsiloedTokenBalance;
 
@@ -67,6 +65,11 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
 
     token.safeApprove(lockBox, type(uint256).max);
     i_lockBox = ERC20LockBox(lockBox);
+  }
+
+  /// @notice Using a function because constant state variables cannot be overridden by child contracts.
+  function typeAndVersion() external pure virtual override returns (string memory) {
+    return "SiloedLockReleaseTokenPool 1.6.3-dev";
   }
 
   /// @notice Locks the token in the pool

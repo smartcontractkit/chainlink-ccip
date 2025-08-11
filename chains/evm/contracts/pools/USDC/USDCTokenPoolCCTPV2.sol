@@ -38,6 +38,11 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
     address router
   ) USDCTokenPool(tokenMessenger, cctpMessageTransmitterProxy, token, allowlist, rmnProxy, router, 1) {}
 
+  /// @notice Using a function because constant state variables cannot be overridden by child contracts.
+  function typeAndVersion() external pure virtual override returns (string memory) {
+    return "USDCTokenPoolCCTPV2 1.6.3-dev";
+  }
+
   /// @notice Burn tokens from the pool to initiate cross-chain transfer.
   /// @notice Outgoing messages (burn operations) are routed via `i_tokenMessenger.depositForBurnWithCaller`.
   /// The allowedCaller is preconfigured per destination domain and token pool version refer Domain struct.

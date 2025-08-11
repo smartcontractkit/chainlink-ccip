@@ -100,8 +100,6 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
     uint32 minFinalityThreshold; // Minimum confirmation threshold before attestation (should be 2000).
   }
 
-  string public constant override typeAndVersion = "USDCTokenPool 1.6.2-dev";
-
   /// @notice The version of the USDC message format that this pool supports. Version 0 is the legacy version of CCTP.
   uint32 public immutable i_supportedUSDCVersion;
 
@@ -174,6 +172,11 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
     i_token.safeIncreaseAllowance(address(i_tokenMessenger), type(uint256).max);
 
     emit ConfigSet(address(tokenMessenger));
+  }
+
+  /// @notice Using a function because constant state variables cannot be overridden by child contracts.
+  function typeAndVersion() external pure virtual override returns (string memory) {
+    return "USDCTokenPool 1.6.3-dev";
   }
 
   /// @notice Burn tokens from the pool to initiate cross-chain transfer.
