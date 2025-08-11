@@ -107,11 +107,7 @@ contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsg
   /// @dev The destination chain specific configs.
   mapping(uint64 destChainSelector => DestChainConfig destChainConfig) private s_destChainConfigs;
 
-  constructor(
-    StaticConfig memory staticConfig,
-    DynamicConfig memory dynamicConfig,
-    DestChainConfigArgs[] memory destChainConfigArgs
-  ) {
+  constructor(StaticConfig memory staticConfig, DynamicConfig memory dynamicConfig) {
     if (
       staticConfig.chainSelector == 0 || address(staticConfig.rmnRemote) == address(0)
         || staticConfig.tokenAdminRegistry == address(0)
@@ -124,7 +120,6 @@ contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsg
     i_tokenAdminRegistry = staticConfig.tokenAdminRegistry;
 
     _setDynamicConfig(dynamicConfig);
-    _applyDestChainConfigUpdates(destChainConfigArgs);
   }
 
   // ================================================================
@@ -330,18 +325,11 @@ contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsg
   /// @notice Updates destination chains specific configs.
   /// @param destChainConfigArgs Array of destination chain specific configs.
   function applyDestChainConfigUpdates(
-    DestChainConfigArgs[] memory destChainConfigArgs
+    DestChainConfigArgs[] calldata destChainConfigArgs
   ) external onlyOwner {
-    _applyDestChainConfigUpdates(destChainConfigArgs);
-  }
-
-  /// @notice Internal version of applyDestChainConfigUpdates.
-  function _applyDestChainConfigUpdates(
-    DestChainConfigArgs[] memory destChainConfigArgs
-  ) internal {
     for (uint256 i = 0; i < destChainConfigArgs.length; ++i) {
       DestChainConfigArgs memory destChainConfigArg = destChainConfigArgs[i];
-      uint64 destChainSelector = destChainConfigArgs[i].destChainSelector;
+      uint64 destChainSelector = destChainConfigArg.destChainSelector;
 
       if (destChainSelector == 0) {
         revert InvalidDestChainConfig(destChainSelector);
