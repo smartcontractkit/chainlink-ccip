@@ -11,8 +11,8 @@ interface IFeeQuoterV2 is IFeeQuoter {
   /// @return destExecDataPerToken Destination chain execution data.
   function processPoolReturnDataNew(
     uint64 destChainSelector,
-    Internal.EVMTokenTransfer[] calldata onRampTokenTransfers
-  ) external view returns (bytes[] memory destExecDataPerToken);
+    Internal.EVMTokenTransfer calldata onRampTokenTransfers
+  ) external view returns (bytes memory destExecDataPerToken);
 
   function resolveTokenReceiver(
     bytes calldata extraArgs

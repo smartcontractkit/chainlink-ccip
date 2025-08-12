@@ -166,25 +166,17 @@ contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsg
 
     // 2. get pool params, this potentially mutates verifier list
 
-    // TODO
+    // TODO pool call
 
-    // 3. getFee on all verifiers
+    _deduplicateVerifiers(
+      new address[](0),
+      resolvedExtraArgs.requiredVerifiers,
+      resolvedExtraArgs.optionalVerifiers,
+      resolvedExtraArgs.optionalThreshold
+    );
 
-    // TODO
-
-    // 4. lockOrBurn
-
+    Internal.Receipt memory emptyReceipt;
     Internal.EVMTokenTransfer memory tokenTransferData;
-    if (message.tokenAmounts.length != 0) {
-      if (message.tokenAmounts.length != 1) {
-        revert CanOnlySendOneTokenPerMessage();
-      }
-      tokenTransferData = _lockOrBurnSingleToken(
-        message.tokenAmounts[0], destChainSelector, tokenReceiver, originalSender, resolvedExtraArgs.tokenArgs
-      );
-    }
-
-    // 5. calculate msg ID
 
     Internal.EVM2AnyVerifierMessage memory newMessage = Internal.EVM2AnyVerifierMessage({
       header: Internal.Header({
@@ -202,8 +194,31 @@ contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsg
       feeTokenAmount: feeTokenAmount,
       feeValueJuels: 0, // TODO
       tokenTransfer: tokenTransferData,
-      receipts: new Internal.Receipt[](0)
+      verifierReceipts: new Internal.Receipt[](0),
+      executorReceipt: emptyReceipt,
+      tokenReceipt: emptyReceipt
     });
+
+    // 3. getFee on all verifiers & executor
+
+    for (uint256 i = 0; i < resolvedExtraArgs.requiredVerifiers.length; ++i) {
+      Client.Verifier memory verifier = resolvedExtraArgs.requiredVerifiers[i];
+    }
+
+    // TODO
+
+    // 4. lockOrBurn
+
+    if (message.tokenAmounts.length != 0) {
+      if (message.tokenAmounts.length != 1) {
+        revert CanOnlySendOneTokenPerMessage();
+      }
+      newMessage.tokenTransfer = _lockOrBurnSingleToken(
+        message.tokenAmounts[0], destChainSelector, tokenReceiver, originalSender, resolvedExtraArgs.tokenArgs
+      );
+    }
+
+    // 5. calculate msg ID
 
     // Hash only after all fields have been set, but before it's sent to the verifiers.
     newMessage.header.messageId = Internal._hash(
@@ -216,12 +231,12 @@ contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsg
     // 6. call each verifier
 
     bytes memory encodedMessage = abi.encode(newMessage);
-    bytes[] memory receiptBlobs = new bytes[](newMessage.receipts.length);
+    bytes[] memory receiptBlobs = new bytes[](newMessage.verifierReceipts.length);
 
-    for (uint256 i = 0; i < newMessage.receipts.length; ++i) {
-      address verifierId = newMessage.receipts[i].issuer;
+    for (uint256 i = 0; i < newMessage.verifierReceipts.length; ++i) {
+      address verifier = newMessage.verifierReceipts[i].issuer;
 
-      IVerifierSender(verifierId).forwardToVerifier(encodedMessage, i);
+      IVerifierSender(verifier).forwardToVerifier(encodedMessage, i);
     }
 
     // 7. emit event
@@ -231,6 +246,55 @@ contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsg
     s_dynamicConfig.reentrancyGuardEntered = false;
 
     return newMessage.header.messageId;
+  }
+
+  function _deduplicateVerifiers(
+    address[] memory poolRequiredVerifiers,
+    Client.Verifier[] memory requiredVerifiers,
+    Client.Verifier[] memory optionalVerifiers,
+    uint8 optionalThreshold
+  ) internal pure {
+    Client.Verifier[] memory toBeAdded = new Client.Verifier[](poolRequiredVerifiers.length);
+    uint256 toBeAddedIndex = 0;
+
+    for (uint256 poolVerifierIndex = 0; poolVerifierIndex < poolRequiredVerifiers.length; ++poolVerifierIndex) {
+      address poolVerifier = poolRequiredVerifiers[poolVerifierIndex];
+      bool found = false;
+      for (uint256 reqVerifierIndex = 0; reqVerifierIndex < requiredVerifiers.length; ++reqVerifierIndex) {
+        if (poolVerifier == requiredVerifiers[reqVerifierIndex].verifierAddress) {
+          found = true;
+          break;
+        }
+      }
+
+      // If it is found in the required verifiers, we do not need to add it again.
+      if (!found) {
+        // If not found, it has to be added to the required verifiers list.
+        toBeAdded[toBeAddedIndex++].verifierAddress = poolVerifier;
+
+        // If the pool verifier is not in the optional verifiers, we remove it and lower the optional threshold since
+        // it is now required.
+        for (uint256 optVerifierIndex = 0; optVerifierIndex < optionalVerifiers.length; ++optVerifierIndex) {
+          if (poolVerifier == optionalVerifiers[optVerifierIndex].verifierAddress) {
+            // Copy the extraArgs for the verifier to the verifier now in the required verifiers.
+            toBeAdded[toBeAddedIndex - 1].args = optionalVerifiers[optVerifierIndex].args;
+
+            // Remove the verifier from the optional verifiers.
+            optionalVerifiers[optVerifierIndex] = optionalVerifiers[optionalVerifiers.length - 1];
+            // This effectively reduces the length of the array by one.
+            assembly {
+              mstore(optionalVerifiers, sub(mload(optionalVerifiers), 1))
+            }
+
+            // Lower the optional threshold since we removed a verifier.
+            if (optionalThreshold > 0) {
+              optionalThreshold--;
+            }
+            break;
+          }
+        }
+      }
+    }
   }
 
   function _parseExtraArgsWithDefaults(
@@ -410,12 +474,9 @@ contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsg
     // NOTE: pool data validations are outsourced to the FeeQuoter to handle family-specific logic handling.
     return Internal.EVMTokenTransfer({
       sourceTokenAddress: tokenAndAmount.token,
-      sourcePoolAddress: address(sourcePool),
       destTokenAddress: poolReturnData.destTokenAddress,
       extraData: poolReturnData.destPoolData,
-      amount: tokenAndAmount.amount,
-      destExecData: "", // This is set in the processPoolReturnData function.
-      requiredVerifierId: bytes32(0)
+      amount: tokenAndAmount.amount
     });
   }
 

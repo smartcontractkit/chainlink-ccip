@@ -309,7 +309,7 @@ library Internal {
   // bytes4(keccak256("CCIP ChainFamilySelector SUI"));
   bytes4 public constant CHAIN_FAMILY_SELECTOR_SUI = 0xc4e05953;
 
-  // byte4(keccak256("CCIP ChainFamiliySelector TVM"));
+  // byte4(keccak256("CCIP ChainFamilySelector TVM"));
   bytes4 public constant CHAIN_FAMILY_SELECTOR_TVM = 0x647e2ba9;
 
   /// @dev Holds a merkle root and interval for a source chain so that an array of these can be passed in the CommitReport.
@@ -337,7 +337,9 @@ library Internal {
     uint256 feeTokenAmount; // fee token amount.
     uint256 feeValueJuels; // fee amount in Juels.
     EVMTokenTransfer tokenTransfer;
-    Receipt[] receipts;
+    Receipt[] verifierReceipts;
+    Receipt executorReceipt;
+    Receipt tokenReceipt;
   }
 
   struct Header {
@@ -347,37 +349,23 @@ library Internal {
     uint64 sequenceNumber; // ──────╯ sequence number, not unique across lanes.
   }
 
-  enum ReceiptType {
-    Verifier,
-    Executor
-  }
-
   struct Receipt {
-    ReceiptType receiptType;
     address issuer;
     uint256 feeTokenAmount;
-    uint64 destGasLimit; // gas limit for the verifier to verify on the destination chain.
+    uint64 destGasLimit;
     uint32 destBytesOverhead;
     bytes extraArgs;
   }
 
   struct EVMTokenTransfer {
     address sourceTokenAddress;
-    // The source pool EVM address. This value is trusted as it was obtained through the onRamp. It can be relied
-    // upon by the destination pool to validate the source pool.
-    address sourcePoolAddress;
     // The EVM address of the destination token.
     // This value is UNTRUSTED as any pool owner can return whatever value they want.
     bytes destTokenAddress;
-    // Optional pool data to be transferred to the destination chain. Be default this is capped at
-    // CCIP_LOCK_OR_BURN_V1_RET_BYTES bytes. If more data is required, the TokenTransferFeeConfig.destBytesOverhead
-    // has to be set for the specific token.
+    // Optional pool data to be transferred to the destination chain. Capped by CCIP_LOCK_OR_BURN_V1_RET_BYTES bytes or
+    // if the pool supports IPoolV2, the pool can specify its own size.
     bytes extraData;
-    uint256 amount; // Amount of tokens.
-    // Destination chain data used to execute the token transfer on the destination chain. For an EVM destination, it
-    // consists of the amount of gas available for the releaseOrMint and transfer calls made by the offRamp.
-    bytes destExecData;
-    bytes32 requiredVerifierId; // The ID of the required verifier for this token transfer.
+    uint256 amount; // Number of tokens.
   }
 
   // receive
