@@ -168,12 +168,15 @@ contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsg
 
     // TODO pool call
 
+    (resolvedExtraArgs.requiredVerifiers, resolvedExtraArgs.optionalVerifiers, resolvedExtraArgs.optionalThreshold) =
     _deduplicateVerifiers(
-      new address[](0),
+      new address[](0), // TODO pass in pool required verifiers
       resolvedExtraArgs.requiredVerifiers,
       resolvedExtraArgs.optionalVerifiers,
       resolvedExtraArgs.optionalThreshold
     );
+
+    uint256 requiredVerifiersCount = resolvedExtraArgs.requiredVerifiers.length;
 
     Internal.Receipt memory emptyReceipt;
     Internal.EVMTokenTransfer memory tokenTransferData;
@@ -194,15 +197,16 @@ contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsg
       feeTokenAmount: feeTokenAmount,
       feeValueJuels: 0, // TODO
       tokenTransfer: tokenTransferData,
-      verifierReceipts: new Internal.Receipt[](0),
+      verifierReceipts: new Internal.Receipt[](requiredVerifiersCount + resolvedExtraArgs.optionalVerifiers.length),
       executorReceipt: emptyReceipt,
       tokenReceipt: emptyReceipt
     });
 
     // 3. getFee on all verifiers & executor
 
-    for (uint256 i = 0; i < resolvedExtraArgs.requiredVerifiers.length; ++i) {
+    for (uint256 i = 0; i < requiredVerifiersCount; ++i) {
       Client.Verifier memory verifier = resolvedExtraArgs.requiredVerifiers[i];
+      IVerifierSender verifierSender = IVerifierSender(verifier.verifierAddress);
     }
 
     // TODO
@@ -253,7 +257,15 @@ contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsg
     Client.Verifier[] memory requiredVerifiers,
     Client.Verifier[] memory optionalVerifiers,
     uint8 optionalThreshold
-  ) internal pure {
+  )
+    internal
+    pure
+    returns (
+      Client.Verifier[] memory newRequiredVerifiers,
+      Client.Verifier[] memory newOptionalVerifiers,
+      uint8 newOptionalThreshold
+    )
+  {
     Client.Verifier[] memory toBeAdded = new Client.Verifier[](poolRequiredVerifiers.length);
     uint256 toBeAddedIndex = 0;
 
@@ -295,6 +307,20 @@ contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsg
         }
       }
     }
+
+    if (toBeAddedIndex > 0) {
+      newRequiredVerifiers = new Client.Verifier[](poolRequiredVerifiers.length + toBeAddedIndex);
+      for (uint256 i = 0; i < toBeAddedIndex; ++i) {
+        newRequiredVerifiers[i] = toBeAdded[i];
+      }
+      for (uint256 i = 0; i < requiredVerifiers.length; ++i) {
+        newRequiredVerifiers[toBeAddedIndex + i] = requiredVerifiers[i];
+      }
+
+      return (newRequiredVerifiers, optionalVerifiers, optionalThreshold);
+    }
+
+    return (requiredVerifiers, optionalVerifiers, optionalThreshold);
   }
 
   function _parseExtraArgsWithDefaults(
