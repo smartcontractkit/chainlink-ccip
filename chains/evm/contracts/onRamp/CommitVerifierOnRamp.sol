@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IFeeQuoter} from "../interfaces/IFeeQuoter.sol";
+import {IFeeQuoterV2} from "../interfaces/IFeeQuoterV2.sol";
 import {INonceManager} from "../interfaces/INonceManager.sol";
 import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
 import {IVerifierSender} from "../interfaces/verifiers/IVerifier.sol";
@@ -11,7 +11,6 @@ import {Client} from "../libraries/Client.sol";
 import {Internal} from "../libraries/Internal.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 
-import {IFeeQuoterV2} from "../interfaces/IFeeQuoterV2.sol";
 import {IERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from
@@ -131,11 +130,11 @@ contract CommitVerifierOnRamp is IVerifierSender, ITypeAndVersion, Ownable2StepM
       }
     }
 
-    (, bool isOutOfOrderExecution,,) = IFeeQuoter(s_dynamicConfig.feeQuoter).processMessageArgs(
+    (, bool isOutOfOrderExecution,,) = IFeeQuoterV2(s_dynamicConfig.feeQuoter).processMessageArgs(
       message.header.destChainSelector,
       message.feeToken,
       message.feeTokenAmount,
-      message.receipts[verifierIndex].extraArgs,
+      message.verifierReceipts[verifierIndex].extraArgs,
       message.receiver
     );
 
@@ -318,7 +317,7 @@ contract CommitVerifierOnRamp is IVerifierSender, ITypeAndVersion, Ownable2StepM
   ) external view returns (uint256 feeTokenAmount) {
     _assertNotCursed(destChainSelector);
 
-    return IFeeQuoter(s_dynamicConfig.feeQuoter).getValidatedFee(destChainSelector, message);
+    return IFeeQuoterV2(s_dynamicConfig.feeQuoter).getValidatedFee(destChainSelector, message);
   }
 
   /// @notice Withdraws the outstanding fee token balances to the fee aggregator.
