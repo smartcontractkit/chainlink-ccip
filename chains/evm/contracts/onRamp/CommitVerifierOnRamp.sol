@@ -307,6 +307,16 @@ contract CommitVerifierOnRamp is IVerifierSender, ITypeAndVersion, Ownable2StepM
   // │                             Fees                             │
   // ================================================================
 
+  function getFee(
+    uint64 destChainSelector,
+    Client.EVM2AnyMessage memory message,
+    bytes memory extraArgs
+  ) external view returns (uint256) {
+    _assertNotCursed(destChainSelector);
+
+    return 0;
+  }
+
   /// @dev getFee MUST revert if the feeToken is not listed in the fee token config, as the router assumes it does.
   /// @param destChainSelector The destination chain selector.
   /// @param message The message to get quote for.
