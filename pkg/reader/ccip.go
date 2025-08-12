@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"os"
 	"slices"
 	"sort"
 	"sync"
@@ -83,9 +82,17 @@ func newCCIPChainReaderWithConfigPollerInternal(
 	configPoller ConfigPoller,
 ) (*ccipChainReader, error) {
 	var crs = make(map[cciptypes.ChainSelector]contractreader.Extended)
+	lggr.Infow("OGT CCIPReader constructor",
+		"len(chainAccessors)", len(chainAccessors),
+		"len(contractReaders)", len(contractReaders),
+		"len(contractWriters)", len(contractWriters))
 
 	for chainSelector, cr := range contractReaders {
 		crs[chainSelector] = contractreader.NewExtendedContractReader(cr)
+		lggr.Infow("OGT CCIPReader constructor crs[chainSelector] memory address",
+			"crs[chainSelector] address", fmt.Sprintf("%p", crs[chainSelector]),
+			"cr reader address", fmt.Sprintf("%p", cr),
+			"chainSelector", chainSelector)
 	}
 
 	offrampAddrStr, err := addrCodec.AddressBytesToString(offrampAddress, destChain)
@@ -769,7 +776,6 @@ func (r *ccipChainReader) DiscoverContracts(ctx context.Context,
 // NOTE: You should ensure that Sync is called deterministically for every oracle in the DON to guarantee
 // a consistent shared addressbook state.
 func (r *ccipChainReader) Sync(ctx context.Context, contracts ContractAddresses) error {
-	fmt.Println("ccip.go Sync(). Process ID: ", os.Getpid())
 	addressBookEntries := make(addressbook.ContractAddresses)
 	for name, addrs := range contracts {
 		addressBookEntries[addressbook.ContractName(name)] = addrs
@@ -798,7 +804,6 @@ func (r *ccipChainReader) Sync(ctx context.Context, contracts ContractAddresses)
 	var errGroup errgroup.Group
 	for chainSelector, boundContract := range chainToContractBinding {
 		errGroup.Go(func() error {
-			fmt.Println("ccip.go Sync() go func. Process ID: ", os.Getpid())
 			// defense in depth: don't bind if the address is empty.
 			// callers should ensure this but we double check here.
 			if len(boundContract.address) == 0 {
@@ -1014,6 +1019,10 @@ func (r *ccipChainReader) fetchFreshSourceChainConfigs(
 			ReturnVal: new(cciptypes.SourceChainConfig),
 		})
 	}
+
+	r.lggr.Debugw("OGT ccip.go fetchFreshSourceChainConfigs dest chain contract reader memory address:",
+		"memory_address", fmt.Sprintf("%p", reader),
+		"destChain", destChain)
 
 	// Execute batch request
 	results, _, err := reader.ExtendedBatchGetLatestValues(

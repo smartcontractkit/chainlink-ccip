@@ -75,7 +75,6 @@ type PluginFactory struct {
 	estimateProvider cciptypes.EstimateProvider
 	tokenDataEncoder cciptypes.TokenDataEncoder
 	chainAccessors   map[cciptypes.ChainSelector]cciptypes.ChainAccessor
-	contractReaders  map[cciptypes.ChainSelector]types.ContractReader
 	extendedReaders  map[cciptypes.ChainSelector]contractreader.Extended
 	chainWriters     map[cciptypes.ChainSelector]types.ContractWriter
 }
@@ -91,7 +90,6 @@ type PluginFactoryParams struct {
 	TokenDataEncoder cciptypes.TokenDataEncoder
 	ChainAccessors   map[cciptypes.ChainSelector]cciptypes.ChainAccessor
 	EstimateProvider cciptypes.EstimateProvider
-	ContractReaders  map[cciptypes.ChainSelector]types.ContractReader
 	ExtendedReaders  map[cciptypes.ChainSelector]contractreader.Extended
 	ContractWriters  map[cciptypes.ChainSelector]types.ContractWriter
 }
@@ -110,7 +108,6 @@ func NewExecutePluginFactory(params PluginFactoryParams) *PluginFactory {
 		estimateProvider: params.EstimateProvider,
 		tokenDataEncoder: params.TokenDataEncoder,
 		chainAccessors:   params.ChainAccessors,
-		contractReaders:  params.ContractReaders,
 		extendedReaders:  params.ExtendedReaders,
 		chainWriters:     params.ContractWriters,
 	}
@@ -139,6 +136,10 @@ func (p PluginFactory) NewReportingPlugin(
 	readerFacades := make(map[cciptypes.ChainSelector]contractreader.ContractReaderFacade)
 	for chain, cr := range p.extendedReaders {
 		readerFacades[chain] = cr
+		lggr.Infow("OGT exec factory extendedReader memory address",
+			"cr address", fmt.Sprintf("%p", cr),
+			"readerFacades[chain] reader address", fmt.Sprintf("%p", cr),
+			"chain", chain)
 	}
 
 	ccipReader, err := readerpkg.NewCCIPChainReader(

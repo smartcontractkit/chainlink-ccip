@@ -73,7 +73,6 @@ type PluginFactory struct {
 	homeChainReader   reader.HomeChain
 	homeChainSelector cciptypes.ChainSelector
 	chainAccessors    map[cciptypes.ChainSelector]cciptypes.ChainAccessor
-	contractReaders   map[cciptypes.ChainSelector]types.ContractReader
 	extendedReaders   map[cciptypes.ChainSelector]contractreader.Extended
 	chainWriters      map[cciptypes.ChainSelector]types.ContractWriter
 	rmnPeerClient     rmn.PeerClient
@@ -90,7 +89,6 @@ type CommitPluginFactoryParams struct {
 	HomeChainReader   reader.HomeChain
 	HomeChainSelector cciptypes.ChainSelector
 	ChainAccessors    map[cciptypes.ChainSelector]cciptypes.ChainAccessor
-	ContractReaders   map[cciptypes.ChainSelector]types.ContractReader
 	ExtendedReaders   map[cciptypes.ChainSelector]contractreader.Extended
 	ContractWriters   map[cciptypes.ChainSelector]types.ContractWriter
 	RmnPeerClient     rmn.PeerClient
@@ -110,7 +108,6 @@ func NewCommitPluginFactory(params CommitPluginFactoryParams) *PluginFactory {
 		homeChainReader:   params.HomeChainReader,
 		homeChainSelector: params.HomeChainSelector,
 		chainAccessors:    params.ChainAccessors,
-		contractReaders:   params.ContractReaders,
 		extendedReaders:   params.ExtendedReaders,
 		chainWriters:      params.ContractWriters,
 		rmnPeerClient:     params.RmnPeerClient,
@@ -140,8 +137,8 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 	}
 
 	// Validate that the readerFacades were already wrapped in the Extended interface from core.
-	readerFacades := make(map[cciptypes.ChainSelector]contractreader.ContractReaderFacade, len(p.contractReaders))
-	for chain, cr := range p.contractReaders {
+	readerFacades := make(map[cciptypes.ChainSelector]contractreader.ContractReaderFacade, len(p.extendedReaders))
+	for chain, cr := range p.extendedReaders {
 		readerFacades[chain] = cr
 	}
 
@@ -195,23 +192,19 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 	_, ok := p.chainAccessors[offchainConfig.PriceFeedChainSelector]
 	if ok {
 		// Bind all token aggregate contracts
-		var bcs []types.BoundContract
 		for _, info := range offchainConfig.TokenInfo {
-			bcs = append(bcs, types.BoundContract{
-				Address: string(info.AggregatorAddress),
-				Name:    consts.ContractNamePriceAggregator,
-			})
-		}
-		for _, bc := range bcs {
-			err = p.chainAccessors[offchainConfig.PriceFeedChainSelector].Sync(
-				ctx,
-				bc.Name,
-				cciptypes.UnknownAddress(bc.Address),
-			)
+			priceAggAddress, err := cciptypes.NewUnknownAddressFromHex(string(info.AggregatorAddress))
 			if err != nil {
 				return nil, ocr3types.ReportingPluginInfo{},
-					fmt.Errorf("failed to sync price aggregator contract %s on chain %d: %w",
-						bc.Name, offchainConfig.PriceFeedChainSelector, err)
+					fmt.Errorf("failed to create unknown address from aggregator address %s: %w",
+						info.AggregatorAddress, err)
+			}
+			err = p.chainAccessors[offchainConfig.PriceFeedChainSelector].
+				Sync(ctx, consts.ContractNamePriceAggregator, priceAggAddress)
+			if err != nil {
+				return nil, ocr3types.ReportingPluginInfo{},
+					fmt.Errorf("failed to sync price aggregator contract via chainAccessor %s on chain %d: %w",
+						consts.ContractNamePriceAggregator, offchainConfig.PriceFeedChainSelector, err)
 			}
 		}
 	}

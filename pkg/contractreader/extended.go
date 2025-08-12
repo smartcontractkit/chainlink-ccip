@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -251,15 +250,10 @@ func (e *extendedContractReader) ExtendedBatchGetLatestValues(
 }
 
 func (e *extendedContractReader) Bind(ctx context.Context, allBindings []types.BoundContract) error {
-	extendedReaderMemoryAddress := fmt.Sprintf("%p", e)
-	fmt.Println("extended.go Bind(). Process ID: ", os.Getpid(), " Extended reader memory address: ", extendedReaderMemoryAddress)
 	validBindings := slicelib.Filter(allBindings, func(b types.BoundContract) bool { return !e.bindingExists(b) })
 	if len(validBindings) == 0 {
 		return nil
 	}
-
-	fmt.Printf("extended.go Bind() with memory address: %s, pid: %d, valid bindings: %d\n\n",
-		extendedReaderMemoryAddress, os.Getpid(), len(validBindings))
 	err := e.reader.Bind(ctx, validBindings)
 	if err != nil {
 		return fmt.Errorf("failed to call ContractReader.Bind: %w", err)
@@ -275,8 +269,6 @@ func (e *extendedContractReader) Bind(ctx context.Context, allBindings []types.B
 			})
 		} else {
 			if len(e.contractBindingsByName[binding.Name]) > 0 {
-				fmt.Println("Bind() unbinding: ", e.contractBindingsByName[binding.Name][0].Binding)
-
 				// Unbind the previous binding
 				err := e.reader.Unbind(ctx, []types.BoundContract{e.contractBindingsByName[binding.Name][0].Binding})
 				if err != nil {
