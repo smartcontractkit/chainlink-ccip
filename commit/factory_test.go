@@ -11,6 +11,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	reader_mocks "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	rmnpb "github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
@@ -322,8 +324,8 @@ func TestPluginFactory_NewReportingPlugin(t *testing.T) {
 					ChainSelector: chainSel,
 				},
 			},
-			contractReaders: map[ccipocr3.ChainSelector]types.ContractReader{
-				chainSel: types.UnimplementedContractReader{},
+			extendedReaders: map[ccipocr3.ChainSelector]contractreader.Extended{
+				chainSel: reader_mocks.NewMockExtended(t),
 			},
 			chainWriters: map[ccipocr3.ChainSelector]types.ContractWriter{chainSel: cw},
 			addrCodec:    mockAddrCodec,
