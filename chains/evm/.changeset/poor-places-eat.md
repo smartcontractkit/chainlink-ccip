@@ -13,7 +13,7 @@ only a removal of internal token accounting which is not inherited from the Silo
 
 5. The USDC Token Pools listed in this PR have overridden their `_onlyOffRamp` functions and instead have been modified to use an `AuthorizedCaller` library in the shared libraries folder. This is necessary to support the Proxy architecture which will be added in a separate PR.
 
-6. To support the AuthorizedCaller library, the TokenPool error `ZeroAddressNotAllowed()` has been replaced with `ZeroAddressIsNotAllowed()` to avoid a naming collision not supported by the compiler.
+6. To support the AuthorizedCaller library, the TokenPool error `ZeroAddressNotAllowed()` has been replaced with `ZeroAddressInvalid()` to avoid a naming collision not supported by the compiler.
 
 7. Since the TokenPool.sol base has been modified, all relevant wrappers have been regenerated and bumped the type and version
 to `1.6.3-dev`

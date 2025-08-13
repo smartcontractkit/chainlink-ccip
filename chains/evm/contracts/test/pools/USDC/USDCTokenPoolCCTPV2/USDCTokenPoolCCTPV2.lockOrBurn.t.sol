@@ -13,7 +13,7 @@ import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/Aut
 
 contract USDCTokenPoolCCTPV2_lockOrBurn is USDCTokenPoolCCTPV2Setup {
   // Base test case, included for PR gas comparisons as fuzz tests are excluded from forge snapshot due to being flaky.
-  function test_LockOrBurn() public {
+  function test_lockOrBurn() public {
     bytes32 receiver = bytes32(uint256(uint160(STRANGER)));
     uint256 amount = 1;
     s_USDCToken.transfer(address(s_usdcTokenPool), amount);
@@ -82,7 +82,7 @@ contract USDCTokenPoolCCTPV2_lockOrBurn is USDCTokenPoolCCTPV2Setup {
     );
   }
 
-  function test_LockOrBurn_MintRecipientOverride() public {
+  function test_lockOrBurn_MintRecipientOverride() public {
     bytes32 receiver = bytes32(uint256(uint160(STRANGER)));
     uint256 amount = 1;
     s_USDCToken.transfer(address(s_usdcTokenPool), amount);
@@ -97,8 +97,7 @@ contract USDCTokenPoolCCTPV2_lockOrBurn is USDCTokenPoolCCTPV2Setup {
       mintRecipient: extraMintRecipient,
       domainIdentifier: expectedDomain.domainIdentifier,
       destChainSelector: DEST_CHAIN_SELECTOR,
-      enabled: expectedDomain.enabled,
-      cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V2
+      enabled: expectedDomain.enabled
     });
     vm.startPrank(OWNER);
     s_usdcTokenPool.setDomains(updates);
@@ -148,7 +147,7 @@ contract USDCTokenPoolCCTPV2_lockOrBurn is USDCTokenPoolCCTPV2Setup {
     assertEq(nonce, 0);
   }
 
-  function testFuzz_LockOrBurn_Success(bytes32 destinationReceiver, uint256 amount) public {
+  function testFuzz_lockOrBurn_Success(bytes32 destinationReceiver, uint256 amount) public {
     vm.assume(destinationReceiver != bytes32(0));
     amount = bound(amount, 1, _getOutboundRateLimiterConfig().capacity);
     s_USDCToken.transfer(address(s_usdcTokenPool), amount);

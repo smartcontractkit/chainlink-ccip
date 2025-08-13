@@ -21,7 +21,7 @@ contract USDCTokenPoolCCTPV2_releaseOrMint is USDCTokenPoolCCTPV2Setup {
     return abi.encodePacked(_version, _burnToken, _mintRecipient, _amount, _messageSender);
   }
 
-  function testFuzz_ReleaseOrMint_Success(address recipient, uint256 amount) public {
+  function testFuzz_releaseOrMint_Success(address recipient, uint256 amount) public {
     vm.assume(recipient != address(0) && recipient != address(s_USDCToken));
     amount = bound(amount, 0, _getInboundRateLimiterConfig().capacity);
 
@@ -103,7 +103,7 @@ contract USDCTokenPoolCCTPV2_releaseOrMint is USDCTokenPoolCCTPV2Setup {
   }
 
   // https://etherscan.io/tx/0x8897ffb613c4d7823ab42c85df2410381e7028c40f0a924530db99412065e338
-  function test_ReleaseOrMintRealTx() public {
+  function test_releaseOrMint_RealTx() public {
     bytes memory encodedUsdcMessage =
       hex"000000010000000500000000bc7e669b9f452229fdd08bac21b6617068f2fd023ad6e805d03afa88b4bb79aea65fc81d0fefa8860cb3b83f089b0224be8a6687b7ae49f594c0b9b4d7e9389300000000000000000000000028b5a0e9c621a5badaa536219b3a228c8168cf5d0000000000000000000000000000000000000000000000000000000000000000000007d0000007d000000001c6fa7af3bedbad3a3d65f36aabc97431b1bbe4c2d2f6e0e47ca60203452f5d61000000000000000000000000e7492c49f71841d0f55f4f22c2ee22f02437084000000000000000000000000000000000000000000000000000000017491105202c747e9f0b8a0bb74202136e08fb8463bb15d1ab1d6d3f916f547004d7c7522f0000000000000000000000000000000000000000000000000000000000989a720000000000000000000000000000000000000000000000000000000000989a7200000000000000000000000000000000000000000000000000000000015d0d4e";
     bytes memory attestation = bytes("attestation bytes");

@@ -70,7 +70,6 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
     bytes32 mintRecipient; // Address to mint to on the destination chain
     uint32 domainIdentifier; // Unique domain ID
     uint64 destChainSelector; // The destination chain for this domain
-    CCTPVersion cctpVersion; // CCTP version used on the domain
     bool enabled; // Whether the domain is enabled
   }
 

@@ -77,8 +77,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
       mintRecipient: extraMintRecipient,
       domainIdentifier: expectedDomain.domainIdentifier,
       destChainSelector: DEST_CHAIN_SELECTOR,
-      enabled: expectedDomain.enabled,
-      cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V1
+      enabled: expectedDomain.enabled
     });
     vm.startPrank(OWNER);
     s_usdcTokenPool.setDomains(updates);
@@ -175,9 +174,6 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
       abi.decode(poolReturnDataV1.destPoolData, (USDCTokenPool.SourceTokenDataPayload));
     assertEq(sourceTokenDataPayload.nonce, s_mockUSDCTokenMessenger.s_nonce() - 1, "nonce is incorrect");
     assertEq(sourceTokenDataPayload.sourceDomain, DEST_DOMAIN_IDENTIFIER, "sourceDomain is incorrect");
-    assertEq(
-      uint8(sourceTokenDataPayload.cctpVersion), uint8(USDCTokenPool.CCTPVersion.CCTP_V1), "cctpVersion is incorrect"
-    );
     assertEq(sourceTokenDataPayload.amount, amount, "amount is incorrect");
     assertEq(
       sourceTokenDataPayload.destinationDomain, expectedDomain.domainIdentifier, "destinationDomain is incorrect"

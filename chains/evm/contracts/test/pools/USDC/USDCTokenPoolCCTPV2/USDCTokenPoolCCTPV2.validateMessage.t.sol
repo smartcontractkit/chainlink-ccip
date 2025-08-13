@@ -43,7 +43,7 @@ contract USDCTokenPoolCCTPV2_validateMessage is USDCTokenPoolCCTPV2Setup {
     });
   }
 
-  function testFuzz_ValidateMessage_Success(uint32 sourceDomain, bytes32 nonce) public {
+  function testFuzz_validateMessage_Success(uint32 sourceDomain, bytes32 nonce) public {
     vm.pauseGasMetering();
     USDCMessageCCTPV2 memory usdcMessage = USDCMessageCCTPV2({
       version: 1,

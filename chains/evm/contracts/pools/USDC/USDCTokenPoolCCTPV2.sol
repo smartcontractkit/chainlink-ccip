@@ -15,13 +15,12 @@ import {IERC20} from
 /// @dev This pool inherits from the USDCTokenPool contract, but is not used for CCTP V1. It overrides
 /// only the functions which are different for CCTP V2, due to a different message format and
 /// deposit function. Since both pools use a message transmitter proxy, which will use the same
-/// function selector, the releaseOrMint function does not need to be modified.
+/// function selector, the releaseOrMint function does not need to be overridden.
 contract USDCTokenPoolCCTPV2 is USDCTokenPool {
   error InvalidMinFinalityThreshold(uint32 expected, uint32 got);
   error InvalidExecutionFinalityThreshold(uint32 expected, uint32 got);
 
-  /// @dev CCTP's max fee is based on the use of fast-burn. Since this pool does not utilize that feature, max fee
-  /// should be 0.
+  /// @dev CCTP's max fee is based on the use of fast-burn. Since this pool does not utilize that feature, max fee should be 0.
   uint32 public constant MAX_FEE = 0;
 
   /// @dev 2000 indicates that finality must be reached before attestation is possible in CCTP V2.
@@ -37,11 +36,6 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
     address rmnProxy,
     address router
   ) USDCTokenPool(tokenMessenger, cctpMessageTransmitterProxy, token, allowlist, rmnProxy, router, 1) {}
-
-  /// @notice Using a function because constant state variables cannot be overridden by child contracts.
-  function typeAndVersion() external pure virtual override returns (string memory) {
-    return "USDCTokenPoolCCTPV2 1.6.3-dev";
-  }
 
   /// @notice Burn tokens from the pool to initiate cross-chain transfer.
   /// @notice Outgoing messages (burn operations) are routed via `i_tokenMessenger.depositForBurnWithCaller`.
@@ -69,7 +63,6 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
       decodedReceiver = abi.decode(lockOrBurnIn.receiver, (bytes32));
     }
 
-    // Deposit the tokens for burn.
     i_tokenMessenger.depositForBurn(
       lockOrBurnIn.amount,
       domain.domainIdentifier,
@@ -118,7 +111,6 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
   ///     * version                    4          uint32     0
   ///     * sourceDomain               4          uint32     4
   ///     * destinationDomain          4          uint32     8
-
   ///     * nonce                      32         bytes32   12
   ///     * sender                     32         bytes32   44
   ///     * recipient                  32         bytes32   76
@@ -130,9 +122,9 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
     bytes memory usdcMessage,
     SourceTokenDataPayload memory sourceTokenData
   ) internal view override {
-    // 148 is the minimum length of a valid USDC message in CCTP V2. Since destinationCaller needs to be checked for
-    // the previous pool, this ensures that it can be parsed correctly and that the message is not too short. Since
-    // messageBody is dynamic and not always used, it is not checked.
+    // 148 is the minimum length of a valid message where all of the require fields are present and capable of being parsed.
+    // correctly below for message validation. Since messageBody is dynamic and not always used, it is not included in this
+    // check.
     if (usdcMessage.length < 148) revert InvalidMessageLength(usdcMessage.length);
 
     uint32 version;
@@ -183,9 +175,6 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
       revert InvalidMinFinalityThreshold(FINALITY_THRESHOLD, minFinalityThreshold);
     }
 
-    // Check that finality was reached on the source chain before delivering the message. This ensures
-    // that there are no additional trust assumptions on the source chain, as CCIP currently requires source-chain
-    // finality as well.
     if (finalityThresholdExecuted != FINALITY_THRESHOLD) {
       revert InvalidExecutionFinalityThreshold(FINALITY_THRESHOLD, finalityThresholdExecuted);
     }
