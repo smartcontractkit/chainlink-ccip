@@ -2,11 +2,13 @@
 pragma solidity ^0.8.24;
 
 import {Pool} from "../../../../libraries/Pool.sol";
-
 import {TokenPool} from "../../../../pools/TokenPool.sol";
 import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
 import {USDCTokenPoolProxy} from "../../../../pools/USDC/USDCTokenPoolProxy.sol";
 import {USDCTokenPoolProxySetup} from "./USDCTokenPoolProxySetup.t.sol";
+
+import {IERC20} from
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
 contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
   address internal s_sender = makeAddr("sender");
@@ -63,6 +65,8 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
 
     vm.expectCall(address(s_cctpV1Pool), abi.encodeWithSelector(USDCTokenPool.lockOrBurn.selector, lockOrBurnIn));
 
+    vm.expectCall(address(s_USDCToken), abi.encodeWithSelector(IERC20.transfer.selector, address(s_cctpV1Pool), amount));
+
     Pool.LockOrBurnOutV1 memory result = s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn);
 
     assertEq(result.destTokenAddress, expectedOutput.destTokenAddress);
@@ -93,6 +97,8 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
       Pool.LockOrBurnOutV1({destTokenAddress: destTokenAddress, destPoolData: s_destPoolData});
 
     vm.expectCall(address(s_cctpV2Pool), abi.encodeWithSelector(TokenPool.lockOrBurn.selector, lockOrBurnIn));
+
+    vm.expectCall(address(s_USDCToken), abi.encodeWithSelector(IERC20.transfer.selector, address(s_cctpV2Pool), amount));
 
     vm.startPrank(s_routerAllowedOnRamp);
     Pool.LockOrBurnOutV1 memory result = s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn);
