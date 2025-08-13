@@ -70,7 +70,11 @@ func (l *DefaultAccessor) GetContractAddress(contractName string) ([]byte, error
 	return addressBytes, nil
 }
 
-func (l *DefaultAccessor) GetAllConfigLegacySnapshot(ctx context.Context) (cciptypes.ChainConfigSnapshot, error) {
+func (l *DefaultAccessor) GetAllConfigsLegacy(
+	ctx context.Context,
+	destChainSelector cciptypes.ChainSelector,
+	sourceChainSelectors []cciptypes.ChainSelector,
+) (cciptypes.ChainConfigSnapshot, map[cciptypes.ChainSelector]cciptypes.SourceChainConfig, error) {
 	panic("implement me")
 }
 
