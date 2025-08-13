@@ -61,6 +61,8 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
 
     vm.startPrank(s_routerAllowedOnRamp);
 
+    vm.expectCall(address(s_cctpV1Pool), abi.encodeWithSelector(USDCTokenPool.lockOrBurn.selector, lockOrBurnIn));
+
     Pool.LockOrBurnOutV1 memory result = s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn);
 
     assertEq(result.destTokenAddress, expectedOutput.destTokenAddress);
@@ -80,15 +82,17 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
       localToken: address(s_USDCToken)
     });
 
+    vm.mockCall(
+      address(s_cctpV2Pool),
+      abi.encodeWithSelector(TokenPool.lockOrBurn.selector, lockOrBurnIn),
+      abi.encode(Pool.LockOrBurnOutV1({destTokenAddress: destTokenAddress, destPoolData: s_destPoolData}))
+    );
+
     // Mock the CCTP V2 pool's lockOrBurn to return expected output
     Pool.LockOrBurnOutV1 memory expectedOutput =
       Pool.LockOrBurnOutV1({destTokenAddress: destTokenAddress, destPoolData: s_destPoolData});
 
-    vm.mockCall(
-      address(s_cctpV2Pool),
-      abi.encodeWithSelector(USDCTokenPool.lockOrBurn.selector, lockOrBurnIn),
-      abi.encode(expectedOutput)
-    );
+    vm.expectCall(address(s_cctpV2Pool), abi.encodeWithSelector(TokenPool.lockOrBurn.selector, lockOrBurnIn));
 
     vm.startPrank(s_routerAllowedOnRamp);
     Pool.LockOrBurnOutV1 memory result = s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn);

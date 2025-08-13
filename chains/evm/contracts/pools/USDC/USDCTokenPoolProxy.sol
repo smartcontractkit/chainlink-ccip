@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
+
 import {Pool} from "../../libraries/Pool.sol";
 import {TokenPool} from "../TokenPool.sol";
-
 import {USDCTokenPool} from "./USDCTokenPool.sol";
 
-import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 import {IERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from
@@ -23,17 +23,15 @@ bytes4 constant LOCK_RELEASE_FLAG = 0xfa7c07de;
 /// lock or burn mechanism. This includes CCTP v1, CCTP v2, and lock release.
 /// @dev This contract will be listed in the Token Admin Registry as a token pool. All of the child pools which
 /// receive the messages should have this contract set as an authorized caller.
-/// @dev This token pool should have minimal state, as it is only used to route messages to the correct pool. If more
-/// mechanisms are needed, such as a new CCTP version, then this contract should be updated to include the proper
-/// routing logic and reference the appropriate child pool.
-/*
-On/OffRamp
-    ↓
-USDCPoolProxy
-    ├──→ CCTPV1Pool → MessageTransmitterProxy/TokenMessenger V1 → CCTPV1
-    ├──→ CCTPV2Pool → MessageTransmitterProxy/TokenMessenger V2 → CCTPV2
-    └──→ SiloedUSDCTokenPool → ERC20LockBox
-*/
+/// @dev This token pool should have minimal state, as it is only used to route messages to the correct
+/// pool. If more mechanisms are needed, such as a new CCTP version, then this contract should be updated
+/// to include the proper routing logic and reference the appropriate child pool.
+/// On/OffRamp
+///     ↓
+/// USDCPoolProxy
+///     ├──→ CCTPV1Pool → MessageTransmitterProxy/TokenMessenger V1 → CCTPV1
+///     ├──→ CCTPV2Pool → MessageTransmitterProxy/TokenMessenger V2 → CCTPV2
+///     └──→ SiloedUSDCTokenPool → ERC20LockBox
 contract USDCTokenPoolProxy is TokenPool, ITypeAndVersion {
   using SafeERC20 for IERC20;
 
@@ -45,7 +43,6 @@ contract USDCTokenPoolProxy is TokenPool, ITypeAndVersion {
   error InvalidMessageVersion(uint32 version);
   error InvalidMessageLength(uint256 length);
 
-  // solhint-disable-next-line gas-struct-packing
   struct PoolAddresses {
     address cctpV1Pool;
     address cctpV2Pool;
@@ -148,23 +145,15 @@ contract USDCTokenPoolProxy is TokenPool, ITypeAndVersion {
 
     // In both version 1 and 2 of CCTP, the version is stored in the first 4 bytes of the message, so this check is
     // valid for both versions. If this changes in future versions, this will need to be updated.
-    uint32 version;
-    bytes memory usdcMessage = releaseOrMintIn.offchainTokenData;
-
+    bytes calldata usdcMessage = releaseOrMintIn.offchainTokenData;
     // Check the first 4 bytes of the message to prevent an out-of-bounds read.
     if (usdcMessage.length < 4) {
       revert InvalidMessageLength(usdcMessage.length);
     }
 
-    // solhint-disable-next-line no-inline-assembly
-    assembly {
-      // We truncate using the datatype of the version variable, meaning
-      // we will only be left with the first 4 bytes of the message when we cast it to uint32. We want the lower 4 bytes
-      // to be the version when casted to a uint32 , so we only add 4. If you added 32, attempting to skip the first word
-      // containing the length, then version would be in the upper-4 bytes of the corresponding slot, which
-      // would not be as easily parsed into a uint32.
-      version := mload(add(usdcMessage, 4)) // 0 + 4 = 4
-    }
+    // According to the CCTP spec, the first 4 bytes of the message are the version, which we can extract
+    // directly and cast into a uint32.
+    uint32 version = uint32(bytes4(usdcMessage[0:4]));
 
     if (version == 0) {
       return USDCTokenPool(pools.cctpV1Pool).releaseOrMint(releaseOrMintIn);
