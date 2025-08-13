@@ -95,10 +95,6 @@ func (l *DefaultAccessor) Sync(
 	contractName string,
 	contractAddress cciptypes.UnknownAddress,
 ) error {
-	l.lggr.Infow("OGT l.contractReader memory address",
-		"address", fmt.Sprintf("%p", l.contractReader),
-		"chainSelector", l.chainSelector)
-
 	lggr := logutil.WithContextValues(ctx, l.lggr)
 	addressStr, err := l.addrCodec.AddressBytesToString(contractAddress, l.chainSelector)
 	if err != nil {

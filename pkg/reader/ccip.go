@@ -82,17 +82,8 @@ func newCCIPChainReaderWithConfigPollerInternal(
 	configPoller ConfigPoller,
 ) (*ccipChainReader, error) {
 	var crs = make(map[cciptypes.ChainSelector]contractreader.Extended)
-	lggr.Infow("OGT CCIPReader constructor",
-		"len(chainAccessors)", len(chainAccessors),
-		"len(contractReaders)", len(contractReaders),
-		"len(contractWriters)", len(contractWriters))
-
 	for chainSelector, cr := range contractReaders {
 		crs[chainSelector] = contractreader.NewExtendedContractReader(cr)
-		lggr.Infow("OGT CCIPReader constructor crs[chainSelector] memory address",
-			"crs[chainSelector] address", fmt.Sprintf("%p", crs[chainSelector]),
-			"cr reader address", fmt.Sprintf("%p", cr),
-			"chainSelector", chainSelector)
 	}
 
 	offrampAddrStr, err := addrCodec.AddressBytesToString(offrampAddress, destChain)
@@ -1019,10 +1010,6 @@ func (r *ccipChainReader) fetchFreshSourceChainConfigs(
 			ReturnVal: new(cciptypes.SourceChainConfig),
 		})
 	}
-
-	r.lggr.Debugw("OGT ccip.go fetchFreshSourceChainConfigs dest chain contract reader memory address:",
-		"memory_address", fmt.Sprintf("%p", reader),
-		"destChain", destChain)
 
 	// Execute batch request
 	results, _, err := reader.ExtendedBatchGetLatestValues(

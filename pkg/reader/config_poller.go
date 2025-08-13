@@ -498,10 +498,6 @@ func (c *configPoller) GetChainConfig(
 		return ChainConfigSnapshot{}, fmt.Errorf("no contract reader for chain %d", chainSel)
 	}
 
-	c.lggr.Debugw("OGT config_poller.go GetChainConfig contract reader memory address:",
-		"address", fmt.Sprintf("%p", reader),
-		"chain", chainSel)
-
 	chainCache := c.getOrCreateChainCache(chainSel)
 
 	chainCache.chainConfigMu.RLock()
@@ -528,15 +524,11 @@ func (c *configPoller) GetOfframpSourceChainConfigs(
 	sourceChains []cciptypes.ChainSelector,
 ) (map[cciptypes.ChainSelector]StaticSourceChainConfig, error) {
 	// Verify we have a reader for the destination chain
-	reader, exists := c.reader.getContractReader(destChain)
+	_, exists := c.reader.getContractReader(destChain)
 	if !exists {
 		c.lggr.Errorw("No contract reader for destination chain", "chain", destChain)
 		return nil, fmt.Errorf("no contract reader for destination chain %d", destChain)
 	}
-
-	c.lggr.Debugw("OGT config_poller.go GetOfframpSourceChainConfigs dest chain contract reader memory address:",
-		"memory_address", fmt.Sprintf("%p", reader),
-		"destChain", destChain)
 
 	// Filter out destination chain from source chains
 	filteredSourceChains := filterOutChainSelector(sourceChains, destChain)

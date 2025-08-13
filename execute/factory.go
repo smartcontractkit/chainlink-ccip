@@ -136,10 +136,6 @@ func (p PluginFactory) NewReportingPlugin(
 	readerFacades := make(map[cciptypes.ChainSelector]contractreader.ContractReaderFacade)
 	for chain, cr := range p.extendedReaders {
 		readerFacades[chain] = cr
-		lggr.Infow("OGT exec factory extendedReader memory address",
-			"cr address", fmt.Sprintf("%p", cr),
-			"readerFacades[chain] reader address", fmt.Sprintf("%p", cr),
-			"chain", chain)
 	}
 
 	ccipReader, err := readerpkg.NewCCIPChainReader(
