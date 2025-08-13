@@ -34,8 +34,7 @@ contract USDCTokenPool_setDomains is USDCTokenPoolSetup {
         domainIdentifier: domainIdentifiers[i],
         mintRecipient: bytes32(0),
         allowedCaller: allowedCallers[i],
-        enabled: true,
-        cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V1
+        enabled: true
       });
     }
 

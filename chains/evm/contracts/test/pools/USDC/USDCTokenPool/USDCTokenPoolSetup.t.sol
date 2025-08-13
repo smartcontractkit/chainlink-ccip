@@ -21,15 +21,14 @@ contract USDCTokenPoolSetup is USDCSetup {
     super.setUp();
 
     s_mockUSDCTransmitter = new MockE2EUSDCTransmitter(0, DEST_DOMAIN_IDENTIFIER, address(s_USDCToken));
-    s_mockUSDC = new MockUSDCTokenMessenger(0, address(s_mockUSDCTransmitter));
-    s_mockLegacyUSDC = new MockUSDCTokenMessenger(0, address(s_mockUSDCTransmitter));
-    s_cctpMessageTransmitterProxy = new CCTPMessageTransmitterProxy(s_mockUSDC);
+    s_mockUSDCTokenMessenger = new MockUSDCTokenMessenger(0, address(s_mockUSDCTransmitter));
+    s_cctpMessageTransmitterProxy = new CCTPMessageTransmitterProxy(s_mockUSDCTokenMessenger);
 
     BurnMintERC677(address(s_USDCToken)).grantMintAndBurnRoles(address(s_mockUSDCTransmitter));
-    BurnMintERC677(address(s_USDCToken)).grantMintAndBurnRoles(address(s_mockUSDC));
+    BurnMintERC677(address(s_USDCToken)).grantMintAndBurnRoles(address(s_mockUSDCTokenMessenger));
 
     s_usdcTokenPool = new USDCTokenPoolHelper(
-      s_mockUSDC,
+      s_mockUSDCTokenMessenger,
       s_cctpMessageTransmitterProxy,
       s_USDCToken,
       new address[](0),
@@ -45,7 +44,12 @@ contract USDCTokenPoolSetup is USDCSetup {
 
     s_allowedList.push(vm.randomAddress());
     s_usdcTokenPoolWithAllowList = new USDCTokenPoolHelper(
-      s_mockUSDC, s_cctpMessageTransmitterProxy, s_USDCToken, s_allowedList, address(s_mockRMNRemote), address(s_router)
+      s_mockUSDCTokenMessenger,
+      s_cctpMessageTransmitterProxy,
+      s_USDCToken,
+      s_allowedList,
+      address(s_mockRMNRemote),
+      address(s_router)
     );
 
     // Set the owner as an authorized caller for the pools

@@ -9,7 +9,7 @@ import {USDCTokenPoolSetup} from "./USDCTokenPoolSetup.t.sol";
 contract USDCTokenPool_constructor is USDCTokenPoolSetup {
   function test_constructor() public {
     new USDCTokenPool(
-      s_mockUSDC,
+      s_mockUSDCTokenMessenger,
       s_cctpMessageTransmitterProxy,
       s_USDCToken,
       new address[](0),
@@ -34,9 +34,9 @@ contract USDCTokenPool_constructor is USDCTokenPoolSetup {
 
   function test_constructor_RevertWhen_InvalidMessageVersion() public {
     // Should revert with InvalidMessageVersion error because the token messenger version is 0, but the token pool itself is being set with version of 1
-    vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidMessageVersion.selector, 0, 1));
+    vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidMessageVersion.selector, 1, 0));
     new USDCTokenPool(
-      s_mockUSDC,
+      s_mockUSDCTokenMessenger,
       s_cctpMessageTransmitterProxy,
       s_USDCToken,
       new address[](0),
@@ -52,9 +52,9 @@ contract USDCTokenPool_constructor is USDCTokenPoolSetup {
     );
 
     // Should revert with InvalidTokenMessengerVersion error because the token messenger version is 0, but the transmitter version is 1
-    vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidTokenMessengerVersion.selector, 0, 1));
+    vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidTokenMessengerVersion.selector, 1, 0));
     new USDCTokenPool(
-      s_mockUSDC,
+      s_mockUSDCTokenMessenger,
       s_cctpMessageTransmitterProxy,
       s_USDCToken,
       new address[](0),
@@ -74,7 +74,7 @@ contract USDCTokenPool_constructor is USDCTokenPoolSetup {
 
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidTransmitterInProxy.selector));
     new USDCTokenPool(
-      s_mockUSDC,
+      s_mockUSDCTokenMessenger,
       s_cctpMessageTransmitterProxy,
       s_USDCToken,
       new address[](0),

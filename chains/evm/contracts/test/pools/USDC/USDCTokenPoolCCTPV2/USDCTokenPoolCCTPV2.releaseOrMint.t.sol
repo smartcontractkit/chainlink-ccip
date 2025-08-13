@@ -171,7 +171,7 @@ contract USDCTokenPoolCCTPV2_releaseOrMint is USDCTokenPoolCCTPV2Setup {
       destinationDomain: DEST_DOMAIN_IDENTIFIER,
       nonce: keccak256("0xC11"),
       sender: SOURCE_CHAIN_TOKEN_SENDER,
-      recipient: bytes32(uint256(uint160(address(s_mockUSDC)))),
+      recipient: bytes32(uint256(uint160(address(s_mockUSDCTokenMessenger)))),
       destinationCaller: bytes32(uint256(uint160(address(s_usdcTokenPool)))),
       minFinalityThreshold: s_usdcTokenPool.FINALITY_THRESHOLD(),
       finalityThresholdExecuted: s_usdcTokenPool.FINALITY_THRESHOLD(),

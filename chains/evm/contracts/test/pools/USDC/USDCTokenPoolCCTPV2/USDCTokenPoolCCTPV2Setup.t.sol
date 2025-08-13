@@ -16,7 +16,7 @@ contract USDCTokenPoolCCTPV2Setup is USDCSetup {
     super.setUp();
 
     s_usdcTokenPool = new USDCTokenPoolCCTPV2Helper(
-      s_mockUSDC,
+      s_mockUSDCTokenMessenger,
       s_cctpMessageTransmitterProxy,
       s_USDCToken,
       new address[](0),

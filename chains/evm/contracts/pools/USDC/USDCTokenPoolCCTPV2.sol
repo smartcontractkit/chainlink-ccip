@@ -95,7 +95,7 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
       sourceDomain: i_localDomainIdentifier,
       cctpVersion: CCTPVersion.CCTP_V2,
       amount: lockOrBurnIn.amount,
-      destinationDomain: i_localDomainIdentifier,
+      destinationDomain: domain.domainIdentifier,
       mintRecipient: decodedReceiver,
       burnToken: address(i_token),
       destinationCaller: domain.allowedCaller,
@@ -118,6 +118,7 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
   ///     * version                    4          uint32     0
   ///     * sourceDomain               4          uint32     4
   ///     * destinationDomain          4          uint32     8
+
   ///     * nonce                      32         bytes32   12
   ///     * sender                     32         bytes32   44
   ///     * recipient                  32         bytes32   76
