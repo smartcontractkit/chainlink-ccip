@@ -33,22 +33,21 @@ import {EnumerableSet} from
 | CCTP Message Transmitter Proxy | --------------------> | Message Transmitter   |
 +-------------------------------+                        +-----------------------+
 */
-
+/// @dev This specific pool is used for CCTP V1. The CCTP V2 pool is a separate contract, which inherits many of the
+/// state management from this contract, only overriding the functions absolutely necessary for supporting CCTP V2.
 contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
   using SafeERC20 for IERC20;
   using EnumerableSet for EnumerableSet.AddressSet;
 
   event DomainsSet(DomainUpdate[]);
   event ConfigSet(address tokenMessenger);
-  event AllowedTokenPoolProxyAdded(address tokenPoolProxy);
-  event AllowedTokenPoolProxyRemoved(address tokenPoolProxy);
 
   error UnknownDomain(uint64 domain);
   error UnlockingUSDCFailed();
   error InvalidConfig();
   error InvalidDomain(DomainUpdate domain);
-  error InvalidMessageVersion(uint32 expected, uint32 got); // TODO: Remove expected
-  error InvalidTokenMessengerVersion(uint32 expected, uint32 got); // TODO: Remove expected
+  error InvalidMessageVersion(uint32 expected, uint32 got);
+  error InvalidTokenMessengerVersion(uint32 expected, uint32 got);
   error InvalidNonce(uint64 expected, uint64 got);
   error InvalidSourceDomain(uint32 expected, uint32 got);
   error InvalidDestinationDomain(uint32 expected, uint32 got);
@@ -57,8 +56,6 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
   error InvalidPreviousPool();
   error InvalidMessageLength(uint256 length);
   error InvalidCCTPVersion(CCTPVersion expected, CCTPVersion got);
-  error TokenPoolProxyAlreadyAllowed(address tokenPoolProxy);
-  error TokenPoolProxyNotAllowed(address tokenPoolProxy);
 
   // This data is supplied from offchain and contains everything needed to mint the USDC tokens on the destination chain
   // through CCTP.
@@ -99,8 +96,6 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
     uint32 minFinalityThreshold; // Minimum confirmation threshold before attestation (should be 2000).
   }
 
-  string public constant override typeAndVersion = "USDCTokenPool 1.6.2-dev";
-
   /// @notice The version of the USDC message format that this pool supports. Version 0 is the legacy version of CCTP.
   uint32 public immutable i_supportedUSDCVersion;
 
@@ -120,7 +115,6 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
     bytes32 allowedCaller; //      Address allowed to mint on the domain
     bytes32 mintRecipient; //      Address to mint to on the destination chain
     uint32 domainIdentifier; // ──╮ Unique domain ID
-    CCTPVersion cctpVersion; //   │ CCTP version used on the domain. Enums are uint8 for packing purposes.
     bool enabled; // ─────────────╯ Whether the domain is enabled
   }
 
@@ -150,7 +144,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
 
     // Check that the message transmitter version is supported by this version of the token pool.
     if (transmitterVersion != i_supportedUSDCVersion) {
-      revert InvalidMessageVersion(transmitterVersion, i_supportedUSDCVersion);
+      revert InvalidMessageVersion(i_supportedUSDCVersion, transmitterVersion);
     }
 
     // Check that the token messenger version is supported by this version of the token pool.
@@ -158,7 +152,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
 
     // If the token messenger version is not supported, revert.
     if (tokenMessengerVersion != i_supportedUSDCVersion) {
-      revert InvalidTokenMessengerVersion(tokenMessengerVersion, i_supportedUSDCVersion);
+      revert InvalidTokenMessengerVersion(i_supportedUSDCVersion, tokenMessengerVersion);
     }
 
     // Check that the message transmitter proxy is configured to use the correct message transmitter for
@@ -173,6 +167,11 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
     i_token.safeIncreaseAllowance(address(i_tokenMessenger), type(uint256).max);
 
     emit ConfigSet(address(tokenMessenger));
+  }
+
+  /// @notice Using a function because constant state variables cannot be overridden by child contracts.
+  function typeAndVersion() external pure virtual override returns (string memory) {
+    return "USDCTokenPool 1.6.3-dev";
   }
 
   /// @notice Burn tokens from the pool to initiate cross-chain transfer.
@@ -223,7 +222,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
       sourceDomain: i_localDomainIdentifier,
       cctpVersion: CCTPVersion.CCTP_V1,
       amount: lockOrBurnIn.amount,
-      destinationDomain: i_localDomainIdentifier,
+      destinationDomain: domain.domainIdentifier,
       mintRecipient: decodedReceiver,
       burnToken: address(i_token),
       destinationCaller: domain.allowedCaller,
@@ -279,12 +278,13 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
     // call releaseOrMint on this contract, with a sourcePoolData from a previous
     // version will revert. However, this should never occur, as the USDC Proxy
     // which receives the message first, should never call this pool with that data,
-    // instead routing the message to a pool capable of decoding properly.
+    // instead formatting the message to the new format if necessary.
     SourceTokenDataPayload memory sourceTokenDataPayload =
       abi.decode(releaseOrMintIn.sourcePoolData, (SourceTokenDataPayload));
 
     _validateMessage(msgAndAttestation.message, sourceTokenDataPayload);
 
+    // Proxy the message to the message transmitter, which will mint the tokens through CCTP's contracts.
     if (!i_messageTransmitterProxy.receiveMessage(msgAndAttestation.message, msgAndAttestation.attestation)) {
       revert UnlockingUSDCFailed();
     }
@@ -336,7 +336,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
     // This token pool only supports version 0 of the CCTP message format
     // We check the version prior to loading the rest of the message
     // to avoid unexpected reverts due to out-of-bounds reads.
-    if (version != i_supportedUSDCVersion) revert InvalidMessageVersion(version, i_supportedUSDCVersion);
+    if (version != i_supportedUSDCVersion) revert InvalidMessageVersion(i_supportedUSDCVersion, version);
 
     uint32 sourceDomain;
     uint32 destinationDomain;
@@ -393,7 +393,6 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
         allowedCaller: domain.allowedCaller,
         mintRecipient: domain.mintRecipient,
         domainIdentifier: domain.domainIdentifier,
-        cctpVersion: domain.cctpVersion,
         enabled: domain.enabled
       });
     }

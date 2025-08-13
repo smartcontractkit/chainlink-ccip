@@ -12,7 +12,7 @@ import {USDCTokenPoolCCTPV2Setup} from "./USDCTokenPoolCCTPV2Setup.t.sol";
 contract USDCTokenPoolCCTPV2_constructor is USDCTokenPoolCCTPV2Setup {
   function test_constructor() public {
     new USDCTokenPoolCCTPV2(
-      s_mockUSDC,
+      s_mockUSDCTokenMessenger,
       s_cctpMessageTransmitterProxy,
       s_USDCToken,
       new address[](0),
@@ -34,10 +34,10 @@ contract USDCTokenPoolCCTPV2_constructor is USDCTokenPoolCCTPV2Setup {
   }
 
   function test_constructor_RevertWhen_InvalidMessageVersion() public {
-    vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidMessageVersion.selector, 0, 1));
+    vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidMessageVersion.selector, 1, 0));
 
     new USDCTokenPoolCCTPV2(
-      s_mockLegacyUSDC,
+      s_mockUSDCTokenMessenger_CCTPV1,
       s_cctpMessageTransmitterProxy,
       s_USDCToken,
       new address[](0),
@@ -50,12 +50,14 @@ contract USDCTokenPoolCCTPV2_constructor is USDCTokenPoolCCTPV2Setup {
     // The error we want to call is most likely unreachable because the token messenger version is 1, but we mock it to
     // 0 to test the error
     vm.mockCall(
-      address(s_mockUSDC), abi.encodeWithSelector(MockUSDCTokenMessenger.messageBodyVersion.selector), abi.encode(0)
+      address(s_mockUSDCTokenMessenger),
+      abi.encodeWithSelector(MockUSDCTokenMessenger.messageBodyVersion.selector),
+      abi.encode(0)
     );
 
-    vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidTokenMessengerVersion.selector, 0, 1));
+    vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidTokenMessengerVersion.selector, 1, 0));
     new USDCTokenPoolCCTPV2(
-      s_mockUSDC,
+      s_mockUSDCTokenMessenger,
       s_cctpMessageTransmitterProxy,
       s_USDCToken,
       new address[](0),
@@ -75,7 +77,7 @@ contract USDCTokenPoolCCTPV2_constructor is USDCTokenPoolCCTPV2Setup {
     // Expect the constructor to revert with InvalidTransmitterInProxy error
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidTransmitterInProxy.selector));
     new USDCTokenPoolCCTPV2(
-      s_mockUSDC,
+      s_mockUSDCTokenMessenger,
       s_cctpMessageTransmitterProxy,
       s_USDCToken,
       new address[](0),

@@ -11,9 +11,19 @@ import {IERC20} from
 import {EnumerableSet} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
 
+/// @dev The flag used to indicate that the source pool data is coming from a chain that does not have CCTP Support,
+/// and so the lock release pool should be used. The BurnMintWithLockReleaseTokenPool uses this flag as its source pool
+/// data to indicate that the tokens should be released from the lock release pool rather than attempting to be minted
+/// through CCTP.
+/// @dev The preimage is bytes4(keccak256("NO_CCTP_USE_LOCK_RELEASE")).
+/// Note: This will be removed in a following PR but is included here to prevent breaking changes to the
+/// BurnMintWithLockReleaseTokenPool.
 bytes4 constant LOCK_RELEASE_FLAG = 0xfa7c07de;
 
 /// @notice A token pool for USDC which inherits the Siloed token functionality while adding the CCTP migration functionality.
+/// @dev The CCTP migration functions have been previously audited. The code has been moved from its own contract
+/// to this, to maximize simplicity. The only difference is that custom balance tracking
+/// has been removed and instead is now inherited from the SiloedLockReleaseTokenPool.
 /// @dev While this technically supports unsiloed chains, as inherited from the parent contract,
 /// it is not recommended to use them. All chains should be siloed, otherwise the chain will not be
 /// able to migrate to CCTP in the future, due to the inability to manage the token
@@ -59,6 +69,11 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     SiloedLockReleaseTokenPool(token, localTokenDecimals, allowlist, rmnProxy, router, lockBox)
     AuthorizedCallers(new address[](0))
   {}
+
+  /// @notice Using a function because constant state variables cannot be overridden by child contracts.
+  function typeAndVersion() external pure virtual override returns (string memory) {
+    return "SiloedUSDCTokenPool 1.6.3-dev";
+  }
 
   /// @notice Release tokens for a specific chain selector.
   /// @dev This function can only be called by an address specified by the owner to be controlled by circle

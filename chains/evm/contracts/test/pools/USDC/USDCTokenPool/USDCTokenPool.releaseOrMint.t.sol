@@ -169,7 +169,7 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
       destinationDomain: DEST_DOMAIN_IDENTIFIER,
       nonce: 0x060606060606,
       sender: SOURCE_CHAIN_TOKEN_SENDER,
-      recipient: bytes32(uint256(uint160(address(s_mockUSDC)))),
+      recipient: bytes32(uint256(uint160(address(s_mockUSDCTokenMessenger)))),
       destinationCaller: bytes32(uint256(uint160(address(s_usdcTokenPool)))),
       messageBody: _formatMessage(
         0,

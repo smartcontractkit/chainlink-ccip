@@ -53,8 +53,8 @@ contract USDCSetup is BaseTest {
   address internal constant DEST_CHAIN_USDC_POOL = address(0x987384873458734);
   address internal constant DEST_CHAIN_USDC_TOKEN = address(0x23598918358198766);
 
-  MockUSDCTokenMessenger internal s_mockUSDC;
-  MockUSDCTokenMessenger internal s_mockLegacyUSDC;
+  MockUSDCTokenMessenger internal s_mockUSDCTokenMessenger;
+  MockUSDCTokenMessenger internal s_mockUSDCTokenMessenger_CCTPV1;
   MockE2EUSDCTransmitter internal s_mockUSDCTransmitter;
   MockE2EUSDCTransmitterCCTPV2 internal s_mockUSDCTransmitterCCTPV2;
 
@@ -83,14 +83,15 @@ contract USDCSetup is BaseTest {
     s_mockUSDCTransmitterCCTPV2 = new MockE2EUSDCTransmitterCCTPV2(1, DEST_DOMAIN_IDENTIFIER, address(s_USDCToken));
     s_mockUSDCTransmitter = new MockE2EUSDCTransmitter(0, DEST_DOMAIN_IDENTIFIER, address(s_USDCToken));
 
-    s_mockUSDC = new MockUSDCTokenMessenger(1, address(s_mockUSDCTransmitterCCTPV2));
+    // Create both of the mock token messengers, one for CCTP V1 and one for CCTP V2. The V1 messenger is
+    // denoted by it's version being 0 and using the mock transmitter with the same version
+    s_mockUSDCTokenMessenger = new MockUSDCTokenMessenger(1, address(s_mockUSDCTransmitterCCTPV2));
+    s_mockUSDCTokenMessenger_CCTPV1 = new MockUSDCTokenMessenger(0, address(s_mockUSDCTransmitter));
 
-    s_mockLegacyUSDC = new MockUSDCTokenMessenger(0, address(s_mockUSDCTransmitter));
-
-    s_cctpMessageTransmitterProxy = new CCTPMessageTransmitterProxy(s_mockUSDC);
+    s_cctpMessageTransmitterProxy = new CCTPMessageTransmitterProxy(s_mockUSDCTokenMessenger);
 
     usdcToken.grantMintAndBurnRoles(address(s_mockUSDCTransmitterCCTPV2));
-    usdcToken.grantMintAndBurnRoles(address(s_mockUSDC));
+    usdcToken.grantMintAndBurnRoles(address(s_mockUSDCTokenMessenger));
 
     // Mock the previous pool's releaseOrMint function to return the input amount
     vm.mockCall(

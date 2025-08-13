@@ -139,7 +139,7 @@ contract USDCTokenPool_validateMessage is USDCTokenPoolSetup {
     usdcMessage.version = wrongVersion;
     encodedUsdcMessage = _generateUSDCMessage(usdcMessage);
 
-    vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidMessageVersion.selector, wrongVersion, 0));
+    vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidMessageVersion.selector, 0, wrongVersion));
     s_usdcTokenPool.validateMessage(encodedUsdcMessage, sourceTokenData);
 
     // Create a byte string of length less than 116 (e.g., 100)

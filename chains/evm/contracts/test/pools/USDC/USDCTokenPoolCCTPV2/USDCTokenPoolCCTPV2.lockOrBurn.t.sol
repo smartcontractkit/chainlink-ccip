@@ -35,7 +35,7 @@ contract USDCTokenPoolCCTPV2_lockOrBurn is USDCTokenPoolCCTPV2Setup {
       address(s_usdcTokenPool),
       receiver,
       expectedDomain.domainIdentifier,
-      s_mockUSDC.DESTINATION_TOKEN_MESSENGER(),
+      s_mockUSDCTokenMessenger.DESTINATION_TOKEN_MESSENGER(),
       expectedDomain.allowedCaller,
       s_usdcTokenPool.MAX_FEE(),
       s_usdcTokenPool.FINALITY_THRESHOLD(),
@@ -60,8 +60,26 @@ contract USDCTokenPoolCCTPV2_lockOrBurn is USDCTokenPoolCCTPV2Setup {
       })
     );
 
-    uint64 nonce = abi.decode(poolReturnDataV1.destPoolData, (uint64));
-    assertEq(nonce, 0);
+    USDCTokenPool.SourceTokenDataPayload memory sourceTokenDataPayload =
+      abi.decode(poolReturnDataV1.destPoolData, (USDCTokenPool.SourceTokenDataPayload));
+    assertEq(sourceTokenDataPayload.nonce, 0, "nonce is incorrect");
+    assertEq(sourceTokenDataPayload.sourceDomain, DEST_DOMAIN_IDENTIFIER, "sourceDomain is incorrect");
+    assertEq(
+      uint8(sourceTokenDataPayload.cctpVersion), uint8(USDCTokenPool.CCTPVersion.CCTP_V2), "cctpVersion is incorrect"
+    );
+    assertEq(sourceTokenDataPayload.amount, amount, "amount is incorrect");
+    assertEq(
+      sourceTokenDataPayload.destinationDomain, expectedDomain.domainIdentifier, "destinationDomain is incorrect"
+    );
+    assertEq(sourceTokenDataPayload.mintRecipient, receiver, "mintRecipient is incorrect");
+    assertEq(sourceTokenDataPayload.burnToken, address(s_USDCToken), "burnToken is incorrect");
+    assertEq(sourceTokenDataPayload.destinationCaller, expectedDomain.allowedCaller, "destinationCaller is incorrect");
+    assertEq(sourceTokenDataPayload.maxFee, s_usdcTokenPool.MAX_FEE(), "maxFee is incorrect");
+    assertEq(
+      sourceTokenDataPayload.minFinalityThreshold,
+      s_usdcTokenPool.FINALITY_THRESHOLD(),
+      "minFinalityThreshold is incorrect"
+    );
   }
 
   function test_LockOrBurn_MintRecipientOverride() public {
@@ -80,7 +98,7 @@ contract USDCTokenPoolCCTPV2_lockOrBurn is USDCTokenPoolCCTPV2Setup {
       domainIdentifier: expectedDomain.domainIdentifier,
       destChainSelector: DEST_CHAIN_SELECTOR,
       enabled: expectedDomain.enabled,
-      cctpVersion: expectedDomain.cctpVersion
+      cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V2
     });
     vm.startPrank(OWNER);
     s_usdcTokenPool.setDomains(updates);
@@ -99,7 +117,7 @@ contract USDCTokenPoolCCTPV2_lockOrBurn is USDCTokenPoolCCTPV2Setup {
       address(s_usdcTokenPool),
       extraMintRecipient,
       expectedDomain.domainIdentifier,
-      s_mockUSDC.DESTINATION_TOKEN_MESSENGER(),
+      s_mockUSDCTokenMessenger.DESTINATION_TOKEN_MESSENGER(),
       expectedDomain.allowedCaller,
       s_usdcTokenPool.MAX_FEE(),
       s_usdcTokenPool.FINALITY_THRESHOLD(),
@@ -152,7 +170,7 @@ contract USDCTokenPoolCCTPV2_lockOrBurn is USDCTokenPoolCCTPV2Setup {
       address(s_usdcTokenPool),
       destinationReceiver,
       expectedDomain.domainIdentifier,
-      s_mockUSDC.DESTINATION_TOKEN_MESSENGER(),
+      s_mockUSDCTokenMessenger.DESTINATION_TOKEN_MESSENGER(),
       expectedDomain.allowedCaller,
       s_usdcTokenPool.MAX_FEE(),
       s_usdcTokenPool.FINALITY_THRESHOLD(),
