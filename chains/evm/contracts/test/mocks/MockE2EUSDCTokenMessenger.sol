@@ -73,6 +73,48 @@ contract MockE2EUSDCTokenMessenger is ITokenMessenger {
     return s_nonce;
   }
 
+  // The mock function is based on the same function in https://github.com/circlefin/evm-cctp-contracts/blob/master/src/v2/TokenMessengerV2.sol
+  function depositForBurn(
+    uint256 amount,
+    uint32 destinationDomain,
+    bytes32 mintRecipient,
+    address burnToken,
+    bytes32 destinationCaller,
+    uint32 maxFee,
+    uint32 minFinalityThreshold
+  ) external {
+    IBurnMintERC20(burnToken).transferFrom(msg.sender, address(this), amount);
+    IBurnMintERC20(burnToken).burn(amount);
+
+    bytes calldata _emptyHookData = msg.data[0:0];
+
+    // Format message body
+    bytes memory _burnMessage = _formatBurnMessage(
+      i_messageBodyVersion, // version
+      bytes32(uint256(uint160(burnToken))), // burnToken
+      mintRecipient, // mintRecipient
+      amount, // amount
+      bytes32(uint256(uint160(msg.sender))), // messageSender
+      0, // maxFee
+      _emptyHookData // hookData
+    );
+
+    _sendDepositForBurnMessage(destinationDomain, DESTINATION_TOKEN_MESSENGER, destinationCaller, _burnMessage);
+
+    emit DepositForBurn(
+      burnToken,
+      amount,
+      msg.sender,
+      mintRecipient,
+      destinationDomain,
+      DESTINATION_TOKEN_MESSENGER,
+      destinationCaller,
+      maxFee,
+      minFinalityThreshold,
+      _emptyHookData
+    );
+  }
+
   function messageBodyVersion() external view returns (uint32) {
     return i_messageBodyVersion;
   }
@@ -108,7 +150,7 @@ contract MockE2EUSDCTokenMessenger is ITokenMessenger {
   }
 
   /**
-   * @notice Formats Burn message
+   * @notice Formats Burn message under CCTP V1
    * @param _version The message body version
    * @param _burnToken The burn token address on source domain as bytes32
    * @param _mintRecipient The mint recipient address as bytes32
@@ -124,5 +166,31 @@ contract MockE2EUSDCTokenMessenger is ITokenMessenger {
     bytes32 _messageSender
   ) internal pure returns (bytes memory) {
     return abi.encodePacked(_version, _burnToken, _mintRecipient, _amount, _messageSender);
+  }
+
+  /**
+   * @notice Formats Burn message according to the format of CCTP V2
+   * @param _version The message body version
+   * @param _burnToken The burn token address on source domain as bytes32
+   * @param _mintRecipient The mint recipient address as bytes32
+   * @param _amount The burn amount
+   * @param _messageSender The message sender
+   * @param _maxFee The maximum fee to be paid on destination domain
+   * @param _hookData Optional hook data for processing on the destination domain
+   * @return Burn formatted message.
+   */
+  function _formatBurnMessage(
+    uint32 _version,
+    bytes32 _burnToken,
+    bytes32 _mintRecipient,
+    uint256 _amount,
+    bytes32 _messageSender,
+    uint256 _maxFee,
+    bytes calldata _hookData
+  ) internal pure returns (bytes memory) {
+    // Uses the encoding scheme defined at https://github.com/circlefin/evm-cctp-contracts/blob/master/src/messages/v2/BurnMessageV2.sol#L68
+    return abi.encodePacked(
+      _version, _burnToken, _mintRecipient, _amount, _messageSender, _maxFee, uint256(0), uint256(0), _hookData
+    );
   }
 }
