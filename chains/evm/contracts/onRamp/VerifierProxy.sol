@@ -89,6 +89,7 @@ contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsg
     IRouter router; //           Source router address.
     address defaultVerifier;
     address requiredVerifier;
+    address defaultExecutor;
   }
 
   // STATIC CONFIG
@@ -207,6 +208,25 @@ contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsg
     for (uint256 i = 0; i < requiredVerifiersCount; ++i) {
       Client.Verifier memory verifier = resolvedExtraArgs.requiredVerifiers[i];
       IVerifierSender verifierSender = IVerifierSender(verifier.verifierAddress);
+      newMessage.verifierReceipts[i] = Internal.Receipt({
+        issuer: verifier.verifierAddress,
+        feeTokenAmount: 0, // TODO
+        destGasLimit: 0, // TODO
+        destBytesOverhead: 0, // TODO
+        extraArgs: verifier.args
+      });
+    }
+
+    for (uint256 i = 0; i < resolvedExtraArgs.optionalVerifiers.length; ++i) {
+      Client.Verifier memory verifier = resolvedExtraArgs.optionalVerifiers[i];
+      IVerifierSender verifierSender = IVerifierSender(verifier.verifierAddress);
+      newMessage.verifierReceipts[i + requiredVerifiersCount] = Internal.Receipt({
+        issuer: verifier.verifierAddress,
+        feeTokenAmount: 0, // TODO
+        destGasLimit: 0, // TODO
+        destBytesOverhead: 0, // TODO
+        extraArgs: verifier.args
+      });
     }
 
     // TODO
@@ -330,30 +350,32 @@ contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsg
     if (bytes4(extraArgs[0:4]) == Client.MOD_SEC_EXTRA_ARGS_V1_TAG) {
       resolvedArgs = abi.decode(extraArgs, (Client.ModSecExtraArgsV1));
 
-      // Requiring more verifiers than are supplied would make a transaction unexecutable forever.
-      if (resolvedArgs.optionalVerifiers.length <= resolvedArgs.optionalThreshold) {
-        revert();
+      if (resolvedArgs.optionalVerifiers.length != 0) {
+        // Requiring more verifiers than are supplied would make a transaction unexecutable forever.
+        if (resolvedArgs.optionalVerifiers.length <= resolvedArgs.optionalThreshold) {
+          revert();
+        }
+
+        // If a user specified an optional verifier, the threshold must be non-zero.
+        if (resolvedArgs.optionalThreshold == 0) {
+          revert();
+        }
       }
 
-      // If a user specified an optional verifier, the threshold must be non-zero.
-      if (resolvedArgs.optionalVerifiers.length != 0 && resolvedArgs.optionalThreshold == 0) {
-        revert();
+      // Not supplying a verifier means the default is chosen.
+      if (resolvedArgs.requiredVerifiers.length + resolvedArgs.optionalVerifiers.length == 0) {
+        resolvedArgs.requiredVerifiers = new Client.Verifier[](1);
+        resolvedArgs.requiredVerifiers[0] =
+          Client.Verifier({verifierAddress: destChainConfig.defaultVerifier, args: ""});
       }
     } else {
       // If old extraArgs are supplied, they are assumed to be for the default verifier and the default executor. This
       // means any default verifier/executor has to be able to process all prior extraArgs.
       resolvedArgs.executorArgs = extraArgs;
 
-      // We set the default here instead of using the similar logic below because we want to include the extraArgs.
       resolvedArgs.requiredVerifiers = new Client.Verifier[](1);
       resolvedArgs.requiredVerifiers[0] =
         Client.Verifier({verifierAddress: destChainConfig.defaultVerifier, args: extraArgs});
-    }
-
-    // Not supplying a verifier means the default is chosen.
-    if (resolvedArgs.requiredVerifiers.length + resolvedArgs.optionalVerifiers.length == 0) {
-      resolvedArgs.requiredVerifiers = new Client.Verifier[](1);
-      resolvedArgs.requiredVerifiers[0] = Client.Verifier({verifierAddress: destChainConfig.defaultVerifier, args: ""});
     }
 
     // Not supplying an executor means the default is chosen.
@@ -428,6 +450,9 @@ contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsg
       DestChainConfig storage destChainConfig = s_destChainConfigs[destChainSelector];
       // The router can be zero to pause the destination chain
       destChainConfig.router = destChainConfigArg.router;
+      destChainConfig.defaultVerifier = destChainConfigArg.defaultVerifier;
+      destChainConfig.requiredVerifier = destChainConfigArg.requiredVerifier;
+      destChainConfig.defaultExecutor = destChainConfigArg.defaultExecutor;
 
       emit DestChainConfigSet(destChainSelector, destChainConfig.sequenceNumber, destChainConfigArg.router);
     }
