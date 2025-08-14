@@ -141,9 +141,13 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
       // would not be as easily parsed into a uint32.
       version := mload(add(usdcMessage, 4)) // 0 + 4 = 4
     }
-    // This token pool only supports version 2 of the CCTP message format.
-    // We check the version prior to loading the rest of the message to avoid unexpected reverts due to out-of-bounds reads.
-    // Note: Even though the CCTP Version is V2, it's on-chain version number is 1, since V1 uses a version number of 0.
+
+    // This token pool only supports version V2 of the CCTP message format.
+    // The version is checked prior to loading the rest of the message to avoid unexpected reverts due to out-of-bounds
+    // reads if the message format is different.
+    // Note: Even though the CCTP Version is V2, it's on-chain version number is 1, since V1 used a version number of 0.
+    // This is different from the CCTPVersion field of sourceTokenData, which is used by off-chain code and the token
+    // pools, rather than being a formal part of the CCTP message format.
     if (version != i_supportedUSDCVersion) revert InvalidMessageVersion(i_supportedUSDCVersion, version);
 
     uint32 messageSourceDomain;
