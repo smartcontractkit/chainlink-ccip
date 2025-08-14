@@ -73,7 +73,7 @@ contract OCRVerifier is ITypeAndVersion, Ownable2StepMsgSender {
     i_chainID = block.chainid;
   }
 
-  function _validateOCRSignatures(bytes calldata rawReport, bytes calldata ocrProof) internal {
+  function _validateOCRSignatures(bytes calldata rawReport, bytes calldata blob, bytes calldata ocrProof) internal {
     OCRProof memory report = abi.decode(ocrProof, (OCRProof));
 
     if (s_ocrConfig.configDigest != report.configDigest) {
@@ -88,7 +88,9 @@ contract OCRVerifier is ITypeAndVersion, Ownable2StepMsgSender {
     if (report.rs.length != report.ss.length) revert SignaturesOutOfRegistration();
 
     _verifySignatures(
-      keccak256(abi.encode(keccak256(rawReport), report.configDigest, report.sequenceNumber)), report.rs, report.ss
+      keccak256(abi.encode(keccak256(rawReport), keccak256(blob), report.configDigest, report.sequenceNumber)),
+      report.rs,
+      report.ss
     );
 
     emit Transmitted(report.configDigest, uint64(uint256(report.sequenceNumber)));

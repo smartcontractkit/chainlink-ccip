@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {ICCVOnRamp} from "../interfaces/ICCVOnRamp.sol";
 import {IFeeQuoterV2} from "../interfaces/IFeeQuoterV2.sol";
 import {INonceManager} from "../interfaces/INonceManager.sol";
 import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
-import {IVerifierSender} from "../interfaces/verifiers/IVerifier.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {Client} from "../libraries/Client.sol";
@@ -21,7 +21,7 @@ import {EnumerableSet} from
 /// @notice The CommitOnRamp is a contract that handles lane-specific fee logic.
 /// @dev The OnRamp and OffRamp form a cross chain upgradeable unit. Any change to one of them results in an onchain
 /// upgrade of both contracts.
-contract CommitOnRamp is IVerifierSender, ITypeAndVersion, Ownable2StepMsgSender {
+contract CommitOnRamp is ICCVOnRamp, ITypeAndVersion, Ownable2StepMsgSender {
   using SafeERC20 for IERC20;
   using EnumerableSet for EnumerableSet.AddressSet;
 

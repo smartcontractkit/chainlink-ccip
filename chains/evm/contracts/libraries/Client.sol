@@ -108,25 +108,25 @@ library Client {
   // │                           ModSec                             │
   // ================================================================
 
-  struct Verifier {
-    address verifierAddress;
+  struct CCV {
+    address ccvAddress;
     bytes args;
   }
 
   bytes4 public constant MOD_SEC_EXTRA_ARGS_V1_TAG = 0x302326cb;
 
   struct ModSecExtraArgsV1 {
+    CCV[] requiredCCV;
+    CCV[] optionalCCV;
+    uint8 optionalThreshold;
     address executor;
     bytes executorArgs;
-    Verifier[] requiredVerifiers;
-    Verifier[] optionalVerifiers;
-    uint8 optionalThreshold;
     bytes tokenArgs;
   }
 
   struct TokenPoolSettings {
     // Token pool can only add required verifiers.
-    Verifier[] requiredVerifiers;
+    CCV[] requiredVerifiers;
     // Token pool gas limit on dest
     uint256 gasLimit;
     // Token pool calldata size on dest

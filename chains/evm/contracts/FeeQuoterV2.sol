@@ -6,7 +6,6 @@ import {IFeeQuoterV2} from "./interfaces/IFeeQuoterV2.sol";
 import {FeeQuoter} from "./FeeQuoter.sol";
 import {Client} from "./libraries/Client.sol";
 import {Internal} from "./libraries/Internal.sol";
-import {Pool} from "./libraries/Pool.sol";
 
 contract FeeQuoterV2 is IFeeQuoterV2, FeeQuoter {
   constructor(

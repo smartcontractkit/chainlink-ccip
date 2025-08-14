@@ -351,9 +351,9 @@ library Internal {
 
   struct Receipt {
     address issuer;
-    uint256 feeTokenAmount;
     uint64 destGasLimit;
     uint32 destBytesOverhead;
+    uint256 feeTokenAmount;
     bytes extraArgs;
   }
 
@@ -377,7 +377,7 @@ library Internal {
     address receiver; // receiver address on the destination chain.
     uint32 gasLimit; // user supplied maximum gas amount available for dest chain execution & token pool ops.
     Any2EVMMultiProofTokenTransfer[] tokenAmounts; // array of tokens and amounts to transfer.
-    bytes[] requiredVerifiers; //
+    address[] requiredVerifiers; //
   }
 
   struct Any2EVMMultiProofTokenTransfer {

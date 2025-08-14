@@ -1,20 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {Client} from "../../libraries/Client.sol";
-import {Internal} from "../../libraries/Internal.sol";
+import {Client} from "../libraries/Client.sol";
 
-interface IVerifier {
-  /// @notice Message execution
-  function validateReport(
-    bytes memory rawReport,
-    bytes memory ocrProof,
-    uint256 verifierIndex,
-    Internal.MessageExecutionState originalState
-  ) external;
-}
-
-interface IVerifierSender {
+interface ICCVOnRamp {
   function getFee(
     uint64 destChainSelector,
     Client.EVM2AnyMessage memory message,

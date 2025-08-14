@@ -9,10 +9,10 @@ contract MockExecutor {
   }
 
   function getFee(
-    uint64 destChainSelector,
-    Client.EVM2AnyMessage memory message,
-    bytes memory extraArgs
-  ) external view returns (uint256) {
+    uint64, // destChainSelector,
+    Client.EVM2AnyMessage memory, // message,
+    bytes memory // extraArgs
+  ) external pure returns (uint256) {
     return 0;
   }
 }
