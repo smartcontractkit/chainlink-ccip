@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {Client} from "../../../libraries/Client.sol";
+import {Internal} from "../../../libraries/Internal.sol";
 import {VerifierProxy} from "../../../onRamp/VerifierProxy.sol";
 import {FeeQuoterFeeSetup} from "../../feeQuoter/FeeQuoterSetup.t.sol";
+import {MockExecutor} from "../../mocks/MockExecutor.sol";
 import {MockVerifier} from "../../mocks/MockVerifier.sol";
 
 contract VerifierProxySetup is FeeQuoterFeeSetup {
@@ -11,6 +14,7 @@ contract VerifierProxySetup is FeeQuoterFeeSetup {
 
   VerifierProxy internal s_verifierProxy;
   MockVerifier internal s_mockVerifierOne;
+  MockExecutor internal s_mockExecutor;
 
   function setUp() public virtual override {
     super.setUp();
@@ -28,5 +32,68 @@ contract VerifierProxySetup is FeeQuoterFeeSetup {
       })
     );
     s_mockVerifierOne = new MockVerifier();
+
+    VerifierProxy.DestChainConfigArgs[] memory destChainConfigs = new VerifierProxy.DestChainConfigArgs[](1);
+    destChainConfigs[0] = VerifierProxy.DestChainConfigArgs({
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      router: s_sourceRouter,
+      defaultVerifier: address(s_mockVerifierOne),
+      requiredVerifier: address(0),
+      defaultExecutor: address(s_mockExecutor)
+    });
+
+    s_verifierProxy.applyDestChainConfigUpdates(destChainConfigs);
+  }
+
+  function _evmMessageToEvent(
+    Client.EVM2AnyMessage memory message,
+    uint64 destChainSelector,
+    uint64 seqNum,
+    uint256 feeTokenAmount,
+    uint256 feeValueJuels,
+    address originalSender,
+    bytes32 metadataHash
+  ) internal view returns (Internal.EVM2AnyVerifierMessage memory) {
+    Internal.EVMTokenTransfer memory tokenTransfer;
+
+    // TODO
+    //    if (message.tokenAmounts.length > 0) {
+    //      tokenTransfer =
+    //        Internal.EVM2AnyTokenTransfer({token: message.tokenAmounts[0].token, amount: message.tokenAmounts[0].amount});
+    //    }
+
+    Internal.EVM2AnyVerifierMessage memory messageEvent = Internal.EVM2AnyVerifierMessage({
+      header: Internal.Header({
+        messageId: "",
+        sourceChainSelector: SOURCE_CHAIN_SELECTOR,
+        destChainSelector: destChainSelector,
+        sequenceNumber: seqNum
+      }),
+      sender: originalSender,
+      data: message.data,
+      receiver: message.receiver,
+      feeToken: message.feeToken,
+      feeTokenAmount: feeTokenAmount,
+      feeValueJuels: feeValueJuels,
+      tokenTransfer: tokenTransfer,
+      verifierReceipts: new Internal.Receipt[](0),
+      executorReceipt: Internal.Receipt({
+        issuer: address(0),
+        feeTokenAmount: 0,
+        destGasLimit: 0,
+        destBytesOverhead: 0,
+        extraArgs: ""
+      }),
+      tokenReceipt: Internal.Receipt({
+        issuer: address(0),
+        feeTokenAmount: 0,
+        destGasLimit: 0,
+        destBytesOverhead: 0,
+        extraArgs: ""
+      })
+    });
+
+    messageEvent.header.messageId = Internal._hash(messageEvent, metadataHash);
+    return messageEvent;
   }
 }
