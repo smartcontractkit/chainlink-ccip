@@ -70,9 +70,9 @@ function getOptimizations() {
 }
 
 # Mod sec
-compileContract onRamp/VerifierProxy
+compileContract onRamp/CCVProxy
 compileContract onRamp/CommitOnRamp
-compileContract offRamp/VerifierAggregator
+compileContract offRamp/CCVAggregator
 compileContract offRamp/CommitOffRamp
 
 # 1.6

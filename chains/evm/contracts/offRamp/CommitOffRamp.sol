@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.10;
 
+import {ICCVOffRamp} from "../interfaces/ICCVOffRamp.sol";
 import {INonceManager} from "../interfaces/INonceManager.sol";
-import {IVerifier} from "../interfaces/verifiers/IVerifier.sol";
 
 import {Internal} from "../libraries/Internal.sol";
 import {OCRVerifier} from "../ocr/OCRVerifier.sol";
 
-contract CommitOffRamp is IVerifier, OCRVerifier {
+contract CommitOffRamp is ICCVOffRamp, OCRVerifier {
   error ZeroAddressNotAllowed();
 
   error InvalidNonce(uint64 nonce);
@@ -25,17 +25,16 @@ contract CommitOffRamp is IVerifier, OCRVerifier {
 
   function validateReport(
     bytes calldata rawReport,
+    bytes calldata ccvBlob,
     bytes calldata ocrProof,
     uint256 verifierIndex,
     Internal.MessageExecutionState originalState
   ) external {
-    _validateOCRSignatures(rawReport, ocrProof);
+    _validateOCRSignatures(rawReport, ccvBlob, ocrProof);
 
     Internal.Any2EVMMultiProofMessage memory message = abi.decode(rawReport, (Internal.Any2EVMMultiProofMessage));
-    // TODO fix
-    bytes memory requiredVerifier = message.requiredVerifiers[verifierIndex];
 
-    uint64 nonce = abi.decode(requiredVerifier, (uint64));
+    uint64 nonce = abi.decode(ccvBlob, (uint64));
 
     // Nonce changes per state transition (these only apply for ordered messages):
     // UNTOUCHED -> FAILURE  nonce bump.

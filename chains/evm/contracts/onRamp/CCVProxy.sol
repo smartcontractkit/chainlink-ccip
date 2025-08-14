@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {ICCVOnRamp} from "../interfaces/ICCVOnRamp.sol";
 import {IEVM2AnyOnRampClient} from "../interfaces/IEVM2AnyOnRampClient.sol";
 import {IFeeQuoterV2} from "../interfaces/IFeeQuoterV2.sol";
 import {IPoolV1} from "../interfaces/IPool.sol";
 import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
 import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
-import {IVerifierSender} from "../interfaces/verifiers/IVerifier.sol";
 
 import {Client} from "../libraries/Client.sol";
 import {Internal} from "../libraries/Internal.sol";
@@ -24,7 +24,7 @@ import {EnumerableSet} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
 
 // TODO post process hooks?
-contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender {
+contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender {
   using SafeERC20 for IERC20;
   using EnumerableSet for EnumerableSet.AddressSet;
   using USDPriceWith18Decimals for uint224;
@@ -39,8 +39,7 @@ contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsg
   error GetSupportedTokensFunctionalityRemovedCheckAdminRegistry();
   error InvalidDestChainConfig(uint64 destChainSelector);
   error ReentrancyGuardReentrantCall();
-  error MalformedVerifierExtraArgs(bytes verifierExtraArgs);
-  error InvalidVerifierId(bytes32 verifierId);
+  error InvalidOptionalCCVThreshold();
 
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event DestChainConfigSet(uint64 indexed destChainSelector, uint64 sequenceNumber, IRouter router);
@@ -72,12 +71,12 @@ contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsg
 
   /// @dev Struct to hold the configs for a single destination chain.
   struct DestChainConfig {
+    IRouter router; // ─────────╮ Local router address  that is allowed to send messages to the destination chain.
     // The last used sequence number. This is zero in the case where no messages have yet been sent.
     // 0 is not a valid sequence number for any real transaction as this value will be incremented before use.
-    uint64 sequenceNumber; // ──╮ The last used sequence number.
-    IRouter router; // ─────────╯ Local router address  that is allowed to send messages to the destination chain.
-    address defaultVerifier;
-    address requiredVerifier;
+    uint64 sequenceNumber; // ──╯
+    address requiredCCV;
+    address defaultCCV;
     address defaultExecutor;
   }
 
@@ -87,13 +86,13 @@ contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsg
   struct DestChainConfigArgs {
     uint64 destChainSelector; // Destination chain selector.
     IRouter router; //           Source router address.
-    address defaultVerifier;
-    address requiredVerifier;
+    address defaultCCV;
+    address requiredCCV;
     address defaultExecutor;
   }
 
   // STATIC CONFIG
-  string public constant override typeAndVersion = "VerifierProxy 1.7.0-dev";
+  string public constant override typeAndVersion = "CCVProxy 1.7.0-dev";
   /// @dev The chain ID of the source chain that this contract is deployed to.
   uint64 private immutable i_localChainSelector;
   /// @dev The rmn contract.
@@ -165,19 +164,19 @@ contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsg
       tokenReceiver = abi.encode(message.receiver);
     }
 
-    // 2. get pool params, this potentially mutates verifier list
+    // 2. get pool params, this potentially mutates CCV list
 
     // TODO pool call
 
-    (resolvedExtraArgs.requiredVerifiers, resolvedExtraArgs.optionalVerifiers, resolvedExtraArgs.optionalThreshold) =
-    _deduplicateVerifiers(
-      new address[](0), // TODO pass in pool required verifiers
-      resolvedExtraArgs.requiredVerifiers,
-      resolvedExtraArgs.optionalVerifiers,
+    (resolvedExtraArgs.requiredCCV, resolvedExtraArgs.optionalCCV, resolvedExtraArgs.optionalThreshold) =
+    _deduplicateCCVs(
+      new address[](0), // TODO pass in pool required CCVs
+      resolvedExtraArgs.requiredCCV,
+      resolvedExtraArgs.optionalCCV,
       resolvedExtraArgs.optionalThreshold
     );
 
-    uint256 requiredVerifiersCount = resolvedExtraArgs.requiredVerifiers.length;
+    uint256 requiredCCVsCount = resolvedExtraArgs.requiredCCV.length;
 
     Internal.Receipt memory emptyReceipt;
     Internal.EVMTokenTransfer memory tokenTransferData;
@@ -198,28 +197,28 @@ contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsg
       feeTokenAmount: feeTokenAmount,
       feeValueJuels: 0, // TODO
       tokenTransfer: tokenTransferData,
-      verifierReceipts: new Internal.Receipt[](requiredVerifiersCount + resolvedExtraArgs.optionalVerifiers.length),
+      verifierReceipts: new Internal.Receipt[](requiredCCVsCount + resolvedExtraArgs.optionalCCV.length),
       executorReceipt: emptyReceipt,
       tokenReceipt: emptyReceipt
     });
 
     // 3. getFee on all verifiers & executor
 
-    for (uint256 i = 0; i < requiredVerifiersCount; ++i) {
-      Client.Verifier memory verifier = resolvedExtraArgs.requiredVerifiers[i];
+    for (uint256 i = 0; i < requiredCCVsCount; ++i) {
+      Client.CCV memory ccv = resolvedExtraArgs.requiredCCV[i];
       newMessage.verifierReceipts[i] = Internal.Receipt({
-        issuer: verifier.verifierAddress,
+        issuer: ccv.ccvAddress,
         feeTokenAmount: 0, // TODO
         destGasLimit: 0, // TODO
         destBytesOverhead: 0, // TODO
-        extraArgs: verifier.args
+        extraArgs: ccv.args
       });
     }
 
-    for (uint256 i = 0; i < resolvedExtraArgs.optionalVerifiers.length; ++i) {
-      Client.Verifier memory verifier = resolvedExtraArgs.optionalVerifiers[i];
-      newMessage.verifierReceipts[i + requiredVerifiersCount] = Internal.Receipt({
-        issuer: verifier.verifierAddress,
+    for (uint256 i = 0; i < resolvedExtraArgs.optionalCCV.length; ++i) {
+      Client.CCV memory verifier = resolvedExtraArgs.optionalCCV[i];
+      newMessage.verifierReceipts[i + requiredCCVsCount] = Internal.Receipt({
+        issuer: verifier.ccvAddress,
         feeTokenAmount: 0, // TODO
         destGasLimit: 0, // TODO
         destBytesOverhead: 0, // TODO
@@ -258,7 +257,7 @@ contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsg
     for (uint256 i = 0; i < newMessage.verifierReceipts.length; ++i) {
       address verifier = newMessage.verifierReceipts[i].issuer;
 
-      IVerifierSender(verifier).forwardToVerifier(encodedMessage, i);
+      ICCVOnRamp(verifier).forwardToVerifier(encodedMessage, i);
     }
 
     // 7. emit event
@@ -270,53 +269,49 @@ contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsg
     return newMessage.header.messageId;
   }
 
-  function _deduplicateVerifiers(
-    address[] memory poolRequiredVerifiers,
-    Client.Verifier[] memory requiredVerifiers,
-    Client.Verifier[] memory optionalVerifiers,
+  function _deduplicateCCVs(
+    address[] memory poolRequiredCCV,
+    Client.CCV[] memory requiredCCV,
+    Client.CCV[] memory optionalCCV,
     uint8 optionalThreshold
   )
     internal
     pure
-    returns (
-      Client.Verifier[] memory newRequiredVerifiers,
-      Client.Verifier[] memory newOptionalVerifiers,
-      uint8 newOptionalThreshold
-    )
+    returns (Client.CCV[] memory newRequiredCCVs, Client.CCV[] memory newOptionalCCVs, uint8 newOptionalThreshold)
   {
-    Client.Verifier[] memory toBeAdded = new Client.Verifier[](poolRequiredVerifiers.length);
+    Client.CCV[] memory toBeAdded = new Client.CCV[](poolRequiredCCV.length);
     uint256 toBeAddedIndex = 0;
 
-    for (uint256 poolVerifierIndex = 0; poolVerifierIndex < poolRequiredVerifiers.length; ++poolVerifierIndex) {
-      address poolVerifier = poolRequiredVerifiers[poolVerifierIndex];
+    for (uint256 poolCCVIndex = 0; poolCCVIndex < poolRequiredCCV.length; ++poolCCVIndex) {
+      address poolCCV = poolRequiredCCV[poolCCVIndex];
       bool found = false;
-      for (uint256 reqVerifierIndex = 0; reqVerifierIndex < requiredVerifiers.length; ++reqVerifierIndex) {
-        if (poolVerifier == requiredVerifiers[reqVerifierIndex].verifierAddress) {
+      for (uint256 reqCCVIndex = 0; reqCCVIndex < requiredCCV.length; ++reqCCVIndex) {
+        if (poolCCV == requiredCCV[reqCCVIndex].ccvAddress) {
           found = true;
           break;
         }
       }
 
-      // If it is found in the required verifiers, we do not need to add it again.
+      // If it is found in the required CCV, we do not need to add it again.
       if (!found) {
-        // If not found, it has to be added to the required verifiers list.
-        toBeAdded[toBeAddedIndex++].verifierAddress = poolVerifier;
+        // If not found, it has to be added to the required CCV list.
+        toBeAdded[toBeAddedIndex++].ccvAddress = poolCCV;
 
-        // If the pool verifier is not in the optional verifiers, we remove it and lower the optional threshold since
+        // If the pool CCV is not in the optional CCVs, we remove it and lower the optional threshold since
         // it is now required.
-        for (uint256 optVerifierIndex = 0; optVerifierIndex < optionalVerifiers.length; ++optVerifierIndex) {
-          if (poolVerifier == optionalVerifiers[optVerifierIndex].verifierAddress) {
-            // Copy the extraArgs for the verifier to the verifier now in the required verifiers.
-            toBeAdded[toBeAddedIndex - 1].args = optionalVerifiers[optVerifierIndex].args;
+        for (uint256 optCCVIndex = 0; optCCVIndex < optionalCCV.length; ++optCCVIndex) {
+          if (poolCCV == optionalCCV[optCCVIndex].ccvAddress) {
+            // Copy the extraArgs for the CCV to the CCV now in the required CCV list.
+            toBeAdded[toBeAddedIndex - 1].args = optionalCCV[optCCVIndex].args;
 
-            // Remove the verifier from the optional verifiers.
-            optionalVerifiers[optVerifierIndex] = optionalVerifiers[optionalVerifiers.length - 1];
+            // Remove the CCV from the optional CCVs.
+            optionalCCV[optCCVIndex] = optionalCCV[optionalCCV.length - 1];
             // This effectively reduces the length of the array by one.
             assembly {
-              mstore(optionalVerifiers, sub(mload(optionalVerifiers), 1))
+              mstore(optionalCCV, sub(mload(optionalCCV), 1))
             }
 
-            // Lower the optional threshold since we removed a verifier.
+            // Lower the optional threshold since we removed a CCV.
             if (optionalThreshold > 0) {
               optionalThreshold--;
             }
@@ -327,18 +322,18 @@ contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsg
     }
 
     if (toBeAddedIndex > 0) {
-      newRequiredVerifiers = new Client.Verifier[](poolRequiredVerifiers.length + toBeAddedIndex);
+      newRequiredCCVs = new Client.CCV[](poolRequiredCCV.length + toBeAddedIndex);
       for (uint256 i = 0; i < toBeAddedIndex; ++i) {
-        newRequiredVerifiers[i] = toBeAdded[i];
+        newRequiredCCVs[i] = toBeAdded[i];
       }
-      for (uint256 i = 0; i < requiredVerifiers.length; ++i) {
-        newRequiredVerifiers[toBeAddedIndex + i] = requiredVerifiers[i];
+      for (uint256 i = 0; i < requiredCCV.length; ++i) {
+        newRequiredCCVs[toBeAddedIndex + i] = requiredCCV[i];
       }
 
-      return (newRequiredVerifiers, optionalVerifiers, optionalThreshold);
+      return (newRequiredCCVs, optionalCCV, optionalThreshold);
     }
 
-    return (requiredVerifiers, optionalVerifiers, optionalThreshold);
+    return (requiredCCV, optionalCCV, optionalThreshold);
   }
 
   function _parseExtraArgsWithDefaults(
@@ -348,32 +343,26 @@ contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsg
     if (bytes4(extraArgs[0:4]) == Client.MOD_SEC_EXTRA_ARGS_V1_TAG) {
       resolvedArgs = abi.decode(extraArgs, (Client.ModSecExtraArgsV1));
 
-      if (resolvedArgs.optionalVerifiers.length != 0) {
-        // Requiring more verifiers than are supplied would make a transaction unexecutable forever.
-        if (resolvedArgs.optionalVerifiers.length <= resolvedArgs.optionalThreshold) {
-          revert();
-        }
-
-        // If a user specified an optional verifier, the threshold must be non-zero.
-        if (resolvedArgs.optionalThreshold == 0) {
-          revert();
+      if (resolvedArgs.optionalCCV.length != 0) {
+        // Requiring more CCVs than are supplied would make a transaction unexecutable forever.
+        // If a user specified an optional CCV, the threshold must be non-zero.
+        if (resolvedArgs.optionalCCV.length <= resolvedArgs.optionalThreshold || resolvedArgs.optionalThreshold == 0) {
+          revert InvalidOptionalCCVThreshold();
         }
       }
 
-      // Not supplying a verifier means the default is chosen.
-      if (resolvedArgs.requiredVerifiers.length + resolvedArgs.optionalVerifiers.length == 0) {
-        resolvedArgs.requiredVerifiers = new Client.Verifier[](1);
-        resolvedArgs.requiredVerifiers[0] =
-          Client.Verifier({verifierAddress: destChainConfig.defaultVerifier, args: ""});
+      // Not supplying a CCV means the default is chosen.
+      if (resolvedArgs.requiredCCV.length + resolvedArgs.optionalCCV.length == 0) {
+        resolvedArgs.requiredCCV = new Client.CCV[](1);
+        resolvedArgs.requiredCCV[0] = Client.CCV({ccvAddress: destChainConfig.defaultCCV, args: ""});
       }
     } else {
-      // If old extraArgs are supplied, they are assumed to be for the default verifier and the default executor. This
-      // means any default verifier/executor has to be able to process all prior extraArgs.
+      // If old extraArgs are supplied, they are assumed to be for the default CCV and the default executor. This
+      // means any default CCV/executor has to be able to process all prior extraArgs.
       resolvedArgs.executorArgs = extraArgs;
 
-      resolvedArgs.requiredVerifiers = new Client.Verifier[](1);
-      resolvedArgs.requiredVerifiers[0] =
-        Client.Verifier({verifierAddress: destChainConfig.defaultVerifier, args: extraArgs});
+      resolvedArgs.requiredCCV = new Client.CCV[](1);
+      resolvedArgs.requiredCCV[0] = Client.CCV({ccvAddress: destChainConfig.defaultCCV, args: extraArgs});
     }
 
     // Not supplying an executor means the default is chosen.
@@ -381,9 +370,9 @@ contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsg
       resolvedArgs.executor = destChainConfig.defaultExecutor;
     }
 
-    // Add the required verifier, if set.
-    if (destChainConfig.requiredVerifier != address(0)) {
-      // TODO set required verifier
+    // Add the required CCV, if set.
+    if (destChainConfig.requiredCCV != address(0)) {
+      // TODO set required CCV
     }
 
     return resolvedArgs;
@@ -448,8 +437,8 @@ contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsg
       DestChainConfig storage destChainConfig = s_destChainConfigs[destChainSelector];
       // The router can be zero to pause the destination chain
       destChainConfig.router = destChainConfigArg.router;
-      destChainConfig.defaultVerifier = destChainConfigArg.defaultVerifier;
-      destChainConfig.requiredVerifier = destChainConfigArg.requiredVerifier;
+      destChainConfig.defaultCCV = destChainConfigArg.defaultCCV;
+      destChainConfig.requiredCCV = destChainConfigArg.requiredCCV;
       destChainConfig.defaultExecutor = destChainConfigArg.defaultExecutor;
 
       emit DestChainConfigSet(destChainSelector, destChainConfig.sequenceNumber, destChainConfigArg.router);

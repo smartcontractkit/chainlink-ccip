@@ -2,13 +2,13 @@
 pragma solidity ^0.8.24;
 
 import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol";
+import {ICCVOffRamp} from "../interfaces/ICCVOffRamp.sol";
 import {IPoolV1} from "../interfaces/IPool.sol";
 import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
 import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
-import {IVerifier} from "../interfaces/verifiers/IVerifier.sol";
 import {Client} from "../libraries/Client.sol";
 import {ERC165CheckerReverting} from "../libraries/ERC165CheckerReverting.sol";
 import {Internal} from "../libraries/Internal.sol";
@@ -21,7 +21,7 @@ import {IERC20} from
 import {EnumerableSet} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
 
-contract VerifierAggregator is ITypeAndVersion, Ownable2StepMsgSender {
+contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   using ERC165CheckerReverting for address;
   using EnumerableSet for EnumerableSet.UintSet;
 
@@ -87,12 +87,13 @@ contract VerifierAggregator is ITypeAndVersion, Ownable2StepMsgSender {
 
   struct AggregatedReport {
     Internal.Any2EVMMultiProofMessage message;
+    bytes[] ccvBlobs;
     bytes[] proofs;
     uint32 gasOverride; // Gas override for the entire report, including receiver call and token transfers.
   }
 
   // STATIC CONFIG
-  string public constant override typeAndVersion = "VerifierAggregator 1.7.0-dev";
+  string public constant override typeAndVersion = "CCVAggregator 1.7.0-dev";
   /// @dev Hash of encoded address(0) used for empty address checks.
   bytes32 internal constant EMPTY_ENCODED_ADDRESS_HASH = keccak256(abi.encode(address(0)));
   /// @dev ChainSelector of this chain.
@@ -114,8 +115,6 @@ contract VerifierAggregator is ITypeAndVersion, Ownable2StepMsgSender {
 
   /// @notice SourceChainConfig per source chain selector.
   mapping(uint64 sourceChainSelector => SourceChainConfig sourceChainConfig) private s_sourceChainConfigs;
-
-  mapping(bytes4 verifierSelector => address verifier) internal s_verifiers;
 
   // STATE
   /// @dev A mapping of sequence numbers (per source chain) to execution state using a bitmap with each execution
@@ -234,7 +233,7 @@ contract VerifierAggregator is ITypeAndVersion, Ownable2StepMsgSender {
       getExecutionState(sourceChainSelector, report.message.header.sequenceNumber);
 
     // SECURITY CRITICAL CHECK.
-    _verifyMessage(report.message, originalState, report.proofs);
+    _verifyMessage(report.message, originalState, report.ccvBlobs, report.proofs);
 
     Internal.Any2EVMMultiProofMessage memory message = _beforeExecuteSingleMessage(report.message);
 
@@ -287,6 +286,7 @@ contract VerifierAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   function _verifyMessage(
     Internal.Any2EVMMultiProofMessage calldata message,
     Internal.MessageExecutionState originalState,
+    bytes[] calldata ccvBlobs,
     bytes[] calldata proofs
   ) internal {
     if (message.requiredVerifiers.length != proofs.length) {
@@ -294,13 +294,9 @@ contract VerifierAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     }
 
     for (uint256 i = 0; i < message.requiredVerifiers.length; ++i) {
-      bytes4 verifierId = bytes4(message.requiredVerifiers[i]);
-
-      address verifier = s_verifiers[verifierId];
-      if (verifier == address(0)) {
-        revert InvalidVerifierSelector(verifierId);
-      }
-      IVerifier(verifier).validateReport(abi.encode(message), proofs[i], i, originalState);
+      ICCVOffRamp(message.requiredVerifiers[i]).validateReport(
+        abi.encode(message), ccvBlobs[i], proofs[i], i, originalState
+      );
     }
   }
 

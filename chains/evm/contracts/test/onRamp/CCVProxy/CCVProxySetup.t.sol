@@ -3,46 +3,46 @@ pragma solidity ^0.8.24;
 
 import {Client} from "../../../libraries/Client.sol";
 import {Internal} from "../../../libraries/Internal.sol";
-import {VerifierProxy} from "../../../onRamp/VerifierProxy.sol";
+import {CCVProxy} from "../../../onRamp/CCVProxy.sol";
 import {FeeQuoterFeeSetup} from "../../feeQuoter/FeeQuoterSetup.t.sol";
+import {MockCCVOnRamp} from "../../mocks/MockCCVOnRamp.sol";
 import {MockExecutor} from "../../mocks/MockExecutor.sol";
-import {MockVerifier} from "../../mocks/MockVerifier.sol";
 
-contract VerifierProxySetup is FeeQuoterFeeSetup {
+contract CCVProxySetup is FeeQuoterFeeSetup {
   address internal constant FEE_AGGREGATOR = 0xa33CDB32eAEce34F6affEfF4899cef45744EDea3;
   bytes32 internal s_metadataHash;
 
-  VerifierProxy internal s_verifierProxy;
-  MockVerifier internal s_mockVerifierOne;
+  CCVProxy internal s_ccvProxy;
+  MockCCVOnRamp internal s_mockCCVOne;
   MockExecutor internal s_mockExecutor;
 
   function setUp() public virtual override {
     super.setUp();
 
-    s_verifierProxy = new VerifierProxy(
-      VerifierProxy.StaticConfig({
+    s_ccvProxy = new CCVProxy(
+      CCVProxy.StaticConfig({
         chainSelector: SOURCE_CHAIN_SELECTOR,
         rmnRemote: s_mockRMNRemote,
         tokenAdminRegistry: address(s_tokenAdminRegistry)
       }),
-      VerifierProxy.DynamicConfig({
+      CCVProxy.DynamicConfig({
         feeQuoter: address(s_feeQuoter),
         reentrancyGuardEntered: false,
         feeAggregator: FEE_AGGREGATOR
       })
     );
-    s_mockVerifierOne = new MockVerifier();
+    s_mockCCVOne = new MockCCVOnRamp();
 
-    VerifierProxy.DestChainConfigArgs[] memory destChainConfigs = new VerifierProxy.DestChainConfigArgs[](1);
-    destChainConfigs[0] = VerifierProxy.DestChainConfigArgs({
+    CCVProxy.DestChainConfigArgs[] memory destChainConfigs = new CCVProxy.DestChainConfigArgs[](1);
+    destChainConfigs[0] = CCVProxy.DestChainConfigArgs({
       destChainSelector: DEST_CHAIN_SELECTOR,
       router: s_sourceRouter,
-      defaultVerifier: address(s_mockVerifierOne),
-      requiredVerifier: address(0),
+      defaultCCV: address(s_mockCCVOne),
+      requiredCCV: address(0),
       defaultExecutor: address(s_mockExecutor)
     });
 
-    s_verifierProxy.applyDestChainConfigUpdates(destChainConfigs);
+    s_ccvProxy.applyDestChainConfigUpdates(destChainConfigs);
   }
 
   function _evmMessageToEvent(
@@ -53,7 +53,7 @@ contract VerifierProxySetup is FeeQuoterFeeSetup {
     uint256 feeValueJuels,
     address originalSender,
     bytes32 metadataHash
-  ) internal view returns (Internal.EVM2AnyVerifierMessage memory) {
+  ) internal pure returns (Internal.EVM2AnyVerifierMessage memory) {
     Internal.EVMTokenTransfer memory tokenTransfer;
 
     // TODO
