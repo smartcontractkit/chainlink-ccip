@@ -21,45 +21,45 @@ func TestIsLeader(t *testing.T) {
 	tests := []struct {
 		name              string
 		destChainSelector uint64
-		offsets           []uint8
+		epochs            []uint64
 		expectedResult    bool
 	}{
 		{
 			name:              "chain 1, is leader for offset 2",
 			destChainSelector: 1,
-			offsets:           []uint8{2},
+			epochs:            []uint64{2},
 			expectedResult:    true,
 		},
 		{
 			name:              "chain 1, all other offsets are not leader",
 			destChainSelector: 1,
-			offsets:           []uint8{0, 1},
+			epochs:            []uint64{0, 1},
 			expectedResult:    false,
 		},
 		{
 			name:              "chain 2, is leader for offset 1",
 			destChainSelector: 2,
-			offsets:           []uint8{1},
+			epochs:            []uint64{1},
 			expectedResult:    true,
 		},
 		{
 			name:              "chain 2, all other offsets are not leader",
 			destChainSelector: 2,
-			offsets:           []uint8{0, 2},
+			epochs:            []uint64{0, 2},
 			expectedResult:    false,
 		},
 		{
 			name:              "chain 3, node not a participant",
 			destChainSelector: 3,
-			offsets:           []uint8{0, 1, 2},
+			epochs:            []uint64{0, 1, 2},
 			expectedResult:    false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			for _, offset := range tt.offsets {
-				result := le.IsLeader(msgId, tt.destChainSelector, offset)
+			for _, epoch := range tt.epochs {
+				result := le.IsLeader(msgId, tt.destChainSelector, epoch)
 				if result != tt.expectedResult {
 					t.Errorf("expected %v, got %v", tt.expectedResult, result)
 				}
@@ -79,10 +79,6 @@ func TestIsLeaderNonParticipant(t *testing.T) {
 	// Test that non-participant chains always return false
 	if le.IsLeader(msgId, 999, 0) {
 		t.Error("expected non-participant to not be leader")
-	}
-
-	if le.IsLeader(msgId, 999, 1) {
-		t.Error("expected non-participant to not be leader for any offset")
 	}
 }
 
@@ -310,12 +306,12 @@ func TestLeaderElectionOffset(t *testing.T) {
 	msgId := [32]byte{}
 	rand.Read(msgId[:])
 
-	// Test that different offsets can produce different results
+	// Test that different epochs can produce different results
 	result0 := le.IsLeader(msgId, 1, 0)
 	result1 := le.IsLeader(msgId, 1, 1)
 	result2 := le.IsLeader(msgId, 1, 2)
 
-	// Count how many offsets make node1 the leader
+	// Count how many epochs make node1 the leader
 	leaderCount := 0
 	if result0 {
 		leaderCount++
@@ -327,16 +323,16 @@ func TestLeaderElectionOffset(t *testing.T) {
 		leaderCount++
 	}
 
-	// Only one offset should make node1 the leader (since it's in the participants)
-	// If more than one offset makes node1 the leader, the test should fail
+	// Only one epochs should make node1 the leader (since it's in the participants)
+	// If more than one epochs makes node1 the leader, the test should fail
 	if leaderCount > 1 {
-		t.Errorf("expected only one offset to make node1 the leader, but got %d: result0=%v, result1=%v, result2=%v",
+		t.Errorf("expected only one epoch to make node1 the leader, but got %d: result0=%v, result1=%v, result2=%v",
 			leaderCount, result0, result1, result2)
 	}
 
-	// If no offset makes node1 the leader, the test should fail
+	// If no epoch makes node1 the leader, the test should fail
 	if leaderCount == 0 {
-		t.Error("expected node1 to be leader for at least one offset")
+		t.Error("expected node1 to be leader for at least one epoch")
 	}
 }
 
@@ -349,18 +345,13 @@ func TestLeaderElectionEdgeCases(t *testing.T) {
 	le := NewSimpleLeaderElection("node1", participants)
 	msgId := [32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32}
 
-	// With single participant, should always be leader for offset 0
+	// With single participant, should always be leader for epoch 0
 	if !le.IsLeader(msgId, 1, 0) {
-		t.Error("single participant should always be leader for offset 0")
+		t.Error("single participant should always be leader for epoch 0")
 	}
 
-	// Test with offset beyond participant count
-	if le.IsLeader(msgId, 1, 1) {
-		t.Error("should not be leader for offset beyond participant count")
-	}
-
-	// Test with very large offset
-	if le.IsLeader(msgId, 1, 255) {
-		t.Error("should not be leader for very large offset")
+	// Test with epoch modulo participant count should be leader
+	if !le.IsLeader(msgId, 1, 1) {
+		t.Error("should be leader for epoch modulo participant count")
 	}
 }

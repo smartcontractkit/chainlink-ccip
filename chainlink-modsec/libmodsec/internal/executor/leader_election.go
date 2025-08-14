@@ -9,7 +9,7 @@ import (
 // LeaderElection provides a way to determine if an executor should be currently executing a given message.
 // This is used to prevent multiple executors from executing the same message concurrently.
 type LeaderElection interface {
-	IsLeader(msgId [32]byte, destChainSelector uint64, offset uint8) bool
+	IsLeader(msgId [32]byte, destChainSelector uint64, epoch uint64) bool
 	SelfParticipations() []uint64 // Think we need a better name for this?
 	IsParticipant(destChainSelector uint64) bool
 	GetParticipants(destChainSelector uint64) []string
@@ -43,7 +43,7 @@ func (s *SimpleLeaderElection) SelfParticipations() []uint64 {
 	return s.selfParticipations
 }
 
-func (s *SimpleLeaderElection) IsLeader(msgId [32]byte, destChainSelector uint64, offset uint8) bool {
+func (s *SimpleLeaderElection) IsLeader(msgId [32]byte, destChainSelector uint64, epoch uint64) bool {
 	// If the executor is not a participant, it cannot be the leader
 	if !s.IsParticipant(destChainSelector) {
 		return false
@@ -51,10 +51,7 @@ func (s *SimpleLeaderElection) IsLeader(msgId [32]byte, destChainSelector uint64
 
 	participants := s.GetParticipants(destChainSelector)
 
-	// If the offset is greater than the number of participants, it cannot be the leader
-	if len(participants) < int(offset)+1 {
-		return false
-	}
+	offset := epoch % uint64(len(participants))
 
 	// Concatenates each participant with the msgId and the participantId together and hashes the resulting value into a uint64
 	// Given multiple participants, this will have an equal chance of resulting in the offset value, and will therefore be the leader
