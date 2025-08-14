@@ -207,7 +207,6 @@ contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsg
 
     for (uint256 i = 0; i < requiredVerifiersCount; ++i) {
       Client.Verifier memory verifier = resolvedExtraArgs.requiredVerifiers[i];
-      IVerifierSender verifierSender = IVerifierSender(verifier.verifierAddress);
       newMessage.verifierReceipts[i] = Internal.Receipt({
         issuer: verifier.verifierAddress,
         feeTokenAmount: 0, // TODO
@@ -219,7 +218,6 @@ contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsg
 
     for (uint256 i = 0; i < resolvedExtraArgs.optionalVerifiers.length; ++i) {
       Client.Verifier memory verifier = resolvedExtraArgs.optionalVerifiers[i];
-      IVerifierSender verifierSender = IVerifierSender(verifier.verifierAddress);
       newMessage.verifierReceipts[i + requiredVerifiersCount] = Internal.Receipt({
         issuer: verifier.verifierAddress,
         feeTokenAmount: 0, // TODO
@@ -498,7 +496,7 @@ contract VerifierProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsg
     uint64 destChainSelector,
     bytes memory receiver,
     address originalSender,
-    bytes memory extraArgs
+    bytes memory // extraArgs
   ) internal returns (Internal.EVMTokenTransfer memory) {
     if (tokenAndAmount.amount == 0) revert CannotSendZeroTokens();
 
