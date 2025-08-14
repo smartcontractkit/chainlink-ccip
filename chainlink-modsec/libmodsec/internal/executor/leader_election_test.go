@@ -274,23 +274,24 @@ func TestLeaderElectionDistribution(t *testing.T) {
 
 	le := NewSimpleLeaderElection("node1", participants)
 
-	// Test multiple offsets to see distribution
+	// Test multiple messages to see distribution
 	leaderCount := 0
-	totalTests := 100
+	totalTests := 100_000
 
 	for i := 0; i < totalTests; i++ {
 		// Use different message IDs to simulate different messages
-		testMsgId := [32]byte{byte(i), 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32}
+		msgId := [32]byte{}
+		rand.Read(msgId[:])
 
-		if le.IsLeader(testMsgId, 1, 0) {
+		if le.IsLeader(msgId, 1, 0) {
 			leaderCount++
 		}
 	}
 
 	// With 5 participants, node1 should be leader roughly 20% of the time
-	// Allow for some variance (10-30% range)
-	expectedMin := totalTests * 10 / 100
-	expectedMax := totalTests * 30 / 100
+	// Allow for some variance (19-21% range)
+	expectedMin := totalTests * 19 / 100
+	expectedMax := totalTests * 21 / 100
 
 	if leaderCount < expectedMin || leaderCount > expectedMax {
 		t.Errorf("leader distribution seems off: got %d/%d (%.1f%%), expected roughly 20%%",
