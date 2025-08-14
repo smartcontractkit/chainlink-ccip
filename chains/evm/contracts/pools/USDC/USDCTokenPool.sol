@@ -19,19 +19,25 @@ import {EnumerableSet} from
 
 /// @notice This pool mints and burns USDC tokens through the Cross Chain Transfer Protocol (CCTP).
 /*
- On/OffRamp
+ OnRamp
    |
-   | releaseOrMint() / LockOrBurn()
+   | lockOrBurn()
    v
-+------------------+    depositForBurn()    +------------------+
-| USDC Token Pool  | ---------------------> | Token Messenger  |
-+------------------+                        +------------------+
-       |
-       | receiveMessage()
-       v
-+-------------------------------+    receiveMessage()    +-----------------------+
-| CCTP Message Transmitter Proxy | --------------------> | Message Transmitter   |
-+-------------------------------+                        +-----------------------+
++------------------+    depositForBurn()    +------------------+    burn(from, localAmount)    +-----------+
+| USDC Token Pool  | ---------------------> | Token Messenger  | ----------------------------> |   USDC    |
++------------------+                        +------------------+                               +-----------+
+
+ OffRamp
+   |
+   | releaseOrMint()
+   v
+ USDC Token Pool
+   |
+   | receiveMessage()
+   v
++------------------------+    receiveMessage()   +---------------------+    mint(amount, recipient)    +----------+
+| CCTP Transmitter Proxy | --------------------> | Message Transmitter | ----------------------------> |   USDC   |
++------------------------+                       +---------------------+                               +----------+
 */
 /// @dev This specific pool is used for CCTP V1. The CCTP V2 pool is a separate contract, which inherits many of the
 /// state management from this contract, only overriding the functions absolutely necessary for supporting CCTP V2.
