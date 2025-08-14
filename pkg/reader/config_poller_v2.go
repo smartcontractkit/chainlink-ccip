@@ -39,6 +39,16 @@ type configPollerV2 struct {
 	consecutiveFailedPolls atomic.Uint32
 }
 
+// newConfigPollerV2 creates a new instance of configPollerV2 with improved batch fetching capabilities.
+// It initializes all necessary maps and channels for concurrent config polling and caching.
+//
+// Parameters:
+//   - lggr: Logger instance for structured logging
+//   - accessors: Map of chain selectors to their corresponding chain accessors for fetching configs
+//   - destChainSelector: The destination chain selector that this poller is configured for
+//   - refreshPeriod: How frequently to refresh configs in the background
+//
+// Returns a fully initialized configPollerV2 instance ready to be started.
 func newConfigPollerV2(
 	lggr logger.Logger,
 	accessors map[cciptypes.ChainSelector]cciptypes.ChainAccessor,
@@ -56,14 +66,16 @@ func newConfigPollerV2(
 	}
 }
 
+// Start initiates the configPollerV2 service and begins background polling.
 func (c *configPollerV2) Start(ctx context.Context) error {
 	return c.StartOnce("configPollerV2", func() error {
 		c.startBackgroundPolling()
-		c.lggr.Info("Background poller started (v2)")
+		c.lggr.Info("Background config poller v2 started")
 		return nil
 	})
 }
 
+// Close gracefully shuts down the configPollerV2 service.
 func (c *configPollerV2) Close() error {
 	return c.StopOnce("configPollerV2", func() error {
 		close(c.stopChan)
@@ -73,10 +85,17 @@ func (c *configPollerV2) Close() error {
 	})
 }
 
+// Name returns the name of this service instance.
 func (c *configPollerV2) Name() string {
 	return c.lggr.Name()
 }
 
+// HealthReport returns the current health status of the configPollerV2 service.
+//
+// If the number of consecutive failed polls exceeds MaxFailedPolls, an error
+// is appended to the service error buffer indicating the service is unhealthy.
+//
+// Returns a map with the service name as key and any health error as value.
 func (c *configPollerV2) HealthReport() map[string]error {
 	// Check if consecutive failed polls exceeds the maximum
 	failCount := c.consecutiveFailedPolls.Load()
@@ -87,10 +106,23 @@ func (c *configPollerV2) HealthReport() map[string]error {
 	return map[string]error{c.Name(): c.Healthy()}
 }
 
+// Ready returns whether the configPollerV2 service is ready to handle requests.
+//
+// Returns an error if the service is not ready, nil if it is ready.
 func (c *configPollerV2) Ready() error {
 	return c.StateMachine.Ready()
 }
 
+// startBackgroundPolling launches a goroutine that periodically refreshes configs for all known chains.
+// This internal method is called during service startup and creates a ticker that fires at the
+// configured refresh interval.
+//
+// The background goroutine will:
+//   - Refresh all cached chain configs at regular intervals
+//   - Gracefully stop when the service is being shut down
+//   - Track its execution in the wait group for proper shutdown coordination
+//
+// The goroutine continues until the stopChan is closed during service shutdown.
 func (c *configPollerV2) startBackgroundPolling() {
 	c.wg.Add(1)
 	go func() {
@@ -108,8 +140,27 @@ func (c *configPollerV2) startBackgroundPolling() {
 	}()
 }
 
-// GetChainConfig retrieves the ChainConfigSnapshot for a specific chain. If the config is not in cache,
-// it will issue a batch refresh to fetch all configs.
+// GetChainConfig retrieves the ChainConfigSnapshot for a specific chain selector.
+// This method implements part of the ConfigPoller interface and provides cached access
+// to chain configuration data with automatic refresh capabilities.
+//
+// The method follows a cache-first strategy with the following flow:
+//   - Validates that a chain accessor exists for the requested chain
+//   - Creates or retrieves the chain cache for the specified chain
+//   - Returns cached data if available (with debug logging of cache age)
+//   - Triggers a batch refresh if cache is empty (cache miss)
+//   - Returns the freshly fetched data after successful refresh
+//
+// The batch refresh will fetch both ChainConfigSnapshot and StaticSourceChainConfigs
+// (if the chain is the destination chain) to minimize network calls.
+//
+// Parameters:
+//   - ctx: Context for the operation (used for batch refresh timeout)
+//   - chainSel: The chain selector to retrieve configuration for
+//
+// Returns:
+//   - ChainConfigSnapshot containing the chain's configuration data
+//   - Error if no chain accessor exists, cache creation fails, or batch refresh fails
 func (c *configPollerV2) GetChainConfig(
 	ctx context.Context,
 	chainSel cciptypes.ChainSelector,
@@ -151,6 +202,22 @@ func (c *configPollerV2) GetChainConfig(
 	return cache.chainConfigData, nil
 }
 
+// GetOfframpSourceChainConfigs retrieves static source chain configurations for the specified chains
+// relative to the destination chain. This method implements part of the ConfigPoller interface.
+//
+// The method performs several important operations:
+//   - Validates that the provided destChain matches the configured destination chain
+//   - Filters out the destination chain from the source chains list
+//   - Tracks new source chains for background refreshing
+//   - Returns cached configs when available, otherwise triggers a batch refresh
+//
+// Parameters:
+//   - ctx: Context for the operation
+//   - destChain: The destination chain selector (must match configured destChainSelector)
+//   - sourceChains: List of source chain selectors to get configs for
+//
+// Returns a map of chain selectors to their static source chain configurations,
+// or an error if the operation fails.
 func (c *configPollerV2) GetOfframpSourceChainConfigs(
 	ctx context.Context,
 	destChain cciptypes.ChainSelector,
@@ -231,7 +298,13 @@ func (c *configPollerV2) GetOfframpSourceChainConfigs(
 	return result, nil
 }
 
-// getOrCreateChainCache safely retrieves or creates a cache for a specific chain
+// getOrCreateChainCache safely retrieves an existing cache or creates a new one for the specified chain.
+// This method is thread-safe and ensures that each chain has exactly one cache instance.
+//
+// Parameters:
+//   - chainSel: The chain selector to get or create a cache for
+//
+// Returns the chain cache instance, or nil if no chain accessor exists for the chain.
 func (c *configPollerV2) getOrCreateChainCache(chainSel cciptypes.ChainSelector) *chainCache {
 	c.Lock()
 	defer c.Unlock()
@@ -253,7 +326,17 @@ func (c *configPollerV2) getOrCreateChainCache(chainSel cciptypes.ChainSelector)
 	return cache
 }
 
-// refreshAllKnownChains iterates through all known chains and issues a batch refresh for each.
+// refreshAllKnownChains performs background refresh of all cached chain configurations.
+// This method is called periodically by the background polling goroutine to keep configs up-to-date.
+//
+// The method performs the following operations:
+//   - Retrieves all chains that need refreshing (cached chains + known source chains)
+//   - Issues batch refresh requests for each chain with a timeout
+//   - Tracks consecutive failures for health monitoring
+//   - Resets failure counter on successful refresh cycles
+//
+// Failed refreshes are logged but don't stop the process - the method continues
+// refreshing other chains and updates the consecutive failure counter for health reporting.
 func (c *configPollerV2) refreshAllKnownChains() {
 	chainsToRefresh := c.getChainsToRefresh()
 
@@ -277,9 +360,16 @@ func (c *configPollerV2) refreshAllKnownChains() {
 	}
 }
 
-// batchRefreshChainAndSourceConfigs fetches both ChainConfigSnapshot and StaticSourceChainConfigs for a specific
-// chain using the chain's chainAccessor. It updates the cache with the results for both ChainConfigSnapshot and
-// StaticSourceChainConfigs.
+// batchRefreshChainAndSourceConfigs performs a batch fetch of both ChainConfigSnapshot and
+// StaticSourceChainConfigs for a specific chain using the chain's chainAccessor. This is the
+// core method that performs the actual config fetching and cache updates. It fetches multiple
+// config types in a single call to minimize network overhead.
+//
+// Parameters:
+//   - ctx: Context for the operation (with timeout for background refreshes)
+//   - chainSel: The chain selector to fetch configs for
+//
+// Returns an error if the fetch or cache update fails, nil on success.
 func (c *configPollerV2) batchRefreshChainAndSourceConfigs(
 	ctx context.Context,
 	chainSel cciptypes.ChainSelector,
@@ -342,8 +432,10 @@ func (c *configPollerV2) batchRefreshChainAndSourceConfigs(
 	return nil
 }
 
-// getChainsToRefresh returns all chains in the cache in addition to all of their associated source chains.
-// This method acquires a read lock for the duration of its execution
+// getChainsToRefresh returns a comprehensive list of all chains that need periodic config refreshing.
+// This includes both cached chains and all known source chains for the destination chain.
+//
+// Returns a slice of unique chain selectors that should be refreshed.
 func (c *configPollerV2) getChainsToRefresh() []cciptypes.ChainSelector {
 	c.RLock()
 	defer c.RUnlock()
@@ -369,7 +461,14 @@ func (c *configPollerV2) getChainsToRefresh() []cciptypes.ChainSelector {
 	return allChainsToTrack
 }
 
-// trackSourceChain adds a source chain to the known source chains map for a destination chain
+// trackSourceChainForDest adds a source chain to the known source chains set for background refreshing.
+// This method ensures that newly discovered source chains are included in periodic config updates.
+//
+// Parameters:
+//   - sourceChain: The source chain selector to track for the configured destination chain
+//
+// Returns true if the source chain was successfully tracked, false if validation failed
+// or if the source chain was already being tracked.
 func (c *configPollerV2) trackSourceChainForDest(sourceChain cciptypes.ChainSelector) bool {
 	if c.destChainSelector == sourceChain {
 		c.lggr.Debugw("Skipping tracking source chain - destination chain is the same as source chain",
@@ -394,8 +493,10 @@ func (c *configPollerV2) trackSourceChainForDest(sourceChain cciptypes.ChainSele
 	return true
 }
 
-// getKnownSourceChainsForDestChain is a helper function that retrieves all known source chains for the destination
-// chain and return them as a slice of ChainSelectors.
+// getKnownSourceChainsForDestChain retrieves all currently tracked source chains for the destination chain.
+// This method is used when performing batch refreshes to determine which source chain configs to fetch.
+//
+// Returns a slice of chain selectors representing all known source chains.
 func (c *configPollerV2) getKnownSourceChainsForDestChain() []cciptypes.ChainSelector {
 	c.RLock()
 	defer c.RUnlock()
