@@ -18,10 +18,10 @@ import {SafeERC20} from
 import {EnumerableSet} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
 
-/// @notice The CommitVerifierOnRamp is a contract that handles lane-specific fee logic.
+/// @notice The CommitOnRamp is a contract that handles lane-specific fee logic.
 /// @dev The OnRamp and OffRamp form a cross chain upgradeable unit. Any change to one of them results in an onchain
 /// upgrade of both contracts.
-contract CommitVerifierOnRamp is IVerifierSender, ITypeAndVersion, Ownable2StepMsgSender {
+contract CommitOnRamp is IVerifierSender, ITypeAndVersion, Ownable2StepMsgSender {
   using SafeERC20 for IERC20;
   using EnumerableSet for EnumerableSet.AddressSet;
 
@@ -307,11 +307,7 @@ contract CommitVerifierOnRamp is IVerifierSender, ITypeAndVersion, Ownable2StepM
   // │                             Fees                             │
   // ================================================================
 
-  function getFee(
-    uint64 destChainSelector,
-    Client.EVM2AnyMessage memory message,
-    bytes memory extraArgs
-  ) external view returns (uint256) {
+  function getFee(uint64 destChainSelector, Client.EVM2AnyMessage memory, bytes memory) external view returns (uint256) {
     _assertNotCursed(destChainSelector);
 
     return 0;
