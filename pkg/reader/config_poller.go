@@ -524,7 +524,8 @@ func (c *configPoller) GetOfframpSourceChainConfigs(
 	sourceChains []cciptypes.ChainSelector,
 ) (map[cciptypes.ChainSelector]StaticSourceChainConfig, error) {
 	// Verify we have a reader for the destination chain
-	if _, exists := c.reader.getContractReader(destChain); !exists {
+	_, exists := c.reader.getContractReader(destChain)
+	if !exists {
 		c.lggr.Errorw("No contract reader for destination chain", "chain", destChain)
 		return nil, fmt.Errorf("no contract reader for destination chain %d", destChain)
 	}
