@@ -27,7 +27,7 @@ contract CommitOffRamp is ICCVOffRamp, OCRVerifier {
     bytes calldata rawReport,
     bytes calldata ccvBlob,
     bytes calldata ocrProof,
-    uint256 verifierIndex,
+    uint256, // verifierIndex,
     Internal.MessageExecutionState originalState
   ) external {
     _validateOCRSignatures(rawReport, ccvBlob, ocrProof);
