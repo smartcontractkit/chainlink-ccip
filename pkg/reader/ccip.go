@@ -1196,6 +1196,8 @@ func (r *ccipChainReader) prepareBatchConfigRequests(
 	return requests
 }
 
+// Deprecated: these process...() functions have now been replaced with pkg/chainaccessor/config_processors.go to
+// support only the DefaultAccessor. TODO: remove once the migration to DefaultAccessor is completed.
 func (r *ccipChainReader) processConfigResults(
 	chainSel cciptypes.ChainSelector,
 	batchResult types.BatchGetLatestValuesResult) (cciptypes.ChainConfigSnapshot, error) {
