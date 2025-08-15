@@ -132,8 +132,9 @@ func newCCIPChainReaderWithConfigPollerInternal(
 	return reader, nil
 }
 
-// WithExtendedContractReader sets the extended contract reader for the provided chain and updates the address book.
-func (r *ccipChainReader) WithExtendedContractReader(
+// WithExtendedContractReaderTESTONLY sets the extended contract reader for the provided chain and updates the address
+// book. This should only be called from tests!
+func (r *ccipChainReader) WithExtendedContractReaderTESTONLY(
 	ch cciptypes.ChainSelector, cr contractreader.Extended) *ccipChainReader {
 	r.contractReaders[ch] = cr
 
@@ -294,14 +295,10 @@ func (r *ccipChainReader) GetExpectedNextSequenceNumber(
 func (r *ccipChainReader) NextSeqNum(
 	ctx context.Context, chains []cciptypes.ChainSelector,
 ) (map[cciptypes.ChainSelector]cciptypes.SeqNum, error) {
-	if err := validateReaderExistence(r.contractReaders, r.destChain); err != nil {
-		return nil, err
-	}
-
 	lggr := logutil.WithContextValues(ctx, r.lggr)
 
 	// Use our direct fetch method that doesn't affect the cache
-	cfgs, err := r.fetchFreshSourceChainConfigs(ctx, r.destChain, chains)
+	cfgs, err := r.fetchFreshSourceChainConfigsViaAccessor(ctx, r.destChain, chains)
 	if err != nil {
 		return nil, fmt.Errorf("get source chains config: %w", err)
 	}
@@ -517,10 +514,6 @@ func (r *ccipChainReader) buildSigners(signers []cciptypes.Signer) []cciptypes.R
 }
 
 func (r *ccipChainReader) GetRMNRemoteConfig(ctx context.Context) (cciptypes.RemoteConfig, error) {
-	if err := validateReaderExistence(r.contractReaders, r.destChain); err != nil {
-		return cciptypes.RemoteConfig{}, fmt.Errorf("validate dest=%d extended reader existence: %w", r.destChain, err)
-	}
-
 	config, err := r.configPoller.GetChainConfig(ctx, r.destChain)
 	if err != nil {
 		return cciptypes.RemoteConfig{}, fmt.Errorf("get chain config: %w", err)
@@ -555,10 +548,6 @@ func (r *ccipChainReader) GetRMNRemoteConfig(ctx context.Context) (cciptypes.Rem
 // GetRmnCurseInfo returns rmn curse/pausing information about the provided chains
 // from the destination chain RMN remote contract.
 func (r *ccipChainReader) GetRmnCurseInfo(ctx context.Context) (cciptypes.CurseInfo, error) {
-	if err := validateReaderExistence(r.contractReaders, r.destChain); err != nil {
-		return cciptypes.CurseInfo{}, fmt.Errorf("validate dest=%d extended reader existence: %w", r.destChain, err)
-	}
-
 	// TODO: Curse requires a dedicated cache, but for now fetching it in background,
 	// together with the other configurations
 	config, err := r.configPoller.GetChainConfig(ctx, r.destChain)
@@ -942,9 +931,53 @@ func (r *ccipChainReader) getOffRampSourceChainsConfig(
 	return configs, nil
 }
 
+func (r *ccipChainReader) fetchFreshSourceChainConfigsViaAccessor(
+	ctx context.Context,
+	destChain cciptypes.ChainSelector,
+	sourceChains []cciptypes.ChainSelector,
+) (map[cciptypes.ChainSelector]cciptypes.SourceChainConfig, error) {
+	lggr := logutil.WithContextValues(ctx, r.lggr)
+
+	chainAccessor, err := getChainAccessor(r.accessors, destChain)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get chain accessor for dest chain %d: %w", destChain, err)
+	}
+
+	// Filter out destination chain
+	filteredSourceChains := filterOutChainSelector(sourceChains, destChain)
+	if len(filteredSourceChains) == 0 {
+		return make(map[cciptypes.ChainSelector]cciptypes.SourceChainConfig), nil
+	}
+
+	_, sourceChainConfigsMap, err := chainAccessor.GetAllConfigsLegacy(
+		ctx,
+		destChain,
+		filteredSourceChains,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch fresh source chain configs via accessor: %w", err)
+	}
+
+	if len(sourceChainConfigsMap) == 0 {
+		lggr.Infow("No fresh source chain configs found for destination chain", "destChain", destChain)
+	}
+
+	if len(sourceChainConfigsMap) != len(filteredSourceChains) {
+		lggr.Infow("fetched source chain configs count mismatch",
+			"expected", len(filteredSourceChains),
+			"actual", len(sourceChainConfigsMap),
+			"destChain", destChain)
+	}
+
+	return sourceChainConfigsMap, nil
+}
+
 // fetchFreshSourceChainConfigs always fetches fresh source chain configs directly from contracts
 // without using any cached values. Use this when up-to-date data is critical, especially
 // for sequence number accuracy.
+// TODO: remove in favor of fetchFreshSourceChainConfigsViaAccessor() once migration to accessors is complete and
+//
+//	config_poller.go is removed.
 func (r *ccipChainReader) fetchFreshSourceChainConfigs(
 	ctx context.Context,
 	destChain cciptypes.ChainSelector,

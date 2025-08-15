@@ -111,6 +111,7 @@ func NewCCIPChainReader(
 }
 
 // NewCCIPReaderWithExtendedContractReaders can be used when you want to directly provide contractreader.Extended
+// Deprecated: This should only be used in tests if absolutely necessary. Use NewCCIPChainReader instead.
 func NewCCIPReaderWithExtendedContractReaders(
 	ctx context.Context,
 	lggr logger.Logger,
@@ -136,7 +137,7 @@ func NewCCIPReaderWithExtendedContractReaders(
 		panic(fmt.Errorf("failed to create CCIP reader: %w", err))
 	}
 	for ch, extendedCr := range extendedContractReaders {
-		cr.WithExtendedContractReader(ch, extendedCr)
+		cr.WithExtendedContractReaderTESTONLY(ch, extendedCr)
 	}
 
 	return cr
