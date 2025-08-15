@@ -193,3 +193,20 @@ type Attestation struct {
 	Proof      []byte   // Proof of the message
 	VerifierId [32]byte // Identifier of the verifier that signed the message
 }
+
+// TimedMessage wraps a Message with a configurable tick duration
+type TimedMessage struct {
+	Message   Message
+	DeliverAt time.Time // Time to deliver this message
+	Index     int       // Index in the heap
+}
+
+// TimedMessageChannel is an interface for a channel that sends messages after configurable ticks
+type TimedMessageChannel interface {
+	// SendMessage sends a message that will be delivered after the specified tick duration
+	SendMessage(msg Message, tick time.Duration)
+	// Messages returns a channel that receives messages after their tick duration has elapsed
+	Messages() <-chan Message
+	// Close closes the channel and stops processing
+	Close()
+}
