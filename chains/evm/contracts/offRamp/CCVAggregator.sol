@@ -324,7 +324,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   function _getCCVsFromReceiverAndPool(
     uint64 sourceChainSelector,
     address receiver,
-    address poolAddress
+    address // poolAddress
   ) internal view returns (address[] memory requiredCCV, address[] memory optionalCCVs, uint8 optionalThreshold) {
     // If the receiver is not a contract, or it doesn't support the required interface, we return the default.
     if (receiver.code.length == 0 || !receiver._supportsInterfaceReverting(type(IAny2EVMMessageReceiverV2).interfaceId))
@@ -402,10 +402,11 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   ) external {
     if (msg.sender != address(this)) revert CanOnlySelfCall();
 
-    Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
+    Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](message.tokenAmounts.length);
     if (message.tokenAmounts.length > 0) {
-      destTokenAmounts =
-        _releaseOrMintTokens(message.tokenAmounts, message.sender, message.receiver, message.header.sourceChainSelector);
+      destTokenAmounts[0] = _releaseOrMintSingleToken(
+        message.tokenAmounts[0], message.sender, message.receiver, message.header.sourceChainSelector
+      );
     }
 
     Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
@@ -530,27 +531,6 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
       // If the call fails, we revert with a known error.
       revert TokenHandlingError(token, err);
     }
-  }
-
-  /// @notice Uses pools to release or mint a number of different tokens to a receiver address.
-  /// @param sourceTokenAmounts List of token amounts with source data of the tokens to be released/minted.
-  /// @param originalSender The message sender on the source chain.
-  /// @param receiver The address that will receive the tokens.
-  /// @param sourceChainSelector The remote source chain selector.
-  /// @return destTokenAmounts local token addresses with amounts.
-  function _releaseOrMintTokens(
-    Internal.Any2EVMMultiProofTokenTransfer[] memory sourceTokenAmounts,
-    bytes memory originalSender,
-    address receiver,
-    uint64 sourceChainSelector
-  ) internal returns (Client.EVMTokenAmount[] memory destTokenAmounts) {
-    destTokenAmounts = new Client.EVMTokenAmount[](sourceTokenAmounts.length);
-    for (uint256 i = 0; i < sourceTokenAmounts.length; ++i) {
-      destTokenAmounts[i] =
-        _releaseOrMintSingleToken(sourceTokenAmounts[i], originalSender, receiver, sourceChainSelector);
-    }
-
-    return destTokenAmounts;
   }
 
   // ================================================================
