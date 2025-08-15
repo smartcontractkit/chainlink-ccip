@@ -504,7 +504,8 @@ func (l *DefaultAccessor) GetTokenPriceUSD(
 		&update,
 	)
 	if err != nil {
-		return cciptypes.TimestampedUnixBig{}, fmt.Errorf("failed to get token price from fee quoter: %w", err)
+		return cciptypes.TimestampedUnixBig{},
+			fmt.Errorf("failed to get token price from fee quoter for token %s: %w", tokenAddress.String(), err)
 	}
 	return update, nil
 }

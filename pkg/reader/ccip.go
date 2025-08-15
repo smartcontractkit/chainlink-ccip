@@ -802,11 +802,6 @@ func (r *ccipChainReader) GetContractAddress(contractName string, chain cciptype
 // function returning the price of LINK not in USD, but in a small denomination of USD, similar to returning
 // the price of ETH not in ETH but in wei (1e-18 ETH).
 func (r *ccipChainReader) LinkPriceUSD(ctx context.Context) (cciptypes.BigInt, error) {
-	// Ensure we can read from the destination chain.
-	if err := validateReaderExistence(r.contractReaders, r.destChain); err != nil {
-		return cciptypes.BigInt{}, fmt.Errorf("failed to validate dest chain reader existence: %w", err)
-	}
-
 	// TODO: consider caching this value.
 	feeQuoterCfg, err := r.getDestFeeQuoterStaticConfig(ctx)
 	if err != nil {
@@ -851,24 +846,14 @@ func (r *ccipChainReader) getFeeQuoterTokenPriceUSD(ctx context.Context, tokenAd
 		return cciptypes.BigInt{}, fmt.Errorf("tokenAddr is empty")
 	}
 
-	reader, ok := r.contractReaders[r.destChain]
-	if !ok {
-		return cciptypes.BigInt{}, fmt.Errorf("contract reader not found for chain %d", r.destChain)
+	accessor, err := getChainAccessor(r.accessors, r.destChain)
+	if err != nil {
+		return cciptypes.BigInt{}, fmt.Errorf("unable to get chain accessor for dest chain %d: %w", r.destChain, err)
 	}
 
-	var timestampedPrice cciptypes.TimestampedUnixBig
-	err := reader.ExtendedGetLatestValue(
-		ctx,
-		consts.ContractNameFeeQuoter,
-		consts.MethodNameFeeQuoterGetTokenPrice,
-		primitives.Unconfirmed,
-		map[string]any{
-			"token": tokenAddr,
-		},
-		&timestampedPrice,
-	)
+	timestampedPrice, err := accessor.GetTokenPriceUSD(ctx, tokenAddr)
 	if err != nil {
-		return cciptypes.BigInt{}, fmt.Errorf("failed to get token price, addr: %v, err: %w", tokenAddr, err)
+		return cciptypes.BigInt{}, fmt.Errorf("failed to get token price from accessor, addr: %v, err: %w", tokenAddr, err)
 	}
 
 	price := timestampedPrice.Value

@@ -1,7 +1,6 @@
 package reader
 
 import (
-	"bytes"
 	"context"
 	"encoding/hex"
 	"errors"
@@ -17,12 +16,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 
+	commonccipocr3 "github.com/smartcontractkit/chainlink-ccip/mocks/chainlink_common/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
-
-	commonccipocr3 "github.com/smartcontractkit/chainlink-ccip/mocks/chainlink_common/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
@@ -588,24 +585,6 @@ func TestCCIPChainReader_DiscoverContracts_GetOfframpStaticConfig_Errors(t *test
 	mockCache.AssertExpectations(t)
 }
 
-// withReturnValueOverridden is a helper function to override the return value of a mocked out
-// ExtendedGetLatestValue call.
-func withReturnValueOverridden(mapper func(returnVal interface{})) func(ctx context.Context,
-	contractName,
-	methodName string,
-	confidenceLevel primitives.ConfidenceLevel,
-	params,
-	returnVal interface{}) {
-	return func(ctx context.Context,
-		contractName,
-		methodName string,
-		confidenceLevel primitives.ConfidenceLevel,
-		params,
-		returnVal interface{}) {
-		mapper(returnVal)
-	}
-}
-
 func TestCCIPChainReader_getDestFeeQuoterStaticConfig(t *testing.T) {
 	ctx := context.Background()
 
@@ -649,31 +628,7 @@ func TestCCIPChainReader_getDestFeeQuoterStaticConfig(t *testing.T) {
 
 func TestCCIPChainReader_getFeeQuoterTokenPriceUSD(t *testing.T) {
 	tokenAddr := []byte{0x3, 0x4}
-	destCR := reader_mocks.NewMockContractReaderFacade(t)
-	destCR.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
-	destCR.EXPECT().HealthReport().Return(nil)
-	destCR.EXPECT().GetLatestValue(
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-	).Run(func(
-		ctx context.Context,
-		readIdentifier string,
-		confidenceLevel primitives.ConfidenceLevel,
-		params interface{},
-		returnVal interface{},
-	) {
-		givenTokenAddr := params.(map[string]any)["token"].([]byte)
-		if bytes.Equal(tokenAddr, givenTokenAddr) {
-			price := returnVal.(*cciptypes.TimestampedUnixBig)
-			price.Value = big.NewInt(145)
-		}
-	}).Return(nil)
-
 	offrampAddress := []byte{0x3}
-	feeQuoterAddress := []byte{0x4}
 
 	mockAddrCodec := internal.NewMockAddressCodecHex(t)
 
@@ -684,13 +639,19 @@ func TestCCIPChainReader_getFeeQuoterTokenPriceUSD(t *testing.T) {
 	contractWriters[chainC] = cw
 
 	chainAccessors := createMockedChainAccessors(t, chainA, chainB, chainC)
+	expectedPrice := cciptypes.TimestampedUnixBig{
+		Value:     big.NewInt(145),
+		Timestamp: uint32(time.Now().Unix()),
+	}
 	mockExpectChainAccessorSyncCall(chainAccessors[chainC], consts.ContractNameOffRamp, offrampAddress, nil)
+	mockExpectChainAccessorGetTokenPriceUSD(chainAccessors[chainC], tokenAddr, expectedPrice)
+
 	ccipReader, err := newCCIPChainReaderInternal(
 		t.Context(),
 		logger.Test(t),
 		chainAccessors,
 		map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
-			chainC: destCR,
+			chainC: reader_mocks.NewMockContractReaderFacade(t),
 		}, contractWriters, chainC, offrampAddress, mockAddrCodec,
 	)
 	require.NoError(t, err)
@@ -702,12 +663,6 @@ func TestCCIPChainReader_getFeeQuoterTokenPriceUSD(t *testing.T) {
 			t.Logf("Error closing ccipReader: %v", err)
 		}
 	})
-
-	feeQuoterAddressStr, err := mockAddrCodec.AddressBytesToString(feeQuoterAddress, 111_111)
-	require.NoError(t, err)
-	require.NoError(t, ccipReader.contractReaders[chainC].Bind(
-		context.Background(), []types.BoundContract{{Name: "FeeQuoter",
-			Address: feeQuoterAddressStr}}))
 
 	ctx := context.Background()
 	price, err := ccipReader.getFeeQuoterTokenPriceUSD(ctx, []byte{0x3, 0x4})
@@ -799,18 +754,13 @@ func TestCCIPChainReader_LinkPriceUSD(t *testing.T) {
 	// Setup contract reader for getting token price
 	destCR := reader_mocks.NewMockExtended(t)
 
-	// mock the call to get the token price
-	destCR.EXPECT().ExtendedGetLatestValue(
-		mock.Anything,
-		consts.ContractNameFeeQuoter,
-		consts.MethodNameFeeQuoterGetTokenPrice,
-		primitives.Unconfirmed,
-		map[string]interface{}{"token": tokenAddr},
-		mock.Anything,
-	).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
-		price := returnVal.(*cciptypes.TimestampedUnixBig)
-		price.Value = big.NewInt(145)
-	}))
+	// Mock accessors
+	chainAccessors := createMockedChainAccessors(t, chainC)
+	expectedPrice := cciptypes.TimestampedUnixBig{
+		Value:     big.NewInt(145),
+		Timestamp: uint32(time.Now().Unix()),
+	}
+	mockExpectChainAccessorGetTokenPriceUSD(chainAccessors[chainC], tokenAddr, expectedPrice)
 
 	// Setup ccipReader with both cache and contract readers
 	mockAddrCodec := internal.NewMockAddressCodecHex(t)
@@ -821,6 +771,7 @@ func TestCCIPChainReader_LinkPriceUSD(t *testing.T) {
 		destChain:      chainC,
 		configPoller:   mockCache,
 		offrampAddress: offrampAddressStr,
+		accessors:      chainAccessors,
 		contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
 			chainC: destCR,
 		},
