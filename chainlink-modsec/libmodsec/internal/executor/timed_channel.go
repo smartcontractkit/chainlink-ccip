@@ -1,10 +1,10 @@
 package executor
 
 import (
-	"container/heap"
 	"sync"
 	"time"
 
+	"github.com/emirpasic/gods/queues/priorityqueue"
 	"github.com/smartcontractkit/chainlink-modsec/libmodsec/pkg/modsectypes"
 )
 
@@ -12,45 +12,12 @@ import (
 type timedMessageItem struct {
 	message   modsectypes.Message
 	deliverAt time.Time
-	index     int // for heap.Interface
-}
-
-// timedMessageHeap implements heap.Interface for managing timed messages
-type timedMessageHeap []*timedMessageItem
-
-func (h timedMessageHeap) Len() int { return len(h) }
-
-func (h timedMessageHeap) Less(i, j int) bool {
-	return h[i].deliverAt.Before(h[j].deliverAt)
-}
-
-func (h timedMessageHeap) Swap(i, j int) {
-	h[i], h[j] = h[j], h[i]
-	h[i].index = i
-	h[j].index = j
-}
-
-func (h *timedMessageHeap) Push(x interface{}) {
-	n := len(*h)
-	item := x.(*timedMessageItem)
-	item.index = n
-	*h = append(*h, item)
-}
-
-func (h *timedMessageHeap) Pop() interface{} {
-	old := *h
-	n := len(old)
-	item := old[n-1]
-	old[n-1] = nil  // avoid memory leak
-	item.index = -1 // for safety
-	*h = old[0 : n-1]
-	return item
 }
 
 // timedMessageChannel implements TimedMessageChannel
 type timedMessageChannel struct {
 	mu         sync.Mutex
-	heap       *timedMessageHeap
+	queue      *priorityqueue.Queue
 	outputChan chan modsectypes.Message
 	stopChan   chan struct{}
 	workerDone chan struct{}
@@ -60,13 +27,16 @@ type timedMessageChannel struct {
 // NewTimedMessageChannel creates a new TimedMessageChannel with the specified buffer size
 func NewTimedMessageChannel(bufferSize int) modsectypes.TimedMessageChannel {
 	tmc := &timedMessageChannel{
-		heap:       &timedMessageHeap{},
+		queue: priorityqueue.NewWith(func(a, b interface{}) int {
+			itemA := a.(*timedMessageItem)
+			itemB := b.(*timedMessageItem)
+			return itemA.deliverAt.Compare(itemB.deliverAt)
+		}),
 		outputChan: make(chan modsectypes.Message, bufferSize),
 		stopChan:   make(chan struct{}),
 		workerDone: make(chan struct{}),
 	}
 
-	heap.Init(tmc.heap)
 	go tmc.worker()
 
 	return tmc
@@ -87,7 +57,7 @@ func (tmc *timedMessageChannel) SendMessage(msg modsectypes.Message, tick time.D
 		deliverAt: deliverAt,
 	}
 
-	heap.Push(tmc.heap, item)
+	tmc.queue.Enqueue(item)
 }
 
 // Messages returns the channel that receives messages after their tick duration has elapsed
@@ -110,7 +80,7 @@ func (tmc *timedMessageChannel) Close() {
 	close(tmc.outputChan)
 }
 
-// worker processes the timed messages and sends them to the output channel when ready
+// worker processes the timed messages using event-driven timers
 func (tmc *timedMessageChannel) worker() {
 	defer close(tmc.workerDone)
 
@@ -132,23 +102,30 @@ func (tmc *timedMessageChannel) processReadyMessages() {
 	tmc.mu.Lock()
 	defer tmc.mu.Unlock()
 
-	now := time.Now()
+	if tmc.closed {
+		return
+	}
 
-	// Process all messages that are ready to be delivered
-	for tmc.heap.Len() > 0 {
-		item := (*tmc.heap)[0]
-		if item.deliverAt.After(now) {
-			break // No more messages ready
-		}
+	// Get the next message
+	next, found := tmc.queue.Dequeue()
+	if !found {
+		return
+	}
 
-		// Remove from heap
-		heap.Pop(tmc.heap)
+	item := next.(*timedMessageItem)
 
-		// Send to output channel (non-blocking)
-		select {
-		case tmc.outputChan <- item.message:
-		default:
-			// Channel is full, could log this or handle overflow
-		}
+	// Check if it's actually ready (in case of clock drift or delays)
+	if item.deliverAt.After(time.Now()) {
+		// Put it back and reschedule
+		tmc.queue.Enqueue(item)
+		return
+	}
+
+	// Send to output channel (non-blocking)
+	select {
+	case tmc.outputChan <- item.message:
+		// Message sent successfully
+	default:
+		// Channel is full, could log this or handle overflow
 	}
 }

@@ -3,9 +3,10 @@ package executor
 import (
 	"context"
 	"fmt"
+	"time"
+
 	indexer "github.com/smartcontractkit/chainlink-modsec/libmodsec/internal/attestation-indexer"
 	"github.com/smartcontractkit/chainlink-modsec/libmodsec/pkg/modsectypes"
-	"time"
 )
 
 type InMemoryAttestationReader struct {
@@ -17,7 +18,7 @@ func NewInMemoryAttestationReader() *InMemoryAttestationReader {
 	return &InMemoryAttestationReader{}
 }
 
-func (at *InMemoryAttestationReader) GetAttestations(ctx context.Context, msg modsectypes.Message) ([]Attestation, error) {
+func (at *InMemoryAttestationReader) GetAttestations(ctx context.Context, msg modsectypes.Message) ([]modsectypes.Attestation, error) {
 	startTime := time.Now()
 	timeoutCh := make(chan struct{})
 	for {
