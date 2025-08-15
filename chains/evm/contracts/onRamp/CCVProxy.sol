@@ -156,7 +156,7 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
     if (msg.sender != address(destChainConfig.router)) revert MustBeCalledByRouter();
 
     // 1. parse extraArgs
-    Client.ModSecExtraArgsV1 memory resolvedExtraArgs = _parseExtraArgsWithDefaults(destChainConfig, message.extraArgs);
+    Client.EVMExtraArgsV3 memory resolvedExtraArgs = _parseExtraArgsWithDefaults(destChainConfig, message.extraArgs);
     // TODO where does the TokenReceiver go? Exec args feels strange but don't have a better place.
     bytes memory tokenReceiver =
       IFeeQuoterV2(s_dynamicConfig.feeQuoter).resolveTokenReceiver(resolvedExtraArgs.executorArgs);
@@ -339,9 +339,9 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
   function _parseExtraArgsWithDefaults(
     DestChainConfig memory destChainConfig,
     bytes calldata extraArgs
-  ) internal pure returns (Client.ModSecExtraArgsV1 memory resolvedArgs) {
-    if (bytes4(extraArgs[0:4]) == Client.MOD_SEC_EXTRA_ARGS_V1_TAG) {
-      resolvedArgs = abi.decode(extraArgs, (Client.ModSecExtraArgsV1));
+  ) internal pure returns (Client.EVMExtraArgsV3 memory resolvedArgs) {
+    if (bytes4(extraArgs[0:4]) == Client.EVM_EXTRA_ARGS_V3_TAG) {
+      resolvedArgs = abi.decode(extraArgs, (Client.EVMExtraArgsV3));
 
       if (resolvedArgs.optionalCCV.length != 0) {
         // Requiring more CCVs than are supplied would make a transaction unexecutable forever.
