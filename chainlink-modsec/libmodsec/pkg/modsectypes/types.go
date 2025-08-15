@@ -198,6 +198,7 @@ type Attestation struct {
 type TimedMessage struct {
 	Message   Message
 	DeliverAt time.Time // Time to deliver this message
+	Index     int       // Index in the heap
 }
 
 // TimedMessageChannel is an interface for a channel that sends messages after configurable ticks
