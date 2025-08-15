@@ -103,4 +103,33 @@ library Client {
   ) internal pure returns (bytes memory bts) {
     return abi.encodeWithSelector(SVM_EXTRA_ARGS_V1_TAG, extraArgs);
   }
+
+  // ================================================================
+  // │                           ModSec                             │
+  // ================================================================
+
+  struct CCV {
+    address ccvAddress;
+    bytes args;
+  }
+
+  bytes4 public constant EVM_EXTRA_ARGS_V3_TAG = 0x302326cb;
+
+  struct EVMExtraArgsV3 {
+    CCV[] requiredCCV;
+    CCV[] optionalCCV;
+    uint8 optionalThreshold;
+    address executor;
+    bytes executorArgs;
+    bytes tokenArgs;
+  }
+
+  struct TokenPoolSettings {
+    // Token pool can only add required verifiers.
+    CCV[] requiredVerifiers;
+    // Token pool gas limit on dest
+    uint256 gasLimit;
+    // Token pool calldata size on dest
+    uint64 destBytesOverhead;
+  }
 }

@@ -69,6 +69,13 @@ function getOptimizations() {
     echo "$optimize_runs_override"
 }
 
+# Mod sec
+compileContract onRamp/CCVProxy
+compileContract onRamp/CommitOnRamp
+compileContract offRamp/CCVAggregator
+compileContract offRamp/CommitOffRamp
+
+# 1.6
 compileContract offRamp/OffRamp
 compileContract FeeQuoter
 compileContract onRamp/OnRamp
