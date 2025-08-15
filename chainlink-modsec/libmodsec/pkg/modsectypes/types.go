@@ -196,8 +196,8 @@ type Attestation struct {
 
 // TimedMessage wraps a Message with a configurable tick duration
 type TimedMessage struct {
-	Message Message
-	Tick    time.Duration // Duration to wait before sending this message
+	Message   Message
+	DeliverAt time.Time // Time to deliver this message
 }
 
 // TimedMessageChannel is an interface for a channel that sends messages after configurable ticks

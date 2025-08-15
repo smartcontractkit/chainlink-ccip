@@ -8,12 +8,6 @@ import (
 	"github.com/smartcontractkit/chainlink-modsec/libmodsec/pkg/modsectypes"
 )
 
-// timedMessageItem represents a message with its delivery time
-type timedMessageItem struct {
-	message   modsectypes.Message
-	deliverAt time.Time
-}
-
 // timedMessageChannel implements TimedMessageChannel
 type timedMessageChannel struct {
 	mu         sync.Mutex
@@ -28,9 +22,9 @@ type timedMessageChannel struct {
 func NewTimedMessageChannel(bufferSize int) modsectypes.TimedMessageChannel {
 	tmc := &timedMessageChannel{
 		queue: priorityqueue.NewWith(func(a, b interface{}) int {
-			itemA := a.(*timedMessageItem)
-			itemB := b.(*timedMessageItem)
-			return itemA.deliverAt.Compare(itemB.deliverAt)
+			itemA := a.(*modsectypes.TimedMessage)
+			itemB := b.(*modsectypes.TimedMessage)
+			return itemA.DeliverAt.Compare(itemB.DeliverAt)
 		}),
 		outputChan: make(chan modsectypes.Message, bufferSize),
 		stopChan:   make(chan struct{}),
@@ -52,9 +46,9 @@ func (tmc *timedMessageChannel) SendMessage(msg modsectypes.Message, tick time.D
 	}
 
 	deliverAt := time.Now().Add(tick)
-	item := &timedMessageItem{
-		message:   msg,
-		deliverAt: deliverAt,
+	item := &modsectypes.TimedMessage{
+		Message:   msg,
+		DeliverAt: deliverAt,
 	}
 
 	tmc.queue.Enqueue(item)
@@ -112,10 +106,10 @@ func (tmc *timedMessageChannel) processReadyMessages() {
 		return
 	}
 
-	item := next.(*timedMessageItem)
+	item := next.(*modsectypes.TimedMessage)
 
 	// Check if it's actually ready (in case of clock drift or delays)
-	if item.deliverAt.After(time.Now()) {
+	if item.DeliverAt.After(time.Now()) {
 		// Put it back and reschedule
 		tmc.queue.Enqueue(item)
 		return
@@ -123,7 +117,7 @@ func (tmc *timedMessageChannel) processReadyMessages() {
 
 	// Send to output channel (non-blocking)
 	select {
-	case tmc.outputChan <- item.message:
+	case tmc.outputChan <- item.Message:
 		// Message sent successfully
 	default:
 		// Channel is full, could log this or handle overflow
