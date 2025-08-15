@@ -2,18 +2,23 @@ package executor
 
 import (
 	"crypto/rand"
+	"fmt"
 	"testing"
+	"time"
 )
 
 func TestIsLeader(t *testing.T) {
+	deltaStage := 10 * time.Second
+
 	// Create a consistent test setup
 	participants := map[uint64][]string{
-		1: {"node1", "node2", "node3"},
-		2: {"node1", "node4", "node5"},
-		3: {"node2", "node3", "node4"}, // Not a participant
+		1: {"node3", "node2", "node1"},
+		2: {"node1", "node2", "node3"}, // Same participants as chain 1, different order
+		3: {"node1", "node2", "node6"},
+		4: {"node2", "node3", "node4"}, // Not a participant
 	}
 
-	le := NewSimpleLeaderElection("node1", participants)
+	le := NewModuloLeaderElection("node2", participants, deltaStage)
 
 	// Test with a fixed message ID for deterministic results
 	msgId := [32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32}
@@ -21,48 +26,37 @@ func TestIsLeader(t *testing.T) {
 	tests := []struct {
 		name              string
 		destChainSelector uint64
-		epochs            []uint64
 		expectedResult    bool
+		expectedDelay     time.Duration
 	}{
 		{
-			name:              "chain 1, is leader for offset 2",
+			name:              "chain 1, is leader",
 			destChainSelector: 1,
-			epochs:            []uint64{2},
 			expectedResult:    true,
+			expectedDelay:     0 * time.Second,
 		},
 		{
-			name:              "chain 1, all other offsets are not leader",
-			destChainSelector: 1,
-			epochs:            []uint64{0, 1},
-			expectedResult:    false,
-		},
-		{
-			name:              "chain 2, is leader for offset 1",
+			name:              "chain 2, different ordering of participants does not change leader",
 			destChainSelector: 2,
-			epochs:            []uint64{1},
 			expectedResult:    true,
+			expectedDelay:     0 * time.Second,
 		},
 		{
-			name:              "chain 2, all other offsets are not leader",
-			destChainSelector: 2,
-			epochs:            []uint64{0, 2},
-			expectedResult:    false,
-		},
-		{
-			name:              "chain 3, node not a participant",
+			name:              "chain 3, is not leader",
 			destChainSelector: 3,
-			epochs:            []uint64{0, 1, 2},
 			expectedResult:    false,
+			expectedDelay:     10 * time.Second,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			for _, epoch := range tt.epochs {
-				result := le.IsLeader(msgId, tt.destChainSelector, epoch)
-				if result != tt.expectedResult {
-					t.Errorf("expected %v, got %v", tt.expectedResult, result)
-				}
+			result, delay := le.IsLeader(msgId, tt.destChainSelector)
+			if result != tt.expectedResult {
+				t.Errorf("expected result %v, got %v", tt.expectedResult, result)
+			}
+			if delay != tt.expectedDelay {
+				t.Errorf("expected delay %v, got %v", tt.expectedDelay, delay)
 			}
 		})
 	}
@@ -73,12 +67,16 @@ func TestIsLeaderNonParticipant(t *testing.T) {
 		1: {"node1", "node2", "node3"},
 	}
 
-	le := NewSimpleLeaderElection("node1", participants)
+	le := NewModuloLeaderElection("node1", participants, 1*time.Second)
 	msgId := [32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32}
 
 	// Test that non-participant chains always return false
-	if le.IsLeader(msgId, 999, 0) {
+	result, delay := le.IsLeader(msgId, 999)
+	if result {
 		t.Error("expected non-participant to not be leader")
+	}
+	if delay != 0 {
+		t.Errorf("expected 0 delay for non-participant, got %v", delay)
 	}
 }
 
@@ -87,36 +85,19 @@ func TestIsLeaderDeterministic(t *testing.T) {
 		1: {"node1", "node2", "node3"},
 	}
 
-	le := NewSimpleLeaderElection("node1", participants)
+	le := NewModuloLeaderElection("node1", participants, 1*time.Second)
 	msgId := [32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32}
 
 	// Test that the same input always produces the same result
-	result1 := le.IsLeader(msgId, 1, 0)
-	result2 := le.IsLeader(msgId, 1, 0)
+	result1, delay1 := le.IsLeader(msgId, 1)
+	result2, delay2 := le.IsLeader(msgId, 1)
 
 	if result1 != result2 {
 		t.Error("leader election should be deterministic")
 	}
-}
-
-func TestIsLeaderDifferentMessageIds(t *testing.T) {
-	participants := map[uint64][]string{
-		1: {"node1", "node2", "node3"},
+	if delay1 != delay2 {
+		t.Error("delay should be deterministic")
 	}
-
-	le := NewSimpleLeaderElection("node1", participants)
-
-	msgId1 := [32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32}
-	msgId2 := [32]byte{2, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32}
-
-	// Different message IDs should potentially produce different results
-	result1 := le.IsLeader(msgId1, 1, 0)
-	result2 := le.IsLeader(msgId2, 1, 0)
-
-	// Note: This test doesn't assert specific values since hash results could be the same
-	// by chance, but it ensures the function handles different inputs correctly
-	_ = result1
-	_ = result2
 }
 
 func TestGetParticipants(t *testing.T) {
@@ -125,7 +106,7 @@ func TestGetParticipants(t *testing.T) {
 		2: {"node4", "node5"},
 	}
 
-	le := NewSimpleLeaderElection("node1", participants)
+	le := NewModuloLeaderElection("node1", participants, 1*time.Second)
 
 	tests := []struct {
 		name                 string
@@ -168,7 +149,7 @@ func TestGetParticipants(t *testing.T) {
 }
 
 func TestSetParticipants(t *testing.T) {
-	le := NewSimpleLeaderElection("node1", make(map[uint64][]string))
+	le := NewModuloLeaderElection("node1", make(map[uint64][]string), 1*time.Second)
 
 	// Test setting participants for a new chain
 	newParticipants := []string{"node1", "node2", "node3"}
@@ -207,7 +188,7 @@ func TestSetParticipants(t *testing.T) {
 }
 
 func TestSetParticipantsEmpty(t *testing.T) {
-	le := NewSimpleLeaderElection("node1", make(map[uint64][]string))
+	le := NewModuloLeaderElection("node1", make(map[uint64][]string), 1*time.Second)
 
 	// Test setting empty participants
 	le.SetParticipants(1, []string{})
@@ -227,14 +208,14 @@ func TestConcurrentAccess(t *testing.T) {
 		1: {"node1", "node2", "node3"},
 	}
 
-	le := NewSimpleLeaderElection("node1", participants)
+	le := NewModuloLeaderElection("node1", participants, 1*time.Second)
 	msgId := [32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32}
 
 	// Test concurrent reads
 	done := make(chan bool, 10)
 	for i := 0; i < 10; i++ {
 		go func() {
-			le.IsLeader(msgId, 1, 0)
+			le.IsLeader(msgId, 1)
 			le.IsParticipant(1)
 			le.GetParticipants(1)
 			le.SelfParticipations()
@@ -268,7 +249,7 @@ func TestLeaderElectionDistribution(t *testing.T) {
 		1: {"node1", "node2", "node3", "node4", "node5"},
 	}
 
-	le := NewSimpleLeaderElection("node1", participants)
+	le := NewModuloLeaderElection("node1", participants, 1*time.Second)
 
 	// Test multiple messages to see distribution
 	leaderCount := 0
@@ -279,7 +260,8 @@ func TestLeaderElectionDistribution(t *testing.T) {
 		msgId := [32]byte{}
 		rand.Read(msgId[:])
 
-		if le.IsLeader(msgId, 1, 0) {
+		result, _ := le.IsLeader(msgId, 1)
+		if result {
 			leaderCount++
 		}
 	}
@@ -295,44 +277,34 @@ func TestLeaderElectionDistribution(t *testing.T) {
 	}
 }
 
-func TestLeaderElectionOffset(t *testing.T) {
+func TestLeaderElectionDelay(t *testing.T) {
 	participants := map[uint64][]string{
 		1: {"node1", "node2", "node3"},
 	}
 
-	le := NewSimpleLeaderElection("node1", participants)
+	le := NewModuloLeaderElection("node1", participants, 2*time.Second)
 
 	// Create a random 32 byte array
 	msgId := [32]byte{}
 	rand.Read(msgId[:])
 
-	// Test that different epochs can produce different results
-	result0 := le.IsLeader(msgId, 1, 0)
-	result1 := le.IsLeader(msgId, 1, 1)
-	result2 := le.IsLeader(msgId, 1, 2)
+	// Test that the delay is calculated correctly based on position
+	result, delay := le.IsLeader(msgId, 1)
 
-	// Count how many epochs make node1 the leader
-	leaderCount := 0
-	if result0 {
-		leaderCount++
-	}
-	if result1 {
-		leaderCount++
-	}
-	if result2 {
-		leaderCount++
-	}
-
-	// Only one epochs should make node1 the leader (since it's in the participants)
-	// If more than one epochs makes node1 the leader, the test should fail
-	if leaderCount > 1 {
-		t.Errorf("expected only one epoch to make node1 the leader, but got %d: result0=%v, result1=%v, result2=%v",
-			leaderCount, result0, result1, result2)
-	}
-
-	// If no epoch makes node1 the leader, the test should fail
-	if leaderCount == 0 {
-		t.Error("expected node1 to be leader for at least one epoch")
+	// If node1 is not the leader (index > 0), it should have a delay
+	if !result {
+		if delay <= 0 {
+			t.Errorf("expected positive delay when not leader, got %v", delay)
+		}
+		// The delay should be a multiple of deltaStage
+		if delay%2*time.Second != 0 {
+			t.Errorf("expected delay to be multiple of deltaStage, got %v", delay)
+		}
+	} else {
+		// If node1 is the leader, delay should be 0
+		if delay != 0 {
+			t.Errorf("expected 0 delay when leader, got %v", delay)
+		}
 	}
 }
 
@@ -342,16 +314,44 @@ func TestLeaderElectionEdgeCases(t *testing.T) {
 		1: {"node1"},
 	}
 
-	le := NewSimpleLeaderElection("node1", participants)
+	le := NewModuloLeaderElection("node1", participants, 1*time.Second)
 	msgId := [32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32}
 
-	// With single participant, should always be leader for epoch 0
-	if !le.IsLeader(msgId, 1, 0) {
-		t.Error("single participant should always be leader for epoch 0")
+	// With single participant, should always be leader
+	result, delay := le.IsLeader(msgId, 1)
+	if !result {
+		t.Error("single participant should always be leader")
+	}
+	if delay != 0 {
+		t.Errorf("single participant should have 0 delay, got %v", delay)
+	}
+}
+
+func TestDeltaStageConfiguration(t *testing.T) {
+	participants := map[uint64][]string{
+		1: {"node1", "node2", "node3"},
 	}
 
-	// Test with epoch modulo participant count should be leader
-	if !le.IsLeader(msgId, 1, 1) {
-		t.Error("should be leader for epoch modulo participant count")
+	// Test with different deltaStage values
+	testCases := []time.Duration{
+		100 * time.Millisecond,
+		1 * time.Second,
+		5 * time.Second,
+	}
+
+	for _, deltaStage := range testCases {
+		t.Run(fmt.Sprintf("deltaStage_%v", deltaStage), func(t *testing.T) {
+			le := NewModuloLeaderElection("node1", participants, deltaStage)
+
+			msgId := [32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32}
+
+			// Test that delays are multiples of deltaStage
+			result, delay := le.IsLeader(msgId, 1)
+			if !result && delay > 0 {
+				if delay%deltaStage != 0 {
+					t.Errorf("expected delay %v to be multiple of deltaStage %v", delay, deltaStage)
+				}
+			}
+		})
 	}
 }
