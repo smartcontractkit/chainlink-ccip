@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol";
+import {IAny2EVMMessageReceiverV2} from "../interfaces/IAny2EVMMessageReceiverV2.sol";
 import {ICCVOffRamp} from "../interfaces/ICCVOffRamp.sol";
 import {IPoolV1} from "../interfaces/IPool.sol";
 import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
@@ -27,6 +28,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
 
   error ZeroChainSelectorNotAllowed();
   error ExecutionError(bytes32 messageId, bytes err);
+  error NoCCVQuorumReached();
   error SourceChainNotEnabled(uint64 sourceChainSelector);
   error CanOnlySelfCall();
   error ReceiverError(bytes err);
@@ -68,6 +70,8 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   struct SourceChainConfig {
     IRouter router; // ─╮ Local router to use for messages coming from this source chain.
     bool isEnabled; // ─╯ Flag whether the source chain is enabled or not.
+    address defaultCCV; // Default CCV to use for messages from this source chain.
+    address requiredCCV; // Required CCV to use for all messages from this source chain.
   }
 
   /// @dev Same as SourceChainConfig but with source chain selector so that an array of these
@@ -87,9 +91,9 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
 
   struct AggregatedReport {
     Internal.Any2EVMMultiProofMessage message;
+    address[] ccvs;
     bytes[] ccvBlobs;
     bytes[] proofs;
-    uint32 gasOverride; // Gas override for the entire report, including receiver call and token transfers.
   }
 
   // STATIC CONFIG
@@ -233,7 +237,19 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
       getExecutionState(sourceChainSelector, report.message.header.sequenceNumber);
 
     // SECURITY CRITICAL CHECK.
-    _verifyMessage(report.message, originalState, report.ccvBlobs, report.proofs);
+    _ensureCCVQuorumIsReached(
+      report.message.header.sourceChainSelector,
+      report.message.receiver,
+      report.message.tokenAmounts[0].destTokenAddress, // TODO fix
+      report.ccvs
+    );
+
+    {
+      bytes memory encodedMessage = abi.encode(report.message);
+      for (uint256 i = 0; i < report.ccvs.length; ++i) {
+        ICCVOffRamp(report.ccvs[i]).validateReport(encodedMessage, report.ccvBlobs[i], report.proofs[i], originalState);
+      }
+    }
 
     Internal.Any2EVMMultiProofMessage memory message = _beforeExecuteSingleMessage(report.message);
 
@@ -249,23 +265,9 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
       revert SkippedAlreadyExecutedMessage(sourceChainSelector, message.header.sequenceNumber);
     }
 
-    uint32 gasLimit = report.gasOverride == 0 ? report.message.gasLimit : report.gasOverride;
-
     _setExecutionState(sourceChainSelector, message.header.sequenceNumber, Internal.MessageExecutionState.IN_PROGRESS);
-    (Internal.MessageExecutionState newState, bytes memory returnData) = _trialExecute(message, gasLimit);
+    (Internal.MessageExecutionState newState, bytes memory returnData) = _trialExecute(message);
     _setExecutionState(sourceChainSelector, message.header.sequenceNumber, newState);
-
-    // Since it's hard to estimate whether manual execution will succeed, we revert the entire transaction if it
-    // fails. This will show the user if their manual exec will fail before they submit it.
-    if (report.gasOverride != 0) {
-      if (newState == Internal.MessageExecutionState.FAILURE) {
-        if (originalState != Internal.MessageExecutionState.UNTOUCHED) {
-          // If manual execution fails, we revert the entire transaction, unless the originalState is UNTOUCHED as we
-          // would still be making progress by changing the state from UNTOUCHED to FAILURE.
-          revert ExecutionError(message.header.messageId, returnData);
-        }
-      }
-    }
 
     // The only valid prior states are UNTOUCHED and FAILURE (checked above).
     // The only valid post states are FAILURE and SUCCESS (checked below).
@@ -281,23 +283,69 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     s_dynamicConfig.reentrancyGuardEntered = false;
   }
 
-  /// @notice Verifies the message and its proofs. It loops through each of the verifiers in order, verifying the
-  /// message and its proof.
-  function _verifyMessage(
-    Internal.Any2EVMMultiProofMessage calldata message,
-    Internal.MessageExecutionState originalState,
-    bytes[] calldata ccvBlobs,
-    bytes[] calldata proofs
-  ) internal {
-    if (message.requiredVerifiers.length != proofs.length) {
-      revert InvalidProofLength(message.requiredVerifiers.length, proofs.length);
+  function _ensureCCVQuorumIsReached(
+    uint64 sourceChainSelector,
+    address receiver,
+    address tokenPool,
+    address[] calldata CCVs
+  ) internal view {
+    (address[] memory requiredCCV, address[] memory optionalCCVs, uint8 optionalThreshold) =
+      _getCCVsFromReceiverAndPool(sourceChainSelector, receiver, tokenPool);
+
+    for (uint256 i = 0; i < requiredCCV.length; ++i) {
+      bool found = false;
+      for (uint256 j = 0; j < CCVs.length; ++j) {
+        if (CCVs[j] == requiredCCV[i]) {
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        revert NoCCVQuorumReached(); // TODO better error message
+      }
     }
 
-    for (uint256 i = 0; i < message.requiredVerifiers.length; ++i) {
-      ICCVOffRamp(message.requiredVerifiers[i]).validateReport(
-        abi.encode(message), ccvBlobs[i], proofs[i], i, originalState
-      );
+    uint256 optionalCCVsToFind = optionalThreshold;
+    for (uint256 i = 0; i < optionalCCVs.length; ++i) {
+      for (uint256 j = 0; j < CCVs.length && optionalCCVsToFind > 0; ++j) {
+        if (CCVs[j] == optionalCCVs[i]) {
+          optionalCCVsToFind--;
+          break;
+        }
+      }
     }
+
+    if (optionalCCVsToFind > 0) {
+      revert NoCCVQuorumReached(); // TODO better error message
+    }
+  }
+
+  // TODO check pool as well.
+  function _getCCVsFromReceiverAndPool(
+    uint64 sourceChainSelector,
+    address receiver,
+    address poolAddress
+  ) internal view returns (address[] memory requiredCCV, address[] memory optionalCCVs, uint8 optionalThreshold) {
+    // If the receiver is not a contract, or it doesn't support the required interface, we return the default.
+    if (receiver.code.length == 0 || !receiver._supportsInterfaceReverting(type(IAny2EVMMessageReceiverV2).interfaceId))
+    {
+      SourceChainConfig memory sourceConfig = s_sourceChainConfigs[sourceChainSelector];
+      if (sourceConfig.requiredCCV == address(0)) {
+        requiredCCV = new address[](1);
+        requiredCCV[0] = sourceConfig.defaultCCV;
+
+        return (requiredCCV, new address[](0), 0);
+      }
+
+      requiredCCV = new address[](2);
+      requiredCCV[0] = sourceConfig.defaultCCV;
+      requiredCCV[1] = sourceConfig.requiredCCV;
+
+      return (requiredCCV, new address[](0), 0);
+    }
+
+    // If it does, we return the required CCVs from the receiver.
+    return IAny2EVMMessageReceiverV2(receiver).getCCVs(sourceChainSelector);
   }
 
   /// @notice Try executing a message.
@@ -305,13 +353,12 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   /// @return executionState The new state of the message, being either SUCCESS or FAILURE.
   /// @return errData Revert data in bytes if CCIP receiver reverted during execution.
   function _trialExecute(
-    Internal.Any2EVMMultiProofMessage memory message,
-    uint32 gasLimit
+    Internal.Any2EVMMultiProofMessage memory message
   ) internal returns (Internal.MessageExecutionState executionState, bytes memory) {
     (bool success, bytes memory returnData,) = CallWithExactGas._callWithExactGasSafeReturnData(
       abi.encodeCall(this.executeSingleMessage, (message)),
       address(this),
-      gasLimit,
+      gasleft(),
       i_gasForCallExactCheck,
       Internal.MAX_RET_BYTES
     );

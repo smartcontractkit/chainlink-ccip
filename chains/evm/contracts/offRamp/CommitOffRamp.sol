@@ -5,9 +5,9 @@ import {ICCVOffRamp} from "../interfaces/ICCVOffRamp.sol";
 import {INonceManager} from "../interfaces/INonceManager.sol";
 
 import {Internal} from "../libraries/Internal.sol";
-import {OCRVerifier} from "../ocr/OCRVerifier.sol";
+import {SignatureQuorumVerifier} from "../ocr/SignatureQuorumVerifier.sol";
 
-contract CommitOffRamp is ICCVOffRamp, OCRVerifier {
+contract CommitOffRamp is ICCVOffRamp, SignatureQuorumVerifier {
   error ZeroAddressNotAllowed();
 
   error InvalidNonce(uint64 nonce);
@@ -26,15 +26,15 @@ contract CommitOffRamp is ICCVOffRamp, OCRVerifier {
   function validateReport(
     bytes calldata rawReport,
     bytes calldata ccvBlob,
-    bytes calldata ocrProof,
-    uint256, // verifierIndex,
+    bytes calldata proof,
     Internal.MessageExecutionState originalState
   ) external {
-    _validateOCRSignatures(rawReport, ccvBlob, ocrProof);
+    (bytes32 configDigest, uint64 nonce) = abi.decode(ccvBlob, (bytes32, uint64));
+
+    _validateConfigDigest(configDigest);
+    _validateOCRSignatures(keccak256(rawReport), keccak256(ccvBlob), proof);
 
     Internal.Any2EVMMultiProofMessage memory message = abi.decode(rawReport, (Internal.Any2EVMMultiProofMessage));
-
-    uint64 nonce = abi.decode(ccvBlob, (uint64));
 
     // Nonce changes per state transition (these only apply for ordered messages):
     // UNTOUCHED -> FAILURE  nonce bump.

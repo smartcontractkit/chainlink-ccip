@@ -8,13 +8,10 @@ import {EnumerableSet} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
 
 /// @notice Onchain verification of reports from the offchain reporting protocol with multiple OCR plugin support.
-contract OCRVerifier is ITypeAndVersion, Ownable2StepMsgSender {
+contract SignatureQuorumVerifier is ITypeAndVersion, Ownable2StepMsgSender {
   using EnumerableSet for EnumerableSet.AddressSet;
 
-  string public constant override typeAndVersion = "OCRVerifier 1.7.0-dev";
-
-  // Maximum number of oracles the offchain reporting protocol is designed for
-  uint256 internal constant MAX_NUM_ORACLES = 64;
+  string public constant override typeAndVersion = "SignatureQuorumVerifier 1.7.0-dev";
 
   /// @notice Triggers a new run of the offchain reporting protocol.
   /// @param configDigest configDigest of this configuration.
@@ -22,18 +19,7 @@ contract OCRVerifier is ITypeAndVersion, Ownable2StepMsgSender {
   /// @param F maximum number of faulty/dishonest oracles the protocol can tolerate while still working correctly.
   event ConfigSet(bytes32 configDigest, address[] signers, uint8 F);
 
-  /// @notice Optionally emitted to indicate the latest configDigest and sequence number
-  /// for which a report was successfully transmitted. Alternatively, the contract may
-  /// use latestConfigDigestAndEpoch with scanLogs set to false.
-  event Transmitted(bytes32 configDigest, uint64 sequenceNumber);
-
-  enum InvalidConfigErrorType {
-    F_MUST_BE_POSITIVE,
-    TOO_MANY_SIGNERS,
-    F_TOO_HIGH
-  }
-
-  error InvalidConfig(InvalidConfigErrorType errorType);
+  error InvalidConfig();
   error ConfigDigestMismatch(bytes32 expected, bytes32 actual);
   error ForkedChain(uint256 expected, uint256 actual);
   error WrongNumberOfSignatures();
@@ -42,28 +28,26 @@ contract OCRVerifier is ITypeAndVersion, Ownable2StepMsgSender {
   error NonUniqueSignatures();
   error OracleCannotBeZeroAddress();
 
-  /// @notice OCR configuration for a single OCR plugin within a DON.
-  struct OCRConfig {
+  struct SignatureConfigConfig {
     bytes32 configDigest;
     uint8 F; //  maximum number of faulty/dishonest oracles the system can tolerate.
     uint8 n; //  number of configured signers.
   }
 
   /// @notice Args to update an OCR Config.
-  struct OCRConfigArgs {
+  struct SignatureConfigArgs {
     bytes32 configDigest; // The new config digest.
     uint8 F; // Maximum number of faulty/dishonest oracles.
     address[] signers; // signing address of each oracle.
   }
 
-  struct OCRProof {
+  struct SignatureProof {
     bytes32 configDigest; // The config digest of the report.
-    uint64 sequenceNumber; // The sequence number of the report.
     bytes32[] rs; // R components of the signatures.
     bytes32[] ss; // S components of the signatures.
   }
 
-  OCRConfig internal s_ocrConfig;
+  SignatureConfigConfig internal s_ocrConfig;
 
   EnumerableSet.AddressSet internal s_signers;
 
@@ -73,12 +57,18 @@ contract OCRVerifier is ITypeAndVersion, Ownable2StepMsgSender {
     i_chainID = block.chainid;
   }
 
-  function _validateOCRSignatures(bytes calldata rawReport, bytes calldata blob, bytes calldata ocrProof) internal {
-    OCRProof memory report = abi.decode(ocrProof, (OCRProof));
-
-    if (s_ocrConfig.configDigest != report.configDigest) {
-      revert ConfigDigestMismatch(s_ocrConfig.configDigest, report.configDigest);
+  // TODO allow older digests.
+  function _validateConfigDigest(
+    bytes32 configDigest
+  ) internal view {
+    if (s_ocrConfig.configDigest != configDigest) {
+      revert ConfigDigestMismatch(s_ocrConfig.configDigest, configDigest);
     }
+  }
+
+  function _validateOCRSignatures(bytes32 reportHash, bytes32 blobHash, bytes calldata ocrProof) internal view {
+    SignatureProof memory report = abi.decode(ocrProof, (SignatureProof));
+
     // If the cached chainID at time of deployment doesn't match the current chainID, we reject all signed reports.
     // This avoids a (rare) scenario where chain A forks into chain A and A', A' still has configDigest calculated
     // from chain A and so OCR reports will be valid on both forks.
@@ -87,13 +77,7 @@ contract OCRVerifier is ITypeAndVersion, Ownable2StepMsgSender {
     if (report.rs.length != s_ocrConfig.F + 1) revert WrongNumberOfSignatures();
     if (report.rs.length != report.ss.length) revert SignaturesOutOfRegistration();
 
-    _verifySignatures(
-      keccak256(abi.encode(keccak256(rawReport), keccak256(blob), report.configDigest, report.sequenceNumber)),
-      report.rs,
-      report.ss
-    );
-
-    emit Transmitted(report.configDigest, uint64(uint256(report.sequenceNumber)));
+    _verifySignatures(keccak256(abi.encode(reportHash, blobHash, report.configDigest)), report.rs, report.ss);
   }
 
   /// @notice Verifies the signatures of a hashed report value for one OCR plugin type.
@@ -123,15 +107,12 @@ contract OCRVerifier is ITypeAndVersion, Ownable2StepMsgSender {
 
   /// @notice Sets offchain reporting protocol configuration incl. participating oracles for a single OCR plugin type.
   /// @param ocrConfigArgs OCR config update args.
-  function setOCR3Config(
-    OCRConfigArgs memory ocrConfigArgs
+  function setSignatureConfig(
+    SignatureConfigArgs memory ocrConfigArgs
   ) external onlyOwner {
-    if (ocrConfigArgs.F == 0) revert InvalidConfig(InvalidConfigErrorType.F_MUST_BE_POSITIVE);
+    if (ocrConfigArgs.F == 0) revert InvalidConfig();
 
     address[] memory newSigners = ocrConfigArgs.signers;
-
-    if (newSigners.length > MAX_NUM_ORACLES) revert InvalidConfig(InvalidConfigErrorType.TOO_MANY_SIGNERS);
-    if (newSigners.length <= 3 * ocrConfigArgs.F) revert InvalidConfig(InvalidConfigErrorType.F_TOO_HIGH);
 
     _clearAllSigners();
 
@@ -142,7 +123,8 @@ contract OCRVerifier is ITypeAndVersion, Ownable2StepMsgSender {
       s_signers.add(newSigners[i]);
     }
 
-    s_ocrConfig = OCRConfig({configDigest: ocrConfigArgs.configDigest, F: ocrConfigArgs.F, n: uint8(newSigners.length)});
+    s_ocrConfig =
+      SignatureConfigConfig({configDigest: ocrConfigArgs.configDigest, F: ocrConfigArgs.F, n: uint8(newSigners.length)});
 
     emit ConfigSet(ocrConfigArgs.configDigest, newSigners, ocrConfigArgs.F);
   }
@@ -157,7 +139,7 @@ contract OCRVerifier is ITypeAndVersion, Ownable2StepMsgSender {
   }
 
   /// @notice Information about current offchain reporting protocol configuration.
-  function latestConfigDetails() external view returns (OCRConfig memory ocrConfig) {
+  function latestConfigDetails() external view returns (SignatureConfigConfig memory ocrConfig) {
     return s_ocrConfig;
   }
 }
