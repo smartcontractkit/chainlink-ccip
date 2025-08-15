@@ -9,7 +9,6 @@ interface ICCVOffRamp {
     bytes memory rawReport,
     bytes memory ccvBlob,
     bytes memory proof,
-    uint256 verifierIndex,
     Internal.MessageExecutionState originalState
   ) external;
 }
