@@ -2,12 +2,18 @@ package executor
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/smartcontractkit/chainlink-modsec/libmodsec/pkg/modsectypes"
 )
 
 type Executor struct {
 	stopCh    chan struct{}
 	messageCh chan modsectypes.Message
+
+	// timedMessageCh is an optional timed message channel for configurable tick-based message delivery
+	timedMessageCh modsectypes.TimedMessageChannel
+
 	// List of sources which can potentially provide messages to be executed. We use an array here in case
 	// custom executors want to subscribe directly to a verifier storage
 	// Example could be a kafka topic, CL commit verifier, etc.
@@ -23,8 +29,11 @@ type Executor struct {
 	// Used for encoding/decoding messages
 	messageCodec modsectypes.MessageCodec
 
-	// peerId used to determine whether it's this executor's turn to process a message
+	// Node's peerId used to determine whether it's this executor's turn to process a message
 	peerId [32]byte
+
+	// leaderElection is used to determine if it's this executor's turn to process a message
+	leaderElection LeaderElection
 }
 
 // Option is the Executor functional option type
@@ -95,6 +104,29 @@ func WithDestChainTransmitter(chain uint64, writer modsectypes.ContractTransmitt
 	}
 }
 
+// WithLeaderElection adds a leader election algorithm to the executor
+func WithLeaderElection(leaderElection LeaderElection) Option {
+	return func(e *Executor) error {
+		if leaderElection == nil {
+			return fmt.Errorf("cannot add nil leader election to executor")
+		}
+		e.leaderElection = leaderElection
+		return nil
+	}
+}
+
+// WithTimedMessageChannel adds a timed message channel to the executor
+// This allows messages to be sent with configurable tick delays
+func WithTimedMessageChannel(tmc modsectypes.TimedMessageChannel) Option {
+	return func(e *Executor) error {
+		if tmc == nil {
+			return fmt.Errorf("cannot add nil timed message channel to executor")
+		}
+		e.timedMessageCh = tmc
+		return nil
+	}
+}
+
 func (e *Executor) Start() {
 	go e.run()
 }
@@ -103,8 +135,7 @@ func (e *Executor) Stop() {
 	close(e.stopCh)
 }
 
-func (e *Executor) isMyTurn(msg modsectypes.Message) bool {
-	// Placeholder for logic to determine if it's this executor's turn to process the message
-	// This could be based on some consensus mechanism, round-robin, or other criteria
-	return true // For now, we assume it's always our turn
+func (e *Executor) isMyTurn(msg modsectypes.Message) (bool, time.Duration) {
+	// Check if the message is the leader for the destination chain
+	return e.leaderElection.IsLeader(msg.Header.MessageID, msg.Header.DestChainSelector)
 }

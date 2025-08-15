@@ -25,14 +25,24 @@ func (e *Executor) run() {
 					fmt.Println("Executor shutting down message reader...")
 					return
 				case msg := <-reader.SubscribeMessages(ctx):
-					if e.isMyTurn(msg) {
+					// Check if it's our turn to execute the message, if not send it to the timed message channel
+					isLeader, delay := e.isMyTurn(msg)
+					if !isLeader {
+						e.timedMessageCh.SendMessage(msg, delay)
 						continue
 					}
+
 					if e.Transmitters[msg.Header.DestChainSelector] == nil {
 						fmt.Printf("No chain writer for destination chain selector %s, skipping message %s\n",
 							msg.Header.DestChainSelector, msg.Header.MessageID)
 						continue
 					}
+					e.messageCh <- msg
+					fmt.Printf("Executor received message %s, it's our turn to execute it\n", msg.Header.MessageID)
+				case msg := <-e.timedMessageCh.Messages():
+					// We don't need to check if it's our turn to execute the message here, we just need to check if it has been executed
+					// TODO: the above
+
 					e.messageCh <- msg
 				}
 			}
