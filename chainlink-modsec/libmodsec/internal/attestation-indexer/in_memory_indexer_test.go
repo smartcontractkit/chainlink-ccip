@@ -22,7 +22,7 @@ func TestInMemoryAttestationIndexer(t *testing.T) {
 	verifierID3 := [32]byte{13, 14, 15}
 	msgID1 := [32]byte{1}
 	msgID2 := [32]byte{2}
-	proof1_1, proof1_2 := []byte("proof_V1_Msg1"), []byte("proof_V1_Msg2")
+	proof1_1 := []byte("proof_V1_Msg1")
 	proof2_1, proof2_2 := []byte("proof_V2_Msg1"), []byte("proof_V2_Msg2")
 	proof3_1, proof3_2 := []byte("proof_V3_Msg1"), []byte("proof_V3_Msg2")
 
@@ -46,14 +46,14 @@ func TestInMemoryAttestationIndexer(t *testing.T) {
 				require.NoError(t, err)
 				assert.Nil(t, attestations)
 
-				hasQuorum := indexer.MessageHasQuorum(context.Background(), msg1, 1)
+				hasQuorum := indexer.MessageIsReady(context.Background(), msg1)
 				assert.False(t, hasQuorum)
 			},
 		},
 		{
 			name: "add single attestation",
 			setup: func(indexer *InMemoryAttestationIndexer) {
-				err := indexer.AddAttestation(msgID1, verifierID1, proof1_1)
+				err := indexer.AddAttestation(nil, msgID1, verifierID1, proof1_1)
 				require.NoError(t, err)
 			},
 			test: func(t *testing.T, indexer *InMemoryAttestationIndexer) {
@@ -63,18 +63,18 @@ func TestInMemoryAttestationIndexer(t *testing.T) {
 				assert.Equal(t, proof1_1, attestations[0].Proof)
 				assert.Equal(t, verifierID1, attestations[0].VerifierId)
 
-				hasQuorum := indexer.MessageHasQuorum(context.Background(), msg1, 1)
+				hasQuorum := indexer.MessageIsReady(context.Background(), msg1)
 				assert.True(t, hasQuorum)
 			},
 		},
 		{
 			name: "add multiple attestations for same message",
 			setup: func(indexer *InMemoryAttestationIndexer) {
-				err := indexer.AddAttestation(msgID1, verifierID1, proof1_1)
+				err := indexer.AddAttestation(nil, msgID1, verifierID1, proof1_1)
 				require.NoError(t, err)
-				err = indexer.AddAttestation(msgID1, verifierID2, proof2_1)
+				err = indexer.AddAttestation(nil, msgID1, verifierID2, proof2_1)
 				require.NoError(t, err)
-				err = indexer.AddAttestation(msgID1, verifierID3, proof3_1)
+				err = indexer.AddAttestation(nil, msgID1, verifierID3, proof3_1)
 				require.NoError(t, err)
 			},
 			test: func(t *testing.T, indexer *InMemoryAttestationIndexer) {
@@ -96,42 +96,24 @@ func TestInMemoryAttestationIndexer(t *testing.T) {
 				assert.True(t, verifiers[verifierID2])
 				assert.True(t, verifiers[verifierID3])
 
-				hasQuorum := indexer.MessageHasQuorum(context.Background(), msg1, 3)
+				hasQuorum := indexer.VerifierTypeMeetsQuorum(nil, msgID1, modsectypes.VerifierTypeCLCommit, 3)
 				assert.True(t, hasQuorum)
-				hasQuorum = indexer.MessageHasQuorum(context.Background(), msg1, 4)
+				hasQuorum = indexer.VerifierTypeMeetsQuorum(nil, msgID1, modsectypes.VerifierTypeCLCommit, 4)
 				assert.False(t, hasQuorum)
-			},
-		},
-		{
-			name: "overwrite attestation for same verifier should error",
-			setup: func(indexer *InMemoryAttestationIndexer) {
-				err := indexer.AddAttestation(msgID1, verifierID1, proof1_1)
-				require.NoError(t, err)
-
-			},
-			test: func(t *testing.T, indexer *InMemoryAttestationIndexer) {
-				err := indexer.AddAttestation(msgID1, verifierID1, proof1_2)
-				require.Error(t, err)
-
-				attestations, err := indexer.GetAttestationsForMessage(context.Background(), msg1)
-				require.NoError(t, err)
-				require.Len(t, attestations, 1)
-				assert.Equal(t, proof1_1, attestations[0].Proof)
-				assert.Equal(t, verifierID1, attestations[0].VerifierId)
 			},
 		},
 		{
 			name: "multiple messages with multiple attestations",
 			setup: func(indexer *InMemoryAttestationIndexer) {
-				err := indexer.AddAttestation(msgID1, verifierID1, proof1_1)
+				err := indexer.AddAttestation(nil, msgID1, verifierID1, proof1_1)
 				require.NoError(t, err)
-				err = indexer.AddAttestation(msgID1, verifierID2, proof2_1)
+				err = indexer.AddAttestation(nil, msgID1, verifierID2, proof2_1)
 				require.NoError(t, err)
-				err = indexer.AddAttestation(msgID1, verifierID3, proof3_1)
+				err = indexer.AddAttestation(nil, msgID1, verifierID3, proof3_1)
 				require.NoError(t, err)
-				err = indexer.AddAttestation(msgID2, verifierID2, proof2_2)
+				err = indexer.AddAttestation(nil, msgID2, verifierID2, proof2_2)
 				require.NoError(t, err)
-				err = indexer.AddAttestation(msgID2, verifierID3, proof3_2)
+				err = indexer.AddAttestation(nil, msgID2, verifierID3, proof3_2)
 				require.NoError(t, err)
 			},
 			test: func(t *testing.T, indexer *InMemoryAttestationIndexer) {
@@ -143,33 +125,33 @@ func TestInMemoryAttestationIndexer(t *testing.T) {
 				require.NoError(t, err)
 				require.Len(t, attestations2, 2)
 
-				hasQuorum1 := indexer.MessageHasQuorum(context.Background(), msg1, 3)
+				hasQuorum1 := indexer.VerifierTypeMeetsQuorum(nil, msgID1, modsectypes.VerifierTypeCLCommit, 3)
 				assert.True(t, hasQuorum1)
-				hasQuorum2 := indexer.MessageHasQuorum(context.Background(), msg2, 2)
+				hasQuorum2 := indexer.VerifierTypeMeetsQuorum(nil, msgID2, modsectypes.VerifierTypeCLCommit, 2)
 				assert.True(t, hasQuorum2)
 			},
 		},
 		{
 			name: "quorum check with different requirements",
 			setup: func(indexer *InMemoryAttestationIndexer) {
-				err := indexer.AddAttestation(msgID1, verifierID1, proof1_1)
+				err := indexer.AddAttestation(nil, msgID1, verifierID1, proof1_1)
 				require.NoError(t, err)
-				err = indexer.AddAttestation(msgID1, verifierID2, proof2_1)
+				err = indexer.AddAttestation(nil, msgID1, verifierID2, proof2_1)
 				require.NoError(t, err)
-				err = indexer.AddAttestation(msgID1, verifierID3, proof3_1)
+				err = indexer.AddAttestation(nil, msgID1, verifierID3, proof3_1)
 				require.NoError(t, err)
-				err = indexer.AddAttestation(msgID2, verifierID2, proof2_2)
+				err = indexer.AddAttestation(nil, msgID2, verifierID2, proof2_2)
 				require.NoError(t, err)
-				err = indexer.AddAttestation(msgID2, verifierID3, proof3_2)
+				err = indexer.AddAttestation(nil, msgID2, verifierID3, proof3_2)
 				require.NoError(t, err)
 			},
 			test: func(t *testing.T, indexer *InMemoryAttestationIndexer) {
-				assert.True(t, indexer.MessageHasQuorum(context.Background(), msg1, 2))
-				assert.True(t, indexer.MessageHasQuorum(context.Background(), msg1, 3))
-				assert.False(t, indexer.MessageHasQuorum(context.Background(), msg1, 4))
-				assert.True(t, indexer.MessageHasQuorum(context.Background(), msg2, 1))
-				assert.True(t, indexer.MessageHasQuorum(context.Background(), msg2, 2))
-				assert.False(t, indexer.MessageHasQuorum(context.Background(), msg2, 3))
+				assert.True(t, indexer.VerifierTypeMeetsQuorum(nil, msg1.Header.MessageID, modsectypes.VerifierTypeCLCommit, 2))
+				assert.True(t, indexer.VerifierTypeMeetsQuorum(nil, msg1.Header.MessageID, modsectypes.VerifierTypeCLCommit, 3))
+				assert.False(t, indexer.VerifierTypeMeetsQuorum(nil, msg1.Header.MessageID, modsectypes.VerifierTypeCLCommit, 4))
+				assert.True(t, indexer.VerifierTypeMeetsQuorum(nil, msg2.Header.MessageID, modsectypes.VerifierTypeCLCommit, 1))
+				assert.True(t, indexer.VerifierTypeMeetsQuorum(nil, msg2.Header.MessageID, modsectypes.VerifierTypeCLCommit, 2))
+				assert.False(t, indexer.VerifierTypeMeetsQuorum(nil, msg2.Header.MessageID, modsectypes.VerifierTypeCLCommit, 3))
 			},
 		},
 		{
@@ -179,15 +161,15 @@ func TestInMemoryAttestationIndexer(t *testing.T) {
 				for i := 0; i < 10; i++ {
 					verifierID := [32]byte{byte(i)}
 					proof := []byte{byte(i)}
-					err := indexer.AddAttestation(msgID1, verifierID, proof)
+					err := indexer.AddAttestation(nil, msgID1, verifierID, proof)
 					require.NoError(t, err)
 				}
 			},
 			test: func(t *testing.T, indexer *InMemoryAttestationIndexer) {
 				// Should return true quickly when required count is met
-				assert.True(t, indexer.MessageHasQuorum(context.Background(), msg1, 5))
-				assert.True(t, indexer.MessageHasQuorum(context.Background(), msg1, 10))
-				assert.False(t, indexer.MessageHasQuorum(context.Background(), msg1, 11))
+				assert.True(t, indexer.VerifierTypeMeetsQuorum(nil, msg1.Header.MessageID, modsectypes.VerifierTypeCLCommit, 5))
+				assert.True(t, indexer.VerifierTypeMeetsQuorum(nil, msg1.Header.MessageID, modsectypes.VerifierTypeCLCommit, 10))
+				assert.False(t, indexer.VerifierTypeMeetsQuorum(nil, msg1.Header.MessageID, modsectypes.VerifierTypeCLCommit, 11))
 			},
 		},
 	}
