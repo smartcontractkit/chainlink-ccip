@@ -33,7 +33,7 @@ func (e *Executor) run() {
 					}
 
 					if e.Transmitters[msg.Header.DestChainSelector] == nil {
-						fmt.Printf("No chain writer for destination chain selector %s, skipping message %s\n",
+						fmt.Printf("No chain writer for destination chain selector %d, skipping message %s\n",
 							msg.Header.DestChainSelector, msg.Header.MessageID)
 						continue
 					}

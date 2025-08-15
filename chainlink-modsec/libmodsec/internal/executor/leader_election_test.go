@@ -253,6 +253,7 @@ func TestLeaderElectionDistribution(t *testing.T) {
 
 	// Test multiple messages to see distribution
 	leaderCount := 0
+	deltaCounts := make(map[time.Duration]int)
 	totalTests := 100_000
 
 	for i := 0; i < totalTests; i++ {
@@ -260,10 +261,12 @@ func TestLeaderElectionDistribution(t *testing.T) {
 		msgId := [32]byte{}
 		rand.Read(msgId[:])
 
-		result, _ := le.IsLeader(msgId, 1)
+		result, delay := le.IsLeader(msgId, 1)
 		if result {
 			leaderCount++
 		}
+
+		deltaCounts[delay]++
 	}
 
 	// With 5 participants, node1 should be leader roughly 20% of the time
@@ -274,6 +277,14 @@ func TestLeaderElectionDistribution(t *testing.T) {
 	if leaderCount < expectedMin || leaderCount > expectedMax {
 		t.Errorf("leader distribution seems off: got %d/%d (%.1f%%), expected roughly 20%%",
 			leaderCount, totalTests, float64(leaderCount)*100/float64(totalTests))
+	}
+
+	// Check that the delay distribution is roughly even
+	for delay, count := range deltaCounts {
+		if count < totalTests*19/100 || count > totalTests*21/100 {
+			t.Errorf("delay %v count seems off: got %d/%d (%.1f%%), expected roughly 20%%",
+				delay, count, totalTests, float64(count)*100/float64(totalTests))
+		}
 	}
 }
 

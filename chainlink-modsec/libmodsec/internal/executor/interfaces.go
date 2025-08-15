@@ -2,6 +2,7 @@ package executor
 
 import (
 	"context"
+
 	"github.com/smartcontractkit/chainlink-modsec/libmodsec/pkg/modsectypes"
 )
 
@@ -22,5 +23,5 @@ type AttestationReader interface {
 	// we will need this at minimum for manual execution
 	// TODO: do returned attestations still need to be associated with its verifierID?
 	// If not, we can just return []byte instead of creating the Attestation struct
-	GetAttestations(ctx context.Context, msg modsectypes.Message) ([]Attestation, error)
+	GetAttestations(ctx context.Context, msg modsectypes.Message) ([]modsectypes.Attestation, error)
 }
