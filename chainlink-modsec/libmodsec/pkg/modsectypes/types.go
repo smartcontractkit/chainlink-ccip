@@ -179,3 +179,17 @@ type Hasher interface {
 	// needs to be included alongside message data.
 	Hash(ctx context.Context, data []byte) ([]byte, error)
 }
+
+type VerifierType int
+
+const (
+	VerifierTypeCLCommit VerifierType = iota // CL Commit verifier
+	VerifierTypeUSDC                         // USDC verifier
+	VerifierTypeLBTC                         // LBTC verifier
+)
+
+// Attestation represents a signature of a message by a verifier.
+type Attestation struct {
+	Proof      []byte   // Proof of the message
+	VerifierId [32]byte // Identifier of the verifier that signed the message
+}
