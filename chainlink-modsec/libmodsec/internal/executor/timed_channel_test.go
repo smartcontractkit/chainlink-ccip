@@ -9,7 +9,7 @@ import (
 
 func TestTimedMessageChannel(t *testing.T) {
 	// Create a new timed message channel
-	tmc := NewTimedMessageChannel(10)
+	tmc := NewTimedMessageChannel(10, 100*time.Millisecond)
 	defer tmc.Close()
 
 	// Create a test message
@@ -48,7 +48,7 @@ func TestTimedMessageChannel(t *testing.T) {
 }
 
 func TestTimedMessageChannelMultipleMessages(t *testing.T) {
-	tmc := NewTimedMessageChannel(10)
+	tmc := NewTimedMessageChannel(10, 100*time.Millisecond)
 	defer tmc.Close()
 
 	// Create multiple messages with different ticks
@@ -75,7 +75,7 @@ func TestTimedMessageChannelMultipleMessages(t *testing.T) {
 }
 
 func TestTimedMessageChannelClose(t *testing.T) {
-	tmc := NewTimedMessageChannel(10)
+	tmc := NewTimedMessageChannel(10, 100*time.Millisecond)
 
 	// Send a message
 	msg := modsectypes.Message{Header: modsectypes.Header{MessageID: [32]byte{1}}}

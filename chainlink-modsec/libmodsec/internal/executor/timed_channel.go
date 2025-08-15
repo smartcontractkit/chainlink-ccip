@@ -10,25 +10,27 @@ import (
 
 // timedMessageChannel implements TimedMessageChannel
 type timedMessageChannel struct {
-	mu         sync.Mutex
-	queue      *priorityqueue.Queue
-	outputChan chan modsectypes.Message
-	stopChan   chan struct{}
-	workerDone chan struct{}
-	closed     bool
+	mu           sync.Mutex
+	queue        *priorityqueue.Queue
+	pollInterval time.Duration
+	outputChan   chan modsectypes.Message
+	stopChan     chan struct{}
+	workerDone   chan struct{}
+	closed       bool
 }
 
 // NewTimedMessageChannel creates a new TimedMessageChannel with the specified buffer size
-func NewTimedMessageChannel(bufferSize int) modsectypes.TimedMessageChannel {
+func NewTimedMessageChannel(bufferSize int, pollInterval time.Duration) modsectypes.TimedMessageChannel {
 	tmc := &timedMessageChannel{
 		queue: priorityqueue.NewWith(func(a, b interface{}) int {
 			itemA := a.(*modsectypes.TimedMessage)
 			itemB := b.(*modsectypes.TimedMessage)
 			return itemA.DeliverAt.Compare(itemB.DeliverAt)
 		}),
-		outputChan: make(chan modsectypes.Message, bufferSize),
-		stopChan:   make(chan struct{}),
-		workerDone: make(chan struct{}),
+		pollInterval: pollInterval,
+		outputChan:   make(chan modsectypes.Message, bufferSize),
+		stopChan:     make(chan struct{}),
+		workerDone:   make(chan struct{}),
 	}
 
 	go tmc.worker()
@@ -78,7 +80,7 @@ func (tmc *timedMessageChannel) Close() {
 func (tmc *timedMessageChannel) worker() {
 	defer close(tmc.workerDone)
 
-	ticker := time.NewTicker(100 * time.Millisecond) // Check every 100ms
+	ticker := time.NewTicker(tmc.pollInterval)
 	defer ticker.Stop()
 
 	for {
