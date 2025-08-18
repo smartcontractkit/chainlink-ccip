@@ -21,8 +21,9 @@ contract BurnMintFastTransferTokenPool is FastTransferTokenPoolAbstract {
     uint8 localTokenDecimals,
     address[] memory allowlist,
     address rmnProxy,
-    address router
-  ) FastTransferTokenPoolAbstract(token, localTokenDecimals, allowlist, rmnProxy, router) {}
+    address router,
+    uint64 sourceChainSelector
+  ) FastTransferTokenPoolAbstract(token, localTokenDecimals, allowlist, rmnProxy, router, sourceChainSelector) {}
 
   /// @notice Handles the locking or burning of tokens for both fast and slow transfers. Regardless of the transfer
   /// type, all the tokens are always burned.

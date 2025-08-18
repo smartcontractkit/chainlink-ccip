@@ -106,6 +106,9 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   /// @notice The division factor for basis points (BPS). This also represents the maximum BPS fee for fast transfer.
   uint256 internal constant BPS_DIVIDER = 10_000;
 
+  /// @notice The chain selector for the source chain where this contract is deployed.
+  uint64 internal immutable i_sourceChainSelector;
+
   /// @dev Mapping of remote chain selector to destinationChain configuration.
   mapping(uint64 remoteChainSelector => DestChainConfig destinationChainConfig) internal s_fastTransferDestChainConfig;
 
@@ -121,13 +124,17 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   /// @param allowlist The allowlist of addresses.
   /// @param rmnProxy The RMN proxy address.
   /// @param router Address of the CCIP router.
+  /// @param sourceChainSelector The chain selector for the source chain.
   constructor(
     IERC20 token,
     uint8 localTokenDecimals,
     address[] memory allowlist,
     address rmnProxy,
-    address router
-  ) TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) CCIPReceiver(router) {}
+    address router,
+    uint64 sourceChainSelector
+  ) TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) CCIPReceiver(router) {
+    i_sourceChainSelector = sourceChainSelector;
+  }
 
   /// @notice Gets the fill information for a given fill ID.
   /// @return fillInfo The fill information including state and filler address.
@@ -182,11 +189,12 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   /// @inheritdoc IFastTransferPool
   function computeFillId(
     bytes32 settlementId,
+    uint64 sourceChainSelector,
     uint256 sourceAmountNetFee,
     uint8 sourceDecimals,
     bytes memory receiver
   ) public pure override returns (bytes32) {
-    return keccak256(abi.encode(settlementId, sourceAmountNetFee, sourceDecimals, receiver));
+    return keccak256(abi.encode(settlementId, sourceChainSelector, sourceAmountNetFee, sourceDecimals, receiver));
   }
 
   // ================================================================
@@ -303,7 +311,10 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
       }
     }
 
-    if (fillId != computeFillId(settlementId, sourceAmountNetFee, sourceDecimals, abi.encode(receiver))) {
+    if (
+      fillId
+        != computeFillId(settlementId, sourceChainSelector, sourceAmountNetFee, sourceDecimals, abi.encode(receiver))
+    ) {
       revert InvalidFillId(fillId);
     }
 
@@ -344,6 +355,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     uint256 localPoolFee = _calculateLocalAmount(sourcePoolFee, mintMessage.sourceDecimals);
     bytes32 fillId = computeFillId(
       settlementId,
+      sourceChainSelector,
       // sourceAmountNetFee is the amount minus the fast fill fee, so we need to subtract both fees.
       mintMessage.sourceAmount - sourceFillerFee - sourcePoolFee,
       mintMessage.sourceDecimals,
@@ -643,7 +655,10 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     bytes memory destinationPool,
     bytes calldata receiver
   ) internal {
-    bytes32 fillId = computeFillId(settlementId, sourceAmountNetFee, i_tokenDecimals, receiver);
+    // Note: For the fillId computation during request emission, we use the configured source chain selector as the
+    // sourceChainSelector since this is where the request originates. When the message is settled on the
+    // destination chain, the same sourceChainSelector (this chain's selector) will be used.
+    bytes32 fillId = computeFillId(settlementId, i_sourceChainSelector, sourceAmountNetFee, i_tokenDecimals, receiver);
 
     emit FastTransferRequested({
       destinationChainSelector: destinationChainSelector,
