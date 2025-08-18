@@ -10,7 +10,6 @@ import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/Aut
 
 contract USDCTokenPoolCCTPV2Setup is USDCSetup {
   USDCTokenPoolCCTPV2Helper internal s_usdcTokenPool;
-  address[] internal s_allowedList;
 
   function setUp() public virtual override {
     super.setUp();
@@ -50,8 +49,7 @@ contract USDCTokenPoolCCTPV2Setup is USDCSetup {
       mintRecipient: bytes32(0),
       domainIdentifier: 9999,
       allowedCaller: keccak256("allowedCallerDestChain"),
-      enabled: true,
-      cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V2
+      enabled: true
     });
     s_usdcTokenPool.setDomains(domains);
   }

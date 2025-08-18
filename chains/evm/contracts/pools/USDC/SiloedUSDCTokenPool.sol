@@ -75,11 +75,7 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     return "SiloedUSDCTokenPool 1.6.3-dev";
   }
 
-  /// @notice Release tokens for a specific chain selector.
-  /// @dev This function can only be called by an address specified by the owner to be controlled by circle
-  /// @dev proposeCCTPMigration must be called first on an approved lane to execute properly.
-  /// @dev This function signature should NEVER be overwritten, otherwise it will be unable to be called by
-  /// circle to properly migrate USDC over to CCTP.
+  /// @inheritdoc SiloedLockReleaseTokenPool
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
@@ -93,18 +89,18 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
 
     uint256 excludedTokens = s_tokensExcludedFromBurn[releaseOrMintIn.remoteChainSelector];
 
-    // Additional security check to prevent underflow by explicitly ensuring that enough funds are available to release
-    uint256 availableLiquidity = excludedTokens != 0 ? excludedTokens : remoteConfig.tokenBalance;
+    // No excluded tokens is the common path, as it means no migration has occured yet, and any released
+    // tokens should come from the stored token balance of previously deposited tokens.
+    if (excludedTokens == 0) {
+      if (localAmount > remoteConfig.tokenBalance) revert InsufficientLiquidity(remoteConfig.tokenBalance, localAmount);
 
-    if (localAmount > availableLiquidity) revert InsufficientLiquidity(availableLiquidity, localAmount);
-
-    // If has excluded tokens, that means a migration has already occurred
-    // and the tokens should be excluded from burn, so we need to subtract the amount from the excluded tokens
-    // instead of the locked tokens
-    if (excludedTokens != 0) {
-      s_tokensExcludedFromBurn[releaseOrMintIn.remoteChainSelector] -= localAmount;
-    } else {
       remoteConfig.tokenBalance -= localAmount;
+
+      // The existence of excluded tokens indicates a migration has occured on the chain, and that any tokens
+      // being released should come from those excluded tokens reserved for processing inflight messages.
+    } else {
+      if (localAmount > excludedTokens) revert InsufficientLiquidity(excludedTokens, localAmount);
+      s_tokensExcludedFromBurn[releaseOrMintIn.remoteChainSelector] -= localAmount;
     }
 
     // Release to the recipient
