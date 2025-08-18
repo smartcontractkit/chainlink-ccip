@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.10;
+// SPDX-License-Identifier: BUSL-1.1
+pragma solidity ^0.8.24;
 
 import {ICCVOffRamp} from "../interfaces/ICCVOffRamp.sol";
 import {INonceManager} from "../interfaces/INonceManager.sol";
@@ -34,8 +34,6 @@ contract CommitOffRamp is ICCVOffRamp, SignatureQuorumVerifier {
 
     _validateOCRSignatures(messageHash, configDigest, keccak256(ccvBlob), proof);
 
-    Internal.Any2EVMMessage memory message = abi.decode(rawMessage, (Internal.Any2EVMMessage));
-
     // Nonce changes per state transition (these only apply for ordered messages):
     // UNTOUCHED -> FAILURE  nonce bump.
     // UNTOUCHED -> SUCCESS  nonce bump.
@@ -44,6 +42,8 @@ contract CommitOffRamp is ICCVOffRamp, SignatureQuorumVerifier {
     // If nonce == 0 then out of order execution is allowed.
     if (nonce != 0) {
       if (originalState == Internal.MessageExecutionState.UNTOUCHED) {
+        Internal.Any2EVMMessage memory message = abi.decode(rawMessage, (Internal.Any2EVMMessage));
+
         // If a nonce is not incremented, that means it was skipped, and we can ignore the message.
         if (
           !INonceManager(i_nonceManager).incrementInboundNonce(message.header.sourceChainSelector, nonce, message.sender)
