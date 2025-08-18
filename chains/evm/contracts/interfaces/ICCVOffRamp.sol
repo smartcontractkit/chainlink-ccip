@@ -6,7 +6,8 @@ import {Internal} from "../libraries/Internal.sol";
 interface ICCVOffRamp {
   /// @notice Message execution
   function validateReport(
-    bytes memory rawReport,
+    bytes memory rawMessage,
+    bytes32 messageHash,
     bytes memory ccvBlob,
     bytes memory proof,
     Internal.MessageExecutionState originalState

@@ -42,7 +42,6 @@ contract SignatureQuorumVerifier is ITypeAndVersion, Ownable2StepMsgSender {
   }
 
   struct SignatureProof {
-    bytes32 configDigest; // The config digest of the report.
     bytes32[] rs; // R components of the signatures.
     bytes32[] ss; // S components of the signatures.
   }
@@ -66,7 +65,14 @@ contract SignatureQuorumVerifier is ITypeAndVersion, Ownable2StepMsgSender {
     }
   }
 
-  function _validateOCRSignatures(bytes32 reportHash, bytes32 blobHash, bytes calldata ocrProof) internal view {
+  function _validateOCRSignatures(
+    bytes32 messageHash,
+    bytes32 configDigest,
+    bytes32 blobHash,
+    bytes calldata ocrProof
+  ) internal view {
+    _validateConfigDigest(configDigest);
+
     SignatureProof memory report = abi.decode(ocrProof, (SignatureProof));
 
     // If the cached chainID at time of deployment doesn't match the current chainID, we reject all signed reports.
@@ -77,7 +83,7 @@ contract SignatureQuorumVerifier is ITypeAndVersion, Ownable2StepMsgSender {
     if (report.rs.length != s_ocrConfig.F + 1) revert WrongNumberOfSignatures();
     if (report.rs.length != report.ss.length) revert SignaturesOutOfRegistration();
 
-    _verifySignatures(keccak256(abi.encode(reportHash, blobHash, report.configDigest)), report.rs, report.ss);
+    _verifySignatures(keccak256(abi.encode(messageHash, blobHash, configDigest)), report.rs, report.ss);
   }
 
   /// @notice Verifies the signatures of a hashed report value for one OCR plugin type.

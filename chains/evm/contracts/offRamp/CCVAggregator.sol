@@ -262,8 +262,12 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
 
     {
       bytes memory encodedMessage = abi.encode(report.message);
+      // TODO real hash
+      bytes32 messageHash = keccak256(encodedMessage);
       for (uint256 i = 0; i < report.ccvs.length; ++i) {
-        ICCVOffRamp(report.ccvs[i]).validateReport(encodedMessage, report.ccvBlobs[i], report.proofs[i], originalState);
+        ICCVOffRamp(report.ccvs[i]).validateReport(
+          encodedMessage, messageHash, report.ccvBlobs[i], report.proofs[i], originalState
+        );
       }
     }
 
