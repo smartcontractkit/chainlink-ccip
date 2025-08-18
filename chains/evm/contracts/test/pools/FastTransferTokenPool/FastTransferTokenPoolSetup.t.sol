@@ -54,7 +54,7 @@ contract FastTransferTokenPoolSetup is BaseTest {
 
     // Deploy pool
     FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs[] memory laneConfigArgs =
-      new FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs[](3);
+      new FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs[](2);
     laneConfigArgs[0] = FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       fastTransferFillerFeeBps: FAST_FEE_FILLER_BPS, // 1%

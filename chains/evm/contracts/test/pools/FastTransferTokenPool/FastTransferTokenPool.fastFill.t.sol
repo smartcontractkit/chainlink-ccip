@@ -232,4 +232,18 @@ contract FastTransferTokenPool_fastFill_Test is FastTransferTokenPoolSetup {
       fillIdWithWrongReceiver, SETTLEMENT_ID, SOURCE_CHAIN_SELECTOR, SOURCE_AMOUNT, SOURCE_DECIMALS, RECEIVER
     );
   }
+
+  function test_RevertWhen_InvalidFillId_WrongChainSelector() public {
+    // Create fillId with different chain selector
+    uint32 wrongChainSelector = uint32(uint256(keccak256("WRONG_CHAIN_SELECTOR")));
+    bytes32 fillIdWithWrongChainSelector =
+      s_pool.computeFillId(SETTLEMENT_ID, wrongChainSelector, SOURCE_AMOUNT, SOURCE_DECIMALS, abi.encode(RECEIVER));
+
+    vm.expectRevert(
+      abi.encodeWithSelector(FastTransferTokenPoolAbstract.InvalidFillId.selector, fillIdWithWrongChainSelector)
+    );
+    s_pool.fastFill(
+      fillIdWithWrongChainSelector, SETTLEMENT_ID, SOURCE_CHAIN_SELECTOR, SOURCE_AMOUNT, SOURCE_DECIMALS, RECEIVER
+    );
+  }
 }
