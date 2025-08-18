@@ -931,6 +931,33 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
     return svmExtraArgs;
   }
 
+  function _parseSuiExtraArgsFromBytes(
+    bytes calldata extraArgs,
+    uint256 maxPerMsgGasLimit,
+    bool enforceOutOfOrder
+  ) internal pure returns (Client.SuiExtraArgsV1 memory suiExtraArgs) {
+    if (extraArgs.length == 0) {
+      revert InvalidExtraArgsData();
+    }
+
+    bytes4 tag = bytes4(extraArgs[:4]);
+    if (tag != Client.SUI_EXTRA_ARGS_V1_TAG) {
+      revert InvalidExtraArgsTag();
+    }
+
+    suiExtraArgs = abi.decode(extraArgs[4:], (Client.SuiExtraArgsV1));
+
+    if (enforceOutOfOrder && !suiExtraArgs.allowOutOfOrderExecution) {
+      revert ExtraArgOutOfOrderExecutionMustBeTrue();
+    }
+
+    if (suiExtraArgs.gasLimit > maxPerMsgGasLimit) {
+      revert MessageGasLimitTooHigh();
+    }
+
+    return suiExtraArgs;
+  }
+
   /// @dev Convert the extra args bytes into a struct with validations against the dest chain config.
   /// @param extraArgs The extra args bytes.
   /// @return genericExtraArgs The GenericExtraArgs struct.
@@ -1010,7 +1037,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
     if (
       destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_EVM
         || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_APTOS
-        || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SUI
         || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_TVM
     ) {
       gasLimit = _parseGenericExtraArgsFromBytes(
@@ -1020,6 +1046,15 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
         destChainConfig.enforceOutOfOrder
       ).gasLimit;
 
+      _validateDestFamilyAddress(destChainConfig.chainFamilySelector, message.receiver, gasLimit);
+    } else if (destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SUI) {
+      Client.SuiExtraArgsV1 memory suiExtraArgsV1 = _parseSuiExtraArgsFromBytes(
+        message.extraArgs,
+        destChainConfig.maxPerMsgGasLimit,
+        destChainConfig.enforceOutOfOrder
+      );
+
+      gasLimit = suiExtraArgsV1.gasLimit;
       _validateDestFamilyAddress(destChainConfig.chainFamilySelector, message.receiver, gasLimit);
     } else if (destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SVM) {
       Client.SVMExtraArgsV1 memory svmExtraArgsV1 = _parseSVMExtraArgsFromBytes(
@@ -1133,7 +1168,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
     if (
       destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_EVM
         || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_APTOS
-        || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SUI
         || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_TVM
     ) {
       Client.GenericExtraArgsV2 memory parsedExtraArgs =
@@ -1152,6 +1186,13 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
           _parseSVMExtraArgsFromBytes(extraArgs, destChainConfig.maxPerMsgGasLimit, destChainConfig.enforceOutOfOrder)
             .tokenReceiver
         )
+      );
+    }
+    if (destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SUI) {
+      return (
+        extraArgs,
+        true,
+        messageReceiver
       );
     }
     revert InvalidChainFamilySelector(destChainConfig.chainFamilySelector);

@@ -55,6 +55,15 @@ library Client {
     bool allowOutOfOrderExecution;
   }
 
+  struct SuiExtraArgsV1 {
+    uint256 gasLimit;
+    bool allowOutOfOrderExecution;
+    bytes32[] objectIds;
+  }
+
+  // Extra args tag for chains that use the Sui VM.
+  bytes4 public constant SUI_EXTRA_ARGS_V1_TAG = 0x21ea4ca9;
+
   // Extra args tag for chains that use the Solana VM.
   bytes4 public constant SVM_EXTRA_ARGS_V1_TAG = 0x1f3b3aba;
 
@@ -102,5 +111,11 @@ library Client {
     SVMExtraArgsV1 memory extraArgs
   ) internal pure returns (bytes memory bts) {
     return abi.encodeWithSelector(SVM_EXTRA_ARGS_V1_TAG, extraArgs);
+  }
+
+  function _suiArgsToBytes(
+    SuiExtraArgsV1 memory extraArgs
+  ) internal pure returns (bytes memory bts) {
+    return abi.encodeWithSelector(SUI_EXTRA_ARGS_V1_TAG, extraArgs);
   }
 }
