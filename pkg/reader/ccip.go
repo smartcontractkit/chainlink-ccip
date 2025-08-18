@@ -107,9 +107,8 @@ func newCCIPChainReaderWithConfigPollerInternal(
 	if configPoller != nil {
 		reader.configPoller = configPoller
 	} else {
-		// TODO: add config check to switch between v1 and v2 pollers?
+		// TODO: maybe add config check to switch between v1 and v2 pollers?
 		reader.configPoller = newConfigPollerV2(lggr, chainAccessors, destChain, defaultRefreshPeriod)
-		//reader.configPoller = newConfigPoller(lggr, reader, defaultRefreshPeriod)
 	}
 
 	contracts := ContractAddresses{
