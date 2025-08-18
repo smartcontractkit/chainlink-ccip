@@ -34,7 +34,7 @@ contract CommitOffRamp is ICCVOffRamp, SignatureQuorumVerifier {
     _validateConfigDigest(configDigest);
     _validateOCRSignatures(keccak256(rawReport), keccak256(ccvBlob), proof);
 
-    Internal.Any2EVMMultiProofMessage memory message = abi.decode(rawReport, (Internal.Any2EVMMultiProofMessage));
+    Internal.Any2EVMMessage memory message = abi.decode(rawReport, (Internal.Any2EVMMessage));
 
     // Nonce changes per state transition (these only apply for ordered messages):
     // UNTOUCHED -> FAILURE  nonce bump.

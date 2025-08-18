@@ -47,7 +47,6 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
 
   /// @dev Atlas depends on various events, if changing, please notify Atlas.
   event StaticConfigSet(StaticConfig staticConfig);
-  event DynamicConfigSet(DynamicConfig dynamicConfig);
   event ExecutionStateChanged(
     uint64 indexed sourceChainSelector,
     uint64 indexed sequenceNumber,
@@ -83,16 +82,22 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     bytes onRamp; // OnRamp address on the source chain.
   }
 
-  /// @dev Dynamic offRamp config.
-  /// @dev Since DynamicConfig is part of DynamicConfigSet event, if changing it, we should update the ABI on Atlas.
-  struct DynamicConfig {
-    bool reentrancyGuardEntered; // Reentrancy guard, used to prevent reentrant calls.
-  }
-
   struct AggregatedReport {
-    Internal.Any2EVMMultiProofMessage message;
+    /// @notice The message that is being executed.
+    Internal.Any2EVMMessage message; // The message is attested to by each CCV in the report.
+    /// @notice CCVs that attested to the message. They must match the CCVs specified by the receiver of the message,
+    /// and the pool of the token being transferred. They can be a superset, but the ones not specified by the receiver
+    /// will be ignored. If there is no token transfer, no additional token CCVs are required. If the receiver is an EOA
+    /// or a contract that does not support the IAny2EVMMessageReceiver2 interface, the default and required CCVs are
+    /// used.
+    /// @dev Must be the same length as ccvBlobs and proofs.
     address[] ccvs;
+    /// @notice CCV blobs that contain the attestation data for each CCV in the report. This data can originate from the
+    /// source chain or can be added by the CCV through other means.
+    /// @dev Each blob is only attested to by the corresponding CCV in the ccvs array.
+    // TODO protect receiver from malicious CCV blobs by ensuring the size isn't too large.
     bytes[] ccvBlobs;
+    /// @notice Proofs for each CCV in the report. The proofs are used to verify the message and blob.
     bytes[] proofs;
   }
 
@@ -112,7 +117,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   uint16 internal immutable i_gasForCallExactCheck;
 
   // DYNAMIC CONFIG
-  DynamicConfig internal s_dynamicConfig;
+  bool private s_reentrancyGuardEntered;
 
   /// @notice Set of source chain selectors.
   EnumerableSet.UintSet internal s_sourceChainSelectors;
@@ -127,11 +132,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   mapping(uint64 sourceChainSelector => mapping(uint64 seqNum => uint256 executionStateBitmap)) internal
     s_executionStates;
 
-  constructor(
-    StaticConfig memory staticConfig,
-    DynamicConfig memory dynamicConfig,
-    SourceChainConfigArgs[] memory sourceChainConfigs
-  ) {
+  constructor(StaticConfig memory staticConfig, SourceChainConfigArgs[] memory sourceChainConfigs) {
     if (address(staticConfig.rmnRemote) == address(0) || staticConfig.tokenAdminRegistry == address(0)) {
       revert ZeroAddressNotAllowed();
     }
@@ -146,7 +147,6 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     i_gasForCallExactCheck = staticConfig.gasForCallExactCheck;
     emit StaticConfigSet(staticConfig);
 
-    _setDynamicConfig(dynamicConfig);
     _applySourceChainConfigUpdates(sourceChainConfigs);
   }
 
@@ -217,8 +217,10 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   function execute(
     AggregatedReport calldata report
   ) external {
-    if (s_dynamicConfig.reentrancyGuardEntered) revert ReentrancyGuardReentrantCall();
-    s_dynamicConfig.reentrancyGuardEntered = true;
+    if (s_reentrancyGuardEntered) revert ReentrancyGuardReentrantCall();
+    s_reentrancyGuardEntered = true;
+
+    Internal.Any2EVMMessage memory message = _beforeExecuteSingleMessage(report.message);
 
     uint64 sourceChainSelector = report.message.header.sourceChainSelector;
 
@@ -228,30 +230,14 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     if (!s_sourceChainConfigs[sourceChainSelector].isEnabled) {
       revert SourceChainNotEnabled(sourceChainSelector);
     }
-
     if (report.message.header.destChainSelector != i_chainSelector) {
       revert InvalidMessageDestChainSelector(report.message.header.destChainSelector);
     }
 
+    /////// Original state checks ///////
+
     Internal.MessageExecutionState originalState =
       getExecutionState(sourceChainSelector, report.message.header.sequenceNumber);
-
-    // SECURITY CRITICAL CHECK.
-    _ensureCCVQuorumIsReached(
-      report.message.header.sourceChainSelector,
-      report.message.receiver,
-      report.message.tokenAmounts[0].destTokenAddress, // TODO fix
-      report.ccvs
-    );
-
-    {
-      bytes memory encodedMessage = abi.encode(report.message);
-      for (uint256 i = 0; i < report.ccvs.length; ++i) {
-        ICCVOffRamp(report.ccvs[i]).validateReport(encodedMessage, report.ccvBlobs[i], report.proofs[i], originalState);
-      }
-    }
-
-    Internal.Any2EVMMultiProofMessage memory message = _beforeExecuteSingleMessage(report.message);
 
     // Two valid cases here, we either have never touched this message before, or we tried to execute and failed. This
     // check protects against reentry and re-execution because the other state is IN_PROGRESS which should not be
@@ -264,6 +250,24 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     ) {
       revert SkippedAlreadyExecutedMessage(sourceChainSelector, message.header.sequenceNumber);
     }
+
+    /////// SECURITY CRITICAL CHECKS ///////
+
+    _ensureCCVQuorumIsReached(
+      report.message.header.sourceChainSelector,
+      report.message.receiver,
+      report.message.tokenAmounts.destTokenAddress, // TODO fix
+      report.ccvs
+    );
+
+    {
+      bytes memory encodedMessage = abi.encode(report.message);
+      for (uint256 i = 0; i < report.ccvs.length; ++i) {
+        ICCVOffRamp(report.ccvs[i]).validateReport(encodedMessage, report.ccvBlobs[i], report.proofs[i], originalState);
+      }
+    }
+
+    /////// Execution ///////
 
     _setExecutionState(sourceChainSelector, message.header.sequenceNumber, Internal.MessageExecutionState.IN_PROGRESS);
     (Internal.MessageExecutionState newState, bytes memory returnData) = _trialExecute(message);
@@ -280,7 +284,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     emit ExecutionStateChanged(
       sourceChainSelector, message.header.sequenceNumber, message.header.messageId, newState, returnData
     );
-    s_dynamicConfig.reentrancyGuardEntered = false;
+    s_reentrancyGuardEntered = false;
   }
 
   function _ensureCCVQuorumIsReached(
@@ -353,7 +357,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   /// @return executionState The new state of the message, being either SUCCESS or FAILURE.
   /// @return errData Revert data in bytes if CCIP receiver reverted during execution.
   function _trialExecute(
-    Internal.Any2EVMMultiProofMessage memory message
+    Internal.Any2EVMMessage memory message
   ) internal returns (Internal.MessageExecutionState executionState, bytes memory) {
     (bool success, bytes memory returnData,) = CallWithExactGas._callWithExactGasSafeReturnData(
       abi.encodeCall(this.executeSingleMessage, (message)),
@@ -386,8 +390,8 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   /// @param message initial message
   /// @return transformedMessage modified message
   function _beforeExecuteSingleMessage(
-    Internal.Any2EVMMultiProofMessage memory message
-  ) internal virtual returns (Internal.Any2EVMMultiProofMessage memory transformedMessage) {
+    Internal.Any2EVMMessage memory message
+  ) internal virtual returns (Internal.Any2EVMMessage memory transformedMessage) {
     return message;
   }
 
@@ -398,14 +402,16 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   /// @dev We use ERC-165 to check for the ccipReceive interface to permit sending tokens to contracts, for example
   /// smart contract wallets, without an associated message.
   function executeSingleMessage(
-    Internal.Any2EVMMultiProofMessage memory message
+    Internal.Any2EVMMessage memory message
   ) external {
     if (msg.sender != address(this)) revert CanOnlySelfCall();
 
-    Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](message.tokenAmounts.length);
-    if (message.tokenAmounts.length > 0) {
+    bool hasToken = message.tokenAmounts.destTokenAddress == address(0);
+
+    Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](hasToken ? 1 : 0);
+    if (hasToken) {
       destTokenAmounts[0] = _releaseOrMintSingleToken(
-        message.tokenAmounts[0], message.sender, message.receiver, message.header.sourceChainSelector
+        message.tokenAmounts, message.sender, message.receiver, message.header.sourceChainSelector
       );
     }
 
@@ -456,7 +462,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   /// @param sourceChainSelector The remote source chain selector
   /// @return destTokenAmount local token address with amount.
   function _releaseOrMintSingleToken(
-    Internal.Any2EVMMultiProofTokenTransfer memory sourceTokenAmount,
+    Internal.TokenTransfer memory sourceTokenAmount,
     bytes memory originalSender,
     address receiver,
     uint64 sourceChainSelector
@@ -612,34 +618,5 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
 
       emit SourceChainConfigSet(sourceChainSelector, currentConfig);
     }
-  }
-
-  // ================================================================
-  // │                       Dynamic config                         │
-  // ================================================================
-
-  /// @notice Returns the current dynamic config.
-  /// @return dynamicConfig The current dynamic config.
-  function getDynamicConfig() external view returns (DynamicConfig memory) {
-    return s_dynamicConfig;
-  }
-
-  /// @notice Sets the dynamic config.
-  /// @param dynamicConfig The new dynamic config.
-  function setDynamicConfig(
-    DynamicConfig memory dynamicConfig
-  ) external onlyOwner {
-    _setDynamicConfig(dynamicConfig);
-  }
-
-  /// @notice Sets the dynamic config.
-  /// @param dynamicConfig The dynamic config.
-  function _setDynamicConfig(
-    DynamicConfig memory dynamicConfig
-  ) internal {
-    // TODO: reentrancy guard can be set to false
-    s_dynamicConfig = dynamicConfig;
-
-    emit DynamicConfigSet(dynamicConfig);
   }
 }
