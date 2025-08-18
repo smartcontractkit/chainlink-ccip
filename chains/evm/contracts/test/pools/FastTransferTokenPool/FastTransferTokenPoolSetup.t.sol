@@ -54,7 +54,7 @@ contract FastTransferTokenPoolSetup is BaseTest {
 
     // Deploy pool
     FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs[] memory laneConfigArgs =
-      new FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs[](2);
+      new FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs[](3);
     laneConfigArgs[0] = FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       fastTransferFillerFeeBps: FAST_FEE_FILLER_BPS, // 1%
@@ -83,7 +83,8 @@ contract FastTransferTokenPoolSetup is BaseTest {
       18, // localTokenDecimals
       new address[](0), // allowlist
       address(s_mockRMNRemote), // rmnProxy
-      address(s_sourceRouter) // router
+      address(s_sourceRouter), // router
+      SOURCE_CHAIN_SELECTOR // sourceChainSelector
     );
 
     s_pool.updateDestChainConfig(laneConfigArgs);
