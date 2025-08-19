@@ -410,7 +410,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   ) external {
     if (msg.sender != address(this)) revert CanOnlySelfCall();
 
-    bool hasToken = message.tokenAmounts.destTokenAddress == address(0);
+    bool hasToken = message.tokenAmounts.destTokenAddress != address(0);
 
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](hasToken ? 1 : 0);
     if (hasToken) {

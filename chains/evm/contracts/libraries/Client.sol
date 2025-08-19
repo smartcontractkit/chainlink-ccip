@@ -119,6 +119,9 @@ library Client {
     CCV[] requiredCCV;
     CCV[] optionalCCV;
     uint8 optionalThreshold;
+    /// @notice The finality config, 0 means the default finality that the CCV considers final. Any non-zero value means
+    /// a block depth.
+    uint32 finalityConfig;
     address executor;
     bytes executorArgs;
     bytes tokenArgs;
