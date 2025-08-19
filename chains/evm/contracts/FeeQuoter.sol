@@ -52,6 +52,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   error InvalidTokenReceiver();
   error TooManySVMExtraArgsAccounts(uint256 numAccounts, uint256 maxAccounts);
   error InvalidSVMExtraArgsWritableBitmap(uint64 accountIsWritableBitmap, uint256 numAccounts);
+  error TooManySuiExtraArgsReceiverObjectIds(uint256 numReceiverObjectIds, uint256 maxReceiverObjectIds);
 
   event FeeTokenAdded(address indexed feeToken);
   event FeeTokenRemoved(address indexed feeToken);
@@ -1056,6 +1057,52 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
 
       gasLimit = suiExtraArgsV1.gasLimit;
       _validateDestFamilyAddress(destChainConfig.chainFamilySelector, message.receiver, gasLimit);
+
+      uint256 receiverObjectIdsLength = suiExtraArgsV1.receiverObjectIds.length;
+      // The max payload size for SUI is heavily dependent on the receiver object ids passed into extra args and the number of
+      // tokens. Below, token and account overhead will count towards maxDataBytes.
+      uint256 suiExpandedDataLength = dataLength;
+
+      // This abi.decode is safe because the address is validated above.
+      if (abi.decode(message.receiver, (uint256)) == 0) {
+        // When message receiver is zero, CCIP receiver is not invoked on SUI.
+        // There should not be additional accounts specified for the receiver.
+        if (receiverObjectIdsLength > 0) {
+          revert TooManySuiExtraArgsReceiverObjectIds(receiverObjectIdsLength, 0);
+        }
+      } else {
+        // The messaging accounts needed for CCIP receiver on SUI are:
+        // message receiver,
+        // plus remaining accounts specified in Sui extraArgs. Each account is 32 bytes.
+        suiExpandedDataLength +=
+          ((receiverObjectIdsLength + Client.SUI_MESSAGING_ACCOUNTS_OVERHEAD) * Client.SUI_ACCOUNT_BYTE_SIZE);
+      }
+
+      if (numberOfTokens > 0 && suiExtraArgsV1.tokenReceiver == bytes32(0)) {
+        revert InvalidTokenReceiver();
+      }
+      if (receiverObjectIdsLength > Client.SUI_EXTRA_ARGS_MAX_RECEIVER_OBJECT_IDS) {
+        revert TooManySuiExtraArgsReceiverObjectIds(receiverObjectIdsLength, Client.SUI_EXTRA_ARGS_MAX_RECEIVER_OBJECT_IDS);
+      }
+
+      suiExpandedDataLength += (numberOfTokens * Client.SUI_TOKEN_TRANSFER_DATA_OVERHEAD);
+
+       // The token destBytesOverhead can be very different per token so we have to take it into account as well.
+      for (uint256 i = 0; i < numberOfTokens; ++i) {
+        uint256 destBytesOverhead =
+          s_tokenTransferFeeConfig[destChainSelector][message.tokenAmounts[i].token].destBytesOverhead;
+
+        // Pools get Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES by default, but if an override is set we use that instead.
+        if (destBytesOverhead > 0) {
+          suiExpandedDataLength += destBytesOverhead;
+        } else {
+          suiExpandedDataLength += Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES;
+        }
+      }
+
+      if (suiExpandedDataLength > uint256(destChainConfig.maxDataBytes)) {
+        revert MessageTooLarge(uint256(destChainConfig.maxDataBytes), suiExpandedDataLength);
+      }
     } else if (destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SVM) {
       Client.SVMExtraArgsV1 memory svmExtraArgsV1 = _parseSVMExtraArgsFromBytes(
         message.extraArgs, destChainConfig.maxPerMsgGasLimit, destChainConfig.enforceOutOfOrder
