@@ -27,7 +27,7 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
   uint32 public constant FINALITY_THRESHOLD = 2000;
 
   /// @dev This contract is only used for CCTP V2, which is why the supportedUSDCVersion field of the parent
-  /// constructor is set to 1. CCTP V1 used a version number of 0, so the version number is incremented by 1 for V1.
+  /// constructor is set to 1. CCTP V1 used a version number of 0, so the version number is incremented by 1 for V2.
   constructor(
     ITokenMessenger tokenMessenger,
     CCTPMessageTransmitterProxy cctpMessageTransmitterProxy,
