@@ -40,12 +40,7 @@ contract CommitOnRamp is Ownable2StepMsgSender, BaseOnRamp {
   /// @dev The dynamic config for the onRamp.
   DynamicConfig private s_dynamicConfig;
 
-  constructor(
-    address rmnRemote,
-    address nonceManager,
-    DynamicConfig memory dynamicConfig,
-    DestChainConfigArgs[] memory destChainConfigArgs
-  ) BaseOnRamp(rmnRemote) {
+  constructor(address rmnRemote, address nonceManager, DynamicConfig memory dynamicConfig) BaseOnRamp(rmnRemote) {
     // The BaseOnRamp allows the RMN to be zero, but the CommitOnRamp requires it to be set.
     if (address(rmnRemote) == address(0) || nonceManager == address(0)) {
       revert InvalidConfig();
@@ -54,7 +49,6 @@ contract CommitOnRamp is Ownable2StepMsgSender, BaseOnRamp {
     i_nonceManager = nonceManager;
 
     _setDynamicConfig(dynamicConfig);
-    _applyDestChainConfigUpdates(destChainConfigArgs);
   }
 
   function forwardToVerifier(bytes calldata rawMessage, uint256 verifierIndex) external returns (bytes memory) {
@@ -120,7 +114,7 @@ contract CommitOnRamp is Ownable2StepMsgSender, BaseOnRamp {
   /// @notice Updates destination chains specific configs.
   /// @param destChainConfigArgs Array of destination chain specific configs.
   function applyDestChainConfigUpdates(
-    DestChainConfigArgs[] memory destChainConfigArgs
+    DestChainConfigArgs[] calldata destChainConfigArgs
   ) external onlyOwner {
     _applyDestChainConfigUpdates(destChainConfigArgs);
   }
@@ -149,8 +143,6 @@ contract CommitOnRamp is Ownable2StepMsgSender, BaseOnRamp {
     Client.EVM2AnyMessage memory message,
     bytes memory // extraArgs
   ) external view returns (uint256) {
-    _assertNotCursed(destChainSelector);
-
     return IFeeQuoterV2(s_dynamicConfig.feeQuoter).getValidatedFee(destChainSelector, message);
   }
 

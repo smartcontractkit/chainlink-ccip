@@ -132,7 +132,9 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   mapping(uint64 sourceChainSelector => mapping(uint64 seqNum => uint256 executionStateBitmap)) internal
     s_executionStates;
 
-  constructor(StaticConfig memory staticConfig, SourceChainConfigArgs[] memory sourceChainConfigs) {
+  constructor(
+    StaticConfig memory staticConfig
+  ) {
     if (address(staticConfig.rmnRemote) == address(0) || staticConfig.tokenAdminRegistry == address(0)) {
       revert ZeroAddressNotAllowed();
     }
@@ -146,8 +148,6 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     i_tokenAdminRegistry = staticConfig.tokenAdminRegistry;
     i_gasForCallExactCheck = staticConfig.gasForCallExactCheck;
     emit StaticConfigSet(staticConfig);
-
-    _applySourceChainConfigUpdates(sourceChainConfigs);
   }
 
   // ================================================================
@@ -583,16 +583,8 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   /// @notice Updates source configs.
   /// @param sourceChainConfigUpdates Source chain configs.
   function applySourceChainConfigUpdates(
-    SourceChainConfigArgs[] memory sourceChainConfigUpdates
+    SourceChainConfigArgs[] calldata sourceChainConfigUpdates
   ) external onlyOwner {
-    _applySourceChainConfigUpdates(sourceChainConfigUpdates);
-  }
-
-  /// @notice Updates source configs.
-  /// @param sourceChainConfigUpdates Source chain configs.
-  function _applySourceChainConfigUpdates(
-    SourceChainConfigArgs[] memory sourceChainConfigUpdates
-  ) internal {
     for (uint256 i = 0; i < sourceChainConfigUpdates.length; ++i) {
       SourceChainConfigArgs memory sourceConfigUpdate = sourceChainConfigUpdates[i];
       uint64 sourceChainSelector = sourceConfigUpdate.sourceChainSelector;
