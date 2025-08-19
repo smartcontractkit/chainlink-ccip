@@ -111,7 +111,7 @@ interface IFastTransferPool {
 
   /// @notice Helper function to generate fill ID from request parameters.
   /// @param settlementId The settlement ID, which under normal circumstances is the same as the CCIP message ID.
-  /// @param sourceChainSelector The source chain selector.
+  /// @param sourceChainSelector The chain selector where the fill request originated.
   /// @param sourceAmountNetFee The amount being filled, excluding the fast fill fee, expressed in source token decimals.
   /// @param sourceDecimals The decimals of the token on the source token.
   /// @param receiver The receiver on the destination chain. ABI encoded in the case of an EVM destination chain.
