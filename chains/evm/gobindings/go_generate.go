@@ -15,6 +15,7 @@ package ccip
 //go:generate go run generation/generate/wrap.go ccip RMNProxy rmn_proxy_contract latest
 //go:generate go run generation/generate/wrap.go ccip RMNRemote rmn_remote latest
 //go:generate go run generation/generate/wrap.go ccip RMNHome rmn_home latest
+//go:generate go run generation/generate/wrap.go ccip HyperLiquidCompatibleERC20 hyper_liquid_compatible_erc20 latest
 
 // Pools
 //go:generate go run generation/generate/wrap.go ccip BurnMintTokenPool burn_mint_token_pool latest
