@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	sel "github.com/smartcontractkit/chain-selectors"
-
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
@@ -75,7 +73,7 @@ type PluginFactory struct {
 	homeChainReader   reader.HomeChain
 	homeChainSelector cciptypes.ChainSelector
 	chainAccessors    map[cciptypes.ChainSelector]cciptypes.ChainAccessor
-	contractReaders   map[cciptypes.ChainSelector]types.ContractReader
+	extendedReaders   map[cciptypes.ChainSelector]contractreader.Extended
 	chainWriters      map[cciptypes.ChainSelector]types.ContractWriter
 	rmnPeerClient     rmn.PeerClient
 	rmnCrypto         cciptypes.RMNCrypto
@@ -91,7 +89,7 @@ type CommitPluginFactoryParams struct {
 	HomeChainReader   reader.HomeChain
 	HomeChainSelector cciptypes.ChainSelector
 	ChainAccessors    map[cciptypes.ChainSelector]cciptypes.ChainAccessor
-	ContractReaders   map[cciptypes.ChainSelector]types.ContractReader
+	ExtendedReaders   map[cciptypes.ChainSelector]contractreader.Extended
 	ContractWriters   map[cciptypes.ChainSelector]types.ContractWriter
 	RmnPeerClient     rmn.PeerClient
 	RmnCrypto         cciptypes.RMNCrypto
@@ -110,7 +108,7 @@ func NewCommitPluginFactory(params CommitPluginFactoryParams) *PluginFactory {
 		homeChainReader:   params.HomeChainReader,
 		homeChainSelector: params.HomeChainSelector,
 		chainAccessors:    params.ChainAccessors,
-		contractReaders:   params.ContractReaders,
+		extendedReaders:   params.ExtendedReaders,
 		chainWriters:      params.ContractWriters,
 		rmnPeerClient:     params.RmnPeerClient,
 		rmnCrypto:         params.RmnCrypto,
@@ -138,29 +136,17 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 		oracleIDToP2PID[commontypes.OracleID(oracleID)] = node.P2pID
 	}
 
-	// Map contract readers to ContractReaderFacade:
-	// - Extended reader adds finality violation and contract binding management.
-	// - Observed reader adds metric reporting.
-	readers := make(map[cciptypes.ChainSelector]contractreader.ContractReaderFacade, len(p.contractReaders))
-	for chain, cr := range p.contractReaders {
-		chainFamily, err1 := sel.GetSelectorFamily(uint64(chain))
-		if err1 != nil {
-			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to get chain family from selector: %w", err1)
-		}
-		chainID, err1 := sel.GetChainIDFromSelector(uint64(chain))
-		if err1 != nil {
-			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to get chain id from selector: %w", err1)
-		}
-		readers[chain] = contractreader.NewExtendedContractReader(
-			contractreader.NewObserverReader(cr, lggr, chainFamily, chainID),
-		)
+	// Validate that the readerFacades were already wrapped in the Extended interface from core.
+	readerFacades := make(map[cciptypes.ChainSelector]contractreader.ContractReaderFacade, len(p.extendedReaders))
+	for chain, cr := range p.extendedReaders {
+		readerFacades[chain] = cr
 	}
 
 	// Bind the RMNHome contract
 	var rmnHomeReader readerpkg.RMNHome
 	if offchainConfig.RMNEnabled {
 		rmnHomeAddress := p.ocrConfig.Config.RmnHomeAddress
-		rmnCr, ok := readers[p.homeChainSelector]
+		rmnCr, ok := p.extendedReaders[p.homeChainSelector]
 		if !ok {
 			return nil,
 				ocr3types.ReportingPluginInfo{},
@@ -191,7 +177,8 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 	ccipReader, err := readerpkg.NewCCIPChainReader(
 		ctx,
 		logutil.WithComponent(lggr, "CCIPReader"),
-		readers,
+		p.chainAccessors,
+		readerFacades,
 		p.chainWriters,
 		p.ocrConfig.Config.ChainSelector,
 		p.ocrConfig.Config.OfframpAddress,
@@ -202,24 +189,29 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 	}
 
 	// The node supports the chain that the token prices are on.
-	_, ok := readers[offchainConfig.PriceFeedChainSelector]
+	_, ok := p.chainAccessors[offchainConfig.PriceFeedChainSelector]
 	if ok {
 		// Bind all token aggregate contracts
-		var bcs []types.BoundContract
 		for _, info := range offchainConfig.TokenInfo {
-			bcs = append(bcs, types.BoundContract{
-				Address: string(info.AggregatorAddress),
-				Name:    consts.ContractNamePriceAggregator,
-			})
-		}
-		if err1 := readers[offchainConfig.PriceFeedChainSelector].Bind(ctx, bcs); err1 != nil {
-			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to bind token price contracts: %w", err1)
+			priceAggAddress, err := cciptypes.NewUnknownAddressFromHex(string(info.AggregatorAddress))
+			if err != nil {
+				return nil, ocr3types.ReportingPluginInfo{},
+					fmt.Errorf("failed to create unknown address from aggregator address %s: %w",
+						info.AggregatorAddress, err)
+			}
+			err = p.chainAccessors[offchainConfig.PriceFeedChainSelector].
+				Sync(ctx, consts.ContractNamePriceAggregator, priceAggAddress)
+			if err != nil {
+				return nil, ocr3types.ReportingPluginInfo{},
+					fmt.Errorf("failed to sync price aggregator contract via chainAccessor %s on chain %d: %w",
+						consts.ContractNamePriceAggregator, offchainConfig.PriceFeedChainSelector, err)
+			}
 		}
 	}
 
 	onChainTokenPricesReader := readerpkg.NewPriceReader(
 		logutil.WithComponent(lggr, "PriceReader"),
-		readers,
+		readerFacades,
 		offchainConfig.TokenInfo,
 		ccipReader,
 		offchainConfig.PriceFeedChainSelector,
