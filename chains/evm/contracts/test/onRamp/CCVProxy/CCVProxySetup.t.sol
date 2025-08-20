@@ -54,8 +54,6 @@ contract CCVProxySetup is FeeQuoterFeeSetup {
     address originalSender,
     bytes32 metadataHash
   ) internal pure returns (Internal.EVM2AnyVerifierMessage memory) {
-    Internal.EVMTokenTransfer memory tokenTransfer;
-
     // TODO
     //    if (message.tokenAmounts.length > 0) {
     //      tokenTransfer =
@@ -75,16 +73,9 @@ contract CCVProxySetup is FeeQuoterFeeSetup {
       feeToken: message.feeToken,
       feeTokenAmount: feeTokenAmount,
       feeValueJuels: feeValueJuels,
-      tokenTransfer: tokenTransfer,
+      tokenTransfer: new Internal.EVMTokenTransfer[](message.tokenAmounts.length),
       verifierReceipts: new Internal.Receipt[](0),
       executorReceipt: Internal.Receipt({
-        issuer: address(0),
-        feeTokenAmount: 0,
-        destGasLimit: 0,
-        destBytesOverhead: 0,
-        extraArgs: ""
-      }),
-      tokenReceipt: Internal.Receipt({
         issuer: address(0),
         feeTokenAmount: 0,
         destGasLimit: 0,

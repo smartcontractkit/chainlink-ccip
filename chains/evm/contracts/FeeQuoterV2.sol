@@ -50,13 +50,6 @@ contract FeeQuoterV2 is IFeeQuoterV2, FeeQuoter {
     return abi.encode(destGasAmount);
   }
 
-  struct ModSecExtraArgs {
-    uint256 gasLimit;
-    bytes tokenReceiver;
-    bytes destChainExtraArgs;
-    bytes[] verifierExtraArgs;
-  }
-
   function resolveTokenReceiver(
     bytes calldata extraArgs
   ) external pure returns (bytes memory tokenReceiver) {

@@ -166,7 +166,9 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
 
     // 2. get pool params, this potentially mutates CCV list
 
-    // TODO pool call
+    // TODO pool call & fill receipt
+
+    Internal.Receipt memory poolReceipt;
 
     (resolvedExtraArgs.requiredCCV, resolvedExtraArgs.optionalCCV, resolvedExtraArgs.optionalThreshold) =
     _deduplicateCCVs(
@@ -179,7 +181,6 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
     uint256 requiredCCVsCount = resolvedExtraArgs.requiredCCV.length;
 
     Internal.Receipt memory emptyReceipt;
-    Internal.EVMTokenTransfer memory tokenTransferData;
 
     Internal.EVM2AnyVerifierMessage memory newMessage = Internal.EVM2AnyVerifierMessage({
       header: Internal.Header({
@@ -196,10 +197,9 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
       feeToken: message.feeToken,
       feeTokenAmount: feeTokenAmount,
       feeValueJuels: 0, // TODO
-      tokenTransfer: tokenTransferData,
+      tokenTransfer: new Internal.EVMTokenTransfer[](message.tokenAmounts.length),
       verifierReceipts: new Internal.Receipt[](requiredCCVsCount + resolvedExtraArgs.optionalCCV.length),
-      executorReceipt: emptyReceipt,
-      tokenReceipt: emptyReceipt
+      executorReceipt: emptyReceipt
     });
 
     // 3. getFee on all verifiers & executor
@@ -234,9 +234,10 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
       if (message.tokenAmounts.length != 1) {
         revert CanOnlySendOneTokenPerMessage();
       }
-      newMessage.tokenTransfer = _lockOrBurnSingleToken(
+      newMessage.tokenTransfer[0] = _lockOrBurnSingleToken(
         message.tokenAmounts[0], destChainSelector, tokenReceiver, originalSender, resolvedExtraArgs.tokenArgs
       );
+      newMessage.tokenTransfer[0].receipt = poolReceipt;
     }
 
     // 5. calculate msg ID
@@ -509,12 +510,15 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
       })
     );
 
+    Internal.Receipt memory emptyReceipt;
+
     // NOTE: pool data validations are outsourced to the FeeQuoter to handle family-specific logic handling.
     return Internal.EVMTokenTransfer({
       sourceTokenAddress: tokenAndAmount.token,
       destTokenAddress: poolReturnData.destTokenAddress,
       extraData: poolReturnData.destPoolData,
-      amount: tokenAndAmount.amount
+      amount: tokenAndAmount.amount,
+      receipt: emptyReceipt
     });
   }
 

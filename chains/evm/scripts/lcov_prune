@@ -20,6 +20,8 @@ exclusion_list_ccip=(
   "contracts/onRamp/CommitOnRamp.sol"
   "contracts/offRamp/CCVAggregator.sol"
   "contracts/offRamp/CommitOffRamp.sol"
+  "contracts/ocr/SignatureQuorumVerifier.sol"
+  "contracts/FeeQuoterV2.sol"
 )
 
 echo "Excluding the following files"

@@ -336,10 +336,9 @@ library Internal {
     address feeToken; // fee token.
     uint256 feeTokenAmount; // fee token amount.
     uint256 feeValueJuels; // fee amount in Juels.
-    EVMTokenTransfer tokenTransfer;
+    EVMTokenTransfer[] tokenTransfer;
     Receipt[] verifierReceipts;
     Receipt executorReceipt;
-    Receipt tokenReceipt;
   }
 
   struct Header {
@@ -362,10 +361,9 @@ library Internal {
     // The EVM address of the destination token.
     // This value is UNTRUSTED as any pool owner can return whatever value they want.
     bytes destTokenAddress;
-    // Optional pool data to be transferred to the destination chain. Capped by CCIP_LOCK_OR_BURN_V1_RET_BYTES bytes or
-    // if the pool supports IPoolV2, the pool can specify its own size.
-    bytes extraData;
     uint256 amount; // Number of tokens.
+    bytes extraData; // Optional pool data to be transferred to the destination chain.
+    Receipt receipt;
   }
 
   // receive
