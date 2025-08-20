@@ -35,13 +35,13 @@ bytes4 constant LOCK_RELEASE_FLAG = 0xfa7c07de;
 contract USDCTokenPoolProxy is TokenPool, ITypeAndVersion {
   using SafeERC20 for IERC20;
 
-  event LockOrBurnMechanismUpdated(uint64 indexed remoteChainSelector, LockOrBurnMechanism mechanism);
-  event PoolAddressesUpdated(PoolAddresses pools);
-
   error PoolAddressCannotBeZero();
   error InvalidLockOrBurnMechanism(LockOrBurnMechanism mechanism);
   error InvalidMessageVersion(uint32 version);
   error InvalidMessageLength(uint256 length);
+
+  event LockOrBurnMechanismUpdated(uint64 indexed remoteChainSelector, LockOrBurnMechanism mechanism);
+  event PoolAddressesUpdated(PoolAddresses pools);
 
   struct PoolAddresses {
     address cctpV1Pool;
@@ -56,11 +56,11 @@ contract USDCTokenPoolProxy is TokenPool, ITypeAndVersion {
     LOCK_RELEASE
   }
 
+  mapping(uint64 remoteChainSelector => LockOrBurnMechanism mechanism) internal s_lockOrBurnMechanism;
+
   PoolAddresses internal s_pools;
 
-  mapping(uint64 remoteChainSelector => LockOrBurnMechanism) internal s_lockOrBurnMechanism;
-
-  string public constant override typeAndVersion = "USDCTokenPoolProxy 1.6.2-dev";
+  string public constant override typeAndVersion = "USDCTokenPoolProxy 1.6.3-dev";
 
   constructor(
     IERC20 token,
@@ -93,12 +93,14 @@ contract USDCTokenPoolProxy is TokenPool, ITypeAndVersion {
 
     address destinationPool;
 
-    if (mechanism == LockOrBurnMechanism.LOCK_RELEASE) {
-      destinationPool = pools.lockReleasePool;
+    // The order of the branches is based on the expected frequency of each mechanism being used, in order to save
+    // gas on every call.
+    if (mechanism == LockOrBurnMechanism.CCTP_V2) {
+      destinationPool = pools.cctpV2Pool;
     } else if (mechanism == LockOrBurnMechanism.CCTP_V1) {
       destinationPool = pools.cctpV1Pool;
-    } else if (mechanism == LockOrBurnMechanism.CCTP_V2) {
-      destinationPool = pools.cctpV2Pool;
+    } else if (mechanism == LockOrBurnMechanism.LOCK_RELEASE) {
+      destinationPool = pools.lockReleasePool;
     }
 
     // Transfer the tokens to the destination pool otherwise any burn or transfer will revert due to insufficient balance.
@@ -151,7 +153,7 @@ contract USDCTokenPoolProxy is TokenPool, ITypeAndVersion {
       revert InvalidMessageLength(usdcMessage.length);
     }
 
-    // According to the CCTP spec, the first 4 bytes of the message are the version, which we can extract
+    // According to the CCTP specification, the first 4 bytes of the message are the version, which we can extract
     // directly and cast into a uint32.
     uint32 version = uint32(bytes4(usdcMessage[0:4]));
 
@@ -178,13 +180,15 @@ contract USDCTokenPoolProxy is TokenPool, ITypeAndVersion {
     emit PoolAddressesUpdated(pools);
   }
 
+  /// @notice Get the current pool addresses that this token pool will route a message to.
+  /// @return The current pool addresses that this token pool will route a message to.
   function getPools() public view returns (PoolAddresses memory) {
     return s_pools;
   }
 
   /// @notice Get the lock or burn mechanism for a given remote chain selector.
-  /// @param remoteChainSelector The remote chain selector to get the lock or burn mechanism for.
-  /// @return The lock or burn mechanism for the given remote chain selector.
+  /// @param remoteChainSelector The remote chain selector to get the mechanism for.
+  /// @return The lock or burn mechanism for the given remote chain selector, including CCTP V1/V2 and Lock/Release
   function getLockOrBurnMechanism(
     uint64 remoteChainSelector
   ) public view returns (LockOrBurnMechanism) {
@@ -203,7 +207,7 @@ contract USDCTokenPoolProxy is TokenPool, ITypeAndVersion {
       revert MismatchedArrayLengths();
     }
 
-    for (uint256 i = 0; i < remoteChainSelectors.length; i++) {
+    for (uint256 i = 0; i < remoteChainSelectors.length; ++i) {
       if (!isSupportedChain(remoteChainSelectors[i])) {
         revert TokenPool.NonExistentChain(remoteChainSelectors[i]);
       }
