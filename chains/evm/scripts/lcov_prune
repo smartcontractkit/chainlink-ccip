@@ -13,6 +13,13 @@ exclusion_list_ccip=(
   "contracts/libraries/MerkleMultiProof.sol"
   "contracts/applications/CCIPClientExample.sol"
   "contracts/test/*"
+
+  # Ignored for initial development of the skeleton
+  "contracts/onRamp/CCVProxy.sol"
+  "contracts/onRamp/BaseOnRamp.sol"
+  "contracts/onRamp/CommitOnRamp.sol"
+  "contracts/offRamp/CCVAggregator.sol"
+  "contracts/offRamp/CommitOffRamp.sol"
 )
 
 echo "Excluding the following files"
