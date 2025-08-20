@@ -8,7 +8,6 @@ interface ICCVOffRamp {
   function validateReport(
     bytes memory rawMessage,
     bytes32 messageHash,
-    bytes memory ccvBlob,
     bytes memory proof,
     Internal.MessageExecutionState originalState
   ) external;

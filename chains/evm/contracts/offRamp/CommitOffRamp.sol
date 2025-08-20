@@ -26,13 +26,14 @@ contract CommitOffRamp is ICCVOffRamp, SignatureQuorumVerifier {
   function validateReport(
     bytes calldata rawMessage,
     bytes32 messageHash,
-    bytes calldata ccvBlob,
     bytes calldata proof,
     Internal.MessageExecutionState originalState
   ) external {
+    (bytes memory ccvBlob, bytes memory signatures) = abi.decode(proof, (bytes, bytes));
+
     (bytes32 configDigest, uint64 nonce) = abi.decode(ccvBlob, (bytes32, uint64));
 
-    _validateOCRSignatures(messageHash, configDigest, keccak256(ccvBlob), proof);
+    _validateOCRSignatures(messageHash, configDigest, keccak256(ccvBlob), signatures);
 
     // Nonce changes per state transition (these only apply for ordered messages):
     // UNTOUCHED -> FAILURE  nonce bump.

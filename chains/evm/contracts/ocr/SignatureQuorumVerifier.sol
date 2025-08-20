@@ -69,7 +69,7 @@ contract SignatureQuorumVerifier is ITypeAndVersion, Ownable2StepMsgSender {
     bytes32 messageHash,
     bytes32 configDigest,
     bytes32 blobHash,
-    bytes calldata ocrProof
+    bytes memory ocrProof
   ) internal view {
     _validateConfigDigest(configDigest);
 

@@ -90,14 +90,11 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     /// will be ignored. If there is no token transfer, no additional token CCVs are required. If the receiver is an EOA
     /// or a contract that does not support the IAny2EVMMessageReceiver2 interface, the default and required CCVs are
     /// used.
-    /// @dev Must be the same length as ccvBlobs and proofs.
+    /// @dev Must be the same length and proofs.
     address[] ccvs;
-    /// @notice CCV blobs that contain the attestation data for each CCV in the report. This data can originate from the
-    /// source chain or can be added by the CCV through other means.
-    /// @dev Each blob is only attested to by the corresponding CCV in the ccvs array.
+    /// @notice Proofs for each CCV in the report. The proofs are used to verify the message. Can contain additional
+    /// data that the CCV requires to verify the message.
     // TODO protect receiver from malicious CCV blobs by ensuring the size isn't too large.
-    bytes[] ccvBlobs;
-    /// @notice Proofs for each CCV in the report. The proofs are used to verify the message and blob.
     bytes[] proofs;
   }
 
@@ -265,9 +262,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
       // TODO real hash
       bytes32 messageHash = keccak256(encodedMessage);
       for (uint256 i = 0; i < report.ccvs.length; ++i) {
-        ICCVOffRamp(report.ccvs[i]).validateReport(
-          encodedMessage, messageHash, report.ccvBlobs[i], report.proofs[i], originalState
-        );
+        ICCVOffRamp(report.ccvs[i]).validateReport(encodedMessage, messageHash, report.proofs[i], originalState);
       }
     }
 
