@@ -13,6 +13,7 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
   function test_updatePoolAddresses() public {
     // Arrange: Define test constants
     USDCTokenPoolProxy.PoolAddresses memory newPools = USDCTokenPoolProxy.PoolAddresses({
+      legacyCctpV1Pool: s_legacyCctpV1Pool,
       cctpV1Pool: s_newCctpV1Pool,
       cctpV2Pool: s_newCctpV2Pool,
       lockReleasePool: s_newLockReleasePool
@@ -24,6 +25,7 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
 
     // Assert: Verify all pool addresses were updated correctly
     USDCTokenPoolProxy.PoolAddresses memory updatedPools = s_usdcTokenPoolProxy.getPools();
+    assertEq(updatedPools.legacyCctpV1Pool, s_legacyCctpV1Pool);
     assertEq(updatedPools.cctpV1Pool, s_newCctpV1Pool);
     assertEq(updatedPools.cctpV2Pool, s_newCctpV2Pool);
     assertEq(updatedPools.lockReleasePool, s_newLockReleasePool);
@@ -34,6 +36,7 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
   function test_updatePoolAddresses_RevertWhen_NotOwner() public {
     // Arrange: Define test constants
     USDCTokenPoolProxy.PoolAddresses memory newPools = USDCTokenPoolProxy.PoolAddresses({
+      legacyCctpV1Pool: s_legacyCctpV1Pool,
       cctpV1Pool: s_newCctpV1Pool,
       cctpV2Pool: s_newCctpV2Pool,
       lockReleasePool: s_newLockReleasePool
@@ -49,6 +52,7 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
   function test_updatePoolAddresses_RevertWhen_CCTPV1PoolIsZero() public {
     // Arrange: Define test constants
     USDCTokenPoolProxy.PoolAddresses memory newPools = USDCTokenPoolProxy.PoolAddresses({
+      legacyCctpV1Pool: s_legacyCctpV1Pool,
       cctpV1Pool: address(0), // Zero address
       cctpV2Pool: s_newCctpV2Pool,
       lockReleasePool: s_newLockReleasePool
@@ -64,6 +68,7 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
   function test_updatePoolAddresses_RevertWhen_CCTPV2PoolIsZero() public {
     // Arrange: Define test constants
     USDCTokenPoolProxy.PoolAddresses memory newPools = USDCTokenPoolProxy.PoolAddresses({
+      legacyCctpV1Pool: s_legacyCctpV1Pool,
       cctpV1Pool: s_newCctpV1Pool,
       cctpV2Pool: address(0), // Zero address
       lockReleasePool: s_newLockReleasePool
@@ -79,6 +84,7 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
   function test_updatePoolAddresses_RevertWhen_LockReleasePoolIsZero() public {
     // Arrange: Define test constants
     USDCTokenPoolProxy.PoolAddresses memory newPools = USDCTokenPoolProxy.PoolAddresses({
+      legacyCctpV1Pool: s_legacyCctpV1Pool,
       cctpV1Pool: s_newCctpV1Pool,
       cctpV2Pool: s_newCctpV2Pool,
       lockReleasePool: address(0) // Zero address
@@ -94,6 +100,7 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
   function test_updatePoolAddresses_EmitsEvent() public {
     // Arrange: Define test constants
     USDCTokenPoolProxy.PoolAddresses memory newPools = USDCTokenPoolProxy.PoolAddresses({
+      legacyCctpV1Pool: s_legacyCctpV1Pool,
       cctpV1Pool: s_newCctpV1Pool,
       cctpV2Pool: s_newCctpV2Pool,
       lockReleasePool: s_newLockReleasePool

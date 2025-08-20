@@ -7,6 +7,7 @@ import {USDCTokenPoolProxy} from "../../../../pools/USDC/USDCTokenPoolProxy.sol"
 import {USDCSetup} from "../USDCSetup.t.sol";
 
 contract USDCTokenPoolProxySetup is USDCSetup {
+  address internal s_legacyCctpV1Pool = makeAddr("legacyCctpV1Pool");
   address internal s_cctpV1Pool = makeAddr("cctpV1Pool");
   address internal s_cctpV2Pool = makeAddr("cctpV2Pool");
   address internal s_lockReleasePool = makeAddr("lockReleasePool");
@@ -32,6 +33,7 @@ contract USDCTokenPoolProxySetup is USDCSetup {
       new address[](0),
       address(s_mockRMNRemote),
       USDCTokenPoolProxy.PoolAddresses({
+        legacyCctpV1Pool: s_legacyCctpV1Pool,
         cctpV1Pool: s_cctpV1Pool,
         cctpV2Pool: s_cctpV2Pool,
         lockReleasePool: s_lockReleasePool

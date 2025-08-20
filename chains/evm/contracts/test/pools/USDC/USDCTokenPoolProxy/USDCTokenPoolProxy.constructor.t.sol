@@ -5,6 +5,7 @@ import {USDCTokenPoolProxy} from "../../../../pools/USDC/USDCTokenPoolProxy.sol"
 import {USDCSetup} from "../USDCSetup.t.sol";
 
 contract USDCTokenPoolProxy_constructor is USDCSetup {
+  address internal s_legacyCctpV1Pool = makeAddr("legacyCctpV1Pool");
   address internal s_cctpV1Pool = makeAddr("cctpV1Pool");
   address internal s_cctpV2Pool = makeAddr("cctpV2Pool");
   address internal s_lockReleasePool = makeAddr("lockReleasePool");
@@ -17,6 +18,7 @@ contract USDCTokenPoolProxy_constructor is USDCSetup {
       new address[](0),
       address(s_mockRMNRemote),
       USDCTokenPoolProxy.PoolAddresses({
+        legacyCctpV1Pool: s_legacyCctpV1Pool,
         cctpV1Pool: s_cctpV1Pool,
         cctpV2Pool: s_cctpV2Pool,
         lockReleasePool: s_lockReleasePool
@@ -24,6 +26,7 @@ contract USDCTokenPoolProxy_constructor is USDCSetup {
     );
 
     USDCTokenPoolProxy.PoolAddresses memory pools = proxy.getPools();
+    assertEq(pools.legacyCctpV1Pool, s_legacyCctpV1Pool);
     assertEq(pools.cctpV1Pool, s_cctpV1Pool);
     assertEq(pools.cctpV2Pool, s_cctpV2Pool);
     assertEq(pools.lockReleasePool, s_lockReleasePool);
@@ -32,7 +35,6 @@ contract USDCTokenPoolProxy_constructor is USDCSetup {
   // Reverts
 
   function test_constructor_RevertWhen_CCTPV2PoolIsZero() public {
-    // Arrange: Define test constants
     vm.expectRevert(USDCTokenPoolProxy.PoolAddressCannotBeZero.selector);
     new USDCTokenPoolProxy(
       s_USDCToken,
@@ -40,6 +42,7 @@ contract USDCTokenPoolProxy_constructor is USDCSetup {
       new address[](0),
       address(s_mockRMNRemote),
       USDCTokenPoolProxy.PoolAddresses({
+        legacyCctpV1Pool: s_legacyCctpV1Pool,
         cctpV1Pool: s_cctpV1Pool,
         cctpV2Pool: address(0),
         lockReleasePool: s_lockReleasePool
@@ -48,14 +51,18 @@ contract USDCTokenPoolProxy_constructor is USDCSetup {
   }
 
   function test_constructor_RevertWhen_LockReleasePoolIsZero() public {
-    // Arrange: Define test constants
     vm.expectRevert(USDCTokenPoolProxy.PoolAddressCannotBeZero.selector);
     new USDCTokenPoolProxy(
       s_USDCToken,
       address(s_router),
       new address[](0),
       address(s_mockRMNRemote),
-      USDCTokenPoolProxy.PoolAddresses({cctpV1Pool: s_cctpV1Pool, cctpV2Pool: s_cctpV2Pool, lockReleasePool: address(0)})
+      USDCTokenPoolProxy.PoolAddresses({
+        legacyCctpV1Pool: s_legacyCctpV1Pool,
+        cctpV1Pool: s_cctpV1Pool,
+        cctpV2Pool: s_cctpV2Pool,
+        lockReleasePool: address(0)
+      })
     );
   }
 }
