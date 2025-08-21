@@ -41,7 +41,7 @@ contract SignatureQuorumVerifier is Ownable2StepMsgSender {
     bytes32[] ss; // S components of the signatures.
   }
 
-  mapping(bytes32 configDigest => SignatureConfigConfig config) internal s_configDigests;
+  mapping(bytes32 configDigest => SignatureConfigConfig config) internal s_signatureConfig;
 
   uint256 internal immutable i_chainID;
 
@@ -49,10 +49,10 @@ contract SignatureQuorumVerifier is Ownable2StepMsgSender {
     i_chainID = block.chainid;
   }
 
-  function _validateOCRSignatures(bytes32 reportHash, bytes32 configDigest, bytes memory signatureProof) internal view {
+  function _validateSignatures(bytes32 reportHash, bytes32 configDigest, bytes memory signatureProof) internal view {
     // We allow proving of older messages that might have been signed by an older set of signers. This means we need to
     // get the set of signers for the given configDigest.
-    SignatureConfigConfig storage config = s_configDigests[configDigest];
+    SignatureConfigConfig storage config = s_signatureConfig[configDigest];
     if (config.signers.length() == 0) {
       revert InvalidConfigDigest(configDigest);
     }
@@ -82,17 +82,13 @@ contract SignatureQuorumVerifier is Ownable2StepMsgSender {
     }
   }
 
-  // ================================================================
-  // │                           Config                             │
-  // ================================================================
-
   /// @notice Sets offchain reporting protocol configuration incl. participating oracles for a single OCR plugin type.
   function setSignatureConfig(
     SignatureConfigArgs calldata signatureConfig
   ) external onlyOwner {
     if (signatureConfig.F == 0) revert InvalidConfig();
 
-    SignatureConfigConfig storage configForDigest = s_configDigests[signatureConfig.configDigest];
+    SignatureConfigConfig storage configForDigest = s_signatureConfig[signatureConfig.configDigest];
 
     // If the configDigest already exists, we cannot modify it as there might be signed transactions that rely on this
     // exact signer set.
