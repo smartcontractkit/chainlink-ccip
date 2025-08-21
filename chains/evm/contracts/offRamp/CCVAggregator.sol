@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol";
 import {IAny2EVMMessageReceiverV2} from "../interfaces/IAny2EVMMessageReceiverV2.sol";
-import {ICCVOffRamp} from "../interfaces/ICCVOffRamp.sol";
+import {ICCVOffRampV1} from "../interfaces/ICCVOffRampV1.sol";
 import {IPoolV1} from "../interfaces/IPool.sol";
 import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
@@ -257,12 +257,11 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     );
 
     {
-      bytes memory encodedMessage = abi.encode(report.message);
       // TODO real hash
-      bytes32 messageHash = keccak256(encodedMessage);
+      bytes32 messageHash = keccak256(abi.encode(report.message));
       // TODO iterate over receiver CCVs not report.
       for (uint256 i = 0; i < report.ccvs.length; ++i) {
-        ICCVOffRamp(report.ccvs[i]).validateReport(encodedMessage, messageHash, report.ccvData[i], originalState);
+        ICCVOffRampV1(report.ccvs[i]).validateReport(report.message, messageHash, report.ccvData[i], originalState);
       }
     }
 
