@@ -28,7 +28,11 @@ contract USDCLiquidityMigration is MCMSForkTest {
     uint64 private constant WEMIX_SELECTOR = 5142893604156789321;
 
     uint256 private ethereumForkId;
-    bytes private ethereumPayload;
+    bytes private ethereumPayload1;
+    bytes private ethereumPayload2;
+    bytes private ethereumPayload3;
+    bytes private ethereumPayload4;
+    bytes private ethereumPayload5;
     uint256 private bitlayerTransferAmount;
     uint256 private bobTransferAmount;
     uint256 private roninTransferAmount;
@@ -36,7 +40,11 @@ contract USDCLiquidityMigration is MCMSForkTest {
 
     function setUp() public {
         ethereumForkId = vm.createFork(vm.envString("ETHEREUM_RPC_URL"));
-        ethereumPayload = vm.envBytes("ETHEREUM_PAYLOAD");
+        ethereumPayload1 = vm.envBytes("ETHEREUM_PAYLOAD_1");
+        ethereumPayload2 = vm.envBytes("ETHEREUM_PAYLOAD_2");
+        ethereumPayload3 = vm.envBytes("ETHEREUM_PAYLOAD_3");
+        ethereumPayload4 = vm.envBytes("ETHEREUM_PAYLOAD_4");
+        ethereumPayload5 = vm.envBytes("ETHEREUM_PAYLOAD_5");
         bitlayerTransferAmount = vm.envUint("BITLAYER_TRANSFER_AMOUNT");
         bobTransferAmount = vm.envUint("BOB_TRANSFER_AMOUNT");
         roninTransferAmount = vm.envUint("RONIN_TRANSFER_AMOUNT");
@@ -59,7 +67,11 @@ contract USDCLiquidityMigration is MCMSForkTest {
         uint256 wemixBalanceOnNew = HybridLockReleaseUSDCTokenPool(NEW_HYBRID_USDC_POOL).getLockedTokensForChain(WEMIX_SELECTOR);
 
         // Apply the liquidity migration
-        applyPayload(ethereumPayload);
+        applyPayload(ethereumPayload1);
+        applyPayload(ethereumPayload2);
+        applyPayload(ethereumPayload3);
+        applyPayload(ethereumPayload4);
+        applyPayload(ethereumPayload5);
 
         TokenAdminRegistry.TokenConfig memory cfg = TokenAdminRegistry(TOKEN_ADMIN_REGISTRY).getTokenConfig(USDC_TOKEN);
         // assertEq(cfg.tokenPool, NEW_HYBRID_USDC_POOL, "Registry should have the new hybrid USDC pool");
