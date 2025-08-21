@@ -1,0 +1,28 @@
+# Run go mod tidy
+tidy:
+    go mod tidy
+
+clean:
+    rm -rf compose/ blockscout/
+
+# Remove all the chaos experiments
+rm-chaos:
+    kubectl delete networkchaos --all -A
+    kubectl delete podchaos --all -A
+    kubectl delete iochaos --all -A
+    kubectl delete timechaos --all -A
+    kubectl delete stresschaos --all -A
+    kubectl delete dnschaos --all -A
+    kubectl delete kernelchaos --all -A
+
+# Format all go files
+fmt:
+    golangci-lint fmt --config=.golangci.yaml
+
+# Run golangci-lint
+lint:
+    golangci-lint run --whole-files --output.text.path stdout --max-same-issues=0 --config=.golangci.yaml
+
+# Install pre-commit hooks
+pre-commit:
+    pre-commit install
