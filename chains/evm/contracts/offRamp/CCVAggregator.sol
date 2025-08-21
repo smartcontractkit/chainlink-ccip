@@ -65,6 +65,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     address tokenAdminRegistry; // Token admin registry address
   }
 
+  // TODO actually set this config
   /// @dev Per-chain source config (defining a lane from a Source Chain -> Dest OffRamp).
   struct SourceChainConfig {
     IRouter router; // ─╮ Local router to use for messages coming from this source chain.
@@ -259,6 +260,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
       bytes memory encodedMessage = abi.encode(report.message);
       // TODO real hash
       bytes32 messageHash = keccak256(encodedMessage);
+      // TODO iterate over receiver CCVs not report.
       for (uint256 i = 0; i < report.ccvs.length; ++i) {
         ICCVOffRamp(report.ccvs[i]).validateReport(encodedMessage, messageHash, report.ccvData[i], originalState);
       }
@@ -288,15 +290,15 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     uint64 sourceChainSelector,
     address receiver,
     address tokenPool,
-    address[] calldata CCVs
+    address[] calldata ccvs
   ) internal view {
     (address[] memory requiredCCV, address[] memory optionalCCVs, uint8 optionalThreshold) =
       _getCCVsFromReceiverAndPool(sourceChainSelector, receiver, tokenPool);
 
     for (uint256 i = 0; i < requiredCCV.length; ++i) {
       bool found = false;
-      for (uint256 j = 0; j < CCVs.length; ++j) {
-        if (CCVs[j] == requiredCCV[i]) {
+      for (uint256 j = 0; j < ccvs.length; ++j) {
+        if (ccvs[j] == requiredCCV[i]) {
           found = true;
           break;
         }
@@ -308,8 +310,8 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
 
     uint256 optionalCCVsToFind = optionalThreshold;
     for (uint256 i = 0; i < optionalCCVs.length; ++i) {
-      for (uint256 j = 0; j < CCVs.length && optionalCCVsToFind > 0; ++j) {
-        if (CCVs[j] == optionalCCVs[i]) {
+      for (uint256 j = 0; j < ccvs.length && optionalCCVsToFind > 0; ++j) {
+        if (ccvs[j] == optionalCCVs[i]) {
           optionalCCVsToFind--;
           break;
         }

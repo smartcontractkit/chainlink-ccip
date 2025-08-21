@@ -342,7 +342,7 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
     DestChainConfig memory destChainConfig,
     bytes calldata extraArgs
   ) internal pure returns (Client.EVMExtraArgsV3 memory resolvedArgs) {
-    if (bytes4(extraArgs[0:4]) == Client.EVM_EXTRA_ARGS_V3_TAG) {
+    if (bytes4(extraArgs[0:4]) == Client.GENERIC_EXTRA_ARGS_V3_TAG) {
       resolvedArgs = abi.decode(extraArgs, (Client.EVMExtraArgsV3));
 
       if (resolvedArgs.optionalCCV.length != 0) {

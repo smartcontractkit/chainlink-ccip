@@ -328,6 +328,7 @@ library Internal {
   // │                            1.7                               │
   // ================================================================
 
+  // TODO better naming
   struct EVM2AnyVerifierMessage {
     Header header; // Message header.
     address sender; // sender address on the source chain.
@@ -356,6 +357,7 @@ library Internal {
     bytes extraArgs;
   }
 
+  // TODO better naming
   struct EVMTokenTransfer {
     address sourceTokenAddress;
     // The EVM address of the destination token.
@@ -374,6 +376,7 @@ library Internal {
     bytes data; // arbitrary data payload supplied by the message sender.
     address receiver; // receiver address on the destination chain.
     uint32 gasLimit; // user supplied maximum gas amount available for dest chain execution.
+    // TODO make a list for gas reasons
     TokenTransfer tokenAmounts; // array of tokens and amounts to transfer.
   }
 

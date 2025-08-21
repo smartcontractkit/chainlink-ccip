@@ -117,7 +117,7 @@ library Client {
     bytes args;
   }
 
-  bytes4 public constant EVM_EXTRA_ARGS_V3_TAG = 0x302326cb;
+  bytes4 public constant GENERIC_EXTRA_ARGS_V3_TAG = 0x302326cb;
 
   struct EVMExtraArgsV3 {
     CCV[] requiredCCV;
