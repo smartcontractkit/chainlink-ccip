@@ -51,6 +51,7 @@ contract CommitOnRamp is Ownable2StepMsgSender, BaseOnRamp {
     _setDynamicConfig(dynamicConfig);
   }
 
+  // TODO access control
   function forwardToVerifier(bytes calldata rawMessage, uint256 verifierIndex) external returns (bytes memory) {
     Internal.EVM2AnyVerifierMessage memory message = abi.decode(rawMessage, (Internal.EVM2AnyVerifierMessage));
 

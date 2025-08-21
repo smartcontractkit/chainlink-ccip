@@ -270,6 +270,7 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
     return newMessage.header.messageId;
   }
 
+  // TODO check for duplicates
   function _deduplicateCCVs(
     address[] memory poolRequiredCCV,
     Client.CCV[] memory requiredCCV,
@@ -323,7 +324,7 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
     }
 
     if (toBeAddedIndex > 0) {
-      newRequiredCCVs = new Client.CCV[](poolRequiredCCV.length + toBeAddedIndex);
+      newRequiredCCVs = new Client.CCV[](requiredCCV.length + toBeAddedIndex);
       for (uint256 i = 0; i < toBeAddedIndex; ++i) {
         newRequiredCCVs[i] = toBeAdded[i];
       }

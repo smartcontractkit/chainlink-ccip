@@ -108,8 +108,12 @@ library Client {
   // │                           ModSec                             │
   // ================================================================
 
+  /// @notice The CCV struct is used to represent a cross-chain verifier.
   struct CCV {
+    /// @param The ccvAddress is the address of the verifier contract on the source chain
     address ccvAddress;
+    /// @param args The args are the arguments that the verifier contract expects. They are opaque to CCIP and are only
+    /// used in the CCV.
     bytes args;
   }
 
@@ -127,12 +131,10 @@ library Client {
     bytes tokenArgs;
   }
 
+  // TODO milestone 2
   struct TokenPoolSettings {
-    // Token pool can only add required verifiers.
-    CCV[] requiredVerifiers;
-    // Token pool gas limit on dest
-    uint256 gasLimit;
-    // Token pool calldata size on dest
-    uint64 destBytesOverhead;
+    CCV[] requiredVerifiers; // Token pool can only add required verifiers.
+    uint256 gasLimit; // Token pool gas limit on dest.
+    uint64 destBytesOverhead; // Token pool calldata size on dest.
   }
 }

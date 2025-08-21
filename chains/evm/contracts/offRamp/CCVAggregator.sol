@@ -92,10 +92,8 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     /// used.
     /// @dev Must be the same length and proofs.
     address[] ccvs;
-    /// @notice Proofs for each CCV in the report. The proofs are used to verify the message. Can contain additional
-    /// data that the CCV requires to verify the message.
-    // TODO protect receiver from malicious CCV blobs by ensuring the size isn't too large.
-    bytes[] proofs;
+    /// @notice This data is specific to the CCV implementation and is used to verify the message.
+    bytes[] ccvData;
   }
 
   // STATIC CONFIG
@@ -262,7 +260,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
       // TODO real hash
       bytes32 messageHash = keccak256(encodedMessage);
       for (uint256 i = 0; i < report.ccvs.length; ++i) {
-        ICCVOffRamp(report.ccvs[i]).validateReport(encodedMessage, messageHash, report.proofs[i], originalState);
+        ICCVOffRamp(report.ccvs[i]).validateReport(encodedMessage, messageHash, report.ccvData[i], originalState);
       }
     }
 
