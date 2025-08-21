@@ -17,9 +17,14 @@ contract MCMSForkTest is Test {
         (MCMSForkTest.Call[] memory calls, , , ) = abi.decode(payload, (MCMSForkTest.Call[], bytes32, bytes32, uint256));
         for (uint256 i = 0; i < calls.length; ++i) {
             MCMSForkTest.Call memory call = calls[i];
-            vm.startPrank(IOwner(call.target).owner());
-            (bool success, ) = call.target.call{value: call.value}(call.data);
-            if (!success) revert TransactionReverted();
+            vm.startPrank(0x44835bBBA9D40DEDa9b64858095EcFB2693c9449);
+            (bool success1, ) = call.target.call{value: call.value}(call.data);
+            if (!success1) {
+                vm.stopPrank();
+                vm.startPrank(IOwner(call.target).owner());
+                (bool success2, ) = call.target.call{value: call.value}(call.data);
+                if (!success2) revert TransactionReverted();
+            }
             vm.stopPrank();
         }
     }
