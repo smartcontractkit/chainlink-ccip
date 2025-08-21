@@ -3,14 +3,17 @@ pragma solidity ^0.8.24;
 
 import {ICCVOffRamp} from "../interfaces/ICCVOffRamp.sol";
 import {INonceManager} from "../interfaces/INonceManager.sol";
-
 import {Internal} from "../libraries/Internal.sol";
+import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
+
 import {SignatureQuorumVerifier} from "../ocr/SignatureQuorumVerifier.sol";
 
-contract CommitOffRamp is ICCVOffRamp, SignatureQuorumVerifier {
+contract CommitOffRamp is ICCVOffRamp, SignatureQuorumVerifier, ITypeAndVersion {
   error ZeroAddressNotAllowed();
 
   error InvalidNonce(uint64 nonce);
+
+  string public constant override typeAndVersion = "CommitOffRamp 1.7.0-dev";
 
   address internal immutable i_nonceManager;
 
@@ -29,11 +32,11 @@ contract CommitOffRamp is ICCVOffRamp, SignatureQuorumVerifier {
     bytes calldata proof,
     Internal.MessageExecutionState originalState
   ) external {
-    (bytes memory ccvBlob, bytes memory signatures) = abi.decode(proof, (bytes, bytes));
+    (bytes memory ccvArgs, bytes memory signatures) = abi.decode(proof, (bytes, bytes));
 
-    (bytes32 configDigest, uint64 nonce) = abi.decode(ccvBlob, (bytes32, uint64));
+    (bytes32 configDigest, uint64 nonce) = abi.decode(ccvArgs, (bytes32, uint64));
 
-    _validateOCRSignatures(messageHash, configDigest, keccak256(ccvBlob), signatures);
+    _validateOCRSignatures(keccak256(abi.encode(messageHash, keccak256(ccvArgs))), configDigest, signatures);
 
     // Nonce changes per state transition (these only apply for ordered messages):
     // UNTOUCHED -> FAILURE  nonce bump.
