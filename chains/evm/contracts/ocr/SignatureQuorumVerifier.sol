@@ -13,6 +13,7 @@ contract SignatureQuorumVerifier is Ownable2StepMsgSender {
   /// @param signers ith element is address ith oracle uses to sign a report.
   /// @param F maximum number of faulty/dishonest singers the protocol can tolerate while still working correctly.
   event ConfigSet(bytes32 configDigest, address[] signers, uint8 F);
+  event ConfigRevoked(bytes32 configDigest);
 
   error InvalidConfig();
   error InvalidConfigDigest(bytes32 configDigest);
@@ -106,5 +107,18 @@ contract SignatureQuorumVerifier is Ownable2StepMsgSender {
     configForDigest.F = signatureConfig.F;
 
     emit ConfigSet(signatureConfig.configDigest, signatureConfig.signers, signatureConfig.F);
+  }
+
+  function revokeConfigDigest(
+    bytes32 configDigest
+  ) external onlyOwner {
+    SignatureConfigConfig storage configForDigest = s_signatureConfig[configDigest];
+    if (configForDigest.signers.length() == 0) {
+      revert InvalidConfigDigest(configDigest);
+    }
+
+    delete s_signatureConfig[configDigest];
+
+    emit ConfigRevoked(configDigest);
   }
 }
