@@ -59,7 +59,7 @@ contract CommitOffRamp is ICCVOffRampV1, SignatureQuorumVerifier, ITypeAndVersio
 
   function supportsInterface(
     bytes4 interfaceId
-  ) external view returns (bool) {
+  ) external pure returns (bool) {
     return interfaceId == type(ICCVOffRampV1).interfaceId || interfaceId == type(IERC165).interfaceId;
   }
 }
