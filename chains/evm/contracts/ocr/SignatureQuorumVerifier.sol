@@ -8,6 +8,7 @@ import {EnumerableSet} from
 
 contract SignatureQuorumVerifier is Ownable2StepMsgSender {
   using EnumerableSet for EnumerableSet.AddressSet;
+  using EnumerableSet for EnumerableSet.Bytes32Set;
 
   /// @param configDigest configDigest of this configuration.
   /// @param signers ith element is address ith oracle uses to sign a report.
@@ -42,7 +43,8 @@ contract SignatureQuorumVerifier is Ownable2StepMsgSender {
     bytes32[] ss; // S components of the signatures.
   }
 
-  mapping(bytes32 configDigest => SignatureConfigConfig config) internal s_signatureConfig;
+  mapping(bytes32 configDigest => SignatureConfigConfig config) private s_signatureConfig;
+  EnumerableSet.Bytes32Set private s_activeConfigDigests;
 
   uint256 internal immutable i_chainID;
 
@@ -50,6 +52,11 @@ contract SignatureQuorumVerifier is Ownable2StepMsgSender {
     i_chainID = block.chainid;
   }
 
+  /// @notice Validates the signatures of a given report hash.
+  /// @dev The configDigest should be included in the report hash!
+  /// @param reportHash The hash of the report to validate signatures for.
+  /// @param configDigest The config digest determines the signature set to use for validation.
+  /// @param signatureProof The signatures to validate, encoded as a SignatureProof struct.
   function _validateSignatures(bytes32 reportHash, bytes32 configDigest, bytes memory signatureProof) internal view {
     // We allow proving of older messages that might have been signed by an older set of signers. This means we need to
     // get the set of signers for the given configDigest.
@@ -83,19 +90,41 @@ contract SignatureQuorumVerifier is Ownable2StepMsgSender {
     }
   }
 
-  /// @notice Sets offchain reporting protocol configuration incl. participating oracles for a single OCR plugin type.
+  /// @notice Returns all active config digests.
+  function getActiveConfigDigests() external view returns (bytes32[] memory) {
+    return s_activeConfigDigests.values();
+  }
+
+  /// @notice Returns all active config digests and their corresponding signer sets, and F values.
+  function getAllActiveConfigs() external view returns (SignatureConfigArgs[] memory) {
+    bytes32[] memory configDigests = s_activeConfigDigests.values();
+    SignatureConfigArgs[] memory configs = new SignatureConfigArgs[](configDigests.length);
+
+    for (uint256 i = 0; i < configDigests.length; ++i) {
+      configs[i] = SignatureConfigArgs({
+        configDigest: configDigests[i],
+        F: s_signatureConfig[configDigests[i]].F,
+        signers: s_signatureConfig[configDigests[i]].signers.values()
+      });
+    }
+    return configs;
+  }
+
+  /// @notice Sets a new signature configuration for a given configDigest.
+  /// @param signatureConfig The configuration to set, containing the configDigest, F value, and signers.
+  /// @dev Reverts if the configDigest already exists, this function cannot override an existing configuration.
   function setSignatureConfig(
     SignatureConfigArgs calldata signatureConfig
   ) external onlyOwner {
     if (signatureConfig.F == 0) revert InvalidConfig();
 
-    SignatureConfigConfig storage configForDigest = s_signatureConfig[signatureConfig.configDigest];
-
     // If the configDigest already exists, we cannot modify it as there might be signed transactions that rely on this
     // exact signer set.
-    if (configForDigest.signers.length() != 0) {
+    if (s_activeConfigDigests.contains(signatureConfig.configDigest)) {
       revert ConfigDigestAlreadyExists(signatureConfig.configDigest);
     }
+
+    SignatureConfigConfig storage configForDigest = s_signatureConfig[signatureConfig.configDigest];
 
     // Add new signers.
     for (uint256 i = 0; i < signatureConfig.signers.length; ++i) {
@@ -109,11 +138,12 @@ contract SignatureQuorumVerifier is Ownable2StepMsgSender {
     emit ConfigSet(signatureConfig.configDigest, signatureConfig.signers, signatureConfig.F);
   }
 
+  /// @notice Revokes a signature configuration for a given configDigest.
+  /// @param configDigest The config digest to revoke.
   function revokeConfigDigest(
     bytes32 configDigest
   ) external onlyOwner {
-    SignatureConfigConfig storage configForDigest = s_signatureConfig[configDigest];
-    if (configForDigest.signers.length() == 0) {
+    if (!s_activeConfigDigests.remove(configDigest)) {
       revert InvalidConfigDigest(configDigest);
     }
 
