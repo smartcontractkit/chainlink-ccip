@@ -6,6 +6,17 @@
 
 </div>
 
+- [Components](#components)
+- [Prerequisites](#prerequisites)
+- [Environment](#run-the-environment-local-chains)
+    - [Local Environment](#run-the-environment-local-chains)
+    - [Testnet Environment](#run-the-environment-testnets)
+    - [Observability Stack](#observability-stack)
+- [Developing](#creating-your-own-components)
+    - [Creating components](#creating-your-own-components)
+    - [S3 Storage](#debugging-storage-minio-inside-nix-shell)
+
+
 ## Components
 
 - x2 Anvil chains
@@ -13,6 +24,7 @@
 - Fake server (mocks)
 - Job Distributor
 - MinIO storage
+- Indexer example service + PostgreSQL
 
 ## Prerequisites
 
@@ -106,3 +118,6 @@ We are using [Justfile](https://github.com/casey/just) for devs task
 ```bash
 just fmt && just lint
 ```
+
+### Creating your own components
+See the [guide](services/README.md)

@@ -39,9 +39,6 @@ jobs:
       - name: Run Soak Test
         working-directory: example/ccipv1_7/tests
         run: go test -timeout 2h -v -run TestSoak
-      - name: Debug via SSH
-        if: ${{ inputs.debug }}
-        uses: mxschmitt/action-tmate@v3
 
 defaults:
   run:

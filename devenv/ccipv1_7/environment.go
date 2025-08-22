@@ -3,6 +3,8 @@ package ccipv1_7
 import (
 	"fmt"
 
+	"github.com/smartcontractkit/devenv/ccipv17/services"
+
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/fake"
@@ -13,12 +15,13 @@ import (
 )
 
 type Cfg struct {
-	CCIPv17         *CCIPv17            `toml:"ccipv17"`
-	StorageProvider *s3provider.Input   `toml:"storage_provider" validate:"required"`
-	FakeServer      *fake.Input         `toml:"fake_server"      validate:"required"`
-	JD              *jd.Input           `toml:"jd"`
-	Blockchains     []*blockchain.Input `toml:"blockchains"      validate:"required"`
-	NodeSets        []*ns.Input         `toml:"nodesets"         validate:"required"`
+	Indexer         *services.IndexerInput `toml:"indexer" validate:"required"`
+	CCIPv17         *CCIPv17               `toml:"ccipv17" validate:"required"`
+	StorageProvider *s3provider.Input      `toml:"storage_provider" validate:"required"`
+	FakeServer      *fake.Input            `toml:"fake_server"      validate:"required"`
+	JD              *jd.Input              `toml:"jd"`
+	Blockchains     []*blockchain.Input    `toml:"blockchains"      validate:"required"`
+	NodeSets        []*ns.Input            `toml:"nodesets"         validate:"required"`
 }
 
 // localEnvironment internal function describing your Docker environment orchestration.
@@ -45,6 +48,10 @@ func localEnvironment() (*Cfg, error) {
 	_, err = fake.NewDockerFakeDataProvider(in.FakeServer)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create fake data provider: %w", err)
+	}
+	_, err = services.NewIndexer(in.Indexer)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create an example service: %w", err)
 	}
 	_, err = jd.NewJD(in.JD)
 	if err != nil {

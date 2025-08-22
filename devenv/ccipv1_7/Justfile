@@ -26,3 +26,7 @@ lint:
 # Install pre-commit hooks
 pre-commit:
     pre-commit install
+
+# Builds and installs new version of CLI locally
+cli:
+    go install cmd/ccip.go
