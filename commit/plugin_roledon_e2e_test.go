@@ -112,7 +112,7 @@ func TestPlugin_RoleDonE2E_NoPrevOutcome(t *testing.T) {
 		// Dest Chain Expectations - Makes sure only oracles that support the destination chain are reading it.
 		{
 			if oracleChains.Contains(s.destChain) {
-				deps.ccipReader.EXPECT().GetRmnCurseInfo(mock.Anything).Return(ccipreader.CurseInfo{}, nil)
+				deps.ccipReader.EXPECT().GetRmnCurseInfo(mock.Anything).Return(cciptypes.CurseInfo{}, nil)
 
 				nextSeqNums := make(map[cciptypes.ChainSelector]cciptypes.SeqNum)
 				for _, ch := range s.sourceChains {
