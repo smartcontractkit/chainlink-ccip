@@ -3,7 +3,10 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
+	"syscall"
 
+	"github.com/smartcontractkit/devenv/ccipv17/services"
 	"github.com/spf13/cobra"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
@@ -167,10 +170,6 @@ var obsRestartCmd = &cobra.Command{
 	Aliases: []string{"r"},
 	Short:   "Restart the observability stack (data wipe)",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		remote, _ := rootCmd.Flags().GetBool("remote")
-		if remote {
-			return fmt.Errorf("remote mode: %v, local observability stack can only be used in 'local' mode", remote)
-		}
 		if err := framework.ObservabilityDown(); err != nil {
 			return fmt.Errorf("observability down failed: %w", err)
 		}
@@ -179,6 +178,27 @@ var obsRestartCmd = &cobra.Command{
 		}
 		ccipv17.Plog.Info().Msgf("CCIPv17 Dashboard: %s", LocalCCIPv2Dashboard)
 		return nil
+	},
+}
+
+var indexerDBShell = &cobra.Command{
+	Use:     "indexer-db",
+	Aliases: []string{"idb"},
+	Short:   "Inspect Indexer Database",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		psqlPath, err := exec.LookPath("psql")
+		if err != nil {
+			return fmt.Errorf("psql not found in PATH, are you inside 'nix develop' shell?: %w", err)
+		}
+		psqlArgs := []string{
+			"psql",
+			services.DefaultDBConnectionString,
+		}
+		if len(args) > 0 {
+			psqlArgs = append(psqlArgs, args...)
+		}
+		env := syscall.Environ()
+		return syscall.Exec(psqlPath, psqlArgs, env)
 	},
 }
 
@@ -199,6 +219,7 @@ func init() {
 	rootCmd.AddCommand(upCmd)
 	rootCmd.AddCommand(reconfigureCmd)
 	rootCmd.AddCommand(downCmd)
+	rootCmd.AddCommand(indexerDBShell)
 }
 
 func main() {

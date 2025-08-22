@@ -29,6 +29,7 @@
               fi
             '';
           packages = [
+          pkgs.postgresql_16
           pkgs.llvmPackages.libcxxClang
           pkgs.clang
           pkgs.minio-client

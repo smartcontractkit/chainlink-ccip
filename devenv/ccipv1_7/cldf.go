@@ -467,7 +467,7 @@ func ExampleCLDFDeployment(in *Cfg) error {
 	   [WebServer]
 	   HTTPWriteTimeout = '30s'
 	   SecureCookies = false
-	   HTTPPort = 6688
+	   Port = 6688
 	   [WebServer.TLS]
 	   HTTPSPort = 0
 	   [JobPipeline]
