@@ -132,4 +132,25 @@ contract MessageHasher {
       extraArgs.accounts
     );
   }
+
+  /// @notice Used offchain to decode an encoded SuiExtraArgsV1 struct.
+function decodeSuiExtraArgsStruct(
+  Client.SuiExtraArgsV1 memory extraArgs
+)
+  public
+  pure
+  returns (
+    uint256 gasLimit,
+    bool allowOutOfOrderExecution,
+    bytes32 tokenReceiver,
+    bytes32[] memory receiverObjectIds
+  )
+{
+  return (
+    extraArgs.gasLimit,
+    extraArgs.allowOutOfOrderExecution,
+    extraArgs.tokenReceiver,
+    extraArgs.receiverObjectIds
+  );
+}
 }
