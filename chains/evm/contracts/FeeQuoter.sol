@@ -200,7 +200,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   mapping(uint64 destChainSelector => DestChainConfig destChainConfig) internal s_destChainConfigs;
 
   /// @dev The token transfer fee config that can be set by the owner or fee admin.
-  mapping(uint64 destChainSelector => mapping(address token => TokenTransferFeeConfig tranferFeeConfig)) private
+  mapping(uint64 destChainSelector => mapping(address token => TokenTransferFeeConfig tranferFeeConfig)) internal
     s_tokenTransferFeeConfig;
 
   /// @dev Maximum fee that can be charged for a message. This is a guard to prevent massively overcharging due to

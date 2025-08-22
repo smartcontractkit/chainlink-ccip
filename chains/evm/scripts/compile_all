@@ -69,6 +69,13 @@ function getOptimizations() {
     echo "$optimize_runs_override"
 }
 
+# Mod sec
+compileContract onRamp/CCVProxy
+compileContract onRamp/CommitOnRamp
+compileContract offRamp/CCVAggregator
+compileContract offRamp/CommitOffRamp
+
+# 1.6
 compileContract offRamp/OffRamp
 compileContract FeeQuoter
 compileContract onRamp/OnRamp
@@ -94,11 +101,12 @@ compileContract pools/BurnWithFromMintTokenPool
 compileContract pools/BurnToAddressMintTokenPool
 compileContract pools/TokenPool
 compileContract pools/USDC/USDCTokenPool
-compileContract pools/USDC/HybridLockReleaseUSDCTokenPool
 compileContract pools/USDC/CCTPMessageTransmitterProxy
 compileContract pools/SiloedLockReleaseTokenPool
 compileContract pools/BurnMintFastTransferTokenPool
 compileContract pools/ERC20LockBox
+compileContract pools/USDC/SiloedUSDCTokenPool
+compileContract pools/USDC/USDCTokenPoolCCTPV2
 
 # Test helpers
 compileContract test/helpers/BurnMintERC677Helper
